@@ -19,7 +19,7 @@ import { paramTarget } from './script-params.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 81
+export const WORLD_FORMAT_VERSION = 82
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -342,6 +342,13 @@ export const migrations: Record<number, MigrationStep> = {
         )
       if (p.took > 0 || (p.heading === 'out' && there)) p.arrivedAt = world.tick
     }
+    return world
+  },
+  // What the Trade Organization can't take back stays owed (`CONTEXT.md`: Trade Org debt;
+  // `WorldState.debts`). Nobody owes anything yet: what earlier armies couldn't take was let go.
+  81: (state) => {
+    const world = structuredClone(state) as WorldState
+    world.debts = []
     return world
   },
 }

@@ -138,6 +138,7 @@ export const GETS_OFF_FIRST: readonly string[] = [
   'handIn',
   'transfer',
   'buyOff',
+  'payDebt',
   'feed',
 ]
 

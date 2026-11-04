@@ -86,8 +86,10 @@ export function CityInspector({
   onSend,
   arrivesIn,
   directives,
+  debt,
   noCaravans,
   onBuyOff,
+  onPayDebt,
   openId,
   onOpen,
   scrollTo,
@@ -117,10 +119,14 @@ export function CityInspector({
   arrivesIn: ((r: Resident) => number | undefined) | undefined
   /** The admin directives in force; one naming the Player's realm may be bought off here. */
   directives: DirectiveView[]
+  /** The Coins the Player's realm owes the Trade Organization (`CONTEXT.md`: Trade Org debt). */
+  debt: number
   /** The Trade Org HQ has fallen, so nothing can be delivered or transferred (`CONTEXT.md`). */
   noCaravans: boolean
   /** Gives the buy-off order for a directive to one of the Player's residents on a warehouse. */
   onBuyOff: (residentId: string, directiveId: string, carriageId: string | null) => void
+  /** Gives the order to pay some of the debt to one of the Player's residents on a warehouse. */
+  onPayDebt: (residentId: string, coins: number, carriageId: string | null) => void
   /** The city shown opened, such as one picked on the map. */
   openId: string | undefined
   /** Called with the city opened in the list, or undefined when it is closed. */
@@ -155,6 +161,11 @@ export function CityInspector({
       <PanelHead title="Cities in sight">
         {views.length === 0 ? 'none in sight' : `${views.length} in sight`}
       </PanelHead>
+      {debt > 0 && (
+        <p className="occupation warn">
+          You owe the Trade Organization {debt} Coins. A resident can pay at any of its warehouses.
+        </p>
+      )}
       <ul className="city-list">
         {views.map((v) => (
           <li key={v.id}>
@@ -241,6 +252,11 @@ export function CityInspector({
                     directives={directives.filter((d) => d.target === realmId && d.price !== null)}
                     traders={tradersAt(w, { residents, carriages }, realmId)}
                     onBuyOff={onBuyOff}
+                  />
+                  <PayingDebt
+                    debt={debt}
+                    traders={tradersAt(w, { residents, carriages }, realmId)}
+                    onPayDebt={onPayDebt}
                   />
                 </div>
               ))}
@@ -945,6 +961,82 @@ function BuyingOff({
           </button>
         </p>
       ))}
+    </div>
+  )
+}
+
+/**
+ * Paying the Trade Org debt (`CONTEXT.md`: Trade Org debt): one of the Player's residents on the
+ * warehouse pays what they choose of it, from their hands or their carriage there. Nothing when
+ * the realm owes nothing.
+ */
+function PayingDebt({
+  debt,
+  traders,
+  onPayDebt,
+}: {
+  debt: number
+  traders: TradersView
+  onPayDebt: (residentId: string, coins: number, carriageId: string | null) => void
+}) {
+  const [residentId, setResidentId] = useState<string | undefined>()
+  const [carriageId, setCarriageId] = useState<string>('')
+  const [wanted, setWanted] = useState<number | undefined>()
+  if (debt <= 0) return null
+  const resident = traders.residents.find((r) => r.id === residentId) ?? traders.residents[0]
+  const carriage = traders.carriages.find((k) => k.id === carriageId)
+  if (!resident) {
+    return <p className="small muted">To pay your debt, bring a resident here with coins.</p>
+  }
+  const most = Math.min(debt, Math.floor((carriage ? carriage.load : resident.carried).coins ?? 0))
+  const coins = Math.min(wanted ?? most, most)
+  return (
+    <div className="warehouse-trading" aria-label="Paying the debt">
+      <label>
+        Payer{' '}
+        <select value={resident.id} onChange={(e) => setResidentId(e.target.value)}>
+          {traders.residents.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {traders.carriages.length > 0 && (
+        <label>
+          With{' '}
+          <select value={carriageId} onChange={(e) => setCarriageId(e.target.value)}>
+            <option value="">their hands</option>
+            {traders.carriages.map((k) => (
+              <option key={k.id} value={k.id}>
+                carriage {k.id}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <label>
+        Coins{' '}
+        <input
+          type="number"
+          min={1}
+          max={most}
+          value={coins}
+          disabled={most < 1}
+          onChange={(e) => setWanted(Math.floor(Number(e.target.value)))}
+        />
+      </label>
+      <p>
+        <button
+          type="button"
+          disabled={coins < 1}
+          onClick={() => onPayDebt(resident.id, coins, carriage?.id ?? null)}
+        >
+          {most < 1
+            ? 'No coins to pay your debt with'
+            : `Pay ${coins} of the ${debt} Coins you owe`}
+        </button>
+      </p>
     </div>
   )
 }

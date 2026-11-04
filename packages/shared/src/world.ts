@@ -778,6 +778,7 @@ export type ResidentOrder =
   | TradeOrder
   | HandInOrder
   | BuyOffOrder
+  | PayDebtOrder
   | RelocateOrder
   | FeedOrder
 
@@ -838,6 +839,8 @@ export interface WorldState {
   punishments: Punishment[]
   /** Admin directives in force, oldest first (`CONTEXT.md`: Admin directive). */
   directives: Directive[]
+  /** What Organizations owe the Trade Organization, at most one for each (`CONTEXT.md`: Trade Org debt). */
+  debts: Debt[]
   /**
    * What each Player has seen of buildings and cities, by their account id (`CONTEXT.md`: Last
    * seen): what is in their sight now as of this tick, and what left it as they last saw it.
@@ -1246,6 +1249,17 @@ export interface BuyOffOrder {
   directiveId: string
   carriageId: string | null
 }
+
+/**
+ * Paying the Trade Org debt (`CONTEXT.md`: Trade Org debt): the resident, standing on a Trade Org
+ * warehouse's tile, pays up to `coins` of it from their hands, or the load of `carriageId` on their
+ * tile, into the Trade Organization's coins there. It happens this tick.
+ */
+export interface PayDebtOrder {
+  kind: 'payDebt'
+  coins: number
+  carriageId: string | null
+}
 /**
  * How the Organization `of` regards `toward` (`CONTEXT.md`: Standing), from -`STANDING_RANGE`
  * to +`STANDING_RANGE`. An Organization is a realm's id, an NPC city's id, or `TRADE_ORG`
@@ -1303,6 +1317,16 @@ export interface Punishment {
    */
   directiveId?: string
 }
+/**
+ * What an Organization owes the Trade Organization, in Coins (`CONTEXT.md`: Trade Org debt): what its
+ * army came for and couldn't take, and what crimes cost it since. Plain data.
+ */
+export interface Debt {
+  /** The Organization that owes it: a realm or an NPC city. */
+  org: string
+  coins: number
+}
+
 /**
  * A crime against another Organization (`CONTEXT.md`: Crime, Witness). An Organization is named by
  * its realm's id, or by its city's id for a city of no realm (`organizationOf`). Plain data.
@@ -1480,6 +1504,30 @@ export type RealmEventWhat =
       where?: 'wayThere' | 'atCity' | 'wayHome'
       /** Sent for an admin directive, with its reason, rather than for crimes. */
       directive?: string
+    }
+  /**
+   * The realm's debt to the Trade Organization (`CONTEXT.md`: Trade Org debt) changed by `coins`,
+   * leaving `owed`: its army left it `owed` for what it couldn't take; a later crime made it `rose`;
+   * or the Fall of the HQ `ended` it.
+   */
+  | {
+      kind: 'debt'
+      what: 'owed' | 'rose' | 'ended'
+      coins: number
+      owed: number
+    }
+  /**
+   * The resident `name` paid `coins` of the realm's Trade Org debt at the warehouse at (`x`, `y`),
+   * which leaves `owed` (`CONTEXT.md`: Trade Org debt).
+   */
+  | {
+      kind: 'debtPaid'
+      residentId: string
+      name: string
+      coins: number
+      owed: number
+      x: number
+      y: number
     }
   /**
    * The resident `name` bought off the admin directive with `reason` for `coins` at the Trade Org

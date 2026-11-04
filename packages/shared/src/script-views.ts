@@ -346,7 +346,7 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field(
         'kind',
         'string',
-        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "store", "fetch", "build", "tearDown", "workAt", "teach", "train", "breed", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "handIn", "buyOff" or "relocate" (on their way to `cityId`, to live there).',
+        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "store", "fetch", "build", "tearDown", "workAt", "teach", "train", "breed", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "handIn", "buyOff", "payDebt" or "relocate" (on their way to `cityId`, to live there).',
       ),
       field(
         'target',

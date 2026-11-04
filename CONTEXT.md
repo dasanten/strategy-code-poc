@@ -660,10 +660,13 @@ The shared language of the game. Domain terms only — no implementation details
   carry home twice what it lost (coins first), fighting whoever resists. It leaves once it has what
   it came for; what it couldn't take becomes a debt.
 - **Trade Org debt:** what the Trade Organization came for and couldn't take stays owed by that
-  Organization, however long it takes. It says so in the realm log, and it can be paid off at any
-  warehouse in Coins at any time. It rises by what later crimes cost. While it is owed the Trade
-  Organization goes up these steps, one after the other (ADR 0025), and paying it in full stops it at
-  any step:
+  Organization, however long it takes, from when its army heads home or is lost, whatever the reason.
+  It says so in the realm log, and a resident on any warehouse's tile can pay it in Coins at any time,
+  in part or in full, from their hands or a carriage there, even if the Trade Organization otherwise
+  refuses them. It rises by what later crimes cost: a crime it comes to know of while it is owed adds
+  what it cost, once, and sends no army of its own. An Organization that is gone takes its debt with
+  it. While it is owed the Trade Organization goes up these steps, one after the other (ADR 0025), and
+  paying it in full stops it at any step:
   1. **It demands:** a demand (Demand) for the debt, with a deadline.
   2. **It wrecks:** past the deadline, its next army goes to that city and tears down workplaces of
      it, each counting for its worth against the debt, until the debt is covered or none are left.
