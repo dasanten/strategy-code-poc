@@ -17,7 +17,6 @@ import {
   seatsLeft,
   KEEPS_GOODS,
   MAX_WORKERS,
-  buildMenu,
   isPassableTerrain,
   isWallOrGate,
   type Account,
@@ -29,6 +28,7 @@ import {
   type OrderRequest,
   type Resident,
   type ScriptParam,
+  type ScriptParamValues,
   type ScriptSummary,
   type StartParamValues,
   type Stock,
@@ -108,6 +108,7 @@ import {
 } from './plan-step.js'
 import { useSavedGroups } from './saved-groups.js'
 import {
+  groupOrderStart,
   groupRequests,
   type GroupOrder,
   type GroupSeen,
@@ -169,16 +170,19 @@ import { ScriptRunInfo } from './ScriptRun.js'
 import { ScriptParamFields, StartParamsForm } from './ScriptParams.js'
 import { WorkSettings } from './WorkSettings.js'
 import {
+  canCustomise,
   groupStartValues,
   isWorkTask,
   overrideParamValues,
   startedScript,
+  startFormOpens,
   startFormParams,
   startParamValues,
   startValues,
   startValuesValid,
   type StartValues,
 } from './start-params.js'
+import { CustomiseContext } from './Customise.js'
 import { paramOnTile, paramPickAt, paramValueLabel, type ParamWorld } from './script-params-view.js'
 import { faresKnown, loadKnown } from './seen.js'
 import { useWorld } from './useWorld.js'
@@ -325,6 +329,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const pickingParam = paramPick ?? starting?.picking ?? workPick?.param
   // A group order waiting for a tile, the tile picked to build on, and what the last one did.
   const [groupPicking, setGroupPicking] = useState<GroupPicking>(false)
+  /**
+   * Customise was tapped (`CONTEXT.md`: Before it starts): the next order opens the form. It waits
+   * through what the order picks on the map first, and goes when that is cancelled.
+   */
+  const customising = useRef(false)
+  const orderPicked = picking !== false || groupPicking !== false || plan !== undefined
+  useEffect(() => {
+    if (!orderPicked) customising.current = false
+  }, [orderPicked])
   // What the group order being picked needs besides the tile, and a line's first end.
   const [groupPickWith, setGroupPickWith] = useState<GroupPickWith>({})
   const [groupLineFrom, setGroupLineFrom] = useState<{ x: number; y: number }>()
@@ -590,31 +603,47 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   /**
    * Gives an order, or, `queued` (Shift held), appends a resident's order to their queue
    * (`CONTEXT.md`: Queue). Orders that can't be queue steps are given as they are. An order
-   * starting a script that declares params first shows the form for them (`CONTEXT.md`: Before
-   * it starts), filled with the resident's kept values or the defaults; Start gives it with them.
-   * Work runs the workplace's work script, the form filled with its settings (`CONTEXT.md`:
-   * Workplace settings).
+   * starting a script starts at once (`CONTEXT.md`: Starting at once), unless the form opens
+   * (`opensForm`); Start gives it with the values.
    */
   const giveOrder = (order: OrderRequest, queued = shift.current): Promise<string | undefined> => {
     const r = own.find((x) => x.id === order.residentId)
-    const settings = world?.workSettings ?? {}
-    const script = order.params === undefined ? startedScript(order, scripts, settings) : undefined
-    const params = script ? startFormParams(order, script) : []
-    if (script && params.length > 0) {
-      const values = isWorkTask(order)
-        ? startValues(params, settings[order.workplaceId as string]?.params)
-        : startValues(params, r?.scriptParams?.[script.id], targetParam(script))
-      setStarting({
-        script,
-        params,
-        values,
-        ...(isWorkTask(order) ? { base: values } : {}),
-        start: async (params) => setOrderError(await giveOrder({ ...order, params }, queued)),
-      })
-      return Promise.resolve(undefined)
-    }
+    const asked =
+      order.params === undefined &&
+      opensForm(order, [r?.scriptParams], async (params) =>
+        setOrderError(await giveOrder({ ...order, params }, queued)),
+      )
+    if (asked) return Promise.resolve(undefined)
     const queuedFor = queued ? r : undefined
     return sendOrder((queuedFor && appendRequest(queuedFor, order)) ?? order)
+  }
+  /**
+   * Opens the form before the script `order` starts, if it should (`startFormOpens`), and says
+   * whether it did: filled with what `keptBy` keep for the script or the defaults, for Work with
+   * the workplace's settings (`CONTEXT.md`: Workplace settings); Start runs `start`. Asking for it
+   * with Customise is used up here, whatever the order.
+   */
+  function opensForm(
+    order: OrderRequest,
+    keptBy: readonly (ScriptParamValues | undefined)[],
+    start: (params: StartParamValues) => Promise<void>,
+  ): boolean {
+    const customise = customising.current
+    customising.current = false
+    const settings = world?.workSettings ?? {}
+    const script = startedScript(order, scripts, settings)
+    const params = script ? startFormParams(order, script) : []
+    if (!script || !startFormOpens(order, params, customise)) return false
+    const atWork = isWorkTask(order)
+    const values = atWork
+      ? startValues(params, settings[order.workplaceId as string]?.params)
+      : groupStartValues(
+          params,
+          keptBy.map((kept) => kept?.[script.id]),
+          targetParam(script),
+        )
+    setStarting({ script, params, values, ...(atWork ? { base: values } : {}), start })
+    return true
   }
   // The city picked on the map or opened in the Cities drawer.
   const [openCityId, setOpenCityId] = useState<string>()
@@ -744,24 +773,48 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setPlan(undefined)
     const step = planOrder(planned, answer)
     if (!step) return
+    const { order, at } = step
+    const keptBy = (group.length > 1 ? group : selected ? [selected] : []).map(
+      (r) => r.scriptParams,
+    )
+    // Customise on a step, or a param it can't go without (`CONTEXT.md`: Before it starts).
+    const add = (params?: StartParamValues) =>
+      addStepOrder({ ...order, ...(params && { params }) }, at)
+    if (!opensForm(order, keptBy, add)) await add()
+  }
+  /** Appends a planned step's order to the open plan or queue (`addPlanned`). */
+  async function addStepOrder(order: OrderRequest, at: { x: number; y: number } | undefined) {
     if (group.length > 1) {
-      if (groupPlan) setGroupPlan(planStep(groupPlan, step.order, step.at))
-      else await sendToGroup(appendToEach(group, step.order, step.at), [])
+      if (groupPlan) setGroupPlan(planStep(groupPlan, order, at))
+      else await sendToGroup(appendToEach(group, order, at), [])
       return
     }
     if (!selected) return
     const open = queuePlans[selected.id]
     if (open) {
-      planQueue(selected.id, planStep(open, step.order, step.at))
+      planQueue(selected.id, planStep(open, order, at))
       return
     }
-    const order = { ...step.order, residentId: selected.id }
-    setOrderError(await sendOrder(appendRequest(selected, order, step.at) ?? order))
+    const request = { ...order, residentId: selected.id }
+    setOrderError(await sendOrder(appendRequest(selected, request, at) ?? request))
   }
+  /** Why a kind can't be laid out on a tile, as far as the Player knows (`buildHereProblem`). */
+  const buildProblemAt =
+    (w: NonNullable<typeof world>, x: number, y: number) => (kind: BuildingKind) =>
+      buildHereProblem(
+        kind,
+        x,
+        y,
+        w,
+        (nx, ny) => nodeAt?.(nx, ny),
+        // Terrain not loaded counts as unexplored: nothing is laid out there.
+        { size: w.map.size, at: (tx, ty) => terrainAt?.(tx, ty) ?? UNEXPLORED },
+      )
   /** The queue planner's Add step, on the resident card and the group card. */
   function addStep(w: NonNullable<typeof world>) {
     const seen = { cities: knownCities, buildings: knownBuildings, residents: w.residents }
     const cities = plan && nextPick(plan)?.pick === 'city' ? planCities(seen, w.home.realmId) : []
+    const tile = plan?.kind === 'build' ? plan.picked[0] : undefined
     return (
       <AddStep
         plan={plan}
@@ -769,12 +822,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         onAnswer={(answer) => plan && void addPlanned(plan, answer)}
         onCancel={() => setPlan(undefined)}
         scripts={scripts}
-        buildKinds={
-          plan?.kind === 'build' && plan.picked[0]
-            ? buildMenu(nodeAt?.(plan.picked[0].x, plan.picked[0].y))
-            : []
-        }
+        buildTile={{
+          node: tile && nodeAt?.(tile.x, tile.y),
+          terrain: tile && terrainAt?.(tile.x, tile.y),
+          problem: tile ? buildProblemAt(w, tile.x, tile.y) : () => undefined,
+        }}
         horses={horsesIn(planWorld(w), w.horses, plan?.picked[0]?.id)}
+        tick={w.tick}
         cities={cities}
         onPickCity={(cityId) => {
           const city = cities.find((c) => c.id === cityId)
@@ -889,39 +943,20 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   /**
    * Gives each resident of the group the same order request (ADR 0002), skipping those who
    * can't take it, and says on the card who was skipped or turned down and why. One starting a
-   * script that declares params first shows the form for them, once for all (`CONTEXT.md`:
-   * Before it starts), filled with the values all of them keep or the defaults; for Work with
-   * the workplace's settings (`CONTEXT.md`: Workplace settings).
+   * script starts at once, each going on with what they keep (`CONTEXT.md`: Starting at once),
+   * unless the form opens, once for all (`opensForm`), filled with the values all of them keep.
    */
   async function sendGroup(order: GroupOrder, queued = shift.current) {
     if (!world) return
-    const starts =
-      order.kind === 'runScript' || order.kind === 'setDefenceScript'
-        ? { kind: order.kind, scriptId: order.scriptId }
-        : order.kind === 'work' || order.kind === 'build' || order.kind === 'explore'
-          ? { kind: 'task', task: order.kind }
-          : undefined
     const given = 'params' in order && order.params !== undefined
-    const workplaceId = order.kind === 'work' ? order.workplace.id : undefined
-    const startsAt = starts && workplaceId !== undefined ? { ...starts, workplaceId } : starts
-    const script =
-      startsAt && !given ? startedScript(startsAt, scripts, world.workSettings) : undefined
-    const params = script ? startFormParams(startsAt!, script) : []
-    if (script && params.length > 0) {
-      const kept = group.map((r) => r.scriptParams?.[script.id])
-      const values =
-        workplaceId === undefined
-          ? groupStartValues(params, kept, targetParam(script))
-          : startValues(params, world.workSettings[workplaceId]?.params)
-      setStarting({
-        script,
-        params,
-        values,
-        ...(workplaceId === undefined ? {} : { base: values }),
-        start: (params) => sendGroup({ ...order, params } as GroupOrder, queued),
-      })
-      return
-    }
+    const asked =
+      !given &&
+      opensForm(
+        groupOrderStart(order) ?? { kind: order.kind },
+        group.map((r) => r.scriptParams),
+        (params) => sendGroup({ ...order, params } as GroupOrder, queued),
+      )
+    if (asked) return
     const size = world.map.size
     const inGroup = new Set(group.map((r) => r.id))
     // Free: explored land a resident can stand on, with no wall or gate and nobody else on it.
@@ -1026,8 +1061,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setOrderError(await giveOrder(order, false))
   }
   /**
-   * Gives the picked resident the Explore task: they run the Player's Explore (default) script,
-   * its params picked first (`CONTEXT.md`: Explore); with Shift held it goes in their queue.
+   * Gives the picked resident the Explore task: they run the Player's Explore (default) script
+   * (`CONTEXT.md`: Explore); with Shift held it goes in their queue.
    */
   async function explore() {
     if (!selected) return
@@ -1319,7 +1354,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // A Player without a realm names it before the world shows (`CONTEXT.md`: Realm name).
   if (founding && !world) return <Founding leaderName={founding.leaderName} onFound={found} />
 
-  return (
+  const game = (
     <div className={phone ? 'game phone' : 'game'}>
       <section className="game-map">
         {world ? (
@@ -1903,17 +1938,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onPickUp={(spot, goods) => carry('pickUp', spot, goods)}
             onDrop={(spot, goods) => carry('drop', spot, goods)}
             onBuild={build}
-            buildProblem={(kind) =>
-              buildHereProblem(
-                kind,
-                selected.x,
-                selected.y,
-                world,
-                (x, y) => nodeAt?.(x, y),
-                // Terrain not loaded counts as unexplored: nothing is laid out there.
-                { size: world.map.size, at: (x, y) => terrainAt?.(x, y) ?? UNEXPLORED },
-              )
-            }
+            buildProblem={buildProblemAt(world, selected.x, selected.y)}
             workers={workersHere(world.residents, buildingHere)}
             holders={heldBy(world.residents, buildingHere)}
             realmId={world.home.realmId}
@@ -2082,18 +2107,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 site: world.buildings.find(
                   (b) => b.kind !== 'road' && b.site && covers(b, groupBuildAt.x, groupBuildAt.y),
                 ),
-                kinds: buildMenu(nodeAt?.(groupBuildAt.x, groupBuildAt.y)).map((kind) => ({
-                  kind,
-                  problem: buildHereProblem(
-                    kind,
-                    groupBuildAt.x,
-                    groupBuildAt.y,
-                    world,
-                    (x, y) => nodeAt?.(x, y),
-                    // Terrain not loaded counts as unexplored: nothing is laid out there.
-                    { size: world.map.size, at: (x, y) => terrainAt?.(x, y) ?? UNEXPLORED },
-                  ),
-                })),
+                node: nodeAt?.(groupBuildAt.x, groupBuildAt.y),
+                terrain: terrainAt?.(groupBuildAt.x, groupBuildAt.y),
+                problem: buildProblemAt(world, groupBuildAt.x, groupBuildAt.y),
               }
             }
             // Picking a defence script is never queued: it leaves what they do as it is.
@@ -2120,8 +2136,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           />
         </CardSheet>
       )}
-      {world && starting && !starting.picking && (
+      {world && starting && (
         <StartParamsForm
+          picking={starting.picking !== undefined}
           script={starting.script.name}
           params={starting.params}
           target={targetParam(starting.script)}
@@ -2163,6 +2180,19 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         </CentredDialog>
       )}
     </div>
+  )
+  return (
+    <CustomiseContext.Provider
+      value={{
+        can: (order) => canCustomise(order, scripts, world?.workSettings),
+        give: (give) => {
+          customising.current = true
+          give()
+        },
+      }}
+    >
+      {game}
+    </CustomiseContext.Provider>
   )
 }
 

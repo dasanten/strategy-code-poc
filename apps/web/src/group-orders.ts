@@ -72,11 +72,18 @@ export type GroupOrder =
    * Each hauls with the carriage on their tile between their tile and the other stop
    * (`CONTEXT.md`: Haul route), a different carriage each.
    */
-  | { kind: 'haul'; x: number; y: number; goods: Good[]; returnGoods: Good[]; keepFood: number }
+  | ({
+      kind: 'haul'
+      x: number
+      y: number
+      goods: Good[]
+      returnGoods: Good[]
+      keepFood: number
+    } & Starts)
   /** Each feeds the stable they stand in (`CONTEXT.md`: Feeding the stable). */
-  | { kind: 'feedStable' }
+  | ({ kind: 'feedStable' } & Starts)
   /** Each trains at the training ground they stand on (`CONTEXT.md`: Trainee). */
-  | { kind: 'train' }
+  | ({ kind: 'train' } & Starts)
   /** Each goes exploring from where they stand (`CONTEXT.md`: Explore). */
   | ({ kind: 'explore' } & Starts)
   /**
@@ -88,19 +95,27 @@ export type GroupOrder =
    * Each gets the Build line task with the same line (`CONTEXT.md`: Build line), so they share it:
    * each takes the nearest tile still to build that no other of them has taken.
    */
-  | {
+  | ({
       kind: 'line'
       building: 'road' | 'wall'
       from: { x: number; y: number }
       to: { x: number; y: number }
-    }
+    } & Starts)
   /** Those standing at the building tear it down. */
-  | { kind: 'tearDown'; building: Pick<Building, 'id' | 'kind' | 'x' | 'y'>; name: string }
+  | ({
+      kind: 'tearDown'
+      building: Pick<Building, 'id' | 'kind' | 'x' | 'y'>
+      name: string
+    } & Starts)
   /**
    * Two horses bred at a stable (`CONTEXT.md`: Breeding): one breeder for a pair, so it goes to
    * the first one standing there who isn't breeding yet.
    */
-  | { kind: 'breed'; stable: Pick<Building, 'id' | 'kind' | 'x' | 'y'>; horseIds: [string, string] }
+  | ({
+      kind: 'breed'
+      stable: Pick<Building, 'id' | 'kind' | 'x' | 'y'>
+      horseIds: [string, string]
+    } & Starts)
   /** Each attacks the same resident of another realm, or breaks the same wall or gate. */
   | { kind: 'attack'; targetId: string }
   /** Those standing next to the wall or gate climb over it. */
@@ -115,6 +130,32 @@ export type GroupOrder =
    * to `units` each, one of them for each one Down.
    */
   | { kind: 'feed'; units: number }
+
+/**
+ * The order a group order starts a script by, as far as it names the script, for the form before
+ * it starts (`CONTEXT.md`: Before it starts); undefined for one that starts none.
+ */
+export function groupOrderStart(order: GroupOrder): OrderRequest | undefined {
+  switch (order.kind) {
+    case 'runScript':
+    case 'setDefenceScript':
+      return { kind: order.kind, scriptId: order.scriptId }
+    case 'work':
+      return { kind: 'task', task: 'work', workplaceId: order.workplace.id }
+    case 'line':
+      return { kind: 'task', task: 'buildLine' }
+    case 'build':
+    case 'explore':
+    case 'feedStable':
+    case 'train':
+    case 'tearDown':
+    case 'haul':
+    case 'breed':
+      return { kind: 'task', task: order.kind }
+    default:
+      return undefined
+  }
+}
 
 /** A storage, stable or carriage picked on the map to store at or fetch from. */
 export interface Place {
@@ -483,12 +524,12 @@ export function groupRequests(
           // The Haul task: they run the Player's Haul (default) script (`CONTEXT.md`: Default script).
           const { x, y, goods, returnGoods, keepFood } = order
           const route = { x, y, goods, returnGoods, keepFood }
-          send(r, { kind: 'task', task: 'haul', carriageId: carriage.id, ...route })
+          send(r, { kind: 'task', task: 'haul', carriageId: carriage.id, ...route, ...params })
         }
         break
       }
       case 'train':
-        send(r, { kind: 'task', task: 'train', groundId: groundOf(r, seen, size)!.id })
+        send(r, { kind: 'task', task: 'train', groundId: groundOf(r, seen, size)!.id, ...params })
         break
       case 'explore':
         send(r, { kind: 'task', task: 'explore', ...params })
@@ -505,22 +546,33 @@ export function groupRequests(
         break
       }
       case 'feedStable':
-        send(r, { kind: 'task', task: 'feedStable', stableId: stableOf(r, seen, size)!.id })
+        send(r, {
+          kind: 'task',
+          task: 'feedStable',
+          stableId: stableOf(r, seen, size)!.id,
+          ...params,
+        })
         break
       case 'line': {
         const { building, from, to } = order
-        send(r, { kind: 'task', task: 'buildLine', building, from, to })
+        send(r, { kind: 'task', task: 'buildLine', building, from, to, ...params })
         break
       }
       case 'tearDown':
-        send(r, { kind: 'task', task: 'tearDown', buildingId: order.building.id })
+        send(r, { kind: 'task', task: 'tearDown', buildingId: order.building.id, ...params })
         break
       case 'breed': {
         const breeder = requests[0] && residents.find((x) => x.id === requests[0]!.residentId)
         if (breeder) skip(r, `${breeder.name} breeds those two`)
         else {
           const { stable, horseIds } = order
-          send(r, { kind: 'task', task: 'breed', stableId: stable.id, horseIds: [...horseIds] })
+          send(r, {
+            kind: 'task',
+            task: 'breed',
+            stableId: stable.id,
+            horseIds: [...horseIds],
+            ...params,
+          })
         }
         break
       }

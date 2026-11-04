@@ -282,11 +282,85 @@ button.hud-logout {
   line-height: 1.5;
   color: var(--ui-muted);
 }
+/* The form before a script starts: the rows scroll between its title and Start and Cancel. */
 .hud-dialog.start-params {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 32px);
   border-top-color: var(--ui-live);
+  backdrop-filter: blur(10px);
 }
-.hud-dialog.start-params .goods-row {
-  margin: 6px 0;
+.start-params h2 {
+  flex: none;
+}
+.start-params .hud-dialog-actions {
+  flex: none;
+  margin-top: 10px;
+}
+.start-params .error {
+  flex: none;
+  margin-top: 6px;
+}
+.start-params-rows {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* Out of the way while a param is picked on the map; the map gets the taps. */
+.start-params-backdrop.picking {
+  visibility: hidden;
+}
+/* A param's row: its name and the value in use on the left, its field on the right. */
+.start-param {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--ui-line);
+}
+.start-param:last-child {
+  border-bottom: 0;
+}
+.start-param-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.start-param .buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.start-param .amount {
+  width: 4.5em;
+  min-height: 36px;
+  box-sizing: border-box;
+}
+.start-param select {
+  max-width: 9.5em;
+  min-height: 36px;
+  text-overflow: ellipsis;
+}
+.start-param .buttons button {
+  min-height: 36px;
+  padding-inline: 10px;
+}
+.start-param-why {
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  margin-left: 6px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 12px;
+  line-height: 1;
+}
+.hud-dialog .start-param-note {
+  grid-column: 1 / -1;
+  margin-top: 4px;
 }
 .hud-dialog-actions {
   display: flex;
@@ -314,6 +388,38 @@ button.hud-logout {
 .game.phone {
   --rail-w: 0px;
   --top-h: 44px;
+}
+/* The form before a script starts is a bottom sheet, up to the top bar; above the keyboard, too. */
+.game.phone .start-params-backdrop {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0;
+}
+.game.phone .hud-dialog.start-params {
+  width: 100%;
+  max-height: calc(100% - var(--top-h));
+  padding: 14px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+  border-width: 3px 0 0;
+  border-radius: 14px 14px 0 0;
+}
+.game.phone .start-params .hud-dialog-actions button {
+  flex: 1;
+  min-height: 44px;
+}
+/* At 16px a phone doesn't zoom the page when the field takes focus. */
+.game.phone .start-param input,
+.game.phone .start-param select {
+  font-size: 16px;
+}
+.game.phone .start-param .buttons button,
+.game.phone .start-param input,
+.game.phone .start-param select {
+  min-height: 40px;
+}
+.game.phone .start-param-why {
+  width: 28px;
+  height: 28px;
 }
 .game.phone .hud-top {
   gap: 10px;
@@ -1443,6 +1549,17 @@ button.residents-row.selected:hover {
   border: 1px solid #3a424a;
   border-radius: 999px;
   font-size: 0.75rem;
+}
+.horse-pick {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  color: inherit;
+}
+.horse-pick input {
+  flex: none;
+  margin: 2px 0 0;
 }
 .clock {
   font-family: ui-monospace, monospace;

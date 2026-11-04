@@ -47,6 +47,19 @@ export const BUILDING_PURPOSE: Record<BuildingKind, string> = {
     'A carriage carries far more than any resident, pulled by a horse; built at a finished stable, on its tiles or right by them, and it belongs to the realm of whoever finishes it.',
 }
 
+/**
+ * The groups of the Build menu and the kinds in each, in the order it shows them (`CONTEXT.md`:
+ * Build menu). Every buildable kind is in exactly one.
+ */
+export const BUILD_GROUPS: readonly { name: string; kinds: readonly BuildingKind[] }[] = [
+  { name: 'Resources', kinds: ['lumberCamp', 'quarry', 'mine'] },
+  { name: 'Food and animals', kinds: ['farm', 'stable'] },
+  { name: 'Industry', kinds: ['smelter', 'mint', 'smithy'] },
+  { name: 'City', kinds: ['townHall', 'house', 'storage', 'trainingGround'] },
+  { name: 'Defence', kinds: ['wall', 'gate'] },
+  { name: 'Transport', kinds: ['road', 'carriage'] },
+]
+
 /** Everything the ⓘ on a building's card says about its kind, numbers from the balance. */
 export interface BuildingInfo {
   kind: BuildingKind

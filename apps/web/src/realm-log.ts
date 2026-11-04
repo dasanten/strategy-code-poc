@@ -3,6 +3,7 @@ import {
   TRADE_ORG_NAME,
   timeLeft,
   type DeliveryView,
+  type PunishmentEnd,
   type RealmEvent,
 } from '@csp/shared'
 import { BUILDING_NAMES } from './city-view.js'
@@ -105,18 +106,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       }
     }
     case 'punished':
-      return e.what === 'coming'
-        ? {
-            text:
-              e.directive === undefined
-                ? `The Trade Organization is sending its army to ${e.city} to take back ${e.worth} Coins' worth.`
-                : `By admin directive (${e.directive}), the Trade Organization is sending its army to ${e.city} to take ${e.worth} Coins' worth.`,
-            tone: 'bad',
-          }
-        : {
-            text: `The Trade Organization's army left ${e.city}, taking ${e.took ?? 0} of the ${e.worth} Coins' worth it came for.`,
-            tone: 'warn',
-          }
+      return punishedLine(e)
     case 'boughtOff':
       return {
         text: `${e.name} paid ${e.coins} Coins at the warehouse to buy off the admin directive (${e.reason}). The Trade Organization no longer punishes you for it.`,
@@ -593,4 +583,60 @@ export function describeDelivery(d: DeliveryView): string {
   const job = d.kind === 'delivery' ? `${what} to ${d.city}` : `up to ${what} from ${d.city}`
   const state = d.underway ? 'a caravan is on it' : 'waiting for a caravan at the warehouse'
   return `${d.kind === 'delivery' ? 'Delivery' : 'Pick-up'} of ${job}: ${state}.`
+}
+
+/** Why the army headed home, to end a sentence about `city`; nothing if it got what it came for. */
+function punishmentEnd(why: PunishmentEnd | undefined, city: string): string {
+  switch (why) {
+    case 'empty':
+      return `: the storages of ${city} held nothing`
+    case 'gaveUp':
+      return ': it ran out of time there'
+    case 'cityLost':
+      return `: ${city} is no longer yours`
+    case 'directiveLifted':
+      return ': the admin directive was lifted'
+    case 'noWay':
+      return `: it found no way to ${city}`
+    default:
+      return ''
+  }
+}
+
+/** A line about the Trade Organization's army (`CONTEXT.md`: Punishment trip). */
+function punishedLine(e: Extract<RealmEvent, { kind: 'punished' }>): EventLine {
+  const army = "The Trade Organization's army"
+  const taking = `${e.took ?? 0} of the ${e.worth} Coins' worth it came for`
+  switch (e.what) {
+    case 'coming':
+      return {
+        text:
+          e.directive === undefined
+            ? `The Trade Organization is sending its army to ${e.city} to take back ${e.worth} Coins' worth.`
+            : `By admin directive (${e.directive}), the Trade Organization is sending its army to ${e.city} to take ${e.worth} Coins' worth.`,
+        tone: 'bad',
+      }
+    case 'arrived':
+      return { text: `${army} has arrived at ${e.city}.`, tone: 'bad' }
+    case 'left':
+      return {
+        text: `${army} left ${e.city}, taking ${taking}${punishmentEnd(e.why, e.city)}.`,
+        tone: 'warn',
+      }
+    case 'turnedBack':
+      return {
+        text: `${army} turned back without reaching ${e.city}${punishmentEnd(e.why, e.city)}.`,
+        tone: 'info',
+      }
+    case 'lost':
+      return {
+        text:
+          e.where === 'wayThere'
+            ? `${army} was lost on its way to ${e.city}.`
+            : e.where === 'atCity'
+              ? `${army} was lost at ${e.city}, having taken ${taking}.`
+              : `${army} was lost on its way home from ${e.city}, with ${taking}.`,
+        tone: 'info',
+      }
+  }
 }
