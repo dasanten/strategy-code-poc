@@ -2120,8 +2120,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           />
         </CardSheet>
       )}
-      {world && starting && !starting.picking && (
+      {world && starting && (
         <StartParamsForm
+          picking={starting.picking !== undefined}
           script={starting.script.name}
           params={starting.params}
           target={targetParam(starting.script)}
