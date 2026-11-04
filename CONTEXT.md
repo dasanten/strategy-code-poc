@@ -192,8 +192,8 @@ The shared language of the game. Domain terms only — no implementation details
   and also anyone there it knows stole from it (seen by one of its residents), which is no crime.
   A captured post joins the captor's realm like any city and leaves the Trade Organization: its
   warehouse becomes a storage with everything in it (no stock floor, no prices), its caravan
-  route ends, and the deliveries and transfers waiting there go over to the HQ, which sends them
-  out of its own stock.
+  route ends, its crew stopping what the caravan had them doing and staying the HQ's, and the
+  deliveries and transfers waiting there go over to the HQ, which sends them out of its own stock.
 - **Fall of the HQ:** the HQ is captured like any city, which is hopeless in practice but not
   forbidden. It joins the captor's realm and leaves the Trade Organization for good. Nothing ever
   takes its place and it never comes back, whoever holds the city later.
