@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import {
   FEED_UNITS,
   GOODS,
@@ -10,11 +10,14 @@ import {
   type Stock,
 } from '@csp/shared'
 import { BUILDING_NAMES } from './city-view.js'
+import { CustomiseButton, taskStart } from './Customise.js'
+import { HorsePick } from './HorsePick.js'
 import { GOOD_LABELS, SubjectPicker } from './Residents.js'
 import {
   makesAt,
   nextPick,
   PLAN_STEPS,
+  PLAN_TASKS,
   planAsk,
   type Plan,
   type PlanAnswer,
@@ -36,6 +39,7 @@ export function AddStep({
   scripts,
   buildKinds,
   horses,
+  tick,
   cities,
   onPickCity,
 }: {
@@ -52,6 +56,8 @@ export function AddStep({
   buildKinds: readonly BuildingKind[]
   /** The realm's horses in the stable picked for Breed horses. */
   horses: readonly SeenHorse[]
+  /** The current tick, for those horses' ages. */
+  tick: number
   /** The realm's cities, for a step that picks one (Relocate). */
   cities: readonly PlanCity[]
   /** Picks a city from the list, as a tap in its area on the map would. */
@@ -119,7 +125,11 @@ export function AddStep({
           </div>
         )}
         {ask === 'horses' && (
-          <HorsesAsk horses={horses} onAnswer={(horseIds) => onAnswer({ ask, horseIds })} />
+          <HorsesAsk
+            horses={horses}
+            tick={tick}
+            onAnswer={(horseIds) => onAnswer({ ask, horseIds })}
+          />
         )}
         {ask === 'haul' && <HaulAsk onAnswer={(setup) => onAnswer({ ask, setup })} />}
         {ask === 'units' && <UnitsAsk onAnswer={(units) => onAnswer({ ask, units })} />}
@@ -132,9 +142,16 @@ export function AddStep({
           ) : (
             <div className="order-buttons">
               {scripts.map((s) => (
-                <button type="button" key={s.id} onClick={() => onAnswer({ ask, scriptId: s.id })}>
-                  {s.name}
-                </button>
+                <Fragment key={s.id}>
+                  <button type="button" onClick={() => onAnswer({ ask, scriptId: s.id })}>
+                    {s.name}
+                  </button>
+                  <CustomiseButton
+                    order={{ kind: 'runScript', scriptId: s.id }}
+                    of={s.name}
+                    give={() => onAnswer({ ask, scriptId: s.id })}
+                  />
+                </Fragment>
               ))}
             </div>
           ))}
@@ -151,11 +168,23 @@ export function AddStep({
       {open && (
         <>
           <div className="chips">
-            {PLAN_STEPS.map((k) => (
-              <button type="button" className="chip" key={k.id} onClick={() => onStart(k.id)}>
-                {k.label}
-              </button>
-            ))}
+            {PLAN_STEPS.map((k) => {
+              const task = PLAN_TASKS[k.id]
+              return (
+                <span className="chip-with" key={k.id}>
+                  <button type="button" className="chip" onClick={() => onStart(k.id)}>
+                    {k.label}
+                  </button>
+                  {task && (
+                    <CustomiseButton
+                      order={taskStart(task)}
+                      of={k.label}
+                      give={() => onStart(k.id)}
+                    />
+                  )}
+                </span>
+              )
+            })}
           </div>
           <p className="muted small">
             A step that acts on a place is picked on the map, with a walk there put before it.
@@ -239,9 +268,11 @@ function GoodsAsk({ onAnswer }: { onAnswer: (goods: Stock) => void }) {
 /** Two of the realm's horses in the stable, to breed. */
 function HorsesAsk({
   horses,
+  tick,
   onAnswer,
 }: {
   horses: readonly SeenHorse[]
+  tick: number
   onAnswer: (horseIds: [string, string]) => void
 }) {
   const [ids, setIds] = useState<string[]>([])
@@ -249,23 +280,18 @@ function HorsesAsk({
     return <p className="muted small">Fewer than two horses of yours are in sight there.</p>
   return (
     <>
-      <div className="chips">
-        {horses.map((h, i) => (
-          <label className="chip" key={h.id}>
-            <input
-              type="checkbox"
-              checked={ids.includes(h.id)}
-              disabled={!ids.includes(h.id) && ids.length >= 2}
-              onChange={() =>
-                setIds((now) =>
-                  now.includes(h.id) ? now.filter((x) => x !== h.id) : [...now, h.id],
-                )
-              }
-            />{' '}
-            Horse {i + 1}
-          </label>
-        ))}
-      </div>
+      {horses.map((h) => (
+        <HorsePick
+          key={h.id}
+          horse={h}
+          tick={tick}
+          checked={ids.includes(h.id)}
+          disabled={!ids.includes(h.id) && ids.length >= 2}
+          onToggle={() =>
+            setIds((now) => (now.includes(h.id) ? now.filter((x) => x !== h.id) : [...now, h.id]))
+          }
+        />
+      ))}
       <div className="order-buttons">
         <button
           type="button"

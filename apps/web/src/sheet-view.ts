@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+
 /**
  * Bottom sheets on a phone (ADR 0012): every card sits at the bottom of the screen at one of three
  * heights, changed by dragging its handle.
@@ -33,4 +35,34 @@ export function stepSheet(height: SheetHeight, up: boolean): SheetHeight {
   const order: SheetHeight[] = ['peek', 'half', 'full']
   const i = order.indexOf(height) + (up ? 1 : -1)
   return order[Math.max(0, Math.min(order.length - 1, i))]!
+}
+
+/**
+ * How many pixels at the bottom of a `screen` tall page the on-screen keyboard covers, from the
+ * part of the page in view. Zoomed in, less is in view with no keyboard at all, so none then.
+ */
+export function keyboardInset(
+  screen: number,
+  view: { height: number; offsetTop: number; scale: number },
+): number {
+  if (view.scale > 1.01) return 0
+  return Math.max(0, Math.round(screen - view.height - view.offsetTop))
+}
+
+/** `keyboardInset` kept up to date, for a sheet to stay above the keyboard. */
+export function useKeyboardInset(): number {
+  const [inset, setInset] = useState(0)
+  useEffect(() => {
+    const view = window.visualViewport
+    if (!view) return
+    const update = () => setInset(keyboardInset(window.innerHeight, view))
+    update()
+    view.addEventListener('resize', update)
+    view.addEventListener('scroll', update)
+    return () => {
+      view.removeEventListener('resize', update)
+      view.removeEventListener('scroll', update)
+    }
+  }, [])
+  return inset
 }

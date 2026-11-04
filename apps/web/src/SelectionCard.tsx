@@ -25,6 +25,7 @@ import {
   type Waypoint,
 } from '@csp/shared'
 import { BuildingInfo } from './BuildingInfo.js'
+import { CustomiseButton, taskStart } from './Customise.js'
 import { GoodIcon, GoodsGrid } from './GoodsGrid.js'
 import { GOOD_LABELS, goodsItems } from './goods-grid.js'
 import { TileGoods } from './Residents.js'
@@ -351,6 +352,7 @@ export function ActionRows<Id extends string>({
   label = 'Actions',
   keys = true,
   panel,
+  beside,
 }: {
   actions: CardAction<Id>[]
   /** The action whose panel is open, if any. */
@@ -361,6 +363,8 @@ export function ActionRows<Id extends string>({
   keys?: boolean
   /** The open action's panel, shown under its row. */
   panel?: ReactNode
+  /** A control beside a row, such as its Customise button. */
+  beside?: (a: CardAction<Id>) => ReactNode
 }) {
   useActionKeys(keys ? actions : [], onAction)
   const ids = useId()
@@ -371,32 +375,35 @@ export function ActionRows<Id extends string>({
         const why = `${ids}-${a.id}`
         return (
           <Fragment key={a.id}>
-            <button
-              type="button"
-              className={on ? 'on' : ''}
-              aria-label={a.label}
-              aria-describedby={a.reason ? why : undefined}
-              aria-pressed={a.opens || a.active !== undefined ? !!on : undefined}
-              aria-expanded={a.opens ? open === a.id : undefined}
-              aria-keyshortcuts={a.key}
-              disabled={a.disabled}
-              onClick={() => onAction(a)}
-            >
-              <kbd>{a.key}</kbd>
-              <span>
-                {a.label}
-                {a.reason && (
-                  <span className="sel-reason" id={why}>
-                    {a.reason}
+            <div className="sel-action">
+              <button
+                type="button"
+                className={on ? 'on' : ''}
+                aria-label={a.label}
+                aria-describedby={a.reason ? why : undefined}
+                aria-pressed={a.opens || a.active !== undefined ? !!on : undefined}
+                aria-expanded={a.opens ? open === a.id : undefined}
+                aria-keyshortcuts={a.key}
+                disabled={a.disabled}
+                onClick={() => onAction(a)}
+              >
+                <kbd>{a.key}</kbd>
+                <span>
+                  {a.label}
+                  {a.reason && (
+                    <span className="sel-reason" id={why}>
+                      {a.reason}
+                    </span>
+                  )}
+                </span>
+                {a.opens && (
+                  <span className="sel-more" aria-hidden="true">
+                    {on ? '▾' : '▸'}
                   </span>
                 )}
-              </span>
-              {a.opens && (
-                <span className="sel-more" aria-hidden="true">
-                  {on ? '▾' : '▸'}
-                </span>
-              )}
-            </button>
+              </button>
+              {beside?.(a)}
+            </div>
             {a.opens && open === a.id && panel && <PanelUnder>{panel}</PanelUnder>}
           </Fragment>
         )
@@ -703,6 +710,17 @@ export function TileCard({
             if (a.id === 'stealHorse' && rider && card.stealHorse)
               onStealHorse(card.stealHorse.horseId, rider.id)
           }}
+          beside={(a) =>
+            a.id === 'build' &&
+            card.buildHere?.at && (
+              <CustomiseButton
+                order={taskStart('build')}
+                of={a.label}
+                disabled={a.disabled}
+                give={() => onBuildHere(card.buildHere!.kind, card.buildHere!.at!)}
+              />
+            )
+          }
         />
       )}
       {shown === 'renameCity' && card.renameCity && (
