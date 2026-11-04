@@ -27,6 +27,8 @@ export const ROW_OVERSCAN = 8
 export interface ListedResident<R> {
   resident: R
   city: string
+  /** The key of that heading (`ResidentGroup`), which the list filters and sorts cities by. */
+  group: string
 }
 
 /**
@@ -35,7 +37,9 @@ export interface ListedResident<R> {
  * alliance army and homeless residents have no city of the realm's to name.
  */
 export function listedResidents<R>(groups: readonly ResidentGroup<R>[]): ListedResident<R>[] {
-  return groups.flatMap((g) => g.residents.map((resident) => ({ resident, city: g.label })))
+  return groups.flatMap((g) =>
+    g.residents.map((resident) => ({ resident, city: g.label, group: g.key })),
+  )
 }
 
 /** A resident's row in the full Residents list, as the table and the phone's card show it. */
@@ -67,6 +71,21 @@ export interface ResidentRow {
 
 const share = (value: number, max: number) => Math.max(0, Math.min(1, value / max))
 
+/** The skills a resident has learned as far as they show, cut to one decimal, the best first. */
+export function learnedSkills(r: Pick<Resident, 'skills'>): { skill: SkillName; level: number }[] {
+  return (Object.keys(SKILL_LABELS) as SkillName[])
+    .map((skill) => ({ skill, level: Math.floor((r.skills[skill] ?? 0) * 10) / 10 }))
+    .filter((s) => s.level > 0)
+    .sort((a, b) => b.level - a.level)
+}
+
+/** The weapon a resident fights with and the protection they carry: "Sword, Shield"; empty with none. */
+export function gearLine(r: Pick<Resident, 'carried'>): string {
+  const weapon = bestWeapon(r)
+  const worn = PROTECTION.filter((p) => (r.carried[p] ?? 0) > 0)
+  return [...(weapon ? [weapon] : []), ...worn].map((g) => GOOD_LABELS[g]).join(', ')
+}
+
 /**
  * What the full Residents list shows of a resident (`CONTEXT.md`: Residents list). It is built only
  * for a resident whose hunger and health the Player knows (`CONTEXT.md`: Seeing how someone fares):
@@ -85,12 +104,6 @@ export function residentRow(
   const stats = Object.fromEntries(
     STAT_NAMES.map((s) => [s, Math.round(statValue(r, s, tick) * 10) / 10]),
   ) as Record<StatName, number>
-  const skills = (Object.keys(SKILL_LABELS) as SkillName[])
-    .map((skill) => ({ skill, level: Math.floor((r.skills[skill] ?? 0) * 10) / 10 }))
-    .filter((s) => s.level > 0)
-    .sort((a, b) => b.level - a.level)
-  const weapon = bestWeapon(r)
-  const worn = PROTECTION.filter((p) => (r.carried[p] ?? 0) > 0)
   return {
     id: r.id,
     name: r.name,
@@ -98,8 +111,10 @@ export function residentRow(
     age: Math.floor(ageInYears(r, tick)),
     city,
     stats,
-    skills: skills.map((s) => `${SKILL_LABELS[s.skill]} ${s.level}`).join(', '),
-    gear: [...(weapon ? [weapon] : []), ...worn].map((g) => GOOD_LABELS[g]).join(', '),
+    skills: learnedSkills(r)
+      .map((s) => `${SKILL_LABELS[s.skill]} ${s.level}`)
+      .join(', '),
+    gear: gearLine(r),
     carrying: goodsShort(r.carried, GOOD_LABELS, Infinity) ?? '',
     weight: carryLine(stockWeight(r.carried), carryCapacity(r, tick)),
     fed: share(r.hunger, MAX_HUNGER),

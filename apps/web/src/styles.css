@@ -1075,6 +1075,32 @@ label > select {
   justify-content: flex-end;
   margin-bottom: 8px;
 }
+/* The full list's search, filters and its close button, wrapping on a narrow screen. */
+.residents-full-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.residents-full-choice .search {
+  flex: 0 1 180px;
+  min-width: 120px;
+}
+.residents-full-choice .search input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.residents-full-choice .muted {
+  align-self: center;
+  font-size: 12px;
+}
+.residents-full-choice .close {
+  margin-left: auto;
+}
+.residents-full-none {
+  padding: 12px 6px;
+}
 /* The full list (`ResidentsFullList`) scrolls by itself, under the drawer's head and its button;
    rows have a fixed height so only those in view are drawn. */
 .residents-full {
@@ -1090,13 +1116,13 @@ label > select {
   overflow-anchor: none;
 }
 .residents-full-table {
-  min-width: 1200px;
+  min-width: 1280px;
 }
 .residents-row.full {
   width: 100%;
   box-sizing: border-box;
   grid-template-columns:
-    150px 28px 110px repeat(4, 34px) 170px 110px 170px 48px 48px
+    150px 40px 110px repeat(4, 40px) 170px 110px 170px 54px 54px
     minmax(180px, 1fr);
 }
 .residents-row.full.heading {
@@ -1105,6 +1131,26 @@ label > select {
   z-index: 1;
   background: var(--ui-panel);
   letter-spacing: 0;
+}
+/* A heading of the full list is a button that sorts by its column. */
+.residents-row.heading .column {
+  padding: 2px 0;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  text-transform: inherit;
+  white-space: nowrap;
+}
+.residents-row.heading .column:hover:not(:disabled) {
+  background: transparent;
+  color: var(--ui-text);
+}
+.residents-row.heading .column[aria-pressed='true'] {
+  color: var(--rel-own);
 }
 /* Cells stay on their line: all of it is in the tooltip, and on the resident's card. */
 .residents-row .cut {

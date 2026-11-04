@@ -3,6 +3,25 @@ import type { City, Resident, ScriptSummary, SeenResident, Building } from '@csp
 import { doingLine, interruptedLine, scriptLine } from './doing-view.js'
 import { PanelHead } from './drawer-head.js'
 import {
+  AGE_OPTIONS,
+  COLUMN_LABELS,
+  DOING_OPTIONS,
+  LIST_COLUMNS,
+  SKILL_OPTIONS,
+  WEAPON_OPTIONS,
+  clearFilters,
+  directionLabel,
+  filterResidents,
+  filtersOn,
+  fittingChoice,
+  loadChoice,
+  sortBy,
+  sortResidents,
+  storeChoice,
+  type ListColumn,
+  type ResidentsChoice,
+} from './residents-list-choice.js'
+import {
   FULL_CARD_HEIGHT,
   FULL_ROW_HEIGHT,
   listedResidents,
@@ -13,12 +32,22 @@ import {
 } from './residents-list-view.js'
 import { residentsCount, yearsLine, type ResidentGroup } from './residents-view.js'
 import { meterClass, pct } from './Residents.js'
+import { browserStorage } from './saved-groups.js'
+
+/** What the table's headings show, where a column's whole name doesn't fit. */
+const COLUMN_HEADINGS: Partial<Record<ListColumn, string>> = {
+  strength: 'Str',
+  endurance: 'End',
+  agility: 'Agi',
+  intellect: 'Int',
+}
 
 /**
  * The Residents drawer opened fully (`CONTEXT.md`: Residents list): the realm's residents with
  * their stats, skills, gear, what they carry and what they are doing, a row each, or a compact card
  * each on a phone. Only the rows in view are drawn (`rowWindow`), so hundreds stay smooth. It opens
- * with the picked resident in view; tapping a row opens that resident.
+ * with the picked resident in view; tapping a row opens that resident. It can be searched, filtered
+ * and sorted by any column, and this browser remembers the choice (`residents-list-choice`).
  */
 export function ResidentsFullList({
   groups,
@@ -53,7 +82,22 @@ export function ResidentsFullList({
   onClose: () => void
   phone?: boolean
 }) {
-  const listed = listedResidents(groups)
+  const all = listedResidents(groups)
+  const [saved, setSaved] = useState(() => loadChoice(browserStorage()))
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const choice = fittingChoice(saved, groups)
+  const doingOf = (r: Resident) =>
+    doingLine(r, {
+      scripts,
+      buildings,
+      residents: inSight,
+      cities,
+      arrives: arrivesIn?.(r),
+    })
+  const listed = sortResidents(filterResidents(all, choice, tick), choice, {
+    tick,
+    doing: doingOf,
+  })
   const rowHeight = phone ? FULL_CARD_HEIGHT : FULL_ROW_HEIGHT
   const scroller = useRef<HTMLDivElement>(null)
   // The row at the top of the view, not the pixel: scrolling within a row draws nothing new.
@@ -72,6 +116,13 @@ export function ResidentsFullList({
     return () => watcher.disconnect()
     // Only on opening: later picks and ticks leave the list where the Player scrolled it.
   }, [])
+  /** Takes a new choice, remembers it and goes back to the top of the list it makes. */
+  const choose = (next: ResidentsChoice) => {
+    setSaved(next)
+    storeChoice(browserStorage(), next)
+    if (scroller.current) scroller.current.scrollTop = 0
+    setTopRow(0)
+  }
   const shown = rowWindow({
     count: listed.length,
     rowHeight,
@@ -81,9 +132,85 @@ export function ResidentsFullList({
   const Row = phone ? ResidentCardRow : ResidentTableRow
   return (
     <section className="residents-full" aria-label="All residents">
-      <PanelHead title="Residents">{residentsCount(listed.map((l) => l.resident))}</PanelHead>
-      <div className="residents-full-tools">
-        <button type="button" onClick={onClose}>
+      <PanelHead title="Residents">{residentsCount(all.map((l) => l.resident))}</PanelHead>
+      <div className="residents-full-choice">
+        <label className="search">
+          Search
+          <input
+            type="search"
+            placeholder="Name"
+            value={saved.search}
+            onChange={(e) => choose({ ...saved, search: e.target.value })}
+          />
+        </label>
+        {phone && (
+          <>
+            <Choice
+              label="Sort by"
+              value={saved.sort}
+              options={LIST_COLUMNS.map((value) => ({ value, label: COLUMN_LABELS[value] }))}
+              onChange={(sort) => choose(sortBy(saved, sort))}
+            />
+            <button type="button" onClick={() => choose(sortBy(saved, saved.sort))}>
+              {directionLabel(saved.sort, saved.descending)}
+            </button>
+            <button
+              type="button"
+              aria-expanded={filtersOpen}
+              onClick={() => setFiltersOpen((open) => !open)}
+            >
+              Filters{filtersOn(choice) > 0 && ` (${filtersOn(choice)})`}
+            </button>
+          </>
+        )}
+        {(!phone || filtersOpen) && (
+          <>
+            <Choice
+              label="Weapons"
+              value={saved.weapons}
+              options={WEAPON_OPTIONS}
+              onChange={(weapons) => choose({ ...saved, weapons })}
+            />
+            <Choice
+              label="Doing"
+              value={saved.doing}
+              options={DOING_OPTIONS}
+              onChange={(doing) => choose({ ...saved, doing })}
+            />
+            <Choice
+              label="Age"
+              value={saved.age}
+              options={AGE_OPTIONS}
+              onChange={(age) => choose({ ...saved, age })}
+            />
+            <Choice
+              label="City"
+              value={choice.city}
+              options={[
+                { value: '', label: 'All' },
+                ...groups.map((g) => ({ value: g.key, label: g.label })),
+              ]}
+              onChange={(city) => choose({ ...saved, city })}
+            />
+            <Choice
+              label="Skill"
+              value={saved.skill}
+              options={SKILL_OPTIONS}
+              onChange={(skill) => choose({ ...saved, skill })}
+            />
+          </>
+        )}
+        {(filtersOn(choice) > 0 || choice.search.trim() !== '') && (
+          <>
+            <span className="muted" role="status">
+              {listed.length} of {all.length} shown
+            </span>
+            <button type="button" onClick={() => choose(clearFilters(saved))}>
+              Clear filters
+            </button>
+          </>
+        )}
+        <button type="button" className="close" onClick={onClose}>
           Close full list
         </button>
       </div>
@@ -94,21 +221,19 @@ export function ResidentsFullList({
       >
         <div className={phone ? 'residents-full-cards' : 'residents-full-table'}>
           {!phone && (
-            <div className="residents-row full heading" aria-hidden="true">
-              <span>Name</span>
-              <span>Age</span>
-              <span>City</span>
-              <span title="Strength">Str</span>
-              <span title="Endurance">End</span>
-              <span title="Agility">Agi</span>
-              <span title="Intellect">Int</span>
-              <span>Skills</span>
-              <span>Gear</span>
-              <span>Carrying</span>
-              <span>Hunger</span>
-              <span>Health</span>
-              <span>Doing</span>
+            <div className="residents-row full heading">
+              {LIST_COLUMNS.map((column) => (
+                <ColumnHeading
+                  key={column}
+                  column={column}
+                  choice={saved}
+                  onSort={() => choose(sortBy(saved, column))}
+                />
+              ))}
             </div>
+          )}
+          {listed.length === 0 && all.length > 0 && (
+            <p className="muted residents-full-none">No resident fits this.</p>
           )}
           <div style={{ height: shown.before }} />
           {listed.slice(shown.first, shown.end).map(({ resident: r, city }) => (
@@ -118,13 +243,7 @@ export function ResidentsFullList({
                 city,
                 leaderId,
                 tick,
-                doing: doingLine(r, {
-                  scripts,
-                  buildings,
-                  residents: inSight,
-                  cities,
-                  arrives: arrivesIn?.(r),
-                }),
+                doing: doingOf(r),
                 under:
                   interruptedLine(r, { scripts, buildings, residents: inSight }) ??
                   scriptLine(r, scripts),
@@ -137,6 +256,61 @@ export function ResidentsFullList({
         </div>
       </div>
     </section>
+  )
+}
+
+/** A filter or the phone's sort, as a labelled select. */
+function Choice<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: T
+  options: readonly { value: T; label: string }[]
+  onChange: (value: T) => void
+}) {
+  return (
+    <label>
+      {label}
+      <select value={value} onChange={(e) => onChange(e.target.value as T)}>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+/** A heading of the table: tapping it sorts by that column, and again turns the order round. */
+function ColumnHeading({
+  column,
+  choice,
+  onSort,
+}: {
+  column: ListColumn
+  choice: ResidentsChoice
+  onSort: () => void
+}) {
+  const sorted = choice.sort === column
+  const name = COLUMN_LABELS[column]
+  return (
+    <button
+      type="button"
+      className="column"
+      title={name}
+      aria-pressed={sorted}
+      aria-label={
+        sorted ? `${name}, sorted ${directionLabel(column, choice.descending)}` : `Sort by ${name}`
+      }
+      onClick={onSort}
+    >
+      {COLUMN_HEADINGS[column] ?? name}
+      {sorted && <span aria-hidden="true">{choice.descending ? ' ▼' : ' ▲'}</span>}
+    </button>
   )
 }
 

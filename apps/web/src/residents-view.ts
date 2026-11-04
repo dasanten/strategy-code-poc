@@ -266,12 +266,17 @@ export function groupCard<R extends Pick<Resident, 'name'>>(
   }
 }
 
+/** Whether a resident is idle: with neither an order nor a script. */
+export function isIdle(r: Pick<Resident, 'order' | 'script'>): boolean {
+  return !r.order && !r.script
+}
+
 /** How many of the residents are busy (with an order or a script) and how many idle. */
 export function busyAndIdle(residents: readonly Pick<Resident, 'order' | 'script'>[]): {
   busy: number
   idle: number
 } {
-  const idle = residents.filter((r) => !r.order && !r.script).length
+  const idle = residents.filter(isIdle).length
   return { busy: residents.length - idle, idle }
 }
 
