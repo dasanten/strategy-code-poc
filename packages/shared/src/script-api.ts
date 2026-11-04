@@ -497,6 +497,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'On a Trade Org warehouse or an NPC city’s storage, sell up to `units` of a good at its prices from my hands, or from my carriage there. At a warehouse, with `cityId` (and no carriage), a caravan picks them up from that city’s storage and pays there, less a fee.',
   ),
   action(
+    'swap',
+    ['give', 'want', 'units', 'carriageId?'],
+    'On a Trade Org warehouse or an NPC city’s storage, get up to `units` of the good `want` for as much of the good `give` as pays for them at its prices, rounded up, from my hands, or from my carriage there. What is over comes back in Coins as far as it holds them. An NPC city swaps only its surplus for what it is short of.',
+  ),
+  action(
     'handIn',
     ['good', 'units', 'toCityId', 'carriageId?'],
     'On a Trade Org warehouse, hand in up to `units` of a good (coins too) from my hands, or from my carriage there, with the fee, for a caravan to bring to the storage of `toCityId`, a city of another realm.',

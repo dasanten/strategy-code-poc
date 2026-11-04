@@ -419,6 +419,14 @@ describe('script bindings', () => {
     ['buyCity("city4")', { kind: 'buyCity', cityId: 'city4' }],
     ['buy("iron", 2)', { kind: 'buy', good: 'iron', units: 2, carriageId: null }],
     ['sell("wood", 3, "k1")', { kind: 'sell', good: 'wood', units: 3, carriageId: 'k1' }],
+    [
+      'swap("wood", "stone", 5)',
+      { kind: 'swap', give: 'wood', want: 'stone', units: 5, carriageId: null },
+    ],
+    [
+      'swap("wood", "stone", 5, "k1")',
+      { kind: 'swap', give: 'wood', want: 'stone', units: 5, carriageId: 'k1' },
+    ],
     ['buyOff("directive1")', { kind: 'buyOff', directiveId: 'directive1', carriageId: null }],
     [
       'buy("iron", 2, null, "c1")',

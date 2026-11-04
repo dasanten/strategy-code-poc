@@ -1092,10 +1092,10 @@ export function Wiki() {
           else the nearest storage of their realm.
         </p>
         <p>
-          A workplace's card says how much is being made there: what each of your workers there makes
-          and how much a game day at their Strength and skill, and the total of each good. It is the
-          pace while they have what they need, not a count of what has been made. Other realms'
-          workers aren't counted, as their stats aren't known.
+          A workplace's card says how much is being made there: what each of your workers there
+          makes and how much a game day at their Strength and skill, and the total of each good. It
+          is the pace while they have what they need, not a count of what has been made. Other
+          realms' workers aren't counted, as their stats aren't known.
         </p>
         <p>
           A smelter, mint or smithy has no storage: it works what its workers carry and what lies in
@@ -1664,14 +1664,14 @@ export function Wiki() {
         <p>
           Every Player may claim {num(HORSE_GRANT_HORSES)} new horses once, whenever they choose and
           whether or not they have horses: a notice at the top of the screen has a Claim button
-          until they do. The horses get new stats and ages and go in your finished stable
-          nearest your Leader's city; with no stable, they stand next to that city's storage (or
-          next to your Leader), each with {num(HORSE_GRANT_FOOD)} Food on the ground by it. The
-          realm log says where they are. Once claimed the offer is gone, also after your Leader dies
-          and you found a new realm; while you have no living Leader you can't claim it. An admin
-          can offer horses again, to every Player or to one: if you had claimed, the notice comes
-          back and you may claim once more, whether or not you still have horses. If you hadn't, you
-          still have just the one claim.
+          until they do. The horses get new stats and ages and go in your finished stable nearest
+          your Leader's city; with no stable, they stand next to that city's storage (or next to
+          your Leader), each with {num(HORSE_GRANT_FOOD)} Food on the ground by it. The realm log
+          says where they are. Once claimed the offer is gone, also after your Leader dies and you
+          found a new realm; while you have no living Leader you can't claim it. An admin can offer
+          horses again, to every Player or to one: if you had claimed, the notice comes back and you
+          may claim once more, whether or not you still have horses. If you hadn't, you still have
+          just the one claim.
         </p>
         <h3>Deliveries and transfers</h3>
         <p>
@@ -1745,14 +1745,25 @@ export function Wiki() {
           wanted. Each unit is priced as it moves, so a big trade moves the price as it goes (see{' '}
           <a href="#trade">Trade &amp; prices</a>).
         </p>
+        <h3>Swapping</h3>
+        <p>
+          A trader there can also swap goods for goods, with no coins in hand: under Swap, pick the
+          good you want, how many, and the good you give. It is a sale and a purchase at once, each
+          unit priced as those are, so the rate comes from the place's prices and moves as its stock
+          moves. You hand over enough to pay for what you want, rounded up, and what is over comes
+          back in coins as far as the place holds them. It is cut down like any trade, and the
+          button says what it would move or why it won't go. Like a trade it raises standing, by
+          both the sale and the purchase.
+        </p>
         <h3>What an NPC city buys and sells</h3>
         <p>
           An NPC city sells only its surplus, what its storages hold above its reserve, and buys
           only goods it is short of, up to its reserve and with the coins in its storage. It takes
           nothing else. Its prices come from its stock like a warehouse's, and its standing toward
-          you moves them: the better, the cheaper it sells and the more it pays. Below{' '}
-          {signed(NPC_CITY_REFUSES_STANDING)} it won't trade with you at all. Every trade raises
-          standing both ways (see <a href="#standing">Standing &amp; reactions</a>).
+          you moves them: the better, the cheaper it sells and the more it pays. It swaps only its
+          surplus for what it is short of. Below {signed(NPC_CITY_REFUSES_STANDING)} it won't trade
+          with you at all. Every trade raises standing both ways (see{' '}
+          <a href="#standing">Standing &amp; reactions</a>).
         </p>
         <h3>Delivery</h3>
         <p>
@@ -1786,7 +1797,8 @@ export function Wiki() {
           times its stock floor it sells at the base price; less stock costs more (to the power{' '}
           {num(PRICE_ELASTICITY)}), between {pct(PRICE_RANGE.min)} and {pct(PRICE_RANGE.max)} of the
           base price. It buys at {pct(BUY_SHARE)} of its selling price. Each unit is priced as it
-          moves, so a big trade moves the price as it goes.
+          moves, so a big trade moves the price as it goes. A swap goes at these same prices (see{' '}
+          <a href="#how-to-trade">How to trade</a>).
         </p>
         <table>
           <thead>

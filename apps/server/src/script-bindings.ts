@@ -719,6 +719,13 @@ function residentActions(
         carriageId: plain(carriageId ?? null),
         ...(cityId === undefined || cityId === null ? {} : { cityId: plain(cityId) }),
       }),
+    swap: ([give, want, units, carriageId]) =>
+      request('swap', {
+        give: plain(give),
+        want: plain(want),
+        units: plain(units),
+        carriageId: plain(carriageId ?? null),
+      }),
     handIn: ([good, units, toCityId, carriageId]) =>
       request('handIn', {
         good: plain(good),

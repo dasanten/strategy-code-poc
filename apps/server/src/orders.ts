@@ -31,7 +31,7 @@ import { roadLine, wallLine } from './road-line.js'
 import { contractOrders, pay } from './contracts.js'
 import { buyCity } from './buying.js'
 import { persuasionOrders } from './persuasion.js'
-import { buy, sell } from './trading.js'
+import { buy, sell, swap } from './trading.js'
 import { handInOrder, transfer } from './transfers.js'
 import { buyOff } from './directives.js'
 import { handOver } from './leader.js'
@@ -115,6 +115,7 @@ export const orderKinds: Record<string, OrderKind> = Object.fromEntries(
     buyCity,
     buy,
     sell,
+    swap,
     handIn: handInOrder,
     transfer,
     buyOff,
