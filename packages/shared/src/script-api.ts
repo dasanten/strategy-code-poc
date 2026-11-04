@@ -549,7 +549,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     ['realmId', 'terms', 'note', 'days'],
     `Send a realm my realm knows of a demand, wherever it is: \`terms\` is \`{ kind: "city", cityId: id }\` for a city of theirs I know of, or \`{ kind: "goods", goods: { food: 5, coins: 20 } }\`, with a note of at most ${DEMAND_NOTE_MAX_LENGTH} characters and a deadline 1 to ${DEMAND_MAX_DAYS} game days away. My realm sends at most ${DEMANDS_PER_GAME_DAY} a game day. It is only words: nothing happens by itself when it is ignored.`,
   ),
-  action('acceptDemand', ['demandId'], 'Accept a demand sent to my realm.'),
+  action(
+    'acceptDemand',
+    ['demandId'],
+    'Accept a demand sent to my realm. A demand for a city hands it over at once, also my last one; a city no longer mine is refused.',
+  ),
   action('declineDemand', ['demandId'], 'Decline a demand sent to my realm.'),
   action(
     'roadLine',

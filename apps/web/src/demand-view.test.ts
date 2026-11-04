@@ -6,6 +6,7 @@ import {
   demandNoticeLine,
   demandSides,
   goodsOfLines,
+  handOverQuestion,
   knownCitiesOf,
   termsLine,
 } from './demand-view.js'
@@ -107,6 +108,46 @@ describe('the cities known of a realm', () => {
   })
 })
 
+describe('accepting a demand for a city', () => {
+  const city = (id: string, name: string, realmId: string) =>
+    ({ id, name, realmId }) as unknown as SeenCity
+  const forAshford = demand('a', 'r2', 'r1', {
+    terms: { kind: 'city', cityId: 'c1', cityName: 'Ashford' },
+  })
+
+  it('asks first, and says so when it is the realm’s last', () => {
+    const own = city('c1', 'Ashford', 'r1')
+    const two = handOverQuestion(forAshford, 'r1', [own, city('c2', 'Zell', 'r1')])
+    expect(two).toMatch(/^Hand Ashford over to the realm of R2,/)
+    expect(two).not.toMatch(/last city/)
+    expect(handOverQuestion(forAshford, 'r1', [own])).toMatch(/It is your last city\.$/)
+  })
+
+  it('doesn’t ask for goods, or for a city no longer theirs, which the server refuses', () => {
+    expect(handOverQuestion(demand('a', 'r2', 'r1'), 'r1', [])).toBeUndefined()
+    expect(handOverQuestion(forAshford, 'r1', [city('c1', 'Ashford', 'r3')])).toBeUndefined()
+  })
+})
+
+describe('the realm log of an accepted demand for goods', () => {
+  it('says only that it was accepted', () => {
+    const line = (mine: boolean) =>
+      describeEvent({
+        kind: 'demand',
+        demandId: 'd',
+        what: 'accepted',
+        mine,
+        other: 'Tobin',
+        terms: { kind: 'goods', goods: { coins: 20 } },
+        seq: 1,
+        tick: 0,
+        userId: 1,
+      } as never).text
+    expect(line(true)).toBe('The realm of Tobin accepted your demand for 20 Coins.')
+    expect(line(false)).toBe('You accepted the demand of the realm of Tobin for 20 Coins.')
+  })
+})
+
 describe('goods on the form', () => {
   it('adds up a good named twice and leaves out what isn’t a whole number', () => {
     expect(
@@ -171,9 +212,11 @@ describe('the realm log', () => {
   it('says what happened on each side', () => {
     expect(line('sent', true)).toBe('You demanded Ashford of the realm of Tobin.')
     expect(line('received', false)).toBe('The realm of Tobin demands Ashford of you.')
-    expect(line('accepted', true)).toBe('The realm of Tobin accepted your demand for Ashford.')
+    expect(line('accepted', true)).toBe(
+      'The realm of Tobin accepted your demand: Ashford joined your realm.',
+    )
     expect(line('accepted', false)).toBe(
-      'You accepted the demand of the realm of Tobin for Ashford.',
+      'You accepted the demand of the realm of Tobin: Ashford joined their realm.',
     )
     expect(line('declined', true)).toBe('The realm of Tobin declined your demand for Ashford.')
     expect(line('declined', false)).toBe(

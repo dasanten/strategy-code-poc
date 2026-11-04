@@ -513,6 +513,17 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         case 'received':
           return { text: `${cap(them)} demands ${terms} of you.`, tone: 'warn' }
         case 'accepted':
+          if (e.terms.kind === 'city') {
+            return e.mine
+              ? {
+                  text: `${cap(them)} accepted your demand: ${terms} joined your realm.`,
+                  tone: 'info',
+                }
+              : {
+                  text: `You accepted the demand of ${them}: ${terms} joined their realm.`,
+                  tone: 'warn',
+                }
+          }
           return e.mine
             ? { text: `${cap(them)} accepted your demand for ${terms}.`, tone: 'info' }
             : { text: `You accepted the demand of ${them} for ${terms}.`, tone: 'info' }
