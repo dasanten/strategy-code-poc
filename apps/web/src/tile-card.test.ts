@@ -2,6 +2,7 @@ import { createElement, isValidElement, type ReactElement, type ReactNode } from
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import {
+  BATCHES_PER_DAY,
   MAX_HEALTH,
   MAX_HUNGER,
   TICKS_PER_GAME_YEAR,
@@ -241,10 +242,40 @@ describe('inventories on the tile card (`CONTEXT.md`: Goods on cards)', () => {
       owner: 'me',
       cityId: 'c-me',
       order: { kind: 'workAt', buildingId: farm.id },
+      stats: { strength: { base: 10, trained: 0 } },
+      skills: {},
+      bornAt: 0,
     } as unknown as SeenResident
     const html = card({ buildings: [farm], residents: [ana], workers: () => 1 }, farm)
     expect(html).toContain('<h3>Crew</h3>')
     expect(html).toMatch(/<span>Ana<\/span><small class="muted">Working<\/small>/)
+  })
+
+  it('shows what each worker makes a game day beside the good’s icon, and the total', () => {
+    const smithy: Building = { id: 'b-smithy', kind: 'smithy', cityId: 'c-me', x: 5, y: 5 }
+    const ana = {
+      id: 'ana',
+      name: 'Ana',
+      owner: 'me',
+      cityId: 'c-me',
+      order: { kind: 'workAt', buildingId: smithy.id, makes: 'sword' },
+      stats: { strength: { base: 10, trained: 0 } },
+      skills: {},
+      bornAt: 0,
+    } as unknown as SeenResident
+    const html = card({ buildings: [smithy], residents: [ana], workers: () => 1 }, smithy)
+    expect(html).toContain('<h3>Made a game day</h3>')
+    expect(html).toContain(`aria-label="Ana: Sword ${BATCHES_PER_DAY.smithy}, open their card"`)
+    const rows = html.slice(html.indexOf('Made a game day')).split('card-list-row').slice(1)
+    const says = rows.map((row) => [
+      row.match(/<span>(\w+)<\/span>/)?.[1],
+      row.match(/<small class="muted">(\w+)<\/small>/)?.[1],
+      row.match(/class="good-icon"/) && row.match(/<span class="mono">([\d.]+)<\/span>/)?.[1],
+    ])
+    expect(says).toEqual([
+      ['Ana', 'Sword', `${BATCHES_PER_DAY.smithy}`],
+      ['Total', 'Sword', `${BATCHES_PER_DAY.smithy}`],
+    ])
   })
 })
 

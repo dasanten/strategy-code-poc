@@ -1092,6 +1092,12 @@ export function Wiki() {
           else the nearest storage of their realm.
         </p>
         <p>
+          A workplace's card says how much is being made there: what each of your workers there makes
+          and how much a game day at their Strength and skill, and the total of each good. It is the
+          pace while they have what they need, not a count of what has been made. Other realms'
+          workers aren't counted, as their stats aren't known.
+        </p>
+        <p>
           A smelter, mint or smithy has no storage: it works what its workers carry and what lies in
           its pile. Once they lack the input for a batch (Iron ore, Gold ore, or the Iron and Wood
           of what a smith makes), one worker at a time, picked at random, fetches a load of what is

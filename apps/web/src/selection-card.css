@@ -489,6 +489,11 @@ button.card-list-row:hover {
 .card-list-name small {
   font-size: 0.72rem;
 }
+.card-list-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
 .card-food .meter {
   margin-bottom: 4px;
 }
