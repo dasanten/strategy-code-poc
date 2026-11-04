@@ -728,6 +728,9 @@ describe('the card for a tile', () => {
       order: working,
       health: MAX_HEALTH,
       hunger: MAX_HUNGER / 2,
+      stats: { strength: { base: 10, trained: 0 } },
+      skills: {},
+      bornAt: 0,
     } as unknown as SeenResident
     // As sight sends another realm's worker: without how they fare.
     const cid = { id: 'cid', name: 'Cid', owner: 'them', cityId: null, carried: {}, order: working }
@@ -738,18 +741,16 @@ describe('the card for a tile', () => {
       strangers: [cid as unknown as SeenResident],
       workers: () => 2,
     })
-    expect(card.lists).toEqual([
-      {
-        title: 'Crew',
-        count: `2 / ${MAX_WORKERS.farm}`,
-        empty: 'Nobody works here',
-        meters: ['Health', 'Hunger'],
-        rows: [
-          { id: 'ana', name: 'Ana', detail: 'Working', shares: [1, 0.5], opens: 'resident' },
-          { id: 'cid', name: 'Cid', detail: 'Working · Another realm' },
-        ],
-      },
-    ])
+    expect(card.lists?.[0]).toEqual({
+      title: 'Crew',
+      count: `2 / ${MAX_WORKERS.farm}`,
+      empty: 'Nobody works here',
+      meters: ['Health', 'Hunger'],
+      rows: [
+        { id: 'ana', name: 'Ana', detail: 'Working', shares: [1, 0.5], opens: 'resident' },
+        { id: 'cid', name: 'Cid', detail: 'Working · Another realm' },
+      ],
+    })
     // Nobody at it: an empty list.
     const none = tile({ buildings: [farm], workers: () => 0 })
     expect(none.lists?.[0]).toMatchObject({ count: `0 / ${MAX_WORKERS.farm}`, rows: [] })
@@ -766,6 +767,9 @@ describe('the card for a tile', () => {
         cityId: 'c-me',
         order,
         script: { scriptId: 1, params: { workplace: smelter.id } },
+        stats: { strength: { base: 10, trained: 0 } },
+        skills: {},
+        bornAt: 0,
       }) as unknown as SeenResident
     const walk = { kind: 'walkTo', target: { x: 0, y: 0 }, path: null, progress: 0 }
     const fetching = { ...walk, kind: 'fetch', goods: { ironOre: 10 }, phase: 'walking' }

@@ -924,7 +924,8 @@ function CardListBlock({
   past?: boolean
   onOpen: (row: CardRow) => void
 }) {
-  const columns = `minmax(0, 1fr)${' 56px'.repeat(list.meters.length)}`
+  const amounts = list.rows.some((row) => row.amount)
+  const columns = `minmax(0, 1fr)${' 56px'.repeat(list.meters.length)}${amounts ? ' auto' : ''}`
   return (
     <section className={`card-list${past ? ' sel-past' : ''}`} aria-label={list.title}>
       <div className="panel-head">
@@ -959,16 +960,23 @@ function CardListBlock({
             {list.meters.map((m, i) => (
               <Meter key={m} label={m} share={row.shares?.[i]} />
             ))}
+            {row.amount && (
+              <span className="card-list-amount">
+                <GoodIcon good={row.amount.good} />
+                <span className="mono">{row.amount.text}</span>
+              </span>
+            )}
           </>
         )
         const style = { gridTemplateColumns: columns }
+        const says = row.amount ? `${row.detail} ${row.amount.text}, ` : ''
         return row.opens ? (
           <button
             type="button"
             key={row.id}
             className="card-list-row"
             style={style}
-            aria-label={`${row.name}: ${row.opens === 'horse' ? 'show in the Horses drawer' : 'open their card'}`}
+            aria-label={`${row.name}: ${says}${row.opens === 'horse' ? 'show in the Horses drawer' : 'open their card'}`}
             onClick={() => onOpen(row)}
           >
             {cells}
