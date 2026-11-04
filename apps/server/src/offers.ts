@@ -161,13 +161,15 @@ function move(from: Stock, to: Stock, good: Good, units: number): void {
 }
 
 /**
- * What an offer accepted moved, in Coins, for standing as a trade raises it: the Coins that changed
- * hands, or goods for goods what the goods given are worth at warehouse base prices.
+ * What an offer accepted moved, in Coins, for standing as a trade raises it. With Coins on one side
+ * it is a sale or a purchase: the Coins that changed hands. Goods for goods it is a sale and a
+ * purchase at once, like a swap (`CONTEXT.md`: Swap), so both goods count; an offer has no prices of
+ * its own, so they count at warehouse base prices. Its two goods always differ (`offerProblem`).
  */
 function offerWorth(offer: Offer, gives: number, wants: number): number {
   if (offer.gives === 'coins') return gives
   if (offer.wants === 'coins') return wants
-  return worthOf({ [offer.gives]: gives })
+  return worthOf({ [offer.gives]: gives, [offer.wants]: wants })
 }
 
 /**

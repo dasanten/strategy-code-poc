@@ -1736,9 +1736,11 @@ export function Wiki() {
           others, cutting the offer down. Anyone in sight sees it and its rate. Someone of another
           realm, a resident or carriage on the storage's tile, accepts it as many times as they can
           pay and carry. It happens at once, whether you are online or not, and raises standing both
-          ways like a trade. What they pay goes into the storage as ordinary goods. It ends when it
-          is used up, when you take it down, or when the storage is torn down or no longer yours;
-          what was set aside is ordinary goods of that storage again.
+          ways like a trade: by the coins, or goods for goods by both goods at warehouse base
+          prices, as a swap counts both its sale and its purchase. What they pay goes into the
+          storage as ordinary goods. It ends when it is used up, when you take it down, or when the
+          storage is torn down or no longer yours; what was set aside is ordinary goods of that
+          storage again.
         </p>
         <h3>Sending a trader</h3>
         <p>
@@ -1759,14 +1761,25 @@ export function Wiki() {
           wanted. Each unit is priced as it moves, so a big trade moves the price as it goes (see{' '}
           <a href="#trade">Trade &amp; prices</a>).
         </p>
+        <h3>Swapping</h3>
+        <p>
+          A trader there can also swap goods for goods, with no coins in hand: under Swap, pick the
+          good you want, how many, and the good you give. It is a sale and a purchase at once, each
+          unit priced as those are, so the rate comes from the place's prices and moves as its stock
+          moves. You hand over enough to pay for what you want, rounded up, and what is over comes
+          back in coins as far as the place holds them. It is cut down like any trade, and the
+          button says what it would move or why it won't go. Like a trade it raises standing, by
+          both the sale and the purchase.
+        </p>
         <h3>What an NPC city buys and sells</h3>
         <p>
           An NPC city sells only its surplus, what its storages hold above its reserve, and buys
           only goods it is short of, up to its reserve and with the coins in its storage. It takes
           nothing else. Its prices come from its stock like a warehouse's, and its standing toward
-          you moves them: the better, the cheaper it sells and the more it pays. Below{' '}
-          {signed(NPC_CITY_REFUSES_STANDING)} it won't trade with you at all. Every trade raises
-          standing both ways (see <a href="#standing">Standing &amp; reactions</a>).
+          you moves them: the better, the cheaper it sells and the more it pays. It swaps only its
+          surplus for what it is short of. Below {signed(NPC_CITY_REFUSES_STANDING)} it won't trade
+          with you at all. Every trade raises standing both ways (see{' '}
+          <a href="#standing">Standing &amp; reactions</a>).
         </p>
         <h3>Delivery</h3>
         <p>
@@ -1800,7 +1813,8 @@ export function Wiki() {
           times its stock floor it sells at the base price; less stock costs more (to the power{' '}
           {num(PRICE_ELASTICITY)}), between {pct(PRICE_RANGE.min)} and {pct(PRICE_RANGE.max)} of the
           base price. It buys at {pct(BUY_SHARE)} of its selling price. Each unit is priced as it
-          moves, so a big trade moves the price as it goes.
+          moves, so a big trade moves the price as it goes. A swap goes at these same prices (see{' '}
+          <a href="#how-to-trade">How to trade</a>).
         </p>
         <table>
           <thead>

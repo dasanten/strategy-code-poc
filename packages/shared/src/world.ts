@@ -776,6 +776,7 @@ export type ResidentOrder =
   | PayOrder
   | BuyCityOrder
   | TradeOrder
+  | SwapOrder
   | HandInOrder
   | BuyOffOrder
   | AcceptOfferOrder
@@ -1226,6 +1227,19 @@ export interface TradeOrder {
 }
 
 /**
+ * A swap at a Trade Org warehouse or an NPC city's storage (`CONTEXT.md`: Swap): the resident,
+ * standing on its tile, gets up to `units` of `want` for as much of `give` as pays for them, from
+ * and into their hands, or the load of `carriageId` on their tile. It happens this tick.
+ */
+export interface SwapOrder {
+  kind: 'swap'
+  give: Exclude<Good, 'coins'>
+  want: Exclude<Good, 'coins'>
+  units: number
+  carriageId: string | null
+}
+
+/**
  * Handing in a transfer at a Trade Org warehouse (`CONTEXT.md`: Transfer): the resident, standing
  * on its tile, hands in up to `units` of `good` (coins too) from their hands, or the load of
  * `carriageId` on their tile, and pays the fee, for a caravan to bring to the storage of
@@ -1672,6 +1686,25 @@ export type RealmEventWhat =
       wants: Good
       wantsUnits: number
       why: 'usedUp' | 'takenDown' | 'storageLost' | 'goodsGone'
+      x: number
+      y: number
+    }
+  /**
+   * The resident `name` swapped at the warehouse or NPC city's storage at (`x`, `y`) (`CONTEXT.md`:
+   * Swap): gave `gave` of `give` for `units` of `want`, of the `wanted` units, with `coins` back;
+   * fewer when it was cut down, none when nothing could be swapped.
+   */
+  | {
+      kind: 'swapped'
+      residentId: string
+      name: string
+      place: 'warehouse' | 'storage'
+      give: Exclude<Good, 'coins'>
+      gave: number
+      want: Exclude<Good, 'coins'>
+      units: number
+      wanted: number
+      coins: number
       x: number
       y: number
     }

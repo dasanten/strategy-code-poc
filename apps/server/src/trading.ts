@@ -19,9 +19,12 @@ import {
   npcTradingStorageAt,
   owedBy,
   quoteDelivery,
+  quoteNpcSwap,
   quoteNpcTrade,
   quotePickUp,
+  quoteSwap,
   quoteTrade,
+  swapProblem,
   tradeCoinWarehouse,
   tradeProblem,
   tradeOrgHq,
@@ -35,6 +38,7 @@ import {
   type PricedGood,
   type Resident,
   type Stock,
+  type SwapOrder,
   type TradeOrder,
   type TradeSide,
   type WorldState,
@@ -95,6 +99,43 @@ function tradeOrder(side: TradeSide): OrderKind {
 export const buy = tradeOrder('buy')
 export const sell = tradeOrder('sell')
 
+/** The input of a swap order: the resident, the goods, how many units wanted, maybe a carriage. */
+interface SwapRequest extends OrderRequest {
+  residentId: string
+  give: PricedGood
+  want: PricedGood
+  units: number
+  carriageId?: string | null
+}
+
+/**
+ * A swap order (`CONTEXT.md`: Swap): one of the Player's residents, on a Trade Org warehouse's tile
+ * or an NPC city's storage, gets up to `units` of a good for another they hold, from and into their
+ * hands or the load of their carriage `carriageId` on the tile. It happens this tick.
+ */
+export const swap: OrderKind = {
+  validate(world, sender, order) {
+    const o = order as Partial<SwapRequest>
+    const realm = realmOf(world, sender.userId)
+    const r = world.residents.find((x) => x.id === o.residentId)
+    if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
+    return swapProblem(world, realm.id, r, o.give, o.want, o.units, o.carriageId)
+  },
+  apply(world, _sender, order) {
+    const o = order as SwapRequest
+    const r = world.residents.find((x) => x.id === o.residentId)
+    if (r) {
+      r.order = {
+        kind: 'swap',
+        give: o.give,
+        want: o.want,
+        units: o.units,
+        carriageId: o.carriageId ?? null,
+      }
+    }
+  },
+}
+
 /** One trade carried out this tick, with the goods and coins of everyone in it before and after. */
 interface TradeRecord {
   residentId: string
@@ -108,7 +149,8 @@ interface TradeRecord {
   after: Stock
   /**
    * For a trade with an NPC city (`CONTEXT.md`: Trading with an NPC city): the city, and whether
-   * the trade kept to its reserve: it sold none of the reserve and bought nothing beyond it.
+   * the trade kept to its reserve: it sold none of the reserve and bought nothing beyond it. A swap
+   * counts both of its goods.
    */
   npcCityId?: string
   keptReserve?: boolean
@@ -146,7 +188,8 @@ function move(from: Stock, to: Stock, good: Good, units: number): void {
  * Standing). A realm the Trade Organization refuses (`CONTEXT.md`: Trade Org reaction) trades
  * nothing. Either way the order is done, with a line in the realm log. An order with a city
  * orders a delivery or pick-up instead (`orderDelivery`), and a hand-in order hands in a transfer
- * (`handIn`, `CONTEXT.md`: Transfer). Returns how many trades moved anything.
+ * (`handIn`, `CONTEXT.md`: Transfer), and a swap order swaps (`swapHere`, `CONTEXT.md`: Swap).
+ * Returns how many trades moved anything.
  * `size` is the map's.
  */
 export function resolveTrades(world: WorldState, size = MAP_SIZE): number {
@@ -155,6 +198,11 @@ export function resolveTrades(world: WorldState, size = MAP_SIZE): number {
   let traded = 0
   for (const r of world.residents) {
     const o = r.order
+    if (o?.kind === 'swap') {
+      r.order = null
+      if (swapHere(world, r, o, records)) traded++
+      continue
+    }
     if (o?.kind !== 'trade' && o?.kind !== 'handIn') continue
     r.order = null
     const npc = npcTradingStorageAt(world, r.x, r.y)
@@ -307,6 +355,85 @@ function tradeWithCity(
 }
 
 /**
+ * Carries out the swap order `o` of resident `r` (`CONTEXT.md`: Swap) on the warehouse or NPC city's
+ * storage they stand on: where the place doesn't refuse their realm and their carriage, if any, is
+ * still theirs and on the tile, the good they give goes in, the good they want comes out and what
+ * is over comes back in Coins (`quoteSwap`, `quoteNpcSwap`), from the HQ's coin warehouse at the HQ.
+ * As a sale and a purchase at once, both raise standing both ways. The swap goes into `records`,
+ * with a line in the realm log. Returns whether it moved anything.
+ */
+function swapHere(world: WorldState, r: Resident, o: SwapOrder, records: TradeRecord[]): boolean {
+  const realm = commanderOf(world, r)
+  const npc = npcTradingStorageAt(world, r.x, r.y)
+  const warehouse = npc ? undefined : tradingWarehouseAt(world, r.x, r.y)
+  const place = npc?.storage ?? warehouse
+  const coinPlace = warehouse ? tradeCoinWarehouse(world, warehouse) : place
+  if (!place || !coinPlace) return false
+  // The place may have come to refuse the realm since the order was given.
+  const refuses = () =>
+    realm !== null && (npc ? npcCityRefuses(world, npc.city, realm) : tradeOrgRefuses(world, realm))
+  if (refuses()) return false
+  const carriage =
+    o.carriageId === null ? undefined : world.carriages.find((k) => k.id === o.carriageId)
+  if (o.carriageId !== null) {
+    if (realm === null || !commandsCarriage(world, realm, carriage)) return false
+    if (!isAt(carriage, place)) return false
+  }
+  const holder = carriage
+    ? loadOf(carriage, goodsCapacity(world, carriage))
+    : handsOf(r, world.tick)
+  const stock = (place.stock ??= {})
+  const coinStock = (coinPlace.stock ??= {})
+  const parties = [...new Set([holder.stock, stock, coinStock])]
+  const before = total(parties)
+  const q = npc
+    ? quoteNpcSwap(world, npc.city, npc.storage, holder, o.give, o.want, o.units, realm)
+    : quoteSwap(world, place, holder, o.give, o.want, o.units, owedBy(world, place.id, o.want))
+  move(holder.stock, stock, o.give, q.gives)
+  move(stock, holder.stock, o.want, q.units)
+  move(coinStock, holder.stock, 'coins', q.coins)
+  const record: TradeRecord = {
+    residentId: r.id,
+    realm,
+    refused: refuses(),
+    before,
+    after: total(parties),
+  }
+  if (npc) {
+    const held = npcCityStock(world, npc.city)
+    const keep = npcReserve(world, npc.city)
+    record.npcCityId = npc.city.id
+    record.keptReserve =
+      q.units === 0 ||
+      ((held[o.want] ?? 0) >= (keep[o.want] ?? 0) && (held[o.give] ?? 0) <= (keep[o.give] ?? 0))
+  }
+  records.push(record)
+  if (realm !== null && q.units > 0) {
+    raiseStandingBothWays(
+      world,
+      realm,
+      npc ? npc.city.id : TRADE_ORG,
+      (q.bought + q.sold) / STANDING_TRADE_COINS_PER_POINT,
+    )
+  }
+  recordEvent(world, realm, {
+    kind: 'swapped',
+    residentId: r.id,
+    name: r.name,
+    place: npc ? 'storage' : 'warehouse',
+    give: o.give,
+    gave: q.gives,
+    want: o.want,
+    units: q.units,
+    wanted: o.units,
+    coins: q.coins,
+    x: place.x,
+    y: place.y,
+  })
+  return q.units > 0
+}
+
+/**
  * Orders a delivery or pick-up (`CONTEXT.md`: Delivery) for the trade order `o` of resident `r`
  * of `realm`, at `warehouse`, paying from `payer` (their hands or carriage). Buying, the goods
  * and the fee (`quoteDelivery`) are paid now into the coin warehouse, and the warehouse keeps
@@ -411,14 +538,16 @@ export const tradesKeepGoods: Invariant = {
 }
 
 /**
- * Every buy, sell and hand-in order is done the tick it is given (`resolveTrades`): none outlasts
- * a tick.
+ * Every buy, sell, swap and hand-in order is done the tick it is given (`resolveTrades`): none
+ * outlasts a tick.
  */
 export const tradeOrdersDone: Invariant = {
   name: 'trade-orders-done',
   check(world) {
     return world.residents
-      .filter((r) => r.order?.kind === 'trade' || r.order?.kind === 'handIn')
+      .filter(
+        (r) => r.order?.kind === 'trade' || r.order?.kind === 'swap' || r.order?.kind === 'handIn',
+      )
       .map((r) => ({
         invariant: this.name,
         message: `resident ${r.id} still holds a trade order after the tick`,

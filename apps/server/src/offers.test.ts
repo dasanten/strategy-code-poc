@@ -379,7 +379,10 @@ describe('accepting an offer', () => {
     expect(t.carried).toEqual({ stone: 5, wood: 10 })
     expect(storage.stock).toEqual({ wood: 90, stone: 55 })
     expect(offer.times).toBe(1)
-    const worth = (10 * WAREHOUSE_BASE_PRICE.wood) / STANDING_TRADE_COINS_PER_POINT
+    // Goods for goods is a sale and a purchase at once, as a swap is: both goods count.
+    const worth =
+      (10 * WAREHOUSE_BASE_PRICE.wood + 5 * WAREHOUSE_BASE_PRICE.stone) /
+      STANDING_TRADE_COINS_PER_POINT
     expect(standingOf(world, 'r1', 'r2')).toBeCloseTo(worth, 2)
     expect(standingOf(world, 'r2', 'r1')).toBeCloseTo(worth, 2)
     expect(eventsFor(world, 8).at(-1)).toMatchObject({ kind: 'offerAccepted', times: 1 })
