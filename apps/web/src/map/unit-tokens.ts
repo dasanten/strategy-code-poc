@@ -4,6 +4,7 @@ import {
   type Army,
   type Building,
   type SeenCaravan,
+  type SeenTrader,
   type SeenCarriage,
   type SeenCity,
   type SeenHorse,
@@ -39,6 +40,7 @@ export interface UnitWorld {
   carriages: readonly SeenCarriage[]
   armies: readonly Pick<Army, 'id' | 'realmId' | 'memberIds'>[]
   caravans: readonly SeenCaravan[]
+  traders?: readonly SeenTrader[]
   cities: readonly Pick<SeenCity, 'id' | 'realmId' | 'tradeOrg'>[]
   buildings: readonly Pick<Building, 'kind' | 'x' | 'y'>[]
 }
@@ -135,7 +137,7 @@ export function drawUnits(
 ): Map<string, Spot> {
   const size = world.map.size
   const tile = cam.scale
-  const parts = caravanParts(world.caravans)
+  const parts = caravanParts([...world.caravans, ...(world.traders ?? [])])
   const known: Known = {
     cities: new Map(world.cities.map((c) => [c.id, c])),
     caravan: new Set([...parts.carriages, ...parts.crew]),

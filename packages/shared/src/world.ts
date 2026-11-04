@@ -825,6 +825,8 @@ export interface WorldState {
   joinRequests: JoinRequest[]
   /** The Trade Organization's caravans, one on each trading post's route (`CONTEXT.md`: Caravan). */
   caravans: Caravan[]
+  /** The Trade Organization's wandering traders (`CONTEXT.md`: Wandering trader). */
+  traders: Trader[]
   /** Deliveries and pick-ups ordered and not yet done, oldest first (`CONTEXT.md`: Delivery). */
   deliveries: Delivery[]
   /** Transfers between realms ordered and not yet done, oldest first (`CONTEXT.md`: Transfer). */
@@ -1138,6 +1140,56 @@ export interface TransferJob {
 export type SeenCaravan = Pick<
   Caravan,
   'id' | 'postId' | 'carriageId' | 'driverId' | 'escortIds' | 'heading'
+>
+
+/**
+ * A wandering trader (`CONTEXT.md`: Wandering trader): a Trade Org carriage with a driver and a
+ * small escort, sent from the HQ on a fixed loop of trading posts, apart from the caravans. At each
+ * post it stops first at the storage, to top up the Food on board for its crew and horse, then at
+ * the warehouse, where it evens out its load with what the warehouse holds. Plain data (ADR 0002):
+ * the game gives the crew the same drive, pick-up, drop and walk orders a Player could give.
+ */
+export interface Trader {
+  id: string
+  carriageId: string
+  /**
+   * The resident who drives the carriage; null with no crew left, until the HQ has someone to send
+   * (`CONTEXT.md`: Caravan crew lost).
+   */
+  driverId: string | null
+  /** The residents who walk along with it (the escort). */
+  escortIds: string[]
+  /** The trading posts it goes round, in order; after the last comes the first again. */
+  loop: string[]
+  /** The post of its loop it stands at or goes to next; null with no post left on its loop. */
+  postId: string | null
+  /**
+   * Where it stands or is driving: at the HQ while it is being sent out, back for a new carriage or
+   * with no post left (`hq`), or out at `postId` (`post`).
+   */
+  heading: 'hq' | 'post'
+  /** Where at that place it stands or is going: the storage first, then the warehouse. */
+  stop: 'storage' | 'warehouse'
+  /**
+   * What it still has to leave at this post's warehouse and take from it, worked out once on
+   * reaching the warehouse (`evenOutLoad`); null until then.
+   */
+  plan: { leave: Stock; take: Stock } | null
+  /**
+   * Goods the driver took last tick to put down, and where they go; null when they hold nothing
+   * for the trader.
+   */
+  holding: { goods: Stock; onto: 'carriage' | 'stop' } | null
+  /** How many drives to this stop have been started without getting there. */
+  misses: number
+  /** How often it was robbed, which earns it more escorts as it does a caravan's route. */
+  robberies: number
+}
+
+/** A wandering trader as Players see it, while its carriage or any of its crew is in sight. */
+export type SeenTrader = Pick<
+  Trader,
+  'id' | 'carriageId' | 'driverId' | 'escortIds' | 'postId' | 'heading'
 >
 
 /**

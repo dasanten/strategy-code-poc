@@ -439,6 +439,13 @@ function everythingSeen(
       out.push({ is: 'caravan', id, postId, carriageId, driverId, escortIds, heading })
     }
   }
+  // A wandering trader likewise (`CONTEXT.md`: Wandering trader).
+  for (const t of world.traders) {
+    if (caravanSeen(world, t, inSight)) {
+      const { id, postId, carriageId, driverId, escortIds, heading } = t
+      out.push({ is: 'trader', id, postId, carriageId, driverId, escortIds, heading })
+    }
+  }
   return out
 }
 
@@ -659,7 +666,7 @@ function sideSight(world: WorldState, size: number, side: string): SideSight {
   return cache?.size === size ? cache.side(world, side) : new SideSight(world, size, side)
 }
 
-/** Whether a caravan's carriage or any of its crew is in sight. */
+/** Whether a caravan's or trader's carriage or any of its crew is in sight. */
 function caravanSeen(
   world: WorldState,
   caravan: Pick<Caravan, 'carriageId' | 'driverId' | 'escortIds'>,
@@ -691,7 +698,7 @@ export function sentOutOfSight(
       ? !world.buildings.some((b) => b.cityId === e.id && buildingSeen(eyes, b))
       : e.is === 'army'
         ? !armySeen(world, e, inSight)
-        : e.is === 'caravan'
+        : e.is === 'caravan' || e.is === 'trader'
           ? !caravanSeen(world, e, inSight)
           : e.is === 'building'
             ? !buildingSeen(eyes, e)

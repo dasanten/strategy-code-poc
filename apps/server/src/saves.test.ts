@@ -14,6 +14,8 @@ import {
   horsesIn,
   tradeOrgHq,
   type TerrainMap,
+  TRADERS,
+  TRADER_ESCORTS,
 } from '@csp/shared'
 import { createAdmin } from './auth.js'
 
@@ -22,6 +24,7 @@ import { loadTerrain } from './terrain.js'
 import { generateTerrain } from './terrain-gen.js'
 import { HORSE_NAMES } from './horses.js'
 import { checkInvariants } from './invariants.js'
+import { Walking } from './walking.js'
 import { refreshLastSeen } from './last-seen.js'
 import { smallTerrain, worldWithCity, worldWithPost } from './test-terrain.js'
 import {
@@ -31,7 +34,7 @@ import {
   migrateWorld,
   migrations,
 } from './world-format.js'
-import { createWorld, generateWorld } from './world.js'
+import { createWorld, generateWorld, stepWorld } from './world.js'
 
 const terrain = smallTerrain()
 
@@ -176,6 +179,53 @@ describe('world saves', () => {
     )
   })
 
+  it('has the HQ send out its wandering traders (migration 80 → 81)', () => {
+    const { world: now, terrain: land } = worldWithPost()
+    // A format 80 world had neither traders nor their carriages, horses and crew.
+    const trader = now.traders[0]!
+    const gone = new Set([trader.driverId, ...trader.escortIds])
+    const v80: Partial<typeof now> = {
+      ...now,
+      residents: now.residents.filter((r) => !gone.has(r.id)),
+      carriages: now.carriages.filter((k) => k.id !== trader.carriageId),
+      horses: now.horses.filter(
+        (h) => h.id !== now.carriages.find((k) => k.id === trader.carriageId)?.horseId,
+      ),
+    }
+    delete v80.traders
+    const v81 = migrateWorld(structuredClone(v80), 80, { terrain: land })
+    const posts = v81.cities.filter((c) => c.tradeOrg === 'post').map((c) => c.id)
+    expect(posts.length).toBeGreaterThan(0)
+    expect(v81.traders).toHaveLength(Math.min(TRADERS, posts.length))
+    for (const t of v81.traders) {
+      expect(t.loop).toEqual(posts)
+      expect(v81.carriages.some((k) => k.id === t.carriageId)).toBe(true)
+      expect(t.escortIds).toHaveLength(TRADER_ESCORTS)
+      expect(v81.residents.some((r) => r.id === t.driverId)).toBe(true)
+    }
+    expect(checkInvariants(v81, land)).toEqual([])
+    // And on it goes from there, tick by tick.
+    const walking = new Walking(land)
+    for (let i = 0; i < 5; i++) stepWorld(v81, land, walking)
+    expect(checkInvariants(v81, land)).toEqual([])
+    // A world with no HQ has no one to send them.
+    const fallen = structuredClone(v80)
+    fallen.cities = fallen.cities!.map((c) => ({
+      ...c,
+      ...(c.tradeOrg === 'hq' ? { tradeOrg: undefined } : {}),
+    }))
+    expect(migrateWorld(fallen, 80, { terrain: land }).traders).toEqual([])
+  })
+
+  it('lets a world from before traders lose a post to migration 37', () => {
+    const { world, terrain: land, post } = worldWithPost()
+    const old: Partial<typeof world> = structuredClone(world)
+    delete old.traders
+    old.cities!.find((c) => c.id === post.id)!.realmId = world.realms[0]!.id
+    const v38 = migrateWorld(old, 37, { terrain: land }, migrations, 38)
+    expect(v38.traders).toEqual([])
+  })
+
   it('leaves every resident unmarked for orders standing under attack (migration 79 → 80)', () => {
     const { world: v79, terrain: land } = worldWithPost()
     const v80 = migrateWorld(structuredClone(v79), 79, { terrain: land }, migrations, 80)
@@ -188,7 +238,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(80)
+    expect(WORLD_FORMAT_VERSION).toBe(81)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)

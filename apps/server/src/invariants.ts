@@ -1,4 +1,5 @@
 import {
+  convoysOf,
   isWallOrGate,
   carriagePulledBy,
   carriageOfResident,
@@ -108,6 +109,7 @@ import {
 } from './trading.js'
 import { armiesSound, supplyLinesSound } from './armies.js'
 import { caravansSound, routeRobberiesSound } from './caravans.js'
+import { tradersSound } from './traders.js'
 import { deliveriesSound } from './deliveries.js'
 import { transfersSound } from './transfers.js'
 import { tradeOrgArmySound } from './trade-org-army.js'
@@ -1363,12 +1365,13 @@ export const cityWorkplacesSound: Invariant = {
 /**
  * An NPC city does nothing a Player's residents couldn't (`CONTEXT.md`: NPC city; ADR 0002): its
  * residents hold only the kinds of order a Player can give (`NPC_ORDER_KINDS`), which the world
- * checks and resolves like anyone's. A caravan's driver also drives (`CONTEXT.md`: Caravan).
+ * checks and resolves like anyone's. A caravan's or wandering trader's driver also drives
+ * (`CONTEXT.md`: Caravan, Wandering trader).
  */
 export const npcOrdersAllowed: Invariant = {
   name: 'npc-orders-allowed',
   check(world) {
-    const drivers = new Set(world.caravans.map((c) => c.driverId))
+    const drivers = new Set(convoysOf(world).map((c) => c.driverId))
     const allowed = (r: Resident) =>
       NPC_ORDER_KINDS.includes(r.order!.kind) || (r.order!.kind === 'drive' && drivers.has(r.id))
     return world.residents
@@ -2064,6 +2067,7 @@ export const worldInvariants: Invariant[] = [
   tradeOrgSound,
   nothingLeftOfTheHq,
   caravansSound,
+  tradersSound,
   routeRobberiesSound,
   tradeOrgArmySound,
   npcHireSound,

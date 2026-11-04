@@ -1,13 +1,18 @@
 import { crewIdsOf, type SeenCaravan, type SeenCarriage, type SeenResident } from '@csp/shared'
 
-/** What of the Trade Org's caravans is in sight (`CONTEXT.md`: Caravan): their carriages and crew, by id. */
+/**
+ * What of the Trade Org's caravans or wandering traders is in sight (`CONTEXT.md`: Caravan, Wandering
+ * trader): their carriages and crew, by id.
+ */
 export interface CaravanParts {
   carriages: Set<string>
   crew: Set<string>
 }
 
-/** The carriages and crew of the caravans in sight. */
-export function caravanParts(caravans: readonly SeenCaravan[]): CaravanParts {
+/** The carriages and crew of the caravans or traders in sight. */
+export function caravanParts(
+  caravans: readonly Pick<SeenCaravan, 'carriageId' | 'driverId' | 'escortIds'>[],
+): CaravanParts {
   return {
     carriages: new Set(caravans.map((c) => c.carriageId)),
     crew: new Set(caravans.flatMap(crewIdsOf)),

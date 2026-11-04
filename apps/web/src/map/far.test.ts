@@ -107,6 +107,20 @@ describe('far markers', () => {
   })
 })
 
+describe('far markers of wandering traders', () => {
+  it('shows one at its carriage, like a caravan', () => {
+    expect(
+      farMarkers({
+        armies: [],
+        caravans: [],
+        traders: [{ carriageId: 'k1' }, { carriageId: 'unseen' }],
+        residents: [],
+        carriages: [{ id: 'k1', x: 30, y: 31 } as never],
+      }),
+    ).toEqual([{ kind: 'caravan', x: 30, y: 31, rel: 'trade' }])
+  })
+})
+
 describe('emblemAt', () => {
   const view = { width: 800, height: 600 }
   const cam = { x: 50, y: 50, scale: 4 }
