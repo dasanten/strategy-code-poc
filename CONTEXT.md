@@ -189,6 +189,24 @@ The shared language of the game. Domain terms only — no implementation details
   warehouse becomes a storage with everything in it (no stock floor, no prices), its caravan
   route ends, and the deliveries and transfers waiting there go over to the HQ, which sends them
   out of its own stock.
+- **Fall of the HQ:** the HQ is captured like any city, which is hopeless in practice but not
+  forbidden. It joins the captor's realm and leaves the Trade Organization for good. Nothing ever
+  takes its place and it never comes back, whoever holds the city later.
+  - **What the captor gets:** the city with its people, wherever they stand, its walls and gates,
+    and its warehouses as storages with everything in them, its coins included (no stock floor,
+    no prices). Caravans end at once: their crew join the captor where they stand, each carriage,
+    horse and load going with them.
+  - **What lives on:** the Trade Organization lives on in its trading posts, which keep their
+    warehouses, prices, stock floor and soldiers and go on trading in person. When the last post
+    falls too it is gone, and standing toward it is forgotten.
+  - **What is lost:** whatever only the HQ gave it. No caravans run, so deliveries and transfers
+    still open are cancelled with a line in the realm's log and nothing refunded (goods at the HQ
+    are the captor's, goods at a post stay in its warehouse, goods on a carriage go with it), and
+    posts take no new ones. It has no army: its contracts end at once, without refund or loss of
+    standing (soldiers a Player hired are the captor's where they stand, Players' mercenaries
+    guarding the HQ walk home), punishments end, and nobody can hire from it. Admin directives
+    stay in force and can still be given and bought off at a post, but it sends nobody out for
+    them.
 - **Trading with the Trade Organization:** only in person, by a resident (or a carriage) on a
   warehouse's tile, at its HQ or a trading post. Selling hands the goods into the warehouse and
   takes its coins into the resident's hands, as far as they can carry; buying is the other way
@@ -498,7 +516,8 @@ The shared language of the game. Domain terms only — no implementation details
 - **Capturing a city:** only by occupying its town hall for a set number of game days without a
   break (Occupying a town hall; ADR 0017). When the time is up, the city and its residents join
   the occupier's realm, loyal at once (for now). Beating its defenders is not enough on its own.
-  Every city is captured this way: NPC cities, Players' cities, trading posts and the HQ.
+  Every city is captured this way: NPC cities, Players' cities, trading posts and the HQ (Fall of
+  the HQ).
 - **Occupying a town hall:** armed residents of one realm stand on a city's town hall (any of its
   tiles), no armed resident of any other realm stands there, and no defender of the city does
   (one on its side: its realm, an ally, or for an NPC city its own residents). An ally of the

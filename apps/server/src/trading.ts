@@ -23,6 +23,7 @@ import {
   quoteTrade,
   tradeCoinWarehouse,
   tradeProblem,
+  tradeOrgHq,
   tradeOrgRefuses,
   tradingWarehouseAt,
   wrapDistance,
@@ -325,7 +326,8 @@ function orderDelivery(
   const city = world.cities.find((c) => c.id === o.cityId)
   const storage = city?.realmId === realm ? deliveryStorage(world, city.id) : undefined
   const coinWarehouse = tradeCoinWarehouse(world, warehouse)
-  if (!city || !storage || !coinWarehouse) return false
+  // No caravan would ever come, should the HQ have fallen since the order was given.
+  if (!city || !storage || !coinWarehouse || !tradeOrgHq(world)) return false
   const tiles = wrapDistance(size, warehouse, storage)
   const q =
     o.side === 'buy'

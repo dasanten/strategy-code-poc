@@ -15,6 +15,7 @@ import {
 } from '@csp/shared'
 import { leaveTradeOrg } from './caravans.js'
 import { recordEvent } from './events.js'
+import { hqFalls } from './hq-fall.js'
 import { residentNamesTaken, uniqueName } from './names.js'
 
 /** A city that changed realm by capture this tick. */
@@ -100,7 +101,7 @@ export function captureCity(world: WorldState, city: City, captor: string, size:
 /**
  * A city joins the realm `captor` with everything in it, as `captureCity` says, whether captured
  * or bought (`CONTEXT.md`: Buying a city); a trading post leaves the Trade Organization
- * (`leaveTradeOrg`). Returns how many of its residents joined.
+ * (`leaveTradeOrg`), and so does its HQ (`hqFalls`). Returns how many of its residents joined.
  */
 export function joinRealm(world: WorldState, city: City, captor: string, size: number): number {
   const leaders = new Set(world.realms.map((r) => r.leaderId))
@@ -144,7 +145,10 @@ export function joinRealm(world: WorldState, city: City, captor: string, size: n
       r.order = null
   }
   city.realmId = captor
-  leaveTradeOrg(world, city)
+  // Only a city of no realm has a plan (`cityPlansSound`), and this tick's planning is over.
+  delete world.cityPlans[city.id]
+  if (city.tradeOrg === 'hq') hqFalls(world, city)
+  else leaveTradeOrg(world, city)
   return joining.length
 }
 

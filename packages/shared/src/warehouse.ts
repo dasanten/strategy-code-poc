@@ -19,6 +19,7 @@ import { townHallOf } from './city.js'
 import { KEEPS_GOODS } from './building.js'
 import { covers, isAt } from './footprint.js'
 import { tradeOrgRefuses } from './standing.js'
+import { NO_CARAVANS, tradeOrgHq } from './trade-org.js'
 import {
   GOODS,
   type Building,
@@ -287,6 +288,7 @@ export function tradeProblem(
     stock = k.load
   }
   if (cityId !== null && cityId !== undefined) {
+    if (!tradeOrgHq(world)) return NO_CARAVANS
     const city = world.cities.find((c) => c.id === cityId)
     if (!city || city.realmId !== realmId) return 'not one of your cities'
     const storage = deliveryStorage(world, city.id)

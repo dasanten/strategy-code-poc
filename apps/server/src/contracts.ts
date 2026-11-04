@@ -108,6 +108,7 @@ function offeredResidents(world: WorldState, order: OrderRequest): unknown[] | s
   if (order.realmId !== TRADE_ORG || order.soldiers === undefined) {
     return Array.isArray(order.residentIds) ? order.residentIds : []
   }
+  if (!tradeOrgHq(world)) return 'the Trade Organization has had no army since its HQ fell'
   const n = order.soldiers
   if (!Number.isInteger(n) || (n as number) < 1) return 'ask for a whole number of soldiers'
   const spare = spareSoldiers(world)
@@ -449,6 +450,33 @@ export function endContractsOnLeaderDeath(world: WorldState, realmId: string): v
     for (const r of world.residents) if (ids.has(r.id)) sendHome(world, r)
     leaveArmies(world, ids)
     tellBoth(world, c, 'ended', undefined, c.lenderId === realmId ? 'lender' : 'hirer')
+  }
+}
+
+/**
+ * The Trade Org HQ fell (`CONTEXT.md`: Fall of the HQ): every contract with the Trade Organization
+ * ends at once, as a contract ends, not breaks, so it costs no standing and refunds nothing. Call
+ * it once the HQ's residents have joined the captor. Soldiers it had hired out are the captor's
+ * now: they stop what they did for the hirer and leave the hirer's armies, where they stand.
+ * Mercenaries it had hired stop guarding it and walk home. Offers lapse.
+ */
+export function endTradeOrgContracts(world: WorldState): void {
+  const ending = world.contracts.filter((c) => c.lenderId === TRADE_ORG || c.hirerId === TRADE_ORG)
+  if (ending.length === 0) return
+  world.contracts = world.contracts.filter((c) => !ending.includes(c))
+  for (const c of ending) {
+    if (c.startedAt === null) continue
+    const ids = new Set(c.residentIds)
+    for (const r of world.residents) {
+      if (!ids.has(r.id)) continue
+      if (c.hirerId === TRADE_ORG) sendHome(world, r)
+      else {
+        delete r.script
+        r.order = null
+      }
+    }
+    leaveArmies(world, ids)
+    tellBoth(world, c, 'ended')
   }
 }
 
