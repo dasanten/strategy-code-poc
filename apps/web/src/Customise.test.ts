@@ -103,6 +103,7 @@ describe('the Customise button', () => {
         scripts: SCRIPTS,
         buildKinds: [],
         horses: [],
+        tick: 0,
         cities: [],
         onPickCity: () => {},
       }),
