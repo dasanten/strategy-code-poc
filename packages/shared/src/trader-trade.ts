@@ -119,7 +119,7 @@ export function quoteTraderTrade(
   )
 }
 
-/** The room on a wandering trader's carriage goes by its horse. */
+/** `quoteTraderTrade` on the world as it is: the room on its `carriage` goes by its horse. */
 export function quoteWithTrader(
   world: Pick<WorldState, 'horses' | 'carriages'>,
   t: Pick<Trader, 'escortIds'>,

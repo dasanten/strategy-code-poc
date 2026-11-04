@@ -212,9 +212,10 @@ describe('a wandering trader on its way', () => {
     expect(trader.stand!.cityId).toBe(city.id)
     const carriage = carriageOf(world, trader)
     expect([carriage.x, carriage.y]).toEqual([trader.stand!.x, trader.stand!.y])
-    const until = trader.stand!.until!
-    expect(until).toBeGreaterThanOrEqual(world.tick + TRADER_STOP_TICKS - 1)
-    // It stands there with its time left.
+    expect(trader.stand!.until!).toBeGreaterThanOrEqual(world.tick + TRADER_STOP_TICKS - 1)
+    // It stands there with its time left, here cut short so the test needn't wait a game day.
+    const until = world.tick + 30
+    trader.stand!.until = until
     const at = { x: carriage.x, y: carriage.y }
     runUntil(world, terrain, () => world.tick >= until - 1)
     expect({ x: carriage.x, y: carriage.y }).toEqual(at)
