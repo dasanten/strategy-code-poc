@@ -10,6 +10,7 @@ export const DRAWERS = [
   { id: 'waypoints', label: 'Waypoints' },
   { id: 'armies', label: 'Armies' },
   { id: 'contracts', label: 'Contracts' },
+  { id: 'demands', label: 'Demands' },
   { id: 'alliance', label: 'Alliance' },
   { id: 'standing', label: 'Standing' },
   { id: 'cities', label: 'Cities' },

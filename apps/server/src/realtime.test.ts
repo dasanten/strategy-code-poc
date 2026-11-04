@@ -984,6 +984,8 @@ describe('realtime', () => {
       invitations: [],
       realmsInSight: [],
       contracts: [],
+      demands: [],
+      knownRealms: [],
       deliveries: [],
       standings: [],
       joinRequests: [],

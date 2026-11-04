@@ -4,6 +4,7 @@ import {
   NPC_ALLIANCE_LEAVE_STANDING,
 } from './balance.js'
 import { contractOf, contractsFor, type ContractView } from './contract.js'
+import { demandsFor, realmsKnownTo, type DemandView } from './demand.js'
 import { directivesFor, type DirectiveView } from './directive.js'
 import { joinRequestsFor, type JoinRequestView } from './persuasion.js'
 import { organizationLabel, standingOf, standingsFor, type StandingView } from './standing.js'
@@ -248,6 +249,10 @@ export interface Diplomacy {
   realmsInSight: RealmLabel[]
   /** Mercenary contracts the realm is a side of, offered or in force (`CONTEXT.md`). */
   contracts: ContractView[]
+  /** Demands the realm sent or was sent, waiting for an answer (`CONTEXT.md`: Demand). */
+  demands: DemandView[]
+  /** The other realms it knows of, whom it can send a demand (`realmsKnownTo`). */
+  knownRealms: RealmLabel[]
   /** The realm's deliveries and pick-ups not yet done (`CONTEXT.md`: Delivery). */
   deliveries: DeliveryView[]
   /** Standing between the realm and other Organizations (`CONTEXT.md`: Standing), shown only. */
@@ -278,6 +283,8 @@ export function diplomacyFor(
     | 'residents'
     | 'carriages'
     | 'contracts'
+    | 'demands'
+    | 'lastSeen'
     | 'buildings'
     | 'deliveries'
     | 'standings'
@@ -315,7 +322,8 @@ export function diplomacyFor(
     .map((a) => ({ allianceId: a.id, name: a.name, leader: realmName(world, a.leaderId) }))
   const realms = new Set(world.realms.map((r) => r.id))
   const allies = new Set(sharingSight(world, realmId))
-  const realmsInSight = [...new Set(seenRealms)]
+  const seen = [...new Set(seenRealms)]
+  const realmsInSight = seen
     .filter(
       (id) => id !== realmId && !allies.has(id) && (realms.has(id) || isAllianceCity(world, id)),
     )
@@ -326,6 +334,8 @@ export function diplomacyFor(
     invitations,
     realmsInSight,
     contracts: contractsFor(world, realmId),
+    demands: demandsFor(world, realmId),
+    knownRealms: realmsKnownTo(world, realmId, seen).map(label),
     deliveries: deliveriesFor(world, realmId),
     standings: standingsFor(world, realmId),
     joinRequests: joinRequestsFor(world, realmId),

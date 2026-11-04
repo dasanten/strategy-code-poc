@@ -2160,3 +2160,24 @@ export const EXPLORED_EDGE_RANGE = 4 * SIGHT_RANGE
  * with the tile it tried.
  */
 export const EXPLORE_SKIP_RANGE = 8
+
+/**
+ * The longest note a demand may carry, in characters (`CONTEXT.md`: Demand): a few sentences, as
+ * "give the city back or we attack" takes, and few enough to keep them cheap to store and show.
+ */
+export const DEMAND_NOTE_MAX_LENGTH = 280
+
+/**
+ * How many demands a realm may send in any one game day (`CONTEXT.md`: Demand): about seven a
+ * real hour, plenty for a war and little for spam. Scripts count too.
+ */
+export const DEMANDS_PER_GAME_DAY = 3
+
+/**
+ * The longest deadline a demand may set, in game days (`CONTEXT.md`: Demand): one real day, so a
+ * Player who comes by once a day can still answer.
+ */
+export const DEMAND_MAX_DAYS = 60
+
+/** The deadline the Demands form starts with, in game days: a game week. */
+export const DEMAND_DEFAULT_DAYS = 7

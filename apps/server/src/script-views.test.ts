@@ -104,6 +104,15 @@ function setup() {
     load: { food: 4 },
   })
   world.piles.push({ id: 'p1', x: 10, y: 10, goods: { food: 5 } })
+  world.demands.push({
+    id: 'dm1',
+    fromId: 'r2',
+    toId: 'r1',
+    terms: { kind: 'goods', goods: { coins: 5 } },
+    note: 'Pay up',
+    sentAt: 40,
+    deadline: 500,
+  })
   world.directives.push({
     id: 'd1',
     target: 'r2',
@@ -197,6 +206,7 @@ describe('script views', () => {
       nodesInSight: 'nodesInSight("forest")',
       lastSeen: 'lastSeen()',
       directives: 'directives()',
+      demands: 'demands()',
       waypoints: 'waypoints()',
       withMemory: 'withMemory("role", "gatherer")',
       building: 'building("s1")',
