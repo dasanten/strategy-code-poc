@@ -8,6 +8,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { leaveTradeOrg } from './caravans.js'
+import { hqFalls } from './hq-fall.js'
 import { grantHorses } from './horse-grant.js'
 import { horseName } from './horses.js'
 import { hash, mulberry32 } from './residents.js'
@@ -18,7 +19,7 @@ import { paramTarget } from './script-params.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 78
+export const WORLD_FORMAT_VERSION = 79
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -312,6 +313,13 @@ export const migrations: Record<number, MigrationStep> = {
   // A caravan outlives its crew (`CONTEXT.md`: Caravan crew lost): its `driverId` may be null. Every
   // caravan from before has a driver, so the step leaves them as they are.
   77: (state) => state,
+  // A captured HQ leaves the Trade Organization (`CONTEXT.md`: Fall of the HQ); one captured before
+  // that still counted as the Trade Org's, with its caravans running.
+  78: (state) => {
+    const world = structuredClone(state) as WorldState
+    for (const c of world.cities) if (c.tradeOrg === 'hq' && c.realmId !== null) hqFalls(world, c)
+    return world
+  },
 }
 
 export class WorldFormatError extends Error {}

@@ -18,6 +18,9 @@ export const TRADE_ORG = 'trade-org'
 /** What Players call the Trade Organization where they would see a realm's name. */
 export const TRADE_ORG_NAME = 'the Trade Organization'
 
+/** Why no caravan will carry anything: the HQ has fallen (`CONTEXT.md`: Fall of the HQ). */
+export const NO_CARAVANS = 'no caravans run since the Trade Org HQ fell'
+
 /** The Trade Org HQ, if the world has one. */
 export function tradeOrgHq(world: Pick<WorldState, 'cities'>): City | undefined {
   return world.cities.find((c) => c.tradeOrg === 'hq')

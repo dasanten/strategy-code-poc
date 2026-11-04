@@ -137,11 +137,50 @@ describe('world saves', () => {
     expect(checkInvariants(v38, land)).toEqual([])
   })
 
+  it('lets an HQ already captured leave the Trade Organization (migration 78 → 79)', () => {
+    const { world: v78, terrain: land, post } = worldWithPost()
+    const realm = v78.realms[0]!
+    const hq = v78.cities.find((c) => c.tradeOrg === 'hq')!
+    const coins = v78.buildings.find(
+      (b) => b.cityId === hq.id && b.kind === 'warehouse' && (b.stock?.coins ?? 0) > 0,
+    )!
+    // Captured the old way: the realm's, but still the Trade Org's HQ, its caravan running.
+    hq.realmId = realm.id
+    for (const r of v78.residents) {
+      if (r.cityId !== hq.id) continue
+      r.owner = realm.id
+      // The realm's own names would have had a numeral added; not what this step is about.
+      delete r.gameName
+    }
+    for (const t of [...v78.carriages, ...v78.horses]) {
+      if (t.cityId === hq.id) Object.assign(t, { realmId: realm.id, cityId: null })
+    }
+    v78.routeRobberies[post.id] = 2
+    expect(checkInvariants(v78, land)).not.toEqual([])
+    const v79 = migrateWorld(structuredClone(v78), 78, { terrain: land }, migrations, 79)
+    const city = v79.cities.find((c) => c.id === hq.id)!
+    expect(city.tradeOrg).toBeUndefined()
+    expect(v79.buildings.find((b) => b.id === coins.id)).toMatchObject({
+      kind: 'storage',
+      stock: coins.stock,
+    })
+    expect(v78.caravans.length).toBeGreaterThan(0)
+    expect(v79.caravans).toEqual([])
+    expect(v79.routeRobberies).toEqual({})
+    expect(v79.cities.find((c) => c.id === post.id)?.tradeOrg).toBe('post')
+    expect(checkInvariants(v79, land)).toEqual([])
+    // A world whose HQ still stands is left as it was.
+    const { world: standing, terrain: same } = worldWithPost()
+    expect(migrateWorld(structuredClone(standing), 78, { terrain: same }, migrations, 79)).toEqual(
+      standing,
+    )
+  })
+
   it('leaves realms from before realm names unnamed (migration 38 → 39)', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(78)
+    expect(WORLD_FORMAT_VERSION).toBe(79)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)

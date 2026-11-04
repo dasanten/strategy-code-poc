@@ -11,6 +11,7 @@ import {
   quoteTransfer,
   stockWeight,
   tradeCoinWarehouse,
+  tradeOrgHq,
   transferFee,
   transferLoad,
   transferTiles,
@@ -173,6 +174,8 @@ export function handIn(
   const coinWarehouse = tradeCoinWarehouse(world, warehouse)
   if (!to?.realmId || to.realmId === realm || !storage || !coinWarehouse) return false
   if (!world.realms.some((x) => x.id === to.realmId)) return false
+  // No caravan would ever come, should the HQ have fallen since the order was given.
+  if (!tradeOrgHq(world)) return false
   const tiles = transferTiles(size, warehouse, null, storage)
   const q = quoteTransfer(payer, o.good, o.units, tiles)
   const coins = (coinWarehouse.stock ??= {})

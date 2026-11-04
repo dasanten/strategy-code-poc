@@ -86,6 +86,7 @@ export function CityInspector({
   onSend,
   arrivesIn,
   directives,
+  noCaravans,
   onBuyOff,
   openId,
   onOpen,
@@ -116,6 +117,8 @@ export function CityInspector({
   arrivesIn: ((r: Resident) => number | undefined) | undefined
   /** The admin directives in force; one naming the Player's realm may be bought off here. */
   directives: DirectiveView[]
+  /** The Trade Org HQ has fallen, so nothing can be delivered or transferred (`CONTEXT.md`). */
+  noCaravans: boolean
   /** Gives the buy-off order for a directive to one of the Player's residents on a warehouse. */
   onBuyOff: (residentId: string, directiveId: string, carriageId: string | null) => void
   /** The city shown opened, such as one picked on the map. */
@@ -200,7 +203,9 @@ export function CityInspector({
                     goods={tradedGoods(w, tradeLists(w, { buildings }))}
                     traders={tradersAt(w, { residents, carriages }, realmId)}
                     sending={sending(w)}
-                    deliveryCities={deliveryCities({ cities, buildings }, realmId)}
+                    deliveryCities={
+                      noCaravans ? [] : deliveryCities({ cities, buildings }, realmId)
+                    }
                     preview={(resident, carriage, good, units) =>
                       previewTrade(
                         { cities, buildings },
@@ -227,6 +232,11 @@ export function CityInspector({
                     }
                     onTrade={onTrade}
                   />
+                  {noCaravans && (
+                    <p className="small muted">
+                      The Trade Org HQ has fallen: no caravans run, so no deliveries or transfers.
+                    </p>
+                  )}
                   <BuyingOff
                     directives={directives.filter((d) => d.target === realmId && d.price !== null)}
                     traders={tradersAt(w, { residents, carriages }, realmId)}
@@ -235,6 +245,7 @@ export function CityInspector({
                 </div>
               ))}
             {openId === v.id &&
+              !noCaravans &&
               takesTransfers(
                 cities.find((c) => c.id === v.id)!,
                 { buildings },
