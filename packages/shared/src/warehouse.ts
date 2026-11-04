@@ -183,10 +183,18 @@ export function loadOf(carriage: Carriage, capacity: number): TradeHolder {
  * What stops a trade short of the units wanted (`CONTEXT.md`: Trade section), from the trader's
  * side: their coins (`coins`), the good they hold to sell (`held`), the room in their hands or on
  * their carriage (`room`), what the other side holds for sale (`stock`) or its coins to pay
- * (`theirCoins`), what an NPC city is short of (`unwanted`), or an NPC city that won't trade with
- * them at all (`refused`).
+ * (`theirCoins`), the room on a wandering trader's carriage (`theirRoom`), what an NPC city is short
+ * of (`unwanted`), or an NPC city that won't trade with them at all (`refused`).
  */
-export type TradeLimit = 'coins' | 'held' | 'room' | 'stock' | 'theirCoins' | 'unwanted' | 'refused'
+export type TradeLimit =
+  | 'coins'
+  | 'held'
+  | 'room'
+  | 'stock'
+  | 'theirCoins'
+  | 'theirRoom'
+  | 'unwanted'
+  | 'refused'
 
 /** What a trade moves: `units` of the good one way, `coins` the other. */
 export interface TradeQuote {
@@ -219,6 +227,26 @@ export function quoteTrade(
   if (floor === undefined || !coinWarehouse) return { units: 0, coins: 0 }
   const coinStock = coinWarehouse.stock?.coins ?? 0
   const stock = warehouse.stock?.[good] ?? 0
+  return quoteAtPrices(stock, floor, coinStock, holder, side, good, wanted, owed)
+}
+
+/**
+ * What a trade of up to `wanted` units of a good would move with a side holding `stock` of it and
+ * `coinStock` coins, which prices it from `floor` (`priceFor`), as `quoteTrade` says. `theirRoom`
+ * is the room that side has for what the trade adds to it, in kg: a wandering trader's carriage
+ * (`CONTEXT.md`: Trader stop). Pure: nothing moves.
+ */
+export function quoteAtPrices(
+  stock: number,
+  floor: number,
+  coinStock: number,
+  holder: TradeHolder,
+  side: TradeSide,
+  good: PricedGood,
+  wanted: number,
+  owed = 0,
+  theirRoom = Infinity,
+): TradeQuote {
   const held = holder.stock[good] ?? 0
   const heldCoins = holder.stock.coins ?? 0
   let units = 0
@@ -231,8 +259,10 @@ export function quoteTrade(
       else {
         const p = priceFor(good, stock + n, floor).buy
         const room = holder.room + n * GOOD_WEIGHT[good] - (coins + p) * GOOD_WEIGHT.coins
+        const added = n * GOOD_WEIGHT[good] - (coins + p) * GOOD_WEIGHT.coins
         if (coins + p > coinStock) limit = 'theirCoins'
         else if (room < -1e-9) limit = 'room'
+        else if (added > theirRoom + 1e-9) limit = 'theirRoom'
         else coins += p
       }
     } else {
@@ -240,8 +270,10 @@ export function quoteTrade(
       else {
         const p = priceFor(good, stock - units, floor).sell
         const room = holder.room + (coins + p) * GOOD_WEIGHT.coins - n * GOOD_WEIGHT[good]
+        const added = (coins + p) * GOOD_WEIGHT.coins - n * GOOD_WEIGHT[good]
         if (coins + p > heldCoins) limit = 'coins'
         else if (room < -1e-9) limit = 'room'
+        else if (added > theirRoom + 1e-9) limit = 'theirRoom'
         else coins += p
       }
     }
