@@ -307,7 +307,7 @@ The shared language of the game. Domain terms only — no implementation details
 - **Punishment trip:** the army always walks to the city, however far; the time it has there before
   giving up starts when it arrives. Whether the storages hold anything is checked when it arrives,
   so emptying them in time works, but you still see the army come. It still turns back on the road
-  when the city is no longer the culprit's. Each soldier packs Food at the HQ for the way there and
+  when the city is no longer the culprit's, or when it finds no way there at all. Each soldier packs Food at the HQ for the way there and
   back, leaving room for what they will carry home; on the way they refill at trading posts they
   pass, and at the city they may take Food from its storage for the way back, apart from what the
   army came to take. The realm log tells the truth: it is coming; it has arrived; it left with so
