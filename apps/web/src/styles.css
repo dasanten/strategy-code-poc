@@ -1095,7 +1095,7 @@ label > select {
   align-self: center;
   font-size: 12px;
 }
-.residents-full-choice .close {
+.residents-full-choice .pick {
   margin-left: auto;
 }
 .residents-full-none {
@@ -1116,7 +1116,56 @@ label > select {
   overflow-anchor: none;
 }
 .residents-full-table {
-  min-width: 1280px;
+  min-width: 1312px;
+}
+/* A row of the full list: its tick, then the button that opens the resident. */
+.residents-full-row {
+  display: flex;
+  align-items: stretch;
+}
+.residents-full-row > .residents-row {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.residents-full-row.heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--ui-panel);
+}
+.residents-full-row .tick {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--ui-line);
+  border-radius: 0;
+  background: transparent;
+}
+/* The whole of a card's height is the tick there, wide enough for a thumb. */
+.residents-full-cards .residents-full-row .tick {
+  width: 44px;
+}
+.tick-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid var(--ui-line-strong);
+  border-radius: 3px;
+  background: var(--ui-well);
+  font-size: 12px;
+  line-height: 1;
+}
+.tick-box.on {
+  border-color: var(--rel-own);
+  background: var(--rel-own);
+  color: var(--ui-ink);
 }
 .residents-row.full {
   width: 100%;
@@ -1126,10 +1175,6 @@ label > select {
     minmax(180px, 1fr);
 }
 .residents-row.full.heading {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: var(--ui-panel);
   letter-spacing: 0;
 }
 /* A heading of the full list is a button that sorts by its column. */

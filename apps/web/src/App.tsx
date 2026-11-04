@@ -1397,7 +1397,17 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         drawer(
           'residents',
           fullList ? (
-            <ResidentsFullList {...residentsPanel} onClose={() => setResidentsFull(false)} />
+            <ResidentsFullList
+              {...residentsPanel}
+              onPick={(ids) => {
+                select(ids)
+                // The group card has no room beside the full list, so the short list comes back.
+                setResidentsFull(false)
+                const first = own.find((r) => r.id === ids[0])
+                if (first) showOnMap(Math.floor(first.x), Math.floor(first.y))
+              }}
+              onClose={() => setResidentsFull(false)}
+            />
           ) : (
             <ResidentsList {...residentsPanel} onOpenFull={() => setResidentsFull(true)} />
           ),

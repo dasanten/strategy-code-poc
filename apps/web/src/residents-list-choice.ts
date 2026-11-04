@@ -190,6 +190,20 @@ export function filterResidents(
   })
 }
 
+/**
+ * Who **Pick these** picks (`CONTEXT.md`: Residents list), in the list's order: those of the listed
+ * who are ticked, or everyone listed when none of them is. A tick on someone the search or a filter
+ * hides doesn't count, so it only ever picks who the Player can see.
+ */
+export function pickedFromList(
+  listed: readonly { resident: Pick<Resident, 'id'> }[],
+  ticked: ReadonlySet<string>,
+): string[] {
+  const ids = listed.map((l) => l.resident.id)
+  const tickedIds = ids.filter((id) => ticked.has(id))
+  return tickedIds.length > 0 ? tickedIds : ids
+}
+
 /** What a resident is sorted by in a column; undefined when they have nothing to show there. */
 function sortValue(
   r: Resident,

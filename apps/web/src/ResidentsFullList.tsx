@@ -15,6 +15,7 @@ import {
   filtersOn,
   fittingChoice,
   loadChoice,
+  pickedFromList,
   sortBy,
   sortResidents,
   storeChoice,
@@ -47,7 +48,9 @@ const COLUMN_HEADINGS: Partial<Record<ListColumn, string>> = {
  * their stats, skills, gear, what they carry and what they are doing, a row each, or a compact card
  * each on a phone. Only the rows in view are drawn (`rowWindow`), so hundreds stay smooth. It opens
  * with the picked resident in view; tapping a row opens that resident. It can be searched, filtered
- * and sorted by any column, and this browser remembers the choice (`residents-list-choice`).
+ * and sorted by any column, and this browser remembers the choice (`residents-list-choice`). Rows
+ * can be ticked, and **Pick these** picks those ticked, or everyone listed, as a Group; the ticks
+ * last only while the list is open.
  */
 export function ResidentsFullList({
   groups,
@@ -60,6 +63,7 @@ export function ResidentsFullList({
   arrivesIn,
   selectedId,
   onSelect,
+  onPick,
   onClose,
   phone = false,
 }: {
@@ -78,6 +82,8 @@ export function ResidentsFullList({
   arrivesIn?: (r: Resident) => number | undefined
   selectedId: string | undefined
   onSelect: (id: string) => void
+  /** Picks these residents as a Group on the map, in the list's order. */
+  onPick: (ids: string[]) => void
   /** Back to the drawer's short list. */
   onClose: () => void
   phone?: boolean
@@ -85,6 +91,7 @@ export function ResidentsFullList({
   const all = listedResidents(groups)
   const [saved, setSaved] = useState(() => loadChoice(browserStorage()))
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set())
   const choice = fittingChoice(saved, groups)
   const doingOf = (r: Resident) =>
     doingLine(r, {
@@ -98,6 +105,13 @@ export function ResidentsFullList({
     tick,
     doing: doingOf,
   })
+  const toPick = pickedFromList(listed, ticked)
+  const toggleTick = (id: string) =>
+    setTicked((was) => {
+      const next = new Set(was)
+      if (!next.delete(id)) next.add(id)
+      return next
+    })
   const rowHeight = phone ? FULL_CARD_HEIGHT : FULL_ROW_HEIGHT
   const scroller = useRef<HTMLDivElement>(null)
   // The row at the top of the view, not the pixel: scrolling within a row draws nothing new.
@@ -210,7 +224,16 @@ export function ResidentsFullList({
             </button>
           </>
         )}
-        <button type="button" className="close" onClick={onClose}>
+        <button
+          type="button"
+          className="primary pick"
+          title="Pick those ticked as a group, or everyone listed when none of them is"
+          disabled={toPick.length === 0}
+          onClick={() => onPick(toPick)}
+        >
+          Pick these ({toPick.length})
+        </button>
+        <button type="button" onClick={onClose}>
           Close full list
         </button>
       </div>
@@ -221,15 +244,18 @@ export function ResidentsFullList({
       >
         <div className={phone ? 'residents-full-cards' : 'residents-full-table'}>
           {!phone && (
-            <div className="residents-row full heading">
-              {LIST_COLUMNS.map((column) => (
-                <ColumnHeading
-                  key={column}
-                  column={column}
-                  choice={saved}
-                  onSort={() => choose(sortBy(saved, column))}
-                />
-              ))}
+            <div className="residents-full-row heading">
+              <span className="tick" />
+              <div className="residents-row full heading">
+                {LIST_COLUMNS.map((column) => (
+                  <ColumnHeading
+                    key={column}
+                    column={column}
+                    choice={saved}
+                    onSort={() => choose(sortBy(saved, column))}
+                  />
+                ))}
+              </div>
             </div>
           )}
           {listed.length === 0 && all.length > 0 && (
@@ -237,20 +263,22 @@ export function ResidentsFullList({
           )}
           <div style={{ height: shown.before }} />
           {listed.slice(shown.first, shown.end).map(({ resident: r, city }) => (
-            <Row
-              key={r.id}
-              row={residentRow(r, {
-                city,
-                leaderId,
-                tick,
-                doing: doingOf(r),
-                under:
-                  interruptedLine(r, { scripts, buildings, residents: inSight }) ??
-                  scriptLine(r, scripts),
-              })}
-              selected={r.id === selectedId}
-              onSelect={onSelect}
-            />
+            <div className="residents-full-row" key={r.id}>
+              <TickBox name={r.name} ticked={ticked.has(r.id)} onToggle={() => toggleTick(r.id)} />
+              <Row
+                row={residentRow(r, {
+                  city,
+                  leaderId,
+                  tick,
+                  doing: doingOf(r),
+                  under:
+                    interruptedLine(r, { scripts, buildings, residents: inSight }) ??
+                    scriptLine(r, scripts),
+                })}
+                selected={r.id === selectedId}
+                onSelect={onSelect}
+              />
+            </div>
           ))}
           <div style={{ height: shown.after }} />
         </div>
@@ -310,6 +338,36 @@ function ColumnHeading({
     >
       {COLUMN_HEADINGS[column] ?? name}
       {sorted && <span aria-hidden="true">{choice.descending ? ' ▼' : ' ▲'}</span>}
+    </button>
+  )
+}
+
+/**
+ * A row's tick, beside its button rather than in it, since a button can't hold another. It is a
+ * button itself: a key pressed in an input counts as typing, so after a tick in one, Escape and the
+ * group keys would do nothing.
+ */
+function TickBox({
+  name,
+  ticked,
+  onToggle,
+}: {
+  name: string
+  ticked: boolean
+  onToggle: () => void
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      className="tick"
+      aria-checked={ticked}
+      aria-label={`Tick ${name}`}
+      onClick={onToggle}
+    >
+      <span className={ticked ? 'tick-box on' : 'tick-box'} aria-hidden="true">
+        {ticked && '✓'}
+      </span>
     </button>
   )
 }
