@@ -3,6 +3,8 @@
 Status: decided (2026-10-18, with Daniel). Revised the same day: originally "refill without
 limit", changed to a floor so the Trade Organization takes part in the real economy.
 
+Changed by ADR 0023 (2026-11-04): only the HQ's warehouses top up; trading posts no longer do.
+
 The game's core rule is that everything is physical: goods and money only change place by being
 carried. The Trade Organization's stock is produced and bought physically like everyone else's:
 it runs workplaces on every kind of resource and buys from others. We make one controlled

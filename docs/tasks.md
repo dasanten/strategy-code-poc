@@ -43,7 +43,12 @@ Waypoints and exploring (64), in that order, all ahead of Bandits. Agreed with D
 2026-11-03, from his list of horse bugs: Horses and stealing (Epic 65, ADR 0022: a joining city
 brings its horses, Feed a horse, stealing carriages and horses) next, ahead of Bandits. Agreed with
 Daniel on 2026-11-04: Quick wins 6 (Epic 66: getting away under attack, offering horses again,
-workplace amounts) next, ahead of Bandits.
+workplace amounts) next, ahead of Bandits. Agreed with Daniel later on 2026-11-04, from his list of
+that day: the bug #798 (the Trade Org's army turns back before it arrives) first, then Quick wins 7
+(Epic 67: breeding shows names and stats, orders start at once), Build menu (68), Residents list
+(69), Swaps and offers (70), Wandering traders (71, ADR 0023), Demands (72, ADR 0024) and Trade Org
+debt (73, ADR 0025), in that order, all ahead of Bandits. Tickets that need an earlier epic name it
+under Depends on, and wait for it to reach `dev`.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
@@ -114,6 +119,13 @@ I sleep.
 | 64  | [Waypoints and exploring](https://github.com/dasanten/strategy-code-poc/issues/721)             | ticketed                |
 | 65  | [Horses and stealing](https://github.com/dasanten/strategy-code-poc/issues/769)                 | ticketed                |
 | 66  | [Quick wins 6](https://github.com/dasanten/strategy-code-poc/issues/787)                        | ticketed                |
+| 67  | [Quick wins 7](https://github.com/dasanten/strategy-code-poc/issues/799)                        | ticketed                |
+| 68  | [Build menu](https://github.com/dasanten/strategy-code-poc/issues/803)                          | ticketed                |
+| 69  | [Residents list](https://github.com/dasanten/strategy-code-poc/issues/806)                      | ticketed                |
+| 70  | [Swaps and offers](https://github.com/dasanten/strategy-code-poc/issues/810)                    | ticketed                |
+| 71  | [Wandering traders](https://github.com/dasanten/strategy-code-poc/issues/817)                   | ticketed                |
+| 72  | [Demands](https://github.com/dasanten/strategy-code-poc/issues/822)                             | ticketed                |
+| 73  | [Trade Org debt](https://github.com/dasanten/strategy-code-poc/issues/827)                      | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
