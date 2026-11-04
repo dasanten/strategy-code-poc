@@ -23,6 +23,8 @@ export interface BuildMenuKind {
   kind: BuildingKind
   name: string
   problem?: string
+  /** False for what never goes on this tile's ground: a node's workplace off it, others on one. */
+  offered: boolean
 }
 
 export interface BuildMenuGroup {
@@ -40,17 +42,33 @@ export function buildMenuGroups(
   node: Pick<ResourceNode, 'kind'> | undefined,
   problem: (kind: BuildingKind) => string | undefined,
 ): BuildMenuGroup[] {
-  const offered: readonly BuildingKind[] = [...buildMenu(node), 'road', 'carriage']
+  const offered: readonly BuildingKind[] = [
+    ...buildMenu(node),
+    'road',
+    ...(node ? [] : (['carriage'] as const)),
+  ]
   return BUILD_GROUPS.map((group) => ({
     name: group.name,
     kinds: group.kinds.map((kind) => {
       const name = BUILDING_NAMES[kind]
       const lower = name.toLowerCase()
       // The placement rule words a kind by its id ("a lumberCamp goes ..."), the menu by its name.
+      const isOffered = offered.includes(kind)
       const why =
         problem(kind)?.replace(kind, lower) ??
-        (offered.includes(kind) ? undefined : `a ${lower} is built standing on its resource node`)
-      return why === undefined ? { kind, name } : { kind, name, problem: why }
+        (isOffered ? undefined : `a ${lower} is built standing on its resource node`)
+      return why === undefined
+        ? { kind, name, offered: isOffered }
+        : { kind, name, problem: why, offered: isOffered }
     }),
   }))
 }
+
+/**
+ * Whether the tapped kind can be chosen. Built now, it must fit the tile now. Planned ahead
+ * (`CONTEXT.md`: Planning ahead) whether it can start is checked when its turn comes, so what the
+ * tile lacks today (a city's area, a finished stable) doesn't stop it: only what the ground rules
+ * out, as the planner's list did.
+ */
+export const canChooseKind = (item: BuildMenuKind, planning: boolean) =>
+  planning ? item.offered : item.problem === undefined

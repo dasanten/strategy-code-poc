@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest'
 import {
   BUILDABLE,
   Terrain,
+  buildMenu,
   type Building,
   type BuildingKind,
   type City,
   type KnownNode,
 } from '@csp/shared'
-import { buildMenuGroups, workSpan } from './build-menu-view.js'
+import { buildMenuGroups, canChooseKind, workSpan } from './build-menu-view.js'
 import { BUILDING_NAMES } from './map/palette.js'
 import { buildHereProblem } from './selection-view.js'
 
@@ -76,6 +77,35 @@ describe('the Build menu', () => {
     expect(entry(groups, 'lumberCamp').problem).toBe(
       'a lumber camp is built standing on its resource node',
     )
+  })
+
+  it('built now, a kind must fit the tile as it stands', () => {
+    const groups = menu()
+    expect(canChooseKind(entry(groups, 'storage'), false)).toBe(true)
+    expect(canChooseKind(entry(groups, 'road'), false)).toBe(true)
+    expect(canChooseKind(entry(groups, 'house'), false)).toBe(false)
+  })
+
+  it('planned ahead, what the tile lacks today can still be added: its turn checks it', () => {
+    // A town hall first and the house beside it; a stable first and the carriage at it.
+    const groups = menu()
+    expect(canChooseKind(entry(groups, 'house'), true)).toBe(true)
+    expect(canChooseKind(entry(groups, 'carriage'), true)).toBe(true)
+    expect(canChooseKind(entry(groups, 'road'), true)).toBe(true)
+  })
+
+  it('planned ahead, what the ground rules out stays out, as the planner’s list did', () => {
+    const open = (groups: ReturnType<typeof menu>) =>
+      groups
+        .flatMap((g) => g.kinds)
+        .filter((k) => canChooseKind(k, true))
+        .map((k) => k.kind)
+    const off = open(menu())
+    expect(off).not.toContain('lumberCamp')
+    expect(off.filter((k) => k !== 'road' && k !== 'carriage').sort()).toEqual(
+      [...buildMenu(undefined)].sort(),
+    )
+    expect(open(menu(forestAt(50, 50))).sort()).toEqual(['lumberCamp', 'road'])
   })
 
   it('tells work in game time', () => {

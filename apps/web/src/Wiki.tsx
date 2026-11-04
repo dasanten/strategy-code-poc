@@ -677,8 +677,10 @@ export function Wiki() {
           lists every kind of step. One that acts on a place (work a workplace, build, store at or
           fetch from a storage, pick up, feed the stable, breed, …) has you pick that place on the
           map, anywhere, not only where the resident stands now; one that needs more (which goods,
-          what to build, what a smithy makes, which script) asks for it on the card after. A step
-          that has to be done on its tile goes after a walk there, unless the step before already
+          what to build, what a smithy makes, which script) asks for it on the card after. What to
+          build is the same Build menu as on the card; a kind dimmed because the tile lacks
+          something today, such as a city's area, can still be added, for a step before it may
+          bring that. A step that has to be done on its tile goes after a walk there, unless the step before already
           walks there. It works on a resident with no queue too, and starts one. Adding a step only
           checks that it could make sense (the place is there as you last knew it, and a carriage or
           horse is yours). A workplace or construction site can be anyone's, in sight or as last
