@@ -1,9 +1,11 @@
 import type { ScriptParam, ScriptSummary } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import {
+  canCustomise,
   groupStartValues,
   overrideParamValues,
   startedScript,
+  startFormOpens,
   startFormParams,
   startParamValues,
   startValues,
@@ -24,6 +26,68 @@ const summary = (id: number, task: ScriptSummary['task']): ScriptSummary => ({
   task,
   followsDefault: task !== null,
   params: PARAMS,
+})
+
+describe('starting at once', () => {
+  const task = { kind: 'task', task: 'work' }
+  const named = (name: string, description?: string): ScriptParam => ({
+    name,
+    type: 'storage',
+    ...(description === undefined ? {} : { description }),
+  })
+
+  it('opens the form by itself only for a param with no default and no none:', () => {
+    expect(startFormOpens(task, [{ name: 'n', type: 'number', default: 2 }], false)).toBe(false)
+    expect(startFormOpens(task, [named('s', 'where; none: the nearest')], false)).toBe(false)
+    // With nothing after it, none: still says the script can go without.
+    expect(startFormOpens(task, [named('s', 'none:')], false)).toBe(false)
+    expect(startFormOpens(task, [named('s')], false)).toBe(true)
+    expect(startFormOpens(task, [named('s', 'where to go')], false)).toBe(true)
+    expect(startFormOpens(task, [{ name: 'n', type: 'number' }], false)).toBe(true)
+    // One such param among those that can go without is enough.
+    const some = [{ name: 'n', type: 'number', default: 2 } as ScriptParam, named('s')]
+    expect(startFormOpens(task, some, false)).toBe(true)
+  })
+
+  it('reads a word like nonetheless as no none:', () => {
+    expect(startFormOpens(task, [named('s', 'nonetheless: here')], false)).toBe(true)
+  })
+
+  it('opens the form for Customise while there are params to show', () => {
+    expect(startFormOpens(task, [{ name: 'n', type: 'number', default: 2 }], true)).toBe(true)
+    expect(startFormOpens(task, [], true)).toBe(false)
+    expect(startFormOpens(task, [], false)).toBe(false)
+  })
+
+  it('still asks for a defence script’s params when it is picked', () => {
+    const pick = { kind: 'setDefenceScript', scriptId: 1 }
+    expect(startFormOpens(pick, [{ name: 'n', type: 'number', default: 2 }], false)).toBe(true)
+    expect(startFormOpens(pick, [], false)).toBe(false)
+  })
+
+  it('offers Customise only for a script with params to show', () => {
+    const work = {
+      ...summary(2, 'work'),
+      params: [{ name: 'workplace', type: 'building' as const }],
+    }
+    const own = { ...summary(3, null), params: [] }
+    const mine = summary(4, null)
+    const scripts = [work, own, mine]
+    // Work's only param is the target its task fills.
+    expect(canCustomise(task, scripts)).toBe(false)
+    expect(canCustomise({ kind: 'runScript', scriptId: 2 }, scripts)).toBe(true)
+    expect(canCustomise({ kind: 'runScript', scriptId: 3 }, scripts)).toBe(false)
+    expect(canCustomise({ kind: 'runScript', scriptId: 4 }, scripts)).toBe(true)
+    expect(canCustomise({ kind: 'walkTo', x: 1, y: 1 }, scripts)).toBe(false)
+    // By the workplace's work script.
+    const worker = {
+      ...mine,
+      params: [{ name: 'workplace', type: 'building' as const }, ...PARAMS],
+    }
+    const at = { kind: 'task', task: 'work', workplaceId: 'farm' }
+    expect(canCustomise(at, [work, worker], { farm: { scriptId: 4 } })).toBe(true)
+    expect(canCustomise(at, [work, worker])).toBe(false)
+  })
 })
 
 describe('the form before Work starts', () => {

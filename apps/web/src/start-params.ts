@@ -3,6 +3,7 @@ import {
   isParamChoice,
   isParamNumber,
   isWorkScript,
+  paramNeedsValue,
   targetParam,
   type OrderRequest,
   type ScriptParam,
@@ -14,9 +15,11 @@ import {
 } from '@csp/shared'
 
 /**
- * The form shown before a script starts (`CONTEXT.md`: Script parameter, Before it starts):
- * giving a task or Run script whose script declares params first shows them, filled with the
- * resident's kept values or the defaults; Start gives the order with them. The server checks the
+ * The form shown before a script starts (`CONTEXT.md`: Script parameter, Starting at once, Before
+ * it starts): a task or Run script starts at once, with no params in the order, so each resident
+ * goes on with what they keep. Customise beside the order opens the form, filled with the
+ * resident's kept values or the defaults, and Start gives the order with them; it opens by itself
+ * for a param the script has nothing to go on without (`startFormOpens`). The server checks the
  * values again (ADR 0002).
  */
 
@@ -67,6 +70,30 @@ export function workScriptOf(
 export function startFormParams(order: OrderRequest, script: ScriptSummary): ScriptParam[] {
   const target = isWorkTask(order) ? WORKPLACE_PARAM : targetParam(script)
   return order.kind === 'task' ? script.params.filter((p) => p.name !== target) : script.params
+}
+
+/**
+ * Whether the order opens the form instead of starting at once, given the params it shows
+ * (`startFormParams`): when Customise asked for it, or a param needs a value (`paramNeedsValue`).
+ * A defence script starts nothing, so its params are still picked when it is picked.
+ */
+export function startFormOpens(
+  order: OrderRequest,
+  params: readonly ScriptParam[],
+  customise: boolean,
+): boolean {
+  if (params.length === 0) return false
+  return customise || order.kind === 'setDefenceScript' || params.some(paramNeedsValue)
+}
+
+/** Whether Customise has anything to show for the order: its script has params in the form. */
+export function canCustomise(
+  order: OrderRequest,
+  scripts: readonly ScriptSummary[],
+  workSettings: Readonly<Record<string, WorkplaceSettings>> = {},
+): boolean {
+  const script = startedScript(order, scripts, workSettings)
+  return script !== undefined && startFormParams(order, script).length > 0
 }
 
 /**

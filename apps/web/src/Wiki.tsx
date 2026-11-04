@@ -1092,10 +1092,10 @@ export function Wiki() {
           else the nearest storage of their realm.
         </p>
         <p>
-          A workplace's card says how much is being made there: what each of your workers there makes
-          and how much a game day at their Strength and skill, and the total of each good. It is the
-          pace while they have what they need, not a count of what has been made. Other realms'
-          workers aren't counted, as their stats aren't known.
+          A workplace's card says how much is being made there: what each of your workers there
+          makes and how much a game day at their Strength and skill, and the total of each good. It
+          is the pace while they have what they need, not a count of what has been made. Other
+          realms' workers aren't counted, as their stats aren't known.
         </p>
         <p>
           A smelter, mint or smithy has no storage: it works what its workers carry and what lies in
@@ -1664,14 +1664,14 @@ export function Wiki() {
         <p>
           Every Player may claim {num(HORSE_GRANT_HORSES)} new horses once, whenever they choose and
           whether or not they have horses: a notice at the top of the screen has a Claim button
-          until they do. The horses get new stats and ages and go in your finished stable
-          nearest your Leader's city; with no stable, they stand next to that city's storage (or
-          next to your Leader), each with {num(HORSE_GRANT_FOOD)} Food on the ground by it. The
-          realm log says where they are. Once claimed the offer is gone, also after your Leader dies
-          and you found a new realm; while you have no living Leader you can't claim it. An admin
-          can offer horses again, to every Player or to one: if you had claimed, the notice comes
-          back and you may claim once more, whether or not you still have horses. If you hadn't, you
-          still have just the one claim.
+          until they do. The horses get new stats and ages and go in your finished stable nearest
+          your Leader's city; with no stable, they stand next to that city's storage (or next to
+          your Leader), each with {num(HORSE_GRANT_FOOD)} Food on the ground by it. The realm log
+          says where they are. Once claimed the offer is gone, also after your Leader dies and you
+          found a new realm; while you have no living Leader you can't claim it. An admin can offer
+          horses again, to every Player or to one: if you had claimed, the notice comes back and you
+          may claim once more, whether or not you still have horses. If you hadn't, you still have
+          just the one claim.
         </p>
         <h3>Deliveries and transfers</h3>
         <p>
@@ -2320,12 +2320,22 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
         </table>
         <ul>
           <li>
-            Before it starts: giving a task or Run script whose script has params first shows them,
-            filled with the values the resident keeps or the defaults. Change what you like and
-            press Start; Cancel gives nothing. A script without params starts at once. For a group
-            the form shows once, and each of them gets the same values. With Shift held the step
-            added to the queue keeps the values.
+            Starting at once: giving a task or Run script starts it in one tap, with the values the
+            resident keeps or the defaults; in a group each one goes on with their own.
           </li>
+          <li>
+            Before it starts: a Customise button beside the order, on the resident card, the group
+            card and in Add step, shows its params, filled with those values. Change what you like
+            and press Start; Cancel gives nothing. For a group the form shows once, and each of them
+            gets the same values. With Shift held the step added to the queue keeps the values. An
+            order whose script has no params to show has no Customise.
+          </li>
+          <li>
+            The form opens by itself only when a param has no default and no <code>none:</code> in
+            its comment, since the script has nothing to go on without it. Give each param one or
+            the other to start your script in one tap.
+          </li>
+          <li>A defence script starts nothing, so its params are still shown when you pick it.</li>
           <li>
             A resident's card shows one field for each param of the script they run: pick it on the
             map, or clear it. A <code>number</code> param has a number field instead: type a whole
@@ -2383,7 +2393,7 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           </li>
           <li>
             The Work default has <code>workplace</code>: the workplace to work, the one they stand
-            on while none is picked; it is never kept between starts, so the form before it starts
+            on while none is picked; it is never kept between starts, so Customise on Run script
             shows it empty, and giving Work on a workplace fills it without asking. It also has{' '}
             <code>storage</code>: the main storage, for the output, inputs and Food; and{' '}
             <code>output</code>, <code>input</code> and <code>food</code>, each taking its place for
@@ -2439,11 +2449,12 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
         <ul>
           <li>
             Giving a resident Work at a workplace, from their card, a group card or a queue step,
-            runs its work script. The form before it starts is filled with the workplace's values.
+            runs its work script, at once. Customise shows its params filled with the workplace's
+            values.
           </li>
           <li>
             A value you change in that form becomes that resident's own, an override. What they kept
-            for that script before doesn't carry over.
+            for that script before doesn't carry over, with Customise or without.
           </li>
           <li>
             While they work there, each param reads their override, else the workplace's value, else
