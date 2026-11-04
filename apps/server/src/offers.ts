@@ -337,6 +337,25 @@ export const offersKeepGoods: Invariant = {
   },
 }
 
+/** The Trade Organization never accepts offers (`CONTEXT.md`: NPC cities at an offer). */
+export const tradeOrgTakesNoOffer: Invariant = {
+  name: 'trade-org-takes-no-offer',
+  check(world) {
+    return (ledger.get(world) ?? []).flatMap((t) => {
+      const r = world.residents.find((x) => x.id === t.residentId)
+      const city = r?.owner === null ? world.cities.find((c) => c.id === r.cityId) : undefined
+      if (!city?.tradeOrg) return []
+      return [
+        {
+          invariant: this.name,
+          message: `${t.residentId} of ${city.id}, the Trade Organization's, accepted an offer`,
+          entityIds: [t.residentId, city.id],
+        },
+      ]
+    })
+  },
+}
+
 /** Every accept order is done the tick it is given (`resolveOffers`): none outlasts a tick. */
 export const acceptOrdersDone: Invariant = {
   name: 'accept-orders-done',

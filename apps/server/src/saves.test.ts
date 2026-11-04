@@ -193,11 +193,19 @@ describe('world saves', () => {
     expect(checkInvariants(migrated, land)).toEqual([])
   })
 
+  it('leaves city plans as they are: no trader is out to an offer yet (migration 81 → 82)', () => {
+    const { world: v81, terrain: land } = worldWithPost()
+    const v82 = migrateWorld(structuredClone(v81), 81, { terrain: land })
+    expect(v82).toEqual(v81)
+    expect(Object.values(v82.cityPlans).every((p) => p.trader?.offer === undefined)).toBe(true)
+    expect(checkInvariants(v82, land)).toEqual([])
+  })
+
   it('leaves realms from before realm names unnamed (migration 38 → 39)', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(81)
+    expect(WORLD_FORMAT_VERSION).toBe(82)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)

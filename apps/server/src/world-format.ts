@@ -19,7 +19,7 @@ import { paramTarget } from './script-params.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 81
+export const WORLD_FORMAT_VERSION = 82
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -326,6 +326,9 @@ export const migrations: Record<number, MigrationStep> = {
   79: (state) => state,
   // Offers at a Player's storage (`CONTEXT.md`: Offer): nobody has posted any yet.
   80: (state) => ({ ...(state as object), offers: [] }),
+  // An NPC city's trader can go to a Player's offer (`CONTEXT.md`: NPC cities at an offer;
+  // `CityTrader.offer`). No trader was on such a run before, so the step leaves every plan as it is.
+  81: (state) => state,
 }
 
 export class WorldFormatError extends Error {}
