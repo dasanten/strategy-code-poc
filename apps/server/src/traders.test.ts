@@ -123,11 +123,11 @@ describe('placing wandering traders', () => {
     expect(tradersSound.check(world, terrain)).toEqual([])
   })
 
-  it('sends them round one loop of all the posts, each from a different place on it', () => {
-    const { posts, traders } = fixture()
+  it('sends them round one loop of all the posts and the HQ, each bound for a different post', () => {
+    const { hq, posts, traders } = fixture()
     const all = posts.map((p) => p.id).sort()
     expect(traders).toHaveLength(posts.length)
-    for (const t of traders) expect([...t.loop].sort()).toEqual(all)
+    for (const t of traders) expect([...t.loop].sort()).toEqual([...all, hq.id].sort())
     expect(new Set(traders.map((t) => t.loop.join())).size).toBe(1)
     expect(traders.map((t) => t.postId).sort()).toEqual(all)
   })
@@ -147,22 +147,22 @@ describe('placing wandering traders', () => {
     const { traders, posts } = fixture(sites)
     expect(traders).toHaveLength(TRADERS)
     expect(new Set(traders.map((t) => t.postId)).size).toBe(TRADERS)
-    expect(traders[0]!.loop).toHaveLength(posts.length)
+    expect(traders[0]!.loop).toHaveLength(posts.length + 1)
   })
 
-  it('goes round without crossing itself on a square of posts', () => {
-    const { posts, trader, world, terrain } = fixture()
+  it('goes round without crossing itself on a square of the HQ and its posts', () => {
+    const { trader, world, terrain } = fixture()
     const places = trader.loop.map((id) =>
       townHallOf(
         world,
-        posts.find((p) => p.id === id)!,
+        world.cities.find((c) => c.id === id)!,
       )!,
     )
     const legs = places.map((p, i) =>
       wrapDistance(terrain.size, p, places[(i + 1) % places.length]!),
     )
-    // Three corners of a square: two sides and a diagonal, whichever way round.
-    expect(Math.max(...legs)).toBeLessThan(140)
+    // The corners of a square: four sides, whichever way round, and no diagonal.
+    expect(Math.max(...legs)).toBeLessThan(120)
   })
 
   it('places none twice, and none without an HQ or with no post', () => {
@@ -343,7 +343,7 @@ describe('a wandering trader at a post', () => {
   })
 
   it(
-    'is sent from the HQ with only its Food, armed, and makes its way round its loop',
+    'is sent from the HQ armed, goes round its loop, the HQ and all, and supplies the posts',
     {
       tags: ['slow'],
       timeout: 240_000,
@@ -352,17 +352,15 @@ describe('a wandering trader at a post', () => {
       const { world, terrain, posts, trader } = fixture()
       world.traders = [trader]
       const warehouses = posts.map((p) => postEnd(world, p.id).warehouse!)
-      for (const w of warehouses) w.stock = { wood: 0 }
-      const first = postEnd(world, trader.postId!).warehouse!
-      first.stock = { wood: 200, coins: 800 }
+      for (const w of warehouses) w.stock = {}
       const arms = hqEnd(world).warehouse!
-      arms.stock = { ...arms.stock, spear: 10 }
-      const start = trader.postId!
+      arms.stock = { ...arms.stock, spear: 10, food: 400 }
+      const start = trader.postId
       const carriage = carriageOf(world, trader)
       const reached: string[] = []
       const walking = new Walking(terrain)
       let farthest = 0
-      for (let t = 0; t < 20_000 && reached.length < trader.loop.length + 1; t++) {
+      for (let t = 0; t < 30_000 && reached.length < trader.loop.length + 1; t++) {
         const was = trader.heading === 'post' ? trader.postId : null
         stepWorld(world, terrain, walking)
         if (was !== null && trader.postId !== was) reached.push(was)
@@ -378,19 +376,205 @@ describe('a wandering trader at a post', () => {
       const i = trader.loop.indexOf(start)
       const inOrder = trader.loop.map((_, n) => trader.loop[(i + n) % trader.loop.length])
       expect(reached).toEqual([...inOrder, start])
-      // What the first post held has spread to the others.
-      for (const w of warehouses) expect(w.stock?.wood ?? 0).toBeGreaterThan(0)
-      expect(warehouses.some((w) => w !== first && (w.stock?.coins ?? 0) > 0)).toBe(true)
+      // What it took at the HQ has reached every post, Food and Coins too.
+      for (const w of warehouses) {
+        expect(w.stock?.wood ?? 0).toBeGreaterThan(0)
+        expect(w.stock?.coins ?? 0).toBeGreaterThan(0)
+        expect(w.stock?.food ?? 0).toBeGreaterThan(0)
+      }
       expect(
         crewOf(world, trader)
           .slice(1)
           .every((r) => (r.carried.spear ?? 0) + (r.carried.sword ?? 0) > 0),
       ).toBe(true)
-      expect(farthest).toBeLessThanOrEqual(CARAVAN_SPREAD + 2)
+      expect(farthest).toBeLessThanOrEqual(CARAVAN_SPREAD + 3)
       expect(world.crimes).toEqual([])
       expect(checkInvariants(world, terrain)).toEqual([])
     },
   )
+})
+
+describe('a wandering trader at the HQ', () => {
+  /** A trader come round to the HQ's goods warehouse, its escort armed and its Food topped up. */
+  function comeRound() {
+    const s = fixture()
+    const { world, hq, trader } = s
+    world.traders = [trader]
+    const goods = hqEnd(world).warehouse!
+    const coins = world.buildings.find((b) => b.cityId === hq.id && b.stock?.coins)!
+    expect(coins).not.toBe(goods)
+    put(world, trader, goods.x, goods.y)
+    trader.postId = hq.id
+    trader.stop = 'warehouse'
+    for (const r of crewOf(world, trader).slice(1)) r.carried.spear = 1
+    carriageOf(world, trader).load = { food: CARAVAN_FOOD }
+    return { ...s, goods, coins, carriage: carriageOf(world, trader) }
+  }
+
+  /** The stop after the HQ on a trader's loop. */
+  const afterHq = (t: Trader, hqId: string) => t.loop[(t.loop.indexOf(hqId) + 1) % t.loop.length]!
+
+  it('comes round to the HQ from the post before it on its loop', () => {
+    const { world, terrain, hq, trader } = fixture()
+    world.traders = [trader]
+    trader.postId =
+      trader.loop[(trader.loop.indexOf(hq.id) + trader.loop.length - 1) % trader.loop.length]!
+    atWarehouse(world, trader).stock = {}
+    runUntil(world, terrain, () => trader.postId === hq.id)
+    expect(trader).toMatchObject({ heading: 'post', stop: 'storage' })
+    stepTraders(world, terrain.size)
+    const storage = hqEnd(world).storage!
+    expect(crewOf(world, trader)[0]!.order).toMatchObject({
+      kind: 'drive',
+      target: { x: storage.x, y: storage.y },
+    })
+  })
+
+  it('loads new Food and Coins there and carries them to a post', () => {
+    const { world, terrain, hq, trader, goods, coins, carriage } = comeRound()
+    goods.stock = { food: 100, wood: 100 }
+    coins.stock = { coins: 4_000 }
+    runUntil(world, terrain, () => trader.postId !== hq.id, 400)
+    expect(carriage.load).toMatchObject({ food: CARAVAN_FOOD + 50, wood: 50, coins: 2_000 })
+    expect(goods.stock).toMatchObject({ food: 50, wood: 50 })
+    expect(coins.stock).toEqual({ coins: 2_000 })
+    expect(trader).toMatchObject({ heading: 'post', stop: 'storage', plan: null })
+    // And on to the next post on its loop, which has none of them.
+    const bound = trader.postId
+    expect(bound).toBe(afterHq(trader, hq.id))
+    const post = postEnd(world, bound).warehouse!
+    post.stock = {}
+    put(world, trader, post.x, post.y)
+    trader.stop = 'warehouse'
+    runUntil(world, terrain, () => trader.postId !== bound, 400)
+    expect(post.stock).toMatchObject({ food: 25, wood: 25, coins: 1_000 })
+    expect(world.crimes).toEqual([])
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('moves Coins only at the coin warehouse and other goods only at the goods warehouse', () => {
+    const { world, terrain, hq, trader, goods, coins, carriage } = comeRound()
+    goods.stock = { iron: 0 }
+    coins.stock = { coins: 2_000 }
+    carriage.load = { food: CARAVAN_FOOD, iron: 40, coins: 6_000 }
+    const before = { iron: total(world, 'iron'), coins: total(world, 'coins') }
+    runUntil(world, terrain, () => trader.stop === 'coinWarehouse', 400)
+    // The goods are done, and nothing of the Coins has moved.
+    expect(goods.stock).toEqual({ iron: 20 })
+    expect(carriage.load).toMatchObject({ iron: 20, coins: 6_000 })
+    expect(coins.stock).toEqual({ coins: 2_000 })
+    expect(trader.plan).toEqual({ leave: { coins: 2_000 }, take: {} })
+    const walking = new Walking(terrain)
+    stepWorld(world, terrain, walking)
+    expect(crewOf(world, trader)[0]!.order).toMatchObject({
+      kind: 'drive',
+      target: { x: coins.x, y: coins.y },
+    })
+    expect(checkInvariants(world, terrain)).toEqual([])
+    runUntil(world, terrain, () => trader.postId !== hq.id, 400)
+    expect(coins.stock).toEqual({ coins: 4_000 })
+    expect(carriage.load).toMatchObject({ iron: 20, coins: 4_000 })
+    expect(goods.stock).toEqual({ iron: 20 })
+    expect(total(world, 'iron')).toBe(before.iron)
+    expect(total(world, 'coins')).toBe(before.coins)
+    expect(world.crimes).toEqual([])
+  })
+
+  it('shares the room on the carriage between the goods and the Coins', () => {
+    const { world, terrain, hq, trader, goods, coins, carriage } = comeRound()
+    goods.stock = { wood: 4_000, stone: 4_000 }
+    coins.stock = { coins: 40_000 }
+    runUntil(world, terrain, () => trader.postId !== hq.id, 2_000)
+    expect(carriage.load.wood).toBeGreaterThan(0)
+    expect(carriage.load.coins).toBeGreaterThan(0)
+    expect(stockWeight(carriage.load)).toBeLessThanOrEqual(CARRIAGE_CAPACITY)
+    expect(stockWeight(carriage.load)).toBeGreaterThan(CARRIAGE_CAPACITY - 10)
+  })
+
+  it('goes on from the goods warehouse with no Coins to move', () => {
+    const { world, terrain, hq, trader, goods, coins } = comeRound()
+    goods.stock = { wood: 10 }
+    coins.stock = {}
+    const stops: string[] = []
+    const walking = new Walking(terrain)
+    for (let t = 0; t < 100 && trader.postId === hq.id; t++) {
+      stepWorld(world, terrain, walking)
+      stops.push(trader.stop)
+    }
+    expect(trader.postId).not.toBe(hq.id)
+    expect(stops).not.toContain('coinWarehouse')
+  })
+
+  it('leaves what is kept for deliveries alone, Coins too', () => {
+    const { world, terrain, hq, trader, goods, coins, carriage } = comeRound()
+    goods.stock = { wood: 100 }
+    coins.stock = { coins: 1_000 }
+    const job = {
+      realmId: 'someone',
+      warehouseId: goods.id,
+      cityId: 'somewhere',
+      fee: 1,
+      caravanId: null,
+    }
+    world.deliveries.push(
+      { ...job, id: 'd1', kind: 'delivery', good: 'wood', units: 60 },
+      { ...job, id: 'd2', kind: 'delivery', good: 'coins', units: 400 },
+    )
+    runUntil(world, terrain, () => trader.postId !== hq.id, 400)
+    expect(goods.stock.wood).toBe(80)
+    expect(carriage.load.wood).toBe(20)
+    expect(coins.stock.coins).toBe(700)
+    expect(carriage.load.coins).toBe(300)
+  })
+
+  it('makes up a lost escort there each time round, but not at a post', () => {
+    const { world, terrain, hq, trader, goods, coins } = comeRound()
+    goods.stock = { spear: 10 }
+    coins.stock = {}
+    const post = postEnd(world, afterHq(trader, hq.id)).warehouse!
+    trader.postId = afterHq(trader, hq.id)
+    put(world, trader, post.x, post.y)
+    die(world, crewOf(world, trader)[1]!)
+    expect(trader.escortIds).toHaveLength(TRADER_ESCORTS - 1)
+    stepTraders(world, terrain.size)
+    expect(trader.escortIds).toHaveLength(TRADER_ESCORTS - 1)
+    // Back at the HQ.
+    trader.postId = hq.id
+    put(world, trader, goods.x, goods.y)
+    trader.plan = null
+    const left = new Set(trader.escortIds)
+    stepTraders(world, terrain.size)
+    expect(trader.escortIds).toHaveLength(TRADER_ESCORTS)
+    expect(trader.postId).toBe(hq.id)
+    // The new one is armed before it goes on.
+    const joined = trader.escortIds.find((id) => !left.has(id))!
+    runUntil(world, terrain, () => trader.postId !== hq.id, 400)
+    expect(world.residents.find((r) => r.id === joined)!.carried.spear).toBe(1)
+  })
+
+  it('back for a new carriage when bound for the HQ, goes on past it, not calling twice', () => {
+    const { world, terrain, hq, trader, goods, coins } = comeRound()
+    goods.stock = {}
+    coins.stock = {}
+    trader.heading = 'hq'
+    runUntil(world, terrain, () => trader.heading === 'post')
+    expect(trader.postId).toBe(afterHq(trader, hq.id))
+  })
+
+  it('takes a load out when it is first sent, as at any stop', () => {
+    const { world, terrain, trader } = fixture()
+    world.traders = [trader]
+    const goods = hqEnd(world).warehouse!
+    goods.stock = { ...goods.stock, wood: 100, spear: 2 }
+    put(world, trader, goods.x, goods.y)
+    trader.heading = 'hq'
+    trader.stop = 'warehouse'
+    const bound = trader.postId
+    runUntil(world, terrain, () => trader.heading === 'post', 2_000)
+    expect(trader.postId).toBe(bound)
+    expect(carriageOf(world, trader).load.wood).toBeGreaterThan(0)
+    expect(carriageOf(world, trader).load.coins).toBeGreaterThan(0)
+  })
 })
 
 describe('a wandering trader losing its crew', () => {
@@ -622,12 +806,12 @@ describe('a wandering trader’s loop', () => {
   it('keeps its way when a post it isn’t bound for drops, wrapping round the end', () => {
     const { world, trader, posts } = fixture()
     const bound = trader.postId!
-    const other = trader.loop.find((id) => id !== bound)!
+    const other = posts.find((p) => p.id !== bound)!.id
     trader.stop = 'warehouse'
     dropFromLoop(trader, other)
     expect(trader.postId).toBe(bound)
     expect(trader.stop).toBe('warehouse')
-    // The last of the loop goes: on to the first.
+    // The last of the loop goes: on to the first, the HQ.
     const last = trader.loop[trader.loop.length - 1]!
     const first = trader.loop[0]
     trader.postId = last
@@ -672,12 +856,12 @@ describe('a wandering trader’s loop', () => {
   })
 
   it('goes back to the HQ with no post left, and out again when there is one', () => {
-    const { world, terrain, trader, posts } = fixture([[220, 128]])
+    const { world, terrain, hq, trader, posts } = fixture([[220, 128]])
     expect(world.traders).toEqual([trader])
     put(world, trader, 300, 300)
     leaveTradeOrg(world, posts[0]!)
     dropFromLoop(trader, posts[0]!.id)
-    expect(trader).toMatchObject({ loop: [], postId: null, heading: 'hq', stop: 'storage' })
+    expect(trader).toMatchObject({ loop: [hq.id], postId: hq.id, stop: 'storage' })
     expect(tradersSound.check(world, terrain)).toEqual([])
     stepTraders(world, terrain.size)
     const storage = hqEnd(world).storage!
@@ -687,21 +871,25 @@ describe('a wandering trader’s loop', () => {
     })
     const post = foundTradingPost(world, terrain, 128, 320, undefined, mulberry32(3))
     stepTraders(world, terrain.size)
-    expect(trader).toMatchObject({ loop: [post.id], postId: post.id, heading: 'hq' })
+    expect(trader).toMatchObject({ loop: [hq.id, post.id], postId: hq.id })
+    expect(tradersSound.check(world, terrain)).toEqual([])
   })
 
   it('stays at the HQ’s warehouse with no post left, not shuttling to and fro', () => {
-    const { world, terrain, trader, posts } = fixture([[220, 128]])
+    const { world, terrain, hq, trader, posts } = fixture([[220, 128]])
     leaveTradeOrg(world, posts[0]!)
     dropFromLoop(trader, posts[0]!.id)
     const warehouse = hqEnd(world).warehouse!
     put(world, trader, warehouse.x, warehouse.y)
-    trader.heading = 'hq'
     trader.stop = 'warehouse'
     for (const r of crewOf(world, trader)) r.carried.spear = 1
     stepTraders(world, terrain.size)
-    expect(trader.stop).toBe('warehouse')
+    expect(trader).toMatchObject({ stop: 'warehouse', postId: hq.id, plan: null })
     expect(crewOf(world, trader)[0]!.order).toBeNull()
+    // Given a post, it goes on from there.
+    const post = foundTradingPost(world, terrain, 128, 320, undefined, mulberry32(3))
+    runUntil(world, terrain, () => trader.postId === post.id, 2_000)
+    expect(trader.heading).toBe('post')
   })
 })
 
@@ -710,6 +898,9 @@ describe('wandering traders and the fall of the HQ', () => {
     const { world, terrain, hq, trader } = fixture()
     const realm = foundStartingCity(world, terrain, 7)
     put(world, trader, 300, 300)
+    // Bound for the HQ, on its loop, makes no difference.
+    expect(trader.loop).toContain(hq.id)
+    trader.postId = hq.id
     const carriage = carriageOf(world, trader)
     carriage.load = { iron: 3 }
     const crew = crewOf(world, trader)
@@ -769,15 +960,31 @@ describe('the invariant on wandering traders', () => {
   const messages = (world: WorldState, terrain: TerrainMap) =>
     tradersSound.check(world, terrain).map((v) => v.message)
 
-  it('catches a loop naming what is no post, or a post twice', () => {
+  it('allows the HQ on a loop, but catches a loop naming anything else, or a stop twice', () => {
     const { world, terrain, trader, hq } = fixture()
-    trader.loop.push(hq.id)
+    expect(trader.loop).toContain(hq.id)
+    expect(messages(world, terrain)).toEqual([])
+    const realm = foundStartingCity(world, terrain, 7)
+    trader.loop.push(realm.id)
     expect(messages(world, terrain)).toEqual([
-      `trader ${trader.id} has ${hq.id} on its loop, which is no trading post`,
+      `trader ${trader.id} has ${realm.id} on its loop, which is no city`,
     ])
     trader.loop.pop()
     trader.loop.push(trader.loop[0]!)
-    expect(messages(world, terrain)).toEqual([`trader ${trader.id} has a post twice on its loop`])
+    expect(messages(world, terrain)).toEqual([`trader ${trader.id} has a stop twice on its loop`])
+  })
+
+  it('catches a loop without the HQ', () => {
+    const { world, terrain, trader, hq } = fixture()
+    trader.loop.splice(trader.loop.indexOf(hq.id), 1)
+    expect(messages(world, terrain)).toEqual([`trader ${trader.id} has no HQ on its loop`])
+  })
+
+  it('catches making for a coin warehouse at a post', () => {
+    const { world, terrain, trader } = fixture()
+    trader.heading = 'post'
+    trader.stop = 'coinWarehouse'
+    expect(messages(world, terrain)[0]).toContain('makes for a coin warehouse')
   })
 
   it('catches going to a post off its loop', () => {

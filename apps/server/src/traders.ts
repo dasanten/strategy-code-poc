@@ -17,10 +17,13 @@ import {
   owedBy,
   stockWeight,
   townHallOf,
+  tradeCoinWarehouse,
   traderEscortsWanted,
   unitsThatFit,
   unitsThatFitCarriage,
+  warehouseKeeps,
   wrapDistance,
+  type Building,
   type Carriage,
   type City,
   type Good,
@@ -54,26 +57,29 @@ import { worldIndex } from './world-index.js'
 
 /*
  * Wandering traders (`CONTEXT.md`: Wandering trader): Trade Org carriages the HQ sends round a
- * fixed loop of its trading posts, apart from the caravans, so posts can hold goods they don't
- * produce. Crew, escort, Food on board and a lost carriage go as for a caravan, and share its code
- * (`stepCrew`). The trader is plain data (ADR 0002); each tick the game gives its crew drive,
+ * fixed loop of its trading posts and itself, apart from the caravans, so posts can hold goods they
+ * don't produce and new Food and Coins reach them. Crew, escort, Food on board and a lost carriage
+ * go as for a caravan, and share its code (`stepCrew`). The trader is plain data (ADR 0002); each tick the game gives its crew drive,
  * pick-up, drop and walk orders, which request actions like a Player's do.
  */
 
-/** Where a trading post lies, for how far its neighbours on a loop are. */
-function placeOf(world: WorldState, postId: string): { x: number; y: number } | undefined {
-  const city = world.cities.find((c) => c.id === postId)
+/** Where a stop lies, for how far its neighbours on a loop are. */
+function placeOf(world: WorldState, stopId: string): { x: number; y: number } | undefined {
+  const city = world.cities.find((c) => c.id === stopId)
   const hall = city && townHallOf(world, city)
   return hall && middleOf(hall)
 }
 
 /**
- * Puts `postId` into `loop` where it adds the least way, keeping the order of the rest, so the loop
- * stays fixed but for that one post. `size` is the map's.
+ * Puts `stopId` into `loop` where it adds the least way, keeping the order of the rest, so the loop
+ * stays fixed but for that one stop; last, when where it lies isn't known. `size` is the map's.
  */
-function insertIntoLoop(world: WorldState, loop: string[], postId: string, size: number): void {
-  const at = placeOf(world, postId)
-  if (!at) return
+function insertIntoLoop(world: WorldState, loop: string[], stopId: string, size: number): void {
+  const at = placeOf(world, stopId)
+  if (!at) {
+    loop.push(stopId)
+    return
+  }
   let best = loop.length
   let least = Infinity
   loop.forEach((id, i) => {
@@ -85,22 +91,22 @@ function insertIntoLoop(world: WorldState, loop: string[], postId: string, size:
     least = added
     best = i + 1
   })
-  loop.splice(best, 0, postId)
+  loop.splice(best, 0, stopId)
 }
 
-/** A loop of all the world's trading posts (`insertIntoLoop`). `size` is the map's. */
-function newLoop(world: WorldState, posts: readonly City[], size: number): string[] {
+/** A loop of the HQ and all the world's trading posts (`insertIntoLoop`). `size` is the map's. */
+function newLoop(world: WorldState, hq: City, posts: readonly City[], size: number): string[] {
   const loop: string[] = []
-  for (const post of posts) insertIntoLoop(world, loop, post.id, size)
+  for (const stop of [hq, ...posts]) insertIntoLoop(world, loop, stop.id, size)
   return loop
 }
 
 /**
  * The HQ sends out its wandering traders (`CONTEXT.md`: Wandering trader): `TRADERS`, or one for
- * each post with fewer, spread evenly round one loop of all the posts. Each gets a carriage with a
- * horse hitched to it, a driver and `TRADER_ESCORTS` escorts, new residents of the HQ, all standing
- * at its goods warehouse. Each starts by topping up its Food at the HQ. Nothing when the world has
- * no HQ. `size` is the map's.
+ * each post with fewer, each bound for a different post, spread evenly round one loop of all the
+ * posts and the HQ. Each gets a carriage with a horse hitched to it, a driver and `TRADER_ESCORTS`
+ * escorts, new residents of the HQ, all standing at its goods warehouse. Each starts at the HQ, a
+ * stop like any. Nothing when the world has no HQ. `size` is the map's.
  */
 export function placeTraders(world: WorldState, size: number): Trader[] {
   const hq = tradeOrgHq(world)
@@ -109,8 +115,9 @@ export function placeTraders(world: WorldState, size: number): Trader[] {
   const middle = middleOf(hall)
   const [x, y] = hqLayout(middle.x, middle.y).goodsWarehouse
   const posts = tradingPosts(world)
-  const loop = newLoop(world, posts, size)
-  const count = Math.min(TRADERS, loop.length)
+  const loop = newLoop(world, hq, posts, size)
+  const bound = loop.filter((id) => id !== hq.id)
+  const count = Math.min(TRADERS, bound.length)
   const placed: Trader[] = []
   for (let i = world.traders.length; i < count; i++) {
     const rand = mulberry32(hash(`${world.seed}:trader:${i}`))
@@ -132,7 +139,7 @@ export function placeTraders(world: WorldState, size: number): Trader[] {
       driverId: crew[0]!.id,
       escortIds: crew.slice(1).map((r) => r.id),
       loop: [...loop],
-      postId: loop[Math.floor((i * loop.length) / count)]!,
+      postId: bound[Math.floor((i * bound.length) / count)]!,
       heading: 'hq',
       stop: 'storage',
       plan: null,
@@ -146,6 +153,21 @@ export function placeTraders(world: WorldState, size: number): Trader[] {
     placed.push(trader)
   }
   return placed
+}
+
+/**
+ * The HQ joins the loops of the world's traders (`CONTEXT.md`: Wandering trader), for a world from
+ * before it was a stop: where it adds the least way, and a trader with no post left is bound for it.
+ * `size` is the map's.
+ */
+export function putHqOnLoops(world: WorldState, size: number): void {
+  const hq = tradeOrgHq(world)
+  if (!hq) return
+  for (const t of world.traders) {
+    if (!t.loop.includes(hq.id)) insertIntoLoop(world, t.loop, hq.id, size)
+    // Null in a world from before: with no post left there was nowhere to be bound for.
+    t.postId = (t.postId as string | null) ?? hq.id
+  }
 }
 
 /**
@@ -182,28 +204,39 @@ export function evenOutLoad(
   return { leave, take: takes }
 }
 
+/** Whether the trader's place now is the HQ: it is sent from there, or has come round to it. */
+const atTheHq = (world: WorldState, trader: Trader) =>
+  trader.heading === 'hq' || trader.postId === tradeOrgHq(world)?.id
+
 /** The trader's place now: its storage and warehouse, at the HQ or at `postId`. */
 function traderEnd(world: WorldState, trader: Trader): RouteEnd {
-  return trader.heading === 'hq' || trader.postId === null
-    ? hqEnd(world)
-    : postEnd(world, trader.postId)
+  return atTheHq(world, trader) ? hqEnd(world) : postEnd(world, trader.postId)
 }
 
 /**
- * The trader goes on: from the HQ out to the post it was bound for, from a post to the next on its
- * loop, its storage first. With no post on its loop it stays at the HQ. The cities it stops at on
- * the way are worked out anew (`CONTEXT.md`: Trader stop).
+ * The building the trader stands at or goes to next: at its place now, its storage, its warehouse or
+ * the warehouse with its Coins, which at a post is the same one (`tradeCoinWarehouse`).
  */
-function goOn(trader: Trader): void {
-  if (trader.postId === null) return
+function traderStop(world: WorldState, trader: Trader): Building | undefined {
+  const end = traderEnd(world, trader)
+  if (trader.stop === 'storage') return end.storage
+  if (trader.stop === 'warehouse' || !end.warehouse) return end.warehouse
+  return tradeCoinWarehouse(world, end.warehouse)
+}
+
+/**
+ * The trader goes on, its storage first: sent from the HQ, out to the post it was bound for; from a
+ * stop, to the next on its loop. The cities it stops at on the way are worked out anew (`CONTEXT.md`:
+ * Trader stop).
+ */
+function goOn(world: WorldState, trader: Trader): void {
   trader.stop = 'storage'
   trader.plan = null
   trader.misses = 0
   trader.calls = null
-  if (trader.heading === 'hq') {
-    trader.heading = 'post'
-    return
-  }
+  const sentOut = trader.heading === 'hq' && trader.postId !== tradeOrgHq(world)?.id
+  trader.heading = 'post'
+  if (sentOut) return
   const at = trader.loop.indexOf(trader.postId)
   trader.postId = trader.loop[(at + 1) % trader.loop.length]!
 }
@@ -257,7 +290,7 @@ function driveToLostPost(
   size: number,
 ): void {
   const standing = world.buildings.filter((b) => b.cityId === city.id && isCityBuilding(b))
-  if (trader.misses >= TRADER_DRIVE_TRIES || standing.length === 0) return goOn(trader)
+  if (trader.misses >= TRADER_DRIVE_TRIES || standing.length === 0) return goOn(world, trader)
   const nearest = standing.reduce((a, b) =>
     wrapDistance(size, carriage, b) < wrapDistance(size, carriage, a) ? b : a,
   )
@@ -274,13 +307,15 @@ function driveToLostPost(
 
 /**
  * One tick of a trader whose driver is idle with the carriage: out to a lost post, drive up to it
- * (`driveToLostPost`); otherwise drive to the next stop, going on to
- * the next post after `TRADER_DRIVE_TRIES` drives that end short of it; at a storage, top up the Food
- * on board for its crew (`caravanFoodFor`); at a post's warehouse, even out its load (`evenOutLoad`),
- * leaving first, beyond what the warehouse keeps for deliveries; then go on. At the HQ it loads
- * nothing but that Food, and waits for its escort to be armed. Each take or put is one pick-up or drop order of the driver's, one a tick,
- * like anyone's. A place without its storage is skipped to the warehouse; one without its warehouse,
- * passed by. `size` is the map's.
+ * (`driveToLostPost`). Otherwise drive to the next stop, going on to the next after
+ * `TRADER_DRIVE_TRIES` drives that end short of it; at a storage, top up the Food on
+ * board for its crew (`caravanFoodFor`); at a warehouse, even out its load (`evenOutLoad`), leaving
+ * first, beyond what the warehouse keeps for deliveries; then go on. The HQ is a stop like a post,
+ * but for two things. It keeps its Coins in its coin warehouse, so they are worked out with the rest,
+ * sharing the room on the carriage, and moved there after the other goods. And at its goods warehouse
+ * the trader first waits for its escort to be armed, and with no post left stays there. Each take or
+ * put is one pick-up or drop order of the driver's, one a tick, like anyone's. A place without its
+ * storage is skipped to the warehouse; one without its warehouse, passed by. `size` is the map's.
  */
 function runTrader(
   world: WorldState,
@@ -291,15 +326,14 @@ function runTrader(
 ): void {
   const lost = lostPostAhead(world, trader)
   if (lost) return driveToLostPost(world, trader, lost, driver, carriage, size)
-  const end = traderEnd(world, trader)
-  const stop = trader.stop === 'storage' ? end.storage : end.warehouse
+  const stop = traderStop(world, trader)
   if (!stop) {
     if (trader.stop === 'storage') trader.stop = 'warehouse'
-    else goOn(trader)
+    else goOn(world, trader)
     return
   }
   if (!isAt(driver, stop, size)) {
-    if (trader.misses >= TRADER_DRIVE_TRIES) return goOn(trader)
+    if (trader.misses >= TRADER_DRIVE_TRIES) return goOn(world, trader)
     trader.misses++
     const target = { x: stop.x, y: stop.y }
     driver.order = { kind: 'drive', carriageId: carriage.id, target, path: null, progress: 0 }
@@ -311,17 +345,19 @@ function runTrader(
     if (!topUpFood(world, trader, driver, stop, carriage)) trader.stop = 'warehouse'
     return
   }
-  if (trader.heading === 'hq') {
-    // It won't be back here soon, so it goes no further than this without arms for its escort.
+  if (trader.stop === 'warehouse' && atTheHq(world, trader)) {
     const index = worldIndex(world)
     const escort = trader.escortIds.flatMap((id) => index.residentById(id) ?? [])
-    if (escort.every(isArmed)) goOn(trader)
-    return
+    if (!escort.every(isArmed) || trader.loop.length < 2) return
   }
   const stock = stop.stock ?? {}
   if (trader.plan === null) {
+    const coins = tradeCoinWarehouse(world, stop)
     const spare: Stock = {}
-    for (const g of GOODS) spare[g] = (stock[g] ?? 0) - owedBy(world, stop.id, g)
+    for (const g of GOODS) {
+      const held = g === 'coins' ? coins?.stock?.coins : stock[g]
+      spare[g] = (held ?? 0) - owedBy(world, stop.id, g)
+    }
     trader.plan = evenOutLoad(
       spare,
       carriage.load,
@@ -333,9 +369,14 @@ function runTrader(
   const onCarriage: GoodsSpot = { kind: 'carriage', carriageId: carriage.id }
   const hands = (g: Good) => unitsThatFit(driver, g, world.tick)
   const { leave, take: toTake } = trader.plan
-  /** The next of `goods` that can be moved, what is left of it noted; undefined with none left. */
+  const keeps = warehouseKeeps(world, stop)
+  /**
+   * The next of `goods` this warehouse keeps that can be moved, what is left of it noted; undefined
+   * with none left.
+   */
   const nextOf = (goods: Stock, most: (g: Good) => number): Stock | undefined => {
     for (const [g, wanted] of Object.entries(goods) as [Good, number][]) {
+      if (!keeps.includes(g)) continue
       const units = Math.min(wanted, most(g))
       if (units <= 0 || wanted - units <= 0) delete goods[g]
       else goods[g] = wanted - units
@@ -349,14 +390,17 @@ function runTrader(
     Math.min(stock[g] ?? 0, hands(g), unitsThatFitCarriage(world, carriage, g)),
   )
   if (on) return take(trader, driver, here, on, 'carriage')
-  goOn(trader)
+  // What is left of the plan is what this warehouse doesn't keep: at the HQ, the Coins.
+  const coinsLeft = Object.keys(leave).length + Object.keys(toTake).length > 0
+  if (trader.stop === 'warehouse' && coinsLeft) trader.stop = 'coinWarehouse'
+  else goOn(world, trader)
 }
 
 /**
  * The trader's loop follows the world's posts (`CONTEXT.md`: Wandering trader): new ones join it
  * where they add the least way (`insertIntoLoop`). One lost stays on it until the trader gets there
- * (`reachLostPost`), and only a city no longer there at all drops at once. With no post left it goes
- * back to the HQ; given one again, it is sent out from there.
+ * (`reachLostPost`), and only a city no longer there at all drops at once. The HQ stays on it, so with
+ * no post left the trader goes back there, and given one again goes out to it.
  */
 function followPosts(
   world: WorldState,
@@ -370,7 +414,6 @@ function followPosts(
   for (const post of posts) {
     if (!trader.loop.includes(post.id)) insertIntoLoop(world, trader.loop, post.id, size)
   }
-  if (trader.postId === null) trader.postId = trader.loop[0] ?? null
 }
 
 /**
@@ -434,7 +477,7 @@ export function robTrader(
 /**
  * `thief` stole a carriage (`CONTEXT.md`: Wandering trader, Caravan crew lost): when it was a
  * trader's that robs it, and the same trader gets a new carriage and horse at the HQ's goods
- * warehouse, where it is sent out again to the post it was bound for and any surviving crew walk back
+ * warehouse, where it is sent out again to the stop it was bound for and any surviving crew walk back
  * to it. With no HQ left to give them, the trader ends.
  */
 export function traderCarriageStolen(world: WorldState, thief: Resident, carriage: Carriage): void {
@@ -461,10 +504,10 @@ export function traderCarriageStolen(world: WorldState, thief: Resident, carriag
 
 /**
  * Wandering traders hold together (`CONTEXT.md`: Wandering trader, Caravan crew lost; ADR 0004):
- * each one's loop names cities that exist, each once, trading posts or those lost and not yet found
- * out (`CONTEXT.md`: Lost post found out), and it goes to one of them, or to none only with an empty
- * loop; its carriage, of the Trade Organization or it ends, and its crew exist and
- * are the HQ's (of no realm, of the HQ city); it has no driver only with no crew left; nobody is on
+ * each one's loop holds the HQ and otherwise names trading posts, or those lost and not yet found out
+ * (`CONTEXT.md`: Lost post found out), all cities that exist, each once, and it goes to one of them; it
+ * makes for a coin warehouse only at the HQ; its carriage, of the Trade Organization or it ends, and
+ * its crew exist and are the HQ's (of no realm, of the HQ city); it has no driver only with no crew left; nobody is on
  * two traders or caravans or both drives and escorts; the driver drives only its carriage; it walks
  * with no more escorts than it gets (`traderEscortsWanted`); and what it means to take fits on a
  * carriage.
@@ -483,13 +526,17 @@ export const tradersSound: Invariant = {
     const crew = new Set(world.caravans.flatMap(crewIdsOf))
     for (const t of world.traders) {
       for (const id of t.loop) {
-        if (!world.cities.some((c) => c.id === id && c.tradeOrg !== 'hq')) {
-          fail(t, `has ${id} on its loop, which is no trading post`, [id])
+        if (!world.cities.some((c) => c.id === id)) {
+          fail(t, `has ${id} on its loop, which is no city`, [id])
         }
       }
-      if (new Set(t.loop).size !== t.loop.length) fail(t, 'has a post twice on its loop')
-      if (t.postId === null ? t.loop.length > 0 : !t.loop.includes(t.postId)) {
-        fail(t, `goes to ${t.postId}, which doesn't fit its loop of ${t.loop.length}`)
+      if (hq && !t.loop.includes(hq.id)) fail(t, 'has no HQ on its loop', [hq.id])
+      if (new Set(t.loop).size !== t.loop.length) fail(t, 'has a stop twice on its loop')
+      if (!t.loop.includes(t.postId)) {
+        fail(t, `goes to ${t.postId}, which isn't on its loop of ${t.loop.length}`)
+      }
+      if (t.stop === 'coinWarehouse' && !atTheHq(world, t)) {
+        fail(t, `makes for a coin warehouse at ${t.postId}, which is not the HQ`)
       }
       const k = world.carriages.find((x) => x.id === t.carriageId)
       if (!k) fail(t, `has carriage ${t.carriageId}, which doesn't exist`)

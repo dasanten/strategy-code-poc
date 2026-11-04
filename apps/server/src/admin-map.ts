@@ -181,9 +181,9 @@ export function adminWorldView(
   return { tick: world.tick, orgs, entities: out }
 }
 
-/** What the admin map calls a wandering trader: by the post it goes to next. */
+/** What the admin map calls a wandering trader: by the stop it goes to next. */
 const traderName = (world: WorldState, t: Trader) =>
-  world.cities.find((c) => c.id === t.postId)?.name ?? 'the HQ'
+  world.cities.find((c) => c.id === t.postId)?.name ?? 'a lost post'
 
 /** The jump list for the whole world (`AdminPlaces`), each list by name. */
 export function adminPlaces(world: WorldState, lookups: AdminLookups): AdminPlaces {
@@ -417,7 +417,7 @@ export function adminInspection(
         org: org(TRADE_ORGANIZATION),
         is: 'trader',
         trader: t,
-        post: t.postId === null ? null : named(cityById(t.postId)),
+        post: named(cityById(t.postId)),
         loop: t.loop.flatMap((p) => named(cityById(p)) ?? []),
         carriage: world.carriages.find((k) => k.id === t.carriageId) ?? null,
         crew: crewIdsOf(t).flatMap((m) => residentNamed(m) ?? []),

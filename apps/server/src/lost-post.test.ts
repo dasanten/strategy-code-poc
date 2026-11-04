@@ -235,7 +235,7 @@ describe('a wandering trader reaching a lost post', () => {
     trader.calls = [post.id]
     runUntil(world, () => !trader.loop.includes(post.id), 1500)
     expect(captureOf(world, post)!.witnesses.length).toBeGreaterThan(0)
-    expect(trader.stand).toBeNull()
+    expect(trader.stand?.cityId).not.toBe(post.id)
     expect(trader.calls).not.toContain(post.id)
     expect(regard(world, realm.id)).toBe(0)
     runUntil(world, () => regard(world, realm.id) < 0, 6000)
@@ -437,7 +437,7 @@ describe('invariants of a lost post', () => {
     expect(checkInvariants(world, terrain)).toEqual([])
     world.cities = world.cities.filter((c) => c !== post)
     expect(tradersSound.check(world, terrain).map((v) => v.message)).toContain(
-      `trader ${traders[0]!.id} has ${post.id} on its loop, which is no trading post`,
+      `trader ${traders[0]!.id} has ${post.id} on its loop, which is no city`,
     )
     // And the trader lets go of it, which forgets a crime nobody can find out any more.
     stepTraders(world, size)
@@ -467,8 +467,8 @@ describe('invariants of a lost post', () => {
 describe('saves from before', () => {
   it('stay as they are: posts lost before were never heard of', () => {
     const { world } = fixture()
-    const v83 = migrateWorld(structuredClone(world), 82, { terrain })
-    expect(v83).toEqual(world)
-    expect(checkInvariants(v83, terrain)).toEqual([])
+    const v84 = migrateWorld(structuredClone(world), 83, { terrain })
+    expect(v84).toEqual(world)
+    expect(checkInvariants(v84, terrain)).toEqual([])
   })
 })

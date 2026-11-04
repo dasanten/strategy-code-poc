@@ -141,15 +141,14 @@ export function leaveTradeOrg(world: WorldState, post: City): void {
 
 /**
  * Post `postId` leaves a wandering trader's loop (`CONTEXT.md`: Wandering trader). Bound for it, the
- * trader goes on to the post after it instead; with no post left it goes back to the HQ.
+ * trader goes on to the stop after it instead, so with no post left to the HQ, which stays on it.
  */
 export function dropFromLoop(trader: Trader, postId: string): void {
   const at = trader.loop.indexOf(postId)
   if (at < 0) return
   trader.loop.splice(at, 1)
   if (trader.postId !== postId) return
-  trader.postId = trader.loop[at % Math.max(1, trader.loop.length)] ?? null
-  trader.heading = trader.postId === null ? 'hq' : trader.heading
+  trader.postId = trader.loop[at % trader.loop.length]!
   trader.stop = 'storage'
   trader.plan = null
   trader.misses = 0

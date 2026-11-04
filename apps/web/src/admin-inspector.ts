@@ -154,10 +154,10 @@ function caravanDoing(c: Caravan, post: string): string {
 
 /** What a wandering trader is doing: being sent from the HQ or going round its loop. */
 function traderDoing(t: Trader, post: string | undefined): string {
-  if (!post) return 'At the HQ, with no post left on its loop'
-  return t.heading === 'hq'
-    ? `At the HQ, to go out to ${post}`
-    : `On its loop to ${post}, for the ${t.stop}`
+  if (t.loop.length < 2) return 'At the HQ, with no post left on its loop'
+  if (t.heading === 'hq') return `At the HQ, to go out to ${post}`
+  const stop = t.stop === 'coinWarehouse' ? 'coin warehouse' : t.stop
+  return `On its loop to ${post}, for the ${stop}`
 }
 
 /** A meter in whole points: "80 / 100". */
