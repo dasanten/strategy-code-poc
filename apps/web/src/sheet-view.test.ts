@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { nextSheet, snapSheet, stepSheet } from './sheet-view.js'
+import { keyboardInset, nextSheet, snapSheet, stepSheet } from './sheet-view.js'
+
+describe('keyboardInset', () => {
+  it('is what the keyboard covers of the page', () => {
+    expect(keyboardInset(812, { height: 812, offsetTop: 0, scale: 1 })).toBe(0)
+    expect(keyboardInset(812, { height: 480, offsetTop: 0, scale: 1 })).toBe(332)
+  })
+
+  it('counts the page panned up to show the focused field', () => {
+    expect(keyboardInset(812, { height: 480, offsetTop: 100, scale: 1 })).toBe(232)
+  })
+
+  it('is none while zoomed in, and never below none', () => {
+    expect(keyboardInset(812, { height: 400, offsetTop: 0, scale: 2 })).toBe(0)
+    expect(keyboardInset(700, { height: 812, offsetTop: 0, scale: 1 })).toBe(0)
+  })
+})
 
 describe('snapSheet', () => {
   it('settles at the nearest of peek, half and full', () => {

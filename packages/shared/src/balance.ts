@@ -542,6 +542,13 @@ export const NPC_NODE_REACH = 160
 export const NPC_TRADER_REACH = 720
 
 /**
+ * How far from its home a Player's offer may be for an NPC city to send its trader there
+ * (`CONTEXT.md`: NPC cities at an offer), in tiles: as far as it goes to a Trade Org warehouse
+ * (`NPC_TRADER_REACH`), since it is the same trader on the same Food.
+ */
+export const NPC_OFFER_REACH = 720
+
+/**
  * Game days after it left that an NPC city stops waiting for its trader (`CONTEXT.md`: NPC
  * trader): dead, robbed or stuck, they are dropped from its plan and it may send another.
  * Several times the longest trade run (`NPC_TRADER_REACH` there and back).
@@ -1349,12 +1356,43 @@ export const HORSE_STOLEN_WORTH = 100
 /**
  * How the Trade Organization's army punishes (`CONTEXT.md`: Trade Org reaction): it takes back
  * `times` what it lost, sends at most `soldiers` of its spare soldiers, and gives up and goes
- * home after `giveUpDays` game days out if it can't get it all.
+ * home after `giveUpDays` game days at the city, from when it arrived (`CONTEXT.md`: Punishment
+ * trip), if it can't get it all.
  */
 export const TRADE_ORG_PUNISH = {
   times: 2,
   soldiers: 8,
   giveUpDays: 12,
+  /**
+   * How much longer a walk takes than the same distance straight over Plains, for the Food packed:
+   * Forest and Hills go at 0.7 of the speed, and the way winds around what can't be crossed.
+   */
+  walkMargin: 1.4,
+  /**
+   * Kilos a soldier keeps free as they pack at the HQ, whatever the trip asks for, for what they
+   * will carry home: 150 Coins. Eating on the way there makes more room by the time they take it.
+   */
+  packRoom: 3,
+  /**
+   * Tiles from a trading post's storage within which a soldier short of Food counts as passing it
+   * and goes to refill: about a third of a game day's walk, little against what it brings.
+   */
+  postReach: 60,
+  /**
+   * How many times the straight walk over Plains it keeps trying to reach the city (never less
+   * than `giveUpDays`). Past that it has no way there, as with every gate shut, and turns back.
+   */
+  roadTimes: 3,
+}
+
+/**
+ * Food for a walk of `tiles` on a punishment trip (`CONTEXT.md`: Punishment trip), in whole units:
+ * at `FOOD_PER_DAY`, the walk taking `TRADE_ORG_PUNISH.walkMargin` times the straight way over
+ * Plains.
+ */
+export function tripFood(tiles: number): number {
+  const days = (tiles * WALK_TICKS_PER_TILE * TRADE_ORG_PUNISH.walkMargin) / TICKS_PER_GAME_DAY
+  return Math.ceil(days * FOOD_PER_DAY)
 }
 
 /**
@@ -2181,3 +2219,16 @@ export const DEMAND_MAX_DAYS = 60
 
 /** The deadline the Demands form starts with, in game days: a game week. */
 export const DEMAND_DEFAULT_DAYS = 7
+
+/**
+ * How long a Direct offer stands, in game days (`CONTEXT.md`: Direct offer): one real day, so a
+ * Player who comes by once a day can still answer and send someone. The sender can take it down
+ * sooner.
+ */
+export const DIRECT_OFFER_DAYS = 60
+
+/**
+ * How many Direct offers a realm may have standing to any one realm (`CONTEXT.md`: Direct offer):
+ * room to deal in several goods at once, and few enough that it can't flood the other's list.
+ */
+export const DIRECT_OFFERS_TO_ONE_REALM = 5

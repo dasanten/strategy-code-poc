@@ -5,6 +5,7 @@ import {
 } from './balance.js'
 import { contractOf, contractsFor, type ContractView } from './contract.js'
 import { demandsFor, realmsKnownTo, type DemandView } from './demand.js'
+import { directOffersFor, type CarriedWay, type DirectOfferView } from './direct-offer.js'
 import { directivesFor, type DirectiveView } from './directive.js'
 import { joinRequestsFor, type JoinRequestView } from './persuasion.js'
 import { organizationLabel, standingOf, standingsFor, type StandingView } from './standing.js'
@@ -253,6 +254,12 @@ export interface Diplomacy {
   demands: DemandView[]
   /** The other realms it knows of, whom it can send a demand (`realmsKnownTo`). */
   knownRealms: RealmLabel[]
+  /** Direct offers the realm sent or was sent, still standing (`CONTEXT.md`: Direct offer). */
+  directOffers: DirectOfferView[]
+  /** The other realms it knows of, whom it can send a Direct offer: the same as `knownRealms`. */
+  directOfferRealms: RealmLabel[]
+  /** The ways it can name for a carried Direct offer, when it sees a storage to go to. */
+  carriedWays?: CarriedWay[]
   /** The realm's deliveries and pick-ups not yet done (`CONTEXT.md`: Delivery). */
   deliveries: DeliveryView[]
   /** Standing between the realm and other Organizations (`CONTEXT.md`: Standing), shown only. */
@@ -284,6 +291,7 @@ export function diplomacyFor(
     | 'carriages'
     | 'contracts'
     | 'demands'
+    | 'offers'
     | 'lastSeen'
     | 'buildings'
     | 'deliveries'
@@ -294,6 +302,7 @@ export function diplomacyFor(
   >,
   realmId: string,
   seenRealms: Iterable<string>,
+  carriedWays: CarriedWay[] = [],
 ): Diplomacy {
   const ownerOf = (p: AllianceArmyPart) =>
     p.is === 'resident'
@@ -323,6 +332,7 @@ export function diplomacyFor(
   const realms = new Set(world.realms.map((r) => r.id))
   const allies = new Set(sharingSight(world, realmId))
   const seen = [...new Set(seenRealms)]
+  const knownRealms = realmsKnownTo(world, realmId, seen).map(label)
   const realmsInSight = seen
     .filter(
       (id) => id !== realmId && !allies.has(id) && (realms.has(id) || isAllianceCity(world, id)),
@@ -335,7 +345,10 @@ export function diplomacyFor(
     realmsInSight,
     contracts: contractsFor(world, realmId),
     demands: demandsFor(world, realmId),
-    knownRealms: realmsKnownTo(world, realmId, seen).map(label),
+    knownRealms,
+    directOffers: directOffersFor(world, realmId),
+    directOfferRealms: knownRealms,
+    ...(carriedWays.length > 0 && { carriedWays }),
     deliveries: deliveriesFor(world, realmId),
     standings: standingsFor(world, realmId),
     joinRequests: joinRequestsFor(world, realmId),

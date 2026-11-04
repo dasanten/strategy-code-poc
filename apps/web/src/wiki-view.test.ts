@@ -187,6 +187,7 @@ describe('the Wiki’s How to trade topic (`CONTEXT.md`: Trade section)', () => 
     for (const heading of [
       'Sending a trader',
       'Buying and selling',
+      'Swapping',
       'What an NPC city buys and sells',
       'Delivery',
       'Transfer',

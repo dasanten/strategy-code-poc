@@ -11,6 +11,7 @@ export const DRAWERS = [
   { id: 'armies', label: 'Armies' },
   { id: 'contracts', label: 'Contracts' },
   { id: 'demands', label: 'Demands' },
+  { id: 'directOffers', label: 'Direct offers' },
   { id: 'alliance', label: 'Alliance' },
   { id: 'standing', label: 'Standing' },
   { id: 'cities', label: 'Cities' },

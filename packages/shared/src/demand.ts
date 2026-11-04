@@ -42,13 +42,13 @@ export function demandsLeft(realm: Pick<Realm, 'demandsSentAt'>, tick: number): 
 /**
  * The other realms a realm knows of (`CONTEXT.md`: Demand): those it sees residents of
  * (`seenRealms`, which may hold anything else too), its allies, those whose cities it has seen
- * (Last seen), those with a standing toward it or it toward them, and its sides in contracts and
- * demands.
+ * (Last seen), those with a standing toward it or it toward them, and its sides in contracts,
+ * demands and Direct offers.
  */
 export function realmsKnownTo(
   world: Pick<
     WorldState,
-    'realms' | 'alliances' | 'lastSeen' | 'standings' | 'contracts' | 'demands'
+    'realms' | 'alliances' | 'lastSeen' | 'standings' | 'contracts' | 'demands' | 'offers'
   >,
   realmId: string,
   seenRealms: Iterable<string>,
@@ -71,6 +71,11 @@ export function realmsKnownTo(
   for (const d of world.demands) {
     if (d.fromId === realmId) known.add(d.toId)
     if (d.toId === realmId) known.add(d.fromId)
+  }
+  for (const o of world.offers) {
+    if (!o.direct) continue
+    if (o.realmId === realmId) known.add(o.direct.toId)
+    if (o.direct.toId === realmId) known.add(o.realmId)
   }
   return world.realms.map((r) => r.id).filter((id) => id !== realmId && known.has(id))
 }

@@ -205,6 +205,7 @@ describe('script views', () => {
       nodes: 'nodes()',
       nodesInSight: 'nodesInSight("forest")',
       lastSeen: 'lastSeen()',
+      offers: 'offers()',
       directives: 'directives()',
       demands: 'demands()',
       waypoints: 'waypoints()',

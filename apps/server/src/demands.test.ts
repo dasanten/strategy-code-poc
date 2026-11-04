@@ -8,6 +8,7 @@ import {
   Terrain,
   diplomacyFor,
   realmsKnownTo,
+  realmsToOfferTo,
   type RealmEvent,
   type Remembered,
   type TerrainMap,
@@ -205,6 +206,15 @@ describe('sending a demand', () => {
     // The one who got a demand knows who sent it, and can answer in kind.
     expect(realmsKnownTo(world, 'r3', [])).toEqual(['r1'])
     expect(diplomacyFor(world, 'r3', []).knownRealms).toEqual([{ realmId: 'r1', realm: 'Mara' }])
+    expect(diplomacyFor(world, 'r3', []).directOfferRealms).toEqual([
+      { realmId: 'r1', realm: 'Mara' },
+    ])
+    world.demands = []
+    // A Direct offer's sides know of each other too, for a demand as for another offer.
+    world.offers.push({ realmId: 'r2', direct: { toId: 'r3', lapsesAt: 100 } } as never)
+    expect(realmsKnownTo(world, 'r3', [])).toEqual(['r2'])
+    expect(realmsToOfferTo(world, 'r3', [])).toEqual(['r2'])
+    expect(realmsKnownTo(world, 'r2', [])).toEqual(['r3'])
   })
 
   it('needs a deadline ahead and within the cap', () => {

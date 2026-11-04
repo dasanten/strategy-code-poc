@@ -23,6 +23,7 @@ describe('drawers', () => {
       'Armies',
       'Contracts',
       'Demands',
+      'Direct offers',
       'Alliance',
       'Standing',
       'Scripts',

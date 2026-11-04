@@ -9,6 +9,7 @@ import {
   inContact,
   carriageCanGoTo,
   driveProblem,
+  freeStock,
   goodsAtSpot,
   haulStopSpot,
   unitsThatFit,
@@ -195,7 +196,10 @@ function nextTransfer(
 ): Transfer | undefined {
   const load = carriage.load
   const onCarriage: GoodsSpot = { kind: 'carriage', carriageId: carriage.id }
-  const there = goodsAtSpot(world, r.x, r.y, spot) ?? {}
+  const held = goodsAtSpot(world, r.x, r.y, spot) ?? {}
+  // A haul route leaves what is set aside for an offer alone (`CONTEXT.md`: Offer).
+  const there =
+    spot.kind === 'storage' ? freeStock(world, { id: spot.storageId, stock: held }) : held
   const hands = (g: Good) => unitsThatFit(r, g, world.tick)
   const loadable = (g: Good) =>
     Math.min(there[g] ?? 0, hands(g), unitsThatFitCarriage(world, carriage, g))

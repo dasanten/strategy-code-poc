@@ -121,7 +121,7 @@ export function storeGroups(
 }
 
 /** The browser's storage, if the page may use it. */
-function browserStorage(): Storage | undefined {
+export function browserStorage(): Storage | undefined {
   try {
     return localStorage
   } catch {
