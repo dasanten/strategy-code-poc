@@ -87,6 +87,7 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     standings: [],
     joinRequests: [],
     punishments: [],
+    supplyWagons: [],
     directives: [],
     debts: [],
     lastSeen: {},

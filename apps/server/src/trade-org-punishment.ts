@@ -1,4 +1,5 @@
 import {
+  ARMY_SPREAD,
   CARRIAGE_STOLEN_WORTH,
   FOOD_PER_DAY,
   GOOD_WEIGHT,
@@ -35,12 +36,21 @@ import {
   type WorldState,
   isAt,
 } from '@csp/shared'
+import { caravanThreats } from './caravans.js'
 import { attackOrder } from './combat.js'
 import { cityOrganization } from './crimes.js'
 import { recordEvent } from './events.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { npcHome, walkTo } from './npc-behaviour.js'
 import { newId } from './starting-city.js'
+import {
+  goToWagonForFood,
+  loadOnWagon,
+  sendWagon,
+  stepSupplyWagons,
+  wagonOf,
+  wagonTook,
+} from './supply-wagons.js'
 import { spareSoldiers } from './trade-org-army.js'
 import { oweTradeOrg } from './trade-org-debt.js'
 
@@ -93,9 +103,10 @@ function living(world: WorldState, p: Punishment) {
   })
 }
 
-/** The Coins' worth a punishment's living members have taken. */
+/** The Coins' worth a punishment's living members have taken, on them or on its supply wagon. */
 export function tookSoFar(world: WorldState, p: Punishment): number {
-  return living(world, p).reduce((sum, m) => sum + worthOf(takenBy(m.r, m.own)), 0)
+  const carried = living(world, p).reduce((sum, m) => sum + worthOf(takenBy(m.r, m.own)), 0)
+  return carried + wagonTook(world, p)
 }
 
 /** Whether a crime is one the Trade Organization knows of against itself and hasn't punished yet. */
@@ -107,13 +118,14 @@ const toPunish = (world: WorldState, c: Crime) =>
 /**
  * One tick of the Trade Organization punishing, on a map of `size` tiles: crimes of those who owe it
  * go on their debts (`addCrimesToDebts`), it sends out new punishments (`sendOut`,
- * `sendOutForDirectives`) and runs those under way. Run after `stepTradeOrgArmy` and before
- * `stepNpcCities`; the HQ leaves the members of a punishment to it.
+ * `sendOutForDirectives`) and runs those under way and their supply wagons. Run after
+ * `stepTradeOrgArmy` and before `stepNpcCities`; the HQ leaves the members of a punishment to it.
  */
 export function stepPunishments(world: WorldState, size: number): void {
   const hq = tradeOrgHq(world)
   if (!hq) {
     world.punishments = []
+    world.supplyWagons = []
     world.debts = []
     return
   }
@@ -121,6 +133,7 @@ export function stepPunishments(world: WorldState, size: number): void {
   sendOut(world, size)
   sendOutForDirectives(world, size)
   for (const p of [...world.punishments]) runPunishment(world, hq, p, size)
+  stepSupplyWagons(world, hq, size)
 }
 
 /**
@@ -171,7 +184,7 @@ function sendOut(world: WorldState, size: number): void {
     const worth = TRADE_ORG_PUNISH.times * theirs.reduce((sum, c) => sum + lossOf(c), 0)
     for (const c of theirs) c.punished = true
     if (worth <= 0) continue
-    world.punishments.push({
+    setOut(world, city, size, {
       id: newId(world, 'punishment'),
       culpritOrg: org,
       cityId: city.id,
@@ -219,7 +232,7 @@ function sendOutForDirectives(world: WorldState, size: number): void {
         .filter((r) => !busy.has(r.id))
         .slice(0, TRADE_ORG_PUNISH.soldiers)
       if (soldiers.length === 0) return
-      world.punishments.push({
+      setOut(world, city, size, {
         id: newId(world, 'punishment'),
         culpritOrg: org,
         cityId: city.id,
@@ -240,6 +253,15 @@ function sendOutForDirectives(world: WorldState, size: number): void {
       })
     }
   }
+}
+
+/** A punishment sets out for `city`, with a supply wagon if it can have one (`sendWagon`). */
+function setOut(world: WorldState, city: City, size: number, p: Punishment): void {
+  world.punishments.push(p)
+  const hq = tradeOrgHq(world)
+  const from = hq && townHallOf(world, hq)
+  const to = townHallOf(world, city)
+  if (hq && from && to) sendWagon(world, hq, p, wrapDistance(size, from, to), size)
 }
 
 /** The city's finished storages that hold anything. */
@@ -367,7 +389,7 @@ function foodWanted(
  * The finished buildings of the given cities with Food to take: their storages, or where those
  * have none, their warehouses, which keep Food for sale.
  */
-function foodIn(world: WorldState, cityIds: Set<string>): Building[] {
+export function foodIn(world: WorldState, cityIds: Set<string>): Building[] {
   const stores = world.buildings.filter(
     (b) =>
       (b.kind === 'storage' || b.kind === 'warehouse') &&
@@ -402,7 +424,7 @@ function refillPlaces(
  * `places`, if they have any: whole units, none for less. What they take for the trip is their
  * own, not what the army came to take. Answers whether they are seeing to it.
  */
-function fetchFood(
+export function fetchFood(
   world: WorldState,
   places: () => Building[],
   r: Resident,
@@ -429,6 +451,34 @@ function fetchFood(
   r.order = { kind: 'pickUp', from: { kind: 'storage', storageId: storage.id }, goods: { food } }
   own.food = (own.food ?? 0) + food
   return true
+}
+
+/**
+ * Which of the Trade Org's soldiers wait this tick, on a map of `size` tiles (`CONTEXT.md`: Army,
+ * Punishment trip): those walking the road, to the city or home to the HQ, with more than `ARMY_SPREAD`
+ * tiles fewer to go than the one furthest behind, so that they keep together with their supply wagon.
+ */
+export function waitingOnTheRoad(world: WorldState, size: number): Set<string> {
+  const waiting = new Set<string>()
+  for (const p of world.punishments) {
+    if (p.heading === 'out' && p.arrivedAt !== undefined) continue
+    const city = world.cities.find((c) => c.id === p.cityId)
+    const hall = city && townHallOf(world, city)
+    const hq = tradeOrgHq(world)
+    const walkers = living(world, p).flatMap(({ r }) => {
+      const o = r.order
+      if (o?.kind !== 'walkTo' || !o.path) return []
+      const onTheRoad =
+        p.heading === 'out'
+          ? hall && o.target.x === hall.x && o.target.y === hall.y
+          : hq && inCityArea(world, hq, o.target.x, o.target.y, size)
+      return onTheRoad ? [{ id: r.id, left: o.path.length }] : []
+    })
+    if (walkers.length < 2) continue
+    const behind = Math.max(...walkers.map((m) => m.left))
+    for (const m of walkers) if (m.left < behind - ARMY_SPREAD) waiting.add(m.id)
+  }
+  return waiting
 }
 
 /**
@@ -473,6 +523,8 @@ function leaveDebt(world: WorldState, p: Punishment, took: number): void {
  * trading posts they pass. Once one of them is in the city's area it has arrived: each
  * goes after anyone attacking one of them, otherwise to the city's nearest storage holding
  * anything, takes Food for the way back and picks up what is still to take there.
+ * With a supply wagon, a member short of Food goes to meet it (`goToWagonForFood`) and one who took
+ * goods puts them on it (`loadOnWagon`); it comes home after them and unloads (`stepSupplyWagons`).
  * Heading home (`whyHeadHome`), each member brings Coins they took to the HQ's coin warehouse and
  * other goods to its goods warehouse, then goes home; once every living member is home with
  * nothing taken, it is over. The culprit reads what happens as it happens: it arrived, it left with
@@ -487,8 +539,9 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
     const where =
       p.heading === 'home' ? 'wayHome' : p.arrivedAt === undefined ? 'wayThere' : 'atCity'
     logPunished(world, p, city, { what: 'lost' }, where)
-    // Nobody is left carrying anything; on the way home the debt was settled as it left.
-    if (p.heading === 'out') leaveDebt(world, p, 0)
+    // Nobody is left carrying anything but its wagon, which goes home by itself; on the way home the
+    // debt was settled as it left.
+    if (p.heading === 'out') leaveDebt(world, p, Math.min(wagonTook(world, p), p.worth))
     return
   }
   for (const { r, own } of members) eatFromOwn(r, own)
@@ -521,10 +574,18 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
   const storages = robbing ? storagesToTake(world, robbing) : []
   const target = city && townHallOf(world, city)
   const ids = new Set(members.map((m) => m.r.id))
+  const on = wagonOf(world, p)
   const resisting = world.residents.filter(
     (r) =>
       r.health > 0 && !ids.has(r.id) && r.order?.kind === 'attack' && ids.has(r.order.targetId),
   )
+  // Those robbing its supply wagon or going after its driver are fought too, like a caravan's.
+  if (on) {
+    const crew = { driverId: on.wagon.driverId, escortIds: [...ids] }
+    for (const t of caravanThreats(world, crew, on.carriage, size)) {
+      if (!resisting.includes(t)) resisting.push(t)
+    }
+  }
   let left = p.worth - took
   for (const { r, own, member } of members) {
     if (r.order?.kind === 'attack') continue
@@ -543,8 +604,10 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
       }
       member.packed = true
     }
+    if (on && goToWagonForFood(r, on.carriage, size)) continue
     const places = () => refillPlaces(world, robbing, r, size)
     if (fetchFood(world, places, r, own, wanted, size)) continue
+    if (on && loadOnWagon(world, r, own, on.carriage, size)) continue
     if (p.heading === 'home') {
       bringHome(world, hq, r, takenBy(r, own), size)
       continue
@@ -606,7 +669,8 @@ function bringHome(world: WorldState, hq: City, r: Resident, taken: Stock, size:
  * 0004): each punishes an Organization other than the Trade Organization, at most one under way
  * for each, for a positive worth of which it took no more than all and nothing before it arrived
  * (Punishment trip); its members are residents of the HQ, each in one punishment at most and in no
- * contract; and the Trade Organization never captures a city.
+ * contract; and the Trade Organization never captures a city. Its supply wagons have their own
+ * invariant (`supplyWagonsSound`).
  */
 export const punishmentsSound: Invariant = {
   name: 'punishments-sound',

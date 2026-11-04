@@ -589,8 +589,9 @@ export interface DriveOrder {
   path: [number, number][] | null
   progress: number
   /**
-   * The army the carriage follows as its supply wagon (`CONTEXT.md`: Supply line): `target` is
-   * then where the army was last seen, and the order lasts as long as the army does.
+   * The army the carriage follows as its supply wagon (`CONTEXT.md`: Supply line), or the punishment
+   * for a Trade Org one: `target` is then where the army was last seen, and the order lasts as long
+   * as the army does.
    */
   army?: string
 }
@@ -837,6 +838,8 @@ export interface WorldState {
   routeRobberies: Record<string, number>
   /** The Trade Org army's punishments under way (`CONTEXT.md`: Trade Org reaction). */
   punishments: Punishment[]
+  /** The supply wagons of its punishments, and those still on the way home from one. */
+  supplyWagons: SupplyWagon[]
   /** Admin directives in force, oldest first (`CONTEXT.md`: Admin directive). */
   directives: Directive[]
   /** What Organizations owe the Trade Organization, at most one for each (`CONTEXT.md`: Trade Org debt). */
@@ -1316,6 +1319,29 @@ export interface Punishment {
    * heads home once that directive is lifted.
    */
   directiveId?: string
+}
+/**
+ * The supply wagon of a punishment (`CONTEXT.md`: Trade Org debt, Supply line): a carriage of the
+ * Trade Org HQ with a driver, Food for the trip and room for what the army takes. It follows the
+ * soldiers, outlives them and goes home to unload. Plain data.
+ */
+export interface SupplyWagon {
+  id: string
+  /** The punishment it follows; null once that is over and it goes home by itself. */
+  punishmentId: string | null
+  carriageId: string
+  /** Who drives it; null with no crew left, until the HQ has someone to send (Caravan crew lost). */
+  driverId: string | null
+  /** The Food it means to set out with. */
+  food: number
+  /** How much of the Food on board is what it set out with; any more was taken. */
+  ownFood: number
+  /** Whether it is done loading Food at the HQ. */
+  loaded?: true
+  /** The driver was sent out on foot and still has to pack Food for the walk. */
+  sentOut?: true
+  /** Goods in the driver's hands to put down next, and where. */
+  holding: { goods: Stock; to: GoodsSpot } | null
 }
 /**
  * What an Organization owes the Trade Organization, in Coins (`CONTEXT.md`: Trade Org debt): what its

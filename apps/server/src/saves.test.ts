@@ -184,6 +184,16 @@ describe('world saves', () => {
     expect(checkInvariants(v80, land)).toEqual([])
   })
 
+  it('starts with no supply wagons, and an army under way goes on without (migration 82 → 83)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v82 = structuredClone(world) as unknown as Record<string, unknown>
+    delete v82.supplyWagons
+    const v83 = migrateWorld(v82, 82, { terrain: land }, migrations, 83)
+    expect(v83.supplyWagons).toEqual([])
+    expect(v83).toEqual(world)
+    expect(checkInvariants(v83, land)).toEqual([])
+  })
+
   it('starts with nobody owing the Trade Organization (migration 81 → 82)', () => {
     const { world, terrain: land } = worldWithPost()
     const v81 = structuredClone(world) as unknown as Record<string, unknown>
@@ -236,7 +246,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(82)
+    expect(WORLD_FORMAT_VERSION).toBe(83)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)

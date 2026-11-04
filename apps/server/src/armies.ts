@@ -307,9 +307,13 @@ function suppliedArmy(r: Resident): string | undefined {
   return undefined
 }
 
-/** Whether the army a resident supplies (`suppliedArmy`) exists and is their commander's. */
+/**
+ * Whether the army a resident supplies (`suppliedArmy`) exists and is their commander's, or is the
+ * punishment whose supply wagon they drive (`CONTEXT.md`: Trade Org debt).
+ */
 function suppliesOwnArmy(world: WorldState, r: Resident): boolean {
   const id = suppliedArmy(r)
+  if (world.supplyWagons.some((w) => w.driverId === r.id && w.punishmentId === id)) return true
   return world.armies.some((a) => a.id === id && a.realmId === commanderOf(world, r))
 }
 

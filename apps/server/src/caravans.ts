@@ -130,7 +130,7 @@ export function leaveTradeOrg(world: WorldState, post: City): void {
  * A new carriage of the Trade Org HQ `hq` at (x, y), with a new horse hitched to it, drawn from
  * `seed`. Returns its id.
  */
-function newCaravanCarriage(
+export function newCaravanCarriage(
   world: WorldState,
   hq: City,
   x: number,
@@ -232,7 +232,7 @@ function replaceDriver(world: WorldState, caravan: Caravan): void {
  * The adults of the HQ `hqId` who can be taken on for a caravan (`CONTEXT.md`: Caravan, Caravan
  * crew lost): unarmed and up, idle or at work, not on another caravan, punishing, or hired out.
  */
-function freeHands(world: WorldState, hqId: string | null): Resident[] {
+export function freeHands(world: WorldState, hqId: string | null): Resident[] {
   const crew = caravanCrew(world)
   const away = punishers(world)
   return world.residents.filter(
@@ -317,7 +317,7 @@ const ofTradeOrg = (world: WorldState, r: Resident) => {
  */
 export function caravanThreats(
   world: WorldState,
-  caravan: Caravan,
+  caravan: Pick<Caravan, 'driverId' | 'escortIds'>,
   carriage: Carriage,
   size: number,
 ): Resident[] {

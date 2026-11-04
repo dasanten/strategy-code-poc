@@ -219,14 +219,17 @@ describe('the Trade Organization punishing', () => {
     const ids = p.members.map((m) => m.residentId)
     run(world, walking, 4 * TICKS_PER_GAME_DAY, () => world.punishments.length === 0)
     expect(world.punishments).toEqual([])
-    // Coins first: the storage had enough, so it took nothing else.
-    const s1 = world.buildings.find((b) => b.id === 's1')!
-    expect(s1.stock).toEqual({ coins: 1000 - worth, iron: 40 })
-    expect(coins.stock!.coins).toBe(before + worth)
     // It never captured the city, and its soldiers are home again.
     expect(world.cities.find((c) => c.id === 'c1')!.realmId).toBe('r1')
     for (const id of ids)
       expect(inCityArea(world, hq, at(world, id).x, at(world, id).y, 160)).toBe(true)
+    // What went on its supply wagon comes in just behind them.
+    run(world, walking, TICKS_PER_GAME_DAY, () => world.supplyWagons.length === 0)
+    expect(world.supplyWagons).toEqual([])
+    // Coins first: the storage had enough, so it took nothing else.
+    const s1 = world.buildings.find((b) => b.id === 's1')!
+    expect(s1.stock).toEqual({ coins: 1000 - worth, iron: 40 })
+    expect(coins.stock!.coins).toBe(before + worth)
     expect(world.events.at(-1)).toMatchObject({ kind: 'punished', what: 'left', took: worth })
     // The crime is punished: it doesn't come again.
     run(world, walking, 1)
@@ -242,7 +245,12 @@ describe('the Trade Organization punishing', () => {
     goods.stock = { ...stockFloor(world, goods), ...goods.stock }
     const iron = goods.stock!.iron ?? 0
     theft(world, hq, { iron: 4 })
-    run(world, walking, 4 * TICKS_PER_GAME_DAY, () => world.punishments.length === 0)
+    run(
+      world,
+      walking,
+      4 * TICKS_PER_GAME_DAY,
+      () => world.punishments.length === 0 && world.supplyWagons.length === 0,
+    )
     // 80 coins' worth: the 30 coins, then 5 iron.
     const s1 = world.buildings.find((b) => b.id === 's1')!
     expect(s1.stock).toEqual({ wood: 50, iron: 35 })
