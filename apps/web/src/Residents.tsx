@@ -73,6 +73,7 @@ import {
   type Stock,
   type SeenResident,
   type SeenHorse,
+  type ResourceNode,
   type Waypoint,
   FOAL_STAT_SPREAD,
   STABLE_BREED_DAYS,
@@ -1241,6 +1242,11 @@ export function GroupCard({
     return p && picked === p ? { ...a, active: true as const } : a
   })
   const shown = actions.some((a) => a.id === panel) ? panel : undefined
+  // The block opens under the orders, out of sight on all but the tallest card.
+  const buildBlock = useRef<HTMLElement>(null)
+  useEffect(() => {
+    buildBlock.current?.scrollIntoView({ block: 'nearest' })
+  }, [buildAt?.x, buildAt?.y, picking])
   useEscapeClosesPanel(tab === 'orders' && (shown !== undefined || (!!buildAt && !picking)), () => {
     setPanel(undefined)
     if (buildAt) onPicking(false)
@@ -1433,7 +1439,7 @@ export function GroupCard({
           </div>
         ))}
       {tab === 'orders' && buildAt && !picking && (
-        <section className="inspector-block" aria-label="Build">
+        <section className="inspector-block" aria-label="Build" ref={buildBlock}>
           <div className="panel-head">
             <h3>Build</h3>
             <span className="small muted">
@@ -1457,21 +1463,20 @@ export function GroupCard({
               </button>
             </div>
           ) : (
-            buildAt.kinds.map(({ kind, problem }) => (
-              <div key={kind}>
-                <div className="order-buttons">
-                  <button
-                    type="button"
-                    className="primary"
-                    disabled={problem !== undefined}
-                    onClick={() => onOrder({ kind: 'build', building: kind, at: buildAt })}
-                  >
-                    Build {BUILDING_NAMES[kind].toLowerCase()}
-                  </button>
-                </div>
-                {problem && <p className="muted small">Not here: {problem}.</p>}
-              </div>
-            ))
+            <BuildMenu
+              // Another tile starts with nothing tapped.
+              key={`${buildAt.x},${buildAt.y}`}
+              node={buildAt.node}
+              terrain={buildAt.terrain}
+              buildProblem={buildAt.problem}
+              onBuild={(kind) =>
+                onOrder({
+                  kind: 'build',
+                  building: kind,
+                  at: { x: buildAt.x, y: buildAt.y },
+                })
+              }
+            />
           )}
           <p className="muted small">
             Each walks there; the first lays out the site and the others join it.
@@ -1592,12 +1597,17 @@ export interface GroupPickWith {
   good?: Good
 }
 
-/** The tile a group is to build on, with the site there or the kinds that may go there. */
+/** The tile a group is to build on, with the site there or what the Build menu needs of it. */
 export interface GroupBuildTile {
   x: number
   y: number
   site: Building | undefined
-  kinds: { kind: BuildingKind; problem: string | undefined }[]
+  /** The resource node on this tile, if the Player knows one. */
+  node: Pick<ResourceNode, 'kind'> | undefined
+  /** The explored terrain beneath this tile, if known. */
+  terrain: number | undefined
+  /** Why a kind can't be laid out on this tile, as far as the Player knows. */
+  problem: (kind: BuildingKind) => string | undefined
 }
 
 /** What picking a tile does for a group, said while the map waits for it. */
@@ -2056,14 +2066,16 @@ export function ResidentCard({
                 />
               ),
           )}
-          <BuildMenu
-            key={r.id}
-            node={node}
-            terrain={terrain}
-            buildProblem={buildProblem ?? (() => undefined)}
-            blocked={!canWork(r, tick)}
-            onBuild={onBuild}
-          />
+          <section className="inspector-block" aria-label="Build">
+            <BuildMenu
+              key={r.id}
+              node={node}
+              terrain={terrain}
+              buildProblem={buildProblem ?? (() => undefined)}
+              blocked={!canWork(r, tick)}
+              onBuild={onBuild}
+            />
+          </section>
         </>
       )}
       {shown === 'tearDown' && (
