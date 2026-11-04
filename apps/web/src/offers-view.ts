@@ -5,10 +5,12 @@ import {
   freeStock,
   handsOf,
   loadOf,
+  offerOpenTo,
   quoteOffer,
   timesToPost,
   type Carriage,
   type City,
+  type DirectOfferView,
   type Good,
   type OfferQuote,
   type Resident,
@@ -48,6 +50,39 @@ function offerStoragesIn(cityId: string | null, seen: Seen, realmId: string): Se
       !b.site &&
       (buildingRealm(seen, b) === realmId || (b.offers?.length ?? 0) > 0),
   )
+}
+
+/** The finished storages of the Player's own: where a Direct offer can set goods aside. */
+export function ownStorages(seen: Seen, realmId: string): SeenBuilding[] {
+  return seen.buildings.filter(
+    (b) => b.kind === 'storage' && !b.site && buildingRealm(seen, b) === realmId,
+  )
+}
+
+/** The Direct offers the realm sent, waiting for an answer, oldest first. */
+export function directOffersSent(
+  offers: readonly DirectOfferView[],
+  realmId: string,
+): DirectOfferView[] {
+  return offers.filter((o) => o.from.realmId === realmId)
+}
+
+/** Where a Direct offer stands, in a sentence: `the storage at (6, 6) in Oakford`. */
+export function offerPlace(o: Pick<DirectOfferView, 'x' | 'y' | 'city'>): string {
+  return `the storage at (${o.x}, ${o.y})${o.city ? ` in ${o.city}` : ''}`
+}
+
+/**
+ * What the Player sees of who a Direct offer at a storage is for, undefined for an offer to anyone
+ * (`CONTEXT.md`: Direct offer).
+ */
+export function offerIsFor(
+  o: Pick<SeenOffer, 'realmId' | 'direct'>,
+  realmId: string,
+): string | undefined {
+  if (!o.direct) return undefined
+  if (o.realmId === realmId) return 'A direct offer you sent'
+  return offerOpenTo(o, realmId) ? 'A direct offer to you' : 'Only for another realm'
 }
 
 /** A good by its name in a sentence, lower case. */

@@ -267,17 +267,43 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       }
     case 'offerEnded': {
       const what = `${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)}`
+      const yours = e.to
+        ? `Your direct offer of ${what} to the realm of ${e.to}`
+        : `Your offer of ${what}`
       const why = {
-        usedUp: `Your offer of ${what} is used up.`,
-        takenDown: `Your offer of ${what} is taken down.`,
-        storageLost: `Your offer of ${what} ended: the storage is gone or no longer yours.`,
-        goodsGone: `Your offer of ${what} ended: its goods are gone from the storage.`,
+        usedUp: `${yours} is used up.`,
+        takenDown: `${yours} is taken down.`,
+        storageLost: `${yours} ended: the storage is gone or no longer yours.`,
+        goodsGone: `${yours} ended: its goods are gone from the storage.`,
+        declined: `${yours} was declined. Its goods are ordinary again.`,
+        lapsed: `${yours} lapsed. Its goods are ordinary again.`,
       }[e.why]
       return {
         text: why,
-        tone: e.why === 'usedUp' || e.why === 'takenDown' ? 'info' : 'warn',
+        tone: e.why === 'storageLost' || e.why === 'goodsGone' ? 'warn' : 'info',
         places: [{ name: 'the storage', x: e.x, y: e.y }],
       }
+    }
+    case 'directOffer': {
+      const what = `${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)}`
+      const place = { name: 'the storage', x: e.x, y: e.y }
+      const them = `the realm of ${e.from}`
+      if (e.what === 'received') {
+        const over = e.times === 1 ? '' : `, ${e.times} times over`
+        return {
+          text: `${cap(them)} sent you a direct offer: ${what}${over}. Fetch it in person at the storage, or decline it, under Direct offers.`,
+          tone: 'info',
+          places: [place],
+        }
+      }
+      const text = {
+        declined: `You declined the direct offer of ${what} from ${them}.`,
+        lapsed: `The direct offer of ${what} from ${them} lapsed.`,
+        takenDown: `${cap(them)} took down its direct offer of ${what} to you.`,
+        storageLost: `The direct offer of ${what} from ${them} ended: its storage is gone or no longer theirs.`,
+        goodsGone: `The direct offer of ${what} from ${them} ended: its goods are gone from the storage.`,
+      }[e.what]
+      return { text, tone: 'info', places: [place] }
     }
     case 'deliveryOrdered': {
       const what = goodText(e.good)

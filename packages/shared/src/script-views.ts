@@ -47,6 +47,7 @@ export type ScriptViewName =
   | 'site'
   | 'price'
   | 'offer'
+  | 'directOffer'
   | 'city'
   | 'occupation'
   | 'hire'
@@ -621,6 +622,19 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field('wantsUnits', 'number', 'How much of it each time.'),
       field('times', 'number', 'How many more times it can be accepted.'),
       field('rate', 'number', 'What it wants for one unit it gives.'),
+      field(
+        'direct',
+        view('directOffer'),
+        'Who it was sent to, when it is a direct offer.',
+        'for an offer to anyone',
+      ),
+    ],
+  },
+  directOffer: {
+    description: 'What makes an offer a direct one: only one realm can accept it, for a set time.',
+    fields: [
+      field('toId', 'string', 'The realm it was sent to, the only one who can accept it.'),
+      field('lapsesAt', 'number', 'The tick it lapses at, its goods then ordinary again.'),
     ],
   },
   city: {

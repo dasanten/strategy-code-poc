@@ -2160,3 +2160,16 @@ export const EXPLORED_EDGE_RANGE = 4 * SIGHT_RANGE
  * with the tile it tried.
  */
 export const EXPLORE_SKIP_RANGE = 8
+
+/**
+ * How long a Direct offer stands, in game days (`CONTEXT.md`: Direct offer): one real day, so a
+ * Player who comes by once a day can still answer and send someone. The sender can take it down
+ * sooner.
+ */
+export const DIRECT_OFFER_DAYS = 60
+
+/**
+ * How many Direct offers a realm may have standing to any one realm (`CONTEXT.md`: Direct offer):
+ * room to deal in several goods at once, and few enough that it can't flood the other's list.
+ */
+export const DIRECT_OFFERS_TO_ONE_REALM = 5

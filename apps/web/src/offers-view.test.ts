@@ -1,12 +1,16 @@
-import type { Good, Resident, SeenBuilding, SeenOffer } from '@csp/shared'
+import type { DirectOfferView, Good, Resident, SeenBuilding, SeenOffer } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import {
   acceptPreview,
+  directOffersSent,
   freeAtStorage,
+  offerIsFor,
+  offerPlace,
   offerStands,
   offerStoragesOf,
   offerTerms,
   outpostOfferStorages,
+  ownStorages,
   postPreview,
   setAsideLine,
 } from './offers-view.js'
@@ -96,6 +100,47 @@ describe('offer lines', () => {
         labels,
       ),
     ).toBe('Set aside for offers: 20 food, 30 wood')
+  })
+})
+
+describe('direct offers', () => {
+  const direct = { toId: 'r2', lapsesAt: 500 }
+
+  it('says who an offer at a storage is for, to each who sees it', () => {
+    expect(offerIsFor(offer(), 'r2')).toBeUndefined()
+    expect(offerIsFor(offer({ direct }), 'r1')).toBe('A direct offer you sent')
+    expect(offerIsFor(offer({ direct }), 'r2')).toBe('A direct offer to you')
+    expect(offerIsFor(offer({ direct }), 'r3')).toBe('Only for another realm')
+  })
+
+  it('says where one stands, with its city when it has one', () => {
+    expect(offerPlace({ x: 6, y: 6, city: 'Oakford' })).toBe('the storage at (6, 6) in Oakford')
+    expect(offerPlace({ x: 6, y: 6, city: null })).toBe('the storage at (6, 6)')
+  })
+
+  it('finds what the realm sent, and its finished storages to send from', () => {
+    const view = (fromId: string, toId: string) =>
+      ({
+        ...offer({ direct: { toId, lapsesAt: 500 } }),
+        direct: { toId, lapsesAt: 500 },
+        from: { realmId: fromId, realm: fromId },
+        to: { realmId: toId, realm: toId },
+        city: null,
+      }) as DirectOfferView
+    const mine = view('r1', 'r2')
+    expect(directOffersSent([mine, view('r2', 'r1')], 'r1')).toEqual([mine])
+    const cities = [
+      { id: 'c1', realmId: 'r1' },
+      { id: 'c2', realmId: 'r2' },
+    ]
+    const storage = (id: string, cityId: string, more = {}) =>
+      ({ id, kind: 'storage', cityId, x: 1, y: 1, ...more }) as SeenBuilding
+    const buildings = [
+      storage('s1', 'c1'),
+      storage('s2', 'c1', { site: { needed: {}, delivered: {} } }),
+      storage('s3', 'c2'),
+    ]
+    expect(ownStorages({ cities, buildings }, 'r1').map((b) => b.id)).toEqual(['s1'])
   })
 })
 

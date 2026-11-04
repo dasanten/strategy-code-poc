@@ -15,6 +15,8 @@ const diplomacy: Diplomacy = {
   invitations: [],
   realmsInSight: [],
   contracts: [],
+  directOffers: [],
+  directOfferRealms: [],
   deliveries: [],
   standings: [],
   joinRequests: [],
