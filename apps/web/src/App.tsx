@@ -72,6 +72,7 @@ import {
 } from './Hud.js'
 import type { Covered } from './map/camera.js'
 import { cardHidden, laneNotices } from './notices-view.js'
+import { ResidentsFullList } from './ResidentsFullList.js'
 import { groupResidents, rememberedTab, rememberTab, type CardSections } from './residents-view.js'
 import { groupHorses } from './horses-view.js'
 import { HorsesList } from './Horses.js'
@@ -412,6 +413,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // The drawer open over the map, if any (ADR 0008: one at a time).
   const [openDrawer, setOpenDrawer] = useState<OpenDrawer>()
   const closeDrawer = useCallback(() => setOpenDrawer(undefined), [])
+  // The Residents drawer opened fully (`CONTEXT.md`: Residents list); closing it goes back.
+  const [residentsFull, setResidentsFull] = useState(false)
+  const fullList = residentsFull && openDrawer === 'residents'
+  useEffect(() => {
+    if (openDrawer !== 'residents') setResidentsFull(false)
+  }, [openDrawer])
   useEscapeCloses(openDrawer, closeDrawer)
   /** Opens a script in the library, at a version and line when given. */
   const openScript = (id: number, where?: Omit<ScriptToOpen, 'id' | 'at'>) => {
@@ -492,7 +499,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // Escape leaves the top-most thing first: pick mode, an open panel (the form before a script
   // starts among them), the tile card, the resident or group card, then the drawer. A card
   // hidden behind the wide drawer is passed over, so Escape closes the drawer in front of it.
-  const shownCard = !cardHidden(openDrawer)
+  const hideCard = cardHidden(openDrawer, fullList)
+  const shownCard = !hideCard
   const anySelected = selectedIds.length > 0
   const picked = pick !== undefined
   const formOpen = starting !== undefined
@@ -1275,11 +1283,38 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const leader = world?.residents.find(
     (r): r is Resident => r.id === world.home.leaderId && faresKnown(r),
   )
-  const drawer = (id: DrawerId, panel: ReactNode) => (
-    <Drawer id={id} open={openDrawer} onClose={closeDrawer}>
+  const drawer = (id: DrawerId, panel: ReactNode, full = false) => (
+    <Drawer id={id} open={openDrawer} onClose={closeDrawer} full={full}>
       {panel}
     </Drawer>
   )
+
+  const residentsPanel = world && {
+    groups: groupResidents(own, {
+      cities: world.cities,
+      realmId: world.home.realmId,
+      homeCityId: world.home.cityId,
+      leaderId: world.home.leaderId,
+      diplomacy: world.diplomacy,
+    }),
+    leaderId: world.home.leaderId,
+    scripts,
+    buildings: world.buildings,
+    inSight: world.residents,
+    cities: knownCities,
+    arrivesIn: arrivesIn || undefined,
+    tick: world.tick,
+    phone,
+    selectedId: selected?.id,
+    onSelect: (id: string) => {
+      setSelectedIds([id])
+      setSelectedTile(undefined)
+      // The card has no room beside the full list, so the short list comes back with it.
+      setResidentsFull(false)
+      const r = own.find((x) => x.id === id)
+      if (r) showOnMap(Math.floor(r.x), Math.floor(r.y))
+    },
+  }
 
   // A Player without a realm names it before the world shows (`CONTEXT.md`: Realm name).
   if (founding && !world) return <Founding leaderName={founding.leaderName} onFound={found} />
@@ -1358,33 +1393,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           onToggle={(id) => setOpenDrawer((open) => toggleDrawer(open, id))}
         />
       )}
-      {world &&
+      {residentsPanel &&
         drawer(
           'residents',
-          <ResidentsList
-            groups={groupResidents(own, {
-              cities: world.cities,
-              realmId: world.home.realmId,
-              homeCityId: world.home.cityId,
-              leaderId: world.home.leaderId,
-              diplomacy: world.diplomacy,
-            })}
-            leaderId={world.home.leaderId}
-            scripts={scripts}
-            buildings={world.buildings}
-            inSight={world.residents}
-            cities={knownCities}
-            arrivesIn={arrivesIn || undefined}
-            tick={world.tick}
-            phone={phone}
-            selectedId={selected?.id}
-            onSelect={(id) => {
-              setSelectedIds([id])
-              setSelectedTile(undefined)
-              const r = own.find((x) => x.id === id)
-              if (r) showOnMap(Math.floor(r.x), Math.floor(r.y))
-            }}
-          />,
+          fullList ? (
+            <ResidentsFullList {...residentsPanel} onClose={() => setResidentsFull(false)} />
+          ) : (
+            <ResidentsList {...residentsPanel} onOpenFull={() => setResidentsFull(true)} />
+          ),
+          fullList,
         )}
       {world &&
         drawer(
@@ -1561,7 +1578,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onShowPlace={(p) => showOnMap(p.x, p.y)}
           />,
         )}
-      <DrawerEdge open={openDrawer} />
+      <DrawerEdge open={fullList ? undefined : openDrawer} />
       {/* Every notice in one lane under the top bar (`CONTEXT.md`: Notices). */}
       <NoticeLane phone={phone}>
         {laneNotices({
@@ -1617,11 +1634,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         />
       )}
       {world && selectedTile && (
-        <CardSheet
-          phone={phone}
-          pinnedPeek={workPick !== undefined}
-          hidden={cardHidden(openDrawer)}
-        >
+        <CardSheet phone={phone} pinnedPeek={workPick !== undefined} hidden={hideCard}>
           <TileCard
             card={describeTile(
               {
@@ -1778,7 +1791,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         <CardSheet
           phone={phone}
           pinnedPeek={pick !== undefined && pick.kind !== 'army'}
-          hidden={cardHidden(openDrawer)}
+          hidden={hideCard}
         >
           <ResidentCard
             key={selected.id}
@@ -2028,7 +2041,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         <CardSheet
           phone={phone}
           pinnedPeek={pick?.kind === 'group' || pick?.kind === 'plan'}
-          hidden={cardHidden(openDrawer)}
+          hidden={hideCard}
         >
           <GroupCard
             // Another group picked starts a card sorted afresh (ADR 0019).

@@ -487,6 +487,12 @@ export function Wiki() {
           the same order.
         </p>
         <p>
+          The Residents drawer’s Open full list button opens the list across the screen, with
+          everyone’s age, city, stats, skills, gear, what they carry, hunger, health and what they
+          are doing. On a phone each resident is a small card. Tap one to open that resident’s card,
+          which closes the full list. Stats there are what they count for now, old age included.
+        </p>
+        <p>
           The card and the residents list say what each resident is doing. Walking, riding or
           driving somewhere, they also say about when they arrive, and the card’s meters and
           countdowns (building, tearing down, breeding, carrying, pairing, growing up) say about how
