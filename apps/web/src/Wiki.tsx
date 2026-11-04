@@ -1726,6 +1726,22 @@ export function Wiki() {
           there and what you <strong>can sell</strong>, with the units and the price of each. Anyone
           with a resident in sight of it sees its prices.
         </p>
+        <h3>Offers at a Player's storage</h3>
+        <p>
+          A storage of your realm can stand an <strong>offer</strong>: "gives 10 Wood, wants 5
+          Stone", either side may be Coins, as many times over as you name and the goods are there.
+          Post it under the city's trade section, wherever your residents are. The goods stay in the
+          storage but are <strong>set aside</strong>: your workers, builders, Fetch, haul routes,
+          pick-ups and refills leave them alone, while a thief or raider can take them like any
+          others, cutting the offer down. Anyone in sight sees it and its rate. Someone of another
+          realm, a resident or carriage on the storage's tile, accepts it as many times as they can
+          pay and carry. It happens at once, whether you are online or not, and raises standing both
+          ways like a trade: by the coins, or goods for goods by both goods at warehouse base
+          prices, as a swap counts both its sale and its purchase. What they pay goes into the
+          storage as ordinary goods. It ends when it is used up, when you take it down, or when the
+          storage is torn down or no longer yours; what was set aside is ordinary goods of that
+          storage again.
+        </p>
         <h3>Sending a trader</h3>
         <p>
           With nobody of yours there, the trade section offers to send someone: your residents

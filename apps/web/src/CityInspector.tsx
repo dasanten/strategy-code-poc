@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   GOODS,
+  buildingRealm,
   isClosed,
   type Building,
+  type SeenBuilding,
   type Carriage,
   type DeliveryQuote,
   type Good,
@@ -54,6 +56,8 @@ import {
   type WarehouseView,
 } from './city-view.js'
 import { GOOD_LABELS } from './Residents.js'
+import { offerStoragesOf, outpostOfferStorages } from './offers-view.js'
+import { StorageOffers, type AcceptOfferRequest, type PostOfferRequest } from './Offers.js'
 import { GoodIcon } from './GoodsGrid.js'
 import { carriedShort } from './residents-view.js'
 import { lastSeenText, type LastSeen } from './last-seen.js'
@@ -94,6 +98,9 @@ export function CityInspector({
   directives,
   noCaravans,
   onBuyOff,
+  onPostOffer,
+  onTakeDownOffer,
+  onAcceptOffer,
   openId,
   onOpen,
   scrollTo,
@@ -102,7 +109,7 @@ export function CityInspector({
   /** What the Player remembers out of sight. */
   lastSeen: LastSeen
   residents: SeenResident[]
-  buildings: Building[]
+  buildings: SeenBuilding[]
   realmId: string
   realms: RealmLabel[]
   carriages: SeenCarriage[]
@@ -129,6 +136,12 @@ export function CityInspector({
   noCaravans: boolean
   /** Gives the buy-off order for a directive to one of the Player's residents on a warehouse. */
   onBuyOff: (residentId: string, directiveId: string, carriageId: string | null) => void
+  /** Posts an offer at a storage of the Player's realm (`CONTEXT.md`: Offer). */
+  onPostOffer: (offer: PostOfferRequest) => void
+  /** Takes down an offer of the Player's realm. */
+  onTakeDownOffer: (offerId: string) => void
+  /** Gives the accept order for an offer to one of the Player's residents on its storage. */
+  onAcceptOffer: (accept: AcceptOfferRequest) => void
   /** The city shown opened, such as one picked on the map. */
   openId: string | undefined
   /** Called with the city opened in the list, or undefined when it is closed. */
@@ -151,6 +164,28 @@ export function CityInspector({
     onSend: (s) =>
       onSend({ residentId: s.residentId, carriageId: s.carriageId, x: place.x, y: place.y }),
   })
+  const offersAt = (s: SeenBuilding) => (
+    <div key={s.id} data-trade-at={s.id}>
+      <StorageOffers
+        storage={s}
+        own={buildingRealm({ cities }, s) === realmId}
+        traders={tradersAt(s, { residents, carriages }, realmId)}
+        sending={
+          <Sending
+            warehouse={{ id: s.id, kind: s.kind, x: s.x, y: s.y, prices: [] }}
+            place="storage"
+            {...sending({ id: s.id, kind: s.kind, x: s.x, y: s.y, prices: [] })}
+          />
+        }
+        tick={tick}
+        horses={horses}
+        onPost={onPostOffer}
+        onTakeDown={onTakeDownOffer}
+        onAccept={onAcceptOffer}
+      />
+    </div>
+  )
+  const outposts = outpostOfferStorages({ cities, buildings }, realmId)
   const list = useRef<HTMLElement>(null)
   useEffect(() => {
     if (!scrollTo) return
@@ -329,6 +364,7 @@ export function CityInspector({
                   />
                 </div>
               ))}
+            {openId === v.id && offerStoragesOf(v, { cities, buildings }, realmId).map(offersAt)}
             {openId === v.id && <Reaction city={cities.find((c) => c.id === v.id)!} />}
             {openId === v.id && (
               <Buying
@@ -349,6 +385,15 @@ export function CityInspector({
           </li>
         ))}
       </ul>
+      {outposts.length > 0 && (
+        <>
+          <div className="panel-head">
+            <h2>Outpost storages</h2>
+            <span>{outposts.length}</span>
+          </div>
+          {outposts.map(offersAt)}
+        </>
+      )}
       {lastSeen.cities.length > 0 && (
         <>
           <div className="panel-head">

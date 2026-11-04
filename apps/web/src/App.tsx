@@ -1548,6 +1548,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 await sendOrder({ kind: 'buyOff', residentId, directiveId, carriageId }),
               )
             }
+            onPostOffer={async (offer) =>
+              setOrderError(await sendOrder({ kind: 'postOffer', ...offer }))
+            }
+            onTakeDownOffer={async (offerId) =>
+              setOrderError(await sendOrder({ kind: 'takeDownOffer', offerId }))
+            }
+            onAcceptOffer={async (accept) =>
+              setOrderError(await giveOrder({ kind: 'acceptOffer', ...accept }))
+            }
           />,
         )}
       {/* Mounted before the world arrives too: it loads the scripts the inspector can run. */}

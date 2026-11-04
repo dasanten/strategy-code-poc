@@ -106,6 +106,7 @@ import {
   tradeOrdersDone,
   tradesKeepGoods,
 } from './trading.js'
+import { acceptOrdersDone, offersKeepGoods, offersSound } from './offers.js'
 import { armiesSound, supplyLinesSound } from './armies.js'
 import { caravansSound, routeRobberiesSound } from './caravans.js'
 import { deliveriesSound } from './deliveries.js'
@@ -2049,6 +2050,9 @@ export const worldInvariants: Invariant[] = [
   tradesKeepGoods,
   refusedTradeNothing,
   npcTradesKeepReserve,
+  offersSound,
+  offersKeepGoods,
+  acceptOrdersDone,
   deliveriesSound,
   transfersSound,
   supplyLinesSound,

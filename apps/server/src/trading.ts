@@ -8,6 +8,7 @@ import {
   commands,
   commandsCarriage,
   deliveryStorage,
+  freeStock,
   handsOf,
   loadOf,
   goodsCapacity,
@@ -472,7 +473,7 @@ function orderDelivery(
           warehouse,
           o.good,
           o.units,
-          storage.stock?.[o.good] ?? 0,
+          freeStock(world, storage)[o.good] ?? 0,
           tiles,
           coinWarehouse.stock?.coins ?? 0,
         )

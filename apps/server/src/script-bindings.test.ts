@@ -429,6 +429,23 @@ describe('script bindings', () => {
     ],
     ['buyOff("directive1")', { kind: 'buyOff', directiveId: 'directive1', carriageId: null }],
     [
+      'postOffer("s1", "wood", 10, "stone", 5, 2)',
+      {
+        kind: 'postOffer',
+        storageId: 's1',
+        gives: 'wood',
+        givesUnits: 10,
+        wants: 'stone',
+        wantsUnits: 5,
+        times: 2,
+      },
+    ],
+    ['takeDownOffer("offer1")', { kind: 'takeDownOffer', offerId: 'offer1' }],
+    [
+      'acceptOffer("offer1", 2)',
+      { kind: 'acceptOffer', offerId: 'offer1', times: 2, carriageId: null },
+    ],
+    [
       'buy("iron", 2, null, "c1")',
       { kind: 'buy', good: 'iron', units: 2, carriageId: null, cityId: 'c1' },
     ],

@@ -124,6 +124,11 @@ const SHARED: readonly ScriptBinding[] = [
     'The buildings, construction sites and cities the Player has seen and that are out of their sight now, as they last saw them: each with `is` ("building" or "city") and `seenAt`, the tick they were last seen.',
   ),
   list(
+    'offers',
+    'offer',
+    'The offers standing at storages in sight, and my realm’s own wherever they are, oldest first.',
+  ),
+  list(
     'directives',
     'directive',
     'The admin directives in force, which every Player sees: target, reason and the price to buy one off (null when it can’t be).',
@@ -505,6 +510,21 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'handIn',
     ['good', 'units', 'toCityId', 'carriageId?'],
     'On a Trade Org warehouse, hand in up to `units` of a good (coins too) from my hands, or from my carriage there, with the fee, for a caravan to bring to the storage of `toCityId`, a city of another realm.',
+  ),
+  action(
+    'postOffer',
+    ['storageId', 'gives', 'givesUnits', 'wants', 'wantsUnits', 'times'],
+    'At a finished storage of my realm, wherever I am, post an offer: gives `givesUnits` of a good, wants `wantsUnits` of another (either may be "coins"), `times` over or as many times as goods not set aside there allow. Those goods are set aside at once.',
+  ),
+  action(
+    'takeDownOffer',
+    ['offerId'],
+    'Take down an offer of my realm; what it set aside is ordinary goods again.',
+  ),
+  action(
+    'acceptOffer',
+    ['offerId', 'times', 'carriageId?'],
+    'On the storage of another’s offer, accept it up to `times` times over, paying from and taking into my hands, or my carriage there, as many times as I can pay and carry.',
   ),
   action(
     'buyOff',

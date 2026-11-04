@@ -1,0 +1,139 @@
+import type { Good, Resident, SeenBuilding, SeenOffer } from '@csp/shared'
+import { describe, expect, it } from 'vitest'
+import {
+  acceptPreview,
+  freeAtStorage,
+  offerStands,
+  offerStoragesOf,
+  offerTerms,
+  outpostOfferStorages,
+  postPreview,
+  setAsideLine,
+} from './offers-view.js'
+
+const labels = new Proxy({} as Record<Good, string>, {
+  get: (_t, g: string) => g[0]!.toUpperCase() + g.slice(1),
+})
+
+const offer = (terms: Partial<SeenOffer> = {}): SeenOffer => ({
+  id: 'o1',
+  realmId: 'r1',
+  storageId: 's1',
+  x: 6,
+  y: 6,
+  gives: 'wood',
+  givesUnits: 10,
+  wants: 'stone',
+  wantsUnits: 5,
+  times: 2,
+  rate: 0.5,
+  ...terms,
+})
+
+const storage = (terms: Partial<SeenBuilding> = {}): SeenBuilding => ({
+  id: 's1',
+  kind: 'storage',
+  cityId: 'c1',
+  x: 6,
+  y: 6,
+  ...terms,
+})
+
+const seen = (buildings: SeenBuilding[]) => ({
+  cities: [
+    { id: 'c1', realmId: 'r1' },
+    { id: 'c2', realmId: 'r2' },
+  ],
+  buildings,
+})
+
+const trader = (carried: Resident['carried'] = {}) =>
+  ({
+    id: 't1',
+    bornAt: -1e9,
+    carried,
+    stats: { strength: { base: 10, trained: 0 } },
+  }) as unknown as Resident
+
+describe('which storages show offers', () => {
+  it('every finished storage of the Player’s own, another realm’s only with an offer', () => {
+    const mine = storage()
+    const site = storage({ id: 's2', site: { delivered: {}, work: 0 } })
+    const house = storage({ id: 's3', kind: 'house' })
+    const theirs = storage({ id: 's4', cityId: 'c2' })
+    const theirsWithOne = storage({ id: 's5', cityId: 'c2', offers: [offer()] })
+    const all = seen([mine, site, house, theirs, theirsWithOne])
+    expect(offerStoragesOf({ id: 'c1' }, all, 'r1')).toEqual([mine])
+    expect(offerStoragesOf({ id: 'c2' }, all, 'r1')).toEqual([theirsWithOne])
+  })
+
+  it('outpost storages likewise', () => {
+    const mine = storage({ cityId: null, realmId: 'r1' })
+    const theirs = storage({ id: 's2', cityId: null, realmId: 'r2' })
+    const theirsWithOne = storage({ id: 's3', cityId: null, realmId: 'r2', offers: [offer()] })
+    const city = storage({ id: 's4' })
+    expect(outpostOfferStorages(seen([mine, theirs, theirsWithOne, city]), 'r1')).toEqual([
+      mine,
+      theirsWithOne,
+    ])
+  })
+})
+
+describe('offer lines', () => {
+  it('says the terms and the rate', () => {
+    expect(offerTerms(offer(), labels)).toBe('Gives 10 wood, wants 5 stone')
+    expect(offerStands(offer(), labels)).toBe('2 times left, 0.5 stone for 1 wood')
+    expect(offerStands(offer({ times: 1, rate: 1 / 3 }), labels)).toBe(
+      'once more, 0.33 stone for 1 wood',
+    )
+  })
+
+  it('adds up what is set aside', () => {
+    expect(setAsideLine(storage(), labels)).toBeUndefined()
+    expect(
+      setAsideLine(
+        storage({ offers: [offer(), offer({ id: 'o2', times: 1 }), offer({ gives: 'food' })] }),
+        labels,
+      ),
+    ).toBe('Set aside for offers: 20 food, 30 wood')
+  })
+})
+
+describe('posting', () => {
+  const b = storage({ stock: { wood: 25 }, offers: [offer({ times: 1 })] })
+
+  it('counts only what isn’t set aside yet', () => {
+    expect(freeAtStorage(b)).toEqual({ wood: 15 })
+    expect(postPreview(b, 'wood', 5, 'coins', 1, 9, labels)).toEqual({
+      text: 'Sets aside 15 wood: gives 5 wood, wants 1 coins, 3 times over.',
+      canPost: true,
+    })
+    expect(postPreview(b, 'wood', 15, 'coins', 1, 1, labels).text).toMatch(/, once\.$/)
+  })
+
+  it('says why it won’t go', () => {
+    expect(postPreview(b, 'wood', 20, 'coins', 1, 1, labels)).toEqual({
+      text: 'Not enough wood here not set aside.',
+      canPost: false,
+    })
+    expect(postPreview(b, 'wood', 5, 'wood', 1, 1, labels).canPost).toBe(false)
+    expect(postPreview(b, 'wood', 0, 'coins', 1, 1, labels).canPost).toBe(false)
+  })
+})
+
+describe('accepting', () => {
+  it('says what it moves and what cuts it', () => {
+    const preview = (carried: Resident['carried'], wanted = 1, o = offer()) =>
+      acceptPreview(o, trader(carried), undefined, wanted, 0, [], labels)
+    expect(preview({ stone: 5 }).text).toBe('Takes 10 wood for 5 stone.')
+    expect(preview({ stone: 7 }, 2).text).toBe(
+      'Takes 10 wood for 5 stone (not enough stone to pay).',
+    )
+    expect(preview({}).text).toBe('Won’t go: not enough stone to pay.')
+    expect(preview({}, 1, offer({ wants: 'coins' })).text).toBe(
+      'Won’t go: not enough coins to pay.',
+    )
+    expect(preview({ stone: 10 }, 5).text).toMatch(/it stands no more times than that/)
+    expect(preview({ stone: 10 }, 5).quote.times).toBe(2)
+  })
+})

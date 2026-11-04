@@ -2035,3 +2035,22 @@ button.residents-row.selected:hover {
   white-space: nowrap;
   max-width: 100%;
 }
+
+.storage-offers h4 {
+  margin: 0 0 4px;
+}
+
+.offer-list {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+}
+
+.offer-list li {
+  margin-bottom: 6px;
+}
+
+.offer-post input[type='number'],
+.offer-accept input[type='number'] {
+  width: 4.5em;
+}

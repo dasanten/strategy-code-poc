@@ -220,6 +220,22 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         places: [place],
       }
     }
+    case 'offerAccepted': {
+      const place = { name: 'the storage', x: e.x, y: e.y }
+      if (e.times === 0) {
+        return {
+          text: `${e.name} couldn’t accept the offer of ${e.realm}.`,
+          tone: 'warn',
+          places: [place],
+        }
+      }
+      const cut = e.times < e.wanted ? ` (of ${e.wanted} times wanted)` : ''
+      return {
+        text: `${e.name} took ${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)} from the offer of ${e.realm}${cut}.`,
+        tone: 'info',
+        places: [place],
+      }
+    }
     case 'swapped': {
       const place = { name: `the ${e.place}`, x: e.x, y: e.y }
       if (e.units === 0) {
@@ -235,6 +251,32 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         text: `${e.name} swapped ${e.gave} ${goodText(e.give)} for ${e.units} ${goodText(e.want)}${cut}${back} at ${place.name}.`,
         tone: 'info',
         places: [place],
+      }
+    }
+    case 'offerTaken':
+      return {
+        text: `${e.by} took your offer: ${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)}.`,
+        tone: 'info',
+        places: [{ name: 'the storage', x: e.x, y: e.y }],
+      }
+    case 'offerCutDown':
+      return {
+        text: `Goods gone from the storage cut your offer of ${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)} down to ${e.times} ${e.times === 1 ? 'time' : 'times'}.`,
+        tone: 'warn',
+        places: [{ name: 'the storage', x: e.x, y: e.y }],
+      }
+    case 'offerEnded': {
+      const what = `${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)}`
+      const why = {
+        usedUp: `Your offer of ${what} is used up.`,
+        takenDown: `Your offer of ${what} is taken down.`,
+        storageLost: `Your offer of ${what} ended: the storage is gone or no longer yours.`,
+        goodsGone: `Your offer of ${what} ended: its goods are gone from the storage.`,
+      }[e.why]
+      return {
+        text: why,
+        tone: e.why === 'usedUp' || e.why === 'takenDown' ? 'info' : 'warn',
+        places: [{ name: 'the storage', x: e.x, y: e.y }],
       }
     }
     case 'deliveryOrdered': {

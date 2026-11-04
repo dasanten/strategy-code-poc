@@ -46,6 +46,7 @@ export type ScriptViewName =
   | 'building'
   | 'site'
   | 'price'
+  | 'offer'
   | 'city'
   | 'occupation'
   | 'hire'
@@ -100,7 +101,7 @@ const BUILDING_FIELDS: readonly ScriptField[] = [
   field(
     'stock',
     view('goods'),
-    'The goods kept here.',
+    'The goods kept here; at a storage of my own, those not set aside for its offers, which I can’t take.',
     'for any building but a storage, warehouse or stable, and when the Player doesn’t see inside it',
   ),
 
@@ -128,6 +129,12 @@ const BUILDING_FIELDS: readonly ScriptField[] = [
     listOf(view('price')),
     'A Trade Org warehouse’s prices, one for each good it keeps.',
     'for any building but a Trade Org warehouse',
+  ),
+  field(
+    'offers',
+    listOf(view('offer')),
+    'The offers standing at a storage, oldest first; anyone in sight sees them.',
+    'for any building but a storage with an offer',
   ),
 ]
 
@@ -346,7 +353,7 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field(
         'kind',
         'string',
-        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "store", "fetch", "build", "tearDown", "workAt", "teach", "train", "breed", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "swap", "handIn", "buyOff" or "relocate" (on their way to `cityId`, to live there).',
+        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "store", "fetch", "build", "tearDown", "workAt", "teach", "train", "breed", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "swap", "handIn", "buyOff", "acceptOffer" or "relocate" (on their way to `cityId`, to live there).',
       ),
       field(
         'target',
@@ -597,6 +604,23 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field('stock', 'number', 'What it holds.', 'unless the Player sees inside'),
       field('forSale', 'number', 'Units an NPC city would sell.', 'at a warehouse'),
       field('wanted', 'number', 'Units an NPC city would buy.', 'at a warehouse'),
+    ],
+  },
+  offer: {
+    description:
+      'What a Player posts at a storage of their realm: "gives 10 Wood, wants 5 Stone", some times over.',
+    fields: [
+      id('offer'),
+      field('realmId', 'string', 'The realm that posted it.'),
+      field('storageId', 'string', 'The storage it stands at; accept it on its tile.'),
+      x,
+      y,
+      field('gives', 'string', 'The good it gives; may be "coins".'),
+      field('givesUnits', 'number', 'How much of it each time.'),
+      field('wants', 'string', 'The good it wants; may be "coins".'),
+      field('wantsUnits', 'number', 'How much of it each time.'),
+      field('times', 'number', 'How many more times it can be accepted.'),
+      field('rate', 'number', 'What it wants for one unit it gives.'),
     ],
   },
   city: {

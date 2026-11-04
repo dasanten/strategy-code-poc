@@ -32,6 +32,7 @@ import { contractOrders, pay } from './contracts.js'
 import { buyCity } from './buying.js'
 import { persuasionOrders } from './persuasion.js'
 import { buy, sell, swap } from './trading.js'
+import { offerOrders } from './offers.js'
 import { handInOrder, transfer } from './transfers.js'
 import { buyOff } from './directives.js'
 import { handOver } from './leader.js'
@@ -128,6 +129,7 @@ export const orderKinds: Record<string, OrderKind> = Object.fromEntries(
     ...allianceOrders,
     ...armyOrders,
     ...contractOrders,
+    ...offerOrders,
     ...persuasionOrders,
     ...queueOrders,
     ...waypointOrders,
@@ -209,6 +211,8 @@ export class OrderQueue {
         'setScriptParam',
         'setDefenceScript',
         'editQueue',
+        'postOffer',
+        'takeDownOffer',
         ...Object.keys(waypointOrders),
       ]
       const r = world.residents.find((x) => x.id === order.residentId)
