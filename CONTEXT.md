@@ -293,9 +293,10 @@ The shared language of the game. Domain terms only — no implementation details
   so one still walking out doesn't stop a theft. Once stolen (Guaranteed carriage), the same
   caravan gets a new carriage and horse at the HQ, and any surviving crew walk back to it.
 - **Wandering trader:** a Trade Org carriage with a driver and a small escort, sent from the HQ on
-  a fixed loop of trading posts, apart from the caravans, so posts can hold goods they don't
-  produce. At each post it evens out its load with the warehouse, every good including Food and
-  Coins: it leaves what the post has less of and takes what it has more of, as far as the carriage
+  a fixed loop of the trading posts and the HQ, apart from the caravans, so posts can hold goods
+  they don't produce. The HQ is a stop like a post, so new Food and Coins reach the posts, and its
+  lost escorts are made up there each time round. At each stop it evens out its load with the
+  warehouse, every good including Food and Coins: it leaves what the post has less of and takes what it has more of, as far as the carriage
   holds. Crew, escort, Food on board and a lost carriage go as for a caravan (Caravan crew lost);
   taking goods off it or stealing it is a theft like any against the Trade Organization, but it
   owes nobody a delivery, so nothing is sent again. How many there are is a balance number.
