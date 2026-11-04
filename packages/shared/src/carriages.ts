@@ -131,6 +131,23 @@ export function driverOf<R extends Pick<Resident, 'order'>>(
 }
 
 /**
+ * Whether a carriage stands still with nothing to move it (`CONTEXT.md`: On a carriage under
+ * attack): no driver driving it, or its horse Down or dead.
+ */
+export function standsStill(
+  world: {
+    horses: readonly CarriageHorse[]
+    carriages: readonly CarriagePlace[]
+    residents: readonly Pick<Resident, 'order' | 'riding'>[]
+  },
+  carriage: CarriagePlace & Pick<Carriage, 'id'>,
+): boolean {
+  if (!driverOf(world, carriage)) return true
+  const horse = horseFor(world, carriage)
+  return !horse || isDown(horse)
+}
+
+/**
  * Where a haul route's stop on tile (x, y) loads and unloads (`CONTEXT.md`: Haul route): the
  * storage there, a stable's included, or else the ground.
  */

@@ -2,6 +2,7 @@ import {
   Terrain,
   UNEXPLORED,
   arrivalTicks,
+  drivenCarriageId,
   isDown,
   timeLeft,
   roadTiles,
@@ -31,9 +32,26 @@ export interface DoingOf {
   script?: SeenScript
   /** The carriage they are aboard (`CONTEXT.md`: Passenger), which shows while they have no order. */
   aboard?: string
+  /** What their defence script keeps aside (`CONTEXT.md`: Defence script), if one runs. */
+  interrupted?: { order: ResidentOrder | null; script?: SeenScript }
   /** Down (`CONTEXT.md`: Down): from the world, or as a Player sees them. */
   down?: true
   downUntil?: number
+}
+
+/**
+ * Whether a driver just struck drives on with their defence script yet to say otherwise, so their
+ * line stays what they were doing and doesn't flicker at each blow (`CONTEXT.md`: On a carriage
+ * under attack).
+ */
+function drivesOn(r: {
+  order?: ResidentOrder | null
+  interrupted?: DoingOf['interrupted']
+  script?: SeenScript
+}): boolean {
+  if (r.script?.task !== 'defend' || r.script.doing || !r.interrupted) return false
+  const driving = drivenCarriageId({ order: r.order ?? null })
+  return driving !== undefined && driving === drivenCarriageId(r.interrupted)
 }
 
 /**
@@ -45,6 +63,13 @@ export interface DoingOf {
  * line ends in "· script waiting".
  */
 export function doingLine(r: DoingOf, seen: DoingSeen): string {
+  if (drivesOn(r)) {
+    const goingOn = { ...r }
+    delete goingOn.interrupted
+    if (r.interrupted!.script) goingOn.script = r.interrupted!.script
+    else delete goingOn.script
+    return doingLine(goingOn, seen)
+  }
   const line = doingOfOrder(r, seen)
   return r.script?.waiting ? `${line} · script waiting` : line
 }
@@ -205,11 +230,11 @@ function placeLine(place: GoodsPlace, buildings: readonly Pick<Building, 'id' | 
  * the small line under their Doing line: "Then: working the farm". Undefined while none runs.
  */
 export function interruptedLine(
-  r: { interrupted?: { order: ResidentOrder | null; script?: SeenScript } },
+  r: Parameters<typeof drivesOn>[0],
   seen: Parameters<typeof doingLine>[1],
 ): string | undefined {
   const kept = r.interrupted
-  if (!kept) return undefined
+  if (!kept || drivesOn(r)) return undefined
   const line = doingLine(
     { order: kept.order, ...(kept.script ? { script: kept.script } : {}) },
     seen,

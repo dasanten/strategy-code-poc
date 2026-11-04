@@ -5,6 +5,7 @@ import {
   blowDamage,
   combatLearned,
   dodgeChance,
+  drivenCarriageId,
   inContact,
   isArmed,
   onOwnWall,
@@ -20,6 +21,7 @@ import {
   contractOf,
   inInnerRing,
   ofTradeOrgHq,
+  standsStill,
   tradeOrgHq,
   type AttackOrder,
   type Building,
@@ -306,11 +308,23 @@ function breakWall(world: WorldState, a: Resident, b: Building, size: number): b
 }
 
 /**
+ * Whether `t` drives a caravan and stands with its carriage, as at a stop between the orders of
+ * their route, which they go on with (`CONTEXT.md`: On a carriage under attack).
+ */
+function withCaravanCarriage(world: WorldState, t: Resident): boolean {
+  const caravan = world.caravans.find((c) => c.driverId === t.id)
+  const carriage = caravan && world.carriages.find((k) => k.id === caravan.carriageId)
+  return !!carriage && carriage.x === t.x && carriage.y === t.y
+}
+
+/**
  * A resident `t` hit by `a` and still alive (`CONTEXT.md`: Combat, Under attack): a Player's
  * resident runs their defence script (`startDefence`), unless what the Player gave them under
  * attack holds. Others react as the game's Defend does, by
- * built-in orders: armed, they fight back unless they are already attacking someone; unarmed,
- * they flee home, walking to their city's town hall.
+ * built-in orders: armed, they fight back unless they are already attacking someone, off any
+ * carriage they are aboard; unarmed, they flee home, walking to their city's town hall, but a
+ * driver drives on and a passenger stays aboard a carriage being driven (`CONTEXT.md`: On a
+ * carriage under attack).
  */
 function react(world: WorldState, t: Resident, a: Resident): void {
   if (t.order?.kind === 'climb') return
@@ -319,15 +333,22 @@ function react(world: WorldState, t: Resident, a: Resident): void {
     return
   }
   if (isArmed(t)) {
-    if (t.order?.kind !== 'attack') t.order = attackOrder(a.id, true, true)
+    if (t.order?.kind !== 'attack') {
+      delete t.aboard
+      t.order = attackOrder(a.id, true, true)
+    }
     return
   }
+  if (drivenCarriageId(t) !== undefined || withCaravanCarriage(world, t)) return
+  const carriage = world.carriages.find((k) => k.id === t.aboard)
+  if (carriage && !standsStill(world, carriage)) return
   const city = world.cities.find((c) => c.id === t.cityId)
   const hall = city && world.buildings.find((b) => b.id === city.townHallId)
   if (!hall) return
   const o = t.order
   const fleeing = o?.kind === 'walkTo' && o.target.x === hall.x && o.target.y === hall.y
   if (fleeing || isAt(t, hall)) return
+  delete t.aboard
   t.order = { kind: 'walkTo', target: { x: hall.x, y: hall.y }, path: null, progress: 0 }
   recordEvent(world, t.owner, { kind: 'fled', residentId: t.id, name: t.name })
 }

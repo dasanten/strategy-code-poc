@@ -82,13 +82,14 @@ export type SeenHorse = Omit<Horse, 'hunger' | 'health' | 'downUntil'> &
 /**
  * A carriage as Players see it (`CONTEXT.md`: Seeing inside a storage): how heavily it is loaded,
  * and the load itself only for its own Organization, their allies and anyone with a resident on
- * its tile. `passengerIds` are the residents aboard it (`CONTEXT.md`: Passenger), always sent by
- * the server.
+ * its tile. `passengerIds` are the residents aboard it (`CONTEXT.md`: Passenger), and `standsStill`
+ * says whether nothing moves it (`CONTEXT.md`: On a carriage under attack), both always sent by the
+ * server.
  */
 export type SeenCarriage = (
   | (Carriage & { loadLevel?: LoadLevel })
   | (Omit<Carriage, 'load'> & { load?: undefined; loadLevel: LoadLevel })
-) & { passengerIds?: string[] }
+) & { passengerIds?: string[]; standsStill?: boolean }
 
 /**
  * Something a Player sees (`CONTEXT.md`: Sight), tagged with what it is. Ids are unique across

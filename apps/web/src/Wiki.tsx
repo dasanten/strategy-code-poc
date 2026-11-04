@@ -1627,8 +1627,10 @@ export function Wiki() {
           carries; clicking it opens its card, which lists them under its load with how much of its
           weight is people and picks one when you click their name (a box drag takes them in too). A
           passenger's Doing line says "Aboard a carriage" and where it is heading while it is
-          driven, and picking them shows the carriage's way ahead. Scripts see a resident's{' '}
-          <code>aboard</code> and a carriage's <code>passengerIds</code>.
+          driven, and picking them shows the carriage's way ahead. Struck, an unarmed passenger
+          stays aboard while it is driven (see Under attack). Scripts see a resident's{' '}
+          <code>aboard</code> and a carriage's <code>passengerIds</code> and{' '}
+          <code>standsStill</code>.
         </p>
         <p>
           <strong>Refilling from a carriage:</strong> passengers and the driver eat the food they
@@ -2071,6 +2073,17 @@ export function Wiki() {
           queue at its step, or a plain order. Struck again while defending, they keep defending.
           Scripts see the last blow as <code>me.struckBy</code> and <code>me.struckAt</code>.
           Residents of NPC cities, and in an army, fight back or flee home the same way.
+        </p>
+        <p>
+          <strong>On a carriage:</strong> the carriage is the way out. An unarmed driver drives on
+          where they were going, at the same pace, a haul route too, and an armed one fights back
+          with the carriage standing, comes back to it if the fight led away, and then goes on. An
+          unarmed passenger stays aboard while the carriage is being driven; on one standing still,
+          with no driver driving it or its horse Down or dead, they get off and walk home. An armed
+          passenger gets off and fights back. A caravan's driver under attack doesn't wait for the
+          escort either. Your own defence script decides for itself: a driver's{' '}
+          <code>me.order</code> stays their drive or haul route until it gives them another order,
+          and a carriage's <code>standsStill</code> says whether anything moves it.
         </p>
         <p>
           An order you give a resident under attack, while their defence script runs or within{' '}

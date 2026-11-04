@@ -3,7 +3,9 @@ import {
   BLOW_PER_STRENGTH,
   COMBAT_SKILL_LIMIT,
   DODGE_LIMIT,
+  AVERAGE_HORSE_STATS,
   MAX_HEALTH,
+  MAX_HUNGER,
   MIN_BLOW_DAMAGE,
   PROTECTION_DEFENCE,
   SIGHT_RANGE,
@@ -24,7 +26,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { attackOrder } from './combat.js'
+import { attackOrder, resolveStrikes } from './combat.js'
 import { attackOrdersSound, checkInvariants, deadLeaveLoot, type Invariant } from './invariants.js'
 import { OrderQueue } from './orders.js'
 import { mulberry32, newResident } from './residents.js'
@@ -267,6 +269,94 @@ describe('combat', () => {
     v.order = null
     expect(untilHit(world, 'n1')).toBeDefined()
     expect(v.order).toMatchObject({ kind: 'attack', targetId: 'a1', defending: true })
+  })
+
+  describe('a resident of an NPC city on a carriage (`CONTEXT.md`: On a carriage under attack)', () => {
+    /** An NPC city's carriage k1 with a horse at (11, 10), driver n1 on it, attacker a1 beside. */
+    function onCarriage() {
+      const s = setup()
+      const { world } = s
+      addCity(world, { id: 'c3', realmId: null, x: 30, y: 30 })
+      world.horses.push({
+        id: 'h1',
+        realmId: null,
+        cityId: 'c3',
+        x: 11,
+        y: 10,
+        hunger: MAX_HUNGER,
+        health: MAX_HEALTH,
+        name: 'Rowan',
+        stats: { ...AVERAGE_HORSE_STATS },
+        bornAt: 0,
+      })
+      world.carriages.push({
+        id: 'k1',
+        realmId: null,
+        cityId: 'c3',
+        x: 11,
+        y: 10,
+        horseId: 'h1',
+        load: {},
+      })
+      const driver = resident(world, 'n1', null, 11, 10)
+      driver.cityId = 'c3'
+      driver.order = {
+        kind: 'drive',
+        carriageId: 'k1',
+        target: { x: 11, y: 30 },
+        path: null,
+        progress: 0,
+      }
+      return { ...s, driver, carriage: world.carriages[0]! }
+    }
+
+    it('an unarmed driver drives on', () => {
+      const { world, queue, driver } = onCarriage()
+      const walking = new Walking(terrain)
+      expect(order(world, queue, 'a1', 'n1')).toBe('ack')
+      expect(untilHit(world, 'n1', 20, walking)).toBeDefined()
+      expect(driver.order).toMatchObject({ kind: 'drive', carriageId: 'k1' })
+      expect(driver.interrupted).toBeUndefined()
+    })
+
+    it('an armed driver fights back', () => {
+      const { world, queue, driver } = onCarriage()
+      driver.carried = { spear: 1 }
+      expect(order(world, queue, 'a1', 'n1')).toBe('ack')
+      expect(untilHit(world, 'n1')).toBeDefined()
+      expect(driver.order).toMatchObject({ kind: 'attack', targetId: 'a1', defending: true })
+    })
+
+    it('an unarmed passenger stays aboard while it is driven, and gets off once it stands', () => {
+      const { world, queue, driver } = onCarriage()
+      const p = resident(world, 'n2', null, 11, 10)
+      p.cityId = 'c3'
+      p.aboard = 'k1'
+      expect(order(world, queue, 'a1', 'n2')).toBe('ack')
+      // The blows alone, without the city's own orders for someone idle.
+      const blow = () => resolveStrikes(world, [{ attackerId: 'a1', targetId: 'n2' }], terrain.size)
+      expect(blow().blows).toBe(1)
+      expect(p.struck?.by).toBe('a1')
+      expect(p.aboard).toBe('k1')
+      expect(p.order).toBeNull()
+
+      driver.order = null
+      blow()
+      expect(p.aboard).toBeUndefined()
+      expect(p.order).toMatchObject({ kind: 'walkTo', target: { x: 30, y: 30 } })
+    })
+
+    it('an armed passenger gets off and fights back', () => {
+      const { world, queue } = onCarriage()
+      const p = resident(world, 'n2', null, 11, 10)
+      p.cityId = 'c3'
+      p.aboard = 'k1'
+      p.carried = { spear: 1 }
+      expect(order(world, queue, 'a1', 'n2')).toBe('ack')
+      expect(untilHit(world, 'n2')).toBeDefined()
+      expect(p.aboard).toBeUndefined()
+      expect(p.order).toMatchObject({ kind: 'attack', targetId: 'a1', defending: true })
+    })
   })
 
   it('a fight goes in both realm logs once', () => {

@@ -387,4 +387,30 @@ describe('defending (`CONTEXT.md`: Defence script)', () => {
     )
     expect(interruptedLine({}, {})).toBeUndefined()
   })
+
+  it('a driver just struck keeps their line: their drive goes on (`CONTEXT.md`: On a carriage under attack)', () => {
+    const drive: ResidentOrder = {
+      kind: 'drive',
+      carriageId: 'k1',
+      target: { x: 4, y: 5 },
+      path: [[4, 5]],
+      progress: 0,
+    }
+    const struck: DoingOf = {
+      order: drive,
+      script: { scriptId: 0, task: 'defend' },
+      interrupted: { order: drive },
+    }
+    const driving = doingLine({ order: drive }, {})
+    expect(doingLine(struck, {})).toBe(driving)
+    expect(interruptedLine(struck, {})).toBeUndefined()
+    // Fighting back they do say so, with the drive to go on with after it.
+    const fighting: DoingOf = {
+      order: walk,
+      script: { scriptId: 7, task: 'defend', doing: 'Defending: fighting back at Bo' },
+      interrupted: { order: drive },
+    }
+    expect(doingLine(fighting, {})).toBe('Defending: fighting back at Bo')
+    expect(interruptedLine(fighting, {})).toMatch(/^Then: /)
+  })
 })
