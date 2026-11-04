@@ -208,11 +208,20 @@ describe('world saves', () => {
     expect(checkInvariants(v82, land)).toEqual([])
   })
 
+  it('leaves offers and transfers as they are: nothing is carried yet (migration 83 → 84)', () => {
+    const { world: v83, terrain: land } = worldWithPost()
+    const v84 = migrateWorld(structuredClone(v83), 83, { terrain: land })
+    expect(v84).toEqual(v83)
+    expect(v84.offers.every((o) => o.direct?.carried === undefined)).toBe(true)
+    expect(v84.transfers.every((t) => t.carriedOffer === undefined)).toBe(true)
+    expect(checkInvariants(v84, land)).toEqual([])
+  })
+
   it('leaves realms from before realm names unnamed (migration 38 → 39)', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(83)
+    expect(WORLD_FORMAT_VERSION).toBe(84)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)

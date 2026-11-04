@@ -215,6 +215,8 @@ export class OrderQueue {
         'takeDownOffer',
         'sendDirectOffer',
         'declineOffer',
+        'sendCarriedOffer',
+        'acceptCarriedOffer',
         ...Object.keys(waypointOrders),
       ]
       const r = world.residents.find((x) => x.id === order.residentId)

@@ -646,6 +646,83 @@ describe('realm log', () => {
     })
   })
 
+  it('tells both sides of a carried direct offer, with what they pay', () => {
+    const terms = {
+      kind: 'directOffer',
+      gives: 'iron',
+      givesUnits: 10,
+      wants: 'stone',
+      wantsUnits: 5,
+      times: 1,
+      from: 'Mara',
+      carried: { fromCity: 'Oakford', toCity: 'Brook', fee: 40 },
+      x: 6,
+      y: 6,
+      seq: 1,
+      tick: 0,
+      userId: 7,
+    } as const
+    const got = (what: string) => describeEvent({ ...terms, what } as RealmEvent).text
+    expect(got('received')).toBe(
+      'The realm of Mara sent you a direct offer the Trade Organization carries between Oakford and Brook: 10 iron for 5 stone. You pay up to 40 coins. Accept or decline it under Direct offers.',
+    )
+    expect(got('carriedAccepted')).toBe(
+      'The realm of Mara accepted your carried direct offer of 10 iron for 5 stone: caravans carry both ways between Oakford and Brook. You pay up to 40 coins.',
+    )
+    expect(got('youAccepted')).toBe(
+      'You accepted the carried direct offer of 10 iron for 5 stone from the realm of Mara: caravans carry both ways between Oakford and Brook. You pay up to 40 coins.',
+    )
+    expect(got('noCaravans')).toBe(
+      'The direct offer of 10 iron for 5 stone from the realm of Mara is cancelled: the Trade Org HQ has fallen and no caravans run.',
+    )
+    const ended = (why: string, carried: boolean) =>
+      describeEvent({ ...terms, kind: 'offerEnded', why, to: 'Bo', carried } as RealmEvent).text
+    expect(ended('declined', true)).toBe(
+      'Your direct offer of 10 iron for 5 stone to the realm of Bo was declined.',
+    )
+    expect(ended('noCaravans', true)).toBe(
+      'Your direct offer of 10 iron for 5 stone to the realm of Bo is cancelled: the Trade Org HQ has fallen and no caravans run.',
+    )
+    expect(
+      describeEvent({
+        kind: 'transferStuck',
+        why: 'nothingCame',
+        good: 'stone',
+        units: 5,
+        cityId: 'c1',
+        city: 'Oakford',
+        seq: 1,
+        tick: 0,
+        userId: 7,
+      } as RealmEvent).text,
+    ).toBe('A caravan found no stone to bring Oakford for a carried direct offer.')
+  })
+
+  it('names no sum for a carried Transfer that arrived, whose fee may be shared', () => {
+    const arrived = {
+      kind: 'transferred',
+      good: 'stone',
+      units: 10,
+      fee: 27,
+      carried: true,
+      fromRealmId: 'r2',
+      fromRealm: 'Boland',
+      toRealmId: 'r1',
+      toRealm: 'Marland',
+      back: false,
+      cityId: 'c1',
+      city: 'Brackenholt',
+      x: 1,
+      y: 2,
+      seq: 1,
+      tick: 0,
+      userId: 8,
+    } as RealmEvent
+    expect(describeEvent(arrived, 'r2').text).toBe(
+      'A caravan brought the 10 stone you sent to Brackenholt of Marland, as your carried direct offer agreed.',
+    )
+  })
+
   it('tells both sides of a direct offer, with its place', () => {
     const terms = {
       gives: 'wood',

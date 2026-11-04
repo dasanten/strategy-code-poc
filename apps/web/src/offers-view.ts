@@ -2,12 +2,16 @@ import {
   GOODS,
   buildingRealm,
   carriageCapacity,
+  carriedFeesOver,
   freeStock,
   handsOf,
   loadOf,
   offerOpenTo,
   quoteOffer,
   timesToPost,
+  transferLoad,
+  type CarriedFeeBy,
+  type CarriedWay,
   type Carriage,
   type City,
   type DirectOfferView,
@@ -104,6 +108,60 @@ export function offerStands(o: SeenOffer, labels: Labels): string {
   const rate = Math.round(o.rate * 100) / 100
   const left = o.times === 1 ? 'once more' : `${o.times} times left`
   return `${left}, ${rate} ${labels[o.wants]!.toLowerCase()} for 1 ${labels[o.gives]!.toLowerCase()}`
+}
+
+/**
+ * A carried Direct offer's whole terms, taken at once: `Gives 20 wood, wants 10 stone, carried`
+ * (`CONTEXT.md`: Direct offer).
+ */
+export function carriedLine(
+  o: Pick<SeenOffer, 'gives' | 'givesUnits' | 'wants' | 'wantsUnits' | 'times'>,
+  labels: Labels,
+): string {
+  const whole = { ...o, givesUnits: o.givesUnits * o.times, wantsUnits: o.wantsUnits * o.times }
+  return `${offerTerms(whole, labels)}, carried`
+}
+
+/** A carried Direct offer's way and who pays what, from `realmId`'s side, in a sentence. */
+export function carriedDetails(o: DirectOfferView, realmId: string): string {
+  const c = o.direct.carried!
+  const own = o.from.realmId === realmId ? c.senderFee : c.otherFee
+  const theirs = o.from.realmId === realmId ? c.otherFee : c.senderFee
+  const fee =
+    c.feeBy === 'sender'
+      ? `Paid by the sender: ${c.senderFee} coins`
+      : `Split: ${own} coins from you, ${theirs} from them`
+  return `By caravan between ${o.city} and ${o.toCity}, taking what is there up to what was agreed. ${fee}, for all of the goods.`
+}
+
+/** What the sender would see before sending a carried Direct offer, and whether it can go. */
+export function carriedPreview(
+  way: CarriedWay | undefined,
+  feeBy: CarriedFeeBy,
+  goods: {
+    gives: Good
+    givesUnits: number
+    wants: Good
+    wantsUnits: number
+    times: number
+  },
+  labels: Labels,
+): { text: string; canPost: boolean } {
+  const { gives, wants, givesUnits, wantsUnits, times } = goods
+  const whole = [givesUnits, wantsUnits, times].every((n) => Number.isInteger(n) && n > 0)
+  if (!whole) return { text: 'Units and times must be whole numbers.', canPost: false }
+  if (gives === wants) return { text: 'An offer wants a different good.', canPost: false }
+  if (givesUnits * times > transferLoad(gives) || wantsUnits * times > transferLoad(wants)) {
+    return { text: 'Each side’s goods must fit one carriage load.', canPost: false }
+  }
+  if (!way) return { text: 'No Trade Org warehouse can send a caravan there.', canPost: false }
+  const fees = carriedFeesOver(way, feeBy, goods)
+  const fee =
+    feeBy === 'sender'
+      ? `You pay ${fees.senderFee} coins, for all of the goods.`
+      : `You pay ${fees.senderFee} coins and they pay ${fees.otherFee}, for all of the goods.`
+  const line = `Gives ${amount(givesUnits * times, gives, labels)}, wants ${amount(wantsUnits * times, wants, labels)}`
+  return { text: `${line}. ${fee} Nothing is set aside.`, canPost: true }
 }
 
 /** The goods set aside for a storage's offers as a line, undefined with none. */

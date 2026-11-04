@@ -1122,22 +1122,33 @@ export interface Transfer {
   back: boolean
   /** The caravan carrying it out, or null while it waits for one. */
   caravanId: string | null
+  /** Set on one of the two Transfers of a carried Direct offer (`CONTEXT.md`: Direct offer). */
+  carriedOffer?: CarriedTransfer
+}
+
+/** How a carried Direct offer's Transfer is paid: part at its pick-up, part on unloading. */
+export interface CarriedTransfer {
+  /** The part of the fee taken from the storage it unloads at: 0, a half or all of it. */
+  unloadShare: number
+  /** The coins still to take there, worked out once it has collected. */
+  due: number
 }
 
 /**
  * What a caravan does for a transfer it took on (`Transfer`), one step after another, each at a
  * building it drives to first. A pick-up takes the goods and then the fee at the sender's storage
  * (`collect`, `fee`); a transfer the warehouse keeps is loaded there, or at its coin warehouse
- * for coins (`load`). Either way it puts the goods into the recipient's storage (`deliver`), then
- * unloads what it still carries at the warehouse (`return`): goods it turned back with at the
- * warehouse, and coins at the coin warehouse. What robbers took once it collected is made good out
- * of the Trade Org's own stock (`CONTEXT.md`: Guaranteed carriage). Plain data (ADR 0002).
+ * for coins (`load`). Either way it puts the goods into the recipient's storage (`deliver`), takes
+ * any part of the fee due there (`unloadFee`), then unloads what it still carries at the warehouse
+ * (`return`): goods it turned back with at the warehouse, and coins at the coin warehouse. What
+ * robbers took once it collected is made good out of the Trade Org's own stock (`CONTEXT.md`:
+ * Guaranteed carriage). Plain data (ADR 0002).
  */
 export interface TransferJob {
   transferId: string
   warehouseId: string
   good: Good
-  step: 'collect' | 'fee' | 'load' | 'deliver' | 'return'
+  step: 'collect' | 'fee' | 'load' | 'deliver' | 'unloadFee' | 'return'
   /** Units of the good on the carriage for the transfer (coins, for a transfer of coins). */
   units: number
   /** Coins of the fee on the carriage, the Trade Org's, besides the units. */
@@ -1319,10 +1330,34 @@ export interface Offer {
 export interface DirectOfferTerms {
   toId: string
   lapsesAt: number
+  /** Set when the Trade Organization carries it, rather than fetched in person. */
+  carried?: CarriedOfferTerms
+}
+
+/** Who pays a carried Direct offer's fee (`CONTEXT.md`: Direct offer). */
+export type CarriedFeeBy = 'sender' | 'split'
+
+/**
+ * A carried Direct offer (`CONTEXT.md`: Direct offer): the two cities the sender named, who pays,
+ * and what each side pays for all of its goods, as shown before sending. Its goods aren't set aside.
+ */
+export interface CarriedOfferTerms {
+  fromCityId: string
+  toCityId: string
+  feeBy: CarriedFeeBy
+  senderFee: number
+  otherFee: number
 }
 
 /** What ended a realm's offer (`CONTEXT.md`: Offer, Direct offer). */
-export type OfferEnd = 'usedUp' | 'takenDown' | 'storageLost' | 'goodsGone' | 'declined' | 'lapsed'
+export type OfferEnd =
+  | 'usedUp'
+  | 'takenDown'
+  | 'storageLost'
+  | 'goodsGone'
+  | 'declined'
+  | 'lapsed'
+  | 'noCaravans'
 
 /**
  * How the Organization `of` regards `toward` (`CONTEXT.md`: Standing), from -`STANDING_RANGE`
@@ -1715,22 +1750,27 @@ export type RealmEventWhat =
       wantsUnits: number
       why: OfferEnd
       to?: string
+      /** A carried Direct offer, which never set anything aside. */
+      carried?: boolean
       x: number
       y: number
     }
   /**
    * The realm `from` sent this realm a Direct offer at its storage at (`x`, `y`), `times` over, or
-   * one it sent is over (`CONTEXT.md`: Direct offer). One used up is told by `offerAccepted`.
+   * one it sent is over (`CONTEXT.md`: Direct offer). One used up is told by `offerAccepted`; a
+   * carried one taken is `carriedAccepted` to its sender, `youAccepted` to the side that took it.
    */
   | {
       kind: 'directOffer'
-      what: 'received' | Exclude<OfferEnd, 'usedUp'>
+      what: 'received' | 'carriedAccepted' | 'youAccepted' | Exclude<OfferEnd, 'usedUp'>
       from: string
       gives: Good
       givesUnits: number
       wants: Good
       wantsUnits: number
       times?: number
+      /** A carried one: the cities its goods go between, and what this side pays for it. */
+      carried?: { fromCity: string; toCity: string; fee: number }
       x: number
       y: number
     }
@@ -1846,6 +1886,8 @@ export type RealmEventWhat =
       good: Good
       units: number
       fee: number
+      /** One of a carried Direct offer's: its fee may be shared, so the line names no sum. */
+      carried?: boolean
       fromRealmId: string
       fromRealm: string
       toRealmId: string
@@ -1866,7 +1908,7 @@ export type RealmEventWhat =
    */
   | {
       kind: 'transferStuck'
-      why: 'turnedBack' | 'cancelled' | 'kept' | 'nothing' | 'robbed'
+      why: 'turnedBack' | 'cancelled' | 'kept' | 'nothing' | 'nothingCame' | 'robbed'
       good: Good
       units: number
       cityId: string

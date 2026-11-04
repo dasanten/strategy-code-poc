@@ -1,6 +1,6 @@
 import type { Diplomacy, DirectOfferView } from '@csp/shared'
 import { GOOD_LABELS } from './goods-grid.js'
-import { offerTerms } from './offers-view.js'
+import { carriedLine, offerTerms } from './offers-view.js'
 
 /**
  * What others sent the Player that waits for their answer, wherever they are: one list, whatever
@@ -27,7 +27,10 @@ export function incomingItems(
     .map((offer) => ({
       kind: 'directOffer' as const,
       id: offer.id,
-      line: `The realm of ${offer.from.realm} offers: ${offerTerms(offer, GOOD_LABELS).toLowerCase()}`,
+      line: `The realm of ${offer.from.realm} offers: ${(offer.direct.carried
+        ? carriedLine(offer, GOOD_LABELS)
+        : offerTerms(offer, GOOD_LABELS)
+      ).toLowerCase()}`,
       lapsesAt: offer.direct.lapsesAt,
       offer,
     }))
