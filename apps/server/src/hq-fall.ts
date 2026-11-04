@@ -43,6 +43,7 @@ export function hqFalls(world: WorldState, hq: City): void {
   world.deliveries = []
   world.transfers = []
   world.punishments = []
+  world.supplyWagons = []
   for (const d of world.debts) {
     recordEvent(world, d.org, { kind: 'debt', what: 'ended', coins: d.coins, owed: 0 })
   }
@@ -84,6 +85,10 @@ export const nothingLeftOfTheHq: Invariant = {
     left(
       'punishments',
       world.punishments.map((p) => p.id),
+    )
+    left(
+      'supply wagons',
+      world.supplyWagons.map((w) => w.id),
     )
     left(
       'debts',

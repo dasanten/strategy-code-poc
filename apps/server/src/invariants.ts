@@ -114,6 +114,7 @@ import { tradeOrgArmySound } from './trade-org-army.js'
 import { npcHireSound } from './npc-hire.js'
 import { buyOffOrdersDone, buyOffsSound, directivesSound } from './directives.js'
 import { punishmentsSound } from './trade-org-punishment.js'
+import { supplyWagonsSound } from './supply-wagons.js'
 import { debtOrdersDone, debtPaymentsSound, debtsSound } from './trade-org-debt.js'
 import { nothingLeftOfTheHq } from './hq-fall.js'
 import { hqRingsSound } from './hq-growth.js'
@@ -1364,12 +1365,16 @@ export const cityWorkplacesSound: Invariant = {
 /**
  * An NPC city does nothing a Player's residents couldn't (`CONTEXT.md`: NPC city; ADR 0002): its
  * residents hold only the kinds of order a Player can give (`NPC_ORDER_KINDS`), which the world
- * checks and resolves like anyone's. A caravan's driver also drives (`CONTEXT.md`: Caravan).
+ * checks and resolves like anyone's. A caravan's or supply wagon's driver also drives (`CONTEXT.md`:
+ * Caravan, Trade Org debt).
  */
 export const npcOrdersAllowed: Invariant = {
   name: 'npc-orders-allowed',
   check(world) {
-    const drivers = new Set(world.caravans.map((c) => c.driverId))
+    const drivers = new Set([
+      ...world.caravans.map((c) => c.driverId),
+      ...world.supplyWagons.map((w) => w.driverId),
+    ])
     const allowed = (r: Resident) =>
       NPC_ORDER_KINDS.includes(r.order!.kind) || (r.order!.kind === 'drive' && drivers.has(r.id))
     return world.residents
@@ -2069,6 +2074,7 @@ export const worldInvariants: Invariant[] = [
   tradeOrgArmySound,
   npcHireSound,
   punishmentsSound,
+  supplyWagonsSound,
   directivesSound,
   buyOffsSound,
   buyOffOrdersDone,

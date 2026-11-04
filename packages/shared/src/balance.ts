@@ -1376,6 +1376,27 @@ export const TRADE_ORG_PUNISH = {
    * than `giveUpDays`). Past that it has no way there, as with every gate shut, and turns back.
    */
   roadTimes: 3,
+  /**
+   * Kilos its supply wagon keeps free of Food, whatever the trip asks for, for what the army takes
+   * (`CONTEXT.md`: Trade Org debt): a quarter of a carriage, 5,000 Coins or 100 Iron.
+   */
+  wagonRoom: 100,
+  /**
+   * Tiles from its supply wagon within which a soldier carries what they took over to it, rather
+   * than on home: as far as they would go for a trading post (`postReach`).
+   */
+  wagonReach: 60,
+  /**
+   * Ticks between a supply wagon's tries to set off after its army: only a failed search for a way
+   * tries again, and these keep a wagon with no way from searching every tick.
+   */
+  wagonRetryTicks: 60,
+  /**
+   * Tiles from its army within which a supply wagon goes after them step by step, finding its way
+   * again as they move. Further behind it first drives to where they were: a search that far takes
+   * longer than they take to move on, so it would never end.
+   */
+  wagonFollowReach: 48,
 }
 
 /**
@@ -1386,6 +1407,19 @@ export const TRADE_ORG_PUNISH = {
 export function tripFood(tiles: number): number {
   const days = (tiles * WALK_TICKS_PER_TILE * TRADE_ORG_PUNISH.walkMargin) / TICKS_PER_GAME_DAY
   return Math.ceil(days * FOOD_PER_DAY)
+}
+
+/**
+ * The Food a supply wagon means to set out with (`CONTEXT.md`: Trade Org debt), for `soldiers` going
+ * `tiles` there and back as much: all of the trip's for each of them, as they may pack little, for
+ * its driver and for its horse. A carriage takes it only as far as it keeps
+ * `TRADE_ORG_PUNISH.wagonRoom` free.
+ */
+export function wagonFoodFor(tiles: number, soldiers: number): number {
+  const walk = tripFood(2 * tiles)
+  const stay = TRADE_ORG_PUNISH.giveUpDays * FOOD_PER_DAY
+  const horse = ((walk + stay) / FOOD_PER_DAY) * HORSE_FOOD_PER_DAY
+  return Math.ceil((soldiers + 1) * (walk + stay) + horse)
 }
 
 /**

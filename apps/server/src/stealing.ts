@@ -9,6 +9,7 @@ import {
 import { caravanCarriageStolen } from './caravans.js'
 import { commitCrime, organizationName } from './crimes.js'
 import { recordEvent } from './events.js'
+import { wagonStolen } from './supply-wagons.js'
 
 /** What a resident takes in one go: a carriage with its hitched horse, or a horse alone. */
 export interface Taken {
@@ -30,7 +31,7 @@ function goodsOf(load: Stock | undefined): Stock | undefined {
  * hitched horse, and leaves any alliance army. One theft, known through a witness; none when it
  * belonged to nobody. The owner's log says at once that it is gone and where it was last, without
  * the thief, and the thief's realm's log says what they took. A caravan's carriage robs the caravan
- * and is replaced (`caravanCarriageStolen`).
+ * and is replaced (`caravanCarriageStolen`); a supply wagon's is gone for its army (`wagonStolen`).
  */
 export function takeOver(
   world: WorldState,
@@ -67,5 +68,8 @@ export function takeOver(
     ...what,
     ...(goods && { goods }),
   })
-  if (carriage) caravanCarriageStolen(world, thief, carriage)
+  if (carriage) {
+    caravanCarriageStolen(world, thief, carriage)
+    wagonStolen(world, carriage, size)
+  }
 }

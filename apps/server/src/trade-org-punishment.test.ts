@@ -219,14 +219,17 @@ describe('the Trade Organization punishing', () => {
     const ids = p.members.map((m) => m.residentId)
     run(world, walking, 4 * TICKS_PER_GAME_DAY, () => world.punishments.length === 0)
     expect(world.punishments).toEqual([])
-    // Coins first: the storage had enough, so it took nothing else.
-    const s1 = world.buildings.find((b) => b.id === 's1')!
-    expect(s1.stock).toEqual({ coins: 1000 - worth, iron: 40 })
-    expect(coins.stock!.coins).toBe(before + worth)
     // It never captured the city, and its soldiers are home again.
     expect(world.cities.find((c) => c.id === 'c1')!.realmId).toBe('r1')
     for (const id of ids)
       expect(inCityArea(world, hq, at(world, id).x, at(world, id).y, 160)).toBe(true)
+    // What went on its supply wagon comes in just behind them.
+    run(world, walking, TICKS_PER_GAME_DAY, () => world.supplyWagons.length === 0)
+    expect(world.supplyWagons).toEqual([])
+    // Coins first: the storage had enough, so it took nothing else.
+    const s1 = world.buildings.find((b) => b.id === 's1')!
+    expect(s1.stock).toEqual({ coins: 1000 - worth, iron: 40 })
+    expect(coins.stock!.coins).toBe(before + worth)
     expect(world.events.at(-1)).toMatchObject({ kind: 'punished', what: 'left', took: worth })
     // The crime is punished: it doesn't come again.
     run(world, walking, 1)
@@ -242,7 +245,12 @@ describe('the Trade Organization punishing', () => {
     goods.stock = { ...stockFloor(world, goods), ...goods.stock }
     const iron = goods.stock!.iron ?? 0
     theft(world, hq, { iron: 4 })
-    run(world, walking, 4 * TICKS_PER_GAME_DAY, () => world.punishments.length === 0)
+    run(
+      world,
+      walking,
+      4 * TICKS_PER_GAME_DAY,
+      () => world.punishments.length === 0 && world.supplyWagons.length === 0,
+    )
     // 80 coins' worth: the 30 coins, then 5 iron.
     const s1 = world.buildings.find((b) => b.id === 's1')!
     expect(s1.stock).toEqual({ wood: 50, iron: 35 })
@@ -608,6 +616,28 @@ describe('the Trade Organization’s punishment trip', () => {
     expect(p.took).toBe(worth)
     expect(world.buildings.find((b) => b.id === 's1')!.stock!.food ?? 0).toBeLessThan(40)
   }, 240_000)
+
+  it('doesn’t walk back to the city for Food once it is far along the way home', () => {
+    const { world, hq, walking } = setup({ coins: 1000, food: 40 })
+    theft(world, hq, { iron: 10 })
+    run(world, walking, 1)
+    const p = world.punishments[0]!
+    p.heading = 'home'
+    p.arrivedAt = world.tick
+    const m = p.members[0]!
+    m.packed = true
+    const r = at(world, m.residentId)
+    // Past `postReach` from the city's storage and from the HQ's, a meal short of the way home.
+    r.x = MID + 200
+    r.y = MID + 88
+    r.carried = { spear: 1 }
+    m.own = { spear: 1 }
+    r.order = null
+    stepPunishments(world, 640)
+    const s1 = world.buildings.find((b) => b.id === 's1')!
+    expect(r.order).toMatchObject({ kind: 'walkTo' })
+    expect(r.order).not.toMatchObject({ target: { x: s1.x, y: s1.y } })
+  })
 
   it('reports a punishment that took anything before it arrived', () => {
     const { world, hq } = setup()

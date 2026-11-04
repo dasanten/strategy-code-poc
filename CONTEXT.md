@@ -358,9 +358,9 @@ The shared language of the game. Domain terms only — no implementation details
   when the city is no longer the culprit's, or when it finds no way there at all. Each soldier packs Food at the HQ for the way there and
   back, leaving room for what they will carry home; on the way they refill at trading posts they
   pass, and at the city they may take Food from its storage for the way back, apart from what the
-  army came to take. The realm log tells the truth: it is coming; it has arrived; it left with so
-  much of what it came for; it turned back without reaching the city, and why; or it was lost on
-  the way.
+  army came to take. On the road its soldiers keep together at the pace of the slowest (Army). The
+  realm log tells the truth: it is coming; it has arrived; it left with so much of what it came for;
+  it turned back without reaching the city, and why; or it was lost on the way.
 - **Admin directive:** an admin orders the Trade Organization to weaken a Player or
   organization that is deliberately ruining the game for others (e.g. farming new Players). The
   game still forbids nothing; the Trade Organization acts because a healthy world is good for
@@ -675,8 +675,16 @@ The shared language of the game. Domain terms only — no implementation details
      town hall (Holding the town hall). The city joins the Trade Organization as a new trading
      post: its storages become warehouses with what is in them, its people stay as the post's, and
      the debt is settled.
-  Its army may travel with a **supply wagon**, a Trade Org carriage with Food and room for what it
-  takes, following it like an army's and robbed like a caravan's; and short of Food on the way it
+  Its army travels with a **supply wagon**, when the HQ has a free adult to drive it: a new Trade Org
+  carriage and horse, loaded at the HQ with Food for the whole trip as far as that leaves room for what
+  it takes. It follows the army (Supply line) and its soldiers refill from it, go to meet it when they
+  run out with it out of reach, and put on it what they take when it is near. It is robbed like a
+  caravan's: taking from it or stealing it is a crime and its soldiers go after those who do, and its
+  crew is lost like one (Caravan crew lost): a soldier takes over from a dead driver, unless they are
+  the last, and with no crew left the HQ sends a new driver on foot, who packs for the walk. Stolen,
+  or with its horse dead, it is gone for the army, which goes on with what it carries. It comes home
+  with them, or by itself once they are lost, and its whole load goes into the warehouses; the carriage
+  and horse go back into the HQ's stock. And short of Food on the way its army
   buys some from a post, NPC city or Player's offer it passes. A captured post the Trade Organization
   has heard of (Lost post found out) is a debt too: it demands the city back, and returning it
   settles the debt. Admin directives go on as before, with no debt.

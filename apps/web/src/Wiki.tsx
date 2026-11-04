@@ -1999,9 +1999,14 @@ export function Wiki() {
             the road if the city stops being yours. Its soldiers pack Food at the HQ for the way
             there and back, keeping {num(TRADE_ORG_PUNISH.packRoom)} kg free for what they carry
             home; they refill at trading posts they pass and may take Food from your storage for the
-            way back, apart from what they came to take. Your realm log says when it is coming, when
-            it arrives, what it left with, why it turned back, or that it was lost. Besides stolen
-            goods, carriages and horses it counts{' '}
+            way back, apart from what they came to take. On the road they keep together. A supply
+            wagon follows them, when the HQ has someone free to drive it: a Trade Org carriage with
+            Food for the trip, always with {num(TRADE_ORG_PUNISH.wagonRoom)} kg free for what they
+            take, which they put on it and it brings home to the warehouses. Taking from it or
+            stealing it is a crime, its soldiers go after whoever does, and without it they go on
+            with what they carry. Your realm log says when it is coming, when it arrives, what it
+            left with, why it turned back, or that it was lost. Besides stolen goods, carriages and
+            horses it counts{' '}
             {(Object.entries(TRADE_ORG_LOSS) as [CrimeKind, number][])
               .map(([c, n]) => `${CRIME_NAMES[c].toLowerCase()} as ${num(n)} coins`)
               .join(', ')}
