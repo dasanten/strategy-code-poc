@@ -32,6 +32,7 @@ import { ART_FILES, BUILDING_ART, NODE_ART, UNIT_ART } from './map/art.js'
 import type { Relationship } from './theme.js'
 import {
   actionForKey,
+  feedTargetLabel,
   feedTargets,
   keepRows,
   tileActions,
@@ -1098,7 +1099,7 @@ export function FeedBlock({
   food,
   onFeed,
 }: {
-  targets: { id: string; name: string; horse?: true }[]
+  targets: { id: string; name: string; horse?: true; down?: true }[]
   /** The Food in the feeding resident's hands. */
   food: number
   onFeed: (targetId: string, units: number) => void
@@ -1127,7 +1128,7 @@ export function FeedBlock({
             >
               {targets.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.horse ? `${t.name} (horse)` : t.name}
+                  {feedTargetLabel(t)}
                 </option>
               ))}
             </select>

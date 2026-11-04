@@ -60,6 +60,7 @@ import {
   HORSE_DOWN_NO_DRIVE,
   riddenHorseLine,
   rowGroups,
+  feedTargetLabel,
   feedTargets,
   tileActions,
   commandedCarriages,
@@ -1173,7 +1174,7 @@ describe('horses on the tile card', () => {
       downUntil: tick,
     })
     const card = tile({ horses: [down], tick })
-    expect(card.horsesToFeed).toEqual([{ id: 'h2', name: 'Star', x: 5, y: 5 }])
+    expect(card.horsesToFeed).toEqual([{ id: 'h2', name: 'Star', x: 5, y: 5, down: true }])
     const feed = (r: Resident) => tileActions(card, r, tick, 64).find((a) => a.id === 'feed')
     expect(feed(feeder({}))).toEqual({
       id: 'feed',
@@ -1193,7 +1194,7 @@ describe('horses on the tile card', () => {
     // Nor is one with room for less than a whole unit (`CONTEXT.md`: Feeding a horse).
     const nearlyFull = tile({ horses: [horse({ x: 5, y: 5, hunger: MAX_HUNGER - 1 })], tick })
     expect(nearlyFull.horsesToFeed).toBeUndefined()
-    const theirs =tile({ horses: [unknown({ x: 5, y: 5, realmId: 'r-other' })], tick })
+    const theirs = tile({ horses: [unknown({ x: 5, y: 5, realmId: 'r-other' })], tick })
     expect(theirs.horsesToFeed).toEqual([{ id: 'h1', name: 'Rowan', x: 5, y: 5 }])
     // With more than one the row doesn't name them; the block lists them, Down residents first.
     const ana = { id: 'ana', name: 'Ana', x: 5, y: 5, down: true as const }
@@ -1205,6 +1206,24 @@ describe('horses on the tile card', () => {
       ['ana', undefined],
       ['h2', true],
     ])
+  })
+
+  it('lists the horses to Feed most in need first, and says which are Down', () => {
+    const card = tile({
+      horses: [
+        unknown({ id: 'stranger', x: 5, y: 5, realmId: 'r-other' }),
+        horse({ id: 'full', x: 5, y: 5, hunger: MAX_HUNGER }),
+        horse({ id: 'hungry', x: 5, y: 5, hunger: 10 }),
+        horse({ id: 'down', x: 5, y: 5, hunger: 0, downUntil: 500 }),
+        { ...unknown({ id: 'stranger-down', x: 5, y: 5, realmId: 'r-other' }), down: true },
+      ],
+    })
+    const targets = feedTargets(card, { id: 'a1' })
+    expect(targets.map((t) => t.id)).toEqual(['down', 'stranger-down', 'hungry', 'stranger'])
+    expect(targets.map((t) => t.down)).toEqual([true, true, undefined, undefined])
+    expect(feedTargetLabel({ name: 'Rowan', horse: true, down: true })).toBe('Rowan (horse, Down)')
+    expect(feedTargetLabel({ name: 'Rowan', horse: true })).toBe('Rowan (horse)')
+    expect(feedTargetLabel({ name: 'Ana', down: true })).toBe('Ana')
   })
 
   it('offers renaming the Player’s own horses on the card, by name (`CONTEXT.md`: Renaming a horse)', () => {
