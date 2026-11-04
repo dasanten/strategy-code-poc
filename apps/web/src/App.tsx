@@ -17,7 +17,6 @@ import {
   seatsLeft,
   KEEPS_GOODS,
   MAX_WORKERS,
-  buildMenu,
   isPassableTerrain,
   isWallOrGate,
   type Account,
@@ -791,10 +790,23 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const request = { ...order, residentId: selected.id }
     setOrderError(await sendOrder(appendRequest(selected, request, at) ?? request))
   }
+  /** Why a kind can't be laid out on a tile, as far as the Player knows (`buildHereProblem`). */
+  const buildProblemAt =
+    (w: NonNullable<typeof world>, x: number, y: number) => (kind: BuildingKind) =>
+      buildHereProblem(
+        kind,
+        x,
+        y,
+        w,
+        (nx, ny) => nodeAt?.(nx, ny),
+        // Terrain not loaded counts as unexplored: nothing is laid out there.
+        { size: w.map.size, at: (tx, ty) => terrainAt?.(tx, ty) ?? UNEXPLORED },
+      )
   /** The queue planner's Add step, on the resident card and the group card. */
   function addStep(w: NonNullable<typeof world>) {
     const seen = { cities: knownCities, buildings: knownBuildings, residents: w.residents }
     const cities = plan && nextPick(plan)?.pick === 'city' ? planCities(seen, w.home.realmId) : []
+    const tile = plan?.kind === 'build' ? plan.picked[0] : undefined
     return (
       <AddStep
         plan={plan}
@@ -802,11 +814,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         onAnswer={(answer) => plan && void addPlanned(plan, answer)}
         onCancel={() => setPlan(undefined)}
         scripts={scripts}
-        buildKinds={
-          plan?.kind === 'build' && plan.picked[0]
-            ? buildMenu(nodeAt?.(plan.picked[0].x, plan.picked[0].y))
-            : []
-        }
+        buildTile={{
+          node: tile && nodeAt?.(tile.x, tile.y),
+          terrain: tile && terrainAt?.(tile.x, tile.y),
+          problem: tile ? buildProblemAt(w, tile.x, tile.y) : () => undefined,
+        }}
         horses={horsesIn(planWorld(w), w.horses, plan?.picked[0]?.id)}
         tick={w.tick}
         cities={cities}
@@ -1903,17 +1915,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onPickUp={(spot, goods) => carry('pickUp', spot, goods)}
             onDrop={(spot, goods) => carry('drop', spot, goods)}
             onBuild={build}
-            buildProblem={(kind) =>
-              buildHereProblem(
-                kind,
-                selected.x,
-                selected.y,
-                world,
-                (x, y) => nodeAt?.(x, y),
-                // Terrain not loaded counts as unexplored: nothing is laid out there.
-                { size: world.map.size, at: (x, y) => terrainAt?.(x, y) ?? UNEXPLORED },
-              )
-            }
+            buildProblem={buildProblemAt(world, selected.x, selected.y)}
             workers={workersHere(world.residents, buildingHere)}
             holders={heldBy(world.residents, buildingHere)}
             realmId={world.home.realmId}
@@ -2082,18 +2084,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 site: world.buildings.find(
                   (b) => b.kind !== 'road' && b.site && covers(b, groupBuildAt.x, groupBuildAt.y),
                 ),
-                kinds: buildMenu(nodeAt?.(groupBuildAt.x, groupBuildAt.y)).map((kind) => ({
-                  kind,
-                  problem: buildHereProblem(
-                    kind,
-                    groupBuildAt.x,
-                    groupBuildAt.y,
-                    world,
-                    (x, y) => nodeAt?.(x, y),
-                    // Terrain not loaded counts as unexplored: nothing is laid out there.
-                    { size: world.map.size, at: (x, y) => terrainAt?.(x, y) ?? UNEXPLORED },
-                  ),
-                })),
+                node: nodeAt?.(groupBuildAt.x, groupBuildAt.y),
+                terrain: terrainAt?.(groupBuildAt.x, groupBuildAt.y),
+                problem: buildProblemAt(world, groupBuildAt.x, groupBuildAt.y),
               }
             }
             // Picking a defence script is never queued: it leaves what they do as it is.

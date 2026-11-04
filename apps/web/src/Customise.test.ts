@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { TICKS_PER_GAME_YEAR, type Resident, type ScriptSummary } from '@csp/shared'
 import { AddStep } from './AddStep.js'
+import { KindDetail } from './BuildMenu.js'
 import { CustomiseContext, type Customising } from './Customise.js'
 import { groupOrderStart, groupRequests, type GroupOrder } from './group-orders.js'
 import { GroupCard, RunScript } from './Residents.js'
@@ -25,6 +26,7 @@ const SCRIPTS = [
   summary(2, 'explore', ['rounds']),
   summary(3, null, ['rounds']),
   summary(4, null, []),
+  summary(5, 'build', ['rounds']),
 ]
 
 const customising: Customising = {
@@ -101,7 +103,7 @@ describe('the Customise button', () => {
         onAnswer: () => {},
         onCancel: () => {},
         scripts: SCRIPTS,
-        buildKinds: [],
+        buildTile: { node: undefined, terrain: undefined, problem: () => undefined },
         horses: [],
         tick: 0,
         cities: [],
@@ -110,6 +112,61 @@ describe('the Customise button', () => {
     )
     expect(html).toContain('aria-label="Customise script 3"')
     expect(html).not.toContain('aria-label="Customise script 4"')
+  })
+
+  describe('in the Build menu, beside the tapped kind’s Build', () => {
+    const detail = (
+      item: { kind: 'storage' | 'house' | 'quarry'; problem?: string; offered?: boolean },
+      options: { blocked?: boolean; planning?: boolean } = {},
+    ) =>
+      inGame(
+        createElement(KindDetail, {
+          item: { name: item.kind, offered: true, ...item },
+          blocked: options.blocked ?? false,
+          planning: options.planning ?? false,
+          onBuild: () => {},
+        }),
+      )
+    const label = (kind: string) => `aria-label="Customise Build ${kind}"`
+
+    it('is offered on a kind that can go here, and is off while Build is', () => {
+      expect(detail({ kind: 'storage' })).toContain(label('storage'))
+      expect(detail({ kind: 'storage' }, { blocked: true })).toMatch(
+        new RegExp(`${label('storage')} disabled`),
+      )
+    })
+
+    it('is not offered on a kind that can’t go here', () => {
+      expect(detail({ kind: 'house', problem: 'a house goes in a city’s area' })).not.toContain(
+        'Customise',
+      )
+    })
+
+    it('follows what the planner can add', () => {
+      const planning = { planning: true }
+      const house = { kind: 'house' as const, problem: 'a house goes in a city’s area' }
+      expect(detail(house, planning)).toContain(label('house'))
+      expect(detail({ ...house, kind: 'quarry', offered: false }, planning)).not.toContain(
+        'Customise',
+      )
+    })
+
+    it('shows nothing when the Build script has no params', () => {
+      const none: Customising = { can: (order) => canCustomise(order, []), give: (g) => g() }
+      const html = renderToStaticMarkup(
+        createElement(
+          CustomiseContext.Provider,
+          { value: none },
+          createElement(KindDetail, {
+            item: { kind: 'storage', name: 'Storage', offered: true },
+            blocked: false,
+            planning: false,
+            onBuild: () => {},
+          }),
+        ),
+      )
+      expect(html).not.toContain('Customise')
+    })
   })
 })
 

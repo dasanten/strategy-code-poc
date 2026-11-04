@@ -27,7 +27,7 @@ const breedAsk = (horses: SeenHorse[], tick = 0) =>
       onAnswer: () => {},
       onCancel: () => {},
       scripts: [],
-      buildKinds: [],
+      buildTile: { node: undefined, terrain: undefined, problem: () => undefined },
       horses,
       tick,
       cities: [],

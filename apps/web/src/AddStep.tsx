@@ -5,11 +5,12 @@ import {
   HAUL_KEEP_FOOD,
   type BuildingKind,
   type Good,
+  type ResourceNode,
   type ScriptSummary,
   type SeenHorse,
   type Stock,
 } from '@csp/shared'
-import { BUILDING_NAMES } from './city-view.js'
+import { BuildMenu } from './BuildMenu.js'
 import { CustomiseButton, taskStart } from './Customise.js'
 import { HorsePick } from './HorsePick.js'
 import { GOOD_LABELS, SubjectPicker } from './Residents.js'
@@ -37,7 +38,7 @@ export function AddStep({
   onAnswer,
   onCancel,
   scripts,
-  buildKinds,
+  buildTile,
   horses,
   tick,
   cities,
@@ -52,8 +53,12 @@ export function AddStep({
   onCancel: () => void
   /** The Player's scripts, for Run script. */
   scripts: readonly ScriptSummary[]
-  /** What can be built on the tile picked for Build. */
-  buildKinds: readonly BuildingKind[]
+  /** The tile picked for Build, as the Build menu needs it. */
+  buildTile: {
+    node: Pick<ResourceNode, 'kind'> | undefined
+    terrain: number | undefined
+    problem: (kind: BuildingKind) => string | undefined
+  }
   /** The realm's horses in the stable picked for Breed horses. */
   horses: readonly SeenHorse[]
   /** The current tick, for those horses' ages. */
@@ -107,13 +112,13 @@ export function AddStep({
         </div>
         {ask === 'goods' && <GoodsAsk onAnswer={(goods) => onAnswer({ ask, goods })} />}
         {ask === 'buildingKind' && (
-          <div className="order-buttons">
-            {buildKinds.map((building) => (
-              <button type="button" key={building} onClick={() => onAnswer({ ask, building })}>
-                {BUILDING_NAMES[building]}
-              </button>
-            ))}
-          </div>
+          <BuildMenu
+            node={buildTile.node}
+            terrain={buildTile.terrain}
+            buildProblem={buildTile.problem}
+            planning
+            onBuild={(building) => onAnswer({ ask, building })}
+          />
         )}
         {ask === 'makes' && (
           <div className="order-buttons">
