@@ -184,11 +184,49 @@ describe('world saves', () => {
     expect(checkInvariants(v80, land)).toEqual([])
   })
 
+  it('says which punishments under way have reached their city (migration 80 → 81)', () => {
+    const { world: v80, terrain: land } = worldWithPost()
+    const city = v80.cities[0]!
+    const hall = v80.buildings.find((b) => b.id === city.townHallId)!
+    const there = v80.residents[0]!
+    there.x = hall.x
+    there.y = hall.y
+    const base = { culpritOrg: 'r1', cityId: city.id, worth: 100, startedAt: 0 }
+    v80.punishments = [
+      {
+        ...base,
+        id: 'there',
+        heading: 'out',
+        took: 0,
+        members: [{ residentId: there.id, own: {} }],
+      },
+      {
+        ...base,
+        id: 'road',
+        heading: 'out',
+        took: 0,
+        members: [{ residentId: 'nobody here', own: {} }],
+      },
+      {
+        ...base,
+        id: 'robbed',
+        heading: 'home',
+        took: 40,
+        members: [{ residentId: 'nobody here either', own: {} }],
+      },
+    ]
+    v80.tick = 500
+    const v81 = migrateWorld(structuredClone(v80), 80, { terrain: land }, migrations, 81)
+    const arrived = Object.fromEntries(v81.punishments.map((p) => [p.id, p.arrivedAt]))
+    expect(arrived).toEqual({ there: 500, road: undefined, robbed: 500 })
+    expect(v81.punishments.flatMap((p) => p.members).every((m) => m.packed)).toBe(true)
+  })
+
   it('leaves realms from before realm names unnamed (migration 38 → 39)', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(80)
+    expect(WORLD_FORMAT_VERSION).toBe(81)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)

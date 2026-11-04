@@ -1,19 +1,26 @@
 import {
   CARRIAGE_STOLEN_WORTH,
+  FOOD_PER_DAY,
+  GOOD_WEIGHT,
   HORSE_STOLEN_WORTH,
+  OWN_FOOD,
   TICKS_PER_GAME_DAY,
   DIRECTIVE_PUNISH_WORTH,
   TRADE_ORG,
   TRADE_ORG_LOSS,
   TRADE_ORG_PUNISH,
   TRADE_ORG_PUNISHES_BELOW,
+  WALK_TICKS_PER_TILE,
   WAREHOUSE_BASE_PRICE,
+  carryCapacity,
   directiveTargets,
   inCityArea,
   standingOf,
   standingOrganization,
+  stockWeight,
   townHallOf,
   tradeOrgHq,
+  tripFood,
   unitsThatFit,
   warehouseKeeps,
   wrapDistance,
@@ -22,6 +29,7 @@ import {
   type Crime,
   type Good,
   type Punishment,
+  type PunishmentEnd,
   type Resident,
   type Stock,
   type WorldState,
@@ -75,11 +83,11 @@ export function takenBy(r: Resident, own: Stock): Stock {
 }
 
 /** A punishment's living members, with what they set out with. */
-function living(world: WorldState, p: Punishment): { r: Resident; own: Stock }[] {
+function living(world: WorldState, p: Punishment) {
   const byId = new Map(world.residents.map((r) => [r.id, r]))
-  return p.members.flatMap((m) => {
-    const r = byId.get(m.residentId)
-    return r && r.health > 0 ? [{ r, own: m.own }] : []
+  return p.members.flatMap((member) => {
+    const r = byId.get(member.residentId)
+    return r && r.health > 0 ? [{ r, own: member.own, member }] : []
   })
 }
 
@@ -266,43 +274,226 @@ function headFor(r: Resident, to: { x: number; y: number }): void {
 }
 
 /**
- * One tick of a punishment (`CONTEXT.md`: Trade Org reaction). Out, each member goes after anyone
- * attacking one of them, otherwise to the city's nearest storage holding anything and picks up
- * what is still to take there. It heads home once it has taken its worth, when the admin directive
- * it was sent for is lifted, when the city has nothing left, when the city is no longer the
- * culprit's, or after `TRADE_ORG_PUNISH.giveUpDays`.
- * Home, each member brings Coins they took to the HQ's coin warehouse and other goods to its goods
- * warehouse, then goes home; once every living member is home with nothing taken, or none is left,
- * it is over and the culprit hears what it took: what it carried as it headed home.
+ * Why a punishment heads home now, if it does (`CONTEXT.md`: Punishment trip). Wherever it is, when
+ * the admin directive it was sent for is lifted or the city is no longer the culprit's. On the road
+ * only when it has been trying for `TRADE_ORG_PUNISH.roadTimes` the straight walk: it has no way
+ * there. At the city once it has taken its worth, when the storages hold nothing, or
+ * `TRADE_ORG_PUNISH.giveUpDays` after it arrived.
+ */
+function whyHeadHome(
+  world: WorldState,
+  hq: City,
+  p: Punishment,
+  city: City | undefined,
+  took: number,
+  size: number,
+): PunishmentEnd | undefined {
+  if (directiveLifted(world, p)) return 'directiveLifted'
+  if (!city || !stillTheCulprits(world, p, city)) return 'cityLost'
+  if (p.arrivedAt === undefined) {
+    const hall = townHallOf(world, hq)
+    const target = townHallOf(world, city)
+    const tiles = hall && target ? wrapDistance(size, hall, target) : 0
+    const most = Math.max(
+      TRADE_ORG_PUNISH.giveUpDays * TICKS_PER_GAME_DAY,
+      TRADE_ORG_PUNISH.roadTimes * tiles * WALK_TICKS_PER_TILE,
+    )
+    return world.tick - p.startedAt >= most ? 'noWay' : undefined
+  }
+  if (took >= p.worth) return 'enough'
+  if (storagesToTake(world, city).length === 0) return 'empty'
+  const stayed = world.tick - p.arrivedAt
+  return stayed >= TRADE_ORG_PUNISH.giveUpDays * TICKS_PER_GAME_DAY ? 'gaveUp' : undefined
+}
+
+/** Whether the admin directive a punishment was sent for is no longer in force. */
+const directiveLifted = (world: WorldState, p: Punishment) =>
+  p.directiveId !== undefined && !world.directives.some((d) => d.id === p.directiveId)
+
+/** Whether the city is one of the culprit's still, with a town hall to walk to. */
+function stillTheCulprits(world: WorldState, p: Punishment, city: City): boolean {
+  return !city.tradeOrg && cityOrganization(city) === p.culpritOrg && !!townHallOf(world, city)
+}
+
+/**
+ * The Food a member still wants on them for the trip, in units (`CONTEXT.md`: Punishment trip): on
+ * the way there, for the walk there, their time there and the walk back, never into the room
+ * they keep for what they will carry home; from then on, for the walk back to the HQ.
+ */
+function foodWanted(
+  world: WorldState,
+  hq: City,
+  p: Punishment,
+  city: City | undefined,
+  r: Resident,
+  size: number,
+): number {
+  const hall = townHallOf(world, hq)
+  if (!hall) return 0
+  const target = city && townHallOf(world, city)
+  if (p.heading === 'home' || p.arrivedAt !== undefined || !target) {
+    return tripFood(wrapDistance(size, r, hall))
+  }
+  const tiles = wrapDistance(size, r, target) + wrapDistance(size, target, hall)
+  const others = stockWeight(r.carried) - (r.carried.food ?? 0) * GOOD_WEIGHT.food
+  const room = carryCapacity(r, world.tick) - others - TRADE_ORG_PUNISH.packRoom
+  return Math.min(
+    tripFood(tiles) + TRADE_ORG_PUNISH.giveUpDays * FOOD_PER_DAY,
+    Math.floor(room / GOOD_WEIGHT.food),
+  )
+}
+
+/**
+ * The finished buildings of the given cities with Food to take: their storages, or where those
+ * have none, their warehouses, which keep Food for sale.
+ */
+function foodIn(world: WorldState, cityIds: Set<string>): Building[] {
+  const stores = world.buildings.filter(
+    (b) =>
+      (b.kind === 'storage' || b.kind === 'warehouse') &&
+      !b.site &&
+      cityIds.has(b.cityId ?? '') &&
+      (b.stock?.food ?? 0) > 0,
+  )
+  const storages = stores.filter((b) => b.kind === 'storage')
+  return storages.length > 0 ? storages : stores
+}
+
+/**
+ * Where a member may refill on the way: the Trade Organization's cities within
+ * `TRADE_ORG_PUNISH.postReach` tiles, the trading posts they pass, and `robbing`, the city the
+ * army reached, while it may still take from it.
+ */
+function refillPlaces(
+  world: WorldState,
+  robbing: City | undefined,
+  r: Resident,
+  size: number,
+): Building[] {
+  const tradeOrg = new Set(world.cities.filter((c) => c.tradeOrg).map((c) => c.id))
+  const near = foodIn(world, tradeOrg).filter(
+    (b) => wrapDistance(size, r, b) <= TRADE_ORG_PUNISH.postReach,
+  )
+  return robbing ? [...near, ...foodIn(world, new Set([robbing.id]))] : near
+}
+
+/**
+ * Sends a member for the Food they are short of (`CONTEXT.md`: Punishment trip) to the nearest of
+ * `places`, if they have any: whole units, none for less. What they take for the trip is their
+ * own, not what the army came to take. Answers whether they are seeing to it.
+ */
+function fetchFood(
+  world: WorldState,
+  places: () => Building[],
+  r: Resident,
+  own: Stock,
+  wanted: number,
+  size: number,
+): boolean {
+  const short = Math.min(
+    Math.floor(wanted - (r.carried.food ?? 0)),
+    unitsThatFit(r, 'food', world.tick),
+  )
+  if (short < 1) return false
+  const found = places()
+  if (found.length === 0) return false
+  const storage = found.reduce((a, b) =>
+    wrapDistance(size, r, b) < wrapDistance(size, r, a) ? b : a,
+  )
+  if (!isAt(r, storage, size)) {
+    headFor(r, storage)
+    return true
+  }
+  const food = Math.min(short, Math.floor(storage.stock!.food!))
+  if (food < 1) return false
+  r.order = { kind: 'pickUp', from: { kind: 'storage', storageId: storage.id }, goods: { food } }
+  own.food = (own.food ?? 0) + food
+  return true
+}
+
+/**
+ * What a member has eaten stops counting as their own, so that Food they take later is told from
+ * it. Their own food (`OWN_FOOD`) always counts, or a meal taken at home would look like loot.
+ */
+function eatFromOwn(r: Resident, own: Stock): void {
+  own.food = Math.max(OWN_FOOD, Math.min(own.food ?? 0, r.carried.food ?? 0))
+}
+
+/** A line in the culprit's log about a punishment (`CONTEXT.md`: Punishment trip). */
+function logPunished(
+  world: WorldState,
+  p: Punishment,
+  city: City | undefined,
+  line: { what: 'arrived' | 'left' | 'turnedBack' | 'lost'; why?: PunishmentEnd },
+  where?: 'wayThere' | 'atCity' | 'wayHome',
+): void {
+  recordEvent(world, p.culpritOrg, {
+    kind: 'punished',
+    cityId: p.cityId,
+    city: city?.name ?? 'a city',
+    worth: p.worth,
+    took: p.took,
+    ...line,
+    ...(where && { where }),
+  })
+}
+
+/**
+ * One tick of a punishment (`CONTEXT.md`: Trade Org reaction, Punishment trip). Each member first
+ * packs at the HQ, then walks to the city's town hall, however long that takes, refilling at
+ * trading posts they pass. Once one of them is in the city's area it has arrived: each
+ * goes after anyone attacking one of them, otherwise to the city's nearest storage holding
+ * anything, takes Food for the way back and picks up what is still to take there.
+ * Heading home (`whyHeadHome`), each member brings Coins they took to the HQ's coin warehouse and
+ * other goods to its goods warehouse, then goes home; once every living member is home with
+ * nothing taken, it is over. The culprit reads what happens as it happens: it arrived, it left with
+ * what it took, it turned back without reaching the city and why, or it was lost.
  */
 function runPunishment(world: WorldState, hq: City, p: Punishment, size: number): void {
   const members = living(world, p)
   const city = world.cities.find((c) => c.id === p.cityId)
-  const took = tookSoFar(world, p)
-  const storages = city ? storagesToTake(world, city) : []
-  const giveUp = world.tick - p.startedAt >= TRADE_ORG_PUNISH.giveUpDays * TICKS_PER_GAME_DAY
-  const lifted =
-    p.directiveId !== undefined && !world.directives.some((d) => d.id === p.directiveId)
-  if (p.heading === 'out') p.took = Math.min(took, p.worth)
-  if (
-    p.heading === 'out' &&
-    (took >= p.worth ||
-      lifted ||
-      !city ||
-      city.tradeOrg ||
-      cityOrganization(city) !== p.culpritOrg ||
-      storages.length === 0 ||
-      giveUp)
-  ) {
-    p.heading = 'home'
+  if (members.length === 0) {
+    world.punishments = world.punishments.filter((x) => x !== p)
+    const where =
+      p.heading === 'home' ? 'wayHome' : p.arrivedAt === undefined ? 'wayThere' : 'atCity'
+    logPunished(world, p, city, { what: 'lost' }, where)
+    return
   }
+  for (const { r, own } of members) eatFromOwn(r, own)
+  const took = tookSoFar(world, p)
+  if (p.heading === 'out') {
+    p.took = Math.min(took, p.worth)
+    if (
+      p.arrivedAt === undefined &&
+      city &&
+      stillTheCulprits(world, p, city) &&
+      members.some((m) => inCityArea(world, city, m.r.x, m.r.y, size))
+    ) {
+      p.arrivedAt = world.tick
+      logPunished(world, p, city, { what: 'arrived' })
+    }
+    const why = whyHeadHome(world, hq, p, city, took, size)
+    if (why) {
+      p.heading = 'home'
+      logPunished(world, p, city, { what: p.arrivedAt === undefined ? 'turnedBack' : 'left', why })
+    }
+  }
+  const robbing =
+    city &&
+    p.arrivedAt !== undefined &&
+    stillTheCulprits(world, p, city) &&
+    !directiveLifted(world, p)
+      ? city
+      : undefined
+  const storages = robbing ? storagesToTake(world, robbing) : []
+  const target = city && townHallOf(world, city)
   const ids = new Set(members.map((m) => m.r.id))
   const resisting = world.residents.filter(
     (r) =>
       r.health > 0 && !ids.has(r.id) && r.order?.kind === 'attack' && ids.has(r.order.targetId),
   )
   let left = p.worth - took
-  for (const { r, own } of members) {
+  for (const { r, own, member } of members) {
     if (r.order?.kind === 'attack') continue
     if (resisting.length > 0) {
       const nearest = resisting.reduce((a, b) =>
@@ -311,21 +502,36 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
       r.order = attackOrder(nearest.id)
       continue
     }
-    if (p.heading === 'out') {
-      const storage = storages.reduce((a, b) =>
-        wrapDistance(size, r, b) < wrapDistance(size, r, a) ? b : a,
-      )
-      if (!isAt(r, storage, size)) {
-        headFor(r, storage)
+    const wanted = foodWanted(world, hq, p, city, r, size)
+    if (p.heading === 'out' && !member.packed) {
+      if (fetchFood(world, () => foodIn(world, new Set([hq.id])), r, own, wanted, size)) {
+        if (r.order?.kind === 'pickUp') member.packed = true
         continue
       }
-      const { goods, worth } = toTake(world, r, storage, left)
-      if (worth <= 0) continue
-      r.order = { kind: 'pickUp', from: { kind: 'storage', storageId: storage.id }, goods }
-      left -= worth
+      member.packed = true
+    }
+    const places = () => refillPlaces(world, robbing, r, size)
+    if (fetchFood(world, places, r, own, wanted, size)) continue
+    if (p.heading === 'home') {
+      bringHome(world, hq, r, takenBy(r, own), size)
       continue
     }
-    bringHome(world, hq, r, takenBy(r, own), size)
+    if (p.arrivedAt === undefined) {
+      if (target) headFor(r, target)
+      continue
+    }
+    if (storages.length === 0) continue
+    const storage = storages.reduce((a, b) =>
+      wrapDistance(size, r, b) < wrapDistance(size, r, a) ? b : a,
+    )
+    if (!isAt(r, storage, size)) {
+      headFor(r, storage)
+      continue
+    }
+    const { goods, worth } = toTake(world, r, storage, left)
+    if (worth <= 0) continue
+    r.order = { kind: 'pickUp', from: { kind: 'storage', storageId: storage.id }, goods }
+    left -= worth
   }
   const done =
     p.heading === 'home' &&
@@ -333,16 +539,7 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
       (m) =>
         Object.keys(takenBy(m.r, m.own)).length === 0 && inCityArea(world, hq, m.r.x, m.r.y, size),
     )
-  if (members.length > 0 && !done) return
-  world.punishments = world.punishments.filter((x) => x !== p)
-  recordEvent(world, p.culpritOrg, {
-    kind: 'punished',
-    what: 'left',
-    cityId: p.cityId,
-    city: city?.name ?? 'a city',
-    worth: p.worth,
-    took: p.took,
-  })
+  if (done) world.punishments = world.punishments.filter((x) => x !== p)
 }
 
 /**
@@ -374,8 +571,9 @@ function bringHome(world: WorldState, hq: City, r: Resident, taken: Stock, size:
 /**
  * The Trade Organization's punishments hold together (`CONTEXT.md`: Trade Org reaction; ADR
  * 0004): each punishes an Organization other than the Trade Organization, at most one under way
- * for each, for a positive worth of which it took no more than all; its members are residents of the HQ, each in one punishment at
- * most and in no contract; and the Trade Organization never captures a city.
+ * for each, for a positive worth of which it took no more than all and nothing before it arrived
+ * (Punishment trip); its members are residents of the HQ, each in one punishment at most and in no
+ * contract; and the Trade Organization never captures a city.
  */
 export const punishmentsSound: Invariant = {
   name: 'punishments-sound',
@@ -393,6 +591,12 @@ export const punishmentsSound: Invariant = {
       if (!(p.worth > 0)) fail(`punishment ${p.id} is worth ${p.worth}`, [p.id])
       if (!(p.took >= 0 && p.took <= p.worth)) {
         fail(`punishment ${p.id} took ${p.took} of its ${p.worth}`, [p.id])
+      }
+      if (p.took > 0 && p.arrivedAt === undefined) {
+        fail(`punishment ${p.id} took ${p.took} before it arrived`, [p.id])
+      }
+      if (p.arrivedAt !== undefined && p.arrivedAt < p.startedAt) {
+        fail(`punishment ${p.id} arrived before it set out`, [p.id])
       }
       if (orgs.has(p.culpritOrg)) fail(`${p.culpritOrg} is punished twice at once`, [p.id])
       orgs.add(p.culpritOrg)
