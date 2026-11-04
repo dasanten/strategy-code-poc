@@ -84,6 +84,11 @@ export interface ResidentLines {
   fed: number
 }
 
+/** An age in whole years, in words: "34 years". */
+export function yearsLine(years: number): string {
+  return `${years} ${years === 1 ? 'year' : 'years'}`
+}
+
 /**
  * A resident's row in the Residents drawer on a phone (ADR 0012): two lines in place of the
  * table's columns, "Edda · Leader · 34 years" and their Doing line (`doingLine`) with the hunger
@@ -93,11 +98,10 @@ export function residentLines(
   r: Pick<Resident, 'id' | 'name' | 'bornAt' | 'hunger'>,
   { leaderId, tick, doing }: { leaderId: string; tick: number; doing: string },
 ): ResidentLines {
-  const years = Math.floor(ageInYears(r, tick))
   return {
     name: r.name,
     leader: r.id === leaderId,
-    age: `${years} ${years === 1 ? 'year' : 'years'}`,
+    age: yearsLine(Math.floor(ageInYears(r, tick))),
     doing,
     fed: Math.max(0, Math.min(1, r.hunger / MAX_HUNGER)),
   }
@@ -121,13 +125,26 @@ export function carriedShort(
   labels: Record<Good, string>,
   max = 3,
 ): string {
+  const goods = goodsShort(carried, labels, max)
+  return goods ? `Carrying ${goods}` : 'Carrying nothing'
+}
+
+/**
+ * Goods, short: "4 Wood, 2 Food" with the most first, at most `max` kinds and then how many more;
+ * undefined with none.
+ */
+export function goodsShort(
+  carried: Stock | undefined,
+  labels: Record<Good, string>,
+  max: number,
+): string | undefined {
   const goods = (Object.entries(carried ?? {}) as [Good, number | undefined][])
     .filter((e): e is [Good, number] => (e[1] ?? 0) > 0)
     .sort((a, b) => b[1] - a[1])
-  if (goods.length === 0) return 'Carrying nothing'
+  if (goods.length === 0) return undefined
   const shown = goods.slice(0, max).map(([g, n]) => `${Math.floor(n)} ${labels[g]}`)
   const more = goods.length - shown.length
-  return `Carrying ${shown.join(', ')}${more > 0 ? ` and ${more} more` : ''}`
+  return `${shown.join(', ')}${more > 0 ? ` and ${more} more` : ''}`
 }
 
 /** The tabs under the resident card's header (ADR 0012), in the order they show. */

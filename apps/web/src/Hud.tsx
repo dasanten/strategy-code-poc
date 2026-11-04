@@ -361,11 +361,14 @@ export function Drawer({
   id,
   open,
   onClose,
+  full = false,
   children,
 }: {
   id: DrawerId
   open: OpenDrawer
   onClose: () => void
+  /** Across the whole screen, whatever the drawer's usual width (the full Residents list). */
+  full?: boolean
   children: ReactNode
 }) {
   const label = DRAWERS.find((d) => d.id === id)!.label
@@ -373,7 +376,7 @@ export function Drawer({
   const [status, setStatus] = useState<HTMLElement | null>(null)
   return (
     <section
-      className={`hud-drawer${isWide(id) ? ' wide' : ''}`}
+      className={`hud-drawer${isWide(id) || full ? ' wide' : ''}${full ? ' full' : ''}`}
       aria-label={`${label} drawer`}
       hidden={open !== id}
     >

@@ -199,6 +199,10 @@ button.hud-logout {
 .hud-drawer.wide {
   width: min(1280px, calc(100vw - var(--rail-w)));
 }
+/* The full Residents list takes all of it. */
+.hud-drawer.full {
+  width: calc(100vw - var(--rail-w));
+}
 .hud-drawer.wide:not([hidden]) {
   display: flex;
   flex-direction: column;
@@ -1064,6 +1068,71 @@ label > select {
   border-radius: 0;
   background: transparent;
   font-size: 12px;
+}
+/* The Residents drawer's button that opens or closes the full list. */
+.residents-full-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+/* The full list (`ResidentsFullList`) scrolls by itself, under the drawer's head and its button;
+   rows have a fixed height so only those in view are drawn. */
+.residents-full {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.residents-full-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overflow-anchor: none;
+}
+.residents-full-table {
+  min-width: 1200px;
+}
+.residents-row.full {
+  width: 100%;
+  box-sizing: border-box;
+  grid-template-columns:
+    150px 28px 110px repeat(4, 34px) 170px 110px 170px 48px 48px
+    minmax(180px, 1fr);
+}
+.residents-row.full.heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--ui-panel);
+  letter-spacing: 0;
+}
+/* Cells stay on their line: all of it is in the tooltip, and on the resident's card. */
+.residents-row .cut {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+}
+.residents-row .cut small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+}
+.residents-row.lines.full-card {
+  width: 100%;
+  box-sizing: border-box;
+  justify-content: center;
+}
+.residents-row.lines.full-card .wide {
+  flex: 1 1 auto;
+}
+.residents-row.lines.full-card .meter {
+  width: 32px;
+}
+.residents-row.lines.full-card .doing.cut {
+  white-space: nowrap;
 }
 /* A horse: name and place, stats, age, health and hunger; narrow enough not to scroll. */
 .horses .residents-table {
