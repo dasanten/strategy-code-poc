@@ -227,7 +227,7 @@ interface Client {
   leaderId: string
   /** The realm name last sent, null while it has none, so a tick sends it once it is named. */
   realmName: string | null
-  /** Whether the Player could still claim their Horse offer when last sent (`CONTEXT.md`). */
+  /** Whether the Player could claim their Horse offer when last sent (`CONTEXT.md`). */
   horseOffer: boolean
   /** The realm's Workplace settings last sent, as JSON, so a tick sends them only when they changed. */
   lastWorkSettings: string
@@ -635,8 +635,10 @@ export function attachRealtime(
       const realmName = realm?.name ?? null
       const named = realmName !== null && realmName !== client.realmName
       if (named) client.realmName = realmName
-      const claimed = client.horseOffer && world.horseOffersClaimed.includes(client.userId)
-      if (claimed) client.horseOffer = false
+      // Off once claimed, on again once an admin re-opens it (`CONTEXT.md`: Horse offer).
+      const horseOffer = !world.horseOffersClaimed.includes(client.userId)
+      const offerChanged = horseOffer !== client.horseOffer
+      client.horseOffer = horseOffer
       const workSettings = world.workplaceSettings[client.realmId] ?? {}
       const settingsJson = JSON.stringify(workSettings)
       const settingsChanged = settingsJson !== client.lastWorkSettings
@@ -656,7 +658,7 @@ export function attachRealtime(
         ...(region ? { region } : {}),
         ...(newLeader ? { leaderId } : {}),
         ...(named ? { realmName } : {}),
-        ...(claimed ? { horseOffer: false as const } : {}),
+        ...(offerChanged ? { horseOffer } : {}),
         ...(settingsChanged ? { workSettings } : {}),
         ...(movedWaypoints ? { waypoints: [...waypoints] } : {}),
       }

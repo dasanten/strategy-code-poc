@@ -20,6 +20,7 @@ import {
   type Account,
   type AdminDirectives,
   type ApiError,
+  type HorseOffersReopened,
   type InviteCreated,
   type MapInfo,
   type TerrainMap,
@@ -41,6 +42,7 @@ import {
   createInviteCode,
   createSession,
   deleteSession,
+  findUserByName,
   getSessionUser,
   logIn,
   resetPassword,
@@ -58,6 +60,7 @@ import {
 } from './directives.js'
 import type { ExploredTerrain } from './explored.js'
 import { dismissFirstDay, markFirstDay, readFirstDay } from './first-day.js'
+import { reopenHorseOffers } from './horse-offer-reopen.js'
 import type { Logger } from './log.js'
 import {
   activateVersion,
@@ -403,6 +406,19 @@ export async function buildApp(opts: AppOptions) {
         return fail(reply, 'not-found', 'No such directive.')
       }
       return reply.code(204).send()
+    })
+
+    // Offering horses again (`CONTEXT.md`: Horse offer), between ticks like directives: for the
+    // named account, or with no name for every Player.
+    admin.post('/api/admin/horse-offers/reopen', async (req, reply) => {
+      const { name } = body(req)
+      let userId: number | undefined
+      if (name !== undefined) {
+        userId = typeof name === 'string' ? findUserByName(db, name)?.id : undefined
+        if (userId === undefined) return fail(reply, 'not-found', 'No account with that name.')
+      }
+      const reopened: HorseOffersReopened = { reopened: reopenHorseOffers(world, userId) }
+      return reopened
     })
   })
 

@@ -14,6 +14,7 @@ import {
   loadLevel,
   carriageCapacity,
   passengersOf,
+  standsStill,
   tradeCoinWarehouse,
   warehousePrices,
   type Army,
@@ -260,14 +261,18 @@ function seenBuilding(world: WorldState, insight: Insight, b: Building): SeenBui
 
 /**
  * A carriage as the side sees it: how heavily it is loaded, its load only when it sees inside,
- * and who is aboard it.
+ * who is aboard it, and whether anything moves it.
  */
 function seenCarriage(world: WorldState, insight: Insight, k: Carriage): SeenCarriage {
   const level = loadLevel(k.load, carriageCapacity(world, k))
-  const passengerIds = passengersOf(world, k).map((r) => r.id)
-  if (insight.insideCarriage(k)) return { ...k, loadLevel: level, passengerIds }
+  const seen = {
+    loadLevel: level,
+    passengerIds: passengersOf(world, k).map((r) => r.id),
+    standsStill: standsStill(world, k),
+  }
+  if (insight.insideCarriage(k)) return { ...k, ...seen }
   const { id, realmId, cityId, x, y, horseId } = k
-  return { id, realmId, cityId, x, y, horseId, loadLevel: level, passengerIds }
+  return { id, realmId, cityId, x, y, horseId, ...seen }
 }
 
 /**
@@ -314,10 +319,15 @@ function buildLineOf(line: unknown): BuildLine | undefined {
 }
 
 /**
- * A resident without their script log, which only the owning Player gets, on the Script tab
- * (`CONTEXT.md`: Script log); it never goes with the resident.
+ * A resident without what never goes with them: their script log, which only the owning Player
+ * gets, on the Script tab (`CONTEXT.md`: Script log), and whether an order stands against blows
+ * (`Resident.givenUnderAttack`), which nobody sees.
  */
-export const withoutScriptLog = ({ scriptLog: _, ...rest }: Resident) => rest
+export const withoutServerOnly = ({
+  scriptLog: _log,
+  givenUnderAttack: _given,
+  ...rest
+}: Resident) => rest
 
 /**
  * What a realm's Player sees (`CONTEXT.md`: Sight): everything within sight range of any of
@@ -354,7 +364,7 @@ function everythingSeen(
     // What a defence script interrupted goes on the owning Player's Doing line only, its memory
     // never; the defence script picked is the owning Player's to see too.
     const { script, scriptParams, queue, interrupted, defenceScriptId, ...rest } =
-      withoutScriptLog(r)
+      withoutServerOnly(r)
     const kept = index.commanderOf(r) === realmId ? scriptParams : undefined
     const params = script ? kept?.[script.scriptId] : undefined
     const own = r.owner === realmId

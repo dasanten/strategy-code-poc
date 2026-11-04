@@ -1092,6 +1092,12 @@ export function Wiki() {
           else the nearest storage of their realm.
         </p>
         <p>
+          A workplace's card says how much is being made there: what each of your workers there makes
+          and how much a game day at their Strength and skill, and the total of each good. It is the
+          pace while they have what they need, not a count of what has been made. Other realms'
+          workers aren't counted, as their stats aren't known.
+        </p>
+        <p>
           A smelter, mint or smithy has no storage: it works what its workers carry and what lies in
           its pile. Once they lack the input for a batch (Iron ore, Gold ore, or the Iron and Wood
           of what a smith makes), one worker at a time, picked at random, fetches a load of what is
@@ -1621,8 +1627,10 @@ export function Wiki() {
           carries; clicking it opens its card, which lists them under its load with how much of its
           weight is people and picks one when you click their name (a box drag takes them in too). A
           passenger's Doing line says "Aboard a carriage" and where it is heading while it is
-          driven, and picking them shows the carriage's way ahead. Scripts see a resident's{' '}
-          <code>aboard</code> and a carriage's <code>passengerIds</code>.
+          driven, and picking them shows the carriage's way ahead. Struck, an unarmed passenger
+          stays aboard while it is driven (see Under attack). Scripts see a resident's{' '}
+          <code>aboard</code> and a carriage's <code>passengerIds</code> and{' '}
+          <code>standsStill</code>.
         </p>
         <p>
           <strong>Refilling from a carriage:</strong> passengers and the driver eat the food they
@@ -1654,13 +1662,16 @@ export function Wiki() {
         </p>
         <h3>Horse offer</h3>
         <p>
-          Every Player may claim {num(HORSE_GRANT_HORSES)} new horses once, ever, whenever they
-          choose and whether or not they have horses: a notice at the top of the screen has a Claim
-          button until they do. The horses get new stats and ages and go in your finished stable
+          Every Player may claim {num(HORSE_GRANT_HORSES)} new horses once, whenever they choose and
+          whether or not they have horses: a notice at the top of the screen has a Claim button
+          until they do. The horses get new stats and ages and go in your finished stable
           nearest your Leader's city; with no stable, they stand next to that city's storage (or
           next to your Leader), each with {num(HORSE_GRANT_FOOD)} Food on the ground by it. The
-          realm log says where they are. Once claimed the offer is gone for good, also after your
-          Leader dies and you found a new realm; while you have no living Leader you can't claim it.
+          realm log says where they are. Once claimed the offer is gone, also after your Leader dies
+          and you found a new realm; while you have no living Leader you can't claim it. An admin
+          can offer horses again, to every Player or to one: if you had claimed, the notice comes
+          back and you may claim once more, whether or not you still have horses. If you hadn't, you
+          still have just the one claim.
         </p>
         <h3>Deliveries and transfers</h3>
         <p>
@@ -2059,10 +2070,30 @@ export function Wiki() {
           {duration(DEFEND_CALM_TICKS)}. Their card says “Defending: fighting back at Bo” or
           “Defending: fleeing home”, with what they were doing on the line under it. What they were
           doing waits meanwhile: once Defend ends they go back to it, a script with its memory, a
-          queue at its step, or a plain order. Struck again while defending, they keep defending; an
-          order you give them meanwhile ends both. Scripts see the last blow as{' '}
-          <code>me.struckBy</code> and <code>me.struckAt</code>. Residents of NPC cities, and in an
-          army, fight back or flee home the same way.
+          queue at its step, or a plain order. Struck again while defending, they keep defending.
+          Scripts see the last blow as <code>me.struckBy</code> and <code>me.struckAt</code>.
+          Residents of NPC cities, and in an army, fight back or flee home the same way.
+        </p>
+        <p>
+          <strong>On a carriage:</strong> the carriage is the way out. An unarmed driver drives on
+          where they were going, at the same pace, a haul route too, and an armed one fights back
+          with the carriage standing, comes back to it if the fight led away, and then goes on. An
+          unarmed passenger stays aboard while the carriage is being driven; on one standing still,
+          with no driver driving it or its horse Down or dead, they get off and walk home. An armed
+          passenger gets off and fights back. A caravan's driver under attack doesn't wait for the
+          escort either. Your own defence script decides for itself: a driver's{' '}
+          <code>me.order</code> stays their drive or haul route until it gives them another order,
+          and a carriage's <code>standsStill</code> says whether anything moves it.
+        </p>
+        <p>
+          An order you give a resident under attack, while their defence script runs or within{' '}
+          {duration(DEFEND_CALM_TICKS)} of a blow, ends the defence script and what it interrupted,
+          and further blows don't undo it. One that ends by itself, like a walk or a drive to a
+          target, stands until it is done or you replace it, however long that takes. What goes on
+          until stopped, like a haul route, working, a task, a script or a queue, holds until no
+          blow has landed for {duration(DEFEND_CALM_TICKS)}; after that the next blow runs the
+          defence script as usual. An order given before the attack is interrupted as usual, and
+          what a script or queue requests itself doesn't count as given by you.
         </p>
         <h3>Defence script</h3>
         <p>

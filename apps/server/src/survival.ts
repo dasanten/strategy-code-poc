@@ -145,6 +145,7 @@ function holdStill(r: Resident): void {
   delete r.script
   delete r.queue
   delete r.interrupted
+  delete r.givenUnderAttack
 }
 
 /**

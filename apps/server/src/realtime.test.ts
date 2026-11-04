@@ -18,6 +18,7 @@ import { createAdmin, createInviteCode, createSession, signUp } from './auth.js'
 import { recordEvent } from './events.js'
 import { ExploredTerrain } from './explored.js'
 import { dismissFirstDay } from './first-day.js'
+import { reopenHorseOffers } from './horse-offer-reopen.js'
 import type { InvariantViolation } from './invariants.js'
 import { openDb, schema, type Db } from './db/index.js'
 import { OrderQueue, orderKinds, type OrderKind } from './orders.js'
@@ -854,6 +855,23 @@ describe('realtime', () => {
     expect(await next('tick')).not.toHaveProperty('horseOffer')
     const again = connect(url, token)
     expect(await again.next('welcome')).toMatchObject({ horseOffer: false })
+  })
+
+  it('says once when an admin offers horses again, to a connected Player (Horse offer)', async () => {
+    const { url, token, world, realtime, userId } = await start()
+    world.horseOffersClaimed.push(userId)
+    const { next } = connect(url, token)
+    expect(await next('welcome')).toMatchObject({ horseOffer: false })
+    realtime.broadcastTick()
+    expect(await next('tick')).not.toHaveProperty('horseOffer')
+    reopenHorseOffers(world)
+    realtime.broadcastTick()
+    expect(await next('tick')).toMatchObject({ horseOffer: true })
+    realtime.broadcastTick()
+    expect(await next('tick')).not.toHaveProperty('horseOffer')
+    world.horseOffersClaimed.push(userId)
+    realtime.broadcastTick()
+    expect(await next('tick')).toMatchObject({ horseOffer: false })
   })
 
   it('sends the realm its own Workplace settings, and again only when they changed', async () => {

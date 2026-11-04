@@ -1793,15 +1793,42 @@ ${LOG_TEXT}
     name: 'Defend',
     source: `// Defend (default): what I do when struck, in place of what I was doing,
 // which goes on once I end. Armed, I fight back at whoever struck me while
-// they are in sight, and end once they are dead, gone or out of sight.
+// they are in sight, and end once they are dead, gone or out of sight; a
+// driver walks back to the carriage first, should the fight have led away.
 // Unarmed, I walk home to my city's town hall, and end there, or once no
-// blow has landed for calm ticks.
+// blow has landed for calm ticks; but driving I end at once and drive on, and
+// aboard a carriage being driven I end at once and stay aboard.
 let calm = ${DEFEND_CALM_TICKS} // ticks without a blow before I go back, fleeing
 
 if (armed()) {
+  // My drive waits while I fight: kept for the way back to my carriage.
+  if (holdsCarriage()) { memory.carriageId = me.order.carriageId }
   fightBack()
+} else if (holdsCarriage() || betweenDrives() || aboardDriven()) {
+  end()
 } else {
   fleeHome()
+}
+
+// Whether I drive a carriage, or haul with one.
+fn holdsCarriage() {
+  let o = me.order
+  return o != null && (o.kind == "drive" || o.kind == "haul")
+}
+
+// Between the drives of my queue: the next step comes once I end.
+fn betweenDrives() {
+  let q = me.queue
+  return me.order == null && q != null && (q.kind == "drive" || q.kind == "haul")
+}
+
+// Whether the carriage I am aboard is being driven.
+fn aboardDriven() {
+  if (me.aboard == null) { return false }
+  for (c of carriages()) {
+    if (c.id == me.aboard) { return !c.standsStill }
+  }
+  return false
 }
 
 // Whether I carry a weapon.
@@ -1820,18 +1847,35 @@ fn fightBack() {
     if (r.id == me.struckBy) { foe = r }
   }
   if (foe == null) {
-    end("the attacker is gone")
+    if (!backToCarriage()) { end("the attacker is gone") }
     return
   }
   let o = me.order
   if (o != null && o.kind == "attack" && o.targetId == foe.id) { return } // at it
   let problem = attack(foe.id)
   if (problem != null) {
-    end("can't fight back: " + problem)
+    if (!backToCarriage()) { end("can't fight back: " + problem) }
     return
   }
   doing("Defending: fighting back at " + foe.name)
   log("fighting back at " + foe.name)
+}
+
+// The fight led me off my carriage: back to it, for my drive to go on. True
+// until I am there; false if I can't get there.
+fn backToCarriage() {
+  if (memory.carriageId == null) { return false }
+  for (c of carriages()) {
+    if (c.id == memory.carriageId) {
+      if (c.x == me.x && c.y == me.y) { return false }
+      if (me.order != null && me.order.kind == "walkTo") { return true } // on my way
+      if (walkTo(c.x, c.y) != null) { return false }
+      doing("Defending: back to the carriage")
+      log("back to " + placeName(c))
+      return true
+    }
+  }
+  return false
 }
 
 // Home to my city's town hall, until I am there or it has been calm.

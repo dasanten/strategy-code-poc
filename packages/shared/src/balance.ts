@@ -1619,6 +1619,26 @@ export function batchWork(resident: Resident, kind: BuildingKind, tick: number):
   return skill ? workPace(resident, BATCHES_PER_DAY[kind] ?? 0, skill, tick) : 0
 }
 
+/**
+ * How much of `good` a worker makes a game day at a workplace of `kind`, at their pace at the given
+ * tick, while they have what they need (`CONTEXT.md`: Workplace amounts): `workOutput`, or at a
+ * workplace that processes goods its batches (`batchWork`) times what a batch of the recipe yields.
+ */
+export function madePerDay(
+  resident: Resident,
+  kind: BuildingKind,
+  good: Good,
+  tick: number,
+): number {
+  const recipes = RECIPES[kind]
+  if (recipes) {
+    const yields = recipes.find((r) => r.output[good] !== undefined)?.output[good] ?? 0
+    return batchWork(resident, kind, tick) * yields * TICKS_PER_GAME_DAY
+  }
+  const skill = WORKPLACE_SKILL[kind]
+  return skill ? workOutput(resident, good, skill, tick) * TICKS_PER_GAME_DAY : 0
+}
+
 /** `perDay` a game day, as a share per tick: in proportion to Strength, more with the skill. */
 function workPace(resident: Resident, perDay: number, skill: SkillName, tick: number): number {
   const strength = statValue(resident, 'strength', tick) / WORK_STRENGTH_AVERAGE

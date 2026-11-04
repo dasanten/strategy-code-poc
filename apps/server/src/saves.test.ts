@@ -176,11 +176,19 @@ describe('world saves', () => {
     )
   })
 
+  it('leaves every resident unmarked for orders standing under attack (migration 79 → 80)', () => {
+    const { world: v79, terrain: land } = worldWithPost()
+    const v80 = migrateWorld(structuredClone(v79), 79, { terrain: land }, migrations, 80)
+    expect(v80).toEqual(v79)
+    expect(v80.residents.every((r) => r.givenUnderAttack === undefined)).toBe(true)
+    expect(checkInvariants(v80, land)).toEqual([])
+  })
+
   it('leaves realms from before realm names unnamed (migration 38 → 39)', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(79)
+    expect(WORLD_FORMAT_VERSION).toBe(80)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
