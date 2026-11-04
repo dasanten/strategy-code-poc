@@ -1719,12 +1719,15 @@ export function Wiki() {
         </p>
         <p>
           The HQ also sends out up to {num(TRADERS)} wandering traders, each a carriage with a
-          driver and {num(TRADER_ESCORTS)} escorts, round a fixed loop of the trading posts. At each
-          post a trader evens out its load with the warehouse, every good including Food and Coins:
-          it leaves what the post has less of and takes what it has more of, as far as the carriage
-          holds. That is how a post comes to hold goods it doesn't produce. Its crew and a lost
-          carriage go as for a caravan, and robbing one is a theft from the Trade Organization, but
-          it owes nobody a delivery, so nothing is sent again.
+          driver and {num(TRADER_ESCORTS)} escorts, round a fixed loop of the trading posts and the
+          HQ. At each stop a trader evens out its load with the warehouse, every good including Food
+          and Coins: it leaves what that place has less of and takes what it has more of, as far as
+          the carriage holds. That is how a post comes to hold goods it doesn't produce. The HQ is a
+          stop like a post, its Coins going through its coin warehouse and its other goods through
+          its goods warehouse, so new Food and Coins reach the posts, and a trader's lost escorts
+          are made up there each time round. Its crew and a lost carriage go as for a caravan, and
+          robbing one is a theft from the Trade Organization, but it owes nobody a delivery, so
+          nothing is sent again.
         </p>
       </Section>
 

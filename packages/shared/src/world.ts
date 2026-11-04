@@ -1144,10 +1144,11 @@ export type SeenCaravan = Pick<
 
 /**
  * A wandering trader (`CONTEXT.md`: Wandering trader): a Trade Org carriage with a driver and a
- * small escort, sent from the HQ on a fixed loop of trading posts, apart from the caravans. At each
- * post it stops first at the storage, to top up the Food on board for its crew and horse, then at
- * the warehouse, where it evens out its load with what the warehouse holds. Plain data (ADR 0002):
- * the game gives the crew the same drive, pick-up, drop and walk orders a Player could give.
+ * small escort, sent from the HQ on a fixed loop of the trading posts and the HQ, apart from the
+ * caravans. At each stop it goes first to the storage, to top up the Food on board for its crew and
+ * horse, then to the warehouse, where it evens out its load with what the warehouse holds; at the
+ * HQ, its Coins with the coin warehouse after that. Plain data (ADR 0002): the game gives the crew
+ * the same drive, pick-up, drop and walk orders a Player could give.
  */
 export interface Trader {
   id: string
@@ -1159,19 +1160,25 @@ export interface Trader {
   driverId: string | null
   /** The residents who walk along with it (the escort). */
   escortIds: string[]
-  /** The trading posts it goes round, in order; after the last comes the first again. */
-  loop: string[]
-  /** The post of its loop it stands at or goes to next; null with no post left on its loop. */
-  postId: string | null
   /**
-   * Where it stands or is driving: at the HQ while it is being sent out, back for a new carriage or
-   * with no post left (`hq`), or out at `postId` (`post`).
+   * The cities it goes round, in order: the trading posts and the HQ, which stays on it; after the
+   * last comes the first again.
+   */
+  loop: string[]
+  /** The stop of its loop, a post or the HQ, it stands at or goes to next. */
+  postId: string
+  /**
+   * Where it stands or is driving: at the HQ first while it is being sent out or is back for a new
+   * carriage, and from there on to `postId` (`hq`), or at `postId` itself (`post`).
    */
   heading: 'hq' | 'post'
-  /** Where at that place it stands or is going: the storage first, then the warehouse. */
-  stop: 'storage' | 'warehouse'
   /**
-   * What it still has to leave at this post's warehouse and take from it, worked out once on
+   * Where at that place it stands or is going: the storage first, then the warehouse, and at the HQ
+   * then its coin warehouse if it has Coins to move.
+   */
+  stop: 'storage' | 'warehouse' | 'coinWarehouse'
+  /**
+   * What it still has to leave at this stop's warehouses and take from them, worked out once on
    * reaching the warehouse (`evenOutLoad`); null until then.
    */
   plan: { leave: Stock; take: Stock } | null

@@ -383,11 +383,12 @@ describe('admin inspection', () => {
       trader: { id: 'tr1', name: 'Ferry' },
     })
     expect(inspect(world, 'trader', 'gone')).toBeUndefined()
-    // With no post left it goes by the HQ, and is still found.
-    world.traders[0]!.postId = null
-    world.traders[0]!.loop = []
+    // Bound for the HQ it goes by the HQ's name, and is still found.
+    const hq = world.cities.find((c) => c.id === 'hq')!
+    world.traders[0]!.postId = 'hq'
+    world.traders[0]!.loop = ['hq']
     expect(adminPlaces(world, lookups).tradeOrg.traders).toEqual([
-      { id: 'tr1', name: 'the HQ', x: 61, y: 61 },
+      { id: 'tr1', name: hq.name, x: 61, y: 61 },
     ])
   })
 
