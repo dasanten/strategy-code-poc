@@ -287,6 +287,8 @@ The shared language of the game. Domain terms only — no implementation details
   warehouse and loads what evens out the two warehouses' stock (half the difference of each good,
   not Food or coins). The escort walks along with the carriage, which waits for it; the crew
   refill from the carriage like an army.
+- **Waiting for Food:** a caravan or wandering trader stays at the HQ until it holds enough Food for
+  its crew and horse to reach its next stop, so nothing sets off to starve on the road.
 - **Caravan crew lost:** a caravan outlives its crew. When its driver dies, a surviving escort
   takes over driving. With no crew left, its carriage stands where it is and the HQ sends a new
   driver on foot, from the same adults it makes up escorts from, once it has one free. A caravan's
