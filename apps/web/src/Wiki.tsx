@@ -1505,8 +1505,8 @@ export function Wiki() {
         <h3>Breeding</h3>
         <p>
           Horses don't breed on their own. A grown resident standing at a finished stable is given
-          Breed horses and picks two fed horses of their realm in it; they tend them for{' '}
-          {days(STABLE_BREED_DAYS)}, and then a foal of their realm is born in the stable. Each of
+          Breed horses and picks two fed horses of their realm in it, each shown with its name and
+          stats; they tend them for {days(STABLE_BREED_DAYS)}, and then a foal of their realm is born in the stable. Each of
           its stats is its parents' average, give or take {num(FOAL_STAT_SPREAD)}. The progress
           belongs to the two horses, and the stable keeps it: breeding pauses when the resident
           leaves or is given another order, or while the stable has no room left for the foal, and

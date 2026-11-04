@@ -808,6 +808,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             : []
         }
         horses={horsesIn(planWorld(w), w.horses, plan?.picked[0]?.id)}
+        tick={w.tick}
         cities={cities}
         onPickCity={(cityId) => {
           const city = cities.find((c) => c.id === cityId)
