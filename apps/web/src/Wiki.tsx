@@ -1777,8 +1777,10 @@ export function Wiki() {
           only goods it is short of, up to its reserve and with the coins in its storage. It takes
           nothing else. Its prices come from its stock like a warehouse's, and its standing toward
           you moves them: the better, the cheaper it sells and the more it pays. It swaps only its
-          surplus for what it is short of. Below {signed(NPC_CITY_REFUSES_STANDING)} it won't trade
-          with you at all. Every trade raises standing both ways (see{' '}
+          surplus for what it is short of, and its Rates in the Trade section list each good it is
+          short of against each it has spare, at today's prices. Pick one to fill in the swap, or to
+          send someone there if nobody of yours is. Below {signed(NPC_CITY_REFUSES_STANDING)} it
+          won't trade with you at all. Every trade raises standing both ways (see{' '}
           <a href="#standing">Standing &amp; reactions</a>).
         </p>
         <h3>Delivery</h3>

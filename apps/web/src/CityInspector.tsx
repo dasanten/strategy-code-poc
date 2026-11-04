@@ -20,6 +20,7 @@ import {
   type SeenCarriage,
   type SeenHorse,
   type SwapQuote,
+  type SwapRate,
 } from '@csp/shared'
 import {
   buildingCount,
@@ -37,6 +38,8 @@ import {
   holderText,
   onTheWay,
   onTheWayLine,
+  ratesAt,
+  rateText,
   sendable,
   swapText,
   takesTransfers,
@@ -332,6 +335,7 @@ export function CityInspector({
                     traders={tradersAt(s, { residents, carriages }, realmId)}
                     sending={sending(s)}
                     deliveryCities={[]}
+                    rates={ratesAt(s, { buildings })}
                     swapGoods={s.prices.map((p) => p.good)}
                     previewSwap={(resident, carriage, give, want, units) =>
                       previewNpcSwap(
@@ -665,7 +669,8 @@ export interface SwapRequest {
  * down, or why it won't go (`CONTEXT.md`: Trade section). Or, with one of the Player's cities picked, a
  * caravan delivers what is bought to its storage, or picks up what is sold from there, for a fee
  * (`CONTEXT.md`: Delivery). Below, the same trader can swap goods for goods (`Swapping`). Nobody of
- * theirs there, and it offers to send someone (`Sending`).
+ * theirs there, and it offers to send someone (`Sending`); a rate picked meanwhile is the swap filled
+ * in once they arrive.
  */
 function Trading({
   warehouse,
@@ -674,6 +679,7 @@ function Trading({
   traders,
   sending,
   deliveryCities,
+  rates = [],
   swapGoods,
   preview,
   previewDelivery,
@@ -690,6 +696,8 @@ function Trading({
   /** Whom to send there while nobody of the Player's is, and who is on the way. */
   sending: SendingProps
   deliveryCities: DeliveryCity[]
+  /** An NPC city's rates at its storage (`ratesAt`); a warehouse lists none. */
+  rates?: SwapRate[]
   /** The goods a swap can name there: every good it prices, so a refusal can say why. */
   swapGoods: PricedGood[]
   preview: (
@@ -720,12 +728,31 @@ function Trading({
   const [cityId, setCityId] = useState<string>('')
   const [good, setGood] = useState<PricedGood | undefined>()
   const [units, setUnits] = useState(1)
+  const [rate, setRate] = useState<SwapRate | undefined>()
   const resident = traders.residents.find((r) => r.id === residentId) ?? traders.residents[0]
   const carriage = traders.carriages.find((k) => k.id === carriageId)
   const city = deliveryCities.find((c) => c.id === cityId)
   const picked = good !== undefined && goods.includes(good) ? good : goods[0]
   if (!picked) return null
-  if (!resident) return <Sending warehouse={warehouse} place={place} {...sending} />
+  if (!resident) {
+    return (
+      <>
+        <Rates rates={rates} hint="Pick one to send someone to swap it." onPick={setRate} />
+        {rate && (
+          <p className="small rate-picked">
+            To swap{' '}
+            {rateText(
+              rate,
+              GOOD_LABELS[rate.give].toLowerCase(),
+              GOOD_LABELS[rate.want].toLowerCase(),
+            )}
+            , send someone there with the {GOOD_LABELS[rate.give].toLowerCase()}.
+          </p>
+        )}
+        <Sending warehouse={warehouse} place={place} {...sending} />
+      </>
+    )
+  }
   const label = GOOD_LABELS[picked].toLowerCase()
   const quote = preview(resident, carriage, picked, units)
   const trade = (side: TradeSide) =>
@@ -836,6 +863,8 @@ function Trading({
       </p>
       <Swapping
         goods={swapGoods}
+        rates={rates}
+        firstRate={rate}
         holds={carriage ? carriage.load : resident.carried}
         preview={(give, want, n) => previewSwap(resident, carriage, give, want, n)}
         onSwap={(give, want, n) =>
@@ -855,23 +884,29 @@ function Trading({
 /**
  * Swapping goods for goods (`CONTEXT.md`: Swap): the good the trader wants and how much, the good
  * they give for it (each with what they hold), and a button saying what it would move at the
- * place's prices, what cut it down, or why it won't go.
+ * place's prices, what cut it down, or why it won't go. An NPC city's rates stand above it, and
+ * picking one fills it in.
  */
 function Swapping({
   goods,
+  rates,
+  firstRate,
   holds,
   preview,
   onSwap,
 }: {
   goods: PricedGood[]
+  rates: SwapRate[]
+  /** The rate picked before anyone was there, to start from. */
+  firstRate: SwapRate | undefined
   /** What the trader holds, in their hands or on their carriage. */
   holds: Stock
   preview: (give: PricedGood, want: PricedGood, units: number) => SwapQuote
   onSwap: (give: PricedGood, want: PricedGood, units: number) => void
 }) {
-  const [wantPicked, setWant] = useState<PricedGood | undefined>()
-  const [givePicked, setGive] = useState<PricedGood | undefined>()
-  const [units, setUnits] = useState(1)
+  const [wantPicked, setWant] = useState<PricedGood | undefined>(firstRate?.want)
+  const [givePicked, setGive] = useState<PricedGood | undefined>(firstRate?.give)
+  const [units, setUnits] = useState(firstRate?.units ?? 1)
   const want = wantPicked !== undefined && goods.includes(wantPicked) ? wantPicked : goods[0]
   if (!want) return null
   const gives = goods.filter((g) => g !== want)
@@ -888,6 +923,15 @@ function Swapping({
         Goods for goods, no coins needed: you hand over enough to pay for what you want, at its
         prices, and what is over comes back in coins as far as it holds them.
       </p>
+      <Rates
+        rates={rates}
+        hint="Pick one to fill in the swap below."
+        onPick={(r) => {
+          setWant(r.want)
+          setGive(r.give)
+          setUnits(r.units)
+        }}
+      />
       <label>
         Want{' '}
         <select value={want} onChange={(e) => setWant(e.target.value as PricedGood)}>
@@ -927,6 +971,42 @@ function Swapping({
           {swapText(GOOD_LABELS[give].toLowerCase(), GOOD_LABELS[want].toLowerCase(), quote)}
         </button>
       </p>
+    </div>
+  )
+}
+
+/**
+ * An NPC city's rates (`CONTEXT.md`: Swap): what it would take of the goods it is short of for the
+ * goods it has spare, at today's prices. Nothing when it has none.
+ */
+function Rates({
+  rates,
+  hint,
+  onPick,
+}: {
+  rates: SwapRate[]
+  /** What picking one does. */
+  hint: string
+  onPick: (rate: SwapRate) => void
+}) {
+  if (rates.length === 0) return null
+  return (
+    <div className="swap-rates" aria-label="Rates">
+      <h3>Rates</h3>
+      <p className="small muted">
+        You give what it is short of for what it has spare, at today’s prices. {hint}
+      </p>
+      <ul>
+        {rates.map((r) => (
+          <li key={`${r.give}:${r.want}`}>
+            <button type="button" onClick={() => onPick(r)}>
+              <GoodIcon good={r.give} />
+              {rateText(r, GOOD_LABELS[r.give].toLowerCase(), GOOD_LABELS[r.want].toLowerCase())}
+              <GoodIcon good={r.want} />
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
