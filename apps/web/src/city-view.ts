@@ -10,6 +10,7 @@ import {
   quoteDelivery,
   quotePickUp,
   quoteTrade,
+  quoteTraderTrade,
   tradeCoinWarehouse,
   wrapDistance,
   canWork,
@@ -37,6 +38,8 @@ import {
   TICKS_PER_GAME_DAY,
   type SeenResident,
   type SeenCarriage,
+  type SeenTrader,
+  type TraderVisit,
   type SeenBuilding,
   type Shown,
 } from '@csp/shared'
@@ -181,10 +184,13 @@ export function describeBuying(
   }
 }
 
-/** A Trade Org warehouse in sight and its prices (`CONTEXT.md`: Warehouse prices). */
+/**
+ * A Trade Org warehouse in sight and its prices (`CONTEXT.md`: Warehouse prices), or the like for
+ * an NPC city's storage or a wandering trader at a stop.
+ */
 export interface WarehouseView {
   id: string
-  /** A warehouse, or an NPC city’s storage: its footprint is where traders stand. */
+  /** A warehouse, an NPC city’s storage or a trader’s carriage: its footprint is where traders stand. */
   kind: BuildingKind
   x: number
   y: number
@@ -465,20 +471,98 @@ export function npcStoragesInSight(
     .map((b) => ({ id: b.id, kind: b.kind, x: b.x, y: b.y, prices }))
 }
 
+/** A wandering trader at a stop, for the Trade section of the city it stands at. */
+export interface TraderStopView extends WarehouseView {
+  /** The trader's id, which `id` is too; the carriage whose load it trades. */
+  carriageId?: string
+  /** The tick it goes on. */
+  until: number
+  /** Its prices aren't known, as it isn't in sight: all there is to do is send someone. */
+  unseen: boolean
+}
+
+/**
+ * The wandering traders standing at the city (`CONTEXT.md`: Trader stop), as the Trade section shows
+ * them: those in sight with their prices, and those only known from a notice with none.
+ */
+export function traderStopsAt(
+  city: Pick<City, 'id'>,
+  traders: readonly SeenTrader[],
+  visits: readonly TraderVisit[],
+): TraderStopView[] {
+  const seen = traders.flatMap((t): TraderStopView[] =>
+    t.standing?.cityId === city.id
+      ? [
+          {
+            id: t.id,
+            kind: 'carriage',
+            x: t.standing.x,
+            y: t.standing.y,
+            prices: t.prices ?? [],
+            carriageId: t.carriageId,
+            until: t.standing.until,
+            unseen: false,
+          },
+        ]
+      : [],
+  )
+  const heard = visits
+    .filter((v) => v.cityId === city.id && !seen.some((s) => s.id === v.traderId))
+    .map(
+      (v): TraderStopView => ({
+        id: v.traderId,
+        kind: 'carriage',
+        x: v.x,
+        y: v.y,
+        prices: [],
+        until: v.until,
+        unseen: true,
+      }),
+    )
+  return [...seen, ...heard]
+}
+
 /**
  * Whether the city's panel shows trading (`CONTEXT.md`: Trade section): a warehouse or NPC
- * storage of it in sight, or a transfer the Player can send it. Then it links "How to trade".
+ * storage of it in sight, a wandering trader standing at it, or a transfer the Player can send it.
+ * Then it links "How to trade".
  */
 export function tradesHere(
   city: SeenCity,
-  seen: { cities: City[]; buildings: SeenBuilding[] },
+  seen: { cities: City[]; buildings: SeenBuilding[]; traders?: readonly SeenTrader[] },
   realmId: string,
+  visits: readonly TraderVisit[] = [],
 ): boolean {
   return (
     warehousesInSight(city, seen).length > 0 ||
     npcStoragesInSight(city, seen).length > 0 ||
+    traderStopsAt(city, seen.traders ?? [], visits).length > 0 ||
     takesTransfers(city, seen, realmId)
   )
+}
+
+/**
+ * What buying and selling up to `units` of a good would move with a wandering trader at a stop
+ * (`quoteTraderTrade`), for one of the Player's on its tile, who sees its load. `escortIds` is its
+ * crew, whose Food on board isn't for sale. The server decides; this is the preview.
+ */
+export function previewTraderTrade(
+  trader: Pick<SeenTrader, 'escortIds'>,
+  wagon: Carriage | undefined,
+  resident: Resident,
+  carriage: Carriage | undefined,
+  good: PricedGood,
+  units: number,
+  tick: number,
+  horses: readonly CarriageHorse[],
+): TradePreview {
+  const holder = holderOf(resident, carriage, tick, horses)
+  const none = { units: 0, coins: 0 }
+  if (!wagon || !(units > 0)) return { buy: none, sell: none, holder }
+  const capacity = carriageCapacity({ horses, carriages: [wagon] }, wagon)
+  const quote = (side: TradeSide) =>
+    quoteTraderTrade(trader, wagon.load, capacity, holder, side, good, units)
+  return { buy: quote('buy'), sell: quote('sell'), holder }
 }
 
 /**
@@ -549,6 +633,7 @@ const WONT_GO: Record<TradeLimit, string> = {
   room: 'no room',
   stock: 'none in stock',
   theirCoins: 'it has no coins to pay',
+  theirRoom: 'it has no room for it',
   unwanted: 'it doesn’t want it',
   refused: 'it won’t trade with you',
 }
@@ -560,6 +645,7 @@ const CUT_BY: Record<TradeLimit, string> = {
   room: 'no room for more',
   stock: 'that’s all it has',
   theirCoins: 'its coins run out',
+  theirRoom: 'that’s all it has room for',
   unwanted: 'that’s all it wants',
   refused: 'it won’t trade with you',
 }
@@ -634,16 +720,19 @@ export interface TradeLists {
  * any amount it takes. An NPC city lists in `canBuy` only its surplus that this storage holds, and
  * in `canSell` only what it is short of, as far as the coins in this storage go (`CONTEXT.md`:
  * Trading with an NPC city). Units are only worked out from what the Player sees inside the
- * building (`CONTEXT.md`: Seeing inside a storage); without that, only the price.
+ * building (`CONTEXT.md`: Seeing inside a storage); without that, only the price. A wandering trader
+ * is like a warehouse, but where its load is seen, it lists to buy only what it carries.
  */
 export function tradeLists(w: WarehouseView, seen: { buildings: Building[] }): TradeLists {
   if (w.kind !== 'storage') {
     return {
-      canBuy: w.prices.map((p) => ({
-        good: p.good,
-        ...(p.stock !== undefined ? { units: p.stock } : {}),
-        price: p.sell,
-      })),
+      canBuy: w.prices
+        .map((p) => ({
+          good: p.good,
+          ...(p.stock !== undefined ? { units: p.stock } : {}),
+          price: p.sell,
+        }))
+        .filter((l) => w.kind !== 'carriage' || l.units !== 0),
       canSell: w.prices.map((p) => ({ good: p.good, price: p.buy })),
       takesOnlyListed: false,
     }

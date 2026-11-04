@@ -49,7 +49,7 @@ import {
   shortGoods,
 } from './npc-chain.js'
 import { foundingParty, planFounding } from './npc-founding.js'
-import { planTrader, traderOut } from './npc-trader.js'
+import { planTrader, planVisit, traderOut } from './npc-trader.js'
 import { hash } from './residents.js'
 
 /*
@@ -248,7 +248,11 @@ export function planCity(
   const unneeded = shareOut(world, city, adults, jobs, held, spare, plan, builders, short)
   // The Trade Organization sends no trader (`tradeOrgSendsNoOne`) and founds nothing.
   if (!city.tradeOrg && !trader) {
-    planTrader(world, city, plan, adults, jobs, short, terrain?.size ?? MAP_SIZE)
+    const size = terrain?.size ?? MAP_SIZE
+    // A wandering trader standing at the city comes first: it isn't there for long.
+    if (!planVisit(world, city, plan, adults, jobs, size)) {
+      planTrader(world, city, plan, adults, jobs, short, size)
+    }
   }
   if (!city.tradeOrg) {
     // A spare hand just sent off as the trader isn't one any more.

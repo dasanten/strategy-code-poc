@@ -399,6 +399,19 @@ describe('buildings on a tile’s card', () => {
     expect(shut.lines).not.toContain('Buys and sells here')
   })
 
+  it('offers Trade here on the tile of a wandering trader standing there (`CONTEXT.md`: Trader stop)', () => {
+    const standing = { cityId: 'c-npc', x: 5, y: 5, until: 100 }
+    const trader = { id: 'trader1', carriageId: 'k', driverId: 'd', escortIds: [] }
+    const card = tile({ traders: [{ ...trader, standing }] })
+    expect(card.lines).toContain('A wandering trader buys and sells here')
+    expect(card.tradeHere).toEqual({ cityId: 'c-npc', buildingId: 'trader1' })
+    expect(tileActions(card, undefined).map((a) => a.label)).toContain('Trade here')
+    // Passing by, or on another tile, it trades with nobody.
+    expect(tile({ traders: [trader] }).tradeHere).toBeUndefined()
+    const away = { ...standing, x: 6 }
+    expect(tile({ traders: [{ ...trader, standing: away }] }).tradeHere).toBeUndefined()
+  })
+
   it('offers Trade here only where the Player trades (`tradesHere`)', () => {
     const food = [{ good: 'food' as const }] as NonNullable<TileThings['cities'][number]['trade']>
     const npc = { id: 'c-npc', name: 'Oakhollow', realmId: null, trade: food }

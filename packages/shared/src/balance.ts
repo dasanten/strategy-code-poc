@@ -786,6 +786,26 @@ export const TRADER_ESCORTS = CARAVAN_ESCORTS
 export const TRADER_DRIVE_TRIES = 3
 
 /**
+ * How far from the straight way between two of its places a city's town hall may lie for a wandering
+ * trader to stop at it on the way (`CONTEXT.md`: Trader stop), in tiles: under half the way between
+ * NPC cities (`NPC_CITY_MIN_DISTANCE`), so about one or two stops a way and no long detours.
+ */
+export const TRADER_STOP_REACH = 200
+
+/**
+ * How many ticks a wandering trader stands at a stop (`CONTEXT.md`: Trader stop): a game day, long
+ * enough for a Player who gets the notice to send someone over.
+ */
+export const TRADER_STOP_TICKS = 1440
+
+/**
+ * The share of a warehouse's floor (`WAREHOUSE_FLOOR`) a wandering trader prices each good from
+ * (`CONTEXT.md`: Trader stop): a carriage holds far less than a warehouse, so a quarter makes
+ * carrying one floor's worth of a good sell at about its base price.
+ */
+export const TRADER_FLOOR_SHARE = 0.25
+
+/**
  * The part of a delivery's fee every delivery or pick-up pays, in coins (`CONTEXT.md`:
  * Delivery), however light or near.
  */

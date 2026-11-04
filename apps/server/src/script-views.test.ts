@@ -103,6 +103,32 @@ function setup() {
     horseId: 'hz1',
     load: { food: 4 },
   })
+  // A wandering trader standing at c3, in sight (`CONTEXT.md`: Trader stop).
+  world.carriages.push({
+    id: 'cr2',
+    realmId: null,
+    cityId: 'c3',
+    x: 11,
+    y: 9,
+    horseId: 'hz1',
+    load: { wood: 4 },
+  })
+  world.traders.push({
+    id: 'trader1',
+    carriageId: 'cr2',
+    driverId: 'a1',
+    escortIds: [],
+    loop: ['c4'],
+    postId: 'c4',
+    heading: 'post',
+    stop: 'storage',
+    plan: null,
+    holding: null,
+    misses: 0,
+    robberies: 0,
+    calls: [],
+    stand: { cityId: 'c3', x: 11, y: 9, until: 900 },
+  })
   world.piles.push({ id: 'p1', x: 10, y: 10, goods: { food: 5 } })
   world.directives.push({
     id: 'd1',
@@ -192,6 +218,7 @@ describe('script views', () => {
       cities: 'cities()',
       horses: 'horses()',
       carriages: 'carriages()',
+      traders: 'traders()',
       piles: 'piles()',
       nodes: 'nodes()',
       nodesInSight: 'nodesInSight("forest")',
@@ -237,6 +264,7 @@ describe('script views', () => {
     for (const name of [
       'horses',
       'carriages',
+      'traders',
       'piles',
       'nodes',
       'nodesInSight',

@@ -20,7 +20,7 @@ import { placeTraders } from './traders.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 81
+export const WORLD_FORMAT_VERSION = 82
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -333,6 +333,16 @@ export const migrations: Record<number, MigrationStep> = {
     const world = structuredClone(state) as WorldState
     world.traders ??= []
     placeTraders(world, terrain.size)
+    return world
+  },
+  // Trader stops (`CONTEXT.md`: Trader stop): a trader out on its loop works out the cities on its
+  // way when it next looks, and stands at none yet.
+  81: (state) => {
+    const world = structuredClone(state) as WorldState
+    for (const t of world.traders) {
+      t.calls = null
+      t.stand = null
+    }
     return world
   },
 }

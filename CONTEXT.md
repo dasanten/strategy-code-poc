@@ -301,10 +301,13 @@ The shared language of the game. Domain terms only — no implementation details
   taking goods off it or stealing it is a theft like any against the Trade Organization, but it
   owes nobody a delivery, so nothing is sent again. How many there are is a balance number.
 - **Trader stop:** on its way a wandering trader stops for a while at each NPC or Player city
-  within a set reach of its route, beside the city's town hall. Anyone with a resident or carriage
-  on its tile can trade with it like at a warehouse: it prices each good from what it carries,
-  buying lower than it sells. An NPC city treats it as its visiting trader: it buys what it is
-  short of and sells its surplus. A Player's realm gets a notice with the place while one stands
+  within a set reach of its route, beside the city's town hall, on the nearest free tile outside
+  any ring of walls, so a gate closed against its armed escort doesn't stop it. Anyone with a
+  resident or carriage on its tile can trade with it like at a warehouse: it prices each good from
+  what it carries, buying lower than it sells; the Food its crew keep on board isn't for sale, and
+  it takes goods only as far as its carriage holds. An NPC city treats it as its visiting trader: it
+  sends a spare hand over, never a soldier, who buys what it is short of and sells its surplus (no
+  weapons, which would arm them). A Player's realm gets a notice with the place while one stands
   at one of their cities, and anyone in sight sees its prices.
 - **Lost post found out:** a captured post leaves the Trade Organization at once as before, but it
   learns who took it only by news: when a wandering trader reaches the post, or a surviving

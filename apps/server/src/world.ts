@@ -202,7 +202,7 @@ export function stepWorld(
   let npcPlanMs = 0
   const npcScriptRuns = time('npc', () => {
     stepCaravans(world, terrain.size)
-    stepTraders(world, terrain.size)
+    stepTraders(world, terrain.size, terrain)
     stepNpcDefence(world, terrain.size)
     stepTradeOrgArmy(world, terrain.size)
     stepNpcHire(world, terrain.size)

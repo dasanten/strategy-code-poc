@@ -24,6 +24,7 @@ import {
   type GoodsSpot,
   type Resident,
   type Stock,
+  type TerrainMap,
   type Trader,
   type WorldState,
 } from '@csp/shared'
@@ -43,6 +44,7 @@ import type { Invariant, InvariantViolation } from './invariants.js'
 import { residentNamesTaken } from './names.js'
 import { hash, mulberry32, newResident } from './residents.js'
 import { newId } from './starting-city.js'
+import { callsOnTheWay, runStops } from './trader-stops.js'
 import { hqLayout, tradeOrgHq } from './trade-org.js'
 import { tradingPosts } from './trading-posts.js'
 import { worldIndex } from './world-index.js'
@@ -134,6 +136,8 @@ export function placeTraders(world: WorldState, size: number): Trader[] {
       holding: null,
       misses: 0,
       robberies: 0,
+      calls: null,
+      stand: null,
     }
     world.traders.push(trader)
     placed.push(trader)
@@ -184,13 +188,15 @@ function traderEnd(world: WorldState, trader: Trader): RouteEnd {
 
 /**
  * The trader goes on: from the HQ out to the post it was bound for, from a post to the next on its
- * loop, its storage first. With no post on its loop it stays at the HQ.
+ * loop, its storage first. With no post on its loop it stays at the HQ. The cities it stops at on
+ * the way are worked out anew (`CONTEXT.md`: Trader stop).
  */
 function goOn(trader: Trader): void {
   if (trader.postId === null) return
   trader.stop = 'storage'
   trader.plan = null
   trader.misses = 0
+  trader.calls = null
   if (trader.heading === 'hq') {
     trader.heading = 'post'
     return
@@ -296,13 +302,25 @@ function followPosts(
 }
 
 /**
+ * The cities a trader stops at on its way from where its carriage stands to its next place, worked
+ * out when it sets off on that way (`CONTEXT.md`: Trader stop). `size` is the map's.
+ */
+function workOutCalls(world: WorldState, trader: Trader, carriage: Carriage, size: number): void {
+  if (trader.calls !== null) return
+  const end = traderEnd(world, trader)
+  const to = end.storage ?? end.warehouse
+  trader.calls = to ? callsOnTheWay(world, carriage, to, size) : []
+}
+
+/**
  * One tick of the Trade Org's wandering traders (`CONTEXT.md`: Wandering trader), run before the
  * actions are requested: escorts who are gone leave it; one whose carriage or HQ is gone ends, its
  * crew left to the HQ; its loop follows the posts (`followPosts`); and its crew and carriage go as
- * for a caravan (`stepCrew`), a driver idle with the carriage going on along its loop (`runTrader`).
+ * for a caravan (`stepCrew`), a driver idle with the carriage making its stops on the way
+ * (`runStops`), then going on along its loop (`runTrader`). Without `terrain` it makes no stops.
  * `size` is the map's.
  */
-export function stepTraders(world: WorldState, size: number): void {
+export function stepTraders(world: WorldState, size: number, terrain?: TerrainMap): void {
   const hq = tradeOrgHq(world)
   const posts = tradingPosts(world)
   world.traders = world.traders.filter((trader) => {
@@ -311,9 +329,11 @@ export function stepTraders(world: WorldState, size: number): void {
     const carriage = index.carriageById(trader.carriageId)
     if (!hq || !carriage) return false
     followPosts(world, trader, posts, size)
-    stepCrew(world, trader, carriage, hq, traderEscortsWanted(trader), size, (driver) =>
-      runTrader(world, trader, driver, carriage, size),
-    )
+    stepCrew(world, trader, carriage, hq, traderEscortsWanted(trader), size, (driver) => {
+      workOutCalls(world, trader, carriage, size)
+      if (terrain && runStops(world, trader, driver, carriage, terrain)) return
+      runTrader(world, trader, driver, carriage, size)
+    })
     return true
   })
 }
@@ -362,6 +382,8 @@ export function traderCarriageStolen(world: WorldState, thief: Resident, carriag
   trader.stop = 'storage'
   trader.plan = null
   trader.misses = 0
+  trader.calls = null
+  trader.stand = null
 }
 
 /**
