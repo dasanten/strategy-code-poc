@@ -74,6 +74,7 @@ interface CrimeAgainst {
   carriage?: true
   horse?: string
   building?: BuildingKind
+  post?: string
 }
 
 /**
@@ -92,7 +93,7 @@ export function commitCrime(
   against: CrimeAgainst,
 ): void {
   const org = organizationOf(culprit)
-  const { victimOrg, victim, goods, carriage, horse, building } = against
+  const { victimOrg, victim, goods, carriage, horse, building, post } = against
   if (org === null || victimOrg === null || victimOrg === org) return
   // The Trade Organization's cities are one Organization: a caravan moving its stock steals nothing.
   if (isTradeOrgCity(world, org) && isTradeOrgCity(world, victimOrg)) return
@@ -144,6 +145,7 @@ export function commitCrime(
   if (carriage) crime.carriage = true
   if (horse !== undefined) crime.horse = horse
   if (building) crime.building = building
+  if (post !== undefined) crime.post = post
   world.crimes.push(crime)
 }
 
@@ -167,11 +169,25 @@ export function knownThieves(world: WorldState, city: City): Set<string> {
 }
 
 /**
+ * Whether a captured post's crime is still waiting for a wandering trader to find it out
+ * (`CONTEXT.md`: Lost post found out): the Trade Organization hasn't heard, and it is on a loop.
+ */
+export function awaitsTrader(world: WorldState, crime: Crime): boolean {
+  const { post, knownBy, victimOrg } = crime
+  if (post === undefined || knownBy.includes(victimOrg)) return false
+  return world.traders.some((t) => t.loop.includes(post))
+}
+
+/**
  * Spreads news of crimes (`CONTEXT.md`: Witness), on a map of `size` tiles. A witness who died
- * takes the news with them. One standing in the area of a city of their own Organization makes
- * the crime known to it, and is done; when that is the victim's Organization, the crime goes in
- * its realm log, with who did it. A crime nobody carries news of any more is forgotten at once
- * when nobody knows it, and `CRIME_MEMORY_DAYS` after it happened otherwise.
+ * takes the news with them, and so does one who has since joined the culprit's Organization. One
+ * standing in the area of a city of their own Organization makes the crime known to it, and is
+ * done; when that is the victim's Organization, the crime goes in its realm log, with who did it.
+ * News of a captured post goes further: any resident of the Trade Organization makes it known to
+ * the Trade Organization at any of its cities (`CONTEXT.md`: Lost post found out). A crime nobody
+ * carries news of any more is forgotten at once when nobody knows it, unless a wandering trader may
+ * still find it out (`awaitsTrader`), and `CRIME_MEMORY_DAYS` after it happened otherwise, or for a
+ * captured post after the news came.
  */
 export function stepCrimes(world: WorldState, size: number): void {
   if (world.crimes.length === 0) return
@@ -182,17 +198,28 @@ export function stepCrimes(world: WorldState, size: number): void {
       if (!w || w.health <= 0) return false
       const org = organizationOf(w)
       if (org === null) return true
+      if (org === crime.culprit.org) return false
+      const lostPost =
+        crime.kind === 'capture' &&
+        isTradeOrgCity(world, org) &&
+        isTradeOrgCity(world, crime.victimOrg)
       const home = world.cities.some(
-        (c) => cityOrganization(c) === org && inCityArea(world, c, w.x, w.y, size),
+        (c) =>
+          (lostPost ? c.tradeOrg !== undefined : cityOrganization(c) === org) &&
+          inCityArea(world, c, w.x, w.y, size),
       )
       if (!home) return true
-      if (!crime.knownBy.includes(org)) learn(world, crime, org)
+      const hears = lostPost ? crime.victimOrg : org
+      if (!crime.knownBy.includes(hears)) learn(world, crime, hears)
       return false
     })
   }
   const memory = CRIME_MEMORY_DAYS * TICKS_PER_GAME_DAY
   world.crimes = world.crimes.filter(
-    (c) => c.witnesses.length > 0 || (c.knownBy.length > 0 && world.tick - c.tick < memory),
+    (c) =>
+      c.witnesses.length > 0 ||
+      (c.knownBy.length > 0 && world.tick - (c.heardAt ?? c.tick) < memory) ||
+      awaitsTrader(world, c),
   )
 }
 
@@ -203,6 +230,7 @@ export function stepCrimes(world: WorldState, size: number): void {
 function learn(world: WorldState, crime: Crime, org: string): void {
   crime.knownBy.push(org)
   if (org !== crime.victimOrg) return
+  if (crime.kind === 'capture') crime.heardAt = world.tick
   changeStanding(world, org, crime.culprit.org, -CRIME_STANDING_LOSS[crime.kind])
   recordEvent(world, org, {
     kind: 'crimeKnown',

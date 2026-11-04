@@ -108,8 +108,8 @@ export function hqEnd(world: WorldState): RouteEnd {
  * it becomes a plain city, its warehouse a storage with all it holds, so it has no stock floor
  * and no prices any more. Its caravan breaks up and its route's robberies are forgotten. The
  * deliveries and transfers that wait at its warehouse go over to the HQ's goods warehouse, which
- * sends them out of its own stock (`CONTEXT.md`: Guaranteed carriage). It drops from the wandering
- * traders' loops (`dropFromLoop`).
+ * sends them out of its own stock (`CONTEXT.md`: Guaranteed carriage). It stays on the wandering
+ * traders' loops until each of them reaches it (`CONTEXT.md`: Lost post found out).
  */
 export function leaveTradeOrg(world: WorldState, post: City): void {
   if (post.tradeOrg !== 'post') return
@@ -127,7 +127,6 @@ export function leaveTradeOrg(world: WorldState, post: City): void {
     return false
   })
   delete world.routeRobberies[post.id]
-  for (const trader of world.traders) dropFromLoop(trader, post.id)
   const hq = tradeOrgHq(world)
   const hall = hq && townHallOf(world, hq)
   const middle = hall && middleOf(hall)

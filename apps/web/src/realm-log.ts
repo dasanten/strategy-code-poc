@@ -77,6 +77,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         attack: `attacked ${e.victim ?? 'one of your residents'}`,
         killing: `killed ${e.victim ?? 'one of your residents'}`,
         tearDown: `tore down your ${e.building ? BUILDING_NAMES[e.building] : 'building'}`,
+        capture: 'captured a trading post',
       }[e.crime]
       return {
         text: `A witness got home: ${e.culprit} of ${e.culpritOrg} ${did} at (${e.x}, ${e.y}).`,

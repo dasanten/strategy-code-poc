@@ -593,6 +593,11 @@ export interface DriveOrder {
    * then where the army was last seen, and the order lasts as long as the army does.
    */
   army?: string
+  /**
+   * It stops in contact with `target` rather than on it, so a wall or closed gate can be driven up
+   * to (`CONTEXT.md`: Lost post found out).
+   */
+  near?: true
 }
 
 /**
@@ -1159,7 +1164,10 @@ export interface Trader {
   driverId: string | null
   /** The residents who walk along with it (the escort). */
   escortIds: string[]
-  /** The trading posts it goes round, in order; after the last comes the first again. */
+  /**
+   * The trading posts it goes round, in order; after the last comes the first again. A post lost
+   * since stays on it until the trader reaches it (`CONTEXT.md`: Lost post found out).
+   */
   loop: string[]
   /** The post of its loop it stands at or goes to next; null with no post left on its loop. */
   postId: string | null
@@ -1310,7 +1318,7 @@ export interface Standing {
 }
 
 /** What a crime was (`CONTEXT.md`: Crime). */
-export type CrimeKind = 'theft' | 'attack' | 'killing' | 'tearDown'
+export type CrimeKind = 'theft' | 'attack' | 'killing' | 'tearDown' | 'capture'
 
 /**
  * The Trade Org army out to punish an Organization for crimes against the Trade Organization
@@ -1367,12 +1375,23 @@ export interface Crime {
   /** What was torn down. */
   building?: BuildingKind
   /**
+   * The trading post captured (`CONTEXT.md`: Lost post found out). It waits for a wandering trader
+   * to reach that post, however long that takes, while the post is on a trader's loop.
+   */
+  post?: string
+  /**
    * Residents who saw it, or the victim who survived it, and have not got home yet. Each makes it
-   * known to their own Organization once they stand in the area of one of its cities.
+   * known to their own Organization once they stand in the area of one of its cities. News of a
+   * captured post goes to any city of the Trade Organization.
    */
   witnesses: string[]
   /** The Organizations it is known to. */
   knownBy: string[]
+  /**
+   * The tick a captured post's news reached the Trade Organization, which it remembers from then
+   * on rather than from the capture, however long ago that was.
+   */
+  heardAt?: number
   /** The Trade Organization has sent its army to punish it (`CONTEXT.md`: Trade Org reaction). */
   punished?: true
 }

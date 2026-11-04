@@ -413,6 +413,7 @@ const CRIME_NAMES: Record<CrimeKind, string> = {
   attack: 'Attack',
   tearDown: 'Tearing down a building',
   killing: 'Killing',
+  capture: 'Capturing a trading post',
 }
 
 const NODE_WORK: { kind: BuildingKind; good: Good }[] = [
@@ -1725,6 +1726,13 @@ export function Wiki() {
           holds. That is how a post comes to hold goods it doesn't produce. Its crew and a lost
           carriage go as for a caravan, and robbing one is a theft from the Trade Organization, but
           it owes nobody a delivery, so nothing is sent again.
+        </p>
+        <p>
+          A captured post leaves the Trade Organization at once, but it learns who took it only by
+          news. A trader that reaches the post drops it from its loop and carries the news on, and
+          anyone of the Trade Organization who saw the capture and gets away carries it too. Once
+          one of them stands at another post or the HQ, the capture is a crime it knows of (see
+          Standing). If they are killed on the way and no trader ever gets there, it never reacts.
         </p>
       </Section>
 
