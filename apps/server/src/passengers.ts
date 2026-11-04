@@ -135,10 +135,12 @@ export const GETS_OFF_FIRST: readonly string[] = [
   'buyCity',
   'buy',
   'sell',
+  'swap',
   'handIn',
   'transfer',
   'buyOff',
   'payDebt',
+  'acceptOffer',
   'feed',
 ]
 

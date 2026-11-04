@@ -26,6 +26,14 @@ export function transferFee(kg: number, tiles: number): number {
   return TRANSFER_FEE_FACTOR * deliveryFee(kg, tiles)
 }
 
+/**
+ * The part of a transfer's fee its caravan takes at the pick-up, the rest (`unloadShare` of it,
+ * rounded up) being taken where it unloads (`CONTEXT.md`: Direct offer). A plain transfer's is all.
+ */
+export function feeAtPickUp(fee: number, unloadShare = 0): number {
+  return fee - Math.ceil(fee * unloadShare)
+}
+
 /** The most units of `good` one transfer carries: one delivery load (`DELIVERY_LOAD`). */
 export function transferLoad(good: Good): number {
   return Math.floor(DELIVERY_LOAD / GOOD_WEIGHT[good] + 1e-9)
@@ -78,18 +86,20 @@ export function transferTiles(
 /**
  * The most of `wanted` units of `good` a transfer takes from `held` (`CONTEXT.md`: Transfer),
  * with its fee over `tiles`: cut down to the units held, one delivery load and the coins held
- * for the fee (for a transfer of coins, the units and the fee together). Pure.
+ * for the fee (for a transfer of coins, the units and the fee together). Only the part of the fee
+ * taken at the pick-up counts (`feeAtPickUp`), and the fee answered is the whole of it. Pure.
  */
 export function quoteTransfer(
   held: Partial<Record<Good, number>>,
   good: Good,
   wanted: number,
   tiles: number,
+  unloadShare = 0,
 ): { units: number; fee: number } {
   let best = { units: 0, fee: 0 }
   for (let n = 1; n <= Math.min(wanted, transferLoad(good)); n++) {
     const fee = transferFee(n * GOOD_WEIGHT[good], tiles)
-    const coins = fee + (good === 'coins' ? n : 0)
+    const coins = feeAtPickUp(fee, unloadShare) + (good === 'coins' ? n : 0)
     if (n > (held[good] ?? 0) || coins > (held.coins ?? 0)) break
     best = { units: n, fee }
   }

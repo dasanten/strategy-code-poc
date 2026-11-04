@@ -1,3 +1,4 @@
+import { freeStock } from './offers.js'
 import {
   CITY_AREA_MARGIN,
   CITY_PRICE_BY_BUILDING,
@@ -333,11 +334,14 @@ export function freeHousing(
   return housingRoom(world, city) - cityResidents(world, city).length
 }
 
-/** Food in a city's storages. Food its residents carry is not counted. */
+/**
+ * Food in a city's storages, but for what is set aside for offers (`CONTEXT.md`: Offer). Food its
+ * residents carry is not counted.
+ */
 export function storedFood(world: WorldState, city: City): number {
   return world.buildings
     .filter((b) => b.cityId === city.id && b.kind === 'storage' && !b.site)
-    .reduce((food, b) => food + (b.stock?.food ?? 0), 0)
+    .reduce((food, b) => food + (freeStock(world, b).food ?? 0), 0)
 }
 
 /** Food all of a city's residents eat in `days` game days, by their Endurance. */

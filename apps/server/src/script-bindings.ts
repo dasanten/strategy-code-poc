@@ -1,5 +1,8 @@
 import { NativeFunction, ScriptRuntimeError, type ScriptObject, type Value } from '@csp/lang'
 import {
+  freeStock,
+  offersAt,
+  seenOffer,
   ARMY_SCRIPT_API,
   GOODS,
   HAUL_KEEP_FOOD,
@@ -234,11 +237,24 @@ export function bindScript(context: ScriptContext): ScriptBindings {
         : world.workplaceSettings[side]?.[id]
     return settings && { workSettings: settings }
   }
-  const buildingExtras = (id: string) => ({ ...teachingAt(id), ...settingsAt(id) })
+  // At a storage of the side's own, a script sees the goods it can take: what is set aside for
+  // offers is not for its workers, builders or Fetch (`CONTEXT.md`: Offer), and it sees the offers.
+  const offersOf = (b: Building) => {
+    const offers = world.offers.length > 0 ? offersAt(world, b.id) : []
+    if (offers.length === 0) return undefined
+    return {
+      offers: offers.map(seenOffer),
+      ...(ownBuilding(b) ? { stock: freeStock(world, b) } : {}),
+    }
+  }
+  const buildingExtras = (id: string) => {
+    const b = world.offers.length > 0 ? world.buildings.find((x) => x.id === id) : undefined
+    return { ...teachingAt(id), ...settingsAt(id), ...(b && offersOf(b)) }
+  }
   const asSeenBuilding = (b: Building) => {
     if (ownBuilding(b)) {
-      const settings = settingsAt(b.id)
-      return settings ? { ...b, ...settings } : b
+      const extras = { ...settingsAt(b.id), ...offersOf(b) }
+      return Object.keys(extras).length > 0 ? { ...b, ...extras } : b
     }
     seen ??= context.seen()
     const shown = seen.find((e) => e.is === 'building' && e.id === b.id)
@@ -282,6 +298,19 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     // A Player's memory, apart from what is in sight (`CONTEXT.md`: Last seen); an NPC city has none.
     lastSeen: () =>
       sender.npcCityId !== undefined ? [] : lastSeenOutOfSight(world, terrain.size, sender.userId),
+    offers: () => {
+      if (world.offers.length === 0) return []
+      seen ??= context.seen()
+      const known = new Set(seen.filter((e) => e.is === 'building').map((e) => e.id))
+      return world.offers
+        .filter(
+          (o) =>
+            o.realmId === side ||
+            o.direct?.toId === side ||
+            (known.has(o.storageId) && !o.direct?.carried),
+        )
+        .map(seenOffer)
+    },
     directives: () => directivesFor(world, (org) => organizationLabel(world, org)),
     withMemory: ([key, value]) => {
       if (typeof key !== 'string') throw new ScriptRuntimeError('"withMemory" needs a key')
@@ -494,15 +523,20 @@ export function bindScript(context: ScriptContext): ScriptBindings {
       ) {
         throw new ScriptRuntimeError('"storages" needs a list of goods')
       }
-      const holds = (b: Building) =>
-        !wanted || (wanted as Good[]).some((g) => (b.stock?.[g] ?? 0) > 0)
+      const holds = (b: Building) => {
+        const free = freeStock(world, b)
+        return !wanted || (wanted as Good[]).some((g) => (free[g] ?? 0) > 0)
+      }
       // A Trade Org city's warehouses hold its goods (`CONTEXT.md`: Warehouse): its residents
       // fetch materials and Food there too, when they name the goods.
       const kinds =
         wanted && sender.npcCityId !== undefined ? ['storage', 'warehouse'] : ['storage']
-      const storages = world.buildings.filter(
-        (b) => kinds.includes(b.kind) && !b.site && ownBuilding(b) && holds(b),
-      )
+      const storages = world.buildings
+        .filter((b) => kinds.includes(b.kind) && !b.site && ownBuilding(b) && holds(b))
+        .map((b) => {
+          const offers = offersOf(b)
+          return offers ? { ...b, ...offers } : b
+        })
       if (from !== undefined && from !== null) {
         const at = spot(from, 'storages')
         const by = new Map(storages.map((b) => [b, time(at, b)]))
@@ -721,6 +755,13 @@ function residentActions(
         carriageId: plain(carriageId ?? null),
         ...(cityId === undefined || cityId === null ? {} : { cityId: plain(cityId) }),
       }),
+    swap: ([give, want, units, carriageId]) =>
+      request('swap', {
+        give: plain(give),
+        want: plain(want),
+        units: plain(units),
+        carriageId: plain(carriageId ?? null),
+      }),
     handIn: ([good, units, toCityId, carriageId]) =>
       request('handIn', {
         good: plain(good),
@@ -738,6 +779,56 @@ function residentActions(
         coins: plain(coins),
         carriageId: plain(carriageId ?? null),
       }),
+    postOffer: ([storageId, gives, givesUnits, wants, wantsUnits, times]) =>
+      request('postOffer', {
+        storageId: plain(storageId),
+        gives: plain(gives),
+        givesUnits: plain(givesUnits),
+        wants: plain(wants),
+        wantsUnits: plain(wantsUnits),
+        times: plain(times),
+      }),
+    takeDownOffer: ([offerId]) => request('takeDownOffer', { offerId: plain(offerId) }),
+    acceptOffer: ([offerId, times, carriageId]) =>
+      request('acceptOffer', {
+        offerId: plain(offerId),
+        times: plain(times),
+        carriageId: plain(carriageId ?? null),
+      }),
+    sendDirectOffer: ([toId, storageId, gives, givesUnits, wants, wantsUnits, times]) =>
+      request('sendDirectOffer', {
+        toId: plain(toId),
+        storageId: plain(storageId),
+        gives: plain(gives),
+        givesUnits: plain(givesUnits),
+        wants: plain(wants),
+        wantsUnits: plain(wantsUnits),
+        times: plain(times),
+      }),
+    sendCarriedOffer: ([
+      toId,
+      fromCityId,
+      toCityId,
+      gives,
+      givesUnits,
+      wants,
+      wantsUnits,
+      times,
+      feeBy,
+    ]) =>
+      request('sendCarriedOffer', {
+        toId: plain(toId),
+        fromCityId: plain(fromCityId),
+        toCityId: plain(toCityId),
+        gives: plain(gives),
+        givesUnits: plain(givesUnits),
+        wants: plain(wants),
+        wantsUnits: plain(wantsUnits),
+        times: plain(times),
+        feeBy: plain(feeBy),
+      }),
+    acceptCarriedOffer: ([offerId]) => request('acceptCarriedOffer', { offerId: plain(offerId) }),
+    declineOffer: ([offerId]) => request('declineOffer', { offerId: plain(offerId) }),
     handOver: ([newLeaderId]) => request('handOver', { newLeaderId: plain(newLeaderId) }),
     rename: ([targetId, name, realmName]) =>
       request('rename', {

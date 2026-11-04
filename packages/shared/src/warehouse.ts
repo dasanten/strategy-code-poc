@@ -18,6 +18,7 @@ import {
 import { townHallOf } from './city.js'
 import { KEEPS_GOODS } from './building.js'
 import { covers, isAt } from './footprint.js'
+import { freeStock } from './offers.js'
 import { tradeOrgRefuses } from './standing.js'
 import { NO_CARAVANS, tradeOrgHq } from './trade-org.js'
 import {
@@ -297,7 +298,7 @@ export function tradeProblem(
       if (carriageId !== null && carriageId !== undefined) {
         return 'a pick-up comes from the city’s storage, not a carriage'
       }
-      stock = storage.stock ?? {}
+      stock = freeStock(world, storage)
     }
   }
   if (side === 'sell' && !((stock[good as PricedGood] ?? 0) > 0)) return 'none of that good to sell'

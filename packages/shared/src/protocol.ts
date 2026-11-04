@@ -4,6 +4,7 @@ import type { FirstDay } from './first-day.js'
 import type { RegionMap } from './region-map.js'
 import type { LoadLevel } from './carriages.js'
 import type { NpcCityPrice } from './npc-trade.js'
+import type { SeenOffer } from './offers.js'
 import type { WarehousePrice } from './warehouse.js'
 import type {
   Building,
@@ -65,9 +66,14 @@ export type Shown<P extends { stock: number }> = Omit<P, 'stock'> & { stock?: nu
 /**
  * A building as Players see it (`CONTEXT.md`: Seeing inside a storage): its stock only for its own
  * Organization, their allies and anyone with a resident at it. A Trade Org warehouse names its
- * prices either way (`prices`, `CONTEXT.md`: Warehouse prices), worked out on the server.
+ * prices either way (`prices`, `CONTEXT.md`: Warehouse prices), worked out on the server, and a
+ * storage its offers (`offers`, `CONTEXT.md`: Offer).
  */
-export type SeenBuilding = Building & { prices?: Shown<WarehousePrice>[] }
+export type SeenBuilding = Building & {
+  prices?: Shown<WarehousePrice>[]
+  /** The offers standing at a storage, which anyone in sight sees (`CONTEXT.md`: Offer). */
+  offers?: SeenOffer[]
+}
 
 /**
  * A horse as Players see it: its hunger and health, and when it dies if it is Down, only for its

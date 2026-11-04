@@ -5,8 +5,9 @@ import {
   type ScriptParamValue,
   type Waypoint,
 } from '@csp/shared'
-import { useRef } from 'react'
+import { useId, useRef, useState, type ReactNode } from 'react'
 import { choiceLabel, effectiveParam, paramNote, waypointLabel } from './script-params-view.js'
+import { useKeyboardInset } from './sheet-view.js'
 import { foodEatenPerDay, num } from './wiki-view.js'
 
 /**
@@ -289,12 +290,59 @@ export function NumberField({
 }
 
 /**
- * The form shown before a script starts (`CONTEXT.md`: Script parameter, Before it starts): one
- * field for each `param` line of the script, filled with the kept values or the defaults. A
- * `building` or `storage` param is picked on the map, which hides the form until it is; a
- * `number` param is typed, its default shown while empty; a `choice` param is chosen from its
- * words, and a `waypoint` param from the Player's waypoints or on the map. Start gives the order
- * with the values, Cancel gives nothing.
+ * One param's compact row in the form before a script starts: its name, the `shown` value if its
+ * field doesn't show that itself, the field, and what its comment says it is for behind a "?".
+ */
+function StartParamRow({
+  param,
+  shown,
+  children,
+}: {
+  param: ScriptParam
+  shown?: ReactNode
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  const noteId = useId()
+  const { purpose } = paramNote(param.description)
+  return (
+    <div className="start-param">
+      <div className="start-param-label">
+        <span className="small">
+          <strong>{param.name}</strong> <span className="muted">({param.type})</span>
+          {purpose && (
+            <button
+              type="button"
+              className="start-param-why"
+              aria-label={`What ${param.name} is for`}
+              aria-expanded={open}
+              aria-controls={noteId}
+              onClick={() => setOpen(!open)}
+            >
+              ?
+            </button>
+          )}
+        </span>
+        {shown}
+      </div>
+      <span className="buttons">{children}</span>
+      {purpose && (
+        <p id={noteId} className="muted small start-param-note" hidden={!open}>
+          {purpose}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The form shown before a script starts (`CONTEXT.md`: Script parameter, Before it starts), a
+ * bottom sheet on a phone (ADR 0012): one compact row for each `param` line of the script, filled
+ * with the kept values or the defaults, under its title and over Start and Cancel, which stay on
+ * screen while the rows scroll. A `building` or `storage` param is picked on the map, which hides
+ * the form until it is; a `number` param is typed, its default shown while empty; a `choice` param
+ * is chosen from its words, and a `waypoint` param from the Player's waypoints or on the map. Start
+ * gives the order with the values, Cancel gives nothing.
  */
 export function StartParamsForm({
   script,
@@ -305,6 +353,7 @@ export function StartParamsForm({
   waypoints,
   canStart,
   error,
+  picking = false,
   onPick,
   onChange,
   onStart,
@@ -313,6 +362,8 @@ export function StartParamsForm({
 }: {
   /** The name of the script about to start. */
   script: string
+  /** A param is being picked on the map: hidden, keeping its scroll and open explanations. */
+  picking?: boolean
   /**
    * Filled with a workplace's settings, for Work (`CONTEXT.md`: Workplace settings): what the
    * Player changes becomes the resident's own.
@@ -339,8 +390,12 @@ export function StartParamsForm({
   onCancel: () => void
 }) {
   const foodHint = foodParamsHint(params.filter((p) => p.type === 'number').map((p) => p.name))
+  const keyboard = useKeyboardInset()
   return (
-    <div className="hud-backdrop">
+    <div
+      className={`hud-backdrop start-params-backdrop${picking ? ' picking' : ''}`}
+      style={keyboard > 0 ? { paddingBottom: keyboard } : undefined}
+    >
       <form
         className="hud-dialog start-params"
         role="dialog"
@@ -355,44 +410,42 @@ export function StartParamsForm({
         }}
       >
         <h2>Start {script}</h2>
-        {fromWorkplace && (
-          <p className="muted small">
-            Filled in from the workplace’s Work settings. What you change here is this resident’s
-            own and stays when the workplace’s settings change.
-          </p>
-        )}
-        <div className="script-params" aria-label="Script parameters">
-          {params.map((p) => {
-            const value = values[p.name]
-            if (p.type === 'number') {
-              const n = typeof value === 'number' ? value : undefined
-              return (
-                <label key={p.name} className="goods-row">
-                  <ParamName param={p} />
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    step={1}
-                    className="amount"
-                    aria-label={p.name}
-                    placeholder={p.default === undefined ? 'unset' : String(p.default)}
-                    title={p.default === undefined ? undefined : `Default ${p.default}`}
-                    value={n ?? ''}
-                    onChange={(e) => {
-                      const text = e.currentTarget.value.trim()
-                      onChange(p.name, text === '' ? undefined : Number(text))
-                    }}
-                  />
-                </label>
-              )
-            }
-            const id = typeof value === 'string' ? value : undefined
-            if (p.type === 'choice' || p.type === 'waypoint') {
-              return (
-                <div key={p.name} className="goods-row">
-                  <ParamName param={p} />
-                  <span className="buttons">
+        <div className="start-params-rows">
+          {fromWorkplace && (
+            <p className="muted small">
+              Filled in from the workplace’s Work settings. What you change here is this resident’s
+              own and stays when the workplace’s settings change.
+            </p>
+          )}
+          <div aria-label="Script parameters">
+            {params.map((p) => {
+              const value = values[p.name]
+              if (p.type === 'number') {
+                const n = typeof value === 'number' ? value : undefined
+                return (
+                  <StartParamRow key={p.name} param={p}>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step={1}
+                      className="amount"
+                      aria-label={p.name}
+                      placeholder={p.default === undefined ? 'unset' : String(p.default)}
+                      title={p.default === undefined ? undefined : `Default ${p.default}`}
+                      value={n ?? ''}
+                      onChange={(e) => {
+                        const text = e.currentTarget.value.trim()
+                        onChange(p.name, text === '' ? undefined : Number(text))
+                      }}
+                    />
+                  </StartParamRow>
+                )
+              }
+              const id = typeof value === 'string' ? value : undefined
+              if (p.type === 'choice' || p.type === 'waypoint') {
+                return (
+                  <StartParamRow key={p.name} param={p}>
                     <ParamSelect
                       param={p}
                       value={id}
@@ -404,20 +457,27 @@ export function StartParamsForm({
                         Pick
                       </button>
                     )}
-                  </span>
-                </div>
-              )
-            }
-            const none =
-              p.name === target
-                ? 'the one they stand on'
-                : (paramNote(p.description).unset ?? 'none picked')
-            const shown = id === undefined ? none : (label(id) ?? 'out of sight')
-            return (
-              <div key={p.name} className="goods-row">
-                <ParamName param={p} />
-                <span className={id === undefined ? 'muted small' : 'small'}>{shown}</span>
-                <span className="buttons">
+                  </StartParamRow>
+                )
+              }
+              const none =
+                p.name === target
+                  ? 'the one they stand on'
+                  : (paramNote(p.description).unset ?? 'none picked')
+              const shown = id === undefined ? none : (label(id) ?? 'out of sight')
+              return (
+                <StartParamRow
+                  key={p.name}
+                  param={p}
+                  shown={
+                    <span
+                      className={`start-param-value small${id === undefined ? ' muted' : ''}`}
+                      aria-label={`${p.name} uses`}
+                    >
+                      {shown}
+                    </span>
+                  }
+                >
                   <button type="button" onClick={() => onPick(p)}>
                     Pick
                   </button>
@@ -428,12 +488,12 @@ export function StartParamsForm({
                   >
                     Clear
                   </button>
-                </span>
-              </div>
-            )
-          })}
+                </StartParamRow>
+              )
+            })}
+          </div>
+          {foodHint && <p className="muted small">{foodHint}</p>}
         </div>
-        {foodHint && <p className="muted small">{foodHint}</p>}
         {error && (
           <p className="error small" role="alert">
             {error}

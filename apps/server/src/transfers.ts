@@ -1,9 +1,11 @@
 import {
+  freeStock,
   DELIVERY_DRIVE_TRIES,
   commands,
   DELIVERY_LOAD,
   GOOD_WEIGHT,
   deliveryStorage,
+  feeAtPickUp,
   handInProblem,
   nearestWarehouse,
   realmName,
@@ -299,6 +301,7 @@ function stepBuilding(world: WorldState, job: TransferJob, t?: Transfer): Buildi
     case 'load':
       return job.good === 'coins' ? coinWarehouse : warehouse
     case 'deliver':
+    case 'unloadFee':
       return t && deliveryStorage(world, t.toCityId)
     case 'return':
       return job.units > 0 && job.good !== 'coins' ? warehouse : coinWarehouse
@@ -350,6 +353,8 @@ function cancel(world: WorldState, job: TransferJob, t: Transfer, size: number):
     t.back = true
     t.toCityId = home
     job.misses = 0
+    // Going back, it unloads at the side that didn't owe that part of the fee.
+    if (t.carriedOffer) t.carriedOffer.due = 0
   } else {
     drop(world, t)
     job.step = 'return'
@@ -421,6 +426,12 @@ export function runTransfer(
       return sendAgain(world, job, t, deliveryStorage(world, t.toCityId))
     }
   }
+  if (t && job.step === 'unloadFee' && !holds(world, receiver(t), t.toCityId)) {
+    // The goods are in and the city has changed hands: nobody there owes the fee.
+    arrived(world, job, t, driver)
+    job.step = 'return'
+    return
+  }
   const b = stepBuilding(world, job, t)
   if (!b) return finish(caravan)
   if (!isAt(driver, b)) {
@@ -435,7 +446,7 @@ export function runTransfer(
   const here: GoodsSpot = { kind: 'storage', storageId: b.id }
   const onCarriage: GoodsSpot = { kind: 'carriage', carriageId: carriage.id }
   // The fee's coins count apart from the transfer's units, coins or not.
-  const feeStep = job.step === 'fee'
+  const feeStep = job.step === 'fee' || job.step === 'unloadFee'
   if (caravan.holding) {
     const { goods, onto } = caravan.holding
     caravan.holding = null
@@ -451,11 +462,13 @@ export function runTransfer(
       if (onto === 'carriage' && feeStep) {
         job.coins += units
         t!.fee += units
+        if (job.step === 'unloadFee') t!.carriedOffer!.due -= units
       } else if (onto === 'carriage') job.units += units
       return
     }
   }
-  const stock = b.stock ?? {}
+  // A pick-up leaves what is set aside for an offer alone (`CONTEXT.md`: Offer).
+  const stock = freeStock(world, b)
   const hands = (g: Good) => unitsThatFit(driver, g, world.tick)
   const fits = (g: Good) => unitsThatFitCarriage(world, carriage, g)
   const take = (from: GoodsSpot, good: Good, units: number, onto: 'carriage' | 'stop') => {
@@ -473,8 +486,9 @@ export function runTransfer(
       const warehouse = world.buildings.find((x) => x.id === job.warehouseId)!
       const to = deliveryStorage(world, t!.toCityId)
       const tiles = to ? transferTiles(size, warehouse, b, to) : 0
+      const unloadShare = t!.carriedOffer?.unloadShare ?? 0
       if (job.target === null) {
-        const q = quoteTransfer(stock, g, t!.units, tiles)
+        const q = quoteTransfer(stock, g, t!.units, tiles, unloadShare)
         job.target = Math.min(q.units, fits(g))
         if (job.target === 0) return nothing(world, job, t!)
       }
@@ -482,7 +496,9 @@ export function runTransfer(
       const have = job.units + job.robbed
       const units = Math.min(job.target - have, stock[g] ?? 0, hands(g), fits(g))
       if (units > 0) return take(here, g, units, 'carriage')
-      job.fee = have > 0 ? transferFee(have * GOOD_WEIGHT[g], tiles) : 0
+      const fee = have > 0 ? transferFee(have * GOOD_WEIGHT[g], tiles) : 0
+      job.fee = feeAtPickUp(fee, unloadShare)
+      if (t!.carriedOffer) t!.carriedOffer.due = fee - job.fee
       job.step = 'fee'
       return
     }
@@ -505,6 +521,19 @@ export function runTransfer(
       const units = Math.min(job.units, hands(g))
       if (units > 0) return off(g, units, false)
       if (job.robbed > 0) return sendAgain(world, job, t!, b)
+      if ((t!.carriedOffer?.due ?? 0) > 0) {
+        job.step = 'unloadFee'
+        return
+      }
+      arrived(world, job, t!, b)
+      job.step = 'return'
+      return
+    }
+    case 'unloadFee': {
+      const due = t!.carriedOffer?.due ?? 0
+      const units = Math.min(due, stock.coins ?? 0, hands('coins'), fits('coins'))
+      if (units > 0) return take(here, 'coins', units, 'carriage')
+      // What the storage hasn't got, or the carriage can't take, is the Trade Organization's loss.
       arrived(world, job, t!, b)
       job.step = 'return'
       return
@@ -547,15 +576,32 @@ function nothing(world: WorldState, job: TransferJob, t: Transfer): void {
     cityId,
     city: cityName(world, cityId),
   })
+  // The other side of a carried Direct offer was waiting for these goods.
+  if (t.carriedOffer) {
+    recordEvent(world, t.toRealmId, {
+      kind: 'transferStuck',
+      why: 'nothingCame',
+      good: t.good,
+      units: t.units,
+      cityId: t.toCityId,
+      city: cityName(world, t.toCityId),
+    })
+  }
 }
 
 /** The line a transfer put into storage `b` leaves in both realms' logs (the sender's, going back). */
-function logArrived(world: WorldState, t: Transfer, units: number, b: Building): void {
+function logArrived(
+  world: WorldState,
+  t: Transfer,
+  units: number,
+  b: { x: number; y: number },
+): void {
   const what = {
     kind: 'transferred' as const,
     good: t.good,
     units,
     fee: t.fee,
+    ...(t.carriedOffer && { carried: true }),
     fromRealmId: t.realmId,
     fromRealm: realmName(world, t.realmId),
     toRealmId: t.toRealmId,
@@ -570,8 +616,13 @@ function logArrived(world: WorldState, t: Transfer, units: number, b: Building):
   if (!t.back) recordEvent(world, t.toRealmId, what)
 }
 
-/** A transfer's goods are all in the storage `b`: it is done. */
-function arrived(world: WorldState, job: TransferJob, t: Transfer, b: Building): void {
+/** A transfer's goods are all in the storage at `b`: it is done. */
+function arrived(
+  world: WorldState,
+  job: TransferJob,
+  t: Transfer,
+  b: { x: number; y: number },
+): void {
   drop(world, t)
   logArrived(world, t, job.target ?? 0, b)
 }
@@ -622,6 +673,10 @@ export function transferRobbed(caravan: Caravan, carriage: Carriage): void {
  */
 export function collectsTransferFrom(world: WorldState, r: Resident, storageId: string): boolean {
   const job = world.caravans.find((c) => c.driverId === r.id)?.transfer
+  if (job?.step === 'unloadFee') {
+    const t = world.transfers.find((x) => x.id === job.transferId)
+    return t !== undefined && deliveryStorage(world, t.toCityId)?.id === storageId
+  }
   if (job?.step !== 'collect' && job?.step !== 'fee') return false
   return job.fromCityId !== null && deliveryStorage(world, job.fromCityId)?.id === storageId
 }
@@ -632,8 +687,9 @@ export function collectsTransferFrom(world: WorldState, r: Resident, storageId: 
  * goes back; one a caravan carries out is that caravan's job, and no caravan's job is for a
  * transfer another carries out or for one gone before its goods reached the storage; a caravan
  * carries out a delivery or a transfer, never both; what it counts on board for its transfer is
- * on its carriage, but for Food its crew may have eaten; and what it counts robbed is a whole
- * number, no more than its transfer is for.
+ * on its carriage, but for Food its crew may have eaten; what it counts robbed is a whole
+ * number, no more than its transfer is for; and what a carried Direct offer's transfer still has
+ * due on unloading is whole, with no fee due on the way back.
  */
 export const transfersSound: Invariant = {
   name: 'transfers-sound',
@@ -649,6 +705,10 @@ export const transfersSound: Invariant = {
       if (!Number.isInteger(t.fee) || t.fee < 0)
         fail(t.id, `transfer ${t.id} has a fee of ${t.fee}`)
       if (!t.back && t.realmId === t.toRealmId) fail(t.id, `transfer ${t.id} goes to its sender`)
+      const due = t.carriedOffer?.due ?? 0
+      if (!Number.isInteger(due) || due < 0 || (t.back && due > 0)) {
+        fail(t.id, `transfer ${t.id} has ${due} coins due on unloading`)
+      }
       if (t.caravanId === null) continue
       const c = world.caravans.find((x) => x.id === t.caravanId)
       if (c?.transfer?.transferId !== t.id) {

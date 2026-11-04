@@ -22,6 +22,7 @@ describe('drawers', () => {
       'Waypoints',
       'Armies',
       'Contracts',
+      'Direct offers',
       'Alliance',
       'Standing',
       'Scripts',
