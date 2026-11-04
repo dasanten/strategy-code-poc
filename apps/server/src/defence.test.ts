@@ -6,13 +6,20 @@ import {
   OWN_FOOD,
   Terrain,
   dodgeChance,
+  isDown,
+  standsStill,
   type Building,
   type OrderRequest,
   type TerrainMap,
 } from '@csp/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { attackOrder, resolveStrikes } from './combat.js'
-import { defenceScriptSound, givenUnderAttackSound, interruptedSound } from './defence.js'
+import {
+  defenceScriptSound,
+  givenUnderAttackSound,
+  interruptedSound,
+  struckDriverDrivesOn,
+} from './defence.js'
 import { goDown } from './survival.js'
 import { checkInvariants } from './invariants.js'
 import type { RunnableScript } from './scripts.js'
@@ -453,30 +460,9 @@ describe('a Player’s order under attack', () => {
 
   it('a drive given under attack gets the carriage there through constant blows', () => {
     const s = setup()
-    s.world.horses.push({
-      id: 'h1',
-      realmId: 'r1',
-      cityId: null,
-      x: 6,
-      y: 6,
-      hunger: MAX_HUNGER,
-      health: MAX_HEALTH,
-      name: 'Rowan',
-      stats: { ...AVERAGE_HORSE_STATS },
-      bornAt: 0,
-    })
-    s.world.carriages.push({
-      id: 'k1',
-      realmId: 'r1',
-      cityId: null,
-      x: 6,
-      y: 6,
-      horseId: null,
-      load: {},
-    })
+    const { carriage: k1 } = withCarriage(s)
     attacked(s)
     expect(s.give({ kind: 'drive', carriageId: 'k1', x: 6, y: 24 })).toMatchObject({ type: 'ack' })
-    const k1 = s.world.carriages[0]!
     const there = () => k1.x === 6 && k1.y === 24
     const start = s.world.tick
     const drove = underBlows(s, there, 200, () => {
@@ -687,7 +673,408 @@ describe('a Player’s order under attack', () => {
   })
 })
 
+/** A carriage k1 with its horse h1 hitched at (6, 6), of realm r1, where w1 stands. */
+function withCarriage(s: ReturnType<typeof setup>) {
+  const horse = {
+    id: 'h1',
+    realmId: 'r1',
+    cityId: null,
+    x: 6,
+    y: 6,
+    hunger: MAX_HUNGER,
+    health: MAX_HEALTH,
+    name: 'Rowan',
+    stats: { ...AVERAGE_HORSE_STATS },
+    bornAt: 0,
+  }
+  const carriage = {
+    id: 'k1',
+    realmId: 'r1',
+    cityId: null,
+    x: 6,
+    y: 6,
+    horseId: 'h1',
+    load: {},
+  }
+  s.world.horses.push(horse)
+  s.world.carriages.push(carriage)
+  return { horse: s.world.horses.at(-1)!, carriage: s.world.carriages.at(-1)! }
+}
+
+/** Resident p1 of realm r1, unarmed, aboard k1. */
+function passenger(s: ReturnType<typeof setup>) {
+  const p = newResident(mulberry32(4), { id: 'p1', owner: 'r1', x: 6, y: 6, tick: 0 })
+  p.cityId = 'c1'
+  p.carried = { food: OWN_FOOD }
+  p.aboard = 'k1'
+  s.world.residents.push(p)
+  return p
+}
+
+/** Blows land on `victim` as in `underBlows`, every tick keeping them and the horse up. */
+function blowsOn(
+  s: ReturnType<typeof setup>,
+  victim: { id: string; x: number; y: number; health: number },
+  done: () => boolean,
+  limit = 300,
+  each: () => void = () => {},
+) {
+  for (let i = 0; i < limit && !done(); i++) {
+    s.x1.x = victim.x
+    s.x1.y = victim.y
+    if (s.x1.order?.kind !== 'attack') s.x1.order = attackOrder(victim.id)
+    victim.health = MAX_HEALTH
+    for (const h of s.world.horses) h.hunger = MAX_HUNGER
+    s.tick()
+    if (!done()) each()
+  }
+  return done()
+}
+
+describe('on a carriage under attack (`CONTEXT.md`)', () => {
+  /** Ticks an unarmed w1 takes to drive k1 to (6, 24), with blows or without. */
+  function driveThere(struck: boolean) {
+    const s = setup()
+    const { carriage, horse } = withCarriage(s)
+    s.give({ kind: 'drive', carriageId: 'k1', x: 6, y: 24 })
+    s.tick()
+    const there = () => carriage.x === 6 && carriage.y === 24
+    const start = s.world.tick
+    if (struck) {
+      expect(blowsOn(s, s.r, there)).toBe(true)
+      expect(s.r.struck).toBeDefined()
+    } else {
+      const fedThere = () => {
+        horse.hunger = MAX_HUNGER
+        return there()
+      }
+      expect(s.until(fedThere, 300)).toBe(true)
+    }
+    return s.world.tick - start
+  }
+
+  it('an unarmed driver reaches their target at the same pace under constant blows', () => {
+    expect(driveThere(true)).toBe(driveThere(false))
+  })
+
+  it('an unarmed driver holds their drive through every blow, and stands with their carriage', () => {
+    const s = setup()
+    const { carriage } = withCarriage(s)
+    s.give({ kind: 'drive', carriageId: 'k1', x: 6, y: 24 })
+    s.tick()
+    const there = () => carriage.x === 6 && carriage.y === 24
+    const each = () => {
+      expect(s.r.order).toMatchObject({ kind: 'drive', carriageId: 'k1' })
+      expect(s.r).toMatchObject({ x: carriage.x, y: carriage.y })
+    }
+    expect(blowsOn(s, s.r, there, 300, each)).toBe(true)
+  })
+
+  it('an unarmed driver’s haul route goes on, there and back, its script with it', () => {
+    const s = setup()
+    const { carriage } = withCarriage(s)
+    carriage.load = { wood: 5 }
+    const route = { kind: 'task', task: 'haul', carriageId: 'k1', x: 6, y: 16 }
+    s.give({ ...route, goods: ['wood'], returnGoods: [], keepFood: 0 })
+    s.tick()
+    const haul = s.r.script!
+    expect(haul.scriptId).toBe(703)
+    const reached = () => carriage.y === 16
+    expect(blowsOn(s, s.r, reached)).toBe(true)
+    const back = () => carriage.y === 6
+    expect(blowsOn(s, s.r, back)).toBe(true)
+    expect(s.world.piles.find((p) => p.x === 6 && p.y === 16)?.goods.wood).toBe(5)
+    expect(s.r.order).toMatchObject({ kind: 'haul', carriageId: 'k1' })
+    // No more blows: Defend, if a last blow started it, has handed back to the Haul script.
+    s.x1.order = null
+    s.tick()
+    expect(s.r.interrupted).toBeUndefined()
+    expect(s.r.script).toMatchObject({ scriptId: haul.scriptId, memory: haul.memory })
+  })
+
+  it('an armed driver fights back, the carriage standing, then goes on', () => {
+    const s = setup()
+    const { carriage } = withCarriage(s)
+    s.r.carried.spear = 1
+    s.give({ kind: 'drive', carriageId: 'k1', x: 6, y: 24 })
+    s.tick()
+    attacked(s)
+    s.tick()
+    expect(s.r.order).toMatchObject({ kind: 'attack', targetId: 'x1', defending: true })
+    expect(s.r.interrupted?.order).toMatchObject({ kind: 'drive', carriageId: 'k1' })
+    const at = { x: carriage.x, y: carriage.y }
+    s.tick()
+    expect(carriage).toMatchObject(at)
+    s.gone()
+    s.tick()
+    expect(s.r.interrupted).toBeUndefined()
+    expect(s.r.order).toMatchObject({ kind: 'drive', carriageId: 'k1' })
+    expect(s.until(() => carriage.y === 24, 300)).toBe(true)
+  })
+
+  it('an armed driver who chased their attacker walks back to the carriage, then goes on', () => {
+    const s = setup()
+    const { carriage } = withCarriage(s)
+    s.r.carried.spear = 1
+    s.give({ kind: 'drive', carriageId: 'k1', x: 6, y: 24 })
+    s.tick()
+    attacked(s)
+    s.x1.order = null
+    s.x1.x = carriage.x + 4
+    s.x1.y = carriage.y
+    expect(s.until(() => s.r.x !== carriage.x || s.r.y !== carriage.y, 60)).toBe(true)
+    const at = { x: carriage.x, y: carriage.y }
+    s.gone()
+    expect(s.until(() => s.r.interrupted === undefined, 60)).toBe(true)
+    expect(s.r).toMatchObject(at)
+    expect(s.r.order).toMatchObject({ kind: 'drive', carriageId: 'k1' })
+    expect(s.until(() => carriage.y === 24, 300)).toBe(true)
+  })
+
+  it('an unarmed passenger stays aboard a carriage being driven, and arrives with it', () => {
+    const s = setup()
+    const { carriage } = withCarriage(s)
+    const p = passenger(s)
+    s.give({ kind: 'drive', carriageId: 'k1', x: 6, y: 24 })
+    s.tick()
+    const there = () => carriage.y === 24
+    const each = () => expect(p.aboard).toBe('k1')
+    expect(blowsOn(s, p, there, 300, each)).toBe(true)
+    expect(p.struck).toBeDefined()
+    expect(p).toMatchObject({ x: 6, y: 24 })
+  })
+
+  it('an unarmed passenger stays aboard whichever of them is struck first', () => {
+    const s = setup()
+    const { carriage } = withCarriage(s)
+    const p = passenger(s)
+    // Both struck on one tick: p1’s script may run first, and the driver still drives.
+    const second = newResident(mulberry32(5), { id: 'x2', owner: 'r2', x: 6, y: 6, tick: 0 })
+    s.world.residents.push(second)
+    s.give({ kind: 'drive', carriageId: 'k1', x: 6, y: 24 })
+    s.tick()
+    const there = () => carriage.y === 24
+    const each = () => expect(p.aboard).toBe('k1')
+    const both = () => {
+      second.x = carriage.x
+      second.y = carriage.y
+      second.order ??= attackOrder('w1')
+      s.r.health = MAX_HEALTH
+      each()
+    }
+    expect(blowsOn(s, p, there, 300, both)).toBe(true)
+    expect(s.r.struck).toBeDefined()
+  })
+
+  it('an unarmed passenger gets off a carriage nobody drives, and walks home', () => {
+    const s = setup()
+    withCarriage(s)
+    const p = passenger(s)
+    s.r.x = 20
+    s.x1.order = attackOrder('p1')
+    expect(s.until(() => p.interrupted !== undefined)).toBe(true)
+    s.x1.order = null
+    s.tick()
+    expect(p.aboard).toBeUndefined()
+    expect(p.order).toMatchObject({ kind: 'walkTo', target: { x: 9, y: 3 } })
+    expect(p.script!.memory.doing).toBe('Defending: fleeing home')
+  })
+
+  /** The horse goes Down of hunger, by the game's own step: it ends its driver's drive. */
+  function horseDown(s: ReturnType<typeof setup>, horse: { hunger: number; health: number }) {
+    horse.hunger = 0
+    horse.health = 1e-9
+    expect(s.until(() => isDown(horse), 20)).toBe(true)
+  }
+
+  it('an unarmed passenger gets off when the horse goes Down', () => {
+    const s = setup()
+    const { horse, carriage } = withCarriage(s)
+    const p = passenger(s)
+    s.give({ kind: 'drive', carriageId: 'k1', x: 6, y: 24 })
+    s.tick()
+    expect(standsStill(s.world, carriage)).toBe(false)
+    horseDown(s, horse)
+    expect(s.r.order).toBeNull()
+    expect(standsStill(s.world, carriage)).toBe(true)
+    s.x1.x = carriage.x + 1
+    s.x1.y = carriage.y
+    s.x1.order = attackOrder('p1')
+    expect(s.until(() => p.interrupted !== undefined)).toBe(true)
+    s.x1.order = null
+    s.tick()
+    expect(p.aboard).toBeUndefined()
+    expect(p.order).toMatchObject({ kind: 'walkTo', target: { x: 9, y: 3 } })
+  })
+
+  it('a carriage with a driver stands still all the same while its horse is Down or gone', () => {
+    const s = setup()
+    const { horse, carriage } = withCarriage(s)
+    s.r.order = { kind: 'drive', carriageId: 'k1', target: { x: 6, y: 24 }, path: null, progress: 0 }
+    expect(standsStill(s.world, carriage)).toBe(false)
+    horse.downUntil = s.world.tick + 1000
+    expect(standsStill(s.world, carriage)).toBe(true)
+    delete horse.downUntil
+    s.world.horses = []
+    expect(standsStill(s.world, carriage)).toBe(true)
+  })
+
+  it('a drive whose horse went Down during the fight doesn’t go on', () => {
+    const s = setup()
+    const { horse } = withCarriage(s)
+    s.r.carried.spear = 1
+    s.give({ kind: 'drive', carriageId: 'k1', x: 6, y: 24 })
+    s.tick()
+    attacked(s)
+    s.tick()
+    expect(s.r.interrupted?.order).toMatchObject({ kind: 'drive' })
+    s.x1.order = null
+    s.r.health = MAX_HEALTH
+    horseDown(s, horse)
+    s.gone()
+    expect(s.until(() => s.r.interrupted === undefined, 20)).toBe(true)
+    expect(s.r.order).toBeNull()
+  })
+
+  it('an armed passenger gets off and fights back', () => {
+    const s = setup()
+    withCarriage(s)
+    const p = passenger(s)
+    p.carried.spear = 1
+    s.give({ kind: 'drive', carriageId: 'k1', x: 6, y: 24 })
+    s.tick()
+    s.x1.order = attackOrder('p1')
+    expect(s.until(() => p.interrupted !== undefined)).toBe(true)
+    s.tick()
+    expect(p.aboard).toBeUndefined()
+    expect(p.order).toMatchObject({ kind: 'attack', targetId: 'x1', defending: true })
+  })
+
+  it('a Player-picked defence script decides for itself', () => {
+    const walker = { ...shout(), source: 'if (me.order.kind == "drive") { walkTo(1, 1) }' }
+    const s = setup(new Map([[750, walker]]))
+    const { carriage } = withCarriage(s)
+    s.give({ kind: 'setDefenceScript', scriptId: 750 })
+    s.give({ kind: 'drive', carriageId: 'k1', x: 6, y: 24 })
+    s.tick()
+    attacked(s)
+    expect(s.r.script).toMatchObject({ scriptId: 750, task: 'defend' })
+    const at = { x: carriage.x, y: carriage.y }
+    s.tick()
+    expect(s.r.order).toMatchObject({ kind: 'walkTo', target: { x: 1, y: 1 } })
+    expect(s.r.interrupted?.order).toMatchObject({ kind: 'drive' })
+    s.x1.order = null
+    s.tick()
+    expect(carriage).toMatchObject(at)
+  })
+
+  it('a picked script that does nothing leaves the drive going until it ends', () => {
+    const idle = { ...shout(), source: 'let quiet = 1' }
+    const s = setup(new Map([[750, idle]]))
+    const { carriage } = withCarriage(s)
+    s.give({ kind: 'setDefenceScript', scriptId: 750 })
+    s.give({ kind: 'drive', carriageId: 'k1', x: 6, y: 24 })
+    s.tick()
+    attacked(s)
+    s.x1.order = null
+    expect(s.until(() => carriage.y === 24, 300)).toBe(true)
+  })
+
+  it('a driver who left the carriage for good doesn’t drive it from afar when they go on', () => {
+    const source = `if (memory.w == null) {
+  memory.w = true
+  walkTo(12, 12)
+} else if (me.order == null) {
+  end("away")
+}`
+    const s = setup(new Map([[750, { ...shout(), source }]]))
+    const { carriage } = withCarriage(s)
+    s.give({ kind: 'setDefenceScript', scriptId: 750 })
+    s.give({ kind: 'drive', carriageId: 'k1', x: 6, y: 24 })
+    s.tick()
+    attacked(s)
+    s.x1.order = null
+    expect(s.until(() => s.r.interrupted === undefined, 200)).toBe(true)
+    expect(s.r).toMatchObject({ x: 12, y: 12 })
+    expect(s.r.order).toBeNull()
+    expect(carriage).not.toMatchObject({ x: 12, y: 12 })
+  })
+
+  it('someone else driving the carriage meanwhile keeps it', () => {
+    const s = setup()
+    const { carriage } = withCarriage(s)
+    const other = newResident(mulberry32(6), { id: 'w2', owner: 'r1', x: 6, y: 6, tick: 0 })
+    other.carried = { food: OWN_FOOD }
+    s.world.residents.push(other)
+    s.r.carried.spear = 1
+    s.give({ kind: 'drive', carriageId: 'k1', x: 6, y: 24 })
+    s.tick()
+    attacked(s)
+    s.tick()
+    expect(s.r.order).toMatchObject({ kind: 'attack' })
+    other.x = carriage.x
+    other.y = carriage.y
+    const to = { residentId: 'w2', kind: 'drive', carriageId: 'k1', x: 20, y: 6 }
+    expect(s.orders.receive(s.world, me, 'q', to)).toMatchObject({ type: 'ack' })
+    s.gone()
+    s.tick()
+    expect(s.r.interrupted).toBeUndefined()
+    expect(s.r.order).toBeNull()
+    expect(other.order).toMatchObject({ kind: 'drive', carriageId: 'k1' })
+  })
+
+  it('a save between the blow and Defend loses nothing of the drive', () => {
+    const s = setup()
+    const { carriage } = withCarriage(s)
+    s.give({ kind: 'drive', carriageId: 'k1', x: 6, y: 24 })
+    s.tick()
+    attacked(s)
+    // Saved and loaded, the order and the one kept aside are no longer one object.
+    const saved = JSON.parse(JSON.stringify(s.r)) as typeof s.r
+    expect(saved.order).toEqual(saved.interrupted!.order)
+    s.r.order = saved.order
+    s.r.interrupted = saved.interrupted!
+    s.x1.order = null
+    s.tick()
+    expect(s.r.interrupted).toBeUndefined()
+    expect(s.r.order).toMatchObject({ kind: 'drive', carriageId: 'k1' })
+    expect(s.until(() => carriage.y === 24, 300)).toBe(true)
+  })
+
+  it('a queue’s drive goes on under blows, and so does the queue', () => {
+    const s = setup()
+    const { carriage } = withCarriage(s)
+    const step = (y: number) => ({ order: { kind: 'drive', carriageId: 'k1', x: 6, y } })
+    s.give({ kind: 'queue', steps: [step(12), step(18)] })
+    s.tick()
+    expect(blowsOn(s, s.r, () => carriage.y === 18 && s.r.queue === undefined)).toBe(true)
+  })
+})
+
 describe('defence invariant', () => {
+  it('flags a driver struck who no longer holds their drive before Defend decides (ADR 0004)', () => {
+    const s = setup()
+    withCarriage(s)
+    const drive = { kind: 'drive' as const, carriageId: 'k1', target: { x: 6, y: 24 } }
+    const order = { ...drive, path: null, progress: 0 }
+    s.r.order = order
+    s.r.interrupted = { order }
+    s.r.script = { scriptId: 0, task: 'defend', memory: {} }
+    s.r.struck = { by: 'x1', tick: s.world.tick - 1 }
+    expect(struckDriverDrivesOn.check(s.world, terrain)).toEqual([])
+    s.r.order = null
+    expect(struckDriverDrivesOn.check(s.world, terrain)).toMatchObject([
+      { invariant: 'struck-driver-drives-on', entityIds: ['w1'] },
+    ])
+    // A tick on, something else may have ended the drive with their script not run yet.
+    s.r.struck = { by: 'x1', tick: s.world.tick - 2 }
+    expect(struckDriverDrivesOn.check(s.world, terrain)).toEqual([])
+    s.r.struck = { by: 'x1', tick: s.world.tick - 1 }
+    // Once a defence script has run, it decides.
+    s.r.script = { scriptId: 707, task: 'defend', memory: {} }
+    expect(struckDriverDrivesOn.check(s.world, terrain)).toEqual([])
+  })
+
   it('flags an order standing with a defence script running or anything interrupted (ADR 0004)', () => {
     const s = setup()
     s.r.givenUnderAttack = 'untilDone'

@@ -14,6 +14,7 @@ import {
   loadLevel,
   carriageCapacity,
   passengersOf,
+  standsStill,
   tradeCoinWarehouse,
   warehousePrices,
   type Army,
@@ -260,14 +261,18 @@ function seenBuilding(world: WorldState, insight: Insight, b: Building): SeenBui
 
 /**
  * A carriage as the side sees it: how heavily it is loaded, its load only when it sees inside,
- * and who is aboard it.
+ * who is aboard it, and whether anything moves it.
  */
 function seenCarriage(world: WorldState, insight: Insight, k: Carriage): SeenCarriage {
   const level = loadLevel(k.load, carriageCapacity(world, k))
-  const passengerIds = passengersOf(world, k).map((r) => r.id)
-  if (insight.insideCarriage(k)) return { ...k, loadLevel: level, passengerIds }
+  const seen = {
+    loadLevel: level,
+    passengerIds: passengersOf(world, k).map((r) => r.id),
+    standsStill: standsStill(world, k),
+  }
+  if (insight.insideCarriage(k)) return { ...k, ...seen }
   const { id, realmId, cityId, x, y, horseId } = k
-  return { id, realmId, cityId, x, y, horseId, loadLevel: level, passengerIds }
+  return { id, realmId, cityId, x, y, horseId, ...seen }
 }
 
 /**

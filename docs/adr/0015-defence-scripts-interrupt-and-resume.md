@@ -46,3 +46,7 @@ didn't make every order immune to blows, however old: a worker must still react 
 
 Defend also no longer abandons a carriage (`CONTEXT.md`: On a carriage under attack): the carriage
 is the way out, so an unarmed driver drives on and an unarmed passenger stays aboard while it moves.
+A driver's drive or haul route is still kept aside when they are struck, but it goes on until the
+defence script gives them another order. Blows land every few ticks: stopping the carriage at each
+and handing the drive back would restart it each time, which is its own standstill. It also keeps
+the carriage driven for everyone looking, a passenger's Defend included, so no blow makes it stand.

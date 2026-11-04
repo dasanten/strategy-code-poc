@@ -781,7 +781,7 @@ export class ScriptRunner {
       // An NPC city runs its residents' game defaults itself (`runNpcScripts`).
       if (realmId === null) {
         // Nobody runs their defence script any more: what it interrupted goes on, if anything.
-        resumeInterrupted(r)
+        resumeInterrupted(world, r)
         if (r.script && !(r.script.task && r.script.scriptId === 0 && r.owner === null))
           delete r.script
       } else {
@@ -1078,7 +1078,7 @@ export class ScriptRunner {
  */
 function endScript(world: WorldState, residentId: string): void {
   const r = world.residents.find((x) => x.id === residentId)
-  if (!r || resumeInterrupted(r)) return
+  if (!r || resumeInterrupted(world, r)) return
   delete r.script
   r.order = null
 }
@@ -1089,7 +1089,7 @@ function endScript(world: WorldState, residentId: string): void {
  */
 function stopScript(world: WorldState, r: Runner): void {
   const resident = 'residentId' in r.bind ? world.residents.find((x) => x.id === r.id) : undefined
-  if (resident && resumeInterrupted(resident)) return
+  if (resident && resumeInterrupted(world, resident)) return
   delete r.holder.script
 }
 

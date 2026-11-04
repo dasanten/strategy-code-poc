@@ -1064,7 +1064,9 @@ The shared language of the game. Domain terms only — no implementation details
   going instead of leaving the carriage, and an armed one fights back and then goes on. An unarmed
   passenger stays aboard while the carriage is being driven; on one standing still (no driver
   driving it, its horse Down or dead) they get off and walk home. An armed passenger fights back.
-  A Player's own defence script decides for itself.
+  A Player's own defence script decides for itself: a driver's drive or haul route goes on until it
+  gives them another order. Residents with no Player follow the same rule, and a caravan's driver
+  under attack doesn't wait for their escort.
 - **Doing:** the line on a resident's card and in the resident list that says what they are
   doing, shown to the owning Player only. It is derived from their task and current order
   ("Building a house: fetching 10 wood from the storage", "Working the farm"); the script they

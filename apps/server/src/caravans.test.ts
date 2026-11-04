@@ -15,6 +15,7 @@ import {
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { caravansSound, evenOut, placeCaravans, routeEnd } from './caravans.js'
+import { attackOrder } from './combat.js'
 import { checkInvariants } from './invariants.js'
 import { mulberry32, newResident } from './residents.js'
 import { entitiesInSight } from './sight.js'
@@ -174,6 +175,85 @@ describe('caravans on their route', () => {
       expect(checkInvariants(world, terrain)).toEqual([])
     },
   )
+
+  describe('its driver under attack (`CONTEXT.md`: On a carriage under attack)', () => {
+    /**
+     * The caravan under way with `bandit` of no city after its driver, staying on their tile,
+     * and the driver kept alive. Stops once `done`, at most `limit` ticks; answers whether it came.
+     */
+    function underAttack(s: ReturnType<typeof route>, done: () => boolean, limit = 400) {
+      const { world, terrain, caravan } = s
+      const walking = new Walking(terrain)
+      const driver = world.residents.find((r) => r.id === caravan.driverId)!
+      const bandit = newResident(mulberry32(9), {
+        id: 'bandit',
+        owner: null,
+        x: driver.x,
+        y: driver.y,
+        tick: world.tick,
+      })
+      world.residents.push(bandit)
+      for (let t = 0; t < limit && !done(); t++) {
+        bandit.x = driver.x
+        bandit.y = driver.y
+        bandit.health = 100
+        if (bandit.order?.kind !== 'attack') bandit.order = attackOrder(driver.id, true)
+        driver.health = 100
+        stepWorld(world, terrain, walking)
+        expect(checkInvariants(world, terrain)).toEqual([])
+      }
+      return { driver, bandit, walking, done: done() }
+    }
+
+    /** The caravan's carriage, its driver on their drive to the first stop. */
+    function underWay() {
+      const s = route()
+      const { world, terrain, caravan } = s
+      const carriage = world.carriages.find((k) => k.id === caravan.carriageId)!
+      const walking = new Walking(terrain)
+      const driver = world.residents.find((r) => r.id === caravan.driverId)!
+      for (let t = 0; t < 2_000 && driver.order?.kind !== 'drive'; t++) {
+        stepWorld(world, terrain, walking)
+      }
+      expect(driver.order).toMatchObject({ kind: 'drive' })
+      return { s, carriage, driver }
+    }
+
+    it('an unarmed driver keeps the carriage going, escort or not, and never flees', () => {
+      const { s, carriage, driver } = underWay()
+      delete driver.carried.spear
+      delete driver.carried.sword
+      const from = { x: carriage.x, y: carriage.y }
+      const tilesOn = () => wrapDistance(s.terrain.size, carriage, from)
+      const { done } = underAttack(s, () => {
+        if (driver.order?.kind !== 'drive' && driver.order?.kind !== 'attack') {
+          // At a stop it may stand for a tick or two between orders, never on foot away from it.
+          expect(driver).toMatchObject({ x: carriage.x, y: carriage.y })
+        }
+        return tilesOn() >= 10
+      })
+      expect(done).toBe(true)
+      expect(driver.struck).toBeDefined()
+      expect(driver).toMatchObject({ x: carriage.x, y: carriage.y })
+    })
+
+    it('an armed driver fights back, then goes back to the carriage and drives on', () => {
+      const { s, carriage, driver } = underWay()
+      const { world, terrain } = s
+      driver.carried = { ...driver.carried, spear: 1 }
+      const fought = underAttack(s, () => driver.order?.kind === 'attack')
+      expect(fought.done).toBe(true)
+      world.residents = world.residents.filter((r) => r !== fought.bandit)
+      driver.order = null
+      const from = { x: carriage.x, y: carriage.y }
+      for (let t = 0; t < 400 && wrapDistance(terrain.size, carriage, from) < 5; t++) {
+        stepWorld(world, terrain, fought.walking)
+      }
+      expect(wrapDistance(terrain.size, carriage, from)).toBeGreaterThanOrEqual(5)
+      expect(driver).toMatchObject({ x: carriage.x, y: carriage.y })
+      expect(checkInvariants(world, terrain)).toEqual([])
+    })
+  })
 
   it('breaks up when its carriage is gone, leaving the crew to the HQ', () => {
     const { world, terrain, caravan } = route()
