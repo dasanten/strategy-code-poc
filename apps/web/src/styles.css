@@ -1284,6 +1284,17 @@ button.residents-row.selected:hover {
   border-radius: 999px;
   font-size: 0.75rem;
 }
+.horse-pick {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  color: inherit;
+}
+.horse-pick input {
+  flex: none;
+  margin: 2px 0 0;
+}
 .clock {
   font-family: ui-monospace, monospace;
   font-size: 0.9rem;
