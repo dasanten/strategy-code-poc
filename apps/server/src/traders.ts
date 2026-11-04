@@ -27,6 +27,7 @@ import {
   type GoodsSpot,
   type Resident,
   type Stock,
+  type TerrainMap,
   type Trader,
   type WorldState,
 } from '@csp/shared'
@@ -40,11 +41,13 @@ import {
   stepCrew,
   take,
   topUpFood,
+  type RouteEnd,
 } from './caravans.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { residentNamesTaken } from './names.js'
 import { hash, mulberry32, newResident } from './residents.js'
 import { newId } from './starting-city.js'
+import { callsOnTheWay, runStops } from './trader-stops.js'
 import { hqLayout, tradeOrgHq } from './trade-org.js'
 import { tradingPosts } from './trading-posts.js'
 import { worldIndex } from './world-index.js'
@@ -52,8 +55,8 @@ import { worldIndex } from './world-index.js'
 /*
  * Wandering traders (`CONTEXT.md`: Wandering trader): Trade Org carriages the HQ sends round a
  * fixed loop of its trading posts and itself, apart from the caravans, so posts can hold goods they
- * don't produce and new Food and Coins reach them. Crew, escort, Food on board and a lost carriage go as for a caravan, and share its code
- * (`stepCrew`). The trader is plain data (ADR 0002); each tick the game gives its crew drive,
+ * don't produce and new Food and Coins reach them. Crew, escort, Food on board and a lost carriage
+ * go as for a caravan, and share its code (`stepCrew`). The trader is plain data (ADR 0002); each tick the game gives its crew drive,
  * pick-up, drop and walk orders, which request actions like a Player's do.
  */
 
@@ -140,6 +143,8 @@ export function placeTraders(world: WorldState, size: number): Trader[] {
       holding: null,
       misses: 0,
       robberies: 0,
+      calls: null,
+      stand: null,
     }
     world.traders.push(trader)
     placed.push(trader)
@@ -200,12 +205,17 @@ export function evenOutLoad(
 const atTheHq = (world: WorldState, trader: Trader) =>
   trader.heading === 'hq' || trader.postId === tradeOrgHq(world)?.id
 
+/** The trader's place now: its storage and warehouse, at the HQ or at `postId`. */
+function traderEnd(world: WorldState, trader: Trader): RouteEnd {
+  return atTheHq(world, trader) ? hqEnd(world) : postEnd(world, trader.postId)
+}
+
 /**
  * The building the trader stands at or goes to next: at its place now, its storage, its warehouse or
  * the warehouse with its Coins, which at a post is the same one (`tradeCoinWarehouse`).
  */
 function traderStop(world: WorldState, trader: Trader): Building | undefined {
-  const end = atTheHq(world, trader) ? hqEnd(world) : postEnd(world, trader.postId)
+  const end = traderEnd(world, trader)
   if (trader.stop === 'storage') return end.storage
   if (trader.stop === 'warehouse' || !end.warehouse) return end.warehouse
   return tradeCoinWarehouse(world, end.warehouse)
@@ -213,12 +223,14 @@ function traderStop(world: WorldState, trader: Trader): Building | undefined {
 
 /**
  * The trader goes on, its storage first: sent from the HQ, out to the post it was bound for; from a
- * stop, to the next on its loop.
+ * stop, to the next on its loop. The cities it stops at on the way are worked out anew (`CONTEXT.md`:
+ * Trader stop).
  */
 function goOn(world: WorldState, trader: Trader): void {
   trader.stop = 'storage'
   trader.plan = null
   trader.misses = 0
+  trader.calls = null
   const sentOut = trader.heading === 'hq' && trader.postId !== tradeOrgHq(world)?.id
   trader.heading = 'post'
   if (sentOut) return
@@ -334,13 +346,25 @@ function followPosts(
 }
 
 /**
+ * The cities a trader stops at on its way from where its carriage stands to its next place, worked
+ * out when it sets off on that way (`CONTEXT.md`: Trader stop). `size` is the map's.
+ */
+function workOutCalls(world: WorldState, trader: Trader, carriage: Carriage, size: number): void {
+  if (trader.calls !== null) return
+  const end = traderEnd(world, trader)
+  const to = end.storage ?? end.warehouse
+  trader.calls = to ? callsOnTheWay(world, carriage, to, size) : []
+}
+
+/**
  * One tick of the Trade Org's wandering traders (`CONTEXT.md`: Wandering trader), run before the
  * actions are requested: escorts who are gone leave it; one whose carriage or HQ is gone ends, its
  * crew left to the HQ; its loop follows the posts (`followPosts`); and its crew and carriage go as
- * for a caravan (`stepCrew`), a driver idle with the carriage going on along its loop (`runTrader`).
+ * for a caravan (`stepCrew`), a driver idle with the carriage making its stops on the way
+ * (`runStops`), then going on along its loop (`runTrader`). Without `terrain` it makes no stops.
  * `size` is the map's.
  */
-export function stepTraders(world: WorldState, size: number): void {
+export function stepTraders(world: WorldState, size: number, terrain?: TerrainMap): void {
   const hq = tradeOrgHq(world)
   const posts = tradingPosts(world)
   world.traders = world.traders.filter((trader) => {
@@ -349,9 +373,11 @@ export function stepTraders(world: WorldState, size: number): void {
     const carriage = index.carriageById(trader.carriageId)
     if (!hq || !carriage) return false
     followPosts(world, trader, hq, posts, size)
-    stepCrew(world, trader, carriage, hq, traderEscortsWanted(trader), size, (driver) =>
-      runTrader(world, trader, driver, carriage, size),
-    )
+    stepCrew(world, trader, carriage, hq, traderEscortsWanted(trader), size, (driver) => {
+      workOutCalls(world, trader, carriage, size)
+      if (terrain && runStops(world, trader, driver, carriage, terrain)) return
+      runTrader(world, trader, driver, carriage, size)
+    })
     return true
   })
 }
@@ -400,13 +426,15 @@ export function traderCarriageStolen(world: WorldState, thief: Resident, carriag
   trader.stop = 'storage'
   trader.plan = null
   trader.misses = 0
+  trader.calls = null
+  trader.stand = null
 }
 
 /**
  * Wandering traders hold together (`CONTEXT.md`: Wandering trader, Caravan crew lost; ADR 0004):
  * each one's loop holds the HQ and otherwise names trading posts that exist, each once, and it goes
- * to one of them; it makes for a coin warehouse only at the HQ; its carriage, of the Trade Organization or it ends, and its crew exist and
- * are the HQ's (of no realm, of the HQ city); it has no driver only with no crew left; nobody is on
+ * to one of them; it makes for a coin warehouse only at the HQ; its carriage, of the Trade
+ * Organization or it ends, and its crew exist and are the HQ's (of no realm, of the HQ city); it has no driver only with no crew left; nobody is on
  * two traders or caravans or both drives and escorts; the driver drives only its carriage; it walks
  * with no more escorts than it gets (`traderEscortsWanted`); and what it means to take fits on a
  * carriage.

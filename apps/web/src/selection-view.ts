@@ -67,6 +67,7 @@ import {
   type MercenaryContract,
   type SeenResident,
   type SeenCaravan,
+  type SeenTrader,
   type SeenCarriage,
   type HaulOrder,
   type GoodsPlace,
@@ -791,8 +792,9 @@ export interface TileCard {
   /** A city the card links to in the city inspector: an own town hall's. */
   city?: { id: string; label: string }
   /**
-   * Where the Player trades on the tile (`CONTEXT.md`: Trade section): a Trade Org warehouse or an
-   * NPC city's storage whose prices they see, opened in the city panel at that building.
+   * Where the Player trades on the tile (`CONTEXT.md`: Trade section, Trader stop): a Trade Org
+   * warehouse, an NPC city's storage whose prices they see or a wandering trader standing there,
+   * opened in the city panel at that building or trader.
    */
   tradeHere?: { cityId: string; buildingId: string }
   /** A city of the Player's own whose town hall is in sight on the tile, which they may rename. */
@@ -1008,7 +1010,8 @@ export interface TileThings {
   /** The caravans the Player sees, whose crew keep their carriages from being driven off. */
   caravans?: readonly Pick<SeenCaravan, 'carriageId' | 'driverId' | 'escortIds'>[]
   /** The wandering traders the Player sees, likewise. */
-  traders?: readonly Pick<SeenCaravan, 'carriageId' | 'driverId' | 'escortIds'>[]
+  traders?: readonly (Pick<SeenTrader, 'carriageId' | 'driverId' | 'escortIds' | 'id'> &
+    Partial<Pick<SeenTrader, 'standing'>>)[]
   /** The map's size, for how near a caravan's crew are to its carriage. */
   mapSize?: number
   /** The alliance army's carriages the Player commands (`commandedCarriages`). */
@@ -1680,6 +1683,9 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     if (road.teardown) lines.push(teardownLine(road))
   }
   if (terrain && !(road && !road.site)) lines.push(terrain)
+  // A wandering trader standing at a stop buys and sells on its tile (`CONTEXT.md`: Trader stop).
+  const visitor = t.traders?.find((v) => v.standing?.x === t.x && v.standing.y === t.y)
+  if (visitor) lines.push('A wandering trader buys and sells here')
   lines.push(`Tile ${t.x}, ${t.y}`)
   // Anyone on a Down resident's tile can take what they carry (`CONTEXT.md`: Down).
   const onTile = here(t.residents ?? [])
@@ -1693,6 +1699,9 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       what: 'tile',
     }),
     lines,
+    ...(visitor?.standing
+      ? { tradeHere: { cityId: visitor.standing.cityId, buildingId: visitor.id } }
+      : {}),
     ...(buildHere ? { buildHere } : {}),
     ...(carriageView ? { carriage: carriageView } : {}),
     ...(unhitch ? { unhitch } : {}),

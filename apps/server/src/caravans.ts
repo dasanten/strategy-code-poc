@@ -153,6 +153,7 @@ export function dropFromLoop(trader: Trader, postId: string): void {
   trader.stop = 'storage'
   trader.plan = null
   trader.misses = 0
+  trader.calls = null
 }
 
 /**

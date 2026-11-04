@@ -22,6 +22,9 @@ import {
   CARAVAN_ROBBERIES_PER_ESCORT,
   TRADERS,
   TRADER_ESCORTS,
+  TRADER_FLOOR_SHARE,
+  TRADER_STOP_REACH,
+  TRADER_STOP_TICKS,
   CARRIAGE_CAPACITY,
   PASSENGER_WEIGHT,
   CARRIAGE_MAX_CAPACITY,
@@ -1094,10 +1097,10 @@ export function Wiki() {
           else the nearest storage of their realm.
         </p>
         <p>
-          A workplace's card says how much is being made there: what each of your workers there makes
-          and how much a game day at their Strength and skill, and the total of each good. It is the
-          pace while they have what they need, not a count of what has been made. Other realms'
-          workers aren't counted, as their stats aren't known.
+          A workplace's card says how much is being made there: what each of your workers there
+          makes and how much a game day at their Strength and skill, and the total of each good. It
+          is the pace while they have what they need, not a count of what has been made. Other
+          realms' workers aren't counted, as their stats aren't known.
         </p>
         <p>
           A smelter, mint or smithy has no storage: it works what its workers carry and what lies in
@@ -1666,14 +1669,14 @@ export function Wiki() {
         <p>
           Every Player may claim {num(HORSE_GRANT_HORSES)} new horses once, whenever they choose and
           whether or not they have horses: a notice at the top of the screen has a Claim button
-          until they do. The horses get new stats and ages and go in your finished stable
-          nearest your Leader's city; with no stable, they stand next to that city's storage (or
-          next to your Leader), each with {num(HORSE_GRANT_FOOD)} Food on the ground by it. The
-          realm log says where they are. Once claimed the offer is gone, also after your Leader dies
-          and you found a new realm; while you have no living Leader you can't claim it. An admin
-          can offer horses again, to every Player or to one: if you had claimed, the notice comes
-          back and you may claim once more, whether or not you still have horses. If you hadn't, you
-          still have just the one claim.
+          until they do. The horses get new stats and ages and go in your finished stable nearest
+          your Leader's city; with no stable, they stand next to that city's storage (or next to
+          your Leader), each with {num(HORSE_GRANT_FOOD)} Food on the ground by it. The realm log
+          says where they are. Once claimed the offer is gone, also after your Leader dies and you
+          found a new realm; while you have no living Leader you can't claim it. An admin can offer
+          horses again, to every Player or to one: if you had claimed, the notice comes back and you
+          may claim once more, whether or not you still have horses. If you hadn't, you still have
+          just the one claim.
         </p>
         <h3>Deliveries and transfers</h3>
         <p>
@@ -1729,6 +1732,14 @@ export function Wiki() {
           robbing one is a theft from the Trade Organization, but it owes nobody a delivery, so
           nothing is sent again.
         </p>
+        <p>
+          On its way a wandering trader stops at each NPC or Player city whose town hall lies within{' '}
+          {num(TRADER_STOP_REACH)} tiles of its route, for{' '}
+          {days(TRADER_STOP_TICKS / TICKS_PER_GAME_DAY)}. It stands on a free tile as near the town
+          hall as it gets outside the walls, so closed gates don't stop it. You get a notice with
+          the place while one stands at one of your cities; see{' '}
+          <a href="#how-to-trade">How to trade</a>.
+        </p>
       </Section>
 
       <Section id="how-to-trade">
@@ -1758,6 +1769,14 @@ export function Wiki() {
           fits. A trade that won't go says why: no coins in hand, no room, none in stock, or not
           wanted. Each unit is priced as it moves, so a big trade moves the price as it goes (see{' '}
           <a href="#trade">Trade &amp; prices</a>).
+        </p>
+        <h3>Trading with a wandering trader</h3>
+        <p>
+          While a wandering trader stands at a city, anyone with a resident or carriage on its tile
+          can trade with it the same way. Press <strong>Trade here</strong> on its tile, or open the
+          city it stands at. It trades with its load, but never the Food its crew keep on board, its
+          coins come from and go onto the carriage, and it takes goods only as far as the carriage
+          holds. It orders no delivery. Those the Trade Organization refuses can't trade with it.
         </p>
         <h3>What an NPC city buys and sells</h3>
         <p>
@@ -1801,6 +1820,12 @@ export function Wiki() {
           {num(PRICE_ELASTICITY)}), between {pct(PRICE_RANGE.min)} and {pct(PRICE_RANGE.max)} of the
           base price. It buys at {pct(BUY_SHARE)} of its selling price. Each unit is priced as it
           moves, so a big trade moves the price as it goes.
+        </p>
+        <p>
+          A wandering trader at a stop prices the same way from what it carries, as if its floor
+          were {pct(TRADER_FLOOR_SHARE)} of a warehouse's, buying lower than it sells. An NPC city
+          treats it as its visiting trader: a spare hand brings over its surplus and buys what the
+          city is short of, Food included but never a weapon.
         </p>
         <table>
           <thead>

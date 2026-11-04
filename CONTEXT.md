@@ -268,8 +268,9 @@ The shared language of the game. Domain terms only — no implementation details
   shown on the way. Once one is there, it shows what the trader carries and room left, and a
   trade that won't go says why (no coins in hand, no room, none in stock, not wanted). Delivery
   and Transfer each have a heading and a line saying what they do, with the fee before ordering,
-  and the section links to the Wiki's "How to trade". The tile card of a warehouse or an NPC
-  city's storage has **Trade here**, which opens it. Only the UI: the trades are those above.
+  and the section links to the Wiki's "How to trade". The tile card of a warehouse, an NPC
+  city's storage or a wandering trader at a stop has **Trade here**, which opens it. Only the UI:
+  the trades are those above.
 - **Stock floor:** the Trade Organization gets its stock physically (its own workplaces on every
   kind of resource, plus buying). When a warehouse of the HQ runs low, it tops up to a minimum at
   the end of each game day. This is the one controlled exception to "everything is physical" (ADR
@@ -302,10 +303,13 @@ The shared language of the game. Domain terms only — no implementation details
   taking goods off it or stealing it is a theft like any against the Trade Organization, but it
   owes nobody a delivery, so nothing is sent again. How many there are is a balance number.
 - **Trader stop:** on its way a wandering trader stops for a while at each NPC or Player city
-  within a set reach of its route, beside the city's town hall. Anyone with a resident or carriage
-  on its tile can trade with it like at a warehouse: it prices each good from what it carries,
-  buying lower than it sells. An NPC city treats it as its visiting trader: it buys what it is
-  short of and sells its surplus. A Player's realm gets a notice with the place while one stands
+  within a set reach of its route, beside the city's town hall, on the nearest free tile outside
+  any ring of walls, so a gate closed against its armed escort doesn't stop it. Anyone with a
+  resident or carriage on its tile can trade with it like at a warehouse: it prices each good from
+  what it carries, buying lower than it sells; the Food its crew keep on board isn't for sale, and
+  it takes goods only as far as its carriage holds. An NPC city treats it as its visiting trader: it
+  sends a spare hand over, never a soldier, who buys what it is short of and sells its surplus (no
+  weapons, which would arm them). A Player's realm gets a notice with the place while one stands
   at one of their cities, and anyone in sight sees its prices.
 - **Lost post found out:** a captured post leaves the Trade Organization at once as before, but it
   learns who took it only by news: when a wandering trader reaches the post, or a surviving
@@ -1308,7 +1312,7 @@ The shared language of the game. Domain terms only — no implementation details
   browser. Tapping a row opens that resident. **Pick these** picks everyone listed, or those ticked,
   as a Group on the map. Only the UI: nothing new is kept in the world. It works on a phone.
 - **Notices:** what the HUD tells the Player unasked (the Horse offer, the pick banner, a group
-  order's report, the first-day card) shows in one lane under the top bar, over the map and never
+  order's report, the first-day card, a wandering trader at one of their cities) shows in one lane under the top bar, over the map and never
   over a drawer or card. While the pick banner shows it replaces the others; they come back after.
 - **First day:** a new realm's HUD shows a checklist card: claim the Horse offer, pick a
   resident, give them an order, open the Wiki. Each line is ticked when the game sees it done;

@@ -894,8 +894,12 @@ export type CityProject =
 export interface CityTrader {
   /** The trader, one of its spare hands. */
   residentId: string
-  /** The Trade Org warehouse they trade at. */
-  warehouseId: string
+  /** The Trade Org warehouse they trade at; null when they go to a visiting trader instead. */
+  warehouseId: string | null
+  /** The wandering trader standing at the city they trade with (`CONTEXT.md`: Trader stop). */
+  visitingId?: string
+  /** On a run to a visiting trader: whether they have fetched what they take along. */
+  loaded?: boolean
   /** The load still to sell there; empty once sold. */
   sells: Stock
   /** What they still buy there, up to what the city is short of; empty once bought. */
@@ -1191,13 +1195,59 @@ export interface Trader {
   misses: number
   /** How often it was robbed, which earns it more escorts as it does a caravan's route. */
   robberies: number
+  /**
+   * The cities it still stops at on its way to its next place, in the order it passes them
+   * (`CONTEXT.md`: Trader stop); null until they are worked out for this way.
+   */
+  calls: string[] | null
+  /** The stop it is driving to or standing at (`CONTEXT.md`: Trader stop); null between stops. */
+  stand: TraderStand | null
 }
 
-/** A wandering trader as Players see it, while its carriage or any of its crew is in sight. */
+/** A wandering trader's stop at a city (`CONTEXT.md`: Trader stop). Plain data (ADR 0002). */
+export interface TraderStand {
+  cityId: string
+  /** The tile it stands on, beside the town hall and outside any wall. */
+  x: number
+  y: number
+  /** The tick it goes on; null while it is still driving there. */
+  until: number | null
+}
+
+/** Where a wandering trader stands at a stop, and until when (`CONTEXT.md`: Trader stop). */
+export interface StandingTrader {
+  cityId: string
+  x: number
+  y: number
+  until: number
+}
+
+/** One line of what a wandering trader names: as a warehouse's (`CONTEXT.md`: Trader stop). */
+export interface TraderPrice {
+  good: Exclude<Good, 'coins'>
+  buy: number
+  sell: number
+  stock: number
+}
+
+/**
+ * A wandering trader as Players see it, while its carriage or any of its crew is in sight: where
+ * it stands, and its prices, while it stands at a stop (`CONTEXT.md`: Trader stop).
+ */
 export type SeenTrader = Pick<
   Trader,
   'id' | 'carriageId' | 'driverId' | 'escortIds' | 'postId' | 'heading'
->
+> & {
+  standing?: StandingTrader
+  /** Without what it holds unless the Player sees inside its carriage. */
+  prices?: (Omit<TraderPrice, 'stock'> & { stock?: number })[]
+}
+
+/** A wandering trader standing at one of a realm's cities: its notice (`CONTEXT.md`: Trader stop). */
+export interface TraderVisit extends StandingTrader {
+  traderId: string
+  city: string
+}
 
 /**
  * An NPC city asking a realm to join it (`CONTEXT.md`: Persuading a city). It stands until the
@@ -1639,6 +1689,8 @@ export type RealmEventWhat =
       coins: number
       x: number
       y: number
+      /** With a wandering trader standing there, not at a warehouse (`CONTEXT.md`: Trader stop). */
+      withTrader?: true
     }
   /**
    * The resident `name` ordered a delivery at the Trade Org warehouse at (`x`, `y`)

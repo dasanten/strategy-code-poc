@@ -16,6 +16,9 @@ import {
   type SeenResident,
   type SeenCarriage,
   type SeenHorse,
+  type SeenTrader,
+  type TraderVisit,
+  aboutTime,
 } from '@csp/shared'
 import {
   buildingCount,
@@ -37,6 +40,8 @@ import {
   tradesHere,
   tradeLists,
   tradersAt,
+  traderStopsAt,
+  previewTraderTrade,
   tradeText,
   warehousesInSight,
   type BuyView,
@@ -48,6 +53,7 @@ import {
   type TradersView,
   type WarehouseView,
 } from './city-view.js'
+import { loadKnown } from './seen.js'
 import { GOOD_LABELS } from './Residents.js'
 import { GoodIcon } from './GoodsGrid.js'
 import { carriedShort } from './residents-view.js'
@@ -63,7 +69,8 @@ import { PanelHead } from './drawer-head.js'
  * the prices of its warehouses in sight (`CONTEXT.md`: Warehouse prices), where the Player's
  * residents on a warehouse buy and sell (`CONTEXT.md`: Trading with the Trade Organization). An
  * NPC city that doesn't refuse the Player lists its prices at its storages in sight, where their
- * residents trade with it the same way (`CONTEXT.md`: Trading with an NPC city).
+ * residents trade with it the same way (`CONTEXT.md`: Trading with an NPC city), and a wandering
+ * trader standing at a city lists its own, for the same (`CONTEXT.md`: Trader stop).
  * A city of another realm takes transfers from the Player's cities (`CONTEXT.md`: Transfer).
  * Below them, the cities the Player remembers out of sight (`CONTEXT.md`: Last seen): as they
  * last saw them and when, greyed, with nothing to do there.
@@ -73,6 +80,8 @@ export function CityInspector({
   lastSeen,
   residents,
   buildings,
+  traders,
+  traderVisits,
   realmId,
   realms,
   carriages,
@@ -97,6 +106,10 @@ export function CityInspector({
   lastSeen: LastSeen
   residents: SeenResident[]
   buildings: Building[]
+  /** The wandering traders in sight (`CONTEXT.md`: Trader stop). */
+  traders: SeenTrader[]
+  /** Those standing at the realm's cities, in sight or not. */
+  traderVisits: TraderVisit[]
   realmId: string
   realms: RealmLabel[]
   carriages: SeenCarriage[]
@@ -181,8 +194,9 @@ export function CityInspector({
             {openId === v.id &&
               tradesHere(
                 cities.find((c) => c.id === v.id)!,
-                { cities, buildings },
+                { cities, buildings, traders },
                 realmId,
+                traderVisits,
               ) && (
                 <p className="small trade-wiki">
                   {/* A new tab, so the game keeps running behind it (`CONTEXT.md`: Wiki). */}
@@ -289,6 +303,48 @@ export function CityInspector({
                     previewDelivery={() => ({ buy: noDelivery, sell: noDelivery })}
                     onTrade={onTrade}
                   />
+                </div>
+              ))}
+            {openId === v.id &&
+              traderStopsAt(v, traders, traderVisits).map((s) => (
+                <div key={s.id} data-trade-at={s.id}>
+                  {!s.unseen && (
+                    <Prices
+                      warehouse={s}
+                      lists={tradeLists(s, { buildings })}
+                      place="Wandering trader"
+                    />
+                  )}
+                  <p className="small muted">
+                    {s.unseen && `A wandering trader stands at (${s.x}, ${s.y}). `}It goes on in{' '}
+                    {aboutTime(Math.max(0, s.until - tick))}.
+                  </p>
+                  {s.unseen ? (
+                    <Sending warehouse={s} place="wandering trader" {...sending(s)} />
+                  ) : (
+                    <Trading
+                      warehouse={s}
+                      goods={tradedGoods(s, tradeLists(s, { buildings }))}
+                      place="wandering trader"
+                      traders={tradersAt(s, { residents, carriages }, realmId)}
+                      sending={sending(s)}
+                      deliveryCities={[]}
+                      preview={(resident, carriage, good, units) =>
+                        previewTraderTrade(
+                          traders.find((t) => t.id === s.id) ?? { escortIds: [] },
+                          carriages.filter(loadKnown).find((k) => k.id === s.carriageId),
+                          resident,
+                          carriage,
+                          good,
+                          units,
+                          tick,
+                          horses,
+                        )
+                      }
+                      previewDelivery={() => ({ buy: noDelivery, sell: noDelivery })}
+                      onTrade={onTrade}
+                    />
+                  )}
                 </div>
               ))}
             {openId === v.id && <Reaction city={cities.find((c) => c.id === v.id)!} />}
@@ -474,8 +530,8 @@ function Prices({
 }: {
   warehouse: WarehouseView
   lists: TradeLists
-  /** What it is called: a Trade Org warehouse or an NPC city's storage. */
-  place?: 'Warehouse' | 'Storage'
+  /** What it is called: a Trade Org warehouse, an NPC city's storage or a wandering trader. */
+  place?: 'Warehouse' | 'Storage' | 'Wandering trader'
 }) {
   const at = `${place} at (${warehouse.x}, ${warehouse.y})`
   return (
@@ -588,8 +644,8 @@ function Trading({
   warehouse: WarehouseView
   /** The goods that can be traded there (`tradedGoods`), for the Good picker. */
   goods: PricedGood[]
-  /** Where the trade happens: a Trade Org warehouse or an NPC city's storage. */
-  place?: 'warehouse' | 'storage'
+  /** Where the trade happens: a Trade Org warehouse, an NPC city's storage or a wandering trader. */
+  place?: TradePlace
   traders: TradersView
   /** Whom to send there while nobody of the Player's is, and who is on the way. */
   sending: SendingProps
@@ -732,6 +788,9 @@ function Trading({
   )
 }
 
+/** Where a trade happens, as the Trade section says it. */
+type TradePlace = 'warehouse' | 'storage' | 'wandering trader'
+
 interface SendingProps {
   /** Whom the Player can send there, nearest first (`sendable`). */
   sendable: SendView[]
@@ -751,7 +810,7 @@ function Sending({
   sendable,
   going,
   onSend,
-}: SendingProps & { warehouse: WarehouseView; place: 'warehouse' | 'storage' }) {
+}: SendingProps & { warehouse: WarehouseView; place: TradePlace }) {
   const [key, setKey] = useState('')
   const keyOf = (s: SendView) => `${s.residentId}:${s.carriageId ?? ''}`
   const picked = sendable.find((s) => keyOf(s) === key) ?? sendable[0]
