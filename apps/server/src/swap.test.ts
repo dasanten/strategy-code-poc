@@ -6,6 +6,7 @@ import {
   carryCapacity,
   npcCityPrices,
   npcReserve,
+  npcSwapRates,
   priceFor,
   quoteNpcSwap,
   quoteSwap,
@@ -390,6 +391,80 @@ describe('a swap with an NPC city', () => {
     expect(swap(world, queue, { give: 'wood', want: 'stone', units: 2 })).toBe(
       'Dunmere won’t trade with you',
     )
+  })
+})
+
+describe('an NPC city’s rates', () => {
+  const line = (
+    good: 'wood' | 'stone' | 'iron' | 'food',
+    forSale: number,
+    wanted: number,
+    buy: number,
+    sell: number,
+  ) => ({ good, forSale, wanted, buy, sell })
+
+  it('sets each good it is short of against each it has spare, in small whole units', () => {
+    const rates = npcSwapRates([
+      line('wood', 0, 9, 4, 6),
+      line('iron', 0, 9, 20, 30),
+      line('food', 10, 0, 1, 3),
+      line('stone', 10, 0, 5, 9),
+    ])
+    expect(rates).toEqual([
+      // A wood fetches 4 and a food costs 3; a stone costs 9, so it takes 3 wood, rounded up.
+      { give: 'wood', gives: 1, want: 'food', units: 1 },
+      { give: 'wood', gives: 3, want: 'stone', units: 1 },
+      // An iron fetches 20: that pays for 6 food or 2 stone.
+      { give: 'iron', gives: 1, want: 'food', units: 6 },
+      { give: 'iron', gives: 1, want: 'stone', units: 2 },
+    ])
+  })
+
+  it('stays within what it has spare and what it is short of', () => {
+    // One iron would pay for 6 food, but it has only 2 to spare.
+    expect(npcSwapRates([line('iron', 0, 9, 20, 30), line('food', 2, 0, 1, 3)])).toEqual([
+      { give: 'iron', gives: 1, want: 'food', units: 2 },
+    ])
+    // A stone takes 3 wood and it lacks only 2: no swap of them can go, so no rate.
+    expect(npcSwapRates([line('wood', 0, 2, 4, 6), line('stone', 10, 0, 5, 9)])).toEqual([])
+    // Less than a whole unit either way is nothing to swap.
+    expect(npcSwapRates([line('wood', 0, 0.5, 4, 6), line('food', 10, 0, 1, 3)])).toEqual([])
+    expect(npcSwapRates([line('wood', 0, 9, 4, 6), line('food', 0.5, 0, 1, 3)])).toEqual([])
+  })
+
+  it('has none when nothing is spare or nothing is short', () => {
+    const { world, npc, storage } = npcCity()
+    const reserve = npcReserve(world, npc)
+    const rates = () => npcSwapRates(npcCityPrices(world, npc, 'r1'))
+    // Holding nothing, it is short of everything it keeps and has nothing to spare.
+    expect(rates()).toEqual([])
+    // Exactly its reserve of everything, and a surplus of nothing.
+    storage.stock = { ...reserve }
+    expect(rates()).toEqual([])
+    // A surplus, with nothing it is short of.
+    storage.stock = { ...reserve, stone: (reserve.stone ?? 0) + 20 }
+    expect(rates()).toEqual([])
+  })
+
+  it('comes from its stock and goes as a swap does, keeping nothing new', () => {
+    const { world, npc, storage } = npcCity()
+    const reserve = npcReserve(world, npc)
+    // At its reserve of everything but wood, which it is short of, and stone, which it has spare.
+    storage.stock = { ...reserve, wood: 0, stone: (reserve.stone ?? 0) + 20, coins: 500 }
+    const before = JSON.stringify(world)
+    const prices = npcCityPrices(world, npc, 'r1')
+    const rates = npcSwapRates(prices)
+    expect(JSON.stringify(world)).toBe(before)
+    // Wood is all it is short of. Holding its weapons, it needs less iron too, so that is spare.
+    expect(rates.map((r) => r.give)).toEqual(rates.map(() => 'wood'))
+    const rate = rates.find((r) => r.want === 'stone')!
+    const wood = prices.find((p) => p.good === 'wood')!
+    const stone = prices.find((p) => p.good === 'stone')!
+    expect(rate.gives * wood.buy).toBeGreaterThanOrEqual(rate.units * stone.sell)
+    const holder = { stock: { wood: 100 }, room: 1e6 }
+    const quote = quoteNpcSwap(world, npc, storage, holder, 'wood', 'stone', rate.units, 'r1')
+    expect(quote.units).toBe(rate.units)
+    expect(quote.gives).toBeGreaterThanOrEqual(rate.gives)
   })
 })
 

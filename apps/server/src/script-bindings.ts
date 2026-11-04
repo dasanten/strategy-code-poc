@@ -301,7 +301,9 @@ export function bindScript(context: ScriptContext): ScriptBindings {
       if (world.offers.length === 0) return []
       seen ??= context.seen()
       const known = new Set(seen.filter((e) => e.is === 'building').map((e) => e.id))
-      return world.offers.filter((o) => o.realmId === side || known.has(o.storageId)).map(seenOffer)
+      return world.offers
+        .filter((o) => o.realmId === side || o.direct?.toId === side || known.has(o.storageId))
+        .map(seenOffer)
     },
     directives: () => directivesFor(world, (org) => organizationLabel(world, org)),
     withMemory: ([key, value]) => {
@@ -781,6 +783,17 @@ function residentActions(
         times: plain(times),
         carriageId: plain(carriageId ?? null),
       }),
+    sendDirectOffer: ([toId, storageId, gives, givesUnits, wants, wantsUnits, times]) =>
+      request('sendDirectOffer', {
+        toId: plain(toId),
+        storageId: plain(storageId),
+        gives: plain(gives),
+        givesUnits: plain(givesUnits),
+        wants: plain(wants),
+        wantsUnits: plain(wantsUnits),
+        times: plain(times),
+      }),
+    declineOffer: ([offerId]) => request('declineOffer', { offerId: plain(offerId) }),
     handOver: ([newLeaderId]) => request('handOver', { newLeaderId: plain(newLeaderId) }),
     rename: ([targetId, name, realmName]) =>
       request('rename', {

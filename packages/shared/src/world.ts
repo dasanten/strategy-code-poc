@@ -1311,7 +1311,18 @@ export interface Offer {
   wantsUnits: number
   /** How many times over it can still be accepted; at least one while it stands. */
   times: number
+  /** Set on a Direct offer: only that realm can accept it, until it lapses. */
+  direct?: DirectOfferTerms
 }
+
+/** Who a Direct offer is for, and the tick it lapses at (`CONTEXT.md`: Direct offer). */
+export interface DirectOfferTerms {
+  toId: string
+  lapsesAt: number
+}
+
+/** What ended a realm's offer (`CONTEXT.md`: Offer, Direct offer). */
+export type OfferEnd = 'usedUp' | 'takenDown' | 'storageLost' | 'goodsGone' | 'declined' | 'lapsed'
 
 /**
  * How the Organization `of` regards `toward` (`CONTEXT.md`: Standing), from -`STANDING_RANGE`
@@ -1692,8 +1703,9 @@ export type RealmEventWhat =
     }
   /**
    * The realm's offer at (`x`, `y`) ended (`CONTEXT.md`: Offer): used up, taken down by its Player,
-   * with the storage torn down or no longer the realm's, or its goods gone from the storage. What
-   * was left of it is ordinary goods.
+   * with the storage torn down or no longer the realm's, or its goods gone from the storage; a
+   * Direct offer also when declined or lapsed, with `to` the realm it was sent to. What was left of
+   * it is ordinary goods.
    */
   | {
       kind: 'offerEnded'
@@ -1701,7 +1713,24 @@ export type RealmEventWhat =
       givesUnits: number
       wants: Good
       wantsUnits: number
-      why: 'usedUp' | 'takenDown' | 'storageLost' | 'goodsGone'
+      why: OfferEnd
+      to?: string
+      x: number
+      y: number
+    }
+  /**
+   * The realm `from` sent this realm a Direct offer at its storage at (`x`, `y`), `times` over, or
+   * one it sent is over (`CONTEXT.md`: Direct offer). One used up is told by `offerAccepted`.
+   */
+  | {
+      kind: 'directOffer'
+      what: 'received' | Exclude<OfferEnd, 'usedUp'>
+      from: string
+      gives: Good
+      givesUnits: number
+      wants: Good
+      wantsUnits: number
+      times?: number
       x: number
       y: number
     }

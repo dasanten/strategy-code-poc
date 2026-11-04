@@ -1,19 +1,27 @@
 import {
+  DIRECT_OFFER_DAYS,
+  TICKS_PER_GAME_DAY,
   acceptOfferProblem,
   carriageCommanderOf,
   commanderOf,
+  declineOfferProblem,
+  directOfferProblem,
   goodsCapacity,
   handsOf,
   isAt,
   loadOf,
+  offerOpenTo,
   offerStorage,
   organizationLabel,
   postOfferProblem,
   quoteOffer,
+  realmsToOfferTo,
   STANDING_TRADE_COINS_PER_POINT,
   timesToPost,
+  type DirectOfferTerms,
   type Good,
   type Offer,
+  type OfferEnd,
   type OfferTerms,
   type Resident,
   type Stock,
@@ -23,6 +31,7 @@ import { recordEvent } from './events.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { orderedResident } from './order-sender.js'
 import type { OrderKind, OrderSender } from './orders.js'
+import { sightOf } from './sight.js'
 import { raiseStandingBothWays } from './standing.js'
 import { newId, realmOf } from './starting-city.js'
 import { worthOf } from './trade-org-punishment.js'
@@ -36,6 +45,33 @@ const terms = (o: Offer) => ({
   x: o.x,
   y: o.y,
 })
+
+/** A new offer on checked terms at the realm's storage, its goods set aside from now on. */
+function standOffer(
+  world: WorldState,
+  realmId: string,
+  t: OfferTerms,
+  direct?: DirectOfferTerms,
+): Offer {
+  const storage = offerStorage(world, realmId, t.storageId)!
+  const gives = t.gives as Good
+  const givesUnits = t.givesUnits as number
+  const offer: Offer = {
+    id: newId(world, 'offer'),
+    realmId,
+    storageId: storage.id,
+    x: storage.x,
+    y: storage.y,
+    gives,
+    givesUnits,
+    wants: t.wants as Good,
+    wantsUnits: t.wantsUnits as number,
+    times: timesToPost(world, storage, gives, givesUnits, t.times as number),
+    ...(direct && { direct }),
+  }
+  world.offers.push(offer)
+  return offer
+}
 
 /**
  * The post-offer order (`CONTEXT.md`: Offer): a Player posts an offer at a storage of their realm,
@@ -52,21 +88,75 @@ const postOffer: OrderKind = {
     const t = order as unknown as OfferTerms
     // Something may have taken the goods or the storage since the order came.
     if (!realm || postOfferProblem(world, realm.id, t)) return
-    const storage = offerStorage(world, realm.id, t.storageId)!
-    const gives = t.gives as Good
-    const givesUnits = t.givesUnits as number
-    world.offers.push({
-      id: newId(world, 'offer'),
-      realmId: realm.id,
-      storageId: storage.id,
-      x: storage.x,
-      y: storage.y,
-      gives,
-      givesUnits,
-      wants: t.wants as Good,
-      wantsUnits: t.wantsUnits as number,
-      times: timesToPost(world, storage, gives, givesUnits, t.times as number),
+    standOffer(world, realm.id, t)
+  },
+}
+
+/** The input of a send-direct-offer order: an offer's terms and the realm it goes to. */
+type DirectOfferRequest = OfferTerms & { toId: unknown }
+
+/** Whether the realm has anyone of `otherId`'s in sight, on a map of `size` tiles. */
+function seesResidentsOf(world: WorldState, realmId: string, otherId: string, size: number) {
+  const sees = sightOf(world, size, realmId)
+  return world.residents.some((r) => r.owner === otherId && sees(r))
+}
+
+/** Why the realm can't send this Direct offer, or undefined when it can (`CONTEXT.md`). */
+function sendProblem(
+  world: WorldState,
+  realmId: string,
+  t: DirectOfferRequest,
+  size?: number,
+): string | undefined {
+  const problem = directOfferProblem(world, realmId, t.toId, t)
+  if (problem) return problem
+  const known =
+    realmsToOfferTo(world, realmId, []).includes(t.toId as string) ||
+    (size !== undefined && seesResidentsOf(world, realmId, t.toId as string, size))
+  return known ? undefined : 'you don’t know of that realm'
+}
+
+/**
+ * The send-direct-offer order (`CONTEXT.md`: Direct offer): an offer at a storage of the Player's
+ * realm, wherever their residents are, that only the named realm can accept until it lapses. The
+ * other side hears at once, wherever they are.
+ */
+const sendDirectOffer: OrderKind = {
+  validate(world, sender, order, terrain) {
+    const realm = realmOf(world, sender.userId)
+    if (!realm) return 'you have no realm'
+    return sendProblem(world, realm.id, order as unknown as DirectOfferRequest, terrain?.size)
+  },
+  apply(world, sender, order, terrain) {
+    const realm = realmOf(world, sender.userId)
+    const t = order as unknown as DirectOfferRequest
+    // Something may have taken the goods, the storage or the other realm since the order came.
+    if (!realm || sendProblem(world, realm.id, t, terrain?.size)) return
+    const toId = t.toId as string
+    const lapsesAt = world.tick + DIRECT_OFFER_DAYS * TICKS_PER_GAME_DAY
+    const offer = standOffer(world, realm.id, t, { toId, lapsesAt })
+    recordEvent(world, toId, {
+      kind: 'directOffer',
+      what: 'received',
+      from: organizationLabel(world, realm.id),
+      times: offer.times,
+      ...terms(offer),
     })
+  },
+}
+
+/** The decline order (`CONTEXT.md`: Direct offer): the realm it was sent to turns it down. */
+const declineOffer: OrderKind = {
+  validate(world, sender, order) {
+    const realm = realmOf(world, sender.userId)
+    if (!realm) return 'you have no realm'
+    return declineOfferProblem(world, realm.id, (order as unknown as TakeDownRequest).offerId)
+  },
+  apply(world, sender, order) {
+    const realm = realmOf(world, sender.userId)
+    const { offerId } = order as unknown as TakeDownRequest
+    if (!realm || declineOfferProblem(world, realm.id, offerId)) return
+    endOffer(world, world.offers.find((o) => o.id === offerId)!, 'declined')
   },
 }
 
@@ -132,7 +222,13 @@ const acceptOffer: OrderKind = {
   },
 }
 
-export const offerOrders: Record<string, OrderKind> = { postOffer, takeDownOffer, acceptOffer }
+export const offerOrders: Record<string, OrderKind> = {
+  postOffer,
+  takeDownOffer,
+  acceptOffer,
+  sendDirectOffer,
+  declineOffer,
+}
 
 /** One offer accepted this tick, with the goods of everyone in it before and after. */
 interface Accepted {
@@ -205,7 +301,8 @@ function acceptNow(
 ): boolean {
   const side = commanderOf(world, r) ?? r.cityId
   const storage = world.buildings.find((b) => b.id === offer.storageId)
-  if (side === null || side === offer.realmId || !storage || !isAt(r, storage)) return false
+  if (side === null || side === offer.realmId || !offerOpenTo(offer, side)) return false
+  if (!storage || !isAt(r, storage)) return false
   const carriage =
     carriageId === null ? undefined : world.carriages.find((k) => k.id === carriageId)
   if (carriageId !== null) {
@@ -250,21 +347,38 @@ function acceptNow(
   return q.times > 0
 }
 
-/** Takes an offer out of the world, with a line in its realm's log. */
-function endOffer(
-  world: WorldState,
-  offer: Offer,
-  why: 'usedUp' | 'takenDown' | 'storageLost' | 'goodsGone',
-): void {
+/**
+ * Takes an offer out of the world, with a line in its realm's log and, for a Direct offer, in the
+ * log of the realm it was sent to, who already heard if they used it up.
+ */
+function endOffer(world: WorldState, offer: Offer, why: OfferEnd): void {
   world.offers = world.offers.filter((o) => o !== offer)
-  recordEvent(world, offer.realmId, { kind: 'offerEnded', why, ...terms(offer) })
+  const toId = offer.direct?.toId
+  recordEvent(world, offer.realmId, {
+    kind: 'offerEnded',
+    why,
+    ...(toId !== undefined && { to: organizationLabel(world, toId) }),
+    ...terms(offer),
+  })
+  if (toId === undefined || why === 'usedUp') return
+  recordEvent(world, toId, {
+    kind: 'directOffer',
+    what: why,
+    from: organizationLabel(world, offer.realmId),
+    ...terms(offer),
+  })
 }
+
+/** Whether a Direct offer's time is up, or the realm it was sent to is gone. */
+const lapsed = (world: WorldState, direct: DirectOfferTerms) =>
+  world.tick >= direct.lapsesAt || !world.realms.some((r) => r.id === direct.toId)
 
 /**
  * Offers follow their storages at the end of each tick (`CONTEXT.md`: Offer): one whose storage is
  * torn down or no longer its realm's ends, and goods gone from the storage, to thieves or raiders
  * or spoiling, cut it down, the newest at a storage first. One cut down to nothing ends, and any
- * goods short of its next time over are ordinary again.
+ * goods short of its next time over are ordinary again. A Direct offer lapses at its time, or when
+ * the realm it was sent to is gone, for nobody else can accept it.
  */
 export function stepOffers(world: WorldState): void {
   if (world.offers.length === 0) return
@@ -273,6 +387,10 @@ export function stepOffers(world: WorldState): void {
     const storage = offerStorage(world, offer.realmId, offer.storageId)
     if (!storage) {
       endOffer(world, offer, 'storageLost')
+      continue
+    }
+    if (offer.direct && lapsed(world, offer.direct)) {
+      endOffer(world, offer, 'lapsed')
       continue
     }
     const stock = left.get(storage.id) ?? { ...storage.stock }
@@ -289,7 +407,8 @@ export function stepOffers(world: WorldState): void {
 
 /**
  * An offer's storage exists and is its realm's, its terms are whole and positive, and what its
- * storage's offers set aside never exceeds what the storage holds (`CONTEXT.md`: Offer).
+ * storage's offers set aside never exceeds what the storage holds (`CONTEXT.md`: Offer). A Direct
+ * offer goes to a realm other than its own that is still there, and hasn't outlived its time.
  */
 export const offersSound: Invariant = {
   name: 'offers-sound',
@@ -308,6 +427,8 @@ export const offersSound: Invariant = {
       const whole = [o.givesUnits, o.wantsUnits, o.times].every((n) => Number.isInteger(n) && n > 0)
       if (!whole) fail(o, 'has terms that aren’t whole and positive')
       if (o.gives === o.wants) fail(o, `wants the ${o.gives} it gives`)
+      if (o.direct?.toId === o.realmId) fail(o, 'was sent to its own realm')
+      if (o.direct && lapsed(world, o.direct)) fail(o, `outlived its time for ${o.direct.toId}`)
       const stock = aside.get(o.storageId) ?? {}
       aside.set(o.storageId, stock)
       stock[o.gives] = (stock[o.gives] ?? 0) + o.times * o.givesUnits

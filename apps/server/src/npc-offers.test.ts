@@ -214,6 +214,15 @@ describe('an NPC city at an offer', () => {
     expect(planCity(near.world, near.city, near.terrain).trader).toBeDefined()
   })
 
+  it('leaves a Direct offer alone: it is for its named realm', () => {
+    const { world, terrain, city, theirs } = setup()
+    const offer = post(world, theirs, 'iron', 5, 'wood', 5)
+    offer.direct = { toId: 'r2', lapsesAt: world.tick + 1000 }
+    expect(planCity(world, city, terrain).trader).toBeUndefined()
+    delete offer.direct
+    expect(planCity(world, city, terrain).trader?.offer?.offerId).toBe(offer.id)
+  })
+
   it('ignores goods it does not lack, and what it has no spare of to pay', () => {
     const lacksNothing = setup()
     post(lacksNothing.world, lacksNothing.theirs, 'wood', 50, 'stone', 1)
@@ -334,20 +343,24 @@ describe('an NPC city at an offer', () => {
     },
   )
 
-  it('with the offer gone the trader comes home with what they took along', { timeout: 60_000 }, () => {
-    const { world, terrain, city, storage, theirs } = setup()
-    const offer = post(world, theirs, 'iron', 5, 'coins', 10)
-    const coins = storage.stock!.coins!
-    run(world, terrain, 2, () => {
-      const t = world.cityPlans[city.id]?.trader
-      if (t?.offer?.leg === 'walking') world.offers = world.offers.filter((o) => o !== offer)
-      return world.offers.length === 0
-    })
-    const r = untilHome(world, terrain, city)
-    expect(storage.stock!.coins).toBe(coins)
-    expect(r.carried.coins ?? 0).toBe(0)
-    expect(theirs.stock!.coins).toBe(1000)
-  })
+  it(
+    'with the offer gone the trader comes home with what they took along',
+    { timeout: 60_000 },
+    () => {
+      const { world, terrain, city, storage, theirs } = setup()
+      const offer = post(world, theirs, 'iron', 5, 'coins', 10)
+      const coins = storage.stock!.coins!
+      run(world, terrain, 2, () => {
+        const t = world.cityPlans[city.id]?.trader
+        if (t?.offer?.leg === 'walking') world.offers = world.offers.filter((o) => o !== offer)
+        return world.offers.length === 0
+      })
+      const r = untilHome(world, terrain, city)
+      expect(storage.stock!.coins).toBe(coins)
+      expect(r.carried.coins ?? 0).toBe(0)
+      expect(theirs.stock!.coins).toBe(1000)
+    },
+  )
 
   it('with no way to the storage they carry the load straight home', { timeout: 60_000 }, () => {
     const { world, terrain, city, storage, theirs } = setup()

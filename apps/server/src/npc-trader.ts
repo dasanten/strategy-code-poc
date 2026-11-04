@@ -136,9 +136,9 @@ export function planTrader(
 
 /**
  * Looks for a Player's offer for the city's trader `r` to take (`CONTEXT.md`: NPC cities at an
- * offer), the good it is shortest of first, then the nearest, and sends them if one suits: within
- * `NPC_OFFER_REACH` of its storage and of a realm it doesn't refuse, giving what it is short of
- * for what it has spare or Coins, at a rate at least as good as its own prices (`offerTimes`). The
+ * offer), the good it is shortest of first, then the nearest, and sends them if one suits: open to
+ * anyone, within `NPC_OFFER_REACH` of its storage and of a realm it doesn't refuse, giving what it
+ * is short of for what it has spare or Coins, at a rate at least as good as its own prices (`offerTimes`). The
  * cheap tests come first, so most offers cost a distance and a lookup, once a game hour. Food short
  * (`foodOnly`), only an offer that gives Food will do. Returns whether it sent them.
  */
@@ -157,6 +157,8 @@ function planOfferRun(
   const rank = new Map(order.map((g, i) => [g, i]))
   let best: { offer: Offer; times: number; rank: number; d: number } | undefined
   for (const offer of world.offers) {
+    // A Direct offer is for its named realm alone (`CONTEXT.md`: Direct offer).
+    if (offer.direct) continue
     if (foodOnly && offer.gives !== 'food') continue
     const place = rank.get(offer.gives)
     if (place === undefined) continue

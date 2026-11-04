@@ -21,6 +21,8 @@ import {
   CARAVAN_GUARD_RANGE,
   CARAVAN_ROBBERIES_PER_ESCORT,
   CARRIAGE_CAPACITY,
+  DIRECT_OFFERS_TO_ONE_REALM,
+  DIRECT_OFFER_DAYS,
   PASSENGER_WEIGHT,
   CARRIAGE_MAX_CAPACITY,
   CARRY_BASE,
@@ -1743,6 +1745,19 @@ export function Wiki() {
           storage is torn down or no longer yours; what was set aside is ordinary goods of that
           storage again.
         </p>
+        <h3>Direct offers</h3>
+        <p>
+          Under <strong>Direct offers</strong> on the tool rail you can send an offer to one realm
+          you know of: one you see residents of, an ally, one whose city you have seen, one with a
+          standing either way, or your side in a contract or direct offer. Name a storage of yours,
+          and the goods are set aside there as for any offer. They hear at once wherever they are,
+          with a notice and the place, and only they can accept it: someone of theirs goes to the
+          storage and takes it in person, as with any offer, or they decline it from anywhere.
+          Anyone else in sight of the storage sees it, and that it is for another realm. It lapses
+          after {num(DIRECT_OFFER_DAYS)} game days. Declined, lapsed or taken down, the goods are
+          ordinary again and both of you are told. At most {num(DIRECT_OFFERS_TO_ONE_REALM)} can
+          stand to one realm.
+        </p>
         <h3>Sending a trader</h3>
         <p>
           With nobody of yours there, the trade section offers to send someone: your residents
@@ -1778,8 +1793,10 @@ export function Wiki() {
           only goods it is short of, up to its reserve and with the coins in its storage. It takes
           nothing else. Its prices come from its stock like a warehouse's, and its standing toward
           you moves them: the better, the cheaper it sells and the more it pays. It swaps only its
-          surplus for what it is short of. Below {signed(NPC_CITY_REFUSES_STANDING)} it won't trade
-          with you at all. Every trade raises standing both ways (see{' '}
+          surplus for what it is short of, and its Rates in the Trade section list each good it is
+          short of against each it has spare, at today's prices. Pick one to fill in the swap, or to
+          send someone there if nobody of yours is. Below {signed(NPC_CITY_REFUSES_STANDING)} it
+          won't trade with you at all. Every trade raises standing both ways (see{' '}
           <a href="#standing">Standing &amp; reactions</a>).
         </p>
         <h3>Delivery</h3>
@@ -1932,11 +1949,11 @@ export function Wiki() {
           The same trader goes to a Player's offer within {num(NPC_OFFER_REACH)} tiles, ahead of any
           warehouse run, when it gives what the city is short of and wants what it has spare or
           Coins, at a rate at least as good as its own prices, and the city doesn't refuse that
-          realm. They take as many times over as make up what it lacks and fit in their arms, never
-          a weapon either way, and walk home with it. It looks once a game hour; while Food runs
-          short only an offer that gives Food will send them. If the offer is gone or cut down when
-          they get there, or there is no way in, they carry what they didn't spend back home. The
-          Trade Organization never accepts offers.
+          realm. A direct offer is left to the realm it is for. They take as many times over as make
+          up what it lacks and fit in their arms, never a weapon either way, and walk home with it.
+          It looks once a game hour; while Food runs short only an offer that gives Food will send
+          them. If the offer is gone or cut down when they get there, or there is no way in, they
+          carry what they didn't spend back home. The Trade Organization never accepts offers.
         </p>
         <p>
           A city is full once it has had spare hands with nothing to do and nothing short of its

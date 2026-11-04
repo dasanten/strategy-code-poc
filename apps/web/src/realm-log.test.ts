@@ -646,6 +646,50 @@ describe('realm log', () => {
     })
   })
 
+  it('tells both sides of a direct offer, with its place', () => {
+    const terms = {
+      gives: 'wood',
+      givesUnits: 10,
+      wants: 'stone',
+      wantsUnits: 5,
+      x: 6,
+      y: 6,
+      seq: 1,
+      tick: 0,
+      userId: 7,
+    } as const
+    const place = [{ name: 'the storage', x: 6, y: 6 }]
+    const got = (what: string, times?: number) =>
+      describeEvent({ ...terms, kind: 'directOffer', what, from: 'Mara', times } as RealmEvent)
+    expect(got('received', 2)).toEqual({
+      text: 'The realm of Mara sent you a direct offer: 10 wood for 5 stone, 2 times over. Fetch it in person at the storage, or decline it, under Direct offers.',
+      tone: 'info',
+      places: place,
+    })
+    expect(got('received', 1).text).toMatch(
+      /^The realm of Mara sent you a direct offer: 10 wood for 5 stone\. /,
+    )
+    expect(got('lapsed').text).toBe(
+      'The direct offer of 10 wood for 5 stone from the realm of Mara lapsed.',
+    )
+    expect(got('declined').text).toBe(
+      'You declined the direct offer of 10 wood for 5 stone from the realm of Mara.',
+    )
+    expect(got('takenDown').text).toBe(
+      'The realm of Mara took down its direct offer of 10 wood for 5 stone to you.',
+    )
+    const ended = (why: string) =>
+      describeEvent({ ...terms, kind: 'offerEnded', why, to: 'Bo' } as RealmEvent)
+    expect(ended('declined')).toEqual({
+      text: 'Your direct offer of 10 wood for 5 stone to the realm of Bo was declined. Its goods are ordinary again.',
+      tone: 'info',
+      places: place,
+    })
+    expect(ended('lapsed').text).toBe(
+      'Your direct offer of 10 wood for 5 stone to the realm of Bo lapsed. Its goods are ordinary again.',
+    )
+  })
+
   it('keeps the latest events, as many as the server does', () => {
     const event = (seq: number): RealmEvent => ({ kind: 'foodSpoiled', units: 1, seq, ...at })
     const log = Array.from({ length: REALM_LOG_LENGTH }, (_, i) => event(i))

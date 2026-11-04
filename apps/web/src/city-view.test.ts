@@ -26,6 +26,8 @@ import {
   npcStoragesInSight,
   previewDelivery,
   previewNpcSwap,
+  ratesAt,
+  rateText,
   previewNpcTrade,
   previewSwap,
   previewTrade,
@@ -483,6 +485,28 @@ describe('swapping in the inspector', () => {
       'Can’t swap wood for stone: it won’t trade with you',
     )
     expect(swapText('wood', 'stone', zero)).toBe('Can’t swap wood for stone')
+  })
+})
+
+describe('an NPC city’s rates in the inspector', () => {
+  const food: NpcCityPrice = { good: 'food', stock: 30, forSale: 10, wanted: 0, buy: 1, sell: 3 }
+  const wood: NpcCityPrice = { good: 'wood', stock: 5, forSale: 0, wanted: 9, buy: 4, sell: 6 }
+  const view = { id: 's1', kind: 'storage' as const, x: 3, y: 4, prices: [food, wood] }
+  const rate = { give: 'wood' as const, gives: 1, want: 'food' as const, units: 1 }
+
+  it('lists what it has spare only as far as this storage holds it', () => {
+    const storage = (stock: Building['stock']) => ({ ...b('s1', 'storage', 'city1'), stock })
+    expect(ratesAt(view, { buildings: [storage({ food: 30, wood: 5 })] })).toEqual([rate])
+    // The surplus lies in its other storage: a swap here couldn't get any.
+    expect(ratesAt(view, { buildings: [storage({ wood: 5 })] })).toEqual([])
+  })
+
+  it('goes by its prices alone where the Player doesn’t see inside', () => {
+    expect(ratesAt(view, { buildings: [b('s1', 'storage', 'city1')] })).toEqual([rate])
+  })
+
+  it('says a rate as the trader would swap it', () => {
+    expect(rateText({ ...rate, gives: 3, units: 2 }, 'wood', 'food')).toBe('3 wood for 2 food')
   })
 })
 

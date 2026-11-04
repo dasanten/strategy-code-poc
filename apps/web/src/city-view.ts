@@ -14,6 +14,7 @@ import {
   quoteTrade,
   cutSwap,
   noSwap,
+  npcSwapRates,
   tradeCoinWarehouse,
   wrapDistance,
   canWork,
@@ -28,6 +29,7 @@ import {
   type NpcCityPrice,
   type PricedGood,
   type SwapQuote,
+  type SwapRate,
   type TradeHolder,
   type TradeLimit,
   type TradeQuote,
@@ -593,6 +595,24 @@ export function previewNpcSwap(
     wantPrice: () => wantLine.sell,
     givePrice: () => giveLine.buy,
   })
+}
+
+/**
+ * An NPC city's rates at one of its storages (`CONTEXT.md`: Swap), from the prices it names the
+ * Player: what it has spare counts only as far as this storage holds it, where the Player sees
+ * inside, as a swap there is cut down the same way.
+ */
+export function ratesAt(w: WarehouseView, seen: { buildings: Building[] }): SwapRate[] {
+  const stock = seen.buildings.find((b) => b.id === w.id)?.stock
+  const lines = w.prices as Shown<NpcCityPrice>[]
+  return npcSwapRates(
+    stock ? lines.map((p) => ({ ...p, forSale: Math.min(p.forSale, stock[p.good] ?? 0) })) : lines,
+  )
+}
+
+/** A rate as the Trade section lists it: "3 wood for 1 stone". The labels are the goods', lower case. */
+export function rateText(rate: SwapRate, giveLabel: string, wantLabel: string): string {
+  return `${rate.gives} ${giveLabel} for ${rate.units} ${wantLabel}`
 }
 
 /** Up to `wanted` whole units under each bound, and the first bound that cut it short. */

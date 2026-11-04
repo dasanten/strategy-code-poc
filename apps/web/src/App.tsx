@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import {
   BUILDABLE,
   firstDayShown,
@@ -51,6 +59,8 @@ import { AlliancePanel } from './Alliance.js'
 import { commandsSeen } from './alliance-army.js'
 import { ArmiesPanel, type ArmyPick } from './Armies.js'
 import { ContractsPanel } from './Contracts.js'
+import { DirectOffersPanel } from './DirectOffers.js'
+import { incomingItems, incomingNoticeLine } from './incoming-view.js'
 import { StandingPanel } from './Standing.js'
 import { TileMenu, WaypointsPanel } from './Waypoints.js'
 import { api } from './api.js'
@@ -63,6 +73,7 @@ import {
   FirstDayCard,
   GroupReportNotice,
   HorseOfferNotice,
+  IncomingNotice,
   NoticeLane,
   PhoneMenu,
   ToolRail,
@@ -411,6 +422,25 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [focus, setFocus] = useState<{ x: number; y: number; cover: Covered }>()
   // The drawer open over the map, if any (ADR 0008: one at a time).
   const [openDrawer, setOpenDrawer] = useState<OpenDrawer>()
+  // The notice of what others sent the realm (`CONTEXT.md`: Notices), until the Player dismisses it
+  // or has it in front of them in the drawer.
+  const [incomingPutAway, setIncomingPutAway] = useState<ReadonlySet<string>>(new Set())
+  const incoming = useMemo(
+    () => (world ? incomingItems(world.diplomacy, world.home.realmId) : []),
+    [world],
+  )
+  const putIncomingAway = useCallback(
+    () => setIncomingPutAway(new Set(incoming.map((i) => i.id))),
+    [incoming],
+  )
+  useEffect(() => {
+    if (openDrawer === 'directOffers') putIncomingAway()
+  }, [openDrawer, putIncomingAway])
+  const incomingNotice = incomingNoticeLine(
+    incoming,
+    incomingPutAway,
+    openDrawer === 'directOffers',
+  )
   const closeDrawer = useCallback(() => setOpenDrawer(undefined), [])
   useEscapeCloses(openDrawer, closeDrawer)
   /** Opens a script in the library, at a version and line when given. */
@@ -1482,6 +1512,26 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         )}
       {world &&
         drawer(
+          'directOffers',
+          <DirectOffersPanel
+            offers={world.diplomacy.directOffers}
+            knownRealms={world.diplomacy.directOfferRealms}
+            buildings={world.buildings}
+            cities={world.cities}
+            residents={world.residents}
+            carriages={world.carriages}
+            horses={world.horses}
+            realmId={world.home.realmId}
+            tick={world.tick}
+            mapSize={world.map.size}
+            arrivesIn={arrivesIn || undefined}
+            onShowPlace={showOnMap}
+            giveOrder={giveOrder}
+            sendOrder={sendOrder}
+          />,
+        )}
+      {world &&
+        drawer(
           'alliance',
           <AlliancePanel
             diplomacy={world.diplomacy}
@@ -1577,6 +1627,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         {laneNotices({
           pick: pick !== undefined,
           horseOffer: world?.horseOffer,
+          incoming: incomingNotice !== undefined,
           firstDay: world !== null && firstDayShown(world.firstDay),
           groupReport: groupReport !== undefined,
         }).map((kind) =>
@@ -1599,6 +1650,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               key={kind}
               horses={HORSE_GRANT_HORSES}
               onClaim={() => sendOrder({ kind: 'claimHorses' })}
+            />
+          ) : kind === 'incoming' && incomingNotice ? (
+            <IncomingNotice
+              key={kind}
+              line={incomingNotice}
+              onOpen={() => setOpenDrawer('directOffers')}
+              onDismiss={putIncomingAway}
             />
           ) : kind === 'firstDay' && world ? (
             <FirstDayCard
