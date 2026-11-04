@@ -81,6 +81,48 @@ describe('realm log', () => {
     expect(describeEvent(foaled).text).toBe('A foal was born in a stable.')
   })
 
+  it('tells the truth about the Trade Organization’s army (`CONTEXT.md`: Punishment trip)', () => {
+    const trip = {
+      kind: 'punished',
+      cityId: 'c1',
+      city: 'Ashford',
+      worth: 240,
+      seq: 1,
+      ...at,
+    } as const
+    const army = "The Trade Organization's army"
+    const line = (e: Partial<Extract<RealmEvent, { kind: 'punished' }>>) =>
+      describeEvent({ ...trip, what: 'left', ...e }).text
+    expect(line({ what: 'arrived' })).toBe(`${army} has arrived at Ashford.`)
+    expect(line({ took: 240, why: 'enough' })).toBe(
+      `${army} left Ashford, taking 240 of the 240 Coins' worth it came for.`,
+    )
+    expect(line({ took: 0, why: 'empty' })).toBe(
+      `${army} left Ashford, taking 0 of the 240 Coins' worth it came for: the storages of Ashford held nothing.`,
+    )
+    expect(line({ took: 90, why: 'gaveUp' })).toBe(
+      `${army} left Ashford, taking 90 of the 240 Coins' worth it came for: it ran out of time there.`,
+    )
+    expect(line({ what: 'turnedBack', why: 'cityLost' })).toBe(
+      `${army} turned back without reaching Ashford: Ashford is no longer yours.`,
+    )
+    expect(line({ what: 'turnedBack', why: 'directiveLifted' })).toBe(
+      `${army} turned back without reaching Ashford: the admin directive was lifted.`,
+    )
+    expect(line({ what: 'turnedBack', why: 'noWay' })).toBe(
+      `${army} turned back without reaching Ashford: it found no way to Ashford.`,
+    )
+    expect(line({ what: 'lost', where: 'wayThere' })).toBe(
+      `${army} was lost on its way to Ashford.`,
+    )
+    expect(line({ what: 'lost', where: 'atCity', took: 10 })).toBe(
+      `${army} was lost at Ashford, having taken 10 of the 240 Coins' worth it came for.`,
+    )
+    expect(line({ what: 'lost', where: 'wayHome', took: 10 })).toBe(
+      `${army} was lost on its way home from Ashford, with 10 of the 240 Coins' worth it came for.`,
+    )
+  })
+
   it('describes a script’s trouble', () => {
     const who = { residentId: 'r1', name: 'Mara', scriptId: 3, seq: 9, ...at } as const
     expect(
