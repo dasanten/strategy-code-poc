@@ -1092,10 +1092,10 @@ export function Wiki() {
           else the nearest storage of their realm.
         </p>
         <p>
-          A workplace's card says how much is being made there: what each of your workers there makes
-          and how much a game day at their Strength and skill, and the total of each good. It is the
-          pace while they have what they need, not a count of what has been made. Other realms'
-          workers aren't counted, as their stats aren't known.
+          A workplace's card says how much is being made there: what each of your workers there
+          makes and how much a game day at their Strength and skill, and the total of each good. It
+          is the pace while they have what they need, not a count of what has been made. Other
+          realms' workers aren't counted, as their stats aren't known.
         </p>
         <p>
           A smelter, mint or smithy has no storage: it works what its workers carry and what lies in
@@ -1664,14 +1664,14 @@ export function Wiki() {
         <p>
           Every Player may claim {num(HORSE_GRANT_HORSES)} new horses once, whenever they choose and
           whether or not they have horses: a notice at the top of the screen has a Claim button
-          until they do. The horses get new stats and ages and go in your finished stable
-          nearest your Leader's city; with no stable, they stand next to that city's storage (or
-          next to your Leader), each with {num(HORSE_GRANT_FOOD)} Food on the ground by it. The
-          realm log says where they are. Once claimed the offer is gone, also after your Leader dies
-          and you found a new realm; while you have no living Leader you can't claim it. An admin
-          can offer horses again, to every Player or to one: if you had claimed, the notice comes
-          back and you may claim once more, whether or not you still have horses. If you hadn't, you
-          still have just the one claim.
+          until they do. The horses get new stats and ages and go in your finished stable nearest
+          your Leader's city; with no stable, they stand next to that city's storage (or next to
+          your Leader), each with {num(HORSE_GRANT_FOOD)} Food on the ground by it. The realm log
+          says where they are. Once claimed the offer is gone, also after your Leader dies and you
+          found a new realm; while you have no living Leader you can't claim it. An admin can offer
+          horses again, to every Player or to one: if you had claimed, the notice comes back and you
+          may claim once more, whether or not you still have horses. If you hadn't, you still have
+          just the one claim.
         </p>
         <h3>Deliveries and transfers</h3>
         <p>
@@ -1725,6 +1725,20 @@ export function Wiki() {
           city under Cities in sight. Its trade section lists what you <strong>can buy</strong>{' '}
           there and what you <strong>can sell</strong>, with the units and the price of each. Anyone
           with a resident in sight of it sees its prices.
+        </p>
+        <h3>Offers at a Player's storage</h3>
+        <p>
+          A storage of your realm can stand an <strong>offer</strong>: "gives 10 Wood, wants 5
+          Stone", either side may be Coins, as many times over as you name and the goods are there.
+          Post it under the city's trade section, wherever your residents are. The goods stay in the
+          storage but are <strong>set aside</strong>: your workers, builders, Fetch, haul routes,
+          pick-ups and refills leave them alone, while a thief or raider can take them like any
+          others, cutting the offer down. Anyone in sight sees it and its rate. Someone of another
+          realm, a resident or carriage on the storage's tile, accepts it as many times as they can
+          pay and carry. It happens at once, whether you are online or not, and raises standing both
+          ways like a trade. What they pay goes into the storage as ordinary goods. It ends when it
+          is used up, when you take it down, or when the storage is torn down or no longer yours;
+          what was set aside is ordinary goods of that storage again.
         </p>
         <h3>Sending a trader</h3>
         <p>

@@ -778,6 +778,7 @@ export type ResidentOrder =
   | TradeOrder
   | HandInOrder
   | BuyOffOrder
+  | AcceptOfferOrder
   | RelocateOrder
   | FeedOrder
 
@@ -829,6 +830,8 @@ export interface WorldState {
   deliveries: Delivery[]
   /** Transfers between realms ordered and not yet done, oldest first (`CONTEXT.md`: Transfer). */
   transfers: Transfer[]
+  /** The offers standing at Players' storages, oldest first (`CONTEXT.md`: Offer). */
+  offers: Offer[]
   /**
    * How often each caravan route was robbed (`CONTEXT.md`: Guaranteed carriage), by the trading
    * post at its far end; a route never robbed has no entry.
@@ -1246,6 +1249,40 @@ export interface BuyOffOrder {
   directiveId: string
   carriageId: string | null
 }
+
+/**
+ * Accepting an offer (`CONTEXT.md`: Offer): the resident, standing on its storage's tile, takes it
+ * up to `times` times over, paying from and taking into their hands, or the load of `carriageId`
+ * on their tile. It happens this tick.
+ */
+export interface AcceptOfferOrder {
+  kind: 'acceptOffer'
+  offerId: string
+  times: number
+  carriageId: string | null
+}
+
+/**
+ * What a Player posts at a storage of their realm (`CONTEXT.md`: Offer): "gives 10 Wood, wants 5
+ * Stone", `times` more times over. The goods stay in the storage's stock; `times` × `givesUnits`
+ * of them are set aside (`setAsideAt`). Plain data.
+ */
+export interface Offer {
+  id: string
+  /** The realm that posted it. */
+  realmId: string
+  storageId: string
+  /** The storage's tile, for the log once the storage is gone. */
+  x: number
+  y: number
+  gives: Good
+  givesUnits: number
+  wants: Good
+  wantsUnits: number
+  /** How many times over it can still be accepted; at least one while it stands. */
+  times: number
+}
+
 /**
  * How the Organization `of` regards `toward` (`CONTEXT.md`: Standing), from -`STANDING_RANGE`
  * to +`STANDING_RANGE`. An Organization is a realm's id, an NPC city's id, or `TRADE_ORG`
@@ -1578,6 +1615,63 @@ export type RealmEventWhat =
       units: number
       wanted: number
       coins: number
+      x: number
+      y: number
+    }
+  /**
+   * The resident `name` accepted an offer of `realm` at the storage at (`x`, `y`), `times` of the
+   * `wanted` times over (`CONTEXT.md`: Offer): they got `givesUnits` of `gives` for `wantsUnits` of
+   * `wants`, all told. None when it couldn't be done.
+   */
+  | {
+      kind: 'offerAccepted'
+      residentId: string
+      name: string
+      realm: string
+      gives: Good
+      givesUnits: number
+      wants: Good
+      wantsUnits: number
+      times: number
+      wanted: number
+      x: number
+      y: number
+    }
+  /** `by` accepted the realm's offer at (`x`, `y`), `times` over, all told as `offerAccepted`. */
+  | {
+      kind: 'offerTaken'
+      by: string
+      gives: Good
+      givesUnits: number
+      wants: Good
+      wantsUnits: number
+      times: number
+      x: number
+      y: number
+    }
+  /** Goods gone from the storage cut the realm's offer down to `times` over (`CONTEXT.md`: Offer). */
+  | {
+      kind: 'offerCutDown'
+      gives: Good
+      givesUnits: number
+      wants: Good
+      wantsUnits: number
+      times: number
+      x: number
+      y: number
+    }
+  /**
+   * The realm's offer at (`x`, `y`) ended (`CONTEXT.md`: Offer): used up, taken down by its Player,
+   * with the storage torn down or no longer the realm's, or its goods gone from the storage. What
+   * was left of it is ordinary goods.
+   */
+  | {
+      kind: 'offerEnded'
+      gives: Good
+      givesUnits: number
+      wants: Good
+      wantsUnits: number
+      why: 'usedUp' | 'takenDown' | 'storageLost' | 'goodsGone'
       x: number
       y: number
     }

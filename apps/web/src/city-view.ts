@@ -1,3 +1,4 @@
+import { offerStoragesOf } from './offers-view.js'
 import {
   deliveryStorage,
   nearestWarehouse,
@@ -467,7 +468,8 @@ export function npcStoragesInSight(
 
 /**
  * Whether the city's panel shows trading (`CONTEXT.md`: Trade section): a warehouse or NPC
- * storage of it in sight, or a transfer the Player can send it. Then it links "How to trade".
+ * storage of it in sight, a transfer the Player can send it, or a storage with offers or that the
+ * Player can post one at (`CONTEXT.md`: Offer). Then it links "How to trade".
  */
 export function tradesHere(
   city: SeenCity,
@@ -477,7 +479,8 @@ export function tradesHere(
   return (
     warehousesInSight(city, seen).length > 0 ||
     npcStoragesInSight(city, seen).length > 0 ||
-    takesTransfers(city, seen, realmId)
+    takesTransfers(city, seen, realmId) ||
+    offerStoragesOf(city, seen, realmId).length > 0
   )
 }
 

@@ -1,4 +1,5 @@
 import {
+  freeStock,
   DELIVERY_DRIVE_TRIES,
   commands,
   DELIVERY_LOAD,
@@ -455,7 +456,8 @@ export function runTransfer(
       return
     }
   }
-  const stock = b.stock ?? {}
+  // A pick-up leaves what is set aside for an offer alone (`CONTEXT.md`: Offer).
+  const stock = freeStock(world, b)
   const hands = (g: Good) => unitsThatFit(driver, g, world.tick)
   const fits = (g: Good) => unitsThatFitCarriage(world, carriage, g)
   const take = (from: GoodsSpot, good: Good, units: number, onto: 'carriage' | 'stop') => {
