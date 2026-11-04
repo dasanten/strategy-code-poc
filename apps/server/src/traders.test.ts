@@ -215,6 +215,23 @@ describe('evening out a load', () => {
     })
   })
 
+  it('makes room for Food and Coins on a carriage full of goods the place has as much of', () => {
+    const level = { wood: 200, stone: 200 }
+    const { leave, take } = evenOutLoad(
+      { ...level, food: 300, coins: 5_000 },
+      { ...level, food: CARAVAN_FOOD },
+      CARAVAN_FOOD,
+      CARRIAGE_CAPACITY,
+    )
+    expect(take.food).toBeGreaterThan(50)
+    expect(take.coins).toBeGreaterThan(1_000)
+    expect(leave.wood).toBe(leave.stone)
+    expect(leave.wood).toBeGreaterThan(0)
+    const after = 400 - leave.wood! - leave.stone! + take.food! + take.coins! * 0.02 + CARAVAN_FOOD
+    expect(after).toBeLessThanOrEqual(CARRIAGE_CAPACITY)
+    expect(after).toBeGreaterThan(CARRIAGE_CAPACITY - 10)
+  })
+
   it('takes only what the carriage holds, cutting every good by the same share', () => {
     const { take } = evenOutLoad(
       { wood: 2_000, stone: 2_000, spear: 400 },
@@ -235,8 +252,14 @@ describe('evening out a load', () => {
     expect(take).toEqual({ stone: 50 })
   })
 
-  it('takes nothing with no room, even with a load over what its horse can pull', () => {
-    expect(evenOutLoad({ wood: 100 }, { stone: 500 }, 0, 100).take).toEqual({})
+  it('leaves what is over with a load more than its horse can pull', () => {
+    const { leave, take } = evenOutLoad({ wood: 100 }, { stone: 500 }, 0, 100)
+    expect(500 - leave.stone! + take.wood!).toBeLessThanOrEqual(100)
+    expect(take.wood).toBeGreaterThan(0)
+  })
+
+  it('takes nothing with no room beside the Food the crew keep on board', () => {
+    expect(evenOutLoad({ wood: 100 }, { food: 100 }, 100, 100)).toEqual({ leave: {}, take: {} })
   })
 })
 

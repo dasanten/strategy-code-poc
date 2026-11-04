@@ -169,11 +169,13 @@ export function putHqOnLoops(world: WorldState, size: number): void {
 
 /**
  * What evens out a trader's load with a warehouse holding `there` (`CONTEXT.md`: Wandering trader),
- * every good including Food and Coins: half of what the load has more of than the warehouse is left
- * there, and half of what it has less of is taken, as far as the carriage holds (`capacity`, by its
- * horse's Strength). When it can't hold all that, each good to take is cut by the same share, so
- * every good travels and not only the first. The Food the crew keep on board (`keepFood`) is not
- * load: it is neither left nor weighed against the warehouse's.
+ * every good including Food and Coins: of each it means to carry on half way between its load and
+ * the warehouse, leaving what it has over that and taking what it has under. When the carriage can't
+ * hold all that (`capacity`, by its horse's Strength), each good's half way is cut by the same share,
+ * so every good travels: otherwise goods the caravans keep level, in bulk, would fill it for good and
+ * leave no room for the Food and Coins only a trader brings. The Food the crew keep on board
+ * (`keepFood`) is not load: it is neither left nor weighed against the warehouse's, but it takes up
+ * room.
  */
 export function evenOutLoad(
   there: Stock,
@@ -181,22 +183,21 @@ export function evenOutLoad(
   keepFood: number,
   capacity: number,
 ): NonNullable<Trader['plan']> {
+  const carried = (g: Good) => Math.max(0, (load[g] ?? 0) - (g === 'food' ? keepFood : 0))
+  const halfWay: Stock = {}
+  for (const g of GOODS) halfWay[g] = Math.max(0, (carried(g) + (there[g] ?? 0)) / 2)
+  const room = Math.max(0, capacity - stockWeight({ food: Math.min(load.food ?? 0, keepFood) }))
+  const share = Math.min(1, room / Math.max(stockWeight(halfWay), 1e-9))
   const leave: Stock = {}
-  const wanted: Stock = {}
-  for (const g of GOODS) {
-    const kept = g === 'food' ? keepFood : 0
-    const carried = Math.max(0, (load[g] ?? 0) - kept)
-    const more = Math.floor((carried - (there[g] ?? 0)) / 2)
-    const less = Math.floor(((there[g] ?? 0) - carried) / 2)
-    if (more > 0) leave[g] = more
-    else if (less > 0) wanted[g] = less
-  }
-  const room = Math.max(0, capacity - stockWeight(load) + stockWeight(leave))
-  const share = Math.min(1, room / Math.max(stockWeight(wanted), 1e-9))
   const takes: Stock = {}
-  for (const [g, units] of Object.entries(wanted) as [Good, number][]) {
-    const n = Math.floor(units * share + 1e-9)
-    if (n > 0) takes[g] = n
+  for (const g of GOODS) {
+    const aim = halfWay[g]! * share
+    // Rounded so that what it ends up with fits, when it was cut to fit.
+    const over = carried(g) - aim
+    const more = share < 1 ? Math.ceil(over - 1e-9) : Math.floor(over + 1e-9)
+    const less = Math.floor(aim - carried(g) + 1e-9)
+    if (more > 0) leave[g] = more
+    else if (less > 0) takes[g] = less
   }
   return { leave, take: takes }
 }

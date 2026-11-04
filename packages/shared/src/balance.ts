@@ -661,14 +661,29 @@ export const TRADING_POST = {
   food: 75,
   /** Coins in its warehouse. */
   coins: 2_000,
-  /** Goods in its warehouse, in units. */
-  goods: { wood: 50, stone: 50, ironOre: 20, iron: 10, spear: 4 } as Partial<Record<Good, number>>,
+  /**
+   * Goods in its warehouse, in units: twice its floor (`WAREHOUSE_FLOOR`), so it has a market of every
+   * good until its first trader and caravan come by, and its soldiers' weapons.
+   */
+  goods: {
+    food: 40,
+    wood: 50,
+    stone: 50,
+    ironOre: 20,
+    iron: 10,
+    goldOre: 10,
+    spear: 4,
+    sword: 2,
+    shield: 4,
+    armour: 2,
+  } as Partial<Record<Good, number>>,
 }
 
 /**
- * A trading post's stock floor (`CONTEXT.md`: Stock floor, ADR 0003), in units: once a game day
- * its warehouse tops up every good below this to this. Half of what a post starts with, so a
- * fresh post is well above it.
+ * A trading post's stock floor (`CONTEXT.md`: Stock floor, ADR 0023), in units: what its spare
+ * hands, caravan and wandering traders go for, and what its prices are reckoned from. It tops up
+ * nothing at a post; the HQ's warehouses top up to `HQ_FLOOR_FACTOR` times this each game day. Half
+ * of what a post starts with, so a fresh post is well above it.
  */
 export const WAREHOUSE_FLOOR: Record<Good, number> = {
   food: 20,
@@ -686,6 +701,14 @@ export const WAREHOUSE_FLOOR: Record<Good, number> = {
 
 /** How many times a trading post's floor (`WAREHOUSE_FLOOR`) the Trade Org HQ's warehouses keep. */
 export const HQ_FLOOR_FACTOR = 5
+
+/**
+ * How many times a trading post's floor of Food the HQ's warehouse keeps, instead of
+ * `HQ_FLOOR_FACTOR`: wandering traders alone carry Food to the posts (`CONTEXT.md`: Caravan, Wandering
+ * trader) and it spoils on the way, so they leave the HQ with more of it, for the posts far along
+ * their loop.
+ */
+export const HQ_FOOD_FLOOR_FACTOR = 15
 
 /**
  * What a warehouse sells a unit of each good for, in coins, when it holds `PRICE_REFERENCE_FLOORS`
@@ -767,10 +790,12 @@ export const CARAVAN_SPREAD = 8
 
 /**
  * How many wandering traders the HQ sends out (`CONTEXT.md`: Wandering trader), spread evenly round
- * one loop of all its posts and itself, or one for each post with fewer. A full-size map's 16 posts
- * lie about 6 game days' drive apart, so with four a post sees a trader about every 25 game days.
+ * one loop of all its posts and itself, or one for each post with fewer. A full-size map's loop takes
+ * about 150 game days with its stops, so with six a post sees a trader about every 25 game days. They
+ * are all that brings a post Food and Coins (ADR 0023): with four, posts far along the loop run out
+ * of Food with nobody buying it, as it spoils between visits.
  */
-export const TRADERS = 4
+export const TRADERS = 6
 
 /**
  * Residents of the Trade Org HQ who walk along with each wandering trader as its escort, besides

@@ -77,6 +77,7 @@ import {
   HORSE_WAKE_HEALTH,
   HORSE_GRANT_FOOD,
   HQ_FLOOR_FACTOR,
+  HQ_FOOD_FLOOR_FACTOR,
   HORSE_GRANT_HORSES,
   HORSE_HUNGRY_SHARE,
   HORSE_NAME_MAX_LENGTH,
@@ -1725,7 +1726,9 @@ export function Wiki() {
           driver and {num(TRADER_ESCORTS)} escorts, round a fixed loop of the trading posts and the
           HQ. At each stop a trader evens out its load with the warehouse, every good including Food
           and Coins: it leaves what that place has less of and takes what it has more of, as far as
-          the carriage holds. That is how a post comes to hold goods it doesn't produce. The HQ is a
+          the carriage holds, every good cut alike when it can't hold it all. That is how a post
+          comes to hold goods it doesn't produce, and caravans carry no Food or Coins, so a post gets
+          those only from traders. The HQ is a
           stop like a post, its Coins going through its coin warehouse and its other goods through
           its goods warehouse, so new Food and Coins reach the posts, and a trader's lost escorts
           are made up there each time round. Its crew and a lost carriage go as for a caravan, and
@@ -1916,17 +1919,28 @@ export function Wiki() {
           The Trade Organization runs its own chain the same way. A trading post's reserve is its
           warehouse's stock floor ({num(WAREHOUSE_FLOOR.ironOre)} Iron ore,{' '}
           {num(WAREHOUSE_FLOOR.wood)} Wood, {num(WAREHOUSE_FLOOR.coins)} coins and so on), the HQ's{' '}
-          {num(HQ_FLOOR_FACTOR)} times that; their Food is their storage's, kept by their farmers.
+          {num(HQ_FLOOR_FACTOR)} times that, and {num(HQ_FOOD_FLOOR_FACTOR)} times its{' '}
+          {num(WAREHOUSE_FLOOR.food)} Food for the traders to carry; their Food is their storage's, kept by their farmers.
           Their spare hands work and build for whatever their warehouses are short of, on the
-          nearest node within {num(NPC_NODE_REACH)} tiles, and carry the output into the warehouse,
-          so less of its stock comes from the floor. A post never grows in people; the HQ grows only
-          while it is too weak. Neither sends a trader or founds a city.
+          nearest node within {num(NPC_NODE_REACH)} tiles, and carry the output into the warehouse.
+          A post never grows in people; the HQ grows only while it is too weak. Neither sends a
+          trader or founds a city.
+        </p>
+        <p>
+          Only the HQ's warehouses top up to their floor at the end of each game day, so the world
+          always has a market of last resort. Nothing tops up a trading post's warehouse: its floor only says what
+          its spare hands, caravan and wandering traders go for, and all it holds came by them or
+          from people selling to it. A post can run dry, even of Food and Coins, and its prices climb
+          as it does, so prices differ with what reached each post. Rob a trader or raid a post and
+          you empty a real market. Its people and soldiers eat from its storage, which its farm fills,
+          not from the Food on sale in the warehouse.
         </p>
         <p>
           The Trade Organization lives on in its trading posts should its HQ ever fall: they keep
-          their warehouses, prices, stock floor and soldiers and go on trading in person. What only
-          the HQ gave it is gone for good, though: no caravans, so no deliveries or transfers, no
-          army to hire and nobody sent out to punish. See "The fall of the HQ" for what that costs.
+          their warehouses, prices and soldiers and go on trading in person, but with no caravans and
+          no traders their warehouses hold only what they had and what their own hands bring. What
+          only the HQ gave it is gone for good: no deliveries or transfers, no army to hire and
+          nobody sent out to punish. See "The fall of the HQ" for what that costs.
         </p>
         <p>
           Once one good's surplus makes a full load for one of its spare hands (beside the Food for
@@ -2179,8 +2193,9 @@ export function Wiki() {
           new ones. Every contract with the Trade Organization ends at once, with no refund and no
           loss of standing: soldiers you hired from it are the captor's where they stand, and your
           mercenaries guarding the HQ walk home. Its punishments end, and admin directives stay in
-          force and can be bought off at a post, but it sends nobody out for them. When the last
-          trading post falls too, the Trade Organization is gone.
+          force and can be bought off at a post, but it sends nobody out for them. With no caravans
+          or wandering traders the posts' warehouses get only what their own hands bring and what
+          people sell them. When the last trading post falls too, the Trade Organization is gone.
         </p>
         <h3>What joins with a city</h3>
         <p>
