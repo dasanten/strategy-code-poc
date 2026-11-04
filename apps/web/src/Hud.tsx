@@ -53,6 +53,13 @@ const ICONS: Record<DrawerId | KeyGood | 'crown', ReactNode> = {
       <path d="M10 8h6M10 12h6" />
     </>
   ),
+  demands: (
+    <>
+      <path d="M5 4h14v16H5z" />
+      <path d="M12 7v7" />
+      <circle cx="12" cy="17" r="1" fill="currentColor" />
+    </>
+  ),
   alliance: (
     <>
       <path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z" />
@@ -545,6 +552,34 @@ export function HorseOfferNotice({
       </span>
       <button type="button" disabled={busy} onClick={() => void claim()}>
         Claim
+      </button>
+    </aside>
+  )
+}
+
+/**
+ * New demands on the Player's realm (`CONTEXT.md`: Demand, Notices): who asks and for what. Opening
+ * the Demands drawer or dismissing it puts it away; the demands themselves wait in the drawer.
+ */
+export function DemandNotice({
+  line,
+  onOpen,
+  onDismiss,
+}: {
+  line: string
+  onOpen: () => void
+  onDismiss: () => void
+}) {
+  return (
+    <aside className="notice demand-notice" role="status">
+      <span className="notice-text" title={line}>
+        {line}
+      </span>
+      <button type="button" onClick={onOpen}>
+        Open
+      </button>
+      <button type="button" aria-label="Dismiss" onClick={onDismiss}>
+        ×
       </button>
     </aside>
   )

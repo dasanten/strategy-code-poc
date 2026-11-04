@@ -6,7 +6,7 @@ import { isWide, type OpenDrawer } from './hud-view.js'
  * banner, in the order they stack. Lasting ones come first and passing ones after, so a notice
  * that comes and goes never moves a button the Player is aiming at.
  */
-export const NOTICE_ORDER = ['horseOffer', 'firstDay', 'groupReport'] as const
+export const NOTICE_ORDER = ['horseOffer', 'demand', 'firstDay', 'groupReport'] as const
 
 /** A notice in the lane: the pick banner or one of `NOTICE_ORDER`. */
 export type NoticeKind = 'pick' | (typeof NOTICE_ORDER)[number]

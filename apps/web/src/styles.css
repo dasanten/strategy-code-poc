@@ -1765,6 +1765,40 @@ button.residents-row.selected:hover {
   background: var(--ui-raised);
   color: var(--ui-text);
 }
+/* A demand's note (`CONTEXT.md`: Demand): the sender's words as they wrote them, line breaks and
+   long words kept inside the drawer. */
+.demand-note {
+  margin: 4px 0;
+  padding: 6px 8px;
+  border-left: 3px solid var(--ui-line-strong);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.demand-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+}
+.demand-goods {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.demand-goods li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.demand-goods select {
+  min-width: 0;
+  flex: 1 1 8em;
+}
+.demand-goods input[type='number'] {
+  width: 72px;
+}
 .game.phone .contract-field {
   grid-template-columns: minmax(0, 1fr);
   gap: 2px;

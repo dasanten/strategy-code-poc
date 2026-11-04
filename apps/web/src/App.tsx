@@ -51,6 +51,8 @@ import { AlliancePanel } from './Alliance.js'
 import { commandsSeen } from './alliance-army.js'
 import { ArmiesPanel, type ArmyPick } from './Armies.js'
 import { ContractsPanel } from './Contracts.js'
+import { demandNoticeLine, demandSides } from './demand-view.js'
+import { DemandsPanel } from './Demands.js'
 import { StandingPanel } from './Standing.js'
 import { TileMenu, WaypointsPanel } from './Waypoints.js'
 import { api } from './api.js'
@@ -62,6 +64,7 @@ import {
   DrawerEdge,
   FirstDayCard,
   GroupReportNotice,
+  DemandNotice,
   HorseOfferNotice,
   NoticeLane,
   PhoneMenu,
@@ -411,6 +414,23 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [focus, setFocus] = useState<{ x: number; y: number; cover: Covered }>()
   // The drawer open over the map, if any (ADR 0008: one at a time).
   const [openDrawer, setOpenDrawer] = useState<OpenDrawer>()
+  // The notice of demands sent to the realm (`CONTEXT.md`: Demand), until the Player dismisses it
+  // or has them in front of them in the drawer.
+  const [demandsPutAway, setDemandsPutAway] = useState<ReadonlySet<string>>(new Set())
+  const demands = world?.diplomacy.demands
+  const homeRealm = world?.home.realmId
+  const putDemandsAway = useCallback(() => {
+    if (demands && homeRealm) {
+      setDemandsPutAway(new Set(demandSides(demands, homeRealm).incoming.map((d) => d.id)))
+    }
+  }, [demands, homeRealm])
+  useEffect(() => {
+    if (openDrawer === 'demands') putDemandsAway()
+  }, [openDrawer, putDemandsAway])
+  const demandNotice =
+    demands && homeRealm
+      ? demandNoticeLine(demands, homeRealm, demandsPutAway, openDrawer === 'demands')
+      : undefined
   const closeDrawer = useCallback(() => setOpenDrawer(undefined), [])
   useEscapeCloses(openDrawer, closeDrawer)
   /** Opens a script in the library, at a version and line when given. */
@@ -1482,6 +1502,19 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         )}
       {world &&
         drawer(
+          'demands',
+          <DemandsPanel
+            demands={world.diplomacy.demands}
+            realmId={world.home.realmId}
+            knownRealms={world.diplomacy.knownRealms}
+            cities={world.cities}
+            lastSeen={world.lastSeen.cities}
+            tick={world.tick}
+            sendOrder={sendOrder}
+          />,
+        )}
+      {world &&
+        drawer(
           'alliance',
           <AlliancePanel
             diplomacy={world.diplomacy}
@@ -1567,6 +1600,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         {laneNotices({
           pick: pick !== undefined,
           horseOffer: world?.horseOffer,
+          demand: demandNotice !== undefined,
           firstDay: world !== null && firstDayShown(world.firstDay),
           groupReport: groupReport !== undefined,
         }).map((kind) =>
@@ -1589,6 +1623,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               key={kind}
               horses={HORSE_GRANT_HORSES}
               onClaim={() => sendOrder({ kind: 'claimHorses' })}
+            />
+          ) : kind === 'demand' && demandNotice ? (
+            <DemandNotice
+              key={kind}
+              line={demandNotice}
+              onOpen={() => setOpenDrawer('demands')}
+              onDismiss={putDemandsAway}
             />
           ) : kind === 'firstDay' && world ? (
             <FirstDayCard

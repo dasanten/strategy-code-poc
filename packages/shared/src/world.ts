@@ -818,6 +818,8 @@ export interface WorldState {
   standings: Standing[]
   /** Mercenary contracts offered or in force (`CONTEXT.md`: Mercenary contract). */
   contracts: MercenaryContract[]
+  /** Demands not yet answered, oldest first (`CONTEXT.md`: Demand). */
+  demands: Demand[]
   /**
    * NPC cities asking a realm to join it, and asks a realm declined that the city still
    * remembers (`CONTEXT.md`: Persuading a city).
@@ -1935,6 +1937,21 @@ export type RealmEventWhat =
       weeks?: number
       leaderDied?: 'lender' | 'hirer'
     }
+  /**
+   * A demand (`CONTEXT.md`: Demand) between this realm and the realm `other` (by its realm name):
+   * `sent` by this realm, `received` from the other, `accepted` or `declined` by the one it was
+   * sent to, or `lapsed` at its deadline. `mine` when this realm sent it. `leaderDied` says which
+   * side's Leader died when that made it lapse early. Its note stays out of the log.
+   */
+  | {
+      kind: 'demand'
+      demandId: string
+      what: 'sent' | 'received' | 'accepted' | 'declined' | 'lapsed'
+      mine: boolean
+      other: string
+      terms: DemandTerms
+      leaderDied?: 'sender' | 'receiver'
+    }
 
 /**
  * Something that happened in a Player's realm, for their log. Plain data. It belongs to the
@@ -2009,6 +2026,37 @@ export interface Realm {
    * from before realm names have none and go by their Leader's name until named.
    */
   name?: string
+  /**
+   * When the realm last sent demands, oldest first, only those still counting against
+   * `DEMANDS_PER_GAME_DAY` (`CONTEXT.md`: Demand). None while it has sent none lately.
+   */
+  demandsSentAt?: number[]
+}
+
+/**
+ * What a demand asks for (`CONTEXT.md`: Demand): a named city, under the name the sender knew it
+ * by, or goods and Coins.
+ */
+export type DemandTerms =
+  | { kind: 'city'; cityId: string; cityName: string }
+  | { kind: 'goods'; goods: Partial<Record<Good, number>> }
+
+/**
+ * A demand waiting for its answer (`CONTEXT.md`: Demand; ADR 0024): it goes once it is accepted,
+ * declined or lapses, and the realm logs say which. Plain data (ADR 0002).
+ */
+export interface Demand {
+  id: string
+  /** The realm that sent it. */
+  fromId: string
+  /** The realm it was sent to, the only one who can answer it. */
+  toId: string
+  terms: DemandTerms
+  /** The sender's words: plain text, trimmed, at most `DEMAND_NOTE_MAX_LENGTH` characters. */
+  note: string
+  sentAt: number
+  /** The tick it lapses at, unanswered. */
+  deadline: number
 }
 
 /**

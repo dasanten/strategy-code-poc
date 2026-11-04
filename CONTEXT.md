@@ -671,7 +671,11 @@ The shared language of the game. Domain terms only — no implementation details
 - **Demand:** a Player or the Trade Organization sends a demand to another Organization: **terms**
   (hand over a named city; hand over goods or Coins), a short written note, and a deadline. It
   arrives at once, like a mercenary offer, wherever the other side is, and sending them is limited.
-  They accept, decline or let it lapse; the sender hears that at once.
+  A Player can send one to any realm they know of: one they see residents of, an ally, one whose city
+  they have seen (Last seen), one with a standing toward them or they toward it, or their side in a
+  contract or demand. Both sides see it in their Demands drawer until it is answered, and a notice
+  tells the one it is sent to. They accept, decline or let it lapse; the sender hears that at once,
+  and it lapses too when either side's Leader dies. The note is plain text.
   - **The threat is only words.** Ignoring a demand does nothing by itself. Whatever was threatened
     is the sender's to carry out, or not. The game forbids nothing.
   - **Accepting** carries the terms out: a named city joins the sender's realm at once, as a captured
@@ -1305,8 +1309,8 @@ The shared language of the game. Domain terms only — no implementation details
   (has weapons, idle, child, by city, and the like) and sorted by any column; the choice is kept per
   browser. Tapping a row opens that resident. **Pick these** picks everyone listed, or those ticked,
   as a Group on the map. Only the UI: nothing new is kept in the world. It works on a phone.
-- **Notices:** what the HUD tells the Player unasked (the Horse offer, the pick banner, a group
-  order's report, the first-day card) shows in one lane under the top bar, over the map and never
+- **Notices:** what the HUD tells the Player unasked (the Horse offer, a demand sent to them, the
+  pick banner, a group order's report, the first-day card) shows in one lane under the top bar, over the map and never
   over a drawer or card. While the pick banner shows it replaces the others; they come back after.
 - **First day:** a new realm's HUD shows a checklist card: claim the Horse offer, pick a
   resident, give them an order, open the Wiki. Each line is ticked when the game sees it done;

@@ -184,11 +184,21 @@ describe('world saves', () => {
     expect(checkInvariants(v80, land)).toEqual([])
   })
 
+  it('gives a format 80 world an empty list of demands (migration 80 → 81)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const old: Partial<typeof world> = { ...world }
+    delete old.demands
+    const v81 = migrateWorld(structuredClone(old), 80, { terrain: land }, migrations, 81)
+    expect(v81.demands).toEqual([])
+    expect(v81.realms).toEqual(world.realms)
+    expect(checkInvariants(v81, land)).toEqual([])
+  })
+
   it('leaves realms from before realm names unnamed (migration 38 → 39)', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(80)
+    expect(WORLD_FORMAT_VERSION).toBe(81)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)

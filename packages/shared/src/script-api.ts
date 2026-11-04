@@ -1,4 +1,7 @@
 import {
+  DEMANDS_PER_GAME_DAY,
+  DEMAND_MAX_DAYS,
+  DEMAND_NOTE_MAX_LENGTH,
   DOING_MAX_LENGTH,
   EXPLORED_EDGE_RANGE,
   EXPLORE_SKIP_RANGE,
@@ -132,6 +135,11 @@ const SHARED: readonly ScriptBinding[] = [
     'waypoints',
     'waypoint',
     'My Player’s waypoints, oldest first: the named markers they put on the map, which only they see.',
+  ),
+  list(
+    'demands',
+    'demand',
+    'The demands my realm sent or was sent that wait for an answer, oldest first.',
   ),
   list(
     'withMemory',
@@ -536,6 +544,13 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     [],
     'Claim my Player’s Horse offer: two new horses for my realm, in its stable nearest the Leader’s city, or else by a storage or the Leader with Food by them. Free and at once; refused once claimed, unless an admin has offered horses again, or while my realm has no living Leader.',
   ),
+  action(
+    'sendDemand',
+    ['realmId', 'terms', 'note', 'days'],
+    `Send a realm my realm knows of a demand, wherever it is: \`terms\` is \`{ kind: "city", cityId: id }\` for a city of theirs I know of, or \`{ kind: "goods", goods: { food: 5, coins: 20 } }\`, with a note of at most ${DEMAND_NOTE_MAX_LENGTH} characters and a deadline 1 to ${DEMAND_MAX_DAYS} game days away. My realm sends at most ${DEMANDS_PER_GAME_DAY} a game day. It is only words: nothing happens by itself when it is ignored.`,
+  ),
+  action('acceptDemand', ['demandId'], 'Accept a demand sent to my realm.'),
+  action('declineDemand', ['demandId'], 'Decline a demand sent to my realm.'),
   action(
     'roadLine',
     ['x', 'y'],

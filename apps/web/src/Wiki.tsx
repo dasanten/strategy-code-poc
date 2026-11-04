@@ -164,6 +164,9 @@ import {
   STANDING_CONTRACT_BROKEN_LOSS,
   STANDING_DRIFT_PER_DAY,
   STANDING_PER_PAID_WEEK,
+  DEMANDS_PER_GAME_DAY,
+  DEMAND_MAX_DAYS,
+  DEMAND_NOTE_MAX_LENGTH,
   STANDING_RANGE,
   STANDING_TRADE_COINS_PER_POINT,
   START_RESIDENTS,
@@ -287,6 +290,7 @@ export const WIKI_TOPICS = [
   { id: 'how-to-trade', title: 'How to trade' },
   { id: 'trade', title: 'Trade & prices' },
   { id: 'standing', title: 'Standing & reactions' },
+  { id: 'demands', title: 'Demands' },
   { id: 'combat', title: 'Combat & walls' },
   { id: 'territory', title: 'Territory' },
   { id: 'language', title: 'Script language' },
@@ -1092,10 +1096,10 @@ export function Wiki() {
           else the nearest storage of their realm.
         </p>
         <p>
-          A workplace's card says how much is being made there: what each of your workers there makes
-          and how much a game day at their Strength and skill, and the total of each good. It is the
-          pace while they have what they need, not a count of what has been made. Other realms'
-          workers aren't counted, as their stats aren't known.
+          A workplace's card says how much is being made there: what each of your workers there
+          makes and how much a game day at their Strength and skill, and the total of each good. It
+          is the pace while they have what they need, not a count of what has been made. Other
+          realms' workers aren't counted, as their stats aren't known.
         </p>
         <p>
           A smelter, mint or smithy has no storage: it works what its workers carry and what lies in
@@ -1664,14 +1668,14 @@ export function Wiki() {
         <p>
           Every Player may claim {num(HORSE_GRANT_HORSES)} new horses once, whenever they choose and
           whether or not they have horses: a notice at the top of the screen has a Claim button
-          until they do. The horses get new stats and ages and go in your finished stable
-          nearest your Leader's city; with no stable, they stand next to that city's storage (or
-          next to your Leader), each with {num(HORSE_GRANT_FOOD)} Food on the ground by it. The
-          realm log says where they are. Once claimed the offer is gone, also after your Leader dies
-          and you found a new realm; while you have no living Leader you can't claim it. An admin
-          can offer horses again, to every Player or to one: if you had claimed, the notice comes
-          back and you may claim once more, whether or not you still have horses. If you hadn't, you
-          still have just the one claim.
+          until they do. The horses get new stats and ages and go in your finished stable nearest
+          your Leader's city; with no stable, they stand next to that city's storage (or next to
+          your Leader), each with {num(HORSE_GRANT_FOOD)} Food on the ground by it. The realm log
+          says where they are. Once claimed the offer is gone, also after your Leader dies and you
+          found a new realm; while you have no living Leader you can't claim it. An admin can offer
+          horses again, to every Player or to one: if you had claimed, the notice comes back and you
+          may claim once more, whether or not you still have horses. If you hadn't, you still have
+          just the one claim.
         </p>
         <h3>Deliveries and transfers</h3>
         <p>
@@ -2009,6 +2013,36 @@ export function Wiki() {
           Leaving an alliance takes {realSeconds(ALLIANCE_LEAVE_DELAY)}; soldiers recalled from its
           army are back under their owner's command after {realSeconds(ALLIANCE_RECALL_DELAY)}.
         </p>
+      </Section>
+
+      <Section id="demands">
+        <p>
+          A demand tells another realm what you want and by when: <strong>a named city</strong> of
+          theirs, or <strong>goods or Coins</strong>, with a note of at most{' '}
+          {num(DEMAND_NOTE_MAX_LENGTH)} characters and a deadline of up to {days(DEMAND_MAX_DAYS)}.
+          Open <strong>Demands</strong> on the tool rail to send one or to answer one. Scripts can
+          too (<code>sendDemand</code>, <code>acceptDemand</code>, <code>declineDemand</code>,{' '}
+          <code>demands</code>).
+        </p>
+        <ul>
+          <li>
+            You can send one to any realm you know of: one whose residents you see, an ally, one
+            whose city you have seen, one with a standing toward you or you toward it, or your side
+            in a contract or demand.
+          </li>
+          <li>
+            It arrives at once, wherever they are, in their Demands drawer and as a notice. A realm
+            sends at most {num(DEMANDS_PER_GAME_DAY)} a game day, scripts included.
+          </li>
+          <li>
+            They accept or decline it, or let it lapse at the deadline; it also lapses when either
+            side's Leader dies. Both realm logs say what happened.
+          </li>
+          <li>
+            <strong>The threat is only words.</strong> Ignoring a demand does nothing by itself:
+            whatever was threatened is the sender's to carry out, or not.
+          </li>
+        </ul>
       </Section>
 
       <Section id="combat">

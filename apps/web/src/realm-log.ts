@@ -25,7 +25,7 @@ export interface EventLine {
 }
 
 /** Goods as the log names them: "5 Food, 2 Iron Ore". */
-function goodsLine(goods: Partial<Record<string, number>> | undefined): string {
+export function goodsLine(goods: Partial<Record<string, number>> | undefined): string {
   return Object.entries(goods ?? {})
     .map(([g, n]) => `${n} ${g[0]!.toUpperCase()}${g.slice(1).replace(/[A-Z]/g, (c) => ` ${c}`)}`)
     .join(', ')
@@ -504,6 +504,36 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
             : `${e.name} couldn’t move in to ${e.city}: ${e.reason}.`,
         tone: 'warn',
       }
+    case 'demand': {
+      const them = `the realm of ${e.other}`
+      const terms = e.terms.kind === 'city' ? e.terms.cityName : goodsLine(e.terms.goods)
+      switch (e.what) {
+        case 'sent':
+          return { text: `You demanded ${terms} of ${them}.`, tone: 'info' }
+        case 'received':
+          return { text: `${cap(them)} demands ${terms} of you.`, tone: 'warn' }
+        case 'accepted':
+          return e.mine
+            ? { text: `${cap(them)} accepted your demand for ${terms}.`, tone: 'info' }
+            : { text: `You accepted the demand of ${them} for ${terms}.`, tone: 'info' }
+        case 'declined':
+          return e.mine
+            ? { text: `${cap(them)} declined your demand for ${terms}.`, tone: 'warn' }
+            : { text: `You declined the demand of ${them} for ${terms}.`, tone: 'info' }
+        case 'lapsed': {
+          const demand = e.mine ? `Your demand on ${them}` : `The demand of ${them}`
+          if (!e.leaderDied) {
+            return { text: `${demand} for ${terms} lapsed unanswered.`, tone: 'info' }
+          }
+          const whose =
+            e.leaderDied === (e.mine ? 'sender' : 'receiver')
+              ? 'your Leader died'
+              : `the Leader of ${them} died`
+          return { text: `${demand} for ${terms} lapsed: ${whose}.`, tone: 'info' }
+        }
+      }
+      break
+    }
     case 'contract': {
       const them = e.other === TRADE_ORG_NAME ? e.other : `the realm of ${e.other}`
       const n = e.residents === 1 ? '1 mercenary' : `${e.residents} mercenaries`
