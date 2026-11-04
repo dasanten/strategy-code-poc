@@ -767,8 +767,8 @@ export const CARAVAN_SPREAD = 8
 
 /**
  * How many wandering traders the HQ sends out (`CONTEXT.md`: Wandering trader), spread evenly round
- * one loop of all its posts, or one for each post with fewer. A full-size map's 16 posts lie about
- * 6 game days' drive apart, so with four a post sees a trader about every 25 game days.
+ * one loop of all its posts and itself, or one for each post with fewer. A full-size map's 16 posts
+ * lie about 6 game days' drive apart, so with four a post sees a trader about every 25 game days.
  */
 export const TRADERS = 4
 

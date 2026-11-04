@@ -13,14 +13,14 @@ import { grantHorses } from './horse-grant.js'
 import { horseName } from './horses.js'
 import { hash, mulberry32 } from './residents.js'
 import { paramTarget } from './script-params.js'
-import { placeTraders } from './traders.js'
+import { placeTraders, putHqOnLoops } from './traders.js'
 
 /**
  * The shape of saved world state (ADR 0006). Any change to `WorldState` that an older save
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 82
+export const WORLD_FORMAT_VERSION = 83
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -343,6 +343,14 @@ export const migrations: Record<number, MigrationStep> = {
       t.calls = null
       t.stand = null
     }
+    return world
+  },
+  // The HQ is a stop on a wandering trader's loop (`CONTEXT.md`: Wandering trader): it joins the
+  // loops of a world from before where it adds the least way, and a trader with no post left, bound
+  // for nothing until now, is bound for it.
+  82: (state, { terrain }) => {
+    const world = structuredClone(state) as WorldState
+    putHqOnLoops(world, terrain.size)
     return world
   },
 }

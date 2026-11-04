@@ -248,8 +248,20 @@ describe('the admin inspector', () => {
       trader: { ...inspection.trader, heading: 'hq' },
     })
     expect(sent.rows.find((r) => r.label === 'Doing')?.text).toBe('At the HQ, to go out to Ferry')
-    const idle = inspectorCard({ ...inspection, post: null, loop: [] })
-    expect(idle.title).toBe('Wandering trader')
+    const atCoins = inspectorCard({
+      ...inspection,
+      trader: { ...inspection.trader, stop: 'coinWarehouse' },
+    })
+    expect(atCoins.rows.find((r) => r.label === 'Doing')?.text).toBe(
+      'On its loop to Ferry, for the coin warehouse',
+    )
+    const idle = inspectorCard({
+      ...inspection,
+      trader: { ...inspection.trader, loop: ['hq'], postId: 'hq' },
+      post: { id: 'hq', name: 'Crossroads' },
+      loop: [{ id: 'hq', name: 'Crossroads' }],
+    })
+    expect(idle.title).toBe('Wandering trader to Crossroads')
     expect(idle.rows.find((r) => r.label === 'Doing')?.text).toBe(
       'At the HQ, with no post left on its loop',
     )
