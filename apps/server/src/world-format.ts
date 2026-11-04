@@ -19,7 +19,7 @@ import { paramTarget } from './script-params.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 81
+export const WORLD_FORMAT_VERSION = 85
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -344,6 +344,18 @@ export const migrations: Record<number, MigrationStep> = {
     }
     return world
   },
+  // Offers at a Player's storage (`CONTEXT.md`: Offer): nobody has posted any yet.
+  81: (state) => ({ ...(state as object), offers: [] }),
+  // A Direct offer (`CONTEXT.md`: Direct offer) adds `direct` to an offer and `directOffer` to the
+  // realm log. Every offer from before is open to anyone, so the step leaves them as they are.
+  82: (state) => state,
+  // An NPC city's trader can go to a Player's offer (`CONTEXT.md`: NPC cities at an offer;
+  // `CityTrader.offer`). No trader was on such a run before, so the step leaves every plan as it is.
+  83: (state) => state,
+  // A carried Direct offer (`CONTEXT.md`: Direct offer) adds `carried` to an offer's `direct`,
+  // `carriedOffer` to a Transfer and `unloadFee` to its caravan's job. Nothing from before is
+  // carried, so the step leaves everything as it is.
+  84: (state) => state,
 }
 
 export class WorldFormatError extends Error {}

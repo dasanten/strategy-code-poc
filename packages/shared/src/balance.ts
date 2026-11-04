@@ -542,6 +542,13 @@ export const NPC_NODE_REACH = 160
 export const NPC_TRADER_REACH = 720
 
 /**
+ * How far from its home a Player's offer may be for an NPC city to send its trader there
+ * (`CONTEXT.md`: NPC cities at an offer), in tiles: as far as it goes to a Trade Org warehouse
+ * (`NPC_TRADER_REACH`), since it is the same trader on the same Food.
+ */
+export const NPC_OFFER_REACH = 720
+
+/**
  * Game days after it left that an NPC city stops waiting for its trader (`CONTEXT.md`: NPC
  * trader): dead, robbed or stuck, they are dropped from its plan and it may send another.
  * Several times the longest trade run (`NPC_TRADER_REACH` there and back).
@@ -2191,3 +2198,16 @@ export const EXPLORED_EDGE_RANGE = 4 * SIGHT_RANGE
  * with the tile it tried.
  */
 export const EXPLORE_SKIP_RANGE = 8
+
+/**
+ * How long a Direct offer stands, in game days (`CONTEXT.md`: Direct offer): one real day, so a
+ * Player who comes by once a day can still answer and send someone. The sender can take it down
+ * sooner.
+ */
+export const DIRECT_OFFER_DAYS = 60
+
+/**
+ * How many Direct offers a realm may have standing to any one realm (`CONTEXT.md`: Direct offer):
+ * room to deal in several goods at once, and few enough that it can't flood the other's list.
+ */
+export const DIRECT_OFFERS_TO_ONE_REALM = 5

@@ -1970,6 +1970,26 @@ button.residents-row.selected:hover {
   text-transform: uppercase;
   color: var(--ui-muted);
 }
+/* An NPC city's rates (`CONTEXT.md`: Swap): a button each, wrapping to the panel's width. */
+.swap-rates ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.swap-rates button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-align: left;
+}
+.swap-rates .good-icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
 .hud-drawer form > fieldset {
   flex-basis: 100%;
 }
@@ -2311,4 +2331,43 @@ button.residents-row.selected:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
+}
+
+.storage-offers h4 {
+  margin: 0 0 4px;
+}
+
+.offer-list {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+}
+
+.offer-list li {
+  margin-bottom: 6px;
+}
+
+.offer-post input[type='number'],
+.offer-accept input[type='number'] {
+  width: 4.5em;
+}
+
+/* What others sent the Player, and what they sent, under Direct offers. */
+.incoming-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+}
+
+.incoming-list li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--ui-line);
+}
+
+.incoming-list p {
+  margin: 4px 0;
+}
+
+.incoming-list strong {
+  overflow-wrap: anywhere;
 }

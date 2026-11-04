@@ -5,6 +5,7 @@ import {
   canHandle,
   commanderOf,
   covers,
+  freeStock,
   stealsCarriage,
   putAwayUnits,
   wrapDistance,
@@ -194,7 +195,7 @@ function fetchPlace(
           b.kind === 'storage' &&
           !b.site &&
           buildingOrganization(world, b) === side &&
-          holds(b.stock),
+          holds(freeStock(world, b)),
       )
       .map((b) => ({ x: b.x, y: b.y, place: { kind: 'storage', storageId: b.id } as const })),
     ...world.carriages

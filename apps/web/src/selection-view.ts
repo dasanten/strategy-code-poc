@@ -1,3 +1,4 @@
+import { offerTerms, setAsideLine } from './offers-view.js'
 import {
   BUILD_MATERIALS,
   BUILD_WORK,
@@ -1541,6 +1542,17 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       if (live && city && tradesHere(live, city)) {
         lines.push('Buys and sells here')
         card.tradeHere = { cityId: city.id, buildingId: live.id }
+      }
+      // Offers (`CONTEXT.md`: Offer) stand at a Player's storage: anyone in sight sees them, and its
+      // own Player posts them from the trade section Trade here opens.
+      const offers = live?.kind === 'storage' ? (live.offers ?? []) : []
+      if (live && city && live.kind === 'storage' && (offers.length > 0 || rel === 'own')) {
+        if (offers.length > 0) lines.push(offers.map((o) => offerTerms(o, goodLabels)).join(' · '))
+        if (rel === 'own' && live.stock) {
+          const aside = setAsideLine(live, goodLabels)
+          if (aside) lines.push(aside)
+        }
+        card.tradeHere ??= { cityId: city.id, buildingId: live.id }
       }
     }
     if (building.teardown) lines.push(teardownLine(building))

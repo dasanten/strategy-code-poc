@@ -21,6 +21,8 @@ import {
   CARAVAN_GUARD_RANGE,
   CARAVAN_ROBBERIES_PER_ESCORT,
   CARRIAGE_CAPACITY,
+  DIRECT_OFFERS_TO_ONE_REALM,
+  DIRECT_OFFER_DAYS,
   PASSENGER_WEIGHT,
   CARRIAGE_MAX_CAPACITY,
   CARRY_BASE,
@@ -121,6 +123,7 @@ import {
   NPC_VILLAGE,
   NPC_NODE_REACH,
   NPC_TRADER_GIVE_UP_DAYS,
+  NPC_OFFER_REACH,
   NPC_TRADER_REACH,
   NPC_PLAN_TICKS,
   NPC_SMITHY_WEAPON,
@@ -1747,6 +1750,46 @@ export function Wiki() {
           there and what you <strong>can sell</strong>, with the units and the price of each. Anyone
           with a resident in sight of it sees its prices.
         </p>
+        <h3>Offers at a Player's storage</h3>
+        <p>
+          A storage of your realm can stand an <strong>offer</strong>: "gives 10 Wood, wants 5
+          Stone", either side may be Coins, as many times over as you name and the goods are there.
+          Post it under the city's trade section, wherever your residents are. The goods stay in the
+          storage but are <strong>set aside</strong>: your workers, builders, Fetch, haul routes,
+          pick-ups and refills leave them alone, while a thief or raider can take them like any
+          others, cutting the offer down. Anyone in sight sees it and its rate. Someone of another
+          realm, a resident or carriage on the storage's tile, accepts it as many times as they can
+          pay and carry. It happens at once, whether you are online or not, and raises standing both
+          ways like a trade: by the coins, or goods for goods by both goods at warehouse base
+          prices, as a swap counts both its sale and its purchase. What they pay goes into the
+          storage as ordinary goods. It ends when it is used up, when you take it down, or when the
+          storage is torn down or no longer yours; what was set aside is ordinary goods of that
+          storage again.
+        </p>
+        <h3>Direct offers</h3>
+        <p>
+          Under <strong>Direct offers</strong> on the tool rail you can send an offer to one realm
+          you know of: one you see residents of, an ally, one whose city you have seen, one with a
+          standing either way, or your side in a contract or direct offer. Name a storage of yours,
+          and the goods are set aside there as for any offer. They hear at once wherever they are,
+          with a notice and the place, and only they can accept it: someone of theirs goes to the
+          storage and takes it in person, as with any offer, or they decline it from anywhere.
+          Anyone else in sight of the storage sees it, and that it is for another realm. It lapses
+          after {num(DIRECT_OFFER_DAYS)} game days. Declined, lapsed or taken down, the goods are
+          ordinary again and both of you are told. At most {num(DIRECT_OFFERS_TO_ONE_REALM)} can
+          stand to one realm.
+        </p>
+        <p>
+          Or have the Trade Organization carry it, while the HQ stands. Name a city of yours and a
+          city of theirs whose storage you see, and whether you pay the fee or split it; the form
+          shows the fee before you send. Nothing is set aside. They accept it whole from anywhere,
+          each side’s goods within one carriage load, and it becomes two Transfers: a caravan takes
+          what is there at each city, up to what was agreed, with a fee for what it takes. Each
+          caravan takes the share of the side it picks up from as it collects, and the other side’s
+          from their storage as it unloads there. If that storage is short of coins then, the goods
+          stay delivered and the Trade Organization bears the loss. It changes no standing, and it
+          is cancelled if the HQ falls.
+        </p>
         <h3>Sending a trader</h3>
         <p>
           With nobody of yours there, the trade section offers to send someone: your residents
@@ -1766,14 +1809,27 @@ export function Wiki() {
           wanted. Each unit is priced as it moves, so a big trade moves the price as it goes (see{' '}
           <a href="#trade">Trade &amp; prices</a>).
         </p>
+        <h3>Swapping</h3>
+        <p>
+          A trader there can also swap goods for goods, with no coins in hand: under Swap, pick the
+          good you want, how many, and the good you give. It is a sale and a purchase at once, each
+          unit priced as those are, so the rate comes from the place's prices and moves as its stock
+          moves. You hand over enough to pay for what you want, rounded up, and what is over comes
+          back in coins as far as the place holds them. It is cut down like any trade, and the
+          button says what it would move or why it won't go. Like a trade it raises standing, by
+          both the sale and the purchase.
+        </p>
         <h3>What an NPC city buys and sells</h3>
         <p>
           An NPC city sells only its surplus, what its storages hold above its reserve, and buys
           only goods it is short of, up to its reserve and with the coins in its storage. It takes
           nothing else. Its prices come from its stock like a warehouse's, and its standing toward
-          you moves them: the better, the cheaper it sells and the more it pays. Below{' '}
-          {signed(NPC_CITY_REFUSES_STANDING)} it won't trade with you at all. Every trade raises
-          standing both ways (see <a href="#standing">Standing &amp; reactions</a>).
+          you moves them: the better, the cheaper it sells and the more it pays. It swaps only its
+          surplus for what it is short of, and its Rates in the Trade section list each good it is
+          short of against each it has spare, at today's prices. Pick one to fill in the swap, or to
+          send someone there if nobody of yours is. Below {signed(NPC_CITY_REFUSES_STANDING)} it
+          won't trade with you at all. Every trade raises standing both ways (see{' '}
+          <a href="#standing">Standing &amp; reactions</a>).
         </p>
         <h3>Delivery</h3>
         <p>
@@ -1807,7 +1863,8 @@ export function Wiki() {
           times its stock floor it sells at the base price; less stock costs more (to the power{' '}
           {num(PRICE_ELASTICITY)}), between {pct(PRICE_RANGE.min)} and {pct(PRICE_RANGE.max)} of the
           base price. It buys at {pct(BUY_SHARE)} of its selling price. Each unit is priced as it
-          moves, so a big trade moves the price as it goes.
+          moves, so a big trade moves the price as it goes. A swap goes at these same prices (see{' '}
+          <a href="#how-to-trade">How to trade</a>).
         </p>
         <table>
           <thead>
@@ -1919,6 +1976,16 @@ export function Wiki() {
           to the storage. One trader at a time, and none while Food runs short or armed outsiders
           stand in its area. Nothing protects them on the way; a trader not back after{' '}
           {days(NPC_TRADER_GIVE_UP_DAYS)} is given up, and the city may send another.
+        </p>
+        <p>
+          The same trader goes to a Player's offer within {num(NPC_OFFER_REACH)} tiles, ahead of any
+          warehouse run, when it gives what the city is short of and wants what it has spare or
+          Coins, at a rate at least as good as its own prices, and the city doesn't refuse that
+          realm. A direct offer is left to the realm it is for. They take as many times over as make
+          up what it lacks and fit in their arms, never a weapon either way, and walk home with it.
+          It looks once a game hour; while Food runs short only an offer that gives Food will send
+          them. If the offer is gone or cut down when they get there, or there is no way in, they
+          carry what they didn't spend back home. The Trade Organization never accepts offers.
         </p>
         <p>
           A city is full once it has had spare hands with nothing to do and nothing short of its

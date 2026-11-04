@@ -53,6 +53,12 @@ const ICONS: Record<DrawerId | KeyGood | 'crown', ReactNode> = {
       <path d="M10 8h6M10 12h6" />
     </>
   ),
+  directOffers: (
+    <>
+      <path d="M3 6h18v12H3z" />
+      <path d="M3 7l9 6 9-6" />
+    </>
+  ),
   alliance: (
     <>
       <path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z" />
@@ -548,6 +554,34 @@ export function HorseOfferNotice({
       </span>
       <button type="button" disabled={busy} onClick={() => void claim()}>
         Claim
+      </button>
+    </aside>
+  )
+}
+
+/**
+ * What others sent the Player and they haven't seen yet (`CONTEXT.md`: Notices): who sent what.
+ * Opening its drawer or dismissing it puts it away; the things themselves wait in the drawer.
+ */
+export function IncomingNotice({
+  line,
+  onOpen,
+  onDismiss,
+}: {
+  line: string
+  onOpen: () => void
+  onDismiss: () => void
+}) {
+  return (
+    <aside className="notice incoming-notice" role="status">
+      <span className="notice-text" title={line}>
+        {line}
+      </span>
+      <button type="button" onClick={onOpen}>
+        Open
+      </button>
+      <button type="button" aria-label="Dismiss" onClick={onDismiss}>
+        ×
       </button>
     </aside>
   )
