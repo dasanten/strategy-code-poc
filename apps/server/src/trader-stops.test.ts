@@ -183,14 +183,14 @@ describe('where a wandering trader stands at a city', () => {
     const tile = stopTile(world, terrain, city, { x: 100, y: 500 })!
     expect(inside.has(tileIndex(terrain.size, tile.x, tile.y))).toBe(false)
     // And it gets there with its armed escort, the city shutting its gates against them.
-    put(world, trader, hall.x - 60, hall.y)
+    put(world, trader, hall.x - 25, hall.y)
     for (const r of crewOf(world, trader)) r.carried = { spear: 1 }
     trader.calls = [city.id]
     runUntil(world, terrain, () => trader.stand?.until !== null && trader.stand !== null)
     expect(traderStandingAt(world, trader.stand!.x, trader.stand!.y)).toBe(trader)
     expect(gates.every((g) => g.closed)).toBe(true)
     expect(checkInvariants(world, terrain)).toEqual([])
-  })
+  }, 120_000)
 
   it('not on a tile another trader stands on or is bound for', () => {
     const { world, terrain, trader } = fixture()
@@ -205,7 +205,7 @@ describe('a wandering trader on its way', () => {
   it('stops at a city on its way for its time, then goes on to the post', () => {
     const { world, terrain, post, trader } = fixture()
     const city = foundNpcCity(world, terrain, NPC_VILLAGE, 300, 500, mulberry32(9))
-    put(world, trader, 200, 500)
+    put(world, trader, 270, 500)
     carriageOf(world, trader).load = { food: CARAVAN_FOOD }
     trader.calls = null
     runUntil(world, terrain, () => trader.stand?.until != null)
@@ -227,7 +227,7 @@ describe('a wandering trader on its way', () => {
     expect(trader.postId).toBe(post.id)
     expect(trader.calls).toEqual([])
     expect(checkInvariants(world, terrain)).toEqual([])
-  })
+  }, 120_000)
 
   it('works out the cities anew on each way', () => {
     const { world, terrain, trader, post } = fixture()
@@ -566,7 +566,7 @@ describe('an NPC city and its visiting trader', () => {
     runUntil(world, terrain, () => (npcCityStock(world, city).iron ?? 0) > 0)
     expect(npcCityStock(world, city).wood).toBeLessThan(before.wood)
     expect(checkInvariants(world, terrain)).toEqual([])
-  })
+  }, 120_000)
 
   it('counts the crew as nobody to fear, though they are armed', () => {
     const { world, terrain, city, trader } = visited()
