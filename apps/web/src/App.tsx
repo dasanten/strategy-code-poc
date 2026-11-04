@@ -63,6 +63,7 @@ import {
   FirstDayCard,
   GroupReportNotice,
   HorseOfferNotice,
+  TraderVisitNotice,
   NoticeLane,
   PhoneMenu,
   ToolRail,
@@ -71,7 +72,7 @@ import {
   useEscapeCloses,
 } from './Hud.js'
 import type { Covered } from './map/camera.js'
-import { cardHidden, laneNotices } from './notices-view.js'
+import { cardHidden, laneNotices, visitKey } from './notices-view.js'
 import { groupResidents, rememberedTab, rememberTab, type CardSections } from './residents-view.js'
 import { groupHorses } from './horses-view.js'
 import { HorsesList } from './Horses.js'
@@ -612,6 +613,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [openCityId, setOpenCityId] = useState<string>()
   // The warehouse or storage Trade here scrolls the open city to; a new object each press.
   const [tradeAt, setTradeAt] = useState<{ buildingId: string }>()
+  // The wandering traders' stops whose notice the Player dismissed (`CONTEXT.md`: Trader stop).
+  const [dismissedVisits, setDismissedVisits] = useState<ReadonlySet<string>>(new Set())
 
   /**
    * Orders the picked resident to walk to a tile, or, while picking where to drive, to drive the
@@ -1509,6 +1512,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             lastSeen={world.lastSeen}
             residents={world.residents}
             buildings={world.buildings}
+            traders={world.traders}
+            traderVisits={world.traderVisits}
             realmId={world.home.realmId}
             realms={realms}
             carriages={world.carriages}
@@ -1568,6 +1573,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           pick: pick !== undefined,
           horseOffer: world?.horseOffer,
           firstDay: world !== null && firstDayShown(world.firstDay),
+          traderVisit: world?.traderVisits.some((v) => !dismissedVisits.has(visitKey(v))),
           groupReport: groupReport !== undefined,
         }).map((kind) =>
           kind === 'pick' && pick ? (
@@ -1597,6 +1603,23 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               onWiki={() => reportFirstDay('openWiki')}
               onDismiss={dismissFirstDay}
             />
+          ) : kind === 'traderVisit' && world ? (
+            world.traderVisits
+              .filter((v) => !dismissedVisits.has(visitKey(v)))
+              .map((v) => (
+                <TraderVisitNotice
+                  key={visitKey(v)}
+                  visit={v}
+                  tick={world.tick}
+                  onShow={() => showOnMap(v.x, v.y)}
+                  onTrade={() => {
+                    setOpenCityId(v.cityId)
+                    setTradeAt({ buildingId: v.traderId })
+                    setOpenDrawer('cities')
+                  }}
+                  onDismiss={() => setDismissedVisits((seen) => new Set([...seen, visitKey(v)]))}
+                />
+              ))
           ) : kind === 'groupReport' && groupReport ? (
             <GroupReportNotice
               key={kind}

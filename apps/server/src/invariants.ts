@@ -105,11 +105,13 @@ import {
   npcTradesKeepReserve,
   refusedTradeNothing,
   tradeOrdersDone,
+  traderTradesKeepFood,
   tradesKeepGoods,
 } from './trading.js'
 import { armiesSound, supplyLinesSound } from './armies.js'
 import { caravansSound, routeRobberiesSound } from './caravans.js'
 import { tradersSound } from './traders.js'
+import { traderStopsSound } from './trader-stops.js'
 import { deliveriesSound } from './deliveries.js'
 import { transfersSound } from './transfers.js'
 import { tradeOrgArmySound } from './trade-org-army.js'
@@ -2075,6 +2077,8 @@ export const worldInvariants: Invariant[] = [
   nothingLeftOfTheHq,
   caravansSound,
   tradersSound,
+  traderStopsSound,
+  traderTradesKeepFood,
   routeRobberiesSound,
   tradeOrgArmySound,
   npcHireSound,

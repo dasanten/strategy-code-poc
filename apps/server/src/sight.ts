@@ -3,6 +3,8 @@ import {
   cityPrice,
   forSale,
   npcCityPrices,
+  traderPrices,
+  traderStanding,
   npcCityRefuses,
   npcHirePrice,
   sellsTo,
@@ -443,7 +445,14 @@ function everythingSeen(
   for (const t of world.traders) {
     if (caravanSeen(world, t, inSight)) {
       const { id, postId, carriageId, driverId, escortIds, heading } = t
-      out.push({ is: 'trader', id, postId, carriageId, driverId, escortIds, heading })
+      // At a stop it names its prices to anyone in sight (`CONTEXT.md`: Trader stop).
+      const standing = traderStanding(world, t)
+      const k = standing && index.carriageById(carriageId)
+      const open =
+        standing && k
+          ? { standing, prices: shownLines(traderPrices(t, k), insight.insideCarriage(k)) }
+          : {}
+      out.push({ is: 'trader', id, postId, carriageId, driverId, escortIds, heading, ...open })
     }
   }
   return out
@@ -739,6 +748,10 @@ export function sentInsideUnseen(
       }
       case 'city':
         return hasStock(e.trade) && !insight.insideCity(e.id)
+      case 'trader': {
+        const k = byId(world.carriages, e.carriageId)
+        return hasStock(e.prices) && !(k && insight.insideCarriage(k))
+      }
       case 'resident': {
         const r = byId(world.residents, e.id)
         const told =

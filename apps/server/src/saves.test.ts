@@ -217,6 +217,25 @@ describe('world saves', () => {
     expect(migrateWorld(fallen, 80, { terrain: land }).traders).toEqual([])
   })
 
+  it('has traders work out the stops on their way when they next look (migration 81 → 82)', () => {
+    const { world: now, terrain: land } = worldWithPost()
+    const v81 = structuredClone(now) as unknown as { traders: Record<string, unknown>[] }
+    for (const t of v81.traders) {
+      delete t.calls
+      delete t.stand
+    }
+    const v82 = migrateWorld(structuredClone(v81), 81, { terrain: land })
+    expect(v82.traders.length).toBeGreaterThan(0)
+    for (const t of v82.traders) {
+      expect(t.calls).toBeNull()
+      expect(t.stand).toBeNull()
+    }
+    expect(checkInvariants(v82, land)).toEqual([])
+    const walking = new Walking(land)
+    for (let i = 0; i < 5; i++) stepWorld(v82, land, walking)
+    expect(checkInvariants(v82, land)).toEqual([])
+  })
+
   it('leaves every resident unmarked for orders standing under attack (migration 79 → 80)', () => {
     const { world: v79, terrain: land } = worldWithPost()
     const v80 = migrateWorld(structuredClone(v79), 79, { terrain: land }, migrations, 80)
@@ -229,7 +248,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(82)
+    expect(WORLD_FORMAT_VERSION).toBe(83)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)

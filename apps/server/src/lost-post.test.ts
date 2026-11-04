@@ -61,7 +61,7 @@ const carriageOf = (world: WorldState, t: Trader) =>
 
 const hallOf = (world: WorldState, city: City) => townHallOf(world, city)!
 
-/** Stands a trader on (x, y), armed, its Food on board, out to `post` with nothing else to do. */
+/** Stands a trader on (x, y), armed, out to `post` with no stops to make on the way. */
 function put(world: WorldState, t: Trader, post: City, x: number, y: number) {
   const carriage = carriageOf(world, t)
   const horse = world.horses.find((h) => h.id === carriage.horseId)!
@@ -76,6 +76,8 @@ function put(world: WorldState, t: Trader, post: City, x: number, y: number) {
   t.heading = 'post'
   t.postId = post.id
   t.stop = 'storage'
+  t.calls = []
+  t.stand = null
 }
 
 /** `by`, armed, stands on the post's town hall as it falls to their realm. */
@@ -229,8 +231,12 @@ describe('a wandering trader reaching a lost post', () => {
     capture(world, post, leader)
     const hall = hallOf(world, post)
     put(world, trader, post, hall.x - 40, hall.y)
+    // It is a Player's city now, so its way there would stop at it too.
+    trader.calls = [post.id]
     runUntil(world, () => !trader.loop.includes(post.id), 1500)
     expect(captureOf(world, post)!.witnesses.length).toBeGreaterThan(0)
+    expect(trader.stand).toBeNull()
+    expect(trader.calls).not.toContain(post.id)
     expect(regard(world, realm.id)).toBe(0)
     runUntil(world, () => regard(world, realm.id) < 0, 6000)
     expect(checkInvariants(world, terrain)).toEqual([])
@@ -250,6 +256,56 @@ describe('a wandering trader reaching a lost post', () => {
     runUntil(world, () => !trader.loop.includes(post.id), 1500)
     expect(captureOf(world, post)!.witnesses.sort()).toEqual(crew.map((r) => r.id).sort())
   }, 120_000)
+
+  it('gives up a stop there and leaves the city out of its calls, so the news goes straight on', () => {
+    const { world, posts, traders, leader } = fixture()
+    const post = posts[0]!
+    const trader = traders[0]!
+    capture(world, post, leader)
+    const hall = hallOf(world, post)
+    put(world, trader, post, hall.x, hall.y)
+    trader.stand = { cityId: post.id, x: hall.x - 20, y: hall.y, until: null }
+    const driver = crewOf(world, trader)[0]!
+    driver.order = {
+      kind: 'drive',
+      carriageId: trader.carriageId,
+      target: { x: hall.x - 20, y: hall.y },
+      path: null,
+      progress: 0,
+    }
+    stepTraders(world, size)
+    expect(trader.loop).not.toContain(post.id)
+    expect(trader.stand).toBeNull()
+    expect(trader.calls).not.toBeNull()
+    expect(trader.calls).not.toContain(post.id)
+    // Off to the next post at once, not to the stop.
+    expect(driver.order).toMatchObject({ kind: 'drive' })
+    expect(driver.order).not.toMatchObject({ target: { x: hall.x - 20, y: hall.y } })
+  })
+
+  it('goes on driving to a stop at another city', () => {
+    const { world, posts, traders, realm, leader } = fixture()
+    const post = posts[0]!
+    const trader = traders[0]!
+    capture(world, post, leader)
+    const hall = hallOf(world, post)
+    put(world, trader, post, hall.x, hall.y)
+    const stand = { cityId: realm.id, x: hall.x - 20, y: hall.y, until: null }
+    trader.stand = stand
+    const driver = crewOf(world, trader)[0]!
+    const drive = {
+      kind: 'drive' as const,
+      carriageId: trader.carriageId,
+      target: { x: stand.x, y: stand.y },
+      path: null,
+      progress: 0,
+    }
+    driver.order = drive
+    stepTraders(world, size)
+    expect(trader.loop).not.toContain(post.id)
+    expect(trader.stand).toEqual(stand)
+    expect(driver.order).toEqual(drive)
+  })
 
   it('with no crew by the carriage has seen nothing yet', () => {
     const { world, posts, traders, leader } = fixture()
@@ -411,8 +467,8 @@ describe('invariants of a lost post', () => {
 describe('saves from before', () => {
   it('stay as they are: posts lost before were never heard of', () => {
     const { world } = fixture()
-    const v82 = migrateWorld(structuredClone(world), 81, { terrain })
-    expect(v82).toEqual(world)
-    expect(checkInvariants(v82, terrain)).toEqual([])
+    const v83 = migrateWorld(structuredClone(world), 82, { terrain })
+    expect(v83).toEqual(world)
+    expect(checkInvariants(v83, terrain)).toEqual([])
   })
 })

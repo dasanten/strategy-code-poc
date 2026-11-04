@@ -205,10 +205,11 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       return { text: `${e.city} no longer asks to join your realm.`, tone: 'warn' }
     case 'traded': {
       const what = goodText(e.good)
-      const place = { name: 'the warehouse', x: e.x, y: e.y }
+      const at = e.withTrader ? 'the wandering trader' : 'the warehouse'
+      const place = { name: at, x: e.x, y: e.y }
       if (e.units === 0) {
         return {
-          text: `${e.name} couldn’t ${e.side} any ${what} at the warehouse.`,
+          text: `${e.name} couldn’t ${e.side} any ${what} at ${at}.`,
           tone: 'warn',
           places: [place],
         }
@@ -216,7 +217,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       const did = e.side === 'buy' ? 'bought' : 'sold'
       const cut = e.units < e.wanted ? ` (of ${e.wanted} wanted)` : ''
       return {
-        text: `${e.name} ${did} ${e.units} ${what}${cut} for ${e.coins} coins at the warehouse.`,
+        text: `${e.name} ${did} ${e.units} ${what}${cut} for ${e.coins} coins at ${at}.`,
         tone: 'info',
         places: [place],
       }

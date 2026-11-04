@@ -17,6 +17,7 @@ import {
   type SeenResident,
   type SeenCaravan,
   type SeenTrader,
+  type TraderVisit,
   type SeenEntity,
   type Remembered,
   type ScriptLogLine,
@@ -73,6 +74,8 @@ export interface ClientWorld {
   region: RegionState | null
   /** Whether the Player may still claim their Horse offer (`CONTEXT.md`: Horse offer). */
   horseOffer: boolean
+  /** Wandering traders standing at the realm's cities, in sight or not (`CONTEXT.md`: Trader stop). */
+  traderVisits: TraderVisit[]
   /** The Player's waypoints, oldest first (`CONTEXT.md`: Waypoint). */
   waypoints: Waypoint[]
   /** The Player's first-day card (`CONTEXT.md`: First day). */
@@ -176,6 +179,7 @@ export function useWorld(onLoggedOut: () => void) {
             diplomacy: msg.diplomacy,
             region: msg.region && applyRegionMap(null, msg.region, msg.map.size),
             horseOffer: msg.horseOffer,
+            traderVisits: msg.traderVisits,
             waypoints: msg.waypoints,
             firstDay: msg.firstDay,
             workSettings: msg.workSettings,
@@ -230,6 +234,7 @@ export function useWorld(onLoggedOut: () => void) {
               diplomacy,
               region,
               horseOffer: msg.horseOffer ?? w.horseOffer,
+              traderVisits: msg.traderVisits ?? w.traderVisits,
               workSettings: msg.workSettings ?? w.workSettings,
               waypoints: msg.waypoints ?? w.waypoints,
             }
