@@ -34,6 +34,7 @@ import { persuasionOrders } from './persuasion.js'
 import { buy, sell } from './trading.js'
 import { handInOrder, transfer } from './transfers.js'
 import { buyOff } from './directives.js'
+import { payDebt } from './trade-org-debt.js'
 import { handOver } from './leader.js'
 import { rename, renameCity, renameHorse } from './renaming.js'
 import { claimHorses } from './horse-grant.js'
@@ -118,6 +119,7 @@ export const orderKinds: Record<string, OrderKind> = Object.fromEntries(
     handIn: handInOrder,
     transfer,
     buyOff,
+    payDebt,
     handOver,
     rename,
     renameCity,

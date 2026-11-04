@@ -89,6 +89,11 @@ const SHARED: readonly ScriptBinding[] = [
     'any',
     'The values of the script’s `param` lines, picked on the resident card for whoever runs it: `params.name` for `param name: type`; a `number` param’s default (`param name: number = 3`) while none is set, else null.',
   ),
+  value(
+    'debt',
+    'number',
+    'The Coins my realm owes the Trade Organization, 0 when it owes nothing: what its army came for and couldn’t take, and what crimes cost it since.',
+  ),
   value('tick', 'number', 'The world tick this run is for.'),
   value('mapSize', 'number', 'Tiles along each side of the map; its opposite sides join.'),
   value(
@@ -505,6 +510,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'buyOff',
     ['directiveId', 'carriageId?'],
     'On a Trade Org warehouse, pay the price of an admin directive against my realm with the coins in my hands, or on my carriage there, to end it.',
+  ),
+  action(
+    'payDebt',
+    ['coins', 'carriageId?'],
+    'On a Trade Org warehouse, pay up to `coins` of my realm’s debt to the Trade Organization with the coins in my hands, or on my carriage there: what I hold, up to what is owed.',
   ),
   action(
     'handOver',

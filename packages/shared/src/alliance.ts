@@ -5,6 +5,7 @@ import {
 } from './balance.js'
 import { contractOf, contractsFor, type ContractView } from './contract.js'
 import { directivesFor, type DirectiveView } from './directive.js'
+import { debtOf } from './warehouse.js'
 import { joinRequestsFor, type JoinRequestView } from './persuasion.js'
 import { organizationLabel, standingOf, standingsFor, type StandingView } from './standing.js'
 import { TRADE_ORG, TRADE_ORG_NAME, tradeOrgHq } from './trade-org.js'
@@ -264,6 +265,8 @@ export interface Diplomacy {
    * (`CONTEXT.md`: Fall of the HQ). Not otherwise visible to a Player who doesn't see the HQ.
    */
   noCaravans?: true
+  /** The Coins the realm owes the Trade Organization (`CONTEXT.md`: Trade Org debt); none when none. */
+  debt?: number
 }
 
 /**
@@ -284,6 +287,7 @@ export function diplomacyFor(
     | 'cities'
     | 'joinRequests'
     | 'directives'
+    | 'debts'
   >,
   realmId: string,
   seenRealms: Iterable<string>,
@@ -331,5 +335,6 @@ export function diplomacyFor(
     joinRequests: joinRequestsFor(world, realmId),
     directives: directivesFor(world, (org) => organizationLabel(world, org)),
     ...(!tradeOrgHq(world) && { noCaravans: true as const }),
+    ...(debtOf(world, realmId) > 0 && { debt: debtOf(world, realmId) }),
   }
 }

@@ -1092,10 +1092,10 @@ export function Wiki() {
           else the nearest storage of their realm.
         </p>
         <p>
-          A workplace's card says how much is being made there: what each of your workers there makes
-          and how much a game day at their Strength and skill, and the total of each good. It is the
-          pace while they have what they need, not a count of what has been made. Other realms'
-          workers aren't counted, as their stats aren't known.
+          A workplace's card says how much is being made there: what each of your workers there
+          makes and how much a game day at their Strength and skill, and the total of each good. It
+          is the pace while they have what they need, not a count of what has been made. Other
+          realms' workers aren't counted, as their stats aren't known.
         </p>
         <p>
           A smelter, mint or smithy has no storage: it works what its workers carry and what lies in
@@ -1664,14 +1664,14 @@ export function Wiki() {
         <p>
           Every Player may claim {num(HORSE_GRANT_HORSES)} new horses once, whenever they choose and
           whether or not they have horses: a notice at the top of the screen has a Claim button
-          until they do. The horses get new stats and ages and go in your finished stable
-          nearest your Leader's city; with no stable, they stand next to that city's storage (or
-          next to your Leader), each with {num(HORSE_GRANT_FOOD)} Food on the ground by it. The
-          realm log says where they are. Once claimed the offer is gone, also after your Leader dies
-          and you found a new realm; while you have no living Leader you can't claim it. An admin
-          can offer horses again, to every Player or to one: if you had claimed, the notice comes
-          back and you may claim once more, whether or not you still have horses. If you hadn't, you
-          still have just the one claim.
+          until they do. The horses get new stats and ages and go in your finished stable nearest
+          your Leader's city; with no stable, they stand next to that city's storage (or next to
+          your Leader), each with {num(HORSE_GRANT_FOOD)} Food on the ground by it. The realm log
+          says where they are. Once claimed the offer is gone, also after your Leader dies and you
+          found a new realm; while you have no living Leader you can't claim it. An admin can offer
+          horses again, to every Player or to one: if you had claimed, the notice comes back and you
+          may claim once more, whether or not you still have horses. If you hadn't, you still have
+          just the one claim.
         </p>
         <h3>Deliveries and transfers</h3>
         <p>
@@ -2008,6 +2008,14 @@ export function Wiki() {
             .
           </li>
           <li>
+            What its army came for and couldn't take stays your debt, from when it heads home or is
+            lost, whatever the reason; an army sent by admin directive leaves none. While you owe, a
+            crime it learns of adds what it cost to the debt instead of sending another army. Your
+            realm log says what you owe, and "Cities in sight" shows it. A resident on any Trade Org
+            warehouse's tile can pay it in coins, from their hands or a carriage there, in part or
+            in full, even if it refuses to trade with you. The debt ends with the fall of its HQ.
+          </li>
+          <li>
             A city whose Leader died starts out holding its former Player at{' '}
             {signed(FORMER_PLAYER_STANDING)}.
           </li>
@@ -2146,9 +2154,9 @@ export function Wiki() {
           cancelled with a line in your realm log and nothing refunded, and trading posts take no
           new ones. Every contract with the Trade Organization ends at once, with no refund and no
           loss of standing: soldiers you hired from it are the captor's where they stand, and your
-          mercenaries guarding the HQ walk home. Its punishments end, and admin directives stay in
-          force and can be bought off at a post, but it sends nobody out for them. When the last
-          trading post falls too, the Trade Organization is gone.
+          mercenaries guarding the HQ walk home. Its punishments and debts end, and admin directives
+          stay in force and can be bought off at a post, but it sends nobody out for them. When the
+          last trading post falls too, the Trade Organization is gone.
         </p>
         <h3>What joins with a city</h3>
         <p>

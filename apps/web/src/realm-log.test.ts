@@ -81,6 +81,38 @@ describe('realm log', () => {
     expect(describeEvent(foaled).text).toBe('A foal was born in a stable.')
   })
 
+  it('says what the realm owes the Trade Organization (`CONTEXT.md`: Trade Org debt)', () => {
+    const debt = (what: 'owed' | 'rose' | 'ended', coins: number, owed: number) =>
+      describeEvent({ kind: 'debt', what, coins, owed, seq: 1, ...at }).text
+    expect(debt('owed', 240, 240)).toBe(
+      "You owe the Trade Organization 240 Coins, what its army came for and couldn't take. Pay at any of its warehouses.",
+    )
+    expect(debt('rose', 20, 260)).toBe(
+      'What you cost the Trade Organization adds 20 Coins to your debt: you owe it 260 Coins.',
+    )
+    expect(debt('ended', 260, 0)).toBe(
+      'Your debt of 260 Coins ended with the fall of the Trade Org HQ.',
+    )
+    const paid = (coins: number, owed: number) =>
+      describeEvent({
+        kind: 'debtPaid',
+        residentId: 'a1',
+        name: 'Aldo',
+        coins,
+        owed,
+        x: 3,
+        y: 4,
+        seq: 1,
+        ...at,
+      }).text
+    expect(paid(60, 200)).toBe(
+      'Aldo paid 60 Coins of your debt at the warehouse. You still owe the Trade Organization 200 Coins.',
+    )
+    expect(paid(200, 0)).toBe(
+      'Aldo paid 200 Coins at the warehouse. You no longer owe the Trade Organization anything.',
+    )
+  })
+
   it('tells the truth about the Trade Organization’s army (`CONTEXT.md`: Punishment trip)', () => {
     const trip = {
       kind: 'punished',

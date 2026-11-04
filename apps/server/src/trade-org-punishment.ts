@@ -42,14 +42,16 @@ import type { Invariant, InvariantViolation } from './invariants.js'
 import { npcHome, walkTo } from './npc-behaviour.js'
 import { newId } from './starting-city.js'
 import { spareSoldiers } from './trade-org-army.js'
+import { oweTradeOrg } from './trade-org-debt.js'
 
 /*
  * The Trade Organization punishes (`CONTEXT.md`: Trade Org reaction, Self-interest): once it
  * holds an Organization below `TRADE_ORG_PUNISHES_BELOW` and knows of crimes it did against it,
  * it sends spare soldiers of its army to that Organization's city nearest the crime, to take
  * back `TRADE_ORG_PUNISH.times` what it lost from the city's storages, Coins first, fighting
- * whoever resists, and carry it home. It never captures the city. Like the rest of the HQ it
- * only gives orders a Player could give (ADR 0002): walking, picking up, dropping, attacking.
+ * whoever resists, and carry it home. What it came for and couldn't take stays owed (`CONTEXT.md`:
+ * Trade Org debt). It never captures the city. Like the rest of the HQ it only gives orders a
+ * Player could give (ADR 0002): walking, picking up, dropping, attacking.
  */
 
 /** What goods are worth in Coins: a Coin one, any other good its warehouse base price. */
@@ -103,19 +105,37 @@ const toPunish = (world: WorldState, c: Crime) =>
   c.knownBy.includes(c.victimOrg)
 
 /**
- * One tick of the Trade Organization punishing, on a map of `size` tiles: it sends out new
- * punishments (`sendOut`, `sendOutForDirectives`) and runs those under way. Run after
- * `stepTradeOrgArmy` and before `stepNpcCities`; the HQ leaves the members of a punishment to it.
+ * One tick of the Trade Organization punishing, on a map of `size` tiles: crimes of those who owe it
+ * go on their debts (`addCrimesToDebts`), it sends out new punishments (`sendOut`,
+ * `sendOutForDirectives`) and runs those under way. Run after `stepTradeOrgArmy` and before
+ * `stepNpcCities`; the HQ leaves the members of a punishment to it.
  */
 export function stepPunishments(world: WorldState, size: number): void {
   const hq = tradeOrgHq(world)
   if (!hq) {
     world.punishments = []
+    world.debts = []
     return
   }
+  addCrimesToDebts(world)
   sendOut(world, size)
   sendOutForDirectives(world, size)
   for (const p of [...world.punishments]) runPunishment(world, hq, p, size)
+}
+
+/**
+ * A crime the Trade Organization comes to know of by an Organization that owes it adds what it cost
+ * to the debt (`CONTEXT.md`: Trade Org debt) and sends no army of its own: it counts as punished.
+ */
+function addCrimesToDebts(world: WorldState): void {
+  if (world.debts.length === 0) return
+  for (const c of world.crimes) {
+    if (!toPunish(world, c)) continue
+    const debt = world.debts.find((d) => d.org === c.culprit.org)
+    if (!debt) continue
+    c.punished = true
+    oweTradeOrg(world, debt.org, lossOf(c))
+  }
 }
 
 /**
@@ -439,6 +459,15 @@ function logPunished(
 }
 
 /**
+ * What a punishment for crimes came for and didn't take stays owed (`CONTEXT.md`: Trade Org debt),
+ * from when it heads home or is lost. `took` is what it got; one sent for an admin directive leaves
+ * no debt.
+ */
+function leaveDebt(world: WorldState, p: Punishment, took: number): void {
+  if (p.directiveId === undefined) oweTradeOrg(world, p.culpritOrg, p.worth - took)
+}
+
+/**
  * One tick of a punishment (`CONTEXT.md`: Trade Org reaction, Punishment trip). Each member first
  * packs at the HQ, then walks to the city's town hall, however long that takes, refilling at
  * trading posts they pass. Once one of them is in the city's area it has arrived: each
@@ -447,7 +476,8 @@ function logPunished(
  * Heading home (`whyHeadHome`), each member brings Coins they took to the HQ's coin warehouse and
  * other goods to its goods warehouse, then goes home; once every living member is home with
  * nothing taken, it is over. The culprit reads what happens as it happens: it arrived, it left with
- * what it took, it turned back without reaching the city and why, or it was lost.
+ * what it took, it turned back without reaching the city and why, or it was lost, and what that
+ * leaves owed (`leaveDebt`).
  */
 function runPunishment(world: WorldState, hq: City, p: Punishment, size: number): void {
   const members = living(world, p)
@@ -457,6 +487,8 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
     const where =
       p.heading === 'home' ? 'wayHome' : p.arrivedAt === undefined ? 'wayThere' : 'atCity'
     logPunished(world, p, city, { what: 'lost' }, where)
+    // Nobody is left carrying anything; on the way home the debt was settled as it left.
+    if (p.heading === 'out') leaveDebt(world, p, 0)
     return
   }
   for (const { r, own } of members) eatFromOwn(r, own)
@@ -476,6 +508,7 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
     if (why) {
       p.heading = 'home'
       logPunished(world, p, city, { what: p.arrivedAt === undefined ? 'turnedBack' : 'left', why })
+      leaveDebt(world, p, p.took)
     }
   }
   const robbing =

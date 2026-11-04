@@ -420,6 +420,8 @@ describe('script bindings', () => {
     ['buy("iron", 2)', { kind: 'buy', good: 'iron', units: 2, carriageId: null }],
     ['sell("wood", 3, "k1")', { kind: 'sell', good: 'wood', units: 3, carriageId: 'k1' }],
     ['buyOff("directive1")', { kind: 'buyOff', directiveId: 'directive1', carriageId: null }],
+    ['payDebt(40)', { kind: 'payDebt', coins: 40, carriageId: null }],
+    ['payDebt(40, "k1")', { kind: 'payDebt', coins: 40, carriageId: 'k1' }],
     [
       'buy("iron", 2, null, "c1")',
       { kind: 'buy', good: 'iron', units: 2, carriageId: null, cityId: 'c1' },

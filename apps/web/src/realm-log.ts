@@ -107,6 +107,17 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
     }
     case 'punished':
       return punishedLine(e)
+    case 'debt':
+      return debtLine(e)
+    case 'debtPaid':
+      return {
+        text:
+          e.owed > 0
+            ? `${e.name} paid ${e.coins} Coins of your debt at the warehouse. You still owe the Trade Organization ${e.owed} Coins.`
+            : `${e.name} paid ${e.coins} Coins at the warehouse. You no longer owe the Trade Organization anything.`,
+        tone: 'info',
+        places: [{ name: 'the warehouse', x: e.x, y: e.y }],
+      }
     case 'boughtOff':
       return {
         text: `${e.name} paid ${e.coins} Coins at the warehouse to buy off the admin directive (${e.reason}). The Trade Organization no longer punishes you for it.`,
@@ -600,6 +611,27 @@ function punishmentEnd(why: PunishmentEnd | undefined, city: string): string {
       return `: it found no way to ${city}`
     default:
       return ''
+  }
+}
+
+/** A line about what the realm owes the Trade Organization (`CONTEXT.md`: Trade Org debt). */
+function debtLine(e: Extract<RealmEvent, { kind: 'debt' }>): EventLine {
+  switch (e.what) {
+    case 'owed':
+      return {
+        text: `You owe the Trade Organization ${e.owed} Coins, what its army came for and couldn't take. Pay at any of its warehouses.`,
+        tone: 'bad',
+      }
+    case 'rose':
+      return {
+        text: `What you cost the Trade Organization adds ${e.coins} Coins to your debt: you owe it ${e.owed} Coins.`,
+        tone: 'bad',
+      }
+    case 'ended':
+      return {
+        text: `Your debt of ${e.coins} Coins ended with the fall of the Trade Org HQ.`,
+        tone: 'info',
+      }
   }
 }
 

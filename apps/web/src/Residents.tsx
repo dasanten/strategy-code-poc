@@ -927,6 +927,7 @@ export function orderDoing(
   if (o?.kind === 'pay') return 'Paying for mercenaries'
   if (o?.kind === 'buyCity') return 'Buying a city'
   if (o?.kind === 'buyOff') return 'Buying off a directive'
+  if (o?.kind === 'payDebt') return 'Paying the debt'
   if (o?.kind === 'trade')
     return o.side === 'buy' ? 'Buying at a warehouse' : 'Selling at a warehouse'
   if (o?.kind === 'attack') return o.path ? 'Going after their target' : 'Fighting'

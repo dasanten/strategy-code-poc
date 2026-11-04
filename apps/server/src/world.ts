@@ -44,6 +44,7 @@ import { stepDirectives } from './directives.js'
 import { resolvePurchases } from './buying.js'
 import { resolveTrades } from './trading.js'
 import { resolveBuyOffs } from './directives.js'
+import { resolveDebtPayments, stepDebts } from './trade-org-debt.js'
 import { stepCrimes } from './crimes.js'
 import { stepStanding } from './standing.js'
 import { stepPersuasion } from './persuasion.js'
@@ -87,6 +88,7 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     joinRequests: [],
     punishments: [],
     directives: [],
+    debts: [],
     lastSeen: {},
     // A new world's Players have nothing to be told of changes before it.
     scriptViewChanges: SCRIPT_VIEW_CHANGES.length,
@@ -258,6 +260,7 @@ function stepRest(
   const purchases = resolvePurchases(world, terrain.size)
   const trades = resolveTrades(world, terrain.size)
   const buyOffs = resolveBuyOffs(world)
+  const debtsPaid = resolveDebtPayments(world)
   const builds = requestBuilding(world)
   resolveBuilding(world, builds, terrain)
   const teardowns = requestTearingDown(world)
@@ -279,6 +282,7 @@ function stepRest(
   stepCrimes(world, terrain.size)
   stepContracts(world)
   stepStanding(world)
+  stepDebts(world)
   stepPersuasion(world, terrain.size)
   stepArmies(world, terrain.size)
   // Workplace settings of buildings and realms that went this tick go with them.
@@ -296,6 +300,7 @@ function stepRest(
     payments +
     purchases +
     trades +
-    buyOffs
+    buyOffs +
+    debtsPaid
   return { actions, survival, combat, horsesDied, aging, captures }
 }

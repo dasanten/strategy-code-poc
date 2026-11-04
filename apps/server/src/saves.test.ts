@@ -184,6 +184,16 @@ describe('world saves', () => {
     expect(checkInvariants(v80, land)).toEqual([])
   })
 
+  it('starts with nobody owing the Trade Organization (migration 81 → 82)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v81 = structuredClone(world) as unknown as Record<string, unknown>
+    delete v81.debts
+    const v82 = migrateWorld(v81, 81, { terrain: land }, migrations, 82)
+    expect(v82.debts).toEqual([])
+    expect(v82).toEqual(world)
+    expect(checkInvariants(v82, land)).toEqual([])
+  })
+
   it('says which punishments under way have reached their city (migration 80 → 81)', () => {
     const { world: v80, terrain: land } = worldWithPost()
     const city = v80.cities[0]!
@@ -226,7 +236,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(81)
+    expect(WORLD_FORMAT_VERSION).toBe(82)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
