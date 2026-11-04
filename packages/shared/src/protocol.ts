@@ -173,10 +173,10 @@ export type ServerMessage =
    * their alliance matters when those changed, and the Region map when territory was worked out
    * again (all of it) or their explored terrain grew (the grown chunks), and the realm's Leader
    * when the Player handed the realm to another (`CONTEXT.md`: Leader handover), and the
-   * realm name once the Player named it (`CONTEXT.md`: Realm name), and `horseOffer: false` once
-   * they claimed their Horse offer (`CONTEXT.md`: Horse offer), all the realm's Workplace
-   * settings whenever they changed, and all their waypoints when they changed (`CONTEXT.md`:
-   * Waypoint).
+   * realm name once the Player named it (`CONTEXT.md`: Realm name), and `horseOffer` when it
+   * changed: false once they claimed their Horse offer, true once an admin re-opened it
+   * (`CONTEXT.md`: Horse offer), all the realm's Workplace settings whenever they changed, and all
+   * their waypoints when they changed (`CONTEXT.md`: Waypoint).
    */
   | {
       type: 'tick'
@@ -190,7 +190,7 @@ export type ServerMessage =
       region?: RegionMap
       leaderId?: string
       realmName?: string
-      horseOffer?: false
+      horseOffer?: boolean
       workSettings?: Record<string, WorkplaceSettings>
       waypoints?: Waypoint[]
     }
