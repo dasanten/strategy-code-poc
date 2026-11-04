@@ -89,7 +89,9 @@ import {
   Terrain,
   WEAPONS,
   footprintTiles,
+  hasChoice,
   hungerFactor,
+  madePerDay,
   recipeFor,
   recipeGood,
   teardownWork,
@@ -942,12 +944,14 @@ export interface CardList {
   goods?: Stock
 }
 
-/** One row of a `CardList`: a horse or one of a workplace's crew. */
+/** One row of a `CardList`: a horse, one of a workplace's crew, or how much is made there. */
 export interface CardRow {
   id: string
   name: string
   /** Under the name: a horse's stats and age, what one of a crew is doing and whose they are. */
   detail?: string
+  /** On the right, with the good's icon: how much of it (`CONTEXT.md`: Workplace amounts). */
+  amount?: { good: Good; text: string }
   /**
    * Each of the list's meters filled to this share, undefined where the Player doesn't know how
    * they fare (`CONTEXT.md`: Seeing how someone fares).
@@ -1493,6 +1497,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     else {
       const max = MAX_WORKERS[building.kind]
       if (max !== undefined && live) lists.push(crewList(live, max, t, goodLabels))
+      const amounts = live && amountsList(live, t, goodLabels)
+      if (amounts) lists.push(amounts)
       // A house's room (`CONTEXT.md`: House), and how its city is housed where the Player may know.
       const room = HOUSING_ROOM[building.kind]
       if (room !== undefined) {
@@ -1506,7 +1512,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
         lists.push(...horseLists(horsesHere, horseRel, t.tick))
         lines.push(`Room for ${Math.max(0, STABLE_CAPACITY - horsesHere.length)} more horses`)
       }
-      const makes = live && makesLine(live, t, goodLabels)
+      const makes = live && makesLine(live, t, goodLabels, amounts !== undefined)
       if (makes) lines.push(makes)
       // A finished training ground teaches what its teacher set, and nothing while nobody
       // teaches there (`CONTEXT.md`: Training ground, Teacher).
@@ -1883,34 +1889,96 @@ function describeSite(site: Building, t: TileThings | undefined): SiteView {
 
 /**
  * What a workplace makes (`CONTEXT.md`: Workplace); at a smithy, what its workers in sight are
- * making (`CONTEXT.md`: Smithy). Its pile shows as a goods grid of its own.
+ * making (`CONTEXT.md`: Smithy). Its pile shows as a goods grid of its own. With `amounts` on the
+ * card (`amountsList`) only what they leave out: what other realms' workers make at a smithy.
  */
-function makesLine(b: Building, t: TileThings, labels: Record<string, string>): string | undefined {
+function makesLine(
+  b: Building,
+  t: TileThings,
+  labels: Record<string, string>,
+  amounts: boolean,
+): string | undefined {
   if (MAX_WORKERS[b.kind] === undefined || !WORKPLACE_SKILL[b.kind]) return undefined
   const label = (g: Good) => labels[g]!.toLowerCase()
-  if ((RECIPES[b.kind]?.length ?? 0) > 1) {
+  if (hasChoice(b.kind)) {
     const making = new Map<Good, number>()
     for (const r of t.residents ?? []) {
       const o = r.order
       if (o?.kind !== 'workAt' || o.buildingId !== b.id) continue
+      // Who the amounts already say what they make for needn't be said again.
+      if (amounts && r.owner === t.viewer.realmId) continue
       const recipe = recipeFor(b.kind, o.makes)
       if (recipe) making.set(recipeGood(recipe), (making.get(recipeGood(recipe)) ?? 0) + 1)
     }
-    if (making.size === 0) return 'Makes weapons and armour, nobody at it'
+    if (making.size === 0) return amounts ? undefined : 'Makes weapons and armour, nobody at it'
     const list = [...making].map(([g, n]) => `${label(g)} (${n})`).join(', ')
-    return `Its workers make ${list}`
+    return `${amounts ? 'Others make' : 'Its workers make'} ${list}`
   }
-  const node =
-    NODE_WORKPLACE_KINDS.has(b.kind) && t.nodeAt
-      ? footprintTiles(b)
-          .map(([x, y]) => t.nodeAt!(x, y))
-          .find((n) => n && NODE_WORKPLACE[n.kind] === b.kind)
-      : undefined
-  const recipe = RECIPES[b.kind]?.[0]
-  const good: Good | undefined =
-    b.kind === 'farm' ? 'food' : node ? NODE_GOOD[node.kind] : recipe && recipeGood(recipe)
-  if (!good) return undefined
-  return `Makes ${label(good)}`
+  const good = amounts ? undefined : goodMadeAt(b, t)
+  return good && `Makes ${label(good)}`
+}
+
+/**
+ * The good a workplace makes, as far as the Player knows (`workplaceGood`): on a resource node
+ * what the known node under its footprint yields; at a smithy what `makes` names.
+ */
+function goodMadeAt(b: Building, t: TileThings, makes?: Good): Good | undefined {
+  if (b.kind === 'farm') return 'food'
+  if (RECIPES[b.kind]) {
+    const recipe = recipeFor(b.kind, makes)
+    return recipe && recipeGood(recipe)
+  }
+  if (!NODE_WORKPLACE_KINDS.has(b.kind) || !t.nodeAt) return undefined
+  const node = footprintTiles(b)
+    .map(([x, y]) => t.nodeAt!(x, y))
+    .find((n) => n && NODE_WORKPLACE[n.kind] === b.kind)
+  return node && NODE_GOOD[node.kind]
+}
+
+/**
+ * How much is being made at a workplace (`CONTEXT.md`: Workplace amounts): a row for each worker of
+ * the Player's realm working there, with what they make and how much a game day at their Strength
+ * and skill, then a row for the total of each good. Undefined with none of them there. It is the
+ * pace while they have what they need; other realms' workers aren't counted, as their stats aren't
+ * known.
+ */
+function amountsList(
+  b: Building,
+  t: TileThings,
+  labels: Record<string, string>,
+): CardList | undefined {
+  if (MAX_WORKERS[b.kind] === undefined || !WORKPLACE_SKILL[b.kind]) return undefined
+  const made = (t.residents ?? []).flatMap((r) => {
+    const o = r.order
+    if (r.owner !== t.viewer.realmId || o?.kind !== 'workAt' || o.buildingId !== b.id) return []
+    const good = goodMadeAt(b, t, o.makes)
+    if (!good) return []
+    return [{ r, good, perDay: madePerDay(r as Resident, b.kind, good, t.tick ?? 0) }]
+  })
+  if (made.length === 0) return undefined
+  return {
+    title: 'Made a game day',
+    count: 'with what they need',
+    meters: [],
+    rows: [
+      ...made.map(({ r, good, perDay }) => ({
+        id: r.id,
+        name: r.name,
+        detail: labels[good]!,
+        amount: { good, text: tenths(perDay) },
+        opens: 'resident' as const,
+      })),
+      ...GOODS.filter((good) => made.some((m) => m.good === good)).map((good) => ({
+        id: `total-${good}`,
+        name: 'Total',
+        detail: labels[good]!,
+        amount: {
+          good,
+          text: tenths(made.reduce((n, m) => (m.good === good ? n + m.perDay : n), 0)),
+        },
+      })),
+    ],
+  }
 }
 
 /** The kinds of workplace built on a resource node. */

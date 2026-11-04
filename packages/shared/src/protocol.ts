@@ -82,13 +82,14 @@ export type SeenHorse = Omit<Horse, 'hunger' | 'health' | 'downUntil'> &
 /**
  * A carriage as Players see it (`CONTEXT.md`: Seeing inside a storage): how heavily it is loaded,
  * and the load itself only for its own Organization, their allies and anyone with a resident on
- * its tile. `passengerIds` are the residents aboard it (`CONTEXT.md`: Passenger), always sent by
- * the server.
+ * its tile. `passengerIds` are the residents aboard it (`CONTEXT.md`: Passenger), and `standsStill`
+ * says whether nothing moves it (`CONTEXT.md`: On a carriage under attack), both always sent by the
+ * server.
  */
 export type SeenCarriage = (
   | (Carriage & { loadLevel?: LoadLevel })
   | (Omit<Carriage, 'load'> & { load?: undefined; loadLevel: LoadLevel })
-) & { passengerIds?: string[] }
+) & { passengerIds?: string[]; standsStill?: boolean }
 
 /**
  * Something a Player sees (`CONTEXT.md`: Sight), tagged with what it is. Ids are unique across
@@ -173,10 +174,10 @@ export type ServerMessage =
    * their alliance matters when those changed, and the Region map when territory was worked out
    * again (all of it) or their explored terrain grew (the grown chunks), and the realm's Leader
    * when the Player handed the realm to another (`CONTEXT.md`: Leader handover), and the
-   * realm name once the Player named it (`CONTEXT.md`: Realm name), and `horseOffer: false` once
-   * they claimed their Horse offer (`CONTEXT.md`: Horse offer), all the realm's Workplace
-   * settings whenever they changed, and all their waypoints when they changed (`CONTEXT.md`:
-   * Waypoint).
+   * realm name once the Player named it (`CONTEXT.md`: Realm name), and `horseOffer` when it
+   * changed: false once they claimed their Horse offer, true once an admin re-opened it
+   * (`CONTEXT.md`: Horse offer), all the realm's Workplace settings whenever they changed, and all
+   * their waypoints when they changed (`CONTEXT.md`: Waypoint).
    */
   | {
       type: 'tick'
@@ -190,7 +191,7 @@ export type ServerMessage =
       region?: RegionMap
       leaderId?: string
       realmName?: string
-      horseOffer?: false
+      horseOffer?: boolean
       workSettings?: Record<string, WorkplaceSettings>
       waypoints?: Waypoint[]
     }

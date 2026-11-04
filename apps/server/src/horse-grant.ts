@@ -97,9 +97,9 @@ function placeNewHorses(
 
 /*
  * The Horse offer (`CONTEXT.md`: Horse offer) is the Player's choice of when to take two new
- * horses, once ever. Claiming is an order request with nothing in it but its kind, which a script
- * could send as well (ADR 0002); whether the Player has claimed is plain data kept by account id
- * (`WorldState.horseOffersClaimed`), so it outlives their realm.
+ * horses, once unless an admin offers horses again. Claiming is an order request with nothing in
+ * it but its kind, which a script could send as well (ADR 0002); whether the Player has claimed is
+ * plain data kept by account id (`WorldState.horseOffersClaimed`), so it outlives their realm.
  */
 
 /** Why a Player can't claim their Horse offer now, if they can't. */
@@ -114,8 +114,8 @@ export function horseOfferProblem(world: WorldState, userId: number): string | u
 
 /**
  * The claim order: the Player's realm gets two new horses placed as the Horse grant places them,
- * the realm log says where, and the offer is claimed for good. With no room for them the offer
- * stays open.
+ * the realm log says where, and the offer is claimed until an admin re-opens it. With no room for
+ * them the offer stays open.
  */
 export const claimHorses: OrderKind = {
   validate(world, sender, _order, terrain) {
@@ -135,8 +135,8 @@ export const claimHorses: OrderKind = {
 }
 
 /**
- * Invariant (ADR 0004; `CONTEXT.md`: Horse offer): each Player claims their Horse offer at most
- * once, so no account id is in `horseOffersClaimed` twice.
+ * Invariant (ADR 0004; `CONTEXT.md`: Horse offer): a Player claims an open Horse offer at most
+ * once, so no account id is in `horseOffersClaimed` twice; re-opening takes the id out again.
  */
 export const horseOffersOnce: Invariant = {
   name: 'horse-offers-once',

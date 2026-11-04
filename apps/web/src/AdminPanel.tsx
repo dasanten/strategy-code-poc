@@ -125,7 +125,7 @@ export function AdminPage({ account, onLoggedOut }: { account: Account; onLogged
   )
 }
 
-/** Invite codes and password resets, for admins only (ADR 0005). */
+/** Invite codes, password resets and offering horses again, for admins only (ADR 0005). */
 function AdminPanel() {
   const [codes, setCodes] = useState<string[]>([])
   const [name, setName] = useState('')
@@ -188,7 +188,54 @@ function AdminPanel() {
         <button type="submit">Reset password</button>
       </form>
       {message && <p role="status">{message}</p>}
+      <OfferHorsesAgain />
     </section>
+  )
+}
+
+/**
+ * Offering horses again (`CONTEXT.md`: Horse offer): re-opens the Horse offer for the Player named,
+ * or with no name for every Player, once the admin has confirmed that.
+ */
+function OfferHorsesAgain() {
+  const [name, setName] = useState('')
+  const [message, setMessage] = useState('')
+
+  async function offer(e: FormEvent) {
+    e.preventDefault()
+    const player = name.trim()
+    if (
+      player === '' &&
+      !window.confirm('Offer horses again to every Player who claimed theirs?')
+    ) {
+      return
+    }
+    try {
+      const { reopened } = await api.reopenHorseOffers(player === '' ? {} : { name: player })
+      const offers = reopened === 1 ? '1 Horse offer' : `${reopened} Horse offers`
+      setMessage(`${offers} re-opened for ${player === '' ? 'every Player' : player}.`)
+      setName('')
+    } catch (err) {
+      setMessage(err instanceof ApiFailure ? err.message : 'Something went wrong.')
+    }
+  }
+
+  return (
+    <>
+      <h2>Offer horses again</h2>
+      <p className="muted small">
+        Each Player who claimed their Horse offer may claim once more, and sees the notice at once.
+        A Player who hasn't claimed still has just the one claim.
+      </p>
+      <form onSubmit={offer}>
+        <label>
+          Player (empty for every Player)
+          <input value={name} onChange={(e) => setName(e.target.value)} />
+        </label>
+        <button type="submit">Offer horses again</button>
+      </form>
+      {message && <p role="status">{message}</p>}
+    </>
   )
 }
 

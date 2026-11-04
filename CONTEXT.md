@@ -67,6 +67,11 @@ The shared language of the game. Domain terms only — no implementation details
   Strength and skill and is limited by the workplace's maximum number of workers. Working there
   teaches its skill. Its output is left in the pile on the workplace's tile, not in the
   workers' hands. Getting it to a storage takes carrying it there.
+  **Workplace amounts:** a workplace's card tells its Player how much is being made there: for
+  each worker of their realm working there, what they make and how much a game day at their
+  Strength and skill, and the total of each good. It is the pace while they have what they need,
+  not a count of what has been made. Other realms' workers aren't counted, as their stats aren't
+  known.
   Kinds:
   - **Mine / Quarry / Lumber camp:** built on a resource node; makes what the node yields (a mine
     iron ore or gold ore). Lumber camps teach Woodcutting, quarries and mines Mining.
@@ -621,8 +626,9 @@ The shared language of the game. Domain terms only — no implementation details
 - **Player:** the human behind an account. Owns nothing physically; joins alliances. Not a thing
   in the world. Signs up with an invite code. _Avoid:_ user (in game rules), "the player" meaning
   the figure.
-- **Admin:** an account with admin rights: creates invite codes, resets passwords and gives
-  admin directives, in an admin panel apart from the game. Being an admin has nothing to do with
+- **Admin:** an account with admin rights: creates invite codes, resets passwords, gives
+  admin directives and offers horses again (Horse offer), in an admin panel apart from the game.
+  Being an admin has nothing to do with
   the admin's own Player: it gives them no power in the world, and they play like anyone else.
   The one exception is knowledge: the admin panel shows the whole world (the **admin map**), so
   admins can watch over it. That knowledge is the admin's, never their Player's: the game screen
@@ -801,11 +807,14 @@ The shared language of the game. Domain terms only — no implementation details
   with no stable, on free tiles next to the storage of the Leader's city (or the realm's oldest
   city; with no city, next to the Leader), each with a few days of Food on the ground by it. The
   realm log says where they arrived. Realms that still have a horse get none.
-- **Horse offer:** every Player may claim two new horses once, ever, when they choose, whether
+- **Horse offer:** every Player may claim two new horses once, when they choose, whether
   or not they have horses. Until claimed, the HUD shows a notice with a Claim button; claiming
   places them as the Horse grant does (stats, stable or storage, Food by them, realm log) and
-  the notice is gone for good, also across Leader deaths. A Player with no living Leader can't
-  claim until they have one again.
+  the notice is gone, also across Leader deaths. A Player with no living Leader can't
+  claim until they have one again. **Offering horses again:** an admin can re-open the offer in
+  the admin panel, for every Player at once or for one by name, as often as needed. Each Player
+  who had claimed may then claim once more, whether or not they still have horses, and sees the
+  notice at once; a Player who hadn't claimed still has just the one claim.
 - **Horse name:** every horse has a name, given by the game when it comes into being (starting
   city, Trade Organization, foal, Horse grant) from a pool of horse names apart from the
   residents' pool. **Renaming a horse:** the Player can rename any horse of their realm, by hand
@@ -1044,6 +1053,20 @@ The shared language of the game. Domain terms only — no implementation details
   queue step continues, or the plain order resumes. A struck resident whose defence script is
   already running isn't interrupted again; a Player order given meanwhile ends both. NPC
   residents, and residents with no Player, run the game's Defend default.
+  **A Player's order under attack:** what the Player gives a resident while they are under attack
+  (their defence script runs, or a blow landed within the calm time Defend waits for) isn't
+  interrupted by further blows. An order that ends by itself (a walk, a drive to a target, and
+  the like) stands until it is done or replaced, however long that takes. What goes on until
+  stopped (a haul route, working, a task, a script, a queue) holds until no blow has landed for
+  the calm time; after that the next blow runs the defence script as usual. What a script or
+  queue requests itself doesn't count as given by the Player.
+  **On a carriage under attack (Defend default):** an unarmed driver drives on where they were
+  going instead of leaving the carriage, and an armed one fights back and then goes on. An unarmed
+  passenger stays aboard while the carriage is being driven; on one standing still (no driver
+  driving it, its horse Down or dead) they get off and walk home. An armed passenger fights back.
+  A Player's own defence script decides for itself: a driver's drive or haul route goes on until it
+  gives them another order. Residents with no Player follow the same rule, and a caravan's driver
+  under attack doesn't wait for their escort.
 - **Doing:** the line on a resident's card and in the resident list that says what they are
   doing, shown to the owning Player only. It is derived from their task and current order
   ("Building a house: fetching 10 wood from the storage", "Working the farm"); the script they

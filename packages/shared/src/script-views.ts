@@ -660,6 +660,11 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       y,
       field('horseId', 'string', 'The horse hitched to it.', 'when none is'),
       field('passengerIds', listOf('string'), 'The residents aboard it as passengers.'),
+      field(
+        'standsStill',
+        'boolean',
+        'Whether it stands still with nothing to move it: no driver driving it, or its horse Down or dead.',
+      ),
       field('load', view('goods'), 'The goods on board.', 'unless the Player sees inside'),
       field(
         'loadLevel',

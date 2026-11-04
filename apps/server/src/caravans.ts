@@ -3,6 +3,7 @@ import {
   CARAVAN_GUARD_RANGE,
   CARAVAN_SPREAD,
   CARRIAGE_CAPACITY,
+  DEFEND_CALM_TICKS,
   GOODS,
   GOOD_WEIGHT,
   START_CARRIED_FOOD,
@@ -555,8 +556,9 @@ export function stepCaravans(world: WorldState, size: number): void {
 
 /**
  * Drivers of caravans who wait this tick for their escort (`CONTEXT.md`: Caravan): those with an
- * escort fighting for the caravan, or on the way to them more than `CARAVAN_SPREAD` tiles away. `size` is the
- * map's.
+ * escort fighting for the caravan, or on the way to them more than `CARAVAN_SPREAD` tiles away. A
+ * driver under attack doesn't wait: they drive on (`CONTEXT.md`: On a carriage under attack). `size`
+ * is the map's.
  */
 export function waitingForEscort(world: WorldState, size: number): Set<string> {
   const waiting = new Set<string>()
@@ -564,6 +566,7 @@ export function waitingForEscort(world: WorldState, size: number): Set<string> {
   for (const caravan of world.caravans) {
     const driver = caravan.driverId === null ? undefined : index.residentById(caravan.driverId)
     if (driver?.order?.kind !== 'drive') continue
+    if (driver.struck && world.tick - driver.struck.tick < DEFEND_CALM_TICKS) continue
     const behind = caravan.escortIds.some((id) => {
       const r = index.residentById(id)
       if (r?.order?.kind === 'attack') return true

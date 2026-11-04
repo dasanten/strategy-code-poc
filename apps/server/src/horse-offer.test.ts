@@ -10,6 +10,7 @@ import {
   pileAt,
   type WorldState,
 } from '@csp/shared'
+import { reopenHorseOffers } from './horse-offer-reopen.js'
 import { checkInvariants } from './invariants.js'
 import { OrderQueue } from './orders.js'
 import { bindScript } from './script-bindings.js'
@@ -134,6 +135,67 @@ describe('the Horse offer', () => {
     const { world, terrain } = setup()
     world.horseOffersClaimed = [1, 1]
     expect(checkInvariants(world, terrain).map((v) => v.invariant)).toEqual(['horse-offers-once'])
+  })
+})
+
+describe('offering horses again', () => {
+  const noViolations = (world: WorldState, terrain: Parameters<typeof checkInvariants>[1]) =>
+    expect(checkInvariants(world, terrain).map((v) => v.invariant)).not.toContain(
+      'horse-offers-once',
+    )
+
+  it('lets a Player who claimed claim once more, and just once, each time', () => {
+    const { world, terrain, claim } = setup()
+    const realmId = realmOf(world, 1)!.id
+    const start = realmHorses(world, realmId).length
+    expect(claim()).toBe('ok')
+    expect(claim()).not.toBe('ok')
+
+    for (const round of [1, 2]) {
+      expect(reopenHorseOffers(world)).toBe(1)
+      expect(world.horseOffersClaimed).toEqual([])
+      noViolations(world, terrain)
+      expect(claim()).toBe('ok')
+      expect(claim()).not.toBe('ok')
+      expect(realmHorses(world, realmId)).toHaveLength(start + HORSE_GRANT_HORSES * (round + 1))
+      expect(world.horseOffersClaimed).toEqual([1])
+      noViolations(world, terrain)
+    }
+  })
+
+  it('places only one claim’s horses for two claims in one tick', () => {
+    const { world, terrain, claim } = setup()
+    const queue = new OrderQueue(undefined, terrain)
+    expect(claim()).toBe('ok')
+    reopenHorseOffers(world)
+    const realmId = realmOf(world, 1)!.id
+    const before = realmHorses(world, realmId).length
+    queue.receive(world, player, 'a', { kind: 'claimHorses' })
+    queue.receive(world, player, 'b', { kind: 'claimHorses' })
+    queue.applyAll(world)
+    expect(realmHorses(world, realmId)).toHaveLength(before + HORSE_GRANT_HORSES)
+    expect(world.horseOffersClaimed).toEqual([1])
+  })
+
+  it('re-opens for one Player or for all who claimed, and counts them', () => {
+    const { world } = setup()
+    world.horseOffersClaimed = [1, 2, 3]
+    expect(reopenHorseOffers(world, 2)).toBe(1)
+    expect(world.horseOffersClaimed).toEqual([1, 3])
+    expect(reopenHorseOffers(world)).toBe(2)
+    expect(world.horseOffersClaimed).toEqual([])
+    expect(reopenHorseOffers(world)).toBe(0)
+  })
+
+  it('still gives a Player who hadn’t claimed just the one claim', () => {
+    const { world, claim } = setup()
+    expect(reopenHorseOffers(world, 1)).toBe(0)
+    expect(reopenHorseOffers(world)).toBe(0)
+    const realmId = realmOf(world, 1)!.id
+    const before = realmHorses(world, realmId).length
+    expect(claim()).toBe('ok')
+    expect(claim()).not.toBe('ok')
+    expect(realmHorses(world, realmId)).toHaveLength(before + HORSE_GRANT_HORSES)
   })
 })
 

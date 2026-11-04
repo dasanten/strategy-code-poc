@@ -1,14 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BATCHES_PER_DAY,
   BUILD_MATERIALS,
   BUILD_WORK,
   FOOD_PER_DAY,
   GOODS,
   HOUSING_ROOM,
   MOUNTAIN_ROAD_WORK_FACTOR,
+  RECIPES,
   TICKS_PER_GAME_YEAR,
   Terrain,
   UNEXPLORED,
+  WORK_OUTPUT_PER_DAY,
+  WORK_SKILL_EFFECT,
+  WORK_STRENGTH_AVERAGE,
   hungerFactor,
   teardownWork,
   type Good,
@@ -161,6 +166,151 @@ describe('buildings on a tile’s card', () => {
     expect(card.lines).toContain('Its workers make sword (2), shield (1)')
     expect(card.lists?.find((l) => l.title === 'Pile')?.goods).toEqual({ sword: 3, iron: 5 })
     expect(linesOf({ buildings: [smithy] })).toContain('Makes weapons and armour, nobody at it')
+  })
+
+  describe('how much is made at a workplace (`CONTEXT.md`: Workplace amounts)', () => {
+    /** A worker of realm `me` at Strength `strength` with `skill` of the workplace's skill. */
+    const worker = (
+      b: SeenBuilding,
+      id: string,
+      strength: number,
+      skills: Resident['skills'] = {},
+      makes?: Good,
+      owner = 'me',
+    ) =>
+      resident({
+        id,
+        name: id,
+        owner,
+        bornAt: 0,
+        skills,
+        stats: { strength: { base: strength, trained: 0 } } as Resident['stats'],
+        order: {
+          kind: 'workAt',
+          buildingId: b.id,
+          at: { x: b.x, y: b.y },
+          progress: 0,
+          ...(makes ? { makes } : {}),
+        },
+      })
+    const skilled = (points: number) => 1 + points * WORK_SKILL_EFFECT
+    const tenth = (n: number) => `${Math.floor(n * 10 + 1e-9) / 10}`
+    /** The list's rows as [name, what, how much]. */
+    const amounts = (more: Partial<TileThings>) => {
+      const list = tile(more).lists?.find((l) => l.title === 'Made a game day')
+      return list?.rows.map((r) => [r.name, r.detail, r.amount?.text])
+    }
+
+    it('gives a farm’s workers by their Strength and skill, and the total', () => {
+      const farm = building({ kind: 'farm', cityId: 'c-me' })
+      const perDay = WORK_OUTPUT_PER_DAY.food!
+      const ana = perDay * (15 / WORK_STRENGTH_AVERAGE) * skilled(50)
+      const bo = perDay * (7 / WORK_STRENGTH_AVERAGE)
+      const residents = [worker(farm, 'Ana', 15, { farming: 50 }), worker(farm, 'Bo', 7)]
+      expect(amounts({ buildings: [farm], residents })).toEqual([
+        ['Ana', 'Food', tenth(ana)],
+        ['Bo', 'Food', tenth(bo)],
+        ['Total', 'Food', tenth(ana + bo)],
+      ])
+      // The rows say what it makes, so the line doesn't.
+      expect(linesOf({ buildings: [farm], residents })).not.toContain('Makes food')
+    })
+
+    it('gives a mine what its node yields, the same way', () => {
+      const mine = building({ kind: 'mine' })
+      const nodeAt = (x: number, y: number) =>
+        x === 6 && y === 6 ? { kind: 'goldOre' as const, x, y } : undefined
+      const perDay = WORK_OUTPUT_PER_DAY.goldOre!
+      const ana = perDay * (20 / WORK_STRENGTH_AVERAGE) * skilled(10)
+      const bo = perDay * (5 / WORK_STRENGTH_AVERAGE)
+      const residents = [worker(mine, 'Ana', 20, { mining: 10 }), worker(mine, 'Bo', 5)]
+      expect(amounts({ buildings: [mine], residents, nodeAt })).toEqual([
+        ['Ana', 'Gold ore', tenth(ana)],
+        ['Bo', 'Gold ore', tenth(bo)],
+        ['Total', 'Gold ore', tenth(ana + bo)],
+      ])
+    })
+
+    it('counts a smelter’s and a mint’s batches times what a batch yields', () => {
+      const smelter = building({ kind: 'smelter' })
+      expect(amounts({ buildings: [smelter], residents: [worker(smelter, 'Ana', 10)] })).toEqual([
+        ['Ana', 'Iron', `${BATCHES_PER_DAY.smelter}`],
+        ['Total', 'Iron', `${BATCHES_PER_DAY.smelter}`],
+      ])
+      const mint = building({ kind: 'mint' })
+      const coins = BATCHES_PER_DAY.mint! * RECIPES.mint![0]!.output.coins!
+      expect(amounts({ buildings: [mint], residents: [worker(mint, 'Ana', 10)] })).toEqual([
+        ['Ana', 'Coins', `${coins}`],
+        ['Total', 'Coins', `${coins}`],
+      ])
+    })
+
+    it('gives a smithy one total for each item being made', () => {
+      const smithy = building({ kind: 'smithy' })
+      const perDay = BATCHES_PER_DAY.smithy!
+      const ana = perDay * (15 / WORK_STRENGTH_AVERAGE)
+      const bo = perDay * skilled(20)
+      const cy = perDay
+      const residents = [
+        worker(smithy, 'Ana', 15, {}, 'sword'),
+        worker(smithy, 'Bo', 10, { smithing: 20 }, 'shield'),
+        worker(smithy, 'Cy', 10, {}, 'sword'),
+      ]
+      expect(amounts({ buildings: [smithy], residents })).toEqual([
+        ['Ana', 'Sword', tenth(ana)],
+        ['Bo', 'Shield', tenth(bo)],
+        ['Cy', 'Sword', tenth(cy)],
+        ['Total', 'Sword', tenth(ana + cy)],
+        ['Total', 'Shield', tenth(bo)],
+      ])
+      expect(linesOf({ buildings: [smithy], residents }).join()).not.toMatch(/make/i)
+    })
+
+    it('opens a worker’s card from their row, and has no card behind a total', () => {
+      const farm = building({ kind: 'farm', cityId: 'c-me' })
+      const card = tile({ buildings: [farm], residents: [worker(farm, 'Ana', 10)] })
+      const rows = card.lists?.find((l) => l.title === 'Made a game day')?.rows
+      expect(rows?.map((r) => r.opens)).toEqual(['resident', undefined])
+    })
+
+    it('doesn’t count another realm’s worker, whose stats aren’t known', () => {
+      const farm = building({ kind: 'farm', cityId: 'c-me' })
+      const them = resident({
+        id: 'Cid',
+        order: { kind: 'workAt', buildingId: farm.id, at: { x: 5, y: 5 }, progress: 0 },
+      })
+      const ana = worker(farm, 'Ana', 10)
+      const perDay = `${WORK_OUTPUT_PER_DAY.food}`
+      expect(amounts({ buildings: [farm], residents: [ana, them] })).toEqual([
+        ['Ana', 'Food', perDay],
+        ['Total', 'Food', perDay],
+      ])
+      // With only them there the card says what it does with nobody counted.
+      expect(amounts({ buildings: [farm], residents: [them] })).toBeUndefined()
+      expect(linesOf({ buildings: [farm], residents: [them] })).toContain('Makes food')
+    })
+
+    it('still says what another realm’s workers make at a smithy', () => {
+      const smithy = building({ kind: 'smithy' })
+      const theirs = worker(smithy, 'Cid', 10, {}, 'spear', 'them')
+      const mine = worker(smithy, 'Ana', 10, {}, 'sword')
+      const lines = linesOf({ buildings: [smithy], residents: [mine, theirs] })
+      expect(lines).toContain('Others make spear (1)')
+      expect(linesOf({ buildings: [smithy], residents: [theirs] })).toContain(
+        'Its workers make spear (1)',
+      )
+    })
+
+    it('leaves the rows out with no worker there, and for one only on the way', () => {
+      const farm = building({ kind: 'farm', cityId: 'c-me' })
+      expect(amounts({ buildings: [farm] })).toBeUndefined()
+      expect(linesOf({ buildings: [farm] })).toContain('Makes food')
+      const away = { ...worker(farm, 'Ana', 10), order: null }
+      expect(amounts({ buildings: [farm], residents: [away] })).toBeUndefined()
+      const smithy = building({ kind: 'smithy' })
+      expect(amounts({ buildings: [smithy] })).toBeUndefined()
+      expect(linesOf({ buildings: [smithy] })).toContain('Makes weapons and armour, nobody at it')
+    })
   })
 
   it('says nobody teaches at a finished training ground yet, and nothing of the kind at its site', () => {

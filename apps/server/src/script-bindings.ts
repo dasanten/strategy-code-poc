@@ -35,6 +35,7 @@ import {
   terrainAt,
   unitsThatFit,
   passengersOf,
+  standsStill,
   workplaceGood,
   wrapDistance,
   addWaypointProblem,
@@ -567,6 +568,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
             carriage && {
               ...carriage,
               passengerIds: passengersOf(world, carriage).map((r) => r.id),
+              standsStill: standsStill(world, carriage),
             },
             { view: 'carriage' },
           )

@@ -112,6 +112,12 @@ export interface Resident {
    */
   interrupted?: Interrupted
   /**
+   * Set when what the resident does now was given by the Player while they were under attack
+   * (`CONTEXT.md`: A Player's order under attack): further blows don't start their defence script.
+   * It holds for as long as `GivenUnderAttack` says. Absent otherwise. Nobody sees it.
+   */
+  givenUnderAttack?: GivenUnderAttack
+  /**
    * The id of the Player's script this resident runs as their defence script when struck
    * (`CONTEXT.md`: Defence script), picked on their card; absent for the game's Defend default.
    * Only the owning Player sees it.
@@ -383,7 +389,7 @@ export interface SeenScript {
  */
 export type SeenResident = Omit<
   Resident,
-  'script' | 'hunger' | 'health' | 'scriptParams' | 'scriptLog' | 'interrupted'
+  'script' | 'hunger' | 'health' | 'scriptParams' | 'scriptLog' | 'interrupted' | 'givenUnderAttack'
 > &
   Partial<Pick<Resident, 'hunger' | 'health' | 'scriptParams'>> & {
     script?: SeenScript
@@ -508,6 +514,13 @@ export interface Interrupted {
   order: ResidentOrder | null
   script?: RunningScript
 }
+
+/**
+ * How long what a Player gave a resident under attack holds (`Resident.givenUnderAttack`):
+ * `untilDone`, an order that ends by itself, until it is done or replaced; `untilCalm`, what goes on
+ * until stopped, until no blow has landed for `DEFEND_CALM_TICKS`.
+ */
+export type GivenUnderAttack = 'untilDone' | 'untilCalm'
 
 export interface Struck {
   by: string
@@ -837,7 +850,8 @@ export interface WorldState {
   scriptViewChanges: number
   /**
    * The account ids of the Players who claimed their Horse offer (`CONTEXT.md`: Horse offer):
-   * kept with the Player, not the realm, so a claim outlives a Leader death.
+   * kept with the Player, not the realm, so a claim outlives a Leader death. Offering horses
+   * again takes them out.
    */
   horseOffersClaimed: number[]
   /**
