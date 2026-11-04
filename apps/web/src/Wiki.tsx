@@ -2059,10 +2059,19 @@ export function Wiki() {
           {duration(DEFEND_CALM_TICKS)}. Their card says “Defending: fighting back at Bo” or
           “Defending: fleeing home”, with what they were doing on the line under it. What they were
           doing waits meanwhile: once Defend ends they go back to it, a script with its memory, a
-          queue at its step, or a plain order. Struck again while defending, they keep defending; an
-          order you give them meanwhile ends both. Scripts see the last blow as{' '}
-          <code>me.struckBy</code> and <code>me.struckAt</code>. Residents of NPC cities, and in an
-          army, fight back or flee home the same way.
+          queue at its step, or a plain order. Struck again while defending, they keep defending.
+          Scripts see the last blow as <code>me.struckBy</code> and <code>me.struckAt</code>.
+          Residents of NPC cities, and in an army, fight back or flee home the same way.
+        </p>
+        <p>
+          An order you give a resident under attack, while their defence script runs or within{' '}
+          {duration(DEFEND_CALM_TICKS)} of a blow, ends the defence script and what it interrupted,
+          and further blows don't undo it. One that ends by itself, like a walk or a drive to a
+          target, stands until it is done or you replace it, however long that takes. What goes on
+          until stopped, like a haul route, working, a task, a script or a queue, holds until no
+          blow has landed for {duration(DEFEND_CALM_TICKS)}; after that the next blow runs the
+          defence script as usual. An order given before the attack is interrupted as usual, and
+          what a script or queue requests itself doesn't count as given by you.
         </p>
         <h3>Defence script</h3>
         <p>
