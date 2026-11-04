@@ -176,6 +176,42 @@ describe('a Trade Org army’s supply wagon', () => {
     expect(wrapDistance(640, carriage, townHallOf(s.world, c1)!)).toBeLessThan(40)
   }, 240_000)
 
+  it('drives to where the army is when far behind, and goes after it step by step once near', () => {
+    const s = setup()
+    const { p, wagon, carriage } = setOff(s)
+    const driver = at(s.world, wagon.driverId!)
+    const horse = s.world.horses.find((h) => h.id === carriage.horseId)!
+    const m = at(s.world, p.members[0]!.residentId)
+    const reach = TRADE_ORG_PUNISH.wagonFollowReach
+    // Fallen far behind every soldier, while going after them step by step.
+    for (const other of p.members) {
+      const r = at(s.world, other.residentId)
+      r.x = carriage.x + 3 * reach
+      r.y = carriage.y
+    }
+    Object.assign(driver, { x: carriage.x, y: carriage.y })
+    Object.assign(horse, { x: carriage.x, y: carriage.y })
+    driver.order = {
+      kind: 'drive',
+      carriageId: carriage.id,
+      target: { x: m.x, y: m.y },
+      path: null,
+      progress: 0,
+      army: p.id,
+    }
+    stepPunishments(s.world, 640)
+    expect(driver.order).toMatchObject({ kind: 'drive', target: { x: m.x, y: m.y } })
+    expect((driver.order as { army?: string }).army).toBeUndefined()
+    // Caught up: the army's own soldiers are near again.
+    for (const other of p.members) {
+      const r = at(s.world, other.residentId)
+      r.x = carriage.x + 4
+      r.y = carriage.y
+    }
+    stepPunishments(s.world, 640)
+    expect(driver.order).toMatchObject({ kind: 'drive', army: p.id })
+  }, 240_000)
+
   it('feeds its soldiers and its driver on the way', () => {
     const s = setup()
     const { p, wagon, carriage } = setOff(s)
@@ -502,29 +538,18 @@ describe('a Trade Org army’s supply wagon', () => {
 describe('the Trade Org army’s longest trip', () => {
   const HQ = 200
   const FAR = MAP_SIZE / 2
-  /**
-   * As large as the real map and all Forest, so the walk takes about `walkMargin` times the straight
-   * way, but for a clearing around the HQ and around the city, which need Plains to stand on.
-   */
-  const forest: TerrainMap = {
+  /** As large as the real map, all Plains. */
+  const big: TerrainMap = {
     size: MAP_SIZE,
-    tiles: new Uint8Array(MAP_SIZE * MAP_SIZE).fill(Terrain.Forest),
-  }
-  for (const [mx, my] of [
-    [HQ, HQ],
-    [HQ + FAR, HQ + FAR],
-  ] as const) {
-    for (let y = my - 150; y < my + 150; y++) {
-      forest.tiles.fill(Terrain.Plains, y * MAP_SIZE + mx - 150, y * MAP_SIZE + mx + 150)
-    }
+    tiles: new Uint8Array(MAP_SIZE * MAP_SIZE).fill(Terrain.Plains),
   }
 
   it(
     'reaches the farthest city on a real-size map and gets home fed, with no Food but its own',
     { tags: ['slow'], timeout: 1_800_000 },
     () => {
-      const world = createWorld(forest)
-      const hq = foundTradeOrgHq(world, forest, HQ, HQ, mulberry32(7))
+      const world = createWorld(big)
+      const hq = foundTradeOrgHq(world, big, HQ, HQ, mulberry32(7))
       world.realms.push({ id: 'r1', userId: 7, leaderId: 'a1' })
       addCity(world, { id: 'c1', realmId: 'r1', x: HQ + FAR, y: HQ + FAR, name: 'Ashford' })
       // Coins and no Food: nothing to refill from at the city, and no posts on the way.
@@ -547,18 +572,20 @@ describe('the Trade Org army’s longest trip', () => {
       for (const r of [...soldiers, ...driverToBe]) {
         r.carried = soldiers.includes(r) ? { spear: 1 } : {}
         const average = { base: 10, trained: 0 }
-        r.stats = { ...r.stats, strength: average, endurance: average, agility: average }
+        // Weak: they can't pack what the way there and back eats.
+        const strength = { base: 5, trained: 0 }
+        r.stats = { ...r.stats, strength, endurance: average, agility: average }
         r.bornAt = -20 * 24 * 3600
         r.lifespan = 60
       }
       // An HQ that has had time to fill its storage: it can pack for all of them.
       const store = world.buildings.find((b) => b.cityId === hq.id && b.kind === 'storage')!
       store.stock = { ...store.stock, food: 1000 }
-      const walking = new Walking(forest)
+      const walking = new Walking(big)
       theft(world, hq, { iron: 10 })
       const worth = TRADE_ORG_PUNISH.times * worthOf({ iron: 10 })
       const stepUntil = (until: () => boolean, most: number) => {
-        for (let i = 0; i < most && !until(); i++) stepWorld(world, forest, walking)
+        for (let i = 0; i < most && !until(); i++) stepWorld(world, big, walking)
       }
       stepUntil(() => world.punishments.length > 0, 2)
       const p = world.punishments[0]!
@@ -568,8 +595,8 @@ describe('the Trade Org army’s longest trip', () => {
       stepUntil(() => wagon.loaded === true && p.members.every((m) => m.packed), 2000)
       stepUntil(() => false, 2)
       expect(carriage.load.food ?? 0).toBeGreaterThan(0)
-      // Through Forest the way there and back eats more than any of them can pack.
-      const days = (2 * FAR * Math.SQRT2 * WALK_TICKS_PER_TILE) / (0.7 * TICKS_PER_GAME_DAY)
+      // The way there and back eats more than any of them could pack.
+      const days = (2 * FAR * Math.SQRT2 * WALK_TICKS_PER_TILE) / TICKS_PER_GAME_DAY
       for (const id of ids) {
         expect(at(world, id).carried.food ?? 0).toBeLessThan(days * FOOD_PER_DAY)
       }
@@ -577,17 +604,20 @@ describe('the Trade Org army’s longest trip', () => {
       expect(p.arrivedAt).toBeDefined()
       const c1 = world.cities.find((c) => c.id === 'c1')!
       expect(wrapDistance(MAP_SIZE, carriage, townHallOf(world, c1)!)).toBeLessThan(100)
-      stepUntil(() => world.supplyWagons.length === 0, 140_000)
-      expect(world.punishments).toEqual([])
-      expect(world.supplyWagons).toEqual([])
-      expect(world.buildings.find((b) => b.id === 's1')!.stock!.coins).toBe(1000 - worth)
-      for (const id of [...ids, driverId]) {
+      const homeFed = (id: string) => {
         const r = at(world, id)
         expect(r.health).toBeGreaterThan(0)
         expect(r.downUntil).toBeUndefined()
         expect(inCityArea(world, hq, r.x, r.y, MAP_SIZE)).toBe(true)
       }
-      expect(checkInvariants(world, forest)).toEqual([])
+      stepUntil(() => world.punishments.length === 0, 140_000)
+      expect(world.punishments).toEqual([])
+      ids.forEach(homeFed)
+      stepUntil(() => world.supplyWagons.length === 0, 40_000)
+      expect(world.supplyWagons).toEqual([])
+      homeFed(driverId)
+      expect(world.buildings.find((b) => b.id === 's1')!.stock!.coins).toBe(1000 - worth)
+      expect(checkInvariants(world, big)).toEqual([])
     },
   )
 })

@@ -402,9 +402,9 @@ export function foodIn(world: WorldState, cityIds: Set<string>): Building[] {
 }
 
 /**
- * Where a member may refill on the way: the Trade Organization's cities within
- * `TRADE_ORG_PUNISH.postReach` tiles, the trading posts they pass, and `robbing`, the city the
- * army reached, while it may still take from it.
+ * Where a member may refill on the way, within `TRADE_ORG_PUNISH.postReach` tiles of them: the Trade
+ * Organization's cities, the trading posts they pass, and `robbing`, the city the army reached, while
+ * it may still take from it. Further off it is behind them: nobody walks back for a meal.
  */
 function refillPlaces(
   world: WorldState,
@@ -413,10 +413,10 @@ function refillPlaces(
   size: number,
 ): Building[] {
   const tradeOrg = new Set(world.cities.filter((c) => c.tradeOrg).map((c) => c.id))
-  const near = foodIn(world, tradeOrg).filter(
-    (b) => wrapDistance(size, r, b) <= TRADE_ORG_PUNISH.postReach,
-  )
-  return robbing ? [...near, ...foodIn(world, new Set([robbing.id]))] : near
+  const places = robbing
+    ? [...foodIn(world, tradeOrg), ...foodIn(world, new Set([robbing.id]))]
+    : foodIn(world, tradeOrg)
+  return places.filter((b) => wrapDistance(size, r, b) <= TRADE_ORG_PUNISH.postReach)
 }
 
 /**

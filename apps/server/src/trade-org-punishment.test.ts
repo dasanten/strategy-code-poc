@@ -617,6 +617,28 @@ describe('the Trade Organization’s punishment trip', () => {
     expect(world.buildings.find((b) => b.id === 's1')!.stock!.food ?? 0).toBeLessThan(40)
   }, 240_000)
 
+  it('doesn’t walk back to the city for Food once it is far along the way home', () => {
+    const { world, hq, walking } = setup({ coins: 1000, food: 40 })
+    theft(world, hq, { iron: 10 })
+    run(world, walking, 1)
+    const p = world.punishments[0]!
+    p.heading = 'home'
+    p.arrivedAt = world.tick
+    const m = p.members[0]!
+    m.packed = true
+    const r = at(world, m.residentId)
+    // Past `postReach` from the city's storage and from the HQ's, a meal short of the way home.
+    r.x = MID + 200
+    r.y = MID + 88
+    r.carried = { spear: 1 }
+    m.own = { spear: 1 }
+    r.order = null
+    stepPunishments(world, 640)
+    const s1 = world.buildings.find((b) => b.id === 's1')!
+    expect(r.order).toMatchObject({ kind: 'walkTo' })
+    expect(r.order).not.toMatchObject({ target: { x: s1.x, y: s1.y } })
+  })
+
   it('reports a punishment that took anything before it arrived', () => {
     const { world, hq } = setup()
     theft(world, hq, { iron: 10 })
