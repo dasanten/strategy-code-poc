@@ -19,7 +19,7 @@ import {
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { captureCity } from './capture.js'
-import { hqEnd, leaveTradeOrg, postEnd } from './caravans.js'
+import { dropFromLoop, hqEnd, leaveTradeOrg, postEnd } from './caravans.js'
 import { resolveCarrying } from './carrying.js'
 import { nothingLeftOfTheHq } from './hq-fall.js'
 import { checkInvariants } from './invariants.js'
@@ -797,7 +797,19 @@ describe('robbing a wandering trader', () => {
 })
 
 describe('a wandering trader’s loop', () => {
-  it('loses a post that leaves the Trade Organization, going on to the one after it', () => {
+  it('keeps a post that leaves the Trade Organization until it gets there', () => {
+    const { world, terrain, trader, posts } = fixture()
+    const bound = trader.postId!
+    leaveTradeOrg(
+      world,
+      posts.find((p) => p.id === bound)!,
+    )
+    expect(trader.loop).toContain(bound)
+    expect(trader.postId).toBe(bound)
+    expect(tradersSound.check(world, terrain)).toEqual([])
+  })
+
+  it('drops a post by going on to the one after it', () => {
     const { world, terrain, trader, posts } = fixture()
     const bound = trader.postId!
     const after = trader.loop[(trader.loop.indexOf(bound) + 1) % trader.loop.length]
@@ -807,40 +819,36 @@ describe('a wandering trader’s loop', () => {
       world,
       posts.find((p) => p.id === bound)!,
     )
+    dropFromLoop(trader, bound)
     expect(trader.loop).not.toContain(bound)
     expect(trader.postId).toBe(after)
     expect(trader).toMatchObject({ stop: 'storage', plan: null })
     expect(tradersSound.check(world, terrain)).toEqual([])
   })
 
-  it('keeps its way when a post it isn’t bound for goes, wrapping round the end', () => {
+  it('keeps its way when a post it isn’t bound for drops, wrapping round the end', () => {
     const { world, trader, posts } = fixture()
     const bound = trader.postId!
     const other = posts.find((p) => p.id !== bound)!.id
     trader.stop = 'warehouse'
-    leaveTradeOrg(
-      world,
-      posts.find((p) => p.id === other)!,
-    )
+    dropFromLoop(trader, other)
     expect(trader.postId).toBe(bound)
     expect(trader.stop).toBe('warehouse')
     // The last of the loop goes: on to the first, the HQ.
     const last = trader.loop[trader.loop.length - 1]!
     const first = trader.loop[0]
     trader.postId = last
-    leaveTradeOrg(
-      world,
-      posts.find((p) => p.id === last)!,
-    )
+    dropFromLoop(trader, last)
     expect(trader.postId).toBe(first)
+    expect(world.cities).toEqual(expect.arrayContaining(posts))
   })
 
-  it('follows a captured post when the capture comes through a captor', () => {
+  it('holds together with a captured post on it', () => {
     const { world, terrain, trader, posts } = fixture()
     const realm = foundStartingCity(world, terrain, 7)
     const post = posts[0]!
     captureCity(world, post, realm.id, terrain.size)
-    expect(trader.loop).not.toContain(post.id)
+    expect(trader.loop).toContain(post.id)
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 
@@ -875,6 +883,7 @@ describe('a wandering trader’s loop', () => {
     expect(world.traders).toEqual([trader])
     put(world, trader, 300, 300)
     leaveTradeOrg(world, posts[0]!)
+    dropFromLoop(trader, posts[0]!.id)
     expect(trader).toMatchObject({ loop: [hq.id], postId: hq.id, stop: 'storage' })
     expect(tradersSound.check(world, terrain)).toEqual([])
     stepTraders(world, terrain.size)
@@ -892,6 +901,7 @@ describe('a wandering trader’s loop', () => {
   it('stays at the HQ’s warehouse with no post left, not shuttling to and fro', () => {
     const { world, terrain, hq, trader, posts } = fixture([[220, 128]])
     leaveTradeOrg(world, posts[0]!)
+    dropFromLoop(trader, posts[0]!.id)
     const warehouse = hqEnd(world).warehouse!
     put(world, trader, warehouse.x, warehouse.y)
     trader.stop = 'warehouse'
@@ -980,7 +990,7 @@ describe('the invariant on wandering traders', () => {
     const realm = foundStartingCity(world, terrain, 7)
     trader.loop.push(realm.id)
     expect(messages(world, terrain)).toEqual([
-      `trader ${trader.id} has ${realm.id} on its loop, which is neither a trading post nor the HQ`,
+      `trader ${trader.id} has ${realm.id} on its loop, which is no city`,
     ])
     trader.loop.pop()
     trader.loop.push(trader.loop[0]!)

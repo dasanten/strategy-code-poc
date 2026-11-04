@@ -20,7 +20,7 @@ import { placeTraders, putHqOnLoops } from './traders.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 83
+export const WORLD_FORMAT_VERSION = 84
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -47,8 +47,6 @@ export const migrations: Record<number, MigrationStep> = {
   // captured before that still counted as the Trade Org's.
   37: (state) => {
     const world = structuredClone(state) as WorldState
-    // Wandering traders come with step 80; `leaveTradeOrg` looks at them.
-    world.traders ??= []
     for (const c of world.cities)
       if (c.tradeOrg === 'post' && c.realmId !== null) leaveTradeOrg(world, c)
     return world
@@ -353,6 +351,11 @@ export const migrations: Record<number, MigrationStep> = {
     putHqOnLoops(world, terrain.size)
     return world
   },
+  // A lost post stays on a trader's loop until it reaches it, and its capture is a crime
+  // (`CONTEXT.md`: Lost post found out), with `post`, `heardAt` and a drive order's `near`. Posts
+  // lost before have already dropped from the loops and no crime is known of them: the Trade
+  // Organization never heard. So the step leaves every world as it is.
+  83: (state) => state,
 }
 
 export class WorldFormatError extends Error {}

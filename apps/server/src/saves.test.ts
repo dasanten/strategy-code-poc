@@ -273,15 +273,6 @@ describe('world saves', () => {
     expect(checkInvariants(v82, land)).toEqual([])
   })
 
-  it('lets a world from before traders lose a post to migration 37', () => {
-    const { world, terrain: land, post } = worldWithPost()
-    const old: Partial<typeof world> = structuredClone(world)
-    delete old.traders
-    old.cities!.find((c) => c.id === post.id)!.realmId = world.realms[0]!.id
-    const v38 = migrateWorld(old, 37, { terrain: land }, migrations, 38)
-    expect(v38.traders).toEqual([])
-  })
-
   it('leaves every resident unmarked for orders standing under attack (migration 79 → 80)', () => {
     const { world: v79, terrain: land } = worldWithPost()
     const v80 = migrateWorld(structuredClone(v79), 79, { terrain: land }, migrations, 80)
@@ -294,7 +285,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(83)
+    expect(WORLD_FORMAT_VERSION).toBe(84)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)

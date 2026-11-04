@@ -90,7 +90,7 @@ import {
   carriageCommanderOf,
   commanderOf,
 } from '@csp/shared'
-import { carriageOrganization, organizationOf } from './crimes.js'
+import { awaitsTrader, carriageOrganization, organizationOf } from './crimes.js'
 import { tallyGoods } from './goods-made.js'
 import { awakeAlive, downDoNothing, refillSource, refillTarget } from './survival.js'
 import { horsesDownLieStill } from './horses.js'
@@ -1657,8 +1657,10 @@ export const alliancesSound: Invariant = {
 /**
  * Crimes hold together (`CONTEXT.md`: Crime, Witness): each is against another Organization than
  * the culprit's and happened no later than now; its witnesses are living residents, each listed
- * once, none of the culprit's Organization; it is known to each Organization at most once; and
- * it is kept only while someone carries news of it or an Organization remembers it.
+ * once, none of the culprit's Organization; it is known to each Organization at most once; it is
+ * kept only while someone carries news of it, an Organization remembers it or a wandering trader may
+ * still find it out; and a capture, and only a capture, names the post taken (`CONTEXT.md`: Lost post
+ * found out).
  */
 export const crimesSound: Invariant = {
   name: 'crimes-sound',
@@ -1678,8 +1680,13 @@ export const crimesSound: Invariant = {
         }
       }
       if (new Set(c.knownBy).size !== c.knownBy.length) problems.push('is known twice to one')
-      const remembered = c.knownBy.length > 0 && world.tick - c.tick <= memory
-      if (c.witnesses.length === 0 && !remembered) problems.push('is kept though forgotten')
+      const remembered = c.knownBy.length > 0 && world.tick - (c.heardAt ?? c.tick) <= memory
+      if (c.witnesses.length === 0 && !remembered && !awaitsTrader(world, c)) {
+        problems.push('is kept though forgotten')
+      }
+      if ((c.kind === 'capture') !== (c.post !== undefined)) {
+        problems.push('names a post without being a capture, or the other way round')
+      }
       return problems.map((p) => ({
         invariant: this.name,
         message: `crime ${c.id} ${p}`,
