@@ -1693,6 +1693,26 @@ button.residents-row.selected:hover {
   text-transform: uppercase;
   color: var(--ui-muted);
 }
+/* An NPC city's rates (`CONTEXT.md`: Swap): a button each, wrapping to the panel's width. */
+.swap-rates ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.swap-rates button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-align: left;
+}
+.swap-rates .good-icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
 .hud-drawer form > fieldset {
   flex-basis: 100%;
 }
