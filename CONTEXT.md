@@ -679,8 +679,10 @@ The shared language of the game. Domain terms only — no implementation details
   - **The threat is only words.** Ignoring a demand does nothing by itself. Whatever was threatened
     is the sender's to carry out, or not. The game forbids nothing.
   - **Accepting** carries the terms out: a named city joins the sender's realm at once, as a captured
-    one does, and goods and Coins are set aside at a storage of the one who accepts, for the sender
-    alone to fetch (like a Direct offer in person), or sent by a Transfer.
+    one does (What joins with a city), and goods and Coins are set aside at a storage of the one who
+    accepts, for the sender alone to fetch (like a Direct offer in person), or sent by a Transfer. A
+    city no longer theirs can't be handed over. Handing over is the Player's own choice, also for
+    their last city, which goes as losing it to capture does: no crime and no standing lost.
   - **An NPC city** accepts when the respect it sees from the sender (their armed residents and
     walls in its sight) far outweighs its soldiers, so an army at the gate can take a city without a
     fight; otherwise it declines and its standing toward the sender drops. It carries out goods the

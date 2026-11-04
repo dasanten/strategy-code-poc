@@ -16,6 +16,7 @@ import {
 import {
   demandSides,
   goodsOfLines,
+  handOverQuestion,
   knownCitiesOf,
   termsLine,
   type GoodsLine,
@@ -113,7 +114,11 @@ export function DemandsPanel({
                 <div className="order-buttons">
                   <button
                     type="button"
-                    onClick={() => void order({ kind: 'acceptDemand', demandId: d.id })}
+                    onClick={() => {
+                      const question = handOverQuestion(d, realmId, cities)
+                      if (question && !window.confirm(question)) return
+                      void order({ kind: 'acceptDemand', demandId: d.id })
+                    }}
                   >
                     Accept
                   </button>

@@ -1,7 +1,9 @@
 import {
+  AVERAGE_HORSE_STATS,
   DEMANDS_PER_GAME_DAY,
   DEMAND_MAX_DAYS,
   DEMAND_NOTE_MAX_LENGTH,
+  OCCUPATION_GAME_DAYS,
   TICKS_PER_GAME_DAY,
   Terrain,
   diplomacyFor,
@@ -297,10 +299,13 @@ describe('answering a demand', () => {
     expect(checkInvariants(world, terrain, [demandsSound])).toEqual([])
   })
 
-  it('carries out nothing yet: an accepted city stays where it was', () => {
-    const { world, queue, id } = sent()
-    order(world, queue, tobin, { kind: 'acceptDemand', demandId: id })
-    expect(world.cities.find((c) => c.id === 'c2')!.realmId).toBe('r2')
+  it('carries out nothing yet for goods and Coins: only the answer is recorded', () => {
+    const s = setup()
+    order(s.world, s.queue, mara, goodsDemand)
+    const id = s.world.demands[0]!.id
+    expect(order(s.world, s.queue, tobin, { kind: 'acceptDemand', demandId: id })).toBeUndefined()
+    expect(s.world.demands).toEqual([])
+    expect(whats(s.world, 8)).toEqual(['received', 'accepted'])
   })
 
   it('is only for the realm it was sent to, and only once', () => {
@@ -320,6 +325,156 @@ describe('answering a demand', () => {
     queue.receive(world, tobin, 'b', { kind: 'declineDemand', demandId: id })
     queue.applyAll(world)
     expect(whats(world, 8)).toEqual(['received', 'accepted'])
+  })
+})
+
+describe('accepting a demand for a city', () => {
+  /** `setup` with Mara's demand for c2 sent, where b2 lives; Tobin's Leader b1 lives far away. */
+  function demanded() {
+    const s = setup()
+    order(s.world, s.queue, mara, cityDemand)
+    const c2 = s.world.cities.find((c) => c.id === 'c2')!
+    const b2 = resident(s.world, 'b2', 'r2', 160, 165)
+    b2.cityId = 'c2'
+    return { ...s, c2, b2, id: s.world.demands[0]!.id }
+  }
+  const accept = { kind: 'acceptDemand' }
+
+  /** A horse of the realm at (x, y), to see who it goes to. */
+  function horse(world: WorldState, id: string, realmId: string, x: number, y: number) {
+    const h = {
+      id,
+      name: 'Rowan',
+      realmId,
+      cityId: null,
+      x,
+      y,
+      hunger: 100,
+      health: 100,
+      stats: { ...AVERAGE_HORSE_STATS },
+      bornAt: 0,
+    }
+    world.horses.push(h)
+    return h
+  }
+
+  it('joins the city at once, with its people, horses and carriages, as capture takes them', () => {
+    const { world, queue, c2, b2, id } = demanded()
+    b2.order = { kind: 'walkTo', target: { x: 170, y: 170 }, path: null, progress: 0 }
+    const near = horse(world, 'near', 'r2', 161, 165)
+    const pulling = horse(world, 'pulling', 'r2', 162, 165)
+    const far = horse(world, 'far', 'r2', 5, 5)
+    const carriage = {
+      id: 'k',
+      realmId: 'r2',
+      cityId: null,
+      x: 162,
+      y: 165,
+      horseId: 'pulling',
+      load: {},
+    }
+    world.carriages.push(carriage)
+
+    expect(order(world, queue, tobin, { ...accept, demandId: id })).toBeUndefined()
+
+    expect(c2.realmId).toBe('r1')
+    expect(b2).toMatchObject({ owner: 'r1', cityId: 'c2', order: null })
+    for (const t of [near, pulling, carriage]) expect(t.realmId, t.id).toBe('r1')
+    expect(far.realmId).toBe('r2')
+    expect(world.demands).toEqual([])
+    expect(whats(world, 7)).toEqual(['sent', 'accepted'])
+    expect(whats(world, 8)).toEqual(['received', 'accepted'])
+    expect(world.events.filter((e) => e.kind === 'cityCaptured')).toEqual([])
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('costs no standing and is no crime', () => {
+    const { world, queue, id } = demanded()
+    order(world, queue, tobin, { ...accept, demandId: id })
+    for (let i = 0; i < 3; i++) stepWorld(world, terrain)
+    expect(world.crimes).toEqual([])
+    expect(world.standings).toEqual([])
+  })
+
+  it('is refused for a city already gone, and the demand stays to decline', () => {
+    const { world, queue, c2, id } = demanded()
+    c2.realmId = 'r3'
+    expect(order(world, queue, tobin, { ...accept, demandId: id })).toMatch(
+      /Ashford is no longer yours/,
+    )
+    expect(c2.realmId).toBe('r3')
+    expect(world.demands).toHaveLength(1)
+    world.cities = world.cities.filter((c) => c !== c2)
+    expect(order(world, queue, tobin, { ...accept, demandId: id })).toMatch(/no longer yours/)
+    expect(order(world, queue, tobin, { kind: 'declineDemand', demandId: id })).toBeUndefined()
+    expect(world.demands).toEqual([])
+  })
+
+  it('hands it to the first of two demands accepted in one tick, and leaves the other open', () => {
+    const { world, queue, c2, id } = demanded()
+    world.lastSeen[9] = [c2Seen()]
+    expect(order(world, queue, wren, cityDemand)).toBeUndefined()
+    const other = world.demands.find((d) => d.id !== id)!.id
+    queue.receive(world, tobin, 'a', { ...accept, demandId: id })
+    queue.receive(world, tobin, 'b', { ...accept, demandId: other })
+    queue.applyAll(world)
+    expect(c2.realmId).toBe('r1')
+    expect(world.demands.map((d) => d.id)).toEqual([other])
+    expect(whats(world, 9)).toEqual(['sent'])
+  })
+
+  it('is their choice for their last city too: the Leader stays in the realm, homeless', () => {
+    const { world, queue, c2, id } = demanded()
+    const leader = world.residents.find((r) => r.id === 'b1')!
+    leader.cityId = 'c2'
+    expect(order(world, queue, tobin, { ...accept, demandId: id })).toBeUndefined()
+    expect(c2.realmId).toBe('r1')
+    expect(world.cities.filter((c) => c.realmId === 'r2')).toEqual([])
+    expect(leader).toMatchObject({ owner: 'r2', cityId: null })
+    expect(world.realms.some((r) => r.id === 'r2')).toBe(true)
+    for (let i = 0; i < 3; i++) stepWorld(world, terrain)
+    expect(world.realms.some((r) => r.id === 'r2')).toBe(true)
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('takes those in an army of the giver out of it as the world ticks on', () => {
+    const { world, queue, b2, id } = demanded()
+    world.armies.push({ id: 'army', realmId: 'r2', name: 'Guard', memberIds: ['b2'], order: null })
+    order(world, queue, tobin, { ...accept, demandId: id })
+    stepWorld(world, terrain)
+    expect(b2.owner).toBe('r1')
+    expect(world.armies.flatMap((a) => a.memberIds)).not.toContain('b2')
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('tells the new owner of an occupation by a third realm, which goes on', () => {
+    const { world, queue, c2, id } = demanded()
+    const since = world.tick - TICKS_PER_GAME_DAY
+    c2.occupation = { realmId: 'r3', since }
+    order(world, queue, tobin, { ...accept, demandId: id })
+    expect(c2.occupation).toEqual({ realmId: 'r3', since })
+    expect(world.events.filter((e) => e.kind === 'hallOccupied')).toEqual([
+      expect.objectContaining({
+        userId: 7,
+        cityId: 'c2',
+        other: 'Wren',
+        occupier: false,
+        days: OCCUPATION_GAME_DAYS - 1,
+      }),
+    ])
+  })
+
+  it('ends the sender’s own occupation, unlogged', () => {
+    const { world, queue, c2, id } = demanded()
+    c2.occupation = { realmId: 'r1', since: world.tick }
+    order(world, queue, tobin, { ...accept, demandId: id })
+    stepWorld(world, terrain)
+    expect(c2.occupation).toBeNull()
+    const logged = world.events.filter(
+      (e) => e.kind === 'hallOccupied' || e.kind === 'occupationBroken',
+    )
+    expect(logged).toEqual([])
+    expect(checkInvariants(world, terrain)).toEqual([])
   })
 })
 

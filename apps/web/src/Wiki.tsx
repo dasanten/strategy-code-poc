@@ -2039,6 +2039,14 @@ export function Wiki() {
             side's Leader dies. Both realm logs say what happened.
           </li>
           <li>
+            <strong>Accepting a demand for a city hands it over at once.</strong> It joins the
+            sender's realm as a captured city does: the residents who live there, its horses and
+            carriages as <a href="#combat">capturing</a> takes them. A Leader who lived there stays
+            in their realm, homeless. You can do this with your last city too. It is your own
+            choice, so it is no crime and costs no standing. A city no longer yours can't be handed
+            over: the demand stays until you decline it or it lapses.
+          </li>
+          <li>
             <strong>The threat is only words.</strong> Ignoring a demand does nothing by itself:
             whatever was threatened is the sender's to carry out, or not.
           </li>
@@ -2179,12 +2187,12 @@ export function Wiki() {
         </p>
         <h3>What joins with a city</h3>
         <p>
-          However a city joins a realm, captured, bought or persuaded, its horses and carriages come
-          with it. An NPC city's are all its own, wherever they stand, at a stable or on the road. A
-          Player's aren't tied to one city, so of those the ones in its area or at its stables join,
-          and the rest stay with their realm. Either way a horse a joining resident rides and a
-          carriage one drives join with them, and a carriage's hitched horse with it. Another NPC
-          city's or realm's that happen to stand there don't.
+          However a city joins a realm, captured, bought, persuaded or handed over, its horses and
+          carriages come with it. An NPC city's are all its own, wherever they stand, at a stable or
+          on the road. A Player's aren't tied to one city, so of those the ones in its area or at
+          its stables join, and the rest stay with their realm. Either way a horse a joining
+          resident rides and a carriage one drives join with them, and a carriage's hitched horse
+          with it. Another NPC city's or realm's that happen to stand there don't.
         </p>
       </Section>
 

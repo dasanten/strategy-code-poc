@@ -37,6 +37,25 @@ export function demandNoticeLine(
 }
 
 /**
+ * What to ask before accepting a demand that hands over a city, which can't be taken back, saying
+ * so when it is the last of the realm's. Undefined for goods and Coins, and for a city that is no
+ * longer the realm's, which the server refuses with its reason.
+ */
+export function handOverQuestion(
+  d: DemandView,
+  realmId: string,
+  cities: readonly SeenCity[],
+): string | undefined {
+  const { terms } = d
+  if (terms.kind !== 'city') return undefined
+  const own = cities.filter((c) => c.realmId === realmId)
+  const city = own.find((c) => c.id === terms.cityId)
+  if (!city) return undefined
+  const last = own.length === 1 ? ' It is your last city.' : ''
+  return `Hand ${city.name} over to the realm of ${d.from.realm}, with those who live there, its horses and carriages? This can’t be undone.${last}`
+}
+
+/**
  * The cities the Player knows of a realm, for naming one in a demand: those in sight, and those
  * they last saw as that realm's, by name.
  */

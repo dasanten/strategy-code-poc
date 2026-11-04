@@ -9,6 +9,7 @@ import {
   demandsLeft,
   realmName,
   realmsKnownTo,
+  type City,
   type Demand,
   type DemandTerms,
   type Good,
@@ -18,6 +19,7 @@ import {
   type Remembered,
   type WorldState,
 } from '@csp/shared'
+import { handOverCity } from './capture.js'
 import { recordEvent } from './events.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import type { OrderKind } from './orders.js'
@@ -27,8 +29,8 @@ import { newId, realmOf } from './starting-city.js'
 /*
  * Demands (`CONTEXT.md`: Demand; ADR 0024): a realm sends another realm it knows of terms, a note
  * and a deadline. It arrives at once, wherever the other is. They accept or decline it, or let it
- * lapse, and both realm logs say so. It is only words: nothing happens by itself when it is
- * ignored, and the sender acts on it or doesn't.
+ * lapse, and both realm logs say so. Accepting carries out the terms. Otherwise it is only words:
+ * nothing happens by itself when it is ignored, and the sender acts on it or doesn't.
  */
 
 /** Whether the realm has anyone of `toId`'s in sight, on a map of `size` tiles when known. */
@@ -192,27 +194,64 @@ function demandToAnswer(world: WorldState, userId: number, order: OrderRequest):
   return d
 }
 
-/** An answer to a demand: it goes, and both realm logs say so. */
-function answerOrder(answer: 'accepted' | 'declined'): OrderKind {
-  return {
-    validate(world, sender, order) {
-      const d = demandToAnswer(world, sender.userId, order)
-      return typeof d === 'string' ? d : undefined
-    },
-    apply(world, sender, order) {
-      const d = demandToAnswer(world, sender.userId, order)
-      if (typeof d === 'string') return
-      world.demands = world.demands.filter((x) => x !== d)
-      tellBoth(world, d, { sender: answer, receiver: answer })
-    },
-  }
+/** A demand answered: it goes, and both realm logs say so. */
+function answered(world: WorldState, d: Demand, answer: 'accepted' | 'declined'): void {
+  world.demands = world.demands.filter((x) => x !== d)
+  tellBoth(world, d, { sender: answer, receiver: answer })
+}
+
+/** The city a demand names, while it is still the city of the realm the demand was sent to. */
+function cityToHandOver(world: WorldState, d: Demand): City | undefined {
+  const { terms } = d
+  if (terms.kind !== 'city') return undefined
+  return world.cities.find((c) => c.id === terms.cityId && c.realmId === d.toId)
+}
+
+/**
+ * Accepting a demand (`CONTEXT.md`: Demand): a named city joins the sender's realm at once, as a
+ * captured one does, also the receiver's last. It is their own choice: no crime, no standing lost.
+ * A city no longer theirs can't be handed over, so that demand stays open until they decline it or
+ * it lapses. Goods and Coins are only recorded for now.
+ */
+const acceptDemand: OrderKind = {
+  validate(world, sender, order) {
+    const d = demandToAnswer(world, sender.userId, order)
+    if (typeof d === 'string') return d
+    if (d.terms.kind === 'city' && !cityToHandOver(world, d)) {
+      return `${d.terms.cityName} is no longer yours to hand over`
+    }
+    return undefined
+  },
+  apply(world, sender, order, terrain) {
+    const d = demandToAnswer(world, sender.userId, order)
+    if (typeof d === 'string') return
+    if (d.terms.kind === 'city') {
+      // It may have gone since the order came, to another demand accepted in this same tick too.
+      const city = cityToHandOver(world, d)
+      if (!city || !terrain) return
+      handOverCity(world, city, d.fromId, terrain.size)
+    }
+    answered(world, d, 'accepted')
+  },
+}
+
+/** Declining a demand: that is all that happens. */
+const declineDemand: OrderKind = {
+  validate(world, sender, order) {
+    const d = demandToAnswer(world, sender.userId, order)
+    return typeof d === 'string' ? d : undefined
+  },
+  apply(world, sender, order) {
+    const d = demandToAnswer(world, sender.userId, order)
+    if (typeof d !== 'string') answered(world, d, 'declined')
+  },
 }
 
 /** The demand order kinds (`CONTEXT.md`: Demand). */
 export const demandOrders: Record<string, OrderKind> = {
   sendDemand,
-  acceptDemand: answerOrder('accepted'),
-  declineDemand: answerOrder('declined'),
+  acceptDemand,
+  declineDemand,
 }
 
 /**
