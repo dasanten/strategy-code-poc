@@ -215,7 +215,7 @@ const stockText = (stock: Stock, times = 1) =>
     .map(([g, n]) => `${n * times} ${GOOD_LABELS[g].toLowerCase()}`)
     .join(', ')
 
-const STAT_LABELS: Record<StatName, string> = {
+export const STAT_LABELS: Record<StatName, string> = {
   strength: 'Strength',
   endurance: 'Endurance',
   agility: 'Agility',
@@ -292,11 +292,11 @@ export function SubjectPicker({
 const STAT_SCALE = STAT_BASE_MAX * (1 + TRAINED_CAP_SHARE)
 
 /** Meter colour by how full it is: low is a warning, half-empty a caution. */
-function meterClass(share: number): string {
+export function meterClass(share: number): string {
   return share < 0.25 ? 'low' : share < 0.5 ? 'mid' : 'ok'
 }
 
-const pct = (share: number) => `${Math.round(Math.max(0, Math.min(1, share)) * 100)}%`
+export const pct = (share: number) => `${Math.round(Math.max(0, Math.min(1, share)) * 100)}%`
 
 /**
  * What the map is waiting for a tile for: to walk or drive there, a haul route's other stop, or
@@ -938,7 +938,7 @@ export function orderDoing(
  * The Player's residents, one row each under the city they live in (see `groupResidents`); click
  * a row to inspect that resident and show them on the map. Picking one elsewhere, such as on the
  * map, scrolls their row into view. On a phone each row is two lines instead of the table's
- * columns (`residentLines`).
+ * columns (`residentLines`). `onOpenFull` opens the full list in its place (`ResidentsFullList`).
  */
 export function ResidentsList({
   groups,
@@ -951,6 +951,7 @@ export function ResidentsList({
   arrivesIn,
   selectedId,
   onSelect,
+  onOpenFull,
   phone = false,
 }: {
   groups: ResidentGroup<Resident>[]
@@ -968,6 +969,7 @@ export function ResidentsList({
   arrivesIn?: (r: Resident) => number | undefined
   selectedId: string | undefined
   onSelect: (id: string) => void
+  onOpenFull: () => void
   /** Rows of two lines each, for a phone's narrow screen. */
   phone?: boolean
 }) {
@@ -982,6 +984,11 @@ export function ResidentsList({
   return (
     <section className="residents" aria-label="Residents">
       <PanelHead title="Residents">{residentsCount(groups.flatMap((g) => g.residents))}</PanelHead>
+      <div className="residents-full-tools">
+        <button type="button" onClick={onOpenFull}>
+          Open full list
+        </button>
+      </div>
       <div className="residents-scroll">
         <div className={`residents-table${phone ? ' lines' : ''}`} ref={tableRef}>
           {!phone && (

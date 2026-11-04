@@ -487,6 +487,25 @@ export function Wiki() {
           the same order.
         </p>
         <p>
+          The Residents drawer’s Open full list button opens the list across the screen, with
+          everyone’s age, city, stats, skills, gear, what they carry, hunger, health and what they
+          are doing. On a phone each resident is a small card. Tap one to open that resident’s card,
+          which closes the full list. Stats there are what they count for now, old age included.
+        </p>
+        <p>
+          Search the full list by name, filter it by weapons (has any, has none, or fights with a
+          certain one), by whether they are idle, by children or the grown up, by city and by a
+          skill they have learned, and sort it by any column: tap a heading, and tap it again to
+          turn the order round; on a phone the sort has its own menu. Whoever has nothing in the
+          column comes last either way. This browser remembers your choice.
+        </p>
+        <p>
+          Pick these makes a group on the map of everyone the full list shows, or of those you
+          ticked among them, ready for one order, and closes the full list so the group card shows.
+          Someone ticked whom the search or a filter hides isn’t picked. Ticks last only while the
+          full list is open.
+        </p>
+        <p>
           The card and the residents list say what each resident is doing. Walking, riding or
           driving somewhere, they also say about when they arrive, and the card’s meters and
           countdowns (building, tearing down, breeding, carrying, pairing, growing up) say about how

@@ -199,6 +199,10 @@ button.hud-logout {
 .hud-drawer.wide {
   width: min(1280px, calc(100vw - var(--rail-w)));
 }
+/* The full Residents list takes all of it. */
+.hud-drawer.full {
+  width: calc(100vw - var(--rail-w));
+}
 .hud-drawer.wide:not([hidden]) {
   display: flex;
   flex-direction: column;
@@ -1170,6 +1174,162 @@ label > select {
   border-radius: 0;
   background: transparent;
   font-size: 12px;
+}
+/* The Residents drawer's button that opens or closes the full list. */
+.residents-full-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+/* The full list's search, filters and its close button, wrapping on a narrow screen. */
+.residents-full-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.residents-full-choice .search {
+  flex: 0 1 180px;
+  min-width: 120px;
+}
+.residents-full-choice .search input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.residents-full-choice .muted {
+  align-self: center;
+  font-size: 12px;
+}
+.residents-full-choice .pick {
+  margin-left: auto;
+}
+.residents-full-none {
+  padding: 12px 6px;
+}
+/* The full list (`ResidentsFullList`) scrolls by itself, under the drawer's head and its button;
+   rows have a fixed height so only those in view are drawn. */
+.residents-full {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.residents-full-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overflow-anchor: none;
+}
+.residents-full-table {
+  min-width: 1312px;
+}
+/* A row of the full list: its tick, then the button that opens the resident. */
+.residents-full-row {
+  display: flex;
+  align-items: stretch;
+}
+.residents-full-row > .residents-row {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.residents-full-row.heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--ui-panel);
+}
+.residents-full-row .tick {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--ui-line);
+  border-radius: 0;
+  background: transparent;
+}
+/* The whole of a card's height is the tick there, wide enough for a thumb. */
+.residents-full-cards .residents-full-row .tick {
+  width: 44px;
+}
+.tick-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid var(--ui-line-strong);
+  border-radius: 3px;
+  background: var(--ui-well);
+  font-size: 12px;
+  line-height: 1;
+}
+.tick-box.on {
+  border-color: var(--rel-own);
+  background: var(--rel-own);
+  color: var(--ui-ink);
+}
+.residents-row.full {
+  width: 100%;
+  box-sizing: border-box;
+  grid-template-columns:
+    150px 40px 110px repeat(4, 40px) 170px 110px 170px 54px 54px
+    minmax(180px, 1fr);
+}
+.residents-row.full.heading {
+  letter-spacing: 0;
+}
+/* A heading of the full list is a button that sorts by its column. */
+.residents-row.heading .column {
+  padding: 2px 0;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  text-transform: inherit;
+  white-space: nowrap;
+}
+.residents-row.heading .column:hover:not(:disabled) {
+  background: transparent;
+  color: var(--ui-text);
+}
+.residents-row.heading .column[aria-pressed='true'] {
+  color: var(--rel-own);
+}
+/* Cells stay on their line: all of it is in the tooltip, and on the resident's card. */
+.residents-row .cut {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+}
+.residents-row .cut small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+}
+.residents-row.lines.full-card {
+  width: 100%;
+  box-sizing: border-box;
+  justify-content: center;
+}
+.residents-row.lines.full-card .wide {
+  flex: 1 1 auto;
+}
+.residents-row.lines.full-card .meter {
+  width: 32px;
+}
+.residents-row.lines.full-card .doing.cut {
+  white-space: nowrap;
 }
 /* A horse: name and place, stats, age, health and hunger; narrow enough not to scroll. */
 .horses .residents-table {
