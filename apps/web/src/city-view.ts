@@ -9,7 +9,10 @@ import {
   type CarriageHorse,
   quoteDelivery,
   quotePickUp,
+  quoteSwap,
   quoteTrade,
+  cutSwap,
+  noSwap,
   tradeCoinWarehouse,
   wrapDistance,
   canWork,
@@ -23,6 +26,7 @@ import {
   type Good,
   type NpcCityPrice,
   type PricedGood,
+  type SwapQuote,
   type TradeHolder,
   type TradeLimit,
   type TradeQuote,
@@ -366,6 +370,28 @@ export function previewTrade(
   }
 }
 
+/**
+ * What a swap of up to `units` of `want` for `give` at a Trade Org warehouse would move for one of
+ * the Player's residents, from their hands or `carriage` (`quoteSwap`), from what the Player sees.
+ * The server decides; this is the preview.
+ */
+export function previewSwap(
+  seen: { cities: City[]; buildings: Building[] },
+  warehouseId: string,
+  resident: Resident,
+  carriage: Carriage | undefined,
+  give: PricedGood,
+  want: PricedGood,
+  units: number,
+  tick: number,
+  horses: readonly CarriageHorse[],
+): SwapQuote {
+  const warehouse = seen.buildings.find((b) => b.id === warehouseId)
+  if (!warehouse || !(units > 0)) return noSwap()
+  const holder = holderOf(resident, carriage, tick, horses)
+  return quoteSwap(seen, warehouse, holder, give, want, units)
+}
+
 /** A city of the Player's that a delivery can go to or a pick-up come from, and its storage. */
 export interface DeliveryCity {
   id: string
@@ -531,6 +557,41 @@ export function previewNpcTrade(
   }
 }
 
+/**
+ * About what a swap with an NPC city at its `storage` would move (`CONTEXT.md`: Swap), from the
+ * prices it names the Player (none when it won't trade with them): each unit at today's price, cut
+ * down to its surplus that storage holds, what it lacks of its reserve, what the trader holds and
+ * what fits, saying which cut it. The server prices each unit as the stock moves, so it may differ
+ * a little.
+ */
+export function previewNpcSwap(
+  prices: NpcCityPrice[] | undefined,
+  storage: Building,
+  resident: Resident,
+  carriage: Carriage | undefined,
+  give: PricedGood,
+  want: PricedGood,
+  units: number,
+  tick: number,
+  horses: readonly CarriageHorse[],
+): SwapQuote {
+  if (!prices) return noSwap('refused')
+  const giveLine = prices.find((p) => p.good === give)
+  const wantLine = prices.find((p) => p.good === want)
+  if (!giveLine || !wantLine || !(units > 0)) return noSwap()
+  return cutSwap({
+    give,
+    want,
+    wanted: units,
+    holder: holderOf(resident, carriage, tick, horses),
+    spare: Math.min(wantLine.forSale, storage.stock?.[want] ?? 0),
+    takes: giveLine.wanted,
+    placeCoins: storage.stock?.coins ?? 0,
+    wantPrice: () => wantLine.sell,
+    givePrice: () => giveLine.buy,
+  })
+}
+
 /** Up to `wanted` whole units under each bound, and the first bound that cut it short. */
 function cutDown(
   wanted: number,
@@ -585,6 +646,29 @@ export function tradeText(
   if (!quote.limit) return cant
   const why =
     quote.limit === 'coins' && onCarriage ? 'no coins on the carriage' : WONT_GO[quote.limit]
+  return `${cant}: ${why}`
+}
+
+/**
+ * The text of a swap's button: the swap it makes ("Swap 7 wood for 5 stone, with 2 coins back"),
+ * with what cut it down when it moves fewer units than asked, or, when it won't go, why ("Can’t
+ * swap wood for stone: it doesn’t want wood"). The labels are the goods', lower case.
+ */
+export function swapText(giveLabel: string, wantLabel: string, quote: SwapQuote): string {
+  if (quote.units > 0) {
+    const back =
+      quote.coins > 0 ? `, with ${quote.coins} ${quote.coins === 1 ? 'coin' : 'coins'} back` : ''
+    const made = `Swap ${quote.gives} ${giveLabel} for ${quote.units} ${wantLabel}${back}`
+    return quote.limit ? `${made}: ${CUT_BY[quote.limit]}` : made
+  }
+  const cant = `Can’t swap ${giveLabel} for ${wantLabel}`
+  if (!quote.limit) return cant
+  const why =
+    quote.limit === 'held'
+      ? `not enough ${giveLabel} to pay for it`
+      : quote.limit === 'unwanted'
+        ? `it doesn’t want ${giveLabel}`
+        : WONT_GO[quote.limit]
   return `${cant}: ${why}`
 }
 

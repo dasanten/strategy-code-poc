@@ -14,8 +14,10 @@ import {
   type SeenCity,
   type TradeSide,
   type SeenResident,
+  type Stock,
   type SeenCarriage,
   type SeenHorse,
+  type SwapQuote,
 } from '@csp/shared'
 import {
   buildingCount,
@@ -25,13 +27,16 @@ import {
   describeOccupation,
   npcStoragesInSight,
   previewDelivery,
+  previewNpcSwap,
   previewNpcTrade,
+  previewSwap,
   previewTrade,
   previewTransfer,
   holderText,
   onTheWay,
   onTheWayLine,
   sendable,
+  swapText,
   takesTransfers,
   tradedGoods,
   tradesHere,
@@ -82,6 +87,7 @@ export function CityInspector({
   onSetGate,
   onBuyCity,
   onTrade,
+  onSwap,
   onTransfer,
   onSend,
   arrivesIn,
@@ -109,6 +115,8 @@ export function CityInspector({
   onBuyCity: (residentId: string, cityId: string) => void
   /** Gives a buy or sell order to one of the Player's residents on a warehouse. */
   onTrade: (trade: TradeRequest) => void
+  /** Gives a swap order to one of the Player's residents on a warehouse or NPC storage. */
+  onSwap: (swap: SwapRequest) => void
   /** Orders a transfer from one of the Player's cities to another realm's city. */
   onTransfer: (transfer: TransferRequest) => void
   /** Sends one of the Player's residents, or a carriage they drive, to a warehouse or storage. */
@@ -206,6 +214,21 @@ export function CityInspector({
                     deliveryCities={
                       noCaravans ? [] : deliveryCities({ cities, buildings }, realmId)
                     }
+                    swapGoods={w.prices.map((p) => p.good)}
+                    previewSwap={(resident, carriage, give, want, units) =>
+                      previewSwap(
+                        { cities, buildings },
+                        w.id,
+                        resident,
+                        carriage,
+                        give,
+                        want,
+                        units,
+                        tick,
+                        horses,
+                      )
+                    }
+                    onSwap={onSwap}
                     preview={(resident, carriage, good, units) =>
                       previewTrade(
                         { cities, buildings },
@@ -274,6 +297,21 @@ export function CityInspector({
                     traders={tradersAt(s, { residents, carriages }, realmId)}
                     sending={sending(s)}
                     deliveryCities={[]}
+                    swapGoods={s.prices.map((p) => p.good)}
+                    previewSwap={(resident, carriage, give, want, units) =>
+                      previewNpcSwap(
+                        s.prices as NpcCityPrice[],
+                        buildings.find((b) => b.id === s.id)!,
+                        resident,
+                        carriage,
+                        give,
+                        want,
+                        units,
+                        tick,
+                        horses,
+                      )
+                    }
+                    onSwap={onSwap}
                     preview={(resident, carriage, good, units) =>
                       previewNpcTrade(
                         s.prices as NpcCityPrice[],
@@ -566,13 +604,23 @@ export interface TradeRequest {
   cityId?: string
 }
 
+/** A swap order as the inspector gives it (`CONTEXT.md`: Swap). */
+export interface SwapRequest {
+  residentId: string
+  give: PricedGood
+  want: PricedGood
+  units: number
+  carriageId: string | null
+}
+
 /**
  * Buying and selling at a warehouse (`CONTEXT.md`: Trading with the Trade Organization): one of
  * the Player's residents on its tile trades a good from their hands or their carriage there, with
  * what they hold and room left, and a preview of what it would move at its prices: what cut it
  * down, or why it won't go (`CONTEXT.md`: Trade section). Or, with one of the Player's cities picked, a
  * caravan delivers what is bought to its storage, or picks up what is sold from there, for a fee
- * (`CONTEXT.md`: Delivery). Nobody of theirs there, and it offers to send someone (`Sending`).
+ * (`CONTEXT.md`: Delivery). Below, the same trader can swap goods for goods (`Swapping`). Nobody of
+ * theirs there, and it offers to send someone (`Sending`).
  */
 function Trading({
   warehouse,
@@ -581,9 +629,12 @@ function Trading({
   traders,
   sending,
   deliveryCities,
+  swapGoods,
   preview,
   previewDelivery,
+  previewSwap,
   onTrade,
+  onSwap,
 }: {
   warehouse: WarehouseView
   /** The goods that can be traded there (`tradedGoods`), for the Good picker. */
@@ -594,6 +645,8 @@ function Trading({
   /** Whom to send there while nobody of the Player's is, and who is on the way. */
   sending: SendingProps
   deliveryCities: DeliveryCity[]
+  /** The goods a swap can name there: every good it prices, so a refusal can say why. */
+  swapGoods: PricedGood[]
   preview: (
     resident: Resident,
     carriage: Carriage | undefined,
@@ -607,7 +660,15 @@ function Trading({
     units: number,
     city: DeliveryCity,
   ) => { buy: DeliveryQuote; sell: DeliveryQuote }
+  previewSwap: (
+    resident: Resident,
+    carriage: Carriage | undefined,
+    give: PricedGood,
+    want: PricedGood,
+    units: number,
+  ) => SwapQuote
   onTrade: (trade: TradeRequest) => void
+  onSwap: (swap: SwapRequest) => void
 }) {
   const [residentId, setResidentId] = useState<string | undefined>()
   const [carriageId, setCarriageId] = useState<string>('')
@@ -726,6 +787,99 @@ function Trading({
         </button>{' '}
         <button type="button" disabled={!canSell} onClick={() => trade('sell')}>
           {sellText}
+        </button>
+      </p>
+      <Swapping
+        goods={swapGoods}
+        holds={carriage ? carriage.load : resident.carried}
+        preview={(give, want, n) => previewSwap(resident, carriage, give, want, n)}
+        onSwap={(give, want, n) =>
+          onSwap({
+            residentId: resident.id,
+            give,
+            want,
+            units: n,
+            carriageId: carriage?.id ?? null,
+          })
+        }
+      />
+    </div>
+  )
+}
+
+/**
+ * Swapping goods for goods (`CONTEXT.md`: Swap): the good the trader wants and how much, the good
+ * they give for it (each with what they hold), and a button saying what it would move at the
+ * place's prices, what cut it down, or why it won't go.
+ */
+function Swapping({
+  goods,
+  holds,
+  preview,
+  onSwap,
+}: {
+  goods: PricedGood[]
+  /** What the trader holds, in their hands or on their carriage. */
+  holds: Stock
+  preview: (give: PricedGood, want: PricedGood, units: number) => SwapQuote
+  onSwap: (give: PricedGood, want: PricedGood, units: number) => void
+}) {
+  const [wantPicked, setWant] = useState<PricedGood | undefined>()
+  const [givePicked, setGive] = useState<PricedGood | undefined>()
+  const [units, setUnits] = useState(1)
+  const want = wantPicked !== undefined && goods.includes(wantPicked) ? wantPicked : goods[0]
+  if (!want) return null
+  const gives = goods.filter((g) => g !== want)
+  const give =
+    givePicked !== undefined && gives.includes(givePicked)
+      ? givePicked
+      : (gives.find((g) => (holds[g] ?? 0) > 0) ?? gives[0])
+  if (!give) return null
+  const quote = preview(give, want, units)
+  return (
+    <div className="trade-service" aria-label="Swap">
+      <h3>Swap</h3>
+      <p className="small muted">
+        Goods for goods, no coins needed: you hand over enough to pay for what you want, at its
+        prices, and what is over comes back in coins as far as it holds them.
+      </p>
+      <label>
+        Want{' '}
+        <select value={want} onChange={(e) => setWant(e.target.value as PricedGood)}>
+          {goods.map((g) => (
+            <option key={g} value={g}>
+              {GOOD_LABELS[g]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Units{' '}
+        <input
+          type="number"
+          min={1}
+          step={1}
+          value={units}
+          onChange={(e) => setUnits(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
+        />
+      </label>
+      <label>
+        Give{' '}
+        <select value={give} onChange={(e) => setGive(e.target.value as PricedGood)}>
+          {gives.map((g) => (
+            <option key={g} value={g}>
+              {GOOD_LABELS[g]} ({Math.floor(holds[g] ?? 0)} held)
+            </option>
+          ))}
+        </select>
+      </label>
+      <p>
+        <button
+          type="button"
+          disabled={quote.units === 0}
+          onClick={() => onSwap(give, want, units)}
+        >
+          {swapText(GOOD_LABELS[give].toLowerCase(), GOOD_LABELS[want].toLowerCase(), quote)}
         </button>
       </p>
     </div>

@@ -220,6 +220,23 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         places: [place],
       }
     }
+    case 'swapped': {
+      const place = { name: `the ${e.place}`, x: e.x, y: e.y }
+      if (e.units === 0) {
+        return {
+          text: `${e.name} couldn’t swap ${goodText(e.give)} for ${goodText(e.want)} at ${place.name}.`,
+          tone: 'warn',
+          places: [place],
+        }
+      }
+      const cut = e.units < e.wanted ? ` (of ${e.wanted} wanted)` : ''
+      const back = e.coins > 0 ? `, with ${e.coins} ${e.coins === 1 ? 'coin' : 'coins'} back,` : ''
+      return {
+        text: `${e.name} swapped ${e.gave} ${goodText(e.give)} for ${e.units} ${goodText(e.want)}${cut}${back} at ${place.name}.`,
+        tone: 'info',
+        places: [place],
+      }
+    }
     case 'deliveryOrdered': {
       const what = goodText(e.good)
       const place = { name: 'the warehouse', x: e.x, y: e.y }

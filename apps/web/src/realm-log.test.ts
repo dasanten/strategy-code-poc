@@ -189,6 +189,40 @@ describe('realm log', () => {
     })
   })
 
+  it('describes swaps, cut down or not, and where', () => {
+    const swap = {
+      kind: 'swapped',
+      residentId: 'p1',
+      name: 'Ada',
+      give: 'wood',
+      want: 'stone',
+      x: 4,
+      y: 5,
+      seq: 9,
+      ...at,
+    } as const
+    expect(
+      describeEvent({
+        ...swap,
+        place: 'warehouse',
+        gave: 7,
+        units: 5,
+        wanted: 5,
+        coins: 2,
+      }),
+    ).toEqual({
+      text: 'Ada swapped 7 wood for 5 stone, with 2 coins back, at the warehouse.',
+      tone: 'info',
+      places: [{ name: 'the warehouse', x: 4, y: 5 }],
+    })
+    expect(
+      describeEvent({ ...swap, place: 'storage', gave: 3, units: 2, wanted: 5, coins: 0 }).text,
+    ).toBe('Ada swapped 3 wood for 2 stone (of 5 wanted) at the storage.')
+    expect(
+      describeEvent({ ...swap, place: 'storage', gave: 0, units: 0, wanted: 5, coins: 0 }),
+    ).toMatchObject({ text: 'Ada couldn’t swap wood for stone at the storage.', tone: 'warn' })
+  })
+
   it('describes deliveries ordered, carried out and stuck', () => {
     const ordered = {
       kind: 'deliveryOrdered',

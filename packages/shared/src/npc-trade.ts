@@ -130,7 +130,7 @@ function priceFloor(good: PricedGood, reserve: Stock): number {
  * an NPC city): the share `CITY_PRICE_STANDING_SWING` × standing / `STANDING_RANGE`, as for its
  * own price (`cityPrice`). 0 without a trader.
  */
-function standingSwing(
+export function standingSwing(
   world: Pick<WorldState, 'standings' | 'cities'>,
   city: City,
   traderId: string | null | undefined,

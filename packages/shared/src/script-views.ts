@@ -346,7 +346,7 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field(
         'kind',
         'string',
-        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "store", "fetch", "build", "tearDown", "workAt", "teach", "train", "breed", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "handIn", "buyOff" or "relocate" (on their way to `cityId`, to live there).',
+        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "store", "fetch", "build", "tearDown", "workAt", "teach", "train", "breed", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "swap", "handIn", "buyOff" or "relocate" (on their way to `cityId`, to live there).',
       ),
       field(
         'target',
@@ -447,7 +447,14 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       ),
       field('side', 'string', 'A trade’s "buy" or "sell".', 'for other orders'),
       field('good', 'string', 'The good traded or handed in.', 'for other orders'),
-      field('units', 'number', 'The units traded or handed in.', 'for other orders'),
+      field(
+        'units',
+        'number',
+        'The units traded, wanted in a swap or handed in.',
+        'for other orders',
+      ),
+      field('give', 'string', 'The good a swap gives.', 'for other orders'),
+      field('want', 'string', 'The good a swap wants.', 'for other orders'),
       field(
         'cityId',
         'string',
