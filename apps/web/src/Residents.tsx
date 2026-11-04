@@ -67,6 +67,7 @@ import {
   QUEUE_MAX_STEPS,
   type Resident,
   type ScriptSummary,
+  type Task,
   type SkillName,
   type StatName,
   type TrainingSubject,
@@ -166,6 +167,7 @@ import {
   type GroupSeen,
 } from './group-orders.js'
 import { GROUP_HINTS } from './pick-mode.js'
+import { CustomiseButton, taskStart } from './Customise.js'
 import { NumberField, foodParamsHint } from './ScriptParams.js'
 import {
   defenceChoices,
@@ -187,8 +189,8 @@ import {
   useEscapeClosesPanel,
   useKeptRows,
 } from './SelectionCard.js'
+import { HorsePick } from './HorsePick.js'
 import {
-  horseDetail,
   orderGroupOf,
   residentOrders,
   DOWN_NO_ORDERS,
@@ -1109,6 +1111,29 @@ function ResidentLinesRow({
  * to those who can take it; Queue plans a queue to give them all; Members lists what each is doing,
  * a click picking just that one; Script says what they run and gives them all one.
  */
+/**
+ * The rows that give a task with no panel of their own to hold its Customise button
+ * (`CONTEXT.md`: Before it starts), beside the row instead.
+ */
+const ROW_TASKS: Partial<Record<ActionId, Task>> = {
+  roadTo: 'buildLine',
+  wallTo: 'buildLine',
+  feedStable: 'feedStable',
+  train: 'train',
+  explore: 'explore',
+}
+
+/** The same on the group card, whose Work and Tear down pick the place on the map. */
+const GROUP_ROW_TASKS: Partial<Record<GroupButton, Task>> = {
+  work: 'work',
+  tearDown: 'tearDown',
+  roadTo: 'buildLine',
+  wallTo: 'buildLine',
+  feedStable: 'feedStable',
+  train: 'train',
+  explore: 'explore',
+}
+
 export function GroupCard({
   residents,
   scripts,
@@ -1435,6 +1460,19 @@ export function GroupCard({
               label={g.label}
               keys={false}
               panel={openPanel || undefined}
+              beside={(a) => {
+                const task = GROUP_ROW_TASKS[a.id]
+                return (
+                  task && (
+                    <CustomiseButton
+                      order={taskStart(task)}
+                      of={a.label}
+                      disabled={a.disabled}
+                      give={() => act(a)}
+                    />
+                  )
+                )
+              }}
             />
           </div>
         ))}
@@ -1461,6 +1499,17 @@ export function GroupCard({
               >
                 All help build the {BUILDING_NAMES[buildAt.site.kind].toLowerCase()}
               </button>
+              <CustomiseButton
+                order={taskStart('build')}
+                of="Build"
+                give={() =>
+                  onOrder({
+                    kind: 'build',
+                    building: buildAt.site!.kind,
+                    at: { x: buildAt.site!.x, y: buildAt.site!.y },
+                  })
+                }
+              />
             </div>
           ) : (
             <BuildMenu
@@ -1515,6 +1564,7 @@ export function GroupCard({
               script={undefined}
               scripts={scripts}
               label="Script for all of them to run"
+              customisable
               onRunScript={(scriptId) => onOrder({ kind: 'runScript', scriptId })}
             />
           </section>
@@ -2282,7 +2332,13 @@ export function ResidentCard({
           <div className="panel-head">
             <h3>Run script</h3>
           </div>
-          <RunScript script={r.script} scripts={scripts} onRunScript={onRunScript} of={r.id} />
+          <RunScript
+            script={r.script}
+            scripts={scripts}
+            onRunScript={onRunScript}
+            of={r.id}
+            customisable
+          />
         </section>
       )}
       {shown === 'relocate' && relocate && onRelocate && (
@@ -2409,6 +2465,19 @@ export function ResidentCard({
               label={g.label}
               keys={false}
               panel={openPanel || undefined}
+              beside={(a) => {
+                const task = ROW_TASKS[a.id]
+                return (
+                  task && (
+                    <CustomiseButton
+                      order={taskStart(task)}
+                      of={a.label}
+                      disabled={a.disabled}
+                      give={() => act(a)}
+                    />
+                  )
+                )
+              }}
             />
           </div>
         ))}
@@ -2625,6 +2694,12 @@ function HaulBlock({
         >
           {picking ? 'Pick a tile…' : 'Pick the other stop'}
         </button>
+        <CustomiseButton
+          order={taskStart('haul')}
+          of="Haul route"
+          disabled={!adult || goods.length === 0}
+          give={() => onHaulTo({ goods, returnGoods, keepFood })}
+        />
       </div>
       <p className="muted small">
         The driver loads the picked goods here, drives them to the other stop and unloads them,
@@ -2698,6 +2773,12 @@ function SiteBlock({
         <button type="button" disabled={!adult || joined} onClick={() => onBuild(site.kind)}>
           {joined ? 'Building…' : 'Help build'}
         </button>
+        <CustomiseButton
+          order={taskStart('build')}
+          of="Help build"
+          disabled={!adult || joined}
+          give={() => onBuild(site.kind)}
+        />
       </div>
       <p className="muted small">
         It becomes a {name.toLowerCase()} once its materials are delivered and the work is done:
@@ -2765,9 +2846,17 @@ function WorkBlock({
             <div key={made} className="goods-row">
               <span>{GOOD_LABELS[made]}</span>
               <span className="muted small">{stockText(r.input)}</span>
-              <button type="button" disabled={blocked || making} onClick={() => onWork(made)}>
-                {making ? 'Making…' : working ? 'Make instead' : 'Make'}
-              </button>
+              <span className="buttons">
+                <button type="button" disabled={blocked || making} onClick={() => onWork(made)}>
+                  {making ? 'Making…' : working ? 'Make instead' : 'Make'}
+                </button>
+                <CustomiseButton
+                  order={taskStart('work', building.id)}
+                  of={`Make ${GOOD_LABELS[made].toLowerCase()}`}
+                  disabled={blocked || making}
+                  give={() => onWork(made)}
+                />
+              </span>
             </div>
           )
         })
@@ -2781,6 +2870,12 @@ function WorkBlock({
           >
             {working ? 'Working…' : 'Work here'}
           </button>
+          <CustomiseButton
+            order={taskStart('work', building.id)}
+            of="Work here"
+            disabled={blocked || working}
+            give={() => onWork()}
+          />
         </div>
       )}
       <p className="muted small">
@@ -2869,6 +2964,12 @@ function TearDownBlock({
         >
           {joined ? 'Tearing down…' : `Tear down ${what}`}
         </button>
+        <CustomiseButton
+          order={taskStart('tearDown')}
+          of={`Tear down ${what}`}
+          disabled={!canWork(resident, tick) || joined}
+          give={() => onTearDown(building.id)}
+        />
       </div>
     </section>
   )
@@ -2997,15 +3098,14 @@ function BreedBlock({
       </p>
       {own.length === 0 && <p className="muted small">No horses of yours in this stable.</p>}
       {own.map((h) => (
-        <label key={h.id} className="small" style={{ display: 'block' }}>
-          <input
-            type="checkbox"
-            checked={chosen.includes(h.id)}
-            onChange={() => toggle(h.id)}
-            disabled={!!breeding || !!kept}
-          />{' '}
-          {h.name} · {horseDetail(h, tick)}
-        </label>
+        <HorsePick
+          key={h.id}
+          horse={h}
+          tick={tick}
+          checked={chosen.includes(h.id)}
+          disabled={!!breeding || !!kept}
+          onToggle={() => toggle(h.id)}
+        />
       ))}
       <div className="order-buttons">
         <button
@@ -3016,6 +3116,12 @@ function BreedBlock({
         >
           {breeding ? 'Breeding…' : kept ? 'Carry on with these two' : 'Breed these two'}
         </button>
+        <CustomiseButton
+          order={taskStart('breed')}
+          of="Breed horses"
+          disabled={!!breeding || !pair || problem !== undefined}
+          give={() => pair && onBreed(stable.id, pair)}
+        />
       </div>
       {!breeding && pair && problem && <p className="muted small">{problem}</p>}
     </section>
@@ -3048,10 +3154,13 @@ function GroupBreed({
         Stable at {stable.x}, {stable.y} · {horses.length} of yours
       </span>
       {horses.map((h) => (
-        <label key={h.id} className="small" style={{ display: 'block' }}>
-          <input type="checkbox" checked={picked.includes(h.id)} onChange={() => toggle(h.id)} />{' '}
-          {h.name} · {horseDetail(h, tick)}
-        </label>
+        <HorsePick
+          key={h.id}
+          horse={h}
+          tick={tick}
+          checked={picked.includes(h.id)}
+          onToggle={() => toggle(h.id)}
+        />
       ))}
       <div className="order-buttons">
         <button
@@ -3065,6 +3174,16 @@ function GroupBreed({
         >
           Breed these two
         </button>
+        <CustomiseButton
+          order={taskStart('breed')}
+          of="Breed horses"
+          disabled={!pair}
+          give={() => {
+            if (!pair) return
+            setPicked([])
+            onBreed(pair)
+          }}
+        />
       </div>
     </div>
   )
@@ -3634,6 +3753,7 @@ export function RunScript({
   onRunScript,
   label = 'Script to run',
   of,
+  customisable = false,
 }: {
   /** The script the resident or army runs now, if any. */
   script: { scriptId: number } | undefined
@@ -3642,6 +3762,8 @@ export function RunScript({
   label?: string
   /** The resident's or army's id, to start on the script they last ran. */
   of?: string
+  /** Offers Customise beside it (`CONTEXT.md`: Before it starts); an army's scripts have no form. */
+  customisable?: boolean
 }) {
   const runnable = scripts.filter((s) => s.activeVersion !== null)
   const [picked, setPicked] = useState<number>()
@@ -3690,6 +3812,16 @@ export function RunScript({
           >
             Run script
           </button>
+          {customisable && scriptId !== undefined && (
+            <CustomiseButton
+              order={{ kind: 'runScript', scriptId }}
+              of="Run script"
+              give={() => {
+                if (of !== undefined) rememberLastScript(of, scriptId)
+                onRunScript(scriptId)
+              }}
+            />
+          )}
         </div>
       )}
     </div>

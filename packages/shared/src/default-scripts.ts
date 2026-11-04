@@ -72,6 +72,15 @@ export function isWorkScript(params: readonly Pick<ScriptParam, 'name' | 'type'>
   return params.some((p) => p.name === WORKPLACE_PARAM && p.type === 'building')
 }
 
+/**
+ * Whether a script has nothing to go on without this param (`CONTEXT.md`: Script parameter, Before
+ * it starts): it has no default and its comment says nothing after `none:`. The form before it
+ * starts then opens by itself.
+ */
+export function paramNeedsValue(p: Pick<ScriptParam, 'default' | 'description'>): boolean {
+  return p.default === undefined && !/\bnone:/.test(p.description ?? '')
+}
+
 /** What giving a task from the UI writes into the script's memory. */
 export interface TaskMemory {
   /**

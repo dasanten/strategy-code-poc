@@ -8,6 +8,7 @@ import {
   type ResourceNode,
 } from '@csp/shared'
 import { buildMenuGroups, canChooseKind, workSpan, type BuildMenuKind } from './build-menu-view.js'
+import { CustomiseButton, taskStart } from './Customise.js'
 import { goodsItems } from './goods-grid.js'
 import { GoodsGrid } from './GoodsGrid.js'
 import { ART_FILES, BUILDING_ART } from './map/art.js'
@@ -26,7 +27,7 @@ function BuildingIcon({ kind }: { kind: BuildingKind }) {
 }
 
 /** What the tapped kind is for, what it costs and Build; or, if it can't go here, why. */
-function KindDetail({
+export function KindDetail({
   item,
   terrain,
   blocked,
@@ -76,6 +77,12 @@ function KindDetail({
           >
             {planning ? 'Add: build' : 'Build'} {name.toLowerCase()}
           </button>
+          <CustomiseButton
+            order={taskStart('build')}
+            of={`Build ${name.toLowerCase()}`}
+            disabled={blocked}
+            give={() => onBuild(kind)}
+          />
         </div>
       )}
     </div>

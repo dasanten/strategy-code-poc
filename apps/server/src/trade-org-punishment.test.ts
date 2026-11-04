@@ -1,5 +1,8 @@
 import {
   CRIME_STANDING_LOSS,
+  FOOD_PER_DAY,
+  MAP_SIZE,
+  OWN_FOOD,
   TICKS_PER_GAME_DAY,
   TRADE_ORG,
   TRADE_ORG_ARMY,
@@ -7,11 +10,16 @@ import {
   TRADE_ORG_PUNISHES_BELOW,
   TRADE_ORG_REFUSES_TRADE_BELOW,
   Terrain,
+  WALK_TICKS_PER_TILE,
+  carryCapacity,
   inCityArea,
+  isArmed,
   standingOf,
   stockFloor,
+  stockWeight,
   townHallOf,
   tradeOrgRefuses,
+  tripFood,
   warehouseKeeps,
   type City,
   type Crime,
@@ -28,7 +36,13 @@ import { mulberry32, newResident } from './residents.js'
 import { changeStanding } from './standing.js'
 import { addCity } from './test-terrain.js'
 import { foundTradeOrgHq } from './trade-org.js'
-import { punishmentsSound, stepPunishments, worthOf } from './trade-org-punishment.js'
+import {
+  punishmentsSound,
+  stepPunishments,
+  takenBy,
+  tookSoFar,
+  worthOf,
+} from './trade-org-punishment.js'
 import { refusedTradeNothing, tradesOf } from './trading.js'
 import { Walking } from './walking.js'
 import { createWorld, stepWorld } from './world.js'
@@ -222,7 +236,9 @@ describe('the Trade Organization punishing', () => {
   it('takes goods once the coins run out, the most worth first', () => {
     const { world, hq, walking } = setup({ coins: 30, wood: 50, iron: 40 })
     const goods = warehouseFor(world, hq, 'iron')
-    // At its floor in every good, so its own chain (`CONTEXT.md`: Trade Org HQ) leaves its Iron be.
+    // Nobody but its soldiers, and at its floor in every good, so its own chain (`CONTEXT.md`: Trade
+    // Org HQ) leaves its Iron be for as long as the trip takes.
+    world.residents = world.residents.filter((r) => r.owner !== null || isArmed(r))
     goods.stock = { ...stockFloor(world, goods), ...goods.stock }
     const iron = goods.stock!.iron ?? 0
     theft(world, hq, { iron: 4 })
@@ -300,6 +316,312 @@ describe('the Trade Organization punishing', () => {
         `punishment ${p.id} sends a1, who is not of the Trade Org HQ`,
         `the Trade Organization holds city ${world.cities[0]!.id}`,
       ]),
+    )
+  })
+})
+
+describe('the Trade Organization’s punishment trip', () => {
+  /** As large as the real map, all Plains. */
+  const big: TerrainMap = {
+    size: MAP_SIZE,
+    tiles: new Uint8Array(MAP_SIZE * MAP_SIZE).fill(Terrain.Plains),
+  }
+  /** The HQ's town hall, on the big map. */
+  const HQ = 200
+  /** The farthest a city can be: half the map away on both axes, on a torus. */
+  const FAR = MAP_SIZE / 2
+
+  /**
+   * On the big map: the Trade Org HQ with nobody but `TRADE_ORG_ARMY.guard` + `soldiers` soldiers
+   * of average Strength and Endurance, and realm r1 with its city c1 as far off as a city can be,
+   * its storage s1 holding `stock`.
+   */
+  function farSetup(stock: Stock, soldiers = 4) {
+    const world = createWorld(big)
+    const hq = foundTradeOrgHq(world, big, HQ, HQ, mulberry32(7))
+    world.realms.push({ id: 'r1', userId: 7, leaderId: 'a1' })
+    addCity(world, { id: 'c1', realmId: 'r1', x: HQ + FAR, y: HQ + FAR, name: 'Ashford' })
+    world.buildings.push({
+      id: 's1',
+      kind: 'storage',
+      cityId: 'c1',
+      x: HQ + FAR + 4,
+      y: HQ + FAR,
+      stock,
+    })
+    resident(world, 'a1', HQ + FAR - 4, HQ + FAR + 4, 'c1')
+    const keep = hqPeople(world, hq).slice(0, TRADE_ORG_ARMY.guard + soldiers)
+    world.residents = world.residents.filter((r) => r.cityId !== hq.id || keep.includes(r))
+    world.caravans = []
+    for (const r of keep) {
+      r.carried = { spear: 1 }
+      const average = { base: 10, trained: 0 }
+      r.stats = { ...r.stats, strength: average, endurance: average, agility: average }
+      r.bornAt = -20 * 24 * 3600
+      r.lifespan = 60
+    }
+    return { world, hq, walking: new Walking(big) }
+  }
+
+  /** Steps the world on the big map until `until` holds, with the residents' real hunger. */
+  function runBig(world: WorldState, walking: Walking, until: () => boolean, most: number) {
+    for (let i = 0; i < most && !until(); i++) stepWorld(world, big, walking)
+  }
+
+  const lastPunished = (world: WorldState) => world.events.filter((e) => e.kind === 'punished')
+
+  it(
+    'walks to a city farther than its time there, robs it and comes home alive',
+    { tags: ['slow'], timeout: 900_000 },
+    () => {
+      const { world, hq, walking } = farSetup({ coins: 1000, food: 200 })
+      expect(FAR * Math.SQRT2 * WALK_TICKS_PER_TILE).toBeGreaterThan(
+        TRADE_ORG_PUNISH.giveUpDays * TICKS_PER_GAME_DAY,
+      )
+      theft(world, hq, { iron: 10 })
+      const worth = TRADE_ORG_PUNISH.times * worthOf({ iron: 10 })
+      runBig(world, walking, () => world.punishments.length > 0, 2)
+      const p = world.punishments[0]!
+      const ids = p.members.map((m) => m.residentId)
+      const c1 = world.cities.find((c) => c.id === 'c1')!
+      // At average Strength, what they pack lasts the longest way there and back over Plains.
+      runBig(world, walking, () => p.members.every((m) => m.packed), 2000)
+      runBig(world, walking, () => false, 2)
+      const flatWalk = (2 * FAR * Math.SQRT2 * WALK_TICKS_PER_TILE) / TICKS_PER_GAME_DAY
+      for (const id of ids) {
+        expect(at(world, id).carried.food ?? 0).toBeGreaterThanOrEqual(flatWalk * FOOD_PER_DAY)
+      }
+      runBig(
+        world,
+        walking,
+        () => p.arrivedAt !== undefined || world.punishments.length === 0,
+        70_000,
+      )
+      expect(p.arrivedAt).toBeDefined()
+      expect(
+        ids.some((id) => inCityArea(world, c1, at(world, id).x, at(world, id).y, MAP_SIZE)),
+      ).toBe(true)
+      runBig(world, walking, () => world.punishments.length === 0, 70_000)
+      expect(world.punishments).toEqual([])
+      expect(world.buildings.find((b) => b.id === 's1')!.stock!.coins).toBe(1000 - worth)
+      for (const id of ids) {
+        const r = at(world, id)
+        expect(r.health).toBeGreaterThan(0)
+        expect(r.downUntil).toBeUndefined()
+        expect(inCityArea(world, hq, r.x, r.y, MAP_SIZE)).toBe(true)
+      }
+      expect(lastPunished(world).map((e) => e.kind === 'punished' && e.what)).toEqual([
+        'coming',
+        'arrived',
+        'left',
+      ])
+      expect(lastPunished(world).at(-1)).toMatchObject({ what: 'left', took: worth })
+      expect(checkInvariants(world, big)).toEqual([])
+    },
+  )
+
+  it('sets out however empty the storages are as it leaves, and looks when it arrives', () => {
+    const { world, hq, walking } = setup({})
+    theft(world, hq, { iron: 10 })
+    run(world, walking, 3)
+    const p = world.punishments[0]!
+    expect(p).toMatchObject({ heading: 'out' })
+    expect(p.arrivedAt).toBeUndefined()
+    run(world, walking, 4 * TICKS_PER_GAME_DAY, () => p.heading === 'home')
+    expect(p.arrivedAt).toBeDefined()
+    expect(world.events.filter((e) => e.kind === 'punished').at(-1)).toMatchObject({
+      what: 'left',
+      why: 'empty',
+      took: 0,
+    })
+    expect(world.events.some((e) => e.kind === 'punished' && e.what === 'arrived')).toBe(true)
+  }, 240_000)
+
+  it('robs storages filled again while it was on the way', () => {
+    const { world, hq, walking } = setup({})
+    theft(world, hq, { iron: 10 })
+    run(world, walking, 3)
+    world.buildings.find((b) => b.id === 's1')!.stock = { coins: 1000 }
+    run(world, walking, 4 * TICKS_PER_GAME_DAY, () => world.punishments.length === 0)
+    expect(world.buildings.find((b) => b.id === 's1')!.stock!.coins).toBeLessThan(1000)
+  }, 240_000)
+
+  it('turns back on the road when the city is no longer the culprit’s, and says so', () => {
+    const { world, hq, walking } = setup()
+    theft(world, hq, { iron: 10 })
+    run(world, walking, 3)
+    const p = world.punishments[0]!
+    world.cities.find((c) => c.id === 'c1')!.realmId = null
+    stepPunishments(world, 640)
+    expect(p).toMatchObject({ heading: 'home', took: 0 })
+    expect(p.arrivedAt).toBeUndefined()
+    expect(world.events.filter((e) => e.kind === 'punished').at(-1)).toMatchObject({
+      what: 'turnedBack',
+      why: 'cityLost',
+      city: 'Ashford',
+    })
+  })
+
+  it('says the army was lost when every soldier falls on the way', () => {
+    const { world, hq, walking } = setup()
+    theft(world, hq, { iron: 10 })
+    run(world, walking, 3)
+    const p = world.punishments[0]!
+    world.residents = world.residents.filter((r) => !p.members.some((m) => m.residentId === r.id))
+    run(world, walking, 1)
+    expect(world.punishments).toEqual([])
+    expect(world.events.filter((e) => e.kind === 'punished').at(-1)).toMatchObject({
+      what: 'lost',
+      where: 'wayThere',
+    })
+  })
+
+  it('turns back when it can’t get there, rather than walking forever', () => {
+    const { world, hq } = setup()
+    theft(world, hq, { iron: 10 })
+    stepPunishments(world, 640)
+    const p = world.punishments[0]!
+    world.tick = p.startedAt + TRADE_ORG_PUNISH.giveUpDays * TICKS_PER_GAME_DAY
+    stepPunishments(world, 640)
+    expect(p.heading).toBe('home')
+    expect(world.events.filter((e) => e.kind === 'punished').at(-1)).toMatchObject({
+      what: 'turnedBack',
+      why: 'noWay',
+    })
+  })
+
+  it('packs Food for the way there and back at the HQ, leaving room to carry goods home', () => {
+    const { world, hq, walking } = setup()
+    const crime = theft(world, hq, { iron: 10 })
+    crime.x = MID + 220
+    crime.y = MID
+    const food = () => world.buildings.find((b) => b.cityId === hq.id && b.kind === 'storage')!
+    const before = food().stock!.food!
+    run(world, walking, 1)
+    const p = world.punishments[0]!
+    expect(p.cityId).toBe('c2')
+    run(world, walking, 2000, () => p.members.every((m) => m.packed))
+    run(world, walking, 2)
+    const wanted = tripFood(2 * 240) + TRADE_ORG_PUNISH.giveUpDays * FOOD_PER_DAY
+    for (const m of p.members) {
+      const r = at(world, m.residentId)
+      expect(r.carried.food ?? 0).toBeGreaterThanOrEqual(wanted - 1)
+      expect(carryCapacity(r, world.tick) - stockWeight(r.carried)).toBeGreaterThanOrEqual(
+        TRADE_ORG_PUNISH.packRoom,
+      )
+    }
+    expect(food().stock!.food!).toBeLessThan(before)
+    // What they packed is theirs, not what they came to take.
+    expect(tookSoFar(world, p)).toBe(0)
+  }, 240_000)
+
+  it('packs from its goods warehouse when its storage has no Food', () => {
+    const { world, hq, walking } = setup()
+    theft(world, hq, { iron: 10 })
+    world.buildings.find((b) => b.cityId === hq.id && b.kind === 'storage')!.stock = {}
+    const warehouse = warehouseFor(world, hq, 'iron')
+    warehouse.stock = { ...warehouse.stock, food: 200 }
+    run(world, walking, 1)
+    const p = world.punishments[0]!
+    run(world, walking, 2000, () => p.members.every((m) => m.packed))
+    run(world, walking, 2)
+    for (const m of p.members) {
+      expect(at(world, m.residentId).carried.food ?? 0).toBeGreaterThan(OWN_FOOD)
+    }
+    expect(warehouse.stock.food!).toBeLessThan(200)
+  }, 240_000)
+
+  it('sets out with what it has when the HQ has no Food at all', () => {
+    const { world, hq, walking } = setup()
+    theft(world, hq, { iron: 10 })
+    for (const b of world.buildings) {
+      if (b.cityId === hq.id && b.stock) delete b.stock.food
+    }
+    world.residents = world.residents.filter((r) => r.owner !== null || isArmed(r))
+    run(world, walking, 3)
+    const p = world.punishments[0]!
+    expect(p.members.every((m) => m.packed)).toBe(true)
+    expect(at(world, p.members[0]!.residentId).order?.kind).toBe('walkTo')
+  })
+
+  it('never packs into the room it leaves for what it carries home', () => {
+    const { world, hq, walking } = setup()
+    theft(world, hq, { iron: 10 })
+    run(world, walking, 1)
+    const p = world.punishments[0]!
+    // Weak, and sent so far the walk's Food alone wouldn't fit.
+    p.cityId = 'c2'
+    for (const m of p.members) at(world, m.residentId).stats.strength = { base: 1, trained: 0 }
+    run(world, walking, 2000, () => p.members.every((m) => m.packed))
+    run(world, walking, 2)
+    for (const m of p.members) {
+      const r = at(world, m.residentId)
+      expect(carryCapacity(r, world.tick) - stockWeight(r.carried)).toBeGreaterThanOrEqual(
+        TRADE_ORG_PUNISH.packRoom,
+      )
+    }
+  }, 240_000)
+
+  it('refills at a trading post it passes, which is no theft', () => {
+    const { world, hq, walking } = setup()
+    theft(world, hq, { iron: 10 })
+    run(world, walking, 1)
+    const p = world.punishments[0]!
+    const m = p.members[0]!
+    const r = at(world, m.residentId)
+    addCity(world, { id: 'post', realmId: null, x: MID, y: MID + 60, name: 'Waypost' })
+    world.cities.find((c) => c.id === 'post')!.tradeOrg = 'post'
+    world.buildings.push({
+      id: 'ps',
+      kind: 'storage',
+      cityId: 'post',
+      x: MID + 8,
+      y: MID + 60,
+      stock: { food: 50 },
+    })
+    for (const each of p.members) each.packed = true
+    r.x = MID + 2
+    r.y = MID + 40
+    r.carried.food = 0
+    m.own.food = 0
+    const crimes = world.crimes.length
+    run(world, walking, 400, () => (r.carried.food ?? 0) >= 2)
+    expect(r.carried.food ?? 0).toBeGreaterThanOrEqual(2)
+    expect(world.buildings.find((b) => b.id === 'ps')!.stock!.food!).toBeLessThan(50)
+    expect(world.crimes.length).toBe(crimes)
+    expect(takenBy(r, m.own)).toEqual({})
+  })
+
+  it('takes Food for the way back at the city, apart from what it came for', () => {
+    const { world, hq, walking } = setup({ coins: 1000, food: 40 })
+    theft(world, hq, { iron: 10 })
+    const worth = TRADE_ORG_PUNISH.times * worthOf({ iron: 10 })
+    run(world, walking, 1)
+    const p = world.punishments[0]!
+    run(world, walking, 4 * TICKS_PER_GAME_DAY, () => p.arrivedAt !== undefined)
+    // Worn down to what they need on the way back: nothing left of what they packed.
+    for (const m of p.members) {
+      at(world, m.residentId).carried.food = 0
+      m.own.food = 0
+    }
+    run(world, walking, 4 * TICKS_PER_GAME_DAY, () => p.heading === 'home')
+    expect(p.took).toBe(worth)
+    expect(world.buildings.find((b) => b.id === 's1')!.stock!.food ?? 0).toBeLessThan(40)
+  }, 240_000)
+
+  it('reports a punishment that took anything before it arrived', () => {
+    const { world, hq } = setup()
+    theft(world, hq, { iron: 10 })
+    stepPunishments(world, 640)
+    const p = world.punishments[0]!
+    expect(punishmentsSound.check(world, terrain)).toEqual([])
+    p.took = 5
+    expect(punishmentsSound.check(world, terrain).map((v) => v.message)).toContain(
+      `punishment ${p.id} took ${p.took} before it arrived`,
+    )
+    p.arrivedAt = p.startedAt - 1
+    expect(punishmentsSound.check(world, terrain).map((v) => v.message)).toContain(
+      `punishment ${p.id} arrived before it set out`,
     )
   })
 })
