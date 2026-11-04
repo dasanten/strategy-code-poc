@@ -134,11 +134,11 @@ describe('the fall of the HQ (CONTEXT.md: Fall of the HQ)', () => {
     expect(post.tradeOrg).toBe('post')
     expect(warehouse.kind).toBe('warehouse')
     expect(tradeProblem(world, realm.id, p1, 'buy', 'wood', 1, null)).toBeUndefined()
-    // The stock floor still tops it up.
-    warehouse.stock = {}
+    // Nothing tops it up (ADR 0023), and with the HQ gone nothing brings it more but its own hands.
+    warehouse.stock = { wood: 3 }
     world.tick = TICKS_PER_GAME_DAY - 1
     stepStockFloor(world)
-    expect(warehouse.stock.wood).toBeGreaterThan(0)
+    expect(warehouse.stock).toEqual({ wood: 3 })
     const refused = 'no caravans run since the Trade Org HQ fell'
     expect(tradeProblem(world, realm.id, p1, 'buy', 'wood', 1, null, city.id)).toBe(refused)
     expect(order(world, queue, { kind: 'buy', good: 'wood', units: 1, cityId: city.id })).toBe(

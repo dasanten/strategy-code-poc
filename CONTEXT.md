@@ -298,7 +298,8 @@ The shared language of the game. Domain terms only — no implementation details
   they don't produce. The HQ is a stop like a post, so new Food and Coins reach the posts, and its
   lost escorts are made up there each time round. At each stop it evens out its load with the
   warehouse, every good including Food and Coins: it leaves what the place has less of and takes
-  what it has more of, as far as the carriage holds. At the HQ its Coins go through the coin
+  what it has more of, as far as the carriage holds; when it can't hold it all, every good is cut
+  alike, so goods the caravans keep level don't crowd out the Food and Coins only a trader brings. At the HQ its Coins go through the coin
   warehouse and its other goods through the goods warehouse. Crew, escort, Food on board and a lost carriage go as for a caravan (Caravan crew lost);
   taking goods off it or stealing it is a theft like any against the Trade Organization, but it
   owes nobody a delivery, so nothing is sent again. How many there are is a balance number.

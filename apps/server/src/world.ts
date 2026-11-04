@@ -165,7 +165,7 @@ export interface StepResult {
 
 /**
  * Advances the world by one tick (ADR 0002): residents get hungry, eat, heal or starve; so do
- * horses; food spoils at the end of each game day and Trade Org warehouses top up to their stock floor; caravans, NPC cities, the Trade Org army and its punishments give their residents orders; then their orders request actions (steps, then blows in fights, then climbing walls, then taking and
+ * horses; food spoils at the end of each game day and the Trade Org HQ's warehouses top up to their stock floor; caravans, NPC cities, the Trade Org army and its punishments give their residents orders; then their orders request actions (steps, then blows in fights, then climbing walls, then taking and
  * putting down goods, store, fetch, haul routes' and road orders' included, then Feeding the Down (`stepFeeding`), then paying for mercenary contracts, then buying NPC cities, then trading at Trade Org warehouses, then laying out and working on construction sites, then tearing down, then
  * working workplaces, then residents breeding horses, then pairs having children), and the world resolves them together. As the next tick begins, residents
  * age: the old die, and loads too heavy for declining Strength are put down; alliance leaves

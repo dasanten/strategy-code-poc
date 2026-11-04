@@ -22,6 +22,7 @@ import {
 import { describe, expect, it } from 'vitest'
 import { tallyGoods, takeMade } from './goods-made.js'
 import { checkInvariants, goodsOnlyFromNothingAtTheFloor } from './invariants.js'
+import { tradeOrgReserve } from './npc-chain.js'
 import { mulberry32 } from './residents.js'
 import { stepStockFloor } from './stock-floor.js'
 import { worldWithCity } from './test-terrain.js'
@@ -97,37 +98,71 @@ describe('the stock floor', () => {
     expect(stockFloor(p.world, { ...p.warehouse, site: { delivered: {}, work: 0 } })).toEqual({})
   })
 
-  it('tops up what is below the floor once a game day, and nothing else', () => {
-    const { world, warehouse } = post()
-    warehouse.stock = { wood: 3, stone: 500, coins: 10 }
+  it('tops up what is below the floor at the HQ once a game day, and nothing else', () => {
+    const { world, goods, coins } = hq()
+    const floor = stockFloor(world, goods)
+    const stone = floor.stone! + 500
+    goods.stock = { wood: 3, stone }
+    coins.stock = { coins: 10 }
     stepStockFloor(world)
-    expect(warehouse.stock).toEqual({ wood: 3, stone: 500, coins: 10 })
+    expect(goods.stock).toEqual({ wood: 3, stone })
+    expect(coins.stock).toEqual({ coins: 10 })
     expect(takeMade(world)).toEqual({})
     toDayEnd(world)
     stepStockFloor(world)
-    expect(warehouse.stock).toEqual({ ...WAREHOUSE_FLOOR, stone: 500 })
-    const rest: Stock = { ...WAREHOUSE_FLOOR }
+    expect(goods.stock).toEqual({ ...floor, stone })
+    expect(coins.stock).toEqual(stockFloor(world, coins))
+    const rest: Stock = { ...floor }
     delete rest.stone
-    expect(takeMade(world)).toEqual({ ...rest, wood: rest.wood! - 3, coins: rest.coins! - 10 })
+    expect(takeMade(world)).toEqual({
+      ...rest,
+      wood: rest.wood! - 3,
+      coins: stockFloor(world, coins).coins! - 10,
+    })
+  })
+
+  it('tops up nothing at a trading post: what it holds came physically (ADR 0023)', () => {
+    const { world, warehouse } = post()
+    warehouse.stock = { wood: 3, stone: 500, coins: 10 }
+    toDayEnd(world)
+    stepStockFloor(world)
+    expect(warehouse.stock).toEqual({ wood: 3, stone: 500, coins: 10 })
+    expect(takeMade(world)).toEqual({})
+  })
+
+  it('still prices a post and tells its hands what to go for, though it tops up nothing', () => {
+    const { world, city, warehouse } = post()
+    warehouse.stock = { iron: 1 }
+    const iron = warehousePrices(world, warehouse).find((x) => x.good === 'iron')!
+    expect(iron.sell).toBeGreaterThan(WAREHOUSE_BASE_PRICE.iron)
+    expect(tradeOrgReserve(world, city).iron).toBe(WAREHOUSE_FLOOR.iron)
   })
 
   it('never adds people: residents and horses stay as they are', () => {
-    const { world, warehouse } = post()
-    warehouse.stock = {}
+    const { world, goods } = hq()
+    goods.stock = {}
     const residents = world.residents.length
     const horses = world.horses.length
     toDayEnd(world)
     stepStockFloor(world)
+    expect(goods.stock).toEqual(stockFloor(world, goods))
     expect(world.residents).toHaveLength(residents)
     expect(world.horses).toHaveLength(horses)
   })
 
-  it('tops up an emptied warehouse as the world steps', () => {
+  it('tops up the HQ’s emptied warehouse as the world steps, and leaves a post’s empty', () => {
+    const h = hq()
+    h.goods.stock = {}
+    toDayEnd(h.world)
+    stepWorld(h.world, h.terrain)
+    expect(h.goods.stock.wood).toBeGreaterThanOrEqual(stockFloor(h.world, h.goods).wood!)
+    expect(checkInvariants(h.world, h.terrain)).toEqual([])
+
     const { world, terrain, warehouse } = post()
     warehouse.stock = {}
     toDayEnd(world)
     stepWorld(world, terrain)
-    expect(warehouse.stock).toEqual(WAREHOUSE_FLOOR)
+    expect(warehouse.stock).toEqual({})
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 })

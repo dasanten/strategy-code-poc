@@ -6,6 +6,7 @@ import {
   DELIVERY_LOAD,
   GOOD_WEIGHT,
   HQ_FLOOR_FACTOR,
+  HQ_FOOD_FLOOR_FACTOR,
   PRICE_ELASTICITY,
   PRICE_RANGE,
   PRICE_REFERENCE_FLOORS,
@@ -62,15 +63,18 @@ export function warehouseKeeps(
 }
 
 /**
- * A warehouse's stock floor (`CONTEXT.md`: Stock floor, ADR 0003): `WAREHOUSE_FLOOR` of every
- * good it keeps (`warehouseKeeps`), `HQ_FLOOR_FACTOR` times that at the HQ. Goods only, never
+ * A warehouse's stock floor (`CONTEXT.md`: Stock floor, ADR 0003, ADR 0023): `WAREHOUSE_FLOOR` of
+ * every good it keeps (`warehouseKeeps`), `HQ_FLOOR_FACTOR` times that at the HQ (of Food,
+ * `HQ_FOOD_FLOOR_FACTOR`), where it tops up
+ * (`stepStockFloor`); at a post it only says what its hands and carriages go for. Goods only, never
  * people; empty for any building that is not a Trade Org warehouse.
  */
 export function stockFloor(world: Pick<WorldState, 'cities' | 'buildings'>, b: Building): Stock {
   const keeps = warehouseKeeps(world, b)
   const hq = world.cities.find((c) => c.id === b.cityId)?.tradeOrg === 'hq'
   const floor: Stock = {}
-  for (const g of keeps) floor[g] = WAREHOUSE_FLOOR[g] * (hq ? HQ_FLOOR_FACTOR : 1)
+  const factor = (g: Good) => (!hq ? 1 : g === 'food' ? HQ_FOOD_FLOOR_FACTOR : HQ_FLOOR_FACTOR)
+  for (const g of keeps) floor[g] = WAREHOUSE_FLOOR[g] * factor(g)
   return floor
 }
 
