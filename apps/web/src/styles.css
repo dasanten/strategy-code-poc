@@ -1955,6 +1955,18 @@ button.residents-row.selected:hover {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+/* But a trader's stop says where it is, which is what the notice is for: its buttons go below. */
+.game.phone .notice.trader-visit {
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.game.phone .trader-visit .notice-text {
+  flex: 1 1 100%;
+  white-space: normal;
+}
+.game.phone .trader-visit .notice-actions {
+  margin-left: auto;
+}
 /* A good's icon beside its name: the wiki's goods table, trade prices (`CONTEXT.md`: Goods on
    cards). */
 .good-label {
