@@ -500,6 +500,12 @@ export function Wiki() {
           column comes last either way. This browser remembers your choice.
         </p>
         <p>
+          Pick these makes a group on the map of everyone the full list shows, or of those you
+          ticked among them, ready for one order, and closes the full list so the group card shows.
+          Someone ticked whom the search or a filter hides isn’t picked. Ticks last only while the
+          full list is open.
+        </p>
+        <p>
           The card and the residents list say what each resident is doing. Walking, riding or
           driving somewhere, they also say about when they arrive, and the card’s meters and
           countdowns (building, tearing down, breeding, carrying, pairing, growing up) say about how

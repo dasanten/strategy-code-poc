@@ -11,6 +11,7 @@ import {
   fittingChoice,
   loadChoice,
   parseChoice,
+  pickedFromList,
   sortBy,
   sortResidents,
   storeChoice,
@@ -318,6 +319,54 @@ describe('sorting the full list', () => {
     expect(directionLabel('doing', true)).toBe('Z to A')
     expect(directionLabel('city', false)).toBe('Home city first')
     expect(directionLabel('city', true)).toBe('Home city last')
+  })
+})
+
+describe('who Pick these picks', () => {
+  const ada = resident('Ada', { carried: { sword: 1 } })
+  const bo = resident('Bo')
+  const cy = resident('Cy', { carried: { spear: 1 } })
+  const dee = resident('Dee', { carried: { spear: 1 } })
+  const all = list(ada, bo, cy, dee)
+  const armed = filterResidents(all, { ...DEFAULT_CHOICE, weapons: 'armed' }, NOW)
+
+  it('picks everyone listed with nobody ticked', () => {
+    expect(pickedFromList(all, new Set())).toEqual(['ada', 'bo', 'cy', 'dee'])
+  })
+
+  it('picks only those ticked', () => {
+    expect(pickedFromList(all, new Set(['cy', 'ada']))).toEqual(['ada', 'cy'])
+  })
+
+  it('picks everyone a filter leaves with nobody ticked', () => {
+    expect(pickedFromList(armed, new Set())).toEqual(['ada', 'cy', 'dee'])
+  })
+
+  it('picks those ticked whom a filter leaves, not those it hides', () => {
+    expect(pickedFromList(armed, new Set(['bo', 'cy']))).toEqual(['cy'])
+  })
+
+  it('picks everyone a filter leaves when it hides all those ticked', () => {
+    expect(pickedFromList(armed, new Set(['bo']))).toEqual(['ada', 'cy', 'dee'])
+  })
+
+  it('picks in the order the list is sorted', () => {
+    const byName = sortResidents(
+      armed,
+      { sort: 'name', descending: true },
+      { tick: NOW, doing: () => '' },
+    )
+    expect(pickedFromList(byName, new Set())).toEqual(['dee', 'cy', 'ada'])
+    expect(pickedFromList(byName, new Set(['ada', 'dee']))).toEqual(['dee', 'ada'])
+  })
+
+  it('picks nobody from an empty list', () => {
+    expect(pickedFromList([], new Set(['ada']))).toEqual([])
+  })
+
+  it('does not pick someone ticked who has left the list', () => {
+    expect(pickedFromList(list(ada, bo), new Set(['ada', 'gone']))).toEqual(['ada'])
+    expect(pickedFromList(list(ada, bo), new Set(['gone']))).toEqual(['ada', 'bo'])
   })
 })
 
