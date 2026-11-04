@@ -542,6 +542,13 @@ export const NPC_NODE_REACH = 160
 export const NPC_TRADER_REACH = 720
 
 /**
+ * How far from its home a Player's offer may be for an NPC city to send its trader there
+ * (`CONTEXT.md`: NPC cities at an offer), in tiles: as far as it goes to a Trade Org warehouse
+ * (`NPC_TRADER_REACH`), since it is the same trader on the same Food.
+ */
+export const NPC_OFFER_REACH = 720
+
+/**
  * Game days after it left that an NPC city stops waiting for its trader (`CONTEXT.md`: NPC
  * trader): dead, robbed or stuck, they are dropped from its plan and it may send another.
  * Several times the longest trade run (`NPC_TRADER_REACH` there and back).

@@ -123,6 +123,7 @@ import {
   NPC_VILLAGE,
   NPC_NODE_REACH,
   NPC_TRADER_GIVE_UP_DAYS,
+  NPC_OFFER_REACH,
   NPC_TRADER_REACH,
   NPC_PLAN_TICKS,
   NPC_SMITHY_WEAPON,
@@ -1943,6 +1944,16 @@ export function Wiki() {
           to the storage. One trader at a time, and none while Food runs short or armed outsiders
           stand in its area. Nothing protects them on the way; a trader not back after{' '}
           {days(NPC_TRADER_GIVE_UP_DAYS)} is given up, and the city may send another.
+        </p>
+        <p>
+          The same trader goes to a Player's offer within {num(NPC_OFFER_REACH)} tiles, ahead of any
+          warehouse run, when it gives what the city is short of and wants what it has spare or
+          Coins, at a rate at least as good as its own prices, and the city doesn't refuse that
+          realm. A direct offer is left to the realm it is for. They take as many times over as make
+          up what it lacks and fit in their arms, never a weapon either way, and walk home with it.
+          It looks once a game hour; while Food runs short only an offer that gives Food will send
+          them. If the offer is gone or cut down when they get there, or there is no way in, they
+          carry what they didn't spend back home. The Trade Organization never accepts offers.
         </p>
         <p>
           A city is full once it has had spare hands with nothing to do and nothing short of its

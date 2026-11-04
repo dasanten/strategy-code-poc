@@ -892,12 +892,28 @@ export type CityProject =
   | { kind: 'build'; building: BuildingKind; x: number; y: number }
   | { kind: 'tearDown'; buildingId: string }
 
+/** A trader's run to a Player's offer (`CONTEXT.md`: NPC cities at an offer). */
+export interface CityTraderOffer {
+  /** The offer they go to take. */
+  offerId: string
+  /** How many times over the city means to take it. */
+  times: number
+  /** The good they pay with: what the offer wants. */
+  pays: Good
+  /** Units of it they take along. */
+  units: number
+  /** Where they are in the run: to load up at home, to set off, or on their way. */
+  leg: 'load' | 'setOff' | 'walking'
+}
+
 /** A game-run city's trade run under way (`CONTEXT.md`: NPC trader). */
 export interface CityTrader {
   /** The trader, one of its spare hands. */
   residentId: string
-  /** The Trade Org warehouse they trade at. */
+  /** The Trade Org warehouse they trade at; on a run to an offer, the offer's storage. */
   warehouseId: string
+  /** On a run to a Player's offer, that run, until they have been there or given it up. */
+  offer?: CityTraderOffer
   /** The load still to sell there; empty once sold. */
   sells: Stock
   /** What they still buy there, up to what the city is short of; empty once bought. */
