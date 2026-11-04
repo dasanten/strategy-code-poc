@@ -20,6 +20,8 @@ import {
   CARAVAN_ESCORTS_MAX,
   CARAVAN_GUARD_RANGE,
   CARAVAN_ROBBERIES_PER_ESCORT,
+  TRADERS,
+  TRADER_ESCORTS,
   CARRIAGE_CAPACITY,
   PASSENGER_WEIGHT,
   CARRIAGE_MAX_CAPACITY,
@@ -1714,6 +1716,15 @@ export function Wiki() {
           one theft from the Trade Organization, worth the carriage, horse and load, and robs the
           caravan: its route counts the robbery and the delivery or transfer goes again. The same
           caravan gets a new carriage and horse at the HQ, and any surviving crew walk back to it.
+        </p>
+        <p>
+          The HQ also sends out up to {num(TRADERS)} wandering traders, each a carriage with a
+          driver and {num(TRADER_ESCORTS)} escorts, round a fixed loop of the trading posts. At each
+          post a trader evens out its load with the warehouse, every good including Food and Coins:
+          it leaves what the post has less of and takes what it has more of, as far as the carriage
+          holds. That is how a post comes to hold goods it doesn't produce. Its crew and a lost
+          carriage go as for a caravan, and robbing one is a theft from the Trade Organization, but
+          it owes nobody a delivery, so nothing is sent again.
         </p>
       </Section>
 

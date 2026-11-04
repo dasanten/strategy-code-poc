@@ -87,8 +87,8 @@ export interface AdminMapData {
 
 /**
  * The admin map's world for `MapView`: every entity in the last view loaded, coloured by
- * Organization; every Leader crowned; the far tier from every city and the places' armies and
- * caravans; all terrain there to load.
+ * Organization; every Leader crowned; the far tier from every city and the places' armies,
+ * caravans and wandering traders; all terrain there to load.
  */
 export function adminMapWorld(data: AdminMapData): MapWorld {
   const world: MapWorld = {
@@ -104,6 +104,7 @@ export function adminMapWorld(data: AdminMapData): MapWorld {
     piles: [],
     armies: [],
     caravans: [],
+    traders: [],
     diplomacy: { alliance: null },
     region: data.region,
   }
@@ -117,6 +118,7 @@ export function adminMapWorld(data: AdminMapData): MapWorld {
     else if (e.is === 'pile') world.piles.push(e)
     else if (e.is === 'army') world.armies.push(e)
     else if (e.is === 'caravan') world.caravans.push(e)
+    else if (e.is === 'trader') world.traders.push(e)
     else {
       world.cities.push(e)
       const rel = cityRelationship(e, ADMIN_VIEWER)!
@@ -131,12 +133,14 @@ export function adminMapWorld(data: AdminMapData): MapWorld {
       y: a.y,
       rel: realmRelationship(a.realmId, ADMIN_VIEWER),
     })),
-    ...(places?.tradeOrg.caravans ?? []).map((c): FarMarker => ({
-      kind: 'caravan',
-      x: c.x,
-      y: c.y,
-      rel: 'trade',
-    })),
+    ...[...(places?.tradeOrg.caravans ?? []), ...(places?.tradeOrg.traders ?? [])].map(
+      (c): FarMarker => ({
+        kind: 'caravan',
+        x: c.x,
+        y: c.y,
+        rel: 'trade',
+      }),
+    ),
   ]
   const leaders = new Set((places?.realms ?? []).flatMap((r) => (r.leader ? [r.leader.id] : [])))
   world.admin = {

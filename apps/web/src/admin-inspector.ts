@@ -15,6 +15,7 @@ import {
   type AdminWorldView,
   type Army,
   type Caravan,
+  type Trader,
   type Stock,
 } from '@csp/shared'
 import type { JumpEntry, JumpKind } from './admin-jump.js'
@@ -31,7 +32,7 @@ import { horseAgeText } from './selection-view.js'
  */
 
 /**
- * What a click on a tile inspects: a resident on it, else a carriage (its caravan, if it is one),
+ * What a click on a tile inspects: a resident on it, else a carriage (its caravan or trader, if it is one),
  * a building (its city, for a town hall), goods on the ground, a horse, a road. Nothing when the
  * tile is open ground or not loaded.
  */
@@ -41,7 +42,13 @@ export function pickOnTile(
   y: number,
 ): AdminInspectTarget | undefined {
   const here = (view?.entities ?? []).filter(
-    (e) => e.is !== 'city' && e.is !== 'army' && e.is !== 'caravan' && e.x === x && e.y === y,
+    (e) =>
+      e.is !== 'city' &&
+      e.is !== 'army' &&
+      e.is !== 'caravan' &&
+      e.is !== 'trader' &&
+      e.x === x &&
+      e.y === y,
   )
   const first = (is: string) => here.find((e) => e.is === is)
   const resident = first('resident')
@@ -49,7 +56,9 @@ export function pickOnTile(
   const carriage = first('carriage')
   if (carriage) {
     const caravan = view!.entities.find((e) => e.is === 'caravan' && e.carriageId === carriage.id)
-    return caravan ? { kind: 'caravan', id: caravan.id } : { kind: 'carriage', id: carriage.id }
+    if (caravan) return { kind: 'caravan', id: caravan.id }
+    const trader = view!.entities.find((e) => e.is === 'trader' && e.carriageId === carriage.id)
+    return trader ? { kind: 'trader', id: trader.id } : { kind: 'carriage', id: carriage.id }
   }
   const building = here.find((e) => e.is === 'building' && e.kind !== 'road')
   if (building?.is === 'building') {
@@ -143,6 +152,14 @@ function caravanDoing(c: Caravan, post: string): string {
   return `On its route to ${to}, for the ${c.stop}`
 }
 
+/** What a wandering trader is doing: being sent from the HQ or going round its loop. */
+function traderDoing(t: Trader, post: string | undefined): string {
+  if (!post) return 'At the HQ, with no post left on its loop'
+  return t.heading === 'hq'
+    ? `At the HQ, to go out to ${post}`
+    : `On its loop to ${post}, for the ${t.stop}`
+}
+
 /** A meter in whole points: "80 / 100". */
 const meter = (value: number, most: number) => `${Math.round(value)} / ${most}`
 
@@ -178,6 +195,7 @@ export function inspectorCard(ins: AdminInspection): InspectorCard {
           ...linkRow('City', 'city', ins.city),
           ...linkRow('Army', 'army', ins.army),
           ...linkRow('Caravan', 'caravan', ins.caravan),
+          ...linkRow('Wandering trader', 'trader', ins.trader ?? null),
           tile(r),
         ],
       })
@@ -262,6 +280,7 @@ export function inspectorCard(ins: AdminInspection): InspectorCard {
           { label: 'Horse', text: k.horseId ? 'Hitched' : 'None hitched' },
           ...linkRow('Driver', 'resident', ins.driver),
           ...linkRow('Caravan', 'caravan', ins.caravan),
+          ...linkRow('Wandering trader', 'trader', ins.trader ?? null),
           tile(k),
         ],
       })
@@ -304,6 +323,26 @@ export function inspectorCard(ins: AdminInspection): InspectorCard {
         ],
       })
     }
+    case 'trader': {
+      return card({
+        title: ins.post ? `Wandering trader to ${ins.post.name}` : 'Wandering trader',
+        badge: 'Wandering trader',
+        rows: [
+          { label: 'Doing', text: traderDoing(ins.trader, ins.post?.name) },
+          ...(ins.carriage
+            ? [{ label: 'Load', text: loadText(ins.carriage.load) }, tile(ins.carriage)]
+            : []),
+          {
+            label: `Loop (${ins.loop.length})`,
+            links: ins.loop.map((p) => link('city', p)),
+          },
+          {
+            label: `Crew (${ins.crew.length})`,
+            links: ins.crew.map((m) => link('resident', m)),
+          },
+        ],
+      })
+    }
   }
 }
 
@@ -316,6 +355,7 @@ const JUMP_INSPECTS: Record<JumpKind, AdminInspectTarget['kind'] | undefined> = 
   hq: 'city',
   post: 'city',
   caravan: 'caravan',
+  trader: 'trader',
   army: 'army',
 }
 

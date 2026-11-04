@@ -1652,6 +1652,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 },
                 armies: world.armies,
                 caravans: world.caravans,
+                traders: world.traders,
                 mapSize: world.map.size,
                 commandedCarriages: armyCarriages,
                 nodeFit: (() => {

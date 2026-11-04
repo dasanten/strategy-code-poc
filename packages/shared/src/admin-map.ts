@@ -2,6 +2,7 @@ import type {
   Army,
   Building,
   Caravan,
+  Trader,
   Carriage,
   City,
   Horse,
@@ -86,6 +87,7 @@ export type AdminEntity = { org: string | null } & (
   | ({ is: 'pile' } & Pile)
   | ({ is: 'army' } & Omit<Army, 'script'> & { script?: AdminScript })
   | ({ is: 'caravan' } & Caravan)
+  | ({ is: 'trader' } & Trader)
 )
 
 /** Every entity in an admin's rectangle (`AdminViewRequest`), and the Organizations they name. */
@@ -131,6 +133,8 @@ export interface AdminPlaces {
     posts: AdminPlace[]
     /** Each where its carriage is, named after its trading post. */
     caravans: (AdminPlace & { postId: string; heading: Caravan['heading'] })[]
+    /** Each where its carriage is, named after the post it goes to next. */
+    traders: AdminPlace[]
   }
   /** Each where one of its members stands; an army with none left is not listed. */
   armies: (AdminPlace & { realmId: string; realm: string })[]
@@ -149,6 +153,7 @@ export const ADMIN_INSPECT_KINDS = [
   'pile',
   'army',
   'caravan',
+  'trader',
 ] as const
 export type AdminInspectKind = (typeof ADMIN_INSPECT_KINDS)[number]
 
@@ -171,12 +176,13 @@ export interface AdminNamed {
 /**
  * One thing on the admin map as its inspector shows it, read-only, with the Organization it
  * belongs to (null for what belongs to none, such as a pile). Script sources are never in it.
- * - `resident`: the resident, the city they live in, the army they march with, the caravan they
- *   drive or escort, and whether they are their realm's Leader.
+ * - `resident`: the resident, the city they live in, the army they march with, the caravan or trader
+ *   they drive or escort, and whether they are their realm's Leader.
  * - `city`: where its town hall stands, its residents, its finished buildings by kind, what its
  *   storages hold together, its finished gates open and shut, and its soldiers (armed residents).
- * - `carriage`: its load, the resident driving it, and the caravan it is.
+ * - `carriage`: its load, the resident driving it, and the caravan or trader it is.
  * - `caravan`: its trading post, carriage and crew.
+ * - `trader`: the post it goes to next, its loop, carriage and crew.
  * - `army`: its members.
  */
 export type AdminInspection = { tick: number; org: AdminOrganization | null } & (
@@ -186,6 +192,7 @@ export type AdminInspection = { tick: number; org: AdminOrganization | null } & 
       city: AdminNamed | null
       army: AdminNamed | null
       caravan: AdminNamed | null
+      trader?: AdminNamed
       leader: boolean
     }
   | {
@@ -199,7 +206,13 @@ export type AdminInspection = { tick: number; org: AdminOrganization | null } & 
     }
   | { is: 'building'; building: Building; city: AdminNamed | null }
   | { is: 'horse'; horse: Horse }
-  | { is: 'carriage'; carriage: Carriage; driver: AdminNamed | null; caravan: AdminNamed | null }
+  | {
+      is: 'carriage'
+      carriage: Carriage
+      driver: AdminNamed | null
+      caravan: AdminNamed | null
+      trader?: AdminNamed
+    }
   | { is: 'pile'; pile: Pile }
   | {
       is: 'army'
@@ -210,6 +223,14 @@ export type AdminInspection = { tick: number; org: AdminOrganization | null } & 
       is: 'caravan'
       caravan: Caravan
       post: AdminNamed | null
+      carriage: Carriage | null
+      crew: AdminNamed[]
+    }
+  | {
+      is: 'trader'
+      trader: Trader
+      post: AdminNamed | null
+      loop: AdminNamed[]
       carriage: Carriage | null
       crew: AdminNamed[]
     }

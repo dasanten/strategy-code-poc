@@ -13,13 +13,14 @@ import { grantHorses } from './horse-grant.js'
 import { horseName } from './horses.js'
 import { hash, mulberry32 } from './residents.js'
 import { paramTarget } from './script-params.js'
+import { placeTraders } from './traders.js'
 
 /**
  * The shape of saved world state (ADR 0006). Any change to `WorldState` that an older save
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 80
+export const WORLD_FORMAT_VERSION = 81
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -46,6 +47,8 @@ export const migrations: Record<number, MigrationStep> = {
   // captured before that still counted as the Trade Org's.
   37: (state) => {
     const world = structuredClone(state) as WorldState
+    // Wandering traders come with step 80; `leaveTradeOrg` looks at them.
+    world.traders ??= []
     for (const c of world.cities)
       if (c.tradeOrg === 'post' && c.realmId !== null) leaveTradeOrg(world, c)
     return world
@@ -324,6 +327,14 @@ export const migrations: Record<number, MigrationStep> = {
   // Player's order under attack; `Resident.givenUnderAttack`). Orders given before weren't marked,
   // so the step leaves every resident as they are.
   79: (state) => state,
+  // Wandering traders (`CONTEXT.md`: Wandering trader): the HQ of a world from before sends its out
+  // now, with new carriages, horses and crew, as a new world's does.
+  80: (state, { terrain }) => {
+    const world = structuredClone(state) as WorldState
+    world.traders ??= []
+    placeTraders(world, terrain.size)
+    return world
+  },
 }
 
 export class WorldFormatError extends Error {}

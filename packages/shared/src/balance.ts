@@ -766,6 +766,26 @@ export const CARAVAN_FOOD = 72
 export const CARAVAN_SPREAD = 8
 
 /**
+ * How many wandering traders the HQ sends out (`CONTEXT.md`: Wandering trader), spread evenly round
+ * one loop of all its posts, or one for each post with fewer. A full-size map's 16 posts lie about
+ * 6 game days' drive apart, so with four a post sees a trader about every 25 game days.
+ */
+export const TRADERS = 4
+
+/**
+ * Residents of the Trade Org HQ who walk along with each wandering trader as its escort, besides
+ * its driver (`CONTEXT.md`: Wandering trader), before it was ever robbed: a caravan's.
+ */
+export const TRADER_ESCORTS = CARAVAN_ESCORTS
+
+/**
+ * How often a wandering trader's drive to a stop may end short of it before it goes on to the next
+ * post (`CONTEXT.md`: Wandering trader), say out of reach of carriages, so one post can't hold up
+ * the whole loop.
+ */
+export const TRADER_DRIVE_TRIES = 3
+
+/**
  * The part of a delivery's fee every delivery or pick-up pays, in coins (`CONTEXT.md`:
  * Delivery), however light or near.
  */

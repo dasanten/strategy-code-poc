@@ -17,6 +17,7 @@ import type {
   ScriptMemory,
   SeenArmy,
   SeenCaravan,
+  SeenTrader,
   SeenResident,
   WorkplaceSettings,
   Waypoint,
@@ -106,6 +107,8 @@ export type SeenEntity =
   | ({ is: 'army' } & SeenArmy)
   /** A Trade Org caravan; its carriage and crew are what is seen of it (`CONTEXT.md`: Caravan). */
   | ({ is: 'caravan' } & SeenCaravan)
+  /** A wandering trader, seen the same way (`CONTEXT.md`: Wandering trader). */
+  | ({ is: 'trader' } & SeenTrader)
 
 /**
  * A building, construction site or city as the Player last saw it (`CONTEXT.md`: Last seen):

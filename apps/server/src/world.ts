@@ -51,6 +51,7 @@ import { stepCaptures, type Capture } from './capture.js'
 import { stepNpcCities } from './npc-behaviour.js'
 import { runNpcScripts } from './script-runner.js'
 import { placeCaravans, stepCaravans } from './caravans.js'
+import { placeTraders, stepTraders } from './traders.js'
 import { stepNpcDefence } from './npc-defence.js'
 import { stepLastSeen } from './last-seen.js'
 import { newSightPhase } from './sight.js'
@@ -79,6 +80,7 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     armies: [],
     contracts: [],
     caravans: [],
+    traders: [],
     deliveries: [],
     transfers: [],
     routeRobberies: {},
@@ -100,7 +102,8 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
 /**
  * A world as the world generator makes it for a new game: `createWorld`, with the Trade Org HQ
  * (`placeTradeOrgHq`), its NPC cities (`placeNpcCities`) and then its trading posts placed
- * (`placeTradingPosts`), with a caravan for each (`placeCaravans`).
+ * (`placeTradingPosts`), with a caravan for each (`placeCaravans`) and wandering traders going round
+ * them (`placeTraders`).
  */
 export function generateWorld(terrain: TerrainMap, seed = 1): WorldState {
   const world = createWorld(terrain, seed)
@@ -108,6 +111,7 @@ export function generateWorld(terrain: TerrainMap, seed = 1): WorldState {
   placeNpcCities(world, terrain)
   placeTradingPosts(world, terrain)
   placeCaravans(world)
+  placeTraders(world, terrain.size)
   return world
 }
 
@@ -198,6 +202,7 @@ export function stepWorld(
   let npcPlanMs = 0
   const npcScriptRuns = time('npc', () => {
     stepCaravans(world, terrain.size)
+    stepTraders(world, terrain.size)
     stepNpcDefence(world, terrain.size)
     stepTradeOrgArmy(world, terrain.size)
     stepNpcHire(world, terrain.size)

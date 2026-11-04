@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type {
   AdminEntity,
   AdminInspection,
+  Trader,
   AdminOrganization,
   AdminWorldView,
   Resident,
@@ -97,6 +98,11 @@ describe('what a click on the admin map inspects', () => {
     expect(pickOnTile(null, 3, 4)).toBeUndefined()
   })
 
+  it("picks a wandering trader's carriage as the trader", () => {
+    const trader = { is: 'trader', org: 'tradeOrg', id: 'tr1', carriageId: 'k1' } as AdminEntity
+    expect(pickOnTile(view(carriage, trader), 3, 4)).toEqual({ kind: 'trader', id: 'tr1' })
+  })
+
   it("picks a caravan's carriage as the caravan", () => {
     const caravan = { is: 'caravan', org: 'tradeOrg', id: 'cv1', carriageId: 'k1' } as AdminEntity
     expect(pickOnTile(view(carriage, caravan), 3, 4)).toEqual({ kind: 'caravan', id: 'cv1' })
@@ -187,6 +193,66 @@ describe('the admin inspector', () => {
     expect(row(card, 'Gates')?.text).toBe('1 open, 2 shut')
     expect(row(card, 'Soldiers')?.text).toBe('4')
     expect(card.directive).toEqual({ org: 'n1', name: 'Nook' })
+  })
+
+  it('shows a wandering trader with where it goes, its load, loop and crew', () => {
+    const trader = {
+      id: 'tr1',
+      carriageId: 'k1',
+      driverId: 'd1',
+      escortIds: ['e1'],
+      loop: ['p1', 'p2'],
+      postId: 'p1',
+      heading: 'post',
+      stop: 'warehouse',
+      plan: null,
+      holding: null,
+      misses: 0,
+      robberies: 0,
+    } as const
+    const inspection = {
+      tick: 1,
+      org: { id: 'tradeOrg', is: 'tradeOrg', name: 'Trade Organization' },
+      is: 'trader',
+      trader: { ...trader, loop: [...trader.loop], escortIds: [...trader.escortIds] } as Trader,
+      post: { id: 'p1', name: 'Ferry' },
+      loop: [
+        { id: 'p1', name: 'Ferry' },
+        { id: 'p2', name: 'Ford' },
+      ],
+      carriage: {
+        id: 'k1',
+        realmId: null,
+        cityId: 'hq',
+        x: 3,
+        y: 4,
+        horseId: null,
+        load: { wood: 2 },
+      },
+      crew: [
+        { id: 'd1', name: 'Dan' },
+        { id: 'e1', name: 'Eve' },
+      ],
+    } as Extract<AdminInspection, { is: 'trader' }>
+    const c = inspectorCard(inspection)
+    expect(c.title).toBe('Wandering trader to Ferry')
+    expect(c.badge).toBe('Wandering trader')
+    const rowOf = (label: string) => c.rows.find((r) => r.label.startsWith(label))
+    expect(rowOf('Doing')?.text).toBe('On its loop to Ferry, for the warehouse')
+    expect(rowOf('Load')?.text).toContain('wood')
+    expect(rowOf('Loop')?.links?.map((l) => l.name)).toEqual(['Ferry', 'Ford'])
+    expect(rowOf('Crew')?.links?.map((l) => l.name)).toEqual(['Dan', 'Eve'])
+    expect(c.directive).toBeUndefined()
+    const sent = inspectorCard({
+      ...inspection,
+      trader: { ...inspection.trader, heading: 'hq' },
+    })
+    expect(sent.rows.find((r) => r.label === 'Doing')?.text).toBe('At the HQ, to go out to Ferry')
+    const idle = inspectorCard({ ...inspection, post: null, loop: [] })
+    expect(idle.title).toBe('Wandering trader')
+    expect(idle.rows.find((r) => r.label === 'Doing')?.text).toBe(
+      'At the HQ, with no post left on its loop',
+    )
   })
 
   it('shows a carriage, a caravan and an army with what they are doing', () => {
@@ -315,6 +381,10 @@ describe('what a place picked from the jump list inspects', () => {
     name: 'X',
     nested: false,
     at: { x: 1, y: 1 },
+  })
+
+  it('inspects a wandering trader', () => {
+    expect(jumpInspectTarget(entry('trader'))).toEqual({ kind: 'trader', id: 'x' })
   })
 
   it('inspects a Leader, a city of any kind, a caravan or an army; a realm is nothing', () => {

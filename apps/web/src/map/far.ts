@@ -84,12 +84,13 @@ export interface FarMarker {
 }
 
 /**
- * The Player's armies, each where its first member in sight stands, and the Trade Org's caravans,
- * where their carriages are.
+ * The Player's armies, each where its first member in sight stands, and the Trade Org's caravans
+ * and wandering traders, where their carriages are.
  */
 export function farMarkers(world: {
   armies: readonly { memberIds: readonly string[] }[]
   caravans: readonly { carriageId: string }[]
+  traders?: readonly { carriageId: string }[]
   residents: readonly SeenResident[]
   carriages: readonly SeenCarriage[]
 }): FarMarker[] {
@@ -100,7 +101,7 @@ export function farMarkers(world: {
     const m = a.memberIds.map((id) => residents.get(id)).find((r) => r !== undefined)
     if (m) out.push({ kind: 'army', x: m.x, y: m.y, rel: 'own' })
   }
-  for (const c of world.caravans) {
+  for (const c of [...world.caravans, ...(world.traders ?? [])]) {
     const k = carriages.get(c.carriageId)
     if (k) out.push({ kind: 'caravan', x: k.x, y: k.y, rel: 'trade' })
   }

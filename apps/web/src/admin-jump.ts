@@ -11,13 +11,14 @@ import { ADMIN_LINK_SCALE } from './admin-map.js'
 export const ADMIN_JUMP_FIGURE_SCALE = CLOSE_SCALE + 6
 
 /** What an entry on the jump list is. */
-export type JumpKind = 'realm' | 'leader' | 'city' | 'npcCity' | 'hq' | 'post' | 'caravan' | 'army'
+export type JumpKind =
+  'realm' | 'leader' | 'city' | 'npcCity' | 'hq' | 'post' | 'caravan' | 'trader' | 'army'
 
 /** An entry on the jump list; `at` is null for a realm with neither a Leader nor a city. */
 export interface JumpEntry {
   /** Unique on the list; a realm and its Leader's entry share no key. */
   key: string
-  /** The id of what it names: the realm, resident, city, caravan or army. */
+  /** The id of what it names: the realm, resident, city, caravan, trader or army. */
   id: string
   kind: JumpKind
   name: string
@@ -35,7 +36,7 @@ export interface JumpGroup {
 
 /** The zoom a jump to an entry lands at: a city in the middle tier, a figure close up. */
 export function jumpScale(kind: JumpKind): number {
-  return kind === 'leader' || kind === 'caravan' || kind === 'army'
+  return kind === 'leader' || kind === 'caravan' || kind === 'trader' || kind === 'army'
     ? ADMIN_JUMP_FIGURE_SCALE
     : ADMIN_LINK_SCALE
 }
@@ -108,9 +109,9 @@ export function jumpList(places: AdminPlaces, search: string): JumpGroup[] {
       at: spot(c),
     }))
 
-  const { hq, posts, caravans } = places.tradeOrg
+  const { hq, posts, caravans, traders } = places.tradeOrg
   const tradeEntry = (p: AdminPlace, kind: JumpKind, detail: string): JumpEntry => ({
-    key: `${kind === 'caravan' ? 'caravan' : 'city'}:${p.id}`,
+    key: `${kind === 'caravan' || kind === 'trader' ? kind : 'city'}:${p.id}`,
     id: p.id,
     kind,
     name: p.name,
@@ -128,6 +129,9 @@ export function jumpList(places: AdminPlaces, search: string): JumpGroup[] {
       .map((c) =>
         tradeEntry(c, 'caravan', c.heading === 'hq' ? 'caravan to the HQ' : 'caravan to its post'),
       ),
+    ...byName(traders)
+      .filter((t) => hit(t.name))
+      .map((t) => tradeEntry(t, 'trader', 'wandering trader')),
   ]
 
   const armies = byName(places.armies)

@@ -1007,6 +1007,8 @@ export interface TileThings {
   armies?: readonly { id: string; name: string }[]
   /** The caravans the Player sees, whose crew keep their carriages from being driven off. */
   caravans?: readonly Pick<SeenCaravan, 'carriageId' | 'driverId' | 'escortIds'>[]
+  /** The wandering traders the Player sees, likewise. */
+  traders?: readonly Pick<SeenCaravan, 'carriageId' | 'driverId' | 'escortIds'>[]
   /** The map's size, for how near a caravan's crew are to its carriage. */
   mapSize?: number
   /** The alliance army's carriages the Player commands (`commandedCarriages`). */
@@ -1590,6 +1592,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       horses: t.horses,
       carriages: t.carriages,
       caravans: t.caravans ?? [],
+      traders: t.traders ?? [],
     }
     /** Each of them with why they can't, by `problem`. */
     const each = (problem: (thief: (typeof thieves)[number]) => string | undefined) =>
