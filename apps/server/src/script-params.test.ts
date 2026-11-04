@@ -1,8 +1,10 @@
+import { scriptParams } from '@csp/lang'
 import {
   BUILD_MATERIALS,
   DEFAULT_SCRIPTS,
   OWN_FOOD,
   Terrain,
+  paramNeedsValue,
   type Building,
   type Resident,
   type Stock,
@@ -511,6 +513,21 @@ memory.take = params.take
     give(world, terrain, run({ rounds: null, take: 7 }))
     expect(w.script!.memory).toMatchObject({ store: { id: 's1' }, rounds: 5, take: 7 })
     expect(w.scriptParams).toEqual({ [SCRIPT]: { store: 's1', take: 7 } })
+  })
+
+  it('starting at once, with no params in the order, goes on with the kept values', () => {
+    const { world, terrain, w } = farmWorld()
+    storage(world, 's1', 12, 6)
+    const kept = { store: 's1', rounds: 3, take: 2 }
+    w.scriptParams = { [SCRIPT]: { ...kept } }
+    give(world, terrain, run())
+    expect(w.script!.memory).toMatchObject({ store: { id: 's1' }, rounds: 3, take: 2 })
+    expect(w.scriptParams).toEqual({ [SCRIPT]: kept })
+  })
+
+  it('no default script needs a value before it starts, so each starts in one tap', () => {
+    for (const { name, source } of Object.values(DEFAULT_SCRIPTS))
+      expect([name, scriptParams(source).filter(paramNeedsValue)]).toEqual([name, []])
   })
 
   it('the task order sets them for the default script too', () => {

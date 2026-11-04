@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import {
   FEED_UNITS,
   GOODS,
@@ -10,11 +10,13 @@ import {
   type Stock,
 } from '@csp/shared'
 import { BUILDING_NAMES } from './city-view.js'
+import { CustomiseButton, taskStart } from './Customise.js'
 import { GOOD_LABELS, SubjectPicker } from './Residents.js'
 import {
   makesAt,
   nextPick,
   PLAN_STEPS,
+  PLAN_TASKS,
   planAsk,
   type Plan,
   type PlanAnswer,
@@ -132,9 +134,16 @@ export function AddStep({
           ) : (
             <div className="order-buttons">
               {scripts.map((s) => (
-                <button type="button" key={s.id} onClick={() => onAnswer({ ask, scriptId: s.id })}>
-                  {s.name}
-                </button>
+                <Fragment key={s.id}>
+                  <button type="button" onClick={() => onAnswer({ ask, scriptId: s.id })}>
+                    {s.name}
+                  </button>
+                  <CustomiseButton
+                    order={{ kind: 'runScript', scriptId: s.id }}
+                    of={s.name}
+                    give={() => onAnswer({ ask, scriptId: s.id })}
+                  />
+                </Fragment>
               ))}
             </div>
           ))}
@@ -151,11 +160,23 @@ export function AddStep({
       {open && (
         <>
           <div className="chips">
-            {PLAN_STEPS.map((k) => (
-              <button type="button" className="chip" key={k.id} onClick={() => onStart(k.id)}>
-                {k.label}
-              </button>
-            ))}
+            {PLAN_STEPS.map((k) => {
+              const task = PLAN_TASKS[k.id]
+              return (
+                <span className="chip-with" key={k.id}>
+                  <button type="button" className="chip" onClick={() => onStart(k.id)}>
+                    {k.label}
+                  </button>
+                  {task && (
+                    <CustomiseButton
+                      order={taskStart(task)}
+                      of={k.label}
+                      give={() => onStart(k.id)}
+                    />
+                  )}
+                </span>
+              )
+            })}
           </div>
           <p className="muted small">
             A step that acts on a place is picked on the map, with a walk there put before it.
