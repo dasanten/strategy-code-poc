@@ -1259,6 +1259,8 @@ export const CRIME_STANDING_LOSS: Record<CrimeKind, number> = {
   attack: 15,
   tearDown: 20,
   killing: 30,
+  /** A trading post captured (`CONTEXT.md`: Lost post found out): worse than any one killing. */
+  capture: 50,
 }
 
 /**
@@ -1365,12 +1367,14 @@ export const TRADE_ORG_PUNISHES_BELOW = -8
 /**
  * What a crime costs the Trade Organization in Coins, besides stolen goods, which are worth their
  * warehouse base price (`WAREHOUSE_BASE_PRICE`): a resident wounded, one killed (worth as much as
- * a resident in a city's price, `CITY_PRICE_PER_RESIDENT`), or a building torn down.
+ * a resident in a city's price, `CITY_PRICE_PER_RESIDENT`), a building torn down, or a trading post
+ * captured (what a city of its adults would be priced at).
  */
 export const TRADE_ORG_LOSS: Record<Exclude<CrimeKind, 'theft'>, number> = {
   attack: 50,
   killing: 200,
   tearDown: 150,
+  capture: CITY_PRICE_PER_RESIDENT * TRADING_POST.residents,
 }
 
 /**

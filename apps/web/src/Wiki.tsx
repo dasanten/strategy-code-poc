@@ -416,6 +416,7 @@ const CRIME_NAMES: Record<CrimeKind, string> = {
   attack: 'Attack',
   tearDown: 'Tearing down a building',
   killing: 'Killing',
+  capture: 'Capturing a trading post',
 }
 
 const NODE_WORK: { kind: BuildingKind; good: Good }[] = [
@@ -1739,6 +1740,13 @@ export function Wiki() {
           hall as it gets outside the walls, so closed gates don't stop it. You get a notice with
           the place while one stands at one of your cities; see{' '}
           <a href="#how-to-trade">How to trade</a>.
+        </p>
+        <p>
+          A captured post leaves the Trade Organization at once, but it learns who took it only by
+          news. A trader that reaches the post drops it from its loop and carries the news on, and
+          anyone of the Trade Organization who saw the capture and gets away carries it too. Once
+          one of them stands at another post or the HQ, the capture is a crime it knows of (see
+          Standing). If they are killed on the way and no trader ever gets there, it never reacts.
         </p>
       </Section>
 

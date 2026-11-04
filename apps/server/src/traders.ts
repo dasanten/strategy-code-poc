@@ -1,6 +1,7 @@
 import {
   CARRIAGE_CAPACITY,
   GOODS,
+  SIGHT_RANGE,
   START_CARRIED_FOOD,
   TRADERS,
   TRADER_DRIVE_TRIES,
@@ -8,7 +9,9 @@ import {
   caravanFoodFor,
   carriageCapacity,
   crewIdsOf,
+  inCityArea,
   isArmed,
+  isCityBuilding,
   middleOf,
   isAt,
   owedBy,
@@ -238,9 +241,74 @@ function goOn(world: WorldState, trader: Trader): void {
   trader.postId = trader.loop[(at + 1) % trader.loop.length]!
 }
 
+/** The city of the post a trader is out to, when that has been lost (`CONTEXT.md`: Lost post found out). */
+function lostPostAhead(world: WorldState, trader: Trader): City | undefined {
+  if (trader.heading !== 'post') return undefined
+  const city = world.cities.find((c) => c.id === trader.postId)
+  return city && city.tradeOrg === undefined ? city : undefined
+}
+
 /**
- * One tick of a trader whose driver is idle with the carriage: drive to the next stop, going on to
- * the next after `TRADER_DRIVE_TRIES` drives that end short of it; at a storage, top up the Food on
+ * A trader coming into the area of the lost post it was out to finds out (`CONTEXT.md`: Lost post
+ * found out): it drops the post from its loop and goes on, and those of its crew with it carry the
+ * news, as witnesses of the capture, to the next city of the Trade Organization they stand in
+ * (`stepCrimes`). It doesn't stop there as at another city: a stop there is given up, and the city
+ * is left out of its calls on the way on, so the news goes straight on. With no crew by the carriage
+ * nobody has seen it yet. `size` is the map's.
+ */
+function reachLostPost(world: WorldState, trader: Trader, carriage: Carriage, size: number): void {
+  const city = lostPostAhead(world, trader)
+  if (!city || !inCityArea(world, city, carriage.x, carriage.y, size)) return
+  const index = worldIndex(world)
+  const crew = crewIdsOf(trader)
+    .flatMap((id) => index.residentById(id) ?? [])
+    .filter((r) => r.health > 0 && wrapDistance(size, r, carriage) <= SIGHT_RANGE)
+  if (crew.length === 0) return
+  const crime = world.crimes.find((c) => c.post === city.id && !c.knownBy.includes(c.victimOrg))
+  if (crime) crime.witnesses = [...new Set([...crime.witnesses, ...crew.map((r) => r.id)])]
+  dropFromLoop(trader, city.id)
+  if (trader.stand?.cityId === city.id) trader.stand = null
+  workOutCalls(world, trader, carriage, size)
+  trader.calls = (trader.calls ?? []).filter((id) => id !== city.id)
+  // A drive to another city's stop goes on; one to here is over.
+  const driver = crew.find((r) => r.id === trader.driverId)
+  if (trader.stand === null && driver?.order?.kind === 'drive') driver.order = null
+}
+
+/**
+ * A trader's driver drives up to the lost post `city`, to its nearest building, in contact rather
+ * than on it, so that a closed gate doesn't keep the news from it (`CONTEXT.md`: Lost post found
+ * out). Getting no nearer after `TRADER_DRIVE_TRIES` drives it goes on, the post still on its loop for
+ * next time round. `size` is the map's.
+ */
+function driveToLostPost(
+  world: WorldState,
+  trader: Trader,
+  city: City,
+  driver: Resident,
+  carriage: Carriage,
+  size: number,
+): void {
+  const standing = world.buildings.filter((b) => b.cityId === city.id && isCityBuilding(b))
+  if (trader.misses >= TRADER_DRIVE_TRIES || standing.length === 0) return goOn(world, trader)
+  const nearest = standing.reduce((a, b) =>
+    wrapDistance(size, carriage, b) < wrapDistance(size, carriage, a) ? b : a,
+  )
+  trader.misses++
+  driver.order = {
+    kind: 'drive',
+    carriageId: carriage.id,
+    target: { x: nearest.x, y: nearest.y },
+    path: null,
+    progress: 0,
+    near: true,
+  }
+}
+
+/**
+ * One tick of a trader whose driver is idle with the carriage: out to a lost post, drive up to it
+ * (`driveToLostPost`). Otherwise drive to the next stop, going on to the next after
+ * `TRADER_DRIVE_TRIES` drives that end short of it; at a storage, top up the Food on
  * board for its crew (`caravanFoodFor`); at a warehouse, even out its load (`evenOutLoad`), leaving
  * first, beyond what the warehouse keeps for deliveries; then go on. The HQ is a stop like a post,
  * but for two things. It keeps its Coins in its coin warehouse, so they are worked out with the rest,
@@ -256,6 +324,8 @@ function runTrader(
   carriage: Carriage,
   size: number,
 ): void {
+  const lost = lostPostAhead(world, trader)
+  if (lost) return driveToLostPost(world, trader, lost, driver, carriage, size)
   const stop = traderStop(world, trader)
   if (!stop) {
     if (trader.stop === 'storage') trader.stop = 'warehouse'
@@ -327,19 +397,20 @@ function runTrader(
 }
 
 /**
- * The trader's loop follows the world's posts (`CONTEXT.md`: Wandering trader): those no longer
- * there drop from it and new ones join it where they add the least way (`insertIntoLoop`). The HQ
- * stays on it, so with no post left the trader goes back there, and given one again goes out to it.
+ * The trader's loop follows the world's posts (`CONTEXT.md`: Wandering trader): new ones join it
+ * where they add the least way (`insertIntoLoop`). One lost stays on it until the trader gets there
+ * (`reachLostPost`), and only a city no longer there at all drops at once. The HQ stays on it, so with
+ * no post left the trader goes back there, and given one again goes out to it.
  */
 function followPosts(
   world: WorldState,
   trader: Trader,
-  hq: City,
   posts: readonly City[],
   size: number,
 ): void {
-  const standing = new Set([hq.id, ...posts.map((p) => p.id)])
-  for (const id of [...trader.loop]) if (!standing.has(id)) dropFromLoop(trader, id)
+  for (const id of [...trader.loop]) {
+    if (!world.cities.some((c) => c.id === id)) dropFromLoop(trader, id)
+  }
   for (const post of posts) {
     if (!trader.loop.includes(post.id)) insertIntoLoop(world, trader.loop, post.id, size)
   }
@@ -359,10 +430,10 @@ function workOutCalls(world: WorldState, trader: Trader, carriage: Carriage, siz
 /**
  * One tick of the Trade Org's wandering traders (`CONTEXT.md`: Wandering trader), run before the
  * actions are requested: escorts who are gone leave it; one whose carriage or HQ is gone ends, its
- * crew left to the HQ; its loop follows the posts (`followPosts`); and its crew and carriage go as
- * for a caravan (`stepCrew`), a driver idle with the carriage making its stops on the way
- * (`runStops`), then going on along its loop (`runTrader`). Without `terrain` it makes no stops.
- * `size` is the map's.
+ * crew left to the HQ; its loop follows the posts (`followPosts`); it finds out a lost post on
+ * reaching it (`reachLostPost`); and its crew and carriage go as for a caravan (`stepCrew`), a driver
+ * idle with the carriage making its stops on the way (`runStops`), then going on along its loop
+ * (`runTrader`). Without `terrain` it makes no stops. `size` is the map's.
  */
 export function stepTraders(world: WorldState, size: number, terrain?: TerrainMap): void {
   const hq = tradeOrgHq(world)
@@ -372,7 +443,8 @@ export function stepTraders(world: WorldState, size: number, terrain?: TerrainMa
     trader.escortIds = trader.escortIds.filter((id) => index.residentById(id) !== undefined)
     const carriage = index.carriageById(trader.carriageId)
     if (!hq || !carriage) return false
-    followPosts(world, trader, hq, posts, size)
+    followPosts(world, trader, posts, size)
+    reachLostPost(world, trader, carriage, size)
     stepCrew(world, trader, carriage, hq, traderEscortsWanted(trader), size, (driver) => {
       workOutCalls(world, trader, carriage, size)
       if (terrain && runStops(world, trader, driver, carriage, terrain)) return
@@ -432,9 +504,10 @@ export function traderCarriageStolen(world: WorldState, thief: Resident, carriag
 
 /**
  * Wandering traders hold together (`CONTEXT.md`: Wandering trader, Caravan crew lost; ADR 0004):
- * each one's loop holds the HQ and otherwise names trading posts that exist, each once, and it goes
- * to one of them; it makes for a coin warehouse only at the HQ; its carriage, of the Trade
- * Organization or it ends, and its crew exist and are the HQ's (of no realm, of the HQ city); it has no driver only with no crew left; nobody is on
+ * each one's loop holds the HQ and otherwise names trading posts, or those lost and not yet found out
+ * (`CONTEXT.md`: Lost post found out), all cities that exist, each once, and it goes to one of them; it
+ * makes for a coin warehouse only at the HQ; its carriage, of the Trade Organization or it ends, and
+ * its crew exist and are the HQ's (of no realm, of the HQ city); it has no driver only with no crew left; nobody is on
  * two traders or caravans or both drives and escorts; the driver drives only its carriage; it walks
  * with no more escorts than it gets (`traderEscortsWanted`); and what it means to take fits on a
  * carriage.
@@ -453,8 +526,8 @@ export const tradersSound: Invariant = {
     const crew = new Set(world.caravans.flatMap(crewIdsOf))
     for (const t of world.traders) {
       for (const id of t.loop) {
-        if (id !== hq?.id && !world.cities.some((c) => c.id === id && c.tradeOrg === 'post')) {
-          fail(t, `has ${id} on its loop, which is neither a trading post nor the HQ`, [id])
+        if (!world.cities.some((c) => c.id === id)) {
+          fail(t, `has ${id} on its loop, which is no city`, [id])
         }
       }
       if (hq && !t.loop.includes(hq.id)) fail(t, 'has no HQ on its loop', [hq.id])
