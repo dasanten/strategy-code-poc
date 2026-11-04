@@ -1993,7 +1993,14 @@ export function Wiki() {
             Below {signed(TRADE_ORG_REFUSES_TRADE_BELOW)} the Trade Organization won't trade with
             you; below {signed(TRADE_ORG_PUNISHES_BELOW)} its army (up to{' '}
             {num(TRADE_ORG_PUNISH.soldiers)} soldiers) comes to take {num(TRADE_ORG_PUNISH.times)}{' '}
-            times what it lost, giving up after {days(TRADE_ORG_PUNISH.giveUpDays)}. Besides stolen
+            times what it lost. It walks to your city however far that is and gives up{' '}
+            {days(TRADE_ORG_PUNISH.giveUpDays)} after it arrives; it looks in your storages when it
+            arrives, so emptying them in time works, though you still see it come. It turns back on
+            the road if the city stops being yours. Its soldiers pack Food at the HQ for the way
+            there and back, keeping {num(TRADE_ORG_PUNISH.packRoom)} kg free for what they carry
+            home; they refill at trading posts they pass and may take Food from your storage for the
+            way back, apart from what they came to take. Your realm log says when it is coming, when
+            it arrives, what it left with, why it turned back, or that it was lost. Besides stolen
             goods, carriages and horses it counts{' '}
             {(Object.entries(TRADE_ORG_LOSS) as [CrimeKind, number][])
               .map(([c, n]) => `${CRIME_NAMES[c].toLowerCase()} as ${num(n)} coins`)
