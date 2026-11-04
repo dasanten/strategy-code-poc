@@ -172,6 +172,7 @@ export function CityInspector({
       <StorageOffers
         storage={s}
         own={buildingRealm({ cities }, s) === realmId}
+        realmId={realmId}
         traders={tradersAt(s, { residents, carriages }, realmId)}
         sending={
           <Sending
@@ -1024,7 +1025,7 @@ interface SendingProps {
  * the way there, and a picker to send one of their residents, or a carriage, nearest first with
  * what each carries.
  */
-function Sending({
+export function Sending({
   warehouse,
   place,
   sendable,

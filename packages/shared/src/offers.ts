@@ -125,6 +125,13 @@ export function postOfferProblem(
   return undefined
 }
 
+/**
+ * Whether `side` may accept an offer, its own aside: anyone, unless it is a Direct offer to another
+ * realm (`CONTEXT.md`: Direct offer). What goes looking for offers to take asks this first.
+ */
+export const offerOpenTo = (o: Pick<Offer, 'direct'>, side: string): boolean =>
+  !o.direct || o.direct.toId === side
+
 /** What accepting an offer moves: `times` over, `gives` to the trader and `wants` from them. */
 export interface OfferQuote {
   times: number
@@ -160,9 +167,9 @@ export function quoteOffer(
 
 /**
  * Why `resident` of `side` can't accept an offer, or undefined when they can (`CONTEXT.md`: Offer):
- * they are grown up and on its storage's tile, it isn't their own side's, `times` is whole and
- * positive, and they hold something to pay with in their hands or on `carriageId`, a carriage on
- * the tile that `side` commands.
+ * they are grown up and on its storage's tile, it isn't their own side's or a Direct offer to
+ * another realm, `times` is whole and positive, and they hold something to pay with in their hands
+ * or on `carriageId`, a carriage on the tile that `side` commands.
  */
 export function acceptOfferProblem(
   world: Pick<WorldState, 'offers' | 'buildings' | 'carriages' | 'alliances' | 'tick'>,
@@ -175,6 +182,7 @@ export function acceptOfferProblem(
   const offer = world.offers.find((o) => o.id === offerId)
   if (!offer) return 'that offer is gone'
   if (offer.realmId === side) return 'that offer is your own'
+  if (!offerOpenTo(offer, side)) return 'that offer is for another realm'
   if (!canWork(resident, world.tick)) return 'children can’t trade'
   const storage = world.buildings.find((b) => b.id === offer.storageId)
   if (!storage || !covers(storage, resident.x, resident.y)) return 'not at that offer’s storage'

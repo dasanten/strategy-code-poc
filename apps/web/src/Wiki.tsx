@@ -21,6 +21,8 @@ import {
   CARAVAN_GUARD_RANGE,
   CARAVAN_ROBBERIES_PER_ESCORT,
   CARRIAGE_CAPACITY,
+  DIRECT_OFFERS_TO_ONE_REALM,
+  DIRECT_OFFER_DAYS,
   PASSENGER_WEIGHT,
   CARRIAGE_MAX_CAPACITY,
   CARRY_BASE,
@@ -1741,6 +1743,19 @@ export function Wiki() {
           storage as ordinary goods. It ends when it is used up, when you take it down, or when the
           storage is torn down or no longer yours; what was set aside is ordinary goods of that
           storage again.
+        </p>
+        <h3>Direct offers</h3>
+        <p>
+          Under <strong>Direct offers</strong> on the tool rail you can send an offer to one realm
+          you know of: one you see residents of, an ally, one whose city you have seen, one with a
+          standing either way, or your side in a contract or direct offer. Name a storage of yours,
+          and the goods are set aside there as for any offer. They hear at once wherever they are,
+          with a notice and the place, and only they can accept it: someone of theirs goes to the
+          storage and takes it in person, as with any offer, or they decline it from anywhere.
+          Anyone else in sight of the storage sees it, and that it is for another realm. It lapses
+          after {num(DIRECT_OFFER_DAYS)} game days. Declined, lapsed or taken down, the goods are
+          ordinary again and both of you are told. At most {num(DIRECT_OFFERS_TO_ONE_REALM)} can
+          stand to one realm.
         </p>
         <h3>Sending a trader</h3>
         <p>

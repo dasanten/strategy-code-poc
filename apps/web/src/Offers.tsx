@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import {
   GOODS,
+  offerOpenTo,
   type Good,
   type Resident,
   type SeenBuilding,
@@ -12,6 +13,7 @@ import { GOOD_LABELS } from './Residents.js'
 import {
   acceptPreview,
   freeAtStorage,
+  offerIsFor,
   offerStands,
   offerTerms,
   postPreview,
@@ -47,11 +49,13 @@ const goodOptions = (goods: readonly Good[]) =>
  * The offers at a storage in a city's trade section (`CONTEXT.md`: Offer, Trade section), which
  * anyone in sight sees with their rate. At one of the Player's own they take one down or post
  * another; at another realm's, someone of theirs on its tile accepts, and with nobody there
- * `sending` offers to send someone.
+ * `sending` offers to send someone. A Direct offer to another realm shows too, but nobody else can
+ * accept it.
  */
 export function StorageOffers({
   storage,
   own,
+  realmId,
   traders,
   sending,
   tick,
@@ -63,6 +67,7 @@ export function StorageOffers({
   storage: SeenBuilding
   /** Whether the storage is the Player's realm's. */
   own: boolean
+  realmId: string
   traders: TradersView
   /** Whom to send there while nobody of the Player's is. */
   sending: ReactNode
@@ -74,6 +79,7 @@ export function StorageOffers({
 }) {
   const offers = storage.offers ?? []
   const aside = setAsideLine(storage, GOOD_LABELS)
+  const open = (o: SeenOffer) => !own && offerOpenTo(o, realmId)
   return (
     <div
       className="storage-offers trade-service"
@@ -88,6 +94,7 @@ export function StorageOffers({
           <li key={o.id}>
             <strong>{offerTerms(o, GOOD_LABELS)}</strong>
             <span className="small muted"> · {offerStands(o, GOOD_LABELS)}</span>
+            {o.direct && <p className="small muted">{offerIsFor(o, realmId)}.</p>}
             {own && (
               <p>
                 <button type="button" onClick={() => onTakeDown(o.id)}>
@@ -95,7 +102,7 @@ export function StorageOffers({
                 </button>
               </p>
             )}
-            {!own && traders.residents.length > 0 && (
+            {open(o) && traders.residents.length > 0 && (
               <AcceptOffer
                 offer={o}
                 traders={traders}
@@ -107,7 +114,7 @@ export function StorageOffers({
           </li>
         ))}
       </ul>
-      {!own && offers.length > 0 && traders.residents.length === 0 && sending}
+      {offers.some(open) && traders.residents.length === 0 && sending}
       {own && aside && <p className="small muted">{aside}</p>}
       {own && <PostOffer storage={storage} onPost={onPost} />}
     </div>
@@ -115,7 +122,7 @@ export function StorageOffers({
 }
 
 /** Accepting one offer: who, from their hands or a carriage on the tile, and how many times over. */
-function AcceptOffer({
+export function AcceptOffer({
   offer,
   traders,
   tick,
@@ -191,12 +198,19 @@ function AcceptOffer({
   )
 }
 
-/** Posting an offer at one of the Player's own storages, with what it would set aside. */
-function PostOffer({
+/**
+ * Posting an offer at one of the Player's own storages, or sending one (`action`, while `ready`),
+ * with what it would set aside.
+ */
+export function PostOffer({
   storage,
+  action = 'Post offer',
+  ready = true,
   onPost,
 }: {
   storage: SeenBuilding
+  action?: string
+  ready?: boolean
   onPost: (offer: PostOfferRequest) => void
 }) {
   const free = freeAtStorage(storage)
@@ -267,12 +281,12 @@ function PostOffer({
       <p className="small muted">{text}</p>
       <button
         type="button"
-        disabled={!canPost}
+        disabled={!canPost || !ready}
         onClick={() =>
           onPost({ storageId: storage.id, gives, givesUnits, wants, wantsUnits, times })
         }
       >
-        Post offer
+        {action}
       </button>
     </div>
   )

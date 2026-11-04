@@ -126,7 +126,7 @@ const SHARED: readonly ScriptBinding[] = [
   list(
     'offers',
     'offer',
-    'The offers standing at storages in sight, and my realm’s own wherever they are, oldest first.',
+    'The offers standing at storages in sight, my realm’s own wherever they are, and direct offers sent to my realm wherever they are, oldest first.',
   ),
   list(
     'directives',
@@ -524,7 +524,17 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action(
     'acceptOffer',
     ['offerId', 'times', 'carriageId?'],
-    'On the storage of another’s offer, accept it up to `times` times over, paying from and taking into my hands, or my carriage there, as many times as I can pay and carry.',
+    'On the storage of another’s offer, accept it up to `times` times over, paying from and taking into my hands, or my carriage there, as many times as I can pay and carry. A direct offer only the realm it was sent to can accept.',
+  ),
+  action(
+    'sendDirectOffer',
+    ['toId', 'storageId', 'gives', 'givesUnits', 'wants', 'wantsUnits', 'times'],
+    'Send a realm my realm knows of an offer at a finished storage of my realm, wherever I am, on the terms of `postOffer`. They see it at once wherever they are, and only they can accept it, on its storage’s tile, until it lapses.',
+  ),
+  action(
+    'declineOffer',
+    ['offerId'],
+    'Decline a direct offer sent to my realm, wherever I am; its sender hears, and what it set aside is ordinary goods again.',
   ),
   action(
     'buyOff',

@@ -259,7 +259,14 @@ The shared language of the game. Domain terms only — no implementation details
   where on accepting the Trade Organization carries both sides' goods as two Transfers, its fee
   paid by the sender or split, as the sender picks (offered only while the HQ stands, and each side's
   goods are taken as a pick-up takes them). A storage's goods are set aside only for the in-person
-  way.
+  way. A Player can send one to any realm they know of: one they see residents of, an ally, one whose
+  city they have seen (Last seen), one with a standing toward them or they toward it, or their side
+  in a contract or Direct offer. Both sides see it in their Direct offers drawer until it ends, and a
+  notice tells the one it is sent to, with the place. In person, it is otherwise an offer like any
+  other: anyone in sight of the storage sees it and that it is for another realm, and the sender can
+  take it down. Declined, lapsed or taken down, its goods are ordinary again and both sides are told;
+  it lapses too when the realm it was sent to is gone. A realm can have only so many standing to one
+  realm.
 - **Trade section:** where a city's panel shows trading, for each of its warehouses or storages
   in sight, from the Player's side: what they **can buy** there and what they **can sell**, with
   how many units and the price (an NPC city lists only its surplus and what it is short of, and
@@ -1305,8 +1312,8 @@ The shared language of the game. Domain terms only — no implementation details
   (has weapons, idle, child, by city, and the like) and sorted by any column; the choice is kept per
   browser. Tapping a row opens that resident. **Pick these** picks everyone listed, or those ticked,
   as a Group on the map. Only the UI: nothing new is kept in the world. It works on a phone.
-- **Notices:** what the HUD tells the Player unasked (the Horse offer, the pick banner, a group
-  order's report, the first-day card) shows in one lane under the top bar, over the map and never
+- **Notices:** what the HUD tells the Player unasked (the Horse offer, a Direct offer sent to them,
+  the pick banner, a group order's report, the first-day card) shows in one lane under the top bar, over the map and never
   over a drawer or card. While the pick banner shows it replaces the others; they come back after.
 - **First day:** a new realm's HUD shows a checklist card: claim the Horse offer, pick a
   resident, give them an order, open the Wiki. Each line is ticked when the game sees it done;

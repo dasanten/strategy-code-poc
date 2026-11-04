@@ -442,6 +442,20 @@ describe('script bindings', () => {
     ],
     ['takeDownOffer("offer1")', { kind: 'takeDownOffer', offerId: 'offer1' }],
     [
+      'sendDirectOffer("r2", "s1", "wood", 10, "stone", 5, 2)',
+      {
+        kind: 'sendDirectOffer',
+        toId: 'r2',
+        storageId: 's1',
+        gives: 'wood',
+        givesUnits: 10,
+        wants: 'stone',
+        wantsUnits: 5,
+        times: 2,
+      },
+    ],
+    ['declineOffer("offer1")', { kind: 'declineOffer', offerId: 'offer1' }],
+    [
       'acceptOffer("offer1", 2)',
       { kind: 'acceptOffer', offerId: 'offer1', times: 2, carriageId: null },
     ],
