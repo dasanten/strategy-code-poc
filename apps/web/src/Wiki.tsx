@@ -2326,9 +2326,11 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           <li>
             Before it starts: a Customise button beside the order, on the resident card, the group
             card and in Add step, shows its params, filled with those values. Change what you like
-            and press Start; Cancel gives nothing. For a group the form shows once, and each of them
-            gets the same values. With Shift held the step added to the queue keeps the values. An
-            order whose script has no params to show has no Customise.
+            and press Start; Cancel gives nothing. Each param's <code>?</code> says what it is for.
+            On a phone the form rises from the bottom of the screen, with Start and Cancel always in
+            view. For a group the form shows once, and each of them gets the same values. With Shift
+            held the step added to the queue keeps the values. An order whose script has no params
+            to show has no Customise.
           </li>
           <li>
             The form opens by itself only when a param has no default and no <code>none:</code> in
