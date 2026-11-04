@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { BUILD_MATERIALS, HOUSING_ROOM, RECIPES, WORKPLACE_MAX_WORKERS } from './balance.js'
-import { BUILDING_PURPOSE, buildingInfo } from './building-info.js'
+import { BUILD_GROUPS, BUILDING_PURPOSE, buildingInfo } from './building-info.js'
+import { BUILDABLE } from './building.js'
 import { FOOTPRINT } from './footprint.js'
 import type { BuildingKind } from './world.js'
 
@@ -21,6 +22,13 @@ describe('building descriptions', () => {
 
   it('says how many residents a house is room for (`HOUSING_ROOM`)', () => {
     expect(BUILDING_PURPOSE.house).toContain(`room for ${HOUSING_ROOM.house} residents`)
+  })
+})
+
+describe('the Build menu’s groups', () => {
+  it('puts every buildable kind in exactly one group, and nothing else', () => {
+    const grouped = BUILD_GROUPS.flatMap((g) => g.kinds)
+    expect([...grouped].sort()).toEqual([...BUILDABLE].sort())
   })
 })
 

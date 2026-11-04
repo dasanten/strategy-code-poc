@@ -9,7 +9,6 @@ import {
   grownIn,
   pairingTicksLeft,
   workLeft,
-  BUILDING_PURPOSE,
   LINE_BUILDING,
   isLineOrder,
   BUILD_WORK,
@@ -20,7 +19,6 @@ import {
   GOODS,
   FEED_UNITS,
   HAUL_KEEP_FOOD,
-  buildMenu,
   buildingWork,
   workFactor,
   MAX_HEALTH,
@@ -37,7 +35,6 @@ import {
   traineesOf,
   STAT_BASE_MAX,
   TICKS_PER_GAME_DAY,
-  TICKS_PER_GAME_HOUR,
   TRAINED_CAP_SHARE,
   ageInYears,
   bestWeapon,
@@ -114,6 +111,8 @@ import {
 } from './residents-view.js'
 import { GOOD_LABELS, carriedItems } from './goods-grid.js'
 import { GoodsGrid } from './GoodsGrid.js'
+import { BuildMenu } from './BuildMenu.js'
+import { workSpan } from './build-menu-view.js'
 import { doingLine, interruptedLine, scriptLine } from './doing-view.js'
 import { type RelocateChoice } from './relocate-view.js'
 import {
@@ -174,7 +173,7 @@ import {
   rememberedLastScript,
   runScriptPick,
 } from './script-run-view.js'
-import { BUILDING_NAMES, NODE_NAMES } from './map/palette.js'
+import { BUILDING_NAMES } from './map/palette.js'
 import { horseFaresKnown } from './seen.js'
 import { PanelHead } from './drawer-head.js'
 import { labelled } from './name-labels.js'
@@ -295,16 +294,6 @@ function meterClass(share: number): string {
 }
 
 const pct = (share: number) => `${Math.round(Math.max(0, Math.min(1, share)) * 100)}%`
-
-/** Work in ticks as a span of game time: "2 game days", "1.5 game hours". */
-const workSpan = (ticks: number) => {
-  const [n, unit] =
-    ticks >= TICKS_PER_GAME_DAY
-      ? [ticks / TICKS_PER_GAME_DAY, 'game day']
-      : [ticks / TICKS_PER_GAME_HOUR, 'game hour']
-  const rounded = Math.round(n * 10) / 10
-  return `${rounded} ${unit}${rounded === 1 ? '' : 's'}`
-}
 
 /**
  * What the map is waiting for a tile for: to walk or drive there, a haul route's other stop, or
@@ -2053,30 +2042,26 @@ export function ResidentCard({
       )}
       {shown === 'build' && (
         <>
-          <BuildBlock
-            resident={r}
-            tick={tick}
-            building={building}
+          {[building, carriageSite, road].map(
+            (site) =>
+              site?.site && (
+                <SiteBlock
+                  key={site.id}
+                  resident={r}
+                  tick={tick}
+                  site={site}
+                  terrain={terrain}
+                  at={at}
+                  onBuild={onBuild}
+                />
+              ),
+          )}
+          <BuildMenu
+            key={r.id}
             node={node}
-            at={at}
-            buildProblem={buildProblem}
-            onBuild={onBuild}
-          />
-          <CarriageBlock
-            resident={r}
-            tick={tick}
-            building={building}
-            carriageSite={carriageSite}
-            at={at}
-            buildProblem={buildProblem}
-            onBuild={onBuild}
-          />
-          <RoadBlock
-            resident={r}
-            tick={tick}
-            road={road}
             terrain={terrain}
-            at={at}
+            buildProblem={buildProblem ?? (() => undefined)}
+            blocked={!canWork(r, tick)}
             onBuild={onBuild}
           />
         </>
@@ -2650,234 +2635,65 @@ interface OnSite {
 }
 
 /**
- * Building on the resident's tile (`CONTEXT.md`: Building): on a resource node with nothing on it,
- * build its workplace; on any other empty tile, whatever goes off a node (`buildMenu`), saying why
- * a kind can't go here; on a construction site, see what it still needs and help build it.
+ * A construction site on the resident's tile (`CONTEXT.md`: Construction site): see what it still
+ * needs and help build it. A tile can hold a building's site, a carriage site and a road site.
  */
-function BuildBlock({
+function SiteBlock({
   resident,
   tick,
-  building,
-  node,
+  site,
   terrain,
   at,
-  buildProblem = () => undefined,
   onBuild,
 }: {
   resident: Resident
   tick: number
-  building: Building | undefined
-  node: KnownNode | undefined
+  site: Building
   /** The explored terrain beneath the site, if known (`buildingWork`). */
   terrain?: number
   at: OnSite
-  /** Why a kind can't be laid out from the resident's tile, as far as the Player knows. */
-  buildProblem?: (kind: BuildingKind) => string | undefined
   onBuild: (kind: BuildingKind) => void
 }) {
   const adult = canWork(resident, tick)
   const o = resident.order
-  if (building?.site) {
-    const name = BUILDING_NAMES[building.kind]
-    const work = BUILD_WORK[building.kind] ?? 0
-    const materials = goodsIn(BUILD_MATERIALS[building.kind])
-    const joined = o?.kind === 'build' && o.siteId === building.id
-    return (
-      <section className="inspector-block" aria-label="Build">
-        <div className="panel-head">
-          <h3>Construction site</h3>
-          <span className="small muted">{name}</span>
-        </div>
-        <Meter
-          label="Work"
-          value={pct(work > 0 ? building.site.work / work : 1)}
-          share={work > 0 ? building.site.work / work : 1}
-          left={workLeft(building, at.residents, tick, { under: terrain, size: at.mapSize })}
-        />
-        {materials.length === 0 && <p className="muted small">Needs no materials.</p>}
-        {materials.map(([good, units]) => (
-          <div className="goods-row" key={good}>
-            <span>{GOOD_LABELS[good]}</span>
-            <span className="mono">
-              {building.site!.delivered[good] ?? 0} / {units}
-            </span>
-            <span />
-          </div>
-        ))}
-        <div className="order-buttons">
-          <button type="button" disabled={!adult || joined} onClick={() => onBuild(building.kind)}>
-            {joined ? 'Building…' : 'Help build'}
-          </button>
-        </div>
-        <p className="muted small">
-          It becomes a {name.toLowerCase()} once its materials are delivered and the work is done:
-          about {workSpan(buildingWork(building.kind, terrain))} of one resident’s work in all
-          {workFactor(building.kind, terrain) > 1 &&
-            `, on Mountain ${workFactor(building.kind, terrain)} times as much as elsewhere`}
-          .
-        </p>
-      </section>
-    )
-  }
-  if (!building) {
-    // On a node its workplace; anywhere else every kind that goes off a node. One that can't go
-    // here says why rather than being left out.
-    const kinds = buildMenu(node)
-    return (
-      <section className="inspector-block" aria-label="Build">
-        <div className="panel-head">
-          <h3>Build</h3>
-          <span className="small muted">
-            {node ? `${NODE_NAMES[node.kind]} node` : 'off any node'}
+  const name = BUILDING_NAMES[site.kind]
+  const work = BUILD_WORK[site.kind] ?? 0
+  const materials = goodsIn(BUILD_MATERIALS[site.kind])
+  const joined = o?.kind === 'build' && o.siteId === site.id
+  return (
+    <section className="inspector-block" aria-label="Construction site">
+      <div className="panel-head">
+        <h3>Construction site</h3>
+        <span className="small muted">{name}</span>
+      </div>
+      <Meter
+        label="Work"
+        value={pct(work > 0 ? site.site!.work / work : 1)}
+        share={work > 0 ? site.site!.work / work : 1}
+        left={workLeft(site, at.residents, tick, { under: terrain, size: at.mapSize })}
+      />
+      {materials.length === 0 && <p className="muted small">Needs no materials.</p>}
+      {materials.map(([good, units]) => (
+        <div className="goods-row" key={good}>
+          <span>{GOOD_LABELS[good]}</span>
+          <span className="mono">
+            {site.site!.delivered[good] ?? 0} / {units}
           </span>
+          <span />
         </div>
-        {kinds.map((kind) => {
-          const materials = goodsIn(BUILD_MATERIALS[kind])
-          const problem = buildProblem(kind)
-          return (
-            <div key={kind}>
-              <p className="muted small">
-                {BUILDING_PURPOSE[kind]} Needs{' '}
-                {materials.length === 0
-                  ? 'no materials'
-                  : materials
-                      .map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`)
-                      .join(', ')}{' '}
-                and about {workSpan(BUILD_WORK[kind] ?? 0)} of one resident’s work.
-              </p>
-              <div className="order-buttons">
-                <button
-                  type="button"
-                  className="primary"
-                  disabled={!adult || problem !== undefined}
-                  onClick={() => onBuild(kind)}
-                >
-                  Build {BUILDING_NAMES[kind].toLowerCase()}
-                </button>
-              </div>
-              {problem && <p className="muted small">Not here: {problem}.</p>}
-            </div>
-          )
-        })}
-      </section>
-    )
-  }
-  return null
-}
-
-/**
- * A carriage at the stable the resident stands at (`CONTEXT.md`: Carriage): on a tile with no
- * carriage site, lay one out there; on a carriage site, see what it still needs and help build it.
- */
-function CarriageBlock({
-  resident,
-  tick,
-  building,
-  carriageSite,
-  at,
-  buildProblem = () => undefined,
-  onBuild,
-}: {
-  resident: Resident
-  tick: number
-  building: Building | undefined
-  carriageSite: Building | undefined
-  at: OnSite
-  buildProblem?: (kind: BuildingKind) => string | undefined
-  onBuild: (kind: BuildingKind) => void
-}) {
-  if (carriageSite?.site) {
-    return (
-      <BuildBlock
-        resident={resident}
-        tick={tick}
-        building={carriageSite}
-        node={undefined}
-        at={at}
-        onBuild={onBuild}
-      />
-    )
-  }
-  if (building?.kind !== 'stable' || building.site) return null
-  const materials = goodsIn(BUILD_MATERIALS.carriage)
-  const problem = buildProblem('carriage')
-  return (
-    <section className="inspector-block" aria-label="Carriage">
-      <div className="panel-head">
-        <h3>Carriage</h3>
-        <span className="small muted">at the stable</span>
-      </div>
-      <p className="muted small">
-        {BUILDING_PURPOSE.carriage} Needs{' '}
-        {materials.map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')} and about{' '}
-        {workSpan(BUILD_WORK.carriage ?? 0)} of one resident’s work.
-      </p>
+      ))}
       <div className="order-buttons">
-        <button
-          type="button"
-          className="primary"
-          disabled={!canWork(resident, tick) || problem !== undefined}
-          onClick={() => onBuild('carriage')}
-        >
-          Build carriage
+        <button type="button" disabled={!adult || joined} onClick={() => onBuild(site.kind)}>
+          {joined ? 'Building…' : 'Help build'}
         </button>
       </div>
-      {problem && <p className="muted small">Not here: {problem}.</p>}
-    </section>
-  )
-}
-
-/**
- * A road on the resident's tile (`CONTEXT.md`: Road): with none, lay one out, next to any
- * building there; on a road site, see what it still needs and help build it.
- */
-function RoadBlock({
-  resident,
-  tick,
-  road,
-  terrain,
-  at,
-  onBuild,
-}: {
-  resident: Resident
-  tick: number
-  road: Building | undefined
-  /** The explored terrain beneath the resident's tile, if known (`buildingWork`). */
-  terrain?: number
-  at: OnSite
-  onBuild: (kind: BuildingKind) => void
-}) {
-  if (road?.site) {
-    return (
-      <BuildBlock
-        resident={resident}
-        tick={tick}
-        building={road}
-        node={undefined}
-        terrain={terrain}
-        at={at}
-        onBuild={onBuild}
-      />
-    )
-  }
-  if (road) return null
-  const materials = goodsIn(BUILD_MATERIALS.road)
-  return (
-    <section className="inspector-block" aria-label="Road">
-      <div className="panel-head">
-        <h3>Road</h3>
-      </div>
       <p className="muted small">
-        {BUILDING_PURPOSE.road} Needs{' '}
-        {materials.map(([g, n]) => `${n} ${GOOD_LABELS[g].toLowerCase()}`).join(', ')} and about{' '}
-        {workSpan(buildingWork('road', terrain))} of one resident’s work
-        {workFactor('road', terrain) > 1 && ' here on Mountain'}.
+        It becomes a {name.toLowerCase()} once its materials are delivered and the work is done:
+        about {workSpan(buildingWork(site.kind, terrain))} of one resident’s work in all
+        {workFactor(site.kind, terrain) > 1 &&
+          `, on Mountain ${workFactor(site.kind, terrain)} times as much as elsewhere`}
+        .
       </p>
-      <div className="order-buttons">
-        <button type="button" disabled={!canWork(resident, tick)} onClick={() => onBuild('road')}>
-          Build road
-        </button>
-      </div>
     </section>
   )
 }
