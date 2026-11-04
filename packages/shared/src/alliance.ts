@@ -4,7 +4,12 @@ import {
   NPC_ALLIANCE_LEAVE_STANDING,
 } from './balance.js'
 import { contractOf, contractsFor, type ContractView } from './contract.js'
-import { directOffersFor, realmsToOfferTo, type DirectOfferView } from './direct-offer.js'
+import {
+  directOffersFor,
+  realmsToOfferTo,
+  type CarriedWay,
+  type DirectOfferView,
+} from './direct-offer.js'
 import { directivesFor, type DirectiveView } from './directive.js'
 import { joinRequestsFor, type JoinRequestView } from './persuasion.js'
 import { organizationLabel, standingOf, standingsFor, type StandingView } from './standing.js'
@@ -253,6 +258,8 @@ export interface Diplomacy {
   directOffers: DirectOfferView[]
   /** The other realms it knows of, whom it can send a Direct offer (`realmsToOfferTo`). */
   directOfferRealms: RealmLabel[]
+  /** The ways it can name for a carried Direct offer, when it sees a storage to go to. */
+  carriedWays?: CarriedWay[]
   /** The realm's deliveries and pick-ups not yet done (`CONTEXT.md`: Delivery). */
   deliveries: DeliveryView[]
   /** Standing between the realm and other Organizations (`CONTEXT.md`: Standing), shown only. */
@@ -294,6 +301,7 @@ export function diplomacyFor(
   >,
   realmId: string,
   seenRealms: Iterable<string>,
+  carriedWays: CarriedWay[] = [],
 ): Diplomacy {
   const ownerOf = (p: AllianceArmyPart) =>
     p.is === 'resident'
@@ -336,6 +344,7 @@ export function diplomacyFor(
     contracts: contractsFor(world, realmId),
     directOffers: directOffersFor(world, realmId),
     directOfferRealms: realmsToOfferTo(world, realmId, seen).map(label),
+    ...(carriedWays.length > 0 && { carriedWays }),
     deliveries: deliveriesFor(world, realmId),
     standings: standingsFor(world, realmId),
     joinRequests: joinRequestsFor(world, realmId),

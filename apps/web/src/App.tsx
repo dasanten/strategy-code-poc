@@ -1516,6 +1516,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           <DirectOffersPanel
             offers={world.diplomacy.directOffers}
             knownRealms={world.diplomacy.directOfferRealms}
+            carriedWays={world.diplomacy.carriedWays ?? []}
             buildings={world.buildings}
             cities={world.cities}
             residents={world.residents}
@@ -1524,6 +1525,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             realmId={world.home.realmId}
             tick={world.tick}
             mapSize={world.map.size}
+            noCaravans={world.diplomacy.noCaravans === true}
             arrivesIn={arrivesIn || undefined}
             onShowPlace={showOnMap}
             giveOrder={giveOrder}

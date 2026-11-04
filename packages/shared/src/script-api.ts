@@ -532,6 +532,26 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'Send a realm my realm knows of an offer at a finished storage of my realm, wherever I am, on the terms of `postOffer`. They see it at once wherever they are, and only they can accept it, on its storage’s tile, until it lapses.',
   ),
   action(
+    'sendCarriedOffer',
+    [
+      'toId',
+      'fromCityId',
+      'toCityId',
+      'gives',
+      'givesUnits',
+      'wants',
+      'wantsUnits',
+      'times',
+      'feeBy',
+    ],
+    'Send a realm my realm knows of an offer the Trade Organization carries, between a city of my realm and one of theirs whose storage my realm sees, on the terms of `postOffer` and within one load each way. `feeBy` is "sender" or "split". Nothing is set aside; only they can accept it, from anywhere, until it lapses.',
+  ),
+  action(
+    'acceptCarriedOffer',
+    ['offerId'],
+    'Accept a carried direct offer sent to my realm, whole, wherever I am: it becomes two Transfers.',
+  ),
+  action(
     'declineOffer',
     ['offerId'],
     'Decline a direct offer sent to my realm, wherever I am; its sender hears, and what it set aside is ordinary goods again.',

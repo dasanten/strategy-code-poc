@@ -259,7 +259,13 @@ The shared language of the game. Domain terms only — no implementation details
   where on accepting the Trade Organization carries both sides' goods as two Transfers, its fee
   paid by the sender or split, as the sender picks (offered only while the HQ stands, and each side's
   goods are taken as a pick-up takes them). A storage's goods are set aside only for the in-person
-  way. A Player can send one to any realm they know of: one they see residents of, an ally, one whose
+  way. Carried, the sender names both cities when sending, as for a Transfer, and can only name a
+  city whose storage they see, so the fee shown is exact; the other side only accepts or declines,
+  from anywhere. It is taken whole on accepting, each side's goods within one carriage load, and
+  changes no standing. Split, each side pays half of both fees; paid by the sender, the sender pays
+  both. Each caravan takes the share of the side it picks up from as it collects, and the other
+  side's from their storage as it unloads there. A storage short of coins on unloading gives what it
+  has, the goods stay delivered and the Trade Organization bears the loss. A Player can send one to any realm they know of: one they see residents of, an ally, one whose
   city they have seen (Last seen), one with a standing toward them or they toward it, or their side
   in a contract or Direct offer. Both sides see it in their Direct offers drawer until it ends, and a
   notice tells the one it is sent to, with the place. In person, it is otherwise an offer like any

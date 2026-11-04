@@ -1758,6 +1758,17 @@ export function Wiki() {
           ordinary again and both of you are told. At most {num(DIRECT_OFFERS_TO_ONE_REALM)} can
           stand to one realm.
         </p>
+        <p>
+          Or have the Trade Organization carry it, while the HQ stands. Name a city of yours and a
+          city of theirs whose storage you see, and whether you pay the fee or split it; the form
+          shows the fee before you send. Nothing is set aside. They accept it whole from anywhere,
+          each side’s goods within one carriage load, and it becomes two Transfers: a caravan takes
+          what is there at each city, up to what was agreed, with a fee for what it takes. Each
+          caravan takes the share of the side it picks up from as it collects, and the other side’s
+          from their storage as it unloads there. If that storage is short of coins then, the goods
+          stay delivered and the Trade Organization bears the loss. It changes no standing, and it
+          is cancelled if the HQ falls.
+        </p>
         <h3>Sending a trader</h3>
         <p>
           With nobody of yours there, the trade section offers to send someone: your residents

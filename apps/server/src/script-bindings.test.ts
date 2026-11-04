@@ -454,6 +454,22 @@ describe('script bindings', () => {
         times: 2,
       },
     ],
+    [
+      'sendCarriedOffer("r2", "c1", "c2", "wood", 10, "stone", 5, 2, "split")',
+      {
+        kind: 'sendCarriedOffer',
+        toId: 'r2',
+        fromCityId: 'c1',
+        toCityId: 'c2',
+        gives: 'wood',
+        givesUnits: 10,
+        wants: 'stone',
+        wantsUnits: 5,
+        times: 2,
+        feeBy: 'split',
+      },
+    ],
+    ['acceptCarriedOffer("offer1")', { kind: 'acceptCarriedOffer', offerId: 'offer1' }],
     ['declineOffer("offer1")', { kind: 'declineOffer', offerId: 'offer1' }],
     [
       'acceptOffer("offer1", 2)',

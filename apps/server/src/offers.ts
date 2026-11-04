@@ -1,15 +1,21 @@
 import {
   DIRECT_OFFER_DAYS,
   TICKS_PER_GAME_DAY,
+  acceptCarriedProblem,
   acceptOfferProblem,
   carriageCommanderOf,
+  carriedOfferFees,
+  carriedOfferProblem,
+  carriedUnloadShares,
   commanderOf,
   declineOfferProblem,
+  deliveryStorage,
   directOfferProblem,
   goodsCapacity,
   handsOf,
   isAt,
   loadOf,
+  nearestWarehouse,
   offerOpenTo,
   offerStorage,
   organizationLabel,
@@ -18,6 +24,11 @@ import {
   realmsToOfferTo,
   STANDING_TRADE_COINS_PER_POINT,
   timesToPost,
+  tradeOrgHq,
+  transferLoad,
+  type CarriedFeeBy,
+  type CarriedOfferTerms,
+  type CarriedRequest,
   type DirectOfferTerms,
   type Good,
   type Offer,
@@ -95,10 +106,27 @@ const postOffer: OrderKind = {
 /** The input of a send-direct-offer order: an offer's terms and the realm it goes to. */
 type DirectOfferRequest = OfferTerms & { toId: unknown }
 
+/** The input of a send-carried-offer order: its goods, its two cities and who pays. */
+type CarriedOfferRequest = Omit<DirectOfferRequest, 'storageId'> & CarriedRequest
+
 /** Whether the realm has anyone of `otherId`'s in sight, on a map of `size` tiles. */
 function seesResidentsOf(world: WorldState, realmId: string, otherId: string, size: number) {
   const sees = sightOf(world, size, realmId)
   return world.residents.some((r) => r.owner === otherId && sees(r))
+}
+
+/** Whether the realm sees the storage of the city its carried offer would go to. */
+function seesStorageOf(world: WorldState, realmId: string, cityId: unknown, size: number) {
+  const storage = deliveryStorage(world, cityId as string)
+  return storage !== undefined && sightOf(world, size, realmId)(storage)
+}
+
+/** Whether the realm knows of `toId`, as sending it a Direct offer needs (`CONTEXT.md`). */
+function knowsOf(world: WorldState, realmId: string, toId: unknown, size?: number): boolean {
+  return (
+    realmsToOfferTo(world, realmId, []).includes(toId as string) ||
+    (size !== undefined && seesResidentsOf(world, realmId, toId as string, size))
+  )
 }
 
 /** Why the realm can't send this Direct offer, or undefined when it can (`CONTEXT.md`). */
@@ -110,10 +138,22 @@ function sendProblem(
 ): string | undefined {
   const problem = directOfferProblem(world, realmId, t.toId, t)
   if (problem) return problem
-  const known =
-    realmsToOfferTo(world, realmId, []).includes(t.toId as string) ||
-    (size !== undefined && seesResidentsOf(world, realmId, t.toId as string, size))
-  return known ? undefined : 'you don’t know of that realm'
+  return knowsOf(world, realmId, t.toId, size) ? undefined : 'you don’t know of that realm'
+}
+
+/** Why the realm can't send this carried Direct offer, or undefined when it can (`CONTEXT.md`). */
+function sendCarriedProblem(
+  world: WorldState,
+  realmId: string,
+  t: CarriedOfferRequest,
+  size?: number,
+): string | undefined {
+  const problem = carriedOfferProblem(world, realmId, t.toId, t, t)
+  if (problem) return problem
+  if (size !== undefined && !seesStorageOf(world, realmId, t.toCityId, size)) {
+    return 'you don’t see that city’s storage'
+  }
+  return knowsOf(world, realmId, t.toId, size) ? undefined : 'you don’t know of that realm'
 }
 
 /**
@@ -145,6 +185,161 @@ const sendDirectOffer: OrderKind = {
   },
 }
 
+/** A city's name for the realm log. */
+const cityName = (world: WorldState, cityId: string): string =>
+  world.cities.find((c) => c.id === cityId)?.name ?? 'a lost city'
+
+/** A carried offer's cities and what `fee` a side pays, as its log line tells them. */
+const carriedLine = (world: WorldState, c: CarriedOfferTerms, fee: number) => ({
+  fromCity: cityName(world, c.fromCityId),
+  toCity: cityName(world, c.toCityId),
+  fee,
+})
+
+/**
+ * A new carried Direct offer on checked terms (`CONTEXT.md`: Direct offer), its fees worked out for
+ * all of its goods and nothing set aside, and the other side told at once.
+ */
+function standCarried(
+  world: WorldState,
+  realmId: string,
+  t: CarriedOfferRequest,
+  size: number,
+): void {
+  const toId = t.toId as string
+  const lapsesAt = world.tick + DIRECT_OFFER_DAYS * TICKS_PER_GAME_DAY
+  const fromCityId = t.fromCityId as string
+  const toCityId = t.toCityId as string
+  const feeBy = t.feeBy as CarriedFeeBy
+  const storage = deliveryStorage(world, fromCityId)!
+  const goods = {
+    gives: t.gives as Good,
+    givesUnits: t.givesUnits as number,
+    wants: t.wants as Good,
+    wantsUnits: t.wantsUnits as number,
+    times: t.times as number,
+  }
+  const fees = carriedOfferFees(world, size, { fromCityId, toCityId, feeBy }, goods)
+  const carried = {
+    fromCityId,
+    toCityId,
+    feeBy,
+    senderFee: fees?.senderFee ?? 0,
+    otherFee: fees?.otherFee ?? 0,
+  }
+  const offer: Offer = {
+    id: newId(world, 'offer'),
+    realmId,
+    storageId: storage.id,
+    x: storage.x,
+    y: storage.y,
+    ...goods,
+    direct: { toId, lapsesAt, carried },
+  }
+  world.offers.push(offer)
+  recordEvent(world, toId, {
+    kind: 'directOffer',
+    what: 'received',
+    from: organizationLabel(world, realmId),
+    times: offer.times,
+    carried: carriedLine(world, carried, carried.otherFee),
+    ...terms(offer),
+  })
+}
+
+/**
+ * The send-carried-offer order (`CONTEXT.md`: Direct offer): a Direct offer the Trade Organization
+ * will carry between a city of the Player's realm and one of the named realm's. The other side hears
+ * at once, wherever they are.
+ */
+const sendCarriedOffer: OrderKind = {
+  validate(world, sender, order, terrain) {
+    const realm = realmOf(world, sender.userId)
+    if (!realm) return 'you have no realm'
+    return sendCarriedProblem(
+      world,
+      realm.id,
+      order as unknown as CarriedOfferRequest,
+      terrain?.size,
+    )
+  },
+  apply(world, sender, order, terrain) {
+    const realm = realmOf(world, sender.userId)
+    const t = order as unknown as CarriedOfferRequest
+    // Something may have taken a city, the HQ or the other realm since the order came.
+    if (!realm || sendCarriedProblem(world, realm.id, t, terrain?.size)) return
+    standCarried(world, realm.id, t, terrain?.size ?? Infinity)
+  },
+}
+
+/** One of a carried offer's two Transfers, waiting for a caravan of the warehouse nearest its pick-up. */
+function carriedTransfer(
+  world: WorldState,
+  size: number,
+  from: { realmId: string; cityId: string },
+  to: { realmId: string; cityId: string },
+  good: Good,
+  units: number,
+  unloadShare: number,
+): void {
+  const storage = deliveryStorage(world, from.cityId)!
+  const warehouse = nearestWarehouse(world, storage, size)!
+  world.transfers.push({
+    id: newId(world, 'transfer'),
+    realmId: from.realmId,
+    toRealmId: to.realmId,
+    toCityId: to.cityId,
+    warehouseId: warehouse.id,
+    fromCityId: from.cityId,
+    good,
+    units,
+    fee: 0,
+    back: false,
+    caravanId: null,
+    carriedOffer: { unloadShare, due: 0 },
+  })
+}
+
+/**
+ * The accept order of a carried Direct offer (`CONTEXT.md`: Direct offer): the realm it was sent to
+ * takes it whole, from anywhere, and it becomes two Transfers. Their goods are taken as a pick-up
+ * takes them, each caravan taking its fee's parts where it collects and where it unloads. No
+ * standing changes.
+ */
+const acceptCarriedOffer: OrderKind = {
+  validate(world, sender, order) {
+    const realm = realmOf(world, sender.userId)
+    if (!realm) return 'you have no realm'
+    return acceptCarriedProblem(world, realm.id, (order as unknown as TakeDownRequest).offerId)
+  },
+  apply(world, sender, order, terrain) {
+    const realm = realmOf(world, sender.userId)
+    const { offerId } = order as unknown as TakeDownRequest
+    const size = terrain?.size ?? Infinity
+    if (!realm || acceptCarriedProblem(world, realm.id, offerId)) return
+    const offer = world.offers.find((o) => o.id === offerId)!
+    const carried = offer.direct!.carried!
+    const shares = carriedUnloadShares(carried.feeBy)
+    const senders = { realmId: offer.realmId, cityId: carried.fromCityId }
+    const others = { realmId: realm.id, cityId: carried.toCityId }
+    const gives = offer.givesUnits * offer.times
+    const wants = offer.wantsUnits * offer.times
+    carriedTransfer(world, size, senders, others, offer.gives, gives, shares.sender)
+    carriedTransfer(world, size, others, senders, offer.wants, wants, shares.other)
+    world.offers = world.offers.filter((o) => o !== offer)
+    const told = (what: 'carriedAccepted' | 'youAccepted', from: string, fee: number) => ({
+      kind: 'directOffer' as const,
+      what,
+      from: organizationLabel(world, from),
+      times: offer.times,
+      carried: carriedLine(world, carried, fee),
+      ...terms(offer),
+    })
+    recordEvent(world, offer.realmId, told('carriedAccepted', realm.id, carried.senderFee))
+    recordEvent(world, realm.id, told('youAccepted', offer.realmId, carried.otherFee))
+  },
+}
+
 /** The decline order (`CONTEXT.md`: Direct offer): the realm it was sent to turns it down. */
 const declineOffer: OrderKind = {
   validate(world, sender, order) {
@@ -156,7 +351,11 @@ const declineOffer: OrderKind = {
     const realm = realmOf(world, sender.userId)
     const { offerId } = order as unknown as TakeDownRequest
     if (!realm || declineOfferProblem(world, realm.id, offerId)) return
-    endOffer(world, world.offers.find((o) => o.id === offerId)!, 'declined')
+    endOffer(
+      world,
+      world.offers.find((o) => o.id === offerId)!,
+      'declined',
+    )
   },
 }
 
@@ -228,6 +427,8 @@ export const offerOrders: Record<string, OrderKind> = {
   acceptOffer,
   sendDirectOffer,
   declineOffer,
+  sendCarriedOffer,
+  acceptCarriedOffer,
 }
 
 /** One offer accepted this tick, with the goods of everyone in it before and after. */
@@ -358,6 +559,7 @@ function endOffer(world: WorldState, offer: Offer, why: OfferEnd): void {
     kind: 'offerEnded',
     why,
     ...(toId !== undefined && { to: organizationLabel(world, toId) }),
+    ...(offer.direct?.carried && { carried: true }),
     ...terms(offer),
   })
   if (toId === undefined || why === 'usedUp') return
@@ -373,6 +575,29 @@ function endOffer(world: WorldState, offer: Offer, why: OfferEnd): void {
 const lapsed = (world: WorldState, direct: DirectOfferTerms) =>
   world.tick >= direct.lapsesAt || !world.realms.some((r) => r.id === direct.toId)
 
+/** Whether both cities of a carried offer are still their sides', each with a storage. */
+function carriedCitiesHold(world: WorldState, offer: Offer, c: CarriedOfferTerms): boolean {
+  const holds = (cityId: string, realmId: string | undefined) =>
+    world.cities.find((x) => x.id === cityId)?.realmId === realmId &&
+    deliveryStorage(world, cityId) !== undefined
+  return holds(c.fromCityId, offer.realmId) && holds(c.toCityId, offer.direct?.toId)
+}
+
+/**
+ * A carried Direct offer at the end of a tick: it ends with the HQ (`CONTEXT.md`: Fall of the HQ),
+ * when its time is up or the other realm is gone, or when either city is no longer its side's.
+ * Goods gone from a storage don't touch it: nothing was set aside.
+ */
+function stepCarried(
+  world: WorldState,
+  offer: Offer,
+  direct: DirectOfferTerms & { carried: CarriedOfferTerms },
+): void {
+  if (!tradeOrgHq(world)) endOffer(world, offer, 'noCaravans')
+  else if (lapsed(world, direct)) endOffer(world, offer, 'lapsed')
+  else if (!carriedCitiesHold(world, offer, direct.carried)) endOffer(world, offer, 'storageLost')
+}
+
 /**
  * Offers follow their storages at the end of each tick (`CONTEXT.md`: Offer): one whose storage is
  * torn down or no longer its realm's ends, and goods gone from the storage, to thieves or raiders
@@ -384,6 +609,10 @@ export function stepOffers(world: WorldState): void {
   if (world.offers.length === 0) return
   const left = new Map<string, Stock>()
   for (const offer of [...world.offers]) {
+    if (offer.direct?.carried) {
+      stepCarried(world, offer, offer.direct as DirectOfferTerms & { carried: CarriedOfferTerms })
+      continue
+    }
     const storage = offerStorage(world, offer.realmId, offer.storageId)
     if (!storage) {
       endOffer(world, offer, 'storageLost')
@@ -422,6 +651,11 @@ export const offersSound: Invariant = {
       })
     const aside = new Map<string, Stock>()
     for (const o of world.offers) {
+      const carried = o.direct?.carried
+      if (carried) {
+        soundCarried(world, o, carried, fail)
+        continue
+      }
       const storage = offerStorage(world, o.realmId, o.storageId)
       if (!storage) fail(o, `stands at ${o.storageId}, no finished storage of ${o.realmId}`)
       const whole = [o.givesUnits, o.wantsUnits, o.times].every((n) => Number.isInteger(n) && n > 0)
@@ -439,6 +673,30 @@ export const offersSound: Invariant = {
     }
     return out
   },
+}
+
+/**
+ * A carried Direct offer stands only while the HQ does, to another realm, between a city of each
+ * side, for no more than one load each way, with fees whole and at least 0 (`CONTEXT.md`: Direct
+ * offer). The whole-terms and time checks are the same as for any offer.
+ */
+function soundCarried(
+  world: WorldState,
+  o: Offer,
+  c: CarriedOfferTerms,
+  fail: (o: Offer, message: string) => void,
+): void {
+  if (!tradeOrgHq(world)) fail(o, 'is carried with the HQ fallen')
+  if (!carriedCitiesHold(world, o, c)) fail(o, 'is carried between cities not its sides’')
+  if (o.direct?.toId === o.realmId) fail(o, 'was sent to its own realm')
+  if (o.direct && lapsed(world, o.direct)) fail(o, `outlived its time for ${o.direct.toId}`)
+  if (o.gives === o.wants) fail(o, `wants the ${o.gives} it gives`)
+  const whole = [o.givesUnits, o.wantsUnits, o.times].every((n) => Number.isInteger(n) && n > 0)
+  if (!whole) fail(o, 'has terms that aren’t whole and positive')
+  if (o.givesUnits * o.times > transferLoad(o.gives)) fail(o, 'gives more than one load')
+  if (o.wantsUnits * o.times > transferLoad(o.wants)) fail(o, 'wants more than one load')
+  const fees = [c.senderFee, c.otherFee]
+  if (!fees.every((n) => Number.isInteger(n) && n >= 0)) fail(o, 'has fees that aren’t whole')
 }
 
 /** Accepting an offer moves goods and creates none: as `tradesKeepGoods` for trades. */

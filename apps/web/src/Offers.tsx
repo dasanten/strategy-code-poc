@@ -200,21 +200,30 @@ export function AcceptOffer({
 
 /**
  * Posting an offer at one of the Player's own storages, or sending one (`action`, while `ready`),
- * with what it would set aside.
+ * with what it would set aside. With `carried`, its goods aren't set aside, so any good can be
+ * named and `carried` says what the Player would see instead (`CONTEXT.md`: Direct offer).
  */
 export function PostOffer({
   storage,
   action = 'Post offer',
   ready = true,
+  carried,
   onPost,
 }: {
   storage: SeenBuilding
   action?: string
   ready?: boolean
+  carried?: (goods: {
+    gives: Good
+    givesUnits: number
+    wants: Good
+    wantsUnits: number
+    times: number
+  }) => { text: string; canPost: boolean }
   onPost: (offer: PostOfferRequest) => void
 }) {
   const free = freeAtStorage(storage)
-  const held = GOODS.filter((g) => (free[g] ?? 0) > 0)
+  const held = carried ? GOODS : GOODS.filter((g) => (free[g] ?? 0) > 0)
   const [picked, setGives] = useState<Good | ''>('')
   const gives = picked !== '' && held.includes(picked) ? picked : held[0]
   const [givesUnits, setGivesUnits] = useState(10)
@@ -222,15 +231,9 @@ export function PostOffer({
   const [wantsUnits, setWantsUnits] = useState(5)
   const [times, setTimes] = useState(1)
   if (!gives) return <p className="small muted">Nothing here to offer that isn’t set aside.</p>
-  const { text, canPost } = postPreview(
-    storage,
-    gives,
-    givesUnits,
-    wants,
-    wantsUnits,
-    times,
-    GOOD_LABELS,
-  )
+  const { text, canPost } = carried
+    ? carried({ gives, givesUnits, wants, wantsUnits, times })
+    : postPreview(storage, gives, givesUnits, wants, wantsUnits, times, GOOD_LABELS)
   return (
     <div className="offer-post">
       <p>

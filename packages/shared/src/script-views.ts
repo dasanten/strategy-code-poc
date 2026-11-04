@@ -48,6 +48,7 @@ export type ScriptViewName =
   | 'price'
   | 'offer'
   | 'directOffer'
+  | 'carriedOffer'
   | 'city'
   | 'occupation'
   | 'hire'
@@ -635,6 +636,23 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
     fields: [
       field('toId', 'string', 'The realm it was sent to, the only one who can accept it.'),
       field('lapsesAt', 'number', 'The tick it lapses at, its goods then ordinary again.'),
+      field(
+        'carried',
+        view('carriedOffer'),
+        'How the Trade Organization carries it, when it does.',
+        'for one fetched in person',
+      ),
+    ],
+  },
+  carriedOffer: {
+    description:
+      'A direct offer the Trade Organization carries as two Transfers once accepted, nothing set aside.',
+    fields: [
+      field('fromCityId', 'string', 'The sender’s city, where its goods are picked up.'),
+      field('toCityId', 'string', 'The other side’s city, where theirs are picked up.'),
+      field('feeBy', 'string', 'Who pays the fee: "sender" or "split".'),
+      field('senderFee', 'number', 'What the sender pays when all of its goods are taken.'),
+      field('otherFee', 'number', 'What the other side pays when all of its goods are taken.'),
     ],
   },
   city: {

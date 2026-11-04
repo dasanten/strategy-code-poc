@@ -302,7 +302,12 @@ export function bindScript(context: ScriptContext): ScriptBindings {
       seen ??= context.seen()
       const known = new Set(seen.filter((e) => e.is === 'building').map((e) => e.id))
       return world.offers
-        .filter((o) => o.realmId === side || o.direct?.toId === side || known.has(o.storageId))
+        .filter(
+          (o) =>
+            o.realmId === side ||
+            o.direct?.toId === side ||
+            (known.has(o.storageId) && !o.direct?.carried),
+        )
         .map(seenOffer)
     },
     directives: () => directivesFor(world, (org) => organizationLabel(world, org)),
@@ -793,6 +798,29 @@ function residentActions(
         wantsUnits: plain(wantsUnits),
         times: plain(times),
       }),
+    sendCarriedOffer: ([
+      toId,
+      fromCityId,
+      toCityId,
+      gives,
+      givesUnits,
+      wants,
+      wantsUnits,
+      times,
+      feeBy,
+    ]) =>
+      request('sendCarriedOffer', {
+        toId: plain(toId),
+        fromCityId: plain(fromCityId),
+        toCityId: plain(toCityId),
+        gives: plain(gives),
+        givesUnits: plain(givesUnits),
+        wants: plain(wants),
+        wantsUnits: plain(wantsUnits),
+        times: plain(times),
+        feeBy: plain(feeBy),
+      }),
+    acceptCarriedOffer: ([offerId]) => request('acceptCarriedOffer', { offerId: plain(offerId) }),
     declineOffer: ([offerId]) => request('declineOffer', { offerId: plain(offerId) }),
     handOver: ([newLeaderId]) => request('handOver', { newLeaderId: plain(newLeaderId) }),
     rename: ([targetId, name, realmName]) =>

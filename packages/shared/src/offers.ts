@@ -28,9 +28,12 @@ export const offerRate = (o: Pick<Offer, 'givesUnits' | 'wantsUnits'>) =>
 /** An offer as anyone in sight sees it. */
 export const seenOffer = (o: Offer): SeenOffer => ({ ...o, rate: offerRate(o) })
 
-/** The offers standing at a storage, oldest first. */
+/**
+ * The offers standing at a storage, oldest first. A carried Direct offer stands at none: it only
+ * names a city to pick up from, and sets nothing aside (`CONTEXT.md`: Direct offer).
+ */
 export function offersAt(world: Pick<WorldState, 'offers'>, storageId: string): Offer[] {
-  return world.offers.filter((o) => o.storageId === storageId)
+  return world.offers.filter((o) => o.storageId === storageId && !o.direct?.carried)
 }
 
 /** The goods its offers set aside at a storage. */
@@ -102,10 +105,22 @@ export function timesToPost(
   return Math.min(times, Math.floor((freeStock(world, storage)[gives] ?? 0) / givesUnits))
 }
 
+/** Why an offer's terms won't do, or undefined: a good for a different good, in whole units. */
+export function offerTermsProblem(
+  terms: Pick<OfferTerms, 'gives' | 'givesUnits' | 'wants' | 'wantsUnits' | 'times'>,
+): string | undefined {
+  if (!isGood(terms.gives) || !isGood(terms.wants)) return 'gives and wants must be goods'
+  if (terms.gives === terms.wants) return 'an offer wants a different good than it gives'
+  if (!isCount(terms.givesUnits) || !isCount(terms.wantsUnits) || !isCount(terms.times)) {
+    return 'units and times must be whole numbers'
+  }
+  return undefined
+}
+
 /**
  * Why `realmId` can't post an offer on these terms, or undefined when it can (`CONTEXT.md`:
- * Offer): at a finished storage of its own, a good for a different good, in whole positive units,
- * with the goods for it once there and not already set aside.
+ * Offer): at a finished storage of its own, on sound terms (`offerTermsProblem`), with the goods
+ * for it once there and not already set aside.
  */
 export function postOfferProblem(
   world: Pick<WorldState, 'buildings' | 'cities' | 'offers'>,
@@ -114,23 +129,22 @@ export function postOfferProblem(
 ): string | undefined {
   const storage = offerStorage(world, realmId, terms.storageId)
   if (!storage) return 'not a finished storage of yours'
-  if (!isGood(terms.gives) || !isGood(terms.wants)) return 'gives and wants must be goods'
-  if (terms.gives === terms.wants) return 'an offer wants a different good than it gives'
-  if (!isCount(terms.givesUnits) || !isCount(terms.wantsUnits) || !isCount(terms.times)) {
-    return 'units and times must be whole numbers'
-  }
-  if (timesToPost(world, storage, terms.gives, terms.givesUnits, terms.times) === 0) {
+  const problem = offerTermsProblem(terms)
+  if (problem) return problem
+  const { gives, givesUnits, times } = terms as { gives: Good; givesUnits: number; times: number }
+  if (timesToPost(world, storage, gives, givesUnits, times) === 0) {
     return 'not enough of that good here that isn’t set aside'
   }
   return undefined
 }
 
 /**
- * Whether `side` may accept an offer, its own aside: anyone, unless it is a Direct offer to another
- * realm (`CONTEXT.md`: Direct offer). What goes looking for offers to take asks this first.
+ * Whether `side` may accept an offer in person, its own aside: anyone, unless it is a Direct offer
+ * to another realm or a carried one (`CONTEXT.md`: Direct offer). What goes looking for offers to
+ * take asks this first.
  */
 export const offerOpenTo = (o: Pick<Offer, 'direct'>, side: string): boolean =>
-  !o.direct || o.direct.toId === side
+  !o.direct || (o.direct.toId === side && !o.direct.carried)
 
 /** What accepting an offer moves: `times` over, `gives` to the trader and `wants` from them. */
 export interface OfferQuote {
@@ -182,6 +196,9 @@ export function acceptOfferProblem(
   const offer = world.offers.find((o) => o.id === offerId)
   if (!offer) return 'that offer is gone'
   if (offer.realmId === side) return 'that offer is your own'
+  if (offer.direct?.carried && offer.direct.toId === side) {
+    return 'a carried offer is accepted from anywhere'
+  }
   if (!offerOpenTo(offer, side)) return 'that offer is for another realm'
   if (!canWork(resident, world.tick)) return 'children can’t trade'
   const storage = world.buildings.find((b) => b.id === offer.storageId)

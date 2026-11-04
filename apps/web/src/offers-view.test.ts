@@ -2,6 +2,9 @@ import type { DirectOfferView, Good, Resident, SeenBuilding, SeenOffer } from '@
 import { describe, expect, it } from 'vitest'
 import {
   acceptPreview,
+  carriedDetails,
+  carriedLine,
+  carriedPreview,
   directOffersSent,
   freeAtStorage,
   offerIsFor,
@@ -100,6 +103,57 @@ describe('offer lines', () => {
         labels,
       ),
     ).toBe('Set aside for offers: 20 food, 30 wood')
+  })
+})
+
+describe('carried direct offers', () => {
+  const way = { fromCityId: 'c1', toCityId: 'c2' }
+  const known = { ...way, senderTiles: 100, otherTiles: 120 }
+  const goods = {
+    gives: 'iron',
+    givesUnits: 10,
+    wants: 'stone',
+    wantsUnits: 5,
+    times: 2,
+  } as const
+
+  it('tells the whole terms, taken at once', () => {
+    expect(carriedLine(offer(), labels)).toBe('Gives 20 wood, wants 10 stone, carried')
+  })
+
+  it('tells each side the way and what they pay', () => {
+    const view = (feeBy: 'sender' | 'split') =>
+      ({
+        ...offer(),
+        direct: {
+          toId: 'r2',
+          lapsesAt: 500,
+          carried: { ...way, feeBy, senderFee: 30, otherFee: feeBy === 'split' ? 20 : 0 },
+        },
+        from: { realmId: 'r1', realm: 'Mara' },
+        to: { realmId: 'r2', realm: 'Bo' },
+        city: 'Oakford',
+        toCity: 'Brook',
+      }) as DirectOfferView
+    expect(carriedDetails(view('sender'), 'r2')).toBe(
+      'By caravan between Oakford and Brook, taking what is there up to what was agreed. Paid by the sender: 30 coins, for all of the goods.',
+    )
+    expect(carriedDetails(view('split'), 'r1')).toContain('Split: 30 coins from you, 20 from them')
+    expect(carriedDetails(view('split'), 'r2')).toContain('Split: 20 coins from you, 30 from them')
+  })
+
+  it('shows the fee before sending, or why it can’t go', () => {
+    const paid = carriedPreview(known, 'sender', goods, labels)
+    expect(paid.canPost).toBe(true)
+    expect(paid.text).toMatch(/^Gives 20 iron, wants 10 stone\. You pay \d+ coins, for all/)
+    const split = carriedPreview(known, 'split', goods, labels)
+    expect(split.text).toMatch(/You pay \d+ coins and they pay \d+, for all/)
+    const load = carriedPreview(known, 'sender', { ...goods, times: 10_000 }, labels)
+    expect(load).toEqual({ text: 'Each side’s goods must fit one carriage load.', canPost: false })
+    expect(carriedPreview(undefined, 'sender', goods, labels)).toEqual({
+      text: 'No Trade Org warehouse can send a caravan there.',
+      canPost: false,
+    })
   })
 })
 
