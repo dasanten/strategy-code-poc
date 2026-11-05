@@ -184,7 +184,10 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       const people = `${e.residents} resident${e.residents === 1 ? '' : 's'}`
       if (!e.captor) {
         return {
-          text: `The realm of ${e.other} captured ${e.city} and its ${people}.`,
+          text:
+            e.other === TRADE_ORG_NAME
+              ? `The Trade Organization took ${e.city} and its ${people}: it is a trading post now.`
+              : `The realm of ${e.other} captured ${e.city} and its ${people}.`,
           tone: 'bad',
         }
       }
@@ -201,7 +204,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
             places,
           }
         : {
-            text: `Your town hall in ${e.city} is occupied by the realm of ${e.other}: it falls in ${days} unless you retake it.`,
+            text: `Your town hall in ${e.city} is occupied by ${realmCalled(e.other)}: it falls in ${days} unless you retake it.`,
             tone: 'bad',
             places,
           }
@@ -218,7 +221,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
             ...(places && { places }),
           }
         : {
-            text: `The occupation of your town hall in ${e.city} by the realm of ${e.other} is broken.`,
+            text: `The occupation of your town hall in ${e.city} by ${realmCalled(e.other)} is broken.`,
             tone: 'info',
             ...(places && { places }),
           }
@@ -868,6 +871,10 @@ function punishmentEnd(why: PunishmentEnd | undefined, city: string): string {
       return ''
   }
 }
+
+/** Who holds a town hall or took a city, by the name the log has for them: most are a realm. */
+const realmCalled = (other: string | null) =>
+  other === TRADE_ORG_NAME ? TRADE_ORG_NAME : `the realm of ${other}`
 
 /** A line about what the realm owes the Trade Organization (`CONTEXT.md`: Trade Org debt). */
 function debtLine(e: Extract<RealmEvent, { kind: 'debt' }>): EventLine {

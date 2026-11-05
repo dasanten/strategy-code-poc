@@ -27,6 +27,21 @@ describe('the Trade Organization taking a city', () => {
     expect(lost).toBe("The Trade Organization's army was lost at Ashford.")
   })
 
+  it('names it as itself, not as a realm', () => {
+    const name = 'the Trade Organization'
+    const place = { cityId: 'c1', city: 'Ashford', x: 1, y: 2, other: name, occupier: false }
+    expect(line({ kind: 'hallOccupied', days: 10, ...place })).toBe(
+      'Your town hall in Ashford is occupied by the Trade Organization: it falls in 10 game days unless you retake it.',
+    )
+    expect(line({ kind: 'occupationBroken', ...place })).toBe(
+      'The occupation of your town hall in Ashford by the Trade Organization is broken.',
+    )
+    const taken = { cityId: 'c1', city: 'Ashford', residents: 6, other: name, captor: false }
+    expect(line({ kind: 'cityCaptured', ...taken })).toBe(
+      'The Trade Organization took Ashford and its 6 residents: it is a trading post now.',
+    )
+  })
+
   it('says the city settled the debt', () => {
     expect(line({ kind: 'debt', what: 'cityTaken', coins: 500, owed: 0 })).toBe(
       'Taking your city settled your debt of 500 Coins to the Trade Organization.',
