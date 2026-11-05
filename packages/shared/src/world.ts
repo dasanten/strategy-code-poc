@@ -1368,13 +1368,7 @@ export interface CarriedOfferTerms {
 
 /** What ended a realm's offer (`CONTEXT.md`: Offer, Direct offer). */
 export type OfferEnd =
-  | 'usedUp'
-  | 'takenDown'
-  | 'storageLost'
-  | 'goodsGone'
-  | 'declined'
-  | 'lapsed'
-  | 'noCaravans'
+  'usedUp' | 'takenDown' | 'storageLost' | 'goodsGone' | 'declined' | 'lapsed' | 'noCaravans'
 
 /**
  * How the Organization `of` regards `toward` (`CONTEXT.md`: Standing), from -`STANDING_RANGE`
@@ -1414,9 +1408,16 @@ export interface Punishment {
   /**
    * Its soldiers, each with what they carried as they set out: anything they carry above that is
    * what they took. `packed` once they have seen to their Food at the HQ (`CONTEXT.md`: Punishment
-   * trip), so that they set out.
+   * trip), so that they set out. `seller` is the place they are on their way to buy Food at, and
+   * `noWay` the places they found no way to (`CONTEXT.md`: Trade Org debt).
    */
-  members: { residentId: string; own: Stock; packed?: true }[]
+  members: {
+    residentId: string
+    own: Stock
+    packed?: true
+    seller?: string
+    noWay?: string[]
+  }[]
   /** Out to the city while it hasn't got what it came for; home once it has or gives up. */
   heading: 'out' | 'home'
   /** The Coins' worth it took, as it stood when it headed home. */

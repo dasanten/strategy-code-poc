@@ -52,6 +52,7 @@ import {
   wagonTook,
 } from './supply-wagons.js'
 import { spareSoldiers } from './trade-org-army.js'
+import { buyFood, packPurse } from './trade-org-buying.js'
 import { oweTradeOrg } from './trade-org-debt.js'
 
 /*
@@ -308,7 +309,7 @@ function toTake(world: WorldState, r: Resident, storage: Building, left: number)
 }
 
 /** Gives a resident an order to walk to a tile, unless they are already on their way there. */
-function headFor(r: Resident, to: { x: number; y: number }): void {
+export function headFor(r: Resident, to: { x: number; y: number }): void {
   const o = r.order
   if (r.x === to.x && r.y === to.y) return
   if (o?.kind === 'walkTo' && o.target.x === to.x && o.target.y === to.y) return
@@ -358,11 +359,11 @@ function stillTheCulprits(world: WorldState, p: Punishment, city: City): boolean
 }
 
 /**
- * The Food a member still wants on them for the trip, in units (`CONTEXT.md`: Punishment trip): on
- * the way there, for the walk there, their time there and the walk back, never into the room
- * they keep for what they will carry home; from then on, for the walk back to the HQ.
+ * The Food the rest of the trip takes a member, in units (`CONTEXT.md`: Punishment trip): on the way
+ * there, for the walk there, their time there and the walk back; from then on, for the walk back to
+ * the HQ.
  */
-function foodWanted(
+function foodNeeded(
   world: WorldState,
   hq: City,
   p: Punishment,
@@ -377,12 +378,36 @@ function foodWanted(
     return tripFood(wrapDistance(size, r, hall))
   }
   const tiles = wrapDistance(size, r, target) + wrapDistance(size, target, hall)
+  return tripFood(tiles) + TRADE_ORG_PUNISH.giveUpDays * FOOD_PER_DAY
+}
+
+/**
+ * The Food a member still wants on them for the trip, in units (`foodNeeded`): on the way there never
+ * into the room they keep for what they will carry home.
+ */
+function foodWanted(
+  world: WorldState,
+  hq: City,
+  p: Punishment,
+  city: City | undefined,
+  r: Resident,
+  size: number,
+): number {
+  const needed = foodNeeded(world, hq, p, city, r, size)
+  if (p.heading === 'home' || p.arrivedAt !== undefined) return needed
   const others = stockWeight(r.carried) - (r.carried.food ?? 0) * GOOD_WEIGHT.food
   const room = carryCapacity(r, world.tick) - others - TRADE_ORG_PUNISH.packRoom
-  return Math.min(
-    tripFood(tiles) + TRADE_ORG_PUNISH.giveUpDays * FOOD_PER_DAY,
-    Math.floor(room / GOOD_WEIGHT.food),
-  )
+  return Math.min(needed, Math.floor(room / GOOD_WEIGHT.food))
+}
+
+/**
+ * The Food a member on the road is short of and would buy (`CONTEXT.md`: Trade Org debt), in units:
+ * what the rest of the trip takes them above what they carry and their share of what is on the wagon,
+ * as far as they `wanted` it on them. Having eaten a meal is not being short.
+ */
+function foodToBuy(r: Resident, needed: number, wanted: number, wagonShare: number): number {
+  const carried = r.carried.food ?? 0
+  return Math.floor(Math.min(needed - carried - wagonShare, wanted - carried))
 }
 
 /**
@@ -483,10 +508,12 @@ export function waitingOnTheRoad(world: WorldState, size: number): Set<string> {
 
 /**
  * What a member has eaten stops counting as their own, so that Food they take later is told from
- * it. Their own food (`OWN_FOOD`) always counts, or a meal taken at home would look like loot.
+ * it. Their own food (`OWN_FOOD`) always counts, or a meal taken at home would look like loot. So do
+ * Coins they spent (`buyFood`), or Coins they take later would look like what they brought.
  */
 function eatFromOwn(r: Resident, own: Stock): void {
   own.food = Math.max(OWN_FOOD, Math.min(own.food ?? 0, r.carried.food ?? 0))
+  if (own.coins !== undefined) own.coins = Math.min(own.coins, r.carried.coins ?? 0)
 }
 
 /** A line in the culprit's log about a punishment (`CONTEXT.md`: Punishment trip). */
@@ -520,7 +547,8 @@ function leaveDebt(world: WorldState, p: Punishment, took: number): void {
 /**
  * One tick of a punishment (`CONTEXT.md`: Trade Org reaction, Punishment trip). Each member first
  * packs at the HQ, then walks to the city's town hall, however long that takes, refilling at
- * trading posts they pass. Once one of them is in the city's area it has arrived: each
+ * trading posts they pass and buying Food if they are short (`buyFood`). Once one of them is in the
+ * city's area it has arrived: each
  * goes after anyone attacking one of them, otherwise to the city's nearest storage holding
  * anything, takes Food for the way back and picks up what is still to take there.
  * With a supply wagon, a member short of Food goes to meet it (`goToWagonForFood`) and one who took
@@ -587,6 +615,8 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
     }
   }
   let left = p.worth - took
+  const onTheRoad = p.heading === 'home' || p.arrivedAt === undefined
+  const wagonShare = on ? (on.carriage.load.food ?? 0) / (members.length + 1) : 0
   for (const { r, own, member } of members) {
     if (r.order?.kind === 'attack') continue
     if (resisting.length > 0) {
@@ -598,18 +628,24 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
     }
     const wanted = foodWanted(world, hq, p, city, r, size)
     if (p.heading === 'out' && !member.packed) {
+      if (packPurse(world, hq, r, own, size)) continue
       if (fetchFood(world, () => foodIn(world, new Set([hq.id])), r, own, wanted, size)) {
         if (r.order?.kind === 'pickUp') member.packed = true
         continue
       }
       member.packed = true
     }
+    if (onTheRoad) {
+      const needed = foodNeeded(world, hq, p, city, r, size)
+      const units = foodToBuy(r, needed, wanted, wagonShare)
+      if (buyFood(world, hq, p, member, r, units, size)) continue
+    }
     if (on && goToWagonForFood(r, on.carriage, size)) continue
     const places = () => refillPlaces(world, robbing, r, size)
     if (fetchFood(world, places, r, own, wanted, size)) continue
     if (on && loadOnWagon(world, r, own, on.carriage, size)) continue
     if (p.heading === 'home') {
-      bringHome(world, hq, r, takenBy(r, own), size)
+      bringHome(world, hq, r, handingIn(world, hq, r, own), size)
       continue
     }
     if (p.arrivedAt === undefined) {
@@ -633,9 +669,24 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
     p.heading === 'home' &&
     members.every(
       (m) =>
-        Object.keys(takenBy(m.r, m.own)).length === 0 && inCityArea(world, hq, m.r.x, m.r.y, size),
+        Object.keys(handingIn(world, hq, m.r, m.own)).length === 0 &&
+        inCityArea(world, hq, m.r.x, m.r.y, size),
     )
   if (done) world.punishments = world.punishments.filter((x) => x !== p)
+}
+
+/**
+ * What a member heading home hands in at the HQ: what they took, and all the Coins they carry, what
+ * they brought to buy Food with included, as long as a warehouse there keeps Coins.
+ */
+function handingIn(world: WorldState, hq: City, r: Resident, own: Stock): Stock {
+  const taken = takenBy(r, own)
+  const coins = r.carried.coins ?? 0
+  if (coins <= 0) return taken
+  const kept = world.buildings.some(
+    (b) => b.cityId === hq.id && warehouseKeeps(world, b).includes('coins'),
+  )
+  return kept ? { ...taken, coins } : taken
 }
 
 /**
@@ -669,7 +720,7 @@ function bringHome(world: WorldState, hq: City, r: Resident, taken: Stock, size:
  * 0004): each punishes an Organization other than the Trade Organization, at most one under way
  * for each, for a positive worth of which it took no more than all and nothing before it arrived
  * (Punishment trip); its members are residents of the HQ, each in one punishment at most and in no
- * contract; and the Trade Organization never captures a city. Its supply wagons have their own
+ * contract, having brought no less than no Coins; and the Trade Organization never captures a city. Its supply wagons have their own
  * invariant (`supplyWagonsSound`).
  */
 export const punishmentsSound: Invariant = {
@@ -697,8 +748,9 @@ export const punishmentsSound: Invariant = {
       }
       if (orgs.has(p.culpritOrg)) fail(`${p.culpritOrg} is punished twice at once`, [p.id])
       orgs.add(p.culpritOrg)
-      for (const { residentId: id } of p.members) {
+      for (const { residentId: id, own } of p.members) {
         const r = world.residents.find((x) => x.id === id)
+        if ((own.coins ?? 0) < 0) fail(`${id} brought ${own.coins} Coins`, [p.id, id])
         if (r && (r.owner !== null || r.cityId !== hq?.id)) {
           fail(`punishment ${p.id} sends ${id}, who is not of the Trade Org HQ`, [p.id, id])
         }

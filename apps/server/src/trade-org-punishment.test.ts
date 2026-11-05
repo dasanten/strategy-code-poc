@@ -546,11 +546,14 @@ describe('the Trade Organization’s punishment trip', () => {
       if (b.cityId === hq.id && b.stock) delete b.stock.food
     }
     world.residents = world.residents.filter((r) => r.owner !== null || isArmed(r))
-    run(world, walking, 3)
+    run(world, walking, 1)
     const p = world.punishments[0]!
+    // They fetch their Coins (`packPurse`), find no Food and go.
+    run(world, walking, 2000, () => p.members.every((m) => m.packed))
+    run(world, walking, 2)
     expect(p.members.every((m) => m.packed)).toBe(true)
     expect(at(world, p.members[0]!.residentId).order?.kind).toBe('walkTo')
-  })
+  }, 240_000)
 
   it('never packs into the room it leaves for what it carries home', () => {
     const { world, hq, walking } = setup()

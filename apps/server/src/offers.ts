@@ -436,6 +436,8 @@ interface Accepted {
   residentId: string
   before: Stock
   after: Stock
+  /** Whether the offer gave Food for Coins. */
+  foodForCoins: boolean
 }
 
 /** The offers accepted by the latest `resolveOffers`, kept beside the world for `offersKeepGoods`. */
@@ -519,7 +521,12 @@ function acceptNow(
   const before = total(holder.stock, stock)
   move(stock, holder.stock, offer.gives, q.gives)
   move(holder.stock, stock, offer.wants, q.wants)
-  records.push({ residentId: r.id, before, after: total(holder.stock, stock) })
+  records.push({
+    residentId: r.id,
+    before,
+    after: total(holder.stock, stock),
+    foodForCoins: offer.gives === 'food' && offer.wants === 'coins',
+  })
   offer.times -= q.times
   if (q.times > 0) {
     const worth = offerWorth(offer, q.gives, q.wants)
@@ -716,18 +723,25 @@ export const offersKeepGoods: Invariant = {
   },
 }
 
-/** The Trade Organization never accepts offers (`CONTEXT.md`: NPC cities at an offer). */
-export const tradeOrgTakesNoOffer: Invariant = {
-  name: 'trade-org-takes-no-offer',
+/**
+ * The Trade Organization accepts offers only for its army to buy Food on the way (`CONTEXT.md`: NPC
+ * cities at an offer, Trade Org debt): only a soldier of a punishment, only Food for Coins.
+ */
+export const tradeOrgOnlyBuysFood: Invariant = {
+  name: 'trade-org-only-buys-food',
   check(world) {
     return (ledger.get(world) ?? []).flatMap((t) => {
       const r = world.residents.find((x) => x.id === t.residentId)
       const city = r?.owner === null ? world.cities.find((c) => c.id === r.cityId) : undefined
       if (!city?.tradeOrg) return []
+      const soldier = world.punishments.some((p) =>
+        p.members.some((m) => m.residentId === t.residentId),
+      )
+      if (soldier && t.foodForCoins) return []
       return [
         {
           invariant: this.name,
-          message: `${t.residentId} of ${city.id}, the Trade Organization's, accepted an offer`,
+          message: `${t.residentId} of ${city.id}, the Trade Organization's, accepted an offer that is no army buying Food`,
           entityIds: [t.residentId, city.id],
         },
       ]

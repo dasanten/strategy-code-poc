@@ -252,7 +252,8 @@ The shared language of the game. Domain terms only — no implementation details
   offers.
 - **NPC cities at an offer:** an NPC city sends its trader to a Player's offer within a set reach
   when the offer gives what it is short of and wants what it has spare (or Coins), at a rate at
-  least as good as its own prices. The Trade Organization never accepts offers.
+  least as good as its own prices. The Trade Organization accepts offers only for its army to buy
+  Food on the way (Trade Org debt).
 - **Direct offer:** an offer sent to one named realm, who sees it at once wherever they are and
   accepts or declines it within a set time. The sender picks how the goods change hands: **in
   person**, an offer at a storage of the sender's that only that realm can accept; or **carried**,
@@ -698,7 +699,14 @@ The shared language of the game. Domain terms only — no implementation details
   or with its horse dead, it is gone for the army, which goes on with what it carries. It comes home
   with them, or by itself once they are lost, and its whole load goes into the warehouses; the carriage
   and horse go back into the HQ's stock. And short of Food on the way its army
-  buys some from a post, NPC city or Player's offer it passes. A captured post the Trade Organization
+  buys some from a post, NPC city or Player's offer it passes. Each soldier packs Coins at the HQ for
+  this and hands in what is left back home. A soldier is short when the rest of the trip takes more
+  than they carry and their share of the wagon's Food; with Coins left, they go to such a place near
+  them and buy by the same trade anyone uses, cut down the same way, and carry on. An NPC city that
+  refuses the Trade Organization sells them nothing. They don't buy from the Organization they are
+  punishing, from one the Trade Organization refuses to trade with, or at an offer asking too much.
+  Coins and Food they brought or bought are their own: none of it counts as what the army took. With
+  no seller near they go on hungry. A captured post the Trade Organization
   has heard of (Lost post found out) is a debt too: it demands the city back, and returning it
   settles the debt. Admin directives go on as before, with no debt.
 - **Demand:** a Player or the Trade Organization sends a demand to another Organization: **terms**
