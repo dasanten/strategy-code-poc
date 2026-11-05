@@ -468,11 +468,11 @@ The shared language of the game. Domain terms only — no implementation details
   where they are until the city moves them. Beyond that it is driven by its
   reserve (NPC reserve): its spare hands go to the good shortest of its reserve first; they work
   the workplace that makes the good, or build it first on the nearest fitting resource node
-  (within a set reach of its home) and work it like its other workplaces, carrying the output to
+  (within a set reach of its home, or further out where a Scout found one) and work it like its other workplaces, carrying the output to
   its storage (Crew food). So a city builds the whole chain its land allows, one need at a time:
   weapons short means a smithy, which wants Iron, so a smelter, which wants ore, so a mine. A
   good with no node in reach stays short; the city buys it from its trader or a visiting trader,
-  or does without. When it has no room left inside its wall it grows its area
+  or does without. With nothing short its spare hands still have work (Spare hands' work). When it has no room left inside its wall it grows its area
   by building on the edge, puts up a new wall 8 tiles further out on every side, with the gate in
   the same place, and only once every tile of the new wall is finished tears down the old one.
   Its residents stand on its walls and pass its gates as a realm's do. It keeps some soldiers by
@@ -487,12 +487,30 @@ The shared language of the game. Domain terms only — no implementation details
   only with a gold node in reach. Whatever its storages hold above the reserve is its surplus,
   for sale (Trading with an NPC city); whatever is below is short and drives what it works and
   builds next (NPC city).
+- **Spare hands' work:** with nothing short of its reserve, an NPC city's spare hands don't stand
+  idle. In this order they go on a road crew while it has a road to build (NPC road), scout (Scout),
+  and otherwise work at its workplaces for **surplus**, past the reserve, up to a cap per good (a
+  balance number). What is short, its trader and a founding party still take them first, and they
+  count as spare hands for a Full city. Trade Org cities do none of this.
+- **NPC road:** a road an NPC city builds with a **road crew** of its spare hands (at most a balance
+  number at once, apart from its builders), only from materials above its reserve. It follows the
+  way a resident would walk, tile by tile, skipping tiles that have a road: first from its home to
+  each of its workplaces outside its area, nearest first; then to the nearest Trade Org warehouse
+  in its trader's reach; then to the edge of its nearest neighbour city's area. Like any road nobody
+  owns it, and anyone can use it or tear it down; a tile torn down is laid again in time. A way with
+  no way through is given up.
+- **Scout:** a spare hand an NPC city sends exploring: a few at a time by its size (a balance
+  number) run the game's Explore default with no `find`, and come home when their Food says turn
+  back. A city knows every resource node within its set reach (NPC city). What a scout saw is
+  the city's only once they step back into its area alive: from then on it knows those nodes, out
+  to a wider limit (a balance number), and can build on them. A scout killed on the way brings
+  nothing. It stops scouting once it knows its limit. Nothing protects them on the way.
 - **NPC trader:** an NPC city's own trade run. Once a good's surplus makes a full load and a
   Trade Org warehouse (HQ or trading post) lies within a set reach, one of its spare hands,
   never a soldier, carries the load there, sells it, buys the good shortest of the reserve that
   the city has no node for, as far as its coins and their arms allow, and walks home to the
   storage. One trader per city at a time. Nothing protects them on the way but what they carry.
-- **Full city:** an NPC city that for a whole game week has had idle spare hands and nothing
+- **Full city:** an NPC city that for a whole game week has had spare hands (idle, on a road crew, scouting or working for surplus) and nothing
   short of its reserve, holds a food surplus, and holds a town hall's and a storage's materials
   above its reserve. A full city founds a daughter (Founding).
 - **Founding:** how a full NPC city spreads out. It picks a free Plains site the usual distance
