@@ -35,8 +35,8 @@ import { realmOf } from './starting-city.js'
 /**
  * `org` owes the Trade Organization `coins` more (rounded up to whole Coins), and reads so in its
  * log, as `first` says when it owed nothing before. Nothing for nothing owed, or from an Organization
- * that is gone or is the Trade Organization. `cityId` is the city its army came to, where the next one
- * comes back to, if none is kept yet.
+ * that is gone or is the Trade Organization. `cityId` is the city its army came to, or the post it
+ * wants back, where the next one goes, if none is kept yet.
  */
 export function oweTradeOrg(
   world: WorldState,
@@ -71,7 +71,7 @@ function lostPostsBecomeDebts(world: WorldState): void {
   for (const c of world.crimes) {
     if (c.post === undefined || c.punished || !c.knownBy.includes(c.victimOrg)) continue
     c.punished = true
-    oweTradeOrg(world, c.culprit.org, TRADE_ORG_LOSS.capture, undefined, 'postOwed')
+    oweTradeOrg(world, c.culprit.org, TRADE_ORG_LOSS.capture, c.post, 'postOwed')
     const city = world.cities.find((x) => x.id === c.post && x.realmId === c.culprit.org)
     if (city && debtOf(world, c.culprit.org) > 0) sendPostDemand(world, c.culprit.org, city)
   }

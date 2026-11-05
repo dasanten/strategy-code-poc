@@ -178,7 +178,9 @@ describe('a wandering trader reaching a lost post', () => {
     // A debt for its worth, and no army of its own (`CONTEXT.md`: Trade Org debt).
     stepDebts(world)
     stepPunishments(world, size)
-    expect(world.debts).toEqual([{ org: realm.id, coins: TRADE_ORG_LOSS.capture }])
+    expect(world.debts).toEqual([
+      { org: realm.id, coins: TRADE_ORG_LOSS.capture, cityId: post.id },
+    ])
     expect(world.punishments).toEqual([])
     expect(crime.punished).toBe(true)
     expect(crimesSound.check(world, terrain)).toEqual([])
