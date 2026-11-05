@@ -196,12 +196,14 @@ function keepSoldiers(
   }
   const recipe = recipeFor('smithy', NPC_SMITHY_WEAPON)
   if (!smithy || !storage || !recipe) return
-  if (smithing(world, smithy, unarmed, recipe.input)) return
+  // One carrying a child can't work (`CONTEXT.md`: Carrying), so can't forge what they would fetch.
+  const smiths = unarmed.filter((r) => !r.carrying)
+  if (smithing(world, smithy, smiths, recipe.input)) return
   const stock = storage.stock ?? {}
   const enough = Object.entries(recipe.input).every(
     ([good, n]) => (stock[good as keyof Stock] ?? 0) >= n,
   )
-  if (enough) fetch(world, storage, unarmed, recipe.input)
+  if (enough) fetch(world, storage, smiths, recipe.input)
 }
 
 /** The first weapon a stock holds, if any. */
