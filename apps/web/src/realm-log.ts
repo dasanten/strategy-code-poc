@@ -693,8 +693,17 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
           return { text: `${cap(them)} demands ${terms} of you.`, tone: 'warn' }
         case 'accepted':
           if (e.terms.kind === 'city') {
+            if (e.otherIs === 'tradeOrg' && !e.mine) {
+              return {
+                text: `You gave ${terms} back to ${them}: it is a trading post again.`,
+                tone: 'info',
+              }
+            }
             if (e.otherIs) {
-              return { text: `${terms} gave in to your demand and joined your realm.`, tone: 'info' }
+              return {
+                text: `${terms} gave in to your demand and joined your realm.`,
+                tone: 'info',
+              }
             }
             return e.mine
               ? {
@@ -848,10 +857,23 @@ function debtLine(e: Extract<RealmEvent, { kind: 'debt' }>): EventLine {
         text: `You owe the Trade Organization ${e.owed} Coins, what its army came for and couldn't take. Pay at any of its warehouses.`,
         tone: 'bad',
       }
+    case 'postOwed':
+      return {
+        text: `The Trade Organization heard you took its trading post: you owe it ${e.owed} Coins, its worth. Pay at any of its warehouses.`,
+        tone: 'bad',
+      }
     case 'rose':
       return {
         text: `What you cost the Trade Organization adds ${e.coins} Coins to your debt: you owe it ${e.owed} Coins.`,
         tone: 'bad',
+      }
+    case 'postReturned':
+      return {
+        text:
+          e.owed > 0
+            ? `Giving back its trading post took ${e.coins} Coins off your debt. You still owe the Trade Organization ${e.owed} Coins.`
+            : `Giving back its trading post settled your debt. You no longer owe the Trade Organization anything.`,
+        tone: 'info',
       }
     case 'collected':
       return {

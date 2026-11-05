@@ -1603,7 +1603,8 @@ export interface Debt {
   /**
    * How far up its steps the Trade Organization has gone (ADR 0025): none until its demand goes out;
    * `demanded` from then on; `wrecks` once that demand was declined or lapsed, or its deadline passed
-   * with something still owed after an answer that didn't cover it.
+   * with something still owed after an answer that didn't cover it. While it only wants a captured
+   * post back there is none yet: that demand, refused, goes straight to `wrecks`.
    */
   step?: 'demanded' | 'wrecks'
   /** The deadline of its demand, in ticks, while the step is `demanded`. */
@@ -1653,7 +1654,10 @@ export interface Crime {
    * on rather than from the capture, however long ago that was.
    */
   heardAt?: number
-  /** The Trade Organization has sent its army to punish it (`CONTEXT.md`: Trade Org reaction). */
+  /**
+   * The Trade Organization has dealt with it: sent its army to punish it (`CONTEXT.md`: Trade Org
+   * reaction), or put it on a debt, as it does with any captured post it hears of.
+   */
   punished?: true
 }
 
@@ -1801,13 +1805,15 @@ export type RealmEventWhat =
     }
   /**
    * The realm's debt to the Trade Organization (`CONTEXT.md`: Trade Org debt) changed by `coins`,
-   * leaving `owed`: its army left it `owed` for what it couldn't take; a later crime made it `rose`;
-   * a caravan `collected` what was handed over on its demand; or the Fall of the HQ `ended` it. It is
-   * `overdue` when its demand didn't settle it and the Trade Organization goes up to its next step.
+   * leaving `owed`: its army left it `owed` for what it couldn't take; hearing who took a post left it
+   * `postOwed` for that post's worth; a later crime made it `rose`; a caravan `collected` what was
+   * handed over on its demand; giving the post back took its worth off (`postReturned`); or the Fall
+   * of the HQ `ended` it. It is `overdue` when its demand didn't settle it and the Trade Organization
+   * goes up to its next step.
    */
   | {
       kind: 'debt'
-      what: 'owed' | 'rose' | 'collected' | 'overdue' | 'ended'
+      what: 'owed' | 'postOwed' | 'rose' | 'collected' | 'postReturned' | 'overdue' | 'ended'
       coins: number
       owed: number
     }
@@ -2524,7 +2530,10 @@ export type DemandHandedOver = { goods: Partial<Record<Good, number>> } & (
  */
 export interface Demand {
   id: string
-  /** The realm that sent it. */
+  /**
+   * The realm that sent it; or the Trade Organization (`TRADE_ORG`), for a debt or, naming a city, a
+   * captured post it wants back (`CONTEXT.md`: Trade Org debt).
+   */
   fromId: string
   /**
    * The realm it was sent to, the only one who can answer it; or an NPC city by its id or the Trade

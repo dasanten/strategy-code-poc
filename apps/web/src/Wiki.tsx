@@ -1795,7 +1795,8 @@ export function Wiki() {
           news. A trader that reaches the post drops it from its loop and carries the news on, and
           anyone of the Trade Organization who saw the capture and gets away carries it too. Once
           one of them stands at another post or the HQ, the capture is a crime it knows of (see
-          Standing). If they are killed on the way and no trader ever gets there, it never reacts.
+          Standing), and it demands the city back with a debt for its worth. If they are killed on
+          the way and no trader ever gets there, it never reacts.
         </p>
       </Section>
 
@@ -2213,6 +2214,16 @@ export function Wiki() {
             its nearest warehouse and pay the fee; what they bring in comes off the debt. Decline it
             or let it lapse and its next step starts at once: its next army comes for your
             workplaces. What accepting leaves owed starts that at the deadline.
+          </li>
+          <li>
+            A trading post you took is a debt too, once it has heard who took it: it adds the post's
+            worth, {num(TRADE_ORG_LOSS.capture)} coins, to what you owe, sends no army of its own
+            for it, and <strong>demands the city back</strong>, with a deadline{' '}
+            {days(TRADE_ORG_DEBT_DEMAND_DAYS)} away. Accept and the city is a trading post again at
+            once, with those who live there, its horses and carriages, its warehouse with all it
+            holds and a caravan of its own, and the post's worth comes off your debt; anything else
+            you owe stays owed. Decline it or let it lapse and your debt goes up its steps like any
+            other. Paying all you owe at a warehouse ends this demand too, and you keep the city.
           </li>
           <li>
             A city whose Leader died starts out holding its former Player at{' '}
