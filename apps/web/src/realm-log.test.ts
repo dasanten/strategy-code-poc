@@ -82,13 +82,25 @@ describe('realm log', () => {
   })
 
   it('says what the realm owes the Trade Organization (`CONTEXT.md`: Trade Org debt)', () => {
-    const debt = (what: 'owed' | 'rose' | 'ended', coins: number, owed: number) =>
-      describeEvent({ kind: 'debt', what, coins, owed, seq: 1, ...at }).text
+    const debt = (
+      what: 'owed' | 'rose' | 'collected' | 'overdue' | 'ended',
+      coins: number,
+      owed: number,
+    ) => describeEvent({ kind: 'debt', what, coins, owed, seq: 1, ...at }).text
     expect(debt('owed', 240, 240)).toBe(
       "You owe the Trade Organization 240 Coins, what its army came for and couldn't take. Pay at any of its warehouses.",
     )
     expect(debt('rose', 20, 260)).toBe(
       'What you cost the Trade Organization adds 20 Coins to your debt: you owe it 260 Coins.',
+    )
+    expect(debt('collected', 100, 160)).toBe(
+      'A caravan brought 100 Coins of your debt to the Trade Organization. You still owe it 160 Coins.',
+    )
+    expect(debt('collected', 160, 0)).toBe(
+      'A caravan brought 160 Coins of your debt to the Trade Organization. You no longer owe it anything.',
+    )
+    expect(debt('overdue', 0, 260)).toBe(
+      'You still owe the Trade Organization 260 Coins and its demand is over: its next army comes for your workplaces. Paying in full at any of its warehouses stops it.',
     )
     expect(debt('ended', 260, 0)).toBe(
       'Your debt of 260 Coins ended with the fall of the Trade Org HQ.',

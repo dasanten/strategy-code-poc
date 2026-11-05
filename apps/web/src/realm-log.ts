@@ -53,7 +53,12 @@ function acceptedGoodsLine(
       tone: 'info',
     }
   }
-  const fetch = e.mine ? 'for you to fetch, under Direct offers' : 'for them alone to fetch'
+  const fetch =
+    e.otherIs === 'tradeOrg' && !e.mine
+      ? 'for its caravan to fetch'
+      : e.mine
+        ? 'for you to fetch, under Direct offers'
+        : 'for them alone to fetch'
   return {
     text: `${said}: ${goods} set aside at the storage, ${fetch}.`,
     tone: 'info',
@@ -315,7 +320,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       const what = `${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)}`
       const yours =
         e.wantsUnits === 0
-          ? `The ${goodText(e.gives)} you set aside for the realm of ${e.to}`
+          ? `The ${goodText(e.gives)} you set aside for ${e.to === TRADE_ORG_NAME ? e.to : `the realm of ${e.to}`}`
           : e.to
             ? `Your direct offer of ${what} to the realm of ${e.to}`
             : `Your offer of ${what}`
@@ -703,7 +708,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
           }
           return acceptedGoodsLine(e, them, terms)
         case 'declined':
-          if (e.otherIs) {
+          if (e.otherIs && e.mine) {
             return {
               text: `${cap(them)} declined your demand for ${terms}, and thinks less of you.`,
               tone: 'warn',
@@ -846,6 +851,19 @@ function debtLine(e: Extract<RealmEvent, { kind: 'debt' }>): EventLine {
     case 'rose':
       return {
         text: `What you cost the Trade Organization adds ${e.coins} Coins to your debt: you owe it ${e.owed} Coins.`,
+        tone: 'bad',
+      }
+    case 'collected':
+      return {
+        text:
+          e.owed > 0
+            ? `A caravan brought ${e.coins} Coins of your debt to the Trade Organization. You still owe it ${e.owed} Coins.`
+            : `A caravan brought ${e.coins} Coins of your debt to the Trade Organization. You no longer owe it anything.`,
+        tone: 'info',
+      }
+    case 'overdue':
+      return {
+        text: `You still owe the Trade Organization ${e.owed} Coins and its demand is over: its next army comes for your workplaces. Paying in full at any of its warehouses stops it.`,
         tone: 'bad',
       }
     case 'ended':

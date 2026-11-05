@@ -179,6 +179,7 @@ import {
   DEMANDS_PER_GAME_DAY,
   DEMAND_DECLINED_STANDING_LOSS,
   DEMAND_MAX_DAYS,
+  TRADE_ORG_DEBT_DEMAND_DAYS,
   DEMAND_NOTE_MAX_LENGTH,
   DEMAND_TRADE_ORG_STANDING_LOSS,
   DEMAND_YIELD_RESPECT_MIN,
@@ -2205,6 +2206,15 @@ export function Wiki() {
             in full, even if it refuses to trade with you. The debt ends with the fall of its HQ.
           </li>
           <li>
+            Once you owe, it sends you a <strong>demand</strong> for the debt, once for each debt,
+            with a deadline {days(TRADE_ORG_DEBT_DEMAND_DAYS)} away. The demand always asks for what
+            you owe now, and paying in full at a warehouse ends it. Accept and its caravan comes for
+            what you set aside at a storage in a city, for no fee, or you send it by a Transfer to
+            its nearest warehouse and pay the fee; what they bring in comes off the debt. Decline it
+            or let it lapse and its next step starts at once: its next army comes for your
+            workplaces. What accepting leaves owed starts that at the deadline.
+          </li>
+          <li>
             A city whose Leader died starts out holding its former Player at{' '}
             {signed(FORMER_PLAYER_STANDING)}.
           </li>
@@ -2273,7 +2283,8 @@ export function Wiki() {
           </li>
           <li>
             <strong>The threat is only words.</strong> Ignoring a demand does nothing by itself:
-            whatever was threatened is the sender's to carry out, or not.
+            whatever was threatened is the sender's to carry out, or not. The Trade Organization
+            carries out what it threatens over a debt (see Standing & reactions).
           </li>
         </ul>
       </Section>

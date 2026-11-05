@@ -695,7 +695,11 @@ The shared language of the game. Domain terms only — no implementation details
   what it cost, once, and sends no army of its own. An Organization that is gone takes its debt with
   it. While it is owed the Trade Organization goes up these steps, one after the other (ADR 0025), and
   paying it in full stops it at any step:
-  1. **It demands:** a demand (Demand) for the debt, with a deadline.
+  1. **It demands:** a demand (Demand) for the debt, with a deadline, once for each debt. It always
+     asks for what is owed now, and paying in full at a warehouse ends it. Declined or lapsed, the
+     next step starts at once. Accepted, what is handed over comes off the debt as a caravan brings it
+     in, from the warehouse nearest: set aside at a storage in a city, for no fee, or sent by a Transfer,
+     for a fee as always. What that leaves owed starts the next step at the deadline.
   2. **It wrecks:** past the deadline, its next army goes to that city and tears down workplaces of
      it, each counting for its worth against the debt, until the debt is covered or none are left.
      Those who resist are fought.

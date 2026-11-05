@@ -2,16 +2,19 @@ import {
   freeStock,
   DELIVERY_DRIVE_TRIES,
   commands,
+  debtOf,
   DELIVERY_LOAD,
   GOOD_WEIGHT,
   deliveryStorage,
   feeAtPickUp,
   handInProblem,
   nearestWarehouse,
+  offerStorage,
   realmName,
   pickUpTransferProblem,
   quoteTransfer,
   stockWeight,
+  TRADE_ORG,
   tradeCoinWarehouse,
   tradeOrgHq,
   transferFee,
@@ -36,6 +39,7 @@ import {
 } from '@csp/shared'
 import { recordEvent } from './events.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
+import { endOffer } from './offers.js'
 import type { OrderKind } from './orders.js'
 import { newId, realmOf } from './starting-city.js'
 
@@ -102,6 +106,41 @@ export function orderPickUp(
     x: storage.x,
     y: storage.y,
   })
+}
+
+/**
+ * Caravans of the warehouse nearest `storage` collect `coins` of a debt there, a load at a time, and
+ * bring them to its coin warehouse (`CONTEXT.md`: Trade Org debt): what was set aside on the offer
+ * `offerId` for no fee, or without one a Transfer's worth out of what is free, for its fee. `org`
+ * owes them. Nothing without a warehouse, or for a storage outside a city. `size` is the map's.
+ */
+export function orderDebtCollection(
+  world: WorldState,
+  size: number,
+  org: string,
+  storage: Building,
+  coins: number,
+  offerId?: string,
+): void {
+  const warehouse = nearestWarehouse(world, storage, size)
+  if (!warehouse?.cityId || !storage.cityId) return
+  const load = transferLoad('coins')
+  for (let left = coins; left > 0; left -= load) {
+    world.transfers.push({
+      id: newId(world, 'transfer'),
+      realmId: org,
+      toRealmId: TRADE_ORG,
+      toCityId: warehouse.cityId,
+      warehouseId: warehouse.id,
+      fromCityId: storage.cityId,
+      good: 'coins',
+      units: Math.min(left, load),
+      fee: 0,
+      back: false,
+      caravanId: null,
+      debt: { storageId: storage.id, ...(offerId !== undefined && { offerId }) },
+    })
+  }
 }
 
 /**
@@ -280,6 +319,26 @@ const cityName = (world: WorldState, cityId: string): string =>
 /** The realm a transfer goes to: the recipient's, or the sender's once it goes back. */
 const receiver = (t: Transfer): string => (t.back ? t.realmId : t.toRealmId)
 
+/**
+ * The building a transfer's goods go into: the recipient's storage, or for a debt being collected
+ * (`CONTEXT.md`: Trade Org debt) the coin warehouse of the warehouse its caravan came from.
+ */
+function dropOff(world: WorldState, t: Transfer): Building | undefined {
+  if (!t.debt || t.back) return deliveryStorage(world, t.toCityId)
+  const warehouse = world.buildings.find((b) => b.id === t.warehouseId)
+  return warehouse && tradeCoinWarehouse(world, warehouse)
+}
+
+/** The building a pick-up collects at: the sender's city's storage, or the one a debt names. */
+function pickUpAt(
+  world: WorldState,
+  fromCityId: string | null,
+  t: Transfer | undefined,
+): Building | undefined {
+  if (t?.debt) return world.buildings.find((b) => b.id === t.debt!.storageId)
+  return fromCityId === null ? undefined : deliveryStorage(world, fromCityId)
+}
+
 /** Whether the city `cityId` is still `realmId`'s, with a storage. */
 function holds(world: WorldState, realmId: string, cityId: string | null): boolean {
   const city = world.cities.find((c) => c.id === cityId)
@@ -287,6 +346,21 @@ function holds(world: WorldState, realmId: string, cityId: string | null): boole
     city !== undefined && city.realmId === realmId && deliveryStorage(world, city.id) !== undefined
   )
 }
+
+/** Whether the sender still holds where its transfer is picked up. */
+const senderHolds = (world: WorldState, job: TransferJob, t: Transfer): boolean =>
+  t.debt
+    ? offerStorage(world, t.realmId, t.debt.storageId) !== undefined
+    : holds(world, t.realmId, job.fromCityId)
+
+/**
+ * Whether what a transfer carries can still go in where it is going: the recipient's city is still
+ * theirs, or for a debt, it is still owed and the warehouse stands.
+ */
+const receiverHolds = (world: WorldState, t: Transfer): boolean =>
+  t.debt && !t.back
+    ? debtOf(world, t.realmId) > 0 && dropOff(world, t) !== undefined
+    : holds(world, receiver(t), t.toCityId)
 
 /**
  * What a transfer job counts on board is cut down to what the carriage holds. For a transfer of
@@ -315,12 +389,12 @@ function stepBuilding(world: WorldState, job: TransferJob, t?: Transfer): Buildi
   switch (job.step) {
     case 'collect':
     case 'fee':
-      return job.fromCityId === null ? undefined : deliveryStorage(world, job.fromCityId)
+      return pickUpAt(world, job.fromCityId, t)
     case 'load':
       return job.good === 'coins' ? coinWarehouse : warehouse
     case 'deliver':
     case 'unloadFee':
-      return t && deliveryStorage(world, t.toCityId)
+      return t && dropOff(world, t)
     case 'return':
       return job.units > 0 && job.good !== 'coins' ? warehouse : coinWarehouse
   }
@@ -346,6 +420,8 @@ function turnBack(world: WorldState, job: TransferJob, t: Transfer): void {
   t.caravanId = null
   job.step = 'return'
   job.misses = 0
+  // No caravan gets there to collect a debt, so it stays owed rather than wait on the next one.
+  if (t.debt && !delivering) drop(world, t)
   const cityId = delivering || job.fromCityId === null ? t.toCityId : job.fromCityId
   recordEvent(world, t.realmId, {
     kind: 'transferStuck',
@@ -432,13 +508,13 @@ export function runTransfer(
     return
   }
   const collecting = job.step === 'collect' || job.step === 'fee'
-  if (t && collecting && !holds(world, t.realmId, job.fromCityId)) {
+  if (t && collecting && !senderHolds(world, job, t)) {
     // The sender's city is gone: with nothing taken yet there is nothing to carry.
     if (job.units + job.robbed === 0) return nothing(world, job, t)
     return collected(world, job, t)
   }
   if (t && job.step === 'deliver') {
-    if (!holds(world, receiver(t), t.toCityId)) return cancel(world, job, t, size)
+    if (!receiverHolds(world, t)) return cancel(world, job, t, size)
     // Robbed of all it carried, it has nothing left to bring.
     if (job.units === 0 && job.robbed > 0 && !caravan.holding) {
       return sendAgain(world, job, t, deliveryStorage(world, t.toCityId))
@@ -485,8 +561,11 @@ export function runTransfer(
       return
     }
   }
-  // A pick-up leaves what is set aside for an offer alone (`CONTEXT.md`: Offer).
-  const stock = freeStock(world, b)
+  // A pick-up leaves what is set aside for an offer alone (`CONTEXT.md`: Offer), but for a debt
+  // collecting just that (`CONTEXT.md`: Trade Org debt).
+  const offerId = job.step === 'collect' || job.step === 'fee' ? t?.debt?.offerId : undefined
+  const offer = offerId === undefined ? undefined : world.offers.find((o) => o.id === offerId)
+  const stock: Stock = offerId === undefined ? freeStock(world, b) : { coins: offer?.times ?? 0 }
   const hands = (g: Good) => unitsThatFit(driver, g, world.tick)
   const fits = (g: Good) => unitsThatFitCarriage(world, carriage, g)
   const take = (from: GoodsSpot, good: Good, units: number, onto: 'carriage' | 'stop') => {
@@ -502,18 +581,28 @@ export function runTransfer(
   switch (job.step) {
     case 'collect': {
       const warehouse = world.buildings.find((x) => x.id === job.warehouseId)!
-      const to = deliveryStorage(world, t!.toCityId)
+      const to = dropOff(world, t!)
       const tiles = to ? transferTiles(size, warehouse, b, to) : 0
-      const unloadShare = t!.carriedOffer?.unloadShare ?? 0
+      // What is set aside for a debt goes for no fee: none of it is taken at the pick-up, and without
+      // a carried offer none is due anywhere else.
+      const unloadShare = offerId !== undefined ? 1 : (t!.carriedOffer?.unloadShare ?? 0)
       if (job.target === null) {
-        const q = quoteTransfer(stock, g, t!.units, tiles, unloadShare)
+        const wanted = t!.debt ? Math.min(t!.units, debtOf(world, t!.realmId)) : t!.units
+        const q = quoteTransfer(stock, g, wanted, tiles, unloadShare)
         job.target = Math.min(q.units, fits(g))
         if (job.target === 0) return nothing(world, job, t!)
       }
       // What robbers took off the carriage was collected all the same.
       const have = job.units + job.robbed
       const units = Math.min(job.target - have, stock[g] ?? 0, hands(g), fits(g))
-      if (units > 0) return take(here, g, units, 'carriage')
+      if (units > 0) {
+        // They stop being set aside now, for the driver to take them next tick.
+        if (offer) {
+          offer.times -= units
+          if (offer.times <= 0) endOffer(world, offer, 'usedUp')
+        }
+        return take(here, g, units, 'carriage')
+      }
       const fee = have > 0 ? transferFee(have * GOOD_WEIGHT[g], tiles) : 0
       job.fee = feeAtPickUp(fee, unloadShare)
       if (t!.carriedOffer) t!.carriedOffer.due = fee - job.fee
@@ -585,6 +674,8 @@ function collected(world: WorldState, job: TransferJob, t: Transfer): void {
 function nothing(world: WorldState, job: TransferJob, t: Transfer): void {
   drop(world, t)
   job.step = 'return'
+  // A debt says for itself what is still owed.
+  if (t.debt) return
   const cityId = job.fromCityId ?? t.toCityId
   recordEvent(world, t.realmId, {
     kind: 'transferStuck',
@@ -607,13 +698,34 @@ function nothing(world: WorldState, job: TransferJob, t: Transfer): void {
   }
 }
 
-/** The line a transfer put into storage `b` leaves in both realms' logs (the sender's, going back). */
+/**
+ * Coins a caravan brought in come off the debt of the one who handed them over, up to what is still
+ * owed, and their log says so (`CONTEXT.md`: Trade Org debt). Any paid at a warehouse while they were
+ * on the road may leave some over, which the Trade Organization keeps.
+ */
+function debtCollected(world: WorldState, org: string, units: number): void {
+  const debt = world.debts.find((d) => d.org === org)
+  if (!debt) return
+  const coins = Math.min(units, debt.coins)
+  debt.coins -= coins
+  if (debt.coins <= 0) world.debts = world.debts.filter((d) => d !== debt)
+  recordEvent(world, org, { kind: 'debt', what: 'collected', coins, owed: debt.coins })
+}
+
+/**
+ * The line a transfer put into storage `b` leaves in both realms' logs (the sender's, going back),
+ * or what a debt collected.
+ */
 function logArrived(
   world: WorldState,
   t: Transfer,
   units: number,
   b: { x: number; y: number },
 ): void {
+  if (t.debt && !t.back) {
+    debtCollected(world, t.realmId, units)
+    return
+  }
   const what = {
     kind: 'transferred' as const,
     good: t.good,
@@ -696,7 +808,8 @@ export function collectsTransferFrom(world: WorldState, r: Resident, storageId: 
     return t !== undefined && deliveryStorage(world, t.toCityId)?.id === storageId
   }
   if (job?.step !== 'collect' && job?.step !== 'fee') return false
-  return job.fromCityId !== null && deliveryStorage(world, job.fromCityId)?.id === storageId
+  const t = world.transfers.find((x) => x.id === job.transferId)
+  return pickUpAt(world, job.fromCityId, t)?.id === storageId
 }
 
 /**

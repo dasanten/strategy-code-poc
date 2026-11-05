@@ -8,11 +8,13 @@ import {
   NPC_PLAN_TICKS,
   TICKS_PER_GAME_DAY,
   TRADE_ORG,
+  TRADE_ORG_DEBT_DEMAND_DAYS,
   answeredByGame,
   demandHandOverProblem,
   demandNoteProblem,
   demandsCounted,
   demandsLeft,
+  deliveryStorage,
   forSale,
   freeStock,
   goodsHandedOver,
@@ -27,7 +29,9 @@ import {
   standingOrganization,
   transferLoads,
   yieldsToDemand,
+  type Building,
   type City,
+  type Debt,
   type Demand,
   type DemandHandOver,
   type DemandHandedOver,
@@ -49,7 +53,7 @@ import type { OrderKind } from './orders.js'
 import { sightOf } from './sight.js'
 import { changeStanding } from './standing.js'
 import { newId, realmOf } from './starting-city.js'
-import { orderPickUp } from './transfers.js'
+import { orderDebtCollection, orderPickUp } from './transfers.js'
 
 /*
  * Demands (`CONTEXT.md`: Demand; ADR 0024): a realm sends another realm it knows of terms, a note
@@ -188,6 +192,7 @@ function tellBoth(
 ): void {
   const base = { kind: 'demand' as const, demandId: d.id, terms: d.terms, ...extra }
   const otherIs = answeredByGame(world, d.toId)
+  const senderIs = d.fromId === TRADE_ORG ? ('tradeOrg' as const) : undefined
   recordEvent(world, d.fromId, {
     ...base,
     what: what.sender,
@@ -200,6 +205,7 @@ function tellBoth(
     what: what.receiver,
     mine: false,
     other: realmName(world, d.fromId),
+    ...(senderIs && { otherIs: senderIs }),
   })
 }
 
@@ -244,6 +250,68 @@ function answered(
 ): void {
   world.demands = world.demands.filter((x) => x !== d)
   tellBoth(world, d, { sender: answer, receiver: answer }, handedOver && { handedOver })
+  if (answer !== 'accepted') debtDemandEnded(world, d)
+}
+
+/** What the Trade Organization writes in its demand for a debt (`CONTEXT.md`: Trade Org debt). */
+const DEBT_DEMAND_NOTE =
+  'Pay what you owe at any of our warehouses, or hand it over here. Past the deadline our army comes for your workplaces.'
+
+/**
+ * The Trade Organization demands a debt of who owes it (`CONTEXT.md`: Trade Org debt), for all that
+ * is owed, the first of its steps (ADR 0025). It goes out once for each debt (`stepDebts`).
+ */
+export function sendDebtDemand(world: WorldState, debt: Debt): void {
+  const demand: Demand = {
+    id: newId(world, 'demand'),
+    fromId: TRADE_ORG,
+    toId: debt.org,
+    terms: { kind: 'goods', goods: { coins: debt.coins } },
+    note: DEBT_DEMAND_NOTE,
+    sentAt: world.tick,
+    deadline: world.tick + TRADE_ORG_DEBT_DEMAND_DAYS * TICKS_PER_GAME_DAY,
+  }
+  world.demands.push(demand)
+  debt.step = 'demanded'
+  debt.deadline = demand.deadline
+  tellBoth(world, demand, { sender: 'sent', receiver: 'received' })
+}
+
+/** The Trade Organization goes up to the next of its steps on a debt, as its log says (ADR 0025). */
+export function debtGoesUp(world: WorldState, debt: Debt): void {
+  debt.step = 'wrecks'
+  delete debt.deadline
+  recordEvent(world, debt.org, { kind: 'debt', what: 'overdue', coins: 0, owed: debt.coins })
+}
+
+/** Whether a demand is the Trade Organization's for a debt (`CONTEXT.md`: Trade Org debt). */
+export const isDebtDemand = (d: Pick<Demand, 'fromId' | 'terms'>) =>
+  d.fromId === TRADE_ORG && d.terms.kind === 'goods'
+
+/** A demand declined or lapsed: for a debt, that starts the next step (`CONTEXT.md`: Trade Org debt). */
+function debtDemandEnded(world: WorldState, d: Demand): void {
+  if (!isDebtDemand(d)) return
+  const debt = world.debts.find((x) => x.org === d.toId)
+  if (debt) debtGoesUp(world, debt)
+}
+
+/**
+ * What is set aside on a demand, at `storage` of `owner`, the one who gave in: for a realm to fetch,
+ * and for the Trade Organization, its caravans come for it (`CONTEXT.md`: Trade Org debt).
+ */
+function setAside(
+  world: WorldState,
+  d: Demand,
+  owner: string,
+  storage: Building,
+  going: Stock,
+  size: number,
+): void {
+  const offers = setAsideForDemand(world, owner, d.fromId, storage, going)
+  if (d.fromId !== TRADE_ORG) return
+  for (const offer of offers) {
+    orderDebtCollection(world, size, owner, storage, offer.times, offer.id)
+  }
 }
 
 /** The city a demand names, while it is still the city of the realm the demand was sent to. */
@@ -263,7 +331,7 @@ function goodsProblem(
   const problem = demandHandOverProblem(world, d.toId, d, order.handOver)
   if (problem) return problem
   const how = order.handOver as DemandHandOver
-  if (how.way !== 'transfer' || size === undefined) return undefined
+  if (how.way !== 'transfer' || size === undefined || d.fromId === TRADE_ORG) return undefined
   return seesStorageOf(world, d.toId, how.toCityId, size)
     ? undefined
     : 'you don’t see that city’s storage'
@@ -272,7 +340,8 @@ function goodsProblem(
 /**
  * The goods of an accepted demand change hands the way its receiver named, as far as the storage
  * holds them: set aside for the sender alone to fetch, or sent by Transfers the receiver pays for
- * (`CONTEXT.md`: Demand). What went, for the logs.
+ * (`CONTEXT.md`: Demand). For the Trade Organization its caravan brings a Transfer to its warehouse
+ * nearest (`CONTEXT.md`: Trade Org debt). What went, for the logs.
  */
 function handOverGoods(
   world: WorldState,
@@ -284,13 +353,24 @@ function handOverGoods(
   const going = goodsHandedOver(world, d.toId, goods, how)
   if (how.way === 'setAside') {
     const storage = offerStorage(world, d.toId, how.storageId)!
-    setAsideForDemand(world, d.toId, d.fromId, storage, going)
+    setAside(world, d, d.toId, storage, going, size)
     return { way: 'setAside', goods: going, x: storage.x, y: storage.y }
+  }
+  const name = (id: string) => world.cities.find((c) => c.id === id)!.name
+  if (d.fromId === TRADE_ORG) {
+    const storage = deliveryStorage(world, how.fromCityId)!
+    orderDebtCollection(world, size, d.toId, storage, going.coins ?? 0)
+    const t = world.transfers.at(-1)!
+    return {
+      way: 'transfer',
+      goods: going,
+      fromCity: name(how.fromCityId),
+      toCity: name(t.toCityId),
+    }
   }
   for (const { good, units } of transferLoads(going)) {
     orderPickUp(world, size, d.toId, how.fromCityId, how.toCityId, good, units)
   }
-  const name = (id: string) => world.cities.find((c) => c.id === id)!.name
   return {
     way: 'transfer',
     goods: going,
@@ -399,7 +479,7 @@ function cityGivesIn(world: WorldState, city: City, d: Demand, size: number): vo
     gameDeclines(world, d, DEMAND_DECLINED_STANDING_LOSS)
     return
   }
-  setAsideForDemand(world, city.id, d.fromId, from.storage, from.going)
+  setAside(world, d, city.id, from.storage, from.going, size)
   answered(world, d, 'accepted', {
     way: 'setAside',
     goods: from.going,
@@ -439,19 +519,24 @@ export function answerDemands(world: WorldState, size: number): void {
 
 /**
  * Demands lapse at their deadline, as a tick ends, and that is all: whatever was threatened is the
- * sender's to carry out, or not (`CONTEXT.md`: Demand).
+ * sender's to carry out, or not (`CONTEXT.md`: Demand). The Trade Organization carries out what it
+ * threatens over a debt (`debtDemandEnded`).
  */
 export function stepDemands(world: WorldState): void {
   if (world.demands.length === 0) return
   const lapsed = world.demands.filter((d) => world.tick >= d.deadline)
   if (lapsed.length === 0) return
   world.demands = world.demands.filter((d) => !lapsed.includes(d))
-  for (const d of lapsed) tellBoth(world, d, { sender: 'lapsed', receiver: 'lapsed' })
+  for (const d of lapsed) {
+    tellBoth(world, d, { sender: 'lapsed', receiver: 'lapsed' })
+    debtDemandEnded(world, d)
+  }
 }
 
 /**
- * Demands hold together (`CONTEXT.md`: Demand): sent by a realm that exists to another one, or to a
- * city or the Trade Organization, who answer within a planning pass; a deadline that lies ahead and
+ * Demands hold together (`CONTEXT.md`: Demand): sent by a realm that exists, or the Trade
+ * Organization for a debt (`debtDemandsSound`), to another one, or to a city or the Trade
+ * Organization, who answer within a planning pass; a deadline that lies ahead and
  * was set after it was sent, a note kept as the order allows, and terms that ask for something. No
  * realm has sent more than it may in a game day.
  */
@@ -468,7 +553,7 @@ export const demandsSound: Invariant = {
       if (d.fromId === d.toId) report(`demand ${d.id} is sent to its own sender`, [d.id])
       const byGame = answeredByGame(world, d.toId) !== undefined
       for (const realm of byGame ? [d.fromId] : [d.fromId, d.toId]) {
-        if (!world.realms.some((r) => r.id === realm)) {
+        if (realm !== TRADE_ORG && !world.realms.some((r) => r.id === realm)) {
           report(`demand ${d.id} has realm ${realm}, which does not exist`, [d.id])
         }
       }

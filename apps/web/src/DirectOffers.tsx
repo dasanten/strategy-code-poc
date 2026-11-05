@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import {
   DIRECT_OFFERS_TO_ONE_REALM,
+  TRADE_ORG,
   aboutTime,
   citiesToCarryAt,
   deliveryStorage,
@@ -262,7 +263,7 @@ export function DirectOffersPanel({
             {sent.map((o) => (
               <li key={o.id}>
                 <strong>
-                  To the realm of {o.to.realm}:{' '}
+                  To {o.to.realmId === TRADE_ORG ? o.to.realm : `the realm of ${o.to.realm}`}:{' '}
                   {(o.direct.carried
                     ? carriedLine(o, GOOD_LABELS)
                     : offerTerms(o, GOOD_LABELS)

@@ -2360,6 +2360,12 @@ export const DEMANDS_PER_GAME_DAY = 3
  */
 export const DEMAND_MAX_DAYS = 60
 
+/**
+ * The deadline of the Trade Organization's demand for a debt, in game days (`CONTEXT.md`: Trade Org
+ * debt): one real day, the longest a demand has, so a Player who comes by once a day can still pay.
+ */
+export const TRADE_ORG_DEBT_DEMAND_DAYS = 60
+
 /** The deadline the Demands form starts with, in game days: a game week. */
 export const DEMAND_DEFAULT_DAYS = 7
 

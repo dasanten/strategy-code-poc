@@ -122,7 +122,12 @@ import { npcHireSound } from './npc-hire.js'
 import { buyOffOrdersDone, buyOffsSound, directivesSound } from './directives.js'
 import { punishmentsSound } from './trade-org-punishment.js'
 import { supplyWagonsSound } from './supply-wagons.js'
-import { debtOrdersDone, debtPaymentsSound, debtsSound } from './trade-org-debt.js'
+import {
+  debtDemandsSound,
+  debtOrdersDone,
+  debtPaymentsSound,
+  debtsSound,
+} from './trade-org-debt.js'
 import { nothingLeftOfTheHq } from './hq-fall.js'
 import { hqRingsSound } from './hq-growth.js'
 import { cityPlansSound, npcFarmersKept, tradeOrgSendsNoOne } from './npc-plan.js'
@@ -2102,6 +2107,7 @@ export const worldInvariants: Invariant[] = [
   buyOffsSound,
   buyOffOrdersDone,
   debtsSound,
+  debtDemandsSound,
   debtPaymentsSound,
   debtOrdersDone,
   hqRingsSound,

@@ -5,6 +5,7 @@ import {
   DEMAND_MAX_DAYS,
   DEMAND_NOTE_MAX_LENGTH,
   GOODS,
+  TRADE_ORG,
   aboutTime,
   citiesToCarryAt,
   deliveryStorage,
@@ -21,9 +22,11 @@ import {
 import {
   answersByGame,
   citiesToDemandOf,
+  debtTransferPreview,
   demandSides,
   goodsOfLines,
   handOverQuestion,
+  senderLine,
   sentLine,
   setAsidePreview,
   termsLine,
@@ -44,7 +47,8 @@ export function DemandNote({ note }: { note: string }) {
 /**
  * Accepting a demand for goods or Coins (`CONTEXT.md`: Demand): the Player picks how they go, set
  * aside at a storage of theirs or sent by a Transfer they pay for, and reads what goes, also when
- * the storage is short, before they accept.
+ * the storage is short, before they accept. For the Trade Organization's demand for a debt its
+ * caravan fetches from a storage in a city, and a Transfer goes to its warehouse nearest.
  */
 function HandOverGoods({
   goods,
@@ -73,7 +77,8 @@ function HandOverGoods({
   const [toCityId, setToCityId] = useState('')
 
   const seen = { cities, buildings }
-  const storages = ownStorages(seen, realmId)
+  const toTradeOrg = senderId === TRADE_ORG
+  const storages = ownStorages(seen, realmId).filter((s) => !toTradeOrg || s.cityId)
   const storage = storages.find((s) => s.id === storageId) ?? storages[0]
   const cityOf = (s: SeenBuilding) => cities.find((c) => c.id === s.cityId)?.name
   const fromCities = citiesToCarryAt(seen, realmId)
@@ -90,12 +95,14 @@ function HandOverGoods({
     )?.senderTiles
     preview = !fromStorage
       ? { text: 'You have no city with a finished storage to pick up from.', canAccept: false }
-      : !toCity
-        ? { text: 'You see no storage of theirs to send it to.', canAccept: false }
-        : transferPreview(goods, freeAtStorage(fromStorage), tiles)
+      : toTradeOrg
+        ? debtTransferPreview(goods, freeAtStorage(fromStorage))
+        : !toCity
+          ? { text: 'You see no storage of theirs to send it to.', canAccept: false }
+          : transferPreview(goods, freeAtStorage(fromStorage), tiles)
   } else {
     preview = storage
-      ? setAsidePreview(goods, freeAtStorage(storage))
+      ? setAsidePreview(goods, freeAtStorage(storage), toTradeOrg)
       : { text: 'You have no finished storage to set goods aside at.', canAccept: false }
   }
 
@@ -109,7 +116,9 @@ function HandOverGoods({
             aria-label="How the goods go"
             onChange={(e) => setWay(e.target.value as DemandHandOver['way'])}
           >
-            <option value="setAside">Set aside for them to fetch</option>
+            <option value="setAside">
+              {toTradeOrg ? 'Set aside for its caravan to fetch' : 'Set aside for them to fetch'}
+            </option>
             <option value="transfer">Send by Transfer, I pay the fee</option>
           </select>
         </label>
@@ -126,17 +135,19 @@ function HandOverGoods({
               ))}
             </select>
           </label>
-          <label className="contract-field">
-            <span className="contract-label">To their city</span>
-            <select value={toCity?.id ?? ''} onChange={(e) => setToCityId(e.target.value)}>
-              {toCities.length === 0 && <option value="">No storage of theirs in sight</option>}
-              {toCities.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          {!toTradeOrg && (
+            <label className="contract-field">
+              <span className="contract-label">To their city</span>
+              <select value={toCity?.id ?? ''} onChange={(e) => setToCityId(e.target.value)}>
+                {toCities.length === 0 && <option value="">No storage of theirs in sight</option>}
+                {toCities.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </>
       ) : (
         storage && (
@@ -159,7 +170,7 @@ function HandOverGoods({
         onClick={() =>
           onAccept(
             sending
-              ? { way: 'transfer', fromCityId: fromCity!.id, toCityId: toCity!.id }
+              ? { way: 'transfer', fromCityId: fromCity!.id, toCityId: toCity?.id ?? '' }
               : { way: 'setAside', storageId: storage!.id },
           )
         }
@@ -258,11 +269,14 @@ export function DemandsPanel({
               <li key={d.id} className="army">
                 <span>
                   <strong>
-                    The realm of {d.from.realm} demands {termsLine(d.terms)}
+                    {senderLine(d.from)} demands {termsLine(d.terms)}
                   </strong>
                   <DemandNote note={d.note} />
                   <span className="muted small">
-                    Lapses in {aboutTime(d.deadline - tick)}. Ignoring it does nothing by itself.
+                    Lapses in {aboutTime(d.deadline - tick)}.{' '}
+                    {d.from.realmId === TRADE_ORG
+                      ? 'If you decline it or let it lapse, its next army comes for your workplaces. Paying in full at any warehouse stops that.'
+                      : 'Ignoring it does nothing by itself.'}
                   </span>
                 </span>
                 {d.terms.kind === 'goods' && (

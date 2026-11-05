@@ -9,7 +9,7 @@ import type { Invariant, InvariantViolation } from './invariants.js'
  * warehouses storages with all they hold. What only the HQ gave the Trade Organization ends with
  * it: caravans, with the robberies counted on their routes, wandering traders, and so the
  * deliveries and transfers still open, each with a line in its realm's log and nothing refunded; its contracts; its
- * punishments and debts, each debt with a line in the log of who owed it. The trading posts live on. Goods stay where they are, whoever that makes them
+ * punishments and debts, each debt with a line in the log of who owed it, and its demands for them. The trading posts live on. Goods stay where they are, whoever that makes them
  * belong to.
  */
 export function hqFalls(world: WorldState, hq: City): void {
@@ -49,13 +49,14 @@ export function hqFalls(world: WorldState, hq: City): void {
     recordEvent(world, d.org, { kind: 'debt', what: 'ended', coins: d.coins, owed: 0 })
   }
   world.debts = []
+  world.demands = world.demands.filter((d) => d.fromId !== TRADE_ORG)
   endTradeOrgContracts(world)
 }
 
 /**
  * A world with no Trade Org HQ has nothing left that only the HQ gave the Trade Organization
  * (`CONTEXT.md`: Fall of the HQ; ADR 0004): no caravans or robberies counted on their routes, no
- * wandering traders, no deliveries or transfers, no punishments or debts, and no contract with it on either side.
+ * wandering traders, no deliveries or transfers, no punishments or debts or demands for them, and no contract with it on either side.
  */
 export const nothingLeftOfTheHq: Invariant = {
   name: 'nothing-left-of-the-hq',
@@ -98,6 +99,10 @@ export const nothingLeftOfTheHq: Invariant = {
     left(
       'debts',
       world.debts.map((d) => d.org),
+    )
+    left(
+      'demands for debts',
+      world.demands.filter((d) => d.fromId === TRADE_ORG).map((d) => d.id),
     )
     left(
       'contracts with the Trade Organization',
