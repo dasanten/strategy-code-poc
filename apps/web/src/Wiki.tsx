@@ -170,6 +170,8 @@ import {
   STABLE_CAPACITY,
   FOAL_STAT_SPREAD,
   BREED_FOOD,
+  NPC_STABLE_HUNGRY_DAYS,
+  NPC_STABLE_REFILL_DAYS,
   STABLE_FEED_DAYS,
   DEFEND_CALM_TICKS,
   STANDING_CONTRACT_BROKEN_LOSS,
@@ -2000,7 +2002,16 @@ export function Wiki() {
           {GOOD_LABELS[NPC_SMITHY_WEAPON].toLowerCase()} for each soldier it keeps and hasn't armed
           yet ({pct(NPC_SOLDIER_SHARE)} of its adults), with the Iron and Wood to forge them; and{' '}
           {num(NPC_WAR_CHEST_PER_RESIDENT)} coins a resident as its war chest. A stable is wanted
-          once it has a horse.
+          once it has a horse, and what the stable lacks of {days(STABLE_FEED_DAYS)} of Food for its
+          horses is in the reserve too; what the stable holds counts.
+        </p>
+        <p>
+          One of its residents at a time feeds its stable, by the Feed the stable default: when the
+          stable holds less than {days(NPC_STABLE_REFILL_DAYS)} of Food for its horses they fill it
+          up, and work for the city in between. The Food comes from what is above the{' '}
+          {days(NPC_TRADE.reserveFoodDays)} kept for its people. Below that only while a horse is
+          hungry or Down, and then only {days(NPC_STABLE_HUNGRY_DAYS)} of Food for each such horse:
+          a short city feeds its people first. Trading posts and the HQ don't do this.
         </p>
         <p>
           It shares out its adults in this order: soldiers; farmers, as many as feed everyone (each

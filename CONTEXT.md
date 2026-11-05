@@ -481,7 +481,8 @@ The shared language of the game. Domain terms only — no implementation details
   and towns, on Plains, far from every starting city and from each other, and out of every
   Player's sight.
 - **NPC reserve:** what an NPC city keeps of each good it can use, and never sells: Food for
-  some game days for all its residents; Wood and Stone for its next house and some wall; weapons
+  some game days for all its residents, and what its stable lacks for its horses (Feeding the
+  stable; the stable's Food counts); Wood and Stone for its next house and some wall; weapons
   for the soldiers it keeps by its size, and the Iron and Wood to forge them; Coins as its war
   chest, for buying what it lacks and hiring help. A stable is wanted once it has horses, a mint
   only with a gold node in reach. Whatever its storages hold above the reserve is its surplus,
@@ -991,8 +992,11 @@ The shared language of the game. Domain terms only — no implementation details
   storage of their realm with Food). With no Food to fetch they wait.
 - **NPC horses:** a new NPC village or town starts with two horses, with some Food by them; one from
   before this got two when it shipped. It wants a stable once it has any, keeps it fed as Feeding
-  the stable says, with one of its residents, and breeds up to the horses it wants for its size (a
-  balance number). A founding party takes none: a daughter with none wants a stable too once nothing
+  the stable says, with one of its residents at a time, and breeds up to the horses it wants for its
+  size (a balance number). The Food comes from what is above the reserve for its people, or below
+  that a little while its horses are hungry or Down: a short city feeds its people first. The
+  resident goes when the stable runs low and fills it, and works for the city in between. Self-managed
+  cities with horses do the same. A founding party takes none: a daughter with none wants a stable too once nothing
   is short of its reserve, and gets its first horses when a Player sells it some. Trading posts and
   the HQ don't take part.
 - **Horse market:** buying and selling a horse with an NPC city, only in person: a grown resident

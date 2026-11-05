@@ -3,9 +3,11 @@ import {
   BUILD_MATERIALS,
   CITY_PRICE_STANDING_SWING,
   GOOD_WEIGHT,
+  HORSE_FOOD_PER_DAY,
   NPC_SOLDIER_SHARE,
   NPC_TRADE,
   NPC_WAR_CHEST_PER_RESIDENT,
+  STABLE_FEED_DAYS,
   STANDING_RANGE,
   WAREHOUSE_FLOOR,
   canWork,
@@ -14,6 +16,7 @@ import {
 import { recipeFor } from './building.js'
 import { cityFoodUse, cityResidents, forSale, npcCityRefuses } from './city.js'
 import { covers, isAt } from './footprint.js'
+import { horsesIn, ownsHorse } from './horses.js'
 import { standingOf } from './standing.js'
 import {
   PRICED_GOODS,
@@ -84,9 +87,33 @@ export function npcSoldierTarget(adults: number): number {
   return Math.ceil(adults * NPC_SOLDIER_SHARE)
 }
 
+/** The Food an NPC city keeps in a stable (`CONTEXT.md`: NPC horses), for its own horses in it. */
+export function npcStableKeep(world: Pick<WorldState, 'horses'>, city: City, stable: Building) {
+  const own = horsesIn(world.horses, stable).filter((h) => ownsHorse({ cityId: city.id }, h))
+  return own.length * STABLE_FEED_DAYS * HORSE_FOOD_PER_DAY
+}
+
+/**
+ * The Food an NPC city's finished stables lack of what it keeps in them (`npcStableKeep`). What a
+ * stable holds counts, so carrying Food from a storage to it leaves the city's surplus as it was.
+ * The Trade Organization's cities don't take part (`CONTEXT.md`: NPC horses).
+ */
+export function npcStablesLack(
+  world: Pick<WorldState, 'horses' | 'buildings'>,
+  city: City,
+): number {
+  if (city.tradeOrg) return 0
+  let lack = 0
+  for (const b of world.buildings) {
+    if (b.kind !== 'stable' || b.site || b.cityId !== city.id) continue
+    lack += Math.max(0, npcStableKeep(world, city, b) - (b.stock?.food ?? 0))
+  }
+  return lack
+}
+
 /**
  * The reserve an NPC city keeps (`CONTEXT.md`: NPC reserve): Food for `NPC_TRADE.reserveFoodDays`
- * game days for all its residents; the materials of a house and `NPC_TRADE.reserveWallStretches`
+ * game days for all its residents and what its stables lack (`npcStablesLack`); the materials of a house and `NPC_TRADE.reserveWallStretches`
  * stretches of wall; a weapon (`NPC_SMITHY_WEAPON`) for each soldier it keeps by its size
  * (`npcSoldierTarget`) and has not armed yet, and the smithy recipe's Iron and Wood for those of
  * them its storages hold no weapon for; and `NPC_WAR_CHEST_PER_RESIDENT` coins for each of its
@@ -94,7 +121,8 @@ export function npcSoldierTarget(adults: number): number {
  */
 export function npcReserve(world: WorldState, city: City): Stock {
   const reserve: Stock = {}
-  const food = Math.ceil(cityFoodUse(world, city, NPC_TRADE.reserveFoodDays) - 1e-9)
+  const eaten = cityFoodUse(world, city, NPC_TRADE.reserveFoodDays)
+  const food = Math.ceil(eaten + npcStablesLack(world, city) - 1e-9)
   if (food > 0) reserve.food = food
   const add = (goods: Stock | undefined, times: number) => {
     if (times <= 0) return
