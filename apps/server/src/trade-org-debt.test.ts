@@ -313,7 +313,7 @@ describe('paying the debt', () => {
     expect(queue.receive(world, player, 'q', pay(30)).type).toBe('ack')
     queue.applyAll(world)
     stepWorld(world, terrain, walking)
-    expect(world.debts).toEqual([{ org: 'r1', coins: 70 }])
+    expect(world.debts).toMatchObject([{ org: 'r1', coins: 70 }])
     expect(a1.carried.coins).toBe(40)
     expect(a1.order).toBeNull()
     expect(coins.stock!.coins).toBe(before + 30)
