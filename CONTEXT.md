@@ -709,6 +709,10 @@ The shared language of the game. Domain terms only — no implementation details
   no seller near they go on hungry. A captured post the Trade Organization
   has heard of (Lost post found out) is a debt too: it demands the city back, and returning it
   settles the debt. Admin directives go on as before, with no debt.
+- **Trade Org army at an NPC gate:** an NPC city that doesn't refuse the Trade Organization keeps its
+  gate open while only the Trade Organization's army is near, so its soldiers can walk in and buy
+  like anyone. A city that refuses it shuts them out as it does anyone it refuses, and other armed
+  outsiders near still shut the gate.
 - **Demand:** a Player or the Trade Organization sends a demand to another Organization: **terms**
   (hand over a named city; hand over goods or Coins), a short written note, and a deadline. It
   arrives at once, like a mercenary offer, wherever the other side is, and sending them is limited.
