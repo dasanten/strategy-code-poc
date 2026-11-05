@@ -83,10 +83,19 @@ describe('realm log', () => {
 
   it('says what the realm owes the Trade Organization (`CONTEXT.md`: Trade Org debt)', () => {
     const debt = (
-      what: 'owed' | 'rose' | 'collected' | 'overdue' | 'ended',
+      what: 'owed' | 'postOwed' | 'rose' | 'collected' | 'postReturned' | 'overdue' | 'ended',
       coins: number,
       owed: number,
     ) => describeEvent({ kind: 'debt', what, coins, owed, seq: 1, ...at }).text
+    expect(debt('postOwed', 600, 600)).toBe(
+      'The Trade Organization heard you took its trading post: you owe it 600 Coins, its worth. Pay at any of its warehouses.',
+    )
+    expect(debt('postReturned', 600, 300)).toBe(
+      'Giving back its trading post took 600 Coins off your debt. You still owe the Trade Organization 300 Coins.',
+    )
+    expect(debt('postReturned', 600, 0)).toBe(
+      'Giving back its trading post settled your debt. You no longer owe the Trade Organization anything.',
+    )
     expect(debt('owed', 240, 240)).toBe(
       "You owe the Trade Organization 240 Coins, what its army came for and couldn't take. Pay at any of its warehouses.",
     )

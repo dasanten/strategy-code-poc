@@ -9,6 +9,7 @@ import {
   TICKS_PER_GAME_DAY,
   TRADE_ORG,
   TRADE_ORG_DEBT_DEMAND_DAYS,
+  TRADE_ORG_LOSS,
   answeredByGame,
   demandHandOverProblem,
   demandNoteProblem,
@@ -44,7 +45,7 @@ import {
   type Stock,
   type WorldState,
 } from '@csp/shared'
-import { handOverCity } from './capture.js'
+import { handOverCity, returnPost } from './capture.js'
 import { recordEvent } from './events.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { planDue } from './npc-plan.js'
@@ -277,6 +278,42 @@ export function sendDebtDemand(world: WorldState, debt: Debt): void {
   tellBoth(world, demand, { sender: 'sent', receiver: 'received' })
 }
 
+/** What the Trade Organization writes in its demand for a captured post (`CONTEXT.md`: Trade Org debt). */
+const POST_DEMAND_NOTE =
+  'You took our trading post. Give it back and that settles what it is worth, or pay that at any of our warehouses. Past the deadline our army comes for your workplaces.'
+
+/**
+ * The Trade Organization demands of `org` the post it took and still holds (`CONTEXT.md`: Trade Org
+ * debt), once it has heard of it. The debt for its worth stands already (`lostPostsBecomeDebts`).
+ */
+export function sendPostDemand(world: WorldState, org: string, city: City): void {
+  const demand: Demand = {
+    id: newId(world, 'demand'),
+    fromId: TRADE_ORG,
+    toId: org,
+    terms: { kind: 'city', cityId: city.id, cityName: city.name },
+    note: POST_DEMAND_NOTE,
+    sentAt: world.tick,
+    deadline: world.tick + TRADE_ORG_DEBT_DEMAND_DAYS * TICKS_PER_GAME_DAY,
+  }
+  world.demands.push(demand)
+  tellBoth(world, demand, { sender: 'sent', receiver: 'received' })
+}
+
+/**
+ * The post comes back to the Trade Organization, which settles its worth of what `org` owes
+ * (`CONTEXT.md`: Trade Org debt), and only that: what else it owes stays owed, as its log says.
+ */
+function postGivenBack(world: WorldState, org: string, city: City, size: number): void {
+  returnPost(world, city, size)
+  const debt = world.debts.find((x) => x.org === org)
+  if (!debt) return
+  const off = Math.min(debt.coins, TRADE_ORG_LOSS.capture)
+  debt.coins -= off
+  if (debt.coins <= 0) world.debts = world.debts.filter((x) => x !== debt)
+  recordEvent(world, org, { kind: 'debt', what: 'postReturned', coins: off, owed: debt.coins })
+}
+
 /** The Trade Organization goes up to the next of its steps on a debt, as its log says (ADR 0025). */
 export function debtGoesUp(world: WorldState, debt: Debt): void {
   debt.step = 'wrecks'
@@ -288,11 +325,21 @@ export function debtGoesUp(world: WorldState, debt: Debt): void {
 export const isDebtDemand = (d: Pick<Demand, 'fromId' | 'terms'>) =>
   d.fromId === TRADE_ORG && d.terms.kind === 'goods'
 
-/** A demand declined or lapsed: for a debt, that starts the next step (`CONTEXT.md`: Trade Org debt). */
+/** Whether a demand is the Trade Organization's for a captured post (`CONTEXT.md`: Trade Org debt). */
+export const isPostDemand = (d: Pick<Demand, 'fromId' | 'terms'>) =>
+  d.fromId === TRADE_ORG && d.terms.kind === 'city'
+
+/**
+ * A demand of the Trade Organization's declined or lapsed: that starts the next step of its debt
+ * (`CONTEXT.md`: Trade Org debt), unless it has gone further up already, or, for a post, while its
+ * demand for the Coins is still open, whose own answer decides.
+ */
 function debtDemandEnded(world: WorldState, d: Demand): void {
-  if (!isDebtDemand(d)) return
+  if (d.fromId !== TRADE_ORG) return
   const debt = world.debts.find((x) => x.org === d.toId)
-  if (debt) debtGoesUp(world, debt)
+  if (!debt || (debt.step !== undefined && debt.step !== 'demanded')) return
+  if (isPostDemand(d) && world.demands.some((x) => isDebtDemand(x) && x.toId === d.toId)) return
+  debtGoesUp(world, debt)
 }
 
 /**
@@ -383,8 +430,9 @@ function handOverGoods(
  * Accepting a demand (`CONTEXT.md`: Demand): a named city joins the sender's realm at once, as a
  * captured one does, also the receiver's last. It is their own choice: no crime, no standing lost.
  * A city no longer theirs can't be handed over, so that demand stays open until they decline it or
- * it lapses. Goods and Coins go the way the order names (`handOverGoods`); with none of them there
- * it is refused the same way.
+ * it lapses. The Trade Organization holds a city in no realm: it gets its post back (`postGivenBack`).
+ * Goods and Coins go the way the order names (`handOverGoods`); with none of them there it is refused
+ * the same way.
  */
 const acceptDemand: OrderKind = {
   validate(world, sender, order, terrain) {
@@ -409,7 +457,8 @@ const acceptDemand: OrderKind = {
     // It may have gone since the order came, to another demand accepted in this same tick too.
     const city = cityToHandOver(world, d)
     if (!city || !terrain) return
-    handOverCity(world, city, d.fromId, terrain.size)
+    if (d.fromId === TRADE_ORG) postGivenBack(world, d.toId, city, terrain.size)
+    else handOverCity(world, city, d.fromId, terrain.size)
     answered(world, d, 'accepted')
   },
 }

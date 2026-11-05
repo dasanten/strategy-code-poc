@@ -2,6 +2,9 @@ import {
   NODE_WORKPLACE,
   TRADING_POST,
   TRADING_POST_REGION,
+  covers,
+  footprintTiles,
+  npcStorages,
   townHallOf,
   type Building,
   type City,
@@ -138,6 +141,37 @@ export function foundTradingPost(
 /** The world's trading posts. */
 export function tradingPosts(world: WorldState): City[] {
   return world.cities.filter((c) => c.tradeOrg === 'post')
+}
+
+/**
+ * A post that comes back has a warehouse again (`CONTEXT.md`: Trade Org debt). Its old warehouse, a
+ * storage since it was lost, turns back with all it holds, on the spot `foundTradingPost` gave it.
+ * Torn down since, another storage than the one its people eat from takes its place; with none, a
+ * new empty one stands on that spot, unless something else does.
+ */
+export function restoreWarehouse(world: WorldState, post: City, size: number): void {
+  const hall = townHallOf(world, post)
+  const storages = npcStorages(world, post)
+  const spot = hall && {
+    x: hall.x + FOOTPRINT.storage + 2,
+    y: hall.y - FOOTPRINT.storage - 1,
+  }
+  const at = (b: Building) => spot && b.x === spot.x && b.y === spot.y
+  const old = storages.find(at) ?? storages.slice(1).at(-1)
+  if (old) {
+    old.kind = 'warehouse'
+    return
+  }
+  if (!spot) return
+  const tiles = footprintTiles({ kind: 'warehouse', ...spot }, size)
+  if (world.buildings.some((b) => tiles.some(([x, y]) => covers(b, x, y, size)))) return
+  world.buildings.push({
+    id: newId(world, 'b'),
+    kind: 'warehouse',
+    cityId: post.id,
+    ...spot,
+    stock: {},
+  })
 }
 
 /**

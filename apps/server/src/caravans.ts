@@ -54,7 +54,7 @@ import { residentNamesTaken } from './names.js'
 import { hash, mulberry32, newResident } from './residents.js'
 import { newId } from './starting-city.js'
 import { hqLayout, tradeOrgHq } from './trade-org.js'
-import { tradingPosts } from './trading-posts.js'
+import { restoreWarehouse, tradingPosts } from './trading-posts.js'
 import { worldIndex } from './world-index.js'
 
 /*
@@ -153,6 +153,18 @@ export function leaveTradeOrg(world: WorldState, post: City): void {
   }
   world.deliveries = world.deliveries.filter((d) => !warehouses.has(d.warehouseId))
   world.transfers = world.transfers.filter((t) => !warehouses.has(t.warehouseId))
+}
+
+/**
+ * A lost post comes back to the Trade Organization (`CONTEXT.md`: Trade Org debt), the other way from
+ * `leaveTradeOrg`: it is a trading post again, its warehouse one again with all it holds, so it has
+ * its stock floor and prices back, and the HQ gives it a caravan. Wandering traders put it back on
+ * their loops by themselves (`stepTraders`).
+ */
+export function rejoinTradeOrg(world: WorldState, post: City, size: number): void {
+  post.tradeOrg = 'post'
+  restoreWarehouse(world, post, size)
+  placeCaravans(world)
 }
 
 /**
