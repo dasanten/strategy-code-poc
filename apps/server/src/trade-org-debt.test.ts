@@ -123,7 +123,7 @@ describe('what the army can’t take', () => {
     expect(world.debts).toEqual([])
     stepPunishments(world, size)
     expect(p.heading).toBe('home')
-    expect(world.debts).toEqual([{ org: 'r1', coins: WORTH }])
+    expect(world.debts).toEqual([{ org: 'r1', coins: WORTH, cityId: 'c1' }])
     expect(world.events.at(-1)).toMatchObject({
       kind: 'debt',
       what: 'owed',

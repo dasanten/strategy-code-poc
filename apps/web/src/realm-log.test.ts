@@ -167,6 +167,66 @@ describe('realm log', () => {
     )
   })
 
+  it('tells of an army that comes to tear down workplaces for a debt', () => {
+    const trip = {
+      kind: 'punished',
+      cityId: 'c1',
+      city: 'Ashford',
+      worth: 240,
+      wrecks: true,
+      seq: 1,
+      ...at,
+    } as const
+    const army = "The Trade Organization's army"
+    const line = (e: Partial<Extract<RealmEvent, { kind: 'punished' }>>) =>
+      describeEvent({ ...trip, what: 'left', ...e }).text
+    expect(line({ what: 'coming' })).toBe(
+      'The Trade Organization is sending its army to Ashford to tear down workplaces for the 240 Coins you owe.',
+    )
+    expect(line({ took: 240, why: 'enough' })).toBe(
+      `${army} left Ashford, having torn down 240 of the 240 Coins' worth you owed.`,
+    )
+    expect(line({ took: 100, why: 'paid' })).toBe(
+      `${army} left Ashford, having torn down 100 of the 240 Coins' worth you owed: your debt is paid.`,
+    )
+    expect(line({ took: 100, why: 'noWorkplaces' })).toBe(
+      `${army} left Ashford, having torn down 100 of the 240 Coins' worth you owed: Ashford has no workplaces left to tear down.`,
+    )
+    expect(line({ what: 'turnedBack', why: 'paid' })).toBe(
+      `${army} turned back without reaching Ashford: your debt is paid.`,
+    )
+    expect(line({ what: 'lost', where: 'atCity', took: 100 })).toBe(
+      `${army} was lost at Ashford, having torn down 100 of the 240 Coins' worth you owed.`,
+    )
+    expect(line({ what: 'lost', where: 'wayHome', took: 100 })).toBe(
+      `${army} was lost on its way home from Ashford.`,
+    )
+  })
+
+  it('reports each workplace its army tore down', () => {
+    const wrecked = {
+      kind: 'wrecked',
+      building: 'farm',
+      x: 12,
+      y: 34,
+      cityId: 'c1',
+      city: 'Ashford',
+      seq: 1,
+      ...at,
+    } as const
+    const owing = describeEvent({ ...wrecked, coins: 100, owed: 140 })
+    expect(owing.text).toBe(
+      "The Trade Organization's army tore down the farm of Ashford, 100 Coins off your debt: you still owe it 140 Coins.",
+    )
+    expect(owing.places).toEqual([{ name: 'farm of Ashford', x: 12, y: 34 }])
+    expect(describeEvent({ ...wrecked, coins: 40, owed: 0 }).text).toBe(
+      "The Trade Organization's army tore down the farm of Ashford, 40 Coins off your debt, which covers it.",
+    )
+    expect(describeEvent({ ...wrecked, coins: 0, owed: 0 }).text).toBe(
+      "The Trade Organization's army tore down the farm of Ashford, after your debt was settled.",
+    )
+  })
+
   it('describes a script’s trouble', () => {
     const who = { residentId: 'r1', name: 'Mara', scriptId: 3, seq: 9, ...at } as const
     expect(

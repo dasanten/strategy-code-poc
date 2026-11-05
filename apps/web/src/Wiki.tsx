@@ -180,6 +180,7 @@ import {
   DEMAND_DECLINED_STANDING_LOSS,
   DEMAND_MAX_DAYS,
   TRADE_ORG_DEBT_DEMAND_DAYS,
+  WORKPLACE_WRECK_WORTH,
   DEMAND_NOTE_MAX_LENGTH,
   DEMAND_TRADE_ORG_STANDING_LOSS,
   DEMAND_YIELD_RESPECT_MIN,
@@ -2213,6 +2214,18 @@ export function Wiki() {
             its nearest warehouse and pay the fee; what they bring in comes off the debt. Decline it
             or let it lapse and its next step starts at once: its next army comes for your
             workplaces. What accepting leaves owed starts that at the deadline.
+          </li>
+          <li>
+            Its next army then goes to that city and tears down its workplaces, one after the other,
+            the same way anyone can. Each comes off the debt for its worth (
+            {(Object.entries(WORKPLACE_WRECK_WORTH) as [BuildingKind, number][])
+              .map(([k, n]) => `${BUILDING_NAMES[k].toLowerCase()} ${num(n)} coins`)
+              .join(', ')}
+            ) until it is covered or none are left, and your realm log reports each one. The
+            workplaces of a city are the farms laid out for it and those its residents work, not one
+            nobody of it works or one someone else works. Its soldiers fight those who attack them,
+            and it goes home after, with the debt still owed if that didn't cover it, and comes
+            again. Pay in full at a warehouse while it is there and it stops and goes home.
           </li>
           <li>
             A city whose Leader died starts out holding its former Player at{' '}

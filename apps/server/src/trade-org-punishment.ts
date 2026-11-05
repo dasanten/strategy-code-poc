@@ -54,6 +54,7 @@ import {
 import { spareSoldiers } from './trade-org-army.js'
 import { buyFood, packPurse } from './trade-org-buying.js'
 import { oweTradeOrg } from './trade-org-debt.js'
+import { findWorkplaces, tearDownNext, workplacesToWreck } from './trade-org-wrecks.js'
 
 /*
  * The Trade Organization punishes (`CONTEXT.md`: Trade Org reaction, Self-interest): once it
@@ -61,8 +62,10 @@ import { oweTradeOrg } from './trade-org-debt.js'
  * it sends spare soldiers of its army to that Organization's city nearest the crime, to take
  * back `TRADE_ORG_PUNISH.times` what it lost from the city's storages, Coins first, fighting
  * whoever resists, and carry it home. What it came for and couldn't take stays owed (`CONTEXT.md`:
- * Trade Org debt). It never captures the city. Like the rest of the HQ it only gives orders a
- * Player could give (ADR 0002): walking, picking up, dropping, attacking.
+ * Trade Org debt), and past its demand's deadline an army comes to tear down workplaces for it
+ * (`Punishment.wrecks`, `trade-org-wrecks.ts`). It never captures the city. Like the rest of the HQ it
+ * only gives orders a Player could give (ADR 0002): walking, picking up, dropping, attacking, tearing
+ * down.
  */
 
 /** What goods are worth in Coins: a Coin one, any other good its warehouse base price. */
@@ -118,7 +121,7 @@ const toPunish = (world: WorldState, c: Crime) =>
 
 /**
  * One tick of the Trade Organization punishing, on a map of `size` tiles: crimes of those who owe it
- * go on their debts (`addCrimesToDebts`), it sends out new punishments (`sendOut`,
+ * go on their debts (`addCrimesToDebts`), it sends out new punishments (`sendOut`, `sendOutForDebts`,
  * `sendOutForDirectives`) and runs those under way and their supply wagons. Run after
  * `stepTradeOrgArmy` and before `stepNpcCities`; the HQ leaves the members of a punishment to it.
  */
@@ -132,6 +135,7 @@ export function stepPunishments(world: WorldState, size: number): void {
   }
   addCrimesToDebts(world)
   sendOut(world, size)
+  sendOutForDebts(world, size)
   sendOutForDirectives(world, size)
   for (const p of [...world.punishments]) runPunishment(world, hq, p, size)
   stepSupplyWagons(world, hq, size)
@@ -201,6 +205,59 @@ function sendOut(world: WorldState, size: number): void {
       cityId: city.id,
       city: city.name,
       worth,
+    })
+  }
+}
+
+/**
+ * For each debt at its step `wrecks`, with none of the Trade Organization's punishments under way
+ * against who owes it: its next army goes to the city kept with the debt, or if that is no longer
+ * theirs their city nearest the HQ, `TRADE_ORG_PUNISH.soldiers` of its spare soldiers at most, to tear
+ * down workplaces for it (`CONTEXT.md`: Trade Org debt). It goes again each time it is back, with the
+ * debt still owed. With no spare soldier, or no city to go to, it waits.
+ */
+function sendOutForDebts(world: WorldState, size: number): void {
+  const hq = tradeOrgHq(world)
+  const hqHall = hq && townHallOf(world, hq)
+  if (!hqHall) return
+  for (const debt of world.debts) {
+    if (debt.step !== 'wrecks') continue
+    if (world.punishments.some((p) => p.culpritOrg === debt.org)) continue
+    const halls = world.cities.flatMap((c) => {
+      const hall = !c.tradeOrg && cityOrganization(c) === debt.org && townHallOf(world, c)
+      return hall ? [{ c, hall }] : []
+    })
+    if (halls.length === 0) continue
+    const kept = halls.find((h) => h.c.id === debt.cityId)
+    const city = (
+      kept ??
+      halls.reduce((a, b) =>
+        wrapDistance(size, hqHall, b.hall) < wrapDistance(size, hqHall, a.hall) ? b : a,
+      )
+    ).c
+    const busy = new Set(world.punishments.flatMap((p) => p.members.map((m) => m.residentId)))
+    const soldiers = spareSoldiers(world)
+      .filter((r) => !busy.has(r.id))
+      .slice(0, TRADE_ORG_PUNISH.soldiers)
+    if (soldiers.length === 0) return
+    setOut(world, city, size, {
+      id: newId(world, 'punishment'),
+      culpritOrg: debt.org,
+      cityId: city.id,
+      worth: debt.coins,
+      members: soldiers.map((r) => ({ residentId: r.id, own: { ...r.carried } })),
+      heading: 'out',
+      took: 0,
+      startedAt: world.tick,
+      wrecks: [],
+    })
+    recordEvent(world, debt.org, {
+      kind: 'punished',
+      what: 'coming',
+      cityId: city.id,
+      city: city.name,
+      worth: debt.coins,
+      wrecks: true,
     })
   }
 }
@@ -318,9 +375,10 @@ export function headFor(r: Resident, to: { x: number; y: number }): void {
 
 /**
  * Why a punishment heads home now, if it does (`CONTEXT.md`: Punishment trip). Wherever it is, when
- * the admin directive it was sent for is lifted or the city is no longer the culprit's. On the road
- * only when it has been trying for `TRADE_ORG_PUNISH.roadTimes` the straight walk: it has no way
- * there. At the city once it has taken its worth, when the storages hold nothing, or
+ * the debt it came about is no longer owed, the admin directive it was sent for is lifted or the city
+ * is no longer the culprit's. On the road only when it has been trying for
+ * `TRADE_ORG_PUNISH.roadTimes` the straight walk: it has no way there. At the city once it has taken
+ * its worth, when the storages hold nothing (for an army that wrecks: no workplaces are left), or
  * `TRADE_ORG_PUNISH.giveUpDays` after it arrived.
  */
 function whyHeadHome(
@@ -331,6 +389,9 @@ function whyHeadHome(
   took: number,
   size: number,
 ): PunishmentEnd | undefined {
+  if (p.wrecks && !world.debts.some((d) => d.org === p.culpritOrg)) {
+    return took >= p.worth ? 'enough' : 'paid'
+  }
   if (directiveLifted(world, p)) return 'directiveLifted'
   if (!city || !stillTheCulprits(world, p, city)) return 'cityLost'
   if (p.arrivedAt === undefined) {
@@ -343,8 +404,12 @@ function whyHeadHome(
     )
     return world.tick - p.startedAt >= most ? 'noWay' : undefined
   }
-  if (took >= p.worth) return 'enough'
-  if (storagesToTake(world, city).length === 0) return 'empty'
+  if (p.wrecks) {
+    if (p.wrecks.length === 0) return 'noWorkplaces'
+  } else {
+    if (took >= p.worth) return 'enough'
+    if (storagesToTake(world, city).length === 0) return 'empty'
+  }
   const stayed = world.tick - p.arrivedAt
   return stayed >= TRADE_ORG_PUNISH.giveUpDays * TICKS_PER_GAME_DAY ? 'gaveUp' : undefined
 }
@@ -532,16 +597,19 @@ function logPunished(
     took: p.took,
     ...line,
     ...(where && { where }),
+    ...(p.wrecks && { wrecks: true as const }),
   })
 }
 
 /**
  * What a punishment for crimes came for and didn't take stays owed (`CONTEXT.md`: Trade Org debt),
  * from when it heads home or is lost. `took` is what it got; one sent for an admin directive leaves
- * no debt.
+ * no debt, nor does one that came to tear down workplaces for a debt, which still stands.
  */
 function leaveDebt(world: WorldState, p: Punishment, took: number): void {
-  if (p.directiveId === undefined) oweTradeOrg(world, p.culpritOrg, p.worth - took)
+  if (p.directiveId === undefined && !p.wrecks) {
+    oweTradeOrg(world, p.culpritOrg, p.worth - took, p.cityId)
+  }
 }
 
 /**
@@ -557,7 +625,9 @@ function leaveDebt(world: WorldState, p: Punishment, took: number): void {
  * other goods to its goods warehouse, then goes home; once every living member is home with
  * nothing taken, it is over. The culprit reads what happens as it happens: it arrived, it left with
  * what it took, it turned back without reaching the city and why, or it was lost, and what that
- * leaves owed (`leaveDebt`).
+ * leaves owed (`leaveDebt`). An army that wrecks takes no goods: at the city its soldiers tear down
+ * the workplaces it finds (`findWorkplaces`), and what comes down counts against the debt
+ * (`countWrecked`).
  */
 function runPunishment(world: WorldState, hq: City, p: Punishment, size: number): void {
   const members = living(world, p)
@@ -573,8 +643,10 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
     return
   }
   for (const { r, own } of members) eatFromOwn(r, own)
-  const took = tookSoFar(world, p)
+  const took = p.wrecks ? p.took : tookSoFar(world, p)
+  const debt = p.wrecks && world.debts.find((d) => d.org === p.culpritOrg)
   if (p.heading === 'out') {
+    if (debt) p.worth = p.took + debt.coins
     p.took = Math.min(took, p.worth)
     if (
       p.arrivedAt === undefined &&
@@ -584,6 +656,9 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
     ) {
       p.arrivedAt = world.tick
       logPunished(world, p, city, { what: 'arrived' })
+    }
+    if (p.wrecks && p.arrivedAt !== undefined && city && stillTheCulprits(world, p, city)) {
+      findWorkplaces(world, p, city, size)
     }
     const why = whyHeadHome(world, hq, p, city, took, size)
     if (why) {
@@ -599,7 +674,9 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
     !directiveLifted(world, p)
       ? city
       : undefined
-  const storages = robbing ? storagesToTake(world, robbing) : []
+  const storages = robbing && !p.wrecks ? storagesToTake(world, robbing) : []
+  const wrecking =
+    robbing && debt && p.heading === 'out' ? workplacesToWreck(world, p, debt.coins) : []
   const target = city && townHallOf(world, city)
   const ids = new Set(members.map((m) => m.r.id))
   const on = wagonOf(world, p)
@@ -618,6 +695,8 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
   const onTheRoad = p.heading === 'home' || p.arrivedAt === undefined
   const wagonShare = on ? (on.carriage.load.food ?? 0) / (members.length + 1) : 0
   for (const { r, own, member } of members) {
+    const o = r.order
+    if (o?.kind === 'tearDown' && !wrecking.some((b) => b.id === o.buildingId)) r.order = null
     if (r.order?.kind === 'attack') continue
     if (resisting.length > 0) {
       const nearest = resisting.reduce((a, b) =>
@@ -650,6 +729,10 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
     }
     if (p.arrivedAt === undefined) {
       if (target) headFor(r, target)
+      continue
+    }
+    if (p.wrecks) {
+      tearDownNext(r, wrecking, size, headFor)
       continue
     }
     if (storages.length === 0) continue

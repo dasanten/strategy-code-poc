@@ -121,6 +121,7 @@ import { npcGateShutToItsPunishers } from './npc-defence.js'
 import { npcHireSound } from './npc-hire.js'
 import { buyOffOrdersDone, buyOffsSound, directivesSound } from './directives.js'
 import { punishmentsSound } from './trade-org-punishment.js'
+import { wrecksSound } from './trade-org-wrecks.js'
 import { supplyWagonsSound } from './supply-wagons.js'
 import {
   debtDemandsSound,
@@ -2107,6 +2108,7 @@ export const worldInvariants: Invariant[] = [
   buyOffsSound,
   buyOffOrdersDone,
   debtsSound,
+  wrecksSound,
   debtDemandsSound,
   debtPaymentsSound,
   debtOrdersDone,

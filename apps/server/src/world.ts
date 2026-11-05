@@ -47,6 +47,7 @@ import { resolveTrades } from './trading.js'
 import { resolveOffers, stepOffers } from './offers.js'
 import { resolveBuyOffs } from './directives.js'
 import { resolveDebtPayments, stepDebts } from './trade-org-debt.js'
+import { countWrecked } from './trade-org-wrecks.js'
 import { stepCrimes } from './crimes.js'
 import { stepStanding } from './standing.js'
 import { stepPersuasion } from './persuasion.js'
@@ -275,7 +276,7 @@ function stepRest(
   const builds = requestBuilding(world)
   resolveBuilding(world, builds, terrain)
   const teardowns = requestTearingDown(world)
-  resolveTearingDown(world, teardowns, terrain)
+  countWrecked(world, resolveTearingDown(world, teardowns, terrain))
   const work = requestWork(world)
   resolveWork(world, work)
   stepTeaching(world, terrain.size)

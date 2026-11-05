@@ -1697,6 +1697,23 @@ export const WORKPLACE_MAX_WORKERS: Partial<Record<BuildingKind, number>> = {
 }
 
 /**
+ * What each kind of workplace counts for against a debt when the Trade Organization's army tears it
+ * down (`CONTEXT.md`: Trade Org debt), in Coins: about its materials at their warehouse base price and
+ * 20 Coins for each game day of a builder's work (as `CARRIAGE_STOLEN_WORTH` weighs a carriage), and
+ * never less than 100, as a farm or lumber camp is cheap to build but worth more than that to a city.
+ * So a debt for a killing (`TRADE_ORG_LOSS`, twice) takes about two to four workplaces.
+ */
+export const WORKPLACE_WRECK_WORTH: Partial<Record<BuildingKind, number>> = {
+  farm: 100,
+  lumberCamp: 100,
+  quarry: 120,
+  mine: 200,
+  smelter: 200,
+  mint: 280,
+  smithy: 300,
+}
+
+/**
  * The skill each kind of workplace uses and teaches (`CONTEXT.md`: Skill): Farming on a farm,
  * Woodcutting in a lumber camp, Mining in quarries and mines, Smelting in smelters and mints,
  * Smithing in a smithy.
