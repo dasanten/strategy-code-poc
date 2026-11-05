@@ -441,6 +441,16 @@ The shared language of the game. Domain terms only — no implementation details
 - **House:** a building in a city's area where a fixed number of residents live (the number is in `balance.ts` and the Wiki). A city's **free housing** is
   its houses' room minus its residents. Houses are the only housing for now; later buildings
   (a palace, a castle) may add room the same way.
+- **City layout:** how an NPC city sets out its town: **Grid** (blocks of houses between straight
+  streets), **Rings** (houses in circles round the town hall), **Main street** (rows along a road
+  from its gate) or **Quarters** (houses, workshops and storages each in their own part). A city
+  gets one at random when it comes to be, a self-managed one when its Leader dies, and keeps it. It
+  says where houses, storages and workshops (smelter, smithy, mint, stable) go, nearest its home
+  first, inside its wall and on outward as the city grows; a spot that doesn't fit is skipped.
+  Streets are real roads, built by its road crew (NPC road). Walls, gates, farms and workplaces on
+  nodes go where they do anyway. A city from before layouts got one when they shipped: nothing is
+  torn down, and new buildings follow it around what stands. Trading posts, the HQ and Players'
+  cities have none.
 - **Food surplus:** a city has one when its storage holds more Food than all its residents eat
   in a set number of game days. Food that residents carry doesn't count.
 - **Storage:** a building where goods are kept. In a city's area it is that city's storage and goes
