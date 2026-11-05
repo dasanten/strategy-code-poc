@@ -101,7 +101,19 @@ body {
 }
 .hud-goods {
   display: inline-flex;
+  align-items: center;
   gap: 14px;
+}
+.hud-goods-pick {
+  max-width: 130px;
+  padding: 1px 4px;
+  font-size: 12px;
+}
+/* The picker's room: without it Log out would run off the bar on a small laptop or tablet. */
+@media (max-width: 1150px) {
+  .hud-top .hud-muted {
+    display: none;
+  }
 }
 .hud-good,
 .hud-leader {
@@ -555,6 +567,12 @@ button.hud-logout {
   padding: 10px 10px 4px;
   border-top: 1px solid var(--ui-line);
   margin-top: 6px;
+}
+.hud-menu-goods .hud-goods-pick {
+  flex: 1 0 100%;
+  max-width: none;
+  padding: 8px;
+  font-size: 14px;
 }
 .hud-menu .hud-leader {
   padding: 6px 10px;

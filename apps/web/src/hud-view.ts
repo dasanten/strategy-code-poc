@@ -1,4 +1,4 @@
-import type { Building, Good } from '@csp/shared'
+import { buildingRealm, type Building, type City, type Good } from '@csp/shared'
 
 /**
  * The drawers the tool rail opens over the map (ADR 0008), in rail order. Cities holds the city
@@ -53,25 +53,76 @@ export function showBeside(
   return { left: 0, right: 0, closeDrawer }
 }
 
-/** The goods the top bar shows for the home city, in this order. */
+/** The goods the top bar shows, in this order (`CONTEXT.md`: Goods in the top bar). */
 export const KEY_GOODS = ['food', 'wood', 'stone', 'coins'] as const satisfies readonly Good[]
 export type KeyGood = (typeof KEY_GOODS)[number]
 
+/** What the top bar's goods are for: one city of the realm by id, or null for the entire realm. */
+export type GoodsPick = string | null
+
+/** What the picker beside the goods offers: the realm's cities the Player knows, by name. */
+export function goodsPickCities<C extends Pick<City, 'id' | 'name' | 'realmId'>>(
+  known: readonly C[],
+  realmId: string,
+): C[] {
+  return known.filter((c) => c.realmId === realmId).sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/** What to show for a picked city: a city no longer the realm's goes back to the entire realm. */
+export function goodsPickOf(picked: GoodsPick, cities: readonly Pick<City, 'id'>[]): GoodsPick {
+  return cities.some((c) => c.id === picked) ? picked : null
+}
+
+/** What the goods shown are, for those who can't see the picker (the aria-label). */
+export function goodsLabel(pick: GoodsPick, cities: readonly Pick<City, 'id' | 'name'>[]): string {
+  const city = cities.find((c) => c.id === pick)
+  return city ? `Goods in ${city.name}` : 'Goods in the entire realm'
+}
+
 /**
- * How much of each key good the city's finished storages and warehouses in sight hold together.
- * A stable's storage is left out: its Food is for its horses.
+ * How much of each key good the finished storages and warehouses in sight hold together: those of
+ * the picked city, or with no pick every one of the realm, outpost storages included. A stable's
+ * storage is left out: its Food is for its horses.
  */
 export function keyGoods(
-  buildings: readonly Building[],
-  cityId: string | null | undefined,
+  world: { buildings: readonly Building[]; cities: readonly Pick<City, 'id' | 'realmId'>[] },
+  realmId: string,
+  pick: GoodsPick,
 ): Record<KeyGood, number> {
   const totals = { food: 0, wood: 0, stone: 0, coins: 0 }
-  if (!cityId) return totals
-  for (const b of buildings) {
-    if (b.cityId !== cityId || b.site || (b.kind !== 'storage' && b.kind !== 'warehouse')) continue
+  for (const b of world.buildings) {
+    if (b.site || (b.kind !== 'storage' && b.kind !== 'warehouse')) continue
+    if (pick === null ? buildingRealm(world, b) !== realmId : b.cityId !== pick) continue
     for (const good of KEY_GOODS) totals[good] += b.stock?.[good] ?? 0
   }
   return totals
+}
+
+const GOODS_PICK_KEY = 'csp.goodsPick'
+
+/** The pick this browser remembers; the entire realm when it has none. */
+export function rememberedGoodsPick(
+  storage: () => Pick<Storage, 'getItem'> = () => localStorage,
+): GoodsPick {
+  try {
+    return storage().getItem(GOODS_PICK_KEY)
+  } catch {
+    // Storage can be off (a private window); the top bar then just shows the entire realm.
+    return null
+  }
+}
+
+/** Remembers the pick in this browser, if it lets us. */
+export function rememberGoodsPick(
+  pick: GoodsPick,
+  storage: () => Pick<Storage, 'setItem' | 'removeItem'> = () => localStorage,
+): void {
+  try {
+    if (pick === null) storage().removeItem(GOODS_PICK_KEY)
+    else storage().setItem(GOODS_PICK_KEY, pick)
+  } catch {
+    // Not remembered, which only costs a click next time.
+  }
 }
 
 /** How wide, in pixels, the Player can drag a drawer (the wide script drawer keeps its own). */

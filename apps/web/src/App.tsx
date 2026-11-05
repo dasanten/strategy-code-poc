@@ -67,7 +67,18 @@ import { StandingPanel } from './Standing.js'
 import { TileMenu, WaypointsPanel } from './Waypoints.js'
 import { api } from './api.js'
 import { CityInspector } from './CityInspector.js'
-import { keyGoods, showBeside, toggleDrawer, type DrawerId, type OpenDrawer } from './hud-view.js'
+import {
+  goodsPickCities,
+  goodsPickOf,
+  keyGoods,
+  rememberGoodsPick,
+  rememberedGoodsPick,
+  showBeside,
+  toggleDrawer,
+  type DrawerId,
+  type GoodsPick,
+  type OpenDrawer,
+} from './hud-view.js'
 import {
   CentredDialog,
   Drawer,
@@ -412,6 +423,19 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // The cities and buildings the Player knows, in sight or remembered (`CONTEXT.md`: Last seen).
   const knownCities = world ? knownOf(world.cities, world.lastSeen.cities) : []
   const knownBuildings = world ? knownOf(world.buildings, world.lastSeen.buildings) : []
+  // The goods in the top bar (`CONTEXT.md`: Goods in the top bar). The pick stays remembered while
+  // its city is lost, as a city just out of sight can be missing from what the Player knows.
+  const [goodsPicked, setGoodsPicked] = useState(() => rememberedGoodsPick())
+  const goods = (() => {
+    if (!world) return undefined
+    const cities = goodsPickCities(knownCities, world.home.realmId)
+    const pick = goodsPickOf(goodsPicked, cities)
+    const onPick = (next: GoodsPick) => {
+      setGoodsPicked(next)
+      rememberGoodsPick(next)
+    }
+    return { totals: keyGoods(world, world.home.realmId, pick), cities, pick, onPick }
+  })()
   /**
    * For one of the Player's own residents: the cities to relocate them to and why they can't be
    * told to at all, if they can't (`CONTEXT.md`: Relocate), from what the Player knows.
@@ -1458,7 +1482,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         cityName={homeCity?.name}
         tick={world?.tick}
         status={status}
-        goods={world && homeCity ? keyGoods(world.buildings, homeCity.id) : undefined}
+        goods={goods}
         leader={leader?.name}
         onLogout={logout}
         onWiki={() => reportFirstDay('openWiki')}
@@ -1467,8 +1491,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         <PhoneMenu
           open={openDrawer}
           onToggle={(id) => setOpenDrawer((open) => toggleDrawer(open, id))}
-          goods={world && homeCity ? keyGoods(world.buildings, homeCity.id) : undefined}
-          cityName={homeCity?.name}
+          goods={goods}
           leader={leader?.name}
           account={account.name}
           onLogout={logout}
