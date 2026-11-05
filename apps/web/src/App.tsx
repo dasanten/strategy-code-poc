@@ -59,6 +59,8 @@ import { AlliancePanel } from './Alliance.js'
 import { commandsSeen } from './alliance-army.js'
 import { ArmiesPanel, type ArmyPick } from './Armies.js'
 import { ContractsPanel } from './Contracts.js'
+import { demandNoticeLine, demandSides } from './demand-view.js'
+import { DemandsPanel } from './Demands.js'
 import { DirectOffersPanel } from './DirectOffers.js'
 import { incomingItems, incomingNoticeLine } from './incoming-view.js'
 import { StandingPanel } from './Standing.js'
@@ -436,6 +438,23 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [focus, setFocus] = useState<{ x: number; y: number; cover: Covered }>()
   // The drawer open over the map, if any (ADR 0008: one at a time).
   const [openDrawer, setOpenDrawer] = useState<OpenDrawer>()
+  // The notice of demands sent to the realm (`CONTEXT.md`: Demand), until the Player dismisses it
+  // or has them in front of them in the drawer.
+  const [demandsPutAway, setDemandsPutAway] = useState<ReadonlySet<string>>(new Set())
+  const demands = world?.diplomacy.demands
+  const homeRealm = world?.home.realmId
+  const putDemandsAway = useCallback(() => {
+    if (demands && homeRealm) {
+      setDemandsPutAway(new Set(demandSides(demands, homeRealm).incoming.map((d) => d.id)))
+    }
+  }, [demands, homeRealm])
+  useEffect(() => {
+    if (openDrawer === 'demands') putDemandsAway()
+  }, [openDrawer, putDemandsAway])
+  const demandNotice =
+    demands && homeRealm
+      ? demandNoticeLine(demands, homeRealm, demandsPutAway, openDrawer === 'demands')
+      : undefined
   // The notice of what others sent the realm (`CONTEXT.md`: Notices), until the Player dismisses it
   // or has it in front of them in the drawer.
   const [incomingPutAway, setIncomingPutAway] = useState<ReadonlySet<string>>(new Set())
@@ -1574,6 +1593,23 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         )}
       {world &&
         drawer(
+          'demands',
+          <DemandsPanel
+            demands={world.diplomacy.demands}
+            realmId={world.home.realmId}
+            knownRealms={world.diplomacy.knownRealms}
+            knownNpcOrgs={world.diplomacy.knownNpcOrgs}
+            cities={world.cities}
+            buildings={world.buildings}
+            carriedWays={world.diplomacy.carriedWays ?? []}
+            noCaravans={world.diplomacy.noCaravans === true}
+            lastSeen={world.lastSeen.cities}
+            tick={world.tick}
+            sendOrder={sendOrder}
+          />,
+        )}
+      {world &&
+        drawer(
           'directOffers',
           <DirectOffersPanel
             offers={world.diplomacy.directOffers}
@@ -1695,6 +1731,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         {laneNotices({
           pick: pick !== undefined,
           horseOffer: world?.horseOffer,
+          demand: demandNotice !== undefined,
           incoming: incomingNotice !== undefined,
           firstDay: world !== null && firstDayShown(world.firstDay),
           groupReport: groupReport !== undefined,
@@ -1718,6 +1755,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               key={kind}
               horses={HORSE_GRANT_HORSES}
               onClaim={() => sendOrder({ kind: 'claimHorses' })}
+            />
+          ) : kind === 'demand' && demandNotice ? (
+            <IncomingNotice
+              key={kind}
+              line={demandNotice}
+              onOpen={() => setOpenDrawer('demands')}
+              onDismiss={putDemandsAway}
             />
           ) : kind === 'incoming' && incomingNotice ? (
             <IncomingNotice

@@ -49,6 +49,7 @@ import { recordEvent } from './events.js'
 import { rememberFormerPlayer } from './standing.js'
 import { leaveOnLeaderDeath } from './alliances.js'
 import { endContractsOnLeaderDeath } from './contracts.js'
+import { lapseDemandsOnLeaderDeath } from './demands.js'
 import { NPC_ORDER_KINDS, npcHome, walkTo } from './npc-behaviour.js'
 import { caravanFood, leaveCaravans } from './caravans.js'
 import { wagonFood } from './supply-wagons.js'
@@ -325,6 +326,7 @@ export function gatherPile(world: WorldState, b: Building, size = MAP_SIZE): voi
  */
 export function endRealm(world: WorldState, realm: Realm, size: number): void {
   endContractsOnLeaderDeath(world, realm.id)
+  lapseDemandsOnLeaderDeath(world, realm.id)
   leaveOnLeaderDeath(world, realm.id)
   const cities = world.cities.filter((c) => c.realmId === realm.id)
   for (const c of cities) c.realmId = null

@@ -14,6 +14,7 @@ import {
   SCRIPT_VIEWS,
   Terrain,
   DOING_MAX_LENGTH,
+  demandsFor,
   isDown,
   ageInYears,
   occupationTicksLeft,
@@ -550,6 +551,17 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   // Requests are applied only after the run, so the cap counts the waypoints the run added, and
   // one it removed can't be removed again; the room a removal makes is there from the next run.
   const pending = (kind: string) => requests.filter((r) => r.kind === kind)
+  // The demands of the Player's realm (`CONTEXT.md`: Demand); an NPC city has none.
+  queries.demands = () =>
+    side === undefined || sender.npcCityId !== undefined
+      ? []
+      : demandsFor(world, side).map(({ from, to, ...d }) => ({
+          ...d,
+          fromId: from.realmId,
+          from: from.realm,
+          toId: to.realmId,
+          to: to.realm,
+        }))
   queries.waypoints = () =>
     sender.npcCityId !== undefined ? [] : waypointsOf(world, sender.userId)
   actions.addWaypoint = ([x, y, name]) => {
@@ -842,6 +854,16 @@ function residentActions(
     renameHorse: ([horseId, name]) =>
       request('renameHorse', { horseId: plain(horseId), name: plain(name) }),
     claimHorses: () => request('claimHorses', {}),
+    sendDemand: ([realmId, terms, note, days]) =>
+      request('sendDemand', {
+        realmId: plain(realmId),
+        terms: plain(terms),
+        note: plain(note),
+        days: plain(days),
+      }),
+    acceptDemand: ([demandId, handOver]) =>
+      request('acceptDemand', { demandId: plain(demandId), handOver: plain(handOver) }),
+    declineDemand: ([demandId]) => request('declineDemand', { demandId: plain(demandId) }),
     roadLine: ([x, y]) =>
       request('roadLine', {
         from: { x: resident.x, y: resident.y },
