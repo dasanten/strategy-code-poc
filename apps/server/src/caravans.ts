@@ -92,11 +92,23 @@ export function routeEnd(world: WorldState, caravan: Caravan, end: Caravan['head
 }
 
 /**
+ * A caravan ends: it lets go of what it was carrying out, and its crew stop what it had them
+ * doing, a drive above all, which only a caravan's driver may hold (`npcOrdersAllowed`). They are
+ * still the HQ's, which runs them from here (`runResidents`). The caller takes it off the caravans.
+ */
+function endCaravan(world: WorldState, caravan: Caravan): void {
+  releaseDelivery(world, caravan)
+  releaseTransfer(world, caravan)
+  const crew = new Set(crewIdsOf(caravan))
+  for (const r of world.residents) if (crew.has(r.id)) r.order = null
+}
+
+/**
  * A trading post that a realm took leaves the Trade Organization (`CONTEXT.md`: Trading post):
  * it becomes a plain city, its warehouse a storage with all it holds, so it has no stock floor
- * and no prices any more. Its caravan breaks up and its route's robberies are forgotten. The
- * deliveries and transfers that wait at its warehouse go over to the HQ's goods warehouse, which
- * sends them out of its own stock (`CONTEXT.md`: Guaranteed carriage).
+ * and no prices any more. Its caravan ends (`endCaravan`) and its route's robberies are forgotten.
+ * The deliveries and transfers that wait at its warehouse go over to the HQ's goods warehouse,
+ * which sends them out of its own stock (`CONTEXT.md`: Guaranteed carriage).
  */
 export function leaveTradeOrg(world: WorldState, post: City): void {
   if (post.tradeOrg !== 'post') return
@@ -109,8 +121,7 @@ export function leaveTradeOrg(world: WorldState, post: City): void {
   }
   world.caravans = world.caravans.filter((caravan) => {
     if (caravan.postId !== post.id) return true
-    releaseDelivery(world, caravan)
-    releaseTransfer(world, caravan)
+    endCaravan(world, caravan)
     return false
   })
   delete world.routeRobberies[post.id]
@@ -534,8 +545,7 @@ export function stepCaravans(world: WorldState, size: number): void {
     const carriage = index.carriageById(caravan.carriageId)
     const post = world.cities.find((c) => c.id === caravan.postId && c.tradeOrg === 'post')
     if (!hq || !carriage || !post) {
-      releaseDelivery(world, caravan)
-      releaseTransfer(world, caravan)
+      endCaravan(world, caravan)
       return false
     }
     if (caravan.driverId !== null && !index.residentById(caravan.driverId)) {
@@ -635,8 +645,7 @@ export function caravanCarriageStolen(
   const hq = tradeOrgHq(world)
   const hall = hq && townHallOf(world, hq)
   if (!hq || !hall) {
-    releaseDelivery(world, caravan)
-    releaseTransfer(world, caravan)
+    endCaravan(world, caravan)
     world.caravans = world.caravans.filter((c) => c !== caravan)
     return
   }

@@ -9,6 +9,7 @@ import {
   occupierOf,
   realmName,
   townHallOf,
+  tradeOrgHq,
   type City,
   type TerrainMap,
   type WorldState,
@@ -541,5 +542,30 @@ describe('Capturing a trading post', () => {
     expect(post).toMatchObject({ realmId: realm.id, occupation: null })
     expect(post.tradeOrg).toBeUndefined()
     expect(world.caravans.some((c) => c.postId === post.id)).toBe(false)
+  })
+
+  it('ends its caravan’s errands: the crew stop what the caravan had them doing', () => {
+    const { world, terrain: land, post } = worldWithPost()
+    const route = world.caravans.find((c) => c.postId === post.id)!
+    const crew = (id: string | null) => world.residents.find((r) => r.id === id)!
+    const carriage = world.carriages.find((k) => k.id === route.carriageId)!
+    const { x, y } = carriage
+    const driver = crew(route.driverId)
+    const [walking, chasing] = route.escortIds.map(crew)
+    const thief = world.residents.find((r) => r.owner === world.realms[0]!.id)!
+    const target = { x: x + 5, y }
+    driver.order = { kind: 'drive', carriageId: carriage.id, target, path: null, progress: 0 }
+    walking!.order = { kind: 'walkTo', target, path: null, progress: 0 }
+    chasing!.order = attackOrder(thief.id, false, true)
+
+    captureCity(world, post, world.realms[0]!.id, land.size)
+
+    for (const r of [driver, walking!, chasing!]) expect(r.order).toBeNull()
+    // Still the HQ's, which runs them from here, and the carriage stands where it stood.
+    expect(driver).toMatchObject({ owner: null, cityId: tradeOrgHq(world)!.id })
+    expect(world.carriages.find((k) => k.id === carriage.id)).toMatchObject({ x, y })
+    expect(checkInvariants(world, land)).toEqual([])
+    stepWorld(world, land)
+    expect(checkInvariants(world, land)).toEqual([])
   })
 })
