@@ -10,6 +10,7 @@ import {
   commanderOf,
   diplomacyFor,
   foundingProblem,
+  traderVisitsTo,
   regionMapFor,
   townHallOf,
   type Account,
@@ -241,6 +242,8 @@ interface Client {
   lastWorkSettings: string
   /** The Player's waypoints last sent, as JSON, so a tick sends them only when they changed. */
   lastWaypoints: string
+  /** The traders standing at the realm's cities last sent, as JSON (`CONTEXT.md`: Trader stop). */
+  lastTraderVisits: string
 }
 
 /**
@@ -437,6 +440,7 @@ export function attachRealtime(
       horseOffer: !world.horseOffersClaimed.includes(user.id),
       lastWorkSettings: '',
       lastWaypoints: JSON.stringify(waypointsOf(world, user.id)),
+      lastTraderVisits: JSON.stringify(traderVisitsTo(world, realm.id)),
     }
     clients.set(socket, client)
     // The view starts at the town hall of the realm's first city, or with the Leader if it has
@@ -485,6 +489,7 @@ export function attachRealtime(
       region: regionFor(client, []) ?? null,
       horseOffer: client.horseOffer,
       waypoints: [...waypointsOf(world, user.id)],
+      traderVisits: traderVisitsTo(world, realm.id),
       firstDay: readFirstDay(opts.db, user.id),
       workSettings,
     })
@@ -666,6 +671,11 @@ export function attachRealtime(
       const waypointsJson = JSON.stringify(waypoints)
       const movedWaypoints = waypointsJson !== client.lastWaypoints
       if (movedWaypoints) client.lastWaypoints = waypointsJson
+      // A notice while one stands at the realm's cities, in sight or not (`CONTEXT.md`: Trader stop).
+      const traderVisits = traderVisitsTo(world, client.realmId)
+      const visitsJson = JSON.stringify(traderVisits)
+      const newVisits = visitsJson !== client.lastTraderVisits
+      if (newVisits) client.lastTraderVisits = visitsJson
       const tick = {
         type: 'tick' as const,
         tick: world.tick,
@@ -679,6 +689,7 @@ export function attachRealtime(
         ...(offerChanged ? { horseOffer } : {}),
         ...(settingsChanged ? { workSettings } : {}),
         ...(movedWaypoints ? { waypoints: [...waypoints] } : {}),
+        ...(newVisits ? { traderVisits } : {}),
       }
       // `changed` and `gone` go last, as the JSON the realm's sockets in step share.
       const rest = JSON.stringify(tick satisfies Omit<TickMessage, 'changed' | 'gone'>)

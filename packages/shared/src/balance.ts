@@ -668,14 +668,29 @@ export const TRADING_POST = {
   food: 75,
   /** Coins in its warehouse. */
   coins: 2_000,
-  /** Goods in its warehouse, in units. */
-  goods: { wood: 50, stone: 50, ironOre: 20, iron: 10, spear: 4 } as Partial<Record<Good, number>>,
+  /**
+   * Goods in its warehouse, in units: twice its floor (`WAREHOUSE_FLOOR`), so it has a market of every
+   * good until its first trader and caravan come by, and its soldiers' weapons.
+   */
+  goods: {
+    food: 40,
+    wood: 50,
+    stone: 50,
+    ironOre: 20,
+    iron: 10,
+    goldOre: 10,
+    spear: 4,
+    sword: 2,
+    shield: 4,
+    armour: 2,
+  } as Partial<Record<Good, number>>,
 }
 
 /**
- * A trading post's stock floor (`CONTEXT.md`: Stock floor, ADR 0003), in units: once a game day
- * its warehouse tops up every good below this to this. Half of what a post starts with, so a
- * fresh post is well above it.
+ * A trading post's stock floor (`CONTEXT.md`: Stock floor, ADR 0023), in units: what its spare
+ * hands, caravan and wandering traders go for, and what its prices are reckoned from. It tops up
+ * nothing at a post; the HQ's warehouses top up to `HQ_FLOOR_FACTOR` times this each game day. Half
+ * of what a post starts with, so a fresh post is well above it.
  */
 export const WAREHOUSE_FLOOR: Record<Good, number> = {
   food: 20,
@@ -693,6 +708,14 @@ export const WAREHOUSE_FLOOR: Record<Good, number> = {
 
 /** How many times a trading post's floor (`WAREHOUSE_FLOOR`) the Trade Org HQ's warehouses keep. */
 export const HQ_FLOOR_FACTOR = 5
+
+/**
+ * How many times a trading post's floor of Food the HQ's warehouse keeps, instead of
+ * `HQ_FLOOR_FACTOR`: wandering traders alone carry Food to the posts (`CONTEXT.md`: Caravan, Wandering
+ * trader) and it spoils on the way, so they leave the HQ with more of it, for the posts far along
+ * their loop.
+ */
+export const HQ_FOOD_FLOOR_FACTOR = 15
 
 /**
  * What a warehouse sells a unit of each good for, in coins, when it holds `PRICE_REFERENCE_FLOORS`
@@ -766,11 +789,81 @@ export const CARAVAN_GUARD_RANGE = 16
 export const CARAVAN_FOOD = 72
 
 /**
+ * How much longer than a plain walk a carriage's way to its next stop may take, for the Food it waits
+ * for at the HQ (`CONTEXT.md`: Waiting for Food): the escort sets its pace, and its way winds and
+ * crosses slower ground. With this a full-size map's longest way, about 4,000 tiles, wants about all
+ * of `CARAVAN_FOOD`.
+ */
+export const WAY_FOOD_MARGIN = 1.5
+
+/**
+ * What a carriage leaves in the HQ's storage (`CONTEXT.md`: Waiting for Food), in game days of what
+ * its people off the carriages eat. No more than `NPC_FOOD_SHORT_DAYS`, below which the HQ puts
+ * residents on its farms first, so the farms always bring the storage up past it.
+ */
+export const HQ_PEOPLE_FOOD_DAYS = 5
+
+/**
+ * Food a carriage waiting at the HQ may always hold, even from what the HQ's people are left
+ * (`CONTEXT.md`: Waiting for Food), in units: its horse eats only from the load, and this is four
+ * game days of it (`HORSE_FOOD_PER_DAY`).
+ */
+export const WAITING_HORSE_FOOD = 3
+
+/**
+ * How far under the Food for its way a carriage just set off from the HQ may hold (`CONTEXT.md`:
+ * Waiting for Food; ADR 0004), in units: its horse goes on eating while its load goes on.
+ */
+export const SET_OFF_FOOD_SLACK = 2
+
+/**
  * How many tiles further along their way a caravan's driver or an escort may get than the one
  * furthest behind (`CONTEXT.md`: Caravan): one ahead waits, so the escort keeps up with the
  * carriage.
  */
 export const CARAVAN_SPREAD = 8
+
+/**
+ * How many wandering traders the HQ sends out (`CONTEXT.md`: Wandering trader), spread evenly round
+ * one loop of all its posts and itself, or one for each post with fewer. A full-size map's loop takes
+ * about 150 game days with its stops, so with six a post sees a trader about every 25 game days. They
+ * are all that brings a post Food and Coins (ADR 0023): with four, posts far along the loop run out
+ * of Food with nobody buying it, as it spoils between visits.
+ */
+export const TRADERS = 6
+
+/**
+ * Residents of the Trade Org HQ who walk along with each wandering trader as its escort, besides
+ * its driver (`CONTEXT.md`: Wandering trader), before it was ever robbed: a caravan's.
+ */
+export const TRADER_ESCORTS = CARAVAN_ESCORTS
+
+/**
+ * How often a wandering trader's drive to a stop may end short of it before it goes on to the next
+ * post (`CONTEXT.md`: Wandering trader), say out of reach of carriages, so one post can't hold up
+ * the whole loop.
+ */
+export const TRADER_DRIVE_TRIES = 3
+
+/**
+ * How far from the straight way between two of its places a city's town hall may lie for a wandering
+ * trader to stop at it on the way (`CONTEXT.md`: Trader stop), in tiles: under half the way between
+ * NPC cities (`NPC_CITY_MIN_DISTANCE`), so about one or two stops a way and no long detours.
+ */
+export const TRADER_STOP_REACH = 200
+
+/**
+ * How many ticks a wandering trader stands at a stop (`CONTEXT.md`: Trader stop): a game day, long
+ * enough for a Player who gets the notice to send someone over.
+ */
+export const TRADER_STOP_TICKS = 1440
+
+/**
+ * The share of a warehouse's floor (`WAREHOUSE_FLOOR`) a wandering trader prices each good from
+ * (`CONTEXT.md`: Trader stop): a carriage holds far less than a warehouse, so a quarter makes
+ * carrying one floor's worth of a good sell at about its base price.
+ */
+export const TRADER_FLOOR_SHARE = 0.25
 
 /**
  * The part of a delivery's fee every delivery or pick-up pays, in coins (`CONTEXT.md`:
@@ -1226,6 +1319,8 @@ export const CRIME_STANDING_LOSS: Record<CrimeKind, number> = {
   attack: 15,
   tearDown: 20,
   killing: 30,
+  /** A trading post captured (`CONTEXT.md`: Lost post found out): worse than any one killing. */
+  capture: 50,
 }
 
 /**
@@ -1332,12 +1427,14 @@ export const TRADE_ORG_PUNISHES_BELOW = -8
 /**
  * What a crime costs the Trade Organization in Coins, besides stolen goods, which are worth their
  * warehouse base price (`WAREHOUSE_BASE_PRICE`): a resident wounded, one killed (worth as much as
- * a resident in a city's price, `CITY_PRICE_PER_RESIDENT`), or a building torn down.
+ * a resident in a city's price, `CITY_PRICE_PER_RESIDENT`), a building torn down, or a trading post
+ * captured (what a city of its adults would be priced at).
  */
 export const TRADE_ORG_LOSS: Record<Exclude<CrimeKind, 'theft'>, number> = {
   attack: 50,
   killing: 200,
   tearDown: 150,
+  capture: CITY_PRICE_PER_RESIDENT * TRADING_POST.residents,
 }
 
 /**

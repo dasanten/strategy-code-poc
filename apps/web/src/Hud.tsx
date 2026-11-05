@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { formatGameTime, type FirstDay } from '@csp/shared'
+import { formatGameTime, type FirstDay, type TraderVisit } from '@csp/shared'
 import { DrawerStatus } from './drawer-head.js'
 import {
   DRAWERS,
@@ -13,7 +13,7 @@ import {
   type OpenDrawer,
 } from './hud-view.js'
 import { groupSentLine, type Skipped } from './group-orders.js'
-import { firstDayView, laneSpot, skippedByWhy } from './notices-view.js'
+import { firstDayView, laneSpot, skippedByWhy, traderVisitLine } from './notices-view.js'
 import type { ConnectionStatus } from './useWorld.js'
 import { WIKI_PATH } from './wiki-view.js'
 
@@ -659,6 +659,45 @@ export function NoticeLane({ phone, children }: { phone: boolean; children: Reac
  * A group order's report in the lane (`CONTEXT.md`: Group, Notices): how many it went to and who
  * was skipped or turned down and why, until the Player dismisses it or gives the next order.
  */
+/**
+ * A wandering trader standing at one of the realm's cities (`CONTEXT.md`: Trader stop, Notices): the
+ * place, with a way to see it and to open the city's Trade section there.
+ */
+export function TraderVisitNotice({
+  visit,
+  tick,
+  onShow,
+  onTrade,
+  onDismiss,
+}: {
+  visit: TraderVisit
+  tick: number
+  onShow: () => void
+  onTrade: () => void
+  onDismiss: () => void
+}) {
+  return (
+    <aside className="notice trader-visit" role="status">
+      <span className="notice-text">{traderVisitLine(visit, tick)}</span>
+      <span className="notice-actions">
+        <button type="button" onClick={onShow}>
+          Show
+        </button>
+        <button type="button" onClick={onTrade}>
+          Trade
+        </button>
+        <button
+          type="button"
+          aria-label={`Dismiss the trader at ${visit.city}`}
+          onClick={onDismiss}
+        >
+          OK
+        </button>
+      </span>
+    </aside>
+  )
+}
+
 export function GroupReportNotice({
   report,
   onDismiss,

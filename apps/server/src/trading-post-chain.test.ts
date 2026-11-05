@@ -60,7 +60,7 @@ describe('a trading post runs the chain for its warehouse', () => {
     expect(warehouseFor(world, city, ['food'])).toBeUndefined()
   })
 
-  it('with no node in reach builds nothing and its warehouse is left to the floor', () => {
+  it('with no node in reach builds nothing and its warehouse is left to what is brought', () => {
     const { world, terrain, city } = post(false)
     const plan = planCity(world, city, terrain)
     expect(plan.project).toBeUndefined()
@@ -100,8 +100,8 @@ describe('a trading post runs the chain for its warehouse', () => {
       const mine = () => world.buildings.find((b) => b.kind === 'mine' && !b.site)
       run(20, () => mine() !== undefined)
       expect(city.workplaceIds).toContain(mine()?.id)
-      // The floor tops the warehouse up to it and never past: above it only by what its miners
-      // brought, and nothing of it in the storage.
+      // Nothing tops the warehouse up: it holds Iron ore only by what its miners brought, and
+      // nothing of it in the storage.
       run(30, () => (store.stock?.ironOre ?? 0) > WAREHOUSE_FLOOR.ironOre, true)
       expect(store.stock?.ironOre ?? 0).toBeGreaterThan(WAREHOUSE_FLOOR.ironOre)
       expect(storage.stock?.ironOre ?? 0).toBe(0)

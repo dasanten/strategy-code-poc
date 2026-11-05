@@ -18,6 +18,7 @@ import {
   npcTradeProblem,
   npcTradingStorageAt,
   owedBy,
+  quoteWithTrader,
   quoteDelivery,
   quoteNpcSwap,
   quoteNpcTrade,
@@ -30,6 +31,9 @@ import {
   tradeProblem,
   tradeOrgHq,
   tradeOrgRefuses,
+  traderStandingAt,
+  traderTradeProblem,
+  caravanFoodFor,
   tradingWarehouseAt,
   wrapDistance,
   type Building,
@@ -40,6 +44,7 @@ import {
   type Resident,
   type Stock,
   type SwapOrder,
+  type Trader,
   type TradeOrder,
   type TradeSide,
   type WorldState,
@@ -68,7 +73,8 @@ interface TradeRequest extends OrderRequest {
  * from and into their hands or the load of their carriage `carriageId` on the tile. It happens
  * this tick. With `cityId` it orders a delivery to or a pick-up from that city instead
  * (`CONTEXT.md`: Delivery). On an NPC city's storage the resident trades with that city instead
- * (`CONTEXT.md`: Trading with an NPC city).
+ * (`CONTEXT.md`: Trading with an NPC city), on the tile of a wandering trader standing at a stop
+ * with that trader (`CONTEXT.md`: Trader stop).
  */
 function tradeOrder(side: TradeSide): OrderKind {
   return {
@@ -77,7 +83,11 @@ function tradeOrder(side: TradeSide): OrderKind {
       const realm = realmOf(world, sender.userId)
       const r = world.residents.find((x) => x.id === o.residentId)
       if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
-      const problem = npcTradingStorageAt(world, r.x, r.y) ? npcTradeProblem : tradeProblem
+      const problem = traderStandingAt(world, r.x, r.y)
+        ? traderTradeProblem
+        : npcTradingStorageAt(world, r.x, r.y)
+          ? npcTradeProblem
+          : tradeProblem
       return problem(world, realm.id, r, side, o.good, o.units, o.carriageId, o.cityId)
     },
     apply(world, _sender, order) {
@@ -155,6 +165,12 @@ interface TradeRecord {
    */
   npcCityId?: string
   keptReserve?: boolean
+  /**
+   * For a trade with a wandering trader (`CONTEXT.md`: Trader stop): the trader, and whether it
+   * still has the Food its crew keep on board, or never sold any of it.
+   */
+  traderId?: string
+  keptFood?: boolean
 }
 
 /** The trades of the latest `resolveTrades`, kept beside the world for `tradesKeepGoods`. */
@@ -206,6 +222,11 @@ export function resolveTrades(world: WorldState, size = MAP_SIZE): number {
     }
     if (o?.kind !== 'trade' && o?.kind !== 'handIn') continue
     r.order = null
+    const visitor = o.kind === 'trade' ? traderStandingAt(world, r.x, r.y) : undefined
+    if (visitor && o.kind === 'trade') {
+      if (tradeWithTrader(world, r, o, visitor, records)) traded++
+      continue
+    }
     const npc = npcTradingStorageAt(world, r.x, r.y)
     // A transfer is handed in only at a Trade Org warehouse.
     if (npc && o.kind === 'trade') {
@@ -355,6 +376,73 @@ function tradeWithCity(
     coins,
     x: storage.x,
     y: storage.y,
+  })
+  return units > 0
+}
+
+/**
+ * Carries out the trade order `o` of resident `r` on the tile of wandering trader `trader`, standing
+ * at a stop (`CONTEXT.md`: Trader stop), as at a warehouse: where the trader's carriage, if any, is
+ * still theirs and on the tile, the goods and coins swap between their hands or carriage and its
+ * load at its prices, cut down to what it has to trade and what fits (`quoteWithTrader`). The coins
+ * raise standing both ways between the realm and the Trade Organization. A realm it refuses trades
+ * nothing. The trade goes into `records`, with a line in the realm log. Returns whether it moved
+ * anything.
+ */
+function tradeWithTrader(
+  world: WorldState,
+  r: Resident,
+  o: TradeOrder,
+  trader: Trader,
+  records: TradeRecord[],
+): boolean {
+  const realm = commanderOf(world, r)
+  if (o.cityId !== undefined) return false
+  if (realm !== null && tradeOrgRefuses(world, realm)) return false
+  const wagon = world.carriages.find((k) => k.id === trader.carriageId)
+  if (!wagon) return false
+  const carriage =
+    o.carriageId === null ? undefined : world.carriages.find((k) => k.id === o.carriageId)
+  if (o.carriageId !== null) {
+    if (realm === null || !commandsCarriage(world, realm, carriage)) return false
+    if (carriage!.x !== wagon.x || carriage!.y !== wagon.y) return false
+  }
+  const holder = carriage
+    ? loadOf(carriage, goodsCapacity(world, carriage))
+    : handsOf(r, world.tick)
+  const parties = [holder.stock, wagon.load]
+  const before = total(parties)
+  const { units, coins } = quoteWithTrader(world, trader, wagon, holder, o.side, o.good, o.units)
+  const goodsFrom = o.side === 'buy' ? wagon.load : holder.stock
+  const goodsTo = o.side === 'buy' ? holder.stock : wagon.load
+  move(goodsFrom, goodsTo, o.good, units)
+  move(goodsTo, goodsFrom, 'coins', coins)
+  const keep = caravanFoodFor(trader.escortIds.length)
+  records.push({
+    residentId: r.id,
+    realm,
+    refused: realm !== null && tradeOrgRefuses(world, realm),
+    before,
+    after: total(parties),
+    traderId: trader.id,
+    keptFood:
+      units === 0 || o.good !== 'food' || o.side === 'sell' || (wagon.load.food ?? 0) >= keep,
+  })
+  if (realm !== null && coins > 0) {
+    raiseStandingBothWays(world, realm, TRADE_ORG, coins / STANDING_TRADE_COINS_PER_POINT)
+  }
+  recordEvent(world, realm, {
+    kind: 'traded',
+    residentId: r.id,
+    name: r.name,
+    side: o.side,
+    good: o.good,
+    units,
+    wanted: o.units,
+    coins,
+    x: wagon.x,
+    y: wagon.y,
+    withTrader: true,
   })
   return units > 0
 }
@@ -580,6 +668,23 @@ export const refusedTradeNothing: Invariant = {
         invariant: this.name,
         message: `${t.residentId} of ${t.realm} traded with ${t.npcCityId ?? 'the Trade Organization'}, which refuses it`,
         entityIds: [t.residentId],
+      }))
+  },
+}
+
+/**
+ * A wandering trader sells only what it has to trade (`CONTEXT.md`: Trader stop, `traderStock`): no
+ * trade with one of the latest tick sold the Food its crew keep on board.
+ */
+export const traderTradesKeepFood: Invariant = {
+  name: 'trader-trades-keep-food',
+  check(world) {
+    return (ledger.get(world) ?? [])
+      .filter((t) => t.traderId !== undefined && !t.keptFood)
+      .map((t) => ({
+        invariant: this.name,
+        message: `a trade by ${t.residentId} sold the Food on board of trader ${t.traderId}`,
+        entityIds: [t.residentId, t.traderId!],
       }))
   },
 }

@@ -16,6 +16,8 @@ import {
   type RealmEvent,
   type SeenResident,
   type SeenCaravan,
+  type SeenTrader,
+  type TraderVisit,
   type SeenEntity,
   type Remembered,
   type ScriptLogLine,
@@ -57,6 +59,8 @@ export interface ClientWorld {
   armies: Army[]
   /** The Trade Org caravans in sight (`CONTEXT.md`: Caravan). */
   caravans: SeenCaravan[]
+  /** The wandering traders in sight (`CONTEXT.md`: Wandering trader). */
+  traders: SeenTrader[]
   /**
    * What the Player remembers out of their sight (`CONTEXT.md`: Last seen), kept apart from what
    * is in sight: never both at once.
@@ -70,6 +74,8 @@ export interface ClientWorld {
   region: RegionState | null
   /** Whether the Player may still claim their Horse offer (`CONTEXT.md`: Horse offer). */
   horseOffer: boolean
+  /** Wandering traders standing at the realm's cities, in sight or not (`CONTEXT.md`: Trader stop). */
+  traderVisits: TraderVisit[]
   /** The Player's waypoints, oldest first (`CONTEXT.md`: Waypoint). */
   waypoints: Waypoint[]
   /** The Player's first-day card (`CONTEXT.md`: First day). */
@@ -89,6 +95,7 @@ function byKind(entities: Iterable<SeenEntity>) {
     piles: [] as Pile[],
     armies: [] as Army[],
     caravans: [] as SeenCaravan[],
+    traders: [] as SeenTrader[],
   }
   for (const { is, ...e } of entities) {
     if (is === 'resident') out.residents.push(e as SeenResident)
@@ -98,6 +105,7 @@ function byKind(entities: Iterable<SeenEntity>) {
     else if (is === 'carriage') out.carriages.push(e as SeenCarriage)
     else if (is === 'army') out.armies.push(e as Army)
     else if (is === 'caravan') out.caravans.push(e as SeenCaravan)
+    else if (is === 'trader') out.traders.push(e as SeenTrader)
     else out.piles.push(e as Pile)
   }
   return out
@@ -171,6 +179,7 @@ export function useWorld(onLoggedOut: () => void) {
             diplomacy: msg.diplomacy,
             region: msg.region && applyRegionMap(null, msg.region, msg.map.size),
             horseOffer: msg.horseOffer,
+            traderVisits: msg.traderVisits,
             waypoints: msg.waypoints,
             firstDay: msg.firstDay,
             workSettings: msg.workSettings,
@@ -225,6 +234,7 @@ export function useWorld(onLoggedOut: () => void) {
               diplomacy,
               region,
               horseOffer: msg.horseOffer ?? w.horseOffer,
+              traderVisits: msg.traderVisits ?? w.traderVisits,
               workSettings: msg.workSettings ?? w.workSettings,
               waypoints: msg.waypoints ?? w.waypoints,
             }

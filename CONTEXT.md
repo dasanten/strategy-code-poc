@@ -282,8 +282,9 @@ The shared language of the game. Domain terms only — no implementation details
   shown on the way. Once one is there, it shows what the trader carries and room left, and a
   trade that won't go says why (no coins in hand, no room, none in stock, not wanted). Delivery
   and Transfer each have a heading and a line saying what they do, with the fee before ordering,
-  and the section links to the Wiki's "How to trade". The tile card of a warehouse or an NPC
-  city's storage has **Trade here**, which opens it. Only the UI: the trades are those above.
+  and the section links to the Wiki's "How to trade". The tile card of a warehouse, an NPC
+  city's storage or a wandering trader at a stop has **Trade here**, which opens it. Only the UI:
+  the trades are those above.
 - **Stock floor:** the Trade Organization gets its stock physically (its own workplaces on every
   kind of resource, plus buying). When a warehouse of the HQ runs low, it tops up to a minimum at
   the end of each game day. This is the one controlled exception to "everything is physical" (ADR
@@ -300,6 +301,13 @@ The shared language of the game. Domain terms only — no implementation details
   warehouse and loads what evens out the two warehouses' stock (half the difference of each good,
   not Food or coins). The escort walks along with the carriage, which waits for it; the crew
   refill from the carriage like an army.
+- **Waiting for Food:** a caravan or wandering trader stays at the HQ until it holds enough Food for
+  its crew and horse to reach its next stop, so nothing sets off to starve on the road. A caravan
+  unloads first, so its Food has room, and wants all it keeps on board when a delivery or transfer
+  waits for it, as there is no Food on that way. A carriage leaves the storage what the HQ's own
+  people eat in a few days, but may always take a little for its horse, which eats only from the
+  load. Short of Food, it tops up from the goods warehouse, which the HQ's people don't eat from
+  and the Stock floor fills each day; only with none there does it stand and wait.
 - **Caravan crew lost:** a caravan outlives its crew. When its driver dies, a surviving escort
   takes over driving. With no crew left, its carriage stands where it is and the HQ sends a new
   driver on foot, from the same adults it makes up escorts from, once it has one free. A caravan's
@@ -307,17 +315,23 @@ The shared language of the game. Domain terms only — no implementation details
   so one still walking out doesn't stop a theft. Once stolen (Guaranteed carriage), the same
   caravan gets a new carriage and horse at the HQ, and any surviving crew walk back to it.
 - **Wandering trader:** a Trade Org carriage with a driver and a small escort, sent from the HQ on
-  a fixed loop of trading posts, apart from the caravans, so posts can hold goods they don't
-  produce. At each post it evens out its load with the warehouse, every good including Food and
-  Coins: it leaves what the post has less of and takes what it has more of, as far as the carriage
-  holds. Crew, escort, Food on board and a lost carriage go as for a caravan (Caravan crew lost);
+  a fixed loop of the trading posts and the HQ, apart from the caravans, so posts can hold goods
+  they don't produce. The HQ is a stop like a post, so new Food and Coins reach the posts, and its
+  lost escorts are made up there each time round. At each stop it evens out its load with the
+  warehouse, every good including Food and Coins: it leaves what the place has less of and takes
+  what it has more of, as far as the carriage holds; when it can't hold it all, every good is cut
+  alike, so goods the caravans keep level don't crowd out the Food and Coins only a trader brings. At the HQ its Coins go through the coin
+  warehouse and its other goods through the goods warehouse. Crew, escort, Food on board and a lost carriage go as for a caravan (Caravan crew lost);
   taking goods off it or stealing it is a theft like any against the Trade Organization, but it
   owes nobody a delivery, so nothing is sent again. How many there are is a balance number.
 - **Trader stop:** on its way a wandering trader stops for a while at each NPC or Player city
-  within a set reach of its route, beside the city's town hall. Anyone with a resident or carriage
-  on its tile can trade with it like at a warehouse: it prices each good from what it carries,
-  buying lower than it sells. An NPC city treats it as its visiting trader: it buys what it is
-  short of and sells its surplus. A Player's realm gets a notice with the place while one stands
+  within a set reach of its route, beside the city's town hall, on the nearest free tile outside
+  any ring of walls, so a gate closed against its armed escort doesn't stop it. Anyone with a
+  resident or carriage on its tile can trade with it like at a warehouse: it prices each good from
+  what it carries, buying lower than it sells; the Food its crew keep on board isn't for sale, and
+  it takes goods only as far as its carriage holds. An NPC city treats it as its visiting trader: it
+  sends a spare hand over, never a soldier, who buys what it is short of and sells its surplus (no
+  weapons, which would arm them). A Player's realm gets a notice with the place while one stands
   at one of their cities, and anyone in sight sees its prices.
 - **Lost post found out:** a captured post leaves the Trade Organization at once as before, but it
   learns who took it only by news: when a wandering trader reaches the post, or a surviving
@@ -1365,7 +1379,7 @@ The shared language of the game. Domain terms only — no implementation details
   browser. Tapping a row opens that resident. **Pick these** picks everyone listed, or those ticked,
   as a Group on the map. Only the UI: nothing new is kept in the world. It works on a phone.
 - **Notices:** what the HUD tells the Player unasked (the Horse offer, a Direct offer or demand sent
-  to them, the pick banner, a group order's report, the first-day card) shows in one lane under the top bar, over the map and never
+  to them, the pick banner, a group order's report, the first-day card, a wandering trader at one of their cities) shows in one lane under the top bar, over the map and never
   over a drawer or card. While the pick banner shows it replaces the others; they come back after.
 - **First day:** a new realm's HUD shows a checklist card: claim the Horse offer, pick a
   resident, give them an order, open the Wiki. Each line is ticked when the game sees it done;

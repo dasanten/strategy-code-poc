@@ -1,4 +1,5 @@
 import {
+  convoysOf,
   commands,
   SIGHT_RANGE,
   STRIKE_TICKS,
@@ -308,12 +309,12 @@ function breakWall(world: WorldState, a: Resident, b: Building, size: number): b
 }
 
 /**
- * Whether `t` drives a caravan or supply wagon and stands with its carriage, as at a stop between the orders of
+ * Whether `t` drives a caravan, wandering trader or supply wagon and stands with its carriage, as at a stop between the orders of
  * their route, which they go on with (`CONTEXT.md`: On a carriage under attack).
  */
 function withCaravanCarriage(world: WorldState, t: Resident): boolean {
   const caravan =
-    world.caravans.find((c) => c.driverId === t.id) ??
+    convoysOf(world).find((c) => c.driverId === t.id) ??
     world.supplyWagons.find((w) => w.driverId === t.id)
   const carriage = caravan && world.carriages.find((k) => k.id === caravan.carriageId)
   return !!carriage && carriage.x === t.x && carriage.y === t.y

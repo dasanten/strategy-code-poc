@@ -28,6 +28,9 @@ in the world, as ADR 0003 wants.
   a region's market. That is meant, but it is the risk to watch: a long simulation test has to show
   posts staying supplied when nobody interferes.
 - The floor goes last, after traders run, so no world spends time with empty posts.
+- Far posts will often sell no Food. A model of the full map (PR #863) shows even 0.1 Food a day of
+  steady draw leaves a post dry 45% of the time with six traders. Daniel accepted this on 2026-11-05:
+  it makes Food worth carrying between regions, and the numbers are adjusted if it plays badly.
 
 ## Alternatives
 
