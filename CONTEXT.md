@@ -930,7 +930,8 @@ The shared language of the game. Domain terms only — no implementation details
 - **Horse:** an animal that pulls a carriage. Eats Food and goes hungry like a resident: an empty
   hunger meter costs health, and a horse without food goes Down after about 5 game days (Down,
   Reviving) and dies if it eats nothing before its time is up. Bred by a
-  resident at a stable, or bought from the Trade Organization.
+  resident at a stable, or bought from an NPC city (Horse market). The Trade Organization doesn't
+  sell horses for now.
 - **Horse grant:** a one-time gift, given once when it ships: every Player realm with a living
   Leader and no horse at all (in a stable, hitched or ridden) gets two new horses with stats drawn
   as in a starting city. They appear in the realm's finished stable nearest the Leader's city;
@@ -988,6 +989,22 @@ The shared language of the game. Domain terms only — no implementation details
   the stable; otherwise they wait there. Its params: `stable`, the stable to feed (by default the
   one they stand in when it starts), and `source`, where the Food comes from (by default the nearest
   storage of their realm with Food). With no Food to fetch they wait.
+- **NPC horses:** a new NPC village or town starts with two horses, with some Food by them; one from
+  before this got two when it shipped. It wants a stable once it has any, keeps it fed as Feeding
+  the stable says, with one of its residents, and breeds up to the horses it wants for its size (a
+  balance number). A founding party takes none: a daughter with none wants a stable too once nothing
+  is short of its reserve, and gets its first horses when a Player sells it some. Trading posts and
+  the HQ don't take part.
+- **Horse market:** buying and selling a horse with an NPC city, only in person: a grown resident
+  at its finished stable. **Buying** takes a horse standing in it that the city can spare (above what
+  it wants), with the Coins in the buyer's hands; the Coins go into its storage and the horse joins
+  their realm where it stands. **Selling** takes a horse of their realm standing in it, pulling no
+  carriage, not ridden and not Down, while the city has fewer than it wants and the Coins in its
+  storage; the Coins go into the resident's hands, and it doesn't go if they can't carry them. The
+  price comes from the horse's stats and age and how many the city has against how many it wants,
+  and its standing toward them moves it like its trade prices. At low standing it refuses (NPC city
+  reaction). A sale raises standing like any trade. The trade section lists its horses with name,
+  stats and price.
 - **Carriage:** a horse-drawn cart driven by a resident with Driving skill. Carries far more than
   any resident and is fast on plains and roads, slower in forest and hills, and cannot enter
   mountains except on a road. Built at a stable (Building a carriage).
