@@ -1,4 +1,6 @@
 import {
+  offersAt,
+  seenOffer,
   SIGHT_RANGE,
   cityPrice,
   forSale,
@@ -245,7 +247,7 @@ function shownLines<P extends { stock: number }>(lines: P[], inside: boolean): S
 
 /**
  * A building as the side sees it: its stock and the breeding progress a stable keeps only when it
- * sees inside, and a Trade Org warehouse's prices either way (`CONTEXT.md`: Seeing inside a storage, Warehouse prices).
+ * sees inside, and a Trade Org warehouse's prices and a storage's offers either way (`CONTEXT.md`: Seeing inside a storage, Warehouse prices, Offer).
  */
 function seenBuilding(world: WorldState, insight: Insight, b: Building): SeenBuilding {
   const inside = insight.insideBuilding(b)
@@ -258,6 +260,8 @@ function seenBuilding(world: WorldState, insight: Insight, b: Building): SeenBui
     const prices = warehousePrices(world, b)
     if (prices.length > 0) shown.prices = shownLines(prices, inside)
   }
+  const offers = world.offers.length > 0 ? offersAt(world, b.id) : []
+  if (offers.length > 0) shown.offers = offers.map(seenOffer)
   return shown
 }
 

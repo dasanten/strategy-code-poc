@@ -192,8 +192,8 @@ The shared language of the game. Domain terms only — no implementation details
   and also anyone there it knows stole from it (seen by one of its residents), which is no crime.
   A captured post joins the captor's realm like any city and leaves the Trade Organization: its
   warehouse becomes a storage with everything in it (no stock floor, no prices), its caravan
-  route ends, and the deliveries and transfers waiting there go over to the HQ, which sends them
-  out of its own stock.
+  route ends, its crew stopping what the caravan had them doing and staying the HQ's, and the
+  deliveries and transfers waiting there go over to the HQ, which sends them out of its own stock.
 - **Fall of the HQ:** the HQ is captured like any city, which is hopeless in practice but not
   forbidden. It joins the captor's realm and leaves the Trade Organization for good. Nothing ever
   takes its place and it never comes back, whoever holds the city later.
@@ -259,7 +259,20 @@ The shared language of the game. Domain terms only — no implementation details
   where on accepting the Trade Organization carries both sides' goods as two Transfers, its fee
   paid by the sender or split, as the sender picks (offered only while the HQ stands, and each side's
   goods are taken as a pick-up takes them). A storage's goods are set aside only for the in-person
-  way.
+  way. Carried, the sender names both cities when sending, as for a Transfer, and can only name a
+  city whose storage they see, so the fee shown is exact; the other side only accepts or declines,
+  from anywhere. It is taken whole on accepting, each side's goods within one carriage load, and
+  changes no standing. Split, each side pays half of both fees; paid by the sender, the sender pays
+  both. Each caravan takes the share of the side it picks up from as it collects, and the other
+  side's from their storage as it unloads there. A storage short of coins on unloading gives what it
+  has, the goods stay delivered and the Trade Organization bears the loss. A Player can send one to any realm they know of: one they see residents of, an ally, one whose
+  city they have seen (Last seen), one with a standing toward them or they toward it, or their side
+  in a contract or Direct offer. Both sides see it in their Direct offers drawer until it ends, and a
+  notice tells the one it is sent to, with the place. In person, it is otherwise an offer like any
+  other: anyone in sight of the storage sees it and that it is for another realm, and the sender can
+  take it down. Declined, lapsed or taken down, its goods are ordinary again and both sides are told;
+  it lapses too when the realm it was sent to is gone. A realm can have only so many standing to one
+  realm.
 - **Trade section:** where a city's panel shows trading, for each of its warehouses or storages
   in sight, from the Player's side: what they **can buy** there and what they **can sell**, with
   how many units and the price (an NPC city lists only its surplus and what it is short of, and
@@ -366,6 +379,15 @@ The shared language of the game. Domain terms only — no implementation details
   horse out of its own stock.
 - **Self-interest:** the Trade Organization defends only itself and whoever hires it. It is not a
   world police. It punishes anyone who steals from it, whoever they are.
+- **Punishment trip:** the army always walks to the city, however far; the time it has there before
+  giving up starts when it arrives. Whether the storages hold anything is checked when it arrives,
+  so emptying them in time works, but you still see the army come. It still turns back on the road
+  when the city is no longer the culprit's, or when it finds no way there at all. Each soldier packs Food at the HQ for the way there and
+  back, leaving room for what they will carry home; on the way they refill at trading posts they
+  pass, and at the city they may take Food from its storage for the way back, apart from what the
+  army came to take. The realm log tells the truth: it is coming; it has arrived; it left with so
+  much of what it came for; it turned back without reaching the city, and why; or it was lost on
+  the way.
 - **Admin directive:** an admin orders the Trade Organization to weaken a Player or
   organization that is deliberately ruining the game for others (e.g. farming new Players). The
   game still forbids nothing; the Trade Organization acts because a healthy world is good for
@@ -1319,8 +1341,8 @@ The shared language of the game. Domain terms only — no implementation details
   (has weapons, idle, child, by city, and the like) and sorted by any column; the choice is kept per
   browser. Tapping a row opens that resident. **Pick these** picks everyone listed, or those ticked,
   as a Group on the map. Only the UI: nothing new is kept in the world. It works on a phone.
-- **Notices:** what the HUD tells the Player unasked (the Horse offer, the pick banner, a group
-  order's report, the first-day card, a wandering trader at one of their cities) shows in one lane under the top bar, over the map and never
+- **Notices:** what the HUD tells the Player unasked (the Horse offer, a Direct offer sent to them,
+  the pick banner, a group order's report, the first-day card, a wandering trader at one of their cities) shows in one lane under the top bar, over the map and never
   over a drawer or card. While the pick banner shows it replaces the others; they come back after.
 - **First day:** a new realm's HUD shows a checklist card: claim the Horse offer, pick a
   resident, give them an order, open the Wiki. Each line is ticked when the game sees it done;

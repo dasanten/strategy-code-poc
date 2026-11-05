@@ -68,6 +68,10 @@ describe('the card behind a drawer', () => {
     expect(cardHidden('scripts')).toBe(true)
   })
 
+  it('hides behind the full Residents list', () => {
+    expect(cardHidden('residents', true)).toBe(true)
+  })
+
   it('shows beside any other drawer and with none open', () => {
     expect(cardHidden(undefined)).toBe(false)
     expect(cardHidden('residents')).toBe(false)

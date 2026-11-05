@@ -26,6 +26,8 @@ import {
   TRADER_STOP_REACH,
   TRADER_STOP_TICKS,
   CARRIAGE_CAPACITY,
+  DIRECT_OFFERS_TO_ONE_REALM,
+  DIRECT_OFFER_DAYS,
   PASSENGER_WEIGHT,
   CARRIAGE_MAX_CAPACITY,
   CARRY_BASE,
@@ -129,6 +131,7 @@ import {
   NPC_VILLAGE,
   NPC_NODE_REACH,
   NPC_TRADER_GIVE_UP_DAYS,
+  NPC_OFFER_REACH,
   NPC_TRADER_REACH,
   NPC_PLAN_TICKS,
   NPC_SMITHY_WEAPON,
@@ -496,6 +499,25 @@ export function Wiki() {
           the same order.
         </p>
         <p>
+          The Residents drawer’s Open full list button opens the list across the screen, with
+          everyone’s age, city, stats, skills, gear, what they carry, hunger, health and what they
+          are doing. On a phone each resident is a small card. Tap one to open that resident’s card,
+          which closes the full list. Stats there are what they count for now, old age included.
+        </p>
+        <p>
+          Search the full list by name, filter it by weapons (has any, has none, or fights with a
+          certain one), by whether they are idle, by children or the grown up, by city and by a
+          skill they have learned, and sort it by any column: tap a heading, and tap it again to
+          turn the order round; on a phone the sort has its own menu. Whoever has nothing in the
+          column comes last either way. This browser remembers your choice.
+        </p>
+        <p>
+          Pick these makes a group on the map of everyone the full list shows, or of those you
+          ticked among them, ready for one order, and closes the full list so the group card shows.
+          Someone ticked whom the search or a filter hides isn’t picked. Ticks last only while the
+          full list is open.
+        </p>
+        <p>
           The card and the residents list say what each resident is doing. Walking, riding or
           driving somewhere, they also say about when they arrive, and the card’s meters and
           countdowns (building, tearing down, breeding, carrying, pairing, growing up) say about how
@@ -686,8 +708,10 @@ export function Wiki() {
           lists every kind of step. One that acts on a place (work a workplace, build, store at or
           fetch from a storage, pick up, feed the stable, breed, …) has you pick that place on the
           map, anywhere, not only where the resident stands now; one that needs more (which goods,
-          what to build, what a smithy makes, which script) asks for it on the card after. A step
-          that has to be done on its tile goes after a walk there, unless the step before already
+          what to build, what a smithy makes, which script) asks for it on the card after. What to
+          build is the same Build menu as on the card; a kind dimmed because the tile lacks
+          something today, such as a city's area, can still be added, for a step before it may
+          bring that. A step that has to be done on its tile goes after a walk there, unless the step before already
           walks there. It works on a resident with no queue too, and starts one. Adding a step only
           checks that it could make sense (the place is there as you last knew it, and a carriage or
           horse is yours). A workplace or construction site can be anyone's, in sight or as last
@@ -1514,8 +1538,8 @@ export function Wiki() {
         <h3>Breeding</h3>
         <p>
           Horses don't breed on their own. A grown resident standing at a finished stable is given
-          Breed horses and picks two fed horses of their realm in it; they tend them for{' '}
-          {days(STABLE_BREED_DAYS)}, and then a foal of their realm is born in the stable. Each of
+          Breed horses and picks two fed horses of their realm in it, each shown with its name and
+          stats; they tend them for {days(STABLE_BREED_DAYS)}, and then a foal of their realm is born in the stable. Each of
           its stats is its parents' average, give or take {num(FOAL_STAT_SPREAD)}. The progress
           belongs to the two horses, and the stable keeps it: breeding pauses when the resident
           leaves or is given another order, or while the stable has no room left for the foal, and
@@ -1774,6 +1798,46 @@ export function Wiki() {
           there and what you <strong>can sell</strong>, with the units and the price of each. Anyone
           with a resident in sight of it sees its prices.
         </p>
+        <h3>Offers at a Player's storage</h3>
+        <p>
+          A storage of your realm can stand an <strong>offer</strong>: "gives 10 Wood, wants 5
+          Stone", either side may be Coins, as many times over as you name and the goods are there.
+          Post it under the city's trade section, wherever your residents are. The goods stay in the
+          storage but are <strong>set aside</strong>: your workers, builders, Fetch, haul routes,
+          pick-ups and refills leave them alone, while a thief or raider can take them like any
+          others, cutting the offer down. Anyone in sight sees it and its rate. Someone of another
+          realm, a resident or carriage on the storage's tile, accepts it as many times as they can
+          pay and carry. It happens at once, whether you are online or not, and raises standing both
+          ways like a trade: by the coins, or goods for goods by both goods at warehouse base
+          prices, as a swap counts both its sale and its purchase. What they pay goes into the
+          storage as ordinary goods. It ends when it is used up, when you take it down, or when the
+          storage is torn down or no longer yours; what was set aside is ordinary goods of that
+          storage again.
+        </p>
+        <h3>Direct offers</h3>
+        <p>
+          Under <strong>Direct offers</strong> on the tool rail you can send an offer to one realm
+          you know of: one you see residents of, an ally, one whose city you have seen, one with a
+          standing either way, or your side in a contract or direct offer. Name a storage of yours,
+          and the goods are set aside there as for any offer. They hear at once wherever they are,
+          with a notice and the place, and only they can accept it: someone of theirs goes to the
+          storage and takes it in person, as with any offer, or they decline it from anywhere.
+          Anyone else in sight of the storage sees it, and that it is for another realm. It lapses
+          after {num(DIRECT_OFFER_DAYS)} game days. Declined, lapsed or taken down, the goods are
+          ordinary again and both of you are told. At most {num(DIRECT_OFFERS_TO_ONE_REALM)} can
+          stand to one realm.
+        </p>
+        <p>
+          Or have the Trade Organization carry it, while the HQ stands. Name a city of yours and a
+          city of theirs whose storage you see, and whether you pay the fee or split it; the form
+          shows the fee before you send. Nothing is set aside. They accept it whole from anywhere,
+          each side’s goods within one carriage load, and it becomes two Transfers: a caravan takes
+          what is there at each city, up to what was agreed, with a fee for what it takes. Each
+          caravan takes the share of the side it picks up from as it collects, and the other side’s
+          from their storage as it unloads there. If that storage is short of coins then, the goods
+          stay delivered and the Trade Organization bears the loss. It changes no standing, and it
+          is cancelled if the HQ falls.
+        </p>
         <h3>Sending a trader</h3>
         <p>
           With nobody of yours there, the trade section offers to send someone: your residents
@@ -1793,22 +1857,36 @@ export function Wiki() {
           wanted. Each unit is priced as it moves, so a big trade moves the price as it goes (see{' '}
           <a href="#trade">Trade &amp; prices</a>).
         </p>
+        <h3>Swapping</h3>
+        <p>
+          A trader there can also swap goods for goods, with no coins in hand: under Swap, pick the
+          good you want, how many, and the good you give. It is a sale and a purchase at once, each
+          unit priced as those are, so the rate comes from the place's prices and moves as its stock
+          moves. You hand over enough to pay for what you want, rounded up, and what is over comes
+          back in coins as far as the place holds them. It is cut down like any trade, and the
+          button says what it would move or why it won't go. Like a trade it raises standing, by
+          both the sale and the purchase.
+        </p>
         <h3>Trading with a wandering trader</h3>
         <p>
           While a wandering trader stands at a city, anyone with a resident or carriage on its tile
           can trade with it the same way. Press <strong>Trade here</strong> on its tile, or open the
           city it stands at. It trades with its load, but never the Food its crew keep on board, its
           coins come from and go onto the carriage, and it takes goods only as far as the carriage
-          holds. It orders no delivery. Those the Trade Organization refuses can't trade with it.
+          holds. It orders no delivery and makes no swap. Those the Trade Organization refuses can't
+          trade with it.
         </p>
         <h3>What an NPC city buys and sells</h3>
         <p>
           An NPC city sells only its surplus, what its storages hold above its reserve, and buys
           only goods it is short of, up to its reserve and with the coins in its storage. It takes
           nothing else. Its prices come from its stock like a warehouse's, and its standing toward
-          you moves them: the better, the cheaper it sells and the more it pays. Below{' '}
-          {signed(NPC_CITY_REFUSES_STANDING)} it won't trade with you at all. Every trade raises
-          standing both ways (see <a href="#standing">Standing &amp; reactions</a>).
+          you moves them: the better, the cheaper it sells and the more it pays. It swaps only its
+          surplus for what it is short of, and its Rates in the Trade section list each good it is
+          short of against each it has spare, at today's prices. Pick one to fill in the swap, or to
+          send someone there if nobody of yours is. Below {signed(NPC_CITY_REFUSES_STANDING)} it
+          won't trade with you at all. Every trade raises standing both ways (see{' '}
+          <a href="#standing">Standing &amp; reactions</a>).
         </p>
         <h3>Delivery</h3>
         <p>
@@ -1842,7 +1920,8 @@ export function Wiki() {
           times its stock floor it sells at the base price; less stock costs more (to the power{' '}
           {num(PRICE_ELASTICITY)}), between {pct(PRICE_RANGE.min)} and {pct(PRICE_RANGE.max)} of the
           base price. It buys at {pct(BUY_SHARE)} of its selling price. Each unit is priced as it
-          moves, so a big trade moves the price as it goes.
+          moves, so a big trade moves the price as it goes. A swap goes at these same prices (see{' '}
+          <a href="#how-to-trade">How to trade</a>).
         </p>
         <p>
           A wandering trader at a stop prices the same way from what it carries, as if its floor
@@ -1973,6 +2052,16 @@ export function Wiki() {
           {days(NPC_TRADER_GIVE_UP_DAYS)} is given up, and the city may send another.
         </p>
         <p>
+          The same trader goes to a Player's offer within {num(NPC_OFFER_REACH)} tiles, ahead of any
+          warehouse run, when it gives what the city is short of and wants what it has spare or
+          Coins, at a rate at least as good as its own prices, and the city doesn't refuse that
+          realm. A direct offer is left to the realm it is for. They take as many times over as make
+          up what it lacks and fit in their arms, never a weapon either way, and walk home with it.
+          It looks once a game hour; while Food runs short only an offer that gives Food will send
+          them. If the offer is gone or cut down when they get there, or there is no way in, they
+          carry what they didn't spend back home. The Trade Organization never accepts offers.
+        </p>
+        <p>
           A city is full once it has had spare hands with nothing to do and nothing short of its
           reserve for {days(NPC_FULL_DAYS)}, with a food surplus and a town hall's and a storage's
           materials above its reserve. A full city founds a daughter. Once a game day it looks for a
@@ -2066,7 +2155,14 @@ export function Wiki() {
             Below {signed(TRADE_ORG_REFUSES_TRADE_BELOW)} the Trade Organization won't trade with
             you; below {signed(TRADE_ORG_PUNISHES_BELOW)} its army (up to{' '}
             {num(TRADE_ORG_PUNISH.soldiers)} soldiers) comes to take {num(TRADE_ORG_PUNISH.times)}{' '}
-            times what it lost, giving up after {days(TRADE_ORG_PUNISH.giveUpDays)}. Besides stolen
+            times what it lost. It walks to your city however far that is and gives up{' '}
+            {days(TRADE_ORG_PUNISH.giveUpDays)} after it arrives; it looks in your storages when it
+            arrives, so emptying them in time works, though you still see it come. It turns back on
+            the road if the city stops being yours. Its soldiers pack Food at the HQ for the way
+            there and back, keeping {num(TRADE_ORG_PUNISH.packRoom)} kg free for what they carry
+            home; they refill at trading posts they pass and may take Food from your storage for the
+            way back, apart from what they came to take. Your realm log says when it is coming, when
+            it arrives, what it left with, why it turned back, or that it was lost. Besides stolen
             goods, carriages and horses it counts{' '}
             {(Object.entries(TRADE_ORG_LOSS) as [CrimeKind, number][])
               .map(([c, n]) => `${CRIME_NAMES[c].toLowerCase()} as ${num(n)} coins`)
@@ -2394,12 +2490,24 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
         </table>
         <ul>
           <li>
-            Before it starts: giving a task or Run script whose script has params first shows them,
-            filled with the values the resident keeps or the defaults. Change what you like and
-            press Start; Cancel gives nothing. A script without params starts at once. For a group
-            the form shows once, and each of them gets the same values. With Shift held the step
-            added to the queue keeps the values.
+            Starting at once: giving a task or Run script starts it in one tap, with the values the
+            resident keeps or the defaults; in a group each one goes on with their own.
           </li>
+          <li>
+            Before it starts: a Customise button beside the order, on the resident card, the group
+            card and in Add step, shows its params, filled with those values. Change what you like
+            and press Start; Cancel gives nothing. Each param's <code>?</code> says what it is for.
+            On a phone the form rises from the bottom of the screen, with Start and Cancel always in
+            view. For a group the form shows once, and each of them gets the same values. With Shift
+            held the step added to the queue keeps the values. An order whose script has no params
+            to show has no Customise.
+          </li>
+          <li>
+            The form opens by itself only when a param has no default and no <code>none:</code> in
+            its comment, since the script has nothing to go on without it. Give each param one or
+            the other to start your script in one tap.
+          </li>
+          <li>A defence script starts nothing, so its params are still shown when you pick it.</li>
           <li>
             A resident's card shows one field for each param of the script they run: pick it on the
             map, or clear it. A <code>number</code> param has a number field instead: type a whole
@@ -2457,7 +2565,7 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           </li>
           <li>
             The Work default has <code>workplace</code>: the workplace to work, the one they stand
-            on while none is picked; it is never kept between starts, so the form before it starts
+            on while none is picked; it is never kept between starts, so Customise on Run script
             shows it empty, and giving Work on a workplace fills it without asking. It also has{' '}
             <code>storage</code>: the main storage, for the output, inputs and Food; and{' '}
             <code>output</code>, <code>input</code> and <code>food</code>, each taking its place for
@@ -2513,11 +2621,12 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
         <ul>
           <li>
             Giving a resident Work at a workplace, from their card, a group card or a queue step,
-            runs its work script. The form before it starts is filled with the workplace's values.
+            runs its work script, at once. Customise shows its params filled with the workplace's
+            values.
           </li>
           <li>
             A value you change in that form becomes that resident's own, an override. What they kept
-            for that script before doesn't carry over.
+            for that script before doesn't carry over, with Customise or without.
           </li>
           <li>
             While they work there, each param reads their override, else the workplace's value, else

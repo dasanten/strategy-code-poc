@@ -25,9 +25,14 @@ import {
   holderText,
   npcStoragesInSight,
   previewDelivery,
+  previewNpcSwap,
+  ratesAt,
+  rateText,
   previewNpcTrade,
+  previewSwap,
   previewTrade,
   previewTransfer,
+  swapText,
   onTheWay,
   onTheWayLine,
   sendable,
@@ -391,6 +396,119 @@ describe('trading with an NPC city in the inspector', () => {
       coins: 0,
       limit: 'refused',
     })
+  })
+})
+
+describe('swapping in the inspector', () => {
+  const trader = (carried: Resident['carried']) =>
+    ({ carried, bornAt: -1e9, stats: { strength: { base: 10, trained: 0 } } }) as never
+
+  it('previews a swap at a warehouse from what the Player sees', () => {
+    const post = { ...city(null), tradeOrg: 'post' as const }
+    const warehouse = {
+      ...b('w1', 'warehouse', 'city1'),
+      stock: { wood: 100, stone: 100, coins: 500 },
+    }
+    const seen = { cities: [post], buildings: [b('b1', 'townHall', 'city1'), warehouse] }
+    const q = previewSwap(seen, 'w1', trader({ wood: 20 }), undefined, 'wood', 'stone', 2, 0, [])
+    expect(q.units).toBe(2)
+    expect(q.gives).toBeGreaterThan(0)
+    expect(q.sold - q.bought).toBe(q.coins)
+    const none = previewSwap(
+      seen,
+      'nope',
+      trader({ wood: 20 }),
+      undefined,
+      'wood',
+      'stone',
+      2,
+      0,
+      [],
+    )
+    expect(none.units).toBe(0)
+  })
+
+  it('previews an NPC city’s swap from its prices, cut down as it trades', () => {
+    const food: NpcCityPrice = { good: 'food', stock: 30, forSale: 10, wanted: 0, buy: 1, sell: 3 }
+    const wood: NpcCityPrice = { good: 'wood', stock: 5, forSale: 0, wanted: 2, buy: 4, sell: 6 }
+    const storage = { ...b('s1', 'storage', 'city1'), stock: { food: 30, wood: 5, coins: 12 } }
+    const q = (
+      carried: Resident['carried'],
+      give: 'food' | 'wood',
+      want: 'food' | 'wood',
+      units: number,
+    ) => previewNpcSwap([food, wood], storage, trader(carried), undefined, give, want, units, 0, [])
+    // 1 wood fetches 4 coins and a food costs 3: rounded up, with what is over back in coins.
+    expect(q({ wood: 3 }, 'wood', 'food', 1)).toMatchObject({ units: 1, gives: 1, coins: 1 })
+    expect(q({ wood: 3 }, 'wood', 'food', 2)).toMatchObject({ units: 2, gives: 2, coins: 2 })
+    // It lacks only 2 wood: what they fetch pays for 2 food.
+    expect(q({ wood: 9 }, 'wood', 'food', 5)).toMatchObject({ units: 2, limit: 'unwanted' })
+    expect(q({ wood: 1 }, 'wood', 'food', 5)).toMatchObject({ units: 1, limit: 'held' })
+    // It isn't short of food, and has no wood to spare.
+    expect(q({ food: 9 }, 'food', 'wood', 1)).toMatchObject({ units: 0, limit: 'stock' })
+    const refused = previewNpcSwap(
+      undefined,
+      storage,
+      trader({ wood: 3 }),
+      undefined,
+      'wood',
+      'food',
+      1,
+      0,
+      [],
+    )
+    expect(refused).toMatchObject({ units: 0, limit: 'refused' })
+  })
+
+  it('names the swap on its button, what cut it down, or why it won’t go', () => {
+    const zero = { units: 0, gives: 0, coins: 0, bought: 0, sold: 0 }
+    const q = { units: 5, gives: 7, coins: 2, bought: 12, sold: 14 }
+    expect(swapText('wood', 'stone', q)).toBe('Swap 7 wood for 5 stone, with 2 coins back')
+    expect(swapText('wood', 'stone', { ...q, coins: 0 })).toBe('Swap 7 wood for 5 stone')
+    expect(swapText('wood', 'stone', { ...q, coins: 1 })).toBe(
+      'Swap 7 wood for 5 stone, with 1 coin back',
+    )
+    expect(swapText('wood', 'stone', { ...q, limit: 'room' })).toBe(
+      'Swap 7 wood for 5 stone, with 2 coins back: no room for more',
+    )
+    expect(swapText('wood', 'stone', { ...zero, limit: 'held' })).toBe(
+      'Can’t swap wood for stone: not enough wood to pay for it',
+    )
+    expect(swapText('wood', 'stone', { ...zero, limit: 'unwanted' })).toBe(
+      'Can’t swap wood for stone: it doesn’t want wood',
+    )
+    expect(swapText('wood', 'stone', { ...zero, limit: 'stock' })).toBe(
+      'Can’t swap wood for stone: none in stock',
+    )
+    expect(swapText('wood', 'stone', { ...zero, limit: 'room' })).toBe(
+      'Can’t swap wood for stone: no room',
+    )
+    expect(swapText('wood', 'stone', { ...zero, limit: 'refused' })).toBe(
+      'Can’t swap wood for stone: it won’t trade with you',
+    )
+    expect(swapText('wood', 'stone', zero)).toBe('Can’t swap wood for stone')
+  })
+})
+
+describe('an NPC city’s rates in the inspector', () => {
+  const food: NpcCityPrice = { good: 'food', stock: 30, forSale: 10, wanted: 0, buy: 1, sell: 3 }
+  const wood: NpcCityPrice = { good: 'wood', stock: 5, forSale: 0, wanted: 9, buy: 4, sell: 6 }
+  const view = { id: 's1', kind: 'storage' as const, x: 3, y: 4, prices: [food, wood] }
+  const rate = { give: 'wood' as const, gives: 1, want: 'food' as const, units: 1 }
+
+  it('lists what it has spare only as far as this storage holds it', () => {
+    const storage = (stock: Building['stock']) => ({ ...b('s1', 'storage', 'city1'), stock })
+    expect(ratesAt(view, { buildings: [storage({ food: 30, wood: 5 })] })).toEqual([rate])
+    // The surplus lies in its other storage: a swap here couldn't get any.
+    expect(ratesAt(view, { buildings: [storage({ wood: 5 })] })).toEqual([])
+  })
+
+  it('goes by its prices alone where the Player doesn’t see inside', () => {
+    expect(ratesAt(view, { buildings: [b('s1', 'storage', 'city1')] })).toEqual([rate])
+  })
+
+  it('says a rate as the trader would swap it', () => {
+    expect(rateText({ ...rate, gives: 3, units: 2 }, 'wood', 'food')).toBe('3 wood for 2 food')
   })
 })
 

@@ -18,6 +18,7 @@ import {
   type OrderRequest,
   type SeenHorse,
   type Stock,
+  type Task,
   type TrainingSubject,
 } from '@csp/shared'
 import type { HaulSetup } from './Residents.js'
@@ -205,6 +206,20 @@ export const PLAN_STEPS: readonly PlanKind[] = [
   { id: 'explore', label: 'Explore', picks: [] },
   { id: 'runScript', label: 'Run script', picks: [], ask: 'script' },
 ]
+
+/** The task a kind of step gives, whose Customise (`CONTEXT.md`: Before it starts) it offers. */
+export const PLAN_TASKS: Partial<Readonly<Record<PlanStepId, Task>>> = {
+  work: 'work',
+  build: 'build',
+  tearDown: 'tearDown',
+  road: 'buildLine',
+  wall: 'buildLine',
+  feedStable: 'feedStable',
+  breed: 'breed',
+  train: 'train',
+  haul: 'haul',
+  explore: 'explore',
+}
 
 export function planKind(id: PlanStepId): PlanKind {
   return PLAN_STEPS.find((k) => k.id === id)!

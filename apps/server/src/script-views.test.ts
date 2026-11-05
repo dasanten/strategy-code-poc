@@ -223,6 +223,7 @@ describe('script views', () => {
       nodes: 'nodes()',
       nodesInSight: 'nodesInSight("forest")',
       lastSeen: 'lastSeen()',
+      offers: 'offers()',
       directives: 'directives()',
       waypoints: 'waypoints()',
       withMemory: 'withMemory("role", "gatherer")',

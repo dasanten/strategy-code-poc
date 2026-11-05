@@ -20,7 +20,7 @@ import { placeTraders, putHqOnLoops } from './traders.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 84
+export const WORLD_FORMAT_VERSION = 89
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -325,9 +325,41 @@ export const migrations: Record<number, MigrationStep> = {
   // Player's order under attack; `Resident.givenUnderAttack`). Orders given before weren't marked,
   // so the step leaves every resident as they are.
   79: (state) => state,
+  // A punishment says when it reached its city and who has packed (`CONTEXT.md`: Punishment trip;
+  // `Punishment.arrivedAt`, `members[].packed`). One under way keeps going: nobody goes back to pack,
+  // and if it took anything or stands in the city it has arrived, its time there starting now;
+  // otherwise it is still on the road.
+  80: (state, { terrain }) => {
+    const world = structuredClone(state) as WorldState
+    for (const p of world.punishments) {
+      for (const m of p.members) m.packed = true
+      const city = world.cities.find((c) => c.id === p.cityId)
+      const there =
+        city !== undefined &&
+        world.residents.some(
+          (r) =>
+            p.members.some((m) => m.residentId === r.id) &&
+            inCityArea(world, city, r.x, r.y, terrain.size),
+        )
+      if (p.took > 0 || (p.heading === 'out' && there)) p.arrivedAt = world.tick
+    }
+    return world
+  },
+  // Offers at a Player's storage (`CONTEXT.md`: Offer): nobody has posted any yet.
+  81: (state) => ({ ...(state as object), offers: [] }),
+  // A Direct offer (`CONTEXT.md`: Direct offer) adds `direct` to an offer and `directOffer` to the
+  // realm log. Every offer from before is open to anyone, so the step leaves them as they are.
+  82: (state) => state,
+  // An NPC city's trader can go to a Player's offer (`CONTEXT.md`: NPC cities at an offer;
+  // `CityTrader.offer`). No trader was on such a run before, so the step leaves every plan as it is.
+  83: (state) => state,
+  // A carried Direct offer (`CONTEXT.md`: Direct offer) adds `carried` to an offer's `direct`,
+  // `carriedOffer` to a Transfer and `unloadFee` to its caravan's job. Nothing from before is
+  // carried, so the step leaves everything as it is.
+  84: (state) => state,
   // Wandering traders (`CONTEXT.md`: Wandering trader): the HQ of a world from before sends its out
   // now, with new carriages, horses and crew, as a new world's does.
-  80: (state, { terrain }) => {
+  85: (state, { terrain }) => {
     const world = structuredClone(state) as WorldState
     world.traders ??= []
     placeTraders(world, terrain.size)
@@ -335,7 +367,7 @@ export const migrations: Record<number, MigrationStep> = {
   },
   // Trader stops (`CONTEXT.md`: Trader stop): a trader out on its loop works out the cities on its
   // way when it next looks, and stands at none yet.
-  81: (state) => {
+  86: (state) => {
     const world = structuredClone(state) as WorldState
     for (const t of world.traders) {
       t.calls = null
@@ -346,7 +378,7 @@ export const migrations: Record<number, MigrationStep> = {
   // The HQ is a stop on a wandering trader's loop (`CONTEXT.md`: Wandering trader): it joins the
   // loops of a world from before where it adds the least way, and a trader with no post left, bound
   // for nothing until now, is bound for it.
-  82: (state, { terrain }) => {
+  87: (state, { terrain }) => {
     const world = structuredClone(state) as WorldState
     putHqOnLoops(world, terrain.size)
     return world
@@ -355,7 +387,7 @@ export const migrations: Record<number, MigrationStep> = {
   // (`CONTEXT.md`: Lost post found out), with `post`, `heardAt` and a drive order's `near`. Posts
   // lost before have already dropped from the loops and no crime is known of them: the Trade
   // Organization never heard. So the step leaves every world as it is.
-  83: (state) => state,
+  88: (state) => state,
 }
 
 export class WorldFormatError extends Error {}

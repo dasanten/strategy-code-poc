@@ -27,6 +27,7 @@ import {
   type TerrainMap,
   type Territory,
   type WorldState,
+  carriedWaysFor,
 } from '@csp/shared'
 import { getSessionUser, hashToken, sessionAlive, type SessionUser } from './auth.js'
 import { config } from './config.js'
@@ -154,6 +155,13 @@ function realmsSeen(entities: readonly SeenEntity[]): string[] {
     if (e.is === 'resident' && e.owner !== null) return [e.owner]
     return e.is === 'city' ? [e.id] : []
   })
+}
+
+/** The storages of cities among what a realm sees: where it can name a carried offer to go. */
+function storagesSeen(entities: readonly SeenEntity[]): { cityId: string | null }[] {
+  return entities.flatMap((e) =>
+    e.is === 'building' && e.kind === 'storage' && !e.site ? [e] : [],
+  )
 }
 
 /** The script a resident or army runs for the realm, if any (`CONTEXT.md`: Debugging a script). */
@@ -451,7 +459,12 @@ export function attachRealtime(
     refreshLastSeenSoon(world, realm.id)
     const events = eventsFor(world, user.id)
     client.lastEventSeq = events.at(-1)?.seq ?? 0
-    const diplomacy = diplomacyFor(world, realm.id, realmsSeen(entities))
+    const diplomacy = diplomacyFor(
+      world,
+      realm.id,
+      realmsSeen(entities),
+      carriedWaysFor(world, opts.terrain.size, realm.id, storagesSeen(entities)),
+    )
     client.lastDiplomacy = JSON.stringify(diplomacy)
     const workSettings = world.workplaceSettings[realm.id] ?? {}
     client.lastWorkSettings = JSON.stringify(workSettings)
@@ -628,7 +641,12 @@ export function attachRealtime(
       const grown = [...(explored.get(client.userId) ?? [])]
       const events = eventsFor(world, client.userId, client.lastEventSeq)
       client.lastEventSeq = events.at(-1)?.seq ?? client.lastEventSeq
-      const diplomacy = diplomacyFor(world, client.realmId, realmsSeen(inSight))
+      const diplomacy = diplomacyFor(
+        world,
+        client.realmId,
+        realmsSeen(inSight),
+        carriedWaysFor(world, opts.terrain.size, client.realmId, storagesSeen(inSight)),
+      )
       const json = JSON.stringify(diplomacy)
       const fresh = json === client.lastDiplomacy ? {} : { diplomacy }
       client.lastDiplomacy = json
