@@ -229,6 +229,20 @@ describe('realm log', () => {
       text: 'Ada couldn’t buy any iron ore at the warehouse.',
       tone: 'warn',
     })
+    expect(
+      describeEvent({
+        ...trade,
+        side: 'buy',
+        units: 2,
+        wanted: 2,
+        coins: 14,
+        atStorage: true,
+        standing: { org: 'c1', name: 'Alder', by: 1.4 },
+      }),
+    ).toMatchObject({
+      text: 'Ada bought 2 iron ore for 14 coins at the storage. Standing with Alder +1.4.',
+      places: [{ name: 'the storage', x: 4, y: 5 }],
+    })
   })
 
   it('describes swaps, cut down or not, and where', () => {
@@ -260,6 +274,17 @@ describe('realm log', () => {
     expect(
       describeEvent({ ...swap, place: 'storage', gave: 3, units: 2, wanted: 5, coins: 0 }).text,
     ).toBe('Ada swapped 3 wood for 2 stone (of 5 wanted) at the storage.')
+    expect(
+      describeEvent({
+        ...swap,
+        place: 'storage',
+        gave: 3,
+        units: 2,
+        wanted: 2,
+        coins: 0,
+        standing: { org: 'c1', name: 'Alder', by: 1.5 },
+      }).text,
+    ).toBe('Ada swapped 3 wood for 2 stone at the storage. Standing with Alder +1.5.')
     expect(
       describeEvent({ ...swap, place: 'storage', gave: 0, units: 0, wanted: 5, coins: 0 }),
     ).toMatchObject({ text: 'Ada couldn’t swap wood for stone at the storage.', tone: 'warn' })

@@ -3,8 +3,10 @@ import {
   NPC_CITY_REFUSES_STANDING,
   NPC_SMITHY_WEAPON,
   NPC_VILLAGE,
+  STANDING_NPC_TRADE_COINS_PER_POINT,
   Terrain,
   TICKS_PER_GAME_DAY,
+  WAREHOUSE_BASE_PRICE,
   npcCityStock,
   npcOfferTimes,
   npcPriceFor,
@@ -181,7 +183,15 @@ describe('an NPC city at an offer', () => {
       const log = eventsFor(world, 7).map((e) => e.kind)
       expect(log).toContain('offerTaken')
       expect(log).toContain('offerEnded')
-      expect(standingOf(world, city.id, 'r1')).toBeGreaterThan(0)
+      // Goods for goods counts both at base prices, by an NPC city's own number.
+      const raised =
+        (5 * WAREHOUSE_BASE_PRICE.iron + 5 * WAREHOUSE_BASE_PRICE.wood) /
+        STANDING_NPC_TRADE_COINS_PER_POINT
+      expect(standingOf(world, city.id, 'r1')).toBeLessThanOrEqual(raised)
+      expect(standingOf(world, city.id, 'r1')).toBeGreaterThan(raised / 2)
+      expect(eventsFor(world, 7).find((e) => e.kind === 'offerTaken')).toMatchObject({
+        standing: { org: city.id, name: city.name, by: raised },
+      })
     },
   )
 
