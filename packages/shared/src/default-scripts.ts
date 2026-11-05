@@ -131,9 +131,10 @@ export interface TaskMemory {
   breed: { stableId: string; horseIds: string[] }
   /**
    * Feed the stable: the stable the resident stood in when given it, in the param `stable` too
-   * (`TARGET_PARAMS`).
+   * (`TARGET_PARAMS`). An NPC city's feeder also has `spareFood`, the most Food the city lets them
+   * take now (`CONTEXT.md`: NPC horses).
    */
-  feedStable: { stableId: string }
+  feedStable: { stableId: string; spareFood?: number }
   /**
    * Train: the training ground the resident stood on when given it, in the param `ground` too
    * (`TARGET_PARAMS`), and the `subject` to learn there, if one was asked for: the default ends
@@ -1357,7 +1358,8 @@ ${LOG_TEXT}
 // stand in when I start, kept in memory.stableId; with none, or once it is
 // gone, I end. Below that I fetch what is missing from params.source, or
 // the nearest storage of my realm with Food while none is picked, and store
-// it in the stable; otherwise I wait there.
+// it in the stable; otherwise I wait there. memory.spareFood, kept only by an
+// NPC city's feeder, is the most Food I may take now.
 param stable: storage // the stable to feed; none: the one I stand in
 param source: storage // where the Food comes from; a carriage too; none: the nearest storage with Food
 let days = ${STABLE_FEED_DAYS} // game days of Food to keep
@@ -1420,9 +1422,10 @@ fn fetchIfLow(stable) {
   if (from != null) {
     let units = floor(need)
     if (units < need) { units = units + 1 } // whole units, rounded up
+    if (memory.spareFood != null && units > memory.spareFood) { units = memory.spareFood }
     let before = me.carried.food
     if (before == null) { before = 0 }
-    if (fetch({food: units}, from.id) == null) {
+    if (units >= 1 && fetch({food: units}, from.id) == null) {
       wait() // until I have it
       memory.fetched = {before: before}
       say("stable low (" + floor(held) + "): fetching " + units + " Food at " + placeName(from))

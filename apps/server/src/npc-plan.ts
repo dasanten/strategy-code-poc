@@ -49,6 +49,7 @@ import {
   shortGoods,
 } from './npc-chain.js'
 import { foundingParty, planFounding } from './npc-founding.js'
+import { feedJobKept, planFeeder } from './npc-stable.js'
 import { planTrader, planVisit, traderOut } from './npc-trader.js'
 import { hash } from './residents.js'
 
@@ -179,9 +180,9 @@ export function workplaceOf(r: Resident): string | undefined {
  * Food isn't short; and gives every adult a job: soldiers (armed adults) stand as soldiers; one
  * carrying a child does nothing; builders go on building; a worker stays at their workplace,
  * except that while Food runs short workers off the farms move to farms with room. It shares out
- * the rest by its reserve (`shareOut`). An NPC city's founding party keeps its `found` jobs, and
- * the pass ends with the founding's part (`planFounding`). Without `terrain` the city picks no
- * project.
+ * the rest by its reserve (`shareOut`); one of them feeds its stable when it is due (`planFeeder`). An
+ * NPC city's founding party keeps its `found` jobs, and the pass ends with the founding's part
+ * (`planFounding`). Without `terrain` the city picks no project.
  * `people` are the residents the city gives orders to (`runResidents`).
  */
 export function planCity(
@@ -218,14 +219,19 @@ export function planCity(
   const spare: Resident[] = []
   // The trader out on their run (`CONTEXT.md`: NPC trader) is nobody's spare hand.
   const trader = city.tradeOrg ? undefined : traderOut(world, plan)
+  let feeding = false
   for (const r of adults) {
     const at = workplaceOf(r)
+    const feed = feedJobKept(world, city, r)
     if (r.id === trader) jobs[r.id] = { kind: 'trade' }
     else if (isArmed(r)) jobs[r.id] = { kind: 'soldier' }
     else if (r.carrying) jobs[r.id] = { kind: 'idle' }
     else if (isBuilder(r)) jobs[r.id] = { kind: 'build' }
     else if (at !== undefined) jobs[r.id] = workJob(placeById.get(at) ?? at)
-    else spare.push(r)
+    else if (feed) {
+      jobs[r.id] = feed
+      feeding = true
+    } else spare.push(r)
   }
   if (short) {
     // Food runs short: workers off the farms go to the farms with room.
@@ -246,6 +252,8 @@ export function planCity(
     }
   }
   const unneeded = shareOut(world, city, adults, jobs, held, spare, plan, builders, short)
+  // Trading posts and the HQ don't feed their stables this way (`npcOneFeeder`).
+  if (!city.tradeOrg && !feeding) planFeeder(world, city, adults, jobs)
   // The Trade Organization sends no trader (`tradeOrgSendsNoOne`) and founds nothing.
   if (!city.tradeOrg && !trader) {
     const size = terrain?.size ?? MAP_SIZE
@@ -255,8 +263,8 @@ export function planCity(
     }
   }
   if (!city.tradeOrg) {
-    // A spare hand just sent off as the trader isn't one any more.
-    const left = unneeded.filter((r) => jobs[r.id]?.kind !== 'trade')
+    // A spare hand just sent off as the trader or to feed the stable isn't one any more.
+    const left = unneeded.filter((r) => !['trade', 'feed'].includes(jobs[r.id]?.kind ?? ''))
     planFounding(world, city, plan, jobs, { adults, unneeded: left, members }, home, terrain)
   }
   plan.jobs = jobs

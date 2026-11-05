@@ -53,6 +53,7 @@ import {
 } from './npc-plan.js'
 import { chainStore, holdsBatch, warehouseFor } from './npc-chain.js'
 import { foundDaughter, foundingParty, stepFounders } from './npc-founding.js'
+import { startFeeding, steerFeeder } from './npc-stable.js'
 import { runTrader } from './npc-trader.js'
 import { refillSource } from './survival.js'
 import { walkTime } from './walk-time.js'
@@ -120,8 +121,8 @@ export function stepNpcCities(world: WorldState, size: number, terrain?: Terrain
  * them elsewhere, or nowhere; then gives each idle adult what comes first: its trader goes on with
  * their run (`runTrader`); a resident carrying a child stays at home; one
  * carrying materials the project needs takes them to its site; a load of goods goes into the
- * storage; they take `OWN_FOOD` from the storage before they set out; one of them breeds the
- * city's horses (`breedHorses`); a planned builder takes their part in the project (`takePart`),
+ * storage; they take `OWN_FOOD` from the storage before they set out; a planned feeder feeds its
+ * stable (`startFeeding`); one of them breeds the city's horses (`breedHorses`); a planned builder takes their part in the project (`takePart`),
  * picking the next one once it is finished; a planned worker at a workplace that processes goods
  * first takes its input from the storage (`takeInput`), and waits at home while the storage holds
  * none; a planned worker runs the game's Work default at their workplace (`runNpcScripts`), which
@@ -204,6 +205,8 @@ function runCity(
     const moved =
       job !== undefined && job.kind !== 'soldier' && at !== undefined && at !== job.buildingId
     if (moved && !r.carrying && plan?.plannedAt === world.tick) stopWork(r)
+    // Done feeding the stable, a feeder is free too; one going on is told what they may take.
+    if (steerFeeder(world, city, r, job, plan?.plannedAt === world.tick) === 'stop') stopWork(r)
     // At a workplace that processes goods with nothing left to process, one of them fetches more
     // by the Work default (`CONTEXT.md`: Fetching inputs) while the store holds a batch; with
     // none there, they get their next job.
@@ -270,6 +273,7 @@ function runCity(
     }
     const job = jobs[r.id]
     const soldier = isArmed(r) || job?.kind === 'soldier'
+    if (!soldier && job?.kind === 'feed' && startFeeding(world, city, r, job)) continue
     if (!soldier && breedHorses(world, city, r)) continue
     if (!soldier && job?.kind === 'build' && free > 0) {
       const p = project()

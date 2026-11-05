@@ -256,6 +256,19 @@ export const HORSE_WAKE_HEALTH = 20
 export const STABLE_FEED_DAYS = 10
 
 /**
+ * Game days of Food for its horses below which an NPC city sends one of its residents to fill its
+ * stable up to `STABLE_FEED_DAYS` (`CONTEXT.md`: NPC horses). Half of it, so they go in one trip
+ * every few days and work for the city in between, rather than walk for every unit eaten.
+ */
+export const NPC_STABLE_REFILL_DAYS = 5
+
+/**
+ * Game days of Food for each hungry horse an NPC city takes from below its Food reserve
+ * (`CONTEXT.md`: NPC horses): enough to get them past hungry, so its people still come first.
+ */
+export const NPC_STABLE_HUNGRY_DAYS = 2
+
+/**
  * Ticks without a blow after which the Defend default ends for a resident fleeing home
  * (`CONTEXT.md`: Defence script): half a minute, so a lone blow from someone who walks off
  * doesn't send them all the way home. Written into the default's source, where a Player can
