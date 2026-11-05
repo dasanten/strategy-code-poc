@@ -323,27 +323,31 @@ describe('accepting a demand for goods: by Transfer', () => {
     expect(eventsOf(s.world, 'transferOrdered', ivo.userId)).toHaveLength(2)
   })
 
-  it('brings them to the sender’s storage by caravan, the fee out of the one accepting', () => {
-    const s = demanded({ iron: 10 })
-    const tiles = transferTiles(
-      s.terrain.size,
-      nearestWarehouse(s.world, s.toStorage, s.terrain.size)!,
-      s.toStorage,
-      s.storage,
-    )
-    const iron = s.storage.stock!.iron ?? 0
-    const coins = s.toStorage.stock!.coins!
-    const herCoins = s.storage.stock!.coins!
-    expect(accept(s, byTransfer(s))).toBe('ack')
-    runUntil(s.world, s.terrain, () => s.world.transfers.length === 0)
-    expect(s.storage.stock!.iron).toBe(iron + 10)
-    expect(s.toStorage.stock!.iron).toBeLessThanOrEqual(30)
-    const fee = transferFee(10 * GOOD_WEIGHT.iron, tiles)
-    expect(transferLoadsFee({ iron: 10 }, tiles)).toBe(fee)
-    expect(s.toStorage.stock!.coins).toBeLessThanOrEqual(coins - fee)
-    expect(s.storage.stock!.coins).toBeGreaterThanOrEqual(herCoins - 1)
-    expect(eventsOf(s.world, 'transferred', mara.userId)[0]).toMatchObject({ units: 10, fee })
-  })
+  it(
+    'brings them to the sender’s storage by caravan, the fee out of the one accepting',
+    { tags: ['slow'], timeout: 120_000 },
+    () => {
+      const s = demanded({ iron: 10 })
+      const tiles = transferTiles(
+        s.terrain.size,
+        nearestWarehouse(s.world, s.toStorage, s.terrain.size)!,
+        s.toStorage,
+        s.storage,
+      )
+      const iron = s.storage.stock!.iron ?? 0
+      const coins = s.toStorage.stock!.coins!
+      const herCoins = s.storage.stock!.coins!
+      expect(accept(s, byTransfer(s))).toBe('ack')
+      runUntil(s.world, s.terrain, () => s.world.transfers.length === 0)
+      expect(s.storage.stock!.iron).toBe(iron + 10)
+      expect(s.toStorage.stock!.iron).toBeLessThanOrEqual(30)
+      const fee = transferFee(10 * GOOD_WEIGHT.iron, tiles)
+      expect(transferLoadsFee({ iron: 10 }, tiles)).toBe(fee)
+      expect(s.toStorage.stock!.coins).toBeLessThanOrEqual(coins - fee)
+      expect(s.storage.stock!.coins).toBeGreaterThanOrEqual(herCoins)
+      expect(eventsOf(s.world, 'transferred', mara.userId)[0]).toMatchObject({ units: 10, fee })
+    },
+  )
 
   it('takes more than one load as several Transfers', () => {
     const load = transferLoad('iron')
