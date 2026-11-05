@@ -712,10 +712,10 @@ export function Wiki() {
         <p>
           A queue gives a resident a list of steps to do one after another, up to{' '}
           {num(QUEUE_MAX_STEPS)} of them. A step is any order you could give them on its own: walk
-          to, pick up, drop, store, fetch, drive, unhitch a horse, mount or dismount, board or get
-          off a carriage, work, build, haul, feed the stable, breed horses, tear down, Build line
-          (road or wall), relocate to another of your cities, or run one of your scripts with its
-          params.
+          to, pick up, drop, store, fetch, drive, hitch or unhitch a horse, mount or dismount, board
+          or get off a carriage, work, build, haul, feed the stable, breed horses, tear down, Build
+          line (road or wall), relocate to another of your cities, or run one of your scripts with
+          its params.
         </p>
         <p>
           To plan ahead, use <strong>Add step</strong> under the queue on the resident's card: it
@@ -1413,6 +1413,15 @@ export function Wiki() {
           led into a stable, and a carriage being driven stops where it is. The carriage stands
           there until it is next driven, when a free horse of the realm standing with it is hitched
           again. A carriage whose horse dies waits the same way.
+        </p>
+        <p>
+          To choose the horse, use <strong>Hitch horse</strong>: any grown resident of the
+          carriage's realm standing on its tile can hitch a horse of the realm there that pulls no
+          carriage, nobody rides and isn't Down. Their card lists those horses with name, stats and
+          age, also when only one stands there; it is a queue step too, and a script's{' '}
+          <code>hitch(carriage, horse)</code>. It happens at once, and a horse already hitched
+          stands free on the tile. A carriage being driven goes on with the new horse. Hitching only
+          takes your realm's own horses; stealing one stays with driving and mounting.
         </p>
         <p>
           A grown resident on the tile of another realm's or city's carriage can steal it: its card,

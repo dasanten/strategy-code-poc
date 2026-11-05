@@ -119,7 +119,7 @@ import { AddStep } from './AddStep.js'
 import { GroupPlanner } from './GroupPlanner.js'
 import { hasBlocks, type PlanItem } from './plan-blocks.js'
 import {
-  horsesIn,
+  planHorses,
   nextPick,
   pickCity,
   pickInto,
@@ -175,6 +175,7 @@ import {
   buildHereProblem,
   describeTile,
   escapeStep,
+  hitchChoice,
   makeLeaderProblem,
   nodeFit,
   type ActionId,
@@ -903,7 +904,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           terrain: tile && terrainAt?.(tile.x, tile.y),
           problem: tile ? buildProblemAt(w, tile.x, tile.y) : () => undefined,
         }}
-        horses={horsesIn(planWorld(w), w.horses, plan?.picked[0]?.id)}
+        horses={planHorses(planWorld(w), w.horses, plan)}
         tick={w.tick}
         cities={cities}
         onPickCity={(cityId) => {
@@ -1265,6 +1266,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function unhitch(carriageId: string, residentId = selected?.id) {
     if (!residentId) return
     setOrderError(await giveOrder({ kind: 'unhitch', residentId, carriageId }))
+  }
+  /**
+   * Orders the picked resident to hitch the horse they choose to a carriage on their tile
+   * (`CONTEXT.md`: Hitched horse); with Shift held, appends it to their queue.
+   */
+  async function hitch(carriageId: string, horseId: string) {
+    if (!selected) return
+    setOrderError(await giveOrder({ kind: 'hitch', residentId: selected.id, carriageId, horseId }))
   }
   /** Orders the picked resident to climb over a wall or gate of another realm next to them. */
   async function climb(wallId: string) {
@@ -2077,6 +2086,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               world.carriages.filter((k) => carriageOfResident(k, selected) && k.horseId),
             )}
             onUnhitch={unhitch}
+            toHitch={hitchChoice(world, selected)}
+            onHitch={hitch}
             scripts={scripts}
             buildings={world.buildings}
             lastSeen={world.lastSeen.buildings}
