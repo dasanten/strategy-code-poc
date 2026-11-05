@@ -373,6 +373,11 @@ describe('anything but giving it back', () => {
     const s = heardOf()
     const home = s.world.cities.find((c) => c.realmId === s.realm.id && c.id !== s.post.id)!
     expect(home).toBeDefined()
+    // Their home stands nearer the HQ, where an army with no city to go to would go.
+    const hall = townHallOf(s.world, home)!
+    const hqHall = townHallOf(s.world, s.hq)!
+    hall.x = hqHall.x + 10
+    hall.y = hqHall.y
     expect(answer(s, 'declineDemand')).toBe('ack')
     expect(s.world.debts[0]).toMatchObject({ cityId: s.post.id })
     const soldiers = s.world.residents.filter((r) => r.owner === null && r.cityId === s.hq.id)
