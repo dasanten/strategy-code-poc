@@ -77,6 +77,9 @@ export function handOverQuestion(
   const city = own.find((c) => c.id === terms.cityId)
   if (!city) return undefined
   const last = own.length === 1 ? ' It is your last city.' : ''
+  if (d.from.realmId === TRADE_ORG) {
+    return `Give ${city.name} back to the Trade Organization as a trading post, with those who live there, its horses and carriages? That settles its worth of your debt. This can’t be undone.${last}`
+  }
   return `Hand ${city.name} over to the realm of ${d.from.realm}, with those who live there, its horses and carriages? This can’t be undone.${last}`
 }
 

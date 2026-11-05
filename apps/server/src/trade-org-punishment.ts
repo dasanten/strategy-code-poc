@@ -113,9 +113,13 @@ export function tookSoFar(world: WorldState, p: Punishment): number {
   return carried + wagonTook(world, p)
 }
 
-/** Whether a crime is one the Trade Organization knows of against itself and hasn't punished yet. */
+/**
+ * Whether a crime is one the Trade Organization knows of against itself and hasn't punished yet. A
+ * captured post never is: that is a debt (`lostPostsBecomeDebts`).
+ */
 const toPunish = (world: WorldState, c: Crime) =>
   !c.punished &&
+  c.post === undefined &&
   standingOrganization(world, c.victimOrg) === TRADE_ORG &&
   c.knownBy.includes(c.victimOrg)
 

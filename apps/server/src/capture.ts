@@ -16,7 +16,7 @@ import {
   type Resident,
   type WorldState,
 } from '@csp/shared'
-import { leaveTradeOrg } from './caravans.js'
+import { leaveTradeOrg, rejoinTradeOrg } from './caravans.js'
 import { commitCrime } from './crimes.js'
 import { recordEvent } from './events.js'
 import { hqFalls } from './hq-fall.js'
@@ -143,18 +143,40 @@ export function handOverCity(world: WorldState, city: City, to: string, size: nu
  * (`leaveTradeOrg`), and so does its HQ (`hqFalls`). Returns how many of its residents joined.
  */
 export function joinRealm(world: WorldState, city: City, captor: string, size: number): number {
+  const joined = changeHands(world, city, captor, size)
+  if (city.tradeOrg === 'hq') hqFalls(world, city)
+  else leaveTradeOrg(world, city)
+  return joined
+}
+
+/**
+ * A captured post goes back to the Trade Organization (`CONTEXT.md`: Trade Org debt). Everything
+ * that joins a realm with a city goes the other way (`changeHands`): those who live there are the
+ * post's again, a Leader staying in their realm, homeless, and its horses and carriages are the
+ * post's. The game runs it from here. Then it is a post again (`rejoinTradeOrg`).
+ */
+export function returnPost(world: WorldState, city: City, size: number): void {
+  changeHands(world, city, null, size)
+  rejoinTradeOrg(world, city, size)
+}
+
+/**
+ * The city and all that goes with it change hands, to the realm `to` or, for none, to the city
+ * itself (`joinRealm`, `returnPost`). Returns how many of its residents went with it.
+ */
+function changeHands(world: WorldState, city: City, to: string | null, size: number): number {
   const leaders = new Set(world.realms.map((r) => r.leaderId))
   const joining = world.residents.filter((r) => r.cityId === city.id && !leaders.has(r.id))
   const joined = new Set(joining.map((r) => r.id))
   // Asked before those who join drop their orders, a drive or haul among them.
   const comesAlong = comesWithCity(world, city, joining, size)
-  const names = residentNamesTaken(world, captor, null)
+  const names = residentNamesTaken(world, to, to === null ? city.id : null)
   for (const r of world.residents) {
     if (r.cityId !== city.id) continue
     if (joined.has(r.id)) {
       if (r.gameName) r.name = uniqueName(r.name, names)
       names.add(r.name)
-      r.owner = captor
+      r.owner = to
       r.order = null
       if (r.pair && !joined.has(r.pair.partnerId)) delete r.pair
     } else {
@@ -163,8 +185,8 @@ export function joinRealm(world: WorldState, city: City, captor: string, size: n
     }
   }
   const join = (t: Horse | Carriage) => {
-    t.realmId = captor
-    t.cityId = null
+    t.realmId = to
+    t.cityId = to === null ? city.id : null
   }
   const carriages = new Set<string>()
   for (const k of world.carriages) {
@@ -183,11 +205,9 @@ export function joinRealm(world: WorldState, city: City, captor: string, size: n
     if (o?.kind === 'attack' && r.owner !== null && owners.get(o.targetId) === r.owner)
       r.order = null
   }
-  city.realmId = captor
+  city.realmId = to
   // Only a city of no realm has a plan (`cityPlansSound`), and this tick's planning is over.
   delete world.cityPlans[city.id]
-  if (city.tradeOrg === 'hq') hqFalls(world, city)
-  else leaveTradeOrg(world, city)
   return joining.length
 }
 
