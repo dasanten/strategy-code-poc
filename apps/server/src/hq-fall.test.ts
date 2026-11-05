@@ -71,6 +71,14 @@ describe('the fall of the HQ (CONTEXT.md: Fall of the HQ)', () => {
     for (const t of [carriage, horse, ...crew]) Object.assign(t, { x: 300, y: 300 })
     carriage.load = { wood: 7 }
     world.routeRobberies[caravan.postId] = 3
+    // Driving when it falls: they join the captor and stop, so no drive is left over.
+    crew[0]!.order = {
+      kind: 'drive',
+      carriageId: carriage.id,
+      target: { x: 310, y: 300 },
+      path: null,
+      progress: 0,
+    }
     captureCity(world, hqOf(world), realm.id, terrain.size)
     expect(world.caravans).toEqual([])
     expect(world.routeRobberies).toEqual({})

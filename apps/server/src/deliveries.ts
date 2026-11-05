@@ -1,4 +1,5 @@
 import {
+  freeStock,
   DELIVERY_DRIVE_TRIES,
   DELIVERY_LOAD,
   STANDING_TRADE_COINS_PER_POINT,
@@ -181,7 +182,8 @@ export function runDelivery(
       return
     }
   }
-  const stock = b.stock ?? {}
+  // A pick-up leaves what is set aside for an offer alone (`CONTEXT.md`: Offer).
+  const stock = freeStock(world, b)
   const hands = (g: Good) => unitsThatFit(driver, g, world.tick)
   const take = (from: GoodsSpot, good: Good, units: number, onto: 'carriage' | 'stop') => {
     driver.order = { kind: 'pickUp', from, goods: { [good]: units } }

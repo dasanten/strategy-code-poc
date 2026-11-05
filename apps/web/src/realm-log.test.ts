@@ -81,6 +81,48 @@ describe('realm log', () => {
     expect(describeEvent(foaled).text).toBe('A foal was born in a stable.')
   })
 
+  it('tells the truth about the Trade Organization’s army (`CONTEXT.md`: Punishment trip)', () => {
+    const trip = {
+      kind: 'punished',
+      cityId: 'c1',
+      city: 'Ashford',
+      worth: 240,
+      seq: 1,
+      ...at,
+    } as const
+    const army = "The Trade Organization's army"
+    const line = (e: Partial<Extract<RealmEvent, { kind: 'punished' }>>) =>
+      describeEvent({ ...trip, what: 'left', ...e }).text
+    expect(line({ what: 'arrived' })).toBe(`${army} has arrived at Ashford.`)
+    expect(line({ took: 240, why: 'enough' })).toBe(
+      `${army} left Ashford, taking 240 of the 240 Coins' worth it came for.`,
+    )
+    expect(line({ took: 0, why: 'empty' })).toBe(
+      `${army} left Ashford, taking 0 of the 240 Coins' worth it came for: the storages of Ashford held nothing.`,
+    )
+    expect(line({ took: 90, why: 'gaveUp' })).toBe(
+      `${army} left Ashford, taking 90 of the 240 Coins' worth it came for: it ran out of time there.`,
+    )
+    expect(line({ what: 'turnedBack', why: 'cityLost' })).toBe(
+      `${army} turned back without reaching Ashford: Ashford is no longer yours.`,
+    )
+    expect(line({ what: 'turnedBack', why: 'directiveLifted' })).toBe(
+      `${army} turned back without reaching Ashford: the admin directive was lifted.`,
+    )
+    expect(line({ what: 'turnedBack', why: 'noWay' })).toBe(
+      `${army} turned back without reaching Ashford: it found no way to Ashford.`,
+    )
+    expect(line({ what: 'lost', where: 'wayThere' })).toBe(
+      `${army} was lost on its way to Ashford.`,
+    )
+    expect(line({ what: 'lost', where: 'atCity', took: 10 })).toBe(
+      `${army} was lost at Ashford, having taken 10 of the 240 Coins' worth it came for.`,
+    )
+    expect(line({ what: 'lost', where: 'wayHome', took: 10 })).toBe(
+      `${army} was lost on its way home from Ashford, with 10 of the 240 Coins' worth it came for.`,
+    )
+  })
+
   it('describes a script’s trouble', () => {
     const who = { residentId: 'r1', name: 'Mara', scriptId: 3, seq: 9, ...at } as const
     expect(
@@ -187,6 +229,40 @@ describe('realm log', () => {
       text: 'Ada couldn’t buy any iron ore at the warehouse.',
       tone: 'warn',
     })
+  })
+
+  it('describes swaps, cut down or not, and where', () => {
+    const swap = {
+      kind: 'swapped',
+      residentId: 'p1',
+      name: 'Ada',
+      give: 'wood',
+      want: 'stone',
+      x: 4,
+      y: 5,
+      seq: 9,
+      ...at,
+    } as const
+    expect(
+      describeEvent({
+        ...swap,
+        place: 'warehouse',
+        gave: 7,
+        units: 5,
+        wanted: 5,
+        coins: 2,
+      }),
+    ).toEqual({
+      text: 'Ada swapped 7 wood for 5 stone, with 2 coins back, at the warehouse.',
+      tone: 'info',
+      places: [{ name: 'the warehouse', x: 4, y: 5 }],
+    })
+    expect(
+      describeEvent({ ...swap, place: 'storage', gave: 3, units: 2, wanted: 5, coins: 0 }).text,
+    ).toBe('Ada swapped 3 wood for 2 stone (of 5 wanted) at the storage.')
+    expect(
+      describeEvent({ ...swap, place: 'storage', gave: 0, units: 0, wanted: 5, coins: 0 }),
+    ).toMatchObject({ text: 'Ada couldn’t swap wood for stone at the storage.', tone: 'warn' })
   })
 
   it('describes deliveries ordered, carried out and stuck', () => {
@@ -610,6 +686,127 @@ describe('realm log', () => {
       tone: 'info',
       places: [{ name: 'Ashford', x: 3, y: 9 }],
     })
+  })
+
+  it('tells both sides of a carried direct offer, with what they pay', () => {
+    const terms = {
+      kind: 'directOffer',
+      gives: 'iron',
+      givesUnits: 10,
+      wants: 'stone',
+      wantsUnits: 5,
+      times: 1,
+      from: 'Mara',
+      carried: { fromCity: 'Oakford', toCity: 'Brook', fee: 40 },
+      x: 6,
+      y: 6,
+      seq: 1,
+      tick: 0,
+      userId: 7,
+    } as const
+    const got = (what: string) => describeEvent({ ...terms, what } as RealmEvent).text
+    expect(got('received')).toBe(
+      'The realm of Mara sent you a direct offer the Trade Organization carries between Oakford and Brook: 10 iron for 5 stone. You pay up to 40 coins. Accept or decline it under Direct offers.',
+    )
+    expect(got('carriedAccepted')).toBe(
+      'The realm of Mara accepted your carried direct offer of 10 iron for 5 stone: caravans carry both ways between Oakford and Brook. You pay up to 40 coins.',
+    )
+    expect(got('youAccepted')).toBe(
+      'You accepted the carried direct offer of 10 iron for 5 stone from the realm of Mara: caravans carry both ways between Oakford and Brook. You pay up to 40 coins.',
+    )
+    expect(got('noCaravans')).toBe(
+      'The direct offer of 10 iron for 5 stone from the realm of Mara is cancelled: the Trade Org HQ has fallen and no caravans run.',
+    )
+    const ended = (why: string, carried: boolean) =>
+      describeEvent({ ...terms, kind: 'offerEnded', why, to: 'Bo', carried } as RealmEvent).text
+    expect(ended('declined', true)).toBe(
+      'Your direct offer of 10 iron for 5 stone to the realm of Bo was declined.',
+    )
+    expect(ended('noCaravans', true)).toBe(
+      'Your direct offer of 10 iron for 5 stone to the realm of Bo is cancelled: the Trade Org HQ has fallen and no caravans run.',
+    )
+    expect(
+      describeEvent({
+        kind: 'transferStuck',
+        why: 'nothingCame',
+        good: 'stone',
+        units: 5,
+        cityId: 'c1',
+        city: 'Oakford',
+        seq: 1,
+        tick: 0,
+        userId: 7,
+      } as RealmEvent).text,
+    ).toBe('A caravan found no stone to bring Oakford for a carried direct offer.')
+  })
+
+  it('names no sum for a carried Transfer that arrived, whose fee may be shared', () => {
+    const arrived = {
+      kind: 'transferred',
+      good: 'stone',
+      units: 10,
+      fee: 27,
+      carried: true,
+      fromRealmId: 'r2',
+      fromRealm: 'Boland',
+      toRealmId: 'r1',
+      toRealm: 'Marland',
+      back: false,
+      cityId: 'c1',
+      city: 'Brackenholt',
+      x: 1,
+      y: 2,
+      seq: 1,
+      tick: 0,
+      userId: 8,
+    } as RealmEvent
+    expect(describeEvent(arrived, 'r2').text).toBe(
+      'A caravan brought the 10 stone you sent to Brackenholt of Marland, as your carried direct offer agreed.',
+    )
+  })
+
+  it('tells both sides of a direct offer, with its place', () => {
+    const terms = {
+      gives: 'wood',
+      givesUnits: 10,
+      wants: 'stone',
+      wantsUnits: 5,
+      x: 6,
+      y: 6,
+      seq: 1,
+      tick: 0,
+      userId: 7,
+    } as const
+    const place = [{ name: 'the storage', x: 6, y: 6 }]
+    const got = (what: string, times?: number) =>
+      describeEvent({ ...terms, kind: 'directOffer', what, from: 'Mara', times } as RealmEvent)
+    expect(got('received', 2)).toEqual({
+      text: 'The realm of Mara sent you a direct offer: 10 wood for 5 stone, 2 times over. Fetch it in person at the storage, or decline it, under Direct offers.',
+      tone: 'info',
+      places: place,
+    })
+    expect(got('received', 1).text).toMatch(
+      /^The realm of Mara sent you a direct offer: 10 wood for 5 stone\. /,
+    )
+    expect(got('lapsed').text).toBe(
+      'The direct offer of 10 wood for 5 stone from the realm of Mara lapsed.',
+    )
+    expect(got('declined').text).toBe(
+      'You declined the direct offer of 10 wood for 5 stone from the realm of Mara.',
+    )
+    expect(got('takenDown').text).toBe(
+      'The realm of Mara took down its direct offer of 10 wood for 5 stone to you.',
+    )
+    const ended = (why: string) =>
+      describeEvent({ ...terms, kind: 'offerEnded', why, to: 'Bo' } as RealmEvent)
+    expect(ended('declined')).toEqual({
+      text: 'Your direct offer of 10 wood for 5 stone to the realm of Bo was declined. Its goods are ordinary again.',
+      tone: 'info',
+      places: place,
+    })
+    expect(ended('lapsed').text).toBe(
+      'Your direct offer of 10 wood for 5 stone to the realm of Bo lapsed. Its goods are ordinary again.',
+    )
   })
 
   it('keeps the latest events, as many as the server does', () => {

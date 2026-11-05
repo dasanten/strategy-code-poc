@@ -1,4 +1,5 @@
 import {
+  freeStock,
   FOOD_PER_DAY,
   HOME_FOOD_LOW,
   OUTPOST_REFILL_REACH,
@@ -48,6 +49,7 @@ import { recordEvent } from './events.js'
 import { rememberFormerPlayer } from './standing.js'
 import { leaveOnLeaderDeath } from './alliances.js'
 import { endContractsOnLeaderDeath } from './contracts.js'
+import { lapseDemandsOnLeaderDeath } from './demands.js'
 import { NPC_ORDER_KINDS, npcHome, walkTo } from './npc-behaviour.js'
 import { caravanFood, leaveCaravans } from './caravans.js'
 import { countSoldiersKilled } from './directives.js'
@@ -323,6 +325,7 @@ export function gatherPile(world: WorldState, b: Building, size = MAP_SIZE): voi
  */
 export function endRealm(world: WorldState, realm: Realm, size: number): void {
   endContractsOnLeaderDeath(world, realm.id)
+  lapseDemandsOnLeaderDeath(world, realm.id)
   leaveOnLeaderDeath(world, realm.id)
   const cities = world.cities.filter((c) => c.realmId === realm.id)
   for (const c of cities) c.realmId = null
@@ -407,7 +410,11 @@ export function homeStorage(world: WorldState, r: Resident, size: number): Build
   for (const home of world.cities) {
     if (!isHome(r, home) || !inCityArea(world, home, r.x, r.y, size)) continue
     const storage = world.buildings.find(
-      (b) => b.cityId === home.id && b.kind === 'storage' && !b.site && (b.stock?.food ?? 0) > 0,
+      (b) =>
+        b.cityId === home.id &&
+        b.kind === 'storage' &&
+        !b.site &&
+        (freeStock(world, b).food ?? 0) > 0,
     )
     if (storage) return storage
   }
@@ -436,7 +443,7 @@ function outpostStorage(world: WorldState, r: Resident, size: number): Building 
   return world.buildings.find(
     (b) =>
       isOutpostStorage(b) &&
-      (b.stock?.food ?? 0) > 0 &&
+      (freeStock(world, b).food ?? 0) > 0 &&
       buildingRealm(world, b) === r.owner &&
       nearFootprint(b, r, OUTPOST_REFILL_REACH, size),
   )
@@ -472,7 +479,8 @@ export function refillSource(
   if (r.downUntil !== undefined) return undefined
   const home =
     homeStorage(world, r, size) ?? hirersStorage(world, r, size) ?? outpostStorage(world, r, size)
-  if (home) return whole(home.stock)
+  // What is set aside for an offer stays there (`CONTEXT.md`: Offer).
+  if (home) return { stock: home.stock!, food: freeStock(world, home).food! }
   const o = r.order
   // Teaching and training refill at the training ground as at a workplace (`CONTEXT.md`: Training).
   const atWork =

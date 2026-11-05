@@ -179,28 +179,28 @@ The shared language of the game. Domain terms only — no implementation details
   from it. Its own workplaces stand on the nearest node of every kind, with a smelter and a mint
   between its rings, and the game runs it like an NPC city: its warehouses' stock floor is its
   reserve, and its spare hands work and build the chain for whatever is short of it (NPC city),
-  so less of its stock comes from the floor. It never founds cities and sends no trader; its
-  caravans carry its goods.
+  so less of its stock comes from the floor. It never founds cities; its caravans and wandering
+  traders carry its goods.
 - **Warehouse:** a Trade Org building that keeps goods like a storage, a city building of the
   storage kind. The HQ keeps its coins in one and its other goods in another, inside the inner
   ring.
 - **Trading post:** a small Trade Org city in a region, with a warehouse, so Players can trade
   nearby. Goods move between posts and HQ by caravan. Its few spare hands work and build the
   chain for what is short of its warehouse's floor, like the HQ, but it never grows in people,
-  founds nothing and sends no trader. It keeps soldiers like an NPC city, armed
+  founds nothing and sends no trader of its own. Nothing tops up its warehouse (Stock floor). It keeps soldiers like an NPC city, armed
   from its warehouse, so its town hall is occupied only by beating them; they fight attackers in its area,
   and also anyone there it knows stole from it (seen by one of its residents), which is no crime.
   A captured post joins the captor's realm like any city and leaves the Trade Organization: its
   warehouse becomes a storage with everything in it (no stock floor, no prices), its caravan
-  route ends, and the deliveries and transfers waiting there go over to the HQ, which sends them
-  out of its own stock.
+  route ends, its crew stopping what the caravan had them doing and staying the HQ's, and the
+  deliveries and transfers waiting there go over to the HQ, which sends them out of its own stock.
 - **Fall of the HQ:** the HQ is captured like any city, which is hopeless in practice but not
   forbidden. It joins the captor's realm and leaves the Trade Organization for good. Nothing ever
   takes its place and it never comes back, whoever holds the city later.
   - **What the captor gets:** the city with its people, wherever they stand, its walls and gates,
     and its warehouses as storages with everything in them, its coins included (no stock floor,
-    no prices). Caravans end at once: their crew join the captor where they stand, each carriage,
-    horse and load going with them.
+    no prices). Caravans and wandering traders end at once: their crew join the captor where they
+    stand, each carriage, horse and load going with them.
   - **What lives on:** the Trade Organization lives on in its trading posts, which keep their
     warehouses, prices, stock floor and soldiers and go on trading in person. When the last post
     falls too it is gone, and standing toward it is forgotten.
@@ -209,7 +209,7 @@ The shared language of the game. Domain terms only — no implementation details
     are the captor's, goods at a post stay in its warehouse, goods on a carriage go with it), and
     posts take no new ones. It has no army: its contracts end at once, without refund or loss of
     standing (soldiers a Player hired are the captor's where they stand, Players' mercenaries
-    guarding the HQ walk home), punishments end, and nobody can hire from it. Admin directives
+    guarding the HQ walk home), punishments and debts end, and nobody can hire from it. Admin directives
     stay in force and can still be given and bought off at a post, but it sends nobody out for
     them.
 - **Trading with the Trade Organization:** only in person, by a resident (or a carriage) on a
@@ -233,6 +233,46 @@ The shared language of the game. Domain terms only — no implementation details
   trader moves them like the city price: the better, the cheaper it sells and the more it pays.
   Anyone with a resident in sight of the storage sees its prices. A trade raises its standing
   toward the trader, like trade with the Trade Organization.
+- **Swap:** goods for goods, in person at a warehouse or an NPC city's storage, with no Coins
+  needed in hand. It is a sale and a purchase at once, each unit priced as those trades do, so the
+  place's prices give the rate: the trader names what they want and how much, and hands over enough
+  of the good they give to pay for it, rounded up. What is over comes back in Coins as far as
+  the place holds them. It is cut down like any trade, and an NPC city swaps only its surplus for
+  what it is short of. The Trade section lists an NPC city's **rates** without being asked: each
+  good it is short of against each it has spare, worked out from its prices, so nothing new is kept
+  and the city plans nothing for them.
+- **Offer:** what a Player posts at a storage of their realm: "gives 10 Wood, wants 5 Stone", either
+  side may be Coins, as many times over as the goods are there. The goods stay in the storage but
+  set aside: workers, builders, Fetch and refills leave them alone, while a thief or raider can
+  take them like any others, cutting the offer down. Anyone in sight sees it and its rate. A
+  resident or carriage on the storage's tile accepts it, as many times as they can pay and carry;
+  it happens at once, whether or not the Player is online, and raises standing like a trade. It
+  ends when it is used up, when the Player takes it down, or when the storage is torn down or no
+  longer the realm's (the goods are then ordinary goods of that storage). Scripts can post and accept
+  offers.
+- **NPC cities at an offer:** an NPC city sends its trader to a Player's offer within a set reach
+  when the offer gives what it is short of and wants what it has spare (or Coins), at a rate at
+  least as good as its own prices. The Trade Organization never accepts offers.
+- **Direct offer:** an offer sent to one named realm, who sees it at once wherever they are and
+  accepts or declines it within a set time. The sender picks how the goods change hands: **in
+  person**, an offer at a storage of the sender's that only that realm can accept; or **carried**,
+  where on accepting the Trade Organization carries both sides' goods as two Transfers, its fee
+  paid by the sender or split, as the sender picks (offered only while the HQ stands, and each side's
+  goods are taken as a pick-up takes them). A storage's goods are set aside only for the in-person
+  way. Carried, the sender names both cities when sending, as for a Transfer, and can only name a
+  city whose storage they see, so the fee shown is exact; the other side only accepts or declines,
+  from anywhere. It is taken whole on accepting, each side's goods within one carriage load, and
+  changes no standing. Split, each side pays half of both fees; paid by the sender, the sender pays
+  both. Each caravan takes the share of the side it picks up from as it collects, and the other
+  side's from their storage as it unloads there. A storage short of coins on unloading gives what it
+  has, the goods stay delivered and the Trade Organization bears the loss. A Player can send one to any realm they know of: one they see residents of, an ally, one whose
+  city they have seen (Last seen), one with a standing toward them or they toward it, or their side
+  in a contract, demand or Direct offer. Both sides see it in their Direct offers drawer until it ends, and a
+  notice tells the one it is sent to, with the place. In person, it is otherwise an offer like any
+  other: anyone in sight of the storage sees it and that it is for another realm, and the sender can
+  take it down. Declined, lapsed or taken down, its goods are ordinary again and both sides are told;
+  it lapses too when the realm it was sent to is gone. A realm can have only so many standing to one
+  realm.
 - **Trade section:** where a city's panel shows trading, for each of its warehouses or storages
   in sight, from the Player's side: what they **can buy** there and what they **can sell**, with
   how many units and the price (an NPC city lists only its surplus and what it is short of, and
@@ -244,8 +284,11 @@ The shared language of the game. Domain terms only — no implementation details
   and the section links to the Wiki's "How to trade". The tile card of a warehouse or an NPC
   city's storage has **Trade here**, which opens it. Only the UI: the trades are those above.
 - **Stock floor:** the Trade Organization gets its stock physically (its own workplaces on every
-  kind of resource, plus buying). When a warehouse runs low, it tops up to a minimum at the end of
-  each game day. This is the one controlled exception to "everything is physical" (see ADR 0003).
+  kind of resource, plus buying). When a warehouse of the HQ runs low, it tops up to a minimum at
+  the end of each game day. This is the one controlled exception to "everything is physical" (ADR
+  0003). A trading post's warehouse has no such top-up (ADR 0023): its floor only says what its
+  spare hands, caravan and wandering traders go for, and what it holds came by them. A post can
+  run dry, and a raid can empty a region's market.
 - **Price anchor:** the Trade Organization buys low and sells high, so it is always there as a
   market of last resort. Its prices rise when its stock is low; Players usually get better deals
   trading with each other.
@@ -262,6 +305,24 @@ The shared language of the game. Domain terms only — no implementation details
   carriage counts as driven or guarded only while its driver or an armed escort is up and near it,
   so one still walking out doesn't stop a theft. Once stolen (Guaranteed carriage), the same
   caravan gets a new carriage and horse at the HQ, and any surviving crew walk back to it.
+- **Wandering trader:** a Trade Org carriage with a driver and a small escort, sent from the HQ on
+  a fixed loop of trading posts, apart from the caravans, so posts can hold goods they don't
+  produce. At each post it evens out its load with the warehouse, every good including Food and
+  Coins: it leaves what the post has less of and takes what it has more of, as far as the carriage
+  holds. Crew, escort, Food on board and a lost carriage go as for a caravan (Caravan crew lost);
+  taking goods off it or stealing it is a theft like any against the Trade Organization, but it
+  owes nobody a delivery, so nothing is sent again. How many there are is a balance number.
+- **Trader stop:** on its way a wandering trader stops for a while at each NPC or Player city
+  within a set reach of its route, beside the city's town hall. Anyone with a resident or carriage
+  on its tile can trade with it like at a warehouse: it prices each good from what it carries,
+  buying lower than it sells. An NPC city treats it as its visiting trader: it buys what it is
+  short of and sells its surplus. A Player's realm gets a notice with the place while one stands
+  at one of their cities, and anyone in sight sees its prices.
+- **Lost post found out:** a captured post leaves the Trade Organization at once as before, but it
+  learns who took it only by news: when a wandering trader reaches the post, or a surviving
+  witness gets away, and the news is brought to another post or the HQ. A trader drops a lost post
+  from its loop and carries the news on. From then on the capture is a crime it knows of (Trade Org
+  debt); if nobody ever tells it, it never reacts.
 - **Delivery:** a caravan brings goods bought from the Trade Organization to the storage of a
   city the buyer names, or picks up goods sold to it from the seller's city, for a fee. Anyone
   can instead carry the goods to or from the warehouse themselves, for free and at their own
@@ -304,6 +365,15 @@ The shared language of the game. Domain terms only — no implementation details
   horse out of its own stock.
 - **Self-interest:** the Trade Organization defends only itself and whoever hires it. It is not a
   world police. It punishes anyone who steals from it, whoever they are.
+- **Punishment trip:** the army always walks to the city, however far; the time it has there before
+  giving up starts when it arrives. Whether the storages hold anything is checked when it arrives,
+  so emptying them in time works, but you still see the army come. It still turns back on the road
+  when the city is no longer the culprit's, or when it finds no way there at all. Each soldier packs Food at the HQ for the way there and
+  back, leaving room for what they will carry home; on the way they refill at trading posts they
+  pass, and at the city they may take Food from its storage for the way back, apart from what the
+  army came to take. The realm log tells the truth: it is coming; it has arrived; it left with so
+  much of what it came for; it turned back without reaching the city, and why; or it was lost on
+  the way.
 - **Admin directive:** an admin orders the Trade Organization to weaken a Player or
   organization that is deliberately ruining the game for others (e.g. farming new Players). The
   game still forbids nothing; the Trade Organization acts because a healthy world is good for
@@ -600,8 +670,54 @@ The shared language of the game. Domain terms only — no implementation details
   they can see. Not stored; NPC cities and bandits avoid targets with high respect.
 - **Trade Org reaction:** below one standing threshold it refuses to trade; below a lower one it
   sends its army to take back the value and punish: to the culprit's city nearest the crime, to
-  carry home twice what it lost (coins first), fighting whoever resists. It never captures the
-  city, and leaves once it has what it came for.
+  carry home twice what it lost (coins first), fighting whoever resists. It leaves once it has what
+  it came for; what it couldn't take becomes a debt.
+- **Trade Org debt:** what the Trade Organization came for and couldn't take stays owed by that
+  Organization, however long it takes. It says so in the realm log, and it can be paid off at any
+  warehouse in Coins at any time. It rises by what later crimes cost. While it is owed the Trade
+  Organization goes up these steps, one after the other (ADR 0025), and paying it in full stops it at
+  any step:
+  1. **It demands:** a demand (Demand) for the debt, with a deadline.
+  2. **It wrecks:** past the deadline, its next army goes to that city and tears down workplaces of
+     it, each counting for its worth against the debt, until the debt is covered or none are left.
+     Those who resist are fought.
+  3. **It takes the city:** with a debt still owed after a set number of trips, its army occupies the
+     town hall (Holding the town hall). The city joins the Trade Organization as a new trading
+     post: its storages become warehouses with what is in them, its people stay as the post's, and
+     the debt is settled.
+  Its army may travel with a **supply wagon**, a Trade Org carriage with Food and room for what it
+  takes, following it like an army's and robbed like a caravan's; and short of Food on the way it
+  buys some from a post, NPC city or Player's offer it passes. A captured post the Trade Organization
+  has heard of (Lost post found out) is a debt too: it demands the city back, and returning it
+  settles the debt. Admin directives go on as before, with no debt.
+- **Demand:** a Player or the Trade Organization sends a demand to another Organization: **terms**
+  (hand over a named city; hand over goods or Coins), a short written note, and a deadline. It
+  arrives at once, like a mercenary offer, wherever the other side is, and sending them is limited.
+  A Player can send one to any realm they know of: one they see residents of, an ally, one whose city
+  they have seen (Last seen), one with a standing toward them or they toward it, or their side in a
+  contract, demand or Direct offer. Both sides see it in their Demands drawer until it is answered, and a notice
+  tells the one it is sent to. They accept, decline or let it lapse; the sender hears that at once,
+  and it lapses too when either side's Leader dies. The note is plain text.
+  - **The threat is only words.** Ignoring a demand does nothing by itself. Whatever was threatened
+    is the sender's to carry out, or not. The game forbids nothing.
+  - **Accepting** carries the terms out: a named city joins the sender's realm at once, as a captured
+    one does (What joins with a city), and goods and Coins are set aside at a storage of the one who
+    accepts, for the sender alone to fetch (a Direct offer in person for each good, wanting nothing
+    back, and fetching it is no trade: no standing changes), or sent by a Transfer from a city of
+    theirs to a city of the sender's whose storage they see, one load at a time, the fee theirs. The
+    one accepting picks which, and where. If the storage is short it says so before they accept, and
+    what it holds is what goes; with none of it there they can't accept that way. A city no longer
+    theirs can't be handed over. Handing over is the Player's own choice, also for their last city,
+    which goes as losing it to capture does: no crime and no standing lost.
+  - **An NPC city** accepts when the respect it sees from the sender (their armed residents and
+    walls in its sight) far outweighs its soldiers, so an army at the gate can take a city without a
+    fight; otherwise it declines and its standing toward the sender drops. It carries out goods the
+    same way: set aside at its storage, for the sender alone to fetch; with none of them there it
+    declines. **The Trade Organization** always declines, and being asked costs standing. A Player
+    knows of an NPC city as of a realm, and everyone knows of the Trade Organization. Both answer at
+    their next planning pass, within a game hour (ADR 0016); a city that has joined a realm by then
+    lets the demand lapse.
+
 
 ## Bandits
 
@@ -843,7 +959,8 @@ The shared language of the game. Domain terms only — no implementation details
   breeds them (**Breeding**). Like a workplace, a stable has no owner: any horse standing in it
   eats from it.
 - **Breeding:** an order (as a script could do it) for a grown resident at a finished stable: they
-  pick two fed horses of their realm standing in it and tend them for a while; then a foal of
+  pick two fed horses of their realm standing in it (wherever the Player picks them, each shows its
+  name and stats) and tend them for a while; then a foal of
   their realm is born in the stable, with its parents' average stats plus a little noise. It
   pauses when the resident leaves or is given another order, or while the stable has no room for
   another horse. Like a construction site's work, the progress belongs to the two horses in that
@@ -965,9 +1082,11 @@ The shared language of the game. Domain terms only — no implementation details
   are kept for each resident and each script (at a workplace, see Workplace settings): giving the task again keeps them, a param removed
   from the script is dropped, a new one starts unset. Unset, or once the one picked is gone (or no
   longer the realm's), it reads its default, or `null` without one; clearing a field goes back to
-  the default. **Before it starts:** giving a task or Run script whose script declares params
-  first shows those params, filled with the resident's kept values or the defaults; Start gives
-  the order with them. A script without params starts at once. The resident card shows one field
+  the default. **Starting at once:** giving a task or Run script starts it at once with the kept values or
+  the defaults. **Before it starts:** a Customise button beside the order opens the form with those
+  params, filled the same way, and Start gives the order with them; it opens by itself only when a
+  param has no default and no `none:` in its comment, since the script has nothing to go on without
+  it. The form fits a phone screen. The resident card shows one field
   for each param of the script the resident runs, picked on the map and cleared with a button;
   picking one doesn't end the script. **Param comment:** the `//` comment at the end of a `param`
   line says what the param is for and, after `none:`, what the script uses while none is picked;
@@ -1021,7 +1140,7 @@ The shared language of the game. Domain terms only — no implementation details
   a realm keeps its own settings, set on the building's card and never seen by other realms: the
   **work script** (the Work default, or one of the Player's scripts that declares
   `param workplace: building`) and values for that script's params. Giving a resident Work there
-  (card, group card, queue step) runs the work script; the Before-it-starts form shows its params
+  (card, group card, queue step) runs the work script; Customise (Before it starts) shows its params
   filled with the workplace's values, and a value the Player changes there becomes that
   resident's **override**; their earlier kept values for that script don't carry over. While they
   work there, a param reads the resident's override, else the workplace's setting, else the
@@ -1212,8 +1331,18 @@ The shared language of the game. Domain terms only — no implementation details
   their tokens on a tile with another realm's carriage shows the tile card too, where it can be
   driven off (Stealing a carriage or horse). With a pointer, what a click would pick is outlined
   on hover.
-- **Notices:** what the HUD tells the Player unasked (the Horse offer, the pick banner, a group
-  order's report, the first-day card) shows in one lane under the top bar, over the map and never
+- **Build menu:** every buildable kind as an icon with a short name, under group headings
+  (Resources, Food and animals, Industry, City, Defence, Transport), all in sight without reading.
+  Tapping one shows what it is for, what it costs and Build. A kind that can't go on this tile is
+  dimmed, and tapping it says why. It is the same on a resident's card, a group card and the
+  planner. Only the UI: where a kind may be built doesn't change.
+- **Residents list:** the Residents drawer opens fully, to a list of the realm's residents with their
+  stats, skills, gear, what they carry and what they are doing. It can be searched by name, filtered
+  (has weapons, idle, child, by city, and the like) and sorted by any column; the choice is kept per
+  browser. Tapping a row opens that resident. **Pick these** picks everyone listed, or those ticked,
+  as a Group on the map. Only the UI: nothing new is kept in the world. It works on a phone.
+- **Notices:** what the HUD tells the Player unasked (the Horse offer, a Direct offer or demand sent
+  to them, the pick banner, a group order's report, the first-day card) shows in one lane under the top bar, over the map and never
   over a drawer or card. While the pick banner shows it replaces the others; they come back after.
 - **First day:** a new realm's HUD shows a checklist card: claim the Horse offer, pick a
   resident, give them an order, open the Wiki. Each line is ticked when the game sees it done;

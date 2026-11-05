@@ -776,8 +776,10 @@ export type ResidentOrder =
   | PayOrder
   | BuyCityOrder
   | TradeOrder
+  | SwapOrder
   | HandInOrder
   | BuyOffOrder
+  | AcceptOfferOrder
   | RelocateOrder
   | FeedOrder
 
@@ -818,6 +820,8 @@ export interface WorldState {
   standings: Standing[]
   /** Mercenary contracts offered or in force (`CONTEXT.md`: Mercenary contract). */
   contracts: MercenaryContract[]
+  /** Demands not yet answered, oldest first (`CONTEXT.md`: Demand). */
+  demands: Demand[]
   /**
    * NPC cities asking a realm to join it, and asks a realm declined that the city still
    * remembers (`CONTEXT.md`: Persuading a city).
@@ -829,6 +833,8 @@ export interface WorldState {
   deliveries: Delivery[]
   /** Transfers between realms ordered and not yet done, oldest first (`CONTEXT.md`: Transfer). */
   transfers: Transfer[]
+  /** The offers standing at Players' storages, oldest first (`CONTEXT.md`: Offer). */
+  offers: Offer[]
   /**
    * How often each caravan route was robbed (`CONTEXT.md`: Guaranteed carriage), by the trading
    * post at its far end; a route never robbed has no entry.
@@ -888,12 +894,28 @@ export type CityProject =
   | { kind: 'build'; building: BuildingKind; x: number; y: number }
   | { kind: 'tearDown'; buildingId: string }
 
+/** A trader's run to a Player's offer (`CONTEXT.md`: NPC cities at an offer). */
+export interface CityTraderOffer {
+  /** The offer they go to take. */
+  offerId: string
+  /** How many times over the city means to take it. */
+  times: number
+  /** The good they pay with: what the offer wants. */
+  pays: Good
+  /** Units of it they take along. */
+  units: number
+  /** Where they are in the run: to load up at home, to set off, or on their way. */
+  leg: 'load' | 'setOff' | 'walking'
+}
+
 /** A game-run city's trade run under way (`CONTEXT.md`: NPC trader). */
 export interface CityTrader {
   /** The trader, one of its spare hands. */
   residentId: string
-  /** The Trade Org warehouse they trade at. */
+  /** The Trade Org warehouse they trade at; on a run to an offer, the offer's storage. */
   warehouseId: string
+  /** On a run to a Player's offer, that run, until they have been there or given it up. */
+  offer?: CityTraderOffer
   /** The load still to sell there; empty once sold. */
   sells: Stock
   /** What they still buy there, up to what the city is short of; empty once bought. */
@@ -1102,22 +1124,33 @@ export interface Transfer {
   back: boolean
   /** The caravan carrying it out, or null while it waits for one. */
   caravanId: string | null
+  /** Set on one of the two Transfers of a carried Direct offer (`CONTEXT.md`: Direct offer). */
+  carriedOffer?: CarriedTransfer
+}
+
+/** How a carried Direct offer's Transfer is paid: part at its pick-up, part on unloading. */
+export interface CarriedTransfer {
+  /** The part of the fee taken from the storage it unloads at: 0, a half or all of it. */
+  unloadShare: number
+  /** The coins still to take there, worked out once it has collected. */
+  due: number
 }
 
 /**
  * What a caravan does for a transfer it took on (`Transfer`), one step after another, each at a
  * building it drives to first. A pick-up takes the goods and then the fee at the sender's storage
  * (`collect`, `fee`); a transfer the warehouse keeps is loaded there, or at its coin warehouse
- * for coins (`load`). Either way it puts the goods into the recipient's storage (`deliver`), then
- * unloads what it still carries at the warehouse (`return`): goods it turned back with at the
- * warehouse, and coins at the coin warehouse. What robbers took once it collected is made good out
- * of the Trade Org's own stock (`CONTEXT.md`: Guaranteed carriage). Plain data (ADR 0002).
+ * for coins (`load`). Either way it puts the goods into the recipient's storage (`deliver`), takes
+ * any part of the fee due there (`unloadFee`), then unloads what it still carries at the warehouse
+ * (`return`): goods it turned back with at the warehouse, and coins at the coin warehouse. What
+ * robbers took once it collected is made good out of the Trade Org's own stock (`CONTEXT.md`:
+ * Guaranteed carriage). Plain data (ADR 0002).
  */
 export interface TransferJob {
   transferId: string
   warehouseId: string
   good: Good
-  step: 'collect' | 'fee' | 'load' | 'deliver' | 'return'
+  step: 'collect' | 'fee' | 'load' | 'deliver' | 'unloadFee' | 'return'
   /** Units of the good on the carriage for the transfer (coins, for a transfer of coins). */
   units: number
   /** Coins of the fee on the carriage, the Trade Org's, besides the units. */
@@ -1223,6 +1256,19 @@ export interface TradeOrder {
 }
 
 /**
+ * A swap at a Trade Org warehouse or an NPC city's storage (`CONTEXT.md`: Swap): the resident,
+ * standing on its tile, gets up to `units` of `want` for as much of `give` as pays for them, from
+ * and into their hands, or the load of `carriageId` on their tile. It happens this tick.
+ */
+export interface SwapOrder {
+  kind: 'swap'
+  give: Exclude<Good, 'coins'>
+  want: Exclude<Good, 'coins'>
+  units: number
+  carriageId: string | null
+}
+
+/**
  * Handing in a transfer at a Trade Org warehouse (`CONTEXT.md`: Transfer): the resident, standing
  * on its tile, hands in up to `units` of `good` (coins too) from their hands, or the load of
  * `carriageId` on their tile, and pays the fee, for a caravan to bring to the storage of
@@ -1246,6 +1292,76 @@ export interface BuyOffOrder {
   directiveId: string
   carriageId: string | null
 }
+
+/**
+ * Accepting an offer (`CONTEXT.md`: Offer): the resident, standing on its storage's tile, takes it
+ * up to `times` times over, paying from and taking into their hands, or the load of `carriageId`
+ * on their tile. It happens this tick.
+ */
+export interface AcceptOfferOrder {
+  kind: 'acceptOffer'
+  offerId: string
+  times: number
+  carriageId: string | null
+}
+
+/**
+ * What a Player posts at a storage of their realm (`CONTEXT.md`: Offer): "gives 10 Wood, wants 5
+ * Stone", `times` more times over. The goods stay in the storage's stock; `times` × `givesUnits`
+ * of them are set aside (`setAsideAt`). Plain data.
+ */
+export interface Offer {
+  id: string
+  /** The realm that posted it, or the NPC city, by its id, that set it aside on a demand. */
+  realmId: string
+  storageId: string
+  /** The storage's tile, for the log once the storage is gone. */
+  x: number
+  y: number
+  gives: Good
+  givesUnits: number
+  wants: Good
+  /** At least one, but 0 for goods set aside on accepting a demand, which want nothing back. */
+  wantsUnits: number
+  /** How many times over it can still be accepted; at least one while it stands. */
+  times: number
+  /** Set on a Direct offer: only that realm can accept it, until it lapses. */
+  direct?: DirectOfferTerms
+}
+
+/** Who a Direct offer is for, and the tick it lapses at (`CONTEXT.md`: Direct offer). */
+export interface DirectOfferTerms {
+  toId: string
+  lapsesAt: number
+  /** Set when the Trade Organization carries it, rather than fetched in person. */
+  carried?: CarriedOfferTerms
+}
+
+/** Who pays a carried Direct offer's fee (`CONTEXT.md`: Direct offer). */
+export type CarriedFeeBy = 'sender' | 'split'
+
+/**
+ * A carried Direct offer (`CONTEXT.md`: Direct offer): the two cities the sender named, who pays,
+ * and what each side pays for all of its goods, as shown before sending. Its goods aren't set aside.
+ */
+export interface CarriedOfferTerms {
+  fromCityId: string
+  toCityId: string
+  feeBy: CarriedFeeBy
+  senderFee: number
+  otherFee: number
+}
+
+/** What ended a realm's offer (`CONTEXT.md`: Offer, Direct offer). */
+export type OfferEnd =
+  | 'usedUp'
+  | 'takenDown'
+  | 'storageLost'
+  | 'goodsGone'
+  | 'declined'
+  | 'lapsed'
+  | 'noCaravans'
+
 /**
  * How the Organization `of` regards `toward` (`CONTEXT.md`: Standing), from -`STANDING_RANGE`
  * to +`STANDING_RANGE`. An Organization is a realm's id, an NPC city's id, or `TRADE_ORG`
@@ -1259,6 +1375,14 @@ export interface Standing {
 
 /** What a crime was (`CONTEXT.md`: Crime). */
 export type CrimeKind = 'theft' | 'attack' | 'killing' | 'tearDown'
+
+/**
+ * Why a punishment headed home (`CONTEXT.md`: Punishment trip): `enough`, it got what it came for;
+ * `empty`, the city's storages held nothing; `gaveUp`, its time there ran out; `cityLost`, the city
+ * is no longer the culprit's; `directiveLifted`, the admin directive it came for was lifted;
+ * `noWay`, it couldn't get there.
+ */
+export type PunishmentEnd = 'enough' | 'empty' | 'gaveUp' | 'cityLost' | 'directiveLifted' | 'noWay'
 
 /**
  * The Trade Org army out to punish an Organization for crimes against the Trade Organization
@@ -1275,14 +1399,20 @@ export interface Punishment {
   worth: number
   /**
    * Its soldiers, each with what they carried as they set out: anything they carry above that is
-   * what they took.
+   * what they took. `packed` once they have seen to their Food at the HQ (`CONTEXT.md`: Punishment
+   * trip), so that they set out.
    */
-  members: { residentId: string; own: Stock }[]
+  members: { residentId: string; own: Stock; packed?: true }[]
   /** Out to the city while it hasn't got what it came for; home once it has or gives up. */
   heading: 'out' | 'home'
   /** The Coins' worth it took, as it stood when it headed home. */
   took: number
   startedAt: number
+  /**
+   * The tick it reached the city (`CONTEXT.md`: Punishment trip), its time there counting from it.
+   * None while it is on the way, and for good if it turned back without getting there.
+   */
+  arrivedAt?: number
   /**
    * The admin directive it was sent for (`CONTEXT.md`: Admin directive) rather than crimes; it
    * heads home once that directive is lifted.
@@ -1450,16 +1580,20 @@ export type RealmEventWhat =
       goods?: Stock
     }
   /**
-   * The Trade Organization punishes the realm (`CONTEXT.md`: Trade Org reaction): its army is
-   * `coming` to `city` to take back `worth` Coins' worth, or `left` it having taken `took`.
+   * The Trade Organization punishes the realm (`CONTEXT.md`: Trade Org reaction, Punishment trip):
+   * its army is `coming` to `city` to take back `worth` Coins' worth; it `arrived`; it `left` having
+   * taken `took`, and `why`; it `turnedBack` without reaching it, and `why`; or it was `lost`,
+   * `where` it was by then.
    */
   | {
       kind: 'punished'
-      what: 'coming' | 'left'
+      what: 'coming' | 'arrived' | 'left' | 'turnedBack' | 'lost'
       cityId: string
       city: string
       worth: number
       took?: number
+      why?: PunishmentEnd
+      where?: 'wayThere' | 'atCity' | 'wayHome'
       /** Sent for an admin directive, with its reason, rather than for crimes. */
       directive?: string
     }
@@ -1582,6 +1716,107 @@ export type RealmEventWhat =
       y: number
     }
   /**
+   * The resident `name` accepted an offer of `realm` at the storage at (`x`, `y`), `times` of the
+   * `wanted` times over (`CONTEXT.md`: Offer): they got `givesUnits` of `gives` for `wantsUnits` of
+   * `wants`, all told. None when it couldn't be done.
+   */
+  | {
+      kind: 'offerAccepted'
+      residentId: string
+      name: string
+      realm: string
+      gives: Good
+      givesUnits: number
+      wants: Good
+      wantsUnits: number
+      times: number
+      wanted: number
+      x: number
+      y: number
+    }
+  /** `by` accepted the realm's offer at (`x`, `y`), `times` over, all told as `offerAccepted`. */
+  | {
+      kind: 'offerTaken'
+      by: string
+      gives: Good
+      givesUnits: number
+      wants: Good
+      wantsUnits: number
+      times: number
+      x: number
+      y: number
+    }
+  /** Goods gone from the storage cut the realm's offer down to `times` over (`CONTEXT.md`: Offer). */
+  | {
+      kind: 'offerCutDown'
+      gives: Good
+      givesUnits: number
+      wants: Good
+      wantsUnits: number
+      times: number
+      x: number
+      y: number
+    }
+  /**
+   * The realm's offer at (`x`, `y`) ended (`CONTEXT.md`: Offer): used up, taken down by its Player,
+   * with the storage torn down or no longer the realm's, or its goods gone from the storage; a
+   * Direct offer also when declined or lapsed, with `to` the realm it was sent to. What was left of
+   * it is ordinary goods.
+   */
+  | {
+      kind: 'offerEnded'
+      gives: Good
+      givesUnits: number
+      wants: Good
+      wantsUnits: number
+      why: OfferEnd
+      to?: string
+      /** A carried Direct offer, which never set anything aside. */
+      carried?: boolean
+      x: number
+      y: number
+    }
+  /**
+   * The realm `from` sent this realm a Direct offer at its storage at (`x`, `y`), `times` over, or
+   * one it sent is over (`CONTEXT.md`: Direct offer). One used up is told by `offerAccepted`; a
+   * carried one taken is `carriedAccepted` to its sender, `youAccepted` to the side that took it.
+   */
+  | {
+      kind: 'directOffer'
+      what: 'received' | 'carriedAccepted' | 'youAccepted' | Exclude<OfferEnd, 'usedUp'>
+      from: string
+      /** `from` is an NPC city, which set this aside on a demand (`CONTEXT.md`: Demand), no realm. */
+      fromCity?: true
+      gives: Good
+      givesUnits: number
+      wants: Good
+      wantsUnits: number
+      times?: number
+      /** A carried one: the cities its goods go between, and what this side pays for it. */
+      carried?: { fromCity: string; toCity: string; fee: number }
+      x: number
+      y: number
+    }
+  /**
+   * The resident `name` swapped at the warehouse or NPC city's storage at (`x`, `y`) (`CONTEXT.md`:
+   * Swap): gave `gave` of `give` for `units` of `want`, of the `wanted` units, with `coins` back;
+   * fewer when it was cut down, none when nothing could be swapped.
+   */
+  | {
+      kind: 'swapped'
+      residentId: string
+      name: string
+      place: 'warehouse' | 'storage'
+      give: Exclude<Good, 'coins'>
+      gave: number
+      want: Exclude<Good, 'coins'>
+      units: number
+      wanted: number
+      coins: number
+      x: number
+      y: number
+    }
+  /**
    * The resident `name` ordered a delivery at the Trade Org warehouse at (`x`, `y`)
    * (`CONTEXT.md`: Delivery): buying, `units` of `good` (of the `wanted`) paid with `coins` and
    * a `fee`, to be brought to the storage of `city`; selling, up to `units` of it to be picked up
@@ -1674,6 +1909,8 @@ export type RealmEventWhat =
       good: Good
       units: number
       fee: number
+      /** One of a carried Direct offer's: its fee may be shared, so the line names no sum. */
+      carried?: boolean
       fromRealmId: string
       fromRealm: string
       toRealmId: string
@@ -1694,7 +1931,7 @@ export type RealmEventWhat =
    */
   | {
       kind: 'transferStuck'
-      why: 'turnedBack' | 'cancelled' | 'kept' | 'nothing' | 'robbed'
+      why: 'turnedBack' | 'cancelled' | 'kept' | 'nothing' | 'nothingCame' | 'robbed'
       good: Good
       units: number
       cityId: string
@@ -1935,6 +2172,25 @@ export type RealmEventWhat =
       weeks?: number
       leaderDied?: 'lender' | 'hirer'
     }
+  /**
+   * A demand (`CONTEXT.md`: Demand) between this realm and the realm `other` (by its realm name):
+   * `sent` by this realm, `received` from the other, `accepted` or `declined` by the one it was
+   * sent to, or `lapsed` at its deadline. `mine` when this realm sent it. `leaderDied` says which
+   * side's Leader died when that made it lapse early. `handedOver` says how goods accepted change
+   * hands. `otherIs` says when the other is no realm, for a demand the game answers, and `other` is
+   * then its name as it stands. Its note stays out of the log.
+   */
+  | {
+      kind: 'demand'
+      demandId: string
+      what: 'sent' | 'received' | 'accepted' | 'declined' | 'lapsed'
+      mine: boolean
+      other: string
+      otherIs?: 'city' | 'tradeOrg'
+      terms: DemandTerms
+      leaderDied?: 'sender' | 'receiver'
+      handedOver?: DemandHandedOver
+    }
 
 /**
  * Something that happened in a Player's realm, for their log. Plain data. It belongs to the
@@ -2009,6 +2265,49 @@ export interface Realm {
    * from before realm names have none and go by their Leader's name until named.
    */
   name?: string
+  /**
+   * When the realm last sent demands, oldest first, only those still counting against
+   * `DEMANDS_PER_GAME_DAY` (`CONTEXT.md`: Demand). None while it has sent none lately.
+   */
+  demandsSentAt?: number[]
+}
+
+/**
+ * What a demand asks for (`CONTEXT.md`: Demand): a named city, under the name the sender knew it
+ * by, or goods and Coins.
+ */
+export type DemandTerms =
+  | { kind: 'city'; cityId: string; cityName: string }
+  | { kind: 'goods'; goods: Partial<Record<Good, number>> }
+
+/**
+ * How the goods of an accepted demand change hands, as the realm logs tell it (`CONTEXT.md`: Demand):
+ * what went, which is less than demanded when the storage was short, and where.
+ */
+export type DemandHandedOver = { goods: Partial<Record<Good, number>> } & (
+  | { way: 'setAside'; x: number; y: number }
+  | { way: 'transfer'; fromCity: string; toCity: string }
+)
+
+/**
+ * A demand waiting for its answer (`CONTEXT.md`: Demand; ADR 0024): it goes once it is accepted,
+ * declined or lapses, and the realm logs say which. Plain data (ADR 0002).
+ */
+export interface Demand {
+  id: string
+  /** The realm that sent it. */
+  fromId: string
+  /**
+   * The realm it was sent to, the only one who can answer it; or an NPC city by its id or the Trade
+   * Organization (`TRADE_ORG`), for the game to answer within a game hour.
+   */
+  toId: string
+  terms: DemandTerms
+  /** The sender's words: plain text, trimmed, at most `DEMAND_NOTE_MAX_LENGTH` characters. */
+  note: string
+  sentAt: number
+  /** The tick it lapses at, unanswered. */
+  deadline: number
 }
 
 /**

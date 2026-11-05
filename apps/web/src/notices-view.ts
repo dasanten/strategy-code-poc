@@ -6,7 +6,7 @@ import { isWide, type OpenDrawer } from './hud-view.js'
  * banner, in the order they stack. Lasting ones come first and passing ones after, so a notice
  * that comes and goes never moves a button the Player is aiming at.
  */
-export const NOTICE_ORDER = ['horseOffer', 'firstDay', 'groupReport'] as const
+export const NOTICE_ORDER = ['horseOffer', 'incoming', 'demand', 'firstDay', 'groupReport'] as const
 
 /** A notice in the lane: the pick banner or one of `NOTICE_ORDER`. */
 export type NoticeKind = 'pick' | (typeof NOTICE_ORDER)[number]
@@ -21,11 +21,11 @@ export function laneNotices(wanted: Partial<Record<NoticeKind, boolean>>): Notic
 }
 
 /**
- * Whether the selection card is hidden: the wide Scripts drawer leaves no room for it. It stays
- * as it was, and closing the drawer brings it back.
+ * Whether the selection card is hidden: the wide Scripts drawer and the full Residents list
+ * (`fullList`) leave no room for it. It stays as it was, and closing them brings it back.
  */
-export function cardHidden(open: OpenDrawer): boolean {
-  return open !== undefined && isWide(open)
+export function cardHidden(open: OpenDrawer, fullList = false): boolean {
+  return open !== undefined && (isWide(open) || fullList)
 }
 
 /** The least width, in pixels, the lane needs over the map between the drawer and the card. */

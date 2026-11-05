@@ -3,6 +3,7 @@ import {
   TRADE_ORG_NAME,
   timeLeft,
   type DeliveryView,
+  type PunishmentEnd,
   type RealmEvent,
 } from '@csp/shared'
 import { BUILDING_NAMES } from './city-view.js'
@@ -25,10 +26,39 @@ export interface EventLine {
 }
 
 /** Goods as the log names them: "5 Food, 2 Iron Ore". */
-function goodsLine(goods: Partial<Record<string, number>> | undefined): string {
+export function goodsLine(goods: Partial<Record<string, number>> | undefined): string {
   return Object.entries(goods ?? {})
     .map(([g, n]) => `${n} ${g[0]!.toUpperCase()}${g.slice(1).replace(/[A-Z]/g, (c) => ` ${c}`)}`)
     .join(', ')
+}
+
+/**
+ * A demand for goods accepted, and how they change hands (`CONTEXT.md`: Demand). What went is less
+ * than `terms` when the storage was short. An event from before goods changed hands has no way.
+ */
+function acceptedGoodsLine(
+  e: Extract<RealmEvent, { kind: 'demand' }>,
+  them: string,
+  terms: string,
+): EventLine {
+  const said = e.mine
+    ? `${cap(them)} accepted your demand for ${terms}`
+    : `You accepted the demand of ${them} for ${terms}`
+  const h = e.handedOver
+  if (!h) return { text: `${said}.`, tone: 'info' }
+  const goods = goodsLine(h.goods)
+  if (h.way === 'transfer') {
+    return {
+      text: `${said}: a Transfer brings ${goods} from ${h.fromCity} to ${h.toCity}.`,
+      tone: 'info',
+    }
+  }
+  const fetch = e.mine ? 'for you to fetch, under Direct offers' : 'for them alone to fetch'
+  return {
+    text: `${said}: ${goods} set aside at the storage, ${fetch}.`,
+    tone: 'info',
+    places: [{ name: 'the storage', x: h.x, y: h.y }],
+  }
 }
 
 /** A stolen carriage or horse as the log names it: "a carriage with Rowan", "Rowan". */
@@ -105,18 +135,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       }
     }
     case 'punished':
-      return e.what === 'coming'
-        ? {
-            text:
-              e.directive === undefined
-                ? `The Trade Organization is sending its army to ${e.city} to take back ${e.worth} Coins' worth.`
-                : `By admin directive (${e.directive}), the Trade Organization is sending its army to ${e.city} to take ${e.worth} Coins' worth.`,
-            tone: 'bad',
-          }
-        : {
-            text: `The Trade Organization's army left ${e.city}, taking ${e.took ?? 0} of the ${e.worth} Coins' worth it came for.`,
-            tone: 'warn',
-          }
+      return punishedLine(e)
     case 'boughtOff':
       return {
         text: `${e.name} paid ${e.coins} Coins at the warehouse to buy off the admin directive (${e.reason}). The Trade Organization no longer punishes you for it.`,
@@ -220,6 +239,131 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         places: [place],
       }
     }
+    case 'offerAccepted': {
+      const place = { name: 'the storage', x: e.x, y: e.y }
+      if (e.times === 0) {
+        return {
+          text: `${e.name} couldn’t accept the offer of ${e.realm}.`,
+          tone: 'warn',
+          places: [place],
+        }
+      }
+      if (e.wantsUnits === 0) {
+        const of = e.times < e.wanted ? ` (of ${e.wanted} wanted)` : ''
+        return {
+          text: `${e.name} fetched ${e.givesUnits} ${goodText(e.gives)} set aside by ${e.realm}${of}.`,
+          tone: 'info',
+          places: [place],
+        }
+      }
+      const cut = e.times < e.wanted ? ` (of ${e.wanted} times wanted)` : ''
+      return {
+        text: `${e.name} took ${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)} from the offer of ${e.realm}${cut}.`,
+        tone: 'info',
+        places: [place],
+      }
+    }
+    case 'swapped': {
+      const place = { name: `the ${e.place}`, x: e.x, y: e.y }
+      if (e.units === 0) {
+        return {
+          text: `${e.name} couldn’t swap ${goodText(e.give)} for ${goodText(e.want)} at ${place.name}.`,
+          tone: 'warn',
+          places: [place],
+        }
+      }
+      const cut = e.units < e.wanted ? ` (of ${e.wanted} wanted)` : ''
+      const back = e.coins > 0 ? `, with ${e.coins} ${e.coins === 1 ? 'coin' : 'coins'} back,` : ''
+      return {
+        text: `${e.name} swapped ${e.gave} ${goodText(e.give)} for ${e.units} ${goodText(e.want)}${cut}${back} at ${place.name}.`,
+        tone: 'info',
+        places: [place],
+      }
+    }
+    case 'offerTaken':
+      return {
+        text:
+          e.wantsUnits === 0
+            ? `${e.by} fetched the ${e.givesUnits} ${goodText(e.gives)} you set aside.`
+            : `${e.by} took your offer: ${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)}.`,
+        tone: 'info',
+        places: [{ name: 'the storage', x: e.x, y: e.y }],
+      }
+    case 'offerCutDown':
+      return {
+        text:
+          e.wantsUnits === 0
+            ? `Goods gone from the storage cut what you set aside down to ${e.times} ${goodText(e.gives)}.`
+            : `Goods gone from the storage cut your offer of ${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)} down to ${e.times} ${e.times === 1 ? 'time' : 'times'}.`,
+        tone: 'warn',
+        places: [{ name: 'the storage', x: e.x, y: e.y }],
+      }
+    case 'offerEnded': {
+      const what = `${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)}`
+      const yours =
+        e.wantsUnits === 0
+          ? `The ${goodText(e.gives)} you set aside for the realm of ${e.to}`
+          : e.to
+            ? `Your direct offer of ${what} to the realm of ${e.to}`
+            : `Your offer of ${what}`
+      const why = {
+        usedUp: `${yours} is used up.`,
+        takenDown: `${yours} is taken down.`,
+        storageLost: `${yours} ended: the storage is gone or no longer yours.`,
+        goodsGone: `${yours} ended: its goods are gone from the storage.`,
+        declined: `${yours} was declined.${e.carried ? '' : ' Its goods are ordinary again.'}`,
+        lapsed: `${yours} lapsed.${e.carried ? '' : ' Its goods are ordinary again.'}`,
+        noCaravans: `${yours} is cancelled: the Trade Org HQ has fallen and no caravans run.`,
+      }[e.why]
+      return {
+        text: why,
+        tone:
+          e.why === 'storageLost' || e.why === 'goodsGone' || e.why === 'noCaravans'
+            ? 'warn'
+            : 'info',
+        places: [{ name: 'the storage', x: e.x, y: e.y }],
+      }
+    }
+    case 'directOffer': {
+      const what =
+        e.wantsUnits === 0
+          ? goodText(e.gives)
+          : `${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)}`
+      const place = { name: 'the storage', x: e.x, y: e.y }
+      const them = e.fromCity ? e.from : `the realm of ${e.from}`
+      if (e.carried) {
+        const over = e.times === 1 ? '' : `, ${e.times} times over`
+        const way = `between ${e.carried.fromCity} and ${e.carried.toCity}${over}`
+        const pays = `You pay up to ${e.carried.fee} coins.`
+        const told = {
+          received: `${cap(them)} sent you a direct offer the Trade Organization carries ${way}: ${what}. ${pays} Accept or decline it under Direct offers.`,
+          carriedAccepted: `${cap(them)} accepted your carried direct offer of ${what}: caravans carry both ways ${way}. ${pays}`,
+          youAccepted: `You accepted the carried direct offer of ${what} from ${them}: caravans carry both ways ${way}. ${pays}`,
+        } as const
+        if (e.what in told) {
+          return { text: told[e.what as keyof typeof told], tone: 'info', places: [place] }
+        }
+      }
+      if (e.what === 'received') {
+        const over = e.times === 1 ? '' : `, ${e.times} times over`
+        return {
+          text: `${cap(them)} sent you a direct offer: ${what}${over}. Fetch it in person at the storage, or decline it, under Direct offers.`,
+          tone: 'info',
+          places: [place],
+        }
+      }
+      const text = {
+        declined: `You declined the direct offer of ${what} from ${them}.`,
+        lapsed: `The direct offer of ${what} from ${them} lapsed.`,
+        takenDown: `${cap(them)} took down its direct offer of ${what} to you.`,
+        storageLost: `The direct offer of ${what} from ${them} ended: its storage is gone or no longer theirs.`,
+        goodsGone: `The direct offer of ${what} from ${them} ended: its goods are gone from the storage.`,
+        noCaravans: `The direct offer of ${what} from ${them} is cancelled: the Trade Org HQ has fallen and no caravans run.`,
+        carriedAccepted: `${cap(them)} accepted your direct offer of ${what}.`,
+        youAccepted: `You accepted the direct offer of ${what} from ${them}.`,
+      }[e.what]
+      return { text, tone: 'info', places: [place] }
+    }
     case 'deliveryOrdered': {
       const what = goodText(e.good)
       const place = { name: 'the warehouse', x: e.x, y: e.y }
@@ -322,10 +466,11 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
           places: [place],
         }
       }
+      const paid = e.carried ? ', as your carried direct offer agreed' : ` (a ${e.fee}-coin fee)`
       const text =
         e.toRealmId === realmId
           ? `A caravan brought ${what} from ${e.fromRealm} to ${e.city}.`
-          : `A caravan brought the ${what} you sent to ${e.city} of ${e.toRealm} (a ${e.fee}-coin fee).`
+          : `A caravan brought the ${what} you sent to ${e.city} of ${e.toRealm}${paid}.`
       return { text, tone: 'info', places: [place] }
     }
     case 'transferStuck': {
@@ -335,6 +480,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         cancelled: `Your transfer of ${what} to ${e.city} was cancelled: the city is no longer theirs. A caravan brings it back.`,
         kept: `Your transfer of ${what} to ${e.city} couldn’t be finished or brought back; the Trade Organization keeps it.`,
         nothing: `A caravan found no ${goodText(e.good)} (or no coins for the fee) to pick up for ${e.city}.`,
+        nothingCame: `A caravan found no ${goodText(e.good)} to bring ${e.city} for a carried direct offer.`,
         robbed: `Robbers took ${what} of your transfer to ${e.city} off a caravan; the Trade Organization sends them again.`,
       }[e.why]
       return { text, tone: e.why === 'turnedBack' || e.why === 'robbed' ? 'warn' : 'bad' }
@@ -504,6 +650,69 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
             : `${e.name} couldn’t move in to ${e.city}: ${e.reason}.`,
         tone: 'warn',
       }
+    case 'demand': {
+      const them = e.otherIs ? e.other : `the realm of ${e.other}`
+      const terms = e.terms.kind === 'city' ? e.terms.cityName : goodsLine(e.terms.goods)
+      // An NPC city demanded of itself is asked to join, not to hand a city over.
+      if (e.otherIs === 'city' && e.terms.kind === 'city' && e.what !== 'accepted') {
+        return {
+          sent: { text: `You demanded that ${terms} join your realm.`, tone: 'info' },
+          declined: {
+            text: `${terms} declined to join your realm, and thinks less of you.`,
+            tone: 'warn',
+          },
+          lapsed: {
+            text: `Your demand that ${terms} join your realm lapsed unanswered.`,
+            tone: 'info',
+          },
+          received: { text: `${terms} was asked to join your realm.`, tone: 'info' },
+        }[e.what] as EventLine
+      }
+      switch (e.what) {
+        case 'sent':
+          return { text: `You demanded ${terms} of ${them}.`, tone: 'info' }
+        case 'received':
+          return { text: `${cap(them)} demands ${terms} of you.`, tone: 'warn' }
+        case 'accepted':
+          if (e.terms.kind === 'city') {
+            if (e.otherIs) {
+              return { text: `${terms} gave in to your demand and joined your realm.`, tone: 'info' }
+            }
+            return e.mine
+              ? {
+                  text: `${cap(them)} accepted your demand: ${terms} joined your realm.`,
+                  tone: 'info',
+                }
+              : {
+                  text: `You accepted the demand of ${them}: ${terms} joined their realm.`,
+                  tone: 'warn',
+                }
+          }
+          return acceptedGoodsLine(e, them, terms)
+        case 'declined':
+          if (e.otherIs) {
+            return {
+              text: `${cap(them)} declined your demand for ${terms}, and thinks less of you.`,
+              tone: 'warn',
+            }
+          }
+          return e.mine
+            ? { text: `${cap(them)} declined your demand for ${terms}.`, tone: 'warn' }
+            : { text: `You declined the demand of ${them} for ${terms}.`, tone: 'info' }
+        case 'lapsed': {
+          const demand = e.mine ? `Your demand on ${them}` : `The demand of ${them}`
+          if (!e.leaderDied) {
+            return { text: `${demand} for ${terms} lapsed unanswered.`, tone: 'info' }
+          }
+          const whose =
+            e.leaderDied === (e.mine ? 'sender' : 'receiver')
+              ? 'your Leader died'
+              : `the Leader of ${them} died`
+          return { text: `${demand} for ${terms} lapsed: ${whose}.`, tone: 'info' }
+        }
+      }
+      break
+    }
     case 'contract': {
       const them = e.other === TRADE_ORG_NAME ? e.other : `the realm of ${e.other}`
       const n = e.residents === 1 ? '1 mercenary' : `${e.residents} mercenaries`
@@ -593,4 +802,60 @@ export function describeDelivery(d: DeliveryView): string {
   const job = d.kind === 'delivery' ? `${what} to ${d.city}` : `up to ${what} from ${d.city}`
   const state = d.underway ? 'a caravan is on it' : 'waiting for a caravan at the warehouse'
   return `${d.kind === 'delivery' ? 'Delivery' : 'Pick-up'} of ${job}: ${state}.`
+}
+
+/** Why the army headed home, to end a sentence about `city`; nothing if it got what it came for. */
+function punishmentEnd(why: PunishmentEnd | undefined, city: string): string {
+  switch (why) {
+    case 'empty':
+      return `: the storages of ${city} held nothing`
+    case 'gaveUp':
+      return ': it ran out of time there'
+    case 'cityLost':
+      return `: ${city} is no longer yours`
+    case 'directiveLifted':
+      return ': the admin directive was lifted'
+    case 'noWay':
+      return `: it found no way to ${city}`
+    default:
+      return ''
+  }
+}
+
+/** A line about the Trade Organization's army (`CONTEXT.md`: Punishment trip). */
+function punishedLine(e: Extract<RealmEvent, { kind: 'punished' }>): EventLine {
+  const army = "The Trade Organization's army"
+  const taking = `${e.took ?? 0} of the ${e.worth} Coins' worth it came for`
+  switch (e.what) {
+    case 'coming':
+      return {
+        text:
+          e.directive === undefined
+            ? `The Trade Organization is sending its army to ${e.city} to take back ${e.worth} Coins' worth.`
+            : `By admin directive (${e.directive}), the Trade Organization is sending its army to ${e.city} to take ${e.worth} Coins' worth.`,
+        tone: 'bad',
+      }
+    case 'arrived':
+      return { text: `${army} has arrived at ${e.city}.`, tone: 'bad' }
+    case 'left':
+      return {
+        text: `${army} left ${e.city}, taking ${taking}${punishmentEnd(e.why, e.city)}.`,
+        tone: 'warn',
+      }
+    case 'turnedBack':
+      return {
+        text: `${army} turned back without reaching ${e.city}${punishmentEnd(e.why, e.city)}.`,
+        tone: 'info',
+      }
+    case 'lost':
+      return {
+        text:
+          e.where === 'wayThere'
+            ? `${army} was lost on its way to ${e.city}.`
+            : e.where === 'atCity'
+              ? `${army} was lost at ${e.city}, having taken ${taking}.`
+              : `${army} was lost on its way home from ${e.city}, with ${taking}.`,
+        tone: 'info',
+      }
+  }
 }

@@ -19,7 +19,7 @@ import { paramTarget } from './script-params.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 80
+export const WORLD_FORMAT_VERSION = 88
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -324,6 +324,46 @@ export const migrations: Record<number, MigrationStep> = {
   // Player's order under attack; `Resident.givenUnderAttack`). Orders given before weren't marked,
   // so the step leaves every resident as they are.
   79: (state) => state,
+  // A punishment says when it reached its city and who has packed (`CONTEXT.md`: Punishment trip;
+  // `Punishment.arrivedAt`, `members[].packed`). One under way keeps going: nobody goes back to pack,
+  // and if it took anything or stands in the city it has arrived, its time there starting now;
+  // otherwise it is still on the road.
+  80: (state, { terrain }) => {
+    const world = structuredClone(state) as WorldState
+    for (const p of world.punishments) {
+      for (const m of p.members) m.packed = true
+      const city = world.cities.find((c) => c.id === p.cityId)
+      const there =
+        city !== undefined &&
+        world.residents.some(
+          (r) =>
+            p.members.some((m) => m.residentId === r.id) &&
+            inCityArea(world, city, r.x, r.y, terrain.size),
+        )
+      if (p.took > 0 || (p.heading === 'out' && there)) p.arrivedAt = world.tick
+    }
+    return world
+  },
+  // Offers at a Player's storage (`CONTEXT.md`: Offer): nobody has posted any yet.
+  81: (state) => ({ ...(state as object), offers: [] }),
+  // A Direct offer (`CONTEXT.md`: Direct offer) adds `direct` to an offer and `directOffer` to the
+  // realm log. Every offer from before is open to anyone, so the step leaves them as they are.
+  82: (state) => state,
+  // An NPC city's trader can go to a Player's offer (`CONTEXT.md`: NPC cities at an offer;
+  // `CityTrader.offer`). No trader was on such a run before, so the step leaves every plan as it is.
+  83: (state) => state,
+  // A carried Direct offer (`CONTEXT.md`: Direct offer) adds `carried` to an offer's `direct`,
+  // `carriedOffer` to a Transfer and `unloadFee` to its caravan's job. Nothing from before is
+  // carried, so the step leaves everything as it is.
+  84: (state) => state,
+  // Demands (`CONTEXT.md`: Demand): no world has any yet, and no realm has sent one.
+  85: (state) => ({ ...(state as WorldState), demands: [] }),
+  // Goods set aside on accepting a demand (`CONTEXT.md`: Demand) are an offer with `wantsUnits` 0,
+  // and a demand's log line gets `handedOver`. Neither is in any save yet, so nothing changes.
+  86: (state) => state,
+  // A demand can go to an NPC city or the Trade Organization, its log line gets `otherIs`, and an
+  // NPC city can stand behind goods set aside (`CONTEXT.md`: Demand). No save holds any yet.
+  87: (state) => state,
 }
 
 export class WorldFormatError extends Error {}

@@ -40,11 +40,16 @@ const diplomacy = (contracts: ContractView[]): Diplomacy => ({
   alliance: null,
   invitations: [],
   realmsInSight: [],
+  directOffers: [],
+  directOfferRealms: [],
   standings: [],
   joinRequests: [],
   directives: [],
   contracts,
   deliveries: [],
+  demands: [],
+  knownRealms: [],
+  knownNpcOrgs: [],
 })
 
 describe('mercenary contracts in the UI', () => {

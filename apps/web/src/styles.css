@@ -199,6 +199,10 @@ button.hud-logout {
 .hud-drawer.wide {
   width: min(1280px, calc(100vw - var(--rail-w)));
 }
+/* The full Residents list takes all of it. */
+.hud-drawer.full {
+  width: calc(100vw - var(--rail-w));
+}
 .hud-drawer.wide:not([hidden]) {
   display: flex;
   flex-direction: column;
@@ -278,11 +282,85 @@ button.hud-logout {
   line-height: 1.5;
   color: var(--ui-muted);
 }
+/* The form before a script starts: the rows scroll between its title and Start and Cancel. */
 .hud-dialog.start-params {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 32px);
   border-top-color: var(--ui-live);
+  backdrop-filter: blur(10px);
 }
-.hud-dialog.start-params .goods-row {
-  margin: 6px 0;
+.start-params h2 {
+  flex: none;
+}
+.start-params .hud-dialog-actions {
+  flex: none;
+  margin-top: 10px;
+}
+.start-params .error {
+  flex: none;
+  margin-top: 6px;
+}
+.start-params-rows {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* Out of the way while a param is picked on the map; the map gets the taps. */
+.start-params-backdrop.picking {
+  visibility: hidden;
+}
+/* A param's row: its name and the value in use on the left, its field on the right. */
+.start-param {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--ui-line);
+}
+.start-param:last-child {
+  border-bottom: 0;
+}
+.start-param-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.start-param .buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.start-param .amount {
+  width: 4.5em;
+  min-height: 36px;
+  box-sizing: border-box;
+}
+.start-param select {
+  max-width: 9.5em;
+  min-height: 36px;
+  text-overflow: ellipsis;
+}
+.start-param .buttons button {
+  min-height: 36px;
+  padding-inline: 10px;
+}
+.start-param-why {
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  margin-left: 6px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 12px;
+  line-height: 1;
+}
+.hud-dialog .start-param-note {
+  grid-column: 1 / -1;
+  margin-top: 4px;
 }
 .hud-dialog-actions {
   display: flex;
@@ -310,6 +388,38 @@ button.hud-logout {
 .game.phone {
   --rail-w: 0px;
   --top-h: 44px;
+}
+/* The form before a script starts is a bottom sheet, up to the top bar; above the keyboard, too. */
+.game.phone .start-params-backdrop {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0;
+}
+.game.phone .hud-dialog.start-params {
+  width: 100%;
+  max-height: calc(100% - var(--top-h));
+  padding: 14px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+  border-width: 3px 0 0;
+  border-radius: 14px 14px 0 0;
+}
+.game.phone .start-params .hud-dialog-actions button {
+  flex: 1;
+  min-height: 44px;
+}
+/* At 16px a phone doesn't zoom the page when the field takes focus. */
+.game.phone .start-param input,
+.game.phone .start-param select {
+  font-size: 16px;
+}
+.game.phone .start-param .buttons button,
+.game.phone .start-param input,
+.game.phone .start-param select {
+  min-height: 40px;
+}
+.game.phone .start-param-why {
+  width: 28px;
+  height: 28px;
 }
 .game.phone .hud-top {
   gap: 10px;
@@ -1065,6 +1175,162 @@ label > select {
   background: transparent;
   font-size: 12px;
 }
+/* The Residents drawer's button that opens or closes the full list. */
+.residents-full-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+/* The full list's search, filters and its close button, wrapping on a narrow screen. */
+.residents-full-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.residents-full-choice .search {
+  flex: 0 1 180px;
+  min-width: 120px;
+}
+.residents-full-choice .search input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.residents-full-choice .muted {
+  align-self: center;
+  font-size: 12px;
+}
+.residents-full-choice .pick {
+  margin-left: auto;
+}
+.residents-full-none {
+  padding: 12px 6px;
+}
+/* The full list (`ResidentsFullList`) scrolls by itself, under the drawer's head and its button;
+   rows have a fixed height so only those in view are drawn. */
+.residents-full {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.residents-full-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overflow-anchor: none;
+}
+.residents-full-table {
+  min-width: 1312px;
+}
+/* A row of the full list: its tick, then the button that opens the resident. */
+.residents-full-row {
+  display: flex;
+  align-items: stretch;
+}
+.residents-full-row > .residents-row {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.residents-full-row.heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--ui-panel);
+}
+.residents-full-row .tick {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--ui-line);
+  border-radius: 0;
+  background: transparent;
+}
+/* The whole of a card's height is the tick there, wide enough for a thumb. */
+.residents-full-cards .residents-full-row .tick {
+  width: 44px;
+}
+.tick-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid var(--ui-line-strong);
+  border-radius: 3px;
+  background: var(--ui-well);
+  font-size: 12px;
+  line-height: 1;
+}
+.tick-box.on {
+  border-color: var(--rel-own);
+  background: var(--rel-own);
+  color: var(--ui-ink);
+}
+.residents-row.full {
+  width: 100%;
+  box-sizing: border-box;
+  grid-template-columns:
+    150px 40px 110px repeat(4, 40px) 170px 110px 170px 54px 54px
+    minmax(180px, 1fr);
+}
+.residents-row.full.heading {
+  letter-spacing: 0;
+}
+/* A heading of the full list is a button that sorts by its column. */
+.residents-row.heading .column {
+  padding: 2px 0;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  text-transform: inherit;
+  white-space: nowrap;
+}
+.residents-row.heading .column:hover:not(:disabled) {
+  background: transparent;
+  color: var(--ui-text);
+}
+.residents-row.heading .column[aria-pressed='true'] {
+  color: var(--rel-own);
+}
+/* Cells stay on their line: all of it is in the tooltip, and on the resident's card. */
+.residents-row .cut {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+}
+.residents-row .cut small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+}
+.residents-row.lines.full-card {
+  width: 100%;
+  box-sizing: border-box;
+  justify-content: center;
+}
+.residents-row.lines.full-card .wide {
+  flex: 1 1 auto;
+}
+.residents-row.lines.full-card .meter {
+  width: 32px;
+}
+.residents-row.lines.full-card .doing.cut {
+  white-space: nowrap;
+}
 /* A horse: name and place, stats, age, health and hunger; narrow enough not to scroll. */
 .horses .residents-table {
   min-width: 0;
@@ -1283,6 +1549,17 @@ button.residents-row.selected:hover {
   border: 1px solid #3a424a;
   border-radius: 999px;
   font-size: 0.75rem;
+}
+.horse-pick {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  color: inherit;
+}
+.horse-pick input {
+  flex: none;
+  margin: 2px 0 0;
 }
 .clock {
   font-family: ui-monospace, monospace;
@@ -1693,6 +1970,26 @@ button.residents-row.selected:hover {
   text-transform: uppercase;
   color: var(--ui-muted);
 }
+/* An NPC city's rates (`CONTEXT.md`: Swap): a button each, wrapping to the panel's width. */
+.swap-rates ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.swap-rates button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-align: left;
+}
+.swap-rates .good-icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
 .hud-drawer form > fieldset {
   flex-basis: 100%;
 }
@@ -1764,6 +2061,40 @@ button.residents-row.selected:hover {
   border-radius: 6px;
   background: var(--ui-raised);
   color: var(--ui-text);
+}
+/* A demand's note (`CONTEXT.md`: Demand): the sender's words as they wrote them, line breaks and
+   long words kept inside the drawer. */
+.demand-note {
+  margin: 4px 0;
+  padding: 6px 8px;
+  border-left: 3px solid var(--ui-line-strong);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.demand-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+}
+.demand-goods {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.demand-goods li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.demand-goods select {
+  min-width: 0;
+  flex: 1 1 8em;
+}
+.demand-goods input[type='number'] {
+  width: 72px;
 }
 .game.phone .contract-field {
   grid-template-columns: minmax(0, 1fr);
@@ -2034,4 +2365,43 @@ button.residents-row.selected:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
+}
+
+.storage-offers h4 {
+  margin: 0 0 4px;
+}
+
+.offer-list {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+}
+
+.offer-list li {
+  margin-bottom: 6px;
+}
+
+.offer-post input[type='number'],
+.offer-accept input[type='number'] {
+  width: 4.5em;
+}
+
+/* What others sent the Player, and what they sent, under Direct offers. */
+.incoming-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+}
+
+.incoming-list li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--ui-line);
+}
+
+.incoming-list p {
+  margin: 4px 0;
+}
+
+.incoming-list strong {
+  overflow-wrap: anywhere;
 }

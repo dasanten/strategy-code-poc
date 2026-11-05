@@ -1,4 +1,7 @@
 import {
+  DEMANDS_PER_GAME_DAY,
+  DEMAND_MAX_DAYS,
+  DEMAND_NOTE_MAX_LENGTH,
   DOING_MAX_LENGTH,
   EXPLORED_EDGE_RANGE,
   EXPLORE_SKIP_RANGE,
@@ -124,6 +127,11 @@ const SHARED: readonly ScriptBinding[] = [
     'The buildings, construction sites and cities the Player has seen and that are out of their sight now, as they last saw them: each with `is` ("building" or "city") and `seenAt`, the tick they were last seen.',
   ),
   list(
+    'offers',
+    'offer',
+    'The offers standing at storages in sight, my realm’s own wherever they are, and direct offers sent to my realm wherever they are, oldest first.',
+  ),
+  list(
     'directives',
     'directive',
     'The admin directives in force, which every Player sees: target, reason and the price to buy one off (null when it can’t be).',
@@ -132,6 +140,11 @@ const SHARED: readonly ScriptBinding[] = [
     'waypoints',
     'waypoint',
     'My Player’s waypoints, oldest first: the named markers they put on the map, which only they see.',
+  ),
+  list(
+    'demands',
+    'demand',
+    'The demands my realm sent or was sent that wait for an answer, oldest first.',
   ),
   list(
     'withMemory',
@@ -497,9 +510,59 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'On a Trade Org warehouse or an NPC city’s storage, sell up to `units` of a good at its prices from my hands, or from my carriage there. At a warehouse, with `cityId` (and no carriage), a caravan picks them up from that city’s storage and pays there, less a fee.',
   ),
   action(
+    'swap',
+    ['give', 'want', 'units', 'carriageId?'],
+    'On a Trade Org warehouse or an NPC city’s storage, get up to `units` of the good `want` for as much of the good `give` as pays for them at its prices, rounded up, from my hands, or from my carriage there. What is over comes back in Coins as far as it holds them. An NPC city swaps only its surplus for what it is short of.',
+  ),
+  action(
     'handIn',
     ['good', 'units', 'toCityId', 'carriageId?'],
     'On a Trade Org warehouse, hand in up to `units` of a good (coins too) from my hands, or from my carriage there, with the fee, for a caravan to bring to the storage of `toCityId`, a city of another realm.',
+  ),
+  action(
+    'postOffer',
+    ['storageId', 'gives', 'givesUnits', 'wants', 'wantsUnits', 'times'],
+    'At a finished storage of my realm, wherever I am, post an offer: gives `givesUnits` of a good, wants `wantsUnits` of another (either may be "coins"), `times` over or as many times as goods not set aside there allow. Those goods are set aside at once.',
+  ),
+  action(
+    'takeDownOffer',
+    ['offerId'],
+    'Take down an offer of my realm; what it set aside is ordinary goods again.',
+  ),
+  action(
+    'acceptOffer',
+    ['offerId', 'times', 'carriageId?'],
+    'On the storage of another’s offer, accept it up to `times` times over, paying from and taking into my hands, or my carriage there, as many times as I can pay and carry. A direct offer only the realm it was sent to can accept.',
+  ),
+  action(
+    'sendDirectOffer',
+    ['toId', 'storageId', 'gives', 'givesUnits', 'wants', 'wantsUnits', 'times'],
+    'Send a realm my realm knows of an offer at a finished storage of my realm, wherever I am, on the terms of `postOffer`. They see it at once wherever they are, and only they can accept it, on its storage’s tile, until it lapses.',
+  ),
+  action(
+    'sendCarriedOffer',
+    [
+      'toId',
+      'fromCityId',
+      'toCityId',
+      'gives',
+      'givesUnits',
+      'wants',
+      'wantsUnits',
+      'times',
+      'feeBy',
+    ],
+    'Send a realm my realm knows of an offer the Trade Organization carries, between a city of my realm and one of theirs whose storage my realm sees, on the terms of `postOffer` and within one load each way. `feeBy` is "sender" or "split". Nothing is set aside; only they can accept it, from anywhere, until it lapses.',
+  ),
+  action(
+    'acceptCarriedOffer',
+    ['offerId'],
+    'Accept a carried direct offer sent to my realm, whole, wherever I am: it becomes two Transfers.',
+  ),
+  action(
+    'declineOffer',
+    ['offerId'],
+    'Decline a direct offer sent to my realm, wherever I am; its sender hears, and what it set aside is ordinary goods again.',
   ),
   action(
     'buyOff',
@@ -536,6 +599,17 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     [],
     'Claim my Player’s Horse offer: two new horses for my realm, in its stable nearest the Leader’s city, or else by a storage or the Leader with Food by them. Free and at once; refused once claimed, unless an admin has offered horses again, or while my realm has no living Leader.',
   ),
+  action(
+    'sendDemand',
+    ['realmId', 'terms', 'note', 'days'],
+    `Send a realm my realm knows of a demand, wherever it is: \`terms\` is \`{ kind: "city", cityId: id }\` for a city of theirs I know of, or \`{ kind: "goods", goods: { food: 5, coins: 20 } }\`, with a note of at most ${DEMAND_NOTE_MAX_LENGTH} characters and a deadline 1 to ${DEMAND_MAX_DAYS} game days away. My realm sends at most ${DEMANDS_PER_GAME_DAY} a game day. It is only words: nothing happens by itself when it is ignored. \`realmId\` can also be an NPC city I know of, or \`"trade-org"\`: the game answers within a game hour.`,
+  ),
+  action(
+    'acceptDemand',
+    ['demandId', 'handOver'],
+    'Accept a demand sent to my realm. A demand for a city hands it over at once, also my last one; a city no longer mine is refused. A demand for goods or Coins names how they go in `handOver`: `{ way: "setAside", storageId: id }`, at a storage of mine for the sender alone to fetch, or `{ way: "transfer", fromCityId: id, toCityId: id }`, by Transfers from a city of mine to one of theirs whose storage I see, for a fee I pay. What the storage holds goes, up to what was demanded; with none of it there, it is refused.',
+  ),
+  action('declineDemand', ['demandId'], 'Decline a demand sent to my realm.'),
   action(
     'roadLine',
     ['x', 'y'],

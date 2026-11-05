@@ -53,6 +53,19 @@ const ICONS: Record<DrawerId | KeyGood | 'crown', ReactNode> = {
       <path d="M10 8h6M10 12h6" />
     </>
   ),
+  demands: (
+    <>
+      <path d="M5 4h14v16H5z" />
+      <path d="M12 7v7" />
+      <circle cx="12" cy="17" r="1" fill="currentColor" />
+    </>
+  ),
+  directOffers: (
+    <>
+      <path d="M3 6h18v12H3z" />
+      <path d="M3 7l9 6 9-6" />
+    </>
+  ),
   alliance: (
     <>
       <path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z" />
@@ -361,11 +374,14 @@ export function Drawer({
   id,
   open,
   onClose,
+  full = false,
   children,
 }: {
   id: DrawerId
   open: OpenDrawer
   onClose: () => void
+  /** Across the whole screen, whatever the drawer's usual width (the full Residents list). */
+  full?: boolean
   children: ReactNode
 }) {
   const label = DRAWERS.find((d) => d.id === id)!.label
@@ -373,7 +389,7 @@ export function Drawer({
   const [status, setStatus] = useState<HTMLElement | null>(null)
   return (
     <section
-      className={`hud-drawer${isWide(id) ? ' wide' : ''}`}
+      className={`hud-drawer${isWide(id) || full ? ' wide' : ''}${full ? ' full' : ''}`}
       aria-label={`${label} drawer`}
       hidden={open !== id}
     >
@@ -545,6 +561,34 @@ export function HorseOfferNotice({
       </span>
       <button type="button" disabled={busy} onClick={() => void claim()}>
         Claim
+      </button>
+    </aside>
+  )
+}
+
+/**
+ * What others sent the Player and they haven't seen yet (`CONTEXT.md`: Notices): who sent what.
+ * Opening its drawer or dismissing it puts it away; the things themselves wait in the drawer.
+ */
+export function IncomingNotice({
+  line,
+  onOpen,
+  onDismiss,
+}: {
+  line: string
+  onOpen: () => void
+  onDismiss: () => void
+}) {
+  return (
+    <aside className="notice incoming-notice" role="status">
+      <span className="notice-text" title={line}>
+        {line}
+      </span>
+      <button type="button" onClick={onOpen}>
+        Open
+      </button>
+      <button type="button" aria-label="Dismiss" onClick={onDismiss}>
+        ×
       </button>
     </aside>
   )

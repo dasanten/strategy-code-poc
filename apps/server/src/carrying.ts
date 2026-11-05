@@ -2,7 +2,9 @@ import {
   GOODS,
   MAP_SIZE,
   canHandle,
+  commanderOf,
   downOn,
+  freeStock,
   goodsAtSpot,
   materialsNeeded,
   outpostStorageGuarded,
@@ -126,8 +128,10 @@ export const pickUp: OrderKind = {
   validate(world, sender, order) {
     const c = check(world, sender, order)
     if (typeof c === 'string') return c
-    if (!has(goodsAtSpot(world, c.r.x, c.r.y, c.spot), c.goods)) return 'none of those goods here'
-    return undefined
+    const here = goodsAtSpot(world, c.r.x, c.r.y, c.spot)
+    if (!has(here, c.goods)) return 'none of those goods here'
+    const free = takeableFrom(world, c.r, c.spot, here!, false)
+    return has(free, c.goods) ? undefined : 'those goods are set aside for an offer'
   },
   apply(world, _sender, order) {
     const { residentId, spot, goods } = order as CarryRequest
@@ -215,19 +219,20 @@ function take(
   const source =
     a.spot.kind === 'ground' ? pileAt(world, r.x, r.y)?.goods : spotStock(world, r, a.spot)
   if (!source || guardedFrom(world, r, a.spot, size)) return
-  const taken: Stock = {}
-  for (const [good, wanted] of Object.entries(a.goods) as [Good, number][]) {
-    const units = Math.min(wanted, source[good] ?? 0, unitsThatFit(r, good, world.tick))
-    move(source, r.carried, good, units)
-    if (units > 0) taken[good] = units
-  }
-  world.piles = world.piles.filter((p) => Object.values(p.goods).some((n) => n > 0))
-  const victimOrg = spotOrganization(world, a.spot)
   // A caravan collecting a pick-up takes what was sold to it (`CONTEXT.md`: Delivery), one
   // collecting a transfer what it was given to carry (`CONTEXT.md`: Transfer).
   const sold =
     a.spot.kind === 'storage' &&
     (collectsFrom(world, r, a.spot.storageId) || collectsTransferFrom(world, r, a.spot.storageId))
+  const free = takeableFrom(world, r, a.spot, source, sold)
+  const taken: Stock = {}
+  for (const [good, wanted] of Object.entries(a.goods) as [Good, number][]) {
+    const units = Math.min(wanted, free[good] ?? 0, unitsThatFit(r, good, world.tick))
+    move(source, r.carried, good, units)
+    if (units > 0) taken[good] = units
+  }
+  world.piles = world.piles.filter((p) => Object.values(p.goods).some((n) => n > 0))
+  const victimOrg = spotOrganization(world, a.spot)
   if (victimOrg !== null && !sold && Object.keys(taken).length > 0) {
     const victim =
       a.spot.kind === 'resident' ? downOn(world, r.x, r.y, a.spot.residentId) : undefined
@@ -236,6 +241,24 @@ function take(
   if (a.spot.kind === 'carriage' && Object.keys(taken).length > 0) {
     robCaravan(world, r, a.spot.carriageId, robbed)
   }
+}
+
+/**
+ * What `r` can take of the goods `source` at a spot (`CONTEXT.md`: Offer): the storage's own side,
+ * and a caravan collecting there (`sold`), leave what is set aside for offers alone. A thief takes
+ * it like any other goods, cutting the offer down.
+ */
+function takeableFrom(
+  world: WorldState,
+  r: Resident,
+  spot: GoodsSpot,
+  source: Stock,
+  sold: boolean,
+): Stock {
+  if (spot.kind !== 'storage') return source
+  const org = spotOrganization(world, spot)
+  const theirs = org !== null && (organizationOf(r) === org || commanderOf(world, r) === org)
+  return theirs || sold ? freeStock(world, { id: spot.storageId, stock: source }) : source
 }
 
 /**

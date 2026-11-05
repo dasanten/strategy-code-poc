@@ -46,6 +46,9 @@ export type ScriptViewName =
   | 'building'
   | 'site'
   | 'price'
+  | 'offer'
+  | 'directOffer'
+  | 'carriedOffer'
   | 'city'
   | 'occupation'
   | 'hire'
@@ -61,6 +64,7 @@ export type ScriptViewName =
   | 'lineTile'
   | 'workSettings'
   | 'waypoint'
+  | 'demand'
 
 const field = (
   name: string,
@@ -100,7 +104,7 @@ const BUILDING_FIELDS: readonly ScriptField[] = [
   field(
     'stock',
     view('goods'),
-    'The goods kept here.',
+    'The goods kept here; at a storage of my own, those not set aside for its offers, which I can’t take.',
     'for any building but a storage, warehouse or stable, and when the Player doesn’t see inside it',
   ),
 
@@ -128,6 +132,12 @@ const BUILDING_FIELDS: readonly ScriptField[] = [
     listOf(view('price')),
     'A Trade Org warehouse’s prices, one for each good it keeps.',
     'for any building but a Trade Org warehouse',
+  ),
+  field(
+    'offers',
+    listOf(view('offer')),
+    'The offers standing at a storage, oldest first; anyone in sight sees them.',
+    'for any building but a storage with an offer',
   ),
 ]
 
@@ -346,7 +356,7 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field(
         'kind',
         'string',
-        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "store", "fetch", "build", "tearDown", "workAt", "teach", "train", "breed", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "handIn", "buyOff" or "relocate" (on their way to `cityId`, to live there).',
+        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "store", "fetch", "build", "tearDown", "workAt", "teach", "train", "breed", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "swap", "handIn", "buyOff", "acceptOffer" or "relocate" (on their way to `cityId`, to live there).',
       ),
       field(
         'target',
@@ -447,7 +457,14 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       ),
       field('side', 'string', 'A trade’s "buy" or "sell".', 'for other orders'),
       field('good', 'string', 'The good traded or handed in.', 'for other orders'),
-      field('units', 'number', 'The units traded or handed in.', 'for other orders'),
+      field(
+        'units',
+        'number',
+        'The units traded, wanted in a swap or handed in.',
+        'for other orders',
+      ),
+      field('give', 'string', 'The good a swap gives.', 'for other orders'),
+      field('want', 'string', 'The good a swap wants.', 'for other orders'),
       field(
         'cityId',
         'string',
@@ -590,6 +607,57 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field('stock', 'number', 'What it holds.', 'unless the Player sees inside'),
       field('forSale', 'number', 'Units an NPC city would sell.', 'at a warehouse'),
       field('wanted', 'number', 'Units an NPC city would buy.', 'at a warehouse'),
+    ],
+  },
+  offer: {
+    description:
+      'What a Player posts at a storage of their realm: "gives 10 Wood, wants 5 Stone", some times over.',
+    fields: [
+      id('offer'),
+      field('realmId', 'string', 'The realm that posted it.'),
+      field('storageId', 'string', 'The storage it stands at; accept it on its tile.'),
+      x,
+      y,
+      field('gives', 'string', 'The good it gives; may be "coins".'),
+      field('givesUnits', 'number', 'How much of it each time.'),
+      field('wants', 'string', 'The good it wants; may be "coins".'),
+      field(
+        'wantsUnits',
+        'number',
+        'How much of it each time: 0 for goods set aside on accepting a demand, which want nothing back.',
+      ),
+      field('times', 'number', 'How many more times it can be accepted.'),
+      field('rate', 'number', 'What it wants for one unit it gives.'),
+      field(
+        'direct',
+        view('directOffer'),
+        'Who it was sent to, when it is a direct offer.',
+        'for an offer to anyone',
+      ),
+    ],
+  },
+  directOffer: {
+    description: 'What makes an offer a direct one: only one realm can accept it, for a set time.',
+    fields: [
+      field('toId', 'string', 'The realm it was sent to, the only one who can accept it.'),
+      field('lapsesAt', 'number', 'The tick it lapses at, its goods then ordinary again.'),
+      field(
+        'carried',
+        view('carriedOffer'),
+        'How the Trade Organization carries it, when it does.',
+        'for one fetched in person',
+      ),
+    ],
+  },
+  carriedOffer: {
+    description:
+      'A direct offer the Trade Organization carries as two Transfers once accepted, nothing set aside.',
+    fields: [
+      field('fromCityId', 'string', 'The sender’s city, where its goods are picked up.'),
+      field('toCityId', 'string', 'The other side’s city, where theirs are picked up.'),
+      field('feeBy', 'string', 'Who pays the fee: "sender" or "split".'),
+      field('senderFee', 'number', 'What the sender pays when all of its goods are taken.'),
+      field('otherFee', 'number', 'What the other side pays when all of its goods are taken.'),
     ],
   },
   city: {
@@ -773,6 +841,25 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field('name', 'string', 'Its name; others may have the same.'),
       field('x', 'number', 'From west to east.'),
       field('y', 'number', 'From north to south.'),
+    ],
+  },
+  demand: {
+    description:
+      'A demand my realm sent or was sent, waiting for an answer (`sendDemand`, `acceptDemand`, `declineDemand`).',
+    fields: [
+      id('demand'),
+      field('fromId', 'string', 'The realm that sent it.'),
+      field('from', 'string', 'That realm’s name.'),
+      field('toId', 'string', 'The realm it was sent to, the only one who can answer it.'),
+      field('to', 'string', 'That realm’s name.'),
+      field(
+        'terms',
+        'any',
+        'What it asks for: `{ kind: "city", cityId, cityName }` or `{ kind: "goods", goods }`.',
+      ),
+      field('note', 'string', 'The sender’s words, as plain text.'),
+      field('sentAt', 'number', 'The tick it was sent.'),
+      field('deadline', 'number', 'The tick it lapses at, unanswered.'),
     ],
   },
 }

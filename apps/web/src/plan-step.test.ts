@@ -11,6 +11,7 @@ import {
 import { describe, expect, it } from 'vitest'
 import {
   PLAN_STEPS,
+  PLAN_TASKS,
   horsesIn,
   nextPick,
   pickCity,
@@ -111,6 +112,28 @@ describe('Add step', () => {
     // Working, building, tearing down, hauling and lines are planned as tasks, as the card gives them.
     const asTasks = ['build', 'tearDown', 'workAt', 'haul', 'roadLine', 'wallLine']
     expect([...kinds].sort()).toEqual(QUEUE_STEP_KINDS.filter((k) => !asTasks.includes(k)).sort())
+  })
+
+  it('offers Customise on exactly the steps that give a task, with that task', () => {
+    const answers: Partial<Record<PlanAsk, PlanAnswer>> = {
+      goods: { ask: 'goods', goods: { wood: 1 } },
+      buildingKind: { ask: 'buildingKind', building: 'farm' },
+      horses: { ask: 'horses', horseIds: ['h1', 'h2'] },
+      haul: { ask: 'haul', setup: { goods: ['wood'], returnGoods: [], keepFood: 0 } },
+      script: { ask: 'script', scriptId: 1 },
+      subject: { ask: 'subject', subject: 'strength' },
+      units: { ask: 'units', units: 2 },
+    }
+    for (const k of PLAN_STEPS) {
+      const picked = k.picks.map(() => ({ x: 0, y: 0, id: 'x', spot: { kind: 'ground' as const } }))
+      const plan: Plan = { kind: k.id, picked }
+      const ask = planAsk(plan)
+      const { order } = planOrder(plan, ask && answers[ask])!
+      expect([k.id, PLAN_TASKS[k.id]]).toEqual([
+        k.id,
+        order.kind === 'task' ? order.task : undefined,
+      ])
+    }
   })
 
   it('plans a Build line from its two picked ends, with no walk before it', () => {

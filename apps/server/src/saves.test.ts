@@ -184,11 +184,106 @@ describe('world saves', () => {
     expect(checkInvariants(v80, land)).toEqual([])
   })
 
+  it('says which punishments under way have reached their city (migration 80 → 81)', () => {
+    const { world: v80, terrain: land } = worldWithPost()
+    const city = v80.cities[0]!
+    const hall = v80.buildings.find((b) => b.id === city.townHallId)!
+    const there = v80.residents[0]!
+    there.x = hall.x
+    there.y = hall.y
+    const base = { culpritOrg: 'r1', cityId: city.id, worth: 100, startedAt: 0 }
+    v80.punishments = [
+      {
+        ...base,
+        id: 'there',
+        heading: 'out',
+        took: 0,
+        members: [{ residentId: there.id, own: {} }],
+      },
+      {
+        ...base,
+        id: 'road',
+        heading: 'out',
+        took: 0,
+        members: [{ residentId: 'nobody here', own: {} }],
+      },
+      {
+        ...base,
+        id: 'robbed',
+        heading: 'home',
+        took: 40,
+        members: [{ residentId: 'nobody here either', own: {} }],
+      },
+    ]
+    v80.tick = 500
+    const v81 = migrateWorld(structuredClone(v80), 80, { terrain: land }, migrations, 81)
+    const arrived = Object.fromEntries(v81.punishments.map((p) => [p.id, p.arrivedAt]))
+    expect(arrived).toEqual({ there: 500, road: undefined, robbed: 500 })
+    expect(v81.punishments.flatMap((p) => p.members).every((m) => m.packed)).toBe(true)
+  })
+
+  it('a format 81 world has no offers yet (migration 81 → 82)', () => {
+    const { world, terrain: land } = worldWithCity()
+    const old: Partial<typeof world> = { ...world }
+    delete old.offers
+    const migrated = migrateWorld(structuredClone(old), 81, { terrain: land })
+    expect(migrated.offers).toEqual([])
+    expect(checkInvariants(migrated, land)).toEqual([])
+  })
+
+  it('leaves every offer open to anyone (migration 82 → 83)', () => {
+    const { world: v82, terrain: land } = worldWithCity()
+    const v83 = migrateWorld(structuredClone(v82), 82, { terrain: land }, migrations, 83)
+    expect(v83).toEqual(v82)
+    expect(checkInvariants(v83, land)).toEqual([])
+  })
+
+  it('leaves city plans as they are: no trader is out to an offer yet (migration 83 → 84)', () => {
+    const { world: v83, terrain: land } = worldWithPost()
+    const v84 = migrateWorld(structuredClone(v83), 83, { terrain: land })
+    expect(v84).toEqual(v83)
+    expect(Object.values(v84.cityPlans).every((p) => p.trader?.offer === undefined)).toBe(true)
+    expect(checkInvariants(v83, land)).toEqual([])
+  })
+
+  it('leaves offers and transfers as they are: nothing is carried yet (migration 84 → 85)', () => {
+    const { world: v84, terrain: land } = worldWithPost()
+    const v85 = migrateWorld(structuredClone(v84), 84, { terrain: land })
+    expect(v85).toEqual(v84)
+    expect(v85.offers.every((o) => o.direct?.carried === undefined)).toBe(true)
+    expect(v85.transfers.every((t) => t.carriedOffer === undefined)).toBe(true)
+    expect(checkInvariants(v85, land)).toEqual([])
+  })
+
+  it('gives a format 85 world an empty list of demands (migration 85 → 86)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const old: Partial<typeof world> = { ...world }
+    delete old.demands
+    const v86 = migrateWorld(structuredClone(old), 85, { terrain: land }, migrations, 86)
+    expect(v86.demands).toEqual([])
+    expect(v86.realms).toEqual(world.realms)
+    expect(checkInvariants(v86, land)).toEqual([])
+  })
+
+  it('leaves a format 86 world as it is: nothing is set aside on a demand yet (migration 86 → 87)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v87 = migrateWorld(structuredClone(world), 86, { terrain: land }, migrations, 87)
+    expect(v87).toEqual(world)
+    expect(checkInvariants(v87, land)).toEqual([])
+  })
+
+  it('leaves a format 87 world as it is: no demand has gone to an NPC city yet (migration 87 → 88)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v88 = migrateWorld(structuredClone(world), 87, { terrain: land }, migrations, 88)
+    expect(v88).toEqual(world)
+    expect(checkInvariants(v88, land)).toEqual([])
+  })
+
   it('leaves realms from before realm names unnamed (migration 38 → 39)', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(80)
+    expect(WORLD_FORMAT_VERSION).toBe(88)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)

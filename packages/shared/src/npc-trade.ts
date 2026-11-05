@@ -29,6 +29,7 @@ import {
   type Building,
   type City,
   type Good,
+  type Offer,
   type Resident,
   type Stock,
   type Weapon,
@@ -130,7 +131,7 @@ function priceFloor(good: PricedGood, reserve: Stock): number {
  * an NPC city): the share `CITY_PRICE_STANDING_SWING` × standing / `STANDING_RANGE`, as for its
  * own price (`cityPrice`). 0 without a trader.
  */
-function standingSwing(
+export function standingSwing(
   world: Pick<WorldState, 'standings' | 'cities'>,
   city: City,
   traderId: string | null | undefined,
@@ -236,6 +237,46 @@ export function quoteNpcTrade(
     units = n
   }
   return { units, coins }
+}
+
+/**
+ * How many times over, up to `wanted`, an offer is at a rate at least as good as an NPC city's own
+ * prices (`CONTEXT.md`: NPC cities at an offer): what it gets is worth what it would pay for it,
+ * what it gives up what it would sell it for, each unit priced with its stock as it moves and
+ * moved by its standing toward the offer's realm, as a swap with that realm would be. A Coin is
+ * worth a Coin. Pure: nothing moves.
+ */
+export function npcOfferTimes(
+  world: WorldState,
+  city: City,
+  offer: Pick<Offer, 'realmId' | 'gives' | 'givesUnits' | 'wants' | 'wantsUnits'>,
+  wanted: number,
+): number {
+  const stock = npcCityStock(world, city)
+  const reserve = npcReserve(world, city)
+  const swing = standingSwing(world, city, offer.realmId)
+  const { gives, wants } = offer
+  const givesStock = stock[gives] ?? 0
+  const wantsStock = stock[wants] ?? 0
+  let got = 0
+  let paid = 0
+  let gotUnits = 0
+  let paidUnits = 0
+  let times = 0
+  while (times < wanted) {
+    for (let i = 0; i < offer.givesUnits; i++) {
+      gotUnits++
+      got += gives === 'coins' ? 1 : npcPriceFor(gives, givesStock + gotUnits, reserve, swing).buy
+    }
+    for (let i = 0; i < offer.wantsUnits; i++) {
+      paid +=
+        wants === 'coins' ? 1 : npcPriceFor(wants, wantsStock - paidUnits, reserve, swing).sell
+      paidUnits++
+    }
+    if (got < paid) break
+    times++
+  }
+  return times
 }
 
 /**

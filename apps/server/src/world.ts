@@ -37,12 +37,14 @@ import { stepPassengers } from './passengers.js'
 import { requestStrikes, resolveStrikes, type CombatResult } from './combat.js'
 import { stepArmies } from './armies.js'
 import { resolvePayments, stepContracts } from './contracts.js'
+import { answerDemands, stepDemands } from './demands.js'
 import { stepTradeOrgArmy } from './trade-org-army.js'
 import { stepNpcHire } from './npc-hire.js'
 import { stepPunishments } from './trade-org-punishment.js'
 import { stepDirectives } from './directives.js'
 import { resolvePurchases } from './buying.js'
 import { resolveTrades } from './trading.js'
+import { resolveOffers, stepOffers } from './offers.js'
 import { resolveBuyOffs } from './directives.js'
 import { stepCrimes } from './crimes.js'
 import { stepStanding } from './standing.js'
@@ -78,9 +80,11 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     alliances: [],
     armies: [],
     contracts: [],
+    demands: [],
     caravans: [],
     deliveries: [],
     transfers: [],
+    offers: [],
     routeRobberies: {},
     crimes: [],
     standings: [],
@@ -162,7 +166,7 @@ export interface StepResult {
 /**
  * Advances the world by one tick (ADR 0002): residents get hungry, eat, heal or starve; so do
  * horses; food spoils at the end of each game day and Trade Org warehouses top up to their stock floor; caravans, NPC cities, the Trade Org army and its punishments give their residents orders; then their orders request actions (steps, then blows in fights, then climbing walls, then taking and
- * putting down goods, store, fetch, haul routes' and road orders' included, then Feeding the Down (`stepFeeding`), then paying for mercenary contracts, then buying NPC cities, then trading at Trade Org warehouses, then laying out and working on construction sites, then tearing down, then
+ * putting down goods, store, fetch, haul routes' and road orders' included, then Feeding the Down (`stepFeeding`), then paying for mercenary contracts, then buying NPC cities, then trading at Trade Org warehouses, then accepting offers (`resolveOffers`), then laying out and working on construction sites, then tearing down, then
  * working workplaces, then residents breeding horses, then pairs having children), and the world resolves them together. As the next tick begins, residents
  * age: the old die, and loads too heavy for declining Strength are put down; alliance leaves
  * whose delay ran out take effect; occupations of town halls run, and a city held long enough
@@ -171,7 +175,7 @@ export interface StepResult {
  * a city captured this tick too; admin directives whose goals are all met end (`stepDirectives`); witnesses who got home make crimes known (`stepCrimes`); mercenary contracts end or break
  * (`stepContracts`); standing drifts toward neutral (`stepStanding`); armies
  * lose members who are gone and give the rest their orders for the next tick; Workplace settings
- * of what is gone are dropped (`stepWorkplaceSettings`); the realms whose
+ * of what is gone are dropped (`stepWorkplaceSettings`); offers follow their storages (`stepOffers`); the realms whose
  * turn it is bring their Last seen up to date (`stepLastSeen`); last, riders who
  * lost their horse get off it (`stepRiders`), and passengers who lost their carriage get off
  * (`stepPassengers`), and whatever anyone Down was given ends (`keepDownStill`). Without `walking`
@@ -257,6 +261,7 @@ function stepRest(
   const payments = resolvePayments(world)
   const purchases = resolvePurchases(world, terrain.size)
   const trades = resolveTrades(world, terrain.size)
+  const accepted = resolveOffers(world)
   const buyOffs = resolveBuyOffs(world)
   const builds = requestBuilding(world)
   resolveBuilding(world, builds, terrain)
@@ -272,17 +277,21 @@ function stepRest(
   resolveBirths(world, births)
   world.tick++
   const aging = stepAging(world, terrain.size)
+  answerDemands(world, terrain.size)
   stepAlliances(world)
   const captures = stepCaptures(world, terrain.size)
   stepRefill(world, terrain.size)
   stepDirectives(world)
   stepCrimes(world, terrain.size)
   stepContracts(world)
+  stepDemands(world)
   stepStanding(world)
   stepPersuasion(world, terrain.size)
   stepArmies(world, terrain.size)
   // Workplace settings of buildings and realms that went this tick go with them.
   stepWorkplaceSettings(world)
+  // Offers follow what this tick took from their storages, or the storages themselves.
+  stepOffers(world)
   const actions =
     steps.length +
     strikes.length +
@@ -296,6 +305,7 @@ function stepRest(
     payments +
     purchases +
     trades +
+    accepted +
     buyOffs
   return { actions, survival, combat, horsesDied, aging, captures }
 }

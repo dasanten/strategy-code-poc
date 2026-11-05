@@ -29,9 +29,11 @@ import { armyOrders, leaveOnOwnOrders, memberOrders } from './armies.js'
 import { setGate } from './gates.js'
 import { roadLine, wallLine } from './road-line.js'
 import { contractOrders, pay } from './contracts.js'
+import { demandOrders } from './demands.js'
 import { buyCity } from './buying.js'
 import { persuasionOrders } from './persuasion.js'
-import { buy, sell } from './trading.js'
+import { buy, sell, swap } from './trading.js'
+import { offerOrders } from './offers.js'
 import { handInOrder, transfer } from './transfers.js'
 import { buyOff } from './directives.js'
 import { handOver } from './leader.js'
@@ -115,6 +117,7 @@ export const orderKinds: Record<string, OrderKind> = Object.fromEntries(
     buyCity,
     buy,
     sell,
+    swap,
     handIn: handInOrder,
     transfer,
     buyOff,
@@ -127,6 +130,8 @@ export const orderKinds: Record<string, OrderKind> = Object.fromEntries(
     ...allianceOrders,
     ...armyOrders,
     ...contractOrders,
+    ...demandOrders,
+    ...offerOrders,
     ...persuasionOrders,
     ...queueOrders,
     ...waypointOrders,
@@ -205,9 +210,16 @@ export class OrderQueue {
         'renameCity',
         'renameHorse',
         'claimHorses',
+        ...Object.keys(demandOrders),
         'setScriptParam',
         'setDefenceScript',
         'editQueue',
+        'postOffer',
+        'takeDownOffer',
+        'sendDirectOffer',
+        'declineOffer',
+        'sendCarriedOffer',
+        'acceptCarriedOffer',
         ...Object.keys(waypointOrders),
       ]
       const r = world.residents.find((x) => x.id === order.residentId)
