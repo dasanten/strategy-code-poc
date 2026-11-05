@@ -1,6 +1,7 @@
 import {
   NPC_GATE_WATCH_RANGE,
   NPC_SMITHY_WEAPON,
+  TRADE_ORG,
   TRADE_ORG_ARMY,
   npcSoldierTarget,
   tradeOrgArmyWanted,
@@ -11,8 +12,10 @@ import {
   contractOf,
   warehouseKeeps,
   defendsCity,
+  forSale,
   inCityArea,
   isArmed,
+  npcCityRefuses,
   punishers,
   recipeFor,
   wallSide,
@@ -21,6 +24,7 @@ import {
   wrapDistance,
   type Building,
   type City,
+  type Punishment,
   type Resident,
   type Stock,
   type Weapon,
@@ -30,7 +34,8 @@ import {
 } from '@csp/shared'
 import { caravanCrew } from './caravans.js'
 import { attackOrder } from './combat.js'
-import { knownThieves } from './crimes.js'
+import { cityOrganization, knownThieves } from './crimes.js'
+import type { Invariant, InvariantViolation } from './invariants.js'
 import { stopWork, walkTo } from './npc-behaviour.js'
 import { foundingParty } from './npc-founding.js'
 import { startWork } from './work.js'
@@ -287,18 +292,41 @@ function smithing(world: WorldState, smithy: Building, unarmed: Resident[], inpu
 }
 
 /**
+ * The Trade Org army an NPC city keeps its gates open for, by id (`CONTEXT.md`: Trade Org army at an
+ * NPC gate): all of it, its supply wagons' drivers included, unless the city refuses the Trade
+ * Organization. A punishment aimed at the city's own Organization it shuts out like any armed
+ * outsider.
+ */
+function armyLetPast(world: WorldState, city: City): Set<string> {
+  const ids = new Set<string>()
+  if (npcCityRefuses(world, city, TRADE_ORG)) return ids
+  const org = cityOrganization(city)
+  const aimedHere = (p: Punishment | undefined) => p?.culpritOrg === org
+  for (const p of world.punishments) {
+    if (!aimedHere(p)) for (const m of p.members) ids.add(m.residentId)
+  }
+  for (const w of world.supplyWagons) {
+    const p = world.punishments.find((x) => x.id === w.punishmentId)
+    if (w.driverId !== null && !aimedHere(p)) ids.add(w.driverId)
+  }
+  return ids
+}
+
+/**
  * An NPC city closes its gates while an armed outsider (anyone armed not of the city or its
- * alliance) stands within `NPC_GATE_WATCH_RANGE` of one of them, and opens them again once none
- * does (`CONTEXT.md`: NPC city, Walls in combat). Its own residents and allies pass them either
- * way.
+ * alliance, nor of the Trade Org army it lets past: `armyLetPast`) stands within
+ * `NPC_GATE_WATCH_RANGE` of one of them, and opens them again once none does (`CONTEXT.md`: NPC city,
+ * Walls in combat). Its own residents and allies pass them either way.
  */
 function watchGates(world: WorldState, city: City, size: number): void {
   const gates = world.buildings.filter((b) => b.cityId === city.id && b.kind === 'gate' && !b.site)
   if (gates.length === 0) return
+  const letPast = armyLetPast(world, city)
   const near = world.residents.some(
     (r) =>
       r.health > 0 &&
       isArmed(r) &&
+      !letPast.has(r.id) &&
       !allied(world, city.id, wallSide(r) ?? '') &&
       gates.some((g) => wrapDistance(size, r, g) <= NPC_GATE_WATCH_RANGE),
   )
@@ -306,4 +334,41 @@ function watchGates(world: WorldState, city: City, size: number): void {
     if (near) g.closed = true
     else delete g.closed
   }
+}
+
+/**
+ * How far inside `NPC_GATE_WATCH_RANGE` the invariant below looks: gates are watched early in a tick,
+ * so someone may have walked into range since.
+ */
+const GATE_WATCH_SLACK = 8
+
+/**
+ * An NPC city's gates are shut to a punishment aimed at it (`CONTEXT.md`: Trade Org army at an NPC
+ * gate): keeping them open for the Trade Org army never opens them to the army coming for that city.
+ */
+export const npcGateShutToItsPunishers: Invariant = {
+  name: 'npc-gate-shut-to-its-punishers',
+  check(world, terrain) {
+    const out: InvariantViolation[] = []
+    const reach = NPC_GATE_WATCH_RANGE - GATE_WATCH_SLACK
+    for (const p of world.punishments ?? []) {
+      const city = world.cities.find((c) => forSale(c) && cityOrganization(c) === p.culpritOrg)
+      if (!city) continue
+      const open = world.buildings.filter(
+        (b) => b.cityId === city.id && b.kind === 'gate' && !b.site && !b.closed,
+      )
+      for (const { residentId } of p.members) {
+        const r = world.residents.find((x) => x.id === residentId)
+        if (!r || r.health <= 0 || !isArmed(r)) continue
+        const gate = open.find((g) => wrapDistance(terrain.size, r, g) <= reach)
+        if (!gate) continue
+        out.push({
+          invariant: this.name,
+          message: `gate ${gate.id} of ${city.id} is open to ${r.id}, who has come to punish it`,
+          entityIds: [gate.id, r.id, p.id],
+        })
+      }
+    }
+    return out
+  },
 }

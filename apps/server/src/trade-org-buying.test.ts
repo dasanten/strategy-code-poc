@@ -1,5 +1,6 @@
 import {
   CRIME_STANDING_LOSS,
+  NPC_VILLAGE,
   TRADE_ORG,
   TRADE_ORG_ARMY,
   TRADE_ORG_PUNISH,
@@ -15,6 +16,8 @@ import {
 import { describe, expect, it } from 'vitest'
 import { newCaravanCarriage } from './caravans.js'
 import { checkInvariants } from './invariants.js'
+import { foundNpcCity } from './npc-cities.js'
+import { attackersOf } from './npc-defence.js'
 import { offersAcceptedIn, tradeOrgOnlyBuysFood } from './offers.js'
 import { mulberry32, newResident } from './residents.js'
 import { changeStanding } from './standing.js'
@@ -160,6 +163,20 @@ function foodOffer(world: WorldState, realmId = 'r2', coins = 4): Offer {
   return offer
 }
 
+/**
+ * A walled NPC village with its gate near the soldier and plenty of Food in its storage, which lies
+ * east of them, walls and all between.
+ */
+function gatedCity(s: Staged) {
+  const { x, y } = { x: ROAD.x + 20, y: ROAD.y - 14 }
+  const city = foundNpcCity(s.world, s.terrain, NPC_VILLAGE, x, y, mulberry32(7))
+  const inCity = (kind: string) =>
+    s.world.buildings.find((b) => b.cityId === city.id && b.kind === kind)!
+  const storage = inCity('storage')
+  storage.stock!.food = 1000
+  return { city, storage, gate: inCity('gate') }
+}
+
 const food = (s: Staged) => s.r.carried.food ?? 0
 const coins = (s: Staged) => s.r.carried.coins ?? 0
 const bought = (s: Staged) => food(s) >= 1
@@ -289,6 +306,68 @@ describe('a Trade Org army buying Food on the way', () => {
     run(s, 120)
     expect(food(s)).toBe(0)
     expect(s.r.x).toBeLessThan(NEAR.x)
+  })
+
+  it("walks through an NPC city's gate, buys at its storage and walks on", () => {
+    const s = setup()
+    const { storage, gate } = gatedCity(s)
+    run(s, 800, () => {
+      expect(gate.closed).toBeUndefined()
+      return bought(s)
+    })
+    expect(bought(s)).toBe(true)
+    expect(coins(s)).toBeLessThan(TRADE_ORG_PUNISH.purse)
+    expect(storage.stock!.food).toBeLessThan(1000)
+    // Bought, they leave by the gate and carry on south, past the city's walls.
+    run(s, 1500, () => s.r.y > ROAD.y + 30)
+    expect(s.r.y).toBeGreaterThan(ROAD.y + 30)
+  })
+
+  it('is not fought by the city while it buys, armed as they are', () => {
+    const s = setup()
+    const { city } = gatedCity(s)
+    const people = s.world.residents.filter((r) => r.owner === null && r.cityId === city.id)
+    for (const r of people) r.carried.spear = 1
+    const health = s.r.health
+    run(s, 800, () => {
+      for (const r of people) expect(r.order?.kind).not.toBe('attack')
+      expect(attackersOf(s.world, city, s.terrain.size)).toEqual([])
+      return bought(s)
+    })
+    expect(bought(s)).toBe(true)
+    expect(s.r.health).toBe(health)
+  })
+
+  it('is shut out by a gated city that refuses the Trade Organization, and goes on', () => {
+    const s = setup()
+    const { city, gate } = gatedCity(s)
+    changeStanding(s.world, city.id, TRADE_ORG, -60)
+    Object.assign(s.r, { x: gate.x, y: gate.y + 10 })
+    run(s, 1)
+    expect(gate.closed).toBe(true)
+    const startY = s.r.y
+    run(s, 120)
+    expect(food(s)).toBe(0)
+    expect(coins(s)).toBe(TRADE_ORG_PUNISH.purse)
+    expect(s.r.y).toBeGreaterThan(startY + 5)
+  })
+
+  it('finds a gated city shut while another armed outsider is near, and goes on', () => {
+    const s = setup()
+    const { storage, gate } = gatedCity(s)
+    const other = addLeader(s.world, 'b1', 'r2', 'c2')
+    Object.assign(other, { x: gate.x, y: gate.y + 3, order: null, carried: { spear: 1 } })
+    run(s, 800, () => {
+      Object.assign(other, { x: gate.x, y: gate.y + 3, order: null })
+      expect(gate.closed).toBe(true)
+      return s.m.noWay?.includes(storage.id) ?? false
+    })
+    expect(s.m.noWay).toContain(storage.id)
+    expect(food(s)).toBe(0)
+    expect(coins(s)).toBe(TRADE_ORG_PUNISH.purse)
+    const startY = s.r.y
+    run(s, 120)
+    expect(s.r.y).toBeGreaterThan(startY)
   })
 
   it('passes by an NPC city that refuses the Trade Organization', () => {
