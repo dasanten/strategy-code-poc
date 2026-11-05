@@ -3,6 +3,7 @@ import {
   FOOTPRINT,
   TICKS_PER_GAME_DAY,
   TRADE_ORG,
+  TRADE_ORG_ARMY,
   TRADE_ORG_DEBT_DEMAND_DAYS,
   TRADE_ORG_LOSS,
   Terrain,
@@ -134,7 +135,7 @@ describe('once it has heard who took a post', () => {
   it('demands the city back with a debt for its worth, and sends no army', () => {
     const s = heardOf()
     const d = postDemand(s.world, s.post)!
-    expect(s.world.debts).toEqual([{ org: s.realm.id, coins: WORTH }])
+    expect(s.world.debts).toEqual([{ org: s.realm.id, coins: WORTH, cityId: s.post.id }])
     expect(d).toMatchObject({
       fromId: TRADE_ORG,
       toId: s.realm.id,
@@ -296,7 +297,7 @@ describe('giving the post back', () => {
     stepDebts(s.world)
     expect(coinDemand(s.world)).toBeUndefined()
     answer(s, 'acceptDemand')
-    expect(s.world.debts).toEqual([{ org: s.realm.id, coins: 300 }])
+    expect(s.world.debts).toEqual([expect.objectContaining({ org: s.realm.id, coins: 300 })])
     stepDebts(s.world)
     expect(coinDemand(s.world)).toMatchObject({ terms: { goods: { coins: 300 } } })
     expect(debtDemandsSound.check(s.world, terrain)).toEqual([])
@@ -374,6 +375,8 @@ describe('anything but giving it back', () => {
     expect(home).toBeDefined()
     expect(answer(s, 'declineDemand')).toBe('ack')
     expect(s.world.debts[0]).toMatchObject({ cityId: s.post.id })
+    const soldiers = s.world.residents.filter((r) => r.owner === null && r.cityId === s.hq.id)
+    for (const r of soldiers.slice(0, TRADE_ORG_ARMY.guard + 4)) r.carried.spear = 1
     stepPunishments(s.world, size)
     expect(s.world.punishments).toHaveLength(1)
     expect(s.world.punishments[0]).toMatchObject({ culpritOrg: s.realm.id, cityId: s.post.id })
