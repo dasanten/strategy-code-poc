@@ -4,6 +4,7 @@ import {
   MAX_WORKERS,
   NPC_FOOD_SHORT_DAYS,
   NPC_PLAN_TICKS,
+  NPC_SURPLUS_CAP,
   RECIPES,
   buildingAt,
   canWork,
@@ -13,6 +14,7 @@ import {
   hasFoodSurplus,
   isArmed,
   materialsNeeded,
+  npcReserve,
   npcStorages,
   punishers,
   storedFood,
@@ -47,6 +49,7 @@ import {
   holdsBatch,
   ownWorkplaces,
   shortGoods,
+  surplusWork,
 } from './npc-chain.js'
 import { foundingParty, planFounding } from './npc-founding.js'
 import { planTrader, planVisit, traderOut } from './npc-trader.js'
@@ -283,10 +286,13 @@ const feeders = (residents: number) =>
  * needs them), as do farmers beyond those it keeps (`farmersWanted`). Then: spare hands, and after them workers off the farms, farm
  * until it has its farmers, while a farm has room; up to `NPC_BUILDERS` (`npcBuilders`) build the project; the
  * rest go to the workplace of the good shortest of the reserve (`chainPlace`), filling its crew
- * before the next. A spare hand with nowhere to go is idle; a farmer let go goes back to farming,
- * and one the last pass put to work who is between jobs now (a carrier home with the load stored:
- * `CONTEXT.md`, Carrying the output) goes back to that workplace.
- * Returns the spare hands with nowhere to go, idle or back on the farm (`CONTEXT.md`: Full city).
+ * before the next. With nothing short to go to, a worker let go goes back (a farmer to farming,
+ * one the last pass put to work who is between jobs now, a carrier home with the load stored:
+ * `CONTEXT.md`, Carrying the output, to that workplace), at an NPC city only up to the cap of its
+ * good (`surplusWork`), and a free spare hand of an NPC city goes to work for surplus
+ * (`surplusPlace`; `CONTEXT.md`: Spare hands' work). Whoever has none of that is idle.
+ * Returns the spare hands nothing short has a use for, idle or working for surplus (`CONTEXT.md`:
+ * Full city).
  */
 function shareOut(
   world: WorldState,
@@ -356,21 +362,50 @@ function shareOut(
       continue
     }
     const place = chainPlace(world, short, own, held, storage)
-    const back = kept.get(r.id)
-    const backTo = back && byId.get(back.buildingId ?? '')
     if (place) {
       jobs[r.id] = workJob(place)
       held.take(place)
-    } else if (back && backTo && held.room(backTo) > 0) {
-      jobs[r.id] = back
-      held.take(backTo)
-      unneeded.push(r)
-    } else {
-      jobs[r.id] = { kind: 'idle' }
-      unneeded.push(r)
-    }
+    } else unneeded.push(r)
+  }
+  if (unneeded.length === 0) return unneeded
+  // Nothing short has a use for them. Those who were at a workplace go back first, so a crew keeps
+  // its places: to anything at a Trade Org city, which has no cap; an NPC city's only while it
+  // still works it for surplus, or it isn't a good it counts (a workplace of no chain).
+  const surplus = city.tradeOrg ? undefined : surplusWork(world, city, storage)
+  const worthBack = (b: Building) =>
+    !surplus || chainGood(world, b) === undefined || surplus(b) !== undefined
+  const free = unneeded.filter((r) => {
+    const back = kept.get(r.id)
+    const backTo = back && byId.get(back.buildingId ?? '')
+    if (!back || !backTo || held.room(backTo) <= 0 || !worthBack(backTo)) return true
+    jobs[r.id] = back
+    held.take(backTo)
+    return false
+  })
+  for (const r of free) {
+    const place = surplus && surplusPlace(own, held, surplus)
+    jobs[r.id] = place ? workJob(place) : { kind: 'idle' }
+    if (place) held.take(place)
   }
   return unneeded
+}
+
+/**
+ * The workplace a free spare hand of an NPC city goes to for surplus (`CONTEXT.md`: Spare hands'
+ * work): of its finished `own` workplaces with room, that of the good furthest below its cap.
+ */
+function surplusPlace(
+  own: Building[],
+  held: Places,
+  surplus: (place: Building) => number | undefined,
+): Building | undefined {
+  let best: { place: Building; full: number } | undefined
+  for (const place of own) {
+    if (held.room(place) <= 0) continue
+    const full = surplus(place)
+    if (full !== undefined && (!best || full < best.full)) best = { place, full }
+  }
+  return best?.place
 }
 
 /**
@@ -527,6 +562,47 @@ export const npcFarmersKept: Invariant = {
           message: `${cityId} plans ${farmers} of ${wanted} farmers, and ${residentId} ${job.kind === 'idle' ? 'idle' : `at ${job.buildingId}`}`,
           entityIds: [cityId, residentId],
         })
+      }
+    }
+    return out
+  },
+}
+
+/**
+ * An NPC city works for surplus only up to its cap (`CONTEXT.md`: Spare hands' work; ADR 0004), as
+ * far as that can be checked. What it holds can lie past the cap for good reason (workers bring in
+ * what they carried when it was reached; a death lowers its reserve), so this looks at its plan,
+ * not its stock: in the plan its pass made this tick, nobody works a good its storage holds twice
+ * the cap of past the reserve (once for what was stored or changed since the pass, this same tick;
+ * no project wants that much). A farm counts only with more farmers than it keeps, and one for a
+ * death. A good with no cap isn't worked for surplus and doesn't count; nor does a Trade Org city,
+ * which has no cap.
+ */
+export const npcSurplusCapped: Invariant = {
+  name: 'npc-surplus-capped',
+  check(world) {
+    const out: InvariantViolation[] = []
+    for (const [cityId, plan] of Object.entries(world.cityPlans)) {
+      const city = world.cities.find((c) => c.id === cityId)
+      if (!city || city.tradeOrg || plan.plannedAt !== world.tick) continue
+      const stock = chainStore(world, city)?.stock ?? {}
+      const reserve = npcReserve(world, city)
+      const jobs = Object.entries(plan.jobs)
+      const farmers = jobs.filter(([, j]) => j.kind === 'farm').length
+      for (const place of ownWorkplaces(world, city)) {
+        const good = chainGood(world, place)
+        const cap = good && NPC_SURPLUS_CAP[good]
+        if (!good || !cap || place.site) continue
+        if ((stock[good] ?? 0) - (reserve[good] ?? 0) < 2 * cap) continue
+        if (place.kind === 'farm' && farmers <= farmersWanted(world, city) + 1) continue
+        for (const [residentId, job] of jobs) {
+          if (job.buildingId !== place.id) continue
+          out.push({
+            invariant: this.name,
+            message: `${cityId} plans ${residentId} at ${place.id}, with ${stock[good]} ${good} past its cap of ${cap}`,
+            entityIds: [cityId, residentId, place.id],
+          })
+        }
       }
     }
     return out

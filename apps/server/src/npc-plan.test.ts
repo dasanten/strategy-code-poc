@@ -2,9 +2,11 @@ import {
   MAX_WORKERS,
   NPC_BUILDERS,
   NPC_PLAN_TICKS,
+  NPC_SURPLUS_CAP,
   NPC_VILLAGE,
   OWN_FOOD,
   Terrain,
+  npcReserve,
   type City,
   type TerrainMap,
   type WorldState,
@@ -58,6 +60,9 @@ describe('planCity', () => {
     }
     const soldier = world.residents[0]!
     soldier.carried.spear = 1
+    // Food at its cap past the reserve, so nobody farms for surplus (`CONTEXT.md`: Spare hands' work).
+    const food = (npcReserve(world, city).food ?? 0) + (NPC_SURPLUS_CAP.food ?? 0)
+    storageOf(world, city).stock = { ...storageOf(world, city).stock, food }
     const plan = planCity(world, city, terrain)
     expect(plan.plannedAt).toBe(world.tick)
     expect(world.cityPlans[city.id]).toBe(plan)
@@ -81,7 +86,8 @@ describe('planCity', () => {
   it('keeps a worker where they are, and sends at most two spare hands to build', () => {
     const { world, terrain, city, home } = village()
     fillHouses(world, city, home)
-    storageOf(world, city).stock = { food: 400 }
+    // Food plenty, and below its cap (`CONTEXT.md`: Spare hands' work).
+    storageOf(world, city).stock = { food: npcReserve(world, city).food! + 1 }
     const plan = planCity(world, city, terrain)
     // Everyone from the founding still works the farm; two newcomers build the lumber camp the
     // house wants Wood from, and the rest take the farm's places left, or wait for the next pass.

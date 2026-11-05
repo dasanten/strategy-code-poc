@@ -134,6 +134,7 @@ import {
   NPC_OFFER_REACH,
   NPC_TRADER_REACH,
   NPC_PLAN_TICKS,
+  NPC_SURPLUS_CAP,
   NPC_SMITHY_WEAPON,
   NPC_SOLDIER_SHARE,
   NPC_WAR_CHEST_PER_RESIDENT,
@@ -2017,9 +2018,21 @@ export function Wiki() {
           smithy, which wants Iron, so a smelter, which wants Iron ore, so a mine first, and the
           Wood and Stone the mine is built of before that. A smelter or smithy is worked only while
           the storage holds the input for a batch, which its workers take with them, and one of them
-          fetches more when it runs out, as yours do; once the city isn't short of what it makes,
-          they stop. A good with no node in reach stays short: a village with no ore in reach forges
-          no weapons, and a mint is built only with Gold ore in reach.
+          fetches more when it runs out, as yours do. A good with no node in reach stays short: a
+          village with no ore in reach forges no weapons, and a mint is built only with Gold ore in
+          reach.
+        </p>
+        <p>
+          A spare hand with nothing short to work for doesn't stand idle: they stay at or go to one
+          of the city's workplaces and work for surplus, past its reserve, the good furthest below
+          its cap first: {num(NPC_SURPLUS_CAP.food ?? 0)} Food, {num(NPC_SURPLUS_CAP.wood ?? 0)}{' '}
+          Wood, {num(NPC_SURPLUS_CAP.stone ?? 0)} Stone, {num(NPC_SURPLUS_CAP.ironOre ?? 0)} each of
+          Iron ore, Iron and Gold ore, {num(NPC_SURPLUS_CAP.coins ?? 0)} coins and{' '}
+          {num(NPC_SURPLUS_CAP[NPC_SMITHY_WEAPON] ?? 0)}{' '}
+          {GOOD_LABELS[NPC_SMITHY_WEAPON].toLowerCase()}s above what it keeps. A smelter, smithy or
+          mint is worked for surplus only from input above the reserve. Past the cap they stop and
+          are idle. What is short, its trader and a founding party still take them first, the next
+          time it thinks. So its workplaces stay busy, and its trader has more to sell.
         </p>
         <h3>Trading posts and the HQ</h3>
         <p>
@@ -2070,8 +2083,8 @@ export function Wiki() {
           carry what they didn't spend back home. The Trade Organization never accepts offers.
         </p>
         <p>
-          A city is full once it has had spare hands with nothing to do and nothing short of its
-          reserve for {days(NPC_FULL_DAYS)}, with a food surplus and a town hall's and a storage's
+          A city is full once it has had spare hands, idle or working for surplus, and nothing short
+          of its reserve for {days(NPC_FULL_DAYS)}, with a food surplus and a town hall's and a storage's
           materials above its reserve. A full city founds a daughter. Once a game day it looks for a
           free Plains site {num(NPC_CITY_MIN_DISTANCE)} to {num(NPC_FOUND_REACH)} tiles away, with
           room for a village and on no realm's territory, nearest a node of a material it has none
