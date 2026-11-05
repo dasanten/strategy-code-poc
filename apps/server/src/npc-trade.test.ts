@@ -4,6 +4,12 @@ import {
   NPC_SMITHY_WEAPON,
   NPC_TRADE,
   NPC_WAR_CHEST_PER_RESIDENT,
+  PERSUADE_STANDING,
+  STANDING_DRIFT_PER_DAY,
+  STANDING_NPC_TRADE_COINS_PER_POINT,
+  STANDING_TRADE_COINS_PER_POINT,
+  TICKS_PER_GAME_DAY,
+  TICK_MS,
   canWork,
   npcSoldierTarget,
   recipeFor,
@@ -141,6 +147,35 @@ describe('trading with an NPC city', () => {
     expect(order(world, queue, trade('buy', 'food', 1))).toBe('ack')
     run(world)
     expect(p1.carried.food).toBe(5)
+  })
+
+  it('raises standing both ways by its own number, and the log says how far', () => {
+    const { world, npc, p1, queue } = setup()
+    storage(world).stock = { food: npcReserve(world, npc).food! + 5 }
+    p1.carried.coins = 500
+    expect(order(world, queue, trade('buy', 'food', 5))).toBe('ack')
+    run(world)
+    const paid = storage(world).stock!.coins!
+    expect(paid).toBeGreaterThan(0)
+    const raised = paid / STANDING_NPC_TRADE_COINS_PER_POINT
+    expect(standingOf(world, 'npc', 'r1')).toBeCloseTo(raised, 2)
+    expect(standingOf(world, 'r1', 'npc')).toBeCloseTo(raised, 2)
+    const line = world.events.findLast((e) => e.kind === 'traded')
+    expect(line).toMatchObject({ atStorage: true, standing: { org: 'npc', name: npc.name } })
+    expect(line).toHaveProperty('standing.by', Math.round(raised * 100) / 100)
+    expect(STANDING_NPC_TRADE_COINS_PER_POINT).toBeLessThan(STANDING_TRADE_COINS_PER_POINT)
+  })
+
+  it('takes a real trade to reach high standing: the drift eats a little trade', () => {
+    // What a village's surplus grows by a game day, bought half and half of that sold back.
+    const tradePerDay = 9
+    const net = tradePerDay / STANDING_NPC_TRADE_COINS_PER_POINT - STANDING_DRIFT_PER_DAY
+    expect(net).toBeGreaterThan(0)
+    const days = PERSUADE_STANDING / net
+    const gameDaysPerRealDay = (24 * 3600 * 1000) / (TICKS_PER_GAME_DAY * TICK_MS)
+    expect(days / gameDaysPerRealDay).toBeLessThan(3)
+    // The old number, shared with the Trade Organization, never got there at that pace.
+    expect(tradePerDay / STANDING_TRADE_COINS_PER_POINT).toBeLessThan(STANDING_DRIFT_PER_DAY)
   })
 
   it('buys only what it lacks of its reserve, with the coins in its storage', () => {
