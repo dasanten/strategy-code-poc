@@ -917,7 +917,10 @@ The shared language of the game. Domain terms only — no implementation details
   them (an order, queue step or script `feed(targetId, units)`), putting Food from their own
   hands into the Down resident's. Once their hunger meter isn't empty they wake at low health
   and stand idle. A Down horse wakes the same way once it has eaten, from Food in reach (Horses
-  have no inventory) or when a resident Feeds it (Feeding a horse).
+  have no inventory) or when a resident Feeds it (Feeding a horse). An NPC city revives its own: while
+  a Down resident of the city lies in or near its area and its storage holds Food, one of its grown
+  residents, never a soldier and a spare hand first, takes Food to them and Feeds them, one at a time
+  per Down resident. It doesn't go far out for one (a balance number).
 - **Eating:** a resident eats only food they carry, everywhere, also at home. Nobody eats
   straight from a storage.
 - **Own food:** the Food a resident keeps on them for their own meals, about four game days of
