@@ -2221,6 +2221,32 @@ export const DEMAND_MAX_DAYS = 60
 export const DEMAND_DEFAULT_DAYS = 7
 
 /**
+ * How many times its soldiers the respect an NPC city sees from a realm must be before it yields to
+ * that realm's demand (`CONTEXT.md`: Demand): "far outweighs", so an army at the gate wins it and a
+ * few spears more than it has soldiers don't. Persuading a city takes only more than its soldiers.
+ */
+export const DEMAND_YIELD_RESPECT_TIMES = 3
+
+/**
+ * The least respect an NPC city yields to a demand for, however few soldiers it has (`CONTEXT.md`:
+ * Demand): a small band, so a city without soldiers doesn't give in to one person with a spear.
+ */
+export const DEMAND_YIELD_RESPECT_MIN = 5
+
+/**
+ * What an NPC city's standing toward a realm drops by when it declines that realm's demand
+ * (`CONTEXT.md`: Demand): as much as a theft, so three in a game day shut its gates.
+ */
+export const DEMAND_DECLINED_STANDING_LOSS = 10
+
+/**
+ * What the Trade Organization's standing toward a realm drops by for being sent a demand
+ * (`CONTEXT.md`: Demand). Small, as it refuses trade and sends its army at small numbers
+ * (`TRADE_ORG_REFUSES_TRADE_BELOW`, `TRADE_ORG_PUNISHES_BELOW`): it takes several to matter.
+ */
+export const DEMAND_TRADE_ORG_STANDING_LOSS = 2
+
+/**
  * How long a Direct offer stands, in game days (`CONTEXT.md`: Direct offer): one real day, so a
  * Player who comes by once a day can still answer and send someone. The sender can take it down
  * sooner.

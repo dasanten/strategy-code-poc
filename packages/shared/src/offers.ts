@@ -74,14 +74,18 @@ export function freeStock(
   return free
 }
 
-/** The finished storage `storageId` if it is the realm's: where the realm can post an offer. */
+/**
+ * The finished storage `storageId` if it is the realm's, where the realm can post an offer; or, by
+ * its id, an NPC city's, where it sets aside what a demand won from it (`CONTEXT.md`: Demand).
+ */
 export function offerStorage(
   world: Pick<WorldState, 'buildings' | 'cities'>,
   realmId: string,
   storageId: unknown,
 ): Building | undefined {
   const b = world.buildings.find((x) => x.id === storageId)
-  return b?.kind === 'storage' && !b.site && buildingRealm(world, b) === realmId ? b : undefined
+  if (b?.kind !== 'storage' || b.site) return undefined
+  return (buildingRealm(world, b) ?? b.cityId) === realmId ? b : undefined
 }
 
 /** The input of an order that posts an offer. */

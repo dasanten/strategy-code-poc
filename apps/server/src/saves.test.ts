@@ -272,11 +272,18 @@ describe('world saves', () => {
     expect(checkInvariants(v87, land)).toEqual([])
   })
 
+  it('leaves a format 87 world as it is: no demand has gone to an NPC city yet (migration 87 → 88)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v88 = migrateWorld(structuredClone(world), 87, { terrain: land }, migrations, 88)
+    expect(v88).toEqual(world)
+    expect(checkInvariants(v88, land)).toEqual([])
+  })
+
   it('leaves realms from before realm names unnamed (migration 38 → 39)', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(87)
+    expect(WORLD_FORMAT_VERSION).toBe(88)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)

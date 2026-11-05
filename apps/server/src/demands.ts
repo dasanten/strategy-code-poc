@@ -1,18 +1,32 @@
 import {
   DEMANDS_PER_GAME_DAY,
+  DEMAND_DECLINED_STANDING_LOSS,
   DEMAND_MAX_DAYS,
   DEMAND_NOTE_MAX_LENGTH,
+  DEMAND_TRADE_ORG_STANDING_LOSS,
   GOODS,
+  NPC_PLAN_TICKS,
   TICKS_PER_GAME_DAY,
+  TRADE_ORG,
+  answeredByGame,
   demandHandOverProblem,
   demandNoteProblem,
   demandsCounted,
   demandsLeft,
+  forSale,
+  freeStock,
   goodsHandedOver,
+  goodsToHandOver,
+  isAllianceCity,
+  npcOrgsKnownTo,
+  npcStorages,
   offerStorage,
+  organizationLabel,
   realmName,
   realmsKnownTo,
+  standingOrganization,
   transferLoads,
+  yieldsToDemand,
   type City,
   type Demand,
   type DemandHandOver,
@@ -23,14 +37,17 @@ import {
   type Realm,
   type RealmEventWhat,
   type Remembered,
+  type Stock,
   type WorldState,
 } from '@csp/shared'
 import { handOverCity } from './capture.js'
 import { recordEvent } from './events.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
+import { planDue } from './npc-plan.js'
 import { seesStorageOf, setAsideForDemand } from './offers.js'
 import type { OrderKind } from './orders.js'
 import { sightOf } from './sight.js'
+import { changeStanding } from './standing.js'
 import { newId, realmOf } from './starting-city.js'
 import { orderPickUp } from './transfers.js'
 
@@ -38,7 +55,8 @@ import { orderPickUp } from './transfers.js'
  * Demands (`CONTEXT.md`: Demand; ADR 0024): a realm sends another realm it knows of terms, a note
  * and a deadline. It arrives at once, wherever the other is. They accept or decline it, or let it
  * lapse, and both realm logs say so. Accepting carries out the terms. Otherwise it is only words:
- * nothing happens by itself when it is ignored, and the sender acts on it or doesn't.
+ * nothing happens by itself when it is ignored, and the sender acts on it or doesn't. The game
+ * answers for an NPC city and the Trade Organization, at the next planning pass (ADR 0016).
  */
 
 /** Whether the realm has anyone of `toId`'s in sight, on a map of `size` tiles when known. */
@@ -57,7 +75,7 @@ function knownCity(
   realm: Realm,
   cityId: unknown,
   size?: number,
-): { name: string; realmId: string | null } | undefined {
+): Pick<City, 'name' | 'realmId' | 'tradeOrg'> | undefined {
   const city = world.cities.find((c) => c.id === cityId)
   if (city && size !== undefined) {
     const sees = sightOf(world, size, realm.id)
@@ -98,9 +116,29 @@ function readTerms(
   }
   if (t.kind !== 'city') return 'demand a named city, or goods or Coins'
   const city = knownCity(world, realm, t.cityId, size)
+  if (answeredByGame(world, toId) === 'city') {
+    // It knows itself, also where the sender knows it only by a standing.
+    if (t.cityId !== toId) return 'an NPC city can only hand over itself'
+    return { kind: 'city', cityId: toId, cityName: city?.name ?? organizationLabel(world, toId) }
+  }
   if (!city) return 'you don’t know of that city'
-  if (city.realmId !== toId) return 'as far as you know, that city isn’t theirs'
+  const theirs = toId === TRADE_ORG ? city.tradeOrg !== undefined : city.realmId === toId
+  if (!theirs) return 'as far as you know, that city isn’t theirs'
   return { kind: 'city', cityId: t.cityId as string, cityName: city.name }
+}
+
+/** Whether the realm knows of `toId`, a realm or what the game answers for (`CONTEXT.md`: Demand). */
+function knowsOf(world: WorldState, realm: Realm, toId: string, size?: number): boolean {
+  if (!answeredByGame(world, toId)) {
+    return (
+      realmsKnownTo(world, realm.id, []).includes(toId) ||
+      seesResidentsOf(world, realm.id, toId, size)
+    )
+  }
+  return (
+    npcOrgsKnownTo(world, realm.id, []).includes(toId) ||
+    knownCity(world, realm, toId, size)?.realmId === null
+  )
 }
 
 /** A demand as plain data, not yet sent, or a reason it can't be sent. */
@@ -113,16 +151,14 @@ function readDemand(
   if (demandsLeft(realm, world.tick) === 0) {
     return `a realm can send at most ${DEMANDS_PER_GAME_DAY} demands a game day`
   }
-  const toId = order.realmId
-  if (toId === realm.id) return 'send a demand to another realm'
-  if (typeof toId !== 'string' || !world.realms.some((r) => r.id === toId)) {
-    return 'send a demand to a realm'
-  }
-  if (
-    !realmsKnownTo(world, realm.id, []).includes(toId) &&
-    !seesResidentsOf(world, realm.id, toId, size)
-  ) {
-    return 'you don’t know of that realm'
+  if (order.realmId === realm.id) return 'send a demand to another realm'
+  if (typeof order.realmId !== 'string') return 'send a demand to a realm'
+  // A trading post's id names the Trade Organization, whose cities are all one Organization.
+  const toId = standingOrganization(world, order.realmId)
+  if (!knowsOf(world, realm, toId, size)) {
+    return world.realms.some((r) => r.id === toId) || isAllianceCity(world, toId)
+      ? 'you don’t know of that realm'
+      : 'send a demand to a realm'
   }
   const terms = readTerms(world, realm, toId, order.terms, size)
   if (typeof terms === 'string') return terms
@@ -151,11 +187,13 @@ function tellBoth(
   extra: { leaderDied?: 'sender' | 'receiver'; handedOver?: DemandHandedOver } = {},
 ): void {
   const base = { kind: 'demand' as const, demandId: d.id, terms: d.terms, ...extra }
+  const otherIs = answeredByGame(world, d.toId)
   recordEvent(world, d.fromId, {
     ...base,
     what: what.sender,
     mine: true,
-    other: realmName(world, d.toId),
+    other: organizationLabel(world, d.toId),
+    ...(otherIs && { otherIs }),
   })
   recordEvent(world, d.toId, {
     ...base,
@@ -201,7 +239,7 @@ function demandToAnswer(world: WorldState, userId: number, order: OrderRequest):
 function answered(
   world: WorldState,
   d: Demand,
-  answer: 'accepted' | 'declined',
+  answer: 'accepted' | 'declined' | 'lapsed',
   handedOver?: DemandHandedOver,
 ): void {
   world.demands = world.demands.filter((x) => x !== d)
@@ -333,6 +371,72 @@ export function lapseDemandsOnLeaderDeath(world: WorldState, realmId: string): v
   }
 }
 
+/** A demand the game answers no: the one it was sent to thinks less of the sender. */
+function gameDeclines(world: WorldState, d: Demand, loss: number): void {
+  changeStanding(world, d.toId, d.fromId, -loss)
+  answered(world, d, 'declined')
+}
+
+/**
+ * An NPC city gives what a demand won from it, as a Player accepting one would (`CONTEXT.md`:
+ * Demand). A city joins at once, and any ask of it to join is forgotten. Goods are set aside for the
+ * sender alone to fetch, at its storage that can give the most of them, as far as it holds them.
+ * With none of them there it can't hand them over, so it declines.
+ */
+function cityGivesIn(world: WorldState, city: City, d: Demand, size: number): void {
+  const { terms } = d
+  if (terms.kind === 'city') {
+    world.joinRequests = world.joinRequests.filter((q) => q.cityId !== city.id)
+    handOverCity(world, city, d.fromId, size)
+    answered(world, d, 'accepted')
+    return
+  }
+  const units = (s: Stock) => Object.values(s).reduce((sum, n) => sum + n, 0)
+  const from = npcStorages(world, city)
+    .map((storage) => ({ storage, going: goodsToHandOver(terms.goods, freeStock(world, storage)) }))
+    .sort((a, b) => units(b.going) - units(a.going))[0]
+  if (!from || units(from.going) === 0) {
+    gameDeclines(world, d, DEMAND_DECLINED_STANDING_LOSS)
+    return
+  }
+  setAsideForDemand(world, city.id, d.fromId, from.storage, from.going)
+  answered(world, d, 'accepted', {
+    way: 'setAside',
+    goods: from.going,
+    x: from.storage.x,
+    y: from.storage.y,
+  })
+}
+
+/**
+ * The game's answer to a demand (`CONTEXT.md`: Demand), at the next planning pass of who it was sent
+ * to (ADR 0016). The Trade Organization always declines, and being asked costs standing. An NPC city
+ * gives in to respect that far outweighs its soldiers (`yieldsToDemand`), and otherwise declines and
+ * its standing drops. A city that is no NPC city any more has nobody left to answer: it lapses.
+ */
+function answerAsGame(world: WorldState, d: Demand, size: number): void {
+  const city = world.cities.find((c) => c.id === d.toId)
+  if (d.toId !== TRADE_ORG && (!city || !forSale(city))) {
+    answered(world, d, 'lapsed')
+    return
+  }
+  if (!planDue(world, { id: d.toId })) return
+  if (!city) gameDeclines(world, d, DEMAND_TRADE_ORG_STANDING_LOSS)
+  else if (yieldsToDemand(world, city, d.fromId, size)) cityGivesIn(world, city, d, size)
+  else gameDeclines(world, d, DEMAND_DECLINED_STANDING_LOSS)
+}
+
+/**
+ * The game answers the demands sent to what it runs (`answerAsGame`). A city it hands over joins as
+ * one captured does, so this runs before the steps that look after what a realm has just got: its
+ * alliances, occupations and refills. `size` is the map's.
+ */
+export function answerDemands(world: WorldState, size: number): void {
+  for (const d of [...world.demands]) {
+    if (!world.realms.some((r) => r.id === d.toId)) answerAsGame(world, d, size)
+  }
+}
+
 /**
  * Demands lapse at their deadline, as a tick ends, and that is all: whatever was threatened is the
  * sender's to carry out, or not (`CONTEXT.md`: Demand).
@@ -346,9 +450,10 @@ export function stepDemands(world: WorldState): void {
 }
 
 /**
- * Demands hold together (`CONTEXT.md`: Demand): two different realms that exist, a deadline that
- * lies ahead and was set after it was sent, a note kept as the order allows, and terms that ask
- * for something. No realm has sent more than it may in a game day.
+ * Demands hold together (`CONTEXT.md`: Demand): sent by a realm that exists to another one, or to a
+ * city or the Trade Organization, who answer within a planning pass; a deadline that lies ahead and
+ * was set after it was sent, a note kept as the order allows, and terms that ask for something. No
+ * realm has sent more than it may in a game day.
  */
 export const demandsSound: Invariant = {
   name: 'demands-sound',
@@ -361,10 +466,16 @@ export const demandsSound: Invariant = {
       if (seen.has(d.id)) report(`demand ${d.id} is there twice`, [d.id])
       seen.add(d.id)
       if (d.fromId === d.toId) report(`demand ${d.id} is sent to its own sender`, [d.id])
-      for (const realm of [d.fromId, d.toId]) {
+      const byGame = answeredByGame(world, d.toId) !== undefined
+      for (const realm of byGame ? [d.fromId] : [d.fromId, d.toId]) {
         if (!world.realms.some((r) => r.id === realm)) {
           report(`demand ${d.id} has realm ${realm}, which does not exist`, [d.id])
         }
+      }
+      if (byGame && world.tick - d.sentAt > NPC_PLAN_TICKS) {
+        report(`demand ${d.id} to ${d.toId} waited longer than a planning pass for its answer`, [
+          d.id,
+        ])
       }
       if (d.deadline <= world.tick) {
         report(`open demand ${d.id} has deadline ${d.deadline}, not ahead of ${world.tick}`, [d.id])

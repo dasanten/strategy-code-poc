@@ -1598,6 +1598,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             demands={world.diplomacy.demands}
             realmId={world.home.realmId}
             knownRealms={world.diplomacy.knownRealms}
+            knownNpcOrgs={world.diplomacy.knownNpcOrgs}
             cities={world.cities}
             buildings={world.buildings}
             carriedWays={world.diplomacy.carriedWays ?? []}

@@ -1312,7 +1312,7 @@ export interface AcceptOfferOrder {
  */
 export interface Offer {
   id: string
-  /** The realm that posted it. */
+  /** The realm that posted it, or the NPC city, by its id, that set it aside on a demand. */
   realmId: string
   storageId: string
   /** The storage's tile, for the log once the storage is gone. */
@@ -1785,6 +1785,8 @@ export type RealmEventWhat =
       kind: 'directOffer'
       what: 'received' | 'carriedAccepted' | 'youAccepted' | Exclude<OfferEnd, 'usedUp'>
       from: string
+      /** `from` is an NPC city, which set this aside on a demand (`CONTEXT.md`: Demand), no realm. */
+      fromCity?: true
       gives: Good
       givesUnits: number
       wants: Good
@@ -2175,7 +2177,8 @@ export type RealmEventWhat =
    * `sent` by this realm, `received` from the other, `accepted` or `declined` by the one it was
    * sent to, or `lapsed` at its deadline. `mine` when this realm sent it. `leaderDied` says which
    * side's Leader died when that made it lapse early. `handedOver` says how goods accepted change
-   * hands. Its note stays out of the log.
+   * hands. `otherIs` says when the other is no realm, for a demand the game answers, and `other` is
+   * then its name as it stands. Its note stays out of the log.
    */
   | {
       kind: 'demand'
@@ -2183,6 +2186,7 @@ export type RealmEventWhat =
       what: 'sent' | 'received' | 'accepted' | 'declined' | 'lapsed'
       mine: boolean
       other: string
+      otherIs?: 'city' | 'tradeOrg'
       terms: DemandTerms
       leaderDied?: 'sender' | 'receiver'
       handedOver?: DemandHandedOver
@@ -2293,7 +2297,10 @@ export interface Demand {
   id: string
   /** The realm that sent it. */
   fromId: string
-  /** The realm it was sent to, the only one who can answer it. */
+  /**
+   * The realm it was sent to, the only one who can answer it; or an NPC city by its id or the Trade
+   * Organization (`TRADE_ORG`), for the game to answer within a game hour.
+   */
   toId: string
   terms: DemandTerms
   /** The sender's words: plain text, trimmed, at most `DEMAND_NOTE_MAX_LENGTH` characters. */
