@@ -950,6 +950,7 @@ export function ResidentsList({
   buildings = [],
   inSight = [],
   cities = [],
+  horses = [],
   arrivesIn,
   selectedId,
   onSelect,
@@ -967,6 +968,8 @@ export function ResidentsList({
   inSight?: readonly SeenResident[]
   /** The cities the Player knows, to name where a resident relocates to (`doingLine`). */
   cities?: readonly Pick<City, 'id' | 'name'>[]
+  /** The horses the Player knows, to name the two being bred (`doingLine`). */
+  horses?: readonly SeenHorse[]
   /** About how many ticks until a resident arrives where they walk, ride or drive (`arrivalTicks`). */
   arrivesIn?: (r: Resident) => number | undefined
   selectedId: string | undefined
@@ -1019,6 +1022,7 @@ export function ResidentsList({
                           scripts,
                           buildings,
                           residents: inSight,
+                          horses,
                           cities,
                           arrives: arrivesIn?.(r),
                         }),
@@ -1030,7 +1034,7 @@ export function ResidentsList({
                   )
                 }
                 const under =
-                  interruptedLine(r, { scripts, buildings, residents: inSight }) ??
+                  interruptedLine(r, { scripts, buildings, residents: inSight, horses }) ??
                   scriptLine(r, scripts)
                 return (
                   <button
@@ -1051,6 +1055,7 @@ export function ResidentsList({
                         scripts,
                         buildings,
                         residents: inSight,
+                        horses,
                         cities,
                         arrives: arrivesIn?.(r),
                       })}
@@ -1552,6 +1557,7 @@ export function GroupCard({
                   scripts,
                   buildings,
                   residents: inSight,
+                  horses,
                   cities,
                   arrives: arrivesIn?.(r),
                 })}
@@ -2080,7 +2086,8 @@ export function ResidentCard({
   }, [r.id, running])
   const ridden = riddenHorseLine(r, horses, tick)
   // The script they run, or what they go on with after their defence script, under Doing.
-  const under = interruptedLine(r, { scripts, buildings, residents }) ?? scriptLine(r, scripts)
+  const under =
+    interruptedLine(r, { scripts, buildings, residents, horses }) ?? scriptLine(r, scripts)
   // The city they live in, or none (`CONTEXT.md`: Homeless).
   const home =
     r.cityId === null
@@ -2414,6 +2421,7 @@ export function ResidentCard({
             scripts,
             buildings,
             residents,
+            horses,
             cities,
             arrives: arrivesIn?.(r),
             tick,
@@ -2501,6 +2509,7 @@ export function ResidentCard({
                 scripts,
                 buildings,
                 residents,
+                horses,
                 cities,
                 arrives: arrivesIn?.(r),
               })}
@@ -2524,7 +2533,14 @@ export function ResidentCard({
           <QueueBlock
             queue={planOf(r.queue)}
             currentId={r.queue.steps[r.queue.current]?.id}
-            doing={doingLine(r, { scripts, buildings, residents, cities, arrives: arrivesIn?.(r) })}
+            doing={doingLine(r, {
+              scripts,
+              buildings,
+              residents,
+              horses,
+              cities,
+              arrives: arrivesIn?.(r),
+            })}
             scripts={scripts}
             buildings={buildings}
             lastSeen={lastSeen}

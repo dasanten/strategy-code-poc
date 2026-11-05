@@ -1553,7 +1553,8 @@ export function Wiki() {
           breeding pauses when the resident leaves or is given another order, or while the stable
           has no room left for the foal, and any grown resident who breeds there later carries on
           with that pair first, where it stopped, if both are still fed. The stable's card shows a
-          paused breeding and how far along it is. The progress is lost only when one of the two
+          paused breeding and how far along it is, and the resident's Doing line names the two they
+          tend. The progress is lost only when one of the two
           leaves the stable or dies. The Breed horses default first takes {num(BREED_FOOD)} Food
           from the stable for the resident's meals, if they carry less. NPC cities have one of their
           residents breed their horses the same way.

@@ -1388,6 +1388,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     scripts,
     buildings: world.buildings,
     inSight: world.residents,
+    horses: world.horses,
     cities: knownCities,
     arrivesIn: arrivesIn || undefined,
     tick: world.tick,
@@ -1586,6 +1587,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             realmId={world.home.realmId}
             own={own}
             inSight={world.residents}
+            horses={world.horses}
             buildings={world.buildings}
             cities={world.cities}
             realms={realms}
