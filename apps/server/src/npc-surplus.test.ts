@@ -218,7 +218,7 @@ describe('the Trade Organization', () => {
   }
 
   it('sends no free hand to work for surplus', () => {
-    const { world, terrain, city, camp } = post()
+    const { world, city, camp } = post()
     expect(at(planCity(world, city), camp)).toBe(0)
   })
 
