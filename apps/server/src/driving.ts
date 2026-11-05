@@ -8,6 +8,7 @@ import {
   driveProblem,
   driverOf,
   hitchOffProblem,
+  hitchProblem,
   horseToSteal,
   stealsCarriage,
   unhitchProblem,
@@ -159,5 +160,37 @@ export const unhitch: OrderKind = {
     const driver = driverOf(world, carriage)
     if (driver) driver.order = null
     carriage.horseId = null
+  },
+}
+
+/** The input of a hitch order: which resident hitches which horse to which carriage. */
+interface HitchRequest extends OrderRequest {
+  kind: 'hitch'
+  residentId: string
+  carriageId: string
+  horseId: string
+}
+
+/**
+ * The hitch order (`CONTEXT.md`: Hitched horse): a grown resident of the carriage's realm on its
+ * tile hitches the horse they name, at once. A horse already hitched stands free on the tile. It
+ * is no order of its own, so what the resident was doing goes on, and a driver drives on with the
+ * new horse. Only the realm's own horses: stealing stays with driving and mounting.
+ */
+export const hitch: OrderKind = {
+  validate(world, sender, order) {
+    const o = order as Partial<HitchRequest>
+    const r = orderedResident(world, sender, o.residentId)
+    if (!r) return 'not one of your residents'
+    const carriage = world.carriages.find((k) => k.id === o.carriageId)
+    return hitchProblem(world, r, carriage, o.horseId)
+  },
+  apply(world, _sender, order) {
+    const { residentId, carriageId, horseId } = order as HitchRequest
+    const r = world.residents.find((x) => x.id === residentId)
+    const carriage = world.carriages.find((k) => k.id === carriageId)
+    // Two hitching one horse in the same tick: the first one gets it.
+    if (!r || !carriage || hitchProblem(world, r, carriage, horseId)) return
+    carriage.horseId = horseId
   },
 }

@@ -146,16 +146,43 @@ export function horseFor<H extends CarriageHorse>(
   carriage: CarriagePlace,
 ): H | undefined {
   if (carriage.horseId) return world.horses.find((h) => h.id === carriage.horseId)
-  return world.horses.find(
-    (h) =>
-      h.x === carriage.x &&
-      h.y === carriage.y &&
-      h.realmId === carriage.realmId &&
-      h.cityId === carriage.cityId &&
-      !carriagePulledBy(world, h) &&
-      !isDown(h) &&
-      !world.residents?.some((r) => r.riding === h.id),
-  )
+  return world.horses.find((h) => !hitchHorseProblem(world, carriage, h))
+}
+
+/**
+ * The horses that can be hitched to a carriage now (`CONTEXT.md`: Hitched horse): those of its
+ * realm or NPC city on its tile that pull no carriage, nobody rides and aren't Down.
+ */
+export function horsesToHitch<H extends CarriageHorse>(
+  world: {
+    horses: readonly H[]
+    carriages: readonly CarriagePlace[]
+    residents?: readonly Pick<Resident, 'riding'>[]
+  },
+  carriage: CarriagePlace,
+): H[] {
+  return world.horses.filter((h) => !hitchHorseProblem(world, carriage, h))
+}
+
+/** Why a horse can't be hitched to a carriage now, or undefined when it can (`horsesToHitch`). */
+function hitchHorseProblem(
+  world: {
+    carriages: readonly CarriagePlace[]
+    residents?: readonly Pick<Resident, 'riding'>[]
+  },
+  carriage: CarriagePlace,
+  horse: CarriageHorse,
+): string | undefined {
+  if (horse.realmId !== carriage.realmId || horse.cityId !== carriage.cityId) {
+    return 'not a horse of your realm'
+  }
+  if (horse.x !== carriage.x || horse.y !== carriage.y) {
+    return 'that horse is not on the carriage’s tile'
+  }
+  if (carriagePulledBy(world, horse)) return 'that horse already pulls a carriage'
+  if (world.residents?.some((r) => r.riding === horse.id)) return 'someone rides that horse'
+  if (isDown(horse)) return 'that horse is Down'
+  return undefined
 }
 
 /** The carriage a resident drives, by a drive order or on a haul route, if they drive one. */
@@ -446,9 +473,27 @@ export function carriageOfResident(
 }
 
 /**
+ * Why a resident can't handle a carriage's horse now, what hitching and unhitching have in common
+ * (`CONTEXT.md`: Hitched horse): they must be grown up and of the carriage's realm, standing on
+ * its tile.
+ */
+function handlerProblem(
+  resident: Pick<Resident, 'x' | 'y' | 'owner' | 'cityId' | 'bornAt'>,
+  carriage: Pick<Carriage, 'x' | 'y' | 'realmId' | 'cityId'>,
+  tick: number,
+  verb: 'hitch' | 'unhitch',
+): string | undefined {
+  if (!canWork(resident, tick)) return `children can’t ${verb}`
+  if (!carriageOfResident(carriage, resident)) return 'not a carriage of your realm'
+  if (carriage.x !== resident.x || carriage.y !== resident.y) {
+    return 'that carriage is not on the resident’s tile'
+  }
+  return undefined
+}
+
+/**
  * Why a resident can't unhitch a carriage's horse now, or undefined when they can (`CONTEXT.md`:
- * Hitched horse): they must be grown up and of the carriage's realm, standing on its tile, and a
- * horse must be hitched to it.
+ * Hitched horse): they must be able to handle it (`handlerProblem`), and a horse must be hitched.
  */
 export function unhitchProblem(
   resident: Pick<Resident, 'x' | 'y' | 'owner' | 'cityId' | 'bornAt'>,
@@ -456,13 +501,35 @@ export function unhitchProblem(
   tick: number,
 ): string | undefined {
   if (!carriage) return 'no such carriage'
-  if (!canWork(resident, tick)) return 'children can’t unhitch'
-  if (!carriageOfResident(carriage, resident)) return 'not a carriage of your realm'
-  if (carriage.x !== resident.x || carriage.y !== resident.y) {
-    return 'that carriage is not on the resident’s tile'
-  }
+  const problem = handlerProblem(resident, carriage, tick, 'unhitch')
+  if (problem) return problem
   if (!carriage.horseId) return 'no horse is hitched to that carriage'
   return undefined
+}
+
+/**
+ * Why a resident can't hitch the named horse to a carriage now, or undefined when they can
+ * (`CONTEXT.md`: Hitched horse): they must be able to handle it (`handlerProblem`), and the horse
+ * must be one that can be hitched (`horsesToHitch`). Only the realm's own: another organization's
+ * is stolen by driving or mounting (`CONTEXT.md`: Stealing a carriage or horse).
+ */
+export function hitchProblem(
+  world: {
+    tick: number
+    horses: readonly CarriageHorse[]
+    carriages: readonly CarriagePlace[]
+    residents: readonly Pick<Resident, 'riding'>[]
+  },
+  resident: Pick<Resident, 'x' | 'y' | 'owner' | 'cityId' | 'bornAt'>,
+  carriage: CarriagePlace | undefined,
+  horseId: unknown,
+): string | undefined {
+  if (!carriage) return 'no such carriage'
+  const problem = handlerProblem(resident, carriage, world.tick, 'hitch')
+  if (problem) return problem
+  const horse = world.horses.find((h) => h.id === horseId)
+  if (!horse) return 'no such horse'
+  return hitchHorseProblem(world, carriage, horse)
 }
 
 /**

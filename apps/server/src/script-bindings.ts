@@ -725,6 +725,11 @@ function residentActions(
     dismount: () => request('dismount', {}),
     unhitch: ([carriage]) =>
       request('unhitch', { carriageId: carriage == null ? null : placeId(carriage) }),
+    hitch: ([carriage, horse]) =>
+      request('hitch', {
+        carriageId: carriage == null ? null : placeId(carriage),
+        horseId: horse == null ? null : placeId(horse),
+      }),
     board: ([carriageId]) => request('board', { carriageId: plain(carriageId) }),
     getOff: ([x, y]) =>
       request('getOff', (x ?? y ?? null) === null ? {} : { x: plain(x), y: plain(y) }),
