@@ -65,7 +65,7 @@ import { hash } from './residents.js'
  */
 
 /** Whether a city's planning pass is due this tick: once every `NPC_PLAN_TICKS`, staggered by id. */
-export function planDue(world: WorldState, city: City): boolean {
+export function planDue(world: WorldState, city: Pick<City, 'id'>): boolean {
   return (world.tick + hash(city.id)) % NPC_PLAN_TICKS === 0
 }
 

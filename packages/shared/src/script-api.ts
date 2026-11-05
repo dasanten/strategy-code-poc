@@ -1,4 +1,7 @@
 import {
+  DEMANDS_PER_GAME_DAY,
+  DEMAND_MAX_DAYS,
+  DEMAND_NOTE_MAX_LENGTH,
   DOING_MAX_LENGTH,
   EXPLORED_EDGE_RANGE,
   EXPLORE_SKIP_RANGE,
@@ -137,6 +140,11 @@ const SHARED: readonly ScriptBinding[] = [
     'waypoints',
     'waypoint',
     'My Player’s waypoints, oldest first: the named markers they put on the map, which only they see.',
+  ),
+  list(
+    'demands',
+    'demand',
+    'The demands my realm sent or was sent that wait for an answer, oldest first.',
   ),
   list(
     'withMemory',
@@ -591,6 +599,17 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     [],
     'Claim my Player’s Horse offer: two new horses for my realm, in its stable nearest the Leader’s city, or else by a storage or the Leader with Food by them. Free and at once; refused once claimed, unless an admin has offered horses again, or while my realm has no living Leader.',
   ),
+  action(
+    'sendDemand',
+    ['realmId', 'terms', 'note', 'days'],
+    `Send a realm my realm knows of a demand, wherever it is: \`terms\` is \`{ kind: "city", cityId: id }\` for a city of theirs I know of, or \`{ kind: "goods", goods: { food: 5, coins: 20 } }\`, with a note of at most ${DEMAND_NOTE_MAX_LENGTH} characters and a deadline 1 to ${DEMAND_MAX_DAYS} game days away. My realm sends at most ${DEMANDS_PER_GAME_DAY} a game day. It is only words: nothing happens by itself when it is ignored. \`realmId\` can also be an NPC city I know of, or \`"trade-org"\`: the game answers within a game hour.`,
+  ),
+  action(
+    'acceptDemand',
+    ['demandId', 'handOver'],
+    'Accept a demand sent to my realm. A demand for a city hands it over at once, also my last one; a city no longer mine is refused. A demand for goods or Coins names how they go in `handOver`: `{ way: "setAside", storageId: id }`, at a storage of mine for the sender alone to fetch, or `{ way: "transfer", fromCityId: id, toCityId: id }`, by Transfers from a city of mine to one of theirs whose storage I see, for a fee I pay. What the storage holds goes, up to what was demanded; with none of it there, it is refused.',
+  ),
+  action('declineDemand', ['demandId'], 'Decline a demand sent to my realm.'),
   action(
     'roadLine',
     ['x', 'y'],

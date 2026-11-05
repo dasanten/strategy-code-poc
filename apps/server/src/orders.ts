@@ -29,6 +29,7 @@ import { armyOrders, leaveOnOwnOrders, memberOrders } from './armies.js'
 import { setGate } from './gates.js'
 import { roadLine, wallLine } from './road-line.js'
 import { contractOrders, pay } from './contracts.js'
+import { demandOrders } from './demands.js'
 import { buyCity } from './buying.js'
 import { persuasionOrders } from './persuasion.js'
 import { buy, sell, swap } from './trading.js'
@@ -129,6 +130,7 @@ export const orderKinds: Record<string, OrderKind> = Object.fromEntries(
     ...allianceOrders,
     ...armyOrders,
     ...contractOrders,
+    ...demandOrders,
     ...offerOrders,
     ...persuasionOrders,
     ...queueOrders,
@@ -208,6 +210,7 @@ export class OrderQueue {
         'renameCity',
         'renameHorse',
         'claimHorses',
+        ...Object.keys(demandOrders),
         'setScriptParam',
         'setDefenceScript',
         'editQueue',

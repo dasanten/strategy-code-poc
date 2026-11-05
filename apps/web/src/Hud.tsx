@@ -53,6 +53,13 @@ const ICONS: Record<DrawerId | KeyGood | 'crown', ReactNode> = {
       <path d="M10 8h6M10 12h6" />
     </>
   ),
+  demands: (
+    <>
+      <path d="M5 4h14v16H5z" />
+      <path d="M12 7v7" />
+      <circle cx="12" cy="17" r="1" fill="currentColor" />
+    </>
+  ),
   directOffers: (
     <>
       <path d="M3 6h18v12H3z" />

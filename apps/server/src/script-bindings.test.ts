@@ -497,6 +497,22 @@ describe('script bindings', () => {
     ['relocate("c1")', { kind: 'relocate', cityId: 'c1' }],
     ['renameHorse("h1", "Rowan")', { kind: 'renameHorse', horseId: 'h1', name: 'Rowan' }],
     ['claimHorses()', { kind: 'claimHorses' }],
+    [
+      'sendDemand("r2", { kind: "goods", goods: { food: 5 } }, "Pay up", 3)',
+      {
+        kind: 'sendDemand',
+        realmId: 'r2',
+        terms: { kind: 'goods', goods: { food: 5 } },
+        note: 'Pay up',
+        days: 3,
+      },
+    ],
+    ['acceptDemand("d9")', { kind: 'acceptDemand', demandId: 'd9' }],
+    [
+      'acceptDemand("d9", { way: "setAside", storageId: "s1" })',
+      { kind: 'acceptDemand', demandId: 'd9', handOver: { way: 'setAside', storageId: 's1' } },
+    ],
+    ['declineDemand("d9")', { kind: 'declineDemand', demandId: 'd9' }],
     ['roadLine(13, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 13, y: 10 } }],
     ['roadLine(250, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 250, y: 10 } }],
     ['wallLine(12, 12)', { kind: 'wallLine', from: { x: 10, y: 10 }, to: { x: 12, y: 12 } }],

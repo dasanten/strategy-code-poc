@@ -1,9 +1,11 @@
-import { sharingSight, type RealmLabel } from './alliance.js'
+import type { RealmLabel } from './alliance.js'
 import { DIRECT_OFFERS_TO_ONE_REALM, GOOD_WEIGHT } from './balance.js'
+import { realmsKnownTo } from './demand.js'
 import {
   offerTermsProblem,
   postOfferProblem,
   seenOffer,
+  wantsNothing,
   type OfferTerms,
   type SeenOffer,
 } from './offers.js'
@@ -32,41 +34,13 @@ import type {
  * scripts and the UI share (ADR 0002).
  */
 
-/**
- * The other realms a realm can send a Direct offer (`CONTEXT.md`: Direct offer): those it sees
- * residents of (`seenRealms`, which may hold anything else too), its allies, those whose cities it
- * has seen (Last seen), those with a standing toward it or it toward them, and its sides in
- * contracts and Direct offers.
- */
+/** The other realms a realm can send a Direct offer (`CONTEXT.md`): those it knows of. */
 export function realmsToOfferTo(
-  world: Pick<
-    WorldState,
-    'realms' | 'alliances' | 'lastSeen' | 'standings' | 'contracts' | 'offers'
-  >,
+  world: Parameters<typeof realmsKnownTo>[0],
   realmId: string,
   seenRealms: Iterable<string>,
 ): string[] {
-  const known = new Set<string>(seenRealms)
-  for (const id of sharingSight(world, realmId)) known.add(id)
-  const userId = world.realms.find((r) => r.id === realmId)?.userId
-  const remembered = userId === undefined ? undefined : world.lastSeen[userId]
-  for (const m of remembered ?? []) {
-    if (m.is === 'city' && m.realmId !== null) known.add(m.realmId)
-  }
-  for (const s of world.standings) {
-    if (s.of === realmId) known.add(s.toward)
-    if (s.toward === realmId) known.add(s.of)
-  }
-  for (const c of world.contracts) {
-    if (c.lenderId === realmId) known.add(c.hirerId)
-    if (c.hirerId === realmId) known.add(c.lenderId)
-  }
-  for (const o of world.offers) {
-    if (!o.direct) continue
-    if (o.realmId === realmId) known.add(o.direct.toId)
-    if (o.direct.toId === realmId) known.add(o.realmId)
-  }
-  return world.realms.map((r) => r.id).filter((id) => id !== realmId && known.has(id))
+  return realmsKnownTo(world, realmId, seenRealms)
 }
 
 /** Why `realmId` can't send `toId` any Direct offer: another realm, and not at its limit to it. */
@@ -77,7 +51,10 @@ function sendingProblem(
 ): string | undefined {
   if (toId === realmId) return 'send a direct offer to another realm'
   if (!world.realms.some((r) => r.id === toId)) return 'send a direct offer to a realm'
-  const standing = world.offers.filter((o) => o.realmId === realmId && o.direct?.toId === toId)
+  // Goods set aside on accepting a demand were asked for: they use up none of the limit.
+  const standing = world.offers.filter(
+    (o) => o.realmId === realmId && o.direct?.toId === toId && !wantsNothing(o),
+  )
   if (standing.length >= DIRECT_OFFERS_TO_ONE_REALM) {
     return `at most ${DIRECT_OFFERS_TO_ONE_REALM} direct offers can stand to one realm`
   }
@@ -328,7 +305,11 @@ export function directOffersFor(
   world: Pick<WorldState, 'offers' | 'buildings' | 'realms' | 'residents' | 'cities'>,
   realmId: string,
 ): DirectOfferView[] {
-  const label = (id: string): RealmLabel => ({ realmId: id, realm: organizationLabel(world, id) })
+  const label = (id: string): RealmLabel => ({
+    realmId: id,
+    realm: organizationLabel(world, id),
+    ...(world.cities.some((c) => c.id === id) && { city: true as const }),
+  })
   return world.offers
     .filter(
       (o): o is Offer & { direct: DirectOfferTerms } =>

@@ -19,7 +19,7 @@ import { paramTarget } from './script-params.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 85
+export const WORLD_FORMAT_VERSION = 88
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -356,6 +356,14 @@ export const migrations: Record<number, MigrationStep> = {
   // `carriedOffer` to a Transfer and `unloadFee` to its caravan's job. Nothing from before is
   // carried, so the step leaves everything as it is.
   84: (state) => state,
+  // Demands (`CONTEXT.md`: Demand): no world has any yet, and no realm has sent one.
+  85: (state) => ({ ...(state as WorldState), demands: [] }),
+  // Goods set aside on accepting a demand (`CONTEXT.md`: Demand) are an offer with `wantsUnits` 0,
+  // and a demand's log line gets `handedOver`. Neither is in any save yet, so nothing changes.
+  86: (state) => state,
+  // A demand can go to an NPC city or the Trade Organization, its log line gets `otherIs`, and an
+  // NPC city can stand behind goods set aside (`CONTEXT.md`: Demand). No save holds any yet.
+  87: (state) => state,
 }
 
 export class WorldFormatError extends Error {}

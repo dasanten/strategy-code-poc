@@ -267,7 +267,7 @@ The shared language of the game. Domain terms only — no implementation details
   side's from their storage as it unloads there. A storage short of coins on unloading gives what it
   has, the goods stay delivered and the Trade Organization bears the loss. A Player can send one to any realm they know of: one they see residents of, an ally, one whose
   city they have seen (Last seen), one with a standing toward them or they toward it, or their side
-  in a contract or Direct offer. Both sides see it in their Direct offers drawer until it ends, and a
+  in a contract, demand or Direct offer. Both sides see it in their Direct offers drawer until it ends, and a
   notice tells the one it is sent to, with the place. In person, it is otherwise an offer like any
   other: anyone in sight of the storage sees it and that it is for another realm, and the sender can
   take it down. Declined, lapsed or taken down, its goods are ordinary again and both sides are told;
@@ -693,16 +693,30 @@ The shared language of the game. Domain terms only — no implementation details
 - **Demand:** a Player or the Trade Organization sends a demand to another Organization: **terms**
   (hand over a named city; hand over goods or Coins), a short written note, and a deadline. It
   arrives at once, like a mercenary offer, wherever the other side is, and sending them is limited.
-  They accept, decline or let it lapse; the sender hears that at once.
+  A Player can send one to any realm they know of: one they see residents of, an ally, one whose city
+  they have seen (Last seen), one with a standing toward them or they toward it, or their side in a
+  contract, demand or Direct offer. Both sides see it in their Demands drawer until it is answered, and a notice
+  tells the one it is sent to. They accept, decline or let it lapse; the sender hears that at once,
+  and it lapses too when either side's Leader dies. The note is plain text.
   - **The threat is only words.** Ignoring a demand does nothing by itself. Whatever was threatened
     is the sender's to carry out, or not. The game forbids nothing.
   - **Accepting** carries the terms out: a named city joins the sender's realm at once, as a captured
-    one does, and goods and Coins are set aside at a storage of the one who accepts, for the sender
-    alone to fetch (like a Direct offer in person), or sent by a Transfer.
+    one does (What joins with a city), and goods and Coins are set aside at a storage of the one who
+    accepts, for the sender alone to fetch (a Direct offer in person for each good, wanting nothing
+    back, and fetching it is no trade: no standing changes), or sent by a Transfer from a city of
+    theirs to a city of the sender's whose storage they see, one load at a time, the fee theirs. The
+    one accepting picks which, and where. If the storage is short it says so before they accept, and
+    what it holds is what goes; with none of it there they can't accept that way. A city no longer
+    theirs can't be handed over. Handing over is the Player's own choice, also for their last city,
+    which goes as losing it to capture does: no crime and no standing lost.
   - **An NPC city** accepts when the respect it sees from the sender (their armed residents and
     walls in its sight) far outweighs its soldiers, so an army at the gate can take a city without a
     fight; otherwise it declines and its standing toward the sender drops. It carries out goods the
-    same way. **The Trade Organization** always declines, and being asked costs standing.
+    same way: set aside at its storage, for the sender alone to fetch; with none of them there it
+    declines. **The Trade Organization** always declines, and being asked costs standing. A Player
+    knows of an NPC city as of a realm, and everyone knows of the Trade Organization. Both answer at
+    their next planning pass, within a game hour (ADR 0016); a city that has joined a realm by then
+    lets the demand lapse.
 
 
 ## Bandits
@@ -1327,8 +1341,8 @@ The shared language of the game. Domain terms only — no implementation details
   (has weapons, idle, child, by city, and the like) and sorted by any column; the choice is kept per
   browser. Tapping a row opens that resident. **Pick these** picks everyone listed, or those ticked,
   as a Group on the map. Only the UI: nothing new is kept in the world. It works on a phone.
-- **Notices:** what the HUD tells the Player unasked (the Horse offer, a Direct offer sent to them,
-  the pick banner, a group order's report, the first-day card) shows in one lane under the top bar, over the map and never
+- **Notices:** what the HUD tells the Player unasked (the Horse offer, a Direct offer or demand sent
+  to them, the pick banner, a group order's report, the first-day card) shows in one lane under the top bar, over the map and never
   over a drawer or card. While the pick banner shows it replaces the others; they come back after.
 - **First day:** a new realm's HUD shows a checklist card: claim the Horse offer, pick a
   resident, give them an order, open the Wiki. Each line is ticked when the game sees it done;

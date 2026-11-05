@@ -106,6 +106,22 @@ describe('offer lines', () => {
   })
 })
 
+describe('goods set aside on a demand', () => {
+  const aside = offer({ gives: 'wood', givesUnits: 1, wantsUnits: 0, times: 7, rate: 0 })
+
+  it('want nothing, and all that is left shows', () => {
+    expect(offerTerms(aside, labels)).toBe('Gives 7 wood, wants nothing')
+    expect(offerStands(aside, labels)).toBe('7 wood left to fetch')
+  })
+
+  it('come with no price to pay', () => {
+    const { quote, text } = acceptPreview(aside, trader(), undefined, 7, 0, [], labels)
+    expect(quote.wants).toBe(0)
+    expect(text).toMatch(/^Takes \d+ wood/)
+    expect(text).not.toContain(' for ')
+  })
+})
+
 describe('carried direct offers', () => {
   const way = { fromCityId: 'c1', toCityId: 'c2' }
   const known = { ...way, senderTiles: 100, otherTiles: 120 }

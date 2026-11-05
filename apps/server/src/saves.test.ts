@@ -255,11 +255,35 @@ describe('world saves', () => {
     expect(checkInvariants(v85, land)).toEqual([])
   })
 
+  it('gives a format 85 world an empty list of demands (migration 85 → 86)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const old: Partial<typeof world> = { ...world }
+    delete old.demands
+    const v86 = migrateWorld(structuredClone(old), 85, { terrain: land }, migrations, 86)
+    expect(v86.demands).toEqual([])
+    expect(v86.realms).toEqual(world.realms)
+    expect(checkInvariants(v86, land)).toEqual([])
+  })
+
+  it('leaves a format 86 world as it is: nothing is set aside on a demand yet (migration 86 → 87)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v87 = migrateWorld(structuredClone(world), 86, { terrain: land }, migrations, 87)
+    expect(v87).toEqual(world)
+    expect(checkInvariants(v87, land)).toEqual([])
+  })
+
+  it('leaves a format 87 world as it is: no demand has gone to an NPC city yet (migration 87 → 88)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v88 = migrateWorld(structuredClone(world), 87, { terrain: land }, migrations, 88)
+    expect(v88).toEqual(world)
+    expect(checkInvariants(v88, land)).toEqual([])
+  })
+
   it('leaves realms from before realm names unnamed (migration 38 → 39)', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(85)
+    expect(WORLD_FORMAT_VERSION).toBe(88)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
