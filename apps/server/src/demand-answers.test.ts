@@ -341,7 +341,6 @@ describe('a demand for goods of an NPC city', () => {
       fromCity: true,
     })
   })
-
 })
 
 describe('over ticks of the whole world', () => {

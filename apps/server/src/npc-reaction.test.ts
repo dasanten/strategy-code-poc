@@ -125,8 +125,7 @@ describe('NPC city reaction', () => {
 
   it('shuts its gate to the Trade Organization’s residents, by each of its cities', () => {
     const { world } = setup()
-    const post = addCity(world, { id: 'post', realmId: null, x: 40, y: 20 })
-    post.tradeOrg = 'post'
+    const post = addCity(world, { id: 'post', realmId: null, x: 40, y: 20, tradeOrg: 'post' })
     changeStanding(world, 'npc', TRADE_ORG, NPC_CITY_REFUSES_STANDING - 1)
     expect(passes(world, 'post')).toBe(false)
     expect(passes(world, 'r1')).toBe(true)

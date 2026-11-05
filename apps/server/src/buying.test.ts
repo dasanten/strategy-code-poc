@@ -104,8 +104,7 @@ describe('buying an NPC city', () => {
   it('only NPC cities name a price', () => {
     const { world } = setup()
     addCity(world, { id: 'mine', realmId: 'r1', x: 24, y: 18 })
-    addCity(world, { id: 'post', realmId: null, x: 18, y: 24 })
-    world.cities.find((c) => c.id === 'post')!.tradeOrg = 'post'
+    addCity(world, { id: 'post', realmId: null, x: 18, y: 24, tradeOrg: 'post' })
     const seen = entitiesInSight(world, terrain, 'r1')
     expect(seen.find((e) => e.id === 'mine')).not.toHaveProperty('price')
     expect(seen.find((e) => e.id === 'post')).not.toHaveProperty('price')
@@ -186,8 +185,7 @@ describe('buying an NPC city', () => {
     at(world, 'p1').x = 23
     expect(order(world, queue, buy)).toBe('the resident must stand at its town hall')
     expect(order(world, queue, { ...buy, residentId: 'n1' })).toBe('not one of your residents')
-    addCity(world, { id: 'post', realmId: null, x: 18, y: 24 })
-    world.cities.find((c) => c.id === 'post')!.tradeOrg = 'post'
+    addCity(world, { id: 'post', realmId: null, x: 18, y: 24, tradeOrg: 'post' })
     expect(order(world, queue, { ...buy, cityId: 'post' })).toBe(
       'the Trade Organization doesn’t sell its cities',
     )
