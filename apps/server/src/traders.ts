@@ -1,6 +1,7 @@
 import {
   CARRIAGE_CAPACITY,
   GOODS,
+  SET_OFF_FOOD_SLACK,
   SIGHT_RANGE,
   START_CARRIED_FOOD,
   TRADERS,
@@ -9,6 +10,7 @@ import {
   caravanFoodFor,
   carriageCapacity,
   crewIdsOf,
+  foodForWay,
   inCityArea,
   isArmed,
   isCityBuilding,
@@ -41,6 +43,7 @@ import {
   ofTradeOrg,
   postEnd,
   putDownHeld,
+  standsAtHqStop,
   stepCrew,
   take,
   topUpFood,
@@ -178,18 +181,22 @@ export function putHqOnLoops(world: WorldState, size: number): void {
  * so every good travels: otherwise goods the caravans keep level, in bulk, would fill it for good and
  * leave no room for the Food and Coins only a trader brings. The Food the crew keep on board
  * (`keepFood`) is not load: it is neither left nor weighed against the warehouse's, but it takes up
- * room.
+ * room. So does the Food it wants before it leaves the HQ (`foodToHold`, `CONTEXT.md`: Waiting for
+ * Food), of which it takes what it lacks, as far as the warehouse has it.
  */
 export function evenOutLoad(
   there: Stock,
   load: Stock,
   keepFood: number,
   capacity: number,
+  foodToHold = 0,
 ): NonNullable<Trader['plan']> {
   const carried = (g: Good) => Math.max(0, (load[g] ?? 0) - (g === 'food' ? keepFood : 0))
   const halfWay: Stock = {}
   for (const g of GOODS) halfWay[g] = Math.max(0, (carried(g) + (there[g] ?? 0)) / 2)
-  const room = Math.max(0, capacity - stockWeight({ food: Math.min(load.food ?? 0, keepFood) }))
+  const onBoard = load.food ?? 0
+  const kept = Math.max(Math.min(onBoard, keepFood), foodToHold)
+  const room = Math.max(0, capacity - stockWeight({ food: kept }))
   const share = Math.min(1, room / Math.max(stockWeight(halfWay), 1e-9))
   const leave: Stock = {}
   const takes: Stock = {}
@@ -201,6 +208,11 @@ export function evenOutLoad(
     const less = Math.floor(aim - carried(g) + 1e-9)
     if (more > 0) leave[g] = more
     else if (less > 0) takes[g] = less
+  }
+  const lacking = Math.floor(Math.min(foodToHold - onBoard, there.food ?? 0))
+  if (lacking > (takes.food ?? 0)) {
+    takes.food = lacking
+    delete leave.food
   }
   return { leave, take: takes }
 }
@@ -225,21 +237,62 @@ function traderStop(world: WorldState, trader: Trader): Building | undefined {
   return tradeCoinWarehouse(world, end.warehouse)
 }
 
+/** Where the trader goes on to: sent from the HQ, the post it was bound for; from a stop, the next on its loop. */
+function nextStop(world: WorldState, trader: Trader): string {
+  if (trader.heading === 'hq' && trader.postId !== tradeOrgHq(world)?.id) return trader.postId
+  const at = trader.loop.indexOf(trader.postId)
+  return trader.loop[(at + 1) % trader.loop.length]!
+}
+
 /**
- * The trader goes on, its storage first: sent from the HQ, out to the post it was bound for; from a
- * stop, to the next on its loop. The cities it stops at on the way are worked out anew (`CONTEXT.md`:
- * Trader stop).
+ * The trader goes on to its next stop (`nextStop`), its storage first. The cities it stops at on the
+ * way are worked out anew (`CONTEXT.md`: Trader stop).
  */
 function goOn(world: WorldState, trader: Trader): void {
+  trader.postId = nextStop(world, trader)
+  trader.heading = 'post'
   trader.stop = 'storage'
   trader.plan = null
   trader.misses = 0
   trader.calls = null
-  const sentOut = trader.heading === 'hq' && trader.postId !== tradeOrgHq(world)?.id
-  trader.heading = 'post'
-  if (sentOut) return
-  const at = trader.loop.indexOf(trader.postId)
-  trader.postId = trader.loop[(at + 1) % trader.loop.length]!
+}
+
+/**
+ * The Food a trader wants on board to reach stop `stopId` from where its carriage stands, the cities
+ * it stops at on the way counted (`CONTEXT.md`: Waiting for Food, Trader stop). `size` is the map's.
+ */
+function wayFoodTo(
+  world: WorldState,
+  trader: Trader,
+  stopId: string,
+  carriage: Carriage,
+  size: number,
+): number {
+  const to = placeOf(world, stopId)
+  if (!to) return 0
+  const stops = callsOnTheWay(world, carriage, to, size).length
+  return foodForWay(trader.escortIds.length, wrapDistance(size, carriage, to), stops)
+}
+
+/**
+ * Whether a trader about to leave the HQ stays for Food (`CONTEXT.md`: Waiting for Food): it holds
+ * too little for the way, so it stands at the goods warehouse, whose Food its evening-out draws on
+ * and the HQ's people don't eat, until that has some: then it evens out again, which takes what it
+ * lacks. `size` is the map's.
+ */
+function waitsForFood(
+  world: WorldState,
+  trader: Trader,
+  carriage: Carriage,
+  size: number,
+): boolean {
+  const { warehouse } = hqEnd(world)
+  const want = wayFoodTo(world, trader, nextStop(world, trader), carriage, size)
+  if (!warehouse || (carriage.load.food ?? 0) >= want) return false
+  const spare = (warehouse.stock?.food ?? 0) - owedBy(world, warehouse.id, 'food')
+  trader.stop = 'warehouse'
+  trader.plan = spare >= 1 ? null : { leave: {}, take: {} }
+  return true
 }
 
 /** The city of the post a trader is out to, when that has been lost (`CONTEXT.md`: Lost post found out). */
@@ -314,9 +367,10 @@ function driveToLostPost(
  * first, beyond what the warehouse keeps for deliveries; then go on. The HQ is a stop like a post,
  * but for two things. It keeps its Coins in its coin warehouse, so they are worked out with the rest,
  * sharing the room on the carriage, and moved there after the other goods. And at its goods warehouse
- * the trader first waits for its escort to be armed, and with no post left stays there. Each take or
- * put is one pick-up or drop order of the driver's, one a tick, like anyone's. A place without its
- * storage is skipped to the warehouse; one without its warehouse, passed by. `size` is the map's.
+ * the trader first waits for its escort to be armed, with no post left stays there, and leaves only
+ * with enough Food for the way (`waitsForFood`). Each take or put is one pick-up or drop order of the
+ * driver's, one a tick, like anyone's. A place without its storage is skipped to the warehouse; one
+ * without its warehouse, passed by. `size` is the map's.
  */
 function runTrader(
   world: WorldState,
@@ -364,6 +418,9 @@ function runTrader(
       carriage.load,
       caravanFoodFor(trader.escortIds.length),
       carriageCapacity(world, carriage),
+      atTheHq(world, trader)
+        ? wayFoodTo(world, trader, nextStop(world, trader), carriage, size)
+        : 0,
     )
   }
   const here: GoodsSpot = { kind: 'storage', storageId: stop.id }
@@ -394,7 +451,9 @@ function runTrader(
   // What is left of the plan is what this warehouse doesn't keep: at the HQ, the Coins.
   const coinsLeft = Object.keys(leave).length + Object.keys(toTake).length > 0
   if (trader.stop === 'warehouse' && coinsLeft) trader.stop = 'coinWarehouse'
-  else goOn(world, trader)
+  else if (!atTheHq(world, trader) || !waitsForFood(world, trader, carriage, size)) {
+    goOn(world, trader)
+  }
 }
 
 /**
@@ -510,12 +569,13 @@ export function traderCarriageStolen(world: WorldState, thief: Resident, carriag
  * makes for a coin warehouse only at the HQ; its carriage, of the Trade Organization or it ends, and
  * its crew exist and are the HQ's (of no realm, of the HQ city); it has no driver only with no crew left; nobody is on
  * two traders or caravans or both drives and escorts; the driver drives only its carriage; it walks
- * with no more escorts than it gets (`traderEscortsWanted`); and what it means to take fits on a
- * carriage.
+ * with no more escorts than it gets (`traderEscortsWanted`); what it means to take fits on a
+ * carriage; and one just set off from the HQ holds enough for its way (`CONTEXT.md`: Waiting for
+ * Food), but for what it ate since it loaded (`SET_OFF_FOOD_SLACK`).
  */
 export const tradersSound: Invariant = {
   name: 'traders-sound',
-  check(world) {
+  check(world, terrain) {
     const out: InvariantViolation[] = []
     const fail = (t: Trader, message: string, ids: string[] = []) =>
       out.push({
@@ -568,6 +628,11 @@ export const tradersSound: Invariant = {
       const holds = k ? carriageCapacity(world, k) : CARRIAGE_CAPACITY
       if (t.plan && stockWeight(t.plan.take) > holds + 1e-9) {
         fail(t, `means to take ${stockWeight(t.plan.take)} kg, more than a carriage holds`)
+      }
+      if (k && driver && !atTheHq(world, t) && standsAtHqStop(world, k, terrain.size)) {
+        const want = wayFoodTo(world, t, t.postId, k, terrain.size) - SET_OFF_FOOD_SLACK
+        const food = k.load.food ?? 0
+        if (food < want) fail(t, `set off from the HQ with ${food} Food, wanting ${want}`, [k.id])
       }
     }
     return out

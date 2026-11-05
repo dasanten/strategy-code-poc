@@ -343,6 +343,7 @@ describe('a wandering trader at a post', () => {
     put(world, trader, warehouse.x, warehouse.y)
     trader.heading = 'hq'
     trader.stop = 'warehouse'
+    carriageOf(world, trader).load = { food: CARAVAN_FOOD }
     const crew = crewOf(world, trader)
     const walking = new Walking(terrain)
     for (let t = 0; t < 10; t++) stepWorld(world, terrain, walking)

@@ -7,8 +7,13 @@ import {
   CARRIAGE_HALF_LOAD,
   CARRIAGE_LIGHT_LOAD,
   CARAVAN_GUARD_RANGE,
+  FOOD_PER_DAY,
   GOOD_WEIGHT,
+  HORSE_FOOD_PER_DAY,
   TRADER_ESCORTS,
+  TRADER_STOP_TICKS,
+  WALK_TICKS_PER_TILE,
+  WAY_FOOD_MARGIN,
   MAP_SIZE,
   PASSENGER_WEIGHT,
   canWork,
@@ -20,6 +25,7 @@ import { guardedBy, type GuardResident } from './city.js'
 import { storageAt } from './goods.js'
 import { wrapDistance } from './terrain.js'
 import {
+  TICKS_PER_GAME_DAY,
   type Caravan,
   type Carriage,
   type Good,
@@ -89,6 +95,19 @@ function escortsAfter(escorts: number, robberies: number): number {
  */
 export function caravanFoodFor(escorts: number): number {
   return CARAVAN_FOOD + CARAVAN_FOOD_PER_ESCORT * Math.max(0, escorts - CARAVAN_ESCORTS)
+}
+
+/**
+ * The Food a caravan or wandering trader with `escorts` escorts holds before it leaves the HQ
+ * (`CONTEXT.md`: Waiting for Food): what its crew and horse eat on a way of `tiles` at walking pace,
+ * the escort setting it, with `WAY_FOOD_MARGIN`, and on `stops` stops of `TRADER_STOP_TICKS`. Never
+ * more than it keeps on board (`caravanFoodFor`), so a long way can't keep it waiting for more than
+ * it would ever take.
+ */
+export function foodForWay(escorts: number, tiles: number, stops = 0): number {
+  const ticks = tiles * WALK_TICKS_PER_TILE * WAY_FOOD_MARGIN + stops * TRADER_STOP_TICKS
+  const perDay = (1 + escorts) * FOOD_PER_DAY + HORSE_FOOD_PER_DAY
+  return Math.min(caravanFoodFor(escorts), Math.ceil((ticks / TICKS_PER_GAME_DAY) * perDay))
 }
 
 /** The carriages standing on a tile. */

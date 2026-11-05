@@ -74,6 +74,8 @@ import {
   HAUL_KEEP_FOOD,
   HEAL_DAYS,
   HORSE_FOOD_PER_DAY,
+  HQ_PEOPLE_FOOD_DAYS,
+  WAITING_HORSE_FOOD,
   HORSE_WAKE_HEALTH,
   HORSE_GRANT_FOOD,
   HQ_FLOOR_FACTOR,
@@ -1735,6 +1737,16 @@ export function Wiki() {
           are made up there each time round. Its crew and a lost carriage go as for a caravan, and
           robbing one is a theft from the Trade Organization, but it owes nobody a delivery, so
           nothing is sent again.
+        </p>
+        <p>
+          A caravan or trader leaves the HQ only with enough Food for its crew and horse to reach its
+          next stop, so when the HQ is short, as in a new world, its carriages stand and wait. They
+          leave the storage what the HQ's own people eat in {num(HQ_PEOPLE_FOOD_DAYS)} days, but may
+          always take {num(WAITING_HORSE_FOOD)} Food for the horse. Short of Food, they top up from
+          the goods warehouse, which the stock floor fills each day, so buying Food there can keep
+          them waiting a little longer. A caravan with a delivery or transfer waiting wants all it
+          keeps on board, as there is no Food on that way. Away from the HQ nothing waits: a
+          carriage takes what a post's storage has and drives on.
         </p>
         <p>
           On its way a wandering trader stops at each NPC or Player city whose town hall lies within{' '}

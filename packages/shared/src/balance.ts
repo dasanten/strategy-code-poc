@@ -782,6 +782,34 @@ export const CARAVAN_GUARD_RANGE = 16
 export const CARAVAN_FOOD = 72
 
 /**
+ * How much longer than a plain walk a carriage's way to its next stop may take, for the Food it waits
+ * for at the HQ (`CONTEXT.md`: Waiting for Food): the escort sets its pace, and its way winds and
+ * crosses slower ground. With this a full-size map's longest way, about 4,000 tiles, wants about all
+ * of `CARAVAN_FOOD`.
+ */
+export const WAY_FOOD_MARGIN = 1.5
+
+/**
+ * What a carriage leaves in the HQ's storage (`CONTEXT.md`: Waiting for Food), in game days of what
+ * its people off the carriages eat. No more than `NPC_FOOD_SHORT_DAYS`, below which the HQ puts
+ * residents on its farms first, so the farms always bring the storage up past it.
+ */
+export const HQ_PEOPLE_FOOD_DAYS = 5
+
+/**
+ * Food a carriage waiting at the HQ may always hold, even from what the HQ's people are left
+ * (`CONTEXT.md`: Waiting for Food), in units: its horse eats only from the load, and this is four
+ * game days of it (`HORSE_FOOD_PER_DAY`).
+ */
+export const WAITING_HORSE_FOOD = 3
+
+/**
+ * How far under the Food for its way a carriage just set off from the HQ may hold (`CONTEXT.md`:
+ * Waiting for Food; ADR 0004), in units: its horse goes on eating while its load goes on.
+ */
+export const SET_OFF_FOOD_SLACK = 2
+
+/**
  * How many tiles further along their way a caravan's driver or an escort may get than the one
  * furthest behind (`CONTEXT.md`: Caravan): one ahead waits, so the escort keeps up with the
  * carriage.
