@@ -481,7 +481,7 @@ describe('a Trade Org army’s supply wagon', () => {
     stepPunishments(s.world, 640)
     expect(s.world.punishments).toEqual([])
     expect(wagon.punishmentId).toBeNull()
-    expect(s.world.debts).toEqual([{ org: 'r1', coins: p.worth - 15 }])
+    expect(s.world.debts).toEqual([{ org: 'r1', coins: p.worth - 15, cityId: p.cityId }])
     const coins = s.world.buildings.find(
       (b) => b.cityId === s.hq.id && warehouseKeeps(s.world, b).includes('coins'),
     )!

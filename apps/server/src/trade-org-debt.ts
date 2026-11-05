@@ -28,14 +28,17 @@ import { realmOf } from './starting-city.js'
 /**
  * `org` owes the Trade Organization `coins` more (rounded up to whole Coins), and reads so in its
  * log. Nothing for nothing owed, or from an Organization that is gone or is the Trade Organization.
+ * `cityId` is the city its army came to, where the next one comes back to, if none is kept yet.
  */
-export function oweTradeOrg(world: WorldState, org: string, coins: number): void {
+export function oweTradeOrg(world: WorldState, org: string, coins: number, cityId?: string): void {
   const more = Math.ceil(coins)
   if (more <= 0) return
   if (!organizationExists(world, org) || standingOrganization(world, org) === TRADE_ORG) return
   const debt = world.debts.find((d) => d.org === org)
-  if (debt) debt.coins += more
-  else world.debts.push({ org, coins: more })
+  if (debt) {
+    debt.coins += more
+    if (cityId !== undefined) debt.cityId ??= cityId
+  } else world.debts.push({ org, coins: more, ...(cityId !== undefined && { cityId }) })
   recordEvent(world, org, {
     kind: 'debt',
     what: debt ? 'rose' : 'owed',

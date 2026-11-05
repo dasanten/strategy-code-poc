@@ -1523,9 +1523,18 @@ export type CrimeKind = 'theft' | 'attack' | 'killing' | 'tearDown' | 'capture'
  * Why a punishment headed home (`CONTEXT.md`: Punishment trip): `enough`, it got what it came for;
  * `empty`, the city's storages held nothing; `gaveUp`, its time there ran out; `cityLost`, the city
  * is no longer the culprit's; `directiveLifted`, the admin directive it came for was lifted;
- * `noWay`, it couldn't get there.
+ * `noWay`, it couldn't get there; `paid`, the debt it came about was paid while it was out;
+ * `noWorkplaces`, the city has no workplaces left to tear down.
  */
-export type PunishmentEnd = 'enough' | 'empty' | 'gaveUp' | 'cityLost' | 'directiveLifted' | 'noWay'
+export type PunishmentEnd =
+  | 'enough'
+  | 'empty'
+  | 'gaveUp'
+  | 'cityLost'
+  | 'directiveLifted'
+  | 'noWay'
+  | 'paid'
+  | 'noWorkplaces'
 
 /**
  * The Trade Org army out to punish an Organization for crimes against the Trade Organization
@@ -1538,7 +1547,10 @@ export interface Punishment {
   culpritOrg: string
   /** The city it goes to. */
   cityId: string
-  /** What it comes to take back, in Coins' worth: twice what it lost. */
+  /**
+   * What it comes to take back, in Coins' worth: twice what it lost. An army that wrecks (`wrecks`)
+   * comes for what it has counted so far and what is still owed.
+   */
   worth: number
   /**
    * Its soldiers, each with what they carried as they set out: anything they carry above that is
@@ -1555,7 +1567,10 @@ export interface Punishment {
   }[]
   /** Out to the city while it hasn't got what it came for; home once it has or gives up. */
   heading: 'out' | 'home'
-  /** The Coins' worth it took, as it stood when it headed home. */
+  /**
+   * The Coins' worth it took, as it stood when it headed home; an army that wrecks, the worth of what
+   * it tore down that came off the debt.
+   */
   took: number
   startedAt: number
   /**
@@ -1568,6 +1583,12 @@ export interface Punishment {
    * heads home once that directive is lifted.
    */
   directiveId?: string
+  /**
+   * There for an army sent for a debt at its step `wrecks` (`CONTEXT.md`: Trade Org debt), which tears
+   * down workplaces rather than taking goods: the workplaces it means to tear down, in that order,
+   * found once it is at the city.
+   */
+  wrecks?: string[]
 }
 /**
  * The supply wagon of a punishment (`CONTEXT.md`: Trade Org debt, Supply line): a carriage of the
@@ -1603,11 +1624,17 @@ export interface Debt {
   /**
    * How far up its steps the Trade Organization has gone (ADR 0025): none until its demand goes out;
    * `demanded` from then on; `wrecks` once that demand was declined or lapsed, or its deadline passed
-   * with something still owed after an answer that didn't cover it.
+   * with something still owed after an answer that didn't cover it, and its army goes to tear down
+   * workplaces from then on (`Punishment.wrecks`).
    */
   step?: 'demanded' | 'wrecks'
   /** The deadline of its demand, in ticks, while the step is `demanded`. */
   deadline?: number
+  /**
+   * The city its army came to when it left this debt, where it comes back to at the step `wrecks`.
+   * None for a debt from before that was kept; its army then goes to the city nearest the HQ.
+   */
+  cityId?: string
 }
 
 /**
@@ -1785,7 +1812,8 @@ export type RealmEventWhat =
    * The Trade Organization punishes the realm (`CONTEXT.md`: Trade Org reaction, Punishment trip):
    * its army is `coming` to `city` to take back `worth` Coins' worth; it `arrived`; it `left` having
    * taken `took`, and `why`; it `turnedBack` without reaching it, and `why`; or it was `lost`,
-   * `where` it was by then.
+   * `where` it was by then. `wrecks` when it comes for a debt, to tear down workplaces, and `took` is
+   * then the worth of what it tore down.
    */
   | {
       kind: 'punished'
@@ -1798,6 +1826,21 @@ export type RealmEventWhat =
       where?: 'wayThere' | 'atCity' | 'wayHome'
       /** Sent for an admin directive, with its reason, rather than for crimes. */
       directive?: string
+      wrecks?: true
+    }
+  /**
+   * The Trade Organization's army tore down a workplace at (`x`, `y`) of `city`, for a debt
+   * (`CONTEXT.md`: Trade Org debt): `coins` came off it, leaving `owed`.
+   */
+  | {
+      kind: 'wrecked'
+      building: BuildingKind
+      x: number
+      y: number
+      cityId: string
+      city: string
+      coins: number
+      owed: number
     }
   /**
    * The realm's debt to the Trade Organization (`CONTEXT.md`: Trade Org debt) changed by `coins`,
