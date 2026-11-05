@@ -289,7 +289,7 @@ function stepRest(
   const aging = stepAging(world, terrain.size)
   answerDemands(world, terrain.size)
   stepAlliances(world)
-  const captures = stepCaptures(world, terrain.size)
+  const captures = stepCaptures(world, terrain)
   stepRefill(world, terrain.size)
   stepDirectives(world)
   stepCrimes(world, terrain.size)

@@ -2383,6 +2383,13 @@ export const DEMAND_MAX_DAYS = 60
  */
 export const TRADE_ORG_DEBT_DEMAND_DAYS = 60
 
+/**
+ * How many of the Trade Organization's armies come to tear down workplaces for a debt before its next
+ * one comes to hold the town hall and take the city (`CONTEXT.md`: Trade Org debt): two, so a Player
+ * who loses workplaces once and again still has time to pay before it comes to that.
+ */
+export const TRADE_ORG_DEBT_TRIPS = 2
+
 /** The deadline the Demands form starts with, in game days: a game week. */
 export const DEMAND_DEFAULT_DAYS = 7
 

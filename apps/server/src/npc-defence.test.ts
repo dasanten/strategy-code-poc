@@ -407,7 +407,7 @@ describe('Trading posts defend themselves', { timeout: 20_000 }, () => {
     Object.assign(soldier, { x: hall.x, y: hall.y })
     Object.assign(p, { x: hall.x, y: hall.y })
     expect(occupierOf(world, city, terrain.size)).toBeNull()
-    expect(stepCaptures(world, terrain.size)).toEqual([])
+    expect(stepCaptures(world, terrain)).toEqual([])
     expect(citizens(world, city)).toHaveLength(TRADING_POST.residents)
   })
 

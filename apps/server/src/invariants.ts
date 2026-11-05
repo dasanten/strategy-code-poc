@@ -82,6 +82,8 @@ import {
   isAt,
   isArmed,
   allied,
+  TRADE_ORG,
+  cityTakers,
   TRAINING_GROUND_MAX_TRAINEES,
   keptBreeding,
   besideStep,
@@ -121,6 +123,7 @@ import { npcGateShutToItsPunishers } from './npc-defence.js'
 import { npcHireSound } from './npc-hire.js'
 import { buyOffOrdersDone, buyOffsSound, directivesSound } from './directives.js'
 import { punishmentsSound } from './trade-org-punishment.js'
+import { citiesTakenSound } from './trade-org-takes.js'
 import { wrecksSound } from './trade-org-wrecks.js'
 import { supplyWagonsSound } from './supply-wagons.js'
 import {
@@ -1320,8 +1323,8 @@ export const relocateOrdersSound: Invariant = {
 /**
  * Occupations of town halls hold (`CONTEXT.md`: Occupying a town hall, Capturing a city): none
  * has run the full `OCCUPATION_TICKS` without capturing its city, or started in the future; the
- * occupier still has armed residents on the hall; and it is never the city's own realm or an
- * ally of it.
+ * occupier still has armed residents on the hall, the Trade Organization soldiers of an army come
+ * to take the city (`cityTakers`); and it is never the city's own realm or an ally of it.
  */
 export const occupationsSound: Invariant = {
   name: 'occupations-sound',
@@ -1336,8 +1339,13 @@ export const occupationsSound: Invariant = {
       if (ran < 0 || ran >= OCCUPATION_TICKS)
         fail(`occupied by ${o.realmId} for ${ran} ticks without being captured`)
       const hall = world.buildings.find((b) => b.id === c.townHallId)
+      const takers = cityTakers(world, c)
       const holds = world.residents.some(
-        (r) => r.owner === o.realmId && isArmed(r) && !!hall && isAt(r, hall, terrain.size),
+        (r) =>
+          (o.realmId === TRADE_ORG ? takers.has(r.id) : r.owner === o.realmId) &&
+          isArmed(r) &&
+          !!hall &&
+          isAt(r, hall, terrain.size),
       )
       if (!holds) fail(`occupied by ${o.realmId} with none of its armed residents on the hall`)
       if (c.realmId !== null && allied(world, c.realmId, o.realmId))
@@ -2109,6 +2117,7 @@ export const worldInvariants: Invariant[] = [
   buyOffOrdersDone,
   debtsSound,
   wrecksSound,
+  citiesTakenSound,
   debtDemandsSound,
   debtPaymentsSound,
   debtOrdersDone,

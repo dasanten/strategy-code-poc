@@ -20,7 +20,7 @@ import { placeTraders, putHqOnLoops } from './traders.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 97
+export const WORLD_FORMAT_VERSION = 98
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -420,6 +420,10 @@ export const migrations: Record<number, MigrationStep> = {
   // punishment's `wrecks`), both optional. A debt that stands has no city kept, so its army goes to the
   // Organization's city nearest the HQ.
   96: (state) => state as WorldState,
+  // Its army takes a city for a debt (`CONTEXT.md`: Trade Org debt; a debt's `trips`, a punishment's
+  // `takes`), both optional, as are the new values in the log. A debt that stands has had no trip
+  // counted, so its next two armies come for workplaces first.
+  97: (state) => state as WorldState,
 }
 
 export class WorldFormatError extends Error {}

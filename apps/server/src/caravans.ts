@@ -39,6 +39,7 @@ import {
   type GoodsSpot,
   type Resident,
   type Stock,
+  type TerrainMap,
   type Trader,
   type WorldState,
   isAt,
@@ -54,7 +55,7 @@ import { residentNamesTaken } from './names.js'
 import { hash, mulberry32, newResident } from './residents.js'
 import { newId } from './starting-city.js'
 import { hqLayout, tradeOrgHq } from './trade-org.js'
-import { restoreWarehouse, tradingPosts } from './trading-posts.js'
+import { restoreWarehouse, storagesBecomeWarehouses, tradingPosts } from './trading-posts.js'
 import { worldIndex } from './world-index.js'
 
 /*
@@ -164,6 +165,20 @@ export function leaveTradeOrg(world: WorldState, post: City): void {
 export function rejoinTradeOrg(world: WorldState, post: City, size: number): void {
   post.tradeOrg = 'post'
   restoreWarehouse(world, post, size)
+  placeCaravans(world)
+}
+
+/**
+ * A city the Trade Organization's army took joins it as a new trading post (`CONTEXT.md`: Trade Org
+ * debt): its storages become warehouses, so it has a stock floor and prices, and the HQ gives it a
+ * caravan. Its gates stand open for those who come to trade, as a post never shuts them, and it
+ * remembers no former Player. Wandering traders put it on their loops by themselves (`stepTraders`).
+ */
+export function joinTradeOrg(world: WorldState, city: City, terrain: TerrainMap): void {
+  city.tradeOrg = 'post'
+  delete city.formerPlayer
+  storagesBecomeWarehouses(world, city, terrain)
+  for (const b of world.buildings) if (b.cityId === city.id && b.kind === 'gate') delete b.closed
   placeCaravans(world)
 }
 

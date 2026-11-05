@@ -429,11 +429,21 @@ describe('world saves', () => {
     expect(v97.punishments.every((p) => p.wrecks === undefined)).toBe(true)
   })
 
+  it('leaves a format 97 world’s debts with no trip counted (migration 97 → 98)', () => {
+    const { world, terrain: land } = worldWithPost()
+    world.realms.push({ id: 'r9', userId: 90, leaderId: 'nobody' })
+    world.debts = [{ org: 'r9', coins: 12, step: 'wrecks', cityId: 'c9' }]
+    const v98 = migrateWorld(structuredClone(world), 97, { terrain: land }, migrations, 98)
+    expect(v98).toEqual(world)
+    expect(v98.debts[0]!.trips).toBeUndefined()
+    expect(v98.punishments.every((p) => p.takes === undefined)).toBe(true)
+  })
+
   it('leaves realms from before realm names unnamed (migration 38 → 39)', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(97)
+    expect(WORLD_FORMAT_VERSION).toBe(98)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)

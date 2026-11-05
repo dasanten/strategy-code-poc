@@ -705,8 +705,9 @@ The shared language of the game. Domain terms only — no implementation details
      Those who resist are fought.
   3. **It takes the city:** with a debt still owed after a set number of trips, its army occupies the
      town hall (Holding the town hall). The city joins the Trade Organization as a new trading
-     post: its storages become warehouses with what is in them, its people stay as the post's, and
-     the debt is settled.
+     post: its storages become warehouses with what is in them, but for the Food, which goes into a
+     new storage near its town hall that its people eat from, its people stay as the post's, and the
+     debt is settled.
   Its army travels with a **supply wagon**, when the HQ has a free adult to drive it: a new Trade Org
   carriage and horse, loaded at the HQ with Food for the whole trip as far as that leaves room for what
   it takes. It follows the army (Supply line) and its soldiers refill from it, go to meet it when they
