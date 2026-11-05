@@ -405,7 +405,7 @@ describe('where its goods go', () => {
     expect(own.filter((b) => b.kind === 'warehouse').map((b) => b.stock)).toEqual([{}])
   })
 
-  it('with no room keeps a storage for the Food', () => {
+  it('with no room keeps the storage holding the most Food', () => {
     const water: TerrainMap = { size, tiles: new Uint8Array(size * size).fill(Terrain.Sea) }
     const world = createWorld(water)
     world.realms.push({ id: 'r1', userId: 7, leaderId: 'a1' })
@@ -419,14 +419,14 @@ describe('where its goods go', () => {
         y: 100,
         stock: { food, iron: 2 },
       })
-    add('s1', 104, 6)
-    add('s2', 108, 4)
+    add('s1', 104, 4)
+    add('s2', 108, 6)
     city.tradeOrg = 'post'
     storagesBecomeWarehouses(world, city, water)
     const at = (id: string) => world.buildings.find((b) => b.id === id)!
-    expect(at('s1')).toMatchObject({ kind: 'storage', stock: { food: 10, iron: 2 } })
-    expect(at('s2')).toMatchObject({ kind: 'warehouse', stock: { iron: 2 } })
-    expect(at('s2').stock!.food).toBeUndefined()
+    expect(at('s2')).toMatchObject({ kind: 'storage', stock: { food: 10, iron: 2 } })
+    expect(at('s1')).toMatchObject({ kind: 'warehouse', stock: { iron: 2 } })
+    expect(at('s1').stock!.food).toBeUndefined()
   })
 })
 

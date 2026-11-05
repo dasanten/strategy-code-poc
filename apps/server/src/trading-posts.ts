@@ -187,6 +187,10 @@ export function storagesBecomeWarehouses(world: WorldState, city: City, terrain:
   if (!hall) return
   const storages = npcStorages(world, city)
   const food = storages.reduce((sum, b) => sum + (b.stock?.food ?? 0), 0)
+  const mostFood = storages.reduce<Building | undefined>(
+    (most, b) => (!most || (b.stock?.food ?? 0) > (most.stock?.food ?? 0) ? b : most),
+    undefined,
+  )
   for (const b of storages) delete b.stock?.food
   const place = (kind: 'storage' | 'warehouse', stock: Building['stock']) => {
     const at = houseTile(world, city, hall, terrain, undefined, kind)
@@ -196,7 +200,7 @@ export function storagesBecomeWarehouses(world: WorldState, city: City, terrain:
     return b
   }
   const eatingFrom = place('storage', food > 0 ? { food } : {})
-  const kept = eatingFrom ? undefined : storages[0]
+  const kept = eatingFrom ? undefined : mostFood
   if (kept) (kept.stock ??= {}).food = food
   for (const b of storages) if (b !== kept) b.kind = 'warehouse'
   if (storages.length === 0) place('warehouse', {})
