@@ -20,7 +20,7 @@ import { placeTraders, putHqOnLoops } from './traders.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 89
+export const WORLD_FORMAT_VERSION = 92
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -357,9 +357,17 @@ export const migrations: Record<number, MigrationStep> = {
   // `carriedOffer` to a Transfer and `unloadFee` to its caravan's job. Nothing from before is
   // carried, so the step leaves everything as it is.
   84: (state) => state,
+  // Demands (`CONTEXT.md`: Demand): no world has any yet, and no realm has sent one.
+  85: (state) => ({ ...(state as WorldState), demands: [] }),
+  // Goods set aside on accepting a demand (`CONTEXT.md`: Demand) are an offer with `wantsUnits` 0,
+  // and a demand's log line gets `handedOver`. Neither is in any save yet, so nothing changes.
+  86: (state) => state,
+  // A demand can go to an NPC city or the Trade Organization, its log line gets `otherIs`, and an
+  // NPC city can stand behind goods set aside (`CONTEXT.md`: Demand). No save holds any yet.
+  87: (state) => state,
   // Wandering traders (`CONTEXT.md`: Wandering trader): the HQ of a world from before sends its out
   // now, with new carriages, horses and crew, as a new world's does.
-  85: (state, { terrain }) => {
+  88: (state, { terrain }) => {
     const world = structuredClone(state) as WorldState
     world.traders ??= []
     placeTraders(world, terrain.size)
@@ -367,7 +375,7 @@ export const migrations: Record<number, MigrationStep> = {
   },
   // Trader stops (`CONTEXT.md`: Trader stop): a trader out on its loop works out the cities on its
   // way when it next looks, and stands at none yet.
-  86: (state) => {
+  89: (state) => {
     const world = structuredClone(state) as WorldState
     for (const t of world.traders) {
       t.calls = null
@@ -378,7 +386,7 @@ export const migrations: Record<number, MigrationStep> = {
   // The HQ is a stop on a wandering trader's loop (`CONTEXT.md`: Wandering trader): it joins the
   // loops of a world from before where it adds the least way, and a trader with no post left, bound
   // for nothing until now, is bound for it.
-  87: (state, { terrain }) => {
+  90: (state, { terrain }) => {
     const world = structuredClone(state) as WorldState
     putHqOnLoops(world, terrain.size)
     return world
@@ -387,7 +395,7 @@ export const migrations: Record<number, MigrationStep> = {
   // (`CONTEXT.md`: Lost post found out), with `post`, `heardAt` and a drive order's `near`. Posts
   // lost before have already dropped from the loops and no crime is known of them: the Trade
   // Organization never heard. So the step leaves every world as it is.
-  88: (state) => state,
+  91: (state) => state,
 }
 
 export class WorldFormatError extends Error {}

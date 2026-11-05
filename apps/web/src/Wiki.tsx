@@ -175,6 +175,13 @@ import {
   STANDING_CONTRACT_BROKEN_LOSS,
   STANDING_DRIFT_PER_DAY,
   STANDING_PER_PAID_WEEK,
+  DEMANDS_PER_GAME_DAY,
+  DEMAND_DECLINED_STANDING_LOSS,
+  DEMAND_MAX_DAYS,
+  DEMAND_NOTE_MAX_LENGTH,
+  DEMAND_TRADE_ORG_STANDING_LOSS,
+  DEMAND_YIELD_RESPECT_MIN,
+  DEMAND_YIELD_RESPECT_TIMES,
   STANDING_RANGE,
   STANDING_TRADE_COINS_PER_POINT,
   START_RESIDENTS,
@@ -298,6 +305,7 @@ export const WIKI_TOPICS = [
   { id: 'how-to-trade', title: 'How to trade' },
   { id: 'trade', title: 'Trade & prices' },
   { id: 'standing', title: 'Standing & reactions' },
+  { id: 'demands', title: 'Demands' },
   { id: 'combat', title: 'Combat & walls' },
   { id: 'territory', title: 'Territory' },
   { id: 'language', title: 'Script language' },
@@ -710,13 +718,13 @@ export function Wiki() {
           map, anywhere, not only where the resident stands now; one that needs more (which goods,
           what to build, what a smithy makes, which script) asks for it on the card after. What to
           build is the same Build menu as on the card; a kind dimmed because the tile lacks
-          something today, such as a city's area, can still be added, for a step before it may
-          bring that. A step that has to be done on its tile goes after a walk there, unless the step before already
-          walks there. It works on a resident with no queue too, and starts one. Adding a step only
-          checks that it could make sense (the place is there as you last knew it, and a carriage or
-          horse is yours). A workplace or construction site can be anyone's, in sight or as last
-          seen, since a workplace has no owner: queue Work at a far mine and they walk there and
-          work it. Whether a step can start is checked when its turn comes.
+          something today, such as a city's area, can still be added, for a step before it may bring
+          that. A step that has to be done on its tile goes after a walk there, unless the step
+          before already walks there. It works on a resident with no queue too, and starts one.
+          Adding a step only checks that it could make sense (the place is there as you last knew
+          it, and a carriage or horse is yours). A workplace or construction site can be anyone's,
+          in sight or as last seen, since a workplace has no owner: queue Work at a far mine and
+          they walk there and work it. Whether a step can start is checked when its turn comes.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while you give an order (a button, its key, or a tile picked on the
@@ -1539,16 +1547,16 @@ export function Wiki() {
         <p>
           Horses don't breed on their own. A grown resident standing at a finished stable is given
           Breed horses and picks two fed horses of their realm in it, each shown with its name and
-          stats; they tend them for {days(STABLE_BREED_DAYS)}, and then a foal of their realm is born in the stable. Each of
-          its stats is its parents' average, give or take {num(FOAL_STAT_SPREAD)}. The progress
-          belongs to the two horses, and the stable keeps it: breeding pauses when the resident
-          leaves or is given another order, or while the stable has no room left for the foal, and
-          any grown resident who breeds there later carries on with that pair first, where it
-          stopped, if both are still fed. The stable's card shows a paused breeding and how far
-          along it is. The progress is lost only when one of the two leaves the stable or dies. The
-          Breed horses default first takes {num(BREED_FOOD)} Food from the stable for the resident's
-          meals, if they carry less. NPC cities have one of their residents breed their horses the
-          same way.
+          stats; they tend them for {days(STABLE_BREED_DAYS)}, and then a foal of their realm is
+          born in the stable. Each of its stats is its parents' average, give or take{' '}
+          {num(FOAL_STAT_SPREAD)}. The progress belongs to the two horses, and the stable keeps it:
+          breeding pauses when the resident leaves or is given another order, or while the stable
+          has no room left for the foal, and any grown resident who breeds there later carries on
+          with that pair first, where it stopped, if both are still fed. The stable's card shows a
+          paused breeding and how far along it is. The progress is lost only when one of the two
+          leaves the stable or dies. The Breed horses default first takes {num(BREED_FOOD)} Food
+          from the stable for the resident's meals, if they carry less. NPC cities have one of their
+          residents breed their horses the same way.
         </p>
         <p>
           Breed horses can be run directly too, with Run script or as a queue step: they breed in
@@ -1818,10 +1826,10 @@ export function Wiki() {
         <p>
           Under <strong>Direct offers</strong> on the tool rail you can send an offer to one realm
           you know of: one you see residents of, an ally, one whose city you have seen, one with a
-          standing either way, or your side in a contract or direct offer. Name a storage of yours,
-          and the goods are set aside there as for any offer. They hear at once wherever they are,
-          with a notice and the place, and only they can accept it: someone of theirs goes to the
-          storage and takes it in person, as with any offer, or they decline it from anywhere.
+          standing either way, or your side in a contract, demand or direct offer. Name a storage of
+          yours, and the goods are set aside there as for any offer. They hear at once wherever they
+          are, with a notice and the place, and only they can accept it: someone of theirs goes to
+          the storage and takes it in person, as with any offer, or they decline it from anywhere.
           Anyone else in sight of the storage sees it, and that it is for another realm. It lapses
           after {num(DIRECT_OFFER_DAYS)} game days. Declined, lapsed or taken down, the goods are
           ordinary again and both of you are told. At most {num(DIRECT_OFFERS_TO_ONE_REALM)} can
@@ -2180,6 +2188,69 @@ export function Wiki() {
         </p>
       </Section>
 
+      <Section id="demands">
+        <p>
+          A demand tells another realm what you want and by when: <strong>a named city</strong> of
+          theirs, or <strong>goods or Coins</strong>, with a note of at most{' '}
+          {num(DEMAND_NOTE_MAX_LENGTH)} characters and a deadline of up to {days(DEMAND_MAX_DAYS)}.
+          Open <strong>Demands</strong> on the tool rail to send one or to answer one. Scripts can
+          too (<code>sendDemand</code>, <code>acceptDemand</code>, <code>declineDemand</code>,{' '}
+          <code>demands</code>).
+        </p>
+        <ul>
+          <li>
+            You can send one to any realm you know of: one whose residents you see, an ally, one
+            whose city you have seen, one with a standing toward you or you toward it, or your side
+            in a contract, demand or Direct offer.
+          </li>
+          <li>
+            It arrives at once, wherever they are, in their Demands drawer and as a notice. A realm
+            sends at most {num(DEMANDS_PER_GAME_DAY)} a game day, scripts included.
+          </li>
+          <li>
+            They accept or decline it, or let it lapse at the deadline; it also lapses when either
+            side's Leader dies. Both realm logs say what happened.
+          </li>
+          <li>
+            <strong>Accepting a demand for a city hands it over at once.</strong> It joins the
+            sender's realm as a captured city does: the residents who live there, its horses and
+            carriages as <a href="#combat">capturing</a> takes them. A Leader who lived there stays
+            in their realm, homeless. You can do this with your last city too. It is your own
+            choice, so it is no crime and costs no standing. A city no longer yours can't be handed
+            over: the demand stays until you decline it or it lapses.
+          </li>
+          <li>
+            <strong>Accepting a demand for goods or Coins hands them over the way you pick.</strong>{' '}
+            Set aside at a storage of yours, they wait for the sender alone to fetch in person,
+            wanting nothing back, under their Direct offers, for up to {days(DIRECT_OFFER_DAYS)};
+            fetching them is no trade and raises no standing. Sent by a Transfer, a caravan brings
+            them from a city of yours to a city of theirs whose storage you see, one load at a time,
+            and you pay the fee. If the storage is short it says so before you accept, and what it
+            holds is what goes. With none of it there you can't accept that way.
+          </li>
+          <li>
+            <strong>An NPC city answers for itself</strong> within a game hour, when it next plans.
+            You can send one to any NPC city you have seen or have a standing with. It gives in when
+            the armed residents and walls of yours in its sight come to at least{' '}
+            {num(DEMAND_YIELD_RESPECT_TIMES)} times its soldiers, and at least{' '}
+            {num(DEMAND_YIELD_RESPECT_MIN)}, so an army at the gate can win a city without a fight.
+            Those out of its sight don't count. It joins your realm as a persuaded city does, or sets
+            what it holds of the goods aside at its storage for you alone to fetch. Otherwise, or
+            with none of the goods there, it declines, and its standing toward you drops by{' '}
+            {num(DEMAND_DECLINED_STANDING_LOSS)}.
+          </li>
+          <li>
+            <strong>The Trade Organization always declines</strong>, within a game hour, and being
+            asked costs you {num(DEMAND_TRADE_ORG_STANDING_LOSS)} of its standing. Everyone knows of
+            it.
+          </li>
+          <li>
+            <strong>The threat is only words.</strong> Ignoring a demand does nothing by itself:
+            whatever was threatened is the sender's to carry out, or not.
+          </li>
+        </ul>
+      </Section>
+
       <Section id="combat">
         <p>
           Residents in contact strike every {duration(STRIKE_TICKS)}. A blow does {num(BLOW_BASE)}{' '}
@@ -2315,12 +2386,12 @@ export function Wiki() {
         </p>
         <h3>What joins with a city</h3>
         <p>
-          However a city joins a realm, captured, bought or persuaded, its horses and carriages come
-          with it. An NPC city's are all its own, wherever they stand, at a stable or on the road. A
-          Player's aren't tied to one city, so of those the ones in its area or at its stables join,
-          and the rest stay with their realm. Either way a horse a joining resident rides and a
-          carriage one drives join with them, and a carriage's hitched horse with it. Another NPC
-          city's or realm's that happen to stand there don't.
+          However a city joins a realm, captured, bought, persuaded or handed over, its horses and
+          carriages come with it. An NPC city's are all its own, wherever they stand, at a stable or
+          on the road. A Player's aren't tied to one city, so of those the ones in its area or at
+          its stables join, and the rest stay with their realm. Either way a horse a joining
+          resident rides and a carriage one drives join with them, and a carriage's hitched horse
+          with it. Another NPC city's or realm's that happen to stand there don't.
         </p>
       </Section>
 

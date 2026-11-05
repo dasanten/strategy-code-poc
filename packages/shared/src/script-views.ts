@@ -66,6 +66,7 @@ export type ScriptViewName =
   | 'waypoint'
   | 'trader'
   | 'traderStand'
+  | 'demand'
 
 const field = (
   name: string,
@@ -655,7 +656,11 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field('gives', 'string', 'The good it gives; may be "coins".'),
       field('givesUnits', 'number', 'How much of it each time.'),
       field('wants', 'string', 'The good it wants; may be "coins".'),
-      field('wantsUnits', 'number', 'How much of it each time.'),
+      field(
+        'wantsUnits',
+        'number',
+        'How much of it each time: 0 for goods set aside on accepting a demand, which want nothing back.',
+      ),
       field('times', 'number', 'How many more times it can be accepted.'),
       field('rate', 'number', 'What it wants for one unit it gives.'),
       field(
@@ -871,6 +876,25 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field('name', 'string', 'Its name; others may have the same.'),
       field('x', 'number', 'From west to east.'),
       field('y', 'number', 'From north to south.'),
+    ],
+  },
+  demand: {
+    description:
+      'A demand my realm sent or was sent, waiting for an answer (`sendDemand`, `acceptDemand`, `declineDemand`).',
+    fields: [
+      id('demand'),
+      field('fromId', 'string', 'The realm that sent it.'),
+      field('from', 'string', 'That realm’s name.'),
+      field('toId', 'string', 'The realm it was sent to, the only one who can answer it.'),
+      field('to', 'string', 'That realm’s name.'),
+      field(
+        'terms',
+        'any',
+        'What it asks for: `{ kind: "city", cityId, cityName }` or `{ kind: "goods", goods }`.',
+      ),
+      field('note', 'string', 'The sender’s words, as plain text.'),
+      field('sentAt', 'number', 'The tick it was sent.'),
+      field('deadline', 'number', 'The tick it lapses at, unanswered.'),
     ],
   },
 }

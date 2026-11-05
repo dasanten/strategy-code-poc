@@ -18,6 +18,7 @@ import {
   nearestWarehouse,
   offerOpenTo,
   offerStorage,
+  answeredByGame,
   organizationLabel,
   postOfferProblem,
   quoteOffer,
@@ -26,6 +27,8 @@ import {
   timesToPost,
   tradeOrgHq,
   transferLoad,
+  wantsNothing,
+  type Building,
   type CarriedFeeBy,
   type CarriedOfferTerms,
   type CarriedRequest,
@@ -85,6 +88,37 @@ function standOffer(
 }
 
 /**
+ * The goods of an accepted demand, set aside at a storage of the realm that accepted it, for the
+ * demand's sender alone to fetch (`CONTEXT.md`: Demand). They stand as a Direct offer in person for
+ * each good, wanting nothing back, one unit at a time so they can be fetched over several trips.
+ */
+export function setAsideForDemand(
+  world: WorldState,
+  realmId: string,
+  toId: string,
+  storage: Building,
+  goods: Stock,
+): void {
+  const lapsesAt = world.tick + DIRECT_OFFER_DAYS * TICKS_PER_GAME_DAY
+  for (const [good, units] of Object.entries(goods) as [Good, number][]) {
+    world.offers.push({
+      id: newId(world, 'offer'),
+      realmId,
+      storageId: storage.id,
+      x: storage.x,
+      y: storage.y,
+      gives: good,
+      givesUnits: 1,
+      // It wants none of this: an offer's two goods just always differ (`offerTermsProblem`).
+      wants: good === 'coins' ? 'food' : 'coins',
+      wantsUnits: 0,
+      times: units,
+      direct: { toId, lapsesAt },
+    })
+  }
+}
+
+/**
  * The post-offer order (`CONTEXT.md`: Offer): a Player posts an offer at a storage of their realm,
  * wherever their residents are, up to `times` over. The goods not yet set aside there go aside.
  */
@@ -115,8 +149,8 @@ function seesResidentsOf(world: WorldState, realmId: string, otherId: string, si
   return world.residents.some((r) => r.owner === otherId && sees(r))
 }
 
-/** Whether the realm sees the storage of the city its carried offer would go to. */
-function seesStorageOf(world: WorldState, realmId: string, cityId: unknown, size: number) {
+/** Whether the realm sees the storage of a city it would send goods to, so it knows the fee. */
+export function seesStorageOf(world: WorldState, realmId: string, cityId: unknown, size: number) {
   const storage = deliveryStorage(world, cityId as string)
   return storage !== undefined && sightOf(world, size, realmId)(storage)
 }
@@ -522,8 +556,11 @@ function acceptNow(
   records.push({ residentId: r.id, before, after: total(holder.stock, stock) })
   offer.times -= q.times
   if (q.times > 0) {
-    const worth = offerWorth(offer, q.gives, q.wants)
-    raiseStandingBothWays(world, side, offer.realmId, worth / STANDING_TRADE_COINS_PER_POINT)
+    // Goods handed over on a demand are no trade: fetching them raises no standing.
+    if (!wantsNothing(offer)) {
+      const worth = offerWorth(offer, q.gives, q.wants)
+      raiseStandingBothWays(world, side, offer.realmId, worth / STANDING_TRADE_COINS_PER_POINT)
+    }
     recordEvent(world, offer.realmId, {
       kind: 'offerTaken',
       by: organizationLabel(world, side),
@@ -567,6 +604,7 @@ function endOffer(world: WorldState, offer: Offer, why: OfferEnd): void {
     kind: 'directOffer',
     what: why,
     from: organizationLabel(world, offer.realmId),
+    ...(answeredByGame(world, offer.realmId) && { fromCity: true as const }),
     ...terms(offer),
   })
 }
@@ -658,7 +696,9 @@ export const offersSound: Invariant = {
       }
       const storage = offerStorage(world, o.realmId, o.storageId)
       if (!storage) fail(o, `stands at ${o.storageId}, no finished storage of ${o.realmId}`)
-      const whole = [o.givesUnits, o.wantsUnits, o.times].every((n) => Number.isInteger(n) && n > 0)
+      // Only goods set aside on accepting a demand can want nothing, and for one realm alone.
+      const asked = o.direct && wantsNothing(o) ? [] : [o.wantsUnits]
+      const whole = [o.givesUnits, ...asked, o.times].every((n) => Number.isInteger(n) && n > 0)
       if (!whole) fail(o, 'has terms that aren’t whole and positive')
       if (o.gives === o.wants) fail(o, `wants the ${o.gives} it gives`)
       if (o.direct?.toId === o.realmId) fail(o, 'was sent to its own realm')

@@ -4,12 +4,8 @@ import {
   NPC_ALLIANCE_LEAVE_STANDING,
 } from './balance.js'
 import { contractOf, contractsFor, type ContractView } from './contract.js'
-import {
-  directOffersFor,
-  realmsToOfferTo,
-  type CarriedWay,
-  type DirectOfferView,
-} from './direct-offer.js'
+import { demandsFor, npcOrgsKnownTo, realmsKnownTo, type DemandView } from './demand.js'
+import { directOffersFor, type CarriedWay, type DirectOfferView } from './direct-offer.js'
 import { directivesFor, type DirectiveView } from './directive.js'
 import { joinRequestsFor, type JoinRequestView } from './persuasion.js'
 import { organizationLabel, standingOf, standingsFor, type StandingView } from './standing.js'
@@ -254,9 +250,15 @@ export interface Diplomacy {
   realmsInSight: RealmLabel[]
   /** Mercenary contracts the realm is a side of, offered or in force (`CONTEXT.md`). */
   contracts: ContractView[]
+  /** Demands the realm sent or was sent, waiting for an answer (`CONTEXT.md`: Demand). */
+  demands: DemandView[]
+  /** The other realms it knows of, whom it can send a demand (`realmsKnownTo`). */
+  knownRealms: RealmLabel[]
+  /** The Trade Organization and the NPC cities it knows of, whom it can too (`npcOrgsKnownTo`). */
+  knownNpcOrgs: RealmLabel[]
   /** Direct offers the realm sent or was sent, still standing (`CONTEXT.md`: Direct offer). */
   directOffers: DirectOfferView[]
-  /** The other realms it knows of, whom it can send a Direct offer (`realmsToOfferTo`). */
+  /** The other realms it knows of, whom it can send a Direct offer: the same as `knownRealms`. */
   directOfferRealms: RealmLabel[]
   /** The ways it can name for a carried Direct offer, when it sees a storage to go to. */
   carriedWays?: CarriedWay[]
@@ -290,6 +292,7 @@ export function diplomacyFor(
     | 'residents'
     | 'carriages'
     | 'contracts'
+    | 'demands'
     | 'offers'
     | 'lastSeen'
     | 'buildings'
@@ -331,6 +334,7 @@ export function diplomacyFor(
   const realms = new Set(world.realms.map((r) => r.id))
   const allies = new Set(sharingSight(world, realmId))
   const seen = [...new Set(seenRealms)]
+  const knownRealms = realmsKnownTo(world, realmId, seen).map(label)
   const realmsInSight = seen
     .filter(
       (id) => id !== realmId && !allies.has(id) && (realms.has(id) || isAllianceCity(world, id)),
@@ -342,8 +346,15 @@ export function diplomacyFor(
     invitations,
     realmsInSight,
     contracts: contractsFor(world, realmId),
+    demands: demandsFor(world, realmId),
+    knownRealms,
+    knownNpcOrgs: npcOrgsKnownTo(world, realmId, seen).map((id) => ({
+      realmId: id,
+      realm: organizationLabel(world, id),
+      ...(id !== TRADE_ORG && { city: true as const }),
+    })),
     directOffers: directOffersFor(world, realmId),
-    directOfferRealms: realmsToOfferTo(world, realmId, seen).map(label),
+    directOfferRealms: knownRealms,
     ...(carriedWays.length > 0 && { carriedWays }),
     deliveries: deliveriesFor(world, realmId),
     standings: standingsFor(world, realmId),

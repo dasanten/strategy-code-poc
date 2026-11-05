@@ -1,6 +1,7 @@
 import {
   OCCUPATION_GAME_DAYS,
   OCCUPATION_TICKS,
+  TICKS_PER_GAME_DAY,
   occupierOf,
   townHallOf,
   tradeOrgHq,
@@ -110,6 +111,30 @@ export function captureCity(world: WorldState, city: City, captor: string, size:
   if (culprit && hq) {
     commitCrime(world, size, 'capture', culprit, { victimOrg: hq.id, post: city.id })
   }
+}
+
+/**
+ * A city handed over joins the realm `to` as a captured one does (`CONTEXT.md`: Demand), though
+ * nobody captured it, so the logs that say so are the caller's. An occupation by a third realm
+ * goes on against the new owner, whose log says how long is left (`CONTEXT.md`: Occupying a town
+ * hall). One by `to` itself ends with the tick (`stepCaptures`), unlogged.
+ */
+export function handOverCity(world: WorldState, city: City, to: string, size: number): void {
+  joinRealm(world, city, to, size)
+  const running = city.occupation
+  const hall = townHallOf(world, city)
+  if (!running || running.realmId === to || !hall) return
+  const ticksLeft = running.since + OCCUPATION_TICKS - world.tick
+  recordEvent(world, to, {
+    kind: 'hallOccupied',
+    cityId: city.id,
+    city: city.name,
+    x: hall.x,
+    y: hall.y,
+    days: Math.max(1, Math.ceil(ticksLeft / TICKS_PER_GAME_DAY)),
+    other: realmName(world, running.realmId),
+    occupier: false,
+  })
 }
 
 /**

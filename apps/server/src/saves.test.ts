@@ -179,12 +179,12 @@ describe('world saves', () => {
     )
   })
 
-  it('has the HQ send out its wandering traders (migration 85 → 86)', () => {
+  it('has the HQ send out its wandering traders (migration 88 → 89)', () => {
     const { world: now, terrain: land } = worldWithPost()
-    // A format 85 world had neither traders nor their carriages, horses and crew.
+    // A format 88 world had neither traders nor their carriages, horses and crew.
     const trader = now.traders[0]!
     const gone = new Set([trader.driverId, ...trader.escortIds])
-    const v85: Partial<typeof now> = {
+    const v88: Partial<typeof now> = {
       ...now,
       residents: now.residents.filter((r) => !gone.has(r.id)),
       carriages: now.carriages.filter((k) => k.id !== trader.carriageId),
@@ -192,85 +192,85 @@ describe('world saves', () => {
         (h) => h.id !== now.carriages.find((k) => k.id === trader.carriageId)?.horseId,
       ),
     }
-    delete v85.traders
-    const v86 = migrateWorld(structuredClone(v85), 85, { terrain: land })
-    const posts = v86.cities.filter((c) => c.tradeOrg === 'post').map((c) => c.id)
-    const hqId = v86.cities.find((c) => c.tradeOrg === 'hq')!.id
+    delete v88.traders
+    const v89 = migrateWorld(structuredClone(v88), 88, { terrain: land })
+    const posts = v89.cities.filter((c) => c.tradeOrg === 'post').map((c) => c.id)
+    const hqId = v89.cities.find((c) => c.tradeOrg === 'hq')!.id
     expect(posts.length).toBeGreaterThan(0)
-    expect(v86.traders).toHaveLength(Math.min(TRADERS, posts.length))
-    for (const t of v86.traders) {
+    expect(v89.traders).toHaveLength(Math.min(TRADERS, posts.length))
+    for (const t of v89.traders) {
       expect([...t.loop].sort()).toEqual([...posts, hqId].sort())
-      expect(v86.carriages.some((k) => k.id === t.carriageId)).toBe(true)
+      expect(v89.carriages.some((k) => k.id === t.carriageId)).toBe(true)
       expect(t.escortIds).toHaveLength(TRADER_ESCORTS)
-      expect(v86.residents.some((r) => r.id === t.driverId)).toBe(true)
+      expect(v89.residents.some((r) => r.id === t.driverId)).toBe(true)
     }
-    expect(checkInvariants(v86, land)).toEqual([])
+    expect(checkInvariants(v89, land)).toEqual([])
     // And on it goes from there, tick by tick.
     const walking = new Walking(land)
-    for (let i = 0; i < 5; i++) stepWorld(v86, land, walking)
-    expect(checkInvariants(v86, land)).toEqual([])
+    for (let i = 0; i < 5; i++) stepWorld(v89, land, walking)
+    expect(checkInvariants(v89, land)).toEqual([])
     // A world with no HQ has no one to send them.
-    const fallen = structuredClone(v85)
+    const fallen = structuredClone(v88)
     fallen.cities = fallen.cities!.map((c) => ({
       ...c,
       ...(c.tradeOrg === 'hq' ? { tradeOrg: undefined } : {}),
     }))
-    expect(migrateWorld(fallen, 85, { terrain: land }).traders).toEqual([])
+    expect(migrateWorld(fallen, 88, { terrain: land }).traders).toEqual([])
   })
 
-  it('puts the HQ on its traders’ loops (migration 87 → 88)', () => {
+  it('puts the HQ on its traders’ loops (migration 90 → 91)', () => {
     const { world: now, terrain: land } = worldWithPost()
     const hqId = now.cities.find((c) => c.tradeOrg === 'hq')!.id
-    // In format 87 the loops held only the posts, and one with no post left was bound for nothing.
-    const v87 = structuredClone(now) as unknown as {
+    // In format 90 the loops held only the posts, and one with no post left was bound for nothing.
+    const v90 = structuredClone(now) as unknown as {
       traders: { loop: string[]; postId: string | null }[]
     }
-    for (const t of v87.traders) t.loop = t.loop.filter((id) => id !== hqId)
-    const bound = v87.traders[0]!.postId
-    const order = [...v87.traders[0]!.loop]
-    const v88 = migrateWorld(structuredClone(v87), 87, { terrain: land })
-    expect(v88.traders[0]!.postId).toBe(bound)
-    expect(v88.traders[0]!.loop.filter((id) => id !== hqId)).toEqual(order)
-    expect(v88.traders[0]!.loop).toContain(hqId)
-    expect(checkInvariants(v88, land)).toEqual([])
+    for (const t of v90.traders) t.loop = t.loop.filter((id) => id !== hqId)
+    const bound = v90.traders[0]!.postId
+    const order = [...v90.traders[0]!.loop]
+    const v91 = migrateWorld(structuredClone(v90), 90, { terrain: land })
+    expect(v91.traders[0]!.postId).toBe(bound)
+    expect(v91.traders[0]!.loop.filter((id) => id !== hqId)).toEqual(order)
+    expect(v91.traders[0]!.loop).toContain(hqId)
+    expect(checkInvariants(v91, land)).toEqual([])
     // And on it goes from there, tick by tick.
     const walking = new Walking(land)
-    for (let i = 0; i < 5; i++) stepWorld(v88, land, walking)
-    expect(checkInvariants(v88, land)).toEqual([])
+    for (let i = 0; i < 5; i++) stepWorld(v91, land, walking)
+    expect(checkInvariants(v91, land)).toEqual([])
     // One with no post left is bound for the HQ now.
-    v87.traders[0]!.loop = []
-    v87.traders[0]!.postId = null
-    expect(migrateWorld(structuredClone(v87), 87, { terrain: land }).traders[0]).toMatchObject({
+    v90.traders[0]!.loop = []
+    v90.traders[0]!.postId = null
+    expect(migrateWorld(structuredClone(v90), 90, { terrain: land }).traders[0]).toMatchObject({
       loop: [hqId],
       postId: hqId,
     })
     // A loop that already has it stays as it was, and a world with no HQ has nothing to add.
-    expect(migrateWorld(structuredClone(now), 87, { terrain: land }).traders).toEqual(now.traders)
+    expect(migrateWorld(structuredClone(now), 90, { terrain: land }).traders).toEqual(now.traders)
     const fallen = structuredClone(now)
     fallen.cities = fallen.cities.map((c) => ({
       ...c,
       ...(c.tradeOrg === 'hq' ? { tradeOrg: undefined } : {}),
     }))
-    expect(migrateWorld(fallen, 87, { terrain: land }).traders).toEqual(now.traders)
+    expect(migrateWorld(fallen, 90, { terrain: land }).traders).toEqual(now.traders)
   })
 
-  it('has traders work out the stops on their way when they next look (migration 86 → 87)', () => {
+  it('has traders work out the stops on their way when they next look (migration 89 → 90)', () => {
     const { world: now, terrain: land } = worldWithPost()
-    const v86 = structuredClone(now) as unknown as { traders: Record<string, unknown>[] }
-    for (const t of v86.traders) {
+    const v89 = structuredClone(now) as unknown as { traders: Record<string, unknown>[] }
+    for (const t of v89.traders) {
       delete t.calls
       delete t.stand
     }
-    const v87 = migrateWorld(structuredClone(v86), 86, { terrain: land })
-    expect(v87.traders.length).toBeGreaterThan(0)
-    for (const t of v87.traders) {
+    const v90 = migrateWorld(structuredClone(v89), 89, { terrain: land })
+    expect(v90.traders.length).toBeGreaterThan(0)
+    for (const t of v90.traders) {
       expect(t.calls).toBeNull()
       expect(t.stand).toBeNull()
     }
-    expect(checkInvariants(v87, land)).toEqual([])
+    expect(checkInvariants(v90, land)).toEqual([])
     const walking = new Walking(land)
-    for (let i = 0; i < 5; i++) stepWorld(v87, land, walking)
-    expect(checkInvariants(v87, land)).toEqual([])
+    for (let i = 0; i < 5; i++) stepWorld(v90, land, walking)
+    expect(checkInvariants(v90, land)).toEqual([])
   })
 
   it('leaves every resident unmarked for orders standing under attack (migration 79 → 80)', () => {
@@ -352,11 +352,35 @@ describe('world saves', () => {
     expect(checkInvariants(v85, land)).toEqual([])
   })
 
+  it('gives a format 85 world an empty list of demands (migration 85 → 86)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const old: Partial<typeof world> = { ...world }
+    delete old.demands
+    const v86 = migrateWorld(structuredClone(old), 85, { terrain: land }, migrations, 86)
+    expect(v86.demands).toEqual([])
+    expect(v86.realms).toEqual(world.realms)
+    expect(checkInvariants(v86, land)).toEqual([])
+  })
+
+  it('leaves a format 86 world as it is: nothing is set aside on a demand yet (migration 86 → 87)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v87 = migrateWorld(structuredClone(world), 86, { terrain: land }, migrations, 87)
+    expect(v87).toEqual(world)
+    expect(checkInvariants(v87, land)).toEqual([])
+  })
+
+  it('leaves a format 87 world as it is: no demand has gone to an NPC city yet (migration 87 → 88)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v88 = migrateWorld(structuredClone(world), 87, { terrain: land }, migrations, 88)
+    expect(v88).toEqual(world)
+    expect(checkInvariants(v88, land)).toEqual([])
+  })
+
   it('leaves realms from before realm names unnamed (migration 38 → 39)', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(89)
+    expect(WORLD_FORMAT_VERSION).toBe(92)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)

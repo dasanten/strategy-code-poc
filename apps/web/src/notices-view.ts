@@ -15,6 +15,7 @@ import { isWide, type OpenDrawer } from './hud-view.js'
 export const NOTICE_ORDER = [
   'horseOffer',
   'incoming',
+  'demand',
   'firstDay',
   'traderVisit',
   'groupReport',

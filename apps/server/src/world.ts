@@ -37,6 +37,7 @@ import { stepPassengers } from './passengers.js'
 import { requestStrikes, resolveStrikes, type CombatResult } from './combat.js'
 import { stepArmies } from './armies.js'
 import { resolvePayments, stepContracts } from './contracts.js'
+import { answerDemands, stepDemands } from './demands.js'
 import { stepTradeOrgArmy } from './trade-org-army.js'
 import { stepNpcHire } from './npc-hire.js'
 import { stepPunishments } from './trade-org-punishment.js'
@@ -80,6 +81,7 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     alliances: [],
     armies: [],
     contracts: [],
+    demands: [],
     caravans: [],
     traders: [],
     deliveries: [],
@@ -280,12 +282,14 @@ function stepRest(
   resolveBirths(world, births)
   world.tick++
   const aging = stepAging(world, terrain.size)
+  answerDemands(world, terrain.size)
   stepAlliances(world)
   const captures = stepCaptures(world, terrain.size)
   stepRefill(world, terrain.size)
   stepDirectives(world)
   stepCrimes(world, terrain.size)
   stepContracts(world)
+  stepDemands(world)
   stepStanding(world)
   stepPersuasion(world, terrain.size)
   stepArmies(world, terrain.size)

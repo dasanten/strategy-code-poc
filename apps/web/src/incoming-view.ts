@@ -1,6 +1,6 @@
-import type { Diplomacy, DirectOfferView } from '@csp/shared'
+import { wantsNothing, type Diplomacy, type DirectOfferView } from '@csp/shared'
 import { GOOD_LABELS } from './goods-grid.js'
-import { carriedLine, offerTerms } from './offers-view.js'
+import { carriedLine, offerStands, offerTerms } from './offers-view.js'
 
 /**
  * What others sent the Player that waits for their answer, wherever they are: one list, whatever
@@ -27,10 +27,12 @@ export function incomingItems(
     .map((offer) => ({
       kind: 'directOffer' as const,
       id: offer.id,
-      line: `The realm of ${offer.from.realm} offers: ${(offer.direct.carried
-        ? carriedLine(offer, GOOD_LABELS)
-        : offerTerms(offer, GOOD_LABELS)
-      ).toLowerCase()}`,
+      line: wantsNothing(offer)
+        ? `${offer.from.city ? offer.from.realm : `The realm of ${offer.from.realm}`} set aside what you demanded: ${offerStands(offer, GOOD_LABELS)}`
+        : `The realm of ${offer.from.realm} offers: ${(offer.direct.carried
+            ? carriedLine(offer, GOOD_LABELS)
+            : offerTerms(offer, GOOD_LABELS)
+          ).toLowerCase()}`,
       lapsesAt: offer.direct.lapsesAt,
       offer,
     }))

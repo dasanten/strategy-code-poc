@@ -2297,6 +2297,53 @@ export const EXPLORED_EDGE_RANGE = 4 * SIGHT_RANGE
 export const EXPLORE_SKIP_RANGE = 8
 
 /**
+ * The longest note a demand may carry, in characters (`CONTEXT.md`: Demand): a few sentences, as
+ * "give the city back or we attack" takes, and few enough to keep them cheap to store and show.
+ */
+export const DEMAND_NOTE_MAX_LENGTH = 280
+
+/**
+ * How many demands a realm may send in any one game day (`CONTEXT.md`: Demand): about seven a
+ * real hour, plenty for a war and little for spam. Scripts count too.
+ */
+export const DEMANDS_PER_GAME_DAY = 3
+
+/**
+ * The longest deadline a demand may set, in game days (`CONTEXT.md`: Demand): one real day, so a
+ * Player who comes by once a day can still answer.
+ */
+export const DEMAND_MAX_DAYS = 60
+
+/** The deadline the Demands form starts with, in game days: a game week. */
+export const DEMAND_DEFAULT_DAYS = 7
+
+/**
+ * How many times its soldiers the respect an NPC city sees from a realm must be before it yields to
+ * that realm's demand (`CONTEXT.md`: Demand): "far outweighs", so an army at the gate wins it and a
+ * few spears more than it has soldiers don't. Persuading a city takes only more than its soldiers.
+ */
+export const DEMAND_YIELD_RESPECT_TIMES = 3
+
+/**
+ * The least respect an NPC city yields to a demand for, however few soldiers it has (`CONTEXT.md`:
+ * Demand): a small band, so a city without soldiers doesn't give in to one person with a spear.
+ */
+export const DEMAND_YIELD_RESPECT_MIN = 5
+
+/**
+ * What an NPC city's standing toward a realm drops by when it declines that realm's demand
+ * (`CONTEXT.md`: Demand): as much as a theft, so three in a game day shut its gates.
+ */
+export const DEMAND_DECLINED_STANDING_LOSS = 10
+
+/**
+ * What the Trade Organization's standing toward a realm drops by for being sent a demand
+ * (`CONTEXT.md`: Demand). Small, as it refuses trade and sends its army at small numbers
+ * (`TRADE_ORG_REFUSES_TRADE_BELOW`, `TRADE_ORG_PUNISHES_BELOW`): it takes several to matter.
+ */
+export const DEMAND_TRADE_ORG_STANDING_LOSS = 2
+
+/**
  * How long a Direct offer stands, in game days (`CONTEXT.md`: Direct offer): one real day, so a
  * Player who comes by once a day can still answer and send someone. The sender can take it down
  * sooner.

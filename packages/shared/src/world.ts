@@ -825,6 +825,8 @@ export interface WorldState {
   standings: Standing[]
   /** Mercenary contracts offered or in force (`CONTEXT.md`: Mercenary contract). */
   contracts: MercenaryContract[]
+  /** Demands not yet answered, oldest first (`CONTEXT.md`: Demand). */
+  demands: Demand[]
   /**
    * NPC cities asking a realm to join it, and asks a realm declined that the city still
    * remembers (`CONTEXT.md`: Persuading a city).
@@ -1428,7 +1430,7 @@ export interface AcceptOfferOrder {
  */
 export interface Offer {
   id: string
-  /** The realm that posted it. */
+  /** The realm that posted it, or the NPC city, by its id, that set it aside on a demand. */
   realmId: string
   storageId: string
   /** The storage's tile, for the log once the storage is gone. */
@@ -1437,6 +1439,7 @@ export interface Offer {
   gives: Good
   givesUnits: number
   wants: Good
+  /** At least one, but 0 for goods set aside on accepting a demand, which want nothing back. */
   wantsUnits: number
   /** How many times over it can still be accepted; at least one while it stands. */
   times: number
@@ -1907,6 +1910,8 @@ export type RealmEventWhat =
       kind: 'directOffer'
       what: 'received' | 'carriedAccepted' | 'youAccepted' | Exclude<OfferEnd, 'usedUp'>
       from: string
+      /** `from` is an NPC city, which set this aside on a demand (`CONTEXT.md`: Demand), no realm. */
+      fromCity?: true
       gives: Good
       givesUnits: number
       wants: Good
@@ -2292,6 +2297,25 @@ export type RealmEventWhat =
       weeks?: number
       leaderDied?: 'lender' | 'hirer'
     }
+  /**
+   * A demand (`CONTEXT.md`: Demand) between this realm and the realm `other` (by its realm name):
+   * `sent` by this realm, `received` from the other, `accepted` or `declined` by the one it was
+   * sent to, or `lapsed` at its deadline. `mine` when this realm sent it. `leaderDied` says which
+   * side's Leader died when that made it lapse early. `handedOver` says how goods accepted change
+   * hands. `otherIs` says when the other is no realm, for a demand the game answers, and `other` is
+   * then its name as it stands. Its note stays out of the log.
+   */
+  | {
+      kind: 'demand'
+      demandId: string
+      what: 'sent' | 'received' | 'accepted' | 'declined' | 'lapsed'
+      mine: boolean
+      other: string
+      otherIs?: 'city' | 'tradeOrg'
+      terms: DemandTerms
+      leaderDied?: 'sender' | 'receiver'
+      handedOver?: DemandHandedOver
+    }
 
 /**
  * Something that happened in a Player's realm, for their log. Plain data. It belongs to the
@@ -2366,6 +2390,49 @@ export interface Realm {
    * from before realm names have none and go by their Leader's name until named.
    */
   name?: string
+  /**
+   * When the realm last sent demands, oldest first, only those still counting against
+   * `DEMANDS_PER_GAME_DAY` (`CONTEXT.md`: Demand). None while it has sent none lately.
+   */
+  demandsSentAt?: number[]
+}
+
+/**
+ * What a demand asks for (`CONTEXT.md`: Demand): a named city, under the name the sender knew it
+ * by, or goods and Coins.
+ */
+export type DemandTerms =
+  | { kind: 'city'; cityId: string; cityName: string }
+  | { kind: 'goods'; goods: Partial<Record<Good, number>> }
+
+/**
+ * How the goods of an accepted demand change hands, as the realm logs tell it (`CONTEXT.md`: Demand):
+ * what went, which is less than demanded when the storage was short, and where.
+ */
+export type DemandHandedOver = { goods: Partial<Record<Good, number>> } & (
+  | { way: 'setAside'; x: number; y: number }
+  | { way: 'transfer'; fromCity: string; toCity: string }
+)
+
+/**
+ * A demand waiting for its answer (`CONTEXT.md`: Demand; ADR 0024): it goes once it is accepted,
+ * declined or lapses, and the realm logs say which. Plain data (ADR 0002).
+ */
+export interface Demand {
+  id: string
+  /** The realm that sent it. */
+  fromId: string
+  /**
+   * The realm it was sent to, the only one who can answer it; or an NPC city by its id or the Trade
+   * Organization (`TRADE_ORG`), for the game to answer within a game hour.
+   */
+  toId: string
+  terms: DemandTerms
+  /** The sender's words: plain text, trimmed, at most `DEMAND_NOTE_MAX_LENGTH` characters. */
+  note: string
+  sentAt: number
+  /** The tick it lapses at, unanswered. */
+  deadline: number
 }
 
 /**
