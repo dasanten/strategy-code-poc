@@ -120,6 +120,7 @@ import {
   NPC_FOUND_REACH,
   NPC_FOUND_STANDING,
   NPC_FULL_DAYS,
+  NPC_GATE_WATCH_RANGE,
   NPC_VILLAGE,
   NPC_NODE_REACH,
   NPC_TRADER_GIVE_UP_DAYS,
@@ -2009,6 +2010,13 @@ export function Wiki() {
           keeping {pct(NPC_TRADE.defenceShare)} of its adults at home. The Trade Organization hires
           out soldiers at {num(TRADE_ORG_ARMY.pricePerSoldierWeek)} coins each a game week. A
           contract runs at most {days(CONTRACT_MAX_DAYS)}.
+        </p>
+        <p>
+          An NPC city shuts its gates while anyone armed who isn't of the city or its alliance
+          stands within {num(NPC_GATE_WATCH_RANGE)} tiles of one, and opens them once nobody does.
+          The Trade Organization's army doesn't count, so its soldiers can walk in and buy, unless
+          the city refuses the Trade Organization or the army has come for that city. Any other
+          armed outsider near still shuts the gates, on the soldiers too.
         </p>
         <p>
           Bought outright, an NPC city asks {num(CITY_PRICE_PER_RESIDENT)} coins a resident plus,

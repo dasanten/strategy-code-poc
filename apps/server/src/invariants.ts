@@ -112,6 +112,7 @@ import { caravansSound, routeRobberiesSound } from './caravans.js'
 import { deliveriesSound } from './deliveries.js'
 import { transfersSound } from './transfers.js'
 import { tradeOrgArmySound } from './trade-org-army.js'
+import { npcGateShutToItsPunishers } from './npc-defence.js'
 import { npcHireSound } from './npc-hire.js'
 import { buyOffOrdersDone, buyOffsSound, directivesSound } from './directives.js'
 import { punishmentsSound } from './trade-org-punishment.js'
@@ -2079,6 +2080,7 @@ export const worldInvariants: Invariant[] = [
   tradeOrgArmySound,
   npcHireSound,
   punishmentsSound,
+  npcGateShutToItsPunishers,
   supplyWagonsSound,
   directivesSound,
   buyOffsSound,
