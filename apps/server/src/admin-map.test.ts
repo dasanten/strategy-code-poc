@@ -82,8 +82,8 @@ function setup(): WorldState {
     userId: 2,
     tick: 0,
   }
-  addCity(world, { id: 'hq', realmId: null, x: 50, y: 50, name: 'Exchange' }).tradeOrg = 'hq'
-  addCity(world, { id: 'p1', realmId: null, x: 20, y: 50, name: 'Ferry' }).tradeOrg = 'post'
+  addCity(world, { id: 'hq', realmId: null, x: 50, y: 50, name: 'Exchange', tradeOrg: 'hq' })
+  addCity(world, { id: 'p1', realmId: null, x: 20, y: 50, name: 'Ferry', tradeOrg: 'post' })
   resident(world, 'a1', 'r1', 'c1', 62, 2).script = { scriptId: 1, memory: { trips: 3 } }
   resident(world, 'n-1', null, 'n1', 40, 41)
   resident(world, 'd1', null, 'hq', 63, 63)

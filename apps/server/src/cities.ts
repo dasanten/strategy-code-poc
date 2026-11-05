@@ -5,6 +5,7 @@ import {
   type City,
   type WorldState,
 } from '@csp/shared'
+import { pickLayout } from './city-layout.js'
 import { cityNamesTaken, uniqueName } from './names.js'
 import { hash } from './residents.js'
 
@@ -70,7 +71,8 @@ export function updateCityMembership(world: WorldState, size: number): void {
 /**
  * Founds a city around a town hall just finished (`CONTEXT.md`: Town hall), belonging to the
  * realm whose resident finished it. Its name is drawn from its id, so a world always names it the
- * same way, and is one no other city has (`givenCityName`).
+ * same way, and is one no other city has (`givenCityName`). One of no realm, a daughter
+ * (`CONTEXT.md`: Founding), gets a layout (`CONTEXT.md`: City layout).
  */
 export function foundCity(world: WorldState, hall: Building, realmId: string | null): City {
   const id = `city${world.nextId++}`
@@ -80,6 +82,7 @@ export function foundCity(world: WorldState, hall: Building, realmId: string | n
     realmId,
     townHallId: hall.id,
     occupation: null,
+    ...(realmId === null ? { layout: pickLayout(world.seed, id) } : {}),
   }
   world.cities.push(city)
   hall.cityId = id

@@ -40,6 +40,7 @@ import {
   npcCityStock,
   npcReserve,
 } from '@csp/shared'
+import { layoutPlan } from './city-layout.js'
 import { hqGrows, hqHouseTile, hqProject, hqRings } from './hq-growth.js'
 import { walkTo } from './npc-behaviour.js'
 import { npcSender } from './order-sender.js'
@@ -726,8 +727,10 @@ function ringsOf(
  * Where the city puts its next house (`CONTEXT.md`: House), or another `kind` of building that
  * goes in its area like one (a smelter, smithy, mint or stable), by the north-west tile of its
  * footprint: wholly on free ground of its area inside its wall, nearest its home first; when it is
- * expanding, inside the new wall. With no room left there, on its edge just outside the wall,
- * which starts its expansion. A city without walls builds anywhere in its area.
+ * expanding, inside the new wall. With no room left there, on its edge just outside the wall and
+ * short of where the next one stands, which starts its expansion. A city without walls builds
+ * anywhere in its area. Its layout (`CONTEXT.md`: City layout), if it has one, says which of those
+ * spots it may take, and keeps its streets free; a spot that doesn't fit is skipped.
  */
 export function houseTile(
   world: WorldState,
@@ -740,19 +743,21 @@ export function houseTile(
   const size = terrain.size
   const area = cityAreaTiles(world, city, size)
   const ground = new Ground(world, terrain)
-  const inArea = (x: number, y: number) => area.has(`${x},${y}`)
+  const plan = layoutPlan(world, city, home, rings?.newGate, size)
+  const allowed = (x: number, y: number) => area.has(`${x},${y}`) && !plan?.street(x, y)
   const free = [...area]
     .map((k) => {
       const [x, y] = k.split(',').map(Number) as [number, number]
-      return { x, y, ...ringsOf(home, { kind, x, y }, size) }
+      return { x, y }
     })
-    .filter((t) => ground.fits(kind, t.x, t.y, inArea))
+    .filter((t) => (!plan || plan.spot(kind, t.x, t.y)) && ground.fits(kind, t.x, t.y, allowed))
+    .map((t) => ({ ...t, ...ringsOf(home, { kind, ...t }, size) }))
     .sort((a, b) => a.near - b.near || a.y - b.y || a.x - b.x)
   const at = (t: { x: number; y: number } | undefined) => t && { x: t.x, y: t.y }
   if (!rings) return at(free[0])
   const inside = free.find((t) => t.far < rings.outer)
   if (inside || rings.expanding) return at(inside)
-  return at(free.find((t) => t.near === rings.inner + 1))
+  return at(free.find((t) => t.near > rings.inner && t.far < rings.inner + NPC_WALL_STEP))
 }
 
 /**

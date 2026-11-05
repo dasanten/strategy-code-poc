@@ -225,7 +225,7 @@ describe('invariants', () => {
 
   it('catch a resident of an NPC city who belongs to a realm', () => {
     const world = worldWithCity().world
-    world.cities[0]!.realmId = null
+    Object.assign(world.cities[0]!, { realmId: null, layout: 'grid' })
     const [r, ...others] = world.residents
     for (const o of others) o.owner = null
     expect(checkInvariants(world, terrain)).toEqual([
@@ -235,7 +235,7 @@ describe('invariants', () => {
 
   it('catch an NPC city resident holding an order the city never gives', () => {
     const world = worldWithCity().world
-    world.cities[0]!.realmId = null
+    Object.assign(world.cities[0]!, { realmId: null, layout: 'grid' })
     for (const o of world.residents) o.owner = null
     const r = world.residents[0]!
     r.order = { kind: 'drive', carriageId: 'k0', target: { x: 0, y: 0 }, path: null, progress: 0 }
@@ -246,7 +246,7 @@ describe('invariants', () => {
 
   it('catch an NPC city resident attacking someone of their own city', () => {
     const world = worldWithCity().world
-    world.cities[0]!.realmId = null
+    Object.assign(world.cities[0]!, { realmId: null, layout: 'grid' })
     for (const o of world.residents) o.owner = null
     const [r, other] = world.residents
     r!.order = {

@@ -124,6 +124,7 @@ import { nothingLeftOfTheHq } from './hq-fall.js'
 import { hqRingsSound } from './hq-growth.js'
 import { cityPlansSound, npcFarmersKept, tradeOrgSendsNoOne } from './npc-plan.js'
 import { foundingPartiesSound, npcCitiesHaveHalls } from './npc-founding.js'
+import { cityLayoutsSound } from './city-layout.js'
 import { npcTradersSound } from './npc-trader.js'
 import { leadersServeNoOne } from './leader.js'
 import { cityNamesWellFormed, horseNamesWellFormed, residentNamesWellFormed } from './renaming.js'
@@ -2097,6 +2098,7 @@ export const worldInvariants: Invariant[] = [
   cityPlansSound,
   foundingPartiesSound,
   npcCitiesHaveHalls,
+  cityLayoutsSound,
   npcFarmersKept,
   tradeOrgSendsNoOne,
   npcTradersSound,

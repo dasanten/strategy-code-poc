@@ -38,6 +38,7 @@ import {
   CHILD_YEAR_DAYS,
   CITY_AREA_MARGIN,
   CITY_BUILDING_REACH,
+  CITY_GRID_BLOCK,
   CITY_PRICE_BY_BUILDING,
   CITY_PRICE_PER_RESIDENT,
   CITY_PRICE_STANDING_SWING,
@@ -2011,6 +2012,17 @@ export function Wiki() {
           filling one workplace's crew before the next. Without a workplace for that good, the city
           builds one: on the nearest fitting resource node within {num(NPC_NODE_REACH)} tiles of
           home, or a smelter, smithy or mint in its area like a house.
+        </p>
+        <p>
+          An NPC city sets out its town by a layout, picked at random when it comes to be (a
+          self-managed city when its Leader dies) and kept. For now there is one: Grid, square
+          blocks {num(CITY_GRID_BLOCK)} tiles along each side between straight lanes a tile wide,
+          left free for streets, with a lane through each gate. Houses, storages, smelters, smithies,
+          mints and stables take the next spot in a block that fits, nearest home first, inside its
+          wall and on outward as the city grows. Walls, gates, farms and workplaces on nodes go
+          where they do anyway. A city from before layouts got one when they shipped: nothing was
+          torn down, and new buildings follow it around what stands. Trading posts, the HQ and
+          Players' cities have none.
         </p>
         <p>
           So it builds the whole chain its land allows, from the node up: weapons short wants a
