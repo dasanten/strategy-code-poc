@@ -5,7 +5,12 @@ import {
   DRAWER_WIDTH,
   MIN_OPEN_MAP,
   drawerWidth,
+  goodsLabel,
+  goodsPickCities,
+  goodsPickOf,
+  rememberGoodsPick,
   rememberedDrawerWidth,
+  rememberedGoodsPick,
   isWide,
   keyGoods,
   showBeside,
@@ -73,7 +78,7 @@ describe('drawers', () => {
   })
 })
 
-describe('key goods of the home city', () => {
+describe('goods in the top bar', () => {
   const building = (b: Partial<Building>): Building => ({
     id: Math.random().toString(36),
     kind: 'storage',
@@ -82,32 +87,96 @@ describe('key goods of the home city', () => {
     y: 0,
     ...b,
   })
+  const city = (id: string, realmId: string | null, name = id) => ({ id, name, realmId })
+  const cities = [city('home', 'r1'), city('second', 'r1'), city('theirs', 'r2'), city('npc', null)]
 
-  it('adds up the storages and warehouses of the city', () => {
-    const goods = keyGoods(
-      [
-        building({ stock: { food: 10, wood: 4, iron: 3 } }),
-        building({ kind: 'warehouse', stock: { food: 5, coins: 20 } }),
-      ],
-      'home',
-    )
-    expect(goods).toEqual({ food: 15, wood: 4, stone: 0, coins: 20 })
+  it('adds up every storage of the realm for the entire realm, outpost storages included', () => {
+    const buildings = [
+      building({ stock: { food: 10, wood: 4, iron: 3 } }),
+      building({ kind: 'warehouse', stock: { food: 5, coins: 20 } }),
+      building({ cityId: 'second', stock: { stone: 2, food: 1 } }),
+      building({ cityId: null, realmId: 'r1', stock: { food: 100 } }),
+    ]
+    expect(keyGoods({ buildings, cities }, 'r1', null)).toEqual({
+      food: 116,
+      wood: 4,
+      stone: 2,
+      coins: 20,
+    })
   })
 
-  it("leaves out other cities, construction sites and stables' horse food", () => {
-    const goods = keyGoods(
-      [
-        building({ cityId: 'other', stock: { food: 9 } }),
-        building({ site: { delivered: {}, work: 0 } as Building['site'], stock: { wood: 9 } }),
-        building({ kind: 'stable', stock: { food: 9 } }),
-      ],
-      'home',
-    )
-    expect(goods).toEqual({ food: 0, wood: 0, stone: 0, coins: 0 })
+  it('adds up only the picked city, without the outpost storages', () => {
+    const buildings = [
+      building({ stock: { food: 10, coins: 1 } }),
+      building({ kind: 'warehouse', stock: { food: 5 } }),
+      building({ cityId: 'second', stock: { food: 7 } }),
+      building({ cityId: null, realmId: 'r1', stock: { food: 100 } }),
+    ]
+    expect(keyGoods({ buildings, cities }, 'r1', 'home')).toEqual({
+      food: 15,
+      wood: 0,
+      stone: 0,
+      coins: 1,
+    })
+    expect(keyGoods({ buildings, cities }, 'r1', 'second').food).toBe(7)
   })
 
-  it('shows nothing when the realm has no home city', () => {
-    expect(keyGoods([building({ stock: { food: 3 } })], null).food).toBe(0)
+  it("leaves out others' storages, construction sites and stables' horse food", () => {
+    const site = { delivered: {}, work: 0 } as Building['site']
+    const buildings = [
+      building({ cityId: 'theirs', stock: { food: 9 } }),
+      building({ cityId: 'npc', stock: { food: 9 } }),
+      building({ cityId: null, realmId: 'r2', stock: { food: 9 } }),
+      building({ site, stock: { wood: 9 } }),
+      building({ cityId: null, realmId: 'r1', site, stock: { wood: 9 } }),
+      building({ kind: 'stable', stock: { food: 9 } }),
+    ]
+    const nothing = { food: 0, wood: 0, stone: 0, coins: 0 }
+    expect(keyGoods({ buildings, cities }, 'r1', null)).toEqual(nothing)
+    expect(keyGoods({ buildings: buildings.slice(3), cities }, 'r1', 'home')).toEqual(nothing)
+  })
+
+  it('offers the cities of the realm the Player knows, by name', () => {
+    const known = [city('b', 'r1', 'Zeltdorf'), city('a', 'r1', 'Aue'), city('c', 'r2', 'Mitte')]
+    expect(goodsPickCities(known, 'r1').map((c) => c.name)).toEqual(['Aue', 'Zeltdorf'])
+  })
+
+  it('keeps a city of the realm picked', () => {
+    expect(goodsPickOf('second', goodsPickCities(cities, 'r1'))).toBe('second')
+  })
+
+  it("goes back to the entire realm for a remembered city no longer the realm's", () => {
+    const lost = [city('home', 'r1'), city('second', 'r2')]
+    expect(goodsPickOf('second', goodsPickCities(lost, 'r1'))).toBeNull()
+    expect(goodsPickOf('gone', goodsPickCities(lost, 'r1'))).toBeNull()
+    expect(goodsPickOf(null, goodsPickCities(lost, 'r1'))).toBeNull()
+  })
+
+  it('says what is shown', () => {
+    expect(goodsLabel(null, cities)).toBe('Goods in the entire realm')
+    expect(goodsLabel('second', cities)).toBe('Goods in second')
+  })
+
+  it('remembers the pick per browser, and shows the entire realm without one', () => {
+    const kept = new Map<string, string>()
+    const storage = () => ({
+      getItem: (k: string) => kept.get(k) ?? null,
+      setItem: (k: string, v: string) => void kept.set(k, v),
+      removeItem: (k: string) => void kept.delete(k),
+    })
+    expect(rememberedGoodsPick(storage)).toBeNull()
+    rememberGoodsPick('second', storage)
+    expect(rememberedGoodsPick(storage)).toBe('second')
+    rememberGoodsPick(null, storage)
+    expect(rememberedGoodsPick(storage)).toBeNull()
+  })
+
+  it('shows the entire realm when the browser lets nothing be kept', () => {
+    const off = () => {
+      throw new Error('storage is off')
+    }
+    expect(rememberedGoodsPick(off)).toBeNull()
+    expect(() => rememberGoodsPick('second', off)).not.toThrow()
   })
 })
 

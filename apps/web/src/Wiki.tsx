@@ -582,6 +582,12 @@ export function Wiki() {
           left them.
         </p>
         <p>
+          The top bar shows the Food, Wood, Stone and Coins held in the storages you see, for what
+          you pick beside them: Entire realm, outpost storages included, or one of your cities by
+          name. Stables, carriages and piles don’t count. Your browser remembers the pick; a city no
+          longer yours goes back to Entire realm.
+        </p>
+        <p>
           On a phone the card sits at the bottom of the screen. Drag its handle to show just its
           header, half the screen or all of it; a tap on the handle goes one step up. While an order
           waits for a target the card drops to its header. The menu button at the top left opens the
