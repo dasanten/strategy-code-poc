@@ -1369,7 +1369,9 @@ The shared language of the game. Domain terms only — no implementation details
   realm: a Player who dismissed it never sees it again, also after a Leader death.
 - **Goods in the top bar:** the top bar shows the Food, Wood, Stone and Coins held in storages, for
   what is picked beside them: **Entire realm** (the default: every storage of the realm, outpost
-  storages included) or one city of the realm by name. Stables, carriages and piles don't count.
+  storages included) or one city of the realm by name. Stables, carriages and piles don't count. A storage out of sight
+  counts with what the Player last saw in it (Last seen), and the total says so when part of it is
+  that old.
   The pick is kept per browser; a city no longer the realm's goes back to Entire realm. Only the UI.
 - **Minimap:** a small map bottom right of the screen (ADR 0008): the Player's explored terrain
   at a glance with their home city, their other cities, their residents and carriages away from
