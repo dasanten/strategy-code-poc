@@ -145,6 +145,7 @@ describe('admin map world', () => {
       hq: null,
       posts: [],
       caravans: [{ id: 'cv', name: 'Ferry', x: 7, y: 8, postId: 'p', heading: 'hq' }],
+      traders: [],
     },
     armies: [{ id: 'ar', name: 'Vanguard', x: 30, y: 31, realmId: 'r1', realm: 'Lea' }],
   }

@@ -13,13 +13,14 @@ import { grantHorses } from './horse-grant.js'
 import { horseName } from './horses.js'
 import { hash, mulberry32 } from './residents.js'
 import { paramTarget } from './script-params.js'
+import { placeTraders, putHqOnLoops } from './traders.js'
 
 /**
  * The shape of saved world state (ADR 0006). Any change to `WorldState` that an older save
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 88
+export const WORLD_FORMAT_VERSION = 92
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -364,6 +365,37 @@ export const migrations: Record<number, MigrationStep> = {
   // A demand can go to an NPC city or the Trade Organization, its log line gets `otherIs`, and an
   // NPC city can stand behind goods set aside (`CONTEXT.md`: Demand). No save holds any yet.
   87: (state) => state,
+  // Wandering traders (`CONTEXT.md`: Wandering trader): the HQ of a world from before sends its out
+  // now, with new carriages, horses and crew, as a new world's does.
+  88: (state, { terrain }) => {
+    const world = structuredClone(state) as WorldState
+    world.traders ??= []
+    placeTraders(world, terrain.size)
+    return world
+  },
+  // Trader stops (`CONTEXT.md`: Trader stop): a trader out on its loop works out the cities on its
+  // way when it next looks, and stands at none yet.
+  89: (state) => {
+    const world = structuredClone(state) as WorldState
+    for (const t of world.traders) {
+      t.calls = null
+      t.stand = null
+    }
+    return world
+  },
+  // The HQ is a stop on a wandering trader's loop (`CONTEXT.md`: Wandering trader): it joins the
+  // loops of a world from before where it adds the least way, and a trader with no post left, bound
+  // for nothing until now, is bound for it.
+  90: (state, { terrain }) => {
+    const world = structuredClone(state) as WorldState
+    putHqOnLoops(world, terrain.size)
+    return world
+  },
+  // A lost post stays on a trader's loop until it reaches it, and its capture is a crime
+  // (`CONTEXT.md`: Lost post found out), with `post`, `heardAt` and a drive order's `near`. Posts
+  // lost before have already dropped from the loops and no crime is known of them: the Trade
+  // Organization never heard. So the step leaves every world as it is.
+  91: (state) => state,
 }
 
 export class WorldFormatError extends Error {}

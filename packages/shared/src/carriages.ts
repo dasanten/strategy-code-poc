@@ -7,7 +7,13 @@ import {
   CARRIAGE_HALF_LOAD,
   CARRIAGE_LIGHT_LOAD,
   CARAVAN_GUARD_RANGE,
+  FOOD_PER_DAY,
   GOOD_WEIGHT,
+  HORSE_FOOD_PER_DAY,
+  TRADER_ESCORTS,
+  TRADER_STOP_TICKS,
+  WALK_TICKS_PER_TILE,
+  WAY_FOOD_MARGIN,
   MAP_SIZE,
   PASSENGER_WEIGHT,
   canWork,
@@ -19,6 +25,7 @@ import { guardedBy, type GuardResident } from './city.js'
 import { storageAt } from './goods.js'
 import { wrapDistance } from './terrain.js'
 import {
+  TICKS_PER_GAME_DAY,
   type Caravan,
   type Carriage,
   type Good,
@@ -26,18 +33,27 @@ import {
   type Horse,
   type Resident,
   type Stock,
+  type Trader,
   type WorldState,
   isDown,
 } from './world.js'
 
 /** World queries about carriages (ADR 0002: the game API orders and scripts share). */
 
-/** The Trade Org caravan a resident drives or escorts, if any (`CONTEXT.md`: Caravan). */
-export function caravanOf(
-  world: Pick<WorldState, 'caravans'>,
+/**
+ * Everything the Trade Org runs with a carriage and a crew: its caravans and its wandering traders
+ * (`CONTEXT.md`: Caravan, Wandering trader, Caravan crew lost).
+ */
+export function convoysOf(world: Pick<WorldState, 'caravans' | 'traders'>): (Caravan | Trader)[] {
+  return [...world.caravans, ...world.traders]
+}
+
+/** The Trade Org caravan or wandering trader a resident drives or escorts, if any. */
+export function convoyOf(
+  world: Pick<WorldState, 'caravans' | 'traders'>,
   residentId: string,
-): Caravan | undefined {
-  return world.caravans.find((c) => c.driverId === residentId || c.escortIds.includes(residentId))
+): Caravan | Trader | undefined {
+  return convoysOf(world).find((c) => c.driverId === residentId || c.escortIds.includes(residentId))
 }
 
 /** Everyone on a caravan, by id: its driver, if it has one, and its escort. */
@@ -56,8 +72,21 @@ export function caravanEscortsWanted(
   world: Pick<WorldState, 'routeRobberies'>,
   postId: string,
 ): number {
-  const extra = Math.floor((world.routeRobberies[postId] ?? 0) / CARAVAN_ROBBERIES_PER_ESCORT)
-  return Math.min(CARAVAN_ESCORTS_MAX, CARAVAN_ESCORTS + extra)
+  return escortsAfter(CARAVAN_ESCORTS, world.routeRobberies[postId] ?? 0)
+}
+
+/**
+ * How many escorts a wandering trader walks with (`CONTEXT.md`: Wandering trader): as for a caravan,
+ * from `TRADER_ESCORTS`, by how often it was robbed.
+ */
+export function traderEscortsWanted(trader: Pick<Trader, 'robberies'>): number {
+  return escortsAfter(TRADER_ESCORTS, trader.robberies)
+}
+
+/** `escorts`, and one more for every `CARAVAN_ROBBERIES_PER_ESCORT` robberies, up to the most. */
+function escortsAfter(escorts: number, robberies: number): number {
+  const extra = Math.floor(robberies / CARAVAN_ROBBERIES_PER_ESCORT)
+  return Math.min(CARAVAN_ESCORTS_MAX, escorts + extra)
 }
 
 /**
@@ -66,6 +95,19 @@ export function caravanEscortsWanted(
  */
 export function caravanFoodFor(escorts: number): number {
   return CARAVAN_FOOD + CARAVAN_FOOD_PER_ESCORT * Math.max(0, escorts - CARAVAN_ESCORTS)
+}
+
+/**
+ * The Food a caravan or wandering trader with `escorts` escorts holds before it leaves the HQ
+ * (`CONTEXT.md`: Waiting for Food): what its crew and horse eat on a way of `tiles` at walking pace,
+ * the escort setting it, with `WAY_FOOD_MARGIN`, and on `stops` stops of `TRADER_STOP_TICKS`. Never
+ * more than it keeps on board (`caravanFoodFor`), so a long way can't keep it waiting for more than
+ * it would ever take.
+ */
+export function foodForWay(escorts: number, tiles: number, stops = 0): number {
+  const ticks = tiles * WALK_TICKS_PER_TILE * WAY_FOOD_MARGIN + stops * TRADER_STOP_TICKS
+  const perDay = (1 + escorts) * FOOD_PER_DAY + HORSE_FOOD_PER_DAY
+  return Math.min(caravanFoodFor(escorts), Math.ceil((ticks / TICKS_PER_GAME_DAY) * perDay))
 }
 
 /** The carriages standing on a tile. */
@@ -277,8 +319,8 @@ export function hitchOffProblem<R extends StealingResident>(
 }
 
 /**
- * Why a caravan's crew keep its carriage from being taken, on a map of `size` tiles (`CONTEXT.md`:
- * Caravan crew lost): its driver or an armed escort is up and within `CARAVAN_GUARD_RANGE` of it.
+ * Why a caravan's or trader's crew keep its carriage from being taken, on a map of `size` tiles
+ * (`CONTEXT.md`: Caravan crew lost): its driver or an armed escort is up and within `CARAVAN_GUARD_RANGE` of it.
  * They have to be beaten or gone, however many of the thief's realm stand there; one still walking
  * out doesn't count until they are that near.
  */
@@ -287,6 +329,7 @@ function crewHolds<R extends StealingResident>(
   caravan: Pick<Caravan, 'driverId' | 'escortIds'>,
   carriage: Pick<Carriage, 'x' | 'y'>,
   size: number,
+  what: 'caravan' | 'trader',
 ): string | undefined {
   const near = (id: string | null, armed: boolean) =>
     residents.some(
@@ -297,9 +340,9 @@ function crewHolds<R extends StealingResident>(
         (!armed || isArmed(r)) &&
         wrapDistance(size, r, carriage) <= CARAVAN_GUARD_RANGE,
     )
-  if (near(caravan.driverId, false)) return 'its driver is still with that caravan’s carriage'
+  if (near(caravan.driverId, false)) return `its driver is still with that ${what}’s carriage`
   if (caravan.escortIds.some((id) => near(id, true))) {
-    return 'its escort guards that caravan’s carriage'
+    return `its escort guards that ${what}’s carriage`
   }
   return undefined
 }
@@ -307,7 +350,7 @@ function crewHolds<R extends StealingResident>(
 /**
  * Why a resident can't drive off in another organization's carriage for the realm `realmId` now,
  * or undefined when they can (`CONTEXT.md`: Stealing a carriage or horse): nobody may drive it or
- * be aboard, a caravan's crew mustn't hold it (`crewHolds`), it mustn't be guarded
+ * be aboard, a caravan's or trader's crew mustn't hold it (`crewHolds`), it mustn't be guarded
  * (`takeProblem`), and they must be able to drive it as if it were their realm's already, so with
  * its hitched horse, a free one of that realm on its tile, or else one they steal with it
  * (`hitchOffProblem`). `size` is the map's.
@@ -319,6 +362,7 @@ export function driveOffProblem<R extends StealingResident>(
     horses: readonly CarriageHorse[]
     carriages: readonly CarriagePlace[]
     caravans: readonly Pick<Caravan, 'carriageId' | 'driverId' | 'escortIds'>[]
+    traders: readonly Pick<Trader, 'carriageId' | 'driverId' | 'escortIds'>[]
   },
   thief: R,
   carriage: CarriagePlace & Pick<Carriage, 'id'>,
@@ -328,7 +372,10 @@ export function driveOffProblem<R extends StealingResident>(
   if (driverOf(world, carriage)) return 'someone is driving that carriage'
   if (passengersOf(world, carriage).length > 0) return 'someone is aboard that carriage'
   const caravan = world.caravans.find((c) => c.carriageId === carriage.id)
-  const held = caravan && crewHolds(world.residents, caravan, carriage, size)
+  const trader = world.traders.find((t) => t.carriageId === carriage.id)
+  const held =
+    (caravan && crewHolds(world.residents, caravan, carriage, size, 'caravan')) ??
+    (trader && crewHolds(world.residents, trader, carriage, size, 'trader'))
   if (held) return held
   return (
     takeProblem(world, thief, carriage, realmId, 'carriage') ??

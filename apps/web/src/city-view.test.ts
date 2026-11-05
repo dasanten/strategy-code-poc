@@ -38,6 +38,8 @@ import {
   sendable,
   takesTransfers,
   tradesHere,
+  traderStopsAt,
+  previewTraderTrade,
   tradedGoods,
   tradeLists,
   tradersAt,
@@ -700,6 +702,116 @@ describe('prices from the Player’s side', () => {
         { good: 'stone', price: 3 },
       ])
     })
+  })
+})
+
+describe('a wandering trader at a stop in the inspector', () => {
+  const standing = { cityId: 'city1', x: 20, y: 30, until: 500 }
+  const seen = {
+    id: 't1',
+    carriageId: 'k1',
+    driverId: 'd1',
+    escortIds: [],
+    postId: 'p',
+    heading: 'post' as const,
+  }
+  const visit = { ...standing, traderId: 't1', city: 'Ashford' }
+  const lines = [
+    { good: 'wood' as const, buy: 2, sell: 4, stock: 10 },
+    { good: 'iron' as const, buy: 9, sell: 40, stock: 0 },
+  ]
+
+  it('shows those standing at the city, in sight with prices, else from the notice', () => {
+    const inSight = { ...seen, standing, prices: lines }
+    expect(traderStopsAt(city(null), [inSight], [visit])).toEqual([
+      {
+        id: 't1',
+        kind: 'carriage',
+        x: 20,
+        y: 30,
+        prices: lines,
+        carriageId: 'k1',
+        until: 500,
+        unseen: false,
+      },
+    ])
+    expect(traderStopsAt(city(null), [seen], [visit])).toEqual([
+      { id: 't1', kind: 'carriage', x: 20, y: 30, prices: [], until: 500, unseen: true },
+    ])
+    expect(traderStopsAt(city(null), [seen], [])).toEqual([])
+    const elsewhere = { ...inSight, standing: { ...standing, cityId: 'other' } }
+    expect(traderStopsAt(city(null), [elsewhere], [])).toEqual([])
+  })
+
+  it('lists what it carries to buy where that is seen, and takes every good', () => {
+    const [view] = traderStopsAt(city(null), [{ ...seen, standing, prices: lines }], [])
+    const lists = tradeLists(view!, { buildings: [] })
+    expect(lists.canBuy).toEqual([{ good: 'wood', units: 10, price: 4 }])
+    expect(lists.canSell.map((l) => l.good)).toEqual(['wood', 'iron'])
+    expect(lists.takesOnlyListed).toBe(false)
+    // Only those on its tile see its load, so others get the price of each.
+    const hidden = lines.map(({ good, buy, sell }) => ({ good, buy, sell }))
+    const [far] = traderStopsAt(city(null), [{ ...seen, standing, prices: hidden }], [])
+    expect(tradeLists(far!, { buildings: [] }).canBuy.map((l) => l.good)).toEqual(['wood', 'iron'])
+  })
+
+  it('finds who is on its tile, or on the way there, and links How to trade', () => {
+    const [view] = traderStopsAt(city(null), [{ ...seen, standing, prices: lines }], [])
+    const carried = {}
+    const here = {
+      id: 'r1',
+      owner: 'realm1',
+      x: 20,
+      y: 30,
+      order: null,
+      carried,
+      hunger: 1,
+      health: 1,
+    }
+    const next = { ...here, id: 'r2', x: 21 }
+    const residents = [here, next] as unknown as Resident[]
+    const at = tradersAt(view!, { residents, carriages: [] }, 'realm1')
+    expect(at.residents.map((r) => r.id)).toEqual(['r1'])
+    const seenCity = { ...city(null) }
+    const place = { cities: [], buildings: [], traders: [{ ...seen, standing, prices: lines }] }
+    expect(tradesHere(seenCity, place, 'realm1')).toBe(true)
+    expect(tradesHere(seenCity, { cities: [], buildings: [] }, 'realm1', [visit])).toBe(true)
+    expect(tradesHere(seenCity, { cities: [], buildings: [] }, 'realm1')).toBe(false)
+  })
+
+  it('previews a trade from its load, keeping the crew’s Food, saying what cut it down', () => {
+    const wagon = {
+      id: 'k1',
+      realmId: null,
+      cityId: 'hq',
+      x: 20,
+      y: 30,
+      horseId: null,
+      load: { wood: 3 },
+    }
+    const buyer = {
+      carried: { coins: 100 },
+      bornAt: -1e9,
+      stats: { strength: { base: 10, trained: 0 } },
+    } as unknown as Resident
+    const q = previewTraderTrade({ escortIds: [] }, wagon, buyer, undefined, 'wood', 5, 0, [])
+    expect(q.buy.units).toBe(3)
+    expect(q.buy.limit).toBe('stock')
+    expect(q.sell.limit).toBe('held')
+    const none = previewTraderTrade(
+      { escortIds: [] },
+      undefined,
+      buyer,
+      undefined,
+      'wood',
+      5,
+      0,
+      [],
+    )
+    expect(none.buy).toEqual({ units: 0, coins: 0 })
+    expect(tradeText('sell', 'wood', { units: 0, coins: 0, limit: 'theirRoom' }, false)).toBe(
+      'Can’t sell wood: it has no room for it',
+    )
   })
 })
 

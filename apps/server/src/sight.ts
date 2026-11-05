@@ -5,6 +5,8 @@ import {
   cityPrice,
   forSale,
   npcCityPrices,
+  traderPrices,
+  traderStanding,
   npcCityRefuses,
   npcHirePrice,
   sellsTo,
@@ -443,6 +445,20 @@ function everythingSeen(
       out.push({ is: 'caravan', id, postId, carriageId, driverId, escortIds, heading })
     }
   }
+  // A wandering trader likewise (`CONTEXT.md`: Wandering trader).
+  for (const t of world.traders) {
+    if (caravanSeen(world, t, inSight)) {
+      const { id, postId, carriageId, driverId, escortIds, heading } = t
+      // At a stop it names its prices to anyone in sight (`CONTEXT.md`: Trader stop).
+      const standing = traderStanding(world, t)
+      const k = standing && index.carriageById(carriageId)
+      const open =
+        standing && k
+          ? { standing, prices: shownLines(traderPrices(t, k), insight.insideCarriage(k)) }
+          : {}
+      out.push({ is: 'trader', id, postId, carriageId, driverId, escortIds, heading, ...open })
+    }
+  }
   return out
 }
 
@@ -663,7 +679,7 @@ function sideSight(world: WorldState, size: number, side: string): SideSight {
   return cache?.size === size ? cache.side(world, side) : new SideSight(world, size, side)
 }
 
-/** Whether a caravan's carriage or any of its crew is in sight. */
+/** Whether a caravan's or trader's carriage or any of its crew is in sight. */
 function caravanSeen(
   world: WorldState,
   caravan: Pick<Caravan, 'carriageId' | 'driverId' | 'escortIds'>,
@@ -695,7 +711,7 @@ export function sentOutOfSight(
       ? !world.buildings.some((b) => b.cityId === e.id && buildingSeen(eyes, b))
       : e.is === 'army'
         ? !armySeen(world, e, inSight)
-        : e.is === 'caravan'
+        : e.is === 'caravan' || e.is === 'trader'
           ? !caravanSeen(world, e, inSight)
           : e.is === 'building'
             ? !buildingSeen(eyes, e)
@@ -736,6 +752,10 @@ export function sentInsideUnseen(
       }
       case 'city':
         return hasStock(e.trade) && !insight.insideCity(e.id)
+      case 'trader': {
+        const k = byId(world.carriages, e.carriageId)
+        return hasStock(e.prices) && !(k && insight.insideCarriage(k))
+      }
       case 'resident': {
         const r = byId(world.residents, e.id)
         const told =

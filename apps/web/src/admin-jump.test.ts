@@ -42,9 +42,31 @@ const places: AdminPlaces = {
     hq: { id: 'hq', name: 'Trade Org HQ', x: 320, y: 320 },
     posts: [{ id: 'post-1', name: 'Saltmarsh', x: 100, y: 100 }],
     caravans: [{ id: 'car-1', name: 'Saltmarsh', x: 200, y: 210, postId: 'post-1', heading: 'hq' }],
+    traders: [],
   },
   armies: [{ id: 'army-1', name: 'Iron Band', x: 44, y: 45, realmId: 'realm-b', realm: 'Bertha' }],
 }
+
+describe('wandering traders on the jump list', () => {
+  const withTrader: AdminPlaces = {
+    ...places,
+    tradeOrg: { ...places.tradeOrg, traders: [{ id: 'tr-1', name: 'Saltmarsh', x: 9, y: 8 }] },
+  }
+
+  it('lists one under the Trade Organization, a figure to land close on', () => {
+    const entry = jumpList(withTrader, '')
+      .flatMap((g) => g.entries)
+      .find((e) => e.kind === 'trader')!
+    expect(entry).toMatchObject({
+      key: 'trader:tr-1',
+      id: 'tr-1',
+      name: 'Saltmarsh',
+      detail: 'wandering trader',
+      at: { x: 9, y: 8 },
+    })
+    expect(jumpScale('trader')).toBe(ADMIN_JUMP_FIGURE_SCALE)
+  })
+})
 
 const names = (search: string) =>
   jumpList(places, search).map((g) => [g.title, g.entries.map((e) => e.name)])

@@ -4,8 +4,10 @@ import {
   TICKS_PER_GAME_DAY,
   occupierOf,
   townHallOf,
+  tradeOrgHq,
   drivenCarriageId,
   inCityArea,
+  isArmed,
   isAt,
   realmName,
   type Carriage,
@@ -15,6 +17,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { leaveTradeOrg } from './caravans.js'
+import { commitCrime } from './crimes.js'
 import { recordEvent } from './events.js'
 import { hqFalls } from './hq-fall.js'
 import { residentNamesTaken, uniqueName } from './names.js'
@@ -89,14 +92,25 @@ function occupationLogged(
  * orders their former owner gave them, and their pair unless the partner joins too; whoever else
  * drove a carriage that joins stops driving it, and nobody keeps attacking their own realm. Both
  * realms' logs show it. One who joins with a name from the game that the realm already has gets a
- * numeral added (`CONTEXT.md`: Game-given names).
+ * numeral added (`CONTEXT.md`: Game-given names). A trading post's capture is a crime against the
+ * Trade Organization, which it hears of only by news (`CONTEXT.md`: Lost post found out); its
+ * witnesses are counted once its residents have joined, so that they are none of them.
  */
 export function captureCity(world: WorldState, city: City, captor: string, size: number): void {
   const from = city.realmId
+  const hall = townHallOf(world, city)
+  const culprit =
+    city.tradeOrg === 'post' && hall
+      ? world.residents.find((r) => r.owner === captor && isArmed(r) && isAt(r, hall, size))
+      : undefined
   const residents = joinRealm(world, city, captor, size)
   const what = { kind: 'cityCaptured', cityId: city.id, city: city.name, residents } as const
   recordEvent(world, captor, { ...what, other: from && realmName(world, from), captor: true })
   recordEvent(world, from, { ...what, other: realmName(world, captor), captor: false })
+  const hq = tradeOrgHq(world)
+  if (culprit && hq) {
+    commitCrime(world, size, 'capture', culprit, { victimOrg: hq.id, post: city.id })
+  }
 }
 
 /**

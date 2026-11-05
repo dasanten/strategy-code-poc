@@ -64,6 +64,8 @@ export type ScriptViewName =
   | 'lineTile'
   | 'workSettings'
   | 'waypoint'
+  | 'trader'
+  | 'traderStand'
   | 'demand'
 
 const field = (
@@ -599,14 +601,47 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
     ],
   },
   price: {
-    description: 'A price for one good, at a Trade Org warehouse or an NPC city.',
+    description:
+      'A price for one good, at a Trade Org warehouse, an NPC city or a wandering trader.',
     fields: [
       field('good', 'string', 'The good.'),
       field('buy', 'number', 'What it pays for one unit.'),
       field('sell', 'number', 'What it asks for one unit.'),
       field('stock', 'number', 'What it holds.', 'unless the Player sees inside'),
-      field('forSale', 'number', 'Units an NPC city would sell.', 'at a warehouse'),
-      field('wanted', 'number', 'Units an NPC city would buy.', 'at a warehouse'),
+      field('forSale', 'number', 'Units an NPC city would sell.', 'but at an NPC city'),
+      field('wanted', 'number', 'Units an NPC city would buy.', 'but at an NPC city'),
+    ],
+  },
+  trader: {
+    description: 'A wandering trader of the Trade Organization, as the Player sees it.',
+    fields: [
+      id('trader'),
+      field('carriageId', 'string', 'Its carriage.'),
+      field('driverId', 'string', 'The resident who drives it.', 'with no crew left'),
+      field('escortIds', listOf('string'), 'The residents who walk along with it.'),
+      field('postId', 'string', 'The trading post it goes to next.', 'with no post left'),
+      field('heading', 'string', 'Where it is bound: "hq" or "post".'),
+      field(
+        'standing',
+        view('traderStand'),
+        'Where it stands to trade.',
+        'unless it stands at a stop',
+      ),
+      field(
+        'prices',
+        listOf(view('price')),
+        'Its prices, one for each good, from what it carries.',
+        'unless it stands at a stop',
+      ),
+    ],
+  },
+  traderStand: {
+    description: 'Where a wandering trader stands to trade: anyone on its tile can.',
+    fields: [
+      field('cityId', 'string', 'The city it stands at.'),
+      x,
+      y,
+      field('until', 'number', 'The tick it goes on.'),
     ],
   },
   offer: {
