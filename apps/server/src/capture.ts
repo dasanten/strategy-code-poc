@@ -2,6 +2,8 @@ import {
   OCCUPATION_GAME_DAYS,
   OCCUPATION_TICKS,
   TICKS_PER_GAME_DAY,
+  TRADE_ORG,
+  TRADE_ORG_DEBT_TRIPS,
   occupierOf,
   townHallOf,
   tradeOrgHq,
@@ -14,13 +16,16 @@ import {
   type City,
   type Horse,
   type Resident,
+  type TerrainMap,
   type WorldState,
 } from '@csp/shared'
-import { leaveTradeOrg, rejoinTradeOrg } from './caravans.js'
-import { commitCrime } from './crimes.js'
+import { joinTradeOrg, leaveTradeOrg, rejoinTradeOrg } from './caravans.js'
+import { commitCrime, cityOrganization } from './crimes.js'
 import { recordEvent } from './events.js'
 import { hqFalls } from './hq-fall.js'
 import { residentNamesTaken, uniqueName } from './names.js'
+import { noteCityTaken } from './trade-org-takes.js'
+import { workplacesOfCity } from './trade-org-wrecks.js'
 
 /** A city that changed realm by capture this tick. */
 export interface Capture {
@@ -31,14 +36,16 @@ export interface Capture {
 }
 
 /**
- * Runs the occupations of town halls (`CONTEXT.md`: Occupying a town hall, Capturing a city), on
- * a map of `size` tiles: one starts the tick a realm occupies a hall (`occupierOf`) with none
+ * Runs the occupations of town halls (`CONTEXT.md`: Occupying a town hall, Capturing a city): one
+ * starts the tick a realm occupies a hall (`occupierOf`) with none
  * running; the first tick another realm or nobody does, it is broken and its days are lost; held
- * `OCCUPATION_TICKS`, the city is captured. Both realms' logs say when one starts and when it is
- * broken (`occupationLogged`). Runs once fights, deaths and dropped weapons are
- * settled, and before refilling, so whoever is at home in a city captured this tick refills there.
+ * `OCCUPATION_TICKS`, the city is captured, or for the Trade Organization taken (`takeCity`). Both
+ * realms' logs say when one starts and when it is broken (`occupationLogged`). Runs once fights,
+ * deaths and dropped weapons are settled, and before refilling, so whoever is at home in a city
+ * captured this tick refills there.
  */
-export function stepCaptures(world: WorldState, size: number): Capture[] {
+export function stepCaptures(world: WorldState, terrain: TerrainMap): Capture[] {
+  const size = terrain.size
   const captures: Capture[] = []
   for (const city of world.cities) {
     const occupier = occupierOf(world, city, size)
@@ -54,7 +61,8 @@ export function stepCaptures(world: WorldState, size: number): Capture[] {
     if (world.tick - city.occupation.since < OCCUPATION_TICKS) continue
     city.occupation = null
     captures.push({ cityId: city.id, from: city.realmId, to: occupier })
-    captureCity(world, city, occupier, size)
+    if (occupier === TRADE_ORG) takeCity(world, city, terrain)
+    else captureCity(world, city, occupier, size)
   }
   return captures
 }
@@ -111,6 +119,41 @@ export function captureCity(world: WorldState, city: City, captor: string, size:
   if (culprit && hq) {
     commitCrime(world, size, 'capture', culprit, { victimOrg: hq.id, post: city.id })
   }
+}
+
+/**
+ * The Trade Organization's army held the town hall to the end (`CONTEXT.md`: Trade Org debt): the city
+ * joins it as a new trading post (`joinTradeOrg`) and that settles all the debt of its Organization.
+ * Those who live there stay as the post's and its horses and carriages are the post's, a Leader staying
+ * in their realm, homeless, as in any capture (`changeHands`). What its residents worked it goes on
+ * working. No crime: it only collects what it is owed. Capturing this post later goes like any other's.
+ */
+function takeCity(world: WorldState, city: City, terrain: TerrainMap): void {
+  const from = city.realmId
+  const org = cityOrganization(city)
+  const worked = workplacesOfCity(world, city, terrain.size)
+  const residents = changeHands(world, city, null, terrain.size)
+  const own = worked.filter((b) => b.cityId !== city.id).map((b) => b.id)
+  city.workplaceIds = [...new Set([...(city.workplaceIds ?? []), ...own])]
+  joinTradeOrg(world, city, terrain)
+  recordEvent(world, from, {
+    kind: 'cityCaptured',
+    cityId: city.id,
+    city: city.name,
+    residents,
+    other: realmName(world, TRADE_ORG),
+    captor: false,
+  })
+  const debt = world.debts.find((d) => d.org === org)
+  noteCityTaken(world, {
+    cityId: city.id,
+    org,
+    trips: debt?.trips ?? 0,
+    enoughTrips: (debt?.trips ?? 0) >= TRADE_ORG_DEBT_TRIPS,
+  })
+  if (!debt) return
+  world.debts = world.debts.filter((d) => d !== debt)
+  recordEvent(world, org, { kind: 'debt', what: 'cityTaken', coins: debt.coins, owed: 0 })
 }
 
 /**

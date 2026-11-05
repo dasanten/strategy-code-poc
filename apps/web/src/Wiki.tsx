@@ -180,6 +180,7 @@ import {
   DEMAND_DECLINED_STANDING_LOSS,
   DEMAND_MAX_DAYS,
   TRADE_ORG_DEBT_DEMAND_DAYS,
+  TRADE_ORG_DEBT_TRIPS,
   WORKPLACE_WRECK_WORTH,
   DEMAND_NOTE_MAX_LENGTH,
   DEMAND_TRADE_ORG_STANDING_LOSS,
@@ -2227,6 +2228,18 @@ export function Wiki() {
             nobody of it works or one someone else works. Its soldiers fight those who attack them,
             and it goes home after, with the debt still owed if that didn't cover it, and comes
             again. Pay in full at a warehouse while it is there and it stops and goes home.
+          </li>
+          <li>
+            After {num(TRADE_ORG_DEBT_TRIPS)} such armies have reached a city, with the debt still
+            owed, its next army comes to <strong>take the city</strong>. It holds the town hall as
+            anyone would, for {days(OCCUPATION_GAME_DAYS)} without a break, and fights whoever is
+            armed on the hall or attacks it. When the time is up the city joins the Trade
+            Organization as a new trading post and all you owe is settled. Its storages become
+            warehouses with what is in them, with prices and a stock floor, but its Food goes into a
+            new storage near the town hall. Its people stay as the post's, your Leader staying in your
+            realm, homeless, and it gets a caravan and joins the wandering traders' loops. Pay in full
+            at a warehouse before that and the army goes home. Capturing that post later goes like
+            any post's capture.
           </li>
           <li>
             A trading post you took is a debt too, once it has heard who took it: it adds the post's

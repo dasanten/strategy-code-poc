@@ -4,6 +4,36 @@ import { appendEvents, describeDelivery, describeEvent, realmEnded } from './rea
 
 const at = { tick: 7, userId: 1 }
 
+describe('the Trade Organization taking a city', () => {
+  const at = { cityId: 'c1', city: 'Ashford', worth: 500 }
+  const line = (what: object) =>
+    describeEvent({ ...what, seq: 1, tick: 1, userId: 7 } as RealmEvent).text
+
+  it('says its army comes for the city, and that paying stops it', () => {
+    const text = line({ kind: 'punished', what: 'coming', takes: true, ...at })
+    expect(text).toMatch(/hold its town hall and take the city/)
+    expect(text).toMatch(/500 Coins/)
+    expect(text).toMatch(/Paying in full/)
+  })
+
+  it('says why it left, with no talk of what it took', () => {
+    const left = line({ kind: 'punished', what: 'left', why: 'tookCity', takes: true, ...at })
+    expect(left).toBe(
+      "The Trade Organization's army left Ashford: Ashford is a trading post of the Trade Organization now.",
+    )
+    const paid = line({ kind: 'punished', what: 'left', why: 'paid', takes: true, ...at })
+    expect(paid).toBe("The Trade Organization's army left Ashford: your debt is paid.")
+    const lost = line({ kind: 'punished', what: 'lost', where: 'atCity', takes: true, ...at })
+    expect(lost).toBe("The Trade Organization's army was lost at Ashford.")
+  })
+
+  it('says the city settled the debt', () => {
+    expect(line({ kind: 'debt', what: 'cityTaken', coins: 500, owed: 0 })).toBe(
+      'Taking your city settled your debt of 500 Coins to the Trade Organization.',
+    )
+  })
+})
+
 describe('realm log', () => {
   it('says why a resident couldn’t move in (`CONTEXT.md`: Relocate)', () => {
     const failed = { kind: 'relocateFailed', residentId: 'r1', name: 'Ana', cityId: 'c2' } as const

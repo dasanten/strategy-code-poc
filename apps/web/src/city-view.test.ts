@@ -87,6 +87,11 @@ describe('city inspector', () => {
       occupation: { realmId: by, since },
     })
     expect(describeOccupation(city(null), 0, 'realm1', realms)).toBeUndefined()
+    expect(describeOccupation(occupied('realm1', 'trade-org', 100), 100, 'realm1', realms)).toEqual({
+      text: `Occupied by the Trade Organization, ${OCCUPATION_GAME_DAYS} game days left`,
+      warning: true,
+      realmId: 'trade-org',
+    })
     expect(describeOccupation(occupied(null, 'realm2', 100), 100, 'realm1', realms)).toEqual({
       text: `Occupied by Mara, ${OCCUPATION_GAME_DAYS} game days left`,
       warning: false,

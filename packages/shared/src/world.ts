@@ -1524,7 +1524,8 @@ export type CrimeKind = 'theft' | 'attack' | 'killing' | 'tearDown' | 'capture'
  * `empty`, the city's storages held nothing; `gaveUp`, its time there ran out; `cityLost`, the city
  * is no longer the culprit's; `directiveLifted`, the admin directive it came for was lifted;
  * `noWay`, it couldn't get there; `paid`, the debt it came about was paid while it was out;
- * `noWorkplaces`, the city has no workplaces left to tear down.
+ * `noWorkplaces`, the city has no workplaces left to tear down; `tookCity`, it held the town hall to
+ * the end and the city is a trading post now.
  */
 export type PunishmentEnd =
   | 'enough'
@@ -1535,6 +1536,7 @@ export type PunishmentEnd =
   | 'noWay'
   | 'paid'
   | 'noWorkplaces'
+  | 'tookCity'
 
 /**
  * The Trade Org army out to punish an Organization for crimes against the Trade Organization
@@ -1589,6 +1591,11 @@ export interface Punishment {
    * found once it is at the city.
    */
   wrecks?: string[]
+  /**
+   * An army sent for a debt once its trips are over (`CONTEXT.md`: Trade Org debt): it takes no goods
+   * and tears nothing down, but occupies the town hall until the city joins the Trade Organization.
+   */
+  takes?: true
 }
 /**
  * The supply wagon of a punishment (`CONTEXT.md`: Trade Org debt, Supply line): a carriage of the
@@ -1631,6 +1638,12 @@ export interface Debt {
   step?: 'demanded' | 'wrecks'
   /** The deadline of its demand, in ticks, while the step is `demanded`. */
   deadline?: number
+  /**
+   * How many armies have reached a city to tear down workplaces for it. Once that is
+   * `TRADE_ORG_DEBT_TRIPS`, the next one comes to take the city (`Punishment.takes`). None before
+   * the first.
+   */
+  trips?: number
   /**
    * The city its army came to when it left this debt, where it comes back to at the step `wrecks`.
    * None for a debt from before that was kept; its army then goes to the city nearest the HQ.
@@ -1831,6 +1844,7 @@ export type RealmEventWhat =
       /** Sent for an admin directive, with its reason, rather than for crimes. */
       directive?: string
       wrecks?: true
+      takes?: true
     }
   /**
    * The Trade Organization's army tore down a workplace at (`x`, `y`) of `city`, for a debt
@@ -1856,7 +1870,7 @@ export type RealmEventWhat =
    */
   | {
       kind: 'debt'
-      what: 'owed' | 'postOwed' | 'rose' | 'collected' | 'postReturned' | 'overdue' | 'ended'
+      what: 'owed' | 'postOwed' | 'rose' | 'collected' | 'postReturned' | 'cityTaken' | 'overdue' | 'ended'
       coins: number
       owed: number
     }

@@ -862,6 +862,8 @@ function punishmentEnd(why: PunishmentEnd | undefined, city: string): string {
       return ': your debt is paid'
     case 'noWorkplaces':
       return `: ${city} has no workplaces left to tear down`
+    case 'tookCity':
+      return `: ${city} is a trading post of the Trade Organization now`
     default:
       return ''
   }
@@ -906,6 +908,11 @@ function debtLine(e: Extract<RealmEvent, { kind: 'debt' }>): EventLine {
         text: `You still owe the Trade Organization ${e.owed} Coins and its demand is over: its next army comes for your workplaces. Paying in full at any of its warehouses stops it.`,
         tone: 'bad',
       }
+    case 'cityTaken':
+      return {
+        text: `Taking your city settled your debt of ${e.coins} Coins to the Trade Organization.`,
+        tone: 'bad',
+      }
     case 'ended':
       return {
         text: `Your debt of ${e.coins} Coins ended with the fall of the Trade Org HQ.`,
@@ -922,7 +929,9 @@ function punishedLine(e: Extract<RealmEvent, { kind: 'punished' }>): EventLine {
   switch (e.what) {
     case 'coming':
       return {
-        text: e.wrecks
+        text: e.takes
+          ? `The Trade Organization is sending its army to ${e.city} to hold its town hall and take the city for the ${e.worth} Coins you owe. Paying in full at any of its warehouses stops it.`
+          : e.wrecks
           ? `The Trade Organization is sending its army to ${e.city} to tear down workplaces for the ${e.worth} Coins you owe.`
           : e.directive === undefined
             ? `The Trade Organization is sending its army to ${e.city} to take back ${e.worth} Coins' worth.`
@@ -933,7 +942,9 @@ function punishedLine(e: Extract<RealmEvent, { kind: 'punished' }>): EventLine {
       return { text: `${army} has arrived at ${e.city}.`, tone: 'bad' }
     case 'left':
       return {
-        text: `${army} left ${e.city}, ${e.wrecks ? tornDown : `taking ${taking}`}${punishmentEnd(e.why, e.city)}.`,
+        text: e.takes
+          ? `${army} left ${e.city}${punishmentEnd(e.why, e.city)}.`
+          : `${army} left ${e.city}, ${e.wrecks ? tornDown : `taking ${taking}`}${punishmentEnd(e.why, e.city)}.`,
         tone: 'warn',
       }
     case 'turnedBack':
@@ -947,8 +958,10 @@ function punishedLine(e: Extract<RealmEvent, { kind: 'punished' }>): EventLine {
           e.where === 'wayThere'
             ? `${army} was lost on its way to ${e.city}.`
             : e.where === 'atCity'
-              ? `${army} was lost at ${e.city}, ${e.wrecks ? tornDown : `having taken ${taking}`}.`
-              : e.wrecks
+              ? e.takes
+                ? `${army} was lost at ${e.city}.`
+                : `${army} was lost at ${e.city}, ${e.wrecks ? tornDown : `having taken ${taking}`}.`
+              : e.wrecks || e.takes
                 ? `${army} was lost on its way home from ${e.city}.`
                 : `${army} was lost on its way home from ${e.city}, with ${taking}.`,
         tone: 'info',

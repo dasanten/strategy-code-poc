@@ -8,6 +8,7 @@ import {
   TICKS_PER_GAME_DAY,
   DIRECTIVE_PUNISH_WORTH,
   TRADE_ORG,
+  TRADE_ORG_DEBT_TRIPS,
   TRADE_ORG_LOSS,
   TRADE_ORG_PUNISH,
   TRADE_ORG_PUNISHES_BELOW,
@@ -54,6 +55,7 @@ import {
 import { spareSoldiers } from './trade-org-army.js'
 import { buyFood, packPurse } from './trade-org-buying.js'
 import { oweTradeOrg } from './trade-org-debt.js'
+import { hallBlockers } from './trade-org-takes.js'
 import { findWorkplaces, tearDownNext, workplacesToWreck } from './trade-org-wrecks.js'
 
 /*
@@ -63,7 +65,9 @@ import { findWorkplaces, tearDownNext, workplacesToWreck } from './trade-org-wre
  * back `TRADE_ORG_PUNISH.times` what it lost from the city's storages, Coins first, fighting
  * whoever resists, and carry it home. What it came for and couldn't take stays owed (`CONTEXT.md`:
  * Trade Org debt), and past its demand's deadline an army comes to tear down workplaces for it
- * (`Punishment.wrecks`, `trade-org-wrecks.ts`). It never captures the city. Like the rest of the HQ it
+ * (`Punishment.wrecks`, `trade-org-wrecks.ts`), and once enough of those have come and it is still owed
+ * the next one holds the town hall until the city joins it as a trading post (`Punishment.takes`,
+ * `takeCity`). Like the rest of the HQ it
  * only gives orders a Player could give (ADR 0002): walking, picking up, dropping, attacking, tearing
  * down.
  */
@@ -218,7 +222,8 @@ function sendOut(world: WorldState, size: number): void {
  * against who owes it: its next army goes to the city kept with the debt, or if that is no longer
  * theirs their city nearest the HQ, `TRADE_ORG_PUNISH.soldiers` of its spare soldiers at most, to tear
  * down workplaces for it (`CONTEXT.md`: Trade Org debt). It goes again each time it is back, with the
- * debt still owed. With no spare soldier, or no city to go to, it waits.
+ * debt still owed; once `TRADE_ORG_DEBT_TRIPS` of them have reached a city, it goes to take the city
+ * instead (`Punishment.takes`). With no spare soldier, or no city to go to, it waits.
  */
 function sendOutForDebts(world: WorldState, size: number): void {
   const hq = tradeOrgHq(world)
@@ -244,6 +249,7 @@ function sendOutForDebts(world: WorldState, size: number): void {
       .filter((r) => !busy.has(r.id))
       .slice(0, TRADE_ORG_PUNISH.soldiers)
     if (soldiers.length === 0) return
+    const takes = (debt.trips ?? 0) >= TRADE_ORG_DEBT_TRIPS
     setOut(world, city, size, {
       id: newId(world, 'punishment'),
       culpritOrg: debt.org,
@@ -253,7 +259,7 @@ function sendOutForDebts(world: WorldState, size: number): void {
       heading: 'out',
       took: 0,
       startedAt: world.tick,
-      wrecks: [],
+      ...(takes ? { takes: true as const } : { wrecks: [] }),
     })
     recordEvent(world, debt.org, {
       kind: 'punished',
@@ -261,7 +267,7 @@ function sendOutForDebts(world: WorldState, size: number): void {
       cityId: city.id,
       city: city.name,
       worth: debt.coins,
-      wrecks: true,
+      ...(takes ? { takes: true as const } : { wrecks: true as const }),
     })
   }
 }
@@ -393,7 +399,8 @@ function whyHeadHome(
   took: number,
   size: number,
 ): PunishmentEnd | undefined {
-  if (p.wrecks && !world.debts.some((d) => d.org === p.culpritOrg)) {
+  if (p.takes && city?.tradeOrg === 'post') return 'tookCity'
+  if ((p.wrecks || p.takes) && !world.debts.some((d) => d.org === p.culpritOrg)) {
     return took >= p.worth ? 'enough' : 'paid'
   }
   if (directiveLifted(world, p)) return 'directiveLifted'
@@ -410,6 +417,8 @@ function whyHeadHome(
   }
   if (p.wrecks) {
     if (p.wrecks.length === 0) return 'noWorkplaces'
+  } else if (p.takes) {
+    if (city.occupation?.realmId === TRADE_ORG) return undefined
   } else {
     if (took >= p.worth) return 'enough'
     if (storagesToTake(world, city).length === 0) return 'empty'
@@ -602,6 +611,7 @@ function logPunished(
     ...line,
     ...(where && { where }),
     ...(p.wrecks && { wrecks: true as const }),
+    ...(p.takes && { takes: true as const }),
   })
 }
 
@@ -611,7 +621,7 @@ function logPunished(
  * no debt, nor does one that came to tear down workplaces for a debt, which still stands.
  */
 function leaveDebt(world: WorldState, p: Punishment, took: number): void {
-  if (p.directiveId === undefined && !p.wrecks) {
+  if (p.directiveId === undefined && !p.wrecks && !p.takes) {
     oweTradeOrg(world, p.culpritOrg, p.worth - took, p.cityId)
   }
 }
@@ -631,7 +641,9 @@ function leaveDebt(world: WorldState, p: Punishment, took: number): void {
  * what it took, it turned back without reaching the city and why, or it was lost, and what that
  * leaves owed (`leaveDebt`). An army that wrecks takes no goods: at the city its soldiers tear down
  * the workplaces it finds (`findWorkplaces`), and what comes down counts against the debt
- * (`countWrecked`).
+ * (`countWrecked`). An army that takes the city takes no goods either: its soldiers go to the town hall
+ * and stand on it (`occupierOf`), fighting whoever blocks it (`hallBlockers`), until it falls or it is
+ * paid.
  */
 function runPunishment(world: WorldState, hq: City, p: Punishment, size: number): void {
   const members = living(world, p)
@@ -647,8 +659,8 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
     return
   }
   for (const { r, own } of members) eatFromOwn(r, own)
-  const took = p.wrecks ? p.took : tookSoFar(world, p)
-  const debt = p.wrecks && world.debts.find((d) => d.org === p.culpritOrg)
+  const took = p.wrecks || p.takes ? p.took : tookSoFar(world, p)
+  const debt = (p.wrecks || p.takes) && world.debts.find((d) => d.org === p.culpritOrg)
   if (p.heading === 'out') {
     if (debt) p.worth = p.took + debt.coins
     p.took = Math.min(took, p.worth)
@@ -660,6 +672,7 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
     ) {
       p.arrivedAt = world.tick
       logPunished(world, p, city, { what: 'arrived' })
+      if (p.wrecks && debt) debt.trips = (debt.trips ?? 0) + 1
     }
     if (p.wrecks && p.arrivedAt !== undefined && city && stillTheCulprits(world, p, city)) {
       findWorkplaces(world, p, city, size)
@@ -678,7 +691,7 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
     !directiveLifted(world, p)
       ? city
       : undefined
-  const storages = robbing && !p.wrecks ? storagesToTake(world, robbing) : []
+  const storages = robbing && !p.wrecks && !p.takes ? storagesToTake(world, robbing) : []
   const wrecking =
     robbing && debt && p.heading === 'out' ? workplacesToWreck(world, p, debt.coins) : []
   const target = city && townHallOf(world, city)
@@ -698,6 +711,15 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
   let left = p.worth - took
   const onTheRoad = p.heading === 'home' || p.arrivedAt === undefined
   const wagonShare = on ? (on.carriage.load.food ?? 0) / (members.length + 1) : 0
+  // Holding the hall: whoever stands in its way there is fought, and one of them stays on it whatever
+  // else the others go for, or the days are lost.
+  const holding = p.takes && robbing && p.heading === 'out' ? target : undefined
+  if (holding && robbing) {
+    for (const t of hallBlockers(world, robbing, ids, size)) {
+      if (!resisting.includes(t)) resisting.push(t)
+    }
+  }
+  const keeper = holding && members.find((m) => isAt(m.r, holding, size))?.r
   for (const { r, own, member } of members) {
     const o = r.order
     if (o?.kind === 'tearDown' && !wrecking.some((b) => b.id === o.buildingId)) r.order = null
@@ -723,6 +745,7 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
       const units = foodToBuy(r, needed, wanted, wagonShare)
       if (buyFood(world, hq, p, member, r, units, size)) continue
     }
+    if (r === keeper) continue
     if (on && goToWagonForFood(r, on.carriage, size)) continue
     const places = () => refillPlaces(world, robbing, r, size)
     if (fetchFood(world, places, r, own, wanted, size)) continue
@@ -737,6 +760,10 @@ function runPunishment(world: WorldState, hq: City, p: Punishment, size: number)
     }
     if (p.wrecks) {
       tearDownNext(r, wrecking, size, headFor)
+      continue
+    }
+    if (p.takes) {
+      if (holding && !isAt(r, holding, size)) headFor(r, holding)
       continue
     }
     if (storages.length === 0) continue
@@ -807,8 +834,11 @@ function bringHome(world: WorldState, hq: City, r: Resident, taken: Stock, size:
  * 0004): each punishes an Organization other than the Trade Organization, at most one under way
  * for each, for a positive worth of which it took no more than all and nothing before it arrived
  * (Punishment trip); its members are residents of the HQ, each in one punishment at most and in no
- * contract, having brought no less than no Coins; and the Trade Organization never captures a city. Its supply wagons have their own
- * invariant (`supplyWagonsSound`).
+ * contract, having brought no less than no Coins. An army that takes a city takes goods from nobody,
+ * tears nothing down and comes for a debt whose trips are over; the city's Organization can be the
+ * Trade Organization's once that is done, for an NPC city taken while it goes home. A city it takes is
+ * a post, of no realm (`trade-org-sound`), so no city ever has the Trade Organization for a realm. Its
+ * supply wagons have their own invariant (`supplyWagonsSound`).
  */
 export const punishmentsSound: Invariant = {
   name: 'punishments-sound',
@@ -820,8 +850,17 @@ export const punishmentsSound: Invariant = {
     const orgs = new Set<string>()
     const members = new Set<string>()
     for (const p of world.punishments ?? []) {
-      if (standingOrganization(world, p.culpritOrg) === TRADE_ORG) {
+      if (!p.takes && standingOrganization(world, p.culpritOrg) === TRADE_ORG) {
         fail(`punishment ${p.id} punishes the Trade Organization itself`, [p.id])
+      }
+      if (p.takes) {
+        if (p.wrecks || p.directiveId !== undefined || p.took !== 0) {
+          fail(`punishment ${p.id} takes a city and does something else too`, [p.id])
+        }
+        const debt = world.debts.find((d) => d.org === p.culpritOrg)
+        if (debt && (debt.trips ?? 0) < TRADE_ORG_DEBT_TRIPS) {
+          fail(`punishment ${p.id} takes a city after ${debt.trips ?? 0} trips`, [p.id])
+        }
       }
       if (!(p.worth > 0)) fail(`punishment ${p.id} is worth ${p.worth}`, [p.id])
       if (!(p.took >= 0 && p.took <= p.worth)) {

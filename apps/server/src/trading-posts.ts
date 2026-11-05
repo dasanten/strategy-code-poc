@@ -15,6 +15,7 @@ import {
 } from '@csp/shared'
 import { updateCityMembership } from './cities.js'
 import { foundNpcCity, npcSiteFits, takenGround } from './npc-cities.js'
+import { houseTile } from './npc-growth.js'
 import type { Ground } from './placing.js'
 import { mulberry32 } from './residents.js'
 import { FARM_RING, newId } from './starting-city.js'
@@ -172,6 +173,34 @@ export function restoreWarehouse(world: WorldState, post: City, size: number): v
     ...spot,
     stock: {},
   })
+}
+
+/**
+ * A city taken by the Trade Organization's army gets its warehouses (`CONTEXT.md`: Trade Org debt):
+ * every finished storage becomes one with all its goods, but for the Food, which goes into a new
+ * storage near the town hall, as a post's people eat from a storage and its farms fill one. A city with
+ * no storage gets an empty warehouse too. With no room for a new building the storage holding the most
+ * Food stays one and takes all the Food, so that nobody goes hungry for want of room.
+ */
+export function storagesBecomeWarehouses(world: WorldState, city: City, terrain: TerrainMap): void {
+  const hall = townHallOf(world, city)
+  if (!hall) return
+  const storages = npcStorages(world, city)
+  const food = storages.reduce((sum, b) => sum + (b.stock?.food ?? 0), 0)
+  for (const b of storages) delete b.stock?.food
+  const place = (kind: 'storage' | 'warehouse', stock: Building['stock']) => {
+    const at = houseTile(world, city, hall, terrain, undefined, kind)
+    if (!at) return undefined
+    const b: Building = { id: newId(world, 'b'), kind, cityId: city.id, ...at, stock }
+    world.buildings.push(b)
+    return b
+  }
+  const eatingFrom = place('storage', food > 0 ? { food } : {})
+  const kept = eatingFrom ? undefined : storages[0]
+  if (kept) (kept.stock ??= {}).food = food
+  for (const b of storages) if (b !== kept) b.kind = 'warehouse'
+  if (storages.length === 0) place('warehouse', {})
+  updateCityMembership(world, terrain.size)
 }
 
 /**
