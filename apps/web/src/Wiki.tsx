@@ -701,13 +701,13 @@ export function Wiki() {
           map, anywhere, not only where the resident stands now; one that needs more (which goods,
           what to build, what a smithy makes, which script) asks for it on the card after. What to
           build is the same Build menu as on the card; a kind dimmed because the tile lacks
-          something today, such as a city's area, can still be added, for a step before it may bring
-          that. A step that has to be done on its tile goes after a walk there, unless the step
-          before already walks there. It works on a resident with no queue too, and starts one.
-          Adding a step only checks that it could make sense (the place is there as you last knew
-          it, and a carriage or horse is yours). A workplace or construction site can be anyone's,
-          in sight or as last seen, since a workplace has no owner: queue Work at a far mine and
-          they walk there and work it. Whether a step can start is checked when its turn comes.
+          something today, such as a city's area, can still be added, for a step before it may
+          bring that. A step that has to be done on its tile goes after a walk there, unless the step before already
+          walks there. It works on a resident with no queue too, and starts one. Adding a step only
+          checks that it could make sense (the place is there as you last knew it, and a carriage or
+          horse is yours). A workplace or construction site can be anyone's, in sight or as last
+          seen, since a workplace has no owner: queue Work at a far mine and they walk there and
+          work it. Whether a step can start is checked when its turn comes.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while you give an order (a button, its key, or a tile picked on the
@@ -1530,16 +1530,16 @@ export function Wiki() {
         <p>
           Horses don't breed on their own. A grown resident standing at a finished stable is given
           Breed horses and picks two fed horses of their realm in it, each shown with its name and
-          stats; they tend them for {days(STABLE_BREED_DAYS)}, and then a foal of their realm is
-          born in the stable. Each of its stats is its parents' average, give or take{' '}
-          {num(FOAL_STAT_SPREAD)}. The progress belongs to the two horses, and the stable keeps it:
-          breeding pauses when the resident leaves or is given another order, or while the stable
-          has no room left for the foal, and any grown resident who breeds there later carries on
-          with that pair first, where it stopped, if both are still fed. The stable's card shows a
-          paused breeding and how far along it is. The progress is lost only when one of the two
-          leaves the stable or dies. The Breed horses default first takes {num(BREED_FOOD)} Food
-          from the stable for the resident's meals, if they carry less. NPC cities have one of their
-          residents breed their horses the same way.
+          stats; they tend them for {days(STABLE_BREED_DAYS)}, and then a foal of their realm is born in the stable. Each of
+          its stats is its parents' average, give or take {num(FOAL_STAT_SPREAD)}. The progress
+          belongs to the two horses, and the stable keeps it: breeding pauses when the resident
+          leaves or is given another order, or while the stable has no room left for the foal, and
+          any grown resident who breeds there later carries on with that pair first, where it
+          stopped, if both are still fed. The stable's card shows a paused breeding and how far
+          along it is. The progress is lost only when one of the two leaves the stable or dies. The
+          Breed horses default first takes {num(BREED_FOOD)} Food from the stable for the resident's
+          meals, if they carry less. NPC cities have one of their residents breed their horses the
+          same way.
         </p>
         <p>
           Breed horses can be run directly too, with Run script or as a queue step: they breed in
@@ -2098,8 +2098,9 @@ export function Wiki() {
             trading post, an NPC city that doesn't refuse the Trade Organization, or a Player's Food
             offer of at most {num(TRADE_ORG_PUNISH.offerFoodPrice)} Coins a unit. They don't buy
             from you if you are the one they are after, and none of this counts as what they came to
-            take. Your realm log says when it is coming, when it arrives, what it left with, why it
-            turned back, or that it was lost. Besides stolen goods, carriages and horses it counts{' '}
+            take. Your realm log says when it is coming, when it arrives, what it
+            left with, why it turned back, or that it was lost. Besides stolen goods, carriages and
+            horses it counts{' '}
             {(Object.entries(TRADE_ORG_LOSS) as [CrimeKind, number][])
               .map(([c, n]) => `${CRIME_NAMES[c].toLowerCase()} as ${num(n)} coins`)
               .join(', ')}

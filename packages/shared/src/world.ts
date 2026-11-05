@@ -1368,7 +1368,13 @@ export interface CarriedOfferTerms {
 
 /** What ended a realm's offer (`CONTEXT.md`: Offer, Direct offer). */
 export type OfferEnd =
-  'usedUp' | 'takenDown' | 'storageLost' | 'goodsGone' | 'declined' | 'lapsed' | 'noCaravans'
+  | 'usedUp'
+  | 'takenDown'
+  | 'storageLost'
+  | 'goodsGone'
+  | 'declined'
+  | 'lapsed'
+  | 'noCaravans'
 
 /**
  * How the Organization `of` regards `toward` (`CONTEXT.md`: Standing), from -`STANDING_RANGE`
