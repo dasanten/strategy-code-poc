@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import type { City, Resident, ScriptSummary, SeenResident, Building } from '@csp/shared'
+import type { Building, City, Resident, ScriptSummary, SeenHorse, SeenResident } from '@csp/shared'
 import { doingLine, interruptedLine, scriptLine } from './doing-view.js'
 import { PanelHead } from './drawer-head.js'
 import {
@@ -60,6 +60,7 @@ export function ResidentsFullList({
   buildings = [],
   inSight = [],
   cities = [],
+  horses = [],
   arrivesIn,
   selectedId,
   onSelect,
@@ -78,6 +79,8 @@ export function ResidentsFullList({
   inSight?: readonly SeenResident[]
   /** The cities the Player knows, to name where a resident relocates to (`doingLine`). */
   cities?: readonly Pick<City, 'id' | 'name'>[]
+  /** The horses the Player knows, to name the two being bred (`doingLine`). */
+  horses?: readonly SeenHorse[]
   /** About how many ticks until a resident arrives where they walk, ride or drive (`arrivalTicks`). */
   arrivesIn?: (r: Resident) => number | undefined
   selectedId: string | undefined
@@ -98,6 +101,7 @@ export function ResidentsFullList({
       scripts,
       buildings,
       residents: inSight,
+      horses,
       cities,
       arrives: arrivesIn?.(r),
     })
@@ -272,7 +276,7 @@ export function ResidentsFullList({
                   tick,
                   doing: doingOf(r),
                   under:
-                    interruptedLine(r, { scripts, buildings, residents: inSight }) ??
+                    interruptedLine(r, { scripts, buildings, residents: inSight, horses }) ??
                     scriptLine(r, scripts),
                 })}
                 selected={r.id === selectedId}
