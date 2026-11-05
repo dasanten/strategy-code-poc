@@ -1374,10 +1374,22 @@ export const TRADE_ORG_PUNISH = {
    */
   packRoom: 3,
   /**
-   * Tiles from a trading post's storage within which a soldier short of Food counts as passing it
-   * and goes to refill: about a third of a game day's walk, little against what it brings.
+   * Tiles from a place within which a soldier short of Food counts as passing it and goes to refill
+   * or buy: about a third of a game day's walk, little against what it brings.
    */
   postReach: 60,
+  /**
+   * Coins a soldier packs at the HQ to buy Food on the way (`CONTEXT.md`: Trade Org debt): the
+   * longest trip's Food at about three Coins a unit, 1.2 kg of their hands. What is left goes back
+   * into the HQ's coin warehouse when they are home.
+   */
+  purse: 60,
+  /**
+   * The most Coins a soldier pays for a unit of Food at a Player's offer: three times what a
+   * warehouse asks at its usual stock. Above that they pass it by, or an offer of one Food at any
+   * price would empty their purse.
+   */
+  offerFoodPrice: 6,
   /**
    * How many times the straight walk over Plains it keeps trying to reach the city (never less
    * than `giveUpDays`). Past that it has no way there, as with every gate shut, and turns back.

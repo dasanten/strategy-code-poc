@@ -2092,7 +2092,13 @@ export function Wiki() {
             Food for the trip, always with {num(TRADE_ORG_PUNISH.wagonRoom)} kg free for what they
             take, which they put on it and it brings home to the warehouses. Taking from it or
             stealing it is a crime, its soldiers go after whoever does, and without it they go on
-            with what they carry. Your realm log says when it is coming, when it arrives, what it
+            with what they carry. Each soldier also packs {num(TRADE_ORG_PUNISH.purse)} Coins: short
+            of Food on the road, with the wagon's share counted, they buy some within{' '}
+            {num(TRADE_ORG_PUNISH.postReach)} tiles of them, by the same trade as anyone, from a
+            trading post, an NPC city that doesn't refuse the Trade Organization, or a Player's Food
+            offer of at most {num(TRADE_ORG_PUNISH.offerFoodPrice)} Coins a unit. They don't buy
+            from you if you are the one they are after, and none of this counts as what they came to
+            take. Your realm log says when it is coming, when it arrives, what it
             left with, why it turned back, or that it was lost. Besides stolen goods, carriages and
             horses it counts{' '}
             {(Object.entries(TRADE_ORG_LOSS) as [CrimeKind, number][])
