@@ -1763,21 +1763,22 @@ export function Wiki() {
           HQ. At each stop a trader evens out its load with the warehouse, every good including Food
           and Coins: it leaves what that place has less of and takes what it has more of, as far as
           the carriage holds, every good cut alike when it can't hold it all. That is how a post
-          comes to hold goods it doesn't produce, and caravans carry no Food or Coins, so a post
-          gets those only from traders. The HQ is a stop like a post, its Coins going through its
-          coin warehouse and its other goods through its goods warehouse, so new Food and Coins
-          reach the posts, and a trader's lost escorts are made up there each time round. Its crew
-          and a lost carriage go as for a caravan, and robbing one is a theft from the Trade
-          Organization, but it owes nobody a delivery, so nothing is sent again.
+          comes to hold goods it doesn't produce, and caravans carry no Food or Coins, so a post gets
+          those only from traders. The HQ is a
+          stop like a post, its Coins going through its coin warehouse and its other goods through
+          its goods warehouse, so new Food and Coins reach the posts, and a trader's lost escorts
+          are made up there each time round. Its crew and a lost carriage go as for a caravan, and
+          robbing one is a theft from the Trade Organization, but it owes nobody a delivery, so
+          nothing is sent again.
         </p>
         <p>
-          A caravan or trader leaves the HQ only with enough Food for its crew and horse to reach
-          its next stop, so when the HQ is short, as in a new world, its carriages stand and wait.
-          They leave the storage what the HQ's own people eat in {num(HQ_PEOPLE_FOOD_DAYS)} days,
-          but may always take {num(WAITING_HORSE_FOOD)} Food for the horse. Short of Food, they top
-          up from the goods warehouse, which the stock floor fills each day, so buying Food there
-          can keep them waiting a little longer. A caravan with a delivery or transfer waiting wants
-          all it keeps on board, as there is no Food on that way. Away from the HQ nothing waits: a
+          A caravan or trader leaves the HQ only with enough Food for its crew and horse to reach its
+          next stop, so when the HQ is short, as in a new world, its carriages stand and wait. They
+          leave the storage what the HQ's own people eat in {num(HQ_PEOPLE_FOOD_DAYS)} days, but may
+          always take {num(WAITING_HORSE_FOOD)} Food for the horse. Short of Food, they top up from
+          the goods warehouse, which the stock floor fills each day, so buying Food there can keep
+          them waiting a little longer. A caravan with a delivery or transfer waiting wants all it
+          keeps on board, as there is no Food on that way. Away from the HQ nothing waits: a
           carriage takes what a post's storage has and drives on.
         </p>
         <p>
@@ -2039,26 +2040,26 @@ export function Wiki() {
           warehouse's stock floor ({num(WAREHOUSE_FLOOR.ironOre)} Iron ore,{' '}
           {num(WAREHOUSE_FLOOR.wood)} Wood, {num(WAREHOUSE_FLOOR.coins)} coins and so on), the HQ's{' '}
           {num(HQ_FLOOR_FACTOR)} times that, and {num(HQ_FOOD_FLOOR_FACTOR)} times its{' '}
-          {num(WAREHOUSE_FLOOR.food)} Food for the traders to carry; their Food is their storage's,
-          kept by their farmers. Their spare hands work and build for whatever their warehouses are
-          short of, on the nearest node within {num(NPC_NODE_REACH)} tiles, and carry the output
-          into the warehouse. A post never grows in people; the HQ grows only while it is too weak.
-          Neither sends a trader or founds a city.
+          {num(WAREHOUSE_FLOOR.food)} Food for the traders to carry; their Food is their storage's, kept by their farmers.
+          Their spare hands work and build for whatever their warehouses are short of, on the
+          nearest node within {num(NPC_NODE_REACH)} tiles, and carry the output into the warehouse.
+          A post never grows in people; the HQ grows only while it is too weak. Neither sends a
+          trader or founds a city.
         </p>
         <p>
           Only the HQ's warehouses top up to their floor at the end of each game day, so the world
-          always has a market of last resort. Nothing tops up a trading post's warehouse: its floor
-          only says what its spare hands, caravan and wandering traders go for, and all it holds
-          came by them or from people selling to it. A post can run dry, even of Food and Coins, and
-          its prices climb as it does, so prices differ with what reached each post. Rob a trader or
-          raid a post and you empty a real market. Its people and soldiers eat from its storage,
-          which its farm fills, not from the Food on sale in the warehouse.
+          always has a market of last resort. Nothing tops up a trading post's warehouse: its floor only says what
+          its spare hands, caravan and wandering traders go for, and all it holds came by them or
+          from people selling to it. A post can run dry, even of Food and Coins, and its prices climb
+          as it does, so prices differ with what reached each post. Rob a trader or raid a post and
+          you empty a real market. Its people and soldiers eat from its storage, which its farm fills,
+          not from the Food on sale in the warehouse.
         </p>
         <p>
           The Trade Organization lives on in its trading posts should its HQ ever fall: they keep
-          their warehouses, prices and soldiers and go on trading in person, but with no caravans
-          and no traders their warehouses hold only what they had and what their own hands bring.
-          What only the HQ gave it is gone for good: no deliveries or transfers, no army to hire and
+          their warehouses, prices and soldiers and go on trading in person, but with no caravans and
+          no traders their warehouses hold only what they had and what their own hands bring. What
+          only the HQ gave it is gone for good: no deliveries or transfers, no army to hire and
           nobody sent out to punish. See "The fall of the HQ" for what that costs.
         </p>
         <p>
@@ -2083,12 +2084,12 @@ export function Wiki() {
         </p>
         <p>
           A city is full once it has had spare hands, idle or working for surplus, and nothing short
-          of its reserve for {days(NPC_FULL_DAYS)}, with a food surplus and a town hall's and a
-          storage's materials above its reserve. A full city founds a daughter. Once a game day it
-          looks for a free Plains site {num(NPC_CITY_MIN_DISTANCE)} to {num(NPC_FOUND_REACH)} tiles
-          away, with room for a village and on no realm's territory, nearest a node of a material it
-          has none of in reach. A founding party of {num(NPC_VILLAGE.residents)} adults, one of them
-          armed, sets out carrying the materials and Food for twice the walk and{' '}
+          of its reserve for {days(NPC_FULL_DAYS)}, with a food surplus and a town hall's and a storage's
+          materials above its reserve. A full city founds a daughter. Once a game day it looks for a
+          free Plains site {num(NPC_CITY_MIN_DISTANCE)} to {num(NPC_FOUND_REACH)} tiles away, with
+          room for a village and on no realm's territory, nearest a node of a material it has none
+          of in reach. A founding party of {num(NPC_VILLAGE.residents)} adults, one of them armed,
+          sets out carrying the materials and Food for twice the walk and{' '}
           {days(NPC_FOUND_FOOD_DAYS)} there, and builds the town hall, which founds the daughter: an
           NPC city of its own with a name from the game. It then builds its storage, a farm and a
           house, and once its storage holds the Wood of its reserve, its first wall, a ring{' '}
@@ -2246,9 +2247,9 @@ export function Wiki() {
             the armed residents and walls of yours in its sight come to at least{' '}
             {num(DEMAND_YIELD_RESPECT_TIMES)} times its soldiers, and at least{' '}
             {num(DEMAND_YIELD_RESPECT_MIN)}, so an army at the gate can win a city without a fight.
-            Those out of its sight don't count. It joins your realm as a persuaded city does, or
-            sets what it holds of the goods aside at its storage for you alone to fetch. Otherwise,
-            or with none of the goods there, it declines, and its standing toward you drops by{' '}
+            Those out of its sight don't count. It joins your realm as a persuaded city does, or sets
+            what it holds of the goods aside at its storage for you alone to fetch. Otherwise, or
+            with none of the goods there, it declines, and its standing toward you drops by{' '}
             {num(DEMAND_DECLINED_STANDING_LOSS)}.
           </li>
           <li>
