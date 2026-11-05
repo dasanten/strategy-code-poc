@@ -6,7 +6,6 @@ import {
   TICKS_PER_GAME_DAY,
   TRADE_ORG,
   TRADE_ORG_LOSS,
-  TRADE_ORG_PUNISH,
   Terrain,
   crewIdsOf,
   standingOf,
@@ -26,6 +25,7 @@ import { mulberry32 } from './residents.js'
 import { foundStartingCity } from './starting-city.js'
 import { die } from './survival.js'
 import { foundTradeOrgHq } from './trade-org.js'
+import { stepDebts } from './trade-org-debt.js'
 import { stepPunishments } from './trade-org-punishment.js'
 import { placeTraders, stepTraders, tradersSound } from './traders.js'
 import { foundTradingPost } from './trading-posts.js'
@@ -175,13 +175,11 @@ describe('a wandering trader reaching a lost post', () => {
     expect(crime.knownBy).toEqual([crime.victimOrg])
     expect(crime.witnesses).toEqual([])
     expect(regard(world, realm.id)).toBe(-CRIME_STANDING_LOSS.capture)
+    // A debt for its worth, and no army of its own (`CONTEXT.md`: Trade Org debt).
+    stepDebts(world)
     stepPunishments(world, size)
-    expect(world.punishments).toEqual([
-      expect.objectContaining({
-        culpritOrg: realm.id,
-        worth: TRADE_ORG_PUNISH.times * TRADE_ORG_LOSS.capture,
-      }),
-    ])
+    expect(world.debts).toEqual([{ org: realm.id, coins: TRADE_ORG_LOSS.capture }])
+    expect(world.punishments).toEqual([])
     expect(crime.punished).toBe(true)
     expect(crimesSound.check(world, terrain)).toEqual([])
     expect(tradersSound.check(world, terrain)).toEqual([])
@@ -215,8 +213,8 @@ describe('a wandering trader reaching a lost post', () => {
     put(world, trader, posts[1]!, other.x, other.y)
     stepCrimes(world, size)
     expect(captureOf(world, post)).toMatchObject({ heardAt: world.tick })
-    stepPunishments(world, size)
-    expect(world.punishments).toHaveLength(1)
+    stepDebts(world)
+    expect(world.debts).toHaveLength(1)
     expect(crimesSound.check(world, terrain)).toEqual([])
     world.tick += CRIME_MEMORY_DAYS * TICKS_PER_GAME_DAY
     stepCrimes(world, size)
