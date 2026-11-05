@@ -309,13 +309,14 @@ describe('answering a demand', () => {
     expect(checkInvariants(world, terrain, [demandsSound])).toEqual([])
   })
 
-  it('carries out nothing yet for goods and Coins: only the answer is recorded', () => {
+  it('needs to know how goods and Coins go, which `demand-goods.test.ts` goes into', () => {
     const s = setup()
     order(s.world, s.queue, mara, goodsDemand)
     const id = s.world.demands[0]!.id
-    expect(order(s.world, s.queue, tobin, { kind: 'acceptDemand', demandId: id })).toBeUndefined()
-    expect(s.world.demands).toEqual([])
-    expect(whats(s.world, 8)).toEqual(['received', 'accepted'])
+    expect(order(s.world, s.queue, tobin, { kind: 'acceptDemand', demandId: id })).toMatch(
+      /set the goods aside/,
+    )
+    expect(s.world.demands).toHaveLength(1)
   })
 
   it('is only for the realm it was sent to, and only once', () => {

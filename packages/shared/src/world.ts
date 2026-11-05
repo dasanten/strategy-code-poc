@@ -1321,6 +1321,7 @@ export interface Offer {
   gives: Good
   givesUnits: number
   wants: Good
+  /** At least one, but 0 for goods set aside on accepting a demand, which want nothing back. */
   wantsUnits: number
   /** How many times over it can still be accepted; at least one while it stands. */
   times: number
@@ -2173,7 +2174,8 @@ export type RealmEventWhat =
    * A demand (`CONTEXT.md`: Demand) between this realm and the realm `other` (by its realm name):
    * `sent` by this realm, `received` from the other, `accepted` or `declined` by the one it was
    * sent to, or `lapsed` at its deadline. `mine` when this realm sent it. `leaderDied` says which
-   * side's Leader died when that made it lapse early. Its note stays out of the log.
+   * side's Leader died when that made it lapse early. `handedOver` says how goods accepted change
+   * hands. Its note stays out of the log.
    */
   | {
       kind: 'demand'
@@ -2183,6 +2185,7 @@ export type RealmEventWhat =
       other: string
       terms: DemandTerms
       leaderDied?: 'sender' | 'receiver'
+      handedOver?: DemandHandedOver
     }
 
 /**
@@ -2272,6 +2275,15 @@ export interface Realm {
 export type DemandTerms =
   | { kind: 'city'; cityId: string; cityName: string }
   | { kind: 'goods'; goods: Partial<Record<Good, number>> }
+
+/**
+ * How the goods of an accepted demand change hands, as the realm logs tell it (`CONTEXT.md`: Demand):
+ * what went, which is less than demanded when the storage was short, and where.
+ */
+export type DemandHandedOver = { goods: Partial<Record<Good, number>> } & (
+  | { way: 'setAside'; x: number; y: number }
+  | { way: 'transfer'; fromCity: string; toCity: string }
+)
 
 /**
  * A demand waiting for its answer (`CONTEXT.md`: Demand; ADR 0024): it goes once it is accepted,

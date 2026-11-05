@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import {
   GOODS,
   offerOpenTo,
+  wantsNothing,
   type Good,
   type Resident,
   type SeenBuilding,
@@ -137,7 +138,9 @@ export function AcceptOffer({
 }) {
   const [residentId, setResidentId] = useState('')
   const [carriageId, setCarriageId] = useState('')
-  const [times, setTimes] = useState(1)
+  // Goods set aside on a demand are one unit a time: all of them is what they came for.
+  const free = wantsNothing(offer)
+  const [times, setTimes] = useState(free ? offer.times : 1)
   const resident: Resident =
     traders.residents.find((r) => r.id === residentId) ?? traders.residents[0]!
   const carriage = traders.carriages.find((k) => k.id === carriageId)
@@ -169,7 +172,7 @@ export function AcceptOffer({
           </label>
         )}{' '}
         <label>
-          Times{' '}
+          {free ? 'Units' : 'Times'}{' '}
           <input
             type="number"
             min={1}

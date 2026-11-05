@@ -508,6 +508,10 @@ describe('script bindings', () => {
       },
     ],
     ['acceptDemand("d9")', { kind: 'acceptDemand', demandId: 'd9' }],
+    [
+      'acceptDemand("d9", { way: "setAside", storageId: "s1" })',
+      { kind: 'acceptDemand', demandId: 'd9', handOver: { way: 'setAside', storageId: 's1' } },
+    ],
     ['declineDemand("d9")', { kind: 'declineDemand', demandId: 'd9' }],
     ['roadLine(13, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 13, y: 10 } }],
     ['roadLine(250, 10)', { kind: 'roadLine', from: { x: 10, y: 10 }, to: { x: 250, y: 10 } }],

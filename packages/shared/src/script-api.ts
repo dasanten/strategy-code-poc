@@ -606,8 +606,8 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   ),
   action(
     'acceptDemand',
-    ['demandId'],
-    'Accept a demand sent to my realm. A demand for a city hands it over at once, also my last one; a city no longer mine is refused.',
+    ['demandId', 'handOver'],
+    'Accept a demand sent to my realm. A demand for a city hands it over at once, also my last one; a city no longer mine is refused. A demand for goods or Coins names how they go in `handOver`: `{ way: "setAside", storageId: id }`, at a storage of mine for the sender alone to fetch, or `{ way: "transfer", fromCityId: id, toCityId: id }`, by Transfers from a city of mine to one of theirs whose storage I see, for a fee I pay. What the storage holds goes, up to what was demanded; with none of it there, it is refused.',
   ),
   action('declineDemand', ['demandId'], 'Decline a demand sent to my realm.'),
   action(

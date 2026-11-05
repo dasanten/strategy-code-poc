@@ -29,6 +29,12 @@ export const offerRate = (o: Pick<Offer, 'givesUnits' | 'wantsUnits'>) =>
 export const seenOffer = (o: Offer): SeenOffer => ({ ...o, rate: offerRate(o) })
 
 /**
+ * Whether an offer wants nothing for its goods: what was set aside on accepting a demand, for the
+ * demand's sender to fetch (`CONTEXT.md`: Demand). Only such a Direct offer can.
+ */
+export const wantsNothing = (o: Pick<Offer, 'wantsUnits'>) => o.wantsUnits === 0
+
+/**
  * The offers standing at a storage, oldest first. A carried Direct offer stands at none: it only
  * names a city to pick up from, and sets nothing aside (`CONTEXT.md`: Direct offer).
  */
@@ -167,7 +173,9 @@ export function quoteOffer(
   available = Infinity,
 ): OfferQuote {
   const left = Math.min(offer.times, Math.floor(available / offer.givesUnits))
-  const paid = Math.floor((holder.stock[offer.wants] ?? 0) / offer.wantsUnits)
+  const paid = wantsNothing(offer)
+    ? Infinity
+    : Math.floor((holder.stock[offer.wants] ?? 0) / offer.wantsUnits)
   const gain =
     offer.givesUnits * GOOD_WEIGHT[offer.gives] - offer.wantsUnits * GOOD_WEIGHT[offer.wants]
   const fits = gain > 0 ? Math.floor((Math.max(0, holder.room) + 1e-9) / gain) : Infinity

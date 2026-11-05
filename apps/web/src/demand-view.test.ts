@@ -1,6 +1,6 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import type { DemandView, SeenCity } from '@csp/shared'
+import { transferLoadsFee, type DemandView, type SeenBuilding, type SeenCity } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import {
   demandNoticeLine,
@@ -8,7 +8,9 @@ import {
   goodsOfLines,
   handOverQuestion,
   knownCitiesOf,
+  setAsidePreview,
   termsLine,
+  transferPreview,
 } from './demand-view.js'
 import { DemandsPanel } from './Demands.js'
 import type { LastSeenCity } from './last-seen.js'
@@ -161,19 +163,163 @@ describe('goods on the form', () => {
   })
 })
 
+describe('what handing over goods would do', () => {
+  const goods = { food: 5, coins: 20 }
+
+  it('sets aside all of it from a storage that holds it', () => {
+    expect(setAsidePreview(goods, { food: 9, coins: 99 })).toEqual({
+      text: 'Sets aside 5 Food, 20 Coins for them alone to fetch.',
+      canAccept: true,
+    })
+  })
+
+  it('says what is short before accepting, and what goes then', () => {
+    expect(setAsidePreview(goods, { food: 2.5, coins: 99 })).toEqual({
+      text: 'This storage is short: only 2 of 5 Food. Sets aside 2 Food, 20 Coins for them alone to fetch.',
+      canAccept: true,
+    })
+    expect(setAsidePreview(goods, { iron: 3 })).toEqual({
+      text: 'This storage holds none of it that isn’t set aside.',
+      canAccept: false,
+    })
+  })
+
+  it('gives a Transfer’s fee over the way, for all of its loads', () => {
+    const fee = transferLoadsFee({ food: 5, coins: 20 }, 100)
+    expect(fee).toBeGreaterThan(0)
+    expect(transferPreview(goods, { food: 9, coins: 20 + fee }, 100)).toEqual({
+      text: `A Transfer carries 5 Food, 20 Coins. You pay ${fee} coins.`,
+      canAccept: true,
+    })
+  })
+
+  it('warns when the storage can’t pay the fee on top', () => {
+    const fee = transferLoadsFee({ food: 5, coins: 20 }, 100)
+    expect(transferPreview(goods, { food: 9, coins: 20 }, 100).text).toBe(
+      `A Transfer carries 5 Food, 20 Coins. You pay ${fee} coins. The storage is short of coins for that, so the caravans take less.`,
+    )
+  })
+
+  it('won’t go with no way there, or with none of it', () => {
+    expect(transferPreview(goods, { food: 9 }, undefined)).toEqual({
+      text: 'No Trade Org warehouse can send a caravan there.',
+      canAccept: false,
+    })
+    expect(transferPreview(goods, {}, 100).canAccept).toBe(false)
+  })
+})
+
+describe('how the realm log tells goods handed over', () => {
+  const line = (mine: boolean, handedOver: object) =>
+    describeEvent({
+      kind: 'demand',
+      demandId: 'd',
+      what: 'accepted',
+      mine,
+      other: 'Tobin',
+      terms: { kind: 'goods', goods: { coins: 20 } },
+      handedOver,
+      seq: 1,
+      tick: 0,
+      userId: 1,
+    } as never)
+
+  it('says where they were set aside, with the place to go to', () => {
+    const aside = { way: 'setAside', goods: { coins: 5 }, x: 3, y: 4 }
+    expect(line(true, aside)).toMatchObject({
+      text: 'The realm of Tobin accepted your demand for 20 Coins: 5 Coins set aside at the storage, for you to fetch, under Direct offers.',
+      places: [{ name: 'the storage', x: 3, y: 4 }],
+    })
+    expect(line(false, aside).text).toBe(
+      'You accepted the demand of the realm of Tobin for 20 Coins: 5 Coins set aside at the storage, for them alone to fetch.',
+    )
+  })
+
+  it('says a Transfer brings them, and between where', () => {
+    const sent = { way: 'transfer', goods: { coins: 20 }, fromCity: 'Oakford', toCity: 'Ashford' }
+    expect(line(true, sent).text).toBe(
+      'The realm of Tobin accepted your demand for 20 Coins: a Transfer brings 20 Coins from Oakford to Ashford.',
+    )
+  })
+
+  const offerLine = (what: object) =>
+    describeEvent({
+      gives: 'food',
+      givesUnits: 3,
+      wants: 'coins',
+      wantsUnits: 0,
+      x: 3,
+      y: 4,
+      seq: 1,
+      tick: 0,
+      userId: 1,
+      ...what,
+    } as never).text
+
+  it('speaks of fetching what was set aside, with no price', () => {
+    expect(
+      offerLine({ kind: 'offerAccepted', name: 'Rowan', realm: 'Tobin', times: 3, wanted: 5 }),
+    ).toBe('Rowan fetched 3 food set aside by Tobin (of 5 wanted).')
+    expect(offerLine({ kind: 'offerTaken', by: 'Mara' })).toBe(
+      'Mara fetched the 3 food you set aside.',
+    )
+    expect(offerLine({ kind: 'offerCutDown', times: 2 })).toBe(
+      'Goods gone from the storage cut what you set aside down to 2 food.',
+    )
+    expect(offerLine({ kind: 'offerEnded', why: 'lapsed', to: 'Mara' })).toBe(
+      'The food you set aside for the realm of Mara lapsed. Its goods are ordinary again.',
+    )
+    expect(offerLine({ kind: 'directOffer', what: 'lapsed', from: 'Tobin' })).toBe(
+      'The direct offer of food from the realm of Tobin lapsed.',
+    )
+  })
+})
+
 describe('the Demands drawer', () => {
-  const panel = (demands: DemandView[]) =>
+  const panel = (demands: DemandView[], noCaravans = false) =>
     renderToStaticMarkup(
       createElement(DemandsPanel, {
         demands,
         realmId: 'r1',
         knownRealms: [{ realmId: 'r2', realm: 'R2' }],
-        cities: [],
+        cities: [{ id: 'c1', name: 'Oakford', realmId: 'r1' } as SeenCity],
+        buildings: [
+          {
+            id: 's1',
+            kind: 'storage',
+            cityId: 'c1',
+            x: 6,
+            y: 6,
+            stock: { coins: 5 },
+          } as SeenBuilding,
+        ],
+        carriedWays: [],
+        noCaravans,
         lastSeen: [],
         tick: 0,
         sendOrder: async () => undefined,
       }),
     )
+
+  it('says how goods go, and what is short, before they are accepted', () => {
+    const html = panel([demand('a', 'r2', 'r1')])
+    expect(html).toContain('Set aside for them to fetch')
+    expect(html).toContain('Send by Transfer')
+    expect(html).toContain('The storage at (6, 6) in Oakford')
+    expect(html).toContain('This storage is short: only 0 of 2 Iron Ore, 5 of 20 Coins.')
+    expect(html).toContain('Sets aside 5 Coins for them alone to fetch.')
+  })
+
+  it('offers no Transfer once the HQ has fallen', () => {
+    expect(panel([demand('a', 'r2', 'r1')], true)).not.toContain('Send by Transfer')
+  })
+
+  it('asks nothing of how a city goes', () => {
+    const city = { kind: 'city', cityId: 'c1', cityName: 'Oakford' } as const
+    const html = panel([demand('a', 'r2', 'r1', { terms: city })])
+    expect(html).not.toContain('Set aside')
+    expect(html).toContain('Accept')
+  })
 
   it('never renders a note as markup, on either side', () => {
     const note = '<img src=x onerror=alert(1)><script>alert(2)</script><b>bold</b>'

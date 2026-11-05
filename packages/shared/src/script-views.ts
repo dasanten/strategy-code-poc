@@ -621,7 +621,11 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field('gives', 'string', 'The good it gives; may be "coins".'),
       field('givesUnits', 'number', 'How much of it each time.'),
       field('wants', 'string', 'The good it wants; may be "coins".'),
-      field('wantsUnits', 'number', 'How much of it each time.'),
+      field(
+        'wantsUnits',
+        'number',
+        'How much of it each time: 0 for goods set aside on accepting a demand, which want nothing back.',
+      ),
       field('times', 'number', 'How many more times it can be accepted.'),
       field('rate', 'number', 'What it wants for one unit it gives.'),
       field(

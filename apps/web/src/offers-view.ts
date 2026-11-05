@@ -10,6 +10,7 @@ import {
   quoteOffer,
   timesToPost,
   transferLoad,
+  wantsNothing,
   type CarriedFeeBy,
   type CarriedWay,
   type Carriage,
@@ -95,16 +96,27 @@ type Labels = Readonly<Record<string, string>>
 const amount = (units: number, good: Good, labels: Labels) =>
   `${units} ${labels[good]!.toLowerCase()}`
 
-/** An offer's terms in a line: `Gives 10 wood, wants 5 stone`. */
+/**
+ * An offer's terms in a line: `Gives 10 wood, wants 5 stone`. Goods set aside on accepting a demand
+ * want nothing back (`CONTEXT.md`: Demand), and all of what is left shows: `Gives 5 food, wants nothing`.
+ */
 export function offerTerms(
-  o: Pick<SeenOffer, 'gives' | 'givesUnits' | 'wants' | 'wantsUnits'>,
+  o: Pick<SeenOffer, 'gives' | 'givesUnits' | 'wants' | 'wantsUnits'> &
+    Partial<Pick<SeenOffer, 'times'>>,
   labels: Labels,
 ): string {
+  if (wantsNothing(o)) {
+    return `Gives ${amount(o.givesUnits * (o.times ?? 1), o.gives, labels)}, wants nothing`
+  }
   return `Gives ${amount(o.givesUnits, o.gives, labels)}, wants ${amount(o.wantsUnits, o.wants, labels)}`
 }
 
-/** An offer's rate and how long it stands: `2 times left, 0.5 stone for 1 wood`. */
+/**
+ * An offer's rate and how long it stands: `2 times left, 0.5 stone for 1 wood`. What wants nothing
+ * back has no rate, and is there to fetch.
+ */
 export function offerStands(o: SeenOffer, labels: Labels): string {
+  if (wantsNothing(o)) return `${amount(o.times * o.givesUnits, o.gives, labels)} left to fetch`
   const rate = Math.round(o.rate * 100) / 100
   const left = o.times === 1 ? 'once more' : `${o.times} times left`
   return `${left}, ${rate} ${labels[o.wants]!.toLowerCase()} for 1 ${labels[o.gives]!.toLowerCase()}`
@@ -237,6 +249,8 @@ export function acceptPreview(
   const wants = labels[offer.wants]!.toLowerCase()
   const why = quote.limit && LIMIT_TEXT[quote.limit]?.(wants)
   if (quote.times === 0) return { quote, text: `Won’t go: ${why ?? 'nothing to accept'}.` }
-  const moved = `${amount(quote.gives, offer.gives, labels)} for ${amount(quote.wants, offer.wants, labels)}`
+  const moved = wantsNothing(offer)
+    ? amount(quote.gives, offer.gives, labels)
+    : `${amount(quote.gives, offer.gives, labels)} for ${amount(quote.wants, offer.wants, labels)}`
   return { quote, text: `Takes ${moved}${why ? ` (${why})` : ''}.` }
 }

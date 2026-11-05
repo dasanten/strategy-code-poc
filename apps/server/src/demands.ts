@@ -4,13 +4,19 @@ import {
   DEMAND_NOTE_MAX_LENGTH,
   GOODS,
   TICKS_PER_GAME_DAY,
+  demandHandOverProblem,
   demandNoteProblem,
   demandsCounted,
   demandsLeft,
+  goodsHandedOver,
+  offerStorage,
   realmName,
   realmsKnownTo,
+  transferLoads,
   type City,
   type Demand,
+  type DemandHandOver,
+  type DemandHandedOver,
   type DemandTerms,
   type Good,
   type OrderRequest,
@@ -22,9 +28,11 @@ import {
 import { handOverCity } from './capture.js'
 import { recordEvent } from './events.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
+import { seesStorageOf, setAsideForDemand } from './offers.js'
 import type { OrderKind } from './orders.js'
 import { sightOf } from './sight.js'
 import { newId, realmOf } from './starting-city.js'
+import { orderPickUp } from './transfers.js'
 
 /*
  * Demands (`CONTEXT.md`: Demand; ADR 0024): a realm sends another realm it knows of terms, a note
@@ -140,14 +148,9 @@ function tellBoth(
   world: WorldState,
   d: Demand,
   what: { sender: DemandWhat; receiver: DemandWhat },
-  leaderDied?: 'sender' | 'receiver',
+  extra: { leaderDied?: 'sender' | 'receiver'; handedOver?: DemandHandedOver } = {},
 ): void {
-  const base = {
-    kind: 'demand' as const,
-    demandId: d.id,
-    terms: d.terms,
-    ...(leaderDied === undefined ? {} : { leaderDied }),
-  }
+  const base = { kind: 'demand' as const, demandId: d.id, terms: d.terms, ...extra }
   recordEvent(world, d.fromId, {
     ...base,
     what: what.sender,
@@ -195,9 +198,14 @@ function demandToAnswer(world: WorldState, userId: number, order: OrderRequest):
 }
 
 /** A demand answered: it goes, and both realm logs say so. */
-function answered(world: WorldState, d: Demand, answer: 'accepted' | 'declined'): void {
+function answered(
+  world: WorldState,
+  d: Demand,
+  answer: 'accepted' | 'declined',
+  handedOver?: DemandHandedOver,
+): void {
   world.demands = world.demands.filter((x) => x !== d)
-  tellBoth(world, d, { sender: answer, receiver: answer })
+  tellBoth(world, d, { sender: answer, receiver: answer }, handedOver && { handedOver })
 }
 
 /** The city a demand names, while it is still the city of the realm the demand was sent to. */
@@ -207,30 +215,83 @@ function cityToHandOver(world: WorldState, d: Demand): City | undefined {
   return world.cities.find((c) => c.id === terms.cityId && c.realmId === d.toId)
 }
 
+/** Why the goods of a demand can't go the way this order names, or undefined when they can. */
+function goodsProblem(
+  world: WorldState,
+  d: Demand,
+  order: OrderRequest,
+  size?: number,
+): string | undefined {
+  const problem = demandHandOverProblem(world, d.toId, d, order.handOver)
+  if (problem) return problem
+  const how = order.handOver as DemandHandOver
+  if (how.way !== 'transfer' || size === undefined) return undefined
+  return seesStorageOf(world, d.toId, how.toCityId, size)
+    ? undefined
+    : 'you don’t see that city’s storage'
+}
+
+/**
+ * The goods of an accepted demand change hands the way its receiver named, as far as the storage
+ * holds them: set aside for the sender alone to fetch, or sent by Transfers the receiver pays for
+ * (`CONTEXT.md`: Demand). What went, for the logs.
+ */
+function handOverGoods(
+  world: WorldState,
+  d: Demand,
+  goods: Partial<Record<Good, number>>,
+  how: DemandHandOver,
+  size: number,
+): DemandHandedOver {
+  const going = goodsHandedOver(world, d.toId, goods, how)
+  if (how.way === 'setAside') {
+    const storage = offerStorage(world, d.toId, how.storageId)!
+    setAsideForDemand(world, d.toId, d.fromId, storage, going)
+    return { way: 'setAside', goods: going, x: storage.x, y: storage.y }
+  }
+  for (const { good, units } of transferLoads(going)) {
+    orderPickUp(world, size, d.toId, how.fromCityId, how.toCityId, good, units)
+  }
+  const name = (id: string) => world.cities.find((c) => c.id === id)!.name
+  return {
+    way: 'transfer',
+    goods: going,
+    fromCity: name(how.fromCityId),
+    toCity: name(how.toCityId),
+  }
+}
+
 /**
  * Accepting a demand (`CONTEXT.md`: Demand): a named city joins the sender's realm at once, as a
  * captured one does, also the receiver's last. It is their own choice: no crime, no standing lost.
  * A city no longer theirs can't be handed over, so that demand stays open until they decline it or
- * it lapses. Goods and Coins are only recorded for now.
+ * it lapses. Goods and Coins go the way the order names (`handOverGoods`); with none of them there
+ * it is refused the same way.
  */
 const acceptDemand: OrderKind = {
-  validate(world, sender, order) {
+  validate(world, sender, order, terrain) {
     const d = demandToAnswer(world, sender.userId, order)
     if (typeof d === 'string') return d
-    if (d.terms.kind === 'city' && !cityToHandOver(world, d)) {
-      return `${d.terms.cityName} is no longer yours to hand over`
-    }
-    return undefined
+    if (d.terms.kind === 'goods') return goodsProblem(world, d, order, terrain?.size)
+    return cityToHandOver(world, d)
+      ? undefined
+      : `${d.terms.cityName} is no longer yours to hand over`
   },
   apply(world, sender, order, terrain) {
     const d = demandToAnswer(world, sender.userId, order)
     if (typeof d === 'string') return
-    if (d.terms.kind === 'city') {
-      // It may have gone since the order came, to another demand accepted in this same tick too.
-      const city = cityToHandOver(world, d)
-      if (!city || !terrain) return
-      handOverCity(world, city, d.fromId, terrain.size)
+    if (d.terms.kind === 'goods') {
+      // The goods may have gone since the order came, to another demand in this same tick too.
+      if (goodsProblem(world, d, order, terrain?.size)) return
+      const how = order.handOver as DemandHandOver
+      const size = terrain?.size ?? Infinity
+      answered(world, d, 'accepted', handOverGoods(world, d, d.terms.goods, how, size))
+      return
     }
+    // It may have gone since the order came, to another demand accepted in this same tick too.
+    const city = cityToHandOver(world, d)
+    if (!city || !terrain) return
+    handOverCity(world, city, d.fromId, terrain.size)
     answered(world, d, 'accepted')
   },
 }
@@ -267,7 +328,7 @@ export function lapseDemandsOnLeaderDeath(world: WorldState, realmId: string): v
       world,
       d,
       { sender: 'lapsed', receiver: 'lapsed' },
-      d.fromId === realmId ? 'sender' : 'receiver',
+      { leaderDied: d.fromId === realmId ? 'sender' : 'receiver' },
     )
   }
 }
