@@ -1,3 +1,4 @@
+import { aboutTime } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import {
   LANE_GAP,
@@ -8,6 +9,8 @@ import {
   laneNotices,
   laneSpot,
   skippedByWhy,
+  traderVisitLine,
+  visitKey,
 } from './notices-view.js'
 
 describe('the notice lane', () => {
@@ -24,6 +27,18 @@ describe('the notice lane', () => {
     const wanted = { horseOffer: true, groupReport: true }
     expect(laneNotices({ ...wanted, pick: true })).toEqual(['pick'])
     expect(laneNotices({ ...wanted, pick: false })).toEqual(['horseOffer', 'groupReport'])
+  })
+
+  it('says where a wandering trader stands and for how long, with a key for its one stop', () => {
+    const visit = { traderId: 't1', cityId: 'c1', city: 'Ashford', x: 40, y: 50, until: 1_000 }
+    expect(traderVisitLine(visit, 940)).toBe(
+      `A wandering trader stands at Ashford, at (40, 50), and goes on in ${aboutTime(60)}`,
+    )
+    expect(visitKey(visit)).not.toBe(visitKey({ ...visit, until: 2_000 }))
+    expect(laneNotices({ groupReport: true, traderVisit: true })).toEqual([
+      'traderVisit',
+      'groupReport',
+    ])
   })
 
   it('stacks several notices in their order, whatever order they were asked in', () => {

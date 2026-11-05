@@ -1,4 +1,5 @@
 import {
+  convoysOf,
   isWallOrGate,
   carriagePulledBy,
   carriageOfResident,
@@ -89,7 +90,7 @@ import {
   carriageCommanderOf,
   commanderOf,
 } from '@csp/shared'
-import { carriageOrganization, organizationOf } from './crimes.js'
+import { awaitsTrader, carriageOrganization, organizationOf } from './crimes.js'
 import { tallyGoods } from './goods-made.js'
 import { awakeAlive, downDoNothing, refillSource, refillTarget } from './survival.js'
 import { horsesDownLieStill } from './horses.js'
@@ -105,11 +106,14 @@ import {
   npcTradesKeepReserve,
   refusedTradeNothing,
   tradeOrdersDone,
+  traderTradesKeepFood,
   tradesKeepGoods,
 } from './trading.js'
 import { acceptOrdersDone, offersKeepGoods, offersSound, tradeOrgOnlyBuysFood } from './offers.js'
 import { armiesSound, supplyLinesSound } from './armies.js'
 import { caravansSound, routeRobberiesSound } from './caravans.js'
+import { tradersSound } from './traders.js'
+import { traderStopsSound } from './trader-stops.js'
 import { deliveriesSound } from './deliveries.js'
 import { transfersSound } from './transfers.js'
 import { tradeOrgArmySound } from './trade-org-army.js'
@@ -1373,14 +1377,14 @@ export const cityWorkplacesSound: Invariant = {
 /**
  * An NPC city does nothing a Player's residents couldn't (`CONTEXT.md`: NPC city; ADR 0002): its
  * residents hold only the kinds of order a Player can give (`NPC_ORDER_KINDS`), which the world
- * checks and resolves like anyone's. A caravan's or supply wagon's driver also drives (`CONTEXT.md`:
- * Caravan, Trade Org debt).
+ * checks and resolves like anyone's. A caravan's, wandering trader's or supply wagon's driver also
+ * drives (`CONTEXT.md`: Caravan, Wandering trader, Trade Org debt).
  */
 export const npcOrdersAllowed: Invariant = {
   name: 'npc-orders-allowed',
   check(world) {
     const drivers = new Set([
-      ...world.caravans.map((c) => c.driverId),
+      ...convoysOf(world).map((c) => c.driverId),
       ...world.supplyWagons.map((w) => w.driverId),
     ])
     const allowed = (r: Resident) =>
@@ -1666,8 +1670,10 @@ export const alliancesSound: Invariant = {
 /**
  * Crimes hold together (`CONTEXT.md`: Crime, Witness): each is against another Organization than
  * the culprit's and happened no later than now; its witnesses are living residents, each listed
- * once, none of the culprit's Organization; it is known to each Organization at most once; and
- * it is kept only while someone carries news of it or an Organization remembers it.
+ * once, none of the culprit's Organization; it is known to each Organization at most once; it is
+ * kept only while someone carries news of it, an Organization remembers it or a wandering trader may
+ * still find it out; and a capture, and only a capture, names the post taken (`CONTEXT.md`: Lost post
+ * found out).
  */
 export const crimesSound: Invariant = {
   name: 'crimes-sound',
@@ -1687,8 +1693,13 @@ export const crimesSound: Invariant = {
         }
       }
       if (new Set(c.knownBy).size !== c.knownBy.length) problems.push('is known twice to one')
-      const remembered = c.knownBy.length > 0 && world.tick - c.tick <= memory
-      if (c.witnesses.length === 0 && !remembered) problems.push('is kept though forgotten')
+      const remembered = c.knownBy.length > 0 && world.tick - (c.heardAt ?? c.tick) <= memory
+      if (c.witnesses.length === 0 && !remembered && !awaitsTrader(world, c)) {
+        problems.push('is kept though forgotten')
+      }
+      if ((c.kind === 'capture') !== (c.post !== undefined)) {
+        problems.push('names a post without being a capture, or the other way round')
+      }
       return problems.map((p) => ({
         invariant: this.name,
         message: `crime ${c.id} ${p}`,
@@ -2083,6 +2094,9 @@ export const worldInvariants: Invariant[] = [
   tradeOrgSound,
   nothingLeftOfTheHq,
   caravansSound,
+  tradersSound,
+  traderStopsSound,
+  traderTradesKeepFood,
   routeRobberiesSound,
   tradeOrgArmySound,
   npcHireSound,

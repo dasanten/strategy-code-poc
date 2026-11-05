@@ -63,6 +63,12 @@ describe('readout', () => {
     )
   })
 
+  it('says when a wandering trader stands there', () => {
+    expect(readoutText({ ...hover, trader: true }, 'far', false)).toBe(
+      'Forest · 12, 7 · Wandering trader · far zoom',
+    )
+  })
+
   it('says just the tier with nothing under the pointer', () => {
     expect(readoutText(null, 'close', true)).toBe('close zoom')
   })

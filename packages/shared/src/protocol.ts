@@ -18,6 +18,8 @@ import type {
   ScriptMemory,
   SeenArmy,
   SeenCaravan,
+  SeenTrader,
+  TraderVisit,
   SeenResident,
   WorkplaceSettings,
   Waypoint,
@@ -112,6 +114,8 @@ export type SeenEntity =
   | ({ is: 'army' } & SeenArmy)
   /** A Trade Org caravan; its carriage and crew are what is seen of it (`CONTEXT.md`: Caravan). */
   | ({ is: 'caravan' } & SeenCaravan)
+  /** A wandering trader, seen the same way (`CONTEXT.md`: Wandering trader). */
+  | ({ is: 'trader' } & SeenTrader)
 
 /**
  * A building, construction site or city as the Player last saw it (`CONTEXT.md`: Last seen):
@@ -164,6 +168,8 @@ export type ServerMessage =
       horseOffer: boolean
       /** The Player's waypoints, oldest first (`CONTEXT.md`: Waypoint). */
       waypoints: Waypoint[]
+      /** Wandering traders standing at the realm's cities (`CONTEXT.md`: Trader stop). */
+      traderVisits: TraderVisit[]
       /** The Player's first-day card (`CONTEXT.md`: First day). */
       firstDay: FirstDay
       /**
@@ -182,8 +188,9 @@ export type ServerMessage =
    * when the Player handed the realm to another (`CONTEXT.md`: Leader handover), and the
    * realm name once the Player named it (`CONTEXT.md`: Realm name), and `horseOffer` when it
    * changed: false once they claimed their Horse offer, true once an admin re-opened it
-   * (`CONTEXT.md`: Horse offer), all the realm's Workplace settings whenever they changed, and all
-   * their waypoints when they changed (`CONTEXT.md`: Waypoint).
+   * (`CONTEXT.md`: Horse offer), all the realm's Workplace settings whenever they changed, all
+   * their waypoints when they changed (`CONTEXT.md`: Waypoint), and all the wandering traders
+   * standing at the realm's cities when those changed (`CONTEXT.md`: Trader stop).
    */
   | {
       type: 'tick'
@@ -200,6 +207,7 @@ export type ServerMessage =
       horseOffer?: boolean
       workSettings?: Record<string, WorkplaceSettings>
       waypoints?: Waypoint[]
+      traderVisits?: TraderVisit[]
     }
   /**
    * The memory of the script run by a resident or army whose Script tab the Player has open

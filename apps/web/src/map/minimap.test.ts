@@ -77,6 +77,7 @@ function world(more: Partial<MapWorld> = {}): MapWorld {
     piles: [],
     armies: [],
     caravans: [],
+    traders: [],
     lastSeen: { cities: [], buildings: [] },
     diplomacy: {},
     region: null,

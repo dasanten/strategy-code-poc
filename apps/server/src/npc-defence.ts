@@ -84,7 +84,7 @@ export function stepNpcDefence(world: WorldState, size: number): void {
       )
     }
     if (city.tradeOrg === 'post') {
-      // A trading post's warehouse keeps weapons in stock (`CONTEXT.md`: Stock floor).
+      // A trading post arms from its warehouse, as far as it holds weapons (`CONTEXT.md`: Stock floor).
       const warehouse = world.buildings.find((b) => b.cityId === city.id && b.kind === 'warehouse')
       keepSoldiers(world, city, people, npcSoldierTarget(adults), warehouse)
     }

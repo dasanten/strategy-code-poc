@@ -7,6 +7,7 @@ import type {
   SeenCarriage,
   SeenHorse,
   SeenResident,
+  SeenTrader,
   Waypoint,
 } from '@csp/shared'
 import type { CityEmblem, FarMarker } from './far.js'
@@ -31,6 +32,7 @@ export interface MapWorld {
   piles: Pile[]
   armies: Pick<Army, 'id' | 'realmId' | 'memberIds'>[]
   caravans: SeenCaravan[]
+  traders: SeenTrader[]
   /**
    * Buildings and cities the Player remembers out of their sight (`CONTEXT.md`: Last seen), drawn
    * faded; none on the admin map.

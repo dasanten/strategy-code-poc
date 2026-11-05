@@ -594,6 +594,11 @@ export interface DriveOrder {
    * as the army does.
    */
   army?: string
+  /**
+   * It stops in contact with `target` rather than on it, so a wall or closed gate can be driven up
+   * to (`CONTEXT.md`: Lost post found out).
+   */
+  near?: true
 }
 
 /**
@@ -831,6 +836,8 @@ export interface WorldState {
   joinRequests: JoinRequest[]
   /** The Trade Organization's caravans, one on each trading post's route (`CONTEXT.md`: Caravan). */
   caravans: Caravan[]
+  /** The Trade Organization's wandering traders (`CONTEXT.md`: Wandering trader). */
+  traders: Trader[]
   /** Deliveries and pick-ups ordered and not yet done, oldest first (`CONTEXT.md`: Delivery). */
   deliveries: Delivery[]
   /** Transfers between realms ordered and not yet done, oldest first (`CONTEXT.md`: Transfer). */
@@ -918,8 +925,15 @@ export interface CityTraderOffer {
 export interface CityTrader {
   /** The trader, one of its spare hands. */
   residentId: string
-  /** The Trade Org warehouse they trade at; on a run to an offer, the offer's storage. */
-  warehouseId: string
+  /**
+   * The Trade Org warehouse they trade at; on a run to an offer, the offer's storage; null when
+   * they go to a visiting trader instead.
+   */
+  warehouseId: string | null
+  /** The wandering trader standing at the city they trade with (`CONTEXT.md`: Trader stop). */
+  visitingId?: string
+  /** On a run to a visiting trader: whether they have fetched what they take along. */
+  loaded?: boolean
   /** On a run to a Player's offer, that run, until they have been there or given it up. */
   offer?: CityTraderOffer
   /** The load still to sell there; empty once sold. */
@@ -1194,6 +1208,110 @@ export type SeenCaravan = Pick<
 >
 
 /**
+ * A wandering trader (`CONTEXT.md`: Wandering trader): a Trade Org carriage with a driver and a
+ * small escort, sent from the HQ on a fixed loop of the trading posts and the HQ, apart from the
+ * caravans. At each stop it goes first to the storage, to top up the Food on board for its crew and
+ * horse, then to the warehouse, where it evens out its load with what the warehouse holds; at the
+ * HQ, its Coins with the coin warehouse after that. Plain data (ADR 0002): the game gives the crew
+ * the same drive, pick-up, drop and walk orders a Player could give.
+ */
+export interface Trader {
+  id: string
+  carriageId: string
+  /**
+   * The resident who drives the carriage; null with no crew left, until the HQ has someone to send
+   * (`CONTEXT.md`: Caravan crew lost).
+   */
+  driverId: string | null
+  /** The residents who walk along with it (the escort). */
+  escortIds: string[]
+  /**
+   * The cities it goes round, in order: the trading posts and the HQ, which stays on it; after the
+   * last comes the first again. A post lost since stays on it until the trader reaches it
+   * (`CONTEXT.md`: Lost post found out).
+   */
+  loop: string[]
+  /** The stop of its loop, a post or the HQ, it stands at or goes to next. */
+  postId: string
+  /**
+   * Where it stands or is driving: at the HQ first while it is being sent out or is back for a new
+   * carriage, and from there on to `postId` (`hq`), or at `postId` itself (`post`).
+   */
+  heading: 'hq' | 'post'
+  /**
+   * Where at that place it stands or is going: the storage first, then the warehouse, and at the HQ
+   * then its coin warehouse if it has Coins to move.
+   */
+  stop: 'storage' | 'warehouse' | 'coinWarehouse'
+  /**
+   * What it still has to leave at this stop's warehouses and take from them, worked out once on
+   * reaching the warehouse (`evenOutLoad`); null until then.
+   */
+  plan: { leave: Stock; take: Stock } | null
+  /**
+   * Goods the driver took last tick to put down, and where they go; null when they hold nothing
+   * for the trader.
+   */
+  holding: { goods: Stock; onto: 'carriage' | 'stop' } | null
+  /** How many drives to this stop have been started without getting there. */
+  misses: number
+  /** How often it was robbed, which earns it more escorts as it does a caravan's route. */
+  robberies: number
+  /**
+   * The cities it still stops at on its way to its next place, in the order it passes them
+   * (`CONTEXT.md`: Trader stop); null until they are worked out for this way.
+   */
+  calls: string[] | null
+  /** The stop it is driving to or standing at (`CONTEXT.md`: Trader stop); null between stops. */
+  stand: TraderStand | null
+}
+
+/** A wandering trader's stop at a city (`CONTEXT.md`: Trader stop). Plain data (ADR 0002). */
+export interface TraderStand {
+  cityId: string
+  /** The tile it stands on, beside the town hall and outside any wall. */
+  x: number
+  y: number
+  /** The tick it goes on; null while it is still driving there. */
+  until: number | null
+}
+
+/** Where a wandering trader stands at a stop, and until when (`CONTEXT.md`: Trader stop). */
+export interface StandingTrader {
+  cityId: string
+  x: number
+  y: number
+  until: number
+}
+
+/** One line of what a wandering trader names: as a warehouse's (`CONTEXT.md`: Trader stop). */
+export interface TraderPrice {
+  good: Exclude<Good, 'coins'>
+  buy: number
+  sell: number
+  stock: number
+}
+
+/**
+ * A wandering trader as Players see it, while its carriage or any of its crew is in sight: where
+ * it stands, and its prices, while it stands at a stop (`CONTEXT.md`: Trader stop).
+ */
+export type SeenTrader = Pick<
+  Trader,
+  'id' | 'carriageId' | 'driverId' | 'escortIds' | 'postId' | 'heading'
+> & {
+  standing?: StandingTrader
+  /** Without what it holds unless the Player sees inside its carriage. */
+  prices?: (Omit<TraderPrice, 'stock'> & { stock?: number })[]
+}
+
+/** A wandering trader standing at one of a realm's cities: its notice (`CONTEXT.md`: Trader stop). */
+export interface TraderVisit extends StandingTrader {
+  traderId: string
+  city: string
+}
+
+/**
  * An NPC city asking a realm to join it (`CONTEXT.md`: Persuading a city). It stands until the
  * Player accepts or declines, or the city stops holding the realm in high standing. A declined
  * ask is kept for `PERSUADE_ASK_AGAIN_DAYS`, so the city doesn't ask that realm again before
@@ -1385,13 +1503,7 @@ export interface CarriedOfferTerms {
 
 /** What ended a realm's offer (`CONTEXT.md`: Offer, Direct offer). */
 export type OfferEnd =
-  | 'usedUp'
-  | 'takenDown'
-  | 'storageLost'
-  | 'goodsGone'
-  | 'declined'
-  | 'lapsed'
-  | 'noCaravans'
+  'usedUp' | 'takenDown' | 'storageLost' | 'goodsGone' | 'declined' | 'lapsed' | 'noCaravans'
 
 /**
  * How the Organization `of` regards `toward` (`CONTEXT.md`: Standing), from -`STANDING_RANGE`
@@ -1405,7 +1517,7 @@ export interface Standing {
 }
 
 /** What a crime was (`CONTEXT.md`: Crime). */
-export type CrimeKind = 'theft' | 'attack' | 'killing' | 'tearDown'
+export type CrimeKind = 'theft' | 'attack' | 'killing' | 'tearDown' | 'capture'
 
 /**
  * Why a punishment headed home (`CONTEXT.md`: Punishment trip): `enough`, it got what it came for;
@@ -1524,12 +1636,23 @@ export interface Crime {
   /** What was torn down. */
   building?: BuildingKind
   /**
+   * The trading post captured (`CONTEXT.md`: Lost post found out). It waits for a wandering trader
+   * to reach that post, however long that takes, while the post is on a trader's loop.
+   */
+  post?: string
+  /**
    * Residents who saw it, or the victim who survived it, and have not got home yet. Each makes it
-   * known to their own Organization once they stand in the area of one of its cities.
+   * known to their own Organization once they stand in the area of one of its cities. News of a
+   * captured post goes to any city of the Trade Organization.
    */
   witnesses: string[]
   /** The Organizations it is known to. */
   knownBy: string[]
+  /**
+   * The tick a captured post's news reached the Trade Organization, which it remembers from then
+   * on rather than from the capture, however long ago that was.
+   */
+  heardAt?: number
   /** The Trade Organization has sent its army to punish it (`CONTEXT.md`: Trade Org reaction). */
   punished?: true
 }
@@ -1818,6 +1941,8 @@ export type RealmEventWhat =
       coins: number
       x: number
       y: number
+      /** With a wandering trader standing there, not at a warehouse (`CONTEXT.md`: Trader stop). */
+      withTrader?: true
     }
   /**
    * The resident `name` accepted an offer of `realm` at the storage at (`x`, `y`), `times` of the

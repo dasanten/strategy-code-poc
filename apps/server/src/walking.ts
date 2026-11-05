@@ -374,8 +374,12 @@ export class Walking {
         // A rider keeps to where a carriage can go, and off the walls (`CONTEXT.md`: Riding).
         const costs = walking(r, o) ? WALKING_COSTS : CARRIAGE_COSTS
         // An attacker only needs to come into contact, even with a defender up on a wall.
-        // So does a carriage going after an army (`CONTEXT.md`: Supply line).
-        const near = o.kind === 'attack' || armyDrivenTo(r) !== undefined
+        // So does a carriage going after an army (`CONTEXT.md`: Supply line), and one driven up to
+        // a wall or gate it may not pass (`CONTEXT.md`: Lost post found out).
+        const near =
+          o.kind === 'attack' ||
+          armyDrivenTo(r) !== undefined ||
+          (o.kind === 'drive' && o.near === true)
         const options = { realmId: wallSide(r), onWalls: walking(r, o), near }
         this.finder.request(r.id, [r.x, r.y], [target.x, target.y], costs, options)
         this.searching.set(r.id, key)

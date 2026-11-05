@@ -288,6 +288,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     cities: () => seenOf('city', occupationSeen),
     horses: () => seenOf('horse'),
     carriages: () => seenOf('carriage'),
+    traders: () => seenOf('trader'),
     piles: () => seenOf('pile'),
     nodes: exploredNodes,
     nodesInSight: ([kind]) => {

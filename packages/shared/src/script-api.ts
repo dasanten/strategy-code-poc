@@ -118,6 +118,11 @@ const SHARED: readonly ScriptBinding[] = [
   list('cities', 'city', 'The cities the Player sees any of.'),
   list('horses', 'horse', 'The horses the Player sees.'),
   list('carriages', 'carriage', 'The carriages the Player sees.'),
+  list(
+    'traders',
+    'trader',
+    'The wandering traders the Player sees: those standing at a stop name where and their prices.',
+  ),
   list('piles', 'pile', 'The piles of goods the Player sees.'),
   list('nodes', 'node', 'The resource nodes on terrain the Player has explored.'),
   list(
@@ -507,12 +512,12 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action(
     'buy',
     ['good', 'units', 'carriageId?', 'cityId?'],
-    'On a Trade Org warehouse or an NPC city’s storage, buy up to `units` of a good at its prices with the coins in my hands, or on my carriage there. At a warehouse, with `cityId`, one of my realm’s cities, a caravan delivers them to its storage for a fee.',
+    'On a Trade Org warehouse, an NPC city’s storage or the tile of a wandering trader standing at a stop, buy up to `units` of a good at its prices with the coins in my hands, or on my carriage there. At a warehouse, with `cityId`, one of my realm’s cities, a caravan delivers them to its storage for a fee.',
   ),
   action(
     'sell',
     ['good', 'units', 'carriageId?', 'cityId?'],
-    'On a Trade Org warehouse or an NPC city’s storage, sell up to `units` of a good at its prices from my hands, or from my carriage there. At a warehouse, with `cityId` (and no carriage), a caravan picks them up from that city’s storage and pays there, less a fee.',
+    'On a Trade Org warehouse, an NPC city’s storage or the tile of a wandering trader standing at a stop, sell up to `units` of a good at its prices from my hands, or from my carriage there. At a warehouse, with `cityId` (and no carriage), a caravan picks them up from that city’s storage and pays there, less a fee.',
   ),
   action(
     'swap',
