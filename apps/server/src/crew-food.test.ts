@@ -11,6 +11,7 @@ import {
   WALK_TICKS_PER_TILE,
   buildingPile,
   isAt,
+  npcReserve,
   pileAt,
   setOutFood,
   type Building,
@@ -379,6 +380,8 @@ describe('setting out for a workplace in an NPC city', () => {
       villager(world, city, id, camp, OWN_FOOD),
     )
     for (const r of crew) putToWork(r, camp)
+    // Past its reserve and below its cap of surplus (`CONTEXT.md`: Spare hands' work).
+    storage.stock!.wood = (npcReserve(world, city).wood ?? 0) + 1
     const working = { kind: 'work', buildingId: camp.id }
     // Planned without the terrain, the city picks no project to send spare hands to.
     planCity(world, city)
@@ -420,6 +423,11 @@ describe('setting out for a workplace in an NPC city', () => {
       const here = new Map<string, boolean>()
       for (let t = 0; t < 30 * TICKS_PER_GAME_DAY; t++) {
         stepWorld(world, terrain, walking)
+        // The Wood they bring goes on out of the store: the crew never reaches the surplus cap.
+        storage.stock!.wood = Math.min(
+          storage.stock!.wood ?? 0,
+          (npcReserve(world, city).wood ?? 0) + 1,
+        )
         if (!arrived) {
           arrived = crew.every(atCamp)
           for (const r of crew) here.set(r.id, true)

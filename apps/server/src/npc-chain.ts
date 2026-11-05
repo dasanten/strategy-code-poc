@@ -2,6 +2,7 @@ import {
   BUILD_MATERIALS,
   MAX_WORKERS,
   NPC_SMITHY_WEAPON,
+  NPC_SURPLUS_CAP,
   buildingAt,
   materialsNeeded,
   npcCityStock,
@@ -89,6 +90,35 @@ export function shortGoods(world: WorldState, city: City, project?: CityProject)
     .filter((s) => s.share > 1e-9)
     .sort((a, b) => b.share - a.share)
     .map((s) => s.good)
+}
+
+/**
+ * How an NPC city weighs its workplaces for surplus work (`CONTEXT.md`: Spare hands' work), from
+ * what it holds now: for a workplace, how full its good's cap is (`NPC_SURPLUS_CAP`, past the
+ * reserve), below 1 and lowest for the good that wants hands most. Undefined for one not to be
+ * worked for surplus: its good at its cap or with no cap, or a workplace that processes goods
+ * while `storage` holds a batch of its input only by eating into the reserve.
+ */
+export function surplusWork(
+  world: WorldState,
+  city: City,
+  storage: Building | undefined,
+): (place: Building) => number | undefined {
+  const stock = npcCityStock(world, city)
+  const reserve = npcReserve(world, city)
+  const spare: Stock = {}
+  for (const [good, n] of Object.entries(storage?.stock ?? {}) as [Good, number][]) {
+    spare[good] = n - (reserve[good] ?? 0)
+  }
+  return (place) => {
+    const good = chainGood(world, place)
+    const cap = good && NPC_SURPLUS_CAP[good]
+    if (!good || !cap) return undefined
+    const input = chainInput(good)
+    if (input && !holdsBatch(spare, input)) return undefined
+    const full = ((stock[good] ?? 0) - (reserve[good] ?? 0)) / cap
+    return full < 1 ? full : undefined
+  }
 }
 
 /** The materials a project still needs: its site's, or all of the building's before it is laid out. */

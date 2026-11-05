@@ -515,6 +515,24 @@ export const NPC_PLAN_TICKS = 60
 export const NPC_BUILDERS = 2
 
 /**
+ * How far past its reserve an NPC city's spare hands work for surplus, by good, in units
+ * (`CONTEXT.md`: Spare hands' work). Several of a trader's full loads (about 30 kg, `CARRY_BASE`),
+ * so its trader has something to sell, and above the materials a Full city wants (`townHall` and
+ * `storage` in `BUILD_MATERIALS`), or it could never found; few weapons, which its trader never
+ * sells. A good not named here is not worked for surplus.
+ */
+export const NPC_SURPLUS_CAP: Partial<Record<Good, number>> = {
+  food: 100,
+  wood: 150,
+  stone: 100,
+  ironOre: 60,
+  iron: 60,
+  goldOre: 60,
+  coins: 300,
+  spear: 4,
+}
+
+/**
  * How many tiles further out an NPC city puts up its new wall when it has no room left inside
  * the old one (`CONTEXT.md`: NPC city), on every side, with the gate in the same place. At most
  * `CITY_BUILDING_REACH`, so the new wall stays part of the city once the old one is gone.
