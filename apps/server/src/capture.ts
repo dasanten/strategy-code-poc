@@ -184,6 +184,8 @@ export function joinRealm(world: WorldState, city: City, captor: string, size: n
       r.order = null
   }
   city.realmId = captor
+  // A Player's city has no layout (`CONTEXT.md`: City layout).
+  delete city.layout
   // Only a city of no realm has a plan (`cityPlansSound`), and this tick's planning is over.
   delete world.cityPlans[city.id]
   if (city.tradeOrg === 'hq') hqFalls(world, city)

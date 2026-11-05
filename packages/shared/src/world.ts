@@ -2527,7 +2527,16 @@ export interface City {
    * Held `OCCUPATION_GAME_DAYS` without a break, it captures the city.
    */
   occupation: Occupation | null
+  /**
+   * How it sets out its town (`CONTEXT.md`: City layout), kept once picked. Every NPC city has one;
+   * trading posts, the HQ and Players' cities have none.
+   */
+  layout?: CityLayout
 }
+
+/** The layouts an NPC city can get (`CONTEXT.md`: City layout). */
+export const CITY_LAYOUTS = ['grid'] as const
+export type CityLayout = (typeof CITY_LAYOUTS)[number]
 
 /** A realm occupying a city's town hall (`CONTEXT.md`: Occupying a town hall). */
 export interface Occupation {

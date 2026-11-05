@@ -45,6 +45,7 @@ import {
   isAt,
   buildingPile,
 } from '@csp/shared'
+import { pickLayout } from './city-layout.js'
 import { recordEvent } from './events.js'
 import { rememberFormerPlayer } from './standing.js'
 import { leaveOnLeaderDeath } from './alliances.js'
@@ -328,7 +329,10 @@ export function endRealm(world: WorldState, realm: Realm, size: number): void {
   lapseDemandsOnLeaderDeath(world, realm.id)
   leaveOnLeaderDeath(world, realm.id)
   const cities = world.cities.filter((c) => c.realmId === realm.id)
-  for (const c of cities) c.realmId = null
+  for (const c of cities) {
+    c.realmId = null
+    c.layout = pickLayout(world.seed, c.id)
+  }
   rememberFormerPlayer(world, cities, realm.userId)
   for (const r of world.residents) {
     if (r.owner !== realm.id) continue

@@ -76,7 +76,7 @@ function setup({ armed = 0 } = {}) {
   world.realms.push({ id: 'r2', userId: 8, leaderId: 'b1', name: 'Tobin' })
   addCity(world, { id: 'c1', realmId: 'r1', x: 5, y: 5 })
   const n1 = addCity(world, { id: 'n1', realmId: null, x: 40, y: 40, name: 'Oakford' })
-  addCity(world, { id: 'post', realmId: null, x: 90, y: 90, name: 'Saltmarsh' }).tradeOrg = 'post'
+  addCity(world, { id: 'post', realmId: null, x: 90, y: 90, name: 'Saltmarsh', tradeOrg: 'post' })
   resident(world, 'a1', 'r1', 5, 5, 'c1')
   resident(world, 'b1', 'r2', 100, 40)
   resident(world, 'n1a', null, 40, 40, 'n1').carried.spear = 1

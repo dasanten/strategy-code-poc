@@ -522,6 +522,12 @@ export const NPC_BUILDERS = 2
 export const NPC_WALL_STEP = 8
 
 /**
+ * Tiles along each side of a block of the Grid layout (`CONTEXT.md`: City layout): room for two
+ * houses each way, or one stable. A lane one tile wide, left free for a street, runs between blocks.
+ */
+export const CITY_GRID_BLOCK = 4
+
+/**
  * How many tiles of wall an NPC city's builder fetches the materials for in one trip to the
  * storage (`CONTEXT.md`: NPC city, Fetching materials): a 40 m stretch's worth, so a long wall is
  * not one walk per tile. What a tile doesn't take goes to the next.
