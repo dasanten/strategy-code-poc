@@ -1113,7 +1113,9 @@ export interface CaravanJob {
  * handed in at the warehouse, the warehouse keeps them for it (`fromCityId` null), the fee paid.
  * What robbers took is sent again out of the warehouse's stock the same way. Cancelled, it is
  * brought `back` to the sender's city `toCityId` instead. A caravan standing at the warehouse
- * takes it on (`caravanId`). Plain data (ADR 0002).
+ * takes it on (`caravanId`). With `debt` it collects Coins owed to the Trade Organization and
+ * brings them to the warehouse's coin warehouse: `realmId` is who owes them, maybe an NPC city, and
+ * `toRealmId` is `TRADE_ORG`. Plain data (ADR 0002).
  */
 export interface Transfer {
   id: string
@@ -1132,6 +1134,18 @@ export interface Transfer {
   caravanId: string | null
   /** Set on one of the two Transfers of a carried Direct offer (`CONTEXT.md`: Direct offer). */
   carriedOffer?: CarriedTransfer
+  /** Set on one that collects a debt's Coins (`CONTEXT.md`: Trade Org debt). */
+  debt?: DebtCollection
+}
+
+/**
+ * Where a caravan collects a debt's Coins (`CONTEXT.md`: Trade Org debt): at the storage `storageId`
+ * of the one who owes them, out of what is set aside there for the Trade Organization on the offer
+ * `offerId`, for no fee, or without one out of what is free there, for the fee a Transfer costs.
+ */
+export interface DebtCollection {
+  storageId: string
+  offerId?: string
 }
 
 /** How a carried Direct offer's Transfer is paid: part at its pick-up, part on unloading. */
@@ -1474,6 +1488,14 @@ export interface Debt {
   /** The Organization that owes it: a realm or an NPC city. */
   org: string
   coins: number
+  /**
+   * How far up its steps the Trade Organization has gone (ADR 0025): none until its demand goes out;
+   * `demanded` from then on; `wrecks` once that demand was declined or lapsed, or its deadline passed
+   * with something still owed after an answer that didn't cover it.
+   */
+  step?: 'demanded' | 'wrecks'
+  /** The deadline of its demand, in ticks, while the step is `demanded`. */
+  deadline?: number
 }
 
 /**
@@ -1657,11 +1679,12 @@ export type RealmEventWhat =
   /**
    * The realm's debt to the Trade Organization (`CONTEXT.md`: Trade Org debt) changed by `coins`,
    * leaving `owed`: its army left it `owed` for what it couldn't take; a later crime made it `rose`;
-   * or the Fall of the HQ `ended` it.
+   * a caravan `collected` what was handed over on its demand; or the Fall of the HQ `ended` it. It is
+   * `overdue` when its demand didn't settle it and the Trade Organization goes up to its next step.
    */
   | {
       kind: 'debt'
-      what: 'owed' | 'rose' | 'ended'
+      what: 'owed' | 'rose' | 'collected' | 'overdue' | 'ended'
       coins: number
       owed: number
     }

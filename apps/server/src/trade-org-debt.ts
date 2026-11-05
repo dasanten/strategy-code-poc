@@ -3,13 +3,17 @@ import {
   buyOffCoinWarehouseAt,
   commanderOf,
   commands,
+  debtOf,
   payDebtProblem,
   standingOrganization,
+  tradeOrgHq,
   type OrderRequest,
   type WorldState,
 } from '@csp/shared'
+import { debtGoesUp, isDebtDemand, sendDebtDemand } from './demands.js'
 import { recordEvent } from './events.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
+import { endOffer } from './offers.js'
 import type { OrderKind } from './orders.js'
 import { organizationExists } from './standing.js'
 import { realmOf } from './starting-city.js'
@@ -17,7 +21,8 @@ import { realmOf } from './starting-city.js'
 /*
  * What the Trade Organization came for and couldn't take stays owed by that Organization
  * (`CONTEXT.md`: Trade Org debt; ADR 0025), and it rises by what later crimes cost. A resident pays
- * it in Coins at any Trade Org warehouse, in part or in full.
+ * it in Coins at any Trade Org warehouse, in part or in full. While it is owed the Trade Organization
+ * goes up its steps, the first a demand for it with a deadline (`stepDebts`, ADR 0025).
  */
 
 /**
@@ -39,13 +44,52 @@ export function oweTradeOrg(world: WorldState, org: string, coins: number): void
   })
 }
 
+/** Whether a caravan is still to bring in, or on the way with, what `org` handed over on its demand. */
+const beingCollected = (world: WorldState, org: string) =>
+  world.transfers.some((t) => t.debt && !t.back && t.realmId === org)
+
 /**
- * The debt of an Organization that is gone goes with it (a realm whose Leader died, a city that
- * joined a realm). Run after whatever ends Organizations in a tick.
+ * Whatever a debt set in motion ends once it is no longer owed, however that came about (paid in full
+ * at a warehouse, collected, the Organization gone, the Fall of the HQ): its demand goes without a
+ * word, as the log has said what became of the debt; caravans not yet sent for its Coins stay home;
+ * and what is set aside with no caravan left to fetch it is ordinary again.
+ */
+function endWhatIsNoLongerOwed(world: WorldState): void {
+  const owed = (org: string) => debtOf(world, org) > 0
+  world.demands = world.demands.filter((d) => !isDebtDemand(d) || owed(d.toId))
+  world.transfers = world.transfers.filter(
+    (t) => !t.debt || t.back || t.caravanId !== null || t.fromCityId === null || owed(t.realmId),
+  )
+  for (const o of [...world.offers]) {
+    if (o.direct?.toId !== TRADE_ORG) continue
+    if (!world.transfers.some((t) => t.debt?.offerId === o.id)) endOffer(world, o, 'lapsed')
+  }
+}
+
+/**
+ * The debts of a tick (`CONTEXT.md`: Trade Org debt). The debt of an Organization that is gone goes
+ * with it (a realm whose Leader died, a city that joined a realm), so run this after whatever ends
+ * Organizations in a tick, and after what changes a debt, which its demand's amount follows. A debt
+ * with no demand yet gets one, once. Declined or lapsed, that starts the next step at once
+ * (`debtDemandEnded`). Accepted, it starts it past the deadline, with what is handed over brought in
+ * and something still owed.
  */
 export function stepDebts(world: WorldState): void {
-  if (world.debts.length === 0) return
   world.debts = world.debts.filter((d) => organizationExists(world, d.org))
+  endWhatIsNoLongerOwed(world)
+  if (!tradeOrgHq(world)) return
+  for (const debt of world.debts) {
+    const open = world.demands.find((d) => isDebtDemand(d) && d.toId === debt.org)
+    if (open) open.terms = { kind: 'goods', goods: { coins: debt.coins } }
+    else if (debt.step === undefined) sendDebtDemand(world, debt)
+    else if (
+      debt.step === 'demanded' &&
+      world.tick >= debt.deadline! &&
+      !beingCollected(world, debt.org)
+    ) {
+      debtGoesUp(world, debt)
+    }
+  }
 }
 
 /** The input of a pay-debt order: the resident, the Coins, maybe a carriage to pay from. */
@@ -164,6 +208,43 @@ export const debtsSound: Invariant = {
       }
       if (seen.has(d.org)) fail(`${d.org} has two debts`, d.org)
       seen.add(d.org)
+    }
+    return out
+  },
+}
+
+/**
+ * The Trade Organization's demands for debts hold together (`CONTEXT.md`: Trade Org debt; ADR 0004):
+ * each is for all the Coins of a debt that is at its step `demanded`, at most one for each debt, and
+ * a debt at that step has a deadline. What caravans collect of a debt goes to the Trade Organization.
+ */
+export const debtDemandsSound: Invariant = {
+  name: 'debt-demands-sound',
+  check(world) {
+    const out: InvariantViolation[] = []
+    const fail = (message: string, id: string) =>
+      out.push({ invariant: this.name, message, entityIds: [id] })
+    const seen = new Set<string>()
+    for (const d of world.demands.filter(isDebtDemand)) {
+      const debt = world.debts.find((x) => x.org === d.toId)
+      if (!debt) fail(`demand ${d.id} is for a debt ${d.toId} doesn’t owe`, d.id)
+      else if (debt.step !== 'demanded') fail(`demand ${d.id} is out at step ${debt.step}`, d.id)
+      if (seen.has(d.toId)) fail(`${d.toId} was sent two demands for its debt`, d.id)
+      seen.add(d.toId)
+      const coins = d.terms.kind === 'goods' ? d.terms.goods.coins : undefined
+      if (debt && coins !== debt.coins) {
+        fail(`demand ${d.id} is for ${coins} Coins, of a debt of ${debt.coins}`, d.id)
+      }
+    }
+    for (const debt of world.debts) {
+      if (debt.step === 'demanded' && debt.deadline === undefined) {
+        fail(`the debt of ${debt.org} was demanded with no deadline`, debt.org)
+      }
+    }
+    for (const t of world.transfers) {
+      if (t.debt && t.toRealmId !== TRADE_ORG) {
+        fail(`${t.id} collects a debt for ${t.toRealmId}`, t.id)
+      }
     }
     return out
   },

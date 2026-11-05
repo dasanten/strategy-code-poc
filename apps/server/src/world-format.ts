@@ -19,7 +19,7 @@ import { paramTarget } from './script-params.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 91
+export const WORLD_FORMAT_VERSION = 92
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -381,6 +381,9 @@ export const migrations: Record<number, MigrationStep> = {
   // Its army buys Food on the way (`CONTEXT.md`: Trade Org debt; a punishment member's `seller` and
   // `noWay`), both optional. Those under way set out with no purse, so they don't buy.
   90: (state) => state as WorldState,
+  // Its debt demands go up steps (`CONTEXT.md`: Trade Org debt; a debt's `step` and `deadline`, a
+  // transfer's `debt`), all optional. A debt that stands has had no demand yet, so it gets one now.
+  91: (state) => state as WorldState,
 }
 
 export class WorldFormatError extends Error {}

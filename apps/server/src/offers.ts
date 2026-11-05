@@ -1,6 +1,7 @@
 import {
   DIRECT_OFFER_DAYS,
   TICKS_PER_GAME_DAY,
+  TRADE_ORG,
   acceptCarriedProblem,
   acceptOfferProblem,
   carriageCommanderOf,
@@ -91,6 +92,7 @@ function standOffer(
  * The goods of an accepted demand, set aside at a storage of the realm that accepted it, for the
  * demand's sender alone to fetch (`CONTEXT.md`: Demand). They stand as a Direct offer in person for
  * each good, wanting nothing back, one unit at a time so they can be fetched over several trips.
+ * Answers the offers.
  */
 export function setAsideForDemand(
   world: WorldState,
@@ -98,10 +100,10 @@ export function setAsideForDemand(
   toId: string,
   storage: Building,
   goods: Stock,
-): void {
+): Offer[] {
   const lapsesAt = world.tick + DIRECT_OFFER_DAYS * TICKS_PER_GAME_DAY
-  for (const [good, units] of Object.entries(goods) as [Good, number][]) {
-    world.offers.push({
+  return (Object.entries(goods) as [Good, number][]).map(([good, units]) => {
+    const offer: Offer = {
       id: newId(world, 'offer'),
       realmId,
       storageId: storage.id,
@@ -114,8 +116,10 @@ export function setAsideForDemand(
       wantsUnits: 0,
       times: units,
       direct: { toId, lapsesAt },
-    })
-  }
+    }
+    world.offers.push(offer)
+    return offer
+  })
 }
 
 /**
@@ -596,7 +600,7 @@ function acceptNow(
  * Takes an offer out of the world, with a line in its realm's log and, for a Direct offer, in the
  * log of the realm it was sent to, who already heard if they used it up.
  */
-function endOffer(world: WorldState, offer: Offer, why: OfferEnd): void {
+export function endOffer(world: WorldState, offer: Offer, why: OfferEnd): void {
   world.offers = world.offers.filter((o) => o !== offer)
   const toId = offer.direct?.toId
   recordEvent(world, offer.realmId, {
@@ -616,9 +620,13 @@ function endOffer(world: WorldState, offer: Offer, why: OfferEnd): void {
   })
 }
 
-/** Whether a Direct offer's time is up, or the realm it was sent to is gone. */
+/**
+ * Whether a Direct offer's time is up, or the realm it was sent to is gone, or for the Trade
+ * Organization, what it was set aside for, the HQ that sends its caravans.
+ */
 const lapsed = (world: WorldState, direct: DirectOfferTerms) =>
-  world.tick >= direct.lapsesAt || !world.realms.some((r) => r.id === direct.toId)
+  world.tick >= direct.lapsesAt ||
+  (direct.toId === TRADE_ORG ? !tradeOrgHq(world) : !world.realms.some((r) => r.id === direct.toId))
 
 /** Whether both cities of a carried offer are still their sides', each with a storage. */
 function carriedCitiesHold(world: WorldState, offer: Offer, c: CarriedOfferTerms): boolean {
