@@ -712,7 +712,11 @@ The shared language of the game. Domain terms only — no implementation details
   - **An NPC city** accepts when the respect it sees from the sender (their armed residents and
     walls in its sight) far outweighs its soldiers, so an army at the gate can take a city without a
     fight; otherwise it declines and its standing toward the sender drops. It carries out goods the
-    same way. **The Trade Organization** always declines, and being asked costs standing.
+    same way: set aside at its storage, for the sender alone to fetch; with none of them there it
+    declines. **The Trade Organization** always declines, and being asked costs standing. A Player
+    knows of an NPC city as of a realm, and everyone knows of the Trade Organization. Both answer at
+    their next planning pass, within a game hour (ADR 0016); a city that has joined a realm by then
+    lets the demand lapse.
 
 
 ## Bandits

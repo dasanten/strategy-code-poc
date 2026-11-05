@@ -20,6 +20,7 @@ const diplomacy: Diplomacy = {
   deliveries: [],
   demands: [],
   knownRealms: [],
+  knownNpcOrgs: [],
   standings: [],
   joinRequests: [],
   directives: [],

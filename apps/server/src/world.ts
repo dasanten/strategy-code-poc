@@ -37,7 +37,7 @@ import { stepPassengers } from './passengers.js'
 import { requestStrikes, resolveStrikes, type CombatResult } from './combat.js'
 import { stepArmies } from './armies.js'
 import { resolvePayments, stepContracts } from './contracts.js'
-import { stepDemands } from './demands.js'
+import { answerDemands, stepDemands } from './demands.js'
 import { stepTradeOrgArmy } from './trade-org-army.js'
 import { stepNpcHire } from './npc-hire.js'
 import { stepPunishments } from './trade-org-punishment.js'
@@ -277,6 +277,7 @@ function stepRest(
   resolveBirths(world, births)
   world.tick++
   const aging = stepAging(world, terrain.size)
+  answerDemands(world, terrain.size)
   stepAlliances(world)
   const captures = stepCaptures(world, terrain.size)
   stepRefill(world, terrain.size)

@@ -290,6 +290,7 @@ describe('alliances', () => {
       contracts: [],
       demands: [],
       knownRealms: [mara, wren, ash].map((p) => ({ realmId: realm(p), realm: name(p) })),
+      knownNpcOrgs: [{ realmId: 'trade-org', realm: 'the Trade Organization' }],
       directOffers: [],
       directOfferRealms: [realm(mara), realm(wren), realm(ash)].map((id) => ({
         realmId: id,
@@ -309,6 +310,7 @@ describe('alliances', () => {
       contracts: [],
       demands: [],
       knownRealms: [],
+      knownNpcOrgs: [{ realmId: 'trade-org', realm: 'the Trade Organization' }],
       directOffers: [],
       directOfferRealms: [],
       deliveries: [],

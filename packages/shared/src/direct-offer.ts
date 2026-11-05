@@ -305,7 +305,11 @@ export function directOffersFor(
   world: Pick<WorldState, 'offers' | 'buildings' | 'realms' | 'residents' | 'cities'>,
   realmId: string,
 ): DirectOfferView[] {
-  const label = (id: string): RealmLabel => ({ realmId: id, realm: organizationLabel(world, id) })
+  const label = (id: string): RealmLabel => ({
+    realmId: id,
+    realm: organizationLabel(world, id),
+    ...(world.cities.some((c) => c.id === id) && { city: true as const }),
+  })
   return world.offers
     .filter(
       (o): o is Offer & { direct: DirectOfferTerms } =>

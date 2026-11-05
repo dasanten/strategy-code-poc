@@ -330,7 +330,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
           ? goodText(e.gives)
           : `${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)}`
       const place = { name: 'the storage', x: e.x, y: e.y }
-      const them = `the realm of ${e.from}`
+      const them = e.fromCity ? e.from : `the realm of ${e.from}`
       if (e.carried) {
         const over = e.times === 1 ? '' : `, ${e.times} times over`
         const way = `between ${e.carried.fromCity} and ${e.carried.toCity}${over}`
@@ -651,8 +651,23 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         tone: 'warn',
       }
     case 'demand': {
-      const them = `the realm of ${e.other}`
+      const them = e.otherIs ? e.other : `the realm of ${e.other}`
       const terms = e.terms.kind === 'city' ? e.terms.cityName : goodsLine(e.terms.goods)
+      // An NPC city demanded of itself is asked to join, not to hand a city over.
+      if (e.otherIs === 'city' && e.terms.kind === 'city' && e.what !== 'accepted') {
+        return {
+          sent: { text: `You demanded that ${terms} join your realm.`, tone: 'info' },
+          declined: {
+            text: `${terms} declined to join your realm, and thinks less of you.`,
+            tone: 'warn',
+          },
+          lapsed: {
+            text: `Your demand that ${terms} join your realm lapsed unanswered.`,
+            tone: 'info',
+          },
+          received: { text: `${terms} was asked to join your realm.`, tone: 'info' },
+        }[e.what] as EventLine
+      }
       switch (e.what) {
         case 'sent':
           return { text: `You demanded ${terms} of ${them}.`, tone: 'info' }
@@ -660,6 +675,9 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
           return { text: `${cap(them)} demands ${terms} of you.`, tone: 'warn' }
         case 'accepted':
           if (e.terms.kind === 'city') {
+            if (e.otherIs) {
+              return { text: `${terms} gave in to your demand and joined your realm.`, tone: 'info' }
+            }
             return e.mine
               ? {
                   text: `${cap(them)} accepted your demand: ${terms} joined your realm.`,
@@ -672,6 +690,12 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
           }
           return acceptedGoodsLine(e, them, terms)
         case 'declined':
+          if (e.otherIs) {
+            return {
+              text: `${cap(them)} declined your demand for ${terms}, and thinks less of you.`,
+              tone: 'warn',
+            }
+          }
           return e.mine
             ? { text: `${cap(them)} declined your demand for ${terms}.`, tone: 'warn' }
             : { text: `You declined the demand of ${them} for ${terms}.`, tone: 'info' }

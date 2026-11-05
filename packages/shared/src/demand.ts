@@ -1,12 +1,22 @@
-import { sharingSight, type RealmLabel } from './alliance.js'
-import { DEMANDS_PER_GAME_DAY, DEMAND_NOTE_MAX_LENGTH, GOOD_WEIGHT } from './balance.js'
+import { isAllianceCity, sharingSight, type RealmLabel } from './alliance.js'
+import {
+  DEMANDS_PER_GAME_DAY,
+  DEMAND_NOTE_MAX_LENGTH,
+  DEMAND_YIELD_RESPECT_MIN,
+  DEMAND_YIELD_RESPECT_TIMES,
+  GOOD_WEIGHT,
+} from './balance.js'
+import { forSale } from './city.js'
 import { freeStock, offerStorage } from './offers.js'
+import { citySoldiers, respectSeenBy } from './persuasion.js'
 import { organizationLabel } from './standing.js'
+import { TRADE_ORG } from './trade-org.js'
 import { pickUpTransferProblem, transferFee, transferLoad } from './transfer.js'
 import { deliveryStorage } from './warehouse.js'
 import {
   GOODS,
   TICKS_PER_GAME_DAY,
+  type City,
   type Demand,
   type DemandTerms,
   type Good,
@@ -84,6 +94,62 @@ export function realmsKnownTo(
     if (o.direct.toId === realmId) known.add(o.realmId)
   }
   return world.realms.map((r) => r.id).filter((id) => id !== realmId && known.has(id))
+}
+
+/**
+ * Whether the game answers demands sent to `id` (`CONTEXT.md`: Demand), and why: the Trade
+ * Organization, or a city by its id. Undefined for a realm, or nothing at all.
+ */
+export function answeredByGame(
+  world: Pick<WorldState, 'cities'>,
+  id: string,
+): 'tradeOrg' | 'city' | undefined {
+  if (id === TRADE_ORG) return 'tradeOrg'
+  return world.cities.some((c) => c.id === id) ? 'city' : undefined
+}
+
+/**
+ * Whom else a realm can send a demand, for the game to answer (`CONTEXT.md`: Demand): the Trade
+ * Organization, which everyone knows of, and the NPC cities it knows of: those it sees (`seen`, which
+ * may hold anything else too), those it last saw as NPC cities, and those with a standing either way.
+ */
+export function npcOrgsKnownTo(
+  world: Pick<WorldState, 'realms' | 'cities' | 'lastSeen' | 'standings'>,
+  realmId: string,
+  seen: Iterable<string>,
+): string[] {
+  const known = new Set<string>()
+  for (const id of seen) if (isAllianceCity(world, id)) known.add(id)
+  for (const s of world.standings) {
+    if (s.toward === realmId && isAllianceCity(world, s.of)) known.add(s.of)
+    if (s.of === realmId && isAllianceCity(world, s.toward)) known.add(s.toward)
+  }
+  const userId = world.realms.find((r) => r.id === realmId)?.userId
+  const remembered = userId === undefined ? undefined : world.lastSeen[userId]
+  for (const m of remembered ?? []) {
+    if (m.is === 'city' && m.realmId === null && m.tradeOrg === undefined) known.add(m.id)
+  }
+  const cities = world.cities.filter((c) => known.has(c.id) && c.realmId !== realmId)
+  return [TRADE_ORG, ...cities.map((c) => c.id)]
+}
+
+/**
+ * Whether an NPC city gives in to a realm's demand (`CONTEXT.md`: Demand): the respect it sees from
+ * the realm, its armed residents and walls in the city's sight, far outweighs its soldiers. `size`
+ * is the map's.
+ */
+export function yieldsToDemand(
+  world: Pick<WorldState, 'residents' | 'buildings' | 'cities'>,
+  city: City,
+  realmId: string,
+  size: number,
+): boolean {
+  if (!forSale(city)) return false
+  const needed = Math.max(
+    DEMAND_YIELD_RESPECT_MIN,
+    DEMAND_YIELD_RESPECT_TIMES * citySoldiers(world, city),
+  )
+  return respectSeenBy(world, city, realmId, size) >= needed
 }
 
 /**
@@ -201,7 +267,11 @@ export function demandsFor(
   world: Pick<WorldState, 'demands' | 'realms' | 'residents' | 'cities'>,
   realmId: string,
 ): DemandView[] {
-  const label = (id: string): RealmLabel => ({ realmId: id, realm: organizationLabel(world, id) })
+  const label = (id: string): RealmLabel => ({
+    realmId: id,
+    realm: organizationLabel(world, id),
+    ...(answeredByGame(world, id) === 'city' && { city: true as const }),
+  })
   return world.demands
     .filter((d: Demand) => d.fromId === realmId || d.toId === realmId)
     .map((d) => ({

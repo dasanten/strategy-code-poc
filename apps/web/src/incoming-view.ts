@@ -28,7 +28,7 @@ export function incomingItems(
       kind: 'directOffer' as const,
       id: offer.id,
       line: wantsNothing(offer)
-        ? `The realm of ${offer.from.realm} set aside what you demanded: ${offerStands(offer, GOOD_LABELS)}`
+        ? `${offer.from.city ? offer.from.realm : `The realm of ${offer.from.realm}`} set aside what you demanded: ${offerStands(offer, GOOD_LABELS)}`
         : `The realm of ${offer.from.realm} offers: ${(offer.direct.carried
             ? carriedLine(offer, GOOD_LABELS)
             : offerTerms(offer, GOOD_LABELS)

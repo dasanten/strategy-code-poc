@@ -18,6 +18,7 @@ import {
   nearestWarehouse,
   offerOpenTo,
   offerStorage,
+  answeredByGame,
   organizationLabel,
   postOfferProblem,
   quoteOffer,
@@ -603,6 +604,7 @@ function endOffer(world: WorldState, offer: Offer, why: OfferEnd): void {
     kind: 'directOffer',
     what: why,
     from: organizationLabel(world, offer.realmId),
+    ...(answeredByGame(world, offer.realmId) && { fromCity: true as const }),
     ...terms(offer),
   })
 }

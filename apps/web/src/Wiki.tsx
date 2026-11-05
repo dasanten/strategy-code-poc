@@ -168,8 +168,12 @@ import {
   STANDING_DRIFT_PER_DAY,
   STANDING_PER_PAID_WEEK,
   DEMANDS_PER_GAME_DAY,
+  DEMAND_DECLINED_STANDING_LOSS,
   DEMAND_MAX_DAYS,
   DEMAND_NOTE_MAX_LENGTH,
+  DEMAND_TRADE_ORG_STANDING_LOSS,
+  DEMAND_YIELD_RESPECT_MIN,
+  DEMAND_YIELD_RESPECT_TIMES,
   STANDING_RANGE,
   STANDING_TRADE_COINS_PER_POINT,
   START_RESIDENTS,
@@ -2149,6 +2153,22 @@ export function Wiki() {
             them from a city of yours to a city of theirs whose storage you see, one load at a time,
             and you pay the fee. If the storage is short it says so before you accept, and what it
             holds is what goes. With none of it there you can't accept that way.
+          </li>
+          <li>
+            <strong>An NPC city answers for itself</strong> within a game hour, when it next plans.
+            You can send one to any NPC city you have seen or have a standing with. It gives in when
+            the armed residents and walls of yours in its sight come to at least{' '}
+            {num(DEMAND_YIELD_RESPECT_TIMES)} times its soldiers, and at least{' '}
+            {num(DEMAND_YIELD_RESPECT_MIN)}, so an army at the gate can win a city without a fight.
+            Those out of its sight don't count. It joins your realm as a persuaded city does, or sets
+            what it holds of the goods aside at its storage for you alone to fetch. Otherwise, or
+            with none of the goods there, it declines, and its standing toward you drops by{' '}
+            {num(DEMAND_DECLINED_STANDING_LOSS)}.
+          </li>
+          <li>
+            <strong>The Trade Organization always declines</strong>, within a game hour, and being
+            asked costs you {num(DEMAND_TRADE_ORG_STANDING_LOSS)} of its standing. Everyone knows of
+            it.
           </li>
           <li>
             <strong>The threat is only words.</strong> Ignoring a demand does nothing by itself:

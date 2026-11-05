@@ -3,11 +3,13 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { transferLoadsFee, type DemandView, type SeenBuilding, type SeenCity } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import {
+  citiesToDemandOf,
   demandNoticeLine,
   demandSides,
   goodsOfLines,
   handOverQuestion,
   knownCitiesOf,
+  sentLine,
   setAsidePreview,
   termsLine,
   transferPreview,
@@ -128,6 +130,72 @@ describe('accepting a demand for a city', () => {
   it('doesn’t ask for goods, or for a city no longer theirs, which the server refuses', () => {
     expect(handOverQuestion(demand('a', 'r2', 'r1'), 'r1', [])).toBeUndefined()
     expect(handOverQuestion(forAshford, 'r1', [city('c1', 'Ashford', 'r3')])).toBeUndefined()
+  })
+})
+
+describe('a demand the game answers', () => {
+  const ashby = { realmId: 'n1', realm: 'Ashby', city: true } as const
+  const tradeOrg = { realmId: 'trade-org', realm: 'the Trade Organization' }
+  const goods = { kind: 'goods', goods: { coins: 20 } } as const
+  const forAshby = { kind: 'city', cityId: 'n1', cityName: 'Ashby' } as const
+  const line = (what: string, terms: object, other: string, otherIs: string) =>
+    describeEvent({
+      kind: 'demand',
+      demandId: 'd',
+      what,
+      mine: true,
+      other,
+      otherIs,
+      terms,
+      seq: 1,
+      tick: 0,
+      userId: 1,
+    } as never).text
+
+  it('reads as sent to a city or the Trade Organization, not to a realm', () => {
+    expect(sentLine({ to: ashby, terms: forAshby })).toBe('Ashby, to join you')
+    expect(sentLine({ to: ashby, terms: goods })).toBe('20 Coins from Ashby')
+    expect(sentLine({ to: tradeOrg, terms: goods })).toBe('20 Coins from the Trade Organization')
+    expect(sentLine({ to: { realmId: 'r2', realm: 'Tobin' }, terms: goods })).toBe(
+      '20 Coins from the realm of Tobin',
+    )
+  })
+
+  it('says in the realm log how it was answered', () => {
+    expect(line('accepted', forAshby, 'Ashby', 'city')).toBe(
+      'Ashby gave in to your demand and joined your realm.',
+    )
+    expect(line('sent', forAshby, 'Ashby', 'city')).toBe(
+      'You demanded that Ashby join your realm.',
+    )
+    expect(line('declined', forAshby, 'Ashby', 'city')).toBe(
+      'Ashby declined to join your realm, and thinks less of you.',
+    )
+    expect(line('declined', goods, 'Ashby', 'city')).toBe(
+      'Ashby declined your demand for 20 Coins, and thinks less of you.',
+    )
+    expect(line('declined', goods, 'the Trade Organization', 'tradeOrg')).toBe(
+      'The Trade Organization declined your demand for 20 Coins, and thinks less of you.',
+    )
+    expect(line('sent', goods, 'the Trade Organization', 'tradeOrg')).toBe(
+      'You demanded 20 Coins of the Trade Organization.',
+    )
+    expect(line('lapsed', forAshby, 'Ashby', 'city')).toBe(
+      'Your demand that Ashby join your realm lapsed unanswered.',
+    )
+  })
+
+  it('names only what the side it goes to can hand over', () => {
+    const city = (id: string, name: string, more: object) =>
+      ({ id, name, realmId: null, ...more }) as SeenCity
+    const post = city('p1', 'Saltmarsh', { tradeOrg: 'post' })
+    const seen = [city('n1', 'Ashby', {}), post]
+    const lost = { ...city('p2', 'Bayhead', { tradeOrg: 'post' }), seenAt: 0 } as LastSeenCity
+    expect(citiesToDemandOf(ashby, seen, [lost])).toEqual([{ id: 'n1', name: 'Ashby' }])
+    expect(citiesToDemandOf(tradeOrg, seen, [lost])).toEqual([
+      { id: 'p2', name: 'Bayhead' },
+      { id: 'p1', name: 'Saltmarsh' },
+    ])
   })
 })
 
@@ -282,6 +350,10 @@ describe('the Demands drawer', () => {
         demands,
         realmId: 'r1',
         knownRealms: [{ realmId: 'r2', realm: 'R2' }],
+        knownNpcOrgs: [
+          { realmId: 'trade-org', realm: 'the Trade Organization' },
+          { realmId: 'n1', realm: 'Ashby', city: true },
+        ],
         cities: [{ id: 'c1', name: 'Oakford', realmId: 'r1' } as SeenCity],
         buildings: [
           {
@@ -308,6 +380,22 @@ describe('the Demands drawer', () => {
     expect(html).toContain('The storage at (6, 6) in Oakford')
     expect(html).toContain('This storage is short: only 0 of 2 Iron Ore, 5 of 20 Coins.')
     expect(html).toContain('Sets aside 5 Coins for them alone to fetch.')
+  })
+
+  it('offers NPC cities and the Trade Organization to send one to, and says who answers', () => {
+    const html = panel([])
+    expect(html).toContain('Ashby (NPC city)')
+    expect(html).toContain('The Trade Organization')
+    expect(html).toContain('answers within a game hour')
+    const sent = panel([
+      demand('a', 'r1', 'n1', {
+        to: { realmId: 'n1', realm: 'Ashby', city: true },
+        terms: { kind: 'city', cityId: 'n1', cityName: 'Ashby' },
+      }),
+    ])
+    expect(sent).toContain('Ashby, to join you')
+    expect(sent).toContain('The answer comes within a game hour.')
+    expect(sent).not.toContain('Lapses in')
   })
 
   it('offers no Transfer once the HQ has fallen', () => {

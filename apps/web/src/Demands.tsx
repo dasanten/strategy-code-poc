@@ -19,10 +19,12 @@ import {
   type SeenCity,
 } from '@csp/shared'
 import {
+  answersByGame,
+  citiesToDemandOf,
   demandSides,
   goodsOfLines,
   handOverQuestion,
-  knownCitiesOf,
+  sentLine,
   setAsidePreview,
   termsLine,
   transferPreview,
@@ -170,13 +172,15 @@ function HandOverGoods({
 
 /**
  * Demands (`CONTEXT.md`: Demand): what others demand of the Player, to accept or decline; what they
- * demanded, waiting for an answer; and a form to send one to a realm they know of. Every change is
- * an order the server checks (ADR 0002). It is only words: nothing happens when one is ignored.
+ * demanded, waiting for an answer; and a form to send one to a realm they know of, an NPC city they
+ * know of or the Trade Organization, which the game answers. Every change is an order the server
+ * checks (ADR 0002). It is only words: nothing happens when one is ignored.
  */
 export function DemandsPanel({
   demands,
   realmId,
   knownRealms,
+  knownNpcOrgs,
   cities,
   buildings,
   carriedWays,
@@ -189,6 +193,8 @@ export function DemandsPanel({
   realmId: string
   /** The other realms the Player knows of. */
   knownRealms: RealmLabel[]
+  /** The Trade Organization and the NPC cities the Player knows of. */
+  knownNpcOrgs: RealmLabel[]
   /** The cities in sight. */
   cities: SeenCity[]
   /** The buildings in sight, for the storages goods can go from and to. */
@@ -216,7 +222,8 @@ export function DemandsPanel({
   }
 
   const { incoming, sent } = demandSides(demands, realmId)
-  const theirCities = toId ? knownCitiesOf(toId, cities, lastSeen) : []
+  const to = [...knownRealms, ...knownNpcOrgs].find((r) => r.realmId === toId)
+  const theirCities = to ? citiesToDemandOf(to, cities, lastSeen) : []
   const goods = goodsOfLines(lines)
   const noteProblem = note === '' ? undefined : demandNoteProblem(note)
   const ready =
@@ -304,11 +311,13 @@ export function DemandsPanel({
             {sent.map((d) => (
               <li key={d.id} className="army">
                 <span>
-                  <strong>
-                    {termsLine(d.terms)} from the realm of {d.to.realm}
-                  </strong>
+                  <strong>{sentLine(d)}</strong>
                   <DemandNote note={d.note} />
-                  <span className="muted small">Lapses in {aboutTime(d.deadline - tick)}.</span>
+                  <span className="muted small">
+                    {answersByGame(d.to)
+                      ? 'The answer comes within a game hour.'
+                      : `Lapses in ${aboutTime(d.deadline - tick)}.`}
+                  </span>
                 </span>
               </li>
             ))}
@@ -323,13 +332,20 @@ export function DemandsPanel({
             value={toId}
             onChange={(e) => {
               setToId(e.target.value)
-              setCityId('')
+              // An NPC city can only hand over itself, so that is the city named.
+              const city = knownNpcOrgs.some((o) => o.city && o.realmId === e.target.value)
+              setCityId(city ? e.target.value : '')
             }}
           >
             <option value="">Send to…</option>
             {knownRealms.map((r) => (
               <option key={r.realmId} value={r.realmId}>
                 The realm of {r.realm}
+              </option>
+            ))}
+            {knownNpcOrgs.map((r) => (
+              <option key={r.realmId} value={r.realmId}>
+                {r.city ? `${r.realm} (NPC city)` : 'The Trade Organization'}
               </option>
             ))}
           </select>
@@ -440,7 +456,10 @@ export function DemandsPanel({
       </form>
       <p className="muted small">
         A demand arrives at once, wherever they are. A realm sends at most {DEMANDS_PER_GAME_DAY} a
-        game day. It is only words: what you threaten is yours to carry out, or not.
+        game day. It is only words: what you threaten is yours to carry out, or not. An NPC city
+        answers within a game hour: it gives in only to far more of your armed residents and walls
+        in its sight than it has soldiers, and otherwise thinks less of you. The Trade Organization
+        always declines, and being asked costs standing.
       </p>
       {error && <p className="error">{error}</p>}
     </section>

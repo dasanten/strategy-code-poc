@@ -986,6 +986,7 @@ describe('realtime', () => {
       contracts: [],
       demands: [],
       knownRealms: [],
+      knownNpcOrgs: [{ realmId: 'trade-org', realm: 'the Trade Organization' }],
       directOffers: [],
       directOfferRealms: [],
       deliveries: [],

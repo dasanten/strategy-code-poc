@@ -602,7 +602,7 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action(
     'sendDemand',
     ['realmId', 'terms', 'note', 'days'],
-    `Send a realm my realm knows of a demand, wherever it is: \`terms\` is \`{ kind: "city", cityId: id }\` for a city of theirs I know of, or \`{ kind: "goods", goods: { food: 5, coins: 20 } }\`, with a note of at most ${DEMAND_NOTE_MAX_LENGTH} characters and a deadline 1 to ${DEMAND_MAX_DAYS} game days away. My realm sends at most ${DEMANDS_PER_GAME_DAY} a game day. It is only words: nothing happens by itself when it is ignored.`,
+    `Send a realm my realm knows of a demand, wherever it is: \`terms\` is \`{ kind: "city", cityId: id }\` for a city of theirs I know of, or \`{ kind: "goods", goods: { food: 5, coins: 20 } }\`, with a note of at most ${DEMAND_NOTE_MAX_LENGTH} characters and a deadline 1 to ${DEMAND_MAX_DAYS} game days away. My realm sends at most ${DEMANDS_PER_GAME_DAY} a game day. It is only words: nothing happens by itself when it is ignored. \`realmId\` can also be an NPC city I know of, or \`"trade-org"\`: the game answers within a game hour.`,
   ),
   action(
     'acceptDemand',

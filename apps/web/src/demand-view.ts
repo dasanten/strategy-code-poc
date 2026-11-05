@@ -1,10 +1,12 @@
 import {
   GOODS,
+  TRADE_ORG,
   goodsToHandOver,
   transferLoadsFee,
   type DemandTerms,
   type DemandView,
   type Good,
+  type RealmLabel,
   type SeenCity,
   type Stock,
 } from '@csp/shared'
@@ -14,6 +16,16 @@ import { goodsLine } from './realm-log.js'
 /** What a demand asks for, in words: a city's name, or "5 Food, 20 Coins". */
 export function termsLine(terms: DemandTerms): string {
   return terms.kind === 'city' ? terms.cityName : goodsLine(terms.goods)
+}
+
+/** Whether the game answers demands sent to this side: an NPC city or the Trade Organization. */
+export const answersByGame = (org: RealmLabel) => org.city === true || org.realmId === TRADE_ORG
+
+/** What was demanded of whom, as the one who sent it reads it, waiting for the answer. */
+export function sentLine(d: Pick<DemandView, 'to' | 'terms'>): string {
+  if (d.to.city && d.terms.kind === 'city') return `${d.to.realm}, to join you`
+  const them = answersByGame(d.to) ? d.to.realm : `the realm of ${d.to.realm}`
+  return `${termsLine(d.terms)} from ${them}`
 }
 
 /** The demands sent to the realm, and those it sent, each oldest first. */
@@ -143,15 +155,38 @@ export function knownCitiesOf(
   cities: readonly SeenCity[],
   lastSeen: readonly LastSeenCity[],
 ): { id: string; name: string }[] {
+  return citiesKnownAs((c) => c.realmId === realmId, cities, lastSeen)
+}
+
+/** The cities the Player knows that `theirs` says yes to: in sight, or last seen so, by name. */
+function citiesKnownAs(
+  theirs: (c: SeenCity) => boolean,
+  cities: readonly SeenCity[],
+  lastSeen: readonly LastSeenCity[],
+): { id: string; name: string }[] {
   const seen = new Map<string, string>()
-  for (const m of lastSeen) if (m.realmId === realmId) seen.set(m.id, m.name)
+  for (const m of lastSeen) if (theirs(m)) seen.set(m.id, m.name)
   for (const c of cities) {
-    if (c.realmId === realmId) seen.set(c.id, c.name)
+    if (theirs(c)) seen.set(c.id, c.name)
     else seen.delete(c.id)
   }
   return [...seen]
     .map(([id, name]) => ({ id, name }))
     .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+}
+
+/**
+ * The cities the Player can name in a demand sent to this side: an NPC city only itself, the Trade
+ * Organization its trading posts and HQ that they know, a realm its cities that they know.
+ */
+export function citiesToDemandOf(
+  to: RealmLabel,
+  cities: readonly SeenCity[],
+  lastSeen: readonly LastSeenCity[],
+): { id: string; name: string }[] {
+  if (to.city) return [{ id: to.realmId, name: to.realm }]
+  if (to.realmId === TRADE_ORG) return citiesKnownAs((c) => !!c.tradeOrg, cities, lastSeen)
+  return knownCitiesOf(to.realmId, cities, lastSeen)
 }
 
 /** One line of goods on the Demands form; `units` is what the field holds. */
