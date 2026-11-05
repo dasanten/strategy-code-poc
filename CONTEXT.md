@@ -288,7 +288,12 @@ The shared language of the game. Domain terms only — no implementation details
   not Food or coins). The escort walks along with the carriage, which waits for it; the crew
   refill from the carriage like an army.
 - **Waiting for Food:** a caravan or wandering trader stays at the HQ until it holds enough Food for
-  its crew and horse to reach its next stop, so nothing sets off to starve on the road.
+  its crew and horse to reach its next stop, so nothing sets off to starve on the road. A caravan
+  unloads first, so its Food has room, and wants all it keeps on board when a delivery or transfer
+  waits for it, as there is no Food on that way. A carriage leaves the storage what the HQ's own
+  people eat in a few days, but may always take a little for its horse, which eats only from the
+  load. Short of Food, it tops up from the goods warehouse, which the HQ's people don't eat from
+  and the Stock floor fills each day; only with none there does it stand and wait.
 - **Caravan crew lost:** a caravan outlives its crew. When its driver dies, a surviving escort
   takes over driving. With no crew left, its carriage stands where it is and the HQ sends a new
   driver on foot, from the same adults it makes up escorts from, once it has one free. A caravan's
