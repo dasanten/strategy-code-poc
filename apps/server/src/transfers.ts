@@ -56,6 +56,55 @@ interface TransferRequest extends OrderRequest {
 }
 
 /**
+ * A pick-up Transfer on terms already checked (`pickUpTransferProblem`): it waits for a caravan of
+ * the warehouse nearest the sender's city, with a line in the sender's log. `size` is the map's.
+ */
+export function orderPickUp(
+  world: WorldState,
+  size: number,
+  realmId: string,
+  fromCityId: string,
+  toCityId: string,
+  good: Good,
+  units: number,
+): void {
+  const from = world.cities.find((c) => c.id === fromCityId)
+  const to = world.cities.find((c) => c.id === toCityId)
+  const storage = deliveryStorage(world, fromCityId)
+  if (!from || !to?.realmId || !storage) return
+  const warehouse = nearestWarehouse(world, storage, size)
+  if (!warehouse) return
+  world.transfers.push({
+    id: newId(world, 'transfer'),
+    realmId,
+    toRealmId: to.realmId,
+    toCityId: to.id,
+    warehouseId: warehouse.id,
+    fromCityId: from.id,
+    good,
+    units,
+    fee: 0,
+    back: false,
+    caravanId: null,
+  })
+  recordEvent(world, realmId, {
+    kind: 'transferOrdered',
+    good,
+    units,
+    wanted: units,
+    fee: 0,
+    fromCity: from.name,
+    name: null,
+    toRealmId: to.realmId,
+    toRealm: realmName(world, to.realmId),
+    cityId: to.id,
+    city: to.name,
+    x: storage.x,
+    y: storage.y,
+  })
+}
+
+/**
  * A transfer order (`CONTEXT.md`: Transfer), given from the realm with nobody at a warehouse: a
  * caravan of the warehouse nearest the sender's city `fromCityId` picks up to `units` of a good
  * there, with its fee, and brings them to the storage of `toCityId`, another realm's city.
@@ -70,41 +119,10 @@ export const transfer: OrderKind = {
   apply(world, sender, order, terrain) {
     const o = order as TransferRequest
     const realm = realmOf(world, sender.userId)
-    const from = world.cities.find((c) => c.id === o.fromCityId)
-    const to = world.cities.find((c) => c.id === o.toCityId)
-    const storage = deliveryStorage(world, o.fromCityId)
-    if (!realm || !from || !to?.realmId || !storage) return
+    if (!realm) return
     if (pickUpTransferProblem(world, realm.id, o.fromCityId, o.good, o.units, o.toCityId)) return
-    const warehouse = nearestWarehouse(world, storage, terrain?.size ?? Infinity)
-    if (!warehouse) return
-    world.transfers.push({
-      id: newId(world, 'transfer'),
-      realmId: realm.id,
-      toRealmId: to.realmId,
-      toCityId: to.id,
-      warehouseId: warehouse.id,
-      fromCityId: from.id,
-      good: o.good,
-      units: o.units,
-      fee: 0,
-      back: false,
-      caravanId: null,
-    })
-    recordEvent(world, realm.id, {
-      kind: 'transferOrdered',
-      good: o.good,
-      units: o.units,
-      wanted: o.units,
-      fee: 0,
-      fromCity: from.name,
-      name: null,
-      toRealmId: to.realmId,
-      toRealm: realmName(world, to.realmId),
-      cityId: to.id,
-      city: to.name,
-      x: storage.x,
-      y: storage.y,
-    })
+    const size = terrain?.size ?? Infinity
+    orderPickUp(world, size, realm.id, o.fromCityId, o.toCityId, o.good, o.units)
   },
 }
 

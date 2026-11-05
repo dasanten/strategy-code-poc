@@ -21,6 +21,13 @@ const offer = (id: string, fromId = 'r1', toId = 'r2'): DirectOfferView => ({
 })
 
 describe('what was sent to the Player', () => {
+  it('tells goods set aside on a demand by what there is to fetch, with no price', () => {
+    const aside = { ...offer('o1'), givesUnits: 1, wantsUnits: 0, times: 7, rate: 0 }
+    expect(incomingItems({ directOffers: [aside] }, 'r2')[0]!.line).toBe(
+      'The realm of Mara set aside what you demanded: 7 wood left to fetch',
+    )
+  })
+
   it('lists what is sent to the realm, and not what it sent', () => {
     const items = incomingItems({ directOffers: [offer('o1'), offer('o2', 'r2', 'r1')] }, 'r2')
     expect(items).toEqual([

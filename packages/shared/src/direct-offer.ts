@@ -5,6 +5,7 @@ import {
   offerTermsProblem,
   postOfferProblem,
   seenOffer,
+  wantsNothing,
   type OfferTerms,
   type SeenOffer,
 } from './offers.js'
@@ -50,7 +51,10 @@ function sendingProblem(
 ): string | undefined {
   if (toId === realmId) return 'send a direct offer to another realm'
   if (!world.realms.some((r) => r.id === toId)) return 'send a direct offer to a realm'
-  const standing = world.offers.filter((o) => o.realmId === realmId && o.direct?.toId === toId)
+  // Goods set aside on accepting a demand were asked for: they use up none of the limit.
+  const standing = world.offers.filter(
+    (o) => o.realmId === realmId && o.direct?.toId === toId && !wantsNothing(o),
+  )
   if (standing.length >= DIRECT_OFFERS_TO_ONE_REALM) {
     return `at most ${DIRECT_OFFERS_TO_ONE_REALM} direct offers can stand to one realm`
   }

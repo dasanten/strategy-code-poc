@@ -1,4 +1,13 @@
-import type { DemandTerms, DemandView, Good, SeenCity } from '@csp/shared'
+import {
+  GOODS,
+  goodsToHandOver,
+  transferLoadsFee,
+  type DemandTerms,
+  type DemandView,
+  type Good,
+  type SeenCity,
+  type Stock,
+} from '@csp/shared'
 import type { LastSeenCity } from './last-seen.js'
 import { goodsLine } from './realm-log.js'
 
@@ -53,6 +62,76 @@ export function handOverQuestion(
   if (!city) return undefined
   const last = own.length === 1 ? ' It is your last city.' : ''
   return `Hand ${city.name} over to the realm of ${d.from.realm}, with those who live there, its horses and carriages? This can’t be undone.${last}`
+}
+
+/** What the storage holds of what was demanded, where it holds too little: `3 of 5 Food`. */
+function shortLine(goods: Partial<Record<Good, number>>, going: Stock): string {
+  return GOODS.filter((g) => (going[g] ?? 0) < (goods[g] ?? 0))
+    .map((g) => `${going[g] ?? 0} of ${goodsLine({ [g]: goods[g] })}`)
+    .join(', ')
+}
+
+/** What the Player reads before accepting a demand for goods, and whether it can go. */
+export interface HandOverPreview {
+  text: string
+  canAccept: boolean
+}
+
+/**
+ * What goes from a storage holding `free` for a demand, said before accepting (`CONTEXT.md`:
+ * Demand): undefined when none of it is there. `line` says what is done with what goes.
+ */
+function previewFrom(
+  goods: Partial<Record<Good, number>>,
+  free: Stock,
+  line: (going: Stock) => string,
+): HandOverPreview {
+  const going = goodsToHandOver(goods, free)
+  if (Object.keys(going).length === 0) {
+    return { text: 'This storage holds none of it that isn’t set aside.', canAccept: false }
+  }
+  const short = shortLine(goods, going)
+  return {
+    text: short ? `This storage is short: only ${short}. ${line(going)}` : line(going),
+    canAccept: true,
+  }
+}
+
+/** What setting a demand's goods aside at a storage holding `free` would do. */
+export function setAsidePreview(
+  goods: Partial<Record<Good, number>>,
+  free: Stock,
+): HandOverPreview {
+  return previewFrom(
+    goods,
+    free,
+    (going) => `Sets aside ${goodsLine(going)} for them alone to fetch.`,
+  )
+}
+
+/**
+ * What sending a demand's goods by Transfer from a storage holding `free` would do, over a whole way
+ * of `tiles` (undefined when no caravan's way there is known), with the fee the Player pays.
+ */
+export function transferPreview(
+  goods: Partial<Record<Good, number>>,
+  free: Stock,
+  tiles: number | undefined,
+): HandOverPreview {
+  if (tiles === undefined) {
+    return { text: 'No Trade Org warehouse can send a caravan there.', canAccept: false }
+  }
+  let coinsShort = false
+  const preview = previewFrom(goods, free, (going) => {
+    const fee = transferLoadsFee(going, tiles)
+    coinsShort = fee + (going.coins ?? 0) > (free.coins ?? 0)
+    return `A Transfer carries ${goodsLine(going)}. You pay ${fee} coins.`
+  })
+  if (!coinsShort) return preview
+  return {
+    ...preview,
+    text: `${preview.text} The storage is short of coins for that, so the caravans take less.`,
+  }
 }
 
 /**

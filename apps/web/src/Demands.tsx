@@ -6,11 +6,16 @@ import {
   DEMAND_NOTE_MAX_LENGTH,
   GOODS,
   aboutTime,
+  citiesToCarryAt,
+  deliveryStorage,
   demandNoteProblem,
+  type CarriedWay,
+  type DemandHandOver,
   type DemandView,
   type Good,
   type OrderRequest,
   type RealmLabel,
+  type SeenBuilding,
   type SeenCity,
 } from '@csp/shared'
 import {
@@ -18,16 +23,149 @@ import {
   goodsOfLines,
   handOverQuestion,
   knownCitiesOf,
+  setAsidePreview,
   termsLine,
+  transferPreview,
   type GoodsLine,
+  type HandOverPreview,
 } from './demand-view.js'
 import { PanelHead } from './drawer-head.js'
 import { GOOD_LABELS } from './goods-grid.js'
 import type { LastSeenCity } from './last-seen.js'
+import { freeAtStorage, ownStorages } from './offers-view.js'
 
 /** A demand's note: the sender's words as plain text, which React escapes, never as markup. */
 export function DemandNote({ note }: { note: string }) {
   return <p className="demand-note">{note}</p>
+}
+
+/**
+ * Accepting a demand for goods or Coins (`CONTEXT.md`: Demand): the Player picks how they go, set
+ * aside at a storage of theirs or sent by a Transfer they pay for, and reads what goes, also when
+ * the storage is short, before they accept.
+ */
+function HandOverGoods({
+  goods,
+  senderId,
+  buildings,
+  cities,
+  carriedWays,
+  noCaravans,
+  realmId,
+  onAccept,
+}: {
+  goods: Partial<Record<Good, number>>
+  senderId: string
+  buildings: SeenBuilding[]
+  cities: SeenCity[]
+  /** The ways the Player can send a Transfer, to show its exact fee. */
+  carriedWays: readonly CarriedWay[]
+  /** The Trade Org HQ has fallen, so nothing can be carried (`CONTEXT.md`: Fall of the HQ). */
+  noCaravans: boolean
+  realmId: string
+  onAccept: (handOver: DemandHandOver) => void
+}) {
+  const [way, setWay] = useState<DemandHandOver['way']>('setAside')
+  const [storageId, setStorageId] = useState('')
+  const [fromCityId, setFromCityId] = useState('')
+  const [toCityId, setToCityId] = useState('')
+
+  const seen = { cities, buildings }
+  const storages = ownStorages(seen, realmId)
+  const storage = storages.find((s) => s.id === storageId) ?? storages[0]
+  const cityOf = (s: SeenBuilding) => cities.find((c) => c.id === s.cityId)?.name
+  const fromCities = citiesToCarryAt(seen, realmId)
+  const toCities = citiesToCarryAt(seen, senderId)
+  const fromCity = fromCities.find((c) => c.id === fromCityId) ?? fromCities[0]
+  const toCity = toCities.find((c) => c.id === toCityId) ?? toCities[0]
+  const fromStorage = fromCity && deliveryStorage(seen, fromCity.id)
+
+  const sending = way === 'transfer' && !noCaravans
+  let preview: HandOverPreview
+  if (sending) {
+    const tiles = carriedWays.find(
+      (w) => w.fromCityId === fromCity?.id && w.toCityId === toCity?.id,
+    )?.senderTiles
+    preview = !fromStorage
+      ? { text: 'You have no city with a finished storage to pick up from.', canAccept: false }
+      : !toCity
+        ? { text: 'You see no storage of theirs to send it to.', canAccept: false }
+        : transferPreview(goods, freeAtStorage(fromStorage), tiles)
+  } else {
+    preview = storage
+      ? setAsidePreview(goods, freeAtStorage(storage))
+      : { text: 'You have no finished storage to set goods aside at.', canAccept: false }
+  }
+
+  return (
+    <div className="demand-hand-over">
+      {!noCaravans && (
+        <label className="contract-field">
+          <span className="contract-label">How</span>
+          <select
+            value={way}
+            aria-label="How the goods go"
+            onChange={(e) => setWay(e.target.value as DemandHandOver['way'])}
+          >
+            <option value="setAside">Set aside for them to fetch</option>
+            <option value="transfer">Send by Transfer, I pay the fee</option>
+          </select>
+        </label>
+      )}
+      {sending ? (
+        <>
+          <label className="contract-field">
+            <span className="contract-label">From</span>
+            <select value={fromCity?.id ?? ''} onChange={(e) => setFromCityId(e.target.value)}>
+              {fromCities.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="contract-field">
+            <span className="contract-label">To their city</span>
+            <select value={toCity?.id ?? ''} onChange={(e) => setToCityId(e.target.value)}>
+              {toCities.length === 0 && <option value="">No storage of theirs in sight</option>}
+              {toCities.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
+      ) : (
+        storage && (
+          <label className="contract-field">
+            <span className="contract-label">At</span>
+            <select value={storage.id} onChange={(e) => setStorageId(e.target.value)}>
+              {storages.map((s) => (
+                <option key={s.id} value={s.id}>
+                  The storage at ({s.x}, {s.y}){cityOf(s) ? ` in ${cityOf(s)}` : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+        )
+      )}
+      <p className="small muted">{preview.text}</p>
+      <button
+        type="button"
+        disabled={!preview.canAccept}
+        onClick={() =>
+          onAccept(
+            sending
+              ? { way: 'transfer', fromCityId: fromCity!.id, toCityId: toCity!.id }
+              : { way: 'setAside', storageId: storage!.id },
+          )
+        }
+      >
+        Accept
+      </button>
+    </div>
+  )
 }
 
 /**
@@ -40,6 +178,9 @@ export function DemandsPanel({
   realmId,
   knownRealms,
   cities,
+  buildings,
+  carriedWays,
+  noCaravans,
   lastSeen,
   tick,
   sendOrder,
@@ -50,6 +191,12 @@ export function DemandsPanel({
   knownRealms: RealmLabel[]
   /** The cities in sight. */
   cities: SeenCity[]
+  /** The buildings in sight, for the storages goods can go from and to. */
+  buildings: SeenBuilding[]
+  /** The ways the Player can send a Transfer, to show its exact fee. */
+  carriedWays: readonly CarriedWay[]
+  /** The Trade Org HQ has fallen, so nothing can be carried (`CONTEXT.md`: Fall of the HQ). */
+  noCaravans: boolean
   /** The cities the Player remembers out of sight. */
   lastSeen: LastSeenCity[]
   tick: number
@@ -111,17 +258,33 @@ export function DemandsPanel({
                     Lapses in {aboutTime(d.deadline - tick)}. Ignoring it does nothing by itself.
                   </span>
                 </span>
+                {d.terms.kind === 'goods' && (
+                  <HandOverGoods
+                    goods={d.terms.goods}
+                    senderId={d.from.realmId}
+                    buildings={buildings}
+                    cities={cities}
+                    carriedWays={carriedWays}
+                    noCaravans={noCaravans}
+                    realmId={realmId}
+                    onAccept={(handOver) =>
+                      void order({ kind: 'acceptDemand', demandId: d.id, handOver })
+                    }
+                  />
+                )}
                 <div className="order-buttons">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const question = handOverQuestion(d, realmId, cities)
-                      if (question && !window.confirm(question)) return
-                      void order({ kind: 'acceptDemand', demandId: d.id })
-                    }}
-                  >
-                    Accept
-                  </button>
+                  {d.terms.kind === 'city' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const question = handOverQuestion(d, realmId, cities)
+                        if (question && !window.confirm(question)) return
+                        void order({ kind: 'acceptDemand', demandId: d.id })
+                      }}
+                    >
+                      Accept
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => void order({ kind: 'declineDemand', demandId: d.id })}

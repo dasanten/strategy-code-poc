@@ -1599,6 +1599,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             realmId={world.home.realmId}
             knownRealms={world.diplomacy.knownRealms}
             cities={world.cities}
+            buildings={world.buildings}
+            carriedWays={world.diplomacy.carriedWays ?? []}
+            noCaravans={world.diplomacy.noCaravans === true}
             lastSeen={world.lastSeen.cities}
             tick={world.tick}
             sendOrder={sendOrder}

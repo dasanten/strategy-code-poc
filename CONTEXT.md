@@ -702,9 +702,13 @@ The shared language of the game. Domain terms only — no implementation details
     is the sender's to carry out, or not. The game forbids nothing.
   - **Accepting** carries the terms out: a named city joins the sender's realm at once, as a captured
     one does (What joins with a city), and goods and Coins are set aside at a storage of the one who
-    accepts, for the sender alone to fetch (like a Direct offer in person), or sent by a Transfer. A
-    city no longer theirs can't be handed over. Handing over is the Player's own choice, also for
-    their last city, which goes as losing it to capture does: no crime and no standing lost.
+    accepts, for the sender alone to fetch (a Direct offer in person for each good, wanting nothing
+    back, and fetching it is no trade: no standing changes), or sent by a Transfer from a city of
+    theirs to a city of the sender's whose storage they see, one load at a time, the fee theirs. The
+    one accepting picks which, and where. If the storage is short it says so before they accept, and
+    what it holds is what goes; with none of it there they can't accept that way. A city no longer
+    theirs can't be handed over. Handing over is the Player's own choice, also for their last city,
+    which goes as losing it to capture does: no crime and no standing lost.
   - **An NPC city** accepts when the respect it sees from the sender (their armed residents and
     walls in its sight) far outweighs its soldiers, so an army at the gate can take a city without a
     fight; otherwise it declines and its standing toward the sender drops. It carries out goods the

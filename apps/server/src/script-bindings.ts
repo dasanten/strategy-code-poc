@@ -854,7 +854,8 @@ function residentActions(
         note: plain(note),
         days: plain(days),
       }),
-    acceptDemand: ([demandId]) => request('acceptDemand', { demandId: plain(demandId) }),
+    acceptDemand: ([demandId, handOver]) =>
+      request('acceptDemand', { demandId: plain(demandId), handOver: plain(handOver) }),
     declineDemand: ([demandId]) => request('declineDemand', { demandId: plain(demandId) }),
     roadLine: ([x, y]) =>
       request('roadLine', {

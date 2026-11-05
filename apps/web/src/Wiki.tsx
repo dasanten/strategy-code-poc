@@ -2142,6 +2142,15 @@ export function Wiki() {
             over: the demand stays until you decline it or it lapses.
           </li>
           <li>
+            <strong>Accepting a demand for goods or Coins hands them over the way you pick.</strong>{' '}
+            Set aside at a storage of yours, they wait for the sender alone to fetch in person,
+            wanting nothing back, under their Direct offers, for up to {days(DIRECT_OFFER_DAYS)};
+            fetching them is no trade and raises no standing. Sent by a Transfer, a caravan brings
+            them from a city of yours to a city of theirs whose storage you see, one load at a time,
+            and you pay the fee. If the storage is short it says so before you accept, and what it
+            holds is what goes. With none of it there you can't accept that way.
+          </li>
+          <li>
             <strong>The threat is only words.</strong> Ignoring a demand does nothing by itself:
             whatever was threatened is the sender's to carry out, or not.
           </li>

@@ -32,6 +32,35 @@ export function goodsLine(goods: Partial<Record<string, number>> | undefined): s
     .join(', ')
 }
 
+/**
+ * A demand for goods accepted, and how they change hands (`CONTEXT.md`: Demand). What went is less
+ * than `terms` when the storage was short. An event from before goods changed hands has no way.
+ */
+function acceptedGoodsLine(
+  e: Extract<RealmEvent, { kind: 'demand' }>,
+  them: string,
+  terms: string,
+): EventLine {
+  const said = e.mine
+    ? `${cap(them)} accepted your demand for ${terms}`
+    : `You accepted the demand of ${them} for ${terms}`
+  const h = e.handedOver
+  if (!h) return { text: `${said}.`, tone: 'info' }
+  const goods = goodsLine(h.goods)
+  if (h.way === 'transfer') {
+    return {
+      text: `${said}: a Transfer brings ${goods} from ${h.fromCity} to ${h.toCity}.`,
+      tone: 'info',
+    }
+  }
+  const fetch = e.mine ? 'for you to fetch, under Direct offers' : 'for them alone to fetch'
+  return {
+    text: `${said}: ${goods} set aside at the storage, ${fetch}.`,
+    tone: 'info',
+    places: [{ name: 'the storage', x: h.x, y: h.y }],
+  }
+}
+
 /** A stolen carriage or horse as the log names it: "a carriage with Rowan", "Rowan". */
 function transportLine(e: { carriage?: true; horse?: string }): string {
   if (!e.carriage) return e.horse ?? 'a horse'
@@ -219,6 +248,14 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
           places: [place],
         }
       }
+      if (e.wantsUnits === 0) {
+        const of = e.times < e.wanted ? ` (of ${e.wanted} wanted)` : ''
+        return {
+          text: `${e.name} fetched ${e.givesUnits} ${goodText(e.gives)} set aside by ${e.realm}${of}.`,
+          tone: 'info',
+          places: [place],
+        }
+      }
       const cut = e.times < e.wanted ? ` (of ${e.wanted} times wanted)` : ''
       return {
         text: `${e.name} took ${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)} from the offer of ${e.realm}${cut}.`,
@@ -245,21 +282,30 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
     }
     case 'offerTaken':
       return {
-        text: `${e.by} took your offer: ${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)}.`,
+        text:
+          e.wantsUnits === 0
+            ? `${e.by} fetched the ${e.givesUnits} ${goodText(e.gives)} you set aside.`
+            : `${e.by} took your offer: ${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)}.`,
         tone: 'info',
         places: [{ name: 'the storage', x: e.x, y: e.y }],
       }
     case 'offerCutDown':
       return {
-        text: `Goods gone from the storage cut your offer of ${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)} down to ${e.times} ${e.times === 1 ? 'time' : 'times'}.`,
+        text:
+          e.wantsUnits === 0
+            ? `Goods gone from the storage cut what you set aside down to ${e.times} ${goodText(e.gives)}.`
+            : `Goods gone from the storage cut your offer of ${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)} down to ${e.times} ${e.times === 1 ? 'time' : 'times'}.`,
         tone: 'warn',
         places: [{ name: 'the storage', x: e.x, y: e.y }],
       }
     case 'offerEnded': {
       const what = `${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)}`
-      const yours = e.to
-        ? `Your direct offer of ${what} to the realm of ${e.to}`
-        : `Your offer of ${what}`
+      const yours =
+        e.wantsUnits === 0
+          ? `The ${goodText(e.gives)} you set aside for the realm of ${e.to}`
+          : e.to
+            ? `Your direct offer of ${what} to the realm of ${e.to}`
+            : `Your offer of ${what}`
       const why = {
         usedUp: `${yours} is used up.`,
         takenDown: `${yours} is taken down.`,
@@ -279,7 +325,10 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       }
     }
     case 'directOffer': {
-      const what = `${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)}`
+      const what =
+        e.wantsUnits === 0
+          ? goodText(e.gives)
+          : `${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)}`
       const place = { name: 'the storage', x: e.x, y: e.y }
       const them = `the realm of ${e.from}`
       if (e.carried) {
@@ -621,9 +670,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
                   tone: 'warn',
                 }
           }
-          return e.mine
-            ? { text: `${cap(them)} accepted your demand for ${terms}.`, tone: 'info' }
-            : { text: `You accepted the demand of ${them} for ${terms}.`, tone: 'info' }
+          return acceptedGoodsLine(e, them, terms)
         case 'declined':
           return e.mine
             ? { text: `${cap(them)} declined your demand for ${terms}.`, tone: 'warn' }

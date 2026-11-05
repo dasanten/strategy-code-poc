@@ -1,11 +1,17 @@
 import { sharingSight, type RealmLabel } from './alliance.js'
-import { DEMANDS_PER_GAME_DAY, DEMAND_NOTE_MAX_LENGTH } from './balance.js'
+import { DEMANDS_PER_GAME_DAY, DEMAND_NOTE_MAX_LENGTH, GOOD_WEIGHT } from './balance.js'
+import { freeStock, offerStorage } from './offers.js'
 import { organizationLabel } from './standing.js'
+import { pickUpTransferProblem, transferFee, transferLoad } from './transfer.js'
+import { deliveryStorage } from './warehouse.js'
 import {
+  GOODS,
   TICKS_PER_GAME_DAY,
   type Demand,
   type DemandTerms,
+  type Good,
   type Realm,
+  type Stock,
   type WorldState,
 } from './world.js'
 
@@ -78,6 +84,104 @@ export function realmsKnownTo(
     if (o.direct.toId === realmId) known.add(o.realmId)
   }
   return world.realms.map((r) => r.id).filter((id) => id !== realmId && known.has(id))
+}
+
+/**
+ * How the one accepting a demand hands over the goods and Coins it names (`CONTEXT.md`: Demand), as
+ * they pick: set aside at a storage of theirs, for the sender alone to fetch, or sent by a Transfer
+ * from a city of theirs to a city of the sender's, the fee theirs.
+ */
+export type DemandHandOver =
+  { way: 'setAside'; storageId: string } | { way: 'transfer'; fromCityId: string; toCityId: string }
+
+/**
+ * What goes of the goods demanded from a storage holding `free` that isn't set aside already: as
+ * many whole units of each as it holds, up to what was demanded (`CONTEXT.md`: Demand).
+ */
+export function goodsToHandOver(goods: Partial<Record<Good, number>>, free: Stock): Stock {
+  const going: Stock = {}
+  for (const good of GOODS) {
+    const units = Math.min(goods[good] ?? 0, Math.floor(free[good] ?? 0))
+    if (units > 0) going[good] = units
+  }
+  return going
+}
+
+/** Goods sent by Transfer, as the Transfers they take: each good by itself, one load at a time. */
+export function transferLoads(goods: Stock): { good: Good; units: number }[] {
+  const loads: { good: Good; units: number }[] = []
+  for (const good of GOODS) {
+    const load = transferLoad(good)
+    for (let left = goods[good] ?? 0; left > 0; left -= load) {
+      loads.push({ good, units: Math.min(left, load) })
+    }
+  }
+  return loads
+}
+
+/** What the Transfers for these goods cost together, each over a whole way of `tiles`. */
+export function transferLoadsFee(goods: Stock, tiles: number): number {
+  return transferLoads(goods).reduce(
+    (fee, { good, units }) => fee + transferFee(units * GOOD_WEIGHT[good], tiles),
+    0,
+  )
+}
+
+/** The storage goods demanded would go from, for a hand-over named as an order takes it. */
+function handOverStorage(
+  world: Pick<WorldState, 'buildings' | 'cities'>,
+  realmId: string,
+  how: DemandHandOver,
+) {
+  if (how.way === 'setAside') return offerStorage(world, realmId, how.storageId)
+  return deliveryStorage(world, how.fromCityId)
+}
+
+/**
+ * What of a demand's goods this hand-over would move now, by `realmId`: an empty stock with none
+ * there, or when the storage named isn't theirs.
+ */
+export function goodsHandedOver(
+  world: Pick<WorldState, 'buildings' | 'cities' | 'offers'>,
+  realmId: string,
+  goods: Partial<Record<Good, number>>,
+  how: DemandHandOver,
+): Stock {
+  const storage = handOverStorage(world, realmId, how)
+  return storage ? goodsToHandOver(goods, freeStock(world, storage)) : {}
+}
+
+/**
+ * Why `realmId` can't hand over a demand's goods this way, or undefined when it can
+ * (`CONTEXT.md`: Demand): a storage of its own holding some of them, or a Transfer it could order to
+ * a city of the sender's. Less than demanded will do: what is short is said before accepting.
+ */
+export function demandHandOverProblem(
+  world: WorldState,
+  realmId: string,
+  demand: Pick<Demand, 'fromId' | 'terms'>,
+  how: unknown,
+): string | undefined {
+  if (demand.terms.kind !== 'goods') return undefined
+  const h = (typeof how === 'object' && how !== null ? how : {}) as Record<string, unknown>
+  let handOver: DemandHandOver
+  if (h.way === 'setAside') {
+    if (!offerStorage(world, realmId, h.storageId)) return 'not a finished storage of yours'
+    handOver = { way: 'setAside', storageId: h.storageId as string }
+  } else if (h.way === 'transfer') {
+    const to = world.cities.find((c) => c.id === h.toCityId)
+    if (to?.realmId !== demand.fromId) return 'send it to a city of theirs'
+    for (const good of Object.keys(demand.terms.goods)) {
+      const problem = pickUpTransferProblem(world, realmId, h.fromCityId, good, 1, h.toCityId)
+      if (problem) return problem
+    }
+    handOver = { way: 'transfer', fromCityId: h.fromCityId as string, toCityId: to.id }
+  } else {
+    return 'set the goods aside at a storage, or send them by a Transfer'
+  }
+  return Object.keys(goodsHandedOver(world, realmId, demand.terms.goods, handOver)).length === 0
+    ? 'that storage holds none of it that isn’t set aside'
+    : undefined
 }
 
 /** A demand as one of its sides sees it. */
