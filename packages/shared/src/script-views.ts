@@ -272,6 +272,12 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
         'The alarm their Alarm script runs for.',
         'except on `me` while my Alarm script runs',
       ),
+      field(
+        'knownThief',
+        'boolean',
+        'Whether my realm knows they stole from it, or one of my residents saw it. In my own City area, striking them is no crime.',
+        'except from `residents()`',
+      ),
       field('bornAt', 'number', 'The tick they were born; may be before the world began.'),
       field('age', 'number', 'Their age in game years.', 'except on `me` and an army’s `members`'),
       field('lifespan', 'number', 'The age in game years at which they die of old age.'),
@@ -738,13 +744,13 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field(
         'kind',
         'string',
-        'What happened: "occupied", the city’s town hall occupied; "attacked", a wall or gate of the city or a resident of the realm struck.',
+        'What happened: "occupied", the city’s town hall occupied; "theft", someone stealing from the realm; "attacked", a wall or gate of the city or a resident of the realm struck.',
       ),
       field('cityId', 'string', 'The city whose area it happened in.'),
       field(
         'about',
         'string',
-        'The id of the resident it is about: an occupier on the hall, or the attacker.',
+        'The id of the resident it is about: an occupier on the hall, the thief, or the attacker.',
       ),
       field(
         'realmId',
@@ -752,8 +758,16 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
         'The realm of who it is about.',
         'when they belong to no realm',
       ),
-      field('x', 'number', 'Where it happened, from west to east: the town hall, or what was struck.'),
-      field('y', 'number', 'Where it happened, from north to south: the town hall, or what was struck.'),
+      field(
+        'x',
+        'number',
+        'Where it happened, from west to east: the town hall, where the thief took it, or what was struck.',
+      ),
+      field(
+        'y',
+        'number',
+        'Where it happened, from north to south: the town hall, where the thief took it, or what was struck.',
+      ),
       field('tick', 'number', 'The tick it happened.'),
     ],
   },

@@ -339,17 +339,24 @@ export interface RunningScript {
  */
 export interface Alarm {
   /**
-   * `occupied`: an occupation of the city's town hall started. `attacked`: someone struck a wall or
-   * gate of the city, or a resident of its realm in its area.
+   * `occupied`: an occupation of the city's town hall started. `theft`: someone stole from the
+   * realm. `attacked`: someone struck a wall or gate of the city, or a resident of its realm in its
+   * area.
    */
-  kind: 'occupied' | 'attacked'
+  kind: 'occupied' | 'theft' | 'attacked'
   /** The city whose area it happened in. */
   cityId: string
-  /** The resident it is about: for `occupied`, an occupier on the hall; for `attacked`, the attacker. */
+  /**
+   * The resident it is about: for `occupied`, an occupier on the hall; for `theft`, the thief; for
+   * `attacked`, the attacker.
+   */
   about: string
   /** The realm of who it is about. */
   realmId: string | null
-  /** Where it happened: for `occupied`, the town hall; for `attacked`, what was struck. */
+  /**
+   * Where it happened: for `occupied`, the town hall; for `theft`, where the thief took it; for
+   * `attacked`, what was struck.
+   */
   x: number
   y: number
   /** The tick it happened. */

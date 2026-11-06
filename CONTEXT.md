@@ -701,6 +701,8 @@ The shared language of the game. Domain terms only — no implementation details
 - **Crime:** theft, attack, killing or tearing down buildings against another organization. In a
   city's own City area, striking someone occupying its town hall, or a thief of its realm that the
   realm knows of or one of its residents saw, is no crime; for an NPC city, the same for the city.
+  Someone occupying is someone armed standing on the hall who could hold it, also once a defender
+  stepping onto the hall has broken the occupation; one who has walked off it no longer is.
   Striking anyone else there still is.
 - **Witness:** a resident who sees a crime (within sight range), or a victim who survives it. A
   crime only becomes known when a witness physically brings the news home. No witness, no

@@ -1933,45 +1933,36 @@ ${LOG_TEXT}
     source: `// Alarm (default): what I do when an alarm reaches me, in place of what I was
 // doing, which goes on once I end. Armed, with the town hall occupied, I go
 // after the occupier while they stand in the city's area, and end once no armed
-// one of theirs is left there or in sight. Going after them is a crime, as
-// striking anyone is. With a wall or neighbour attacked, I go after the attacker
-// until they have left the area or sight; striking back is no crime. Unarmed, or
-// for another alarm, I end at once.
+// one of theirs is left there or in sight. For a theft I go after the thief, and
+// with a wall or neighbour attacked the attacker, until they are dead or have left
+// the area or sight. Striking someone occupying the hall, or a thief I know of, is
+// no crime in my own city's area, nor is striking back at an attacker; striking
+// anyone else is. Unarmed, or for another alarm, I end at once.
 if (me.alarm == null || !armed(me)) {
   end()
 } else if (me.alarm.kind == "occupied") {
-  goAfterOccupier()
+  let foe = occupier()
+  if (foe == null) {
+    end("the occupier is gone")
+  } else {
+    memory.foeId = foe.id
+    goAfter(foe)
+  }
+} else if (me.alarm.kind == "theft") {
+  goAfterCulprit("the thief is gone")
 } else if (me.alarm.kind == "attacked") {
-  goAfterAttacker()
+  goAfterCulprit("the attacker is gone")
 } else {
   end()
 }
 
-fn goAfterOccupier() {
-  let foe = occupier()
+fn goAfterCulprit(goneText) {
+  let foe = culprit()
   if (foe == null) {
-    end("the occupier is gone")
-    return
+    end(goneText)
+  } else {
+    goAfter(foe)
   }
-  memory.foeId = foe.id
-  goAfter(foe)
-}
-
-fn goAfterAttacker() {
-  let foe = attacker()
-  if (foe == null) {
-    end("the attacker is gone")
-    return
-  }
-  goAfter(foe)
-}
-
-// The attacker, while I see them in the city's area.
-fn attacker() {
-  for (r of residents()) {
-    if (r.id == me.alarm.about && inCityArea(me.alarm.cityId, r.x, r.y)) { return r }
-  }
-  return null
 }
 
 fn goAfter(foe) {
@@ -2002,6 +1993,14 @@ fn occupier() {
     }
   }
   return other
+}
+
+// Who the alarm is about, while I see them in the city's area.
+fn culprit() {
+  for (r of residents()) {
+    if (r.id == me.alarm.about && inCityArea(me.alarm.cityId, r.x, r.y)) { return r }
+  }
+  return null
 }
 
 // Whether they carry a weapon.

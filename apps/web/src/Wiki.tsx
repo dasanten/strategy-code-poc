@@ -2317,7 +2317,8 @@ export function Wiki() {
           carriage, {num(HORSE_STOLEN_WORTH)} for its horse, and the load. So is mounting another's
           horse or hitching it (see Riding): one theft, worth {num(HORSE_STOLEN_WORTH)} coins. A
           carriage driven off with a horse of a different owner is a theft from each. Taking back
-          what was stolen from you is theft like any other.
+          what was stolen from you is theft like any other. In your own city's area, force against
+          someone occupying its town hall or a thief you know of is no crime (see Under attack).
         </p>
         <table>
           <thead>
@@ -2621,23 +2622,32 @@ export function Wiki() {
         <h3>Alarms</h3>
         <p>
           An alarm is something happening in a city's area that your residents at home can react to.
-          So far two set it off. An occupation of the city's town hall starting reaches every
-          resident of your realm standing in that city's area. An attack, someone striking a wall or
-          gate of the city or a resident of yours standing in its area, reaches those standing in
-          the area who see it, so the armed residents beside them react rather than only the one
-          struck, who runs their defence script. It is raised once per attacker, the first time
-          someone at home sees them at it, and again only after {duration(DEFEND_CALM_TICKS)} with
-          no blow from them. Those already fighting aren't interrupted, and someone fighting back
-          raises none. Army members, those hired out and those driving a carriage get no alarm. It
-          runs their <strong>Alarm script</strong>, which by default is <strong>Alarm</strong> (one
-          of your default scripts) for an armed resident and nothing for an unarmed one.
+          Three things set it off. An occupation of the city's town hall starting reaches every
+          resident of your realm standing in that city's area. A theft from your realm in that area,
+          of goods from a storage, a carriage or a Down resident, or of a carriage or horse, reaches
+          those standing there who see it; what lies in a pile is anyone's to take, so that raises
+          none. An attack, someone striking a wall or gate of the city or a resident of yours
+          standing in its area, reaches those standing there who see it, so the armed residents
+          beside them react rather than only the one struck, who runs their defence script. It is
+          raised once per attacker, the first time someone at home sees them at it, and again only
+          after {duration(DEFEND_CALM_TICKS)} with no blow from them. Those already fighting aren't
+          interrupted, and someone fighting back raises none. Army members, those hired out and
+          those driving a carriage get no alarm. It runs their <strong>Alarm script</strong>, which
+          by default is <strong>Alarm</strong> (one of your default scripts) for an armed resident
+          and nothing for an unarmed one. Alarm goes after the occupier while they stand in the
+          city's area, any other armed one of theirs there after them, and ends once they are gone.
+          It goes after a thief or an attacker until they are dead or have left the area or sight.
+          Their card says “On alarm: going after Bo”.
         </p>
         <p>
-          For an occupation, Alarm goes after the occupier while they stand in the city's area, any
-          other armed one of theirs there after them, and ends once they are gone. Going after them
-          is a crime for now, like any attack. For an attack, it goes after the attacker until they
-          have left the area or your sight; striking back at them is no crime. Their card says “On
-          alarm: going after Bo”.
+          <strong>Force at home:</strong> in your own city's area, striking someone occupying its
+          town hall, or a thief of your realm that you know of or one of your residents saw, is no
+          crime and costs no standing. Someone occupying is someone armed standing on the hall, so
+          one who has walked off it no longer is. Striking back at an attacker on their alarm is no
+          crime either. Striking anyone else there is a crime as anywhere, and so is striking a thief
+          outside the area. Scripts see this as <code>knownThief</code> on those{' '}
+          <code>residents()</code> gives: whether your realm knows they stole from it or one of your
+          residents saw it, no more than that.
         </p>
         <p>
           On a resident's card, the Script tab's <strong>Alarm script</strong> picks any of your
