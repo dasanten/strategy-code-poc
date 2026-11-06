@@ -338,15 +338,15 @@ export interface RunningScript {
  * kind, who it is about, where and when.
  */
 export interface Alarm {
-  /** `occupied`: an occupation of the city's town hall started. */
-  kind: 'occupied'
+  /** `occupied`: an occupation of the city's town hall started. `theft`: someone stole from the realm. */
+  kind: 'occupied' | 'theft'
   /** The city whose area it happened in. */
   cityId: string
-  /** The resident it is about: for `occupied`, an occupier on the hall. */
+  /** The resident it is about: for `occupied`, an occupier on the hall; for `theft`, the thief. */
   about: string
   /** The realm of who it is about. */
   realmId: string | null
-  /** Where it happened: for `occupied`, the town hall. */
+  /** Where it happened: for `occupied`, the town hall; for `theft`, where the thief took it. */
   x: number
   y: number
   /** The tick it happened. */

@@ -2317,7 +2317,8 @@ export function Wiki() {
           carriage, {num(HORSE_STOLEN_WORTH)} for its horse, and the load. So is mounting another's
           horse or hitching it (see Riding): one theft, worth {num(HORSE_STOLEN_WORTH)} coins. A
           carriage driven off with a horse of a different owner is a theft from each. Taking back
-          what was stolen from you is theft like any other.
+          what was stolen from you is theft like any other. In your own city's area, force against
+          someone occupying its town hall or a thief you know of is no crime (see Under attack).
         </p>
         <table>
           <thead>
@@ -2620,14 +2621,25 @@ export function Wiki() {
         <h3>Alarms</h3>
         <p>
           An alarm is something happening in a city's area that your residents at home can react to.
-          So far one sets it off: an occupation of the city's town hall starting, which reaches
-          every resident of your realm standing in that city's area. Army members, those hired out
-          and those driving a carriage get no alarm. It runs their <strong>Alarm script</strong>,
-          which by default is <strong>Alarm</strong> (one of your default scripts) for an armed
-          resident and nothing for an unarmed one. Alarm goes after the occupier while they stand in
-          the city's area, any other armed one of theirs there after them, and ends once they are
-          gone. Going after them is a crime for now, like any attack. Their card says “On alarm:
-          going after Bo”.
+          Two things set it off. An occupation of the city's town hall starting reaches every
+          resident of your realm standing in that city's area. A theft from your realm in that area,
+          of goods from a storage, a carriage or a Down resident, or of a carriage or horse, reaches
+          those standing there who see it; what lies in a pile is anyone's to take, so that raises
+          none. Army members, those hired out and those driving a carriage get no alarm. It runs
+          their <strong>Alarm script</strong>, which by default is <strong>Alarm</strong> (one of
+          your default scripts) for an armed resident and nothing for an unarmed one. Alarm goes
+          after the occupier while they stand in the city's area, any other armed one of theirs
+          there after them, and ends once they are gone. It goes after a thief until they are dead
+          or have left the area or sight. Their card says “On alarm: going after Bo”.
+        </p>
+        <p>
+          <strong>Force at home:</strong> in your own city's area, striking someone occupying its
+          town hall, or a thief of your realm that you know of or one of your residents saw, is no
+          crime and costs no standing. Someone occupying is someone armed standing on the hall, so
+          one who has walked off it no longer is. Striking anyone else there is a crime as anywhere,
+          and so is striking a thief outside the area. Scripts see this as{' '}
+          <code>knownThief</code> on those <code>residents()</code> gives: whether your realm knows
+          they stole from it or one of your residents saw it, no more than that.
         </p>
         <p>
           On a resident's card, the Script tab's <strong>Alarm script</strong> picks any of your

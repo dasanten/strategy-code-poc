@@ -135,7 +135,7 @@ export function attackersOf(world: WorldState, city: City, size: number): Reside
  * thefts from it that it knows of or one of its residents saw, standing in its area.
  */
 export function thievesOf(world: WorldState, city: City, size: number): Resident[] {
-  const thieves = knownThieves(world, city)
+  const thieves = knownThieves(world, cityOrganization(city))
   return world.residents.filter(
     (r) => thieves.has(r.id) && r.health > 0 && inCityArea(world, city, r.x, r.y, size),
   )

@@ -1,4 +1,5 @@
 import {
+  SIGHT_RANGE,
   TRADE_ORG,
   commanderOf,
   drivenCarriageId,
@@ -7,11 +8,13 @@ import {
   isAt,
   isDown,
   townHallOf,
+  wrapDistance,
   type Alarm,
   type City,
   type Resident,
   type WorldState,
 } from '@csp/shared'
+import { organizationOf } from './crimes.js'
 import { endHoldIfOver } from './defence.js'
 import type { Invariant } from './invariants.js'
 
@@ -88,6 +91,37 @@ export function raiseOccupied(world: WorldState, city: City, occupier: string, s
 }
 
 /**
+ * `thief` just stole from the Organization `victimOrg`, on a map of `size` tiles (`CONTEXT.md`:
+ * Alarm, theft): standing in the area of a city of that realm, it reaches its residents standing
+ * there who see it. Taking from your own raises none, and an NPC city has nobody to reach yet.
+ */
+export function raiseTheft(
+  world: WorldState,
+  thief: Resident,
+  victimOrg: string,
+  size: number,
+): void {
+  if (organizationOf(thief) === victimOrg) return
+  for (const city of world.cities) {
+    if (city.realmId !== victimOrg || !inCityArea(world, city, thief.x, thief.y, size)) continue
+    const alarm: Alarm = {
+      kind: 'theft',
+      cityId: city.id,
+      about: thief.id,
+      realmId: thief.owner,
+      x: thief.x,
+      y: thief.y,
+      tick: world.tick,
+    }
+    for (const r of world.residents) {
+      if (wrapDistance(size, r, thief) <= SIGHT_RANGE && canBeAlarmed(world, city, r, size)) {
+        startAlarm(world, r, alarm)
+      }
+    }
+  }
+}
+
+/**
  * Invariant (ADR 0004; `CONTEXT.md`: Alarm script): nobody runs two Alarm scripts. One running
  * holds its alarm and has what it interrupted kept aside, so that they get it back; kept aside
  * itself, a defence script is what runs, and what it interrupted is no Alarm or defence script.
@@ -100,6 +134,7 @@ export const alarmsSound: Invariant = {
       const aside = kept?.alarm
       const problems = [
         r.script?.task === 'alarm' && !r.script.alarm && 'runs an Alarm script with no alarm',
+        r.script?.alarm?.about === r.id && 'runs an Alarm script about themselves',
         r.script?.task === 'alarm' && !kept && 'runs an Alarm script with nothing kept aside',
         r.script?.task === 'alarm' && aside && 'runs two Alarm scripts',
         aside && r.script?.task !== 'defend' && 'keeps an Alarm script aside but doesn’t defend',
