@@ -184,11 +184,11 @@ describe('the Trade Org HQ', () => {
       // Starting ages and lifespans leave nobody to die of old age in seven weeks.
       expect(world.residents.map((r) => r.id)).toEqual(expect.arrayContaining(people))
       expect(storedFood(world, city)).toBeGreaterThan(0)
-      // Its workplaces on the nodes were worked too.
-      const goods = world.buildings.find(
+      // What its builders had left went back to its goods warehouse, not the storage it eats from.
+      const stock = world.buildings.find(
         (b) => b.kind === 'storage' && b.cityId === city.id,
       )!.stock!
-      expect(goods.wood ?? 0).toBeGreaterThan(0)
+      expect(stock.wood ?? 0).toBe(0)
     },
   )
 })
