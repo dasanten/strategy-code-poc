@@ -20,6 +20,7 @@ import {
   type Stock,
   type WorldState,
 } from '@csp/shared'
+import { raiseTheft } from './alarms.js'
 import { finishSite } from './building.js'
 import { updateCityMembership } from './cities.js'
 import { robCaravan } from './caravans.js'
@@ -197,17 +198,27 @@ function move(from: Stock, to: Stock, good: Good, units: number): void {
  * (`carriedForOrder`). Taking from another Organization's storage, carriage or Down resident is
  * theft (`CONTEXT.md`: Crime, Down), on a map of `size` tiles, and taking from a caravan's
  * carriage robs it (`robCaravan`), as a trader's does (`robTrader`). Nobody but its realm takes from a guarded outpost storage.
+ * A theft raises its alarm (`raiseTheft`) once all have carried, so that an alarm doesn't take
+ * someone from what they carry this tick and leave it to be done again.
  */
 export function resolveCarrying(world: WorldState, actions: CarryAction[], size = MAP_SIZE): void {
   const robbed = new Set<string>()
+  const thefts: Theft[] = []
   for (const a of actions) {
     const r = world.residents.find((x) => x.id === a.residentId)
     if (!r) continue
-    if (a.kind === 'take') take(world, r, a, size, robbed)
+    if (a.kind === 'take') take(world, r, a, size, robbed, thefts)
     else put(world, r, a, size)
     if (r.order?.kind === 'pickUp' || r.order?.kind === 'drop') r.order = null
     else carriedForOrder(world, r)
   }
+  for (const { thief, victimOrg } of thefts) raiseTheft(world, thief, victimOrg, size)
+}
+
+/** A theft of goods this tick, whose alarm is still to be raised. */
+interface Theft {
+  thief: Resident
+  victimOrg: string
 }
 
 function take(
@@ -216,6 +227,7 @@ function take(
   a: CarryAction,
   size: number,
   robbed: Set<string>,
+  thefts: Theft[],
 ): void {
   const source =
     a.spot.kind === 'ground' ? pileAt(world, r.x, r.y)?.goods : spotStock(world, r, a.spot)
@@ -238,6 +250,7 @@ function take(
     const victim =
       a.spot.kind === 'resident' ? downOn(world, r.x, r.y, a.spot.residentId) : undefined
     commitCrime(world, size, 'theft', r, { victimOrg, goods: taken, ...(victim && { victim }) })
+    thefts.push({ thief: r, victimOrg })
   }
   if (a.spot.kind === 'carriage' && Object.keys(taken).length > 0) {
     robCaravan(world, r, a.spot.carriageId, robbed)
