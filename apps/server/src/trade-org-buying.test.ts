@@ -130,8 +130,14 @@ function run(s: Staged, ticks: number, until?: () => boolean) {
 
 /** A trading post with a warehouse of Food near the soldier. */
 function post(world: WorldState, food = 50) {
-  addCity(world, { id: 'post', realmId: null, x: NEAR.x, y: NEAR.y + 8, name: 'Waypost' })
-  world.cities.find((c) => c.id === 'post')!.tradeOrg = 'post'
+  addCity(world, {
+    id: 'post',
+    realmId: null,
+    x: NEAR.x,
+    y: NEAR.y + 8,
+    name: 'Waypost',
+    tradeOrg: 'post',
+  })
   const stock: Stock = { food }
   world.buildings.push({ id: 'pw', kind: 'warehouse', cityId: 'post', ...NEAR, stock })
   return world.buildings.find((b) => b.id === 'pw')!

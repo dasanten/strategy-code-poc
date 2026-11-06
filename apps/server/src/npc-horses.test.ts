@@ -329,6 +329,7 @@ describe('an NPC city breeding its horses', () => {
   it('the Trade Organization’s cities don’t breed, and the invariant says so', () => {
     const { world, terrain, city } = stabled()
     city.tradeOrg = 'post'
+    delete city.layout
     run(world, terrain, TICKS_PER_GAME_DAY / 4, () => expect(breeders(world)).toEqual([]))
     const r = world.residents.find((x) => x.cityId === city.id)!
     expect(tradeOrgBreedsNoHorses.check(world, terrain)).toEqual([])
