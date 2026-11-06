@@ -107,14 +107,15 @@ body {
 /* Part of the goods are as last seen (`CONTEXT.md`: Goods in the top bar): the bar has room for a
    mark with the words in its tooltip; the phone menu has no hover, and room for the words. */
 .hud-goods-old {
-  color: var(--ui-muted);
   cursor: help;
 }
 .hud-goods-old-mark {
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
 }
 .hud-goods-old-words {
   display: none;
+  color: var(--ui-muted);
 }
 .hud-menu-goods .hud-goods-old {
   flex: 1 0 100%;
