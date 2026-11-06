@@ -174,6 +174,7 @@ import {
   HORSE_PRICE_AGE_PER_YEAR,
   HORSE_PRICE_BASE,
   HORSE_PRICE_GLUT,
+  HORSE_PRICE_PAID_SHARE,
   HORSE_PRICE_PER_STAT,
   HORSE_PRICE_SCARCITY,
   NPC_HORSES_BASE,
@@ -1927,6 +1928,25 @@ export function Wiki() {
           last it would sell; with more than it wants, up to {pct(HORSE_PRICE_GLUT)} less. Its
           standing toward you moves the price like its trade prices. Below{' '}
           {signed(NPC_CITY_REFUSES_STANDING)} it won't sell you one.
+        </p>
+        <h3>Selling a horse</h3>
+        <p>
+          An NPC city buys a horse while it has fewer than it wants, which grows with its size. Ride
+          one of yours into its finished stable and get off, with the rider or another grown
+          resident of yours there. <strong>Trade here</strong> on the stable's tile, or the city's
+          Trade section, lists your horses standing there with what it pays, and says why one won't
+          go. A horse that is hitched, ridden or Down can't be sold. A stolen horse sells like any
+          other.
+        </p>
+        <p>
+          It pays about {pct(HORSE_PRICE_PAID_SHARE)} of what it would ask for that horse once it is
+          among its own, so a good horse fetches more, and a city with few pays more. Good standing
+          brings what it pays and what it asks closer, and it always asks more than it pays. The
+          Coins come out of its storages, so it must hold them, and go into your resident's hands;
+          if they can't carry all of them the sale doesn't go, so come with room. The horse is the
+          city's where it stands, which feeds and breeds it from then on, and any breeding it was
+          part of ends. Selling one raises standing both ways like any trade. Below{' '}
+          {signed(NPC_CITY_REFUSES_STANDING)} it won't buy from you.
         </p>
         <h3>Delivery</h3>
         <p>

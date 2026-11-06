@@ -857,5 +857,13 @@ describe('linking How to trade from the inspector', () => {
     expect(views[0]!.horses.map((h) => h.horseId)).toEqual(['h1', 'h2'])
     expect(tradesHere(npc, stables, 'realm1')).toBe(true)
     expect(tradesHere(city(null), stables, 'realm1')).toBe(false)
+
+    // A city with no horses still trades where a horse of the Player's stands to sell it.
+    const selling = { ...city(null), horsesToSell: [offer('mine', 'st2')] }
+    const sellingViews = npcStablesInSight(selling, stables)
+    expect(sellingViews.map((s) => s.id)).toEqual(['st2'])
+    expect(sellingViews[0]!.horses).toEqual([])
+    expect(sellingViews[0]!.toSell.map((h) => h.horseId)).toEqual(['mine'])
+    expect(tradesHere(selling, stables, 'realm1')).toBe(true)
   })
 })

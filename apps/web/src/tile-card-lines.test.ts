@@ -440,6 +440,11 @@ describe('buildings on a tile’s card', () => {
     expect(tradesHere({ id: 'st2', kind: 'stable' }, herd)).toBe(false)
     expect(tradesHere(stable, npc)).toBe(false)
     expect(tradesHere(stable, { ...herd, refuses: true })).toBe(false)
+    // Or with a horse of the Player's standing in it, though it has none to sell.
+    const mine = { ...npc, horsesToSell: [offer] }
+    expect(tradesHere(stable, mine)).toBe(true)
+    expect(tradesHere({ id: 'st2', kind: 'stable' }, mine)).toBe(false)
+    expect(tradesHere(stable, { ...mine, refuses: true })).toBe(false)
   })
 
   it('offers no Trade here on a warehouse only remembered', () => {

@@ -429,6 +429,8 @@ describe('script bindings', () => {
     ],
     ['buyHorse("h9")', { kind: 'buyHorse', horseId: 'h9' }],
     ['buyHorse({ id: "h9", x: 1, y: 2 })', { kind: 'buyHorse', horseId: 'h9' }],
+    ['sellHorse("h9")', { kind: 'sellHorse', horseId: 'h9' }],
+    ['sellHorse({ id: "h9", x: 1, y: 2 })', { kind: 'sellHorse', horseId: 'h9' }],
     ['buyOff("directive1")', { kind: 'buyOff', directiveId: 'directive1', carriageId: null }],
     [
       'postOffer("s1", "wood", 10, "stone", 5, 2)',

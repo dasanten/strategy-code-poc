@@ -16,8 +16,11 @@ import {
   goodsCapacity,
   npcCityRefuses,
   npcHorseAt,
+  npcHorseBuyPrice,
+  npcHorseBuyerAt,
   npcHorsePrice,
   npcHorsesOf,
+  npcHorsesWanted,
   npcReserve,
   npcCityStock,
   npcStorages,
@@ -31,6 +34,7 @@ import {
   quotePickUp,
   quoteSwap,
   quoteTrade,
+  sellHorseProblem,
   swapProblem,
   tradeCoinWarehouse,
   tradeProblem,
@@ -48,6 +52,7 @@ import {
   type OrderRequest,
   type PricedGood,
   type Resident,
+  type SellHorseOrder,
   type Stock,
   type SwapOrder,
   type Trader,
@@ -154,8 +159,8 @@ export const swap: OrderKind = {
   },
 }
 
-/** The input of a buy horse order: the resident and the horse. */
-interface BuyHorseRequest extends OrderRequest {
+/** The input of a buy or sell horse order: the resident and the horse. */
+interface HorseTradeRequest extends OrderRequest {
   residentId: string
   horseId: string
 }
@@ -166,16 +171,36 @@ interface BuyHorseRequest extends OrderRequest {
  */
 export const buyHorse: OrderKind = {
   validate(world, sender, order) {
-    const o = order as Partial<BuyHorseRequest>
+    const o = order as Partial<HorseTradeRequest>
     const realm = realmOf(world, sender.userId)
     const r = world.residents.find((x) => x.id === o.residentId)
     if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
     return buyHorseProblem(world, realm.id, r, o.horseId)
   },
   apply(world, _sender, order) {
-    const o = order as BuyHorseRequest
+    const o = order as HorseTradeRequest
     const r = world.residents.find((x) => x.id === o.residentId)
     if (r) r.order = { kind: 'buyHorse', horseId: o.horseId }
+  },
+}
+
+/**
+ * A sell horse order (`CONTEXT.md`: Horse market): one of the Player's residents, at an NPC city's
+ * finished stable, sells it a horse of their realm standing in it, for Coins in their hands. It
+ * happens this tick.
+ */
+export const sellHorse: OrderKind = {
+  validate(world, sender, order) {
+    const o = order as Partial<HorseTradeRequest>
+    const realm = realmOf(world, sender.userId)
+    const r = world.residents.find((x) => x.id === o.residentId)
+    if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
+    return sellHorseProblem(world, realm.id, r, o.horseId)
+  },
+  apply(world, _sender, order) {
+    const o = order as HorseTradeRequest
+    const r = world.residents.find((x) => x.id === o.residentId)
+    if (r) r.order = { kind: 'sellHorse', horseId: o.horseId }
   },
 }
 
@@ -204,11 +229,13 @@ interface TradeRecord {
   traderId?: string
   keptFood?: boolean
   /**
-   * For a horse bought from an NPC city (`CONTEXT.md`: Horse market): the horse, and whether the
-   * city still has the pair it keeps.
+   * For a horse traded with an NPC city (`CONTEXT.md`: Horse market): the horse, whether the city
+   * still has the pair it keeps after selling it, and whether it has no more than it wants after
+   * buying it.
    */
   horseId?: string
   keptPair?: boolean
+  wanted?: boolean
 }
 
 /** The trades of the latest `resolveTrades`, kept beside the world for `tradesKeepGoods`. */
@@ -261,6 +288,11 @@ export function resolveTrades(world: WorldState, size = MAP_SIZE): number {
     if (o?.kind === 'buyHorse') {
       r.order = null
       if (buyHorseHere(world, r, o, records)) traded++
+      continue
+    }
+    if (o?.kind === 'sellHorse') {
+      r.order = null
+      if (sellHorseHere(world, r, o, records)) traded++
       continue
     }
     if (o?.kind !== 'trade' && o?.kind !== 'handIn') continue
@@ -615,6 +647,61 @@ function buyHorseHere(
 }
 
 /**
+ * Carries out the sell horse order `o` of resident `r` (`CONTEXT.md`: Horse market), if nothing came
+ * in its way since it was given (`sellHorseProblem`): the Coins go from the NPC city's storages into
+ * their hands and the horse joins the city where it stands, ending any breeding it was part of
+ * (`endBreedingOf`). The Coins raise standing both ways. It goes into `records`, with a line in the
+ * realm log. Returns whether it moved anything.
+ */
+function sellHorseHere(
+  world: WorldState,
+  r: Resident,
+  o: SellHorseOrder,
+  records: TradeRecord[],
+): boolean {
+  const realm = commanderOf(world, r)
+  const horse = world.horses.find((h) => h.id === o.horseId)
+  const at = realm !== null && horse ? npcHorseBuyerAt(world, r, horse, realm) : undefined
+  if (realm === null || !horse || !at) return false
+  const { city, stable } = at
+  const log = { residentId: r.id, name: r.name, horseId: horse.id, horse: horse.name }
+  const where = { city: city.name, x: stable.x, y: stable.y }
+  const problem = sellHorseProblem(world, realm, r, horse.id)
+  if (problem) {
+    recordEvent(world, realm, { kind: 'horseSold', ...log, ...where, coins: 0, problem })
+    return false
+  }
+  const coins = npcHorseBuyPrice(world, city, horse, realm)
+  const storages = npcStorages(world, city)
+  const parties = [r.carried, ...storages.map((s) => (s.stock ??= {}))]
+  const before = total(parties)
+  let owed = coins
+  for (const s of storages) {
+    const paid = Math.min(owed, s.stock?.coins ?? 0)
+    move(s.stock!, r.carried, 'coins', paid)
+    owed -= paid
+  }
+  horse.realmId = null
+  horse.cityId = city.id
+  endBreedingOf(world, horse.id)
+  records.push({
+    residentId: r.id,
+    realm,
+    refused: npcCityRefuses(world, city, realm),
+    before,
+    after: total(parties),
+    npcCityId: city.id,
+    keptReserve: true,
+    horseId: horse.id,
+    keptPair: true,
+    wanted: npcHorsesOf(world, city).length <= npcHorsesWanted(world, city),
+  })
+  raiseStandingBothWays(world, realm, city.id, coins / STANDING_TRADE_COINS_PER_POINT)
+  recordEvent(world, realm, { kind: 'horseSold', ...log, ...where, coins })
+  return true
+}
+
+/**
  * Orders a delivery or pick-up (`CONTEXT.md`: Delivery) for the trade order `o` of resident `r`
  * of `realm`, at `warehouse`, paying from `payer` (their hands or carriage). Buying, the goods
  * and the fee (`quoteDelivery`) are paid now into the coin warehouse, and the warehouse keeps
@@ -731,7 +818,8 @@ export const tradeOrdersDone: Invariant = {
           r.order?.kind === 'trade' ||
           r.order?.kind === 'swap' ||
           r.order?.kind === 'handIn' ||
-          r.order?.kind === 'buyHorse',
+          r.order?.kind === 'buyHorse' ||
+          r.order?.kind === 'sellHorse',
       )
       .map((r) => ({
         invariant: this.name,
@@ -793,6 +881,23 @@ export const npcHorseSalesKeepPair: Invariant = {
       .map((t) => ({
         invariant: this.name,
         message: `${t.residentId} bought ${t.horseId} out of the pair ${t.npcCityId} keeps`,
+        entityIds: [t.residentId, t.horseId!, t.npcCityId!],
+      }))
+  },
+}
+
+/**
+ * An NPC city buys a horse only while it has fewer than it wants (`CONTEXT.md`: Horse market): no
+ * horse sold to one in the latest tick left it with more.
+ */
+export const npcHorsePurchasesWanted: Invariant = {
+  name: 'npc-horse-purchases-wanted',
+  check(world) {
+    return (ledger.get(world) ?? [])
+      .filter((t) => t.wanted === false)
+      .map((t) => ({
+        invariant: this.name,
+        message: `${t.residentId} sold ${t.horseId} to ${t.npcCityId}, which wanted no more`,
         entityIds: [t.residentId, t.horseId!, t.npcCityId!],
       }))
   },

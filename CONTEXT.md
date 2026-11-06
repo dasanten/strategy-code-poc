@@ -282,7 +282,7 @@ The shared language of the game. Domain terms only — no implementation details
   trade that won't go says why (no coins in hand, no room, none in stock, not wanted). Delivery
   and Transfer each have a heading and a line saying what they do, with the fee before ordering,
   and the section links to the Wiki's "How to trade". The tile card of a warehouse, an NPC
-  city's storage or stable with horses (Horse market), or a wandering trader at a stop has **Trade here**, which opens it. Only the UI:
+  city's storage or stable with horses to buy or sell (Horse market), or a wandering trader at a stop has **Trade here**, which opens it. Only the UI:
   the trades are those above.
 - **Stock floor:** the Trade Organization gets its stock physically (its own workplaces on every
   kind of resource, plus buying). When a warehouse of the HQ runs low, it tops up to a minimum at
@@ -1007,9 +1007,9 @@ The shared language of the game. Domain terms only — no implementation details
   carriage, not ridden and not Down, while the city has fewer than it wants and the Coins in its
   storage; the Coins go into the resident's hands, and it doesn't go if they can't carry them. The
   price comes from the horse's stats and age and how many the city has against how many it wants, dearer as it nears the pair it keeps,
-  and its standing toward them moves it like its trade prices. At low standing it refuses (NPC city
-  reaction). A sale raises standing like any trade. The trade section lists its horses with name,
-  stats and price.
+  and its standing toward them moves it like its trade prices. It pays less than it asks. At low standing it refuses (NPC city
+  reaction). A sale raises standing like any trade. The trade section lists its horses, and the
+  realm's standing in the stable, with name, stats and price.
 - **Carriage:** a horse-drawn cart driven by a resident with Driving skill. Carries far more than
   any resident and is fast on plains and roads, slower in forest and hills, and cannot enter
   mountains except on a road. Built at a stable (Building a carriage).

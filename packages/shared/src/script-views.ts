@@ -192,6 +192,12 @@ const CITY_FIELDS: readonly ScriptField[] = [
     'unless a stable of the NPC city with a horse is in sight',
   ),
   field(
+    'horsesToSell',
+    listOf(view('horseOffer')),
+    'The Player’s horses in sight standing in an NPC city’s finished stables, with what it pays for each.',
+    'unless a stable of the NPC city with a horse of the Player’s is in sight',
+  ),
+  field(
     'occupation',
     view('occupation'),
     'Who occupies its town hall and how long is left before the city is captured.',
@@ -365,7 +371,7 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field(
         'kind',
         'string',
-        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "store", "fetch", "build", "tearDown", "workAt", "teach", "train", "breed", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "swap", "buyHorse", "handIn", "buyOff", "acceptOffer" or "relocate" (on their way to `cityId`, to live there).',
+        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "store", "fetch", "build", "tearDown", "workAt", "teach", "train", "breed", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "swap", "buyHorse", "sellHorse", "handIn", "buyOff", "acceptOffer" or "relocate" (on their way to `cityId`, to live there).',
       ),
       field(
         'target',
@@ -721,18 +727,19 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
     ],
   },
   horseOffer: {
-    description: 'A horse in an NPC city’s stable, as its Trade section lists it.',
+    description:
+      'A horse in an NPC city’s stable with a price on it, as its Trade section lists it: its own to buy, or the Player’s to sell.',
     fields: [
       field('horseId', 'string', 'The horse’s id.'),
       field('stableId', 'string', 'The id of the stable it stands in.'),
       field('name', 'string', 'Its name.'),
       field('stats', view('horseStats'), 'Its Speed, Strength and Endurance.'),
       field('bornAt', 'number', 'The tick it was born.'),
-      field('price', 'number', 'What the city asks of the Player for it, in Coins.'),
+      field('price', 'number', 'What the city asks of the Player for it, or pays, in Coins.'),
       field(
         'problem',
         'string',
-        'Why the city won’t sell it to the Player, whoever goes there.',
+        'Why the city won’t trade it with the Player, whoever goes there.',
         'when it would',
       ),
     ],
