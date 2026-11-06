@@ -2535,7 +2535,7 @@ export interface City {
 }
 
 /** The layouts an NPC city can get (`CONTEXT.md`: City layout). */
-export const CITY_LAYOUTS = ['grid'] as const
+export const CITY_LAYOUTS = ['grid', 'rings'] as const
 export type CityLayout = (typeof CITY_LAYOUTS)[number]
 
 /** A realm occupying a city's town hall (`CONTEXT.md`: Occupying a town hall). */
