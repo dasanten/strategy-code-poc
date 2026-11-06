@@ -279,7 +279,7 @@ export function planCity(
     builders,
     short,
     sendToDown,
-    { home, ways, size },
+    { home, ways, terrain },
   )
   // Trading posts and the HQ don't feed their stables this way (`npcOneFeeder`).
   if (!city.tradeOrg && !feeding) planFeeder(world, city, adults, jobs)
@@ -341,7 +341,11 @@ function shareOut(
   builders: number,
   foodShort: boolean,
   sendToDown: (spare: Resident[], leave: (r: Resident) => void) => void,
-  roads: { home: Building | undefined; ways: WayFinder | undefined; size: number },
+  roads: {
+    home: Building | undefined
+    ways: WayFinder | undefined
+    terrain: TerrainMap | undefined
+  },
 ): Resident[] {
   const project = plan.project
   const unneeded: Resident[] = []
@@ -415,9 +419,9 @@ function shareOut(
   }
   if (unneeded.length === 0) return unneeded
   // Nothing short has a use for them. A road comes first (`CONTEXT.md`: Spare hands' work).
-  const { home, ways, size } = roads
+  const { home, ways, terrain } = roads
   const crew = new Set(
-    roadCrew(world, city, plan, unneeded, new Set(kept.keys()), storage, home, ways, size).map(
+    roadCrew(world, city, plan, unneeded, new Set(kept.keys()), storage, home, ways, terrain).map(
       (r) => r.id,
     ),
   )

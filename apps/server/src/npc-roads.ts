@@ -25,24 +25,28 @@ import {
   type Good,
   type Resident,
   type Stock,
+  type TerrainMap,
   type WorldState,
 } from '@csp/shared'
+import { streetsOwed } from './city-layout.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { walkTo } from './npc-behaviour.js'
 import { holdsBatch, ownWorkplaces, projectNeeds } from './npc-chain.js'
+import { wallRings } from './npc-growth.js'
 import type { PathResult, Point } from './pathfinding.js'
 import { worldIndex } from './world-index.js'
 
 /*
- * An NPC city's road crew (`CONTEXT.md`: NPC road, Spare hands' work; ADR 0026): with nothing short,
- * up to `NPC_ROAD_CREW` of its spare hands, apart from its builders, build road from its home to
- * each of its workplaces outside its area, nearest first, then on to the nearest Trade Org warehouse
- * in its trader's reach and the edge of its nearest neighbour's area, along the way a resident would
- * walk, tile by tile, skipping tiles that have a road. They take the materials from the storage only
- * above its reserve and what its project wants, and each tile is the game's Build default with the
+ * An NPC city's road crew (`CONTEXT.md`: NPC road, City layout, Spare hands' work; ADR 0026): with
+ * nothing short, up to `NPC_ROAD_CREW` of its spare hands, apart from its builders, build its
+ * layout's streets beside the buildings that stand, then road from its home to each of its
+ * workplaces outside its area, nearest first, then on to the nearest Trade Org warehouse in its
+ * trader's reach and the edge of its nearest neighbour's area, along the way a resident would walk,
+ * tile by tile, skipping tiles that have a road. They take the materials from the storage only above
+ * its reserve and what its project wants, and each tile is the game's Build default with the
  * materials in hand, so it never fetches any more, and gets its Food as that default does (Getting
  * food). A way is worked out once and kept in the plan as plain data (`CityPlan.roads`; ADR 0002), so
- * a road costs no pathfinding a tick.
+ * a road costs no pathfinding a tick; its streets are worked out each pass (`CityPlan.streets`).
  */
 
 /** What a road crew asks for a way: `Walking` in the game, a found path a little at a time. */
@@ -88,9 +92,13 @@ function aboveKept(world: WorldState, city: City, plan: CityPlan, store: Buildin
   return above
 }
 
-/** The next tile of its roads still to build that no other of the crew took, and how many are left. */
+/**
+ * The next tile still to build that no other of the crew took, and how many are left: of its streets
+ * first (`CONTEXT.md`: City layout), then of its roads in order.
+ */
 function nextTile(
   world: WorldState,
+  streets: readonly (readonly [number, number])[],
   roads: readonly CityRoad[],
   size: number,
   taken: ReadonlySet<string> = new Set(),
@@ -98,8 +106,8 @@ function nextTile(
   const built = worldIndex(world).roads(size)
   let tile: readonly [number, number] | undefined
   let left = 0
-  for (const road of roads) {
-    for (const t of road.tiles) {
+  for (const tiles of [streets, ...roads.map((road) => road.tiles)]) {
+    for (const t of tiles) {
       if (built.has(tileIndex(size, t[0], t[1]))) continue
       left++
       if (!tile && !taken.has(`${t[0]},${t[1]}`)) tile = t
@@ -133,7 +141,8 @@ function isPost(world: WorldState, b: Building, size: number): boolean {
   if (b.kind !== 'warehouse' || b.site) return false
   const owner = world.cities.find((c) => c.id === b.cityId)
   if (!owner?.tradeOrg) return false
-  const hall = owner.tradeOrg === 'hq' ? worldIndex(world).buildingById(owner.townHallId) : undefined
+  const hall =
+    owner.tradeOrg === 'hq' ? worldIndex(world).buildingById(owner.townHallId) : undefined
   return !hall || !inInnerRingAround(hall, b, size)
 }
 
@@ -176,8 +185,9 @@ function leadsOn(world: WorldState, to: string, size: number): boolean {
 }
 
 /**
- * Brings its ways up to date and says whether it has a road to build now (`CONTEXT.md`: NPC road).
- * Ways go in the order of its finished workplaces outside its area, nearest its home first; those of
+ * Brings its streets and ways up to date and says whether it has a road to build now (`CONTEXT.md`:
+ * NPC road, City layout). Its streets come ahead of all its ways, worked out anew each pass, so they
+ * follow its buildings as they go up. Ways go in the order of its finished workplaces outside its area, nearest its home first; those of
  * workplaces gone or taken into its area are dropped. The nearest workplace without a way yet asks
  * for one, one search at a time, and the ways it knows go on meanwhile. Once all it knows are built,
  * it asks for the way to the nearest post, then to the edge of its nearest neighbour's area, unless
@@ -191,8 +201,18 @@ function planRoads(
   plan: CityPlan,
   home: Building,
   ways: WayFinder,
-  size: number,
+  terrain: TerrainMap,
 ): boolean {
+  const size = terrain.size
+  const streets = streetsOwed(
+    world,
+    city,
+    home,
+    wallRings(world, city, home, size)?.newGate,
+    terrain,
+  )
+  if (streets.length > 0) plan.streets = streets
+  else delete plan.streets
   const known = new Map((plan.roads ?? []).map((r) => [r.to, r]))
   /** The fewest tiles a way from its home to (x, y) can have: a Step can go diagonally. */
   const fewestTiles = (x: number, y: number) =>
@@ -225,7 +245,7 @@ function planRoads(
     if (!placeIds.has(road.to) && leadsOn(world, road.to, size)) roads.push(road)
   }
   const has = (to: string) => roads.some((r) => r.to === to)
-  if (!searching && !nextTile(world, roads, size)) {
+  if (!searching && !nextTile(world, streets, roads, size)) {
     const post = nearestPost(world, home, size)
     if (post && !has(post.id)) {
       const road = settle(post.id, [post.x, post.y])
@@ -233,7 +253,7 @@ function planRoads(
       else searching = true
     }
   }
-  if (!searching && !nextTile(world, roads, size)) {
+  if (!searching && !nextTile(world, streets, roads, size)) {
     const next = nearestNeighbour(world, city, home, size)
     const theirs = next && world.cityPlans[next.city.id]?.roads?.some((r) => r.to === city.id)
     if (next && !theirs && !has(next.city.id)) {
@@ -244,7 +264,7 @@ function planRoads(
   }
   if (roads.length > 0) plan.roads = roads
   else delete plan.roads
-  return nextTile(world, roads, size) !== undefined
+  return nextTile(world, streets, roads, size) !== undefined
 }
 
 /**
@@ -263,15 +283,15 @@ export function roadCrew(
   store: Building | undefined,
   home: Building | undefined,
   ways: WayFinder | undefined,
-  size: number,
+  terrain: TerrainMap | undefined,
 ): Resident[] {
-  if (city.tradeOrg || !ways || !store || !home || unneeded.length === 0) return []
+  if (city.tradeOrg || !ways || !terrain || !store || !home || unneeded.length === 0) return []
   const onCrew = (r: Resident) => plan.jobs[r.id]?.kind === 'road'
   const above = aboveKept(world, city, plan, store)
   if (Object.values(above).some((n) => n < 0)) return []
   const inHand = unneeded.filter(onCrew).reduce((sum, r) => sum + tilesIn(r.carried), 0)
   if (tilesIn(above) + inHand < 1) return []
-  if (!planRoads(world, city, plan, home, ways, size)) return []
+  if (!planRoads(world, city, plan, home, ways, terrain)) return []
   const rank = (r: Resident) =>
     onCrew(r) ? 0 : plan.scouts?.[r.id] ? 3 : returning.has(r.id) ? 2 : 1
   return [...unneeded].sort((a, b) => rank(a) - rank(b)).slice(0, NPC_ROAD_CREW)
@@ -307,13 +327,12 @@ export function layRoad(
     const at = other.id !== r.id ? other.script?.memory.at : undefined
     if (at && typeof at === 'object' && !Array.isArray(at)) taken.add(`${at.x},${at.y}`)
   }
-  const next = nextTile(world, plan.roads ?? [], size, taken)
+  const next = nextTile(world, plan.streets ?? [], plan.roads ?? [], size, taken)
   if (!next) return false
   const [x, y] = next.tile
   const holds = holdsBatch(r.carried, roadMaterials())
   const walk = store ? wrapDistance(size, store, { x, y }) * WALK_TICKS_PER_TILE : 0
-  const fed =
-    !store || (store.stock?.food ?? 0) < 1 || (r.carried.food ?? 0) >= roadCrewFood(walk)
+  const fed = !store || (store.stock?.food ?? 0) < 1 || (r.carried.food ?? 0) >= roadCrewFood(walk)
   if (holds && fed) {
     r.order = null
     r.script = { scriptId: 0, task: 'build', memory: { building: 'road', at: { x, y } } }

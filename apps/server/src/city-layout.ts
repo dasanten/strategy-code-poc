@@ -5,18 +5,25 @@ import {
   CITY_RING_STEP,
   CITY_SIDE_LANE_GAP,
   FOOTPRINT,
+  footprintTiles,
+  isPassableTerrain,
   middleOf,
+  terrainAt,
+  tileIndex,
   townHallOf,
   wrap,
   wrapDelta,
+  wrapDistance,
   type Building,
   type BuildingKind,
   type City,
   type CityLayout,
+  type TerrainMap,
   type WorldState,
 } from '@csp/shared'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { hash } from './residents.js'
+import { worldIndex } from './world-index.js'
 
 /*
  * How an NPC city sets out its town (`CONTEXT.md`: City layout): the layout it gets when it comes to
@@ -316,6 +323,80 @@ function gateOffsets(
     .filter((b) => b.kind === 'gate' && b.cityId === city.id)
     .map((b) => ({ dx: wrapDelta(home.x, b.x, size), dy: wrapDelta(home.y, b.y, size) }))
   return [...gates, { dx: gate?.dx ?? 0, dy: gate?.dy ?? 1 }]
+}
+
+/** What a street goes up beside: the town hall, and what a layout sets out. */
+const STREET_SIDE: readonly BuildingKind[] = [
+  'townHall',
+  'house',
+  'storage',
+  'smelter',
+  'smithy',
+  'mint',
+  'stable',
+]
+
+/**
+ * The tiles of the city's streets it wants as road now (`CONTEXT.md`: City layout), nearest its home
+ * first: those touching a finished building of `STREET_SIDE`, corners too so a crossing is not left
+ * out, on passable land, with no finished road yet. Nothing is torn down for a street: it stops at
+ * whatever stands on its line, as it may in a city from before layouts. None for a city without a
+ * layout.
+ */
+export function streetsOwed(
+  world: WorldState,
+  city: City,
+  home: Building,
+  gate: { dx: number; dy: number } | undefined,
+  terrain: TerrainMap,
+): [x: number, y: number][] {
+  const size = terrain.size
+  const plan = layoutPlan(world, city, home, gate, size)
+  if (!plan) return []
+  const index = worldIndex(world)
+  const built = index.roads(size)
+  const own = new Set(city.workplaceIds)
+  const owed = new Map<number, [number, number]>()
+  for (const b of world.buildings) {
+    if (b.site || !STREET_SIDE.includes(b.kind)) continue
+    if (b.cityId !== city.id && !own.has(b.id)) continue
+    for (const [fx, fy] of footprintTiles(b, size)) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const x = wrap(fx + dx, size)
+          const y = wrap(fy + dy, size)
+          const tile = tileIndex(size, x, y)
+          if (owed.has(tile) || built.has(tile) || !plan.street(x, y)) continue
+          if (index.buildingAt(x, y, size)) continue
+          if (isPassableTerrain(terrainAt(terrain, x, y))) owed.set(tile, [x, y])
+        }
+      }
+    }
+  }
+  const far = ([x, y]: [number, number]) => wrapDistance(size, home, { x, y })
+  return [...owed.values()].sort((a, b) => far(a) - far(b) || a[1] - b[1] || a[0] - b[0])
+}
+
+/**
+ * Streets belong to cities with a layout (`CONTEXT.md`: City layout; ADR 0004): no other city's plan
+ * keeps any, and no tile of them stands twice.
+ */
+export const cityStreetsSound: Invariant = {
+  name: 'city-streets-sound',
+  check(world) {
+    const out: InvariantViolation[] = []
+    for (const city of world.cities) {
+      const streets = world.cityPlans[city.id]?.streets
+      if (!streets) continue
+      const report = (what: string) =>
+        out.push({ invariant: this.name, message: `${city.id} ${what}`, entityIds: [city.id] })
+      if (!city.layout) report('has no layout but plans streets')
+      if (new Set(streets.map(([x, y]) => `${x},${y}`)).size !== streets.length) {
+        report('plans a tile of street twice')
+      }
+    }
+    return out
+  },
 }
 
 /**

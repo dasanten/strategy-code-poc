@@ -2145,6 +2145,12 @@ export function Wiki() {
           stands. Trading posts, the HQ and Players' cities have none.
         </p>
         <p>
+          Its streets are real roads. Its road crew lays them ahead of its other roads, nearest home
+          first, once its town hall, a house, a storage or a workshop stands beside a tile, and only
+          from materials above its reserve. Tiles kept free for streets stay free, and a street stops
+          at whatever already stands on its line. Like any road they belong to nobody.
+        </p>
+        <p>
           So it builds the whole chain its land allows, from the node up: weapons short wants a
           smithy, which wants Iron, so a smelter, which wants Iron ore, so a mine first, and the
           Wood and Stone the mine is built of before that. A smelter or smithy is worked only while
@@ -2183,8 +2189,8 @@ export function Wiki() {
         </p>
         <p>
           Ahead of scouting and that work comes its road crew: up to {num(NPC_ROAD_CREW)} spare hands, apart from
-          its builders, build road from its home to each of its workplaces outside its area, farms
-          too, the nearest first. They follow the way a resident would walk, tile by tile, so a road
+          its builders, build its streets, then road from its home to each of its workplaces outside
+          its area, farms too, the nearest first. They follow the way a resident would walk, tile by tile, so a road
           goes round a lake, and they skip tiles that already have a road. They only use materials
           above its reserve and what its project still needs; with none to spare, or with something
           short that they can work for, they go back to other work and bring back what they carry.
