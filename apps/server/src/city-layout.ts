@@ -1,6 +1,7 @@
 import {
   CITY_GRID_BLOCK,
   CITY_LAYOUTS,
+  CITY_SIDE_LANE_GAP,
   FOOTPRINT,
   middleOf,
   townHallOf,
@@ -34,6 +35,8 @@ export interface LayoutPlan {
   street(x: number, y: number): boolean
   /** Whether a building of `kind` may have the north-west tile of its footprint here. */
   spot(kind: BuildingKind, x: number, y: number): boolean
+  /** Which spots it fills first, lowest first; among equals, nearest home. All alike without it. */
+  rank?(kind: BuildingKind, x: number, y: number): number
 }
 
 /**
@@ -48,6 +51,7 @@ export function layoutPlan(
   size: number,
 ): LayoutPlan | undefined {
   if (!city.layout) return undefined
+  if (city.layout === 'mainStreet') return mainStreetPlan(world, city, home, gate, size)
   return gridPlan(world, city, home, gate, size)
 }
 
@@ -82,6 +86,63 @@ function gridPlan(
       lanes.rows.has(y),
     spot: (kind, x, y) =>
       inBlock(anchor.x, x, FOOTPRINT[kind]) && inBlock(anchor.y, y, FOOTPRINT[kind]),
+  }
+}
+
+/**
+ * Main street: one straight street from the gate on past the town hall and the far side of the home,
+ * with side lanes crossing it every `CITY_SIDE_LANE_GAP` tiles, counted from the middle of the town
+ * hall, which never moves. The street runs through where the next gate goes, in line with the one
+ * that stands, so it stays put as the city grows.
+ *
+ * Buildings stand in rows along it, the row on the street filling first (`rank`). Only then do they
+ * go further back, along the side lanes, so a building always has a street beside it: a row further
+ * back keeps to the tiles next to a lane. A building takes its place by whole footprints counted
+ * from the street, and along the street from the side lane before it. Lanes through other gates are
+ * kept free too.
+ */
+function mainStreetPlan(
+  world: Pick<WorldState, 'buildings'>,
+  city: City,
+  home: Building,
+  gate: { dx: number; dy: number } | undefined,
+  size: number,
+): LayoutPlan {
+  const anchor = middleOf(townHallOf(world, city) ?? home, size)
+  const lanes = gateLanes(world, city, home, gate, size)
+  const standing = world.buildings.find((b) => b.kind === 'gate' && b.cityId === city.id)
+  const way = gate ??
+    (standing && {
+      dx: wrapDelta(home.x, standing.x, size),
+      dy: wrapDelta(home.y, standing.y, size),
+    }) ?? { dx: 0, dy: 1 }
+  const northSouth = Math.abs(way.dy) >= Math.abs(way.dx)
+  const line = northSouth ? wrap(home.x + way.dx, size) : wrap(home.y + way.dy, size)
+  /** How far a tile lies to the side of the street, and along it from the town hall. */
+  const across = (x: number, y: number) => wrapDelta(line, northSouth ? x : y, size)
+  const along = (x: number, y: number) =>
+    northSouth ? wrapDelta(anchor.y, y, size) : wrapDelta(anchor.x, x, size)
+  const pitch = CITY_SIDE_LANE_GAP + 1
+  /** Tiles between the street and a footprint; negative for one that stands on the street. */
+  const back = (kind: BuildingKind, x: number, y: number) => {
+    const at = across(x, y)
+    return at > 0 ? at - 1 : -(at + FOOTPRINT[kind])
+  }
+  return {
+    street: (x, y) =>
+      across(x, y) === 0 ||
+      mod(along(x, y), pitch) === 0 ||
+      lanes.columns.has(x) ||
+      lanes.rows.has(y),
+    spot: (kind, x, y) => {
+      const side = FOOTPRINT[kind]
+      const behind = back(kind, x, y)
+      const from = mod(along(x, y), pitch) - 1
+      if (behind < 0 || behind % side !== 0 || from < 0) return false
+      if (from + side > CITY_SIDE_LANE_GAP) return false
+      return behind === 0 ? from % side === 0 : from === 0 || from + side === CITY_SIDE_LANE_GAP
+    },
+    rank: back,
   }
 }
 

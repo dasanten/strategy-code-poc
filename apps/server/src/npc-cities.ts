@@ -1,5 +1,4 @@
 import {
-  CITY_GRID_BLOCK,
   MAP_SIZE,
   NPC_CITY_MIN_DISTANCE,
   NPC_TOWN,
@@ -11,6 +10,7 @@ import {
   Terrain,
   terrainAt,
   townHallOf,
+  wrap,
   wrapDistance,
   type Building,
   type City,
@@ -192,7 +192,9 @@ export function foundNpcCity(
 /**
  * Where a starting house goes by its city's layout: the spot nearest its tile in a starting city's
  * row, and no further from the home than that. The row is what ties a town's wall to its middle
- * (`CITY_BUILDING_REACH`), so the houses stay near it and the wall stays part of the city.
+ * (`CITY_BUILDING_REACH`), so the houses stay near it and the wall stays part of the city. A layout
+ * that fills some spots first (`LayoutPlan.rank`) takes the first of those, as far out as the row
+ * stands.
  */
 function startingHouseSpot(
   plan: LayoutPlan,
@@ -200,16 +202,21 @@ function startingHouseSpot(
   home: Building,
   [rx, ry]: [number, number],
 ): [number, number] | undefined {
-  const ring = (x: number, y: number) => Math.max(Math.abs(x - home.x), Math.abs(y - home.y))
+  const size = ground.terrain.size
+  const reach = Math.max(Math.abs(rx - home.x), Math.abs(ry - home.y))
   const off = (x: number, y: number) => !plan.street(x, y)
-  let best: { at: [number, number]; d: number } | undefined
-  for (let dy = -CITY_GRID_BLOCK; dy <= CITY_GRID_BLOCK; dy++) {
-    for (let dx = -CITY_GRID_BLOCK; dx <= CITY_GRID_BLOCK; dx++) {
-      const x = rx + dx
-      const y = ry + dy
-      const d = Math.hypot(dx, dy)
-      if ((best && d >= best.d) || ring(x, y) > ring(rx, ry)) continue
-      if (plan.spot('house', x, y) && ground.fits('house', x, y, off)) best = { at: [x, y], d }
+  let best: { at: [number, number]; rank: number; d: number } | undefined
+  for (let dy = -reach; dy <= reach; dy++) {
+    for (let dx = -reach; dx <= reach; dx++) {
+      const x = wrap(home.x + dx, size)
+      const y = wrap(home.y + dy, size)
+      if (!plan.spot('house', x, y)) continue
+      const rank = plan.rank?.('house', x, y) ?? 0
+      const d = plan.rank
+        ? reach - Math.max(Math.abs(dx), Math.abs(dy))
+        : Math.hypot(home.x + dx - rx, home.y + dy - ry)
+      if (best && (rank > best.rank || (rank === best.rank && d >= best.d))) continue
+      if (ground.fits('house', x, y, off)) best = { at: [x, y], rank, d }
     }
   }
   return best?.at

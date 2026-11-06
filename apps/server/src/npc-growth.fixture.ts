@@ -12,10 +12,12 @@ import {
   wrapDelta,
   type Building,
   type City,
+  type CityLayout,
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
 import { expect } from 'vitest'
+import { pickLayout } from './city-layout.js'
 import { checkInvariants } from './invariants.js'
 import { npcHome } from './npc-behaviour.js'
 import { newWall, wallRings } from './npc-growth.js'
@@ -36,13 +38,26 @@ export const WALL = Math.floor(NPC_VILLAGE.size / 2)
 /** Where the forest node lies: east of the village, beyond where its next wall would stand. */
 export const FOREST = { x: 34 + 40, y: 34 }
 
+/** A seed that gives the world's first city `layout` (`pickLayout`). */
+export function seedFor(layout: CityLayout): number {
+  let seed = 1
+  while (pickLayout(seed, 'city1') !== layout) seed++
+  return seed
+}
+
 /**
  * A village alone on a Plains map, its top-left wall tile at (20, 20) and its home (the storage)
  * at (34, 34), `WALL` tiles from its wall, with a forest node east of it.
  */
-export function village(): { world: WorldState; terrain: TerrainMap; city: City; home: Building } {
+export function village(layout?: CityLayout): {
+  world: WorldState
+  terrain: TerrainMap
+  city: City
+  home: Building
+} {
   const terrain = plains(200)
   const world = createWorld(terrain)
+  if (layout) world.seed = seedFor(layout)
   const city = foundNpcCity(world, terrain, NPC_VILLAGE, 20, 20, mulberry32(7))
   world.nodes.push({ id: 'forest', kind: 'forest', ...FOREST })
   terrain.tiles[tileIndex(terrain.size, FOREST.x, FOREST.y)] = Terrain.Forest
