@@ -24,7 +24,6 @@ import {
   postOfferProblem,
   quoteOffer,
   realmsToOfferTo,
-  STANDING_TRADE_COINS_PER_POINT,
   timesToPost,
   tradeOrgHq,
   transferLoad,
@@ -47,7 +46,7 @@ import type { Invariant, InvariantViolation } from './invariants.js'
 import { orderedResident } from './order-sender.js'
 import type { OrderKind, OrderSender } from './orders.js'
 import { sightOf } from './sight.js'
-import { raiseStandingBothWays } from './standing.js'
+import { raiseStandingByTrade } from './standing.js'
 import { newId, realmOf } from './starting-city.js'
 import { worthOf } from './trade-org-punishment.js'
 
@@ -568,10 +567,9 @@ function acceptNow(
   offer.times -= q.times
   if (q.times > 0) {
     // Goods handed over on a demand are no trade: fetching them raises no standing.
-    if (!wantsNothing(offer)) {
-      const worth = offerWorth(offer, q.gives, q.wants)
-      raiseStandingBothWays(world, side, offer.realmId, worth / STANDING_TRADE_COINS_PER_POINT)
-    }
+    const moved = wantsNothing(offer)
+      ? undefined
+      : raiseStandingByTrade(world, offer.realmId, side, offerWorth(offer, q.gives, q.wants))
     recordEvent(world, offer.realmId, {
       kind: 'offerTaken',
       by: organizationLabel(world, side),
@@ -579,6 +577,7 @@ function acceptNow(
       givesUnits: q.gives,
       wantsUnits: q.wants,
       times: q.times,
+      ...(moved && { standing: moved }),
     })
   }
   recordEvent(world, commanderOf(world, r), {

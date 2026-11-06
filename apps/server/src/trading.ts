@@ -53,7 +53,7 @@ import {
 import { recordEvent } from './events.js'
 import type { Invariant } from './invariants.js'
 import type { OrderKind } from './orders.js'
-import { raiseStandingBothWays } from './standing.js'
+import { raiseStandingBothWays, raiseStandingByTrade } from './standing.js'
 import { handIn } from './transfers.js'
 import { newId, realmOf } from './starting-city.js'
 
@@ -282,9 +282,8 @@ export function resolveTrades(world: WorldState, size = MAP_SIZE): number {
       after: total([...new Set(parties)]),
     })
     if (units > 0) traded++
-    if (realm !== null && coins > 0) {
-      raiseStandingBothWays(world, realm, TRADE_ORG, coins / STANDING_TRADE_COINS_PER_POINT)
-    }
+    const moved =
+      realm !== null && coins > 0 ? raiseStandingByTrade(world, realm, TRADE_ORG, coins) : undefined
     recordEvent(world, realm, {
       kind: 'traded',
       residentId: r.id,
@@ -296,6 +295,7 @@ export function resolveTrades(world: WorldState, size = MAP_SIZE): number {
       coins,
       x: warehouse.x,
       y: warehouse.y,
+      ...(moved && { standing: moved }),
     })
   }
   return traded
@@ -362,9 +362,8 @@ function tradeWithCity(
     npcCityId: city.id,
     keptReserve: units === 0 || (o.side === 'buy' ? held >= keep : held <= keep),
   })
-  if (trader !== null && coins > 0) {
-    raiseStandingBothWays(world, trader, city.id, coins / STANDING_TRADE_COINS_PER_POINT)
-  }
+  const moved =
+    trader !== null && coins > 0 ? raiseStandingByTrade(world, trader, city.id, coins) : undefined
   recordEvent(world, realm, {
     kind: 'traded',
     residentId: r.id,
@@ -376,6 +375,8 @@ function tradeWithCity(
     coins,
     x: storage.x,
     y: storage.y,
+    atStorage: true,
+    ...(moved && { standing: moved }),
   })
   return units > 0
 }
@@ -428,9 +429,8 @@ function tradeWithTrader(
     keptFood:
       units === 0 || o.good !== 'food' || o.side === 'sell' || (wagon.load.food ?? 0) >= keep,
   })
-  if (realm !== null && coins > 0) {
-    raiseStandingBothWays(world, realm, TRADE_ORG, coins / STANDING_TRADE_COINS_PER_POINT)
-  }
+  const moved =
+    realm !== null && coins > 0 ? raiseStandingByTrade(world, realm, TRADE_ORG, coins) : undefined
   recordEvent(world, realm, {
     kind: 'traded',
     residentId: r.id,
@@ -443,6 +443,7 @@ function tradeWithTrader(
     x: wagon.x,
     y: wagon.y,
     withTrader: true,
+    ...(moved && { standing: moved }),
   })
   return units > 0
 }
@@ -501,14 +502,10 @@ function swapHere(world: WorldState, r: Resident, o: SwapOrder, records: TradeRe
       ((held[o.want] ?? 0) >= (keep[o.want] ?? 0) && (held[o.give] ?? 0) <= (keep[o.give] ?? 0))
   }
   records.push(record)
-  if (realm !== null && q.units > 0) {
-    raiseStandingBothWays(
-      world,
-      realm,
-      npc ? npc.city.id : TRADE_ORG,
-      (q.bought + q.sold) / STANDING_TRADE_COINS_PER_POINT,
-    )
-  }
+  const moved =
+    realm !== null && q.units > 0
+      ? raiseStandingByTrade(world, realm, npc ? npc.city.id : TRADE_ORG, q.bought + q.sold)
+      : undefined
   recordEvent(world, realm, {
     kind: 'swapped',
     residentId: r.id,
@@ -522,6 +519,7 @@ function swapHere(world: WorldState, r: Resident, o: SwapOrder, records: TradeRe
     coins: q.coins,
     x: place.x,
     y: place.y,
+    ...(moved && { standing: moved }),
   })
   return q.units > 0
 }

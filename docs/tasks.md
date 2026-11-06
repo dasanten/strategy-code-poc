@@ -47,7 +47,13 @@ workplace amounts) next, ahead of Bandits. Agreed with Daniel later on 2026-11-0
 that day: the bug #798 (the Trade Org's army turns back before it arrives) first, then Quick wins 7
 (Epic 67: breeding shows names and stats, orders start at once), Build menu (68), Residents list
 (69), Swaps and offers (70), Wandering traders (71, ADR 0023), Demands (72, ADR 0024) and Trade Org
-debt (73, ADR 0025), in that order, all ahead of Bandits. Tickets that need an earlier epic name it
+debt (73, ADR 0025), in that order, all ahead of Bandits. Agreed with Daniel on 2026-11-05, from his list of
+that day: the bug #878 (NPC residents stop getting commands) first, then, after Trade Org debt (73),
+Quick wins 8 (Epic 74: hitching the horse you choose, realm goods in the top bar, trade standing),
+Living NPC cities (75, ADR 0026: road crews, scouts, work for surplus), City layouts (76) and Horse
+market (77, ADR 0027), in that order, all ahead of Bandits. Adding Claude API calls to NPC cities was
+looked at the same day and left out for now: these epics fix what makes them look idle, at no running
+cost. Tickets that need an earlier epic name it
 under Depends on, and wait for it to reach `dev`.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
@@ -126,6 +132,10 @@ I sleep.
 | 71  | [Wandering traders](https://github.com/dasanten/strategy-code-poc/issues/817)                   | ticketed                |
 | 72  | [Demands](https://github.com/dasanten/strategy-code-poc/issues/822)                             | ticketed                |
 | 73  | [Trade Org debt](https://github.com/dasanten/strategy-code-poc/issues/827)                      | ticketed                |
+| 74  | [Quick wins 8](https://github.com/dasanten/strategy-code-poc/issues/880)                        | ticketed                |
+| 75  | [Living NPC cities](https://github.com/dasanten/strategy-code-poc/issues/885)                   | ticketed                |
+| 76  | [City layouts](https://github.com/dasanten/strategy-code-poc/issues/891)                        | ticketed                |
+| 77  | [Horse market](https://github.com/dasanten/strategy-code-poc/issues/897)                        | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.

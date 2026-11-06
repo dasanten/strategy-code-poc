@@ -5,8 +5,10 @@ import {
   type DeliveryView,
   type PunishmentEnd,
   type RealmEvent,
+  type StandingMove,
 } from '@csp/shared'
 import { BUILDING_NAMES } from './city-view.js'
+import { formatMove } from './standing-view.js'
 
 /** How bad an event is, for its colour in the log. */
 export type EventTone = 'bad' | 'warn' | 'info'
@@ -257,7 +259,11 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       return { text: `${e.city} no longer asks to join your realm.`, tone: 'warn' }
     case 'traded': {
       const what = goodText(e.good)
-      const at = e.withTrader ? 'the wandering trader' : 'the warehouse'
+      const at = e.withTrader
+        ? 'the wandering trader'
+        : e.atStorage
+          ? 'the storage'
+          : 'the warehouse'
       const place = { name: at, x: e.x, y: e.y }
       if (e.units === 0) {
         return {
@@ -269,7 +275,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       const did = e.side === 'buy' ? 'bought' : 'sold'
       const cut = e.units < e.wanted ? ` (of ${e.wanted} wanted)` : ''
       return {
-        text: `${e.name} ${did} ${e.units} ${what}${cut} for ${e.coins} coins at ${at}.`,
+        text: `${e.name} ${did} ${e.units} ${what}${cut} for ${e.coins} coins at ${at}.${standingMoved(e.standing)}`,
         tone: 'info',
         places: [place],
       }
@@ -310,7 +316,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       const cut = e.units < e.wanted ? ` (of ${e.wanted} wanted)` : ''
       const back = e.coins > 0 ? `, with ${e.coins} ${e.coins === 1 ? 'coin' : 'coins'} back,` : ''
       return {
-        text: `${e.name} swapped ${e.gave} ${goodText(e.give)} for ${e.units} ${goodText(e.want)}${cut}${back} at ${place.name}.`,
+        text: `${e.name} swapped ${e.gave} ${goodText(e.give)} for ${e.units} ${goodText(e.want)}${cut}${back} at ${place.name}.${standingMoved(e.standing)}`,
         tone: 'info',
         places: [place],
       }
@@ -320,7 +326,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         text:
           e.wantsUnits === 0
             ? `${e.by} fetched the ${e.givesUnits} ${goodText(e.gives)} you set aside.`
-            : `${e.by} took your offer: ${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)}.`,
+            : `${e.by} took your offer: ${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)}.${standingMoved(e.standing)}`,
         tone: 'info',
         places: [{ name: 'the storage', x: e.x, y: e.y }],
       }
@@ -833,6 +839,11 @@ function cap(text: string): string {
 }
 
 /** A good's name in a sentence: `ironOre` is "iron ore". */
+/** How far a trade moved standing, as the end of its line (`CONTEXT.md`: Trade section). */
+function standingMoved(moved: StandingMove | undefined): string {
+  return moved ? ` Standing with ${moved.name} ${formatMove(moved.by)}.` : ''
+}
+
 function goodText(good: string): string {
   return good.replace(/[A-Z]/g, (c) => ` ${c.toLowerCase()}`)
 }

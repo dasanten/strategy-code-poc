@@ -59,7 +59,7 @@ export function AddStep({
     terrain: number | undefined
     problem: (kind: BuildingKind) => string | undefined
   }
-  /** The realm's horses in the stable picked for Breed horses. */
+  /** The realm's horses in the stable picked for Breed horses, or on the carriage's tile for Hitch. */
   horses: readonly SeenHorse[]
   /** The current tick, for those horses' ages. */
   tick: number
@@ -134,6 +134,13 @@ export function AddStep({
             horses={horses}
             tick={tick}
             onAnswer={(horseIds) => onAnswer({ ask, horseIds })}
+          />
+        )}
+        {ask === 'horse' && (
+          <HorseAsk
+            horses={horses}
+            tick={tick}
+            onAnswer={(horseId) => onAnswer({ ask, horseId })}
           />
         )}
         {ask === 'haul' && <HaulAsk onAnswer={(setup) => onAnswer({ ask, setup })} />}
@@ -304,6 +311,39 @@ function HorsesAsk({
           disabled={ids.length !== 2}
           onClick={() => onAnswer([ids[0]!, ids[1]!])}
         >
+          Add
+        </button>
+      </div>
+    </>
+  )
+}
+
+/** One of the realm's horses on the carriage's tile, to hitch (`CONTEXT.md`: Hitched horse). */
+function HorseAsk({
+  horses,
+  tick,
+  onAnswer,
+}: {
+  horses: readonly SeenHorse[]
+  tick: number
+  onAnswer: (horseId: string) => void
+}) {
+  const [id, setId] = useState<string>()
+  if (horses.length === 0)
+    return <p className="muted small">No horse of yours is in sight on that carriage’s tile.</p>
+  return (
+    <>
+      {horses.map((h) => (
+        <HorsePick
+          key={h.id}
+          horse={h}
+          tick={tick}
+          checked={id === h.id}
+          onToggle={() => setId((now) => (now === h.id ? undefined : h.id))}
+        />
+      ))}
+      <div className="order-buttons">
+        <button type="button" className="primary" disabled={!id} onClick={() => onAnswer(id!)}>
           Add
         </button>
       </div>

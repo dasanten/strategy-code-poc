@@ -378,6 +378,8 @@ describe('script bindings', () => {
     ['dismount()', { kind: 'dismount' }],
     ['unhitch("k9")', { kind: 'unhitch', carriageId: 'k9' }],
     ['unhitch({ id: "k9", x: 1, y: 2 })', { kind: 'unhitch', carriageId: 'k9' }],
+    ['hitch("k9", "h9")', { kind: 'hitch', carriageId: 'k9', horseId: 'h9' }],
+    ['hitch({ id: "k9" }, { id: "h9" })', { kind: 'hitch', carriageId: 'k9', horseId: 'h9' }],
     ['board("k9")', { kind: 'board', carriageId: 'k9' }],
     ['getOff()', { kind: 'getOff' }],
     ['getOff(3, 4)', { kind: 'getOff', x: 3, y: 4 }],

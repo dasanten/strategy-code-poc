@@ -283,8 +283,8 @@ The shared language of the game. Domain terms only — no implementation details
   trade that won't go says why (no coins in hand, no room, none in stock, not wanted). Delivery
   and Transfer each have a heading and a line saying what they do, with the fee before ordering,
   and the section links to the Wiki's "How to trade". The tile card of a warehouse, an NPC
-  city's storage or a wandering trader at a stop has **Trade here**, which opens it. Only the UI:
-  the trades are those above.
+  city's storage or a wandering trader at a stop has **Trade here**, which opens it. It shows their standing with that city, and a trade says how far it moved it. Only
+  the UI: the trades are those above.
 - **Stock floor:** the Trade Organization gets its stock physically (its own workplaces on every
   kind of resource, plus buying). When a warehouse of the HQ runs low, it tops up to a minimum at
   the end of each game day. This is the one controlled exception to "everything is physical" (ADR
@@ -1061,6 +1061,11 @@ The shared language of the game. Domain terms only — no implementation details
   tile unhitches it (an order, as a script could do it); the horse stands free on the tile, and
   the carriage stands where it is until it is next driven. A carriage
   whose horse dies stands where it is until another horse is hitched.
+  **Hitching:** a grown resident of the carriage's realm on its tile hitches the horse they choose
+  (an order, as a script could do it): any horse of the realm on that tile that pulls no carriage,
+  nobody rides and isn't Down, listed on the card with name, stats and age. It happens at once; a
+  horse already hitched stands free on the tile. Driving with none hitched still takes the first
+  free horse there.
 - **Riding:** a resident on a tile with a horse that pulls no carriage and nobody rides mounts
   it (another organization's is stolen by that: Stealing a carriage or horse), and dismounts
   anywhere; the horse stays on that tile. Riding is not an order:
@@ -1252,7 +1257,7 @@ The shared language of the game. Domain terms only — no implementation details
   doing, shown to the owning Player only. It is derived from their task and current order
   ("Building a house: fetching 10 wood from the storage", "Working the farm"); the script they
   run is named on a small line of its own, left out when it is their task's own default script
-  ("Working the farm" alone). Long lines wrap rather than being cut off. A script can say it
+  ("Working the farm" alone). Breeding names the two horses. Long lines wrap rather than being cut off. A script can say it
   itself with `doing(text)`: short
   text, kept in its memory, that shows instead until the script says something else or stops.
   **Estimates:** the Doing line and every meter or countdown that shows progress also say about
@@ -1410,6 +1415,12 @@ The shared language of the game. Domain terms only — no implementation details
   resident, give them an order, open the Wiki. Each line is ticked when the game sees it done;
   the card goes for good once all are ticked or the Player dismisses it. Kept per Player, not per
   realm: a Player who dismissed it never sees it again, also after a Leader death.
+- **Goods in the top bar:** the top bar shows the Food, Wood, Stone and Coins held in storages, for
+  what is picked beside them: **Entire realm** (the default: every storage of the realm, outpost
+  storages included) or one city of the realm by name. Stables, carriages and piles don't count. A storage out of sight
+  counts with what the Player last saw in it (Last seen), and the total says so when part of it is
+  that old.
+  The pick is kept per browser; a city no longer the realm's goes back to Entire realm. Only the UI.
 - **Minimap:** a small map bottom right of the screen (ADR 0008): the Player's explored terrain
   at a glance with their home city, their other cities, their residents and carriages away from
   home and the cities they know (Last seen), each a dot in its relationship colour, and the

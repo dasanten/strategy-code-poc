@@ -11,7 +11,7 @@ import { tearDown } from './teardown.js'
 import { breed } from './breeding.js'
 import { drop, pickUp } from './carrying.js'
 import { fetch, store } from './storing.js'
-import { drive, unhitch } from './driving.js'
+import { drive, hitch, unhitch } from './driving.js'
 import { haul, stop } from './hauling.js'
 import { pair } from './pairing.js'
 import { relocate } from './relocating.js'
@@ -91,6 +91,7 @@ export const orderKinds: Record<string, OrderKind> = Object.fromEntries(
     walkTo,
     drive,
     unhitch,
+    hitch,
     haul,
     stop,
     pickUp,

@@ -1325,9 +1325,18 @@ export const CRIME_STANDING_LOSS: Record<CrimeKind, number> = {
 
 /**
  * Coins of trade that raise standing by one point, both ways between the trader's realm and the
- * Trade Organization (`CONTEXT.md`: Standing). About two spears' worth.
+ * Trade Organization, or between two realms (`CONTEXT.md`: Standing). About two spears' worth.
  */
 export const STANDING_TRADE_COINS_PER_POINT = 50
+
+/**
+ * Coins of trade that raise standing by one point, both ways between the trader's realm and an NPC
+ * city (`CONTEXT.md`: Standing, Trading with an NPC city). A village's surplus grows by about 12
+ * coins' worth a game day, so buying half of it and selling back half of that holds about 0.9 points
+ * a game day against a drift of `STANDING_DRIFT_PER_DAY`: `PERSUADE_STANDING` in about two real days
+ * for a Player who trades there regularly.
+ */
+export const STANDING_NPC_TRADE_COINS_PER_POINT = 10
 
 /** Standing each paid game week of a mercenary contract raises, both ways between its sides. */
 export const STANDING_PER_PAID_WEEK = 0.8

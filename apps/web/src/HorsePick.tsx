@@ -2,9 +2,9 @@ import type { SeenHorse } from '@csp/shared'
 import { horseDetail } from './selection-view.js'
 
 /**
- * One horse to tick when picking two to breed (`CONTEXT.md`: Breeding): its name, stats and age,
- * and how it fares, so two can be compared. The same row on the resident card, the group card and
- * the queue planner.
+ * One horse to tick when picking two to breed or one to hitch (`CONTEXT.md`: Breeding, Hitched
+ * horse): its name, stats and age, and how it fares, so they can be compared. The same row on the
+ * resident card, the group card and the queue planner.
  */
 export function HorsePick({
   horse,

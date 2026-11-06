@@ -187,6 +187,7 @@ import {
   DEMAND_YIELD_RESPECT_MIN,
   DEMAND_YIELD_RESPECT_TIMES,
   STANDING_RANGE,
+  STANDING_NPC_TRADE_COINS_PER_POINT,
   STANDING_TRADE_COINS_PER_POINT,
   START_RESIDENTS,
   STAT_BASE_MAX,
@@ -586,6 +587,14 @@ export function Wiki() {
           left them.
         </p>
         <p>
+          The top bar shows the Food, Wood, Stone and Coins held in your storages, for what you pick
+          beside them: Entire realm, outpost storages included, or one of your cities by name.
+          Stables, carriages and piles don’t count. A storage in sight counts as it is now, one out
+          of sight with what you last saw in it; then ≈ beside the goods says that part of the total
+          is that old, and how old. Your browser remembers the pick; a city no longer yours goes
+          back to Entire realm.
+        </p>
+        <p>
           On a phone the card sits at the bottom of the screen. Drag its handle to show just its
           header, half the screen or all of it; a tap on the handle goes one step up. While an order
           waits for a target the card drops to its header. The menu button at the top left opens the
@@ -710,10 +719,10 @@ export function Wiki() {
         <p>
           A queue gives a resident a list of steps to do one after another, up to{' '}
           {num(QUEUE_MAX_STEPS)} of them. A step is any order you could give them on its own: walk
-          to, pick up, drop, store, fetch, drive, unhitch a horse, mount or dismount, board or get
-          off a carriage, work, build, haul, feed the stable, breed horses, tear down, Build line
-          (road or wall), relocate to another of your cities, or run one of your scripts with its
-          params.
+          to, pick up, drop, store, fetch, drive, hitch or unhitch a horse, mount or dismount, board
+          or get off a carriage, work, build, haul, feed the stable, breed horses, tear down, Build
+          line (road or wall), relocate to another of your cities, or run one of your scripts with
+          its params.
         </p>
         <p>
           To plan ahead, use <strong>Add step</strong> under the queue on the resident's card: it
@@ -1413,6 +1422,15 @@ export function Wiki() {
           again. A carriage whose horse dies waits the same way.
         </p>
         <p>
+          To choose the horse, use <strong>Hitch horse</strong>: any grown resident of the
+          carriage's realm standing on its tile can hitch a horse of the realm there that pulls no
+          carriage, nobody rides and isn't Down. Their card lists those horses with name, stats and
+          age, also when only one stands there; it is a queue step too, and a script's{' '}
+          <code>hitch(carriage, horse)</code>. It happens at once, and a horse already hitched
+          stands free on the tile. A carriage being driven goes on with the new horse. Hitching only
+          takes your realm's own horses; stealing one stays with driving and mounting.
+        </p>
+        <p>
           A grown resident on the tile of another realm's or city's carriage can steal it: its card,
           or the resident's, offers <strong>Drive off (theft)</strong>, and a script's{' '}
           <code>drive</code> naming that carriage does the same. The carriage joins your realm at
@@ -1557,7 +1575,8 @@ export function Wiki() {
           breeding pauses when the resident leaves or is given another order, or while the stable
           has no room left for the foal, and any grown resident who breeds there later carries on
           with that pair first, where it stopped, if both are still fed. The stable's card shows a
-          paused breeding and how far along it is. The progress is lost only when one of the two
+          paused breeding and how far along it is, and the resident's Doing line names the two they
+          tend. The progress is lost only when one of the two
           leaves the stable or dies. The Breed horses default first takes {num(BREED_FOOD)} Food
           from the stable for the resident's meals, if they carry less. NPC cities have one of their
           residents breed their horses the same way.
@@ -1766,22 +1785,21 @@ export function Wiki() {
           HQ. At each stop a trader evens out its load with the warehouse, every good including Food
           and Coins: it leaves what that place has less of and takes what it has more of, as far as
           the carriage holds, every good cut alike when it can't hold it all. That is how a post
-          comes to hold goods it doesn't produce, and caravans carry no Food or Coins, so a post gets
-          those only from traders. The HQ is a
-          stop like a post, its Coins going through its coin warehouse and its other goods through
-          its goods warehouse, so new Food and Coins reach the posts, and a trader's lost escorts
-          are made up there each time round. Its crew and a lost carriage go as for a caravan, and
-          robbing one is a theft from the Trade Organization, but it owes nobody a delivery, so
-          nothing is sent again.
+          comes to hold goods it doesn't produce, and caravans carry no Food or Coins, so a post
+          gets those only from traders. The HQ is a stop like a post, its Coins going through its
+          coin warehouse and its other goods through its goods warehouse, so new Food and Coins
+          reach the posts, and a trader's lost escorts are made up there each time round. Its crew
+          and a lost carriage go as for a caravan, and robbing one is a theft from the Trade
+          Organization, but it owes nobody a delivery, so nothing is sent again.
         </p>
         <p>
-          A caravan or trader leaves the HQ only with enough Food for its crew and horse to reach its
-          next stop, so when the HQ is short, as in a new world, its carriages stand and wait. They
-          leave the storage what the HQ's own people eat in {num(HQ_PEOPLE_FOOD_DAYS)} days, but may
-          always take {num(WAITING_HORSE_FOOD)} Food for the horse. Short of Food, they top up from
-          the goods warehouse, which the stock floor fills each day, so buying Food there can keep
-          them waiting a little longer. A caravan with a delivery or transfer waiting wants all it
-          keeps on board, as there is no Food on that way. Away from the HQ nothing waits: a
+          A caravan or trader leaves the HQ only with enough Food for its crew and horse to reach
+          its next stop, so when the HQ is short, as in a new world, its carriages stand and wait.
+          They leave the storage what the HQ's own people eat in {num(HQ_PEOPLE_FOOD_DAYS)} days,
+          but may always take {num(WAITING_HORSE_FOOD)} Food for the horse. Short of Food, they top
+          up from the goods warehouse, which the stock floor fills each day, so buying Food there
+          can keep them waiting a little longer. A caravan with a delivery or transfer waiting wants
+          all it keeps on board, as there is no Food on that way. Away from the HQ nothing waits: a
           carriage takes what a post's storage has and drives on.
         </p>
         <p>
@@ -2032,26 +2050,26 @@ export function Wiki() {
           warehouse's stock floor ({num(WAREHOUSE_FLOOR.ironOre)} Iron ore,{' '}
           {num(WAREHOUSE_FLOOR.wood)} Wood, {num(WAREHOUSE_FLOOR.coins)} coins and so on), the HQ's{' '}
           {num(HQ_FLOOR_FACTOR)} times that, and {num(HQ_FOOD_FLOOR_FACTOR)} times its{' '}
-          {num(WAREHOUSE_FLOOR.food)} Food for the traders to carry; their Food is their storage's, kept by their farmers.
-          Their spare hands work and build for whatever their warehouses are short of, on the
-          nearest node within {num(NPC_NODE_REACH)} tiles, and carry the output into the warehouse.
-          A post never grows in people; the HQ grows only while it is too weak. Neither sends a
-          trader or founds a city.
+          {num(WAREHOUSE_FLOOR.food)} Food for the traders to carry; their Food is their storage's,
+          kept by their farmers. Their spare hands work and build for whatever their warehouses are
+          short of, on the nearest node within {num(NPC_NODE_REACH)} tiles, and carry the output
+          into the warehouse. A post never grows in people; the HQ grows only while it is too weak.
+          Neither sends a trader or founds a city.
         </p>
         <p>
           Only the HQ's warehouses top up to their floor at the end of each game day, so the world
-          always has a market of last resort. Nothing tops up a trading post's warehouse: its floor only says what
-          its spare hands, caravan and wandering traders go for, and all it holds came by them or
-          from people selling to it. A post can run dry, even of Food and Coins, and its prices climb
-          as it does, so prices differ with what reached each post. Rob a trader or raid a post and
-          you empty a real market. Its people and soldiers eat from its storage, which its farm fills,
-          not from the Food on sale in the warehouse.
+          always has a market of last resort. Nothing tops up a trading post's warehouse: its floor
+          only says what its spare hands, caravan and wandering traders go for, and all it holds
+          came by them or from people selling to it. A post can run dry, even of Food and Coins, and
+          its prices climb as it does, so prices differ with what reached each post. Rob a trader or
+          raid a post and you empty a real market. Its people and soldiers eat from its storage,
+          which its farm fills, not from the Food on sale in the warehouse.
         </p>
         <p>
           The Trade Organization lives on in its trading posts should its HQ ever fall: they keep
-          their warehouses, prices and soldiers and go on trading in person, but with no caravans and
-          no traders their warehouses hold only what they had and what their own hands bring. What
-          only the HQ gave it is gone for good: no deliveries or transfers, no army to hire and
+          their warehouses, prices and soldiers and go on trading in person, but with no caravans
+          and no traders their warehouses hold only what they had and what their own hands bring.
+          What only the HQ gave it is gone for good: no deliveries or transfers, no army to hire and
           nobody sent out to punish. See "The fall of the HQ" for what that costs.
         </p>
         <p>
@@ -2114,8 +2132,12 @@ export function Wiki() {
           the better it holds you.
         </p>
         <p>
-          Every {num(STANDING_TRADE_COINS_PER_POINT)} coins of trade with the Trade Organization or
-          an NPC city raise standing by a point, both ways.
+          Trade raises standing by a point, both ways, for every{' '}
+          {num(STANDING_NPC_TRADE_COINS_PER_POINT)} coins with an NPC city and every{' '}
+          {num(STANDING_TRADE_COINS_PER_POINT)} with the Trade Organization or another realm. A swap
+          counts both its sale and its purchase, and so does an accepted offer of goods for goods.
+          The trade section shows your standing there and how far your last trade moved it, and the
+          realm log says so for each trade.
         </p>
       </Section>
 
@@ -2151,6 +2173,13 @@ export function Wiki() {
             ))}
           </tbody>
         </table>
+        <p>
+          Trade raises it too: a point for every {num(STANDING_NPC_TRADE_COINS_PER_POINT)} coins
+          with an NPC city, every {num(STANDING_TRADE_COINS_PER_POINT)} with the Trade Organization
+          or another realm. To stay level against the drift takes{' '}
+          {num(STANDING_DRIFT_PER_DAY * STANDING_NPC_TRADE_COINS_PER_POINT)} coins of trade a game
+          day with an NPC city.
+        </p>
         <p>
           Each paid week of a mercenary contract raises standing by {num(STANDING_PER_PAID_WEEK)}{' '}
           both ways; an unpaid week breaks it and costs {num(STANDING_CONTRACT_BROKEN_LOSS)}.
@@ -2308,9 +2337,9 @@ export function Wiki() {
             the armed residents and walls of yours in its sight come to at least{' '}
             {num(DEMAND_YIELD_RESPECT_TIMES)} times its soldiers, and at least{' '}
             {num(DEMAND_YIELD_RESPECT_MIN)}, so an army at the gate can win a city without a fight.
-            Those out of its sight don't count. It joins your realm as a persuaded city does, or sets
-            what it holds of the goods aside at its storage for you alone to fetch. Otherwise, or
-            with none of the goods there, it declines, and its standing toward you drops by{' '}
+            Those out of its sight don't count. It joins your realm as a persuaded city does, or
+            sets what it holds of the goods aside at its storage for you alone to fetch. Otherwise,
+            or with none of the goods there, it declines, and its standing toward you drops by{' '}
             {num(DEMAND_DECLINED_STANDING_LOSS)}.
           </li>
           <li>

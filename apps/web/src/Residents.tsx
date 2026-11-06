@@ -951,6 +951,7 @@ export function ResidentsList({
   buildings = [],
   inSight = [],
   cities = [],
+  horses = [],
   arrivesIn,
   selectedId,
   onSelect,
@@ -968,6 +969,8 @@ export function ResidentsList({
   inSight?: readonly SeenResident[]
   /** The cities the Player knows, to name where a resident relocates to (`doingLine`). */
   cities?: readonly Pick<City, 'id' | 'name'>[]
+  /** The horses the Player knows, to name the two being bred (`doingLine`). */
+  horses?: readonly SeenHorse[]
   /** About how many ticks until a resident arrives where they walk, ride or drive (`arrivalTicks`). */
   arrivesIn?: (r: Resident) => number | undefined
   selectedId: string | undefined
@@ -1020,6 +1023,7 @@ export function ResidentsList({
                           scripts,
                           buildings,
                           residents: inSight,
+                          horses,
                           cities,
                           arrives: arrivesIn?.(r),
                         }),
@@ -1031,7 +1035,7 @@ export function ResidentsList({
                   )
                 }
                 const under =
-                  interruptedLine(r, { scripts, buildings, residents: inSight }) ??
+                  interruptedLine(r, { scripts, buildings, residents: inSight, horses }) ??
                   scriptLine(r, scripts)
                 return (
                   <button
@@ -1052,6 +1056,7 @@ export function ResidentsList({
                         scripts,
                         buildings,
                         residents: inSight,
+                        horses,
                         cities,
                         arrives: arrivesIn?.(r),
                       })}
@@ -1553,6 +1558,7 @@ export function GroupCard({
                   scripts,
                   buildings,
                   residents: inSight,
+                  horses,
                   cities,
                   arrives: arrivesIn?.(r),
                 })}
@@ -1740,6 +1746,8 @@ export function ResidentCard({
   onBoard,
   carriageToUnhitch,
   onUnhitch,
+  toHitch,
+  onHitch,
   onRide,
   scripts,
   buildings = [],
@@ -1831,6 +1839,10 @@ export function ResidentCard({
   carriageToUnhitch: { id: string } | undefined
   /** Orders the resident to unhitch the horse from that carriage. */
   onUnhitch: (carriageId: string) => void
+  /** The carriage on the resident's tile and the horses that can pull it (`hitchChoice`). */
+  toHitch: { carriageId: string; horses: SeenHorse[] } | undefined
+  /** Orders the resident to hitch that horse to that carriage. */
+  onHitch: (carriageId: string, horseId: string) => void
   /** Orders the resident to mount that horse, or with none to dismount. */
   onRide: (horseId?: string) => void
   /** The Player's script library, to pick a script to run. */
@@ -2040,6 +2052,7 @@ export function ResidentCard({
     driving: r.order?.kind === 'drive' || r.order?.kind === 'haul',
     carriageToBoard: !!carriageToBoard,
     carriageToUnhitch: !!carriageToUnhitch,
+    horseToHitch: !!toHitch,
     carrying: !!r.carrying,
     carries: carried.length > 0,
     down: isDown(r),
@@ -2081,7 +2094,8 @@ export function ResidentCard({
   }, [r.id, running])
   const ridden = riddenHorseLine(r, horses, tick)
   // The script they run, or what they go on with after their defence script, under Doing.
-  const under = interruptedLine(r, { scripts, buildings, residents }) ?? scriptLine(r, scripts)
+  const under =
+    interruptedLine(r, { scripts, buildings, residents, horses }) ?? scriptLine(r, scripts)
   // The city they live in, or none (`CONTEXT.md`: Homeless).
   const home =
     r.cityId === null
@@ -2170,6 +2184,14 @@ export function ResidentCard({
           residents={residents}
           mapSize={mapSize}
           onTeach={(subject) => onTeach(building.id, subject)}
+        />
+      )}
+      {shown === 'hitch' && toHitch && (
+        <HitchBlock
+          key={r.id}
+          horses={toHitch.horses}
+          tick={tick}
+          onHitch={(horseId) => onHitch(toHitch.carriageId, horseId)}
         />
       )}
       {shown === 'breed' && building && (
@@ -2415,6 +2437,7 @@ export function ResidentCard({
             scripts,
             buildings,
             residents,
+            horses,
             cities,
             arrives: arrivesIn?.(r),
             tick,
@@ -2502,6 +2525,7 @@ export function ResidentCard({
                 scripts,
                 buildings,
                 residents,
+                horses,
                 cities,
                 arrives: arrivesIn?.(r),
               })}
@@ -2525,7 +2549,14 @@ export function ResidentCard({
           <QueueBlock
             queue={planOf(r.queue)}
             currentId={r.queue.steps[r.queue.current]?.id}
-            doing={doingLine(r, { scripts, buildings, residents, cities, arrives: arrivesIn?.(r) })}
+            doing={doingLine(r, {
+              scripts,
+              buildings,
+              residents,
+              horses,
+              cities,
+              arrives: arrivesIn?.(r),
+            })}
             scripts={scripts}
             buildings={buildings}
             lastSeen={lastSeen}
@@ -3031,6 +3062,49 @@ function TeachBlock({
         disabled={!!other}
         onPick={onTeach}
       />
+    </section>
+  )
+}
+
+/**
+ * Hitching (`CONTEXT.md`: Hitched horse): pick which of the realm's free horses on the resident's
+ * tile pulls the carriage there, also when only one stands there.
+ */
+function HitchBlock({
+  horses,
+  tick,
+  onHitch,
+}: {
+  horses: SeenHorse[]
+  tick: number
+  onHitch: (horseId: string) => void
+}) {
+  const [picked, setPicked] = useState<string>()
+  // A horse picked may have gone or been hitched since.
+  const chosen = horses.some((h) => h.id === picked) ? picked : undefined
+  return (
+    <section className="inspector-block" aria-label="Hitch horse">
+      <div className="panel-head">
+        <h3>Hitch horse</h3>
+        <span className="small muted">{horses.length} free here</span>
+      </div>
+      <p className="muted small">
+        The horse you pick pulls the carriage at once; one already hitched stands free on the tile.
+      </p>
+      {horses.map((h) => (
+        <HorsePick
+          key={h.id}
+          horse={h}
+          tick={tick}
+          checked={chosen === h.id}
+          onToggle={() => setPicked(chosen === h.id ? undefined : h.id)}
+        />
+      ))}
+      <div className="order-buttons">
+        <button type="button" disabled={!chosen} onClick={() => chosen && onHitch(chosen)}>
+          Hitch
+        </button>
+      </div>
     </section>
   )
 }

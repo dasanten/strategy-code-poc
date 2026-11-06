@@ -418,6 +418,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'Unhitch the horse from a carriage of my realm on my tile, by it or its id; the horse stands free there, and a driver stops.',
   ),
   action(
+    'hitch',
+    ['carriage', 'horse'],
+    'Hitch a horse to a carriage of my realm on my tile, each by it or its id, at once: a horse of my realm on that tile that pulls no carriage, nobody rides and isn’t Down. A horse already hitched stands free there.',
+  ),
+  action(
     'board',
     ['carriageId'],
     'Get on a carriage of my realm on my tile as a passenger, and ride along with it.',
