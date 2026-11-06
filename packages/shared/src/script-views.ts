@@ -54,6 +54,7 @@ export type ScriptViewName =
   | 'hire'
   | 'horse'
   | 'horseStats'
+  | 'horseOffer'
   | 'carriage'
   | 'pile'
   | 'node'
@@ -183,6 +184,12 @@ const CITY_FIELDS: readonly ScriptField[] = [
     listOf(view('price')),
     'An NPC city’s prices to the Player, one for each good.',
     'unless a storage of the NPC city is in sight',
+  ),
+  field(
+    'horses',
+    listOf(view('horseOffer')),
+    'The horses in sight standing in an NPC city’s finished stables, with what it asks for each.',
+    'unless a stable of the NPC city with a horse is in sight',
   ),
   field(
     'occupation',
@@ -358,7 +365,7 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field(
         'kind',
         'string',
-        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "store", "fetch", "build", "tearDown", "workAt", "teach", "train", "breed", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "swap", "handIn", "buyOff", "acceptOffer" or "relocate" (on their way to `cityId`, to live there).',
+        'The order: "walkTo", "drive", "haul", "pickUp", "drop", "store", "fetch", "build", "tearDown", "workAt", "teach", "train", "breed", "attack", "climb", "roadLine", "wallLine", "pay", "buyCity", "trade", "swap", "buyHorse", "handIn", "buyOff", "acceptOffer" or "relocate" (on their way to `cityId`, to live there).',
       ),
       field(
         'target',
@@ -711,6 +718,23 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
     fields: [
       field('spare', 'number', 'How many residents it would lend.'),
       field('pricePerResidentWeek', 'number', 'What it asks for each a week, in Coins.'),
+    ],
+  },
+  horseOffer: {
+    description: 'A horse in an NPC city’s stable, as its Trade section lists it.',
+    fields: [
+      field('horseId', 'string', 'The horse’s id.'),
+      field('stableId', 'string', 'The id of the stable it stands in.'),
+      field('name', 'string', 'Its name.'),
+      field('stats', view('horseStats'), 'Its Speed, Strength and Endurance.'),
+      field('bornAt', 'number', 'The tick it was born.'),
+      field('price', 'number', 'What the city asks of the Player for it, in Coins.'),
+      field(
+        'problem',
+        'string',
+        'Why the city won’t sell it to the Player, whoever goes there.',
+        'when it would',
+      ),
     ],
   },
   horse: {

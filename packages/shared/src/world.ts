@@ -782,6 +782,7 @@ export type ResidentOrder =
   | BuyCityOrder
   | TradeOrder
   | SwapOrder
+  | BuyHorseOrder
   | HandInOrder
   | BuyOffOrder
   | AcceptOfferOrder
@@ -1390,6 +1391,15 @@ export interface SwapOrder {
 }
 
 /**
+ * Buying a horse at an NPC city's stable (`CONTEXT.md`: Horse market): the resident, standing at
+ * it, pays for the horse standing there from their hands. It happens this tick.
+ */
+export interface BuyHorseOrder {
+  kind: 'buyHorse'
+  horseId: string
+}
+
+/**
  * Handing in a transfer at a Trade Org warehouse (`CONTEXT.md`: Transfer): the resident, standing
  * on its tile, hands in up to `units` of `good` (coins too) from their hands, or the load of
  * `carriageId` on their tile, and pays the fee, for a caravan to bring to the storage of
@@ -1943,6 +1953,22 @@ export type RealmEventWhat =
       coins: number
       x: number
       y: number
+    }
+  /**
+   * The resident `name` bought the horse `horse` of `city` for `coins`, at its stable at (`x`, `y`)
+   * (`CONTEXT.md`: Horse market); or couldn't, for `problem`, and nothing moved.
+   */
+  | {
+      kind: 'horseBought'
+      residentId: string
+      name: string
+      horseId: string
+      horse: string
+      city: string
+      coins: number
+      x: number
+      y: number
+      problem?: string
     }
   /**
    * The resident `name` ordered a delivery at the Trade Org warehouse at (`x`, `y`)

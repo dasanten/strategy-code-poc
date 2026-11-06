@@ -282,6 +282,20 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         places: [place],
       }
     }
+    case 'horseBought': {
+      const place = { name: `the stable of ${e.city}`, x: e.x, y: e.y }
+      return e.problem
+        ? {
+            text: `${e.name} couldn’t buy ${e.horse} at ${place.name}: ${e.problem}.`,
+            tone: 'warn',
+            places: [place],
+          }
+        : {
+            text: `${e.name} bought ${e.horse} for ${e.coins} coins at ${place.name}.`,
+            tone: 'info',
+            places: [place],
+          }
+    }
     case 'offerTaken':
       return {
         text:

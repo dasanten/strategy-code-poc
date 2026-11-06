@@ -1970,6 +1970,16 @@ button.residents-row.selected:hover {
   text-transform: uppercase;
   color: var(--ui-muted);
 }
+/* An NPC city's horses for sale (`CONTEXT.md`: Horse market): a block each. */
+.horse-offers {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.horse-offers li {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--ui-line);
+}
 /* An NPC city's rates (`CONTEXT.md`: Swap): a button each, wrapping to the panel's width. */
 .swap-rates ul {
   display: flex;

@@ -1680,6 +1680,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setOrderError(await giveOrder({ kind: side, ...trade }))
             }
             onSwap={async (swap) => setOrderError(await giveOrder({ kind: 'swap', ...swap }))}
+            onBuyHorse={async (buy) => setOrderError(await giveOrder({ kind: 'buyHorse', ...buy }))}
             onTransfer={async (transfer) =>
               setOrderError(await giveOrder({ kind: 'transfer', ...transfer }))
             }

@@ -103,6 +103,7 @@ import { joinRequestsSound } from './persuasion.js'
 import { formerPlayersSound, standingsSound } from './standing.js'
 import { buyOrdersDone, cityPricesSound } from './buying.js'
 import {
+  npcHorseSalesKeepPair,
   npcTradesKeepReserve,
   refusedTradeNothing,
   tradeOrdersDone,
@@ -2064,6 +2065,7 @@ export const worldInvariants: Invariant[] = [
   tradeOrdersDone,
   tradesKeepGoods,
   refusedTradeNothing,
+  npcHorseSalesKeepPair,
   npcTradesKeepReserve,
   offersSound,
   offersKeepGoods,

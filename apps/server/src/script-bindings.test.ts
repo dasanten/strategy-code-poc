@@ -427,6 +427,8 @@ describe('script bindings', () => {
       'swap("wood", "stone", 5, "k1")',
       { kind: 'swap', give: 'wood', want: 'stone', units: 5, carriageId: 'k1' },
     ],
+    ['buyHorse("h9")', { kind: 'buyHorse', horseId: 'h9' }],
+    ['buyHorse({ id: "h9", x: 1, y: 2 })', { kind: 'buyHorse', horseId: 'h9' }],
     ['buyOff("directive1")', { kind: 'buyOff', directiveId: 'directive1', carriageId: null }],
     [
       'postOffer("s1", "wood", 10, "stone", 5, 2)',
