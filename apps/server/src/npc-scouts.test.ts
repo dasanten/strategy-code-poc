@@ -28,6 +28,7 @@ import { describe, expect, it } from 'vitest'
 import { checkInvariants } from './invariants.js'
 import { npcHome, stepNpcCities } from './npc-behaviour.js'
 import { foundNpcCity } from './npc-cities.js'
+import { farOut } from './npc-founding.js'
 import { plains } from './npc-growth.fixture.js'
 import { planCity } from './npc-plan.js'
 import {
@@ -35,7 +36,6 @@ import {
   npcScoutsSound,
   scoutEdge,
   scoutEnded,
-  scoutFarOut,
   scoutsWanted,
   sectorOf,
   sendScout,
@@ -184,9 +184,9 @@ describe('sending scouts', () => {
   it('leaves a scout far out of a founding party, who could not fetch their load', () => {
     const t = town()
     const far = scoutOut(t, NPC_NODE_REACH + 10)
-    expect(scoutFarOut(plan(t), far, t.home, t.terrain.size)).toBe(true)
+    expect(farOut(far, t.home, t.terrain.size)).toBe(true)
     far.x = t.home.x
-    expect(scoutFarOut(plan(t), far, t.home, t.terrain.size)).toBe(false)
+    expect(farOut(far, t.home, t.terrain.size)).toBe(false)
   })
 })
 

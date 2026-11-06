@@ -2021,17 +2021,17 @@ export function Wiki() {
           {num(NPC_BUILDERS)} builders while it has a project; everyone else is a spare hand. Spare
           hands go to the good the reserve is shortest of, as a share of what it wants of it,
           filling one workplace's crew before the next. Without a workplace for that good, the city
-          builds one: on the nearest fitting resource node within {num(NPC_NODE_REACH)} tiles of
-          home, or a smelter, smithy or mint in its area like a house.
+          builds one: on the nearest fitting resource node it knows of, or a smelter, smithy or mint
+          in its area like a house.
         </p>
         <p>
           So it builds the whole chain its land allows, from the node up: weapons short wants a
           smithy, which wants Iron, so a smelter, which wants Iron ore, so a mine first, and the
           Wood and Stone the mine is built of before that. A smelter or smithy is worked only while
           the storage holds the input for a batch, which its workers take with them, and one of them
-          fetches more when it runs out, as yours do. A good with no node in reach stays short: a
-          village with no ore in reach forges no weapons, and a mint is built only with Gold ore in
-          reach.
+          fetches more when it runs out, as yours do. A good it knows no node of stays short: a
+          village that knows no ore forges no weapons, and a mint is built only with Gold ore it
+          knows of. What it stays short of, its trader buys.
         </p>
         <p>
           A spare hand with nothing short to work for doesn't stand idle. A few at a time, one for
@@ -2041,6 +2041,13 @@ export function Wiki() {
           {num(NPC_SCOUT_LIMIT)} tiles, it knows only once they step back into its area alive. A
           scout killed on the way brings nothing, and nothing protects them. What is short calls
           them home, with what they saw. Once a city knows its limit it stops scouting.
+        </p>
+        <p>
+          What a scout brought home it can build on. Short of a good it knows no nearer node of, it
+          puts up the workplace on a far one, and the crew works it like any other, its carrier
+          bringing their Food on the way back from the storage. Knowing such a node, it no longer
+          buys that good from its trader or founds a daughter for it. A place a scout or a builder
+          finds no way to is given up, and it counts on no node there.
         </p>
         <p>
           The others stay at or go to one
