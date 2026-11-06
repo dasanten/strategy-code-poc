@@ -2,7 +2,9 @@ import { realmName } from './alliance.js'
 import {
   FORMER_PLAYER_STANDING,
   STANDING_DRIFT_PER_DAY,
+  STANDING_NPC_TRADE_COINS_PER_POINT,
   STANDING_RANGE,
+  STANDING_TRADE_COINS_PER_POINT,
   TRADE_ORG_REFUSES_TRADE_BELOW,
 } from './balance.js'
 import { directiveAgainst } from './directive.js'
@@ -32,6 +34,21 @@ export function standingOf(
   const a = standingOrganization(world, of)
   const b = standingOrganization(world, toward)
   return world.standings.find((s) => s.of === a && s.toward === b)?.value ?? 0
+}
+
+/**
+ * Coins of trade between two Organizations that raise standing by one point (`CONTEXT.md`:
+ * Standing): an NPC city has its own number, whichever side of the trade it is on.
+ */
+export function tradeCoinsPerPoint(
+  world: Pick<WorldState, 'cities'>,
+  a: string,
+  b: string,
+): number {
+  const npc = world.cities.some(
+    (c) => (c.id === a || c.id === b) && c.realmId === null && !c.tradeOrg,
+  )
+  return npc ? STANDING_NPC_TRADE_COINS_PER_POINT : STANDING_TRADE_COINS_PER_POINT
 }
 
 /** Whether a standing value is within its range. */

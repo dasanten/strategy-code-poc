@@ -12,9 +12,11 @@ import {
   type DirectiveView,
   type NpcCityPrice,
   type PricedGood,
+  type RealmEvent,
   type RealmLabel,
   type Resident,
   type SeenCity,
+  type StandingView,
   type TradeSide,
   type SeenResident,
   type Stock,
@@ -73,6 +75,7 @@ import { carriedShort } from './residents-view.js'
 import { lastSeenText, type LastSeen } from './last-seen.js'
 import { HOW_TO_TRADE_PATH } from './wiki-view.js'
 import { PanelHead } from './drawer-head.js'
+import { tradeStandingLine } from './standing-view.js'
 
 /**
  * The city inspector: every city in sight (`CONTEXT.md`: City, NPC city), whose it is, and,
@@ -117,6 +120,8 @@ export function CityInspector({
   openId,
   onOpen,
   scrollTo,
+  standings,
+  events,
 }: {
   cities: SeenCity[]
   /** What the Player remembers out of sight. */
@@ -168,6 +173,10 @@ export function CityInspector({
    * asks (`CONTEXT.md`: Trade section); each new object scrolls again.
    */
   scrollTo?: { buildingId: string }
+  /** How others regard the realm, for the standing line of the Trade section. */
+  standings: StandingView[]
+  /** The realm's log, for how far its last trade moved that standing. */
+  events: RealmEvent[]
 }) {
   const views = cities.map((c) => ({
     ...describeCity(c, { residents, buildings }, realmId, realms),
@@ -253,6 +262,17 @@ export function CityInspector({
                   </a>
                 </p>
               )}
+            {openId === v.id && (
+              <TradeStanding
+                line={tradeStandingLine(
+                  cities.find((c) => c.id === v.id)!,
+                  { cities, buildings, traders },
+                  traderVisits,
+                  standings,
+                  events,
+                )}
+              />
+            )}
             {openId === v.id &&
               warehousesInSight(
                 cities.find((c) => c.id === v.id)!,
@@ -530,6 +550,19 @@ function RememberedCity({
         </div>
       )}
     </li>
+  )
+}
+
+/**
+ * The standing with whoever a trade at this city moves it with, and how far the last trade moved it
+ * (`CONTEXT.md`: Trade section), where one can be traded with here.
+ */
+function TradeStanding({ line }: { line: string | undefined }) {
+  if (!line) return null
+  return (
+    <p className="small" aria-label="Standing here">
+      {line}
+    </p>
   )
 }
 

@@ -1739,6 +1739,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             openId={openCityId}
             onOpen={setOpenCityId}
             scrollTo={tradeAt}
+            standings={world.diplomacy.standings}
+            events={world.events}
             onBuyOff={async (residentId, directiveId, carriageId) =>
               setOrderError(
                 await sendOrder({ kind: 'buyOff', residentId, directiveId, carriageId }),

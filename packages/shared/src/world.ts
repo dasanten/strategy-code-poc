@@ -1839,6 +1839,10 @@ export type RealmEventWhat =
       y: number
       /** With a wandering trader standing there, not at a warehouse (`CONTEXT.md`: Trader stop). */
       withTrader?: true
+      /** At an NPC city's storage, not at a warehouse (`CONTEXT.md`: Trading with an NPC city). */
+      atStorage?: true
+      /** How far the trade moved standing; none on older lines or when it moved none. */
+      standing?: StandingMove
     }
   /**
    * The resident `name` accepted an offer of `realm` at the storage at (`x`, `y`), `times` of the
@@ -1870,6 +1874,8 @@ export type RealmEventWhat =
       times: number
       x: number
       y: number
+      /** How far taking it moved standing; none on older lines or when it moved none. */
+      standing?: StandingMove
     }
   /** Goods gone from the storage cut the realm's offer down to `times` over (`CONTEXT.md`: Offer). */
   | {
@@ -1940,6 +1946,8 @@ export type RealmEventWhat =
       coins: number
       x: number
       y: number
+      /** How far the swap moved standing; none on older lines or when it moved none. */
+      standing?: StandingMove
     }
   /**
    * The resident `name` ordered a delivery at the Trade Org warehouse at (`x`, `y`)
@@ -2377,6 +2385,16 @@ export type Protection = (typeof PROTECTION)[number]
 
 /** Goods by kind, as unit counts; a missing good is 0. */
 export type Stock = Partial<Record<Good, number>>
+
+/** How far a trade moved an Organization's regard for the realm (`CONTEXT.md`: Trade section). */
+export interface StandingMove {
+  /** The Organization: an NPC city, another realm or the Trade Organization. */
+  org: string
+  /** What Players call it (`organizationLabel`). */
+  name: string
+  /** Points it rose by. */
+  by: number
+}
 
 /** Everything one Player controls through their Leader (`CONTEXT.md`: Realm). */
 export interface Realm {
