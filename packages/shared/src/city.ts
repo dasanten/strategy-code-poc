@@ -209,6 +209,23 @@ export function inCityArea(
   )
 }
 
+/** Whether a tile lies in a city's area or within `tiles` of it (`inCityArea`). */
+export function nearCityArea(
+  world: { buildings: readonly Building[] },
+  city: Pick<City, 'id'>,
+  x: number,
+  y: number,
+  tiles: number,
+  size: number,
+): boolean {
+  return world.buildings.some(
+    (b) =>
+      b.cityId === city.id &&
+      isCityBuilding(b) &&
+      nearFootprint(b, { x, y }, CITY_AREA_MARGIN + tiles, size),
+  )
+}
+
 /** The cities whose area the tile lies in; areas can overlap where cities meet. */
 export function citiesAt(
   world: Pick<WorldState, 'cities' | 'buildings'>,

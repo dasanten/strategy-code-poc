@@ -888,12 +888,15 @@ export interface WorldState {
 /**
  * What a game-run city's plan has one of its residents do (`CONTEXT.md`: NPC city; ADR 0016):
  * stand as a soldier, work a farm or another workplace, build its project, go on its trade run
- * (NPC trader), found its daughter (Founding), or nothing, until the next pass moves them.
+ * (NPC trader), found its daughter (Founding), revive one of its own (Reviving), or nothing, until
+ * the next pass moves them.
  */
 export interface CityJob {
-  kind: 'soldier' | 'farm' | 'work' | 'build' | 'trade' | 'found' | 'idle'
+  kind: 'soldier' | 'farm' | 'work' | 'build' | 'trade' | 'found' | 'revive' | 'idle'
   /** The farm or workplace to work, for `farm` and `work`. */
   buildingId?: string
+  /** The Down resident to revive, for `revive`. */
+  targetId?: string
 }
 
 /** What a game-run city builds or takes down next (`CONTEXT.md`: NPC city), as plain data. */
