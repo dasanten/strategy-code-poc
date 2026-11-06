@@ -190,6 +190,21 @@ const SHARED: readonly ScriptBinding[] = [
       'Whether a tile lies in that city’s area, for a city of my realm’s or a tile the Player sees; false for any other.',
   },
   {
+    name: 'cityAreaAt',
+    is: 'query',
+    params: ['x', 'y'],
+    returns: 'string',
+    cost: SCRIPT_TILE_QUERY_COST,
+    description:
+      'The id of the city whose area a tile lies in, one of my realm’s first where areas overlap; null where there is none, or the tile is the area of no city of my realm and the Player doesn’t see it.',
+  },
+  list(
+    'outsidersIn',
+    'resident',
+    'The outsiders the Player sees in that city’s area: those of another realm, not allied, leaving out Trade Organization caravans and wandering traders with their crews.',
+    ['cityId'],
+  ),
+  {
     name: 'pileAt',
     is: 'query',
     params: ['x', 'y'],

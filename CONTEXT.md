@@ -1332,7 +1332,8 @@ The shared language of the game. Domain terms only — no implementation details
   **attacked**, someone attacking a wall or gate of the city, or striking a resident of the realm.
   An alarm reaches the residents standing in that city's area who see it (Sight); an occupation
   reaches all of them. It runs their Alarm script. Army members, those hired out and those driving
-  a carriage get no alarm.
+  a carriage get no alarm, and someone already attacking gets no outsider alarm. Someone of an NPC
+  city or of the Trade Organization counts as of another realm here.
 - **Alarm script:** the script a resident runs when an alarm reaches them: for an armed resident the
   game's **Alarm** default, unless the Player picked one of their own scripts or None for that
   resident, on the card's Script tab or the group card; an unarmed resident runs one only if the
@@ -1342,7 +1343,8 @@ The shared language of the game. Domain terms only — no implementation details
   given under attack holds, an alarm doesn't reach them. A Player's order given meanwhile ends both.
   Scripts read `me.alarm`: its kind, who it is about and their realm, the city and tile, and when;
   `inCityArea(cityId, x, y)` says whether a tile lies in a City area, for a city of their realm or a
-  tile in sight. **The Alarm default:** a thief, an occupier or an attacker it goes after
+  tile in sight, `cityAreaAt(x, y)` which city's area it lies in, and `outsidersIn(cityId)` lists the
+  outsiders they see in a City area. **The Alarm default:** a thief, an occupier or an attacker it goes after
   until they are dead or have left the area or sight; for an armed outsider it walks to the town
   hall and stands there until no armed outsider is left in the area, which blocks an occupation
   before it starts; an unarmed outsider it only logs. NPC villages, towns and self-managed cities

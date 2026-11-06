@@ -236,6 +236,21 @@ export function citiesAt(
   return world.cities.filter((c) => inCityArea(world, c, x, y, size))
 }
 
+/** The ids of the cities whose area the tile lies in (`citiesAt`), going through the buildings once. */
+export function cityIdsAt(
+  world: { buildings: readonly Building[] },
+  x: number,
+  y: number,
+  size: number,
+): string[] {
+  const ids: string[] = []
+  for (const b of world.buildings) {
+    if (b.cityId === null || !isCityBuilding(b) || ids.includes(b.cityId)) continue
+    if (nearFootprint(b, { x, y }, CITY_AREA_MARGIN, size)) ids.push(b.cityId)
+  }
+  return ids
+}
+
 /** Every tile in a city's area, as "x,y" keys on the map. */
 export function cityAreaTiles(
   world: { buildings: readonly Building[] },

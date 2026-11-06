@@ -338,15 +338,18 @@ export interface RunningScript {
  * kind, who it is about, where and when.
  */
 export interface Alarm {
-  /** `occupied`: an occupation of the city's town hall started. */
-  kind: 'occupied'
+  /**
+   * `occupied`: an occupation of the city's town hall started. `outsider`: someone of another realm,
+   * not allied, came into its area.
+   */
+  kind: 'occupied' | 'outsider'
   /** The city whose area it happened in. */
   cityId: string
-  /** The resident it is about: for `occupied`, an occupier on the hall. */
+  /** The resident it is about: for `occupied`, an occupier on the hall; for `outsider`, who came. */
   about: string
   /** The realm of who it is about. */
   realmId: string | null
-  /** Where it happened: for `occupied`, the town hall. */
+  /** Where it happened: for `occupied`, the town hall; for `outsider`, where they stood. */
   x: number
   y: number
   /** The tick it happened. */
@@ -2873,6 +2876,12 @@ export interface City {
    * Held `OCCUPATION_GAME_DAYS` without a break, it captures the city.
    */
   occupation: Occupation | null
+  /**
+   * The ids of the outsiders in its area as of the last tick (`CONTEXT.md`: Alarm), so that one
+   * coming in raises the alarm once and one leaving and coming back raises it again. Absent while
+   * there are none, and for trading posts and the HQ, which keep their own rules. Nobody sees it.
+   */
+  outsiders?: string[]
   /**
    * How it sets out its town (`CONTEXT.md`: City layout), kept once picked. Every NPC city has one;
    * trading posts, the HQ and Players' cities have none.

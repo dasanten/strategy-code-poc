@@ -1934,13 +1934,70 @@ ${LOG_TEXT}
 // doing, which goes on once I end. Armed, with the town hall occupied, I go
 // after the occupier while they stand in the city's area, and end once no armed
 // one of theirs is left there or in sight. Going after them is a crime, as
-// striking anyone is. Unarmed, or for another alarm, I end at once.
+// striking anyone is. For an armed outsider in the area I walk to the town hall
+// and stand there until no armed outsider is left, which blocks an occupation
+// before it starts; an unarmed outsider I only log. Unarmed, or for another
+// alarm, I end at once.
 if (me.alarm == null || !armed(me)) {
   end()
 } else if (me.alarm.kind == "occupied") {
   goAfterOccupier()
+} else if (me.alarm.kind == "outsider") {
+  onOutsider()
 } else {
   end()
+}
+
+// Who came decides whether I go at all; once I do, any armed outsider keeps me.
+fn onOutsider() {
+  let about = null
+  let armedLeft = false
+  for (r of outsidersIn(me.alarm.cityId)) {
+    if (r.id == me.alarm.about) { about = r }
+    if (armed(r)) { armedLeft = true }
+  }
+  if (memory.holding == null) {
+    if (about == null) {
+      end()
+      return
+    }
+    if (!armed(about)) {
+      log(about.name + " came into the area, unarmed")
+      end()
+      return
+    }
+    memory.holding = true
+  }
+  if (!armedLeft) {
+    end("no armed outsider left in the area")
+    return
+  }
+  holdHall()
+}
+
+// To the town hall of the alarm's city, and stay there.
+fn holdHall() {
+  let hall = null
+  for (c of cities()) {
+    if (c.id == me.alarm.cityId) { hall = building(c.townHallId) }
+  }
+  if (hall == null) {
+    end("no town hall to hold")
+    return
+  }
+  let here = buildingAt(me.x, me.y)
+  if (here != null && here.id == hall.id) {
+    doing("On alarm: holding the town hall")
+    return
+  }
+  if (me.order != null && me.order.kind == "walkTo") { return } // on my way
+  let problem = walkTo(hall.x, hall.y)
+  if (problem != null) {
+    end("can't reach the town hall: " + problem)
+    return
+  }
+  doing("On alarm: going to hold the town hall")
+  log("going to hold " + placeName(hall))
 }
 
 fn goAfterOccupier() {

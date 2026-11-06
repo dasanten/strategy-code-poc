@@ -533,9 +533,11 @@ function places(
     const toSell = listed(horsesToSell)
     // Who occupies its town hall only with the hall in sight (`CONTEXT.md`: Occupying a town hall).
     const occupation = seenHalls.has(c.id) ? c.occupation : null
-    // What its scouts brought home is its own (`CONTEXT.md`: Scout).
+    // What its scouts brought home is its own (`CONTEXT.md`: Scout), and who is in its area counts
+    // only for its alarms: nobody sees them for being on that list (`CONTEXT.md`: Alarm).
     const shown = { ...c }
     delete shown.scouted
+    delete shown.outsiders
     out.push({
       is: 'city',
       ...shown,

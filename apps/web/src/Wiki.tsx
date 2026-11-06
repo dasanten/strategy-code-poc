@@ -2620,14 +2620,23 @@ export function Wiki() {
         <h3>Alarms</h3>
         <p>
           An alarm is something happening in a city's area that your residents at home can react to.
-          So far one sets it off: an occupation of the city's town hall starting, which reaches
-          every resident of your realm standing in that city's area. Army members, those hired out
-          and those driving a carriage get no alarm. It runs their <strong>Alarm script</strong>,
-          which by default is <strong>Alarm</strong> (one of your default scripts) for an armed
-          resident and nothing for an unarmed one. Alarm goes after the occupier while they stand in
-          the city's area, any other armed one of theirs there after them, and ends once they are
-          gone. Going after them is a crime for now, like any attack. Their card says “On alarm:
-          going after Bo”.
+          An occupation of the city's town hall starting reaches every resident of your realm
+          standing in that city's area. An <strong>outsider</strong> coming into the area, someone
+          of another realm or NPC city who isn't allied, reaches those standing there who see them
+          (within {num(SIGHT_RANGE)} tiles), once as they come in and again if they leave and come back.
+          Trade Organization caravans and wandering traders, with their crews, don't count. Army
+          members, those hired out and those driving a carriage get no alarm, and someone already
+          attacking gets no outsider alarm. It runs their{' '}
+          <strong>Alarm script</strong>, which by default is <strong>Alarm</strong> (one of your
+          default scripts) for an armed resident and nothing for an unarmed one.
+        </p>
+        <p>
+          Alarm goes after an occupier while they stand in the city's area, any other armed one of
+          theirs there after them, and ends once they are gone. Going after them is a crime for now,
+          like any attack. Their card says “On alarm: going after Bo”. For an armed outsider it walks
+          to the town hall and stands there until no armed outsider is left in the area, then goes
+          back to what it was doing; someone armed of yours on the hall blocks an occupation before
+          it starts, at no cost in standing. An unarmed outsider it only writes in the script log.
         </p>
         <p>
           On a resident's card, the Script tab's <strong>Alarm script</strong> picks any of your
@@ -2640,8 +2649,10 @@ export function Wiki() {
           meanwhile ends both. Scripts read the alarm as <code>me.alarm</code>: its{' '}
           <code>kind</code>, <code>about</code> who and their <code>realmId</code>, where (
           <code>cityId</code>, <code>x</code>, <code>y</code>) and <code>tick</code>;{' '}
-          <code>inCityArea(cityId, x, y)</code> says whether a tile lies in a city's area. The pick
-          reads as <code>me.alarmScript</code>. If the script is gone from your library when an
+          <code>inCityArea(cityId, x, y)</code> says whether a tile lies in a city's area,{' '}
+          <code>cityAreaAt(x, y)</code> which city's area it lies in, and{' '}
+          <code>outsidersIn(cityId)</code> lists the outsiders you see in one. The pick reads as{' '}
+          <code>me.alarmScript</code>. If the script is gone from your library when an
           alarm comes, your realm log says so once and the pick goes back to Alarm.
         </p>
         <h3>Capturing a city</h3>

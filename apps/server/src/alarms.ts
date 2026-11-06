@@ -1,4 +1,5 @@
 import {
+  SIGHT_RANGE,
   TRADE_ORG,
   commanderOf,
   drivenCarriageId,
@@ -7,6 +8,7 @@ import {
   isAt,
   isDown,
   townHallOf,
+  wrapDistance,
   type Alarm,
   type City,
   type Resident,
@@ -84,6 +86,30 @@ export function raiseOccupied(world: WorldState, city: City, occupier: string, s
   }
   for (const r of world.residents) {
     if (canBeAlarmed(world, city, r, size)) startAlarm(world, r, alarm)
+  }
+}
+
+/**
+ * `who`, an outsider, just came into `city`'s area (`CONTEXT.md`: Alarm, outsider): it reaches its
+ * realm's residents in its area who see them, within sight range themselves, but for those already
+ * attacking someone, who stay at it. An NPC city has nobody to reach yet.
+ */
+export function raiseOutsider(world: WorldState, city: City, who: Resident, size: number): void {
+  if (city.realmId === null) return
+  const alarm: Alarm = {
+    kind: 'outsider',
+    cityId: city.id,
+    about: who.id,
+    realmId: who.owner,
+    x: who.x,
+    y: who.y,
+    tick: world.tick,
+  }
+  for (const r of world.residents) {
+    if (r.owner !== city.realmId || wrapDistance(size, r, who) > SIGHT_RANGE) continue
+    if (r.order?.kind !== 'attack' && canBeAlarmed(world, city, r, size)) {
+      startAlarm(world, r, alarm)
+    }
   }
 }
 

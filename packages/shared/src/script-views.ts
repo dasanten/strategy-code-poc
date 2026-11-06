@@ -735,17 +735,33 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
   alarm: {
     description: 'Something that happened in a City area, that an Alarm script runs for.',
     fields: [
-      field('kind', 'string', 'What happened: "occupied", the city’s town hall occupied.'),
+      field(
+        'kind',
+        'string',
+        'What happened: "occupied", the city’s town hall occupied; "outsider", someone of another realm, not allied, came into its area.',
+      ),
       field('cityId', 'string', 'The city whose area it happened in.'),
-      field('about', 'string', 'The id of the resident it is about: an occupier on the hall.'),
+      field(
+        'about',
+        'string',
+        'The id of the resident it is about: an occupier on the hall, or the outsider who came.',
+      ),
       field(
         'realmId',
         'string',
         'The realm of who it is about.',
         'when they belong to no realm',
       ),
-      field('x', 'number', 'Where it happened, from west to east: the town hall.'),
-      field('y', 'number', 'Where it happened, from north to south: the town hall.'),
+      field(
+        'x',
+        'number',
+        'Where it happened, from west to east: the town hall, or where the outsider stood.',
+      ),
+      field(
+        'y',
+        'number',
+        'Where it happened, from north to south: the town hall, or where the outsider stood.',
+      ),
       field('tick', 'number', 'The tick it happened.'),
     ],
   },
