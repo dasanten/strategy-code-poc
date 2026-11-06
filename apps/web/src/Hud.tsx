@@ -158,6 +158,8 @@ export function Icon({ name, size = 18 }: { name: keyof typeof ICONS; size?: num
 /** The goods the top bar shows and the picker beside them (`CONTEXT.md`: Goods in the top bar). */
 export interface GoodsShown {
   totals: Record<KeyGood, number>
+  /** How old part of the totals is, in words; null when all of it is in sight now. */
+  oldText: string | null
   /** The cities of the realm to pick from, by name. */
   cities: readonly { id: string; name: string }[]
   pick: GoodsPick
@@ -166,8 +168,9 @@ export interface GoodsShown {
 
 /** The goods and their picker, in the top bar and the phone menu alike. */
 function Goods({ goods, className }: { goods: GoodsShown; className: string }) {
+  const label = goodsLabel(goods.pick, goods.cities, goods.oldText)
   return (
-    <div className={className} role="group" aria-label={goodsLabel(goods.pick, goods.cities)}>
+    <div className={className} role="group" aria-label={label}>
       <select
         className="hud-goods-pick"
         aria-label="Show the goods of"
@@ -186,6 +189,13 @@ function Goods({ goods, className }: { goods: GoodsShown; className: string }) {
           <Icon name={g} size={15} /> {Math.floor(goods.totals[g])}
         </span>
       ))}
+      {/* The label above says it for those who can't see this. */}
+      {goods.oldText && (
+        <span className="hud-goods-old" title={goods.oldText} aria-hidden="true">
+          <span className="hud-goods-old-mark">≈</span>
+          <span className="hud-goods-old-words">{goods.oldText}</span>
+        </span>
+      )}
     </div>
   )
 }

@@ -583,10 +583,12 @@ export function Wiki() {
           left them.
         </p>
         <p>
-          The top bar shows the Food, Wood, Stone and Coins held in the storages you see, for what
-          you pick beside them: Entire realm, outpost storages included, or one of your cities by
-          name. Stables, carriages and piles don’t count. Your browser remembers the pick; a city no
-          longer yours goes back to Entire realm.
+          The top bar shows the Food, Wood, Stone and Coins held in your storages, for what you pick
+          beside them: Entire realm, outpost storages included, or one of your cities by name.
+          Stables, carriages and piles don’t count. A storage in sight counts as it is now, one out
+          of sight with what you last saw in it; then ≈ beside the goods says that part of the total
+          is that old, and how old. Your browser remembers the pick; a city no longer yours goes
+          back to Entire realm.
         </p>
         <p>
           On a phone the card sits at the bottom of the screen. Drag its handle to show just its

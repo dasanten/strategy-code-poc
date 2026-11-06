@@ -1,4 +1,5 @@
 import { buildingRealm, type Building, type City, type Good } from '@csp/shared'
+import { agoText } from './last-seen.js'
 
 /**
  * The drawers the tool rail opens over the map (ADR 0008), in rail order. Cities holds the city
@@ -73,29 +74,73 @@ export function goodsPickOf(picked: GoodsPick, cities: readonly Pick<City, 'id'>
   return cities.some((c) => c.id === picked) ? picked : null
 }
 
-/** What the goods shown are, for those who can't see the picker (the aria-label). */
-export function goodsLabel(pick: GoodsPick, cities: readonly Pick<City, 'id' | 'name'>[]): string {
+/**
+ * What the goods shown are, for those who can't see the picker (the aria-label), and how old they
+ * are when any of them is (`goodsOldText`).
+ */
+export function goodsLabel(
+  pick: GoodsPick,
+  cities: readonly Pick<City, 'id' | 'name'>[],
+  oldText: string | null = null,
+): string {
   const city = cities.find((c) => c.id === pick)
-  return city ? `Goods in ${city.name}` : 'Goods in the entire realm'
+  const shown = city ? `Goods in ${city.name}` : 'Goods in the entire realm'
+  return oldText ? `${shown}. ${oldText}` : shown
+}
+
+/** What the top bar's goods add up to (`CONTEXT.md`: Goods in the top bar). */
+export interface GoodsHeld {
+  totals: Record<KeyGood, number>
+  /** The storages counted as last seen: when the oldest was seen, and whether they are all of them. */
+  old: { oldestSeenAt: number; all: boolean } | null
 }
 
 /**
- * How much of each key good the finished storages and warehouses in sight hold together: those of
- * the picked city, or with no pick every one of the realm, outpost storages included. A stable's
- * storage is left out: its Food is for its horses.
+ * How much of each key good the finished storages and warehouses hold together: those of the picked
+ * city, or with no pick every one of the realm, outpost storages included. One in sight counts as it
+ * is now, one out of sight with what the Player last saw in it. A stable's storage is left out: its
+ * Food is for its horses. `cities` are those the Player knows, in sight or last seen, so a city seen
+ * to be someone else's takes its remembered storages with it.
  */
 export function keyGoods(
-  world: { buildings: readonly Building[]; cities: readonly Pick<City, 'id' | 'realmId'>[] },
+  world: {
+    buildings: readonly Building[]
+    lastSeen: readonly (Building & { seenAt: number })[]
+    cities: readonly Pick<City, 'id' | 'realmId'>[]
+  },
   realmId: string,
   pick: GoodsPick,
-): Record<KeyGood, number> {
+): GoodsHeld {
   const totals = { food: 0, wood: 0, stone: 0, coins: 0 }
-  for (const b of world.buildings) {
-    if (b.site || (b.kind !== 'storage' && b.kind !== 'warehouse')) continue
-    if (pick === null ? buildingRealm(world, b) !== realmId : b.cityId !== pick) continue
+  const counts = (b: Building) =>
+    !b.site &&
+    (b.kind === 'storage' || b.kind === 'warehouse') &&
+    (pick === null ? buildingRealm(world, b) === realmId : b.cityId === pick)
+  const add = (b: Building) => {
     for (const good of KEY_GOODS) totals[good] += b.stock?.[good] ?? 0
   }
-  return totals
+  const inSight = new Set<string>()
+  let anyInSight = false
+  for (const b of world.buildings) {
+    inSight.add(b.id)
+    if (!counts(b)) continue
+    anyInSight = true
+    add(b)
+  }
+  let oldestSeenAt: number | null = null
+  for (const b of world.lastSeen) {
+    if (inSight.has(b.id) || !counts(b)) continue
+    add(b)
+    oldestSeenAt = oldestSeenAt === null ? b.seenAt : Math.min(oldestSeenAt, b.seenAt)
+  }
+  return { totals, old: oldestSeenAt === null ? null : { oldestSeenAt, all: !anyInSight } }
+}
+
+/** The goods' age in words, for the marker's tooltip and the aria-label; null when all is in sight. */
+export function goodsOldText(old: GoodsHeld['old'], tick: number): string | null {
+  if (!old) return null
+  const part = old.all ? 'All' : 'Part'
+  return `${part} of this is as last seen, the oldest ${agoText(tick - old.oldestSeenAt)}`
 }
 
 const GOODS_PICK_KEY = 'csp.goodsPick'
