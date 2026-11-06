@@ -552,12 +552,13 @@ The shared language of the game. Domain terms only — no implementation details
   storage. A village sends one trader at a time, a bigger city more by its size (a balance number).
   Nothing protects them on the way but what they carry.
 - **Full city:** an NPC city that for a whole game week, less the bigger it is (a balance number), has had spare hands (idle, on a road crew, scouting or working for surplus) and nothing
-  short of its reserve, holds a food surplus, and holds a town hall's and a storage's materials
+  short of its reserve, holds a food surplus, and holds its founding party's materials
   above its reserve. A full city founds a daughter (Founding).
 - **Founding:** how a full NPC city spreads out. It picks a free Plains site the usual distance
   from every city, within a set reach of itself and on no realm's territory, nearest a node of
   the good it is short of and has no node for. A **founding party** of a village's worth of
-  adults, more from a big city, one of them armed, each carrying a share of the materials and Food for the walk and
+  adults, more from a big city, one of them armed, each carrying a share of the materials (a town
+  hall's and a storage's, and houses for those past a village's worth) and Food for the walk and
   the first weeks, walks there and builds the town hall, which founds the **daughter** as an
   ordinary NPC city with a name from the game; then its storage, a farm and a house. Its first
   wall comes later out of its own reserve, a ring round its home. Mother and daughter are

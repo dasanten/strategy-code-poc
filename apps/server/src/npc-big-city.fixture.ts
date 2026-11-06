@@ -91,15 +91,16 @@ function buildHouses(world: WorldState, terrain: TerrainMap, city: City, home: B
  * An NPC city of `BIG_CITY_RESIDENTS` alone on a Plains map, staged as production's big city stood
  * when Daniel looked (2026-11-06; ADR 0029): its soldiers armed, children among its residents, the
  * farms it needs, its whole chain built from lumber camp to smithy, and every good at its reserve and
- * half its surplus cap. Everyone starts free at home, and its first pass shares them out.
+ * half its surplus cap. Everyone starts free at home, and its first pass shares them out. Its map
+ * of `mapSize` is by default too small to hold a daughter (`NPC_CITY_MIN_DISTANCE`).
  */
-export function bigCity(): {
+export function bigCity(mapSize = 240): {
   world: WorldState
   terrain: TerrainMap
   city: City
   home: Building
 } {
-  const terrain = plains(240)
+  const terrain = plains(mapSize)
   const world = createWorld(terrain)
   const size = { ...NPC_TOWN, size: BIG_CITY_SIZE, residents: BIG_CITY_RESIDENTS, farms: 8 }
   const city = foundNpcCity(world, terrain, size, 60, 60, mulberry32(29))

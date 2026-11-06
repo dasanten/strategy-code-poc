@@ -132,9 +132,14 @@ import {
   NPC_CITY_MIN_DISTANCE,
   NPC_FOUND_FOOD_DAYS,
   NPC_FOUND_GIVE_UP_DAYS,
+  NPC_FOUND_PARTY_MOST,
   NPC_FOUND_REACH,
+  NPC_FOUND_RESIDENTS_PER_MEMBER,
   NPC_FOUND_STANDING,
+  NPC_FOUND_VILLAGE_RESIDENTS,
   NPC_FULL_DAYS,
+  NPC_FULL_DAYS_LEAST,
+  NPC_FULL_RESIDENTS_PER_DAY,
   NPC_GATE_WATCH_RANGE,
   NPC_VILLAGE,
   NPC_NODE_REACH,
@@ -2265,13 +2270,18 @@ export function Wiki() {
         </p>
         <p>
           A city is full once it has had spare hands, idle, on a road crew, scouting or working for surplus, and nothing short
-          of its reserve for {days(NPC_FULL_DAYS)}, with a food surplus and a town hall's and a storage's
-          materials above its reserve. A full city founds a daughter. Once a game day it looks for a
+          of its reserve for {days(NPC_FULL_DAYS)}, with a food surplus and its founding party's
+          materials above its reserve. Past {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a
+          game day less for each {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at least{' '}
+          {days(NPC_FULL_DAYS_LEAST)}. A full city founds a daughter. Once a game day it looks for a
           free Plains site {num(NPC_CITY_MIN_DISTANCE)} to {num(NPC_FOUND_REACH)} tiles away, with
           room for a village and on no realm's territory, nearest a node of a material it has none
-          of in reach. A founding party of {num(NPC_VILLAGE.residents)} adults, one of them armed,
-          sets out carrying the materials and Food for twice the walk and{' '}
-          {days(NPC_FOUND_FOOD_DAYS)} there, and builds the town hall, which founds the daughter: an
+          of in reach. A founding party of {num(NPC_VILLAGE.residents)} adults, one more for each{' '}
+          {num(NPC_FOUND_RESIDENTS_PER_MEMBER)} residents past {num(NPC_FOUND_VILLAGE_RESIDENTS)} up to{' '}
+          {num(NPC_FOUND_PARTY_MOST)}, one of them armed, sets out carrying a town hall's and a
+          storage's materials, a house's for each {num(HOUSING_ROOM.house ?? 1)} members past{' '}
+          {num(NPC_VILLAGE.residents)}, and Food for twice the walk and {days(NPC_FOUND_FOOD_DAYS)}{' '}
+          there, and builds the town hall, which founds the daughter: an
           NPC city of its own with a name from the game. It then builds its storage, a farm and a
           house, and once its storage holds the Wood of its reserve, its first wall, a ring{' '}
           {num(Math.floor(NPC_VILLAGE.size / 2))} tiles round its home. Mother and daughter start at

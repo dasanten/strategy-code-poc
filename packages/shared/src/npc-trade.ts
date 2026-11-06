@@ -4,10 +4,17 @@ import {
   CITY_PRICE_STANDING_SWING,
   GOOD_WEIGHT,
   HORSE_FOOD_PER_DAY,
+  NPC_FOUND_PARTY_MOST,
+  NPC_FOUND_RESIDENTS_PER_MEMBER,
+  NPC_FOUND_VILLAGE_RESIDENTS,
+  NPC_FULL_DAYS,
+  NPC_FULL_DAYS_LEAST,
+  NPC_FULL_RESIDENTS_PER_DAY,
   NPC_HORSES_BASE,
   NPC_RESIDENTS_PER_HORSE,
   NPC_SOLDIER_SHARE,
   NPC_TRADE,
+  NPC_VILLAGE,
   NPC_WAR_CHEST_PER_RESIDENT,
   STABLE_CAPACITY,
   STABLE_FEED_DAYS,
@@ -88,6 +95,27 @@ export const NPC_SMITHY_WEAPON: Weapon = 'spear'
  */
 export function npcSoldierTarget(adults: number): number {
   return Math.ceil(adults * NPC_SOLDIER_SHARE)
+}
+
+/**
+ * Game days a full NPC city of `residents` waits before it founds (`CONTEXT.md`: Full city): a game
+ * week up to `NPC_FOUND_VILLAGE_RESIDENTS`, a game day less for each `NPC_FULL_RESIDENTS_PER_DAY`
+ * past that, and never less than `NPC_FULL_DAYS_LEAST`.
+ */
+export function npcFullDays(residents: number): number {
+  const past = Math.max(0, residents - NPC_FOUND_VILLAGE_RESIDENTS)
+  return Math.max(NPC_FULL_DAYS_LEAST, NPC_FULL_DAYS - past / NPC_FULL_RESIDENTS_PER_DAY)
+}
+
+/**
+ * How many adults a full NPC city of `residents` sends to found a daughter (`CONTEXT.md`: Founding):
+ * a village's worth up to `NPC_FOUND_VILLAGE_RESIDENTS`, one more for each
+ * `NPC_FOUND_RESIDENTS_PER_MEMBER` past that, and never more than `NPC_FOUND_PARTY_MOST`.
+ */
+export function npcFoundingPartySize(residents: number): number {
+  const past = Math.max(0, residents - NPC_FOUND_VILLAGE_RESIDENTS)
+  const more = Math.floor(past / NPC_FOUND_RESIDENTS_PER_MEMBER)
+  return Math.min(NPC_FOUND_PARTY_MOST, NPC_VILLAGE.residents + more)
 }
 
 /**
