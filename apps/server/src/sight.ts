@@ -518,7 +518,8 @@ function places(
     // Who occupies its town hall only with the hall in sight (`CONTEXT.md`: Occupying a town hall).
     const occupation = seenHalls.has(c.id) ? c.occupation : null
     // What its scouts brought home is its own (`CONTEXT.md`: Scout).
-    const { scouted: _scouted, ...shown } = c
+    const shown = { ...c }
+    delete shown.scouted
     out.push({ is: 'city', ...shown, occupation, ...sale, ...refuses, ...deal })
   }
   return out

@@ -130,7 +130,8 @@ export function adminWorldView(
     if (hall && here(hall)) {
       const at = { x: hall.x, y: hall.y, houses: houses.get(c.id) ?? 0 }
       // What its scouts brought home is for the inspector, not for every map update.
-      const { scouted: _scouted, ...shown } = c
+      const shown = { ...c }
+      delete shown.scouted
       out.push({ is: 'city', ...shown, ...at, org: cityOrganization(c) })
     }
   }
