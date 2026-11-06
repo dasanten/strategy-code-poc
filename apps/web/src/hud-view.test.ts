@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import type { Building } from '@csp/shared'
+import { TICKS_PER_GAME_DAY, type Building } from '@csp/shared'
 import {
   DRAWERS,
   DRAWER_WIDTH,
   MIN_OPEN_MAP,
   drawerWidth,
   goodsLabel,
+  goodsOldText,
   goodsPickCities,
   goodsPickOf,
   rememberGoodsPick,
@@ -97,7 +98,7 @@ describe('goods in the top bar', () => {
       building({ cityId: 'second', stock: { stone: 2, food: 1 } }),
       building({ cityId: null, realmId: 'r1', stock: { food: 100 } }),
     ]
-    expect(keyGoods({ buildings, cities }, 'r1', null)).toEqual({
+    expect(keyGoods({ buildings, lastSeen: [], cities }, 'r1', null).totals).toEqual({
       food: 116,
       wood: 4,
       stone: 2,
@@ -112,13 +113,13 @@ describe('goods in the top bar', () => {
       building({ cityId: 'second', stock: { food: 7 } }),
       building({ cityId: null, realmId: 'r1', stock: { food: 100 } }),
     ]
-    expect(keyGoods({ buildings, cities }, 'r1', 'home')).toEqual({
+    expect(keyGoods({ buildings, lastSeen: [], cities }, 'r1', 'home').totals).toEqual({
       food: 15,
       wood: 0,
       stone: 0,
       coins: 1,
     })
-    expect(keyGoods({ buildings, cities }, 'r1', 'second').food).toBe(7)
+    expect(keyGoods({ buildings, lastSeen: [], cities }, 'r1', 'second').totals.food).toBe(7)
   })
 
   it("leaves out others' storages, construction sites and stables' horse food", () => {
@@ -132,8 +133,96 @@ describe('goods in the top bar', () => {
       building({ kind: 'stable', stock: { food: 9 } }),
     ]
     const nothing = { food: 0, wood: 0, stone: 0, coins: 0 }
-    expect(keyGoods({ buildings, cities }, 'r1', null)).toEqual(nothing)
-    expect(keyGoods({ buildings: buildings.slice(3), cities }, 'r1', 'home')).toEqual(nothing)
+    expect(keyGoods({ buildings, lastSeen: [], cities }, 'r1', null).totals).toEqual(nothing)
+    const fromHome = { buildings: buildings.slice(3), lastSeen: [], cities }
+    expect(keyGoods(fromHome, 'r1', 'home').totals).toEqual(nothing)
+  })
+
+  describe('storages out of sight', () => {
+    const seen = (seenAt: number, b: Partial<Building>) => ({ ...building(b), seenAt })
+    const inSight = [building({ stock: { food: 10 } })]
+
+    it('counts an outpost storage out of sight as last seen, and marks the total', () => {
+      const lastSeen = [seen(100, { cityId: null, realmId: 'r1', stock: { food: 5, wood: 2 } })]
+      const held = keyGoods({ buildings: inSight, lastSeen, cities }, 'r1', null)
+      expect(held.totals).toEqual({ food: 15, wood: 2, stone: 0, coins: 0 })
+      expect(held.old).toEqual({ oldestSeenAt: 100, all: false })
+    })
+
+    it('is exact and unmarked with everything in sight', () => {
+      const held = keyGoods({ buildings: inSight, lastSeen: [], cities }, 'r1', null)
+      expect(held.totals.food).toBe(10)
+      expect(held.old).toBeNull()
+      expect(goodsOldText(held.old, 500)).toBeNull()
+    })
+
+    it('shows a picked city out of sight as last seen, marked, all of it', () => {
+      const lastSeen = [seen(100, { cityId: 'second', stock: { food: 7 } })]
+      const held = keyGoods({ buildings: inSight, lastSeen, cities }, 'r1', 'second')
+      expect(held.totals.food).toBe(7)
+      expect(held.old).toEqual({ oldestSeenAt: 100, all: true })
+    })
+
+    it('leaves the other cities out of a picked one, and does not mark it for them', () => {
+      const lastSeen = [seen(100, { cityId: 'second', stock: { food: 7 } })]
+      const held = keyGoods({ buildings: inSight, lastSeen, cities }, 'r1', 'home')
+      expect(held.totals.food).toBe(10)
+      expect(held.old).toBeNull()
+    })
+
+    it("doesn't count a storage no longer the realm's", () => {
+      // Its city has since been seen to be someone else's; the outpost was someone else's when seen.
+      const taken = [city('home', 'r1'), city('second', 'r2')]
+      const lastSeen = [
+        seen(100, { cityId: 'second', stock: { food: 7 } }),
+        seen(100, { cityId: null, realmId: 'r2', stock: { food: 9 } }),
+      ]
+      const held = keyGoods({ buildings: inSight, lastSeen, cities: taken }, 'r1', null)
+      expect(held.totals.food).toBe(10)
+      expect(held.old).toBeNull()
+    })
+
+    it("doesn't count a site or a stable out of sight", () => {
+      const site = { delivered: {}, work: 0 } as Building['site']
+      const lastSeen = [
+        seen(100, { site, stock: { wood: 9 } }),
+        seen(100, { kind: 'stable', stock: { food: 9 } }),
+      ]
+      const held = keyGoods({ buildings: inSight, lastSeen, cities }, 'r1', null)
+      expect(held.totals).toEqual({ food: 10, wood: 0, stone: 0, coins: 0 })
+      expect(held.old).toBeNull()
+    })
+
+    it('counts a storage in sight once, as it is now, not also as remembered', () => {
+      const now = building({ stock: { food: 10 } })
+      const lastSeen = [{ ...now, seenAt: 100, stock: { food: 3 } }]
+      const held = keyGoods({ buildings: [now], lastSeen, cities }, 'r1', null)
+      expect(held.totals.food).toBe(10)
+      expect(held.old).toBeNull()
+    })
+
+    it('marks a storage last seen with nothing in it', () => {
+      const held = keyGoods({ buildings: inSight, lastSeen: [seen(100, {})], cities }, 'r1', null)
+      expect(held.totals.food).toBe(10)
+      expect(held.old).toEqual({ oldestSeenAt: 100, all: false })
+    })
+
+    it('says how old it is by the oldest, in words', () => {
+      const lastSeen = [
+        seen(TICKS_PER_GAME_DAY, { stock: { food: 1 } }),
+        seen(TICKS_PER_GAME_DAY * 3, { stock: { food: 1 } }),
+      ]
+      const { old } = keyGoods({ buildings: inSight, lastSeen, cities }, 'r1', null)
+      const text = goodsOldText(old, TICKS_PER_GAME_DAY * 4)
+      expect(text).toBe('Part of this is as last seen, the oldest 3 days ago')
+      const alone = keyGoods({ buildings: [], lastSeen, cities }, 'r1', null)
+      expect(goodsOldText(alone.old, TICKS_PER_GAME_DAY * 4)).toBe(
+        'All of this is as last seen, the oldest 3 days ago',
+      )
+      expect(goodsLabel(null, cities, text)).toBe(
+        'Goods in the entire realm. Part of this is as last seen, the oldest 3 days ago',
+      )
+    })
   })
 
   it('offers the cities of the realm the Player knows, by name', () => {

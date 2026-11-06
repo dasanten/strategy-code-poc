@@ -68,6 +68,7 @@ import { TileMenu, WaypointsPanel } from './Waypoints.js'
 import { api } from './api.js'
 import { CityInspector } from './CityInspector.js'
 import {
+  goodsOldText,
   goodsPickCities,
   goodsPickOf,
   keyGoods,
@@ -435,7 +436,13 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       setGoodsPicked(next)
       rememberGoodsPick(next)
     }
-    return { totals: keyGoods(world, world.home.realmId, pick), cities, pick, onPick }
+    const seen = {
+      buildings: world.buildings,
+      lastSeen: world.lastSeen.buildings,
+      cities: knownCities,
+    }
+    const { totals, old } = keyGoods(seen, world.home.realmId, pick)
+    return { totals, oldText: goodsOldText(old, world.tick), cities, pick, onPick }
   })()
   /**
    * For one of the Player's own residents: the cities to relocate them to and why they can't be

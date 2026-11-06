@@ -104,6 +104,28 @@ body {
   align-items: center;
   gap: 14px;
 }
+/* Part of the goods are as last seen (`CONTEXT.md`: Goods in the top bar): the bar has room for a
+   mark with the words in its tooltip; the phone menu has no hover, and room for the words. */
+.hud-goods-old {
+  color: var(--ui-muted);
+  cursor: help;
+}
+.hud-goods-old-mark {
+  font-weight: 600;
+}
+.hud-goods-old-words {
+  display: none;
+}
+.hud-menu-goods .hud-goods-old {
+  flex: 1 0 100%;
+  font-size: 12px;
+}
+.hud-menu-goods .hud-goods-old-mark {
+  margin-right: 5px;
+}
+.hud-menu-goods .hud-goods-old-words {
+  display: inline;
+}
 .hud-goods-pick {
   max-width: 130px;
   padding: 1px 4px;
