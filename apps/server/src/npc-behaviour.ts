@@ -10,7 +10,9 @@ import {
   type CityJob,
   type ScriptMemory,
   OWN_FOOD,
+  PROTECTION,
   WALK_TICKS_PER_TILE,
+  WEAPONS,
   WORK_OUTPUT_PER_DAY,
   breedersAt,
   breedingPair,
@@ -26,6 +28,7 @@ import {
   putAwayUnits,
   setOutFood,
   unitsThatFit,
+  warehouseKeeps,
   wrapDistance,
   type Building,
   type City,
@@ -140,7 +143,8 @@ export function stepNpcCities(
  * walking there and that one is up or dead; one on its road crew takes the next step of its road
  * (`layRoad`); one
  * carrying materials the project needs takes them to its site; a load of goods goes into the
- * storage; they take `OWN_FOOD` from the storage before they set out; a planned feeder feeds its
+ * storage, a Trade Org city's into its warehouse (`stowing`); they take `OWN_FOOD` from the
+ * storage before they set out; a planned feeder feeds its
  * stable (`startFeeding`); one of them breeds the city's horses (`breedHorses`); a planned builder takes their part in the project (`takePart`),
  * picking the next one once it is finished; a planned worker at a workplace that processes goods
  * first takes its input from the storage (`takeInput`), and waits at home while the storage holds
@@ -302,8 +306,8 @@ function runCity(
     // Carrying a child, they get no work and stay at home, where they take their meals; a load
     // goes into the storage first, or their hands may have no room for one.
     if (r.carrying) {
-      const load = storage && haul(r)
-      if (storage && load) putAway(r, storage, load, size)
+      const stow = stowing(world, city, r, storage)
+      if (stow) putAway(r, stow.to, stow.load, size)
       else if (home && !inCityArea(world, city, r.x, r.y, size)) walkTo(r, home)
       continue
     }
@@ -311,16 +315,16 @@ function runCity(
     if (jobs[r.id]?.kind === 'road' && plan && layRoad(world, city, plan, r, crew, store, size)) {
       continue
     }
-    if (free > 0 && !isArmed(r) && carriesMaterials(r)) {
+    if (free > 0 && !isArmed(r) && carriesMaterials(r, city)) {
       const p = project()
       if (p && takePart(world, r, p, store, true)) {
         free--
         continue
       }
     }
-    const load = storage && haul(r, inputOf(buildings, jobs[r.id]))
-    if (storage && load) {
-      putAway(r, storage, load, size)
+    const stow = stowing(world, city, r, storage, inputOf(buildings, jobs[r.id]))
+    if (stow) {
+      putAway(r, stow.to, stow.load, size)
       continue
     }
     const food = storage?.stock?.food ?? 0
@@ -381,7 +385,7 @@ function noWayOut(
   return typeof at?.x === 'number' && typeof at.y === 'number' && (r.x !== at.x || r.y !== at.y)
 }
 
-/** Takes a load to the storage: at it, the drop; away from it, the walk there first. */
+/** Takes a load to a storage or warehouse: at it, the drop; away from it, the walk there first. */
 function putAway(r: Resident, storage: Building, load: Stock, size: number): void {
   if (isAt(r, storage, size)) {
     r.order = { kind: 'drop', to: { kind: 'storage', storageId: storage.id }, goods: load }
@@ -403,10 +407,17 @@ function workByDefault(r: Resident, buildings: Map<string, Building>): void {
   r.script = { scriptId: 0, task: 'work', memory }
 }
 
-/** Whether a resident carries goods a site could take: anything workplaces make but Food. */
-function carriesMaterials(r: Resident): boolean {
+/**
+ * Whether a resident carries goods a site could take: anything workplaces make but Food; in a Trade
+ * Org city anything its warehouses take back (`backToWarehouse`), so Iron goes to a site that needs
+ * it rather than back first.
+ */
+function carriesMaterials(r: Resident, city: City): boolean {
   return (Object.entries(r.carried) as [Good, number][]).some(
-    ([good, units]) => good !== 'food' && units > 0 && WORK_OUTPUT_PER_DAY[good] !== undefined,
+    ([good, units]) =>
+      good !== 'food' &&
+      units > 0 &&
+      (WORK_OUTPUT_PER_DAY[good] !== undefined || (!!city.tradeOrg && backToWarehouse(good))),
   )
 }
 
@@ -577,6 +588,45 @@ export function haul(r: Resident, input?: Stock): Stock | undefined {
     if (n > 0) load[good] = n
   }
   return Object.keys(load).length > 0 ? load : undefined
+}
+
+/**
+ * Whether a Trade Org city's warehouse takes a good back from an idle resident (`CONTEXT.md`: Trade
+ * Org HQ, Trading post): all but Food, which is for the storage they eat from, and the weapons and
+ * armour that stay on them.
+ */
+function backToWarehouse(good: Good): boolean {
+  const worn: readonly Good[] = [...WEAPONS, ...PROTECTION]
+  return good !== 'food' && !worn.includes(good)
+}
+
+/**
+ * What an idle resident has to put away and where it goes, if anything: in a Trade Org city what
+ * its warehouses take back goes first, to the one that keeps it (`warehouseFor`), or its chain could
+ * not use it (`chainStore`) and Iron, which `haul` leaves in hand, would stay there. The rest goes
+ * to the storage (`haul`). `input` is what they go to process, which stays on them.
+ */
+function stowing(
+  world: WorldState,
+  city: City,
+  r: Resident,
+  storage: Building | undefined,
+  input?: Stock,
+): { to: Building; load: Stock } | undefined {
+  if (city.tradeOrg) {
+    const goods = (Object.keys(r.carried) as Good[]).filter(
+      (g) => (r.carried[g] ?? 0) > 0 && backToWarehouse(g) && input?.[g] === undefined,
+    )
+    const to = warehouseFor(world, city, goods)
+    if (to) {
+      const keeps = warehouseKeeps(world, to)
+      const load: Stock = {}
+      for (const g of goods) if (keeps.includes(g)) load[g] = r.carried[g]
+      return { to, load }
+    }
+  }
+  const load = storage && haul(r, input)
+  return storage && load && { to: storage, load }
 }
 
 /** Whether a resident carries less food than a resident at home takes meals at (`HOME_FOOD_LOW`). */
