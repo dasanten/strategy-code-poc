@@ -141,6 +141,28 @@ export function startFeeding(world: WorldState, city: City, r: Resident, job: Ci
 }
 
 /**
+ * The Trade Organization breeds no horses (`CONTEXT.md`: NPC horses; ADR 0004): none of its
+ * residents runs the game's Breed horses default.
+ */
+export const tradeOrgBreedsNoHorses: Invariant = {
+  name: 'trade-org-breeds-no-horses',
+  check(world) {
+    const out: InvariantViolation[] = []
+    const theirs = new Set(world.cities.filter((c) => c.tradeOrg).map((c) => c.id))
+    for (const r of world.residents) {
+      if (r.owner !== null || r.cityId === null || !theirs.has(r.cityId)) continue
+      if (r.script?.scriptId !== 0 || r.script.task !== 'breed') continue
+      out.push({
+        invariant: this.name,
+        message: `${r.id} of the Trade Organization's ${r.cityId} breeds horses`,
+        entityIds: [r.id, r.cityId],
+      })
+    }
+    return out
+  },
+}
+
+/**
  * One feeder at a time (`CONTEXT.md`: NPC horses; ADR 0004): no city the game runs has more than one
  * of its residents running the game's Feed the stable default, none of them in the Trade
  * Organization's cities, which don't take part.

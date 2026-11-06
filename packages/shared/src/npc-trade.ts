@@ -4,9 +4,12 @@ import {
   CITY_PRICE_STANDING_SWING,
   GOOD_WEIGHT,
   HORSE_FOOD_PER_DAY,
+  NPC_HORSES_BASE,
+  NPC_RESIDENTS_PER_HORSE,
   NPC_SOLDIER_SHARE,
   NPC_TRADE,
   NPC_WAR_CHEST_PER_RESIDENT,
+  STABLE_CAPACITY,
   STABLE_FEED_DAYS,
   STANDING_RANGE,
   WAREHOUSE_FLOOR,
@@ -85,6 +88,19 @@ export const NPC_SMITHY_WEAPON: Weapon = 'spear'
  */
 export function npcSoldierTarget(adults: number): number {
   return Math.ceil(adults * NPC_SOLDIER_SHARE)
+}
+
+/**
+ * How many horses an NPC city wants for its size (`CONTEXT.md`: NPC horses): it breeds up to this
+ * many. None for the Trade Organization's cities, which don't take part.
+ */
+export function npcHorsesWanted(world: Pick<WorldState, 'residents'>, city: City): number {
+  if (city.tradeOrg) return 0
+  const residents = cityResidents(world, city).length
+  return Math.min(
+    STABLE_CAPACITY,
+    NPC_HORSES_BASE + Math.floor(residents / NPC_RESIDENTS_PER_HORSE),
+  )
 }
 
 /** The Food an NPC city keeps in a stable (`CONTEXT.md`: NPC horses), for its own horses in it. */

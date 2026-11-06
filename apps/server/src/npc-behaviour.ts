@@ -15,10 +15,13 @@ import {
   breedersAt,
   breedingPair,
   canWork,
+  cityResidents,
   contractOf,
   inCityArea,
   isArmed,
   isAt,
+  npcHorsesWanted,
+  ownsHorse,
   putAwayUnits,
   setOutFood,
   unitsThatFit,
@@ -311,12 +314,17 @@ function carriesMaterials(r: Resident): boolean {
 }
 
 /**
- * Has one of the city's residents breed its horses (`CONTEXT.md`: Breeding, NPC city): at the
+ * Has one of the city's residents breed its horses (`CONTEXT.md`: Breeding, NPC horses): at the
  * first of its finished stables with two fed horses of the city in it, room for a foal and nobody
  * breeding there yet, they run the game's Breed horses default for that pair, which walks them
- * there. Whether they were given it.
+ * there. Only while the city has fewer than it wants, the foals on their way counted, and Food isn't
+ * short, and never in the Trade Organization's cities. Whether they were given it.
  */
 function breedHorses(world: WorldState, city: City, r: Resident): boolean {
+  if (city.tradeOrg || foodShort(world, city)) return false
+  const horses = world.horses.filter((h) => ownsHorse({ cityId: city.id }, h)).length
+  const foals = cityResidents(world, city).filter((x) => x.script?.task === 'breed').length
+  if (horses + foals >= npcHorsesWanted(world, city)) return false
   for (const stable of world.buildings) {
     if (stable.kind !== 'stable' || stable.site || stable.cityId !== city.id) continue
     const tending = world.residents.some(
