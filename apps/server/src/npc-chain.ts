@@ -72,14 +72,20 @@ export function holdsBatch(stock: Stock | undefined, input: Stock): boolean {
   return (Object.entries(input) as [Good, number][]).every(([g, n]) => (stock?.[g] ?? 0) >= n)
 }
 
+/** A good a city is short of, and how much of what it wants of it it lacks, 0 to 1. */
+export interface Shortage {
+  good: Good
+  share: number
+}
+
 /**
- * The goods an NPC city is short of (`CONTEXT.md`: NPC reserve), the shortest first: what its
+ * What an NPC city is short of (`CONTEXT.md`: NPC reserve), the shortest first: what its
  * storages lack of its reserve (`npcReserve`; a Trade Org city, what its warehouses lack of their
  * stock floor, `tradeOrgReserve`), and of the materials its `project` still needs
  * beyond that, as a share of what it wants of each. Ties go by the reserve's order (Food,
  * building materials, weapons, their Iron, Coins).
  */
-export function shortGoods(world: WorldState, city: City, project?: CityProject): Good[] {
+export function shortages(world: WorldState, city: City, project?: CityProject): Shortage[] {
   const want = city.tradeOrg ? tradeOrgReserve(world, city) : npcReserve(world, city)
   for (const [good, n] of Object.entries(projectNeeds(world, project)) as [Good, number][]) {
     want[good] = (want[good] ?? 0) + n
@@ -89,7 +95,11 @@ export function shortGoods(world: WorldState, city: City, project?: CityProject)
     .map(([good, n]) => ({ good, share: n > 0 ? (n - (stock[good] ?? 0)) / n : 0 }))
     .filter((s) => s.share > 1e-9)
     .sort((a, b) => b.share - a.share)
-    .map((s) => s.good)
+}
+
+/** The goods an NPC city is short of, the shortest first (`shortages`). */
+export function shortGoods(world: WorldState, city: City, project?: CityProject): Good[] {
+  return shortages(world, city, project).map((s) => s.good)
 }
 
 /**
