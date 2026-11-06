@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="384" height="384" viewBox="0 0 384 384" stroke-linejoin="round" stroke-linecap="round">
+  <title>training ground</title>
+  <defs>
+    <linearGradient id="sand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ecd196"/>
+      <stop offset="1" stop-color="#c79c58"/>
+    </linearGradient>
+    <linearGradient id="dirt" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d9b676"/>
+      <stop offset="1" stop-color="#b48a4c"/>
+    </linearGradient>
+    <linearGradient id="stone" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d8d3c8"/>
+      <stop offset="1" stop-color="#928c82"/>
+    </linearGradient>
+    <linearGradient id="wood" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#c58a4c"/>
+      <stop offset="1" stop-color="#7f5028"/>
+    </linearGradient>
+    <linearGradient id="straw" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f6df8a"/>
+      <stop offset="1" stop-color="#c79a3c"/>
+    </linearGradient>
+    <linearGradient id="red" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d9553c"/>
+      <stop offset="1" stop-color="#9c2f22"/>
+    </linearGradient>
+    <linearGradient id="owner" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#cfcfcb"/>
+    </linearGradient>
+    <linearGradient id="iron" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d5dbe0"/>
+      <stop offset="1" stop-color="#7f8a93"/>
+    </linearGradient>
+
+    <g id="post">
+      <circle r="10" fill="url(#wood)" stroke="#3d2a18" stroke-width="3.5"/>
+      <circle r="4" fill="none" stroke="#5e3a1b" stroke-width="2"/>
+    </g>
+    <g id="corner">
+      <circle r="15" fill="url(#wood)" stroke="#3d2a18" stroke-width="4"/>
+      <circle r="8" fill="none" stroke="#5e3a1b" stroke-width="2.5"/>
+      <circle r="3" fill="#5e3a1b"/>
+    </g>
+    <!-- A spear on a rack: shaft along y, iron head pointing up. -->
+    <g id="spear">
+      <path d="M0 26V-14" stroke="#3d2a18" stroke-width="8"/>
+      <path d="M0 26V-14" stroke="#b07a42" stroke-width="4"/>
+      <path d="M0 -32L7 -14L0 -9L-7 -14Z" fill="url(#iron)" stroke="#3d2a18" stroke-width="3"/>
+    </g>
+    <!-- A training post: a straw-wrapped pell with a wooden cap, seen from above. -->
+    <g id="pell">
+      <circle r="20" fill="url(#straw)" stroke="#3d2a18" stroke-width="4"/>
+      <path d="M-13 -6Q0 -14 13 -6M-13 6Q0 14 13 6" fill="none" stroke="#a97f2e" stroke-width="2.5"/>
+      <circle r="8" fill="url(#wood)" stroke="#3d2a18" stroke-width="3"/>
+    </g>
+  </defs>
+
+  <!-- The yard, edge to edge. -->
+  <rect x="14" y="14" width="356" height="356" rx="10" fill="url(#sand)" stroke="#3d2a18" stroke-width="4"/>
+  <g fill="#b78f50" opacity="0.55">
+    <ellipse cx="84" cy="110" rx="9" ry="5"/>
+    <ellipse cx="322" cy="104" rx="7" ry="4"/>
+    <ellipse cx="66" cy="288" rx="6" ry="3.5"/>
+    <ellipse cx="310" cy="300" rx="9" ry="5"/>
+    <ellipse cx="246" cy="84" rx="6" ry="3"/>
+  </g>
+
+  <!-- The paved way from the gate into the ring. -->
+  <rect x="164" y="296" width="56" height="64" fill="url(#stone)" stroke="#3d2a18" stroke-width="4"/>
+  <path d="M164 318H220M164 340H220M192 318V340" stroke="#6f6a60" stroke-width="3"/>
+
+  <!-- The paved ring with its trampled floor. -->
+  <circle cx="192" cy="202" r="100" fill="none" stroke="#3d2a18" stroke-width="40"/>
+  <circle cx="192" cy="202" r="100" fill="none" stroke="url(#stone)" stroke-width="33"/>
+  <circle cx="192" cy="202" r="100" fill="none" stroke="#6f6a60" stroke-width="33" stroke-dasharray="3 36.27" stroke-linecap="butt"/>
+  <circle cx="192" cy="202" r="81" fill="url(#dirt)"/>
+
+  <!-- The straw target in the middle of the ring. -->
+  <circle cx="192" cy="202" r="52" fill="url(#straw)" stroke="#3d2a18" stroke-width="4.5"/>
+  <circle cx="192" cy="202" r="36" fill="url(#red)" stroke="#3d2a18" stroke-width="3"/>
+  <circle cx="192" cy="202" r="23" fill="#f5ead2" stroke="#3d2a18" stroke-width="3"/>
+  <circle cx="192" cy="202" r="10" fill="url(#red)" stroke="#3d2a18" stroke-width="3"/>
+
+  <!-- The weapon rack along the top. -->
+  <use xlink:href="#spear" href="#spear" x="128" y="66"/>
+  <use xlink:href="#spear" href="#spear" x="160" y="66"/>
+  <use xlink:href="#spear" href="#spear" x="192" y="66"/>
+  <use xlink:href="#spear" href="#spear" x="224" y="66"/>
+  <use xlink:href="#spear" href="#spear" x="256" y="66"/>
+  <rect x="106" y="60" width="172" height="13" rx="4" fill="url(#wood)" stroke="#3d2a18" stroke-width="4"/>
+
+  <!-- Training posts along the left and right. -->
+  <use xlink:href="#pell" href="#pell" x="60" y="142"/>
+  <use xlink:href="#pell" href="#pell" x="60" y="240"/>
+  <use xlink:href="#pell" href="#pell" x="324" y="142"/>
+  <use xlink:href="#pell" href="#pell" x="324" y="240"/>
+
+  <!-- A straw bale and a crate by the gate. -->
+  <g>
+    <rect x="48" y="304" width="58" height="34" rx="9" fill="url(#straw)" stroke="#3d2a18" stroke-width="4"/>
+    <path d="M66 305V337M88 305V337" stroke="#a97f2e" stroke-width="3.5"/>
+  </g>
+  <g>
+    <rect x="288" y="298" width="40" height="40" rx="3" fill="url(#wood)" stroke="#3d2a18" stroke-width="4"/>
+    <path d="M295 305L321 331M321 305L295 331" stroke="#5e3a1b" stroke-width="3.5"/>
+  </g>
+
+  <!-- The fence with its gate gap at the bottom. -->
+  <path d="M158 354H30V30H354V354H226" fill="none" stroke="#3d2a18" stroke-width="11"/>
+  <path d="M158 354H30V30H354V354H226" fill="none" stroke="url(#wood)" stroke-width="5.5"/>
+  <use xlink:href="#post" href="#post" x="96" y="30"/>
+  <use xlink:href="#post" href="#post" x="162" y="30"/>
+  <use xlink:href="#post" href="#post" x="222" y="30"/>
+  <use xlink:href="#post" href="#post" x="288" y="30"/>
+  <use xlink:href="#post" href="#post" x="96" y="354"/>
+  <use xlink:href="#post" href="#post" x="288" y="354"/>
+  <use xlink:href="#post" href="#post" x="30" y="96"/>
+  <use xlink:href="#post" href="#post" x="30" y="162"/>
+  <use xlink:href="#post" href="#post" x="30" y="222"/>
+  <use xlink:href="#post" href="#post" x="30" y="288"/>
+  <use xlink:href="#post" href="#post" x="354" y="96"/>
+  <use xlink:href="#post" href="#post" x="354" y="162"/>
+  <use xlink:href="#post" href="#post" x="354" y="222"/>
+  <use xlink:href="#post" href="#post" x="354" y="288"/>
+  <use xlink:href="#corner" href="#corner" x="158" y="354"/>
+  <use xlink:href="#corner" href="#corner" x="226" y="354"/>
+  <use xlink:href="#corner" href="#corner" x="354" y="30"/>
+  <use xlink:href="#corner" href="#corner" x="30" y="354"/>
+  <use xlink:href="#corner" href="#corner" x="354" y="354"/>
+
+  <!-- The owner's flag on the top-left corner post: light grey, like the sheet's flags. -->
+  <path d="M34 24L104 34L88 48L106 66L34 56Z" fill="url(#owner)" stroke="#3d2a18" stroke-width="4"/>
+  <use xlink:href="#corner" href="#corner" x="30" y="30"/>
+</svg>
