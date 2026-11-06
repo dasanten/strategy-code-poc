@@ -1,10 +1,13 @@
 import {
+  NODE_WORKPLACE,
   NPC_NODE_REACH,
   NPC_RESIDENTS_PER_SCOUT,
   NPC_SCOUT_LIMIT,
   NPC_SCOUT_SECTOR,
   SIGHT_RANGE,
+  buildingAt,
   cityResidents,
+  cornersCovering,
   inCityArea,
   isDown,
   wrap,
@@ -282,7 +285,8 @@ function nearestTileIn(
 /**
  * An NPC city's scouts are few and its knowledge sound (`CONTEXT.md`: Scout; ADR 0004): in the plan
  * its pass made this tick it sends no more than `scoutsWanted`, and one for a death since; a Trade
- * Org city sends none; a sector it knows of, or a scout has seen, is a sector of the map.
+ * Org city sends none; a sector it knows of, or a scout has seen, is a sector of the map; and a
+ * workplace that pass plans on a node, not begun yet, goes on one it has heard of (`plansOnKnown`).
  */
 export const npcScoutsSound: Invariant = {
   name: 'npc-scouts-sound',
@@ -308,7 +312,32 @@ export const npcScoutsSound: Invariant = {
       if (plan.plannedAt === world.tick && scouts > scoutsWanted(world, city) + 1) {
         fail(city.id, `plans ${scouts} scouts of ${scoutsWanted(world, city)}`)
       }
+      if (plan.plannedAt === world.tick && !plansOnKnown(world, city, plan, terrain.size)) {
+        fail(city.id, 'plans a workplace on a node it has not heard of')
+      }
     }
     return out
   },
+}
+
+/**
+ * Whether the workplace a city's project lays out on a node goes on one it has heard of: it knows of
+ * it, or gave its sector up since the pass that planned it, this same tick (`giveUpSite`). A site
+ * begun was planned before, and the city may have moved its home since.
+ */
+function plansOnKnown(world: WorldState, city: City, plan: CityPlan, size: number): boolean {
+  const p = plan.project
+  if (p?.kind !== 'build' || buildingAt(world, p.x, p.y)) return true
+  const nodes = world.nodes.filter(
+    (n) =>
+      NODE_WORKPLACE[n.kind] === p.building &&
+      cornersCovering(p.building, n.x, n.y, size).some(([x, y]) => x === p.x && y === p.y),
+  )
+  const home = npcHome(world, city)
+  if (nodes.length === 0 || !home) return true
+  return nodes.some(
+    (n) =>
+      knowsNode(city, home, n, size) ||
+      city.scouted?.noWay?.includes(sectorOf(size, n.x, n.y)) === true,
+  )
 }

@@ -471,7 +471,7 @@ The shared language of the game. Domain terms only — no implementation details
   (within a set reach of its home, or further out where a Scout found one) and work it like its other workplaces, carrying the output to
   its storage (Crew food). So a city builds the whole chain its land allows, one need at a time:
   weapons short means a smithy, which wants Iron, so a smelter, which wants ore, so a mine. A
-  good with no node in reach stays short; the city buys it from its trader or a visiting trader,
+  good it knows no node of stays short; the city buys it from its trader or a visiting trader,
   or does without. With nothing short its spare hands still have work (Spare hands' work). When it has no room left inside its wall it grows its area
   by building on the edge, puts up a new wall 8 tiles further out on every side, with the gate in
   the same place, and only once every tile of the new wall is finished tears down the old one.
@@ -484,7 +484,7 @@ The shared language of the game. Domain terms only — no implementation details
   some game days for all its residents; Wood and Stone for its next house and some wall; weapons
   for the soldiers it keeps by its size, and the Iron and Wood to forge them; Coins as its war
   chest, for buying what it lacks and hiring help. A stable is wanted once it has horses, a mint
-  only with a gold node in reach. Whatever its storages hold above the reserve is its surplus,
+  only with a gold node it knows of. Whatever its storages hold above the reserve is its surplus,
   for sale (Trading with an NPC city); whatever is below is short and drives what it works and
   builds next (NPC city).
 - **Spare hands' work:** with nothing short of its reserve, an NPC city's spare hands don't stand

@@ -212,8 +212,11 @@ function runCity(
     // script ended itself.
     const built = r.script?.scriptId === 0 && r.script.task === 'build' ? r.script.memory : null
     if (built && built.stuck === true) stopWork(r)
-    // No way to a site on a far node: the city gives its sector up (`CONTEXT.md`: Scout).
-    if (built && noWayOut(r, built) && giveUpSite(world, city, built.at, size)) stopWork(r)
+    // No way to a site on a far node: the city gives its sector up (`CONTEXT.md`: Scout). A tile of
+    // road is no such site: the nodes out there are as good as they were.
+    if (built && !onRoadWork(r) && noWayOut(r, built)) {
+      if (giveUpSite(world, city, built.at, size)) stopWork(r)
+    }
     // Done breeding (a foal born, or the breeding stopped), a breeder is free too.
     const bred = r.script?.scriptId === 0 && r.script.task === 'breed' ? r.script.memory : null
     if (bred && bred.done === true) stopWork(r)

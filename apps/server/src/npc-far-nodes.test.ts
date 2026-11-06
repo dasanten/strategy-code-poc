@@ -1,15 +1,19 @@
 import {
+  BUILD_MATERIALS,
   CREW_FOOD,
   NPC_NODE_REACH,
   NPC_SCOUT_LIMIT,
+  NPC_SURPLUS_CAP,
   NPC_TOWN,
   TICKS_PER_GAME_DAY,
   Terrain,
   buildingPile,
   canWork,
   npcReserve,
+  roadAt,
   tileIndex,
   wrapDistance,
+  type Building,
   type Good,
   type Resident,
   type ResourceKind,
@@ -22,7 +26,7 @@ import { farOut, lackedGood } from './npc-founding.js'
 import { chainProject } from './npc-growth.js'
 import { plains } from './npc-growth.fixture.js'
 import { planCity } from './npc-plan.js'
-import { sectorOf, sendScout, stepScouts } from './npc-scouts.js'
+import { npcScoutsSound, sectorOf, sendScout, stepScouts } from './npc-scouts.js'
 import { hasNodeFor } from './npc-trader.js'
 import { mulberry32 } from './residents.js'
 import { newId } from './starting-city.js'
@@ -208,7 +212,105 @@ describe('a far workplace', () => {
   })
 })
 
+describe('a road crew past the set reach', () => {
+  it('gives no sector up when they find no way to a tile of road', () => {
+    const t = town()
+    const node = nodeAt(t, 'stone', FAR)
+    scouted(t, node)
+    const r = worker(t)
+    const memory = { building: 'road', at: { x: node.x - 5, y: node.y } }
+    r.script = { scriptId: 0, task: 'build', memory }
+    stepNpcCities(t.world, t.size, t.terrain)
+    expect(t.city.scouted?.noWay).toBeUndefined()
+    expect(buildsOn(t, 'stone', node)).toBe(true)
+  })
+})
+
+describe('the npc-scouts-sound invariant on what it builds on', () => {
+  /** The plan of this tick has the city's next workplace on the node. */
+  function planOn(t: Town, node: { x: number; y: number }) {
+    t.world.cityPlans[t.city.id] = {
+      plannedAt: t.world.tick,
+      jobs: {},
+      project: { kind: 'build', building: 'quarry', x: node.x, y: node.y },
+    }
+  }
+
+  it('finds a workplace planned on a node it has not heard of', () => {
+    const t = town()
+    planOn(t, nodeAt(t, 'stone', FAR))
+    expect(npcScoutsSound.check(t.world, t.terrain)).toHaveLength(1)
+  })
+
+  it('lets one on a node it knows of be, or in a sector it just gave up', () => {
+    const t = town()
+    const node = nodeAt(t, 'stone', FAR)
+    planOn(t, node)
+    scouted(t, node)
+    expect(npcScoutsSound.check(t.world, t.terrain)).toEqual([])
+    t.city.scouted!.noWay = [sectorOf(t.size, node.x, node.y)]
+    expect(npcScoutsSound.check(t.world, t.terrain)).toEqual([])
+  })
+
+  it('lets one begun, or a plan from before, be', () => {
+    const t = town()
+    const node = nodeAt(t, 'stone', FAR)
+    planOn(t, node)
+    t.world.cityPlans[t.city.id]!.plannedAt = t.world.tick - 1
+    expect(npcScoutsSound.check(t.world, t.terrain)).toEqual([])
+    planOn(t, node)
+    t.world.buildings.push({
+      id: newId(t.world, 'b'),
+      kind: 'quarry',
+      x: node.x,
+      y: node.y,
+      cityId: t.city.id,
+      site: {},
+    } as unknown as Building)
+    expect(npcScoutsSound.check(t.world, t.terrain)).toEqual([])
+  })
+})
+
 describe('on the map', () => {
+  it('a road follows out to a far workplace', { tags: ['slow'], timeout: 1_200_000 }, () => {
+    const t = town()
+    const node = nodeAt(t, 'forest', FAR)
+    scouted(t, node)
+    const place = {
+      id: newId(t.world, 'b'),
+      kind: 'lumberCamp',
+      x: node.x,
+      y: node.y,
+      cityId: null,
+    } as Building
+    t.world.buildings.push(place)
+    ;(t.city.workplaceIds ??= []).push(place.id)
+    // Nothing short, and Stone for the whole way.
+    const reserve = npcReserve(t.world, t.city)
+    t.storage.stock = {
+      ...reserve,
+      food: (reserve.food ?? 0) + 2 * (NPC_SURPLUS_CAP.food ?? 0),
+      wood: (reserve.wood ?? 0) + (NPC_SURPLUS_CAP.wood ?? 0),
+      stone: (reserve.stone ?? 0) + 2 * FAR * (BUILD_MATERIALS.road?.stone ?? 0),
+    }
+    const way = () => t.world.cityPlans[t.city.id]?.roads?.find((r) => r.to === place.id)?.tiles
+    const laid = () =>
+      (way() ?? []).filter(([x, y]) => {
+        const road = roadAt(t.world, x, y)
+        return road && !road.site
+      }).length
+    const built = () => (way()?.length ?? 0) > 0 && laid() === way()!.length
+    const walking = new Walking(t.terrain)
+    for (let i = 0; i < 150 * TICKS_PER_GAME_DAY && !built(); i++) {
+      stepWorld(t.world, t.terrain, walking)
+      if (i % TICKS_PER_GAME_DAY === 0) expect(checkInvariants(t.world, t.terrain)).toEqual([])
+    }
+    expect(way()?.at(-1)).toEqual([place.x, place.y])
+    expect(way()!.length).toBeGreaterThan(NPC_NODE_REACH)
+    expect(laid()).toBe(way()!.length)
+    expect(t.city.scouted?.noWay).toBeUndefined()
+  })
+
   it(
     'a city short of a good builds on a far node, and its crew stays fed there',
     { tags: ['slow'], timeout: 1_200_000 },
