@@ -1000,12 +1000,12 @@ The shared language of the game. Domain terms only — no implementation details
   is short of its reserve, and gets its first horses when a Player sells it some. Trading posts and
   the HQ don't take part.
 - **Horse market:** buying and selling a horse with an NPC city, only in person: a grown resident
-  at its finished stable. **Buying** takes a horse standing in it that the city can spare (above what
-  it wants), with the Coins in the buyer's hands; the Coins go into its storage and the horse joins
+  at its finished stable. **Buying** takes a horse standing in it that the city can spare (any beyond a
+  breeding pair it keeps), with the Coins in the buyer's hands; the Coins go into its storage and the horse joins
   their realm where it stands. **Selling** takes a horse of their realm standing in it, pulling no
   carriage, not ridden and not Down, while the city has fewer than it wants and the Coins in its
   storage; the Coins go into the resident's hands, and it doesn't go if they can't carry them. The
-  price comes from the horse's stats and age and how many the city has against how many it wants,
+  price comes from the horse's stats and age and how many the city has against how many it wants, dearer as it nears the pair it keeps,
   and its standing toward them moves it like its trade prices. At low standing it refuses (NPC city
   reaction). A sale raises standing like any trade. The trade section lists its horses with name,
   stats and price.
