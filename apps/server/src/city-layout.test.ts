@@ -2,6 +2,7 @@ import {
   CITY_GRID_BLOCK,
   CITY_LAYOUTS,
   CITY_RING_STEP,
+  CITY_SIDE_LANE_GAP,
   FOOTPRINT,
   NPC_TOWN,
   NPC_VILLAGE,
@@ -33,7 +34,7 @@ import { cityLayoutsSound, layoutPlan, pickLayout } from './city-layout.js'
 import { checkInvariants } from './invariants.js'
 import { npcHome } from './npc-behaviour.js'
 import { foundNpcCity } from './npc-cities.js'
-import { fillHouses, plains, storageOf, village, WALL } from './npc-growth.fixture.js'
+import { fillHouses, nearRing, plains, storageOf, village, WALL } from './npc-growth.fixture.js'
 import { houseTile, newWall, nextProject, wallRings } from './npc-growth.js'
 import { mulberry32 } from './residents.js'
 import { foundStartingCity, newId } from './starting-city.js'
@@ -106,10 +107,14 @@ function canWalkOut(
   return false
 }
 
-/** A new city of `kind` that picked `layout`, which goes by the world's seed. */
-function newCity(layout: CityLayout, kind: NpcCitySize) {
+/**
+ * A new city of `kind` that picked `layout`, which goes by the world's seed. `prepare` readies the
+ * ground first.
+ */
+function newCity(layout: CityLayout, kind: NpcCitySize, prepare?: (terrain: TerrainMap) => void) {
   for (let seed = 1; ; seed++) {
     const terrain = plains(200)
+    prepare?.(terrain)
     const world = createWorld(terrain, seed)
     const city = foundNpcCity(world, terrain, kind, 20, 20, mulberry32(7))
     if (city.layout === layout) return { world, terrain, city, home: npcHome(world, city)! }
@@ -677,6 +682,245 @@ describe('the Rings layout', () => {
         expect(after.street(x, y)).toBe(lanes[i++])
       }
     }
+  })
+})
+
+/** A new city of `kind` with the Main street layout. `prepare` readies the ground first. */
+const mainStreetCity = (kind = NPC_VILLAGE, prepare?: (terrain: TerrainMap) => void) =>
+  newCity('mainStreet', kind, prepare)
+
+describe('the Main street layout', () => {
+  const kinds = ['house', 'storage', 'smelter', 'mint', 'smithy', 'stable'] as const
+
+  /** Builds `kind` where the city wants it, `n` times, and says where they went. */
+  function build(
+    { world, terrain, city, home }: ReturnType<typeof mainStreetCity>,
+    n: number,
+    kind: BuildingKind = 'house',
+  ) {
+    const out: Building[] = []
+    for (let i = 0; i < n; i++) {
+      const rings = wallRings(world, city, home, terrain.size)
+      const t = houseTile(world, city, home, terrain, rings, kind)
+      if (!t) break
+      expect(buildProblem(world, t.x, t.y, kind, terrain)).toBeUndefined()
+      expectFollows(world, city, home, kind, t, terrain.size)
+      out.push(put(world, city, kind, t.x, t.y))
+    }
+    return out
+  }
+
+  /** Whether a building stands with its side on the main street, in the gate's column. */
+  const onStreet = (b: Building, column: number) =>
+    b.x === column + 1 || b.x + FOOTPRINT[b.kind] === column
+
+  it('is in the random pick', () => {
+    expect(CITY_LAYOUTS).toContain('mainStreet')
+  })
+
+  it('keeps a straight street free from the gate past the town hall and on beyond the home', () => {
+    const { world, terrain, city, home } = mainStreetCity()
+    const plan = planOf(world, city, home, terrain.size)
+    const gate = world.buildings.find((b) => b.kind === 'gate' && b.cityId === city.id)!
+    const hall = world.buildings.find((b) => b.id === city.townHallId)!
+    expect(hall.y).toBeLessThan(gate.y)
+    for (let y = home.y - WALL - NPC_WALL_STEP; y <= gate.y + NPC_WALL_STEP; y++) {
+      expect(plan.street(gate.x, y)).toBe(true)
+    }
+  })
+
+  it.each([
+    ['village', NPC_VILLAGE],
+    ['town', NPC_TOWN],
+  ])('a new %s’s houses stand on its street, and its wall stays part of it', (_, kind) => {
+    const { world, terrain, city, home } = mainStreetCity(kind)
+    const gate = world.buildings.find((b) => b.kind === 'gate' && b.cityId === city.id)!
+    const houses = world.buildings.filter((b) => b.kind === 'house' && b.cityId === city.id)
+    expect(houses).toHaveLength(kind.houses)
+    for (const h of houses) {
+      expectFollows(world, city, home, 'house', h, terrain.size)
+      expect(onStreet(h, gate.x)).toBe(true)
+    }
+    const walls = world.buildings.filter((b) => b.kind === 'wall' || b.kind === 'gate')
+    expect(walls.filter((b) => b.cityId === city.id)).toHaveLength(walls.length)
+    expect(wallRings(world, city, home, terrain.size)?.inner).toBe(Math.floor(kind.size / 2))
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('fills both rows on the street, nearest home first, before going further back', () => {
+    const c = mainStreetCity()
+    const gate = c.world.buildings.find((b) => b.kind === 'gate' && b.cityId === c.city.id)!
+    const built = build(c, 80)
+    const firstBack = built.findIndex((b) => !onStreet(b, gate.x))
+    expect(firstBack).toBeGreaterThan(0)
+    const row = built.slice(0, firstBack)
+    expect(row.some((b) => b.x < gate.x)).toBe(true)
+    expect(row.some((b) => b.x > gate.x)).toBe(true)
+    // A long row along the street, not a block.
+    const ys = row.map((b) => b.y)
+    expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(WALL)
+    const rings = row.map((b) => nearRing(c.home, b))
+    expect(rings).toEqual([...rings].sort((a, b) => a - b))
+    // Inside the wall, nothing on the street comes after the first one further back.
+    const inside = built.slice(firstBack).filter((b) => nearRing(c.home, b) < WALL)
+    expect(inside.length).toBeGreaterThan(0)
+    expect(inside.filter((b) => onStreet(b, gate.x))).toEqual([])
+  })
+
+  it('every building has a street beside it', () => {
+    const c = mainStreetCity()
+    const plan = planOf(c.world, c.city, c.home, c.terrain.size)
+    for (const b of build(c, 80)) {
+      const side = FOOTPRINT[b.kind]
+      const beside = footprintTiles(b, c.terrain.size).some(([x, y]) =>
+        [
+          [x + 1, y],
+          [x - 1, y],
+          [x, y + 1],
+          [x, y - 1],
+        ].some(([sx, sy]) => plan.street(sx!, sy!)),
+      )
+      expect(beside, `${side}-wide at ${b.x},${b.y}`).toBe(true)
+    }
+  })
+
+  it('leaves side lanes across the street, and the buildings further back line them', () => {
+    const c = mainStreetCity()
+    const { world, city, home, terrain } = c
+    const gate = world.buildings.find((b) => b.kind === 'gate' && b.cityId === city.id)!
+    const plan = planOf(world, city, home, terrain.size)
+    const lanes: number[] = []
+    for (let y = home.y - WALL + 1; y < home.y + WALL; y++) {
+      if (plan.street(gate.x + 1, y)) lanes.push(y)
+    }
+    expect(lanes.length).toBeGreaterThan(1)
+    for (let i = 1; i < lanes.length; i++) {
+      expect(lanes[i]! - lanes[i - 1]!).toBe(CITY_SIDE_LANE_GAP + 1)
+    }
+    for (const b of build(c, 80).filter((h) => !onStreet(h, gate.x))) {
+      expect(plan.street(b.x, b.y - 1) || plan.street(b.x, b.y + FOOTPRINT[b.kind])).toBe(true)
+    }
+  })
+
+  it('puts every kind on a spot, and each fits between two side lanes', () => {
+    const c = mainStreetCity()
+    for (const kind of kinds) {
+      expect(FOOTPRINT[kind]).toBeLessThanOrEqual(CITY_SIDE_LANE_GAP)
+      expect(build(c, 1, kind)).toHaveLength(1)
+    }
+  })
+
+  it('runs along a gate on the east side', () => {
+    const { world, terrain, city, home } = mainStreetCity()
+    const gate = world.buildings.find((b) => b.kind === 'gate' && b.cityId === city.id)!
+    const wall = world.buildings.find((b) => b.x === home.x + WALL && b.y === home.y + 2)!
+    Object.assign(wall, { x: gate.x, y: gate.y })
+    Object.assign(gate, { x: home.x + WALL, y: home.y + 2 })
+    const plan = planOf(world, city, home, terrain.size)
+    for (let x = home.x - WALL; x <= home.x + WALL + NPC_WALL_STEP; x++) {
+      expect(plan.street(x, home.y + 2)).toBe(true)
+    }
+    const t = houseTile(world, city, home, terrain, wallRings(world, city, home, terrain.size))!
+    expect(t.y === home.y + 3 || t.y + FOOTPRINT.house === home.y + 2).toBe(true)
+  })
+
+  it('a lake takes the spots it covers: the street stays straight and the row goes on past it', () => {
+    // West of where the street runs, across the row on the street.
+    const lake = (x: number, y: number) => x >= 28 && x <= 33 && y >= 24 && y <= 31
+    const c = mainStreetCity(NPC_VILLAGE, (terrain) => {
+      for (let y = 0; y < terrain.size; y++) {
+        for (let x = 0; x < terrain.size; x++) {
+          if (lake(x, y)) terrain.tiles[tileIndex(terrain.size, x, y)] = Terrain.Lake
+        }
+      }
+    })
+    const { world, terrain, city, home } = c
+    const gate = world.buildings.find((b) => b.kind === 'gate' && b.cityId === city.id)!
+    const plan = planOf(world, city, home, terrain.size)
+    const built = [
+      ...world.buildings.filter((b) => b.kind === 'house' && b.cityId === city.id),
+      ...build(c, 40),
+    ]
+    for (const b of built) {
+      for (const [x, y] of footprintTiles(b, terrain.size)) expect(lake(x, y)).toBe(false)
+    }
+    // The street is where it would be without the lake.
+    expect(gate.x).toBe(home.x)
+    for (let y = home.y - WALL; y <= gate.y; y++) expect(plan.street(gate.x, y)).toBe(true)
+    // Beside the lake nothing, north and south of it the same row.
+    const westRow = built.filter((b) => b.x + FOOTPRINT[b.kind] === gate.x)
+    expect(westRow.some((b) => b.y > 31)).toBe(true)
+    expect(westRow.some((b) => b.y >= 24 && b.y <= 30)).toBe(false)
+    // The side away from the lake is unbothered.
+    const eastRow = built.filter((b) => b.x === gate.x + 1)
+    expect(eastRow.some((b) => b.y >= 24 && b.y <= 30)).toBe(true)
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('a lake over the street leaves the street where it is, and houses go round', () => {
+    const lake = (x: number, y: number) => x >= 30 && x <= 38 && y >= 23 && y <= 30
+    const c = mainStreetCity(NPC_VILLAGE, (terrain) => {
+      for (let y = 23; y <= 30; y++) {
+        for (let x = 30; x <= 38; x++) terrain.tiles[tileIndex(terrain.size, x, y)] = Terrain.Lake
+      }
+    })
+    const { world, terrain, city, home } = c
+    const plan = planOf(world, city, home, terrain.size)
+    expect(plan.street(home.x, 27)).toBe(true)
+    const built = build(c, 30)
+    expect(built.length).toBe(30)
+    for (const b of built) {
+      for (const [x, y] of footprintTiles(b, terrain.size)) expect(lake(x, y)).toBe(false)
+    }
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('grows out through a new wall in line with its street, and nobody is walled in', () => {
+    const c = mainStreetCity()
+    const { world, terrain, city, home } = c
+    const size = terrain.size
+    const built = build(c, 400)
+    expect(built.some((b) => nearRing(home, b) > WALL)).toBe(true)
+    let rings = wallRings(world, city, home, size)!
+    expect(rings).toMatchObject({ inner: WALL, outer: WALL + NPC_WALL_STEP, expanding: true })
+    const tiles = newWall(world, home, terrain, rings)
+    expect(tiles.filter((t) => t.kind === 'gate')).toEqual([
+      expect.objectContaining({ x: home.x, y: home.y + WALL + NPC_WALL_STEP }),
+    ])
+    for (const t of tiles) put(world, city, t.kind, t.x, t.y)
+    const before = planOf(world, city, home, size)
+    world.buildings = world.buildings.filter(
+      (b) =>
+        !(
+          (b.kind === 'wall' || b.kind === 'gate') &&
+          Math.max(Math.abs(b.x - home.x), Math.abs(b.y - home.y)) === WALL
+        ),
+    )
+    rings = wallRings(world, city, home, size)!
+    expect(rings.inner).toBe(WALL + NPC_WALL_STEP)
+    const inside = { x: home.x, y: home.y + 2 }
+    expect(canWalkOut(world, terrain, city, inside, WALL + NPC_WALL_STEP, home)).toBe(true)
+    // Same streets as before the wall moved.
+    const after = planOf(world, city, home, size)
+    for (let y = home.y - 30; y <= home.y + 30; y++) {
+      for (let x = home.x - 30; x <= home.x + 30; x++) {
+        expect(after.street(x, y)).toBe(before.street(x, y))
+      }
+    }
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('a city from before follows it around what stands, losing nothing', () => {
+    const { world, terrain, city, home } = village()
+    city.layout = 'mainStreet'
+    // A house as a city put it before layouts, on what is now the street.
+    const old = put(world, city, 'house', home.x, home.y - 3)
+    const before = structuredClone(world.buildings)
+    const rings = wallRings(world, city, home, terrain.size)
+    const t = houseTile(world, city, home, terrain, rings)!
+    expectFollows(world, city, home, 'house', t, terrain.size)
+    expect(world.buildings).toEqual(before)
+    expect(buildingAt(world, old.x, old.y)?.id).toBe(old.id)
   })
 })
 
