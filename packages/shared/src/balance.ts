@@ -522,6 +522,12 @@ export const NPC_BUILDERS = 2
 export const NPC_ROAD_CREW = 2
 
 /**
+ * The longest way an NPC city's road crew takes on (`CONTEXT.md`: NPC road), in tiles: a way longer
+ * than this is given up. Past `NPC_FOUND_REACH`, so a city can join its daughter round a lake.
+ */
+export const NPC_ROAD_LONGEST = 1200
+
+/**
  * How far outside its area an NPC city still fetches a Down resident of its own (`CONTEXT.md`:
  * Reviving), in tiles: about a quarter of a game day's walk on plains each way.
  */
@@ -1058,6 +1064,16 @@ export const SET_OUT_WORK_DAYS = 3
 export function setOutFood(walkTicks: number): number {
   const days = (2 * walkTicks) / TICKS_PER_GAME_DAY + SET_OUT_WORK_DAYS
   return Math.max(OWN_FOOD, Math.ceil(days * FOOD_PER_DAY))
+}
+
+/**
+ * Units of Food an NPC city's road crew has on them before they start a tile of road a walk of
+ * `walkTicks` ticks from the storage (`CONTEXT.md`: NPC road): what the walk home eats, in whole units
+ * rounded up, over what the Build default fetches Food below (`GET_FOOD_AT`), which from far out
+ * would come too late to get home fed.
+ */
+export function roadCrewFood(walkTicks: number): number {
+  return Math.ceil((walkTicks / TICKS_PER_GAME_DAY) * FOOD_PER_DAY) + GET_FOOD_AT
 }
 
 /**

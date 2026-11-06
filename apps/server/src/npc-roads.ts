@@ -1,14 +1,22 @@
 import {
   BUILD_MATERIALS,
+  CITY_AREA_MARGIN,
   NPC_ROAD_CREW,
+  NPC_ROAD_LONGEST,
+  NPC_TRADER_REACH,
   WALK_TICKS_PER_TILE,
   carryCapacity,
+  footprintTiles,
   inCityArea,
+  inInnerRingAround,
   isAt,
+  isCityBuilding,
   npcReserve,
+  roadCrewFood,
   setOutFood,
   stockWeight,
   tileIndex,
+  wrapDelta,
   wrapDistance,
   type Building,
   type City,
@@ -28,17 +36,25 @@ import { worldIndex } from './world-index.js'
 /*
  * An NPC city's road crew (`CONTEXT.md`: NPC road, Spare hands' work; ADR 0026): with nothing short,
  * up to `NPC_ROAD_CREW` of its spare hands, apart from its builders, build road from its home to
- * each of its workplaces outside its area, nearest first, along the way a resident would walk, tile
- * by tile, skipping tiles that have a road. They take the materials from the storage only above its
- * reserve and what its project wants, and each tile is the game's Build default with the materials
- * in hand, so it never fetches any more. A way is worked out once and kept in the plan as plain data
- * (`CityPlan.roads`; ADR 0002), so a road costs no pathfinding a tick.
+ * each of its workplaces outside its area, nearest first, then on to the nearest Trade Org warehouse
+ * in its trader's reach and the edge of its nearest neighbour's area, along the way a resident would
+ * walk, tile by tile, skipping tiles that have a road. They take the materials from the storage only
+ * above its reserve and what its project wants, and each tile is the game's Build default with the
+ * materials in hand, so it never fetches any more, and gets its Food as that default does (Getting
+ * food). A way is worked out once and kept in the plan as plain data (`CityPlan.roads`; ADR 0002), so
+ * a road costs no pathfinding a tick.
  */
 
 /** What a road crew asks for a way: `Walking` in the game, a found path a little at a time. */
 export interface WayFinder {
   /** The way a resident of `side` would walk; asked again until it is settled. `key` names it. */
-  way(key: string, from: Point, to: Point, side: string | null): PathResult
+  way(
+    key: string,
+    from: Point,
+    to: Point,
+    side: string | null,
+    area?: ReadonlySet<number>,
+  ): PathResult
 }
 
 /** What one tile of road takes. */
@@ -75,14 +91,14 @@ function aboveKept(world: WorldState, city: City, plan: CityPlan, store: Buildin
 /** The next tile of its roads still to build that no other of the crew took, and how many are left. */
 function nextTile(
   world: WorldState,
-  plan: CityPlan,
+  roads: readonly CityRoad[],
   size: number,
   taken: ReadonlySet<string> = new Set(),
 ): { tile: readonly [number, number]; left: number } | undefined {
   const built = worldIndex(world).roads(size)
   let tile: readonly [number, number] | undefined
   let left = 0
-  for (const road of plan.roads ?? []) {
+  for (const road of roads) {
     for (const t of road.tiles) {
       if (built.has(tileIndex(size, t[0], t[1]))) continue
       left++
@@ -92,12 +108,82 @@ function nextTile(
   return tile && { tile, left }
 }
 
+/** The tiles of a city's area (`inCityArea`), as tile indices, for a way's search. */
+function areaTiles(world: WorldState, city: City, size: number): Set<number> {
+  const tiles = new Set<number>()
+  for (const b of world.buildings) {
+    if (b.cityId !== city.id || !isCityBuilding(b)) continue
+    for (const [x, y] of footprintTiles(b, size)) {
+      for (let dy = -CITY_AREA_MARGIN; dy <= CITY_AREA_MARGIN; dy++) {
+        for (let dx = -CITY_AREA_MARGIN; dx <= CITY_AREA_MARGIN; dx++) {
+          tiles.add(tileIndex(size, x + dx, y + dy))
+        }
+      }
+    }
+  }
+  return tiles
+}
+
+/**
+ * Whether a building is a finished Trade Org warehouse a road can lead to: not one in the HQ's inner
+ * ring, whose gates stay closed to everyone else (`CONTEXT.md`: Trade Org HQ), so that a way there
+ * isn't given up in place of the way to a post it can walk to.
+ */
+function isPost(world: WorldState, b: Building, size: number): boolean {
+  if (b.kind !== 'warehouse' || b.site) return false
+  const owner = world.cities.find((c) => c.id === b.cityId)
+  if (!owner?.tradeOrg) return false
+  const hall = owner.tradeOrg === 'hq' ? worldIndex(world).buildingById(owner.townHallId) : undefined
+  return !hall || !inInnerRingAround(hall, b, size)
+}
+
+/** The nearest such warehouse (`isPost`) within its trader's reach of `home`. */
+function nearestPost(world: WorldState, home: Building, size: number): Building | undefined {
+  let best: { b: Building; d: number } | undefined
+  for (const b of world.buildings) {
+    if (b.kind !== 'warehouse') continue
+    const d = wrapDistance(size, home, b)
+    if (d > NPC_TRADER_REACH || (best && d >= best.d) || !isPost(world, b, size)) continue
+    best = { b, d }
+  }
+  return best?.b
+}
+
+/** The city nearest `home` and its town hall, the Trade Org's aside: they have their warehouses. */
+function nearestNeighbour(
+  world: WorldState,
+  city: City,
+  home: Building,
+  size: number,
+): { city: City; hall: Building } | undefined {
+  const index = worldIndex(world)
+  let best: { city: City; hall: Building; d: number } | undefined
+  for (const other of world.cities) {
+    if (other.id === city.id || other.tradeOrg) continue
+    const hall = index.buildingById(other.townHallId)
+    if (!hall) continue
+    const d = wrapDistance(size, home, hall)
+    if (!best || d < best.d) best = { city: other, hall, d }
+  }
+  return best
+}
+
+/** Whether a road's far end still stands, for one that isn't to a workplace: a post, or a city. */
+function leadsOn(world: WorldState, to: string, size: number): boolean {
+  if (world.cities.some((c) => c.id === to && !c.tradeOrg)) return true
+  const b = worldIndex(world).buildingById(to)
+  return b !== undefined && isPost(world, b, size)
+}
+
 /**
  * Brings its ways up to date and says whether it has a road to build now (`CONTEXT.md`: NPC road).
  * Ways go in the order of its finished workplaces outside its area, nearest its home first; those of
  * workplaces gone or taken into its area are dropped. The nearest workplace without a way yet asks
- * for one, one search at a time, and the ways it knows go on meanwhile. One with no way through
- * stays empty, given up.
+ * for one, one search at a time, and the ways it knows go on meanwhile. Once all it knows are built,
+ * it asks for the way to the nearest post, then to the edge of its nearest neighbour's area, unless
+ * that neighbour already has the road between them. Ways on to ones no longer the nearest stay while
+ * they stand, so a road isn't left half done when a daughter is founded. One with no way through, or
+ * longer than `NPC_ROAD_LONGEST`, stays empty, given up.
  */
 function planRoads(
   world: WorldState,
@@ -107,32 +193,58 @@ function planRoads(
   ways: WayFinder,
   size: number,
 ): boolean {
+  const known = new Map((plan.roads ?? []).map((r) => [r.to, r]))
+  /** The fewest tiles a way from its home to (x, y) can have: a Step can go diagonally. */
+  const fewestTiles = (x: number, y: number) =>
+    Math.max(Math.abs(wrapDelta(home.x, x, size)), Math.abs(wrapDelta(home.y, y, size)))
+  /** The way to `to` once it is settled; until then, asks a search for it. */
+  const settle = (to: string, at: Point, area?: ReadonlySet<number>): CityRoad | undefined => {
+    const ends = area ? [...area].map((t) => [t % size, Math.floor(t / size)] as const) : [at]
+    if (ends.every(([x, y]) => fewestTiles(x, y) > NPC_ROAD_LONGEST)) return { to, tiles: [] }
+    const found = ways.way(`${city.id}:${to}`, [home.x, home.y], at, city.id, area)
+    if (found.status === 'searching') return undefined
+    const tiles =
+      found.status === 'found' && found.path.length <= NPC_ROAD_LONGEST ? found.path : []
+    return { to, tiles: tiles.map(([x, y]) => [x, y]) }
+  }
   const places = ownWorkplaces(world, city)
     .filter((b) => !b.site && !inCityArea(world, city, b.x, b.y, size))
     .sort((a, b) => wrapDistance(size, home, a) - wrapDistance(size, home, b))
-  const known = new Map((plan.roads ?? []).map((r) => [r.to, r]))
+  const placeIds = new Set(places.map((b) => b.id))
   const roads: CityRoad[] = []
   let searching = false
   for (const place of places) {
     let road = known.get(place.id)
     if (!road && !searching) {
-      const found = ways.way(
-        `${city.id}:${place.id}`,
-        [home.x, home.y],
-        [place.x, place.y],
-        city.id,
-      )
-      if (found.status === 'searching') searching = true
-      else {
-        const tiles = found.status === 'found' ? found.path : []
-        road = { to: place.id, tiles: tiles.map(([x, y]) => [x, y]) }
-      }
+      road = settle(place.id, [place.x, place.y])
+      searching = !road
     }
     if (road) roads.push(road)
   }
+  for (const road of plan.roads ?? []) {
+    if (!placeIds.has(road.to) && leadsOn(world, road.to, size)) roads.push(road)
+  }
+  const has = (to: string) => roads.some((r) => r.to === to)
+  if (!searching && !nextTile(world, roads, size)) {
+    const post = nearestPost(world, home, size)
+    if (post && !has(post.id)) {
+      const road = settle(post.id, [post.x, post.y])
+      if (road) roads.push(road)
+      else searching = true
+    }
+  }
+  if (!searching && !nextTile(world, roads, size)) {
+    const next = nearestNeighbour(world, city, home, size)
+    const theirs = next && world.cityPlans[next.city.id]?.roads?.some((r) => r.to === city.id)
+    if (next && !theirs && !has(next.city.id)) {
+      const area = areaTiles(world, next.city, size)
+      const road = settle(next.city.id, [next.hall.x, next.hall.y], area)
+      if (road) roads.push(road)
+    }
+  }
   if (roads.length > 0) plan.roads = roads
   else delete plan.roads
-  return nextTile(world, plan, size) !== undefined
+  return nextTile(world, roads, size) !== undefined
 }
 
 /**
@@ -174,11 +286,12 @@ export function onRoadWork(r: Resident): boolean {
 
 /**
  * Gives an idle resident on the road crew their next step, if they have one (`CONTEXT.md`: NPC
- * road): with what a tile takes in hand, the Build default on the next tile still to build that no
- * other of the crew took; else the walk to the storage, and there a pick-up of the Food for the walk
- * (`setOutFood`) and as many tiles' materials as fit and it can spare above what it keeps (`keeps`,
- * less what the crew is picking up this tick). False with no tile to go to or nothing to fetch.
- * `crew` are the city's residents on the crew, them too.
+ * road): with what a tile takes in hand and the Food to get home from it (`roadCrewFood`), the Build
+ * default on the next tile still to build that no other of the crew took; else the walk to the
+ * storage, and there a pick-up of the Food for the walk (`setOutFood`) and as many tiles' materials
+ * as fit and it can spare above what it keeps (`keeps`, less what the crew is picking up this tick).
+ * False with no tile to go to or nothing to fetch. `crew` are the city's residents on the crew, them
+ * too.
  */
 export function layRoad(
   world: WorldState,
@@ -194,10 +307,14 @@ export function layRoad(
     const at = other.id !== r.id ? other.script?.memory.at : undefined
     if (at && typeof at === 'object' && !Array.isArray(at)) taken.add(`${at.x},${at.y}`)
   }
-  const next = nextTile(world, plan, size, taken)
+  const next = nextTile(world, plan.roads ?? [], size, taken)
   if (!next) return false
   const [x, y] = next.tile
-  if (holdsBatch(r.carried, roadMaterials())) {
+  const holds = holdsBatch(r.carried, roadMaterials())
+  const walk = store ? wrapDistance(size, store, { x, y }) * WALK_TICKS_PER_TILE : 0
+  const fed =
+    !store || (store.stock?.food ?? 0) < 1 || (r.carried.food ?? 0) >= roadCrewFood(walk)
+  if (holds && fed) {
     r.order = null
     r.script = { scriptId: 0, task: 'build', memory: { building: 'road', at: { x, y } } }
     return true
@@ -211,13 +328,12 @@ export function layRoad(
       above[good] = (above[good] ?? 0) - (o.goods[good] ?? 0)
     }
   }
-  if (tilesIn(above) < 1) return false
+  if (!holds && tilesIn(above) < 1) return false
   if (!isAt(r, store, size)) {
     walkTo(r, store)
     return true
   }
   let room = carryCapacity(r, world.tick) - stockWeight(r.carried)
-  const walk = wrapDistance(size, r, { x, y }) * WALK_TICKS_PER_TILE
   const food = Math.min(
     store.stock?.food ?? 0,
     Math.max(0, setOutFood(walk) - (r.carried.food ?? 0)),
@@ -225,13 +341,48 @@ export function layRoad(
   )
   room -= stockWeight({ food })
   const tiles = Math.min(tilesIn(above), next.left, Math.floor(room / stockWeight(roadMaterials())))
-  if (tiles < 1) return false
+  // Holding a tile's materials already, they can come for the Food alone.
+  if (tiles < 1 && !(holds && food > 0)) return false
   const goods: Stock = food > 0 ? { food } : {}
-  for (const [good, n] of Object.entries(roadMaterials()) as [Good, number][]) {
-    goods[good] = n * tiles
+  if (tiles >= 1) {
+    for (const [good, n] of Object.entries(roadMaterials()) as [Good, number][]) {
+      goods[good] = n * tiles
+    }
   }
   r.order = { kind: 'pickUp', from: { kind: 'storage', storageId: store.id }, goods }
   return true
+}
+
+/**
+ * NPC roads are built once and stay in bounds (`CONTEXT.md`: NPC road; ADR 0004): two cities never
+ * each keep a road to the other, and no way is longer than `NPC_ROAD_LONGEST`.
+ */
+export const npcRoadsOnce: Invariant = {
+  name: 'npc-roads-once',
+  check(world) {
+    const out: InvariantViolation[] = []
+    for (const city of world.cities) {
+      for (const road of world.cityPlans[city.id]?.roads ?? []) {
+        if (road.tiles.length > NPC_ROAD_LONGEST) {
+          out.push({
+            invariant: this.name,
+            message: `${city.id}'s way to ${road.to} is ${road.tiles.length} tiles long`,
+            entityIds: [city.id, road.to],
+          })
+        }
+        // Each pair once: seen from the one with the lower id.
+        if (city.id > road.to) continue
+        if (world.cityPlans[road.to]?.roads?.some((r) => r.to === city.id)) {
+          out.push({
+            invariant: this.name,
+            message: `${city.id} and ${road.to} each keep a road to the other`,
+            entityIds: [city.id, road.to],
+          })
+        }
+      }
+    }
+    return out
+  },
 }
 
 /**
