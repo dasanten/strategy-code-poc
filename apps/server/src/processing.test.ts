@@ -76,9 +76,9 @@ function total(world: WorldState, good: 'ironOre' | 'iron' | 'goldOre' | 'coins'
 }
 
 describe('conversion rates (balance file)', () => {
-  it('a smelter turns 2 iron ore into 1 iron, a mint 1 gold ore into 20 coins', () => {
+  it('a smelter turns 2 iron ore into 1 iron, a mint 1 gold ore into 10 coins', () => {
     expect(RECIPES.smelter).toEqual([{ input: { ironOre: 2 }, output: { iron: 1 } }])
-    expect(RECIPES.mint).toEqual([{ input: { goldOre: 1 }, output: { coins: 20 } }])
+    expect(RECIPES.mint).toEqual([{ input: { goldOre: 1 }, output: { coins: 10 } }])
     expect(BATCHES_PER_DAY.smelter).toBeGreaterThan(0)
     expect(BATCHES_PER_DAY.mint).toBeGreaterThan(0)
   })
@@ -118,7 +118,7 @@ describe('smelter and mint', () => {
     world.piles.push({ id: 'p1', x: 2, y: 2, goods: { goldOre: 1 } })
     run(world, TICKS_PER_GAME_DAY)
     expect(r.carried.coins ?? 0).toBe(0)
-    expect(world.piles).toEqual([expect.objectContaining({ goods: { coins: 20 } })])
+    expect(world.piles).toEqual([expect.objectContaining({ goods: { coins: 10 } })])
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 
