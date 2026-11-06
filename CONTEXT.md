@@ -702,12 +702,23 @@ The shared language of the game. Domain terms only — no implementation details
      for a fee as always. What that leaves owed starts the next step at the deadline.
   2. **It wrecks:** past the deadline, its next army goes to that city and tears down workplaces of
      it, each counting for its worth against the debt, until the debt is covered or none are left.
-     Those who resist are fought.
+     Those who resist are fought. A workplace is that city's if it is on its books or one of its
+     residents works it, also while away carrying; not an idle one nobody of it works, nor one on
+     another Organization's books or that someone of another Organization works. Once its army has
+     found one at the city it stays on its list, even if the workers leave or die, unless another
+     Organization takes it over.
   3. **It takes the city:** with a debt still owed after a set number of trips, its army occupies the
      town hall (Holding the town hall). The city joins the Trade Organization as a new trading
      post: its storages become warehouses with what is in them, but for the Food, which goes into a
      new storage near its town hall that its people eat from, its people stay as the post's, and the
-     debt is settled.
+     debt is settled. A trip counts once its army has reached the city: one lost or turned back on
+     the road doesn't, and a city behind shut gates it can't reach never comes to this step. Its
+     soldiers fight anyone armed standing on the hall, as those block an occupation, and one stays on
+     the hall when the others go for Food. It doesn't give up while its occupation is running; broken
+     and past its time, it goes home and the next army comes. With no room for a new storage, the
+     storage holding the most Food stays one and takes all the Food, and a city with no other has no
+     warehouse. A city with no storage at all gets an empty storage and an empty warehouse. Workplaces
+     its residents worked that aren't on its books stay the post's own, and its gates open as it joins.
   Its army travels with a **supply wagon**, when the HQ has a free adult to drive it: a new Trade Org
   carriage and horse, loaded at the HQ with Food for the whole trip as far as that leaves room for what
   it takes. It follows the army (Supply line) and its soldiers refill from it, go to meet it when they
@@ -726,8 +737,17 @@ The shared language of the game. Domain terms only — no implementation details
   punishing, from one the Trade Organization refuses to trade with, or at an offer asking too much.
   Coins and Food they brought or bought are their own: none of it counts as what the army took. With
   no seller near they go on hungry. A captured post the Trade Organization
-  has heard of (Lost post found out) is a debt too: it demands the city back, and returning it
-  settles the debt. Admin directives go on as before, with no debt.
+  has heard of (Lost post found out) is a debt too, for its worth, added to what is owed: it demands
+  the city back. Returning it takes the post's worth off the debt; anything else owed stays, and gets
+  its own demand for Coins. A demand for Coins already open stays open and rises by the worth, and
+  refusing the post then leaves the next step to that demand's answer. With only the post's demand
+  out, no demand for Coins goes too. A city they no longer hold can't be given back, so news of it
+  makes an ordinary debt with a demand for Coins. Given back, its warehouse turns back with all it
+  holds; if they tore that down, another storage takes its place, keeping the one its people eat from,
+  and with none spare a new empty warehouse stands on the old spot. The post gets a caravan with a new
+  crew, carriage and horse. Armed residents left on its hall start a new occupation as anyone's do
+  (Occupying a town hall), and taking it again is a new crime. Admin directives go on as before, with
+  no debt.
 - **Trade Org army at an NPC gate:** an NPC city that doesn't refuse the Trade Organization keeps its
   gate open while only the Trade Organization's army is near, so its soldiers can walk in and buy
   like anyone. A city that refuses it shuts them out as it does anyone it refuses, and other armed
