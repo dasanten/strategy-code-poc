@@ -15,6 +15,7 @@ import {
   type AdminInspectKind,
   type AdminWorldView,
   type Caravan,
+  type Trader,
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
@@ -81,8 +82,8 @@ function setup(): WorldState {
     userId: 2,
     tick: 0,
   }
-  addCity(world, { id: 'hq', realmId: null, x: 50, y: 50, name: 'Exchange' }).tradeOrg = 'hq'
-  addCity(world, { id: 'p1', realmId: null, x: 20, y: 50, name: 'Ferry' }).tradeOrg = 'post'
+  addCity(world, { id: 'hq', realmId: null, x: 50, y: 50, name: 'Exchange', tradeOrg: 'hq' })
+  addCity(world, { id: 'p1', realmId: null, x: 20, y: 50, name: 'Ferry', tradeOrg: 'post' })
   resident(world, 'a1', 'r1', 'c1', 62, 2).script = { scriptId: 1, memory: { trips: 3 } }
   resident(world, 'n-1', null, 'n1', 40, 41)
   resident(world, 'd1', null, 'hq', 63, 63)
@@ -121,6 +122,30 @@ function setup(): WorldState {
     transfer: null,
   }
   world.caravans.push(caravan)
+  world.carriages.push({
+    id: 'k2',
+    realmId: null,
+    cityId: 'hq',
+    x: 61,
+    y: 61,
+    horseId: null,
+    load: { wood: 2 },
+  })
+  const trader: Trader = {
+    id: 'tr1',
+    carriageId: 'k2',
+    driverId: 'd2',
+    escortIds: [],
+    loop: ['p1'],
+    postId: 'p1',
+    heading: 'post',
+    stop: 'warehouse',
+    plan: null,
+    holding: null,
+    misses: 0,
+    robberies: 0,
+  }
+  world.traders.push(trader)
   world.armies.push({ id: 'ar1', name: 'Vanguard', realmId: 'r1', memberIds: ['a1'], order: null })
   world.piles.push({ id: 'pl1', x: 2, y: 2, goods: { wood: 4 } })
   return world
@@ -138,7 +163,9 @@ describe('admin world view', () => {
     const world = setup()
     // From (60, 60), 8 × 8 tiles: x and y 60–63 and 0–3, the four corners of the map.
     const view = adminWorldView(world, size, { x: 60, y: 60, w: 8, h: 8 }, lookups)
-    expect(ids(view)).toEqual(['a1', 'ar1', 'c1', 'c1-hall', 'cv1', 'd1', 'k1', 'pl1'].sort())
+    expect(ids(view)).toEqual(
+      ['a1', 'ar1', 'c1', 'c1-hall', 'cv1', 'd1', 'k1', 'k2', 'pl1', 'tr1'].sort(),
+    )
     expect(view.tick).toBe(world.tick)
     // The same corner asked for from the other side of the edge.
     expect(ids(adminWorldView(world, size, { x: -4, y: -4, w: 8, h: 8 }, lookups))).toEqual(
@@ -263,6 +290,7 @@ describe('admin places', () => {
         hq: { id: 'hq', name: 'Exchange', x: 50, y: 50 },
         posts: [{ id: 'p1', name: 'Ferry', x: 20, y: 50 }],
         caravans: [{ id: 'cv1', name: 'Ferry', x: 63, y: 63, postId: 'p1', heading: 'post' }],
+        traders: [{ id: 'tr1', name: 'Ferry', x: 61, y: 61 }],
       },
       armies: [{ id: 'ar1', name: 'Vanguard', x: 62, y: 2, realmId: 'r1', realm: 'a1' }],
     })
@@ -331,6 +359,37 @@ describe('admin inspection', () => {
     })
     expect(inspect(world, 'city', 'n1')).toMatchObject({ org: { id: 'n1', is: 'city' } })
     expect(inspect(world, 'city', 'hq')).toMatchObject({ org: { is: 'tradeOrg' } })
+  })
+
+  it('shows a wandering trader, its carriage and who is on it', () => {
+    const world = setup()
+    world.residents.push({ ...world.residents.find((r) => r.id === 'd1')!, id: 'd2', name: 'Dee' })
+    expect(inspect(world, 'trader', 'tr1')).toMatchObject({
+      is: 'trader',
+      org: { is: 'tradeOrg' },
+      post: { id: 'p1', name: 'Ferry' },
+      loop: [{ id: 'p1', name: 'Ferry' }],
+      carriage: { id: 'k2', load: { wood: 2 } },
+      crew: [{ id: 'd2', name: 'Dee' }],
+    })
+    expect(inspect(world, 'carriage', 'k2')).toMatchObject({
+      org: { is: 'tradeOrg' },
+      caravan: null,
+      driver: { id: 'd2' },
+      trader: { id: 'tr1', name: 'Ferry' },
+    })
+    expect(inspect(world, 'resident', 'd2')).toMatchObject({
+      caravan: null,
+      trader: { id: 'tr1', name: 'Ferry' },
+    })
+    expect(inspect(world, 'trader', 'gone')).toBeUndefined()
+    // Bound for the HQ it goes by the HQ's name, and is still found.
+    const hq = world.cities.find((c) => c.id === 'hq')!
+    world.traders[0]!.postId = 'hq'
+    world.traders[0]!.loop = ['hq']
+    expect(adminPlaces(world, lookups).tradeOrg.traders).toEqual([
+      { id: 'tr1', name: hq.name, x: 61, y: 61 },
+    ])
   })
 
   it('shows carriages, caravans, armies and the rest', () => {

@@ -1,19 +1,21 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { formatGameTime, type FirstDay } from '@csp/shared'
+import { formatGameTime, type FirstDay, type TraderVisit } from '@csp/shared'
 import { DrawerStatus } from './drawer-head.js'
 import {
   DRAWERS,
   DRAWER_WIDTH,
   KEY_GOODS,
   drawerWidth,
+  goodsLabel,
   isWide,
   rememberedDrawerWidth,
   type DrawerId,
+  type GoodsPick,
   type KeyGood,
   type OpenDrawer,
 } from './hud-view.js'
 import { groupSentLine, type Skipped } from './group-orders.js'
-import { firstDayView, laneSpot, skippedByWhy } from './notices-view.js'
+import { firstDayView, laneSpot, skippedByWhy, traderVisitLine } from './notices-view.js'
 import type { ConnectionStatus } from './useWorld.js'
 import { WIKI_PATH } from './wiki-view.js'
 
@@ -153,9 +155,54 @@ export function Icon({ name, size = 18 }: { name: keyof typeof ICONS; size?: num
   )
 }
 
+/** The goods the top bar shows and the picker beside them (`CONTEXT.md`: Goods in the top bar). */
+export interface GoodsShown {
+  totals: Record<KeyGood, number>
+  /** How old part of the totals is, in words; null when all of it is in sight now. */
+  oldText: string | null
+  /** The cities of the realm to pick from, by name. */
+  cities: readonly { id: string; name: string }[]
+  pick: GoodsPick
+  onPick: (pick: GoodsPick) => void
+}
+
+/** The goods and their picker, in the top bar and the phone menu alike. */
+function Goods({ goods, className }: { goods: GoodsShown; className: string }) {
+  const label = goodsLabel(goods.pick, goods.cities, goods.oldText)
+  return (
+    <div className={className} role="group" aria-label={label}>
+      <select
+        className="hud-goods-pick"
+        aria-label="Show the goods of"
+        value={goods.pick ?? ''}
+        onChange={(e) => goods.onPick(e.target.value || null)}
+      >
+        <option value="">Entire realm</option>
+        {goods.cities.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
+          </option>
+        ))}
+      </select>
+      {KEY_GOODS.map((g) => (
+        <span key={g} className="hud-good" title={GOOD_LABELS[g]}>
+          <Icon name={g} size={15} /> {Math.floor(goods.totals[g])}
+        </span>
+      ))}
+      {/* The label above says it for those who can't see this. */}
+      {goods.oldText && (
+        <span className="hud-goods-old" title={goods.oldText} aria-hidden="true">
+          <span className="hud-goods-old-mark">≈</span>
+          <span className="hud-goods-old-words">{goods.oldText}</span>
+        </span>
+      )}
+    </div>
+  )
+}
+
 /**
- * The thin bar along the top: the realm's name and home city, game clock, connection, home city
- * goods, Leader, and the Player's account by Log out.
+ * The thin bar along the top: the realm's name and home city, game clock, connection, the goods
+ * of the realm or a city picked beside them, Leader, and the Player's account by Log out.
  */
 export function TopBar({
   realm,
@@ -174,7 +221,7 @@ export function TopBar({
   cityName?: string
   tick?: number
   status: ConnectionStatus
-  goods?: Record<KeyGood, number>
+  goods?: GoodsShown
   leader?: string
   onLogout: () => void
   /** The Wiki link was followed (`CONTEXT.md`: First day). */
@@ -202,15 +249,7 @@ export function TopBar({
         ● {STATUS_LABELS[status]}
       </span>
       <span className="hud-grow" />
-      {goods && (
-        <span className="hud-goods" aria-label={`Goods in ${cityName ?? 'your home city'}`}>
-          {KEY_GOODS.map((g) => (
-            <span key={g} className="hud-good" title={GOOD_LABELS[g]}>
-              <Icon name={g} size={15} /> {Math.floor(goods[g])}
-            </span>
-          ))}
-        </span>
-      )}
+      {goods && <Goods goods={goods} className="hud-goods" />}
       {leader && (
         <>
           <span className="hud-sep" />
@@ -269,7 +308,6 @@ export function PhoneMenu({
   open,
   onToggle,
   goods,
-  cityName,
   leader,
   account,
   onLogout,
@@ -277,8 +315,7 @@ export function PhoneMenu({
 }: {
   open: OpenDrawer
   onToggle: (id: DrawerId) => void
-  goods?: Record<KeyGood, number>
-  cityName?: string
+  goods?: GoodsShown
   leader?: string
   account: string
   onLogout: () => void
@@ -325,18 +362,7 @@ export function PhoneMenu({
                 <Icon name={d.id} size={18} /> {d.label}
               </button>
             ))}
-            {goods && (
-              <div
-                className="hud-menu-goods"
-                aria-label={`Goods in ${cityName ?? 'your home city'}`}
-              >
-                {KEY_GOODS.map((g) => (
-                  <span key={g} className="hud-good" title={GOOD_LABELS[g]}>
-                    <Icon name={g} size={15} /> {Math.floor(goods[g])}
-                  </span>
-                ))}
-              </div>
-            )}
+            {goods && <Goods goods={goods} className="hud-menu-goods" />}
             {leader && (
               <span className="hud-leader" title="Your Leader">
                 <Icon name="crown" size={15} /> {leader}
@@ -659,6 +685,45 @@ export function NoticeLane({ phone, children }: { phone: boolean; children: Reac
  * A group order's report in the lane (`CONTEXT.md`: Group, Notices): how many it went to and who
  * was skipped or turned down and why, until the Player dismisses it or gives the next order.
  */
+/**
+ * A wandering trader standing at one of the realm's cities (`CONTEXT.md`: Trader stop, Notices): the
+ * place, with a way to see it and to open the city's Trade section there.
+ */
+export function TraderVisitNotice({
+  visit,
+  tick,
+  onShow,
+  onTrade,
+  onDismiss,
+}: {
+  visit: TraderVisit
+  tick: number
+  onShow: () => void
+  onTrade: () => void
+  onDismiss: () => void
+}) {
+  return (
+    <aside className="notice trader-visit" role="status">
+      <span className="notice-text">{traderVisitLine(visit, tick)}</span>
+      <span className="notice-actions">
+        <button type="button" onClick={onShow}>
+          Show
+        </button>
+        <button type="button" onClick={onTrade}>
+          Trade
+        </button>
+        <button
+          type="button"
+          aria-label={`Dismiss the trader at ${visit.city}`}
+          onClick={onDismiss}
+        >
+          OK
+        </button>
+      </span>
+    </aside>
+  )
+}
+
 export function GroupReportNotice({
   report,
   onDismiss,

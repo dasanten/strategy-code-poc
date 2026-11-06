@@ -5,8 +5,12 @@ import {
   cityPrice,
   forSale,
   npcCityPrices,
+  traderPrices,
+  traderStanding,
   npcCityRefuses,
   npcHirePrice,
+  horsesToSell,
+  npcHorseOffers,
   sellsTo,
   spareResidents,
   sharingSight,
@@ -443,6 +447,20 @@ function everythingSeen(
       out.push({ is: 'caravan', id, postId, carriageId, driverId, escortIds, heading })
     }
   }
+  // A wandering trader likewise (`CONTEXT.md`: Wandering trader).
+  for (const t of world.traders) {
+    if (caravanSeen(world, t, inSight)) {
+      const { id, postId, carriageId, driverId, escortIds, heading } = t
+      // At a stop it names its prices to anyone in sight (`CONTEXT.md`: Trader stop).
+      const standing = traderStanding(world, t)
+      const k = standing && index.carriageById(carriageId)
+      const open =
+        standing && k
+          ? { standing, prices: shownLines(traderPrices(t, k), insight.insideCarriage(k)) }
+          : {}
+      out.push({ is: 'trader', id, postId, carriageId, driverId, escortIds, heading, ...open })
+    }
+  }
   return out
 }
 
@@ -461,6 +479,7 @@ function places(
   const seenCities = new Set<string>()
   const seenStorages = new Set<string>()
   const seenHalls = new Set<string>()
+  const seenStables: Building[] = []
   // Only the buildings near the observers, in the world's order, when they are sorted by square.
   const near = bySquare
     ? [...eyes.watched]
@@ -474,6 +493,7 @@ function places(
     if (b.cityId !== null) seenCities.add(b.cityId)
     if (b.cityId !== null && b.kind === 'storage' && !b.site) seenStorages.add(b.cityId)
     if (b.cityId !== null && b.kind === 'townHall') seenHalls.add(b.cityId)
+    if (b.kind === 'stable' && !b.site) seenStables.push(b)
   }
   // An NPC city names the Player its price (`CONTEXT.md`: Buying a city), from all of it, or says
   // it won't sell to them or refuses them at all (`CONTEXT.md`: NPC city reaction). One that doesn't
@@ -499,9 +519,32 @@ function places(
               ? { trade: shownLines(npcCityPrices(world, c, realmId), insight.insideCity(c.id)) }
               : {}),
           }
+    // Its horses in sight in its stables in sight, and the Player's standing there (`CONTEXT.md`:
+    // Horse market), refusing or not, so the Trade section can say why.
+    const listed = (list: typeof npcHorseOffers) =>
+      forSale(c)
+        ? seenStables
+            .filter((b) => b.cityId === c.id)
+            .flatMap((b) => list(world, c, b, realmId))
+            .filter((o) => eyes.sees(world.horses.find((x) => x.id === o.horseId)!))
+        : []
+    const horses = listed(npcHorseOffers)
+    const toSell = listed(horsesToSell)
     // Who occupies its town hall only with the hall in sight (`CONTEXT.md`: Occupying a town hall).
     const occupation = seenHalls.has(c.id) ? c.occupation : null
-    out.push({ is: 'city', ...c, occupation, ...sale, ...refuses, ...deal })
+    // What its scouts brought home is its own (`CONTEXT.md`: Scout).
+    const shown = { ...c }
+    delete shown.scouted
+    out.push({
+      is: 'city',
+      ...shown,
+      occupation,
+      ...sale,
+      ...refuses,
+      ...deal,
+      ...(horses.length > 0 ? { horses } : {}),
+      ...(toSell.length > 0 ? { horsesToSell: toSell } : {}),
+    })
   }
   return out
 }
@@ -663,7 +706,7 @@ function sideSight(world: WorldState, size: number, side: string): SideSight {
   return cache?.size === size ? cache.side(world, side) : new SideSight(world, size, side)
 }
 
-/** Whether a caravan's carriage or any of its crew is in sight. */
+/** Whether a caravan's or trader's carriage or any of its crew is in sight. */
 function caravanSeen(
   world: WorldState,
   caravan: Pick<Caravan, 'carriageId' | 'driverId' | 'escortIds'>,
@@ -695,7 +738,7 @@ export function sentOutOfSight(
       ? !world.buildings.some((b) => b.cityId === e.id && buildingSeen(eyes, b))
       : e.is === 'army'
         ? !armySeen(world, e, inSight)
-        : e.is === 'caravan'
+        : e.is === 'caravan' || e.is === 'trader'
           ? !caravanSeen(world, e, inSight)
           : e.is === 'building'
             ? !buildingSeen(eyes, e)
@@ -736,6 +779,10 @@ export function sentInsideUnseen(
       }
       case 'city':
         return hasStock(e.trade) && !insight.insideCity(e.id)
+      case 'trader': {
+        const k = byId(world.carriages, e.carriageId)
+        return hasStock(e.prices) && !(k && insight.insideCarriage(k))
+      }
       case 'resident': {
         const r = byId(world.residents, e.id)
         const told =

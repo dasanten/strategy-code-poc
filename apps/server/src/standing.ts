@@ -4,10 +4,14 @@ import {
   TICKS_PER_GAME_DAY,
   TRADE_ORG,
   formerPlayerStanding,
+  organizationLabel,
   standingInRange,
+  standingOf,
   standingOrganization,
+  tradeCoinsPerPoint,
   type City,
   type Realm,
+  type StandingMove,
   type WorldState,
 } from '@csp/shared'
 import type { Invariant, InvariantViolation } from './invariants.js'
@@ -48,10 +52,28 @@ export function raiseStandingBothWays(
 }
 
 /**
+ * A trade of `coins` between `realm` and `org` raises standing both ways by the number between them
+ * (`tradeCoinsPerPoint`). Returns how far it moved `org`'s regard for the realm, for the realm's log
+ * (`CONTEXT.md`: Trade section); nothing when it is already as high as it goes.
+ */
+export function raiseStandingByTrade(
+  world: WorldState,
+  realm: string,
+  org: string,
+  coins: number,
+): StandingMove | undefined {
+  const before = standingOf(world, org, realm)
+  raiseStandingBothWays(world, realm, org, coins / tradeCoinsPerPoint(world, realm, org))
+  const by = Math.round((standingOf(world, org, realm) - before) * 100) / 100
+  if (by <= 0) return undefined
+  return { org: standingOrganization(world, org), name: organizationLabel(world, org), by }
+}
+
+/**
  * Whether an Organization still exists: a realm, a city of no realm, or the Trade Organization
  * while it has a city. A city that joined a realm is part of that realm's Organization now.
  */
-function organizationExists(world: WorldState, org: string): boolean {
+export function organizationExists(world: WorldState, org: string): boolean {
   if (org === TRADE_ORG) return world.cities.some((c) => c.tradeOrg !== undefined)
   return (
     world.realms.some((r) => r.id === org) ||

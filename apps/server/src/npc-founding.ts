@@ -39,6 +39,7 @@ import {
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { shortGoods } from './npc-chain.js'
 import { npcSiteFits, takenGround } from './npc-cities.js'
+import { knowsNode } from './npc-scouts.js'
 import { hash, mulberry32 } from './residents.js'
 import { FARM_RING, hallTile } from './starting-city.js'
 import { raiseStandingBothWays } from './standing.js'
@@ -142,7 +143,8 @@ export function planFounding(
   }
   if (!plan.foundingSite) return
   const walk = wrapDistance(terrain.size, home, plan.foundingSite) * WALK_TICKS_PER_TILE
-  const chosen = pickParty(world, adults, unneeded, jobs, walk)
+  const near = (r: Resident) => !farOut(r, home, terrain.size)
+  const chosen = pickParty(world, adults, unneeded, near, jobs, walk)
   if (!chosen) return
   for (const r of chosen) {
     r.order = null
@@ -167,23 +169,36 @@ function hallStands(world: WorldState, plan: CityPlan): boolean {
 }
 
 /**
+ * Whether a resident is too far from home to fetch their share of a founding party's load
+ * (`stepFounders`): a scout out, or a worker at a workplace on a far node.
+ */
+export function farOut(
+  r: Pick<Resident, 'x' | 'y'>,
+  home: Pick<Building, 'x' | 'y'>,
+  size: number,
+): boolean {
+  return wrapDistance(size, r, home) > NPC_NODE_REACH
+}
+
+/**
  * The founding party (`CONTEXT.md`: Founding): `NPC_VILLAGE.residents` adults, one of them armed
  * while the city has an armed adult, the rest of its `unneeded` spare hands and its workers off the
- * farms, those with the most room on them first; none of them building, carrying a child or with
- * one on the way. None while there aren't enough, or while their arms can't hold the Food for the
- * walk (`foundingFood`) and all the materials (`foundingMaterials`): a daughter without them could
- * never build its storage.
+ * farms, those with the most room on them first; all of them `near` enough to fetch their share,
+ * none of them building, carrying a child or with one on the way. None while there aren't enough,
+ * or while their arms can't hold the Food for the walk (`foundingFood`) and all the materials
+ * (`foundingMaterials`): a daughter without them could never build its storage.
  */
 function pickParty(
   world: WorldState,
   adults: Resident[],
   unneeded: Resident[],
+  near: (r: Resident) => boolean,
   jobs: Record<string, CityJob>,
   walkTicks: number,
 ): Resident[] | undefined {
   const byId = new Map(world.residents.map((r) => [r.id, r]))
   const free = (r: Resident) => {
-    if (r.carrying) return false
+    if (r.carrying || !near(r)) return false
     const partner = r.pair && byId.get(r.pair.partnerId)
     return !partner?.carrying
   }
@@ -235,16 +250,19 @@ function siteStillFits(
 
 /**
  * The good a city wants its daughter near (`CONTEXT.md`: Founding): the first good of a node
- * (Wood, Stone, Iron ore, Gold ore) that no node within `NPC_NODE_REACH` of its home yields; none
- * if it has a node of each.
+ * (Wood, Stone, Iron ore, Gold ore) that no node it knows of yields (`knowsNode`); none if it
+ * knows a node of each.
  */
-export function lackedGood(world: WorldState, home: Building, size: number): Good | undefined {
+export function lackedGood(
+  world: WorldState,
+  city: City,
+  home: Building,
+  size: number,
+): Good | undefined {
   const goods = [...new Set(Object.values(NODE_GOOD))]
   return goods.find(
     (good) =>
-      !world.nodes.some(
-        (n) => NODE_GOOD[n.kind] === good && wrapDistance(size, home, n) <= NPC_NODE_REACH,
-      ),
+      !world.nodes.some((n) => NODE_GOOD[n.kind] === good && knowsNode(city, home, n, size)),
   )
 }
 
@@ -279,7 +297,7 @@ export function findFoundingSite(
     }
     return false
   }
-  const good = lackedGood(world, home, size)
+  const good = lackedGood(world, city, home, size)
   const nodes = good ? world.nodes.filter((n) => NODE_GOOD[n.kind] === good) : []
   const score = (at: { x: number; y: number }) =>
     nodes.length > 0

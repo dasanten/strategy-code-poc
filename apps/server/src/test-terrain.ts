@@ -1,4 +1,5 @@
 import type { Building, City, TerrainMap, WorldState } from '@csp/shared'
+import { stockFloor } from '@csp/shared'
 import { foundStartingCity } from './starting-city.js'
 import { generateTerrain } from './terrain-gen.js'
 import { createWorld, generateWorld } from './world.js'
@@ -24,7 +25,14 @@ export function cityTerrain(): TerrainMap {
  */
 export function addCity(
   world: WorldState,
-  city: { id: string; realmId: string | null; x: number; y: number; name?: string },
+  city: {
+    id: string
+    realmId: string | null
+    x: number
+    y: number
+    name?: string
+    tradeOrg?: 'hq' | 'post'
+  },
 ): City {
   const hall: Building = {
     id: `${city.id}-hall`,
@@ -39,6 +47,8 @@ export function addCity(
     realmId: city.realmId,
     townHallId: hall.id,
     occupation: null,
+    ...(city.tradeOrg ? { tradeOrg: city.tradeOrg } : {}),
+    ...(city.realmId === null && !city.tradeOrg ? { layout: 'grid' as const } : {}),
   }
   world.buildings.push(hall)
   world.cities.push(c)
@@ -62,4 +72,21 @@ export function worldWithPost(): { world: WorldState; terrain: TerrainMap; post:
   const world = generateWorld(terrain, 1)
   foundStartingCity(world, terrain, 1)
   return { world, terrain, post: tradingPosts(world)[0]! }
+}
+
+/**
+ * Stills the Trade Organization's own chain (`CONTEXT.md`: Trade Org HQ) for a test that counts a good
+ * across the world: every warehouse holds its floor, and only the crews of its caravans and wandering
+ * traders are left. With its hands there, it rightly smelts and builds with what the test counts.
+ */
+export function stillTradeOrgChain(world: WorldState): void {
+  for (const b of world.buildings) {
+    if (b.kind === 'warehouse') b.stock = { ...stockFloor(world, b), ...b.stock }
+  }
+  const crews = [...world.caravans, ...world.traders]
+  const crew = new Set(crews.flatMap((c) => [c.driverId, ...c.escortIds]))
+  const ofTradeOrg = new Set(world.cities.filter((c) => c.tradeOrg).map((c) => c.id))
+  world.residents = world.residents.filter(
+    (r) => r.cityId === null || !ofTradeOrg.has(r.cityId) || crew.has(r.id),
+  )
 }

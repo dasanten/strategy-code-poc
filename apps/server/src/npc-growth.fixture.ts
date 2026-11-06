@@ -12,6 +12,7 @@ import {
   wrapDelta,
   type Building,
   type City,
+  type CityLayout,
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
@@ -38,12 +39,19 @@ export const FOREST = { x: 34 + 40, y: 34 }
 
 /**
  * A village alone on a Plains map, its top-left wall tile at (20, 20) and its home (the storage)
- * at (34, 34), `WALL` tiles from its wall, with a forest node east of it.
+ * at (34, 34), `WALL` tiles from its wall, with a forest node east of it. It follows `layout` from
+ * here on, if given, the way a migrated city does: its first houses stand as they were picked.
  */
-export function village(): { world: WorldState; terrain: TerrainMap; city: City; home: Building } {
+export function village(layout?: CityLayout): {
+  world: WorldState
+  terrain: TerrainMap
+  city: City
+  home: Building
+} {
   const terrain = plains(200)
   const world = createWorld(terrain)
   const city = foundNpcCity(world, terrain, NPC_VILLAGE, 20, 20, mulberry32(7))
+  if (layout) city.layout = layout
   world.nodes.push({ id: 'forest', kind: 'forest', ...FOREST })
   terrain.tiles[tileIndex(terrain.size, FOREST.x, FOREST.y)] = Terrain.Forest
   return { world, terrain, city, home: npcHome(world, city)! }

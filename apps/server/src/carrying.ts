@@ -23,6 +23,7 @@ import {
 import { finishSite } from './building.js'
 import { updateCityMembership } from './cities.js'
 import { robCaravan } from './caravans.js'
+import { robTrader } from './traders.js'
 import {
   buildingOrganization,
   carriageOrganization,
@@ -195,7 +196,7 @@ function move(from: Stock, to: Stock, good: Good, units: number): void {
  * nothing happens. Either way the order is done; a store or fetch order goes on or ends
  * (`carriedForOrder`). Taking from another Organization's storage, carriage or Down resident is
  * theft (`CONTEXT.md`: Crime, Down), on a map of `size` tiles, and taking from a caravan's
- * carriage robs it (`robCaravan`). Nobody but its realm takes from a guarded outpost storage.
+ * carriage robs it (`robCaravan`), as a trader's does (`robTrader`). Nobody but its realm takes from a guarded outpost storage.
  */
 export function resolveCarrying(world: WorldState, actions: CarryAction[], size = MAP_SIZE): void {
   const robbed = new Set<string>()
@@ -240,6 +241,7 @@ function take(
   }
   if (a.spot.kind === 'carriage' && Object.keys(taken).length > 0) {
     robCaravan(world, r, a.spot.carriageId, robbed)
+    robTrader(world, r, a.spot.carriageId, robbed)
   }
 }
 

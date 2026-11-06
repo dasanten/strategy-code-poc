@@ -232,7 +232,9 @@ function timed(steps: QueueStepRequest[]): QueueStepRequest[] {
 /** Orders that act on the tile they are given for (by the card, their own): they only start there. */
 function actsHere(order: OrderRequest): boolean {
   if (
-    ['pickUp', 'drop', 'drive', 'mount', 'board', 'unhitch', 'teach', 'feed'].includes(order.kind)
+    ['pickUp', 'drop', 'drive', 'mount', 'board', 'unhitch', 'hitch', 'teach', 'feed'].includes(
+      order.kind,
+    )
   )
     return true
   // A Build line walks to its line itself (`CONTEXT.md`: Build line).
@@ -364,6 +366,8 @@ export function stepLabel(
       return 'Board the carriage'
     case 'unhitch':
       return 'Unhitch the horse'
+    case 'hitch':
+      return 'Hitch a horse'
     case 'getOff':
       return order.x === undefined ? 'Get off' : `Get off at ${at(order)}`
     case 'pickUp':

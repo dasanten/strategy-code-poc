@@ -45,6 +45,7 @@ import {
   isAt,
   buildingPile,
 } from '@csp/shared'
+import { pickLayout } from './city-layout.js'
 import { recordEvent } from './events.js'
 import { rememberFormerPlayer } from './standing.js'
 import { leaveOnLeaderDeath } from './alliances.js'
@@ -52,6 +53,7 @@ import { endContractsOnLeaderDeath } from './contracts.js'
 import { lapseDemandsOnLeaderDeath } from './demands.js'
 import { NPC_ORDER_KINDS, npcHome, walkTo } from './npc-behaviour.js'
 import { caravanFood, leaveCaravans } from './caravans.js'
+import { wagonFood } from './supply-wagons.js'
 import { countSoldiersKilled } from './directives.js'
 import { leaveArmies } from './armies.js'
 import { worldIndex } from './world-index.js'
@@ -328,7 +330,10 @@ export function endRealm(world: WorldState, realm: Realm, size: number): void {
   lapseDemandsOnLeaderDeath(world, realm.id)
   leaveOnLeaderDeath(world, realm.id)
   const cities = world.cities.filter((c) => c.realmId === realm.id)
-  for (const c of cities) c.realmId = null
+  for (const c of cities) {
+    c.realmId = null
+    c.layout = pickLayout(world.seed, c.id)
+  }
   rememberFormerPlayer(world, cities, realm.userId)
   for (const r of world.residents) {
     if (r.owner !== realm.id) continue
@@ -465,7 +470,8 @@ const whole = (stock: Stock | undefined): RefillSource | undefined =>
  * of their realm, that storage; working at a
  * workplace, or teaching or training at a training ground, the Food in its pile, else on a
  * carriage standing at it; on a caravan's crew, its
- * carriage close by (`caravanFood`); driving a carriage of their realm, that carriage, but not
+ * carriage close by (`caravanFood`); in a Trade Org punishment or driving for it, its supply wagon
+ * close by (`wagonFood`); driving a carriage of their realm, that carriage, but not
  * the horse's share of what a haul route keeps on board (`driversFood`); in an army or aboard a
  * carriage as a passenger, a carriage of their realm on or next to their tile, but not the Food
  * a haul route keeps on board (`spareFood`). Elsewhere nowhere, and nowhere for a resident who is
@@ -494,7 +500,7 @@ export function refillSource(
     const here = world.carriages.find((k) => isAt(k, place, size) && (k.load.food ?? 0) > 0)
     if (here) return whole(here.load)
   }
-  const caravan = caravanFood(world, r, size)
+  const caravan = caravanFood(world, r, size) ?? wagonFood(world, r, size)
   if (caravan) return whole(caravan)
   if (r.owner === null) return undefined
   const driven = driversFood(world, r)

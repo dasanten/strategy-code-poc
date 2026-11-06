@@ -58,6 +58,8 @@ export interface Hover {
   holder?: string
   /** A Trade Org caravan stands there (`CONTEXT.md`: Caravan). */
   caravan?: boolean
+  /** A wandering trader stands there (`CONTEXT.md`: Wandering trader). */
+  trader?: boolean
 }
 
 /**
@@ -71,6 +73,7 @@ export function readoutText(hover: Hover | null, tier: ZoomTier, territory: bool
     `${hover.x}, ${hover.y}`,
     hover.node,
     hover.caravan ? 'Trade Org caravan' : undefined,
+    hover.trader ? 'Wandering trader' : undefined,
     territory ? hover.holder : undefined,
     `${tier} zoom`,
   ]

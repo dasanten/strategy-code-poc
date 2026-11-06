@@ -111,6 +111,21 @@ export function dropLostBreedings(world: WorldState, size?: number): void {
 }
 
 /**
+ * Ends the breeding a horse is part of as it changes hands (`CONTEXT.md`: Breeding, Horse market):
+ * whoever tends it stops, and its stable drops the progress of any pair with it.
+ */
+export function endBreedingOf(world: WorldState, horseId: string): void {
+  for (const r of world.residents) {
+    if (r.order?.kind === 'breed' && r.order.horseIds.includes(horseId)) r.order = null
+  }
+  for (const stable of world.buildings) {
+    if (!stable.breedings) continue
+    stable.breedings = stable.breedings.filter((k) => !k.horseIds.includes(horseId))
+    if (stable.breedings.length === 0) delete stable.breedings
+  }
+}
+
+/**
  * A foal's stats (`CONTEXT.md`: Breeding): its parents' average in each, plus or minus up to
  * `FOAL_STAT_SPREAD`, whole and at least 1.
  */

@@ -750,6 +750,7 @@ export const GROUP_COUNTERPARTS: Record<
   ride: ['mount', 'dismount'],
   board: ['board', 'getOff'],
   unhitch: ['unhitch'],
+  hitch: { none: 'one resident hitches one horse' },
   drive: ['drive'],
   driveOff: { none: 'one resident steals one carriage' },
   hitchOff: { none: 'one resident steals one horse' },

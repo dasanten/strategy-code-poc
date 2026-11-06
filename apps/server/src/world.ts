@@ -46,6 +46,8 @@ import { resolvePurchases } from './buying.js'
 import { resolveTrades } from './trading.js'
 import { resolveOffers, stepOffers } from './offers.js'
 import { resolveBuyOffs } from './directives.js'
+import { resolveDebtPayments, stepDebts } from './trade-org-debt.js'
+import { countWrecked } from './trade-org-wrecks.js'
 import { stepCrimes } from './crimes.js'
 import { stepStanding } from './standing.js'
 import { stepPersuasion } from './persuasion.js'
@@ -53,6 +55,7 @@ import { stepCaptures, type Capture } from './capture.js'
 import { stepNpcCities } from './npc-behaviour.js'
 import { runNpcScripts } from './script-runner.js'
 import { placeCaravans, stepCaravans } from './caravans.js'
+import { placeTraders, stepTraders } from './traders.js'
 import { stepNpcDefence } from './npc-defence.js'
 import { stepLastSeen } from './last-seen.js'
 import { newSightPhase } from './sight.js'
@@ -82,6 +85,7 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     contracts: [],
     demands: [],
     caravans: [],
+    traders: [],
     deliveries: [],
     transfers: [],
     offers: [],
@@ -90,7 +94,9 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     standings: [],
     joinRequests: [],
     punishments: [],
+    supplyWagons: [],
     directives: [],
+    debts: [],
     lastSeen: {},
     // A new world's Players have nothing to be told of changes before it.
     scriptViewChanges: SCRIPT_VIEW_CHANGES.length,
@@ -104,7 +110,8 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
 /**
  * A world as the world generator makes it for a new game: `createWorld`, with the Trade Org HQ
  * (`placeTradeOrgHq`), its NPC cities (`placeNpcCities`) and then its trading posts placed
- * (`placeTradingPosts`), with a caravan for each (`placeCaravans`).
+ * (`placeTradingPosts`), with a caravan for each (`placeCaravans`) and wandering traders going round
+ * them (`placeTraders`).
  */
 export function generateWorld(terrain: TerrainMap, seed = 1): WorldState {
   const world = createWorld(terrain, seed)
@@ -112,6 +119,7 @@ export function generateWorld(terrain: TerrainMap, seed = 1): WorldState {
   placeNpcCities(world, terrain)
   placeTradingPosts(world, terrain)
   placeCaravans(world)
+  placeTraders(world, terrain.size)
   return world
 }
 
@@ -165,7 +173,7 @@ export interface StepResult {
 
 /**
  * Advances the world by one tick (ADR 0002): residents get hungry, eat, heal or starve; so do
- * horses; food spoils at the end of each game day and Trade Org warehouses top up to their stock floor; caravans, NPC cities, the Trade Org army and its punishments give their residents orders; then their orders request actions (steps, then blows in fights, then climbing walls, then taking and
+ * horses; food spoils at the end of each game day and the Trade Org HQ's warehouses top up to their stock floor; caravans, NPC cities, the Trade Org army and its punishments give their residents orders; then their orders request actions (steps, then blows in fights, then climbing walls, then taking and
  * putting down goods, store, fetch, haul routes' and road orders' included, then Feeding the Down (`stepFeeding`), then paying for mercenary contracts, then buying NPC cities, then trading at Trade Org warehouses, then accepting offers (`resolveOffers`), then laying out and working on construction sites, then tearing down, then
  * working workplaces, then residents breeding horses, then pairs having children), and the world resolves them together. As the next tick begins, residents
  * age: the old die, and loads too heavy for declining Strength are put down; alliance leaves
@@ -202,11 +210,12 @@ export function stepWorld(
   let npcPlanMs = 0
   const npcScriptRuns = time('npc', () => {
     stepCaravans(world, terrain.size)
+    stepTraders(world, terrain.size, terrain)
     stepNpcDefence(world, terrain.size)
     stepTradeOrgArmy(world, terrain.size)
     stepNpcHire(world, terrain.size)
     stepPunishments(world, terrain.size)
-    npcPlanMs = stepNpcCities(world, terrain.size, terrain)
+    npcPlanMs = stepNpcCities(world, terrain.size, terrain, walking)
     const runs = runNpcScripts(world, terrain)
     // Whatever the game's own cities gave someone Down ends before they act on it.
     keepDownStill(world)
@@ -263,10 +272,11 @@ function stepRest(
   const trades = resolveTrades(world, terrain.size)
   const accepted = resolveOffers(world)
   const buyOffs = resolveBuyOffs(world)
+  const debtsPaid = resolveDebtPayments(world)
   const builds = requestBuilding(world)
   resolveBuilding(world, builds, terrain)
   const teardowns = requestTearingDown(world)
-  resolveTearingDown(world, teardowns, terrain)
+  countWrecked(world, resolveTearingDown(world, teardowns, terrain))
   const work = requestWork(world)
   resolveWork(world, work)
   stepTeaching(world, terrain.size)
@@ -279,13 +289,14 @@ function stepRest(
   const aging = stepAging(world, terrain.size)
   answerDemands(world, terrain.size)
   stepAlliances(world)
-  const captures = stepCaptures(world, terrain.size)
+  const captures = stepCaptures(world, terrain)
   stepRefill(world, terrain.size)
   stepDirectives(world)
   stepCrimes(world, terrain.size)
   stepContracts(world)
   stepDemands(world)
   stepStanding(world)
+  stepDebts(world)
   stepPersuasion(world, terrain.size)
   stepArmies(world, terrain.size)
   // Workplace settings of buildings and realms that went this tick go with them.
@@ -306,6 +317,7 @@ function stepRest(
     purchases +
     trades +
     accepted +
-    buyOffs
+    buyOffs +
+    debtsPaid
   return { actions, survival, combat, horsesDied, aging, captures }
 }

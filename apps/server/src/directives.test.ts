@@ -478,7 +478,10 @@ describe('a directive ending on its goals', () => {
     ])
     stepPunishments(world, terrain.size)
     expect(world.punishments.length).toBeGreaterThan(0)
-    world.cities.find((c) => c.id === 'c2')!.realmId = null
+    Object.assign(
+      world.cities.find((c) => c.id === 'c2')!,
+      { realmId: null, layout: 'grid' },
+    )
     dieAll(world, [soldier(world, 's1')], 'killed', terrain.size)
     stepDirectives(world)
     // One soldier of two: it stands.
@@ -505,7 +508,10 @@ describe('a directive ending on its goals', () => {
     give(world, 'r1', false, [{ kind: 'city', cityId: 'c2' }])
     run(world, walking, 1)
     expect(world.directives).toHaveLength(1)
-    world.cities.find((c) => c.id === 'c2')!.realmId = null
+    Object.assign(
+      world.cities.find((c) => c.id === 'c2')!,
+      { realmId: null, layout: 'grid' },
+    )
     run(world, walking, 1)
     expect(world.directives).toEqual([])
   })

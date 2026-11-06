@@ -29,6 +29,7 @@ import {
   lineTile,
   roadLine,
   crewTile,
+  debtOf,
   directivesFor,
   materialsNeeded,
   inputToFetch,
@@ -73,6 +74,7 @@ import { paramTarget, paramWaypoint } from './script-params.js'
 import { realmOf } from './starting-city.js'
 import { walkTime, wayFood } from './walk-time.js'
 import { COMPASS, exploredEdge } from './explored-edge.js'
+import type { ScoutEdgeSearch } from './npc-scouts.js'
 import { waypointsOf } from './waypoints.js'
 
 /** Re-exported for the callers that reckon walks like scripts do. */
@@ -108,6 +110,11 @@ export interface ScriptContext {
   explored: (x: number, y: number) => boolean
   /** The order kinds actions go through; the game's own by default. */
   kinds?: Record<string, OrderKind>
+  /**
+   * For an NPC city, which has no explored terrain, where `exploredEdge` leads instead: the next
+   * place its scout goes (`scoutEdge`). `toward` plays no part: nobody picks an NPC city's params.
+   */
+  edge?: (search: ScoutEdgeSearch) => { x: number; y: number } | undefined
   /**
    * The script's `param` lines with the id, number or word picked for each (`paramValues`);
    * `params` holds nothing without it.
@@ -287,6 +294,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     cities: () => seenOf('city', occupationSeen),
     horses: () => seenOf('horse'),
     carriages: () => seenOf('carriage'),
+    traders: () => seenOf('trader'),
     piles: () => seenOf('pile'),
     nodes: exploredNodes,
     nodesInSight: ([kind]) => {
@@ -499,14 +507,17 @@ export function bindScript(context: ScriptContext): ScriptBindings {
         resident.riding !== undefined
           ? (x: number, y: number) => carriageCanGoTo(world, terrain, x, y)
           : (x: number, y: number) => isPassableTerrain(terrainAt(terrain, x, y))
-      const edge = exploredEdge({
-        size: terrain.size,
-        explored: context.explored,
-        canEnter,
-        from: spot(from, 'exploredEdge'),
-        toward: toward ?? undefined,
-        skip: skipped.map((s) => spot(s, 'exploredEdge')),
-      })
+      const skips = skipped.map((s) => spot(s, 'exploredEdge'))
+      const edge = context.edge
+        ? context.edge({ canEnter, skip: skips })
+        : exploredEdge({
+            size: terrain.size,
+            explored: context.explored,
+            canEnter,
+            from: spot(from, 'exploredEdge'),
+            toward: toward ?? undefined,
+            skip: skips,
+          })
       return edge ?? null
     }
     queries.crewTile = ([building]) => {
@@ -624,6 +635,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     me: viewValue(me, api.find((b) => b.name === 'me')!.returns),
     memory: context.memory,
     params: Object.freeze(params),
+    debt: side === undefined ? 0 : debtOf(world, side),
     tick: world.tick,
     mapSize: terrain.size,
     random: tickRandom(world),
@@ -724,6 +736,11 @@ function residentActions(
     dismount: () => request('dismount', {}),
     unhitch: ([carriage]) =>
       request('unhitch', { carriageId: carriage == null ? null : placeId(carriage) }),
+    hitch: ([carriage, horse]) =>
+      request('hitch', {
+        carriageId: carriage == null ? null : placeId(carriage),
+        horseId: horse == null ? null : placeId(horse),
+      }),
     board: ([carriageId]) => request('board', { carriageId: plain(carriageId) }),
     getOff: ([x, y]) =>
       request('getOff', (x ?? y ?? null) === null ? {} : { x: plain(x), y: plain(y) }),
@@ -772,6 +789,9 @@ function residentActions(
         units: plain(units),
         carriageId: plain(carriageId ?? null),
       }),
+    buyHorse: ([horse]) => request('buyHorse', { horseId: horse == null ? null : placeId(horse) }),
+    sellHorse: ([horse]) =>
+      request('sellHorse', { horseId: horse == null ? null : placeId(horse) }),
     handIn: ([good, units, toCityId, carriageId]) =>
       request('handIn', {
         good: plain(good),
@@ -782,6 +802,11 @@ function residentActions(
     buyOff: ([directiveId, carriageId]) =>
       request('buyOff', {
         directiveId: plain(directiveId),
+        carriageId: plain(carriageId ?? null),
+      }),
+    payDebt: ([coins, carriageId]) =>
+      request('payDebt', {
+        coins: plain(coins),
         carriageId: plain(carriageId ?? null),
       }),
     postOffer: ([storageId, gives, givesUnits, wants, wantsUnits, times]) =>

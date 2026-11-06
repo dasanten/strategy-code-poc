@@ -589,10 +589,16 @@ export interface DriveOrder {
   path: [number, number][] | null
   progress: number
   /**
-   * The army the carriage follows as its supply wagon (`CONTEXT.md`: Supply line): `target` is
-   * then where the army was last seen, and the order lasts as long as the army does.
+   * The army the carriage follows as its supply wagon (`CONTEXT.md`: Supply line), or the punishment
+   * for a Trade Org one: `target` is then where the army was last seen, and the order lasts as long
+   * as the army does.
    */
   army?: string
+  /**
+   * It stops in contact with `target` rather than on it, so a wall or closed gate can be driven up
+   * to (`CONTEXT.md`: Lost post found out).
+   */
+  near?: true
 }
 
 /**
@@ -777,8 +783,11 @@ export type ResidentOrder =
   | BuyCityOrder
   | TradeOrder
   | SwapOrder
+  | BuyHorseOrder
+  | SellHorseOrder
   | HandInOrder
   | BuyOffOrder
+  | PayDebtOrder
   | AcceptOfferOrder
   | RelocateOrder
   | FeedOrder
@@ -829,6 +838,8 @@ export interface WorldState {
   joinRequests: JoinRequest[]
   /** The Trade Organization's caravans, one on each trading post's route (`CONTEXT.md`: Caravan). */
   caravans: Caravan[]
+  /** The Trade Organization's wandering traders (`CONTEXT.md`: Wandering trader). */
+  traders: Trader[]
   /** Deliveries and pick-ups ordered and not yet done, oldest first (`CONTEXT.md`: Delivery). */
   deliveries: Delivery[]
   /** Transfers between realms ordered and not yet done, oldest first (`CONTEXT.md`: Transfer). */
@@ -842,8 +853,12 @@ export interface WorldState {
   routeRobberies: Record<string, number>
   /** The Trade Org army's punishments under way (`CONTEXT.md`: Trade Org reaction). */
   punishments: Punishment[]
+  /** The supply wagons of its punishments, and those still on the way home from one. */
+  supplyWagons: SupplyWagon[]
   /** Admin directives in force, oldest first (`CONTEXT.md`: Admin directive). */
   directives: Directive[]
+  /** What Organizations owe the Trade Organization, at most one for each (`CONTEXT.md`: Trade Org debt). */
+  debts: Debt[]
   /**
    * What each Player has seen of buildings and cities, by their account id (`CONTEXT.md`: Last
    * seen): what is in their sight now as of this tick, and what left it as they last saw it.
@@ -881,12 +896,36 @@ export interface WorldState {
 /**
  * What a game-run city's plan has one of its residents do (`CONTEXT.md`: NPC city; ADR 0016):
  * stand as a soldier, work a farm or another workplace, build its project, go on its trade run
- * (NPC trader), found its daughter (Founding), or nothing, until the next pass moves them.
+ * (NPC trader), found its daughter (Founding), revive one of its own (Reviving), scout (Scout), feed
+ * its stable (NPC horses), or nothing, until the next pass moves them.
  */
 export interface CityJob {
-  kind: 'soldier' | 'farm' | 'work' | 'build' | 'trade' | 'found' | 'idle'
+  kind:
+    | 'soldier'
+    | 'farm'
+    | 'work'
+    | 'build'
+    | 'road'
+    | 'trade'
+    | 'found'
+    | 'revive'
+    | 'scout'
+    | 'feed'
+    | 'idle'
   /** The farm or workplace to work, for `farm` and `work`. */
   buildingId?: string
+  /** The Down resident to revive, for `revive`. */
+  targetId?: string
+  /** The stable to feed, for `feed`. */
+  stableId?: string
+}
+
+/** A road a game-run city builds (`CONTEXT.md`: NPC road): its way, worked out once. */
+export interface CityRoad {
+  /** The building it leads to; for one to a neighbour (the edge of its area), that city. */
+  to: string
+  /** The tiles of the way from its home, as a resident would walk it; none when it is given up. */
+  tiles: [x: number, y: number][]
 }
 
 /** What a game-run city builds or takes down next (`CONTEXT.md`: NPC city), as plain data. */
@@ -912,8 +951,15 @@ export interface CityTraderOffer {
 export interface CityTrader {
   /** The trader, one of its spare hands. */
   residentId: string
-  /** The Trade Org warehouse they trade at; on a run to an offer, the offer's storage. */
-  warehouseId: string
+  /**
+   * The Trade Org warehouse they trade at; on a run to an offer, the offer's storage; null when
+   * they go to a visiting trader instead.
+   */
+  warehouseId: string | null
+  /** The wandering trader standing at the city they trade with (`CONTEXT.md`: Trader stop). */
+  visitingId?: string
+  /** On a run to a visiting trader: whether they have fetched what they take along. */
+  loaded?: boolean
   /** On a run to a Player's offer, that run, until they have been there or given it up. */
   offer?: CityTraderOffer
   /** The load still to sell there; empty once sold. */
@@ -922,6 +968,27 @@ export interface CityTrader {
   buys: Stock
   /** The tick they were sent. */
   since: number
+}
+
+/**
+ * What a scout out has seen and not brought home yet (`CONTEXT.md`: Scout), in sectors
+ * (`NPC_SCOUT_SECTOR`). Lost if they die on the way.
+ */
+export interface ScoutTrip {
+  /** The sectors they have had in sight. */
+  saw: number[]
+  /** The sectors of the tiles they found no way to. */
+  noWay?: number[]
+}
+
+/** What an NPC city's scouts have brought home (`CONTEXT.md`: Scout), in sectors (`NPC_SCOUT_SECTOR`). */
+export interface CityScouted {
+  /** The sectors scouts saw: it knows the nodes in them, out to its limit (`NPC_SCOUT_LIMIT`). */
+  sectors: number[]
+  /** Sectors a scout or builder found no way to, which it sends nobody to again and knows nothing of. */
+  noWay?: number[]
+  /** It knows its limit, and scouts no more. */
+  done?: true
 }
 
 /**
@@ -937,6 +1004,13 @@ export interface CityPlan {
   jobs: Record<string, CityJob>
   /** What the city builds or takes down next; none when it has nothing to build. */
   project?: CityProject
+  /** The roads it has worked out the way of (`CONTEXT.md`: NPC road), in the order it builds them. */
+  roads?: CityRoad[]
+  /**
+   * The tiles of its layout's streets it wanted as road at its last pass (`CONTEXT.md`: City layout),
+   * which its road crew builds ahead of `roads`; worked out anew each pass.
+   */
+  streets?: [x: number, y: number][]
   /** Its trade run under way (`CONTEXT.md`: NPC trader); none while no trader is out. */
   trader?: CityTrader
   /**
@@ -950,6 +1024,8 @@ export interface CityPlan {
    * full, and the founding party's goal once it is out.
    */
   foundingSite?: { x: number; y: number }
+  /** Its scouts with something still to bring home, by resident id (`CONTEXT.md`: Scout). */
+  scouts?: Record<string, ScoutTrip>
 }
 
 /**
@@ -1107,7 +1183,9 @@ export interface CaravanJob {
  * handed in at the warehouse, the warehouse keeps them for it (`fromCityId` null), the fee paid.
  * What robbers took is sent again out of the warehouse's stock the same way. Cancelled, it is
  * brought `back` to the sender's city `toCityId` instead. A caravan standing at the warehouse
- * takes it on (`caravanId`). Plain data (ADR 0002).
+ * takes it on (`caravanId`). With `debt` it collects Coins owed to the Trade Organization and
+ * brings them to the warehouse's coin warehouse: `realmId` is who owes them, maybe an NPC city, and
+ * `toRealmId` is `TRADE_ORG`. Plain data (ADR 0002).
  */
 export interface Transfer {
   id: string
@@ -1126,6 +1204,18 @@ export interface Transfer {
   caravanId: string | null
   /** Set on one of the two Transfers of a carried Direct offer (`CONTEXT.md`: Direct offer). */
   carriedOffer?: CarriedTransfer
+  /** Set on one that collects a debt's Coins (`CONTEXT.md`: Trade Org debt). */
+  debt?: DebtCollection
+}
+
+/**
+ * Where a caravan collects a debt's Coins (`CONTEXT.md`: Trade Org debt): at the storage `storageId`
+ * of the one who owes them, out of what is set aside there for the Trade Organization on the offer
+ * `offerId`, for no fee, or without one out of what is free there, for the fee a Transfer costs.
+ */
+export interface DebtCollection {
+  storageId: string
+  offerId?: string
 }
 
 /** How a carried Direct offer's Transfer is paid: part at its pick-up, part on unloading. */
@@ -1172,6 +1262,110 @@ export type SeenCaravan = Pick<
   Caravan,
   'id' | 'postId' | 'carriageId' | 'driverId' | 'escortIds' | 'heading'
 >
+
+/**
+ * A wandering trader (`CONTEXT.md`: Wandering trader): a Trade Org carriage with a driver and a
+ * small escort, sent from the HQ on a fixed loop of the trading posts and the HQ, apart from the
+ * caravans. At each stop it goes first to the storage, to top up the Food on board for its crew and
+ * horse, then to the warehouse, where it evens out its load with what the warehouse holds; at the
+ * HQ, its Coins with the coin warehouse after that. Plain data (ADR 0002): the game gives the crew
+ * the same drive, pick-up, drop and walk orders a Player could give.
+ */
+export interface Trader {
+  id: string
+  carriageId: string
+  /**
+   * The resident who drives the carriage; null with no crew left, until the HQ has someone to send
+   * (`CONTEXT.md`: Caravan crew lost).
+   */
+  driverId: string | null
+  /** The residents who walk along with it (the escort). */
+  escortIds: string[]
+  /**
+   * The cities it goes round, in order: the trading posts and the HQ, which stays on it; after the
+   * last comes the first again. A post lost since stays on it until the trader reaches it
+   * (`CONTEXT.md`: Lost post found out).
+   */
+  loop: string[]
+  /** The stop of its loop, a post or the HQ, it stands at or goes to next. */
+  postId: string
+  /**
+   * Where it stands or is driving: at the HQ first while it is being sent out or is back for a new
+   * carriage, and from there on to `postId` (`hq`), or at `postId` itself (`post`).
+   */
+  heading: 'hq' | 'post'
+  /**
+   * Where at that place it stands or is going: the storage first, then the warehouse, and at the HQ
+   * then its coin warehouse if it has Coins to move.
+   */
+  stop: 'storage' | 'warehouse' | 'coinWarehouse'
+  /**
+   * What it still has to leave at this stop's warehouses and take from them, worked out once on
+   * reaching the warehouse (`evenOutLoad`); null until then.
+   */
+  plan: { leave: Stock; take: Stock } | null
+  /**
+   * Goods the driver took last tick to put down, and where they go; null when they hold nothing
+   * for the trader.
+   */
+  holding: { goods: Stock; onto: 'carriage' | 'stop' } | null
+  /** How many drives to this stop have been started without getting there. */
+  misses: number
+  /** How often it was robbed, which earns it more escorts as it does a caravan's route. */
+  robberies: number
+  /**
+   * The cities it still stops at on its way to its next place, in the order it passes them
+   * (`CONTEXT.md`: Trader stop); null until they are worked out for this way.
+   */
+  calls: string[] | null
+  /** The stop it is driving to or standing at (`CONTEXT.md`: Trader stop); null between stops. */
+  stand: TraderStand | null
+}
+
+/** A wandering trader's stop at a city (`CONTEXT.md`: Trader stop). Plain data (ADR 0002). */
+export interface TraderStand {
+  cityId: string
+  /** The tile it stands on, beside the town hall and outside any wall. */
+  x: number
+  y: number
+  /** The tick it goes on; null while it is still driving there. */
+  until: number | null
+}
+
+/** Where a wandering trader stands at a stop, and until when (`CONTEXT.md`: Trader stop). */
+export interface StandingTrader {
+  cityId: string
+  x: number
+  y: number
+  until: number
+}
+
+/** One line of what a wandering trader names: as a warehouse's (`CONTEXT.md`: Trader stop). */
+export interface TraderPrice {
+  good: Exclude<Good, 'coins'>
+  buy: number
+  sell: number
+  stock: number
+}
+
+/**
+ * A wandering trader as Players see it, while its carriage or any of its crew is in sight: where
+ * it stands, and its prices, while it stands at a stop (`CONTEXT.md`: Trader stop).
+ */
+export type SeenTrader = Pick<
+  Trader,
+  'id' | 'carriageId' | 'driverId' | 'escortIds' | 'postId' | 'heading'
+> & {
+  standing?: StandingTrader
+  /** Without what it holds unless the Player sees inside its carriage. */
+  prices?: (Omit<TraderPrice, 'stock'> & { stock?: number })[]
+}
+
+/** A wandering trader standing at one of a realm's cities: its notice (`CONTEXT.md`: Trader stop). */
+export interface TraderVisit extends StandingTrader {
+  traderId: string
+  city: string
+}
 
 /**
  * An NPC city asking a realm to join it (`CONTEXT.md`: Persuading a city). It stands until the
@@ -1269,6 +1463,25 @@ export interface SwapOrder {
 }
 
 /**
+ * Buying a horse at an NPC city's stable (`CONTEXT.md`: Horse market): the resident, standing at
+ * it, pays for the horse standing there from their hands. It happens this tick.
+ */
+export interface BuyHorseOrder {
+  kind: 'buyHorse'
+  horseId: string
+}
+
+/**
+ * Selling a horse at an NPC city's stable (`CONTEXT.md`: Horse market): the resident, standing at
+ * it, takes the Coins for the horse of their realm standing there in their hands. It happens this
+ * tick.
+ */
+export interface SellHorseOrder {
+  kind: 'sellHorse'
+  horseId: string
+}
+
+/**
  * Handing in a transfer at a Trade Org warehouse (`CONTEXT.md`: Transfer): the resident, standing
  * on its tile, hands in up to `units` of `good` (coins too) from their hands, or the load of
  * `carriageId` on their tile, and pays the fee, for a caravan to bring to the storage of
@@ -1290,6 +1503,17 @@ export interface HandInOrder {
 export interface BuyOffOrder {
   kind: 'buyOff'
   directiveId: string
+  carriageId: string | null
+}
+
+/**
+ * Paying the Trade Org debt (`CONTEXT.md`: Trade Org debt): the resident, standing on a Trade Org
+ * warehouse's tile, pays up to `coins` of it from their hands, or the load of `carriageId` on their
+ * tile, into the Trade Organization's coins there. It happens this tick.
+ */
+export interface PayDebtOrder {
+  kind: 'payDebt'
+  coins: number
   carriageId: string | null
 }
 
@@ -1354,13 +1578,7 @@ export interface CarriedOfferTerms {
 
 /** What ended a realm's offer (`CONTEXT.md`: Offer, Direct offer). */
 export type OfferEnd =
-  | 'usedUp'
-  | 'takenDown'
-  | 'storageLost'
-  | 'goodsGone'
-  | 'declined'
-  | 'lapsed'
-  | 'noCaravans'
+  'usedUp' | 'takenDown' | 'storageLost' | 'goodsGone' | 'declined' | 'lapsed' | 'noCaravans'
 
 /**
  * How the Organization `of` regards `toward` (`CONTEXT.md`: Standing), from -`STANDING_RANGE`
@@ -1374,15 +1592,26 @@ export interface Standing {
 }
 
 /** What a crime was (`CONTEXT.md`: Crime). */
-export type CrimeKind = 'theft' | 'attack' | 'killing' | 'tearDown'
+export type CrimeKind = 'theft' | 'attack' | 'killing' | 'tearDown' | 'capture'
 
 /**
  * Why a punishment headed home (`CONTEXT.md`: Punishment trip): `enough`, it got what it came for;
  * `empty`, the city's storages held nothing; `gaveUp`, its time there ran out; `cityLost`, the city
  * is no longer the culprit's; `directiveLifted`, the admin directive it came for was lifted;
- * `noWay`, it couldn't get there.
+ * `noWay`, it couldn't get there; `paid`, the debt it came about was paid while it was out;
+ * `noWorkplaces`, the city has no workplaces left to tear down; `tookCity`, it held the town hall to
+ * the end and the city is a trading post now.
  */
-export type PunishmentEnd = 'enough' | 'empty' | 'gaveUp' | 'cityLost' | 'directiveLifted' | 'noWay'
+export type PunishmentEnd =
+  | 'enough'
+  | 'empty'
+  | 'gaveUp'
+  | 'cityLost'
+  | 'directiveLifted'
+  | 'noWay'
+  | 'paid'
+  | 'noWorkplaces'
+  | 'tookCity'
 
 /**
  * The Trade Org army out to punish an Organization for crimes against the Trade Organization
@@ -1395,17 +1624,30 @@ export interface Punishment {
   culpritOrg: string
   /** The city it goes to. */
   cityId: string
-  /** What it comes to take back, in Coins' worth: twice what it lost. */
+  /**
+   * What it comes to take back, in Coins' worth: twice what it lost. An army that wrecks (`wrecks`)
+   * comes for what it has counted so far and what is still owed.
+   */
   worth: number
   /**
    * Its soldiers, each with what they carried as they set out: anything they carry above that is
    * what they took. `packed` once they have seen to their Food at the HQ (`CONTEXT.md`: Punishment
-   * trip), so that they set out.
+   * trip), so that they set out. `seller` is the place they are on their way to buy Food at, and
+   * `noWay` the places they found no way to (`CONTEXT.md`: Trade Org debt).
    */
-  members: { residentId: string; own: Stock; packed?: true }[]
+  members: {
+    residentId: string
+    own: Stock
+    packed?: true
+    seller?: string
+    noWay?: string[]
+  }[]
   /** Out to the city while it hasn't got what it came for; home once it has or gives up. */
   heading: 'out' | 'home'
-  /** The Coins' worth it took, as it stood when it headed home. */
+  /**
+   * The Coins' worth it took, as it stood when it headed home; an army that wrecks, the worth of what
+   * it tore down that came off the debt.
+   */
   took: number
   startedAt: number
   /**
@@ -1418,7 +1660,72 @@ export interface Punishment {
    * heads home once that directive is lifted.
    */
   directiveId?: string
+  /**
+   * There for an army sent for a debt at its step `wrecks` (`CONTEXT.md`: Trade Org debt), which tears
+   * down workplaces rather than taking goods: the workplaces it means to tear down, in that order,
+   * found once it is at the city.
+   */
+  wrecks?: string[]
+  /**
+   * An army sent for a debt once its trips are over (`CONTEXT.md`: Trade Org debt): it takes no goods
+   * and tears nothing down, but occupies the town hall until the city joins the Trade Organization.
+   */
+  takes?: true
 }
+/**
+ * The supply wagon of a punishment (`CONTEXT.md`: Trade Org debt, Supply line): a carriage of the
+ * Trade Org HQ with a driver, Food for the trip and room for what the army takes. It follows the
+ * soldiers, outlives them and goes home to unload. Plain data.
+ */
+export interface SupplyWagon {
+  id: string
+  /** The punishment it follows; null once that is over and it goes home by itself. */
+  punishmentId: string | null
+  carriageId: string
+  /** Who drives it; null with no crew left, until the HQ has someone to send (Caravan crew lost). */
+  driverId: string | null
+  /** The Food it means to set out with. */
+  food: number
+  /** How much of the Food on board is what it set out with; any more was taken. */
+  ownFood: number
+  /** Whether it is done loading Food at the HQ. */
+  loaded?: true
+  /** The driver was sent out on foot and still has to pack Food for the walk. */
+  sentOut?: true
+  /** Goods in the driver's hands to put down next, and where. */
+  holding: { goods: Stock; to: GoodsSpot } | null
+}
+/**
+ * What an Organization owes the Trade Organization, in Coins (`CONTEXT.md`: Trade Org debt): what its
+ * army came for and couldn't take, and what crimes cost it since. Plain data.
+ */
+export interface Debt {
+  /** The Organization that owes it: a realm or an NPC city. */
+  org: string
+  coins: number
+  /**
+   * How far up its steps the Trade Organization has gone (ADR 0025): none until its demand goes out;
+   * `demanded` from then on; `wrecks` once that demand was declined or lapsed, or its deadline passed
+   * with something still owed after an answer that didn't cover it, and its army goes to tear down
+   * workplaces from then on (`Punishment.wrecks`). While it only wants a captured post back there is
+   * none yet: that demand, refused, goes straight to `wrecks`.
+   */
+  step?: 'demanded' | 'wrecks'
+  /** The deadline of its demand, in ticks, while the step is `demanded`. */
+  deadline?: number
+  /**
+   * How many armies have reached a city to tear down workplaces for it. Once that is
+   * `TRADE_ORG_DEBT_TRIPS`, the next one comes to take the city (`Punishment.takes`). None before
+   * the first.
+   */
+  trips?: number
+  /**
+   * The city its army came to when it left this debt, where it comes back to at the step `wrecks`.
+   * None for a debt from before that was kept; its army then goes to the city nearest the HQ.
+   */
+  cityId?: string
+}
+
 /**
  * A crime against another Organization (`CONTEXT.md`: Crime, Witness). An Organization is named by
  * its realm's id, or by its city's id for a city of no realm (`organizationOf`). Plain data.
@@ -1445,13 +1752,27 @@ export interface Crime {
   /** What was torn down. */
   building?: BuildingKind
   /**
+   * The trading post captured (`CONTEXT.md`: Lost post found out). It waits for a wandering trader
+   * to reach that post, however long that takes, while the post is on a trader's loop.
+   */
+  post?: string
+  /**
    * Residents who saw it, or the victim who survived it, and have not got home yet. Each makes it
-   * known to their own Organization once they stand in the area of one of its cities.
+   * known to their own Organization once they stand in the area of one of its cities. News of a
+   * captured post goes to any city of the Trade Organization.
    */
   witnesses: string[]
   /** The Organizations it is known to. */
   knownBy: string[]
-  /** The Trade Organization has sent its army to punish it (`CONTEXT.md`: Trade Org reaction). */
+  /**
+   * The tick a captured post's news reached the Trade Organization, which it remembers from then
+   * on rather than from the capture, however long ago that was.
+   */
+  heardAt?: number
+  /**
+   * The Trade Organization has dealt with it: sent its army to punish it (`CONTEXT.md`: Trade Org
+   * reaction), or put it on a debt, as it does with any captured post it hears of.
+   */
   punished?: true
 }
 
@@ -1583,7 +1904,8 @@ export type RealmEventWhat =
    * The Trade Organization punishes the realm (`CONTEXT.md`: Trade Org reaction, Punishment trip):
    * its army is `coming` to `city` to take back `worth` Coins' worth; it `arrived`; it `left` having
    * taken `took`, and `why`; it `turnedBack` without reaching it, and `why`; or it was `lost`,
-   * `where` it was by then.
+   * `where` it was by then. `wrecks` when it comes for a debt, to tear down workplaces, and `took` is
+   * then the worth of what it tore down.
    */
   | {
       kind: 'punished'
@@ -1596,6 +1918,57 @@ export type RealmEventWhat =
       where?: 'wayThere' | 'atCity' | 'wayHome'
       /** Sent for an admin directive, with its reason, rather than for crimes. */
       directive?: string
+      wrecks?: true
+      takes?: true
+    }
+  /**
+   * The Trade Organization's army tore down a workplace at (`x`, `y`) of `city`, for a debt
+   * (`CONTEXT.md`: Trade Org debt): `coins` came off it, leaving `owed`.
+   */
+  | {
+      kind: 'wrecked'
+      building: BuildingKind
+      x: number
+      y: number
+      cityId: string
+      city: string
+      coins: number
+      owed: number
+    }
+  /**
+   * The realm's debt to the Trade Organization (`CONTEXT.md`: Trade Org debt) changed by `coins`,
+   * leaving `owed`: its army left it `owed` for what it couldn't take; hearing who took a post left it
+   * `postOwed` for that post's worth; a later crime made it `rose`; a caravan `collected` what was
+   * handed over on its demand; giving the post back took its worth off (`postReturned`); or the Fall
+   * of the HQ `ended` it. It is `overdue` when its demand didn't settle it and the Trade Organization
+   * goes up to its next step.
+   */
+  | {
+      kind: 'debt'
+      what:
+        | 'owed'
+        | 'postOwed'
+        | 'rose'
+        | 'collected'
+        | 'postReturned'
+        | 'cityTaken'
+        | 'overdue'
+        | 'ended'
+      coins: number
+      owed: number
+    }
+  /**
+   * The resident `name` paid `coins` of the realm's Trade Org debt at the warehouse at (`x`, `y`),
+   * which leaves `owed` (`CONTEXT.md`: Trade Org debt).
+   */
+  | {
+      kind: 'debtPaid'
+      residentId: string
+      name: string
+      coins: number
+      owed: number
+      x: number
+      y: number
     }
   /**
    * The resident `name` bought off the admin directive with `reason` for `coins` at the Trade Org
@@ -1714,6 +2087,12 @@ export type RealmEventWhat =
       coins: number
       x: number
       y: number
+      /** With a wandering trader standing there, not at a warehouse (`CONTEXT.md`: Trader stop). */
+      withTrader?: true
+      /** At an NPC city's storage, not at a warehouse (`CONTEXT.md`: Trading with an NPC city). */
+      atStorage?: true
+      /** How far the trade moved standing; none on older lines or when it moved none. */
+      standing?: StandingMove
     }
   /**
    * The resident `name` accepted an offer of `realm` at the storage at (`x`, `y`), `times` of the
@@ -1745,6 +2124,8 @@ export type RealmEventWhat =
       times: number
       x: number
       y: number
+      /** How far taking it moved standing; none on older lines or when it moved none. */
+      standing?: StandingMove
     }
   /** Goods gone from the storage cut the realm's offer down to `times` over (`CONTEXT.md`: Offer). */
   | {
@@ -1815,6 +2196,40 @@ export type RealmEventWhat =
       coins: number
       x: number
       y: number
+      /** How far the swap moved standing; none on older lines or when it moved none. */
+      standing?: StandingMove
+    }
+  /**
+   * The resident `name` bought the horse `horse` of `city` for `coins`, at its stable at (`x`, `y`)
+   * (`CONTEXT.md`: Horse market); or couldn't, for `problem`, and nothing moved.
+   */
+  | {
+      kind: 'horseBought'
+      residentId: string
+      name: string
+      horseId: string
+      horse: string
+      city: string
+      coins: number
+      x: number
+      y: number
+      problem?: string
+    }
+  /**
+   * The resident `name` sold the horse `horse` to `city` for `coins`, at its stable at (`x`, `y`)
+   * (`CONTEXT.md`: Horse market); or couldn't, for `problem`, and nothing moved.
+   */
+  | {
+      kind: 'horseSold'
+      residentId: string
+      name: string
+      horseId: string
+      horse: string
+      city: string
+      coins: number
+      x: number
+      y: number
+      problem?: string
     }
   /**
    * The resident `name` ordered a delivery at the Trade Org warehouse at (`x`, `y`)
@@ -2253,6 +2668,16 @@ export type Protection = (typeof PROTECTION)[number]
 /** Goods by kind, as unit counts; a missing good is 0. */
 export type Stock = Partial<Record<Good, number>>
 
+/** How far a trade moved an Organization's regard for the realm (`CONTEXT.md`: Trade section). */
+export interface StandingMove {
+  /** The Organization: an NPC city, another realm or the Trade Organization. */
+  org: string
+  /** What Players call it (`organizationLabel`). */
+  name: string
+  /** Points it rose by. */
+  by: number
+}
+
 /** Everything one Player controls through their Leader (`CONTEXT.md`: Realm). */
 export interface Realm {
   id: string
@@ -2285,8 +2710,7 @@ export type DemandTerms =
  * what went, which is less than demanded when the storage was short, and where.
  */
 export type DemandHandedOver = { goods: Partial<Record<Good, number>> } & (
-  | { way: 'setAside'; x: number; y: number }
-  | { way: 'transfer'; fromCity: string; toCity: string }
+  { way: 'setAside'; x: number; y: number } | { way: 'transfer'; fromCity: string; toCity: string }
 )
 
 /**
@@ -2295,7 +2719,10 @@ export type DemandHandedOver = { goods: Partial<Record<Good, number>> } & (
  */
 export interface Demand {
   id: string
-  /** The realm that sent it. */
+  /**
+   * The realm that sent it; or the Trade Organization (`TRADE_ORG`), for a debt or, naming a city, a
+   * captured post it wants back (`CONTEXT.md`: Trade Org debt).
+   */
   fromId: string
   /**
    * The realm it was sent to, the only one who can answer it; or an NPC city by its id or the Trade
@@ -2391,6 +2818,8 @@ export interface City {
    * one that is gone is skipped.
    */
   workplaceIds?: string[]
+  /** What an NPC city's scouts have brought home (`CONTEXT.md`: Scout); nobody else sees it. */
+  scouted?: CityScouted
   /**
    * For a self-managed city, the Player whose Leader died while it was theirs and the tick it
    * happened (`CONTEXT.md`: Self-managed city). It holds them in good standing, fading from then
@@ -2402,7 +2831,16 @@ export interface City {
    * Held `OCCUPATION_GAME_DAYS` without a break, it captures the city.
    */
   occupation: Occupation | null
+  /**
+   * How it sets out its town (`CONTEXT.md`: City layout), kept once picked. Every NPC city has one;
+   * trading posts, the HQ and Players' cities have none.
+   */
+  layout?: CityLayout
 }
+
+/** The layouts an NPC city can get (`CONTEXT.md`: City layout). */
+export const CITY_LAYOUTS = ['grid', 'rings', 'mainStreet', 'quarters'] as const
+export type CityLayout = (typeof CITY_LAYOUTS)[number]
 
 /** A realm occupying a city's town hall (`CONTEXT.md`: Occupying a town hall). */
 export interface Occupation {

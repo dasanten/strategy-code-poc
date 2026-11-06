@@ -92,6 +92,11 @@ const SHARED: readonly ScriptBinding[] = [
     'any',
     'The values of the script’s `param` lines, picked on the resident card for whoever runs it: `params.name` for `param name: type`; a `number` param’s default (`param name: number = 3`) while none is set, else null.',
   ),
+  value(
+    'debt',
+    'number',
+    'The Coins my realm owes the Trade Organization, 0 when it owes nothing: what its army came for and couldn’t take, and what crimes cost it since.',
+  ),
   value('tick', 'number', 'The world tick this run is for.'),
   value('mapSize', 'number', 'Tiles along each side of the map; its opposite sides join.'),
   value(
@@ -113,6 +118,11 @@ const SHARED: readonly ScriptBinding[] = [
   list('cities', 'city', 'The cities the Player sees any of.'),
   list('horses', 'horse', 'The horses the Player sees.'),
   list('carriages', 'carriage', 'The carriages the Player sees.'),
+  list(
+    'traders',
+    'trader',
+    'The wandering traders the Player sees: those standing at a stop name where and their prices.',
+  ),
   list('piles', 'pile', 'The piles of goods the Player sees.'),
   list('nodes', 'node', 'The resource nodes on terrain the Player has explored.'),
   list(
@@ -408,6 +418,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'Unhitch the horse from a carriage of my realm on my tile, by it or its id; the horse stands free there, and a driver stops.',
   ),
   action(
+    'hitch',
+    ['carriage', 'horse'],
+    'Hitch a horse to a carriage of my realm on my tile, each by it or its id, at once: a horse of my realm on that tile that pulls no carriage, nobody rides and isn’t Down. A horse already hitched stands free there.',
+  ),
+  action(
     'board',
     ['carriageId'],
     'Get on a carriage of my realm on my tile as a passenger, and ride along with it.',
@@ -502,17 +517,27 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action(
     'buy',
     ['good', 'units', 'carriageId?', 'cityId?'],
-    'On a Trade Org warehouse or an NPC city’s storage, buy up to `units` of a good at its prices with the coins in my hands, or on my carriage there. At a warehouse, with `cityId`, one of my realm’s cities, a caravan delivers them to its storage for a fee.',
+    'On a Trade Org warehouse, an NPC city’s storage or the tile of a wandering trader standing at a stop, buy up to `units` of a good at its prices with the coins in my hands, or on my carriage there. At a warehouse, with `cityId`, one of my realm’s cities, a caravan delivers them to its storage for a fee.',
   ),
   action(
     'sell',
     ['good', 'units', 'carriageId?', 'cityId?'],
-    'On a Trade Org warehouse or an NPC city’s storage, sell up to `units` of a good at its prices from my hands, or from my carriage there. At a warehouse, with `cityId` (and no carriage), a caravan picks them up from that city’s storage and pays there, less a fee.',
+    'On a Trade Org warehouse, an NPC city’s storage or the tile of a wandering trader standing at a stop, sell up to `units` of a good at its prices from my hands, or from my carriage there. At a warehouse, with `cityId` (and no carriage), a caravan picks them up from that city’s storage and pays there, less a fee.',
   ),
   action(
     'swap',
     ['give', 'want', 'units', 'carriageId?'],
     'On a Trade Org warehouse or an NPC city’s storage, get up to `units` of the good `want` for as much of the good `give` as pays for them at its prices, rounded up, from my hands, or from my carriage there. What is over comes back in Coins as far as it holds them. An NPC city swaps only its surplus for what it is short of.',
+  ),
+  action(
+    'buyHorse',
+    ['horse'],
+    'At an NPC city’s finished stable, buy a horse standing in it that it can spare, by it or its id, with the coins in my hands; they go into its storage, and the horse joins my realm where it stands. `city.horses` lists its horses with their prices and why it won’t sell one.',
+  ),
+  action(
+    'sellHorse',
+    ['horse'],
+    'At an NPC city’s finished stable, sell it a horse of my realm standing in it, by it or its id; the coins go into my hands, and it doesn’t go if I can’t carry them. The horse joins the city where it stands. `city.horsesToSell` lists my horses there with what it pays and why it won’t buy one.',
   ),
   action(
     'handIn',
@@ -570,6 +595,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'On a Trade Org warehouse, pay the price of an admin directive against my realm with the coins in my hands, or on my carriage there, to end it.',
   ),
   action(
+    'payDebt',
+    ['coins', 'carriageId?'],
+    'On a Trade Org warehouse, pay up to `coins` of my realm’s debt to the Trade Organization with the coins in my hands, or on my carriage there: what I hold, up to what is owed.',
+  ),
+  action(
     'handOver',
     ['newLeaderId'],
     'As my realm’s Leader, make another resident its Leader: an adult of my realm serving no one else (no mercenary contract, not in the alliance army), standing in the same city of my realm as I do. Free and at once; I stay on as an ordinary resident.',
@@ -607,7 +637,7 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action(
     'acceptDemand',
     ['demandId', 'handOver'],
-    'Accept a demand sent to my realm. A demand for a city hands it over at once, also my last one; a city no longer mine is refused. A demand for goods or Coins names how they go in `handOver`: `{ way: "setAside", storageId: id }`, at a storage of mine for the sender alone to fetch, or `{ way: "transfer", fromCityId: id, toCityId: id }`, by Transfers from a city of mine to one of theirs whose storage I see, for a fee I pay. What the storage holds goes, up to what was demanded; with none of it there, it is refused.',
+    'Accept a demand sent to my realm. A demand for a city hands it over at once, also my last one; a city no longer mine is refused. A demand for goods or Coins names how they go in `handOver`: `{ way: "setAside", storageId: id }`, at a storage of mine for the sender alone to fetch, or `{ way: "transfer", fromCityId: id, toCityId: id }`, by Transfers from a city of mine to one of theirs whose storage I see, for a fee I pay. What the storage holds goes, up to what was demanded; with none of it there, it is refused. For the Trade Organization’s demand for my debt, its caravan fetches what is set aside at a storage in a city for no fee, and a Transfer goes to its nearest warehouse whatever `toCityId` says; what they bring in comes off the debt.',
   ),
   action('declineDemand', ['demandId'], 'Decline a demand sent to my realm.'),
   action(

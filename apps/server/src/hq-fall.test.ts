@@ -96,7 +96,7 @@ describe('the fall of the HQ (CONTEXT.md: Fall of the HQ)', () => {
     Object.assign(p1, { x: hall.x + 1, y: hall.y + 1, carried: { sword: 1, food: 5 } })
     hq.occupation = { realmId: realm.id, since: world.tick + 1 - OCCUPATION_TICKS }
     world.tick++
-    expect(stepCaptures(world, terrain.size)).toEqual([{ cityId: hq.id, from: null, to: realm.id }])
+    expect(stepCaptures(world, terrain)).toEqual([{ cityId: hq.id, from: null, to: realm.id }])
     expect(hq.tradeOrg).toBeUndefined()
     expect(world.caravans).toEqual([])
     expect(checkInvariants(world, terrain)).toEqual([])
@@ -142,11 +142,11 @@ describe('the fall of the HQ (CONTEXT.md: Fall of the HQ)', () => {
     expect(post.tradeOrg).toBe('post')
     expect(warehouse.kind).toBe('warehouse')
     expect(tradeProblem(world, realm.id, p1, 'buy', 'wood', 1, null)).toBeUndefined()
-    // The stock floor still tops it up.
-    warehouse.stock = {}
+    // Nothing tops it up (ADR 0023), and with the HQ gone nothing brings it more but its own hands.
+    warehouse.stock = { wood: 3 }
     world.tick = TICKS_PER_GAME_DAY - 1
     stepStockFloor(world)
-    expect(warehouse.stock.wood).toBeGreaterThan(0)
+    expect(warehouse.stock).toEqual({ wood: 3 })
     const refused = 'no caravans run since the Trade Org HQ fell'
     expect(tradeProblem(world, realm.id, p1, 'buy', 'wood', 1, null, city.id)).toBe(refused)
     expect(order(world, queue, { kind: 'buy', good: 'wood', units: 1, cityId: city.id })).toBe(

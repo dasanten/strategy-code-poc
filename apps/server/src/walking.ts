@@ -39,11 +39,18 @@ import {
 } from '@csp/shared'
 import { orderedResident } from './order-sender.js'
 import type { OrderKind, OrderSender } from './orders.js'
-import { CARRIAGE_COSTS, PathFinder, WALKING_COSTS } from './pathfinding.js'
+import {
+  CARRIAGE_COSTS,
+  PathFinder,
+  WALKING_COSTS,
+  type PathResult,
+  type Point,
+} from './pathfinding.js'
 import { waitingForArmy } from './armies.js'
 import { waitingForEscort } from './caravans.js'
 import { attackTarget } from './combat.js'
 import { endOrder, placeOf, placeTile } from './storing.js'
+import { waitingOnTheRoad } from './trade-org-punishment.js'
 import { worldIndex } from './world-index.js'
 
 /** Time the pathfinder may use per tick (ADR 0004: ticks stay well under their 1 s budget). */
@@ -268,6 +275,28 @@ export class Walking {
   }
 
   /**
+   * The way someone of `side` would walk between two tiles, through their own gates and not over
+   * walls, for what is built along it (`CONTEXT.md`: NPC road); with `area`, only as far as the first
+   * of its tiles. Searched a little at a time with the walks (`PathFinder`): ask again until it is
+   * settled; a settled answer is handed out once. A search lost on a restart is simply asked for
+   * again.
+   */
+  way(
+    key: string,
+    from: Point,
+    to: Point,
+    side: string | null,
+    area?: ReadonlySet<number>,
+  ): PathResult {
+    const id = `way:${key}`
+    const result = this.finder.result(id)
+    if (result) return result
+    const options = { realmId: side, onWalls: false, ...(area && { area }) }
+    this.finder.request(id, from, to, WALKING_COSTS, options)
+    return { status: 'searching' }
+  }
+
+  /**
    * Requests this tick's steps for every walking resident and every driver. A driver goes at
    * their carriage's speed and learns Driving while they drive; so does a rider, at their horse's
    * (`CONTEXT.md`: Riding). On a finished road all go at
@@ -299,6 +328,8 @@ export class Walking {
     const waiting = waitingForArmy(world, holding)
     // And caravans with their escort (`CONTEXT.md`: Caravan).
     for (const id of waitingForEscort(world, this.terrain.size)) waiting.add(id)
+    // And the Trade Org's soldiers on the road (`CONTEXT.md`: Punishment trip).
+    for (const id of waitingOnTheRoad(world, this.terrain.size)) waiting.add(id)
     const steps: StepAction[] = []
     for (const r of world.residents) {
       const o = moveOrder(r)
@@ -371,8 +402,12 @@ export class Walking {
         // A rider keeps to where a carriage can go, and off the walls (`CONTEXT.md`: Riding).
         const costs = walking(r, o) ? WALKING_COSTS : CARRIAGE_COSTS
         // An attacker only needs to come into contact, even with a defender up on a wall.
-        // So does a carriage going after an army (`CONTEXT.md`: Supply line).
-        const near = o.kind === 'attack' || armyDrivenTo(r) !== undefined
+        // So does a carriage going after an army (`CONTEXT.md`: Supply line), and one driven up to
+        // a wall or gate it may not pass (`CONTEXT.md`: Lost post found out).
+        const near =
+          o.kind === 'attack' ||
+          armyDrivenTo(r) !== undefined ||
+          (o.kind === 'drive' && o.near === true)
         const options = { realmId: wallSide(r), onWalls: walking(r, o), near }
         this.finder.request(r.id, [r.x, r.y], [target.x, target.y], costs, options)
         this.searching.set(r.id, key)

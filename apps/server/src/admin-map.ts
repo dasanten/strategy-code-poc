@@ -22,6 +22,7 @@ import {
   type AdminWorldView,
   type Building,
   type Caravan,
+  type Trader,
   type RegionMap,
   type RunningScript,
   type Stock,
@@ -103,7 +104,7 @@ function adminOrganization(
 /**
  * Every entity in the rectangle, each with its Organization (`AdminWorldView`): residents, cities
  * (where their town hall stands, with their finished houses), buildings, horses, carriages, piles, armies (when any member is
- * in it) and caravans (when their carriage or any of their crew is). With `citiesOnly`, cities
+ * in it) and caravans and wandering traders (when their carriage or any of their crew is). With `citiesOnly`, cities
  * alone.
  */
 export function adminWorldView(
@@ -128,7 +129,10 @@ export function adminWorldView(
     const hall = townHallOf(world, c)
     if (hall && here(hall)) {
       const at = { x: hall.x, y: hall.y, houses: houses.get(c.id) ?? 0 }
-      out.push({ is: 'city', ...c, ...at, org: cityOrganization(c) })
+      // What its scouts brought home is for the inspector, not for every map update.
+      const shown = { ...c }
+      delete shown.scouted
+      out.push({ is: 'city', ...shown, ...at, org: cityOrganization(c) })
     }
   }
   if (!view.citiesOnly) {
@@ -169,11 +173,20 @@ export function adminWorldView(
       if (!carriageHere.has(c.carriageId) && !crew.some((id) => residentHere.has(id))) continue
       out.push({ is: 'caravan', ...c, org: TRADE_ORGANIZATION })
     }
+    for (const t of world.traders) {
+      const crew = crewIdsOf(t)
+      if (!carriageHere.has(t.carriageId) && !crew.some((id) => residentHere.has(id))) continue
+      out.push({ is: 'trader', ...t, org: TRADE_ORGANIZATION })
+    }
   }
   const orgIds = new Set(out.flatMap((e) => (e.org === null ? [] : [e.org])))
   const orgs = [...orgIds].sort().map((id) => adminOrganization(world, id, lookups))
   return { tick: world.tick, orgs, entities: out }
 }
+
+/** What the admin map calls a wandering trader: by the stop it goes to next. */
+const traderName = (world: WorldState, t: Trader) =>
+  world.cities.find((c) => c.id === t.postId)?.name ?? 'a lost post'
 
 /** The jump list for the whole world (`AdminPlaces`), each list by name. */
 export function adminPlaces(world: WorldState, lookups: AdminLookups): AdminPlaces {
@@ -224,6 +237,14 @@ export function adminPlaces(world: WorldState, lookups: AdminLookups): AdminPlac
     })
     .sort(byName)
 
+  const traders = world.traders
+    .flatMap((t) => {
+      const at = carriages.get(t.carriageId) ?? (t.driverId ? residents.get(t.driverId) : undefined)
+      if (!at) return []
+      return [{ id: t.id, name: traderName(world, t), x: at.x, y: at.y }]
+    })
+    .sort(byName)
+
   const armies = world.armies
     .flatMap((a) => {
       const member = a.memberIds.map((id) => residents.get(id)).find((r) => r !== undefined)
@@ -237,7 +258,7 @@ export function adminPlaces(world: WorldState, lookups: AdminLookups): AdminPlac
     tick: world.tick,
     realms,
     npcCities,
-    tradeOrg: { hq: (hq && cityPlace(hq)) ?? null, posts: placesOf(posts), caravans },
+    tradeOrg: { hq: (hq && cityPlace(hq)) ?? null, posts: placesOf(posts), caravans, traders },
     armies,
   }
 }
@@ -268,6 +289,8 @@ export function adminInspection(
   const residentNamed = (id: string) => named(world.residents.find((r) => r.id === id))
   const postName = (c: Caravan) => cityById(c.postId)?.name ?? 'a lost post'
   const caravanNamed = (c: Caravan | undefined) => (c ? { id: c.id, name: postName(c) } : null)
+  const traderNamed = (t: Trader | undefined) =>
+    t ? { trader: { id: t.id, name: traderName(world, t) } } : {}
   const { tick } = world
   const { id } = target
 
@@ -286,6 +309,7 @@ export function adminInspection(
         city: named(cityById(r.cityId)),
         army: named(army),
         caravan: caravanNamed(caravan),
+        ...traderNamed(world.traders.find((t) => t.driverId === id || t.escortIds.includes(id))),
         leader: world.realms.some((realm) => realm.leaderId === id),
       }
     }
@@ -340,16 +364,19 @@ export function adminInspection(
       const k = world.carriages.find((x) => x.id === id)
       if (!k) return undefined
       const caravan = world.caravans.find((c) => c.carriageId === id)
+      const trader = world.traders.find((t) => t.carriageId === id)
+      const crewed = caravan ?? trader
       const driver = world.residents.find(
         (r) => (r.order?.kind === 'drive' || r.order?.kind === 'haul') && r.order.carriageId === id,
       )
       return {
         tick,
-        org: org(caravan ? TRADE_ORGANIZATION : (k.realmId ?? cityOrg(k.cityId))),
+        org: org(crewed ? TRADE_ORGANIZATION : (k.realmId ?? cityOrg(k.cityId))),
         is: 'carriage',
         carriage: k,
-        driver: named(driver) ?? (caravan?.driverId ? residentNamed(caravan.driverId) : null),
+        driver: named(driver) ?? (crewed?.driverId ? residentNamed(crewed.driverId) : null),
         caravan: caravanNamed(caravan),
+        ...traderNamed(trader),
       }
     }
     case 'pile': {
@@ -383,6 +410,20 @@ export function adminInspection(
         post: named(cityById(c.postId)),
         carriage: world.carriages.find((k) => k.id === c.carriageId) ?? null,
         crew: crewIdsOf(c).flatMap((m) => residentNamed(m) ?? []),
+      }
+    }
+    case 'trader': {
+      const t = world.traders.find((x) => x.id === id)
+      if (!t) return undefined
+      return {
+        tick,
+        org: org(TRADE_ORGANIZATION),
+        is: 'trader',
+        trader: t,
+        post: named(cityById(t.postId)),
+        loop: t.loop.flatMap((p) => named(cityById(p)) ?? []),
+        carriage: world.carriages.find((k) => k.id === t.carriageId) ?? null,
+        crew: crewIdsOf(t).flatMap((m) => residentNamed(m) ?? []),
       }
     }
   }

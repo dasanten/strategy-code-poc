@@ -1,5 +1,6 @@
 import {
   GOOD_WEIGHT,
+  STANDING_NPC_TRADE_COINS_PER_POINT,
   STANDING_TRADE_COINS_PER_POINT,
   TRADE_ORG,
   Terrain,
@@ -323,6 +324,33 @@ describe('a swap with an NPC city', () => {
     expect(storage.stock.stone).toBe((reserve.stone ?? 0) + 18)
     expect(world.events.at(-1)).toMatchObject({ kind: 'swapped', place: 'storage', units: 2 })
     expect(standingOf(world, 'r1', 'npc')).toBeGreaterThan(0)
+  })
+
+  it('raises standing both ways by an NPC city’s own number, and the log says how far', () => {
+    const { world, npc, storage, p1, queue } = npcCity()
+    const reserve = npcReserve(world, npc)
+    storage.stock = { stone: (reserve.stone ?? 0) + 20, wood: 0, coins: 500 }
+    p1.carried = { wood: 20 }
+    const q = quoteNpcSwap(
+      world,
+      npc,
+      storage,
+      { stock: p1.carried, room: 100 },
+      'wood',
+      'stone',
+      2,
+      'r1',
+    )
+    swap(world, queue, { give: 'wood', want: 'stone', units: 2 })
+    run(world)
+    const raised = (q.bought + q.sold) / STANDING_NPC_TRADE_COINS_PER_POINT
+    expect(raised).toBeGreaterThan(0)
+    expect(standingOf(world, 'npc', 'r1')).toBeCloseTo(raised, 2)
+    expect(standingOf(world, 'r1', 'npc')).toBeCloseTo(raised, 2)
+    expect(world.events.at(-1)).toMatchObject({
+      kind: 'swapped',
+      standing: { org: 'npc', name: npc.name, by: Math.round(raised * 100) / 100 },
+    })
   })
 
   it('refuses a good it isn’t short of', () => {

@@ -55,7 +55,7 @@ function setup() {
   resident(world, 'b1', 'r2', 160, 20)
   addCity(world, { id: 'npc', realmId: null, x: 80, y: 80, name: 'Dunmere' })
   resident(world, 'n1', null, 84, 80)
-  addCity(world, { id: 'post', realmId: null, x: 200, y: 200, name: 'Post' }).tradeOrg = 'post'
+  addCity(world, { id: 'post', realmId: null, x: 200, y: 200, name: 'Post', tradeOrg: 'post' })
   const queue = new OrderQueue()
   const order = (sender: ReturnType<typeof player>, o: object) => {
     const answer = queue.receive(world, sender, 'q', o)

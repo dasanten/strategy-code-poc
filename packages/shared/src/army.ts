@@ -26,19 +26,22 @@ export function armyDrivenTo(driver: Resident): string | undefined {
 
 /**
  * Where an army is for a carriage at `from` that goes after it: the tile of its member nearest
- * `from`, on a map of `size` tiles. Undefined when the army is gone.
+ * `from`, on a map of `size` tiles. `armyId` may name a Trade Org punishment, whose soldiers are an
+ * army too (`CONTEXT.md`: Trade Org debt). Undefined when the army is gone.
  */
 export function armySpot(
-  world: Pick<WorldState, 'armies' | 'residents'>,
+  world: Pick<WorldState, 'armies' | 'residents' | 'punishments'>,
   armyId: string,
   from: { x: number; y: number },
   size: number,
 ): { x: number; y: number } | undefined {
-  const army = world.armies.find((a) => a.id === armyId)
-  if (!army) return undefined
+  const members =
+    world.armies.find((a) => a.id === armyId)?.memberIds ??
+    world.punishments.find((p) => p.id === armyId)?.members.map((m) => m.residentId)
+  if (!members) return undefined
   let best: { at: { x: number; y: number }; d: number } | undefined
   for (const r of world.residents) {
-    if (!army.memberIds.includes(r.id)) continue
+    if (!members.includes(r.id)) continue
     const d = wrapDistance(size, from, r)
     if (!best || d < best.d) best = { at: { x: r.x, y: r.y }, d }
   }

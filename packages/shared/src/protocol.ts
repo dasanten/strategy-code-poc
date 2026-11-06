@@ -3,6 +3,7 @@ import type { Diplomacy } from './alliance.js'
 import type { FirstDay } from './first-day.js'
 import type { RegionMap } from './region-map.js'
 import type { LoadLevel } from './carriages.js'
+import type { NpcHorseOffer } from './horse-market.js'
 import type { NpcCityPrice } from './npc-trade.js'
 import type { SeenOffer } from './offers.js'
 import type { WarehousePrice } from './warehouse.js'
@@ -18,6 +19,8 @@ import type {
   ScriptMemory,
   SeenArmy,
   SeenCaravan,
+  SeenTrader,
+  TraderVisit,
   SeenResident,
   WorkplaceSettings,
   Waypoint,
@@ -47,7 +50,10 @@ export interface OrderRequest {
  * reaction). An NPC city that doesn't refuse them says how many residents it would lend and what
  * it asks for each a week (`hire`, `CONTEXT.md`: Hiring from an NPC city) and, with a storage of
  * it in sight, its prices to them (`trade`, `CONTEXT.md`: Trading with an NPC city). What its
- * storages hold together is left out of those unless the Player sees inside one of them.
+ * storages hold together is left out of those unless the Player sees inside one of them. With a
+ * stable of it in sight, the horses in sight standing there, with what it asks for each and why it
+ * won't sell it (`horses`, `CONTEXT.md`: Horse market), and the Player's own in sight standing there,
+ * with what it pays for each and why it won't buy it (`horsesToSell`), refusing or not.
  */
 export type SeenCity = City & {
   price?: number
@@ -55,6 +61,8 @@ export type SeenCity = City & {
   refuses?: true
   hire?: { spare: number; pricePerResidentWeek: number }
   trade?: Shown<NpcCityPrice>[]
+  horses?: NpcHorseOffer[]
+  horsesToSell?: NpcHorseOffer[]
 }
 
 /**
@@ -112,6 +120,8 @@ export type SeenEntity =
   | ({ is: 'army' } & SeenArmy)
   /** A Trade Org caravan; its carriage and crew are what is seen of it (`CONTEXT.md`: Caravan). */
   | ({ is: 'caravan' } & SeenCaravan)
+  /** A wandering trader, seen the same way (`CONTEXT.md`: Wandering trader). */
+  | ({ is: 'trader' } & SeenTrader)
 
 /**
  * A building, construction site or city as the Player last saw it (`CONTEXT.md`: Last seen):
@@ -164,6 +174,8 @@ export type ServerMessage =
       horseOffer: boolean
       /** The Player's waypoints, oldest first (`CONTEXT.md`: Waypoint). */
       waypoints: Waypoint[]
+      /** Wandering traders standing at the realm's cities (`CONTEXT.md`: Trader stop). */
+      traderVisits: TraderVisit[]
       /** The Player's first-day card (`CONTEXT.md`: First day). */
       firstDay: FirstDay
       /**
@@ -182,8 +194,9 @@ export type ServerMessage =
    * when the Player handed the realm to another (`CONTEXT.md`: Leader handover), and the
    * realm name once the Player named it (`CONTEXT.md`: Realm name), and `horseOffer` when it
    * changed: false once they claimed their Horse offer, true once an admin re-opened it
-   * (`CONTEXT.md`: Horse offer), all the realm's Workplace settings whenever they changed, and all
-   * their waypoints when they changed (`CONTEXT.md`: Waypoint).
+   * (`CONTEXT.md`: Horse offer), all the realm's Workplace settings whenever they changed, all
+   * their waypoints when they changed (`CONTEXT.md`: Waypoint), and all the wandering traders
+   * standing at the realm's cities when those changed (`CONTEXT.md`: Trader stop).
    */
   | {
       type: 'tick'
@@ -200,6 +213,7 @@ export type ServerMessage =
       horseOffer?: boolean
       workSettings?: Record<string, WorkplaceSettings>
       waypoints?: Waypoint[]
+      traderVisits?: TraderVisit[]
     }
   /**
    * The memory of the script run by a resident or army whose Script tab the Player has open

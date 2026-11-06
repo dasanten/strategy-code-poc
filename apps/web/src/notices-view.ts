@@ -1,4 +1,10 @@
-import { FIRST_DAY_LINES, type FirstDay, type FirstDayLine } from '@csp/shared'
+import {
+  FIRST_DAY_LINES,
+  aboutTime,
+  type FirstDay,
+  type FirstDayLine,
+  type TraderVisit,
+} from '@csp/shared'
 import { isWide, type OpenDrawer } from './hud-view.js'
 
 /**
@@ -6,7 +12,14 @@ import { isWide, type OpenDrawer } from './hud-view.js'
  * banner, in the order they stack. Lasting ones come first and passing ones after, so a notice
  * that comes and goes never moves a button the Player is aiming at.
  */
-export const NOTICE_ORDER = ['horseOffer', 'incoming', 'demand', 'firstDay', 'groupReport'] as const
+export const NOTICE_ORDER = [
+  'horseOffer',
+  'incoming',
+  'demand',
+  'firstDay',
+  'traderVisit',
+  'groupReport',
+] as const
 
 /** A notice in the lane: the pick banner or one of `NOTICE_ORDER`. */
 export type NoticeKind = 'pick' | (typeof NOTICE_ORDER)[number]
@@ -18,6 +31,15 @@ export type NoticeKind = 'pick' | (typeof NOTICE_ORDER)[number]
 export function laneNotices(wanted: Partial<Record<NoticeKind, boolean>>): NoticeKind[] {
   if (wanted.pick) return ['pick']
   return NOTICE_ORDER.filter((kind) => wanted[kind])
+}
+
+/** Which of a realm's trader visits (`CONTEXT.md`: Trader stop) stays dismissed: this one stop. */
+export const visitKey = (v: Pick<TraderVisit, 'traderId' | 'until'>) => `${v.traderId}:${v.until}`
+
+/** The notice's text for a wandering trader standing at a city (`CONTEXT.md`: Trader stop). */
+export function traderVisitLine(v: TraderVisit, tick: number): string {
+  const left = aboutTime(Math.max(0, v.until - tick))
+  return `A wandering trader stands at ${v.city}, at (${v.x}, ${v.y}), and goes on in ${left}`
 }
 
 /**

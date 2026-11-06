@@ -905,6 +905,7 @@ export function MapView({
           ? holderLabel(holderAt(worldRef.current.region, mapSize, wx, wy))
           : undefined,
         caravan: caravanAt(caravanParts(worldRef.current.caravans), worldRef.current, wx, wy),
+        trader: caravanAt(caravanParts(worldRef.current.traders), worldRef.current, wx, wy),
       })
       pointer = { x: sx, y: sy }
       updateHover()
@@ -1380,6 +1381,11 @@ function Legend() {
       <div>
         <span className="swatch" style={{ background: css(CARAVAN_COLOR) }} />
         <span>Caravan</span>
+        <span className="rule">Trade Org</span>
+      </div>
+      <div>
+        <span className="swatch" style={{ background: css(CARAVAN_COLOR) }} />
+        <span>Wandering trader</span>
         <span className="rule">Trade Org</span>
       </div>
     </div>

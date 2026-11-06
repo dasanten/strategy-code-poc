@@ -2,8 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import {
   GOODS,
   buildingRealm,
+  horseBuyerProblem,
+  horseSellerProblem,
   isClosed,
+  noSwap,
   type Building,
+  type NpcHorseOffer,
   type SeenBuilding,
   type Carriage,
   type DeliveryQuote,
@@ -11,14 +15,19 @@ import {
   type DirectiveView,
   type NpcCityPrice,
   type PricedGood,
+  type RealmEvent,
   type RealmLabel,
   type Resident,
   type SeenCity,
+  type StandingView,
   type TradeSide,
   type SeenResident,
   type Stock,
   type SeenCarriage,
   type SeenHorse,
+  type SeenTrader,
+  type TraderVisit,
+  aboutTime,
   type SwapQuote,
   type SwapRate,
 } from '@csp/shared'
@@ -28,6 +37,7 @@ import {
   deliveryCities,
   describeCity,
   describeOccupation,
+  npcStablesInSight,
   npcStoragesInSight,
   previewDelivery,
   previewNpcSwap,
@@ -47,10 +57,13 @@ import {
   tradesHere,
   tradeLists,
   tradersAt,
+  traderStopsAt,
+  previewTraderTrade,
   tradeText,
   warehousesInSight,
   type BuyView,
   type DeliveryCity,
+  type NpcStableView,
   type SendView,
   type TradeLine,
   type TradeLists,
@@ -58,14 +71,17 @@ import {
   type TradersView,
   type WarehouseView,
 } from './city-view.js'
+import { loadKnown } from './seen.js'
 import { GOOD_LABELS } from './Residents.js'
 import { offerStoragesOf, outpostOfferStorages } from './offers-view.js'
 import { StorageOffers, type AcceptOfferRequest, type PostOfferRequest } from './Offers.js'
 import { GoodIcon } from './GoodsGrid.js'
 import { carriedShort } from './residents-view.js'
 import { lastSeenText, type LastSeen } from './last-seen.js'
+import { horseStatsText } from './selection-view.js'
 import { HOW_TO_TRADE_PATH } from './wiki-view.js'
 import { PanelHead } from './drawer-head.js'
+import { tradeStandingLine } from './standing-view.js'
 
 /**
  * The city inspector: every city in sight (`CONTEXT.md`: City, NPC city), whose it is, and,
@@ -75,7 +91,8 @@ import { PanelHead } from './drawer-head.js'
  * the prices of its warehouses in sight (`CONTEXT.md`: Warehouse prices), where the Player's
  * residents on a warehouse buy and sell (`CONTEXT.md`: Trading with the Trade Organization). An
  * NPC city that doesn't refuse the Player lists its prices at its storages in sight, where their
- * residents trade with it the same way (`CONTEXT.md`: Trading with an NPC city).
+ * residents trade with it the same way (`CONTEXT.md`: Trading with an NPC city), and a wandering
+ * trader standing at a city lists its own, for the same (`CONTEXT.md`: Trader stop).
  * A city of another realm takes transfers from the Player's cities (`CONTEXT.md`: Transfer).
  * Below them, the cities the Player remembers out of sight (`CONTEXT.md`: Last seen): as they
  * last saw them and when, greyed, with nothing to do there.
@@ -85,6 +102,8 @@ export function CityInspector({
   lastSeen,
   residents,
   buildings,
+  traders,
+  traderVisits,
   realmId,
   realms,
   carriages,
@@ -95,24 +114,34 @@ export function CityInspector({
   onBuyCity,
   onTrade,
   onSwap,
+  onBuyHorse,
+  onSellHorse,
   onTransfer,
   onSend,
   arrivesIn,
   directives,
+  debt,
   noCaravans,
   onBuyOff,
+  onPayDebt,
   onPostOffer,
   onTakeDownOffer,
   onAcceptOffer,
   openId,
   onOpen,
   scrollTo,
+  standings,
+  events,
 }: {
   cities: SeenCity[]
   /** What the Player remembers out of sight. */
   lastSeen: LastSeen
   residents: SeenResident[]
   buildings: SeenBuilding[]
+  /** The wandering traders in sight (`CONTEXT.md`: Trader stop). */
+  traders: SeenTrader[]
+  /** Those standing at the realm's cities, in sight or not. */
+  traderVisits: TraderVisit[]
   realmId: string
   realms: RealmLabel[]
   carriages: SeenCarriage[]
@@ -127,6 +156,10 @@ export function CityInspector({
   onTrade: (trade: TradeRequest) => void
   /** Gives a swap order to one of the Player's residents on a warehouse or NPC storage. */
   onSwap: (swap: SwapRequest) => void
+  /** Gives a buy horse order to one of the Player's residents at an NPC city's stable. */
+  onBuyHorse: (buy: HorseTradeRequest) => void
+  /** Gives a sell horse order to one of the Player's residents at an NPC city's stable. */
+  onSellHorse: (sale: HorseTradeRequest) => void
   /** Orders a transfer from one of the Player's cities to another realm's city. */
   onTransfer: (transfer: TransferRequest) => void
   /** Sends one of the Player's residents, or a carriage they drive, to a warehouse or storage. */
@@ -135,10 +168,14 @@ export function CityInspector({
   arrivesIn: ((r: Resident) => number | undefined) | undefined
   /** The admin directives in force; one naming the Player's realm may be bought off here. */
   directives: DirectiveView[]
+  /** The Coins the Player's realm owes the Trade Organization (`CONTEXT.md`: Trade Org debt). */
+  debt: number
   /** The Trade Org HQ has fallen, so nothing can be delivered or transferred (`CONTEXT.md`). */
   noCaravans: boolean
   /** Gives the buy-off order for a directive to one of the Player's residents on a warehouse. */
   onBuyOff: (residentId: string, directiveId: string, carriageId: string | null) => void
+  /** Gives the order to pay some of the debt to one of the Player's residents on a warehouse. */
+  onPayDebt: (residentId: string, coins: number, carriageId: string | null) => void
   /** Posts an offer at a storage of the Player's realm (`CONTEXT.md`: Offer). */
   onPostOffer: (offer: PostOfferRequest) => void
   /** Takes down an offer of the Player's realm. */
@@ -154,6 +191,10 @@ export function CityInspector({
    * asks (`CONTEXT.md`: Trade section); each new object scrolls again.
    */
   scrollTo?: { buildingId: string }
+  /** How others regard the realm, for the standing line of the Trade section. */
+  standings: StandingView[]
+  /** The realm's log, for how far its last trade moved that standing. */
+  events: RealmEvent[]
 }) {
   const views = cities.map((c) => ({
     ...describeCity(c, { residents, buildings }, realmId, realms),
@@ -202,6 +243,11 @@ export function CityInspector({
       <PanelHead title="Cities in sight">
         {views.length === 0 ? 'none in sight' : `${views.length} in sight`}
       </PanelHead>
+      {debt > 0 && (
+        <p className="occupation warn">
+          You owe the Trade Organization {debt} Coins. A resident can pay at any of its warehouses.
+        </p>
+      )}
       <ul className="city-list">
         {views.map((v) => (
           <li key={v.id}>
@@ -228,8 +274,9 @@ export function CityInspector({
             {openId === v.id &&
               tradesHere(
                 cities.find((c) => c.id === v.id)!,
-                { cities, buildings },
+                { cities, buildings, traders },
                 realmId,
+                traderVisits,
               ) && (
                 <p className="small trade-wiki">
                   {/* A new tab, so the game keeps running behind it (`CONTEXT.md`: Wiki). */}
@@ -238,6 +285,17 @@ export function CityInspector({
                   </a>
                 </p>
               )}
+            {openId === v.id && (
+              <TradeStanding
+                line={tradeStandingLine(
+                  cities.find((c) => c.id === v.id)!,
+                  { cities, buildings, traders },
+                  traderVisits,
+                  standings,
+                  events,
+                )}
+              />
+            )}
             {openId === v.id &&
               warehousesInSight(
                 cities.find((c) => c.id === v.id)!,
@@ -304,6 +362,11 @@ export function CityInspector({
                     traders={tradersAt(w, { residents, carriages }, realmId)}
                     onBuyOff={onBuyOff}
                   />
+                  <PayingDebt
+                    debt={debt}
+                    traders={tradersAt(w, { residents, carriages }, realmId)}
+                    onPayDebt={onPayDebt}
+                  />
                 </div>
               ))}
             {openId === v.id &&
@@ -367,6 +430,67 @@ export function CityInspector({
                     previewDelivery={() => ({ buy: noDelivery, sell: noDelivery })}
                     onTrade={onTrade}
                   />
+                </div>
+              ))}
+            {openId === v.id &&
+              npcStablesInSight(
+                cities.find((c) => c.id === v.id)!,
+                { buildings },
+              ).map((s) => (
+                <div key={s.id} data-trade-at={s.id}>
+                  <HorseMarket
+                    stable={s}
+                    traders={tradersAt(s, { residents, carriages }, realmId).residents}
+                    sending={sending(s)}
+                    tick={tick}
+                    onBuy={onBuyHorse}
+                    onSell={onSellHorse}
+                  />
+                </div>
+              ))}
+            {openId === v.id &&
+              traderStopsAt(v, traders, traderVisits).map((s) => (
+                <div key={s.id} data-trade-at={s.id}>
+                  {!s.unseen && (
+                    <Prices
+                      warehouse={s}
+                      lists={tradeLists(s, { buildings })}
+                      place="Wandering trader"
+                    />
+                  )}
+                  <p className="small muted">
+                    {s.unseen && `A wandering trader stands at (${s.x}, ${s.y}). `}It goes on in{' '}
+                    {aboutTime(Math.max(0, s.until - tick))}.
+                  </p>
+                  {s.unseen ? (
+                    <Sending warehouse={s} place="wandering trader" {...sending(s)} />
+                  ) : (
+                    <Trading
+                      warehouse={s}
+                      goods={tradedGoods(s, tradeLists(s, { buildings }))}
+                      place="wandering trader"
+                      traders={tradersAt(s, { residents, carriages }, realmId)}
+                      sending={sending(s)}
+                      deliveryCities={[]}
+                      swapGoods={[]}
+                      previewSwap={() => noSwap()}
+                      onSwap={onSwap}
+                      preview={(resident, carriage, good, units) =>
+                        previewTraderTrade(
+                          traders.find((t) => t.id === s.id) ?? { escortIds: [] },
+                          carriages.filter(loadKnown).find((k) => k.id === s.carriageId),
+                          resident,
+                          carriage,
+                          good,
+                          units,
+                          tick,
+                          horses,
+                        )
+                      }
+                      previewDelivery={() => ({ buy: noDelivery, sell: noDelivery })}
+                      onTrade={onTrade}
+                    />
+                  )}
                 </div>
               ))}
             {openId === v.id && offerStoragesOf(v, { cities, buildings }, realmId).map(offersAt)}
@@ -474,6 +598,19 @@ function RememberedCity({
 }
 
 /**
+ * The standing with whoever a trade at this city moves it with, and how far the last trade moved it
+ * (`CONTEXT.md`: Trade section), where one can be traded with here.
+ */
+function TradeStanding({ line }: { line: string | undefined }) {
+  if (!line) return null
+  return (
+    <p className="small" aria-label="Standing here">
+      {line}
+    </p>
+  )
+}
+
+/**
  * What an NPC city that holds the Player in low standing won't do (`CONTEXT.md`: NPC city
  * reaction): let their residents through its gates, trade, hire out, or sell itself.
  */
@@ -562,8 +699,8 @@ function Prices({
 }: {
   warehouse: WarehouseView
   lists: TradeLists
-  /** What it is called: a Trade Org warehouse or an NPC city's storage. */
-  place?: 'Warehouse' | 'Storage'
+  /** What it is called: a Trade Org warehouse, an NPC city's storage or a wandering trader. */
+  place?: 'Warehouse' | 'Storage' | 'Wandering trader'
 }) {
   const at = `${place} at (${warehouse.x}, ${warehouse.y})`
   return (
@@ -691,8 +828,8 @@ function Trading({
   warehouse: WarehouseView
   /** The goods that can be traded there (`tradedGoods`), for the Good picker. */
   goods: PricedGood[]
-  /** Where the trade happens: a Trade Org warehouse or an NPC city's storage. */
-  place?: 'warehouse' | 'storage'
+  /** Where the trade happens: a Trade Org warehouse, an NPC city's storage or a wandering trader. */
+  place?: TradePlace
   traders: TradersView
   /** Whom to send there while nobody of the Player's is, and who is on the way. */
   sending: SendingProps
@@ -862,22 +999,24 @@ function Trading({
           {sellText}
         </button>
       </p>
-      <Swapping
-        goods={swapGoods}
-        rates={rates}
-        firstRate={rate}
-        holds={carriage ? carriage.load : resident.carried}
-        preview={(give, want, n) => previewSwap(resident, carriage, give, want, n)}
-        onSwap={(give, want, n) =>
-          onSwap({
-            residentId: resident.id,
-            give,
-            want,
-            units: n,
-            carriageId: carriage?.id ?? null,
-          })
-        }
-      />
+      {swapGoods.length > 0 && (
+        <Swapping
+          goods={swapGoods}
+          rates={rates}
+          firstRate={rate}
+          holds={carriage ? carriage.load : resident.carried}
+          preview={(give, want, n) => previewSwap(resident, carriage, give, want, n)}
+          onSwap={(give, want, n) =>
+            onSwap({
+              residentId: resident.id,
+              give,
+              want,
+              units: n,
+              carriageId: carriage?.id ?? null,
+            })
+          }
+        />
+      )}
     </div>
   )
 }
@@ -1012,6 +1151,137 @@ function Rates({
   )
 }
 
+/** A buy or sell horse order as the inspector gives it (`CONTEXT.md`: Horse market). */
+export interface HorseTradeRequest {
+  residentId: string
+  horseId: string
+}
+
+/**
+ * An NPC city's stable from the Player's side (`CONTEXT.md`: Horse market, Trade section): its horses
+ * and the Player's own standing there, with name, stats and price, and for one of the Player's
+ * residents there a button for each, or why it won't go. Nobody of theirs there, and it offers to
+ * send someone (`Sending`).
+ */
+function HorseMarket({
+  stable,
+  traders,
+  sending,
+  tick,
+  onBuy,
+  onSell,
+}: {
+  stable: NpcStableView
+  /** The Player's residents at the stable. */
+  traders: Resident[]
+  /** Whom to send there while nobody of the Player's is, and who is on the way. */
+  sending: SendingProps
+  tick: number
+  onBuy: (buy: HorseTradeRequest) => void
+  onSell: (sale: HorseTradeRequest) => void
+}) {
+  const [residentId, setResidentId] = useState<string | undefined>()
+  const resident = traders.find((r) => r.id === residentId) ?? traders[0]
+  const at = `Stable at (${stable.x}, ${stable.y})`
+  return (
+    <div className="warehouse-prices horse-market" aria-label={at}>
+      <p className="warehouse-prices-place">{at}</p>
+      {stable.horses.length > 0 && (
+        <ul className="horse-offers" aria-label="Horses">
+          {stable.horses.map((h) => (
+            <HorseOfferRow
+              key={h.horseId}
+              offer={h}
+              verb="Buy"
+              tick={tick}
+              resident={resident}
+              problem={h.problem ?? (resident && horseBuyerProblem(resident, h.price, tick))}
+              onTrade={onBuy}
+            />
+          ))}
+        </ul>
+      )}
+      {stable.toSell.length > 0 && (
+        <ul className="horse-offers" aria-label="Your horses">
+          {stable.toSell.map((h) => (
+            <HorseOfferRow
+              key={h.horseId}
+              offer={h}
+              verb="Sell"
+              tick={tick}
+              resident={resident}
+              problem={h.problem ?? (resident && horseSellerProblem(resident, h.price, tick))}
+              onTrade={onSell}
+            />
+          ))}
+        </ul>
+      )}
+      {resident ? (
+        <>
+          {traders.length > 1 && (
+            <label>
+              Trader{' '}
+              <select value={resident.id} onChange={(e) => setResidentId(e.target.value)}>
+                {traders.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <p className="small muted trader-holds">
+            {resident.name} holds {Math.floor(resident.carried.coins ?? 0)} coins.
+          </p>
+        </>
+      ) : (
+        <Sending warehouse={stable} place="stable" {...sending} />
+      )}
+    </div>
+  )
+}
+
+/** One horse in `HorseMarket`: what it is and costs, and the button to trade it or why it won't go. */
+function HorseOfferRow({
+  offer,
+  verb,
+  tick,
+  resident,
+  problem,
+  onTrade,
+}: {
+  offer: NpcHorseOffer
+  verb: 'Buy' | 'Sell'
+  tick: number
+  resident: Resident | undefined
+  problem: string | undefined
+  onTrade: (trade: HorseTradeRequest) => void
+}) {
+  return (
+    <li>
+      <strong>{offer.name}</strong>: <strong>{offer.price} coins</strong>
+      <br />
+      <span className="small">{horseStatsText(offer, tick)}</span>
+      {resident && (
+        <>
+          <br />
+          <button
+            type="button"
+            disabled={problem !== undefined}
+            onClick={() => onTrade({ residentId: resident.id, horseId: offer.horseId })}
+          >
+            {verb} {offer.name} for {offer.price} coins
+          </button>
+        </>
+      )}
+      {problem && <p className="small muted">{problem}.</p>}
+    </li>
+  )
+}
+
+/** Where a trade happens, as the Trade section says it. */
+type TradePlace = 'warehouse' | 'storage' | 'stable' | 'wandering trader'
+
 interface SendingProps {
   /** Whom the Player can send there, nearest first (`sendable`). */
   sendable: SendView[]
@@ -1031,7 +1301,7 @@ export function Sending({
   sendable,
   going,
   onSend,
-}: SendingProps & { warehouse: WarehouseView; place: 'warehouse' | 'storage' }) {
+}: SendingProps & { warehouse: WarehouseView; place: TradePlace }) {
   const [key, setKey] = useState('')
   const keyOf = (s: SendView) => `${s.residentId}:${s.carriageId ?? ''}`
   const picked = sendable.find((s) => keyOf(s) === key) ?? sendable[0]
@@ -1225,6 +1495,82 @@ function BuyingOff({
           </button>
         </p>
       ))}
+    </div>
+  )
+}
+
+/**
+ * Paying the Trade Org debt (`CONTEXT.md`: Trade Org debt): one of the Player's residents on the
+ * warehouse pays what they choose of it, from their hands or their carriage there. Nothing when
+ * the realm owes nothing.
+ */
+function PayingDebt({
+  debt,
+  traders,
+  onPayDebt,
+}: {
+  debt: number
+  traders: TradersView
+  onPayDebt: (residentId: string, coins: number, carriageId: string | null) => void
+}) {
+  const [residentId, setResidentId] = useState<string | undefined>()
+  const [carriageId, setCarriageId] = useState<string>('')
+  const [wanted, setWanted] = useState<number | undefined>()
+  if (debt <= 0) return null
+  const resident = traders.residents.find((r) => r.id === residentId) ?? traders.residents[0]
+  const carriage = traders.carriages.find((k) => k.id === carriageId)
+  if (!resident) {
+    return <p className="small muted">To pay your debt, bring a resident here with coins.</p>
+  }
+  const most = Math.min(debt, Math.floor((carriage ? carriage.load : resident.carried).coins ?? 0))
+  const coins = Math.min(wanted ?? most, most)
+  return (
+    <div className="warehouse-trading" aria-label="Paying the debt">
+      <label>
+        Payer{' '}
+        <select value={resident.id} onChange={(e) => setResidentId(e.target.value)}>
+          {traders.residents.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      {traders.carriages.length > 0 && (
+        <label>
+          With{' '}
+          <select value={carriageId} onChange={(e) => setCarriageId(e.target.value)}>
+            <option value="">their hands</option>
+            {traders.carriages.map((k) => (
+              <option key={k.id} value={k.id}>
+                carriage {k.id}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <label>
+        Coins{' '}
+        <input
+          type="number"
+          min={1}
+          max={most}
+          value={coins}
+          disabled={most < 1}
+          onChange={(e) => setWanted(Math.floor(Number(e.target.value)))}
+        />
+      </label>
+      <p>
+        <button
+          type="button"
+          disabled={coins < 1}
+          onClick={() => onPayDebt(resident.id, coins, carriage?.id ?? null)}
+        >
+          {most < 1
+            ? 'No coins to pay your debt with'
+            : `Pay ${coins} of the ${debt} Coins you owe`}
+        </button>
+      </p>
     </div>
   )
 }

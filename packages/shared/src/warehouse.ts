@@ -6,6 +6,7 @@ import {
   DELIVERY_LOAD,
   GOOD_WEIGHT,
   HQ_FLOOR_FACTOR,
+  HQ_FOOD_FLOOR_FACTOR,
   PRICE_ELASTICITY,
   PRICE_RANGE,
   PRICE_REFERENCE_FLOORS,
@@ -63,15 +64,18 @@ export function warehouseKeeps(
 }
 
 /**
- * A warehouse's stock floor (`CONTEXT.md`: Stock floor, ADR 0003): `WAREHOUSE_FLOOR` of every
- * good it keeps (`warehouseKeeps`), `HQ_FLOOR_FACTOR` times that at the HQ. Goods only, never
+ * A warehouse's stock floor (`CONTEXT.md`: Stock floor, ADR 0003, ADR 0023): `WAREHOUSE_FLOOR` of
+ * every good it keeps (`warehouseKeeps`), `HQ_FLOOR_FACTOR` times that at the HQ (of Food,
+ * `HQ_FOOD_FLOOR_FACTOR`), where it tops up
+ * (`stepStockFloor`); at a post it only says what its hands and carriages go for. Goods only, never
  * people; empty for any building that is not a Trade Org warehouse.
  */
 export function stockFloor(world: Pick<WorldState, 'cities' | 'buildings'>, b: Building): Stock {
   const keeps = warehouseKeeps(world, b)
   const hq = world.cities.find((c) => c.id === b.cityId)?.tradeOrg === 'hq'
   const floor: Stock = {}
-  for (const g of keeps) floor[g] = WAREHOUSE_FLOOR[g] * (hq ? HQ_FLOOR_FACTOR : 1)
+  const factor = (g: Good) => (!hq ? 1 : g === 'food' ? HQ_FOOD_FLOOR_FACTOR : HQ_FLOOR_FACTOR)
+  for (const g of keeps) floor[g] = WAREHOUSE_FLOOR[g] * factor(g)
   return floor
 }
 
@@ -184,10 +188,18 @@ export function loadOf(carriage: Carriage, capacity: number): TradeHolder {
  * What stops a trade short of the units wanted (`CONTEXT.md`: Trade section), from the trader's
  * side: their coins (`coins`), the good they hold to sell (`held`), the room in their hands or on
  * their carriage (`room`), what the other side holds for sale (`stock`) or its coins to pay
- * (`theirCoins`), what an NPC city is short of (`unwanted`), or an NPC city that won't trade with
- * them at all (`refused`).
+ * (`theirCoins`), the room on a wandering trader's carriage (`theirRoom`), what an NPC city is short
+ * of (`unwanted`), or an NPC city that won't trade with them at all (`refused`).
  */
-export type TradeLimit = 'coins' | 'held' | 'room' | 'stock' | 'theirCoins' | 'unwanted' | 'refused'
+export type TradeLimit =
+  | 'coins'
+  | 'held'
+  | 'room'
+  | 'stock'
+  | 'theirCoins'
+  | 'theirRoom'
+  | 'unwanted'
+  | 'refused'
 
 /** What a trade moves: `units` of the good one way, `coins` the other. */
 export interface TradeQuote {
@@ -220,6 +232,26 @@ export function quoteTrade(
   if (floor === undefined || !coinWarehouse) return { units: 0, coins: 0 }
   const coinStock = coinWarehouse.stock?.coins ?? 0
   const stock = warehouse.stock?.[good] ?? 0
+  return quoteAtPrices(stock, floor, coinStock, holder, side, good, wanted, owed)
+}
+
+/**
+ * What a trade of up to `wanted` units of a good would move with a side holding `stock` of it and
+ * `coinStock` coins, which prices it from `floor` (`priceFor`), as `quoteTrade` says. `theirRoom`
+ * is the room that side has for what the trade adds to it, in kg: a wandering trader's carriage
+ * (`CONTEXT.md`: Trader stop). Pure: nothing moves.
+ */
+export function quoteAtPrices(
+  stock: number,
+  floor: number,
+  coinStock: number,
+  holder: TradeHolder,
+  side: TradeSide,
+  good: PricedGood,
+  wanted: number,
+  owed = 0,
+  theirRoom = Infinity,
+): TradeQuote {
   const held = holder.stock[good] ?? 0
   const heldCoins = holder.stock.coins ?? 0
   let units = 0
@@ -232,8 +264,10 @@ export function quoteTrade(
       else {
         const p = priceFor(good, stock + n, floor).buy
         const room = holder.room + n * GOOD_WEIGHT[good] - (coins + p) * GOOD_WEIGHT.coins
+        const added = n * GOOD_WEIGHT[good] - (coins + p) * GOOD_WEIGHT.coins
         if (coins + p > coinStock) limit = 'theirCoins'
         else if (room < -1e-9) limit = 'room'
+        else if (added > theirRoom + 1e-9) limit = 'theirRoom'
         else coins += p
       }
     } else {
@@ -241,8 +275,10 @@ export function quoteTrade(
       else {
         const p = priceFor(good, stock - units, floor).sell
         const room = holder.room + (coins + p) * GOOD_WEIGHT.coins - n * GOOD_WEIGHT[good]
+        const added = (coins + p) * GOOD_WEIGHT.coins - n * GOOD_WEIGHT[good]
         if (coins + p > heldCoins) limit = 'coins'
         else if (room < -1e-9) limit = 'room'
+        else if (added > theirRoom + 1e-9) limit = 'theirRoom'
         else coins += p
       }
     }
@@ -354,6 +390,47 @@ export function buyOffProblem(
     stock = k.load
   }
   if ((stock.coins ?? 0) < d.price) return `it costs ${d.price} coins`
+  return undefined
+}
+
+/** The Coins an Organization owes the Trade Organization (`CONTEXT.md`: Trade Org debt), or 0. */
+export function debtOf(world: Pick<WorldState, 'debts'>, org: string): number {
+  return world.debts.find((d) => d.org === org)?.coins ?? 0
+}
+
+/**
+ * Why a resident can't pay `coins` of `realmId`'s Trade Org debt now, or undefined when they can
+ * (`CONTEXT.md`: Trade Org debt): the realm owes it and the resident is grown up, on a Trade Org
+ * warehouse's tile (`buyOffCoinWarehouseAt`), with a Coin at least in their hands or on `carriageId`,
+ * a carriage on their tile that `realmId` commands. They pay what they hold, up to what is owed. The
+ * Trade Organization takes it even from those it otherwise refuses.
+ */
+export function payDebtProblem(
+  world: WorldState,
+  realmId: string,
+  resident: Resident,
+  coins: unknown,
+  carriageId: unknown,
+): string | undefined {
+  if (debtOf(world, realmId) <= 0) return 'your realm owes the Trade Organization nothing'
+  if (typeof coins !== 'number' || !Number.isInteger(coins) || coins <= 0) {
+    return 'pay a whole number of coins'
+  }
+  if (!canWork(resident, world.tick)) return 'children can’t pay'
+  const at = world.buildings.find(
+    (b) => covers(b, resident.x, resident.y) && warehouseKeeps(world, b).length > 0,
+  )
+  if (!at || !buyOffCoinWarehouseAt(world, resident.x, resident.y)) {
+    return 'not at a Trade Org warehouse'
+  }
+  let stock = resident.carried
+  if (carriageId !== null && carriageId !== undefined) {
+    const k = world.carriages.find((x) => x.id === carriageId)
+    if (!commandsCarriage(world, realmId, k)) return 'not one of your carriages'
+    if (!isAt(k, at)) return 'that carriage is not at the warehouse'
+    stock = k.load
+  }
+  if ((stock.coins ?? 0) < 1) return 'no coins to pay with'
   return undefined
 }
 
