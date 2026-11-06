@@ -698,7 +698,10 @@ The shared language of the game. Domain terms only — no implementation details
 
 ## Crime and reputation
 
-- **Crime:** theft, attack, killing or tearing down buildings against another organization.
+- **Crime:** theft, attack, killing or tearing down buildings against another organization. In a
+  city's own City area, striking someone occupying its town hall, or a thief of its realm that the
+  realm knows of or one of its residents saw, is no crime; for an NPC city, the same for the city.
+  Striking anyone else there still is.
 - **Witness:** a resident who sees a crime (within sight range), or a victim who survives it. A
   crime only becomes known when a witness physically brings the news home. No witness, no
   consequences.
@@ -1321,6 +1324,26 @@ The shared language of the game. Domain terms only — no implementation details
   A Player's own defence script decides for itself: a driver's drive or haul route goes on until it
   gives them another order. Residents with no Player follow the same rule, and a caravan's driver
   under attack doesn't wait for their escort.
+- **Alarm:** something happening in a City area that residents at home can react to (ADR 0028). Four
+  kinds: **outsider**, someone of another realm, not allied, entering the area, raised once on
+  entering, and again if they leave and come back (Trade Org caravans and wandering traders, with
+  their crews, don't count); **theft**, someone stealing from the realm (goods, a carriage or a
+  horse); **occupied**, an occupation of the city's town hall starting (Occupying a town hall);
+  **attacked**, someone attacking a wall or gate of the city, or striking a resident of the realm.
+  An alarm reaches the residents standing in that city's area who see it (Sight); an occupation
+  reaches all of them. It runs their Alarm script. Army members, those hired out and those driving
+  a carriage get no alarm.
+- **Alarm script:** the script a resident runs when an alarm reaches them: for an armed resident the
+  game's **Alarm** default, unless the Player picked one of their own scripts or None for that
+  resident, on the card's Script tab or the group card; an unarmed resident runs one only if the
+  Player picked it. It interrupts and hands back like a Defence script: when it calls `end()`, what
+  they were doing goes on. A blow still runs the Defence script, and one alarm doesn't interrupt
+  another. A Player's order given meanwhile ends both. Scripts read `me.alarm`: its kind, who it is
+  about, where and when. **The Alarm default:** a thief, an occupier or an attacker it goes after
+  until they are dead or have left the area or sight; for an armed outsider it walks to the town
+  hall and stands there until no armed outsider is left in the area, which blocks an occupation
+  before it starts; an unarmed outsider it only logs. NPC villages, towns and self-managed cities
+  run this default for their armed residents; trading posts and the HQ keep their own rules.
 - **Doing:** the line on a resident's card and in the resident list that says what they are
   doing, shown to the owning Player only. It is derived from their task and current order
   ("Building a house: fetching 10 wood from the storage", "Working the farm"); the script they
