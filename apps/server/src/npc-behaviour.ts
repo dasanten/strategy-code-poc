@@ -55,6 +55,7 @@ import {
 import { chainStore, holdsBatch, warehouseFor } from './npc-chain.js'
 import { foundDaughter, foundingParty, stepFounders } from './npc-founding.js'
 import { reviveTarget, runReviver } from './npc-revive.js'
+import { layRoad, onRoadWork, type WayFinder } from './npc-roads.js'
 import { giveUpSite, sendScout, stepScouts } from './npc-scouts.js'
 import { runTrader } from './npc-trader.js'
 import { refillSource } from './survival.js'
@@ -93,10 +94,16 @@ export function runByNpcCity(world: WorldState, r: Resident): boolean {
  * itself alive. It only gives its residents orders, which request actions like a Player's
  * orders do (ADR 0002); the world resolves them later in the tick. Run before the actions are
  * requested. `size` is the map's. A city whose planning pass is due plans (`planCity`, ADR 0016),
- * with `terrain` picking its project too; the others go by their plan. Plans of cities the game
- * no longer runs are dropped. Returns the milliseconds spent planning, for the tick health.
+ * with `terrain` picking its project too and `ways` finding the ways of its roads; the others go by
+ * their plan. Plans of cities the game no longer runs are dropped. Returns the milliseconds spent
+ * planning, for the tick health.
  */
-export function stepNpcCities(world: WorldState, size: number, terrain?: TerrainMap): number {
+export function stepNpcCities(
+  world: WorldState,
+  size: number,
+  terrain?: TerrainMap,
+  ways?: WayFinder,
+): number {
   const cities = new Map(world.cities.map((c) => [c.id, c]))
   for (const id of Object.keys(world.cityPlans)) {
     const city = cities.get(id)
@@ -108,7 +115,7 @@ export function stepNpcCities(world: WorldState, size: number, terrain?: Terrain
   for (const city of world.cities) {
     if (city.realmId !== null) continue
     const people = residents.get(city.id)
-    if (people) planMs += runCity(world, city, people, size, buildings, terrain)
+    if (people) planMs += runCity(world, city, people, size, buildings, terrain, ways)
   }
   return planMs
 }
@@ -121,10 +128,11 @@ export function stepNpcCities(world: WorldState, size: number, terrain?: Terrain
  * storage yet, everyone builds, `npcBuilders`), breeders who are done and workers at a smelter or
  * smithy with nothing left to process and none in the store, so they get their next job (with
  * some there, one of them fetches it by the Work default); moves a worker whose plan puts
- * them elsewhere, or nowhere; then gives each idle adult what comes first: its trader goes on with
- * their run (`runTrader`); a resident carrying a child stays at home; a reviver goes to the Down
- * resident they are to revive (`runReviver`), called off if they were walking there and that one is
- * up or dead; one
+ * them elsewhere, or nowhere, and one taken off its road crew; then gives each idle adult what comes
+ * first: its trader goes on with their run (`runTrader`); a resident carrying a child stays at home;
+ * a reviver goes to the Down resident they are to revive (`runReviver`), called off if they were
+ * walking there and that one is up or dead; one on its road crew takes the next step of its road
+ * (`layRoad`); one
  * carrying materials the project needs takes them to its site; a load of goods goes into the
  * storage; they take `OWN_FOOD` from the storage before they set out; one of them breeds the
  * city's horses (`breedHorses`); a planned builder takes their part in the project (`takePart`),
@@ -146,13 +154,14 @@ function runCity(
   size: number,
   buildings: Map<string, Building>,
   terrain?: TerrainMap,
+  ways?: WayFinder,
 ): number {
   let planMs = 0
   let plan: CityPlan | undefined = world.cityPlans[city.id]
   if (plan) stepScouts(world, city, plan, people, size)
   if (planDue(world, city)) {
     const start = performance.now()
-    plan = planCity(world, city, terrain, people)
+    plan = planCity(world, city, terrain, people, ways)
     planMs += performance.now() - start
   }
   const storage = world.buildings.find(
@@ -215,6 +224,8 @@ function runCity(
     const moved =
       job !== undefined && job.kind !== 'soldier' && at !== undefined && at !== job.buildingId
     if (moved && !r.carrying && plan?.plannedAt === world.tick) stopWork(r)
+    // Off the road crew, they leave the road to it (`CONTEXT.md`: NPC road).
+    if (onRoadWork(r) && job?.kind !== 'road' && plan?.plannedAt === world.tick) stopWork(r)
     // The pass just now called a scout off: they come home with what they saw, below.
     if (r.script?.task === 'explore' && plan?.plannedAt === world.tick && job?.kind !== 'scout') {
       stopWork(r)
@@ -236,7 +247,10 @@ function runCity(
 
   const home = npcHome(world, city)
   const held = new Places(people)
-  let free = npcBuilders(world, city) - adults.filter(isBuilder).length
+  // The road crew is apart from its builders (`CONTEXT.md`: NPC road).
+  const crew = adults.filter((r) => jobs[r.id]?.kind === 'road')
+  const building = adults.filter((r) => isBuilder(r) && jobs[r.id]?.kind !== 'road')
+  let free = npcBuilders(world, city) - building.length
   // The project, picked anew once the planned one is finished: a site search, so once a tick at most.
   let checked = false
   const project = () => {
@@ -279,6 +293,9 @@ function runCity(
       continue
     }
     if (runReviver(world, r, jobs[r.id], storage, size)) continue
+    if (jobs[r.id]?.kind === 'road' && plan && layRoad(world, city, plan, r, crew, store, size)) {
+      continue
+    }
     if (free > 0 && carriesMaterials(r)) {
       const p = project()
       if (p && takePart(world, r, p, store, true)) {

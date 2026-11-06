@@ -892,11 +892,19 @@ export interface WorldState {
  * nothing, until the next pass moves them.
  */
 export interface CityJob {
-  kind: 'soldier' | 'farm' | 'work' | 'build' | 'trade' | 'found' | 'revive' | 'scout' | 'idle'
+  kind: 'soldier' | 'farm' | 'work' | 'build' | 'road' | 'trade' | 'found' | 'revive' | 'scout' | 'idle'
   /** The farm or workplace to work, for `farm` and `work`. */
   buildingId?: string
   /** The Down resident to revive, for `revive`. */
   targetId?: string
+}
+
+/** A road a game-run city builds (`CONTEXT.md`: NPC road): its way, worked out once. */
+export interface CityRoad {
+  /** The building it leads to. */
+  to: string
+  /** The tiles of the way from its home, as a resident would walk it; none when it is given up. */
+  tiles: [x: number, y: number][]
 }
 
 /** What a game-run city builds or takes down next (`CONTEXT.md`: NPC city), as plain data. */
@@ -975,6 +983,8 @@ export interface CityPlan {
   jobs: Record<string, CityJob>
   /** What the city builds or takes down next; none when it has nothing to build. */
   project?: CityProject
+  /** The roads it has worked out the way of (`CONTEXT.md`: NPC road), in the order it builds them. */
+  roads?: CityRoad[]
   /** Its trade run under way (`CONTEXT.md`: NPC trader); none while no trader is out. */
   trader?: CityTrader
   /**
