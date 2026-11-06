@@ -522,6 +522,12 @@ export const NPC_BUILDERS = 2
 export const NPC_ROAD_CREW = 2
 
 /**
+ * How far outside its area an NPC city still fetches a Down resident of its own (`CONTEXT.md`:
+ * Reviving), in tiles: about a quarter of a game day's walk on plains each way.
+ */
+export const NPC_REVIVE_REACH = 48
+
+/**
  * How far past its reserve an NPC city's spare hands work for surplus, by good, in units
  * (`CONTEXT.md`: Spare hands' work). Several of a trader's full loads (about 30 kg, `CARRY_BASE`),
  * so its trader has something to sell, and above the materials a Full city wants (`townHall` and

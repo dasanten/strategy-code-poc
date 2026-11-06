@@ -218,6 +218,11 @@ describe('world saves', () => {
     expect(migrateWorld(fallen, 88, { terrain: land }).traders).toEqual([])
   })
 
+  it('leaves every world as it is for the revive job (migration 92 → 93)', () => {
+    const { world: now, terrain: land } = worldWithPost()
+    expect(migrateWorld(structuredClone(now), 92, { terrain: land })).toEqual(now)
+  })
+
   it('puts the HQ on its traders’ loops (migration 90 → 91)', () => {
     const { world: now, terrain: land } = worldWithPost()
     const hqId = now.cities.find((c) => c.tradeOrg === 'hq')!.id
@@ -376,19 +381,19 @@ describe('world saves', () => {
     expect(checkInvariants(v88, land)).toEqual([])
   })
 
-  it('leaves a format 92 world as it is: no plan has a road crew or a way yet (migration 92 → 93)', () => {
+  it('leaves a format 92 world as it is: no plan has a road crew or a way yet (migration 93 → 94)', () => {
     const { world, terrain: land } = worldWithPost()
-    const v93 = migrateWorld(structuredClone(world), 92, { terrain: land }, migrations, 93)
-    expect(v93).toEqual(world)
-    expect(Object.values(v93.cityPlans).every((p) => p.roads === undefined)).toBe(true)
-    expect(checkInvariants(v93, land)).toEqual([])
+    const v94 = migrateWorld(structuredClone(world), 93, { terrain: land }, migrations, 94)
+    expect(v94).toEqual(world)
+    expect(Object.values(v94.cityPlans).every((p) => p.roads === undefined)).toBe(true)
+    expect(checkInvariants(v94, land)).toEqual([])
   })
 
   it('leaves realms from before realm names unnamed (migration 38 → 39)', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(93)
+    expect(WORLD_FORMAT_VERSION).toBe(94)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)

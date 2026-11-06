@@ -19,6 +19,7 @@ import {
   inCityArea,
   isArmed,
   isAt,
+  isDown,
   putAwayUnits,
   setOutFood,
   unitsThatFit,
@@ -53,6 +54,7 @@ import {
 } from './npc-plan.js'
 import { chainStore, holdsBatch, warehouseFor } from './npc-chain.js'
 import { foundDaughter, foundingParty, stepFounders } from './npc-founding.js'
+import { reviveTarget, runReviver } from './npc-revive.js'
 import { layRoad, onRoadWork, type WayFinder } from './npc-roads.js'
 import { runTrader } from './npc-trader.js'
 import { refillSource } from './survival.js'
@@ -74,6 +76,7 @@ export const NPC_ORDER_KINDS: readonly ResidentOrder['kind'][] = [
   'breed',
   'attack',
   'trade',
+  'feed',
 ]
 
 /**
@@ -126,7 +129,9 @@ export function stepNpcCities(
  * some there, one of them fetches it by the Work default); moves a worker whose plan puts
  * them elsewhere, or nowhere, and one taken off its road crew; then gives each idle adult what comes
  * first: its trader goes on with their run (`runTrader`); a resident carrying a child stays at home;
- * one on its road crew takes the next step of its road (`layRoad`); one
+ * a reviver goes to the Down resident they are to revive (`runReviver`), called off if they were
+ * walking there and that one is up or dead; one on its road crew takes the next step of its road
+ * (`layRoad`); one
  * carrying materials the project needs takes them to its site; a load of goods goes into the
  * storage; they take `OWN_FOOD` from the storage before they set out; one of them breeds the
  * city's horses (`breedHorses`); a planned builder takes their part in the project (`takePart`),
@@ -174,7 +179,7 @@ function runCity(
   }
   // Materials and a smith's input: a Trade Org city's from its warehouse (`chainStore`).
   const store = chainStore(world, city)
-  const adults = people.filter((r) => canWork(r, world.tick) && !party.has(r.id))
+  const adults = people.filter((r) => canWork(r, world.tick) && !isDown(r) && !party.has(r.id))
   const jobs = plan?.jobs ?? {}
 
   stopBuildersWhoCantGoOn(world, adults, store)
@@ -215,6 +220,12 @@ function runCity(
     if (moved && !r.carrying && plan?.plannedAt === world.tick) stopWork(r)
     // Off the road crew, they leave the road to it (`CONTEXT.md`: NPC road).
     if (onRoadWork(r) && job?.kind !== 'road' && plan?.plannedAt === world.tick) stopWork(r)
+    if (job?.kind === 'revive') {
+      // Whatever they were at, the pass just now sent them to the Down (`CONTEXT.md`: Reviving).
+      const atWork = r.script || r.order?.kind === 'build' || r.order?.kind === 'tearDown'
+      if (atWork && plan?.plannedAt === world.tick) stopWork(r)
+      if (r.order?.kind === 'walkTo' && !reviveTarget(world, job)) r.order = null
+    }
     // At a workplace that processes goods with nothing left to process, one of them fetches more
     // by the Work default (`CONTEXT.md`: Fetching inputs) while the store holds a batch; with
     // none there, they get their next job.
@@ -259,6 +270,7 @@ function runCity(
       if (home && !inCityArea(world, city, r.x, r.y, size)) walkTo(r, home)
       continue
     }
+    if (runReviver(world, r, jobs[r.id], storage, size)) continue
     if (jobs[r.id]?.kind === 'road' && plan && layRoad(world, city, plan, r, crew, store, size)) {
       continue
     }
@@ -477,7 +489,7 @@ export function stopWork(r: Resident): void {
  * to eat and the `input` of the workplace they go to process at; none if nothing. Weapons and
  * armour stay on them.
  */
-function haul(r: Resident, input?: Stock): Stock | undefined {
+export function haul(r: Resident, input?: Stock): Stock | undefined {
   const load: Stock = {}
   for (const [good, units] of Object.entries(r.carried) as [Good, number][]) {
     if (WORK_OUTPUT_PER_DAY[good] === undefined || input?.[good] !== undefined) continue
