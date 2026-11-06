@@ -49,6 +49,8 @@ import {
   type TraderVisit,
   type SeenBuilding,
   type Shown,
+  TRADE_ORG,
+  TRADE_ORG_NAME,
 } from '@csp/shared'
 import { faresKnown, loadKnown } from './seen.js'
 
@@ -152,7 +154,9 @@ export function describeOccupation(
   const by =
     o.realmId === realmId
       ? 'you'
-      : (realms.find((r) => r.realmId === o.realmId)?.realm ?? 'another realm')
+      : o.realmId === TRADE_ORG
+        ? TRADE_ORG_NAME
+        : (realms.find((r) => r.realmId === o.realmId)?.realm ?? 'another realm')
   const days = Math.max(1, Math.ceil(ticks / TICKS_PER_GAME_DAY))
   return {
     text: `Occupied by ${by}, ${days} game ${days === 1 ? 'day' : 'days'} left`,

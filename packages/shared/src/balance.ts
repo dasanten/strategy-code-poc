@@ -1471,15 +1471,48 @@ export const TRADE_ORG_PUNISH = {
    */
   packRoom: 3,
   /**
-   * Tiles from a trading post's storage within which a soldier short of Food counts as passing it
-   * and goes to refill: about a third of a game day's walk, little against what it brings.
+   * Tiles from a place within which a soldier short of Food counts as passing it and goes to refill
+   * or buy: about a third of a game day's walk, little against what it brings.
    */
   postReach: 60,
+  /**
+   * Coins a soldier packs at the HQ to buy Food on the way (`CONTEXT.md`: Trade Org debt): the
+   * longest trip's Food at about three Coins a unit, 1.2 kg of their hands. What is left goes back
+   * into the HQ's coin warehouse when they are home.
+   */
+  purse: 60,
+  /**
+   * The most Coins a soldier pays for a unit of Food at a Player's offer: three times what a
+   * warehouse asks at its usual stock. Above that they pass it by, or an offer of one Food at any
+   * price would empty their purse.
+   */
+  offerFoodPrice: 6,
   /**
    * How many times the straight walk over Plains it keeps trying to reach the city (never less
    * than `giveUpDays`). Past that it has no way there, as with every gate shut, and turns back.
    */
   roadTimes: 3,
+  /**
+   * Kilos its supply wagon keeps free of Food, whatever the trip asks for, for what the army takes
+   * (`CONTEXT.md`: Trade Org debt): a quarter of a carriage, 5,000 Coins or 100 Iron.
+   */
+  wagonRoom: 100,
+  /**
+   * Tiles from its supply wagon within which a soldier carries what they took over to it, rather
+   * than on home: as far as they would go for a trading post (`postReach`).
+   */
+  wagonReach: 60,
+  /**
+   * Ticks between a supply wagon's tries to set off after its army: only a failed search for a way
+   * tries again, and these keep a wagon with no way from searching every tick.
+   */
+  wagonRetryTicks: 60,
+  /**
+   * Tiles from its army within which a supply wagon goes after them step by step, finding its way
+   * again as they move. Further behind it first drives to where they were: a search that far takes
+   * longer than they take to move on, so it would never end.
+   */
+  wagonFollowReach: 48,
 }
 
 /**
@@ -1490,6 +1523,19 @@ export const TRADE_ORG_PUNISH = {
 export function tripFood(tiles: number): number {
   const days = (tiles * WALK_TICKS_PER_TILE * TRADE_ORG_PUNISH.walkMargin) / TICKS_PER_GAME_DAY
   return Math.ceil(days * FOOD_PER_DAY)
+}
+
+/**
+ * The Food a supply wagon means to set out with (`CONTEXT.md`: Trade Org debt), for `soldiers` going
+ * `tiles` there and back as much: all of the trip's for each of them, as they may pack little, for
+ * its driver and for its horse. A carriage takes it only as far as it keeps
+ * `TRADE_ORG_PUNISH.wagonRoom` free.
+ */
+export function wagonFoodFor(tiles: number, soldiers: number): number {
+  const walk = tripFood(2 * tiles)
+  const stay = TRADE_ORG_PUNISH.giveUpDays * FOOD_PER_DAY
+  const horse = ((walk + stay) / FOOD_PER_DAY) * HORSE_FOOD_PER_DAY
+  return Math.ceil((soldiers + 1) * (walk + stay) + horse)
 }
 
 /**
@@ -1648,6 +1694,23 @@ export const WORKPLACE_MAX_WORKERS: Partial<Record<BuildingKind, number>> = {
   smelter: 4,
   mint: 4,
   smithy: 4,
+}
+
+/**
+ * What each kind of workplace counts for against a debt when the Trade Organization's army tears it
+ * down (`CONTEXT.md`: Trade Org debt), in Coins: about its materials at their warehouse base price and
+ * 20 Coins for each game day of a builder's work (as `CARRIAGE_STOLEN_WORTH` weighs a carriage), and
+ * never less than 100, as a farm or lumber camp is cheap to build but worth more than that to a city.
+ * So a debt for a killing (`TRADE_ORG_LOSS`, twice) takes about two to four workplaces.
+ */
+export const WORKPLACE_WRECK_WORTH: Partial<Record<BuildingKind, number>> = {
+  farm: 100,
+  lumberCamp: 100,
+  quarry: 120,
+  mine: 200,
+  smelter: 200,
+  mint: 280,
+  smithy: 300,
 }
 
 /**
@@ -2313,6 +2376,19 @@ export const DEMANDS_PER_GAME_DAY = 3
  * Player who comes by once a day can still answer.
  */
 export const DEMAND_MAX_DAYS = 60
+
+/**
+ * The deadline of the Trade Organization's demand for a debt, in game days (`CONTEXT.md`: Trade Org
+ * debt): one real day, the longest a demand has, so a Player who comes by once a day can still pay.
+ */
+export const TRADE_ORG_DEBT_DEMAND_DAYS = 60
+
+/**
+ * How many of the Trade Organization's armies come to tear down workplaces for a debt before its next
+ * one comes to hold the town hall and take the city (`CONTEXT.md`: Trade Org debt): two, so a Player
+ * who loses workplaces once and again still has time to pay before it comes to that.
+ */
+export const TRADE_ORG_DEBT_TRIPS = 2
 
 /** The deadline the Demands form starts with, in game days: a game week. */
 export const DEMAND_DEFAULT_DAYS = 7

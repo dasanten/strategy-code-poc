@@ -24,7 +24,7 @@ import { npcHome } from './npc-behaviour.js'
 import { foundNpcCity } from './npc-cities.js'
 import { plains } from './npc-growth.fixture.js'
 import { planCity, planDue } from './npc-plan.js'
-import { offersAcceptedIn, offersKeepGoods, tradeOrgTakesNoOffer } from './offers.js'
+import { offersAcceptedIn, offersKeepGoods, tradeOrgOnlyBuysFood } from './offers.js'
 import { mulberry32, newResident } from './residents.js'
 import { changeStanding } from './standing.js'
 import { addCity } from './test-terrain.js'
@@ -378,7 +378,7 @@ describe('an NPC city at an offer', () => {
     expect(world.offers).toHaveLength(1)
   })
 
-  it('the Trade Organization never accepts offers', () => {
+  it('the Trade Organization sends nobody to an offer but its army', () => {
     const terrain = plains(SIZE)
     const world = createWorld(terrain)
     const post_ = foundTradingPost(world, terrain, 200, 200, undefined, mulberry32(3))
@@ -389,9 +389,9 @@ describe('an NPC city at an offer', () => {
     expect(planCity(world, post_, terrain).trader).toBeUndefined()
     // And the invariant would say so if one of its residents ever did.
     stepWorld(world, terrain)
-    expect(tradeOrgTakesNoOffer.check(world, terrain)).toEqual([])
+    expect(tradeOrgOnlyBuysFood.check(world, terrain)).toEqual([])
     const one = world.residents.find((r) => r.cityId === post_.id)!
-    offersAcceptedIn(world).push({ residentId: one.id, before: {}, after: {} })
-    expect(tradeOrgTakesNoOffer.check(world, terrain)).toHaveLength(1)
+    offersAcceptedIn(world).push({ residentId: one.id, before: {}, after: {}, foodForCoins: true })
+    expect(tradeOrgOnlyBuysFood.check(world, terrain)).toHaveLength(1)
   })
 })

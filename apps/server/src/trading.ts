@@ -25,6 +25,7 @@ import {
   quotePickUp,
   quoteSwap,
   quoteTrade,
+  standingOrganization,
   swapProblem,
   tradeCoinWarehouse,
   tradeProblem,
@@ -318,9 +319,13 @@ function tradeWithCity(
   records: TradeRecord[],
 ): boolean {
   const realm = commanderOf(world, r)
+  // A resident of the Trade Organization trades for it, like a realm's for theirs (its army buying
+  // Food, `CONTEXT.md`: Trade Org debt); another NPC city's residents trade for nobody.
+  const ofTradeOrg = r.cityId !== null && standingOrganization(world, r.cityId) === TRADE_ORG
+  const trader = realm ?? (ofTradeOrg ? TRADE_ORG : null)
   if (o.cityId !== undefined) return false
   // The city may have come to refuse the realm since the order was given.
-  if (realm !== null && npcCityRefuses(world, city, realm)) return false
+  if (trader !== null && npcCityRefuses(world, city, trader)) return false
   const carriage =
     o.carriageId === null ? undefined : world.carriages.find((k) => k.id === o.carriageId)
   if (o.carriageId !== null) {
@@ -340,7 +345,7 @@ function tradeWithCity(
     o.side,
     o.good,
     o.units,
-    realm,
+    trader,
   )
   const goodsFrom = o.side === 'buy' ? storage.stock : holder.stock
   const goodsTo = o.side === 'buy' ? holder.stock : storage.stock
@@ -350,15 +355,15 @@ function tradeWithCity(
   const keep = npcReserve(world, city)[o.good] ?? 0
   records.push({
     residentId: r.id,
-    realm,
-    refused: realm !== null && npcCityRefuses(world, city, realm),
+    realm: trader,
+    refused: trader !== null && npcCityRefuses(world, city, trader),
     before,
     after: total(parties),
     npcCityId: city.id,
     keptReserve: units === 0 || (o.side === 'buy' ? held >= keep : held <= keep),
   })
-  if (realm !== null && coins > 0) {
-    raiseStandingBothWays(world, realm, city.id, coins / STANDING_TRADE_COINS_PER_POINT)
+  if (trader !== null && coins > 0) {
+    raiseStandingBothWays(world, trader, city.id, coins / STANDING_TRADE_COINS_PER_POINT)
   }
   recordEvent(world, realm, {
     kind: 'traded',

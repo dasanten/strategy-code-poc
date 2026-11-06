@@ -92,6 +92,11 @@ const SHARED: readonly ScriptBinding[] = [
     'any',
     'The values of the script’s `param` lines, picked on the resident card for whoever runs it: `params.name` for `param name: type`; a `number` param’s default (`param name: number = 3`) while none is set, else null.',
   ),
+  value(
+    'debt',
+    'number',
+    'The Coins my realm owes the Trade Organization, 0 when it owes nothing: what its army came for and couldn’t take, and what crimes cost it since.',
+  ),
   value('tick', 'number', 'The world tick this run is for.'),
   value('mapSize', 'number', 'Tiles along each side of the map; its opposite sides join.'),
   value(
@@ -575,6 +580,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'On a Trade Org warehouse, pay the price of an admin directive against my realm with the coins in my hands, or on my carriage there, to end it.',
   ),
   action(
+    'payDebt',
+    ['coins', 'carriageId?'],
+    'On a Trade Org warehouse, pay up to `coins` of my realm’s debt to the Trade Organization with the coins in my hands, or on my carriage there: what I hold, up to what is owed.',
+  ),
+  action(
     'handOver',
     ['newLeaderId'],
     'As my realm’s Leader, make another resident its Leader: an adult of my realm serving no one else (no mercenary contract, not in the alliance army), standing in the same city of my realm as I do. Free and at once; I stay on as an ordinary resident.',
@@ -612,7 +622,7 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
   action(
     'acceptDemand',
     ['demandId', 'handOver'],
-    'Accept a demand sent to my realm. A demand for a city hands it over at once, also my last one; a city no longer mine is refused. A demand for goods or Coins names how they go in `handOver`: `{ way: "setAside", storageId: id }`, at a storage of mine for the sender alone to fetch, or `{ way: "transfer", fromCityId: id, toCityId: id }`, by Transfers from a city of mine to one of theirs whose storage I see, for a fee I pay. What the storage holds goes, up to what was demanded; with none of it there, it is refused.',
+    'Accept a demand sent to my realm. A demand for a city hands it over at once, also my last one; a city no longer mine is refused. A demand for goods or Coins names how they go in `handOver`: `{ way: "setAside", storageId: id }`, at a storage of mine for the sender alone to fetch, or `{ way: "transfer", fromCityId: id, toCityId: id }`, by Transfers from a city of mine to one of theirs whose storage I see, for a fee I pay. What the storage holds goes, up to what was demanded; with none of it there, it is refused. For the Trade Organization’s demand for my debt, its caravan fetches what is set aside at a storage in a city for no fee, and a Transfer goes to its nearest warehouse whatever `toCityId` says; what they bring in comes off the debt.',
   ),
   action('declineDemand', ['demandId'], 'Decline a demand sent to my realm.'),
   action(

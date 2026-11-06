@@ -252,7 +252,8 @@ The shared language of the game. Domain terms only — no implementation details
   offers.
 - **NPC cities at an offer:** an NPC city sends its trader to a Player's offer within a set reach
   when the offer gives what it is short of and wants what it has spare (or Coins), at a rate at
-  least as good as its own prices. The Trade Organization never accepts offers.
+  least as good as its own prices. The Trade Organization accepts offers only for its army to buy
+  Food on the way (Trade Org debt).
 - **Direct offer:** an offer sent to one named realm, who sees it at once wherever they are and
   accepts or declines it within a set time. The sender picks how the goods change hands: **in
   person**, an offer at a storage of the sender's that only that realm can accept; or **carried**,
@@ -385,9 +386,9 @@ The shared language of the game. Domain terms only — no implementation details
   when the city is no longer the culprit's, or when it finds no way there at all. Each soldier packs Food at the HQ for the way there and
   back, leaving room for what they will carry home; on the way they refill at trading posts they
   pass, and at the city they may take Food from its storage for the way back, apart from what the
-  army came to take. The realm log tells the truth: it is coming; it has arrived; it left with so
-  much of what it came for; it turned back without reaching the city, and why; or it was lost on
-  the way.
+  army came to take. On the road its soldiers keep together at the pace of the slowest (Army). The
+  realm log tells the truth: it is coming; it has arrived; it left with so much of what it came for;
+  it turned back without reaching the city, and why; or it was lost on the way.
 - **Admin directive:** an admin orders the Trade Organization to weaken a Player or
   organization that is deliberately ruining the game for others (e.g. farming new Players). The
   game still forbids nothing; the Trade Organization acts because a healthy world is good for
@@ -687,23 +688,50 @@ The shared language of the game. Domain terms only — no implementation details
   carry home twice what it lost (coins first), fighting whoever resists. It leaves once it has what
   it came for; what it couldn't take becomes a debt.
 - **Trade Org debt:** what the Trade Organization came for and couldn't take stays owed by that
-  Organization, however long it takes. It says so in the realm log, and it can be paid off at any
-  warehouse in Coins at any time. It rises by what later crimes cost. While it is owed the Trade
-  Organization goes up these steps, one after the other (ADR 0025), and paying it in full stops it at
-  any step:
-  1. **It demands:** a demand (Demand) for the debt, with a deadline.
+  Organization, however long it takes, from when its army heads home or is lost, whatever the reason.
+  It says so in the realm log, and a resident on any warehouse's tile can pay it in Coins at any time,
+  in part or in full, from their hands or a carriage there, even if the Trade Organization otherwise
+  refuses them. It rises by what later crimes cost: a crime it comes to know of while it is owed adds
+  what it cost, once, and sends no army of its own. An Organization that is gone takes its debt with
+  it. While it is owed the Trade Organization goes up these steps, one after the other (ADR 0025), and
+  paying it in full stops it at any step:
+  1. **It demands:** a demand (Demand) for the debt, with a deadline, once for each debt. It always
+     asks for what is owed now, and paying in full at a warehouse ends it. Declined or lapsed, the
+     next step starts at once. Accepted, what is handed over comes off the debt as a caravan brings it
+     in, from the warehouse nearest: set aside at a storage in a city, for no fee, or sent by a Transfer,
+     for a fee as always. What that leaves owed starts the next step at the deadline.
   2. **It wrecks:** past the deadline, its next army goes to that city and tears down workplaces of
      it, each counting for its worth against the debt, until the debt is covered or none are left.
      Those who resist are fought.
   3. **It takes the city:** with a debt still owed after a set number of trips, its army occupies the
      town hall (Holding the town hall). The city joins the Trade Organization as a new trading
-     post: its storages become warehouses with what is in them, its people stay as the post's, and
-     the debt is settled.
-  Its army may travel with a **supply wagon**, a Trade Org carriage with Food and room for what it
-  takes, following it like an army's and robbed like a caravan's; and short of Food on the way it
-  buys some from a post, NPC city or Player's offer it passes. A captured post the Trade Organization
+     post: its storages become warehouses with what is in them, but for the Food, which goes into a
+     new storage near its town hall that its people eat from, its people stay as the post's, and the
+     debt is settled.
+  Its army travels with a **supply wagon**, when the HQ has a free adult to drive it: a new Trade Org
+  carriage and horse, loaded at the HQ with Food for the whole trip as far as that leaves room for what
+  it takes. It follows the army (Supply line) and its soldiers refill from it, go to meet it when they
+  run out with it out of reach, and put on it what they take when it is near. It is robbed like a
+  caravan's: taking from it or stealing it is a crime and its soldiers go after those who do, and its
+  crew is lost like one (Caravan crew lost): a soldier takes over from a dead driver, unless they are
+  the last, and with no crew left the HQ sends a new driver on foot, who packs for the walk. Stolen,
+  or with its horse dead, it is gone for the army, which goes on with what it carries. It comes home
+  with them, or by itself once they are lost, and its whole load goes into the warehouses; the carriage
+  and horse go back into the HQ's stock. And short of Food on the way its army
+  buys some from a post, NPC city or Player's offer it passes. Each soldier packs Coins at the HQ for
+  this and hands in what is left back home. A soldier is short when the rest of the trip takes more
+  than they carry and their share of the wagon's Food; with Coins left, they go to such a place near
+  them and buy by the same trade anyone uses, cut down the same way, and carry on. An NPC city that
+  refuses the Trade Organization sells them nothing. They don't buy from the Organization they are
+  punishing, from one the Trade Organization refuses to trade with, or at an offer asking too much.
+  Coins and Food they brought or bought are their own: none of it counts as what the army took. With
+  no seller near they go on hungry. A captured post the Trade Organization
   has heard of (Lost post found out) is a debt too: it demands the city back, and returning it
   settles the debt. Admin directives go on as before, with no debt.
+- **Trade Org army at an NPC gate:** an NPC city that doesn't refuse the Trade Organization keeps its
+  gate open while only the Trade Organization's army is near, so its soldiers can walk in and buy
+  like anyone. A city that refuses it shuts them out as it does anyone it refuses, and other armed
+  outsiders near still shut the gate.
 - **Demand:** a Player or the Trade Organization sends a demand to another Organization: **terms**
   (hand over a named city; hand over goods or Coins), a short written note, and a deadline. It
   arrives at once, like a mercenary offer, wherever the other side is, and sending them is limited.

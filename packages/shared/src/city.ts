@@ -398,16 +398,21 @@ export function defendsCity(
  * residents of exactly one realm not on the city's side stand on the hall's footprint, and no
  * defender of the city (`defendsCity`) does. An ally of that realm there is another realm, so
  * nobody occupies it; armed residents elsewhere in the city don't count. Mercenaries the Trade
- * Organization hired occupy nothing, and defend its HQ (`CONTEXT.md`: Trade Org army). None while
- * the hall is gone. `size` is the map's.
+ * Organization hired occupy nothing, and defend its HQ (`CONTEXT.md`: Trade Org army). Its own
+ * soldiers occupy only as an army come to take the city (`cityTakers`). None while the hall is gone.
+ * `size` is the map's.
  */
 export function occupierOf(
-  world: Pick<WorldState, 'buildings' | 'alliances' | 'residents' | 'contracts'>,
+  world: Pick<
+    WorldState,
+    'buildings' | 'alliances' | 'residents' | 'contracts' | 'punishments' | 'debts'
+  >,
   city: City,
   size: number,
 ): string | null {
   const hall = townHallOf(world, city)
   if (!hall) return null
+  const takers = cityTakers(world, city)
   let occupier: string | null = null
   for (const r of world.residents) {
     if (!isArmed(r) || !isAt(r, hall, size)) continue
@@ -416,11 +421,32 @@ export function occupierOf(
       (c) => c.startedAt !== null && c.hirerId === TRADE_ORG && c.residentIds.includes(r.id),
     )
     if (forTradeOrg && city.tradeOrg === 'hq') return null
-    if (forTradeOrg || r.owner === null || onCitySide(world, city, r.owner)) continue
-    if (occupier !== null && occupier !== r.owner) return null
-    occupier = r.owner
+    const realm = takers.has(r.id) ? TRADE_ORG : r.owner
+    if (forTradeOrg || realm === null || (realm !== TRADE_ORG && onCitySide(world, city, realm)))
+      continue
+    if (occupier !== null && occupier !== realm) return null
+    occupier = realm
   }
   return occupier
+}
+
+/**
+ * The soldiers of the Trade Organization's army come to take `city` (`CONTEXT.md`: Trade Org debt):
+ * on their way there or at it, for a debt the city's Organization still owes. Paid in full, they stop
+ * occupying at once, so the debt can't be paid and the city lost in one tick.
+ */
+export function cityTakers(
+  world: Pick<WorldState, 'punishments' | 'debts'>,
+  city: City,
+): Set<string> {
+  const org = city.realmId ?? city.id
+  const takers = new Set<string>()
+  for (const p of world.punishments) {
+    if (!p.takes || p.heading !== 'out' || p.cityId !== city.id || p.culpritOrg !== org) continue
+    if (!world.debts.some((d) => d.org === org)) continue
+    for (const m of p.members) takers.add(m.residentId)
+  }
+  return takers
 }
 
 /** Ticks a city's town hall has to be occupied (`OCCUPATION_GAME_DAYS`) before it is captured. */

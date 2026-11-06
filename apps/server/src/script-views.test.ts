@@ -255,6 +255,7 @@ describe('script views', () => {
       exploredEdge: 'exploredEdge(me, "north")',
       crewTile: 'crewTile(building("s1"))',
       lineTiles: 'lineTiles({building: "road", from: {x: 10, y: 12}, to: {x: 13, y: 12}}, me)',
+      debt: 'debt',
       tick: 'tick',
       mapSize: 'mapSize',
       random: 'random',

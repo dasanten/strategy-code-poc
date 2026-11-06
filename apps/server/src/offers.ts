@@ -1,6 +1,7 @@
 import {
   DIRECT_OFFER_DAYS,
   TICKS_PER_GAME_DAY,
+  TRADE_ORG,
   acceptCarriedProblem,
   acceptOfferProblem,
   carriageCommanderOf,
@@ -91,6 +92,7 @@ function standOffer(
  * The goods of an accepted demand, set aside at a storage of the realm that accepted it, for the
  * demand's sender alone to fetch (`CONTEXT.md`: Demand). They stand as a Direct offer in person for
  * each good, wanting nothing back, one unit at a time so they can be fetched over several trips.
+ * Answers the offers.
  */
 export function setAsideForDemand(
   world: WorldState,
@@ -98,10 +100,10 @@ export function setAsideForDemand(
   toId: string,
   storage: Building,
   goods: Stock,
-): void {
+): Offer[] {
   const lapsesAt = world.tick + DIRECT_OFFER_DAYS * TICKS_PER_GAME_DAY
-  for (const [good, units] of Object.entries(goods) as [Good, number][]) {
-    world.offers.push({
+  return (Object.entries(goods) as [Good, number][]).map(([good, units]) => {
+    const offer: Offer = {
       id: newId(world, 'offer'),
       realmId,
       storageId: storage.id,
@@ -114,8 +116,10 @@ export function setAsideForDemand(
       wantsUnits: 0,
       times: units,
       direct: { toId, lapsesAt },
-    })
-  }
+    }
+    world.offers.push(offer)
+    return offer
+  })
 }
 
 /**
@@ -470,6 +474,8 @@ interface Accepted {
   residentId: string
   before: Stock
   after: Stock
+  /** Whether the offer gave Food for Coins. */
+  foodForCoins: boolean
 }
 
 /** The offers accepted by the latest `resolveOffers`, kept beside the world for `offersKeepGoods`. */
@@ -553,7 +559,12 @@ function acceptNow(
   const before = total(holder.stock, stock)
   move(stock, holder.stock, offer.gives, q.gives)
   move(holder.stock, stock, offer.wants, q.wants)
-  records.push({ residentId: r.id, before, after: total(holder.stock, stock) })
+  records.push({
+    residentId: r.id,
+    before,
+    after: total(holder.stock, stock),
+    foodForCoins: offer.gives === 'food' && offer.wants === 'coins',
+  })
   offer.times -= q.times
   if (q.times > 0) {
     // Goods handed over on a demand are no trade: fetching them raises no standing.
@@ -589,7 +600,7 @@ function acceptNow(
  * Takes an offer out of the world, with a line in its realm's log and, for a Direct offer, in the
  * log of the realm it was sent to, who already heard if they used it up.
  */
-function endOffer(world: WorldState, offer: Offer, why: OfferEnd): void {
+export function endOffer(world: WorldState, offer: Offer, why: OfferEnd): void {
   world.offers = world.offers.filter((o) => o !== offer)
   const toId = offer.direct?.toId
   recordEvent(world, offer.realmId, {
@@ -609,9 +620,13 @@ function endOffer(world: WorldState, offer: Offer, why: OfferEnd): void {
   })
 }
 
-/** Whether a Direct offer's time is up, or the realm it was sent to is gone. */
+/**
+ * Whether a Direct offer's time is up, or the realm it was sent to is gone, or for the Trade
+ * Organization, what it was set aside for, the HQ that sends its caravans.
+ */
 const lapsed = (world: WorldState, direct: DirectOfferTerms) =>
-  world.tick >= direct.lapsesAt || !world.realms.some((r) => r.id === direct.toId)
+  world.tick >= direct.lapsesAt ||
+  (direct.toId === TRADE_ORG ? !tradeOrgHq(world) : !world.realms.some((r) => r.id === direct.toId))
 
 /** Whether both cities of a carried offer are still their sides', each with a storage. */
 function carriedCitiesHold(world: WorldState, offer: Offer, c: CarriedOfferTerms): boolean {
@@ -756,18 +771,25 @@ export const offersKeepGoods: Invariant = {
   },
 }
 
-/** The Trade Organization never accepts offers (`CONTEXT.md`: NPC cities at an offer). */
-export const tradeOrgTakesNoOffer: Invariant = {
-  name: 'trade-org-takes-no-offer',
+/**
+ * The Trade Organization accepts offers only for its army to buy Food on the way (`CONTEXT.md`: NPC
+ * cities at an offer, Trade Org debt): only a soldier of a punishment, only Food for Coins.
+ */
+export const tradeOrgOnlyBuysFood: Invariant = {
+  name: 'trade-org-only-buys-food',
   check(world) {
     return (ledger.get(world) ?? []).flatMap((t) => {
       const r = world.residents.find((x) => x.id === t.residentId)
       const city = r?.owner === null ? world.cities.find((c) => c.id === r.cityId) : undefined
       if (!city?.tradeOrg) return []
+      const soldier = world.punishments.some((p) =>
+        p.members.some((m) => m.residentId === t.residentId),
+      )
+      if (soldier && t.foodForCoins) return []
       return [
         {
           invariant: this.name,
-          message: `${t.residentId} of ${city.id}, the Trade Organization's, accepted an offer`,
+          message: `${t.residentId} of ${city.id}, the Trade Organization's, accepted an offer that is no army buying Food`,
           entityIds: [t.residentId, city.id],
         },
       ]

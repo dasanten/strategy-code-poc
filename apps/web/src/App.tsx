@@ -1694,6 +1694,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             }
             arrivesIn={arrivesIn || undefined}
             directives={world.diplomacy.directives}
+            debt={world.diplomacy.debt ?? 0}
             noCaravans={world.diplomacy.noCaravans === true}
             openId={openCityId}
             onOpen={setOpenCityId}
@@ -1702,6 +1703,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setOrderError(
                 await sendOrder({ kind: 'buyOff', residentId, directiveId, carriageId }),
               )
+            }
+            onPayDebt={async (residentId, coins, carriageId) =>
+              setOrderError(await sendOrder({ kind: 'payDebt', residentId, coins, carriageId }))
             }
             onPostOffer={async (offer) =>
               setOrderError(await sendOrder({ kind: 'postOffer', ...offer }))
