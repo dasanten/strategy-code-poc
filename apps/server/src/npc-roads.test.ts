@@ -131,6 +131,25 @@ describe('a road crew', () => {
     expect(jobs.filter((j) => j.kind === 'build').length).toBeLessThanOrEqual(NPC_BUILDERS)
   })
 
+  it('comes ahead of scouts, who are the rest of the spare hands, and takes one out last', () => {
+    const { world, terrain, city } = town()
+    const { ways } = waysOf(world, terrain)
+    const plan = planCity(world, city, terrain, undefined, ways)
+    const jobs = Object.values(plan.jobs)
+    expect(jobs.filter((j) => j.kind === 'road')).toHaveLength(NPC_ROAD_CREW)
+    expect(jobs.filter((j) => j.kind === 'scout').length).toBeGreaterThan(0)
+    const crew = crewOf(world, plan).map((r) => r.id)
+    expect(crew.some((id) => plan.jobs[id]?.kind === 'scout')).toBe(false)
+
+    // A new crew, with a scout out among the spare hands: the scout stays out.
+    const scout = world.residents.find((r) => plan.jobs[r.id]?.kind === 'scout')!
+    plan.scouts = { [scout.id]: { saw: [] } }
+    for (const id of crew) delete plan.jobs[id]
+    const next = planCity(world, city, terrain, undefined, ways)
+    expect(next.jobs[scout.id]?.kind).toBe('scout')
+    expect(crewOf(world, next)).toHaveLength(NPC_ROAD_CREW)
+  })
+
   it('keeps its members from pass to pass', () => {
     const { world, terrain, city } = town()
     const { ways } = waysOf(world, terrain)

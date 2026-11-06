@@ -504,7 +504,10 @@ The shared language of the game. Domain terms only — no implementation details
   back. A city knows every resource node within its set reach (NPC city). What a scout saw is
   the city's only once they step back into its area alive: from then on it knows those nodes, out
   to a wider limit (a balance number), and can build on them. A scout killed on the way brings
-  nothing. It stops scouting once it knows its limit. Nothing protects them on the way.
+  nothing. Called off for what is short, they come home first with what they saw. Unexplored to a
+  scout is what their city doesn't know and they haven't seen. It stops scouting once it knows its
+  limit: once a scout finds nothing left they can get to, on their Food. Nothing protects them on
+  the way.
 - **NPC trader:** an NPC city's own trade run. Once a good's surplus makes a full load and a
   Trade Org warehouse (HQ or trading post) lies within a set reach, one of its spare hands,
   never a soldier, carries the load there, sells it, buys the good shortest of the reserve that

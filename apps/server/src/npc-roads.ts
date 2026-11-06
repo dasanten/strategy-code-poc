@@ -139,7 +139,8 @@ function planRoads(
  * The road crew of this planning pass (`CONTEXT.md`: NPC road), from `unneeded`, the spare hands
  * nothing short has a use for: none at a Trade Org city, or while what a road takes is short or
  * neither the storage nor the crew has any to spare, or with no road to build. Those on the crew
- * stay on it; next come those free of any workplace, and last those who would go back to one.
+ * stay on it; next come those free of any workplace, then those who would go back to one, and last
+ * a scout out, who is far off and comes home first.
  */
 export function roadCrew(
   world: WorldState,
@@ -159,7 +160,8 @@ export function roadCrew(
   const inHand = unneeded.filter(onCrew).reduce((sum, r) => sum + tilesIn(r.carried), 0)
   if (tilesIn(above) + inHand < 1) return []
   if (!planRoads(world, city, plan, home, ways, size)) return []
-  const rank = (r: Resident) => (onCrew(r) ? 0 : returning.has(r.id) ? 2 : 1)
+  const rank = (r: Resident) =>
+    onCrew(r) ? 0 : plan.scouts?.[r.id] ? 3 : returning.has(r.id) ? 2 : 1
   return [...unneeded].sort((a, b) => rank(a) - rank(b)).slice(0, NPC_ROAD_CREW)
 }
 

@@ -381,23 +381,31 @@ describe('world saves', () => {
     expect(checkInvariants(v88, land)).toEqual([])
   })
 
-  it('leaves a format 92 world as it is: no plan has a road crew or a way yet (migration 93 → 94)', () => {
+  it('leaves a format 94 world as it is: no plan has a road crew or a way yet (migration 94 → 95)', () => {
     const { world, terrain: land } = worldWithPost()
-    const v94 = migrateWorld(structuredClone(world), 93, { terrain: land }, migrations, 94)
-    expect(v94).toEqual(world)
-    expect(Object.values(v94.cityPlans).every((p) => p.roads === undefined)).toBe(true)
-    expect(checkInvariants(v94, land)).toEqual([])
+    const v95 = migrateWorld(structuredClone(world), 94, { terrain: land }, migrations, 95)
+    expect(v95).toEqual(world)
+    expect(Object.values(v95.cityPlans).every((p) => p.roads === undefined)).toBe(true)
+    expect(checkInvariants(v95, land)).toEqual([])
   })
 
   it('leaves realms from before realm names unnamed (migration 38 → 39)', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(94)
+    expect(WORLD_FORMAT_VERSION).toBe(95)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
     expect(checkInvariants(v39, land)).toEqual([])
+  })
+
+  it('migrates a format 93 world: a city knows nothing from scouts yet (migration 93 → 94)', () => {
+    const { world, terrain } = worldWithPost()
+    const migrated = migrateWorld(structuredClone(world), 93, { terrain }, migrations, 94)
+    expect(migrated).toEqual(world)
+    expect(migrated.cities.every((c) => c.scouted === undefined)).toBe(true)
+    expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 
   it('migrates a format 39 world: every Player starts with an empty Last seen (migration 39 → 40)', () => {

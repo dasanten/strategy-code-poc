@@ -52,7 +52,7 @@ function villages(n: number): { world: WorldState; terrain: TerrainMap; cities: 
 }
 
 describe('planCity', () => {
-  it('gives every adult a job: soldiers stand, farmers feed the city, two build, the rest wait', () => {
+  it('gives every adult a job: soldiers stand, farmers feed the city, two build, one scouts, the rest wait', () => {
     const { world, terrain, city, home } = village()
     for (const r of world.residents) {
       Object.assign(r, { x: home.x, y: home.y, order: null })
@@ -74,11 +74,13 @@ describe('planCity', () => {
     expect(farmers).toHaveLength(farmersWanted(world, city))
     expect(farmers.length).toBeLessThan(NPC_VILLAGE.residents - 1)
     for (const job of farmers) expect(job).toEqual({ kind: 'farm', buildingId: farm.id })
-    // Its reserve lacks Wood: two build the lumber camp; the last waits for it.
+    // Its reserve lacks Wood: two build the lumber camp; the last scouts, and any more wait.
     expect(plan.project).toEqual({ kind: 'build', building: 'lumberCamp', ...FOREST })
     expect(jobs.filter((j) => j?.kind === 'build')).toHaveLength(NPC_BUILDERS)
+    const scouts = jobs.filter((j) => j?.kind === 'scout').length
+    expect(scouts).toBeLessThanOrEqual(1)
     expect(jobs.filter((j) => j?.kind === 'idle')).toHaveLength(
-      NPC_VILLAGE.residents - 1 - farmers.length - NPC_BUILDERS,
+      NPC_VILLAGE.residents - 1 - farmers.length - NPC_BUILDERS - scouts,
     )
     expect(checkInvariants(world, terrain)).toEqual([])
   })
@@ -88,6 +90,8 @@ describe('planCity', () => {
     fillHouses(world, city, home)
     // Food plenty, and below its cap (`CONTEXT.md`: Spare hands' work).
     storageOf(world, city).stock = { food: npcReserve(world, city).food! + 1 }
+    // It knows its limit, so nobody leaves the farm to scout (`CONTEXT.md`: Scout).
+    city.scouted = { sectors: [], done: true }
     const plan = planCity(world, city, terrain)
     // Everyone from the founding still works the farm; two newcomers build the lumber camp the
     // house wants Wood from, and the rest take the farm's places left, or wait for the next pass.

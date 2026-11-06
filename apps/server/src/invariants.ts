@@ -125,6 +125,7 @@ import { hqRingsSound } from './hq-growth.js'
 import { cityPlansSound, npcFarmersKept, npcSurplusCapped, tradeOrgSendsNoOne } from './npc-plan.js'
 import { npcRoadCrewSized } from './npc-roads.js'
 import { npcRevivers } from './npc-revive.js'
+import { npcScoutsSound } from './npc-scouts.js'
 import { foundingPartiesSound, npcCitiesHaveHalls } from './npc-founding.js'
 import { npcTradersSound } from './npc-trader.js'
 import { leadersServeNoOne } from './leader.js'
@@ -2103,6 +2104,7 @@ export const worldInvariants: Invariant[] = [
   npcSurplusCapped,
   npcRoadCrewSized,
   npcRevivers,
+  npcScoutsSound,
   tradeOrgSendsNoOne,
   npcTradersSound,
   lineOrdersSound,

@@ -888,11 +888,11 @@ export interface WorldState {
 /**
  * What a game-run city's plan has one of its residents do (`CONTEXT.md`: NPC city; ADR 0016):
  * stand as a soldier, work a farm or another workplace, build its project, go on its trade run
- * (NPC trader), found its daughter (Founding), revive one of its own (Reviving), or nothing, until
- * the next pass moves them.
+ * (NPC trader), found its daughter (Founding), revive one of its own (Reviving), scout (Scout), or
+ * nothing, until the next pass moves them.
  */
 export interface CityJob {
-  kind: 'soldier' | 'farm' | 'work' | 'build' | 'road' | 'trade' | 'found' | 'revive' | 'idle'
+  kind: 'soldier' | 'farm' | 'work' | 'build' | 'road' | 'trade' | 'found' | 'revive' | 'scout' | 'idle'
   /** The farm or workplace to work, for `farm` and `work`. */
   buildingId?: string
   /** The Down resident to revive, for `revive`. */
@@ -950,6 +950,27 @@ export interface CityTrader {
 }
 
 /**
+ * What a scout out has seen and not brought home yet (`CONTEXT.md`: Scout), in sectors
+ * (`NPC_SCOUT_SECTOR`). Lost if they die on the way.
+ */
+export interface ScoutTrip {
+  /** The sectors they have had in sight. */
+  saw: number[]
+  /** The sectors of the tiles they found no way to. */
+  noWay?: number[]
+}
+
+/** What an NPC city's scouts have brought home (`CONTEXT.md`: Scout), in sectors (`NPC_SCOUT_SECTOR`). */
+export interface CityScouted {
+  /** The sectors scouts saw: it knows the nodes in them, out to its limit (`NPC_SCOUT_LIMIT`). */
+  sectors: number[]
+  /** Sectors a scout found no way to, which it sends nobody to again and knows nothing of. */
+  noWay?: number[]
+  /** It knows its limit, and scouts no more. */
+  done?: true
+}
+
+/**
  * What a city the game runs decided at its last planning pass (`CONTEXT.md`: NPC city;
  * ADR 0016), kept in the world so a restart forgets nothing: plain serialisable data like an
  * order's state (ADR 0002). Only the pass changes the jobs; between passes the city hands them
@@ -977,6 +998,8 @@ export interface CityPlan {
    * full, and the founding party's goal once it is out.
    */
   foundingSite?: { x: number; y: number }
+  /** Its scouts with something still to bring home, by resident id (`CONTEXT.md`: Scout). */
+  scouts?: Record<string, ScoutTrip>
 }
 
 /**
@@ -2529,6 +2552,8 @@ export interface City {
    * one that is gone is skipped.
    */
   workplaceIds?: string[]
+  /** What an NPC city's scouts have brought home (`CONTEXT.md`: Scout); nobody else sees it. */
+  scouted?: CityScouted
   /**
    * For a self-managed city, the Player whose Leader died while it was theirs and the tick it
    * happened (`CONTEXT.md`: Self-managed city). It holds them in good standing, fading from then

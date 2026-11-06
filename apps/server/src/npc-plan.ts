@@ -55,6 +55,7 @@ import {
 import { foundingParty, planFounding } from './npc-founding.js'
 import { downToRevive, goesOnReviving, sendRevivers } from './npc-revive.js'
 import { roadCrew, type WayFinder } from './npc-roads.js'
+import { pickScouts } from './npc-scouts.js'
 import { planTrader, planVisit, traderOut } from './npc-trader.js'
 import { hash } from './residents.js'
 
@@ -315,9 +316,10 @@ const feeders = (residents: number) =>
  * `CONTEXT.md`, Carrying the output, to that workplace), at an NPC city only up to the cap of its
  * good (`surplusWork`), and a free spare hand of an NPC city goes to work for surplus
  * (`surplusPlace`; `CONTEXT.md`: Spare hands' work). Ahead of all that, some of them go on its road
- * crew (`roadCrew`; `CONTEXT.md`: NPC road). Whoever has none of that is idle.
- * Returns the spare hands nothing short has a use for, idle, on the road crew or working for
- * surplus (`CONTEXT.md`: Full city).
+ * crew (`roadCrew`; `CONTEXT.md`: NPC road), and after them a few scout (`pickScouts`). Whoever has
+ * none of that is idle.
+ * Returns the spare hands nothing short has a use for, idle, on the road crew, scouting or working
+ * for surplus (`CONTEXT.md`: Full city).
  */
 function shareOut(
   world: WorldState,
@@ -362,6 +364,8 @@ function shareOut(
     if (!before || kept.has(r.id) || !byId.has(before.buildingId ?? '')) continue
     if (before.kind === 'work' || before.kind === 'farm') kept.set(r.id, before)
   }
+  // A scout out is called home for what is short only once those at hand have gone.
+  spare.sort((a, b) => Number(!!plan.scouts?.[a.id]) - Number(!!plan.scouts?.[b.id]))
   const wanted = farmersWanted(world, city)
   const farmers = adults.filter((r) => jobs[r.id]?.kind === 'farm')
   if (!foodShort) for (const r of farmers.slice(wanted).reverse()) release(r, true)
@@ -415,8 +419,15 @@ function shareOut(
   const surplus = city.tradeOrg ? undefined : surplusWork(world, city, storage)
   const worthBack = (b: Building) =>
     !surplus || chainGood(world, b) === undefined || surplus(b) !== undefined
+  // Scouts after the road and before surplus (`CONTEXT.md`: Spare hands' work), those already out
+  // first; they stay spare hands for a Full city. What is short took them above, and they walk home for it.
+  const hasPlace = (r: Resident) => byId.has(kept.get(r.id)?.buildingId ?? '')
+  const offRoad = unneeded.filter((r) => !crew.has(r.id))
+  for (const r of pickScouts(world, city, plan, offRoad, hasPlace, foodShort)) {
+    jobs[r.id] = { kind: 'scout' }
+  }
   const free = unneeded.filter((r) => {
-    if (crew.has(r.id)) return false
+    if (crew.has(r.id) || jobs[r.id]?.kind === 'scout') return false
     const back = kept.get(r.id)
     const backTo = back && byId.get(back.buildingId ?? '')
     if (!back || !backTo || held.room(backTo) <= 0 || !worthBack(backTo)) return true

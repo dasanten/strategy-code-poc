@@ -20,7 +20,7 @@ import { placeTraders, putHqOnLoops } from './traders.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 94
+export const WORLD_FORMAT_VERSION = 95
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -399,10 +399,14 @@ export const migrations: Record<number, MigrationStep> = {
   // A city's plan can give a resident a `revive` job, with `targetId` (`CONTEXT.md`: Reviving). No
   // plan has one yet, and the next pass hands them out: every world stays as it is.
   92: (state) => state,
+  // An NPC city's scouts (`CONTEXT.md`: Scout), with `City.scouted`, `CityPlan.scouts` and the
+  // `scout` job: until its first scout comes home a city knows only its set reach, as it did, and
+  // nobody is out yet. So the step leaves every world as it is.
+  93: (state) => state,
   // An NPC city's plan may keep the ways of its roads and put residents on its road crew
   // (`CONTEXT.md`: NPC road). No plan has either yet, and the next pass works them out. So the step
   // leaves every world as it is.
-  93: (state) => state,
+  94: (state) => state,
 }
 
 export class WorldFormatError extends Error {}
