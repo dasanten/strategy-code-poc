@@ -638,6 +638,33 @@ export const NPC_SURPLUS_CAP: Partial<Record<Good, number>> = {
 export const NPC_WALL_STEP = 8
 
 /**
+ * Tiles along each side of a block of the Grid layout (`CONTEXT.md`: City layout): room for two
+ * houses each way, or one stable. A lane one tile wide, left free for a street, runs between blocks.
+ */
+export const CITY_GRID_BLOCK = 4
+
+/**
+ * Tiles from one circular lane of the Rings layout to the next (`CONTEXT.md`: City layout), the first
+ * this far from the middle of the town hall: room between two lanes for a circle of houses, or
+ * stables, all the way round.
+ */
+export const CITY_RING_STEP = 5
+
+/**
+ * Tiles along the street between two side lanes of the Main street layout (`CONTEXT.md`: City
+ * layout): a row of four houses, long enough to read as a row and not as a block of the Grid. A lane
+ * one tile wide, left free for a street, comes after them.
+ */
+export const CITY_SIDE_LANE_GAP = 8
+
+/**
+ * Tiles deep of a band of rows in the Quarters layout (`CONTEXT.md`: City layout): two rows of houses
+ * back to back, or one row of stables. A lane one tile wide, left free for a street, runs between
+ * bands.
+ */
+export const CITY_QUARTER_ROWS = 4
+
+/**
  * How many tiles of wall an NPC city's builder fetches the materials for in one trip to the
  * storage (`CONTEXT.md`: NPC city, Fetching materials): a 40 m stretch's worth, so a long wall is
  * not one walk per tile. What a tile doesn't take goes to the next.

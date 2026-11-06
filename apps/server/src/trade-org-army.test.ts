@@ -39,8 +39,7 @@ const MID = 320
 function setup() {
   const world = createWorld(terrain)
   const hq = foundTradeOrgHq(world, terrain, MID, MID, mulberry32(7))
-  const post = addCity(world, { id: 'p', realmId: null, x: 20, y: 20 })
-  post.tradeOrg = 'post'
+  addCity(world, { id: 'p', realmId: null, x: 20, y: 20, tradeOrg: 'post' })
   world.buildings.push({ id: 'w', kind: 'warehouse', cityId: 'p', x: 23, y: 20, stock: {} })
   world.realms.push({ id: 'r1', userId: 7, leaderId: 'a1' })
   addCity(world, { id: 'c1', realmId: 'r1', x: 20, y: 140 })

@@ -1006,6 +1006,11 @@ export interface CityPlan {
   project?: CityProject
   /** The roads it has worked out the way of (`CONTEXT.md`: NPC road), in the order it builds them. */
   roads?: CityRoad[]
+  /**
+   * The tiles of its layout's streets it wanted as road at its last pass (`CONTEXT.md`: City layout),
+   * which its road crew builds ahead of `roads`; worked out anew each pass.
+   */
+  streets?: [x: number, y: number][]
   /** Its trade run under way (`CONTEXT.md`: NPC trader); none while no trader is out. */
   trader?: CityTrader
   /**
@@ -2826,7 +2831,16 @@ export interface City {
    * Held `OCCUPATION_GAME_DAYS` without a break, it captures the city.
    */
   occupation: Occupation | null
+  /**
+   * How it sets out its town (`CONTEXT.md`: City layout), kept once picked. Every NPC city has one;
+   * trading posts, the HQ and Players' cities have none.
+   */
+  layout?: CityLayout
 }
+
+/** The layouts an NPC city can get (`CONTEXT.md`: City layout). */
+export const CITY_LAYOUTS = ['grid', 'rings', 'mainStreet', 'quarters'] as const
+export type CityLayout = (typeof CITY_LAYOUTS)[number]
 
 /** A realm occupying a city's town hall (`CONTEXT.md`: Occupying a town hall). */
 export interface Occupation {

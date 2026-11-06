@@ -580,8 +580,14 @@ describe('the Trade Organization’s punishment trip', () => {
     const p = world.punishments[0]!
     const m = p.members[0]!
     const r = at(world, m.residentId)
-    addCity(world, { id: 'post', realmId: null, x: MID, y: MID + 60, name: 'Waypost' })
-    world.cities.find((c) => c.id === 'post')!.tradeOrg = 'post'
+    addCity(world, {
+      id: 'post',
+      realmId: null,
+      x: MID,
+      y: MID + 60,
+      name: 'Waypost',
+      tradeOrg: 'post',
+    })
     world.buildings.push({
       id: 'ps',
       kind: 'storage',

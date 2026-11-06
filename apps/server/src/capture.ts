@@ -249,6 +249,8 @@ function changeHands(world: WorldState, city: City, to: string | null, size: num
       r.order = null
   }
   city.realmId = to
+  // A Player's city has no layout (`CONTEXT.md`: City layout).
+  delete city.layout
   // Only a city of no realm has a plan (`cityPlansSound`), and this tick's planning is over.
   delete world.cityPlans[city.id]
   return joining.length

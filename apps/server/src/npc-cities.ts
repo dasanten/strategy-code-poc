@@ -10,6 +10,7 @@ import {
   Terrain,
   terrainAt,
   townHallOf,
+  wrap,
   wrapDistance,
   type Building,
   type City,
@@ -18,6 +19,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { CITY_NAMES, givenCityName, updateCityMembership } from './cities.js'
+import { layoutPlan, pickLayout, type LayoutPlan } from './city-layout.js'
 import { giveNpcHorses } from './npc-horses.js'
 import { hash, mulberry32, newResident } from './residents.js'
 import { Ground } from './placing.js'
@@ -112,8 +114,10 @@ export function findNpcCitySite(
 /**
  * Lays out an NPC city of `kind` with its top-left wall tile at (x, y), as a starting city is
  * laid out: a ring of wall with a gate, the storage with food in the middle, the town hall south
- * of it, houses in a row north of it, and farms outside the wall by the gate. Its residents
- * belong to no realm; they start on the farms, working them, each with a little food on them.
+ * of it, houses in a row north of it, each on the nearest spot its layout has (`CONTEXT.md`: City
+ * layout), and farms outside the wall by the gate. Its residents belong to no realm; they start on
+ * the farms, working them, each with a little food on them. A trading post (`tradeOrg`) has no
+ * layout, and its row stands as it falls.
  */
 export function foundNpcCity(
   world: WorldState,
@@ -122,6 +126,7 @@ export function foundNpcCity(
   x: number,
   y: number,
   rand: () => number,
+  tradeOrg?: 'post',
 ): City {
   const mid = Math.floor(kind.size / 2)
   const square = wallSquare(x, y, kind.size)
@@ -132,6 +137,7 @@ export function foundNpcCity(
     realmId: null,
     townHallId: '',
     occupation: null,
+    ...(tradeOrg ? { tradeOrg } : { layout: pickLayout(world.seed, id) }),
   }
   const building = (k: Building['kind'], bx: number, by: number): Building => ({
     id: newId(world, 'b'),
@@ -145,17 +151,20 @@ export function foundNpcCity(
   const farms = (spotsOutside(takenGround(world, terrain), square, farmKinds(kind)) ?? []).map(
     ([fx, fy]) => building('farm', fx, fy),
   )
-  const buildings: Building[] = [
-    hall,
-    { ...building('storage', x + mid, y + mid), stock: { food: kind.food } },
-    ...Array.from({ length: kind.houses }, (_, i) =>
-      building('house', ...houseTile(x, y, kind.size, i)),
-    ),
-    ...ringTiles(square).map(([wx, wy]) =>
-      building(wx === square.gate.x && wy === square.gate.y ? 'gate' : 'wall', wx, wy),
-    ),
-    ...farms,
-  ]
+  const storage = { ...building('storage', x + mid, y + mid), stock: { food: kind.food } }
+  const walls = ringTiles(square).map(([wx, wy]) =>
+    building(wx === square.gate.x && wy === square.gate.y ? 'gate' : 'wall', wx, wy),
+  )
+  world.cities.push(city)
+  world.buildings.push(hall, storage, ...walls, ...farms)
+  const plan = layoutPlan(world, city, storage, { dx: 0, dy: mid }, terrain.size)
+  const ground = new Ground(world, terrain)
+  for (let i = 0; i < kind.houses; i++) {
+    const row = houseTile(x, y, kind.size, i)
+    const [hx, hy] = (plan && startingHouseSpot(plan, ground, storage, row)) ?? row
+    ground.take('house', hx, hy)
+    world.buildings.push(building('house', hx, hy))
+  }
   const names = new Set<string>()
   const residents = Array.from({ length: kind.residents }, (_, i) => {
     const farm = farms[i % farms.length]!
@@ -176,11 +185,42 @@ export function foundNpcCity(
     r.script = { scriptId: 0, task: 'work', memory: { workplaceId: farm.id } }
     return r
   })
-  world.cities.push(city)
-  world.buildings.push(...buildings)
   world.residents.push(...residents)
   updateCityMembership(world, terrain.size)
   return city
+}
+
+/**
+ * Where a starting house goes by its city's layout: the spot nearest its tile in a starting city's
+ * row, and no further from the home than that. The row is what ties a town's wall to its middle
+ * (`CITY_BUILDING_REACH`), so the houses stay near it and the wall stays part of the city. A layout
+ * that fills some spots first (`LayoutPlan.rank`) takes the first of those, as far out as the row
+ * stands.
+ */
+function startingHouseSpot(
+  plan: LayoutPlan,
+  ground: Ground,
+  home: Building,
+  [rx, ry]: [number, number],
+): [number, number] | undefined {
+  const size = ground.terrain.size
+  const reach = Math.max(Math.abs(rx - home.x), Math.abs(ry - home.y))
+  const off = (x: number, y: number) => !plan.street(x, y)
+  let best: { at: [number, number]; rank: number; d: number } | undefined
+  for (let dy = -reach; dy <= reach; dy++) {
+    for (let dx = -reach; dx <= reach; dx++) {
+      const x = wrap(home.x + dx, size)
+      const y = wrap(home.y + dy, size)
+      if (!plan.spot('house', x, y)) continue
+      const rank = plan.rank?.('house', x, y) ?? 0
+      const d = plan.rank
+        ? reach - Math.max(Math.abs(dx), Math.abs(dy))
+        : Math.hypot(home.x + dx - rx, home.y + dy - ry)
+      if (best && (rank > best.rank || (rank === best.rank && d >= best.d))) continue
+      if (ground.fits('house', x, y, off)) best = { at: [x, y], rank, d }
+    }
+  }
+  return best?.at
 }
 
 /**

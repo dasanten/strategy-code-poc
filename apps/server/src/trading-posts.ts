@@ -109,8 +109,7 @@ export function foundTradingPost(
   resource: ResourceKind | undefined,
   rand: () => number,
 ): City {
-  const city = foundNpcCity(world, terrain, TRADING_POST, x, y, rand)
-  city.tradeOrg = 'post'
+  const city = foundNpcCity(world, terrain, TRADING_POST, x, y, rand, 'post')
   const mid = Math.floor(TRADING_POST.size / 2)
   const warehouse: Building = {
     id: newId(world, 'b'),

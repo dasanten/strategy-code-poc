@@ -8,6 +8,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { leaveTradeOrg } from './caravans.js'
+import { pickLayout } from './city-layout.js'
 import { hqFalls } from './hq-fall.js'
 import { grantHorses } from './horse-grant.js'
 import { horseName } from './horses.js'
@@ -21,7 +22,7 @@ import { placeTraders, putHqOnLoops } from './traders.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 102
+export const WORLD_FORMAT_VERSION = 104
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -443,6 +444,18 @@ export const migrations: Record<number, MigrationStep> = {
   // (`CONTEXT.md`: NPC road). No plan has either yet, and the next pass works them out. So the step
   // leaves every world as it is.
   101: (state) => state,
+  // City layouts (`CONTEXT.md`: City layout; `City.layout`): every NPC city from before gets one now.
+  // Nothing is torn down; its new buildings follow the layout around what stands.
+  102: (state) => {
+    const world = structuredClone(state) as WorldState
+    for (const c of world.cities) {
+      if (c.realmId === null && !c.tradeOrg) c.layout = pickLayout(world.seed, c.id)
+    }
+    return world
+  },
+  // An NPC city's plan may keep the streets its road crew builds next (`CityPlan.streets`). No plan
+  // has any yet, and the next pass works them out. So the step leaves every world as it is.
+  103: (state) => state,
 }
 
 export class WorldFormatError extends Error {}

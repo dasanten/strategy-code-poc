@@ -24,7 +24,14 @@ export function cityTerrain(): TerrainMap {
  */
 export function addCity(
   world: WorldState,
-  city: { id: string; realmId: string | null; x: number; y: number; name?: string },
+  city: {
+    id: string
+    realmId: string | null
+    x: number
+    y: number
+    name?: string
+    tradeOrg?: 'hq' | 'post'
+  },
 ): City {
   const hall: Building = {
     id: `${city.id}-hall`,
@@ -39,6 +46,8 @@ export function addCity(
     realmId: city.realmId,
     townHallId: hall.id,
     occupation: null,
+    ...(city.tradeOrg ? { tradeOrg: city.tradeOrg } : {}),
+    ...(city.realmId === null && !city.tradeOrg ? { layout: 'grid' as const } : {}),
   }
   world.buildings.push(hall)
   world.cities.push(c)

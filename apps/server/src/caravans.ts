@@ -164,6 +164,8 @@ export function leaveTradeOrg(world: WorldState, post: City): void {
  */
 export function rejoinTradeOrg(world: WorldState, post: City, size: number): void {
   post.tradeOrg = 'post'
+  // A Trade Org city has no layout (`CONTEXT.md`: City layout).
+  delete post.layout
   restoreWarehouse(world, post, size)
   placeCaravans(world)
 }
@@ -176,6 +178,7 @@ export function rejoinTradeOrg(world: WorldState, post: City, size: number): voi
  */
 export function joinTradeOrg(world: WorldState, city: City, terrain: TerrainMap): void {
   city.tradeOrg = 'post'
+  delete city.layout
   delete city.formerPlayer
   storagesBecomeWarehouses(world, city, terrain)
   for (const b of world.buildings) if (b.cityId === city.id && b.kind === 'gate') delete b.closed

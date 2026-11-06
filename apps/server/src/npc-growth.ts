@@ -41,6 +41,7 @@ import {
   covers,
   ownsHorse,
 } from '@csp/shared'
+import { layoutPlan } from './city-layout.js'
 import { hqGrows, hqHouseTile, hqProject, hqRings } from './hq-growth.js'
 import { walkTo } from './npc-behaviour.js'
 import { npcSender } from './order-sender.js'
@@ -554,10 +555,11 @@ function wantsStable(world: WorldState, city: City): boolean {
 
 /**
  * Where an NPC city puts its stable, by the north-west tile of its footprint: over its horses when
- * one fits there, so that they stand in it once it is finished (`CONTEXT.md`: NPC horses); else where
- * it would put a house (`houseTile`).
+ * one fits there, so that they stand in it once it is finished (`CONTEXT.md`: NPC horses), off its
+ * streets (`CONTEXT.md`: City layout) unless they stand on one, as in a city from before layouts,
+ * since nobody leads them anywhere; else where it would put a house (`houseTile`).
  */
-function stableTile(
+export function stableTile(
   world: WorldState,
   city: City,
   home: Building,
@@ -578,9 +580,14 @@ function stableTile(
       [wrap(first.x - middle, size), wrap(first.y - middle, size)],
       ...footprintTiles({ kind: 'stable', x: first.x - far, y: first.y - far }, size),
     ]
-    for (const [x, y] of corners) {
-      const over = horses.every((h) => covers({ kind: 'stable', x, y }, h.x, h.y, size))
-      if (over && ground.fits('stable', x, y, (tx, ty) => area.has(`${tx},${ty}`))) return { x, y }
+    const over = corners.filter(([x, y]) =>
+      horses.every((h) => covers({ kind: 'stable', x, y }, h.x, h.y, size)),
+    )
+    const inArea = (tx: number, ty: number) => area.has(`${tx},${ty}`)
+    const lanes = layoutPlan(world, city, home, rings?.newGate, size)
+    const offStreet = (tx: number, ty: number) => inArea(tx, ty) && !lanes?.street(tx, ty)
+    for (const allowed of [offStreet, inArea]) {
+      for (const [x, y] of over) if (ground.fits('stable', x, y, allowed)) return { x, y }
     }
   }
   return houseTile(world, city, home, terrain, rings, 'stable')
@@ -588,9 +595,10 @@ function stableTile(
 
 /**
  * Where an NPC city's first horses stand while it has no stable (`giveNpcHorses`), by the north-west
- * tile of a stable's footprint: wholly on free ground of its area, with nothing standing or lying
- * there, inside its wall and as far from its home as that goes, as its houses and workplaces go up
- * nearest it first and reach this last. None with no room.
+ * tile of a stable's footprint: wholly on free ground of its area, off its streets (`CONTEXT.md`:
+ * City layout), with nothing standing or lying there, inside its wall and as far from its home as
+ * that goes, as its houses and workplaces go up nearest it first and reach this last. None with no
+ * room.
  */
 export function farStableSpot(
   world: WorldState,
@@ -602,7 +610,8 @@ export function farStableSpot(
   const area = cityAreaTiles(world, city, size)
   const ground = new Ground(world, terrain, residentTiles(world))
   const rings = wallRings(world, city, home, size)
-  const inArea = (x: number, y: number) => area.has(`${x},${y}`)
+  const lanes = layoutPlan(world, city, home, rings?.newGate, size)
+  const inArea = (x: number, y: number) => area.has(`${x},${y}`) && !lanes?.street(x, y)
   const free = [...area]
     .map((k) => {
       const [x, y] = k.split(',').map(Number) as [number, number]
@@ -800,8 +809,12 @@ function ringsOf(
  * Where the city puts its next house (`CONTEXT.md`: House), or another `kind` of building that
  * goes in its area like one (a smelter, smithy, mint or stable), by the north-west tile of its
  * footprint: wholly on free ground of its area inside its wall, nearest its home first; when it is
- * expanding, inside the new wall. With no room left there, on its edge just outside the wall,
- * which starts its expansion. A city without walls builds anywhere in its area.
+ * expanding, inside the new wall. With no room left there, on its edge just outside the wall and
+ * short of where the next one stands, which starts its expansion. A city without walls builds
+ * anywhere in its area. Its layout (`CONTEXT.md`: City layout), if it has one, says which of those
+ * spots it may take and which it fills first, and keeps its streets free; a spot that doesn't fit
+ * is skipped. All that among the spots it has for the kind, and then, unless a new wall is going up
+ * to make room, among those the layout lets it spill over to.
  */
 export function houseTile(
   world: WorldState,
@@ -814,19 +827,31 @@ export function houseTile(
   const size = terrain.size
   const area = cityAreaTiles(world, city, size)
   const ground = new Ground(world, terrain)
-  const inArea = (x: number, y: number) => area.has(`${x},${y}`)
-  const free = [...area]
-    .map((k) => {
-      const [x, y] = k.split(',').map(Number) as [number, number]
-      return { x, y, ...ringsOf(home, { kind, x, y }, size) }
-    })
-    .filter((t) => ground.fits(kind, t.x, t.y, inArea))
-    .sort((a, b) => a.near - b.near || a.y - b.y || a.x - b.x)
-  const at = (t: { x: number; y: number } | undefined) => t && { x: t.x, y: t.y }
-  if (!rings) return at(free[0])
-  const inside = free.find((t) => t.far < rings.outer)
-  if (inside || rings.expanding) return at(inside)
-  return at(free.find((t) => t.near === rings.inner + 1))
+  const plan = layoutPlan(world, city, home, rings?.newGate, size)
+  const allowed = (x: number, y: number) => area.has(`${x},${y}`) && !plan?.street(x, y)
+  const among = (spot?: (x: number, y: number) => boolean) => {
+    const free = [...area]
+      .map((k) => {
+        const [x, y] = k.split(',').map(Number) as [number, number]
+        return { x, y }
+      })
+      .filter((t) => (!spot || spot(t.x, t.y)) && ground.fits(kind, t.x, t.y, allowed))
+      .map((t) => ({
+        ...t,
+        ...ringsOf(home, { kind, ...t }, size),
+        rank: plan?.rank?.(kind, t.x, t.y) ?? 0,
+      }))
+      .sort((a, b) => a.rank - b.rank || a.near - b.near || a.y - b.y || a.x - b.x)
+    const at = (t: { x: number; y: number } | undefined) => t && { x: t.x, y: t.y }
+    if (!rings) return at(free[0])
+    const inside = free.find((t) => t.far < rings.outer)
+    if (inside || rings.expanding) return at(inside)
+    return at(free.find((t) => t.near > rings.inner && t.far < rings.inner + NPC_WALL_STEP))
+  }
+  if (!plan) return among()
+  const own = among((x, y) => plan.spot(kind, x, y))
+  if (own || !plan.spill || rings?.expanding) return own
+  return among((x, y) => plan.spill!(kind, x, y))
 }
 
 /**
