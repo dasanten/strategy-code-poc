@@ -23,8 +23,8 @@ import { FOOTPRINT } from './footprint.js'
 import type { ScriptParam } from './script-api.js'
 
 /**
- * The tasks that run a default script. Defend is never given: being struck starts it
- * (`CONTEXT.md`: Defence script).
+ * The tasks that run a default script. Defend and Alarm are never given: being struck starts the
+ * one (`CONTEXT.md`: Defence script), an alarm the other (Alarm script).
  */
 export const TASKS = [
   'work',
@@ -37,6 +37,7 @@ export const TASKS = [
   'train',
   'buildLine',
   'explore',
+  'alarm',
 ] as const
 export type Task = (typeof TASKS)[number]
 
@@ -1922,6 +1923,69 @@ fn townHall() {
     if (c.id == me.cityId) { return building(c.townHallId) }
   }
   return null
+}
+
+${LOG_TEXT}
+`,
+  },
+  alarm: {
+    name: 'Alarm',
+    source: `// Alarm (default): what I do when an alarm reaches me, in place of what I was
+// doing, which goes on once I end. Armed, with the town hall occupied, I go
+// after the occupier while they stand in the city's area, and end once no armed
+// one of theirs is left there or in sight. Going after them is a crime, as
+// striking anyone is. Unarmed, or for another alarm, I end at once.
+if (me.alarm == null || !armed(me)) {
+  end()
+} else if (me.alarm.kind == "occupied") {
+  goAfterOccupier()
+} else {
+  end()
+}
+
+fn goAfterOccupier() {
+  let foe = occupier()
+  if (foe == null) {
+    end("the occupier is gone")
+    return
+  }
+  memory.foeId = foe.id
+  let o = me.order
+  if (o != null && o.kind == "attack" && o.targetId == foe.id) { return } // at it
+  let problem = attack(foe.id)
+  if (problem != null) {
+    end("can't go after " + foe.name + ": " + problem)
+    return
+  }
+  doing("On alarm: going after " + foe.name)
+  log("going after " + foe.name)
+}
+
+// The occupier I am after while they stand in the area, else another armed one
+// of theirs there.
+fn occupier() {
+  let after = memory.foeId
+  if (after == null) { after = me.alarm.about }
+  let realm = me.alarm.realmId
+  let other = null
+  for (r of residents()) {
+    if (r.owner == realm || r.id == after) {
+      if (armed(r) && inCityArea(me.alarm.cityId, r.x, r.y)) {
+        if (r.id == after) { return r }
+        other = r
+      }
+    }
+  }
+  return other
+}
+
+// Whether they carry a weapon.
+fn armed(who) {
+  for (w of ["spear", "sword"]) {
+    let n = who.carried[w]
+    if (n != null && n > 0) { return true }
+  }
+  return false
 }
 
 ${LOG_TEXT}

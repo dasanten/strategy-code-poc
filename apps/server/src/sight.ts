@@ -370,8 +370,8 @@ function everythingSeen(
     // its params are shown only to the realm commanding them, all they keep (to fill in before a
     // script starts), as is the queue to the realm that gave it.
     // What a defence script interrupted goes on the owning Player's Doing line only, its memory
-    // never; the defence script picked is the owning Player's to see too.
-    const { script, scriptParams, queue, interrupted, defenceScriptId, ...rest } =
+    // never; the defence and Alarm scripts picked are the owning Player's to see too.
+    const { script, scriptParams, queue, interrupted, defenceScriptId, alarmScriptId, ...rest } =
       withoutServerOnly(r)
     const kept = index.commanderOf(r) === realmId ? scriptParams : undefined
     const params = script ? kept?.[script.scriptId] : undefined
@@ -381,6 +381,7 @@ function everythingSeen(
       ...rest,
       ...(kept ? { scriptParams: kept } : {}),
       ...(defenceScriptId !== undefined && own ? { defenceScriptId } : {}),
+      ...(alarmScriptId !== undefined && own ? { alarmScriptId } : {}),
       ...(queue && queue.realmId === realmId ? { queue } : {}),
       ...(interrupted && own
         ? {

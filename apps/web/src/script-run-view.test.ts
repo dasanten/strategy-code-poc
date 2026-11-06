@@ -1,8 +1,10 @@
 import { SCRIPT_STEP_BUDGET, TICKS_PER_GAME_HOUR, type ScriptSummary } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import {
+  alarmChoices,
   defenceChoices,
   errorWhen,
+  groupAlarmScript,
   groupDefenceScript,
   rememberLastScript,
   rememberedLastScript,
@@ -79,6 +81,45 @@ describe('the Defence script picker', () => {
     expect(groupDefenceScript([{}, { defenceScriptId: undefined }])).toBeNull()
     expect(groupDefenceScript([{ defenceScriptId: 3 }, { defenceScriptId: 3 }])).toBe(3)
     expect(groupDefenceScript([{ defenceScriptId: 3 }, {}])).toBeUndefined()
+  })
+})
+
+describe('The Alarm script picker', () => {
+  const script = (id: number, name: string, more: Partial<ScriptSummary> = {}): ScriptSummary => ({
+    id,
+    name,
+    activeVersion: 1,
+    latestVersion: 1,
+    task: null,
+    followsDefault: false,
+    params: [],
+    ...more,
+  })
+  const scripts = [
+    script(1, 'Alarm (default)', { task: 'alarm', followsDefault: true }),
+    script(2, 'Defend (default)', { task: 'defend', followsDefault: true }),
+    script(3, 'Bell'),
+    script(4, 'Draft', { activeVersion: null }),
+  ]
+
+  it('offers the Player’s scripts that can run, but for Alarm, which is the default', () => {
+    expect(alarmChoices(scripts).map((s) => s.id)).toEqual([2, 3])
+    expect(alarmChoices(scripts, 'none').map((s) => s.id)).toEqual([2, 3])
+  })
+
+  it('keeps one picked that is gone from the library listed', () => {
+    expect(alarmChoices(scripts, 9)).toMatchObject([
+      { id: 2 },
+      { id: 3 },
+      { id: 9, name: 'a script no longer in your library' },
+    ])
+  })
+
+  it('shows for a group the one all of them keep, None too, or none when they differ', () => {
+    expect(groupAlarmScript([{}, { alarmScriptId: undefined }])).toBeNull()
+    expect(groupAlarmScript([{ alarmScriptId: 3 }, { alarmScriptId: 3 }])).toBe(3)
+    expect(groupAlarmScript([{ alarmScriptId: 'none' }, { alarmScriptId: 'none' }])).toBe('none')
+    expect(groupAlarmScript([{ alarmScriptId: 'none' }, {}])).toBeUndefined()
   })
 })
 

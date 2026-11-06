@@ -1178,6 +1178,16 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setOrderError(await giveOrder(order, false))
   }
   /**
+   * Picks what the picked resident runs when an alarm reaches them: a script, `none` for nothing,
+   * or with null the Alarm default (`CONTEXT.md`: Alarm script); a script's params are picked
+   * first, as before a script starts. Never queued: it leaves what they do as it is.
+   */
+  async function setAlarmScript(scriptId: number | 'none' | null) {
+    if (!selected) return
+    const order = { kind: 'setAlarmScript', residentId: selected.id, scriptId }
+    setOrderError(await giveOrder(order, false))
+  }
+  /**
    * Picks, or clears with a null `targetId`, the value of a param of the script the picked
    * resident runs (`CONTEXT.md`: Script parameter): the building, carriage or waypoint's id, or
    * the number typed for a number param or the word chosen for a choice param. It leaves the
@@ -2111,6 +2121,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             waypoints={world.waypoints}
             onRunScript={runScript}
             onSetDefenceScript={setDefenceScript}
+            onSetAlarmScript={setAlarmScript}
             onEditScript={(id) => openScript(id)}
             orderError={orderError}
             pile={world.piles.find(
@@ -2303,9 +2314,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 problem: buildProblemAt(world, groupBuildAt.x, groupBuildAt.y),
               }
             }
-            // Picking a defence script is never queued: it leaves what they do as it is.
+            // Picking a defence or Alarm script is never queued: it leaves what they do as it is.
             onOrder={(order) =>
-              void sendGroup(order, order.kind !== 'setDefenceScript' && shift.current)
+              void sendGroup(
+                order,
+                order.kind !== 'setDefenceScript' &&
+                  order.kind !== 'setAlarmScript' &&
+                  shift.current,
+              )
             }
             orderError={groupError}
             onPick={(id) => select([id])}

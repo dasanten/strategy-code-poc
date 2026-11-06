@@ -1337,9 +1337,12 @@ The shared language of the game. Domain terms only — no implementation details
   game's **Alarm** default, unless the Player picked one of their own scripts or None for that
   resident, on the card's Script tab or the group card; an unarmed resident runs one only if the
   Player picked it. It interrupts and hands back like a Defence script: when it calls `end()`, what
-  they were doing goes on. A blow still runs the Defence script, and one alarm doesn't interrupt
-  another. A Player's order given meanwhile ends both. Scripts read `me.alarm`: its kind, who it is
-  about, where and when. **The Alarm default:** a thief, an occupier or an attacker it goes after
+  they were doing goes on. A blow still runs the Defence script, and once that ends the Alarm script
+  goes on; one alarm doesn't interrupt another, and while a Defence script runs or a Player's order
+  given under attack holds, an alarm doesn't reach them. A Player's order given meanwhile ends both.
+  Scripts read `me.alarm`: its kind, who it is about and their realm, the city and tile, and when;
+  `inCityArea(cityId, x, y)` says whether a tile lies in a City area, for a city of their realm or a
+  tile in sight. **The Alarm default:** a thief, an occupier or an attacker it goes after
   until they are dead or have left the area or sight; for an armed outsider it walks to the town
   hall and stands there until no armed outsider is left in the area, which blocks an occupation
   before it starts; an unarmed outsider it only logs. NPC villages, towns and self-managed cities

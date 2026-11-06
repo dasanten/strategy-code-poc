@@ -170,7 +170,9 @@ import { GROUP_HINTS } from './pick-mode.js'
 import { CustomiseButton, taskStart } from './Customise.js'
 import { NumberField, foodParamsHint } from './ScriptParams.js'
 import {
+  alarmChoices,
   defenceChoices,
+  groupAlarmScript,
   groupDefenceScript,
   rememberLastScript,
   rememberedLastScript,
@@ -1592,6 +1594,12 @@ export function GroupCard({
             label="Defence script for all of them"
             onPick={(scriptId) => onOrder({ kind: 'setDefenceScript', scriptId })}
           />
+          <AlarmScript
+            picked={groupAlarmScript(residents)}
+            scripts={scripts}
+            label="Alarm script for all of them"
+            onPick={(scriptId) => onOrder({ kind: 'setAlarmScript', scriptId })}
+          />
           {numberParams.length > 0 && (
             <section className="inspector-block" aria-label="Script params">
               <div className="script-params">
@@ -1757,6 +1765,7 @@ export function ResidentCard({
   waypoints,
   onRunScript,
   onSetDefenceScript,
+  onSetAlarmScript,
   onEditScript,
   makeLeader,
   leaderName,
@@ -1862,6 +1871,11 @@ export function ResidentCard({
    * (`CONTEXT.md`: Defence script); without it the card offers no picker.
    */
   onSetDefenceScript?: (scriptId: number | null) => void
+  /**
+   * Picks what one of the Player's own residents runs when an alarm reaches them, `none` for
+   * nothing, null for Alarm (default) (`CONTEXT.md`: Alarm script).
+   */
+  onSetAlarmScript?: (scriptId: number | 'none' | null) => void
   /** Opens a script in the library, such as the one the resident's task runs. */
   onEditScript: (scriptId: number) => void
   /** Why the last order was turned down, if it was. */
@@ -1994,6 +2008,10 @@ export function ResidentCard({
       scripts={scripts}
       onPick={onSetDefenceScript}
     />
+  )
+  // Only the owning Player picks it (`CONTEXT.md`: Alarm script).
+  const alarmScript = onSetAlarmScript && r.owner === realmId && (
+    <AlarmScript picked={r.alarmScriptId ?? null} scripts={scripts} onPick={onSetAlarmScript} />
   )
   const grown = grownIn(r, tick)
   const at: OnSite = { residents, mapSize }
@@ -2585,6 +2603,7 @@ export function ResidentCard({
           <>
             <TaskScript scriptId={r.script.scriptId} scripts={scripts} onEdit={onEditScript} />
             {defenceScript}
+            {alarmScript}
             {scriptParams}
             {scriptMemory}
             {scriptLog}
@@ -2603,6 +2622,7 @@ export function ResidentCard({
               </div>
             )}
             {defenceScript}
+            {alarmScript}
             {scriptLog}
           </>
         ))}
@@ -3823,6 +3843,54 @@ export function DefenceScript({
       </div>
       <p className="muted small">
         What they run when struck. Once it ends, they go on with what they were doing.
+      </p>
+    </section>
+  )
+}
+
+/**
+ * Picks what a resident runs when an alarm reaches them (`CONTEXT.md`: Alarm script): Alarm
+ * (default) first, then None, then the Player's scripts. For a group, `picked` is the one all of
+ * them keep, or undefined while they differ; picking sets it for all of them.
+ */
+export function AlarmScript({
+  picked,
+  scripts,
+  onPick,
+  label = 'Alarm script',
+}: {
+  picked: number | 'none' | null | undefined
+  scripts: readonly ScriptSummary[]
+  onPick: (scriptId: number | 'none' | null) => void
+  label?: string
+}) {
+  const choices = alarmChoices(scripts, picked)
+  const value = picked === undefined ? '' : picked === null ? 'alarm' : String(picked)
+  const pick = (v: string) => onPick(v === 'alarm' ? null : v === 'none' ? 'none' : Number(v))
+  return (
+    <section className="inspector-block" aria-label="Alarm script">
+      <div className="goods-row">
+        <span className="small">
+          <strong>Alarm script</strong>
+        </span>
+        <select aria-label={label} value={value} onChange={(e) => pick(e.target.value)}>
+          {picked === undefined && (
+            <option value="" disabled>
+              They differ
+            </option>
+          )}
+          <option value="alarm">Alarm (default)</option>
+          <option value="none">None</option>
+          {choices.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <p className="muted small">
+        What they run when an alarm reaches them at home. Alarm (default) is for the armed. Once it
+        ends, they go on with what they were doing.
       </p>
     </section>
   )

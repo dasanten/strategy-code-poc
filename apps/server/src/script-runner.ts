@@ -234,6 +234,53 @@ export function setDefenceScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKi
   }
 }
 
+interface SetAlarmScriptRequest extends OrderRequest {
+  kind: 'setAlarmScript'
+  residentId: string
+  /** The Player's script to run on an alarm, `none` for nothing, or null for the Alarm default. */
+  scriptId: number | 'none' | null
+  /** Values for the script's params, kept for the resident (`CONTEXT.md`: Before it starts). */
+  params?: StartParamValues
+}
+
+/**
+ * The set-alarm-script order (`CONTEXT.md`: Alarm script): the Player picks one of their scripts
+ * or None as what a resident of their own runs when an alarm reaches them, or with null clears it,
+ * back to the Alarm default; picking their Alarm itself clears it too. Free and instant; it leaves
+ * what the resident does as it is, an Alarm script running too. Any of their scripts may be picked.
+ * The param values it gives are kept for the resident and the script, as a start's are.
+ */
+export function setAlarmScriptOrder(host: Pick<ScriptHost, 'script'>): OrderKind {
+  return {
+    validate(world, sender, order) {
+      const o = order as Partial<SetAlarmScriptRequest>
+      const realm = realmOf(world, sender.userId)
+      const r = world.residents.find((x) => x.id === o.residentId)
+      if (!realm || !r || r.owner !== realm.id) return 'not one of your residents'
+      if (o.scriptId === null || o.scriptId === 'none') {
+        return o.params === undefined ? undefined : 'that takes no params'
+      }
+      return (
+        badScript(host, sender, o.scriptId) ??
+        paramsProblem(host, world, realm.id, o.scriptId!, o.params)
+      )
+    },
+    apply(world, _sender, order) {
+      const { residentId, scriptId, params } = order as SetAlarmScriptRequest
+      const r = world.residents.find((x) => x.id === residentId)
+      if (!r) return
+      if (scriptId === 'none') {
+        r.alarmScriptId = 'none'
+      } else if (scriptId === null || host.script(scriptId)?.task === 'alarm') {
+        delete r.alarmScriptId
+      } else {
+        r.alarmScriptId = scriptId
+        setStartParams(r, scriptId, params)
+      }
+    },
+  }
+}
+
 /** Where a task order finds the Player's version of a task's default script. */
 export interface DefaultScriptHost {
   /** The id of the Player's version of the task's default script, made if they have none. */
@@ -565,6 +612,8 @@ function taskProblem(
 ): string | undefined {
   // Being struck starts Defend (`CONTEXT.md`: Defence script); it is no task to give.
   if ((o.task as unknown) === 'defend') return 'Defend runs when they are struck'
+  // An alarm starts Alarm (`CONTEXT.md`: Alarm script); nor is it a task to give.
+  if ((o.task as unknown) === 'alarm') return 'Alarm runs when an alarm reaches them'
   if (!isTask(o.task)) return 'no such task'
   const realm = realmOf(world, sender.userId)
   const r = world.residents.find((x) => x.id === o.residentId)
@@ -781,8 +830,9 @@ export class ScriptRunner {
       const realmId = index.commanderOf(r)
       // An NPC city runs its residents' game defaults itself (`runNpcScripts`).
       if (realmId === null) {
-        // Nobody runs their defence script any more: what it interrupted goes on, if anything.
-        resumeInterrupted(world, r)
+        // Nobody runs their defence or Alarm script any more: what it interrupted goes on, if
+        // anything; a defence script hands back to an Alarm script it kept aside, and that on.
+        while (resumeInterrupted(world, r));
         if (r.script && !(r.script.task && r.script.scriptId === 0 && r.owner === null))
           delete r.script
       } else {
@@ -921,6 +971,24 @@ export class ScriptRunner {
       delete resident.defenceScriptId
       recordEvent(world, realm.id, {
         kind: 'defenceScriptGone',
+        residentId: r.id,
+        name: r.name,
+        scriptId,
+      })
+      running.scriptId = 0
+      return this.runOne(world, realm, sender, r, steps, { seen }, used, violations)
+    }
+    if (
+      (!script || script.userId !== realm.userId) &&
+      running.task === 'alarm' &&
+      resident?.alarmScriptId === running.scriptId
+    ) {
+      // The Alarm script picked is deleted or no longer theirs: they run the Alarm default, from
+      // now on, which ends at once for someone unarmed (`CONTEXT.md`: Alarm script).
+      const { scriptId } = running
+      delete resident.alarmScriptId
+      recordEvent(world, realm.id, {
+        kind: 'alarmScriptGone',
         residentId: r.id,
         name: r.name,
         scriptId,
@@ -1074,8 +1142,8 @@ export class ScriptRunner {
 
 /**
  * A resident's script called `end()` (`CONTEXT.md`: Running a script): it ends and they stand
- * idle; in a queue, its next step starts. A defence script hands back to what it interrupted
- * (`CONTEXT.md`: Defence script).
+ * idle; in a queue, its next step starts. A defence or Alarm script hands back to what it
+ * interrupted (`CONTEXT.md`: Defence script, Alarm script).
  */
 function endScript(world: WorldState, residentId: string): void {
   const r = world.residents.find((x) => x.id === residentId)
