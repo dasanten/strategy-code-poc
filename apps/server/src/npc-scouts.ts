@@ -12,7 +12,6 @@ import {
   isDown,
   wrap,
   wrapDistance,
-  type Building,
   type City,
   type CityPlan,
   type CityScouted,
