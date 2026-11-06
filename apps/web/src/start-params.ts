@@ -26,10 +26,13 @@ import {
 /** What the form holds for each param: the value picked or typed, or none (empty). */
 export type StartValues = Record<string, ScriptParamValue | undefined>
 
+/** The orders that pick a script for later, leaving what the resident does as it is. */
+const PICKS_A_SCRIPT: ReadonlySet<string> = new Set(['setDefenceScript', 'setAlarmScript'])
+
 /**
- * The script an order starts, from the Player's library: the one Run script names, the defence
- * script picked (`CONTEXT.md`: Defence script), whose params are picked then, the work script of
- * the workplace Work is given at (`workScriptOf`), or the Player's version of any other task's
+ * The script an order starts, from the Player's library: the one Run script names, the defence or
+ * Alarm script picked (`CONTEXT.md`: Defence script, Alarm script), whose params are picked then,
+ * the work script of the workplace Work is given at (`workScriptOf`), or the Player's version of any other task's
  * default script. Undefined for an order that starts none.
  */
 export function startedScript(
@@ -37,7 +40,7 @@ export function startedScript(
   scripts: readonly ScriptSummary[],
   workSettings: Readonly<Record<string, WorkplaceSettings>> = {},
 ): ScriptSummary | undefined {
-  if (order.kind === 'runScript' || order.kind === 'setDefenceScript')
+  if (order.kind === 'runScript' || PICKS_A_SCRIPT.has(order.kind))
     return scripts.find((s) => s.id === order.scriptId)
   if (isWorkTask(order)) return workScriptOf(scripts, workSettings[order.workplaceId as string])
   if (order.kind === 'task') return scripts.find((s) => s.task === order.task)
@@ -75,7 +78,7 @@ export function startFormParams(order: OrderRequest, script: ScriptSummary): Scr
 /**
  * Whether the order opens the form instead of starting at once, given the params it shows
  * (`startFormParams`): when Customise asked for it, or a param needs a value (`paramNeedsValue`).
- * A defence script starts nothing, so its params are still picked when it is picked.
+ * A defence or Alarm script starts nothing, so its params are still picked when it is picked.
  */
 export function startFormOpens(
   order: OrderRequest,
@@ -83,7 +86,7 @@ export function startFormOpens(
   customise: boolean,
 ): boolean {
   if (params.length === 0) return false
-  return customise || order.kind === 'setDefenceScript' || params.some(paramNeedsValue)
+  return customise || PICKS_A_SCRIPT.has(order.kind) || params.some(paramNeedsValue)
 }
 
 /** Whether Customise has anything to show for the order: its script has params in the form. */

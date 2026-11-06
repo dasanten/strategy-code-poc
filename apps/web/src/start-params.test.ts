@@ -65,6 +65,15 @@ describe('starting at once', () => {
     expect(startFormOpens(pick, [], false)).toBe(false)
   })
 
+  it('still asks for an Alarm script’s params when it is picked, but not for None', () => {
+    const pick = { kind: 'setAlarmScript', scriptId: 1 }
+    expect(startFormOpens(pick, [{ name: 'n', type: 'number', default: 2 }], false)).toBe(true)
+    const scripts = [summary(1, null)]
+    expect(startedScript(pick, scripts)?.id).toBe(1)
+    expect(startedScript({ kind: 'setAlarmScript', scriptId: 'none' }, scripts)).toBeUndefined()
+    expect(startedScript({ kind: 'setAlarmScript', scriptId: null }, scripts)).toBeUndefined()
+  })
+
   it('offers Customise only for a script with params to show', () => {
     const work = {
       ...summary(2, 'work'),

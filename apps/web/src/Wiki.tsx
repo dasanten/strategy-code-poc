@@ -2617,6 +2617,33 @@ export function Wiki() {
           when they are struck, they defend by Defend, your realm log says so once, and the pick
           goes back to Defend. A resident lent to another realm defends by that realm's Defend.
         </p>
+        <h3>Alarms</h3>
+        <p>
+          An alarm is something happening in a city's area that your residents at home can react to.
+          So far one sets it off: an occupation of the city's town hall starting, which reaches
+          every resident of your realm standing in that city's area. Army members, those hired out
+          and those driving a carriage get no alarm. It runs their <strong>Alarm script</strong>,
+          which by default is <strong>Alarm</strong> (one of your default scripts) for an armed
+          resident and nothing for an unarmed one. Alarm goes after the occupier while they stand in
+          the city's area, any other armed one of theirs there after them, and ends once they are
+          gone. Going after them is a crime for now, like any attack. Their card says “On alarm:
+          going after Bo”.
+        </p>
+        <p>
+          On a resident's card, the Script tab's <strong>Alarm script</strong> picks any of your
+          scripts for them to run instead, an unarmed resident too, or <strong>None</strong> to run
+          nothing; the group card picks it for all of them at once. It runs in place of what they
+          were doing, which goes on with its memory once it calls <code>end()</code>, as for a
+          defence script. A second alarm doesn't interrupt it. A blow still runs their defence
+          script, and once that ends the Alarm script goes on; while a defence script runs, or an
+          order you gave under attack holds, an alarm doesn't reach them. An order you give
+          meanwhile ends both. Scripts read the alarm as <code>me.alarm</code>: its{' '}
+          <code>kind</code>, <code>about</code> who and their <code>realmId</code>, where (
+          <code>cityId</code>, <code>x</code>, <code>y</code>) and <code>tick</code>;{' '}
+          <code>inCityArea(cityId, x, y)</code> says whether a tile lies in a city's area. The pick
+          reads as <code>me.alarmScript</code>. If the script is gone from your library when an
+          alarm comes, your realm log says so once and the pick goes back to Alarm.
+        </p>
         <h3>Capturing a city</h3>
         <p>
           A city is captured by occupying its town hall: armed residents of your realm stand on it

@@ -204,8 +204,8 @@ export class OrderQueue {
       // Any other order for a resident or army ends the script it runs (`CONTEXT.md`: Running a
       // script). Pairing, the Leader handover, renaming and claiming the Horse offer change
       // nobody's order, so they leave scripts running too, as do picking a param value and a
-      // defence script (`CONTEXT.md`: Script parameter, Defence script), and putting down, renaming
-      // and removing waypoints (Waypoint).
+      // defence or Alarm script (`CONTEXT.md`: Script parameter, Defence script, Alarm script), and
+      // putting down, renaming and removing waypoints (Waypoint).
       // Editing a queue keeps its current step going (`CONTEXT.md`: Queue).
       const keeps = [
         'runScript',
@@ -218,6 +218,7 @@ export class OrderQueue {
         ...Object.keys(demandOrders),
         'setScriptParam',
         'setDefenceScript',
+        'setAlarmScript',
         'editQueue',
         'postOffer',
         'takeDownOffer',
@@ -239,8 +240,8 @@ export class OrderQueue {
         delete r.orderEnded
       }
       // Any order that isn't a step of it ends the resident's queue, running a script too; a new
-      // queue replaces it. It ends a defence script and what it interrupted too (`CONTEXT.md`:
-      // Defence script).
+      // queue replaces it. It ends a defence or Alarm script and what it interrupted too
+      // (`CONTEXT.md`: Defence script, Alarm script).
       if (replaces) {
         delete r.queue
         if (r.interrupted) {

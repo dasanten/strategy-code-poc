@@ -181,6 +181,15 @@ const SHARED: readonly ScriptBinding[] = [
       'The building or construction site on a tile, roads and carriage sites left out, as `building(id)` gives it; null where there is none or the Player doesn’t see it.',
   },
   {
+    name: 'inCityArea',
+    is: 'query',
+    params: ['cityId', 'x', 'y'],
+    returns: 'boolean',
+    cost: SCRIPT_TILE_QUERY_COST,
+    description:
+      'Whether a tile lies in that city’s area, for a city of my realm’s or a tile the Player sees; false for any other.',
+  },
+  {
     name: 'pileAt',
     is: 'query',
     params: ['x', 'y'],

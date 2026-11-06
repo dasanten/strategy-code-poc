@@ -465,6 +465,14 @@ describe('world saves', () => {
     expect(checkInvariants(v104, land)).toEqual([])
   })
 
+  it('leaves a format 104 world as it is: nobody picked an Alarm script (migration 104 → 105)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v105 = migrateWorld(structuredClone(world), 104, { terrain: land }, migrations, 105)
+    expect(v105).toEqual(world)
+    expect(v105.residents.every((r) => r.alarmScriptId === undefined)).toBe(true)
+    expect(checkInvariants(v105, land)).toEqual([])
+  })
+
   it('leaves a format 95 world’s debts to get their demand on the next tick (migration 95 → 96)', () => {
     const { world, terrain: land } = worldWithPost()
     world.realms.push({ id: 'r9', userId: 90, leaderId: 'nobody' })
@@ -503,7 +511,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(104)
+    expect(WORLD_FORMAT_VERSION).toBe(105)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)

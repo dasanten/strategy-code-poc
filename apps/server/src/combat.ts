@@ -107,7 +107,8 @@ function isAggression(world: WorldState, a: Resident, t: Resident, size: number)
   const sides = new Set([organizationOf(a)])
   if (hq && contractOf(world, a.id)?.hirerId === TRADE_ORG) sides.add(hq.id)
   // Defending themselves, what they were doing before counts (`CONTEXT.md`: Defence script).
-  const o = t.interrupted ? t.interrupted.order : t.order
+  const kept = t.interrupted && t.script?.task !== 'alarm' ? t.interrupted : undefined
+  const o = kept ? (kept.alarm ?? kept).order : t.order
   const ours = (buildingId: string) => {
     const b = world.buildings.find((x) => x.id === buildingId)
     return !!b && sides.has(buildingOrganization(world, b))
@@ -153,7 +154,8 @@ export const attack: OrderKind = {
     const r = world.residents.find((x) => x.id === residentId)
     if (!r) return
     // A defence script going after who struck them fights back, in a fight already logged.
-    const defending = r.interrupted !== undefined && r.struck?.by === targetId
+    const defending =
+      r.interrupted !== undefined && r.script?.task !== 'alarm' && r.struck?.by === targetId
     r.order = attackOrder(targetId, defending, defending)
   },
 }
