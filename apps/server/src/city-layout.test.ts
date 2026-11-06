@@ -11,6 +11,7 @@ import {
   footprintTiles,
   isPassableTerrain,
   mayStep,
+  middleOf,
   terrainAt,
   tileIndex,
   wallMap,
@@ -28,7 +29,7 @@ import { cityLayoutsSound, layoutPlan, pickLayout } from './city-layout.js'
 import { checkInvariants } from './invariants.js'
 import { npcHome } from './npc-behaviour.js'
 import { foundNpcCity } from './npc-cities.js'
-import { fillHouses, plains, storageOf, village, WALL } from './npc-growth.fixture.js'
+import { fillHouses, nearRing, plains, storageOf, village, WALL } from './npc-growth.fixture.js'
 import { houseTile, newWall, nextProject, wallRings } from './npc-growth.js'
 import { mulberry32 } from './residents.js'
 import { foundStartingCity, newId } from './starting-city.js'
@@ -332,6 +333,201 @@ describe('the Grid layout', () => {
     const ring = Math.max(Math.abs(p.x - home.x), Math.abs(p.y - home.y))
     expect(ring).toBeGreaterThan(WALL - 2)
     expect(ring).toBeLessThan(WALL + NPC_WALL_STEP)
+  })
+})
+
+/**
+ * A village alone on a Plains map, as `village`, on the first seed that gives it the Quarters layout.
+ * Which houses go where comes from the layout it is founded with, so it has to be picked for real.
+ */
+function quartersVillage(kind = NPC_VILLAGE) {
+  const terrain = plains(200)
+  for (let seed = 1; ; seed++) {
+    const world = createWorld(terrain, seed)
+    const city = foundNpcCity(world, terrain, kind, 20, 20, mulberry32(7))
+    if (city.layout === 'quarters') return { world, terrain, city, home: npcHome(world, city)! }
+  }
+}
+
+/** Puts up buildings of `kind` where the city wants them until it has none left to give. */
+function fillUp(
+  world: WorldState,
+  city: City,
+  home: Building,
+  terrain: TerrainMap,
+  kind: BuildingKind,
+  until: (b: Building) => boolean,
+): Building[] {
+  const out: Building[] = []
+  for (let i = 0; i < 400; i++) {
+    const rings = wallRings(world, city, home, terrain.size)
+    const t = houseTile(world, city, home, terrain, rings, kind)
+    if (!t) break
+    const b = put(world, city, kind, t.x, t.y)
+    out.push(b)
+    if (until(b)) break
+  }
+  return out
+}
+
+describe('the Quarters layout', () => {
+  /** Where a building lies from the crossing of the streets, the middle of the town hall. */
+  const part = (world: WorldState, city: City, b: Pick<Building, 'x' | 'y'>) => {
+    const hall = world.buildings.find((h) => h.id === city.townHallId)!
+    const middle = middleOf(hall, 200)
+    if (b.y < middle.y) return 'north'
+    return b.x < middle.x ? 'south-west' : 'south-east'
+  }
+
+  it('is one a new city can get', () => {
+    expect(CITY_LAYOUTS).toContain('quarters')
+    expect(quartersVillage().city.layout).toBe('quarters')
+  })
+
+  it.each([
+    ['village', NPC_VILLAGE],
+    ['town', NPC_TOWN],
+  ])('a new %s’s houses stand north of the crossing, and its wall stays part of it', (_, kind) => {
+    const { world, terrain, city, home } = quartersVillage(kind)
+    const houses = world.buildings.filter((b) => b.kind === 'house' && b.cityId === city.id)
+    expect(houses).toHaveLength(kind.houses)
+    for (const h of houses) {
+      expectFollows(world, city, home, 'house', h, terrain.size)
+      expect(part(world, city, h)).toBe('north')
+    }
+    expect(wallRings(world, city, home, terrain.size)?.inner).toBe(Math.floor(kind.size / 2))
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('puts each kind in its own part', () => {
+    const { world, terrain, city, home } = quartersVillage()
+    const rings = wallRings(world, city, home, terrain.size)
+    const where = {
+      house: 'north',
+      storage: 'south-east',
+      smelter: 'south-west',
+      smithy: 'south-west',
+      mint: 'south-west',
+      stable: 'south-west',
+    } as const
+    for (const [kind, expected] of Object.entries(where) as [BuildingKind, string][]) {
+      const t = houseTile(world, city, home, terrain, rings, kind)!
+      expectFollows(world, city, home, kind, t, terrain.size)
+      expect(part(world, city, t)).toBe(expected)
+      // On its feet, it doesn't reach across a street into another part.
+      for (const [x, y] of footprintTiles({ kind, ...t }, terrain.size)) {
+        expect(part(world, city, { x, y })).toBe(expected)
+      }
+    }
+  })
+
+  it('keeps streets between the parts, and the way out of its gate, free', () => {
+    const { world, terrain, city, home } = quartersVillage()
+    const size = terrain.size
+    const plan = planOf(world, city, home, size)
+    const hall = world.buildings.find((b) => b.id === city.townHallId)!
+    const middle = middleOf(hall, size)
+    for (let d = -WALL - NPC_WALL_STEP; d <= WALL + NPC_WALL_STEP; d++) {
+      expect(plan.street(middle.x + d, middle.y)).toBe(true)
+      expect(plan.street(middle.x, middle.y + d)).toBe(true)
+      expect(plan.street(home.x, home.y + d)).toBe(true)
+    }
+    for (const kind of ['house', 'storage', 'smelter', 'stable'] as const) {
+      expect(plan.spot(kind, middle.x, middle.y - 2)).toBe(false)
+      expect(plan.spill!(kind, middle.x, middle.y - 2)).toBe(false)
+    }
+  })
+
+  it('leaves a lane through a gate wherever it stands', () => {
+    const { world, terrain, city, home } = quartersVillage()
+    const size = terrain.size
+    const gate = world.buildings.find((b) => b.kind === 'gate' && b.cityId === city.id)!
+    Object.assign(gate, { x: home.x + WALL, y: home.y + 2 })
+    world.buildings.find((b) => b.x === home.x + WALL && b.y === home.y + 2 && b !== gate)!.x =
+      home.x
+    const plan = planOf(world, city, home, size)
+    for (let dx = -WALL + 1; dx <= WALL + NPC_WALL_STEP; dx++) {
+      expect(plan.street(home.x + dx, home.y + 2)).toBe(true)
+    }
+  })
+
+  it('skips a spot that doesn’t fit, and stays in its part', () => {
+    const { world, terrain, city, home } = quartersVillage()
+    const rings = wallRings(world, city, home, terrain.size)
+    const first = houseTile(world, city, home, terrain, rings, 'smelter')!
+    terrain.tiles[tileIndex(terrain.size, first.x, first.y)] = Terrain.Mountain
+    const next = houseTile(world, city, home, terrain, rings, 'smelter')!
+    expect(next).not.toEqual(first)
+    expect(part(world, city, next)).toBe('south-west')
+    expectFollows(world, city, home, 'smelter', next, terrain.size)
+  })
+
+  it('a full part goes on out through the wall, in its own part', () => {
+    const { world, terrain, city, home } = quartersVillage()
+    const built = fillUp(world, city, home, terrain, 'house', (b) => nearRing(home, b) >= WALL)
+    const last = built.at(-1)!
+    expect(nearRing(home, last)).toBeGreaterThan(WALL)
+    expect(part(world, city, last)).toBe('north')
+    for (const b of built) expect(part(world, city, b)).toBe('north')
+    expect(wallRings(world, city, home, terrain.size)).toMatchObject({ expanding: true })
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('a part with nowhere left to go spills over rather than stopping the city', () => {
+    const { world, terrain, city, home } = quartersVillage()
+    const size = terrain.size
+    // A lake on all of the north, as far as the city could reach.
+    const hall = world.buildings.find((b) => b.id === city.townHallId)!
+    const middle = middleOf(hall, size)
+    const plan = planOf(world, city, home, size)
+    for (let y = 0; y < middle.y; y++) {
+      for (let x = 0; x < size; x++) {
+        if (buildingAt(world, x, y) || plan.street(x, y)) continue
+        terrain.tiles[tileIndex(size, x, y)] = Terrain.Lake
+      }
+    }
+    const rings = wallRings(world, city, home, size)
+    const t = houseTile(world, city, home, terrain, rings)!
+    expect(t).toBeDefined()
+    expect(part(world, city, t)).not.toBe('north')
+    expect(plan.spot('house', t.x, t.y)).toBe(false)
+    expect(plan.spill!('house', t.x, t.y)).toBe(true)
+    expect(buildProblem(world, t.x, t.y, 'house', terrain)).toBeUndefined()
+    // The workshops still take their own part first.
+    const smelter = houseTile(world, city, home, terrain, rings, 'smelter')!
+    expect(part(world, city, smelter)).toBe('south-west')
+  })
+
+  it('a kind spills over as well when only another part has room', () => {
+    const { world, terrain, city, home } = quartersVillage()
+    const rings = wallRings(world, city, home, terrain.size)
+    // A lake everywhere but the storages’ part.
+    const plan = planOf(world, city, home, terrain.size)
+    const size = terrain.size
+    const middle = middleOf(world.buildings.find((b) => b.id === city.townHallId)!, size)
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        if (buildingAt(world, x, y) || plan.street(x, y)) continue
+        if (y > middle.y && x > middle.x) continue
+        terrain.tiles[tileIndex(size, x, y)] = Terrain.Lake
+      }
+    }
+    const stable = houseTile(world, city, home, terrain, rings, 'stable')!
+    expect(part(world, city, stable)).toBe('south-east')
+    const house = houseTile(world, city, home, terrain, rings)!
+    expect(part(world, city, house)).toBe('south-east')
+  })
+
+  it('a city from before layouts that gets it keeps what stands and builds around it', () => {
+    const { world, terrain, city, home } = quartersVillage()
+    const hall = world.buildings.find((b) => b.id === city.townHallId)!
+    const middle = middleOf(hall, terrain.size)
+    const old = put(world, city, 'house', middle.x - 4, middle.y)
+    const rings = wallRings(world, city, home, terrain.size)
+    const t = houseTile(world, city, home, terrain, rings)!
+    expectFollows(world, city, home, 'house', t, terrain.size)
+    expect(buildingAt(world, old.x, old.y)?.id).toBe(old.id)
+    expect(checkInvariants(world, terrain)).toEqual([])
   })
 })
 
