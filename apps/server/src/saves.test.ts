@@ -376,11 +376,19 @@ describe('world saves', () => {
     expect(checkInvariants(v88, land)).toEqual([])
   })
 
+  it('leaves a format 92 world as it is: no plan has a road crew or a way yet (migration 92 → 93)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v93 = migrateWorld(structuredClone(world), 92, { terrain: land }, migrations, 93)
+    expect(v93).toEqual(world)
+    expect(Object.values(v93.cityPlans).every((p) => p.roads === undefined)).toBe(true)
+    expect(checkInvariants(v93, land)).toEqual([])
+  })
+
   it('leaves realms from before realm names unnamed (migration 38 → 39)', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(92)
+    expect(WORLD_FORMAT_VERSION).toBe(93)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)

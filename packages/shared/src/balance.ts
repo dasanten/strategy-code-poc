@@ -515,6 +515,13 @@ export const NPC_PLAN_TICKS = 60
 export const NPC_BUILDERS = 2
 
 /**
+ * Most of an NPC city's spare hands on its road crew at once (`CONTEXT.md`: NPC road), apart from
+ * its builders: enough for a road to grow out day by day and to fetch for each other, while the
+ * rest go on working for surplus.
+ */
+export const NPC_ROAD_CREW = 2
+
+/**
  * How far past its reserve an NPC city's spare hands work for surplus, by good, in units
  * (`CONTEXT.md`: Spare hands' work). Several of a trader's full loads (about 30 kg, `CARRY_BASE`),
  * so its trader has something to sell, and above the materials a Full city wants (`townHall` and

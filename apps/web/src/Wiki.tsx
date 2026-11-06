@@ -122,6 +122,7 @@ import {
   NPC_CITY_WONT_SELL_STANDING,
   FOOD_PER_DAY,
   NPC_BUILDERS,
+  NPC_ROAD_CREW,
   NPC_CITY_MIN_DISTANCE,
   NPC_FOUND_FOOD_DAYS,
   NPC_FOUND_GIVE_UP_DAYS,
@@ -2034,6 +2035,16 @@ export function Wiki() {
           are idle. What is short, its trader and a founding party still take them first, the next
           time it thinks. So its workplaces stay busy, and its trader has more to sell.
         </p>
+        <p>
+          Ahead of that work comes its road crew: up to {num(NPC_ROAD_CREW)} spare hands, apart from
+          its builders, build road from its home to each of its workplaces outside its area, farms
+          too, the nearest first. They follow the way a resident would walk, tile by tile, so a road
+          goes round a lake, and they skip tiles that already have a road. They only use materials
+          above its reserve and what its project still needs; with none to spare, or with something
+          short that they can work for, they go back to other work and bring back what they carry.
+          Like any road it belongs to nobody, and anyone can use it or tear it down; a tile torn down
+          is laid again in time. A workplace with no way through gets no road.
+        </p>
         <h3>Trading posts and the HQ</h3>
         <p>
           The Trade Organization runs its own chain the same way. A trading post's reserve is its
@@ -2083,7 +2094,7 @@ export function Wiki() {
           carry what they didn't spend back home. The Trade Organization never accepts offers.
         </p>
         <p>
-          A city is full once it has had spare hands, idle or working for surplus, and nothing short
+          A city is full once it has had spare hands, idle, on a road crew or working for surplus, and nothing short
           of its reserve for {days(NPC_FULL_DAYS)}, with a food surplus and a town hall's and a storage's
           materials above its reserve. A full city founds a daughter. Once a game day it looks for a
           free Plains site {num(NPC_CITY_MIN_DISTANCE)} to {num(NPC_FOUND_REACH)} tiles away, with
