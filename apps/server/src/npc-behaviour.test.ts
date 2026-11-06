@@ -114,7 +114,7 @@ describe('NPC cities work and eat', () => {
     })
   })
 
-  it('puts idle adults to work on the farm and leaves children alone', () => {
+  it('puts idle adults to work on the farm and sends children to a house', () => {
     const { world, terrain, city } = village()
     const farm = farmOf(world, city)
     const storage = storageOf(world, city)
@@ -139,7 +139,9 @@ describe('NPC cities work and eat', () => {
     runNpcScripts(world, terrain)
     expect(adult!.order).toMatchObject({ kind: 'walkTo' })
     expect(isAt((adult!.order as { target: { x: number; y: number } }).target, farm)).toBe(true)
-    expect(child!.order).toBeNull()
+    expect(child!.order).toMatchObject({ kind: 'walkTo' })
+    const house = (child!.order as { target: { x: number; y: number } }).target
+    expect(world.buildings.some((b) => b.kind === 'house' && isAt(house, b))).toBe(true)
   })
 
   it('puts residents on the farms first when Food runs short', () => {

@@ -2125,6 +2125,13 @@ export function Wiki() {
           in its area like a house.
         </p>
         <p>
+          Those with nothing to do, those carrying a child and its children stand at a house of the
+          city rather than on its storage, each at their own one, and stay there: they eat where
+          they stand, as anyone does in their own city's area, and leave when the city has work for
+          them. A city with no house has them at home. Its soldiers stand apart from this, and
+          trading posts and the HQ don't do it.
+        </p>
+        <p>
           An NPC city sets out its town by a layout, picked at random when it comes to be (a
           self-managed city when its Leader dies) and kept. In Grid, square blocks{' '}
           {num(CITY_GRID_BLOCK)} tiles along each side lie between straight lanes a tile wide, left
