@@ -5,6 +5,7 @@ import {
   TRADE_ORG_ARMY,
   type Building,
   type SeenCity,
+  type SeenHorse,
   type ContractView,
   type OrderRequest,
   type RealmLabel,
@@ -39,6 +40,7 @@ export function ContractsPanel({
   realmId,
   own,
   inSight,
+  horses,
   buildings,
   cities,
   realms,
@@ -52,6 +54,8 @@ export function ContractsPanel({
   own: Resident[]
   /** Everyone in sight, the Player's own included. */
   inSight: SeenResident[]
+  /** The horses the Player knows, for the residents' Doing lines. */
+  horses: readonly SeenHorse[]
   buildings: Building[]
   /** Cities in sight; an NPC city that doesn't refuse the Player says what it would lend. */
   cities: SeenCity[]
@@ -322,7 +326,7 @@ export function ContractsPanel({
                           </span>
                         </span>
                         <small className="muted">
-                          {doingLine(r, { scripts, buildings, residents: inSight, cities })}
+                          {doingLine(r, { scripts, buildings, residents: inSight, horses, cities })}
                         </small>
                       </span>
                     </label>

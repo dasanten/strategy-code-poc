@@ -18,6 +18,10 @@ export function termsLine(terms: DemandTerms): string {
   return terms.kind === 'city' ? terms.cityName : goodsLine(terms.goods)
 }
 
+/** Who sent a demand, as the one it was sent to reads it. */
+export const senderLine = (from: RealmLabel) =>
+  from.realmId === TRADE_ORG ? 'The Trade Organization' : `The realm of ${from.realm}`
+
 /** Whether the game answers demands sent to this side: an NPC city or the Trade Organization. */
 export const answersByGame = (org: RealmLabel) => org.city === true || org.realmId === TRADE_ORG
 
@@ -53,7 +57,7 @@ export function demandNoticeLine(
   const fresh = demandSides(demands, realmId).incoming.filter((d) => !putAway.has(d.id))
   const newest = fresh.at(-1)
   if (!newest) return undefined
-  const line = `The realm of ${newest.from.realm} demands ${termsLine(newest.terms)} of you`
+  const line = `${senderLine(newest.from)} demands ${termsLine(newest.terms)} of you`
   return fresh.length === 1 ? line : `${line}, and ${fresh.length - 1} more`
 }
 
@@ -73,6 +77,9 @@ export function handOverQuestion(
   const city = own.find((c) => c.id === terms.cityId)
   if (!city) return undefined
   const last = own.length === 1 ? ' It is your last city.' : ''
+  if (d.from.realmId === TRADE_ORG) {
+    return `Give ${city.name} back to the Trade Organization as a trading post, with those who live there, its horses and carriages? That settles its worth of your debt. This can’t be undone.${last}`
+  }
   return `Hand ${city.name} over to the realm of ${d.from.realm}, with those who live there, its horses and carriages? This can’t be undone.${last}`
 }
 
@@ -109,15 +116,36 @@ function previewFrom(
   }
 }
 
-/** What setting a demand's goods aside at a storage holding `free` would do. */
+/**
+ * What setting a demand's goods aside at a storage holding `free` would do. The Trade Organization
+ * sends a caravan for them (`CONTEXT.md`: Trade Org debt).
+ */
 export function setAsidePreview(
+  goods: Partial<Record<Good, number>>,
+  free: Stock,
+  byCaravan = false,
+): HandOverPreview {
+  return previewFrom(goods, free, (going) =>
+    byCaravan
+      ? `Sets aside ${goodsLine(going)}. A caravan of the Trade Organization comes to fetch them, for no fee, and what it brings in comes off your debt.`
+      : `Sets aside ${goodsLine(going)} for them alone to fetch.`,
+  )
+}
+
+/**
+ * What sending the Coins of the Trade Organization's demand by Transfer from a storage holding `free`
+ * would do (`CONTEXT.md`: Trade Org debt). The caravan's warehouse is out of the Player's sight, so
+ * the fee isn't known here.
+ */
+export function debtTransferPreview(
   goods: Partial<Record<Good, number>>,
   free: Stock,
 ): HandOverPreview {
   return previewFrom(
     goods,
     free,
-    (going) => `Sets aside ${goodsLine(going)} for them alone to fetch.`,
+    (going) =>
+      `A Transfer carries ${goodsLine(going)} to its nearest warehouse, where they come off your debt. You pay the caravan’s fee, out of this storage.`,
   )
 }
 

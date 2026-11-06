@@ -265,7 +265,7 @@ describe('the Grid layout', () => {
     expect(plan.street(lane.x, lane.y)).toBe(true)
     const old = put(world, city, 'house', lane.x, lane.y)
     const before = structuredClone(world.buildings)
-    const migrated = migrateWorld(structuredClone(world), 92, { terrain }, migrations, 93)
+    const migrated = migrateWorld(structuredClone(world), 102, { terrain }, migrations, 103)
     expect(migrated.buildings).toEqual(before)
     expect(migrated.residents).toEqual(world.residents)
     const moved = migrated.cities.find((c) => c.id === city.id)!
@@ -284,7 +284,7 @@ describe('the Grid layout', () => {
     const realm = foundStartingCity(world, terrain, 1)
     const city = world.cities.find((c) => c.realmId === realm.id)!
     const post = foundTradingPost(world, terrain, 200, 200, undefined, mulberry32(8))
-    const migrated = migrateWorld(structuredClone(world), 92, { terrain }, migrations, 93)
+    const migrated = migrateWorld(structuredClone(world), 102, { terrain }, migrations, 103)
     expect(migrated.cities.find((c) => c.id === city.id)!.layout).toBeUndefined()
     expect(migrated.cities.find((c) => c.id === post.id)!.layout).toBeUndefined()
   })

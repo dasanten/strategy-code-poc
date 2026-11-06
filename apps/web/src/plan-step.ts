@@ -47,7 +47,7 @@ export type PlanPick =
 
 /** What a planned step asks for on the card once its places are picked. */
 export type PlanAsk =
-  'goods' | 'buildingKind' | 'makes' | 'horses' | 'haul' | 'script' | 'subject' | 'units'
+  'goods' | 'buildingKind' | 'makes' | 'horses' | 'horse' | 'haul' | 'script' | 'subject' | 'units'
 
 export type PlanStepId =
   | 'walk'
@@ -71,6 +71,7 @@ export type PlanStepId =
   | 'board'
   | 'getOff'
   | 'unhitch'
+  | 'hitch'
   | 'relocate'
   | 'feed'
   | 'explore'
@@ -109,6 +110,12 @@ export const PLAN_STEPS: readonly PlanKind[] = [
     id: 'unhitch',
     label: 'Unhitch a horse',
     picks: [{ pick: 'carriage', prompt: 'the carriage to unhitch the horse from' }],
+  },
+  {
+    id: 'hitch',
+    label: 'Hitch a horse',
+    picks: [{ pick: 'carriage', prompt: 'the carriage to hitch a horse to' }],
+    ask: 'horse',
   },
   { id: 'work', label: 'Work', picks: [{ pick: 'workplace', prompt: 'the workplace to work' }] },
   {
@@ -408,6 +415,7 @@ export type PlanAnswer =
   | { ask: 'buildingKind'; building: BuildingKind }
   | { ask: 'makes'; makes: Good }
   | { ask: 'horses'; horseIds: [string, string] }
+  | { ask: 'horse'; horseId: string }
   | { ask: 'haul'; setup: HaulSetup }
   | { ask: 'script'; scriptId: number }
   | { ask: 'subject'; subject: TrainingSubject }
@@ -448,6 +456,11 @@ export function planOrder(
       return { order: { kind: 'task', task: 'explore' } }
     case 'unhitch':
       return { order: { kind: 'unhitch', carriageId: p.id }, at }
+    case 'hitch':
+      return {
+        order: { kind: 'hitch', carriageId: p.id, horseId: a?.ask === 'horse' ? a.horseId : null },
+        at,
+      }
     case 'work': {
       const makes = a?.ask === 'makes' ? { makes: a.makes } : {}
       return { order: { kind: 'task', task: 'work', workplaceId: p.id, ...makes }, at }
@@ -510,4 +523,19 @@ export function horsesIn(
 ): SeenHorse[] {
   const stable = w.buildings.find((b) => b.id === stableId)
   return stable ? horses.filter((h) => h.realmId === w.realmId && isAt(h, stable, w.size)) : []
+}
+
+/**
+ * The horses the plan's card lists: for Hitch a horse the realm's in sight on the carriage's tile,
+ * any of them, as whether it can be hitched is checked when the step's turn comes; else those in
+ * the stable picked (`horsesIn`).
+ */
+export function planHorses(
+  w: Pick<PlanWorld, 'buildings' | 'size' | 'realmId'>,
+  horses: readonly SeenHorse[],
+  plan: Plan | undefined,
+): SeenHorse[] {
+  const at = plan?.picked[0]
+  if (plan?.kind !== 'hitch') return horsesIn(w, horses, at?.id)
+  return horses.filter((h) => h.realmId === w.realmId && h.x === at?.x && h.y === at?.y)
 }

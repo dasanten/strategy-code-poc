@@ -5,8 +5,10 @@ import {
   type DeliveryView,
   type PunishmentEnd,
   type RealmEvent,
+  type StandingMove,
 } from '@csp/shared'
 import { BUILDING_NAMES } from './city-view.js'
+import { formatMove } from './standing-view.js'
 
 /** How bad an event is, for its colour in the log. */
 export type EventTone = 'bad' | 'warn' | 'info'
@@ -53,7 +55,12 @@ function acceptedGoodsLine(
       tone: 'info',
     }
   }
-  const fetch = e.mine ? 'for you to fetch, under Direct offers' : 'for them alone to fetch'
+  const fetch =
+    e.otherIs === 'tradeOrg' && !e.mine
+      ? 'for its caravan to fetch'
+      : e.mine
+        ? 'for you to fetch, under Direct offers'
+        : 'for them alone to fetch'
   return {
     text: `${said}: ${goods} set aside at the storage, ${fetch}.`,
     tone: 'info',
@@ -137,6 +144,31 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
     }
     case 'punished':
       return punishedLine(e)
+    case 'wrecked': {
+      const place = `${BUILDING_NAMES[e.building]} of ${e.city}`
+      const left =
+        e.owed > 0
+          ? `${e.coins} Coins off your debt: you still owe it ${e.owed} Coins`
+          : e.coins > 0
+            ? `${e.coins} Coins off your debt, which covers it`
+            : 'after your debt was settled'
+      return {
+        text: `The Trade Organization's army tore down the ${place}, ${left}.`,
+        tone: 'bad',
+        places: [{ name: place, x: e.x, y: e.y }],
+      }
+    }
+    case 'debt':
+      return debtLine(e)
+    case 'debtPaid':
+      return {
+        text:
+          e.owed > 0
+            ? `${e.name} paid ${e.coins} Coins of your debt at the warehouse. You still owe the Trade Organization ${e.owed} Coins.`
+            : `${e.name} paid ${e.coins} Coins at the warehouse. You no longer owe the Trade Organization anything.`,
+        tone: 'info',
+        places: [{ name: 'the warehouse', x: e.x, y: e.y }],
+      }
     case 'boughtOff':
       return {
         text: `${e.name} paid ${e.coins} Coins at the warehouse to buy off the admin directive (${e.reason}). The Trade Organization no longer punishes you for it.`,
@@ -154,7 +186,10 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       const people = `${e.residents} resident${e.residents === 1 ? '' : 's'}`
       if (!e.captor) {
         return {
-          text: `The realm of ${e.other} captured ${e.city} and its ${people}.`,
+          text:
+            e.other === TRADE_ORG_NAME
+              ? `The Trade Organization took ${e.city} and its ${people}: it is a trading post now.`
+              : `The realm of ${e.other} captured ${e.city} and its ${people}.`,
           tone: 'bad',
         }
       }
@@ -171,7 +206,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
             places,
           }
         : {
-            text: `Your town hall in ${e.city} is occupied by the realm of ${e.other}: it falls in ${days} unless you retake it.`,
+            text: `Your town hall in ${e.city} is occupied by ${realmCalled(e.other)}: it falls in ${days} unless you retake it.`,
             tone: 'bad',
             places,
           }
@@ -188,7 +223,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
             ...(places && { places }),
           }
         : {
-            text: `The occupation of your town hall in ${e.city} by the realm of ${e.other} is broken.`,
+            text: `The occupation of your town hall in ${e.city} by ${realmCalled(e.other)} is broken.`,
             tone: 'info',
             ...(places && { places }),
           }
@@ -224,7 +259,11 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       return { text: `${e.city} no longer asks to join your realm.`, tone: 'warn' }
     case 'traded': {
       const what = goodText(e.good)
-      const at = e.withTrader ? 'the wandering trader' : 'the warehouse'
+      const at = e.withTrader
+        ? 'the wandering trader'
+        : e.atStorage
+          ? 'the storage'
+          : 'the warehouse'
       const place = { name: at, x: e.x, y: e.y }
       if (e.units === 0) {
         return {
@@ -236,7 +275,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       const did = e.side === 'buy' ? 'bought' : 'sold'
       const cut = e.units < e.wanted ? ` (of ${e.wanted} wanted)` : ''
       return {
-        text: `${e.name} ${did} ${e.units} ${what}${cut} for ${e.coins} coins at ${at}.`,
+        text: `${e.name} ${did} ${e.units} ${what}${cut} for ${e.coins} coins at ${at}.${standingMoved(e.standing)}`,
         tone: 'info',
         places: [place],
       }
@@ -277,17 +316,45 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       const cut = e.units < e.wanted ? ` (of ${e.wanted} wanted)` : ''
       const back = e.coins > 0 ? `, with ${e.coins} ${e.coins === 1 ? 'coin' : 'coins'} back,` : ''
       return {
-        text: `${e.name} swapped ${e.gave} ${goodText(e.give)} for ${e.units} ${goodText(e.want)}${cut}${back} at ${place.name}.`,
+        text: `${e.name} swapped ${e.gave} ${goodText(e.give)} for ${e.units} ${goodText(e.want)}${cut}${back} at ${place.name}.${standingMoved(e.standing)}`,
         tone: 'info',
         places: [place],
       }
+    }
+    case 'horseBought': {
+      const place = { name: `the stable of ${e.city}`, x: e.x, y: e.y }
+      return e.problem
+        ? {
+            text: `${e.name} couldn’t buy ${e.horse} at ${place.name}: ${e.problem}.`,
+            tone: 'warn',
+            places: [place],
+          }
+        : {
+            text: `${e.name} bought ${e.horse} for ${e.coins} coins at ${place.name}.`,
+            tone: 'info',
+            places: [place],
+          }
+    }
+    case 'horseSold': {
+      const place = { name: `the stable of ${e.city}`, x: e.x, y: e.y }
+      return e.problem
+        ? {
+            text: `${e.name} couldn’t sell ${e.horse} at ${place.name}: ${e.problem}.`,
+            tone: 'warn',
+            places: [place],
+          }
+        : {
+            text: `${e.name} sold ${e.horse} for ${e.coins} coins at ${place.name}.`,
+            tone: 'info',
+            places: [place],
+          }
     }
     case 'offerTaken':
       return {
         text:
           e.wantsUnits === 0
             ? `${e.by} fetched the ${e.givesUnits} ${goodText(e.gives)} you set aside.`
-            : `${e.by} took your offer: ${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)}.`,
+            : `${e.by} took your offer: ${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)}.${standingMoved(e.standing)}`,
         tone: 'info',
         places: [{ name: 'the storage', x: e.x, y: e.y }],
       }
@@ -304,7 +371,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       const what = `${e.givesUnits} ${goodText(e.gives)} for ${e.wantsUnits} ${goodText(e.wants)}`
       const yours =
         e.wantsUnits === 0
-          ? `The ${goodText(e.gives)} you set aside for the realm of ${e.to}`
+          ? `The ${goodText(e.gives)} you set aside for ${e.to === TRADE_ORG_NAME ? e.to : `the realm of ${e.to}`}`
           : e.to
             ? `Your direct offer of ${what} to the realm of ${e.to}`
             : `Your offer of ${what}`
@@ -677,8 +744,17 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
           return { text: `${cap(them)} demands ${terms} of you.`, tone: 'warn' }
         case 'accepted':
           if (e.terms.kind === 'city') {
+            if (e.otherIs === 'tradeOrg' && !e.mine) {
+              return {
+                text: `You gave ${terms} back to ${them}: it is a trading post again.`,
+                tone: 'info',
+              }
+            }
             if (e.otherIs) {
-              return { text: `${terms} gave in to your demand and joined your realm.`, tone: 'info' }
+              return {
+                text: `${terms} gave in to your demand and joined your realm.`,
+                tone: 'info',
+              }
             }
             return e.mine
               ? {
@@ -692,7 +768,7 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
           }
           return acceptedGoodsLine(e, them, terms)
         case 'declined':
-          if (e.otherIs) {
+          if (e.otherIs && e.mine) {
             return {
               text: `${cap(them)} declined your demand for ${terms}, and thinks less of you.`,
               tone: 'warn',
@@ -791,6 +867,11 @@ function cap(text: string): string {
 }
 
 /** A good's name in a sentence: `ironOre` is "iron ore". */
+/** How far a trade moved standing, as the end of its line (`CONTEXT.md`: Trade section). */
+function standingMoved(moved: StandingMove | undefined): string {
+  return moved ? ` Standing with ${moved.name} ${formatMove(moved.by)}.` : ''
+}
+
 function goodText(good: string): string {
   return good.replace(/[A-Z]/g, (c) => ` ${c.toLowerCase()}`)
 }
@@ -819,8 +900,70 @@ function punishmentEnd(why: PunishmentEnd | undefined, city: string): string {
       return ': the admin directive was lifted'
     case 'noWay':
       return `: it found no way to ${city}`
+    case 'paid':
+      return ': your debt is paid'
+    case 'noWorkplaces':
+      return `: ${city} has no workplaces left to tear down`
+    case 'tookCity':
+      return `: ${city} is a trading post of the Trade Organization now`
     default:
       return ''
+  }
+}
+
+/** Who holds a town hall or took a city, by the name the log has for them: most are a realm. */
+const realmCalled = (other: string | null) =>
+  other === TRADE_ORG_NAME ? TRADE_ORG_NAME : `the realm of ${other}`
+
+/** A line about what the realm owes the Trade Organization (`CONTEXT.md`: Trade Org debt). */
+function debtLine(e: Extract<RealmEvent, { kind: 'debt' }>): EventLine {
+  switch (e.what) {
+    case 'owed':
+      return {
+        text: `You owe the Trade Organization ${e.owed} Coins, what its army came for and couldn't take. Pay at any of its warehouses.`,
+        tone: 'bad',
+      }
+    case 'postOwed':
+      return {
+        text: `The Trade Organization heard you took its trading post: you owe it ${e.owed} Coins, its worth. Pay at any of its warehouses.`,
+        tone: 'bad',
+      }
+    case 'rose':
+      return {
+        text: `What you cost the Trade Organization adds ${e.coins} Coins to your debt: you owe it ${e.owed} Coins.`,
+        tone: 'bad',
+      }
+    case 'postReturned':
+      return {
+        text:
+          e.owed > 0
+            ? `Giving back its trading post took ${e.coins} Coins off your debt. You still owe the Trade Organization ${e.owed} Coins.`
+            : `Giving back its trading post settled your debt. You no longer owe the Trade Organization anything.`,
+        tone: 'info',
+      }
+    case 'collected':
+      return {
+        text:
+          e.owed > 0
+            ? `A caravan brought ${e.coins} Coins of your debt to the Trade Organization. You still owe it ${e.owed} Coins.`
+            : `A caravan brought ${e.coins} Coins of your debt to the Trade Organization. You no longer owe it anything.`,
+        tone: 'info',
+      }
+    case 'overdue':
+      return {
+        text: `You still owe the Trade Organization ${e.owed} Coins and its demand is over: its next army comes for your workplaces. Paying in full at any of its warehouses stops it.`,
+        tone: 'bad',
+      }
+    case 'cityTaken':
+      return {
+        text: `Taking your city settled your debt of ${e.coins} Coins to the Trade Organization.`,
+        tone: 'bad',
+      }
+    case 'ended':
+      return {
+        text: `Your debt of ${e.coins} Coins ended with the fall of the Trade Org HQ.`,
+        tone: 'info',
+      }
   }
 }
 
@@ -828,11 +971,15 @@ function punishmentEnd(why: PunishmentEnd | undefined, city: string): string {
 function punishedLine(e: Extract<RealmEvent, { kind: 'punished' }>): EventLine {
   const army = "The Trade Organization's army"
   const taking = `${e.took ?? 0} of the ${e.worth} Coins' worth it came for`
+  const tornDown = `having torn down ${e.took ?? 0} of the ${e.worth} Coins' worth you owed`
   switch (e.what) {
     case 'coming':
       return {
-        text:
-          e.directive === undefined
+        text: e.takes
+          ? `The Trade Organization is sending its army to ${e.city} to hold its town hall and take the city for the ${e.worth} Coins you owe. Paying in full at any of its warehouses stops it.`
+          : e.wrecks
+          ? `The Trade Organization is sending its army to ${e.city} to tear down workplaces for the ${e.worth} Coins you owe.`
+          : e.directive === undefined
             ? `The Trade Organization is sending its army to ${e.city} to take back ${e.worth} Coins' worth.`
             : `By admin directive (${e.directive}), the Trade Organization is sending its army to ${e.city} to take ${e.worth} Coins' worth.`,
         tone: 'bad',
@@ -841,7 +988,9 @@ function punishedLine(e: Extract<RealmEvent, { kind: 'punished' }>): EventLine {
       return { text: `${army} has arrived at ${e.city}.`, tone: 'bad' }
     case 'left':
       return {
-        text: `${army} left ${e.city}, taking ${taking}${punishmentEnd(e.why, e.city)}.`,
+        text: e.takes
+          ? `${army} left ${e.city}${punishmentEnd(e.why, e.city)}.`
+          : `${army} left ${e.city}, ${e.wrecks ? tornDown : `taking ${taking}`}${punishmentEnd(e.why, e.city)}.`,
         tone: 'warn',
       }
     case 'turnedBack':
@@ -855,8 +1004,12 @@ function punishedLine(e: Extract<RealmEvent, { kind: 'punished' }>): EventLine {
           e.where === 'wayThere'
             ? `${army} was lost on its way to ${e.city}.`
             : e.where === 'atCity'
-              ? `${army} was lost at ${e.city}, having taken ${taking}.`
-              : `${army} was lost on its way home from ${e.city}, with ${taking}.`,
+              ? e.takes
+                ? `${army} was lost at ${e.city}.`
+                : `${army} was lost at ${e.city}, ${e.wrecks ? tornDown : `having taken ${taking}`}.`
+              : e.wrecks || e.takes
+                ? `${army} was lost on its way home from ${e.city}.`
+                : `${army} was lost on its way home from ${e.city}, with ${taking}.`,
         tone: 'info',
       }
   }

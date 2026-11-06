@@ -12,6 +12,7 @@ import {
   type City,
   type GoodsPlace,
   type GoodsWanted,
+  type Horse,
   type Resident,
   type ResidentOrder,
   type ScriptSummary,
@@ -103,6 +104,8 @@ interface DoingSeen {
   residents?: readonly Pick<Resident, 'order'>[]
   /** The cities the Player knows, to name where a resident relocates to (`CONTEXT.md`: Relocate). */
   cities?: readonly Pick<City, 'id' | 'name'>[]
+  /** The horses the Player knows, to name the two being bred (`CONTEXT.md`: Breeding). */
+  horses?: readonly Pick<Horse, 'id' | 'name'>[]
   /** About how many ticks until they arrive where they walk, ride or drive (`arrivalTicks`). */
   arrives?: number
   /** The world's tick, to say how long someone Down has left. */
@@ -112,22 +115,31 @@ interface DoingSeen {
 /** The Doing line but for the script waiting (`doingLine`). */
 function doingOfOrder(
   r: DoingOf,
-  { scripts = [], buildings = [], residents = [], cities = [], arrives, tick }: DoingSeen,
+  {
+    scripts = [],
+    buildings = [],
+    residents = [],
+    cities = [],
+    horses = [],
+    arrives,
+    tick,
+  }: DoingSeen,
 ): string {
   if (isDown(r)) return downLine(r, tick)
   if (r.script?.doing) return r.script.doing
   if (r.aboard !== undefined && !r.order) return aboardLine(r, residents)
   if (r.carrying && !r.order) return 'Carrying a child'
   const task = r.script && taskOf(r.script, scripts)
-  const step = stepLine(r.order, buildings)
+  const step = stepLine(r.order, buildings, horses)
   if (!task) return step ?? orderDoing(r, arrives, cities)
   const what = taskLine(task, r.script!.building, r.script!.site)
   const o = r.order
   // Building the workplace first, Work's own order is building (`CONTEXT.md`: Working a site).
   const own = task === 'work' && r.script!.site ? 'build' : TASK_ORDER[task]
   // The task's own order says no more than the task does, but where a haul route is, what a
-  // trainee learns and what a smithy makes.
+  // trainee learns, which two horses are bred and what a smithy makes.
   if (o && o.kind === own) {
+    if (o.kind === 'breed') return breedingLine(o.horseIds, horses)
     if (o.kind === 'haul' || o.kind === 'train') return orderDoing(r, arrives, cities)
     return o.kind === 'workAt' && o.makes
       ? `${what}: ${lower(orderDoing(r, arrives, cities))}`
@@ -193,19 +205,35 @@ function taskLine(task: Task, building: SeenScript['building'], site?: true): st
 }
 
 /**
- * What storing and fetching say beyond the built-in order line: the goods and where, "Carrying
- * iron to the storage", "Fetching 10 wood from the stable". Undefined for any other order.
+ * What storing, fetching and breeding say beyond the built-in order line: the goods and where,
+ * "Carrying iron to the storage", "Fetching 10 wood from the stable", and the two horses, "Breeding
+ * Star and Blaze". Undefined for any other order.
  */
 function stepLine(
   o: ResidentOrder | null,
   buildings: readonly Pick<Building, 'id' | 'kind'>[],
+  horses: readonly Pick<Horse, 'id' | 'name'>[],
 ): string | undefined {
   if (o?.kind === 'store' && o.phase !== 'refilling') {
     return `Carrying ${goodsLine(o.goods)} to ${placeLine(o.to, buildings)}`
   }
   if (o?.kind === 'fetch')
     return `Fetching ${goodsLine(o.goods)} from ${placeLine(o.from, buildings)}`
+  if (o?.kind === 'breed') return breedingLine(o.horseIds, horses)
   return undefined
+}
+
+/**
+ * "Breeding Star and Blaze", as far as the Player knows the two (`CONTEXT.md`: Breeding, Doing): one
+ * they no longer know of is "another horse", and with neither known it is "Breeding horses".
+ */
+function breedingLine(
+  horseIds: readonly string[],
+  horses: readonly Pick<Horse, 'id' | 'name'>[],
+): string {
+  const names = horseIds.flatMap((id) => horses.find((h) => h.id === id)?.name ?? [])
+  if (names.length === 0) return 'Breeding horses'
+  return `Breeding ${names[0]} and ${names[1] ?? 'another horse'}`
 }
 
 /** "10 wood and iron": units where the order names them. */

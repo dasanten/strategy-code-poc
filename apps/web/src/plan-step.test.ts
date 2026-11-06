@@ -18,6 +18,7 @@ import {
   pickInto,
   planAsk,
   planCities,
+  planHorses,
   planOrder,
   planPickAt,
   type Plan,
@@ -91,6 +92,7 @@ describe('Add step', () => {
       buildingKind: { ask: 'buildingKind', building: 'farm' },
       makes: { ask: 'makes', makes: 'spear' },
       horses: { ask: 'horses', horseIds: ['h1', 'h2'] },
+      horse: { ask: 'horse', horseId: 'h1' },
       haul: { ask: 'haul', setup: { goods: ['wood'], returnGoods: [], keepFood: 0 } },
       script: { ask: 'script', scriptId: 1 },
       subject: { ask: 'subject', subject: 'strength' },
@@ -119,6 +121,7 @@ describe('Add step', () => {
       goods: { ask: 'goods', goods: { wood: 1 } },
       buildingKind: { ask: 'buildingKind', building: 'farm' },
       horses: { ask: 'horses', horseIds: ['h1', 'h2'] },
+      horse: { ask: 'horse', horseId: 'h1' },
       haul: { ask: 'haul', setup: { goods: ['wood'], returnGoods: [], keepFood: 0 } },
       script: { ask: 'script', scriptId: 1 },
       subject: { ask: 'subject', subject: 'strength' },
@@ -290,6 +293,26 @@ describe('Add step', () => {
       stableId: 'b1',
       horseIds: ['h1', 'h2'],
     })
+  })
+
+  it('hitches a horse the card lists from the carriage’s tile, after a walk there', () => {
+    const horses = [
+      { id: 'h1', x: 3, y: 3, realmId: 'r1' },
+      { id: 'h2', x: 3, y: 3, realmId: 'r1' },
+      { id: 'h3', x: 4, y: 3, realmId: 'r1' },
+      { id: 'h9', x: 3, y: 3, realmId: 'r2' },
+    ]
+    const plan = planned('hitch', [3, 3])
+    expect(planAsk(plan)).toBe('horse')
+    expect(planHorses(w, horses as never, plan).map((h) => h.id)).toEqual(['h1', 'h2'])
+    expect(planOrder(plan)).toBeUndefined()
+    const { order, at } = planOrder(plan, { ask: 'horse', horseId: 'h2' })!
+    const request = appendRequest(inCity, order, at)!
+    expect(request.steps).toEqual([
+      { order: { kind: 'walkTo', x: 3, y: 3 } },
+      { order: { kind: 'hitch', carriageId: 'k1', horseId: 'h2' } },
+    ])
+    expect(queueStepsProblem(request.steps)).toBeUndefined()
   })
 
   it('teaches and trains at a training ground picked, anyone’s, after a walk there', () => {

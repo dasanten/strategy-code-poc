@@ -252,7 +252,8 @@ The shared language of the game. Domain terms only — no implementation details
   offers.
 - **NPC cities at an offer:** an NPC city sends its trader to a Player's offer within a set reach
   when the offer gives what it is short of and wants what it has spare (or Coins), at a rate at
-  least as good as its own prices. The Trade Organization never accepts offers.
+  least as good as its own prices. The Trade Organization accepts offers only for its army to buy
+  Food on the way (Trade Org debt).
 - **Direct offer:** an offer sent to one named realm, who sees it at once wherever they are and
   accepts or declines it within a set time. The sender picks how the goods change hands: **in
   person**, an offer at a storage of the sender's that only that realm can accept; or **carried**,
@@ -282,8 +283,8 @@ The shared language of the game. Domain terms only — no implementation details
   trade that won't go says why (no coins in hand, no room, none in stock, not wanted). Delivery
   and Transfer each have a heading and a line saying what they do, with the fee before ordering,
   and the section links to the Wiki's "How to trade". The tile card of a warehouse, an NPC
-  city's storage or a wandering trader at a stop has **Trade here**, which opens it. Only the UI:
-  the trades are those above.
+  city's storage or stable with horses to buy or sell (Horse market), or a wandering trader at a stop has **Trade here**, which opens it. It shows their standing with that city, and a trade says how far it moved it. Only
+  the UI: the trades are those above.
 - **Stock floor:** the Trade Organization gets its stock physically (its own workplaces on every
   kind of resource, plus buying). When a warehouse of the HQ runs low, it tops up to a minimum at
   the end of each game day. This is the one controlled exception to "everything is physical" (ADR
@@ -385,9 +386,9 @@ The shared language of the game. Domain terms only — no implementation details
   when the city is no longer the culprit's, or when it finds no way there at all. Each soldier packs Food at the HQ for the way there and
   back, leaving room for what they will carry home; on the way they refill at trading posts they
   pass, and at the city they may take Food from its storage for the way back, apart from what the
-  army came to take. The realm log tells the truth: it is coming; it has arrived; it left with so
-  much of what it came for; it turned back without reaching the city, and why; or it was lost on
-  the way.
+  army came to take. On the road its soldiers keep together at the pace of the slowest (Army). The
+  realm log tells the truth: it is coming; it has arrived; it left with so much of what it came for;
+  it turned back without reaching the city, and why; or it was lost on the way.
 - **Admin directive:** an admin orders the Trade Organization to weaken a Player or
   organization that is deliberately ruining the game for others (e.g. farming new Players). The
   game still forbids nothing; the Trade Organization acts because a healthy world is good for
@@ -479,11 +480,11 @@ The shared language of the game. Domain terms only — no implementation details
   where they are until the city moves them. Beyond that it is driven by its
   reserve (NPC reserve): its spare hands go to the good shortest of its reserve first; they work
   the workplace that makes the good, or build it first on the nearest fitting resource node
-  (within a set reach of its home) and work it like its other workplaces, carrying the output to
+  (within a set reach of its home, or further out where a Scout found one) and work it like its other workplaces, carrying the output to
   its storage (Crew food). So a city builds the whole chain its land allows, one need at a time:
   weapons short means a smithy, which wants Iron, so a smelter, which wants ore, so a mine. A
-  good with no node in reach stays short; the city buys it from its trader or a visiting trader,
-  or does without. When it has no room left inside its wall it grows its area
+  good it knows no node of stays short; the city buys it from its trader or a visiting trader,
+  or does without. With nothing short its spare hands still have work (Spare hands' work). When it has no room left inside its wall it grows its area
   by building on the edge, puts up a new wall 8 tiles further out on every side, with the gate in
   the same place, and only once every tile of the new wall is finished tears down the old one.
   Its residents stand on its walls and pass its gates as a realm's do. It keeps some soldiers by
@@ -492,18 +493,45 @@ The shared language of the game. Domain terms only — no implementation details
   and towns, on Plains, far from every starting city and from each other, and out of every
   Player's sight.
 - **NPC reserve:** what an NPC city keeps of each good it can use, and never sells: Food for
-  some game days for all its residents; Wood and Stone for its next house and some wall; weapons
+  some game days for all its residents, and what its stable lacks for its horses (Feeding the
+  stable; the stable's Food counts); Wood and Stone for its next house and some wall; weapons
   for the soldiers it keeps by its size, and the Iron and Wood to forge them; Coins as its war
-  chest, for buying what it lacks and hiring help. A stable is wanted once it has horses, a mint
-  only with a gold node in reach. Whatever its storages hold above the reserve is its surplus,
+  chest, for buying what it lacks and hiring help. A stable is wanted once it has horses, or with
+  none once nothing else is short (NPC horses), a mint only with a gold node it knows of. Whatever its storages hold above the reserve is its surplus,
   for sale (Trading with an NPC city); whatever is below is short and drives what it works and
   builds next (NPC city).
+- **Spare hands' work:** with nothing short of its reserve, an NPC city's spare hands don't stand
+  idle. In this order they go on a road crew while it has a road to build (NPC road), scout (Scout),
+  and otherwise work at its workplaces for **surplus**, past the reserve, up to a cap per good (a
+  balance number). What is short, its trader and a founding party still take them first, and they
+  count as spare hands for a Full city. Trade Org cities do none of this.
+- **NPC road:** a road an NPC city builds with a **road crew** of its spare hands (at most a balance
+  number at once, apart from its builders), only from materials above its reserve. It follows the
+  way a resident would walk, tile by tile, skipping tiles that have a road: first from its home to
+  each of its workplaces outside its area, nearest first; then to the nearest Trade Org warehouse
+  in its trader's reach, leaving out those of the HQ's inner ring, which keeps everyone out; then to
+  the edge of its nearest neighbour city's area. Like any road nobody owns it, and anyone can use it
+  or tear it down; a tile torn down is laid again in time. A way too long (a balance number, in
+  tiles) or with no way through is given up. A road two cities would each build between them is
+  built by only one. The crew takes Food along, never starts a tile with too little to walk home
+  on, and fetches more by Getting food.
+- **Scout:** a spare hand an NPC city sends exploring: a few at a time by its size (a balance
+  number) run the game's Explore default with no `find`, and come home when their Food says turn
+  back. A city knows every resource node within its set reach (NPC city). What a scout saw is
+  the city's only once they step back into its area alive: from then on it knows those nodes, out
+  to a wider limit (a balance number), and can build on them. So a good it has no node for is one
+  it knows no node of: its trader and a founding go by that too. A scout killed on the way brings
+  nothing. Called off for what is short, they come home first with what they saw. Unexplored to a
+  scout is what their city doesn't know and they haven't seen. A place a scout or a builder finds no
+  way to is given up, and the city no longer counts on the nodes there. It stops scouting once it
+  knows its limit: once a scout finds nothing left they can get to, on their Food. Nothing protects
+  them on the way.
 - **NPC trader:** an NPC city's own trade run. Once a good's surplus makes a full load and a
   Trade Org warehouse (HQ or trading post) lies within a set reach, one of its spare hands,
   never a soldier, carries the load there, sells it, buys the good shortest of the reserve that
   the city has no node for, as far as its coins and their arms allow, and walks home to the
   storage. One trader per city at a time. Nothing protects them on the way but what they carry.
-- **Full city:** an NPC city that for a whole game week has had idle spare hands and nothing
+- **Full city:** an NPC city that for a whole game week has had spare hands (idle, on a road crew, scouting or working for surplus) and nothing
   short of its reserve, holds a food surplus, and holds a town hall's and a storage's materials
   above its reserve. A full city founds a daughter (Founding).
 - **Founding:** how a full NPC city spreads out. It picks a free Plains site the usual distance
@@ -698,23 +726,70 @@ The shared language of the game. Domain terms only — no implementation details
   carry home twice what it lost (coins first), fighting whoever resists. It leaves once it has what
   it came for; what it couldn't take becomes a debt.
 - **Trade Org debt:** what the Trade Organization came for and couldn't take stays owed by that
-  Organization, however long it takes. It says so in the realm log, and it can be paid off at any
-  warehouse in Coins at any time. It rises by what later crimes cost. While it is owed the Trade
-  Organization goes up these steps, one after the other (ADR 0025), and paying it in full stops it at
-  any step:
-  1. **It demands:** a demand (Demand) for the debt, with a deadline.
+  Organization, however long it takes, from when its army heads home or is lost, whatever the reason.
+  It says so in the realm log, and a resident on any warehouse's tile can pay it in Coins at any time,
+  in part or in full, from their hands or a carriage there, even if the Trade Organization otherwise
+  refuses them. It rises by what later crimes cost: a crime it comes to know of while it is owed adds
+  what it cost, once, and sends no army of its own. An Organization that is gone takes its debt with
+  it. While it is owed the Trade Organization goes up these steps, one after the other (ADR 0025), and
+  paying it in full stops it at any step:
+  1. **It demands:** a demand (Demand) for the debt, with a deadline, once for each debt. It always
+     asks for what is owed now, and paying in full at a warehouse ends it. Declined or lapsed, the
+     next step starts at once. Accepted, what is handed over comes off the debt as a caravan brings it
+     in, from the warehouse nearest: set aside at a storage in a city, for no fee, or sent by a Transfer,
+     for a fee as always. What that leaves owed starts the next step at the deadline.
   2. **It wrecks:** past the deadline, its next army goes to that city and tears down workplaces of
      it, each counting for its worth against the debt, until the debt is covered or none are left.
-     Those who resist are fought.
+     Those who resist are fought. A workplace is that city's if it is on its books or one of its
+     residents works it, also while away carrying; not an idle one nobody of it works, nor one on
+     another Organization's books or that someone of another Organization works. Once its army has
+     found one at the city it stays on its list, even if the workers leave or die, unless another
+     Organization takes it over.
   3. **It takes the city:** with a debt still owed after a set number of trips, its army occupies the
      town hall (Holding the town hall). The city joins the Trade Organization as a new trading
-     post: its storages become warehouses with what is in them, its people stay as the post's, and
-     the debt is settled.
-  Its army may travel with a **supply wagon**, a Trade Org carriage with Food and room for what it
-  takes, following it like an army's and robbed like a caravan's; and short of Food on the way it
-  buys some from a post, NPC city or Player's offer it passes. A captured post the Trade Organization
-  has heard of (Lost post found out) is a debt too: it demands the city back, and returning it
-  settles the debt. Admin directives go on as before, with no debt.
+     post: its storages become warehouses with what is in them, but for the Food, which goes into a
+     new storage near its town hall that its people eat from, its people stay as the post's, and the
+     debt is settled. A trip counts once its army has reached the city: one lost or turned back on
+     the road doesn't, and a city behind shut gates it can't reach never comes to this step. Its
+     soldiers fight anyone armed standing on the hall, as those block an occupation, and one stays on
+     the hall when the others go for Food. It doesn't give up while its occupation is running; broken
+     and past its time, it goes home and the next army comes. With no room for a new storage, the
+     storage holding the most Food stays one and takes all the Food, and a city with no other has no
+     warehouse. A city with no storage at all gets an empty storage and an empty warehouse. Workplaces
+     its residents worked that aren't on its books stay the post's own, and its gates open as it joins.
+  Its army travels with a **supply wagon**, when the HQ has a free adult to drive it: a new Trade Org
+  carriage and horse, loaded at the HQ with Food for the whole trip as far as that leaves room for what
+  it takes. It follows the army (Supply line) and its soldiers refill from it, go to meet it when they
+  run out with it out of reach, and put on it what they take when it is near. It is robbed like a
+  caravan's: taking from it or stealing it is a crime and its soldiers go after those who do, and its
+  crew is lost like one (Caravan crew lost): a soldier takes over from a dead driver, unless they are
+  the last, and with no crew left the HQ sends a new driver on foot, who packs for the walk. Stolen,
+  or with its horse dead, it is gone for the army, which goes on with what it carries. It comes home
+  with them, or by itself once they are lost, and its whole load goes into the warehouses; the carriage
+  and horse go back into the HQ's stock. And short of Food on the way its army
+  buys some from a post, NPC city or Player's offer it passes. Each soldier packs Coins at the HQ for
+  this and hands in what is left back home. A soldier is short when the rest of the trip takes more
+  than they carry and their share of the wagon's Food; with Coins left, they go to such a place near
+  them and buy by the same trade anyone uses, cut down the same way, and carry on. An NPC city that
+  refuses the Trade Organization sells them nothing. They don't buy from the Organization they are
+  punishing, from one the Trade Organization refuses to trade with, or at an offer asking too much.
+  Coins and Food they brought or bought are their own: none of it counts as what the army took. With
+  no seller near they go on hungry. A captured post the Trade Organization
+  has heard of (Lost post found out) is a debt too, for its worth, added to what is owed: it demands
+  the city back. Returning it takes the post's worth off the debt; anything else owed stays, and gets
+  its own demand for Coins. A demand for Coins already open stays open and rises by the worth, and
+  refusing the post then leaves the next step to that demand's answer. With only the post's demand
+  out, no demand for Coins goes too. A city they no longer hold can't be given back, so news of it
+  makes an ordinary debt with a demand for Coins. Given back, its warehouse turns back with all it
+  holds; if they tore that down, another storage takes its place, keeping the one its people eat from,
+  and with none spare a new empty warehouse stands on the old spot. The post gets a caravan with a new
+  crew, carriage and horse. Armed residents left on its hall start a new occupation as anyone's do
+  (Occupying a town hall), and taking it again is a new crime. Admin directives go on as before, with
+  no debt.
+- **Trade Org army at an NPC gate:** an NPC city that doesn't refuse the Trade Organization keeps its
+  gate open while only the Trade Organization's army is near, so its soldiers can walk in and buy
+  like anyone. A city that refuses it shuts them out as it does anyone it refuses, and other armed
+  outsiders near still shut the gate.
 - **Demand:** a Player or the Trade Organization sends a demand to another Organization: **terms**
   (hand over a named city; hand over goods or Coins), a short written note, and a deadline. It
   arrives at once, like a mercenary offer, wherever the other side is, and sending them is limited.
@@ -910,7 +985,12 @@ The shared language of the game. Domain terms only — no implementation details
   them (an order, queue step or script `feed(targetId, units)`), putting Food from their own
   hands into the Down resident's. Once their hunger meter isn't empty they wake at low health
   and stand idle. A Down horse wakes the same way once it has eaten, from Food in reach (Horses
-  have no inventory) or when a resident Feeds it (Feeding a horse).
+  have no inventory) or when a resident Feeds it (Feeding a horse). An NPC city revives its own: while
+  a Down resident of the city lies in or near its area and its storage holds Food, one of its grown
+  residents, never a soldier and a spare hand first, takes Food to them and Feeds them, one at a time
+  per Down resident. It doesn't go far out for one (a balance number). This comes ahead of building,
+  road crews, scouts and work for surplus, and of what is short, except Food for those who aren't Down:
+  its farmers stay while Food is short. The Trade Organization's cities do the same.
 - **Eating:** a resident eats only food they carry, everywhere, also at home. Nobody eats
   straight from a storage.
 - **Own food:** the Food a resident keeps on them for their own meals, about four game days of
@@ -941,7 +1021,8 @@ The shared language of the game. Domain terms only — no implementation details
 - **Horse:** an animal that pulls a carriage. Eats Food and goes hungry like a resident: an empty
   hunger meter costs health, and a horse without food goes Down after about 5 game days (Down,
   Reviving) and dies if it eats nothing before its time is up. Bred by a
-  resident at a stable, or bought from the Trade Organization.
+  resident at a stable, or bought from an NPC city (Horse market). The Trade Organization doesn't
+  sell horses for now.
 - **Horse grant:** a one-time gift, given once when it ships: every Player realm with a living
   Leader and no horse at all (in a stable, hitched or ridden) gets two new horses with stats drawn
   as in a starting city. They appear in the realm's finished stable nearest the Leader's city;
@@ -999,6 +1080,26 @@ The shared language of the game. Domain terms only — no implementation details
   the stable; otherwise they wait there. Its params: `stable`, the stable to feed (by default the
   one they stand in when it starts), and `source`, where the Food comes from (by default the nearest
   storage of their realm with Food). With no Food to fetch they wait.
+- **NPC horses:** a new NPC village or town starts with two horses, with some Food by them; one from
+  before this got two when it shipped. It wants a stable once it has any and lays it out where they
+  stand, so they are in it when it is finished; it keeps it fed as Feeding
+  the stable says, with one of its residents at a time, and breeds up to the horses it wants for its
+  size (a balance number), while Food isn't short. The Food comes from what is above the reserve for its people, or below
+  that a little while its horses are hungry or Down: a short city feeds its people first. The
+  resident goes when the stable runs low and fills it, and works for the city in between. Self-managed
+  cities with horses do the same. A founding party takes none: a daughter with none wants a stable too once nothing
+  is short of its reserve, and gets its first horses when a Player sells it some. Trading posts and
+  the HQ don't take part.
+- **Horse market:** buying and selling a horse with an NPC city, only in person: a grown resident
+  at its finished stable. **Buying** takes a horse standing in it that the city can spare (any beyond a
+  breeding pair it keeps), with the Coins in the buyer's hands; the Coins go into its storage and the horse joins
+  their realm where it stands. **Selling** takes a horse of their realm standing in it, pulling no
+  carriage, not ridden and not Down, while the city has fewer than it wants and the Coins in its
+  storage; the Coins go into the resident's hands, and it doesn't go if they can't carry them. The
+  price comes from the horse's stats and age and how many the city has against how many it wants, dearer as it nears the pair it keeps,
+  and its standing toward them moves it like its trade prices. It pays less than it asks. At low standing it refuses (NPC city
+  reaction). A sale raises standing like any trade. The trade section lists its horses, and the
+  realm's standing in the stable, with name, stats and price.
 - **Carriage:** a horse-drawn cart driven by a resident with Driving skill. Carries far more than
   any resident and is fast on plains and roads, slower in forest and hills, and cannot enter
   mountains except on a road. Built at a stable (Building a carriage).
@@ -1024,6 +1125,11 @@ The shared language of the game. Domain terms only — no implementation details
   tile unhitches it (an order, as a script could do it); the horse stands free on the tile, and
   the carriage stands where it is until it is next driven. A carriage
   whose horse dies stands where it is until another horse is hitched.
+  **Hitching:** a grown resident of the carriage's realm on its tile hitches the horse they choose
+  (an order, as a script could do it): any horse of the realm on that tile that pulls no carriage,
+  nobody rides and isn't Down, listed on the card with name, stats and age. It happens at once; a
+  horse already hitched stands free on the tile. Driving with none hitched still takes the first
+  free horse there.
 - **Riding:** a resident on a tile with a horse that pulls no carriage and nobody rides mounts
   it (another organization's is stolen by that: Stealing a carriage or horse), and dismounts
   anywhere; the horse stays on that tile. Riding is not an order:
@@ -1215,7 +1321,7 @@ The shared language of the game. Domain terms only — no implementation details
   doing, shown to the owning Player only. It is derived from their task and current order
   ("Building a house: fetching 10 wood from the storage", "Working the farm"); the script they
   run is named on a small line of its own, left out when it is their task's own default script
-  ("Working the farm" alone). Long lines wrap rather than being cut off. A script can say it
+  ("Working the farm" alone). Breeding names the two horses. Long lines wrap rather than being cut off. A script can say it
   itself with `doing(text)`: short
   text, kept in its memory, that shows instead until the script says something else or stops.
   **Estimates:** the Doing line and every meter or countdown that shows progress also say about
@@ -1373,6 +1479,12 @@ The shared language of the game. Domain terms only — no implementation details
   resident, give them an order, open the Wiki. Each line is ticked when the game sees it done;
   the card goes for good once all are ticked or the Player dismisses it. Kept per Player, not per
   realm: a Player who dismissed it never sees it again, also after a Leader death.
+- **Goods in the top bar:** the top bar shows the Food, Wood, Stone and Coins held in storages, for
+  what is picked beside them: **Entire realm** (the default: every storage of the realm, outpost
+  storages included) or one city of the realm by name. Stables, carriages and piles don't count. A storage out of sight
+  counts with what the Player last saw in it (Last seen), and the total says so when part of it is
+  that old.
+  The pick is kept per browser; a city no longer the realm's goes back to Entire realm. Only the UI.
 - **Minimap:** a small map bottom right of the screen (ADR 0008): the Player's explored terrain
   at a glance with their home city, their other cities, their residents and carriages away from
   home and the cities they know (Last seen), each a dot in its relationship colour, and the

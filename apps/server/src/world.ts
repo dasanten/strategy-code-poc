@@ -46,6 +46,8 @@ import { resolvePurchases } from './buying.js'
 import { resolveTrades } from './trading.js'
 import { resolveOffers, stepOffers } from './offers.js'
 import { resolveBuyOffs } from './directives.js'
+import { resolveDebtPayments, stepDebts } from './trade-org-debt.js'
+import { countWrecked } from './trade-org-wrecks.js'
 import { stepCrimes } from './crimes.js'
 import { stepStanding } from './standing.js'
 import { stepPersuasion } from './persuasion.js'
@@ -92,7 +94,9 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
     standings: [],
     joinRequests: [],
     punishments: [],
+    supplyWagons: [],
     directives: [],
+    debts: [],
     lastSeen: {},
     // A new world's Players have nothing to be told of changes before it.
     scriptViewChanges: SCRIPT_VIEW_CHANGES.length,
@@ -211,7 +215,7 @@ export function stepWorld(
     stepTradeOrgArmy(world, terrain.size)
     stepNpcHire(world, terrain.size)
     stepPunishments(world, terrain.size)
-    npcPlanMs = stepNpcCities(world, terrain.size, terrain)
+    npcPlanMs = stepNpcCities(world, terrain.size, terrain, walking)
     const runs = runNpcScripts(world, terrain)
     // Whatever the game's own cities gave someone Down ends before they act on it.
     keepDownStill(world)
@@ -268,10 +272,11 @@ function stepRest(
   const trades = resolveTrades(world, terrain.size)
   const accepted = resolveOffers(world)
   const buyOffs = resolveBuyOffs(world)
+  const debtsPaid = resolveDebtPayments(world)
   const builds = requestBuilding(world)
   resolveBuilding(world, builds, terrain)
   const teardowns = requestTearingDown(world)
-  resolveTearingDown(world, teardowns, terrain)
+  countWrecked(world, resolveTearingDown(world, teardowns, terrain))
   const work = requestWork(world)
   resolveWork(world, work)
   stepTeaching(world, terrain.size)
@@ -284,13 +289,14 @@ function stepRest(
   const aging = stepAging(world, terrain.size)
   answerDemands(world, terrain.size)
   stepAlliances(world)
-  const captures = stepCaptures(world, terrain.size)
+  const captures = stepCaptures(world, terrain)
   stepRefill(world, terrain.size)
   stepDirectives(world)
   stepCrimes(world, terrain.size)
   stepContracts(world)
   stepDemands(world)
   stepStanding(world)
+  stepDebts(world)
   stepPersuasion(world, terrain.size)
   stepArmies(world, terrain.size)
   // Workplace settings of buildings and realms that went this tick go with them.
@@ -311,6 +317,7 @@ function stepRest(
     purchases +
     trades +
     accepted +
-    buyOffs
+    buyOffs +
+    debtsPaid
   return { actions, survival, combat, horsesDied, aging, captures }
 }

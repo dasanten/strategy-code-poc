@@ -20,6 +20,7 @@ import {
 } from '@csp/shared'
 import { CITY_NAMES, givenCityName, updateCityMembership } from './cities.js'
 import { layoutPlan, pickLayout, type LayoutPlan } from './city-layout.js'
+import { giveNpcHorses } from './npc-horses.js'
 import { hash, mulberry32, newResident } from './residents.js'
 import { Ground } from './placing.js'
 import {
@@ -224,8 +225,9 @@ function startingHouseSpot(
 
 /**
  * Places the world's NPC cities (`CONTEXT.md`: NPC city): `NPC_TOWNS` towns, then `NPC_VILLAGES`
- * villages, scaled to the map's area, each on a site `findNpcCitySite` picks. Fewer when the map
- * has no room left. The same world always gets the same cities.
+ * villages, scaled to the map's area, each on a site `findNpcCitySite` picks and with its first
+ * horses (`giveNpcHorses`). Fewer when the map has no room left. The same world always gets the
+ * same cities.
  */
 export function placeNpcCities(world: WorldState, terrain: TerrainMap): City[] {
   const rand = mulberry32(world.seed * 104729 + 31)
@@ -238,5 +240,7 @@ export function placeNpcCities(world: WorldState, terrain: TerrainMap): City[] {
     const site = findNpcCitySite(world, terrain, kind, rand)
     if (site) placed.push(foundNpcCity(world, terrain, kind, site[0], site[1], rand))
   }
+  // Trading posts are laid out by `foundNpcCity` too, and get none.
+  for (const city of placed) giveNpcHorses(world, terrain, city)
   return placed
 }

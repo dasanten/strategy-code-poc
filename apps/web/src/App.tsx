@@ -67,7 +67,19 @@ import { StandingPanel } from './Standing.js'
 import { TileMenu, WaypointsPanel } from './Waypoints.js'
 import { api } from './api.js'
 import { CityInspector } from './CityInspector.js'
-import { keyGoods, showBeside, toggleDrawer, type DrawerId, type OpenDrawer } from './hud-view.js'
+import {
+  goodsOldText,
+  goodsPickCities,
+  goodsPickOf,
+  keyGoods,
+  rememberGoodsPick,
+  rememberedGoodsPick,
+  showBeside,
+  toggleDrawer,
+  type DrawerId,
+  type GoodsPick,
+  type OpenDrawer,
+} from './hud-view.js'
 import {
   CentredDialog,
   Drawer,
@@ -108,7 +120,7 @@ import { AddStep } from './AddStep.js'
 import { GroupPlanner } from './GroupPlanner.js'
 import { hasBlocks, type PlanItem } from './plan-blocks.js'
 import {
-  horsesIn,
+  planHorses,
   nextPick,
   pickCity,
   pickInto,
@@ -164,6 +176,7 @@ import {
   buildHereProblem,
   describeTile,
   escapeStep,
+  hitchChoice,
   makeLeaderProblem,
   nodeFit,
   type ActionId,
@@ -412,6 +425,25 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // The cities and buildings the Player knows, in sight or remembered (`CONTEXT.md`: Last seen).
   const knownCities = world ? knownOf(world.cities, world.lastSeen.cities) : []
   const knownBuildings = world ? knownOf(world.buildings, world.lastSeen.buildings) : []
+  // The goods in the top bar (`CONTEXT.md`: Goods in the top bar). The pick stays remembered while
+  // its city is lost, as a city just out of sight can be missing from what the Player knows.
+  const [goodsPicked, setGoodsPicked] = useState(() => rememberedGoodsPick())
+  const goods = (() => {
+    if (!world) return undefined
+    const cities = goodsPickCities(knownCities, world.home.realmId)
+    const pick = goodsPickOf(goodsPicked, cities)
+    const onPick = (next: GoodsPick) => {
+      setGoodsPicked(next)
+      rememberGoodsPick(next)
+    }
+    const seen = {
+      buildings: world.buildings,
+      lastSeen: world.lastSeen.buildings,
+      cities: knownCities,
+    }
+    const { totals, old } = keyGoods(seen, world.home.realmId, pick)
+    return { totals, oldText: goodsOldText(old, world.tick), cities, pick, onPick }
+  })()
   /**
    * For one of the Player's own residents: the cities to relocate them to and why they can't be
    * told to at all, if they can't (`CONTEXT.md`: Relocate), from what the Player knows.
@@ -879,7 +911,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           terrain: tile && terrainAt?.(tile.x, tile.y),
           problem: tile ? buildProblemAt(w, tile.x, tile.y) : () => undefined,
         }}
-        horses={horsesIn(planWorld(w), w.horses, plan?.picked[0]?.id)}
+        horses={planHorses(planWorld(w), w.horses, plan)}
         tick={w.tick}
         cities={cities}
         onPickCity={(cityId) => {
@@ -1242,6 +1274,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (!residentId) return
     setOrderError(await giveOrder({ kind: 'unhitch', residentId, carriageId }))
   }
+  /**
+   * Orders the picked resident to hitch the horse they choose to a carriage on their tile
+   * (`CONTEXT.md`: Hitched horse); with Shift held, appends it to their queue.
+   */
+  async function hitch(carriageId: string, horseId: string) {
+    if (!selected) return
+    setOrderError(await giveOrder({ kind: 'hitch', residentId: selected.id, carriageId, horseId }))
+  }
   /** Orders the picked resident to climb over a wall or gate of another realm next to them. */
   async function climb(wallId: string) {
     if (!selected) return
@@ -1388,6 +1428,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     scripts,
     buildings: world.buildings,
     inSight: world.residents,
+    horses: world.horses,
     cities: knownCities,
     arrivesIn: arrivesIn || undefined,
     tick: world.tick,
@@ -1458,7 +1499,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         cityName={homeCity?.name}
         tick={world?.tick}
         status={status}
-        goods={world && homeCity ? keyGoods(world.buildings, homeCity.id) : undefined}
+        goods={goods}
         leader={leader?.name}
         onLogout={logout}
         onWiki={() => reportFirstDay('openWiki')}
@@ -1467,8 +1508,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         <PhoneMenu
           open={openDrawer}
           onToggle={(id) => setOpenDrawer((open) => toggleDrawer(open, id))}
-          goods={world && homeCity ? keyGoods(world.buildings, homeCity.id) : undefined}
-          cityName={homeCity?.name}
+          goods={goods}
           leader={leader?.name}
           account={account.name}
           onLogout={logout}
@@ -1586,6 +1626,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             realmId={world.home.realmId}
             own={own}
             inSight={world.residents}
+            horses={world.horses}
             buildings={world.buildings}
             cities={world.cities}
             realms={realms}
@@ -1680,6 +1721,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setOrderError(await giveOrder({ kind: side, ...trade }))
             }
             onSwap={async (swap) => setOrderError(await giveOrder({ kind: 'swap', ...swap }))}
+            onBuyHorse={async (buy) => setOrderError(await giveOrder({ kind: 'buyHorse', ...buy }))}
+            onSellHorse={async (sale) =>
+              setOrderError(await giveOrder({ kind: 'sellHorse', ...sale }))
+            }
             onTransfer={async (transfer) =>
               setOrderError(await giveOrder({ kind: 'transfer', ...transfer }))
             }
@@ -1694,14 +1739,20 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             }
             arrivesIn={arrivesIn || undefined}
             directives={world.diplomacy.directives}
+            debt={world.diplomacy.debt ?? 0}
             noCaravans={world.diplomacy.noCaravans === true}
             openId={openCityId}
             onOpen={setOpenCityId}
             scrollTo={tradeAt}
+            standings={world.diplomacy.standings}
+            events={world.events}
             onBuyOff={async (residentId, directiveId, carriageId) =>
               setOrderError(
                 await sendOrder({ kind: 'buyOff', residentId, directiveId, carriageId }),
               )
+            }
+            onPayDebt={async (residentId, coins, carriageId) =>
+              setOrderError(await sendOrder({ kind: 'payDebt', residentId, coins, carriageId }))
             }
             onPostOffer={async (offer) =>
               setOrderError(await sendOrder({ kind: 'postOffer', ...offer }))
@@ -2052,6 +2103,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               world.carriages.filter((k) => carriageOfResident(k, selected) && k.horseId),
             )}
             onUnhitch={unhitch}
+            toHitch={hitchChoice(world, selected)}
+            onHitch={hitch}
             scripts={scripts}
             buildings={world.buildings}
             lastSeen={world.lastSeen.buildings}

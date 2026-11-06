@@ -11,6 +11,8 @@ import {
   HORSE_HUNGRY_SHARE,
   PASSENGER_WEIGHT,
   carriageCapacity,
+  carriageOfResident,
+  horsesToHitch,
   isDown,
   carriagePulledBy,
   driveOffProblem,
@@ -54,6 +56,8 @@ import {
   type TerrainLookup,
   type Building,
   type Carriage,
+  type CarriageHorse,
+  type CarriagePlace,
   type City,
   type KnownNode,
   type Pile,
@@ -123,6 +127,7 @@ export type ActionId =
   | 'ride'
   | 'board'
   | 'unhitch'
+  | 'hitch'
   | 'drive'
   | 'driveOff'
   | 'hitchOff'
@@ -162,6 +167,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   ride: 'M',
   board: 'K',
   unhitch: 'U',
+  hitch: 'J',
   drive: 'D',
   driveOff: 'D',
   hitchOff: 'D',
@@ -277,6 +283,8 @@ export interface ResidentHere {
   carriageToBoard?: boolean
   /** A carriage of their realm on their tile with a horse hitched, to unhitch (`CONTEXT.md`: Hitched horse). */
   carriageToUnhitch?: boolean
+  /** A carriage of their realm on their tile and a horse to hitch to it (`hitchChoice`). */
+  horseToHitch?: boolean
   /** A horse of their realm on their tile that pulls no carriage and nobody rides, to mount. */
   horseToRide?: boolean
   /** They carry a child (`CONTEXT.md`: Carrying), so they can't work, build, tear down, haul or pair. */
@@ -418,6 +426,8 @@ function ordersOffered(h: ResidentHere): {
   } else miss('board', 'no carriage of yours here')
   if (h.adult && h.carriageToUnhitch) add(row('unhitch', 'Unhitch horse'))
   else miss('unhitch', h.adult ? 'no hitched horse here' : 'children can’t unhitch')
+  if (h.adult && h.horseToHitch) add(row('hitch', 'Hitch horse…', { opens: true }))
+  else miss('hitch', h.adult ? 'no carriage and free horse here' : 'children can’t hitch')
   const drivable = h.carriage && !h.carriageTheirs
   if (drivable && h.adult) {
     // A rider doesn't drive (`CONTEXT.md`: Riding), and a Down horse pulls nothing (Down).
@@ -578,6 +588,7 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   ride: 'move',
   board: 'move',
   unhitch: 'move',
+  hitch: 'move',
   drive: 'move',
   driveOff: 'move',
   hitchOff: 'move',
@@ -993,7 +1004,10 @@ export interface TileThings {
   strangers: SeenResident[]
   /** Everyone in sight, for who works where and who lives in a city. */
   residents?: SeenResident[]
-  cities: (Pick<SeenCity, 'id' | 'name' | 'realmId' | 'tradeOrg' | 'trade' | 'refuses'> &
+  cities: (Pick<
+    SeenCity,
+    'id' | 'name' | 'realmId' | 'tradeOrg' | 'trade' | 'refuses' | 'horses' | 'horsesToSell'
+  > &
     Partial<Pick<SeenCity, 'occupation'>>)[]
   /** The realms the Player knows by name, for who occupies a town hall. */
   realms?: RealmLabel[]
@@ -1150,11 +1164,32 @@ function horseFares(h: Horse): { hunger: 'fed' | 'hungry' | 'starving'; health: 
 }
 
 /** A horse's age in words: game days for a foal under a game year, whole game years after. */
-export function horseAgeText(h: SeenHorse, tick: number): string {
+export function horseAgeText(h: Pick<SeenHorse, 'bornAt'>, tick: number): string {
   const years = Math.floor(horseAgeInYears(h, tick))
   if (years >= 1) return `${years} ${years === 1 ? 'year' : 'years'} old`
   const days = Math.max(0, Math.floor((tick - h.bornAt) / TICKS_PER_GAME_DAY))
   return `${days} game ${days === 1 ? 'day' : 'days'} old`
+}
+
+/**
+ * What a resident's card offers to hitch (`CONTEXT.md`: Hitched horse): the carriage of their realm
+ * on their tile, the one Drive drives, and the horses that can pull it. Undefined with no such
+ * carriage or horse.
+ */
+export function hitchChoice<H extends CarriageHorse>(
+  world: {
+    horses: readonly H[]
+    carriages: readonly (CarriagePlace & { id: string })[]
+    residents: readonly Pick<Resident, 'riding'>[]
+  },
+  resident: Pick<Resident, 'x' | 'y' | 'owner' | 'cityId'>,
+): { carriageId: string; horses: H[] } | undefined {
+  const carriage = world.carriages.find(
+    (k) => k.x === resident.x && k.y === resident.y && carriageOfResident(k, resident),
+  )
+  if (!carriage) return undefined
+  const horses = horsesToHitch(world, carriage)
+  return horses.length > 0 ? { carriageId: carriage.id, horses } : undefined
 }
 
 /**
@@ -1174,7 +1209,10 @@ export function horseDetail(h: SeenHorse, tick: number | undefined): string {
 }
 
 /** A horse's stats and age: "Speed 12, Strength 8, Endurance 10 · 5 years old". */
-function horseStatsText(h: SeenHorse, tick: number | undefined): string {
+export function horseStatsText(
+  h: Pick<SeenHorse, 'stats' | 'bornAt'>,
+  tick: number | undefined,
+): string {
   const { speed, strength, endurance } = h.stats
   const stats = `Speed ${speed}, Strength ${strength}, Endurance ${endurance}`
   return tick === undefined ? stats : `${stats} · ${horseAgeText(h, tick)}`
@@ -1545,7 +1583,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
         if (rel === 'own' && live) card.renameCity = { id: city.id, name: city.name }
       }
       if (live && city && tradesHere(live, city)) {
-        lines.push('Buys and sells here')
+        lines.push(live.kind === 'stable' ? horseTradeLine(live, city) : 'Buys and sells here')
         card.tradeHere = { cityId: city.id, buildingId: live.id }
       }
       // Offers (`CONTEXT.md`: Offer) stand at a Player's storage: anyone in sight sees them, and its
@@ -2092,13 +2130,18 @@ function townHallLines(cityId: string, t: TileThings): string[] {
 /**
  * Whether the building is where the Player trades with a Trade Org warehouse or an NPC city
  * (`CONTEXT.md`: Warehouse prices, Trading with an NPC city, Trade section), with prices they are
- * shown: a warehouse, or a storage of an NPC city that doesn't refuse them (`npcCityRefuses`).
+ * shown: a warehouse, or a storage of an NPC city that doesn't refuse them (`npcCityRefuses`). Or
+ * its stable with horses it lists, or of the Player's standing in it (`CONTEXT.md`: Horse market).
  */
 export function tradesHere(
-  b: Pick<SeenBuilding, 'kind' | 'prices'>,
+  b: Pick<SeenBuilding, 'kind' | 'prices'> & { id?: string },
   city: TileThings['cities'][number],
 ): boolean {
   if (b.kind === 'warehouse') return (b.prices?.length ?? 0) > 0
+  if (b.kind === 'stable') {
+    const here = (h: { stableId: string }) => h.stableId === b.id
+    return !city.refuses && ((city.horses ?? []).some(here) || (city.horsesToSell ?? []).some(here))
+  }
   return (
     b.kind === 'storage' &&
     city.realmId === null &&
@@ -2106,6 +2149,18 @@ export function tradesHere(
     !city.refuses &&
     (city.trade?.length ?? 0) > 0
   )
+}
+
+/** What an NPC city's stable that trades (`tradesHere`) does for the Player, for its tile's card. */
+function horseTradeLine(b: { id: string }, city: TileThings['cities'][number]): string {
+  const here = (h: { stableId: string }) => h.stableId === b.id
+  const sells = (city.horses ?? []).some(here)
+  const buys = (city.horsesToSell ?? []).some(here)
+  return sells && buys
+    ? 'Buys and sells horses here'
+    : buys
+      ? 'Buys horses here'
+      : 'Sells horses here'
 }
 
 /** How far tearing a building or site down has come (`CONTEXT.md`: Tearing down). */

@@ -10,6 +10,9 @@ import {
   AVERAGE_HORSE_STATS,
   HORSE_START_AGE_MAX,
   HORSE_START_AGE_MIN,
+  MAX_HUNGER,
+  NPC_START_HORSES,
+  NPC_VILLAGE,
   horseAgeInYears,
   horsesIn,
   tradeOrgHq,
@@ -17,16 +20,20 @@ import {
   TRADERS,
   TRADER_ESCORTS,
 } from '@csp/shared'
+import { TRADE_ORG } from '@csp/shared'
 import { createAdmin } from './auth.js'
 
 import { KEEP_LATEST, WorldSaver, loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
 import { loadTerrain } from './terrain.js'
 import { generateTerrain } from './terrain-gen.js'
 import { HORSE_NAMES } from './horses.js'
+import { foundNpcCity } from './npc-cities.js'
+import { mulberry32 } from './residents.js'
 import { checkInvariants } from './invariants.js'
 import { Walking } from './walking.js'
 import { refreshLastSeen } from './last-seen.js'
 import { smallTerrain, worldWithCity, worldWithPost } from './test-terrain.js'
+import { stepDebts } from './trade-org-debt.js'
 import {
   RESET_BEFORE,
   WORLD_FORMAT_VERSION,
@@ -218,6 +225,45 @@ describe('world saves', () => {
     expect(migrateWorld(fallen, 88, { terrain: land }).traders).toEqual([])
   })
 
+  it('leaves every world as it is for the revive job (migration 99 → 100)', () => {
+    const { world: now, terrain: land } = worldWithPost()
+    expect(migrateWorld(structuredClone(now), 99, { terrain: land })).toEqual(now)
+  })
+
+  it('gives NPC cities from before two horses, with Food by them (migration 98 → 99)', () => {
+    const { world: now, terrain: land } = worldWithPost()
+    const hall = now.buildings.find((b) => b.kind === 'townHall')!
+    const city = foundNpcCity(now, land, NPC_VILLAGE, hall.x + 200, hall.y, mulberry32(3))
+    const npc = now.cities.filter((c) => c.realmId === null && !c.tradeOrg)
+    expect(npc).toContain(city)
+    // Before this step no NPC city had a horse, nor the Food by it.
+    const v98 = structuredClone(now)
+    const ofNpc = (h: { cityId: string | null }) => npc.some((c) => c.id === h.cityId)
+    v98.piles = v98.piles.filter(
+      (p) => !v98.horses.some((h) => ofNpc(h) && h.x === p.x && h.y === p.y),
+    )
+    v98.horses = v98.horses.filter((h) => !ofNpc(h))
+    const others = v98.horses.map((h) => h.id)
+
+    const v99 = migrateWorld(structuredClone(v98), 98, { terrain: land })
+    for (const c of npc) {
+      const own = v99.horses.filter((h) => h.realmId === null && h.cityId === c.id)
+      expect(own).toHaveLength(NPC_START_HORSES)
+      for (const h of own) {
+        expect(h.hunger).toBe(MAX_HUNGER)
+        expect(v99.piles.some((p) => p.x === h.x && p.y === h.y && (p.goods.food ?? 0) > 0)).toBe(
+          true,
+        )
+      }
+    }
+    // Nobody else's horses change, and trading posts and the HQ get none.
+    expect(v99.horses.filter((h) => !ofNpc(h)).map((h) => h.id)).toEqual(others)
+    expect(checkInvariants(v99, land)).toEqual([])
+    const walking = new Walking(land)
+    for (let i = 0; i < 5; i++) stepWorld(v99, land, walking)
+    expect(checkInvariants(v99, land)).toEqual([])
+  })
+
   it('puts the HQ on its traders’ loops (migration 90 → 91)', () => {
     const { world: now, terrain: land } = worldWithPost()
     const hqId = now.cities.find((c) => c.tradeOrg === 'hq')!.id
@@ -279,6 +325,33 @@ describe('world saves', () => {
     expect(v80).toEqual(v79)
     expect(v80.residents.every((r) => r.givenUnderAttack === undefined)).toBe(true)
     expect(checkInvariants(v80, land)).toEqual([])
+  })
+
+  it('changes nothing for an army under way, which set out with no purse (migration 94 → 95)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v95 = migrateWorld(structuredClone(world), 94, { terrain: land }, migrations, 95)
+    expect(v95).toEqual(world)
+    expect(checkInvariants(v95, land)).toEqual([])
+  })
+
+  it('starts with no supply wagons, and an army under way goes on without (migration 93 → 94)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v93 = structuredClone(world) as unknown as Record<string, unknown>
+    delete v93.supplyWagons
+    const v94 = migrateWorld(v93, 93, { terrain: land }, migrations, 94)
+    expect(v94.supplyWagons).toEqual([])
+    expect(v94).toEqual(world)
+    expect(checkInvariants(v94, land)).toEqual([])
+  })
+
+  it('starts with nobody owing the Trade Organization (migration 92 → 93)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v92 = structuredClone(world) as unknown as Record<string, unknown>
+    delete v92.debts
+    const v93 = migrateWorld(v92, 92, { terrain: land }, migrations, 93)
+    expect(v93.debts).toEqual([])
+    expect(v93).toEqual(world)
+    expect(checkInvariants(v93, land)).toEqual([])
   })
 
   it('says which punishments under way have reached their city (migration 80 → 81)', () => {
@@ -376,15 +449,65 @@ describe('world saves', () => {
     expect(checkInvariants(v88, land)).toEqual([])
   })
 
+  it('leaves a format 101 world as it is: no plan has a road crew or a way yet (migration 101 → 102)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v102 = migrateWorld(structuredClone(world), 101, { terrain: land }, migrations, 102)
+    expect(v102).toEqual(world)
+    expect(Object.values(v102.cityPlans).every((p) => p.roads === undefined)).toBe(true)
+    expect(checkInvariants(v102, land)).toEqual([])
+  })
+
+  it('leaves a format 95 world’s debts to get their demand on the next tick (migration 95 → 96)', () => {
+    const { world, terrain: land } = worldWithPost()
+    world.realms.push({ id: 'r9', userId: 90, leaderId: 'nobody' })
+    world.debts = [{ org: 'r9', coins: 12 }]
+    const v96 = migrateWorld(structuredClone(world), 95, { terrain: land }, migrations, 96)
+    expect(v96).toEqual(world)
+    expect(v96.debts[0]!.step).toBeUndefined()
+    stepDebts(v96)
+    expect(v96.demands).toMatchObject([
+      { fromId: TRADE_ORG, toId: 'r9', terms: { kind: 'goods', goods: { coins: 12 } } },
+    ])
+    expect(v96.debts[0]!.step).toBe('demanded')
+  })
+
+  it('leaves a format 96 world’s debts with no city kept, for the HQ’s nearest (migration 96 → 97)', () => {
+    const { world, terrain: land } = worldWithPost()
+    world.realms.push({ id: 'r9', userId: 90, leaderId: 'nobody' })
+    world.debts = [{ org: 'r9', coins: 12, step: 'wrecks' }]
+    const v97 = migrateWorld(structuredClone(world), 96, { terrain: land }, migrations, 97)
+    expect(v97).toEqual(world)
+    expect(v97.debts[0]!.cityId).toBeUndefined()
+    expect(v97.punishments.every((p) => p.wrecks === undefined)).toBe(true)
+  })
+
+  it('leaves a format 97 world’s debts with no trip counted (migration 97 → 98)', () => {
+    const { world, terrain: land } = worldWithPost()
+    world.realms.push({ id: 'r9', userId: 90, leaderId: 'nobody' })
+    world.debts = [{ org: 'r9', coins: 12, step: 'wrecks', cityId: 'c9' }]
+    const v98 = migrateWorld(structuredClone(world), 97, { terrain: land }, migrations, 98)
+    expect(v98).toEqual(world)
+    expect(v98.debts[0]!.trips).toBeUndefined()
+    expect(v98.punishments.every((p) => p.takes === undefined)).toBe(true)
+  })
+
   it('leaves realms from before realm names unnamed (migration 38 → 39)', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(93)
+    expect(WORLD_FORMAT_VERSION).toBe(103)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
     expect(checkInvariants(v39, land)).toEqual([])
+  })
+
+  it('migrates a format 100 world: a city knows nothing from scouts yet (migration 100 → 101)', () => {
+    const { world, terrain } = worldWithPost()
+    const migrated = migrateWorld(structuredClone(world), 100, { terrain }, migrations, 101)
+    expect(migrated).toEqual(world)
+    expect(migrated.cities.every((c) => c.scouted === undefined)).toBe(true)
+    expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 
   it('migrates a format 39 world: every Player starts with an empty Last seen (migration 39 → 40)', () => {

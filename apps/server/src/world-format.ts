@@ -12,6 +12,7 @@ import { pickLayout } from './city-layout.js'
 import { hqFalls } from './hq-fall.js'
 import { grantHorses } from './horse-grant.js'
 import { horseName } from './horses.js'
+import { giveHorsesToNpcCities } from './npc-horses.js'
 import { hash, mulberry32 } from './residents.js'
 import { paramTarget } from './script-params.js'
 import { placeTraders, putHqOnLoops } from './traders.js'
@@ -21,7 +22,7 @@ import { placeTraders, putHqOnLoops } from './traders.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 93
+export const WORLD_FORMAT_VERSION = 103
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -397,9 +398,55 @@ export const migrations: Record<number, MigrationStep> = {
   // lost before have already dropped from the loops and no crime is known of them: the Trade
   // Organization never heard. So the step leaves every world as it is.
   91: (state) => state,
+  // What the Trade Organization can't take back stays owed (`CONTEXT.md`: Trade Org debt;
+  // `WorldState.debts`). Nobody owes anything yet: what earlier armies couldn't take was let go.
+  92: (state) => {
+    const world = structuredClone(state) as WorldState
+    world.debts = []
+    return world
+  },
+  // Its army travels with a supply wagon (`CONTEXT.md`: Trade Org debt; `WorldState.supplyWagons`).
+  // One under way goes on with what it carries, as it set out with none.
+  93: (state) => {
+    const world = structuredClone(state) as WorldState
+    world.supplyWagons = []
+    return world
+  },
+  // Its army buys Food on the way (`CONTEXT.md`: Trade Org debt; a punishment member's `seller` and
+  // `noWay`), both optional. Those under way set out with no purse, so they don't buy.
+  94: (state) => state as WorldState,
+  // Its debt demands go up steps (`CONTEXT.md`: Trade Org debt; a debt's `step` and `deadline`, a
+  // transfer's `debt`), all optional. A debt that stands has had no demand yet, so it gets one now.
+  95: (state) => state as WorldState,
+  // Its army tears down workplaces for a debt (`CONTEXT.md`: Trade Org debt; a debt's `cityId`, a
+  // punishment's `wrecks`), both optional. A debt that stands has no city kept, so its army goes to the
+  // Organization's city nearest the HQ.
+  96: (state) => state as WorldState,
+  // Its army takes a city for a debt (`CONTEXT.md`: Trade Org debt; a debt's `trips`, a punishment's
+  // `takes`), both optional, as are the new values in the log. A debt that stands has had no trip
+  // counted, so its next two armies come for workplaces first.
+  97: (state) => state as WorldState,
+  // NPC horses (`CONTEXT.md`: NPC horses): an NPC city from before with no horse gets its two, with
+  // Food by them, as a new village or town starts.
+  98: (state, { terrain }) => {
+    const world = structuredClone(state) as WorldState
+    giveHorsesToNpcCities(world, terrain)
+    return world
+  },
+  // A city's plan can give a resident a `revive` job, with `targetId` (`CONTEXT.md`: Reviving). No
+  // plan has one yet, and the next pass hands them out: every world stays as it is.
+  99: (state) => state,
+  // An NPC city's scouts (`CONTEXT.md`: Scout), with `City.scouted`, `CityPlan.scouts` and the
+  // `scout` job: until its first scout comes home a city knows only its set reach, as it did, and
+  // nobody is out yet. So the step leaves every world as it is.
+  100: (state) => state,
+  // An NPC city's plan may keep the ways of its roads and put residents on its road crew
+  // (`CONTEXT.md`: NPC road). No plan has either yet, and the next pass works them out. So the step
+  // leaves every world as it is.
+  101: (state) => state,
   // City layouts (`CONTEXT.md`: City layout; `City.layout`): every NPC city from before gets one now.
   // Nothing is torn down; its new buildings follow the layout around what stands.
-  92: (state) => {
+  102: (state) => {
     const world = structuredClone(state) as WorldState
     for (const c of world.cities) {
       if (c.realmId === null && !c.tradeOrg) c.layout = pickLayout(world.seed, c.id)

@@ -82,6 +82,8 @@ import {
   isAt,
   isArmed,
   allied,
+  TRADE_ORG,
+  cityTakers,
   TRAINING_GROUND_MAX_TRAINEES,
   keptBreeding,
   besideStep,
@@ -94,7 +96,7 @@ import { awaitsTrader, carriageOrganization, organizationOf } from './crimes.js'
 import { tallyGoods } from './goods-made.js'
 import { awakeAlive, downDoNothing, refillSource, refillTarget } from './survival.js'
 import { horsesDownLieStill } from './horses.js'
-import { NPC_ORDER_KINDS, runByNpcCity } from './npc-behaviour.js'
+import { NPC_ORDER_KINDS, npcResidentsKeptGoing, runByNpcCity } from './npc-behaviour.js'
 import { CARRYING_BLOCKS } from './pairing.js'
 import { isWalkable } from './world.js'
 import { contractsSound } from './contracts.js'
@@ -103,13 +105,15 @@ import { joinRequestsSound } from './persuasion.js'
 import { formerPlayersSound, standingsSound } from './standing.js'
 import { buyOrdersDone, cityPricesSound } from './buying.js'
 import {
+  npcHorsePurchasesWanted,
+  npcHorseSalesKeepPair,
   npcTradesKeepReserve,
   refusedTradeNothing,
   tradeOrdersDone,
   traderTradesKeepFood,
   tradesKeepGoods,
 } from './trading.js'
-import { acceptOrdersDone, offersKeepGoods, offersSound, tradeOrgTakesNoOffer } from './offers.js'
+import { acceptOrdersDone, offersKeepGoods, offersSound, tradeOrgOnlyBuysFood } from './offers.js'
 import { armiesSound, supplyLinesSound } from './armies.js'
 import { caravansSound, routeRobberiesSound } from './caravans.js'
 import { tradersSound } from './traders.js'
@@ -117,12 +121,26 @@ import { traderStopsSound } from './trader-stops.js'
 import { deliveriesSound } from './deliveries.js'
 import { transfersSound } from './transfers.js'
 import { tradeOrgArmySound } from './trade-org-army.js'
+import { npcGateShutToItsPunishers } from './npc-defence.js'
 import { npcHireSound } from './npc-hire.js'
 import { buyOffOrdersDone, buyOffsSound, directivesSound } from './directives.js'
 import { punishmentsSound } from './trade-org-punishment.js'
+import { citiesTakenSound } from './trade-org-takes.js'
+import { wrecksSound } from './trade-org-wrecks.js'
+import { supplyWagonsSound } from './supply-wagons.js'
+import {
+  debtDemandsSound,
+  debtOrdersDone,
+  debtPaymentsSound,
+  debtsSound,
+} from './trade-org-debt.js'
 import { nothingLeftOfTheHq } from './hq-fall.js'
 import { hqRingsSound } from './hq-growth.js'
-import { cityPlansSound, npcFarmersKept, tradeOrgSendsNoOne } from './npc-plan.js'
+import { cityPlansSound, npcFarmersKept, npcSurplusCapped, tradeOrgSendsNoOne } from './npc-plan.js'
+import { npcRoadCrewSized, npcRoadsOnce } from './npc-roads.js'
+import { npcRevivers } from './npc-revive.js'
+import { npcScoutsSound } from './npc-scouts.js'
+import { npcOneFeeder, tradeOrgBreedsNoHorses } from './npc-stable.js'
 import { foundingPartiesSound, npcCitiesHaveHalls } from './npc-founding.js'
 import { cityLayoutsSound } from './city-layout.js'
 import { npcTradersSound } from './npc-trader.js'
@@ -1312,8 +1330,8 @@ export const relocateOrdersSound: Invariant = {
 /**
  * Occupations of town halls hold (`CONTEXT.md`: Occupying a town hall, Capturing a city): none
  * has run the full `OCCUPATION_TICKS` without capturing its city, or started in the future; the
- * occupier still has armed residents on the hall; and it is never the city's own realm or an
- * ally of it.
+ * occupier still has armed residents on the hall, the Trade Organization soldiers of an army come
+ * to take the city (`cityTakers`); and it is never the city's own realm or an ally of it.
  */
 export const occupationsSound: Invariant = {
   name: 'occupations-sound',
@@ -1328,8 +1346,13 @@ export const occupationsSound: Invariant = {
       if (ran < 0 || ran >= OCCUPATION_TICKS)
         fail(`occupied by ${o.realmId} for ${ran} ticks without being captured`)
       const hall = world.buildings.find((b) => b.id === c.townHallId)
+      const takers = cityTakers(world, c)
       const holds = world.residents.some(
-        (r) => r.owner === o.realmId && isArmed(r) && !!hall && isAt(r, hall, terrain.size),
+        (r) =>
+          (o.realmId === TRADE_ORG ? takers.has(r.id) : r.owner === o.realmId) &&
+          isArmed(r) &&
+          !!hall &&
+          isAt(r, hall, terrain.size),
       )
       if (!holds) fail(`occupied by ${o.realmId} with none of its armed residents on the hall`)
       if (c.realmId !== null && allied(world, c.realmId, o.realmId))
@@ -1370,13 +1393,16 @@ export const cityWorkplacesSound: Invariant = {
 /**
  * An NPC city does nothing a Player's residents couldn't (`CONTEXT.md`: NPC city; ADR 0002): its
  * residents hold only the kinds of order a Player can give (`NPC_ORDER_KINDS`), which the world
- * checks and resolves like anyone's. A caravan's or wandering trader's driver also drives
- * (`CONTEXT.md`: Caravan, Wandering trader).
+ * checks and resolves like anyone's. A caravan's, wandering trader's or supply wagon's driver also
+ * drives (`CONTEXT.md`: Caravan, Wandering trader, Trade Org debt).
  */
 export const npcOrdersAllowed: Invariant = {
   name: 'npc-orders-allowed',
   check(world) {
-    const drivers = new Set(convoysOf(world).map((c) => c.driverId))
+    const drivers = new Set([
+      ...convoysOf(world).map((c) => c.driverId),
+      ...world.supplyWagons.map((w) => w.driverId),
+    ])
     const allowed = (r: Resident) =>
       NPC_ORDER_KINDS.includes(r.order!.kind) || (r.order!.kind === 'drive' && drivers.has(r.id))
     return world.residents
@@ -2064,10 +2090,12 @@ export const worldInvariants: Invariant[] = [
   tradeOrdersDone,
   tradesKeepGoods,
   refusedTradeNothing,
+  npcHorseSalesKeepPair,
+  npcHorsePurchasesWanted,
   npcTradesKeepReserve,
   offersSound,
   offersKeepGoods,
-  tradeOrgTakesNoOffer,
+  tradeOrgOnlyBuysFood,
   acceptOrdersDone,
   deliveriesSound,
   transfersSound,
@@ -2091,15 +2119,31 @@ export const worldInvariants: Invariant[] = [
   tradeOrgArmySound,
   npcHireSound,
   punishmentsSound,
+  npcGateShutToItsPunishers,
+  supplyWagonsSound,
   directivesSound,
   buyOffsSound,
   buyOffOrdersDone,
+  debtsSound,
+  wrecksSound,
+  citiesTakenSound,
+  debtDemandsSound,
+  debtPaymentsSound,
+  debtOrdersDone,
   hqRingsSound,
   cityPlansSound,
   foundingPartiesSound,
   npcCitiesHaveHalls,
   cityLayoutsSound,
   npcFarmersKept,
+  npcSurplusCapped,
+  npcRoadCrewSized,
+  npcRoadsOnce,
+  npcRevivers,
+  npcScoutsSound,
+  npcOneFeeder,
+  tradeOrgBreedsNoHorses,
+  npcResidentsKeptGoing,
   tradeOrgSendsNoOne,
   npcTradersSound,
   lineOrdersSound,

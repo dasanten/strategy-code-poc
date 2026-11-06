@@ -35,6 +35,7 @@ import {
   type ContractView,
   type Diplomacy,
   type Horse,
+  type CarriageHorse,
   type HaulOrder,
   type Pile,
   type Resident,
@@ -67,6 +68,7 @@ import {
   strangersCarriage,
   thiefAmong,
   thiefOf,
+  hitchChoice,
   unhitcherOf,
   type ActionId,
   type CardAction,
@@ -325,6 +327,45 @@ describe('the actions on a resident’s card', () => {
       disabled: true,
       reason: 'guarded',
     })
+  })
+
+  it('offers hitching with a carriage and a free horse on their tile to grown-ups', () => {
+    expect(ids(here({ carriage }))).not.toContain('hitch')
+    const hitch = residentActions(here({ horseToHitch: true })).find((a) => a.id === 'hitch')
+    expect(hitch).toMatchObject({ label: 'Hitch horse…', key: 'J', opens: true })
+    expect(ids(here({ horseToHitch: true, adult: false }))).not.toContain('hitch')
+    expect(residentOrders(here({ adult: false })).missing.hitch).toBe('children can’t hitch')
+  })
+
+  it('lists the horses to hitch to the carriage on their tile, also when only one stands there', () => {
+    const horse = (id: string, more: object = {}) =>
+      ({
+        id,
+        realmId: 'r1',
+        cityId: null,
+        x: 2,
+        y: 2,
+        ...more,
+      }) as unknown as CarriageHorse
+    const k = { id: 'k1', realmId: 'r1', cityId: null, x: 2, y: 2, horseId: 'h1' }
+    const r = { x: 2, y: 2, owner: 'r1', cityId: 'c1' }
+    const free = horse('h2')
+    const world = {
+      carriages: [{ ...k, id: 'k0', realmId: 'r2' }, k, { ...k, id: 'k2', horseId: 'h3', x: 5 }],
+      residents: [{ riding: 'h4' }, {}],
+      horses: [
+        horse('h1'),
+        free,
+        horse('h3', { x: 5 }),
+        horse('h4'),
+        horse('h5', { down: true }),
+        horse('h6', { realmId: 'r2' }),
+        horse('h7', { x: 3 }),
+      ],
+    } as unknown as Parameters<typeof hitchChoice>[0]
+    expect(hitchChoice(world, r)).toEqual({ carriageId: 'k1', horses: [free] })
+    expect(hitchChoice(world, { ...r, x: 3 })).toBeUndefined()
+    expect(hitchChoice({ ...world, horses: [horse('h1')] }, r)).toBeUndefined()
   })
 
   it('offers unhitching a hitched carriage of the realm on their tile to grown-ups', () => {
