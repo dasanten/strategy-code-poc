@@ -74,6 +74,7 @@ import { paramTarget, paramWaypoint } from './script-params.js'
 import { realmOf } from './starting-city.js'
 import { walkTime, wayFood } from './walk-time.js'
 import { COMPASS, exploredEdge } from './explored-edge.js'
+import type { ScoutEdgeSearch } from './npc-scouts.js'
 import { waypointsOf } from './waypoints.js'
 
 /** Re-exported for the callers that reckon walks like scripts do. */
@@ -109,6 +110,11 @@ export interface ScriptContext {
   explored: (x: number, y: number) => boolean
   /** The order kinds actions go through; the game's own by default. */
   kinds?: Record<string, OrderKind>
+  /**
+   * For an NPC city, which has no explored terrain, where `exploredEdge` leads instead: the next
+   * place its scout goes (`scoutEdge`). `toward` plays no part: nobody picks an NPC city's params.
+   */
+  edge?: (search: ScoutEdgeSearch) => { x: number; y: number } | undefined
   /**
    * The script's `param` lines with the id, number or word picked for each (`paramValues`);
    * `params` holds nothing without it.
@@ -501,14 +507,17 @@ export function bindScript(context: ScriptContext): ScriptBindings {
         resident.riding !== undefined
           ? (x: number, y: number) => carriageCanGoTo(world, terrain, x, y)
           : (x: number, y: number) => isPassableTerrain(terrainAt(terrain, x, y))
-      const edge = exploredEdge({
-        size: terrain.size,
-        explored: context.explored,
-        canEnter,
-        from: spot(from, 'exploredEdge'),
-        toward: toward ?? undefined,
-        skip: skipped.map((s) => spot(s, 'exploredEdge')),
-      })
+      const skips = skipped.map((s) => spot(s, 'exploredEdge'))
+      const edge = context.edge
+        ? context.edge({ canEnter, skip: skips })
+        : exploredEdge({
+            size: terrain.size,
+            explored: context.explored,
+            canEnter,
+            from: spot(from, 'exploredEdge'),
+            toward: toward ?? undefined,
+            skip: skips,
+          })
       return edge ?? null
     }
     queries.crewTile = ([building]) => {

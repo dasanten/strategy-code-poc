@@ -2,9 +2,11 @@ import {
   MAX_WORKERS,
   NPC_BUILDERS,
   NPC_PLAN_TICKS,
+  NPC_SURPLUS_CAP,
   NPC_VILLAGE,
   OWN_FOOD,
   Terrain,
+  npcReserve,
   type City,
   type TerrainMap,
   type WorldState,
@@ -50,7 +52,7 @@ function villages(n: number): { world: WorldState; terrain: TerrainMap; cities: 
 }
 
 describe('planCity', () => {
-  it('gives every adult a job: soldiers stand, farmers feed the city, two build, the rest wait', () => {
+  it('gives every adult a job: soldiers stand, farmers feed the city, two build, one scouts, the rest wait', () => {
     const { world, terrain, city, home } = village()
     for (const r of world.residents) {
       Object.assign(r, { x: home.x, y: home.y, order: null })
@@ -58,6 +60,9 @@ describe('planCity', () => {
     }
     const soldier = world.residents[0]!
     soldier.carried.spear = 1
+    // Food at its cap past the reserve, so nobody farms for surplus (`CONTEXT.md`: Spare hands' work).
+    const food = (npcReserve(world, city).food ?? 0) + (NPC_SURPLUS_CAP.food ?? 0)
+    storageOf(world, city).stock = { ...storageOf(world, city).stock, food }
     const plan = planCity(world, city, terrain)
     expect(plan.plannedAt).toBe(world.tick)
     expect(world.cityPlans[city.id]).toBe(plan)
@@ -69,11 +74,13 @@ describe('planCity', () => {
     expect(farmers).toHaveLength(farmersWanted(world, city))
     expect(farmers.length).toBeLessThan(NPC_VILLAGE.residents - 1)
     for (const job of farmers) expect(job).toEqual({ kind: 'farm', buildingId: farm.id })
-    // Its reserve lacks Wood: two build the lumber camp; the last waits for it.
+    // Its reserve lacks Wood: two build the lumber camp; the last scouts, and any more wait.
     expect(plan.project).toEqual({ kind: 'build', building: 'lumberCamp', ...FOREST })
     expect(jobs.filter((j) => j?.kind === 'build')).toHaveLength(NPC_BUILDERS)
+    const scouts = jobs.filter((j) => j?.kind === 'scout').length
+    expect(scouts).toBeLessThanOrEqual(1)
     expect(jobs.filter((j) => j?.kind === 'idle')).toHaveLength(
-      NPC_VILLAGE.residents - 1 - farmers.length - NPC_BUILDERS,
+      NPC_VILLAGE.residents - 1 - farmers.length - NPC_BUILDERS - scouts,
     )
     expect(checkInvariants(world, terrain)).toEqual([])
   })
@@ -81,7 +88,10 @@ describe('planCity', () => {
   it('keeps a worker where they are, and sends at most two spare hands to build', () => {
     const { world, terrain, city, home } = village()
     fillHouses(world, city, home)
-    storageOf(world, city).stock = { food: 400 }
+    // Food plenty, and below its cap (`CONTEXT.md`: Spare hands' work).
+    storageOf(world, city).stock = { food: npcReserve(world, city).food! + 1 }
+    // It knows its limit, so nobody leaves the farm to scout (`CONTEXT.md`: Scout).
+    city.scouted = { sectors: [], done: true }
     const plan = planCity(world, city, terrain)
     // Everyone from the founding still works the farm; two newcomers build the lumber camp the
     // house wants Wood from, and the rest take the farm's places left, or wait for the next pass.

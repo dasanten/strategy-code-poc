@@ -1,7 +1,6 @@
 import {
   GOOD_WEIGHT,
   NODE_GOOD,
-  NPC_NODE_REACH,
   NPC_OFFER_REACH,
   NPC_TRADER_GIVE_UP_DAYS,
   NPC_TRADER_REACH,
@@ -50,6 +49,7 @@ import { caravanCrew } from './caravans.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { npcHome, walkTo } from './npc-behaviour.js'
 import { chainInput, makes, projectNeeds, shortGoods } from './npc-chain.js'
+import { knowsNode } from './npc-scouts.js'
 import { farmersWanted } from './npc-plan.js'
 
 /*
@@ -133,7 +133,8 @@ export function planTrader(
 
 /**
  * The spare hand a city sends to trade (`CONTEXT.md`: NPC trader), idle ones first, never a soldier:
- * idle, at the chain's workplaces, or farming beyond the farmers it keeps.
+ * idle, at the chain's workplaces, on its road crew, farming beyond the farmers it keeps, or else a
+ * scout, who comes home first.
  */
 function spareHand(
   world: WorldState,
@@ -146,7 +147,11 @@ function spareHand(
   const rank = (r: Resident) => {
     const kind = jobs[r.id]?.kind
     if (isArmed(r) || r.carrying) return undefined
-    return kind === 'idle' ? 0 : kind === 'work' ? 1 : extra.has(r.id) ? 2 : undefined
+    if (kind === 'idle') return 0
+    if (kind === 'work') return 1
+    if (kind === 'road') return 2
+    if (kind === 'scout') return 4
+    return extra.has(r.id) ? 3 : undefined
   }
   const spare = adults.filter((r) => rank(r) !== undefined)
   spare.sort((a, b) => rank(a)! - rank(b)!)
@@ -384,8 +389,8 @@ function buyGood(
 
 /**
  * Whether an NPC city can make a good from its own land (`CONTEXT.md`: NPC city): one of its
- * workplaces makes it, a resource node yielding it lies within `NPC_NODE_REACH` of home, or for a
- * good a workplace processes, it can make every input. `seen` keeps it from going round.
+ * workplaces makes it, it knows of a resource node yielding it (`knowsNode`), or for a good a
+ * workplace processes, it can make every input. `seen` keeps it from going round.
  */
 export function hasNodeFor(
   world: WorldState,
@@ -402,9 +407,7 @@ export function hasNodeFor(
   if (input) {
     return Object.keys(input).every((g) => hasNodeFor(world, city, home, g as Good, size, seen))
   }
-  return world.nodes.some(
-    (n) => NODE_GOOD[n.kind] === good && wrapDistance(size, home, n) <= NPC_NODE_REACH,
-  )
+  return world.nodes.some((n) => NODE_GOOD[n.kind] === good && knowsNode(city, home, n, size))
 }
 
 /**

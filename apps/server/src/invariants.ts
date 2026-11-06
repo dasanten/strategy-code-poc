@@ -136,7 +136,10 @@ import {
 } from './trade-org-debt.js'
 import { nothingLeftOfTheHq } from './hq-fall.js'
 import { hqRingsSound } from './hq-growth.js'
-import { cityPlansSound, npcFarmersKept, tradeOrgSendsNoOne } from './npc-plan.js'
+import { cityPlansSound, npcFarmersKept, npcSurplusCapped, tradeOrgSendsNoOne } from './npc-plan.js'
+import { npcRoadCrewSized, npcRoadsOnce } from './npc-roads.js'
+import { npcRevivers } from './npc-revive.js'
+import { npcScoutsSound } from './npc-scouts.js'
 import { npcOneFeeder, tradeOrgBreedsNoHorses } from './npc-stable.js'
 import { foundingPartiesSound, npcCitiesHaveHalls } from './npc-founding.js'
 import { npcTradersSound } from './npc-trader.js'
@@ -2131,6 +2134,11 @@ export const worldInvariants: Invariant[] = [
   foundingPartiesSound,
   npcCitiesHaveHalls,
   npcFarmersKept,
+  npcSurplusCapped,
+  npcRoadCrewSized,
+  npcRoadsOnce,
+  npcRevivers,
+  npcScoutsSound,
   npcOneFeeder,
   tradeOrgBreedsNoHorses,
   npcResidentsKeptGoing,

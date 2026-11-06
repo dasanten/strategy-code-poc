@@ -215,7 +215,7 @@ export function stepWorld(
     stepTradeOrgArmy(world, terrain.size)
     stepNpcHire(world, terrain.size)
     stepPunishments(world, terrain.size)
-    npcPlanMs = stepNpcCities(world, terrain.size, terrain)
+    npcPlanMs = stepNpcCities(world, terrain.size, terrain, walking)
     const runs = runNpcScripts(world, terrain)
     // Whatever the game's own cities gave someone Down ends before they act on it.
     keepDownStill(world)

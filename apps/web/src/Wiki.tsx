@@ -64,6 +64,7 @@ import {
   STARVE_DAYS,
   DOWN_DAYS,
   FEED_UNITS,
+  NPC_REVIVE_REACH,
   WAKE_HEALTH,
   FOOD_SPOIL_PER_DAY,
   FOOD_SURPLUS_DAYS,
@@ -122,6 +123,8 @@ import {
   NPC_CITY_WONT_SELL_STANDING,
   FOOD_PER_DAY,
   NPC_BUILDERS,
+  NPC_ROAD_CREW,
+  NPC_ROAD_LONGEST,
   NPC_CITY_MIN_DISTANCE,
   NPC_FOUND_FOOD_DAYS,
   NPC_FOUND_GIVE_UP_DAYS,
@@ -131,10 +134,13 @@ import {
   NPC_GATE_WATCH_RANGE,
   NPC_VILLAGE,
   NPC_NODE_REACH,
+  NPC_RESIDENTS_PER_SCOUT,
+  NPC_SCOUT_LIMIT,
   NPC_TRADER_GIVE_UP_DAYS,
   NPC_OFFER_REACH,
   NPC_TRADER_REACH,
   NPC_PLAN_TICKS,
+  NPC_SURPLUS_CAP,
   NPC_SMITHY_WEAPON,
   NPC_SOLDIER_SHARE,
   NPC_WAR_CHEST_PER_RESIDENT,
@@ -1141,6 +1147,13 @@ export function Wiki() {
           stays in their hands to eat later.
         </p>
         <p>
+          NPC cities and the Trade Organization's cities revive their own: while one of their
+          residents lies Down in their area or within {num(NPC_REVIVE_REACH)} tiles of it and their
+          storage holds Food, one grown resident, never a soldier and a spare hand first, takes Food
+          there and Feeds them, one for each resident Down. It comes ahead of building, road crews,
+          scouts, work for surplus and what is short, but their farmers stay while Food is short.
+        </p>
+        <p>
           Food spoils: {pct(FOOD_SPOIL_PER_DAY)} of every stock goes bad each game day, half of it
           in {days(foodHalfLifeDays)}. A city has a food surplus when its storages hold more Food
           than its residents eat in {days(FOOD_SURPLUS_DAYS)}.
@@ -2104,17 +2117,66 @@ export function Wiki() {
           {num(NPC_BUILDERS)} builders while it has a project; everyone else is a spare hand. Spare
           hands go to the good the reserve is shortest of, as a share of what it wants of it,
           filling one workplace's crew before the next. Without a workplace for that good, the city
-          builds one: on the nearest fitting resource node within {num(NPC_NODE_REACH)} tiles of
-          home, or a smelter, smithy or mint in its area like a house.
+          builds one: on the nearest fitting resource node it knows of, or a smelter, smithy or mint
+          in its area like a house.
         </p>
         <p>
           So it builds the whole chain its land allows, from the node up: weapons short wants a
           smithy, which wants Iron, so a smelter, which wants Iron ore, so a mine first, and the
           Wood and Stone the mine is built of before that. A smelter or smithy is worked only while
           the storage holds the input for a batch, which its workers take with them, and one of them
-          fetches more when it runs out, as yours do; once the city isn't short of what it makes,
-          they stop. A good with no node in reach stays short: a village with no ore in reach forges
-          no weapons, and a mint is built only with Gold ore in reach.
+          fetches more when it runs out, as yours do. A good it knows no node of stays short: a
+          village that knows no ore forges no weapons, and a mint is built only with Gold ore it
+          knows of. What it stays short of, its trader buys.
+        </p>
+        <p>
+          A spare hand with nothing short to work for doesn't stand idle. A few at a time, one for
+          every {num(NPC_RESIDENTS_PER_SCOUT)} residents, go scouting: they explore with as much
+          Food as they can carry, and turn back when it only just covers the way home. A city knows
+          every node within {num(NPC_NODE_REACH)} tiles; what a scout saw, out to{' '}
+          {num(NPC_SCOUT_LIMIT)} tiles, it knows only once they step back into its area alive. A
+          scout killed on the way brings nothing, and nothing protects them. What is short calls
+          them home, with what they saw. Once a city knows its limit it stops scouting.
+        </p>
+        <p>
+          What a scout brought home it can build on. Short of a good it knows no nearer node of, it
+          puts up the workplace on a far one, and the crew works it like any other, its carrier
+          bringing their Food on the way back from the storage. Knowing such a node, it no longer
+          buys that good from its trader or founds a daughter for it. A place a scout or a builder
+          finds no way to is given up, and it counts on no node there.
+        </p>
+        <p>
+          The others stay at or go to one
+          of the city's workplaces and work for surplus, past its reserve, the good furthest below
+          its cap first: {num(NPC_SURPLUS_CAP.food ?? 0)} Food, {num(NPC_SURPLUS_CAP.wood ?? 0)}{' '}
+          Wood, {num(NPC_SURPLUS_CAP.stone ?? 0)} Stone, {num(NPC_SURPLUS_CAP.ironOre ?? 0)} each of
+          Iron ore, Iron and Gold ore, {num(NPC_SURPLUS_CAP.coins ?? 0)} coins and{' '}
+          {num(NPC_SURPLUS_CAP[NPC_SMITHY_WEAPON] ?? 0)}{' '}
+          {GOOD_LABELS[NPC_SMITHY_WEAPON].toLowerCase()}s above what it keeps. A smelter, smithy or
+          mint is worked for surplus only from input above the reserve. Past the cap they stop and
+          are idle. What is short, its trader and a founding party still take them first, the next
+          time it thinks. So its workplaces stay busy, and its trader has more to sell.
+        </p>
+        <p>
+          Ahead of scouting and that work comes its road crew: up to {num(NPC_ROAD_CREW)} spare hands, apart from
+          its builders, build road from its home to each of its workplaces outside its area, farms
+          too, the nearest first. They follow the way a resident would walk, tile by tile, so a road
+          goes round a lake, and they skip tiles that already have a road. They only use materials
+          above its reserve and what its project still needs; with none to spare, or with something
+          short that they can work for, they go back to other work and bring back what they carry.
+          Like any road it belongs to nobody, and anyone can use it or tear it down; a tile torn down
+          is laid again in time.
+        </p>
+        <p>
+          With its workplaces joined the crew goes on: to the nearest Trade Organization warehouse
+          within {num(NPC_TRADER_REACH)} tiles, its trader's reach, leaving out those of the HQ's
+          inner ring, which keeps everyone out, and then to the edge of the area of its nearest
+          neighbour, any city but the Trade Organization's. A road two neighbours would each build
+          is built by only one of them. A road on Mountain takes{' '}
+          {num(MOUNTAIN_ROAD_WORK_FACTOR)} times the work here as anywhere. The crew takes Food along
+          for the walk, goes back for more before a tile it couldn't walk home from on what it has,
+          and fetches more when it runs low, as any builder does. A way longer than{' '}
+          {num(NPC_ROAD_LONGEST)} tiles, or with no way through, is given up.
         </p>
         <h3>Trading posts and the HQ</h3>
         <p>
@@ -2165,8 +2227,8 @@ export function Wiki() {
           carry what they didn't spend back home. The Trade Organization never accepts offers.
         </p>
         <p>
-          A city is full once it has had spare hands with nothing to do and nothing short of its
-          reserve for {days(NPC_FULL_DAYS)}, with a food surplus and a town hall's and a storage's
+          A city is full once it has had spare hands, idle, on a road crew, scouting or working for surplus, and nothing short
+          of its reserve for {days(NPC_FULL_DAYS)}, with a food surplus and a town hall's and a storage's
           materials above its reserve. A full city founds a daughter. Once a game day it looks for a
           free Plains site {num(NPC_CITY_MIN_DISTANCE)} to {num(NPC_FOUND_REACH)} tiles away, with
           room for a village and on no realm's territory, nearest a node of a material it has none

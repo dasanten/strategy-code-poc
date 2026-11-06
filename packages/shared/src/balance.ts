@@ -594,6 +594,43 @@ export const NPC_PLAN_TICKS = 60
 export const NPC_BUILDERS = 2
 
 /**
+ * Most of an NPC city's spare hands on its road crew at once (`CONTEXT.md`: NPC road), apart from
+ * its builders: enough for a road to grow out day by day and to fetch for each other, while the
+ * rest go on working for surplus.
+ */
+export const NPC_ROAD_CREW = 2
+
+/**
+ * The longest way an NPC city's road crew takes on (`CONTEXT.md`: NPC road), in tiles: a way longer
+ * than this is given up. Past `NPC_FOUND_REACH`, so a city can join its daughter round a lake.
+ */
+export const NPC_ROAD_LONGEST = 1200
+
+/**
+ * How far outside its area an NPC city still fetches a Down resident of its own (`CONTEXT.md`:
+ * Reviving), in tiles: about a quarter of a game day's walk on plains each way.
+ */
+export const NPC_REVIVE_REACH = 48
+
+/**
+ * How far past its reserve an NPC city's spare hands work for surplus, by good, in units
+ * (`CONTEXT.md`: Spare hands' work). Several of a trader's full loads (about 30 kg, `CARRY_BASE`),
+ * so its trader has something to sell, and above the materials a Full city wants (`townHall` and
+ * `storage` in `BUILD_MATERIALS`), or it could never found; few weapons, which its trader never
+ * sells. A good not named here is not worked for surplus.
+ */
+export const NPC_SURPLUS_CAP: Partial<Record<Good, number>> = {
+  food: 100,
+  wood: 150,
+  stone: 100,
+  ironOre: 60,
+  iron: 60,
+  goldOre: 60,
+  coins: 300,
+  spear: 4,
+}
+
+/**
  * How many tiles further out an NPC city puts up its new wall when it has no room left inside
  * the old one (`CONTEXT.md`: NPC city), on every side, with the gate in the same place. At most
  * `CITY_BUILDING_REACH`, so the new wall stays part of the city once the old one is gone.
@@ -613,6 +650,25 @@ export const NPC_WALL_TILES_PER_TRIP = 4
  * minutes' walk on plains.
  */
 export const NPC_NODE_REACH = 160
+
+/**
+ * How many of an NPC city's residents it takes to send one scout at a time, rounded up
+ * (`CONTEXT.md`: Scout): a village one, a town of 16 two, a city of 48 four.
+ */
+export const NPC_RESIDENTS_PER_SCOUT = 12
+
+/**
+ * How far from its home an NPC city comes to know resource nodes through its scouts (`CONTEXT.md`:
+ * Scout), in tiles: 2.5 times its set reach (`NPC_NODE_REACH`), about 50 minutes' walk on plains.
+ */
+export const NPC_SCOUT_LIMIT = 400
+
+/**
+ * The squares of map an NPC city's knowledge from its scouts goes by (`CONTEXT.md`: Scout), in tiles
+ * along each side. Small enough that a scout standing in one has its middle and its neighbours' in
+ * sight (`SIGHT_RANGE`), large enough that what a city knows stays a few hundred numbers.
+ */
+export const NPC_SCOUT_SECTOR = 32
 
 /**
  * How far from its home a Trade Org warehouse may be for an NPC city to send its trader there
@@ -1087,6 +1143,16 @@ export const SET_OUT_WORK_DAYS = 3
 export function setOutFood(walkTicks: number): number {
   const days = (2 * walkTicks) / TICKS_PER_GAME_DAY + SET_OUT_WORK_DAYS
   return Math.max(OWN_FOOD, Math.ceil(days * FOOD_PER_DAY))
+}
+
+/**
+ * Units of Food an NPC city's road crew has on them before they start a tile of road a walk of
+ * `walkTicks` ticks from the storage (`CONTEXT.md`: NPC road): what the walk home eats, in whole units
+ * rounded up, over what the Build default fetches Food below (`GET_FOOD_AT`), which from far out
+ * would come too late to get home fed.
+ */
+export function roadCrewFood(walkTicks: number): number {
+  return Math.ceil((walkTicks / TICKS_PER_GAME_DAY) * FOOD_PER_DAY) + GET_FOOD_AT
 }
 
 /**

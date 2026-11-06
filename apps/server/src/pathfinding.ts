@@ -78,6 +78,11 @@ export interface PathOptions {
   onWalls?: boolean
   /** Stop on any tile in contact with the goal (`inContact`) rather than on it: to attack. */
   near?: boolean
+  /**
+   * Stop on the first of these tiles (tile indices) rather than at the goal, which then only says
+   * which way to go: to the edge of a city's area, whatever stands inside it.
+   */
+  area?: ReadonlySet<number>
 }
 
 interface Request extends PathOptions {
@@ -218,8 +223,9 @@ function stepsTo(req: Request, size: number, x: number, y: number): number {
   return dx > dy ? dx + (DIAGONAL_STEP - 1) * dy : dy + (DIAGONAL_STEP - 1) * dx
 }
 
-/** Whether a search may stop on (x, y): the goal, or for a `near` request beside it. */
+/** Whether a search may stop on (x, y): the goal, for a `near` request beside it, or its `area`. */
 function reached(req: Request, size: number, x: number, y: number): boolean {
+  if (req.area) return req.area.has(tileIndex(size, x, y))
   if (!req.near) return x === req.to[0] && y === req.to[1]
   return (
     Math.abs(wrapDelta(x, req.to[0], size)) <= 1 && Math.abs(wrapDelta(y, req.to[1], size)) <= 1
@@ -544,13 +550,14 @@ export class PathFinder {
     const s = tileIndex(size, req.from[0], req.from[1])
     const goal = tileIndex(size, req.to[0], req.to[1])
     req.start = s
-    if (table[ground.at(s)] === Infinity || (!req.near && table[ground.at(goal)] === Infinity))
+    const toGoal = !req.near && !req.area
+    if (table[ground.at(s)] === Infinity || (toGoal && table[ground.at(goal)] === Infinity))
       return { status: 'unreachable' }
     if (reached(req, size, req.from[0], req.from[1])) return { status: 'found', path: [], cost: 0 }
     const regions = regionsOf(ground, table)
     const region = regions[s]!
     if (region !== MANY) {
-      const goals: number[] = [goal]
+      const goals: number[] = req.area ? [...req.area] : [goal]
       if (req.near)
         for (let dy = -1; dy <= 1; dy++)
           for (let dx = -1; dx <= 1; dx++)
@@ -560,7 +567,7 @@ export class PathFinder {
     }
     const walls = ground.walls
     req.stranded = !!walls && strandedOnWall(walls, req.realmId ?? null, s)
-    if (!req.near && walls?.inside.has(goal) && this.shutIn(req, goal))
+    if (toGoal && walls?.inside.has(goal) && this.shutIn(req, goal))
       return { status: 'unreachable' }
     // A road is the cheapest ground, but only counts while there are any: the heuristic stays as
     // sharp as it can, so searches stay short.

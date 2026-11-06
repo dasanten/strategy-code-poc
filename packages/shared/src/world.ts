@@ -896,15 +896,36 @@ export interface WorldState {
 /**
  * What a game-run city's plan has one of its residents do (`CONTEXT.md`: NPC city; ADR 0016):
  * stand as a soldier, work a farm or another workplace, build its project, go on its trade run
- * (NPC trader), found its daughter (Founding), feed its stable (NPC horses), or nothing, until the
- * next pass moves them.
+ * (NPC trader), found its daughter (Founding), revive one of its own (Reviving), scout (Scout), feed
+ * its stable (NPC horses), or nothing, until the next pass moves them.
  */
 export interface CityJob {
-  kind: 'soldier' | 'farm' | 'work' | 'build' | 'trade' | 'found' | 'feed' | 'idle'
+  kind:
+    | 'soldier'
+    | 'farm'
+    | 'work'
+    | 'build'
+    | 'road'
+    | 'trade'
+    | 'found'
+    | 'revive'
+    | 'scout'
+    | 'feed'
+    | 'idle'
   /** The farm or workplace to work, for `farm` and `work`. */
   buildingId?: string
+  /** The Down resident to revive, for `revive`. */
+  targetId?: string
   /** The stable to feed, for `feed`. */
   stableId?: string
+}
+
+/** A road a game-run city builds (`CONTEXT.md`: NPC road): its way, worked out once. */
+export interface CityRoad {
+  /** The building it leads to; for one to a neighbour (the edge of its area), that city. */
+  to: string
+  /** The tiles of the way from its home, as a resident would walk it; none when it is given up. */
+  tiles: [x: number, y: number][]
 }
 
 /** What a game-run city builds or takes down next (`CONTEXT.md`: NPC city), as plain data. */
@@ -950,6 +971,27 @@ export interface CityTrader {
 }
 
 /**
+ * What a scout out has seen and not brought home yet (`CONTEXT.md`: Scout), in sectors
+ * (`NPC_SCOUT_SECTOR`). Lost if they die on the way.
+ */
+export interface ScoutTrip {
+  /** The sectors they have had in sight. */
+  saw: number[]
+  /** The sectors of the tiles they found no way to. */
+  noWay?: number[]
+}
+
+/** What an NPC city's scouts have brought home (`CONTEXT.md`: Scout), in sectors (`NPC_SCOUT_SECTOR`). */
+export interface CityScouted {
+  /** The sectors scouts saw: it knows the nodes in them, out to its limit (`NPC_SCOUT_LIMIT`). */
+  sectors: number[]
+  /** Sectors a scout or builder found no way to, which it sends nobody to again and knows nothing of. */
+  noWay?: number[]
+  /** It knows its limit, and scouts no more. */
+  done?: true
+}
+
+/**
  * What a city the game runs decided at its last planning pass (`CONTEXT.md`: NPC city;
  * ADR 0016), kept in the world so a restart forgets nothing: plain serialisable data like an
  * order's state (ADR 0002). Only the pass changes the jobs; between passes the city hands them
@@ -962,6 +1004,8 @@ export interface CityPlan {
   jobs: Record<string, CityJob>
   /** What the city builds or takes down next; none when it has nothing to build. */
   project?: CityProject
+  /** The roads it has worked out the way of (`CONTEXT.md`: NPC road), in the order it builds them. */
+  roads?: CityRoad[]
   /** Its trade run under way (`CONTEXT.md`: NPC trader); none while no trader is out. */
   trader?: CityTrader
   /**
@@ -975,6 +1019,8 @@ export interface CityPlan {
    * full, and the founding party's goal once it is out.
    */
   foundingSite?: { x: number; y: number }
+  /** Its scouts with something still to bring home, by resident id (`CONTEXT.md`: Scout). */
+  scouts?: Record<string, ScoutTrip>
 }
 
 /**
@@ -1894,7 +1940,15 @@ export type RealmEventWhat =
    */
   | {
       kind: 'debt'
-      what: 'owed' | 'postOwed' | 'rose' | 'collected' | 'postReturned' | 'cityTaken' | 'overdue' | 'ended'
+      what:
+        | 'owed'
+        | 'postOwed'
+        | 'rose'
+        | 'collected'
+        | 'postReturned'
+        | 'cityTaken'
+        | 'overdue'
+        | 'ended'
       coins: number
       owed: number
     }
@@ -2651,8 +2705,7 @@ export type DemandTerms =
  * what went, which is less than demanded when the storage was short, and where.
  */
 export type DemandHandedOver = { goods: Partial<Record<Good, number>> } & (
-  | { way: 'setAside'; x: number; y: number }
-  | { way: 'transfer'; fromCity: string; toCity: string }
+  { way: 'setAside'; x: number; y: number } | { way: 'transfer'; fromCity: string; toCity: string }
 )
 
 /**
@@ -2760,6 +2813,8 @@ export interface City {
    * one that is gone is skipped.
    */
   workplaceIds?: string[]
+  /** What an NPC city's scouts have brought home (`CONTEXT.md`: Scout); nobody else sees it. */
+  scouted?: CityScouted
   /**
    * For a self-managed city, the Player whose Leader died while it was theirs and the tick it
    * happened (`CONTEXT.md`: Self-managed city). It holds them in good standing, fading from then

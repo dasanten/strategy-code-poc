@@ -225,6 +225,11 @@ describe('world saves', () => {
     expect(migrateWorld(fallen, 88, { terrain: land }).traders).toEqual([])
   })
 
+  it('leaves every world as it is for the revive job (migration 99 → 100)', () => {
+    const { world: now, terrain: land } = worldWithPost()
+    expect(migrateWorld(structuredClone(now), 99, { terrain: land })).toEqual(now)
+  })
+
   it('gives NPC cities from before two horses, with Food by them (migration 98 → 99)', () => {
     const { world: now, terrain: land } = worldWithPost()
     const hall = now.buildings.find((b) => b.kind === 'townHall')!
@@ -444,6 +449,14 @@ describe('world saves', () => {
     expect(checkInvariants(v88, land)).toEqual([])
   })
 
+  it('leaves a format 101 world as it is: no plan has a road crew or a way yet (migration 101 → 102)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v102 = migrateWorld(structuredClone(world), 101, { terrain: land }, migrations, 102)
+    expect(v102).toEqual(world)
+    expect(Object.values(v102.cityPlans).every((p) => p.roads === undefined)).toBe(true)
+    expect(checkInvariants(v102, land)).toEqual([])
+  })
+
   it('leaves a format 95 world’s debts to get their demand on the next tick (migration 95 → 96)', () => {
     const { world, terrain: land } = worldWithPost()
     world.realms.push({ id: 'r9', userId: 90, leaderId: 'nobody' })
@@ -482,11 +495,19 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(99)
+    expect(WORLD_FORMAT_VERSION).toBe(102)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
     expect(checkInvariants(v39, land)).toEqual([])
+  })
+
+  it('migrates a format 100 world: a city knows nothing from scouts yet (migration 100 → 101)', () => {
+    const { world, terrain } = worldWithPost()
+    const migrated = migrateWorld(structuredClone(world), 100, { terrain }, migrations, 101)
+    expect(migrated).toEqual(world)
+    expect(migrated.cities.every((c) => c.scouted === undefined)).toBe(true)
+    expect(checkInvariants(migrated, terrain)).toEqual([])
   })
 
   it('migrates a format 39 world: every Player starts with an empty Last seen (migration 39 → 40)', () => {
