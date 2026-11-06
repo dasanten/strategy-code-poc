@@ -4,6 +4,7 @@ import {
   TICKS_PER_GAME_DAY,
   npcFoundingPartySize,
   npcFullDays,
+  npcReserve,
   storedFood,
   surplusFoodLine,
 } from '@csp/shared'
@@ -46,10 +47,13 @@ describe('a big NPC city', () => {
     () => {
       const staged = bigCity(1300)
       const { world, terrain, city, home } = staged
-      const stoneFor = foundingMaterials(npcFoundingPartySize(BIG_CITY_RESIDENTS)).stone ?? 0
+      const materials = foundingMaterials(npcFoundingPartySize(BIG_CITY_RESIDENTS))
       const walking = unhurriedWalking(terrain)
       const wait = npcFullDays(BIG_CITY_RESIDENTS)
       expect(wait).toBeLessThan(NPC_FULL_DAYS)
+      // Past what its scouts and road crew take out with them in an hour, which puts Food under the
+      // reserve and restarts its full days; so this is about the waiting.
+      home.stock!.food = (home.stock!.food ?? 0) + 500
 
       let setOut: number | undefined
       let party: string[] = []
@@ -57,11 +61,17 @@ describe('a big NPC city', () => {
       const daughter = () =>
         world.cities.find((c) => c.id !== city.id && c.realmId === null && !c.tradeOrg)
       const moved = () => world.residents.some((r) => r.cityId === daughter()?.id)
-      const lastDay = 30 * TICKS_PER_GAME_DAY
+      const lastDay = 20 * TICKS_PER_GAME_DAY
       while (world.tick < lastDay && !moved()) {
-        // Its road crew spends every Stone above the reserve until the roads are done; here, what
-        // the party wants stays, so this is about the waiting.
-        home.stock!.stone = Math.max(home.stock!.stone ?? 0, stoneFor)
+        // Its road crew spends every Stone above the reserve until its roads are done, and spare
+        // hands take time to cut the Wood. Until it sets out, what the party wants stays.
+        if (setOut === undefined) {
+          const reserve = npcReserve(world, city)
+          for (const good of ['wood', 'stone'] as const) {
+            const want = (reserve[good] ?? 0) + (materials[good] ?? 0)
+            home.stock![good] = Math.max(home.stock![good] ?? 0, want)
+          }
+        }
         stepWorld(world, terrain, walking)
         const now = foundingParty(world.cityPlans[city.id])
         if (setOut === undefined && now.length > 0) {
