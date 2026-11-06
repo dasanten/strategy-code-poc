@@ -8,6 +8,7 @@ import {
   carryCapacity,
   footprintTiles,
   inCityArea,
+  inInnerRingAround,
   isAt,
   isCityBuilding,
   npcReserve,
@@ -15,6 +16,7 @@ import {
   setOutFood,
   stockWeight,
   tileIndex,
+  wrapDelta,
   wrapDistance,
   type Building,
   type City,
@@ -122,19 +124,26 @@ function areaTiles(world: WorldState, city: City, size: number): Set<number> {
   return tiles
 }
 
-/** Whether a building is a finished Trade Org warehouse. */
-function isPost(world: WorldState, b: Building): boolean {
+/**
+ * Whether a building is a finished Trade Org warehouse a road can lead to: not one in the HQ's inner
+ * ring, whose gates stay closed to everyone else (`CONTEXT.md`: Trade Org HQ), so that a way there
+ * isn't given up in place of the way to a post it can walk to.
+ */
+function isPost(world: WorldState, b: Building, size: number): boolean {
   if (b.kind !== 'warehouse' || b.site) return false
-  return world.cities.some((c) => c.id === b.cityId && c.tradeOrg !== undefined)
+  const owner = world.cities.find((c) => c.id === b.cityId)
+  if (!owner?.tradeOrg) return false
+  const hall = owner.tradeOrg === 'hq' ? worldIndex(world).buildingById(owner.townHallId) : undefined
+  return !hall || !inInnerRingAround(hall, b, size)
 }
 
-/** The nearest finished Trade Org warehouse within its trader's reach of `home`. */
+/** The nearest such warehouse (`isPost`) within its trader's reach of `home`. */
 function nearestPost(world: WorldState, home: Building, size: number): Building | undefined {
   let best: { b: Building; d: number } | undefined
   for (const b of world.buildings) {
     if (b.kind !== 'warehouse') continue
     const d = wrapDistance(size, home, b)
-    if (d > NPC_TRADER_REACH || (best && d >= best.d) || !isPost(world, b)) continue
+    if (d > NPC_TRADER_REACH || (best && d >= best.d) || !isPost(world, b, size)) continue
     best = { b, d }
   }
   return best?.b
@@ -160,10 +169,10 @@ function nearestNeighbour(
 }
 
 /** Whether a road's far end still stands, for one that isn't to a workplace: a post, or a city. */
-function leadsOn(world: WorldState, to: string): boolean {
+function leadsOn(world: WorldState, to: string, size: number): boolean {
   if (world.cities.some((c) => c.id === to && !c.tradeOrg)) return true
   const b = worldIndex(world).buildingById(to)
-  return b !== undefined && isPost(world, b)
+  return b !== undefined && isPost(world, b, size)
 }
 
 /**
@@ -185,15 +194,14 @@ function planRoads(
   size: number,
 ): boolean {
   const known = new Map((plan.roads ?? []).map((r) => [r.to, r]))
+  /** The fewest tiles a way from its home to (x, y) can have: a Step can go diagonally. */
+  const fewestTiles = (x: number, y: number) =>
+    Math.max(Math.abs(wrapDelta(home.x, x, size)), Math.abs(wrapDelta(home.y, y, size)))
   /** The way to `to` once it is settled; until then, asks a search for it. */
-  const settle = (
-    to: string,
-    at: Point,
-    area?: () => ReadonlySet<number>,
-  ): CityRoad | undefined => {
-    if (wrapDistance(size, home, { x: at[0], y: at[1] }) > NPC_ROAD_LONGEST)
-      return { to, tiles: [] }
-    const found = ways.way(`${city.id}:${to}`, [home.x, home.y], at, city.id, area?.())
+  const settle = (to: string, at: Point, area?: ReadonlySet<number>): CityRoad | undefined => {
+    const ends = area ? [...area].map((t) => [t % size, Math.floor(t / size)] as const) : [at]
+    if (ends.every(([x, y]) => fewestTiles(x, y) > NPC_ROAD_LONGEST)) return { to, tiles: [] }
+    const found = ways.way(`${city.id}:${to}`, [home.x, home.y], at, city.id, area)
     if (found.status === 'searching') return undefined
     const tiles =
       found.status === 'found' && found.path.length <= NPC_ROAD_LONGEST ? found.path : []
@@ -214,7 +222,7 @@ function planRoads(
     if (road) roads.push(road)
   }
   for (const road of plan.roads ?? []) {
-    if (!placeIds.has(road.to) && leadsOn(world, road.to)) roads.push(road)
+    if (!placeIds.has(road.to) && leadsOn(world, road.to, size)) roads.push(road)
   }
   const has = (to: string) => roads.some((r) => r.to === to)
   if (!searching && !nextTile(world, roads, size)) {
@@ -229,7 +237,7 @@ function planRoads(
     const next = nearestNeighbour(world, city, home, size)
     const theirs = next && world.cityPlans[next.city.id]?.roads?.some((r) => r.to === city.id)
     if (next && !theirs && !has(next.city.id)) {
-      const area = () => areaTiles(world, next.city, size)
+      const area = areaTiles(world, next.city, size)
       const road = settle(next.city.id, [next.hall.x, next.hall.y], area)
       if (road) roads.push(road)
     }

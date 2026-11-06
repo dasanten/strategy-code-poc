@@ -557,7 +557,7 @@ export class PathFinder {
     const regions = regionsOf(ground, table)
     const region = regions[s]!
     if (region !== MANY) {
-      const goals: number[] = [goal]
+      const goals: number[] = req.area ? [...req.area] : [goal]
       if (req.near)
         for (let dy = -1; dy <= 1; dy++)
           for (let dx = -1; dx <= 1; dx++)

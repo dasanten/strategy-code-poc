@@ -42,6 +42,7 @@ import { npcRoadCrewSized, npcRoadsOnce, roadCrew, type WayFinder } from './npc-
 import { PathFinder, WALKING_COSTS } from './pathfinding.js'
 import { mulberry32 } from './residents.js'
 import { newId } from './starting-city.js'
+import { foundTradeOrgHq } from './trade-org.js'
 import { foundTradingPost } from './trading-posts.js'
 import { Walking } from './walking.js'
 import { createWorld, stepWorld } from './world.js'
@@ -487,6 +488,65 @@ describe('a road crew going on from its workplaces', () => {
     expect(checkInvariants(w2, t2)).toEqual([])
   })
 
+  /** Answers the way to `to` with `steps` tiles running south-east, and every other with none. */
+  const diagonalTo = (to: string, steps: number): WayFinder => ({
+    way: (key, from) => {
+      if (!key.endsWith(`:${to}`)) return { status: 'found', path: [], cost: 0 }
+      const path = Array.from(
+        { length: steps },
+        (_, i): [number, number] => [from[0] + i + 1, from[1] + i + 1],
+      )
+      return { status: 'found', path, cost: steps }
+    },
+  })
+
+  it('goes by the tiles of a way, not by how far it is as the crow flies', () => {
+    const size = 2 * NPC_ROAD_LONGEST + 400
+    const { world, terrain, city, home } = town({ stone: 50 }, size)
+    // Too far as the crow flies, but not that many Steps away, going diagonally.
+    const d = NPC_ROAD_LONGEST - 100
+    const next = foundNpcCity(world, terrain, NPC_TOWN, 60 + d, 60 + d, mulberry32(6))
+    const hall = world.buildings.find((b) => b.id === next.townHallId)!
+    expect(wrapDistance(size, home, hall)).toBeGreaterThan(NPC_ROAD_LONGEST)
+    const plan = joinAll(world, terrain, city, diagonalTo(next.id, d))
+    expect(plan.roads!.find((r) => r.to === next.id)!.tiles).toHaveLength(d)
+  })
+
+  it('goes by the edge of the area, not by the town hall further in', () => {
+    const size = 2 * NPC_ROAD_LONGEST + 400
+    const { world, terrain, city, home } = town({ stone: 50 }, size)
+    const next = neighbour(world, terrain, NPC_ROAD_LONGEST + 3)
+    const hall = world.buildings.find((b) => b.id === next.townHallId)!
+    expect(Math.abs(hall.x - home.x)).toBeGreaterThan(NPC_ROAD_LONGEST)
+    const plan = joinAll(world, terrain, city, diagonalTo(next.id, NPC_ROAD_LONGEST))
+    expect(plan.roads!.find((r) => r.to === next.id)!.tiles).toHaveLength(NPC_ROAD_LONGEST)
+  })
+
+  it('leaves out the warehouses of the HQ inner ring, and goes on to a post it can walk to', () => {
+    const { world, terrain, city, home } = town({ stone: 50 }, 1400)
+    const hq = foundTradeOrgHq(world, terrain, 300, 60, mulberry32(3))
+    const post = warehouseOf(
+      world,
+      foundTradingPost(world, terrain, 60, 500, undefined, mulberry32(4)),
+    )
+    const inner = world.buildings.filter((b) => b.kind === 'warehouse' && b.cityId === hq.id)
+    expect(inner.length).toBeGreaterThan(0)
+    const { ways } = waysOf(world, terrain)
+    // Nearer than the post, but behind gates that stay closed to everyone else.
+    for (const b of inner) {
+      expect(wrapDistance(terrain.size, home, b)).toBeLessThan(
+        wrapDistance(terrain.size, home, post),
+      )
+      expect(ways.way(`look:${b.id}`, [home.x, home.y], [b.x, b.y], city.id).status).toBe(
+        'unreachable',
+      )
+    }
+    const plan = joinAll(world, terrain, city, ways)
+    const to = plan.roads!.map((r) => r.to)
+    for (const b of inner) expect(to).not.toContain(b.id)
+    expect(plan.roads!.find((r) => r.to === post.id)!.tiles.length).toBeGreaterThan(0)
+  })
+
   it('finishes a road on to a neighbour no longer its nearest, while it stands', () => {
     const { world, terrain, city } = town({ stone: 50 }, 800)
     const next = neighbour(world, terrain, 300)
@@ -512,6 +572,22 @@ describe('a road crew going on from its workplaces', () => {
     const found = finder.findPath([40, 50], [70, 50], WALKING_COSTS, { area })
     expect(found).toMatchObject({ status: 'found' })
     expect(found.status === 'found' && found.path.at(-1)).toEqual([50, 50])
+  })
+
+  it('finds the edge of an area on its own land, with the goal across water', () => {
+    const terrain = plains(100)
+    // Water all the way across on both sides of the goal, so it is on land of its own.
+    for (let y = 0; y < terrain.size; y++) {
+      for (const x of [48, 49, 90, 91]) terrain.tiles[tileIndex(100, x, y)] = Terrain.Lake
+    }
+    const finder = new PathFinder(terrain)
+    const tiles = (xs: number[]) => new Set(xs.map((x) => tileIndex(100, x, 50)))
+    const area = tiles([46, 47, 50, 51])
+    const found = finder.findPath([20, 50], [55, 50], WALKING_COSTS, { area })
+    expect(found.status === 'found' && found.path.at(-1)).toEqual([46, 50])
+    // None of it on the start's land: no way, without a search.
+    const across = finder.findPath([20, 50], [55, 50], WALKING_COSTS, { area: tiles([50, 51]) })
+    expect(across.status).toBe('unreachable')
   })
 })
 

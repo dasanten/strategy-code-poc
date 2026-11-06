@@ -2074,9 +2074,10 @@ export function Wiki() {
         </p>
         <p>
           With its workplaces joined the crew goes on: to the nearest Trade Organization warehouse
-          within {num(NPC_TRADER_REACH)} tiles, its trader's reach, and then to the edge of the area
-          of its nearest neighbour, any city but the Trade Organization's. A road two neighbours
-          would each build is built by only one of them. A road on Mountain takes{' '}
+          within {num(NPC_TRADER_REACH)} tiles, its trader's reach, leaving out those of the HQ's
+          inner ring, which keeps everyone out, and then to the edge of the area of its nearest
+          neighbour, any city but the Trade Organization's. A road two neighbours would each build
+          is built by only one of them. A road on Mountain takes{' '}
           {num(MOUNTAIN_ROAD_WORK_FACTOR)} times the work here as anywhere. The crew takes Food along
           for the walk, goes back for more before a tile it couldn't walk home from on what it has,
           and fetches more when it runs low, as any builder does. A way longer than{' '}
