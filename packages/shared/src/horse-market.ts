@@ -32,8 +32,8 @@ import {
 
 /*
  * The Horse market (`CONTEXT.md`: Horse market): what an NPC city asks for a horse or pays for one,
- * and whether it sells or buys it. Queries here are the game API that orders, scripts and the UI share (ADR 0002); nothing
- * moves.
+ * and whether it sells or buys it. Queries here are the game API that orders, scripts and the UI
+ * share (ADR 0002); nothing moves.
  */
 
 /**

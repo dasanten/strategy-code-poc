@@ -330,7 +330,7 @@ export const HORSE_PRICE_GLUT = 0.25
 /**
  * What an NPC city pays for a horse, as a share of what it would ask for it with that horse among
  * its own (`CONTEXT.md`: Horse market): as much as it pays for goods against what it sells them for
- * (`BUY_SHARE`), so the market is no way to make Coins.
+ * (`BUY_SHARE`).
  */
 export const HORSE_PRICE_PAID_SHARE = 0.6
 
