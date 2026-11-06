@@ -96,7 +96,12 @@ import { awaitsTrader, carriageOrganization, organizationOf } from './crimes.js'
 import { tallyGoods } from './goods-made.js'
 import { awakeAlive, downDoNothing, refillSource, refillTarget } from './survival.js'
 import { horsesDownLieStill } from './horses.js'
-import { NPC_ORDER_KINDS, npcResidentsKeptGoing, runByNpcCity } from './npc-behaviour.js'
+import {
+  NPC_ORDER_KINDS,
+  npcIdleOffTheStorage,
+  npcResidentsKeptGoing,
+  runByNpcCity,
+} from './npc-behaviour.js'
 import { CARRYING_BLOCKS } from './pairing.js'
 import { isWalkable } from './world.js'
 import { contractsSound } from './contracts.js'
@@ -2145,6 +2150,7 @@ export const worldInvariants: Invariant[] = [
   npcOneFeeder,
   tradeOrgBreedsNoHorses,
   npcResidentsKeptGoing,
+  npcIdleOffTheStorage,
   tradeOrgSendsNoOne,
   npcTradersSound,
   lineOrdersSound,
