@@ -39,7 +39,13 @@ import {
 } from '@csp/shared'
 import { orderedResident } from './order-sender.js'
 import type { OrderKind, OrderSender } from './orders.js'
-import { CARRIAGE_COSTS, PathFinder, WALKING_COSTS } from './pathfinding.js'
+import {
+  CARRIAGE_COSTS,
+  PathFinder,
+  WALKING_COSTS,
+  type PathResult,
+  type Point,
+} from './pathfinding.js'
 import { waitingForArmy } from './armies.js'
 import { waitingForEscort } from './caravans.js'
 import { attackTarget } from './combat.js'
@@ -265,6 +271,20 @@ export class Walking {
     if (!this.roads || !sameTiles(this.roads, roads)) this.finder.setRoads(roads)
     this.roads = roads
     this.finder.setWalls(this.wallsOf(world))
+  }
+
+  /**
+   * The way someone of `side` would walk between two tiles, through their own gates and not over
+   * walls, for what is built along it (`CONTEXT.md`: NPC road). Searched a little at a time with the
+   * walks (`PathFinder`): ask again until it is settled; a settled answer is handed out once. A
+   * search lost on a restart is simply asked for again.
+   */
+  way(key: string, from: Point, to: Point, side: string | null): PathResult {
+    const id = `way:${key}`
+    const result = this.finder.result(id)
+    if (result) return result
+    this.finder.request(id, from, to, WALKING_COSTS, { realmId: side, onWalls: false })
+    return { status: 'searching' }
   }
 
   /**

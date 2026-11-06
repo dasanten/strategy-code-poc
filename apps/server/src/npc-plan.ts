@@ -54,6 +54,7 @@ import {
 } from './npc-chain.js'
 import { foundingParty, planFounding } from './npc-founding.js'
 import { downToRevive, goesOnReviving, sendRevivers } from './npc-revive.js'
+import { roadCrew, type WayFinder } from './npc-roads.js'
 import { pickScouts } from './npc-scouts.js'
 import { planTrader, planVisit, traderOut } from './npc-trader.js'
 import { hash } from './residents.js'
@@ -188,7 +189,7 @@ export function workplaceOf(r: Resident): string | undefined {
  * the rest by its reserve (`shareOut`), a reviver for each of its Down residents among them
  * (`CONTEXT.md`: Reviving; those Down do nothing and get no job). An NPC city's founding party keeps
  * its `found` jobs, and the pass ends with the founding's part (`planFounding`). Without `terrain`
- * the city picks no project.
+ * the city picks no project; without `ways` it builds no road (`roadCrew`).
  * `people` are the residents the city gives orders to (`runResidents`).
  */
 export function planCity(
@@ -196,6 +197,7 @@ export function planCity(
   city: City,
   terrain?: TerrainMap,
   people: Resident[] = runResidents(world).get(city.id) ?? [],
+  ways?: WayFinder,
 ): CityPlan {
   const plan = (world.cityPlans[city.id] ??= { plannedAt: world.tick, jobs: {} })
   plan.plannedAt = world.tick
@@ -221,7 +223,9 @@ export function planCity(
   const placeById = new Map(places.map((p) => [p.id, p]))
   const held = new Places(people)
   const jobs: Record<string, CityJob> = {}
-  const builders = adults.filter(isBuilder).length
+  // The road crew is apart from its builders, and spare hands (`CONTEXT.md`: NPC road).
+  const builds = (r: Resident) => isBuilder(r) && plan.jobs[r.id]?.kind !== 'road'
+  const builders = adults.filter(builds).length
   const spare: Resident[] = []
   // The trader out on their run (`CONTEXT.md`: NPC trader) is nobody's spare hand.
   const trader = city.tradeOrg ? undefined : traderOut(world, plan)
@@ -233,7 +237,7 @@ export function planCity(
     else if (isArmed(r)) jobs[r.id] = { kind: 'soldier' }
     else if (r.carrying) jobs[r.id] = { kind: 'idle' }
     else if (goesOnReviving(plan.jobs[r.id], waiting)) jobs[r.id] = plan.jobs[r.id]!
-    else if (isBuilder(r)) jobs[r.id] = { kind: 'build' }
+    else if (builds(r)) jobs[r.id] = { kind: 'build' }
     else if (at !== undefined) jobs[r.id] = workJob(placeById.get(at) ?? at)
     else spare.push(r)
   }
@@ -268,6 +272,7 @@ export function planCity(
     builders,
     short,
     sendToDown,
+    { home, ways, size },
   )
   // The Trade Organization sends no trader (`tradeOrgSendsNoOne`) and founds nothing.
   if (!city.tradeOrg && !trader) {
@@ -310,10 +315,11 @@ const feeders = (residents: number) =>
  * one the last pass put to work who is between jobs now, a carrier home with the load stored:
  * `CONTEXT.md`, Carrying the output, to that workplace), at an NPC city only up to the cap of its
  * good (`surplusWork`), and a free spare hand of an NPC city goes to work for surplus
- * (`surplusPlace`; `CONTEXT.md`: Spare hands' work). Ahead of both, a few of them scout
- * (`pickScouts`). Whoever has none of that is idle.
- * Returns the spare hands nothing short has a use for, idle, scouting or working for surplus
- * (`CONTEXT.md`: Full city).
+ * (`surplusPlace`; `CONTEXT.md`: Spare hands' work). Ahead of all that, some of them go on its road
+ * crew (`roadCrew`; `CONTEXT.md`: NPC road), and after them a few scout (`pickScouts`). Whoever has
+ * none of that is idle.
+ * Returns the spare hands nothing short has a use for, idle, on the road crew, scouting or working
+ * for surplus (`CONTEXT.md`: Full city).
  */
 function shareOut(
   world: WorldState,
@@ -326,6 +332,7 @@ function shareOut(
   builders: number,
   foodShort: boolean,
   sendToDown: (spare: Resident[], leave: (r: Resident) => void) => void,
+  roads: { home: Building | undefined; ways: WayFinder | undefined; size: number },
 ): Resident[] {
   const project = plan.project
   const unneeded: Resident[] = []
@@ -398,20 +405,29 @@ function shareOut(
     } else unneeded.push(r)
   }
   if (unneeded.length === 0) return unneeded
-  // Nothing short has a use for them. Those who were at a workplace go back first, so a crew keeps
-  // its places: to anything at a Trade Org city, which has no cap; an NPC city's only while it
-  // still works it for surplus, or it isn't a good it counts (a workplace of no chain).
+  // Nothing short has a use for them. A road comes first (`CONTEXT.md`: Spare hands' work).
+  const { home, ways, size } = roads
+  const crew = new Set(
+    roadCrew(world, city, plan, unneeded, new Set(kept.keys()), storage, home, ways, size).map(
+      (r) => r.id,
+    ),
+  )
+  for (const id of crew) jobs[id] = { kind: 'road' }
+  // Those who were at a workplace go back next, so a crew keeps its places: to anything at a Trade
+  // Org city, which has no cap; an NPC city's only while it still works it for surplus, or it isn't
+  // a good it counts (a workplace of no chain).
   const surplus = city.tradeOrg ? undefined : surplusWork(world, city, storage)
   const worthBack = (b: Building) =>
     !surplus || chainGood(world, b) === undefined || surplus(b) !== undefined
-  // Scouts before surplus (`CONTEXT.md`: Spare hands' work), those already out first; they stay
-  // spare hands for a Full city. What is short took them above, and they walk home for it.
+  // Scouts after the road and before surplus (`CONTEXT.md`: Spare hands' work), those already out
+  // first; they stay spare hands for a Full city. What is short took them above, and they walk home for it.
   const hasPlace = (r: Resident) => byId.has(kept.get(r.id)?.buildingId ?? '')
-  for (const r of pickScouts(world, city, plan, unneeded, hasPlace, foodShort)) {
+  const offRoad = unneeded.filter((r) => !crew.has(r.id))
+  for (const r of pickScouts(world, city, plan, offRoad, hasPlace, foodShort)) {
     jobs[r.id] = { kind: 'scout' }
   }
   const free = unneeded.filter((r) => {
-    if (jobs[r.id]?.kind === 'scout') return false
+    if (crew.has(r.id) || jobs[r.id]?.kind === 'scout') return false
     const back = kept.get(r.id)
     const backTo = back && byId.get(back.buildingId ?? '')
     if (!back || !backTo || held.room(backTo) <= 0 || !worthBack(backTo)) return true

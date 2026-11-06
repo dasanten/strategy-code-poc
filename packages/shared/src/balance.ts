@@ -515,6 +515,13 @@ export const NPC_PLAN_TICKS = 60
 export const NPC_BUILDERS = 2
 
 /**
+ * Most of an NPC city's spare hands on its road crew at once (`CONTEXT.md`: NPC road), apart from
+ * its builders: enough for a road to grow out day by day and to fetch for each other, while the
+ * rest go on working for surplus.
+ */
+export const NPC_ROAD_CREW = 2
+
+/**
  * How far outside its area an NPC city still fetches a Down resident of its own (`CONTEXT.md`:
  * Reviving), in tiles: about a quarter of a game day's walk on plains each way.
  */
