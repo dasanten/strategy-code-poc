@@ -125,11 +125,11 @@ function run(world: WorldState, terrain: TerrainMap, days: number, done: () => b
 function untilHome(world: WorldState, terrain: TerrainMap, city: City, days = 6) {
   let traderId: string | undefined
   run(world, terrain, days, () => {
-    traderId ??= world.cityPlans[city.id]?.trader?.residentId
-    return traderId !== undefined && !world.cityPlans[city.id]?.trader
+    traderId ??= world.cityPlans[city.id]?.traders?.[0]?.residentId
+    return traderId !== undefined && !world.cityPlans[city.id]?.traders?.[0]
   })
   expect(traderId).toBeDefined()
-  expect(world.cityPlans[city.id]?.trader).toBeUndefined()
+  expect(world.cityPlans[city.id]?.traders?.[0]).toBeUndefined()
   return world.residents.find((r) => r.id === traderId)!
 }
 
@@ -149,7 +149,7 @@ describe('an NPC city at an offer', () => {
     const lacks = npcReserve(world, city).iron! - (storage.stock!.iron ?? 0)
     expect(lacks).toBeGreaterThan(0)
     const plan = planCity(world, city, terrain)
-    const t = plan.trader!
+    const t = plan.traders![0]!
     expect(t.warehouseId).toBe(theirs.id)
     expect(t.offer).toEqual({
       offerId: offer.id,
@@ -199,7 +199,7 @@ describe('an NPC city at an offer', () => {
     const { world, terrain, city, theirs } = setup()
     // One Iron for forty Wood: its own prices make that a bad bargain.
     post(world, theirs, 'iron', 1, 'wood', 40)
-    expect(planCity(world, city, terrain).trader).toBeUndefined()
+    expect(planCity(world, city, terrain).traders?.[0]).toBeUndefined()
   })
 
   it('takes a rate exactly as good as its own prices, not a coin worse', () => {
@@ -209,40 +209,40 @@ describe('an NPC city at an offer', () => {
     expect(npcOfferTimes(world, city, fair, 1)).toBe(1)
     fair.wantsUnits = buy + 1
     expect(npcOfferTimes(world, city, fair, 1)).toBe(0)
-    expect(planCity(world, city, terrain).trader).toBeUndefined()
+    expect(planCity(world, city, terrain).traders?.[0]).toBeUndefined()
     fair.wantsUnits = buy
-    expect(planCity(world, city, terrain).trader?.offer?.pays).toBe('coins')
+    expect(planCity(world, city, terrain).traders?.[0]?.offer?.pays).toBe('coins')
   })
 
   it('ignores an offer out of reach', () => {
     const far = setup(NPC_OFFER_REACH + 10)
     post(far.world, far.theirs, 'iron', 5, 'wood', 5)
-    expect(far.world.cityPlans[far.city.id]?.trader).toBeUndefined()
-    expect(planCity(far.world, far.city, far.terrain).trader).toBeUndefined()
+    expect(far.world.cityPlans[far.city.id]?.traders?.[0]).toBeUndefined()
+    expect(planCity(far.world, far.city, far.terrain).traders?.[0]).toBeUndefined()
     const near = setup(NPC_OFFER_REACH - 10)
     post(near.world, near.theirs, 'iron', 5, 'wood', 5)
-    expect(planCity(near.world, near.city, near.terrain).trader).toBeDefined()
+    expect(planCity(near.world, near.city, near.terrain).traders?.[0]).toBeDefined()
   })
 
   it('leaves a Direct offer alone: it is for its named realm', () => {
     const { world, terrain, city, theirs } = setup()
     const offer = post(world, theirs, 'iron', 5, 'wood', 5)
     offer.direct = { toId: 'r2', lapsesAt: world.tick + 1000 }
-    expect(planCity(world, city, terrain).trader).toBeUndefined()
+    expect(planCity(world, city, terrain).traders?.[0]).toBeUndefined()
     delete offer.direct
-    expect(planCity(world, city, terrain).trader?.offer?.offerId).toBe(offer.id)
+    expect(planCity(world, city, terrain).traders?.[0]?.offer?.offerId).toBe(offer.id)
   })
 
   it('ignores goods it does not lack, and what it has no spare of to pay', () => {
     const lacksNothing = setup()
     post(lacksNothing.world, lacksNothing.theirs, 'wood', 50, 'stone', 1)
-    expect(planCity(lacksNothing.world, lacksNothing.city, lacksNothing.terrain).trader).toBe(
+    expect(planCity(lacksNothing.world, lacksNothing.city, lacksNothing.terrain).traders?.[0]).toBe(
       undefined,
     )
     const noSpare = setup()
     noSpare.storage.stock!.wood = npcReserve(noSpare.world, noSpare.city).wood ?? 0
     post(noSpare.world, noSpare.theirs, 'iron', 5, 'wood', 1)
-    expect(planCity(noSpare.world, noSpare.city, noSpare.terrain).trader).toBeUndefined()
+    expect(planCity(noSpare.world, noSpare.city, noSpare.terrain).traders?.[0]).toBeUndefined()
   })
 
   it('never goes for a weapon, nor pays with one', () => {
@@ -251,31 +251,31 @@ describe('an NPC city at an offer', () => {
     post(gives.world, gives.theirs, NPC_SMITHY_WEAPON, 1, 'coins', 1)
     expect(npcCityStock(gives.world, gives.city)[NPC_SMITHY_WEAPON] ?? 0).toBe(0)
     expect(npcReserve(gives.world, gives.city)[NPC_SMITHY_WEAPON]).toBeGreaterThan(0)
-    expect(planCity(gives.world, gives.city, gives.terrain).trader).toBeUndefined()
+    expect(planCity(gives.world, gives.city, gives.terrain).traders?.[0]).toBeUndefined()
     const pays = setup()
     pays.storage.stock![NPC_SMITHY_WEAPON] = 50
     post(pays.world, pays.theirs, 'iron', 1, NPC_SMITHY_WEAPON, 1)
-    expect(planCity(pays.world, pays.city, pays.terrain).trader).toBeUndefined()
+    expect(planCity(pays.world, pays.city, pays.terrain).traders?.[0]).toBeUndefined()
   })
 
   it('pays in Coins from its war chest, and takes Coins for what it has spare', () => {
     const buying = setup()
     post(buying.world, buying.theirs, 'iron', 1, 'coins', 1, 50)
     const plan = planCity(buying.world, buying.city, buying.terrain)
-    expect(plan.trader?.offer?.pays).toBe('coins')
+    expect(plan.traders?.[0]?.offer?.pays).toBe('coins')
     const selling = setup()
     selling.storage.stock!.coins = 0
     selling.storage.stock!.iron = 100
     selling.storage.stock![NPC_SMITHY_WEAPON] = 20
     post(selling.world, selling.theirs, 'coins', 200, 'wood', 1)
-    expect(planCity(selling.world, selling.city, selling.terrain).trader?.offer?.pays).toBe('wood')
+    expect(planCity(selling.world, selling.city, selling.terrain).traders?.[0]?.offer?.pays).toBe('wood')
   })
 
   it('refuses a realm it holds in low standing', () => {
     const { world, terrain, city, theirs } = setup()
     post(world, theirs, 'iron', 5, 'wood', 5)
     changeStanding(world, city.id, 'r1', NPC_CITY_REFUSES_STANDING - 1)
-    expect(planCity(world, city, terrain).trader).toBeUndefined()
+    expect(planCity(world, city, terrain).traders?.[0]).toBeUndefined()
   })
 
   it('goes for the good it is shortest of, then the nearest', () => {
@@ -291,16 +291,16 @@ describe('an NPC city at an offer', () => {
     post(world, theirs, 'iron', 5, 'wood', 5)
     const near = post(world, nearer, 'iron', 5, 'wood', 5)
     expect(storage.stock!.iron ?? 0).toBe(0)
-    expect(planCity(world, city, terrain).trader?.offer?.offerId).toBe(near.id)
+    expect(planCity(world, city, terrain).traders?.[0]?.offer?.offerId).toBe(near.id)
   })
 
   it('looks only on its planning hour', () => {
     const { world, terrain, city, theirs } = setup()
     post(world, theirs, 'iron', 5, 'wood', 5)
     const walking = new Walking(terrain)
-    while (!world.cityPlans[city.id]?.trader) {
+    while (!world.cityPlans[city.id]?.traders?.[0]) {
       stepWorld(world, terrain, walking)
-      if (world.cityPlans[city.id]?.trader) {
+      if (world.cityPlans[city.id]?.traders?.[0]) {
         expect(planDue({ ...world, tick: world.tick - 1 }, city)).toBe(true)
       }
     }
@@ -310,11 +310,11 @@ describe('an NPC city at an offer', () => {
     const wood = setup()
     wood.storage.stock!.food = 0
     post(wood.world, wood.theirs, 'iron', 5, 'wood', 5)
-    expect(planCity(wood.world, wood.city, wood.terrain).trader).toBeUndefined()
+    expect(planCity(wood.world, wood.city, wood.terrain).traders?.[0]).toBeUndefined()
     const food = setup()
     food.storage.stock!.food = 0
     post(food.world, food.theirs, 'food', 10, 'wood', 5)
-    expect(planCity(food.world, food.city, food.terrain).trader?.offer?.pays).toBe('wood')
+    expect(planCity(food.world, food.city, food.terrain).traders?.[0]?.offer?.pays).toBe('wood')
   })
 
   it(
@@ -338,7 +338,7 @@ describe('an NPC city at an offer', () => {
       run(world, terrain, 12, () => {
         expect(offersKeepGoods.check(world, terrain)).toEqual([])
         expect(worldHolds(world, 'coins')).toBe(coins)
-        const plans = [world.cityPlans[a.city.id]?.trader, world.cityPlans[b.city.id]?.trader]
+        const plans = [world.cityPlans[a.city.id]?.traders?.[0], world.cityPlans[b.city.id]?.traders?.[0]]
         out ||= plans.every((t) => t?.offer)
         return out && plans.every((t) => !t)
       })
@@ -361,7 +361,7 @@ describe('an NPC city at an offer', () => {
       const offer = post(world, theirs, 'iron', 5, 'coins', 10)
       const coins = storage.stock!.coins!
       run(world, terrain, 2, () => {
-        const t = world.cityPlans[city.id]?.trader
+        const t = world.cityPlans[city.id]?.traders?.[0]
         if (t?.offer?.leg === 'walking') world.offers = world.offers.filter((o) => o !== offer)
         return world.offers.length === 0
       })
@@ -396,7 +396,7 @@ describe('an NPC city at an offer', () => {
     const warehouse = world.buildings.find((b) => b.cityId === post_.id && b.kind === 'warehouse')!
     warehouse.stock = {}
     post(world, theirs, 'wood', 100, 'coins', 1, 1)
-    expect(planCity(world, post_, terrain).trader).toBeUndefined()
+    expect(planCity(world, post_, terrain).traders?.[0]).toBeUndefined()
     // And the invariant would say so if one of its residents ever did.
     stepWorld(world, terrain)
     expect(tradeOrgOnlyBuysFood.check(world, terrain)).toEqual([])

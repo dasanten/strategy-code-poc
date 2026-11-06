@@ -4,6 +4,8 @@ import {
   HORSE_START_AGE_MIN,
   TICKS_PER_GAME_YEAR,
   inCityArea,
+  type CityPlan,
+  type CityTrader,
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
@@ -22,7 +24,7 @@ import { placeTraders, putHqOnLoops } from './traders.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 104
+export const WORLD_FORMAT_VERSION = 105
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -456,6 +458,16 @@ export const migrations: Record<number, MigrationStep> = {
   // An NPC city's plan may keep the streets its road crew builds next (`CityPlan.streets`). No plan
   // has any yet, and the next pass works them out. So the step leaves every world as it is.
   103: (state) => state,
+  // A bigger NPC city has more traders out (`CONTEXT.md`: NPC trader), so `CityPlan.trader` becomes
+  // the list `CityPlan.traders`. A run under way carries on as the first of it.
+  104: (state) => {
+    const world = structuredClone(state) as WorldState
+    for (const plan of Object.values(world.cityPlans) as (CityPlan & { trader?: CityTrader })[]) {
+      if (plan.trader) plan.traders = [plan.trader]
+      delete plan.trader
+    }
+    return world
+  },
 }
 
 export class WorldFormatError extends Error {}

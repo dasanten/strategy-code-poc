@@ -309,8 +309,9 @@ function runCity(
       walkTo(r, home)
       continue
     }
-    if (plan?.trader?.residentId === r.id && !city.tradeOrg) {
-      runTrader(world, city, plan, r, storage, size)
+    const run = city.tradeOrg ? undefined : plan?.traders?.find((t) => t.residentId === r.id)
+    if (run) {
+      runTrader(world, city, plan!, run, r, storage, size)
       continue
     }
     // Carrying a child, they get no work and stand at a house, where they take their meals; a load

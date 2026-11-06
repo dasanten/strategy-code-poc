@@ -183,9 +183,11 @@ function keepSoldiers(
     else delete r.script
   }
   if (soldiers.length >= target) return
-  // Its trader (`CONTEXT.md`: NPC trader) is never made a soldier.
-  const trader = world.cityPlans[city.id]?.trader?.residentId
-  const unarmed = adults.filter((r) => !isArmed(r) && r.order?.kind !== 'attack' && r.id !== trader)
+  // Its traders (`CONTEXT.md`: NPC trader) are never made soldiers.
+  const traders = world.cityPlans[city.id]?.traders ?? []
+  const unarmed = adults.filter(
+    (r) => !isArmed(r) && r.order?.kind !== 'attack' && !traders.some((t) => t.residentId === r.id),
+  )
   if (unarmed.length === 0) return
 
   const smithy = world.buildings.find(
