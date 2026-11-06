@@ -39,6 +39,7 @@ import {
   type GoodsSpot,
   type Resident,
   type Stock,
+  type TerrainMap,
   type Trader,
   type WorldState,
   isAt,
@@ -54,7 +55,7 @@ import { residentNamesTaken } from './names.js'
 import { hash, mulberry32, newResident } from './residents.js'
 import { newId } from './starting-city.js'
 import { hqLayout, tradeOrgHq } from './trade-org.js'
-import { tradingPosts } from './trading-posts.js'
+import { restoreWarehouse, storagesBecomeWarehouses, tradingPosts } from './trading-posts.js'
 import { worldIndex } from './world-index.js'
 
 /*
@@ -153,6 +154,32 @@ export function leaveTradeOrg(world: WorldState, post: City): void {
   }
   world.deliveries = world.deliveries.filter((d) => !warehouses.has(d.warehouseId))
   world.transfers = world.transfers.filter((t) => !warehouses.has(t.warehouseId))
+}
+
+/**
+ * A lost post comes back to the Trade Organization (`CONTEXT.md`: Trade Org debt), the other way from
+ * `leaveTradeOrg`: it is a trading post again, its warehouse one again with all it holds, so it has
+ * its stock floor and prices back, and the HQ gives it a caravan. Wandering traders put it back on
+ * their loops by themselves (`stepTraders`).
+ */
+export function rejoinTradeOrg(world: WorldState, post: City, size: number): void {
+  post.tradeOrg = 'post'
+  restoreWarehouse(world, post, size)
+  placeCaravans(world)
+}
+
+/**
+ * A city the Trade Organization's army took joins it as a new trading post (`CONTEXT.md`: Trade Org
+ * debt): its storages become warehouses, so it has a stock floor and prices, and the HQ gives it a
+ * caravan. Its gates stand open for those who come to trade, as a post never shuts them, and it
+ * remembers no former Player. Wandering traders put it on their loops by themselves (`stepTraders`).
+ */
+export function joinTradeOrg(world: WorldState, city: City, terrain: TerrainMap): void {
+  city.tradeOrg = 'post'
+  delete city.formerPlayer
+  storagesBecomeWarehouses(world, city, terrain)
+  for (const b of world.buildings) if (b.cityId === city.id && b.kind === 'gate') delete b.closed
+  placeCaravans(world)
 }
 
 /**
@@ -277,7 +304,7 @@ function replaceDriver(world: WorldState, caravan: Convoy): void {
  * The adults of the HQ `hqId` who can be taken on for a caravan (`CONTEXT.md`: Caravan, Caravan
  * crew lost): unarmed and up, idle or at work, not on another caravan, punishing, or hired out.
  */
-function freeHands(world: WorldState, hqId: string | null): Resident[] {
+export function freeHands(world: WorldState, hqId: string | null): Resident[] {
   const crew = caravanCrew(world)
   const away = punishers(world)
   return world.residents.filter(
@@ -362,7 +389,7 @@ export const ofTradeOrg = (world: WorldState, r: Resident) => {
  */
 export function caravanThreats(
   world: WorldState,
-  caravan: Convoy,
+  caravan: Pick<Caravan, 'driverId' | 'escortIds'>,
   carriage: Carriage,
   size: number,
 ): Resident[] {

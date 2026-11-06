@@ -11,7 +11,7 @@ import { tearDown } from './teardown.js'
 import { breed } from './breeding.js'
 import { drop, pickUp } from './carrying.js'
 import { fetch, store } from './storing.js'
-import { drive, unhitch } from './driving.js'
+import { drive, hitch, unhitch } from './driving.js'
 import { haul, stop } from './hauling.js'
 import { pair } from './pairing.js'
 import { relocate } from './relocating.js'
@@ -32,10 +32,11 @@ import { contractOrders, pay } from './contracts.js'
 import { demandOrders } from './demands.js'
 import { buyCity } from './buying.js'
 import { persuasionOrders } from './persuasion.js'
-import { buy, sell, swap } from './trading.js'
+import { buy, buyHorse, sell, sellHorse, swap } from './trading.js'
 import { offerOrders } from './offers.js'
 import { handInOrder, transfer } from './transfers.js'
 import { buyOff } from './directives.js'
+import { payDebt } from './trade-org-debt.js'
 import { handOver } from './leader.js'
 import { rename, renameCity, renameHorse } from './renaming.js'
 import { claimHorses } from './horse-grant.js'
@@ -90,6 +91,7 @@ export const orderKinds: Record<string, OrderKind> = Object.fromEntries(
     walkTo,
     drive,
     unhitch,
+    hitch,
     haul,
     stop,
     pickUp,
@@ -118,9 +120,12 @@ export const orderKinds: Record<string, OrderKind> = Object.fromEntries(
     buy,
     sell,
     swap,
+    buyHorse,
+    sellHorse,
     handIn: handInOrder,
     transfer,
     buyOff,
+    payDebt,
     handOver,
     rename,
     renameCity,

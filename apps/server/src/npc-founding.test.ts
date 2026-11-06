@@ -21,6 +21,7 @@ import { CITY_NAMES, foundCity, updateCityMembership } from './cities.js'
 import { checkInvariants } from './invariants.js'
 import { npcHome } from './npc-behaviour.js'
 import { foundNpcCity } from './npc-cities.js'
+import { farStableSpot } from './npc-growth.js'
 import { findFoundingSite, foundingParty } from './npc-founding.js'
 import { plains } from './npc-growth.fixture.js'
 import { planCity } from './npc-plan.js'
@@ -44,7 +45,8 @@ function node(world: WorldState, terrain: TerrainMap, kind: ResourceKind, x: num
 
 /**
  * A town alone on a Plains map of `size` with its storage full of everything its reserve wants,
- * so it is short of nothing, and more hands than its farms take.
+ * so it is short of nothing, and more hands than its farms take. It has its stable already, as
+ * one this far along does (`CONTEXT.md`: NPC horses), with nothing left to build but a daughter.
  */
 function fullTown(size: number): { world: WorldState; terrain: TerrainMap; city: City } {
   const terrain = plains(size)
@@ -52,6 +54,8 @@ function fullTown(size: number): { world: WorldState; terrain: TerrainMap; city:
   const city = foundNpcCity(world, terrain, NPC_TOWN, 60, 60, mulberry32(5))
   const home = npcHome(world, city)!
   home.stock = { food: 3000, wood: 800, stone: 800, iron: 200, spear: 20, coins: 1000 }
+  const stable = farStableSpot(world, city, home, terrain)!
+  world.buildings.push({ id: 'stable0', kind: 'stable', cityId: city.id, ...stable })
   return { world, terrain, city }
 }
 
@@ -155,6 +159,8 @@ describe('a full city', () => {
       const people = world.residents.filter((r) => r.cityId === village!.id)
       expect(people.length).toBe(NPC_VILLAGE.residents)
       expect(people.some((r) => r.carried.spear || r.carried.sword)).toBe(true)
+      // A founding party takes no horses (`CONTEXT.md`: NPC horses).
+      expect(world.horses.filter((h) => h.cityId === village!.id)).toEqual([])
       const standing = (of: string, toward: string) =>
         world.standings.find((s) => s.of === of && s.toward === toward)?.value ?? 0
       expect(standing(city.id, village!.id)).toBeGreaterThan(NPC_FOUND_STANDING - 1)

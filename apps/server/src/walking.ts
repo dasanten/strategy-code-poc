@@ -50,6 +50,7 @@ import { waitingForArmy } from './armies.js'
 import { waitingForEscort } from './caravans.js'
 import { attackTarget } from './combat.js'
 import { endOrder, placeOf, placeTile } from './storing.js'
+import { waitingOnTheRoad } from './trade-org-punishment.js'
 import { worldIndex } from './world-index.js'
 
 /** Time the pathfinder may use per tick (ADR 0004: ticks stay well under their 1 s budget). */
@@ -327,6 +328,8 @@ export class Walking {
     const waiting = waitingForArmy(world, holding)
     // And caravans with their escort (`CONTEXT.md`: Caravan).
     for (const id of waitingForEscort(world, this.terrain.size)) waiting.add(id)
+    // And the Trade Org's soldiers on the road (`CONTEXT.md`: Punishment trip).
+    for (const id of waitingOnTheRoad(world, this.terrain.size)) waiting.add(id)
     const steps: StepAction[] = []
     for (const r of world.residents) {
       const o = moveOrder(r)

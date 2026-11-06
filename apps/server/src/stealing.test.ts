@@ -463,6 +463,15 @@ describe('never by accident', () => {
     }
   })
 
+  it('keeps hitching to the realm’s own horses: it steals nothing', () => {
+    const { world, orders, horse } = setup()
+    const order = { kind: 'hitch', residentId: 't1', carriageId: 'k2', horseId: horse.id }
+    expect(orders.receive(world, mara, 'q', order)).toMatchObject({
+      reason: 'not a carriage of your realm',
+    })
+    expect(horse.realmId).toBe('r2')
+  })
+
   it('refuses another realm’s carriage in a queue, and skips a step whose carriage was stolen', () => {
     const { world, thief, carriage, horse, orders } = setup()
     const step = { order: { kind: 'drive', carriageId: 'k2', x: 25, y: 20 } }

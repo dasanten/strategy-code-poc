@@ -256,6 +256,85 @@ export const HORSE_WAKE_HEALTH = 20
 export const STABLE_FEED_DAYS = 10
 
 /**
+ * Game days of Food for its horses below which an NPC city sends one of its residents to fill its
+ * stable up to `STABLE_FEED_DAYS` (`CONTEXT.md`: NPC horses). Half of it, so they go in one trip
+ * every few days and work for the city in between, rather than walk for every unit eaten.
+ */
+export const NPC_STABLE_REFILL_DAYS = 5
+
+/**
+ * Game days of Food for each hungry horse an NPC city takes from below its Food reserve
+ * (`CONTEXT.md`: NPC horses): enough to get them past hungry, so its people still come first.
+ */
+export const NPC_STABLE_HUNGRY_DAYS = 2
+
+/** Horses a new NPC village or town starts with (`CONTEXT.md`: NPC horses): a pair to breed. */
+export const NPC_START_HORSES = 2
+
+/**
+ * Game days of Food laid on the ground by an NPC city's first horses (`CONTEXT.md`: NPC horses),
+ * for each of them: long enough for a new village to find the Wood and put up its stable, whose
+ * feeder takes over from there.
+ */
+export const NPC_START_HORSE_FOOD_DAYS = 40
+
+/**
+ * The horses an NPC city wants however small it is (`CONTEXT.md`: NPC horses): a pair, so even a
+ * new daughter has one to breed once a Player sells it some.
+ */
+export const NPC_HORSES_BASE = 2
+
+/**
+ * Residents of an NPC city for each horse it wants beyond `NPC_HORSES_BASE`, up to what a stable
+ * holds (`STABLE_CAPACITY`): a village of 6 wants 4, a town of 16 wants the full 6.
+ */
+export const NPC_RESIDENTS_PER_HORSE = 3
+
+/**
+ * The horses an NPC city keeps to breed from and won't sell (`CONTEXT.md`: Horse market): a
+ * breeding pair.
+ */
+export const NPC_HORSES_KEPT = 2
+
+/**
+ * What an NPC city asks for an average new horse with as many as it wants, in Coins (`CONTEXT.md`:
+ * Horse market): about what a stolen one is worth (`HORSE_STOLEN_WORTH`).
+ */
+export const HORSE_PRICE_BASE = 100
+
+/**
+ * How much more a horse costs for each point its mean stat is above average (less below), as a
+ * share: the full range of new horses goes from half the price to half as much again, so breeding
+ * good ones pays.
+ */
+export const HORSE_PRICE_PER_STAT = 0.1
+
+/** The least a horse's stats leave of its price, for a foal bred far below the range. */
+export const HORSE_PRICE_STATS_FLOOR = 0.25
+
+/** How much less a horse costs for each game year of its age, as a share. */
+export const HORSE_PRICE_AGE_PER_YEAR = 0.03
+
+/** The least a horse's age leaves of its price. */
+export const HORSE_PRICE_AGE_FLOOR = 0.5
+
+/**
+ * How much more an NPC city asks for the last horse it would sell, beyond the pair it keeps, as a
+ * share: twice the price of one it has as many as it wants of.
+ */
+export const HORSE_PRICE_SCARCITY = 1
+
+/** How much less an NPC city asks at most with more horses than it wants, as a share. */
+export const HORSE_PRICE_GLUT = 0.25
+
+/**
+ * What an NPC city pays for a horse, as a share of what it would ask for it with that horse among
+ * its own (`CONTEXT.md`: Horse market): as much as it pays for goods against what it sells them for
+ * (`BUY_SHARE`).
+ */
+export const HORSE_PRICE_PAID_SHARE = 0.6
+
+/**
  * Ticks without a blow after which the Defend default ends for a resident fleeing home
  * (`CONTEXT.md`: Defence script): half a minute, so a lone blow from someone who walks off
  * doesn't send them all the way home. Written into the default's source, where a Player can
@@ -1391,9 +1470,18 @@ export const CRIME_STANDING_LOSS: Record<CrimeKind, number> = {
 
 /**
  * Coins of trade that raise standing by one point, both ways between the trader's realm and the
- * Trade Organization (`CONTEXT.md`: Standing). About two spears' worth.
+ * Trade Organization, or between two realms (`CONTEXT.md`: Standing). About two spears' worth.
  */
 export const STANDING_TRADE_COINS_PER_POINT = 50
+
+/**
+ * Coins of trade that raise standing by one point, both ways between the trader's realm and an NPC
+ * city (`CONTEXT.md`: Standing, Trading with an NPC city). A village's surplus grows by about 12
+ * coins' worth a game day, so buying half of it and selling back half of that holds about 0.9 points
+ * a game day against a drift of `STANDING_DRIFT_PER_DAY`: `PERSUADE_STANDING` in about two real days
+ * for a Player who trades there regularly.
+ */
+export const STANDING_NPC_TRADE_COINS_PER_POINT = 10
 
 /** Standing each paid game week of a mercenary contract raises, both ways between its sides. */
 export const STANDING_PER_PAID_WEEK = 0.8
@@ -1537,15 +1625,48 @@ export const TRADE_ORG_PUNISH = {
    */
   packRoom: 3,
   /**
-   * Tiles from a trading post's storage within which a soldier short of Food counts as passing it
-   * and goes to refill: about a third of a game day's walk, little against what it brings.
+   * Tiles from a place within which a soldier short of Food counts as passing it and goes to refill
+   * or buy: about a third of a game day's walk, little against what it brings.
    */
   postReach: 60,
+  /**
+   * Coins a soldier packs at the HQ to buy Food on the way (`CONTEXT.md`: Trade Org debt): the
+   * longest trip's Food at about three Coins a unit, 1.2 kg of their hands. What is left goes back
+   * into the HQ's coin warehouse when they are home.
+   */
+  purse: 60,
+  /**
+   * The most Coins a soldier pays for a unit of Food at a Player's offer: three times what a
+   * warehouse asks at its usual stock. Above that they pass it by, or an offer of one Food at any
+   * price would empty their purse.
+   */
+  offerFoodPrice: 6,
   /**
    * How many times the straight walk over Plains it keeps trying to reach the city (never less
    * than `giveUpDays`). Past that it has no way there, as with every gate shut, and turns back.
    */
   roadTimes: 3,
+  /**
+   * Kilos its supply wagon keeps free of Food, whatever the trip asks for, for what the army takes
+   * (`CONTEXT.md`: Trade Org debt): a quarter of a carriage, 5,000 Coins or 100 Iron.
+   */
+  wagonRoom: 100,
+  /**
+   * Tiles from its supply wagon within which a soldier carries what they took over to it, rather
+   * than on home: as far as they would go for a trading post (`postReach`).
+   */
+  wagonReach: 60,
+  /**
+   * Ticks between a supply wagon's tries to set off after its army: only a failed search for a way
+   * tries again, and these keep a wagon with no way from searching every tick.
+   */
+  wagonRetryTicks: 60,
+  /**
+   * Tiles from its army within which a supply wagon goes after them step by step, finding its way
+   * again as they move. Further behind it first drives to where they were: a search that far takes
+   * longer than they take to move on, so it would never end.
+   */
+  wagonFollowReach: 48,
 }
 
 /**
@@ -1556,6 +1677,19 @@ export const TRADE_ORG_PUNISH = {
 export function tripFood(tiles: number): number {
   const days = (tiles * WALK_TICKS_PER_TILE * TRADE_ORG_PUNISH.walkMargin) / TICKS_PER_GAME_DAY
   return Math.ceil(days * FOOD_PER_DAY)
+}
+
+/**
+ * The Food a supply wagon means to set out with (`CONTEXT.md`: Trade Org debt), for `soldiers` going
+ * `tiles` there and back as much: all of the trip's for each of them, as they may pack little, for
+ * its driver and for its horse. A carriage takes it only as far as it keeps
+ * `TRADE_ORG_PUNISH.wagonRoom` free.
+ */
+export function wagonFoodFor(tiles: number, soldiers: number): number {
+  const walk = tripFood(2 * tiles)
+  const stay = TRADE_ORG_PUNISH.giveUpDays * FOOD_PER_DAY
+  const horse = ((walk + stay) / FOOD_PER_DAY) * HORSE_FOOD_PER_DAY
+  return Math.ceil((soldiers + 1) * (walk + stay) + horse)
 }
 
 /**
@@ -1714,6 +1848,23 @@ export const WORKPLACE_MAX_WORKERS: Partial<Record<BuildingKind, number>> = {
   smelter: 4,
   mint: 4,
   smithy: 4,
+}
+
+/**
+ * What each kind of workplace counts for against a debt when the Trade Organization's army tears it
+ * down (`CONTEXT.md`: Trade Org debt), in Coins: about its materials at their warehouse base price and
+ * 20 Coins for each game day of a builder's work (as `CARRIAGE_STOLEN_WORTH` weighs a carriage), and
+ * never less than 100, as a farm or lumber camp is cheap to build but worth more than that to a city.
+ * So a debt for a killing (`TRADE_ORG_LOSS`, twice) takes about two to four workplaces.
+ */
+export const WORKPLACE_WRECK_WORTH: Partial<Record<BuildingKind, number>> = {
+  farm: 100,
+  lumberCamp: 100,
+  quarry: 120,
+  mine: 200,
+  smelter: 200,
+  mint: 280,
+  smithy: 300,
 }
 
 /**
@@ -2379,6 +2530,19 @@ export const DEMANDS_PER_GAME_DAY = 3
  * Player who comes by once a day can still answer.
  */
 export const DEMAND_MAX_DAYS = 60
+
+/**
+ * The deadline of the Trade Organization's demand for a debt, in game days (`CONTEXT.md`: Trade Org
+ * debt): one real day, the longest a demand has, so a Player who comes by once a day can still pay.
+ */
+export const TRADE_ORG_DEBT_DEMAND_DAYS = 60
+
+/**
+ * How many of the Trade Organization's armies come to tear down workplaces for a debt before its next
+ * one comes to hold the town hall and take the city (`CONTEXT.md`: Trade Org debt): two, so a Player
+ * who loses workplaces once and again still has time to pay before it comes to that.
+ */
+export const TRADE_ORG_DEBT_TRIPS = 2
 
 /** The deadline the Demands form starts with, in game days: a game week. */
 export const DEMAND_DEFAULT_DAYS = 7

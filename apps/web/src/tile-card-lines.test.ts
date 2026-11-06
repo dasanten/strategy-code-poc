@@ -425,6 +425,26 @@ describe('buildings on a tile’s card', () => {
     expect(tradesHere(storage, { id: 'c-me', name: 'Eastmere', realmId: 'me' })).toBe(false)
     // A warehouse whose prices the Player doesn't see.
     expect(tradesHere({ kind: 'warehouse' }, post)).toBe(false)
+    // An NPC city's stable, with horses it lists there (`CONTEXT.md`: Horse market).
+    const offer = {
+      horseId: 'h1',
+      stableId: 'st1',
+      name: 'Onyx',
+      stats: { speed: 10, strength: 10, endurance: 10 },
+      bornAt: 0,
+      price: 100,
+    }
+    const stable = { id: 'st1', kind: 'stable' as const }
+    const herd = { ...npc, horses: [offer] }
+    expect(tradesHere(stable, herd)).toBe(true)
+    expect(tradesHere({ id: 'st2', kind: 'stable' }, herd)).toBe(false)
+    expect(tradesHere(stable, npc)).toBe(false)
+    expect(tradesHere(stable, { ...herd, refuses: true })).toBe(false)
+    // Or with a horse of the Player's standing in it, though it has none to sell.
+    const mine = { ...npc, horsesToSell: [offer] }
+    expect(tradesHere(stable, mine)).toBe(true)
+    expect(tradesHere({ id: 'st2', kind: 'stable' }, mine)).toBe(false)
+    expect(tradesHere(stable, { ...mine, refuses: true })).toBe(false)
   })
 
   it('offers no Trade here on a warehouse only remembered', () => {

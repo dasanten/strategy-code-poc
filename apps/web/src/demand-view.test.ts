@@ -67,6 +67,14 @@ describe('the notice', () => {
     )
   })
 
+  it('names the Trade Organization as itself, not a realm (`CONTEXT.md`: Trade Org debt)', () => {
+    const from = demand('a', 'trade-org', 'r1', { terms: { kind: 'goods', goods: { coins: 40 } } })
+    from.from = { realmId: 'trade-org', realm: 'the Trade Organization' }
+    expect(demandNoticeLine([from], 'r1', noSet, false)).toBe(
+      'The Trade Organization demands 40 Coins of you',
+    )
+  })
+
   it('stays quiet for the sender, for what is put away and while the drawer is open', () => {
     const one = [demand('a', 'r2', 'r1')]
     expect(demandNoticeLine(one, 'r2', noSet, false)).toBeUndefined()
@@ -127,6 +135,31 @@ describe('accepting a demand for a city', () => {
     expect(handOverQuestion(forAshford, 'r1', [own])).toMatch(/It is your last city\.$/)
   })
 
+  it('asks about giving a captured post back to the Trade Organization, and says so after', () => {
+    const terms = { kind: 'city', cityId: 'c1', cityName: 'Ashford' } as const
+    const back = demand('a', 'trade-org', 'r1', { terms })
+    expect(
+      handOverQuestion(back, 'r1', [city('c1', 'Ashford', 'r1'), city('c2', 'Zell', 'r1')]),
+    ).toBe(
+      'Give Ashford back to the Trade Organization as a trading post, with those who live there, its horses and carriages? That settles its worth of your debt. This can’t be undone.',
+    )
+    const line = describeEvent({
+      kind: 'demand',
+      demandId: 'd',
+      what: 'accepted',
+      mine: false,
+      other: 'the Trade Organization',
+      otherIs: 'tradeOrg',
+      terms,
+      seq: 1,
+      tick: 0,
+      userId: 1,
+    })
+    expect(line.text).toBe(
+      'You gave Ashford back to the Trade Organization: it is a trading post again.',
+    )
+  })
+
   it('doesn’t ask for goods, or for a city no longer theirs, which the server refuses', () => {
     expect(handOverQuestion(demand('a', 'r2', 'r1'), 'r1', [])).toBeUndefined()
     expect(handOverQuestion(forAshford, 'r1', [city('c1', 'Ashford', 'r3')])).toBeUndefined()
@@ -165,9 +198,7 @@ describe('a demand the game answers', () => {
     expect(line('accepted', forAshby, 'Ashby', 'city')).toBe(
       'Ashby gave in to your demand and joined your realm.',
     )
-    expect(line('sent', forAshby, 'Ashby', 'city')).toBe(
-      'You demanded that Ashby join your realm.',
-    )
+    expect(line('sent', forAshby, 'Ashby', 'city')).toBe('You demanded that Ashby join your realm.')
     expect(line('declined', forAshby, 'Ashby', 'city')).toBe(
       'Ashby declined to join your realm, and thinks less of you.',
     )
@@ -344,6 +375,20 @@ describe('how the realm log tells goods handed over', () => {
 })
 
 describe('the Demands drawer', () => {
+  it('shows the Trade Organization’s demand for a debt: its army follows, its caravan fetches', () => {
+    const debt = demand('a', 'trade-org', 'r1', { terms: { kind: 'goods', goods: { coins: 40 } } })
+    debt.from = { realmId: 'trade-org', realm: 'the Trade Organization' }
+    debt.note = 'Pay what you owe.'
+    const html = panel([debt])
+    expect(html).toContain('The Trade Organization demands 40 Coins')
+    expect(html).toContain('Pay what you owe.')
+    expect(html).toContain('its next army comes for your workplaces')
+    expect(html).not.toContain('Ignoring it does nothing by itself')
+    expect(html).toContain('Set aside for its caravan to fetch')
+    expect(html).toContain('A caravan of the Trade Organization comes to fetch them')
+    expect(html).not.toContain('To their city')
+  })
+
   const panel = (demands: DemandView[], noCaravans = false) =>
     renderToStaticMarkup(
       createElement(DemandsPanel, {
@@ -442,6 +487,35 @@ describe('the realm log', () => {
       tick: 0,
       userId: 1,
     } as never).text
+
+  it('tells of the Trade Organization’s demand for a debt (`CONTEXT.md`: Trade Org debt)', () => {
+    const debt = (what: string, extra: object = {}) =>
+      describeEvent({
+        kind: 'demand',
+        demandId: 'd',
+        what,
+        mine: false,
+        other: 'the Trade Organization',
+        otherIs: 'tradeOrg',
+        terms: { kind: 'goods', goods: { coins: 40 } },
+        seq: 1,
+        tick: 0,
+        userId: 1,
+        ...extra,
+      } as never).text
+    expect(debt('received')).toBe('The Trade Organization demands 40 Coins of you.')
+    expect(debt('declined')).toBe('You declined the demand of the Trade Organization for 40 Coins.')
+    expect(debt('lapsed')).toBe(
+      'The demand of the Trade Organization for 40 Coins lapsed unanswered.',
+    )
+    expect(
+      debt('accepted', {
+        handedOver: { way: 'setAside', goods: { coins: 40 }, x: 1, y: 2 },
+      }),
+    ).toBe(
+      'You accepted the demand of the Trade Organization for 40 Coins: 40 Coins set aside at the storage, for its caravan to fetch.',
+    )
+  })
 
   it('says what happened on each side', () => {
     expect(line('sent', true)).toBe('You demanded Ashford of the realm of Tobin.')

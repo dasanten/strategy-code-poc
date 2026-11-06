@@ -38,6 +38,8 @@ import {
   NPC_VILLAGE,
   npcCityStock,
   npcReserve,
+  covers,
+  ownsHorse,
 } from '@csp/shared'
 import { hqGrows, hqHouseTile, hqProject, hqRings } from './hq-growth.js'
 import { walkTo } from './npc-behaviour.js'
@@ -46,6 +48,7 @@ import { pair } from './pairing.js'
 import { PROCESSED_BY, chainInput, chainStore, makes, shortGoods } from './npc-chain.js'
 import { knowsNode } from './npc-scouts.js'
 import { Ground } from './placing.js'
+import { residentTiles } from './starting-city.js'
 
 /**
  * How an NPC city grows (`CONTEXT.md`: NPC city): it pairs its adults, builds a house when it has a
@@ -495,8 +498,7 @@ function wanted(
   }
   if (!city.tradeOrg) {
     const stable =
-      wantsStable(world, city) &&
-      at('stable', houseTile(world, city, home, terrain, rings, 'stable'))
+      wantsStable(world, city) && at('stable', stableTile(world, city, home, terrain, rings))
     if (stable) return stable
     for (const good of shortGoods(world, city)) {
       const chain = chainProject(world, city, home, terrain, rings, good)
@@ -540,12 +542,77 @@ function firstWall(
 }
 
 /**
- * Whether an NPC city wants a stable (`CONTEXT.md`: NPC reserve): a living horse of it, and no
- * stable of it, finished or begun.
+ * Whether an NPC city wants a stable (`CONTEXT.md`: NPC reserve, NPC horses): no stable of it,
+ * finished or begun, and a living horse of it; with none, a daughter say, once nothing is short of
+ * its reserve, so a Player can sell it some.
  */
 function wantsStable(world: WorldState, city: City): boolean {
-  if (!world.horses.some((h) => h.cityId === city.id && h.health > 0)) return false
-  return !world.buildings.some((b) => b.kind === 'stable' && b.cityId === city.id)
+  if (world.buildings.some((b) => b.kind === 'stable' && b.cityId === city.id)) return false
+  if (world.horses.some((h) => h.cityId === city.id && h.health > 0)) return true
+  return shortGoods(world, city).length === 0
+}
+
+/**
+ * Where an NPC city puts its stable, by the north-west tile of its footprint: over its horses when
+ * one fits there, so that they stand in it once it is finished (`CONTEXT.md`: NPC horses); else where
+ * it would put a house (`houseTile`).
+ */
+function stableTile(
+  world: WorldState,
+  city: City,
+  home: Building,
+  terrain: TerrainMap,
+  rings: Rings | undefined,
+): { x: number; y: number } | undefined {
+  const size = terrain.size
+  const horses = world.horses.filter((h) => ownsHorse({ cityId: city.id }, h))
+  const first = horses[0]
+  if (first) {
+    const area = cityAreaTiles(world, city, size)
+    const ground = new Ground(world, terrain)
+    // With them in the middle first, where the Food by them, gathered on its north-west tile
+    // (`CONTEXT.md`: A building's pile), stays in reach; else any footprint with the first on it.
+    const middle = Math.floor(FOOTPRINT.stable / 2)
+    const far = FOOTPRINT.stable - 1
+    const corners: [number, number][] = [
+      [wrap(first.x - middle, size), wrap(first.y - middle, size)],
+      ...footprintTiles({ kind: 'stable', x: first.x - far, y: first.y - far }, size),
+    ]
+    for (const [x, y] of corners) {
+      const over = horses.every((h) => covers({ kind: 'stable', x, y }, h.x, h.y, size))
+      if (over && ground.fits('stable', x, y, (tx, ty) => area.has(`${tx},${ty}`))) return { x, y }
+    }
+  }
+  return houseTile(world, city, home, terrain, rings, 'stable')
+}
+
+/**
+ * Where an NPC city's first horses stand while it has no stable (`giveNpcHorses`), by the north-west
+ * tile of a stable's footprint: wholly on free ground of its area, with nothing standing or lying
+ * there, inside its wall and as far from its home as that goes, as its houses and workplaces go up
+ * nearest it first and reach this last. None with no room.
+ */
+export function farStableSpot(
+  world: WorldState,
+  city: City,
+  home: Building,
+  terrain: TerrainMap,
+): { x: number; y: number } | undefined {
+  const size = terrain.size
+  const area = cityAreaTiles(world, city, size)
+  const ground = new Ground(world, terrain, residentTiles(world))
+  const rings = wallRings(world, city, home, size)
+  const inArea = (x: number, y: number) => area.has(`${x},${y}`)
+  const free = [...area]
+    .map((k) => {
+      const [x, y] = k.split(',').map(Number) as [number, number]
+      return { x, y, ...ringsOf(home, { kind: 'stable', x, y }, size) }
+    })
+    .filter((t) => ground.fits('stable', t.x, t.y, inArea))
+    .filter((t) => !rings || t.far < rings.inner)
+    .sort((a, b) => b.near - a.near || a.y - b.y || a.x - b.x)
+  const spot = free[0]
+  return spot && { x: spot.x, y: spot.y }
 }
 
 /** Whether the city has farms and none of them has room for another worker, coming or there. */
