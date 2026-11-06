@@ -1081,9 +1081,10 @@ export function Wiki() {
           trained bonus from nothing to its cap (+{num(trainedCap(AVERAGE_STATS.strength))} on an
           average base of {num(AVERAGE_STATS.strength)}) in {days(trainingDays('strength'))}, a work
           skill to {num(WORK_SKILL_MAX)} in {days(trainingDays('mining'))},{' '}
-          {num(TRAIN_SKILL_FACTOR)} times as fast as by working, and Combat to its most in{' '}
-          {days(trainingDays('combat'))}. Training costs time and the food trainees eat; nothing
-          trained decays, though old age shrinks a trained stat with its base.
+          {num(TRAIN_SKILL_FACTOR)} times as fast as by working (Construction and Driving train that
+          much faster too), and Combat to its most in {days(trainingDays('combat'))}. Training costs
+          time and the food trainees eat; nothing trained decays, though old age shrinks a trained
+          stat with its base.
         </p>
         <p>
           Players' residents train, by order, queue step or script. NPC cities and the Trade

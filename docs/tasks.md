@@ -53,7 +53,10 @@ Quick wins 8 (Epic 74: hitching the horse you choose, realm goods in the top bar
 Living NPC cities (75, ADR 0026: road crews, scouts, work for surplus), City layouts (76) and Horse
 market (77, ADR 0027), in that order, all ahead of Bandits. Adding Claude API calls to NPC cities was
 looked at the same day and left out for now: these epics fix what makes them look idle, at no running
-cost. Tickets that need an earlier epic name it
+cost. Agreed with Daniel on 2026-11-06: the bug #936 (NPC soldiers don't fight occupiers) first, then
+Balance and art (Epic 78: coins, training numbers, a training ground image), City guards (79, ADR 0028:
+the Alarm script) and Busy big cities (80, ADR 0029: the planner scores its jobs, and big cities get
+more to do), in that order, all ahead of Bandits. Tickets that need an earlier epic name it
 under Depends on, and wait for it to reach `dev`.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
@@ -136,6 +139,9 @@ I sleep.
 | 75  | [Living NPC cities](https://github.com/dasanten/strategy-code-poc/issues/885)                   | ticketed                |
 | 76  | [City layouts](https://github.com/dasanten/strategy-code-poc/issues/891)                        | ticketed                |
 | 77  | [Horse market](https://github.com/dasanten/strategy-code-poc/issues/897)                        | ticketed                |
+| 78  | [Balance and art](https://github.com/dasanten/strategy-code-poc/issues/937)                     | ticketed                |
+| 79  | [City guards](https://github.com/dasanten/strategy-code-poc/issues/941)                         | ticketed                |
+| 80  | [Busy big cities](https://github.com/dasanten/strategy-code-poc/issues/947)                     | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
