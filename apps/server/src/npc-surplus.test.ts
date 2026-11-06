@@ -80,6 +80,9 @@ function town(size = 400) {
   const quarry = workplace(world, terrain, city, 'quarry', 'stone')
   const storage = npcHome(world, city)!
   storage.stock = pastReserve(world, city, { food: CAP.food })
+  // It knows its limit: scouts go ahead of surplus (`CONTEXT.md`: Scout), and these tests are the
+  // surplus's.
+  city.scouted = { sectors: [], done: true }
   return { world, terrain, city, camp, quarry, storage }
 }
 

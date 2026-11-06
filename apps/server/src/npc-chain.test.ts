@@ -126,6 +126,8 @@ describe('the reserve-driven chain', () => {
     world.buildings.push(smithy)
     city.workplaceIds = [...(city.workplaceIds ?? []), smithy.id]
     storage.stock = { food: 200, iron: 3, wood: 100 }
+    // It knows its limit, so the spare hand has no scouting to go to (`CONTEXT.md`: Scout).
+    city.scouted = { sectors: [], done: true }
     // Two of them: one farms for both, the other is a spare hand.
     const [farmer, smith] = world.residents.filter((r) => canWork(r, world.tick)) as [
       Resident,
