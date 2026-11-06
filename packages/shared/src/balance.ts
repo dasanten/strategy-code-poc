@@ -528,6 +528,13 @@ export const NPC_WALL_STEP = 8
 export const CITY_GRID_BLOCK = 4
 
 /**
+ * Tiles from one circular lane of the Rings layout to the next (`CONTEXT.md`: City layout), the first
+ * this far from the middle of the town hall: room between two lanes for a circle of houses, or
+ * stables, all the way round.
+ */
+export const CITY_RING_STEP = 5
+
+/**
  * How many tiles of wall an NPC city's builder fetches the materials for in one trip to the
  * storage (`CONTEXT.md`: NPC city, Fetching materials): a 40 m stretch's worth, so a long wall is
  * not one walk per tile. What a tile doesn't take goes to the next.

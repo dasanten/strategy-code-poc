@@ -1,6 +1,7 @@
 import {
   CITY_GRID_BLOCK,
   CITY_LAYOUTS,
+  CITY_RING_STEP,
   FOOTPRINT,
   middleOf,
   townHallOf,
@@ -47,8 +48,14 @@ export function layoutPlan(
   gate: { dx: number; dy: number } | undefined,
   size: number,
 ): LayoutPlan | undefined {
-  if (!city.layout) return undefined
-  return gridPlan(world, city, home, gate, size)
+  switch (city.layout) {
+    case undefined:
+      return undefined
+    case 'grid':
+      return gridPlan(world, city, home, gate, size)
+    case 'rings':
+      return ringsPlan(world, city, home, gate, size)
+  }
 }
 
 /** `n` counted up from 0 again every `by`, for negative numbers too. */
@@ -86,9 +93,79 @@ function gridPlan(
 }
 
 /**
- * The lines of tiles straight through the city's gates, and through where its next gate goes (south
- * of the home when it has no plan for one yet): a column for a gate north or south of the home, else
- * a row. The way out of a gate lies along these.
+ * How far either way of its line a circle of tiles reaches: half a tile's diagonal. Drawn that wide
+ * it has no gaps, its tiles joining side to side all the way round.
+ */
+const CIRCLE_REACH = Math.SQRT1_2
+
+/**
+ * Rings: circular lanes round the middle of the town hall, which never moves, `CITY_RING_STEP` tiles
+ * apart, so they stay put as the city grows. A circle of buildings runs halfway between each two
+ * lanes, with its footprints' middles on that line. Nothing goes inside the first lane: that is the
+ * town hall's. A way runs straight from each gate to the middle and leaves the far side of the town
+ * alone, so the circles close there.
+ */
+function ringsPlan(
+  world: Pick<WorldState, 'buildings'>,
+  city: City,
+  home: Building,
+  gate: { dx: number; dy: number } | undefined,
+  size: number,
+): LayoutPlan {
+  const anchor = middleOf(townHallOf(world, city) ?? home, size)
+  const ways = gateWays(world, city, home, anchor, gate, size)
+  return {
+    street: (x, y) => {
+      const dx = wrapDelta(anchor.x, x, size)
+      const dy = wrapDelta(anchor.y, y, size)
+      const far = Math.hypot(dx, dy)
+      const lane = Math.round(far / CITY_RING_STEP)
+      if (lane > 0 && Math.abs(far - lane * CITY_RING_STEP) <= CIRCLE_REACH) return true
+      return ways.some((way) => way(dx, dy))
+    },
+    spot: (kind, x, y) => {
+      const middle = (FOOTPRINT[kind] - 1) / 2
+      const far = Math.hypot(
+        wrapDelta(anchor.x, x, size) + middle,
+        wrapDelta(anchor.y, y, size) + middle,
+      )
+      const lane = Math.floor(far / CITY_RING_STEP)
+      return lane > 0 && Math.abs(far - (lane + 0.5) * CITY_RING_STEP) <= CIRCLE_REACH
+    },
+  }
+}
+
+/**
+ * The ways from the city's gates, and from where its next gate goes, to the middle, each saying
+ * whether a tile (relative to the middle) is on it: straight in along the gate's line until level
+ * with the middle, then along to it. The line goes on out past the gate too, where the next gate
+ * comes in line with it as the city grows.
+ */
+function gateWays(
+  world: Pick<WorldState, 'buildings'>,
+  city: City,
+  home: Building,
+  anchor: { x: number; y: number },
+  gate: { dx: number; dy: number } | undefined,
+  size: number,
+): ((dx: number, dy: number) => boolean)[] {
+  const homeDx = wrapDelta(anchor.x, home.x, size)
+  const homeDy = wrapDelta(anchor.y, home.y, size)
+  // `across` the gate's line and `along` it, from the middle; `out` is the way along it out of town.
+  const way =
+    (gateAcross: number, gateAlong: number, out: number) => (across: number, along: number) =>
+      (across === gateAcross && along * out >= Math.min(0, gateAlong * out)) ||
+      (along === 0 && across >= Math.min(0, gateAcross) && across <= Math.max(0, gateAcross))
+  return gateOffsets(world, city, home, gate, size).map(({ dx, dy }) => {
+    if (Math.abs(dy) >= Math.abs(dx)) return way(homeDx + dx, homeDy + dy, Math.sign(dy))
+    const onWay = way(homeDy + dy, homeDx + dx, Math.sign(dx))
+    return (x, y) => onWay(y, x)
+  })
+}
+
+/**
+ * The lines of tiles straight through the city's gates, and through where its next gate goes: a
+ * column for a gate north or south of the home, else a row. The way out of a gate lies along these.
  */
 function gateLanes(
   world: Pick<WorldState, 'buildings'>,
@@ -99,16 +176,28 @@ function gateLanes(
 ): { columns: Set<number>; rows: Set<number> } {
   const columns = new Set<number>()
   const rows = new Set<number>()
-  const add = (dx: number, dy: number) => {
+  for (const { dx, dy } of gateOffsets(world, city, home, gate, size)) {
     if (Math.abs(dy) >= Math.abs(dx)) columns.add(wrap(home.x + dx, size))
     else rows.add(wrap(home.y + dy, size))
   }
-  for (const b of world.buildings) {
-    if (b.kind !== 'gate' || b.cityId !== city.id) continue
-    add(wrapDelta(home.x, b.x, size), wrapDelta(home.y, b.y, size))
-  }
-  add(gate?.dx ?? 0, gate?.dy ?? 1)
   return { columns, rows }
+}
+
+/**
+ * Where the city's gates stand relative to its home, and where its next one goes (south of the home
+ * when it has no plan for one yet).
+ */
+function gateOffsets(
+  world: Pick<WorldState, 'buildings'>,
+  city: City,
+  home: Building,
+  gate: { dx: number; dy: number } | undefined,
+  size: number,
+): { dx: number; dy: number }[] {
+  const gates = world.buildings
+    .filter((b) => b.kind === 'gate' && b.cityId === city.id)
+    .map((b) => ({ dx: wrapDelta(home.x, b.x, size), dy: wrapDelta(home.y, b.y, size) }))
+  return [...gates, { dx: gate?.dx ?? 0, dy: gate?.dy ?? 1 }]
 }
 
 /**
