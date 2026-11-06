@@ -478,9 +478,11 @@ The shared language of the game. Domain terms only — no implementation details
   the walk and the first days, and the carrier brings the crew's Food back: Crew food), pairs its adults,
   builds a house when it has a food surplus and no free housing, and shares its adults out:
   soldiers by its size first; then farmers, as many as feed everyone (one farmer feeds about
-  four) and one more while it has no food surplus, building a farm when they don't fit; then at
-  most two builders while it has a project; everyone else is its **spare hands**. A worker stays
-  where they are until the city moves them. Beyond that it is driven by its
+  four) and one more while it has no food surplus, building a farm only when those it keeps don't
+  fit; then builders while it has a project, at most two in a village and more as it grows (a balance
+  number); everyone else is its **spare hands**. Its planning pass gives each free adult the job
+  that scores highest (ADR 0029). A worker stays where they are until another job beats theirs by a
+  margin, so nobody goes back and forth. Beyond that it is driven by its
   reserve (NPC reserve): its spare hands go to the good shortest of its reserve first; they work
   the workplace that makes the good, or build it first on the nearest fitting resource node
   (within a set reach of its home, or further out where a Scout found one) and work it like its other workplaces, carrying the output to
@@ -497,7 +499,7 @@ The shared language of the game. Domain terms only — no implementation details
   Player's sight.
 - **NPC reserve:** what an NPC city keeps of each good it can use, and never sells: Food for
   some game days for all its residents, and what its stable lacks for its horses (Feeding the
-  stable; the stable's Food counts); Wood and Stone for its next house and some wall; weapons
+  stable; the stable's Food counts); Wood and Stone for its next house and some wall, more as it grows; weapons
   for the soldiers it keeps by its size, and the Iron and Wood to forge them; Coins as its war
   chest, for buying what it lacks and hiring help. A stable is wanted once it has horses, or with
   none once nothing else is short (NPC horses), a mint only with a gold node it knows of. Whatever its storages hold above the reserve is its surplus,
@@ -506,15 +508,28 @@ The shared language of the game. Domain terms only — no implementation details
 - **Spare hands' work:** with nothing short of its reserve, an NPC city's spare hands don't stand
   idle. In this order they go on a road crew while it has a road to build (NPC road), scout (Scout),
   and otherwise work at its workplaces for **surplus**, past the reserve, up to a cap per good (a
-  balance number). What is short, its trader and a founding party still take them first, and they
-  count as spare hands for a Full city. Trade Org cities do none of this.
+  balance number that grows with its residents). With a crew full and its good below the cap, a big
+  city opens a second workplace of that kind on a node it knows. What is short, its traders and a
+  founding party still take them first, and they count as spare hands for a Full city. Trade Org
+  cities do none of this.
+- **Standing idle:** an NPC city's adults with nothing to do, those carrying a child and its children
+  stand at a house of the city, not at its storage; a city with no house, at its home.
+- **Soldier posts:** between fights an NPC city's soldiers stand spread out: first on its town hall,
+  then at its gates and along its wall. Some of them (at most a balance number) walk a round along
+  its wall and roads in turns, and in a city with a training ground some train (Who trains). An
+  alarm takes them from any of this, and they come back (Alarm). Trading posts and the HQ keep their
+  own rules.
+- **Bigger projects:** once nothing is short, from materials above its reserve, a big NPC city (by a
+  balance number of residents) builds beyond its needs: a training ground, an inner ring of wall
+  round its town hall and storage with a gate, and more roads (NPC road).
 - **NPC road:** a road an NPC city builds with a **road crew** of its spare hands (at most a balance
-  number at once, apart from its builders), only from materials above its reserve. Its layout's
+  number at once, which grows with the city, apart from its builders), only from materials above its reserve. Its layout's
   streets come first (City layout). Then it follows the
   way a resident would walk, tile by tile, skipping tiles that have a road: first from its home to
   each of its workplaces outside its area, nearest first; then to the nearest Trade Org warehouse
   in its trader's reach, leaving out those of the HQ's inner ring, which keeps everyone out; then to
-  the edge of its nearest neighbour city's area. Like any road nobody owns it, and anyone can use it
+  the edge of its nearest neighbour city's area; a big city goes on to further warehouses and
+  neighbours, nearest first. Like any road nobody owns it, and anyone can use it
   or tear it down; a tile torn down is laid again in time. A way too long (a balance number, in
   tiles) or with no way through is given up. A road two cities would each build between them is
   built by only one. The crew takes Food along, never starts a tile with too little to walk home
@@ -534,14 +549,15 @@ The shared language of the game. Domain terms only — no implementation details
   Trade Org warehouse (HQ or trading post) lies within a set reach, one of its spare hands,
   never a soldier, carries the load there, sells it, buys the good shortest of the reserve that
   the city has no node for, as far as its coins and their arms allow, and walks home to the
-  storage. One trader per city at a time. Nothing protects them on the way but what they carry.
-- **Full city:** an NPC city that for a whole game week has had spare hands (idle, on a road crew, scouting or working for surplus) and nothing
+  storage. A village sends one trader at a time, a bigger city more by its size (a balance number).
+  Nothing protects them on the way but what they carry.
+- **Full city:** an NPC city that for a whole game week, less the bigger it is (a balance number), has had spare hands (idle, on a road crew, scouting or working for surplus) and nothing
   short of its reserve, holds a food surplus, and holds a town hall's and a storage's materials
   above its reserve. A full city founds a daughter (Founding).
 - **Founding:** how a full NPC city spreads out. It picks a free Plains site the usual distance
   from every city, within a set reach of itself and on no realm's territory, nearest a node of
   the good it is short of and has no node for. A **founding party** of a village's worth of
-  adults, one of them armed, each carrying a share of the materials and Food for the walk and
+  adults, more from a big city, one of them armed, each carrying a share of the materials and Food for the walk and
   the first weeks, walks there and builds the town hall, which founds the **daughter** as an
   ordinary NPC city with a name from the game; then its storage, a farm and a house. Its first
   wall comes later out of its own reserve, a ring round its home. Mother and daughter are
@@ -947,9 +963,10 @@ The shared language of the game. Domain terms only — no implementation details
   skill to teach. Training costs nothing but time and food: teacher and trainees eat as usual and
   refill at the ground as at a workplace (Refilling at a workplace); the Train default has the
   usual food params. Nothing trained decays; only old age lowers stats.
-- **Who trains:** Players' residents, by order, queue step or script. NPC cities and the Trade
-  Organization train nobody for now; whether an NPC city puts a spare hand to teaching its
-  soldiers is a question for the reserve-driven chain (NPC city), not settled here. Scripts have
+- **Who trains:** Players' residents, by order, queue step or script, and the soldiers of a big NPC
+  city with a training ground (Bigger projects): its soldier with the most Combat teaches and others
+  train in turns, Combat if the teacher has any, else Strength, with the posts on its hall and
+  gates still held. The Trade Organization trains nobody for now. Scripts have
   `teach(subject)` and `train()`; a building's script view shows its teacher, subject and trainees.
 - **Carry capacity:** the most weight a resident can carry, set by Strength. Everything has weight,
   including money, so nobody walks around with a fortune in their pocket.
