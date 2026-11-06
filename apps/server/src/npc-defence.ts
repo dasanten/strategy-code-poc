@@ -16,6 +16,7 @@ import {
   inCityArea,
   isArmed,
   npcCityRefuses,
+  occupiersOf,
   punishers,
   recipeFor,
   wallSide,
@@ -107,11 +108,13 @@ export function tradeOrgArmyTarget(adults: number, wanted = TRADE_ORG_ARMY.size)
 }
 
 /**
- * Attackers in a city's area (`CONTEXT.md`: Combat, Walls in combat): residents there going after
- * one of its residents on their own account (not fighting back at one who hit them), striking
- * one of its walls or gates to break it, or climbing one.
+ * Attackers in a city's area (`CONTEXT.md`: Combat, Walls in combat, Occupying a town hall):
+ * residents there going after one of its residents on their own account (not fighting back at one
+ * who hit them), striking one of its walls or gates to break it, or climbing one, and whoever
+ * occupies its town hall (`occupiersOf`), even Down, as they hold it all the same.
  */
 export function attackersOf(world: WorldState, city: City, size: number): Resident[] {
+  const occupiers = occupiersOf(world, city, size)
   const own = (id: string) => {
     const t = world.residents.find((x) => x.id === id)
     return !!t && t.owner === null && t.cityId === city.id
@@ -121,6 +124,7 @@ export function attackersOf(world: WorldState, city: City, size: number): Reside
       (b) => b.id === id && b.cityId === city.id && (b.kind === 'wall' || b.kind === 'gate'),
     )
   return world.residents.filter((r) => {
+    if (occupiers.includes(r)) return true
     if (r.health <= 0 || (r.owner === null && r.cityId === city.id)) return false
     const o = r.order
     const attacking =
@@ -150,13 +154,29 @@ function fightAttackers(world: WorldState, city: City, people: Resident[], size:
   const attackers = attackersOf(world, city, size)
   if (city.tradeOrg === 'post') attackers.push(...thievesOf(world, city, size))
   if (attackers.length === 0) return
+  const occupiers = occupiersOf(world, city, size)
   for (const r of people) {
     if (r.order?.kind === 'attack' || !defendsCity(world, city, r, size)) continue
-    const nearest = attackers.reduce((a, b) =>
-      wrapDistance(size, r, b) < wrapDistance(size, r, a) ? b : a,
-    )
-    r.order = attackOrder(nearest.id)
+    goAfterNearest(r, attackers, occupiers, size)
   }
+}
+
+/**
+ * Sends a city's defender after the nearest of `attackers`. Going after one of the `occupiers` of
+ * its town hall is defending it, no crime (`CONTEXT.md`: Occupying a town hall): an occupier need
+ * attack nobody, may have left the hall by the time the blows land, and stops occupying it the
+ * moment the defender stands on it, so the order has to say so from the start.
+ */
+export function goAfterNearest(
+  r: Resident,
+  attackers: Resident[],
+  occupiers: Resident[],
+  size: number,
+): void {
+  const nearest = attackers.reduce((a, b) =>
+    wrapDistance(size, r, b) < wrapDistance(size, r, a) ? b : a,
+  )
+  r.order = attackOrder(nearest.id, false, occupiers.includes(nearest))
 }
 
 /**
