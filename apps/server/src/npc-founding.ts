@@ -39,6 +39,7 @@ import {
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { shortGoods } from './npc-chain.js'
 import { npcSiteFits, takenGround } from './npc-cities.js'
+import { scoutFarOut } from './npc-scouts.js'
 import { hash, mulberry32 } from './residents.js'
 import { FARM_RING, hallTile } from './starting-city.js'
 import { raiseStandingBothWays } from './standing.js'
@@ -142,7 +143,9 @@ export function planFounding(
   }
   if (!plan.foundingSite) return
   const walk = wrapDistance(terrain.size, home, plan.foundingSite) * WALK_TICKS_PER_TILE
-  const chosen = pickParty(world, adults, unneeded, jobs, walk)
+  // A scout far out is too far to fetch their share of the load (`stepFounders`).
+  const near = unneeded.filter((r) => !scoutFarOut(plan, r, home, terrain.size))
+  const chosen = pickParty(world, adults, near, jobs, walk)
   if (!chosen) return
   for (const r of chosen) {
     r.order = null

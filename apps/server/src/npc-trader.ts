@@ -133,7 +133,8 @@ export function planTrader(
 
 /**
  * The spare hand a city sends to trade (`CONTEXT.md`: NPC trader), idle ones first, never a soldier:
- * idle, at the chain's workplaces, or farming beyond the farmers it keeps.
+ * idle, at the chain's workplaces, farming beyond the farmers it keeps, or else a scout, who comes
+ * home first.
  */
 function spareHand(
   world: WorldState,
@@ -146,6 +147,7 @@ function spareHand(
   const rank = (r: Resident) => {
     const kind = jobs[r.id]?.kind
     if (isArmed(r) || r.carrying) return undefined
+    if (kind === 'scout') return 3
     return kind === 'idle' ? 0 : kind === 'work' ? 1 : extra.has(r.id) ? 2 : undefined
   }
   const spare = adults.filter((r) => rank(r) !== undefined)
