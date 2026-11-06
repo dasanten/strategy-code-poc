@@ -473,6 +473,14 @@ describe('world saves', () => {
     expect(checkInvariants(v105, land)).toEqual([])
   })
 
+  it('leaves a format 105 world as it is: no attacker raised an alarm (migration 105 → 106)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v106 = migrateWorld(structuredClone(world), 105, { terrain: land }, migrations, 106)
+    expect(v106).toEqual(world)
+    expect(v106.cities.every((c) => c.alarmedAttackers === undefined)).toBe(true)
+    expect(checkInvariants(v106, land)).toEqual([])
+  })
+
   it('leaves a format 95 world’s debts to get their demand on the next tick (migration 95 → 96)', () => {
     const { world, terrain: land } = worldWithPost()
     world.realms.push({ id: 'r9', userId: 90, leaderId: 'nobody' })
@@ -511,7 +519,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(105)
+    expect(WORLD_FORMAT_VERSION).toBe(106)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)

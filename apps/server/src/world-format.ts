@@ -22,7 +22,7 @@ import { placeTraders, putHqOnLoops } from './traders.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 105
+export const WORLD_FORMAT_VERSION = 106
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -461,6 +461,10 @@ export const migrations: Record<number, MigrationStep> = {
   // (`RunningScript.alarm`). Nobody picked one and no alarm rang before, so the step leaves every
   // world as it is.
   104: (state) => state,
+  // A city keeps who raised an `attacked` alarm there (`City.alarmedAttackers`), and an alarm may be
+  // of that kind (`CONTEXT.md`: Alarm). No such alarm rang before, so the step leaves every world as
+  // it is.
+  105: (state) => state,
 }
 
 export class WorldFormatError extends Error {}

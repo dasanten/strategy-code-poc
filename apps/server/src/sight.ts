@@ -536,6 +536,7 @@ function places(
     // What its scouts brought home is its own (`CONTEXT.md`: Scout).
     const shown = { ...c }
     delete shown.scouted
+    delete shown.alarmedAttackers
     out.push({
       is: 'city',
       ...shown,

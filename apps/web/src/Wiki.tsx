@@ -2580,7 +2580,8 @@ export function Wiki() {
           doing waits meanwhile: once Defend ends they go back to it, a script with its memory, a
           queue at its step, or a plain order. Struck again while defending, they keep defending.
           Scripts see the last blow as <code>me.struckBy</code> and <code>me.struckAt</code>.
-          Residents of NPC cities, and in an army, fight back or flee home the same way.
+          Residents of NPC cities, and in an army, fight back or flee home the same way. Armed
+          neighbours at home who see the blow come to help (see Alarms below).
         </p>
         <p>
           <strong>On a carriage:</strong> the carriage is the way out. An unarmed driver drives on
@@ -2620,14 +2621,23 @@ export function Wiki() {
         <h3>Alarms</h3>
         <p>
           An alarm is something happening in a city's area that your residents at home can react to.
-          So far one sets it off: an occupation of the city's town hall starting, which reaches
-          every resident of your realm standing in that city's area. Army members, those hired out
-          and those driving a carriage get no alarm. It runs their <strong>Alarm script</strong>,
-          which by default is <strong>Alarm</strong> (one of your default scripts) for an armed
-          resident and nothing for an unarmed one. Alarm goes after the occupier while they stand in
-          the city's area, any other armed one of theirs there after them, and ends once they are
-          gone. Going after them is a crime for now, like any attack. Their card says “On alarm:
-          going after Bo”.
+          So far two set it off. An occupation of the city's town hall starting reaches every
+          resident of your realm standing in that city's area. An attack, someone striking a wall or
+          gate of the city or a resident of yours standing in its area, reaches those standing in
+          the area who see it, so the armed residents beside them react rather than only the one
+          struck, who runs their defence script. It is raised once per attacker, the first time
+          someone at home sees them at it, and again only after {duration(DEFEND_CALM_TICKS)} with
+          no blow from them. Those already fighting aren't interrupted, and someone fighting back
+          raises none. Army members, those hired out and those driving a carriage get no alarm. It
+          runs their <strong>Alarm script</strong>, which by default is <strong>Alarm</strong> (one
+          of your default scripts) for an armed resident and nothing for an unarmed one.
+        </p>
+        <p>
+          For an occupation, Alarm goes after the occupier while they stand in the city's area, any
+          other armed one of theirs there after them, and ends once they are gone. Going after them
+          is a crime for now, like any attack. For an attack, it goes after the attacker until they
+          have left the area or your sight; striking back at them is no crime. Their card says “On
+          alarm: going after Bo”.
         </p>
         <p>
           On a resident's card, the Script tab's <strong>Alarm script</strong> picks any of your

@@ -338,15 +338,18 @@ export interface RunningScript {
  * kind, who it is about, where and when.
  */
 export interface Alarm {
-  /** `occupied`: an occupation of the city's town hall started. */
-  kind: 'occupied'
+  /**
+   * `occupied`: an occupation of the city's town hall started. `attacked`: someone struck a wall or
+   * gate of the city, or a resident of its realm in its area.
+   */
+  kind: 'occupied' | 'attacked'
   /** The city whose area it happened in. */
   cityId: string
-  /** The resident it is about: for `occupied`, an occupier on the hall. */
+  /** The resident it is about: for `occupied`, an occupier on the hall; for `attacked`, the attacker. */
   about: string
   /** The realm of who it is about. */
   realmId: string | null
-  /** Where it happened: for `occupied`, the town hall. */
+  /** Where it happened: for `occupied`, the town hall; for `attacked`, what was struck. */
   x: number
   y: number
   /** The tick it happened. */
@@ -685,8 +688,9 @@ export interface HaulOrder {
  * along `path` (null while it is being found), as for a walk order; `progress` is how far into the
  * next step they are. `strike` is how far, from 0 up to 1, they are into their next blow.
  * `started` is set once the fight went in the realm logs. `defending` is set when the resident
- * fights back at someone who hit them, or as a caravan's escort defends it (`CONTEXT.md`:
- * Caravan), which is no crime (`CONTEXT.md`: Crime).
+ * fights back at someone who hit them, as a caravan's escort defends it (`CONTEXT.md`: Caravan), or
+ * goes after the attacker their Alarm script runs for (`CONTEXT.md`: Alarm), which is no crime
+ * (`CONTEXT.md`: Crime).
  */
 export interface AttackOrder {
   kind: 'attack'
@@ -2873,6 +2877,12 @@ export interface City {
    * Held `OCCUPATION_GAME_DAYS` without a break, it captures the city.
    */
   occupation: Occupation | null
+  /**
+   * Who already raised an `attacked` alarm here (`CONTEXT.md`: Alarm), by resident id, with the tick
+   * of their latest blow, so that a long fight raises it once. After `DEFEND_CALM_TICKS` with no
+   * blow from them the next one raises it again. Absent while nobody did. Only the server reads it.
+   */
+  alarmedAttackers?: Record<string, number>
   /**
    * How it sets out its town (`CONTEXT.md`: City layout), kept once picked. Every NPC city has one;
    * trading posts, the HQ and Players' cities have none.
