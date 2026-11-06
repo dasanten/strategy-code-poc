@@ -3,6 +3,7 @@ import type { Diplomacy } from './alliance.js'
 import type { FirstDay } from './first-day.js'
 import type { RegionMap } from './region-map.js'
 import type { LoadLevel } from './carriages.js'
+import type { NpcHorseOffer } from './horse-market.js'
 import type { NpcCityPrice } from './npc-trade.js'
 import type { SeenOffer } from './offers.js'
 import type { WarehousePrice } from './warehouse.js'
@@ -49,7 +50,9 @@ export interface OrderRequest {
  * reaction). An NPC city that doesn't refuse them says how many residents it would lend and what
  * it asks for each a week (`hire`, `CONTEXT.md`: Hiring from an NPC city) and, with a storage of
  * it in sight, its prices to them (`trade`, `CONTEXT.md`: Trading with an NPC city). What its
- * storages hold together is left out of those unless the Player sees inside one of them.
+ * storages hold together is left out of those unless the Player sees inside one of them. With a
+ * stable of it in sight, the horses in sight standing there, with what it asks for each and why it
+ * won't sell it (`horses`, `CONTEXT.md`: Horse market), refusing or not.
  */
 export type SeenCity = City & {
   price?: number
@@ -57,6 +60,7 @@ export type SeenCity = City & {
   refuses?: true
   hire?: { spare: number; pricePerResidentWeek: number }
   trade?: Shown<NpcCityPrice>[]
+  horses?: NpcHorseOffer[]
 }
 
 /**

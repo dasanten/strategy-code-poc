@@ -38,6 +38,7 @@ import {
   sendable,
   takesTransfers,
   tradesHere,
+  npcStablesInSight,
   traderStopsAt,
   previewTraderTrade,
   tradedGoods,
@@ -835,5 +836,26 @@ describe('linking How to trade from the inspector', () => {
     // An NPC city that names no prices, or the Player's own city: nothing to trade there.
     expect(tradesHere(city(null), at([b('s1', 'storage', 'city1')]), 'realm1')).toBe(false)
     expect(tradesHere(city('realm1'), at([b('s1', 'storage', 'city1')]), 'realm1')).toBe(false)
+  })
+
+  it('an NPC city’s stable trades with horses listed, grouped by stable (`CONTEXT.md`: Horse market)', () => {
+    const offer = (horseId: string, stableId: string) => ({
+      horseId,
+      stableId,
+      name: horseId,
+      stats: { speed: 10, strength: 10, endurance: 10 },
+      bornAt: 0,
+      price: 100,
+    })
+    const stables = {
+      cities: [],
+      buildings: [b('st1', 'stable', 'city1'), b('st2', 'stable', 'city1')],
+    }
+    const npc = { ...city(null), horses: [offer('h1', 'st1'), offer('h2', 'st1')] }
+    const views = npcStablesInSight(npc, stables)
+    expect(views.map((s) => s.id)).toEqual(['st1'])
+    expect(views[0]!.horses.map((h) => h.horseId)).toEqual(['h1', 'h2'])
+    expect(tradesHere(npc, stables, 'realm1')).toBe(true)
+    expect(tradesHere(city(null), stables, 'realm1')).toBe(false)
   })
 })

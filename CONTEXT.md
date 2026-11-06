@@ -282,7 +282,7 @@ The shared language of the game. Domain terms only — no implementation details
   trade that won't go says why (no coins in hand, no room, none in stock, not wanted). Delivery
   and Transfer each have a heading and a line saying what they do, with the fee before ordering,
   and the section links to the Wiki's "How to trade". The tile card of a warehouse, an NPC
-  city's storage or a wandering trader at a stop has **Trade here**, which opens it. Only the UI:
+  city's storage or stable with horses (Horse market), or a wandering trader at a stop has **Trade here**, which opens it. Only the UI:
   the trades are those above.
 - **Stock floor:** the Trade Organization gets its stock physically (its own workplaces on every
   kind of resource, plus buying). When a warehouse of the HQ runs low, it tops up to a minimum at

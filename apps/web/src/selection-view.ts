@@ -993,7 +993,7 @@ export interface TileThings {
   strangers: SeenResident[]
   /** Everyone in sight, for who works where and who lives in a city. */
   residents?: SeenResident[]
-  cities: (Pick<SeenCity, 'id' | 'name' | 'realmId' | 'tradeOrg' | 'trade' | 'refuses'> &
+  cities: (Pick<SeenCity, 'id' | 'name' | 'realmId' | 'tradeOrg' | 'trade' | 'refuses' | 'horses'> &
     Partial<Pick<SeenCity, 'occupation'>>)[]
   /** The realms the Player knows by name, for who occupies a town hall. */
   realms?: RealmLabel[]
@@ -1150,7 +1150,7 @@ function horseFares(h: Horse): { hunger: 'fed' | 'hungry' | 'starving'; health: 
 }
 
 /** A horse's age in words: game days for a foal under a game year, whole game years after. */
-export function horseAgeText(h: SeenHorse, tick: number): string {
+export function horseAgeText(h: Pick<SeenHorse, 'bornAt'>, tick: number): string {
   const years = Math.floor(horseAgeInYears(h, tick))
   if (years >= 1) return `${years} ${years === 1 ? 'year' : 'years'} old`
   const days = Math.max(0, Math.floor((tick - h.bornAt) / TICKS_PER_GAME_DAY))
@@ -1174,7 +1174,10 @@ export function horseDetail(h: SeenHorse, tick: number | undefined): string {
 }
 
 /** A horse's stats and age: "Speed 12, Strength 8, Endurance 10 · 5 years old". */
-function horseStatsText(h: SeenHorse, tick: number | undefined): string {
+export function horseStatsText(
+  h: Pick<SeenHorse, 'stats' | 'bornAt'>,
+  tick: number | undefined,
+): string {
   const { speed, strength, endurance } = h.stats
   const stats = `Speed ${speed}, Strength ${strength}, Endurance ${endurance}`
   return tick === undefined ? stats : `${stats} · ${horseAgeText(h, tick)}`
@@ -1545,7 +1548,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
         if (rel === 'own' && live) card.renameCity = { id: city.id, name: city.name }
       }
       if (live && city && tradesHere(live, city)) {
-        lines.push('Buys and sells here')
+        lines.push(live.kind === 'stable' ? 'Sells horses here' : 'Buys and sells here')
         card.tradeHere = { cityId: city.id, buildingId: live.id }
       }
       // Offers (`CONTEXT.md`: Offer) stand at a Player's storage: anyone in sight sees them, and its
@@ -2092,13 +2095,17 @@ function townHallLines(cityId: string, t: TileThings): string[] {
 /**
  * Whether the building is where the Player trades with a Trade Org warehouse or an NPC city
  * (`CONTEXT.md`: Warehouse prices, Trading with an NPC city, Trade section), with prices they are
- * shown: a warehouse, or a storage of an NPC city that doesn't refuse them (`npcCityRefuses`).
+ * shown: a warehouse, or a storage of an NPC city that doesn't refuse them (`npcCityRefuses`). Or
+ * its stable with horses it lists (`CONTEXT.md`: Horse market).
  */
 export function tradesHere(
-  b: Pick<SeenBuilding, 'kind' | 'prices'>,
+  b: Pick<SeenBuilding, 'kind' | 'prices'> & { id?: string },
   city: TileThings['cities'][number],
 ): boolean {
   if (b.kind === 'warehouse') return (b.prices?.length ?? 0) > 0
+  if (b.kind === 'stable') {
+    return !city.refuses && (city.horses ?? []).some((h) => h.stableId === b.id)
+  }
   return (
     b.kind === 'storage' &&
     city.realmId === null &&

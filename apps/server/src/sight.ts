@@ -9,6 +9,7 @@ import {
   traderStanding,
   npcCityRefuses,
   npcHirePrice,
+  npcHorseOffers,
   sellsTo,
   spareResidents,
   sharingSight,
@@ -477,6 +478,7 @@ function places(
   const seenCities = new Set<string>()
   const seenStorages = new Set<string>()
   const seenHalls = new Set<string>()
+  const seenStables: Building[] = []
   // Only the buildings near the observers, in the world's order, when they are sorted by square.
   const near = bySquare
     ? [...eyes.watched]
@@ -490,6 +492,7 @@ function places(
     if (b.cityId !== null) seenCities.add(b.cityId)
     if (b.cityId !== null && b.kind === 'storage' && !b.site) seenStorages.add(b.cityId)
     if (b.cityId !== null && b.kind === 'townHall') seenHalls.add(b.cityId)
+    if (b.kind === 'stable' && !b.site) seenStables.push(b)
   }
   // An NPC city names the Player its price (`CONTEXT.md`: Buying a city), from all of it, or says
   // it won't sell to them or refuses them at all (`CONTEXT.md`: NPC city reaction). One that doesn't
@@ -515,9 +518,28 @@ function places(
               ? { trade: shownLines(npcCityPrices(world, c, realmId), insight.insideCity(c.id)) }
               : {}),
           }
+    // Its horses in sight in its stables in sight (`CONTEXT.md`: Horse market), refusing or not, so
+    // the Trade section can say why.
+    const horses = forSale(c)
+      ? seenStables
+          .filter((b) => b.cityId === c.id)
+          .flatMap((b) => npcHorseOffers(world, c, b, realmId))
+          .filter((o) => {
+            const h = world.horses.find((x) => x.id === o.horseId)!
+            return eyes.sees(h)
+          })
+      : []
     // Who occupies its town hall only with the hall in sight (`CONTEXT.md`: Occupying a town hall).
     const occupation = seenHalls.has(c.id) ? c.occupation : null
-    out.push({ is: 'city', ...c, occupation, ...sale, ...refuses, ...deal })
+    out.push({
+      is: 'city',
+      ...c,
+      occupation,
+      ...sale,
+      ...refuses,
+      ...deal,
+      ...(horses.length > 0 ? { horses } : {}),
+    })
   }
   return out
 }

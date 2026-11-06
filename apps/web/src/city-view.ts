@@ -28,6 +28,7 @@ import {
   type DeliveryQuote,
   type Good,
   type NpcCityPrice,
+  type NpcHorseOffer,
   type PricedGood,
   type SwapQuote,
   type SwapRate,
@@ -500,6 +501,30 @@ export function npcStoragesInSight(
     .map((b) => ({ id: b.id, kind: b.kind, x: b.x, y: b.y, prices }))
 }
 
+/** An NPC city's stable in sight and the horses it lists there (`CONTEXT.md`: Horse market). */
+export interface NpcStableView extends WarehouseView {
+  horses: NpcHorseOffer[]
+}
+
+/** The stables of an NPC city in sight with horses it lists to the Player (`SeenCity.horses`). */
+export function npcStablesInSight(
+  city: SeenCity,
+  seen: { buildings: Building[] },
+): NpcStableView[] {
+  const offers = city.horses ?? []
+  return seen.buildings
+    .filter((b) => b.kind === 'stable' && !b.site && b.cityId === city.id)
+    .map((b) => ({
+      id: b.id,
+      kind: b.kind,
+      x: b.x,
+      y: b.y,
+      prices: [],
+      horses: offers.filter((h) => h.stableId === b.id),
+    }))
+    .filter((s) => s.horses.length > 0)
+}
+
 /** A wandering trader at a stop, for the Trade section of the city it stands at. */
 export interface TraderStopView extends WarehouseView {
   /** The trader's id, which `id` is too; the carriage whose load it trades. */
@@ -564,6 +589,7 @@ export function tradesHere(
   return (
     warehousesInSight(city, seen).length > 0 ||
     npcStoragesInSight(city, seen).length > 0 ||
+    npcStablesInSight(city, seen).length > 0 ||
     traderStopsAt(city, seen.traders ?? [], visits).length > 0 ||
     takesTransfers(city, seen, realmId) ||
     offerStoragesOf(city, seen, realmId).length > 0

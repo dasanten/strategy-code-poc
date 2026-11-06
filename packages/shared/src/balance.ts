@@ -291,6 +291,43 @@ export const NPC_HORSES_BASE = 2
 export const NPC_RESIDENTS_PER_HORSE = 3
 
 /**
+ * The horses an NPC city keeps to breed from and won't sell (`CONTEXT.md`: Horse market): a
+ * breeding pair.
+ */
+export const NPC_HORSES_KEPT = 2
+
+/**
+ * What an NPC city asks for an average new horse with as many as it wants, in Coins (`CONTEXT.md`:
+ * Horse market): about what a stolen one is worth (`HORSE_STOLEN_WORTH`).
+ */
+export const HORSE_PRICE_BASE = 100
+
+/**
+ * How much more a horse costs for each point its mean stat is above average (less below), as a
+ * share: the full range of new horses goes from half the price to half as much again, so breeding
+ * good ones pays.
+ */
+export const HORSE_PRICE_PER_STAT = 0.1
+
+/** The least a horse's stats leave of its price, for a foal bred far below the range. */
+export const HORSE_PRICE_STATS_FLOOR = 0.25
+
+/** How much less a horse costs for each game year of its age, as a share. */
+export const HORSE_PRICE_AGE_PER_YEAR = 0.03
+
+/** The least a horse's age leaves of its price. */
+export const HORSE_PRICE_AGE_FLOOR = 0.5
+
+/**
+ * How much more an NPC city asks for the last horse it would sell, beyond the pair it keeps, as a
+ * share: twice the price of one it has as many as it wants of.
+ */
+export const HORSE_PRICE_SCARCITY = 1
+
+/** How much less an NPC city asks at most with more horses than it wants, as a share. */
+export const HORSE_PRICE_GLUT = 0.25
+
+/**
  * Ticks without a blow after which the Defend default ends for a resident fleeing home
  * (`CONTEXT.md`: Defence script): half a minute, so a lone blow from someone who walks off
  * doesn't send them all the way home. Written into the default's source, where a Player can

@@ -773,6 +773,7 @@ function residentActions(
         units: plain(units),
         carriageId: plain(carriageId ?? null),
       }),
+    buyHorse: ([horse]) => request('buyHorse', { horseId: horse == null ? null : placeId(horse) }),
     handIn: ([good, units, toCityId, carriageId]) =>
       request('handIn', {
         good: plain(good),

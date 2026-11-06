@@ -170,7 +170,14 @@ import {
   STABLE_CAPACITY,
   FOAL_STAT_SPREAD,
   BREED_FOOD,
+  HORSE_PRICE_AGE_FLOOR,
+  HORSE_PRICE_AGE_PER_YEAR,
+  HORSE_PRICE_BASE,
+  HORSE_PRICE_GLUT,
+  HORSE_PRICE_PER_STAT,
+  HORSE_PRICE_SCARCITY,
   NPC_HORSES_BASE,
+  NPC_HORSES_KEPT,
   NPC_RESIDENTS_PER_HORSE,
   NPC_STABLE_HUNGRY_DAYS,
   NPC_STABLE_REFILL_DAYS,
@@ -1900,6 +1907,26 @@ export function Wiki() {
           send someone there if nobody of yours is. Below {signed(NPC_CITY_REFUSES_STANDING)} it
           won't trade with you at all. Every trade raises standing both ways (see{' '}
           <a href="#standing">Standing &amp; reactions</a>).
+        </p>
+        <h3>Buying a horse</h3>
+        <p>
+          An NPC city sells any horse beyond the {num(NPC_HORSES_KEPT)} it keeps to breed. Only in
+          person: a grown resident of yours goes to its finished stable with the Coins in their
+          hands, not on a carriage. Press <strong>Trade here</strong> on the stable's tile, or open
+          the city: the Trade section lists the horses standing there with name, stats, age and
+          price, and says why one won't go. A horse that is hitched, ridden or Down isn't for sale.
+          The Coins go into its storage, and the horse is yours where it stands, ready to ride home.
+          Buying one raises standing both ways like any trade, and any breeding it was part of ends.
+        </p>
+        <p>
+          An average new horse costs about {num(HORSE_PRICE_BASE)} coins while the city has all it
+          wants. Each point of its mean stat above or below average moves that by{' '}
+          {pct(HORSE_PRICE_PER_STAT)}, and each game year of age takes off{' '}
+          {pct(HORSE_PRICE_AGE_PER_YEAR)}, leaving at least {pct(HORSE_PRICE_AGE_FLOOR)}. As the
+          city nears the pair it keeps it asks more, up to {pct(HORSE_PRICE_SCARCITY)} more for the
+          last it would sell; with more than it wants, up to {pct(HORSE_PRICE_GLUT)} less. Its
+          standing toward you moves the price like its trade prices. Below{' '}
+          {signed(NPC_CITY_REFUSES_STANDING)} it won't sell you one.
         </p>
         <h3>Delivery</h3>
         <p>
