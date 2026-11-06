@@ -35,6 +35,7 @@ import {
   isAt,
   isDown,
 } from '@csp/shared'
+import { answersAttack, raiseResidentAttacked, raiseWallAttacked } from './alarms.js'
 import { updateCityMembership } from './cities.js'
 import { buildingOrganization, commitCrime, knownThieves, organizationOf } from './crimes.js'
 import { defendsByScript, endHoldIfOver, startDefence } from './defence.js'
@@ -175,7 +176,8 @@ export const attack: OrderKind = {
     // A defence script going after who struck them fights back, in a fight already logged.
     const defending =
       r.interrupted !== undefined && r.script?.task !== 'alarm' && r.struck?.by === targetId
-    r.order = attackOrder(targetId, defending, defending)
+    // An Alarm script answering an attack strikes back too, in a fight of its own to log.
+    r.order = attackOrder(targetId, defending, defending || answersAttack(r, targetId))
   },
 }
 
@@ -250,6 +252,7 @@ export function resolveStrikes(
     if (o?.kind !== 'attack' || o.targetId !== target.id || !inContact(size, a, target)) continue
     if (isBuilding(target)) {
       blows++
+      raiseWallAttacked(world, a, target, size)
       if (breakWall(world, a, target, size)) broken.push(target)
       continue
     }
@@ -283,6 +286,7 @@ export function resolveStrikes(
     }
     endHoldIfOver(world, t)
     t.struck = { by: a.id, tick: world.tick }
+    raiseResidentAttacked(world, a, t, size)
     a.skills.combat = (a.skills.combat ?? 0) + combatLearned(a, world.tick)
     t.skills.combat = (t.skills.combat ?? 0) + combatLearned(t, world.tick)
     const roll = mulberry32(hash(`${world.seed}:${world.tick}:${a.id}:strike`))()

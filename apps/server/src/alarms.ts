@@ -1,4 +1,5 @@
 import {
+  DEFEND_CALM_TICKS,
   SIGHT_RANGE,
   TRADE_ORG,
   commanderOf,
@@ -10,6 +11,7 @@ import {
   townHallOf,
   wrapDistance,
   type Alarm,
+  type Building,
   type City,
   type Resident,
   type WorldState,
@@ -91,6 +93,81 @@ export function raiseOccupied(world: WorldState, city: City, occupier: string, s
 }
 
 /**
+ * `a` just attacked something of `city` at `at` (`CONTEXT.md`: Alarm, attacked): `at` is one of its
+ * walls or gates, or `struck`, a resident of its realm standing in its area, whose answer to the
+ * blow is their Defence script. It reaches those at home who see it, leaving alone those already
+ * fighting. Raised once per attacker: while their blows keep coming, the rest raise nothing. An
+ * attack nobody at home saw has raised nothing yet, so the next blow someone sees does.
+ */
+function raiseAttacked(
+  world: WorldState,
+  city: City,
+  a: Resident,
+  at: { x: number; y: number },
+  struck: Resident | undefined,
+  size: number,
+): void {
+  const raised = city.alarmedAttackers?.[a.id]
+  if (raised !== undefined && world.tick - raised < DEFEND_CALM_TICKS) {
+    city.alarmedAttackers![a.id] = world.tick
+    return
+  }
+  const witnesses = world.residents.filter(
+    (r) =>
+      r !== struck &&
+      r.owner === city.realmId &&
+      wrapDistance(size, r, at) <= SIGHT_RANGE &&
+      canBeAlarmed(world, city, r, size),
+  )
+  if (witnesses.length === 0) return
+  const stillFresh = Object.entries(city.alarmedAttackers ?? {}).filter(
+    ([, tick]) => world.tick - tick < DEFEND_CALM_TICKS,
+  )
+  city.alarmedAttackers = { ...Object.fromEntries(stillFresh), [a.id]: world.tick }
+  const alarm: Alarm = {
+    kind: 'attacked',
+    cityId: city.id,
+    about: a.id,
+    realmId: a.owner,
+    x: at.x,
+    y: at.y,
+    tick: world.tick,
+  }
+  for (const r of witnesses) {
+    if (r.order?.kind !== 'attack') startAlarm(world, r, alarm)
+  }
+}
+
+/**
+ * Whether `a`'s blow is an attack on the realm `realmId` for its `attacked` alarm: a blow struck in
+ * fighting back is none (`CONTEXT.md`: Alarm), nor is one by someone of that realm. An NPC city has
+ * nobody to reach yet.
+ */
+function attacksRealm(a: Resident, realmId: string | null): boolean {
+  if (realmId === null || a.owner === realmId) return false
+  return !(a.order?.kind === 'attack' && a.order.defending)
+}
+
+/** `a`'s blow at the wall or gate `wall` raises an `attacked` alarm in its city (`raiseAttacked`). */
+export function raiseWallAttacked(world: WorldState, a: Resident, wall: Building, size: number) {
+  const city = world.cities.find((c) => c.id === wall.cityId)
+  if (city && attacksRealm(a, city.realmId)) raiseAttacked(world, city, a, wall, undefined, size)
+}
+
+/**
+ * `a`'s blow at the resident `t` raises an `attacked` alarm in each city of `t`'s realm whose area
+ * they stand in (`raiseAttacked`); out of those, nothing.
+ */
+export function raiseResidentAttacked(world: WorldState, a: Resident, t: Resident, size: number) {
+  if (!attacksRealm(a, t.owner)) return
+  for (const city of world.cities) {
+    if (city.realmId === t.owner && inCityArea(world, city, t.x, t.y, size)) {
+      raiseAttacked(world, city, a, t, t, size)
+    }
+  }
+}
+
+/**
  * `thief` just stole from the Organization `victimOrg`, on a map of `size` tiles (`CONTEXT.md`:
  * Alarm, theft): standing in the area of a city of that realm, it reaches its residents standing
  * there who see it. Taking from your own raises none, and an NPC city has nobody to reach yet.
@@ -119,6 +196,33 @@ export function raiseTheft(
       }
     }
   }
+}
+
+/**
+ * Whether `r` going after `targetId` answers the attack their Alarm script runs for: they strike
+ * back, which is no crime (`CONTEXT.md`: Alarm), whatever the attacker has gone on to since.
+ */
+export function answersAttack(r: Resident, targetId: string): boolean {
+  const alarm = r.script?.alarm
+  return alarm?.kind === 'attacked' && alarm.about === targetId
+}
+
+/**
+ * Invariant (ADR 0004; `CONTEXT.md`: Alarm): who raised an `attacked` alarm is kept with the tick of
+ * a blow already struck.
+ */
+export const alarmedAttackersSound: Invariant = {
+  name: 'alarmed-attackers-sound',
+  check: (world) =>
+    world.cities.flatMap((c) =>
+      Object.entries(c.alarmedAttackers ?? {})
+        .filter(([, tick]) => !Number.isInteger(tick) || tick < 0 || tick > world.tick)
+        .map(([id, tick]) => ({
+          invariant: 'alarmed-attackers-sound',
+          message: `${c.id} keeps ${id} as an attacker at tick ${tick}, at tick ${world.tick}`,
+          entityIds: [c.id, id],
+        })),
+    ),
 }
 
 /**

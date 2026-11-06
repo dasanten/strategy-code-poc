@@ -1933,10 +1933,11 @@ ${LOG_TEXT}
     source: `// Alarm (default): what I do when an alarm reaches me, in place of what I was
 // doing, which goes on once I end. Armed, with the town hall occupied, I go
 // after the occupier while they stand in the city's area, and end once no armed
-// one of theirs is left there or in sight. For a theft I go after the thief until
-// they are dead or have left the area or sight. Striking someone occupying the
-// hall, or a thief I know of, is no crime in my own city's area; striking anyone
-// else is. Unarmed, or for another alarm, I end at once.
+// one of theirs is left there or in sight. For a theft I go after the thief, and
+// with a wall or neighbour attacked the attacker, until they are dead or have left
+// the area or sight. Striking someone occupying the hall, or a thief I know of, is
+// no crime in my own city's area, nor is striking back at an attacker; striking
+// anyone else is. Unarmed, or for another alarm, I end at once.
 if (me.alarm == null || !armed(me)) {
   end()
 } else if (me.alarm.kind == "occupied") {
@@ -1948,14 +1949,20 @@ if (me.alarm == null || !armed(me)) {
     goAfter(foe)
   }
 } else if (me.alarm.kind == "theft") {
-  let foe = thief()
+  goAfterCulprit("the thief is gone")
+} else if (me.alarm.kind == "attacked") {
+  goAfterCulprit("the attacker is gone")
+} else {
+  end()
+}
+
+fn goAfterCulprit(goneText) {
+  let foe = culprit()
   if (foe == null) {
-    end("the thief is gone")
+    end(goneText)
   } else {
     goAfter(foe)
   }
-} else {
-  end()
 }
 
 fn goAfter(foe) {
@@ -1988,8 +1995,8 @@ fn occupier() {
   return other
 }
 
-// The thief while they are in sight and stand in the area.
-fn thief() {
+// Who the alarm is about, while I see them in the city's area.
+fn culprit() {
   for (r of residents()) {
     if (r.id == me.alarm.about && inCityArea(me.alarm.cityId, r.x, r.y)) { return r }
   }

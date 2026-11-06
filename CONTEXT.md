@@ -1331,10 +1331,13 @@ The shared language of the game. Domain terms only — no implementation details
   entering, and again if they leave and come back (Trade Org caravans and wandering traders, with
   their crews, don't count); **theft**, someone stealing from the realm (goods, a carriage or a
   horse); **occupied**, an occupation of the city's town hall starting (Occupying a town hall);
-  **attacked**, someone attacking a wall or gate of the city, or striking a resident of the realm.
-  An alarm reaches the residents standing in that city's area who see it (Sight); an occupation
-  reaches all of them. It runs their Alarm script. Army members, those hired out and those driving
-  a carriage get no alarm.
+  **attacked**, someone attacking a wall or gate of the city, or striking a resident of the realm
+  standing in its area, a blow struck in fighting back aside. It is raised once per attacker, the
+  first time someone at home sees them at it, and again only once no blow has come from them for the
+  calm time Defend waits for; it doesn't interrupt those already fighting, and the one struck runs
+  their Defence script. An alarm reaches the residents standing in that city's area who see it
+  (Sight); an occupation reaches all of them. It runs their Alarm script. Army members, those hired
+  out and those driving a carriage get no alarm.
 - **Alarm script:** the script a resident runs when an alarm reaches them: for an armed resident the
   game's **Alarm** default, unless the Player picked one of their own scripts or None for that
   resident, on the card's Script tab or the group card; an unarmed resident runs one only if the

@@ -2581,7 +2581,8 @@ export function Wiki() {
           doing waits meanwhile: once Defend ends they go back to it, a script with its memory, a
           queue at its step, or a plain order. Struck again while defending, they keep defending.
           Scripts see the last blow as <code>me.struckBy</code> and <code>me.struckAt</code>.
-          Residents of NPC cities, and in an army, fight back or flee home the same way.
+          Residents of NPC cities, and in an army, fight back or flee home the same way. Armed
+          neighbours at home who see the blow come to help (see Alarms below).
         </p>
         <p>
           <strong>On a carriage:</strong> the carriage is the way out. An unarmed driver drives on
@@ -2621,25 +2622,32 @@ export function Wiki() {
         <h3>Alarms</h3>
         <p>
           An alarm is something happening in a city's area that your residents at home can react to.
-          Two things set it off. An occupation of the city's town hall starting reaches every
+          Three things set it off. An occupation of the city's town hall starting reaches every
           resident of your realm standing in that city's area. A theft from your realm in that area,
           of goods from a storage, a carriage or a Down resident, or of a carriage or horse, reaches
           those standing there who see it; what lies in a pile is anyone's to take, so that raises
-          none. Army members, those hired out and those driving a carriage get no alarm. It runs
-          their <strong>Alarm script</strong>, which by default is <strong>Alarm</strong> (one of
-          your default scripts) for an armed resident and nothing for an unarmed one. Alarm goes
-          after the occupier while they stand in the city's area, any other armed one of theirs
-          there after them, and ends once they are gone. It goes after a thief until they are dead
-          or have left the area or sight. Their card says “On alarm: going after Bo”.
+          none. An attack, someone striking a wall or gate of the city or a resident of yours
+          standing in its area, reaches those standing there who see it, so the armed residents
+          beside them react rather than only the one struck, who runs their defence script. It is
+          raised once per attacker, the first time someone at home sees them at it, and again only
+          after {duration(DEFEND_CALM_TICKS)} with no blow from them. Those already fighting aren't
+          interrupted, and someone fighting back raises none. Army members, those hired out and
+          those driving a carriage get no alarm. It runs their <strong>Alarm script</strong>, which
+          by default is <strong>Alarm</strong> (one of your default scripts) for an armed resident
+          and nothing for an unarmed one. Alarm goes after the occupier while they stand in the
+          city's area, any other armed one of theirs there after them, and ends once they are gone.
+          It goes after a thief or an attacker until they are dead or have left the area or sight.
+          Their card says “On alarm: going after Bo”.
         </p>
         <p>
           <strong>Force at home:</strong> in your own city's area, striking someone occupying its
           town hall, or a thief of your realm that you know of or one of your residents saw, is no
           crime and costs no standing. Someone occupying is someone armed standing on the hall, so
-          one who has walked off it no longer is. Striking anyone else there is a crime as anywhere,
-          and so is striking a thief outside the area. Scripts see this as{' '}
-          <code>knownThief</code> on those <code>residents()</code> gives: whether your realm knows
-          they stole from it or one of your residents saw it, no more than that.
+          one who has walked off it no longer is. Striking back at an attacker on their alarm is no
+          crime either. Striking anyone else there is a crime as anywhere, and so is striking a thief
+          outside the area. Scripts see this as <code>knownThief</code> on those{' '}
+          <code>residents()</code> gives: whether your realm knows they stole from it or one of your
+          residents saw it, no more than that.
         </p>
         <p>
           On a resident's card, the Script tab's <strong>Alarm script</strong> picks any of your
