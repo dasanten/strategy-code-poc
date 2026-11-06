@@ -2,9 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import {
   GOODS,
   buildingRealm,
+  horseBuyerProblem,
+  horseSellerProblem,
   isClosed,
   noSwap,
   type Building,
+  type NpcHorseOffer,
   type SeenBuilding,
   type Carriage,
   type DeliveryQuote,
@@ -34,6 +37,7 @@ import {
   deliveryCities,
   describeCity,
   describeOccupation,
+  npcStablesInSight,
   npcStoragesInSight,
   previewDelivery,
   previewNpcSwap,
@@ -59,6 +63,7 @@ import {
   warehousesInSight,
   type BuyView,
   type DeliveryCity,
+  type NpcStableView,
   type SendView,
   type TradeLine,
   type TradeLists,
@@ -73,6 +78,7 @@ import { StorageOffers, type AcceptOfferRequest, type PostOfferRequest } from '.
 import { GoodIcon } from './GoodsGrid.js'
 import { carriedShort } from './residents-view.js'
 import { lastSeenText, type LastSeen } from './last-seen.js'
+import { horseStatsText } from './selection-view.js'
 import { HOW_TO_TRADE_PATH } from './wiki-view.js'
 import { PanelHead } from './drawer-head.js'
 import { tradeStandingLine } from './standing-view.js'
@@ -108,6 +114,8 @@ export function CityInspector({
   onBuyCity,
   onTrade,
   onSwap,
+  onBuyHorse,
+  onSellHorse,
   onTransfer,
   onSend,
   arrivesIn,
@@ -148,6 +156,10 @@ export function CityInspector({
   onTrade: (trade: TradeRequest) => void
   /** Gives a swap order to one of the Player's residents on a warehouse or NPC storage. */
   onSwap: (swap: SwapRequest) => void
+  /** Gives a buy horse order to one of the Player's residents at an NPC city's stable. */
+  onBuyHorse: (buy: HorseTradeRequest) => void
+  /** Gives a sell horse order to one of the Player's residents at an NPC city's stable. */
+  onSellHorse: (sale: HorseTradeRequest) => void
   /** Orders a transfer from one of the Player's cities to another realm's city. */
   onTransfer: (transfer: TransferRequest) => void
   /** Sends one of the Player's residents, or a carriage they drive, to a warehouse or storage. */
@@ -417,6 +429,22 @@ export function CityInspector({
                     }
                     previewDelivery={() => ({ buy: noDelivery, sell: noDelivery })}
                     onTrade={onTrade}
+                  />
+                </div>
+              ))}
+            {openId === v.id &&
+              npcStablesInSight(
+                cities.find((c) => c.id === v.id)!,
+                { buildings },
+              ).map((s) => (
+                <div key={s.id} data-trade-at={s.id}>
+                  <HorseMarket
+                    stable={s}
+                    traders={tradersAt(s, { residents, carriages }, realmId).residents}
+                    sending={sending(s)}
+                    tick={tick}
+                    onBuy={onBuyHorse}
+                    onSell={onSellHorse}
                   />
                 </div>
               ))}
@@ -1123,8 +1151,136 @@ function Rates({
   )
 }
 
+/** A buy or sell horse order as the inspector gives it (`CONTEXT.md`: Horse market). */
+export interface HorseTradeRequest {
+  residentId: string
+  horseId: string
+}
+
+/**
+ * An NPC city's stable from the Player's side (`CONTEXT.md`: Horse market, Trade section): its horses
+ * and the Player's own standing there, with name, stats and price, and for one of the Player's
+ * residents there a button for each, or why it won't go. Nobody of theirs there, and it offers to
+ * send someone (`Sending`).
+ */
+function HorseMarket({
+  stable,
+  traders,
+  sending,
+  tick,
+  onBuy,
+  onSell,
+}: {
+  stable: NpcStableView
+  /** The Player's residents at the stable. */
+  traders: Resident[]
+  /** Whom to send there while nobody of the Player's is, and who is on the way. */
+  sending: SendingProps
+  tick: number
+  onBuy: (buy: HorseTradeRequest) => void
+  onSell: (sale: HorseTradeRequest) => void
+}) {
+  const [residentId, setResidentId] = useState<string | undefined>()
+  const resident = traders.find((r) => r.id === residentId) ?? traders[0]
+  const at = `Stable at (${stable.x}, ${stable.y})`
+  return (
+    <div className="warehouse-prices horse-market" aria-label={at}>
+      <p className="warehouse-prices-place">{at}</p>
+      {stable.horses.length > 0 && (
+        <ul className="horse-offers" aria-label="Horses">
+          {stable.horses.map((h) => (
+            <HorseOfferRow
+              key={h.horseId}
+              offer={h}
+              verb="Buy"
+              tick={tick}
+              resident={resident}
+              problem={h.problem ?? (resident && horseBuyerProblem(resident, h.price, tick))}
+              onTrade={onBuy}
+            />
+          ))}
+        </ul>
+      )}
+      {stable.toSell.length > 0 && (
+        <ul className="horse-offers" aria-label="Your horses">
+          {stable.toSell.map((h) => (
+            <HorseOfferRow
+              key={h.horseId}
+              offer={h}
+              verb="Sell"
+              tick={tick}
+              resident={resident}
+              problem={h.problem ?? (resident && horseSellerProblem(resident, h.price, tick))}
+              onTrade={onSell}
+            />
+          ))}
+        </ul>
+      )}
+      {resident ? (
+        <>
+          {traders.length > 1 && (
+            <label>
+              Trader{' '}
+              <select value={resident.id} onChange={(e) => setResidentId(e.target.value)}>
+                {traders.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <p className="small muted trader-holds">
+            {resident.name} holds {Math.floor(resident.carried.coins ?? 0)} coins.
+          </p>
+        </>
+      ) : (
+        <Sending warehouse={stable} place="stable" {...sending} />
+      )}
+    </div>
+  )
+}
+
+/** One horse in `HorseMarket`: what it is and costs, and the button to trade it or why it won't go. */
+function HorseOfferRow({
+  offer,
+  verb,
+  tick,
+  resident,
+  problem,
+  onTrade,
+}: {
+  offer: NpcHorseOffer
+  verb: 'Buy' | 'Sell'
+  tick: number
+  resident: Resident | undefined
+  problem: string | undefined
+  onTrade: (trade: HorseTradeRequest) => void
+}) {
+  return (
+    <li>
+      <strong>{offer.name}</strong>: <strong>{offer.price} coins</strong>
+      <br />
+      <span className="small">{horseStatsText(offer, tick)}</span>
+      {resident && (
+        <>
+          <br />
+          <button
+            type="button"
+            disabled={problem !== undefined}
+            onClick={() => onTrade({ residentId: resident.id, horseId: offer.horseId })}
+          >
+            {verb} {offer.name} for {offer.price} coins
+          </button>
+        </>
+      )}
+      {problem && <p className="small muted">{problem}.</p>}
+    </li>
+  )
+}
+
 /** Where a trade happens, as the Trade section says it. */
-type TradePlace = 'warehouse' | 'storage' | 'wandering trader'
+type TradePlace = 'warehouse' | 'storage' | 'stable' | 'wandering trader'
 
 interface SendingProps {
   /** Whom the Player can send there, nearest first (`sendable`). */

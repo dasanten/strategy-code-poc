@@ -11,6 +11,7 @@ import { leaveTradeOrg } from './caravans.js'
 import { hqFalls } from './hq-fall.js'
 import { grantHorses } from './horse-grant.js'
 import { horseName } from './horses.js'
+import { giveHorsesToNpcCities } from './npc-horses.js'
 import { hash, mulberry32 } from './residents.js'
 import { paramTarget } from './script-params.js'
 import { placeTraders, putHqOnLoops } from './traders.js'
@@ -20,7 +21,7 @@ import { placeTraders, putHqOnLoops } from './traders.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 98
+export const WORLD_FORMAT_VERSION = 99
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -424,6 +425,13 @@ export const migrations: Record<number, MigrationStep> = {
   // `takes`), both optional, as are the new values in the log. A debt that stands has had no trip
   // counted, so its next two armies come for workplaces first.
   97: (state) => state as WorldState,
+  // NPC horses (`CONTEXT.md`: NPC horses): an NPC city from before with no horse gets its two, with
+  // Food by them, as a new village or town starts.
+  98: (state, { terrain }) => {
+    const world = structuredClone(state) as WorldState
+    giveHorsesToNpcCities(world, terrain)
+    return world
+  },
 }
 
 export class WorldFormatError extends Error {}

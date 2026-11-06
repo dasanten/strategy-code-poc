@@ -256,6 +256,85 @@ export const HORSE_WAKE_HEALTH = 20
 export const STABLE_FEED_DAYS = 10
 
 /**
+ * Game days of Food for its horses below which an NPC city sends one of its residents to fill its
+ * stable up to `STABLE_FEED_DAYS` (`CONTEXT.md`: NPC horses). Half of it, so they go in one trip
+ * every few days and work for the city in between, rather than walk for every unit eaten.
+ */
+export const NPC_STABLE_REFILL_DAYS = 5
+
+/**
+ * Game days of Food for each hungry horse an NPC city takes from below its Food reserve
+ * (`CONTEXT.md`: NPC horses): enough to get them past hungry, so its people still come first.
+ */
+export const NPC_STABLE_HUNGRY_DAYS = 2
+
+/** Horses a new NPC village or town starts with (`CONTEXT.md`: NPC horses): a pair to breed. */
+export const NPC_START_HORSES = 2
+
+/**
+ * Game days of Food laid on the ground by an NPC city's first horses (`CONTEXT.md`: NPC horses),
+ * for each of them: long enough for a new village to find the Wood and put up its stable, whose
+ * feeder takes over from there.
+ */
+export const NPC_START_HORSE_FOOD_DAYS = 40
+
+/**
+ * The horses an NPC city wants however small it is (`CONTEXT.md`: NPC horses): a pair, so even a
+ * new daughter has one to breed once a Player sells it some.
+ */
+export const NPC_HORSES_BASE = 2
+
+/**
+ * Residents of an NPC city for each horse it wants beyond `NPC_HORSES_BASE`, up to what a stable
+ * holds (`STABLE_CAPACITY`): a village of 6 wants 4, a town of 16 wants the full 6.
+ */
+export const NPC_RESIDENTS_PER_HORSE = 3
+
+/**
+ * The horses an NPC city keeps to breed from and won't sell (`CONTEXT.md`: Horse market): a
+ * breeding pair.
+ */
+export const NPC_HORSES_KEPT = 2
+
+/**
+ * What an NPC city asks for an average new horse with as many as it wants, in Coins (`CONTEXT.md`:
+ * Horse market): about what a stolen one is worth (`HORSE_STOLEN_WORTH`).
+ */
+export const HORSE_PRICE_BASE = 100
+
+/**
+ * How much more a horse costs for each point its mean stat is above average (less below), as a
+ * share: the full range of new horses goes from half the price to half as much again, so breeding
+ * good ones pays.
+ */
+export const HORSE_PRICE_PER_STAT = 0.1
+
+/** The least a horse's stats leave of its price, for a foal bred far below the range. */
+export const HORSE_PRICE_STATS_FLOOR = 0.25
+
+/** How much less a horse costs for each game year of its age, as a share. */
+export const HORSE_PRICE_AGE_PER_YEAR = 0.03
+
+/** The least a horse's age leaves of its price. */
+export const HORSE_PRICE_AGE_FLOOR = 0.5
+
+/**
+ * How much more an NPC city asks for the last horse it would sell, beyond the pair it keeps, as a
+ * share: twice the price of one it has as many as it wants of.
+ */
+export const HORSE_PRICE_SCARCITY = 1
+
+/** How much less an NPC city asks at most with more horses than it wants, as a share. */
+export const HORSE_PRICE_GLUT = 0.25
+
+/**
+ * What an NPC city pays for a horse, as a share of what it would ask for it with that horse among
+ * its own (`CONTEXT.md`: Horse market): as much as it pays for goods against what it sells them for
+ * (`BUY_SHARE`).
+ */
+export const HORSE_PRICE_PAID_SHARE = 0.6
+
+/**
  * Ticks without a blow after which the Defend default ends for a resident fleeing home
  * (`CONTEXT.md`: Defence script): half a minute, so a lone blow from someone who walks off
  * doesn't send them all the way home. Written into the default's source, where a Player can

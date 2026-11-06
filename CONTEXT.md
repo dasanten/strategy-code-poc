@@ -283,7 +283,7 @@ The shared language of the game. Domain terms only — no implementation details
   trade that won't go says why (no coins in hand, no room, none in stock, not wanted). Delivery
   and Transfer each have a heading and a line saying what they do, with the fee before ordering,
   and the section links to the Wiki's "How to trade". The tile card of a warehouse, an NPC
-  city's storage or a wandering trader at a stop has **Trade here**, which opens it. It shows their standing with that city, and a trade says how far it moved it. Only
+  city's storage or stable with horses to buy or sell (Horse market), or a wandering trader at a stop has **Trade here**, which opens it. It shows their standing with that city, and a trade says how far it moved it. Only
   the UI: the trades are those above.
 - **Stock floor:** the Trade Organization gets its stock physically (its own workplaces on every
   kind of resource, plus buying). When a warehouse of the HQ runs low, it tops up to a minimum at
@@ -482,10 +482,11 @@ The shared language of the game. Domain terms only — no implementation details
   and towns, on Plains, far from every starting city and from each other, and out of every
   Player's sight.
 - **NPC reserve:** what an NPC city keeps of each good it can use, and never sells: Food for
-  some game days for all its residents; Wood and Stone for its next house and some wall; weapons
+  some game days for all its residents, and what its stable lacks for its horses (Feeding the
+  stable; the stable's Food counts); Wood and Stone for its next house and some wall; weapons
   for the soldiers it keeps by its size, and the Iron and Wood to forge them; Coins as its war
-  chest, for buying what it lacks and hiring help. A stable is wanted once it has horses, a mint
-  only with a gold node in reach. Whatever its storages hold above the reserve is its surplus,
+  chest, for buying what it lacks and hiring help. A stable is wanted once it has horses, or with
+  none once nothing else is short (NPC horses), a mint only with a gold node in reach. Whatever its storages hold above the reserve is its surplus,
   for sale (Trading with an NPC city); whatever is below is short and drives what it works and
   builds next (NPC city).
 - **NPC trader:** an NPC city's own trade run. Once a good's surplus makes a full load and a
@@ -978,7 +979,8 @@ The shared language of the game. Domain terms only — no implementation details
 - **Horse:** an animal that pulls a carriage. Eats Food and goes hungry like a resident: an empty
   hunger meter costs health, and a horse without food goes Down after about 5 game days (Down,
   Reviving) and dies if it eats nothing before its time is up. Bred by a
-  resident at a stable, or bought from the Trade Organization.
+  resident at a stable, or bought from an NPC city (Horse market). The Trade Organization doesn't
+  sell horses for now.
 - **Horse grant:** a one-time gift, given once when it ships: every Player realm with a living
   Leader and no horse at all (in a stable, hitched or ridden) gets two new horses with stats drawn
   as in a starting city. They appear in the realm's finished stable nearest the Leader's city;
@@ -1036,6 +1038,26 @@ The shared language of the game. Domain terms only — no implementation details
   the stable; otherwise they wait there. Its params: `stable`, the stable to feed (by default the
   one they stand in when it starts), and `source`, where the Food comes from (by default the nearest
   storage of their realm with Food). With no Food to fetch they wait.
+- **NPC horses:** a new NPC village or town starts with two horses, with some Food by them; one from
+  before this got two when it shipped. It wants a stable once it has any and lays it out where they
+  stand, so they are in it when it is finished; it keeps it fed as Feeding
+  the stable says, with one of its residents at a time, and breeds up to the horses it wants for its
+  size (a balance number), while Food isn't short. The Food comes from what is above the reserve for its people, or below
+  that a little while its horses are hungry or Down: a short city feeds its people first. The
+  resident goes when the stable runs low and fills it, and works for the city in between. Self-managed
+  cities with horses do the same. A founding party takes none: a daughter with none wants a stable too once nothing
+  is short of its reserve, and gets its first horses when a Player sells it some. Trading posts and
+  the HQ don't take part.
+- **Horse market:** buying and selling a horse with an NPC city, only in person: a grown resident
+  at its finished stable. **Buying** takes a horse standing in it that the city can spare (any beyond a
+  breeding pair it keeps), with the Coins in the buyer's hands; the Coins go into its storage and the horse joins
+  their realm where it stands. **Selling** takes a horse of their realm standing in it, pulling no
+  carriage, not ridden and not Down, while the city has fewer than it wants and the Coins in its
+  storage; the Coins go into the resident's hands, and it doesn't go if they can't carry them. The
+  price comes from the horse's stats and age and how many the city has against how many it wants, dearer as it nears the pair it keeps,
+  and its standing toward them moves it like its trade prices. It pays less than it asks. At low standing it refuses (NPC city
+  reaction). A sale raises standing like any trade. The trade section lists its horses, and the
+  realm's standing in the stable, with name, stats and price.
 - **Carriage:** a horse-drawn cart driven by a resident with Driving skill. Carries far more than
   any resident and is fast on plains and roads, slower in forest and hills, and cannot enter
   mountains except on a road. Built at a stable (Building a carriage).

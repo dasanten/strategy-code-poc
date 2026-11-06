@@ -364,6 +364,29 @@ describe('realm log', () => {
     )
   })
 
+  it('describes a horse sold to an NPC city, or why it wasn’t', () => {
+    const sale = {
+      kind: 'horseSold',
+      residentId: 'p1',
+      name: 'Ada',
+      horseId: 'h1',
+      horse: 'Onyx',
+      city: 'Dunmere',
+      x: 4,
+      y: 5,
+      seq: 9,
+      ...at,
+    } as const
+    expect(describeEvent({ ...sale, coins: 60 })).toEqual({
+      text: 'Ada sold Onyx for 60 coins at the stable of Dunmere.',
+      tone: 'info',
+      places: [{ name: 'the stable of Dunmere', x: 4, y: 5 }],
+    })
+    const refused = describeEvent({ ...sale, coins: 0, problem: 'Onyx is Down' })
+    expect(refused.text).toBe('Ada couldn’t sell Onyx at the stable of Dunmere: Onyx is Down.')
+    expect(refused.tone).toBe('warn')
+  })
+
   it('describes trades at a warehouse, cut down or not', () => {
     const trade = {
       kind: 'traded',

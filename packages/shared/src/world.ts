@@ -783,6 +783,8 @@ export type ResidentOrder =
   | BuyCityOrder
   | TradeOrder
   | SwapOrder
+  | BuyHorseOrder
+  | SellHorseOrder
   | HandInOrder
   | BuyOffOrder
   | PayDebtOrder
@@ -894,12 +896,15 @@ export interface WorldState {
 /**
  * What a game-run city's plan has one of its residents do (`CONTEXT.md`: NPC city; ADR 0016):
  * stand as a soldier, work a farm or another workplace, build its project, go on its trade run
- * (NPC trader), found its daughter (Founding), or nothing, until the next pass moves them.
+ * (NPC trader), found its daughter (Founding), feed its stable (NPC horses), or nothing, until the
+ * next pass moves them.
  */
 export interface CityJob {
-  kind: 'soldier' | 'farm' | 'work' | 'build' | 'trade' | 'found' | 'idle'
+  kind: 'soldier' | 'farm' | 'work' | 'build' | 'trade' | 'found' | 'feed' | 'idle'
   /** The farm or workplace to work, for `farm` and `work`. */
   buildingId?: string
+  /** The stable to feed, for `feed`. */
+  stableId?: string
 }
 
 /** What a game-run city builds or takes down next (`CONTEXT.md`: NPC city), as plain data. */
@@ -1404,6 +1409,25 @@ export interface SwapOrder {
   want: Exclude<Good, 'coins'>
   units: number
   carriageId: string | null
+}
+
+/**
+ * Buying a horse at an NPC city's stable (`CONTEXT.md`: Horse market): the resident, standing at
+ * it, pays for the horse standing there from their hands. It happens this tick.
+ */
+export interface BuyHorseOrder {
+  kind: 'buyHorse'
+  horseId: string
+}
+
+/**
+ * Selling a horse at an NPC city's stable (`CONTEXT.md`: Horse market): the resident, standing at
+ * it, takes the Coins for the horse of their realm standing there in their hands. It happens this
+ * tick.
+ */
+export interface SellHorseOrder {
+  kind: 'sellHorse'
+  horseId: string
 }
 
 /**
@@ -2115,6 +2139,38 @@ export type RealmEventWhat =
       y: number
       /** How far the swap moved standing; none on older lines or when it moved none. */
       standing?: StandingMove
+    }
+  /**
+   * The resident `name` bought the horse `horse` of `city` for `coins`, at its stable at (`x`, `y`)
+   * (`CONTEXT.md`: Horse market); or couldn't, for `problem`, and nothing moved.
+   */
+  | {
+      kind: 'horseBought'
+      residentId: string
+      name: string
+      horseId: string
+      horse: string
+      city: string
+      coins: number
+      x: number
+      y: number
+      problem?: string
+    }
+  /**
+   * The resident `name` sold the horse `horse` to `city` for `coins`, at its stable at (`x`, `y`)
+   * (`CONTEXT.md`: Horse market); or couldn't, for `problem`, and nothing moved.
+   */
+  | {
+      kind: 'horseSold'
+      residentId: string
+      name: string
+      horseId: string
+      horse: string
+      city: string
+      coins: number
+      x: number
+      y: number
+      problem?: string
     }
   /**
    * The resident `name` ordered a delivery at the Trade Org warehouse at (`x`, `y`)

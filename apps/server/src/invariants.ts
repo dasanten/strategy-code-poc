@@ -105,6 +105,8 @@ import { joinRequestsSound } from './persuasion.js'
 import { formerPlayersSound, standingsSound } from './standing.js'
 import { buyOrdersDone, cityPricesSound } from './buying.js'
 import {
+  npcHorsePurchasesWanted,
+  npcHorseSalesKeepPair,
   npcTradesKeepReserve,
   refusedTradeNothing,
   tradeOrdersDone,
@@ -135,6 +137,7 @@ import {
 import { nothingLeftOfTheHq } from './hq-fall.js'
 import { hqRingsSound } from './hq-growth.js'
 import { cityPlansSound, npcFarmersKept, tradeOrgSendsNoOne } from './npc-plan.js'
+import { npcOneFeeder, tradeOrgBreedsNoHorses } from './npc-stable.js'
 import { foundingPartiesSound, npcCitiesHaveHalls } from './npc-founding.js'
 import { npcTradersSound } from './npc-trader.js'
 import { leadersServeNoOne } from './leader.js'
@@ -2083,6 +2086,8 @@ export const worldInvariants: Invariant[] = [
   tradeOrdersDone,
   tradesKeepGoods,
   refusedTradeNothing,
+  npcHorseSalesKeepPair,
+  npcHorsePurchasesWanted,
   npcTradesKeepReserve,
   offersSound,
   offersKeepGoods,
@@ -2126,6 +2131,8 @@ export const worldInvariants: Invariant[] = [
   foundingPartiesSound,
   npcCitiesHaveHalls,
   npcFarmersKept,
+  npcOneFeeder,
+  tradeOrgBreedsNoHorses,
   npcResidentsKeptGoing,
   tradeOrgSendsNoOne,
   npcTradersSound,

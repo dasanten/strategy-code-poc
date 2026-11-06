@@ -137,6 +137,8 @@ export const GETS_OFF_FIRST: readonly string[] = [
   'buy',
   'sell',
   'swap',
+  'buyHorse',
+  'sellHorse',
   'handIn',
   'transfer',
   'buyOff',

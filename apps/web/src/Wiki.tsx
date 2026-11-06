@@ -171,6 +171,20 @@ import {
   STABLE_CAPACITY,
   FOAL_STAT_SPREAD,
   BREED_FOOD,
+  HORSE_PRICE_AGE_FLOOR,
+  HORSE_PRICE_AGE_PER_YEAR,
+  HORSE_PRICE_BASE,
+  HORSE_PRICE_GLUT,
+  HORSE_PRICE_PAID_SHARE,
+  HORSE_PRICE_PER_STAT,
+  HORSE_PRICE_SCARCITY,
+  NPC_HORSES_BASE,
+  NPC_HORSES_KEPT,
+  NPC_RESIDENTS_PER_HORSE,
+  NPC_STABLE_HUNGRY_DAYS,
+  NPC_STABLE_REFILL_DAYS,
+  NPC_START_HORSE_FOOD_DAYS,
+  NPC_START_HORSES,
   STABLE_FEED_DAYS,
   DEFEND_CALM_TICKS,
   STANDING_CONTRACT_BROKEN_LOSS,
@@ -1919,6 +1933,45 @@ export function Wiki() {
           won't trade with you at all. Every trade raises standing both ways (see{' '}
           <a href="#standing">Standing &amp; reactions</a>).
         </p>
+        <h3>Buying a horse</h3>
+        <p>
+          An NPC city sells any horse beyond the {num(NPC_HORSES_KEPT)} it keeps to breed. Only in
+          person: a grown resident of yours goes to its finished stable with the Coins in their
+          hands, not on a carriage. Press <strong>Trade here</strong> on the stable's tile, or open
+          the city: the Trade section lists the horses standing there with name, stats, age and
+          price, and says why one won't go. A horse that is hitched, ridden or Down isn't for sale.
+          The Coins go into its storage, and the horse is yours where it stands, ready to ride home.
+          Buying one raises standing both ways like any trade, and any breeding it was part of ends.
+        </p>
+        <p>
+          An average new horse costs about {num(HORSE_PRICE_BASE)} coins while the city has all it
+          wants. Each point of its mean stat above or below average moves that by{' '}
+          {pct(HORSE_PRICE_PER_STAT)}, and each game year of age takes off{' '}
+          {pct(HORSE_PRICE_AGE_PER_YEAR)}, leaving at least {pct(HORSE_PRICE_AGE_FLOOR)}. As the
+          city nears the pair it keeps it asks more, up to {pct(HORSE_PRICE_SCARCITY)} more for the
+          last it would sell; with more than it wants, up to {pct(HORSE_PRICE_GLUT)} less. Its
+          standing toward you moves the price like its trade prices. Below{' '}
+          {signed(NPC_CITY_REFUSES_STANDING)} it won't sell you one.
+        </p>
+        <h3>Selling a horse</h3>
+        <p>
+          An NPC city buys a horse while it has fewer than it wants, which grows with its size. Ride
+          one of yours into its finished stable and get off, with the rider or another grown
+          resident of yours there. <strong>Trade here</strong> on the stable's tile, or the city's
+          Trade section, lists your horses standing there with what it pays, and says why one won't
+          go. A horse that is hitched, ridden or Down can't be sold. A stolen horse sells like any
+          other.
+        </p>
+        <p>
+          It pays about {pct(HORSE_PRICE_PAID_SHARE)} of what it would ask for that horse once it is
+          among its own, so a good horse fetches more, and a city with few pays more. Good standing
+          brings what it pays and what it asks closer, and it always asks more than it pays. The
+          Coins come out of its storages, so it must hold them, and go into your resident's hands;
+          if they can't carry all of them the sale doesn't go, so come with room. The horse is the
+          city's where it stands, which feeds and breeds it from then on, and any breeding it was
+          part of ends. Selling one raises standing both ways like any trade. Below{' '}
+          {signed(NPC_CITY_REFUSES_STANDING)} it won't buy from you.
+        </p>
         <h3>Delivery</h3>
         <p>
           At a Trade Org warehouse, instead of carrying, a caravan brings what you buy to your
@@ -2023,7 +2076,26 @@ export function Wiki() {
           {GOOD_LABELS[NPC_SMITHY_WEAPON].toLowerCase()} for each soldier it keeps and hasn't armed
           yet ({pct(NPC_SOLDIER_SHARE)} of its adults), with the Iron and Wood to forge them; and{' '}
           {num(NPC_WAR_CHEST_PER_RESIDENT)} coins a resident as its war chest. A stable is wanted
-          once it has a horse.
+          once it has a horse, or with none once nothing else is short, and what the stable lacks of{' '}
+          {days(STABLE_FEED_DAYS)} of Food for its horses is in the reserve too; what the stable
+          holds counts.
+        </p>
+        <p>
+          A new NPC village or town starts with {num(NPC_START_HORSES)} horses, with{' '}
+          {days(NPC_START_HORSE_FOOD_DAYS)} of Food for each on the ground by them, and lays its
+          stable out where they stand, so they are in it once it is finished. It breeds them up to{' '}
+          {num(NPC_HORSES_BASE)} horses and one more for every {num(NPC_RESIDENTS_PER_HORSE)}{' '}
+          residents, at most what a stable holds ({num(STABLE_CAPACITY)}), while Food isn't short. A
+          founding party takes no horses, and a daughter gets its first when a Player sells it some.
+          Trading posts and the HQ have none of this.
+        </p>
+        <p>
+          One of its residents at a time feeds its stable, by the Feed the stable default: when the
+          stable holds less than {days(NPC_STABLE_REFILL_DAYS)} of Food for its horses they fill it
+          up, and work for the city in between. The Food comes from what is above the{' '}
+          {days(NPC_TRADE.reserveFoodDays)} kept for its people. Below that only while a horse is
+          hungry or Down, and then only {days(NPC_STABLE_HUNGRY_DAYS)} of Food for each such horse:
+          a short city feeds its people first. Trading posts and the HQ don't do this.
         </p>
         <p>
           It shares out its adults in this order: soldiers; farmers, as many as feed everyone (each
