@@ -588,6 +588,43 @@ export const PAIRING_WAIT_TICKS = PAIRING_WAIT_DAYS * TICKS_PER_GAME_DAY
 export const NPC_PLAN_TICKS = 60
 
 /**
+ * What each job of an NPC city is worth to a free adult (`CONTEXT.md`: NPC city; ADR 0029): each
+ * goes to the highest-scoring job with room. Only the order and the gaps mean anything: `short` runs
+ * up to `short` + `shortRange` by how much of a good it lacks, staying below `project`, and `surplus`
+ * up to `surplus` + `surplusRange` by how far below its cap, staying below `back`.
+ */
+export const NPC_JOB_SCORE = {
+  /** Farming for a worker off the farms, while Food runs short: past the farmers it keeps. */
+  farmFoodShort: 110,
+  /** Farming, while it lacks the farmers it keeps. */
+  farm: 100,
+  /** Not weighed: where revivers get their turn, Food for those who aren't Down coming first. */
+  revive: 80,
+  /** Building its project. */
+  project: 55,
+  /** Making a good short of its reserve, at the least. */
+  short: 50,
+  shortRange: 4,
+  /** Its road crew. */
+  road: 30,
+  /** Scouting. */
+  scout: 28,
+  /** Going back to the workplace they were let go from. */
+  back: 20,
+  /** Working for surplus, at the least. */
+  surplus: 10,
+  surplusRange: 5,
+} as const
+
+/**
+ * How much more another job must score for an NPC city's worker to leave theirs (`CONTEXT.md`: NPC
+ * city; ADR 0029), so nobody goes back and forth: more than the whole of `NPC_JOB_SCORE.shortRange`
+ * and the step up to `project`, so a worker on one short good stays for another or for the project,
+ * and less than the gaps above `back`, so one let go leaves for anything that wants them.
+ */
+export const NPC_JOB_MARGIN = 6
+
+/**
  * Most of an NPC city's adults that build at once (`CONTEXT.md`: NPC city): laying out, carrying
  * materials to the site, building or tearing down. The others keep working.
  */
