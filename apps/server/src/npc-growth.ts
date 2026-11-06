@@ -555,10 +555,11 @@ function wantsStable(world: WorldState, city: City): boolean {
 
 /**
  * Where an NPC city puts its stable, by the north-west tile of its footprint: over its horses when
- * one fits there, so that they stand in it once it is finished (`CONTEXT.md`: NPC horses); else where
- * it would put a house (`houseTile`).
+ * one fits there, so that they stand in it once it is finished (`CONTEXT.md`: NPC horses), off its
+ * streets (`CONTEXT.md`: City layout) unless they stand on one, as in a city from before layouts,
+ * since nobody leads them anywhere; else where it would put a house (`houseTile`).
  */
-function stableTile(
+export function stableTile(
   world: WorldState,
   city: City,
   home: Building,
@@ -579,9 +580,14 @@ function stableTile(
       [wrap(first.x - middle, size), wrap(first.y - middle, size)],
       ...footprintTiles({ kind: 'stable', x: first.x - far, y: first.y - far }, size),
     ]
-    for (const [x, y] of corners) {
-      const over = horses.every((h) => covers({ kind: 'stable', x, y }, h.x, h.y, size))
-      if (over && ground.fits('stable', x, y, (tx, ty) => area.has(`${tx},${ty}`))) return { x, y }
+    const over = corners.filter(([x, y]) =>
+      horses.every((h) => covers({ kind: 'stable', x, y }, h.x, h.y, size)),
+    )
+    const inArea = (tx: number, ty: number) => area.has(`${tx},${ty}`)
+    const lanes = layoutPlan(world, city, home, rings?.newGate, size)
+    const offStreet = (tx: number, ty: number) => inArea(tx, ty) && !lanes?.street(tx, ty)
+    for (const allowed of [offStreet, inArea]) {
+      for (const [x, y] of over) if (ground.fits('stable', x, y, allowed)) return { x, y }
     }
   }
   return houseTile(world, city, home, terrain, rings, 'stable')
@@ -589,9 +595,10 @@ function stableTile(
 
 /**
  * Where an NPC city's first horses stand while it has no stable (`giveNpcHorses`), by the north-west
- * tile of a stable's footprint: wholly on free ground of its area, with nothing standing or lying
- * there, inside its wall and as far from its home as that goes, as its houses and workplaces go up
- * nearest it first and reach this last. None with no room.
+ * tile of a stable's footprint: wholly on free ground of its area, off its streets (`CONTEXT.md`:
+ * City layout), with nothing standing or lying there, inside its wall and as far from its home as
+ * that goes, as its houses and workplaces go up nearest it first and reach this last. None with no
+ * room.
  */
 export function farStableSpot(
   world: WorldState,
@@ -603,7 +610,8 @@ export function farStableSpot(
   const area = cityAreaTiles(world, city, size)
   const ground = new Ground(world, terrain, residentTiles(world))
   const rings = wallRings(world, city, home, size)
-  const inArea = (x: number, y: number) => area.has(`${x},${y}`)
+  const lanes = layoutPlan(world, city, home, rings?.newGate, size)
+  const inArea = (x: number, y: number) => area.has(`${x},${y}`) && !lanes?.street(x, y)
   const free = [...area]
     .map((k) => {
       const [x, y] = k.split(',').map(Number) as [number, number]

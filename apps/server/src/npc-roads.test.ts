@@ -1,5 +1,6 @@
 import {
   BUILD_MATERIALS,
+  CITY_LAYOUTS,
   GET_FOOD_AT,
   MOUNTAIN_ROAD_WORK_FACTOR,
   NPC_BUILDERS,
@@ -14,6 +15,9 @@ import {
   TICKS_PER_GAME_DAY,
   Terrain,
   WALK_TICKS_PER_TILE,
+  buildingAt,
+  covers,
+  footprintTiles,
   inCityArea,
   isDown,
   npcReserve,
@@ -25,6 +29,7 @@ import {
   wrapDistance,
   type Building,
   type City,
+  type CityLayout,
   type CityPlan,
   type Good,
   type Resident,
@@ -33,10 +38,13 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
+import { cityStreetsSound, layoutPlan, streetsOwed } from './city-layout.js'
 import { checkInvariants } from './invariants.js'
 import { npcHome, stepNpcCities } from './npc-behaviour.js'
 import { foundNpcCity } from './npc-cities.js'
 import { plains } from './npc-growth.fixture.js'
+import { farStableSpot, houseTile, stableTile, wallRings } from './npc-growth.js'
+import { giveNpcHorses } from './npc-horses.js'
 import { planCity } from './npc-plan.js'
 import { npcRoadCrewSized, npcRoadsOnce, roadCrew, type WayFinder } from './npc-roads.js'
 import { PathFinder, WALKING_COSTS } from './pathfinding.js'
@@ -78,7 +86,20 @@ function town(past: Stock = { stone: 50 }, size = 300) {
   const place = camp(world, terrain, city, FAR)
   const storage = npcHome(world, city)!
   setStock(world, city, storage, past)
+  layStreets(world, terrain, city)
   return { world, terrain, city, place, storage, home: npcHome(world, city)! }
+}
+
+/** The street tiles the city wants as road now (`streetsOwed`). */
+function owedBy(world: WorldState, terrain: TerrainMap, city: City) {
+  const home = npcHome(world, city)!
+  const gate = wallRings(world, city, home, terrain.size)?.newGate
+  return streetsOwed(world, city, home, gate, terrain)
+}
+
+/** Its streets laid, so its crew goes on to its other roads. */
+function layStreets(world: WorldState, terrain: TerrainMap, city: City): void {
+  layAll(world, owedBy(world, terrain, city))
 }
 
 /** The city holds its reserve, its Food cap and Wood cap above that, and `past` above it. */
@@ -114,6 +135,7 @@ function neighbour(
 ) {
   const city = foundNpcCity(world, terrain, NPC_TOWN, 60 + dx, 60, mulberry32(6))
   setStock(world, city, npcHome(world, city)!, past)
+  layStreets(world, terrain, city)
   return city
 }
 
@@ -288,11 +310,42 @@ describe('a road crew', () => {
     const { ways } = waysOf(world, terrain)
     const people = world.residents.filter((r) => r.cityId === city.id)
     const crew = (plan: CityPlan) =>
-      roadCrew(world, city, plan, people, new Set(), storage, home, ways, terrain.size)
+      roadCrew(world, city, plan, people, new Set(), storage, home, ways, terrain)
     expect(crew({ plannedAt: 0, jobs: {} })).toHaveLength(NPC_ROAD_CREW)
     // A mine wants more Stone than the 2 above the reserve.
     const project = { kind: 'build' as const, building: 'mine' as const, x: 200, y: 200 }
     expect(crew({ plannedAt: 0, jobs: {}, project })).toEqual([])
+  })
+
+  it('lets go of its tile and brings home what it carries once armed', () => {
+    const { world, terrain, city, storage } = town()
+    const { ways } = waysOf(world, terrain)
+    const plan = planCity(world, city, terrain, undefined, ways)
+    const member = crewOf(world, plan)[0]!
+    const [x, y] = plan.roads![0]!.tiles[0]!
+    const site: Building = {
+      id: newId(world, 'b'),
+      kind: 'road',
+      x,
+      y,
+      cityId: null,
+      site: { delivered: {}, work: 0 },
+    }
+    world.buildings.push(site)
+    member.x = x
+    member.y = y
+    member.carried = { food: 3, stone: 20, [NPC_SMITHY_WEAPON]: 1 }
+    member.order = { kind: 'build', building: 'road', at: { x, y }, siteId: site.id }
+    delete member.script
+    expect(planCity(world, city, terrain, undefined, ways).jobs[member.id]?.kind).toBe('soldier')
+    const before = storage.stock!.stone ?? 0
+    const walking = new Walking(terrain)
+    for (let t = 0; t < TICKS_PER_GAME_DAY && (member.carried.stone ?? 0) > 0; t++) {
+      stepWorld(world, terrain, walking)
+    }
+    expect(member.carried.stone ?? 0).toBe(0)
+    expect(storage.stock!.stone ?? 0).toBeGreaterThanOrEqual(before + 20)
+    expect(member.carried[NPC_SMITHY_WEAPON]).toBe(1)
   })
 
   it('lays a torn-down tile again', () => {
@@ -492,10 +545,10 @@ describe('a road crew going on from its workplaces', () => {
   const diagonalTo = (to: string, steps: number): WayFinder => ({
     way: (key, from) => {
       if (!key.endsWith(`:${to}`)) return { status: 'found', path: [], cost: 0 }
-      const path = Array.from(
-        { length: steps },
-        (_, i): [number, number] => [from[0] + i + 1, from[1] + i + 1],
-      )
+      const path = Array.from({ length: steps }, (_, i): [number, number] => [
+        from[0] + i + 1,
+        from[1] + i + 1,
+      ])
       return { status: 'found', path, cost: steps }
     },
   })
@@ -769,6 +822,7 @@ describe('on the map', () => {
     const city = foundNpcCity(world, terrain, NPC_TOWN, 60, 60, mulberry32(5))
     const place = camp(world, terrain, city, far)
     setStock(world, city, npcHome(world, city)!, { stone: 200 })
+    layStreets(world, terrain, city)
     const { ways } = waysOf(world, terrain)
     // All of it laid but the far end, so the crew walks a long way for each load.
     let plan = joinAll(world, terrain, city, ways, 0)
@@ -799,8 +853,9 @@ describe('on the map', () => {
     expect(onCrew).toBeGreaterThan(0)
     expect(left.every((tile) => finished(world, tile))).toBe(true)
     expect(lowest).toBeGreaterThan(0)
-    expect(people().filter((r) => isDown(r))).toEqual([])
-    expect(people().length).toBeGreaterThanOrEqual(count)
+    expect(world.residents.filter((r) => isDown(r))).toEqual([])
+    // Streets come first, so it can take long enough for the city to found a daughter: count hers.
+    expect(world.residents.length).toBeGreaterThanOrEqual(count)
     expect(checkInvariants(world, terrain)).toEqual([])
   })
 
@@ -810,6 +865,7 @@ describe('on the map', () => {
     () => {
       const { world, terrain, city, storage } = town({ stone: 3 })
       const walking = new Walking(terrain)
+      const before = world.buildings.filter((b) => b.kind === 'road').length
       const reserve = () => npcReserve(world, city).stone ?? 0
       let lowest = Infinity
       let onCrew = 0
@@ -821,12 +877,229 @@ describe('on the map', () => {
       }
       expect(onCrew).toBeGreaterThan(0)
       expect(lowest).toBeGreaterThanOrEqual(0)
-      const roads = world.buildings.filter((b) => b.kind === 'road')
-      expect(roads.length).toBeGreaterThan(0)
-      expect(roads.length).toBeLessThanOrEqual(3 / STONE)
+      const roads = world.buildings.filter((b) => b.kind === 'road').length - before
+      expect(roads).toBeGreaterThan(0)
+      expect(roads).toBeLessThanOrEqual(3 / STONE)
       expect(crewOf(world, world.cityPlans[city.id]!)).toEqual([])
     },
   )
+})
+
+describe.each(CITY_LAYOUTS)('the streets of %s', (layout) => {
+  /** A new town that picked the layout, with a far lumber camp, its streets not laid yet. */
+  function unlaid(past: Stock = { stone: 50 }) {
+    const pick = (l: CityLayout) => {
+      for (let seed = 1; ; seed++) {
+        const terrain = plains(300)
+        const world = createWorld(terrain, seed)
+        const city = foundNpcCity(world, terrain, NPC_TOWN, 60, 60, mulberry32(5))
+        if (city.layout === l) return { world, terrain, city }
+      }
+    }
+    const { world, terrain, city } = pick(layout)
+    const place = camp(world, terrain, city, FAR)
+    const home = npcHome(world, city)!
+    setStock(world, city, home, past)
+    return { world, terrain, city, place, home, ...waysOf(world, terrain) }
+  }
+
+  /** Whether a tile touches a building, corners too. */
+  const touches = (b: Building, [x, y]: readonly [number, number], size: number) =>
+    footprintTiles(b, size).some(([fx, fy]) => wrapDistance(size, { x: fx, y: fy }, { x, y }) < 2)
+
+  /** What the city's layout says now. */
+  const lanesOf = ({ world, city, home, terrain }: ReturnType<typeof unlaid>) =>
+    layoutPlan(
+      world,
+      city,
+      home,
+      wallRings(world, city, home, terrain.size)?.newGate,
+      terrain.size,
+    )!
+
+  /** A finished house of the city at the next spot of its layout. */
+  function putUpHouse(t: ReturnType<typeof unlaid>): Building {
+    const { world, terrain, city, home } = t
+    const rings = wallRings(world, city, home, terrain.size)
+    const at = houseTile(world, city, home, terrain, rings)!
+    const house: Building = { id: newId(world, 'b'), kind: 'house', cityId: city.id, ...at }
+    world.buildings.push(house)
+    return house
+  }
+
+  it('wants only tiles of its streets beside what stands, and none under it', () => {
+    const t = unlaid()
+    const { world, terrain, city, ways } = t
+    const streets = planCity(world, city, terrain, undefined, ways).streets!
+    expect(streets.length).toBeGreaterThan(0)
+    const side = world.buildings.filter(
+      (b) => b.cityId === city.id && ['townHall', 'house', 'storage'].includes(b.kind),
+    )
+    const lanes = lanesOf(t)
+    for (const tile of streets) {
+      expect(buildingAt(world, tile[0], tile[1], terrain.size)).toBeUndefined()
+      expect(side.some((b) => touches(b, tile, terrain.size))).toBe(true)
+      expect(lanes.street(tile[0], tile[1])).toBe(true)
+    }
+    expect(JSON.parse(JSON.stringify(streets))).toEqual(streets)
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('goes up beside a new building once it stands', () => {
+    const t = unlaid()
+    const { world, terrain, city, ways } = t
+    layStreets(world, terrain, city)
+    expect(owedBy(world, terrain, city)).toEqual([])
+    const house = putUpHouse(t)
+    house.site = { delivered: {}, work: 0 }
+    expect(owedBy(world, terrain, city)).toEqual([])
+    delete house.site
+    const owed = owedBy(world, terrain, city)
+    expect(owed.length).toBeGreaterThan(0)
+    for (const tile of owed) expect(touches(house, tile, terrain.size)).toBe(true)
+    expect(planCity(world, city, terrain, undefined, ways).streets).toEqual(owed)
+  })
+
+  it('comes ahead of its other roads, nearest home first', () => {
+    const { world, terrain, city, place, ways, home } = unlaid()
+    const plan = planCity(world, city, terrain, undefined, ways)
+    expect(plan.roads!.map((r) => r.to)).toContain(place.id)
+    const far = plan.streets!.map(([x, y]) => wrapDistance(terrain.size, home, { x, y }))
+    expect(far).toEqual([...far].sort((a, b) => a - b))
+    const [member] = crewOf(world, plan)
+    member!.carried.stone = STONE
+    member!.order = null
+    delete member!.script
+    world.tick = plan.plannedAt + 1
+    stepNpcCities(world, terrain.size, terrain, ways)
+    const [x, y] = plan.streets![0]!
+    expect(member!.script?.memory).toMatchObject({ building: 'road', at: { x, y } })
+  })
+
+  it('waits for materials above its reserve', () => {
+    const { world, terrain, city, home, ways } = unlaid({})
+    home.stock!.stone = npcReserve(world, city).stone ?? 0
+    const plan = planCity(world, city, terrain, undefined, ways)
+    expect(crewOf(world, plan)).toEqual([])
+    expect(plan.streets).toBeUndefined()
+  })
+
+  it('in an old city stops at what stands, and tears nothing down', () => {
+    const { world, terrain, city, ways } = unlaid()
+    const owed = owedBy(world, terrain, city)
+    // A house from before layouts, right on the street.
+    const [x, y] = owed[0]!
+    const old: Building = { id: newId(world, 'b'), kind: 'house', cityId: city.id, x, y }
+    world.buildings.push(old)
+    const streets = planCity(world, city, terrain, undefined, ways).streets!
+    const tiles = new Set(streets.map(([tx, ty]) => `${tx},${ty}`))
+    for (const [fx, fy] of footprintTiles(old, terrain.size)) {
+      expect(tiles.has(`${fx},${fy}`)).toBe(false)
+    }
+    expect(streets.length).toBeGreaterThan(0)
+    expect(world.buildings).toContain(old)
+  })
+
+  it('leaves out water, and does not go up beside a farm', () => {
+    const { world, terrain, city, ways, home } = unlaid()
+    const [lx, ly] = owedBy(world, terrain, city)[0]!
+    terrain.tiles[tileIndex(terrain.size, lx, ly)] = Terrain.Lake
+    layStreets(world, terrain, city)
+    expect(roadAt(world, lx, ly)).toBeUndefined()
+    // Beyond its wall, as a farm goes, across the lines of its streets or not.
+    const farm: Building = {
+      id: newId(world, 'b'),
+      kind: 'farm',
+      cityId: city.id,
+      x: home.x + 40,
+      y: home.y + 40,
+    }
+    world.buildings.push(farm)
+    expect(planCity(world, city, terrain, undefined, ways).streets).toBeUndefined()
+  })
+
+  it('keeps the tiles of its streets free, road or no road', () => {
+    const t = unlaid()
+    const { world, terrain, city, home } = t
+    const rings = wallRings(world, city, home, terrain.size)
+    const before = houseTile(world, city, home, terrain, rings)
+    layStreets(world, terrain, city)
+    expect(houseTile(world, city, home, terrain, rings)).toEqual(before)
+    const house = putUpHouse(t)
+    const lanes = lanesOf(t)
+    for (const [x, y] of footprintTiles(house, terrain.size)) {
+      expect(lanes.street(x, y)).toBe(false)
+    }
+  })
+
+  it('keeps them free of a stable over its horses, unless they stand on one already', () => {
+    const t = unlaid()
+    const { world, terrain, city, home } = t
+    const size = terrain.size
+    const lanes = lanesOf(t)
+    const offLanes = (at: { x: number; y: number }) =>
+      footprintTiles({ kind: 'stable', ...at }, size).every(([x, y]) => !lanes.street(x, y))
+    const spot = farStableSpot(world, city, home, terrain)!
+    expect(offLanes(spot)).toBe(true)
+
+    // Its horses go where that spot is, and its stable goes up around them, off the streets.
+    giveNpcHorses(world, terrain, city)
+    const horses = world.horses.filter((h) => h.cityId === city.id)
+    expect(horses.length).toBeGreaterThan(0)
+    const rings = wallRings(world, city, home, size)
+    const around = stableTile(world, city, home, terrain, rings)!
+    expect(offLanes(around)).toBe(true)
+    for (const h of horses) expect(covers({ kind: 'stable', ...around }, h.x, h.y, size)).toBe(true)
+
+    // As a city from before layouts may have them, on a street: nobody leads them anywhere.
+    const goesAround = owedBy(world, terrain, city).some(([x, y]) => {
+      for (const h of horses) {
+        h.x = x
+        h.y = y
+      }
+      const at = stableTile(world, city, home, terrain, rings)!
+      return covers({ kind: 'stable', ...at }, x, y, size) && !offLanes(at)
+    })
+    expect(goesAround).toBe(true)
+  })
+
+  it(
+    'goes up on the map, tile by tile, never below the reserve',
+    { tags: ['slow'], timeout: 600_000 },
+    () => {
+      const { world, terrain, city, home } = unlaid({ stone: 30 })
+      const owed = owedBy(world, terrain, city)
+      const wanted = Math.min(owed.length, 8)
+      expect(wanted).toBeGreaterThan(0)
+      const walking = new Walking(terrain)
+      const built = () => owed.filter((tile) => finished(world, tile)).length
+      let lowest = Infinity
+      for (let t = 0; t < 10 * TICKS_PER_GAME_DAY && built() < wanted; t++) {
+        stepWorld(world, terrain, walking)
+        lowest = Math.min(lowest, (home.stock?.stone ?? 0) - (npcReserve(world, city).stone ?? 0))
+        if (t % TICKS_PER_GAME_DAY === 0) expect(checkInvariants(world, terrain)).toEqual([])
+      }
+      expect(built()).toBeGreaterThanOrEqual(wanted)
+      expect(lowest).toBeGreaterThanOrEqual(0)
+      expect(checkInvariants(world, terrain)).toEqual([])
+    },
+  )
+})
+
+describe('the city-streets-sound invariant', () => {
+  it('finds streets of a city with no layout, and a tile twice', () => {
+    const { world, terrain, city } = town()
+    world.cityPlans[city.id] = { plannedAt: 0, jobs: {}, streets: [[1, 1]] }
+    expect(cityStreetsSound.check(world, terrain)).toEqual([])
+    world.cityPlans[city.id]!.streets = [
+      [1, 1],
+      [1, 1],
+    ]
+    expect(cityStreetsSound.check(world, terrain)).toHaveLength(1)
+    world.cityPlans[city.id]!.streets = [[1, 1]]
+    delete city.layout
+    expect(cityStreetsSound.check(world, terrain)).toHaveLength(1)
+  })
 })
 
 describe('the npc-roads-once invariant', () => {

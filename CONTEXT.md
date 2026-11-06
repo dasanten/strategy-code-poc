@@ -449,7 +449,10 @@ The shared language of the game. Domain terms only — no implementation details
   says where houses, storages and workshops (smelter, smithy, mint, stable) go, nearest its home
   first, inside its wall and on outward as the city grows; a spot that doesn't fit is skipped. In Rings only a storage may stand inside the first lane, where a new city's storage stands anyway, so a daughter with just its town hall still finds a spot for it.
   A building whose part of a Quarters city has no room left spills over into another part.
-  Streets are real roads, built by its road crew (NPC road). Walls, gates, farms and workplaces on
+  Streets are real roads, built by its road crew (NPC road) ahead of its other roads, tile by tile
+  once its town hall, a house, a storage or a workshop stands beside them. Tiles kept free for streets stay
+  free, and a street stops at whatever stands on its line. A stable goes up round the city's horses
+  off its streets, unless they already stand on one, as nobody leads them anywhere. Walls, gates, farms and workplaces on
   nodes go where they do anyway. A city from before layouts got one when they shipped: nothing is
   torn down, and new buildings follow it around what stands. Trading posts, the HQ and Players'
   cities have none.
@@ -506,7 +509,8 @@ The shared language of the game. Domain terms only — no implementation details
   balance number). What is short, its trader and a founding party still take them first, and they
   count as spare hands for a Full city. Trade Org cities do none of this.
 - **NPC road:** a road an NPC city builds with a **road crew** of its spare hands (at most a balance
-  number at once, apart from its builders), only from materials above its reserve. It follows the
+  number at once, apart from its builders), only from materials above its reserve. Its layout's
+  streets come first (City layout). Then it follows the
   way a resident would walk, tile by tile, skipping tiles that have a road: first from its home to
   each of its workplaces outside its area, nearest first; then to the nearest Trade Org warehouse
   in its trader's reach, leaving out those of the HQ's inner ring, which keeps everyone out; then to

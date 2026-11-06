@@ -178,7 +178,8 @@ function keepSoldiers(
   const adults = people.filter((r) => canWork(r, world.tick) && !party.has(r.id))
   const soldiers = adults.filter(isArmed)
   for (const r of soldiers) {
-    if (r.order?.kind === 'workAt') stopWork(r)
+    // A bare building order would hold them, and the materials on them, at the site for good.
+    if (r.order?.kind === 'workAt' || r.order?.kind === 'build') stopWork(r)
     else delete r.script
   }
   if (soldiers.length >= target) return
