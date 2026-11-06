@@ -731,7 +731,8 @@ function ringsOf(
  * short of where the next one stands, which starts its expansion. A city without walls builds
  * anywhere in its area. Its layout (`CONTEXT.md`: City layout), if it has one, says which of those
  * spots it may take and which it fills first, and keeps its streets free; a spot that doesn't fit
- * is skipped.
+ * is skipped. All that among the spots it has for the kind, and then, unless a new wall is going up
+ * to make room, among those the layout lets it spill over to.
  */
 export function houseTile(
   world: WorldState,
@@ -746,23 +747,29 @@ export function houseTile(
   const ground = new Ground(world, terrain)
   const plan = layoutPlan(world, city, home, rings?.newGate, size)
   const allowed = (x: number, y: number) => area.has(`${x},${y}`) && !plan?.street(x, y)
-  const free = [...area]
-    .map((k) => {
-      const [x, y] = k.split(',').map(Number) as [number, number]
-      return { x, y }
-    })
-    .filter((t) => (!plan || plan.spot(kind, t.x, t.y)) && ground.fits(kind, t.x, t.y, allowed))
-    .map((t) => ({
-      ...t,
-      ...ringsOf(home, { kind, ...t }, size),
-      rank: plan?.rank?.(kind, t.x, t.y) ?? 0,
-    }))
-    .sort((a, b) => a.rank - b.rank || a.near - b.near || a.y - b.y || a.x - b.x)
-  const at = (t: { x: number; y: number } | undefined) => t && { x: t.x, y: t.y }
-  if (!rings) return at(free[0])
-  const inside = free.find((t) => t.far < rings.outer)
-  if (inside || rings.expanding) return at(inside)
-  return at(free.find((t) => t.near > rings.inner && t.far < rings.inner + NPC_WALL_STEP))
+  const among = (spot?: (x: number, y: number) => boolean) => {
+    const free = [...area]
+      .map((k) => {
+        const [x, y] = k.split(',').map(Number) as [number, number]
+        return { x, y }
+      })
+      .filter((t) => (!spot || spot(t.x, t.y)) && ground.fits(kind, t.x, t.y, allowed))
+      .map((t) => ({
+        ...t,
+        ...ringsOf(home, { kind, ...t }, size),
+        rank: plan?.rank?.(kind, t.x, t.y) ?? 0,
+      }))
+      .sort((a, b) => a.rank - b.rank || a.near - b.near || a.y - b.y || a.x - b.x)
+    const at = (t: { x: number; y: number } | undefined) => t && { x: t.x, y: t.y }
+    if (!rings) return at(free[0])
+    const inside = free.find((t) => t.far < rings.outer)
+    if (inside || rings.expanding) return at(inside)
+    return at(free.find((t) => t.near > rings.inner && t.far < rings.inner + NPC_WALL_STEP))
+  }
+  if (!plan) return among()
+  const own = among((x, y) => plan.spot(kind, x, y))
+  if (own || !plan.spill || rings?.expanding) return own
+  return among((x, y) => plan.spill!(kind, x, y))
 }
 
 /**

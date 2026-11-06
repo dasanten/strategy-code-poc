@@ -447,6 +447,7 @@ The shared language of the game. Domain terms only — no implementation details
   gets one at random when it comes to be, a self-managed one when its Leader dies, and keeps it. It
   says where houses, storages and workshops (smelter, smithy, mint, stable) go, nearest its home
   first, inside its wall and on outward as the city grows; a spot that doesn't fit is skipped. In Rings only a storage may stand inside the first lane, where a new city's storage stands anyway, so a daughter with just its town hall still finds a spot for it.
+  A building whose part of a Quarters city has no room left spills over into another part.
   Streets are real roads, built by its road crew (NPC road). Walls, gates, farms and workplaces on
   nodes go where they do anyway. A city from before layouts got one when they shipped: nothing is
   torn down, and new buildings follow it around what stands. Trading posts, the HQ and Players'

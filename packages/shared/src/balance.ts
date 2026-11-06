@@ -542,6 +542,13 @@ export const CITY_RING_STEP = 5
 export const CITY_SIDE_LANE_GAP = 8
 
 /**
+ * Tiles deep of a band of rows in the Quarters layout (`CONTEXT.md`: City layout): two rows of houses
+ * back to back, or one row of stables. A lane one tile wide, left free for a street, runs between
+ * bands.
+ */
+export const CITY_QUARTER_ROWS = 4
+
+/**
  * How many tiles of wall an NPC city's builder fetches the materials for in one trip to the
  * storage (`CONTEXT.md`: NPC city, Fetching materials): a 40 m stretch's worth, so a long wall is
  * not one walk per tile. What a tile doesn't take goes to the next.

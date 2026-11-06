@@ -1,6 +1,7 @@
 import {
   CITY_GRID_BLOCK,
   CITY_LAYOUTS,
+  CITY_QUARTER_ROWS,
   CITY_RING_STEP,
   CITY_SIDE_LANE_GAP,
   FOOTPRINT,
@@ -38,6 +39,11 @@ export interface LayoutPlan {
   spot(kind: BuildingKind, x: number, y: number): boolean
   /** Which spots it fills first, lowest first; among equals, nearest home. All alike without it. */
   rank?(kind: BuildingKind, x: number, y: number): number
+  /**
+   * Whether a building of `kind` may have that tile once no `spot` is left for it, for a layout that
+   * lets it go elsewhere rather than stop the city.
+   */
+  spill?(kind: BuildingKind, x: number, y: number): boolean
 }
 
 /**
@@ -60,6 +66,8 @@ export function layoutPlan(
       return ringsPlan(world, city, home, gate, size)
     case 'mainStreet':
       return mainStreetPlan(world, city, home, gate, size)
+    case 'quarters':
+      return quartersPlan(world, city, home, gate, size)
   }
 }
 
@@ -94,6 +102,57 @@ function gridPlan(
       lanes.rows.has(y),
     spot: (kind, x, y) =>
       inBlock(anchor.x, x, FOOTPRINT[kind]) && inBlock(anchor.y, y, FOOTPRINT[kind]),
+  }
+}
+
+/** The part of a Quarters city a kind of building belongs in. */
+function quarterOf(kind: BuildingKind): 'houses' | 'storages' | 'workshops' {
+  if (kind === 'house') return 'houses'
+  return kind === 'storage' ? 'storages' : 'workshops'
+}
+
+/**
+ * Quarters: two streets cross at the middle of the town hall, which never moves, so the parts stay
+ * put and grow outward with the city. Houses take everything north of the crossing, workshops the
+ * south-west and storages the south-east. Each part stands in long rows, in bands
+ * `CITY_QUARTER_ROWS` tiles deep between lanes a tile wide, by whole footprints away from the street
+ * running north and south. A lane also runs straight through each gate. A building whose part has no
+ * room left spills over into a row of another part, unless a new wall is going up to make room.
+ */
+function quartersPlan(
+  world: Pick<WorldState, 'buildings'>,
+  city: City,
+  home: Building,
+  gate: { dx: number; dy: number } | undefined,
+  size: number,
+): LayoutPlan {
+  const anchor = middleOf(townHallOf(world, city) ?? home, size)
+  const lanes = gateLanes(world, city, home, gate, size)
+  const pitch = CITY_QUARTER_ROWS + 1
+  const inRow = (kind: BuildingKind, x: number, y: number) => {
+    const side = FOOTPRINT[kind]
+    const dx = wrapDelta(anchor.x, x, size)
+    const at = mod(wrapDelta(anchor.y, y, size), pitch)
+    return (
+      dx !== 0 &&
+      mod(dx > 0 ? dx - 1 : dx, side) === 0 &&
+      at > 0 &&
+      (at - 1) % side === 0 &&
+      at - 1 + side <= CITY_QUARTER_ROWS
+    )
+  }
+  const partAt = (x: number, y: number) => {
+    if (wrapDelta(anchor.y, y, size) < 0) return 'houses'
+    return wrapDelta(anchor.x, x, size) < 0 ? 'workshops' : 'storages'
+  }
+  return {
+    street: (x, y) =>
+      x === anchor.x ||
+      mod(wrapDelta(anchor.y, y, size), pitch) === 0 ||
+      lanes.columns.has(x) ||
+      lanes.rows.has(y),
+    spot: (kind, x, y) => inRow(kind, x, y) && partAt(x, y) === quarterOf(kind),
+    spill: inRow,
   }
 }
 

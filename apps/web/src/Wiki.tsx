@@ -44,6 +44,7 @@ import {
   CITY_PRICE_BY_BUILDING,
   CITY_PRICE_PER_RESIDENT,
   CITY_PRICE_STANDING_SWING,
+  CITY_QUARTER_ROWS,
   CLIMB_TICKS,
   COMBAT_SKILL_EFFECT,
   COMBAT_SKILL_PER_BLOW,
@@ -2024,13 +2025,16 @@ export function Wiki() {
           lane from each gate to the middle; only a storage goes inside the first lane. In Main
           street, one straight street runs from the gate past the town hall, with buildings in rows
           along it; side lanes cross it every {num(CITY_SIDE_LANE_GAP)} tiles, and once the rows on
-          the street are full, buildings go further back along those. Houses, storages, smelters,
-          smithies, mints and stables take the next spot of the layout that fits, nearest home
-          first, inside its wall and on outward as the city grows; a lake or a rock only leaves a
-          gap in a block, a circle or a row. Walls, gates, farms and workplaces on nodes go where
-          they do anyway. A city from before layouts got one when they shipped: nothing was torn
-          down, and new buildings follow it around what stands. Trading posts, the HQ and Players'
-          cities have none.
+          the street are full, buildings go further back along those. In Quarters, two streets cross
+          at the town hall, with houses north of them, workshops (smelter, smithy, mint, stable)
+          south-west and storages south-east, each part in long rows in bands{' '}
+          {num(CITY_QUARTER_ROWS)} tiles deep between lanes; a building whose part has no room left
+          spills over into another. Houses, storages, smelters, smithies, mints and stables take the
+          next spot of the layout that fits, nearest home first, inside its wall and on outward as
+          the city grows; a lake or a rock only leaves a gap in a block, a circle or a row. Walls,
+          gates, farms and workplaces on nodes go where they do anyway. A city from before layouts
+          got one when they shipped: nothing was torn down, and new buildings follow it around what
+          stands. Trading posts, the HQ and Players' cities have none.
         </p>
         <p>
           So it builds the whole chain its land allows, from the node up: weapons short wants a
