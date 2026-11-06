@@ -416,6 +416,7 @@ describe('every resident order on the group card', () => {
     carries: true,
     carriageToBoard: true,
     carriageToUnhitch: true,
+    horseToHitch: true,
     driveOff: { problem: undefined },
     hitchOff: { problem: undefined },
     stealHorse: { problem: undefined },
@@ -440,6 +441,7 @@ describe('every resident order on the group card', () => {
     const oneOnly = Object.entries(GROUP_COUNTERPARTS).filter(([, c]) => 'none' in c)
     expect(oneOnly.map(([id]) => id).sort()).toEqual([
       'driveOff',
+      'hitch',
       'hitchOff',
       'makeLeader',
       'pair',

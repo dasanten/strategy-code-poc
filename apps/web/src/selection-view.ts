@@ -11,6 +11,8 @@ import {
   HORSE_HUNGRY_SHARE,
   PASSENGER_WEIGHT,
   carriageCapacity,
+  carriageOfResident,
+  horsesToHitch,
   isDown,
   carriagePulledBy,
   driveOffProblem,
@@ -54,6 +56,8 @@ import {
   type TerrainLookup,
   type Building,
   type Carriage,
+  type CarriageHorse,
+  type CarriagePlace,
   type City,
   type KnownNode,
   type Pile,
@@ -123,6 +127,7 @@ export type ActionId =
   | 'ride'
   | 'board'
   | 'unhitch'
+  | 'hitch'
   | 'drive'
   | 'driveOff'
   | 'hitchOff'
@@ -162,6 +167,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   ride: 'M',
   board: 'K',
   unhitch: 'U',
+  hitch: 'J',
   drive: 'D',
   driveOff: 'D',
   hitchOff: 'D',
@@ -277,6 +283,8 @@ export interface ResidentHere {
   carriageToBoard?: boolean
   /** A carriage of their realm on their tile with a horse hitched, to unhitch (`CONTEXT.md`: Hitched horse). */
   carriageToUnhitch?: boolean
+  /** A carriage of their realm on their tile and a horse to hitch to it (`hitchChoice`). */
+  horseToHitch?: boolean
   /** A horse of their realm on their tile that pulls no carriage and nobody rides, to mount. */
   horseToRide?: boolean
   /** They carry a child (`CONTEXT.md`: Carrying), so they can't work, build, tear down, haul or pair. */
@@ -418,6 +426,8 @@ function ordersOffered(h: ResidentHere): {
   } else miss('board', 'no carriage of yours here')
   if (h.adult && h.carriageToUnhitch) add(row('unhitch', 'Unhitch horse'))
   else miss('unhitch', h.adult ? 'no hitched horse here' : 'children can’t unhitch')
+  if (h.adult && h.horseToHitch) add(row('hitch', 'Hitch horse…', { opens: true }))
+  else miss('hitch', h.adult ? 'no carriage and free horse here' : 'children can’t hitch')
   const drivable = h.carriage && !h.carriageTheirs
   if (drivable && h.adult) {
     // A rider doesn't drive (`CONTEXT.md`: Riding), and a Down horse pulls nothing (Down).
@@ -578,6 +588,7 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   ride: 'move',
   board: 'move',
   unhitch: 'move',
+  hitch: 'move',
   drive: 'move',
   driveOff: 'move',
   hitchOff: 'move',
@@ -1158,6 +1169,27 @@ export function horseAgeText(h: Pick<SeenHorse, 'bornAt'>, tick: number): string
   if (years >= 1) return `${years} ${years === 1 ? 'year' : 'years'} old`
   const days = Math.max(0, Math.floor((tick - h.bornAt) / TICKS_PER_GAME_DAY))
   return `${days} game ${days === 1 ? 'day' : 'days'} old`
+}
+
+/**
+ * What a resident's card offers to hitch (`CONTEXT.md`: Hitched horse): the carriage of their realm
+ * on their tile, the one Drive drives, and the horses that can pull it. Undefined with no such
+ * carriage or horse.
+ */
+export function hitchChoice<H extends CarriageHorse>(
+  world: {
+    horses: readonly H[]
+    carriages: readonly (CarriagePlace & { id: string })[]
+    residents: readonly Pick<Resident, 'riding'>[]
+  },
+  resident: Pick<Resident, 'x' | 'y' | 'owner' | 'cityId'>,
+): { carriageId: string; horses: H[] } | undefined {
+  const carriage = world.carriages.find(
+    (k) => k.x === resident.x && k.y === resident.y && carriageOfResident(k, resident),
+  )
+  if (!carriage) return undefined
+  const horses = horsesToHitch(world, carriage)
+  return horses.length > 0 ? { carriageId: carriage.id, horses } : undefined
 }
 
 /**

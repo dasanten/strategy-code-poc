@@ -58,6 +58,7 @@ import { chainStore, holdsBatch, warehouseFor } from './npc-chain.js'
 import { foundDaughter, foundingParty, stepFounders } from './npc-founding.js'
 import { startFeeding, steerFeeder } from './npc-stable.js'
 import { runTrader } from './npc-trader.js'
+import type { Invariant } from './invariants.js'
 import { refillSource } from './survival.js'
 import { walkTime } from './walk-time.js'
 
@@ -121,8 +122,9 @@ export function stepNpcCities(world: WorldState, size: number, terrain?: Terrain
  * storage yet, everyone builds, `npcBuilders`), breeders who are done and workers at a smelter or
  * smithy with nothing left to process and none in the store, so they get their next job (with
  * some there, one of them fetches it by the Work default); moves a worker whose plan puts
- * them elsewhere, or nowhere; then gives each idle adult what comes first: its trader goes on with
- * their run (`runTrader`); a resident carrying a child stays at home; one
+ * them elsewhere, or nowhere; takes a worker on a bare work-at order onto the Work default
+ * (`workByDefault`); then gives each idle adult what comes first: its trader goes on with
+ * their run (`runTrader`); a resident carrying a child puts any load away and stays at home; one
  * carrying materials the project needs takes them to its site; a load of goods goes into the
  * storage; they take `OWN_FOOD` from the storage before they set out; a planned feeder feeds its
  * stable (`startFeeding`); one of them breeds the city's horses (`breedHorses`); a planned builder takes their part in the project (`takePart`),
@@ -217,6 +219,7 @@ function runCity(
     if (place && RECIPES[place.kind] && !inputLeft(world, place, r) && !inputIn(place, store)) {
       stopWork(r)
     }
+    workByDefault(r, buildings)
   }
 
   const home = npcHome(world, city)
@@ -246,9 +249,12 @@ function runCity(
       runTrader(world, city, plan, r, storage, size)
       continue
     }
-    // Carrying a child, they get no work and stay at home, where they take their meals.
+    // Carrying a child, they get no work and stay at home, where they take their meals; a load
+    // goes into the storage first, or their hands may have no room for one.
     if (r.carrying) {
-      if (home && !inCityArea(world, city, r.x, r.y, size)) walkTo(r, home)
+      const load = storage && haul(r)
+      if (storage && load) putAway(r, storage, load, size)
+      else if (home && !inCityArea(world, city, r.x, r.y, size)) walkTo(r, home)
       continue
     }
     if (free > 0 && carriesMaterials(r)) {
@@ -260,9 +266,7 @@ function runCity(
     }
     const load = storage && haul(r, inputOf(buildings, jobs[r.id]))
     if (storage && load) {
-      if (isAt(r, storage, size)) {
-        r.order = { kind: 'drop', to: { kind: 'storage', storageId: storage.id }, goods: load }
-      } else walkTo(r, storage)
+      putAway(r, storage, load, size)
       continue
     }
     const food = storage?.stock?.food ?? 0
@@ -304,6 +308,28 @@ function runCity(
     if (home && !inCityArea(world, city, r.x, r.y, size)) walkTo(r, home)
   }
   return planMs
+}
+
+/** Takes a load to the storage: at it, the drop; away from it, the walk there first. */
+function putAway(r: Resident, storage: Building, load: Stock, size: number): void {
+  if (isAt(r, storage, size)) {
+    r.order = { kind: 'drop', to: { kind: 'storage', storageId: storage.id }, goods: load }
+  } else walkTo(r, storage)
+}
+
+/**
+ * A worker on a bare work-at order, such as a dead Leader's whose script ended with their Player's
+ * control, goes on by the Work default (`runNpcScripts`), from the tile they stand on. Otherwise
+ * what they make never gets home (`CONTEXT.md`: Carrying the output): a farm's crew eats from its
+ * pile while the storage runs out, and holds the places others could work.
+ */
+function workByDefault(r: Resident, buildings: Map<string, Building>): void {
+  const o = r.order
+  if (o?.kind !== 'workAt' || r.script) return
+  const memory: ScriptMemory = { workplaceId: o.buildingId }
+  const makes = o.makes ?? (buildings.get(o.buildingId)?.kind === 'smithy' && NPC_SMITHY_WEAPON)
+  if (makes) memory.makes = makes
+  r.script = { scriptId: 0, task: 'work', memory }
 }
 
 /** Whether a resident carries goods a site could take: anything workplaces make but Food. */
@@ -488,6 +514,38 @@ const lowOnFood = (r: Resident) => (r.carried.food ?? 0) < HOME_FOOD_LOW
 /** Gives a resident an order to walk to a tile. */
 export function walkTo(r: Resident, to: { x: number; y: number }): void {
   r.order = { kind: 'walkTo', target: { x: to.x, y: to.y }, path: null, progress: 0 }
+}
+
+/**
+ * The residents of a city the game runs keep going (ADR 0004; `CONTEXT.md`: NPC city, Carrying),
+ * once it has planned: none of them works by a bare work-at order, whose output would never get
+ * home (`workByDefault`), and none carrying a child stands with no Food and hands too full for a
+ * meal while the load could go into a storage. The tick a resident starts carrying doesn't count:
+ * their city gives them the order the tick after.
+ */
+export const npcResidentsKeptGoing: Invariant = {
+  name: 'npc-residents-kept-going',
+  check(world) {
+    const storages = new Set(
+      world.buildings.flatMap((b) => (b.kind === 'storage' && !b.site && b.cityId ? [b.cityId] : [])),
+    )
+    return world.residents.flatMap((r) => {
+      if (r.cityId === null || r.script || r.downUntil !== undefined) return []
+      const bare = r.order?.kind === 'workAt'
+      const full =
+        r.order === null &&
+        !!r.carrying &&
+        r.carrying.since < world.tick - 1 &&
+        storages.has(r.cityId) &&
+        (r.carried.food ?? 0) < 1 &&
+        unitsThatFit(r, 'food', world.tick) === 0 &&
+        haul(r) !== undefined
+      if (!bare && !full) return []
+      if (!world.cityPlans[r.cityId] || !canWork(r, world.tick) || !runByNpcCity(world, r)) return []
+      const what = bare ? 'works by a bare work-at order' : 'carries a child with no room for a meal'
+      return [{ invariant: this.name, message: `NPC resident ${r.id} ${what}`, entityIds: [r.id] }]
+    })
+  },
 }
 
 /** Where an NPC city's residents go home to: its finished storage, else its town hall. */

@@ -12,6 +12,7 @@ import {
   teardownReturns,
   teardownWork,
   MAP_SIZE,
+  type Building,
   type OrderRequest,
   type TerrainMap,
   type WorldState,
@@ -27,6 +28,12 @@ import { dropGoods } from './survival.js'
 /** An action a resident with a tear-down order requests: put a tick's work into tearing down. */
 export interface TearDownAction {
   residentId: string
+}
+
+/** A building or site that came down, and who put in the last work. */
+export interface Felled {
+  residentId: string
+  building: Building
 }
 
 /** The input of a tear-down order: which resident, and which building or site on their tile. */
@@ -74,13 +81,14 @@ export function requestTearingDown(world: WorldState): TearDownAction[] {
  * or tear-down order on it is done. Tearing down a town hall dissolves its city, and tearing down
  * any city building may shrink or split a city (`updateCityMembership`). Taking down another
  * Organization's building is a crime by whoever puts in the last work (`CONTEXT.md`: Crime).
+ * Returns what came down.
  */
 export function resolveTearingDown(
   world: WorldState,
   actions: TearDownAction[],
   terrain?: TerrainMap,
-): void {
-  let removed = false
+): Felled[] {
+  const felled: Felled[] = []
   for (const a of actions) {
     const r = world.residents.find((x) => x.id === a.residentId)
     const o = r?.order
@@ -107,16 +115,17 @@ export function resolveTearingDown(
       noteMade(world, returned)
       // What a stable kept for its horses stays on the tile too.
       dropGoods(world, b.x, b.y, b.stock ?? {})
-      removed = true
+      felled.push({ residentId: r.id, building: b })
       const city = world.cities.find((c) => c.townHallId === b.id)
       if (city) dissolveCity(world, city)
     }
   }
-  if (removed) updateCityMembership(world, terrain?.size ?? MAP_SIZE)
+  if (felled.length > 0) updateCityMembership(world, terrain?.size ?? MAP_SIZE)
   const standing = new Set(world.buildings.map((b) => b.id))
   for (const r of world.residents) {
     const o = r.order
     if (o?.kind === 'tearDown' && !standing.has(o.buildingId)) r.order = null
     if (o?.kind === 'build' && o.siteId !== null && !standing.has(o.siteId)) r.order = null
   }
+  return felled
 }

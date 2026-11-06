@@ -192,6 +192,49 @@ describe('doingLine', () => {
     )
   })
 
+  it('names the two horses being bred, as far as the Player knows them (`CONTEXT.md`: Doing)', () => {
+    const breed: ResidentOrder = {
+      kind: 'breed',
+      stableId: 'st1',
+      horseIds: ['h1', 'h2'],
+      at,
+      progress: 0,
+    }
+    const star = { id: 'h1', name: 'Star' }
+    const blaze = { id: 'h2', name: 'Blaze' }
+    const breeder = { scriptId: 7, building: 'stable' as const }
+    const seen = (horses: { id: string; name: string }[]) => ({ scripts, buildings, horses })
+
+    // The order on its own, and under the Breed horses task.
+    expect(doingLine({ order: breed }, seen([star, blaze]))).toBe('Breeding Star and Blaze')
+    expect(doingLine({ order: breed, script: breeder }, seen([star, blaze]))).toBe(
+      'Breeding Star and Blaze',
+    )
+    // One gone from the stable and out of what the Player knows, whichever of the two it is.
+    expect(doingLine({ order: breed, script: breeder }, seen([star]))).toBe(
+      'Breeding Star and another horse',
+    )
+    expect(doingLine({ order: breed, script: breeder }, seen([blaze]))).toBe(
+      'Breeding Blaze and another horse',
+    )
+    // Neither known.
+    expect(doingLine({ order: breed, script: breeder }, seen([]))).toBe('Breeding horses')
+    // Getting Food first, no pair is being bred yet.
+    expect(
+      doingLine({ order: { ...fetch, goods: { food: 10 } }, script: breeder }, seen([star, blaze])),
+    ).toBe('Breeding horses: fetching 10 food from the storage')
+    // Under another task, a script's own doing() and a defence script's small line.
+    expect(
+      doingLine({ order: breed, script: { scriptId: 1, building: 'farm' } }, seen([star, blaze])),
+    ).toBe('Working the farm: breeding Star and Blaze')
+    expect(
+      doingLine({ order: breed, script: { ...breeder, doing: 'Tending' } }, seen([star, blaze])),
+    ).toBe('Tending')
+    expect(
+      interruptedLine({ interrupted: { order: breed, script: breeder } }, seen([star, blaze])),
+    ).toBe('Then: breeding Star and Blaze')
+  })
+
   it('says Work builds its workplace first while it is still a site', () => {
     // `CONTEXT.md`: Working a site.
     const first = { scriptId: 0, task: 'work', building: 'farm', site: true } as const

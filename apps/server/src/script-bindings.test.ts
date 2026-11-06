@@ -378,6 +378,8 @@ describe('script bindings', () => {
     ['dismount()', { kind: 'dismount' }],
     ['unhitch("k9")', { kind: 'unhitch', carriageId: 'k9' }],
     ['unhitch({ id: "k9", x: 1, y: 2 })', { kind: 'unhitch', carriageId: 'k9' }],
+    ['hitch("k9", "h9")', { kind: 'hitch', carriageId: 'k9', horseId: 'h9' }],
+    ['hitch({ id: "k9" }, { id: "h9" })', { kind: 'hitch', carriageId: 'k9', horseId: 'h9' }],
     ['board("k9")', { kind: 'board', carriageId: 'k9' }],
     ['getOff()', { kind: 'getOff' }],
     ['getOff(3, 4)', { kind: 'getOff', x: 3, y: 4 }],
@@ -432,6 +434,8 @@ describe('script bindings', () => {
     ['sellHorse("h9")', { kind: 'sellHorse', horseId: 'h9' }],
     ['sellHorse({ id: "h9", x: 1, y: 2 })', { kind: 'sellHorse', horseId: 'h9' }],
     ['buyOff("directive1")', { kind: 'buyOff', directiveId: 'directive1', carriageId: null }],
+    ['payDebt(40)', { kind: 'payDebt', coins: 40, carriageId: null }],
+    ['payDebt(40, "k1")', { kind: 'payDebt', coins: 40, carriageId: 'k1' }],
     [
       'postOffer("s1", "wood", 10, "stone", 5, 2)',
       {

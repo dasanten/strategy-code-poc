@@ -115,6 +115,12 @@ describe('trading at a warehouse', () => {
     expect(standingOf(world, 'r1', TRADE_ORG)).toBeCloseTo(raised, 2)
     // Named by any of its cities, the Trade Organization is one.
     expect(standingOf(world, warehouse.cityId!, 'r1')).toBeCloseTo(raised, 2)
+    // Its number is not an NPC city's, and the log says how far the trade moved it.
+    expect(STANDING_TRADE_COINS_PER_POINT).toBe(50)
+    expect(world.events.at(-1)).toMatchObject({
+      kind: 'traded',
+      standing: { org: TRADE_ORG, by: Math.round(raised * 100) / 100 },
+    })
   })
 
   it('buys: the coins go into the warehouse and the goods into the hands at its sell price', () => {

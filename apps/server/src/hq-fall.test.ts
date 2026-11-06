@@ -96,7 +96,7 @@ describe('the fall of the HQ (CONTEXT.md: Fall of the HQ)', () => {
     Object.assign(p1, { x: hall.x + 1, y: hall.y + 1, carried: { sword: 1, food: 5 } })
     hq.occupation = { realmId: realm.id, since: world.tick + 1 - OCCUPATION_TICKS }
     world.tick++
-    expect(stepCaptures(world, terrain.size)).toEqual([{ cityId: hq.id, from: null, to: realm.id }])
+    expect(stepCaptures(world, terrain)).toEqual([{ cityId: hq.id, from: null, to: realm.id }])
     expect(hq.tradeOrg).toBeUndefined()
     expect(world.caravans).toEqual([])
     expect(checkInvariants(world, terrain)).toEqual([])
