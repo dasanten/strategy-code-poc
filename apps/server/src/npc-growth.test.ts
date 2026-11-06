@@ -80,7 +80,7 @@ describe('NPC cities grow', () => {
     expect(world.residents.filter((r) => r.pair)).toEqual([])
   })
 
-  it('keeps a resident carrying a child out of work, at home; the partner works', () => {
+  it('keeps a resident carrying a child out of work, at a house; the partner works', () => {
     const { world, terrain, city, home } = village()
     for (const r of world.residents) Object.assign(r, { x: home.x, y: home.y, order: null })
     storageOf(world, city).stock = { food: 400 }
@@ -98,7 +98,7 @@ describe('NPC cities grow', () => {
     }
     planCity(world, city, terrain)
     stepNpcCities(world, terrain.size, terrain)
-    expect(a.order).toBeNull()
+    expect(a.order).toMatchObject({ kind: 'walkTo' })
     expect(a.script).toBeUndefined()
     expect(b.order !== null || b.script !== undefined).toBe(true)
     // Food running short doesn't end a pair with a child on the way.
