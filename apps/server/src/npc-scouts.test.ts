@@ -324,6 +324,35 @@ describe('calling a scout home', () => {
   })
 })
 
+describe('a scout sent to one of the city’s Down', () => {
+  it('goes straight there, and comes home with the news after', () => {
+    const t = town()
+    const node = nodeAt(t, 250)
+    const r = scoutOut(t, 50)
+    plan(t).scouts![r.id] = { saw: [sectorOf(t.terrain.size, node.x, node.y)] }
+    delete r.script
+    r.carried = { food: 10 }
+    const down = t.people().find((p) => p !== r)!
+    Object.assign(down, { x: r.x + 2, y: r.y, order: null, downUntil: t.world.tick + 1000 })
+    delete down.script
+    plan(t).jobs[r.id] = { kind: 'revive', targetId: down.id }
+    stepNpcCities(t.world, t.terrain.size)
+    const going = r.order
+    expect(going?.kind).toBe('walkTo')
+    if (going?.kind === 'walkTo') expect(going.target).toEqual({ x: down.x, y: down.y })
+    expect(knowsNode(t.city, t.home, node, t.terrain.size)).toBe(false)
+
+    // They are awake: the reviver has nobody to go to, and goes home.
+    delete down.downUntil
+    r.order = null
+    plan(t).jobs[r.id] = { kind: 'idle' }
+    stepNpcCities(t.world, t.terrain.size)
+    const home = r.order
+    expect(home?.kind).toBe('walkTo')
+    if (home?.kind === 'walkTo') expect(home.target).toEqual(t.home)
+  })
+})
+
 describe('where a scout goes', () => {
   const edge = (t: Town, r: Resident, skip: { x: number; y: number }[] = []) =>
     scoutEdge(t.world, t.city, plan(t), r, t.terrain.size, { canEnter: () => true, skip })

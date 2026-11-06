@@ -923,7 +923,9 @@ The shared language of the game. Domain terms only — no implementation details
   have no inventory) or when a resident Feeds it (Feeding a horse). An NPC city revives its own: while
   a Down resident of the city lies in or near its area and its storage holds Food, one of its grown
   residents, never a soldier and a spare hand first, takes Food to them and Feeds them, one at a time
-  per Down resident. It doesn't go far out for one (a balance number).
+  per Down resident. It doesn't go far out for one (a balance number). This comes ahead of building,
+  road crews, scouts and work for surplus, and of what is short, except Food for those who aren't Down:
+  its farmers stay while Food is short. The Trade Organization's cities do the same.
 - **Eating:** a resident eats only food they carry, everywhere, also at home. Nobody eats
   straight from a storage.
 - **Own food:** the Food a resident keeps on them for their own meals, about four game days of

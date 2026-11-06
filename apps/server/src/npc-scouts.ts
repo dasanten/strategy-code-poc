@@ -87,7 +87,7 @@ export function knowsNode(
 /**
  * Those of a city's spare hands who scout for it next (`CONTEXT.md`: Spare hands' work), up to
  * `scoutsWanted`: while it doesn't know its limit and Food isn't short, of `unneeded`, first those
- * already out, then those with no workplace to go back to, then the rest. Nobody Down.
+ * already out, then those with no workplace to go back to, then the rest.
  */
 export function pickScouts(
   world: WorldState,
@@ -99,10 +99,7 @@ export function pickScouts(
 ): Resident[] {
   if (city.tradeOrg || city.scouted?.done || foodShort) return []
   const rank = (r: Resident) => (plan.scouts?.[r.id] ? 0 : hasPlace(r) ? 2 : 1)
-  return unneeded
-    .filter((r) => !isDown(r))
-    .sort((a, b) => rank(a) - rank(b))
-    .slice(0, scoutsWanted(world, city))
+  return [...unneeded].sort((a, b) => rank(a) - rank(b)).slice(0, scoutsWanted(world, city))
 }
 
 /** Sends a resident scouting: they run the game's Explore default with no `find`. */

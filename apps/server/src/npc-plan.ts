@@ -13,6 +13,7 @@ import {
   contractOf,
   hasFoodSurplus,
   isArmed,
+  isDown,
   materialsNeeded,
   npcReserve,
   npcStorages,
@@ -52,6 +53,7 @@ import {
   surplusWork,
 } from './npc-chain.js'
 import { foundingParty, planFounding } from './npc-founding.js'
+import { downToRevive, goesOnReviving, sendRevivers } from './npc-revive.js'
 import { pickScouts } from './npc-scouts.js'
 import { planTrader, planVisit, traderOut } from './npc-trader.js'
 import { hash } from './residents.js'
@@ -183,9 +185,10 @@ export function workplaceOf(r: Resident): string | undefined {
  * Food isn't short; and gives every adult a job: soldiers (armed adults) stand as soldiers; one
  * carrying a child does nothing; builders go on building; a worker stays at their workplace,
  * except that while Food runs short workers off the farms move to farms with room. It shares out
- * the rest by its reserve (`shareOut`). An NPC city's founding party keeps its `found` jobs, and
- * the pass ends with the founding's part (`planFounding`). Without `terrain` the city picks no
- * project.
+ * the rest by its reserve (`shareOut`), a reviver for each of its Down residents among them
+ * (`CONTEXT.md`: Reviving; those Down do nothing and get no job). An NPC city's founding party keeps
+ * its `found` jobs, and the pass ends with the founding's part (`planFounding`). Without `terrain`
+ * the city picks no project.
  * `people` are the residents the city gives orders to (`runResidents`).
  */
 export function planCity(
@@ -199,7 +202,7 @@ export function planCity(
   // A founding party out is the founding's business (`planFounding`), not shared out.
   const party = new Set(foundingParty(plan))
   const members = people.filter((r) => party.has(r.id))
-  const adults = people.filter((r) => canWork(r, world.tick) && !party.has(r.id))
+  const adults = people.filter((r) => canWork(r, world.tick) && !isDown(r) && !party.has(r.id))
   const short = foodShort(world, city)
   const grows = cityGrows(world, city, adults)
   if (grows) {
@@ -222,11 +225,14 @@ export function planCity(
   const spare: Resident[] = []
   // The trader out on their run (`CONTEXT.md`: NPC trader) is nobody's spare hand.
   const trader = city.tradeOrg ? undefined : traderOut(world, plan)
+  const size = terrain?.size ?? MAP_SIZE
+  const waiting = downToRevive(world, city, size)
   for (const r of adults) {
     const at = workplaceOf(r)
     if (r.id === trader) jobs[r.id] = { kind: 'trade' }
     else if (isArmed(r)) jobs[r.id] = { kind: 'soldier' }
     else if (r.carrying) jobs[r.id] = { kind: 'idle' }
+    else if (goesOnReviving(plan.jobs[r.id], waiting)) jobs[r.id] = plan.jobs[r.id]!
     else if (isBuilder(r)) jobs[r.id] = { kind: 'build' }
     else if (at !== undefined) jobs[r.id] = workJob(placeById.get(at) ?? at)
     else spare.push(r)
@@ -249,10 +255,22 @@ export function planCity(
       }
     }
   }
-  const unneeded = shareOut(world, city, adults, jobs, held, spare, plan, builders, short)
+  const sendToDown = (rest: Resident[], leave: (r: Resident) => void) =>
+    sendRevivers(waiting, rest, adults, jobs, short, size, leave)
+  const unneeded = shareOut(
+    world,
+    city,
+    adults,
+    jobs,
+    held,
+    spare,
+    plan,
+    builders,
+    short,
+    sendToDown,
+  )
   // The Trade Organization sends no trader (`tradeOrgSendsNoOne`) and founds nothing.
   if (!city.tradeOrg && !trader) {
-    const size = terrain?.size ?? MAP_SIZE
     // A wandering trader standing at the city comes first: it isn't there for long.
     if (!planVisit(world, city, plan, adults, jobs, size)) {
       planTrader(world, city, plan, adults, jobs, short, size)
@@ -285,7 +303,8 @@ const feeders = (residents: number) =>
  * (`CONTEXT.md`: NPC city, NPC reserve). Workers stay where they are, except that the workers of a
  * workplace whose good the city isn't short of become spare hands (and go back when nothing else
  * needs them), as do farmers beyond those it keeps (`farmersWanted`). Then: spare hands, and after them workers off the farms, farm
- * until it has its farmers, while a farm has room; up to `NPC_BUILDERS` (`npcBuilders`) build the project; the
+ * until it has its farmers, while a farm has room; revivers go to its Down residents (`sendToDown`,
+ * `sendRevivers`), ahead of all that comes after; up to `NPC_BUILDERS` (`npcBuilders`) build the project; the
  * rest go to the workplace of the good shortest of the reserve (`chainPlace`), filling its crew
  * before the next. With nothing short to go to, a worker let go goes back (a farmer to farming,
  * one the last pass put to work who is between jobs now, a carrier home with the load stored:
@@ -306,6 +325,7 @@ function shareOut(
   plan: CityPlan,
   builders: number,
   foodShort: boolean,
+  sendToDown: (spare: Resident[], leave: (r: Resident) => void) => void,
 ): Resident[] {
   const project = plan.project
   const unneeded: Resident[] = []
@@ -358,8 +378,14 @@ function shareOut(
     if (farming >= wanted) break
     if (jobs[r.id]?.kind === 'work' && !toFarm(r)) break
   }
+  sendToDown(rest, (r) => {
+    const place = placeOf(r)
+    if (place) held.leave(place)
+    if (jobs[r.id]?.kind === 'build') builders--
+  })
   const storage = chainStore(world, city)
   for (const r of rest) {
+    if (jobs[r.id]?.kind === 'revive') continue
     if (project && builders < npcBuilders(world, city) && canTakePart(world, city, r, project)) {
       jobs[r.id] = { kind: 'build' }
       builders++

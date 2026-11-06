@@ -218,6 +218,11 @@ describe('world saves', () => {
     expect(migrateWorld(fallen, 88, { terrain: land }).traders).toEqual([])
   })
 
+  it('leaves every world as it is for the revive job (migration 92 → 93)', () => {
+    const { world: now, terrain: land } = worldWithPost()
+    expect(migrateWorld(structuredClone(now), 92, { terrain: land })).toEqual(now)
+  })
+
   it('puts the HQ on its traders’ loops (migration 90 → 91)', () => {
     const { world: now, terrain: land } = worldWithPost()
     const hqId = now.cities.find((c) => c.tradeOrg === 'hq')!.id
@@ -380,16 +385,16 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(93)
+    expect(WORLD_FORMAT_VERSION).toBe(94)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
     expect(checkInvariants(v39, land)).toEqual([])
   })
 
-  it('migrates a format 92 world: a city knows nothing from scouts yet (migration 92 → 93)', () => {
+  it('migrates a format 93 world: a city knows nothing from scouts yet (migration 93 → 94)', () => {
     const { world, terrain } = worldWithPost()
-    const migrated = migrateWorld(structuredClone(world), 92, { terrain }, migrations, 93)
+    const migrated = migrateWorld(structuredClone(world), 93, { terrain }, migrations, 94)
     expect(migrated).toEqual(world)
     expect(migrated.cities.every((c) => c.scouted === undefined)).toBe(true)
     expect(checkInvariants(migrated, terrain)).toEqual([])

@@ -64,6 +64,7 @@ import {
   STARVE_DAYS,
   DOWN_DAYS,
   FEED_UNITS,
+  NPC_REVIVE_REACH,
   WAKE_HEALTH,
   FOOD_SPOIL_PER_DAY,
   FOOD_SURPLUS_DAYS,
@@ -1115,6 +1116,13 @@ export function Wiki() {
           set). One unit is eaten at once, and they wake idle with {num(WAKE_HEALTH)} of{' '}
           {num(MAX_HEALTH)} health, which comes back while their hunger meter isn't empty; the rest
           stays in their hands to eat later.
+        </p>
+        <p>
+          NPC cities and the Trade Organization's cities revive their own: while one of their
+          residents lies Down in their area or within {num(NPC_REVIVE_REACH)} tiles of it and their
+          storage holds Food, one grown resident, never a soldier and a spare hand first, takes Food
+          there and Feeds them, one for each resident Down. It comes ahead of building, road crews,
+          scouts, work for surplus and what is short, but their farmers stay while Food is short.
         </p>
         <p>
           Food spoils: {pct(FOOD_SPOIL_PER_DAY)} of every stock goes bad each game day, half of it
