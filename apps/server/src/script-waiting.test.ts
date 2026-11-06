@@ -151,6 +151,8 @@ describe('a waiting script', () => {
 describe('an NPC town’s residents', () => {
   it('run their defaults far fewer times than once a tick each, on their way to work', () => {
     const { world, terrain: land } = village()
+    // Everyone goes to work, none scouting (`CONTEXT.md`: Scout).
+    for (const c of world.cities) c.scouted = { sectors: [], done: true }
     const walking = new Walking(land)
     // Settled at work, then each finds themself 30 tiles off and walks back.
     for (let t = 0; t < 20; t++) stepWorld(world, land, walking)

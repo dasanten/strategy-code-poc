@@ -383,6 +383,8 @@ describe('setting out for a workplace in an NPC city', () => {
     // Past its reserve and below its cap of surplus (`CONTEXT.md`: Spare hands' work).
     storage.stock!.wood = (npcReserve(world, city).wood ?? 0) + 1
     const working = { kind: 'work', buildingId: camp.id }
+    // It knows its limit, so none of them goes scouting (`CONTEXT.md`: Scout).
+    city.scouted = { sectors: [], done: true }
     // Planned without the terrain, the city picks no project to send spare hands to.
     planCity(world, city)
     expect(shortGoods(world, city)).not.toContain('wood')

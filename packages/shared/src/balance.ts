@@ -560,6 +560,25 @@ export const NPC_WALL_TILES_PER_TRIP = 4
 export const NPC_NODE_REACH = 160
 
 /**
+ * How many of an NPC city's residents it takes to send one scout at a time, rounded up
+ * (`CONTEXT.md`: Scout): a village one, a town of 16 two, a city of 48 four.
+ */
+export const NPC_RESIDENTS_PER_SCOUT = 12
+
+/**
+ * How far from its home an NPC city comes to know resource nodes through its scouts (`CONTEXT.md`:
+ * Scout), in tiles: 2.5 times its set reach (`NPC_NODE_REACH`), about 50 minutes' walk on plains.
+ */
+export const NPC_SCOUT_LIMIT = 400
+
+/**
+ * The squares of map an NPC city's knowledge from its scouts goes by (`CONTEXT.md`: Scout), in tiles
+ * along each side. Small enough that a scout standing in one has its middle and its neighbours' in
+ * sight (`SIGHT_RANGE`), large enough that what a city knows stays a few hundred numbers.
+ */
+export const NPC_SCOUT_SECTOR = 32
+
+/**
  * How far from its home a Trade Org warehouse may be for an NPC city to send its trader there
  * (`CONTEXT.md`: NPC trader), in tiles: about a game day and a half's walk on plains each way.
  */

@@ -131,6 +131,8 @@ import {
   NPC_FULL_DAYS,
   NPC_VILLAGE,
   NPC_NODE_REACH,
+  NPC_RESIDENTS_PER_SCOUT,
+  NPC_SCOUT_LIMIT,
   NPC_TRADER_GIVE_UP_DAYS,
   NPC_OFFER_REACH,
   NPC_TRADER_REACH,
@@ -2031,7 +2033,16 @@ export function Wiki() {
           reach.
         </p>
         <p>
-          A spare hand with nothing short to work for doesn't stand idle: they stay at or go to one
+          A spare hand with nothing short to work for doesn't stand idle. A few at a time, one for
+          every {num(NPC_RESIDENTS_PER_SCOUT)} residents, go scouting: they explore with as much
+          Food as they can carry, and turn back when it only just covers the way home. A city knows
+          every node within {num(NPC_NODE_REACH)} tiles; what a scout saw, out to{' '}
+          {num(NPC_SCOUT_LIMIT)} tiles, it knows only once they step back into its area alive. A
+          scout killed on the way brings nothing, and nothing protects them. What is short calls
+          them home, with what they saw. Once a city knows its limit it stops scouting.
+        </p>
+        <p>
+          The others stay at or go to one
           of the city's workplaces and work for surplus, past its reserve, the good furthest below
           its cap first: {num(NPC_SURPLUS_CAP.food ?? 0)} Food, {num(NPC_SURPLUS_CAP.wood ?? 0)}{' '}
           Wood, {num(NPC_SURPLUS_CAP.stone ?? 0)} Stone, {num(NPC_SURPLUS_CAP.ironOre ?? 0)} each of
@@ -2091,7 +2102,7 @@ export function Wiki() {
           carry what they didn't spend back home. The Trade Organization never accepts offers.
         </p>
         <p>
-          A city is full once it has had spare hands, idle or working for surplus, and nothing short
+          A city is full once it has had spare hands, idle, scouting or working for surplus, and nothing short
           of its reserve for {days(NPC_FULL_DAYS)}, with a food surplus and a town hall's and a storage's
           materials above its reserve. A full city founds a daughter. Once a game day it looks for a
           free Plains site {num(NPC_CITY_MIN_DISTANCE)} to {num(NPC_FOUND_REACH)} tiles away, with

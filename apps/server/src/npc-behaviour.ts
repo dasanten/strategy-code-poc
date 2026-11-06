@@ -55,6 +55,7 @@ import {
 import { chainStore, holdsBatch, warehouseFor } from './npc-chain.js'
 import { foundDaughter, foundingParty, stepFounders } from './npc-founding.js'
 import { reviveTarget, runReviver } from './npc-revive.js'
+import { sendScout, stepScouts } from './npc-scouts.js'
 import { runTrader } from './npc-trader.js'
 import { refillSource } from './survival.js'
 import { walkTime } from './walk-time.js'
@@ -132,7 +133,9 @@ export function stepNpcCities(world: WorldState, size: number, terrain?: Terrain
  * none; a planned worker runs the game's Work default at their workplace (`runNpcScripts`), which
  * carries the output to the storage
  * (`CONTEXT.md`: Carrying the output), taking the Food for the walk and their first days there
- * from the storage first (`takeSetOutFood`); with nothing to do they come home. Its soldiers (armed
+ * from the storage first (`takeSetOutFood`); a planned scout runs the Explore default
+ * (`CONTEXT.md`: Scout), and one the pass called off comes home first with what they saw
+ * (`stepScouts`); with nothing to do they come home. Its soldiers (armed
  * adults) are put to no work and no building (`stepNpcDefence`). Children are left alone: they
  * refill at home. Returns the milliseconds spent planning.
  */
@@ -146,6 +149,7 @@ function runCity(
 ): number {
   let planMs = 0
   let plan: CityPlan | undefined = world.cityPlans[city.id]
+  if (plan) stepScouts(world, city, plan, people, size)
   if (planDue(world, city)) {
     const start = performance.now()
     plan = planCity(world, city, terrain, people)
@@ -209,6 +213,10 @@ function runCity(
     const moved =
       job !== undefined && job.kind !== 'soldier' && at !== undefined && at !== job.buildingId
     if (moved && !r.carrying && plan?.plannedAt === world.tick) stopWork(r)
+    // The pass just now called a scout off: they come home with what they saw, below.
+    if (r.script?.task === 'explore' && plan?.plannedAt === world.tick && job?.kind !== 'scout') {
+      stopWork(r)
+    }
     if (job?.kind === 'revive') {
       // Whatever they were at, the pass just now sent them to the Down (`CONTEXT.md`: Reviving).
       const atWork = r.script || r.order?.kind === 'build' || r.order?.kind === 'tearDown'
@@ -247,6 +255,18 @@ function runCity(
 
   for (const r of adults) {
     if (r.order !== null || r.script) continue
+    // A scout called off comes home with what they saw before anything else (`CONTEXT.md`: Scout),
+    // but for one of the city's Down, who can't wait; they come home after.
+    if (
+      plan?.scouts?.[r.id] &&
+      jobs[r.id]?.kind !== 'scout' &&
+      jobs[r.id]?.kind !== 'revive' &&
+      home &&
+      !inCityArea(world, city, r.x, r.y, size)
+    ) {
+      walkTo(r, home)
+      continue
+    }
     if (plan?.trader?.residentId === r.id && !city.tradeOrg) {
       runTrader(world, city, plan, r, storage, size)
       continue
@@ -283,6 +303,10 @@ function runCity(
     const job = jobs[r.id]
     const soldier = isArmed(r) || job?.kind === 'soldier'
     if (!soldier && breedHorses(world, city, r)) continue
+    if (!soldier && plan && job?.kind === 'scout' && !city.scouted?.done) {
+      sendScout(plan, r)
+      continue
+    }
     if (!soldier && job?.kind === 'build' && free > 0) {
       const p = project()
       if (p && takePart(world, r, p, store, false)) {

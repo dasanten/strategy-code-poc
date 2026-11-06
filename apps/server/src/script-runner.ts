@@ -46,6 +46,7 @@ import {
 import { resumeInterrupted } from './defence.js'
 import { recordEvent } from './events.js'
 import type { InvariantViolation } from './invariants.js'
+import { scoutEdge, scoutEnded } from './npc-scouts.js'
 import { npcSender, orderedResident } from './order-sender.js'
 import { orderKinds, type OrderKind, type OrderSender } from './orders.js'
 import {
@@ -1291,6 +1292,9 @@ function runCityScripts(
       kinds,
       // Nobody picks values for an NPC city: its defaults fall back on their own.
       params: program.params,
+      // A scout explores what their city doesn't know yet (`CONTEXT.md`: Scout).
+      edge: (search) =>
+        scoutEdge(world, city, world.cityPlans[city.id], r, terrain.size, search),
     })
     const { globals, requests } = bound
     run(program, {
@@ -1302,6 +1306,7 @@ function runCityScripts(
     // What it logs is dropped: no Player owns an NPC city's residents to read their script log.
     for (const order of requests) kinds[order.kind]!.apply(world, sender, order, terrain)
     if (bound.ended()) {
+      if (running.task === 'explore') scoutEnded(city, bound.endReason())
       endScript(world, r.id)
       continue
     }
