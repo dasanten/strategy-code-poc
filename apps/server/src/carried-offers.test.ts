@@ -11,7 +11,6 @@ import {
   offerOpenTo,
   offersAt,
   quoteTransfer,
-  stockFloor,
   transferFee,
   transferLoad,
   transferTiles,
@@ -28,6 +27,7 @@ import { mulberry32, newResident } from './residents.js'
 import { changeStanding } from './standing.js'
 import { collectsTransferFrom, transfersSound } from './transfers.js'
 import { ivo, mara, order, eventsOf, runUntil, setup, total } from './transfers.fixture.js'
+import { stillTradeOrgChain } from './test-terrain.js'
 
 /** Mara's resident stands on Ivo's storage, so she sees it and knows of his realm. */
 function carriedSetup() {
@@ -87,13 +87,6 @@ function fullFees({ world, terrain, storage, toStorage }: Setup) {
   return {
     iron: transferFee(25 * GOOD_WEIGHT.iron, transferTiles(size, near, storage, toStorage)),
     stone: transferFee(10 * GOOD_WEIGHT.stone, transferTiles(size, toNear, toStorage, storage)),
-  }
-}
-
-/** Keeps the Trade Org's own chain from touching the goods the test counts. */
-function floorEveryWarehouse(world: WorldState) {
-  for (const b of world.buildings) {
-    if (b.kind === 'warehouse') b.stock = { ...stockFloor(world, b), ...b.stock }
   }
 }
 
@@ -422,7 +415,7 @@ describe('invariants of a carried direct offer', () => {
 describe('the caravans of a carried direct offer', () => {
   /** Accepts Mara's offer and runs both Transfers out; answers what each storage paid in coins. */
   function runOut(s: Setup, feeBy: CarriedFeeBy) {
-    floorEveryWarehouse(s.world)
+    stillTradeOrgChain(s.world)
     const coins = s.storage.stock!.coins ?? 0
     const toCoins = s.toStorage.stock!.coins ?? 0
     accepted(s, feeBy)
@@ -503,7 +496,7 @@ describe('the caravans of a carried direct offer', () => {
       delete s.toStorage.stock!.coins
       const before = s.toStorage.stock!.iron ?? 0
       const { iron } = fullFees(s)
-      floorEveryWarehouse(s.world)
+      stillTradeOrgChain(s.world)
       accepted(s, 'split')
       let collecting = false
       runUntil(s.world, s.terrain, () => {
