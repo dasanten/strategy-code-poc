@@ -1,11 +1,13 @@
 import { CanvasSource, Rectangle, Texture } from 'pixi.js'
 import {
   ART_FILES,
+  PAINTED_BUILDING_IMAGE,
   PAINTED_FILES,
   PAINTED_SHEET,
   artInUse,
   paintedCell,
   paintedCellsInUse,
+  paintedImage,
 } from './art.js'
 
 /** Pixels per symbol in the atlas: enough for the largest token at the closest zoom. */
@@ -46,7 +48,26 @@ export async function loadAtlas(): Promise<Atlas> {
     files.map((f, i) => [f, new Texture({ source, frame: frame(i), label: f })]),
   )
   await addPaintedSheet(atlas)
+  await addPaintedImages(atlas)
   return atlas
+}
+
+/** Adds the painted images that are files of their own (`PAINTED_BUILDING_IMAGE`), each a texture. */
+async function addPaintedImages(atlas: Map<string, Texture>) {
+  for (const file of Object.values(PAINTED_BUILDING_IMAGE)) {
+    const url = PAINTED_FILES[file]
+    if (!url) continue
+    const img = new Image()
+    img.src = url
+    await img.decode()
+    const canvas = document.createElement('canvas')
+    canvas.width = img.naturalWidth
+    canvas.height = img.naturalHeight
+    canvas.getContext('2d')!.drawImage(img, 0, 0)
+    const source = new CanvasSource({ resource: canvas, autoGenerateMipmaps: true })
+    const key = paintedImage(file)
+    atlas.set(key, new Texture({ source, label: key }))
+  }
 }
 
 /** How far from magenta a pixel may be and still count as background. */

@@ -81,9 +81,7 @@ import {
   BUILDING_ART,
   CITY_ART,
   NODE_ART,
-  PAINTED_BUILDING_ART,
-  PAINTED_SITE_ART,
-  paintedCell,
+  paintedBuildingArt,
 } from './map/art.js'
 import {
   EMBLEM_RADIUS,
@@ -1680,7 +1678,7 @@ function drawStructures(
     const [cx, cy] = [sx + (side * tile) / 2, sy + (side * tile) / 2]
     if (!near(cx - (side - 1) * tile, cy - (side - 1) * tile) && !near(cx, cy)) continue
     const rel = relOf(b)
-    const painted = PAINTED_BUILDING_ART[b.kind]
+    const painted = paintedBuildingArt(b.kind, Boolean(b.site))
     if (painted !== undefined) {
       // Painted art (`docs/art.md`): the building, or its site, filling its whole footprint over
       // a plate in the owner's colour.
@@ -1688,8 +1686,7 @@ function drawStructures(
         .rect(sx, sy, side * tile, side * tile)
         .fill({ color: relationshipColor(rel), alpha: 0.18 * fade })
         .stroke({ width: 1.5, color: relationshipColor(rel), alpha: 0.8 * fade })
-      const cell = b.site ? PAINTED_SITE_ART[side - 1]! : painted
-      tokens.place(paintedCell(cell), cx, cy, side * tile, 0xffffff, fade)
+      tokens.place(painted, cx, cy, side * tile, 0xffffff, fade)
       continue
     }
     const alpha = (b.site ? 0.45 : 1) * fade
