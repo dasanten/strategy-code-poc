@@ -528,6 +528,20 @@ export const NPC_WALL_STEP = 8
 export const CITY_GRID_BLOCK = 4
 
 /**
+ * Tiles from one circular lane of the Rings layout to the next (`CONTEXT.md`: City layout), the first
+ * this far from the middle of the town hall: room between two lanes for a circle of houses, or
+ * stables, all the way round.
+ */
+export const CITY_RING_STEP = 5
+
+/**
+ * Tiles along the street between two side lanes of the Main street layout (`CONTEXT.md`: City
+ * layout): a row of four houses, long enough to read as a row and not as a block of the Grid. A lane
+ * one tile wide, left free for a street, comes after them.
+ */
+export const CITY_SIDE_LANE_GAP = 8
+
+/**
  * Tiles deep of a band of rows in the Quarters layout (`CONTEXT.md`: City layout): two rows of houses
  * back to back, or one row of stables. A lane one tile wide, left free for a street, runs between
  * bands.

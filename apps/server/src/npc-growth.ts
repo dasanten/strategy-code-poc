@@ -730,8 +730,9 @@ function ringsOf(
  * expanding, inside the new wall. With no room left there, on its edge just outside the wall and
  * short of where the next one stands, which starts its expansion. A city without walls builds
  * anywhere in its area. Its layout (`CONTEXT.md`: City layout), if it has one, says which of those
- * spots it may take, and keeps its streets free; a spot that doesn't fit is skipped. All that among
- * the spots it has for the kind, and then among those the layout lets it spill over to.
+ * spots it may take and which it fills first, and keeps its streets free; a spot that doesn't fit
+ * is skipped. All that among the spots it has for the kind, and then, unless a new wall is going up
+ * to make room, among those the layout lets it spill over to.
  */
 export function houseTile(
   world: WorldState,
@@ -753,8 +754,12 @@ export function houseTile(
         return { x, y }
       })
       .filter((t) => (!spot || spot(t.x, t.y)) && ground.fits(kind, t.x, t.y, allowed))
-      .map((t) => ({ ...t, ...ringsOf(home, { kind, ...t }, size) }))
-      .sort((a, b) => a.near - b.near || a.y - b.y || a.x - b.x)
+      .map((t) => ({
+        ...t,
+        ...ringsOf(home, { kind, ...t }, size),
+        rank: plan?.rank?.(kind, t.x, t.y) ?? 0,
+      }))
+      .sort((a, b) => a.rank - b.rank || a.near - b.near || a.y - b.y || a.x - b.x)
     const at = (t: { x: number; y: number } | undefined) => t && { x: t.x, y: t.y }
     if (!rings) return at(free[0])
     const inside = free.find((t) => t.far < rings.outer)
@@ -762,10 +767,9 @@ export function houseTile(
     return at(free.find((t) => t.near > rings.inner && t.far < rings.inner + NPC_WALL_STEP))
   }
   if (!plan) return among()
-  return (
-    among((x, y) => plan.spot(kind, x, y)) ??
-    (plan.spill && among((x, y) => plan.spill!(kind, x, y)))
-  )
+  const own = among((x, y) => plan.spot(kind, x, y))
+  if (own || !plan.spill || rings?.expanding) return own
+  return among((x, y) => plan.spill!(kind, x, y))
 }
 
 /**
