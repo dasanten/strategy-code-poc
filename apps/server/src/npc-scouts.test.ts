@@ -2,6 +2,7 @@ import {
   NPC_NODE_REACH,
   NPC_RESIDENTS_PER_SCOUT,
   NPC_SCOUT_LIMIT,
+  NPC_SCOUT_SECTOR,
   NPC_SURPLUS_CAP,
   NPC_TOWN,
   SIGHT_RANGE,
@@ -453,29 +454,36 @@ describe('the npc-scouts-sound invariant', () => {
 
 describe('on the map', () => {
   it(
-    'a scout walks out past the set reach and brings what they saw home',
+    'a scout walks out past the set reach and brings what they saw there home',
     { tags: ['slow'], timeout: 600_000 },
     () => {
       const t = town()
       const walking = new Walking(t.terrain)
-      let furthest = 0
-      let days = 0
-      for (let i = 0; i < 40 * TICKS_PER_GAME_DAY; i++) {
-        stepWorld(t.world, t.terrain, walking)
-        if (i % TICKS_PER_GAME_DAY === 0) {
-          days++
-          expect(checkInvariants(t.world, t.terrain)).toEqual([])
+      const size = t.terrain.size
+      const across = Math.ceil(size / NPC_SCOUT_SECTOR)
+      // A sector the city knows that nobody sees from anywhere near its set reach.
+      const farOff = (sector: number) => {
+        const middle = {
+          x: (sector % across) * NPC_SCOUT_SECTOR + NPC_SCOUT_SECTOR / 2,
+          y: Math.floor(sector / across) * NPC_SCOUT_SECTOR + NPC_SCOUT_SECTOR / 2,
         }
+        return wrapDistance(size, t.home, middle) > NPC_NODE_REACH + SIGHT_RANGE
+      }
+      const broughtHome = () => (t.city.scouted?.sectors ?? []).some(farOff)
+      let furthest = 0
+      let tick = 0
+      for (; tick < 120 * TICKS_PER_GAME_DAY && !broughtHome(); tick++) {
+        stepWorld(t.world, t.terrain, walking)
+        if (tick % TICKS_PER_GAME_DAY === 0) expect(checkInvariants(t.world, t.terrain)).toEqual([])
         for (const id of Object.keys(t.world.cityPlans[t.city.id]?.scouts ?? {})) {
           const r = t.world.residents.find((p) => p.id === id)
-          if (r) furthest = Math.max(furthest, wrapDistance(t.terrain.size, t.home, r))
+          if (r) furthest = Math.max(furthest, wrapDistance(size, t.home, r))
         }
-        if (furthest > NPC_NODE_REACH && (t.city.scouted?.sectors.length ?? 0) > 20) break
       }
-      expect(days).toBeGreaterThan(0)
       expect(furthest).toBeGreaterThan(NPC_NODE_REACH)
       expect(furthest).toBeLessThanOrEqual(NPC_SCOUT_LIMIT + 64)
-      expect(t.city.scouted?.sectors.length ?? 0).toBeGreaterThan(20)
+      expect(broughtHome()).toBe(true)
+      expect(checkInvariants(t.world, t.terrain)).toEqual([])
     },
   )
 })
