@@ -9,6 +9,7 @@ import {
   traderStanding,
   npcCityRefuses,
   npcHirePrice,
+  horsesToSell,
   npcHorseOffers,
   sellsTo,
   spareResidents,
@@ -518,17 +519,17 @@ function places(
               ? { trade: shownLines(npcCityPrices(world, c, realmId), insight.insideCity(c.id)) }
               : {}),
           }
-    // Its horses in sight in its stables in sight (`CONTEXT.md`: Horse market), refusing or not, so
-    // the Trade section can say why.
-    const horses = forSale(c)
-      ? seenStables
-          .filter((b) => b.cityId === c.id)
-          .flatMap((b) => npcHorseOffers(world, c, b, realmId))
-          .filter((o) => {
-            const h = world.horses.find((x) => x.id === o.horseId)!
-            return eyes.sees(h)
-          })
-      : []
+    // Its horses in sight in its stables in sight, and the Player's standing there (`CONTEXT.md`:
+    // Horse market), refusing or not, so the Trade section can say why.
+    const listed = (list: typeof npcHorseOffers) =>
+      forSale(c)
+        ? seenStables
+            .filter((b) => b.cityId === c.id)
+            .flatMap((b) => list(world, c, b, realmId))
+            .filter((o) => eyes.sees(world.horses.find((x) => x.id === o.horseId)!))
+        : []
+    const horses = listed(npcHorseOffers)
+    const toSell = listed(horsesToSell)
     // Who occupies its town hall only with the hall in sight (`CONTEXT.md`: Occupying a town hall).
     const occupation = seenHalls.has(c.id) ? c.occupation : null
     out.push({
@@ -539,6 +540,7 @@ function places(
       ...refuses,
       ...deal,
       ...(horses.length > 0 ? { horses } : {}),
+      ...(toSell.length > 0 ? { horsesToSell: toSell } : {}),
     })
   }
   return out

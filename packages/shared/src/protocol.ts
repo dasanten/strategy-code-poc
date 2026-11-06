@@ -52,7 +52,8 @@ export interface OrderRequest {
  * it in sight, its prices to them (`trade`, `CONTEXT.md`: Trading with an NPC city). What its
  * storages hold together is left out of those unless the Player sees inside one of them. With a
  * stable of it in sight, the horses in sight standing there, with what it asks for each and why it
- * won't sell it (`horses`, `CONTEXT.md`: Horse market), refusing or not.
+ * won't sell it (`horses`, `CONTEXT.md`: Horse market), and the Player's own in sight standing there,
+ * with what it pays for each and why it won't buy it (`horsesToSell`), refusing or not.
  */
 export type SeenCity = City & {
   price?: number
@@ -61,6 +62,7 @@ export type SeenCity = City & {
   hire?: { spare: number; pricePerResidentWeek: number }
   trade?: Shown<NpcCityPrice>[]
   horses?: NpcHorseOffer[]
+  horsesToSell?: NpcHorseOffer[]
 }
 
 /**

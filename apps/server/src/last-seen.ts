@@ -100,8 +100,8 @@ export function refreshLastSeen(
       // Who occupies a town hall is seen only while it is in sight (`CONTEXT.md`: Occupying a
       // town hall), never remembered, and so are the horses a city's stable lists.
       const e =
-        seenNow.is === 'city' && (seenNow.occupation || seenNow.horses)
-          ? { ...seenNow, occupation: null, horses: undefined }
+        seenNow.is === 'city' && (seenNow.occupation || seenNow.horses || seenNow.horsesToSell)
+          ? { ...seenNow, occupation: null, horses: undefined, horsesToSell: undefined }
           : seenNow
       const was = memory.get(e.id)
       // Most of it is as it was at the last refresh; anything else is copied, since what it holds is the

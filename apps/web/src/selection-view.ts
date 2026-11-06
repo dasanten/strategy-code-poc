@@ -993,7 +993,10 @@ export interface TileThings {
   strangers: SeenResident[]
   /** Everyone in sight, for who works where and who lives in a city. */
   residents?: SeenResident[]
-  cities: (Pick<SeenCity, 'id' | 'name' | 'realmId' | 'tradeOrg' | 'trade' | 'refuses' | 'horses'> &
+  cities: (Pick<
+    SeenCity,
+    'id' | 'name' | 'realmId' | 'tradeOrg' | 'trade' | 'refuses' | 'horses' | 'horsesToSell'
+  > &
     Partial<Pick<SeenCity, 'occupation'>>)[]
   /** The realms the Player knows by name, for who occupies a town hall. */
   realms?: RealmLabel[]
@@ -1548,7 +1551,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
         if (rel === 'own' && live) card.renameCity = { id: city.id, name: city.name }
       }
       if (live && city && tradesHere(live, city)) {
-        lines.push(live.kind === 'stable' ? 'Sells horses here' : 'Buys and sells here')
+        lines.push(live.kind === 'stable' ? horseTradeLine(live, city) : 'Buys and sells here')
         card.tradeHere = { cityId: city.id, buildingId: live.id }
       }
       // Offers (`CONTEXT.md`: Offer) stand at a Player's storage: anyone in sight sees them, and its
@@ -2096,7 +2099,7 @@ function townHallLines(cityId: string, t: TileThings): string[] {
  * Whether the building is where the Player trades with a Trade Org warehouse or an NPC city
  * (`CONTEXT.md`: Warehouse prices, Trading with an NPC city, Trade section), with prices they are
  * shown: a warehouse, or a storage of an NPC city that doesn't refuse them (`npcCityRefuses`). Or
- * its stable with horses it lists (`CONTEXT.md`: Horse market).
+ * its stable with horses it lists, or of the Player's standing in it (`CONTEXT.md`: Horse market).
  */
 export function tradesHere(
   b: Pick<SeenBuilding, 'kind' | 'prices'> & { id?: string },
@@ -2104,7 +2107,8 @@ export function tradesHere(
 ): boolean {
   if (b.kind === 'warehouse') return (b.prices?.length ?? 0) > 0
   if (b.kind === 'stable') {
-    return !city.refuses && (city.horses ?? []).some((h) => h.stableId === b.id)
+    const here = (h: { stableId: string }) => h.stableId === b.id
+    return !city.refuses && ((city.horses ?? []).some(here) || (city.horsesToSell ?? []).some(here))
   }
   return (
     b.kind === 'storage' &&
@@ -2113,6 +2117,18 @@ export function tradesHere(
     !city.refuses &&
     (city.trade?.length ?? 0) > 0
   )
+}
+
+/** What an NPC city's stable that trades (`tradesHere`) does for the Player, for its tile's card. */
+function horseTradeLine(b: { id: string }, city: TileThings['cities'][number]): string {
+  const here = (h: { stableId: string }) => h.stableId === b.id
+  const sells = (city.horses ?? []).some(here)
+  const buys = (city.horsesToSell ?? []).some(here)
+  return sells && buys
+    ? 'Buys and sells horses here'
+    : buys
+      ? 'Buys horses here'
+      : 'Sells horses here'
 }
 
 /** How far tearing a building or site down has come (`CONTEXT.md`: Tearing down). */

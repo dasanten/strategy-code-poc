@@ -525,6 +525,11 @@ export const SCRIPT_API: readonly ScriptBinding[] = [
     'At an NPC city’s finished stable, buy a horse standing in it that it can spare, by it or its id, with the coins in my hands; they go into its storage, and the horse joins my realm where it stands. `city.horses` lists its horses with their prices and why it won’t sell one.',
   ),
   action(
+    'sellHorse',
+    ['horse'],
+    'At an NPC city’s finished stable, sell it a horse of my realm standing in it, by it or its id; the coins go into my hands, and it doesn’t go if I can’t carry them. The horse joins the city where it stands. `city.horsesToSell` lists my horses there with what it pays and why it won’t buy one.',
+  ),
+  action(
     'handIn',
     ['good', 'units', 'toCityId', 'carriageId?'],
     'On a Trade Org warehouse, hand in up to `units` of a good (coins too) from my hands, or from my carriage there, with the fee, for a caravan to bring to the storage of `toCityId`, a city of another realm.',

@@ -501,17 +501,25 @@ export function npcStoragesInSight(
     .map((b) => ({ id: b.id, kind: b.kind, x: b.x, y: b.y, prices }))
 }
 
-/** An NPC city's stable in sight and the horses it lists there (`CONTEXT.md`: Horse market). */
+/**
+ * An NPC city's stable in sight (`CONTEXT.md`: Horse market): the horses it lists there, and the
+ * Player's own standing in it.
+ */
 export interface NpcStableView extends WarehouseView {
   horses: NpcHorseOffer[]
+  toSell: NpcHorseOffer[]
 }
 
-/** The stables of an NPC city in sight with horses it lists to the Player (`SeenCity.horses`). */
+/**
+ * The stables of an NPC city in sight with horses it lists to the Player or of the Player's standing
+ * in them (`SeenCity.horses`, `SeenCity.horsesToSell`).
+ */
 export function npcStablesInSight(
   city: SeenCity,
   seen: { buildings: Building[] },
 ): NpcStableView[] {
   const offers = city.horses ?? []
+  const toSell = city.horsesToSell ?? []
   return seen.buildings
     .filter((b) => b.kind === 'stable' && !b.site && b.cityId === city.id)
     .map((b) => ({
@@ -521,8 +529,9 @@ export function npcStablesInSight(
       y: b.y,
       prices: [],
       horses: offers.filter((h) => h.stableId === b.id),
+      toSell: toSell.filter((h) => h.stableId === b.id),
     }))
-    .filter((s) => s.horses.length > 0)
+    .filter((s) => s.horses.length + s.toSell.length > 0)
 }
 
 /** A wandering trader at a stop, for the Trade section of the city it stands at. */

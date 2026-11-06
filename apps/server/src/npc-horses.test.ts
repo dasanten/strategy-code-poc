@@ -15,6 +15,8 @@ import {
   isAt,
   npcHorsesWanted,
   npcReserve,
+  npcStableKeep,
+  npcStablesLack,
   ownsHorse,
   type Building,
   type City,
@@ -29,7 +31,8 @@ import { nextProject } from './npc-growth.js'
 import { plains, storageOf, village } from './npc-growth.fixture.js'
 import { giveHorsesToNpcCities, giveNpcHorses } from './npc-horses.js'
 import { tradeOrgBreedsNoHorses } from './npc-stable.js'
-import { mulberry32 } from './residents.js'
+import { OrderQueue } from './orders.js'
+import { mulberry32, newResident } from './residents.js'
 import { Walking } from './walking.js'
 import { createWorld, generateWorld, stepWorld } from './world.js'
 import { generateTerrain } from './terrain-gen.js'
@@ -272,6 +275,55 @@ describe('an NPC city breeding its horses', () => {
     })
     expect(bred).toBe(true)
     expect(breeders(world)).toHaveLength(1)
+  })
+
+  it('feeds and breeds a horse a Player sold it (`CONTEXT.md`: Horse market)', () => {
+    const { world, terrain, city, stable } = stabled()
+    const [theirs] = horsesOf(world, city)
+    theirs!.realmId = 'r1'
+    theirs!.cityId = null
+    world.realms.push({ id: 'r1', userId: 7, leaderId: 'seller' })
+    const seller = newResident(mulberry32(3), {
+      id: 'seller',
+      owner: 'r1',
+      cityId: null,
+      x: theirs!.x,
+      y: theirs!.y,
+      tick: 0,
+    })
+    seller.bornAt = -20 * 24 * 3600
+    seller.lifespan = 60
+    world.residents.push(seller)
+    storageOf(world, city).stock = { food: 2000, coins: 1000 }
+    const keptAlone = npcStableKeep(world, city, stable)
+
+    // With one horse of its own it breeds nothing.
+    run(world, terrain, 30, () => expect(breeders(world)).toEqual([]))
+
+    const queue = new OrderQueue(undefined, terrain)
+    const account = { name: 'Mara', isAdmin: false }
+    const answer = queue.receive(world, { userId: 7, account }, 'q', {
+      kind: 'sellHorse',
+      residentId: 'seller',
+      horseId: theirs!.id,
+    })
+    expect(answer.type).toBe('ack')
+    queue.applyAll(world)
+    run(world, terrain, 1)
+    expect(ownsHorse({ cityId: city.id }, theirs!)).toBe(true)
+    expect(npcStableKeep(world, city, stable)).toBeGreaterThan(keptAlone)
+
+    // It keeps Food in the stable for it, however low the stable has run.
+    stable.stock!.food = 0
+    expect(npcStablesLack(world, city)).toBe(npcStableKeep(world, city, stable))
+    let refilled = false
+    let bred = false
+    run(world, terrain, TICKS_PER_GAME_DAY / 4, () => {
+      refilled ||= (stable.stock!.food ?? 0) > 0
+      bred ||= breeders(world).length > 0
+    })
+    expect(refilled).toBe(true)
+    expect(bred).toBe(true)
   })
 
   it('the Trade Organization’s cities don’t breed, and the invariant says so', () => {
