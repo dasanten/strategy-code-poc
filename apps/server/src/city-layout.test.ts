@@ -286,6 +286,29 @@ describe('the Grid layout', () => {
 })
 
 describe.each(CITY_LAYOUTS)('whichever layout: %s', (layout) => {
+  it('a daughter with just its town hall finds room for its storage, then a house', () => {
+    const terrain = plains(200)
+    const world = createWorld(terrain)
+    const hall: Building = {
+      id: newId(world, 'b'),
+      kind: 'townHall',
+      cityId: null,
+      x: 100,
+      y: 100,
+    }
+    world.buildings.push(hall)
+    const city = foundCity(world, hall, null)
+    city.layout = layout
+    const storage = houseTile(world, city, hall, terrain, undefined, 'storage')!
+    expect(storage).toBeDefined()
+    expectFollows(world, city, hall, 'storage', storage, terrain.size)
+    put(world, city, 'storage', storage.x, storage.y)
+    const home = npcHome(world, city)!
+    const house = houseTile(world, city, home, terrain, undefined)!
+    expect(house).toBeDefined()
+    expectFollows(world, city, home, 'house', house, terrain.size)
+  })
+
   it('grows out through a new wall, and nobody is walled in', () => {
     const { world, terrain, city, home } = village(layout)
     const size = terrain.size
@@ -497,17 +520,62 @@ describe('the Rings layout', () => {
     },
   )
 
-  it('puts houses, storages, workshops and stables on its circles', () => {
+  it('puts houses, workshops and stables on its circles', () => {
     const { world, terrain, city, home } = village('rings')
     const size = terrain.size
     const hall = hallOf(world, city, size)
     const rings = wallRings(world, city, home, size)
-    for (const kind of ['house', 'storage', 'smelter', 'mint', 'smithy', 'stable'] as const) {
+    for (const kind of ['house', 'smelter', 'mint', 'smithy', 'stable'] as const) {
       const t = houseTile(world, city, home, terrain, rings, kind)!
       expect(t).toBeDefined()
       expectFollows(world, city, home, kind, t, size)
       expect(circleOf(farOf(hall, kind, t))).toBeGreaterThan(0)
     }
+  })
+
+  it('puts a storage inside the first lane while there is room, then on its circles', () => {
+    const { world, terrain, city, home } = village('rings')
+    const size = terrain.size
+    const hall = hallOf(world, city, size)
+    const placed: number[] = []
+    for (let i = 0; i < 30; i++) {
+      const rings = wallRings(world, city, home, size)
+      const t = houseTile(world, city, home, terrain, rings, 'storage')!
+      expect(t).toBeDefined()
+      expectFollows(world, city, home, 'storage', t, size)
+      placed.push(circleOf(farOf(hall, 'storage', t)))
+      put(world, city, 'storage', t.x, t.y)
+    }
+    expect(placed[0]).toBe(0)
+    expect(placed.some((circle) => circle > 0)).toBe(true)
+  })
+
+  it('a lake by the town hall leaves a daughter room for its storage on the other sides', () => {
+    const terrain = plains(200)
+    const world = createWorld(terrain)
+    const hall: Building = {
+      id: newId(world, 'b'),
+      kind: 'townHall',
+      cityId: null,
+      x: 100,
+      y: 100,
+    }
+    world.buildings.push(hall)
+    const city = foundCity(world, hall, null)
+    city.layout = 'rings'
+    const middle = hallOf(world, city, terrain.size)
+    // Water all along its north and its east.
+    for (let y = middle.y - 8; y <= middle.y + 8; y++) {
+      for (let x = middle.x - 8; x <= middle.x + 8; x++) {
+        if (y < middle.y - 1 || x > middle.x + 1) {
+          terrain.tiles[tileIndex(terrain.size, x, y)] = Terrain.Lake
+        }
+      }
+    }
+    const t = houseTile(world, city, hall, terrain, undefined, 'storage')!
+    expect(t).toBeDefined()
+    expect(buildProblem(world, t.x, t.y, 'storage', terrain)).toBeUndefined()
+    expectFollows(world, city, hall, 'storage', t, terrain.size)
   })
 
   it('keeps a way free from its gate to the middle, and leaves the far side alone', () => {

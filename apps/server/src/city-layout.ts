@@ -101,9 +101,10 @@ const CIRCLE_REACH = Math.SQRT1_2
 /**
  * Rings: circular lanes round the middle of the town hall, which never moves, `CITY_RING_STEP` tiles
  * apart, so they stay put as the city grows. A circle of buildings runs halfway between each two
- * lanes, with its footprints' middles on that line. Nothing goes inside the first lane: that is the
- * town hall's. A way runs straight from each gate to the middle and leaves the far side of the town
- * alone, so the circles close there.
+ * lanes, with its footprints' middles on that line. Inside the first lane only a storage goes, as
+ * in a new city: a daughter that has just its town hall has no other ground, its area reaching short
+ * of the first circle. A way runs straight from each gate to the middle and leaves the far side of
+ * the town alone, so the circles close there.
  */
 function ringsPlan(
   world: Pick<WorldState, 'buildings'>,
@@ -130,7 +131,8 @@ function ringsPlan(
         wrapDelta(anchor.y, y, size) + middle,
       )
       const lane = Math.floor(far / CITY_RING_STEP)
-      return lane > 0 && Math.abs(far - (lane + 0.5) * CITY_RING_STEP) <= CIRCLE_REACH
+      if (lane === 0) return kind === 'storage'
+      return Math.abs(far - (lane + 0.5) * CITY_RING_STEP) <= CIRCLE_REACH
     },
   }
 }
