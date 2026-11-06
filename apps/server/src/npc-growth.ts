@@ -47,6 +47,7 @@ import { walkTo } from './npc-behaviour.js'
 import { npcSender } from './order-sender.js'
 import { pair } from './pairing.js'
 import { PROCESSED_BY, chainInput, chainStore, makes, shortGoods } from './npc-chain.js'
+import { innerWallProject, outerWalls } from './npc-inner-wall.js'
 import { knowsNode } from './npc-scouts.js'
 import { Ground } from './placing.js'
 import { residentTiles } from './starting-city.js'
@@ -77,7 +78,8 @@ const ringOf = (o: Offset) => Math.max(Math.abs(o.dx), Math.abs(o.dy))
 /**
  * The city's walls as rings round its home (`npcHome`): the innermost ring, the one it builds or
  * keeps (`outer`), and where the gate of each goes. Undefined for a city without walls, or one
- * whose walls stand at more distances than an old and a new ring.
+ * whose walls stand at more distances than an old and a new ring. A big city's inner ring round its
+ * town hall is none of these (`outerWalls`; `CONTEXT.md`: Bigger projects).
  */
 export interface Rings {
   inner: number
@@ -445,7 +447,8 @@ function nearestNode(
  * its own, a house in its area, its new wall); else a farm when every farm is full; else a house
  * when it has a food surplus and no free housing; else, for an NPC city, a stable once it has a
  * horse (`wantsStable`), or the workplace for the shortest good of its reserve it can make
- * (`chainProject`, `CONTEXT.md`: NPC reserve); else the next stretch of its new wall.
+ * (`chainProject`, `CONTEXT.md`: NPC reserve); else the next stretch of its new wall; else, in a big
+ * city with materials to spare, the next tile of its inner ring (`innerWallProject`).
  */
 function wanted(
   world: WorldState,
@@ -507,7 +510,8 @@ function wanted(
     }
   }
   const next = ring.find((t) => !t.done)
-  return next && { kind: 'build', building: next.kind, x: next.x, y: next.y }
+  if (next) return { kind: 'build', building: next.kind, x: next.x, y: next.y }
+  return rings && innerWallProject(world, city, home, terrain, rings, npcBuilders(world, city))
 }
 
 /**
@@ -653,8 +657,12 @@ export function wallRings(
     dx: wrapDelta(home.x, b.x, size),
     dy: wrapDelta(home.y, b.y, size),
   })
-  const walls = world.buildings.filter(
-    (b) => b.cityId === city.id && (b.kind === 'wall' || b.kind === 'gate') && !b.site,
+  const walls = outerWalls(
+    world.buildings.filter(
+      (b) => b.cityId === city.id && (b.kind === 'wall' || b.kind === 'gate') && !b.site,
+    ),
+    home,
+    size,
   )
   if (walls.length === 0) return undefined
   const dists = walls.map((b) => ringOf(off(b)))
