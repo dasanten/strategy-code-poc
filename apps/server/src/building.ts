@@ -239,7 +239,8 @@ export function resolveBuilding(
       )
       r.skills.construction = (r.skills.construction ?? 0) + constructionLearned(r, world.tick)
     }
-    finished = finishSite(world, site, r) || finished
+    // A road is no city building, so a tile of it changes no city (`updateCityMembership`).
+    finished = (finishSite(world, site, r) && site.kind !== 'road') || finished
   }
   if (finished) updateCityMembership(world, terrain?.size ?? MAP_SIZE)
   // Orders on a site that is finished go on (a road order to its next tile); on one that is gone, they end.
