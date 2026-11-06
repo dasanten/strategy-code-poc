@@ -1,15 +1,17 @@
 import {
+  NODE_WORKPLACE,
   NPC_NODE_REACH,
   NPC_RESIDENTS_PER_SCOUT,
   NPC_SCOUT_LIMIT,
   NPC_SCOUT_SECTOR,
   SIGHT_RANGE,
+  buildingAt,
   cityResidents,
+  cornersCovering,
   inCityArea,
   isDown,
   wrap,
   wrapDistance,
-  type Building,
   type City,
   type CityPlan,
   type CityScouted,
@@ -70,7 +72,8 @@ export function scoutsWanted(world: WorldState, city: City): number {
 
 /**
  * Whether a city knows of a resource node (`CONTEXT.md`: Scout): within its set reach it simply
- * does; out to its limit, once a scout who saw the node's sector has come home.
+ * does; out to its limit, once a scout who saw the node's sector has come home, unless it has found
+ * no way to that sector.
  */
 export function knowsNode(
   city: City,
@@ -80,8 +83,27 @@ export function knowsNode(
 ): boolean {
   const d = wrapDistance(size, home, node)
   if (d <= NPC_NODE_REACH) return true
-  if (d > NPC_SCOUT_LIMIT) return false
-  return city.scouted?.sectors.includes(sectorOf(size, node.x, node.y)) ?? false
+  if (d > NPC_SCOUT_LIMIT || !city.scouted) return false
+  const sector = sectorOf(size, node.x, node.y)
+  return city.scouted.sectors.includes(sector) && !city.scouted.noWay?.includes(sector)
+}
+
+/**
+ * A city's builder found no way to a site past its set reach (`CONTEXT.md`: Scout): it gives the
+ * site's sector up as it does one a scout found no way to, so it picks another node or, knowing
+ * none, buys the good. Inside its set reach it goes on knowing its nodes, and nothing is given up.
+ * Whether it gave the sector up.
+ */
+export function giveUpSite(
+  world: WorldState,
+  city: City,
+  site: { x: number; y: number },
+  size: number,
+): boolean {
+  const home = npcHome(world, city)
+  if (!home || wrapDistance(size, home, site) <= NPC_NODE_REACH) return false
+  addAll(((city.scouted ??= { sectors: [] }).noWay ??= []), [sectorOf(size, site.x, site.y)])
+  return true
 }
 
 /**
@@ -260,22 +282,10 @@ function nearestTileIn(
 }
 
 /**
- * Whether a resident is out on a scout's trip beyond a city's set reach, too far to fetch a founding
- * party's load (`stepFounders`).
- */
-export function scoutFarOut(
-  plan: CityPlan,
-  r: Resident,
-  home: Pick<Building, 'x' | 'y'>,
-  size: number,
-): boolean {
-  return plan.scouts?.[r.id] !== undefined && wrapDistance(size, r, home) > NPC_NODE_REACH
-}
-
-/**
  * An NPC city's scouts are few and its knowledge sound (`CONTEXT.md`: Scout; ADR 0004): in the plan
  * its pass made this tick it sends no more than `scoutsWanted`, and one for a death since; a Trade
- * Org city sends none; a sector it knows of, or a scout has seen, is a sector of the map.
+ * Org city sends none; a sector it knows of, or a scout has seen, is a sector of the map; and a
+ * workplace that pass plans on a node, not begun yet, goes on one it has heard of (`plansOnKnown`).
  */
 export const npcScoutsSound: Invariant = {
   name: 'npc-scouts-sound',
@@ -301,7 +311,32 @@ export const npcScoutsSound: Invariant = {
       if (plan.plannedAt === world.tick && scouts > scoutsWanted(world, city) + 1) {
         fail(city.id, `plans ${scouts} scouts of ${scoutsWanted(world, city)}`)
       }
+      if (plan.plannedAt === world.tick && !plansOnKnown(world, city, plan, terrain.size)) {
+        fail(city.id, 'plans a workplace on a node it has not heard of')
+      }
     }
     return out
   },
+}
+
+/**
+ * Whether the workplace a city's project lays out on a node goes on one it has heard of: it knows of
+ * it, or gave its sector up since the pass that planned it, this same tick (`giveUpSite`). A site
+ * begun was planned before, and the city may have moved its home since.
+ */
+function plansOnKnown(world: WorldState, city: City, plan: CityPlan, size: number): boolean {
+  const p = plan.project
+  if (p?.kind !== 'build' || buildingAt(world, p.x, p.y)) return true
+  const nodes = world.nodes.filter(
+    (n) =>
+      NODE_WORKPLACE[n.kind] === p.building &&
+      cornersCovering(p.building, n.x, n.y, size).some(([x, y]) => x === p.x && y === p.y),
+  )
+  const home = npcHome(world, city)
+  if (nodes.length === 0 || !home) return true
+  return nodes.some(
+    (n) =>
+      knowsNode(city, home, n, size) ||
+      city.scouted?.noWay?.includes(sectorOf(size, n.x, n.y)) === true,
+  )
 }

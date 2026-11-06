@@ -6,7 +6,6 @@ import {
   NODE_WORKPLACE,
   NPC_ADULTS_PER_PAIR,
   NPC_FARM_REACH,
-  NPC_NODE_REACH,
   NPC_WALL_STEP,
   buildProblem,
   buildingAt,
@@ -45,6 +44,7 @@ import { walkTo } from './npc-behaviour.js'
 import { npcSender } from './order-sender.js'
 import { pair } from './pairing.js'
 import { PROCESSED_BY, chainInput, chainStore, makes, shortGoods } from './npc-chain.js'
+import { knowsNode } from './npc-scouts.js'
 import { Ground } from './placing.js'
 
 /**
@@ -116,7 +116,8 @@ export function cityProject(
 /**
  * The chain a Trade Org city builds (`CONTEXT.md`: Trade Org HQ, Trading post): a workplace of its
  * own it has begun, else the workplace for the good shortest of its warehouses' floor it can make
- * (`chainProject`), on the nearest node within `NPC_NODE_REACH` of its home.
+ * (`chainProject`), on the nearest node it knows of, which sends no scouts: within `NPC_NODE_REACH`
+ * of its home.
  */
 function tradeOrgChainProject(
   world: WorldState,
@@ -379,7 +380,7 @@ function materialsFirst(
  * input its storage lacks a batch of and none of its workplaces makes, the workplace for that
  * input first, so the chain goes up from the node (mine, smelter, smithy); without a way to make
  * the input, nothing. Then, while none of its workplaces makes the good: on the nearest fitting
- * node of it within `NPC_NODE_REACH` (`nearestNode`), or for a processing workplace in its area
+ * node of it the city knows of (`nearestNode`), or for a processing workplace in its area
  * like a house (`houseTile`). `seen` keeps the goods already asked after, so it never goes round.
  */
 export function chainProject(
@@ -408,21 +409,27 @@ export function chainProject(
       : houseTile(world, city, home, terrain, rings, kind)
     return t && { kind: 'build', building: kind, ...t }
   }
-  const node = nearestNode(world, home, terrain, good)
+  const node = nearestNode(world, city, home, terrain, good)
   return node && { kind: 'build', building: NODE_WORKPLACE[node.node.kind], ...node.at }
 }
 
 /**
- * The nearest free resource node yielding `good` within `NPC_NODE_REACH` of the home, with where
- * its workplace goes (`nodeCorner`).
+ * The nearest free resource node yielding `good` that the city knows of (`knowsNode`; `CONTEXT.md`:
+ * Scout), with where its workplace goes (`nodeCorner`).
  */
-function nearestNode(world: WorldState, home: Building, terrain: TerrainMap, good: Good) {
+function nearestNode(
+  world: WorldState,
+  city: City,
+  home: Building,
+  terrain: TerrainMap,
+  good: Good,
+) {
   let best:
     { node: (typeof world.nodes)[number]; at: { x: number; y: number }; d: number } | undefined
   for (const node of world.nodes) {
     if (NODE_GOOD[node.kind] !== good) continue
     const d = wrapDistance(terrain.size, home, node)
-    if (d > NPC_NODE_REACH || (best && d >= best.d)) continue
+    if ((best && d >= best.d) || !knowsNode(city, home, node, terrain.size)) continue
     const at = nodeCorner(world, terrain, node)
     if (at) best = { node, at, d }
   }

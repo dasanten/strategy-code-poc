@@ -964,7 +964,7 @@ export interface ScoutTrip {
 export interface CityScouted {
   /** The sectors scouts saw: it knows the nodes in them, out to its limit (`NPC_SCOUT_LIMIT`). */
   sectors: number[]
-  /** Sectors a scout found no way to, which it sends nobody to again and knows nothing of. */
+  /** Sectors a scout or builder found no way to, which it sends nobody to again and knows nothing of. */
   noWay?: number[]
   /** It knows its limit, and scouts no more. */
   done?: true

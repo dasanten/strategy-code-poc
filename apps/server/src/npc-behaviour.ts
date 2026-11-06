@@ -56,7 +56,7 @@ import { chainStore, holdsBatch, warehouseFor } from './npc-chain.js'
 import { foundDaughter, foundingParty, stepFounders } from './npc-founding.js'
 import { reviveTarget, runReviver } from './npc-revive.js'
 import { layRoad, onRoadWork, type WayFinder } from './npc-roads.js'
-import { sendScout, stepScouts } from './npc-scouts.js'
+import { giveUpSite, sendScout, stepScouts } from './npc-scouts.js'
 import { runTrader } from './npc-trader.js'
 import { refillSource } from './survival.js'
 import { walkTime } from './walk-time.js'
@@ -212,6 +212,11 @@ function runCity(
     // script ended itself.
     const built = r.script?.scriptId === 0 && r.script.task === 'build' ? r.script.memory : null
     if (built && built.stuck === true) stopWork(r)
+    // No way to a site on a far node: the city gives its sector up (`CONTEXT.md`: Scout). A tile of
+    // road is no such site: the nodes out there are as good as they were.
+    if (built && !onRoadWork(r) && noWayOut(r, built)) {
+      if (giveUpSite(world, city, built.at, size)) stopWork(r)
+    }
     // Done breeding (a foal born, or the breeding stopped), a breeder is free too.
     const bred = r.script?.scriptId === 0 && r.script.task === 'breed' ? r.script.memory : null
     if (bred && bred.done === true) stopWork(r)
@@ -350,6 +355,19 @@ function runCity(
     if (home && !inCityArea(world, city, r.x, r.y, size)) walkTo(r, home)
   }
   return planMs
+}
+
+/**
+ * Whether a builder's walk out to their site ended short of it: the Build default gives the walk at
+ * once and it only ends there or with no way. Away fetching, its own way back says (`stuck`).
+ */
+function noWayOut(
+  r: Resident,
+  memory: ScriptMemory,
+): memory is ScriptMemory & { at: { x: number; y: number } } {
+  const at = memory.at as { x?: unknown; y?: unknown } | null | undefined
+  if (r.order !== null || memory.fetch != null || memory.food != null) return false
+  return typeof at?.x === 'number' && typeof at.y === 'number' && (r.x !== at.x || r.y !== at.y)
 }
 
 /** Whether a resident carries goods a site could take: anything workplaces make but Food. */
