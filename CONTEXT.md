@@ -484,8 +484,8 @@ The shared language of the game. Domain terms only — no implementation details
   some game days for all its residents, and what its stable lacks for its horses (Feeding the
   stable; the stable's Food counts); Wood and Stone for its next house and some wall; weapons
   for the soldiers it keeps by its size, and the Iron and Wood to forge them; Coins as its war
-  chest, for buying what it lacks and hiring help. A stable is wanted once it has horses, a mint
-  only with a gold node in reach. Whatever its storages hold above the reserve is its surplus,
+  chest, for buying what it lacks and hiring help. A stable is wanted once it has horses, or with
+  none once nothing else is short (NPC horses), a mint only with a gold node in reach. Whatever its storages hold above the reserve is its surplus,
   for sale (Trading with an NPC city); whatever is below is short and drives what it works and
   builds next (NPC city).
 - **NPC trader:** an NPC city's own trade run. Once a good's surplus makes a full load and a
@@ -991,9 +991,10 @@ The shared language of the game. Domain terms only — no implementation details
   one they stand in when it starts), and `source`, where the Food comes from (by default the nearest
   storage of their realm with Food). With no Food to fetch they wait.
 - **NPC horses:** a new NPC village or town starts with two horses, with some Food by them; one from
-  before this got two when it shipped. It wants a stable once it has any, keeps it fed as Feeding
+  before this got two when it shipped. It wants a stable once it has any and lays it out where they
+  stand, so they are in it when it is finished; it keeps it fed as Feeding
   the stable says, with one of its residents at a time, and breeds up to the horses it wants for its
-  size (a balance number). The Food comes from what is above the reserve for its people, or below
+  size (a balance number), while Food isn't short. The Food comes from what is above the reserve for its people, or below
   that a little while its horses are hungry or Down: a short city feeds its people first. The
   resident goes when the stable runs low and fills it, and works for the city in between. Self-managed
   cities with horses do the same. A founding party takes none: a daughter with none wants a stable too once nothing

@@ -10,6 +10,9 @@ import {
   AVERAGE_HORSE_STATS,
   HORSE_START_AGE_MAX,
   HORSE_START_AGE_MIN,
+  MAX_HUNGER,
+  NPC_START_HORSES,
+  NPC_VILLAGE,
   horseAgeInYears,
   horsesIn,
   tradeOrgHq,
@@ -23,6 +26,8 @@ import { KEEP_LATEST, WorldSaver, loadOrCreateWorld, pruneSaves, saveWorld } fro
 import { loadTerrain } from './terrain.js'
 import { generateTerrain } from './terrain-gen.js'
 import { HORSE_NAMES } from './horses.js'
+import { foundNpcCity } from './npc-cities.js'
+import { mulberry32 } from './residents.js'
 import { checkInvariants } from './invariants.js'
 import { Walking } from './walking.js'
 import { refreshLastSeen } from './last-seen.js'
@@ -218,6 +223,40 @@ describe('world saves', () => {
     expect(migrateWorld(fallen, 88, { terrain: land }).traders).toEqual([])
   })
 
+  it('gives NPC cities from before two horses, with Food by them (migration 92 → 93)', () => {
+    const { world: now, terrain: land } = worldWithPost()
+    const hall = now.buildings.find((b) => b.kind === 'townHall')!
+    const city = foundNpcCity(now, land, NPC_VILLAGE, hall.x + 200, hall.y, mulberry32(3))
+    const npc = now.cities.filter((c) => c.realmId === null && !c.tradeOrg)
+    expect(npc).toContain(city)
+    // In format 92 no NPC city had a horse, nor the Food by it.
+    const v92 = structuredClone(now)
+    const ofNpc = (h: { cityId: string | null }) => npc.some((c) => c.id === h.cityId)
+    v92.piles = v92.piles.filter(
+      (p) => !v92.horses.some((h) => ofNpc(h) && h.x === p.x && h.y === p.y),
+    )
+    v92.horses = v92.horses.filter((h) => !ofNpc(h))
+    const others = v92.horses.map((h) => h.id)
+
+    const v93 = migrateWorld(structuredClone(v92), 92, { terrain: land })
+    for (const c of npc) {
+      const own = v93.horses.filter((h) => h.realmId === null && h.cityId === c.id)
+      expect(own).toHaveLength(NPC_START_HORSES)
+      for (const h of own) {
+        expect(h.hunger).toBe(MAX_HUNGER)
+        expect(v93.piles.some((p) => p.x === h.x && p.y === h.y && (p.goods.food ?? 0) > 0)).toBe(
+          true,
+        )
+      }
+    }
+    // Nobody else's horses change, and trading posts and the HQ get none.
+    expect(v93.horses.filter((h) => !ofNpc(h)).map((h) => h.id)).toEqual(others)
+    expect(checkInvariants(v93, land)).toEqual([])
+    const walking = new Walking(land)
+    for (let i = 0; i < 5; i++) stepWorld(v93, land, walking)
+    expect(checkInvariants(v93, land)).toEqual([])
+  })
+
   it('puts the HQ on its traders’ loops (migration 90 → 91)', () => {
     const { world: now, terrain: land } = worldWithPost()
     const hqId = now.cities.find((c) => c.tradeOrg === 'hq')!.id
@@ -380,7 +419,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(92)
+    expect(WORLD_FORMAT_VERSION).toBe(93)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)

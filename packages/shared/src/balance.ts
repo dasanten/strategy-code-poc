@@ -268,6 +268,28 @@ export const NPC_STABLE_REFILL_DAYS = 5
  */
 export const NPC_STABLE_HUNGRY_DAYS = 2
 
+/** Horses a new NPC village or town starts with (`CONTEXT.md`: NPC horses): a pair to breed. */
+export const NPC_START_HORSES = 2
+
+/**
+ * Game days of Food laid on the ground by an NPC city's first horses (`CONTEXT.md`: NPC horses),
+ * for each of them: long enough for a new village to find the Wood and put up its stable, whose
+ * feeder takes over from there.
+ */
+export const NPC_START_HORSE_FOOD_DAYS = 40
+
+/**
+ * The horses an NPC city wants however small it is (`CONTEXT.md`: NPC horses): a pair, so even a
+ * new daughter has one to breed once a Player sells it some.
+ */
+export const NPC_HORSES_BASE = 2
+
+/**
+ * Residents of an NPC city for each horse it wants beyond `NPC_HORSES_BASE`, up to what a stable
+ * holds (`STABLE_CAPACITY`): a village of 6 wants 4, a town of 16 wants the full 6.
+ */
+export const NPC_RESIDENTS_PER_HORSE = 3
+
 /**
  * Ticks without a blow after which the Defend default ends for a resident fleeing home
  * (`CONTEXT.md`: Defence script): half a minute, so a lone blow from someone who walks off
