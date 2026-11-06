@@ -393,6 +393,47 @@ export function buyOffProblem(
   return undefined
 }
 
+/** The Coins an Organization owes the Trade Organization (`CONTEXT.md`: Trade Org debt), or 0. */
+export function debtOf(world: Pick<WorldState, 'debts'>, org: string): number {
+  return world.debts.find((d) => d.org === org)?.coins ?? 0
+}
+
+/**
+ * Why a resident can't pay `coins` of `realmId`'s Trade Org debt now, or undefined when they can
+ * (`CONTEXT.md`: Trade Org debt): the realm owes it and the resident is grown up, on a Trade Org
+ * warehouse's tile (`buyOffCoinWarehouseAt`), with a Coin at least in their hands or on `carriageId`,
+ * a carriage on their tile that `realmId` commands. They pay what they hold, up to what is owed. The
+ * Trade Organization takes it even from those it otherwise refuses.
+ */
+export function payDebtProblem(
+  world: WorldState,
+  realmId: string,
+  resident: Resident,
+  coins: unknown,
+  carriageId: unknown,
+): string | undefined {
+  if (debtOf(world, realmId) <= 0) return 'your realm owes the Trade Organization nothing'
+  if (typeof coins !== 'number' || !Number.isInteger(coins) || coins <= 0) {
+    return 'pay a whole number of coins'
+  }
+  if (!canWork(resident, world.tick)) return 'children can’t pay'
+  const at = world.buildings.find(
+    (b) => covers(b, resident.x, resident.y) && warehouseKeeps(world, b).length > 0,
+  )
+  if (!at || !buyOffCoinWarehouseAt(world, resident.x, resident.y)) {
+    return 'not at a Trade Org warehouse'
+  }
+  let stock = resident.carried
+  if (carriageId !== null && carriageId !== undefined) {
+    const k = world.carriages.find((x) => x.id === carriageId)
+    if (!commandsCarriage(world, realmId, k)) return 'not one of your carriages'
+    if (!isAt(k, at)) return 'that carriage is not at the warehouse'
+    stock = k.load
+  }
+  if ((stock.coins ?? 0) < 1) return 'no coins to pay with'
+  return undefined
+}
+
 /**
  * The storage of a city that deliveries go to and pick-ups come from (`CONTEXT.md`: Delivery):
  * its first finished one. Undefined when it has none.

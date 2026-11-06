@@ -31,8 +31,10 @@ import {
   type Good,
   type GoodsSpot,
   type Horse,
+  type Punishment,
   type Resident,
   type Stock,
+  type SupplyWagon,
   type Trader,
   type WorldState,
   isDown,
@@ -349,14 +351,14 @@ export function hitchOffProblem<R extends StealingResident>(
  * Why a caravan's or trader's crew keep its carriage from being taken, on a map of `size` tiles
  * (`CONTEXT.md`: Caravan crew lost): its driver or an armed escort is up and within `CARAVAN_GUARD_RANGE` of it.
  * They have to be beaten or gone, however many of the thief's realm stand there; one still walking
- * out doesn't count until they are that near.
+ * out doesn't count until they are that near. `what` names the carriage in the reason.
  */
 function crewHolds<R extends StealingResident>(
   residents: readonly R[],
   caravan: Pick<Caravan, 'driverId' | 'escortIds'>,
   carriage: Pick<Carriage, 'x' | 'y'>,
   size: number,
-  what: 'caravan' | 'trader',
+  what: 'caravan’s carriage' | 'trader’s carriage' | 'supply wagon',
 ): string | undefined {
   const near = (id: string | null, armed: boolean) =>
     residents.some(
@@ -367,11 +369,26 @@ function crewHolds<R extends StealingResident>(
         (!armed || isArmed(r)) &&
         wrapDistance(size, r, carriage) <= CARAVAN_GUARD_RANGE,
     )
-  if (near(caravan.driverId, false)) return `its driver is still with that ${what}’s carriage`
-  if (caravan.escortIds.some((id) => near(id, true))) {
-    return `its escort guards that ${what}’s carriage`
-  }
+  if (near(caravan.driverId, false)) return `its driver is still with that ${what}`
+  if (caravan.escortIds.some((id) => near(id, true))) return `its escort guards that ${what}`
   return undefined
+}
+
+/**
+ * The crew of a Trade Org army's supply wagon (`CONTEXT.md`: Trade Org debt), robbed like a caravan's:
+ * its driver, with the army's soldiers as its escort.
+ */
+function wagonCrew(
+  world: {
+    supplyWagons?: readonly Pick<SupplyWagon, 'carriageId' | 'driverId' | 'punishmentId'>[]
+    punishments?: readonly Pick<Punishment, 'id' | 'members'>[]
+  },
+  carriage: Pick<Carriage, 'id'>,
+): Pick<Caravan, 'driverId' | 'escortIds'> | undefined {
+  const wagon = world.supplyWagons?.find((w) => w.carriageId === carriage.id)
+  if (!wagon) return undefined
+  const army = world.punishments?.find((p) => p.id === wagon.punishmentId)
+  return { driverId: wagon.driverId, escortIds: army?.members.map((m) => m.residentId) ?? [] }
 }
 
 /**
@@ -390,6 +407,8 @@ export function driveOffProblem<R extends StealingResident>(
     carriages: readonly CarriagePlace[]
     caravans: readonly Pick<Caravan, 'carriageId' | 'driverId' | 'escortIds'>[]
     traders: readonly Pick<Trader, 'carriageId' | 'driverId' | 'escortIds'>[]
+    supplyWagons?: readonly Pick<SupplyWagon, 'carriageId' | 'driverId' | 'punishmentId'>[]
+    punishments?: readonly Pick<Punishment, 'id' | 'members'>[]
   },
   thief: R,
   carriage: CarriagePlace & Pick<Carriage, 'id'>,
@@ -401,9 +420,12 @@ export function driveOffProblem<R extends StealingResident>(
   const caravan = world.caravans.find((c) => c.carriageId === carriage.id)
   const trader = world.traders.find((t) => t.carriageId === carriage.id)
   const held =
-    (caravan && crewHolds(world.residents, caravan, carriage, size, 'caravan')) ??
-    (trader && crewHolds(world.residents, trader, carriage, size, 'trader'))
+    (caravan && crewHolds(world.residents, caravan, carriage, size, 'caravan’s carriage')) ??
+    (trader && crewHolds(world.residents, trader, carriage, size, 'trader’s carriage'))
   if (held) return held
+  const wagon = wagonCrew(world, carriage)
+  const heldWagon = wagon && crewHolds(world.residents, wagon, carriage, size, 'supply wagon')
+  if (heldWagon) return heldWagon
   return (
     takeProblem(world, thief, carriage, realmId, 'carriage') ??
     hitchOffProblem(world, thief, { ...carriage, realmId, cityId: null })

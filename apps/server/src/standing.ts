@@ -73,7 +73,7 @@ export function raiseStandingByTrade(
  * Whether an Organization still exists: a realm, a city of no realm, or the Trade Organization
  * while it has a city. A city that joined a realm is part of that realm's Organization now.
  */
-function organizationExists(world: WorldState, org: string): boolean {
+export function organizationExists(world: WorldState, org: string): boolean {
   if (org === TRADE_ORG) return world.cities.some((c) => c.tradeOrg !== undefined)
   return (
     world.realms.some((r) => r.id === org) ||

@@ -10,8 +10,8 @@ import { forSale } from './city.js'
 import { freeStock, offerStorage } from './offers.js'
 import { citySoldiers, respectSeenBy } from './persuasion.js'
 import { organizationLabel } from './standing.js'
-import { TRADE_ORG } from './trade-org.js'
-import { pickUpTransferProblem, transferFee, transferLoad } from './transfer.js'
+import { NO_CARAVANS, TRADE_ORG, tradeOrgHq } from './trade-org.js'
+import { pickUpTransferProblem, transferFee, transferLoad, transferWarehouses } from './transfer.js'
 import { deliveryStorage } from './warehouse.js'
 import {
   GOODS,
@@ -220,7 +220,10 @@ export function goodsHandedOver(
 /**
  * Why `realmId` can't hand over a demand's goods this way, or undefined when it can
  * (`CONTEXT.md`: Demand): a storage of its own holding some of them, or a Transfer it could order to
- * a city of the sender's. Less than demanded will do: what is short is said before accepting.
+ * a city of the sender's. Less than demanded will do: what is short is said before accepting. For
+ * the Trade Organization, which fetches by caravan and takes it to the warehouse nearest
+ * (`CONTEXT.md`: Trade Org debt), a storage in a city, or a Transfer from one, whoever it refuses;
+ * `toCityId` is left out of it.
  */
 export function demandHandOverProblem(
   world: WorldState,
@@ -230,10 +233,22 @@ export function demandHandOverProblem(
 ): string | undefined {
   if (demand.terms.kind !== 'goods') return undefined
   const h = (typeof how === 'object' && how !== null ? how : {}) as Record<string, unknown>
+  const toTradeOrg = demand.fromId === TRADE_ORG
+  if (toTradeOrg) {
+    if (!tradeOrgHq(world)) return NO_CARAVANS
+    if (transferWarehouses(world).length === 0) return 'no Trade Org warehouse to send a caravan'
+  }
   let handOver: DemandHandOver
   if (h.way === 'setAside') {
-    if (!offerStorage(world, realmId, h.storageId)) return 'not a finished storage of yours'
-    handOver = { way: 'setAside', storageId: h.storageId as string }
+    const storage = offerStorage(world, realmId, h.storageId)
+    if (!storage) return 'not a finished storage of yours'
+    if (toTradeOrg && !storage.cityId) return 'its caravans fetch only from a storage in a city'
+    handOver = { way: 'setAside', storageId: storage.id }
+  } else if (h.way === 'transfer' && toTradeOrg) {
+    const from = world.cities.find((c) => c.id === h.fromCityId)
+    if (from?.realmId !== realmId) return 'not one of your cities'
+    if (!deliveryStorage(world, from.id)) return 'your city has no storage'
+    handOver = { way: 'transfer', fromCityId: from.id, toCityId: '' }
   } else if (h.way === 'transfer') {
     const to = world.cities.find((c) => c.id === h.toCityId)
     if (to?.realmId !== demand.fromId) return 'send it to a city of theirs'

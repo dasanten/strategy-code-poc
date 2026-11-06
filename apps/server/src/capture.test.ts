@@ -83,7 +83,7 @@ function armed<T extends { carried: Record<string, number | undefined> }>(r: T):
 /** One tick of the occupation step alone, so nobody walks or fights meanwhile. */
 function tick(world: WorldState) {
   world.tick++
-  return stepCaptures(world, terrain.size)
+  return stepCaptures(world, terrain)
 }
 
 /** `realmId` has occupied the city's town hall for all but its last tick. */
@@ -538,7 +538,7 @@ describe('Capturing a trading post', () => {
     expect(occupierOf(world, post, land.size)).toBe(realm.id)
     heldAllButOneTick(world, post, realm.id)
     world.tick++
-    expect(stepCaptures(world, land.size)).toEqual([{ cityId: post.id, from: null, to: realm.id }])
+    expect(stepCaptures(world, land)).toEqual([{ cityId: post.id, from: null, to: realm.id }])
     expect(post).toMatchObject({ realmId: realm.id, occupation: null })
     expect(post.tradeOrg).toBeUndefined()
     expect(world.caravans.some((c) => c.postId === post.id)).toBe(false)

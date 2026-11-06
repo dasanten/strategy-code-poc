@@ -17,6 +17,7 @@ import {
   TRADERS,
   TRADER_ESCORTS,
 } from '@csp/shared'
+import { TRADE_ORG } from '@csp/shared'
 import { createAdmin } from './auth.js'
 
 import { KEEP_LATEST, WorldSaver, loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
@@ -27,6 +28,7 @@ import { checkInvariants } from './invariants.js'
 import { Walking } from './walking.js'
 import { refreshLastSeen } from './last-seen.js'
 import { smallTerrain, worldWithCity, worldWithPost } from './test-terrain.js'
+import { stepDebts } from './trade-org-debt.js'
 import {
   RESET_BEFORE,
   WORLD_FORMAT_VERSION,
@@ -281,6 +283,33 @@ describe('world saves', () => {
     expect(checkInvariants(v80, land)).toEqual([])
   })
 
+  it('changes nothing for an army under way, which set out with no purse (migration 94 → 95)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v95 = migrateWorld(structuredClone(world), 94, { terrain: land }, migrations, 95)
+    expect(v95).toEqual(world)
+    expect(checkInvariants(v95, land)).toEqual([])
+  })
+
+  it('starts with no supply wagons, and an army under way goes on without (migration 93 → 94)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v93 = structuredClone(world) as unknown as Record<string, unknown>
+    delete v93.supplyWagons
+    const v94 = migrateWorld(v93, 93, { terrain: land }, migrations, 94)
+    expect(v94.supplyWagons).toEqual([])
+    expect(v94).toEqual(world)
+    expect(checkInvariants(v94, land)).toEqual([])
+  })
+
+  it('starts with nobody owing the Trade Organization (migration 92 → 93)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v92 = structuredClone(world) as unknown as Record<string, unknown>
+    delete v92.debts
+    const v93 = migrateWorld(v92, 92, { terrain: land }, migrations, 93)
+    expect(v93.debts).toEqual([])
+    expect(v93).toEqual(world)
+    expect(checkInvariants(v93, land)).toEqual([])
+  })
+
   it('says which punishments under way have reached their city (migration 80 → 81)', () => {
     const { world: v80, terrain: land } = worldWithPost()
     const city = v80.cities[0]!
@@ -376,11 +405,45 @@ describe('world saves', () => {
     expect(checkInvariants(v88, land)).toEqual([])
   })
 
+  it('leaves a format 95 world’s debts to get their demand on the next tick (migration 95 → 96)', () => {
+    const { world, terrain: land } = worldWithPost()
+    world.realms.push({ id: 'r9', userId: 90, leaderId: 'nobody' })
+    world.debts = [{ org: 'r9', coins: 12 }]
+    const v96 = migrateWorld(structuredClone(world), 95, { terrain: land }, migrations, 96)
+    expect(v96).toEqual(world)
+    expect(v96.debts[0]!.step).toBeUndefined()
+    stepDebts(v96)
+    expect(v96.demands).toMatchObject([
+      { fromId: TRADE_ORG, toId: 'r9', terms: { kind: 'goods', goods: { coins: 12 } } },
+    ])
+    expect(v96.debts[0]!.step).toBe('demanded')
+  })
+
+  it('leaves a format 96 world’s debts with no city kept, for the HQ’s nearest (migration 96 → 97)', () => {
+    const { world, terrain: land } = worldWithPost()
+    world.realms.push({ id: 'r9', userId: 90, leaderId: 'nobody' })
+    world.debts = [{ org: 'r9', coins: 12, step: 'wrecks' }]
+    const v97 = migrateWorld(structuredClone(world), 96, { terrain: land }, migrations, 97)
+    expect(v97).toEqual(world)
+    expect(v97.debts[0]!.cityId).toBeUndefined()
+    expect(v97.punishments.every((p) => p.wrecks === undefined)).toBe(true)
+  })
+
+  it('leaves a format 97 world’s debts with no trip counted (migration 97 → 98)', () => {
+    const { world, terrain: land } = worldWithPost()
+    world.realms.push({ id: 'r9', userId: 90, leaderId: 'nobody' })
+    world.debts = [{ org: 'r9', coins: 12, step: 'wrecks', cityId: 'c9' }]
+    const v98 = migrateWorld(structuredClone(world), 97, { terrain: land }, migrations, 98)
+    expect(v98).toEqual(world)
+    expect(v98.debts[0]!.trips).toBeUndefined()
+    expect(v98.punishments.every((p) => p.takes === undefined)).toBe(true)
+  })
+
   it('leaves realms from before realm names unnamed (migration 38 → 39)', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(92)
+    expect(WORLD_FORMAT_VERSION).toBe(98)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)

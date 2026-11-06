@@ -105,7 +105,12 @@ export function tradeOrgArmyWanted(
   )
 }
 
-/** Everyone in the Trade Org army out to punish someone (`CONTEXT.md`: Trade Org reaction), by id. */
-export function punishers(world: Pick<WorldState, 'punishments'>): Set<string> {
-  return new Set(world.punishments.flatMap((p) => p.members.map((m) => m.residentId)))
+/**
+ * Everyone in the Trade Org army out to punish someone (`CONTEXT.md`: Trade Org reaction) and everyone
+ * driving a supply wagon for it, by id: all run by their punishment, not by the HQ.
+ */
+export function punishers(world: Pick<WorldState, 'punishments' | 'supplyWagons'>): Set<string> {
+  const ids = world.punishments.flatMap((p) => p.members.map((m) => m.residentId))
+  for (const w of world.supplyWagons) if (w.driverId !== null) ids.push(w.driverId)
+  return new Set(ids)
 }

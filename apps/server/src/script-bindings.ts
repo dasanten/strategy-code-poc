@@ -29,6 +29,7 @@ import {
   lineTile,
   roadLine,
   crewTile,
+  debtOf,
   directivesFor,
   materialsNeeded,
   inputToFetch,
@@ -625,6 +626,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     me: viewValue(me, api.find((b) => b.name === 'me')!.returns),
     memory: context.memory,
     params: Object.freeze(params),
+    debt: side === undefined ? 0 : debtOf(world, side),
     tick: world.tick,
     mapSize: terrain.size,
     random: tickRandom(world),
@@ -788,6 +790,11 @@ function residentActions(
     buyOff: ([directiveId, carriageId]) =>
       request('buyOff', {
         directiveId: plain(directiveId),
+        carriageId: plain(carriageId ?? null),
+      }),
+    payDebt: ([coins, carriageId]) =>
+      request('payDebt', {
+        coins: plain(coins),
         carriageId: plain(carriageId ?? null),
       }),
     postOffer: ([storageId, gives, givesUnits, wants, wantsUnits, times]) =>

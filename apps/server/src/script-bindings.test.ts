@@ -430,6 +430,8 @@ describe('script bindings', () => {
       { kind: 'swap', give: 'wood', want: 'stone', units: 5, carriageId: 'k1' },
     ],
     ['buyOff("directive1")', { kind: 'buyOff', directiveId: 'directive1', carriageId: null }],
+    ['payDebt(40)', { kind: 'payDebt', coins: 40, carriageId: null }],
+    ['payDebt(40, "k1")', { kind: 'payDebt', coins: 40, carriageId: 'k1' }],
     [
       'postOffer("s1", "wood", 10, "stone", 5, 2)',
       {
