@@ -2626,8 +2626,10 @@ export function Wiki() {
           without a break, the city joins your realm with its buildings and the residents who live
           there, loyal at once; its Leader never joins. Beating its defenders is not enough on its
           own, and defenders elsewhere in the city don't stop the clock: they have to come to the
-          hall. The first tick the occupation doesn't hold, it is broken and its days are lost; the
-          next one starts again from nothing. Your realm log says when one of your town halls is
+          hall. An NPC city's soldiers, a trading post's and the HQ's do: anyone occupying their town
+          hall is an attacker to them, even one who attacks nobody, and those in the city's area go
+          after them, which is no crime. The first tick the occupation doesn't hold, it is broken and
+          its days are lost; the next one starts again from nothing. Your realm log says when one of your town halls is
           occupied, by whom, and when the occupation is broken, and likewise when you occupy a town
           hall and when your occupation is broken. Every city is captured this way: NPC cities,
           Players' cities, trading posts and the Trade Org HQ, whose hired mercenaries defend it.
