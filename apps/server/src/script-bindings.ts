@@ -66,6 +66,7 @@ import {
   type Waypoint,
   type WorldState,
 } from '@csp/shared'
+import { knownThieves } from './crimes.js'
 import type { InvariantViolation } from './invariants.js'
 import { orderKindOf, orderKinds, type OrderKind, type OrderSender } from './orders.js'
 import { hash, mulberry32 } from './residents.js'
@@ -218,6 +219,13 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     const running = ownScripts.get(id)
     return running && { script: { scriptId: running.scriptId, memory: running.memory } }
   }
+  // Who stole from the side, as far as it knows (`CONTEXT.md`: Crime): what its residents saw and
+  // what news brought home, the same knowledge force at home goes by, no more.
+  let thieves: Set<string> | undefined
+  const residentExtras = (id: string) => {
+    thieves ??= side === undefined ? new Set() : knownThieves(world, side)
+    return { ...ownMemory(id), knownThief: thieves.has(id) }
+  }
   const asSeen = (r: Resident) => {
     const { script, ...rest } = r
     const running = { scriptId: script!.scriptId, memory: script!.memory }
@@ -291,7 +299,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   // What each query answers, as the server's data; the script gets it built from the view the
   // query returns (`viewValue`).
   const queries: Record<string, (args: Value[]) => unknown> = {
-    residents: () => seenOf('resident', ownMemory),
+    residents: () => seenOf('resident', residentExtras),
     buildings: () => seenOf('building', buildingExtras),
     cities: () => seenOf('city', occupationSeen),
     horses: () => seenOf('horse'),

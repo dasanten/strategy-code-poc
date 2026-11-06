@@ -463,6 +463,27 @@ export function occupierOf(
 }
 
 /**
+ * Whether `r` is someone occupying `city`'s town hall (`CONTEXT.md`: Crime): armed, on its
+ * footprint, and one who could hold it (`occupierOf`). A defender stepping onto the hall breaks
+ * the occupation, but those still standing on it are the same occupiers.
+ */
+export function standsOccupying(
+  world: Pick<WorldState, 'buildings' | 'alliances' | 'contracts' | 'punishments' | 'debts'>,
+  city: City,
+  r: Resident,
+  size: number,
+): boolean {
+  const hall = townHallOf(world, city)
+  if (!hall || !isArmed(r) || !isAt(r, hall, size) || defendsCity(world, city, r, size)) {
+    return false
+  }
+  const forTradeOrg = world.contracts.some(
+    (c) => c.startedAt !== null && c.hirerId === TRADE_ORG && c.residentIds.includes(r.id),
+  )
+  return !forTradeOrg && (r.owner !== null || cityTakers(world, city).has(r.id))
+}
+
+/**
  * The soldiers of the Trade Organization's army come to take `city` (`CONTEXT.md`: Trade Org debt):
  * on their way there or at it, for a debt the city's Organization still owes. Paid in full, they stop
  * occupying at once, so the debt can't be paid and the city lost in one tick.

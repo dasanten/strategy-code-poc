@@ -7,9 +7,11 @@ import {
   combatLearned,
   dodgeChance,
   drivenCarriageId,
+  inCityArea,
   inContact,
   isArmed,
   onOwnWall,
+  standsOccupying,
   WALL_DEFENCE,
   attackPower,
   brokenReturns,
@@ -33,6 +35,7 @@ import {
   isAt,
   isDown,
 } from '@csp/shared'
+import { answersAttack, raiseResidentAttacked, raiseWallAttacked } from './alarms.js'
 import { updateCityMembership } from './cities.js'
 import { buildingOrganization, commitCrime, knownThieves, organizationOf } from './crimes.js'
 import { defendsByScript, endHoldIfOver, startDefence } from './defence.js'
@@ -87,12 +90,28 @@ export function attackOrder(targetId: string, started = false, defending = false
 }
 
 /**
+ * Whether `t` stands in the City area of a city of `realm` as someone force is allowed against
+ * (`CONTEXT.md`: Crime): occupying its town hall, or a thief of the realm that it knows of or one
+ * of its residents saw. Anywhere else, or anyone else there, striking them stays a crime.
+ */
+function wantedAtHome(world: WorldState, realm: string, t: Resident, size: number): boolean {
+  const home = world.cities.filter(
+    (c) => c.realmId === realm && inCityArea(world, c, t.x, t.y, size),
+  )
+  if (home.length === 0) return false
+  return (
+    home.some((c) => standsOccupying(world, c, t, size)) || knownThieves(world, realm).has(t.id)
+  )
+}
+
+/**
  * Whether `a` striking `t` is a crime (`CONTEXT.md`: Crime): not when `a` fights back at someone
  * who hit them, nor when `t` is attacking someone of `a`'s Organization on their own account, or
  * breaking or climbing one of its walls or gates (`CONTEXT.md`: Walls in combat). The Trade Org
  * HQ's mercenaries stand with the HQ, and its soldiers keep its inner ring clear by force, never
  * a crime (`CONTEXT.md`: Trade Org army); nor is a trading post's going after a thief it knows of
- * (`CONTEXT.md`: Trading post). For `t` running their defence script, what it interrupted is what
+ * (`CONTEXT.md`: Trading post), nor a realm's striking those wanted in its own City area
+ * (`wantedAtHome`). For `t` running their defence script, what it interrupted is what
  * they are doing. `size` is the map's.
  */
 function isAggression(world: WorldState, a: Resident, t: Resident, size: number): boolean {
@@ -103,7 +122,8 @@ function isAggression(world: WorldState, a: Resident, t: Resident, size: number)
   }
   const post =
     a.owner === null && world.cities.find((c) => c.id === a.cityId && c.tradeOrg === 'post')
-  if (post && knownThieves(world, post).has(t.id)) return false
+  if (post && knownThieves(world, post.id).has(t.id)) return false
+  if (a.owner !== null && wantedAtHome(world, a.owner, t, size)) return false
   const sides = new Set([organizationOf(a)])
   if (hq && contractOf(world, a.id)?.hirerId === TRADE_ORG) sides.add(hq.id)
   // Defending themselves, what they were doing before counts (`CONTEXT.md`: Defence script).
@@ -156,7 +176,8 @@ export const attack: OrderKind = {
     // A defence script going after who struck them fights back, in a fight already logged.
     const defending =
       r.interrupted !== undefined && r.script?.task !== 'alarm' && r.struck?.by === targetId
-    r.order = attackOrder(targetId, defending, defending)
+    // An Alarm script answering an attack strikes back too, in a fight of its own to log.
+    r.order = attackOrder(targetId, defending, defending || answersAttack(r, targetId))
   },
 }
 
@@ -231,6 +252,7 @@ export function resolveStrikes(
     if (o?.kind !== 'attack' || o.targetId !== target.id || !inContact(size, a, target)) continue
     if (isBuilding(target)) {
       blows++
+      raiseWallAttacked(world, a, target, size)
       if (breakWall(world, a, target, size)) broken.push(target)
       continue
     }
@@ -264,6 +286,7 @@ export function resolveStrikes(
     }
     endHoldIfOver(world, t)
     t.struck = { by: a.id, tick: world.tick }
+    raiseResidentAttacked(world, a, t, size)
     a.skills.combat = (a.skills.combat ?? 0) + combatLearned(a, world.tick)
     t.skills.combat = (t.skills.combat ?? 0) + combatLearned(t, world.tick)
     const roll = mulberry32(hash(`${world.seed}:${world.tick}:${a.id}:strike`))()

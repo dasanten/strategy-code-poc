@@ -474,23 +474,31 @@ describe('world saves', () => {
     expect(checkInvariants(v105, land)).toEqual([])
   })
 
-  it('puts those already in a city’s area on its list, to raise no alarm (migration 105 → 106)', () => {
+  it('leaves a format 105 world as it is: no attacker raised an alarm (migration 105 → 106)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v106 = migrateWorld(structuredClone(world), 105, { terrain: land }, migrations, 106)
+    expect(v106).toEqual(world)
+    expect(v106.cities.every((c) => c.alarmedAttackers === undefined)).toBe(true)
+    expect(checkInvariants(v106, land)).toEqual([])
+  })
+
+  it('puts those already in a city’s area on its list, to raise no alarm (migration 106 → 107)', () => {
     const { world, terrain: land } = worldWithCity()
     const city = world.cities[0]!
-    const v105 = structuredClone(world)
+    const v106 = structuredClone(world)
     // Nobody's in the area of another: the world stays as it is.
-    expect(migrateWorld(structuredClone(v105), 105, { terrain: land }, migrations, 106)).toEqual(world)
+    expect(migrateWorld(structuredClone(v106), 106, { terrain: land }, migrations, 107)).toEqual(world)
 
     const hall = townHallOf(world, city)!
-    v105.realms.push({ id: 'r9', userId: 90, leaderId: 'x9' })
+    v106.realms.push({ id: 'r9', userId: 90, leaderId: 'x9' })
     const visitor = newResident(mulberry32(9), { id: 'x9', owner: 'r9', x: hall.x, y: hall.y, tick: 0 })
     visitor.carried = { sword: 1 }
-    v105.residents.push(visitor)
-    const v106 = migrateWorld(structuredClone(v105), 105, { terrain: land }, migrations, 106)
-    expect(v106.cities[0]!.outsiders).toEqual(['x9'])
-    expect(checkInvariants(v106, land)).toEqual([])
-    stepOutsiders(v106, land.size)
-    expect(v106.residents.some((r) => r.script?.task === 'alarm')).toBe(false)
+    v106.residents.push(visitor)
+    const v107 = migrateWorld(structuredClone(v106), 106, { terrain: land }, migrations, 107)
+    expect(v107.cities[0]!.outsiders).toEqual(['x9'])
+    expect(checkInvariants(v107, land)).toEqual([])
+    stepOutsiders(v107, land.size)
+    expect(v107.residents.some((r) => r.script?.task === 'alarm')).toBe(false)
   })
 
   it('leaves a format 95 world’s debts to get their demand on the next tick (migration 95 → 96)', () => {
@@ -531,7 +539,7 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(106)
+    expect(WORLD_FORMAT_VERSION).toBe(107)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)

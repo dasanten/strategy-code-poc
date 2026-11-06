@@ -158,7 +158,7 @@ import {
 } from './script-runner.js'
 import { readWanted } from './storing.js'
 import { queuesSound } from './queues.js'
-import { alarmScriptSound, alarmsSound } from './alarms.js'
+import { alarmedAttackersSound, alarmScriptSound, alarmsSound } from './alarms.js'
 import { outsidersSound } from './outsiders.js'
 import {
   defenceScriptSound,
@@ -2163,6 +2163,7 @@ export const worldInvariants: Invariant[] = [
   alarmsSound,
   alarmScriptSound,
   outsidersSound,
+  alarmedAttackersSound,
   scriptLogsSound,
 ]
 

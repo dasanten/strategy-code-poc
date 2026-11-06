@@ -1,14 +1,24 @@
 import {
+  DEFEND_CALM_TICKS,
   OWN_FOOD,
   Terrain,
   townHallOf,
   type Alarm,
   type Building,
   type OrderRequest,
+  type Stock,
   type TerrainMap,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { alarmScriptSound, alarmsSound, raiseOccupied, startAlarm } from './alarms.js'
+import {
+  alarmedAttackersSound,
+  alarmScriptSound,
+  alarmsSound,
+  raiseOccupied,
+  raiseResidentAttacked,
+  raiseWallAttacked,
+  startAlarm,
+} from './alarms.js'
 import { attackOrder } from './combat.js'
 import { interruptedSound } from './defence.js'
 import { checkInvariants } from './invariants.js'
@@ -270,6 +280,294 @@ describe('the town hall occupied', () => {
     s.occupy()
     raiseOccupied(s.world, s.city, 'r2', SIZE)
     expect(s.r.script).toBeUndefined()
+  })
+})
+
+describe('a wall or neighbour attacked', () => {
+  type Setup = ReturnType<typeof setup>
+
+  /** Another resident of r1, armed unless told otherwise, standing in the city's area beside w1. */
+  const neighbour = (s: Setup, id = 'w2', x = 8, y = 6, carried: Stock = { spear: 1 }) => {
+    const n = newResident(mulberry32(4), { id, owner: 'r1', x, y, tick: 0 })
+    n.cityId = 'c1'
+    n.carried = { food: OWN_FOOD, ...carried }
+    s.world.residents.push(n)
+    return n
+  }
+  /** x1 stands beside w1, set on striking them. */
+  const strikes = (s: Setup) => {
+    s.x1.x = s.r.x - 1
+    s.x1.y = s.r.y
+    s.x1.order = attackOrder('w1')
+  }
+  /** A row of houses of c1 out to (66, 6), so the area reaches out of sight of those at the farm. */
+  const farSide = (s: Setup) => {
+    for (let x = 16; x <= 66; x += 10) {
+      s.world.buildings.push({ id: `h${x}`, kind: 'house', cityId: 'c1', x, y: 6 })
+    }
+  }
+  const raise = (s: Setup) => raiseResidentAttacked(s.world, s.x1, s.r, SIZE)
+
+  it('a blow on one worker brings armed neighbours in sight, who go back to what they did after', () => {
+    const s = setup()
+    const n = neighbour(s)
+    n.order = { kind: 'walkTo', target: { x: 8, y: 9 }, path: null, progress: 0 }
+    strikes(s)
+    expect(s.until(() => n.script?.task === 'alarm', 10)).toBe(true)
+    expect(n.script!.alarm).toMatchObject({
+      kind: 'attacked',
+      cityId: 'c1',
+      about: 'x1',
+      realmId: 'r2',
+      x: s.r.x,
+      y: s.r.y,
+    })
+    expect(n.interrupted).toMatchObject({ order: { kind: 'walkTo' } })
+    // The one struck has their Defence script for it, not this.
+    expect(s.r.script?.task).not.toBe('alarm')
+
+    s.tick()
+    expect(n.script?.scriptId).toBe(ALARM_DEFAULT)
+    expect(n.order).toMatchObject({ kind: 'attack', targetId: 'x1', defending: true })
+    expect(n.script!.memory.doing).toBe(`On alarm: going after ${s.x1.name}`)
+
+    s.gone()
+    s.tick()
+    expect(n.script).toBeUndefined()
+    expect(n.interrupted).toBeUndefined()
+    expect(n.order).toMatchObject({ kind: 'walkTo' })
+    expect(logged(n)).toContain('the attacker is gone')
+  })
+
+  it('a blow on someone out of sight doesn’t, though they stand in the same area', () => {
+    const s = setup()
+    farSide(s)
+    const n = neighbour(s, 'w2', 66, 6)
+    strikes(s)
+    expect(s.until(() => s.r.struck !== undefined, 10)).toBe(true)
+    s.tick()
+    expect(n.script).toBeUndefined()
+    expect(n.order).toBeNull()
+  })
+
+  it('doesn’t reach those in sight who stand outside the area', () => {
+    const s = setup()
+    const n = neighbour(s, 'w2', 6, 30)
+    raise(s)
+    expect(n.script).toBeUndefined()
+  })
+
+  it('a blow outside the realm’s city areas raises nothing', () => {
+    const s = setup()
+    const n = neighbour(s)
+    s.r.y = 30
+    raise(s)
+    expect(n.script).toBeUndefined()
+    expect(s.city.alarmedAttackers).toBeUndefined()
+  })
+
+  it.each(['wall', 'gate'] as const)('a %s attacked does, and they go after who strikes it', (kind) => {
+    const s = setup()
+    const n = neighbour(s)
+    s.world.buildings.push({ id: 'b9', kind, cityId: 'c1', x: 12, y: 8 })
+    s.x1.x = 13
+    s.x1.y = 8
+    s.x1.order = attackOrder('b9')
+    expect(s.until(() => n.script?.task === 'alarm', 10)).toBe(true)
+    expect(n.script!.alarm).toMatchObject({ kind: 'attacked', about: 'x1', x: 12, y: 8 })
+    // The first worker sees it too.
+    expect(s.r.script?.task).toBe('alarm')
+    s.tick()
+    expect(n.order).toMatchObject({ kind: 'attack', targetId: 'x1', defending: true })
+  })
+
+  it('those already fighting aren’t interrupted', () => {
+    const s = setup()
+    s.l2.x = 8
+    s.l2.y = 8
+    const n = neighbour(s)
+    n.order = attackOrder('l2')
+    raise(s)
+    expect(n.script).toBeUndefined()
+    expect(n.order).toMatchObject({ kind: 'attack', targetId: 'l2' })
+    // They count as having seen it, and the next one in sight gets none for this attacker.
+    expect(s.city.alarmedAttackers).toEqual({ x1: s.world.tick })
+  })
+
+  it('doesn’t reach someone defending themselves', () => {
+    const s = setup()
+    const n = neighbour(s)
+    n.script = { scriptId: 1, task: 'defend', memory: {} }
+    n.interrupted = { order: null }
+    const before = structuredClone(n.interrupted)
+    raise(s)
+    expect(n.script.task).toBe('defend')
+    expect(n.interrupted).toEqual(before)
+  })
+
+  it('is raised once per attacker, and again once their blows have stopped for the calm time', () => {
+    const s = setup()
+    farSide(s)
+    const first = neighbour(s)
+    const later = neighbour(s, 'w3', 66, 6)
+    raise(s)
+    expect(first.script?.task).toBe('alarm')
+    expect(later.script).toBeUndefined()
+
+    // In sight now, with the blows still coming.
+    later.x = 8
+    later.y = 8
+    for (let i = 0; i < 3; i++) {
+      s.world.tick += DEFEND_CALM_TICKS - 1
+      raise(s)
+      expect(later.script).toBeUndefined()
+    }
+
+    s.world.tick += DEFEND_CALM_TICKS
+    raise(s)
+    expect(later.script?.task).toBe('alarm')
+    expect(s.city.alarmedAttackers).toEqual({ x1: s.world.tick })
+  })
+
+  it('a long fight runs a picked script once', () => {
+    const s = setup(new Map([[750, reader()]]))
+    const n = neighbour(s)
+    n.alarmScriptId = 750
+    strikes(s)
+    for (let i = 0; i < 30; i++) {
+      s.r.order = null
+      s.tick()
+    }
+    expect(logged(n).filter((l) => l.startsWith('attacked about x1'))).toHaveLength(1)
+  })
+
+  it('a second attacker raises one of their own', () => {
+    const s = setup(new Map([[750, reader()]]))
+    const n = neighbour(s)
+    n.alarmScriptId = 750
+    raise(s)
+    raiseResidentAttacked(s.world, s.l2, s.r, SIZE)
+    expect(s.city.alarmedAttackers).toEqual({ x1: s.world.tick, l2: s.world.tick })
+  })
+
+  it('an attack nobody at home saw has raised nothing: the next blow seen does', () => {
+    const s = setup()
+    farSide(s)
+    const n = neighbour(s, 'w2', 66, 6)
+    raise(s)
+    expect(s.city.alarmedAttackers).toBeUndefined()
+    n.x = 8
+    raise(s)
+    expect(n.script?.task).toBe('alarm')
+  })
+
+  it('leaves someone unarmed as they were, unless the Player picked a script, or None', () => {
+    const s = setup(new Map([[750, reader()]]))
+    const unarmed = neighbour(s, 'w2', 8, 6, {})
+    const none = neighbour(s, 'w3', 8, 7)
+    none.alarmScriptId = 'none'
+    const picked = neighbour(s, 'w4', 8, 8, {})
+    picked.alarmScriptId = 750
+    raise(s)
+    expect(unarmed.script).toBeUndefined()
+    expect(none.script).toBeUndefined()
+    s.tick()
+    expect(logged(picked)[0]).toBe('attacked about x1 of r2 in c1')
+  })
+
+  it('a blow struck in fighting back raises nothing', () => {
+    const s = setup()
+    const n = neighbour(s)
+    s.x1.order = attackOrder('w1', true, true)
+    raise(s)
+    expect(n.script).toBeUndefined()
+    expect(s.city.alarmedAttackers).toBeUndefined()
+  })
+
+  it('someone of the realm raises nothing, nor does an NPC city have anyone to reach yet', () => {
+    const s = setup()
+    const n = neighbour(s)
+    raiseResidentAttacked(s.world, n, s.r, SIZE)
+    expect(s.r.script).toBeUndefined()
+    expect(s.city.alarmedAttackers).toBeUndefined()
+
+    s.city.realmId = null
+    const wall: Building = { id: 'b9', kind: 'wall', cityId: 'c1', x: 12, y: 8 }
+    raiseWallAttacked(s.world, s.x1, wall, SIZE)
+    expect(n.script).toBeUndefined()
+    expect(s.city.alarmedAttackers).toBeUndefined()
+  })
+
+  it('the default ends once the attacker has left the area, in sight or not', () => {
+    const s = setup()
+    const n = neighbour(s)
+    s.x1.x = 7
+    s.x1.y = 7
+    raise(s)
+    s.tick()
+    expect(n.order).toMatchObject({ kind: 'attack', targetId: 'x1' })
+    // Out of the area, but within sight of them.
+    s.x1.x = n.x + 15
+    s.tick()
+    expect(n.script).toBeUndefined()
+    expect(n.interrupted).toBeUndefined()
+    expect(logged(n)).toContain('the attacker is gone')
+  })
+
+  it('the default ends once the attacker is out of sight, still in the area', () => {
+    const s = setup()
+    farSide(s)
+    const n = neighbour(s)
+    s.x1.x = 7
+    s.x1.y = 7
+    raise(s)
+    s.tick()
+    expect(n.script?.task).toBe('alarm')
+    s.x1.x = 66
+    s.x1.y = 6
+    s.tick()
+    expect(n.script).toBeUndefined()
+    expect(n.interrupted).toBeUndefined()
+  })
+
+  it('striking back at the attacker is no crime, whatever they have gone on to since', () => {
+    const s = setup()
+    const n = neighbour(s)
+    s.x1.x = n.x + 1
+    s.x1.y = n.y
+    raise(s)
+    // Their victim dead or left behind, they aren't attacking anyone now.
+    s.x1.order = null
+    expect(
+      s.until(() => n.order?.kind === 'attack' && n.order.started, 20),
+    ).toBe(true)
+    expect(s.world.crimes).toEqual([])
+    // In a fight of its own, which goes in the realm logs.
+    expect(s.world.events.some((e) => e.kind === 'fight')).toBe(true)
+  })
+
+  it('striking anyone but the attacker on that alarm stays a crime', () => {
+    const script: RunnableScript = {
+      ...reader(),
+      source: 'if (me.order == null) { attack("l2") }',
+    }
+    const s = setup(new Map([[750, script]]))
+    const n = neighbour(s)
+    n.alarmScriptId = 750
+    s.l2.x = n.x + 1
+    s.l2.y = n.y
+    raise(s)
+    expect(s.until(() => s.world.crimes.length > 0, 20)).toBe(true)
+    expect(s.world.crimes).toMatchObject([{ kind: 'attack', culprit: { residentId: 'w2' } }])
+  })
+
+  it('who raised it stays on the server', () => {
+    const s = setup()
+    neighbour(s)
+    raise(s)
+    expect(s.city.alarmedAttackers).toBeDefined()
+    const seen = entitiesInSight(s.world, terrain, 'r1').find((e) => e.id === 'c1')!
+    expect(seen).not.toHaveProperty('alarmedAttackers')
   })
 })
 
@@ -595,5 +893,16 @@ describe('invariants (ADR 0004)', () => {
     expect(alarmScriptSound.check(s.world, terrain)).toEqual([])
     s.r.alarmScriptId = 750
     expect(alarmScriptSound.check(s.world, terrain)).toEqual([])
+  })
+
+  it('flags an attacker kept with a blow still to come', () => {
+    const s = setup()
+    s.world.tick = 10
+    s.city.alarmedAttackers = { x1: 10 }
+    expect(alarmedAttackersSound.check(s.world, terrain)).toEqual([])
+    s.city.alarmedAttackers = { x1: 11 }
+    expect(alarmedAttackersSound.check(s.world, terrain)).toMatchObject([
+      { invariant: 'alarmed-attackers-sound', entityIds: ['c1', 'x1'] },
+    ])
   })
 })

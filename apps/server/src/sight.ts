@@ -538,6 +538,7 @@ function places(
     const shown = { ...c }
     delete shown.scouted
     delete shown.outsiders
+    delete shown.alarmedAttackers
     out.push({
       is: 'city',
       ...shown,
