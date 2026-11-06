@@ -70,7 +70,8 @@ export function scoutsWanted(world: WorldState, city: City): number {
 
 /**
  * Whether a city knows of a resource node (`CONTEXT.md`: Scout): within its set reach it simply
- * does; out to its limit, once a scout who saw the node's sector has come home.
+ * does; out to its limit, once a scout who saw the node's sector has come home, unless it has found
+ * no way to that sector.
  */
 export function knowsNode(
   city: City,
@@ -80,8 +81,27 @@ export function knowsNode(
 ): boolean {
   const d = wrapDistance(size, home, node)
   if (d <= NPC_NODE_REACH) return true
-  if (d > NPC_SCOUT_LIMIT) return false
-  return city.scouted?.sectors.includes(sectorOf(size, node.x, node.y)) ?? false
+  if (d > NPC_SCOUT_LIMIT || !city.scouted) return false
+  const sector = sectorOf(size, node.x, node.y)
+  return city.scouted.sectors.includes(sector) && !city.scouted.noWay?.includes(sector)
+}
+
+/**
+ * A city's builder found no way to a site past its set reach (`CONTEXT.md`: Scout): it gives the
+ * site's sector up as it does one a scout found no way to, so it picks another node or, knowing
+ * none, buys the good. Inside its set reach it goes on knowing its nodes, and nothing is given up.
+ * Whether it gave the sector up.
+ */
+export function giveUpSite(
+  world: WorldState,
+  city: City,
+  site: { x: number; y: number },
+  size: number,
+): boolean {
+  const home = npcHome(world, city)
+  if (!home || wrapDistance(size, home, site) <= NPC_NODE_REACH) return false
+  addAll(((city.scouted ??= { sectors: [] }).noWay ??= []), [sectorOf(size, site.x, site.y)])
+  return true
 }
 
 /**
@@ -257,19 +277,6 @@ function nearestTileIn(
     }
   }
   return best && { x: best.x, y: best.y }
-}
-
-/**
- * Whether a resident is out on a scout's trip beyond a city's set reach, too far to fetch a founding
- * party's load (`stepFounders`).
- */
-export function scoutFarOut(
-  plan: CityPlan,
-  r: Resident,
-  home: Pick<Building, 'x' | 'y'>,
-  size: number,
-): boolean {
-  return plan.scouts?.[r.id] !== undefined && wrapDistance(size, r, home) > NPC_NODE_REACH
 }
 
 /**
