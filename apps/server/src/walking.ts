@@ -275,15 +275,23 @@ export class Walking {
 
   /**
    * The way someone of `side` would walk between two tiles, through their own gates and not over
-   * walls, for what is built along it (`CONTEXT.md`: NPC road). Searched a little at a time with the
-   * walks (`PathFinder`): ask again until it is settled; a settled answer is handed out once. A
-   * search lost on a restart is simply asked for again.
+   * walls, for what is built along it (`CONTEXT.md`: NPC road); with `area`, only as far as the first
+   * of its tiles. Searched a little at a time with the walks (`PathFinder`): ask again until it is
+   * settled; a settled answer is handed out once. A search lost on a restart is simply asked for
+   * again.
    */
-  way(key: string, from: Point, to: Point, side: string | null): PathResult {
+  way(
+    key: string,
+    from: Point,
+    to: Point,
+    side: string | null,
+    area?: ReadonlySet<number>,
+  ): PathResult {
     const id = `way:${key}`
     const result = this.finder.result(id)
     if (result) return result
-    this.finder.request(id, from, to, WALKING_COSTS, { realmId: side, onWalls: false })
+    const options = { realmId: side, onWalls: false, ...(area && { area }) }
+    this.finder.request(id, from, to, WALKING_COSTS, options)
     return { status: 'searching' }
   }
 

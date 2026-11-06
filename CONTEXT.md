@@ -497,8 +497,10 @@ The shared language of the game. Domain terms only — no implementation details
   way a resident would walk, tile by tile, skipping tiles that have a road: first from its home to
   each of its workplaces outside its area, nearest first; then to the nearest Trade Org warehouse
   in its trader's reach; then to the edge of its nearest neighbour city's area. Like any road nobody
-  owns it, and anyone can use it or tear it down; a tile torn down is laid again in time. A way with
-  no way through is given up.
+  owns it, and anyone can use it or tear it down; a tile torn down is laid again in time. A way too
+  long (a balance number) or with no way through is given up. A road two cities would each build
+  between them is built by only one. The crew takes Food along, never starts a tile with too little
+  to walk home on, and fetches more by Getting food.
 - **Scout:** a spare hand an NPC city sends exploring: a few at a time by its size (a balance
   number) run the game's Explore default with no `find`, and come home when their Food says turn
   back. A city knows every resource node within its set reach (NPC city). What a scout saw is

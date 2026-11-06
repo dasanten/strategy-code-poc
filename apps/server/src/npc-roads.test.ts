@@ -1,14 +1,24 @@
 import {
   BUILD_MATERIALS,
+  GET_FOOD_AT,
+  MOUNTAIN_ROAD_WORK_FACTOR,
   NPC_BUILDERS,
   NPC_ROAD_CREW,
+  NPC_ROAD_LONGEST,
+  NPC_SMITHY_WEAPON,
+  NPC_SOLDIER_SHARE,
   NPC_SURPLUS_CAP,
   NPC_TOWN,
+  NPC_TRADER_REACH,
+  OWN_FOOD,
   TICKS_PER_GAME_DAY,
   Terrain,
+  WALK_TICKS_PER_TILE,
   inCityArea,
+  isDown,
   npcReserve,
   roadAt,
+  roadCrewFood,
   terrainAt,
   tileIndex,
   wallMap,
@@ -28,7 +38,7 @@ import { npcHome, stepNpcCities } from './npc-behaviour.js'
 import { foundNpcCity } from './npc-cities.js'
 import { plains } from './npc-growth.fixture.js'
 import { planCity } from './npc-plan.js'
-import { npcRoadCrewSized, roadCrew, type WayFinder } from './npc-roads.js'
+import { npcRoadCrewSized, npcRoadsOnce, roadCrew, type WayFinder } from './npc-roads.js'
 import { PathFinder, WALKING_COSTS } from './pathfinding.js'
 import { mulberry32 } from './residents.js'
 import { newId } from './starting-city.js'
@@ -85,13 +95,57 @@ function waysOf(world: WorldState, terrain: TerrainMap) {
   const finder = new PathFinder(terrain)
   const asked: string[] = []
   const ways: WayFinder = {
-    way(key, from, to, side) {
+    way(key, from, to, side, area) {
       asked.push(key)
       finder.setWalls(wallMap(world, terrain))
-      return finder.findPath(from, to, WALKING_COSTS, { realmId: side })
+      return finder.findPath(from, to, WALKING_COSTS, { realmId: side, ...(area && { area }) })
     },
   }
   return { ways, asked }
+}
+
+/** A second town at `dx` tiles east of the first, holding its reserve and `past` above it. */
+function neighbour(
+  world: WorldState,
+  terrain: TerrainMap,
+  dx: number,
+  past: Stock = { stone: 50 },
+) {
+  const city = foundNpcCity(world, terrain, NPC_TOWN, 60 + dx, 60, mulberry32(6))
+  setStock(world, city, npcHome(world, city)!, past)
+  return city
+}
+
+/** The finished Trade Org warehouse of a post. */
+const warehouseOf = (world: WorldState, post: City): Building =>
+  world.buildings.find((b) => b.kind === 'warehouse' && b.cityId === post.id)!
+
+/** Plans the city a few times, laying at once all it wants built, so it comes to its next road. */
+function joinAll(
+  world: WorldState,
+  terrain: TerrainMap,
+  city: City,
+  ways: WayFinder,
+  passes = 8,
+): CityPlan {
+  let plan = planCity(world, city, terrain, undefined, ways)
+  for (let i = 0; i < passes; i++) {
+    layNew(
+      world,
+      (plan.roads ?? []).flatMap((r) => r.tiles),
+    )
+    plan = planCity(world, city, terrain, undefined, ways)
+  }
+  return plan
+}
+
+/** A finished road on each of the tiles that has none yet, once each. */
+function layNew(world: WorldState, tiles: readonly (readonly [number, number])[]): void {
+  const once = new Map(tiles.map((t) => [`${t[0]},${t[1]}`, t]))
+  layAll(
+    world,
+    [...once.values()].filter(([x, y]) => !roadAt(world, x, y)),
+  )
 }
 
 /** Those a plan puts on the road crew. */
@@ -311,6 +365,252 @@ describe('a road crew', () => {
   })
 })
 
+describe('a road crew going on from its workplaces', () => {
+  it('goes to the nearest post in its reach once its workplaces are joined', () => {
+    const { world, terrain, city, place } = town({ stone: 50 }, 600)
+    const near = foundTradingPost(world, terrain, 180, 60, undefined, mulberry32(3))
+    foundTradingPost(world, terrain, 300, 60, undefined, mulberry32(4))
+    const warehouse = warehouseOf(world, near)
+    const { ways } = waysOf(world, terrain)
+
+    const first = planCity(world, city, terrain, undefined, ways)
+    expect(first.roads!.map((r) => r.to)).toContain(place.id)
+    expect(first.roads!.map((r) => r.to)).not.toContain(warehouse.id)
+
+    const plan = joinAll(world, terrain, city, ways)
+    const to = plan.roads!.map((r) => r.to)
+    expect(to).toContain(warehouse.id)
+    expect(to.indexOf(place.id)).toBeLessThan(to.indexOf(warehouse.id))
+    expect(to).toHaveLength(new Set(to).size)
+    const road = plan.roads!.find((r) => r.to === warehouse.id)!
+    expect(road.tiles.at(-1)).toEqual([warehouse.x, warehouse.y])
+    const other = world.buildings.filter((b) => b.kind === 'warehouse' && b.id !== warehouse.id)
+    expect(to).not.toContain(other[0]!.id)
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('leaves a post out of its reach alone, and takes no city of the Trade Org for a neighbour', () => {
+    const { world, terrain, city } = town({ stone: 50 }, 1700)
+    const far = foundTradingPost(
+      world,
+      terrain,
+      60 + NPC_TRADER_REACH + 50,
+      60,
+      undefined,
+      mulberry32(3),
+    )
+    const { ways, asked } = waysOf(world, terrain)
+    const plan = joinAll(world, terrain, city, ways)
+    expect(plan.roads!.map((r) => r.to)).not.toContain(warehouseOf(world, far).id)
+    expect(plan.roads!.map((r) => r.to)).not.toContain(far.id)
+    expect(asked.some((key) => key.endsWith(far.id))).toBe(false)
+  })
+
+  it('goes on to the edge of its nearest neighbour, past the post, and stops there', () => {
+    const { world, terrain, city } = town({ stone: 50 }, 800)
+    const next = neighbour(world, terrain, 150)
+    neighbour(world, terrain, 400)
+    const post = foundTradingPost(world, terrain, 60, 200, undefined, mulberry32(3))
+    const { ways } = waysOf(world, terrain)
+    const plan = joinAll(world, terrain, city, ways)
+    const to = plan.roads!.map((r) => r.to)
+    expect(to.indexOf(warehouseOf(world, post).id)).toBeLessThan(to.indexOf(next.id))
+    expect(to).toHaveLength(new Set(to).size)
+    const tiles = plan.roads!.find((r) => r.to === next.id)!.tiles
+    // Its first tile in the area is the way's last: no walls or gates of theirs are crossed.
+    const [x, y] = tiles.at(-1)!
+    expect(inCityArea(world, next, x, y, terrain.size)).toBe(true)
+    for (const [tx, ty] of tiles.slice(0, -1)) {
+      expect(inCityArea(world, next, tx, ty, terrain.size)).toBe(false)
+    }
+    expect(crewOf(world, plan)).toEqual([])
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('builds the road between two cities only once', () => {
+    const { world, terrain, city } = town({ stone: 50 }, 600)
+    const next = neighbour(world, terrain, 150)
+    const { ways } = waysOf(world, terrain)
+    const plan = joinAll(world, terrain, city, ways)
+    expect(plan.roads!.map((r) => r.to)).toContain(next.id)
+    const theirs = joinAll(world, terrain, next, ways)
+    expect((theirs.roads ?? []).map((r) => r.to)).not.toContain(city.id)
+    expect(crewOf(world, theirs)).toEqual([])
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('gives up on a neighbour with no way through, and does not ask again', () => {
+    const { world, terrain, city } = town({ stone: 50 }, 600)
+    const next = neighbour(world, terrain, 150)
+    // Water on both sides of the first town, all the way across the map.
+    for (let y = 0; y < terrain.size; y++) {
+      for (const x of [170, 171, 500, 501])
+        terrain.tiles[tileIndex(terrain.size, x, y)] = Terrain.Lake
+    }
+    const { ways, asked } = waysOf(world, terrain)
+    const plan = joinAll(world, terrain, city, ways)
+    expect(plan.roads!.find((r) => r.to === next.id)!.tiles).toEqual([])
+    expect(crewOf(world, plan)).toEqual([])
+    expect(asked.filter((key) => key.endsWith(`:${next.id}`))).toHaveLength(1)
+    // Nor do they try it from their side.
+    const theirs = joinAll(world, terrain, next, ways)
+    expect((theirs.roads ?? []).map((r) => r.to)).not.toContain(city.id)
+  })
+
+  it('gives up on a way too long, however it is too long, and does not ask again', () => {
+    const size = 2 * NPC_ROAD_LONGEST + 400
+    const { world, terrain, city } = town({ stone: 50 }, size)
+    const beyond = neighbour(world, terrain, NPC_ROAD_LONGEST + 100)
+    const asked: string[] = []
+    const none: WayFinder = {
+      way(key) {
+        asked.push(key)
+        return { status: 'found', path: [], cost: 0 }
+      },
+    }
+    const straight = joinAll(world, terrain, city, none)
+    expect(straight.roads!.find((r) => r.to === beyond.id)!.tiles).toEqual([])
+    expect(asked.filter((key) => key.endsWith(`:${beyond.id}`))).toEqual([])
+
+    // Near enough as the crow flies, but the way round is too long.
+    const { world: w2, terrain: t2, city: c2 } = town({ stone: 50 }, 600)
+    const next = neighbour(w2, t2, 150)
+    const long = Array.from({ length: NPC_ROAD_LONGEST + 1 }, (): [number, number] => [1, 1])
+    const round: WayFinder = {
+      way: (key) =>
+        key.endsWith(`:${next.id}`)
+          ? { status: 'found', path: long, cost: long.length }
+          : { status: 'found', path: [], cost: 0 },
+    }
+    const plan = joinAll(w2, t2, c2, round)
+    expect(plan.roads!.find((r) => r.to === next.id)!.tiles).toEqual([])
+    expect(checkInvariants(w2, t2)).toEqual([])
+  })
+
+  it('finishes a road on to a neighbour no longer its nearest, while it stands', () => {
+    const { world, terrain, city } = town({ stone: 50 }, 800)
+    const next = neighbour(world, terrain, 300)
+    const { ways } = waysOf(world, terrain)
+    const before = joinAll(world, terrain, city, ways, 2)
+    const old = before.roads!.find((r) => r.to === next.id)!
+    expect(old.tiles.length).toBeGreaterThan(0)
+
+    const daughter = neighbour(world, terrain, 150)
+    const plan = joinAll(world, terrain, city, ways)
+    const to = plan.roads!.map((r) => r.to)
+    expect(to.indexOf(next.id)).toBeLessThan(to.indexOf(daughter.id))
+
+    world.cities = world.cities.filter((c) => c.id !== next.id)
+    const after = planCity(world, city, terrain, undefined, ways)
+    expect(after.roads!.map((r) => r.to)).not.toContain(next.id)
+  })
+
+  it('searches its way only as far as the first tile of the area', () => {
+    const terrain = plains(100)
+    const finder = new PathFinder(terrain)
+    const area = new Set([tileIndex(100, 50, 50), tileIndex(100, 51, 50)])
+    const found = finder.findPath([40, 50], [70, 50], WALKING_COSTS, { area })
+    expect(found).toMatchObject({ status: 'found' })
+    expect(found.status === 'found' && found.path.at(-1)).toEqual([50, 50])
+  })
+})
+
+describe('on a road', () => {
+  /** A road city with one tile left of its way, and a crew member standing on it with Stone. */
+  function oneTileLeft(under: number) {
+    const { world, terrain, city, home } = town({ stone: 50 })
+    const { ways } = waysOf(world, terrain)
+    // The way's tile a little out of the town, on the wanted ground.
+    let plan = planCity(world, city, terrain, undefined, ways)
+    const tiles = plan.roads!.flatMap((r) => r.tiles)
+    const outside = tiles.filter(([x, y]) => !inCityArea(world, city, x, y, terrain.size))
+    const [x, y] = outside[Math.floor(outside.length / 2)]!
+    terrain.tiles[tileIndex(terrain.size, x, y)] = under
+    layNew(
+      world,
+      tiles.filter(([tx, ty]) => tx !== x || ty !== y),
+    )
+    plan = planCity(world, city, terrain, undefined, ways)
+    const crew = crewOf(world, plan)
+    const [member] = crew
+    // Enough soldiers armed already, none of them its farmers, so nobody is sent off for a weapon.
+    const people = world.residents.filter((r) => r.cityId === city.id)
+    const others = people.filter((r) => !crew.includes(r) && plan.jobs[r.id]?.kind !== 'farm')
+    for (const r of others.slice(0, Math.ceil(people.length * NPC_SOLDIER_SHARE))) {
+      r.carried[NPC_SMITHY_WEAPON] = 1
+    }
+    member!.x = x
+    member!.y = y
+    member!.carried = { food: 3, stone: STONE }
+    member!.order = null
+    member!.script = { scriptId: 0, task: 'build', memory: { building: 'road', at: { x, y } } }
+    expect(wrapDistance(terrain.size, home, member!)).toBeGreaterThan(0)
+    return { world, terrain, member: member!, x, y }
+  }
+
+  /** The ticks until the tile is built. */
+  function ticksToBuild(under: number): number {
+    const { world, terrain, x, y } = oneTileLeft(under)
+    const walking = new Walking(terrain)
+    let t = 0
+    while (!finished(world, [x, y]) && t < TICKS_PER_GAME_DAY) {
+      stepWorld(world, terrain, walking)
+      t++
+    }
+    return t
+  }
+
+  it('builds Mountain at MOUNTAIN_ROAD_WORK_FACTOR times the work', () => {
+    const onPlains = ticksToBuild(Terrain.Plains)
+    const onMountain = ticksToBuild(Terrain.Mountain)
+    expect(onMountain / onPlains).toBeGreaterThan(MOUNTAIN_ROAD_WORK_FACTOR * 0.8)
+    expect(onMountain / onPlains).toBeLessThan(MOUNTAIN_ROAD_WORK_FACTOR * 1.2)
+  })
+
+  it('walks back for Food when it runs low, and goes on with the tile', () => {
+    const { world, terrain, member, x, y } = oneTileLeft(Terrain.Plains)
+    member.carried.food = GET_FOOD_AT - 1
+    const walking = new Walking(terrain)
+    let fetched = false
+    for (let t = 0; t < TICKS_PER_GAME_DAY && !finished(world, [x, y]); t++) {
+      stepWorld(world, terrain, walking)
+      const o = member.order
+      if (o?.kind === 'fetch' && (o.goods.food ?? 0) >= 1) fetched = true
+    }
+    expect(fetched).toBe(true)
+    expect(member.carried.food ?? 0).toBeGreaterThan(GET_FOOD_AT)
+    expect(finished(world, [x, y])).toBeTruthy()
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('comes for the Food to get home before it starts a far tile, Stone or no Stone', () => {
+    const far = 700
+    const { world, terrain, city, home } = town({ stone: 50 }, 1600)
+    const place = camp(world, terrain, city, far)
+    const asked: WayFinder = {
+      way: (_key, _from, to) =>
+        to[0] === place.x
+          ? { status: 'found', path: [[place.x, place.y]], cost: 1 }
+          : { status: 'found', path: [], cost: 0 },
+    }
+    const plan = planCity(world, city, terrain, undefined, asked)
+    const [member] = crewOf(world, plan)
+    member!.x = home.x
+    member!.y = home.y
+    member!.carried = { food: OWN_FOOD, stone: 10 * STONE }
+    member!.order = null
+    delete member!.script
+    world.tick = plan.plannedAt + 1
+    stepNpcCities(world, terrain.size, terrain, asked)
+    expect(member!.script).toBeUndefined()
+    const need = roadCrewFood(far * WALK_TICKS_PER_TILE)
+    expect(need).toBeGreaterThan(OWN_FOOD)
+    expect(member!.order).toMatchObject({ kind: 'pickUp' })
+    const goods = member!.order?.kind === 'pickUp' ? member!.order.goods : {}
+    expect(OWN_FOOD + (goods.food ?? 0)).toBeGreaterThanOrEqual(need)
+  })
+})
+
 describe('on the map', () => {
   /** Runs the world until `done` or `days` have passed, checking the invariants every game day. */
   function run(world: WorldState, terrain: TerrainMap, days: number, done = () => false) {
@@ -355,6 +655,80 @@ describe('on the map', () => {
   )
 
   it(
+    'joins two cities with one road, and reaches a post on the way',
+    { tags: ['slow'], timeout: 600_000 },
+    () => {
+      const { world, terrain, city } = town({ stone: 400 }, 500)
+      const next = neighbour(world, terrain, 130, { stone: 400 })
+      const post = foundTradingPost(world, terrain, 60, 150, undefined, mulberry32(3))
+      const warehouse = warehouseOf(world, post)
+      const roadTo = (c: City, to: string) =>
+        world.cityPlans[c.id]?.roads?.find((r) => r.to === to)?.tiles
+      const between = () => roadTo(city, next.id) ?? roadTo(next, city.id)
+      const built = (tiles: readonly (readonly [number, number])[] | undefined) =>
+        tiles !== undefined && tiles.length > 0 && tiles.every((t) => finished(world, t))
+      const done = () =>
+        built(between()) && (built(roadTo(city, warehouse.id)) || built(roadTo(next, warehouse.id)))
+      run(world, terrain, 40, done)
+      expect(done()).toBe(true)
+      // One road between them, not one from each side.
+      expect(roadTo(city, next.id) !== undefined && roadTo(next, city.id) !== undefined).toBe(false)
+      const way = between()!
+      const far = roadTo(city, next.id) ? next : city
+      const [x, y] = way.at(-1)!
+      expect(inCityArea(world, far, x, y, terrain.size)).toBe(true)
+      for (let i = 1; i < way.length; i++) {
+        const [x0, y0] = way[i - 1]!
+        const [x1, y1] = way[i]!
+        expect(wrapDistance(terrain.size, { x: x0, y: y0 }, { x: x1, y: y1 })).toBeLessThan(2)
+      }
+    },
+  )
+
+  it('does not starve its crew on a long road', { tags: ['slow'], timeout: 600_000 }, () => {
+    const far = 700
+    const size = 1600
+    const terrain = plains(size)
+    const world = createWorld(terrain)
+    const city = foundNpcCity(world, terrain, NPC_TOWN, 60, 60, mulberry32(5))
+    const place = camp(world, terrain, city, far)
+    setStock(world, city, npcHome(world, city)!, { stone: 200 })
+    const { ways } = waysOf(world, terrain)
+    // All of it laid but the far end, so the crew walks a long way for each load.
+    let plan = joinAll(world, terrain, city, ways, 0)
+    for (let i = 0; i < 8 && !plan.roads?.some((r) => r.to === place.id); i++) {
+      layNew(
+        world,
+        (plan.roads ?? []).flatMap((r) => r.tiles),
+      )
+      plan = planCity(world, city, terrain, undefined, ways)
+    }
+    const tiles = plan.roads!.find((r) => r.to === place.id)!.tiles
+    expect(tiles.length).toBeGreaterThan(far - 1)
+    const left = tiles.slice(-25)
+    layNew(world, tiles.slice(0, -25))
+    const walking = new Walking(terrain)
+    const people = () => world.residents.filter((r) => r.cityId === city.id)
+    const count = people().length
+    let lowest = Infinity
+    let onCrew = 0
+    for (let t = 0; t < 40 * TICKS_PER_GAME_DAY; t++) {
+      stepWorld(world, terrain, walking)
+      const now = world.cityPlans[city.id]
+      const crew = now ? crewOf(world, now) : []
+      onCrew = Math.max(onCrew, crew.length)
+      for (const r of crew) lowest = Math.min(lowest, r.hunger)
+      if (left.every((tile) => finished(world, tile))) break
+    }
+    expect(onCrew).toBeGreaterThan(0)
+    expect(left.every((tile) => finished(world, tile))).toBe(true)
+    expect(lowest).toBeGreaterThan(0)
+    expect(people().filter((r) => isDown(r))).toEqual([])
+    expect(people().length).toBeGreaterThanOrEqual(count)
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it(
     'never takes its stone below the reserve, and goes back to other work',
     { tags: ['slow'], timeout: 600_000 },
     () => {
@@ -377,6 +751,32 @@ describe('on the map', () => {
       expect(crewOf(world, world.cityPlans[city.id]!)).toEqual([])
     },
   )
+})
+
+describe('the npc-roads-once invariant', () => {
+  it('finds two cities each keeping a road to the other', () => {
+    const { world, terrain, city } = town({ stone: 50 }, 600)
+    const next = neighbour(world, terrain, 150)
+    world.cityPlans[city.id] = {
+      plannedAt: 0,
+      jobs: {},
+      roads: [{ to: next.id, tiles: [[1, 1]] }],
+    }
+    expect(npcRoadsOnce.check(world, terrain)).toEqual([])
+    world.cityPlans[next.id] = {
+      plannedAt: 0,
+      jobs: {},
+      roads: [{ to: city.id, tiles: [[1, 1]] }],
+    }
+    expect(npcRoadsOnce.check(world, terrain)).toHaveLength(1)
+  })
+
+  it('finds a way too long', () => {
+    const { world, terrain, city, place } = town()
+    const tiles = Array.from({ length: NPC_ROAD_LONGEST + 1 }, (): [number, number] => [1, 1])
+    world.cityPlans[city.id] = { plannedAt: 0, jobs: {}, roads: [{ to: place.id, tiles }] }
+    expect(npcRoadsOnce.check(world, terrain)).toHaveLength(1)
+  })
 })
 
 describe('the npc-road-crew-sized invariant', () => {

@@ -124,6 +124,7 @@ import {
   FOOD_PER_DAY,
   NPC_BUILDERS,
   NPC_ROAD_CREW,
+  NPC_ROAD_LONGEST,
   NPC_CITY_MIN_DISTANCE,
   NPC_FOUND_FOOD_DAYS,
   NPC_FOUND_GIVE_UP_DAYS,
@@ -2062,7 +2063,17 @@ export function Wiki() {
           above its reserve and what its project still needs; with none to spare, or with something
           short that they can work for, they go back to other work and bring back what they carry.
           Like any road it belongs to nobody, and anyone can use it or tear it down; a tile torn down
-          is laid again in time. A workplace with no way through gets no road.
+          is laid again in time.
+        </p>
+        <p>
+          With its workplaces joined the crew goes on: to the nearest Trade Organization warehouse
+          within {num(NPC_TRADER_REACH)} tiles, its trader's reach, and then to the edge of the area
+          of its nearest neighbour, any city but the Trade Organization's. A road two neighbours
+          would each build is built by only one of them. A road on Mountain takes{' '}
+          {num(MOUNTAIN_ROAD_WORK_FACTOR)} times the work here as anywhere. The crew takes Food along
+          for the walk, goes back for more before a tile it couldn't walk home from on what it has,
+          and fetches more when it runs low, as any builder does. A way longer than{' '}
+          {num(NPC_ROAD_LONGEST)} tiles, or with no way through, is given up.
         </p>
         <h3>Trading posts and the HQ</h3>
         <p>

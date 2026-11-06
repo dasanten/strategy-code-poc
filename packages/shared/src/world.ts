@@ -901,7 +901,7 @@ export interface CityJob {
 
 /** A road a game-run city builds (`CONTEXT.md`: NPC road): its way, worked out once. */
 export interface CityRoad {
-  /** The building it leads to. */
+  /** The building it leads to; for one to a neighbour (the edge of its area), that city. */
   to: string
   /** The tiles of the way from its home, as a resident would walk it; none when it is given up. */
   tiles: [x: number, y: number][]
