@@ -1,17 +1,32 @@
 import {
+  FOOD_PER_DAY,
+  FOOD_SURPLUS_DAYS,
   NPC_CITY_MIN_DISTANCE,
   NPC_FOUND_GIVE_UP_DAYS,
+  NPC_FOUND_PARTY_MOST,
   NPC_FOUND_REACH,
   NPC_FOUND_STANDING,
+  NPC_FOUND_VILLAGE_RESIDENTS,
+  NPC_FULL_DAYS,
+  NPC_FULL_DAYS_LEAST,
+  NPC_FULL_DIP_DAYS,
   NPC_TOWN,
+  NPC_TRADE,
   NPC_VILLAGE,
   TICKS_PER_GAME_DAY,
   Terrain,
+  WALK_TICKS_PER_TILE,
   computeTerritory,
+  npcFoundingPartySize,
+  npcFullDays,
+  npcReserve,
+  npcSoldierTarget,
+  ticksForAge,
   tileIndex,
   townHallOf,
   wrapDistance,
   type City,
+  type CityPlan,
   type ResourceKind,
   type TerrainMap,
   type WorldState,
@@ -22,7 +37,14 @@ import { checkInvariants } from './invariants.js'
 import { npcHome } from './npc-behaviour.js'
 import { foundNpcCity } from './npc-cities.js'
 import { farStableSpot } from './npc-growth.js'
-import { findFoundingSite, foundingParty } from './npc-founding.js'
+import {
+  findFoundingSite,
+  foundingFood,
+  foundingMaterials,
+  foundingPartiesSound,
+  foundingParty,
+  fullWaitSound,
+} from './npc-founding.js'
 import { plains } from './npc-growth.fixture.js'
 import { planCity } from './npc-plan.js'
 import { mulberry32, newResident } from './residents.js'
@@ -80,6 +102,111 @@ describe('a full city', () => {
     const { world, terrain, city } = fullTown(300)
     const plan = planCity(world, city, terrain)
     expect(plan.fullSince).toBe(world.tick)
+  })
+
+  describe('by its size', () => {
+    /** A full town staged at `residents`, with a site ready and full since `days` ago. */
+    function fullFor(residents: number, days: number) {
+      const staged = fullTown(1300)
+      const { world, terrain, city } = staged
+      const rand = mulberry32(13)
+      const home = npcHome(world, city)!
+      while (world.residents.filter((r) => r.cityId === city.id).length < residents) {
+        const id = newId(world, 'r')
+        const r = newResident(rand, {
+          id,
+          owner: null,
+          cityId: city.id,
+          x: home.x,
+          y: home.y,
+          tick: world.tick,
+        })
+        world.residents.push(r)
+      }
+      // Time for those just added to be grown, whatever the map's clock says.
+      world.tick = 4000 * TICKS_PER_GAME_DAY
+      for (const r of world.residents) r.bornAt = world.tick - ticksForAge(30)
+      // Its soldiers armed, and well past what so many want, so nothing is short.
+      const people = world.residents.filter((r) => r.cityId === city.id)
+      for (const r of people.slice(0, npcSoldierTarget(people.length))) r.carried.spear = 1
+      const reserve = npcReserve(world, city)
+      home.stock = { ...home.stock, coins: (reserve.coins ?? 0) + 1000 }
+      planCity(world, city, terrain)
+      const plan = world.cityPlans[city.id]!
+      plan.fullSince = world.tick - days * TICKS_PER_GAME_DAY
+      plan.foundingSite = findFoundingSite(world, terrain, city, home)
+      expect(plan.fullSince).toBeDefined()
+      expect(plan.foundingSite).toBeDefined()
+      return { ...staged, plan, home }
+    }
+
+    it('waits less and sends more the bigger it is, down to a floor and up to a most', () => {
+      expect(npcFullDays(NPC_TOWN.residents)).toBe(NPC_FULL_DAYS)
+      expect(npcFullDays(NPC_FOUND_VILLAGE_RESIDENTS)).toBe(NPC_FULL_DAYS)
+      expect(npcFullDays(110)).toBeLessThan(NPC_FULL_DAYS)
+      expect(npcFullDays(100_000)).toBe(NPC_FULL_DAYS_LEAST)
+      expect(npcFoundingPartySize(NPC_TOWN.residents)).toBe(NPC_VILLAGE.residents)
+      expect(npcFoundingPartySize(NPC_FOUND_VILLAGE_RESIDENTS)).toBe(NPC_VILLAGE.residents)
+      expect(npcFoundingPartySize(110)).toBeGreaterThan(NPC_VILLAGE.residents)
+      expect(npcFoundingPartySize(100_000)).toBe(NPC_FOUND_PARTY_MOST)
+    })
+
+    it('a big city founds sooner than a week and sends more, with more materials', () => {
+      const days = npcFullDays(110)
+      const { world, terrain, city, plan } = fullFor(110, days - 0.5)
+      planCity(world, city, terrain)
+      expect(foundingParty(plan)).toEqual([])
+
+      plan.fullSince = world.tick - days * TICKS_PER_GAME_DAY
+      planCity(world, city, terrain)
+      expect(days).toBeLessThan(NPC_FULL_DAYS)
+      expect(foundingParty(plan)).toHaveLength(npcFoundingPartySize(110))
+      expect(foundingParty(plan).length).toBeGreaterThan(NPC_VILLAGE.residents)
+      const armed = foundingParty(plan).filter((id) =>
+        world.residents.some((r) => r.id === id && (r.carried.spear || r.carried.sword)),
+      )
+      expect(armed).toHaveLength(1)
+      const more = foundingMaterials(npcFoundingPartySize(110))
+      expect(more.wood).toBeGreaterThan(foundingMaterials().wood!)
+    })
+
+    it('a city of a village’s size still waits a week and sends a village’s worth', () => {
+      const { world, terrain, city, plan } = fullFor(NPC_TOWN.residents, NPC_FULL_DAYS - 0.5)
+      planCity(world, city, terrain)
+      expect(foundingParty(plan)).toEqual([])
+
+      plan.fullSince = world.tick - NPC_FULL_DAYS * TICKS_PER_GAME_DAY
+      planCity(world, city, terrain)
+      expect(foundingParty(plan)).toHaveLength(NPC_VILLAGE.residents)
+      expect(foundingMaterials(NPC_VILLAGE.residents)).toEqual({ wood: 90, stone: 50 })
+    })
+
+    it('a big city that isn’t full of what its bigger party takes stays home', () => {
+      const days = npcFullDays(110)
+      const { world, terrain, city, plan, home } = fullFor(110, days)
+      const reserve = npcReserve(world, city)
+      // A village's materials above its reserve, but not the houses of its bigger party.
+      const village = foundingMaterials()
+      home.stock = {
+        ...home.stock,
+        wood: (reserve.wood ?? 0) + village.wood!,
+        stone: (reserve.stone ?? 0) + village.stone!,
+      }
+      planCity(world, city, terrain)
+      expect(foundingParty(plan)).toEqual([])
+    })
+
+    it('the mother keeps enough to feed itself, at any size past a village’s', () => {
+      // It founds only with nothing short, so at worst it holds just its reserve of Food. The party
+      // takes the most it can, for the furthest walk, and those who stay still have a surplus.
+      const furthest = foundingFood(NPC_FOUND_REACH * WALK_TICKS_PER_TILE)
+      for (let n = NPC_FOUND_VILLAGE_RESIDENTS; n <= 1000; n++) {
+        const members = npcFoundingPartySize(n)
+        const left =
+          n * FOOD_PER_DAY * NPC_TRADE.reserveFoodDays - members * (furthest.walk + furthest.stay)
+        expect(left).toBeGreaterThan((n - members) * FOOD_PER_DAY * FOOD_SURPLUS_DAYS)
+      }
+    })
   })
 
   it('looks for its daughter on no realm territory, near a node of what it lacks', () => {
@@ -181,6 +308,126 @@ describe('a full city', () => {
       expect(storage.stock?.food ?? 0).toBeGreaterThan(0)
     },
   )
+})
+
+describe('a dip below the reserve', () => {
+  /** A town full for `days` game days, with its site found, its Food under the reserve now. */
+  function dipping(days: number) {
+    const { world, terrain, city } = fullTown(1300)
+    const home = npcHome(world, city)!
+    const full = home.stock!.food!
+    const plan = planCity(world, city, terrain)
+    world.tick = 100 * TICKS_PER_GAME_DAY
+    plan.fullSince = world.tick - days * TICKS_PER_GAME_DAY
+    plan.foundingSite = findFoundingSite(world, terrain, city, home)
+    home.stock!.food = 1
+    return { world, terrain, city, plan, home, full }
+  }
+
+  it('keeps the wait while it lasts up to a game day, and sends nobody meanwhile', () => {
+    const { world, terrain, city, plan } = dipping(NPC_FULL_DAYS + 1)
+    const since = plan.fullSince
+    planCity(world, city, terrain)
+    expect(plan.shortSince).toBe(world.tick)
+    expect(plan.fullSince).toBe(since)
+    expect(plan.foundingSite).toBeDefined()
+    expect(foundingParty(plan)).toEqual([])
+
+    world.tick += NPC_FULL_DIP_DAYS * TICKS_PER_GAME_DAY
+    planCity(world, city, terrain)
+    expect(plan.fullSince).toBe(since)
+    expect(foundingParty(plan)).toEqual([])
+  })
+
+  it('restarts the wait once it lasts longer than a game day', () => {
+    const { world, terrain, city, plan } = dipping(NPC_FULL_DAYS + 1)
+    planCity(world, city, terrain)
+    world.tick += NPC_FULL_DIP_DAYS * TICKS_PER_GAME_DAY + 1
+    planCity(world, city, terrain)
+    expect(plan.fullSince).toBeUndefined()
+    expect(plan.shortSince).toBeUndefined()
+    expect(plan.foundingSite).toBeUndefined()
+  })
+
+  it('is over when nothing is short, so the next dip gets its own game day', () => {
+    const { world, terrain, city, plan, home, full } = dipping(1)
+    const since = plan.fullSince
+    planCity(world, city, terrain)
+    world.tick += NPC_FULL_DIP_DAYS * TICKS_PER_GAME_DAY
+    home.stock!.food = full
+    planCity(world, city, terrain)
+    expect(plan.shortSince).toBeUndefined()
+    expect(plan.fullSince).toBe(since)
+
+    world.tick += 60
+    home.stock!.food = 1
+    planCity(world, city, terrain)
+    expect(plan.shortSince).toBe(world.tick)
+    expect(plan.fullSince).toBe(since)
+  })
+
+  it('starts nothing in a city with no wait under way', () => {
+    const { world, terrain, city, plan } = dipping(1)
+    delete plan.fullSince
+    planCity(world, city, terrain)
+    expect(plan.shortSince).toBeUndefined()
+  })
+
+  it('still sets a party out once nothing is short, its wait kept', () => {
+    const { world, terrain, city, plan, home, full } = dipping(NPC_FULL_DAYS + 1)
+    planCity(world, city, terrain)
+    home.stock!.food = full
+    world.tick += 60
+    planCity(world, city, terrain)
+    expect(foundingParty(plan)).toHaveLength(NPC_VILLAGE.residents)
+    expect(plan.shortSince).toBeUndefined()
+  })
+})
+
+describe('the full-wait-sound invariant', () => {
+  const planWith = (over: Partial<CityPlan>) => {
+    const { world, terrain, city } = fullTown(300)
+    world.tick = 100
+    world.cityPlans[city.id] = { plannedAt: 0, jobs: {}, ...over }
+    return { world, terrain }
+  }
+
+  it('holds for a dip in a wait under way', () => {
+    const { world, terrain } = planWith({ fullSince: 10, shortSince: 50 })
+    expect(fullWaitSound.check(world, terrain)).toEqual([])
+  })
+
+  it('finds a dip with no wait under way, or with a party out, or to come', () => {
+    for (const over of [
+      { shortSince: 50 },
+      { fullSince: 10, shortSince: 50, jobs: { gone: { kind: 'found' as const } } },
+      { fullSince: 10, shortSince: 101 },
+    ]) {
+      const { world, terrain } = planWith(over)
+      expect(fullWaitSound.check(world, terrain)).toHaveLength(1)
+    }
+  })
+})
+
+describe('the founding-parties-sound invariant', () => {
+  /** A town with a plan of `members` in its founding party. */
+  function withParty(members: number) {
+    const { world, terrain, city } = fullTown(300)
+    const jobs: Record<string, { kind: 'found' }> = {}
+    for (const i of Array(members).keys()) jobs[`gone${i}`] = { kind: 'found' }
+    world.cityPlans[city.id] = { plannedAt: 0, jobs, foundingSite: { x: 250, y: 250 } }
+    return { world, terrain }
+  }
+
+  it('holds for the largest party', () => {
+    const { world, terrain } = withParty(NPC_FOUND_PARTY_MOST)
+    expect(foundingPartiesSound.check(world, terrain)).toEqual([])
+  })
+
+  it('finds a party past the largest', () => {
+    const { world, terrain } = withParty(NPC_FOUND_PARTY_MOST + 1)
+    expect(foundingPartiesSound.check(world, terrain)).toHaveLength(1)
+  })
 })
 
 describe('a daughter', () => {

@@ -1,5 +1,6 @@
 import {
   MAX_WORKERS,
+  NPC_FOUND_PARTY_MOST,
   NPC_FULL_DAYS,
   NPC_SURPLUS_CAP,
   NPC_TOWN,
@@ -169,7 +170,8 @@ describe('spare hands with nothing short', () => {
   })
 
   it('have a cap high enough for a Full city to found on what they make', () => {
-    for (const [good, n] of Object.entries(foundingMaterials()) as [Good, number][]) {
+    const largest = foundingMaterials(NPC_FOUND_PARTY_MOST)
+    for (const [good, n] of Object.entries(largest) as [Good, number][]) {
       expect(NPC_SURPLUS_CAP[good]).toBeGreaterThan(n)
     }
   })

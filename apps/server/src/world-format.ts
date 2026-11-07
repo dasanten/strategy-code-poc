@@ -24,7 +24,7 @@ import { placeTraders, putHqOnLoops } from './traders.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 105
+export const WORLD_FORMAT_VERSION = 106
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -468,6 +468,9 @@ export const migrations: Record<number, MigrationStep> = {
     }
     return world
   },
+  // A full NPC city's plan may keep when a dip below its reserve began (`CityPlan.shortSince`). No plan
+  // has one yet, and the next pass starts it if it needs one. So the step leaves every world as it is.
+  105: (state) => state,
 }
 
 export class WorldFormatError extends Error {}
