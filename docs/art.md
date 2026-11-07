@@ -118,6 +118,9 @@ drawn across its footprint (see the table below); the construction sites go with
 | gate        | 1×1       | Wooden gate in the palisade; one east–west, one north–south     |
 | road        | 1×1       | Packed light dirt road #e8cf97 (pieces below)                   |
 
+- **Training ground:** the one workplace not in the sheet. It is drawn by hand as
+  `apps/web/src/assets/painted/training-ground.svg` in the same style, and the registry points to
+  it with `PAINTED_BUILDING_IMAGE`. Its site still uses the 3×3 site cell.
 - **Wall and road pieces:** both join their neighbours, so each needs end, straight, corner,
   T-junction, cross and single post (6 each), asked for as one sprite sheet so they line up. A
   stone wall set for the Trade Org HQ is optional.

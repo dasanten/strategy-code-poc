@@ -106,9 +106,9 @@ export interface Resident {
   script?: RunningScript
   /**
    * What the resident was doing when a blow started their defence script (`CONTEXT.md`: Defence
-   * script), kept aside while it runs as `script`: their order and the script they ran, with its
-   * memory; a queue stays in `queue` and waits. When the defence script ends they go on; a
-   * Player order given meanwhile ends both. Absent while no defence script runs.
+   * script) or an alarm their Alarm script, kept aside while it runs as `script`: their order and
+   * the script they ran, with its memory; a queue stays in `queue` and waits. When that script ends
+   * they go on; a Player order given meanwhile ends both. Absent while neither runs.
    */
   interrupted?: Interrupted
   /**
@@ -123,6 +123,12 @@ export interface Resident {
    * Only the owning Player sees it.
    */
   defenceScriptId?: number
+  /**
+   * What the resident runs when an alarm reaches them (`CONTEXT.md`: Alarm script), picked on their
+   * card: the id of one of the Player's scripts, or `none` for nothing; absent for the game's Alarm
+   * default, which only an armed resident runs. Only the owning Player sees it.
+   */
+  alarmScriptId?: number | 'none'
   /**
    * The values the Player picked for this resident's script parameters (`CONTEXT.md`: Script
    * parameter): by script id, then by param name, the id of the building or carriage picked.
@@ -320,6 +326,46 @@ export interface RunningScript {
    * Absent while it runs every tick.
    */
   waitingSince?: number
+  /**
+   * The alarm it runs for (`CONTEXT.md`: Alarm), which scripts read as `me.alarm`. Only an Alarm
+   * script has one, and it goes wherever the script goes, kept aside and back with it.
+   */
+  alarm?: Alarm
+  /**
+   * The outsider alarm `alarm` took over from (`CONTEXT.md`: Alarm script). When the script calls
+   * `end()` it goes on for this one instead of ending, so those holding the hall go back to it.
+   */
+  alarmUnder?: Alarm
+}
+
+/**
+ * Something that happened in a City area, as an Alarm script reads it (`CONTEXT.md`: Alarm): its
+ * kind, who it is about, where and when.
+ */
+export interface Alarm {
+  /**
+   * `occupied`: an occupation of the city's town hall started. `outsider`: someone of another realm,
+   * not allied, came into its area. `theft`: someone stole from the realm. `attacked`: someone
+   * struck a wall or gate of the city, or a resident of its realm in its area.
+   */
+  kind: 'occupied' | 'outsider' | 'theft' | 'attacked'
+  /** The city whose area it happened in. */
+  cityId: string
+  /**
+   * The resident it is about: for `occupied`, an occupier on the hall; for `outsider`, who came; for
+   * `theft`, the thief; for `attacked`, the attacker.
+   */
+  about: string
+  /** The realm of who it is about. */
+  realmId: string | null
+  /**
+   * Where it happened: for `occupied`, the town hall; for `outsider`, where they stood; for `theft`,
+   * where the thief took it; for `attacked`, what was struck.
+   */
+  x: number
+  y: number
+  /** The tick it happened. */
+  tick: number
 }
 
 /** A script's last runtime error, as its Script tab shows it (`CONTEXT.md`: Debugging a script). */
@@ -509,10 +555,15 @@ export interface FetchOrder {
  * store or fetch order, or until the Player orders them otherwise.
  */
 /** Who last struck a resident (`Resident.struck`): the attacker's id, and the tick. */
-/** What a defence script interrupted (`Resident.interrupted`). */
+/** What a defence or Alarm script interrupted (`Resident.interrupted`). */
 export interface Interrupted {
   order: ResidentOrder | null
   script?: RunningScript
+  /**
+   * The Alarm script a blow interrupted in turn, with its order (`CONTEXT.md`: Alarm script): once
+   * the defence script ends it goes on, and then what is above once it ends.
+   */
+  alarm?: { order: ResidentOrder | null; script: RunningScript }
 }
 
 /**
@@ -649,8 +700,10 @@ export interface HaulOrder {
  * along `path` (null while it is being found), as for a walk order; `progress` is how far into the
  * next step they are. `strike` is how far, from 0 up to 1, they are into their next blow.
  * `started` is set once the fight went in the realm logs. `defending` is set when the resident
- * fights back at someone who hit them, or as a caravan's escort defends it (`CONTEXT.md`:
- * Caravan), which is no crime (`CONTEXT.md`: Crime).
+ * fights back at someone who hit them, as a caravan's escort defends it (`CONTEXT.md`: Caravan),
+ * goes after the attacker their Alarm script runs for (`CONTEXT.md`: Alarm), or as a city's soldier
+ * goes after whoever occupies its town hall (`CONTEXT.md`: Occupying a town hall), which is no
+ * crime (`CONTEXT.md`: Crime).
  */
 export interface AttackOrder {
   kind: 'attack'
@@ -2520,6 +2573,12 @@ export type RealmEventWhat =
    */
   | { kind: 'defenceScriptGone'; residentId: string; name: string; scriptId: number }
   /**
+   * A resident's Alarm script (`Resident.alarmScriptId`) couldn't run when an alarm reached them,
+   * deleted or no longer theirs (`CONTEXT.md`: Alarm script): the pick goes back to the Alarm
+   * default, which they run instead if they are armed.
+   */
+  | { kind: 'alarmScriptGone'; residentId: string; name: string; scriptId: number }
+  /**
    * A resident's script ended itself with `end(reason)` (`CONTEXT.md`: Script): `script` is its
    * name, `reason` the short text it gave. Not an error: one for each end, never rate-limited.
    */
@@ -2836,6 +2895,18 @@ export interface City {
    * Held `OCCUPATION_GAME_DAYS` without a break, it captures the city.
    */
   occupation: Occupation | null
+  /**
+   * The ids of the outsiders in its area as of the last tick (`CONTEXT.md`: Alarm), so that one
+   * coming in raises the alarm once and one leaving and coming back raises it again. Absent while
+   * there are none, and for trading posts and the HQ, which keep their own rules. Nobody sees it.
+   */
+  outsiders?: string[]
+  /**
+   * Who already raised an `attacked` alarm here (`CONTEXT.md`: Alarm), by resident id, with the tick
+   * of their latest blow, so that a long fight raises it once. After `DEFEND_CALM_TICKS` with no
+   * blow from them the next one raises it again. Absent while nobody did. Only the server reads it.
+   */
+  alarmedAttackers?: Record<string, number>
   /**
    * How it sets out its town (`CONTEXT.md`: City layout), kept once picked. Every NPC city has one;
    * trading posts, the HQ and Players' cities have none.

@@ -1090,9 +1090,10 @@ export function Wiki() {
           trained bonus from nothing to its cap (+{num(trainedCap(AVERAGE_STATS.strength))} on an
           average base of {num(AVERAGE_STATS.strength)}) in {days(trainingDays('strength'))}, a work
           skill to {num(WORK_SKILL_MAX)} in {days(trainingDays('mining'))},{' '}
-          {num(TRAIN_SKILL_FACTOR)} times as fast as by working, and Combat to its most in{' '}
-          {days(trainingDays('combat'))}. Training costs time and the food trainees eat; nothing
-          trained decays, though old age shrinks a trained stat with its base.
+          {num(TRAIN_SKILL_FACTOR)} times as fast as by working (Construction and Driving train that
+          much faster too), and Combat to its most in {days(trainingDays('combat'))}. Training costs
+          time and the food trainees eat; nothing trained decays, though old age shrinks a trained
+          stat with its base.
         </p>
         <p>
           Players' residents train, by order, queue step or script. NPC cities and the Trade
@@ -2341,6 +2342,15 @@ export function Wiki() {
           armed outsider near still shuts the gates, on the soldiers too.
         </p>
         <p>
+          The soldiers of an NPC village, town or self-managed city run the same Alarm default as
+          your armed residents do (see Alarms): they go after a thief they saw, an attacker and
+          whoever occupies the town hall, as no crime, and walk to the town hall to hold it while an
+          armed outsider is in the area, then go home. An unarmed visitor they leave alone, and
+          striking anyone else there is a crime for them too. One who gets armed or comes home while
+          the hall is occupied joins in. Trading posts and the HQ keep their own rules: their soldiers
+          go straight at attackers and occupiers in the area, a post's at thieves it knows of as well.
+        </p>
+        <p>
           Bought outright, an NPC city asks {num(CITY_PRICE_PER_RESIDENT)} coins a resident plus,
           for its buildings:{' '}
           {(Object.entries(CITY_PRICE_BY_BUILDING) as [BuildingKind, number][])
@@ -2371,7 +2381,8 @@ export function Wiki() {
           carriage, {num(HORSE_STOLEN_WORTH)} for its horse, and the load. So is mounting another's
           horse or hitching it (see Riding): one theft, worth {num(HORSE_STOLEN_WORTH)} coins. A
           carriage driven off with a horse of a different owner is a theft from each. Taking back
-          what was stolen from you is theft like any other.
+          what was stolen from you is theft like any other. In your own city's area, force against
+          someone occupying its town hall or a thief you know of is no crime (see Under attack).
         </p>
         <table>
           <thead>
@@ -2634,7 +2645,8 @@ export function Wiki() {
           doing waits meanwhile: once Defend ends they go back to it, a script with its memory, a
           queue at its step, or a plain order. Struck again while defending, they keep defending.
           Scripts see the last blow as <code>me.struckBy</code> and <code>me.struckAt</code>.
-          Residents of NPC cities, and in an army, fight back or flee home the same way.
+          Residents of NPC cities, and in an army, fight back or flee home the same way. Armed
+          neighbours at home who see the blow come to help (see Alarms below).
         </p>
         <p>
           <strong>On a carriage:</strong> the carriage is the way out. An unarmed driver drives on
@@ -2671,6 +2683,69 @@ export function Wiki() {
           when they are struck, they defend by Defend, your realm log says so once, and the pick
           goes back to Defend. A resident lent to another realm defends by that realm's Defend.
         </p>
+        <h3>Alarms</h3>
+        <p>
+          An alarm is something happening in a city's area that your residents at home can react to.
+          Four things set it off. An occupation of the city's town hall starting reaches every
+          resident of your realm standing in that city's area. An <strong>outsider</strong> coming
+          into the area, someone of another realm or NPC city who isn't allied, reaches those
+          standing there who see them (within {num(SIGHT_RANGE)} tiles), once as they come in and
+          again if they leave and come back. Trade Organization caravans and wandering traders, with
+          their crews, don't count, and someone already attacking gets no outsider alarm. A theft
+          from your realm in that area, of goods from a storage, a carriage or a Down resident, or of
+          a carriage or horse, reaches those standing there who see it; what lies in a pile is
+          anyone's to take, so that raises none. An attack, someone striking a wall or gate of the
+          city or a resident of yours standing in its area, reaches those standing there who see it,
+          so the armed residents beside them react rather than only the one struck, who runs their
+          defence script. It is raised once per attacker, the first time someone at home sees them at
+          it, and again only after {duration(DEFEND_CALM_TICKS)} with no blow from them. Those already
+          fighting aren't interrupted, and someone fighting back raises none. Army members, those
+          hired out and those driving a carriage get no alarm. It runs their{' '}
+          <strong>Alarm script</strong>, which by default is <strong>Alarm</strong> (one of your
+          default scripts) for an armed resident and nothing for an unarmed one.
+        </p>
+        <p>
+          Alarm goes after the occupier while they stand in the city's area, any other armed one of
+          theirs there after them, and ends once they are gone. It goes after a thief or an attacker
+          until they are dead or have left the area or sight. Their card says “On alarm: going after
+          Bo”. For an armed outsider it walks to the town hall and stands there until no armed
+          outsider is left in the area, then goes back to what it was doing; someone armed of yours
+          on the hall blocks an occupation before it starts, at no cost in standing. An unarmed
+          outsider it only writes in the script log.
+        </p>
+        <p>
+          <strong>Force at home:</strong> in your own city's area, striking someone occupying its
+          town hall, or a thief of your realm that you know of or one of your residents saw, is no
+          crime and costs no standing. Someone occupying is someone armed standing on the hall, so
+          one who has walked off it no longer is. Striking back at an attacker on their alarm is no
+          crime either. Striking anyone else there is a crime as anywhere, and so is striking a thief
+          outside the area. Scripts see this as <code>knownThief</code> on those{' '}
+          <code>residents()</code> gives: whether your realm knows they stole from it or one of your
+          residents saw it, no more than that.
+        </p>
+        <p>
+          On a resident's card, the Script tab's <strong>Alarm script</strong> picks any of your
+          scripts for them to run instead, an unarmed resident too, or <strong>None</strong> to run
+          nothing; the group card picks it for all of them at once. It runs in place of what they
+          were doing, which goes on with its memory once it calls <code>end()</code>, as for a
+          defence script. A second alarm doesn't interrupt it, with two exceptions: a theft or an
+          attack takes over from an outsider alarm, unless they are already attacking someone, and
+          an occupation takes over from any other. The script goes on with its memory,{' '}
+          <code>me.alarm</code> now the new one, and when it calls <code>end()</code> an outsider
+          alarm it took over from goes on. So those holding the hall go after a thief or an attacker,
+          then back to holding while armed outsiders remain; should an armed outsider lure them away
+          and step onto the hall, the occupation brings them all back. A blow still runs their defence
+          script, and once that ends the Alarm script goes on; while a defence script runs, or an
+          order you gave under attack holds, an alarm doesn't reach them. An order you give
+          meanwhile ends both. Scripts read the alarm as <code>me.alarm</code>: its{' '}
+          <code>kind</code>, <code>about</code> who and their <code>realmId</code>, where (
+          <code>cityId</code>, <code>x</code>, <code>y</code>) and <code>tick</code>;{' '}
+          <code>inCityArea(cityId, x, y)</code> says whether a tile lies in a city's area,{' '}
+          <code>cityAreaAt(x, y)</code> which city's area it lies in, and{' '}
+          <code>outsidersIn(cityId)</code> lists the outsiders you see in one. The pick reads as{' '}
+          <code>me.alarmScript</code>. If the script is gone from your library when an
+          alarm comes, your realm log says so once and the pick goes back to Alarm.
+        </p>
         <h3>Capturing a city</h3>
         <p>
           A city is captured by occupying its town hall: armed residents of your realm stand on it
@@ -2680,8 +2755,10 @@ export function Wiki() {
           without a break, the city joins your realm with its buildings and the residents who live
           there, loyal at once; its Leader never joins. Beating its defenders is not enough on its
           own, and defenders elsewhere in the city don't stop the clock: they have to come to the
-          hall. The first tick the occupation doesn't hold, it is broken and its days are lost; the
-          next one starts again from nothing. Your realm log says when one of your town halls is
+          hall. An NPC city's soldiers, a trading post's and the HQ's do: anyone occupying their town
+          hall is an attacker to them, even one who attacks nobody, and those in the city's area go
+          after them, which is no crime. The first tick the occupation doesn't hold, it is broken and
+          its days are lost; the next one starts again from nothing. Your realm log says when one of your town halls is
           occupied, by whom, and when the occupation is broken, and likewise when you occupy a town
           hall and when your occupation is broken. Every city is captured this way: NPC cities,
           Players' cities, trading posts and the Trade Org HQ, whose hired mercenaries defend it.

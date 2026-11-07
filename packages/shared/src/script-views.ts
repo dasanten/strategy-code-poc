@@ -51,6 +51,7 @@ export type ScriptViewName =
   | 'carriedOffer'
   | 'city'
   | 'occupation'
+  | 'alarm'
   | 'hire'
   | 'horse'
   | 'horseStats'
@@ -258,6 +259,24 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
         'number',
         'The id of the script they run when struck, picked on their card.',
         'for the Defend default, and for a resident of another Player',
+      ),
+      field(
+        'alarmScript',
+        'any',
+        'What they run when an alarm reaches them, picked on their card: a script’s id, or "none" for nothing.',
+        'for the Alarm default, and for a resident of another Player',
+      ),
+      field(
+        'alarm',
+        view('alarm'),
+        'The alarm their Alarm script runs for.',
+        'except on `me` while my Alarm script runs',
+      ),
+      field(
+        'knownThief',
+        'boolean',
+        'Whether my realm knows they stole from it, or one of my residents saw it. In my own City area, striking them is no crime.',
+        'except from `residents()`',
       ),
       field('bornAt', 'number', 'The tick they were born; may be before the world began.'),
       field('age', 'number', 'Their age in game years.', 'except on `me` and an army’s `members`'),
@@ -717,6 +736,39 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
     fields: [
       field('realmId', 'string', 'The realm occupying it.'),
       field('ticksLeft', 'number', 'Ticks it has to hold the town hall to capture the city.'),
+    ],
+  },
+  alarm: {
+    description: 'Something that happened in a City area, that an Alarm script runs for.',
+    fields: [
+      field(
+        'kind',
+        'string',
+        'What happened: "occupied", the city’s town hall occupied; "outsider", someone of another realm, not allied, came into its area; "theft", someone stealing from the realm; "attacked", a wall or gate of the city or a resident of the realm struck.',
+      ),
+      field('cityId', 'string', 'The city whose area it happened in.'),
+      field(
+        'about',
+        'string',
+        'The id of the resident it is about: an occupier on the hall, the outsider who came, the thief, or the attacker.',
+      ),
+      field(
+        'realmId',
+        'string',
+        'The realm of who it is about.',
+        'when they belong to no realm',
+      ),
+      field(
+        'x',
+        'number',
+        'Where it happened, from west to east: the town hall, where the outsider stood, where the thief took it, or what was struck.',
+      ),
+      field(
+        'y',
+        'number',
+        'Where it happened, from north to south: the town hall, where the outsider stood, where the thief took it, or what was struck.',
+      ),
+      field('tick', 'number', 'The tick it happened.'),
     ],
   },
   hire: {

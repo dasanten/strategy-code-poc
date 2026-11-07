@@ -150,20 +150,16 @@ export function commitCrime(
 }
 
 /**
- * Who stole from an NPC city, as far as it knows (`CONTEXT.md`: Trading post): the culprits of
- * thefts from it that it knows of or one of its residents saw.
+ * Who stole from an Organization, as far as it knows (`CONTEXT.md`: Crime, Trading post): the
+ * culprits of thefts from it that it knows of or one of its residents saw.
  */
-export function knownThieves(world: WorldState, city: City): Set<string> {
-  const ours = (id: string) =>
-    world.residents.some((r) => r.id === id && r.owner === null && r.cityId === city.id)
+export function knownThieves(world: WorldState, org: string): Set<string> {
+  const thefts = world.crimes.filter((c) => c.kind === 'theft' && c.victimOrg === org)
+  if (thefts.length === 0) return new Set()
+  const ours = new Set(world.residents.filter((r) => organizationOf(r) === org).map((r) => r.id))
   return new Set(
-    world.crimes
-      .filter(
-        (c) =>
-          c.kind === 'theft' &&
-          c.victimOrg === city.id &&
-          (c.knownBy.includes(city.id) || c.witnesses.some(ours)),
-      )
+    thefts
+      .filter((c) => c.knownBy.includes(org) || c.witnesses.some((id) => ours.has(id)))
       .map((c) => c.culprit.residentId),
   )
 }

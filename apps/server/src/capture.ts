@@ -19,6 +19,7 @@ import {
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
+import { raiseOccupied } from './alarms.js'
 import { joinTradeOrg, leaveTradeOrg, rejoinTradeOrg } from './caravans.js'
 import { commitCrime, cityOrganization } from './crimes.js'
 import { recordEvent } from './events.js'
@@ -57,6 +58,7 @@ export function stepCaptures(world: WorldState, terrain: TerrainMap): Capture[] 
     if (!city.occupation) {
       city.occupation = { realmId: occupier, since: world.tick }
       occupationLogged(world, city, occupier, 'hallOccupied')
+      raiseOccupied(world, city, occupier, size)
     }
     if (world.tick - city.occupation.since < OCCUPATION_TICKS) continue
     city.occupation = null

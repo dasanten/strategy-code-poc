@@ -5,11 +5,16 @@ import {
   ART_FILES,
   BUILDING_ART,
   NODE_ART,
+  PAINTED_BUILDING_ART,
+  PAINTED_BUILDING_IMAGE,
   PAINTED_FILES,
   PAINTED_SHEET,
   PAINTED_SITE_ART,
   artInUse,
+  paintedBuildingArt,
+  paintedCell,
   paintedCellsInUse,
+  paintedImage,
 } from './art.js'
 import type { Activity } from './figures.js'
 import { BUILDING_NAMES } from './palette.js'
@@ -38,6 +43,21 @@ describe('map art registry', () => {
     const cells = PAINTED_SHEET.columns ** 2
     for (const cell of paintedCellsInUse()) expect(cell >= 0 && cell < cells, `${cell}`).toBe(true)
     expect(PAINTED_SITE_ART).toHaveLength(Math.max(...Object.values(FOOTPRINT)))
+  })
+
+  it('gives the training ground its painted image, and its site the 3×3 site cell', () => {
+    const file = PAINTED_BUILDING_IMAGE.trainingGround!
+    expect(PAINTED_FILES[file]).toBeDefined()
+    expect(paintedBuildingArt('trainingGround', false)).toBe(paintedImage(file))
+    expect(FOOTPRINT.trainingGround).toBe(3)
+    expect(paintedBuildingArt('trainingGround', true)).toBe(paintedCell(PAINTED_SITE_ART[2]))
+    expect(artInUse()).not.toContain(paintedImage(file))
+  })
+
+  it('keeps the other workplaces on their cells of the sheet, and walls unpainted', () => {
+    expect(paintedBuildingArt('stable', false)).toBe(paintedCell(PAINTED_BUILDING_ART.stable!))
+    expect(paintedBuildingArt('stable', true)).toBe(paintedCell(PAINTED_SITE_ART[2]))
+    expect(paintedBuildingArt('wall', false)).toBeUndefined()
   })
 
   it('points to every SVG in the assets folder, each with a viewBox', () => {

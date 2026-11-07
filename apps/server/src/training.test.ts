@@ -36,7 +36,7 @@ const WEEK = 7 * TICKS_PER_GAME_DAY
 /**
  * Realm r1 (Player 7) with a finished training ground g1 on (3, 3) to (5, 5); on it the teacher
  * Tea (t1, Strength 15) and the trainees Ann (a1), Bo (a2) and Cy (a3), Strength and Intellect 10.
- * Dee (a4) stands on it too, as a fourth.
+ * Dee (a4) stands on it too.
  */
 function setup() {
   const world = createWorld(terrain)
@@ -62,6 +62,20 @@ function resident(world: WorldState, id: string, name: string, x: number, y: num
   r.skills = {}
   world.residents.push(r)
   return r
+}
+
+/**
+ * Enough more residents on the ground that one more wants to train than it has room for; answers
+ * the ids of all who could train, the one too many last.
+ */
+function crowd(world: WorldState) {
+  const ids = ['a1', 'a2', 'a3', 'a4']
+  while (ids.length <= TRAINING_GROUND_MAX_TRAINEES) {
+    const id = `a${ids.length + 1}`
+    resident(world, id, id, 4, 3)
+    ids.push(id)
+  }
+  return ids
 }
 
 /** Sends an order and, if accepted, applies it; answers 'ack' or why it was rejected. */
@@ -180,23 +194,21 @@ describe('training (`CONTEXT.md`: Trainee, Training)', () => {
     expect(ann.order).toBeNull()
   })
 
-  it('refuses the fourth trainee at a full ground, also within one tick', () => {
-    const { world, ground, dee, queue } = setup()
-    for (const id of ['a1', 'a2', 'a3']) expect(order(world, queue, train(id))).toBe('ack')
-    expect(order(world, queue, train('a4'))).toBe(
+  it('refuses one too many at a full ground, also within one tick', () => {
+    const { world, ground, queue } = setup()
+    const ids = crowd(world)
+    const room = ids.slice(0, TRAINING_GROUND_MAX_TRAINEES)
+    for (const id of room) expect(order(world, queue, train(id))).toBe('ack')
+    expect(order(world, queue, train(ids.at(-1)!))).toBe(
       `the training ground has room for ${TRAINING_GROUND_MAX_TRAINEES} trainees`,
     )
-    expect(dee.order).toBeNull()
+    expect(world.residents.find((r) => r.id === ids.at(-1))!.order).toBeNull()
     const fresh = setup()
-    for (const id of ['a1', 'a2', 'a3', 'a4']) {
+    for (const id of crowd(fresh.world)) {
       expect(fresh.queue.receive(fresh.world, me, id, train(id)).type).toBe('ack')
     }
     fresh.queue.applyAll(fresh.world)
-    expect(traineesOf(fresh.ground, fresh.world.residents).map((r) => r.id)).toEqual([
-      'a1',
-      'a2',
-      'a3',
-    ])
+    expect(traineesOf(fresh.ground, fresh.world.residents).map((r) => r.id)).toEqual(room)
     expect(traineesOf(ground, world.residents)).toHaveLength(TRAINING_GROUND_MAX_TRAINEES)
   })
 
@@ -255,11 +267,12 @@ describe('training (`CONTEXT.md`: Trainee, Training)', () => {
 
 describe('trainees sound (ADR 0004)', () => {
   it('flags a trainee off the ground, at no ground, and one too many', () => {
-    const { world, ann, bo, cy, dee } = setup()
-    for (const r of [ann, bo, cy, dee])
+    const { world, ann, dee } = setup()
+    const ids = crowd(world)
+    for (const r of world.residents.filter((r) => ids.includes(r.id)))
       r.order = { kind: 'train', buildingId: 'g1', learning: null }
     expect(traineesSound.check(world, terrain)).toEqual([
-      expect.objectContaining({ entityIds: ['a1', 'a2', 'a3', 'a4'] }),
+      expect.objectContaining({ entityIds: ids }),
     ])
     dee.order = { kind: 'train', buildingId: 'gone', learning: null }
     ann.x = 9

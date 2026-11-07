@@ -28,6 +28,8 @@ import { foundNpcCity } from './npc-cities.js'
 import { attackersOf, npcGateShutToItsPunishers, stepNpcDefence } from './npc-defence.js'
 import { mulberry32, newResident } from './residents.js'
 import { changeStanding } from './standing.js'
+import { stepTradeOrgArmy } from './trade-org-army.js'
+import { foundTradeOrgHq } from './trade-org.js'
 import { foundTradingPost } from './trading-posts.js'
 import { Walking } from './walking.js'
 import { createWorld, stepWorld } from './world.js'
@@ -43,6 +45,14 @@ function village(): { world: WorldState; terrain: TerrainMap; city: City } {
   const terrain = plains(160)
   const world = createWorld(terrain)
   const city = foundNpcCity(world, terrain, NPC_VILLAGE, 20, 20, mulberry32(7))
+  return { world, terrain, city }
+}
+
+/** A trading post alone on a small Plains map, its top-left wall tile at (20, 20). */
+function post(): { world: WorldState; terrain: TerrainMap; city: City } {
+  const terrain = plains(160)
+  const world = createWorld(terrain)
+  const city = foundTradingPost(world, terrain, 20, 20, undefined, mulberry32(7))
   return { world, terrain, city }
 }
 
@@ -307,8 +317,9 @@ describe('NPC cities defend themselves', { timeout: 20_000 }, () => {
     expect(p.y).toBeGreaterThan(gate.y)
   })
 
-  it('fight attackers in their area', () => {
-    const { world, terrain, city } = village()
+  // An NPC city's run the Alarm default for this (`npc-alarms.test.ts`); a post's go on their own.
+  it('fight attackers in their area, a trading post’s', () => {
+    const { world, terrain, city } = post()
     const hall = buildingOf(world, city, 'townHall')
     const [victim, soldier, bystander] = citizens(world, city)
     for (const r of [victim!, soldier!, bystander!]) Object.assign(r, { x: hall.x, y: hall.y })
@@ -324,8 +335,8 @@ describe('NPC cities defend themselves', { timeout: 20_000 }, () => {
     expect(world.crimes.filter((c) => c.culprit.residentId === soldier!.id)).toEqual([])
   })
 
-  it('leave attackers outside their area alone', () => {
-    const { world, terrain, city } = village()
+  it('leave attackers outside their area alone, a trading post’s', () => {
+    const { world, terrain, city } = post()
     const hall = buildingOf(world, city, 'townHall')
     const [victim, soldier] = citizens(world, city)
     Object.assign(soldier!, { x: hall.x, y: hall.y, order: null })
@@ -337,8 +348,8 @@ describe('NPC cities defend themselves', { timeout: 20_000 }, () => {
     expect(soldier!.order).toBeNull()
   })
 
-  it('fight those breaking or climbing their walls, and commit no crime by it', () => {
-    const { world, terrain, city } = village()
+  it('fight those breaking or climbing their walls, and commit no crime by it, a trading post’s', () => {
+    const { world, terrain, city } = post()
     const gate = buildingOf(world, city, 'gate')
     const wall = buildingOf(world, city, 'wall')
     const [soldier] = citizens(world, city)
@@ -384,15 +395,204 @@ describe('NPC cities defend themselves', { timeout: 20_000 }, () => {
   })
 })
 
-describe('Trading posts defend themselves', { timeout: 20_000 }, () => {
-  /** A trading post alone on a small Plains map, its top-left wall tile at (20, 20). */
-  function post(): { world: WorldState; terrain: TerrainMap; city: City } {
-    const terrain = plains(160)
+describe('Soldiers and whoever occupies their town hall', { timeout: 20_000 }, () => {
+  /** A citizen of `city` armed with a spear, standing on the given building of it, not the hall. */
+  function soldierOn(world: WorldState, city: City, kind: Building['kind']): Resident {
+    const at = buildingOf(world, city, kind)
+    const soldier = citizens(world, city).find((r) => !isArmed(r))!
+    Object.assign(soldier, { x: at.x, y: at.y, order: null })
+    soldier.carried.spear = 1
+    return soldier
+  }
+
+  /** An armed Player's resident standing on the city's town hall, attacking nobody. */
+  function occupierOn(world: WorldState, city: City, id = 'p1'): Resident {
+    const hall = buildingOf(world, city, 'townHall')
+    const p = outsider(world, id, hall.x, hall.y)
+    p.carried.sword = 1
+    return p
+  }
+
+  const headquarters = () => {
+    const terrain = plains(640)
     const world = createWorld(terrain)
-    const city = foundTradingPost(world, terrain, 20, 20, undefined, mulberry32(7))
+    const city = foundTradeOrgHq(world, terrain, 320, 320, mulberry32(7))
+    for (const r of citizens(world, city)) delete r.carried.spear
     return { world, terrain, city }
   }
 
+  /** A contract the Trade Organization has running for resident `id` of realm r1. */
+  function hiredByTradeOrg(world: WorldState, id: string): void {
+    world.contracts.push({
+      id: 'k1',
+      lenderId: 'r1',
+      hirerId: TRADE_ORG,
+      offeredBy: 'hirer',
+      residentIds: [id],
+      days: 7,
+      pricePerWeek: 5,
+      storageId: 's1',
+      startedAt: world.tick,
+      paidWeeks: 1,
+    })
+  }
+
+  it('an NPC city leaves them to their Alarm default, which goes after an armed outsider who attacks nobody', () => {
+    const { world, terrain, city } = village()
+    const soldier = soldierOn(world, city, 'storage')
+    const p = occupierOn(world, city)
+    expect(occupierOf(world, city, terrain.size)).toBe('r1')
+    expect(attackersOf(world, city, terrain.size)).toEqual([p])
+    stepNpcDefence(world, terrain.size)
+    expect(soldier.order?.kind).not.toBe('attack')
+    stepCaptures(world, terrain)
+    expect(soldier.script).toMatchObject({ task: 'alarm', alarm: { kind: 'occupied', about: p.id } })
+  })
+
+  it('a trading post sends them after an armed outsider who attacks nobody, as no crime', () => {
+    const { world, terrain, city } = post()
+    const soldier = soldierOn(world, city, 'warehouse')
+    const bystander = citizens(world, city).find((r) => !isArmed(r))!
+    const p = occupierOn(world, city)
+    stepNpcDefence(world, terrain.size)
+    expect(soldier.order).toMatchObject({
+      kind: 'attack',
+      targetId: p.id,
+      started: false,
+      defending: true,
+    })
+    expect(bystander.order?.kind).not.toBe('attack')
+  })
+
+  it('the HQ sends them too', () => {
+    const { world, terrain, city } = headquarters()
+    const soldier = soldierOn(world, city, 'warehouse')
+    const p = occupierOn(world, city)
+    stepNpcDefence(world, terrain.size)
+    expect(soldier.order).toMatchObject({ kind: 'attack', targetId: p.id, defending: true })
+  })
+
+  it("the HQ's mercenaries go after them as well, but none stands on the hall for them", () => {
+    const { world, terrain, city } = headquarters()
+    const hall = buildingOf(world, city, 'townHall')
+    const at = buildingOf(world, city, 'warehouse')
+    const merc = outsider(world, 'm1', at.x, at.y)
+    merc.carried.spear = 1
+    hiredByTradeOrg(world, merc.id)
+    const p = occupierOn(world, city)
+    stepTradeOrgArmy(world, terrain.size)
+    expect(merc.order).toMatchObject({ kind: 'attack', targetId: p.id, defending: true })
+
+    // A mercenary on the HQ's hall defends it, so nobody occupies it.
+    merc.order = null
+    Object.assign(merc, { x: hall.x, y: hall.y })
+    const soldier = soldierOn(world, city, 'warehouse')
+    expect(occupierOf(world, city, terrain.size)).toBeNull()
+    expect(attackersOf(world, city, terrain.size)).toEqual([])
+    stepNpcDefence(world, terrain.size)
+    expect(soldier.order?.kind).not.toBe('attack')
+  })
+
+  it('leave alone an unarmed outsider on the hall and an armed one elsewhere in the area', () => {
+    const { world, terrain, city } = post()
+    const soldier = soldierOn(world, city, 'warehouse')
+    const hall = buildingOf(world, city, 'townHall')
+    outsider(world, 'p1', hall.x, hall.y)
+    const passing = outsider(world, 'p2', soldier.x + 1, soldier.y)
+    passing.carried.sword = 1
+    stepNpcDefence(world, terrain.size)
+    expect(occupierOf(world, city, terrain.size)).toBeNull()
+    expect(soldier.order?.kind).not.toBe('attack')
+  })
+
+  it('fight nobody while two realms share the hall, as nobody occupies it', () => {
+    const { world, terrain, city } = post()
+    const soldier = soldierOn(world, city, 'warehouse')
+    occupierOn(world, city, 'p1')
+    const other = occupierOn(world, city, 'p2')
+    other.owner = 'r2'
+    world.realms.push({ id: 'r2', userId: 8, leaderId: 'p2' })
+    stepNpcDefence(world, terrain.size)
+    expect(occupierOf(world, city, terrain.size)).toBeNull()
+    expect(soldier.order?.kind).not.toBe('attack')
+  })
+
+  it('fight nobody while one of them stands on the hall, as nobody occupies it', () => {
+    const { world, terrain, city } = post()
+    const hall = buildingOf(world, city, 'townHall')
+    const onHall = soldierOn(world, city, 'warehouse')
+    Object.assign(onHall, { x: hall.x, y: hall.y })
+    const soldier = soldierOn(world, city, 'warehouse')
+    occupierOn(world, city)
+    stepNpcDefence(world, terrain.size)
+    expect(soldier.order?.kind).not.toBe('attack')
+    expect(onHall.order?.kind).not.toBe('attack')
+  })
+
+  it('go after an occupier who is Down, who holds the hall all the same', () => {
+    const { world, terrain, city } = post()
+    const soldier = soldierOn(world, city, 'warehouse')
+    const p = occupierOn(world, city)
+    p.health = 0
+    p.downUntil = world.tick + TICKS_PER_GAME_DAY
+    expect(occupierOf(world, city, terrain.size)).toBe('r1')
+    stepNpcDefence(world, terrain.size)
+    expect(soldier.order).toMatchObject({ kind: 'attack', targetId: p.id, defending: true })
+  })
+
+  it('leave alone a mercenary the Trade Organization hired, who occupies nothing', () => {
+    const { world, terrain, city } = post()
+    const soldier = soldierOn(world, city, 'warehouse')
+    const merc = occupierOn(world, city)
+    hiredByTradeOrg(world, merc.id)
+    stepNpcDefence(world, terrain.size)
+    expect(occupierOf(world, city, terrain.size)).toBeNull()
+    expect(soldier.order?.kind).not.toBe('attack')
+  })
+
+  it('fight the Trade Org army on the hall only as an army come to take the city', () => {
+    const { world, terrain, city } = post()
+    const soldier = soldierOn(world, city, 'warehouse')
+    const hall = buildingOf(world, city, 'townHall')
+    const taker = armySoldier(world, 'a1', city.id, hall.x, hall.y)
+    const punishment = world.punishments[0]!
+    punishment.cityId = city.id
+    const fought = () => {
+      soldier.order = null
+      stepNpcDefence(world, terrain.size)
+      return soldier.order?.kind === 'attack'
+    }
+    expect(fought()).toBe(false)
+    punishment.takes = true
+    expect(fought()).toBe(false)
+    world.debts.push({ org: city.id, coins: 100 })
+    expect(occupierOf(world, city, terrain.size)).toBe(TRADE_ORG)
+    expect(fought()).toBe(true)
+    expect(soldier.order).toMatchObject({ targetId: taker.id, defending: true })
+    // Paid in full, they occupy nothing any more.
+    world.debts = []
+    expect(fought()).toBe(false)
+  })
+
+  it('beat a lone occupier before the city falls, with no crime and every invariant holding', () => {
+    const { world, terrain, city } = village()
+    // The Leader stays home, so the fight is over the occupier and the realm goes on after.
+    outsider(world, 'leader', 140, 140)
+    for (let i = 0; i < 3; i++) soldierOn(world, city, 'storage')
+    const p = occupierOn(world, city)
+    const walking = new Walking(terrain)
+    for (let t = 0; t < TICKS_PER_GAME_DAY; t++) {
+      run(world, terrain, walking, 1)
+      // Each tick: a crime with the occupier as its only witness goes when they die.
+      expect(world.crimes.filter((c) => c.culprit.org === city.id)).toEqual([])
+    }
+    expect(world.residents.some((r) => r.id === p.id)).toBe(false)
+    expect(city).toMatchObject({ realmId: null })
+    expect(city.occupation).toBeNull()
+  })
+})
+
+describe('Trading posts defend themselves', { timeout: 20_000 }, () => {
   it('arm soldiers from the warehouse, so one armed outsider does not capture the post', () => {
     const { world, terrain, city } = post()
     const hall = buildingOf(world, city, 'townHall')

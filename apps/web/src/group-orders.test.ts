@@ -359,6 +359,11 @@ describe('group orders with Shift held', () => {
       { kind: 'setDefenceScript', scriptId: 7, params, residentId: 'a' },
       { kind: 'setDefenceScript', scriptId: 7, params, residentId: 'c' },
     ])
+    expect(send({ kind: 'setAlarmScript', scriptId: 'none' }, rs).requests[0]!.order).toEqual({
+      kind: 'setAlarmScript',
+      scriptId: 'none',
+      residentId: 'a',
+    })
     expect(send({ kind: 'setDefenceScript', scriptId: null }, rs).requests[0]!.order).toEqual({
       kind: 'setDefenceScript',
       scriptId: null,

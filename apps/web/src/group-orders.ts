@@ -42,6 +42,8 @@ export type GroupOrder =
   | ({ kind: 'runScript'; scriptId: number } & Starts)
   /** Picks each one's defence script, null for Defend (`CONTEXT.md`: Defence script). */
   | ({ kind: 'setDefenceScript'; scriptId: number | null } & Starts)
+  /** Picks each one's Alarm script, null for Alarm (`CONTEXT.md`: Alarm script). */
+  | ({ kind: 'setAlarmScript'; scriptId: number | 'none' | null } & Starts)
   | { kind: 'stop' }
   /**
    * Boards the carriage (`CONTEXT.md`: Passenger): those on its tile, in the group's order, until
@@ -139,6 +141,7 @@ export function groupOrderStart(order: GroupOrder): OrderRequest | undefined {
   switch (order.kind) {
     case 'runScript':
     case 'setDefenceScript':
+    case 'setAlarmScript':
       return { kind: order.kind, scriptId: order.scriptId }
     case 'work':
       return { kind: 'task', task: 'work', workplaceId: order.workplace.id }
@@ -482,6 +485,9 @@ export function groupRequests(
       }
       case 'setDefenceScript':
         send(r, { kind: 'setDefenceScript', scriptId: order.scriptId, ...params })
+        break
+      case 'setAlarmScript':
+        send(r, { kind: 'setAlarmScript', scriptId: order.scriptId, ...params })
         break
       case 'runScript':
         send(r, { kind: 'runScript', scriptId: order.scriptId, ...params })

@@ -15,6 +15,7 @@ import { hqFalls } from './hq-fall.js'
 import { grantHorses } from './horse-grant.js'
 import { horseName } from './horses.js'
 import { giveHorsesToNpcCities } from './npc-horses.js'
+import { noteOutsidersInside } from './outsiders.js'
 import { hash, mulberry32 } from './residents.js'
 import { paramTarget } from './script-params.js'
 import { placeTraders, putHqOnLoops } from './traders.js'
@@ -24,7 +25,7 @@ import { placeTraders, putHqOnLoops } from './traders.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 106
+export const WORLD_FORMAT_VERSION = 109
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -458,9 +459,27 @@ export const migrations: Record<number, MigrationStep> = {
   // An NPC city's plan may keep the streets its road crew builds next (`CityPlan.streets`). No plan
   // has any yet, and the next pass works them out. So the step leaves every world as it is.
   103: (state) => state,
+  // A resident keeps the Alarm script picked for them (`CONTEXT.md`: Alarm script;
+  // `Resident.alarmScriptId`), absent for the Alarm default, and a running script may hold its alarm
+  // (`RunningScript.alarm`). Nobody picked one and no alarm rang before, so the step leaves every
+  // world as it is.
+  104: (state) => state,
+  // A city keeps who raised an `attacked` alarm there (`City.alarmedAttackers`), and an alarm may be
+  // of that kind (`CONTEXT.md`: Alarm). No such alarm rang before, so the step leaves every world as
+  // it is.
+  105: (state) => state,
+  // A city keeps who is in its area (`CONTEXT.md`: Alarm; `City.outsiders`). Those there already came
+  // in before there were alarms, so they go on the list as they stand, and raise none. A running
+  // script may keep the outsider alarm another took over from (`RunningScript.alarmUnder`); no alarm
+  // has yet.
+  106: (state, { terrain }) => {
+    const world = structuredClone(state) as WorldState
+    noteOutsidersInside(world, terrain.size)
+    return world
+  },
   // A bigger NPC city has more traders out (`CONTEXT.md`: NPC trader), so `CityPlan.trader` becomes
   // the list `CityPlan.traders`. A run under way carries on as the first of it.
-  104: (state) => {
+  107: (state) => {
     const world = structuredClone(state) as WorldState
     for (const plan of Object.values(world.cityPlans) as (CityPlan & { trader?: CityTrader })[]) {
       if (plan.trader) plan.traders = [plan.trader]
@@ -470,7 +489,7 @@ export const migrations: Record<number, MigrationStep> = {
   },
   // A full NPC city's plan may keep when a dip below its reserve began (`CityPlan.shortSince`). No plan
   // has one yet, and the next pass starts it if it needs one. So the step leaves every world as it is.
-  105: (state) => state,
+  108: (state) => state,
 }
 
 export class WorldFormatError extends Error {}

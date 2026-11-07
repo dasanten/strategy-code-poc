@@ -307,6 +307,7 @@ export function startContract(world: WorldState, c: MercenaryContract): void {
     if (!c.residentIds.includes(r.id)) continue
     r.order = null
     delete r.script
+    delete r.interrupted
   }
   tellBoth(world, c, 'started')
 }

@@ -9,6 +9,7 @@ import {
   contractWeeks,
   handedOverTo,
   inCityArea,
+  occupiersOf,
   inInnerRingAround,
   isArmed,
   realmName,
@@ -32,7 +33,7 @@ import { cannotStart, payInto, startContract } from './contracts.js'
 import { recordEvent } from './events.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { walkTo } from './npc-behaviour.js'
-import { attackersOf } from './npc-defence.js'
+import { attackersOf, goAfterNearest } from './npc-defence.js'
 import { newId } from './starting-city.js'
 import { hqLayout } from './trade-org.js'
 
@@ -270,13 +271,11 @@ function runMercenaries(world: WorldState, hq: City, size: number): void {
   if (hired.length === 0 || !hall) return
   const posts = guardPosts(hall)
   const attackers = attackersOf(world, hq, size)
+  const occupiers = occupiersOf(world, hq, size)
   hired.forEach((r, i) => {
     if (r.health <= 0 || r.order?.kind === 'attack') return
     if (attackers.length > 0 && isArmed(r) && inCityArea(world, hq, r.x, r.y, size)) {
-      const nearest = attackers.reduce((a, b) =>
-        wrapDistance(size, r, b) < wrapDistance(size, r, a) ? b : a,
-      )
-      r.order = attackOrder(nearest.id)
+      goAfterNearest(r, attackers, occupiers, size)
       return
     }
     const post = posts[i % posts.length]!

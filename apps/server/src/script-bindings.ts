@@ -18,6 +18,8 @@ import {
   isDown,
   ageInYears,
   occupationTicksLeft,
+  cityIdsAt,
+  inCityArea as cityAreaHolds,
   breedingPair,
   buildingAt,
   carriageCanGoTo,
@@ -64,6 +66,7 @@ import {
   type Waypoint,
   type WorldState,
 } from '@csp/shared'
+import { knownThieves } from './crimes.js'
 import type { InvariantViolation } from './invariants.js'
 import { orderKindOf, orderKinds, type OrderKind, type OrderSender } from './orders.js'
 import { hash, mulberry32 } from './residents.js'
@@ -216,6 +219,13 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     const running = ownScripts.get(id)
     return running && { script: { scriptId: running.scriptId, memory: running.memory } }
   }
+  // Who stole from the side, as far as it knows (`CONTEXT.md`: Crime): what its residents saw and
+  // what news brought home, the same knowledge force at home goes by, no more.
+  let thieves: Set<string> | undefined
+  const residentExtras = (id: string) => {
+    thieves ??= side === undefined ? new Set() : knownThieves(world, side)
+    return { ...ownMemory(id), knownThief: thieves.has(id) }
+  }
   const asSeen = (r: Resident) => {
     const { script, ...rest } = r
     const running = { scriptId: script!.scriptId, memory: script!.memory }
@@ -289,7 +299,7 @@ export function bindScript(context: ScriptContext): ScriptBindings {
   // What each query answers, as the server's data; the script gets it built from the view the
   // query returns (`viewValue`).
   const queries: Record<string, (args: Value[]) => unknown> = {
-    residents: () => seenOf('resident', ownMemory),
+    residents: () => seenOf('resident', residentExtras),
     buildings: () => seenOf('building', buildingExtras),
     cities: () => seenOf('city', occupationSeen),
     horses: () => seenOf('horse'),
@@ -337,6 +347,31 @@ export function bindScript(context: ScriptContext): ScriptBindings {
       const at = tile(x, y, 'buildingAt')
       const b = worldIndex(world).buildingAt(at.x, at.y, terrain.size)
       return b && (ownBuilding(b) || inSight(at)) ? asSeenBuilding(b) : null
+    },
+    inCityArea: ([id, x, y]) => {
+      const at = tile(x, y, 'inCityArea')
+      const city = world.cities.find((c) => c.id === id)
+      const ours = city && (sender.npcCityId !== undefined ? city.id : city.realmId) === side
+      return !!city && (ours || inSight(at)) && cityAreaHolds(world, city, at.x, at.y, terrain.size)
+    },
+    cityAreaAt: ([x, y]) => {
+      const at = tile(x, y, 'cityAreaAt')
+      const here = cityIdsAt(world, at.x, at.y, terrain.size)
+      const ours = here.find((id) => {
+        const city = world.cities.find((c) => c.id === id)
+        return city && (sender.npcCityId !== undefined ? city.id : city.realmId) === side
+      })
+      return ours ?? (here[0] !== undefined && inSight(at) ? here[0] : null)
+    },
+    outsidersIn: ([id]) => {
+      const city = typeof id === 'string' ? world.cities.find((c) => c.id === id) : undefined
+      if (!city?.outsiders) return []
+      const ids = new Set(city.outsiders)
+      seen ??= context.seen()
+      return seen
+        .filter((e) => e.is === 'resident' && ids.has(e.id))
+        .map(untagged)
+        .map((rest) => asView(world, { ...rest, ...ownMemory(rest.id) }))
     },
     pileAt: ([x, y]) => {
       const at = tile(x, y, 'pileAt')
@@ -409,7 +444,9 @@ export function bindScript(context: ScriptContext): ScriptBindings {
       const r = worldIndex(world).residentById(id)
       if (!r) return []
       const defenceScriptId = r.owner === side ? r.defenceScriptId : undefined
-      return [{ ...r, script: undefined, defenceScriptId, age: ageInYears(r, world.tick) }]
+      const alarmScriptId = r.owner === side ? r.alarmScriptId : undefined
+      const age = ageInYears(r, world.tick)
+      return [{ ...r, script: undefined, defenceScriptId, alarmScriptId, age }]
     })
     const struck = lastStruck(members)
     me = {
@@ -430,10 +467,20 @@ export function bindScript(context: ScriptContext): ScriptBindings {
     api = SCRIPT_API
     forMe = { residentId: resident.id }
     // The script's own state is `memory`, not part of `me`.
-    // The defence script picked is its owner's to see (`CONTEXT.md`: Defence script).
+    // The defence and Alarm scripts picked are their owner's to see (`CONTEXT.md`: Defence script,
+    // Alarm script); the alarm is what the Alarm script runs for, on `me` alone.
     const defenceScriptId = resident.owner === side ? resident.defenceScriptId : undefined
+    const alarmScriptId = resident.owner === side ? resident.alarmScriptId : undefined
     const age = ageInYears(resident, world.tick)
-    me = asView(world, { ...resident, script: undefined, defenceScriptId, age })
+    const alarm = resident.script?.alarm
+    me = asView(world, {
+      ...resident,
+      script: undefined,
+      defenceScriptId,
+      alarmScriptId,
+      alarm,
+      age,
+    })
     actions = residentActions(request, resident)
     // At the training ground on my tile; the order checks it is one.
     actions.teach = ([subject]) =>
@@ -961,10 +1008,11 @@ function requestsSound(
  * else passes as it is.
  */
 function asView(world: WorldState, r: object): object {
-  const { queue, struck, defenceScriptId } = r as {
+  const { queue, struck, defenceScriptId, alarmScriptId } = r as {
     queue?: Queue
     struck?: Struck
     defenceScriptId?: number
+    alarmScriptId?: number | 'none'
   }
   return {
     ...r,
@@ -972,6 +1020,7 @@ function asView(world: WorldState, r: object): object {
     ...(queue ? { queue: queueView(queue) } : {}),
     ...(struck ? struckView(world, struck) : {}),
     ...(defenceScriptId !== undefined ? { defenceScript: defenceScriptId } : {}),
+    ...(alarmScriptId !== undefined ? { alarmScript: alarmScriptId } : {}),
   }
 }
 

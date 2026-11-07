@@ -183,6 +183,7 @@ export function planFounding(
   for (const r of chosen) {
     r.order = null
     delete r.script
+    delete r.interrupted
     endPair(world, r)
     jobs[r.id] = { kind: 'found' }
   }

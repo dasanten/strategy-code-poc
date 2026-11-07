@@ -18,8 +18,12 @@ import {
   stockWeight,
   ticksForAge,
   SKILL_MAX,
+  SKILL_PER_DAY,
+  TRAINING_GROUND_MAX_TRAINEES,
+  TRAIN_SKILL_FACTOR,
   subjectValue,
   trainingCeiling,
+  trainingGain,
 } from './balance.js'
 import { TICKS_PER_GAME_DAY, TICKS_PER_GAME_YEAR, type Resident } from './world.js'
 
@@ -74,15 +78,15 @@ describe('aging', () => {
   })
 })
 
-describe('work and Construction skill', () => {
-  /** An adult of average Strength and Intellect with the given skills. */
-  const worker = (skills: Resident['skills']) =>
-    ({
-      stats: { strength: { base: 10, trained: 0 }, intellect: { base: 10, trained: 0 } },
-      skills,
-      bornAt: -ticksForAge(25),
-    }) as unknown as Resident
+/** An adult of average Strength and Intellect with the given skills. */
+const worker = (skills: Resident['skills']) =>
+  ({
+    stats: { strength: { base: 10, trained: 0 }, intellect: { base: 10, trained: 0 } },
+    skills,
+    bornAt: -ticksForAge(25),
+  }) as unknown as Resident
 
+describe('work and Construction skill', () => {
   it('never makes more than twice what an unskilled worker does', () => {
     const unskilled = workOutput(worker({}), 'food', 'farming', 0)
     expect(unskilled * TICKS_PER_GAME_DAY).toBeCloseTo(WORK_OUTPUT_PER_DAY.food!)
@@ -103,6 +107,56 @@ describe('work and Construction skill', () => {
     expect(workLearned(worker({ farming: 100 }), 'farming', 0)).toBe(0)
     expect(workLearned(worker({ farming: 100 - 1e-6 }), 'farming', 0)).toBeCloseTo(1e-6, 9)
     expect(constructionLearned(worker({ construction: 100 }), 0)).toBe(0)
+  })
+})
+
+describe('what training is worth (`CONTEXT.md`: Training)', () => {
+  it('training a work skill to its maximum and then working beats learning by doing by game day 420, the teacher’s share counted', () => {
+    const teacher = worker({ mining: WORK_SKILL_MAX })
+    const doer = worker({})
+    const trainee = worker({})
+    let byDoing = 0
+    let byTraining = 0
+    let teachersShare = 0
+    for (let tick = 0; tick < TICKS_PER_GAME_YEAR; tick++) {
+      byDoing += workOutput(doer, 'ironOre', 'mining', tick)
+      doer.skills.mining = (doer.skills.mining ?? 0) + workLearned(doer, 'mining', tick)
+      const gain = trainingGain(trainee, teacher, 'mining', tick)
+      if (gain > 0) {
+        trainee.skills.mining = (trainee.skills.mining ?? 0) + gain
+        // The teacher gives up a master's work, shared by a full ground.
+        teachersShare +=
+          workOutput(teacher, 'ironOre', 'mining', tick) / TRAINING_GROUND_MAX_TRAINEES
+      } else {
+        byTraining += workOutput(trainee, 'ironOre', 'mining', tick)
+      }
+    }
+    // In game days of an unskilled worker's output.
+    const unskilledDay = WORK_OUTPUT_PER_DAY.ironOre!
+    expect(byDoing / unskilledDay).toBeCloseTo(630, 0)
+    expect(byTraining / unskilledDay).toBeCloseTo(700, 0)
+    expect(teachersShare / unskilledDay).toBeCloseTo(70 / 3, 0)
+    expect(byTraining - teachersShare).toBeGreaterThan(byDoing)
+  })
+
+  it('takes Combat half a game year to its maximum, under a teacher who has it', () => {
+    const teacher = worker({ combat: SKILL_MAX.combat })
+    const perTick = trainingGain(worker({}), teacher, 'combat', 0)
+    expect(SKILL_MAX.combat / perTick).toBeCloseTo(TICKS_PER_GAME_YEAR / 2)
+  })
+
+  it('takes a stat’s trained bonus to its cap in half a game year', () => {
+    const teacher = worker({})
+    teacher.stats.strength = { base: 20, trained: 0 }
+    const perTick = trainingGain(worker({}), teacher, 'strength', 0)
+    expect(5 / perTick).toBeCloseTo(TICKS_PER_GAME_YEAR / 2)
+  })
+
+  it('trains Construction and Driving by the same factor as a work skill', () => {
+    for (const skill of ['mining', 'construction', 'driving'] as const) {
+      const perTick = trainingGain(worker({}), worker({ [skill]: 1e6 }), skill, 0)
+      expect(perTick * TICKS_PER_GAME_DAY).toBeCloseTo(SKILL_PER_DAY[skill] * TRAIN_SKILL_FACTOR)
+    }
   })
 })
 
