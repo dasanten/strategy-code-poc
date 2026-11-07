@@ -1,0 +1,595 @@
+{
+  "tokens": [
+    {
+      "type": "keyword",
+      "value": "let",
+      "line": 1,
+      "column": 1
+    },
+    {
+      "type": "identifier",
+      "value": "x",
+      "line": 1,
+      "column": 5
+    },
+    {
+      "type": "punctuator",
+      "value": "=",
+      "line": 1,
+      "column": 7
+    },
+    {
+      "type": "number",
+      "value": 1.5,
+      "line": 1,
+      "column": 9
+    },
+    {
+      "type": "string",
+      "value": "a\n",
+      "line": 2,
+      "column": 3
+    },
+    {
+      "type": "punctuator",
+      "value": "<=",
+      "line": 2,
+      "column": 9
+    },
+    {
+      "type": "identifier",
+      "value": "y",
+      "line": 2,
+      "column": 12
+    },
+    {
+      "type": "end",
+      "line": 2,
+      "column": 13
+    }
+  ],
+  "statements": {
+    "let a = 1; let b": [
+      {
+        "kind": "Let",
+        "name": "a",
+        "init": {
+          "kind": "Number",
+          "value": 1
+        }
+      },
+      {
+        "kind": "Let",
+        "name": "b",
+        "init": null
+      }
+    ],
+    "if (a) { 1 } else if (b) { 2 } else { 3 }": [
+      {
+        "kind": "If",
+        "test": {
+          "kind": "Identifier",
+          "name": "a"
+        },
+        "then": {
+          "kind": "Block",
+          "body": [
+            {
+              "kind": "ExpressionStatement",
+              "expression": {
+                "kind": "Number",
+                "value": 1
+              }
+            }
+          ]
+        },
+        "else": {
+          "kind": "If",
+          "test": {
+            "kind": "Identifier",
+            "name": "b"
+          },
+          "then": {
+            "kind": "Block",
+            "body": [
+              {
+                "kind": "ExpressionStatement",
+                "expression": {
+                  "kind": "Number",
+                  "value": 2
+                }
+              }
+            ]
+          },
+          "else": {
+            "kind": "Block",
+            "body": [
+              {
+                "kind": "ExpressionStatement",
+                "expression": {
+                  "kind": "Number",
+                  "value": 3
+                }
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "while (i < 3) { i = i + 1 }": [
+      {
+        "kind": "While",
+        "test": {
+          "kind": "Binary",
+          "operator": "<",
+          "left": {
+            "kind": "Identifier",
+            "name": "i"
+          },
+          "right": {
+            "kind": "Number",
+            "value": 3
+          }
+        },
+        "body": {
+          "kind": "Block",
+          "body": [
+            {
+              "kind": "ExpressionStatement",
+              "expression": {
+                "kind": "Assign",
+                "target": {
+                  "kind": "Identifier",
+                  "name": "i"
+                },
+                "value": {
+                  "kind": "Binary",
+                  "operator": "+",
+                  "left": {
+                    "kind": "Identifier",
+                    "name": "i"
+                  },
+                  "right": {
+                    "kind": "Number",
+                    "value": 1
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "for (x of [1, 2]) { say(x) }": [
+      {
+        "kind": "ForOf",
+        "name": "x",
+        "list": {
+          "kind": "List",
+          "items": [
+            {
+              "kind": "Number",
+              "value": 1
+            },
+            {
+              "kind": "Number",
+              "value": 2
+            }
+          ]
+        },
+        "body": {
+          "kind": "Block",
+          "body": [
+            {
+              "kind": "ExpressionStatement",
+              "expression": {
+                "kind": "Call",
+                "callee": {
+                  "kind": "Identifier",
+                  "name": "say"
+                },
+                "args": [
+                  {
+                    "kind": "Identifier",
+                    "name": "x"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "fn add(a, b) { return a + b }\nlet f = fn () { return }": [
+      {
+        "kind": "FunctionDeclaration",
+        "name": "add",
+        "params": [
+          "a",
+          "b"
+        ],
+        "body": {
+          "kind": "Block",
+          "body": [
+            {
+              "kind": "Return",
+              "value": {
+                "kind": "Binary",
+                "operator": "+",
+                "left": {
+                  "kind": "Identifier",
+                  "name": "a"
+                },
+                "right": {
+                  "kind": "Identifier",
+                  "name": "b"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "kind": "Let",
+        "name": "f",
+        "init": {
+          "kind": "FunctionExpression",
+          "params": [],
+          "body": {
+            "kind": "Block",
+            "body": [
+              {
+                "kind": "Return",
+                "value": null
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "fn f() { return\n1 }": [
+      {
+        "kind": "FunctionDeclaration",
+        "name": "f",
+        "params": [],
+        "body": {
+          "kind": "Block",
+          "body": [
+            {
+              "kind": "Return",
+              "value": null
+            },
+            {
+              "kind": "ExpressionStatement",
+              "expression": {
+                "kind": "Number",
+                "value": 1
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "let o = { role: \"miner\", \"max load\": 3, if: [], }": [
+      {
+        "kind": "Let",
+        "name": "o",
+        "init": {
+          "kind": "Object",
+          "properties": [
+            {
+              "key": "role",
+              "value": {
+                "kind": "String",
+                "value": "miner"
+              }
+            },
+            {
+              "key": "max load",
+              "value": {
+                "kind": "Number",
+                "value": 3
+              }
+            },
+            {
+              "key": "if",
+              "value": {
+                "kind": "List",
+                "items": []
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "// role\nlet /* inline */ a = 1 // done": [
+      {
+        "kind": "Let",
+        "name": "a",
+        "init": {
+          "kind": "Number",
+          "value": 1
+        }
+      }
+    ]
+  },
+  "expressions": {
+    "[1, \"a\", true, false, null]": {
+      "kind": "List",
+      "items": [
+        {
+          "kind": "Number",
+          "value": 1
+        },
+        {
+          "kind": "String",
+          "value": "a"
+        },
+        {
+          "kind": "Boolean",
+          "value": true
+        },
+        {
+          "kind": "Boolean",
+          "value": false
+        },
+        {
+          "kind": "Null"
+        }
+      ]
+    },
+    "a || b && c == d < e + f * -g": {
+      "kind": "Logical",
+      "operator": "||",
+      "left": {
+        "kind": "Identifier",
+        "name": "a"
+      },
+      "right": {
+        "kind": "Logical",
+        "operator": "&&",
+        "left": {
+          "kind": "Identifier",
+          "name": "b"
+        },
+        "right": {
+          "kind": "Binary",
+          "operator": "==",
+          "left": {
+            "kind": "Identifier",
+            "name": "c"
+          },
+          "right": {
+            "kind": "Binary",
+            "operator": "<",
+            "left": {
+              "kind": "Identifier",
+              "name": "d"
+            },
+            "right": {
+              "kind": "Binary",
+              "operator": "+",
+              "left": {
+                "kind": "Identifier",
+                "name": "e"
+              },
+              "right": {
+                "kind": "Binary",
+                "operator": "*",
+                "left": {
+                  "kind": "Identifier",
+                  "name": "f"
+                },
+                "right": {
+                  "kind": "Unary",
+                  "operator": "-",
+                  "operand": {
+                    "kind": "Identifier",
+                    "name": "g"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "a - b - c": {
+      "kind": "Binary",
+      "operator": "-",
+      "left": {
+        "kind": "Binary",
+        "operator": "-",
+        "left": {
+          "kind": "Identifier",
+          "name": "a"
+        },
+        "right": {
+          "kind": "Identifier",
+          "name": "b"
+        }
+      },
+      "right": {
+        "kind": "Identifier",
+        "name": "c"
+      }
+    },
+    "a = b = 1": {
+      "kind": "Assign",
+      "target": {
+        "kind": "Identifier",
+        "name": "a"
+      },
+      "value": {
+        "kind": "Assign",
+        "target": {
+          "kind": "Identifier",
+          "name": "b"
+        },
+        "value": {
+          "kind": "Number",
+          "value": 1
+        }
+      }
+    },
+    "(a + b) * c": {
+      "kind": "Binary",
+      "operator": "*",
+      "left": {
+        "kind": "Binary",
+        "operator": "+",
+        "left": {
+          "kind": "Identifier",
+          "name": "a"
+        },
+        "right": {
+          "kind": "Identifier",
+          "name": "b"
+        }
+      },
+      "right": {
+        "kind": "Identifier",
+        "name": "c"
+      }
+    },
+    "memory.plan[0] = world.nearest(\"enemy\").x": {
+      "kind": "Assign",
+      "target": {
+        "kind": "Index",
+        "object": {
+          "kind": "Member",
+          "object": {
+            "kind": "Identifier",
+            "name": "memory"
+          },
+          "property": "plan"
+        },
+        "index": {
+          "kind": "Number",
+          "value": 0
+        }
+      },
+      "value": {
+        "kind": "Member",
+        "object": {
+          "kind": "Call",
+          "callee": {
+            "kind": "Member",
+            "object": {
+              "kind": "Identifier",
+              "name": "world"
+            },
+            "property": "nearest"
+          },
+          "args": [
+            {
+              "kind": "String",
+              "value": "enemy"
+            }
+          ]
+        },
+        "property": "x"
+      }
+    }
+  },
+  "serialisable": {
+    "kind": "Program",
+    "params": [],
+    "body": [
+      {
+        "kind": "FunctionDeclaration",
+        "name": "f",
+        "params": [
+          "a"
+        ],
+        "body": {
+          "kind": "Block",
+          "body": [
+            {
+              "kind": "ForOf",
+              "name": "x",
+              "list": {
+                "kind": "Identifier",
+                "name": "a",
+                "line": 1,
+                "column": 21
+              },
+              "body": {
+                "kind": "Block",
+                "body": [
+                  {
+                    "kind": "While",
+                    "test": {
+                      "kind": "Identifier",
+                      "name": "x",
+                      "line": 1,
+                      "column": 33
+                    },
+                    "body": {
+                      "kind": "Block",
+                      "body": [
+                        {
+                          "kind": "ExpressionStatement",
+                          "expression": {
+                            "kind": "Assign",
+                            "target": {
+                              "kind": "Identifier",
+                              "name": "x",
+                              "line": 1,
+                              "column": 38
+                            },
+                            "value": {
+                              "kind": "Object",
+                              "properties": [
+                                {
+                                  "key": "k",
+                                  "value": {
+                                    "kind": "List",
+                                    "items": [
+                                      {
+                                        "kind": "Identifier",
+                                        "name": "x",
+                                        "line": 1,
+                                        "column": 47
+                                      }
+                                    ],
+                                    "line": 1,
+                                    "column": 46
+                                  },
+                                  "line": 1,
+                                  "column": 43
+                                }
+                              ],
+                              "line": 1,
+                              "column": 42
+                            },
+                            "line": 1,
+                            "column": 38
+                          },
+                          "line": 1,
+                          "column": 38
+                        }
+                      ],
+                      "line": 1,
+                      "column": 36
+                    },
+                    "line": 1,
+                    "column": 26
+                  }
+                ],
+                "line": 1,
+                "column": 24
+              },
+              "line": 1,
+              "column": 11
+            }
+          ],
+          "line": 1,
+          "column": 9
+        },
+        "line": 1,
+        "column": 1
+      }
+    ]
+  }
+}
