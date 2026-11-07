@@ -240,6 +240,8 @@ describe('script views', () => {
       building: 'building("s1")',
       buildingAt: 'buildingAt(13, 10)',
       inCityArea: 'inCityArea("c1", 13, 10)',
+      cityAreaAt: 'cityAreaAt(13, 10)',
+      outsidersIn: 'outsidersIn("c1")',
       pileAt: 'pileAt(10, 10)',
       outputOf: 'outputOf(building("s1"))',
       materialsNeeded: 'materialsNeeded(building("site1"))',

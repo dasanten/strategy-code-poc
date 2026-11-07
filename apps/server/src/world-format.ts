@@ -13,6 +13,7 @@ import { hqFalls } from './hq-fall.js'
 import { grantHorses } from './horse-grant.js'
 import { horseName } from './horses.js'
 import { giveHorsesToNpcCities } from './npc-horses.js'
+import { noteOutsidersInside } from './outsiders.js'
 import { hash, mulberry32 } from './residents.js'
 import { paramTarget } from './script-params.js'
 import { placeTraders, putHqOnLoops } from './traders.js'
@@ -22,7 +23,7 @@ import { placeTraders, putHqOnLoops } from './traders.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 106
+export const WORLD_FORMAT_VERSION = 107
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -465,6 +466,15 @@ export const migrations: Record<number, MigrationStep> = {
   // of that kind (`CONTEXT.md`: Alarm). No such alarm rang before, so the step leaves every world as
   // it is.
   105: (state) => state,
+  // A city keeps who is in its area (`CONTEXT.md`: Alarm; `City.outsiders`). Those there already came
+  // in before there were alarms, so they go on the list as they stand, and raise none. A running
+  // script may keep the outsider alarm another took over from (`RunningScript.alarmUnder`); no alarm
+  // has yet.
+  106: (state, { terrain }) => {
+    const world = structuredClone(state) as WorldState
+    noteOutsidersInside(world, terrain.size)
+    return world
+  },
 }
 
 export class WorldFormatError extends Error {}

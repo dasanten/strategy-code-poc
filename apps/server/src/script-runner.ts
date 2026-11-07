@@ -43,6 +43,7 @@ import {
   type WorldState,
   isDown,
 } from '@csp/shared'
+import { backToOutsiderAlarm } from './alarms.js'
 import { resumeInterrupted } from './defence.js'
 import { recordEvent } from './events.js'
 import type { InvariantViolation } from './invariants.js'
@@ -1099,6 +1100,13 @@ export class ScriptRunner {
     }
     if (bound.ended()) {
       endScript(world, r.id)
+      // An Alarm script going back to an outsider alarm hasn't ended: it keeps what it remembered,
+      // and its script log has the reason.
+      if (r.holder.script === running) {
+        const kept = keepMemory(memory)
+        if (typeof kept !== 'string') running.memory = kept
+        return result.steps
+      }
       // A reason is noted each time, not rate-limited: an end is no error.
       if (reason !== null) {
         recordEvent(world, realm.id, {
@@ -1147,7 +1155,7 @@ export class ScriptRunner {
  */
 function endScript(world: WorldState, residentId: string): void {
   const r = world.residents.find((x) => x.id === residentId)
-  if (!r || resumeInterrupted(world, r)) return
+  if (!r || backToOutsiderAlarm(r) || resumeInterrupted(world, r)) return
   delete r.script
   r.order = null
 }

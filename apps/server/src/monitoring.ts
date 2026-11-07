@@ -64,6 +64,10 @@ export function createTickReporter(log: Logger): TickReporter {
         unit: 'millisecond',
         attributes,
       })
+      Sentry.metrics.distribution('tick.outsiders', health.outsidersMs, {
+        unit: 'millisecond',
+        attributes,
+      })
       Sentry.metrics.gauge('tick.scriptRuns', health.scriptRuns, { attributes })
       for (const [phase, ms] of phasesSlowestFirst(health.phases)) {
         Sentry.metrics.distribution(`tick.phase.${phase}`, ms, { unit: 'millisecond', attributes })

@@ -331,6 +331,11 @@ export interface RunningScript {
    * script has one, and it goes wherever the script goes, kept aside and back with it.
    */
   alarm?: Alarm
+  /**
+   * The outsider alarm `alarm` took over from (`CONTEXT.md`: Alarm script). When the script calls
+   * `end()` it goes on for this one instead of ending, so those holding the hall go back to it.
+   */
+  alarmUnder?: Alarm
 }
 
 /**
@@ -339,23 +344,23 @@ export interface RunningScript {
  */
 export interface Alarm {
   /**
-   * `occupied`: an occupation of the city's town hall started. `theft`: someone stole from the
-   * realm. `attacked`: someone struck a wall or gate of the city, or a resident of its realm in its
-   * area.
+   * `occupied`: an occupation of the city's town hall started. `outsider`: someone of another realm,
+   * not allied, came into its area. `theft`: someone stole from the realm. `attacked`: someone
+   * struck a wall or gate of the city, or a resident of its realm in its area.
    */
-  kind: 'occupied' | 'theft' | 'attacked'
+  kind: 'occupied' | 'outsider' | 'theft' | 'attacked'
   /** The city whose area it happened in. */
   cityId: string
   /**
-   * The resident it is about: for `occupied`, an occupier on the hall; for `theft`, the thief; for
-   * `attacked`, the attacker.
+   * The resident it is about: for `occupied`, an occupier on the hall; for `outsider`, who came; for
+   * `theft`, the thief; for `attacked`, the attacker.
    */
   about: string
   /** The realm of who it is about. */
   realmId: string | null
   /**
-   * Where it happened: for `occupied`, the town hall; for `theft`, where the thief took it; for
-   * `attacked`, what was struck.
+   * Where it happened: for `occupied`, the town hall; for `outsider`, where they stood; for `theft`,
+   * where the thief took it; for `attacked`, what was struck.
    */
   x: number
   y: number
@@ -2884,6 +2889,12 @@ export interface City {
    * Held `OCCUPATION_GAME_DAYS` without a break, it captures the city.
    */
   occupation: Occupation | null
+  /**
+   * The ids of the outsiders in its area as of the last tick (`CONTEXT.md`: Alarm), so that one
+   * coming in raises the alarm once and one leaving and coming back raises it again. Absent while
+   * there are none, and for trading posts and the HQ, which keep their own rules. Nobody sees it.
+   */
+  outsiders?: string[]
   /**
    * Who already raised an `attacked` alarm here (`CONTEXT.md`: Alarm), by resident id, with the tick
    * of their latest blow, so that a long fight raises it once. After `DEFEND_CALM_TICKS` with no

@@ -1337,17 +1337,25 @@ The shared language of the game. Domain terms only — no implementation details
   calm time Defend waits for; it doesn't interrupt those already fighting, and the one struck runs
   their Defence script. An alarm reaches the residents standing in that city's area who see it
   (Sight); an occupation reaches all of them. It runs their Alarm script. Army members, those hired
-  out and those driving a carriage get no alarm.
+  out and those driving a carriage get no alarm, and someone already attacking gets no outsider
+  alarm. Someone of an NPC city or of the Trade Organization counts as of another realm here.
 - **Alarm script:** the script a resident runs when an alarm reaches them: for an armed resident the
   game's **Alarm** default, unless the Player picked one of their own scripts or None for that
   resident, on the card's Script tab or the group card; an unarmed resident runs one only if the
   Player picked it. It interrupts and hands back like a Defence script: when it calls `end()`, what
   they were doing goes on. A blow still runs the Defence script, and once that ends the Alarm script
-  goes on; one alarm doesn't interrupt another, and while a Defence script runs or a Player's order
-  given under attack holds, an alarm doesn't reach them. A Player's order given meanwhile ends both.
+  goes on. One alarm doesn't interrupt another, with two exceptions: a theft or an attack takes over
+  from an outsider alarm, unless they are already attacking someone, and an occupation takes over
+  from any other. The script goes on with its memory, `me.alarm` now the new one. When it calls
+  `end()`, an outsider alarm it took over from goes on: those holding the hall go after the thief or
+  attacker, then back to holding while armed outsiders remain. An armed outsider who lures them away
+  and steps onto the hall raises the occupied alarm, and they all come back. While a Defence script
+  runs or a Player's order given under attack holds, an alarm doesn't reach them. A Player's order
+  given meanwhile ends both.
   Scripts read `me.alarm`: its kind, who it is about and their realm, the city and tile, and when;
   `inCityArea(cityId, x, y)` says whether a tile lies in a City area, for a city of their realm or a
-  tile in sight. **The Alarm default:** a thief, an occupier or an attacker it goes after
+  tile in sight, `cityAreaAt(x, y)` which city's area it lies in, and `outsidersIn(cityId)` lists the
+  outsiders they see in a City area. **The Alarm default:** a thief, an occupier or an attacker it goes after
   until they are dead or have left the area or sight; for an armed outsider it walks to the town
   hall and stands there until no armed outsider is left in the area, which blocks an occupation
   before it starts; an unarmed outsider it only logs. NPC villages, towns and self-managed cities

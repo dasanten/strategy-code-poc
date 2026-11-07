@@ -744,13 +744,13 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field(
         'kind',
         'string',
-        'What happened: "occupied", the city’s town hall occupied; "theft", someone stealing from the realm; "attacked", a wall or gate of the city or a resident of the realm struck.',
+        'What happened: "occupied", the city’s town hall occupied; "outsider", someone of another realm, not allied, came into its area; "theft", someone stealing from the realm; "attacked", a wall or gate of the city or a resident of the realm struck.',
       ),
       field('cityId', 'string', 'The city whose area it happened in.'),
       field(
         'about',
         'string',
-        'The id of the resident it is about: an occupier on the hall, the thief, or the attacker.',
+        'The id of the resident it is about: an occupier on the hall, the outsider who came, the thief, or the attacker.',
       ),
       field(
         'realmId',
@@ -761,12 +761,12 @@ export const SCRIPT_VIEWS: Readonly<Record<ScriptViewName, ScriptView>> = {
       field(
         'x',
         'number',
-        'Where it happened, from west to east: the town hall, where the thief took it, or what was struck.',
+        'Where it happened, from west to east: the town hall, where the outsider stood, where the thief took it, or what was struck.',
       ),
       field(
         'y',
         'number',
-        'Where it happened, from north to south: the town hall, where the thief took it, or what was struck.',
+        'Where it happened, from north to south: the town hall, where the outsider stood, where the thief took it, or what was struck.',
       ),
       field('tick', 'number', 'The tick it happened.'),
     ],

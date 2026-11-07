@@ -18,6 +18,7 @@ import {
   isDown,
   ageInYears,
   occupationTicksLeft,
+  cityIdsAt,
   inCityArea as cityAreaHolds,
   breedingPair,
   buildingAt,
@@ -352,6 +353,25 @@ export function bindScript(context: ScriptContext): ScriptBindings {
       const city = world.cities.find((c) => c.id === id)
       const ours = city && (sender.npcCityId !== undefined ? city.id : city.realmId) === side
       return !!city && (ours || inSight(at)) && cityAreaHolds(world, city, at.x, at.y, terrain.size)
+    },
+    cityAreaAt: ([x, y]) => {
+      const at = tile(x, y, 'cityAreaAt')
+      const here = cityIdsAt(world, at.x, at.y, terrain.size)
+      const ours = here.find((id) => {
+        const city = world.cities.find((c) => c.id === id)
+        return city && (sender.npcCityId !== undefined ? city.id : city.realmId) === side
+      })
+      return ours ?? (here[0] !== undefined && inSight(at) ? here[0] : null)
+    },
+    outsidersIn: ([id]) => {
+      const city = typeof id === 'string' ? world.cities.find((c) => c.id === id) : undefined
+      if (!city?.outsiders) return []
+      const ids = new Set(city.outsiders)
+      seen ??= context.seen()
+      return seen
+        .filter((e) => e.is === 'resident' && ids.has(e.id))
+        .map(untagged)
+        .map((rest) => asView(world, { ...rest, ...ownMemory(rest.id) }))
     },
     pileAt: ([x, y]) => {
       const at = tile(x, y, 'pileAt')
