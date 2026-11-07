@@ -251,7 +251,7 @@ describe('an outsider coming into the area', () => {
     expect(s.r.interrupted).toBeUndefined()
   })
 
-  it('counts for an NPC city too, though nobody there has an alarm yet', () => {
+  it('counts for an NPC city too, whose armed residents run the Alarm default', () => {
     const s = setup()
     const npc = addCity(s.world, { id: 'n1', realmId: null, x: 120, y: 120 })
     const home = newResident(mulberry32(10), { id: 'n', owner: null, x: 121, y: 118, tick: 0 })
@@ -261,7 +261,7 @@ describe('an outsider coming into the area', () => {
     s.enter(s.x1, 122, 119)
     stepOutsiders(s.world, SIZE)
     expect(npc.outsiders).toEqual(['x1'])
-    expect(home.script).toBeUndefined()
+    expect(home.script).toMatchObject({ scriptId: 0, task: 'alarm', alarm: { about: 'x1' } })
   })
 
   it('counts a resident of another NPC city, with no realm in the alarm', () => {

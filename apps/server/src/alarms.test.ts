@@ -274,13 +274,13 @@ describe('the town hall occupied', () => {
     for (const x of [soldier, hired, driver, down]) expect(x.script).toBeUndefined()
   })
 
-  it('is no alarm for an NPC city yet', () => {
+  it('reaches an NPC city too, with the game’s default', () => {
     const s = setup()
     s.city.realmId = null
     s.r.owner = null
     s.occupy()
     raiseOccupied(s.world, s.city, 'r2', SIZE)
-    expect(s.r.script).toBeUndefined()
+    expect(s.r.script).toMatchObject({ scriptId: 0, task: 'alarm', alarm: { kind: 'occupied' } })
   })
 })
 

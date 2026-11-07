@@ -638,7 +638,8 @@ The shared language of the game. Domain terms only — no implementation details
   (Control): by default they fight back when armed and go home when not, and then go on with
   what they were doing. Scripts see who last struck a resident and when (`struckBy`, `struckAt`),
   as far as the Player may see how that resident fares.
-  A city's soldiers fight attackers in its area on their own.
+  A trading post's and the HQ's soldiers fight attackers in its area on their own; every other city's
+  armed residents go by the Alarm script (Alarm).
 - **Walls in combat:** nobody walks through a wall. The city's own realm and its allies can stand on its walls
   and defend far better there. A **gate** lets the city's realm and its allies through always, everyone else
   only while it is open; the city's realm opens and closes it. A wall or gate can be **broken**
@@ -656,8 +657,8 @@ The shared language of the game. Domain terms only — no implementation details
   occupier on the hall counts as another realm, so nobody occupies it. The occupation starts the
   tick that holds and runs as long as it keeps holding; the first tick it doesn't, it is broken
   and its days are lost: the next one starts again from nothing. The city goes on as before
-  meanwhile; its soldiers fight the occupiers as they fight any attacker in its area, which is no
-  crime. Its realm's log says when its town hall is occupied, by whom, and when the occupation is broken. Anyone
+  meanwhile; its soldiers fight the occupiers (Alarm; a trading post's and the HQ's on their own),
+  which is no crime. Its realm's log says when its town hall is occupied, by whom, and when the occupation is broken. Anyone
   with the town hall in sight sees who occupies it and how long is left; scripts see it too.
 - **Mercenary contract:** one Organization rents residents to another for coins over a period.
   One side offers (residents, game days, price per game week, a storage of the lender to pay
@@ -1336,8 +1337,9 @@ The shared language of the game. Domain terms only — no implementation details
   first time someone at home sees them at it, and again only once no blow has come from them for the
   calm time Defend waits for; it doesn't interrupt those already fighting, and the one struck runs
   their Defence script. An alarm reaches the residents standing in that city's area who see it
-  (Sight); an occupation reaches all of them. It runs their Alarm script. Army members, those hired
-  out and those driving a carriage get no alarm, and someone already attacking gets no outsider
+  (Sight); an occupation reaches all of them, and in an NPC city also those who come home or get armed
+  while it lasts. It runs their Alarm script. Army members, those hired out and those driving a carriage
+  get no alarm, nor do an NPC city's founding party, and someone already attacking gets no outsider
   alarm. Someone of an NPC city or of the Trade Organization counts as of another realm here.
 - **Alarm script:** the script a resident runs when an alarm reaches them: for an armed resident the
   game's **Alarm** default, unless the Player picked one of their own scripts or None for that
@@ -1359,7 +1361,9 @@ The shared language of the game. Domain terms only — no implementation details
   until they are dead or have left the area or sight; for an armed outsider it walks to the town
   hall and stands there until no armed outsider is left in the area, which blocks an occupation
   before it starts; an unarmed outsider it only logs. NPC villages, towns and self-managed cities
-  run this default for their armed residents; trading posts and the HQ keep their own rules.
+  run this default for their armed residents, and nothing else: no Player picks theirs, and a blow
+  has them fight back first as under the Defend default, then the script goes on. Trading posts and
+  the HQ keep their own rules.
 - **Doing:** the line on a resident's card and in the resident list that says what they are
   doing, shown to the owning Player only. It is derived from their task and current order
   ("Building a house: fetching 10 wood from the storage", "Working the farm"); the script they

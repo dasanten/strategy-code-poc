@@ -2288,6 +2288,15 @@ export function Wiki() {
           armed outsider near still shuts the gates, on the soldiers too.
         </p>
         <p>
+          The soldiers of an NPC village, town or self-managed city run the same Alarm default as
+          your armed residents do (see Alarms): they go after a thief they saw, an attacker and
+          whoever occupies the town hall, as no crime, and walk to the town hall to hold it while an
+          armed outsider is in the area, then go home. An unarmed visitor they leave alone, and
+          striking anyone else there is a crime for them too. One who gets armed or comes home while
+          the hall is occupied joins in. Trading posts and the HQ keep their own rules: their soldiers
+          go straight at attackers and occupiers in the area, a post's at thieves it knows of as well.
+        </p>
+        <p>
           Bought outright, an NPC city asks {num(CITY_PRICE_PER_RESIDENT)} coins a resident plus,
           for its buildings:{' '}
           {(Object.entries(CITY_PRICE_BY_BUILDING) as [BuildingKind, number][])
