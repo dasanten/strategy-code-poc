@@ -148,6 +148,7 @@ import {
   cityPlansSound,
   npcFarmersKept,
   npcSurplusCapped,
+  npcSpareHandsWork,
   npcWorkplacesBounded,
   tradeOrgSendsNoOne,
 } from './npc-plan.js'
@@ -2157,6 +2158,7 @@ export const worldInvariants: Invariant[] = [
   innerWallLeavesAWay,
   npcFarmersKept,
   npcSurplusCapped,
+  npcSpareHandsWork,
   npcWorkplacesBounded,
   npcRoadCrewSized,
   npcRoadsOnce,

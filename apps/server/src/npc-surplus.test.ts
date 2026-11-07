@@ -27,7 +27,7 @@ import { npcHome, putToWork, stepNpcCities } from './npc-behaviour.js'
 import { foundNpcCity } from './npc-cities.js'
 import { findFoundingSite, foundingMaterials, foundingParty } from './npc-founding.js'
 import { plains } from './npc-growth.fixture.js'
-import { farmersWanted, npcSurplusCapped, planCity } from './npc-plan.js'
+import { farmersWanted, npcSpareHandsWork, npcSurplusCapped, planCity } from './npc-plan.js'
 import { mulberry32 } from './residents.js'
 import { newId } from './starting-city.js'
 import { foundTradingPost } from './trading-posts.js'
@@ -263,5 +263,81 @@ describe('the npc-surplus-capped invariant', () => {
     const { world, terrain } = planned(CAP.wood * 2)
     world.tick++
     expect(npcSurplusCapped.check(world, terrain)).toEqual([])
+  })
+})
+
+describe('the npc-spare-hands-work invariant', () => {
+  /** A plan made now that leaves an adult idle, with Wood `past` over the reserve and its camp empty. */
+  function idleBeside(past: number) {
+    const { world, terrain, city, camp, storage } = town()
+    storage.stock = pastReserve(world, city, { food: CAP.food, wood: past, stone: CAP.stone })
+    const adults = world.residents.filter((r) => r.cityId === city.id && canWork(r, world.tick))
+    const r = adults[0]!
+    delete r.carrying
+    delete r.weapon
+    delete r.carried.spear
+    const plan: CityPlan = { plannedAt: world.tick, jobs: { [r.id]: { kind: 'idle' } } }
+    world.cityPlans[city.id] = plan
+    return { world, terrain, city, camp, storage, plan, r, adults }
+  }
+
+  it('finds an idle adult beside a workplace with room, its good far below its cap', () => {
+    const { world, terrain, camp, r } = idleBeside(0)
+    const found = npcSpareHandsWork.check(world, terrain)
+    expect(found).toHaveLength(1)
+    expect(found[0]!.entityIds).toContain(camp.id)
+    expect(found[0]!.entityIds).toContain(r.id)
+    expect(checkInvariants(world, terrain).map((v) => v.invariant)).toContain(npcSpareHandsWork.name)
+  })
+
+  it('leaves a good over half its cap alone: it may have left the storage since the pass', () => {
+    const { world, terrain } = idleBeside(CAP.wood / 2 + 1)
+    expect(npcSpareHandsWork.check(world, terrain)).toEqual([])
+  })
+
+  it('leaves a full workplace alone, by plan or by who holds it', () => {
+    const { world, terrain, camp, plan, adults } = idleBeside(0)
+    const crew = adults.slice(1, (MAX_WORKERS.lumberCamp ?? 0) + 1)
+    for (const r of crew) plan.jobs[r.id] = { kind: 'work', buildingId: camp.id }
+    expect(npcSpareHandsWork.check(world, terrain)).toEqual([])
+    for (const r of crew) {
+      delete plan.jobs[r.id]
+      putToWork(r, camp)
+    }
+    expect(npcSpareHandsWork.check(world, terrain)).toEqual([])
+    // One of the crew gone, there is room.
+    delete crew[0]!.script
+    expect(npcSpareHandsWork.check(world, terrain)).toHaveLength(1)
+  })
+
+  it('leaves those not free to work alone: carrying a child, or armed', () => {
+    const { world, terrain, r } = idleBeside(0)
+    r.carrying = { partnerId: 'nobody', since: world.tick }
+    expect(npcSpareHandsWork.check(world, terrain)).toEqual([])
+    delete r.carrying
+    r.carried.spear = 1
+    expect(npcSpareHandsWork.check(world, terrain)).toEqual([])
+  })
+
+  it('leaves a plan of an earlier tick alone, and a Trade Org city', () => {
+    const { world, terrain, city } = idleBeside(0)
+    city.tradeOrg = 'post'
+    expect(npcSpareHandsWork.check(world, terrain)).toEqual([])
+    delete city.tradeOrg
+    world.tick++
+    expect(npcSpareHandsWork.check(world, terrain)).toEqual([])
+  })
+
+  it('holds for what a real pass plans, with its caps full and with them not', () => {
+    const { world, terrain, city, storage, camp } = idleBeside(0)
+    planCity(world, city)
+    expect(Object.values(world.cityPlans[city.id]!.jobs).some((j) => j.buildingId === camp.id)).toBe(
+      true,
+    )
+    expect(npcSpareHandsWork.check(world, terrain)).toEqual([])
+    storage.stock = pastReserve(world, city, { food: CAP.food, wood: CAP.wood, stone: CAP.stone })
+    const plan = planCity(world, city)
+    expect(Object.values(plan.jobs).some((j) => j.kind === 'idle')).toBe(true)
+    expect(npcSpareHandsWork.check(world, terrain)).toEqual([])
   })
 })

@@ -739,6 +739,52 @@ export const npcSurplusCapped: Invariant = {
 }
 
 /**
+ * An NPC city's spare hands don't stand idle while it has work for them (`CONTEXT.md`: Spare hands'
+ * work; ADR 0004): in the plan its pass made this tick, nobody free to work is idle while a farm or
+ * workplace on a node of its has room and its good lies under half its cap past the reserve (`surplusWork`;
+ * half, for what has left the storage since the pass, this same tick). How many of its adults are idle
+ * can't be held live: a city with its caps full has nothing for them, which is no fault. This is
+ * the rule beneath that share. A Trade Org city has no cap.
+ */
+export const npcSpareHandsWork: Invariant = {
+  name: 'npc-spare-hands-work',
+  check(world) {
+    const out: InvariantViolation[] = []
+    for (const [cityId, plan] of Object.entries(world.cityPlans)) {
+      if (plan.plannedAt !== world.tick) continue
+      const city = world.cities.find((c) => c.id === cityId)
+      if (!city || city.tradeOrg) continue
+      const jobs = Object.values(plan.jobs)
+      if (!jobs.some((j) => j.kind === 'idle')) continue
+      const people = runResidents(world).get(cityId) ?? []
+      const free = (r: Resident) =>
+        plan.jobs[r.id]?.kind === 'idle' &&
+        canWork(r, world.tick) &&
+        !isDown(r) &&
+        !r.carrying &&
+        !isArmed(r)
+      const idle = people.filter(free)
+      if (idle.length === 0) continue
+      const held = new Places(people)
+      const planned = (b: Building) => jobs.filter((j) => j.buildingId === b.id).length
+      const full = surplusWork(world, city, chainStore(world, city))
+      const open = ownWorkplaces(world, city).find((b) => {
+        if (b.site || RECIPES[b.kind]) return false
+        const most = MAX_WORKERS[b.kind] ?? 0
+        return (full(b) ?? 1) < 0.5 && Math.max(planned(b), held.taken(b)) < most
+      })
+      if (!open) continue
+      out.push({
+        invariant: this.name,
+        message: `${cityId} plans ${idle.length} idle, with room at ${open.id}, a ${open.kind} under half its cap`,
+        entityIds: [cityId, open.id, ...idle.map((r) => r.id)],
+      })
+    }
+    return out
+  },
+}
+
+/**
  * An NPC city opens no more workplaces than a good needs (`CONTEXT.md`: Spare hands' work; ADR 0004):
  * a plan made this tick lays out no workplace on a node of a good it already has one finished of,
  * unless it is a big city (`isBigNpcCity`) with just that one. A site already begun isn't looked at.
