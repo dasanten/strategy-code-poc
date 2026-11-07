@@ -6,6 +6,7 @@ import {
   type Stock,
   type WorldState,
 } from '@csp/shared'
+import { raiseTheft } from './alarms.js'
 import { caravanCarriageStolen } from './caravans.js'
 import { traderCarriageStolen } from './traders.js'
 import { commitCrime, organizationName } from './crimes.js'
@@ -30,7 +31,7 @@ function goodsOf(load: Stock | undefined): Stock | undefined {
  * `size` tiles (`CONTEXT.md`: Stealing a carriage or horse), once the shared check allows it
  * (`driveOffProblem`, `takeProblem`). It joins that realm at once, a carriage with its load and
  * hitched horse, and leaves any alliance army. One theft, known through a witness; none when it
- * belonged to nobody. The owner's log says at once that it is gone and where it was last, without
+ * belonged to nobody. A theft raises the alarm for those at home who see it (`raiseTheft`). The owner's log says at once that it is gone and where it was last, without
  * the thief, and the thief's realm's log says what they took. A caravan's carriage robs the caravan
  * and is replaced (`caravanCarriageStolen`), a trader's likewise (`traderCarriageStolen`); a supply
  * wagon's is gone for its army (`wagonStolen`).
@@ -58,6 +59,7 @@ export function takeOver(
     for (const a of world.alliances) a.army = a.army.filter((p) => p.id !== t.id)
   }
   commitCrime(world, size, 'theft', thief, { victimOrg, ...what, ...(goods && { goods }) })
+  if (victimOrg !== null) raiseTheft(world, thief, victimOrg, size)
   const { x, y } = thing
   recordEvent(world, victimOrg, { kind: 'transportGone', x, y, ...what })
   recordEvent(world, realmId, {

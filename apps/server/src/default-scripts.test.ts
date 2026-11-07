@@ -88,6 +88,7 @@ describe('a Player’s default scripts', () => {
   it('are in their library from the start, one per task, following the game’s default', () => {
     const list = listScripts(db, mara)
     expect(list.map((s) => [s.name, s.task, s.followsDefault])).toEqual([
+      ['Alarm (default)', 'alarm', true],
       ['Breed horses (default)', 'breed', true],
       ['Build (default)', 'build', true],
       ['Build line (default)', 'buildLine', true],
@@ -975,6 +976,92 @@ describe('the step budget', () => {
           memory: {},
           prepare: (world) => void (world.residents[0]!.struck = { by: 't1', tick: -1000 }),
         },
+      ],
+      alarm: [
+        // Armed with Tobin's t1 on the hall: going after them, or at it already; they gone;
+        // Tobin's t1 attacking, then gone; no alarm at all.
+        {
+          memory: {},
+          prepare: (world) => {
+            world.residents[0]!.carried.spear = 1
+            world.residents.find((r) => r.id === 't1')!.carried.spear = 1
+            world.residents[0]!.script = {
+              scriptId: 1,
+              task: 'alarm',
+              memory: {},
+              alarm: {
+                kind: 'occupied',
+                cityId: 'c1',
+                about: 't1',
+                realmId: world.residents.find((r) => r.id === 't1')!.owner,
+                x: 3,
+                y: 3,
+                tick: world.tick,
+              },
+            }
+          },
+        },
+        {
+          memory: {},
+          prepare: (world) => {
+            world.residents[0]!.carried.spear = 1
+            world.residents[0]!.script = {
+              scriptId: 1,
+              task: 'alarm',
+              memory: {},
+              alarm: {
+                kind: 'occupied',
+                cityId: 'c1',
+                about: 'nobody',
+                realmId: 'nobody',
+                x: 3,
+                y: 3,
+                tick: world.tick,
+              },
+            }
+          },
+        },
+        {
+          memory: {},
+          prepare: (world) => {
+            world.residents[0]!.carried.spear = 1
+            world.residents[0]!.script = {
+              scriptId: 1,
+              task: 'alarm',
+              memory: {},
+              alarm: {
+                kind: 'attacked',
+                cityId: 'c1',
+                about: 't1',
+                realmId: world.residents.find((r) => r.id === 't1')!.owner,
+                x: 3,
+                y: 3,
+                tick: world.tick,
+              },
+            }
+          },
+        },
+        {
+          memory: {},
+          prepare: (world) => {
+            world.residents[0]!.carried.spear = 1
+            world.residents[0]!.script = {
+              scriptId: 1,
+              task: 'alarm',
+              memory: {},
+              alarm: {
+                kind: 'attacked',
+                cityId: 'c1',
+                about: 'nobody',
+                realmId: 'nobody',
+                x: 3,
+                y: 3,
+                tick: world.tick,
+              },
+            }
+          },
+        },
+        { memory: {}, prepare: () => {} },
       ],
     }
     /** A storage of Mara's with Food, away from the farm. */

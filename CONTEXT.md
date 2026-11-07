@@ -638,7 +638,8 @@ The shared language of the game. Domain terms only — no implementation details
   (Control): by default they fight back when armed and go home when not, and then go on with
   what they were doing. Scripts see who last struck a resident and when (`struckBy`, `struckAt`),
   as far as the Player may see how that resident fares.
-  A city's soldiers fight attackers in its area on their own.
+  A trading post's and the HQ's soldiers fight attackers in its area on their own; every other city's
+  armed residents go by the Alarm script (Alarm).
 - **Walls in combat:** nobody walks through a wall. The city's own realm and its allies can stand on its walls
   and defend far better there. A **gate** lets the city's realm and its allies through always, everyone else
   only while it is open; the city's realm opens and closes it. A wall or gate can be **broken**
@@ -656,8 +657,8 @@ The shared language of the game. Domain terms only — no implementation details
   occupier on the hall counts as another realm, so nobody occupies it. The occupation starts the
   tick that holds and runs as long as it keeps holding; the first tick it doesn't, it is broken
   and its days are lost: the next one starts again from nothing. The city goes on as before
-  meanwhile; its soldiers fight the occupiers as they fight any attacker in its area, which is no
-  crime. Its realm's log says when its town hall is occupied, by whom, and when the occupation is broken. Anyone
+  meanwhile; its soldiers fight the occupiers (Alarm; a trading post's and the HQ's on their own),
+  which is no crime. Its realm's log says when its town hall is occupied, by whom, and when the occupation is broken. Anyone
   with the town hall in sight sees who occupies it and how long is left; scripts see it too.
 - **Mercenary contract:** one Organization rents residents to another for coins over a period.
   One side offers (residents, game days, price per game week, a storage of the lender to pay
@@ -698,7 +699,12 @@ The shared language of the game. Domain terms only — no implementation details
 
 ## Crime and reputation
 
-- **Crime:** theft, attack, killing or tearing down buildings against another organization.
+- **Crime:** theft, attack, killing or tearing down buildings against another organization. In a
+  city's own City area, striking someone occupying its town hall, or a thief of its realm that the
+  realm knows of or one of its residents saw, is no crime; for an NPC city, the same for the city.
+  Someone occupying is someone armed standing on the hall who could hold it, also once a defender
+  stepping onto the hall has broken the occupation; one who has walked off it no longer is.
+  Striking anyone else there still is.
 - **Witness:** a resident who sees a crime (within sight range), or a victim who survives it. A
   crime only becomes known when a witness physically brings the news home. No witness, no
   consequences.
@@ -1321,6 +1327,43 @@ The shared language of the game. Domain terms only — no implementation details
   A Player's own defence script decides for itself: a driver's drive or haul route goes on until it
   gives them another order. Residents with no Player follow the same rule, and a caravan's driver
   under attack doesn't wait for their escort.
+- **Alarm:** something happening in a City area that residents at home can react to (ADR 0028). Four
+  kinds: **outsider**, someone of another realm, not allied, entering the area, raised once on
+  entering, and again if they leave and come back (Trade Org caravans and wandering traders, with
+  their crews, don't count); **theft**, someone stealing from the realm (goods, a carriage or a
+  horse); **occupied**, an occupation of the city's town hall starting (Occupying a town hall);
+  **attacked**, someone attacking a wall or gate of the city, or striking a resident of the realm
+  standing in its area, a blow struck in fighting back aside. It is raised once per attacker, the
+  first time someone at home sees them at it, and again only once no blow has come from them for the
+  calm time Defend waits for; it doesn't interrupt those already fighting, and the one struck runs
+  their Defence script. An alarm reaches the residents standing in that city's area who see it
+  (Sight); an occupation reaches all of them, and in an NPC city also those who come home or get armed
+  while it lasts. It runs their Alarm script. Army members, those hired out and those driving a carriage
+  get no alarm, nor do an NPC city's founding party, and someone already attacking gets no outsider
+  alarm. Someone of an NPC city or of the Trade Organization counts as of another realm here.
+- **Alarm script:** the script a resident runs when an alarm reaches them: for an armed resident the
+  game's **Alarm** default, unless the Player picked one of their own scripts or None for that
+  resident, on the card's Script tab or the group card; an unarmed resident runs one only if the
+  Player picked it. It interrupts and hands back like a Defence script: when it calls `end()`, what
+  they were doing goes on. A blow still runs the Defence script, and once that ends the Alarm script
+  goes on. One alarm doesn't interrupt another, with two exceptions: a theft or an attack takes over
+  from an outsider alarm, unless they are already attacking someone, and an occupation takes over
+  from any other. The script goes on with its memory, `me.alarm` now the new one. When it calls
+  `end()`, an outsider alarm it took over from goes on: those holding the hall go after the thief or
+  attacker, then back to holding while armed outsiders remain. An armed outsider who lures them away
+  and steps onto the hall raises the occupied alarm, and they all come back. While a Defence script
+  runs or a Player's order given under attack holds, an alarm doesn't reach them. A Player's order
+  given meanwhile ends both.
+  Scripts read `me.alarm`: its kind, who it is about and their realm, the city and tile, and when;
+  `inCityArea(cityId, x, y)` says whether a tile lies in a City area, for a city of their realm or a
+  tile in sight, `cityAreaAt(x, y)` which city's area it lies in, and `outsidersIn(cityId)` lists the
+  outsiders they see in a City area. **The Alarm default:** a thief, an occupier or an attacker it goes after
+  until they are dead or have left the area or sight; for an armed outsider it walks to the town
+  hall and stands there until no armed outsider is left in the area, which blocks an occupation
+  before it starts; an unarmed outsider it only logs. NPC villages, towns and self-managed cities
+  run this default for their armed residents, and nothing else: no Player picks theirs, and a blow
+  has them fight back first as under the Defend default, then the script goes on. Trading posts and
+  the HQ keep their own rules.
 - **Doing:** the line on a resident's card and in the resident list that says what they are
   doing, shown to the owning Player only. It is derived from their task and current order
   ("Building a house: fetching 10 wood from the storage", "Working the farm"); the script they

@@ -33,6 +33,7 @@ import {
   buildingPile,
   isAt,
 } from '@csp/shared'
+import { raiseOccupied } from './alarms.js'
 import { caravanCrew } from './caravans.js'
 import { attackOrder } from './combat.js'
 import { cityOrganization, knownThieves } from './crimes.js'
@@ -42,11 +43,15 @@ import { foundingParty } from './npc-founding.js'
 import { startWork } from './work.js'
 
 /**
- * One tick of NPC cities defending themselves (`CONTEXT.md`: NPC city, Combat, Trading post):
- * every city run by the game sends its armed residents in its area after attackers there, a
- * trading post's after the thieves it knows of too; one that isn't the Trade Organization's also
- * keeps soldiers by its size and closes its gates while armed outsiders are near, a trading post
- * keeps soldiers by its size, and the Trade Org HQ builds its army (`tradeOrgArmyTarget`). Like
+ * One tick of NPC cities defending themselves (`CONTEXT.md`: NPC city, Combat, Trading post, Alarm):
+ * a trading post and the HQ send their armed residents in their area after attackers there, a
+ * trading post's after the thieves it knows of too. A city that isn't the Trade Organization's has
+ * its armed residents run the Alarm default instead, as a Player's do (`alarms.ts`): those alarms
+ * are raised where what they are about happens. As it always has, it also sends after those
+ * occupying its town hall whoever came home or got armed since the occupation started
+ * (`raiseOccupied`), and it keeps soldiers by its size and closes its gates while armed outsiders
+ * are near. A trading post keeps soldiers by its size, and the Trade Org HQ builds its army
+ * (`tradeOrgArmyTarget`). Like
  * the rest of an NPC city's behaviour it only gives orders a Player could give
  * (ADR 0002), or opens and closes its own gates as a realm does. Run before `stepNpcCities`, so
  * the work it hands out passes its soldiers by. `size` is the map's.
@@ -67,7 +72,8 @@ export function stepNpcDefence(world: WorldState, size: number): void {
         !away.has(r.id) &&
         !contractOf(world, r.id),
     )
-    fightAttackers(world, city, people, size)
+    if (city.tradeOrg) fightAttackers(world, city, people, size)
+    else if (city.occupation) raiseOccupied(world, city, city.occupation.realmId, size)
     const adults = people.filter((r) => canWork(r, world.tick)).length
     if (city.tradeOrg === 'hq') {
       // Its army's weapons come from its goods warehouse, which keeps them in stock.
@@ -139,15 +145,15 @@ export function attackersOf(world: WorldState, city: City, size: number): Reside
  * thefts from it that it knows of or one of its residents saw, standing in its area.
  */
 export function thievesOf(world: WorldState, city: City, size: number): Resident[] {
-  const thieves = knownThieves(world, city)
+  const thieves = knownThieves(world, cityOrganization(city))
   return world.residents.filter(
     (r) => thieves.has(r.id) && r.health > 0 && inCityArea(world, city, r.x, r.y, size),
   )
 }
 
 /**
- * A city's soldiers fight attackers in its area on their own (`CONTEXT.md`: Combat): each of its
- * defenders there (`defendsCity`) not already fighting goes after the nearest attacker, a trading
+ * A trading post's or the HQ's soldiers fight attackers in its area on their own (`CONTEXT.md`:
+ * Combat, Trading post): each of its defenders there (`defendsCity`) not already fighting goes after the nearest attacker, a trading
  * post's after the nearest thief it knows of too (`thievesOf`).
  */
 function fightAttackers(world: WorldState, city: City, people: Resident[], size: number): void {
@@ -198,6 +204,8 @@ function keepSoldiers(
   const adults = people.filter((r) => canWork(r, world.tick) && !party.has(r.id))
   const soldiers = adults.filter(isArmed)
   for (const r of soldiers) {
+    // Their Alarm script hands back what it interrupted, which they are put off then if need be.
+    if (r.script?.task === 'alarm') continue
     // A bare building order would hold them, and the materials on them, at the site for good.
     if (r.order?.kind === 'workAt' || r.order?.kind === 'build') stopWork(r)
     else delete r.script

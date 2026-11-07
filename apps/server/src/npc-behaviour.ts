@@ -198,6 +198,8 @@ function runCity(
 
   stopBuildersWhoCantGoOn(world, adults, store)
   for (const r of adults) {
+    // On alarm, they get back to all this when their Alarm script hands back.
+    if (r.script?.task === 'alarm') continue
     sendToWarehouse(world, city, r)
     const o = r.order
     const busy = o?.kind === 'workAt' || o?.kind === 'build' || o?.kind === 'tearDown'

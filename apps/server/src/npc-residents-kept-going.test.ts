@@ -259,7 +259,21 @@ describe('after a Leader death', () => {
       }),
       add('bare-worker', farm, (r) => void (r.order = workAt())),
       ...TASKS.map((task) =>
-        add(`task-${task}`, home, (r) => void (r.script = { scriptId: 0, task, memory: {} })),
+        add(`task-${task}`, home, (r) => {
+          r.script = { scriptId: 0, task, memory: {} }
+          // An Alarm script always has what it interrupted kept aside, and its alarm.
+          if (task !== 'alarm') return
+          r.interrupted = { order: null }
+          r.script.alarm = {
+            kind: 'occupied',
+            cityId: city.id,
+            about: 'nobody',
+            realmId: null,
+            x: home.x,
+            y: home.y,
+            tick: 0,
+          }
+        }),
       ),
     ]
     leaderDies()
