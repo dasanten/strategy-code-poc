@@ -5,21 +5,27 @@ import {
   MOUNTAIN_ROAD_WORK_FACTOR,
   NPC_BUILDERS,
   NPC_ROAD_CREW,
+  NPC_RESIDENTS_PER_NEEDS_STEP,
   NPC_ROAD_LONGEST,
   NPC_SMITHY_WEAPON,
   NPC_SOLDIER_SHARE,
   NPC_SURPLUS_CAP,
   NPC_TOWN,
   NPC_TRADER_REACH,
+  NPC_VILLAGE,
   OWN_FOOD,
   TICKS_PER_GAME_DAY,
   Terrain,
   WALK_TICKS_PER_TILE,
   buildingAt,
+  cityResidents,
   covers,
   footprintTiles,
   inCityArea,
+  hasFoodSurplus,
+  isBigNpcCity,
   isDown,
+  npcFullDays,
   npcReserve,
   roadAt,
   roadCrewFood,
@@ -41,13 +47,21 @@ import { describe, expect, it } from 'vitest'
 import { cityStreetsSound, layoutPlan, streetsOwed } from './city-layout.js'
 import { checkInvariants } from './invariants.js'
 import { npcHome, stepNpcCities } from './npc-behaviour.js'
+import { bigCity, unhurriedWalking } from './npc-big-city.fixture.js'
+import { ownWorkplaces } from './npc-chain.js'
 import { foundNpcCity } from './npc-cities.js'
-import { foundingMaterials } from './npc-founding.js'
+import { foundingMaterials, foundingParty, fullButMaterials } from './npc-founding.js'
 import { plains } from './npc-growth.fixture.js'
 import { farStableSpot, houseTile, stableTile, wallRings } from './npc-growth.js'
 import { giveNpcHorses } from './npc-horses.js'
 import { planCity } from './npc-plan.js'
-import { npcRoadCrewSized, npcRoadsOnce, roadCrew, type WayFinder } from './npc-roads.js'
+import {
+  layRoad,
+  npcRoadCrewSized,
+  npcRoadsOnce,
+  roadCrew,
+  type WayFinder,
+} from './npc-roads.js'
 import { PathFinder, WALKING_COSTS } from './pathfinding.js'
 import { mulberry32 } from './residents.js'
 import { newId } from './starting-city.js'
@@ -80,10 +94,10 @@ function camp(world: WorldState, terrain: TerrainMap, city: City, dx: number, dy
 }
 
 /** A town alone on Plains with a far lumber camp, holding its reserve and `past` above it. */
-function town(past: Stock = { stone: 50 }, size = 300) {
+function town(past: Stock = { stone: 50 }, size = 300, kind = NPC_TOWN) {
   const terrain = plains(size)
   const world = createWorld(terrain)
-  const city = foundNpcCity(world, terrain, NPC_TOWN, 60, 60, mulberry32(5))
+  const city = foundNpcCity(world, terrain, kind, 60, 60, mulberry32(5))
   const place = camp(world, terrain, city, FAR)
   const storage = npcHome(world, city)!
   setStock(world, city, storage, past)
@@ -133,8 +147,9 @@ function neighbour(
   terrain: TerrainMap,
   dx: number,
   past: Stock = { stone: 50 },
+  kind = NPC_TOWN,
 ) {
-  const city = foundNpcCity(world, terrain, NPC_TOWN, 60 + dx, 60, mulberry32(6))
+  const city = foundNpcCity(world, terrain, kind, 60 + dx, 60, mulberry32(6))
   setStock(world, city, npcHome(world, city)!, past)
   layStreets(world, terrain, city)
   return city
@@ -711,6 +726,340 @@ describe('a road crew going on from its workplaces', () => {
     // None of it on the start's land: no way, without a search.
     const across = finder.findPath([20, 50], [55, 50], WALKING_COSTS, { area: tiles([50, 51]) })
     expect(across.status).toBe('unreachable')
+  })
+})
+
+describe('a big city going on past its nearest', () => {
+  /** A city big enough to go further (`isBigNpcCity`). */
+  const BIG = { ...NPC_TOWN, residents: 2 * NPC_RESIDENTS_PER_NEEDS_STEP + 10, farms: 8 }
+
+  const to = (plan: CityPlan) => (plan.roads ?? []).map((r) => r.to)
+
+  /** The places its roads go on to, past its workplaces. */
+  const past = (world: WorldState, city: City, plan: CityPlan) => {
+    const own = new Set(ownWorkplaces(world, city).map((b) => b.id))
+    return to(plan).filter((id) => !own.has(id))
+  }
+
+  /** Plans and lays what it wants until it has a way to `id`, not yet laid. */
+  function until(world: WorldState, terrain: TerrainMap, city: City, ways: WayFinder, id: string) {
+    let plan = planCity(world, city, terrain, undefined, ways)
+    for (let i = 0; i < 12 && !to(plan).includes(id); i++) {
+      layNew(
+        world,
+        (plan.roads ?? []).flatMap((r) => r.tiles),
+      )
+      plan = planCity(world, city, terrain, undefined, ways)
+    }
+    expect(to(plan)).toContain(id)
+    return plan
+  }
+
+  it('goes on to a second neighbour once the first is done', () => {
+    const { world, terrain, city } = town({ stone: 50 }, 1000, BIG)
+    expect(isBigNpcCity(world, city)).toBe(true)
+    const near = neighbour(world, terrain, 150)
+    const far = neighbour(world, terrain, 400)
+    const { ways, asked } = waysOf(world, terrain)
+
+    const first = until(world, terrain, city, ways, near.id)
+    expect(first.roads!.find((r) => r.to === near.id)!.tiles.length).toBeGreaterThan(0)
+    expect(to(first)).not.toContain(far.id)
+    expect(asked.filter((key) => key.endsWith(`:${far.id}`))).toEqual([])
+
+    const plan = joinAll(world, terrain, city, ways)
+    const roads = to(plan)
+    expect(roads.indexOf(near.id)).toBeLessThan(roads.indexOf(far.id))
+    expect(roads).toHaveLength(new Set(roads).size)
+    // To the edge of its area, as with the nearest; and with both done it has none left to build.
+    const [x, y] = plan.roads!.find((r) => r.to === far.id)!.tiles.at(-1)!
+    expect(inCityArea(world, far, x, y, terrain.size)).toBe(true)
+    expect(crewOf(world, plan)).toEqual([])
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('goes on to further warehouses in reach and further neighbours, nearest first', () => {
+    const { world, terrain, city } = town({ stone: 50 }, 1700, BIG)
+    const next = neighbour(world, terrain, 150)
+    const second = neighbour(world, terrain, 500)
+    const posts = [200, 350].map((y, i) =>
+      warehouseOf(world, foundTradingPost(world, terrain, 60, y, undefined, mulberry32(3 + i))),
+    )
+    const out = foundTradingPost(
+      world,
+      terrain,
+      60,
+      60 + NPC_TRADER_REACH + 50,
+      undefined,
+      mulberry32(9),
+    )
+    const { ways, asked } = waysOf(world, terrain)
+    const plan = joinAll(world, terrain, city, ways, 12)
+    // Today's two, then the further ones by how far they lie.
+    expect(past(world, city, plan)).toEqual([posts[0]!.id, next.id, posts[1]!.id, second.id])
+    const beyond = warehouseOf(world, out).id
+    expect(asked.some((key) => key.endsWith(`:${beyond}`))).toBe(false)
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it("leaves a village's and a town's list as it was", () => {
+    const { world, terrain, city } = town({ stone: 50 }, 1700)
+    expect(isBigNpcCity(world, city)).toBe(false)
+    const next = neighbour(world, terrain, 150)
+    neighbour(world, terrain, 500)
+    const near = foundTradingPost(world, terrain, 60, 200, undefined, mulberry32(3))
+    foundTradingPost(world, terrain, 60, 350, undefined, mulberry32(4))
+    const { ways } = waysOf(world, terrain)
+    const plan = joinAll(world, terrain, city, ways, 12)
+    expect(past(world, city, plan)).toEqual([warehouseOf(world, near).id, next.id])
+    expect(crewOf(world, plan)).toEqual([])
+  })
+
+  it('builds none without materials above its reserve, and goes on once it has them', () => {
+    const { world, terrain, city, storage } = town({ stone: 50 }, 1000, BIG)
+    const near = neighbour(world, terrain, 150)
+    const far = neighbour(world, terrain, 400)
+    const { ways, asked } = waysOf(world, terrain)
+    const first = until(world, terrain, city, ways, near.id)
+    layNew(
+      world,
+      first.roads!.flatMap((r) => r.tiles),
+    )
+
+    const kept = npcReserve(world, city).stone ?? 0
+    storage.stock = { ...storage.stock, stone: kept + STONE - 1 }
+    const without = planCity(world, city, terrain, undefined, ways)
+    expect(crewOf(world, without)).toEqual([])
+    expect(to(without)).not.toContain(far.id)
+    expect(asked.filter((key) => key.endsWith(`:${far.id}`))).toEqual([])
+
+    storage.stock = { ...storage.stock, stone: kept + STONE }
+    const plan = planCity(world, city, terrain, undefined, ways)
+    expect(to(plan)).toContain(far.id)
+    expect(crewOf(world, plan).length).toBeGreaterThan(0)
+  })
+
+  describe('once it would otherwise be full, with a further road still to build', () => {
+    /**
+     * A big city that has waited its time, on game day 100, with its road to its second neighbour
+     * begun and `stone` Stone past its reserve. Its Wood is at its reserve, so no party sets out.
+     */
+    function waiting(stone: number) {
+      const t = town({ stone: 50 }, 1000, BIG)
+      const near = neighbour(t.world, t.terrain, 150)
+      const far = neighbour(t.world, t.terrain, 400)
+      const { ways } = waysOf(t.world, t.terrain)
+      const first = until(t.world, t.terrain, t.city, ways, near.id)
+      layNew(
+        t.world,
+        first.roads!.flatMap((r) => r.tiles),
+      )
+      const begun = until(t.world, t.terrain, t.city, ways, far.id)
+      const tiles = begun.roads!.find((r) => r.to === far.id)!.tiles
+      layNew(t.world, tiles.slice(0, 1))
+      t.world.tick = 100 * TICKS_PER_GAME_DAY
+      begun.fullSince = 0
+      const reserve = npcReserve(t.world, t.city)
+      t.storage.stock = {
+        ...t.storage.stock,
+        wood: reserve.wood ?? 0,
+        stone: (reserve.stone ?? 0) + stone,
+      }
+      expect(hasFoodSurplus(t.world, t.city)).toBe(true)
+      expect(tiles.filter((tile) => !finished(t.world, tile)).length).toBeGreaterThan(0)
+      return { ...t, ways, plan: begun }
+    }
+    const hallAndStorage = foundingMaterials().stone!
+
+    it('stands down and leaves a town hall’s and a storage’s materials', () => {
+      const { world, terrain, city, storage, ways } = waiting(hallAndStorage)
+      const before = storage.stock?.stone
+      const plan = planCity(world, city, terrain, undefined, ways)
+      expect(plan.fullSince).toBe(0)
+      expect(fullButMaterials(world, city, plan)).toBe(true)
+      expect(crewOf(world, plan)).toEqual([])
+      expect(storage.stock?.stone).toBe(before)
+    })
+
+    it('fetches none of them for one already on the crew', () => {
+      const { world, terrain, city, storage, plan } = waiting(hallAndStorage)
+      const member = world.residents.find((r) => r.cityId === city.id)!
+      Object.assign(member, { x: storage.x, y: storage.y, order: null })
+      member.carried = {}
+      expect(layRoad(world, city, plan, member, [member], storage, terrain.size)).toBe(false)
+      expect(member.order).toBeNull()
+    })
+
+    it('goes on with the road from what is past them', () => {
+      const { world, terrain, city, storage, ways } = waiting(hallAndStorage + 1)
+      const plan = planCity(world, city, terrain, undefined, ways)
+      expect(fullButMaterials(world, city, plan)).toBe(true)
+      expect(crewOf(world, plan).length).toBeGreaterThan(0)
+
+      // One Stone to spare is all that is fetched: what the founding takes stays in the store.
+      const member = crewOf(world, plan)[0]!
+      Object.assign(member, { x: storage.x, y: storage.y, order: null })
+      member.carried = {}
+      expect(layRoad(world, city, plan, member, [member], storage, terrain.size)).toBe(true)
+      expect(member.order).toMatchObject({ kind: 'pickUp', goods: { stone: 1 } })
+    })
+  })
+
+  it('gives up a way too long, and goes on to the next', () => {
+    const size = 2 * NPC_ROAD_LONGEST + 400
+    const { world, terrain, city } = town({ stone: 50 }, size, BIG)
+    const round = neighbour(world, terrain, 150)
+    const after = neighbour(world, terrain, 400)
+    const beyond = neighbour(world, terrain, NPC_ROAD_LONGEST + 100)
+    const long = Array.from({ length: NPC_ROAD_LONGEST + 1 }, (): [number, number] => [1, 1])
+    const asked: string[] = []
+    const ways: WayFinder = {
+      way: (key, from) => {
+        asked.push(key)
+        if (key.endsWith(`:${round.id}`)) return { status: 'found', path: long, cost: long.length }
+        if (!key.endsWith(`:${after.id}`)) return { status: 'found', path: [], cost: 0 }
+        const path: [number, number][] = [[from[0] + 1, from[1] + 1]]
+        return { status: 'found', path, cost: 1 }
+      },
+    }
+    const plan = joinAll(world, terrain, city, ways)
+    const tilesTo = (id: string) => plan.roads!.find((r) => r.to === id)!.tiles
+    expect(tilesTo(round.id)).toEqual([])
+    expect(tilesTo(after.id)).toHaveLength(1)
+    // Too far as the crow flies: given up with no search at all.
+    expect(tilesTo(beyond.id)).toEqual([])
+    expect(asked.filter((key) => key.endsWith(`:${beyond.id}`))).toEqual([])
+    expect(asked.filter((key) => key.endsWith(`:${round.id}`))).toHaveLength(1)
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it('builds a road only once between two big cities, and each goes on to the third', () => {
+    const { world, terrain, city } = town({ stone: 50 }, 1000, BIG)
+    const other = neighbour(world, terrain, 150, { stone: 50 }, BIG)
+    const third = neighbour(world, terrain, 400)
+    const { ways } = waysOf(world, terrain)
+    const plan = joinAll(world, terrain, city, ways)
+    expect(to(plan)).toEqual(expect.arrayContaining([other.id, third.id]))
+    const theirs = joinAll(world, terrain, other, ways)
+    expect(to(theirs)).not.toContain(city.id)
+    expect(to(theirs)).toContain(third.id)
+    expect(crewOf(world, theirs)).toEqual([])
+    expect(checkInvariants(world, terrain)).toEqual([])
+  })
+
+  it(
+    'on the map, stands down for the founding with a further road unfinished, and then founds',
+    { tags: ['slow'], timeout: 1_800_000 },
+    () => {
+      const { world, terrain, city, home } = bigCity(undefined, 1300)
+      foundNpcCity(world, terrain, NPC_VILLAGE, 380, 60, mulberry32(40))
+      const far = foundNpcCity(world, terrain, NPC_VILLAGE, 580, 60, mulberry32(41))
+      const hallAndStorage = foundingMaterials().stone!
+      const reserve = npcReserve(world, city)
+      home.stock = {
+        ...home.stock,
+        wood: (reserve.wood ?? 0) + 800,
+        food: (reserve.food ?? 0) + 3000,
+        stone: (reserve.stone ?? 0) + 400,
+      }
+      const further = () => world.cityPlans[city.id]?.roads?.find((r) => r.to === far.id)?.tiles
+      const unfinished = () => (further() ?? []).filter((t) => !finished(world, t)).length
+
+      /** Lays at once all it wants ahead of the further road, so its crew comes to that road. */
+      const layAhead = (plan: CityPlan) => {
+        const ahead = (plan.roads ?? []).filter((r) => r.to !== far.id).flatMap((r) => r.tiles)
+        layNew(world, [...(plan.streets ?? []), ...ahead])
+      }
+      const { ways } = waysOf(world, terrain)
+      for (let i = 0; i < 40 && !further(); i++) {
+        layAhead(planCity(world, city, terrain, undefined, ways))
+      }
+      expect(unfinished()).toBeGreaterThan(0)
+
+      // It has waited its time, and Stone holds it back and nothing else: the rule has to leave what
+      // the quarry brings in until the party's share is there.
+      const kept = (npcReserve(world, city).stone ?? 0) + hallAndStorage
+      home.stock.stone = kept - 30
+      const waited = npcFullDays(cityResidents(world, city).length) * TICKS_PER_GAME_DAY
+      world.cityPlans[city.id]!.fullSince = world.tick - waited
+
+      const walking = unhurriedWalking(terrain)
+      let stoodDown = 0
+      let tookKept = 0
+      let othersTook = 0
+      let before = home.stock.stone
+      let lastPass: number | undefined
+      const held = new Map<string, number>()
+      let setOut: { day: number; left: number; stone: number } | undefined
+      while (world.tick < 20 * TICKS_PER_GAME_DAY && !setOut) {
+        stepWorld(world, terrain, walking)
+        const plan = world.cityPlans[city.id]!
+        const newPass = plan.plannedAt !== lastPass
+        lastPass = plan.plannedAt
+        if (newPass) layAhead(plan)
+        // Those sent out at first don't count as spare hands yet, which would start its wait over.
+        if (world.tick < TICKS_PER_GAME_DAY) plan.fullSince = world.tick - waited
+        const stone = home.stock.stone ?? 0
+        if (foundingParty(plan).length > 0) {
+          setOut = { day: world.tick / TICKS_PER_GAME_DAY, left: unfinished(), stone: before }
+        } else if (fullButMaterials(world, city, plan)) {
+          // What others take isn't the crew's: its project is built from the store as ever.
+          let crewTook = false
+          for (const r of crewOf(world, plan)) {
+            const now = r.carried.stone ?? 0
+            if (now > (held.get(r.id) ?? 0)) crewTook = true
+            held.set(r.id, now)
+          }
+          if (crewTook && stone < kept) tookKept++
+          if (!crewTook && stone < before) othersTook += before - stone
+          if (newPass && stone < kept && crewOf(world, plan).length === 0) stoodDown++
+        }
+        before = stone
+        if (world.tick % TICKS_PER_GAME_DAY === 0) {
+          expect(checkInvariants(world, terrain)).toEqual([])
+        }
+      }
+      expect(setOut).toBeDefined()
+
+      // The party fetches its share, as a road crew free of the rule may fetch at the same time.
+      const party = () =>
+        world.residents.filter((r) => world.cityPlans[city.id]?.jobs[r.id]?.kind === 'found')
+      const fetched = () => party().reduce((sum, r) => sum + (r.carried.stone ?? 0), 0)
+      const lastTick = world.tick + TICKS_PER_GAME_DAY
+      let lowest = home.stock.stone ?? 0
+      while (world.tick < lastTick && fetched() < hallAndStorage) {
+        stepWorld(world, terrain, walking)
+        lowest = Math.min(lowest, home.stock.stone ?? 0)
+      }
+      console.log(
+        `Further road and the founding: stood down ${stoodDown} passes, others took ${othersTook} Stone, set out ${JSON.stringify(setOut)} of ${further()?.length} tiles, kept ${kept}; the party holds ${fetched()} Stone, the store fell to ${lowest}, reserve ${npcReserve(world, city).stone}`,
+      )
+      expect(stoodDown).toBeGreaterThan(0)
+      expect(tookKept).toBe(0)
+      // Founding came before the road, the city held the party's Stone, and the party has it.
+      expect(setOut!.left).toBeGreaterThan(0)
+      expect(setOut!.stone).toBeGreaterThanOrEqual(kept)
+      expect(fetched()).toBeGreaterThanOrEqual(hallAndStorage)
+    },
+  )
+
+  it('lays a road to its second neighbour on the map', { tags: ['slow'], timeout: 600_000 }, () => {
+    const { world, terrain, city } = town({ stone: 400 }, 500, BIG)
+    const near = neighbour(world, terrain, 100, { stone: 400 })
+    const far = neighbour(world, terrain, 170, { stone: 400 })
+    const roadTo = (id: string) => world.cityPlans[city.id]?.roads?.find((r) => r.to === id)?.tiles
+    const built = (id: string) => {
+      const tiles = roadTo(id)
+      return tiles !== undefined && tiles.length > 0 && tiles.every((t) => finished(world, t))
+    }
+    const walking = new Walking(terrain)
+    for (let t = 0; t < 30 * TICKS_PER_GAME_DAY && !built(far.id); t++) {
+      stepWorld(world, terrain, walking)
+      if (t % TICKS_PER_GAME_DAY === 0) expect(checkInvariants(world, terrain)).toEqual([])
+    }
+    expect(built(near.id)).toBe(true)
+    expect(built(far.id)).toBe(true)
+    expect(checkInvariants(world, terrain)).toEqual([])
   })
 })
 
