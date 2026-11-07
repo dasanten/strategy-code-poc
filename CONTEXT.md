@@ -521,7 +521,13 @@ The shared language of the game. Domain terms only — no implementation details
   own rules.
 - **Bigger projects:** once nothing is short, from materials above its reserve, a big NPC city (by a
   balance number of residents) builds beyond its needs: a training ground, an inner ring of wall
-  round its town hall and storage with a gate, and more roads (NPC road).
+  round its town hall and storage with a gate, and more roads (NPC road). The inner ring goes up tile
+  by tile like its outer wall, once that has its gate and isn't moving out, and waits whenever
+  something runs short. It takes the shape that leaves fewest gaps, along its layout's streets where
+  it can: a square on the lanes round the town hall in Grid, a circle on the first lane in Rings. What
+  stands on its line leaves a gap, as in any wall, and a street it crosses stops at it. Its gate
+  stands in line with the outer gate and goes up last, so its people never lose the way to the
+  storage. The city grows its outer wall as before, and never tears the inner ring down.
 - **NPC road:** a road an NPC city builds with a **road crew** of its spare hands (at most a balance
   number at once, which grows with the city, apart from its builders), only from materials above its reserve. Once the city would otherwise be full (Full city), it also leaves a town hall's and a storage's materials untouched, so founding comes before roads. Its layout's
   streets come first (City layout). Then it follows the

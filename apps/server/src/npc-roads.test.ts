@@ -857,8 +857,9 @@ describe('on the map', () => {
     'joins two cities with one road, and reaches a post on the way',
     { tags: ['slow'], timeout: 600_000 },
     () => {
-      const { world, terrain, city } = town({ stone: 400 }, 500)
-      const next = neighbour(world, terrain, 130, { stone: 400 })
+      // Past what they keep from their crews once they would be full (`CONTEXT.md`: NPC road).
+      const { world, terrain, city } = town({ stone: 500 }, 500)
+      const next = neighbour(world, terrain, 130, { stone: 500 })
       const post = foundTradingPost(world, terrain, 60, 150, undefined, mulberry32(3))
       const warehouse = warehouseOf(world, post)
       const roadTo = (c: City, to: string) =>

@@ -44,7 +44,7 @@ describe('a big NPC city', () => {
     'on a map with room, founds a daughter unaided, and goes on feeding itself',
     { tags: ['slow'], timeout: 1_800_000 },
     () => {
-      const staged = bigCity(1300)
+      const staged = bigCity(undefined, 1300)
       const { world, terrain, city } = staged
       const walking = unhurriedWalking(terrain)
 

@@ -685,6 +685,13 @@ export const NPC_SURPLUS_CAP: Partial<Record<Good, number>> = {
 export const NPC_WALL_STEP = 8
 
 /**
+ * How far from the middle of its town hall a big NPC city's inner ring of wall may stand
+ * (`CONTEXT.md`: Bigger projects), in tiles: room for its first lanes round the hall and storage,
+ * and always short of its outer wall, which stands at least 14 from its home.
+ */
+export const NPC_INNER_WALL_REACH = 9
+
+/**
  * Tiles along each side of a block of the Grid layout (`CONTEXT.md`: City layout): room for two
  * houses each way, or one stable. A lane one tile wide, left free for a street, runs between blocks.
  */
