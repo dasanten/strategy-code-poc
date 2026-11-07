@@ -37,6 +37,38 @@ export function encodeChunk(tiles: Uint8Array, nodes: KnownNode[], cx: number, c
   return out
 }
 
+/**
+ * Many chunks in one body, as served from `TERRAIN_BATCH_PATH`: for each, its index (see
+ * `chunksAcross`) and the length of its bytes, both unsigned 32-bit little-endian, then the bytes
+ * `encodeChunk` gives.
+ */
+export function encodeChunkBatch(chunks: ReadonlyArray<readonly [number, Uint8Array]>): Uint8Array {
+  const out = new Uint8Array(chunks.reduce((sum, [, bytes]) => sum + 8 + bytes.length, 0))
+  const view = new DataView(out.buffer)
+  let at = 0
+  for (const [index, bytes] of chunks) {
+    view.setUint32(at, index, true)
+    view.setUint32(at + 4, bytes.length, true)
+    out.set(bytes, at + 8)
+    at += 8 + bytes.length
+  }
+  return out
+}
+
+/** The chunks of an `encodeChunkBatch` body, each as its index and its `encodeChunk` bytes. */
+export function decodeChunkBatch(body: Uint8Array): Array<[number, Uint8Array]> {
+  const view = new DataView(body.buffer, body.byteOffset, body.byteLength)
+  const chunks: Array<[number, Uint8Array]> = []
+  for (let at = 0; at + 8 <= body.length;) {
+    const index = view.getUint32(at, true)
+    const length = view.getUint32(at + 4, true)
+    if (at + 8 + length > body.length) break
+    chunks.push([index, body.subarray(at + 8, at + 8 + length)])
+    at += 8 + length
+  }
+  return chunks
+}
+
 export function decodeChunk(cx: number, cy: number, bytes: Uint8Array): TerrainChunk {
   const size = CHUNK_SIZE * CHUNK_SIZE
   const nodes: KnownNode[] = []

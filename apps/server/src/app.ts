@@ -17,6 +17,9 @@ import {
   FIRST_DAY_PATH,
   SCRIPT_WRITES_PER_MINUTE,
   SESSION_COOKIE,
+  TERRAIN_BATCH_MAX,
+  TERRAIN_BATCH_PATH,
+  encodeChunkBatch,
   type Account,
   type AdminDirectives,
   type ApiError,
@@ -227,6 +230,20 @@ export async function buildApp(opts: AppOptions) {
       const chunk = explored.chunk(req.user, Number(req.params.cx), Number(req.params.cy))
       if (!chunk) return fail(reply, 'not-explored', 'You have not explored that terrain.')
       return reply.type('application/octet-stream').send(Buffer.from(chunk))
+    })
+    // Many chunks in one answer, so a Player who explored a lot loads the map in a few requests.
+    app.post(TERRAIN_BATCH_PATH, async (req, reply) => {
+      if (!req.user) return fail(reply, 'not-logged-in', 'Not logged in.')
+      const wanted = body(req).chunks
+      if (!Array.isArray(wanted) || wanted.length > TERRAIN_BATCH_MAX) {
+        return fail(
+          reply,
+          'invalid-input',
+          `Ask for a list of at most ${TERRAIN_BATCH_MAX} chunk indices.`,
+        )
+      }
+      const batch = explored.chunkBatch(req.user, wanted)
+      return reply.type('application/octet-stream').send(Buffer.from(encodeChunkBatch(batch)))
     })
   }
 

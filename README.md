@@ -62,6 +62,30 @@ memory and is saved as a gzipped snapshot every 30 ticks and on shutdown; old sa
   `WORLD_FORMAT_VERSION` in `apps/server/src/world-format.ts` and adds a migration step with a
   test.
 
+## Rust backend
+
+The server is being rewritten in Rust (ADR 0030, Epic 84 onwards); the TypeScript game is frozen.
+One cargo workspace at the root, four crates:
+
+| Crate        | What it is for                                                                  |
+| ------------ | ------------------------------------------------------------------------------- |
+| `csp-shared` | World types, balance numbers, protocol and helpers; the Rust twin of `packages/shared` |
+| `csp-lang`   | The script language: lexer, parser, checker, interpreter with the step budget   |
+| `csp-sim`    | Everything in a tick: terrain, pathfinding, orders, the world step, NPC cities, invariants; fixtures in `crates/csp-sim/fixtures/` |
+| `csp-server` | The I/O shell: HTTP, WebSocket sync, accounts, SQLite, saves, monitoring, admin CLI |
+
+Toolchain: rustup stable (`rust-toolchain.toml`) with the Visual Studio MSVC build tools (the
+"Desktop development with C++" workload), plus `cargo install cargo-nextest --locked`. Check with:
+
+```bash
+pnpm check:rust
+```
+
+That runs `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings` and
+`cargo nextest run --workspace`; `cargo fmt --all` fixes formatting. A test over 5 s is a
+regression to fix (nextest flags it). Run cargo from PowerShell: in Git Bash `/usr/bin/link`
+shadows the MSVC linker, so put the MSVC `bin` directory ahead of Git's on `PATH` there.
+
 ## Monitoring
 
 See ADR 0004. The server logs JSON lines with pino (pretty-printed outside production; level via

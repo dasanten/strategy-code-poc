@@ -131,3 +131,24 @@ Ticketed the same day; the order was agreed with Daniel the same day (`docs/task
 - [Epic 83: Native kernels](https://github.com/dasanten/strategy-code-poc/issues/976), scope
   only: the open questions above (go or no go, napi-rs or WASM, first kernel, parity, ADR), to be
   ticketed only if T81.5 says so.
+
+## Measurements
+
+### Explored map loading (T84.6, 2026-11-07)
+
+A copy of a worked world (5,760 tiles across, 180 × 180 chunks) with its Player's explored
+terrain grown to a disc of 2,997 whole chunks, loaded in the browser through the Vite dev proxy
+on one machine (no compression, no network latency), minimap open so every explored chunk loads.
+
+|                                                   | Before (one chunk per request) | After (batches of 64) |
+| ------------------------------------------------- | ------------------------------ | --------------------- |
+| Requests for the start view (12 chunks)           | 12                             | 1                     |
+| Start view complete after the first chunk request | 0.95 s                         | 0.94 s                |
+| Requests for every explored chunk                 | 2,997                          | 47                    |
+| Every explored chunk loaded                       | 25.1 s                         | 4.3 s                 |
+| Bytes on the wire                                 | 3.97 MB                        | 3.11 MB               |
+
+The server answers a chunk in ~4 ms and a batch of 64 in ~5 ms, so per call the time is not in
+the server. What remains: the TypeScript server's tick holds every request in flight for
+~0.5 s once a second, and the client spends ~1.4 ms per chunk making its texture. Over a real
+network each request also pays a round trip, which batches pay 64 times less often.
