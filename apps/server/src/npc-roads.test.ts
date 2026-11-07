@@ -45,6 +45,7 @@ import { checkInvariants } from './invariants.js'
 import { npcHome, stepNpcCities } from './npc-behaviour.js'
 import { ownWorkplaces } from './npc-chain.js'
 import { foundNpcCity } from './npc-cities.js'
+import { foundingMaterials } from './npc-founding.js'
 import { plains } from './npc-growth.fixture.js'
 import { farStableSpot, houseTile, stableTile, wallRings } from './npc-growth.js'
 import { giveNpcHorses } from './npc-horses.js'
@@ -319,6 +320,75 @@ describe('a road crew', () => {
     // A mine wants more Stone than the 2 above the reserve.
     const project = { kind: 'build' as const, building: 'mine' as const, x: 200, y: 200 }
     expect(crew({ plannedAt: 0, jobs: {}, project })).toEqual([])
+  })
+
+  describe('in a city that would otherwise be full', () => {
+    /** A town waiting since game day 0, on day 100, with `stone` Stone past its reserve. */
+    function waited(stone: number) {
+      const t = town({ stone })
+      t.world.tick = 100 * TICKS_PER_GAME_DAY
+      const people = t.world.residents.filter((r) => r.cityId === t.city.id)
+      const crew = (plan: CityPlan) =>
+        roadCrew(
+          t.world,
+          t.city,
+          plan,
+          people,
+          new Set(),
+          t.storage,
+          t.home,
+          waysOf(t.world, t.terrain).ways,
+          t.terrain,
+        )
+      return { ...t, crew }
+    }
+    const hallAndStorage = foundingMaterials().stone!
+
+    it('leaves a town hall’s and a storage’s materials', () => {
+      const { crew } = waited(hallAndStorage)
+      expect(crew({ plannedAt: 0, jobs: {}, fullSince: 0 })).toEqual([])
+    })
+
+    it('goes on with what is past them', () => {
+      const { crew } = waited(hallAndStorage + 1)
+      expect(crew({ plannedAt: 0, jobs: {}, fullSince: 0 })).toHaveLength(NPC_ROAD_CREW)
+    })
+
+    it('takes them until the city has waited its time', () => {
+      const { world, crew } = waited(hallAndStorage)
+      const fullSince = world.tick - TICKS_PER_GAME_DAY
+      expect(crew({ plannedAt: 0, jobs: {}, fullSince })).toHaveLength(NPC_ROAD_CREW)
+      expect(crew({ plannedAt: 0, jobs: {} })).toHaveLength(NPC_ROAD_CREW)
+    })
+
+    it('takes them while a party is out, which has its materials', () => {
+      const { crew } = waited(hallAndStorage)
+      const jobs = { gone: { kind: 'found' as const } }
+      expect(crew({ plannedAt: 0, jobs, fullSince: 0 })).toHaveLength(NPC_ROAD_CREW)
+    })
+
+    it('takes none from the store for a tile, while in hand it finishes what it carries', () => {
+      const { world, terrain, city, storage, crew } = waited(hallAndStorage)
+      const plan: CityPlan = { plannedAt: 0, jobs: {}, fullSince: 0 }
+      expect(crew(plan)).toEqual([])
+      const member = world.residents.find((r) => r.cityId === city.id)!
+      member.carried.stone = 1
+      plan.jobs[member.id] = { kind: 'road' }
+      const people = world.residents.filter((r) => r.cityId === city.id)
+      const { ways } = waysOf(world, terrain)
+      const again = roadCrew(
+        world,
+        city,
+        plan,
+        people,
+        new Set(),
+        storage,
+        npcHome(world, city),
+        ways,
+        terrain,
+      )
+      expect(again.map((r) => r.id)).toContain(member.id)
+    })
   })
 
   it('lets go of its tile and brings home what it carries once armed', () => {
@@ -963,8 +1033,9 @@ describe('on the map', () => {
     'joins two cities with one road, and reaches a post on the way',
     { tags: ['slow'], timeout: 600_000 },
     () => {
-      const { world, terrain, city } = town({ stone: 400 }, 500)
-      const next = neighbour(world, terrain, 130, { stone: 400 })
+      // Past what they keep from their crews once they would be full (`CONTEXT.md`: NPC road).
+      const { world, terrain, city } = town({ stone: 500 }, 500)
+      const next = neighbour(world, terrain, 130, { stone: 500 })
       const post = foundTradingPost(world, terrain, 60, 150, undefined, mulberry32(3))
       const warehouse = warehouseOf(world, post)
       const roadTo = (c: City, to: string) =>

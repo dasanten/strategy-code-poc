@@ -95,15 +95,16 @@ function buildHouses(world: WorldState, terrain: TerrainMap, city: City, home: B
  * farms it needs, its whole chain built from lumber camp to smithy with a free node of each good for
  * a second, and every good at its reserve and half a village's surplus cap. Everyone starts free at
  * home, and its first pass shares them out. With `layout` its houses follow that one, in place of
- * the one it drew.
+ * the one it drew. Its map of `mapSize` is by default too small to hold a daughter
+ * (`NPC_CITY_MIN_DISTANCE`).
  */
-export function bigCity(layout?: CityLayout): {
+export function bigCity(layout?: CityLayout, mapSize = 240): {
   world: WorldState
   terrain: TerrainMap
   city: City
   home: Building
 } {
-  const terrain = plains(240)
+  const terrain = plains(mapSize)
   const world = createWorld(terrain)
   const size = { ...NPC_TOWN, size: BIG_CITY_SIZE, residents: BIG_CITY_RESIDENTS, farms: 8 }
   const city = foundNpcCity(world, terrain, size, 60, 60, mulberry32(29))

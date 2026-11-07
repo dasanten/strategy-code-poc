@@ -1020,6 +1020,11 @@ export interface CityPlan {
    */
   fullSince?: number
   /**
+   * Since when a city with `fullSince` has been short of something (`CONTEXT.md`: Full city): a dip
+   * that lasts past `NPC_FULL_DIP_DAYS` restarts its wait. None while nothing is short.
+   */
+  shortSince?: number
+  /**
    * The tile of the town hall it founds its daughter round (`CONTEXT.md`: Founding): found once
    * full, and the founding party's goal once it is out.
    */

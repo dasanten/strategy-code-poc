@@ -1,14 +1,16 @@
 import {
   BUILD_MATERIALS,
   FOOD_PER_DAY,
+  HOUSING_ROOM,
   NODE_GOOD,
   NPC_CITY_MIN_DISTANCE,
   NPC_FOUND_FOOD_DAYS,
   NPC_FOUND_GIVE_UP_DAYS,
+  NPC_FOUND_PARTY_MOST,
   NPC_FOUND_REACH,
   NPC_FOUND_SAMPLES,
   NPC_FOUND_STANDING,
-  NPC_FULL_DAYS,
+  NPC_FULL_DIP_DAYS,
   NPC_NODE_REACH,
   NPC_PLAN_TICKS,
   NPC_VILLAGE,
@@ -16,11 +18,14 @@ import {
   WALK_TICKS_PER_TILE,
   buildingAt,
   carryCapacity,
+  cityResidents,
   computeTerritory,
   hasFoodSurplus,
   isArmed,
   isAt,
   npcCityStock,
+  npcFoundingPartySize,
+  npcFullDays,
   npcReserve,
   stockWeight,
   wrap,
@@ -47,22 +52,30 @@ import { raiseStandingBothWays } from './standing.js'
 /*
  * How a full NPC city founds a daughter (`CONTEXT.md`: Full city, Founding). Its planning pass
  * (`planCity`) keeps `CityPlan.fullSince` while it has idle spare hands and nothing short; full a
- * game week with a food surplus and a town hall's and a storage's materials to spare, it looks for
- * a site once a game day (`CityPlan.foundingSite`, the town hall's tile) and sends a founding
+ * game week, less the bigger it is, with a food surplus and its party's materials to spare, it looks
+ * for a site once a game day (`CityPlan.foundingSite`, the town hall's tile) and sends a founding
  * party: its members get the `found` job, and `fullSince` then holds when they set out. Each tick
  * the party loads its share at the storage and builds the town hall by the Build default
  * (`stepFounders`); once it stands, the party moves to the daughter (`foundDaughter`). All through
  * the orders a Player's residents take (ADR 0002).
  */
 
-/** The materials a founding party carries: a town hall's and a storage's. */
-export function foundingMaterials(): Stock {
+/**
+ * The materials a founding party of `members` carries (`CONTEXT.md`: Founding): a town hall's and a
+ * storage's, and a house's for each `HOUSING_ROOM.house` members past a village's worth, rounded up.
+ * What they don't build with they put in the daughter's storage, which builds the houses.
+ */
+export function foundingMaterials(members: number = NPC_VILLAGE.residents): Stock {
   const out: Stock = {}
-  for (const kind of ['townHall', 'storage'] as const) {
-    for (const [good, n] of Object.entries(BUILD_MATERIALS[kind] ?? {}) as [Good, number][]) {
-      out[good] = (out[good] ?? 0) + n
+  const add = (goods: Stock | undefined, times = 1) => {
+    for (const [good, n] of Object.entries(goods ?? {}) as [Good, number][]) {
+      out[good] = (out[good] ?? 0) + n * times
     }
   }
+  add(BUILD_MATERIALS.townHall)
+  add(BUILD_MATERIALS.storage)
+  const past = Math.max(0, members - NPC_VILLAGE.residents)
+  add(BUILD_MATERIALS.house, Math.ceil(past / (HOUSING_ROOM.house ?? 1)))
   return out
 }
 
@@ -75,16 +88,26 @@ export function foundingParty(plan: CityPlan | undefined): string[] {
 }
 
 /**
- * Whether a city is full (`CONTEXT.md`: Full city): full since `NPC_FULL_DAYS` game days at least,
- * with a food surplus and a town hall's and a storage's materials above its reserve.
+ * Whether a city would be full but for its materials (`CONTEXT.md`: Full city, NPC road): with no
+ * party out, full since `npcFullDays` game days at least, less the bigger it is, and with a food
+ * surplus. From then on its road crew leaves what the founding takes (`keeps` in `npc-roads.ts`).
+ */
+export function fullButMaterials(world: WorldState, city: City, plan: CityPlan): boolean {
+  if (plan.fullSince === undefined || foundingParty(plan).length > 0) return false
+  const wait = npcFullDays(cityResidents(world, city).length) * TICKS_PER_GAME_DAY
+  return world.tick - plan.fullSince >= wait && hasFoodSurplus(world, city)
+}
+
+/**
+ * Whether a city is full (`CONTEXT.md`: Full city): it would be but for its materials
+ * (`fullButMaterials`), and holds its founding party's (`foundingMaterials`) above its reserve.
  */
 export function isFull(world: WorldState, city: City, plan: CityPlan): boolean {
-  if (plan.fullSince === undefined) return false
-  if (world.tick - plan.fullSince < NPC_FULL_DAYS * TICKS_PER_GAME_DAY) return false
-  if (!hasFoodSurplus(world, city)) return false
+  if (!fullButMaterials(world, city, plan)) return false
   const reserve = npcReserve(world, city)
   const stock = npcCityStock(world, city)
-  return (Object.entries(foundingMaterials()) as [Good, number][]).every(
+  const materials = foundingMaterials(npcFoundingPartySize(cityResidents(world, city).length))
+  return (Object.entries(materials) as [Good, number][]).every(
     ([good, n]) => (stock[good] ?? 0) >= (reserve[good] ?? 0) + n,
   )
 }
@@ -93,12 +116,13 @@ export function isFull(world: WorldState, city: City, plan: CityPlan): boolean {
  * The founding part of an NPC city's planning pass (`CONTEXT.md`: Full city, Founding), after its
  * jobs are shared out. With a party out, it only gives up once `NPC_FOUND_GIVE_UP_DAYS` have gone
  * by since it set out and the town hall doesn't stand: its members who live are let go (`idle`, so
- * they walk home) and the city may found again once full again. Otherwise it keeps `fullSince`
- * while it has idle spare hands (`unneeded`: spare hands the pass had nowhere to send, idle or back
- * on a farm beyond the farmers it keeps) and nothing is short of its reserve, clears it (and the
- * site) else; once full it searches for a site on its daily pass (`findFoundingSite`), and with
- * one sends a party (`pickParty`). `adults` are those it gives orders to, the party aside;
- * `members` the party's who live and belong to it.
+ * they walk home) and the city may found again once full again. With something short of its reserve
+ * it does nothing more, and a wait under way starts over only once that has lasted past
+ * `NPC_FULL_DIP_DAYS` (`CityPlan.shortSince`). Otherwise it keeps `fullSince` while it has idle
+ * spare hands (`unneeded`: spare hands the pass had nowhere to send, idle or back on a farm beyond
+ * the farmers it keeps), clears it (and the site) else; once full it searches for a site on its
+ * daily pass (`findFoundingSite`), and with one sends a party (`pickParty`). `adults` are those it
+ * gives orders to, the party aside; `members` the party's who live and belong to it.
  */
 export function planFounding(
   world: WorldState,
@@ -127,7 +151,17 @@ export function planFounding(
     delete plan.foundingSite
     return
   }
-  if (unneeded.length === 0 || shortGoods(world, city).length > 0) {
+  if (shortGoods(world, city).length > 0) {
+    if (plan.fullSince === undefined) return
+    plan.shortSince ??= world.tick
+    if (world.tick - plan.shortSince <= NPC_FULL_DIP_DAYS * TICKS_PER_GAME_DAY) return
+    delete plan.shortSince
+    delete plan.fullSince
+    delete plan.foundingSite
+    return
+  }
+  delete plan.shortSince
+  if (unneeded.length === 0) {
     delete plan.fullSince
     delete plan.foundingSite
     return
@@ -144,7 +178,7 @@ export function planFounding(
   if (!plan.foundingSite) return
   const walk = wrapDistance(terrain.size, home, plan.foundingSite) * WALK_TICKS_PER_TILE
   const near = (r: Resident) => !farOut(r, home, terrain.size)
-  const chosen = pickParty(world, adults, unneeded, near, jobs, walk)
+  const chosen = pickParty(world, city, adults, unneeded, near, jobs, walk)
   if (!chosen) return
   for (const r of chosen) {
     r.order = null
@@ -181,15 +215,18 @@ export function farOut(
 }
 
 /**
- * The founding party (`CONTEXT.md`: Founding): `NPC_VILLAGE.residents` adults, one of them armed
+ * The founding party (`CONTEXT.md`: Founding): `npcFoundingPartySize` adults, one of them armed
  * while the city has an armed adult, the rest of its `unneeded` spare hands and its workers off the
  * farms, those with the most room on them first; all of them `near` enough to fetch their share,
  * none of them building, carrying a child or with one on the way. None while there aren't enough,
  * or while their arms can't hold the Food for the walk (`foundingFood`) and all the materials
- * (`foundingMaterials`): a daughter without them could never build its storage.
+ * (`foundingMaterials`): a daughter without them could never build its storage. A city only founds
+ * with nothing short, so it holds its reserve of Food, and what they take of that still leaves those
+ * who stay fed.
  */
 function pickParty(
   world: WorldState,
+  city: City,
   adults: Resident[],
   unneeded: Resident[],
   near: (r: Resident) => boolean,
@@ -211,10 +248,11 @@ function pickParty(
       ...adults.filter((r) => !isArmed(r) && free(r) && jobs[r.id]?.kind === 'work'),
     ]),
   ].sort((a, b) => room(b) - room(a))
-  const party = [...(armed ? [armed] : []), ...rest].slice(0, NPC_VILLAGE.residents)
-  if (party.length < NPC_VILLAGE.residents) return undefined
+  const members = npcFoundingPartySize(cityResidents(world, city).length)
+  const party = [...(armed ? [armed] : []), ...rest].slice(0, members)
+  if (party.length < members) return undefined
   const load =
-    stockWeight(foundingMaterials()) +
+    stockWeight(foundingMaterials(members)) +
     party.length * foundingFood(walkTicks).walk * GOOD_WEIGHT.food
   return party.reduce((sum, r) => sum + room(r), 0) >= load ? party : undefined
 }
@@ -331,11 +369,11 @@ export function foundingFood(walkTicks: number): { walk: number; stay: number } 
 }
 
 /**
- * What a founding party still lacks of its materials (`foundingMaterials`) beyond what its
- * `members` carry, as two parts in the order they are taken: the town hall's, then the storage's,
- * so that what doesn't fit on them is the storage's.
+ * What a founding party of `size` still lacks of its materials (`foundingMaterials`) beyond what
+ * its `members` who live carry, as two parts in the order they are taken: the town hall's, then the
+ * rest, so that what doesn't fit on them isn't the town hall's.
  */
-function partyLacks(members: Resident[]): Stock[] {
+function partyLacks(members: Resident[], size: number): Stock[] {
   const carried: Stock = {}
   for (const r of members) {
     // What they are picking up this tick counts as carried.
@@ -348,7 +386,7 @@ function partyLacks(members: Resident[]): Stock[] {
   }
   const hall: Stock = {}
   const rest: Stock = {}
-  for (const [good, n] of Object.entries(foundingMaterials()) as [Good, number][]) {
+  for (const [good, n] of Object.entries(foundingMaterials(size)) as [Good, number][]) {
     const forHall = BUILD_MATERIALS.townHall?.[good] ?? 0
     const lack = Math.max(0, n - (carried[good] ?? 0))
     hall[good] = Math.max(0, forHall - (carried[good] ?? 0))
@@ -375,6 +413,7 @@ export function stepFounders(
 ): void {
   const site = plan.foundingSite
   if (!site) return
+  const partySize = foundingParty(plan).length
   for (const r of members) {
     if (r.order !== null || r.script) continue
     if (storage && wrapDistance(size, r, storage) <= NPC_NODE_REACH) {
@@ -385,7 +424,7 @@ export function stepFounders(
       const load = loadFor(
         world,
         r,
-        [{ food: onWay }, ...partyLacks(members), { food: stay }],
+        [{ food: onWay }, ...partyLacks(members, partySize), { food: stay }],
         storage,
       )
       if (load) {
@@ -462,7 +501,7 @@ export function foundDaughter(world: WorldState, city: City, plan: CityPlan): Ci
 
 /**
  * Founding parties hold together (`CONTEXT.md`: Founding; ADR 0004): a plan with a party has its
- * site and at most `NPC_VILLAGE.residents` members; no resident is in two cities' parties; and a
+ * site and at most `NPC_FOUND_PARTY_MOST` members; no resident is in two cities' parties; and a
  * member who lives and belongs to no realm belongs to the mother until the town hall stands.
  */
 export const foundingPartiesSound: Invariant = {
@@ -474,7 +513,7 @@ export const foundingPartiesSound: Invariant = {
     for (const [cityId, plan] of Object.entries(world.cityPlans)) {
       const party = foundingParty(plan)
       if (party.length === 0) continue
-      if (!plan.foundingSite || party.length > NPC_VILLAGE.residents) {
+      if (!plan.foundingSite || party.length > NPC_FOUND_PARTY_MOST) {
         out.push({
           invariant: this.name,
           message: `${cityId} has a party of ${party.length}${plan.foundingSite ? '' : ' and no site'}`,
@@ -500,6 +539,28 @@ export const foundingPartiesSound: Invariant = {
           })
         }
       }
+    }
+    return out
+  },
+}
+
+/**
+ * A city's dip below its reserve belongs to a wait under way (`CONTEXT.md`: Full city; ADR 0004): a
+ * plan with `shortSince` has `fullSince`, no party out, and began no later than now.
+ */
+export const fullWaitSound: Invariant = {
+  name: 'full-wait-sound',
+  check(world) {
+    const out: InvariantViolation[] = []
+    for (const [cityId, plan] of Object.entries(world.cityPlans)) {
+      if (plan.shortSince === undefined) continue
+      const party = foundingParty(plan).length
+      if (plan.fullSince !== undefined && party === 0 && plan.shortSince <= world.tick) continue
+      out.push({
+        invariant: this.name,
+        message: `${cityId} has been short since ${plan.shortSince}, with ${plan.fullSince === undefined ? 'no wait under way' : `a party of ${party}`}`,
+        entityIds: [cityId],
+      })
     }
     return out
   },

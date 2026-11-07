@@ -785,10 +785,45 @@ export const NPC_TRADER_GIVE_UP_DAYS = 10
 export const NPC_FARM_REACH = 48
 
 /**
- * Game days an NPC city must have been full before it founds a daughter (`CONTEXT.md`: Full
- * city): a game week of idle spare hands and nothing short.
+ * Game days an NPC city of up to `NPC_FOUND_VILLAGE_RESIDENTS` must have been full before it founds
+ * a daughter (`CONTEXT.md`: Full city): a game week of idle spare hands and nothing short. A bigger
+ * city waits less (`npcFullDays`).
  */
 export const NPC_FULL_DAYS = 7
+
+/**
+ * Residents up to which an NPC city founds as a village does (`CONTEXT.md`: Full city, Founding): it
+ * waits `NPC_FULL_DAYS` and sends a village's worth. About twice a town as it is placed.
+ */
+export const NPC_FOUND_VILLAGE_RESIDENTS = 30
+
+/**
+ * Residents past `NPC_FOUND_VILLAGE_RESIDENTS` that take a game day off how long a full city waits
+ * (`npcFullDays`): a city of 110 waits 3 game days.
+ */
+export const NPC_FULL_RESIDENTS_PER_DAY = 20
+
+/** The fewest game days any full NPC city waits before it founds (`npcFullDays`). */
+export const NPC_FULL_DAYS_LEAST = 2
+
+/**
+ * Game days a dip below its reserve may last before a full NPC city's wait starts over (`CONTEXT.md`:
+ * Full city): Food its scouts and road crew take out and bring back doesn't count.
+ */
+export const NPC_FULL_DIP_DAYS = 1
+
+/**
+ * Residents past `NPC_FOUND_VILLAGE_RESIDENTS` that add one adult to a founding party
+ * (`npcFoundingPartySize`): a city of 110 sends the most, about one in eight of it.
+ */
+export const NPC_FOUND_RESIDENTS_PER_MEMBER = 10
+
+/**
+ * The largest founding party (`npcFoundingPartySize`): with the houses it carries for those past a
+ * village's worth (`foundingMaterials`), its materials stay under the surplus caps
+ * (`NPC_SURPLUS_CAP`), or a big city could never found on what it makes.
+ */
+export const NPC_FOUND_PARTY_MOST = 14
 
 /**
  * Random tiles a full NPC city tries in one search for its daughter's site (`CONTEXT.md`:
