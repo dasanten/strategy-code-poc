@@ -219,6 +219,18 @@ export function standsStill(
 }
 
 /**
+ * Whether a carriage's hitched horse lies Down (`CONTEXT.md`: Down): until it wakes or dies nobody
+ * can drive the carriage, so the Trade Org's crews give no drive order and count no failed drive.
+ */
+export function horseLiesDown(
+  world: { horses: readonly CarriageHorse[] },
+  carriage: Pick<Carriage, 'horseId'>,
+): boolean {
+  const horse = world.horses.find((h) => h.id === carriage.horseId)
+  return horse !== undefined && isDown(horse)
+}
+
+/**
  * Where a haul route's stop on tile (x, y) loads and unloads (`CONTEXT.md`: Haul route): the
  * storage there, a stable's included, or else the ground.
  */

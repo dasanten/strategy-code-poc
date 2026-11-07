@@ -6,6 +6,7 @@ import {
   TRADE_ORG,
   GOOD_WEIGHT,
   deliveryStorage,
+  horseLiesDown,
   quotePickUp,
   stockWeight,
   tradeCoinWarehouse,
@@ -153,6 +154,8 @@ export function runDelivery(
   const b = stepBuilding(world, job)
   if (!b) return finish(caravan)
   if (!isAt(driver, b)) {
+    // Its horse Down, the carriage stands until it wakes or dies (`CONTEXT.md`: Down).
+    if (horseLiesDown(world, carriage)) return
     if (atStorage && job.misses >= DELIVERY_DRIVE_TRIES) return turnBack(world, caravan, job, d!)
     job.misses++
     const target = { x: b.x, y: b.y }

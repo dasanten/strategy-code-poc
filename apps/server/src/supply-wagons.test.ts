@@ -23,6 +23,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
+import { horsesDownLieStill } from './horses.js'
 import { checkInvariants } from './invariants.js'
 import { mulberry32, newResident } from './residents.js'
 import { changeStanding } from './standing.js'
@@ -210,6 +211,33 @@ describe('a Trade Org army’s supply wagon', () => {
     }
     stepPunishments(s.world, 640)
     expect(driver.order).toMatchObject({ kind: 'drive', army: p.id })
+  }, 240_000)
+
+  it('stands where it is while its horse is Down, its driver given no drive order (bug #993)', () => {
+    const s = setup()
+    const { wagon, carriage } = setOff(s)
+    const driver = at(s.world, wagon.driverId!)
+    const horse = s.world.horses.find((h) => h.id === carriage.horseId)!
+    // Nothing on board for the horse, which goes Down next tick.
+    delete carriage.load.food
+    wagon.ownFood = 0
+    horse.hunger = 0
+    horse.health = 1e-9
+    const from = { x: carriage.x, y: carriage.y }
+    // A busy world's pathfinder (bug #993): no search settles within the tick it starts.
+    const requestSteps = s.walking.requestSteps.bind(s.walking)
+    s.walking.requestSteps = (world) => requestSteps(world, 0)
+    const orders = new Set<string>()
+    for (let i = 0; i < 3 * TRADE_ORG_PUNISH.wagonRetryTicks; i++) {
+      for (const r of s.world.residents) r.hunger = 100
+      stepWorld(s.world, terrain, s.walking)
+      orders.add(driver.order?.kind ?? 'none')
+      expect(horsesDownLieStill.check(s.world, terrain)).toEqual([])
+    }
+    expect([...orders]).toEqual(['none'])
+    expect(horse.downUntil).toBeDefined()
+    expect(driver.order).toBeNull()
+    expect({ x: carriage.x, y: carriage.y }).toEqual(from)
   }, 240_000)
 
   it('feeds its soldiers and its driver on the way', () => {

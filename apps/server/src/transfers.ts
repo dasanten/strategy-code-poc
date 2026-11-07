@@ -7,6 +7,7 @@ import {
   GOOD_WEIGHT,
   deliveryStorage,
   feeAtPickUp,
+  horseLiesDown,
   handInProblem,
   nearestWarehouse,
   offerStorage,
@@ -529,6 +530,8 @@ export function runTransfer(
   const b = stepBuilding(world, job, t)
   if (!b) return finish(caravan)
   if (!isAt(driver, b)) {
+    // Its horse Down, the carriage stands until it wakes or dies (`CONTEXT.md`: Down).
+    if (horseLiesDown(world, carriage)) return
     const toStorage = collecting || job.step === 'deliver'
     if (toStorage && job.misses >= DELIVERY_DRIVE_TRIES) return turnBack(world, job, t!)
     job.misses++

@@ -21,6 +21,7 @@ import {
   crewIdsOf,
   foodForWay,
   inContact,
+  horseLiesDown,
   isDown,
   isArmed,
   owedBy,
@@ -641,6 +642,8 @@ function runCaravan(
     return
   }
   if (!isAt(driver, stop, size)) {
+    // Its horse Down, the carriage stands until it wakes or dies (`CONTEXT.md`: Down).
+    if (horseLiesDown(world, carriage)) return
     const target = { x: stop.x, y: stop.y }
     driver.order = { kind: 'drive', carriageId: carriage.id, target, path: null, progress: 0 }
     return

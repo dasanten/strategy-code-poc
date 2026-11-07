@@ -5,6 +5,7 @@ import {
   TRADER_STOP_TICKS,
   WALL_ENCLOSES_MAX,
   footprintKeys,
+  horseLiesDown,
   isPassableTerrain,
   middleOf,
   terrainAt,
@@ -168,6 +169,8 @@ export function runStops(
       trader.misses = 0
       return true
     }
+    // Its horse Down, the carriage stands until it wakes or dies (`CONTEXT.md`: Down).
+    if (horseLiesDown(world, carriage)) return true
     if (trader.misses >= TRADER_DRIVE_TRIES) {
       passedBy()
       continue
