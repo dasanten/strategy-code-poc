@@ -1084,6 +1084,17 @@ export interface CityPlan {
   foundingSite?: { x: number; y: number }
   /** Its scouts with something still to bring home, by resident id (`CONTEXT.md`: Scout). */
   scouts?: Record<string, ScoutTrip>
+  /** Its soldiers walking a round now (`CONTEXT.md`: Soldier posts); none while nobody is. */
+  patrols?: CityPatrol[]
+  /** The soldier who last set out on a round: the next by id goes next. */
+  patrolledLast?: string
+}
+
+/** A soldier of an NPC city walking a round (`CONTEXT.md`: Soldier posts). Plain data (ADR 0002). */
+export interface CityPatrol {
+  residentId: string
+  /** The tiles still ahead of them, the next first; the last is where they set out from. */
+  stops: { x: number; y: number }[]
 }
 
 /**

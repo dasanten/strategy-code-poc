@@ -68,10 +68,14 @@ import {
   STARVE_DAYS,
   DOWN_DAYS,
   FEED_UNITS,
+  NPC_PATROLS_MAX,
+  NPC_PATROL_ROAD_STOPS,
+  NPC_PATROL_WALL_STOPS,
   NPC_POST_AROUND_HALL,
   NPC_REVIVE_REACH,
   NPC_SOLDIERS_AT_GATE,
   NPC_SOLDIERS_ON_HALL,
+  NPC_SOLDIERS_PER_PATROL,
   WAKE_HEALTH,
   FOOD_SPOIL_PER_DAY,
   FOOD_SURPLUS_DAYS,
@@ -2366,6 +2370,15 @@ export function Wiki() {
           where they stand. If those on the hall or at a gate are called away or die, the next soldiers
           take over at the city's next planning pass, and they come back once the alarm is over. Trading
           posts and the HQ don't do this.
+        </p>
+        <p>
+          For every {num(NPC_SOLDIERS_PER_PATROL)} soldiers on its wall one walks a round, and never more
+          than {num(NPC_PATROLS_MAX)} in a city however big: {num(NPC_PATROL_WALL_STOPS)} stops along its
+          wall, {num(NPC_PATROL_ROAD_STOPS)} along its roads inside it, and back to where they set out.
+          When a round ends the next by id goes, so those on the wall take turns; those on the hall and at
+          the gates stay put. They refill as they walk, and one low on Food with none to take goes back to
+          their post. A stop they can't get to they skip. An alarm breaks a round off, and they go on with
+          it once the alarm is over.
         </p>
         <p>
           Bought outright, an NPC city asks {num(CITY_PRICE_PER_RESIDENT)} coins a resident plus,
