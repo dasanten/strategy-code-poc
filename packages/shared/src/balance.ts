@@ -545,6 +545,22 @@ export const WORK_FOOD_KEPT = 2
 export const NPC_SOLDIER_SHARE = 0.25
 
 /**
+ * How many of an NPC city's soldiers stand on its town hall between fights, the first to be posted
+ * (`CONTEXT.md`: Soldier posts). One there is enough to block an occupation; a second keeps it held
+ * when the first is called away.
+ */
+export const NPC_SOLDIERS_ON_HALL = 2
+
+/** How many of an NPC city's soldiers stand at each of its gates, once its hall is held. */
+export const NPC_SOLDIERS_AT_GATE = 1
+
+/**
+ * How many tiles out from its town hall an NPC city's soldiers stand around it when its wall has too
+ * few tiles for them, or it has none (`CONTEXT.md`: Soldier posts).
+ */
+export const NPC_POST_AROUND_HALL = 2
+
+/**
  * Coins an NPC city keeps as its war chest for each of its residents (`CONTEXT.md`: NPC reserve):
  * a town of 16 keeps 160, what four mint workers strike in two game days (`RECIPES`).
  */

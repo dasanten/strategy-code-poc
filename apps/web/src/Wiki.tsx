@@ -68,7 +68,10 @@ import {
   STARVE_DAYS,
   DOWN_DAYS,
   FEED_UNITS,
+  NPC_POST_AROUND_HALL,
   NPC_REVIVE_REACH,
+  NPC_SOLDIERS_AT_GATE,
+  NPC_SOLDIERS_ON_HALL,
   WAKE_HEALTH,
   FOOD_SPOIL_PER_DAY,
   FOOD_SURPLUS_DAYS,
@@ -2345,10 +2348,21 @@ export function Wiki() {
           The soldiers of an NPC village, town or self-managed city run the same Alarm default as
           your armed residents do (see Alarms): they go after a thief they saw, an attacker and
           whoever occupies the town hall, as no crime, and walk to the town hall to hold it while an
-          armed outsider is in the area, then go home. An unarmed visitor they leave alone, and
-          striking anyone else there is a crime for them too. One who gets armed or comes home while
-          the hall is occupied joins in. Trading posts and the HQ keep their own rules: their soldiers
-          go straight at attackers and occupiers in the area, a post's at thieves it knows of as well.
+          armed outsider is in the area, then go back to their posts. An unarmed visitor they leave
+          alone, and striking anyone else there is a crime for them too. One who gets armed or comes
+          home while the hall is occupied joins in. Trading posts and the HQ keep their own rules: their
+          soldiers go straight at attackers and occupiers in the area, a post's at thieves it knows of
+          as well.
+        </p>
+        <p>
+          Between fights those soldiers stand spread out, each on the post their id gives them among
+          those the city has: first {num(NPC_SOLDIERS_ON_HALL)} on the town hall, where one is enough to
+          stop anyone occupying it, then {num(NPC_SOLDIERS_AT_GATE)} at each gate, and the rest on the
+          tiles of its wall they can get up to. A city with too little wall for them, or none, has them
+          stand on the free ground within {num(NPC_POST_AROUND_HALL)} tiles of its hall as well. They eat
+          where they stand. If those on the hall or at a gate are called away or die, the next soldiers
+          take over at the city's next planning pass, and they come back once the alarm is over. Trading
+          posts and the HQ don't do this.
         </p>
         <p>
           Bought outright, an NPC city asks {num(CITY_PRICE_PER_RESIDENT)} coins a resident plus,

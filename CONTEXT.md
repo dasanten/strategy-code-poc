@@ -515,10 +515,15 @@ The shared language of the game. Domain terms only — no implementation details
 - **Standing idle:** an NPC city's adults with nothing to do, those carrying a child and its children
   stand at a house of the city, not at its storage; a city with no house, at its home.
 - **Soldier posts:** between fights an NPC city's soldiers stand spread out: first on its town hall,
-  then at its gates and along its wall. Some of them (at most a balance number) walk a round along
-  its wall and roads in turns, and in a city with a training ground some train (Who trains). An
-  alarm takes them from any of this, and they come back (Alarm). Trading posts and the HQ keep their
-  own rules.
+  then at its gates and along its wall, each on the post their id gives them among those the city
+  has: a balance number on the hall, one at each gate (a balance number too), the rest on the tiles of
+  its wall they can get up to. While its wall has too few tiles for them, or it has none, they also
+  stand on the free ground around its hall. Once on a stretch of wall they stay, so a new one moves
+  nobody. They eat where they stand (Refilling at home). When those on the hall or at a gate are called
+  away or die, the next by id take their place at the city's next pass. Some of them (at most a balance
+  number) walk a round along its wall and roads in turns, and in a city with a training ground some
+  train (Who trains). An alarm takes them from any of this, and they come back (Alarm). Trading posts
+  and the HQ keep their own rules.
 - **Bigger projects:** once nothing is short, from materials above its reserve, a big NPC city (by a
   balance number of residents) builds beyond its needs: a training ground, an inner ring of wall
   round its town hall and storage with a gate, and more roads (NPC road). The inner ring goes up tile

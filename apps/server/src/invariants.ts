@@ -102,6 +102,7 @@ import {
   npcResidentsKeptGoing,
   runByNpcCity,
 } from './npc-behaviour.js'
+import { npcSoldiersOnPosts } from './npc-posts.js'
 import { CARRYING_BLOCKS } from './pairing.js'
 import { isWalkable } from './world.js'
 import { contractsSound } from './contracts.js'
@@ -2163,6 +2164,7 @@ export const worldInvariants: Invariant[] = [
   tradeOrgBreedsNoHorses,
   npcResidentsKeptGoing,
   npcIdleOffTheStorage,
+  npcSoldiersOnPosts,
   tradeOrgSendsNoOne,
   npcTradersSound,
   lineOrdersSound,
