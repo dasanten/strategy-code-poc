@@ -157,6 +157,7 @@ import { npcRevivers } from './npc-revive.js'
 import { npcScoutsSound } from './npc-scouts.js'
 import { npcOneFeeder, tradeOrgBreedsNoHorses } from './npc-stable.js'
 import { foundingPartiesSound, fullWaitSound, npcCitiesHaveHalls } from './npc-founding.js'
+import { coinsShortOnlyWithIncome } from './npc-coins.js'
 import { cityLayoutsSound, cityStreetsSound } from './city-layout.js'
 import { innerWallLeavesAWay } from './npc-inner-wall.js'
 import { npcTradersSound } from './npc-trader.js'
@@ -2152,6 +2153,7 @@ export const worldInvariants: Invariant[] = [
   cityPlansSound,
   foundingPartiesSound,
   fullWaitSound,
+  coinsShortOnlyWithIncome,
   npcCitiesHaveHalls,
   cityLayoutsSound,
   cityStreetsSound,

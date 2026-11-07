@@ -270,6 +270,7 @@ export function planCity(
     foodShort: short,
     sendToDown,
     roads: { home, ways, terrain },
+    size,
   })
   // Trading posts and the HQ don't feed their stables this way (`npcOneFeeder`).
   if (!city.tradeOrg && !feeding) planFeeder(world, city, adults, jobs)
@@ -312,6 +313,8 @@ interface ShareOut {
   builders: number
   foodShort: boolean
   sendToDown: (spare: Resident[], leave: (r: Resident) => void) => void
+  /** The map's size. */
+  size: number
   roads: {
     home: Building | undefined
     ways: WayFinder | undefined
@@ -355,7 +358,7 @@ function shareOut(pass: ShareOut): Resident[] {
   const byId = new Map(own.map((b) => [b.id, b]))
   const placeOf = (r: Resident) => byId.get(jobs[r.id]?.buildingId ?? '')
   const farms = own.filter((b) => b.kind === 'farm')
-  const short = shortages(world, city, project)
+  const short = shortages(world, city, pass.size, project)
   const shareOf = new Map(short.map((s) => [s.good, s.share]))
   /** What a resident's job at a workplace is worth to them: what its good lacks, or only going back. */
   const heldScore = (r: Resident) => {
@@ -468,21 +471,19 @@ function shareOut(pass: ShareOut): Resident[] {
         },
       ]
     : []
-  const shortWork = short.map(
-    ({ good, share }): JobOffer => ({
-      job: { kind: 'short', share },
-      take: (takers) => {
-        const took: Resident[] = []
-        for (const r of takers) {
-          const place = shortPlace(world, good, own, held, storage)
-          if (!place) break
-          give(r, workJob(place), place)
-          took.push(r)
-        }
-        return took
-      },
-    }),
-  )
+  const shortWork = short.map(({ good, share }): JobOffer => ({
+    job: { kind: 'short', share },
+    take: (takers) => {
+      const took: Resident[] = []
+      for (const r of takers) {
+        const place = shortPlace(world, good, own, held, storage)
+        if (!place) break
+        give(r, workJob(place), place)
+        took.push(r)
+      }
+      return took
+    },
+  }))
   const unneeded = fill([toFarm, reviving, ...building, ...shortWork], spare)
   if (unneeded.length === 0) return unneeded
 

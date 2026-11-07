@@ -56,7 +56,8 @@ function ready(layout: CityLayout): Staged {
   return staged
 }
 
-const ringsOf = ({ world, terrain, city, home }: Staged) => wallRings(world, city, home, terrain.size)!
+const ringsOf = ({ world, terrain, city, home }: Staged) =>
+  wallRings(world, city, home, terrain.size)!
 
 function ringOf({ world, terrain, city, home }: Staged) {
   const rings = wallRings(world, city, home, terrain.size)!
@@ -66,9 +67,13 @@ function ringOf({ world, terrain, city, home }: Staged) {
 /** Puts up the ring as it stands in the plan. */
 function finishRing(staged: Staged): Building[] {
   const { world, city } = staged
-  const built = ringOf(staged).map(
-    (t): Building => ({ id: newId(world, 'b'), kind: t.kind, cityId: city.id, x: t.x, y: t.y }),
-  )
+  const built = ringOf(staged).map((t): Building => ({
+    id: newId(world, 'b'),
+    kind: t.kind,
+    cityId: city.id,
+    x: t.x,
+    y: t.y,
+  }))
   world.buildings.push(...built)
   return built
 }
@@ -131,19 +136,22 @@ describe("a big NPC city's inner ring", () => {
     },
   )
 
-  it.each(LAYOUTS)('holds its town hall and storage in a %s city, with one gate, built last', (l) => {
-    const staged = ready(l)
-    const tiles = ringOf(staged)
-    expect(tiles.filter((t) => t.kind === 'gate')).toHaveLength(1)
-    expect(tiles.at(-1)!.kind).toBe('gate')
-    // Whatever gaps it has, nothing it plans stands on the town hall or the storage.
-    const { world, terrain, city, home } = staged
-    const hall = townHallOf(world, city)!
-    const held = new Set(
-      [...footprintTiles(hall, terrain.size), ...footprintTiles(home, terrain.size)].map(String),
-    )
-    for (const t of tiles) expect(held.has(`${t.x},${t.y}`)).toBe(false)
-  })
+  it.each(LAYOUTS)(
+    'holds its town hall and storage in a %s city, with one gate, built last',
+    (l) => {
+      const staged = ready(l)
+      const tiles = ringOf(staged)
+      expect(tiles.filter((t) => t.kind === 'gate')).toHaveLength(1)
+      expect(tiles.at(-1)!.kind).toBe('gate')
+      // Whatever gaps it has, nothing it plans stands on the town hall or the storage.
+      const { world, terrain, city, home } = staged
+      const hall = townHallOf(world, city)!
+      const held = new Set(
+        [...footprintTiles(hall, terrain.size), ...footprintTiles(home, terrain.size)].map(String),
+      )
+      for (const t of tiles) expect(held.has(`${t.x},${t.y}`)).toBe(false)
+    },
+  )
 
   it.each(['grid', 'rings'] as const)(
     'has its gate in line with the outer gate in a %s city, so no new street opens',
@@ -154,14 +162,14 @@ describe("a big NPC city's inner ring", () => {
       const gate = ringOf(staged).at(-1)!
       expect(gate.x).toBe(rings.gate!.x)
       expect(gate.y).toBeLessThan(rings.gate!.y)
-      const streets = (() => {
+      const streets = () => {
         const plan = layoutPlan(world, city, home, rings.newGate, terrain.size)!
         const out: boolean[] = []
         for (let dy = -30; dy <= 30; dy++) {
           for (let dx = -30; dx <= 30; dx++) out.push(plan.street(home.x + dx, home.y + dy))
         }
         return out
-      })
+      }
       const before = streets()
       finishRing(staged)
       expect(streets()).toEqual(before)
@@ -217,7 +225,9 @@ describe('when a city builds its inner ring', () => {
   it('nothing comes of it below the big city number', () => {
     const staged = ready('grid')
     const { world, city } = staged
-    const rest = world.residents.filter((r) => r.cityId === city.id).slice(2 * NPC_RESIDENTS_PER_NEEDS_STEP - 1)
+    const rest = world.residents
+      .filter((r) => r.cityId === city.id)
+      .slice(2 * NPC_RESIDENTS_PER_NEEDS_STEP - 1)
     const gone = new Set(rest)
     world.residents = world.residents.filter((r) => !gone.has(r))
     expect(isBigNpcCity(world, city)).toBe(false)
@@ -254,8 +264,8 @@ describe('when a city builds its inner ring', () => {
     const staged = ready('grid')
     const { world, terrain, city, home } = staged
     const rings = ringsOf(staged)
-    home.stock!.coins = 0
-    expect(npcReserve(world, city).coins).toBeGreaterThan(0)
+    home.stock!.food = 0
+    expect(npcReserve(world, city).food).toBeGreaterThan(0)
     expect(innerWallProject(world, city, home, terrain, rings, 2)).toBeUndefined()
   })
 
@@ -361,7 +371,11 @@ describe('getting to the storage through it', () => {
     from: { x: number; y: number },
   ): boolean {
     const r = world.residents[0]!
-    Object.assign(r, { x: from.x, y: from.y, order: { kind: 'walkTo', target: { x: home.x, y: home.y } } })
+    Object.assign(r, {
+      x: from.x,
+      y: from.y,
+      order: { kind: 'walkTo', target: { x: home.x, y: home.y } },
+    })
     delete r.script
     const walking = new Walking(terrain)
     for (let t = 0; t < 400; t++) {
@@ -425,7 +439,8 @@ describe('a big city building it for real', () => {
       const want = ringOf(staged).map((t) => `${t.x},${t.y}`)
       const standing = () =>
         world.buildings.filter(
-          (b) => (b.kind === 'wall' || b.kind === 'gate') && !b.site && want.includes(`${b.x},${b.y}`),
+          (b) =>
+            (b.kind === 'wall' || b.kind === 'gate') && !b.site && want.includes(`${b.x},${b.y}`),
         )
       const rings = ringsOf(staged)
       const wood = BUILD_MATERIALS.wall?.wood ?? 0
@@ -438,11 +453,16 @@ describe('a big city building it for real', () => {
         // A tile is only ever taken on with Wood above the reserve, whatever else uses it.
         const plan = world.cityPlans[city.id]
         const p = plan?.project
-        if (plan?.plannedAt === world.tick && p?.kind === 'build' && want.includes(`${p.x},${p.y}`)) {
+        if (
+          plan?.plannedAt === world.tick &&
+          p?.kind === 'build' &&
+          want.includes(`${p.x},${p.y}`)
+        ) {
           const above = (npcCityStock(world, city).wood ?? 0) - (npcReserve(world, city).wood ?? 0)
           expect(above).toBeGreaterThanOrEqual(-wood)
         }
-        if (world.tick % TICKS_PER_GAME_DAY === 0) expect(checkInvariants(world, terrain)).toEqual([])
+        if (world.tick % TICKS_PER_GAME_DAY === 0)
+          expect(checkInvariants(world, terrain)).toEqual([])
       }
       expect(standing()).toHaveLength(want.length)
       expect(standing().filter((b) => b.kind === 'gate')).toHaveLength(1)

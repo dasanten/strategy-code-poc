@@ -50,7 +50,7 @@ import {
 import { caravanCrew } from './caravans.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { npcHome, walkTo } from './npc-behaviour.js'
-import { chainInput, makes, projectNeeds, shortGoods } from './npc-chain.js'
+import { chainInput, makes, projectNeeds, reserveLacks, shortGoods } from './npc-chain.js'
 import { knowsNode } from './npc-scouts.js'
 import { farmersWanted } from './npc-plan.js'
 
@@ -273,7 +273,7 @@ function planVisit(
   const r = spareHand(world, city, adults, jobs)
   if (!r) return false
   const spoken = spokenFor(world, city, plan, adults)
-  const deal = visitDeal(world, city, plan.project, r, visitor, carriage, spoken)
+  const deal = visitDeal(world, city, plan.project, r, visitor, carriage, spoken, size)
   if (!deal) return false
   addRun(plan, {
     residentId: r.id,
@@ -291,7 +291,8 @@ function planVisit(
  * Looks for a Player's offer for the city's trader `r` to take (`CONTEXT.md`: NPC cities at an
  * offer), the good it is shortest of first, then the nearest, and sends them if one suits: open to
  * anyone, within `NPC_OFFER_REACH` of its storage and of a realm it doesn't refuse, giving what it
- * is short of for what it has spare or Coins, at a rate at least as good as its own prices (`offerTimes`),
+ * lacks of its reserve (`reserveLacks`: its whole war chest, though it may not count Coins as
+ * short) for what it has spare or Coins, at a rate at least as good as its own prices (`offerTimes`),
  * and no trader out brings that good. The cheap tests come first, so most offers cost a distance and a lookup, once a game hour. Food short
  * (`foodOnly`), only an offer that gives Food will do. Returns whether it sent them.
  */
@@ -307,7 +308,7 @@ function planOfferRun(
   if (world.offers.length === 0) return false
   const storage = npcStorages(world, city)[0]
   if (!storage) return false
-  const order = shortGoods(world, city, plan.project)
+  const order = reserveLacks(world, city, plan.project).map((s) => s.good)
   const rank = new Map(order.map((g, i) => [g, i]))
   let best: { offer: Offer; times: number; rank: number; d: number } | undefined
   for (const offer of world.offers) {
@@ -359,6 +360,7 @@ function visitDeal(
   visitor: Trader,
   carriage: Carriage,
   spoken: SpokenFor,
+  size: number,
 ): { sells: Stock; buys: Stock } | undefined {
   const stock = npcCityStock(world, city)
   const reserve = npcReserve(world, city)
@@ -388,7 +390,7 @@ function visitDeal(
   const has = traderStock(visitor, carriage.load)
   const prices = traderPrices(visitor, carriage)
   const buys: Stock = {}
-  const buy = shortGoods(world, city, project).find(
+  const buy = shortGoods(world, city, size, project).find(
     (g): g is PricedGood =>
       g !== 'coins' &&
       !WEAPONS.includes(g as Weapon) &&
@@ -486,7 +488,7 @@ function buyGood(
   size: number,
 ): PricedGood | undefined {
   const priced = stockFloor(world, warehouse)
-  return shortGoods(world, city, project).find(
+  return shortGoods(world, city, size, project).find(
     (g): g is PricedGood =>
       g !== 'food' &&
       g !== 'coins' &&

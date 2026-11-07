@@ -103,7 +103,9 @@ describe('the reserve-driven chain', () => {
     const home = npcHome(world, city)!
     // Short of weapons, and the Iron and Wood to forge them.
     expect(npcReserve(world, city)[NPC_SMITHY_WEAPON]).toBeGreaterThan(0)
-    expect(shortGoods(world, city)).toEqual(expect.arrayContaining(['spear', 'iron', 'wood']))
+    expect(shortGoods(world, city, terrain.size)).toEqual(
+      expect.arrayContaining(['spear', 'iron', 'wood']),
+    )
     // Weapons want a smithy, which wants Iron, so a smelter, which wants ore: a mine first, and
     // its Wood a lumber camp before that.
     const next = () =>
@@ -198,7 +200,7 @@ describe('the reserve-driven chain', () => {
       for (const kind of ['mine', 'smelter', 'smithy'] as const) {
         expect(world.buildings.some((b) => b.kind === kind)).toBe(false)
       }
-      expect(shortGoods(world, city)).toContain(NPC_SMITHY_WEAPON)
+      expect(shortGoods(world, city, terrain.size)).toContain(NPC_SMITHY_WEAPON)
       // Fed: nobody starved, and its storages hold Food.
       expect(cityResidents(world, city).filter((r) => r.health > 0).length).toBeGreaterThanOrEqual(
         people,

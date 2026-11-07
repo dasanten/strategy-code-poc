@@ -55,7 +55,7 @@ export function cityGround(world: WorldState, city: City, size: number): Buildin
  */
 export function wantsTrainingGround(world: WorldState, city: City, size: number): boolean {
   if (city.tradeOrg || !isBigNpcCity(world, city)) return false
-  if (cityGround(world, city, size) || shortGoods(world, city).length > 0) return false
+  if (cityGround(world, city, size) || shortGoods(world, city, size).length > 0) return false
   return holdsAboveReserve(world, city, BUILD_MATERIALS.trainingGround ?? {})
 }
 

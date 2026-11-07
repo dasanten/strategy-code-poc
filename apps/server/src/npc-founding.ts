@@ -2,6 +2,7 @@ import {
   BUILD_MATERIALS,
   FOOD_PER_DAY,
   HOUSING_ROOM,
+  MAP_SIZE,
   NODE_GOOD,
   NPC_CITY_MIN_DISTANCE,
   NPC_FOUND_FOOD_DAYS,
@@ -152,7 +153,7 @@ export function planFounding(
     delete plan.foundingSite
     return
   }
-  if (shortGoods(world, city).length > 0) {
+  if (shortGoods(world, city, terrain?.size ?? MAP_SIZE).length > 0) {
     if (plan.fullSince === undefined) return
     plan.shortSince ??= world.tick
     if (world.tick - plan.shortSince <= NPC_FULL_DIP_DAYS * TICKS_PER_GAME_DAY) return

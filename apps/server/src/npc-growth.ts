@@ -149,7 +149,7 @@ function tradeOrgChainProject(
   const begun = world.buildings.find((b) => b.site && own.has(b.id))
   if (begun) return { kind: 'build', building: begun.kind, x: begun.x, y: begun.y }
   const rings = city.tradeOrg === 'hq' ? undefined : wallRings(world, city, home, terrain.size)
-  for (const good of shortGoods(world, city)) {
+  for (const good of shortGoods(world, city, terrain.size)) {
     const chain = chainProject(world, city, home, terrain, rings, good)
     if (chain) return chain
   }
@@ -534,9 +534,10 @@ function wanted(
   }
   if (!city.tradeOrg) {
     const stable =
-      wantsStable(world, city) && at('stable', stableTile(world, city, home, terrain, rings))
+      wantsStable(world, city, terrain.size) &&
+      at('stable', stableTile(world, city, home, terrain, rings))
     if (stable) return stable
-    for (const good of shortGoods(world, city)) {
+    for (const good of shortGoods(world, city, terrain.size)) {
       const chain = chainProject(world, city, home, terrain, rings, good)
       if (chain) return chain
     }
@@ -616,7 +617,7 @@ function anotherWorkplace(
     const places = own.filter((b) => chainGood(world, b) === good)
     return places.length > 0 && places.every((b) => crewHeld(world, city, b)) ? good : undefined
   }
-  for (const short of shortGoods(world, city)) {
+  for (const short of shortGoods(world, city, terrain.size)) {
     const good = fullGood(short, new Set())
     if (!good) continue
     if (good === 'food') {
@@ -649,7 +650,7 @@ function secondWorkplace(
   terrain: TerrainMap,
 ): BuildProject | undefined {
   if (city.tradeOrg || !isBigNpcCity(world, city)) return undefined
-  if (shortGoods(world, city).length > 0) return undefined
+  if (shortGoods(world, city, terrain.size).length > 0) return undefined
   const surplus = surplusWork(world, city, chainStore(world, city))
   const places = new Map<Good, Building[]>()
   for (const b of ownWorkplaces(world, city)) {
@@ -732,10 +733,10 @@ function firstWall(
  * finished or begun, and a living horse of it; with none, a daughter say, once nothing is short of
  * its reserve, so a Player can sell it some.
  */
-function wantsStable(world: WorldState, city: City): boolean {
+function wantsStable(world: WorldState, city: City, size: number): boolean {
   if (world.buildings.some((b) => b.kind === 'stable' && b.cityId === city.id)) return false
   if (world.horses.some((h) => h.cityId === city.id && h.health > 0)) return true
-  return shortGoods(world, city).length === 0
+  return shortGoods(world, city, size).length === 0
 }
 
 /**
