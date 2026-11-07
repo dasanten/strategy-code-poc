@@ -6,6 +6,7 @@ import {
   carriageCapacity,
   inCityArea,
   isAt,
+  horseLiesDown,
   isDown,
   middleOf,
   townHallOf,
@@ -234,13 +235,18 @@ function sendDriver(
   wagon.sentOut = true
 }
 
-/** The driver drives the carriage to a tile, or with `army` after that punishment's soldiers. */
+/**
+ * The driver drives the carriage to a tile, or with `army` after that punishment's soldiers. With
+ * its horse Down it stands instead, until the horse wakes or dies (`CONTEXT.md`: Down).
+ */
 function driveTo(
+  world: WorldState,
   driver: Resident,
   carriage: Carriage,
   to: { x: number; y: number },
   army?: string,
 ): void {
+  if (horseLiesDown(world, carriage)) return
   driver.order = {
     kind: 'drive',
     carriageId: carriage.id,
@@ -301,7 +307,7 @@ function loadFood(
     wrapDistance(size, carriage, b) < wrapDistance(size, carriage, a) ? b : a,
   )
   if (!isAt(driver, store, size)) {
-    driveTo(driver, carriage, store)
+    driveTo(world, driver, carriage, store)
     return true
   }
   const food = Math.min(
@@ -348,7 +354,7 @@ function unload(
     const b = homeFor(world, hq, g)
     if (!b) continue
     if (!isAt(driver, b, size)) {
-      driveTo(driver, carriage, b)
+      driveTo(world, driver, carriage, b)
       return true
     }
     const units = Math.min(Math.floor(n), unitsThatFit(driver, g, world.tick))
@@ -389,8 +395,8 @@ function keepAfterArmy(
   if (!spot) return
   const tiles = wrapDistance(size, carriage, spot)
   const reach = TRADE_ORG_PUNISH.wagonFollowReach
-  if (o.army === undefined && tiles <= reach) driveTo(driver, carriage, spot, p.id)
-  else if (o.army !== undefined && tiles > 2 * reach) driveTo(driver, carriage, spot)
+  if (o.army === undefined && tiles <= reach) driveTo(world, driver, carriage, spot, p.id)
+  else if (o.army !== undefined && tiles > 2 * reach) driveTo(world, driver, carriage, spot)
 }
 
 /**
@@ -444,7 +450,7 @@ function runWagon(world: WorldState, hq: City, wagon: SupplyWagon, size: number)
     const spot = armySpot(world, p.id, driver, size)
     if (spot) {
       const near = wrapDistance(size, carriage, spot) <= TRADE_ORG_PUNISH.wagonFollowReach
-      driveTo(driver, carriage, spot, near ? p.id : undefined)
+      driveTo(world, driver, carriage, spot, near ? p.id : undefined)
     }
     return true
   }
