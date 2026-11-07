@@ -85,12 +85,24 @@ function lessonOf(
   return undefined
 }
 
-/** Whose turn it is: `places` of `learners`, going round them by id, a new lot each turn. */
-function theirTurn(learners: readonly Resident[], places: number, tick: number): Resident[] {
-  const inOrder = [...learners].sort((a, b) => (a.id < b.id ? -1 : 1))
+/**
+ * Whose turn it is: `places` of `learners`, going round all a city's `soldiers` by id, a ground's worth
+ * further each turn. It goes by all of them, not those at hand, so one leaving on a round or coming
+ * back from one, as happens every game day, moves nobody else off the ground.
+ */
+function theirTurn(
+  soldiers: readonly Resident[],
+  learners: readonly Resident[],
+  places: number,
+  tick: number,
+): Resident[] {
+  const inOrder = [...soldiers].sort((a, b) => (a.id < b.id ? -1 : 1))
   const turn = Math.floor(tick / NPC_TRAIN_TURN_TICKS)
-  const from = (turn * places) % inOrder.length
-  return [...inOrder, ...inOrder].slice(from, from + Math.min(places, inOrder.length))
+  const from = (turn * TRAINING_GROUND_MAX_TRAINEES) % inOrder.length
+  const canLearn = new Set(learners)
+  return [...inOrder.slice(from), ...inOrder.slice(0, from)]
+    .filter((r) => canLearn.has(r))
+    .slice(0, places)
 }
 
 /**
@@ -130,7 +142,7 @@ export function planTraining(
   )
   if (!lesson) return
   jobs[teacher.id] = { kind: 'teach', groundId: ground.id, subject: lesson.subject }
-  for (const r of theirTurn(lesson.learners, places, world.tick)) {
+  for (const r of theirTurn(adults.filter(isArmed), lesson.learners, places, world.tick)) {
     jobs[r.id] = { kind: 'train', groundId: ground.id }
   }
 }

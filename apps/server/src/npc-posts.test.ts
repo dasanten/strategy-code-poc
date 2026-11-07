@@ -80,6 +80,12 @@ const target = (r: Resident) => {
 
 const tile = (t: { x: number; y: number }) => `${t.x},${t.y}`
 
+/** Those of `soldiers` not set off on a round (`npc-patrols.test.ts`) by the city's pass. */
+const notOnRound = (world: WorldState, city: City, soldiers: Resident[]) => {
+  const out = world.cityPlans[city.id]?.patrols?.map((p) => p.residentId) ?? []
+  return soldiers.filter((r) => !out.includes(r.id))
+}
+
 describe('Soldier posts (CONTEXT.md)', () => {
   it('sends soldiers off the storage to posts, spread out, and leaves them there', () => {
     const { world, city, storage } = staged(10)
@@ -94,7 +100,7 @@ describe('Soldier posts (CONTEXT.md)', () => {
     const where = soldiers.map((r) => tile(r))
     for (const r of soldiers) expect(r.order).toBeNull()
     pass(world, city)
-    for (const r of soldiers) expect(r.order).toBeNull()
+    for (const r of notOnRound(world, city, soldiers)) expect(r.order).toBeNull()
     expect(soldiers.map((r) => tile(r))).toEqual(where)
   })
 
@@ -168,7 +174,7 @@ describe('Soldier posts (CONTEXT.md)', () => {
       world.buildings.push({ id: `new${i}`, kind: 'wall', cityId: city.id, ...at })
     }
     pass(world, city)
-    for (const r of rest) expect(r.order).toBeNull()
+    for (const r of notOnRound(world, city, rest)) expect(r.order).toBeNull()
     expect(rest.map((r) => tile(r))).toEqual(where)
   })
 

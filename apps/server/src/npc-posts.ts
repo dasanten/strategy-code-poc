@@ -64,8 +64,8 @@ export function freeSoldiers(world: WorldState, city: City, adults: readonly Res
 
 /**
  * The armed adults of a city's `adults` it can put somewhere: not at any script but the Train default
- * (`CONTEXT.md`: Who trains), so not on alarm; not fighting, carrying a child, Down, nor its traders
- * or founding party.
+ * (`CONTEXT.md`: Who trains), so not on alarm; not fighting, carrying a child, Down, on a round, nor
+ * its traders or founding party.
  */
 export function soldiersAtHand(
   world: WorldState,
@@ -75,6 +75,7 @@ export function soldiersAtHand(
   const plan = world.cityPlans[city.id]
   const party = new Set(foundingParty(plan))
   const traders = new Set(plan?.traders?.map((t) => t.residentId))
+  const onRound = new Set(plan?.patrols?.map((p) => p.residentId))
   return adults.filter(
     (r) =>
       isArmed(r) &&
@@ -83,7 +84,8 @@ export function soldiersAtHand(
       !r.carrying &&
       r.order?.kind !== 'attack' &&
       !party.has(r.id) &&
-      !traders.has(r.id),
+      !traders.has(r.id) &&
+      !onRound.has(r.id),
   )
 }
 
@@ -149,7 +151,7 @@ export function soldierPosts(
  * from a gate or from a closed ring's inside (`mayStep`), so a stretch joined side to side to a gate.
  * A wall still going up, or a stretch cut off by what was torn down, is no post.
  */
-function reachableWalls(
+export function reachableWalls(
   world: WorldState,
   city: City,
   size: number,

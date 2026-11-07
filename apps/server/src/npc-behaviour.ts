@@ -62,6 +62,7 @@ import {
 } from './npc-plan.js'
 import { chainStore, holdsBatch, warehouseFor } from './npc-chain.js'
 import { foundDaughter, foundingParty, stepFounders } from './npc-founding.js'
+import { nextStop, sharePatrols } from './npc-patrols.js'
 import { freeSoldiers, soldierPosts, standsPosts, type SoldierPost } from './npc-posts.js'
 import { reviveTarget, runReviver } from './npc-revive.js'
 import { layRoad, onRoadWork, type WayFinder } from './npc-roads.js'
@@ -163,7 +164,7 @@ export function stepNpcCities(
  * (`stepScouts`); with nothing to do they stand at a house (`standIdle`), and take no Food to set
  * out with. Its soldiers (armed adults) are put to no work and no building (`stepNpcDefence`), and
  * go to their training ground if it is their turn (`goTrain`), else to their posts (`standPost`), a
- * Trade Org city's home. Children stand at a house too, and refill
+ * few on a round in turns (`sharePatrols`), a Trade Org city's home. Children stand at a house too, and refill
  * there. Returns the milliseconds spent planning.
  */
 function runCity(
@@ -289,6 +290,7 @@ function runCity(
   const postOf = (r: Resident) =>
     (posts ??= soldierPosts(world, city, freeSoldiers(world, city, adults), size, terrain)).get(r.id)
   const hasPosts = standsPosts(world, city)
+  if (passed && plan) sharePatrols(world, city, plan, adults, size, terrain)
   // The road crew is apart from its builders (`CONTEXT.md`: NPC road).
   const crew = adults.filter((r) => jobs[r.id]?.kind === 'road')
   const building = adults.filter((r) => isBuilder(r) && jobs[r.id]?.kind !== 'road')
@@ -353,7 +355,8 @@ function runCity(
       }
     }
     const stow = stowing(world, city, r, storage, inputOf(buildings, jobs[r.id]))
-    if (stow) {
+    // A soldier keeps spare Food on them and eats it where they stand: the walk could leave a post bare.
+    if (stow && !(hasPosts && isArmed(r) && onlyFood(stow.load))) {
       putAway(r, stow.to, stow.load, size)
       continue
     }
@@ -402,7 +405,9 @@ function runCity(
       }
     }
     if (goTrain(world, city, r, job, passed, size)) continue
-    if (onPost) standPost(world, city, r, postOf, home, size, passed)
+    const stop = onPost && plan ? nextStop(plan, r) : undefined
+    if (stop) walkTo(r, stop)
+    else if (onPost) standPost(world, city, r, postOf, home, size, passed)
     else if (soldier) comeHome(world, city, r, home, size)
     else stand(r)
   }
@@ -478,8 +483,12 @@ function standPost(
 function walkingOffPost(r: Resident, post: SoldierPost | undefined, size: number): boolean {
   const o = r.order
   if (o?.kind !== 'walkTo' || r.script || !post) return false
-  return !post.tiles.has(tileIndex(size, o.target.x, o.target.y)) && haul(r) === undefined
+  const load = haul(r)
+  return !post.tiles.has(tileIndex(size, o.target.x, o.target.y)) && (!load || onlyFood(load))
 }
+
+/** Whether a load is Food and nothing else. */
+const onlyFood = (load: Stock) => Object.keys(load).every((good) => good === 'food')
 
 /** Whether a resident is on a walk that ends at one of these houses. */
 function walkingToHouse(r: Resident, houses: readonly Building[], size: number): boolean {

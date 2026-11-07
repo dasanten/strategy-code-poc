@@ -567,6 +567,24 @@ export const NPC_POST_AROUND_HALL = 2
 export const NPC_TRAIN_TURN_TICKS = 5 * TICKS_PER_GAME_DAY
 
 /**
+ * The most of an NPC city's soldiers walking a round at once, whatever its size (`CONTEXT.md`: Soldier
+ * posts). They walk every tick, the dearest of a soldier's jobs, so a city's cost stops growing here.
+ */
+export const NPC_PATROLS_MAX = 3
+
+/** One soldier walks a round for every this many on an NPC city's wall, up to `NPC_PATROLS_MAX`. */
+export const NPC_SOLDIERS_PER_PATROL = 4
+
+/**
+ * How many stops a round has along an NPC city's wall, spread evenly round it. Each costs one path
+ * search; a town's wall of 180 tiles gives legs of about 22 tiles, some 3 game hours each.
+ */
+export const NPC_PATROL_WALL_STOPS = 8
+
+/** How many stops a round has along an NPC city's roads inside it, after those on its wall. */
+export const NPC_PATROL_ROAD_STOPS = 3
+
+/**
  * Coins an NPC city keeps as its war chest for each of its residents (`CONTEXT.md`: NPC reserve):
  * a town of 16 keeps 160, what four mint workers strike in two game days (`RECIPES`).
  */

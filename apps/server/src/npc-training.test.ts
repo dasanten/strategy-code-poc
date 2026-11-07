@@ -5,6 +5,7 @@ import {
   NPC_VILLAGE,
   TICKS_PER_GAME_DAY,
   TRAINING_GROUND_MAX_TRAINEES,
+  canWork,
   isAt,
   isDown,
   npcReserve,
@@ -24,13 +25,15 @@ import { npcHome } from './npc-behaviour.js'
 import { foundNpcCity } from './npc-cities.js'
 import { houseTile, nextProject, wallRings } from './npc-growth.js'
 import { plains } from './npc-growth.fixture.js'
+import { sharePatrols } from './npc-patrols.js'
 import { planCity, runResidents } from './npc-plan.js'
-import { postsToHold } from './npc-posts.js'
+import { postsToHold, soldiersAtHand } from './npc-posts.js'
 import {
   cityGround,
   npcTrainingGroundsBounded,
   npcTrainsItsSoldiers,
   planTraining,
+  steerTraining,
 } from './npc-training.js'
 import { npcSender } from './order-sender.js'
 import { mulberry32, newResident } from './residents.js'
@@ -556,4 +559,145 @@ describe('the invariants of the training ground (ADR 0004)', () => {
     )
     expect(plan({ [a.id]: { kind: 'teach' }, [b.id]: { kind: 'train' } })).toHaveLength(1)
   })
+})
+
+describe('training and patrols share a city’s soldiers (`CONTEXT.md`: Soldier posts, Who trains)', () => {
+  /** One of the city's soldiers put on a round, walking to the first of its stops. */
+  function onRound(world: WorldState, city: City, r: Resident): void {
+    const plan = (world.cityPlans[city.id] ??= { plannedAt: world.tick, jobs: {} })
+    plan.patrols = [{ residentId: r.id, stops: [{ x: r.x + 5, y: r.y }] }]
+    r.order = { kind: 'walkTo', target: { x: r.x + 3, y: r.y }, path: null, progress: 0 }
+  }
+
+  it('leaves one on a round out of those at hand: no teacher, no trainee', () => {
+    const staged = bigCity()
+    const { world, city, terrain } = staged
+    withGround(staged)
+    const soldiers = soldiersOf(world, city)
+    const best = soldiers[5]!
+    best.skills.combat = 6
+    onRound(world, city, best)
+    const adults = runResidents(world).get(city.id)!
+    expect(soldiersAtHand(world, city, adults)).not.toContain(best)
+    planCity(world, city, terrain)
+    expect(jobsOf(world, city, 'teach')).not.toContain(best.id)
+    expect(jobsOf(world, city, 'train')).not.toContain(best.id)
+    expect(world.cityPlans[city.id]!.jobs[best.id]).toEqual({ kind: 'soldier' })
+  })
+
+  it('takes one given a job at the ground off their round and their walk', () => {
+    const staged = bigCity()
+    const { world, city, terrain } = staged
+    const ground = withGround(staged)
+    const r = soldiersOf(world, city)[5]!
+    onRound(world, city, r)
+    const plan = world.cityPlans[city.id]!
+    const job = { kind: 'train' as const, groundId: ground.id }
+    plan.jobs[r.id] = job
+    sharePatrols(world, city, plan, runResidents(world).get(city.id)!, terrain.size, terrain)
+    expect(plan.patrols).toBeUndefined()
+    steerTraining(world, city, r, job)
+    expect(r.order).toBeNull()
+  })
+
+  it('moves nobody else off the ground when one goes on a round or comes back', () => {
+    const staged = bigCity()
+    const { world, city, terrain } = staged
+    withGround(staged)
+    planCity(world, city, terrain)
+    const before = jobsOf(world, city, 'train')
+    const offTheGround = soldiersOf(world, city).find(
+      (r) => world.cityPlans[city.id]!.jobs[r.id]?.kind === 'soldier',
+    )!
+    onRound(world, city, offTheGround)
+    planCity(world, city, terrain)
+    expect(jobsOf(world, city, 'train')).toEqual(before)
+    delete world.cityPlans[city.id]!.patrols
+    offTheGround.order = null
+    planCity(world, city, terrain)
+    expect(jobsOf(world, city, 'train')).toEqual(before)
+  })
+
+  /** Runs a city for `days`, checking both rules as it goes; what it saw, hour by hour. */
+  function runBoth(staged: Staged, days: number) {
+    const { world, terrain, city } = staged
+    const hall = townHallOf(world, city)!
+    const walking = unhurriedWalking(terrain)
+    const seen = {
+      hours: 0,
+      trainees: 0,
+      rounds: 0,
+      leftForWall: 0,
+      hoursWithRounds: 0,
+      hoursWithBoth: 0,
+      mostMovedInATurn: 0,
+    }
+    let before = { turn: -1, lot: new Set<string>() }
+    for (let t = 0; t < days * TICKS_PER_GAME_DAY; t++) {
+      stepWorld(world, terrain, walking)
+      if (t % 20 === 0) expect(checkInvariants(world, terrain)).toEqual([])
+      const plan = world.cityPlans[city.id]
+      if (!plan) continue
+      const held = soldiersOf(world, city).some(
+        (r) =>
+          !isDown(r) &&
+          (isAt(r, hall, terrain.size) ||
+            (r.order?.kind === 'walkTo' && isAt(r.order.target, hall, terrain.size))),
+      )
+      expect(held).toBe(true)
+      // Never on a round and at the ground at once.
+      const out = plan.patrols?.map((p) => p.residentId) ?? []
+      for (const id of out) expect(plan.jobs[id]?.kind).toBe('soldier')
+      if (t % 60 !== 0) continue
+      const trainees = jobsOf(world, city, 'train')
+      const turn = Math.floor(world.tick / NPC_TRAIN_TURN_TICKS)
+      if (turn === before.turn) {
+        const moved = trainees.filter((id) => !before.lot.has(id)).length
+        seen.mostMovedInATurn = Math.max(seen.mostMovedInATurn, moved)
+      }
+      before = { turn, lot: new Set(trainees) }
+      seen.leftForWall +=
+        jobsOf(world, city, 'soldier').length - out.length - postsToHold(world, city)
+      seen.hours++
+      seen.trainees += trainees.length
+      seen.rounds += out.length
+      if (out.length > 0) seen.hoursWithRounds++
+      if (out.length > 0 && trainees.length > 0) seen.hoursWithBoth++
+    }
+    return seen
+  }
+
+  it(
+    'a city of 110 does both at once, with invariants checked and the hall held',
+    { tags: ['slow'], timeout: 900_000 },
+    () => {
+      const staged = bigCity()
+      withGround(staged)
+      const seen = runBoth(staged, 12)
+      console.log(`Training and patrols, city of 110: ${JSON.stringify(seen)}`)
+      expect(seen.hoursWithBoth).toBeGreaterThan(0)
+      // A lot stays a lot: someone back from a round takes a place, but it is never reshuffled.
+      expect(seen.mostMovedInATurn).toBeLessThanOrEqual(TRAINING_GROUND_MAX_TRAINEES / 2)
+    },
+  )
+
+  it(
+    'a city just big enough keeps its hall and gates, with its wall left to training',
+    { tags: ['slow'], timeout: 900_000 },
+    () => {
+      const staged = bigCity()
+      const { world, city } = staged
+      withGround(staged)
+      // Down to 52 residents, 10 of them soldiers: few past those it must keep.
+      for (const r of soldiersOf(world, city).slice(10)) delete r.carried.spear
+      const spare = world.residents.filter(
+        (r) => r.cityId === city.id && !r.carried.spear && canWork(r, world.tick),
+      )
+      const gone = new Set(spare.slice(0, world.residents.length - 52).map((r) => r.id))
+      world.residents = world.residents.filter((r) => !gone.has(r.id))
+      const seen = runBoth(staged, 12)
+      console.log(`Training and patrols, city of 52: ${JSON.stringify(seen)}`)
+      expect(seen.trainees).toBeGreaterThan(0)
+    },
+  )
 })

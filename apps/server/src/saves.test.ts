@@ -543,18 +543,27 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(110)
+    expect(WORLD_FORMAT_VERSION).toBe(111)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
     expect(checkInvariants(v39, land)).toEqual([])
   })
 
-  it('leaves a format 109 world as it is: no plan has anyone at a training ground yet (migration 109 → 110)', () => {
+  it('leaves a format 110 world as it is: no plan has anyone at a training ground yet (migration 110 → 111)', () => {
     const { world, terrain: land } = worldWithPost()
     world.cityPlans = { waiting: { plannedAt: 0, jobs: { p1: { kind: 'soldier' } } } }
+    const v111 = migrateWorld(structuredClone(world), 110, { terrain: land }, migrations, 111)
+    expect(v111).toEqual(world)
+  })
+
+  it('leaves a format 109 world as it is: nobody is on patrol yet (migration 109 → 110)', () => {
+    const { world, terrain: land } = worldWithPost()
+    world.cityPlans = { home: { plannedAt: 0, jobs: {} } }
     const v110 = migrateWorld(structuredClone(world), 109, { terrain: land }, migrations, 110)
     expect(v110).toEqual(world)
+    expect(v110.cityPlans.home?.patrols).toBeUndefined()
+    expect(v110.cityPlans.home?.patrolledLast).toBeUndefined()
   })
 
   it('leaves a format 108 world as it is: no plan has a dip yet (migration 108 → 109)', () => {
