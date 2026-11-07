@@ -9,7 +9,7 @@ import {
   type TerrainMap,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
-import { raiseResidentAttacked, raiseTheft } from './alarms.js'
+import { alarmsSound, raiseOccupied, raiseResidentAttacked, raiseTheft } from './alarms.js'
 import { attackOrder } from './combat.js'
 import { startDefence } from './defence.js'
 import { checkInvariants } from './invariants.js'
@@ -380,20 +380,173 @@ describe('the Alarm default against an armed outsider', () => {
     expect(s.city.occupation).toMatchObject({ realmId: 'r2' })
   })
 
-  it('holding, they don’t answer an attack or a theft: one alarm doesn’t interrupt another', () => {
-    const s = setup()
-    const other = newResident(mulberry32(13), { id: 'w2', owner: 'r1', x: 7, y: 7, tick: 0 })
-    other.cityId = 'c1'
-    s.world.residents.push(other)
-    s.enter()
-    s.tick()
-    expect(s.until(s.onHall)).toBe(true)
-    raiseResidentAttacked(s.world, s.x1, other, SIZE)
-    raiseTheft(s.world, s.x1, 'r1', SIZE)
-    expect(s.r.script?.alarm?.kind).toBe('outsider')
-    s.tick()
-    expect(s.r.order?.kind).not.toBe('attack')
-    expect(s.onHall()).toBe(true)
+  describe('another alarm taking over from holding the hall', () => {
+    /** w1 holds the hall against x1; w2 stands by, and z1, armed too, stands in the area. */
+    const holding = () => {
+      const s = setup()
+      s.working()
+      const other = newResident(mulberry32(13), { id: 'w2', owner: 'r1', x: 7, y: 7, tick: 0 })
+      other.cityId = 'c1'
+      const z1 = newResident(mulberry32(14), { id: 'z1', owner: 'r2', x: 13, y: 9, tick: 0 })
+      z1.carried = { sword: 1 }
+      s.world.residents.push(other, z1)
+      s.enter()
+      s.tick()
+      expect(s.until(s.onHall)).toBe(true)
+      s.tick()
+      expect(s.r.script?.alarm?.kind).toBe('outsider')
+      const gone = (who: { id: string }) => {
+        s.world.residents = s.world.residents.filter((x) => x.id !== who.id)
+      }
+      return { ...s, other, z1, gone }
+    }
+
+    it.each(['attacked', 'theft'] as const)(
+      '%s takes over, and they go back to holding while armed outsiders remain',
+      (kind) => {
+        const s = holding()
+        const work = s.r.interrupted!
+        if (kind === 'attacked') raiseResidentAttacked(s.world, s.z1, s.other, SIZE)
+        else raiseTheft(s.world, s.z1, 'r1', SIZE)
+        expect(s.r.script).toMatchObject({
+          task: 'alarm',
+          alarm: { kind, about: 'z1' },
+          alarmUnder: { kind: 'outsider', about: 'x1' },
+        })
+        expect(s.r.order).toBeNull()
+        // What they were doing before the first alarm stays where it was.
+        expect(s.r.interrupted).toBe(work)
+        s.tick()
+        expect(s.r.order).toMatchObject({ kind: 'attack', targetId: 'z1' })
+        expect(s.r.script!.memory.doing).toBe(`On alarm: going after ${s.z1.name}`)
+
+        // The culprit gone, the script goes on for the outsider alarm, with no line in the realm log.
+        s.gone(s.z1)
+        s.tick()
+        expect(s.r.script?.task).toBe('alarm')
+        expect(s.r.script?.alarm).toMatchObject({ kind: 'outsider', about: 'x1' })
+        expect(s.r.script?.alarmUnder).toBeUndefined()
+        expect(s.r.interrupted).toBe(work)
+        expect(s.world.events.some((e) => e.kind === 'scriptStopped')).toBe(false)
+        expect(s.until(s.onHall)).toBe(true)
+        s.tick()
+        expect(s.r.script!.memory.doing).toBe('On alarm: holding the town hall')
+
+        // No armed outsider left, it ends and what they were doing goes on.
+        s.leave()
+        s.tick()
+        s.tick()
+        expect(s.r.interrupted).toBeUndefined()
+        expect(s.r.script?.memory.workplaceId).toBe('f1')
+      },
+    )
+
+    it('ends for good when no armed outsider remains once the culprit is gone', () => {
+      const s = holding()
+      raiseResidentAttacked(s.world, s.z1, s.other, SIZE)
+      s.tick()
+      s.gone(s.z1)
+      s.leave()
+      s.tick()
+      s.tick()
+      s.tick()
+      expect(s.r.interrupted).toBeUndefined()
+      expect(s.r.script?.memory.workplaceId).toBe('f1')
+    })
+
+    it('leaves someone already attacking at it', () => {
+      const s = holding()
+      s.r.order = attackOrder('l2')
+      raiseTheft(s.world, s.z1, 'r1', SIZE)
+      raiseResidentAttacked(s.world, s.z1, s.other, SIZE)
+      expect(s.r.script?.alarm?.kind).toBe('outsider')
+      expect(s.r.order).toMatchObject({ kind: 'attack', targetId: 'l2' })
+    })
+
+    it('a second outsider or attacker doesn’t take over from going after the first', () => {
+      const s = holding()
+      raiseResidentAttacked(s.world, s.z1, s.other, SIZE)
+      s.tick()
+      const newcomer = newResident(mulberry32(15), { id: 'z2', owner: 'r2', x: 14, y: 9, tick: 0 })
+      newcomer.carried = { sword: 1 }
+      s.world.residents.push(newcomer)
+      stepOutsiders(s.world, SIZE)
+      raiseResidentAttacked(s.world, s.x1, s.other, SIZE)
+      expect(s.r.script?.alarm).toMatchObject({ kind: 'attacked', about: 'z1' })
+    })
+
+    it('lured off the hall, an occupation brings them back, and they hold again after', () => {
+      const s = holding()
+      // Someone armed of a third realm stays in the area, for them to come back to hold against.
+      s.world.realms.push({ id: 'r3', userId: 9, leaderId: 'y1' })
+      const stays = newResident(mulberry32(16), { id: 'y1', owner: 'r3', x: 14, y: 8, tick: 0 })
+      stays.carried = { spear: 1 }
+      s.world.residents.push(stays)
+      raiseResidentAttacked(s.world, s.z1, s.other, SIZE)
+      s.tick()
+      expect(s.r.order).toMatchObject({ kind: 'attack', targetId: 'z1' })
+      // Well away from the hall, as the fight has led them.
+      s.r.x = 6
+      s.r.y = 9
+      const hall = townHallOf(s.world, s.city)!
+      s.enter(s.x1, hall.x, hall.y)
+      raiseOccupied(s.world, s.city, 'r2', SIZE)
+      expect(s.r.script).toMatchObject({
+        alarm: { kind: 'occupied', about: 'x1' },
+        alarmUnder: { kind: 'outsider', about: 'x1' },
+      })
+      s.tick()
+      expect(s.r.order).toMatchObject({ kind: 'attack', targetId: 'x1' })
+      s.gone(s.x1)
+      s.gone(s.z1)
+      s.tick()
+      expect(s.r.script?.alarm).toMatchObject({ kind: 'outsider', about: 'x1' })
+      expect(s.r.order).toBeNull()
+      expect(s.until(s.onHall)).toBe(true)
+      s.tick()
+      expect(s.r.script!.memory.doing).toBe('On alarm: holding the town hall')
+    })
+
+    it('a script the Player picked gets the new alarm with its memory, then the old one', () => {
+      const s = setup(
+        new Map([
+          [
+            750,
+            {
+              ...reader(),
+              source:
+                'log(me.alarm.kind)\nif (memory.ran != null) { log("ran before") }\nmemory.ran = true\nend()',
+            },
+          ],
+        ]),
+      )
+      s.r.alarmScriptId = 750
+      const other = newResident(mulberry32(13), { id: 'w2', owner: 'r1', x: 7, y: 7, tick: 0 })
+      other.cityId = 'c1'
+      s.world.residents.push(other)
+      s.enter()
+      s.tick()
+      raiseResidentAttacked(s.world, s.x1, other, SIZE)
+      s.tick()
+      s.tick()
+      s.tick()
+      expect(logged(s.r)).toEqual(['attacked', 'outsider', 'ran before'])
+      expect(s.r.script).toBeUndefined()
+    })
+
+    it('the invariant catches an alarm kept to go back to that is wrong', () => {
+      const s = holding()
+      const about = s.r.script!.alarm!
+      s.r.script!.alarmUnder = about
+      expect(alarmsSound.check(s.world, terrain).map((v) => v.message)).toEqual([
+        'w1 keeps an outsider alarm under another',
+      ])
+      s.r.script!.alarm = { ...about, kind: 'theft' }
+      s.r.script!.alarmUnder = { ...about, kind: 'attacked' }
+      expect(alarmsSound.check(s.world, terrain).map((v) => v.message)).toEqual([
+        'w1 keeps an alarm to go back to that is no outsider alarm',
+      ])
+    })
   })
 
   it('leaves someone set to None where they are, and someone unarmed', () => {

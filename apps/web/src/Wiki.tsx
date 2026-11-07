@@ -2664,7 +2664,13 @@ export function Wiki() {
           scripts for them to run instead, an unarmed resident too, or <strong>None</strong> to run
           nothing; the group card picks it for all of them at once. It runs in place of what they
           were doing, which goes on with its memory once it calls <code>end()</code>, as for a
-          defence script. A second alarm doesn't interrupt it. A blow still runs their defence
+          defence script. A second alarm doesn't interrupt it, with two exceptions: a theft or an
+          attack takes over from an outsider alarm, unless they are already attacking someone, and
+          an occupation takes over from any other. The script goes on with its memory,{' '}
+          <code>me.alarm</code> now the new one, and when it calls <code>end()</code> an outsider
+          alarm it took over from goes on. So those holding the hall go after a thief or an attacker,
+          then back to holding while armed outsiders remain; should an armed outsider lure them away
+          and step onto the hall, the occupation brings them all back. A blow still runs their defence
           script, and once that ends the Alarm script goes on; while a defence script runs, or an
           order you gave under attack holds, an alarm doesn't reach them. An order you give
           meanwhile ends both. Scripts read the alarm as <code>me.alarm</code>: its{' '}

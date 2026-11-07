@@ -1939,8 +1939,9 @@ ${LOG_TEXT}
 // no crime in my own city's area, nor is striking back at an attacker; striking
 // anyone else is. For an armed outsider in the area I walk to the town hall and
 // stand there until no armed outsider is left, which blocks an occupation before
-// it starts; an unarmed outsider I only log. Unarmed, or for another alarm, I end
-// at once.
+// it starts; an unarmed outsider I only log. A theft, an attack or an occupation
+// takes me off the hall, and when I end for it I come back here while armed
+// outsiders remain. Unarmed, or for another alarm, I end at once.
 if (me.alarm == null || !armed(me)) {
   end()
 } else if (me.alarm.kind == "occupied") {

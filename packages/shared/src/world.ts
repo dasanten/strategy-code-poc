@@ -331,6 +331,11 @@ export interface RunningScript {
    * script has one, and it goes wherever the script goes, kept aside and back with it.
    */
   alarm?: Alarm
+  /**
+   * The outsider alarm `alarm` took over from (`CONTEXT.md`: Alarm script). When the script calls
+   * `end()` it goes on for this one instead of ending, so those holding the hall go back to it.
+   */
+  alarmUnder?: Alarm
 }
 
 /**

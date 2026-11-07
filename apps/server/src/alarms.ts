@@ -50,18 +50,53 @@ function canBeAlarmed(world: WorldState, city: City, r: Resident, size: number):
  * Starts `t`'s Alarm script for `alarm`, keeping what they were doing aside (`CONTEXT.md`: Alarm
  * script): the script their Player picked (`Resident.alarmScriptId`), else, for an armed resident,
  * the Alarm default of their realm (script id 0, which the runner resolves); for None or unarmed
- * with none picked, nothing. Not while an Alarm or defence script runs, or over what the Player
- * gave them under attack, while that holds.
+ * with none picked, nothing. Not while a defence script runs, or over what the Player gave them
+ * under attack, while that holds. Nor while an Alarm script runs, unless the new alarm takes over
+ * from its alarm (`takesOver`): the script goes on with its memory, for the new alarm.
  */
 export function startAlarm(world: WorldState, t: Resident, alarm: Alarm): void {
   const picked = t.alarmScriptId
   if (picked === 'none' || (picked === undefined && !isArmed(t))) return
   endHoldIfOver(world, t)
+  const running = t.script?.task === 'alarm' ? t.script : undefined
+  if (running?.alarm && takesOver(t, running.alarm, alarm)) {
+    const under = running.alarm.kind === 'outsider' ? running.alarm : running.alarmUnder
+    if (under) running.alarmUnder = under
+    running.alarm = alarm
+    delete running.waitingSince
+    t.order = null
+    return
+  }
   if (t.interrupted || t.givenUnderAttack) return
   if (t.script) delete t.script.waitingSince
   t.interrupted = { order: t.order, ...(t.script ? { script: t.script } : {}) }
   t.order = null
   t.script = { scriptId: picked ?? 0, task: 'alarm', memory: {}, alarm }
+}
+
+/**
+ * Whether `alarm` takes over from the alarm `t`'s Alarm script runs for (`CONTEXT.md`: Alarm
+ * script): an occupation from any other, and a theft or an attack from an outsider, unless they
+ * are already attacking someone.
+ */
+function takesOver(t: Resident, running: Alarm, alarm: Alarm): boolean {
+  if (alarm.kind === 'occupied') return running.kind !== 'occupied'
+  if (alarm.kind === 'outsider' || running.kind !== 'outsider') return false
+  return t.order?.kind !== 'attack'
+}
+
+/**
+ * `r`'s Alarm script called `end()`: if its alarm took over from an outsider alarm, the script goes
+ * on for that one, with its memory (`CONTEXT.md`: Alarm script), and those holding the hall go back
+ * to it. False if there is none to go back to, and it really ends.
+ */
+export function backToOutsiderAlarm(r: Resident): boolean {
+  const under = r.script?.alarmUnder
+  if (!under) return false
+  r.script!.alarm = under
+  delete r.script!.alarmUnder
+  r.order = null
+  return true
 }
 
 /**
@@ -265,6 +300,13 @@ export const alarmsSound: Invariant = {
         r.script?.alarm?.about === r.id && 'runs an Alarm script about themselves',
         r.script?.task === 'alarm' && !kept && 'runs an Alarm script with nothing kept aside',
         r.script?.task === 'alarm' && aside && 'runs two Alarm scripts',
+        r.script?.alarmUnder && r.script.task !== 'alarm' && 'keeps an alarm under no Alarm script',
+        r.script?.alarmUnder &&
+          r.script.alarmUnder.kind !== 'outsider' &&
+          'keeps an alarm to go back to that is no outsider alarm',
+        r.script?.alarmUnder?.kind === 'outsider' &&
+          r.script.alarm?.kind === 'outsider' &&
+          'keeps an outsider alarm under another',
         aside && r.script?.task !== 'defend' && 'keeps an Alarm script aside but doesn’t defend',
         aside && aside.script.task !== 'alarm' && 'keeps a script aside as an Alarm script',
         kept?.script?.task === 'alarm' && 'came back to an Alarm script as what it interrupted',

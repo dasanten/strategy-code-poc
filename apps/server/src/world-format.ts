@@ -467,7 +467,9 @@ export const migrations: Record<number, MigrationStep> = {
   // it is.
   105: (state) => state,
   // A city keeps who is in its area (`CONTEXT.md`: Alarm; `City.outsiders`). Those there already came
-  // in before there were alarms, so they go on the list as they stand, and raise none.
+  // in before there were alarms, so they go on the list as they stand, and raise none. A running
+  // script may keep the outsider alarm another took over from (`RunningScript.alarmUnder`); no alarm
+  // has yet.
   106: (state, { terrain }) => {
     const world = structuredClone(state) as WorldState
     noteOutsidersInside(world, terrain.size)
