@@ -7,6 +7,7 @@ import {
   NPC_TOWN,
   TICKS_PER_GAME_DAY,
   HOUSING_ROOM,
+  RECIPES,
   canWork,
   cityResidents,
   isAt,
@@ -20,6 +21,7 @@ import {
   type City,
   type CityLayout,
   type Good,
+  type Resident,
   type ResourceKind,
   type Stock,
   type TerrainMap,
@@ -265,7 +267,10 @@ export interface BigCityHold {
   stillShare: number
   /** The mean of that share over its ticks. */
   meanStillShare: number
-  /** The longest anyone stood on its storage with no order and no script, in ticks. */
+  /**
+   * The longest anyone stood on its storage with no order and no script, in ticks. One waiting there for
+   * what their smelter or smithy needs (`takeInput`) is fetching, and isn't counted.
+   */
   longestOnStorage: number
   /** The job of whoever did: `child` for one too young for a job. */
   longestJob: string
@@ -314,16 +319,21 @@ export function watchBigCity(staged: ReturnType<typeof bigCity>, fromDay: number
     }
     if (world.tick % TICKS_PER_GAME_DAY === 0) farmers.push(count('farm'))
     const still = adults.filter(
-      (r) => !r.order && !r.script && !['soldier', 'teach', 'train'].includes(jobs[r.id]?.kind ?? ''),
+      (r) =>
+        !r.order && !r.script && !['soldier', 'teach', 'train'].includes(jobs[r.id]?.kind ?? ''),
     )
     seen.stillShare = Math.max(seen.stillShare, still.length / adults.length)
     stillShares += still.length / adults.length
     ticks++
+    const fetching = (r: Resident) => {
+      const place = world.buildings.find((b) => b.id === jobs[r.id]?.buildingId)
+      return !!place && RECIPES[place.kind] !== undefined
+    }
     let on = 0
     for (const r of residents) {
       const here = isAt(r, home, terrain.size)
       if (here) on++
-      if (!here || r.order || r.script) {
+      if (!here || r.order || r.script || fetching(r)) {
         standing.delete(r.id)
         continue
       }

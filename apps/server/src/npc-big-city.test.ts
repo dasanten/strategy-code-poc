@@ -39,7 +39,8 @@ const MOST_IDLE_SHARE = 0.15
 /**
  * The most ticks anyone stands on the storage with nothing to do. Those who come to rest there between
  * passes are sent off by the next one (`standIdle`), so this is one pass and the ticks around it. Those
- * stowing or fetching have an order, and those walking over it one too.
+ * stowing, fetching and walking over it have an order; one waiting there for what their smelter or
+ * smithy needs is fetching too (`watchBigCity`).
  */
 const LONGEST_ON_STORAGE = NPC_PLAN_TICKS + 5
 
