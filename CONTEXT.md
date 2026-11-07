@@ -520,10 +520,12 @@ The shared language of the game. Domain terms only — no implementation details
   its wall they can get up to. While its wall has too few tiles for them, or it has none, they also
   stand on the free ground around its hall. Once on a stretch of wall they stay, so a new one moves
   nobody. They eat where they stand (Refilling at home). When those on the hall or at a gate are called
-  away or die, the next by id take their place at the city's next pass. Some of them (at most a balance
-  number) walk a round along its wall and roads in turns, and in a city with a training ground some
-  train (Who trains). An alarm takes them from any of this, and they come back (Alarm). Trading posts
-  and the HQ keep their own rules.
+  away or die, the next by id take their place at the city's next pass. Some of those on its wall (a
+  share of them, at most a balance number whatever its size) walk a round along it and its roads
+  inside it, and back to where they set out, in turns by id. They refill as they walk, and one low on
+  Food with none to take stops and goes back to their post; a stop they can't get to they skip. In a
+  city with a training ground some train (Who trains). An alarm takes them from any of this, and they
+  come back (Alarm): one on a round goes on with it. Trading posts and the HQ keep their own rules.
 - **Bigger projects:** once nothing is short, from materials above its reserve, a big NPC city (by a
   balance number of residents) builds beyond its needs: a training ground, an inner ring of wall
   round its town hall and storage with a gate, and more roads (NPC road). The inner ring goes up tile

@@ -52,13 +52,14 @@ export function standsPosts(world: WorldState, city: City): boolean {
 
 /**
  * Those of a city's `adults` who take a post: its armed adults free to, so not on alarm or at any
- * other script, fighting, carrying a child, Down, or its traders or founding party. Those away from
- * it leave the posts to the others, and they are shared out anew once they are back.
+ * other script, fighting, carrying a child, Down, on a round, or its traders or founding party. Those
+ * away from it leave the posts to the others, and they are shared out anew once they are back.
  */
 export function freeSoldiers(world: WorldState, city: City, adults: Resident[]): Resident[] {
   const plan = world.cityPlans[city.id]
   const party = new Set(foundingParty(plan))
   const traders = new Set(plan?.traders?.map((t) => t.residentId))
+  const onRound = new Set(plan?.patrols?.map((p) => p.residentId))
   return adults.filter(
     (r) =>
       isArmed(r) &&
@@ -67,7 +68,8 @@ export function freeSoldiers(world: WorldState, city: City, adults: Resident[]):
       !r.carrying &&
       r.order?.kind !== 'attack' &&
       !party.has(r.id) &&
-      !traders.has(r.id),
+      !traders.has(r.id) &&
+      !onRound.has(r.id),
   )
 }
 
@@ -122,7 +124,7 @@ export function soldierPosts(
  * from a gate or from a closed ring's inside (`mayStep`), so a stretch joined side to side to a gate.
  * A wall still going up, or a stretch cut off by what was torn down, is no post.
  */
-function reachableWalls(
+export function reachableWalls(
   world: WorldState,
   city: City,
   size: number,
