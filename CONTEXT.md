@@ -504,7 +504,13 @@ The shared language of the game. Domain terms only — no implementation details
   chest, for buying what it lacks and hiring help. A stable is wanted once it has horses, or with
   none once nothing else is short (NPC horses), a mint only with a gold node it knows of. Whatever its storages hold above the reserve is its surplus,
   for sale (Trading with an NPC city); whatever is below is short and drives what it works and
-  builds next (NPC city).
+  builds next (NPC city). Coins below the war chest count as short only for a city with a way to
+  earn them: gold or a mint of its own (a mint or gold mine, finished or begun, Gold ore in its
+  storages, or a gold node it knows of), or trade in reach (a Trade Org warehouse within its NPC
+  trader's reach of its home, or a wandering trader whose loop passes close enough to stop at it,
+  Trader stop). A Player's offer doesn't count: offers come and go. A city with none of these keeps
+  its war chest for everything else (its prices, what it sells and buys, what its traders take
+  along), but it never waits on Coins it can't earn.
 - **Spare hands' work:** with nothing short of its reserve, an NPC city's spare hands don't stand
   idle. In this order they go on a road crew while it has a road to build (NPC road), scout (Scout),
   and otherwise work at its workplaces for **surplus**, past the reserve, up to a cap per good (a
@@ -567,7 +573,8 @@ The shared language of the game. Domain terms only — no implementation details
   sell does one take a second load of a good already on the road. Nothing protects them on the way but what they carry.
 - **Full city:** an NPC city that for a whole game week, less the bigger it is (a balance number), has had spare hands (idle, on a road crew, scouting or working for surplus) and nothing
   short of its reserve, holds a food surplus, and holds its founding party's materials
-  above its reserve. A dip below the reserve only restarts that time if it lasts longer than a game
+  above its reserve. Coins it has no way to earn are not short (NPC reserve), so a city that can't
+  earn them isn't held back by its war chest. A dip below the reserve only restarts that time if it lasts longer than a game
   day, though nothing sets out during one. A full city founds a daughter (Founding).
 - **Founding:** how a full NPC city spreads out. It picks a free Plains site the usual distance
   from every city, within a set reach of itself and on no realm's territory, nearest a node of

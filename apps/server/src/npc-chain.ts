@@ -20,6 +20,7 @@ import {
   type Stock,
   type WorldState,
 } from '@csp/shared'
+import { earnsCoins } from './npc-coins.js'
 
 /*
  * The chain an NPC city's reserve drives (`CONTEXT.md`: NPC city, NPC reserve): which goods it is
@@ -83,24 +84,41 @@ export interface Shortage {
  * What an NPC city is short of (`CONTEXT.md`: NPC reserve), the shortest first: what its
  * storages lack of its reserve (`npcReserve`; a Trade Org city, what its warehouses lack of their
  * stock floor, `tradeOrgReserve`), and of the materials its `project` still needs
- * beyond that, as a share of what it wants of each. Ties go by the reserve's order (Food,
- * building materials, weapons, their Iron, Coins).
+ * beyond that, as a share of what it wants of each. Coins only for a city that can earn them
+ * (`earnsCoins`): one that can't keeps its war chest in its reserve but doesn't count it as short.
+ * Ties go by the reserve's order (Food, building materials, weapons, their Iron, Coins). `size` is
+ * the map's.
  */
-export function shortages(world: WorldState, city: City, project?: CityProject): Shortage[] {
+export function shortages(
+  world: WorldState,
+  city: City,
+  size: number,
+  project?: CityProject,
+): Shortage[] {
   const want = city.tradeOrg ? tradeOrgReserve(world, city) : npcReserve(world, city)
   for (const [good, n] of Object.entries(projectNeeds(world, project)) as [Good, number][]) {
     want[good] = (want[good] ?? 0) + n
   }
   const stock = city.tradeOrg ? warehouseStock(world, city) : npcCityStock(world, city)
-  return (Object.entries(want) as [Good, number][])
+  const short = (Object.entries(want) as [Good, number][])
     .map(([good, n]) => ({ good, share: n > 0 ? (n - (stock[good] ?? 0)) / n : 0 }))
     .filter((s) => s.share > 1e-9)
     .sort((a, b) => b.share - a.share)
+  // Looked into only once Coins are short: finding a way to earn them looks over the map.
+  if (city.tradeOrg || !short.some((s) => s.good === 'coins') || earnsCoins(world, city, size)) {
+    return short
+  }
+  return short.filter((s) => s.good !== 'coins')
 }
 
-/** The goods an NPC city is short of, the shortest first (`shortages`). */
-export function shortGoods(world: WorldState, city: City, project?: CityProject): Good[] {
-  return shortages(world, city, project).map((s) => s.good)
+/** The goods an NPC city is short of, the shortest first (`shortages`). `size` is the map's. */
+export function shortGoods(
+  world: WorldState,
+  city: City,
+  size: number,
+  project?: CityProject,
+): Good[] {
+  return shortages(world, city, size, project).map((s) => s.good)
 }
 
 /**

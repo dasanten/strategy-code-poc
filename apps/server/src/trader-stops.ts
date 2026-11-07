@@ -56,20 +56,57 @@ export function callsOnTheWay(
   size: number,
 ): string[] {
   if (wrapDistance(size, from, to) < SAME_PLACE) return []
-  const dx = wrapDelta(from.x, to.x, size)
-  const dy = wrapDelta(from.y, to.y, size)
-  const length2 = dx * dx + dy * dy
   const passed: { id: string; along: number }[] = []
   for (const city of world.cities) {
     if (!takesStops(world, city)) continue
-    const hall = middleOf(townHallOf(world, city)!, size)
-    const px = wrapDelta(from.x, hall.x, size)
-    const py = wrapDelta(from.y, hall.y, size)
-    const along = Math.max(0, Math.min(1, (px * dx + py * dy) / length2))
-    if (Math.hypot(px - along * dx, py - along * dy) > TRADER_STOP_REACH) continue
-    passed.push({ id: city.id, along })
+    const along = passesWithinReach(from, to, middleOf(townHallOf(world, city)!, size), size)
+    if (along !== undefined) passed.push({ id: city.id, along })
   }
   return passed.sort((a, b) => a.along - b.along).map((c) => c.id)
+}
+
+/**
+ * How far along the straight way from `from` to `to` it passes `at` within `TRADER_STOP_REACH`, 0
+ * to 1; undefined when it passes further off. `size` is the map's.
+ */
+function passesWithinReach(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  at: { x: number; y: number },
+  size: number,
+): number | undefined {
+  const dx = wrapDelta(from.x, to.x, size)
+  const dy = wrapDelta(from.y, to.y, size)
+  const px = wrapDelta(from.x, at.x, size)
+  const py = wrapDelta(from.y, at.y, size)
+  const along = Math.max(0, Math.min(1, (px * dx + py * dy) / (dx * dx + dy * dy)))
+  return Math.hypot(px - along * dx, py - along * dy) > TRADER_STOP_REACH ? undefined : along
+}
+
+/**
+ * Whether a wandering trader stops at `city` on its loop (`CONTEXT.md`: Trader stop): the city takes
+ * stops, and some trader's way between two places of its loop that follow each other, the last and
+ * the first too, passes within `TRADER_STOP_REACH` of its town hall. Each way is reckoned from town
+ * hall to town hall, as the loop is laid out (`insertIntoLoop`). `size` is the map's.
+ */
+export function onATradersLoop(world: WorldState, city: City, size: number): boolean {
+  if (!takesStops(world, city)) return false
+  const at = middleOf(townHallOf(world, city)!, size)
+  const placeOf = (id: string) => {
+    const place = world.cities.find((c) => c.id === id)
+    const hall = place && townHallOf(world, place)
+    return hall && middleOf(hall, size)
+  }
+  for (const trader of world.traders) {
+    const places = trader.loop.map(placeOf)
+    for (let i = 0; i < places.length; i++) {
+      const from = places[i]
+      const to = places[(i + 1) % places.length]
+      if (!from || !to || wrapDistance(size, from, to) < SAME_PLACE) continue
+      if (passesWithinReach(from, to, at, size) !== undefined) return true
+    }
+  }
+  return false
 }
 
 /**

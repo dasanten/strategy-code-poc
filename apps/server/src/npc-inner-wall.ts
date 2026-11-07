@@ -248,7 +248,7 @@ export function innerWallProject(
 ): { kind: 'build'; building: 'wall' | 'gate'; x: number; y: number } | undefined {
   if (city.tradeOrg || rings.expanding || !rings.gate) return undefined
   if (!isBigNpcCity(world, city)) return undefined
-  if (shortGoods(world, city).length > 0) return undefined
+  if (shortGoods(world, city, terrain.size).length > 0) return undefined
   const tiles = innerWall(world, city, home, terrain, rings.gate, rings.newGate)
   const next = tiles.find((t) => t.site) ?? tiles.find((t) => !t.done)
   if (!next) return undefined

@@ -387,7 +387,7 @@ describe('setting out for a workplace in an NPC city', () => {
     city.scouted = { sectors: [], done: true }
     // Planned without the terrain, the city picks no project to send spare hands to.
     planCity(world, city)
-    expect(shortGoods(world, city)).not.toContain('wood')
+    expect(shortGoods(world, city, terrain.size)).not.toContain('wood')
     for (const r of crew) expect(world.cityPlans[city.id]!.jobs[r.id]).toEqual(working)
     // One of the crew walks back to the camp's own tile by the Work default, with the crew's
     // Food: one place at the camp, not two. Another is home with the load stored, free, and

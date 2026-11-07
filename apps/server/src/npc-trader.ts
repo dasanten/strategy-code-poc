@@ -273,7 +273,7 @@ function planVisit(
   const r = spareHand(world, city, adults, jobs)
   if (!r) return false
   const spoken = spokenFor(world, city, plan, adults)
-  const deal = visitDeal(world, city, plan.project, r, visitor, carriage, spoken)
+  const deal = visitDeal(world, city, plan.project, r, visitor, carriage, spoken, size)
   if (!deal) return false
   addRun(plan, {
     residentId: r.id,
@@ -307,7 +307,7 @@ function planOfferRun(
   if (world.offers.length === 0) return false
   const storage = npcStorages(world, city)[0]
   if (!storage) return false
-  const order = shortGoods(world, city, plan.project)
+  const order = shortGoods(world, city, size, plan.project)
   const rank = new Map(order.map((g, i) => [g, i]))
   let best: { offer: Offer; times: number; rank: number; d: number } | undefined
   for (const offer of world.offers) {
@@ -359,6 +359,7 @@ function visitDeal(
   visitor: Trader,
   carriage: Carriage,
   spoken: SpokenFor,
+  size: number,
 ): { sells: Stock; buys: Stock } | undefined {
   const stock = npcCityStock(world, city)
   const reserve = npcReserve(world, city)
@@ -388,7 +389,7 @@ function visitDeal(
   const has = traderStock(visitor, carriage.load)
   const prices = traderPrices(visitor, carriage)
   const buys: Stock = {}
-  const buy = shortGoods(world, city, project).find(
+  const buy = shortGoods(world, city, size, project).find(
     (g): g is PricedGood =>
       g !== 'coins' &&
       !WEAPONS.includes(g as Weapon) &&
@@ -486,7 +487,7 @@ function buyGood(
   size: number,
 ): PricedGood | undefined {
   const priced = stockFloor(world, warehouse)
-  return shortGoods(world, city, project).find(
+  return shortGoods(world, city, size, project).find(
     (g): g is PricedGood =>
       g !== 'food' &&
       g !== 'coins' &&
