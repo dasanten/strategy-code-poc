@@ -518,8 +518,8 @@ function wanted(
       const house = at('house', houseTile(world, city, home, terrain, plan))
       if (house) return house
     }
-    // Its Food runs short and only another farm can take those it has idle.
-    if (foodShort(world, city) && farmsOverflow(world, city)) {
+    // Its Food runs short with every farm full: another farm, whether or not anyone is idle.
+    if (foodShort(world, city) && farmsFull(world, city)) {
       const farm = at('farm', farmTile(world, home, terrain, plan))
       if (farm) return farm
     }
@@ -574,12 +574,10 @@ function crewHeld(world: WorldState, city: City, place: Building): boolean {
   return jobs.filter((j) => j.buildingId === place.id).length >= (MAX_WORKERS[place.kind] ?? 0)
 }
 
-/** Whether an NPC city's farms all have their crews full, with someone idle who could take a place. */
-export function farmsOverflow(world: WorldState, city: City): boolean {
-  return handsIdle(world, city) && farmsFull(world, city)
-}
-
-/** Whether an NPC city has finished farms and every one of them has its crew full (`crewHeld`). */
+/**
+ * Whether an NPC city has finished farms and every one of them has its crew full (`crewHeld`). Short
+ * of Food, it then opens another, whether or not anyone is idle (`CONTEXT.md`: NPC city).
+ */
 export function farmsFull(world: WorldState, city: City): boolean {
   if (city.tradeOrg) return false
   const farms = world.buildings.filter((b) => b.kind === 'farm' && b.cityId === city.id && !b.site)
@@ -587,12 +585,13 @@ export function farmsFull(world: WorldState, city: City): boolean {
 }
 
 /**
- * Another workplace for a good an NPC city is short of (`CONTEXT.md`: NPC city), with someone idle
- * to work it: where spare hands would go for the good (`shortPlace`; for a good it processes without
- * a batch of its input in store, the input's workplaces), when all of those have their crews full. A
- * farm for Food, on the nearest fitting node it knows of for what is dug or cut, in its area like a
- * house for what is processed. However many it has: a new one takes the idle first, and only once it
- * too is full can another follow.
+ * Another workplace for a good an NPC city is short of (`CONTEXT.md`: NPC city): where spare hands
+ * would go for the good (`shortPlace`; for a good it processes without a batch of its input in store,
+ * the input's workplaces), when all of those have their crews full. A farm for Food, whether or not
+ * anyone is idle: its farmers come from surplus work and scouting first (`shareOut`). For any other
+ * good only with someone idle to work it: on the nearest fitting node it knows of for what is dug or
+ * cut, in its area like a house for what is processed. However many it has: only once a new one too
+ * is full can another follow.
  */
 function anotherWorkplace(
   world: WorldState,
@@ -601,7 +600,7 @@ function anotherWorkplace(
   terrain: TerrainMap,
   rings: Rings | undefined,
 ): BuildProject | undefined {
-  if (!handsIdle(world, city)) return undefined
+  const idle = handsIdle(world, city)
   const own = ownWorkplaces(world, city).filter((b) => !b.site)
   const stock = chainStore(world, city)?.stock
   const fullGood = (good: Good, seen: Set<Good>): Good | undefined => {
@@ -623,7 +622,7 @@ function anotherWorkplace(
   }
   for (const short of shortGoods(world, city)) {
     const good = fullGood(short, new Set())
-    if (!good) continue
+    if (!good || (good !== 'food' && !idle)) continue
     if (good === 'food') {
       const t = farmTile(world, home, terrain, rings)
       if (t) return { kind: 'build', building: 'farm', ...t }

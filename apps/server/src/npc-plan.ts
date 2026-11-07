@@ -40,7 +40,7 @@ import {
   cityGrows,
   cityProject,
   endPairs,
-  farmsOverflow,
+  farmsFull,
   isBuilder,
   noFarm,
   npcBuilders,
@@ -220,9 +220,9 @@ export function planCity(
     else pairAdults(world, city, adults)
   }
   const home = npcHome(world, city)
-  // With Food short it builds nothing but what ends that: a first farm, or one for those it has idle.
+  // With Food short it builds nothing but what ends that: a first farm, or another with every farm full.
   const project =
-    (!short || noFarm(world, city) || farmsOverflow(world, city)) && terrain && home
+    (!short || noFarm(world, city) || farmsFull(world, city)) && terrain && home
       ? cityProject(world, city, home, terrain, grows)
       : undefined
   if (project) plan.project = project
@@ -371,16 +371,24 @@ function shareOut(pass: ShareOut): Resident[] {
     jobs[r.id] = job
     if (place) held.take(place)
   }
+  const onlyBack = jobScore({ kind: 'back' })
   if (foodShort) {
-    // Food runs short: workers off the farms go to the farms with room.
+    // Food runs short: workers off the farms go to the farms with room. Those working for surplus
+    // go first, then its scouts, then the rest, those whose job is worth least first.
     const score = jobScore({ kind: 'farm', foodShort })
-    for (const r of adults) {
-      const job = jobs[r.id]
-      if (job?.kind !== 'work' || !placeById.has(job.buildingId ?? '')) continue
-      if (!beats(score, heldScore(r))) continue
+    const off = adults
+      .filter((r) => {
+        const job = jobs[r.id]
+        return job?.kind === 'work' && placeById.has(job.buildingId ?? '') && beats(score, heldScore(r))
+      })
+      .map((r) => ({ r, worth: heldScore(r) }))
+    const scouts = spare.filter((r) => plan.scouts?.[r.id]).map((r) => ({ r, worth: onlyBack }))
+    // Sorting keeps the order given among equals: surplus work ahead of scouts.
+    for (const { r } of [...off, ...scouts].sort((a, b) => a.worth - b.worth)) {
       const farm = farms.find((f) => held.room(f) > 0)
       if (!farm) break
       give(r, workJob(farm), farm)
+      if (spare.includes(r)) spare.splice(spare.indexOf(r), 1)
     }
   }
   const kept = new Map<string, CityJob>()
@@ -393,7 +401,6 @@ function shareOut(pass: ShareOut): Resident[] {
   }
   // Workers of a workplace whose good the city isn't short of become spare hands, the farms aside
   // (farmersWanted): the city moves them to what is short, and they go back when nothing is.
-  const onlyBack = jobScore({ kind: 'back' })
   for (const r of adults) {
     if (heldScore(r) <= onlyBack) release(r)
   }

@@ -2150,13 +2150,17 @@ export function Wiki() {
           eats {num(FOOD_PER_DAY)} Food a day, a farmer makes {num(WORK_OUTPUT_PER_DAY.food ?? 0)})
           and one more while it has no food surplus, a new farm when they don't fit; up to{' '}
           {num(NPC_BUILDERS)} builders a step while it has a project; everyone else is a spare hand. A
-          farm is otherwise built only when Food is short of its reserve with its farms full and
-          someone idle, never because spare hands filled the farms working for surplus. Spare
-          hands go to the good the reserve is shortest of, as a share of what it wants of it,
-          filling one workplace's crew before the next. Without a workplace for that good, the city
-          builds one: on the nearest fitting resource node it knows of, or a smelter, smithy or mint
-          in its area like a house. With every workplace of a short good at its full crew and
-          someone idle, it opens another of them, however many it has, and a farm for Food.
+          farm is otherwise built only when Food is short of its reserve (
+          {days(NPC_TRADE.reserveFoodDays)} of Food for everyone) with every farm at its full crew
+          of {num(WORKPLACE_MAX_WORKERS.farm ?? 0)}, never because spare hands filled the farms
+          working for surplus. It needs nobody idle for that: the new farm's farmers come from
+          those working for surplus and from its scouts first, and from other work only after them.
+          A farm already begun is finished before another. Spare hands go to the good the reserve
+          is shortest of, as a share of what it wants of it, filling one workplace's crew before the
+          next. Without a workplace for that good, the city builds one: on the nearest fitting
+          resource node it knows of, or a smelter, smithy or mint in its area like a house. With
+          every workplace of another short good at its full crew and someone idle, it opens another
+          of them, however many it has.
         </p>
         <p>
           Those with nothing to do, those carrying a child and its children stand at a house of the
