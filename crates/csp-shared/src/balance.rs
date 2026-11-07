@@ -2173,7 +2173,7 @@ pub const DIRECT_OFFER_DAYS: f64 = 60.0;
 pub const DIRECT_OFFERS_TO_ONE_REALM: f64 = 5.0;
 
 /// Every exported constant of the table as JSON, keyed by its TypeScript name: the shape of
-/// `crates/csp-sim/fixtures/balance.json`, which `scripts/dump-balance.mts` writes from
+/// `crates/csp-sim/fixtures/balance.json`, which `scripts/dump-fixtures.mts` writes from
 /// `balance.ts`. The fixture test compares the two field by field.
 pub fn balance_json() -> Value {
     let mut m = Map::new();
@@ -2538,7 +2538,7 @@ pub fn balance_json() -> Value {
 mod tests {
     use super::*;
 
-    /// The export of `balance.ts`, written by `scripts/dump-balance.mts`.
+    /// The export of `balance.ts`, written by `scripts/dump-fixtures.mts`.
     const EXPORT: &str = include_str!("../../csp-sim/fixtures/balance.json");
 
     /// Every number where `rust` and `ts` differ, named by its path, e.g.
