@@ -58,7 +58,7 @@ import { roadCrew, type WayFinder } from './npc-roads.js'
 import { beats, jobScore, rankJobs, type ScoredJob } from './npc-scores.js'
 import { pickScouts } from './npc-scouts.js'
 import { feedJobKept, planFeeder } from './npc-stable.js'
-import { planTrader, planVisit, traderOut } from './npc-trader.js'
+import { sendTraders, tradersOut } from './npc-trader.js'
 import { hash } from './residents.js'
 
 /*
@@ -229,15 +229,15 @@ export function planCity(
   const builds = (r: Resident) => isBuilder(r) && plan.jobs[r.id]?.kind !== 'road'
   const builders = adults.filter(builds).length
   const spare: Resident[] = []
-  // The trader out on their run (`CONTEXT.md`: NPC trader) is nobody's spare hand.
-  const trader = city.tradeOrg ? undefined : traderOut(world, plan)
+  // A trader out on their run (`CONTEXT.md`: NPC trader) is nobody's spare hand.
+  const traders = city.tradeOrg ? new Set<string>() : tradersOut(world, plan)
   const size = terrain?.size ?? MAP_SIZE
   const waiting = downToRevive(world, city, size)
   let feeding = false
   for (const r of adults) {
     const at = workplaceOf(r)
     const feed = feedJobKept(world, city, r)
-    if (r.id === trader) jobs[r.id] = { kind: 'trade' }
+    if (traders.has(r.id)) jobs[r.id] = { kind: 'trade' }
     else if (isArmed(r)) jobs[r.id] = { kind: 'soldier' }
     else if (r.carrying) jobs[r.id] = { kind: 'idle' }
     else if (goesOnReviving(plan.jobs[r.id], waiting)) jobs[r.id] = plan.jobs[r.id]!
@@ -267,14 +267,9 @@ export function planCity(
   // Trading posts and the HQ don't feed their stables this way (`npcOneFeeder`).
   if (!city.tradeOrg && !feeding) planFeeder(world, city, adults, jobs)
   // The Trade Organization sends no trader (`tradeOrgSendsNoOne`) and founds nothing.
-  if (!city.tradeOrg && !trader) {
-    // A wandering trader standing at the city comes first: it isn't there for long.
-    if (!planVisit(world, city, plan, adults, jobs, size)) {
-      planTrader(world, city, plan, adults, jobs, short, size)
-    }
-  }
   if (!city.tradeOrg) {
-    // A spare hand just sent off as the trader or to feed the stable isn't one any more.
+    sendTraders(world, city, plan, adults, jobs, short, size)
+    // A spare hand just sent off as a trader or to feed the stable isn't one any more.
     const left = unneeded.filter((r) => !['trade', 'feed'].includes(jobs[r.id]?.kind ?? ''))
     planFounding(world, city, plan, jobs, { adults, unneeded: left, members }, home, terrain)
   }

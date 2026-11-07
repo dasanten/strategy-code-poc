@@ -147,6 +147,7 @@ import {
   NPC_SCOUT_LIMIT,
   NPC_TRADER_GIVE_UP_DAYS,
   NPC_OFFER_REACH,
+  NPC_RESIDENTS_PER_TRADER,
   NPC_TRADER_REACH,
   NPC_PLAN_TICKS,
   NPC_SURPLUS_CAP,
@@ -2254,8 +2255,10 @@ export function Wiki() {
           sends that spare hand, never a soldier, as its trader: they carry the load and the coins
           above its war chest there, sell the load, buy the good shortest of its reserve that it has
           no node for (never Food or a weapon) as far as their coins and arms allow, and walk home
-          to the storage. One trader at a time, and none while Food runs short or armed outsiders
-          stand in its area. Nothing protects them on the way; a trader not back after{' '}
+          to the storage. A city has one trader out for each {num(NPC_RESIDENTS_PER_TRADER)} of
+          its residents, and a village keeps one; they spread over the goods with surplus, and only
+          with no other good to sell does one take a second load of a good already on the road.
+          None go while Food runs short or armed outsiders stand in its area. Nothing protects them on the way; a trader not back after{' '}
           {days(NPC_TRADER_GIVE_UP_DAYS)} is given up, and the city may send another.
         </p>
         <p>

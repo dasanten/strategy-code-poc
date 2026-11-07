@@ -549,8 +549,9 @@ The shared language of the game. Domain terms only — no implementation details
   Trade Org warehouse (HQ or trading post) lies within a set reach, one of its spare hands,
   never a soldier, carries the load there, sells it, buys the good shortest of the reserve that
   the city has no node for, as far as its coins and their arms allow, and walks home to the
-  storage. A village sends one trader at a time, a bigger city more by its size (a balance number).
-  Nothing protects them on the way but what they carry.
+  storage. A village sends one trader at a time, a bigger city more by its size (a balance number),
+  each on their own run; they spread over the goods with surplus, and only with no other good to
+  sell does one take a second load of a good already on the road. Nothing protects them on the way but what they carry.
 - **Full city:** an NPC city that for a whole game week, less the bigger it is (a balance number), has had spare hands (idle, on a road crew, scouting or working for surplus) and nothing
   short of its reserve, holds a food surplus, and holds its founding party's materials
   above its reserve. A full city founds a daughter (Founding).
