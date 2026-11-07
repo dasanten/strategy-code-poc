@@ -56,8 +56,13 @@ looked at the same day and left out for now: these epics fix what makes them loo
 cost. Agreed with Daniel on 2026-11-06: the bug #936 (NPC soldiers don't fight occupiers) first, then
 Balance and art (Epic 78: coins, training numbers, a training ground image), City guards (79, ADR 0028:
 the Alarm script) and Busy big cities (80, ADR 0029: the planner scores its jobs, and big cities get
-more to do), in that order, all ahead of Bandits. Tickets that need an earlier epic name it
-under Depends on, and wait for it to reach `dev`.
+more to do), in that order, all ahead of Bandits. Agreed with Daniel on 2026-11-07
+(`docs/proposals/rust-rewrite.md`): Tick numbers (Epic 81: tick health readable in the game, world
+generation and a simulation benchmark measured) runs alongside City guards (79) and Busy big
+cities (80); then Fast worlds (82: a fresh world in minutes, the full-size map once per test run,
+cheaper ticks on a small world). Native kernels (83, leaf computations in Rust) stays scope-only
+until T81.5 is decided from a week of live numbers. All ahead of Bandits. Tickets that need an
+earlier epic name it under Depends on, and wait for it to reach `dev`.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
@@ -142,6 +147,9 @@ I sleep.
 | 78  | [Balance and art](https://github.com/dasanten/strategy-code-poc/issues/937)                     | ticketed                |
 | 79  | [City guards](https://github.com/dasanten/strategy-code-poc/issues/941)                         | ticketed                |
 | 80  | [Busy big cities](https://github.com/dasanten/strategy-code-poc/issues/947)                     | ticketed                |
+| 81  | [Tick numbers](https://github.com/dasanten/strategy-code-poc/issues/974)                        | ticketed                |
+| 82  | [Fast worlds](https://github.com/dasanten/strategy-code-poc/issues/975)                         | ticketed                |
+| 83  | [Native kernels](https://github.com/dasanten/strategy-code-poc/issues/976)                      | scope only              |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
