@@ -179,7 +179,7 @@ describe('Patrols (CONTEXT.md: Soldier posts)', () => {
       world.buildings.push({
         id: `rd${i}`,
         kind: 'road',
-        cityId: city.id,
+        cityId: null,
         x: hall.x + 4 + i,
         y: hall.y,
       })
@@ -543,7 +543,7 @@ function onPostsWithRoad(armed: number) {
   for (let i = 0; i < 8; i++) {
     const at = { x: s.hall.x + 3 + i, y: s.hall.y + 6 }
     if (s.world.buildings.some((b) => b.x === at.x && b.y === at.y)) continue
-    s.world.buildings.push({ id: `rd${i}`, kind: 'road', cityId: s.city.id, ...at })
+    s.world.buildings.push({ id: `rd${i}`, kind: 'road', cityId: null, ...at })
   }
   pass(s.world, s.city)
   arrive(s.world)
