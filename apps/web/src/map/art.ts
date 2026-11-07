@@ -1,3 +1,4 @@
+import { FOOTPRINT } from '@csp/shared'
 import type { BuildingKind, ResourceKind } from '@csp/shared'
 import type { Activity } from './figures.js'
 
@@ -55,6 +56,26 @@ export const PAINTED_BUILDING_ART: Partial<Record<BuildingKind, number>> = {
 
 /** A construction site's cell by its building's footprint, 1×1 to 4×4 (`CONTEXT.md`: Footprint). */
 export const PAINTED_SITE_ART = [25, 26, 27, 28] as const
+
+/** Building kinds with their own file in `assets/painted/` instead of a cell of the sheet. */
+export const PAINTED_BUILDING_IMAGE: Partial<Record<BuildingKind, string>> = {
+  trainingGround: 'training-ground.svg',
+}
+
+/** The atlas key of a painted image; prefixed, as line art can have the same file name. */
+export const paintedImage = (file: string) => `painted/${file}`
+
+/**
+ * The atlas key a building draws with, if it is painted at all: its own image or cell of the sheet,
+ * or while it is a site the site cell of its footprint.
+ */
+export function paintedBuildingArt(kind: BuildingKind, isSite: boolean): string | undefined {
+  const image = PAINTED_BUILDING_IMAGE[kind]
+  const cell = PAINTED_BUILDING_ART[kind]
+  if (image === undefined && cell === undefined) return undefined
+  if (isSite) return paintedCell(PAINTED_SITE_ART[FOOTPRINT[kind] - 1]!)
+  return image !== undefined ? paintedImage(image) : paintedCell(cell!)
+}
 
 /** The sheet's cell drawn in place of a unit glyph (`UNIT_ART`). */
 export const PAINTED_UNIT_ART: Readonly<Record<string, number>> = {

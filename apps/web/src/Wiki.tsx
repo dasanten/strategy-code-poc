@@ -1081,9 +1081,10 @@ export function Wiki() {
           trained bonus from nothing to its cap (+{num(trainedCap(AVERAGE_STATS.strength))} on an
           average base of {num(AVERAGE_STATS.strength)}) in {days(trainingDays('strength'))}, a work
           skill to {num(WORK_SKILL_MAX)} in {days(trainingDays('mining'))},{' '}
-          {num(TRAIN_SKILL_FACTOR)} times as fast as by working, and Combat to its most in{' '}
-          {days(trainingDays('combat'))}. Training costs time and the food trainees eat; nothing
-          trained decays, though old age shrinks a trained stat with its base.
+          {num(TRAIN_SKILL_FACTOR)} times as fast as by working (Construction and Driving train that
+          much faster too), and Combat to its most in {days(trainingDays('combat'))}. Training costs
+          time and the food trainees eat; nothing trained decays, though old age shrinks a trained
+          stat with its base.
         </p>
         <p>
           Players' residents train, by order, queue step or script. NPC cities and the Trade
@@ -2287,6 +2288,15 @@ export function Wiki() {
           armed outsider near still shuts the gates, on the soldiers too.
         </p>
         <p>
+          The soldiers of an NPC village, town or self-managed city run the same Alarm default as
+          your armed residents do (see Alarms): they go after a thief they saw, an attacker and
+          whoever occupies the town hall, as no crime, and walk to the town hall to hold it while an
+          armed outsider is in the area, then go home. An unarmed visitor they leave alone, and
+          striking anyone else there is a crime for them too. One who gets armed or comes home while
+          the hall is occupied joins in. Trading posts and the HQ keep their own rules: their soldiers
+          go straight at attackers and occupiers in the area, a post's at thieves it knows of as well.
+        </p>
+        <p>
           Bought outright, an NPC city asks {num(CITY_PRICE_PER_RESIDENT)} coins a resident plus,
           for its buildings:{' '}
           {(Object.entries(CITY_PRICE_BY_BUILDING) as [BuildingKind, number][])
@@ -2691,8 +2701,10 @@ export function Wiki() {
           without a break, the city joins your realm with its buildings and the residents who live
           there, loyal at once; its Leader never joins. Beating its defenders is not enough on its
           own, and defenders elsewhere in the city don't stop the clock: they have to come to the
-          hall. The first tick the occupation doesn't hold, it is broken and its days are lost; the
-          next one starts again from nothing. Your realm log says when one of your town halls is
+          hall. An NPC city's soldiers, a trading post's and the HQ's do: anyone occupying their town
+          hall is an attacker to them, even one who attacks nobody, and those in the city's area go
+          after them, which is no crime. The first tick the occupation doesn't hold, it is broken and
+          its days are lost; the next one starts again from nothing. Your realm log says when one of your town halls is
           occupied, by whom, and when the occupation is broken, and likewise when you occupy a town
           hall and when your occupation is broken. Every city is captured this way: NPC cities,
           Players' cities, trading posts and the Trade Org HQ, whose hired mercenaries defend it.

@@ -43,7 +43,7 @@ import {
   type WorldState,
   isDown,
 } from '@csp/shared'
-import { backToOutsiderAlarm } from './alarms.js'
+import { backToOutsiderAlarm, runsNpcAlarm } from './alarms.js'
 import { resumeInterrupted } from './defence.js'
 import { recordEvent } from './events.js'
 import type { InvariantViolation } from './invariants.js'
@@ -831,6 +831,7 @@ export class ScriptRunner {
       const realmId = index.commanderOf(r)
       // An NPC city runs its residents' game defaults itself (`runNpcScripts`).
       if (realmId === null) {
+        if (runsNpcAlarm(world, r)) continue
         // Nobody runs their defence or Alarm script any more: what it interrupted goes on, if
         // anything; a defence script hands back to an Alarm script it kept aside, and that on.
         while (resumeInterrupted(world, r));
@@ -1336,6 +1337,12 @@ export function runNpcScripts(
   })
 }
 
+/** Whether `r` fights back at who last struck them (`CONTEXT.md`: Under attack). */
+function fightsBack(r: Resident): boolean {
+  const o = r.order
+  return o?.kind === 'attack' && o.defending === true && r.struck?.by === o.targetId
+}
+
 /** Runs one NPC city's residents' scripts; returns how many ran. */
 function runCityScripts(
   world: WorldState,
@@ -1352,6 +1359,8 @@ function runCityScripts(
     const running = r.script
     // Its script may have ended this tick; a resident lent out is run by the hirer.
     if (!running?.task || !orderedResident(world, sender, r.id) || waits(r)) continue
+    // Struck on alarm, they fight back first, as Defend does (`react`), and it goes on after.
+    if (running.task === 'alarm' && fightsBack(r)) continue
     runs++
     const { source } = DEFAULT_SCRIPTS[running.task]
     let program = gamePrograms.get(source)
@@ -1384,6 +1393,9 @@ function runCityScripts(
     if (bound.ended()) {
       if (running.task === 'explore') scoutEnded(city, bound.endReason())
       endScript(world, r.id)
+      // An Alarm script going back to an outsider alarm hasn't ended: it keeps what it remembered.
+      const back = r.script === running ? keepMemory(memory) : 'ended'
+      if (typeof back !== 'string') running.memory = back
       continue
     }
     if (bound.waited()) startWaiting(world, r, running)

@@ -8,6 +8,8 @@ import {
   isArmed,
   isAt,
   isDown,
+  occupiersOf,
+  punishers,
   townHallOf,
   wrapDistance,
   type Alarm,
@@ -16,46 +18,76 @@ import {
   type Resident,
   type WorldState,
 } from '@csp/shared'
-import { organizationOf } from './crimes.js'
+import { caravanCrew } from './caravans.js'
+import { cityOrganization, organizationOf } from './crimes.js'
 import { endHoldIfOver } from './defence.js'
 import type { Invariant } from './invariants.js'
+import { foundingParty } from './npc-founding.js'
 
 /**
  * Alarms (`CONTEXT.md`: Alarm, Alarm script; ADR 0028). Something happening in a City area starts
  * the Alarm script of its realm's residents at home. It runs as `script` like any other, holding
  * the alarm for `me.alarm`, with what they were doing kept aside in `interrupted` as for a defence
  * script (ADR 0015): when it ends they go on with it. A blow still starts the defence script,
- * which keeps the Alarm script aside in turn and hands back to it (`startDefence`).
+ * which keeps the Alarm script aside in turn and hands back to it (`startDefence`). NPC villages,
+ * towns and self-managed cities run the same for their armed residents, with the game's default
+ * only; trading posts and the HQ keep their own rules (`stepNpcDefence`).
  */
 
 /**
- * Whether an alarm can reach `r`, of the city's realm and in its area (`CONTEXT.md`: Alarm): army
- * members, those hired out and those driving a carriage get none. Nor do those Down, or on a wall
- * they are climbing, who can't react to a blow either.
+ * Whether an alarm can reach `r`, of the city's Organization and in its area (`CONTEXT.md`: Alarm):
+ * army members, those hired out and those driving a carriage get none. Nor do those Down, or on a
+ * wall they are climbing, who can't react to a blow either. A trading post's and the HQ's keep their
+ * own rules, and those an NPC city doesn't run itself get none (`runApart`).
  */
 function canBeAlarmed(world: WorldState, city: City, r: Resident, size: number): boolean {
   return (
-    city.realmId !== null &&
-    r.owner === city.realmId &&
+    !city.tradeOrg &&
+    organizationOf(r) === cityOrganization(city) &&
     commanderOf(world, r) === r.owner &&
     inCityArea(world, city, r.x, r.y, size) &&
     drivenCarriageId(r) === undefined &&
     r.order?.kind !== 'climb' &&
     !isDown(r) &&
-    !world.armies.some((a) => a.memberIds.includes(r.id))
+    !world.armies.some((a) => a.memberIds.includes(r.id)) &&
+    !runApart(world, city, r)
   )
+}
+
+/**
+ * Whether `r` of an NPC city goes by something other than their city: a caravan, a punishment or a
+ * founding (`CONTEXT.md`: Founding), which would give them orders over their Alarm script's.
+ */
+function runApart(world: WorldState, city: City, r: Resident): boolean {
+  if (city.realmId !== null) return false
+  return (
+    foundingParty(world.cityPlans[city.id]).includes(r.id) ||
+    caravanCrew(world).has(r.id) ||
+    punishers(world).has(r.id)
+  )
+}
+
+/**
+ * Whether `r` runs the Alarm default as their NPC city's (`runNpcScripts`): one of a city that has
+ * no realm and isn't the Trade Organization's, so nobody else is to end it.
+ */
+export function runsNpcAlarm(world: WorldState, r: Resident): boolean {
+  if (r.owner !== null || r.script?.task !== 'alarm' || r.script.scriptId !== 0) return false
+  const city = world.cities.find((c) => c.id === r.cityId)
+  return !!city && city.realmId === null && !city.tradeOrg
 }
 
 /**
  * Starts `t`'s Alarm script for `alarm`, keeping what they were doing aside (`CONTEXT.md`: Alarm
  * script): the script their Player picked (`Resident.alarmScriptId`), else, for an armed resident,
  * the Alarm default of their realm (script id 0, which the runner resolves); for None or unarmed
- * with none picked, nothing. Not while a defence script runs, or over what the Player gave them
+ * with none picked, nothing. One no Player commands has no pick: they run the game's default if
+ * armed (`CONTEXT.md`: NPC city). Not while a defence script runs, or over what the Player gave them
  * under attack, while that holds. Nor while an Alarm script runs, unless the new alarm takes over
  * from its alarm (`takesOver`): the script goes on with its memory, for the new alarm.
  */
 export function startAlarm(world: WorldState, t: Resident, alarm: Alarm): void {
-  const picked = t.alarmScriptId
+  const picked = commanderOf(world, t) === null ? undefined : t.alarmScriptId
   if (picked === 'none' || (picked === undefined && !isArmed(t))) return
   endHoldIfOver(world, t)
   const running = t.script?.task === 'alarm' ? t.script : undefined
@@ -101,12 +133,12 @@ export function backToOutsiderAlarm(r: Resident): boolean {
 
 /**
  * An occupation of `city`'s town hall by the realm `occupier` just started (`CONTEXT.md`: Alarm,
- * occupied): it reaches all its realm's residents in its area, whoever sees it or not. An NPC city
- * has nobody to reach yet.
+ * occupied): it reaches all its residents in its area, whoever sees it or not. Raised again for one
+ * who already runs it, it leaves them alone (`startAlarm`).
  */
 export function raiseOccupied(world: WorldState, city: City, occupier: string, size: number): void {
   const hall = townHallOf(world, city)
-  if (!hall || city.realmId === null) return
+  if (!hall) return
   // Occupying takes someone armed there, so there is one to name; the Trade Org's are of no realm.
   const someone = world.residents.find(
     (r) =>
@@ -129,11 +161,11 @@ export function raiseOccupied(world: WorldState, city: City, occupier: string, s
 
 /**
  * `who`, an outsider, just came into `city`'s area (`CONTEXT.md`: Alarm, outsider): it reaches its
- * realm's residents in its area who see them, within sight range themselves, but for those already
- * attacking someone, who stay at it. An NPC city has nobody to reach yet.
+ * residents in its area who see them, within sight range themselves, but for those already
+ * attacking someone, who stay at it.
  */
 export function raiseOutsider(world: WorldState, city: City, who: Resident, size: number): void {
-  if (city.realmId === null) return
+  const org = cityOrganization(city)
   const alarm: Alarm = {
     kind: 'outsider',
     cityId: city.id,
@@ -144,7 +176,7 @@ export function raiseOutsider(world: WorldState, city: City, who: Resident, size
     tick: world.tick,
   }
   for (const r of world.residents) {
-    if (r.owner !== city.realmId || wrapDistance(size, r, who) > SIGHT_RANGE) continue
+    if (organizationOf(r) !== org || wrapDistance(size, r, who) > SIGHT_RANGE) continue
     if (r.order?.kind !== 'attack' && canBeAlarmed(world, city, r, size)) {
       startAlarm(world, r, alarm)
     }
@@ -153,7 +185,7 @@ export function raiseOutsider(world: WorldState, city: City, who: Resident, size
 
 /**
  * `a` just attacked something of `city` at `at` (`CONTEXT.md`: Alarm, attacked): `at` is one of its
- * walls or gates, or `struck`, a resident of its realm standing in its area, whose answer to the
+ * walls or gates, or `struck`, a resident of its Organization standing in its area, whose answer to the
  * blow is their Defence script. It reaches those at home who see it, leaving alone those already
  * fighting. Raised once per attacker: while their blows keep coming, the rest raise nothing. An
  * attack nobody at home saw has raised nothing yet, so the next blow someone sees does.
@@ -171,10 +203,11 @@ function raiseAttacked(
     city.alarmedAttackers![a.id] = world.tick
     return
   }
+  const org = cityOrganization(city)
   const witnesses = world.residents.filter(
     (r) =>
       r !== struck &&
-      r.owner === city.realmId &&
+      organizationOf(r) === org &&
       wrapDistance(size, r, at) <= SIGHT_RANGE &&
       canBeAlarmed(world, city, r, size),
   )
@@ -198,29 +231,31 @@ function raiseAttacked(
 }
 
 /**
- * Whether `a`'s blow is an attack on the realm `realmId` for its `attacked` alarm: a blow struck in
- * fighting back is none (`CONTEXT.md`: Alarm), nor is one by someone of that realm. An NPC city has
- * nobody to reach yet.
+ * Whether `a`'s blow is an attack on the Organization `org` for its `attacked` alarm: a blow struck
+ * in fighting back is none (`CONTEXT.md`: Alarm), nor is one by someone of that Organization.
  */
-function attacksRealm(a: Resident, realmId: string | null): boolean {
-  if (realmId === null || a.owner === realmId) return false
+function attacksOrganization(a: Resident, org: string | null): boolean {
+  if (org === null || organizationOf(a) === org) return false
   return !(a.order?.kind === 'attack' && a.order.defending)
 }
 
 /** `a`'s blow at the wall or gate `wall` raises an `attacked` alarm in its city (`raiseAttacked`). */
 export function raiseWallAttacked(world: WorldState, a: Resident, wall: Building, size: number) {
   const city = world.cities.find((c) => c.id === wall.cityId)
-  if (city && attacksRealm(a, city.realmId)) raiseAttacked(world, city, a, wall, undefined, size)
+  if (city && attacksOrganization(a, cityOrganization(city))) {
+    raiseAttacked(world, city, a, wall, undefined, size)
+  }
 }
 
 /**
- * `a`'s blow at the resident `t` raises an `attacked` alarm in each city of `t`'s realm whose area
- * they stand in (`raiseAttacked`); out of those, nothing.
+ * `a`'s blow at the resident `t` raises an `attacked` alarm in each city of `t`'s Organization whose
+ * area they stand in (`raiseAttacked`); out of those, nothing.
  */
 export function raiseResidentAttacked(world: WorldState, a: Resident, t: Resident, size: number) {
-  if (!attacksRealm(a, t.owner)) return
+  const org = organizationOf(t)
+  if (!attacksOrganization(a, org)) return
   for (const city of world.cities) {
-    if (city.realmId === t.owner && inCityArea(world, city, t.x, t.y, size)) {
+    if (cityOrganization(city) === org && inCityArea(world, city, t.x, t.y, size)) {
       raiseAttacked(world, city, a, t, t, size)
     }
   }
@@ -228,8 +263,8 @@ export function raiseResidentAttacked(world: WorldState, a: Resident, t: Residen
 
 /**
  * `thief` just stole from the Organization `victimOrg`, on a map of `size` tiles (`CONTEXT.md`:
- * Alarm, theft): standing in the area of a city of that realm, it reaches its residents standing
- * there who see it. Taking from your own raises none, and an NPC city has nobody to reach yet.
+ * Alarm, theft): standing in the area of a city of that Organization, it reaches its residents
+ * standing there who see it. Taking from your own raises none.
  */
 export function raiseTheft(
   world: WorldState,
@@ -239,7 +274,8 @@ export function raiseTheft(
 ): void {
   if (organizationOf(thief) === victimOrg) return
   for (const city of world.cities) {
-    if (city.realmId !== victimOrg || !inCityArea(world, city, thief.x, thief.y, size)) continue
+    if (cityOrganization(city) !== victimOrg) continue
+    if (!inCityArea(world, city, thief.x, thief.y, size)) continue
     const alarm: Alarm = {
       kind: 'theft',
       cityId: city.id,
@@ -264,6 +300,23 @@ export function raiseTheft(
 export function answersAttack(r: Resident, targetId: string): boolean {
   const alarm = r.script?.alarm
   return alarm?.kind === 'attacked' && alarm.about === targetId
+}
+
+/**
+ * Whether `r`, of an NPC city, goes after `targetId` as one occupying their town hall for their Alarm
+ * script (`CONTEXT.md`: Occupying a town hall): no crime, as for any of its soldiers. An occupier need
+ * attack nobody, may have left the hall by the time the blows land, and stops occupying it the moment
+ * a defender stands on it, so the order has to say so from the start.
+ */
+export function goesAfterOccupier(
+  world: WorldState,
+  r: Resident,
+  targetId: string,
+  size: number,
+): boolean {
+  if (r.owner !== null || r.script?.alarm?.kind !== 'occupied') return false
+  const city = world.cities.find((c) => c.id === r.cityId)
+  return !!city && occupiersOf(world, city, size).some((o) => o.id === targetId)
 }
 
 /**

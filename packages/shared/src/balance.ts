@@ -504,15 +504,16 @@ export const OCCUPATION_GAME_DAYS = 10
 
 /**
  * What an NPC city asks for each resident living there when it is bought (`CONTEXT.md`: Buying a
- * city), in Coins: five game days of one mint worker's coins (`RECIPES`, `BATCHES_PER_DAY`).
+ * city), in Coins: twenty game days of one mint worker's coins (`RECIPES`, `BATCHES_PER_DAY`), or
+ * five of a full gold mine and its mint.
  */
-export const CITY_PRICE_PER_RESIDENT = 200
+export const CITY_PRICE_PER_RESIDENT = 400
 
 /**
  * What an NPC city asks for each of its finished buildings when it is bought, in Coins, by kind;
  * a kind missing here adds nothing. A village (6 residents, a town hall, a storage, 2 houses, a
- * farm and its wall ring) comes to about 1 600 coins, which three residents can carry; a town to
- * about 4 000. A stretch of wall is a quarter of what it was on the old 40 m tiles.
+ * farm and its wall ring) comes to about 2 800 coins, which three residents can carry; a town to
+ * about 7 000. A stretch of wall is a quarter of what it was on the old 40 m tiles.
  */
 export const CITY_PRICE_BY_BUILDING: Partial<Record<BuildingKind, number>> = {
   townHall: 200,
@@ -545,7 +546,7 @@ export const NPC_SOLDIER_SHARE = 0.25
 
 /**
  * Coins an NPC city keeps as its war chest for each of its residents (`CONTEXT.md`: NPC reserve):
- * a town of 16 keeps 160, what two mint workers strike in two game days (`RECIPES`).
+ * a town of 16 keeps 160, what four mint workers strike in two game days (`RECIPES`).
  */
 export const NPC_WAR_CHEST_PER_RESIDENT = 10
 
@@ -882,7 +883,7 @@ export const HQ_FOOD_FLOOR_FACTOR = 15
 /**
  * What a warehouse sells a unit of each good for, in coins, when it holds `PRICE_REFERENCE_FLOORS`
  * times its floor (`CONTEXT.md`: Warehouse prices, Price anchor). Roughly what goes into it: an
- * iron is two iron ore and the work, a sword two iron and a wood; gold ore stays below the 20
+ * iron is two iron ore and the work, a sword two iron and a wood; gold ore stays below the 10
  * coins the mint strikes from it.
  */
 export const WAREHOUSE_BASE_PRICE: Record<Exclude<Good, 'coins'>, number> = {
@@ -891,7 +892,7 @@ export const WAREHOUSE_BASE_PRICE: Record<Exclude<Good, 'coins'>, number> = {
   stone: 2,
   ironOre: 4,
   iron: 10,
-  goldOre: 15,
+  goldOre: 8,
   spear: 20,
   sword: 30,
   shield: 22,
@@ -1613,7 +1614,7 @@ export const TRADE_ORG_PUNISHES_BELOW = -8
  */
 export const TRADE_ORG_LOSS: Record<Exclude<CrimeKind, 'theft'>, number> = {
   attack: 50,
-  killing: 200,
+  killing: CITY_PRICE_PER_RESIDENT,
   tearDown: 150,
   capture: CITY_PRICE_PER_RESIDENT * TRADING_POST.residents,
 }
@@ -1725,15 +1726,15 @@ export function wagonFoodFor(tiles: number, soldiers: number): number {
  * it by: as much as it takes back for a killing (`TRADE_ORG_PUNISH.times` its loss). It goes again
  * as soon as one punishment is over, until the directive is lifted.
  */
-export const DIRECTIVE_PUNISH_WORTH = 400
+export const DIRECTIVE_PUNISH_WORTH = TRADE_ORG_PUNISH.times * TRADE_ORG_LOSS.killing
 
 /**
  * The price, in Coins, the admin panel offers for buying off an admin directive (`CONTEXT.md`:
- * Admin directive) when an admin allows it; they may set another. A couple of punishments'
- * worth (`DIRECTIVE_PUNISH_WORTH`), and 20 kg of coins: a resident's hands or a carriage can
- * bring it.
+ * Admin directive) when an admin allows it; they may set another. About a couple of punishments'
+ * worth (`DIRECTIVE_PUNISH_WORTH`), and 30 kg of coins: an average resident's hands or a carriage
+ * can bring it.
  */
-export const DIRECTIVE_BUY_OFF_PRICE = 1000
+export const DIRECTIVE_BUY_OFF_PRICE = 1500
 
 /**
  * Materials each kind of building needs before its construction site can become the building
@@ -1879,19 +1880,19 @@ export const WORKPLACE_MAX_WORKERS: Partial<Record<BuildingKind, number>> = {
 
 /**
  * What each kind of workplace counts for against a debt when the Trade Organization's army tears it
- * down (`CONTEXT.md`: Trade Org debt), in Coins: about its materials at their warehouse base price and
- * 20 Coins for each game day of a builder's work (as `CARRIAGE_STOLEN_WORTH` weighs a carriage), and
- * never less than 100, as a farm or lumber camp is cheap to build but worth more than that to a city.
- * So a debt for a killing (`TRADE_ORG_LOSS`, twice) takes about two to four workplaces.
+ * down (`CONTEXT.md`: Trade Org debt), in Coins: about twice its materials at their warehouse base
+ * price and 20 Coins for each game day of a builder's work (as `CARRIAGE_STOLEN_WORTH` weighs a
+ * carriage), and never less than 200, as a farm or lumber camp is cheap to build but worth more than
+ * that to a city. So a debt for a killing (`TRADE_ORG_LOSS`, twice) takes about two to four workplaces.
  */
 export const WORKPLACE_WRECK_WORTH: Partial<Record<BuildingKind, number>> = {
-  farm: 100,
-  lumberCamp: 100,
-  quarry: 120,
-  mine: 200,
-  smelter: 200,
-  mint: 280,
-  smithy: 300,
+  farm: 200,
+  lumberCamp: 200,
+  quarry: 240,
+  mine: 400,
+  smelter: 400,
+  mint: 560,
+  smithy: 600,
 }
 
 /**
@@ -1919,14 +1920,14 @@ export interface Recipe {
 
 /**
  * The fixed recipes of the workplaces that process goods (`CONTEXT.md`: Smelter, Coins, Smithy).
- * A smelter turns 2 iron ore into 1 iron, a mint 1 gold ore into 20 coins (less weight than the
+ * A smelter turns 2 iron ore into 1 iron, a mint 1 gold ore into 10 coins (less weight than the
  * ore, but a fortune still weighs something). A smithy has one recipe for each weapon and piece
  * of armour, each from Iron and Wood weighing what the good weighs (`GOOD_WEIGHT`): a spear is
  * mostly wood, a sword mostly iron, a shield wood bound with iron, armour nearly all iron.
  */
 export const RECIPES: Partial<Record<BuildingKind, readonly Recipe[]>> = {
   smelter: [{ input: { ironOre: 2 }, output: { iron: 1 } }],
-  mint: [{ input: { goldOre: 1 }, output: { coins: 20 } }],
+  mint: [{ input: { goldOre: 1 }, output: { coins: 10 } }],
   smithy: [
     { input: { iron: 1, wood: 2 }, output: { spear: 1 } },
     { input: { iron: 2, wood: 1 }, output: { sword: 1 } },
@@ -1938,7 +1939,7 @@ export const RECIPES: Partial<Record<BuildingKind, readonly Recipe[]>> = {
 /**
  * Batches one worker of average Strength and no skill gets through per game day: a smelter worker
  * smelts what two miners dig (4 iron ore into 2 iron), a mint worker strikes what two gold miners
- * dig (2 gold ore into 40 coins), a smithy worker makes two weapons or pieces of armour.
+ * dig (2 gold ore into 20 coins), a smithy worker makes two weapons or pieces of armour.
  */
 export const BATCHES_PER_DAY: Partial<Record<BuildingKind, number>> = {
   smelter: 2,
@@ -2219,16 +2220,26 @@ export function combatLearned(resident: Resident, tick: number): number {
 }
 
 /** Most trainees at one training ground at a time (`CONTEXT.md`: Trainee). */
-export const TRAINING_GROUND_MAX_TRAINEES = 3
+export const TRAINING_GROUND_MAX_TRAINEES = 6
 
 /**
  * Trained bonus a trainee of average Intellect gains in a stat each tick a teacher is there
- * (`CONTEXT.md`: Training): an average base of 10 reaches its cap of 5 in about a game year.
+ * (`CONTEXT.md`: Training): an average base of 10 reaches its cap of 5 in half a game year.
  */
-export const TRAIN_STAT_PER_TICK = 5 / TICKS_PER_GAME_YEAR
+export const TRAIN_STAT_PER_TICK = 5 / (TICKS_PER_GAME_YEAR / 2)
 
-/** How much faster training a skill goes than learning it by doing (`CONTEXT.md`: Training). */
-export const TRAIN_SKILL_FACTOR = 2
+/**
+ * How much faster training a work skill, Construction or Driving goes than learning it by doing
+ * (`CONTEXT.md`: Training). Fast enough that training first and then working has made more by the
+ * end of a game year than learning at the job, the teacher's lost work counted.
+ */
+export const TRAIN_SKILL_FACTOR = 6
+
+/**
+ * How much faster training Combat goes than its game year in `SKILL_PER_DAY`, half a game year to
+ * its maximum. Slower than `TRAIN_SKILL_FACTOR`: it doubles a blow and has no output to give up.
+ */
+export const TRAIN_COMBAT_FACTOR = 2
 
 /**
  * The most of each skill a resident can have (`CONTEXT.md`: Skill): where it stops making them
@@ -2264,9 +2275,10 @@ export const SKILL_PER_DAY: Readonly<Record<SkillName, number>> = {
 /**
  * What `trainee` gains in `subject` from one tick with `teacher` at the ground (`CONTEXT.md`:
  * Training): their Intellect sets the pace, `TRAIN_STAT_PER_TICK` for a stat, `TRAIN_SKILL_FACTOR`
- * times the by-doing rate for a skill. Never past the teacher's own effective value, nor a stat's
- * `trainedCap` or a skill's `SKILL_MAX`; 0 at that ceiling. A stat's gain goes into its trained
- * bonus, which old age shrinks along with the base, so the teacher's ceiling is scaled back by it.
+ * times the by-doing rate for a skill and `TRAIN_COMBAT_FACTOR` for Combat. Never past the
+ * teacher's own effective value, nor a stat's `trainedCap` or a skill's `SKILL_MAX`; 0 at that
+ * ceiling. A stat's gain goes into its trained bonus, which old age shrinks along with the base,
+ * so the teacher's ceiling is scaled back by it.
  */
 export function trainingGain(
   trainee: Resident,
@@ -2286,7 +2298,8 @@ export function trainingGain(
   const skill = subject as SkillName
   const has = trainee.skills[skill] ?? 0
   const toTeacher = (teacher.skills[skill] ?? 0) - has
-  const perTick = (SKILL_PER_DAY[skill] / TICKS_PER_GAME_DAY) * TRAIN_SKILL_FACTOR * pace
+  const factor = skill === 'combat' ? TRAIN_COMBAT_FACTOR : TRAIN_SKILL_FACTOR
+  const perTick = (SKILL_PER_DAY[skill] / TICKS_PER_GAME_DAY) * factor * pace
   return Math.max(0, Math.min(perTick, SKILL_MAX[skill] - has, toTeacher))
 }
 
