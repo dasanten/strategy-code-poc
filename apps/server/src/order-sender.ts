@@ -1,4 +1,12 @@
-import { commands, contractOf, type City, type Resident, type WorldState } from '@csp/shared'
+import {
+  commands,
+  contractOf,
+  isArmed,
+  isBigNpcCity,
+  type City,
+  type Resident,
+  type WorldState,
+} from '@csp/shared'
 import type { OrderSender } from './orders.js'
 import { realmOf } from './starting-city.js'
 
@@ -28,4 +36,20 @@ export function orderedResident(
   }
   const realm = realmOf(world, sender.userId)
   return realm && commands(world, realm.id, r) ? r : undefined
+}
+
+/**
+ * Why an NPC city's sender can't have a resident teach or train (`CONTEXT.md`: Who trains), if it
+ * can't: of the game's cities, only a big one trains, and only its soldiers. A Player's sender needs
+ * no such check.
+ */
+export function npcTrainingProblem(
+  world: WorldState,
+  sender: OrderSender,
+  r: Resident,
+): string | undefined {
+  if (sender.npcCityId === undefined) return undefined
+  const city = world.cities.find((c) => c.id === sender.npcCityId)
+  if (!city || city.tradeOrg || !isBigNpcCity(world, city)) return 'this city trains nobody'
+  return isArmed(r) ? undefined : 'it trains only its soldiers'
 }

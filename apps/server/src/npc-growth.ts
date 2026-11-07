@@ -61,6 +61,7 @@ import {
 import { innerWallProject, outerWalls } from './npc-inner-wall.js'
 import { farmersWanted } from './npc-plan.js'
 import { knowsNode } from './npc-scouts.js'
+import { wantsTrainingGround } from './npc-training.js'
 import { Ground } from './placing.js'
 import { residentTiles } from './starting-city.js'
 
@@ -464,12 +465,12 @@ function nearestNode(
 
 /**
  * What the city wants built most, where: a site of its own already begun (a farm, a workplace of
- * its own, a house in its area, its new wall); else a farm when the farmers it wants don't fit
+ * its own, a house in its area, a big city's training ground there, its new wall); else a farm when the farmers it wants don't fit
  * (`farmersDontFit`); else a house when it has a food surplus and no free housing; else, for an NPC
  * city, a stable once it has a horse (`wantsStable`), or the workplace for the shortest good of its
  * reserve it can make (`chainProject`, `CONTEXT.md`: NPC reserve); else the next stretch of its new
  * wall; else a big city's second workplace (`secondWorkplace`); else, with materials to spare, its
- * inner ring (`innerWallProject`).
+ * training ground (`wantsTrainingGround`) and its inner ring (`innerWallProject`).
  */
 function wanted(
   world: WorldState,
@@ -488,7 +489,11 @@ function wanted(
       b.site &&
       (((b.kind === 'farm' || b.kind === 'stable') && b.cityId === city.id) ||
         own.has(b.id) ||
-        ((b.kind === 'house' || b.kind === 'storage') && inCityArea(world, city, b.x, b.y, size))),
+        ((b.kind === 'house' || b.kind === 'storage') && inCityArea(world, city, b.x, b.y, size)) ||
+        (b.kind === 'trainingGround' &&
+          !city.tradeOrg &&
+          isBigNpcCity(world, city) &&
+          inCityArea(world, city, b.x, b.y, size))),
   )
   const wallSite = ring.find((t) => t.site)
   const site = begun ?? wallSite?.site
@@ -532,8 +537,13 @@ function wanted(
   }
   const next = ring.find((t) => !t.done)
   if (next) return { kind: 'build', building: next.kind, x: next.x, y: next.y }
+  const ground = () =>
+    wantsTrainingGround(world, city, size)
+      ? at('trainingGround', houseTile(world, city, home, terrain, rings, 'trainingGround'))
+      : undefined
   return (
     secondWorkplace(world, city, home, terrain) ??
+    ground() ??
     (rings && innerWallProject(world, city, home, terrain, rings, npcBuilders(world, city)))
   )
 }

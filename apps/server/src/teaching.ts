@@ -7,7 +7,7 @@ import {
   type TrainingSubject,
   type WorldState,
 } from '@csp/shared'
-import { orderedResident } from './order-sender.js'
+import { npcTrainingProblem, orderedResident } from './order-sender.js'
 import type { OrderKind } from './orders.js'
 
 /**
@@ -21,17 +21,17 @@ interface TeachRequest extends OrderRequest {
 }
 
 /**
- * The teach order (`CONTEXT.md`: Teacher): a grown resident of the Player's realm teaches a stat
+ * The teach order (`CONTEXT.md`: Teacher): a grown resident of the sender's teaches a stat
  * or a skill at the finished training ground they stand on, until they walk off or take another
- * order. A ground has one teacher at a time. NPC cities train nobody (`CONTEXT.md`: Who trains).
+ * order. A ground has one teacher at a time. Of the game's cities only a big one's soldiers teach
+ * (`CONTEXT.md`: Who trains).
  */
 export const teach: OrderKind = {
   validate(world, sender, order) {
     const o = order as Partial<TeachRequest>
-    if (sender.npcCityId !== undefined) return 'NPC cities don’t train'
     const r = orderedResident(world, sender, o.residentId)
     if (!r) return 'not one of your residents'
-    const problem = teachProblem(world, r, o.subject)
+    const problem = npcTrainingProblem(world, sender, r) ?? teachProblem(world, r, o.subject)
     if (problem) return problem
     const here = buildingAt(world, r.x, r.y)
     if (o.buildingId !== here?.id) return 'stand on the training ground to teach there'

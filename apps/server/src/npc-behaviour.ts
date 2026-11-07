@@ -68,6 +68,7 @@ import { layRoad, onRoadWork, type WayFinder } from './npc-roads.js'
 import { giveUpSite, sendScout, stepScouts } from './npc-scouts.js'
 import { startFeeding, steerFeeder } from './npc-stable.js'
 import { runTrader } from './npc-trader.js'
+import { goTrain, steerTraining } from './npc-training.js'
 import type { Invariant } from './invariants.js'
 import { hash } from './residents.js'
 import { refillSource } from './survival.js'
@@ -90,6 +91,8 @@ export const NPC_ORDER_KINDS: readonly ResidentOrder['kind'][] = [
   'attack',
   'trade',
   'feed',
+  'teach',
+  'train',
 ]
 
 /**
@@ -159,7 +162,8 @@ export function stepNpcCities(
  * (`CONTEXT.md`: Scout), and one the pass called off comes home first with what they saw
  * (`stepScouts`); with nothing to do they stand at a house (`standIdle`), and take no Food to set
  * out with. Its soldiers (armed adults) are put to no work and no building (`stepNpcDefence`), and
- * go to their posts (`standPost`), a Trade Org city's home. Children stand at a house too, and refill
+ * go to their training ground if it is their turn (`goTrain`), else to their posts (`standPost`), a
+ * Trade Org city's home. Children stand at a house too, and refill
  * there. Returns the milliseconds spent planning.
  */
 function runCity(
@@ -250,6 +254,8 @@ function runCity(
     const moved =
       job !== undefined && job.kind !== 'soldier' && at !== undefined && at !== job.buildingId
     if (moved && !r.carrying && plan?.plannedAt === world.tick) stopWork(r)
+    // At the training ground, or now to be: the pass just now may have moved them.
+    if (plan?.plannedAt === world.tick) steerTraining(world, city, r, job)
     // Off the road crew, they leave the road to it (`CONTEXT.md`: NPC road).
     if (onRoadWork(r) && job?.kind !== 'road' && plan?.plannedAt === world.tick) stopWork(r)
     // The pass just now called a scout off: they come home with what they saw, below.
@@ -395,6 +401,7 @@ function runCity(
         continue
       }
     }
+    if (goTrain(world, city, r, job, passed, size)) continue
     if (onPost) standPost(world, city, r, postOf, home, size, passed)
     else if (soldier) comeHome(world, city, r, home, size)
     else stand(r)

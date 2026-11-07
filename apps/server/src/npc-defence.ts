@@ -207,6 +207,8 @@ function keepSoldiers(
   for (const r of soldiers) {
     // Their Alarm script hands back what it interrupted, which they are put off then if need be.
     if (r.script?.task === 'alarm') continue
+    // Their Train default is the city's own doing (`CONTEXT.md`: Who trains): its pass ends it.
+    if (r.script?.task === 'train') continue
     // A daughter's armed founder brings the materials on them to its first storage.
     if (r.script?.task === 'build' && noStorageYet(world, city)) continue
     // A bare building order would hold them, and the materials on them, at the site for good.

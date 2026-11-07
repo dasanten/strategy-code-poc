@@ -100,7 +100,7 @@ describe('the teach order (`CONTEXT.md`: Teacher)', () => {
     expect(bo.order).toBeNull()
   })
 
-  it('is refused for another realm’s resident, and NPC cities train nobody', () => {
+  it('is refused for another realm’s resident, and for a city’s sender not its own (`npc-training.test.ts`)', () => {
     const { world, bo, queue } = setup()
     bo.owner = 'r2'
     expect(order(world, queue, teach('a2'))).toBe('not one of your residents')
