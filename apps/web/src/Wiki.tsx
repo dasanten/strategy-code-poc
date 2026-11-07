@@ -127,6 +127,7 @@ import {
   NPC_CITY_WONT_SELL_STANDING,
   FOOD_PER_DAY,
   NPC_BUILDERS,
+  NPC_INNER_WALL_REACH,
   NPC_ROAD_CREW,
   NPC_ROAD_LONGEST,
   NPC_CITY_MIN_DISTANCE,
@@ -2232,6 +2233,18 @@ export function Wiki() {
           for the walk, goes back for more before a tile it couldn't walk home from on what it has,
           and fetches more when it runs low, as any builder does. A way longer than{' '}
           {num(NPC_ROAD_LONGEST)} tiles, or with no way through, is given up.
+        </p>
+        <p>
+          A big city, from {num(2 * NPC_RESIDENTS_PER_NEEDS_STEP)} residents, builds beyond its needs. With
+          nothing short, its outer wall standing with its gate, and materials above its reserve, it
+          puts up an <strong>inner ring</strong> of wall round its town hall and storage, up to{' '}
+          {num(NPC_INNER_WALL_REACH)} tiles from the hall's middle, tile by tile as it does its outer
+          wall. It takes the shape that leaves fewest gaps, along its layout's streets where it can: a
+          square on the lanes round the town hall in Grid, a circle on the first lane in Rings. What
+          stands on its line leaves a gap, and a street it crosses stops at it. Its one gate stands in
+          line with the outer gate and goes up last, so its people never lose the way to the storage;
+          its own pass through the gate as they do any of its gates. It waits whenever something runs
+          short or the outer wall is moving out, and it stays when the outer wall moves.
         </p>
         <h3>Trading posts and the HQ</h3>
         <p>

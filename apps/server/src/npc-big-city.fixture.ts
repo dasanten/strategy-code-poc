@@ -18,6 +18,7 @@ import {
   type Building,
   type BuildingKind,
   type City,
+  type CityLayout,
   type Good,
   type ResourceKind,
   type Stock,
@@ -93,9 +94,10 @@ function buildHouses(world: WorldState, terrain: TerrainMap, city: City, home: B
  * when Daniel looked (2026-11-06; ADR 0029): its soldiers armed, children among its residents, the
  * farms it needs, its whole chain built from lumber camp to smithy with a free node of each good for
  * a second, and every good at its reserve and half a village's surplus cap. Everyone starts free at
- * home, and its first pass shares them out.
+ * home, and its first pass shares them out. With `layout` its houses follow that one, in place of
+ * the one it drew.
  */
-export function bigCity(): {
+export function bigCity(layout?: CityLayout): {
   world: WorldState
   terrain: TerrainMap
   city: City
@@ -105,6 +107,7 @@ export function bigCity(): {
   const world = createWorld(terrain)
   const size = { ...NPC_TOWN, size: BIG_CITY_SIZE, residents: BIG_CITY_RESIDENTS, farms: 8 }
   const city = foundNpcCity(world, terrain, size, 60, 60, mulberry32(29))
+  if (layout) city.layout = layout
   const home = npcHome(world, city)!
   for (const [i, kind] of (['smelter', 'smithy'] as const).entries()) {
     workplace(world, terrain, city, { x: home.x + 6 + i * 4, y: home.y + 6 }, kind)

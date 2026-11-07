@@ -154,6 +154,7 @@ import { npcScoutsSound } from './npc-scouts.js'
 import { npcOneFeeder, tradeOrgBreedsNoHorses } from './npc-stable.js'
 import { foundingPartiesSound, npcCitiesHaveHalls } from './npc-founding.js'
 import { cityLayoutsSound, cityStreetsSound } from './city-layout.js'
+import { innerWallLeavesAWay } from './npc-inner-wall.js'
 import { npcTradersSound } from './npc-trader.js'
 import { leadersServeNoOne } from './leader.js'
 import { cityNamesWellFormed, horseNamesWellFormed, residentNamesWellFormed } from './renaming.js'
@@ -2147,6 +2148,7 @@ export const worldInvariants: Invariant[] = [
   npcCitiesHaveHalls,
   cityLayoutsSound,
   cityStreetsSound,
+  innerWallLeavesAWay,
   npcFarmersKept,
   npcSurplusCapped,
   npcWorkplacesBounded,
