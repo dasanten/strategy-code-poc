@@ -10,6 +10,7 @@ import {
   inCityArea,
   inInnerRingAround,
   isAt,
+  isBigNpcCity,
   isCityBuilding,
   npcNeedsScale,
   npcReserve,
@@ -42,8 +43,9 @@ import { worldIndex } from './world-index.js'
  * nothing short, up to `npcRoadCrew` of its spare hands, apart from its builders, build its
  * layout's streets beside the buildings that stand, then road from its home to each of its
  * workplaces outside its area, nearest first, then on to the nearest Trade Org warehouse in its
- * trader's reach and the edge of its nearest neighbour's area, along the way a resident would walk,
- * tile by tile, skipping tiles that have a road. They take the materials from the storage only above
+ * trader's reach and the edge of its nearest neighbour's area, and in a big city on to further ones,
+ * along the way a resident would walk, tile by tile, skipping tiles that have a road. They take the
+ * materials from the storage only above
  * its reserve and what its project wants, and each tile is the game's Build default with the
  * materials in hand, so it never fetches any more, and gets its Food as that default does (Getting
  * food). A way is worked out once and kept in the plan as plain data (`CityPlan.roads`; ADR 0002), so
@@ -147,35 +149,60 @@ function isPost(world: WorldState, b: Building, size: number): boolean {
   return !hall || !inInnerRingAround(hall, b, size)
 }
 
-/** The nearest such warehouse (`isPost`) within its trader's reach of `home`. */
-function nearestPost(world: WorldState, home: Building, size: number): Building | undefined {
-  let best: { b: Building; d: number } | undefined
-  for (const b of world.buildings) {
-    if (b.kind !== 'warehouse') continue
-    const d = wrapDistance(size, home, b)
-    if (d > NPC_TRADER_REACH || (best && d >= best.d) || !isPost(world, b, size)) continue
-    best = { b, d }
-  }
-  return best?.b
+/** A place a road goes on to past its workplaces: a warehouse, or a neighbour city's area. */
+interface RoadOn {
+  /** What the road's `to` names: the warehouse, or the city. */
+  to: string
+  at: Point
+  /** How far it lies from the city's home. */
+  distance: number
+  /** The neighbour, for a road to the edge of its area. */
+  city?: City
 }
 
-/** The city nearest `home` and its town hall, the Trade Org's aside: they have their warehouses. */
-function nearestNeighbour(
-  world: WorldState,
-  city: City,
-  home: Building,
-  size: number,
-): { city: City; hall: Building } | undefined {
+/** Such warehouses (`isPost`) within its trader's reach of `home`, nearest first. */
+function postsInReach(world: WorldState, home: Building, size: number): RoadOn[] {
+  const posts: RoadOn[] = []
+  for (const b of world.buildings) {
+    if (b.kind !== 'warehouse') continue
+    const distance = wrapDistance(size, home, b)
+    if (distance > NPC_TRADER_REACH || !isPost(world, b, size)) continue
+    posts.push({ to: b.id, at: [b.x, b.y], distance })
+  }
+  return posts.sort((a, b) => a.distance - b.distance)
+}
+
+/** The cities, by their town halls, nearest `home` first; not the Trade Org's: they have warehouses. */
+function neighbours(world: WorldState, city: City, home: Building, size: number): RoadOn[] {
   const index = worldIndex(world)
-  let best: { city: City; hall: Building; d: number } | undefined
+  const out: RoadOn[] = []
   for (const other of world.cities) {
     if (other.id === city.id || other.tradeOrg) continue
     const hall = index.buildingById(other.townHallId)
     if (!hall) continue
-    const d = wrapDistance(size, home, hall)
-    if (!best || d < best.d) best = { city: other, hall, d }
+    out.push({
+      to: other.id,
+      at: [hall.x, hall.y],
+      distance: wrapDistance(size, home, hall),
+      city: other,
+    })
   }
-  return best
+  return out.sort((a, b) => a.distance - b.distance)
+}
+
+/**
+ * Where a road goes on to once its workplaces are joined, in order (`CONTEXT.md`: NPC road, Bigger
+ * projects): the nearest post, the nearest neighbour, and for a big city (`isBigNpcCity`) then the
+ * other posts and neighbours, nearest first. A neighbour who keeps the road between them is left out.
+ */
+function placesOn(world: WorldState, city: City, home: Building, size: number): RoadOn[] {
+  const [post, ...posts] = postsInReach(world, home, size)
+  const [next, ...others] = neighbours(world, city, home, size)
+  const further = isBigNpcCity(world, city)
+    ? [...posts, ...others].sort((a, b) => a.distance - b.distance)
+    : []
+  const places = [post, next, ...further].filter((p) => p !== undefined)
+  return places.filter((p) => !world.cityPlans[p.to]?.roads?.some((r) => r.to === city.id))
 }
 
 /** Whether a road's far end still stands, for one that isn't to a workplace: a post, or a city. */
@@ -191,10 +218,10 @@ function leadsOn(world: WorldState, to: string, size: number): boolean {
  * follow its buildings as they go up. Ways go in the order of its finished workplaces outside its area, nearest its home first; those of
  * workplaces gone or taken into its area are dropped. The nearest workplace without a way yet asks
  * for one, one search at a time, and the ways it knows go on meanwhile. Once all it knows are built,
- * it asks for the way to the nearest post, then to the edge of its nearest neighbour's area, unless
- * that neighbour already has the road between them. Ways on to ones no longer the nearest stay while
- * they stand, so a road isn't left half done when a daughter is founded. One with no way through, or
- * longer than `NPC_ROAD_LONGEST`, stays empty, given up.
+ * it asks for the way to the next of `placesOn`, one at a time, the next only once that one is built.
+ * Ways on to ones no longer the nearest stay while they stand, so a road isn't left half done when a
+ * daughter is founded. One with no way through, or longer than `NPC_ROAD_LONGEST`, stays empty, given
+ * up, and it asks for the next.
  */
 function planRoads(
   world: WorldState,
@@ -247,20 +274,13 @@ function planRoads(
   }
   const has = (to: string) => roads.some((r) => r.to === to)
   if (!searching && !nextTile(world, streets, roads, size)) {
-    const post = nearestPost(world, home, size)
-    if (post && !has(post.id)) {
-      const road = settle(post.id, [post.x, post.y])
-      if (road) roads.push(road)
-      else searching = true
-    }
-  }
-  if (!searching && !nextTile(world, streets, roads, size)) {
-    const next = nearestNeighbour(world, city, home, size)
-    const theirs = next && world.cityPlans[next.city.id]?.roads?.some((r) => r.to === city.id)
-    if (next && !theirs && !has(next.city.id)) {
-      const area = areaTiles(world, next.city, size)
-      const road = settle(next.city.id, [next.hall.x, next.hall.y], area)
-      if (road) roads.push(road)
+    for (const place of placesOn(world, city, home, size)) {
+      if (has(place.to)) continue
+      const area = place.city && areaTiles(world, place.city, size)
+      const road = settle(place.to, place.at, area)
+      if (!road) break
+      roads.push(road)
+      if (nextTile(world, streets, roads, size)) break
     }
   }
   if (roads.length > 0) plan.roads = roads
