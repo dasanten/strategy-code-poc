@@ -146,7 +146,7 @@ import { npcRoadCrewSized, npcRoadsOnce } from './npc-roads.js'
 import { npcRevivers } from './npc-revive.js'
 import { npcScoutsSound } from './npc-scouts.js'
 import { npcOneFeeder, tradeOrgBreedsNoHorses } from './npc-stable.js'
-import { foundingPartiesSound, npcCitiesHaveHalls } from './npc-founding.js'
+import { foundingPartiesSound, fullWaitSound, npcCitiesHaveHalls } from './npc-founding.js'
 import { cityLayoutsSound, cityStreetsSound } from './city-layout.js'
 import { npcTradersSound } from './npc-trader.js'
 import { leadersServeNoOne } from './leader.js'
@@ -2138,6 +2138,7 @@ export const worldInvariants: Invariant[] = [
   hqRingsSound,
   cityPlansSound,
   foundingPartiesSound,
+  fullWaitSound,
   npcCitiesHaveHalls,
   cityLayoutsSound,
   cityStreetsSound,

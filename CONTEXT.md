@@ -523,7 +523,7 @@ The shared language of the game. Domain terms only — no implementation details
   balance number of residents) builds beyond its needs: a training ground, an inner ring of wall
   round its town hall and storage with a gate, and more roads (NPC road).
 - **NPC road:** a road an NPC city builds with a **road crew** of its spare hands (at most a balance
-  number at once, which grows with the city, apart from its builders), only from materials above its reserve. Its layout's
+  number at once, which grows with the city, apart from its builders), only from materials above its reserve. Once the city would otherwise be full (Full city), it also leaves a town hall's and a storage's materials untouched, so founding comes before roads. Its layout's
   streets come first (City layout). Then it follows the
   way a resident would walk, tile by tile, skipping tiles that have a road: first from its home to
   each of its workplaces outside its area, nearest first; then to the nearest Trade Org warehouse
@@ -554,7 +554,8 @@ The shared language of the game. Domain terms only — no implementation details
   sell does one take a second load of a good already on the road. Nothing protects them on the way but what they carry.
 - **Full city:** an NPC city that for a whole game week, less the bigger it is (a balance number), has had spare hands (idle, on a road crew, scouting or working for surplus) and nothing
   short of its reserve, holds a food surplus, and holds its founding party's materials
-  above its reserve. A full city founds a daughter (Founding).
+  above its reserve. A dip below the reserve only restarts that time if it lasts longer than a game
+  day, though nothing sets out during one. A full city founds a daughter (Founding).
 - **Founding:** how a full NPC city spreads out. It picks a free Plains site the usual distance
   from every city, within a set reach of itself and on no realm's territory, nearest a node of
   the good it is short of and has no node for. A **founding party** of a village's worth of

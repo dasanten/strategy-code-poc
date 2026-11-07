@@ -1,13 +1,4 @@
-import {
-  NPC_FULL_DAYS,
-  NPC_VILLAGE,
-  TICKS_PER_GAME_DAY,
-  npcFoundingPartySize,
-  npcFullDays,
-  npcReserve,
-  storedFood,
-  surplusFoodLine,
-} from '@csp/shared'
+import { NPC_VILLAGE, TICKS_PER_GAME_DAY, storedFood, surplusFoodLine } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
 import { checkInvariants } from './invariants.js'
 import {
@@ -17,7 +8,7 @@ import {
   runBigCity,
   unhurriedWalking,
 } from './npc-big-city.fixture.js'
-import { foundingMaterials, foundingParty } from './npc-founding.js'
+import { foundingParty } from './npc-founding.js'
 import { stepWorld } from './world.js'
 
 /*
@@ -42,18 +33,12 @@ describe('a big NPC city', () => {
   )
 
   it(
-    'founds sooner than a week with a larger party, and goes on feeding itself',
+    'on a map with room, founds a daughter unaided, and goes on feeding itself',
     { tags: ['slow'], timeout: 1_800_000 },
     () => {
       const staged = bigCity(1300)
-      const { world, terrain, city, home } = staged
-      const materials = foundingMaterials(npcFoundingPartySize(BIG_CITY_RESIDENTS))
+      const { world, terrain, city } = staged
       const walking = unhurriedWalking(terrain)
-      const wait = npcFullDays(BIG_CITY_RESIDENTS)
-      expect(wait).toBeLessThan(NPC_FULL_DAYS)
-      // Past what its scouts and road crew take out with them in an hour, which puts Food under the
-      // reserve and restarts its full days; so this is about the waiting.
-      home.stock!.food = (home.stock!.food ?? 0) + 500
 
       let setOut: number | undefined
       let party: string[] = []
@@ -61,17 +46,9 @@ describe('a big NPC city', () => {
       const daughter = () =>
         world.cities.find((c) => c.id !== city.id && c.realmId === null && !c.tradeOrg)
       const moved = () => world.residents.some((r) => r.cityId === daughter()?.id)
-      const lastDay = 20 * TICKS_PER_GAME_DAY
+      // Nothing is held for it: its scouts and road crew go out with Food and its crew lays roads.
+      const lastDay = 60 * TICKS_PER_GAME_DAY
       while (world.tick < lastDay && !moved()) {
-        // Its road crew spends every Stone above the reserve until its roads are done, and spare
-        // hands take time to cut the Wood. Until it sets out, what the party wants stays.
-        if (setOut === undefined) {
-          const reserve = npcReserve(world, city)
-          for (const good of ['wood', 'stone'] as const) {
-            const want = (reserve[good] ?? 0) + (materials[good] ?? 0)
-            home.stock![good] = Math.max(home.stock![good] ?? 0, want)
-          }
-        }
         stepWorld(world, terrain, walking)
         const now = foundingParty(world.cityPlans[city.id])
         if (setOut === undefined && now.length > 0) {
@@ -83,10 +60,10 @@ describe('a big NPC city', () => {
           expect(checkInvariants(world, terrain)).toEqual([])
         }
       }
+      console.log(
+        `Big city unaided: party of ${party.length} set out on day ${(setOut ?? NaN) / TICKS_PER_GAME_DAY}, moved by day ${world.tick / TICKS_PER_GAME_DAY}`,
+      )
       expect(setOut).toBeDefined()
-      // The first pass counts it as full; it searches once a game day from when it may found.
-      expect(setOut!).toBeLessThan((wait + 2) * TICKS_PER_GAME_DAY)
-      expect(party.length).toBe(npcFoundingPartySize(BIG_CITY_RESIDENTS))
       expect(party.length).toBeGreaterThan(NPC_VILLAGE.residents)
       expect(moved()).toBe(true)
       const people = world.residents.filter((r) => r.cityId === daughter()!.id)

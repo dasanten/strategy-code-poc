@@ -790,6 +790,12 @@ export const NPC_FULL_RESIDENTS_PER_DAY = 20
 export const NPC_FULL_DAYS_LEAST = 2
 
 /**
+ * Game days a dip below its reserve may last before a full NPC city's wait starts over (`CONTEXT.md`:
+ * Full city): Food its scouts and road crew take out and bring back doesn't count.
+ */
+export const NPC_FULL_DIP_DAYS = 1
+
+/**
  * Residents past `NPC_FOUND_VILLAGE_RESIDENTS` that add one adult to a founding party
  * (`npcFoundingPartySize`): a city of 110 sends the most, about one in eight of it.
  */

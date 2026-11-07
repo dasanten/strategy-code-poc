@@ -507,11 +507,19 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(105)
+    expect(WORLD_FORMAT_VERSION).toBe(106)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
     expect(checkInvariants(v39, land)).toEqual([])
+  })
+
+  it('leaves a format 105 world as it is: no plan has a dip yet (migration 105 → 106)', () => {
+    const { world, terrain: land } = worldWithPost()
+    world.cityPlans = { waiting: { plannedAt: 0, jobs: {}, fullSince: 0 } }
+    const v106 = migrateWorld(structuredClone(world), 105, { terrain: land }, migrations, 106)
+    expect(v106).toEqual(world)
+    expect(v106.cityPlans.waiting?.shortSince).toBeUndefined()
   })
 
   it('makes a list of the trader run in a city plan (migration 104 → 105)', () => {

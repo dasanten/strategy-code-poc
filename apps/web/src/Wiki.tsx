@@ -139,6 +139,7 @@ import {
   NPC_FOUND_VILLAGE_RESIDENTS,
   NPC_FULL_DAYS,
   NPC_FULL_DAYS_LEAST,
+  NPC_FULL_DIP_DAYS,
   NPC_FULL_RESIDENTS_PER_DAY,
   NPC_GATE_WATCH_RANGE,
   NPC_VILLAGE,
@@ -2207,7 +2208,8 @@ export function Wiki() {
           goes round a lake, and they skip tiles that already have a road. They only use materials
           above its reserve and what its project still needs; with none to spare, or with something
           short that they can work for, they go back to other work and bring back what they carry.
-          Like any road it belongs to nobody, and anyone can use it or tear it down; a tile torn down
+          Once the city would otherwise be full, they also leave a town hall's and a storage's
+          materials untouched, so founding comes before roads. Like any road it belongs to nobody, and anyone can use it or tear it down; a tile torn down
           is laid again in time.
         </p>
         <p>
@@ -2276,7 +2278,9 @@ export function Wiki() {
           of its reserve for {days(NPC_FULL_DAYS)}, with a food surplus and its founding party's
           materials above its reserve. Past {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a
           game day less for each {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at least{' '}
-          {days(NPC_FULL_DAYS_LEAST)}. A full city founds a daughter. Once a game day it looks for a
+          {days(NPC_FULL_DAYS_LEAST)}. A dip below its reserve only restarts that wait if it lasts
+          longer than {days(NPC_FULL_DIP_DAYS)}, though nobody sets out during one. A full city founds
+          a daughter. Once a game day it looks for a
           free Plains site {num(NPC_CITY_MIN_DISTANCE)} to {num(NPC_FOUND_REACH)} tiles away, with
           room for a village and on no realm's territory, nearest a node of a material it has none
           of in reach. A founding party of {num(NPC_VILLAGE.residents)} adults, one more for each{' '}

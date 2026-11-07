@@ -10,6 +10,7 @@ import {
   NPC_FOUND_REACH,
   NPC_FOUND_SAMPLES,
   NPC_FOUND_STANDING,
+  NPC_FULL_DIP_DAYS,
   NPC_NODE_REACH,
   NPC_PLAN_TICKS,
   NPC_VILLAGE,
@@ -87,18 +88,25 @@ export function foundingParty(plan: CityPlan | undefined): string[] {
 }
 
 /**
- * Whether a city is full (`CONTEXT.md`: Full city): full since `npcFullDays` game days at least, less
- * the bigger it is, with a food surplus and its founding party's materials (`foundingMaterials`)
- * above its reserve.
+ * Whether a city would be full but for its materials (`CONTEXT.md`: Full city, NPC road): with no
+ * party out, full since `npcFullDays` game days at least, less the bigger it is, and with a food
+ * surplus. From then on its road crew leaves what the founding takes (`keeps` in `npc-roads.ts`).
+ */
+export function fullButMaterials(world: WorldState, city: City, plan: CityPlan): boolean {
+  if (plan.fullSince === undefined || foundingParty(plan).length > 0) return false
+  const wait = npcFullDays(cityResidents(world, city).length) * TICKS_PER_GAME_DAY
+  return world.tick - plan.fullSince >= wait && hasFoodSurplus(world, city)
+}
+
+/**
+ * Whether a city is full (`CONTEXT.md`: Full city): it would be but for its materials
+ * (`fullButMaterials`), and holds its founding party's (`foundingMaterials`) above its reserve.
  */
 export function isFull(world: WorldState, city: City, plan: CityPlan): boolean {
-  if (plan.fullSince === undefined) return false
-  const residents = cityResidents(world, city).length
-  if (world.tick - plan.fullSince < npcFullDays(residents) * TICKS_PER_GAME_DAY) return false
-  if (!hasFoodSurplus(world, city)) return false
+  if (!fullButMaterials(world, city, plan)) return false
   const reserve = npcReserve(world, city)
   const stock = npcCityStock(world, city)
-  const materials = foundingMaterials(npcFoundingPartySize(residents))
+  const materials = foundingMaterials(npcFoundingPartySize(cityResidents(world, city).length))
   return (Object.entries(materials) as [Good, number][]).every(
     ([good, n]) => (stock[good] ?? 0) >= (reserve[good] ?? 0) + n,
   )
@@ -108,12 +116,13 @@ export function isFull(world: WorldState, city: City, plan: CityPlan): boolean {
  * The founding part of an NPC city's planning pass (`CONTEXT.md`: Full city, Founding), after its
  * jobs are shared out. With a party out, it only gives up once `NPC_FOUND_GIVE_UP_DAYS` have gone
  * by since it set out and the town hall doesn't stand: its members who live are let go (`idle`, so
- * they walk home) and the city may found again once full again. Otherwise it keeps `fullSince`
- * while it has idle spare hands (`unneeded`: spare hands the pass had nowhere to send, idle or back
- * on a farm beyond the farmers it keeps) and nothing is short of its reserve, clears it (and the
- * site) else; once full it searches for a site on its daily pass (`findFoundingSite`), and with
- * one sends a party (`pickParty`). `adults` are those it gives orders to, the party aside;
- * `members` the party's who live and belong to it.
+ * they walk home) and the city may found again once full again. With something short of its reserve
+ * it does nothing more, and a wait under way starts over only once that has lasted past
+ * `NPC_FULL_DIP_DAYS` (`CityPlan.shortSince`). Otherwise it keeps `fullSince` while it has idle
+ * spare hands (`unneeded`: spare hands the pass had nowhere to send, idle or back on a farm beyond
+ * the farmers it keeps), clears it (and the site) else; once full it searches for a site on its
+ * daily pass (`findFoundingSite`), and with one sends a party (`pickParty`). `adults` are those it
+ * gives orders to, the party aside; `members` the party's who live and belong to it.
  */
 export function planFounding(
   world: WorldState,
@@ -142,7 +151,17 @@ export function planFounding(
     delete plan.foundingSite
     return
   }
-  if (unneeded.length === 0 || shortGoods(world, city).length > 0) {
+  if (shortGoods(world, city).length > 0) {
+    if (plan.fullSince === undefined) return
+    plan.shortSince ??= world.tick
+    if (world.tick - plan.shortSince <= NPC_FULL_DIP_DAYS * TICKS_PER_GAME_DAY) return
+    delete plan.shortSince
+    delete plan.fullSince
+    delete plan.foundingSite
+    return
+  }
+  delete plan.shortSince
+  if (unneeded.length === 0) {
     delete plan.fullSince
     delete plan.foundingSite
     return
@@ -520,6 +539,28 @@ export const foundingPartiesSound: Invariant = {
           })
         }
       }
+    }
+    return out
+  },
+}
+
+/**
+ * A city's dip below its reserve belongs to a wait under way (`CONTEXT.md`: Full city; ADR 0004): a
+ * plan with `shortSince` has `fullSince`, no party out, and began no later than now.
+ */
+export const fullWaitSound: Invariant = {
+  name: 'full-wait-sound',
+  check(world) {
+    const out: InvariantViolation[] = []
+    for (const [cityId, plan] of Object.entries(world.cityPlans)) {
+      if (plan.shortSince === undefined) continue
+      const party = foundingParty(plan).length
+      if (plan.fullSince !== undefined && party === 0 && plan.shortSince <= world.tick) continue
+      out.push({
+        invariant: this.name,
+        message: `${cityId} has been short since ${plan.shortSince}, with ${plan.fullSince === undefined ? 'no wait under way' : `a party of ${party}`}`,
+        entityIds: [cityId],
+      })
     }
     return out
   },

@@ -32,6 +32,7 @@ import { streetsOwed } from './city-layout.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { walkTo } from './npc-behaviour.js'
 import { holdsBatch, ownWorkplaces, projectNeeds } from './npc-chain.js'
+import { foundingMaterials, fullButMaterials } from './npc-founding.js'
 import { wallRings } from './npc-growth.js'
 import type { PathResult, Point } from './pathfinding.js'
 import { worldIndex } from './world-index.js'
@@ -64,12 +65,20 @@ export interface WayFinder {
 /** What one tile of road takes. */
 const roadMaterials = (): Stock => BUILD_MATERIALS.road ?? {}
 
-/** What the city keeps from its crew: its reserve, and what its project still needs. */
+/**
+ * What the city keeps from its crew: its reserve, what its project still needs, and once it would
+ * otherwise be full (`fullButMaterials`) a town hall's and a storage's materials, so founding comes
+ * before roads (`CONTEXT.md`: NPC road).
+ */
 function keeps(world: WorldState, city: City, plan: CityPlan): Stock {
   const want = npcReserve(world, city)
-  for (const [good, n] of Object.entries(projectNeeds(world, plan.project)) as [Good, number][]) {
-    want[good] = (want[good] ?? 0) + n
+  const add = (goods: Stock) => {
+    for (const [good, n] of Object.entries(goods) as [Good, number][]) {
+      want[good] = (want[good] ?? 0) + n
+    }
   }
+  add(projectNeeds(world, plan.project))
+  if (fullButMaterials(world, city, plan)) add(foundingMaterials())
   return want
 }
 

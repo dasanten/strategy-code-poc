@@ -9,6 +9,7 @@ import {
   NPC_FOUND_VILLAGE_RESIDENTS,
   NPC_FULL_DAYS,
   NPC_FULL_DAYS_LEAST,
+  NPC_FULL_DIP_DAYS,
   NPC_TOWN,
   NPC_TRADE,
   NPC_VILLAGE,
@@ -25,6 +26,7 @@ import {
   townHallOf,
   wrapDistance,
   type City,
+  type CityPlan,
   type ResourceKind,
   type TerrainMap,
   type WorldState,
@@ -41,6 +43,7 @@ import {
   foundingMaterials,
   foundingPartiesSound,
   foundingParty,
+  fullWaitSound,
 } from './npc-founding.js'
 import { plains } from './npc-growth.fixture.js'
 import { planCity } from './npc-plan.js'
@@ -305,6 +308,105 @@ describe('a full city', () => {
       expect(storage.stock?.food ?? 0).toBeGreaterThan(0)
     },
   )
+})
+
+describe('a dip below the reserve', () => {
+  /** A town full for `days` game days, with its site found, its Food under the reserve now. */
+  function dipping(days: number) {
+    const { world, terrain, city } = fullTown(1300)
+    const home = npcHome(world, city)!
+    const full = home.stock!.food!
+    const plan = planCity(world, city, terrain)
+    world.tick = 100 * TICKS_PER_GAME_DAY
+    plan.fullSince = world.tick - days * TICKS_PER_GAME_DAY
+    plan.foundingSite = findFoundingSite(world, terrain, city, home)
+    home.stock!.food = 1
+    return { world, terrain, city, plan, home, full }
+  }
+
+  it('keeps the wait while it lasts up to a game day, and sends nobody meanwhile', () => {
+    const { world, terrain, city, plan } = dipping(NPC_FULL_DAYS + 1)
+    const since = plan.fullSince
+    planCity(world, city, terrain)
+    expect(plan.shortSince).toBe(world.tick)
+    expect(plan.fullSince).toBe(since)
+    expect(plan.foundingSite).toBeDefined()
+    expect(foundingParty(plan)).toEqual([])
+
+    world.tick += NPC_FULL_DIP_DAYS * TICKS_PER_GAME_DAY
+    planCity(world, city, terrain)
+    expect(plan.fullSince).toBe(since)
+    expect(foundingParty(plan)).toEqual([])
+  })
+
+  it('restarts the wait once it lasts longer than a game day', () => {
+    const { world, terrain, city, plan } = dipping(NPC_FULL_DAYS + 1)
+    planCity(world, city, terrain)
+    world.tick += NPC_FULL_DIP_DAYS * TICKS_PER_GAME_DAY + 1
+    planCity(world, city, terrain)
+    expect(plan.fullSince).toBeUndefined()
+    expect(plan.shortSince).toBeUndefined()
+    expect(plan.foundingSite).toBeUndefined()
+  })
+
+  it('is over when nothing is short, so the next dip gets its own game day', () => {
+    const { world, terrain, city, plan, home, full } = dipping(1)
+    const since = plan.fullSince
+    planCity(world, city, terrain)
+    world.tick += NPC_FULL_DIP_DAYS * TICKS_PER_GAME_DAY
+    home.stock!.food = full
+    planCity(world, city, terrain)
+    expect(plan.shortSince).toBeUndefined()
+    expect(plan.fullSince).toBe(since)
+
+    world.tick += 60
+    home.stock!.food = 1
+    planCity(world, city, terrain)
+    expect(plan.shortSince).toBe(world.tick)
+    expect(plan.fullSince).toBe(since)
+  })
+
+  it('starts nothing in a city with no wait under way', () => {
+    const { world, terrain, city, plan } = dipping(1)
+    delete plan.fullSince
+    planCity(world, city, terrain)
+    expect(plan.shortSince).toBeUndefined()
+  })
+
+  it('still sets a party out once nothing is short, its wait kept', () => {
+    const { world, terrain, city, plan, home, full } = dipping(NPC_FULL_DAYS + 1)
+    planCity(world, city, terrain)
+    home.stock!.food = full
+    world.tick += 60
+    planCity(world, city, terrain)
+    expect(foundingParty(plan)).toHaveLength(NPC_VILLAGE.residents)
+    expect(plan.shortSince).toBeUndefined()
+  })
+})
+
+describe('the full-wait-sound invariant', () => {
+  const planWith = (over: Partial<CityPlan>) => {
+    const { world, terrain, city } = fullTown(300)
+    world.tick = 100
+    world.cityPlans[city.id] = { plannedAt: 0, jobs: {}, ...over }
+    return { world, terrain }
+  }
+
+  it('holds for a dip in a wait under way', () => {
+    const { world, terrain } = planWith({ fullSince: 10, shortSince: 50 })
+    expect(fullWaitSound.check(world, terrain)).toEqual([])
+  })
+
+  it('finds a dip with no wait under way, or with a party out, or to come', () => {
+    for (const over of [
+      { shortSince: 50 },
+      { fullSince: 10, shortSince: 50, jobs: { gone: { kind: 'found' as const } } },
+      { fullSince: 10, shortSince: 101 },
+    ]) {
+      const { world, terrain } = planWith(over)
+      expect(fullWaitSound.check(world, terrain)).toHaveLength(1)
+    }
+  })
 })
 
 describe('the founding-parties-sound invariant', () => {
