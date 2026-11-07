@@ -275,23 +275,23 @@ export const innerWallLeavesAWay: Invariant = {
   check(world, terrain) {
     const out: InvariantViolation[] = []
     const size = terrain.size
+    // One pass over the buildings, as this runs often and few cities have a ring.
+    const homes = new Map<string, Building>()
+    const wallsOf = new Map<string, Building[]>()
+    for (const b of world.buildings) {
+      if (!b.cityId || b.site) continue
+      if (b.kind === 'storage' && !homes.has(b.cityId)) homes.set(b.cityId, b)
+      else if (b.kind === 'wall') wallsOf.set(b.cityId, [...(wallsOf.get(b.cityId) ?? []), b])
+    }
     for (const city of world.cities) {
       if (city.realmId !== null || city.tradeOrg) continue
-      const home = world.buildings.find(
-        (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
-      )
+      const home = homes.get(city.id)
       if (!home) continue
-      const walls = world.buildings.filter(
-        (b) =>
-          b.cityId === city.id &&
-          (b.kind === 'wall' || b.kind === 'gate') &&
-          !b.site &&
-          fromHome(home, b.x, b.y, size) < OUTER_WALL_NEAREST,
+      const walls = (wallsOf.get(city.id) ?? []).filter(
+        (b) => fromHome(home, b.x, b.y, size) < OUTER_WALL_NEAREST,
       )
       if (walls.length === 0) continue
-      const blocked = new Set(
-        walls.filter((b) => b.kind === 'wall').map((b) => tileIndex(size, b.x, b.y)),
-      )
+      const blocked = new Set(walls.map((b) => tileIndex(size, b.x, b.y)))
       if (!wayPast(home, blocked, terrain)) {
         out.push({
           invariant: this.name,
