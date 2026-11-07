@@ -1,5 +1,5 @@
 // Writes ts-made.db: a database the TypeScript server's own code path makes (better-sqlite3, the
-// Drizzle migrator on apps/server/drizzle, the pragmas of db/index.ts) with one row per table.
+// Drizzle migrator on migrations/ (a copy of apps/server/drizzle, pinned to LF), the pragmas of db/index.ts) with one row per table.
 // Never hand-edited, never a copy of a real database (those hold accounts). Run from the repo root:
 //   node crates/csp-server/tests/data/make-ts-db.mjs
 import fs from 'node:fs'
@@ -20,7 +20,7 @@ const sqlite = new Database(out)
 sqlite.pragma('journal_mode = WAL')
 sqlite.pragma('foreign_keys = ON')
 sqlite.pragma('busy_timeout = 5000')
-migrate(drizzle(sqlite), { migrationsFolder: path.join(server, 'drizzle') })
+migrate(drizzle(sqlite), { migrationsFolder: path.join(here, '../../migrations') })
 
 sqlite.exec(`
 INSERT INTO users (id, name, password_hash, is_admin) VALUES (1, 'Mara', 'scrypt$salt$hash', 1);

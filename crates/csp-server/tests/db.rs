@@ -78,10 +78,10 @@ fn an_empty_file_gets_the_typescript_schema_and_journal() {
     let fresh = open_db(dir.path().join("fresh.db"), None).unwrap();
     let ts = Connection::open(ts).unwrap();
     assert_eq!(schema(&fresh), schema(&ts));
-    // Same timestamps, the only thing Drizzle compares, so the TypeScript migrator sees nothing to
-    // run. (Hashes are not compared: the fixture may be made on a checkout with CRLF files.)
-    let stamps = |j: Vec<(i64, String, i64)>| j.into_iter().map(|(_, _, c)| c).collect::<Vec<_>>();
-    assert_eq!(stamps(journal(&fresh)), stamps(journal(&ts)));
+    // Same hashes and timestamps, so the TypeScript migrator sees nothing to run.
+    let rows =
+        |j: Vec<(i64, String, i64)>| j.into_iter().map(|(_, h, c)| (h, c)).collect::<Vec<_>>();
+    assert_eq!(rows(journal(&fresh)), rows(journal(&ts)));
 }
 
 #[test]
