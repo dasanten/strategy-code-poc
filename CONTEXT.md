@@ -510,7 +510,8 @@ The shared language of the game. Domain terms only — no implementation details
   trader's reach of its home, or a wandering trader whose loop passes close enough to stop at it,
   Trader stop). A Player's offer doesn't count: offers come and go. A city with none of these keeps
   its war chest for everything else (its prices, what it sells and buys, what its traders take
-  along), but it never waits on Coins it can't earn.
+  along, and taking a Player's offer that pays Coins while under it), but it never waits on Coins
+  it can't earn.
 - **Spare hands' work:** with nothing short of its reserve, an NPC city's spare hands don't stand
   idle. In this order they go on a road crew while it has a road to build (NPC road), scout (Scout),
   and otherwise work at its workplaces for **surplus**, past the reserve, up to a cap per good (a

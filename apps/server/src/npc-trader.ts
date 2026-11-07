@@ -50,7 +50,7 @@ import {
 import { caravanCrew } from './caravans.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { npcHome, walkTo } from './npc-behaviour.js'
-import { chainInput, makes, projectNeeds, shortGoods } from './npc-chain.js'
+import { chainInput, makes, projectNeeds, reserveLacks, shortGoods } from './npc-chain.js'
 import { knowsNode } from './npc-scouts.js'
 import { farmersWanted } from './npc-plan.js'
 
@@ -291,7 +291,8 @@ function planVisit(
  * Looks for a Player's offer for the city's trader `r` to take (`CONTEXT.md`: NPC cities at an
  * offer), the good it is shortest of first, then the nearest, and sends them if one suits: open to
  * anyone, within `NPC_OFFER_REACH` of its storage and of a realm it doesn't refuse, giving what it
- * is short of for what it has spare or Coins, at a rate at least as good as its own prices (`offerTimes`),
+ * lacks of its reserve (`reserveLacks`: its whole war chest, though it may not count Coins as
+ * short) for what it has spare or Coins, at a rate at least as good as its own prices (`offerTimes`),
  * and no trader out brings that good. The cheap tests come first, so most offers cost a distance and a lookup, once a game hour. Food short
  * (`foodOnly`), only an offer that gives Food will do. Returns whether it sent them.
  */
@@ -307,7 +308,7 @@ function planOfferRun(
   if (world.offers.length === 0) return false
   const storage = npcStorages(world, city)[0]
   if (!storage) return false
-  const order = shortGoods(world, city, size, plan.project)
+  const order = reserveLacks(world, city, plan.project).map((s) => s.good)
   const rank = new Map(order.map((g, i) => [g, i]))
   let best: { offer: Offer; times: number; rank: number; d: number } | undefined
   for (const offer of world.offers) {
