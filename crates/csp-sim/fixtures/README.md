@@ -32,7 +32,7 @@ Conventions:
 
 | File | Made by |
 | --- | --- |
-| `balance.json` | every exported constant of packages/shared/src/balance.ts |
+| `balance.json` | every exported constant of packages/shared/src/balance.ts; `csp-shared`'s `balance::tests` compare the Rust table with it, every constant present on both sides |
 | `lang/cases.json` | tokenize, parse, checkScript, checkNames and run for every script in the lang tests and DEFAULT_SCRIPTS |
 | `nodes/1-256.json` | placeResourceNodes(generateTerrain(1, 256), 1) |
 | `nodes/1-512.json` | placeResourceNodes(generateTerrain(1, 512), 1) |
