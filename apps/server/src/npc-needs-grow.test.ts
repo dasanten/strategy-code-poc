@@ -28,7 +28,7 @@ import { bigCity } from './npc-big-city.fixture.js'
 import { npcHome } from './npc-behaviour.js'
 import { surplusWork } from './npc-chain.js'
 import { foundNpcCity } from './npc-cities.js'
-import { farmsOverflow, nextProject, npcBuilders } from './npc-growth.js'
+import { farmsFull, nextProject, npcBuilders } from './npc-growth.js'
 import { plains } from './npc-growth.fixture.js'
 import { farmersWanted, npcSurplusCapped, npcWorkplacesBounded, planCity } from './npc-plan.js'
 import { npcRoadCrew, npcRoadCrewSized } from './npc-roads.js'
@@ -402,12 +402,85 @@ describe('a short good with its workplaces full (CONTEXT.md: NPC city)', () => {
     expect(planned(t)).toBe('farm')
   })
 
-  it('opens none with nobody idle, or only one carrying a child', () => {
+  it('opens another farm for Food with nobody idle (#995)', () => {
     const t = fullFarms(3)
-    expect(planned(t)).not.toBe('farm')
+    expect(planned(t)).toBe('farm')
     idle(t.world, t.city).carrying = { partnerId: 'nobody', since: t.world.tick }
-    expect(planned(t)).not.toBe('farm')
+    expect(planned(t)).toBe('farm')
+    expect(npcWorkplacesBounded.check(t.world, t.terrain)).toEqual([])
   })
+
+  it('finishes a farm already begun before it opens another', () => {
+    const t = fullFarms(3)
+    const begun: Building = {
+      id: newId(t.world, 'b'),
+      kind: 'farm',
+      cityId: t.city.id,
+      x: t.home.x,
+      y: t.home.y - 40,
+      site: { delivered: {}, work: 0 },
+    }
+    t.world.buildings.push(begun)
+    expect(nextProject(t.world, t.city, t.home, t.terrain)).toMatchObject({
+      building: 'farm',
+      x: begun.x,
+      y: begun.y,
+    })
+  })
+
+  /**
+   * The big city with three full farms and a fourth just finished, its lumber camp full and Wood
+   * short, its quarry working for surplus, and every other adult free to work out scouting.
+   */
+  const newFarm = (food: (reserve: number) => number) => {
+    const t = fullFarms(3)
+    const { world, city } = t
+    const reserve = npcReserve(world, city)
+    const fourth: Building = {
+      id: newId(world, 'b'),
+      kind: 'farm',
+      cityId: city.id,
+      x: t.home.x,
+      y: t.home.y - 40,
+    }
+    world.buildings.push(fourth)
+    t.home.stock = {
+      ...t.home.stock,
+      food: food(reserve.food ?? 0),
+      wood: Math.floor((reserve.wood ?? 0) / 2),
+    }
+    fillCrew(world, city, t.camp)
+    fillCrew(world, city, t.quarry)
+    const scouts: CityPlan['scouts'] = {}
+    for (const r of cityResidents(world, city)) {
+      if (canWork(r, world.tick) && !r.script && !r.carried.spear) scouts[r.id] = { saw: [] }
+    }
+    world.cityPlans[city.id] = { plannedAt: world.tick, jobs: {}, scouts }
+    const crew = (place: Building) =>
+      cityResidents(world, city)
+        .filter((r) => r.script?.memory.workplaceId === place.id)
+        .map((r) => r.id)
+    return { ...t, fourth, scouts, campCrew: crew(t.camp), quarryCrew: crew(t.quarry) }
+  }
+
+  it.each([
+    ['short of its reserve', (reserve: number) => reserve - 1],
+    ['running short', () => 1],
+  ])(
+    'takes the new farm’s farmers from surplus work and scouts first, Food %s',
+    (_, food) => {
+      const t = newFarm(food)
+      const { jobs } = planCity(t.world, t.city, t.terrain)
+      const there = Object.entries(jobs)
+        .filter(([, j]) => j.buildingId === t.fourth.id)
+        .map(([id]) => id)
+      expect(there).toHaveLength(MAX_WORKERS.farm ?? 0)
+      for (const id of there) expect(t.quarryCrew.includes(id) || id in t.scouts!).toBe(true)
+      // Those making a short good stay at it.
+      expect(t.campCrew.length).toBeGreaterThan(0)
+      for (const id of t.campCrew) expect(jobs[id]).toMatchObject({ buildingId: t.camp.id })
+    },
+  )
 
   it('opens none while a farm has room, or with Food not short', () => {
     const room = fullFarms(3)
@@ -424,13 +497,18 @@ describe('a short good with its workplaces full (CONTEXT.md: NPC city)', () => {
     expect(planned(fed)).not.toBe('farm')
   })
 
-  it('opens a farm even as Food runs short, but nothing else, and none with nobody idle', () => {
+  it('opens a farm even as Food runs short, nobody idle, but nothing else', () => {
     const t = fullFarms(3)
     t.home.stock = { ...t.home.stock, food: 1 }
-    expect(planCity(t.world, t.city, t.terrain).project).toBeUndefined()
-    idle(t.world, t.city)
-    expect(farmsOverflow(t.world, t.city)).toBe(true)
+    expect(farmsFull(t.world, t.city)).toBe(true)
     expect(planCity(t.world, t.city, t.terrain).project).toMatchObject({ building: 'farm' })
+    // With a farm's place free, Food running short builds nothing.
+    const fresh = fullFarms(3)
+    fresh.home.stock = { ...fresh.home.stock, food: 1 }
+    delete cityResidents(fresh.world, fresh.city).find(
+      (r) => r.script?.memory.workplaceId === fresh.farms[0]!.id,
+    )!.script
+    expect(planCity(fresh.world, fresh.city, fresh.terrain).project).toBeUndefined()
   })
 
   it('opens a third lumber camp with two full and Wood short', () => {
@@ -467,6 +545,6 @@ describe('a short good with its workplaces full (CONTEXT.md: NPC city)', () => {
     const t = fullFarms(3)
     idle(t.world, t.city)
     t.city.tradeOrg = 'post'
-    expect(farmsOverflow(t.world, t.city)).toBe(false)
+    expect(farmsFull(t.world, t.city)).toBe(false)
   })
 })
