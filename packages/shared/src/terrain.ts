@@ -123,6 +123,16 @@ export function terrainChunkPath(cx: number, cy: number): string {
 }
 
 /**
+ * Where the client loads many chunks of explored terrain in one request: a `POST` whose JSON body
+ * is `{ chunks: number[] }`, chunk indices as in `chunksAcross`, at most `TERRAIN_BATCH_MAX` of
+ * them. The answer is `encodeChunkBatch`: the explored ones among them, unexplored ones left out.
+ */
+export const TERRAIN_BATCH_PATH = '/api/terrain/chunks'
+
+/** The most chunks one `TERRAIN_BATCH_PATH` request may ask for. */
+export const TERRAIN_BATCH_MAX = 64
+
+/**
  * Where an admin loads any chunk of terrain, explored or not (`CONTEXT.md`: admin map): the same
  * format as `terrainChunkPath`, with every tile and every resource node in it.
  */
