@@ -8,7 +8,6 @@ import {
   chunksAcross,
   cityAreaTiles,
   wrap,
-  wrapDelta,
   type Building,
   type KnownNode,
   type SeenResident,
@@ -32,7 +31,7 @@ import {
   type Covered,
   type Size,
 } from './map/camera.js'
-import { ChunkStore } from './map/chunks.js'
+import { ChunkStore, chunkByChunk, exploredChunkBatches } from './map/chunks.js'
 import { selectedWay, wayInView, wayLine } from './map/way.js'
 import { TerrainLayer } from './map/terrain-layer.js'
 import {
@@ -76,13 +75,7 @@ import {
   WAYPOINT_COLOR,
   css,
 } from './map/palette.js'
-import {
-  BASE_ART,
-  BUILDING_ART,
-  CITY_ART,
-  NODE_ART,
-  paintedBuildingArt,
-} from './map/art.js'
+import { BASE_ART, BUILDING_ART, CITY_ART, NODE_ART, paintedBuildingArt } from './map/art.js'
 import {
   EMBLEM_RADIUS,
   MARKER_RADIUS,
@@ -402,7 +395,9 @@ export function MapView({
         miniTerrain = undefined
         redraw()
       },
-      terrainPathRef.current,
+      terrainPathRef.current
+        ? chunkByChunk(terrainPathRef.current, across)
+        : exploredChunkBatches(),
     )
 
     function redraw() {
@@ -499,17 +494,15 @@ export function MapView({
         )
         sprite.scale.set(cam.scale)
       }
-      const away = (i: number) =>
-        Math.hypot(
-          wrapDelta(cam.x, ((i % across) + 0.5) * CHUNK_SIZE, mapSize),
-          wrapDelta(cam.y, (Math.floor(i / across) + 0.5) * CHUNK_SIZE, mapSize),
-        )
-      // The minimap's chunks load after those on screen.
+      // The minimap's chunks load too; the store asks for the nearest to the view first.
       const forMinimap =
         minimapOpenRef.current && !admin
           ? [...worldRef.current.exploredChunks].filter((i) => !shown.has(i))
           : []
-      store.want([...[...onScreen].sort((a, b) => away(a) - away(b)), ...forMinimap])
+      store.want([...onScreen, ...forMinimap], {
+        cx: cam.x / CHUNK_SIZE,
+        cy: cam.y / CHUNK_SIZE,
+      })
       const notHere = store.waiting(onScreen)
       waiting.clear()
       for (const i of notHere) {
