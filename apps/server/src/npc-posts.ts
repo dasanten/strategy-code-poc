@@ -51,11 +51,27 @@ export function standsPosts(world: WorldState, city: City): boolean {
 }
 
 /**
- * Those of a city's `adults` who take a post: its armed adults free to, so not on alarm or at any
- * other script, fighting, carrying a child, Down, or its traders or founding party. Those away from
- * it leave the posts to the others, and they are shared out anew once they are back.
+ * Those of a city's `adults` who take a post: its armed adults at hand (`soldiersAtHand`) and not at
+ * a script, so not on alarm or training, nor teaching. Those away from it leave the posts to the
+ * others, and they are shared out anew once they are back.
  */
-export function freeSoldiers(world: WorldState, city: City, adults: Resident[]): Resident[] {
+export function freeSoldiers(world: WorldState, city: City, adults: readonly Resident[]): Resident[] {
+  const jobs = world.cityPlans[city.id]?.jobs
+  return soldiersAtHand(world, city, adults).filter(
+    (r) => !r.script && jobs?.[r.id]?.kind !== 'teach' && jobs?.[r.id]?.kind !== 'train',
+  )
+}
+
+/**
+ * The armed adults of a city's `adults` it can put somewhere: not at any script but the Train default
+ * (`CONTEXT.md`: Who trains), so not on alarm; not fighting, carrying a child, Down, nor its traders
+ * or founding party.
+ */
+export function soldiersAtHand(
+  world: WorldState,
+  city: City,
+  adults: readonly Resident[],
+): Resident[] {
   const plan = world.cityPlans[city.id]
   const party = new Set(foundingParty(plan))
   const traders = new Set(plan?.traders?.map((t) => t.residentId))
@@ -63,12 +79,23 @@ export function freeSoldiers(world: WorldState, city: City, adults: Resident[]):
     (r) =>
       isArmed(r) &&
       !isDown(r) &&
-      !r.script &&
+      (!r.script || r.script.task === 'train') &&
       !r.carrying &&
       r.order?.kind !== 'attack' &&
       !party.has(r.id) &&
       !traders.has(r.id),
   )
+}
+
+/**
+ * How many soldiers it takes to hold the posts on a city's hall and at its finished gates (`CONTEXT.md`:
+ * Soldier posts), which come first: those it can't send anywhere else.
+ */
+export function postsToHold(world: WorldState, city: City): number {
+  const gates = world.buildings.filter(
+    (b) => b.kind === 'gate' && b.cityId === city.id && !b.site,
+  ).length
+  return NPC_SOLDIERS_ON_HALL + NPC_SOLDIERS_AT_GATE * gates
 }
 
 /**

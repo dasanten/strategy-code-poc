@@ -987,9 +987,11 @@ The shared language of the game. Domain terms only — no implementation details
   refill at the ground as at a workplace (Refilling at a workplace); the Train default has the
   usual food params. Nothing trained decays; only old age lowers stats.
 - **Who trains:** Players' residents, by order, queue step or script, and the soldiers of a big NPC
-  city with a training ground (Bigger projects): its soldier with the most Combat teaches and others
-  train in turns, Combat if the teacher has any, else Strength, with the posts on its hall and
-  gates still held. The Trade Organization trains nobody for now. Scripts have
+  city with a training ground (Bigger projects): its soldier with the most Combat teaches, among
+  equals the strongest, and others train in turns of a balance number of days, Combat while any of them
+  is below the teacher in it, else Strength, with the posts on its hall and gates still held. A ground
+  sits empty with too few soldiers left over for a teacher and a trainee, or with nothing anyone can
+  learn from the teacher. A city's ground is the one in its area. The Trade Organization trains nobody for now. Scripts have
   `teach(subject)` and `train()`; a building's script view shows its teacher, subject and trainees.
 - **Carry capacity:** the most weight a resident can carry, set by Strength. Everything has weight,
   including money, so nobody walks around with a fortune in their pocket.

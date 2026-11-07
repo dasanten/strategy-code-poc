@@ -31,18 +31,26 @@ import { stepWorld } from './world.js'
 type Staged = ReturnType<typeof bigCity>
 
 /**
- * The big city with nothing left to want but its inner ring: it has its stable, and the Wood above
- * its reserve for the whole ring.
+ * The big city with nothing left to want but its inner ring: it has its stable and training ground,
+ * and the Wood above its reserve for the whole ring.
  */
 function ready(layout: CityLayout): Staged {
   const staged = bigCity(layout)
-  const { world, city, home } = staged
+  const { world, terrain, city, home } = staged
   world.buildings.push({
     id: newId(world, 'b'),
     kind: 'stable',
     cityId: city.id,
     x: home.x + 30,
     y: home.y + 30,
+  })
+  // Just outside its outer wall, so in its area and well off the ring.
+  world.buildings.push({
+    id: newId(world, 'b'),
+    kind: 'trainingGround',
+    cityId: null,
+    x: home.x + wallRings(world, city, home, terrain.size)!.outer + 1,
+    y: home.y - 1,
   })
   home.stock!.wood = (npcReserve(world, city).wood ?? 0) + 500
   return staged

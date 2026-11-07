@@ -561,6 +561,12 @@ export const NPC_SOLDIERS_AT_GATE = 1
 export const NPC_POST_AROUND_HALL = 2
 
 /**
+ * Ticks each lot of a big NPC city's soldiers trains before the next lot's turn (`CONTEXT.md`: Who
+ * trains): five game days, long enough to be worth the walk there and back.
+ */
+export const NPC_TRAIN_TURN_TICKS = 5 * TICKS_PER_GAME_DAY
+
+/**
  * Coins an NPC city keeps as its war chest for each of its residents (`CONTEXT.md`: NPC reserve):
  * a town of 16 keeps 160, what four mint workers strike in two game days (`RECIPES`).
  */
