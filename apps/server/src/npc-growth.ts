@@ -564,11 +564,21 @@ function handsIdle(world: WorldState, city: City): boolean {
   )
 }
 
+/**
+ * Whether a workplace's crew is full, by who is there (`crewFull`) or by the last pass: a carrier
+ * home between trips holds their place, and is at neither the workplace nor on the way to it.
+ */
+function crewHeld(world: WorldState, city: City, place: Building): boolean {
+  if (crewFull(world, place)) return true
+  const jobs = Object.values(world.cityPlans[city.id]?.jobs ?? {})
+  return jobs.filter((j) => j.buildingId === place.id).length >= (MAX_WORKERS[place.kind] ?? 0)
+}
+
 /** Whether an NPC city's farms all have their crews full, with someone idle who could take a place. */
 export function farmsOverflow(world: WorldState, city: City): boolean {
   if (city.tradeOrg || !handsIdle(world, city)) return false
   const farms = world.buildings.filter((b) => b.kind === 'farm' && b.cityId === city.id && !b.site)
-  return farms.length > 0 && farms.every((b) => crewFull(world, b))
+  return farms.length > 0 && farms.every((b) => crewHeld(world, city, b))
 }
 
 /**
@@ -604,7 +614,7 @@ function anotherWorkplace(
       return undefined
     }
     const places = own.filter((b) => chainGood(world, b) === good)
-    return places.length > 0 && places.every((b) => crewFull(world, b)) ? good : undefined
+    return places.length > 0 && places.every((b) => crewHeld(world, city, b)) ? good : undefined
   }
   for (const short of shortGoods(world, city)) {
     const good = fullGood(short, new Set())

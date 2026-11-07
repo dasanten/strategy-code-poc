@@ -388,6 +388,20 @@ describe('a short good with its workplaces full (CONTEXT.md: NPC city)', () => {
     expect(planned(t)).toBe('farm')
   })
 
+  it('counts a carrier home between trips as holding their place', () => {
+    const t = fullFarms(3)
+    const r = idle(t.world, t.city)
+    const farm = t.farms[0]!
+    const crew = cityResidents(t.world, t.city).filter(
+      (x) => x.script?.memory.workplaceId === farm.id,
+    )
+    const jobs = t.world.cityPlans[t.city.id]!.jobs
+    for (const x of crew) jobs[x.id] = { kind: 'farm', buildingId: farm.id }
+    delete crew[0]!.script
+    expect(jobs[r.id]?.kind).toBe('idle')
+    expect(planned(t)).toBe('farm')
+  })
+
   it('opens none with nobody idle, or only one carrying a child', () => {
     const t = fullFarms(3)
     expect(planned(t)).not.toBe('farm')
