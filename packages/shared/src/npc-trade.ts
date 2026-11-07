@@ -12,6 +12,7 @@ import {
   NPC_FULL_RESIDENTS_PER_DAY,
   NPC_HORSES_BASE,
   NPC_RESIDENTS_PER_HORSE,
+  NPC_RESIDENTS_PER_NEEDS_STEP,
   NPC_SOLDIER_SHARE,
   NPC_TRADE,
   NPC_VILLAGE,
@@ -156,9 +157,25 @@ export function npcStablesLack(
 }
 
 /**
+ * How many steps of a village's needs and crews an NPC city has (`CONTEXT.md`: NPC reserve, Spare
+ * hands' work, NPC road): one for each `NPC_RESIDENTS_PER_NEEDS_STEP` residents, whole, and at least
+ * one, so a village and a town keep a village's numbers.
+ */
+export function npcNeedsScale(world: Pick<WorldState, 'residents'>, city: City): number {
+  return Math.max(1, Math.floor(cityResidents(world, city).length / NPC_RESIDENTS_PER_NEEDS_STEP))
+}
+
+/** Whether an NPC city counts as big (`CONTEXT.md`: Spare hands' work): two steps of needs or more. */
+export function isBigNpcCity(world: Pick<WorldState, 'residents'>, city: City): boolean {
+  return npcNeedsScale(world, city) > 1
+}
+
+/**
  * The reserve an NPC city keeps (`CONTEXT.md`: NPC reserve): Food for `NPC_TRADE.reserveFoodDays`
- * game days for all its residents and what its stables lack (`npcStablesLack`); the materials of a house and `NPC_TRADE.reserveWallStretches`
- * stretches of wall; a weapon (`NPC_SMITHY_WEAPON`) for each soldier it keeps by its size
+ * game days for all its residents and what its stables lack (`npcStablesLack`); for each step of its
+ * needs (`npcNeedsScale`) the materials of a house and `NPC_TRADE.reserveWallStretches` stretches of
+ * wall, and `NPC_TRADE.reserveStonePerStep` Stone for each step past the first; a weapon
+ * (`NPC_SMITHY_WEAPON`) for each soldier it keeps by its size
  * (`npcSoldierTarget`) and has not armed yet, and the smithy recipe's Iron and Wood for those of
  * them its storages hold no weapon for; and `NPC_WAR_CHEST_PER_RESIDENT` coins for each of its
  * residents. Whole units. What it holds above this is for sale, what it lacks drives its work.
@@ -174,8 +191,10 @@ export function npcReserve(world: WorldState, city: City): Stock {
       reserve[good] = (reserve[good] ?? 0) + n * times
     }
   }
-  add(BUILD_MATERIALS.house, 1)
-  add(BUILD_MATERIALS.wall, NPC_TRADE.reserveWallStretches)
+  const steps = npcNeedsScale(world, city)
+  add(BUILD_MATERIALS.house, steps)
+  add(BUILD_MATERIALS.wall, NPC_TRADE.reserveWallStretches * steps)
+  add({ stone: NPC_TRADE.reserveStonePerStep }, steps - 1)
   const residents = cityResidents(world, city).filter((r) => r.owner === null && r.health > 0)
   const adults = residents.filter((r) => canWork(r, world.tick))
   const unarmed = npcSoldierTarget(adults.length) - adults.filter(isArmed).length

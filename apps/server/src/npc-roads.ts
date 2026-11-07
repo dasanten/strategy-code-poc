@@ -11,6 +11,7 @@ import {
   inInnerRingAround,
   isAt,
   isCityBuilding,
+  npcNeedsScale,
   npcReserve,
   roadCrewFood,
   setOutFood,
@@ -39,7 +40,7 @@ import { worldIndex } from './world-index.js'
 
 /*
  * An NPC city's road crew (`CONTEXT.md`: NPC road, City layout, Spare hands' work; ADR 0026): with
- * nothing short, up to `NPC_ROAD_CREW` of its spare hands, apart from its builders, build its
+ * nothing short, up to `npcRoadCrew` of its spare hands, apart from its builders, build its
  * layout's streets beside the buildings that stand, then road from its home to each of its
  * workplaces outside its area, nearest first, then on to the nearest Trade Org warehouse in its
  * trader's reach and the edge of its nearest neighbour's area, along the way a resident would walk,
@@ -303,7 +304,12 @@ export function roadCrew(
   if (!planRoads(world, city, plan, home, ways, terrain)) return []
   const rank = (r: Resident) =>
     onCrew(r) ? 0 : plan.scouts?.[r.id] ? 3 : returning.has(r.id) ? 2 : 1
-  return [...unneeded].sort((a, b) => rank(a) - rank(b)).slice(0, NPC_ROAD_CREW)
+  return [...unneeded].sort((a, b) => rank(a) - rank(b)).slice(0, npcRoadCrew(world, city))
+}
+
+/** Most of an NPC city's spare hands on its road crew (`CONTEXT.md`: NPC road): more as it grows. */
+export function npcRoadCrew(world: WorldState, city: City): number {
+  return NPC_ROAD_CREW * npcNeedsScale(world, city)
 }
 
 /** Whether a resident is running the Build default on a tile of road (`layRoad`). */
@@ -414,18 +420,22 @@ export const npcRoadsOnce: Invariant = {
 }
 
 /**
- * A road crew stays its size (`CONTEXT.md`: NPC road; ADR 0004): no plan puts more than
- * `NPC_ROAD_CREW` residents on it, and no plan of a Trade Org city any, since they build none.
+ * A road crew stays its size (`CONTEXT.md`: NPC road; ADR 0004): no plan made this tick puts more
+ * than `npcRoadCrew` residents on it, as an older one may have been made when the city was bigger, and
+ * no plan of a Trade Org city any, since they build none.
  */
 export const npcRoadCrewSized: Invariant = {
   name: 'npc-road-crew-sized',
   check(world) {
     const out: InvariantViolation[] = []
     for (const city of world.cities) {
-      const jobs = world.cityPlans[city.id]?.jobs
+      const plan = world.cityPlans[city.id]
+      const jobs = plan?.jobs
       if (!jobs) continue
       const crew = Object.keys(jobs).filter((id) => jobs[id]?.kind === 'road')
-      const most = city.tradeOrg ? 0 : NPC_ROAD_CREW
+      if (crew.length === 0) continue
+      if (!city.tradeOrg && plan.plannedAt !== world.tick) continue
+      const most = city.tradeOrg ? 0 : npcRoadCrew(world, city)
       if (crew.length <= most) continue
       out.push({
         invariant: this.name,

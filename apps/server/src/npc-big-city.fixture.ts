@@ -27,6 +27,7 @@ import {
 import { updateCityMembership } from './cities.js'
 import { layoutPlan } from './city-layout.js'
 import { npcHome } from './npc-behaviour.js'
+import { ownWorkplaces } from './npc-chain.js'
 import { foundNpcCity, takenGround } from './npc-cities.js'
 import { plains } from './npc-growth.fixture.js'
 import { mulberry32 } from './residents.js'
@@ -90,9 +91,10 @@ function buildHouses(world: WorldState, terrain: TerrainMap, city: City, home: B
 /**
  * An NPC city of `BIG_CITY_RESIDENTS` alone on a Plains map, staged as production's big city stood
  * when Daniel looked (2026-11-06; ADR 0029): its soldiers armed, children among its residents, the
- * farms it needs, its whole chain built from lumber camp to smithy, and every good at its reserve and
- * half its surplus cap. Everyone starts free at home, and its first pass shares them out. Its map
- * of `mapSize` is by default too small to hold a daughter (`NPC_CITY_MIN_DISTANCE`).
+ * farms it needs, its whole chain built from lumber camp to smithy with a free node of each good for
+ * a second, and every good at its reserve and half a village's surplus cap. Everyone starts free at
+ * home, and its first pass shares them out. Its map of `mapSize` is by default too small to hold a
+ * daughter (`NPC_CITY_MIN_DISTANCE`).
  */
 export function bigCity(mapSize = 240): {
   world: WorldState
@@ -115,6 +117,11 @@ export function bigCity(mapSize = 240): {
   workplace(world, terrain, city, { x: east, y: 70 }, NODE_WORKPLACE.forest, 'forest')
   workplace(world, terrain, city, { x: east, y: 80 }, NODE_WORKPLACE.stone, 'stone')
   workplace(world, terrain, city, { x: east, y: 90 }, NODE_WORKPLACE.ironOre, 'ironOre')
+  for (const [i, kind] of (['forest', 'stone', 'ironOre'] as const).entries()) {
+    const at = { x: east + 10, y: 70 + i * 10 }
+    world.nodes.push({ id: newId(world, 'n'), kind, ...at })
+    terrain.tiles[tileIndex(terrain.size, at.x, at.y)] = NODE_TERRAINS[kind][0]!
+  }
 
   const residents = cityResidents(world, city)
   for (const r of residents.slice(-BIG_CITY_CHILDREN)) {
@@ -145,6 +152,8 @@ export interface BigCityCount {
   onStorage: number
   /** Adults by the kind of their job in the last plan; `none` for one who has none yet. */
   jobs: Record<string, number>
+  /** Its finished workplaces by kind. */
+  places: Record<string, number>
 }
 
 /** Counts the city as it stands. */
@@ -162,12 +171,17 @@ export function countBigCity(
     const kind = planned[r.id]?.kind ?? 'none'
     jobs[kind] = (jobs[kind] ?? 0) + 1
   }
+  const places: Record<string, number> = {}
+  for (const b of ownWorkplaces(world, city)) {
+    if (!b.site) places[b.kind] = (places[b.kind] ?? 0) + 1
+  }
   return {
     day: world.tick / TICKS_PER_GAME_DAY,
     residents: residents.length,
     adults: adults.length,
     onStorage: residents.filter((r) => isAt(r, home, terrain.size)).length,
     jobs,
+    places,
   }
 }
 
@@ -219,7 +233,11 @@ export function bigCityReport(run: BigCityRun): string {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([kind, n]) => `${kind} ${n}`)
       .join(', ')
-    return `day ${c.day}: ${c.residents} residents, ${c.adults} adults, ${c.onStorage} on the storage; ${jobs}`
+    const places = Object.entries(c.places)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([kind, n]) => `${kind} ${n}`)
+      .join(', ')
+    return `day ${c.day}: ${c.residents} residents, ${c.adults} adults, ${c.onStorage} on the storage; ${jobs}; built: ${places}`
   })
   const on = run.counts.map((c) => c.onStorage)
   lines.push(`on the storage: ${Math.min(...on)} to ${Math.max(...on)}`)

@@ -29,6 +29,14 @@ describe('a big NPC city', () => {
       })
       console.log(`Big city, ${BIG_CITY_RESIDENTS} residents staged:\n${bigCityReport(run)}`)
       expect(run.counts).toHaveLength(8)
+      // Needs grow with the city (`CONTEXT.md`: Spare hands' work): at most a second of each workplace
+      // on a node, and no more farms than it was staged with, which is more than it needs.
+      const { places } = run.counts.at(-1)!
+      console.log(`Built by the end: ${JSON.stringify(places)}`)
+      expect(places.farm).toBe(8)
+      for (const kind of ['lumberCamp', 'quarry', 'mine']) {
+        expect(places[kind]).toBe(2)
+      }
     },
   )
 
