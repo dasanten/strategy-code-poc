@@ -741,6 +741,13 @@ export const NPC_SCOUT_SECTOR = 32
 export const NPC_TRADER_REACH = 720
 
 /**
+ * Residents of an NPC city for each trader it has out at once (`CONTEXT.md`: NPC trader), rounded
+ * down: a village, a town and a city of under 60 keep one; a city of 110 sends three. Each walks
+ * every tick, so this is what its trading costs the server.
+ */
+export const NPC_RESIDENTS_PER_TRADER = 30
+
+/**
  * How far from its home a Player's offer may be for an NPC city to send its trader there
  * (`CONTEXT.md`: NPC cities at an offer), in tiles: as far as it goes to a Trade Org warehouse
  * (`NPC_TRADER_REACH`), since it is the same trader on the same Food.

@@ -1011,8 +1011,8 @@ export interface CityPlan {
    * which its road crew builds ahead of `roads`; worked out anew each pass.
    */
   streets?: [x: number, y: number][]
-  /** Its trade run under way (`CONTEXT.md`: NPC trader); none while no trader is out. */
-  trader?: CityTrader
+  /** Its trade runs under way (`CONTEXT.md`: NPC trader); none while no trader is out. */
+  traders?: CityTrader[]
   /**
    * Since when it has been full (`CONTEXT.md`: Full city); while its founding party is out (its
    * residents with the `found` job), since when the party has been on its way (`CONTEXT.md`:
