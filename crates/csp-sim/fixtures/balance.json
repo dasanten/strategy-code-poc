@@ -1,0 +1,742 @@
+{
+  "ADULT_AGE": 14,
+  "AGILITY_AVERAGE": 10,
+  "AGILITY_LIMIT": 0.3,
+  "AGILITY_SPEED_EFFECT": 0.02,
+  "AGILITY_TERRAIN_EFFECT": 0.03,
+  "ALLIANCE_LEAVE_DELAY": 3600,
+  "ALLIANCE_RECALL_DELAY": 3600,
+  "ARMY_SPREAD": 4,
+  "AVERAGE_HORSE_STATS": {
+    "speed": 10,
+    "strength": 10,
+    "endurance": 10
+  },
+  "BATCHES_PER_DAY": {
+    "smelter": 2,
+    "mint": 2,
+    "smithy": 2
+  },
+  "BLOW_BASE": 1,
+  "BLOW_PER_STRENGTH": 0.3,
+  "BREED_FOOD": 5,
+  "BROKEN_MATERIALS_RETURNED": 0.34,
+  "BUILD_MATERIALS": {
+    "lumberCamp": {},
+    "quarry": {
+      "wood": 30
+    },
+    "mine": {
+      "wood": 40,
+      "stone": 20
+    },
+    "stable": {
+      "wood": 40
+    },
+    "smelter": {
+      "stone": 40,
+      "wood": 20
+    },
+    "mint": {
+      "stone": 40,
+      "iron": 10
+    },
+    "smithy": {
+      "stone": 30,
+      "wood": 20,
+      "iron": 10
+    },
+    "townHall": {
+      "wood": 60,
+      "stone": 40
+    },
+    "wall": {
+      "wood": 3
+    },
+    "gate": {
+      "wood": 4
+    },
+    "road": {
+      "stone": 1
+    },
+    "house": {
+      "wood": 20
+    },
+    "storage": {
+      "wood": 30,
+      "stone": 10
+    },
+    "farm": {},
+    "trainingGround": {
+      "wood": 50,
+      "stone": 10
+    },
+    "carriage": {
+      "wood": 30,
+      "iron": 5
+    }
+  },
+  "BUILD_STRENGTH_AVERAGE": 10,
+  "BUILD_WORK": {
+    "lumberCamp": 2880,
+    "quarry": 4320,
+    "mine": 5760,
+    "stable": 4320,
+    "smelter": 5760,
+    "mint": 7200,
+    "smithy": 7200,
+    "townHall": 8640,
+    "wall": 90,
+    "gate": 180,
+    "road": 90,
+    "house": 1440,
+    "storage": 2880,
+    "farm": 720,
+    "trainingGround": 4320,
+    "carriage": 2880
+  },
+  "BUY_SHARE": 0.6,
+  "CARAVAN_ESCORTS": 2,
+  "CARAVAN_ESCORTS_MAX": 8,
+  "CARAVAN_FOOD": 72,
+  "CARAVAN_FOOD_PER_ESCORT": 16,
+  "CARAVAN_GUARD_RANGE": 16,
+  "CARAVAN_ROBBERIES_PER_ESCORT": 2,
+  "CARAVAN_SPREAD": 8,
+  "CARRIAGE_CAPACITY": 400,
+  "CARRIAGE_HALF_LOAD": 0.6666666666666666,
+  "CARRIAGE_LIGHT_LOAD": 0.3333333333333333,
+  "CARRIAGE_MAX_CAPACITY": 600,
+  "CARRIAGE_SPEED": {
+    "0": 2,
+    "1": 0.6,
+    "2": 0.6,
+    "6": 2.6
+  },
+  "CARRIAGE_STOLEN_WORTH": 150,
+  "CARRYING_DAYS": 10,
+  "CARRYING_TICKS": 14400,
+  "CARRY_BASE": 10,
+  "CARRY_PER_STRENGTH": 2,
+  "CHILD_GOODS": [
+    "food"
+  ],
+  "CHILD_STAT_SPREAD": 2,
+  "CHILD_YEAR_DAYS": 10,
+  "CITY_AREA_MARGIN": 4,
+  "CITY_BUILDING_REACH": 12,
+  "CITY_GRID_BLOCK": 4,
+  "CITY_MIN_DISTANCE": 1200,
+  "CITY_NAME_MAX_LENGTH": 30,
+  "CITY_PRICE_BY_BUILDING": {
+    "townHall": 200,
+    "house": 50,
+    "storage": 50,
+    "farm": 30,
+    "stable": 40,
+    "wall": 0.5,
+    "gate": 1.25
+  },
+  "CITY_PRICE_PER_RESIDENT": 400,
+  "CITY_PRICE_STANDING_SWING": 0.5,
+  "CITY_QUARTER_ROWS": 4,
+  "CITY_RING_STEP": 5,
+  "CITY_SIDE_LANE_GAP": 8,
+  "CLIMB_TICKS": 60,
+  "COMBAT_SKILL_EFFECT": 0.05,
+  "COMBAT_SKILL_LIMIT": 1,
+  "COMBAT_SKILL_PER_BLOW": 0.02,
+  "CONSTRUCTION_SKILL_EFFECT": 0.01,
+  "CONSTRUCTION_SKILL_LIMIT": 1,
+  "CONSTRUCTION_SKILL_MAX": 100,
+  "CONSTRUCTION_SKILL_PER_DAY": 0.23809523809523808,
+  "CONTRACT_MAX_DAYS": 120,
+  "CREW_FOOD": 20,
+  "CRIME_MEMORY_DAYS": 18,
+  "CRIME_STANDING_LOSS": {
+    "theft": 10,
+    "attack": 15,
+    "tearDown": 20,
+    "killing": 30,
+    "capture": 50
+  },
+  "DECLINE_AGE": 45,
+  "DECLINE_FLOOR": 0.6,
+  "DECLINE_PER_YEAR": 0.02,
+  "DEFEND_CALM_TICKS": 30,
+  "DELIVERY_DRIVE_TRIES": 3,
+  "DELIVERY_FEE_BASE": 5,
+  "DELIVERY_FEE_PER_KG_TILE": 0.00125,
+  "DELIVERY_LOAD": 328,
+  "DEMANDS_PER_GAME_DAY": 3,
+  "DEMAND_DECLINED_STANDING_LOSS": 10,
+  "DEMAND_DEFAULT_DAYS": 7,
+  "DEMAND_MAX_DAYS": 60,
+  "DEMAND_NOTE_MAX_LENGTH": 280,
+  "DEMAND_TRADE_ORG_STANDING_LOSS": 2,
+  "DEMAND_YIELD_RESPECT_MIN": 5,
+  "DEMAND_YIELD_RESPECT_TIMES": 3,
+  "DIRECTIVE_BUY_OFF_PRICE": 1500,
+  "DIRECTIVE_PUNISH_WORTH": 800,
+  "DIRECT_OFFERS_TO_ONE_REALM": 5,
+  "DIRECT_OFFER_DAYS": 60,
+  "DODGE_LIMIT": 0.5,
+  "DODGE_PER_AGILITY": 0.02,
+  "DOING_MAX_LENGTH": 60,
+  "DOWN_DAYS": 60,
+  "DRIVING_SKILL_EFFECT": 0.02,
+  "DRIVING_SKILL_LIMIT": 0.5,
+  "DRIVING_SKILL_PER_DAY": 1,
+  "ENDURANCE_TERRAIN_EFFECT": 0.03,
+  "EXPLORED_EDGE_RANGE": 192,
+  "EXPLORE_FOOD_MARGIN": 3,
+  "EXPLORE_SKIP_RANGE": 8,
+  "FEED_UNITS": 2,
+  "FOAL_STAT_SPREAD": 1,
+  "FOOD_PER_DAY": 0.5,
+  "FOOD_SPOIL_PER_DAY": 0.005,
+  "FOOD_SURPLUS_DAYS": 10,
+  "FORMER_PLAYER_STANDING": 60,
+  "GET_FOOD_AT": 1,
+  "GET_FOOD_TAKE": 3,
+  "GOOD_WEIGHT": {
+    "food": 1,
+    "wood": 1,
+    "stone": 1,
+    "ironOre": 1,
+    "iron": 1,
+    "goldOre": 1,
+    "coins": 0.02,
+    "spear": 3,
+    "sword": 3,
+    "shield": 4,
+    "armour": 8
+  },
+  "HAUL_HORSE_FOOD": 4,
+  "HAUL_KEEP_FOOD": 7,
+  "HEAL_DAYS": 3,
+  "HOME_FOOD_LOW": 1,
+  "HORSE_ENDURANCE_EFFECT": 0.03,
+  "HORSE_ENDURANCE_LIMIT": 0.3,
+  "HORSE_FILL_PER_FOOD": 44.44444444444444,
+  "HORSE_FOOD_PER_DAY": 0.75,
+  "HORSE_GRANT_FOOD": 4,
+  "HORSE_GRANT_HORSES": 2,
+  "HORSE_HUNGRY_SHARE": 0.25,
+  "HORSE_NAME_MAX_LENGTH": 30,
+  "HORSE_PRICE_AGE_FLOOR": 0.5,
+  "HORSE_PRICE_AGE_PER_YEAR": 0.03,
+  "HORSE_PRICE_BASE": 100,
+  "HORSE_PRICE_GLUT": 0.25,
+  "HORSE_PRICE_PAID_SHARE": 0.6,
+  "HORSE_PRICE_PER_STAT": 0.1,
+  "HORSE_PRICE_SCARCITY": 1,
+  "HORSE_PRICE_STATS_FLOOR": 0.25,
+  "HORSE_REACH": 1,
+  "HORSE_SPEED_EFFECT": 0.04,
+  "HORSE_SPEED_LIMIT": 0.5,
+  "HORSE_START_AGE_MAX": 8,
+  "HORSE_START_AGE_MIN": 3,
+  "HORSE_STAT_AVERAGE": 10,
+  "HORSE_STAT_MAX": 15,
+  "HORSE_STAT_MIN": 5,
+  "HORSE_STOLEN_WORTH": 100,
+  "HORSE_STRENGTH_EFFECT": 0.04,
+  "HORSE_STRENGTH_LIMIT": 0.5,
+  "HORSE_WAKE_HEALTH": 20,
+  "HOUSING_ROOM": {
+    "house": 4
+  },
+  "HQ_FLOOR_FACTOR": 5,
+  "HQ_FOOD_FLOOR_FACTOR": 15,
+  "HQ_PEOPLE_FOOD_DAYS": 5,
+  "HUNGER_DAYS": 3,
+  "HUNGER_ENDURANCE_AVERAGE": 10,
+  "HUNGER_ENDURANCE_EFFECT": 0.02,
+  "HUNGER_ENDURANCE_LIMIT": 0.3,
+  "HUNGRY_HORSE_PACE": 0.5,
+  "INTELLECT_AVERAGE": 10,
+  "LAST_SEEN_EVERY_TICKS": 5,
+  "LIFESPAN_MAX": 65,
+  "LIFESPAN_MIN": 55,
+  "MAP_SIZE": 5760,
+  "MAX_HEALTH": 100,
+  "MAX_HUNGER": 100,
+  "MEAL_UNITS": 1,
+  "MIN_BLOW_DAMAGE": 1,
+  "MOUNTAIN_ROAD_WORK_FACTOR": 4,
+  "NODE_DENSITY": {
+    "forest": {
+      "1": 0.00020833333333333335
+    },
+    "stone": {
+      "2": 0.00025
+    },
+    "ironOre": {
+      "2": 0.000041666666666666665,
+      "3": 0.00020833333333333335
+    },
+    "goldOre": {
+      "2": 0.000004166666666666667,
+      "3": 0.000020833333333333333
+    }
+  },
+  "NODE_MIN_SPACING": 16,
+  "NPC_ADULTS_PER_PAIR": 6,
+  "NPC_ALLIANCE_JOIN_STANDING": 50,
+  "NPC_ALLIANCE_LEAVE_STANDING": -20,
+  "NPC_BUILDERS": 2,
+  "NPC_CITY_MIN_DISTANCE": 480,
+  "NPC_CITY_REFUSES_STANDING": -25,
+  "NPC_CITY_WONT_SELL_STANDING": -60,
+  "NPC_FARM_REACH": 48,
+  "NPC_FOOD_SHORT_DAYS": 5,
+  "NPC_FOUND_FOOD_DAYS": 20,
+  "NPC_FOUND_GIVE_UP_DAYS": 20,
+  "NPC_FOUND_PARTY_MOST": 14,
+  "NPC_FOUND_REACH": 960,
+  "NPC_FOUND_RESIDENTS_PER_MEMBER": 10,
+  "NPC_FOUND_SAMPLES": 200,
+  "NPC_FOUND_STANDING": 80,
+  "NPC_FOUND_VILLAGE_RESIDENTS": 30,
+  "NPC_FULL_DAYS": 7,
+  "NPC_FULL_DAYS_LEAST": 2,
+  "NPC_FULL_DIP_DAYS": 1,
+  "NPC_FULL_RESIDENTS_PER_DAY": 20,
+  "NPC_GATE_WATCH_RANGE": 32,
+  "NPC_HORSES_BASE": 2,
+  "NPC_HORSES_KEPT": 2,
+  "NPC_INNER_WALL_REACH": 9,
+  "NPC_JOB_MARGIN": 6,
+  "NPC_JOB_SCORE": {
+    "farmFoodShort": 110,
+    "farm": 100,
+    "revive": 80,
+    "project": 55,
+    "short": 50,
+    "shortRange": 4,
+    "road": 30,
+    "scout": 28,
+    "back": 20,
+    "surplus": 10,
+    "surplusRange": 5
+  },
+  "NPC_NODE_REACH": 160,
+  "NPC_OFFER_REACH": 720,
+  "NPC_PATROLS_MAX": 3,
+  "NPC_PATROL_ROAD_STOPS": 3,
+  "NPC_PATROL_WALL_STOPS": 8,
+  "NPC_PLAN_TICKS": 60,
+  "NPC_POST_AROUND_HALL": 2,
+  "NPC_RESIDENTS_PER_HORSE": 3,
+  "NPC_RESIDENTS_PER_NEEDS_STEP": 25,
+  "NPC_RESIDENTS_PER_SCOUT": 12,
+  "NPC_RESIDENTS_PER_TRADER": 30,
+  "NPC_REVIVE_REACH": 48,
+  "NPC_ROAD_CREW": 2,
+  "NPC_ROAD_LONGEST": 1200,
+  "NPC_SCOUT_LIMIT": 400,
+  "NPC_SCOUT_SECTOR": 32,
+  "NPC_SOLDIERS_AT_GATE": 1,
+  "NPC_SOLDIERS_ON_HALL": 2,
+  "NPC_SOLDIERS_PER_PATROL": 4,
+  "NPC_SOLDIER_SHARE": 0.25,
+  "NPC_STABLE_HUNGRY_DAYS": 2,
+  "NPC_STABLE_REFILL_DAYS": 5,
+  "NPC_START_HORSES": 2,
+  "NPC_START_HORSE_FOOD_DAYS": 40,
+  "NPC_SURPLUS_CAP": {
+    "food": 100,
+    "wood": 150,
+    "stone": 100,
+    "ironOre": 60,
+    "iron": 60,
+    "goldOre": 60,
+    "coins": 300,
+    "spear": 4
+  },
+  "NPC_TOWN": {
+    "size": 45,
+    "residents": 16,
+    "houses": 5,
+    "farms": 2,
+    "food": 200
+  },
+  "NPC_TOWNS": 4,
+  "NPC_TRADE": {
+    "reserveFoodDays": 15,
+    "reserveWallStretches": 16,
+    "reserveStonePerStep": 40,
+    "pricePerResidentWeek": 5,
+    "defenceShare": 0.25
+  },
+  "NPC_TRADER_GIVE_UP_DAYS": 10,
+  "NPC_TRADER_REACH": 720,
+  "NPC_TRAIN_TURN_TICKS": 7200,
+  "NPC_VILLAGE": {
+    "size": 29,
+    "residents": 6,
+    "houses": 2,
+    "farms": 1,
+    "food": 75
+  },
+  "NPC_VILLAGES": 12,
+  "NPC_WALL_STEP": 8,
+  "NPC_WALL_TILES_PER_TRIP": 4,
+  "NPC_WAR_CHEST_PER_RESIDENT": 10,
+  "OCCUPATION_GAME_DAYS": 10,
+  "OUTPOST_REFILL_REACH": 3,
+  "OWN_FOOD": 2,
+  "PAIRING_WAIT_DAYS": 10,
+  "PAIRING_WAIT_TICKS": 14400,
+  "PASSENGER_WEIGHT": 70,
+  "PATH_DETOUR_LIMIT": 8,
+  "PATH_DETOUR_SLACK": 500,
+  "PERSUADE_ASK_AGAIN_DAYS": 18,
+  "PERSUADE_CHECK_TICKS": 60,
+  "PERSUADE_STANDING": 50,
+  "PRICE_ELASTICITY": 0.5,
+  "PRICE_RANGE": {
+    "min": 0.5,
+    "max": 4
+  },
+  "PRICE_REFERENCE_FLOORS": 4,
+  "PROTECTION_DEFENCE": {
+    "shield": 3,
+    "armour": 5
+  },
+  "QUEUE_DEFAULT_STEP_MINUTES": 60,
+  "QUEUE_MAX_STEPS": 50,
+  "QUEUE_STEP_MAX_CHARS": 1000,
+  "REALM_LOG_LENGTH": 100,
+  "REALM_NAME_MAX_LENGTH": 30,
+  "RECIPES": {
+    "smelter": [
+      {
+        "input": {
+          "ironOre": 2
+        },
+        "output": {
+          "iron": 1
+        }
+      }
+    ],
+    "mint": [
+      {
+        "input": {
+          "goldOre": 1
+        },
+        "output": {
+          "coins": 10
+        }
+      }
+    ],
+    "smithy": [
+      {
+        "input": {
+          "iron": 1,
+          "wood": 2
+        },
+        "output": {
+          "spear": 1
+        }
+      },
+      {
+        "input": {
+          "iron": 2,
+          "wood": 1
+        },
+        "output": {
+          "sword": 1
+        }
+      },
+      {
+        "input": {
+          "iron": 1,
+          "wood": 3
+        },
+        "output": {
+          "shield": 1
+        }
+      },
+      {
+        "input": {
+          "iron": 7,
+          "wood": 1
+        },
+        "output": {
+          "armour": 1
+        }
+      }
+    ]
+  },
+  "RESIDENT_NAME_MAX_LENGTH": 30,
+  "ROAD_LINE_MAX_TILES": 128,
+  "SCRIPT_ACTION_COST": 10,
+  "SCRIPT_ACTION_VALUE_MAX": 4000,
+  "SCRIPT_HELPER_COST": 1,
+  "SCRIPT_LIBRARY_MAX_SCRIPTS": 40,
+  "SCRIPT_LIST_QUERY_COST": 20,
+  "SCRIPT_LOG_INTERVAL": 60,
+  "SCRIPT_LOG_LINES": 20,
+  "SCRIPT_MAX_CALL_DEPTH": 50,
+  "SCRIPT_MAX_LIST_LENGTH": 500,
+  "SCRIPT_MAX_OBJECT_KEYS": 200,
+  "SCRIPT_MAX_STRING_LENGTH": 4000,
+  "SCRIPT_MAX_VERSIONS": 40,
+  "SCRIPT_MEMORY_MAX": 4000,
+  "SCRIPT_REALM_STEP_BUDGET": 20000,
+  "SCRIPT_STEP_BUDGET": 2000,
+  "SCRIPT_TILE_QUERY_COST": 1,
+  "SCRIPT_VALUE_LIMITS": {
+    "maxStringLength": 4000,
+    "maxListLength": 500,
+    "maxObjectKeys": 200
+  },
+  "SCRIPT_WRITES_PER_MINUTE": 60,
+  "SEA_COUNT": 3,
+  "SET_OFF_FOOD_SLACK": 2,
+  "SET_OUT_WORK_DAYS": 3,
+  "SIGHT_RANGE": 48,
+  "SKILL_MAX": {
+    "mining": 100,
+    "woodcutting": 100,
+    "smelting": 100,
+    "smithing": 100,
+    "farming": 100,
+    "construction": 100,
+    "combat": 20,
+    "driving": 25
+  },
+  "SKILL_PER_DAY": {
+    "mining": 0.23809523809523808,
+    "woodcutting": 0.23809523809523808,
+    "smelting": 0.23809523809523808,
+    "smithing": 0.23809523809523808,
+    "farming": 0.23809523809523808,
+    "construction": 0.23809523809523808,
+    "combat": 0.047619047619047616,
+    "driving": 1
+  },
+  "STABLE_BREED_DAYS": 10,
+  "STABLE_CAPACITY": 6,
+  "STABLE_FEED_DAYS": 10,
+  "STANDING_CONTRACT_BROKEN_LOSS": 20,
+  "STANDING_DRIFT_PER_DAY": 0.4,
+  "STANDING_NPC_TRADE_COINS_PER_POINT": 10,
+  "STANDING_PER_PAID_WEEK": 0.8,
+  "STANDING_RANGE": 100,
+  "STANDING_TRADE_COINS_PER_POINT": 50,
+  "START_AGE_MAX": 45,
+  "START_AGE_MIN": 16,
+  "START_CARRIED_FOOD": 2,
+  "START_CITY_SIZE": 29,
+  "START_FOOD": 100,
+  "START_HORSES": 2,
+  "START_RESIDENTS": 8,
+  "START_SPARE_HOUSES": 1,
+  "START_STABLE_FOOD": 30,
+  "STARVE_DAYS": 2,
+  "STAT_BASE_MAX": 15,
+  "STAT_BASE_MIN": 5,
+  "STRIKE_TICKS": 2,
+  "TEARDOWN_MATERIALS_RETURNED": 0.5,
+  "TEARDOWN_WORK_SHARE": 0.5,
+  "TERRAIN_FOOD": {
+    "0": 1,
+    "1": 1,
+    "2": 1.3,
+    "3": 2,
+    "6": 1
+  },
+  "TERRAIN_SHARES": {
+    "sea": 0.08,
+    "lake": 0.025,
+    "mountain": 0.07,
+    "hills": 0.13,
+    "forest": 0.25
+  },
+  "TERRAIN_SPEED": {
+    "0": 1,
+    "1": 0.7,
+    "2": 0.7,
+    "3": 0.35,
+    "6": 1.3
+  },
+  "TERRITORY_CITY_BASE": 5,
+  "TERRITORY_MAX_REACH": 96,
+  "TERRITORY_PER_ARMED": 3,
+  "TERRITORY_PER_RESIDENT": 1,
+  "TERRITORY_REACH_PER_ROOT": 8,
+  "TERRITORY_WORKPLACE_BASE": 2,
+  "TRADERS": 6,
+  "TRADER_DRIVE_TRIES": 3,
+  "TRADER_ESCORTS": 2,
+  "TRADER_FLOOR_SHARE": 0.25,
+  "TRADER_STOP_REACH": 200,
+  "TRADER_STOP_TICKS": 1440,
+  "TRADE_ORG_ARMY": {
+    "size": 16,
+    "workers": 12,
+    "guard": 8,
+    "pricePerSoldierWeek": 8,
+    "hireBelow": 0.6,
+    "hirePricePerSoldierWeek": 5,
+    "hireDays": 35,
+    "strongestMultiple": 1.5,
+    "gateShare": 0.5,
+    "gateWatchRange": 32
+  },
+  "TRADE_ORG_DEBT_DEMAND_DAYS": 60,
+  "TRADE_ORG_DEBT_TRIPS": 2,
+  "TRADE_ORG_HQ": {
+    "innerRadius": 16,
+    "outerRadius": 40,
+    "ringStep": 12,
+    "gates": 4,
+    "residents": 32,
+    "houses": 9,
+    "farms": 4,
+    "food": 225,
+    "coins": 20000,
+    "goods": {
+      "wood": 300,
+      "stone": 300,
+      "ironOre": 150,
+      "iron": 100,
+      "goldOre": 50
+    }
+  },
+  "TRADE_ORG_HQ_MIN_DISTANCE": 1600,
+  "TRADE_ORG_LOSS": {
+    "attack": 50,
+    "killing": 400,
+    "tearDown": 150,
+    "capture": 2400
+  },
+  "TRADE_ORG_PUNISH": {
+    "times": 2,
+    "soldiers": 8,
+    "giveUpDays": 12,
+    "walkMargin": 1.4,
+    "packRoom": 3,
+    "postReach": 60,
+    "purse": 60,
+    "offerFoodPrice": 6,
+    "roadTimes": 3,
+    "wagonRoom": 100,
+    "wagonReach": 60,
+    "wagonRetryTicks": 60,
+    "wagonFollowReach": 48
+  },
+  "TRADE_ORG_PUNISHES_BELOW": -8,
+  "TRADE_ORG_REFUSES_TRADE_BELOW": -5,
+  "TRADING_POST": {
+    "size": 29,
+    "residents": 6,
+    "houses": 2,
+    "farms": 1,
+    "food": 75,
+    "coins": 2000,
+    "goods": {
+      "food": 40,
+      "wood": 50,
+      "stone": 50,
+      "ironOre": 20,
+      "iron": 10,
+      "goldOre": 10,
+      "spear": 4,
+      "sword": 2,
+      "shield": 4,
+      "armour": 2
+    }
+  },
+  "TRADING_POST_REGION": 1440,
+  "TRAINED_CAP_SHARE": 0.5,
+  "TRAINING_GROUND_MAX_TRAINEES": 6,
+  "TRAIN_COMBAT_FACTOR": 2,
+  "TRAIN_SKILL_FACTOR": 6,
+  "TRAIN_STAT_PER_TICK": 0.000016534391534391536,
+  "TRANSFER_FEE_FACTOR": 3,
+  "WAITING_HORSE_FOOD": 3,
+  "WAKE_HEALTH": 10,
+  "WALK_TICKS_PER_TILE": 7.5,
+  "WALL_DEFENCE": 0.25,
+  "WALL_ENCLOSES_MAX": 160000,
+  "WALL_STRENGTH": {
+    "wall": 600,
+    "gate": 900
+  },
+  "WAREHOUSE_BASE_PRICE": {
+    "food": 2,
+    "wood": 2,
+    "stone": 2,
+    "ironOre": 4,
+    "iron": 10,
+    "goldOre": 8,
+    "spear": 20,
+    "sword": 30,
+    "shield": 22,
+    "armour": 90
+  },
+  "WAREHOUSE_FLOOR": {
+    "food": 20,
+    "wood": 25,
+    "stone": 25,
+    "ironOre": 10,
+    "iron": 5,
+    "goldOre": 5,
+    "coins": 1000,
+    "spear": 2,
+    "sword": 1,
+    "shield": 2,
+    "armour": 1
+  },
+  "WAYPOINTS_MAX": 50,
+  "WAYPOINT_NAME_MAX_LENGTH": 30,
+  "WAY_FOOD_MARGIN": 1.5,
+  "WEAPON_ATTACK": {
+    "spear": 4,
+    "sword": 6
+  },
+  "WORKPLACE_MAX_WORKERS": {
+    "farm": 10,
+    "lumberCamp": 6,
+    "quarry": 6,
+    "mine": 8,
+    "smelter": 4,
+    "mint": 4,
+    "smithy": 4
+  },
+  "WORKPLACE_SKILL": {
+    "farm": "farming",
+    "lumberCamp": "woodcutting",
+    "quarry": "mining",
+    "mine": "mining",
+    "smelter": "smelting",
+    "mint": "smelting",
+    "smithy": "smithing"
+  },
+  "WORKPLACE_WRECK_WORTH": {
+    "farm": 200,
+    "lumberCamp": 200,
+    "quarry": 240,
+    "mine": 400,
+    "smelter": 400,
+    "mint": 560,
+    "smithy": 600
+  },
+  "WORK_FOOD_KEPT": 2,
+  "WORK_OUTPUT_PER_DAY": {
+    "food": 2,
+    "wood": 4,
+    "stone": 3,
+    "ironOre": 2,
+    "goldOre": 1
+  },
+  "WORK_SKILL_EFFECT": 0.01,
+  "WORK_SKILL_LIMIT": 1,
+  "WORK_SKILL_MAX": 100,
+  "WORK_SKILL_PER_DAY": 0.23809523809523808,
+  "WORK_STRENGTH_AVERAGE": 10
+}
