@@ -576,7 +576,12 @@ function crewHeld(world: WorldState, city: City, place: Building): boolean {
 
 /** Whether an NPC city's farms all have their crews full, with someone idle who could take a place. */
 export function farmsOverflow(world: WorldState, city: City): boolean {
-  if (city.tradeOrg || !handsIdle(world, city)) return false
+  return handsIdle(world, city) && farmsFull(world, city)
+}
+
+/** Whether an NPC city has finished farms and every one of them has its crew full (`crewHeld`). */
+export function farmsFull(world: WorldState, city: City): boolean {
+  if (city.tradeOrg) return false
   const farms = world.buildings.filter((b) => b.kind === 'farm' && b.cityId === city.id && !b.site)
   return farms.length > 0 && farms.every((b) => crewHeld(world, city, b))
 }
