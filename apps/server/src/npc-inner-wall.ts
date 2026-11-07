@@ -1,11 +1,10 @@
 import {
   BUILD_MATERIALS,
-  NPC_BIG_CITY_RESIDENTS,
   NPC_INNER_WALL_REACH,
   NPC_VILLAGE,
   NPC_WALL_TILES_PER_TRIP,
-  cityResidents,
   footprintTiles,
+  isBigNpcCity,
   isPassableTerrain,
   middleOf,
   npcCityStock,
@@ -248,7 +247,7 @@ export function innerWallProject(
   builders: number,
 ): { kind: 'build'; building: 'wall' | 'gate'; x: number; y: number } | undefined {
   if (city.tradeOrg || rings.expanding || !rings.gate) return undefined
-  if (cityResidents(world, city).length < NPC_BIG_CITY_RESIDENTS) return undefined
+  if (!isBigNpcCity(world, city)) return undefined
   if (shortGoods(world, city).length > 0) return undefined
   const tiles = innerWall(world, city, home, terrain, rings.gate, rings.newGate)
   const next = tiles.find((t) => t.site) ?? tiles.find((t) => !t.done)

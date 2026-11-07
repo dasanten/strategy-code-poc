@@ -13,8 +13,10 @@ import {
   contractOf,
   hasFoodSurplus,
   isArmed,
+  isBigNpcCity,
   isDown,
   materialsNeeded,
+  npcNeedsScale,
   npcReserve,
   npcStorages,
   punishers,
@@ -41,6 +43,7 @@ import {
   isBuilder,
   noFarm,
   npcBuilders,
+  onNode,
   pairAdults,
 } from './npc-growth.js'
 import {
@@ -58,7 +61,7 @@ import { roadCrew, type WayFinder } from './npc-roads.js'
 import { beats, jobScore, rankJobs, type ScoredJob } from './npc-scores.js'
 import { pickScouts } from './npc-scouts.js'
 import { feedJobKept, planFeeder } from './npc-stable.js'
-import { planTrader, planVisit, traderOut } from './npc-trader.js'
+import { sendTraders, tradersOut } from './npc-trader.js'
 import { hash } from './residents.js'
 
 /*
@@ -229,15 +232,15 @@ export function planCity(
   const builds = (r: Resident) => isBuilder(r) && plan.jobs[r.id]?.kind !== 'road'
   const builders = adults.filter(builds).length
   const spare: Resident[] = []
-  // The trader out on their run (`CONTEXT.md`: NPC trader) is nobody's spare hand.
-  const trader = city.tradeOrg ? undefined : traderOut(world, plan)
+  // A trader out on their run (`CONTEXT.md`: NPC trader) is nobody's spare hand.
+  const traders = city.tradeOrg ? new Set<string>() : tradersOut(world, plan)
   const size = terrain?.size ?? MAP_SIZE
   const waiting = downToRevive(world, city, size)
   let feeding = false
   for (const r of adults) {
     const at = workplaceOf(r)
     const feed = feedJobKept(world, city, r)
-    if (r.id === trader) jobs[r.id] = { kind: 'trade' }
+    if (traders.has(r.id)) jobs[r.id] = { kind: 'trade' }
     else if (isArmed(r)) jobs[r.id] = { kind: 'soldier' }
     else if (r.carrying) jobs[r.id] = { kind: 'idle' }
     else if (goesOnReviving(plan.jobs[r.id], waiting)) jobs[r.id] = plan.jobs[r.id]!
@@ -267,14 +270,9 @@ export function planCity(
   // Trading posts and the HQ don't feed their stables this way (`npcOneFeeder`).
   if (!city.tradeOrg && !feeding) planFeeder(world, city, adults, jobs)
   // The Trade Organization sends no trader (`tradeOrgSendsNoOne`) and founds nothing.
-  if (!city.tradeOrg && !trader) {
-    // A wandering trader standing at the city comes first: it isn't there for long.
-    if (!planVisit(world, city, plan, adults, jobs, size)) {
-      planTrader(world, city, plan, adults, jobs, short, size)
-    }
-  }
   if (!city.tradeOrg) {
-    // A spare hand just sent off as the trader or to feed the stable isn't one any more.
+    sendTraders(world, city, plan, adults, jobs, short, size)
+    // A spare hand just sent off as a trader or to feed the stable isn't one any more.
     const left = unneeded.filter((r) => !['trade', 'feed'].includes(jobs[r.id]?.kind ?? ''))
     planFounding(world, city, plan, jobs, { adults, unneeded: left, members }, home, terrain)
   }
@@ -334,7 +332,7 @@ interface JobOffer {
  *
  * What is short comes first. Farming, until it has its farmers, while a farm has room; revivers go to
  * its Down residents (`sendToDown`, `sendRevivers`), ahead of all that comes after; up to
- * `NPC_BUILDERS` (`npcBuilders`) build the project; the rest go to the workplace of the good shortest
+ * `npcBuilders` build the project; the rest go to the workplace of the good shortest
  * of the reserve (`shortPlace`), filling its crew before the next. Those it leaves are the unneeded,
  * for the work spare hands have with nothing short (`CONTEXT.md`: Spare hands' work): its road crew
  * (`roadCrew`; `CONTEXT.md`: NPC road), a few scouts (`pickScouts`), going back (a farmer to farming,
@@ -702,7 +700,7 @@ export const npcFarmersKept: Invariant = {
  * the cap of past the reserve (once for what was stored or changed since the pass, this same tick;
  * no project wants that much). A farm counts only with more farmers than it keeps, and one for a
  * death. A good with no cap isn't worked for surplus and doesn't count; nor does a Trade Org city,
- * which has no cap.
+ * which has no cap. The cap is the one for its size now (`npcNeedsScale`).
  */
 export const npcSurplusCapped: Invariant = {
   name: 'npc-surplus-capped',
@@ -713,12 +711,14 @@ export const npcSurplusCapped: Invariant = {
       if (!city || city.tradeOrg || plan.plannedAt !== world.tick) continue
       const stock = chainStore(world, city)?.stock ?? {}
       const reserve = npcReserve(world, city)
+      const steps = npcNeedsScale(world, city)
       const jobs = Object.entries(plan.jobs)
       const farmers = jobs.filter(([, j]) => j.kind === 'farm').length
       for (const place of ownWorkplaces(world, city)) {
         const good = chainGood(world, place)
-        const cap = good && NPC_SURPLUS_CAP[good]
-        if (!good || !cap || place.site) continue
+        const base = good && NPC_SURPLUS_CAP[good]
+        if (!good || !base || place.site) continue
+        const cap = base * steps
         if ((stock[good] ?? 0) - (reserve[good] ?? 0) < 2 * cap) continue
         if (place.kind === 'farm' && farmers <= farmersWanted(world, city) + 1) continue
         for (const [residentId, job] of jobs) {
@@ -730,6 +730,36 @@ export const npcSurplusCapped: Invariant = {
           })
         }
       }
+    }
+    return out
+  },
+}
+
+/**
+ * An NPC city opens no more workplaces than a good needs (`CONTEXT.md`: Spare hands' work; ADR 0004):
+ * a plan made this tick lays out no workplace on a node of a good it already has one finished of,
+ * unless it is a big city (`isBigNpcCity`) with just that one. A site already begun isn't looked at.
+ */
+export const npcWorkplacesBounded: Invariant = {
+  name: 'npc-workplaces-bounded',
+  check(world) {
+    const out: InvariantViolation[] = []
+    for (const [cityId, plan] of Object.entries(world.cityPlans)) {
+      const project = plan.project
+      if (plan.plannedAt !== world.tick || project?.kind !== 'build') continue
+      if (!onNode(project.building) || buildingAt(world, project.x, project.y)) continue
+      const city = world.cities.find((c) => c.id === cityId)
+      if (!city || city.tradeOrg) continue
+      const good = workplaceGood(world, { ...project, id: '', kind: project.building, cityId })
+      const standing = ownWorkplaces(world, city).filter(
+        (b) => !b.site && onNode(b.kind) && chainGood(world, b) === good,
+      ).length
+      if (standing < (isBigNpcCity(world, city) ? 2 : 1)) continue
+      out.push({
+        invariant: this.name,
+        message: `${cityId} plans another ${project.building} for ${good}, with ${standing} standing`,
+        entityIds: [cityId],
+      })
     }
     return out
   },

@@ -1,10 +1,11 @@
 import {
   BUILD_MATERIALS,
-  NPC_BIG_CITY_RESIDENTS,
+  NPC_RESIDENTS_PER_NEEDS_STEP,
   NPC_WALL_STEP,
   NPC_WALL_TILES_PER_TRIP,
   TICKS_PER_GAME_DAY,
   footprintTiles,
+  isBigNpcCity,
   isAt,
   middleOf,
   npcCityStock,
@@ -29,7 +30,10 @@ import { stepWorld } from './world.js'
 
 type Staged = ReturnType<typeof bigCity>
 
-/** The big city with nothing left to want but its inner ring: it has its stable. */
+/**
+ * The big city with nothing left to want but its inner ring: it has its stable, and the Wood above
+ * its reserve for the whole ring.
+ */
 function ready(layout: CityLayout): Staged {
   const staged = bigCity(layout)
   const { world, city, home } = staged
@@ -40,6 +44,7 @@ function ready(layout: CityLayout): Staged {
     x: home.x + 30,
     y: home.y + 30,
   })
+  home.stock!.wood = (npcReserve(world, city).wood ?? 0) + 500
   return staged
 }
 
@@ -204,9 +209,10 @@ describe('when a city builds its inner ring', () => {
   it('nothing comes of it below the big city number', () => {
     const staged = ready('grid')
     const { world, city } = staged
-    const rest = world.residents.filter((r) => r.cityId === city.id).slice(NPC_BIG_CITY_RESIDENTS - 1)
+    const rest = world.residents.filter((r) => r.cityId === city.id).slice(2 * NPC_RESIDENTS_PER_NEEDS_STEP - 1)
     const gone = new Set(rest)
     world.residents = world.residents.filter((r) => !gone.has(r))
+    expect(isBigNpcCity(world, city)).toBe(false)
     const rings = ringsOf(staged)
     expect(innerWallProject(world, city, staged.home, staged.terrain, rings, 2)).toBeUndefined()
   })

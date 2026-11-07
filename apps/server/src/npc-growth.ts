@@ -36,7 +36,9 @@ import {
   NPC_WALL_TILES_PER_TRIP,
   NPC_BUILDERS,
   NPC_VILLAGE,
+  isBigNpcCity,
   npcCityStock,
+  npcNeedsScale,
   npcReserve,
   covers,
   ownsHorse,
@@ -46,16 +48,26 @@ import { hqGrows, hqHouseTile, hqProject, hqRings } from './hq-growth.js'
 import { walkTo } from './npc-behaviour.js'
 import { npcSender } from './order-sender.js'
 import { pair } from './pairing.js'
-import { PROCESSED_BY, chainInput, chainStore, makes, shortGoods } from './npc-chain.js'
+import {
+  PROCESSED_BY,
+  chainGood,
+  chainInput,
+  chainStore,
+  makes,
+  ownWorkplaces,
+  shortGoods,
+  surplusWork,
+} from './npc-chain.js'
 import { innerWallProject, outerWalls } from './npc-inner-wall.js'
+import { farmersWanted } from './npc-plan.js'
 import { knowsNode } from './npc-scouts.js'
 import { Ground } from './placing.js'
 import { residentTiles } from './starting-city.js'
 
 /**
  * How an NPC city grows (`CONTEXT.md`: NPC city): it pairs its adults, builds a house when it has a
- * food surplus and no free housing, a farm when every farm is full, and the workplace for a
- * material it needs but has no workplace for. With no room left inside its wall it builds on its
+ * food surplus and no free housing, a farm when the farmers it wants don't fit, and the workplace for
+ * a material it needs but has no workplace for. With no room left inside its wall it builds on its
  * edge, puts up a new wall `NPC_WALL_STEP` tiles further out and then tears down the old one. All
  * through the orders a Player's residents take (ADR 0002). The Trade Org HQ grows this way only
  * while it is too weak, building round rings of its own (`hqProject`); trading posts never grow.
@@ -328,15 +340,17 @@ function carriedBy(world: WorldState, city: City): Stock {
 }
 
 /**
- * How many of a city's adults build at once (`CONTEXT.md`: NPC city): `NPC_BUILDERS`; an NPC city with no
+ * How many of a city's adults build at once (`CONTEXT.md`: NPC city): `NPC_BUILDERS` for each step of
+ * an NPC city's needs (`npcNeedsScale`), and just that at a Trade Org city; an NPC city with no
  * storage yet (a daughter, `CONTEXT.md`: Founding) lets everyone who can, since the materials are on
  * them and there is nowhere else to put them.
  */
 export function npcBuilders(world: WorldState, city: City): number {
+  if (city.tradeOrg) return NPC_BUILDERS
   const storage = world.buildings.some(
     (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
   )
-  return storage || city.tradeOrg ? NPC_BUILDERS : Infinity
+  return storage ? NPC_BUILDERS * npcNeedsScale(world, city) : Infinity
 }
 
 /**
@@ -444,11 +458,12 @@ function nearestNode(
 
 /**
  * What the city wants built most, where: a site of its own already begun (a farm, a workplace of
- * its own, a house in its area, its new wall); else a farm when every farm is full; else a house
- * when it has a food surplus and no free housing; else, for an NPC city, a stable once it has a
- * horse (`wantsStable`), or the workplace for the shortest good of its reserve it can make
- * (`chainProject`, `CONTEXT.md`: NPC reserve); else the next stretch of its new wall; else, in a big
- * city with materials to spare, the next tile of its inner ring (`innerWallProject`).
+ * its own, a house in its area, its new wall); else a farm when the farmers it wants don't fit
+ * (`farmersDontFit`); else a house when it has a food surplus and no free housing; else, for an NPC
+ * city, a stable once it has a horse (`wantsStable`), or the workplace for the shortest good of its
+ * reserve it can make (`chainProject`, `CONTEXT.md`: NPC reserve); else the next stretch of its new
+ * wall; else a big city's second workplace (`secondWorkplace`); else, with materials to spare, its
+ * inner ring (`innerWallProject`).
  */
 function wanted(
   world: WorldState,
@@ -492,7 +507,7 @@ function wanted(
       if (house) return house
     }
   }
-  if (farmsFull(world, city)) {
+  if (farmersDontFit(world, city)) {
     const farm = at('farm', farmTile(world, home, terrain, rings))
     if (farm) return farm
   }
@@ -511,7 +526,69 @@ function wanted(
   }
   const next = ring.find((t) => !t.done)
   if (next) return { kind: 'build', building: next.kind, x: next.x, y: next.y }
-  return rings && innerWallProject(world, city, home, terrain, rings, npcBuilders(world, city))
+  return (
+    secondWorkplace(world, city, home, terrain) ??
+    (rings && innerWallProject(world, city, home, terrain, rings, npcBuilders(world, city)))
+  )
+}
+
+/**
+ * A big NPC city's second workplace (`CONTEXT.md`: Spare hands' work): with nothing short, of a good
+ * dug or cut whose one workplace has its crew full and whose cap isn't reached, the good furthest
+ * below its cap first, on the nearest node of it the city knows of. Never a third, and never a farm
+ * or a workplace that processes goods, which stand on no node.
+ */
+function secondWorkplace(
+  world: WorldState,
+  city: City,
+  home: Building,
+  terrain: TerrainMap,
+): BuildProject | undefined {
+  if (city.tradeOrg || !isBigNpcCity(world, city)) return undefined
+  if (shortGoods(world, city).length > 0) return undefined
+  const surplus = surplusWork(world, city, chainStore(world, city))
+  const places = new Map<Good, Building[]>()
+  for (const b of ownWorkplaces(world, city)) {
+    if (!onNode(b.kind)) continue
+    const good = chainGood(world, b)
+    if (good) places.set(good, [...(places.get(good) ?? []), b])
+  }
+  const wants = [...places]
+    .flatMap(([good, of]) => {
+      const place = of[0]
+      const full = place && of.length === 1 ? surplus(place) : undefined
+      return full !== undefined && crewFull(world, place!) ? [{ good, full }] : []
+    })
+    .sort((a, b) => a.full - b.full)
+  for (const { good } of wants) {
+    const node = nearestNode(world, city, home, terrain, good)
+    if (node) return { kind: 'build', building: NODE_WORKPLACE[node.node.kind], ...node.at }
+  }
+  return undefined
+}
+
+/** Whether a kind of workplace stands on a resource node. */
+export function onNode(kind: BuildingKind): boolean {
+  return Object.values(NODE_WORKPLACE).includes(kind)
+}
+
+/**
+ * Whether a workplace has no room for another worker, coming or there: those working it by the Work
+ * default or a bare work-at order, or walking to its tile.
+ */
+function crewFull(world: WorldState, place: Building): boolean {
+  let there = 0
+  for (const r of world.residents) {
+    const o = r.order
+    if (
+      r.script?.memory.workplaceId === place.id ||
+      (o?.kind === 'workAt' && o.buildingId === place.id) ||
+      (o?.kind === 'walkTo' && o.target.x === place.x && o.target.y === place.y)
+    ) {
+      there++
+    }
+  }
+  return there >= (MAX_WORKERS[place.kind] ?? 0)
 }
 
 /**
@@ -628,19 +705,15 @@ export function farStableSpot(
   return spot && { x: spot.x, y: spot.y }
 }
 
-/** Whether the city has farms and none of them has room for another worker, coming or there. */
-function farmsFull(world: WorldState, city: City): boolean {
+/**
+ * Whether the farmers an NPC city wants (`farmersWanted`) don't fit on the farms it has (`CONTEXT.md`:
+ * NPC city). Those on its farms for surplus don't count, or they would have it build farms it doesn't
+ * need.
+ */
+function farmersDontFit(world: WorldState, city: City): boolean {
   const farms = world.buildings.filter((b) => b.kind === 'farm' && b.cityId === city.id && !b.site)
   if (farms.length === 0) return false
-  return farms.every((f) => {
-    const there = world.residents.filter(
-      (r) =>
-        r.script?.memory.workplaceId === f.id ||
-        (r.order?.kind === 'workAt' && r.order.buildingId === f.id) ||
-        (r.order?.kind === 'walkTo' && r.order.target.x === f.x && r.order.target.y === f.y),
-    ).length
-    return there >= (MAX_WORKERS.farm ?? 0)
-  })
+  return farmersWanted(world, city) > farms.length * (MAX_WORKERS.farm ?? 0)
 }
 
 /**

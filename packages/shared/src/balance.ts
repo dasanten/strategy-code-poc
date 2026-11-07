@@ -625,15 +625,25 @@ export const NPC_JOB_SCORE = {
 export const NPC_JOB_MARGIN = 6
 
 /**
- * Most of an NPC city's adults that build at once (`CONTEXT.md`: NPC city): laying out, carrying
- * materials to the site, building or tearing down. The others keep working.
+ * Residents to each step of an NPC city's needs and crews (`CONTEXT.md`: NPC reserve, Spare hands'
+ * work, NPC road): its Wood and Stone kept, surplus caps, builders and road crew are this many steps
+ * of a village's (`npcNeedsScale`), in whole steps so one birth doesn't move them. Below two steps
+ * it keeps a village's numbers, and from two on it is a big city (`isBigNpcCity`): at 50 residents,
+ * about three times a town.
+ */
+export const NPC_RESIDENTS_PER_NEEDS_STEP = 25
+
+/**
+ * Most of an NPC city's adults that build at once, per step of its needs (`npcNeedsScale`;
+ * `CONTEXT.md`: NPC city): laying out, carrying materials to the site, building or tearing down. The
+ * others keep working.
  */
 export const NPC_BUILDERS = 2
 
 /**
- * Most of an NPC city's spare hands on its road crew at once (`CONTEXT.md`: NPC road), apart from
- * its builders: enough for a road to grow out day by day and to fetch for each other, while the
- * rest go on working for surplus.
+ * Most of an NPC city's spare hands on its road crew at once, per step of its needs
+ * (`npcNeedsScale`; `CONTEXT.md`: NPC road), apart from its builders: enough for a road to grow out
+ * day by day and to fetch for each other, while the rest go on working for surplus.
  */
 export const NPC_ROAD_CREW = 2
 
@@ -650,9 +660,9 @@ export const NPC_ROAD_LONGEST = 1200
 export const NPC_REVIVE_REACH = 48
 
 /**
- * How far past its reserve an NPC city's spare hands work for surplus, by good, in units
- * (`CONTEXT.md`: Spare hands' work). Several of a trader's full loads (about 30 kg, `CARRY_BASE`),
- * so its trader has something to sell, and above the materials a Full city wants (`townHall` and
+ * How far past its reserve an NPC city's spare hands work for surplus, by good, in units per step
+ * of its needs (`npcNeedsScale`; `CONTEXT.md`: Spare hands' work). Several of a trader's full loads
+ * (about 30 kg, `CARRY_BASE`), so its trader has something to sell, and above the materials a Full city wants (`townHall` and
  * `storage` in `BUILD_MATERIALS`), or it could never found; few weapons, which its trader never
  * sells. A good not named here is not worked for surplus.
  */
@@ -673,12 +683,6 @@ export const NPC_SURPLUS_CAP: Partial<Record<Good, number>> = {
  * `CITY_BUILDING_REACH`, so the new wall stays part of the city once the old one is gone.
  */
 export const NPC_WALL_STEP = 8
-
-/**
- * Residents from which an NPC city is big (`CONTEXT.md`: Bigger projects): about four towns' worth,
- * well past what a city needs just to run itself, and short of production's city of 108.
- */
-export const NPC_BIG_CITY_RESIDENTS = 60
 
 /**
  * How far from the middle of its town hall a big NPC city's inner ring of wall may stand
@@ -752,6 +756,13 @@ export const NPC_SCOUT_SECTOR = 32
  * (`CONTEXT.md`: NPC trader), in tiles: about a game day and a half's walk on plains each way.
  */
 export const NPC_TRADER_REACH = 720
+
+/**
+ * Residents of an NPC city for each trader it has out at once (`CONTEXT.md`: NPC trader), rounded
+ * down: a village, a town and a city of under 60 keep one; a city of 110 sends three. Each walks
+ * every tick, so this is what its trading costs the server.
+ */
+export const NPC_RESIDENTS_PER_TRADER = 30
 
 /**
  * How far from its home a Player's offer may be for an NPC city to send its trader there
@@ -1600,10 +1611,15 @@ export const NPC_TRADE = {
    */
   reserveFoodDays: 15,
   /**
-   * Stretches of wall whose materials it keeps in reserve, beside a house's (`BUILD_MATERIALS`):
-   * with a house that makes 68 Wood.
+   * Stretches of wall whose materials it keeps in reserve, beside a house's (`BUILD_MATERIALS`),
+   * per step of its needs (`npcNeedsScale`): with a house that makes 68 Wood a step.
    */
   reserveWallStretches: 16,
+  /**
+   * Stone it keeps in reserve for each step of its needs past the first (`npcNeedsScale`), so a
+   * village keeps none: about a smelter's (`BUILD_MATERIALS`), or a road 40 tiles long.
+   */
+  reserveStonePerStep: 40,
   /**
    * What it asks for each resident it lends and game week, in coins, at neutral standing: less
    * than a Trade Org soldier (`TRADE_ORG_ARMY.pricePerSoldierWeek`), as they come mostly unarmed.
