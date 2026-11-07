@@ -9,3 +9,6 @@ data/
 .env
 .DS_Store
 coverage/
+
+# Rust (ADR 0030)
+target/

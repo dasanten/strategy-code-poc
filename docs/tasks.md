@@ -59,6 +59,13 @@ the Alarm script) and Busy big cities (80, ADR 0029: the planner scores its jobs
 more to do), in that order, all ahead of Bandits. Tickets that need an earlier epic name it
 under Depends on, and wait for it to reach `dev`.
 
+**Decided with Daniel on 2026-11-07 (ADR 0030, `docs/proposals/rust-rewrite.md`): the backend is
+rewritten in Rust** on the branch `rust-backend`, and the TypeScript game is under a feature
+freeze (bugs only) until the cutover. The rewrite epics, in order: Rust foundations (84), Pure
+kernels (85, in parallel with 84), The rules (86), The shell (87), Client and cutover (88). Their
+branches come from and go into `rust-backend`. Epics 81 to 83 (measuring and TypeScript
+optimisations) are superseded by the rewrite, which includes their aims. Everything else waits.
+
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
 
@@ -142,6 +149,11 @@ I sleep.
 | 78  | [Balance and art](https://github.com/dasanten/strategy-code-poc/issues/937)                     | ticketed                |
 | 79  | [City guards](https://github.com/dasanten/strategy-code-poc/issues/941)                         | ticketed                |
 | 80  | [Busy big cities](https://github.com/dasanten/strategy-code-poc/issues/947)                     | ticketed                |
+| 84  | [Rust backend: foundations](https://github.com/dasanten/strategy-code-poc/issues/1001)          | ticketed                |
+| 85  | [Rust backend: pure kernels](https://github.com/dasanten/strategy-code-poc/issues/1002)         | ticketed                |
+| 86  | [Rust backend: the rules](https://github.com/dasanten/strategy-code-poc/issues/1003)            | scope only              |
+| 87  | [Rust backend: the shell](https://github.com/dasanten/strategy-code-poc/issues/1004)            | scope only              |
+| 88  | [Rust backend: client and cutover](https://github.com/dasanten/strategy-code-poc/issues/1005)   | scope only              |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.

@@ -1,0 +1,20 @@
+[package]
+name = "csp-server"
+description = "The I/O shell: HTTP, WebSocket sync, accounts, SQLite, saves, explored terrain, monitoring, the admin CLI and the benchmarks (ADR 0030)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "csp-server"
+path = "src/main.rs"
+
+[dependencies]
+csp-shared.workspace = true
+csp-sim.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

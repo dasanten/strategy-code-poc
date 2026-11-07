@@ -19,6 +19,15 @@
 - **World state is never reset** (ADR 0006): a change to its shape bumps `WORLD_FORMAT_VERSION`
   and ships a migration step with a test.
 - **Monitoring** (ADR 0004): new simulation rules come with invariants and tests.
+- **Rust backend (ADR 0030), on the branch `rust-backend`:** the server is being rewritten in Rust
+  in the cargo workspace at the root (`crates/csp-shared`, `csp-lang`, `csp-sim`, `csp-server`).
+  The TypeScript game is under a **feature freeze**: a frozen specification, bugs only. A rewrite
+  ticket ports one module with its tests and proves parity against the fixtures in
+  `crates/csp-sim/fixtures/` (written by `scripts/dump-fixtures.mts`, never by hand). No rule
+  changes in the port. Rewrite epics branch from and merge into `rust-backend`, not `dev`.
+  Before finishing a Rust ticket: `pnpm check:rust` (fmt, clippy with warnings as errors,
+  `cargo nextest run`). A test over 5 s is a regression to fix, not to tag. Run cargo from
+  PowerShell, or in bash with the MSVC `link.exe` ahead of Git's: `/usr/bin/link` is not a linker.
 - Toolchain: the machine's default Node is too old. In bash run
   `eval "$(fnm env --shell bash)" && fnm use` first (from the repo root), and call pnpm as
   `corepack pnpm`. `gh` is at `C:\Program Files\GitHub CLI\gh.exe`.
