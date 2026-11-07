@@ -9,6 +9,7 @@ import {
   type TerrainMap,
 } from '@csp/shared'
 import { describe, expect, it } from 'vitest'
+import { raiseResidentAttacked, raiseTheft } from './alarms.js'
 import { attackOrder } from './combat.js'
 import { startDefence } from './defence.js'
 import { checkInvariants } from './invariants.js'
@@ -377,6 +378,22 @@ describe('the Alarm default against an armed outsider', () => {
     s.world.realms[0]!.leaderId = 'nobody'
     stepWorld(s.world, terrain, new Walking(terrain))
     expect(s.city.occupation).toMatchObject({ realmId: 'r2' })
+  })
+
+  it('holding, they don’t answer an attack or a theft: one alarm doesn’t interrupt another', () => {
+    const s = setup()
+    const other = newResident(mulberry32(13), { id: 'w2', owner: 'r1', x: 7, y: 7, tick: 0 })
+    other.cityId = 'c1'
+    s.world.residents.push(other)
+    s.enter()
+    s.tick()
+    expect(s.until(s.onHall)).toBe(true)
+    raiseResidentAttacked(s.world, s.x1, other, SIZE)
+    raiseTheft(s.world, s.x1, 'r1', SIZE)
+    expect(s.r.script?.alarm?.kind).toBe('outsider')
+    s.tick()
+    expect(s.r.order?.kind).not.toBe('attack')
+    expect(s.onHall()).toBe(true)
   })
 
   it('leaves someone set to None where they are, and someone unarmed', () => {

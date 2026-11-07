@@ -23,6 +23,7 @@ import { attackOrder } from './combat.js'
 import { interruptedSound } from './defence.js'
 import { checkInvariants } from './invariants.js'
 import { OrderQueue } from './orders.js'
+import { noteOutsidersInside } from './outsiders.js'
 import { QueueRunner } from './queues.js'
 import { mulberry32, newResident } from './residents.js'
 import type { RunnableScript } from './scripts.js'
@@ -294,11 +295,15 @@ describe('a wall or neighbour attacked', () => {
     s.world.residents.push(n)
     return n
   }
-  /** x1 stands beside w1, set on striking them. */
+  /**
+   * x1 stands beside w1, set on striking them. They came in long ago: an alarm for their coming in
+   * would keep this one from reaching anyone.
+   */
   const strikes = (s: Setup) => {
     s.x1.x = s.r.x - 1
     s.x1.y = s.r.y
     s.x1.order = attackOrder('w1')
+    noteOutsidersInside(s.world, SIZE)
   }
   /** A row of houses of c1 out to (66, 6), so the area reaches out of sight of those at the farm. */
   const farSide = (s: Setup) => {
@@ -373,6 +378,7 @@ describe('a wall or neighbour attacked', () => {
     s.x1.x = 13
     s.x1.y = 8
     s.x1.order = attackOrder('b9')
+    noteOutsidersInside(s.world, SIZE)
     expect(s.until(() => n.script?.task === 'alarm', 10)).toBe(true)
     expect(n.script!.alarm).toMatchObject({ kind: 'attacked', about: 'x1', x: 12, y: 8 })
     // The first worker sees it too.
