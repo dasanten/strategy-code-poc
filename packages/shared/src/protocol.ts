@@ -26,7 +26,7 @@ import type {
   Waypoint,
 } from './world.js'
 
-/** The map the client draws; its terrain comes in explored chunks (`terrainChunkPath`). */
+/** The map the client draws; its terrain comes in explored chunks (`TERRAIN_BATCH_PATH`). */
 export interface MapInfo {
   seed: number
   /** Tiles along each side of the map; its opposite sides join. */
@@ -146,7 +146,7 @@ export type ServerMessage =
       account: Account
       tick: number
       map: MapInfo
-      /** Chunks with explored terrain, to load from `terrainChunkPath` (see `chunksAcross`). */
+      /** Chunks with explored terrain, to load from `TERRAIN_BATCH_PATH` (see `chunksAcross`). */
       exploredChunks: number[]
       /**
        * The Player's realm and the city the view starts on; `realmName` is the realm's own name,

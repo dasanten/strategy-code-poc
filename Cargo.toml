@@ -17,6 +17,8 @@ csp-sim = { path = "crates/csp-sim" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
 thiserror = "2"
+indexmap = { version = "2", features = ["serde"] }
+flate2 = "1"
 
 [workspace.lints.clippy]
 all = "warn"

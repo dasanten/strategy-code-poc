@@ -157,6 +157,25 @@ export class ExploredTerrain {
   }
 
   /**
+   * The chunks among `indices` (see `chunksAcross`) in which the Player explored something, each
+   * with its index and encoded as `chunk` does, in the order asked and once each. Anything else
+   * asked for (unexplored, off the map, not an index) is left out.
+   */
+  chunkBatch(viewer: Viewer, indices: readonly unknown[]): Array<[number, Uint8Array]> {
+    const n = chunksAcross(this.terrain.size)
+    const known = this.chunks.get(viewer.id) ?? new Set<number>()
+    const out: Array<[number, Uint8Array]> = []
+    const seen = new Set<number>()
+    for (const i of indices) {
+      if (typeof i !== 'number' || !known.has(i) || seen.has(i)) continue
+      seen.add(i)
+      const bytes = this.chunk(viewer, i % n, Math.floor(i / n))
+      if (bytes) out.push([i, bytes])
+    }
+    return out
+  }
+
+  /**
    * One chunk of terrain as it is, for admins only (`CONTEXT.md`: admin map): every tile and every
    * resource node, explored or not. Undefined for a chunk off the map.
    */

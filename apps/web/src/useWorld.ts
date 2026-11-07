@@ -42,7 +42,7 @@ const THROTTLED_RETRY_MS = 10_000
 export interface ClientWorld {
   tick: number
   map: MapInfo
-  /** Chunks with explored terrain, loaded on demand from `terrainChunkPath`. */
+  /** Chunks with explored terrain, loaded on demand from `TERRAIN_BATCH_PATH`. */
   exploredChunks: ReadonlySet<number>
   /** Chunks whose explored terrain grew in the latest tick; any copy loaded before is stale. */
   grownChunks: readonly number[]
