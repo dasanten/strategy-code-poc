@@ -656,8 +656,8 @@ The shared language of the game. Domain terms only — no implementation details
   occupier on the hall counts as another realm, so nobody occupies it. The occupation starts the
   tick that holds and runs as long as it keeps holding; the first tick it doesn't, it is broken
   and its days are lost: the next one starts again from nothing. The city goes on as before
-  meanwhile; its soldiers fight the occupiers as they fight any attacker in its area. Its realm's
-  log says when its town hall is occupied, by whom, and when the occupation is broken. Anyone
+  meanwhile; its soldiers fight the occupiers as they fight any attacker in its area, which is no
+  crime. Its realm's log says when its town hall is occupied, by whom, and when the occupation is broken. Anyone
   with the town hall in sight sees who occupies it and how long is left; scripts see it too.
 - **Mercenary contract:** one Organization rents residents to another for coins over a period.
   One side offers (residents, game days, price per game week, a storage of the lender to pay

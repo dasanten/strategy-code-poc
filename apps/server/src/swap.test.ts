@@ -210,9 +210,10 @@ describe('a swap at a warehouse', () => {
 
   it('is cut down by what fits, counting what is given, what is got and the Coins back', () => {
     const { world, warehouse, p1, queue } = post()
-    // A shield is heavier than the gold ore that pays for it: each swapped adds to the load.
+    // Shields are plenty here and cheap, so a shield is heavier than the gold ore that pays for it:
+    // each swapped adds to the load.
     expect(GOOD_WEIGHT.shield).toBeGreaterThan(GOOD_WEIGHT.goldOre)
-    warehouse.stock = { ...warehouse.stock, shield: 8, goldOre: 20 }
+    warehouse.stock = { ...warehouse.stock, shield: 32, goldOre: 20 }
     const capacity = carryCapacity(p1, world.tick)
     p1.carried = { goldOre: capacity - 2 }
     const room = capacity - stockWeight(p1.carried)
