@@ -40,6 +40,7 @@ import {
   cityGrows,
   cityProject,
   endPairs,
+  farmsOverflow,
   isBuilder,
   noFarm,
   npcBuilders,
@@ -219,8 +220,9 @@ export function planCity(
     else pairAdults(world, city, adults)
   }
   const home = npcHome(world, city)
+  // With Food short it builds nothing but what ends that: a first farm, or one for those it has idle.
   const project =
-    (!short || noFarm(world, city)) && terrain && home
+    (!short || noFarm(world, city) || farmsOverflow(world, city)) && terrain && home
       ? cityProject(world, city, home, terrain, grows)
       : undefined
   if (project) plan.project = project
@@ -785,9 +787,11 @@ export const npcSpareHandsWork: Invariant = {
 }
 
 /**
- * An NPC city opens no more workplaces than a good needs (`CONTEXT.md`: Spare hands' work; ADR 0004):
- * a plan made this tick lays out no workplace on a node of a good it already has one finished of,
- * unless it is a big city (`isBigNpcCity`) with just that one. A site already begun isn't looked at.
+ * An NPC city opens no more workplaces than a good needs (`CONTEXT.md`: NPC city, Spare hands' work;
+ * ADR 0004): a plan made this tick lays out no workplace on a node of a good it already has one
+ * finished of, unless it is a big city (`isBigNpcCity`) with just that one, nor a farm when the farmers
+ * it wants fit, unless the good is short. Short here means under its reserve and half a cap, for what
+ * came in since the pass, this same tick. A site already begun isn't looked at.
  */
 export const npcWorkplacesBounded: Invariant = {
   name: 'npc-workplaces-bounded',
@@ -796,14 +800,24 @@ export const npcWorkplacesBounded: Invariant = {
     for (const [cityId, plan] of Object.entries(world.cityPlans)) {
       const project = plan.project
       if (plan.plannedAt !== world.tick || project?.kind !== 'build') continue
-      if (!onNode(project.building) || buildingAt(world, project.x, project.y)) continue
+      const farm = project.building === 'farm'
+      if ((!farm && !onNode(project.building)) || buildingAt(world, project.x, project.y)) continue
       const city = world.cities.find((c) => c.id === cityId)
       if (!city || city.tradeOrg) continue
-      const good = workplaceGood(world, { ...project, id: '', kind: project.building, cityId })
+      const good = farm
+        ? 'food'
+        : workplaceGood(world, { ...project, id: '', kind: project.building, cityId })
+      if (!good) continue
       const standing = ownWorkplaces(world, city).filter(
-        (b) => !b.site && onNode(b.kind) && chainGood(world, b) === good,
+        (b) => !b.site && chainGood(world, b) === good && (farm || onNode(b.kind)),
       ).length
-      if (standing < (isBigNpcCity(world, city) ? 2 : 1)) continue
+      const allowed = farm
+        ? standing === 0 || farmersWanted(world, city) > standing * (MAX_WORKERS.farm ?? 0)
+        : standing < (isBigNpcCity(world, city) ? 2 : 1)
+      if (allowed) continue
+      const slack = ((NPC_SURPLUS_CAP[good] ?? 0) * npcNeedsScale(world, city)) / 2
+      const held = chainStore(world, city)?.stock?.[good] ?? 0
+      if (held < (npcReserve(world, city)[good] ?? 0) + slack) continue
       out.push({
         invariant: this.name,
         message: `${cityId} plans another ${project.building} for ${good}, with ${standing} standing`,

@@ -2150,12 +2150,13 @@ export function Wiki() {
           eats {num(FOOD_PER_DAY)} Food a day, a farmer makes {num(WORK_OUTPUT_PER_DAY.food ?? 0)})
           and one more while it has no food surplus, a new farm when they don't fit; up to{' '}
           {num(NPC_BUILDERS)} builders a step while it has a project; everyone else is a spare hand. A
-          farm is built only for the farmers it keeps, never because spare hands filled the farms
-          working for surplus. Spare
+          farm is otherwise built only when Food is short of its reserve with its farms full and
+          someone idle, never because spare hands filled the farms working for surplus. Spare
           hands go to the good the reserve is shortest of, as a share of what it wants of it,
           filling one workplace's crew before the next. Without a workplace for that good, the city
           builds one: on the nearest fitting resource node it knows of, or a smelter, smithy or mint
-          in its area like a house.
+          in its area like a house. With every workplace of a short good at its full crew and
+          someone idle, it opens another of them, however many it has, and a farm for Food.
         </p>
         <p>
           Those with nothing to do, those carrying a child and its children stand at a house of the
@@ -2230,8 +2231,8 @@ export function Wiki() {
         </p>
         <p>
           With nothing short, a big city whose one lumber camp, quarry or mine has its crew full and
-          its good below the cap opens a second of that kind, on the nearest node it knows. It opens
-          no third, and none for a good at its cap.
+          its good below the cap opens a second of that kind, on the nearest node it knows. For surplus it opens no third,
+          and none for a good at its cap.
         </p>
         <p>
           Ahead of scouting and that work comes its road crew: up to {num(NPC_ROAD_CREW)} spare hands

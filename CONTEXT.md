@@ -478,15 +478,15 @@ The shared language of the game. Domain terms only — no implementation details
   the walk and the first days, and the carrier brings the crew's Food back: Crew food), pairs its adults,
   builds a house when it has a food surplus and no free housing, and shares its adults out:
   soldiers by its size first; then farmers, as many as feed everyone (one farmer feeds about
-  four) and one more while it has no food surplus, building a farm only when those it keeps don't
-  fit; then builders while it has a project, at most two in a village and more as it grows (a balance
+  four) and one more while it has no food surplus, building a farm when those it keeps don't
+  fit, or when Food is short of its reserve with its farms full and someone idle (below); then builders while it has a project, at most two in a village and more as it grows (a balance
   number); everyone else is its **spare hands**. Its planning pass gives each free adult the job
   that scores highest (ADR 0029). A worker stays where they are until another job beats theirs by a
   margin, so nobody goes back and forth. Beyond that it is driven by its
   reserve (NPC reserve): its spare hands go to the good shortest of its reserve first; they work
   the workplace that makes the good, or build it first on the nearest fitting resource node
   (within a set reach of its home, or further out where a Scout found one) and work it like its other workplaces, carrying the output to
-  its storage (Crew food). So a city builds the whole chain its land allows, one need at a time:
+  its storage (Crew food). With every workplace of a short good at its full crew and someone idle, it opens another, however many it has: a farm for Food, on the nearest fitting node for what is dug or cut, in its area for what is processed. While Food runs short that farm is the one thing it builds, besides a first farm. So a city builds the whole chain its land allows, one need at a time:
   weapons short means a smithy, which wants Iron, so a smelter, which wants ore, so a mine. A
   good it knows no node of stays short; the city buys it from its trader or a visiting trader,
   or does without. With nothing short its spare hands still have work (Spare hands' work). When it has no room left inside its wall it grows its area

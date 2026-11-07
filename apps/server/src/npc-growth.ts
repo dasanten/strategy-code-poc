@@ -53,13 +53,14 @@ import {
   chainGood,
   chainInput,
   chainStore,
+  holdsBatch,
   makes,
   ownWorkplaces,
   shortGoods,
   surplusWork,
 } from './npc-chain.js'
 import { innerWallProject, outerWalls } from './npc-inner-wall.js'
-import { farmersWanted } from './npc-plan.js'
+import { farmersWanted, foodShort } from './npc-plan.js'
 import { knowsNode } from './npc-scouts.js'
 import { wantsTrainingGround } from './npc-training.js'
 import { Ground } from './placing.js'
@@ -468,8 +469,8 @@ function nearestNode(
  * its own, a house in its area, a big city's training ground there, its new wall); else a farm when the farmers it wants don't fit
  * (`farmersDontFit`); else a house when it has a food surplus and no free housing; else, for an NPC
  * city, a stable once it has a horse (`wantsStable`), or the workplace for the shortest good of its
- * reserve it can make (`chainProject`, `CONTEXT.md`: NPC reserve); else the next stretch of its new
- * wall; else a big city's second workplace (`secondWorkplace`); else, with materials to spare, its
+ * reserve it can make (`chainProject`, `CONTEXT.md`: NPC reserve), or another of a short good's
+ * full workplaces (`anotherWorkplace`); else the next stretch of its new wall; else a big city's second workplace (`secondWorkplace`); else, with materials to spare, its
  * training ground (`wantsTrainingGround`) and its inner ring (`innerWallProject`).
  */
 function wanted(
@@ -517,6 +518,11 @@ function wanted(
       const house = at('house', houseTile(world, city, home, terrain, plan))
       if (house) return house
     }
+    // Its Food runs short and only another farm can take those it has idle.
+    if (foodShort(world, city) && farmsOverflow(world, city)) {
+      const farm = at('farm', farmTile(world, home, terrain, plan))
+      if (farm) return farm
+    }
   }
   if (farmersDontFit(world, city)) {
     const farm = at('farm', farmTile(world, home, terrain, rings))
@@ -534,6 +540,8 @@ function wanted(
       const chain = chainProject(world, city, home, terrain, rings, good)
       if (chain) return chain
     }
+    const another = anotherWorkplace(world, city, home, terrain, rings)
+    if (another) return another
   }
   const next = ring.find((t) => !t.done)
   if (next) return { kind: 'build', building: next.kind, x: next.x, y: next.y }
@@ -546,6 +554,76 @@ function wanted(
     ground() ??
     (rings && innerWallProject(world, city, home, terrain, rings, npcBuilders(world, city)))
   )
+}
+
+/** Whether a city's last pass left someone idle who is free to work: not one carrying a child. */
+function handsIdle(world: WorldState, city: City): boolean {
+  const jobs = world.cityPlans[city.id]?.jobs ?? {}
+  return world.residents.some(
+    (r) => r.cityId === city.id && !r.carrying && jobs[r.id]?.kind === 'idle',
+  )
+}
+
+/** Whether an NPC city's farms all have their crews full, with someone idle who could take a place. */
+export function farmsOverflow(world: WorldState, city: City): boolean {
+  if (city.tradeOrg || !handsIdle(world, city)) return false
+  const farms = world.buildings.filter((b) => b.kind === 'farm' && b.cityId === city.id && !b.site)
+  return farms.length > 0 && farms.every((b) => crewFull(world, b))
+}
+
+/**
+ * Another workplace for a good an NPC city is short of (`CONTEXT.md`: NPC city), with someone idle
+ * to work it: where spare hands would go for the good (`shortPlace`; for a good it processes without
+ * a batch of its input in store, the input's workplaces), when all of those have their crews full. A
+ * farm for Food, on the nearest fitting node it knows of for what is dug or cut, in its area like a
+ * house for what is processed. However many it has: a new one takes the idle first, and only once it
+ * too is full can another follow.
+ */
+function anotherWorkplace(
+  world: WorldState,
+  city: City,
+  home: Building,
+  terrain: TerrainMap,
+  rings: Rings | undefined,
+): BuildProject | undefined {
+  if (!handsIdle(world, city)) return undefined
+  const own = ownWorkplaces(world, city).filter((b) => !b.site)
+  const stock = chainStore(world, city)?.stock
+  const fullGood = (good: Good, seen: Set<Good>): Good | undefined => {
+    if (seen.has(good)) return undefined
+    seen.add(good)
+    const input = chainInput(good)
+    if (input && !holdsBatch(stock, input)) {
+      const lacking = (Object.entries(input) as [Good, number][]).filter(
+        ([g, n]) => (stock?.[g] ?? 0) < n,
+      )
+      for (const [g] of lacking) {
+        const full = fullGood(g, seen)
+        if (full) return full
+      }
+      return undefined
+    }
+    const places = own.filter((b) => chainGood(world, b) === good)
+    return places.length > 0 && places.every((b) => crewFull(world, b)) ? good : undefined
+  }
+  for (const short of shortGoods(world, city)) {
+    const good = fullGood(short, new Set())
+    if (!good) continue
+    if (good === 'food') {
+      const t = farmTile(world, home, terrain, rings)
+      if (t) return { kind: 'build', building: 'farm', ...t }
+      continue
+    }
+    const kind = PROCESSED_BY[good]
+    if (kind) {
+      const t = houseTile(world, city, home, terrain, rings, kind)
+      if (t) return { kind: 'build', building: kind, ...t }
+      continue
+    }
+    const node = nearestNode(world, city, home, terrain, good)
+    if (node) return { kind: 'build', building: NODE_WORKPLACE[node.node.kind], ...node.at }
+  }
+  return undefined
 }
 
 /**
