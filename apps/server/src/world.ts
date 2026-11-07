@@ -52,6 +52,7 @@ import { stepCrimes } from './crimes.js'
 import { stepStanding } from './standing.js'
 import { stepPersuasion } from './persuasion.js'
 import { stepCaptures, type Capture } from './capture.js'
+import { stepOutsiders } from './outsiders.js'
 import { stepNpcCities } from './npc-behaviour.js'
 import { runNpcScripts } from './script-runner.js'
 import { placeCaravans, stepCaravans } from './caravans.js'
@@ -169,6 +170,8 @@ export interface StepResult {
   captures: Capture[]
   /** The NPC cities' residents' scripts that ran this tick (`runNpcScripts`), for tick health. */
   npcScriptRuns: number
+  /** Milliseconds spent noting who came into a City area (`stepOutsiders`), for tick health. */
+  outsidersMs: number
 }
 
 /**
@@ -299,6 +302,10 @@ function stepRest(
   stepDebts(world)
   stepPersuasion(world, terrain.size)
   stepArmies(world, terrain.size)
+  // Who came into a City area, now that everyone has moved and nobody changes sides this tick.
+  const outsidersFrom = performance.now()
+  stepOutsiders(world, terrain.size)
+  const outsidersMs = performance.now() - outsidersFrom
   // Workplace settings of buildings and realms that went this tick go with them.
   stepWorkplaceSettings(world)
   // Offers follow what this tick took from their storages, or the storages themselves.
@@ -319,5 +326,5 @@ function stepRest(
     accepted +
     buyOffs +
     debtsPaid
-  return { actions, survival, combat, horsesDied, aging, captures }
+  return { actions, survival, combat, horsesDied, aging, captures, outsidersMs }
 }

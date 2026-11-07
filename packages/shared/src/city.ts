@@ -236,6 +236,21 @@ export function citiesAt(
   return world.cities.filter((c) => inCityArea(world, c, x, y, size))
 }
 
+/** The ids of the cities whose area the tile lies in (`citiesAt`), going through the buildings once. */
+export function cityIdsAt(
+  world: { buildings: readonly Building[] },
+  x: number,
+  y: number,
+  size: number,
+): string[] {
+  const ids: string[] = []
+  for (const b of world.buildings) {
+    if (b.cityId === null || !isCityBuilding(b) || ids.includes(b.cityId)) continue
+    if (nearFootprint(b, { x, y }, CITY_AREA_MARGIN, size)) ids.push(b.cityId)
+  }
+  return ids
+}
+
 /** Every tile in a city's area, as "x,y" keys on the map. */
 export function cityAreaTiles(
   world: { buildings: readonly Building[] },
@@ -419,18 +434,35 @@ export function defendsCity(
  * soldiers occupy only as an army come to take the city (`cityTakers`). None while the hall is gone.
  * `size` is the map's.
  */
-export function occupierOf(
-  world: Pick<
-    WorldState,
-    'buildings' | 'alliances' | 'residents' | 'contracts' | 'punishments' | 'debts'
-  >,
+export function occupierOf(world: OccupationWorld, city: City, size: number): string | null {
+  return occupationOf(world, city, size)?.realm ?? null
+}
+
+/**
+ * The armed residents occupying a city's town hall (`occupierOf`), by whose standing there it is
+ * occupied; none while nobody occupies it. `size` is the map's.
+ */
+export function occupiersOf(world: OccupationWorld, city: City, size: number): Resident[] {
+  return occupationOf(world, city, size)?.residents ?? []
+}
+
+/** What of the world decides who occupies a town hall. */
+type OccupationWorld = Pick<
+  WorldState,
+  'buildings' | 'alliances' | 'residents' | 'contracts' | 'punishments' | 'debts'
+>
+
+/** Who occupies a city's town hall right now: `occupierOf` and `occupiersOf`. */
+function occupationOf(
+  world: OccupationWorld,
   city: City,
   size: number,
-): string | null {
+): { realm: string; residents: Resident[] } | null {
   const hall = townHallOf(world, city)
   if (!hall) return null
   const takers = cityTakers(world, city)
   let occupier: string | null = null
+  const residents: Resident[] = []
   for (const r of world.residents) {
     if (!isArmed(r) || !isAt(r, hall, size)) continue
     if (defendsCity(world, city, r, size)) return null
@@ -443,8 +475,30 @@ export function occupierOf(
       continue
     if (occupier !== null && occupier !== realm) return null
     occupier = realm
+    residents.push(r)
   }
-  return occupier
+  return occupier === null ? null : { realm: occupier, residents }
+}
+
+/**
+ * Whether `r` is someone occupying `city`'s town hall (`CONTEXT.md`: Crime): armed, on its
+ * footprint, and one who could hold it (`occupierOf`). A defender stepping onto the hall breaks
+ * the occupation, but those still standing on it are the same occupiers.
+ */
+export function standsOccupying(
+  world: Pick<WorldState, 'buildings' | 'alliances' | 'contracts' | 'punishments' | 'debts'>,
+  city: City,
+  r: Resident,
+  size: number,
+): boolean {
+  const hall = townHallOf(world, city)
+  if (!hall || !isArmed(r) || !isAt(r, hall, size) || defendsCity(world, city, r, size)) {
+    return false
+  }
+  const forTradeOrg = world.contracts.some(
+    (c) => c.startedAt !== null && c.hirerId === TRADE_ORG && c.residentIds.includes(r.id),
+  )
+  return !forTradeOrg && (r.owner !== null || cityTakers(world, city).has(r.id))
 }
 
 /**

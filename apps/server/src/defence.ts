@@ -35,13 +35,19 @@ export function defendsByScript(world: WorldState, t: Resident): boolean {
  * (`CONTEXT.md`: Defence script). It is the script their Player picked for them
  * (`Resident.defenceScriptId`) while that Player commands them, else the Defend default of the
  * realm commanding them (script id 0, which the runner resolves). Either runs as task `defend`.
- * Nor does it start over what the Player gave them under attack, while that holds.
+ * Nor does it start over what the Player gave them under attack, while that holds. Their Alarm
+ * script it keeps aside in turn, with what that interrupted staying where it is (`CONTEXT.md`:
+ * Alarm script).
  */
 export function startDefence(world: WorldState, t: Resident): void {
-  if (t.interrupted || t.givenUnderAttack) return
+  const alarm = t.script?.task === 'alarm' ? t.script : undefined
+  if ((t.interrupted && !alarm) || t.givenUnderAttack) return
   // Being struck ends a wait (`CONTEXT.md`: Running a script, Waiting): back, it runs again.
   if (t.script) delete t.script.waitingSince
-  t.interrupted = { order: t.order, ...(t.script ? { script: t.script } : {}) }
+  t.interrupted =
+    alarm && t.interrupted
+      ? { ...t.interrupted, alarm: { order: t.order, script: alarm } }
+      : { order: t.order, ...(t.script ? { script: t.script } : {}) }
   // A driver goes on driving until their defence script says otherwise, and one that ends at once
   // hands back with nothing lost. Blows land every few ticks: a restart at each would keep the
   // carriage where it is (`CONTEXT.md`: On a carriage under attack).
@@ -70,11 +76,20 @@ function orderGoingOn(world: WorldState, r: Resident, o: ResidentOrder | null) {
 /**
  * The defence script ended: what it interrupted goes on, the script with its memory, the order
  * where it was (`orderGoingOn`), the queue step with them. A drive it never took them off goes on
- * as it is, its path and progress with it. False when no defence script ran.
+ * as it is, its path and progress with it. An Alarm script it kept aside goes on first, with what
+ * that interrupted still aside (`CONTEXT.md`: Alarm script). The same for an Alarm script that ended.
+ * False when neither ran.
  */
 export function resumeInterrupted(world: WorldState, r: Resident): boolean {
   const kept = r.interrupted
   if (!kept) return false
+  if (kept.alarm) {
+    const { alarm, ...under } = kept
+    r.interrupted = under
+    if (r.order !== alarm.order) r.order = orderGoingOn(world, r, alarm.order)
+    r.script = alarm.script
+    return true
+  }
   delete r.interrupted
   if (r.order !== kept.order) r.order = orderGoingOn(world, r, kept.order)
   if (kept.script) r.script = kept.script
@@ -96,9 +111,10 @@ const GOES_ON_UNTIL_STOPPED: ReadonlySet<ResidentOrder['kind']> = new Set([
 /**
  * Whether `r` counts as under attack for an order given now (`CONTEXT.md`: A Player's order under
  * attack): their defence script runs, or the last blow is within the calm time Defend waits for.
+ * An Alarm script running says nothing of it (`CONTEXT.md`: Alarm script).
  */
 export function underAttack(world: WorldState, r: Resident): boolean {
-  if (r.interrupted) return true
+  if (r.interrupted && r.script?.task !== 'alarm') return true
   return r.struck !== undefined && world.tick - r.struck.tick < DEFEND_CALM_TICKS
 }
 
@@ -155,17 +171,17 @@ export const givenUnderAttackSound: Invariant = {
 }
 
 /**
- * Invariant (ADR 0004; `CONTEXT.md`: Defence script): a resident with something kept aside in
- * `interrupted` is running their defence script.
+ * Invariant (ADR 0004; `CONTEXT.md`: Defence script, Alarm script): a resident with something kept
+ * aside in `interrupted` is running their defence or Alarm script.
  */
 export const interruptedSound: Invariant = {
   name: 'interrupted-runs-defence',
   check: (world) =>
     world.residents
-      .filter((r) => r.interrupted && r.script?.task !== 'defend')
+      .filter((r) => r.interrupted && r.script?.task !== 'defend' && r.script?.task !== 'alarm')
       .map((r) => ({
         invariant: 'interrupted-runs-defence',
-        message: `${r.id} has something interrupted but runs no defence script`,
+        message: `${r.id} has something interrupted but runs no defence or Alarm script`,
         entityIds: [r.id],
       })),
 }

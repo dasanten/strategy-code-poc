@@ -167,7 +167,7 @@ function quartersPlan(
  * How far either way of its line a circle of tiles reaches: half a tile's diagonal. Drawn that wide
  * it has no gaps, its tiles joining side to side all the way round.
  */
-const CIRCLE_REACH = Math.SQRT1_2
+export const CIRCLE_REACH = Math.SQRT1_2
 
 /**
  * Rings: circular lanes round the middle of the town hall, which never moves, `CITY_RING_STEP` tiles
@@ -334,6 +334,7 @@ const STREET_SIDE: readonly BuildingKind[] = [
   'smithy',
   'mint',
   'stable',
+  'trainingGround',
 ]
 
 /**

@@ -478,13 +478,15 @@ The shared language of the game. Domain terms only — no implementation details
   the walk and the first days, and the carrier brings the crew's Food back: Crew food), pairs its adults,
   builds a house when it has a food surplus and no free housing, and shares its adults out:
   soldiers by its size first; then farmers, as many as feed everyone (one farmer feeds about
-  four) and one more while it has no food surplus, building a farm when they don't fit; then at
-  most two builders while it has a project; everyone else is its **spare hands**. A worker stays
-  where they are until the city moves them. Beyond that it is driven by its
+  four) and one more while it has no food surplus, building a farm when those it keeps don't
+  fit, or when Food is short of its reserve with every farm at its full crew (below); then builders while it has a project, at most two in a village and more as it grows (a balance
+  number); everyone else is its **spare hands**. Its planning pass gives each free adult the job
+  that scores highest (ADR 0029). A worker stays where they are until another job beats theirs by a
+  margin, so nobody goes back and forth. Beyond that it is driven by its
   reserve (NPC reserve): its spare hands go to the good shortest of its reserve first; they work
   the workplace that makes the good, or build it first on the nearest fitting resource node
   (within a set reach of its home, or further out where a Scout found one) and work it like its other workplaces, carrying the output to
-  its storage (Crew food). So a city builds the whole chain its land allows, one need at a time:
+  its storage (Crew food). With every workplace of a short good at its full crew and someone idle, it opens another, however many it has: on the nearest fitting node for what is dug or cut, in its area for what is processed. Food short with every farm at its full crew opens another farm even with nobody idle: its farmers come from those working for surplus and from its scouts first (Spare hands' work), and from other work only after them. A farm already begun is finished before another. While Food runs short that farm is the one thing it builds, besides a first farm. So a city builds the whole chain its land allows, one need at a time:
   weapons short means a smithy, which wants Iron, so a smelter, which wants ore, so a mine. A
   good it knows no node of stays short; the city buys it from its trader or a visiting trader,
   or does without. With nothing short its spare hands still have work (Spare hands' work). When it has no room left inside its wall it grows its area
@@ -497,24 +499,59 @@ The shared language of the game. Domain terms only — no implementation details
   Player's sight.
 - **NPC reserve:** what an NPC city keeps of each good it can use, and never sells: Food for
   some game days for all its residents, and what its stable lacks for its horses (Feeding the
-  stable; the stable's Food counts); Wood and Stone for its next house and some wall; weapons
+  stable; the stable's Food counts); Wood and Stone for its next house and some wall, more as it grows; weapons
   for the soldiers it keeps by its size, and the Iron and Wood to forge them; Coins as its war
   chest, for buying what it lacks and hiring help. A stable is wanted once it has horses, or with
   none once nothing else is short (NPC horses), a mint only with a gold node it knows of. Whatever its storages hold above the reserve is its surplus,
   for sale (Trading with an NPC city); whatever is below is short and drives what it works and
-  builds next (NPC city).
+  builds next (NPC city). Coins below the war chest count as short only for a city with a way to
+  earn them: gold or a mint of its own (a mint or gold mine, finished or begun, Gold ore in its
+  storages, or a gold node it knows of), or trade in reach (a Trade Org warehouse within its NPC
+  trader's reach of its home, or a wandering trader whose loop passes close enough to stop at it,
+  Trader stop). A Player's offer doesn't count: offers come and go. A city with none of these keeps
+  its war chest for everything else (its prices, what it sells and buys, what its traders take
+  along, and taking a Player's offer that pays Coins while under it), but it never waits on Coins
+  it can't earn.
 - **Spare hands' work:** with nothing short of its reserve, an NPC city's spare hands don't stand
   idle. In this order they go on a road crew while it has a road to build (NPC road), scout (Scout),
   and otherwise work at its workplaces for **surplus**, past the reserve, up to a cap per good (a
-  balance number). What is short, its trader and a founding party still take them first, and they
-  count as spare hands for a Full city. Trade Org cities do none of this.
+  balance number that grows with its residents). With a crew full and its good below the cap, a big
+  city opens a second workplace of that kind on a node it knows. What is short, its traders and a
+  founding party still take them first, and they count as spare hands for a Full city: Food short
+  with every farm full opens another farm, and those working for surplus and scouting are its first
+  farmers (NPC city). Trade Org
+  cities do none of this.
+- **Standing idle:** an NPC city's adults with nothing to do, those carrying a child and its children
+  stand at a house of the city, not at its storage; a city with no house, at its home.
+- **Soldier posts:** between fights an NPC city's soldiers stand spread out: first on its town hall,
+  then at its gates and along its wall, each on the post their id gives them among those the city
+  has: a balance number on the hall, one at each gate (a balance number too), the rest on the tiles of
+  its wall they can get up to. While its wall has too few tiles for them, or it has none, they also
+  stand on the free ground around its hall. Once on a stretch of wall they stay, so a new one moves
+  nobody. They eat where they stand (Refilling at home), and keep any spare Food on them. When those on the hall or at a gate are called
+  away or die, the next by id take their place at the city's next pass. Some of those on its wall (a
+  share of them, at most a balance number whatever its size) walk a round along it and its roads
+  inside it, and back to where they set out, in turns by id. They refill as they walk, and one low on
+  Food with none to take stops and goes back to their post; a stop they can't get to they skip. In a
+  city with a training ground some train (Who trains). An alarm takes them from any of this, and they
+  come back (Alarm): one on a round goes on with it. Trading posts and the HQ keep their own rules.
+- **Bigger projects:** once nothing is short, from materials above its reserve, a big NPC city (by a
+  balance number of residents) builds beyond its needs: a training ground, an inner ring of wall
+  round its town hall and storage with a gate, and more roads (NPC road). The inner ring goes up tile
+  by tile like its outer wall, once that has its gate and isn't moving out, and waits whenever
+  something runs short. It takes the shape that leaves fewest gaps, along its layout's streets where
+  it can: a square on the lanes round the town hall in Grid, a circle on the first lane in Rings. What
+  stands on its line leaves a gap, as in any wall, and a street it crosses stops at it. Its gate
+  stands in line with the outer gate and goes up last, so its people never lose the way to the
+  storage. The city grows its outer wall as before, and never tears the inner ring down.
 - **NPC road:** a road an NPC city builds with a **road crew** of its spare hands (at most a balance
-  number at once, apart from its builders), only from materials above its reserve. Its layout's
+  number at once, which grows with the city, apart from its builders), only from materials above its reserve. Once the city would otherwise be full (Full city), it also leaves a town hall's and a storage's materials untouched, so founding comes before roads. Its layout's
   streets come first (City layout). Then it follows the
   way a resident would walk, tile by tile, skipping tiles that have a road: first from its home to
   each of its workplaces outside its area, nearest first; then to the nearest Trade Org warehouse
   in its trader's reach, leaving out those of the HQ's inner ring, which keeps everyone out; then to
-  the edge of its nearest neighbour city's area. Like any road nobody owns it, and anyone can use it
+  the edge of its nearest neighbour city's area; a big city goes on to further warehouses and
+  neighbours, nearest first. Like any road nobody owns it, and anyone can use it
   or tear it down; a tile torn down is laid again in time. A way too long (a balance number, in
   tiles) or with no way through is given up. A road two cities would each build between them is
   built by only one. The crew takes Food along, never starts a tile with too little to walk home
@@ -534,16 +571,24 @@ The shared language of the game. Domain terms only — no implementation details
   Trade Org warehouse (HQ or trading post) lies within a set reach, one of its spare hands,
   never a soldier, carries the load there, sells it, buys the good shortest of the reserve that
   the city has no node for, as far as its coins and their arms allow, and walks home to the
-  storage. One trader per city at a time. Nothing protects them on the way but what they carry.
-- **Full city:** an NPC city that for a whole game week has had spare hands (idle, on a road crew, scouting or working for surplus) and nothing
-  short of its reserve, holds a food surplus, and holds a town hall's and a storage's materials
-  above its reserve. A full city founds a daughter (Founding).
+  storage. A village sends one trader at a time, a bigger city more by its size (a balance number),
+  each on their own run; they spread over the goods with surplus, and only with no other good to
+  sell does one take a second load of a good already on the road. Nothing protects them on the way but what they carry.
+- **Full city:** an NPC city that for a whole game week, less the bigger it is (a balance number), has had spare hands (idle, on a road crew, scouting or working for surplus) and nothing
+  short of its reserve, holds a food surplus, and holds its founding party's materials
+  above its reserve. Coins it has no way to earn are not short (NPC reserve), so a city that can't
+  earn them isn't held back by its war chest. A dip below the reserve only restarts that time if it lasts longer than a game
+  day, though nothing sets out during one. A full city founds a daughter (Founding).
 - **Founding:** how a full NPC city spreads out. It picks a free Plains site the usual distance
   from every city, within a set reach of itself and on no realm's territory, nearest a node of
   the good it is short of and has no node for. A **founding party** of a village's worth of
-  adults, one of them armed, each carrying a share of the materials and Food for the walk and
+  adults, more from a big city, one of them armed, each carrying a share of the materials (a town
+  hall's and a storage's, and houses for those past a village's worth) and Food for the walk and
   the first weeks, walks there and builds the town hall, which founds the **daughter** as an
-  ordinary NPC city with a name from the game; then its storage, a farm and a house. Its first
+  ordinary NPC city with a name from the game; then its storage, a farm and a house. Until its
+  storage stands its armed residents build with the rest, since the materials are on them and
+  there is nowhere else to put them. A member gone back to the mother's storage for materials
+  when the town hall stands comes to the daughter instead. Its first
   wall comes later out of its own reserve, a ring round its home. Mother and daughter are
   independent and hold each other in high standing, which fades like any standing; neither
   shares anything with the other. A city founds again once it is full again. Trading posts and
@@ -638,7 +683,8 @@ The shared language of the game. Domain terms only — no implementation details
   (Control): by default they fight back when armed and go home when not, and then go on with
   what they were doing. Scripts see who last struck a resident and when (`struckBy`, `struckAt`),
   as far as the Player may see how that resident fares.
-  A city's soldiers fight attackers in its area on their own.
+  A trading post's and the HQ's soldiers fight attackers in its area on their own; every other city's
+  armed residents go by the Alarm script (Alarm).
 - **Walls in combat:** nobody walks through a wall. The city's own realm and its allies can stand on its walls
   and defend far better there. A **gate** lets the city's realm and its allies through always, everyone else
   only while it is open; the city's realm opens and closes it. A wall or gate can be **broken**
@@ -656,8 +702,8 @@ The shared language of the game. Domain terms only — no implementation details
   occupier on the hall counts as another realm, so nobody occupies it. The occupation starts the
   tick that holds and runs as long as it keeps holding; the first tick it doesn't, it is broken
   and its days are lost: the next one starts again from nothing. The city goes on as before
-  meanwhile; its soldiers fight the occupiers as they fight any attacker in its area. Its realm's
-  log says when its town hall is occupied, by whom, and when the occupation is broken. Anyone
+  meanwhile; its soldiers fight the occupiers (Alarm; a trading post's and the HQ's on their own),
+  which is no crime. Its realm's log says when its town hall is occupied, by whom, and when the occupation is broken. Anyone
   with the town hall in sight sees who occupies it and how long is left; scripts see it too.
 - **Mercenary contract:** one Organization rents residents to another for coins over a period.
   One side offers (residents, game days, price per game week, a storage of the lender to pay
@@ -698,7 +744,12 @@ The shared language of the game. Domain terms only — no implementation details
 
 ## Crime and reputation
 
-- **Crime:** theft, attack, killing or tearing down buildings against another organization.
+- **Crime:** theft, attack, killing or tearing down buildings against another organization. In a
+  city's own City area, striking someone occupying its town hall, or a thief of its realm that the
+  realm knows of or one of its residents saw, is no crime; for an NPC city, the same for the city.
+  Someone occupying is someone armed standing on the hall who could hold it, also once a defender
+  stepping onto the hall has broken the occupation; one who has walked off it no longer is.
+  Striking anyone else there still is.
 - **Witness:** a resident who sees a crime (within sight range), or a victim who survives it. A
   crime only becomes known when a witness physically brings the news home. No witness, no
   consequences.
@@ -947,9 +998,12 @@ The shared language of the game. Domain terms only — no implementation details
   skill to teach. Training costs nothing but time and food: teacher and trainees eat as usual and
   refill at the ground as at a workplace (Refilling at a workplace); the Train default has the
   usual food params. Nothing trained decays; only old age lowers stats.
-- **Who trains:** Players' residents, by order, queue step or script. NPC cities and the Trade
-  Organization train nobody for now; whether an NPC city puts a spare hand to teaching its
-  soldiers is a question for the reserve-driven chain (NPC city), not settled here. Scripts have
+- **Who trains:** Players' residents, by order, queue step or script, and the soldiers of a big NPC
+  city with a training ground (Bigger projects): its soldier with the most Combat teaches, among
+  equals the strongest, and others train in turns of a balance number of days, Combat while any of them
+  is below the teacher in it, else Strength, with the posts on its hall and gates still held. A ground
+  sits empty with too few soldiers left over for a teacher and a trainee, or with nothing anyone can
+  learn from the teacher. A city's ground is the one in its area. The Trade Organization trains nobody for now. Scripts have
   `teach(subject)` and `train()`; a building's script view shows its teacher, subject and trainees.
 - **Carry capacity:** the most weight a resident can carry, set by Strength. Everything has weight,
   including money, so nobody walks around with a fortune in their pocket.
@@ -1321,6 +1375,43 @@ The shared language of the game. Domain terms only — no implementation details
   A Player's own defence script decides for itself: a driver's drive or haul route goes on until it
   gives them another order. Residents with no Player follow the same rule, and a caravan's driver
   under attack doesn't wait for their escort.
+- **Alarm:** something happening in a City area that residents at home can react to (ADR 0028). Four
+  kinds: **outsider**, someone of another realm, not allied, entering the area, raised once on
+  entering, and again if they leave and come back (Trade Org caravans and wandering traders, with
+  their crews, don't count); **theft**, someone stealing from the realm (goods, a carriage or a
+  horse); **occupied**, an occupation of the city's town hall starting (Occupying a town hall);
+  **attacked**, someone attacking a wall or gate of the city, or striking a resident of the realm
+  standing in its area, a blow struck in fighting back aside. It is raised once per attacker, the
+  first time someone at home sees them at it, and again only once no blow has come from them for the
+  calm time Defend waits for; it doesn't interrupt those already fighting, and the one struck runs
+  their Defence script. An alarm reaches the residents standing in that city's area who see it
+  (Sight); an occupation reaches all of them, and in an NPC city also those who come home or get armed
+  while it lasts. It runs their Alarm script. Army members, those hired out and those driving a carriage
+  get no alarm, nor do an NPC city's founding party, and someone already attacking gets no outsider
+  alarm. Someone of an NPC city or of the Trade Organization counts as of another realm here.
+- **Alarm script:** the script a resident runs when an alarm reaches them: for an armed resident the
+  game's **Alarm** default, unless the Player picked one of their own scripts or None for that
+  resident, on the card's Script tab or the group card; an unarmed resident runs one only if the
+  Player picked it. It interrupts and hands back like a Defence script: when it calls `end()`, what
+  they were doing goes on. A blow still runs the Defence script, and once that ends the Alarm script
+  goes on. One alarm doesn't interrupt another, with two exceptions: a theft or an attack takes over
+  from an outsider alarm, unless they are already attacking someone, and an occupation takes over
+  from any other. The script goes on with its memory, `me.alarm` now the new one. When it calls
+  `end()`, an outsider alarm it took over from goes on: those holding the hall go after the thief or
+  attacker, then back to holding while armed outsiders remain. An armed outsider who lures them away
+  and steps onto the hall raises the occupied alarm, and they all come back. While a Defence script
+  runs or a Player's order given under attack holds, an alarm doesn't reach them. A Player's order
+  given meanwhile ends both.
+  Scripts read `me.alarm`: its kind, who it is about and their realm, the city and tile, and when;
+  `inCityArea(cityId, x, y)` says whether a tile lies in a City area, for a city of their realm or a
+  tile in sight, `cityAreaAt(x, y)` which city's area it lies in, and `outsidersIn(cityId)` lists the
+  outsiders they see in a City area. **The Alarm default:** a thief, an occupier or an attacker it goes after
+  until they are dead or have left the area or sight; for an armed outsider it walks to the town
+  hall and stands there until no armed outsider is left in the area, which blocks an occupation
+  before it starts; an unarmed outsider it only logs. NPC villages, towns and self-managed cities
+  run this default for their armed residents, and nothing else: no Player picks theirs, and a blow
+  has them fight back first as under the Defend default, then the script goes on. Trading posts and
+  the HQ keep their own rules.
 - **Doing:** the line on a resident's card and in the resident list that says what they are
   doing, shown to the owning Player only. It is derived from their task and current order
   ("Building a house: fetching 10 wood from the storage", "Working the farm"); the script they

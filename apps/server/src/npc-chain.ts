@@ -6,6 +6,7 @@ import {
   buildingAt,
   materialsNeeded,
   npcCityStock,
+  npcNeedsScale,
   npcReserve,
   recipeFor,
   stockFloor,
@@ -19,6 +20,7 @@ import {
   type Stock,
   type WorldState,
 } from '@csp/shared'
+import { earnsCoins } from './npc-coins.js'
 
 /*
  * The chain an NPC city's reserve drives (`CONTEXT.md`: NPC city, NPC reserve): which goods it is
@@ -72,14 +74,21 @@ export function holdsBatch(stock: Stock | undefined, input: Stock): boolean {
   return (Object.entries(input) as [Good, number][]).every(([g, n]) => (stock?.[g] ?? 0) >= n)
 }
 
+/** A good a city is short of, and how much of what it wants of it it lacks, 0 to 1. */
+export interface Shortage {
+  good: Good
+  share: number
+}
+
 /**
- * The goods an NPC city is short of (`CONTEXT.md`: NPC reserve), the shortest first: what its
- * storages lack of its reserve (`npcReserve`; a Trade Org city, what its warehouses lack of their
- * stock floor, `tradeOrgReserve`), and of the materials its `project` still needs
- * beyond that, as a share of what it wants of each. Ties go by the reserve's order (Food,
- * building materials, weapons, their Iron, Coins).
+ * What an NPC city lacks of its reserve, the shortest first: what its storages lack of it
+ * (`npcReserve`; a Trade Org city, what its warehouses lack of their stock floor,
+ * `tradeOrgReserve`), and of the materials its `project` still needs beyond that, as a share of
+ * what it wants of each. Its whole war chest counts, whether or not it can earn Coins: a trade it
+ * takes goes by this (`CONTEXT.md`: NPC cities at an offer). What it counts as short is
+ * `shortages`. Ties go by the reserve's order (Food, building materials, weapons, their Iron, Coins).
  */
-export function shortGoods(world: WorldState, city: City, project?: CityProject): Good[] {
+export function reserveLacks(world: WorldState, city: City, project?: CityProject): Shortage[] {
   const want = city.tradeOrg ? tradeOrgReserve(world, city) : npcReserve(world, city)
   for (const [good, n] of Object.entries(projectNeeds(world, project)) as [Good, number][]) {
     want[good] = (want[good] ?? 0) + n
@@ -89,13 +98,42 @@ export function shortGoods(world: WorldState, city: City, project?: CityProject)
     .map(([good, n]) => ({ good, share: n > 0 ? (n - (stock[good] ?? 0)) / n : 0 }))
     .filter((s) => s.share > 1e-9)
     .sort((a, b) => b.share - a.share)
-    .map((s) => s.good)
+}
+
+/**
+ * What an NPC city is short of (`CONTEXT.md`: NPC reserve), the shortest first: what it lacks of
+ * its reserve and its project (`reserveLacks`), Coins only for a city that can earn them
+ * (`earnsCoins`). One that can't keeps its war chest in its reserve but doesn't count it as short.
+ * `size` is the map's.
+ */
+export function shortages(
+  world: WorldState,
+  city: City,
+  size: number,
+  project?: CityProject,
+): Shortage[] {
+  const short = reserveLacks(world, city, project)
+  // Looked into only once Coins are short: finding a way to earn them looks over the map.
+  if (city.tradeOrg || !short.some((s) => s.good === 'coins') || earnsCoins(world, city, size)) {
+    return short
+  }
+  return short.filter((s) => s.good !== 'coins')
+}
+
+/** The goods an NPC city is short of, the shortest first (`shortages`). `size` is the map's. */
+export function shortGoods(
+  world: WorldState,
+  city: City,
+  size: number,
+  project?: CityProject,
+): Good[] {
+  return shortages(world, city, size, project).map((s) => s.good)
 }
 
 /**
  * How an NPC city weighs its workplaces for surplus work (`CONTEXT.md`: Spare hands' work), from
- * what it holds now: for a workplace, how full its good's cap is (`NPC_SURPLUS_CAP`, past the
- * reserve), below 1 and lowest for the good that wants hands most. Undefined for one not to be
+ * what it holds now: for a workplace, how full its good's cap is (`NPC_SURPLUS_CAP` for each step of
+ * its needs, `npcNeedsScale`, past the reserve), below 1 and lowest for the good that wants hands most. Undefined for one not to be
  * worked for surplus: its good at its cap or with no cap, or a workplace that processes goods
  * while `storage` holds a batch of its input only by eating into the reserve.
  */
@@ -106,6 +144,7 @@ export function surplusWork(
 ): (place: Building) => number | undefined {
   const stock = npcCityStock(world, city)
   const reserve = npcReserve(world, city)
+  const steps = npcNeedsScale(world, city)
   const spare: Stock = {}
   for (const [good, n] of Object.entries(storage?.stock ?? {}) as [Good, number][]) {
     spare[good] = n - (reserve[good] ?? 0)
@@ -116,7 +155,7 @@ export function surplusWork(
     if (!good || !cap) return undefined
     const input = chainInput(good)
     if (input && !holdsBatch(spare, input)) return undefined
-    const full = ((stock[good] ?? 0) - (reserve[good] ?? 0)) / cap
+    const full = ((stock[good] ?? 0) - (reserve[good] ?? 0)) / (cap * steps)
     return full < 1 ? full : undefined
   }
 }

@@ -13,6 +13,7 @@ import {
   foodForWay,
   inCityArea,
   isArmed,
+  horseLiesDown,
   isCityBuilding,
   middleOf,
   isAt,
@@ -343,6 +344,8 @@ function driveToLostPost(
   carriage: Carriage,
   size: number,
 ): void {
+  // Its horse Down, the carriage stands until it wakes or dies (`CONTEXT.md`: Down).
+  if (horseLiesDown(world, carriage)) return
   const standing = world.buildings.filter((b) => b.cityId === city.id && isCityBuilding(b))
   if (trader.misses >= TRADER_DRIVE_TRIES || standing.length === 0) return goOn(world, trader)
   const nearest = standing.reduce((a, b) =>
@@ -388,6 +391,8 @@ function runTrader(
     return
   }
   if (!isAt(driver, stop, size)) {
+    // Its horse Down, the carriage stands until it wakes or dies (`CONTEXT.md`: Down).
+    if (horseLiesDown(world, carriage)) return
     if (trader.misses >= TRADER_DRIVE_TRIES) return goOn(world, trader)
     trader.misses++
     const target = { x: stop.x, y: stop.y }

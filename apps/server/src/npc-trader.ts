@@ -2,6 +2,7 @@ import {
   GOOD_WEIGHT,
   NODE_GOOD,
   NPC_OFFER_REACH,
+  NPC_RESIDENTS_PER_TRADER,
   NPC_TRADER_GIVE_UP_DAYS,
   NPC_TRADER_REACH,
   PRICED_GOODS,
@@ -10,6 +11,7 @@ import {
   WEAPONS,
   allied,
   carryCapacity,
+  cityResidents,
   handsOf,
   inCityArea,
   isArmed,
@@ -48,43 +50,94 @@ import {
 import { caravanCrew } from './caravans.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { npcHome, walkTo } from './npc-behaviour.js'
-import { chainInput, makes, projectNeeds, shortGoods } from './npc-chain.js'
+import { chainInput, makes, projectNeeds, reserveLacks, shortGoods } from './npc-chain.js'
 import { knowsNode } from './npc-scouts.js'
 import { farmersWanted } from './npc-plan.js'
 
 /*
- * An NPC city's own trade run (`CONTEXT.md`: NPC trader). Its planning pass sends one spare hand
- * with a full load of a surplus good to the nearest Trade Org warehouse in reach (`planTrader`);
- * between passes the city walks them through the run with orders a Player could give
- * (`runTrader`, ADR 0002): load up at the storage, walk to the warehouse, sell, buy, walk home,
- * put everything away. The run is kept in the city's plan (`CityPlan.trader`). The same trader
- * goes to a Player's offer in reach when one suits the city (`CONTEXT.md`: NPC cities at an offer;
- * `planOfferRun`, `runToOffer`), and only the planning pass looks for one (ADR 0016).
+ * An NPC city's own trade runs (`CONTEXT.md`: NPC trader). Its planning pass sends spare hands, up
+ * to the number its size allows (`tradersWanted`), each with a full load of a surplus good to the
+ * nearest Trade Org warehouse in reach (`planTrader`); between passes the city walks each through
+ * their run with orders a Player could give (`runTrader`, ADR 0002): load up at the storage, walk to
+ * the warehouse, sell, buy, walk home, put everything away. The runs are kept in the city's plan
+ * (`CityPlan.traders`). A trader goes to a Player's offer in reach when one suits the city
+ * (`CONTEXT.md`: NPC cities at an offer; `planOfferRun`, `runToOffer`), and only the planning pass
+ * looks for one (ADR 0016).
  */
 
 /** Ticks after it left that a city stops waiting for its trader (`NPC_TRADER_GIVE_UP_DAYS`). */
 const GIVE_UP_TICKS = NPC_TRADER_GIVE_UP_DAYS * TICKS_PER_GAME_DAY
 
 /**
- * The city's trader still out (`CONTEXT.md`: NPC trader), at the start of its planning pass: one
- * out longer than `NPC_TRADER_GIVE_UP_DAYS` (dead, robbed, stuck) is dropped from the plan first,
- * so the city may send another. The city doesn't know before then that a trader died.
+ * How many traders a city has out at once (`CONTEXT.md`: NPC trader): one for each
+ * `NPC_RESIDENTS_PER_TRADER` of its residents, and a village keeps one.
  */
-export function traderOut(world: WorldState, plan: CityPlan): string | undefined {
-  if (plan.trader && world.tick - plan.trader.since > GIVE_UP_TICKS) delete plan.trader
-  return plan.trader?.residentId
+export function tradersWanted(world: WorldState, city: City): number {
+  return Math.max(1, Math.floor(cityResidents(world, city).length / NPC_RESIDENTS_PER_TRADER))
 }
 
 /**
- * The trader's part of a planning pass (`CONTEXT.md`: NPC trader), for an NPC city with no trader
- * out (`traderOut`) once its other adults have their jobs. While no armed outsider stands in its
- * area one of its spare hands, idle ones first, never a soldier, goes to a Player's offer that
- * suits the city (`planOfferRun`), the only run it makes while Food is short. Else a surplus good
- * that makes a full load (`traderLoad`) and a Trade Org warehouse within `NPC_TRADER_REACH` that
- * prices it send them: they sell the load there and buy the good shortest of the reserve it has no
- * node for (`buyGood`). Their job becomes `trade`.
+ * The city's traders still out (`CONTEXT.md`: NPC trader), at the start of its planning pass: one
+ * out longer than `NPC_TRADER_GIVE_UP_DAYS` (dead, robbed, stuck) is dropped from the plan first,
+ * so the city may send another. The city doesn't know before then that a trader died.
  */
-export function planTrader(
+export function tradersOut(world: WorldState, plan: CityPlan): Set<string> {
+  const out = plan.traders?.filter((t) => world.tick - t.since <= GIVE_UP_TICKS) ?? []
+  if (out.length > 0) plan.traders = out
+  else delete plan.traders
+  return new Set(out.map((t) => t.residentId))
+}
+
+/** What a city's traders out have spoken for, so the next one sent counts on the rest. */
+interface SpokenFor {
+  /** What they have yet to fetch from the storage. */
+  takes: Stock
+  /** The goods they mean to sell. */
+  sells: Set<Good>
+  /** The goods they mean to bring home. */
+  brings: Set<Good>
+}
+
+/**
+ * What the city's traders out have spoken for: the load each has yet to fetch, and with it the coins
+ * above its reserve when they buy; what they sell; and what they bring home from a warehouse, a
+ * visiting trader or an offer.
+ */
+function spokenFor(world: WorldState, city: City, plan: CityPlan, adults: Resident[]): SpokenFor {
+  const spoken: SpokenFor = { takes: {}, sells: new Set(), brings: new Set() }
+  const add = (good: Good, units: number) => {
+    spoken.takes[good] = (spoken.takes[good] ?? 0) + units
+  }
+  for (const t of plan.traders ?? []) {
+    const r = adults.find((x) => x.id === t.residentId)
+    const sells = Object.entries(t.sells) as [Good, number][]
+    const fetched =
+      t.visitingId !== undefined ? !!t.loaded : sells.every(([g]) => (r?.carried[g] ?? 0) >= 1)
+    for (const [good, units] of sells) {
+      spoken.sells.add(good)
+      if (!fetched) add(good, units)
+    }
+    for (const good of Object.keys(t.buys) as Good[]) spoken.brings.add(good)
+    if (!fetched && Object.keys(t.buys).length > 0) {
+      const coins = (npcCityStock(world, city).coins ?? 0) - (npcReserve(world, city).coins ?? 0)
+      spoken.takes.coins = Math.max(spoken.takes.coins ?? 0, coins)
+    }
+    if (t.offer) {
+      if (t.offer.leg === 'load') add(t.offer.pays, t.offer.units)
+      const offer = world.offers.find((o) => o.id === t.offer!.offerId)
+      if (offer) spoken.brings.add(offer.gives)
+    }
+  }
+  return spoken
+}
+
+/**
+ * The traders' part of a planning pass (`CONTEXT.md`: NPC trader), for an NPC city once its other
+ * adults have their jobs: it sends spare hands until it has as many out as `tradersWanted` or has
+ * nobody or nothing more to send. A wandering trader standing at the city comes first
+ * (`planVisit`): it isn't there for long.
+ */
+export function sendTraders(
   world: WorldState,
   city: City,
   plan: CityPlan,
@@ -93,42 +146,81 @@ export function planTrader(
   foodShort: boolean,
   size: number,
 ): void {
-  if ((foodShort && world.offers.length === 0) || armedOutsiders(world, city, size)) return
-  const home = npcHome(world, city)
-  if (!home) return
-  const r = spareHand(world, city, adults, jobs)
-  if (!r) return
-  if (planOfferRun(world, city, plan, r, foodShort, size)) {
-    jobs[r.id] = { kind: 'trade' }
-    return
+  const wanted = tradersWanted(world, city)
+  while ((plan.traders?.length ?? 0) < wanted) {
+    const sent =
+      planVisit(world, city, plan, adults, jobs, size) ||
+      planTrader(world, city, plan, adults, jobs, foodShort, size)
+    if (!sent) return
   }
-  if (foodShort) return
+}
+
+/**
+ * One more trader for a city with room for one (`sendTraders`). While no armed outsider stands in
+ * its area one of its spare hands, idle ones first, never a soldier, goes to a Player's offer that
+ * suits the city (`planOfferRun`), the only run it makes while Food is short. Else a surplus good
+ * that makes a full load (`traderLoad`) past what its traders out have yet to fetch, and a Trade Org
+ * warehouse within `NPC_TRADER_REACH` that prices it, send them: a good no trader out sells before
+ * one already on the road, so they spread over the goods with surplus. They sell the load there and
+ * buy the good shortest of the reserve it has no node for that no trader out brings (`buyGood`).
+ * Their job becomes `trade`. Returns whether it sent them.
+ */
+function planTrader(
+  world: WorldState,
+  city: City,
+  plan: CityPlan,
+  adults: Resident[],
+  jobs: Record<string, CityJob>,
+  foodShort: boolean,
+  size: number,
+): boolean {
+  if ((foodShort && world.offers.length === 0) || armedOutsiders(world, city, size)) return false
+  const home = npcHome(world, city)
+  if (!home) return false
+  const r = spareHand(world, city, adults, jobs)
+  if (!r) return false
+  const spoken = spokenFor(world, city, plan, adults)
+  if (planOfferRun(world, city, plan, r, spoken, foodShort, size)) {
+    jobs[r.id] = { kind: 'trade' }
+    return true
+  }
+  if (foodShort) return false
   const stock = npcCityStock(world, city)
   const reserve = npcReserve(world, city)
-  let best: { good: PricedGood; units: number; warehouse: Building; over: number } | undefined
+  let best:
+    | { good: PricedGood; units: number; warehouse: Building; over: number; fresh: boolean }
+    | undefined
   for (const good of PRICED_GOODS) {
     if (WEAPONS.includes(good as Weapon)) continue
-    const surplus = (stock[good] ?? 0) - (reserve[good] ?? 0)
+    const surplus = (stock[good] ?? 0) - (reserve[good] ?? 0) - (spoken.takes[good] ?? 0)
     if (surplus < 1) continue
     const warehouse = nearestWarehouse(world, home, good, size)
     if (!warehouse) continue
     const units = traderLoad(world, r, good, wrapDistance(size, home, warehouse))
     if (units < 1 || surplus < units) continue
-    if (!best || surplus - units > best.over)
-      best = { good, units, warehouse, over: surplus - units }
+    const fresh = !spoken.sells.has(good)
+    if (best?.fresh && !fresh) continue
+    if (!best || fresh !== best.fresh || surplus - units > best.over)
+      best = { good, units, warehouse, over: surplus - units, fresh }
   }
-  if (!best) return
+  if (!best) return false
   const buys: Stock = {}
-  const buy = buyGood(world, city, home, best.warehouse, plan.project, size)
+  const buy = buyGood(world, city, home, best.warehouse, plan.project, spoken, size)
   if (buy) buys[buy] = Math.max(1, Math.ceil((reserve[buy] ?? 0) - (stock[buy] ?? 0)))
-  plan.trader = {
+  addRun(plan, {
     residentId: r.id,
     warehouseId: best.warehouse.id,
     sells: { [best.good]: best.units },
     buys,
     since: world.tick,
-  }
+  })
   jobs[r.id] = { kind: 'trade' }
+  return true
+}
+
+/** A trader sets out: their run joins the city's plan. */
+function addRun(plan: CityPlan, run: CityTrader): void {
+  ;(plan.traders ??= []).push(run)
 }
 
 /**
@@ -160,12 +252,13 @@ function spareHand(
 
 /**
  * An NPC city treats a wandering trader standing at it as its visiting trader (`CONTEXT.md`: Trader
- * stop), part of its planning pass with no trader out: while nobody armed but the trader's own crew
- * stands in its area, it sends a spare hand (`spareHand`) over with what it deals in (`visitDeal`),
- * and more on later passes for as long as the trader stands and there is a deal to make. Whether it
- * sent someone; their job becomes `trade`. Food short is no reason not to: Food may be what it buys.
+ * stop), part of its planning pass with room for a trader (`sendTraders`): while nobody armed but the
+ * trader's own crew stands in its area, it sends a spare hand (`spareHand`) over with what it deals
+ * in (`visitDeal`), and more on later passes for as long as the trader stands and there is a deal to
+ * make. Whether it sent someone; their job becomes `trade`. Food short is no reason not to: Food may
+ * be what it buys.
  */
-export function planVisit(
+function planVisit(
   world: WorldState,
   city: City,
   plan: CityPlan,
@@ -179,16 +272,17 @@ export function planVisit(
   if (armedOutsiders(world, city, size, caravanCrew(world))) return false
   const r = spareHand(world, city, adults, jobs)
   if (!r) return false
-  const deal = visitDeal(world, city, plan.project, r, visitor, carriage)
+  const spoken = spokenFor(world, city, plan, adults)
+  const deal = visitDeal(world, city, plan.project, r, visitor, carriage, spoken, size)
   if (!deal) return false
-  plan.trader = {
+  addRun(plan, {
     residentId: r.id,
     warehouseId: null,
     visitingId: visitor.id,
     sells: deal.sells,
     buys: deal.buys,
     since: world.tick,
-  }
+  })
   jobs[r.id] = { kind: 'trade' }
   return true
 }
@@ -197,8 +291,9 @@ export function planVisit(
  * Looks for a Player's offer for the city's trader `r` to take (`CONTEXT.md`: NPC cities at an
  * offer), the good it is shortest of first, then the nearest, and sends them if one suits: open to
  * anyone, within `NPC_OFFER_REACH` of its storage and of a realm it doesn't refuse, giving what it
- * is short of for what it has spare or Coins, at a rate at least as good as its own prices (`offerTimes`). The
- * cheap tests come first, so most offers cost a distance and a lookup, once a game hour. Food short
+ * lacks of its reserve (`reserveLacks`: its whole war chest, though it may not count Coins as
+ * short) for what it has spare or Coins, at a rate at least as good as its own prices (`offerTimes`),
+ * and no trader out brings that good. The cheap tests come first, so most offers cost a distance and a lookup, once a game hour. Food short
  * (`foodOnly`), only an offer that gives Food will do. Returns whether it sent them.
  */
 function planOfferRun(
@@ -206,31 +301,33 @@ function planOfferRun(
   city: City,
   plan: CityPlan,
   r: Resident,
+  spoken: SpokenFor,
   foodOnly: boolean,
   size: number,
 ): boolean {
   if (world.offers.length === 0) return false
   const storage = npcStorages(world, city)[0]
   if (!storage) return false
-  const order = shortGoods(world, city, plan.project)
+  const order = reserveLacks(world, city, plan.project).map((s) => s.good)
   const rank = new Map(order.map((g, i) => [g, i]))
   let best: { offer: Offer; times: number; rank: number; d: number } | undefined
   for (const offer of world.offers) {
     // A Direct offer is for its named realm alone (`CONTEXT.md`: Direct offer).
     if (offer.direct) continue
     if (foodOnly && offer.gives !== 'food') continue
+    if (spoken.brings.has(offer.gives)) continue
     const place = rank.get(offer.gives)
     if (place === undefined) continue
     const d = wrapDistance(size, storage, offer)
     if (d > NPC_OFFER_REACH) continue
     if (best && (place > best.rank || (place === best.rank && d >= best.d))) continue
     if (npcCityRefuses(world, city, offer.realmId)) continue
-    const times = offerTimes(world, city, storage, plan.project, r, offer, d)
+    const times = offerTimes(world, city, storage, plan.project, r, offer, d, spoken)
     if (times > 0) best = { offer, times, rank: place, d }
   }
   if (!best) return false
   const { offer, times } = best
-  plan.trader = {
+  addRun(plan, {
     residentId: r.id,
     warehouseId: offer.storageId,
     offer: {
@@ -243,16 +340,17 @@ function planOfferRun(
     sells: {},
     buys: {},
     since: world.tick,
-  }
+  })
   return true
 }
 
 /**
  * What a city deals in with its visiting trader (`CONTEXT.md`: Trader stop): it sells the surplus
- * good that brings most, as far as `r`'s arms, the trader's coins and its room go; and with the
- * coins that brings and those above its reserve it buys the good it is shortest of (`shortGoods`)
- * that the trader has to trade, Food included. Never a weapon, which would arm `r`. Undefined with
- * no deal to make.
+ * good that brings most, past what its traders out have yet to fetch and one none of them sells
+ * first, as far as `r`'s arms, the trader's coins and its room go; and with the coins that brings
+ * and those above its reserve no trader out has spoken for it buys the good it is shortest of
+ * (`shortGoods`) that the trader has to trade and no trader out brings, Food included. Never a
+ * weapon, which would arm `r`. Undefined with no deal to make.
  */
 function visitDeal(
   world: WorldState,
@@ -261,32 +359,42 @@ function visitDeal(
   r: Resident,
   visitor: Trader,
   carriage: Carriage,
+  spoken: SpokenFor,
+  size: number,
 ): { sells: Stock; buys: Stock } | undefined {
   const stock = npcCityStock(world, city)
   const reserve = npcReserve(world, city)
   const room = carryCapacity(r, world.tick)
   const sells: Stock = {}
   let bestCoins = 0
+  let bestFresh = false
   for (const good of PRICED_GOODS) {
     if (WEAPONS.includes(good as Weapon)) continue
-    const surplus = Math.floor((stock[good] ?? 0) - (reserve[good] ?? 0))
+    const fresh = !spoken.sells.has(good)
+    if (bestFresh && !fresh) continue
+    const surplus = Math.floor(
+      (stock[good] ?? 0) - (reserve[good] ?? 0) - (spoken.takes[good] ?? 0),
+    )
     if (surplus < 1) continue
     const arms = Math.min(surplus, Math.floor(room / GOOD_WEIGHT[good] + 1e-9))
     const holder = { stock: { [good]: arms }, room: Infinity }
     const q = quoteWithTrader(world, visitor, carriage, holder, 'sell', good, arms)
-    if (q.units < 1 || q.coins <= bestCoins) continue
+    if (q.units < 1 || q.coins <= 0 || (fresh === bestFresh && q.coins <= bestCoins)) continue
     bestCoins = q.coins
+    bestFresh = fresh
     delete sells[Object.keys(sells)[0] as Good]
     sells[good] = q.units
   }
-  const coins = bestCoins + Math.max(0, (stock.coins ?? 0) - (reserve.coins ?? 0))
+  const above = (stock.coins ?? 0) - (reserve.coins ?? 0) - (spoken.takes.coins ?? 0)
+  const coins = bestCoins + Math.max(0, above)
   const has = traderStock(visitor, carriage.load)
   const prices = traderPrices(visitor, carriage)
   const buys: Stock = {}
-  const buy = shortGoods(world, city, project).find(
+  const buy = shortGoods(world, city, size, project).find(
     (g): g is PricedGood =>
       g !== 'coins' &&
       !WEAPONS.includes(g as Weapon) &&
+      !spoken.brings.has(g) &&
       (has[g] ?? 0) >= 1 &&
       coins >= prices.find((p) => p.good === g)!.sell,
   )
@@ -297,8 +405,8 @@ function visitDeal(
 /**
  * How many times over the city's trader `r` would take an offer `tiles` from its storage: enough to
  * make up what the city lacks of the good, rounded up, as far as the offer stands, the city has the
- * good it wants to spare (any Coins in the storage: its war chest is for buying what it lacks,
- * `CONTEXT.md`: NPC reserve), both loads fit in their arms beside the Food for the walk, and the
+ * good it wants to spare past what its traders out have yet to fetch (any Coins in the storage: its
+ * war chest is for buying what it lacks, `CONTEXT.md`: NPC reserve), both loads fit in their arms beside the Food for the walk, and the
  * rate stays at least as good as its own prices (`npcOfferTimes`). 0 when it doesn't suit: a weapon
  * either way, which would arm the trader, never does.
  */
@@ -310,15 +418,17 @@ function offerTimes(
   r: Resident,
   offer: Offer,
   tiles: number,
+  spoken: SpokenFor,
 ): number {
   if (WEAPONS.includes(offer.gives as Weapon) || WEAPONS.includes(offer.wants as Weapon)) return 0
   const stock = npcCityStock(world, city)
   const reserve = npcReserve(world, city)
   const held = storage.stock?.[offer.wants] ?? 0
   const spare =
-    offer.wants === 'coins'
+    (offer.wants === 'coins'
       ? held
-      : Math.min(held, (stock[offer.wants] ?? 0) - (reserve[offer.wants] ?? 0))
+      : Math.min(held, (stock[offer.wants] ?? 0) - (reserve[offer.wants] ?? 0))) -
+    (spoken.takes[offer.wants] ?? 0)
   const wanted = (reserve[offer.gives] ?? 0) + (projectNeeds(world, project)[offer.gives] ?? 0)
   const lacks = wanted - (stock[offer.gives] ?? 0)
   const hands = handsOf(r, world.tick)
@@ -365,8 +475,8 @@ function nearestWarehouse(
 
 /**
  * What a trader buys (`CONTEXT.md`: NPC trader): the good shortest of the city's reserve
- * (`shortGoods`) that it has no node for (`hasNodeFor`) and the warehouse prices. Never Food,
- * which its farms grow, nor Coins, and never a weapon, which would arm them.
+ * (`shortGoods`) that it has no node for (`hasNodeFor`), the warehouse prices and no trader out
+ * brings. Never Food, which its farms grow, nor Coins, and never a weapon, which would arm them.
  */
 function buyGood(
   world: WorldState,
@@ -374,15 +484,17 @@ function buyGood(
   home: Building,
   warehouse: Building,
   project: CityProject | undefined,
+  spoken: SpokenFor,
   size: number,
 ): PricedGood | undefined {
   const priced = stockFloor(world, warehouse)
-  return shortGoods(world, city, project).find(
+  return shortGoods(world, city, size, project).find(
     (g): g is PricedGood =>
       g !== 'food' &&
       g !== 'coins' &&
       !WEAPONS.includes(g as Weapon) &&
       priced[g] !== undefined &&
+      !spoken.brings.has(g) &&
       !hasNodeFor(world, city, home, g, size),
   )
 }
@@ -431,7 +543,7 @@ function armedOutsiders(
 }
 
 /**
- * One tick of the city's trader, idle between orders (`CONTEXT.md`: NPC trader): with a load
+ * One tick of a city's trader on their run `t`, idle between orders (`CONTEXT.md`: NPC trader): with a load
  * still to sell and not carrying it, they pick it up at the storage with the Food for the run and
  * the city's coins above its reserve; carrying it, they walk to the warehouse and sell it there;
  * then they buy what the run buys; with nothing left to sell or buy they walk home and put
@@ -444,12 +556,12 @@ export function runTrader(
   world: WorldState,
   city: City,
   plan: CityPlan,
+  t: CityTrader,
   r: Resident,
   storage: Building | undefined,
   size: number,
 ): void {
-  const t = plan.trader!
-  if (t.visitingId !== undefined) return runVisit(world, city, plan, r, storage, size)
+  if (t.visitingId !== undefined) return runVisit(world, city, plan, t, r, storage, size)
   if (t.offer && runToOffer(world, r, t, storage, size)) return
   const warehouse = world.buildings.find((b) => b.id === t.warehouseId)
   const [sell, units] = (Object.entries(t.sells) as [PricedGood, number][])[0] ?? []
@@ -496,11 +608,11 @@ function runVisit(
   world: WorldState,
   city: City,
   plan: CityPlan,
+  t: CityTrader,
   r: Resident,
   storage: Building | undefined,
   size: number,
 ): void {
-  const t = plan.trader!
   const visitor = world.traders.find((x) => x.id === t.visitingId)
   const stand = visitor && traderStanding(world, visitor)
   const [sell, units] = (Object.entries(t.sells) as [PricedGood, number][])[0] ?? []
@@ -601,10 +713,12 @@ function runToOffer(
 }
 
 /**
- * NPC traders hold together (`CONTEXT.md`: NPC trader; ADR 0004): a city sends at most one, so
- * its plan gives the `trade` job to its trader alone; only an NPC city sends one, never the
- * Trade Organization's; a living trader is unarmed and of the city; a run to an offer takes it a
- * whole, positive number of times, for a whole, positive load.
+ * NPC traders hold together (`CONTEXT.md`: NPC trader; ADR 0004): its plan gives the `trade` job to
+ * those on a run alone, and nobody is on two; a city sending one this tick has no more out than
+ * its size allows (`tradersWanted`, and one for a death this same tick: one sent earlier may outlast
+ * those it was sent for); only an NPC city sends one, never the Trade Organization's; a living trader
+ * is unarmed and of the city; a run to an offer takes it a whole, positive number of times, for a
+ * whole, positive load.
  */
 export const npcTradersSound: Invariant = {
   name: 'npc-traders-sound',
@@ -612,47 +726,64 @@ export const npcTradersSound: Invariant = {
     const out: InvariantViolation[] = []
     const residents = new Map(world.residents.map((r) => [r.id, r]))
     for (const [cityId, plan] of Object.entries(world.cityPlans)) {
-      const traders = Object.entries(plan.jobs).filter(([, j]) => j.kind === 'trade')
-      const t = plan.trader
+      const jobbed = Object.entries(plan.jobs)
+        .filter(([, j]) => j.kind === 'trade')
+        .map(([id]) => id)
+      const runs = plan.traders ?? []
+      const onRun = new Set(runs.map((t) => t.residentId))
       const city = world.cities.find((c) => c.id === cityId)
-      if (traders.length > 1 || traders.some(([id]) => id !== t?.residentId)) {
+      if (jobbed.some((id) => !onRun.has(id)) || onRun.size < runs.length) {
         out.push({
           invariant: this.name,
-          message: `${cityId} plans ${traders.length} traders: ${traders.map(([id]) => id).join(', ')}`,
-          entityIds: [cityId, ...traders.map(([id]) => id)],
+          message: `${cityId} plans traders ${jobbed.join(', ')}, with runs for ${runs.map((t) => t.residentId).join(', ')}`,
+          entityIds: [cityId, ...jobbed],
         })
       }
-      if (!t) continue
-      if (t.offer && ![t.offer.times, t.offer.units].every((n) => Number.isInteger(n) && n > 0)) {
+      if (
+        city &&
+        runs.some((t) => t.since === world.tick) &&
+        runs.length > tradersWanted(world, city) + 1
+      ) {
         out.push({
           invariant: this.name,
-          message: `${cityId}'s trader goes to ${t.offer.offerId} ${t.offer.times} times for ${t.offer.units} ${t.offer.pays}`,
-          entityIds: [cityId, t.residentId, t.offer.offerId],
+          message: `${cityId} sent a trader with ${runs.length} out, for ${cityResidents(world, city).length} residents`,
+          entityIds: [cityId, ...onRun],
         })
       }
-      if (city?.tradeOrg) {
-        out.push({
-          invariant: this.name,
-          message: `${cityId}, the Trade Organization's, sends trader ${t.residentId}`,
-          entityIds: [cityId, t.residentId],
-        })
-      }
-      const r = residents.get(t.residentId)
-      if (!r || r.health <= 0) continue
-      if (r.cityId !== cityId || r.owner !== null || isArmed(r)) {
-        out.push({
-          invariant: this.name,
-          message: `${cityId}'s trader ${r.id} is ${isArmed(r) ? 'armed' : 'not of the city'}`,
-          entityIds: [cityId, r.id],
-        })
+      for (const t of runs) {
+        if (t.offer && ![t.offer.times, t.offer.units].every((n) => Number.isInteger(n) && n > 0)) {
+          out.push({
+            invariant: this.name,
+            message: `${cityId}'s trader goes to ${t.offer.offerId} ${t.offer.times} times for ${t.offer.units} ${t.offer.pays}`,
+            entityIds: [cityId, t.residentId, t.offer.offerId],
+          })
+        }
+        if (city?.tradeOrg) {
+          out.push({
+            invariant: this.name,
+            message: `${cityId}, the Trade Organization's, sends trader ${t.residentId}`,
+            entityIds: [cityId, t.residentId],
+          })
+        }
+        const r = residents.get(t.residentId)
+        if (!r || r.health <= 0) continue
+        if (r.cityId !== cityId || r.owner !== null || isArmed(r)) {
+          out.push({
+            invariant: this.name,
+            message: `${cityId}'s trader ${r.id} is ${isArmed(r) ? 'armed' : 'not of the city'}`,
+            entityIds: [cityId, r.id],
+          })
+        }
       }
     }
     return out
   },
 }
 
-/** The trader's run is over: the plan forgets it, and they are idle until the next pass. */
+/** A trader's run is over: the plan forgets it, and they are idle until the next pass. */
 function endRun(plan: CityPlan, r: Resident): void {
-  delete plan.trader
+  const left = plan.traders?.filter((t) => t.residentId !== r.id) ?? []
+  if (left.length > 0) plan.traders = left
+  else delete plan.traders
   plan.jobs[r.id] = { kind: 'idle' }
 }

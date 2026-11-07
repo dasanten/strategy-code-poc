@@ -13,8 +13,10 @@ import {
   contractOf,
   hasFoodSurplus,
   isArmed,
+  isBigNpcCity,
   isDown,
   materialsNeeded,
+  npcNeedsScale,
   npcReserve,
   npcStorages,
   punishers,
@@ -38,9 +40,11 @@ import {
   cityGrows,
   cityProject,
   endPairs,
+  farmsFull,
   isBuilder,
   noFarm,
   npcBuilders,
+  onNode,
   pairAdults,
 } from './npc-growth.js'
 import {
@@ -49,15 +53,17 @@ import {
   chainStore,
   holdsBatch,
   ownWorkplaces,
-  shortGoods,
+  shortages,
   surplusWork,
 } from './npc-chain.js'
 import { foundingParty, planFounding } from './npc-founding.js'
 import { downToRevive, goesOnReviving, sendRevivers } from './npc-revive.js'
 import { roadCrew, type WayFinder } from './npc-roads.js'
+import { beats, jobScore, rankJobs, type ScoredJob } from './npc-scores.js'
 import { pickScouts } from './npc-scouts.js'
 import { feedJobKept, planFeeder } from './npc-stable.js'
-import { planTrader, planVisit, traderOut } from './npc-trader.js'
+import { sendTraders, tradersOut } from './npc-trader.js'
+import { planTraining } from './npc-training.js'
 import { hash } from './residents.js'
 
 /*
@@ -185,12 +191,12 @@ export function workplaceOf(r: Resident): string | undefined {
  * it has now. Ends its pairs with no child on the way while Food runs short, else pairs adults
  * while it has a food surplus, if it grows (`cityGrows`); picks its project (`cityProject`) while
  * Food isn't short; and gives every adult a job: soldiers (armed adults) stand as soldiers; one
- * carrying a child does nothing; builders go on building; a worker stays at their workplace,
- * except that while Food runs short workers off the farms move to farms with room. It shares out
- * the rest by its reserve (`shareOut`), a reviver for each of its Down residents among them
+ * carrying a child does nothing; builders go on building. It shares out the rest by the scores of
+ * their jobs (`shareOut`), a reviver for each of its Down residents among them
  * (`CONTEXT.md`: Reviving; those Down do nothing and get no job); one of them feeds its stable when
  * it is due (`planFeeder`). An NPC city's founding party keeps its `found` jobs, and the pass ends
- * with the founding's part (`planFounding`). Without `terrain` the city picks no project; without
+ * with the founding's part (`planFounding`) and, of the soldiers left, those at its training ground
+ * (`planTraining`). Without `terrain` the city picks no project; without
  * `ways` it builds no road (`roadCrew`).
  * `people` are the residents the city gives orders to (`runResidents`).
  */
@@ -214,8 +220,9 @@ export function planCity(
     else pairAdults(world, city, adults)
   }
   const home = npcHome(world, city)
+  // With Food short it builds nothing but what ends that: a first farm, or another with every farm full.
   const project =
-    (!short || noFarm(world, city)) && terrain && home
+    (!short || noFarm(world, city) || farmsFull(world, city)) && terrain && home
       ? cityProject(world, city, home, terrain, grows)
       : undefined
   if (project) plan.project = project
@@ -229,15 +236,15 @@ export function planCity(
   const builds = (r: Resident) => isBuilder(r) && plan.jobs[r.id]?.kind !== 'road'
   const builders = adults.filter(builds).length
   const spare: Resident[] = []
-  // The trader out on their run (`CONTEXT.md`: NPC trader) is nobody's spare hand.
-  const trader = city.tradeOrg ? undefined : traderOut(world, plan)
+  // A trader out on their run (`CONTEXT.md`: NPC trader) is nobody's spare hand.
+  const traders = city.tradeOrg ? new Set<string>() : tradersOut(world, plan)
   const size = terrain?.size ?? MAP_SIZE
   const waiting = downToRevive(world, city, size)
   let feeding = false
   for (const r of adults) {
     const at = workplaceOf(r)
     const feed = feedJobKept(world, city, r)
-    if (r.id === trader) jobs[r.id] = { kind: 'trade' }
+    if (traders.has(r.id)) jobs[r.id] = { kind: 'trade' }
     else if (isArmed(r)) jobs[r.id] = { kind: 'soldier' }
     else if (r.carrying) jobs[r.id] = { kind: 'idle' }
     else if (goesOnReviving(plan.jobs[r.id], waiting)) jobs[r.id] = plan.jobs[r.id]!
@@ -248,27 +255,9 @@ export function planCity(
       feeding = true
     } else spare.push(r)
   }
-  if (short) {
-    // Food runs short: workers off the farms go to the farms with room.
-    const farms = places.filter((p) => p.kind === 'farm')
-    for (const farm of farms) {
-      while (held.room(farm) > 0) {
-        const worker = adults.find((r) => {
-          const job = jobs[r.id]
-          return (
-            job?.kind === 'work' && job.buildingId !== undefined && placeById.has(job.buildingId)
-          )
-        })
-        if (!worker) break
-        held.leave(placeById.get(jobs[worker.id]!.buildingId!)!)
-        jobs[worker.id] = workJob(farm)
-        held.take(farm)
-      }
-    }
-  }
   const sendToDown = (rest: Resident[], leave: (r: Resident) => void) =>
     sendRevivers(waiting, rest, adults, jobs, short, size, leave)
-  const unneeded = shareOut(
+  const unneeded = shareOut({
     world,
     city,
     adults,
@@ -276,24 +265,22 @@ export function planCity(
     held,
     spare,
     plan,
+    placeById,
     builders,
-    short,
+    foodShort: short,
     sendToDown,
-    { home, ways, terrain },
-  )
+    roads: { home, ways, terrain },
+    size,
+  })
   // Trading posts and the HQ don't feed their stables this way (`npcOneFeeder`).
   if (!city.tradeOrg && !feeding) planFeeder(world, city, adults, jobs)
   // The Trade Organization sends no trader (`tradeOrgSendsNoOne`) and founds nothing.
-  if (!city.tradeOrg && !trader) {
-    // A wandering trader standing at the city comes first: it isn't there for long.
-    if (!planVisit(world, city, plan, adults, jobs, size)) {
-      planTrader(world, city, plan, adults, jobs, short, size)
-    }
-  }
   if (!city.tradeOrg) {
-    // A spare hand just sent off as the trader or to feed the stable isn't one any more.
+    sendTraders(world, city, plan, adults, jobs, short, size)
+    // A spare hand just sent off as a trader or to feed the stable isn't one any more.
     const left = unneeded.filter((r) => !['trade', 'feed'].includes(jobs[r.id]?.kind ?? ''))
     planFounding(world, city, plan, jobs, { adults, unneeded: left, members }, home, terrain)
+    planTraining(world, city, adults, jobs, size)
   }
   plan.jobs = jobs
   return plan
@@ -312,63 +299,113 @@ export function farmersWanted(world: WorldState, city: City): number {
 const feeders = (residents: number) =>
   Math.ceil((residents * FOOD_PER_DAY) / (WORK_OUTPUT_PER_DAY.food ?? 1) - 1e-9)
 
-/**
- * How an NPC city shares out its adults beyond its soldiers and those carrying a child
- * (`CONTEXT.md`: NPC city, NPC reserve). Workers stay where they are, except that the workers of a
- * workplace whose good the city isn't short of become spare hands (and go back when nothing else
- * needs them), as do farmers beyond those it keeps (`farmersWanted`). Then: spare hands, and after them workers off the farms, farm
- * until it has its farmers, while a farm has room; revivers go to its Down residents (`sendToDown`,
- * `sendRevivers`), ahead of all that comes after; up to `NPC_BUILDERS` (`npcBuilders`) build the project; the
- * rest go to the workplace of the good shortest of the reserve (`chainPlace`), filling its crew
- * before the next. With nothing short to go to, a worker let go goes back (a farmer to farming,
- * one the last pass put to work who is between jobs now, a carrier home with the load stored:
- * `CONTEXT.md`, Carrying the output, to that workplace), at an NPC city only up to the cap of its
- * good (`surplusWork`), and a free spare hand of an NPC city goes to work for surplus
- * (`surplusPlace`; `CONTEXT.md`: Spare hands' work). Ahead of all that, some of them go on its road
- * crew (`roadCrew`; `CONTEXT.md`: NPC road), and after them a few scout (`pickScouts`). Whoever has
- * none of that is idle.
- * Returns the spare hands nothing short has a use for, idle, on the road crew, scouting or working
- * for surplus (`CONTEXT.md`: Full city).
- */
-function shareOut(
-  world: WorldState,
-  city: City,
-  adults: Resident[],
-  jobs: Record<string, CityJob>,
-  held: Places,
-  spare: Resident[],
-  plan: CityPlan,
-  builders: number,
-  foodShort: boolean,
-  sendToDown: (spare: Resident[], leave: (r: Resident) => void) => void,
+/** What `shareOut` is given by its planning pass. */
+interface ShareOut {
+  world: WorldState
+  city: City
+  adults: Resident[]
+  jobs: Record<string, CityJob>
+  held: Places
+  spare: Resident[]
+  plan: CityPlan
+  /** The workplaces it fills (`workplaces`), by id: those it moves to the farms while Food is short. */
+  placeById: Map<string, Building>
+  builders: number
+  foodShort: boolean
+  sendToDown: (spare: Resident[], leave: (r: Resident) => void) => void
+  /** The map's size. */
+  size: number
   roads: {
     home: Building | undefined
     ways: WayFinder | undefined
     terrain: TerrainMap | undefined
-  },
-): Resident[] {
+  }
+}
+
+/** A job on offer: what it is, and giving it to those of `takers` it has room for, who are returned. */
+interface JobOffer {
+  job: ScoredJob
+  take: (takers: Resident[]) => Resident[]
+}
+
+/**
+ * How an NPC city shares out its adults beyond its soldiers and those carrying a child
+ * (`CONTEXT.md`: NPC city, NPC reserve; ADR 0029): each goes to the job that scores highest with
+ * room (`jobScore`), the spare hands first, then any worker whose job it beats by the margin
+ * (`beats`). A worker holds their job at the score of the good it makes, which keeps them from moving
+ * for another short good or the project; a farm lacking farmers takes them. While Food runs short,
+ * workers off the farms go to the farms with room, past the farmers it keeps. The workers of a
+ * workplace whose good the city isn't short of are let go and become spare hands (and go back when
+ * nothing else needs them), as do farmers beyond those it keeps (`farmersWanted`).
+ *
+ * What is short comes first. Farming, until it has its farmers, while a farm has room; revivers go to
+ * its Down residents (`sendToDown`, `sendRevivers`), ahead of all that comes after; up to
+ * `npcBuilders` build the project; the rest go to the workplace of the good shortest
+ * of the reserve (`shortPlace`), filling its crew before the next. Those it leaves are the unneeded,
+ * for the work spare hands have with nothing short (`CONTEXT.md`: Spare hands' work): its road crew
+ * (`roadCrew`; `CONTEXT.md`: NPC road), a few scouts (`pickScouts`), going back (a farmer to farming,
+ * one the last pass put to work who is between jobs now, a carrier home with the load stored:
+ * `CONTEXT.md`, Carrying the output, to that workplace; at an NPC city only up to the cap of its good,
+ * `surplusWork`), and work for surplus at an NPC city. Whoever has none of that is idle.
+ * Returns the spare hands nothing short has a use for, idle, on the road crew, scouting or working
+ * for surplus (`CONTEXT.md`: Full city).
+ */
+function shareOut(pass: ShareOut): Resident[] {
+  const { world, city, adults, jobs, held, spare, plan, placeById, foodShort, sendToDown } = pass
   const project = plan.project
-  const unneeded: Resident[] = []
+  let builders = pass.builders
   const own = ownWorkplaces(world, city).filter((b) => !b.site)
   const byId = new Map(own.map((b) => [b.id, b]))
   const placeOf = (r: Resident) => byId.get(jobs[r.id]?.buildingId ?? '')
   const farms = own.filter((b) => b.kind === 'farm')
-  const short = shortGoods(world, city, project)
-  const shortOf = new Set(short)
+  const short = shortages(world, city, pass.size, project)
+  const shareOf = new Map(short.map((s) => [s.good, s.share]))
+  /** What a resident's job at a workplace is worth to them: what its good lacks, or only going back. */
+  const heldScore = (r: Resident) => {
+    const place = placeOf(r)
+    const good = place && place.kind !== 'farm' ? chainGood(world, place) : undefined
+    if (!good) return jobScore({ kind: 'short', share: 0 })
+    const share = shareOf.get(good)
+    return jobScore(share === undefined ? { kind: 'back' } : { kind: 'short', share })
+  }
+  const give = (r: Resident, job: CityJob, place?: Building) => {
+    const left = placeOf(r)
+    if (left) held.leave(left)
+    jobs[r.id] = job
+    if (place) held.take(place)
+  }
+  const onlyBack = jobScore({ kind: 'back' })
+  if (foodShort) {
+    // Food runs short: workers off the farms go to the farms with room. Those working for surplus
+    // go first, then its scouts, then the rest, those whose job is worth least first.
+    const score = jobScore({ kind: 'farm', foodShort })
+    const off = adults
+      .filter((r) => {
+        const job = jobs[r.id]
+        return job?.kind === 'work' && placeById.has(job.buildingId ?? '') && beats(score, heldScore(r))
+      })
+      .map((r) => ({ r, worth: heldScore(r) }))
+    const scouts = spare.filter((r) => plan.scouts?.[r.id]).map((r) => ({ r, worth: onlyBack }))
+    // Sorting keeps the order given among equals: surplus work ahead of scouts.
+    for (const { r } of [...off, ...scouts].sort((a, b) => a.worth - b.worth)) {
+      const farm = farms.find((f) => held.room(f) > 0)
+      if (!farm) break
+      give(r, workJob(farm), farm)
+      if (spare.includes(r)) spare.splice(spare.indexOf(r), 1)
+    }
+  }
   const kept = new Map<string, CityJob>()
-  const release = (r: Resident, keep: boolean) => {
+  const release = (r: Resident) => {
     const place = placeOf(r)
     if (place) held.leave(place)
-    if (keep) kept.set(r.id, jobs[r.id]!)
+    kept.set(r.id, jobs[r.id]!)
     delete jobs[r.id]
     spare.push(r)
   }
   // Workers of a workplace whose good the city isn't short of become spare hands, the farms aside
   // (farmersWanted): the city moves them to what is short, and they go back when nothing is.
   for (const r of adults) {
-    const place = placeOf(r)
-    const good = place && place.kind !== 'farm' && chainGood(world, place)
-    if (good && !shortOf.has(good)) release(r, true)
+    if (heldScore(r) <= onlyBack) release(r)
   }
   // A worker stays where they are until the city moves them: one the last pass put to work who
   // has no workplace now (a carrier freed at the storage) goes back there when nothing else needs them.
@@ -381,133 +418,167 @@ function shareOut(
   spare.sort((a, b) => Number(!!plan.scouts?.[a.id]) - Number(!!plan.scouts?.[b.id]))
   const wanted = farmersWanted(world, city)
   const farmers = adults.filter((r) => jobs[r.id]?.kind === 'farm')
-  if (!foodShort) for (const r of farmers.slice(wanted).reverse()) release(r, true)
+  if (!foodShort) for (const r of farmers.slice(wanted).reverse()) release(r)
   let farming = foodShort ? farmers.length : Math.min(farmers.length, wanted)
-  const toFarm = (r: Resident) => {
-    const farm = farms.find((f) => held.room(f) > 0)
-    if (!farm) return false
-    const place = placeOf(r)
-    if (place) held.leave(place)
-    jobs[r.id] = workJob(farm)
-    held.take(farm)
-    farming++
-    return true
-  }
-  const rest = spare.filter((r) => farming >= wanted || !toFarm(r))
-  for (const r of adults) {
-    if (farming >= wanted) break
-    if (jobs[r.id]?.kind === 'work' && !toFarm(r)) break
-  }
-  sendToDown(rest, (r) => {
-    const place = placeOf(r)
-    if (place) held.leave(place)
-    if (jobs[r.id]?.kind === 'build') builders--
-  })
-  const storage = chainStore(world, city)
-  for (const r of rest) {
-    if (jobs[r.id]?.kind === 'revive') continue
-    if (project && builders < npcBuilders(world, city) && canTakePart(world, city, r, project)) {
-      jobs[r.id] = { kind: 'build' }
-      builders++
-      continue
-    }
-    const place = chainPlace(world, short, own, held, storage)
-    if (place) {
-      jobs[r.id] = workJob(place)
-      held.take(place)
-    } else unneeded.push(r)
-  }
-  if (unneeded.length === 0) return unneeded
-  // Nothing short has a use for them. A road comes first (`CONTEXT.md`: Spare hands' work).
-  const { home, ways, terrain } = roads
-  const crew = new Set(
-    roadCrew(world, city, plan, unneeded, new Set(kept.keys()), storage, home, ways, terrain).map(
-      (r) => r.id,
-    ),
+
+  // Those holding a job a better one can take them from, at what it is worth to them.
+  const workers = new Map(
+    adults.filter((r) => jobs[r.id]?.kind === 'work').map((r) => [r, heldScore(r)]),
   )
-  for (const id of crew) jobs[id] = { kind: 'road' }
-  // Those who were at a workplace go back next, so a crew keeps its places: to anything at a Trade
-  // Org city, which has no cap; an NPC city's only while it still works it for surplus, or it isn't
-  // a good it counts (a workplace of no chain).
+  /** Offers its jobs, the highest-scoring first, and returns those of `free` none of them took. */
+  const fill = (offers: JobOffer[], free: Resident[]) => {
+    for (const offer of rankJobs(offers)) {
+      const score = jobScore(offer.job)
+      const beaten = [...workers]
+        .filter(([r, holds]) => jobs[r.id]?.kind === 'work' && beats(score, holds))
+        .map(([r]) => r)
+      const took = new Set(offer.take([...free, ...beaten]))
+      free = free.filter((r) => !took.has(r))
+      for (const r of took) workers.delete(r)
+    }
+    return free
+  }
+
+  const storage = chainStore(world, city)
+  const toFarm: JobOffer = {
+    job: { kind: 'farm' },
+    take: (takers) =>
+      takers.filter((r) => {
+        if (farming >= wanted) return false
+        const farm = farms.find((f) => held.room(f) > 0)
+        if (!farm) return false
+        give(r, workJob(farm), farm)
+        farming++
+        return true
+      }),
+  }
+  const reviving: JobOffer = {
+    job: { kind: 'revive' },
+    take: (takers) => {
+      sendToDown(takers, (r) => {
+        const place = placeOf(r)
+        if (place) held.leave(place)
+        if (jobs[r.id]?.kind === 'build') builders--
+      })
+      return takers.filter((r) => jobs[r.id]?.kind === 'revive')
+    },
+  }
+  const building: JobOffer[] = project
+    ? [
+        {
+          job: { kind: 'project' },
+          take: (takers) =>
+            takers.filter((r) => {
+              if (builders >= npcBuilders(world, city)) return false
+              if (!canTakePart(world, city, r, project)) return false
+              give(r, { kind: 'build' })
+              builders++
+              return true
+            }),
+        },
+      ]
+    : []
+  const shortWork = short.map(({ good, share }): JobOffer => ({
+    job: { kind: 'short', share },
+    take: (takers) => {
+      const took: Resident[] = []
+      for (const r of takers) {
+        const place = shortPlace(world, good, own, held, storage)
+        if (!place) break
+        give(r, workJob(place), place)
+        took.push(r)
+      }
+      return took
+    },
+  }))
+  const unneeded = fill([toFarm, reviving, ...building, ...shortWork], spare)
+  if (unneeded.length === 0) return unneeded
+
+  // Nothing short has a use for them (`CONTEXT.md`: Spare hands' work).
+  const { home, ways, terrain } = pass.roads
+  const road: JobOffer = {
+    job: { kind: 'road' },
+    take: (takers) => {
+      const returning = new Set(kept.keys())
+      const crew = roadCrew(world, city, plan, takers, returning, storage, home, ways, terrain)
+      for (const r of crew) give(r, { kind: 'road' })
+      return crew
+    },
+  }
+  const wentBackTo = (r: Resident) => byId.get(kept.get(r.id)?.buildingId ?? '')
+  // Scouts already out first; they stay spare hands for a Full city. What is short took them above,
+  // and they walk home for it.
+  const scouting: JobOffer = {
+    job: { kind: 'scout' },
+    take: (takers) => {
+      const hasPlace = (r: Resident) => wentBackTo(r) !== undefined
+      const scouts = pickScouts(world, city, plan, takers, hasPlace, foodShort)
+      for (const r of scouts) give(r, { kind: 'scout' })
+      return scouts
+    },
+  }
+  // Those who were at a workplace go back so a crew keeps its places: to anything at a Trade Org
+  // city, which has no cap; an NPC city's only while it still works it for surplus, or it isn't a
+  // good it counts (a workplace of no chain).
   const surplus = city.tradeOrg ? undefined : surplusWork(world, city, storage)
   const worthBack = (b: Building) =>
     !surplus || chainGood(world, b) === undefined || surplus(b) !== undefined
-  // Scouts after the road and before surplus (`CONTEXT.md`: Spare hands' work), those already out
-  // first; they stay spare hands for a Full city. What is short took them above, and they walk home for it.
-  const hasPlace = (r: Resident) => byId.has(kept.get(r.id)?.buildingId ?? '')
-  const offRoad = unneeded.filter((r) => !crew.has(r.id))
-  for (const r of pickScouts(world, city, plan, offRoad, hasPlace, foodShort)) {
-    jobs[r.id] = { kind: 'scout' }
+  const goingBack: JobOffer = {
+    job: { kind: 'back' },
+    take: (takers) =>
+      takers.filter((r) => {
+        const back = kept.get(r.id)
+        const place = wentBackTo(r)
+        if (!back || !place || held.room(place) <= 0 || !worthBack(place)) return false
+        give(r, back, place)
+        return true
+      }),
   }
-  const free = unneeded.filter((r) => {
-    if (crew.has(r.id) || jobs[r.id]?.kind === 'scout') return false
-    const back = kept.get(r.id)
-    const backTo = back && byId.get(back.buildingId ?? '')
-    if (!back || !backTo || held.room(backTo) <= 0 || !worthBack(backTo)) return true
-    jobs[r.id] = back
-    held.take(backTo)
-    return false
+  const surplusJobs = own.flatMap((place): JobOffer[] => {
+    const full = surplus?.(place)
+    if (full === undefined) return []
+    const take = (takers: Resident[]) =>
+      takers.filter((r) => {
+        if (held.room(place) <= 0) return false
+        give(r, workJob(place), place)
+        return true
+      })
+    return [{ job: { kind: 'surplus', full }, take }]
   })
-  for (const r of free) {
-    const place = surplus && surplusPlace(own, held, surplus)
-    jobs[r.id] = place ? workJob(place) : { kind: 'idle' }
-    if (place) held.take(place)
-  }
+  const idle = fill([road, scouting, goingBack, ...surplusJobs], unneeded)
+  for (const r of idle) jobs[r.id] = { kind: 'idle' }
   return unneeded
 }
 
 /**
- * The workplace a free spare hand of an NPC city goes to for surplus (`CONTEXT.md`: Spare hands'
- * work): of its finished `own` workplaces with room, that of the good furthest below its cap.
+ * The workplace a spare hand goes to for a good short (`CONTEXT.md`: NPC city): of the city's
+ * finished `own` workplaces, one with room that makes it. For a good a workplace processes, only
+ * while the storage holds a batch of its input; else the workplace of an input it lacks, so the ore
+ * is dug before it is smelted.
  */
-function surplusPlace(
-  own: Building[],
-  held: Places,
-  surplus: (place: Building) => number | undefined,
-): Building | undefined {
-  let best: { place: Building; full: number } | undefined
-  for (const place of own) {
-    if (held.room(place) <= 0) continue
-    const full = surplus(place)
-    if (full !== undefined && (!best || full < best.full)) best = { place, full }
-  }
-  return best?.place
-}
-
-/**
- * The workplace a spare hand goes to (`CONTEXT.md`: NPC city): of the city's finished `own`
- * workplaces, one with room that makes the first good of `short` it can work on. For a good a
- * workplace processes, only while the storage holds a batch of its input; else the workplace of
- * an input it lacks, so the ore is dug before it is smelted.
- */
-function chainPlace(
+function shortPlace(
   world: WorldState,
-  short: Good[],
+  good: Good,
   own: Building[],
   held: Places,
   storage: Building | undefined,
 ): Building | undefined {
   const seen = new Set<Good>()
-  const workFor = (good: Good): Building | undefined => {
-    if (seen.has(good)) return undefined
-    seen.add(good)
-    const input = chainInput(good)
+  const workFor = (g: Good): Building | undefined => {
+    if (seen.has(g)) return undefined
+    seen.add(g)
+    const input = chainInput(g)
     if (input && !holdsBatch(storage?.stock, input)) {
-      for (const [g, n] of Object.entries(input) as [Good, number][]) {
-        if ((storage?.stock?.[g] ?? 0) >= n) continue
-        const place = workFor(g)
+      for (const [from, n] of Object.entries(input) as [Good, number][]) {
+        if ((storage?.stock?.[from] ?? 0) >= n) continue
+        const place = workFor(from)
         if (place) return place
       }
       return undefined
     }
-    return own.find((b) => chainGood(world, b) === good && held.room(b) > 0)
+    return own.find((b) => chainGood(world, b) === g && held.room(b) > 0)
   }
-  for (const good of short) {
-    seen.clear()
-    const place = workFor(good)
-    if (place) return place
-  }
-  return undefined
+  return workFor(good)
 }
 
 /**
@@ -642,7 +713,7 @@ export const npcFarmersKept: Invariant = {
  * the cap of past the reserve (once for what was stored or changed since the pass, this same tick;
  * no project wants that much). A farm counts only with more farmers than it keeps, and one for a
  * death. A good with no cap isn't worked for surplus and doesn't count; nor does a Trade Org city,
- * which has no cap.
+ * which has no cap. The cap is the one for its size now (`npcNeedsScale`).
  */
 export const npcSurplusCapped: Invariant = {
   name: 'npc-surplus-capped',
@@ -653,12 +724,14 @@ export const npcSurplusCapped: Invariant = {
       if (!city || city.tradeOrg || plan.plannedAt !== world.tick) continue
       const stock = chainStore(world, city)?.stock ?? {}
       const reserve = npcReserve(world, city)
+      const steps = npcNeedsScale(world, city)
       const jobs = Object.entries(plan.jobs)
       const farmers = jobs.filter(([, j]) => j.kind === 'farm').length
       for (const place of ownWorkplaces(world, city)) {
         const good = chainGood(world, place)
-        const cap = good && NPC_SURPLUS_CAP[good]
-        if (!good || !cap || place.site) continue
+        const base = good && NPC_SURPLUS_CAP[good]
+        if (!good || !base || place.site) continue
+        const cap = base * steps
         if ((stock[good] ?? 0) - (reserve[good] ?? 0) < 2 * cap) continue
         if (place.kind === 'farm' && farmers <= farmersWanted(world, city) + 1) continue
         for (const [residentId, job] of jobs) {
@@ -670,6 +743,94 @@ export const npcSurplusCapped: Invariant = {
           })
         }
       }
+    }
+    return out
+  },
+}
+
+/**
+ * An NPC city's spare hands don't stand idle while it has work for them (`CONTEXT.md`: Spare hands'
+ * work; ADR 0004): in the plan its pass made this tick, nobody free to work is idle while a farm or
+ * workplace on a node of its has room and its good lies under half its cap past the reserve (`surplusWork`;
+ * half, for what has left the storage since the pass, this same tick). How many of its adults are idle
+ * can't be held live: a city with its caps full has nothing for them, which is no fault. This is
+ * the rule beneath that share. A Trade Org city has no cap.
+ */
+export const npcSpareHandsWork: Invariant = {
+  name: 'npc-spare-hands-work',
+  check(world) {
+    const out: InvariantViolation[] = []
+    for (const [cityId, plan] of Object.entries(world.cityPlans)) {
+      if (plan.plannedAt !== world.tick) continue
+      const city = world.cities.find((c) => c.id === cityId)
+      if (!city || city.tradeOrg) continue
+      const jobs = Object.values(plan.jobs)
+      if (!jobs.some((j) => j.kind === 'idle')) continue
+      const people = runResidents(world).get(cityId) ?? []
+      const free = (r: Resident) =>
+        plan.jobs[r.id]?.kind === 'idle' &&
+        canWork(r, world.tick) &&
+        !isDown(r) &&
+        !r.carrying &&
+        !isArmed(r)
+      const idle = people.filter(free)
+      if (idle.length === 0) continue
+      const held = new Places(people)
+      const planned = (b: Building) => jobs.filter((j) => j.buildingId === b.id).length
+      const full = surplusWork(world, city, chainStore(world, city))
+      const open = ownWorkplaces(world, city).find((b) => {
+        if (b.site || RECIPES[b.kind]) return false
+        const most = MAX_WORKERS[b.kind] ?? 0
+        return (full(b) ?? 1) < 0.5 && Math.max(planned(b), held.taken(b)) < most
+      })
+      if (!open) continue
+      out.push({
+        invariant: this.name,
+        message: `${cityId} plans ${idle.length} idle, with room at ${open.id}, a ${open.kind} under half its cap`,
+        entityIds: [cityId, open.id, ...idle.map((r) => r.id)],
+      })
+    }
+    return out
+  },
+}
+
+/**
+ * An NPC city opens no more workplaces than a good needs (`CONTEXT.md`: NPC city, Spare hands' work;
+ * ADR 0004): a plan made this tick lays out no workplace on a node of a good it already has one
+ * finished of, unless it is a big city (`isBigNpcCity`) with just that one, nor a farm when the farmers
+ * it wants fit, unless the good is short. Short here means under its reserve and half a cap, for what
+ * came in since the pass, this same tick. A site already begun isn't looked at.
+ */
+export const npcWorkplacesBounded: Invariant = {
+  name: 'npc-workplaces-bounded',
+  check(world) {
+    const out: InvariantViolation[] = []
+    for (const [cityId, plan] of Object.entries(world.cityPlans)) {
+      const project = plan.project
+      if (plan.plannedAt !== world.tick || project?.kind !== 'build') continue
+      const farm = project.building === 'farm'
+      if ((!farm && !onNode(project.building)) || buildingAt(world, project.x, project.y)) continue
+      const city = world.cities.find((c) => c.id === cityId)
+      if (!city || city.tradeOrg) continue
+      const good = farm
+        ? 'food'
+        : workplaceGood(world, { ...project, id: '', kind: project.building, cityId })
+      if (!good) continue
+      const standing = ownWorkplaces(world, city).filter(
+        (b) => !b.site && chainGood(world, b) === good && (farm || onNode(b.kind)),
+      ).length
+      const allowed = farm
+        ? standing === 0 || farmersWanted(world, city) > standing * (MAX_WORKERS.farm ?? 0)
+        : standing < (isBigNpcCity(world, city) ? 2 : 1)
+      if (allowed) continue
+      const slack = ((NPC_SURPLUS_CAP[good] ?? 0) * npcNeedsScale(world, city)) / 2
+      const held = chainStore(world, city)?.stock?.[good] ?? 0
+      if (held < (npcReserve(world, city)[good] ?? 0) + slack) continue
+      out.push({
+        invariant: this.name,
+        message: `${cityId} plans another ${project.building} for ${good}, with ${standing} standing`,
+        entityIds: [cityId],
+      })
     }
     return out
   },

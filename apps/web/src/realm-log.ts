@@ -687,6 +687,11 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         text: `${e.name}’s defence script is gone, so they defend by Defend (default) again.`,
         tone: 'warn',
       }
+    case 'alarmScriptGone':
+      return {
+        text: `${e.name}’s Alarm script is gone, so they go by Alarm (default) again.`,
+        tone: 'warn',
+      }
     case 'scriptStopped':
       return { text: `${e.name} stopped ${e.script}: ${e.reason}`, tone: 'info' }
     case 'waypointAdded':

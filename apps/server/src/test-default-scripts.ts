@@ -2,7 +2,13 @@ import { DEFAULT_SCRIPTS, TASKS, type Task, type TerrainMap, type WorldState } f
 import type { InvariantViolation } from './invariants.js'
 import type { RunnableScript } from './scripts.js'
 import { orderKinds, type OrderKind, type OrderSender } from './orders.js'
-import { ScriptRunner, runScriptOrder, setDefenceScriptOrder, taskOrder } from './script-runner.js'
+import {
+  ScriptRunner,
+  runScriptOrder,
+  setAlarmScriptOrder,
+  setDefenceScriptOrder,
+  taskOrder,
+} from './script-runner.js'
 
 /**
  * For tests without a script library: tasks given as from the UI, every Player running the
@@ -41,6 +47,7 @@ export function defaultScripts(
     ...orderKinds,
     runScript: runScriptOrder(host),
     setDefenceScript: setDefenceScriptOrder(host),
+    setAlarmScript: setAlarmScriptOrder(host),
     task: taskOrder({ defaultScript, script: host.script }),
   }
   const runner = new ScriptRunner(terrain, host)

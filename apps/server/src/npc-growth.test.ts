@@ -21,7 +21,7 @@ import { requestCarrying, resolveCarrying } from './carrying.js'
 import { checkInvariants } from './invariants.js'
 import { stepNpcCities } from './npc-behaviour.js'
 import { nextProject, wallRings } from './npc-growth.js'
-import { planCity } from './npc-plan.js'
+import { farmersWanted, planCity } from './npc-plan.js'
 import { mulberry32, newResident } from './residents.js'
 import { newId } from './starting-city.js'
 import { Walking } from './walking.js'
@@ -80,7 +80,7 @@ describe('NPC cities grow', () => {
     expect(world.residents.filter((r) => r.pair)).toEqual([])
   })
 
-  it('keeps a resident carrying a child out of work, at home; the partner works', () => {
+  it('keeps a resident carrying a child out of work, at a house; the partner works', () => {
     const { world, terrain, city, home } = village()
     for (const r of world.residents) Object.assign(r, { x: home.x, y: home.y, order: null })
     storageOf(world, city).stock = { food: 400 }
@@ -98,7 +98,7 @@ describe('NPC cities grow', () => {
     }
     planCity(world, city, terrain)
     stepNpcCities(world, terrain.size, terrain)
-    expect(a.order).toBeNull()
+    expect(a.order).toMatchObject({ kind: 'walkTo' })
     expect(a.script).toBeUndefined()
     expect(b.order !== null || b.script !== undefined).toBe(true)
     // Food running short doesn't end a pair with a child on the way.
@@ -178,11 +178,11 @@ describe('NPC cities grow', () => {
     })
   })
 
-  it('builds a farm beyond its next wall when every farm is full', () => {
+  it('builds a farm beyond its next wall when the farmers it wants do not fit', () => {
     const { world, terrain, city, home } = village()
     const farm = world.buildings.find((b) => b.kind === 'farm' && b.cityId === city.id)!
     const rand = mulberry32(5)
-    while (world.residents.length < MAX_WORKERS.farm!) {
+    while (farmersWanted(world, city) <= MAX_WORKERS.farm!) {
       world.residents.push(
         newResident(rand, {
           id: newId(world, 'r'),
@@ -193,9 +193,6 @@ describe('NPC cities grow', () => {
           tick: 0,
         }),
       )
-    }
-    for (const r of world.residents) {
-      r.order = { kind: 'workAt', buildingId: farm.id, at: { x: farm.x, y: farm.y }, progress: 0 }
     }
     const project = nextProject(world, city, home, terrain) as { x: number; y: number }
     expect(project).toMatchObject({ kind: 'build', building: 'farm' })

@@ -20,7 +20,7 @@ import {
   TRADERS,
   TRADER_ESCORTS,
 } from '@csp/shared'
-import { TRADE_ORG } from '@csp/shared'
+import { TRADE_ORG, townHallOf } from '@csp/shared'
 import { createAdmin } from './auth.js'
 
 import { KEEP_LATEST, WorldSaver, loadOrCreateWorld, pruneSaves, saveWorld } from './saves.js'
@@ -28,7 +28,8 @@ import { loadTerrain } from './terrain.js'
 import { generateTerrain } from './terrain-gen.js'
 import { HORSE_NAMES } from './horses.js'
 import { foundNpcCity } from './npc-cities.js'
-import { mulberry32 } from './residents.js'
+import { stepOutsiders } from './outsiders.js'
+import { mulberry32, newResident } from './residents.js'
 import { checkInvariants } from './invariants.js'
 import { Walking } from './walking.js'
 import { refreshLastSeen } from './last-seen.js'
@@ -412,7 +413,11 @@ describe('world saves', () => {
     const { world: v83, terrain: land } = worldWithPost()
     const v84 = migrateWorld(structuredClone(v83), 83, { terrain: land })
     expect(v84).toEqual(v83)
-    expect(Object.values(v84.cityPlans).every((p) => p.trader?.offer === undefined)).toBe(true)
+    expect(
+      Object.values(v84.cityPlans)
+        .flatMap((p) => p.traders ?? [])
+        .every((t) => t.offer === undefined),
+    ).toBe(true)
     expect(checkInvariants(v83, land)).toEqual([])
   })
 
@@ -465,6 +470,41 @@ describe('world saves', () => {
     expect(checkInvariants(v104, land)).toEqual([])
   })
 
+  it('leaves a format 104 world as it is: nobody picked an Alarm script (migration 104 → 105)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v105 = migrateWorld(structuredClone(world), 104, { terrain: land }, migrations, 105)
+    expect(v105).toEqual(world)
+    expect(v105.residents.every((r) => r.alarmScriptId === undefined)).toBe(true)
+    expect(checkInvariants(v105, land)).toEqual([])
+  })
+
+  it('leaves a format 105 world as it is: no attacker raised an alarm (migration 105 → 106)', () => {
+    const { world, terrain: land } = worldWithPost()
+    const v106 = migrateWorld(structuredClone(world), 105, { terrain: land }, migrations, 106)
+    expect(v106).toEqual(world)
+    expect(v106.cities.every((c) => c.alarmedAttackers === undefined)).toBe(true)
+    expect(checkInvariants(v106, land)).toEqual([])
+  })
+
+  it('puts those already in a city’s area on its list, to raise no alarm (migration 106 → 107)', () => {
+    const { world, terrain: land } = worldWithCity()
+    const city = world.cities[0]!
+    const v106 = structuredClone(world)
+    // Nobody's in the area of another: the world stays as it is.
+    expect(migrateWorld(structuredClone(v106), 106, { terrain: land }, migrations, 107)).toEqual(world)
+
+    const hall = townHallOf(world, city)!
+    v106.realms.push({ id: 'r9', userId: 90, leaderId: 'x9' })
+    const visitor = newResident(mulberry32(9), { id: 'x9', owner: 'r9', x: hall.x, y: hall.y, tick: 0 })
+    visitor.carried = { sword: 1 }
+    v106.residents.push(visitor)
+    const v107 = migrateWorld(structuredClone(v106), 106, { terrain: land }, migrations, 107)
+    expect(v107.cities[0]!.outsiders).toEqual(['x9'])
+    expect(checkInvariants(v107, land)).toEqual([])
+    stepOutsiders(v107, land.size)
+    expect(v107.residents.some((r) => r.script?.task === 'alarm')).toBe(false)
+  })
+
   it('leaves a format 95 world’s debts to get their demand on the next tick (migration 95 → 96)', () => {
     const { world, terrain: land } = worldWithPost()
     world.realms.push({ id: 'r9', userId: 90, leaderId: 'nobody' })
@@ -503,11 +543,53 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(104)
+    expect(WORLD_FORMAT_VERSION).toBe(111)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
     expect(checkInvariants(v39, land)).toEqual([])
+  })
+
+  it('leaves a format 110 world as it is: no plan has anyone at a training ground yet (migration 110 → 111)', () => {
+    const { world, terrain: land } = worldWithPost()
+    world.cityPlans = { waiting: { plannedAt: 0, jobs: { p1: { kind: 'soldier' } } } }
+    const v111 = migrateWorld(structuredClone(world), 110, { terrain: land }, migrations, 111)
+    expect(v111).toEqual(world)
+  })
+
+  it('leaves a format 109 world as it is: nobody is on patrol yet (migration 109 → 110)', () => {
+    const { world, terrain: land } = worldWithPost()
+    world.cityPlans = { home: { plannedAt: 0, jobs: {} } }
+    const v110 = migrateWorld(structuredClone(world), 109, { terrain: land }, migrations, 110)
+    expect(v110).toEqual(world)
+    expect(v110.cityPlans.home?.patrols).toBeUndefined()
+    expect(v110.cityPlans.home?.patrolledLast).toBeUndefined()
+  })
+
+  it('leaves a format 108 world as it is: no plan has a dip yet (migration 108 → 109)', () => {
+    const { world, terrain: land } = worldWithPost()
+    world.cityPlans = { waiting: { plannedAt: 0, jobs: {}, fullSince: 0 } }
+    const v109 = migrateWorld(structuredClone(world), 108, { terrain: land }, migrations, 109)
+    expect(v109).toEqual(world)
+    expect(v109.cityPlans.waiting?.shortSince).toBeUndefined()
+  })
+
+  it('makes a list of the trader run in a city plan (migration 107 → 108)', () => {
+    const { world: v107, terrain: land } = worldWithPost()
+    const run = {
+      residentId: 'p1',
+      warehouseId: 'b1',
+      sells: { wood: 20 },
+      buys: {},
+      since: v107.tick,
+    }
+    v107.cityPlans = {
+      out: { plannedAt: 0, jobs: {}, trader: run },
+      home: { plannedAt: 0, jobs: {} },
+    } as unknown as typeof v107.cityPlans
+    const v108 = migrateWorld(structuredClone(v107), 107, { terrain: land }, migrations, 108)
+    expect(v108.cityPlans.out).toEqual({ plannedAt: 0, jobs: {}, traders: [run] })
+    expect(v108.cityPlans.home).toEqual({ plannedAt: 0, jobs: {} })
   })
 
   it('migrates a format 100 world: a city knows nothing from scouts yet (migration 100 → 101)', () => {

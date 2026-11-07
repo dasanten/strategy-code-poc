@@ -24,6 +24,7 @@ import { goDown } from './survival.js'
 import { checkInvariants } from './invariants.js'
 import type { RunnableScript } from './scripts.js'
 import { OrderQueue, orderKinds } from './orders.js'
+import { noteOutsidersInside } from './outsiders.js'
 import { QueueRunner } from './queues.js'
 import { hash, mulberry32, newResident } from './residents.js'
 import { entitiesInSight } from './sight.js'
@@ -60,6 +61,8 @@ function setup(library = new Map<number, RunnableScript>()) {
   const x1 = newResident(mulberry32(2), { id: 'x1', owner: 'r2', x: 7, y: 6, tick: 0 })
   const l2 = newResident(mulberry32(3), { id: 'l2', owner: 'r2', x: 28, y: 28, tick: 0 })
   world.residents.push(r, x1, l2)
+  // x1 came in long ago: what these tests look at is the blow, not an alarm for their coming in.
+  noteOutsidersInside(world, SIZE)
   const scripts = defaultScripts(terrain, [me], library)
   const orders = new OrderQueue(scripts.kinds, terrain)
   const queues = new QueueRunner(
@@ -608,6 +611,7 @@ describe('a Player’s order under attack', () => {
     expect(s.world.tick - s.r.struck!.tick).toBeLessThan(DEFEND_CALM_TICKS)
     expect(s.r.givenUnderAttack).toBeUndefined()
     s.world.residents.push(foe)
+    noteOutsidersInside(s.world, SIZE)
     attacked(s)
   })
 

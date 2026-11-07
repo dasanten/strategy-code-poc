@@ -7,9 +7,11 @@ import {
   combatLearned,
   dodgeChance,
   drivenCarriageId,
+  inCityArea,
   inContact,
   isArmed,
   onOwnWall,
+  standsOccupying,
   WALL_DEFENCE,
   attackPower,
   brokenReturns,
@@ -33,13 +35,26 @@ import {
   isAt,
   isDown,
 } from '@csp/shared'
+import {
+  answersAttack,
+  goesAfterOccupier,
+  raiseResidentAttacked,
+  raiseWallAttacked,
+} from './alarms.js'
 import { updateCityMembership } from './cities.js'
-import { buildingOrganization, commitCrime, knownThieves, organizationOf } from './crimes.js'
+import {
+  buildingOrganization,
+  cityOrganization,
+  commitCrime,
+  knownThieves,
+  organizationOf,
+} from './crimes.js'
 import { defendsByScript, endHoldIfOver, startDefence } from './defence.js'
 import { recordEvent } from './events.js'
 import { noteMade } from './goods-made.js'
 import type { OrderKind } from './orders.js'
 import { hash, mulberry32 } from './residents.js'
+import { orderedResident } from './order-sender.js'
 import { realmOf } from './starting-city.js'
 import { dieAll, dropGoods } from './survival.js'
 
@@ -87,12 +102,27 @@ export function attackOrder(targetId: string, started = false, defending = false
 }
 
 /**
+ * Whether `t` stands in the City area of a city of the Organization `org`, a realm or an NPC city,
+ * as someone force is allowed against (`CONTEXT.md`: Crime): occupying its town hall, or a thief of
+ * it that it knows of or one of its residents saw. Anywhere else, or anyone else there, striking them
+ * stays a crime.
+ */
+function wantedAtHome(world: WorldState, org: string, t: Resident, size: number): boolean {
+  const home = world.cities.filter(
+    (c) => cityOrganization(c) === org && inCityArea(world, c, t.x, t.y, size),
+  )
+  if (home.length === 0) return false
+  return home.some((c) => standsOccupying(world, c, t, size)) || knownThieves(world, org).has(t.id)
+}
+
+/**
  * Whether `a` striking `t` is a crime (`CONTEXT.md`: Crime): not when `a` fights back at someone
  * who hit them, nor when `t` is attacking someone of `a`'s Organization on their own account, or
  * breaking or climbing one of its walls or gates (`CONTEXT.md`: Walls in combat). The Trade Org
  * HQ's mercenaries stand with the HQ, and its soldiers keep its inner ring clear by force, never
  * a crime (`CONTEXT.md`: Trade Org army); nor is a trading post's going after a thief it knows of
- * (`CONTEXT.md`: Trading post). For `t` running their defence script, what it interrupted is what
+ * (`CONTEXT.md`: Trading post), nor an Organization's striking those wanted in its own City area
+ * (`wantedAtHome`). For `t` running their defence script, what it interrupted is what
  * they are doing. `size` is the map's.
  */
 function isAggression(world: WorldState, a: Resident, t: Resident, size: number): boolean {
@@ -103,11 +133,14 @@ function isAggression(world: WorldState, a: Resident, t: Resident, size: number)
   }
   const post =
     a.owner === null && world.cities.find((c) => c.id === a.cityId && c.tradeOrg === 'post')
-  if (post && knownThieves(world, post).has(t.id)) return false
-  const sides = new Set([organizationOf(a)])
+  if (post && knownThieves(world, post.id).has(t.id)) return false
+  const org = organizationOf(a)
+  if (org !== null && wantedAtHome(world, org, t, size)) return false
+  const sides = new Set([org])
   if (hq && contractOf(world, a.id)?.hirerId === TRADE_ORG) sides.add(hq.id)
   // Defending themselves, what they were doing before counts (`CONTEXT.md`: Defence script).
-  const o = t.interrupted ? t.interrupted.order : t.order
+  const kept = t.interrupted && t.script?.task !== 'alarm' ? t.interrupted : undefined
+  const o = kept ? (kept.alarm ?? kept).order : t.order
   const ours = (buildingId: string) => {
     const b = world.buildings.find((x) => x.id === buildingId)
     return !!b && sides.has(buildingOrganization(world, b))
@@ -123,38 +156,52 @@ function isAggression(world: WorldState, a: Resident, t: Resident, size: number)
  * The attack order (`CONTEXT.md`: Combat): one of the Player's residents goes after a resident of
  * another realm, or of none, that the Player sees, and strikes them once in contact. The target
  * may also be a wall or gate of another realm's city, or of none, to break it (`CONTEXT.md`:
- * Walls in combat).
+ * Walls in combat). An NPC city's Alarm default gives it too, for a resident of the city after
+ * someone not of it that the city sees (`CONTEXT.md`: Alarm script).
  */
 export const attack: OrderKind = {
   validate(world, sender, order, terrain) {
     const o = order as Partial<AttackRequest>
-    const realm = realmOf(world, sender.userId)
-    const r = world.residents.find((x) => x.id === o.residentId)
-    if (!realm || !commands(world, realm.id, r)) return 'not one of your residents'
+    const npc = sender.npcCityId
+    const realm = npc === undefined ? realmOf(world, sender.userId) : undefined
+    const side = npc ?? realm?.id
+    if (side === undefined || !orderedResident(world, sender, o.residentId)) {
+      return 'not one of your residents'
+    }
     const resident = world.residents.find((x) => x.id === o.targetId)
-    if (resident?.owner === realm.id) return 'that is one of your own residents'
+    if (resident && organizationOf(resident) === side) return 'that is one of your own residents'
     let target: { x: number; y: number } | undefined = resident
     if (!target) {
-      const wall = foreignWall(world, realm.id, o.targetId)
+      if (npc !== undefined) return 'no such resident'
+      const wall = foreignWall(world, side, o.targetId)
       if (typeof wall === 'string')
         return world.buildings.some((b) => b.id === o.targetId) ? wall : 'no such resident'
       target = wall
     }
     const size = terrain?.size
+    const ours = (x: Resident) =>
+      realm
+        ? commands(world, realm.id, x)
+        : x.owner === null && x.cityId === npc && !contractOf(world, x.id)
     const seen = world.residents.some(
-      (x) => commands(world, realm.id, x) && size && wrapDistance(size, x, target) <= SIGHT_RANGE,
+      (x) => ours(x) && size && wrapDistance(size, x, target) <= SIGHT_RANGE,
     )
     if (size && !seen)
       return resident ? 'that resident is out of sight' : 'that wall is out of sight'
     return undefined
   },
-  apply(world, _sender, order) {
+  apply(world, _sender, order, terrain) {
     const { residentId, targetId } = order as AttackRequest
     const r = world.residents.find((x) => x.id === residentId)
     if (!r) return
     // A defence script going after who struck them fights back, in a fight already logged.
-    const defending = r.interrupted !== undefined && r.struck?.by === targetId
-    r.order = attackOrder(targetId, defending, defending)
+    const defending =
+      r.interrupted !== undefined && r.script?.task !== 'alarm' && r.struck?.by === targetId
+    // An Alarm script answering an attack strikes back too, in a fight of its own to log.
+    const noCrime =
+      answersAttack(r, targetId) ||
+      (terrain !== undefined && goesAfterOccupier(world, r, targetId, terrain.size))
+    r.order = attackOrder(targetId, defending, defending || noCrime)
   },
 }
 
@@ -229,6 +276,7 @@ export function resolveStrikes(
     if (o?.kind !== 'attack' || o.targetId !== target.id || !inContact(size, a, target)) continue
     if (isBuilding(target)) {
       blows++
+      raiseWallAttacked(world, a, target, size)
       if (breakWall(world, a, target, size)) broken.push(target)
       continue
     }
@@ -262,6 +310,7 @@ export function resolveStrikes(
     }
     endHoldIfOver(world, t)
     t.struck = { by: a.id, tick: world.tick }
+    raiseResidentAttacked(world, a, t, size)
     a.skills.combat = (a.skills.combat ?? 0) + combatLearned(a, world.tick)
     t.skills.combat = (t.skills.combat ?? 0) + combatLearned(t, world.tick)
     const roll = mulberry32(hash(`${world.seed}:${world.tick}:${a.id}:strike`))()

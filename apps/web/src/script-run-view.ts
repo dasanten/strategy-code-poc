@@ -63,6 +63,33 @@ export function groupDefenceScript(
 }
 
 /**
+ * The scripts the Alarm script picker offers after Alarm (default) and None (`CONTEXT.md`: Alarm
+ * script): the Player's scripts with a version that can run, but for their Alarm, which is the
+ * default already. `picked`, kept for a resident but gone from the library, stays listed, so the
+ * picker shows it until an alarm falls back to Alarm.
+ */
+export function alarmChoices(
+  scripts: readonly ScriptSummary[],
+  picked?: number | 'none' | null,
+): { id: number; name: string }[] {
+  const choices = scripts.filter((s) => s.activeVersion !== null && s.task !== 'alarm')
+  if (typeof picked === 'number' && !choices.some((s) => s.id === picked))
+    return [...choices, { id: picked, name: 'a script no longer in your library' }]
+  return choices
+}
+
+/**
+ * The Alarm script a group keeps: the one all of them have picked or None, null when all run the
+ * Alarm default, undefined when they differ.
+ */
+export function groupAlarmScript(
+  residents: readonly Pick<Resident, 'alarmScriptId'>[],
+): number | 'none' | null | undefined {
+  const picked = new Set(residents.map((r) => r.alarmScriptId ?? null))
+  return picked.size === 1 ? [...picked][0] : undefined
+}
+
+/**
  * The script Run script starts on: the one the Player picked, else the one the resident or army
  * runs now, else the one this browser last saw them run; each only while it can run. Undefined
  * leaves the picker on "Pick a script…" and Run disabled, rather than on whichever script comes

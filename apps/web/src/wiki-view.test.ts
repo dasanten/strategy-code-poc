@@ -15,6 +15,8 @@ import {
   WAREHOUSE_BASE_PRICE,
   WORK_OUTPUT_PER_DAY,
   GAME_DAYS_PER_YEAR,
+  TRAINING_GROUND_MAX_TRAINEES,
+  TRAIN_COMBAT_FACTOR,
   TRAIN_SKILL_FACTOR,
   buildWork,
   carryCapacity,
@@ -164,10 +166,17 @@ describe('the Wiki’s Scripting budgets topic', () => {
 })
 
 describe('training pace', () => {
-  it('takes an average learner a stat’s bonus to its cap in a game year, a skill twice as fast as doing', () => {
-    expect(trainingDays('strength')).toBeCloseTo(GAME_DAYS_PER_YEAR)
+  it('takes an average learner a stat’s bonus to its cap in half a game year, a work skill and Combat by their factors', () => {
+    expect(trainingDays('strength')).toBeCloseTo(GAME_DAYS_PER_YEAR / 2)
     expect(trainingDays('mining')).toBeCloseTo(daysToWorkSkillMax / TRAIN_SKILL_FACTOR)
-    expect(trainingDays('combat')).toBeCloseTo(GAME_DAYS_PER_YEAR / TRAIN_SKILL_FACTOR)
+    expect(trainingDays('combat')).toBeCloseTo(GAME_DAYS_PER_YEAR / TRAIN_COMBAT_FACTOR)
+  })
+
+  it('the Wiki’s Training section says the same', () => {
+    const html = render()
+    const section = html.slice(html.indexOf('id="training"'), html.indexOf('id="food"'))
+    expect(section).toContain(`${TRAIN_SKILL_FACTOR} times as fast as by working`)
+    expect(section).toContain(`Up to ${TRAINING_GROUND_MAX_TRAINEES} train at a ground`)
   })
 })
 

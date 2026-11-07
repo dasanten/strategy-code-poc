@@ -23,8 +23,8 @@ import { FOOTPRINT } from './footprint.js'
 import type { ScriptParam } from './script-api.js'
 
 /**
- * The tasks that run a default script. Defend is never given: being struck starts it
- * (`CONTEXT.md`: Defence script).
+ * The tasks that run a default script. Defend and Alarm are never given: being struck starts the
+ * one (`CONTEXT.md`: Defence script), an alarm the other (Alarm script).
  */
 export const TASKS = [
   'work',
@@ -37,6 +37,7 @@ export const TASKS = [
   'train',
   'buildLine',
   'explore',
+  'alarm',
 ] as const
 export type Task = (typeof TASKS)[number]
 
@@ -1922,6 +1923,151 @@ fn townHall() {
     if (c.id == me.cityId) { return building(c.townHallId) }
   }
   return null
+}
+
+${LOG_TEXT}
+`,
+  },
+  alarm: {
+    name: 'Alarm',
+    source: `// Alarm (default): what I do when an alarm reaches me, in place of what I was
+// doing, which goes on once I end. Armed, with the town hall occupied, I go
+// after the occupier while they stand in the city's area, and end once no armed
+// one of theirs is left there or in sight. For a theft I go after the thief, and
+// with a wall or neighbour attacked the attacker, until they are dead or have left
+// the area or sight. Striking someone occupying the hall, or a thief I know of, is
+// no crime in my own city's area, nor is striking back at an attacker; striking
+// anyone else is. For an armed outsider in the area I walk to the town hall and
+// stand there until no armed outsider is left, which blocks an occupation before
+// it starts; an unarmed outsider I only log. A theft, an attack or an occupation
+// takes me off the hall, and when I end for it I come back here while armed
+// outsiders remain. Unarmed, or for another alarm, I end at once.
+if (me.alarm == null || !armed(me)) {
+  end()
+} else if (me.alarm.kind == "occupied") {
+  let foe = occupier()
+  if (foe == null) {
+    end("the occupier is gone")
+  } else {
+    memory.foeId = foe.id
+    goAfter(foe)
+  }
+} else if (me.alarm.kind == "theft") {
+  goAfterCulprit("the thief is gone")
+} else if (me.alarm.kind == "attacked") {
+  goAfterCulprit("the attacker is gone")
+} else if (me.alarm.kind == "outsider") {
+  onOutsider()
+} else {
+  end()
+}
+
+// Who came decides whether I go at all; once I do, any armed outsider keeps me.
+fn onOutsider() {
+  let about = null
+  let armedLeft = false
+  for (r of outsidersIn(me.alarm.cityId)) {
+    if (r.id == me.alarm.about) { about = r }
+    if (armed(r)) { armedLeft = true }
+  }
+  if (memory.holding == null) {
+    if (about == null) {
+      end()
+      return
+    }
+    if (!armed(about)) {
+      log(about.name + " came into the area, unarmed")
+      end()
+      return
+    }
+    memory.holding = true
+  }
+  if (!armedLeft) {
+    end("no armed outsider left in the area")
+    return
+  }
+  holdHall()
+}
+
+// To the town hall of the alarm's city, and stay there.
+fn holdHall() {
+  let hall = null
+  for (c of cities()) {
+    if (c.id == me.alarm.cityId) { hall = building(c.townHallId) }
+  }
+  if (hall == null) {
+    end("no town hall to hold")
+    return
+  }
+  let here = buildingAt(me.x, me.y)
+  if (here != null && here.id == hall.id) {
+    doing("On alarm: holding the town hall")
+    return
+  }
+  if (me.order != null && me.order.kind == "walkTo") { return } // on my way
+  let problem = walkTo(hall.x, hall.y)
+  if (problem != null) {
+    end("can't reach the town hall: " + problem)
+    return
+  }
+  doing("On alarm: going to hold the town hall")
+  log("going to hold " + placeName(hall))
+}
+
+fn goAfterCulprit(goneText) {
+  let foe = culprit()
+  if (foe == null) {
+    end(goneText)
+  } else {
+    goAfter(foe)
+  }
+}
+
+fn goAfter(foe) {
+  let o = me.order
+  if (o != null && o.kind == "attack" && o.targetId == foe.id) { return } // at it
+  let problem = attack(foe.id)
+  if (problem != null) {
+    end("can't go after " + foe.name + ": " + problem)
+    return
+  }
+  doing("On alarm: going after " + foe.name)
+  log("going after " + foe.name)
+}
+
+// The occupier I am after while they stand in the area, else another armed one
+// of theirs there.
+fn occupier() {
+  let after = memory.foeId
+  if (after == null) { after = me.alarm.about }
+  let realm = me.alarm.realmId
+  let other = null
+  for (r of residents()) {
+    if (r.owner == realm || r.id == after) {
+      if (armed(r) && inCityArea(me.alarm.cityId, r.x, r.y)) {
+        if (r.id == after) { return r }
+        other = r
+      }
+    }
+  }
+  return other
+}
+
+// Who the alarm is about, while I see them in the city's area.
+fn culprit() {
+  for (r of residents()) {
+    if (r.id == me.alarm.about && inCityArea(me.alarm.cityId, r.x, r.y)) { return r }
+  }
+  return null
+}
+
+// Whether they carry a weapon.
+fn armed(who) {
+  for (w of ["spear", "sword"]) {
+    let n = who.carried[w]
+    if (n != null && n > 0) { return true }
+  }
+  return false
 }
 
 ${LOG_TEXT}
