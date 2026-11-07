@@ -650,7 +650,7 @@ describe('training and patrols share a city’s soldiers (`CONTEXT.md`: Soldier 
       for (const id of out) expect(plan.jobs[id]?.kind).toBe('soldier')
       if (t % 60 !== 0) continue
       const trainees = jobsOf(world, city, 'train')
-      const turn = Math.floor(world.tick / NPC_TRAIN_TURN_TICKS)
+      const turn = Math.floor(plan.plannedAt / NPC_TRAIN_TURN_TICKS)
       if (turn === before.turn) {
         const moved = trainees.filter((id) => !before.lot.has(id)).length
         seen.mostMovedInATurn = Math.max(seen.mostMovedInATurn, moved)
