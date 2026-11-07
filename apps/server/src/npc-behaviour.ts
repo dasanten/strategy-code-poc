@@ -27,6 +27,7 @@ import {
   ownsHorse,
   putAwayUnits,
   setOutFood,
+  tileIndex,
   unitsThatFit,
   warehouseKeeps,
   wrapDistance,
@@ -61,6 +62,7 @@ import {
 } from './npc-plan.js'
 import { chainStore, holdsBatch, warehouseFor } from './npc-chain.js'
 import { foundDaughter, foundingParty, stepFounders } from './npc-founding.js'
+import { freeSoldiers, soldierPosts, standsPosts, type SoldierPost } from './npc-posts.js'
 import { reviveTarget, runReviver } from './npc-revive.js'
 import { layRoad, onRoadWork, type WayFinder } from './npc-roads.js'
 import { giveUpSite, sendScout, stepScouts } from './npc-scouts.js'
@@ -157,8 +159,8 @@ export function stepNpcCities(
  * (`CONTEXT.md`: Scout), and one the pass called off comes home first with what they saw
  * (`stepScouts`); with nothing to do they stand at a house (`standIdle`), and take no Food to set
  * out with. Its soldiers (armed adults) are put to no work and no building (`stepNpcDefence`), and
- * come home. Children stand at a house too, and refill there. Returns the milliseconds spent
- * planning.
+ * go to their posts (`standPost`), a Trade Org city's home. Children stand at a house too, and refill
+ * there. Returns the milliseconds spent planning.
  */
 function runCity(
   world: WorldState,
@@ -274,8 +276,13 @@ function runCity(
 
   const home = npcHome(world, city)
   const held = new Places(people)
-  const stand = (r: Resident) =>
-    standIdle(world, city, r, houses(), home, size, plan?.plannedAt === world.tick)
+  const passed = plan?.plannedAt === world.tick
+  const stand = (r: Resident) => standIdle(world, city, r, houses(), home, size, passed)
+  // Worked out at most once a tick, and only when a soldier is to be sent: most ticks none is.
+  let posts: Map<string, SoldierPost> | undefined
+  const postOf = (r: Resident) =>
+    (posts ??= soldierPosts(world, city, freeSoldiers(world, city, adults), size, terrain)).get(r.id)
+  const hasPosts = standsPosts(world, city)
   // The road crew is apart from its builders (`CONTEXT.md`: NPC road).
   const crew = adults.filter((r) => jobs[r.id]?.kind === 'road')
   const building = adults.filter((r) => isBuilder(r) && jobs[r.id]?.kind !== 'road')
@@ -299,6 +306,9 @@ function runCity(
   }
 
   for (const r of adults) {
+    // The pass just now gave a soldier another post (one on the hall was called away): a walk to
+    // their old one ends here. One taking a load to the storage does that first.
+    if (passed && hasPosts && isArmed(r) && walkingOffPost(r, postOf(r), size)) r.order = null
     if (r.order !== null || r.script) continue
     // A scout called off comes home with what they saw before anything else (`CONTEXT.md`: Scout),
     // but for one of the city's Down, who can't wait; they come home after.
@@ -346,8 +356,9 @@ function runCity(
     // Food to set out with is for those who set out: one with nothing to do would walk back for it
     // after every meal, and eats where they stand (`CONTEXT.md`: Refilling at home).
     const standsAtHouse = !soldier && (!job || job.kind === 'idle') && houses().length > 0
+    const onPost = hasPosts && isArmed(r)
     const food = storage?.stock?.food ?? 0
-    if (storage && food > 0 && (r.carried.food ?? 0) < OWN_FOOD && !standsAtHouse) {
+    if (storage && food > 0 && (r.carried.food ?? 0) < OWN_FOOD && !standsAtHouse && !onPost) {
       if (isAt(r, storage, size)) {
         const units = Math.min(food, OWN_FOOD - (r.carried.food ?? 0))
         const from = { kind: 'storage' as const, storageId: storage.id }
@@ -384,7 +395,8 @@ function runCity(
         continue
       }
     }
-    if (soldier) comeHome(world, city, r, home, size)
+    if (onPost) standPost(world, city, r, postOf, home, size, passed)
+    else if (soldier) comeHome(world, city, r, home, size)
     else stand(r)
   }
   // A city with no house leaves its children be, as they refill anywhere in its area.
@@ -432,6 +444,34 @@ function standIdle(
   if (houses.length === 0) return comeHome(world, city, r, home, size)
   if (!passed && inCityArea(world, city, r.x, r.y, size)) return
   if (!houses.some((h) => isAt(r, h, size))) walkTo(r, houses[hash(r.id) % houses.length]!)
+}
+
+/**
+ * A soldier with nothing to do goes to their post (`CONTEXT.md`: Soldier posts), and one on it stays.
+ * In the city's area they set off only when its pass just ran (`passed`), as for `standIdle`, so one
+ * back from an alarm walks there within the game hour, and one with no way there tries again an hour
+ * on. With no post they come home (`comeHome`).
+ */
+function standPost(
+  world: WorldState,
+  city: City,
+  r: Resident,
+  postOf: (r: Resident) => SoldierPost | undefined,
+  home: Building | undefined,
+  size: number,
+  passed: boolean,
+): void {
+  if (!passed && inCityArea(world, city, r.x, r.y, size)) return
+  const post = postOf(r)
+  if (!post) return comeHome(world, city, r, home, size)
+  if (!post.tiles.has(tileIndex(size, r.x, r.y))) walkTo(r, post.at)
+}
+
+/** Whether a soldier is on a walk that doesn't end on their `post`, with no load to put away first. */
+function walkingOffPost(r: Resident, post: SoldierPost | undefined, size: number): boolean {
+  const o = r.order
+  if (o?.kind !== 'walkTo' || r.script || !post) return false
+  return !post.tiles.has(tileIndex(size, o.target.x, o.target.y)) && haul(r) === undefined
 }
 
 /** Whether a resident is on a walk that ends at one of these houses. */
