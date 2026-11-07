@@ -1,6 +1,8 @@
 import {
+  BUILD_MATERIALS,
   FOOD_PER_DAY,
   FOOD_SURPLUS_DAYS,
+  GOOD_WEIGHT,
   NPC_CITY_MIN_DISTANCE,
   NPC_FOUND_GIVE_UP_DAYS,
   NPC_FOUND_PARTY_MOST,
@@ -16,6 +18,7 @@ import {
   TICKS_PER_GAME_DAY,
   Terrain,
   WALK_TICKS_PER_TILE,
+  carryCapacity,
   computeTerritory,
   npcFoundingPartySize,
   npcFullDays,
@@ -39,6 +42,7 @@ import { foundNpcCity } from './npc-cities.js'
 import { farStableSpot } from './npc-growth.js'
 import {
   findFoundingSite,
+  foundDaughter,
   foundingFood,
   foundingMaterials,
   foundingPartiesSound,
@@ -431,6 +435,108 @@ describe('the founding-parties-sound invariant', () => {
 })
 
 describe('a daughter', () => {
+  it(
+    'has its armed founder bring what they carry to its first storage, then stand as a soldier',
+    { timeout: 120_000 },
+    () => {
+      const terrain = plains(240)
+      const world = createWorld(terrain)
+      const rand = mulberry32(11)
+      const hall = {
+        id: newId(world, 'b'),
+        kind: 'townHall' as const,
+        cityId: null,
+        x: 120,
+        y: 120,
+      }
+      world.buildings.push(hall)
+      const city = foundCity(world, hall, null)
+      updateCityMembership(world, terrain.size)
+      const people = Array.from({ length: NPC_VILLAGE.residents }, (_, i) => {
+        const r = newResident(rand, {
+          id: newId(world, 'r'),
+          owner: null,
+          cityId: city.id,
+          x: 118 + i,
+          y: 124,
+          tick: world.tick,
+        })
+        r.bornAt = world.tick - ticksForAge(30)
+        r.carried = { food: 15 }
+        world.residents.push(r)
+        return r
+      })
+      // Wood the storage needs is on the one who is armed, as much as they can carry: nobody else
+      // can finish it. The rest is on the others.
+      const need = BUILD_MATERIALS.storage!
+      const room = (r: (typeof people)[number]) => carryCapacity(r, world.tick) - 1
+      const [armed, ...rest] = [...people].sort((a, b) => room(b) - room(a)) as [
+        (typeof people)[number],
+        ...typeof people,
+      ]
+      const onArmed = Math.min(need.wood!, Math.floor(room(armed) - GOOD_WEIGHT.spear))
+      expect(onArmed).toBeGreaterThan(0)
+      armed.carried = { food: 1, spear: 1, wood: onArmed }
+      let wood = need.wood! - onArmed
+      let stone = need.stone!
+      for (const r of rest) {
+        const w = Math.min(wood, Math.floor(room(r)))
+        const s = Math.min(stone, Math.floor(room(r)) - w)
+        r.carried = { food: 1, wood: w, stone: s }
+        wood -= w
+        stone -= s
+      }
+      const storage = () =>
+        world.buildings.find((b) => b.kind === 'storage' && b.cityId === city.id && !b.site)
+      run(world, terrain, 8 * TICKS_PER_GAME_DAY, () => storage() !== undefined)
+      expect(storage()).toBeDefined()
+      expect(armed.carried.wood ?? 0).toBe(0)
+      expect(armed.carried.stone ?? 0).toBe(0)
+      expect(armed.carried.spear).toBe(1)
+      run(world, terrain, TICKS_PER_GAME_DAY, () => false)
+      expect(armed.script?.task).not.toBe('build')
+      expect(world.cityPlans[city.id]?.jobs[armed.id]?.kind).toBe('soldier')
+    },
+  )
+
+  it('has a founder gone back for materials come to it instead once the town hall stands', () => {
+    const { world, terrain, city } = fullTown(1300)
+    const storage = npcHome(world, city)!
+    const hall = { id: newId(world, 'b'), kind: 'townHall' as const, cityId: null, x: 700, y: 60 }
+    world.buildings.push(hall)
+    const daughter = foundCity(world, hall, null)
+    const [back, there] = world.residents.filter((r) => r.cityId === city.id && !r.carrying)
+    const fetch = { storageId: storage.id, goods: { wood: 28 } }
+    back!.script = {
+      scriptId: 0,
+      task: 'build',
+      memory: { building: 'townHall', at: { x: 700, y: 60 }, fetch },
+    }
+    back!.order = {
+      kind: 'walkTo',
+      target: { x: storage.x, y: storage.y },
+      path: null,
+      progress: 0,
+    }
+    there!.script = {
+      scriptId: 0,
+      task: 'build',
+      memory: { building: 'townHall', at: { x: 700, y: 60 } },
+    }
+    const plan = planCity(world, city, terrain)
+    plan.foundingSite = { x: hall.x, y: hall.y }
+    plan.jobs[back!.id] = { kind: 'found' }
+    plan.jobs[there!.id] = { kind: 'found' }
+
+    expect(foundDaughter(world, city, plan)).toBe(daughter)
+
+    expect(back!.cityId).toBe(daughter.id)
+    expect(back!.script).toBeUndefined()
+    expect(back!.order).toBeNull()
+    expect(there!.cityId).toBe(daughter.id)
+    expect(there!.script?.task).toBe('build')
+  })
+
   it(
     'builds its storage, a farm and a house in that order, then walls itself',
     { tags: ['slow'], timeout: 600_000 },

@@ -347,10 +347,16 @@ function carriedBy(world: WorldState, city: City): Stock {
  */
 export function npcBuilders(world: WorldState, city: City): number {
   if (city.tradeOrg) return NPC_BUILDERS
-  const storage = world.buildings.some(
-    (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
-  )
-  return storage ? NPC_BUILDERS * npcNeedsScale(world, city) : Infinity
+  return noStorageYet(world, city) ? Infinity : NPC_BUILDERS * npcNeedsScale(world, city)
+}
+
+/**
+ * Whether an NPC city has no finished storage yet (a daughter, `CONTEXT.md`: Founding). The materials
+ * are then on its residents, so its armed ones build with the rest: nowhere else could they put theirs.
+ */
+export function noStorageYet(world: WorldState, city: City): boolean {
+  if (city.tradeOrg) return false
+  return !world.buildings.some((b) => b.cityId === city.id && b.kind === 'storage' && !b.site)
 }
 
 /**

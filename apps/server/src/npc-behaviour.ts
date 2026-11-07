@@ -44,6 +44,7 @@ import {
   cityGrows,
   cityProject,
   isBuilder,
+  noStorageYet,
   noFarm,
   npcBuilders,
   stopBuildersWhoCantGoOn,
@@ -328,7 +329,7 @@ function runCity(
     if (jobs[r.id]?.kind === 'road' && plan && layRoad(world, city, plan, r, crew, store, size)) {
       continue
     }
-    if (free > 0 && !isArmed(r) && carriesMaterials(r, city)) {
+    if (free > 0 && (!isArmed(r) || noStorageYet(world, city)) && carriesMaterials(r, city)) {
       const p = project()
       if (p && takePart(world, r, p, store, true)) {
         free--

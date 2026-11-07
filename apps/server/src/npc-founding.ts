@@ -42,6 +42,7 @@ import {
   type WorldState,
 } from '@csp/shared'
 import type { Invariant, InvariantViolation } from './invariants.js'
+import { stopWork } from './npc-behaviour.js'
 import { shortGoods } from './npc-chain.js'
 import { npcSiteFits, takenGround } from './npc-cities.js'
 import { knowsNode } from './npc-scouts.js'
@@ -492,6 +493,9 @@ export function foundDaughter(world: WorldState, city: City, plan: CityPlan): Ci
   for (const r of world.residents) {
     if (!ids.has(r.id) || r.cityId !== city.id || r.owner !== null || r.health <= 0) continue
     r.cityId = daughter.id
+    // One gone back to the mother's storage for materials comes to the daughter instead: the hall
+    // needs them no more, and that storage is no longer theirs to take from.
+    if (r.script?.memory.fetch != null) stopWork(r)
   }
   for (const id of party) delete plan.jobs[id]
   delete plan.fullSince

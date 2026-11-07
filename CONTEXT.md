@@ -568,7 +568,10 @@ The shared language of the game. Domain terms only — no implementation details
   adults, more from a big city, one of them armed, each carrying a share of the materials (a town
   hall's and a storage's, and houses for those past a village's worth) and Food for the walk and
   the first weeks, walks there and builds the town hall, which founds the **daughter** as an
-  ordinary NPC city with a name from the game; then its storage, a farm and a house. Its first
+  ordinary NPC city with a name from the game; then its storage, a farm and a house. Until its
+  storage stands its armed residents build with the rest, since the materials are on them and
+  there is nowhere else to put them. A member gone back to the mother's storage for materials
+  when the town hall stands comes to the daughter instead. Its first
   wall comes later out of its own reserve, a ring round its home. Mother and daughter are
   independent and hold each other in high standing, which fades like any standing; neither
   shares anything with the other. A city founds again once it is full again. Trading posts and
