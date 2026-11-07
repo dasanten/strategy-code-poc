@@ -7,6 +7,7 @@ import {
   NPC_TOWN,
   TICKS_PER_GAME_DAY,
   HOUSING_ROOM,
+  RECIPES,
   canWork,
   cityResidents,
   isAt,
@@ -20,6 +21,7 @@ import {
   type City,
   type CityLayout,
   type Good,
+  type Resident,
   type ResourceKind,
   type Stock,
   type TerrainMap,
@@ -209,20 +211,24 @@ export function unhurriedWalking(terrain: TerrainMap): Walking {
 
 /**
  * Runs the world for `days` game days, counting every `everyDays`, and calling `eachDay` at the end
- * of each game day.
+ * of each game day and `eachTick` after each tick.
  */
 export function runBigCity(
   staged: ReturnType<typeof bigCity>,
   days: number,
   everyDays: number,
   eachDay: () => void = () => {},
+  eachTick: () => void = () => {},
 ): BigCityRun {
   const { world, terrain, city, home } = staged
   const walking = unhurriedWalking(terrain)
   const counts: BigCityCount[] = []
   let ms = 0
   for (let day = 1; day <= days; day++) {
-    for (let t = 0; t < TICKS_PER_GAME_DAY; t++) ms += stepWorld(world, terrain, walking).npcPlanMs
+    for (let t = 0; t < TICKS_PER_GAME_DAY; t++) {
+      ms += stepWorld(world, terrain, walking).npcPlanMs
+      eachTick()
+    }
     if (day % everyDays === 0) counts.push(countBigCity(world, terrain, city, home))
     eachDay()
   }
@@ -246,4 +252,118 @@ export function bigCityReport(run: BigCityRun): string {
   lines.push(`on the storage: ${Math.min(...on)} to ${Math.max(...on)}`)
   lines.push(`planning: ${run.planMsPerHour.toFixed(2)} ms per game hour`)
   return lines.join('\n')
+}
+
+/** What the big city shows while it is watched (`watchBigCity`). */
+export interface BigCityHold {
+  /** The most of its adults idle in any one plan, as a share of those it had then. */
+  idleShare: number
+  /** The mean of that share over its plans. */
+  meanIdleShare: number
+  /**
+   * The most of its adults, its soldiers aside, with no order and no script at any tick, as a share of
+   * those it had then: its idle, and those whose job has nothing for them just now.
+   */
+  stillShare: number
+  /** The mean of that share over its ticks. */
+  meanStillShare: number
+  /**
+   * The longest anyone stood on its storage with no order and no script, in ticks. One waiting there for
+   * what their smelter or smithy needs (`takeInput`) is fetching, and isn't counted.
+   */
+  longestOnStorage: number
+  /** The job of whoever did: `child` for one too young for a job. */
+  longestJob: string
+  /** The most residents on its storage at any tick, those walking over it and stowing included. */
+  mostOnStorage: number
+  /** Its planned farmers at the end of each game day. */
+  farmers: number[]
+  /** The biggest change in `farmers` from one game day to the next. */
+  farmerSwing: number
+}
+
+/** A watch of the big city: `tick` after every tick from `fromDay` on, then `hold` says what it saw. */
+export interface BigCityWatch {
+  tick: () => void
+  hold: () => BigCityHold
+}
+
+/** Watches the big city from game day `fromDay` on: whether it holds to its idle share (T80.11). */
+export function watchBigCity(staged: ReturnType<typeof bigCity>, fromDay: number): BigCityWatch {
+  const { world, terrain, city, home } = staged
+  const shares: number[] = []
+  const farmers: number[] = []
+  const standing = new Map<string, number>()
+  let stillShares = 0
+  let ticks = 0
+  const seen: Pick<
+    BigCityHold,
+    'stillShare' | 'longestOnStorage' | 'longestJob' | 'mostOnStorage'
+  > = {
+    stillShare: 0,
+    longestOnStorage: 0,
+    longestJob: 'nobody',
+    mostOnStorage: 0,
+  }
+  let plannedAt: number | undefined
+  const tick = () => {
+    if (world.tick < fromDay * TICKS_PER_GAME_DAY) return
+    const plan = world.cityPlans[city.id]
+    const jobs = plan?.jobs ?? {}
+    const residents = cityResidents(world, city).filter((r) => !isDown(r))
+    const adults = residents.filter((r) => canWork(r, world.tick))
+    const count = (kind: string) => adults.filter((r) => jobs[r.id]?.kind === kind).length
+    if (plan && plan.plannedAt !== plannedAt) {
+      plannedAt = plan.plannedAt
+      shares.push(count('idle') / adults.length)
+    }
+    if (world.tick % TICKS_PER_GAME_DAY === 0) farmers.push(count('farm'))
+    const still = adults.filter(
+      (r) =>
+        !r.order && !r.script && !['soldier', 'teach', 'train'].includes(jobs[r.id]?.kind ?? ''),
+    )
+    seen.stillShare = Math.max(seen.stillShare, still.length / adults.length)
+    stillShares += still.length / adults.length
+    ticks++
+    const fetching = (r: Resident) => {
+      const place = world.buildings.find((b) => b.id === jobs[r.id]?.buildingId)
+      return !!place && RECIPES[place.kind] !== undefined
+    }
+    let on = 0
+    for (const r of residents) {
+      const here = isAt(r, home, terrain.size)
+      if (here) on++
+      if (!here || r.order || r.script || fetching(r)) {
+        standing.delete(r.id)
+        continue
+      }
+      const stood = (standing.get(r.id) ?? 0) + 1
+      standing.set(r.id, stood)
+      if (stood > seen.longestOnStorage) {
+        seen.longestOnStorage = stood
+        seen.longestJob = canWork(r, world.tick) ? (jobs[r.id]?.kind ?? 'none') : 'child'
+      }
+    }
+    seen.mostOnStorage = Math.max(seen.mostOnStorage, on)
+  }
+  const hold = (): BigCityHold => ({
+    ...seen,
+    idleShare: Math.max(...shares),
+    meanIdleShare: shares.reduce((sum, s) => sum + s, 0) / shares.length,
+    meanStillShare: stillShares / ticks,
+    farmers,
+    farmerSwing: Math.max(0, ...farmers.slice(1).map((n, i) => Math.abs(n - farmers[i]!))),
+  })
+  return { tick, hold }
+}
+
+/** What a watch saw as lines of text, for the log and the PR. */
+export function bigCityHoldReport(hold: BigCityHold): string {
+  const percent = (share: number) => `${(share * 100).toFixed(1)}%`
+  return [
+    `idle: at most ${percent(hold.idleShare)} of its adults, ${percent(hold.meanIdleShare)} on average`,
+    `no order and no script, soldiers aside: at most ${percent(hold.stillShare)}, ${percent(hold.meanStillShare)} on average`,
+    `on the storage: at most ${hold.mostOnStorage} at once; the longest anyone stood there ${hold.longestOnStorage} ticks (${hold.longestJob})`,
+    `farmers: ${hold.farmers.join(', ')}; swing ${hold.farmerSwing}`,
+  ].join('\n')
 }
