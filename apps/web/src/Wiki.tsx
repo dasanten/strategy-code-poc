@@ -138,6 +138,7 @@ import {
   NPC_GATE_WATCH_RANGE,
   NPC_VILLAGE,
   NPC_NODE_REACH,
+  NPC_RESIDENTS_PER_NEEDS_STEP,
   NPC_RESIDENTS_PER_SCOUT,
   NPC_SCOUT_LIMIT,
   NPC_TRADER_GIVE_UP_DAYS,
@@ -2099,6 +2100,13 @@ export function Wiki() {
           holds counts.
         </p>
         <p>
+          A city's needs grow in steps, one for every {num(NPC_RESIDENTS_PER_NEEDS_STEP)} residents.
+          A village or town under {num(2 * NPC_RESIDENTS_PER_NEEDS_STEP)} residents counts as one
+          step; from there on it is a big city. Each step keeps another house's and those wall
+          tiles' Wood in its reserve, and each past the first {num(NPC_TRADE.reserveStonePerStep)}{' '}
+          Stone. Its surplus caps, its builders and its road crew below are per step too.
+        </p>
+        <p>
           A new NPC village or town starts with {num(NPC_START_HORSES)} horses, with{' '}
           {days(NPC_START_HORSE_FOOD_DAYS)} of Food for each on the ground by them, and lays its
           stable out where they stand, so they are in it once it is finished. It breeds them up to{' '}
@@ -2119,7 +2127,9 @@ export function Wiki() {
           It shares out its adults in this order: soldiers; farmers, as many as feed everyone (each
           eats {num(FOOD_PER_DAY)} Food a day, a farmer makes {num(WORK_OUTPUT_PER_DAY.food ?? 0)})
           and one more while it has no food surplus, a new farm when they don't fit; up to{' '}
-          {num(NPC_BUILDERS)} builders while it has a project; everyone else is a spare hand. Spare
+          {num(NPC_BUILDERS)} builders a step while it has a project; everyone else is a spare hand. A
+          farm is built only for the farmers it keeps, never because spare hands filled the farms
+          working for surplus. Spare
           hands go to the good the reserve is shortest of, as a share of what it wants of it,
           filling one workplace's crew before the next. Without a workplace for that good, the city
           builds one: on the nearest fitting resource node it knows of, or a smelter, smithy or mint
@@ -2186,7 +2196,8 @@ export function Wiki() {
         <p>
           The others stay at or go to one
           of the city's workplaces and work for surplus, past its reserve, the good furthest below
-          its cap first: {num(NPC_SURPLUS_CAP.food ?? 0)} Food, {num(NPC_SURPLUS_CAP.wood ?? 0)}{' '}
+          its cap first. Each step of its needs caps it at {num(NPC_SURPLUS_CAP.food ?? 0)} Food,{' '}
+          {num(NPC_SURPLUS_CAP.wood ?? 0)}{' '}
           Wood, {num(NPC_SURPLUS_CAP.stone ?? 0)} Stone, {num(NPC_SURPLUS_CAP.ironOre ?? 0)} each of
           Iron ore, Iron and Gold ore, {num(NPC_SURPLUS_CAP.coins ?? 0)} coins and{' '}
           {num(NPC_SURPLUS_CAP[NPC_SMITHY_WEAPON] ?? 0)}{' '}
@@ -2196,7 +2207,13 @@ export function Wiki() {
           time it thinks. So its workplaces stay busy, and its trader has more to sell.
         </p>
         <p>
-          Ahead of scouting and that work comes its road crew: up to {num(NPC_ROAD_CREW)} spare hands, apart from
+          With nothing short, a big city whose one lumber camp, quarry or mine has its crew full and
+          its good below the cap opens a second of that kind, on the nearest node it knows. It opens
+          no third, and none for a good at its cap.
+        </p>
+        <p>
+          Ahead of scouting and that work comes its road crew: up to {num(NPC_ROAD_CREW)} spare hands
+          a step, apart from
           its builders, build its streets, then road from its home to each of its workplaces outside
           its area, farms too, the nearest first. They follow the way a resident would walk, tile by tile, so a road
           goes round a lake, and they skip tiles that already have a road. They only use materials

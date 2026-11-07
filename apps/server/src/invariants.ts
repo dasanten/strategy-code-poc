@@ -141,7 +141,13 @@ import {
 } from './trade-org-debt.js'
 import { nothingLeftOfTheHq } from './hq-fall.js'
 import { hqRingsSound } from './hq-growth.js'
-import { cityPlansSound, npcFarmersKept, npcSurplusCapped, tradeOrgSendsNoOne } from './npc-plan.js'
+import {
+  cityPlansSound,
+  npcFarmersKept,
+  npcSurplusCapped,
+  npcWorkplacesBounded,
+  tradeOrgSendsNoOne,
+} from './npc-plan.js'
 import { npcRoadCrewSized, npcRoadsOnce } from './npc-roads.js'
 import { npcRevivers } from './npc-revive.js'
 import { npcScoutsSound } from './npc-scouts.js'
@@ -2143,6 +2149,7 @@ export const worldInvariants: Invariant[] = [
   cityStreetsSound,
   npcFarmersKept,
   npcSurplusCapped,
+  npcWorkplacesBounded,
   npcRoadCrewSized,
   npcRoadsOnce,
   npcRevivers,
