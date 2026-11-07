@@ -68,7 +68,14 @@ import {
   STARVE_DAYS,
   DOWN_DAYS,
   FEED_UNITS,
+  NPC_PATROLS_MAX,
+  NPC_PATROL_ROAD_STOPS,
+  NPC_PATROL_WALL_STOPS,
+  NPC_POST_AROUND_HALL,
   NPC_REVIVE_REACH,
+  NPC_SOLDIERS_AT_GATE,
+  NPC_SOLDIERS_ON_HALL,
+  NPC_SOLDIERS_PER_PATROL,
   WAKE_HEALTH,
   FOOD_SPOIL_PER_DAY,
   FOOD_SURPLUS_DAYS,
@@ -127,21 +134,31 @@ import {
   NPC_CITY_WONT_SELL_STANDING,
   FOOD_PER_DAY,
   NPC_BUILDERS,
+  NPC_INNER_WALL_REACH,
   NPC_ROAD_CREW,
   NPC_ROAD_LONGEST,
   NPC_CITY_MIN_DISTANCE,
   NPC_FOUND_FOOD_DAYS,
   NPC_FOUND_GIVE_UP_DAYS,
+  NPC_FOUND_PARTY_MOST,
   NPC_FOUND_REACH,
+  NPC_FOUND_RESIDENTS_PER_MEMBER,
   NPC_FOUND_STANDING,
+  NPC_FOUND_VILLAGE_RESIDENTS,
   NPC_FULL_DAYS,
+  NPC_FULL_DAYS_LEAST,
+  NPC_FULL_DIP_DAYS,
+  NPC_FULL_RESIDENTS_PER_DAY,
   NPC_GATE_WATCH_RANGE,
   NPC_VILLAGE,
   NPC_NODE_REACH,
+  NPC_RESIDENTS_PER_NEEDS_STEP,
+  NPC_TRAIN_TURN_TICKS,
   NPC_RESIDENTS_PER_SCOUT,
   NPC_SCOUT_LIMIT,
   NPC_TRADER_GIVE_UP_DAYS,
   NPC_OFFER_REACH,
+  NPC_RESIDENTS_PER_TRADER,
   NPC_TRADER_REACH,
   NPC_PLAN_TICKS,
   NPC_SURPLUS_CAP,
@@ -1087,8 +1104,14 @@ export function Wiki() {
           stat with its base.
         </p>
         <p>
-          Players' residents train, by order, queue step or script. NPC cities and the Trade
-          Organization train nobody yet.
+          Players' residents train, by order, queue step or script, and so do the soldiers of a big
+          NPC city with a training ground of its own: the one of them with the most Combat teaches, or
+          among equals the strongest, and up to {num(TRAINING_GROUND_MAX_TRAINEES)} others train in
+          turns of {days(NPC_TRAIN_TURN_TICKS / TICKS_PER_GAME_DAY)}, by the same rules: Combat while any
+          of them is below the teacher in it, else Strength. The soldiers its hall and gates need stay
+          on their posts, so with too few left the ground stands empty. So it does once nobody can learn
+          anything more from the teacher. An alarm takes them from it and they come back after. The
+          Trade Organization trains nobody.
         </p>
       </Section>
 
@@ -2099,6 +2122,13 @@ export function Wiki() {
           holds counts.
         </p>
         <p>
+          A city's needs grow in steps, one for every {num(NPC_RESIDENTS_PER_NEEDS_STEP)} residents.
+          A village or town under {num(2 * NPC_RESIDENTS_PER_NEEDS_STEP)} residents counts as one
+          step; from there on it is a big city. Each step keeps another house's and those wall
+          tiles' Wood in its reserve, and each past the first {num(NPC_TRADE.reserveStonePerStep)}{' '}
+          Stone. Its surplus caps, its builders and its road crew below are per step too.
+        </p>
+        <p>
           A new NPC village or town starts with {num(NPC_START_HORSES)} horses, with{' '}
           {days(NPC_START_HORSE_FOOD_DAYS)} of Food for each on the ground by them, and lays its
           stable out where they stand, so they are in it once it is finished. It breeds them up to{' '}
@@ -2119,11 +2149,21 @@ export function Wiki() {
           It shares out its adults in this order: soldiers; farmers, as many as feed everyone (each
           eats {num(FOOD_PER_DAY)} Food a day, a farmer makes {num(WORK_OUTPUT_PER_DAY.food ?? 0)})
           and one more while it has no food surplus, a new farm when they don't fit; up to{' '}
-          {num(NPC_BUILDERS)} builders while it has a project; everyone else is a spare hand. Spare
+          {num(NPC_BUILDERS)} builders a step while it has a project; everyone else is a spare hand. A
+          farm is otherwise built only when Food is short of its reserve with its farms full and
+          someone idle, never because spare hands filled the farms working for surplus. Spare
           hands go to the good the reserve is shortest of, as a share of what it wants of it,
           filling one workplace's crew before the next. Without a workplace for that good, the city
           builds one: on the nearest fitting resource node it knows of, or a smelter, smithy or mint
-          in its area like a house.
+          in its area like a house. With every workplace of a short good at its full crew and
+          someone idle, it opens another of them, however many it has, and a farm for Food.
+        </p>
+        <p>
+          Those with nothing to do, those carrying a child and its children stand at a house of the
+          city rather than on its storage, each at their own one, and stay there: they eat where
+          they stand, as anyone does in their own city's area, and leave when the city has work for
+          them. A city with no house has them at home. Its soldiers stand apart from this, and
+          trading posts and the HQ don't do it.
         </p>
         <p>
           An NPC city sets out its town by a layout, picked at random when it comes to be (a
@@ -2179,7 +2219,8 @@ export function Wiki() {
         <p>
           The others stay at or go to one
           of the city's workplaces and work for surplus, past its reserve, the good furthest below
-          its cap first: {num(NPC_SURPLUS_CAP.food ?? 0)} Food, {num(NPC_SURPLUS_CAP.wood ?? 0)}{' '}
+          its cap first. Each step of its needs caps it at {num(NPC_SURPLUS_CAP.food ?? 0)} Food,{' '}
+          {num(NPC_SURPLUS_CAP.wood ?? 0)}{' '}
           Wood, {num(NPC_SURPLUS_CAP.stone ?? 0)} Stone, {num(NPC_SURPLUS_CAP.ironOre ?? 0)} each of
           Iron ore, Iron and Gold ore, {num(NPC_SURPLUS_CAP.coins ?? 0)} coins and{' '}
           {num(NPC_SURPLUS_CAP[NPC_SMITHY_WEAPON] ?? 0)}{' '}
@@ -2189,25 +2230,49 @@ export function Wiki() {
           time it thinks. So its workplaces stay busy, and its trader has more to sell.
         </p>
         <p>
-          Ahead of scouting and that work comes its road crew: up to {num(NPC_ROAD_CREW)} spare hands, apart from
+          With nothing short, a big city whose one lumber camp, quarry or mine has its crew full and
+          its good below the cap opens a second of that kind, on the nearest node it knows. For surplus it opens no third,
+          and none for a good at its cap.
+        </p>
+        <p>
+          Ahead of scouting and that work comes its road crew: up to {num(NPC_ROAD_CREW)} spare hands
+          a step, apart from
           its builders, build its streets, then road from its home to each of its workplaces outside
           its area, farms too, the nearest first. They follow the way a resident would walk, tile by tile, so a road
           goes round a lake, and they skip tiles that already have a road. They only use materials
           above its reserve and what its project still needs; with none to spare, or with something
           short that they can work for, they go back to other work and bring back what they carry.
-          Like any road it belongs to nobody, and anyone can use it or tear it down; a tile torn down
+          Once the city would otherwise be full, they also leave a town hall's and a storage's
+          materials untouched, so founding comes before roads. Like any road it belongs to nobody, and anyone can use it or tear it down; a tile torn down
           is laid again in time.
         </p>
         <p>
           With its workplaces joined the crew goes on: to the nearest Trade Organization warehouse
           within {num(NPC_TRADER_REACH)} tiles, its trader's reach, leaving out those of the HQ's
           inner ring, which keeps everyone out, and then to the edge of the area of its nearest
-          neighbour, any city but the Trade Organization's. A road two neighbours would each build
+          neighbour, any city but the Trade Organization's. A big city, of{' '}
+          {num(2 * NPC_RESIDENTS_PER_NEEDS_STEP)} residents or more, doesn't stop there: while it has
+          materials to spare it goes on to its further warehouses within that reach and its further
+          neighbours, one road at a time, the nearest first. A road two neighbours would each build
           is built by only one of them. A road on Mountain takes{' '}
           {num(MOUNTAIN_ROAD_WORK_FACTOR)} times the work here as anywhere. The crew takes Food along
           for the walk, goes back for more before a tile it couldn't walk home from on what it has,
           and fetches more when it runs low, as any builder does. A way longer than{' '}
           {num(NPC_ROAD_LONGEST)} tiles, or with no way through, is given up.
+        </p>
+        <p>
+          A big city, from {num(2 * NPC_RESIDENTS_PER_NEEDS_STEP)} residents, builds beyond its needs. With
+          nothing short, its outer wall standing with its gate, and materials above its reserve, it
+          puts up an <strong>inner ring</strong> of wall round its town hall and storage, up to{' '}
+          {num(NPC_INNER_WALL_REACH)} tiles from the hall's middle, tile by tile as it does its outer
+          wall. It takes the shape that leaves fewest gaps, along its layout's streets where it can: a
+          square on the lanes round the town hall in Grid, a circle on the first lane in Rings. What
+          stands on its line leaves a gap, and a street it crosses stops at it. Its one gate stands in
+          line with the outer gate and goes up last, so its people never lose the way to the storage;
+          its own pass through the gate as they do any of its gates. It waits whenever something runs
+          short or the outer wall is moving out, and it stays when the outer wall moves. Before that,
+          with nothing short and materials above its reserve, it builds one{' '}
+          <a href="#training">training ground</a> in its area, and its soldiers train there.
         </p>
         <h3>Trading posts and the HQ</h3>
         <p>
@@ -2243,8 +2308,10 @@ export function Wiki() {
           sends that spare hand, never a soldier, as its trader: they carry the load and the coins
           above its war chest there, sell the load, buy the good shortest of its reserve that it has
           no node for (never Food or a weapon) as far as their coins and arms allow, and walk home
-          to the storage. One trader at a time, and none while Food runs short or armed outsiders
-          stand in its area. Nothing protects them on the way; a trader not back after{' '}
+          to the storage. A city has one trader out for each {num(NPC_RESIDENTS_PER_TRADER)} of
+          its residents, and a village keeps one; they spread over the goods with surplus, and only
+          with no other good to sell does one take a second load of a good already on the road.
+          None go while Food runs short or armed outsiders stand in its area. Nothing protects them on the way; a trader not back after{' '}
           {days(NPC_TRADER_GIVE_UP_DAYS)} is given up, and the city may send another.
         </p>
         <p>
@@ -2259,13 +2326,20 @@ export function Wiki() {
         </p>
         <p>
           A city is full once it has had spare hands, idle, on a road crew, scouting or working for surplus, and nothing short
-          of its reserve for {days(NPC_FULL_DAYS)}, with a food surplus and a town hall's and a storage's
-          materials above its reserve. A full city founds a daughter. Once a game day it looks for a
+          of its reserve for {days(NPC_FULL_DAYS)}, with a food surplus and its founding party's
+          materials above its reserve. Past {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a
+          game day less for each {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at least{' '}
+          {days(NPC_FULL_DAYS_LEAST)}. A dip below its reserve only restarts that wait if it lasts
+          longer than {days(NPC_FULL_DIP_DAYS)}, though nobody sets out during one. A full city founds
+          a daughter. Once a game day it looks for a
           free Plains site {num(NPC_CITY_MIN_DISTANCE)} to {num(NPC_FOUND_REACH)} tiles away, with
           room for a village and on no realm's territory, nearest a node of a material it has none
-          of in reach. A founding party of {num(NPC_VILLAGE.residents)} adults, one of them armed,
-          sets out carrying the materials and Food for twice the walk and{' '}
-          {days(NPC_FOUND_FOOD_DAYS)} there, and builds the town hall, which founds the daughter: an
+          of in reach. A founding party of {num(NPC_VILLAGE.residents)} adults, one more for each{' '}
+          {num(NPC_FOUND_RESIDENTS_PER_MEMBER)} residents past {num(NPC_FOUND_VILLAGE_RESIDENTS)} up to{' '}
+          {num(NPC_FOUND_PARTY_MOST)}, one of them armed, sets out carrying a town hall's and a
+          storage's materials, a house's for each {num(HOUSING_ROOM.house ?? 1)} members past{' '}
+          {num(NPC_VILLAGE.residents)}, and Food for twice the walk and {days(NPC_FOUND_FOOD_DAYS)}{' '}
+          there, and builds the town hall, which founds the daughter: an
           NPC city of its own with a name from the game. It then builds its storage, a farm and a
           house, and once its storage holds the Wood of its reserve, its first wall, a ring{' '}
           {num(Math.floor(NPC_VILLAGE.size / 2))} tiles round its home. Mother and daughter start at
@@ -2291,10 +2365,31 @@ export function Wiki() {
           The soldiers of an NPC village, town or self-managed city run the same Alarm default as
           your armed residents do (see Alarms): they go after a thief they saw, an attacker and
           whoever occupies the town hall, as no crime, and walk to the town hall to hold it while an
-          armed outsider is in the area, then go home. An unarmed visitor they leave alone, and
-          striking anyone else there is a crime for them too. One who gets armed or comes home while
-          the hall is occupied joins in. Trading posts and the HQ keep their own rules: their soldiers
-          go straight at attackers and occupiers in the area, a post's at thieves it knows of as well.
+          armed outsider is in the area, then go back to their posts. An unarmed visitor they leave
+          alone, and striking anyone else there is a crime for them too. One who gets armed or comes
+          home while the hall is occupied joins in. Trading posts and the HQ keep their own rules: their
+          soldiers go straight at attackers and occupiers in the area, a post's at thieves it knows of
+          as well.
+        </p>
+        <p>
+          Between fights those soldiers stand spread out, each on the post their id gives them among
+          those the city has: first {num(NPC_SOLDIERS_ON_HALL)} on the town hall, where one is enough to
+          stop anyone occupying it, then {num(NPC_SOLDIERS_AT_GATE)} at each gate, and the rest on the
+          tiles of its wall they can get up to. A city with too little wall for them, or none, has them
+          stand on the free ground within {num(NPC_POST_AROUND_HALL)} tiles of its hall as well. They eat
+          where they stand. If those on the hall or at a gate are called away or die, the next soldiers
+          take over at the city's next planning pass, and they come back once the alarm is over. In a
+          big city with a training ground some train in turns (<a href="#training">Training</a>). Trading
+          posts and the HQ don't do this.
+        </p>
+        <p>
+          For every {num(NPC_SOLDIERS_PER_PATROL)} soldiers on its wall one walks a round, and never more
+          than {num(NPC_PATROLS_MAX)} in a city however big: {num(NPC_PATROL_WALL_STOPS)} stops along its
+          wall, {num(NPC_PATROL_ROAD_STOPS)} along its roads inside it, and back to where they set out.
+          When a round ends the next by id goes, so those on the wall take turns; those on the hall and at
+          the gates stay put. They refill as they walk, and one low on Food with none to take goes back to
+          their post. A stop they can't get to they skip. An alarm breaks a round off, and they go on with
+          it once the alarm is over.
         </p>
         <p>
           Bought outright, an NPC city asks {num(CITY_PRICE_PER_RESIDENT)} coins a resident plus,

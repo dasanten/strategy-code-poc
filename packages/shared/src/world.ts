@@ -948,13 +948,16 @@ export interface WorldState {
 
 /**
  * What a game-run city's plan has one of its residents do (`CONTEXT.md`: NPC city; ADR 0016):
- * stand as a soldier, work a farm or another workplace, build its project, go on its trade run
- * (NPC trader), found its daughter (Founding), revive one of its own (Reviving), scout (Scout), feed
- * its stable (NPC horses), or nothing, until the next pass moves them.
+ * stand as a soldier, teach or train at its training ground (Who trains), work a farm or another
+ * workplace, build its project, go on its trade run (NPC trader), found its daughter (Founding),
+ * revive one of its own (Reviving), scout (Scout), feed its stable (NPC horses), or nothing, until the
+ * next pass moves them.
  */
 export interface CityJob {
   kind:
     | 'soldier'
+    | 'teach'
+    | 'train'
     | 'farm'
     | 'work'
     | 'build'
@@ -971,6 +974,10 @@ export interface CityJob {
   targetId?: string
   /** The stable to feed, for `feed`. */
   stableId?: string
+  /** The training ground, for `teach` and `train`. */
+  groundId?: string
+  /** What the ground teaches, for `teach`. */
+  subject?: TrainingSubject
 }
 
 /** A road a game-run city builds (`CONTEXT.md`: NPC road): its way, worked out once. */
@@ -1064,8 +1071,8 @@ export interface CityPlan {
    * which its road crew builds ahead of `roads`; worked out anew each pass.
    */
   streets?: [x: number, y: number][]
-  /** Its trade run under way (`CONTEXT.md`: NPC trader); none while no trader is out. */
-  trader?: CityTrader
+  /** Its trade runs under way (`CONTEXT.md`: NPC trader); none while no trader is out. */
+  traders?: CityTrader[]
   /**
    * Since when it has been full (`CONTEXT.md`: Full city); while its founding party is out (its
    * residents with the `found` job), since when the party has been on its way (`CONTEXT.md`:
@@ -1073,12 +1080,28 @@ export interface CityPlan {
    */
   fullSince?: number
   /**
+   * Since when a city with `fullSince` has been short of something (`CONTEXT.md`: Full city): a dip
+   * that lasts past `NPC_FULL_DIP_DAYS` restarts its wait. None while nothing is short.
+   */
+  shortSince?: number
+  /**
    * The tile of the town hall it founds its daughter round (`CONTEXT.md`: Founding): found once
    * full, and the founding party's goal once it is out.
    */
   foundingSite?: { x: number; y: number }
   /** Its scouts with something still to bring home, by resident id (`CONTEXT.md`: Scout). */
   scouts?: Record<string, ScoutTrip>
+  /** Its soldiers walking a round now (`CONTEXT.md`: Soldier posts); none while nobody is. */
+  patrols?: CityPatrol[]
+  /** The soldier who last set out on a round: the next by id goes next. */
+  patrolledLast?: string
+}
+
+/** A soldier of an NPC city walking a round (`CONTEXT.md`: Soldier posts). Plain data (ADR 0002). */
+export interface CityPatrol {
+  residentId: string
+  /** The tiles still ahead of them, the next first; the last is where they set out from. */
+  stops: { x: number; y: number }[]
 }
 
 /**

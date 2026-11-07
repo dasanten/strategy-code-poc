@@ -17,7 +17,7 @@ import {
   type TrainingSubject,
   type WorldState,
 } from '@csp/shared'
-import { orderedResident } from './order-sender.js'
+import { npcTrainingProblem, orderedResident } from './order-sender.js'
 import type { OrderKind } from './orders.js'
 
 /** The input of a train order: which resident trains at the training ground they stand on. */
@@ -28,18 +28,17 @@ interface TrainRequest extends OrderRequest {
 }
 
 /**
- * The train order (`CONTEXT.md`: Trainee): a grown resident of the Player's realm trains at the
+ * The train order (`CONTEXT.md`: Trainee): a grown resident of the sender's trains at the
  * finished training ground they stand on, until they walk off or take another order. A ground
- * has room for `TRAINING_GROUND_MAX_TRAINEES`. NPC cities train nobody (`CONTEXT.md`: Who
- * trains).
+ * has room for `TRAINING_GROUND_MAX_TRAINEES`. Of the game's cities only a big one's soldiers train
+ * (`CONTEXT.md`: Who trains).
  */
 export const train: OrderKind = {
   validate(world, sender, order) {
     const o = order as Partial<TrainRequest>
-    if (sender.npcCityId !== undefined) return 'NPC cities don’t train'
     const r = orderedResident(world, sender, o.residentId)
     if (!r) return 'not one of your residents'
-    const problem = trainProblem(world, r)
+    const problem = npcTrainingProblem(world, sender, r) ?? trainProblem(world, r)
     if (problem) return problem
     const here = buildingAt(world, r.x, r.y)
     if (o.buildingId !== here?.id) return 'stand on the training ground to train there'

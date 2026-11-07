@@ -36,7 +36,9 @@ import {
   NPC_WALL_TILES_PER_TRIP,
   NPC_BUILDERS,
   NPC_VILLAGE,
+  isBigNpcCity,
   npcCityStock,
+  npcNeedsScale,
   npcReserve,
   covers,
   ownsHorse,
@@ -46,15 +48,28 @@ import { hqGrows, hqHouseTile, hqProject, hqRings } from './hq-growth.js'
 import { walkTo } from './npc-behaviour.js'
 import { npcSender } from './order-sender.js'
 import { pair } from './pairing.js'
-import { PROCESSED_BY, chainInput, chainStore, makes, shortGoods } from './npc-chain.js'
+import {
+  PROCESSED_BY,
+  chainGood,
+  chainInput,
+  chainStore,
+  holdsBatch,
+  makes,
+  ownWorkplaces,
+  shortGoods,
+  surplusWork,
+} from './npc-chain.js'
+import { innerWallProject, outerWalls } from './npc-inner-wall.js'
+import { farmersWanted, foodShort } from './npc-plan.js'
 import { knowsNode } from './npc-scouts.js'
+import { wantsTrainingGround } from './npc-training.js'
 import { Ground } from './placing.js'
 import { residentTiles } from './starting-city.js'
 
 /**
  * How an NPC city grows (`CONTEXT.md`: NPC city): it pairs its adults, builds a house when it has a
- * food surplus and no free housing, a farm when every farm is full, and the workplace for a
- * material it needs but has no workplace for. With no room left inside its wall it builds on its
+ * food surplus and no free housing, a farm when the farmers it wants don't fit, and the workplace for
+ * a material it needs but has no workplace for. With no room left inside its wall it builds on its
  * edge, puts up a new wall `NPC_WALL_STEP` tiles further out and then tears down the old one. All
  * through the orders a Player's residents take (ADR 0002). The Trade Org HQ grows this way only
  * while it is too weak, building round rings of its own (`hqProject`); trading posts never grow.
@@ -77,7 +92,8 @@ const ringOf = (o: Offset) => Math.max(Math.abs(o.dx), Math.abs(o.dy))
 /**
  * The city's walls as rings round its home (`npcHome`): the innermost ring, the one it builds or
  * keeps (`outer`), and where the gate of each goes. Undefined for a city without walls, or one
- * whose walls stand at more distances than an old and a new ring.
+ * whose walls stand at more distances than an old and a new ring. A big city's inner ring round its
+ * town hall is none of these (`outerWalls`; `CONTEXT.md`: Bigger projects).
  */
 export interface Rings {
   inner: number
@@ -326,15 +342,23 @@ function carriedBy(world: WorldState, city: City): Stock {
 }
 
 /**
- * How many of a city's adults build at once (`CONTEXT.md`: NPC city): `NPC_BUILDERS`; an NPC city with no
+ * How many of a city's adults build at once (`CONTEXT.md`: NPC city): `NPC_BUILDERS` for each step of
+ * an NPC city's needs (`npcNeedsScale`), and just that at a Trade Org city; an NPC city with no
  * storage yet (a daughter, `CONTEXT.md`: Founding) lets everyone who can, since the materials are on
  * them and there is nowhere else to put them.
  */
 export function npcBuilders(world: WorldState, city: City): number {
-  const storage = world.buildings.some(
-    (b) => b.cityId === city.id && b.kind === 'storage' && !b.site,
-  )
-  return storage || city.tradeOrg ? NPC_BUILDERS : Infinity
+  if (city.tradeOrg) return NPC_BUILDERS
+  return noStorageYet(world, city) ? Infinity : NPC_BUILDERS * npcNeedsScale(world, city)
+}
+
+/**
+ * Whether an NPC city has no finished storage yet (a daughter, `CONTEXT.md`: Founding). The materials
+ * are then on its residents, so its armed ones build with the rest: nowhere else could they put theirs.
+ */
+export function noStorageYet(world: WorldState, city: City): boolean {
+  if (city.tradeOrg) return false
+  return !world.buildings.some((b) => b.cityId === city.id && b.kind === 'storage' && !b.site)
 }
 
 /**
@@ -442,10 +466,12 @@ function nearestNode(
 
 /**
  * What the city wants built most, where: a site of its own already begun (a farm, a workplace of
- * its own, a house in its area, its new wall); else a farm when every farm is full; else a house
- * when it has a food surplus and no free housing; else, for an NPC city, a stable once it has a
- * horse (`wantsStable`), or the workplace for the shortest good of its reserve it can make
- * (`chainProject`, `CONTEXT.md`: NPC reserve); else the next stretch of its new wall.
+ * its own, a house in its area, a big city's training ground there, its new wall); else a farm when the farmers it wants don't fit
+ * (`farmersDontFit`); else a house when it has a food surplus and no free housing; else, for an NPC
+ * city, a stable once it has a horse (`wantsStable`), or the workplace for the shortest good of its
+ * reserve it can make (`chainProject`, `CONTEXT.md`: NPC reserve), or another of a short good's
+ * full workplaces (`anotherWorkplace`); else the next stretch of its new wall; else a big city's second workplace (`secondWorkplace`); else, with materials to spare, its
+ * training ground (`wantsTrainingGround`) and its inner ring (`innerWallProject`).
  */
 function wanted(
   world: WorldState,
@@ -464,7 +490,11 @@ function wanted(
       b.site &&
       (((b.kind === 'farm' || b.kind === 'stable') && b.cityId === city.id) ||
         own.has(b.id) ||
-        ((b.kind === 'house' || b.kind === 'storage') && inCityArea(world, city, b.x, b.y, size))),
+        ((b.kind === 'house' || b.kind === 'storage') && inCityArea(world, city, b.x, b.y, size)) ||
+        (b.kind === 'trainingGround' &&
+          !city.tradeOrg &&
+          isBigNpcCity(world, city) &&
+          inCityArea(world, city, b.x, b.y, size))),
   )
   const wallSite = ring.find((t) => t.site)
   const site = begun ?? wallSite?.site
@@ -488,8 +518,13 @@ function wanted(
       const house = at('house', houseTile(world, city, home, terrain, plan))
       if (house) return house
     }
+    // Its Food runs short and only another farm can take those it has idle.
+    if (foodShort(world, city) && farmsOverflow(world, city)) {
+      const farm = at('farm', farmTile(world, home, terrain, plan))
+      if (farm) return farm
+    }
   }
-  if (farmsFull(world, city)) {
+  if (farmersDontFit(world, city)) {
     const farm = at('farm', farmTile(world, home, terrain, rings))
     if (farm) return farm
   }
@@ -505,9 +540,159 @@ function wanted(
       const chain = chainProject(world, city, home, terrain, rings, good)
       if (chain) return chain
     }
+    const another = anotherWorkplace(world, city, home, terrain, rings)
+    if (another) return another
   }
   const next = ring.find((t) => !t.done)
-  return next && { kind: 'build', building: next.kind, x: next.x, y: next.y }
+  if (next) return { kind: 'build', building: next.kind, x: next.x, y: next.y }
+  const ground = () =>
+    wantsTrainingGround(world, city, size)
+      ? at('trainingGround', houseTile(world, city, home, terrain, rings, 'trainingGround'))
+      : undefined
+  return (
+    secondWorkplace(world, city, home, terrain) ??
+    ground() ??
+    (rings && innerWallProject(world, city, home, terrain, rings, npcBuilders(world, city)))
+  )
+}
+
+/** Whether a city's last pass left someone idle who is free to work: not one carrying a child. */
+function handsIdle(world: WorldState, city: City): boolean {
+  const jobs = world.cityPlans[city.id]?.jobs ?? {}
+  return world.residents.some(
+    (r) => r.cityId === city.id && !r.carrying && jobs[r.id]?.kind === 'idle',
+  )
+}
+
+/**
+ * Whether a workplace's crew is full, by who is there (`crewFull`) or by the last pass: a carrier
+ * home between trips holds their place, and is at neither the workplace nor on the way to it.
+ */
+function crewHeld(world: WorldState, city: City, place: Building): boolean {
+  if (crewFull(world, place)) return true
+  const jobs = Object.values(world.cityPlans[city.id]?.jobs ?? {})
+  return jobs.filter((j) => j.buildingId === place.id).length >= (MAX_WORKERS[place.kind] ?? 0)
+}
+
+/** Whether an NPC city's farms all have their crews full, with someone idle who could take a place. */
+export function farmsOverflow(world: WorldState, city: City): boolean {
+  if (city.tradeOrg || !handsIdle(world, city)) return false
+  const farms = world.buildings.filter((b) => b.kind === 'farm' && b.cityId === city.id && !b.site)
+  return farms.length > 0 && farms.every((b) => crewHeld(world, city, b))
+}
+
+/**
+ * Another workplace for a good an NPC city is short of (`CONTEXT.md`: NPC city), with someone idle
+ * to work it: where spare hands would go for the good (`shortPlace`; for a good it processes without
+ * a batch of its input in store, the input's workplaces), when all of those have their crews full. A
+ * farm for Food, on the nearest fitting node it knows of for what is dug or cut, in its area like a
+ * house for what is processed. However many it has: a new one takes the idle first, and only once it
+ * too is full can another follow.
+ */
+function anotherWorkplace(
+  world: WorldState,
+  city: City,
+  home: Building,
+  terrain: TerrainMap,
+  rings: Rings | undefined,
+): BuildProject | undefined {
+  if (!handsIdle(world, city)) return undefined
+  const own = ownWorkplaces(world, city).filter((b) => !b.site)
+  const stock = chainStore(world, city)?.stock
+  const fullGood = (good: Good, seen: Set<Good>): Good | undefined => {
+    if (seen.has(good)) return undefined
+    seen.add(good)
+    const input = chainInput(good)
+    if (input && !holdsBatch(stock, input)) {
+      const lacking = (Object.entries(input) as [Good, number][]).filter(
+        ([g, n]) => (stock?.[g] ?? 0) < n,
+      )
+      for (const [g] of lacking) {
+        const full = fullGood(g, seen)
+        if (full) return full
+      }
+      return undefined
+    }
+    const places = own.filter((b) => chainGood(world, b) === good)
+    return places.length > 0 && places.every((b) => crewHeld(world, city, b)) ? good : undefined
+  }
+  for (const short of shortGoods(world, city)) {
+    const good = fullGood(short, new Set())
+    if (!good) continue
+    if (good === 'food') {
+      const t = farmTile(world, home, terrain, rings)
+      if (t) return { kind: 'build', building: 'farm', ...t }
+      continue
+    }
+    const kind = PROCESSED_BY[good]
+    if (kind) {
+      const t = houseTile(world, city, home, terrain, rings, kind)
+      if (t) return { kind: 'build', building: kind, ...t }
+      continue
+    }
+    const node = nearestNode(world, city, home, terrain, good)
+    if (node) return { kind: 'build', building: NODE_WORKPLACE[node.node.kind], ...node.at }
+  }
+  return undefined
+}
+
+/**
+ * A big NPC city's second workplace (`CONTEXT.md`: Spare hands' work): with nothing short, of a good
+ * dug or cut whose one workplace has its crew full and whose cap isn't reached, the good furthest
+ * below its cap first, on the nearest node of it the city knows of. Never a third, and never a farm
+ * or a workplace that processes goods, which stand on no node.
+ */
+function secondWorkplace(
+  world: WorldState,
+  city: City,
+  home: Building,
+  terrain: TerrainMap,
+): BuildProject | undefined {
+  if (city.tradeOrg || !isBigNpcCity(world, city)) return undefined
+  if (shortGoods(world, city).length > 0) return undefined
+  const surplus = surplusWork(world, city, chainStore(world, city))
+  const places = new Map<Good, Building[]>()
+  for (const b of ownWorkplaces(world, city)) {
+    if (!onNode(b.kind)) continue
+    const good = chainGood(world, b)
+    if (good) places.set(good, [...(places.get(good) ?? []), b])
+  }
+  const wants = [...places]
+    .flatMap(([good, of]) => {
+      const place = of[0]
+      const full = place && of.length === 1 ? surplus(place) : undefined
+      return full !== undefined && crewFull(world, place!) ? [{ good, full }] : []
+    })
+    .sort((a, b) => a.full - b.full)
+  for (const { good } of wants) {
+    const node = nearestNode(world, city, home, terrain, good)
+    if (node) return { kind: 'build', building: NODE_WORKPLACE[node.node.kind], ...node.at }
+  }
+  return undefined
+}
+
+/** Whether a kind of workplace stands on a resource node. */
+export function onNode(kind: BuildingKind): boolean {
+  return Object.values(NODE_WORKPLACE).includes(kind)
+}
+
+/**
+ * Whether a workplace has no room for another worker, coming or there: those working it by the Work
+ * default or a bare work-at order, or walking to its tile.
+ */
+function crewFull(world: WorldState, place: Building): boolean {
+  let there = 0
+  for (const r of world.residents) {
+    const o = r.order
+    if (
+      r.script?.memory.workplaceId === place.id ||
+      (o?.kind === 'workAt' && o.buildingId === place.id) ||
+      (o?.kind === 'walkTo' && o.target.x === place.x && o.target.y === place.y)
+    ) {
+      there++
+    }
+  }
+  return there >= (MAX_WORKERS[place.kind] ?? 0)
 }
 
 /**
@@ -624,19 +809,15 @@ export function farStableSpot(
   return spot && { x: spot.x, y: spot.y }
 }
 
-/** Whether the city has farms and none of them has room for another worker, coming or there. */
-function farmsFull(world: WorldState, city: City): boolean {
+/**
+ * Whether the farmers an NPC city wants (`farmersWanted`) don't fit on the farms it has (`CONTEXT.md`:
+ * NPC city). Those on its farms for surplus don't count, or they would have it build farms it doesn't
+ * need.
+ */
+function farmersDontFit(world: WorldState, city: City): boolean {
   const farms = world.buildings.filter((b) => b.kind === 'farm' && b.cityId === city.id && !b.site)
   if (farms.length === 0) return false
-  return farms.every((f) => {
-    const there = world.residents.filter(
-      (r) =>
-        r.script?.memory.workplaceId === f.id ||
-        (r.order?.kind === 'workAt' && r.order.buildingId === f.id) ||
-        (r.order?.kind === 'walkTo' && r.order.target.x === f.x && r.order.target.y === f.y),
-    ).length
-    return there >= (MAX_WORKERS.farm ?? 0)
-  })
+  return farmersWanted(world, city) > farms.length * (MAX_WORKERS.farm ?? 0)
 }
 
 /**
@@ -653,8 +834,12 @@ export function wallRings(
     dx: wrapDelta(home.x, b.x, size),
     dy: wrapDelta(home.y, b.y, size),
   })
-  const walls = world.buildings.filter(
-    (b) => b.cityId === city.id && (b.kind === 'wall' || b.kind === 'gate') && !b.site,
+  const walls = outerWalls(
+    world.buildings.filter(
+      (b) => b.cityId === city.id && (b.kind === 'wall' || b.kind === 'gate') && !b.site,
+    ),
+    home,
+    size,
   )
   if (walls.length === 0) return undefined
   const dists = walls.map((b) => ringOf(off(b)))

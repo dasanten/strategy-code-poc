@@ -413,7 +413,11 @@ describe('world saves', () => {
     const { world: v83, terrain: land } = worldWithPost()
     const v84 = migrateWorld(structuredClone(v83), 83, { terrain: land })
     expect(v84).toEqual(v83)
-    expect(Object.values(v84.cityPlans).every((p) => p.trader?.offer === undefined)).toBe(true)
+    expect(
+      Object.values(v84.cityPlans)
+        .flatMap((p) => p.traders ?? [])
+        .every((t) => t.offer === undefined),
+    ).toBe(true)
     expect(checkInvariants(v83, land)).toEqual([])
   })
 
@@ -539,11 +543,53 @@ describe('world saves', () => {
     const { world: v38, terrain: land } = worldWithPost()
     expect(v38.realms.length).toBeGreaterThan(0)
     // The live format, so a step no version reaches would show here.
-    expect(WORLD_FORMAT_VERSION).toBe(107)
+    expect(WORLD_FORMAT_VERSION).toBe(111)
     const v39 = migrateWorld(structuredClone(v38), 38, { terrain: land }, migrations, 39)
     expect(v39.realms).toEqual(v38.realms)
     expect(v39.realms.every((r) => r.name === undefined)).toBe(true)
     expect(checkInvariants(v39, land)).toEqual([])
+  })
+
+  it('leaves a format 110 world as it is: no plan has anyone at a training ground yet (migration 110 → 111)', () => {
+    const { world, terrain: land } = worldWithPost()
+    world.cityPlans = { waiting: { plannedAt: 0, jobs: { p1: { kind: 'soldier' } } } }
+    const v111 = migrateWorld(structuredClone(world), 110, { terrain: land }, migrations, 111)
+    expect(v111).toEqual(world)
+  })
+
+  it('leaves a format 109 world as it is: nobody is on patrol yet (migration 109 → 110)', () => {
+    const { world, terrain: land } = worldWithPost()
+    world.cityPlans = { home: { plannedAt: 0, jobs: {} } }
+    const v110 = migrateWorld(structuredClone(world), 109, { terrain: land }, migrations, 110)
+    expect(v110).toEqual(world)
+    expect(v110.cityPlans.home?.patrols).toBeUndefined()
+    expect(v110.cityPlans.home?.patrolledLast).toBeUndefined()
+  })
+
+  it('leaves a format 108 world as it is: no plan has a dip yet (migration 108 → 109)', () => {
+    const { world, terrain: land } = worldWithPost()
+    world.cityPlans = { waiting: { plannedAt: 0, jobs: {}, fullSince: 0 } }
+    const v109 = migrateWorld(structuredClone(world), 108, { terrain: land }, migrations, 109)
+    expect(v109).toEqual(world)
+    expect(v109.cityPlans.waiting?.shortSince).toBeUndefined()
+  })
+
+  it('makes a list of the trader run in a city plan (migration 107 → 108)', () => {
+    const { world: v107, terrain: land } = worldWithPost()
+    const run = {
+      residentId: 'p1',
+      warehouseId: 'b1',
+      sells: { wood: 20 },
+      buys: {},
+      since: v107.tick,
+    }
+    v107.cityPlans = {
+      out: { plannedAt: 0, jobs: {}, trader: run },
+      home: { plannedAt: 0, jobs: {} },
+    } as unknown as typeof v107.cityPlans
+    const v108 = migrateWorld(structuredClone(v107), 107, { terrain: land }, migrations, 108)
+    expect(v108.cityPlans.out).toEqual({ plannedAt: 0, jobs: {}, traders: [run] })
+    expect(v108.cityPlans.home).toEqual({ plannedAt: 0, jobs: {} })
   })
 
   it('migrates a format 100 world: a city knows nothing from scouts yet (migration 100 → 101)', () => {

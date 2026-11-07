@@ -548,7 +548,7 @@ describe('an NPC city and its visiting trader', () => {
     return { ...f, city, storage, k, tile }
   }
 
-  const sent = (world: WorldState, city: City) => world.cityPlans[city.id]?.trader
+  const sent = (world: WorldState, city: City) => world.cityPlans[city.id]?.traders?.[0]
 
   it('sends a spare hand, never a soldier, who sells its surplus and buys what it is short of', () => {
     const { world, terrain, city, k } = visited()

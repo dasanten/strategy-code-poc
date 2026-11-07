@@ -40,6 +40,7 @@ import { cityOrganization, knownThieves } from './crimes.js'
 import type { Invariant, InvariantViolation } from './invariants.js'
 import { stopWork, walkTo } from './npc-behaviour.js'
 import { foundingParty } from './npc-founding.js'
+import { noStorageYet } from './npc-growth.js'
 import { startWork } from './work.js'
 
 /**
@@ -206,14 +207,20 @@ function keepSoldiers(
   for (const r of soldiers) {
     // Their Alarm script hands back what it interrupted, which they are put off then if need be.
     if (r.script?.task === 'alarm') continue
+    // Their Train default is the city's own doing (`CONTEXT.md`: Who trains): its pass ends it.
+    if (r.script?.task === 'train') continue
+    // A daughter's armed founder brings the materials on them to its first storage.
+    if (r.script?.task === 'build' && noStorageYet(world, city)) continue
     // A bare building order would hold them, and the materials on them, at the site for good.
     if (r.order?.kind === 'workAt' || r.order?.kind === 'build') stopWork(r)
     else delete r.script
   }
   if (soldiers.length >= target) return
-  // Its trader (`CONTEXT.md`: NPC trader) is never made a soldier.
-  const trader = world.cityPlans[city.id]?.trader?.residentId
-  const unarmed = adults.filter((r) => !isArmed(r) && r.order?.kind !== 'attack' && r.id !== trader)
+  // Its traders (`CONTEXT.md`: NPC trader) are never made soldiers.
+  const traders = world.cityPlans[city.id]?.traders ?? []
+  const unarmed = adults.filter(
+    (r) => !isArmed(r) && r.order?.kind !== 'attack' && !traders.some((t) => t.residentId === r.id),
+  )
   if (unarmed.length === 0) return
 
   const smithy = world.buildings.find(

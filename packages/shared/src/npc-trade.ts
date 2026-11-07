@@ -4,10 +4,18 @@ import {
   CITY_PRICE_STANDING_SWING,
   GOOD_WEIGHT,
   HORSE_FOOD_PER_DAY,
+  NPC_FOUND_PARTY_MOST,
+  NPC_FOUND_RESIDENTS_PER_MEMBER,
+  NPC_FOUND_VILLAGE_RESIDENTS,
+  NPC_FULL_DAYS,
+  NPC_FULL_DAYS_LEAST,
+  NPC_FULL_RESIDENTS_PER_DAY,
   NPC_HORSES_BASE,
   NPC_RESIDENTS_PER_HORSE,
+  NPC_RESIDENTS_PER_NEEDS_STEP,
   NPC_SOLDIER_SHARE,
   NPC_TRADE,
+  NPC_VILLAGE,
   NPC_WAR_CHEST_PER_RESIDENT,
   STABLE_CAPACITY,
   STABLE_FEED_DAYS,
@@ -91,6 +99,27 @@ export function npcSoldierTarget(adults: number): number {
 }
 
 /**
+ * Game days a full NPC city of `residents` waits before it founds (`CONTEXT.md`: Full city): a game
+ * week up to `NPC_FOUND_VILLAGE_RESIDENTS`, a game day less for each `NPC_FULL_RESIDENTS_PER_DAY`
+ * past that, and never less than `NPC_FULL_DAYS_LEAST`.
+ */
+export function npcFullDays(residents: number): number {
+  const past = Math.max(0, residents - NPC_FOUND_VILLAGE_RESIDENTS)
+  return Math.max(NPC_FULL_DAYS_LEAST, NPC_FULL_DAYS - past / NPC_FULL_RESIDENTS_PER_DAY)
+}
+
+/**
+ * How many adults a full NPC city of `residents` sends to found a daughter (`CONTEXT.md`: Founding):
+ * a village's worth up to `NPC_FOUND_VILLAGE_RESIDENTS`, one more for each
+ * `NPC_FOUND_RESIDENTS_PER_MEMBER` past that, and never more than `NPC_FOUND_PARTY_MOST`.
+ */
+export function npcFoundingPartySize(residents: number): number {
+  const past = Math.max(0, residents - NPC_FOUND_VILLAGE_RESIDENTS)
+  const more = Math.floor(past / NPC_FOUND_RESIDENTS_PER_MEMBER)
+  return Math.min(NPC_FOUND_PARTY_MOST, NPC_VILLAGE.residents + more)
+}
+
+/**
  * How many horses an NPC city wants for its size (`CONTEXT.md`: NPC horses): it breeds up to this
  * many. None for the Trade Organization's cities, which don't take part.
  */
@@ -128,9 +157,25 @@ export function npcStablesLack(
 }
 
 /**
+ * How many steps of a village's needs and crews an NPC city has (`CONTEXT.md`: NPC reserve, Spare
+ * hands' work, NPC road): one for each `NPC_RESIDENTS_PER_NEEDS_STEP` residents, whole, and at least
+ * one, so a village and a town keep a village's numbers.
+ */
+export function npcNeedsScale(world: Pick<WorldState, 'residents'>, city: City): number {
+  return Math.max(1, Math.floor(cityResidents(world, city).length / NPC_RESIDENTS_PER_NEEDS_STEP))
+}
+
+/** Whether an NPC city counts as big (`CONTEXT.md`: Spare hands' work): two steps of needs or more. */
+export function isBigNpcCity(world: Pick<WorldState, 'residents'>, city: City): boolean {
+  return npcNeedsScale(world, city) > 1
+}
+
+/**
  * The reserve an NPC city keeps (`CONTEXT.md`: NPC reserve): Food for `NPC_TRADE.reserveFoodDays`
- * game days for all its residents and what its stables lack (`npcStablesLack`); the materials of a house and `NPC_TRADE.reserveWallStretches`
- * stretches of wall; a weapon (`NPC_SMITHY_WEAPON`) for each soldier it keeps by its size
+ * game days for all its residents and what its stables lack (`npcStablesLack`); for each step of its
+ * needs (`npcNeedsScale`) the materials of a house and `NPC_TRADE.reserveWallStretches` stretches of
+ * wall, and `NPC_TRADE.reserveStonePerStep` Stone for each step past the first; a weapon
+ * (`NPC_SMITHY_WEAPON`) for each soldier it keeps by its size
  * (`npcSoldierTarget`) and has not armed yet, and the smithy recipe's Iron and Wood for those of
  * them its storages hold no weapon for; and `NPC_WAR_CHEST_PER_RESIDENT` coins for each of its
  * residents. Whole units. What it holds above this is for sale, what it lacks drives its work.
@@ -146,8 +191,10 @@ export function npcReserve(world: WorldState, city: City): Stock {
       reserve[good] = (reserve[good] ?? 0) + n * times
     }
   }
-  add(BUILD_MATERIALS.house, 1)
-  add(BUILD_MATERIALS.wall, NPC_TRADE.reserveWallStretches)
+  const steps = npcNeedsScale(world, city)
+  add(BUILD_MATERIALS.house, steps)
+  add(BUILD_MATERIALS.wall, NPC_TRADE.reserveWallStretches * steps)
+  add({ stone: NPC_TRADE.reserveStonePerStep }, steps - 1)
   const residents = cityResidents(world, city).filter((r) => r.owner === null && r.health > 0)
   const adults = residents.filter((r) => canWork(r, world.tick))
   const unarmed = npcSoldierTarget(adults.length) - adults.filter(isArmed).length

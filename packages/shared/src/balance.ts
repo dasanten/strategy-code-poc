@@ -545,6 +545,46 @@ export const WORK_FOOD_KEPT = 2
 export const NPC_SOLDIER_SHARE = 0.25
 
 /**
+ * How many of an NPC city's soldiers stand on its town hall between fights, the first to be posted
+ * (`CONTEXT.md`: Soldier posts). One there is enough to block an occupation; a second keeps it held
+ * when the first is called away.
+ */
+export const NPC_SOLDIERS_ON_HALL = 2
+
+/** How many of an NPC city's soldiers stand at each of its gates, once its hall is held. */
+export const NPC_SOLDIERS_AT_GATE = 1
+
+/**
+ * How many tiles out from its town hall an NPC city's soldiers stand around it when its wall has too
+ * few tiles for them, or it has none (`CONTEXT.md`: Soldier posts).
+ */
+export const NPC_POST_AROUND_HALL = 2
+
+/**
+ * Ticks each lot of a big NPC city's soldiers trains before the next lot's turn (`CONTEXT.md`: Who
+ * trains): five game days, long enough to be worth the walk there and back.
+ */
+export const NPC_TRAIN_TURN_TICKS = 5 * TICKS_PER_GAME_DAY
+
+/**
+ * The most of an NPC city's soldiers walking a round at once, whatever its size (`CONTEXT.md`: Soldier
+ * posts). They walk every tick, the dearest of a soldier's jobs, so a city's cost stops growing here.
+ */
+export const NPC_PATROLS_MAX = 3
+
+/** One soldier walks a round for every this many on an NPC city's wall, up to `NPC_PATROLS_MAX`. */
+export const NPC_SOLDIERS_PER_PATROL = 4
+
+/**
+ * How many stops a round has along an NPC city's wall, spread evenly round it. Each costs one path
+ * search; a town's wall of 180 tiles gives legs of about 22 tiles, some 3 game hours each.
+ */
+export const NPC_PATROL_WALL_STOPS = 8
+
+/** How many stops a round has along an NPC city's roads inside it, after those on its wall. */
+export const NPC_PATROL_ROAD_STOPS = 3
+
+/**
  * Coins an NPC city keeps as its war chest for each of its residents (`CONTEXT.md`: NPC reserve):
  * a town of 16 keeps 160, what four mint workers strike in two game days (`RECIPES`).
  */
@@ -589,15 +629,62 @@ export const PAIRING_WAIT_TICKS = PAIRING_WAIT_DAYS * TICKS_PER_GAME_DAY
 export const NPC_PLAN_TICKS = 60
 
 /**
- * Most of an NPC city's adults that build at once (`CONTEXT.md`: NPC city): laying out, carrying
- * materials to the site, building or tearing down. The others keep working.
+ * What each job of an NPC city is worth to a free adult (`CONTEXT.md`: NPC city; ADR 0029): each
+ * goes to the highest-scoring job with room. Only the order and the gaps mean anything: `short` runs
+ * up to `short` + `shortRange` by how much of a good it lacks, staying below `project`, and `surplus`
+ * up to `surplus` + `surplusRange` by how far below its cap, staying below `back`.
+ */
+export const NPC_JOB_SCORE = {
+  /** Farming for a worker off the farms, while Food runs short: past the farmers it keeps. */
+  farmFoodShort: 110,
+  /** Farming, while it lacks the farmers it keeps. */
+  farm: 100,
+  /** Not weighed: where revivers get their turn, Food for those who aren't Down coming first. */
+  revive: 80,
+  /** Building its project. */
+  project: 55,
+  /** Making a good short of its reserve, at the least. */
+  short: 50,
+  shortRange: 4,
+  /** Its road crew. */
+  road: 30,
+  /** Scouting. */
+  scout: 28,
+  /** Going back to the workplace they were let go from. */
+  back: 20,
+  /** Working for surplus, at the least. */
+  surplus: 10,
+  surplusRange: 5,
+} as const
+
+/**
+ * How much more another job must score for an NPC city's worker to leave theirs (`CONTEXT.md`: NPC
+ * city; ADR 0029), so nobody goes back and forth: more than the whole of `NPC_JOB_SCORE.shortRange`
+ * and the step up to `project`, so a worker on one short good stays for another or for the project,
+ * and less than the gaps above `back`, so one let go leaves for anything that wants them.
+ */
+export const NPC_JOB_MARGIN = 6
+
+/**
+ * Residents to each step of an NPC city's needs and crews (`CONTEXT.md`: NPC reserve, Spare hands'
+ * work, NPC road): its Wood and Stone kept, surplus caps, builders and road crew are this many steps
+ * of a village's (`npcNeedsScale`), in whole steps so one birth doesn't move them. Below two steps
+ * it keeps a village's numbers, and from two on it is a big city (`isBigNpcCity`): at 50 residents,
+ * about three times a town.
+ */
+export const NPC_RESIDENTS_PER_NEEDS_STEP = 25
+
+/**
+ * Most of an NPC city's adults that build at once, per step of its needs (`npcNeedsScale`;
+ * `CONTEXT.md`: NPC city): laying out, carrying materials to the site, building or tearing down. The
+ * others keep working.
  */
 export const NPC_BUILDERS = 2
 
 /**
- * Most of an NPC city's spare hands on its road crew at once (`CONTEXT.md`: NPC road), apart from
- * its builders: enough for a road to grow out day by day and to fetch for each other, while the
- * rest go on working for surplus.
+ * Most of an NPC city's spare hands on its road crew at once, per step of its needs
+ * (`npcNeedsScale`; `CONTEXT.md`: NPC road), apart from its builders: enough for a road to grow out
+ * day by day and to fetch for each other, while the rest go on working for surplus.
  */
 export const NPC_ROAD_CREW = 2
 
@@ -614,9 +701,9 @@ export const NPC_ROAD_LONGEST = 1200
 export const NPC_REVIVE_REACH = 48
 
 /**
- * How far past its reserve an NPC city's spare hands work for surplus, by good, in units
- * (`CONTEXT.md`: Spare hands' work). Several of a trader's full loads (about 30 kg, `CARRY_BASE`),
- * so its trader has something to sell, and above the materials a Full city wants (`townHall` and
+ * How far past its reserve an NPC city's spare hands work for surplus, by good, in units per step
+ * of its needs (`npcNeedsScale`; `CONTEXT.md`: Spare hands' work). Several of a trader's full loads
+ * (about 30 kg, `CARRY_BASE`), so its trader has something to sell, and above the materials a Full city wants (`townHall` and
  * `storage` in `BUILD_MATERIALS`), or it could never found; few weapons, which its trader never
  * sells. A good not named here is not worked for surplus.
  */
@@ -637,6 +724,13 @@ export const NPC_SURPLUS_CAP: Partial<Record<Good, number>> = {
  * `CITY_BUILDING_REACH`, so the new wall stays part of the city once the old one is gone.
  */
 export const NPC_WALL_STEP = 8
+
+/**
+ * How far from the middle of its town hall a big NPC city's inner ring of wall may stand
+ * (`CONTEXT.md`: Bigger projects), in tiles: room for its first lanes round the hall and storage,
+ * and always short of its outer wall, which stands at least 14 from its home.
+ */
+export const NPC_INNER_WALL_REACH = 9
 
 /**
  * Tiles along each side of a block of the Grid layout (`CONTEXT.md`: City layout): room for two
@@ -705,6 +799,13 @@ export const NPC_SCOUT_SECTOR = 32
 export const NPC_TRADER_REACH = 720
 
 /**
+ * Residents of an NPC city for each trader it has out at once (`CONTEXT.md`: NPC trader), rounded
+ * down: a village, a town and a city of under 60 keep one; a city of 110 sends three. Each walks
+ * every tick, so this is what its trading costs the server.
+ */
+export const NPC_RESIDENTS_PER_TRADER = 30
+
+/**
  * How far from its home a Player's offer may be for an NPC city to send its trader there
  * (`CONTEXT.md`: NPC cities at an offer), in tiles: as far as it goes to a Trade Org warehouse
  * (`NPC_TRADER_REACH`), since it is the same trader on the same Food.
@@ -725,10 +826,45 @@ export const NPC_TRADER_GIVE_UP_DAYS = 10
 export const NPC_FARM_REACH = 48
 
 /**
- * Game days an NPC city must have been full before it founds a daughter (`CONTEXT.md`: Full
- * city): a game week of idle spare hands and nothing short.
+ * Game days an NPC city of up to `NPC_FOUND_VILLAGE_RESIDENTS` must have been full before it founds
+ * a daughter (`CONTEXT.md`: Full city): a game week of idle spare hands and nothing short. A bigger
+ * city waits less (`npcFullDays`).
  */
 export const NPC_FULL_DAYS = 7
+
+/**
+ * Residents up to which an NPC city founds as a village does (`CONTEXT.md`: Full city, Founding): it
+ * waits `NPC_FULL_DAYS` and sends a village's worth. About twice a town as it is placed.
+ */
+export const NPC_FOUND_VILLAGE_RESIDENTS = 30
+
+/**
+ * Residents past `NPC_FOUND_VILLAGE_RESIDENTS` that take a game day off how long a full city waits
+ * (`npcFullDays`): a city of 110 waits 3 game days.
+ */
+export const NPC_FULL_RESIDENTS_PER_DAY = 20
+
+/** The fewest game days any full NPC city waits before it founds (`npcFullDays`). */
+export const NPC_FULL_DAYS_LEAST = 2
+
+/**
+ * Game days a dip below its reserve may last before a full NPC city's wait starts over (`CONTEXT.md`:
+ * Full city): Food its scouts and road crew take out and bring back doesn't count.
+ */
+export const NPC_FULL_DIP_DAYS = 1
+
+/**
+ * Residents past `NPC_FOUND_VILLAGE_RESIDENTS` that add one adult to a founding party
+ * (`npcFoundingPartySize`): a city of 110 sends the most, about one in eight of it.
+ */
+export const NPC_FOUND_RESIDENTS_PER_MEMBER = 10
+
+/**
+ * The largest founding party (`npcFoundingPartySize`): with the houses it carries for those past a
+ * village's worth (`foundingMaterials`), its materials stay under the surplus caps
+ * (`NPC_SURPLUS_CAP`), or a big city could never found on what it makes.
+ */
+export const NPC_FOUND_PARTY_MOST = 14
 
 /**
  * Random tiles a full NPC city tries in one search for its daughter's site (`CONTEXT.md`:
@@ -1551,10 +1687,15 @@ export const NPC_TRADE = {
    */
   reserveFoodDays: 15,
   /**
-   * Stretches of wall whose materials it keeps in reserve, beside a house's (`BUILD_MATERIALS`):
-   * with a house that makes 68 Wood.
+   * Stretches of wall whose materials it keeps in reserve, beside a house's (`BUILD_MATERIALS`),
+   * per step of its needs (`npcNeedsScale`): with a house that makes 68 Wood a step.
    */
   reserveWallStretches: 16,
+  /**
+   * Stone it keeps in reserve for each step of its needs past the first (`npcNeedsScale`), so a
+   * village keeps none: about a smelter's (`BUILD_MATERIALS`), or a road 40 tiles long.
+   */
+  reserveStonePerStep: 40,
   /**
    * What it asks for each resident it lends and game week, in coins, at neutral standing: less
    * than a Trade Org soldier (`TRADE_ORG_ARMY.pricePerSoldierWeek`), as they come mostly unarmed.

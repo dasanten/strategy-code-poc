@@ -96,7 +96,15 @@ import { awaitsTrader, carriageOrganization, organizationOf } from './crimes.js'
 import { tallyGoods } from './goods-made.js'
 import { awakeAlive, downDoNothing, refillSource, refillTarget } from './survival.js'
 import { horsesDownLieStill } from './horses.js'
-import { NPC_ORDER_KINDS, npcResidentsKeptGoing, runByNpcCity } from './npc-behaviour.js'
+import {
+  NPC_ORDER_KINDS,
+  npcIdleOffTheStorage,
+  npcResidentsKeptGoing,
+  runByNpcCity,
+} from './npc-behaviour.js'
+import { npcPatrolsSound } from './npc-patrols.js'
+import { npcSoldiersOnPosts } from './npc-posts.js'
+import { npcTrainingGroundsBounded, npcTrainsItsSoldiers } from './npc-training.js'
 import { CARRYING_BLOCKS } from './pairing.js'
 import { isWalkable } from './world.js'
 import { contractsSound } from './contracts.js'
@@ -136,13 +144,21 @@ import {
 } from './trade-org-debt.js'
 import { nothingLeftOfTheHq } from './hq-fall.js'
 import { hqRingsSound } from './hq-growth.js'
-import { cityPlansSound, npcFarmersKept, npcSurplusCapped, tradeOrgSendsNoOne } from './npc-plan.js'
+import {
+  cityPlansSound,
+  npcFarmersKept,
+  npcSurplusCapped,
+  npcSpareHandsWork,
+  npcWorkplacesBounded,
+  tradeOrgSendsNoOne,
+} from './npc-plan.js'
 import { npcRoadCrewSized, npcRoadsOnce } from './npc-roads.js'
 import { npcRevivers } from './npc-revive.js'
 import { npcScoutsSound } from './npc-scouts.js'
 import { npcOneFeeder, tradeOrgBreedsNoHorses } from './npc-stable.js'
-import { foundingPartiesSound, npcCitiesHaveHalls } from './npc-founding.js'
+import { foundingPartiesSound, fullWaitSound, npcCitiesHaveHalls } from './npc-founding.js'
 import { cityLayoutsSound, cityStreetsSound } from './city-layout.js'
+import { innerWallLeavesAWay } from './npc-inner-wall.js'
 import { npcTradersSound } from './npc-trader.js'
 import { leadersServeNoOne } from './leader.js'
 import { cityNamesWellFormed, horseNamesWellFormed, residentNamesWellFormed } from './renaming.js'
@@ -2135,11 +2151,15 @@ export const worldInvariants: Invariant[] = [
   hqRingsSound,
   cityPlansSound,
   foundingPartiesSound,
+  fullWaitSound,
   npcCitiesHaveHalls,
   cityLayoutsSound,
   cityStreetsSound,
+  innerWallLeavesAWay,
   npcFarmersKept,
   npcSurplusCapped,
+  npcSpareHandsWork,
+  npcWorkplacesBounded,
   npcRoadCrewSized,
   npcRoadsOnce,
   npcRevivers,
@@ -2147,6 +2167,11 @@ export const worldInvariants: Invariant[] = [
   npcOneFeeder,
   tradeOrgBreedsNoHorses,
   npcResidentsKeptGoing,
+  npcIdleOffTheStorage,
+  npcSoldiersOnPosts,
+  npcPatrolsSound,
+  npcTrainingGroundsBounded,
+  npcTrainsItsSoldiers,
   tradeOrgSendsNoOne,
   npcTradersSound,
   lineOrdersSound,

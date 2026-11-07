@@ -4,6 +4,8 @@ import {
   HORSE_START_AGE_MIN,
   TICKS_PER_GAME_YEAR,
   inCityArea,
+  type CityPlan,
+  type CityTrader,
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
@@ -23,7 +25,7 @@ import { placeTraders, putHqOnLoops } from './traders.js'
  * would not match bumps this and adds a migration below, with a test in saves.test.ts.
  * Deploys never reset the world, with two recorded exceptions (`RESET_BEFORE`).
  */
-export const WORLD_FORMAT_VERSION = 107
+export const WORLD_FORMAT_VERSION = 111
 
 /**
  * Saves older than this format are thrown away and a new world created, while accounts stay
@@ -475,6 +477,24 @@ export const migrations: Record<number, MigrationStep> = {
     noteOutsidersInside(world, terrain.size)
     return world
   },
+  // A bigger NPC city has more traders out (`CONTEXT.md`: NPC trader), so `CityPlan.trader` becomes
+  // the list `CityPlan.traders`. A run under way carries on as the first of it.
+  107: (state) => {
+    const world = structuredClone(state) as WorldState
+    for (const plan of Object.values(world.cityPlans) as (CityPlan & { trader?: CityTrader })[]) {
+      if (plan.trader) plan.traders = [plan.trader]
+      delete plan.trader
+    }
+    return world
+  },
+  // A full NPC city's plan may keep when a dip below its reserve began (`CityPlan.shortSince`). No plan
+  // has one yet, and the next pass starts it if it needs one. So the step leaves every world as it is.
+  108: (state) => state,
+  // An NPC city's plan may keep the soldiers on a round (`CityPlan.patrols`, `patrolledLast`). None is
+  // out yet, and its next pass sends the first. So the step leaves every world as it is.
+  109: (state) => state,
+  // A plan's job may now be `teach` or `train` (`CONTEXT.md`: Who trains): no plan has one yet.
+  110: (state) => state,
 }
 
 export class WorldFormatError extends Error {}
