@@ -20,6 +20,7 @@ import {
   type Stock,
   type WorldState,
 } from '@csp/shared'
+import { earnsCoins } from './npc-coins.js'
 
 /*
  * The chain an NPC city's reserve drives (`CONTEXT.md`: NPC city, NPC reserve): which goods it is
@@ -80,13 +81,14 @@ export interface Shortage {
 }
 
 /**
- * What an NPC city is short of (`CONTEXT.md`: NPC reserve), the shortest first: what its
- * storages lack of its reserve (`npcReserve`; a Trade Org city, what its warehouses lack of their
- * stock floor, `tradeOrgReserve`), and of the materials its `project` still needs
- * beyond that, as a share of what it wants of each. Ties go by the reserve's order (Food,
- * building materials, weapons, their Iron, Coins).
+ * What an NPC city lacks of its reserve, the shortest first: what its storages lack of it
+ * (`npcReserve`; a Trade Org city, what its warehouses lack of their stock floor,
+ * `tradeOrgReserve`), and of the materials its `project` still needs beyond that, as a share of
+ * what it wants of each. Its whole war chest counts, whether or not it can earn Coins: a trade it
+ * takes goes by this (`CONTEXT.md`: NPC cities at an offer). What it counts as short is
+ * `shortages`. Ties go by the reserve's order (Food, building materials, weapons, their Iron, Coins).
  */
-export function shortages(world: WorldState, city: City, project?: CityProject): Shortage[] {
+export function reserveLacks(world: WorldState, city: City, project?: CityProject): Shortage[] {
   const want = city.tradeOrg ? tradeOrgReserve(world, city) : npcReserve(world, city)
   for (const [good, n] of Object.entries(projectNeeds(world, project)) as [Good, number][]) {
     want[good] = (want[good] ?? 0) + n
@@ -98,9 +100,34 @@ export function shortages(world: WorldState, city: City, project?: CityProject):
     .sort((a, b) => b.share - a.share)
 }
 
-/** The goods an NPC city is short of, the shortest first (`shortages`). */
-export function shortGoods(world: WorldState, city: City, project?: CityProject): Good[] {
-  return shortages(world, city, project).map((s) => s.good)
+/**
+ * What an NPC city is short of (`CONTEXT.md`: NPC reserve), the shortest first: what it lacks of
+ * its reserve and its project (`reserveLacks`), Coins only for a city that can earn them
+ * (`earnsCoins`). One that can't keeps its war chest in its reserve but doesn't count it as short.
+ * `size` is the map's.
+ */
+export function shortages(
+  world: WorldState,
+  city: City,
+  size: number,
+  project?: CityProject,
+): Shortage[] {
+  const short = reserveLacks(world, city, project)
+  // Looked into only once Coins are short: finding a way to earn them looks over the map.
+  if (city.tradeOrg || !short.some((s) => s.good === 'coins') || earnsCoins(world, city, size)) {
+    return short
+  }
+  return short.filter((s) => s.good !== 'coins')
+}
+
+/** The goods an NPC city is short of, the shortest first (`shortages`). `size` is the map's. */
+export function shortGoods(
+  world: WorldState,
+  city: City,
+  size: number,
+  project?: CityProject,
+): Good[] {
+  return shortages(world, city, size, project).map((s) => s.good)
 }
 
 /**

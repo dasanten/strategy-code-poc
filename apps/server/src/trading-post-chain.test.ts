@@ -58,12 +58,12 @@ const warehouse = (world: WorldState, city: City) =>
 
 describe('a trading post runs the chain for its warehouse', () => {
   it('is short of what its warehouse lacks of its floor, Food aside', () => {
-    const { world, city } = post(false)
+    const { world, terrain, city } = post(false)
     expect(tradeOrgReserve(world, city)).toEqual(
       expect.objectContaining({ ironOre: WAREHOUSE_FLOOR.ironOre, coins: WAREHOUSE_FLOOR.coins }),
     )
     expect(tradeOrgReserve(world, city).food).toBeUndefined()
-    expect(shortGoods(world, city)[0]).toBe('ironOre')
+    expect(shortGoods(world, city, terrain.size)[0]).toBe('ironOre')
     // Its loads go to the warehouse, its Food to the storage its residents eat from.
     expect(warehouseFor(world, city, ['ironOre'])?.id).toBe(warehouse(world, city).id)
     expect(warehouseFor(world, city, ['food'])).toBeUndefined()
