@@ -62,6 +62,7 @@ import { beats, jobScore, rankJobs, type ScoredJob } from './npc-scores.js'
 import { pickScouts } from './npc-scouts.js'
 import { feedJobKept, planFeeder } from './npc-stable.js'
 import { sendTraders, tradersOut } from './npc-trader.js'
+import { planTraining } from './npc-training.js'
 import { hash } from './residents.js'
 
 /*
@@ -193,7 +194,8 @@ export function workplaceOf(r: Resident): string | undefined {
  * their jobs (`shareOut`), a reviver for each of its Down residents among them
  * (`CONTEXT.md`: Reviving; those Down do nothing and get no job); one of them feeds its stable when
  * it is due (`planFeeder`). An NPC city's founding party keeps its `found` jobs, and the pass ends
- * with the founding's part (`planFounding`). Without `terrain` the city picks no project; without
+ * with the founding's part (`planFounding`) and, of the soldiers left, those at its training ground
+ * (`planTraining`). Without `terrain` the city picks no project; without
  * `ways` it builds no road (`roadCrew`).
  * `people` are the residents the city gives orders to (`runResidents`).
  */
@@ -275,6 +277,7 @@ export function planCity(
     // A spare hand just sent off as a trader or to feed the stable isn't one any more.
     const left = unneeded.filter((r) => !['trade', 'feed'].includes(jobs[r.id]?.kind ?? ''))
     planFounding(world, city, plan, jobs, { adults, unneeded: left, members }, home, terrain)
+    planTraining(world, city, adults, jobs, size)
   }
   plan.jobs = jobs
   return plan

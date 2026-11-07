@@ -153,6 +153,7 @@ import {
   NPC_VILLAGE,
   NPC_NODE_REACH,
   NPC_RESIDENTS_PER_NEEDS_STEP,
+  NPC_TRAIN_TURN_TICKS,
   NPC_RESIDENTS_PER_SCOUT,
   NPC_SCOUT_LIMIT,
   NPC_TRADER_GIVE_UP_DAYS,
@@ -1103,8 +1104,14 @@ export function Wiki() {
           stat with its base.
         </p>
         <p>
-          Players' residents train, by order, queue step or script. NPC cities and the Trade
-          Organization train nobody yet.
+          Players' residents train, by order, queue step or script, and so do the soldiers of a big
+          NPC city with a training ground of its own: the one of them with the most Combat teaches, or
+          among equals the strongest, and up to {num(TRAINING_GROUND_MAX_TRAINEES)} others train in
+          turns of {days(NPC_TRAIN_TURN_TICKS / TICKS_PER_GAME_DAY)}, by the same rules: Combat while any
+          of them is below the teacher in it, else Strength. The soldiers its hall and gates need stay
+          on their posts, so with too few left the ground stands empty. So it does once nobody can learn
+          anything more from the teacher. An alarm takes them from it and they come back after. The
+          Trade Organization trains nobody.
         </p>
       </Section>
 
@@ -2262,7 +2269,9 @@ export function Wiki() {
           stands on its line leaves a gap, and a street it crosses stops at it. Its one gate stands in
           line with the outer gate and goes up last, so its people never lose the way to the storage;
           its own pass through the gate as they do any of its gates. It waits whenever something runs
-          short or the outer wall is moving out, and it stays when the outer wall moves.
+          short or the outer wall is moving out, and it stays when the outer wall moves. Before that,
+          with nothing short and materials above its reserve, it builds one{' '}
+          <a href="#training">training ground</a> in its area, and its soldiers train there.
         </p>
         <h3>Trading posts and the HQ</h3>
         <p>
@@ -2368,7 +2377,8 @@ export function Wiki() {
           tiles of its wall they can get up to. A city with too little wall for them, or none, has them
           stand on the free ground within {num(NPC_POST_AROUND_HALL)} tiles of its hall as well. They eat
           where they stand. If those on the hall or at a gate are called away or die, the next soldiers
-          take over at the city's next planning pass, and they come back once the alarm is over. Trading
+          take over at the city's next planning pass, and they come back once the alarm is over. In a
+          big city with a training ground some train in turns (<a href="#training">Training</a>). Trading
           posts and the HQ don't do this.
         </p>
         <p>

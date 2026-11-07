@@ -334,6 +334,7 @@ const STREET_SIDE: readonly BuildingKind[] = [
   'smithy',
   'mint',
   'stable',
+  'trainingGround',
 ]
 
 /**

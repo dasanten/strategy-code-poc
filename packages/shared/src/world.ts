@@ -948,13 +948,16 @@ export interface WorldState {
 
 /**
  * What a game-run city's plan has one of its residents do (`CONTEXT.md`: NPC city; ADR 0016):
- * stand as a soldier, work a farm or another workplace, build its project, go on its trade run
- * (NPC trader), found its daughter (Founding), revive one of its own (Reviving), scout (Scout), feed
- * its stable (NPC horses), or nothing, until the next pass moves them.
+ * stand as a soldier, teach or train at its training ground (Who trains), work a farm or another
+ * workplace, build its project, go on its trade run (NPC trader), found its daughter (Founding),
+ * revive one of its own (Reviving), scout (Scout), feed its stable (NPC horses), or nothing, until the
+ * next pass moves them.
  */
 export interface CityJob {
   kind:
     | 'soldier'
+    | 'teach'
+    | 'train'
     | 'farm'
     | 'work'
     | 'build'
@@ -971,6 +974,10 @@ export interface CityJob {
   targetId?: string
   /** The stable to feed, for `feed`. */
   stableId?: string
+  /** The training ground, for `teach` and `train`. */
+  groundId?: string
+  /** What the ground teaches, for `teach`. */
+  subject?: TrainingSubject
 }
 
 /** A road a game-run city builds (`CONTEXT.md`: NPC road): its way, worked out once. */

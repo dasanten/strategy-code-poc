@@ -220,7 +220,7 @@ export function innerWall(
 }
 
 /** Whether a city's stock holds all of `goods` above its reserve. */
-function holdsAboveReserve(world: WorldState, city: City, goods: Stock): boolean {
+export function holdsAboveReserve(world: WorldState, city: City, goods: Stock): boolean {
   const stock = npcCityStock(world, city)
   const reserve = npcReserve(world, city)
   return (Object.entries(goods) as [Good, number][]).every(

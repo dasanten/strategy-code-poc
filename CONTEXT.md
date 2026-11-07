@@ -519,7 +519,7 @@ The shared language of the game. Domain terms only — no implementation details
   has: a balance number on the hall, one at each gate (a balance number too), the rest on the tiles of
   its wall they can get up to. While its wall has too few tiles for them, or it has none, they also
   stand on the free ground around its hall. Once on a stretch of wall they stay, so a new one moves
-  nobody. They eat where they stand (Refilling at home). When those on the hall or at a gate are called
+  nobody. They eat where they stand (Refilling at home), and keep any spare Food on them. When those on the hall or at a gate are called
   away or die, the next by id take their place at the city's next pass. Some of those on its wall (a
   share of them, at most a balance number whatever its size) walk a round along it and its roads
   inside it, and back to where they set out, in turns by id. They refill as they walk, and one low on
@@ -989,9 +989,11 @@ The shared language of the game. Domain terms only — no implementation details
   refill at the ground as at a workplace (Refilling at a workplace); the Train default has the
   usual food params. Nothing trained decays; only old age lowers stats.
 - **Who trains:** Players' residents, by order, queue step or script, and the soldiers of a big NPC
-  city with a training ground (Bigger projects): its soldier with the most Combat teaches and others
-  train in turns, Combat if the teacher has any, else Strength, with the posts on its hall and
-  gates still held. The Trade Organization trains nobody for now. Scripts have
+  city with a training ground (Bigger projects): its soldier with the most Combat teaches, among
+  equals the strongest, and others train in turns of a balance number of days, Combat while any of them
+  is below the teacher in it, else Strength, with the posts on its hall and gates still held. A ground
+  sits empty with too few soldiers left over for a teacher and a trainee, or with nothing anyone can
+  learn from the teacher. A city's ground is the one in its area. The Trade Organization trains nobody for now. Scripts have
   `teach(subject)` and `train()`; a building's script view shows its teacher, subject and trainees.
 - **Carry capacity:** the most weight a resident can carry, set by Strength. Everything has weight,
   including money, so nobody walks around with a fortune in their pocket.

@@ -104,6 +104,7 @@ import {
 } from './npc-behaviour.js'
 import { npcPatrolsSound } from './npc-patrols.js'
 import { npcSoldiersOnPosts } from './npc-posts.js'
+import { npcTrainingGroundsBounded, npcTrainsItsSoldiers } from './npc-training.js'
 import { CARRYING_BLOCKS } from './pairing.js'
 import { isWalkable } from './world.js'
 import { contractsSound } from './contracts.js'
@@ -2167,6 +2168,8 @@ export const worldInvariants: Invariant[] = [
   npcIdleOffTheStorage,
   npcSoldiersOnPosts,
   npcPatrolsSound,
+  npcTrainingGroundsBounded,
+  npcTrainsItsSoldiers,
   tradeOrgSendsNoOne,
   npcTradersSound,
   lineOrdersSound,

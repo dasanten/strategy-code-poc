@@ -212,7 +212,7 @@ describe('training (`CONTEXT.md`: Trainee, Training)', () => {
     expect(traineesOf(ground, world.residents)).toHaveLength(TRAINING_GROUND_MAX_TRAINEES)
   })
 
-  it('is refused for another realm’s resident, and NPC cities train nobody', () => {
+  it('is refused for another realm’s resident, and for a city’s sender not its own (`npc-training.test.ts`)', () => {
     const { world, ann, queue } = setup()
     ann.owner = 'r2'
     expect(order(world, queue, train('a1'))).toBe('not one of your residents')

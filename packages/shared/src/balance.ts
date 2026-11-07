@@ -561,6 +561,12 @@ export const NPC_SOLDIERS_AT_GATE = 1
 export const NPC_POST_AROUND_HALL = 2
 
 /**
+ * Ticks each lot of a big NPC city's soldiers trains before the next lot's turn (`CONTEXT.md`: Who
+ * trains): five game days, long enough to be worth the walk there and back.
+ */
+export const NPC_TRAIN_TURN_TICKS = 5 * TICKS_PER_GAME_DAY
+
+/**
  * The most of an NPC city's soldiers walking a round at once, whatever its size (`CONTEXT.md`: Soldier
  * posts). They walk every tick, the dearest of a soldier's jobs, so a city's cost stops growing here.
  */
