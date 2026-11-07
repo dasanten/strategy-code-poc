@@ -6,11 +6,14 @@ import {
   MAP_SIZE,
   SESSION_COOKIE,
   SIGHT_RANGE,
+  TERRAIN_BATCH_MAX,
+  TERRAIN_BATCH_PATH,
   Terrain,
   UNEXPLORED,
   adminTerrainChunkPath,
   chunksAcross,
   decodeChunk,
+  decodeChunkBatch,
   overviewAcross,
   terrainAt,
   terrainChunkPath,
@@ -274,6 +277,31 @@ describe('terrain chunk API', () => {
 
     const anonymous = await app.inject({ method: 'GET', url: terrainChunkPath(1, 1) })
     expect(anonymous.statusCode).toBe(401)
+    await app.close()
+    close()
+  })
+
+  it('answers many explored chunks in one body and leaves the unexplored ones out', async () => {
+    const { app, explored, mara, cookies, close } = await start()
+    // Around (32, 32): tiles in chunks (0, 0), (1, 0), (0, 1) and (1, 1) of the 4-across map.
+    explored.explore(mara.id, 32, 32, 2)
+    const n = chunksAcross(terrain.size)
+    const post = (chunks: unknown, c: Record<string, string> | undefined = cookies) =>
+      app.inject({ method: 'POST', url: TERRAIN_BATCH_PATH, payload: { chunks }, cookies: c })
+
+    // Asked in this order, with an unexplored chunk, one off the map, nonsense and a repeat.
+    const res = await post([n + 1, 0, 2 * n + 2, n * n, 'x', -1, 0.5, n + 1])
+    expect(res.statusCode).toBe(200)
+    expect(res.headers['content-type']).toBe('application/octet-stream')
+    const batch = decodeChunkBatch(new Uint8Array(res.rawPayload))
+    expect(batch.map(([i]) => i)).toEqual([n + 1, 0])
+    expect(batch[0]![1]).toEqual(explored.chunk(mara, 1, 1))
+    expect(batch[1]![1]).toEqual(explored.chunk(mara, 0, 0))
+
+    expect((await post([2 * n + 2])).rawPayload).toHaveLength(0)
+    expect((await post(new Array(TERRAIN_BATCH_MAX + 1).fill(0))).statusCode).toBe(400)
+    expect((await post('0')).statusCode).toBe(400)
+    expect((await post([0], {})).statusCode).toBe(401)
     await app.close()
     close()
   })
