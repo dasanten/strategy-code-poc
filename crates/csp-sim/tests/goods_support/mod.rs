@@ -214,3 +214,88 @@ macro_rules! assert_stock {
         assert!(goods_support::same(got, &want), "stock {:?}, want {:?}", got, want);
     }};
 }
+
+/// A stand-in for `Walking` (T86.4) in the goods tests: on an open map with nothing in the way,
+/// a store or fetch order walking to its place, and a haul route driving to its next stop, take
+/// one step a tick straight toward it (diagonals too, the short way round) and arrive as
+/// `walking.ts`'s `arrive` has them: store putting, fetch taking, a haul route loading. A driver
+/// takes their carriage and its horse along. Nothing else walks.
+pub struct StraightWalk {
+    pub size: i32,
+}
+
+fn toward(from: f64, to: f64, size: i32) -> f64 {
+    let d = csp_shared::terrain::wrap_delta(from as i32, to as i32, size);
+    csp_shared::terrain::wrap(from as i32 + d.signum(), size) as f64
+}
+
+impl csp_sim::tick::Walk for StraightWalk {
+    fn walk(&mut self, world: &mut WorldState, _scratch: &mut Scratch) -> usize {
+        use csp_shared::world::{FetchPhase, HaulPhase, HaulStop, ResidentOrder, StorePhase};
+        let mut steps = 0;
+        for ri in 0..world.residents.len() {
+            let (x, y) = (world.residents[ri].x, world.residents[ri].y);
+            let target = match &world.residents[ri].order {
+                Some(ResidentOrder::Store(o)) if o.phase == StorePhase::Walking => {
+                    storing::place_tile(world, &o.to)
+                }
+                Some(ResidentOrder::Fetch(o)) if o.phase == FetchPhase::Walking => {
+                    storing::place_tile(world, &o.from)
+                }
+                Some(ResidentOrder::Haul(o)) if o.phase == HaulPhase::Driving => {
+                    let t = if o.stop == HaulStop::To { &o.to } else { &o.from };
+                    Some((t.x, t.y))
+                }
+                _ => continue,
+            };
+            let Some((tx, ty)) = target else { continue };
+            if (x, y) != (tx, ty) {
+                let (nx, ny) = (toward(x, tx, self.size), toward(y, ty, self.size));
+                if let Some(ResidentOrder::Haul(o)) = &world.residents[ri].order {
+                    let id = o.carriage_id.clone();
+                    if let Some(k) = world.carriages.iter_mut().find(|k| k.id == id) {
+                        k.x = nx;
+                        k.y = ny;
+                        if let Some(h) = k.horse_id.clone() {
+                            if let Some(h) = world.horses.iter_mut().find(|x| x.id == h) {
+                                h.x = nx;
+                                h.y = ny;
+                            }
+                        }
+                    }
+                }
+                world.residents[ri].x = nx;
+                world.residents[ri].y = ny;
+                steps += 1;
+            }
+            if (world.residents[ri].x, world.residents[ri].y) != (tx, ty) {
+                continue;
+            }
+            match world.residents[ri].order.as_mut() {
+                Some(ResidentOrder::Store(o)) => {
+                    o.phase = StorePhase::Putting;
+                    o.path = None;
+                    o.progress = 0.0;
+                }
+                Some(ResidentOrder::Fetch(o)) => {
+                    o.phase = FetchPhase::Taking;
+                    o.path = None;
+                    o.progress = 0.0;
+                }
+                Some(ResidentOrder::Haul(o)) => {
+                    o.phase = HaulPhase::Loading;
+                    o.path = None;
+                    o.progress = 0.0;
+                }
+                _ => {}
+            }
+        }
+        steps
+    }
+}
+
+/// One step of the world (`stepWorld`) with the stand-in walking.
+pub fn step_walking(world: &mut WorldState, terrain: &TerrainMap, scratch: &mut Scratch) {
+    let mut walk = StraightWalk { size: terrain.size };
+    step_world(world, terrain, scratch, Some(&mut walk), None);
+}
