@@ -19,7 +19,21 @@ Status: decided (2026-10-18, with Daniel). Replaces the storage and map parts of
   a deploy. Schema changes to tables use Drizzle migrations as before.
 - **Sync:** the server sends each client only what its Player can see (`CONTEXT.md`, Sight). On
   connect it sends everything in sight; each tick it sends the entities in sight that changed and
-  the ids that left sight, as JSON. Explored terrain is loaded in 32×32 chunks over HTTP.
+  the ids that left sight, as JSON. Explored terrain is loaded in 32×32 chunks over HTTP, many
+  at a time (below).
+- **Chunk batches (2026-11-07, T84.6):** the client asks for explored chunks with
+  `POST /api/terrain/chunks` and the JSON body `{ "chunks": [i, …] }`, chunk indices
+  `i = cy · n + cx` with `n = ⌈map size / 32⌉`, at most 64 per request (`TERRAIN_BATCH_MAX`;
+  more is a 400 `invalid-input`). The answer is `application/octet-stream`: for each chunk the
+  Player explored something in, in the order asked and once each, its index and its byte length
+  as unsigned 32-bit little-endian, then the chunk's bytes as `encodeChunk` gives them (the
+  1,024 terrain bytes, then three bytes per known resource node). Indices not explored, off the
+  map or not integers are left out silently, so an empty body is a valid answer. The welcome's
+  `exploredChunks` list says what to ask for; the client asks nearest to the view first, up to six
+  batches in flight. One chunk per request (`GET /api/terrain/:cx/:cy`) stays for the admin map.
+  The Rust server serves the same shape (ADR 0030). A Player with ~3,000 explored chunks went
+  from ~3,000 requests and 25 s to 47 requests and ~4 s (`docs/proposals/rust-rewrite.md`,
+  Measurements).
 - **Orders** travel over the same WebSocket with a request id. The server checks them, answers
   with an ack or an error and applies them from the next tick (ADR 0002).
 
