@@ -3,6 +3,8 @@
 //! TypeScript game is checked against the fixtures in `fixtures/`.
 
 pub mod explored;
+pub mod node_gen;
 pub mod pathfinding;
 pub mod random;
+pub mod terrain_gen;
 pub mod walls;
