@@ -5,6 +5,7 @@
 pub mod aging;
 pub mod buying;
 pub mod carrying;
+pub mod deliveries;
 pub mod directive;
 pub mod events;
 pub mod explored;
