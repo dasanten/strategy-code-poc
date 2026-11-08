@@ -6,44 +6,18 @@ use csp_server::db::open_db;
 use csp_server::scripts::{
     activate_version, active_source, check_script_library, create_script, default_script_id,
     delete_older_versions, delete_script, delete_version, get_script, list_scripts, rename_script,
-    reset_script, save_script, task_name, DefaultScript, ScriptDetail,
+    reset_script, save_script, DefaultScript, ScriptDetail,
 };
 use csp_shared::balance::{SCRIPT_LIBRARY_MAX_SCRIPTS, SCRIPT_MAX_VERSIONS};
 use csp_shared::world::default_scripts::Task;
 use rusqlite::{params, Connection};
 
+mod common;
+use common::{defaults, TASKS};
+
 const VALID: &str = "let x = 1\n";
 const VALID_2: &str = "let x = 2\n";
 const BROKEN: &str = "let = \n";
-
-const TASKS: [Task; 11] = [
-    Task::Work,
-    Task::Build,
-    Task::Haul,
-    Task::TearDown,
-    Task::Breed,
-    Task::FeedStable,
-    Task::Defend,
-    Task::Train,
-    Task::BuildLine,
-    Task::Explore,
-    Task::Alarm,
-];
-
-/// A stand-in for `DEFAULT_SCRIPTS`: a valid script of its own for every task.
-pub fn defaults() -> Vec<DefaultScript> {
-    TASKS
-        .iter()
-        .map(|&task| {
-            let name = task_name(task);
-            DefaultScript {
-                task,
-                name: format!("{}{}", name[..1].to_uppercase(), &name[1..]),
-                source: format!("// {name} (default)\nlet task = 1\n"),
-            }
-        })
-        .collect()
-}
 
 struct Lib {
     db: Connection,
