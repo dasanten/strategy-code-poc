@@ -178,3 +178,6 @@ pub fn resident_names_well_formed(world: &WorldState) -> Vec<InvariantViolation>
         world.residents.iter().map(|r| (r.id.as_str(), r.name.as_str())),
     )
 }
+
+#[cfg(test)]
+mod tests;
