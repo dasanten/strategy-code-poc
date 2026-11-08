@@ -112,6 +112,11 @@ impl<L: LogSink> ServerReporter<L> {
         &self.log
     }
 
+    /// When the window's clock started: its ticks are noted at ms since then.
+    pub fn started(&self) -> Instant {
+        self.started
+    }
+
     /// Notes a tick's health in the window at `at_ms`, and once a minute logs the summary.
     pub fn note_health(&mut self, at_ms: f64, health: &TickHealth) {
         let mut window = self.window.lock().unwrap_or_else(|e| e.into_inner());
