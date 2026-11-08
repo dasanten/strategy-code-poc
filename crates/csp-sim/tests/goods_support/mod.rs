@@ -252,16 +252,26 @@ impl csp_sim::tick::Walk for StraightWalk {
             if (x, y) != (tx, ty) {
                 let (nx, ny) = (toward(x, tx, self.size), toward(y, ty, self.size));
                 if let Some(ResidentOrder::Haul(o)) = &world.residents[ri].order {
+                    // As `Walking` resolves a drive step: without its horse there, or with it
+                    // Down, the order ends; else the horse pulls the carriage, hitched.
                     let id = o.carriage_id.clone();
-                    if let Some(k) = world.carriages.iter_mut().find(|k| k.id == id) {
-                        k.x = nx;
-                        k.y = ny;
-                        if let Some(h) = k.horse_id.clone() {
-                            if let Some(h) = world.horses.iter_mut().find(|x| x.id == h) {
-                                h.x = nx;
-                                h.y = ny;
-                            }
-                        }
+                    let k = world.carriages.iter().position(|k| k.id == id);
+                    let horse = k.and_then(|k| {
+                        csp_sim::queries::carriages::horse_for(world, &world.carriages[k])
+                    });
+                    let pulls = horse.filter(|h| {
+                        h.x == x && h.y == y && !csp_sim::queries::residents::is_down(h.down_until)
+                    });
+                    let (Some(k), Some(h)) = (k, pulls.map(|h| h.id.clone())) else {
+                        world.residents[ri].order = None;
+                        continue;
+                    };
+                    world.carriages[k].x = nx;
+                    world.carriages[k].y = ny;
+                    world.carriages[k].horse_id = Some(h.clone());
+                    if let Some(h) = world.horses.iter_mut().find(|x| x.id == h) {
+                        h.x = nx;
+                        h.y = ny;
                     }
                 }
                 world.residents[ri].x = nx;
