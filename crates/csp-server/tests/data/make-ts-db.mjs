@@ -2,6 +2,7 @@
 // Drizzle migrator on migrations/ (a copy of apps/server/drizzle, pinned to LF), the pragmas of db/index.ts) with one row per table.
 // Never hand-edited, never a copy of a real database (those hold accounts). Run from the repo root:
 //   node crates/csp-server/tests/data/make-ts-db.mjs
+import console from 'node:console'
 import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
