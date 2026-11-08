@@ -447,3 +447,6 @@ pub fn workplace_settings_sound(world: &WorldState) -> Vec<InvariantViolation> {
     }
     out
 }
+
+#[cfg(test)]
+mod tests;
