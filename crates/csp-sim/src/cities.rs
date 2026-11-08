@@ -137,3 +137,6 @@ pub fn dissolve_city(world: &mut WorldState, city_id: &str) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;
