@@ -89,6 +89,24 @@ impl GameHandle for LocalGame {
     }
 }
 
+impl<L: crate::monitoring::LogSink + Send + Sync + 'static> GameHandle
+    for crate::server::GameThread<L>
+{
+    fn run_job(&self, job: GameJob) -> Pin<Box<dyn Future<Output = bool> + Send + '_>> {
+        Box::pin(async move {
+            self.run(move |g, _conn| {
+                job(GameView {
+                    world: &mut g.world,
+                    terrain: &g.terrain,
+                    explored: &mut g.explored,
+                })
+            })
+            .await
+            .is_some()
+        })
+    }
+}
+
 /// Runs `f` on the game between ticks and answers its result; `None` if the game is gone.
 pub async fn with_game<T: Send + 'static>(
     game: &dyn GameHandle,

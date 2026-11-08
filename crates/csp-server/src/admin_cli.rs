@@ -8,12 +8,14 @@ use crate::auth::{create_admin, create_invite_code, AuthFailure};
 
 pub const USAGE: &str = "usage: admin create <name> | admin invite";
 
-/// The database the server uses: `DB_PATH`, or `data/world.db` from where it runs.
-// TODO(T87.1): read from the server's config once it exists, `.env` included.
+/// The database the server uses (`config.dbPath`, `.env` included): `DB_PATH`, or
+/// `data/world.db` from where it runs.
 pub fn db_path() -> PathBuf {
-    std::env::var_os("DB_PATH")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default().join("data/world.db"))
+    crate::config::Config::from_env().map(|c| c.db_path).unwrap_or_else(|_| {
+        std::env::var_os("DB_PATH")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default().join("data/world.db"))
+    })
 }
 
 /// Runs one admin command; `Ok` is what to print, `Err` the message for stderr (exit code 1).

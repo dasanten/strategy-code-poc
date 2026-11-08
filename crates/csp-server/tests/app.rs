@@ -751,3 +751,59 @@ async fn answers_the_health_check_with_the_tick() {
     let res = call(&db.app(), "GET", "/api/health", None, None).await;
     assert_eq!(res.json(), json!({ "ok": true, "tick": 0, "language": 1 }));
 }
+
+// ------------------------------------------------------------------ with the server's game thread
+
+struct NoLog;
+
+impl csp_server::monitoring::LogSink for NoLog {
+    fn log(&self, _: tracing::Level, _: Value, _: &str) {}
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn answers_health_and_tick_health_from_the_game_thread_between_ticks() {
+    use csp_server::server::{Game, GameThread, TickSettings};
+    let db = Db::new();
+    let path = db.path.clone();
+    let settings =
+        TickSettings { invariant_sample_rate: 0.0, slow_tick_ms: 800.0, save_every_ticks: 30 };
+    let game = GameThread::spawn(
+        move || {
+            let terrain = TerrainMap { size: 64, tiles: vec![0; 64 * 64] };
+            let world = create_world(&terrain, 1);
+            let explored = ExploredTerrain::new(terrain.clone(), &world.nodes);
+            Ok((open_db(&path, None)?, Game::new(world, terrain, explored, NoLog)))
+        },
+        settings,
+    )
+    .unwrap();
+    game.tick().await.unwrap();
+    game.tick().await.unwrap();
+    let window = Arc::clone(&game.tick_health);
+    let clock = game.tick_clock;
+    let game = Arc::new(game);
+    let mut opts = db.opts();
+    opts.game = Some(game.clone());
+    opts.tick_health = Some(Arc::new(move || {
+        let now = clock.elapsed().as_secs_f64() * 1000.0;
+        serde_json::to_value(window.lock().unwrap().summary(now)).unwrap()
+    }));
+    let app = build_app(opts);
+
+    let health = call(&app, "GET", "/api/health", None, None).await;
+    assert_eq!(health.json(), json!({ "ok": true, "tick": 2, "language": 1 }));
+
+    let conn = db.conn();
+    create_admin(&conn, Some("Daniel"), Some("admin password")).unwrap();
+    let admin = login_as(&app, "Daniel", "admin password").await;
+    let summary = call(&app, "GET", "/api/admin/tick-health", Some(&admin), None).await;
+    assert_eq!(summary.status, StatusCode::OK);
+    assert_eq!(summary.json()["lastMinute"]["ticks"], 2);
+    assert_eq!(summary.json()["lastHour"]["ticks"], 2);
+    let mara = token_for(&conn, add_user(&conn, "Mara"));
+    let refused = call(&app, "GET", "/api/admin/tick-health", Some(&mara), None).await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+
+    drop(app);
+    Arc::try_unwrap(game).ok().expect("the app let go of the game").stop().await.unwrap();
+}
