@@ -3,6 +3,7 @@
 //! TypeScript game is checked against the fixtures in `fixtures/`.
 
 pub mod aging;
+pub mod city_layout;
 pub mod events;
 pub mod explored;
 pub mod goods_made;

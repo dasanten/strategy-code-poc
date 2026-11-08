@@ -295,7 +295,7 @@ mod tests {
             assert_eq!(unique_name(drawn, &taken, &pool), case["out"].as_str().unwrap());
         }
         for case in expected()["layouts"].as_array().unwrap() {
-            let layout = crate::survival::pick_layout(
+            let layout = crate::city_layout::pick_layout(
                 case["seed"].as_i64().unwrap(),
                 case["id"].as_str().unwrap(),
             );
