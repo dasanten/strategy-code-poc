@@ -29,6 +29,8 @@ pub mod hauling;
 pub mod holders;
 pub mod horse_grant;
 pub mod horses;
+pub mod invariants;
+pub mod last_seen;
 pub mod leader;
 pub mod movement_pending;
 #[cfg(test)]
