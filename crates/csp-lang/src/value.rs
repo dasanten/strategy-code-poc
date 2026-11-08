@@ -109,6 +109,11 @@ impl ObjectData {
         self.entries.iter()
     }
 
+    /// Deletes `key` (`delete object[key]`), keeping the others' order; what it held, if any.
+    pub fn remove(&mut self, key: &str) -> Option<Value> {
+        self.entries.shift_remove(key)
+    }
+
     /// Sets `key`, keeping its place if it is there and JavaScript's key order if it is new.
     pub fn insert(&mut self, key: impl Into<String>, value: Value) {
         let key = key.into();

@@ -299,6 +299,8 @@ pub struct Scratch {
     pub index: Option<WorldIndex>,
     /// Goods that came into the world this tick (`noteMade`, `takeMade`).
     pub made: GoodsMade,
+    /// The orders waiting scripts wait on (`waitingOn`, T86.12).
+    pub waiting: crate::script_runner::Waiting,
     /// When each realm's Last seen was last refreshed (`refreshes`, `soon` of `last-seen.ts`).
     pub last_seen: crate::last_seen::LastSeenState,
     /// The trades of the latest `resolveTrades`, for the invariants over them (`ledger`).

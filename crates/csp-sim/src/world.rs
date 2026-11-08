@@ -15,6 +15,7 @@ use csp_shared::terrain::{is_passable_terrain, terrain_at, wrap, TerrainMap};
 use csp_shared::world::{Horse, WorldState};
 
 use crate::aging::{step_aging, AgingResult};
+use crate::alarms::GameAlarms;
 use crate::alliances::step_alliances;
 use crate::armies::step_armies;
 use crate::breeding::{request_breeding, resolve_breeding};
@@ -26,7 +27,6 @@ use crate::climbing::{request_climbing, resolve_climbing};
 use crate::combat::{request_strikes, resolve_strikes, CombatResult};
 use crate::contracts::{resolve_payments, step_contracts};
 use crate::crimes::step_crimes;
-use crate::defence::NoAlarms;
 use crate::directives::{resolve_buy_offs, step_directives, BuyOffRecord};
 use crate::hauling::request_hauling;
 use crate::horses::step_horses;
@@ -36,6 +36,8 @@ use crate::passengers::step_passengers;
 use crate::persuasion::step_persuasion;
 use crate::relocating::step_relocating;
 use crate::riding::step_riders;
+use crate::script_runner::run_npc_scripts;
+use crate::script_views::SCRIPT_VIEW_CHANGES;
 use crate::spoilage::step_spoilage;
 use crate::standing::step_standing;
 use crate::stock_floor::step_stock_floor;
@@ -47,10 +49,10 @@ use crate::tick::{reborrow, Scratch, TickPhase, TickTimer, Walk};
 use crate::trading::resolve_trades;
 use crate::training::step_training;
 use crate::work::{request_work, resolve_work};
+use crate::workplace_settings::step_workplace_settings;
 
 /// How many breaking changes to the script views there are so far (`SCRIPT_VIEW_CHANGES.length`).
-// TODO(T86.12): `SCRIPT_VIEW_CHANGES.len()` once the script views are ported.
-const SCRIPT_VIEW_CHANGES_LEN: f64 = 1.0;
+const SCRIPT_VIEW_CHANGES_LEN: f64 = SCRIPT_VIEW_CHANGES.len() as f64;
 
 /// A new world (`createWorld`): terrain's resource nodes and nobody yet. Each Player gets a realm
 /// and starting city when they first connect (`foundStartingCity`).
@@ -246,8 +248,7 @@ fn step_rest(
     step_relocating(world, terrain);
     let strikes = request_strikes(world, size);
     let strikes_len = strikes.len();
-    // TODO(T86.12): the alarm rules (`alarms.ts`) behind `Alarms`.
-    let combat = resolve_strikes(world, &strikes, size, &mut NoAlarms, &mut scratch.made);
+    let combat = resolve_strikes(world, &strikes, size, &mut GameAlarms, &mut scratch.made);
     let climbs = request_climbing(world);
     let climbs_len = climbs.len();
     resolve_climbing(world, &climbs, terrain);
@@ -286,7 +287,7 @@ fn step_rest(
     let aging = step_aging(world, size);
     answer_demands(world, size, scratch);
     step_alliances(world);
-    let captures = step_captures(world, size, &mut NoAlarms);
+    let captures = step_captures(world, size, &mut GameAlarms);
     step_refill(world, size);
     step_directives(world);
     step_crimes(world, size);
@@ -356,10 +357,6 @@ fn resolve_offers(_world: &mut WorldState, _scratch: &mut Scratch) -> usize {
 }
 fn step_offers(_world: &mut WorldState, _scratch: &mut Scratch) {}
 
-// T86.6 (`building.ts`, `teardown.ts`, `work.ts`, `teaching.ts`, `training.ts`) is in its modules;
-// `workplace-settings.ts` is not ported yet (T86.6 left it: its ticket does not name it).
-fn step_workplace_settings(_world: &mut WorldState, _scratch: &mut Scratch) {}
-
 // `reviving.ts` (feeding someone Down); not in T86.7's list of modules, so still to port.
 fn step_feeding(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
 
@@ -399,15 +396,6 @@ fn step_outsiders(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {
 // `demands.ts` (filed under T86.11 here, but named by no ticket; T86.14 or whoever ports it).
 fn answer_demands(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
 fn step_demands(_world: &mut WorldState, _scratch: &mut Scratch) {}
-
-// T86.12 (`script-runner.ts`). Returns how many NPC scripts ran.
-fn run_npc_scripts(
-    _world: &mut WorldState,
-    _terrain: &TerrainMap,
-    _scratch: &mut Scratch,
-) -> usize {
-    0
-}
 
 // T86.13 (`last-seen.ts`).
 fn step_last_seen(world: &mut WorldState, size: i32, scratch: &mut Scratch) {
