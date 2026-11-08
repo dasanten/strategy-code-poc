@@ -21,6 +21,7 @@ csp-sim.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+flate2.workspace = true
 rusqlite = { version = "0.37", features = ["bundled", "backup"] }
 sha2 = "0.10"
 base64 = "0.22"
