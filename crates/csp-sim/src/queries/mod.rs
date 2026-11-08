@@ -8,12 +8,17 @@
 
 pub mod alliance;
 pub mod alliance_rules;
+pub mod army;
 pub mod building;
 pub mod carriages;
 pub mod city;
+pub mod combat;
 pub mod contract;
+pub mod crew;
+pub mod goods;
 pub mod horse_market;
 pub mod horses;
+pub mod leader;
 pub mod names;
 pub mod npc_trade;
 pub mod offers;
@@ -21,6 +26,7 @@ pub mod region_map;
 pub mod residents;
 pub mod standing;
 pub mod territory;
+pub mod trade_org;
 pub mod trader_trade;
 pub mod warehouse;
 
