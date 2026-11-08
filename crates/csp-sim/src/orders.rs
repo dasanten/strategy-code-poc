@@ -139,6 +139,7 @@ pub fn order_kinds() -> OrderKinds {
     let mut kinds = OrderKinds::default();
     crate::building::add_building_orders(&mut kinds);
     crate::queues::add_queue_orders(&mut kinds);
+    crate::waypoints::add_waypoint_orders(&mut kinds);
     kinds
 }
 

@@ -297,6 +297,8 @@ pub struct Scratch {
     pub index: Option<WorldIndex>,
     /// Goods that came into the world this tick (`noteMade`, `takeMade`).
     pub made: GoodsMade,
+    /// The orders waiting scripts wait on (`waitingOn`, T86.12).
+    pub waiting: crate::script_runner::Waiting,
 }
 
 impl Scratch {
