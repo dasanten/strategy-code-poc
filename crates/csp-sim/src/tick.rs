@@ -277,6 +277,11 @@ pub trait Walk {
     /// Requests this tick's steps and resolves them together (`requestSteps` then `resolve`);
     /// returns how many steps were requested, which count as actions.
     fn walk(&mut self, world: &mut WorldState, scratch: &mut Scratch) -> usize;
+
+    /// The same walking as the road crews' way finder (`WayFinder`), if it finds ways.
+    fn ways(&mut self) -> Option<&mut dyn crate::npc_roads::WayFinder> {
+        None
+    }
 }
 
 /// The walking for one call, borrowed again from an optional one (`Option::as_deref_mut` would

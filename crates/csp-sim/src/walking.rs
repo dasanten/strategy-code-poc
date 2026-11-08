@@ -769,6 +769,10 @@ impl Walk for Walking {
         self.resolve(world, scratch, &steps);
         steps.len()
     }
+
+    fn ways(&mut self) -> Option<&mut dyn crate::npc_roads::WayFinder> {
+        Some(self)
+    }
 }
 
 #[cfg(test)]
