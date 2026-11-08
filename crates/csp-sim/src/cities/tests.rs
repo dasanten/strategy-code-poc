@@ -129,7 +129,8 @@ fn drops_a_building_cut_off_from_the_chain_once_the_building_between_goes() {
     let link = put(&mut world, BuildingKind::Wall, 42.0 + R, 40.0);
     let end = put(&mut world, BuildingKind::House, 42.0 + 2.0 * R, 40.0);
     update_city_membership(&mut world, SIZE);
-    let city = |world: &WorldState| world.buildings.iter().find(|b| b.id == end).unwrap().city_id.clone();
+    let city =
+        |world: &WorldState| world.buildings.iter().find(|b| b.id == end).unwrap().city_id.clone();
     assert_eq!(city(&world), c1());
     world.buildings.retain(|b| b.id != link);
     update_city_membership(&mut world, SIZE);
@@ -165,7 +166,10 @@ fn founds_a_city_around_a_town_hall_of_a_realm_and_names_it_from_its_id() {
     let hall = building(&mut world, "hall", BuildingKind::TownHall, None, 40.0, 40.0);
     let ci = found_city(&mut world, hall, Some("r1"));
     let city = &world.cities[ci];
-    assert_eq!((city.realm_id.as_deref(), city.town_hall_id.as_str(), city.game_name), (Some("r1"), "hall", Some(true)));
+    assert_eq!(
+        (city.realm_id.as_deref(), city.town_hall_id.as_str(), city.game_name),
+        (Some("r1"), "hall", Some(true))
+    );
     assert!(CITY_NAMES.contains(&city.name.as_str()));
     assert_eq!(city.layout, None);
     assert_eq!(world.buildings[hall].city_id.as_deref(), Some(city.id.as_str()));

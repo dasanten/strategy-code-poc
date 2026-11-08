@@ -2,10 +2,9 @@
 //! fixtures are `createWorld(cityTerrain())` with `foundStartingCity` for Players 1 to n, so the
 //! Rust world founded the same way must be the same world. `checkInvariants` is T86.13's.
 
-
 use csp_shared::balance::{
-    ADULT_AGE, HOUSING_ROOM, MAX_HEALTH, MAX_HUNGER, START_CARRIED_FOOD, START_CITY_SIZE, START_FOOD, START_HORSES,
-    START_RESIDENTS, START_STABLE_FOOD, STAT_BASE_MAX, STAT_BASE_MIN,
+    ADULT_AGE, HOUSING_ROOM, MAX_HEALTH, MAX_HUNGER, START_CARRIED_FOOD, START_CITY_SIZE,
+    START_FOOD, START_HORSES, START_RESIDENTS, START_STABLE_FOOD, STAT_BASE_MAX, STAT_BASE_MIN,
 };
 use csp_shared::terrain::{terrain_at, Terrain};
 use csp_shared::world::{BuildingKind, Good, ResidentOrder, WorldState};
@@ -15,7 +14,6 @@ use crate::queries::city_area::{in_city_area, is_city_building};
 use crate::queries::residents::age_in_years;
 use crate::test_world::{city_terrain, world_with_city};
 use crate::world::create_world;
-
 
 fn fixture(name: &str) -> WorldState {
     let path = format!("{}/fixtures/sight/{name}.json", env!("CARGO_MANIFEST_DIR"));
@@ -54,14 +52,22 @@ fn gives_a_player_a_realm_with_everything_a_starting_city_has() {
     assert_eq!(city.realm_id.as_deref(), Some(realm.id.as_str()));
     // A town hall, and a ring of wooden wall with one gate in the middle of a side.
     let hall = town_hall_of(&world, city).unwrap();
-    assert_eq!((hall.kind, hall.city_id.as_deref()), (BuildingKind::TownHall, Some(city.id.as_str())));
-    let walls: Vec<_> = world.buildings.iter().filter(|b| matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate)).collect();
+    assert_eq!(
+        (hall.kind, hall.city_id.as_deref()),
+        (BuildingKind::TownHall, Some(city.id.as_str()))
+    );
+    let walls: Vec<_> = world
+        .buildings
+        .iter()
+        .filter(|b| matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate))
+        .collect();
     assert_eq!(walls.len() as f64, 4.0 * (START_CITY_SIZE - 1.0));
     assert_eq!(walls.iter().filter(|b| b.kind == BuildingKind::Gate).count(), 1);
     for b in world.buildings.iter().filter(|b| is_city_building(b)) {
         assert_eq!(b.city_id.as_deref(), Some(city.id.as_str()));
     }
-    let residents: Vec<_> = world.residents.iter().filter(|r| r.owner.as_deref() == Some(realm.id.as_str())).collect();
+    let residents: Vec<_> =
+        world.residents.iter().filter(|r| r.owner.as_deref() == Some(realm.id.as_str())).collect();
     assert_eq!(residents.len() as f64, START_RESIDENTS);
     assert!(residents.iter().any(|r| r.id == realm.leader_id));
     // Everyone starts on the farm, working it, with a little food on them.
@@ -79,7 +85,9 @@ fn gives_a_player_a_realm_with_everything_a_starting_city_has() {
         }
     }
     let count = |k: BuildingKind| world.buildings.iter().filter(|b| b.kind == k).count();
-    assert!(count(BuildingKind::House) as f64 * HOUSING_ROOM.get("house").unwrap() > START_RESIDENTS);
+    assert!(
+        count(BuildingKind::House) as f64 * HOUSING_ROOM.get("house").unwrap() > START_RESIDENTS
+    );
     assert_eq!(count(BuildingKind::Storage), 1);
     assert_eq!(count(BuildingKind::Farm), 1);
     let storage = world.buildings.iter().find(|b| b.kind == BuildingKind::Storage).unwrap();
@@ -97,13 +105,19 @@ fn gives_a_player_a_realm_with_everything_a_starting_city_has() {
     assert!((stable.x - farm.x).abs().max((stable.y - farm.y).abs()) < 4.0);
     assert_eq!(world.horses.len() as f64, START_HORSES);
     for h in &world.horses {
-        assert_eq!((h.realm_id.as_deref(), h.x, h.y), (Some(realm.id.as_str()), stable.x, stable.y));
+        assert_eq!(
+            (h.realm_id.as_deref(), h.x, h.y),
+            (Some(realm.id.as_str()), stable.x, stable.y)
+        );
         assert_eq!((h.hunger, h.health), (MAX_HUNGER, MAX_HEALTH));
     }
     // The carriage stands at the stable with one of its horses hitched, ready to drive.
     assert_eq!(world.carriages.len(), 1);
     let k = &world.carriages[0];
-    assert_eq!((k.realm_id.as_deref(), k.load.is_empty(), k.x, k.y), (Some(realm.id.as_str()), true, stable.x, stable.y));
+    assert_eq!(
+        (k.realm_id.as_deref(), k.load.is_empty(), k.x, k.y),
+        (Some(realm.id.as_str()), true, stable.x, stable.y)
+    );
     assert!(world.horses.iter().any(|h| Some(&h.id) == k.horse_id.as_ref()));
 }
 

@@ -3,7 +3,8 @@
 //! the Leader's death is `dieAll`'s (T86.3); handing over from a script is the game API's (T86.12).
 
 use csp_shared::world::{
-    Alliance, MercenaryContract, RealmEventWhat, Resident, ResidentOrder, Tile, WalkOrder, WorldState,
+    Alliance, MercenaryContract, RealmEventWhat, Resident, ResidentOrder, Tile, WalkOrder,
+    WorldState,
 };
 
 use super::*;
@@ -39,11 +40,20 @@ fn setup() -> Setup {
     let heir = world
         .residents
         .iter()
-        .find(|r| r.owner.as_deref() == Some(realm.id.as_str()) && r.id != leader && can_work(r.born_at, world.tick as f64))
+        .find(|r| {
+            r.owner.as_deref() == Some(realm.id.as_str())
+                && r.id != leader
+                && can_work(r.born_at, world.tick as f64)
+        })
         .unwrap()
         .id
         .clone();
-    let city = world.cities.iter().find(|c| c.realm_id.as_deref() == Some(realm.id.as_str())).unwrap().clone();
+    let city = world
+        .cities
+        .iter()
+        .find(|c| c.realm_id.as_deref() == Some(realm.id.as_str()))
+        .unwrap()
+        .clone();
     let hall = town_hall_of(&world, &city).unwrap().clone();
     for id in [&leader, &heir] {
         let r = live_mut(&mut world, id);
@@ -74,7 +84,13 @@ fn name(world: &WorldState, id: &str) -> String {
 
 /// A contract between two realms naming `r`, offered or in force.
 fn contract(world: &mut WorldState, r: &str, lender: &str, hirer: &str, started: bool) {
-    let storage = world.buildings.iter().find(|b| b.kind == csp_shared::world::BuildingKind::Storage).unwrap().id.clone();
+    let storage = world
+        .buildings
+        .iter()
+        .find(|b| b.kind == csp_shared::world::BuildingKind::Storage)
+        .unwrap()
+        .id
+        .clone();
     let c: MercenaryContract = serde_json::from_value(serde_json::json!({
         "id": format!("contract-{r}"), "lenderId": lender, "hirerId": hirer, "offeredBy": "lender",
         "residentIds": [r], "days": 5, "pricePerWeek": 3, "storageId": storage,
@@ -97,8 +113,12 @@ fn alliance(realm: &str, army: &[&str]) -> Alliance {
 fn makes_a_grown_resident_in_the_same_city_the_leader_and_changes_nothing_else() {
     let Setup { mut world, realm, leader, heir, city, .. } = setup();
     let (lx, ly) = (live(&world, &leader).unwrap().x, live(&world, &leader).unwrap().y);
-    live_mut(&mut world, &leader).order =
-        Some(ResidentOrder::WalkTo(WalkOrder { target: Tile { x: lx + 1.0, y: ly }, path: None, progress: 0.0, army: None }));
+    live_mut(&mut world, &leader).order = Some(ResidentOrder::WalkTo(WalkOrder {
+        target: Tile { x: lx + 1.0, y: ly },
+        path: None,
+        progress: 0.0,
+        army: None,
+    }));
     let cities = world.cities.clone();
     let residents = world.residents.len();
     assert_eq!(hand_over(&mut world, &heir, &leader, MARA), "ok");
@@ -148,8 +168,15 @@ fn keeps_the_realms_alliance_its_leader_role_and_its_contracts() {
 #[test]
 fn happens_also_while_the_leader_is_in_a_fight() {
     let Setup { mut world, realm, tobin, leader, heir, .. } = setup();
-    let foe = world.residents.iter().find(|r| r.owner.as_deref() == Some(tobin.as_str())).unwrap().id.clone();
-    live_mut(&mut world, &leader).order = Some(ResidentOrder::Attack(attack_order(&foe, false, false)));
+    let foe = world
+        .residents
+        .iter()
+        .find(|r| r.owner.as_deref() == Some(tobin.as_str()))
+        .unwrap()
+        .id
+        .clone();
+    live_mut(&mut world, &leader).order =
+        Some(ResidentOrder::Attack(attack_order(&foe, false, false)));
     assert_eq!(hand_over(&mut world, &heir, &leader, MARA), "ok");
     assert_eq!(leader_of(&world, &realm), heir);
     assert_eq!(world.realms.len(), 2);
@@ -160,7 +187,10 @@ fn refuses_a_child() {
     let Setup { mut world, realm, leader, heir, .. } = setup();
     let tick = world.tick as f64;
     live_mut(&mut world, &heir).born_at = tick;
-    assert_eq!(hand_over(&mut world, &heir, &leader, MARA), format!("{} is a child", name(&world, &heir)));
+    assert_eq!(
+        hand_over(&mut world, &heir, &leader, MARA),
+        format!("{} is a child", name(&world, &heir))
+    );
     assert_ne!(leader_of(&world, &realm), heir);
 }
 
@@ -185,9 +215,15 @@ fn refuses_one_hired_out_or_named_in_an_offer() {
     let Setup { mut world, realm, tobin, leader, heir, .. } = setup();
     contract(&mut world, &heir, &realm, &tobin, true);
     let n = name(&world, &heir);
-    assert_eq!(hand_over(&mut world, &heir, &leader, MARA), format!("{n} is in a mercenary contract"));
+    assert_eq!(
+        hand_over(&mut world, &heir, &leader, MARA),
+        format!("{n} is in a mercenary contract")
+    );
     world.contracts[0].started_at = None;
-    assert_eq!(hand_over(&mut world, &heir, &leader, MARA), format!("{n} is named in a mercenary contract offer"));
+    assert_eq!(
+        hand_over(&mut world, &heir, &leader, MARA),
+        format!("{n} is named in a mercenary contract offer")
+    );
     assert_ne!(leader_of(&world, &realm), heir);
 }
 
@@ -195,7 +231,10 @@ fn refuses_one_hired_out_or_named_in_an_offer() {
 fn refuses_one_in_an_alliance_army() {
     let Setup { mut world, realm, leader, heir, .. } = setup();
     world.alliances.push(alliance(&realm, &[&heir]));
-    assert_eq!(hand_over(&mut world, &heir, &leader, MARA), format!("{} is in the alliance army", name(&world, &heir)));
+    assert_eq!(
+        hand_over(&mut world, &heir, &leader, MARA),
+        format!("{} is in the alliance army", name(&world, &heir))
+    );
     assert_ne!(leader_of(&world, &realm), heir);
 }
 
@@ -215,7 +254,12 @@ fn refuses_when_the_two_dont_stand_in_the_same_city_of_the_realm() {
     assert_eq!(hand_over(&mut world, &heir, &leader, MARA), must);
     assert_eq!(leader_of(&world, &realm), leader);
     // Standing in another realm's city doesn't do either.
-    let other = world.cities.iter().find(|c| c.realm_id.as_deref() != Some(realm.as_str())).unwrap().clone();
+    let other = world
+        .cities
+        .iter()
+        .find(|c| c.realm_id.as_deref() != Some(realm.as_str()))
+        .unwrap()
+        .clone();
     let hall = town_hall_of(&world, &other).unwrap().clone();
     for id in [&leader, &heir] {
         let r = live_mut(&mut world, id);
@@ -237,11 +281,23 @@ fn is_the_leaders_to_give_not_another_residents_not_another_players_not_twice() 
     third.x = at.0;
     third.y = at.1;
     let third = third.id.clone();
-    assert_eq!(hand_over(&mut world, &third, &heir, MARA), "only your Leader can hand over the realm");
-    assert_eq!(hand_over(&mut world, &heir, &leader, TOBIN), "only your Leader can hand over the realm");
-    assert_eq!(hand_over(&mut world, &leader, &leader, MARA), format!("{} is your Leader already", name(&world, &leader)));
+    assert_eq!(
+        hand_over(&mut world, &third, &heir, MARA),
+        "only your Leader can hand over the realm"
+    );
+    assert_eq!(
+        hand_over(&mut world, &heir, &leader, TOBIN),
+        "only your Leader can hand over the realm"
+    );
+    assert_eq!(
+        hand_over(&mut world, &leader, &leader, MARA),
+        format!("{} is your Leader already", name(&world, &leader))
+    );
     assert_eq!(leader_of(&world, &realm), leader);
-    assert!(!world.events.iter().any(|e| matches!(e.what, RealmEventWhat::LeaderHandedOver { .. })));
+    assert!(!world
+        .events
+        .iter()
+        .any(|e| matches!(e.what, RealmEventWhat::LeaderHandedOver { .. })));
 }
 
 #[test]

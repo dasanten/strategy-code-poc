@@ -33,11 +33,20 @@ fn free_plains(world: &WorldState, terrain: &TerrainMap, far: f64) -> (f64, f64)
             if taken.contains(&t) {
                 continue;
             }
-            let plains = (0..3).all(|dy| (0..3).all(|dx| terrain_at(terrain, t.0 + dx, t.1 + dy) == Terrain::Plains as u8));
-            if !plains || !world.buildings.iter().all(|b| wrap_distance(size, (b.x as i32, b.y as i32), t) >= far) {
+            let plains = (0..3).all(|dy| {
+                (0..3).all(|dx| terrain_at(terrain, t.0 + dx, t.1 + dy) == Terrain::Plains as u8)
+            });
+            if !plains
+                || !world
+                    .buildings
+                    .iter()
+                    .all(|b| wrap_distance(size, (b.x as i32, b.y as i32), t) >= far)
+            {
                 continue;
             }
-            if best.is_none_or(|b| wrap_distance(size, (hx, hy), t) < wrap_distance(size, (hx, hy), b)) {
+            if best
+                .is_none_or(|b| wrap_distance(size, (hx, hy), t) < wrap_distance(size, (hx, hy), b))
+            {
                 best = Some(t);
             }
         }
@@ -52,9 +61,18 @@ fn add_houses(world: &mut WorldState, city: &str, n: usize) {
     for _ in 0..n {
         let free = city_area_tiles(world, city, terrain.size)
             .into_iter()
-            .find(|&(x, y)| Ground::new(world, terrain, &[]).fits(BuildingKind::House, x, y, &|_, _| true))
+            .find(|&(x, y)| {
+                Ground::new(world, terrain, &[]).fits(BuildingKind::House, x, y, &|_, _| true)
+            })
             .expect("a free tile in the city");
-        building(world, &format!("h{},{}", free.0, free.1), BuildingKind::House, Some(city), f64::from(free.0), f64::from(free.1));
+        building(
+            world,
+            &format!("h{},{}", free.0, free.1),
+            BuildingKind::House,
+            Some(city),
+            f64::from(free.0),
+            f64::from(free.1),
+        );
     }
 }
 
@@ -75,14 +93,19 @@ fn setup(houses: usize) -> Setup {
     add_city(&mut world, "city-second", Some(&realm.id), at.0, at.1, None);
     world.cities.last_mut().unwrap().name = "Redbank".into();
     add_houses(&mut world, "city-second", houses);
-    let ana = world.residents.iter_mut().find(|r| r.id != realm.leader_id && r.city_id.as_deref() == Some(first.as_str())).unwrap();
+    let ana = world
+        .residents
+        .iter_mut()
+        .find(|r| r.id != realm.leader_id && r.city_id.as_deref() == Some(first.as_str()))
+        .unwrap();
     ana.name = "Ana".into();
     let ana = ana.id.clone();
     Setup { world, first, second: "city-second".into(), ana }
 }
 
 fn relocate_by(world: &mut WorldState, r: &str, city: &str, sender: &Sender) -> Option<String> {
-    let o = RelocateRequest { resident_id: Some(r.into()), city_id: Some(city.into()), group: None };
+    let o =
+        RelocateRequest { resident_id: Some(r.into()), city_id: Some(city.into()), group: None };
     let reason = validate_relocate(world, sender, &o);
     if reason.is_none() {
         apply_relocate(world, &o, Some(city_terrain()));
@@ -102,12 +125,20 @@ fn until_done(world: &mut WorldState, r: &str) {
         me.y = o.target.y;
     }
     step_relocating(world, city_terrain());
-    assert!(!matches!(live(world, r).unwrap().order, Some(ResidentOrder::Relocate(_))), "{r} still relocating");
+    assert!(
+        !matches!(live(world, r).unwrap().order, Some(ResidentOrder::Relocate(_))),
+        "{r} still relocating"
+    );
 }
 
 fn carry_child(world: &mut WorldState, r: &str, partner: &str) {
     let p = live(world, partner).unwrap();
-    let carrying = Carrying { since: 0.0, partner_id: p.id.clone(), partner_name: p.name.clone(), partner_base: base_stats(p) };
+    let carrying = Carrying {
+        since: 0.0,
+        partner_id: p.id.clone(),
+        partner_name: p.name.clone(),
+        partner_base: base_stats(p),
+    };
     live_mut(world, r).carrying = Some(carrying);
 }
 
@@ -126,7 +157,13 @@ fn hall_of(world: &WorldState, city: &str) -> (f64, f64) {
 }
 
 fn other_of_first(world: &WorldState, ana: &str, first: &str) -> String {
-    world.residents.iter().find(|r| r.id != ana && r.city_id.as_deref() == Some(first)).unwrap().id.clone()
+    world
+        .residents
+        .iter()
+        .find(|r| r.id != ana && r.city_id.as_deref() == Some(first))
+        .unwrap()
+        .id
+        .clone()
 }
 
 #[test]
@@ -134,7 +171,9 @@ fn heads_for_the_nearest_tile_of_the_citys_area() {
     let Setup { mut world, second, ana, .. } = setup(1);
     let terrain = city_terrain();
     assert_eq!(relocate(&mut world, &ana, &second), None);
-    let Some(ResidentOrder::Relocate(o)) = live(&world, &ana).unwrap().order.clone() else { panic!("relocating") };
+    let Some(ResidentOrder::Relocate(o)) = live(&world, &ana).unwrap().order.clone() else {
+        panic!("relocating")
+    };
     assert_eq!(o.city_id, second);
     assert!(in_city_area(&world, &second, o.target.x, o.target.y, terrain.size));
     let a = live(&world, &ana).unwrap();
@@ -153,10 +192,16 @@ fn heads_for_the_nearest_tile_of_the_citys_area() {
 fn turns_it_down_for_someone_elses_resident_or_an_npc_citys() {
     let Setup { mut world, second, ana, .. } = setup(1);
     let before = live(&world, &ana).unwrap().order.clone();
-    assert_eq!(relocate_by(&mut world, &ana, &second, &STRANGER).as_deref(), Some("not one of your residents"));
+    assert_eq!(
+        relocate_by(&mut world, &ana, &second, &STRANGER).as_deref(),
+        Some("not one of your residents")
+    );
     add_city(&mut world, "npc", None, 0.0, 0.0, None);
     let npc = Sender { user_id: 0, npc_city_id: Some("npc".into()) };
-    assert_eq!(relocate_by(&mut world, &ana, &second, &npc).as_deref(), Some("not one of your residents"));
+    assert_eq!(
+        relocate_by(&mut world, &ana, &second, &npc).as_deref(),
+        Some("not one of your residents")
+    );
     assert_eq!(live(&world, &ana).unwrap().order, before);
 }
 
@@ -165,10 +210,14 @@ fn turns_it_down_for_a_city_that_isnt_the_realms_or_their_own() {
     let Setup { mut world, first, second, ana } = setup(1);
     add_city(&mut world, "npc", None, 0.0, 0.0, None);
     assert_eq!(relocate(&mut world, &ana, "npc").as_deref(), Some("not a city of your realm"));
-    world.cities.iter_mut().find(|c| c.id == second).unwrap().realm_id = Some("someone-else".into());
+    world.cities.iter_mut().find(|c| c.id == second).unwrap().realm_id =
+        Some("someone-else".into());
     assert_eq!(relocate(&mut world, &ana, &second).as_deref(), Some("not a city of your realm"));
     let first_name = world.cities.iter().find(|c| c.id == first).unwrap().name.clone();
-    assert_eq!(relocate(&mut world, &ana, &first), Some(format!("Ana already lives in {first_name}")));
+    assert_eq!(
+        relocate(&mut world, &ana, &first),
+        Some(format!("Ana already lives in {first_name}"))
+    );
     let o = RelocateRequest { resident_id: Some(ana.clone()), city_id: None, group: None };
     assert_eq!(validate_relocate(&world, &ME, &o).as_deref(), Some("not a city of your realm"));
 }
@@ -200,7 +249,10 @@ fn counts_the_residents_already_relocating_there_against_its_free_housing() {
     live_mut(&mut world, &others[0]).order = None;
     let realm = world.realms[0].id.clone();
     let pair = [live(&world, &others[0]).unwrap(), live(&world, &ana).unwrap()];
-    assert_eq!(relocate_problem(&world, &realm, &pair, Some(&second)).as_deref(), Some("free housing for 1 only"));
+    assert_eq!(
+        relocate_problem(&world, &realm, &pair, Some(&second)).as_deref(),
+        Some("free housing for 1 only")
+    );
 }
 
 #[test]
@@ -257,7 +309,10 @@ fn ends_a_pair_on_both_partners() {
     relocate(&mut world, &ana, &second);
     until_done(&mut world, &ana);
     assert_eq!(live(&world, &ana).unwrap().city_id.as_deref(), Some(second.as_str()));
-    assert_eq!((live(&world, &ana).unwrap().pair.clone(), live(&world, &partner).unwrap().pair.clone()), (None, None));
+    assert_eq!(
+        (live(&world, &ana).unwrap().pair.clone(), live(&world, &partner).unwrap().pair.clone()),
+        (None, None)
+    );
 }
 
 #[test]
@@ -284,7 +339,11 @@ fn relocate_group(world: &mut WorldState, group: &[String], city: &str) -> Vec<O
     group
         .iter()
         .map(|id| {
-            let o = RelocateRequest { resident_id: Some(id.clone()), city_id: Some(city.into()), group: Some(Some(group.to_vec())) };
+            let o = RelocateRequest {
+                resident_id: Some(id.clone()),
+                city_id: Some(city.into()),
+                group: Some(Some(group.to_vec())),
+            };
             validate_relocate(world, &ME, &o)
         })
         .collect()
@@ -292,7 +351,11 @@ fn relocate_group(world: &mut WorldState, group: &[String], city: &str) -> Vec<O
 
 fn apply_group(world: &mut WorldState, group: &[String], city: &str) {
     for id in group {
-        let o = RelocateRequest { resident_id: Some(id.clone()), city_id: Some(city.into()), group: Some(Some(group.to_vec())) };
+        let o = RelocateRequest {
+            resident_id: Some(id.clone()),
+            city_id: Some(city.into()),
+            group: Some(Some(group.to_vec())),
+        };
         apply_relocate(world, &o, Some(city_terrain()));
     }
 }
@@ -319,8 +382,13 @@ fn turns_all_of_them_down_when_the_city_has_no_room_for_the_whole_group() {
         add_resident(&mut world, &format!("settler{i}"), Some(&second), hall.0, hall.1);
     }
     assert_eq!(relocate_room(&world, &second, &Default::default()), 2.0);
-    assert_eq!(relocate_group(&mut world, &group, &second), vec![Some("free housing for 2 only".to_string()); 3]);
-    assert!(group.iter().all(|id| !matches!(live(&world, id).unwrap().order, Some(ResidentOrder::Relocate(_)))));
+    assert_eq!(
+        relocate_group(&mut world, &group, &second),
+        vec![Some("free housing for 2 only".to_string()); 3]
+    );
+    assert!(group
+        .iter()
+        .all(|id| !matches!(live(&world, id).unwrap().order, Some(ResidentOrder::Relocate(_)))));
 }
 
 #[test]
@@ -333,7 +401,10 @@ fn turns_all_of_them_down_when_one_of_them_carries_a_child_or_lives_there() {
     live_mut(&mut world, &group[1]).carrying = None;
     live_mut(&mut world, &group[2]).city_id = Some(second.clone());
     let name = live(&world, &group[2]).unwrap().name.clone();
-    assert_eq!(relocate_group(&mut world, &group, &second), vec![Some(format!("{name} already lives in Redbank")); 3]);
+    assert_eq!(
+        relocate_group(&mut world, &group, &second),
+        vec![Some(format!("{name} already lives in Redbank")); 3]
+    );
 }
 
 #[test]
@@ -342,7 +413,11 @@ fn turns_it_down_for_a_group_naming_someone_the_sender_may_not_order_or_not_nami
     let hall = hall_of(&world, &first);
     add_resident(&mut world, "bo", Some(&first), hall.0, hall.1);
     let send = |world: &WorldState, group: Option<Vec<String>>| {
-        let o = RelocateRequest { resident_id: Some(ana.clone()), city_id: Some(second.clone()), group: Some(group) };
+        let o = RelocateRequest {
+            resident_id: Some(ana.clone()),
+            city_id: Some(second.clone()),
+            group: Some(group),
+        };
         validate_relocate(world, &ME, &o)
     };
     let owner = live(&world, &ana).unwrap().owner.clone();
@@ -369,27 +444,41 @@ fn moves_them_in_while_room_lasts_on_arrival_the_rest_keep_their_city_with_a_log
         add_resident(&mut world, &format!("settler{i}"), Some(&second), hall.0, hall.1);
     }
     step_relocating(&mut world, city_terrain());
-    let cities: Vec<Option<String>> = group.iter().map(|id| live(&world, id).unwrap().city_id.clone()).collect();
+    let cities: Vec<Option<String>> =
+        group.iter().map(|id| live(&world, id).unwrap().city_id.clone()).collect();
     assert_eq!(cities, vec![Some(second.clone()), Some(first.clone()), Some(first.clone())]);
     assert!(group.iter().all(|id| live(&world, id).unwrap().order.is_none()));
     let failed: Vec<(String, Option<String>, String)> = world
         .events
         .iter()
         .filter_map(|e| match &e.what {
-            RealmEventWhat::RelocateFailed { name, city, reason, .. } => Some((name.clone(), city.clone(), reason.clone())),
+            RealmEventWhat::RelocateFailed { name, city, reason, .. } => {
+                Some((name.clone(), city.clone(), reason.clone()))
+            }
             _ => None,
         })
         .collect();
     let expected: Vec<_> = group[1..]
         .iter()
-        .map(|id| (live(&world, id).unwrap().name.clone(), Some("Redbank".to_string()), "no free housing".to_string()))
+        .map(|id| {
+            (
+                live(&world, id).unwrap().name.clone(),
+                Some("Redbank".to_string()),
+                "no free housing".to_string(),
+            )
+        })
         .collect();
     assert_eq!(failed, expected);
     assert_eq!(free_housing(&world, &second), 0.0);
 }
 
 fn failed(world: &WorldState) -> Vec<&RealmEventWhat> {
-    world.events.iter().map(|e| &e.what).filter(|w| matches!(w, RealmEventWhat::RelocateFailed { .. })).collect()
+    world
+        .events
+        .iter()
+        .map(|e| &e.what)
+        .filter(|w| matches!(w, RealmEventWhat::RelocateFailed { .. }))
+        .collect()
 }
 
 #[test]
@@ -404,8 +493,10 @@ fn stops_when_the_free_housing_is_gone_on_arrival_keeping_their_old_city() {
     until_done(&mut world, &ana);
     assert_eq!(live(&world, &ana).unwrap().city_id.as_deref(), Some(first.as_str()));
     assert_eq!(live(&world, &ana).unwrap().order, None);
-    assert!(matches!(failed(&world).as_slice(), [RealmEventWhat::RelocateFailed { name, city: Some(c), city_id, reason, .. }]
-        if name == "Ana" && c == "Redbank" && *city_id == second && reason == "no free housing"));
+    assert!(
+        matches!(failed(&world).as_slice(), [RealmEventWhat::RelocateFailed { name, city: Some(c), city_id, reason, .. }]
+        if name == "Ana" && c == "Redbank" && *city_id == second && reason == "no free housing")
+    );
 }
 
 #[test]
@@ -420,8 +511,10 @@ fn stops_when_the_city_changed_hands_on_the_way() {
     world.cities.iter_mut().find(|c| c.id == second).unwrap().realm_id = Some("realm-other".into());
     until_done(&mut world, &ana);
     assert_eq!(live(&world, &ana).unwrap().city_id.as_deref(), Some(first.as_str()));
-    assert!(matches!(failed(&world).as_slice(), [RealmEventWhat::RelocateFailed { name, city: Some(c), reason, .. }]
-        if name == "Ana" && c == "Redbank" && reason == "it is no longer your realm’s"));
+    assert!(
+        matches!(failed(&world).as_slice(), [RealmEventWhat::RelocateFailed { name, city: Some(c), reason, .. }]
+        if name == "Ana" && c == "Redbank" && reason == "it is no longer your realm’s")
+    );
 }
 
 #[test]
@@ -431,8 +524,10 @@ fn stops_when_the_city_is_gone() {
     dissolve_city(&mut world, &second);
     step_relocating(&mut world, city_terrain());
     assert_eq!(live(&world, &ana).unwrap().city_id.as_deref(), Some(first.as_str()));
-    assert!(matches!(failed(&world).as_slice(), [RealmEventWhat::RelocateFailed { name, city: None, reason, .. }]
-        if name == "Ana" && reason == "the city is gone"));
+    assert!(
+        matches!(failed(&world).as_slice(), [RealmEventWhat::RelocateFailed { name, city: None, reason, .. }]
+        if name == "Ana" && reason == "the city is gone")
+    );
 }
 
 // `relocating invariants` (`residentsInCities`, `npcCityResidentsUnowned`,

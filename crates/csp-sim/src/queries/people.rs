@@ -283,3 +283,55 @@ pub fn first_day_line_of(kind: &str, has_resident: bool) -> Option<&'static str>
     }
     has_resident.then_some("giveOrder")
 }
+
+#[cfg(test)]
+mod tests {
+    //! Shared `first-day.test.ts` and `firstDayLineOf` of the server's (the account rows are the
+    //! shell's: Epic 87).
+    use super::*;
+
+    fn fresh() -> FirstDay {
+        FirstDay { done: vec![], dismissed: false }
+    }
+
+    #[test]
+    fn shows_for_a_new_player_with_nothing_ticked() {
+        assert!(first_day_shown(&fresh()));
+    }
+
+    #[test]
+    fn ticks_each_line_once_kept_in_the_cards_order_whatever_order_they_were_done_in() {
+        let card = tick_first_day(&tick_first_day(&fresh(), "openWiki"), "claimHorses");
+        assert_eq!(card.done, vec!["claimHorses", "openWiki"]);
+        assert_eq!(tick_first_day(&card, "openWiki"), card);
+    }
+
+    #[test]
+    fn goes_for_good_once_every_line_is_ticked() {
+        let card = FIRST_DAY_LINES.iter().fold(fresh(), |c, l| tick_first_day(&c, l));
+        assert_eq!(card.done, FIRST_DAY_LINES.to_vec());
+        assert!(!first_day_shown(&card));
+    }
+
+    #[test]
+    fn goes_for_good_once_dismissed_however_few_lines_are_ticked() {
+        assert!(!first_day_shown(&FirstDay { done: vec!["claimHorses".into()], dismissed: true }));
+    }
+
+    #[test]
+    fn lets_the_client_report_only_picking_a_resident_and_opening_the_wiki() {
+        let client: Vec<&str> =
+            FIRST_DAY_LINES.iter().copied().filter(|l| is_client_first_day_line(l)).collect();
+        assert_eq!(client, vec!["pickResident", "openWiki"]);
+        assert!(!is_client_first_day_line("claimHorses"));
+        assert!(!is_client_first_day_line("constructor"));
+        assert!(is_first_day_line("giveOrder"));
+    }
+
+    #[test]
+    fn knows_which_line_an_accepted_order_ticks() {
+        assert_eq!(first_day_line_of("claimHorses", false), Some("claimHorses"));
+        assert_eq!(first_day_line_of("walkTo", true), Some("giveOrder"));
+        assert_eq!(first_day_line_of("armyStop", false), None);
+    }
+}

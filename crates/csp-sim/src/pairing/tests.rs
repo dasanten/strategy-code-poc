@@ -6,7 +6,8 @@
 use csp_shared::balance::{CARRYING_TICKS, CHILD_STAT_SPREAD, HOUSING_ROOM, PAIRING_WAIT_TICKS};
 use csp_shared::time::{TICKS_PER_GAME_DAY, TICKS_PER_GAME_YEAR};
 use csp_shared::world::{
-    BuildingKind, ConstructionSite, DeathCause, Good, RealmEventWhat, ResidentOrder, Stat, WorldState,
+    BuildingKind, ConstructionSite, DeathCause, Good, RealmEventWhat, ResidentOrder, Stat,
+    WorldState,
 };
 
 use super::*;
@@ -73,7 +74,14 @@ fn add_house(world: &mut WorldState) {
         if !Ground::new(world, terrain, &[]).fits(BuildingKind::House, x, y, &|_, _| true) {
             continue;
         }
-        building(world, &format!("h{x},{y}"), BuildingKind::House, Some(&city), f64::from(x), f64::from(y));
+        building(
+            world,
+            &format!("h{x},{y}"),
+            BuildingKind::House,
+            Some(&city),
+            f64::from(x),
+            f64::from(y),
+        );
         return;
     }
     panic!("no free tile in the city");
@@ -92,7 +100,12 @@ fn counts_houses_room_against_the_residents_and_only_finished_houses() {
     assert_eq!(housing_room(&world, &city), houses * room);
     assert_eq!(free_housing(&world, &city), houses * room - world.residents.len() as f64);
     let house = world.buildings.iter_mut().find(|b| b.kind == BuildingKind::House).unwrap();
-    house.site = Some(serde_json::from_value::<ConstructionSite>(serde_json::json!({ "delivered": {}, "work": 0 })).unwrap());
+    house.site = Some(
+        serde_json::from_value::<ConstructionSite>(
+            serde_json::json!({ "delivered": {}, "work": 0 }),
+        )
+        .unwrap(),
+    );
     assert_eq!(housing_room(&world, &city), (houses - 1.0) * room);
 }
 
@@ -123,13 +136,21 @@ fn has_a_surplus_only_with_more_stored_food_than_its_residents_eat_in_the_surplu
 fn pairs_two_adults_of_the_same_city_leaving_what_both_of_them_do_alone() {
     let (mut world, ids) = setup(100_000.0);
     let (a, b) = (&ids[0], &ids[1]);
-    let before = (live(&world, a).unwrap().order.clone(), live(&world, b).unwrap().order.clone(), live(&world, a).unwrap().script.clone());
+    let before = (
+        live(&world, a).unwrap().order.clone(),
+        live(&world, b).unwrap().order.clone(),
+        live(&world, a).unwrap().script.clone(),
+    );
     assert!(matches!(before.0, Some(ResidentOrder::WorkAt(_))));
     assert_eq!(pair_up(&mut world, a, b, &ME), None);
     let since = world.tick as f64;
     assert_eq!(live(&world, a).unwrap().pair, Some(Pair { partner_id: b.clone(), since }));
     assert_eq!(live(&world, b).unwrap().pair, Some(Pair { partner_id: a.clone(), since }));
-    let after = (live(&world, a).unwrap().order.clone(), live(&world, b).unwrap().order.clone(), live(&world, a).unwrap().script.clone());
+    let after = (
+        live(&world, a).unwrap().order.clone(),
+        live(&world, b).unwrap().order.clone(),
+        live(&world, a).unwrap().script.clone(),
+    );
     assert_eq!(after, before);
 }
 
@@ -162,7 +183,10 @@ fn ends_for_the_one_left_when_a_partner_dies_or_pairs_with_someone_else() {
     let (a, b, c, d) = (&ids[0], &ids[1], &ids[2], &ids[3]);
     pair_up(&mut world, a, b, &ME);
     request_births(&mut world);
-    assert_eq!(live(&world, b).unwrap().pair, Some(Pair { partner_id: a.clone(), since: world.tick as f64 }));
+    assert_eq!(
+        live(&world, b).unwrap().pair,
+        Some(Pair { partner_id: a.clone(), since: world.tick as f64 })
+    );
     pair_up(&mut world, c, d, &ME);
     die(&mut world, c);
     // `die` ends the pair of the one left at once.
@@ -177,8 +201,14 @@ fn moves_a_resident_to_a_new_partner_ending_the_old_pair() {
     pair_up(&mut world, a, c, &ME);
     request_births(&mut world);
     assert_eq!(live(&world, b).unwrap().pair, None);
-    assert_eq!(live(&world, a).unwrap().pair.as_ref().map(|p| p.partner_id.as_str()), Some(c.as_str()));
-    assert_eq!(live(&world, c).unwrap().pair.as_ref().map(|p| p.partner_id.as_str()), Some(a.as_str()));
+    assert_eq!(
+        live(&world, a).unwrap().pair.as_ref().map(|p| p.partner_id.as_str()),
+        Some(c.as_str())
+    );
+    assert_eq!(
+        live(&world, c).unwrap().pair.as_ref().map(|p| p.partner_id.as_str()),
+        Some(a.as_str())
+    );
 }
 
 #[test]
@@ -337,7 +367,8 @@ fn makes_a_child_of_the_carriers_city_and_realm_on_their_tile_inheriting_base_st
     let carrier = carrier_of(&world, a, b).unwrap();
     let born = days(&mut world, CARRYING_DAYS);
     let child = live(&world, &born[0]).unwrap();
-    let (ra, rb, c) = (live(&world, a).unwrap(), live(&world, b).unwrap(), live(&world, &carrier).unwrap());
+    let (ra, rb, c) =
+        (live(&world, a).unwrap(), live(&world, b).unwrap(), live(&world, &carrier).unwrap());
     assert_eq!(child.owner, ra.owner);
     assert_eq!(child.city_id.as_deref(), Some(world.cities[0].id.as_str()));
     assert_eq!((child.x, child.y, child.born_at), (c.x, c.y, world.tick as f64));
@@ -368,11 +399,14 @@ fn still_has_the_child_when_the_other_parent_dies_while_it_is_carried() {
     days(&mut world, WAIT_DAYS);
     let carrier = carrier_of(&world, a, b).unwrap();
     let other = if carrier == *a { b.clone() } else { a.clone() };
-    let names = (live(&world, &carrier).unwrap().name.clone(), live(&world, &other).unwrap().name.clone());
+    let names =
+        (live(&world, &carrier).unwrap().name.clone(), live(&world, &other).unwrap().name.clone());
     die(&mut world, &other);
     let born = days(&mut world, CARRYING_DAYS);
     assert_eq!(born.len(), 1);
-    assert!(matches!(&world.events.last().unwrap().what, RealmEventWhat::Born { parents, .. } if *parents == [names.0.clone(), names.1.clone()]));
+    assert!(
+        matches!(&world.events.last().unwrap().what, RealmEventWhat::Born { parents, .. } if *parents == [names.0.clone(), names.1.clone()])
+    );
 }
 
 #[test]
@@ -381,7 +415,12 @@ fn never_makes_a_base_stat_below_1() {
     let (a, b) = (&ids[0], &ids[1]);
     for id in [a, b] {
         let r = live_mut(&mut world, id);
-        for s in [&mut r.stats.strength, &mut r.stats.endurance, &mut r.stats.agility, &mut r.stats.intellect] {
+        for s in [
+            &mut r.stats.strength,
+            &mut r.stats.endurance,
+            &mut r.stats.agility,
+            &mut r.stats.intellect,
+        ] {
             *s = Stat { base: 1.0, trained: 0.0 };
         }
     }
