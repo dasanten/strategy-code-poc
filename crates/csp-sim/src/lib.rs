@@ -27,6 +27,7 @@ pub mod movement_pending;
 mod movement_test_world;
 pub mod names;
 pub mod node_gen;
+pub mod order_kinds;
 pub mod order_sender;
 pub mod orders;
 pub mod passengers;

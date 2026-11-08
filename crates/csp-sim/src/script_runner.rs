@@ -2127,3 +2127,6 @@ pub fn seen_by(world: &WorldState, size: i32, side: &str) -> Arc<Vec<SeenEntity>
     let index = WorldIndex::new(world, size);
     entities_in_sight(world, &index, Some(side), None)
 }
+
+#[cfg(test)]
+mod tests;
