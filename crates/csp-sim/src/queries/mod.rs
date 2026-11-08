@@ -13,6 +13,7 @@ pub mod building;
 pub mod building_info;
 pub mod carriages;
 pub mod city;
+pub mod city_area;
 pub mod combat;
 pub mod crew;
 pub mod driving;
@@ -25,12 +26,14 @@ pub mod names;
 pub mod npc_trade;
 pub mod offers;
 pub mod pace;
+pub mod persuasion;
 pub mod residents;
 pub mod riding;
 pub mod standing;
 pub mod territory;
 pub mod trade_org;
 pub mod trader_trade;
+pub mod walls;
 pub mod warehouse;
 
 /// `Math.round`: halves round up, toward +âˆž (`Math.round(-2.5)` is -2), unlike `f64::round`.

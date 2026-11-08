@@ -6,12 +6,10 @@
 use std::collections::{HashMap, HashSet};
 
 use csp_shared::balance::{REALM_LOG_LENGTH, WALL_ENCLOSES_MAX};
-use csp_shared::terrain::{
-    is_passable_terrain, tile_index, wrap, wrap_delta, wrap_distance, TerrainMap,
-};
+use csp_shared::terrain::{is_passable_terrain, tile_index, wrap, wrap_delta, TerrainMap};
 use csp_shared::world::{
-    Building, BuildingKind, GoodsPlace, HaulStop, OrderEnded, OrderEndedKind, OrderRequest,
-    RealmEvent, RealmEventWhat, Resident, ResidentOrder, WorldState,
+    Building, BuildingKind, GoodsPlace, OrderEnded, OrderEndedKind, OrderRequest, RealmEvent,
+    RealmEventWhat, Resident, ResidentOrder, WorldState,
 };
 
 use crate::queries::alliance::{allied_realms, commander_of, contract_of};
@@ -313,72 +311,22 @@ pub fn climb_landing(
     (x as f64, y as f64)
 }
 
-// ---- T86.7 (`army.ts`, `combat.ts`, `armies.ts`, `stealing.ts`) --------------------------------
+// ---- T86.7 (`army.ts`, `combat.ts`, `armies.ts`): the ported ones, in the shapes movement uses ----
 
-/// Whether two spots are in contact (`inContact`): the same tile or one of the eight around it.
-// TODO(T86.7): `queries::combat::in_contact`.
+pub use crate::armies::waiting_for_army;
+pub use crate::queries::army::{army_driven_to, army_spot};
+
+/// Whether two spots are in contact (`inContact`), on whole tiles.
 pub fn in_contact(size: i32, a: (f64, f64), b: (f64, f64)) -> bool {
-    wrap_delta(a.0 as i32, b.0 as i32, size).abs() <= 1
-        && wrap_delta(a.1 as i32, b.1 as i32, size).abs() <= 1
-}
-
-/// The army a driver's carriage goes after now (`armyDrivenTo`).
-// TODO(T86.7): `queries::army::army_driven_to`.
-pub fn army_driven_to(driver: &Resident) -> Option<&str> {
-    match &driver.order {
-        Some(ResidentOrder::Drive(o)) => o.army.as_deref(),
-        Some(ResidentOrder::Haul(o)) if o.stop == HaulStop::To => o.to_army.as_deref(),
-        _ => None,
-    }
-}
-
-/// Where an army is for a carriage at `from` that goes after it (`armySpot`): the tile of its
-/// member nearest `from`.
-// TODO(T86.7): `queries::army::army_spot`.
-pub fn army_spot(
-    world: &WorldState,
-    army_id: &str,
-    from: (f64, f64),
-    size: i32,
-) -> Option<(f64, f64)> {
-    let members: Vec<&str> = match world.armies.iter().find(|a| a.id == army_id) {
-        Some(a) => a.member_ids.iter().map(String::as_str).collect(),
-        None => world
-            .punishments
-            .iter()
-            .find(|p| p.id == army_id)?
-            .members
-            .iter()
-            .map(|m| m.resident_id.as_str())
-            .collect(),
-    };
-    let mut best: Option<((f64, f64), f64)> = None;
-    for r in &world.residents {
-        if !members.contains(&r.id.as_str()) {
-            continue;
-        }
-        let d = wrap_distance(size, (from.0 as i32, from.1 as i32), (r.x as i32, r.y as i32));
-        if best.is_none_or(|(_, bd)| d < bd) {
-            best = Some(((r.x, r.y), d));
-        }
-    }
-    best.map(|b| b.0)
+    crate::queries::combat::in_contact(size, (a.0 as i32, a.1 as i32), (b.0 as i32, b.1 as i32))
 }
 
 /// Where an attack order's target stands (`attackTarget`): a resident, or a finished wall or gate.
-// TODO(T86.7): `combat::attack_target`.
 pub fn attack_target(world: &WorldState, target_id: &str) -> Option<(f64, f64)> {
-    if let Some(r) = world.residents.iter().find(|x| x.id == target_id) {
-        return Some((r.x, r.y));
+    match crate::combat::attack_target(world, target_id)? {
+        crate::combat::Target::Resident(i) => Some((world.residents[i].x, world.residents[i].y)),
+        crate::combat::Target::Building(i) => Some((world.buildings[i].x, world.buildings[i].y)),
     }
-    let b = world.buildings.iter().find(|x| x.id == target_id)?;
-    is_wall_or_gate(b).then_some((b.x, b.y))
-}
-
-/// The residents keeping together with their army this tick (`waitingForArmy`).
-// TODO(T86.7): `armies::waiting_for_army`. Nobody waits until armies land.
-pub fn waiting_for_army(_world: &WorldState, _holding: &HashSet<String>) -> HashSet<String> {
-    HashSet::new()
 }
 
 /// What stealing takes over (`Taken`).
