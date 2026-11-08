@@ -136,3 +136,7 @@ pub fn workplace_of(r: &Resident) -> Option<String> {
 pub fn task_of(r: &Resident) -> Option<Task> {
     r.script.as_ref().and_then(|s| s.task)
 }
+
+mod run;
+
+pub use run::step_npc_cities;

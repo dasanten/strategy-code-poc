@@ -314,6 +314,21 @@ pub fn is_big_npc_city(world: &WorldState, city: &City) -> bool {
     npc_needs_scale(world, city) > 1.0
 }
 
+/// How many game days an NPC city of `residents` waits full before it founds (`npcFullDays`).
+pub fn npc_full_days(residents: f64) -> f64 {
+    use csp_shared::balance::{NPC_FOUND_VILLAGE_RESIDENTS, NPC_FULL_DAYS, NPC_FULL_DAYS_LEAST, NPC_FULL_RESIDENTS_PER_DAY};
+    let past = (residents - NPC_FOUND_VILLAGE_RESIDENTS).max(0.0);
+    NPC_FULL_DAYS_LEAST.max(NPC_FULL_DAYS - past / NPC_FULL_RESIDENTS_PER_DAY)
+}
+
+/// How many adults a full NPC city of `residents` sends to found a daughter (`npcFoundingPartySize`).
+pub fn npc_founding_party_size(residents: f64) -> f64 {
+    use csp_shared::balance::{NPC_FOUND_PARTY_MOST, NPC_FOUND_RESIDENTS_PER_MEMBER, NPC_FOUND_VILLAGE_RESIDENTS, NPC_VILLAGE};
+    let past = (residents - NPC_FOUND_VILLAGE_RESIDENTS).max(0.0);
+    let more = (past / NPC_FOUND_RESIDENTS_PER_MEMBER).floor();
+    NPC_FOUND_PARTY_MOST.min(NPC_VILLAGE.residents + more)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
