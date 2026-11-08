@@ -39,7 +39,14 @@ use crate::walking::Walking;
 /// a time.
 pub trait WayFinder {
     /// The way a resident of `side` would walk; asked again until it is settled. `key` names it.
-    fn way(&mut self, key: &str, from: Point, to: Point, side: Option<&str>, area: Option<HashSet<usize>>) -> PathResult;
+    fn way(
+        &mut self,
+        key: &str,
+        from: Point,
+        to: Point,
+        side: Option<&str>,
+        area: Option<HashSet<usize>>,
+    ) -> PathResult;
 }
 
 /// The way finder for one call, borrowed again from an optional one (as `tick::reborrow`).
@@ -51,7 +58,14 @@ pub fn reborrow<'s>(ways: &'s mut Option<&mut dyn WayFinder>) -> Option<&'s mut 
 }
 
 impl WayFinder for Walking {
-    fn way(&mut self, key: &str, from: Point, to: Point, side: Option<&str>, area: Option<HashSet<usize>>) -> PathResult {
+    fn way(
+        &mut self,
+        key: &str,
+        from: Point,
+        to: Point,
+        side: Option<&str>,
+        area: Option<HashSet<usize>>,
+    ) -> PathResult {
         Walking::way(self, key, from, to, side, area)
     }
 }
@@ -150,7 +164,8 @@ fn area_tiles(world: &WorldState, city_id: &str, size: i32) -> HashSet<usize> {
 /// Whether a tile lies in the HQ's inner ring round its hall (`inInnerRingAround`).
 fn in_inner_ring_around(hall: &Building, at: (i32, i32), size: i32) -> bool {
     let c = middle_of(placed(hall), size);
-    let d = js_hypot(f64::from(wrap_delta(c.0, at.0, size)), f64::from(wrap_delta(c.1, at.1, size)));
+    let d =
+        js_hypot(f64::from(wrap_delta(c.0, at.0, size)), f64::from(wrap_delta(c.1, at.1, size)));
     d <= TRADE_ORG_HQ.inner_radius + 0.5
 }
 
@@ -160,7 +175,9 @@ fn is_post(world: &WorldState, b: &Building, size: i32) -> bool {
     if b.kind != BuildingKind::Warehouse || b.site.is_some() {
         return false;
     }
-    let Some(owner) = world.cities.iter().find(|c| Some(&c.id) == b.city_id.as_ref()) else { return false };
+    let Some(owner) = world.cities.iter().find(|c| Some(&c.id) == b.city_id.as_ref()) else {
+        return false;
+    };
     let Some(trade_org) = owner.trade_org else { return false };
     let hall = if trade_org == TradeOrgCity::Hq {
         world.buildings.iter().find(|x| x.id == owner.town_hall_id)
@@ -189,8 +206,12 @@ fn posts_in_reach(world: &WorldState, home: &Building, size: i32) -> Vec<RoadOn>
         .filter_map(|b| {
             let at = (b.x as i32, b.y as i32);
             let distance = wrap_distance(size, home_at, at);
-            (distance <= NPC_TRADER_REACH && is_post(world, b, size))
-                .then(|| RoadOn { to: b.id.clone(), at, distance, city: None })
+            (distance <= NPC_TRADER_REACH && is_post(world, b, size)).then(|| RoadOn {
+                to: b.id.clone(),
+                at,
+                distance,
+                city: None,
+            })
         })
         .collect();
     posts.sort_by(|a, b| a.distance.total_cmp(&b.distance));
@@ -207,7 +228,12 @@ fn neighbours(world: &WorldState, city: &City, home: &Building, size: i32) -> Ve
         .filter_map(|o| {
             let hall = world.buildings.iter().find(|b| b.id == o.town_hall_id)?;
             let at = (hall.x as i32, hall.y as i32);
-            Some(RoadOn { to: o.id.clone(), at, distance: wrap_distance(size, home_at, at), city: Some(o.id.clone()) })
+            Some(RoadOn {
+                to: o.id.clone(),
+                at,
+                distance: wrap_distance(size, home_at, at),
+                city: Some(o.id.clone()),
+            })
         })
         .collect();
     out.sort_by(|a, b| a.distance.total_cmp(&b.distance));
@@ -221,7 +247,8 @@ fn places_on(world: &WorldState, city: &City, home: &Building, size: i32) -> Vec
     let mut posts = posts_in_reach(world, home, size).into_iter();
     let mut others = neighbours(world, city, home, size).into_iter();
     let (post, next) = (posts.next(), others.next());
-    let mut further: Vec<RoadOn> = if is_big_npc_city(world, city) { posts.chain(others).collect() } else { Vec::new() };
+    let mut further: Vec<RoadOn> =
+        if is_big_npc_city(world, city) { posts.chain(others).collect() } else { Vec::new() };
     further.sort_by(|a, b| a.distance.total_cmp(&b.distance));
     post.into_iter()
         .chain(next)
@@ -246,9 +273,16 @@ fn leads_on(world: &WorldState, to: &str, size: i32) -> bool {
 
 /// Brings its streets and ways up to date and says whether it has a road to build now
 /// (`planRoads`). The plan is `world.city_plans[city.id]`.
-fn plan_roads(world: &mut WorldState, city: &City, home: &Building, ways: &mut dyn WayFinder, terrain: &TerrainMap) -> bool {
+fn plan_roads(
+    world: &mut WorldState,
+    city: &City,
+    home: &Building,
+    ways: &mut dyn WayFinder,
+    terrain: &TerrainMap,
+) -> bool {
     let size = terrain.size;
-    let gate = wall_rings(world, city, home, size).map(|r| GateAt { dx: r.new_gate.dx, dy: r.new_gate.dy });
+    let gate = wall_rings(world, city, home, size)
+        .map(|r| GateAt { dx: r.new_gate.dx, dy: r.new_gate.dy });
     let roads_now = road_tiles(world, size);
     let streets: Vec<(f64, f64)> = streets_owed(world, city, home, gate, terrain, &roads_now)
         .into_iter()
@@ -258,7 +292,8 @@ fn plan_roads(world: &mut WorldState, city: &City, home: &Building, ways: &mut d
     plan.streets = (!streets.is_empty()).then(|| streets.clone());
     let old_roads = plan.roads.clone().unwrap_or_default();
     let (hx, hy) = (home.x as i32, home.y as i32);
-    let fewest_tiles = |x: i32, y: i32| wrap_delta(hx, x, size).abs().max(wrap_delta(hy, y, size).abs());
+    let fewest_tiles =
+        |x: i32, y: i32| wrap_delta(hx, x, size).abs().max(wrap_delta(hy, y, size).abs());
     let mut settle = |to: &str, at: Point, area: Option<HashSet<usize>>| -> Option<CityRoad> {
         let ends: Vec<(i32, i32)> = match &area {
             Some(a) => a.iter().map(|&t| (t as i32 % size, t as i32 / size)).collect(),
@@ -273,16 +308,22 @@ fn plan_roads(world: &mut WorldState, city: &City, home: &Building, ways: &mut d
             PathResult::Found { path, .. } if path.len() as f64 <= NPC_ROAD_LONGEST => path,
             _ => Vec::new(),
         };
-        Some(CityRoad { to: to.to_string(), tiles: tiles.into_iter().map(|(x, y)| (f64::from(x), f64::from(y))).collect() })
+        Some(CityRoad {
+            to: to.to_string(),
+            tiles: tiles.into_iter().map(|(x, y)| (f64::from(x), f64::from(y))).collect(),
+        })
     };
     let mut places: Vec<&Building> = own_workplaces(world, city)
         .into_iter()
-        .filter(|b| b.site.is_none() && !in_city_area(world, &city.id, b.x as i32, b.y as i32, size))
+        .filter(|b| {
+            b.site.is_none() && !in_city_area(world, &city.id, b.x as i32, b.y as i32, size)
+        })
         .collect();
     let d = |b: &Building| wrap_distance(size, (hx, hy), (b.x as i32, b.y as i32));
     places.sort_by(|a, b| d(a).total_cmp(&d(b)));
     let place_ids: HashSet<String> = places.iter().map(|b| b.id.clone()).collect();
-    let places: Vec<(String, Point)> = places.iter().map(|b| (b.id.clone(), (b.x as i32, b.y as i32))).collect();
+    let places: Vec<(String, Point)> =
+        places.iter().map(|b| (b.id.clone(), (b.x as i32, b.y as i32))).collect();
     let mut roads: Vec<CityRoad> = Vec::new();
     let mut searching = false;
     for (id, at) in places {
@@ -341,12 +382,18 @@ pub fn road_crew(
         return Vec::new();
     }
     let plan = world.city_plans.get(&city.id).expect("a plan");
-    let on_crew = |i: usize| plan.jobs.get(&world.residents[i].id).is_some_and(|j| j.kind == CityJobKind::Road);
+    let on_crew = |i: usize| {
+        plan.jobs.get(&world.residents[i].id).is_some_and(|j| j.kind == CityJobKind::Road)
+    };
     let above = above_kept(world, city, &world.buildings[store]);
     if above.values().any(|n| *n < 0.0) {
         return Vec::new();
     }
-    let in_hand: f64 = unneeded.iter().filter(|&&i| on_crew(i)).map(|&i| tiles_in(&world.residents[i].carried)).sum();
+    let in_hand: f64 = unneeded
+        .iter()
+        .filter(|&&i| on_crew(i))
+        .map(|&i| tiles_in(&world.residents[i].carried))
+        .sum();
     if tiles_in(&above) + in_hand < 1.0 {
         return Vec::new();
     }
@@ -395,15 +442,28 @@ pub fn on_road_work(r: &csp_shared::world::Resident) -> bool {
 /// to build that no other of the crew took; else the walk to the storage, and there a pick-up of
 /// the Food for the walk and as many tiles' materials as fit and it can spare. False with no tile
 /// to go to or nothing to fetch. `crew` are the city's residents on the crew, them too.
-pub fn lay_road(world: &mut WorldState, city: &City, i: usize, crew: &[usize], store: Option<usize>, size: i32) -> bool {
+pub fn lay_road(
+    world: &mut WorldState,
+    city: &City,
+    i: usize,
+    crew: &[usize],
+    store: Option<usize>,
+    size: i32,
+) -> bool {
     let mut taken = HashSet::new();
     for &o in crew {
         if world.residents[o].id == world.residents[i].id {
             continue;
         }
-        let at = world.residents[o].script.as_ref().and_then(|s| s.memory.get("at")).and_then(|v| v.as_object());
+        let at = world.residents[o]
+            .script
+            .as_ref()
+            .and_then(|s| s.memory.get("at"))
+            .and_then(|v| v.as_object());
         if let Some(at) = at {
-            if let (Some(x), Some(y)) = (at.get("x").and_then(|v| v.as_f64()), at.get("y").and_then(|v| v.as_f64())) {
+            if let (Some(x), Some(y)) =
+                (at.get("x").and_then(|v| v.as_f64()), at.get("y").and_then(|v| v.as_f64()))
+            {
                 taken.insert((x as i32, y as i32));
             }
         }
@@ -411,16 +471,24 @@ pub fn lay_road(world: &mut WorldState, city: &City, i: usize, crew: &[usize], s
     let plan = world.city_plans.get(&city.id).expect("a plan");
     let streets = plan.streets.clone().unwrap_or_default();
     let roads = plan.roads.clone().unwrap_or_default();
-    let Some(((x, y), left)) = next_tile(world, &streets, &roads, size, &taken) else { return false };
+    let Some(((x, y), left)) = next_tile(world, &streets, &roads, size, &taken) else {
+        return false;
+    };
     let r = &world.residents[i];
     let holds = holds_batch(Some(&r.carried), &road_materials());
     let store_b = store.map(|s| &world.buildings[s]);
-    let walk = store_b.map_or(0.0, |s| wrap_distance(size, (s.x as i32, s.y as i32), (x, y)) * WALK_TICKS_PER_TILE);
-    let fed = store_b.is_none_or(|s| held_in(s.stock.as_ref(), Good::Food) < 1.0) || carried_food(r) >= road_crew_food(walk);
+    let walk = store_b.map_or(0.0, |s| {
+        wrap_distance(size, (s.x as i32, s.y as i32), (x, y)) * WALK_TICKS_PER_TILE
+    });
+    let fed = store_b.is_none_or(|s| held_in(s.stock.as_ref(), Good::Food) < 1.0)
+        || carried_food(r) >= road_crew_food(walk);
     if holds && fed {
         let r = &mut world.residents[i];
         r.order = None;
-        r.script = Some(default_script(Task::Build, json!({ "building": "road", "at": { "x": x, "y": y } })));
+        r.script = Some(default_script(
+            Task::Build,
+            json!({ "building": "road", "at": { "x": x, "y": y } }),
+        ));
         return true;
     }
     let Some(store) = store_b else { return false };
@@ -442,9 +510,12 @@ pub fn lay_road(world: &mut WorldState, city: &City, i: usize, crew: &[usize], s
     }
     let tick = world.tick as f64;
     let mut room = carry_capacity(r, tick) - stock_weight(&r.carried);
-    let food = held_in(store.stock.as_ref(), Good::Food).min((set_out_food(walk) - carried_food(r)).max(0.0)).min(room.max(0.0));
+    let food = held_in(store.stock.as_ref(), Good::Food)
+        .min((set_out_food(walk) - carried_food(r)).max(0.0))
+        .min(room.max(0.0));
     room -= stock_weight(&Stock::from([(Good::Food, food)]));
-    let tiles = tiles_in(&above).min(left as f64).min((room / stock_weight(&road_materials())).floor());
+    let tiles =
+        tiles_in(&above).min(left as f64).min((room / stock_weight(&road_materials())).floor());
     // Holding a tile's materials already, they can come for the Food alone.
     if tiles < 1.0 && !(holds && food > 0.0) {
         return false;
@@ -470,7 +541,12 @@ pub fn npc_roads_once(world: &WorldState) -> Vec<InvariantViolation> {
             if road.tiles.len() as f64 > NPC_ROAD_LONGEST {
                 out.push(InvariantViolation {
                     invariant: "npc-roads-once".into(),
-                    message: format!("{}'s way to {} is {} tiles long", city.id, road.to, road.tiles.len()),
+                    message: format!(
+                        "{}'s way to {} is {} tiles long",
+                        city.id,
+                        road.to,
+                        road.tiles.len()
+                    ),
                     entity_ids: vec![city.id.clone(), road.to.clone()],
                 });
             }

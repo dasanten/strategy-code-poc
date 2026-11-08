@@ -16,7 +16,7 @@ use csp_shared::balance::{
 use csp_shared::footprint::{covers, footprint_tiles, is_at, Placed, FOOTPRINT};
 use csp_shared::terrain::{wrap, wrap_delta, wrap_distance, TerrainMap};
 use csp_shared::world::{
-    Building, BuildingKind, City, CityJobKind, CityProject, Good, GoodsSpot, Pair, PickUpOrder,
+    Building, BuildingKind, City, CityJobKind, CityProject, Good, GoodsSpot, PickUpOrder,
     ResidentOrder, Stock, Task, TearDownOrder, Tile, TradeOrgCity, WorldState,
 };
 use serde_json::json;
@@ -53,7 +53,11 @@ mod hq {
     }
 
     /// The HQ's next ring or house (`hqProject`). TODO(T86.9).
-    pub fn hq_project(_world: &WorldState, _city: &City, _terrain: &TerrainMap) -> Option<CityProject> {
+    pub fn hq_project(
+        _world: &WorldState,
+        _city: &City,
+        _terrain: &TerrainMap,
+    ) -> Option<CityProject> {
         None
     }
 
@@ -107,7 +111,8 @@ fn build(building: BuildingKind, at: (i32, i32)) -> CityProject {
 /// Whether a city grows at all (`cityGrows`): an NPC city always, the Trade Organization's cities
 /// only while the HQ is too weak (`hqGrows`); trading posts never.
 pub fn city_grows(world: &WorldState, city: &City, adults: &[usize]) -> bool {
-    city.trade_org.is_none() || (city.trade_org == Some(TradeOrgCity::Hq) && hq::hq_grows(world, adults))
+    city.trade_org.is_none()
+        || (city.trade_org == Some(TradeOrgCity::Hq) && hq::hq_grows(world, adults))
 }
 
 /// What a city builds or takes down next (`cityProject`): an NPC city whatever it wants most
@@ -146,9 +151,9 @@ fn trade_org_chain_project(
     } else {
         wall_rings(world, city, home, terrain.size)
     };
-    short_goods(world, city, terrain.size, None)
-        .into_iter()
-        .find_map(|good| chain_project(world, city, home, terrain, rings.as_ref(), good, &mut HashSet::new()))
+    short_goods(world, city, terrain.size, None).into_iter().find_map(|good| {
+        chain_project(world, city, home, terrain, rings.as_ref(), good, &mut HashSet::new())
+    })
 }
 
 /// Food runs short: the city's pairs with no child on the way end (`endPairs`, `CONTEXT.md`:
@@ -163,7 +168,11 @@ pub fn end_pairs(world: &mut WorldState, adults: &[usize]) {
 }
 
 /// Stops a builder who can do no more at their site until materials come (`stopBuildersWhoCantGoOn`).
-pub fn stop_builders_who_cant_go_on(world: &mut WorldState, adults: &[usize], storage: Option<usize>) {
+pub fn stop_builders_who_cant_go_on(
+    world: &mut WorldState,
+    adults: &[usize],
+    storage: Option<usize>,
+) {
     for &i in adults {
         let Some(ResidentOrder::Build(o)) = &world.residents[i].order else { continue };
         let Some(site) = world.buildings.iter().find(|b| Some(&b.id) == o.site_id.as_ref()) else {
@@ -179,20 +188,28 @@ pub fn stop_builders_who_cant_go_on(world: &mut WorldState, adults: &[usize], st
 
 /// Whether a builder can still help a site (`canDoMore`): it needs work, or materials they carry or
 /// the storage holds, or they are fetching some.
-pub fn can_do_more(world: &WorldState, i: usize, site: &Building, storage: Option<&Building>) -> bool {
+pub fn can_do_more(
+    world: &WorldState,
+    i: usize,
+    site: &Building,
+    storage: Option<&Building>,
+) -> bool {
     let r = &world.residents[i];
-    let fetching = r.script.as_ref().and_then(|s| s.memory.get("fetch")).is_some_and(|v| !v.is_null());
+    let fetching =
+        r.script.as_ref().and_then(|s| s.memory.get("fetch")).is_some_and(|v| !v.is_null());
     if work_needed(site) > 0.0 || fetching {
         return true;
     }
     let need = materials_needed(site);
-    pick(Some(&r.carried), &need).is_some() || pick(storage.and_then(|s| s.stock.as_ref()), &need).is_some()
+    pick(Some(&r.carried), &need).is_some()
+        || pick(storage.and_then(|s| s.stock.as_ref()), &need).is_some()
 }
 
 /// Whether a resident is building (by the Build default or not), tearing down or delivering
 /// (`isBuilder`).
 pub fn is_builder(r: &csp_shared::world::Resident) -> bool {
-    let building = r.script.as_ref().is_some_and(|s| s.script_id == 0 && s.task == Some(Task::Build));
+    let building =
+        r.script.as_ref().is_some_and(|s| s.script_id == 0 && s.task == Some(Task::Build));
     building
         || match &r.order {
             Some(ResidentOrder::Build(_)) | Some(ResidentOrder::TearDown(_)) => true,
@@ -216,23 +233,13 @@ fn partner_carrying(world: &WorldState, i: usize) -> bool {
         .is_some_and(|p| p.carrying.as_ref().is_some_and(|c| c.partner_id == r.id))
 }
 
-/// Pairs two residents (`pair.apply` of `pairing.ts`). TODO(T86.8): call the ported pairing.
+/// Pairs two residents, by the pairing order as a Player would (`pair.apply`).
 fn apply_pair(world: &mut WorldState, a: usize, b: usize) {
-    let (ra, rb) = (&world.residents[a], &world.residents[b]);
-    if ra.carrying.is_some() || rb.carrying.is_some() {
-        return;
-    }
-    let paired = |x: &csp_shared::world::Resident, y: &csp_shared::world::Resident| {
-        x.pair.as_ref().is_some_and(|p| p.partner_id == y.id)
-    };
-    let since = if paired(ra, rb) && paired(rb, ra) {
-        ra.pair.as_ref().expect("paired").since
-    } else {
-        world.tick as f64
-    };
-    let (ia, ib) = (ra.id.clone(), rb.id.clone());
-    world.residents[a].pair = Some(Pair { partner_id: ib, since });
-    world.residents[b].pair = Some(Pair { partner_id: ia, since });
+    let (ra, rb) = (world.residents[a].id.clone(), world.residents[b].id.clone());
+    crate::pairing::apply_pair(
+        world,
+        &crate::pairing::PairRequest { resident_id: Some(&ra), partner_id: Some(&rb) },
+    );
 }
 
 /// Pairs unpaired adults two by two (`pairAdults`, `CONTEXT.md`: Pairing) while the city has a
@@ -283,7 +290,9 @@ pub fn take_part(
     }
     let (building, x, y) = match project {
         CityProject::TearDown { building_id } => {
-            let Some(b) = world.buildings.iter().find(|x| &x.id == building_id) else { return false };
+            let Some(b) = world.buildings.iter().find(|x| &x.id == building_id) else {
+                return false;
+            };
             let (bid, at) = (b.id.clone(), (b.x, b.y));
             let here = (r.x as i32, r.y as i32);
             if !is_at(here, placed(b), MAP_SIZE) {
@@ -303,7 +312,8 @@ pub fn take_part(
         world.residents[i].script = Some(default_script(Task::Build, memory));
         true
     };
-    let Some(site) = building_at(world, x as i32, y as i32, MAP_SIZE).filter(|s| s.site.is_some()) else {
+    let Some(site) = building_at(world, x as i32, y as i32, MAP_SIZE).filter(|s| s.site.is_some())
+    else {
         return start_build(world);
     };
     let need = materials_needed(site);
@@ -406,7 +416,9 @@ pub fn npc_builders(world: &WorldState, city: &City) -> f64 {
 pub fn no_storage_yet(world: &WorldState, city: &City) -> bool {
     city.trade_org.is_none()
         && !world.buildings.iter().any(|b| {
-            b.city_id.as_ref() == Some(&city.id) && b.kind == BuildingKind::Storage && b.site.is_none()
+            b.city_id.as_ref() == Some(&city.id)
+                && b.kind == BuildingKind::Storage
+                && b.site.is_none()
         })
 }
 
@@ -554,7 +566,8 @@ fn wanted(
             && (((b.kind == BuildingKind::Farm || b.kind == BuildingKind::Stable)
                 && b.city_id.as_ref() == Some(&city.id))
                 || own.contains(&b.id)
-                || ((b.kind == BuildingKind::House || b.kind == BuildingKind::Storage) && in_area(b))
+                || ((b.kind == BuildingKind::House || b.kind == BuildingKind::Storage)
+                    && in_area(b))
                 || (b.kind == BuildingKind::TrainingGround
                     && city.trade_org.is_none()
                     && is_big_npc_city(world, city)
@@ -574,10 +587,16 @@ fn wanted(
         let first = first_ring();
         let plan = rings.unwrap_or(&first);
         let has = |kind: BuildingKind| {
-            world.buildings.iter().any(|b| b.kind == kind && b.site.is_none() && b.city_id.as_ref() == Some(&city.id))
+            world
+                .buildings
+                .iter()
+                .any(|b| b.kind == kind && b.site.is_none() && b.city_id.as_ref() == Some(&city.id))
         };
         if !has(BuildingKind::Storage) {
-            if let Some(p) = at(BuildingKind::Storage, house_tile(world, city, home, terrain, Some(plan), BuildingKind::Storage)) {
+            if let Some(p) = at(
+                BuildingKind::Storage,
+                house_tile(world, city, home, terrain, Some(plan), BuildingKind::Storage),
+            ) {
                 return Some(p);
             }
         }
@@ -587,7 +606,10 @@ fn wanted(
             }
         }
         if !has(BuildingKind::House) {
-            if let Some(p) = at(BuildingKind::House, house_tile(world, city, home, terrain, Some(plan), BuildingKind::House)) {
+            if let Some(p) = at(
+                BuildingKind::House,
+                house_tile(world, city, home, terrain, Some(plan), BuildingKind::House),
+            ) {
                 return Some(p);
             }
         }
@@ -604,18 +626,25 @@ fn wanted(
         }
     }
     if has_food_surplus(world, city) && free_housing(world, &city.id) <= 0.0 {
-        if let Some(p) = at(BuildingKind::House, house_tile(world, city, home, terrain, rings, BuildingKind::House)) {
+        if let Some(p) = at(
+            BuildingKind::House,
+            house_tile(world, city, home, terrain, rings, BuildingKind::House),
+        ) {
             return Some(p);
         }
     }
     if city.trade_org.is_none() {
         if wants_stable(world, city, size) {
-            if let Some(p) = at(BuildingKind::Stable, stable_tile(world, city, home, terrain, rings)) {
+            if let Some(p) =
+                at(BuildingKind::Stable, stable_tile(world, city, home, terrain, rings))
+            {
                 return Some(p);
             }
         }
         for good in short_goods(world, city, size, None) {
-            if let Some(chain) = chain_project(world, city, home, terrain, rings, good, &mut HashSet::new()) {
+            if let Some(chain) =
+                chain_project(world, city, home, terrain, rings, good, &mut HashSet::new())
+            {
                 return Some(chain);
             }
         }
@@ -660,7 +689,11 @@ fn crew_held(world: &WorldState, city: &City, place: &Building) -> bool {
         return true;
     }
     let jobs = world.city_plans.get(&city.id).map(|p| &p.jobs);
-    let n = jobs.into_iter().flatten().filter(|(_, j)| j.building_id.as_ref() == Some(&place.id)).count();
+    let n = jobs
+        .into_iter()
+        .flatten()
+        .filter(|(_, j)| j.building_id.as_ref() == Some(&place.id))
+        .count();
     n as f64 >= max_workers(place.kind).unwrap_or(0.0)
 }
 
@@ -672,7 +705,9 @@ pub fn farms_full(world: &WorldState, city: &City) -> bool {
     let farms: Vec<&Building> = world
         .buildings
         .iter()
-        .filter(|b| b.kind == BuildingKind::Farm && b.city_id.as_ref() == Some(&city.id) && b.site.is_none())
+        .filter(|b| {
+            b.kind == BuildingKind::Farm && b.city_id.as_ref() == Some(&city.id) && b.site.is_none()
+        })
         .collect();
     !farms.is_empty() && farms.iter().all(|b| crew_held(world, city, b))
 }
@@ -687,7 +722,8 @@ fn another_workplace(
     rings: Option<&Rings>,
 ) -> Option<CityProject> {
     let idle = hands_idle(world, city);
-    let own: Vec<&Building> = own_workplaces(world, city).into_iter().filter(|b| b.site.is_none()).collect();
+    let own: Vec<&Building> =
+        own_workplaces(world, city).into_iter().filter(|b| b.site.is_none()).collect();
     let stock = chain_store(world, city).and_then(|s| s.stock.as_ref());
     fn full_good(
         world: &WorldState,
@@ -705,11 +741,14 @@ fn another_workplace(
                 input.iter().filter(|(g, n)| held_in(stock, **g) < **n).map(|(g, _)| *g).collect();
             return lacking.into_iter().find_map(|g| full_good(world, city, own, stock, g, seen));
         }
-        let places: Vec<&&Building> = own.iter().filter(|b| chain_good(world, b) == Some(good)).collect();
+        let places: Vec<&&Building> =
+            own.iter().filter(|b| chain_good(world, b) == Some(good)).collect();
         (!places.is_empty() && places.iter().all(|b| crew_held(world, city, b))).then_some(good)
     }
     for short in short_goods(world, city, terrain.size, None) {
-        let Some(good) = full_good(world, city, &own, stock, short, &mut HashSet::new()) else { continue };
+        let Some(good) = full_good(world, city, &own, stock, short, &mut HashSet::new()) else {
+            continue;
+        };
         if good != Good::Food && !idle {
             continue;
         }
@@ -735,7 +774,12 @@ fn another_workplace(
 /// A big NPC city's second workplace (`secondWorkplace`): with nothing short, of a good dug or cut
 /// whose one workplace has its crew full and whose cap isn't reached, the good furthest below its
 /// cap first, on the nearest node of it the city knows of.
-fn second_workplace(world: &WorldState, city: &City, home: &Building, terrain: &TerrainMap) -> Option<CityProject> {
+fn second_workplace(
+    world: &WorldState,
+    city: &City,
+    home: &Building,
+    terrain: &TerrainMap,
+) -> Option<CityProject> {
     if city.trade_org.is_some() || !is_big_npc_city(world, city) {
         return None;
     }
@@ -785,7 +829,9 @@ fn crew_full(world: &WorldState, place: &Building) -> bool {
             by_script
                 || match &r.order {
                     Some(ResidentOrder::WorkAt(o)) => o.building_id == place.id,
-                    Some(ResidentOrder::WalkTo(o)) => o.target.x == place.x && o.target.y == place.y,
+                    Some(ResidentOrder::WalkTo(o)) => {
+                        o.target.x == place.x && o.target.y == place.y
+                    }
                     _ => false,
                 }
         })
@@ -811,7 +857,10 @@ fn first_wall(
     if city.trade_org.is_some() || rings.is_some_and(|r| r.gate.is_some() || r.expanding) {
         return Vec::new();
     }
-    if rings.is_none() && held(&npc_city_stock(world, city), Good::Wood) < held(&npc_reserve(world, city), Good::Wood) {
+    if rings.is_none()
+        && held(&npc_city_stock(world, city), Good::Wood)
+            < held(&npc_reserve(world, city), Good::Wood)
+    {
         return Vec::new();
     }
     // Its gate south of the home on this ring, not where a wall moving out would put it.
@@ -820,13 +869,18 @@ fn first_wall(
         None => first_ring(),
     };
     let tiles = new_wall(world, home, terrain, &ring);
-    let (walls, gates): (Vec<_>, Vec<_>) = tiles.into_iter().partition(|t| t.kind == BuildingKind::Wall);
+    let (walls, gates): (Vec<_>, Vec<_>) =
+        tiles.into_iter().partition(|t| t.kind == BuildingKind::Wall);
     walls.into_iter().chain(gates.into_iter().filter(|t| t.kind == BuildingKind::Gate)).collect()
 }
 
 /// Whether an NPC city wants a stable (`wantsStable`).
 fn wants_stable(world: &WorldState, city: &City, size: i32) -> bool {
-    if world.buildings.iter().any(|b| b.kind == BuildingKind::Stable && b.city_id.as_ref() == Some(&city.id)) {
+    if world
+        .buildings
+        .iter()
+        .any(|b| b.kind == BuildingKind::Stable && b.city_id.as_ref() == Some(&city.id))
+    {
         return false;
     }
     if world.horses.iter().any(|h| h.city_id.as_ref() == Some(&city.id) && h.health > 0.0) {
@@ -850,9 +904,11 @@ pub fn stable_tile(
     rings: Option<&Rings>,
 ) -> Option<(i32, i32)> {
     let size = terrain.size;
-    let horses: Vec<_> = world.horses.iter().filter(|h| owns_horse(HorseOwner::City(&city.id), h)).collect();
+    let horses: Vec<_> =
+        world.horses.iter().filter(|h| owns_horse(HorseOwner::City(&city.id), h)).collect();
     if let Some(first) = horses.first() {
-        let area: HashSet<(i32, i32)> = city_area_tiles(world, &city.id, size).into_iter().collect();
+        let area: HashSet<(i32, i32)> =
+            city_area_tiles(world, &city.id, size).into_iter().collect();
         let ground = Ground::new(world, terrain, []);
         let side = FOOTPRINT.get("stable").expect("a footprint");
         let middle = side / 2;
@@ -863,12 +919,15 @@ pub fn stable_tile(
         let over: Vec<(i32, i32)> = corners
             .into_iter()
             .filter(|&(x, y)| {
-                horses.iter().all(|h| covers(at_kind(BuildingKind::Stable, x, y), h.x as i32, h.y as i32, size))
+                horses.iter().all(|h| {
+                    covers(at_kind(BuildingKind::Stable, x, y), h.x as i32, h.y as i32, size)
+                })
             })
             .collect();
         let lanes = layout_plan(world, city, home, rings.map(Rings::gate_at), size);
         let in_area = |tx: i32, ty: i32| area.contains(&(tx, ty));
-        let off_street = |tx: i32, ty: i32| in_area(tx, ty) && !lanes.as_ref().is_some_and(|l| l.street(tx, ty));
+        let off_street =
+            |tx: i32, ty: i32| in_area(tx, ty) && !lanes.as_ref().is_some_and(|l| l.street(tx, ty));
         let allowed: [&dyn Fn(i32, i32) -> bool; 2] = [&off_street, &in_area];
         for allowed in allowed {
             for &(x, y) in &over {
@@ -881,31 +940,25 @@ pub fn stable_tile(
     house_tile(world, city, home, terrain, rings, BuildingKind::Stable)
 }
 
-/// The tiles residents, horses, carriages and piles stand on (`residentTiles` of
-/// `starting-city.ts`). TODO(T86.8): call the ported starting city.
-pub fn resident_tiles(world: &WorldState) -> Vec<(i32, i32)> {
-    let at = |x: f64, y: f64| (x as i32, y as i32);
-    world
-        .residents
-        .iter()
-        .map(|r| at(r.x, r.y))
-        .chain(world.horses.iter().map(|h| at(h.x, h.y)))
-        .chain(world.carriages.iter().map(|k| at(k.x, k.y)))
-        .chain(world.piles.iter().map(|p| at(p.x, p.y)))
-        .collect()
-}
+pub use crate::starting_city::resident_tiles;
 
 /// Where an NPC city's first horses stand while it has no stable (`farStableSpot`), by the
 /// north-west tile of a stable's footprint: wholly on free ground of its area, off its streets,
 /// inside its wall and as far from its home as that goes.
-pub fn far_stable_spot(world: &WorldState, city: &City, home: &Building, terrain: &TerrainMap) -> Option<(i32, i32)> {
+pub fn far_stable_spot(
+    world: &WorldState,
+    city: &City,
+    home: &Building,
+    terrain: &TerrainMap,
+) -> Option<(i32, i32)> {
     let size = terrain.size;
     let area_list = city_area_tiles(world, &city.id, size);
     let area: HashSet<(i32, i32)> = area_list.iter().copied().collect();
     let ground = Ground::new(world, terrain, resident_tiles(world));
     let rings = wall_rings(world, city, home, size);
     let lanes = layout_plan(world, city, home, rings.as_ref().map(Rings::gate_at), size);
-    let in_area = |x: i32, y: i32| area.contains(&(x, y)) && !lanes.as_ref().is_some_and(|l| l.street(x, y));
+    let in_area =
+        |x: i32, y: i32| area.contains(&(x, y)) && !lanes.as_ref().is_some_and(|l| l.street(x, y));
     let mut free: Vec<(i32, i32, i32, i32)> = area_list
         .iter()
         .filter(|&&(x, y)| ground.fits(BuildingKind::Stable, x, y, Some(&in_area)))
@@ -924,7 +977,9 @@ fn farmers_dont_fit(world: &WorldState, city: &City) -> bool {
     let farms = world
         .buildings
         .iter()
-        .filter(|b| b.kind == BuildingKind::Farm && b.city_id.as_ref() == Some(&city.id) && b.site.is_none())
+        .filter(|b| {
+            b.kind == BuildingKind::Farm && b.city_id.as_ref() == Some(&city.id) && b.site.is_none()
+        })
         .count();
     if farms == 0 {
         return false;
@@ -962,12 +1017,14 @@ pub fn wall_rings(world: &WorldState, city: &City, home: &Building, size: i32) -
         return None;
     }
     let is_wall = |b: &Building| b.kind == BuildingKind::Wall || b.kind == BuildingKind::Gate;
-    let begun = world.buildings.iter().any(|b| is_wall(b) && b.site.is_some() && ring_of(off(b)) == target);
+    let begun =
+        world.buildings.iter().any(|b| is_wall(b) && b.site.is_some() && ring_of(off(b)) == target);
     let outside = world.buildings.iter().any(|b| {
         b.kind == BuildingKind::House
             && ring_of(off(b)) > inner
             && (b.city_id.as_ref() == Some(&city.id)
-                || (b.site.is_some() && in_city_area(world, &city.id, b.x as i32, b.y as i32, size)))
+                || (b.site.is_some()
+                    && in_city_area(world, &city.id, b.x as i32, b.y as i32, size)))
     });
     let gate = walls.iter().find(|b| b.kind == BuildingKind::Gate && ring_of(off(b)) == inner);
     let new_gate = match gate.map(|g| off(g)) {
@@ -998,7 +1055,12 @@ pub struct WallTileState {
 
 /// The tiles of the city's new wall (`newWall`), the gate first and then on round the ring from
 /// it: each either finished, begun, or free for it. Tiles that can take no wall are left out.
-pub fn new_wall(world: &WorldState, home: &Building, terrain: &TerrainMap, rings: &Rings) -> Vec<WallTileState> {
+pub fn new_wall(
+    world: &WorldState,
+    home: &Building,
+    terrain: &TerrainMap,
+    rings: &Rings,
+) -> Vec<WallTileState> {
     let size = terrain.size;
     let d = rings.outer;
     let (hx, hy) = (home.x as i32, home.y as i32);
@@ -1070,7 +1132,9 @@ fn old_wall_to_tear_down(
             b.city_id.as_ref() == Some(&city.id)
                 && (b.kind == BuildingKind::Wall || b.kind == BuildingKind::Gate)
                 && b.site.is_none()
-                && wrap_delta(hx, b.x as i32, size).abs().max(wrap_delta(hy, b.y as i32, size).abs())
+                && wrap_delta(hx, b.x as i32, size)
+                    .abs()
+                    .max(wrap_delta(hy, b.y as i32, size).abs())
                     == rings.inner
         })
         .collect();
@@ -1112,7 +1176,11 @@ fn old_wall_to_tear_down(
     // Stretches cut off from the gate go first; then the farthest; the gate last.
     let far = |i: usize| dist[i].map_or(f64::INFINITY, f64::from);
     let mut order: Vec<usize> = (0..old.len()).collect();
-    order.sort_by(|&a, &b| far(b).total_cmp(&far(a)).then_with(|| crate::queries::npc_trade::locale_compare(&old[a].id, &old[b].id)));
+    order.sort_by(|&a, &b| {
+        far(b)
+            .total_cmp(&far(a))
+            .then_with(|| crate::queries::npc_trade::locale_compare(&old[a].id, &old[b].id))
+    });
     order.first().map(|&i| old[i].id.clone())
 }
 
@@ -1144,18 +1212,23 @@ pub fn house_tile(
     let area: HashSet<(i32, i32)> = area_list.iter().copied().collect();
     let ground = Ground::new(world, terrain, []);
     let plan = layout_plan(world, city, home, rings.map(Rings::gate_at), size);
-    let allowed = |x: i32, y: i32| area.contains(&(x, y)) && !plan.as_ref().is_some_and(|p| p.street(x, y));
+    let allowed =
+        |x: i32, y: i32| area.contains(&(x, y)) && !plan.as_ref().is_some_and(|p| p.street(x, y));
     let among = |spot: Option<&dyn Fn(i32, i32) -> bool>| -> Option<(i32, i32)> {
         let mut free: Vec<(i32, i32, i32, i32, i32)> = area_list
             .iter()
-            .filter(|&&(x, y)| spot.is_none_or(|s| s(x, y)) && ground.fits(kind, x, y, Some(&allowed)))
+            .filter(|&&(x, y)| {
+                spot.is_none_or(|s| s(x, y)) && ground.fits(kind, x, y, Some(&allowed))
+            })
             .map(|&(x, y)| {
                 let (near, far) = rings_of(home, at_kind(kind, x, y), size);
                 let rank = plan.as_ref().and_then(|p| p.rank(kind, x, y)).unwrap_or(0);
                 (x, y, near, far, rank)
             })
             .collect();
-        free.sort_by(|a, b| a.4.cmp(&b.4).then(a.2.cmp(&b.2)).then(a.1.cmp(&b.1)).then(a.0.cmp(&b.0)));
+        free.sort_by(|a, b| {
+            a.4.cmp(&b.4).then(a.2.cmp(&b.2)).then(a.1.cmp(&b.1)).then(a.0.cmp(&b.0))
+        });
         let Some(rings) = rings else { return free.first().map(|t| (t.0, t.1)) };
         let inside = free.iter().find(|t| t.3 < rings.outer);
         if inside.is_some() || rings.expanding {
@@ -1175,7 +1248,12 @@ pub fn house_tile(
 /// Where the city lays out its next farm (`farmTile`), by the north-west tile of its footprint:
 /// wholly on free Plains beyond where its next wall would stand, nearest that wall first and then
 /// nearest its gate, up to `NPC_FARM_REACH` further out, off the way out of its gate.
-pub fn farm_tile(world: &WorldState, home: &Building, terrain: &TerrainMap, rings: Option<&Rings>) -> Option<(i32, i32)> {
+pub fn farm_tile(
+    world: &WorldState,
+    home: &Building,
+    terrain: &TerrainMap,
+    rings: Option<&Rings>,
+) -> Option<(i32, i32)> {
     let size = terrain.size;
     let wall = rings.map_or(0, |r| r.outer);
     let gate = rings.map_or(Offset { dx: 0, dy: wall }, |r| r.new_gate);

@@ -48,7 +48,14 @@ fn is_weapon(g: Good) -> bool {
 
 /// A job of trading.
 fn trade_job() -> CityJob {
-    CityJob { kind: CityJobKind::Trade, building_id: None, target_id: None, stable_id: None, ground_id: None, subject: None }
+    CityJob {
+        kind: CityJobKind::Trade,
+        building_id: None,
+        target_id: None,
+        stable_id: None,
+        ground_id: None,
+        subject: None,
+    }
 }
 
 /// How many traders a city has out at once (`tradersWanted`): one for each
@@ -62,7 +69,13 @@ pub fn traders_wanted(world: &WorldState, city: &City) -> usize {
 pub fn traders_out(world: &mut WorldState, city_id: &str) -> HashSet<String> {
     let tick = world.tick as f64;
     let plan = world.city_plans.get_mut(city_id).expect("a plan");
-    let out: Vec<CityTrader> = plan.traders.take().unwrap_or_default().into_iter().filter(|t| tick - t.since <= GIVE_UP_TICKS).collect();
+    let out: Vec<CityTrader> = plan
+        .traders
+        .take()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|t| tick - t.since <= GIVE_UP_TICKS)
+        .collect();
     let ids = out.iter().map(|t| t.resident_id.clone()).collect();
     plan.traders = (!out.is_empty()).then_some(out);
     ids
@@ -95,7 +108,8 @@ fn spoken_for(world: &WorldState, city: &City, adults: &[usize]) -> SpokenFor {
         }
         spoken.brings.extend(t.buys.keys().copied());
         if !fetched && !t.buys.is_empty() {
-            let coins = held(&npc_city_stock(world, city), Good::Coins) - held(&npc_reserve(world, city), Good::Coins);
+            let coins = held(&npc_city_stock(world, city), Good::Coins)
+                - held(&npc_reserve(world, city), Good::Coins);
             let entry = spoken.takes.entry(Good::Coins).or_insert(0.0);
             *entry = entry.max(coins);
         }
@@ -114,14 +128,23 @@ fn spoken_for(world: &WorldState, city: &City, adults: &[usize]) -> SpokenFor {
 /// The traders' part of a planning pass (`sendTraders`): it sends spare hands until it has as many
 /// out as `traders_wanted` or nobody or nothing more to send. A wandering trader standing at the
 /// city comes first.
-pub fn send_traders(world: &mut WorldState, city: &City, adults: &[usize], jobs: &mut Jobs, food_short: bool, size: i32) {
+pub fn send_traders(
+    world: &mut WorldState,
+    city: &City,
+    adults: &[usize],
+    jobs: &mut Jobs,
+    food_short: bool,
+    size: i32,
+) {
     let wanted = traders_wanted(world, city);
     loop {
-        let out = world.city_plans.get(&city.id).and_then(|p| p.traders.as_ref()).map_or(0, Vec::len);
+        let out =
+            world.city_plans.get(&city.id).and_then(|p| p.traders.as_ref()).map_or(0, Vec::len);
         if out >= wanted {
             return;
         }
-        let sent = plan_visit(world, city, adults, jobs, size) || plan_trader(world, city, adults, jobs, food_short, size);
+        let sent = plan_visit(world, city, adults, jobs, size)
+            || plan_trader(world, city, adults, jobs, food_short, size);
         if !sent {
             return;
         }
@@ -130,11 +153,24 @@ pub fn send_traders(world: &mut WorldState, city: &City, adults: &[usize], jobs:
 
 /// Adds a run to the city's plan (`addRun`).
 fn add_run(world: &mut WorldState, city_id: &str, run: CityTrader) {
-    world.city_plans.get_mut(city_id).expect("a plan").traders.get_or_insert_with(Vec::new).push(run);
+    world
+        .city_plans
+        .get_mut(city_id)
+        .expect("a plan")
+        .traders
+        .get_or_insert_with(Vec::new)
+        .push(run);
 }
 
 /// One more trader for a city with room for one (`planTrader`). Returns whether it sent them.
-fn plan_trader(world: &mut WorldState, city: &City, adults: &[usize], jobs: &mut Jobs, food_short: bool, size: i32) -> bool {
+fn plan_trader(
+    world: &mut WorldState,
+    city: &City,
+    adults: &[usize],
+    jobs: &mut Jobs,
+    food_short: bool,
+    size: i32,
+) -> bool {
     if (food_short && world.offers.is_empty()) || armed_outsiders(world, city, size, None) {
         return false;
     }
@@ -162,7 +198,8 @@ fn plan_trader(world: &mut WorldState, city: &City, adults: &[usize], jobs: &mut
         }
         let Some(w) = nearest_warehouse(world, home_at, good, size) else { continue };
         let wb = &world.buildings[w];
-        let units = trader_load(world, r, good, wrap_distance(size, home_at, (wb.x as i32, wb.y as i32)));
+        let units =
+            trader_load(world, r, good, wrap_distance(size, home_at, (wb.x as i32, wb.y as i32)));
         if units < 1.0 || surplus < units {
             continue;
         }
@@ -198,7 +235,8 @@ fn plan_trader(world: &mut WorldState, city: &City, adults: &[usize], jobs: &mut
 /// The spare hand a city sends to trade (`spareHand`), idle ones first, never a soldier.
 fn spare_hand(world: &WorldState, city: &City, adults: &[usize], jobs: &Jobs) -> Option<usize> {
     let kind = |i: usize| jobs.get(&world.residents[i].id).map(|j| j.kind);
-    let farmers: Vec<usize> = adults.iter().copied().filter(|&i| kind(i) == Some(CityJobKind::Farm)).collect();
+    let farmers: Vec<usize> =
+        adults.iter().copied().filter(|&i| kind(i) == Some(CityJobKind::Farm)).collect();
     let wanted = farmers_wanted(world, city) as usize;
     let extra: HashSet<usize> = farmers.into_iter().skip(wanted).collect();
     let rank = |i: usize| -> Option<u8> {
@@ -214,18 +252,31 @@ fn spare_hand(world: &WorldState, city: &City, adults: &[usize], jobs: &Jobs) ->
             _ => extra.contains(&i).then_some(3),
         }
     };
-    let mut spare: Vec<(usize, u8)> = adults.iter().filter_map(|&i| rank(i).map(|k| (i, k))).collect();
+    let mut spare: Vec<(usize, u8)> =
+        adults.iter().filter_map(|&i| rank(i).map(|k| (i, k))).collect();
     spare.sort_by_key(|(_, k)| *k);
     spare.first().map(|(i, _)| *i)
 }
 
 /// An NPC city treats a wandering trader standing at it as its visiting trader (`planVisit`).
 /// Whether it sent someone; their job becomes `trade`.
-fn plan_visit(world: &mut WorldState, city: &City, adults: &[usize], jobs: &mut Jobs, size: i32) -> bool {
-    let Some(visitor) = world.traders.iter().find(|t| trader_standing(world, t).is_some_and(|s| s.city_id == city.id)) else {
+fn plan_visit(
+    world: &mut WorldState,
+    city: &City,
+    adults: &[usize],
+    jobs: &mut Jobs,
+    size: i32,
+) -> bool {
+    let Some(visitor) = world
+        .traders
+        .iter()
+        .find(|t| trader_standing(world, t).is_some_and(|s| s.city_id == city.id))
+    else {
         return false;
     };
-    let Some(carriage) = world.carriages.iter().find(|k| k.id == visitor.carriage_id) else { return false };
+    let Some(carriage) = world.carriages.iter().find(|k| k.id == visitor.carriage_id) else {
+        return false;
+    };
     let crew: HashSet<String> = world
         .caravans
         .iter()
@@ -239,7 +290,9 @@ fn plan_visit(world: &mut WorldState, city: &City, adults: &[usize], jobs: &mut 
     let Some(r) = spare_hand(world, city, adults, jobs) else { return false };
     let spoken = spoken_for(world, city, adults);
     let project = world.city_plans.get(&city.id).and_then(|p| p.project.clone());
-    let Some((sells, buys)) = visit_deal(world, city, project.as_ref(), r, visitor, carriage, &spoken, size) else {
+    let Some((sells, buys)) =
+        visit_deal(world, city, project.as_ref(), r, visitor, carriage, &spoken, size)
+    else {
         return false;
     };
     let run = CityTrader {
@@ -259,18 +312,29 @@ fn plan_visit(world: &mut WorldState, city: &City, adults: &[usize], jobs: &mut 
 
 /// Looks for a Player's offer for the city's trader to take (`planOfferRun`), the good it is
 /// shortest of first, then the nearest, and sends them if one suits. Returns whether it sent them.
-fn plan_offer_run(world: &mut WorldState, city: &City, r: usize, spoken: &SpokenFor, food_only: bool, size: i32) -> bool {
+fn plan_offer_run(
+    world: &mut WorldState,
+    city: &City,
+    r: usize,
+    spoken: &SpokenFor,
+    food_only: bool,
+    size: i32,
+) -> bool {
     if world.offers.is_empty() {
         return false;
     }
     let Some(storage) = npc_storages(world, city).into_iter().next() else { return false };
     let project = world.city_plans.get(&city.id).and_then(|p| p.project.clone());
-    let order: Vec<Good> = reserve_lacks(world, city, project.as_ref()).into_iter().map(|s| s.good).collect();
+    let order: Vec<Good> =
+        reserve_lacks(world, city, project.as_ref()).into_iter().map(|s| s.good).collect();
     let storage_at = (storage.x as i32, storage.y as i32);
     let mut best: Option<(&Offer, f64, usize, f64)> = None;
     for offer in &world.offers {
         // A Direct offer is for its named realm alone.
-        if offer.direct.is_some() || (food_only && offer.gives != Good::Food) || spoken.brings.contains(&offer.gives) {
+        if offer.direct.is_some()
+            || (food_only && offer.gives != Good::Food)
+            || spoken.brings.contains(&offer.gives)
+        {
             continue;
         }
         let Some(place) = order.iter().position(|g| *g == offer.gives) else { continue };
@@ -336,7 +400,8 @@ fn visit_deal(
         if best_fresh && !fresh {
             continue;
         }
-        let surplus = (held(&stock, good) - held(&reserve, good) - held(&spoken.takes, good)).floor();
+        let surplus =
+            (held(&stock, good) - held(&reserve, good) - held(&spoken.takes, good)).floor();
         if surplus < 1.0 {
             continue;
         }
@@ -352,7 +417,8 @@ fn visit_deal(
         sells.clear();
         sells.insert(good, q.units);
     }
-    let above = held(&stock, Good::Coins) - held(&reserve, Good::Coins) - held(&spoken.takes, Good::Coins);
+    let above =
+        held(&stock, Good::Coins) - held(&reserve, Good::Coins) - held(&spoken.takes, Good::Coins);
     let coins = best_coins + above.max(0.0);
     let has = trader_stock(visitor.escort_ids.len(), &carriage.load);
     let prices = trader_prices(visitor, carriage);
@@ -423,8 +489,11 @@ fn offer_times(
 /// Units of a good that make a trader's full load (`traderLoad`): what fits in their arms beside
 /// the Food for the walk to a warehouse `tiles` away and back.
 pub fn trader_load(world: &WorldState, r: usize, good: Good, tiles: f64) -> f64 {
-    let food = set_out_food(tiles * WALK_TICKS_PER_TILE) * GOOD_WEIGHT.get("food").expect("a weight");
-    ((carry_capacity(&world.residents[r], world.tick as f64) - food) / good_weight(good) + 1e-9).floor().max(0.0)
+    let food =
+        set_out_food(tiles * WALK_TICKS_PER_TILE) * GOOD_WEIGHT.get("food").expect("a weight");
+    ((carry_capacity(&world.residents[r], world.tick as f64) - food) / good_weight(good) + 1e-9)
+        .floor()
+        .max(0.0)
 }
 
 /// The nearest finished Trade Org warehouse within `NPC_TRADER_REACH` of `home` that prices `good`
@@ -432,7 +501,10 @@ pub fn trader_load(world: &WorldState, r: usize, good: Good, tiles: f64) -> f64 
 fn nearest_warehouse(world: &WorldState, home: (i32, i32), good: Good, size: i32) -> Option<usize> {
     let mut best: Option<(usize, f64)> = None;
     for (i, b) in world.buildings.iter().enumerate() {
-        if b.kind != BuildingKind::Warehouse || b.site.is_some() || !stock_floor(world, b).contains_key(&good) {
+        if b.kind != BuildingKind::Warehouse
+            || b.site.is_some()
+            || !stock_floor(world, b).contains_key(&good)
+        {
             continue;
         }
         if trade_coin_warehouse(world, b).is_none() {
@@ -448,7 +520,15 @@ fn nearest_warehouse(world: &WorldState, home: (i32, i32), good: Good, size: i32
 
 /// What a trader buys (`buyGood`): the good shortest of the city's reserve that it has no node for,
 /// the warehouse prices and no trader out brings. Never Food, Coins or a weapon.
-fn buy_good(world: &WorldState, city: &City, home: (i32, i32), warehouse: usize, project: Option<&CityProject>, spoken: &SpokenFor, size: i32) -> Option<Good> {
+fn buy_good(
+    world: &WorldState,
+    city: &City,
+    home: (i32, i32),
+    warehouse: usize,
+    project: Option<&CityProject>,
+    spoken: &SpokenFor,
+    size: i32,
+) -> Option<Good> {
     let priced = stock_floor(world, &world.buildings[warehouse]);
     short_goods(world, city, size, project).into_iter().find(|g| {
         *g != Good::Food
@@ -461,7 +541,14 @@ fn buy_good(world: &WorldState, city: &City, home: (i32, i32), warehouse: usize,
 }
 
 /// Whether an NPC city can make a good from its own land (`hasNodeFor`).
-pub fn has_node_for(world: &WorldState, city: &City, home: (i32, i32), good: Good, size: i32, seen: &mut HashSet<Good>) -> bool {
+pub fn has_node_for(
+    world: &WorldState,
+    city: &City,
+    home: (i32, i32),
+    good: Good,
+    size: i32,
+    seen: &mut HashSet<Good>,
+) -> bool {
     if good == Good::Food || makes(world, city, good) {
         return true;
     }
@@ -471,11 +558,18 @@ pub fn has_node_for(world: &WorldState, city: &City, home: (i32, i32), good: Goo
     if let Some(input) = chain_input(good) {
         return input.keys().all(|g| has_node_for(world, city, home, *g, size, seen));
     }
-    world.nodes.iter().any(|n| node_good(n.kind) == good && knows_node(city, home, (n.x as i32, n.y as i32), size))
+    world.nodes.iter().any(|n| {
+        node_good(n.kind) == good && knows_node(city, home, (n.x as i32, n.y as i32), size)
+    })
 }
 
 /// Whether an armed outsider stands in the city's area (`armedOutsiders`): then it sends no trader.
-fn armed_outsiders(world: &WorldState, city: &City, size: i32, except: Option<&HashSet<String>>) -> bool {
+fn armed_outsiders(
+    world: &WorldState,
+    city: &City,
+    size: i32,
+    except: Option<&HashSet<String>>,
+) -> bool {
     world.residents.iter().any(|r| {
         r.health > 0.0
             && is_armed(&r.carried)
@@ -486,8 +580,18 @@ fn armed_outsiders(world: &WorldState, city: &City, size: i32, except: Option<&H
 }
 
 /// The run of resident `i`, as kept in the city's plan.
-fn run_of<'w>(world: &'w mut WorldState, city_id: &str, resident_id: &str) -> Option<&'w mut CityTrader> {
-    world.city_plans.get_mut(city_id)?.traders.as_mut()?.iter_mut().find(|t| t.resident_id == resident_id)
+fn run_of<'w>(
+    world: &'w mut WorldState,
+    city_id: &str,
+    resident_id: &str,
+) -> Option<&'w mut CityTrader> {
+    world
+        .city_plans
+        .get_mut(city_id)?
+        .traders
+        .as_mut()?
+        .iter_mut()
+        .find(|t| t.resident_id == resident_id)
 }
 
 /// A trade order.
@@ -497,11 +601,20 @@ fn trade(side: TradeSide, good: Good, units: f64) -> ResidentOrder {
 
 /// A pick-up from a storage.
 fn pick_up(storage_id: &str, goods: Stock) -> ResidentOrder {
-    ResidentOrder::PickUp(PickUpOrder { from: GoodsSpot::Storage { storage_id: storage_id.to_string() }, goods })
+    ResidentOrder::PickUp(PickUpOrder {
+        from: GoodsSpot::Storage { storage_id: storage_id.to_string() },
+        goods,
+    })
 }
 
 /// One tick of a city's trader on their run, idle between orders (`runTrader`).
-pub fn run_trader(world: &mut WorldState, city: &City, i: usize, storage: Option<usize>, size: i32) {
+pub fn run_trader(
+    world: &mut WorldState,
+    city: &City,
+    i: usize,
+    storage: Option<usize>,
+    size: i32,
+) {
     let rid = world.residents[i].id.clone();
     let Some(t) = run_of(world, &city.id, &rid).cloned() else { return };
     if t.visiting_id.is_some() {
@@ -510,7 +623,8 @@ pub fn run_trader(world: &mut WorldState, city: &City, i: usize, storage: Option
     if t.offer.is_some() && run_to_offer(world, city, i, storage, size) {
         return;
     }
-    let warehouse = world.buildings.iter().find(|b| Some(&b.id) == t.warehouse_id.as_ref()).cloned();
+    let warehouse =
+        world.buildings.iter().find(|b| Some(&b.id) == t.warehouse_id.as_ref()).cloned();
     let sell = t.sells.iter().next().map(|(g, n)| (*g, *n));
     let buy = t.buys.iter().next().map(|(g, n)| (*g, *n));
     let at = (world.residents[i].x as i32, world.residents[i].y as i32);
@@ -532,13 +646,17 @@ pub fn run_trader(world: &mut WorldState, city: &City, i: usize, storage: Option
                 return end_run(world, &city.id, &rid);
             }
             let mut goods = Stock::new();
-            let food = set_out_food(wrap_distance(size, at, (w.x as i32, w.y as i32)) * WALK_TICKS_PER_TILE);
-            let lacks = held_in(store.stock.as_ref(), Good::Food).min(food - held(&world.residents[i].carried, Good::Food));
+            let food = set_out_food(
+                wrap_distance(size, at, (w.x as i32, w.y as i32)) * WALK_TICKS_PER_TILE,
+            );
+            let lacks = held_in(store.stock.as_ref(), Good::Food)
+                .min(food - held(&world.residents[i].carried, Good::Food));
             if lacks >= 1.0 {
                 goods.insert(Good::Food, lacks.floor());
             }
             goods.insert(sell, units.min(has));
-            let coins = held_in(store.stock.as_ref(), Good::Coins) - held(&npc_reserve(world, city), Good::Coins);
+            let coins = held_in(store.stock.as_ref(), Good::Coins)
+                - held(&npc_reserve(world, city), Good::Coins);
             if coins >= 1.0 && buy.is_some() {
                 goods.insert(Good::Coins, coins.floor());
             }
@@ -572,14 +690,23 @@ pub fn run_trader(world: &mut WorldState, city: &City, i: usize, storage: Option
 }
 
 /// One tick of the city's spare hand on a run to its visiting trader (`runVisit`).
-fn run_visit(world: &mut WorldState, city: &City, i: usize, t: &CityTrader, storage: Option<usize>, size: i32) {
+fn run_visit(
+    world: &mut WorldState,
+    city: &City,
+    i: usize,
+    t: &CityTrader,
+    storage: Option<usize>,
+    size: i32,
+) {
     let rid = world.residents[i].id.clone();
     let visitor = world.traders.iter().find(|x| Some(&x.id) == t.visiting_id.as_ref());
     let stand = visitor.and_then(|v| trader_standing(world, v));
     let sell = t.sells.iter().next().map(|(g, n)| (*g, *n));
     let buy = t.buys.iter().next().map(|(g, n)| (*g, *n));
     let Some(s) = storage else { return go_home(world, &city.id, i, storage, size) };
-    let Some(stand) = stand.filter(|s| s.city_id == city.id) else { return go_home(world, &city.id, i, storage, size) };
+    let Some(stand) = stand.filter(|s| s.city_id == city.id) else {
+        return go_home(world, &city.id, i, storage, size);
+    };
     if sell.is_none() && buy.is_none() {
         return go_home(world, &city.id, i, storage, size);
     }
@@ -599,7 +726,8 @@ fn run_visit(world: &mut WorldState, city: &City, i: usize, t: &CityTrader, stor
                 goods.insert(sell, units.min(has));
             }
         }
-        let coins = held_in(store.stock.as_ref(), Good::Coins) - held(&npc_reserve(world, city), Good::Coins);
+        let coins = held_in(store.stock.as_ref(), Good::Coins)
+            - held(&npc_reserve(world, city), Good::Coins);
         if coins >= 1.0 && buy.is_some() {
             goods.insert(Good::Coins, coins.floor());
         }
@@ -661,11 +789,20 @@ fn go_home(world: &mut WorldState, city_id: &str, i: usize, storage: Option<usiz
 }
 
 /// One tick of the trader's way to an offer (`runToOffer`). Returns whether they got an order.
-fn run_to_offer(world: &mut WorldState, city: &City, i: usize, storage: Option<usize>, size: i32) -> bool {
+fn run_to_offer(
+    world: &mut WorldState,
+    city: &City,
+    i: usize,
+    storage: Option<usize>,
+    size: i32,
+) -> bool {
     let rid = world.residents[i].id.clone();
-    let Some(run) = run_of(world, &city.id, &rid).and_then(|t| t.offer.clone()) else { return false };
+    let Some(run) = run_of(world, &city.id, &rid).and_then(|t| t.offer.clone()) else {
+        return false;
+    };
     let offer = world.offers.iter().find(|o| o.id == run.offer_id).cloned();
-    let target = offer.as_ref().and_then(|o| world.buildings.iter().find(|b| b.id == o.storage_id)).cloned();
+    let target =
+        offer.as_ref().and_then(|o| world.buildings.iter().find(|b| b.id == o.storage_id)).cloned();
     let at = (world.residents[i].x as i32, world.residents[i].y as i32);
     if let (Some(offer), Some(target)) = (&offer, &target) {
         if run.leg == TraderLeg::Load {
@@ -679,9 +816,14 @@ fn run_to_offer(world: &mut WorldState, city: &City, i: usize, storage: Option<u
                 if has >= offer.wants_units {
                     let units = run.units.min(has);
                     let mut goods = Stock::from([(run.pays, units)]);
-                    let food = set_out_food(wrap_distance(size, at, (target.x as i32, target.y as i32)) * WALK_TICKS_PER_TILE);
-                    let left = held_in(store.stock.as_ref(), Good::Food) - if run.pays == Good::Food { units } else { 0.0 };
-                    let lacks = left.min(food - held(&world.residents[i].carried, Good::Food)).floor();
+                    let food = set_out_food(
+                        wrap_distance(size, at, (target.x as i32, target.y as i32))
+                            * WALK_TICKS_PER_TILE,
+                    );
+                    let left = held_in(store.stock.as_ref(), Good::Food)
+                        - if run.pays == Good::Food { units } else { 0.0 };
+                    let lacks =
+                        left.min(food - held(&world.residents[i].carried, Good::Food)).floor();
                     if lacks >= 1.0 {
                         *goods.entry(Good::Food).or_insert(0.0) += lacks;
                     }
@@ -722,9 +864,22 @@ fn run_to_offer(world: &mut WorldState, city: &City, i: usize, storage: Option<u
 /// A trader's run is over (`endRun`): the plan forgets it, and they are idle until the next pass.
 fn end_run(world: &mut WorldState, city_id: &str, resident_id: &str) {
     let plan = world.city_plans.get_mut(city_id).expect("a plan");
-    let left: Vec<CityTrader> = plan.traders.take().unwrap_or_default().into_iter().filter(|t| t.resident_id != resident_id).collect();
+    let left: Vec<CityTrader> = plan
+        .traders
+        .take()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|t| t.resident_id != resident_id)
+        .collect();
     plan.traders = (!left.is_empty()).then_some(left);
-    let idle = CityJob { kind: CityJobKind::Idle, building_id: None, target_id: None, stable_id: None, ground_id: None, subject: None };
+    let idle = CityJob {
+        kind: CityJobKind::Idle,
+        building_id: None,
+        target_id: None,
+        stable_id: None,
+        ground_id: None,
+        subject: None,
+    };
     plan.jobs.insert(resident_id.to_string(), idle);
 }
 
@@ -733,43 +888,83 @@ pub fn npc_traders_sound(world: &WorldState) -> Vec<InvariantViolation> {
     let mut out = Vec::new();
     let tick = world.tick as f64;
     for (city_id, plan) in &world.city_plans {
-        let jobbed: Vec<&String> = plan.jobs.iter().filter(|(_, j)| j.kind == CityJobKind::Trade).map(|(id, _)| id).collect();
+        let jobbed: Vec<&String> = plan
+            .jobs
+            .iter()
+            .filter(|(_, j)| j.kind == CityJobKind::Trade)
+            .map(|(id, _)| id)
+            .collect();
         let runs = plan.traders.as_deref().unwrap_or(&[]);
         let on_run: HashSet<&String> = runs.iter().map(|t| &t.resident_id).collect();
         let city = world.cities.iter().find(|c| &c.id == city_id);
         let mut push = |message: String, ids: Vec<String>| {
-            out.push(InvariantViolation { invariant: "npc-traders-sound".into(), message, entity_ids: ids })
+            out.push(InvariantViolation {
+                invariant: "npc-traders-sound".into(),
+                message,
+                entity_ids: ids,
+            })
         };
         if jobbed.iter().any(|id| !on_run.contains(id)) || on_run.len() < runs.len() {
             let names: Vec<&str> = jobbed.iter().map(|s| s.as_str()).collect();
             let run_names: Vec<&str> = runs.iter().map(|t| t.resident_id.as_str()).collect();
             let mut ids = vec![city_id.clone()];
             ids.extend(jobbed.iter().map(|s| s.to_string()));
-            push(format!("{city_id} plans traders {}, with runs for {}", names.join(", "), run_names.join(", ")), ids);
+            push(
+                format!(
+                    "{city_id} plans traders {}, with runs for {}",
+                    names.join(", "),
+                    run_names.join(", ")
+                ),
+                ids,
+            );
         }
         if let Some(city) = city {
-            if runs.iter().any(|t| t.since == tick) && runs.len() > traders_wanted(world, city) + 1 {
+            if runs.iter().any(|t| t.since == tick) && runs.len() > traders_wanted(world, city) + 1
+            {
                 let mut ids = vec![city_id.clone()];
                 ids.extend(on_run.iter().map(|s| s.to_string()));
-                push(format!("{city_id} sent a trader with {} out, for {} residents", runs.len(), city_residents(world, &city.id).len()), ids);
+                push(
+                    format!(
+                        "{city_id} sent a trader with {} out, for {} residents",
+                        runs.len(),
+                        city_residents(world, &city.id).len()
+                    ),
+                    ids,
+                );
             }
         }
         for t in runs {
             if let Some(o) = &t.offer {
                 if ![o.times, o.units].iter().all(|n| n.fract() == 0.0 && *n > 0.0) {
                     push(
-                        format!("{city_id}'s trader goes to {} {} times for {} {}", o.offer_id, o.times, o.units, good_name(o.pays)),
+                        format!(
+                            "{city_id}'s trader goes to {} {} times for {} {}",
+                            o.offer_id,
+                            o.times,
+                            o.units,
+                            good_name(o.pays)
+                        ),
                         vec![city_id.clone(), t.resident_id.clone(), o.offer_id.clone()],
                     );
                 }
             }
             if city.is_some_and(|c| c.trade_org.is_some()) {
-                push(format!("{city_id}, the Trade Organization's, sends trader {}", t.resident_id), vec![city_id.clone(), t.resident_id.clone()]);
+                push(
+                    format!("{city_id}, the Trade Organization's, sends trader {}", t.resident_id),
+                    vec![city_id.clone(), t.resident_id.clone()],
+                );
             }
-            let Some(r) = world.residents.iter().find(|r| r.id == t.resident_id).filter(|r| r.health > 0.0) else { continue };
+            let Some(r) =
+                world.residents.iter().find(|r| r.id == t.resident_id).filter(|r| r.health > 0.0)
+            else {
+                continue;
+            };
             if r.city_id.as_ref() != Some(city_id) || r.owner.is_some() || is_armed(&r.carried) {
                 let what = if is_armed(&r.carried) { "armed" } else { "not of the city" };
-                push(format!("{city_id}'s trader {} is {what}", r.id), vec![city_id.clone(), r.id.clone()]);
+                push(
+                    format!("{city_id}'s trader {} is {what}", r.id),
+                    vec![city_id.clone(), r.id.clone()],
+                );
             }
         }
     }

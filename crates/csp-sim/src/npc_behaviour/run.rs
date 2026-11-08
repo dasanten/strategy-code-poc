@@ -4,8 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 use csp_shared::balance::{
-    set_out_food, GOOD_WEIGHT, HOME_FOOD_LOW, MAP_SIZE, OWN_FOOD, STABLE_CAPACITY, WALK_TICKS_PER_TILE,
-    WORK_OUTPUT_PER_DAY,
+    set_out_food, GOOD_WEIGHT, HOME_FOOD_LOW, OWN_FOOD, WALK_TICKS_PER_TILE, WORK_OUTPUT_PER_DAY,
 };
 use csp_shared::footprint::is_at;
 use csp_shared::goods::{PROTECTION, WEAPONS};
@@ -19,7 +18,10 @@ use serde_json::{json, Value};
 use super::{default_script, haul, npc_home, put_to_work, stop_work, walk_to, workplace_of};
 use crate::npc_chain::{chain_store_index, holds_batch, warehouse_for};
 use crate::npc_founding::{found_daughter, founding_party, step_founders};
-use crate::npc_growth::{city_grows, city_project, is_builder, no_farm, no_storage_yet, npc_builders, stop_builders_who_cant_go_on, take_part};
+use crate::npc_growth::{
+    city_grows, city_project, is_builder, no_farm, no_storage_yet, npc_builders,
+    stop_builders_who_cant_go_on, take_part,
+};
 use crate::npc_patrols::{next_stop, share_patrols};
 use crate::npc_plan::{food_short, plan_city, plan_due, project_done, run_residents, Places};
 use crate::npc_posts::{free_soldiers, soldier_posts, stands_posts, SoldierPost};
@@ -32,7 +34,7 @@ use crate::npc_training::{go_train, steer_training};
 use crate::queries::building::{has_input, recipe_for, recipe_input};
 use crate::queries::city::{city_residents, in_city_area};
 use crate::queries::goods::units_that_fit;
-use crate::queries::horses::{horses_in, owns_horse, HorseOwner};
+use crate::queries::horses::{owns_horse, HorseOwner};
 use crate::queries::names::{good_name, held, held_in, kind_name, placed};
 use crate::queries::npc_trade::{npc_horses_wanted, NPC_SMITHY_WEAPON};
 use crate::queries::residents::{can_work, carry_capacity, is_armed, stock_weight};
@@ -44,15 +46,29 @@ use crate::walk_time::walk_time;
 /// One tick of NPC city behaviour (`stepNpcCities`, `CONTEXT.md`: NPC city): each city run by the
 /// game keeps itself alive. Plans of cities the game no longer runs are dropped. Returns the
 /// milliseconds spent planning, for the tick health.
-pub fn step_npc_cities(world: &mut WorldState, size: i32, terrain: Option<&TerrainMap>, mut ways: Option<&mut dyn WayFinder>) -> f64 {
-    let runs: HashSet<String> = world.cities.iter().filter(|c| c.realm_id.is_none()).map(|c| c.id.clone()).collect();
+pub fn step_npc_cities(
+    world: &mut WorldState,
+    size: i32,
+    terrain: Option<&TerrainMap>,
+    mut ways: Option<&mut dyn WayFinder>,
+) -> f64 {
+    let runs: HashSet<String> =
+        world.cities.iter().filter(|c| c.realm_id.is_none()).map(|c| c.id.clone()).collect();
     world.city_plans.retain(|id, _| runs.contains(id));
     let residents = run_residents(world);
     let mut plan_ms = 0.0;
-    let ids: Vec<String> = world.cities.iter().filter(|c| c.realm_id.is_none()).map(|c| c.id.clone()).collect();
+    let ids: Vec<String> =
+        world.cities.iter().filter(|c| c.realm_id.is_none()).map(|c| c.id.clone()).collect();
     for id in ids {
         if let Some(people) = residents.get(&id) {
-            plan_ms += run_city(world, &id, people.clone(), size, terrain, crate::npc_roads::reborrow(&mut ways));
+            plan_ms += run_city(
+                world,
+                &id,
+                people.clone(),
+                size,
+                terrain,
+                crate::npc_roads::reborrow(&mut ways),
+            );
         }
     }
     plan_ms
@@ -69,26 +85,43 @@ fn tile(world: &WorldState, i: usize) -> (i32, i32) {
 }
 
 /// What an NPC city does each tick (`runCity`). Returns the milliseconds spent planning.
-fn run_city(world: &mut WorldState, city_id: &str, mut people: Vec<usize>, size: i32, terrain: Option<&TerrainMap>, mut ways: Option<&mut dyn WayFinder>) -> f64 {
+fn run_city(
+    world: &mut WorldState,
+    city_id: &str,
+    mut people: Vec<usize>,
+    size: i32,
+    terrain: Option<&TerrainMap>,
+    mut ways: Option<&mut dyn WayFinder>,
+) -> f64 {
     let mut plan_ms = 0.0;
     if world.city_plans.contains_key(city_id) {
         step_scouts(world, city_id, &people, size);
     }
     if plan_due(world, city_id) {
         let start = Instant::now();
-        plan_city(world, city_id, terrain, Some(people.clone()), crate::npc_roads::reborrow(&mut ways));
+        plan_city(
+            world,
+            city_id,
+            terrain,
+            Some(people.clone()),
+            crate::npc_roads::reborrow(&mut ways),
+        );
         plan_ms += start.elapsed().as_secs_f64() * 1000.0;
     }
     let tick = world.tick as f64;
-    let storage = world.buildings.iter().position(|b| b.city_id.as_deref() == Some(city_id) && b.kind == BuildingKind::Storage && b.site.is_none());
+    let storage = world.buildings.iter().position(|b| {
+        b.city_id.as_deref() == Some(city_id) && b.kind == BuildingKind::Storage && b.site.is_none()
+    });
     // Its founding party moves to the daughter once the town hall stands, and goes by the founding
     // until then, apart from the rest.
     if world.city_plans.contains_key(city_id) && found_daughter(world, city_id).is_some() {
         people.retain(|&i| world.residents[i].city_id.as_deref() == Some(city_id));
     }
-    let party: HashSet<String> = founding_party(world.city_plans.get(city_id)).into_iter().collect();
+    let party: HashSet<String> =
+        founding_party(world.city_plans.get(city_id)).into_iter().collect();
     if !party.is_empty() {
-        let members: Vec<usize> = people.iter().copied().filter(|&i| party.contains(&world.residents[i].id)).collect();
+        let members: Vec<usize> =
+            people.iter().copied().filter(|&i| party.contains(&world.residents[i].id)).collect();
         step_founders(world, city_id, &members, storage, size);
     }
     let Some(city) = world.cities.iter().find(|c| c.id == city_id).cloned() else { return plan_ms };
@@ -113,26 +146,44 @@ fn run_city(world: &mut WorldState, city_id: &str, mut people: Vec<usize>, size:
             continue;
         }
         send_to_warehouse(world, &city, i);
-        let busy = matches!(world.residents[i].order, Some(ResidentOrder::WorkAt(_)) | Some(ResidentOrder::Build(_)) | Some(ResidentOrder::TearDown(_)));
-        if busy && held(&world.residents[i].carried, Good::Food) < HOME_FOOD_LOW && refill_source(world, &world.residents[i], size).is_none() {
+        let busy = matches!(
+            world.residents[i].order,
+            Some(ResidentOrder::WorkAt(_))
+                | Some(ResidentOrder::Build(_))
+                | Some(ResidentOrder::TearDown(_))
+        );
+        if busy
+            && held(&world.residents[i].carried, Good::Food) < HOME_FOOD_LOW
+            && refill_source(world, &world.residents[i], size).is_none()
+        {
             stop_work(&mut world.residents[i]);
         }
         // Home at the storage with the load stored, a carrier is free; one bringing the crew's Food
         // back goes back by the Work default.
         let r = &world.residents[i];
-        let carry = r.script.as_ref().filter(|s| s.script_id == 0).and_then(|s| s.memory.get("carry")).and_then(Value::as_object);
+        let carry = r
+            .script
+            .as_ref()
+            .filter(|s| s.script_id == 0)
+            .and_then(|s| s.memory.get("carry"))
+            .and_then(Value::as_object);
         if let Some(carry) = carry {
             let crew_food = carry.get("crewFood").and_then(Value::as_f64).is_some_and(|n| n >= 1.0);
             let stored = carry.get("stored") == Some(&Value::Bool(true));
             let storing = matches!(r.order, Some(ResidentOrder::Store(_)));
-            let at_storage = storage.is_some_and(|s| is_at(tile(world, i), placed(&world.buildings[s]), size));
+            let at_storage =
+                storage.is_some_and(|s| is_at(tile(world, i), placed(&world.buildings[s]), size));
             if stored && !crew_food && !storing && at_storage {
                 stop_work(&mut world.residents[i]);
             }
         }
         // Stuck in the Build default, a builder is free.
         let r = &world.residents[i];
-        let built = r.script.as_ref().filter(|s| s.script_id == 0 && s.task == Some(Task::Build)).map(|s| s.memory.clone());
+        let built = r
+            .script
+            .as_ref()
+            .filter(|s| s.script_id == 0 && s.task == Some(Task::Build))
+            .map(|s| s.memory.clone());
         if let Some(memory) = &built {
             if memory.get("stuck") == Some(&Value::Bool(true)) {
                 stop_work(&mut world.residents[i]);
@@ -149,17 +200,26 @@ fn run_city(world: &mut WorldState, city_id: &str, mut people: Vec<usize>, size:
             }
         }
         // Done breeding, a breeder is free too.
-        let bred = world.residents[i].script.as_ref().filter(|s| s.script_id == 0 && s.task == Some(Task::Breed)).map(|s| s.memory.get("done") == Some(&Value::Bool(true)));
+        let bred = world.residents[i]
+            .script
+            .as_ref()
+            .filter(|s| s.script_id == 0 && s.task == Some(Task::Breed))
+            .map(|s| s.memory.get("done") == Some(&Value::Bool(true)));
         if bred == Some(true) {
             stop_work(&mut world.residents[i]);
         }
         let job = job_of(world, city_id, i);
         // The pass just now gave them something to do: they don't finish the walk to their house.
-        if passed && job.as_ref().is_some_and(|j| j.kind != CityJobKind::Idle) && walking_to_house(&world.residents[i], &houses, size) {
+        if passed
+            && job.as_ref().is_some_and(|j| j.kind != CityJobKind::Idle)
+            && walking_to_house(&world.residents[i], &houses, size)
+        {
             world.residents[i].order = None;
         }
         let at = workplace_of(&world.residents[i]);
-        let moved = job.as_ref().is_some_and(|j| j.kind != CityJobKind::Soldier) && at.is_some() && at != job.as_ref().and_then(|j| j.building_id.clone());
+        let moved = job.as_ref().is_some_and(|j| j.kind != CityJobKind::Soldier)
+            && at.is_some()
+            && at != job.as_ref().and_then(|j| j.building_id.clone());
         if moved && world.residents[i].carrying.is_none() && passed {
             stop_work(&mut world.residents[i]);
         }
@@ -168,21 +228,31 @@ fn run_city(world: &mut WorldState, city_id: &str, mut people: Vec<usize>, size:
             steer_training(world, &city, i, job.as_ref());
         }
         // Off the road crew, they leave the road to it.
-        if on_road_work(&world.residents[i]) && job.as_ref().is_none_or(|j| j.kind != CityJobKind::Road) && passed {
+        if on_road_work(&world.residents[i])
+            && job.as_ref().is_none_or(|j| j.kind != CityJobKind::Road)
+            && passed
+        {
             stop_work(&mut world.residents[i]);
         }
         // The pass just now called a scout off: they come home with what they saw, below.
-        let exploring = world.residents[i].script.as_ref().is_some_and(|s| s.task == Some(Task::Explore));
+        let exploring =
+            world.residents[i].script.as_ref().is_some_and(|s| s.task == Some(Task::Explore));
         if exploring && passed && job.as_ref().is_none_or(|j| j.kind != CityJobKind::Scout) {
             stop_work(&mut world.residents[i]);
         }
         if job.as_ref().is_some_and(|j| j.kind == CityJobKind::Revive) {
             let r = &world.residents[i];
-            let at_work = r.script.is_some() || matches!(r.order, Some(ResidentOrder::Build(_)) | Some(ResidentOrder::TearDown(_)));
+            let at_work = r.script.is_some()
+                || matches!(
+                    r.order,
+                    Some(ResidentOrder::Build(_)) | Some(ResidentOrder::TearDown(_))
+                );
             if at_work && passed {
                 stop_work(&mut world.residents[i]);
             }
-            if matches!(world.residents[i].order, Some(ResidentOrder::WalkTo(_))) && revive_target(world, job.as_ref()).is_none() {
+            if matches!(world.residents[i].order, Some(ResidentOrder::WalkTo(_)))
+                && revive_target(world, job.as_ref()).is_none()
+            {
                 world.residents[i].order = None;
             }
         }
@@ -194,9 +264,14 @@ fn run_city(world: &mut WorldState, city_id: &str, mut people: Vec<usize>, size:
         // they get their next job.
         let at = workplace_of(&world.residents[i]);
         let working = matches!(world.residents[i].order, Some(ResidentOrder::WorkAt(_)));
-        if let Some(place) = at.filter(|_| working).and_then(|id| world.buildings.iter().position(|b| b.id == id)) {
+        if let Some(place) =
+            at.filter(|_| working).and_then(|id| world.buildings.iter().position(|b| b.id == id))
+        {
             let pb = &world.buildings[place];
-            if processes(pb.kind) && !input_left(world, pb, i) && !input_in(pb, store.map(|s| &world.buildings[s])) {
+            if processes(pb.kind)
+                && !input_left(world, pb, i)
+                && !input_in(pb, store.map(|s| &world.buildings[s]))
+            {
                 stop_work(&mut world.residents[i]);
             }
         }
@@ -213,24 +288,39 @@ fn run_city(world: &mut WorldState, city_id: &str, mut people: Vec<usize>, size:
     let jobs = world.city_plans.get(city_id).map(|p| p.jobs.clone()).unwrap_or_default();
     let kind_of = |id: &String| jobs.get(id).map(|j| j.kind);
     // The road crew is apart from its builders.
-    let crew: Vec<usize> = adults.iter().copied().filter(|&i| kind_of(&world.residents[i].id) == Some(CityJobKind::Road)).collect();
-    let building = adults.iter().filter(|&&i| is_builder(&world.residents[i]) && kind_of(&world.residents[i].id) != Some(CityJobKind::Road)).count();
+    let crew: Vec<usize> = adults
+        .iter()
+        .copied()
+        .filter(|&i| kind_of(&world.residents[i].id) == Some(CityJobKind::Road))
+        .collect();
+    let building = adults
+        .iter()
+        .filter(|&&i| {
+            is_builder(&world.residents[i])
+                && kind_of(&world.residents[i].id) != Some(CityJobKind::Road)
+        })
+        .count();
     let mut free = npc_builders(world, &city) - building as f64;
     // The project, picked anew once the planned one is finished: a site search, so once a tick.
     let mut checked = false;
-    let mut project = |world: &mut WorldState, plan_ms: &mut f64| -> Option<csp_shared::world::CityProject> {
-        let (Some(terrain), Some(home)) = (terrain, home.as_ref()) else { return None };
-        let current = world.city_plans.get(city_id)?.project.clone();
-        if !checked && current.as_ref().is_some_and(|p| project_done(world, p)) {
-            let start = Instant::now();
-            let grows = city_grows(world, &city, &adults);
-            let next = if !food_short(world, &city) || no_farm(world, &city) { city_project(world, &city, home, terrain, grows) } else { None };
-            world.city_plans.get_mut(city_id).expect("a plan").project = next;
-            *plan_ms += start.elapsed().as_secs_f64() * 1000.0;
-        }
-        checked = true;
-        world.city_plans.get(city_id)?.project.clone()
-    };
+    let mut project =
+        |world: &mut WorldState, plan_ms: &mut f64| -> Option<csp_shared::world::CityProject> {
+            let (Some(terrain), Some(home)) = (terrain, home.as_ref()) else { return None };
+            let current = world.city_plans.get(city_id)?.project.clone();
+            if !checked && current.as_ref().is_some_and(|p| project_done(world, p)) {
+                let start = Instant::now();
+                let grows = city_grows(world, &city, &adults);
+                let next = if !food_short(world, &city) || no_farm(world, &city) {
+                    city_project(world, &city, home, terrain, grows)
+                } else {
+                    None
+                };
+                world.city_plans.get_mut(city_id).expect("a plan").project = next;
+                *plan_ms += start.elapsed().as_secs_f64() * 1000.0;
+            }
+            checked = true;
+            world.city_plans.get(city_id)?.project.clone()
+        };
 
     for &i in &adults {
         let rid = world.residents[i].id.clone();
@@ -248,8 +338,17 @@ fn run_city(world: &mut WorldState, city_id: &str, mut people: Vec<usize>, size:
         }
         // A scout called off comes home with what they saw before anything else, but for one of the
         // city's Down, who can't wait.
-        let scouting = world.city_plans.get(city_id).and_then(|p| p.scouts.as_ref()).is_some_and(|s| s.contains_key(&rid));
-        if scouting && !matches!(job.as_ref().map(|j| j.kind), Some(CityJobKind::Scout) | Some(CityJobKind::Revive)) {
+        let scouting = world
+            .city_plans
+            .get(city_id)
+            .and_then(|p| p.scouts.as_ref())
+            .is_some_and(|s| s.contains_key(&rid));
+        if scouting
+            && !matches!(
+                job.as_ref().map(|j| j.kind),
+                Some(CityJobKind::Scout) | Some(CityJobKind::Revive)
+            )
+        {
             if let Some(h) = &home {
                 let (x, y) = tile(world, i);
                 if !in_city_area(world, city_id, x, y, size) {
@@ -259,7 +358,11 @@ fn run_city(world: &mut WorldState, city_id: &str, mut people: Vec<usize>, size:
             }
         }
         let trading = city.trade_org.is_none()
-            && world.city_plans.get(city_id).and_then(|p| p.traders.as_ref()).is_some_and(|t| t.iter().any(|t| t.resident_id == rid));
+            && world
+                .city_plans
+                .get(city_id)
+                .and_then(|p| p.traders.as_ref())
+                .is_some_and(|t| t.iter().any(|t| t.resident_id == rid));
         if trading {
             run_trader(world, &city, i, storage, size);
             continue;
@@ -275,10 +378,16 @@ fn run_city(world: &mut WorldState, city_id: &str, mut people: Vec<usize>, size:
         if run_reviver(world, i, job.as_ref(), storage, size) {
             continue;
         }
-        if job.as_ref().is_some_and(|j| j.kind == CityJobKind::Road) && world.city_plans.contains_key(city_id) && lay_road(world, &city, i, &crew, store, size) {
+        if job.as_ref().is_some_and(|j| j.kind == CityJobKind::Road)
+            && world.city_plans.contains_key(city_id)
+            && lay_road(world, &city, i, &crew, store, size)
+        {
             continue;
         }
-        if free > 0.0 && (!armed || no_storage_yet(world, &city)) && carries_materials(&world.residents[i], &city) {
+        if free > 0.0
+            && (!armed || no_storage_yet(world, &city))
+            && carries_materials(&world.residents[i], &city)
+        {
             if let Some(p) = project(world, &mut plan_ms) {
                 if take_part(world, i, &p, store, true) {
                     free -= 1.0;
@@ -296,16 +405,25 @@ fn run_city(world: &mut WorldState, city_id: &str, mut people: Vec<usize>, size:
             }
         }
         let soldier = armed || job.as_ref().is_some_and(|j| j.kind == CityJobKind::Soldier);
-        let stands_at_house = !soldier && job.as_ref().is_none_or(|j| j.kind == CityJobKind::Idle) && !houses.is_empty();
+        let stands_at_house = !soldier
+            && job.as_ref().is_none_or(|j| j.kind == CityJobKind::Idle)
+            && !houses.is_empty();
         let on_post = has_posts && armed;
         let food = storage.map_or(0.0, |s| held_in(world.buildings[s].stock.as_ref(), Good::Food));
         if let Some(s) = storage {
-            if food > 0.0 && held(&world.residents[i].carried, Good::Food) < OWN_FOOD && !stands_at_house && !on_post {
+            if food > 0.0
+                && held(&world.residents[i].carried, Good::Food) < OWN_FOOD
+                && !stands_at_house
+                && !on_post
+            {
                 let sb = &world.buildings[s];
                 if is_at(tile(world, i), placed(sb), size) {
                     let units = food.min(OWN_FOOD - held(&world.residents[i].carried, Good::Food));
                     let from = GoodsSpot::Storage { storage_id: sb.id.clone() };
-                    world.residents[i].order = Some(ResidentOrder::PickUp(PickUpOrder { from, goods: Stock::from([(Good::Food, units)]) }));
+                    world.residents[i].order = Some(ResidentOrder::PickUp(PickUpOrder {
+                        from,
+                        goods: Stock::from([(Good::Food, units)]),
+                    }));
                 } else {
                     let to = (sb.x, sb.y);
                     walk_to(&mut world.residents[i], to);
@@ -323,7 +441,10 @@ fn run_city(world: &mut WorldState, city_id: &str, mut people: Vec<usize>, size:
                 continue;
             }
             let done = city.scouted.as_ref().is_some_and(|s| s.done == Some(true));
-            if job.as_ref().is_some_and(|j| j.kind == CityJobKind::Scout) && !done && world.city_plans.contains_key(city_id) {
+            if job.as_ref().is_some_and(|j| j.kind == CityJobKind::Scout)
+                && !done
+                && world.city_plans.contains_key(city_id)
+            {
                 send_scout(world, city_id, i);
                 continue;
             }
@@ -337,7 +458,9 @@ fn run_city(world: &mut WorldState, city_id: &str, mut people: Vec<usize>, size:
             }
             if let Some(bid) = job.as_ref().and_then(|j| j.building_id.clone()) {
                 if let Some(place) = world.buildings.iter().position(|b| b.id == bid) {
-                    if world.buildings[place].site.is_none() && places.room(&world.buildings[place]) > 0.0 {
+                    if world.buildings[place].site.is_none()
+                        && places.room(&world.buildings[place]) > 0.0
+                    {
                         if let Some(input) = &input {
                             if !take_input(world, i, input, store, size) {
                                 if let Some(h) = &home {
@@ -352,7 +475,9 @@ fn run_city(world: &mut WorldState, city_id: &str, mut people: Vec<usize>, size:
                         if world.residents[i].order.is_some() {
                             continue;
                         }
-                        if storage.is_none_or(|s| take_set_out_food(world, i, place, s, size, terrain)) {
+                        if storage
+                            .is_none_or(|s| take_set_out_food(world, i, place, s, size, terrain))
+                        {
                             let pb = world.buildings[place].clone();
                             put_to_work(&mut world.residents[i], &pb);
                             places.take(&pb);
@@ -365,7 +490,11 @@ fn run_city(world: &mut WorldState, city_id: &str, mut people: Vec<usize>, size:
         if go_train(world, &city, i, job.as_ref(), passed, size) {
             continue;
         }
-        let stop = if on_post { world.city_plans.get_mut(city_id).and_then(|p| next_stop(p, &rid)) } else { None };
+        let stop = if on_post {
+            world.city_plans.get_mut(city_id).and_then(|p| next_stop(p, &rid))
+        } else {
+            None
+        };
         if let Some(stop) = stop {
             walk_to(&mut world.residents[i], stop);
         } else if on_post {
@@ -381,7 +510,11 @@ fn run_city(world: &mut WorldState, city_id: &str, mut people: Vec<usize>, size:
     if !houses.is_empty() {
         for &i in &people {
             let r = &world.residents[i];
-            if !can_work(r.born_at, tick) && r.down_until.is_none() && r.order.is_none() && r.script.is_none() {
+            if !can_work(r.born_at, tick)
+                && r.down_until.is_none()
+                && r.order.is_none()
+                && r.script.is_none()
+            {
                 stand_idle(world, &city, i, &houses, home.as_ref(), size, passed);
             }
         }
@@ -399,7 +532,9 @@ fn post_of(
     posts: &mut Option<HashMap<String, SoldierPost>>,
     id: &str,
 ) -> Option<SoldierPost> {
-    let posts = posts.get_or_insert_with(|| soldier_posts(world, city, &free_soldiers(world, city, adults), size, terrain));
+    let posts = posts.get_or_insert_with(|| {
+        soldier_posts(world, city, &free_soldiers(world, city, adults), size, terrain)
+    });
     posts.get(id).cloned()
 }
 
@@ -408,7 +543,16 @@ fn houses_to_stand_at(world: &WorldState, city: &City) -> Vec<Building> {
     if city.trade_org.is_some() {
         return Vec::new();
     }
-    world.buildings.iter().filter(|b| b.kind == BuildingKind::House && b.site.is_none() && b.city_id.as_ref() == Some(&city.id)).cloned().collect()
+    world
+        .buildings
+        .iter()
+        .filter(|b| {
+            b.kind == BuildingKind::House
+                && b.site.is_none()
+                && b.city_id.as_ref() == Some(&city.id)
+        })
+        .cloned()
+        .collect()
 }
 
 /// Sends a resident outside their city's area home (`comeHome`).
@@ -424,7 +568,15 @@ fn come_home(world: &mut WorldState, city: &City, i: usize, home: Option<&Buildi
 /// A resident with nothing to do goes to stand at a house (`standIdle`), the one their id hashes
 /// to; one at any of the city's houses stays. In the city's area they set off only when its pass
 /// just ran.
-fn stand_idle(world: &mut WorldState, city: &City, i: usize, houses: &[Building], home: Option<&Building>, size: i32, passed: bool) {
+fn stand_idle(
+    world: &mut WorldState,
+    city: &City,
+    i: usize,
+    houses: &[Building],
+    home: Option<&Building>,
+    size: i32,
+    passed: bool,
+) {
     if houses.is_empty() {
         return come_home(world, city, i, home, size);
     }
@@ -439,7 +591,15 @@ fn stand_idle(world: &mut WorldState, city: &City, i: usize, houses: &[Building]
 }
 
 /// A soldier with nothing to do goes to their post (`standPost`), and one on it stays.
-fn stand_post(world: &mut WorldState, city: &City, i: usize, post: Option<&SoldierPost>, home: Option<&Building>, size: i32, passed: bool) {
+fn stand_post(
+    world: &mut WorldState,
+    city: &City,
+    i: usize,
+    post: Option<&SoldierPost>,
+    home: Option<&Building>,
+    size: i32,
+    passed: bool,
+) {
     let (x, y) = tile(world, i);
     if !passed && in_city_area(world, &city.id, x, y, size) {
         return;
@@ -452,10 +612,17 @@ fn stand_post(world: &mut WorldState, city: &City, i: usize, post: Option<&Soldi
 
 /// Whether a soldier is on a walk that doesn't end on their post, with no load to put away first
 /// (`walkingOffPost`).
-fn walking_off_post(r: &csp_shared::world::Resident, post: Option<&SoldierPost>, size: i32) -> bool {
-    let (Some(ResidentOrder::WalkTo(o)), None, Some(post)) = (&r.order, &r.script, post) else { return false };
+fn walking_off_post(
+    r: &csp_shared::world::Resident,
+    post: Option<&SoldierPost>,
+    size: i32,
+) -> bool {
+    let (Some(ResidentOrder::WalkTo(o)), None, Some(post)) = (&r.order, &r.script, post) else {
+        return false;
+    };
     let load = haul(r, None);
-    !post.tiles.contains(&tile_index(size, o.target.x as i32, o.target.y as i32)) && load.as_ref().is_none_or(only_food)
+    !post.tiles.contains(&tile_index(size, o.target.x as i32, o.target.y as i32))
+        && load.as_ref().is_none_or(only_food)
 }
 
 /// Whether a load is Food and nothing else (`onlyFood`).
@@ -470,7 +637,10 @@ fn walking_to_house(r: &csp_shared::world::Resident, houses: &[Building], size: 
 }
 
 /// Where a builder's walk out to their site ended short of it (`noWayOut`): the site, if so.
-fn no_way_out(r: &csp_shared::world::Resident, memory: &serde_json::Map<String, Value>) -> Option<(i32, i32)> {
+fn no_way_out(
+    r: &csp_shared::world::Resident,
+    memory: &serde_json::Map<String, Value>,
+) -> Option<(i32, i32)> {
     let present = |k: &str| memory.get(k).is_some_and(|v| !v.is_null());
     if r.order.is_some() || present("fetch") || present("food") {
         return None;
@@ -501,7 +671,11 @@ fn work_by_default(world: &mut WorldState, i: usize) {
         return;
     }
     let mut memory = json!({ "workplaceId": o.building_id });
-    let smithy = world.buildings.iter().find(|b| b.id == o.building_id).is_some_and(|b| b.kind == BuildingKind::Smithy);
+    let smithy = world
+        .buildings
+        .iter()
+        .find(|b| b.id == o.building_id)
+        .is_some_and(|b| b.kind == BuildingKind::Smithy);
     let makes = o.makes.or(smithy.then_some(NPC_SMITHY_WEAPON));
     if let Some(makes) = makes {
         memory["makes"] = json!(good_name(makes));
@@ -514,41 +688,16 @@ fn carries_materials(r: &csp_shared::world::Resident, city: &City) -> bool {
     r.carried.iter().any(|(good, units)| {
         *good != Good::Food
             && *units > 0.0
-            && (WORK_OUTPUT_PER_DAY.get(good_name(*good)).is_some() || (city.trade_org.is_some() && back_to_warehouse(*good)))
+            && (WORK_OUTPUT_PER_DAY.get(good_name(*good)).is_some()
+                || (city.trade_org.is_some() && back_to_warehouse(*good)))
     })
 }
 
-/// Two fed horses of the city in a stable that a resident there can breed (`breedingPair` of
-/// `horses.ts`). TODO(T86.8): call the ported breeding.
+/// Two fed horses of the city in a stable a resident there can breed (`breedingPair`).
 fn breeding_pair(world: &WorldState, stable: &Building, city_id: &str) -> Option<[String; 2]> {
-    let owner = HorseOwner::City(city_id);
-    let problem = |ids: &[String; 2]| -> bool {
-        if stable.kind != BuildingKind::Stable || stable.site.is_some() || ids[0] == ids[1] {
-            return true;
-        }
-        let horses: Vec<_> = ids.iter().map(|id| world.horses.iter().find(|h| &h.id == id)).collect();
-        if horses.iter().any(|h| h.is_none_or(|h| !is_at((h.x as i32, h.y as i32), placed(stable), MAP_SIZE))) {
-            return true;
-        }
-        if horses.iter().flatten().any(|h| !owns_horse(owner, h) || h.hunger <= 0.0) {
-            return true;
-        }
-        if horses_in(&world.horses, stable).len() as f64 >= STABLE_CAPACITY {
-            return true;
-        }
-        world.residents.iter().any(|r| matches!(&r.order, Some(ResidentOrder::Breed(o)) if o.stable_id == stable.id && o.horse_ids.iter().any(|id| ids.contains(id))))
-    };
-    let mut kept: Vec<_> = stable.breedings.iter().flatten().collect();
-    kept.sort_by(|a, b| b.progress.total_cmp(&a.progress));
-    if let Some(k) = kept.into_iter().find(|k| !problem(&k.horse_ids)) {
-        return Some(k.horse_ids.clone());
-    }
-    let fed: Vec<_> = horses_in(&world.horses, stable).into_iter().filter(|h| owns_horse(owner, h) && h.hunger > 0.0).take(2).collect();
-    if fed.len() < 2 {
-        return None;
-    }
-    let pair = [fed[0].id.clone(), fed[1].id.clone()];
-    (!problem(&pair)).then_some(pair)
+    let [a, b] =
+        crate::queries::breeding::breeding_pair(world, stable, HorseOwner::City(city_id), None)?;
+    Some([a.id.clone(), b.id.clone()])
 }
 
 /// Has one of the city's residents breed its horses (`breedHorses`). Whether they were given it.
@@ -557,18 +706,30 @@ fn breed_horses(world: &mut WorldState, city: &City, i: usize) -> bool {
         return false;
     }
     let horses = world.horses.iter().filter(|h| owns_horse(HorseOwner::City(&city.id), h)).count();
-    let foals = city_residents(world, &city.id).iter().filter(|x| x.script.as_ref().is_some_and(|s| s.task == Some(Task::Breed))).count();
+    let foals = city_residents(world, &city.id)
+        .iter()
+        .filter(|x| x.script.as_ref().is_some_and(|s| s.task == Some(Task::Breed)))
+        .count();
     if (horses + foals) as f64 >= npc_horses_wanted(world, city) {
         return false;
     }
     for stable in &world.buildings {
-        if stable.kind != BuildingKind::Stable || stable.site.is_some() || stable.city_id.as_ref() != Some(&city.id) {
+        if stable.kind != BuildingKind::Stable
+            || stable.site.is_some()
+            || stable.city_id.as_ref() != Some(&city.id)
+        {
             continue;
         }
         let tending = world.residents.iter().any(|x| {
-            x.script.as_ref().is_some_and(|s| s.task == Some(Task::Breed) && s.memory.get("stableId").and_then(Value::as_str) == Some(stable.id.as_str()))
+            x.script.as_ref().is_some_and(|s| {
+                s.task == Some(Task::Breed)
+                    && s.memory.get("stableId").and_then(Value::as_str) == Some(stable.id.as_str())
+            })
         });
-        let breeding = world.residents.iter().any(|x| matches!(&x.order, Some(ResidentOrder::Breed(o)) if o.stable_id == stable.id));
+        let breeding = world
+            .residents
+            .iter()
+            .any(|x| matches!(&x.order, Some(ResidentOrder::Breed(o)) if o.stable_id == stable.id));
         if tending || breeding {
             continue;
         }
@@ -582,7 +743,14 @@ fn breed_horses(world: &mut WorldState, city: &City, i: usize) -> bool {
 
 /// Before a resident sets out for a workplace, they take the Food for the walk there and back and
 /// their first days of work from the storage (`takeSetOutFood`). Whether they set out now.
-fn take_set_out_food(world: &mut WorldState, i: usize, place: usize, storage: usize, size: i32, terrain: Option<&TerrainMap>) -> bool {
+fn take_set_out_food(
+    world: &mut WorldState,
+    i: usize,
+    place: usize,
+    storage: usize,
+    size: i32,
+    terrain: Option<&TerrainMap>,
+) -> bool {
     let food = held_in(world.buildings[storage].stock.as_ref(), Good::Food);
     if food <= 0.0 {
         return true;
@@ -609,7 +777,10 @@ fn take_set_out_food(world: &mut WorldState, i: usize, place: usize, storage: us
         return true;
     }
     let from = GoodsSpot::Storage { storage_id: sb.id.clone() };
-    world.residents[i].order = Some(ResidentOrder::PickUp(PickUpOrder { from, goods: Stock::from([(Good::Food, units)]) }));
+    world.residents[i].order = Some(ResidentOrder::PickUp(PickUpOrder {
+        from,
+        goods: Stock::from([(Good::Food, units)]),
+    }));
     true
 }
 
@@ -618,15 +789,23 @@ fn send_to_warehouse(world: &mut WorldState, city: &City, i: usize) {
     if city.trade_org.is_none() {
         return;
     }
-    let Some(script) = world.residents[i].script.as_ref().filter(|s| s.script_id == 0) else { return };
+    let Some(script) = world.residents[i].script.as_ref().filter(|s| s.script_id == 0) else {
+        return;
+    };
     let Some(carry) = script.memory.get("carry").and_then(Value::as_object) else { return };
     if carry.get("stored") == Some(&Value::Bool(true)) {
         return;
     }
     let Some(goods) = carry.get("goods").and_then(Value::as_array) else { return };
-    let goods: Vec<Good> = goods.iter().filter_map(|g| serde_json::from_value(g.clone()).ok()).collect();
+    let goods: Vec<Good> =
+        goods.iter().filter_map(|g| serde_json::from_value(g.clone()).ok()).collect();
     let Some(w) = warehouse_for(world, city, &goods).map(|w| w.id.clone()) else { return };
-    if let Some(carry) = world.residents[i].script.as_mut().and_then(|s| s.memory.get_mut("carry")).and_then(Value::as_object_mut) {
+    if let Some(carry) = world.residents[i]
+        .script
+        .as_mut()
+        .and_then(|s| s.memory.get_mut("carry"))
+        .and_then(Value::as_object_mut)
+    {
         carry.insert("storageId".into(), json!(w));
     }
 }
@@ -655,12 +834,20 @@ fn input_left(world: &WorldState, place: &Building, i: usize) -> bool {
 /// Whether a store holds a batch of what a workplace that processes goods uses up (`inputIn`).
 fn input_in(place: &Building, store: Option<&Building>) -> bool {
     let makes = (place.kind == BuildingKind::Smithy).then(|| good_name(NPC_SMITHY_WEAPON));
-    recipe_for(place.kind, makes).is_some_and(|r| holds_batch(store.and_then(|s| s.stock.as_ref()), &recipe_input(r).into_iter().collect()))
+    recipe_for(place.kind, makes).is_some_and(|r| {
+        holds_batch(store.and_then(|s| s.stock.as_ref()), &recipe_input(r).into_iter().collect())
+    })
 }
 
 /// Before a resident sets out for a workplace that processes goods, they take its `input` from the
 /// storage (`takeInput`). Whether they carry a batch, or have just been given the pick-up.
-fn take_input(world: &mut WorldState, i: usize, input: &Stock, storage: Option<usize>, size: i32) -> bool {
+fn take_input(
+    world: &mut WorldState,
+    i: usize,
+    input: &Stock,
+    storage: Option<usize>,
+    size: i32,
+) -> bool {
     let r = &world.residents[i];
     if holds_batch(Some(&r.carried), input) {
         return true;
@@ -677,7 +864,8 @@ fn take_input(world: &mut WorldState, i: usize, input: &Stock, storage: Option<u
     }
     let batch = stock_weight(input);
     let food_weight = GOOD_WEIGHT.get("food").expect("a weight");
-    let room = carry_capacity(r, world.tick as f64) - stock_weight(&r.carried) - OWN_FOOD * food_weight;
+    let room =
+        carry_capacity(r, world.tick as f64) - stock_weight(&r.carried) - OWN_FOOD * food_weight;
     let mut batches = (room / batch).floor();
     for (g, n) in input {
         batches = batches.min((held_in(sb.stock.as_ref(), *g) / n).floor());
@@ -699,23 +887,37 @@ fn processes(kind: BuildingKind) -> bool {
 /// Whether a Trade Org city's warehouse takes a good back from an idle resident
 /// (`backToWarehouse`): all but Food and the weapons and armour that stay on them.
 fn back_to_warehouse(good: Good) -> bool {
-    good != Good::Food && !WEAPONS.contains(&good_name(good)) && !PROTECTION.contains(&good_name(good))
+    good != Good::Food
+        && !WEAPONS.contains(&good_name(good))
+        && !PROTECTION.contains(&good_name(good))
 }
 
 /// What an idle resident has to put away and where it goes, if anything (`stowing`): where in
 /// `world.buildings` it goes, and the load.
-fn stowing(world: &WorldState, city: &City, i: usize, storage: Option<usize>, input: Option<&Stock>) -> Option<(usize, Stock)> {
+fn stowing(
+    world: &WorldState,
+    city: &City,
+    i: usize,
+    storage: Option<usize>,
+    input: Option<&Stock>,
+) -> Option<(usize, Stock)> {
     let r = &world.residents[i];
     if city.trade_org.is_some() {
         let goods: Vec<Good> = r
             .carried
             .iter()
-            .filter(|(g, n)| **n > 0.0 && back_to_warehouse(**g) && input.is_none_or(|i| !i.contains_key(*g)))
+            .filter(|(g, n)| {
+                **n > 0.0 && back_to_warehouse(**g) && input.is_none_or(|i| !i.contains_key(*g))
+            })
             .map(|(g, _)| *g)
             .collect();
         if let Some(to) = warehouse_for(world, city, &goods) {
             let keeps = warehouse_keeps(world, to);
-            let load: Stock = goods.iter().filter(|g| keeps.contains(g)).map(|g| (*g, held(&r.carried, *g))).collect();
+            let load: Stock = goods
+                .iter()
+                .filter(|g| keeps.contains(g))
+                .map(|g| (*g, held(&r.carried, *g)))
+                .collect();
             let to = world.buildings.iter().position(|b| b.id == to.id).expect("a warehouse");
             return Some((to, load));
         }
@@ -723,4 +925,3 @@ fn stowing(world: &WorldState, city: &City, i: usize, storage: Option<usize>, in
     let s = storage?;
     haul(r, input).map(|load| (s, load))
 }
-

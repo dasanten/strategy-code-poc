@@ -7,7 +7,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use csp_shared::balance::{FOOD_PER_DAY, MAP_SIZE, NPC_FOOD_SHORT_DAYS, NPC_PLAN_TICKS, WORK_OUTPUT_PER_DAY};
+use csp_shared::balance::{
+    FOOD_PER_DAY, MAP_SIZE, NPC_FOOD_SHORT_DAYS, NPC_PLAN_TICKS, WORK_OUTPUT_PER_DAY,
+};
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{
     Building, BuildingKind, City, CityJob, CityJobKind, CityPlan, CityProject, Good, ResidentOrder,
@@ -16,9 +18,13 @@ use csp_shared::world::{
 use indexmap::IndexMap;
 
 use crate::npc_behaviour::{npc_home, workplace_of, Jobs};
-use crate::npc_chain::{chain_good, chain_input, chain_store_index, holds_batch, own_workplaces, shortages, SurplusWork};
+use crate::npc_chain::{
+    chain_good, chain_input, chain_store_index, holds_batch, shortages, SurplusWork,
+};
 use crate::npc_founding::{founding_party, plan_founding, FoundingPeople};
-use crate::npc_growth::{city_grows, city_project, end_pairs, farms_full, is_builder, no_farm, npc_builders, pair_adults};
+use crate::npc_growth::{
+    city_grows, city_project, end_pairs, farms_full, is_builder, no_farm, npc_builders, pair_adults,
+};
 use crate::npc_revive::{down_to_revive, goes_on_reviving, send_revivers};
 use crate::npc_roads::{road_crew, WayFinder};
 use crate::npc_scores::{beats, job_score, rank_jobs, ScoredJob};
@@ -26,19 +32,25 @@ use crate::npc_scouts::pick_scouts;
 use crate::npc_stable::{feed_job_kept, plan_feeder};
 use crate::npc_trader::{send_traders, traders_out};
 use crate::npc_training::plan_training;
+use crate::queries::alliance::contract_of;
 use crate::queries::building::{building_at, materials_needed, max_workers, workplace_good};
 use crate::queries::city::{city_food_use, city_residents, has_food_surplus, stored_food};
 use crate::queries::names::{held, held_in};
 use crate::queries::npc_trade::npc_storages;
 use crate::queries::residents::{can_work, is_armed};
-use crate::queries::alliance::contract_of;
-use crate::queries::names::good_name;
 use crate::random::hash_str;
 use crate::sight::InvariantViolation;
 
 /// A job with its kind and building, if it has one.
 fn job_at(kind: CityJobKind, building_id: Option<&str>) -> CityJob {
-    CityJob { kind, building_id: building_id.map(str::to_string), target_id: None, stable_id: None, ground_id: None, subject: None }
+    CityJob {
+        kind,
+        building_id: building_id.map(str::to_string),
+        target_id: None,
+        stable_id: None,
+        ground_id: None,
+        subject: None,
+    }
 }
 
 /// Whether a city's planning pass is due this tick (`planDue`): once every `NPC_PLAN_TICKS`,
@@ -59,7 +71,9 @@ pub fn run_residents(world: &mut WorldState) -> IndexMap<String, Vec<usize>> {
         .chain(world.traders.iter().flat_map(|t| t.driver_id.iter().chain(&t.escort_ids)))
         .cloned()
         .collect();
-    away.extend(world.punishments.iter().flat_map(|p| p.members.iter().map(|m| m.resident_id.clone())));
+    away.extend(
+        world.punishments.iter().flat_map(|p| p.members.iter().map(|m| m.resident_id.clone())),
+    );
     away.extend(world.supply_wagons.iter().filter_map(|w| w.driver_id.clone()));
     let mut out: IndexMap<String, Vec<usize>> = IndexMap::new();
     for i in 0..world.residents.len() {
@@ -102,7 +116,9 @@ pub fn workplaces(world: &WorldState, city: &City) -> Vec<usize> {
             (b.city_id.as_ref() == Some(&city.id) || own.contains(&b.id))
                 && b.site.is_none()
                 && max_workers(b.kind).is_some()
-                && csp_shared::balance::RECIPES.get(crate::queries::names::kind_name(b.kind)).is_none()
+                && csp_shared::balance::RECIPES
+                    .get(crate::queries::names::kind_name(b.kind))
+                    .is_none()
                 && workplace_good(world, b, None).is_some()
         })
         .map(|(i, _)| i)
@@ -141,7 +157,8 @@ impl Places {
 
     /// Places taken at a workplace (`taken`).
     pub fn taken(&self, place: &Building) -> i64 {
-        self.by_workplace.get(&place.id).copied().unwrap_or(0) + self.by_tile.get(&(place.x as i64, place.y as i64)).copied().unwrap_or(0)
+        self.by_workplace.get(&place.id).copied().unwrap_or(0)
+            + self.by_tile.get(&(place.x as i64, place.y as i64)).copied().unwrap_or(0)
     }
 
     /// Room left at a workplace (`room`).
@@ -174,28 +191,27 @@ pub fn plan_city(
         Some(p) => p,
         None => run_residents(world).shift_remove(city_id).unwrap_or_default(),
     };
-    let plan = world
-        .city_plans
-        .entry(city_id.to_string())
-        .or_insert_with(|| CityPlan {
-            planned_at: tick,
-            jobs: IndexMap::new(),
-            project: None,
-            roads: None,
-            streets: None,
-            traders: None,
-            full_since: None,
-            short_since: None,
-            founding_site: None,
-            scouts: None,
-            patrols: None,
-            patrolled_last: None,
-        });
+    let plan = world.city_plans.entry(city_id.to_string()).or_insert_with(|| CityPlan {
+        planned_at: tick,
+        jobs: IndexMap::new(),
+        project: None,
+        roads: None,
+        streets: None,
+        traders: None,
+        full_since: None,
+        short_since: None,
+        founding_site: None,
+        scouts: None,
+        patrols: None,
+        patrolled_last: None,
+    });
     plan.planned_at = tick;
     let Some(city) = world.cities.iter().find(|c| c.id == city_id).cloned() else { return };
     // A founding party out is the founding's business, not shared out.
-    let party: HashSet<String> = founding_party(world.city_plans.get(city_id)).into_iter().collect();
-    let members: Vec<usize> = people.iter().copied().filter(|&i| party.contains(&world.residents[i].id)).collect();
+    let party: HashSet<String> =
+        founding_party(world.city_plans.get(city_id)).into_iter().collect();
+    let members: Vec<usize> =
+        people.iter().copied().filter(|&i| party.contains(&world.residents[i].id)).collect();
     let adults: Vec<usize> = people
         .iter()
         .copied()
@@ -217,24 +233,29 @@ pub fn plan_city(
     // With Food short it builds nothing but what ends that: a first farm, or another with every
     // farm full.
     let project = match (terrain, &home) {
-        (Some(t), Some(h)) if !short || no_farm(world, &city) || farms_full(world, &city) => city_project(world, &city, h, t, grows),
+        (Some(t), Some(h)) if !short || no_farm(world, &city) || farms_full(world, &city) => {
+            city_project(world, &city, h, t, grows)
+        }
         _ => None,
     };
     world.city_plans.get_mut(city_id).expect("a plan").project = project;
 
     let places = workplaces(world, &city);
-    let place_ids: HashSet<String> = places.iter().map(|&b| world.buildings[b].id.clone()).collect();
+    let place_ids: HashSet<String> =
+        places.iter().map(|&b| world.buildings[b].id.clone()).collect();
     let mut held = Places::new(world, &people);
     let mut jobs: Jobs = IndexMap::new();
     let old_jobs = world.city_plans[city_id].jobs.clone();
     // The road crew is apart from its builders, and spare hands.
     let builds = |world: &WorldState, i: usize| {
-        is_builder(&world.residents[i]) && old_jobs.get(&world.residents[i].id).is_none_or(|j| j.kind != CityJobKind::Road)
+        is_builder(&world.residents[i])
+            && old_jobs.get(&world.residents[i].id).is_none_or(|j| j.kind != CityJobKind::Road)
     };
     let builders = adults.iter().filter(|&&i| builds(world, i)).count() as f64;
     let mut spare: Vec<usize> = Vec::new();
     // A trader out on their run is nobody's spare hand.
-    let traders = if city.trade_org.is_some() { HashSet::new() } else { traders_out(world, city_id) };
+    let traders =
+        if city.trade_org.is_some() { HashSet::new() } else { traders_out(world, city_id) };
     let size = terrain.map_or(MAP_SIZE, |t| t.size);
     let mut waiting = down_to_revive(world, &city, size);
     let mut feeding = false;
@@ -291,9 +312,14 @@ pub fn plan_city(
         // A spare hand just sent off as a trader or to feed the stable isn't one any more.
         let left: Vec<usize> = unneeded
             .into_iter()
-            .filter(|&i| !jobs.get(&world.residents[i].id).is_some_and(|j| j.kind == CityJobKind::Trade || j.kind == CityJobKind::Feed))
+            .filter(|&i| {
+                !jobs
+                    .get(&world.residents[i].id)
+                    .is_some_and(|j| j.kind == CityJobKind::Trade || j.kind == CityJobKind::Feed)
+            })
             .collect();
-        let city_now = world.cities.iter().find(|c| c.id == city_id).cloned().unwrap_or(city.clone());
+        let city_now =
+            world.cities.iter().find(|c| c.id == city_id).cloned().unwrap_or(city.clone());
         plan_founding(
             world,
             &city_now,
@@ -310,7 +336,8 @@ pub fn plan_city(
 /// How many farmers an NPC city keeps (`farmersWanted`): as many as feed all its residents, and
 /// one more while it has no food surplus.
 pub fn farmers_wanted(world: &WorldState, city: &City) -> f64 {
-    feeders(city_residents(world, &city.id).len()) + if has_food_surplus(world, city) { 0.0 } else { 1.0 }
+    feeders(city_residents(world, &city.id).len())
+        + if has_food_surplus(world, city) { 0.0 } else { 1.0 }
 }
 
 /// Farmers who feed `residents`, rounded up (`feeders`).
@@ -356,27 +383,38 @@ fn share_out(
     size: i32,
     old_jobs: &Jobs,
 ) -> Vec<usize> {
-    let mut builders = builders;
     let project = world.city_plans[&city.id].project.clone();
-    let own: Vec<usize> = crate::npc_chain::own_workplace_indices(world, city).into_iter().filter(|&b| world.buildings[b].site.is_none()).collect();
-    let by_id: HashMap<String, usize> = own.iter().map(|&b| (world.buildings[b].id.clone(), b)).collect();
+    let own: Vec<usize> = crate::npc_chain::own_workplace_indices(world, city)
+        .into_iter()
+        .filter(|&b| world.buildings[b].site.is_none())
+        .collect();
+    let by_id: HashMap<String, usize> =
+        own.iter().map(|&b| (world.buildings[b].id.clone(), b)).collect();
     let place_of = |world: &WorldState, jobs: &Jobs, i: usize| -> Option<usize> {
         let id = jobs.get(&world.residents[i].id)?.building_id.as_ref()?;
         by_id.get(id).copied()
     };
-    let farms: Vec<usize> = own.iter().copied().filter(|&b| world.buildings[b].kind == BuildingKind::Farm).collect();
+    let farms: Vec<usize> =
+        own.iter().copied().filter(|&b| world.buildings[b].kind == BuildingKind::Farm).collect();
     let short = shortages(world, city, size, project.as_ref());
     let share_of: HashMap<Good, f64> = short.iter().map(|s| (s.good, s.share)).collect();
     // What a resident's job at a workplace is worth to them: what its good lacks, or only going back.
     let held_score = |world: &WorldState, jobs: &Jobs, i: usize| -> f64 {
-        let good = place_of(world, jobs, i).filter(|&b| world.buildings[b].kind != BuildingKind::Farm).and_then(|b| chain_good(world, &world.buildings[b]));
+        let good = place_of(world, jobs, i)
+            .filter(|&b| world.buildings[b].kind != BuildingKind::Farm)
+            .and_then(|b| chain_good(world, &world.buildings[b]));
         let Some(good) = good else { return job_score(ScoredJob::Short { share: 0.0 }) };
         match share_of.get(&good) {
             None => job_score(ScoredJob::Back),
             Some(&share) => job_score(ScoredJob::Short { share }),
         }
     };
-    let give = |world: &WorldState, jobs: &mut Jobs, held: &mut Places, i: usize, job: CityJob, place: Option<usize>| {
+    let give = |world: &WorldState,
+                jobs: &mut Jobs,
+                held: &mut Places,
+                i: usize,
+                job: CityJob,
+                place: Option<usize>| {
         if let Some(left) = place_of(world, jobs, i) {
             held.leave(&world.buildings[left]);
         }
@@ -386,7 +424,8 @@ fn share_out(
         }
     };
     let only_back = job_score(ScoredJob::Back);
-    let scouts_out: HashSet<String> = world.city_plans[&city.id].scouts.iter().flat_map(|s| s.keys().cloned()).collect();
+    let scouts_out: HashSet<String> =
+        world.city_plans[&city.id].scouts.iter().flat_map(|s| s.keys().cloned()).collect();
     if food_short {
         // Food runs short: workers off the farms go to the farms with room.
         let score = job_score(ScoredJob::Farm { food_short });
@@ -395,16 +434,26 @@ fn share_out(
             .copied()
             .filter(|&i| {
                 let job = jobs.get(&world.residents[i].id);
-                job.is_some_and(|j| j.kind == CityJobKind::Work && place_ids.contains(j.building_id.as_deref().unwrap_or("")))
-                    && beats(score, held_score(world, jobs, i))
+                job.is_some_and(|j| {
+                    j.kind == CityJobKind::Work
+                        && place_ids.contains(j.building_id.as_deref().unwrap_or(""))
+                }) && beats(score, held_score(world, jobs, i))
             })
             .map(|i| (i, held_score(world, jobs, i)))
             .collect();
-        off.extend(spare.iter().copied().filter(|i| scouts_out.contains(&world.residents[*i].id)).map(|i| (i, only_back)));
+        off.extend(
+            spare
+                .iter()
+                .copied()
+                .filter(|i| scouts_out.contains(&world.residents[*i].id))
+                .map(|i| (i, only_back)),
+        );
         // Sorting keeps the order given among equals: surplus work ahead of scouts.
         off.sort_by(|a, b| a.1.total_cmp(&b.1));
         for (i, _) in off {
-            let Some(&farm) = farms.iter().find(|&&f| held.room(&world.buildings[f]) > 0.0) else { break };
+            let Some(&farm) = farms.iter().find(|&&f| held.room(&world.buildings[f]) > 0.0) else {
+                break;
+            };
             give(world, jobs, held, i, work_job(&world.buildings[farm]), Some(farm));
             if let Some(k) = spare.iter().position(|&s| s == i) {
                 spare.remove(k);
@@ -412,7 +461,12 @@ fn share_out(
         }
     }
     let mut kept: IndexMap<String, CityJob> = IndexMap::new();
-    let release = |world: &WorldState, jobs: &mut Jobs, held: &mut Places, kept: &mut IndexMap<String, CityJob>, spare: &mut Vec<usize>, i: usize| {
+    let release = |world: &WorldState,
+                   jobs: &mut Jobs,
+                   held: &mut Places,
+                   kept: &mut IndexMap<String, CityJob>,
+                   spare: &mut Vec<usize>,
+                   i: usize| {
         if let Some(place) = place_of(world, jobs, i) {
             held.leave(&world.buildings[place]);
         }
@@ -432,7 +486,8 @@ fn share_out(
     for &i in &spare {
         let id = &world.residents[i].id;
         let Some(before) = old_jobs.get(id) else { continue };
-        if kept.contains_key(id) || !by_id.contains_key(before.building_id.as_deref().unwrap_or("")) {
+        if kept.contains_key(id) || !by_id.contains_key(before.building_id.as_deref().unwrap_or(""))
+        {
             continue;
         }
         if before.kind == CityJobKind::Work || before.kind == CityJobKind::Farm {
@@ -442,13 +497,18 @@ fn share_out(
     // A scout out is called home for what is short only once those at hand have gone.
     spare.sort_by_key(|&i| scouts_out.contains(&world.residents[i].id));
     let wanted = farmers_wanted(world, city);
-    let farmers: Vec<usize> = adults.iter().copied().filter(|&i| jobs.get(&world.residents[i].id).is_some_and(|j| j.kind == CityJobKind::Farm)).collect();
+    let farmers: Vec<usize> = adults
+        .iter()
+        .copied()
+        .filter(|&i| jobs.get(&world.residents[i].id).is_some_and(|j| j.kind == CityJobKind::Farm))
+        .collect();
     if !food_short {
         for &i in farmers.iter().skip(wanted as usize).rev() {
             release(world, jobs, held, &mut kept, &mut spare, i);
         }
     }
-    let mut farming = if food_short { farmers.len() as f64 } else { (farmers.len() as f64).min(wanted) };
+    let farming =
+        if food_short { farmers.len() as f64 } else { (farmers.len() as f64).min(wanted) };
 
     // Those holding a job a better one can take them from, at what it is worth to them.
     let mut workers: IndexMap<usize, f64> = adults
@@ -476,7 +536,10 @@ fn share_out(
             let score = job_score(job);
             let beaten: Vec<usize> = workers
                 .iter()
-                .filter(|(i, holds)| jobs.get(&world.residents[**i].id).is_some_and(|j| j.kind == CityJobKind::Work) && beats(score, **holds))
+                .filter(|(i, holds)| {
+                    jobs.get(&world.residents[**i].id).is_some_and(|j| j.kind == CityJobKind::Work)
+                        && beats(score, **holds)
+                })
                 .map(|(i, _)| *i)
                 .collect();
             let mut takers = free.clone();
@@ -488,7 +551,11 @@ fn share_out(
                         if state.farming >= wanted {
                             return false;
                         }
-                        let Some(&farm) = farms.iter().find(|&&f| held.room(&world.buildings[f]) > 0.0) else { return false };
+                        let Some(&farm) =
+                            farms.iter().find(|&&f| held.room(&world.buildings[f]) > 0.0)
+                        else {
+                            return false;
+                        };
                         give(world, jobs, held, i, work_job(&world.buildings[farm]), Some(farm));
                         state.farming += 1.0;
                         true
@@ -499,19 +566,32 @@ fn share_out(
                         if let Some(place) = place_of(world, jobs, i) {
                             held.leave(&world.buildings[place]);
                         }
-                        if jobs.get(&world.residents[i].id).is_some_and(|j| j.kind == CityJobKind::Build) {
+                        if jobs
+                            .get(&world.residents[i].id)
+                            .is_some_and(|j| j.kind == CityJobKind::Build)
+                        {
                             state.builders -= 1.0;
                         }
                     };
-                    send_revivers(world, waiting, &takers, adults, jobs, food_short, size, &mut leave);
-                    takers.into_iter().filter(|&i| jobs.get(&world.residents[i].id).is_some_and(|j| j.kind == CityJobKind::Revive)).collect()
+                    send_revivers(
+                        world, waiting, &takers, adults, jobs, food_short, size, &mut leave,
+                    );
+                    takers
+                        .into_iter()
+                        .filter(|&i| {
+                            jobs.get(&world.residents[i].id)
+                                .is_some_and(|j| j.kind == CityJobKind::Revive)
+                        })
+                        .collect()
                 }
                 Offer::Project => {
                     let project = project.clone().expect("a project");
                     takers
                         .into_iter()
                         .filter(|&i| {
-                            if state.builders >= npc_builders(world, city) || !can_take_part(world, city, i, &project) {
+                            if state.builders >= npc_builders(world, city)
+                                || !can_take_part(world, city, i, &project)
+                            {
                                 return false;
                             }
                             give(world, jobs, held, i, job_at(CityJobKind::Build, None), None);
@@ -523,7 +603,9 @@ fn share_out(
                 Offer::Short(good) => {
                     let mut took = Vec::new();
                     for i in takers {
-                        let Some(place) = short_place(world, good, &own, held, storage) else { break };
+                        let Some(place) = short_place(world, good, &own, held, storage) else {
+                            break;
+                        };
                         give(world, jobs, held, i, work_job(&world.buildings[place]), Some(place));
                         took.push(i);
                     }
@@ -531,14 +613,27 @@ fn share_out(
                 }
                 Offer::Road => {
                     let returning: HashSet<String> = kept.keys().cloned().collect();
-                    let crew = road_crew(world, city, &takers, &returning, storage, home, crate::npc_roads::reborrow(ways), terrain);
+                    let crew = road_crew(
+                        world,
+                        city,
+                        &takers,
+                        &returning,
+                        storage,
+                        home,
+                        crate::npc_roads::reborrow(ways),
+                        terrain,
+                    );
                     for &i in &crew {
                         give(world, jobs, held, i, job_at(CityJobKind::Road, None), None);
                     }
                     crew
                 }
                 Offer::Scout => {
-                    let has_place = |i: usize| kept.get(&world.residents[i].id).and_then(|k| k.building_id.as_ref()).is_some_and(|b| by_id.contains_key(b));
+                    let has_place = |i: usize| {
+                        kept.get(&world.residents[i].id)
+                            .and_then(|k| k.building_id.as_ref())
+                            .is_some_and(|b| by_id.contains_key(b))
+                    };
                     let scouts = pick_scouts(world, city, &takers, &has_place, food_short);
                     for &i in &scouts {
                         give(world, jobs, held, i, job_at(CityJobKind::Scout, None), None);
@@ -546,15 +641,24 @@ fn share_out(
                     scouts
                 }
                 Offer::Back => {
-                    let surplus = if city.trade_org.is_some() { None } else { Some(SurplusWork::of(world, city, storage.map(|s| &world.buildings[s]))) };
+                    let surplus = if city.trade_org.is_some() {
+                        None
+                    } else {
+                        Some(SurplusWork::of(world, city, storage.map(|s| &world.buildings[s])))
+                    };
                     takers
                         .into_iter()
                         .filter(|&i| {
                             let id = &world.residents[i].id;
                             let Some(back) = kept.get(id).cloned() else { return false };
-                            let Some(&place) = back.building_id.as_ref().and_then(|b| by_id.get(b)) else { return false };
+                            let Some(&place) = back.building_id.as_ref().and_then(|b| by_id.get(b))
+                            else {
+                                return false;
+                            };
                             let b = &world.buildings[place];
-                            let worth = surplus.as_ref().is_none_or(|s| chain_good(world, b).is_none() || s.full(world, b).is_some());
+                            let worth = surplus.as_ref().is_none_or(|s| {
+                                chain_good(world, b).is_none() || s.full(world, b).is_some()
+                            });
                             if held.room(b) <= 0.0 || !worth {
                                 return false;
                             }
@@ -583,7 +687,10 @@ fn share_out(
         free
     };
 
-    let mut first: Vec<(ScoredJob, Offer)> = vec![(ScoredJob::Farm { food_short: false }, Offer::Farm), (ScoredJob::Revive, Offer::Revive)];
+    let mut first: Vec<(ScoredJob, Offer)> = vec![
+        (ScoredJob::Farm { food_short: false }, Offer::Farm),
+        (ScoredJob::Revive, Offer::Revive),
+    ];
     if project.is_some() {
         first.push((ScoredJob::Project, Offer::Project));
     }
@@ -594,7 +701,11 @@ fn share_out(
         return unneeded;
     }
     // Nothing short has a use for them (`CONTEXT.md`: Spare hands' work).
-    let mut second: Vec<(ScoredJob, Offer)> = vec![(ScoredJob::Road, Offer::Road), (ScoredJob::Scout, Offer::Scout), (ScoredJob::Back, Offer::Back)];
+    let mut second: Vec<(ScoredJob, Offer)> = vec![
+        (ScoredJob::Road, Offer::Road),
+        (ScoredJob::Scout, Offer::Scout),
+        (ScoredJob::Back, Offer::Back),
+    ];
     if city.trade_org.is_none() {
         let surplus = SurplusWork::of(world, city, storage.map(|s| &world.buildings[s]));
         for &place in &own {
@@ -619,9 +730,22 @@ struct Share {
 /// The workplace a spare hand goes to for a good short (`shortPlace`): of the city's finished
 /// workplaces, one with room that makes it; for a good a workplace processes, only while the
 /// storage holds a batch of its input, else the workplace of an input it lacks.
-fn short_place(world: &WorldState, good: Good, own: &[usize], held: &Places, storage: Option<usize>) -> Option<usize> {
+fn short_place(
+    world: &WorldState,
+    good: Good,
+    own: &[usize],
+    held: &Places,
+    storage: Option<usize>,
+) -> Option<usize> {
     let stock = storage.and_then(|s| world.buildings[s].stock.as_ref());
-    fn work_for(world: &WorldState, g: Good, own: &[usize], held: &Places, stock: Option<&csp_shared::world::Stock>, seen: &mut HashSet<Good>) -> Option<usize> {
+    fn work_for(
+        world: &WorldState,
+        g: Good,
+        own: &[usize],
+        held: &Places,
+        stock: Option<&csp_shared::world::Stock>,
+        seen: &mut HashSet<Good>,
+    ) -> Option<usize> {
         if !seen.insert(g) {
             return None;
         }
@@ -636,7 +760,10 @@ fn short_place(world: &WorldState, good: Good, own: &[usize], held: &Places, sto
             }
             return None;
         }
-        own.iter().copied().find(|&b| chain_good(world, &world.buildings[b]) == Some(g) && held.room(&world.buildings[b]) > 0.0)
+        own.iter().copied().find(|&b| {
+            chain_good(world, &world.buildings[b]) == Some(g)
+                && held.room(&world.buildings[b]) > 0.0
+        })
     }
     work_for(world, good, own, held, stock, &mut HashSet::new())
 }
@@ -645,25 +772,33 @@ fn short_place(world: &WorldState, good: Good, own: &[usize], held: &Places, sto
 /// materials neither they carry nor the storage holds.
 fn can_take_part(world: &WorldState, city: &City, i: usize, project: &CityProject) -> bool {
     let (x, y) = match project {
-        CityProject::TearDown { building_id } => return world.buildings.iter().any(|b| &b.id == building_id),
+        CityProject::TearDown { building_id } => {
+            return world.buildings.iter().any(|b| &b.id == building_id)
+        }
         CityProject::Build { x, y, .. } => (*x as i32, *y as i32),
     };
-    let Some(site) = building_at(world, x, y, MAP_SIZE).filter(|s| s.site.is_some()) else { return true };
+    let Some(site) = building_at(world, x, y, MAP_SIZE).filter(|s| s.site.is_some()) else {
+        return true;
+    };
     let need = materials_needed(site);
     if need.is_empty() {
         return true;
     }
     let storage = crate::npc_chain::chain_store(world, city);
-    need.keys().any(|g| held(&world.residents[i].carried, *g) > 0.0 || held_in(storage.and_then(|s| s.stock.as_ref()), *g) > 0.0)
+    need.keys().any(|g| {
+        held(&world.residents[i].carried, *g) > 0.0
+            || held_in(storage.and_then(|s| s.stock.as_ref()), *g) > 0.0
+    })
 }
 
 /// Whether a city's project is finished, or can't go on (`projectDone`).
 pub fn project_done(world: &WorldState, project: &CityProject) -> bool {
     match project {
-        CityProject::TearDown { building_id } => !world.buildings.iter().any(|b| &b.id == building_id),
-        CityProject::Build { building, x, y } => {
-            building_at(world, *x as i32, *y as i32, MAP_SIZE).is_some_and(|b| b.kind != *building || b.site.is_none())
+        CityProject::TearDown { building_id } => {
+            !world.buildings.iter().any(|b| &b.id == building_id)
         }
+        CityProject::Build { building, x, y } => building_at(world, *x as i32, *y as i32, MAP_SIZE)
+            .is_some_and(|b| b.kind != *building || b.site.is_none()),
     }
 }
 
@@ -686,12 +821,4 @@ pub fn trade_org_sends_no_one(world: &WorldState) -> Vec<InvariantViolation> {
         }
     }
     out
-}
-
-/// Keeps `own_workplaces` and `good_name` in view for the ported invariants still to come
-/// (`cityPlansSound`, `npcFarmersKept`, `npcSurplusCapped`, `npcSpareHandsWork`,
-/// `npcWorkplacesBounded`). TODO(T86.13): port them with the invariants' list.
-#[allow(dead_code)]
-fn _invariants_to_come(world: &WorldState, city: &City) -> usize {
-    own_workplaces(world, city).len() + good_name(Good::Food).len()
 }

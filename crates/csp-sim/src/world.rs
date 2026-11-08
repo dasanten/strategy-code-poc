@@ -344,7 +344,9 @@ fn place_caravans(_world: &mut WorldState) {}
 fn place_traders(_world: &mut WorldState, _size: i32) {}
 
 // T86.10 (`npc-cities.ts`): world generation.
-fn place_npc_cities(_world: &mut WorldState, _terrain: &TerrainMap) {}
+fn place_npc_cities(world: &mut WorldState, terrain: &TerrainMap) {
+    crate::npc_cities::place_npc_cities(world, terrain);
+}
 
 // Carrying, storing, hauling, buying and trading are T86.5's (`carrying.rs`, `storing.rs`,
 // `hauling.rs`, `buying.rs`, `trading.rs`); road materials and offers are still to come.
@@ -382,17 +384,23 @@ fn step_debts(_world: &mut WorldState, _scratch: &mut Scratch) {}
 fn count_wrecked(_world: &mut WorldState, _wrecked: Vec<Felled>, _scratch: &mut Scratch) {}
 
 // T86.10 (`npc-defence.ts`, `npc-hire.ts`, `npc-behaviour.ts`, `outsiders.ts`).
-fn step_npc_defence(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
-fn step_npc_hire(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
+fn step_npc_defence(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
+    crate::npc_defence::step_npc_defence(world, size);
+}
+fn step_npc_hire(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
+    crate::npc_hire::step_npc_hire(world, size);
+}
 /// Returns the milliseconds the cities spent planning.
 fn step_npc_cities(
-    _world: &mut WorldState,
-    _size: i32,
-    _terrain: &TerrainMap,
-    _walking: Option<&mut dyn Walk>,
+    world: &mut WorldState,
+    size: i32,
+    terrain: &TerrainMap,
+    walking: Option<&mut dyn Walk>,
     _scratch: &mut Scratch,
 ) -> f64 {
-    0.0
+    // The walking finds the road crews' ways (`WayFinder`).
+    let ways = walking.and_then(|w| w.ways());
+    crate::npc_behaviour::step_npc_cities(world, size, Some(terrain), ways)
 }
 fn step_outsiders(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
 

@@ -89,7 +89,11 @@ fn add_all(to: &mut Vec<f64>, sectors: &[f64]) {
 
 /// A city's knowledge, made if it has none yet (`city.scouted ??= { sectors: [] }`).
 fn scouted(city: &mut City) -> &mut CityScouted {
-    city.scouted.get_or_insert_with(|| CityScouted { sectors: Vec::new(), no_way: None, done: None })
+    city.scouted.get_or_insert_with(|| CityScouted {
+        sectors: Vec::new(),
+        no_way: None,
+        done: None,
+    })
 }
 
 /// A city's builder found no way to a site past its set reach (`giveUpSite`): it gives the site's
@@ -115,7 +119,10 @@ pub fn pick_scouts(
     has_place: &dyn Fn(usize) -> bool,
     food_short: bool,
 ) -> Vec<usize> {
-    if city.trade_org.is_some() || city.scouted.as_ref().is_some_and(|s| s.done == Some(true)) || food_short {
+    if city.trade_org.is_some()
+        || city.scouted.as_ref().is_some_and(|s| s.done == Some(true))
+        || food_short
+    {
         return Vec::new();
     }
     let scouts = world.city_plans.get(&city.id).and_then(|p| p.scouts.as_ref());
@@ -139,7 +146,10 @@ pub fn send_scout(world: &mut WorldState, city_id: &str, i: usize) {
     world.residents[i].script = Some(default_script(Task::Explore, json!({})));
     let id = world.residents[i].id.clone();
     if let Some(plan) = world.city_plans.get_mut(city_id) {
-        plan.scouts.get_or_insert_with(Default::default).entry(id).or_insert(ScoutTrip { saw: Vec::new(), no_way: None });
+        plan.scouts
+            .get_or_insert_with(Default::default)
+            .entry(id)
+            .or_insert(ScoutTrip { saw: Vec::new(), no_way: None });
     }
 }
 
@@ -148,7 +158,12 @@ pub fn send_scout(world: &mut WorldState, city_id: &str, i: usize) {
 /// to. On stepping into its area they bring it all home. One gone brings nothing; one Down sees
 /// nothing.
 pub fn step_scouts(world: &mut WorldState, city_id: &str, people: &[usize], size: i32) {
-    let Some(ids) = world.city_plans.get(city_id).and_then(|p| p.scouts.as_ref()).map(|s| s.keys().cloned().collect::<Vec<_>>()) else {
+    let Some(ids) = world
+        .city_plans
+        .get(city_id)
+        .and_then(|p| p.scouts.as_ref())
+        .map(|s| s.keys().cloned().collect::<Vec<_>>())
+    else {
         return;
     };
     for id in ids {
@@ -167,7 +182,8 @@ pub fn step_scouts(world: &mut WorldState, city_id: &str, people: &[usize], size
         let no_way = no_way_tiles(r, size);
         let exploring = r.script.as_ref().is_some_and(|s| s.task == Some(Task::Explore));
         let home = in_city_area(world, city_id, at.0, at.1, size);
-        let scouts = world.city_plans.get_mut(city_id).and_then(|p| p.scouts.as_mut()).expect("scouts");
+        let scouts =
+            world.city_plans.get_mut(city_id).and_then(|p| p.scouts.as_mut()).expect("scouts");
         let trip = scouts.get_mut(&id).expect("a trip");
         add_all(&mut trip.saw, &seen);
         add_all(trip.no_way.get_or_insert_with(Vec::new), &no_way);
@@ -193,8 +209,12 @@ pub fn step_scouts(world: &mut WorldState, city_id: &str, people: &[usize], size
 
 /// The sectors of the tiles a scout's script found no way to (`noWayTiles`).
 fn no_way_tiles(r: &Resident, size: i32) -> Vec<f64> {
-    let Some(script) = r.script.as_ref().filter(|s| s.task == Some(Task::Explore)) else { return Vec::new() };
-    let Some(skip) = script.memory.get("skip").and_then(|v| v.as_array()) else { return Vec::new() };
+    let Some(script) = r.script.as_ref().filter(|s| s.task == Some(Task::Explore)) else {
+        return Vec::new();
+    };
+    let Some(skip) = script.memory.get("skip").and_then(|v| v.as_array()) else {
+        return Vec::new();
+    };
     skip.iter()
         .filter_map(|t| {
             let x = t.get("x")?.as_f64()?;
@@ -241,7 +261,8 @@ pub fn scout_edge(
 ) -> Option<(i32, i32)> {
     let home = npc_home(world, &city.id)?;
     let home_at = (home.x as i32, home.y as i32);
-    let trip = world.city_plans.get(&city.id).and_then(|p| p.scouts.as_ref()).and_then(|s| s.get(&r.id));
+    let trip =
+        world.city_plans.get(&city.id).and_then(|p| p.scouts.as_ref()).and_then(|s| s.get(&r.id));
     let mut known: Vec<f64> = Vec::new();
     if let Some(s) = &city.scouted {
         known.extend(&s.sectors);

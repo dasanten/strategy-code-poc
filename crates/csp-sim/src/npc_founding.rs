@@ -27,10 +27,12 @@ use crate::placing::Ground;
 use crate::queries::building::{build_materials, building_at, node_good};
 use crate::queries::city::{city_residents, has_food_surplus};
 use crate::queries::goods::carried_food;
-use crate::queries::names::{held, held_in, kind_name, placed};
-use crate::queries::npc_trade::{npc_city_stock, npc_founding_party_size, npc_full_days, npc_reserve};
-use crate::queries::residents::{carry_capacity, good_weight, is_armed, stock_weight};
 use crate::queries::js_round;
+use crate::queries::names::{held, held_in, kind_name, placed};
+use crate::queries::npc_trade::{
+    npc_city_stock, npc_founding_party_size, npc_full_days, npc_reserve,
+};
+use crate::queries::residents::{carry_capacity, good_weight, is_armed, stock_weight};
 use crate::random::{hash_str, Mulberry32};
 use crate::sight::InvariantViolation;
 use crate::standing::raise_standing_both_ways;
@@ -47,7 +49,14 @@ pub fn founding_party(plan: Option<&CityPlan>) -> Vec<String> {
 
 /// A job of the given kind and nothing else.
 fn job(kind: CityJobKind) -> CityJob {
-    CityJob { kind, building_id: None, target_id: None, stable_id: None, ground_id: None, subject: None }
+    CityJob {
+        kind,
+        building_id: None,
+        target_id: None,
+        stable_id: None,
+        ground_id: None,
+        subject: None,
+    }
 }
 
 /// What a founding party of `members` takes along (`foundingMaterials`): a town hall's and a
@@ -63,7 +72,10 @@ pub fn founding_materials(members: Option<f64>) -> Stock {
     add(build_materials(BuildingKind::TownHall), 1.0);
     add(build_materials(BuildingKind::Storage), 1.0);
     let past = (members - NPC_VILLAGE.residents).max(0.0);
-    add(build_materials(BuildingKind::House), (past / HOUSING_ROOM.get("house").unwrap_or(1.0)).ceil());
+    add(
+        build_materials(BuildingKind::House),
+        (past / HOUSING_ROOM.get("house").unwrap_or(1.0)).ceil(),
+    );
     out
 }
 
@@ -85,7 +97,9 @@ pub fn is_full(world: &WorldState, city: &City, plan: &CityPlan) -> bool {
     }
     let reserve = npc_reserve(world, city);
     let stock = npc_city_stock(world, city);
-    let materials = founding_materials(Some(npc_founding_party_size(city_residents(world, &city.id).len() as f64)));
+    let materials = founding_materials(Some(npc_founding_party_size(
+        city_residents(world, &city.id).len() as f64,
+    )));
     materials.iter().all(|(good, n)| held(&stock, *good) >= held(&reserve, *good) + n)
 }
 
@@ -166,7 +180,7 @@ pub fn plan_founding(
     if !is_full(world, city, &world.city_plans[&city.id]) {
         return;
     }
-    let site = world.city_plans[&city.id].founding_site.clone();
+    let site = world.city_plans[&city.id].founding_site;
     if let Some(s) = &site {
         if !site_still_fits(world, terrain, (s.x as i32, s.y as i32), None) {
             world.city_plans.get_mut(&city.id).expect("a plan").founding_site = None;
@@ -178,11 +192,17 @@ pub fn plan_founding(
             world.city_plans.get_mut(&city.id).expect("a plan").founding_site = Some(site);
         }
     }
-    let Some(site) = world.city_plans[&city.id].founding_site.clone() else { return };
+    let Some(site) = world.city_plans[&city.id].founding_site else { return };
     let home_at = (home.x as i32, home.y as i32);
-    let walk = wrap_distance(terrain.size, home_at, (site.x as i32, site.y as i32)) * WALK_TICKS_PER_TILE;
-    let near = |i: usize| !far_out((world.residents[i].x as i32, world.residents[i].y as i32), home_at, terrain.size);
-    let Some(chosen) = pick_party(world, city, people.adults, people.unneeded, &near, jobs, walk) else { return };
+    let walk =
+        wrap_distance(terrain.size, home_at, (site.x as i32, site.y as i32)) * WALK_TICKS_PER_TILE;
+    let near = |i: usize| {
+        !far_out((world.residents[i].x as i32, world.residents[i].y as i32), home_at, terrain.size)
+    };
+    let Some(chosen) = pick_party(world, city, people.adults, people.unneeded, &near, jobs, walk)
+    else {
+        return;
+    };
     for i in chosen {
         let r = &mut world.residents[i];
         r.order = None;
@@ -233,7 +253,8 @@ fn pick_party(
         if r.carrying.is_some() || !near(i) {
             return false;
         }
-        let partner = r.pair.as_ref().and_then(|p| world.residents.iter().find(|x| x.id == p.partner_id));
+        let partner =
+            r.pair.as_ref().and_then(|p| world.residents.iter().find(|x| x.id == p.partner_id));
         partner.is_none_or(|p| p.carrying.is_none())
     };
     let food_weight = GOOD_WEIGHT.get("food").expect("a weight");
@@ -242,12 +263,18 @@ fn pick_party(
         carry_capacity(r, tick) - stock_weight(&r.carried) + carried_food(r) * food_weight
     };
     let armed_now = |i: usize| is_armed(&world.residents[i].carried);
-    let mut armed: Vec<usize> = adults.iter().copied().filter(|&i| armed_now(i) && free(i)).collect();
+    let mut armed: Vec<usize> =
+        adults.iter().copied().filter(|&i| armed_now(i) && free(i)).collect();
     armed.sort_by(|&a, &b| room(b).total_cmp(&room(a)));
     let mut rest: Vec<usize> = Vec::new();
     let mut seen = HashSet::new();
-    let working = |i: usize| jobs.get(&world.residents[i].id).is_some_and(|j| j.kind == CityJobKind::Work);
-    for &i in unneeded.iter().filter(|&&i| !armed_now(i) && free(i)).chain(adults.iter().filter(|&&i| !armed_now(i) && free(i) && working(i))) {
+    let working =
+        |i: usize| jobs.get(&world.residents[i].id).is_some_and(|j| j.kind == CityJobKind::Work);
+    for &i in unneeded
+        .iter()
+        .filter(|&&i| !armed_now(i) && free(i))
+        .chain(adults.iter().filter(|&&i| !armed_now(i) && free(i) && working(i)))
+    {
         if seen.insert(i) {
             rest.push(i);
         }
@@ -283,7 +310,12 @@ fn square_of(hall: (i32, i32)) -> (i32, i32) {
 
 /// Whether a village laid out from its town hall at `hall` fits, out of sight or not, and never
 /// straddles the map's joins (`siteStillFits`).
-fn site_still_fits(world: &WorldState, terrain: &TerrainMap, hall: (i32, i32), ground: Option<&Ground>) -> bool {
+fn site_still_fits(
+    world: &WorldState,
+    terrain: &TerrainMap,
+    hall: (i32, i32),
+    ground: Option<&Ground>,
+) -> bool {
     let (x, y) = square_of(hall);
     let far = terrain.size - NPC_VILLAGE.size as i32 - FARM_RING;
     if x < FARM_RING || y < FARM_RING || x > far || y > far {
@@ -291,7 +323,9 @@ fn site_still_fits(world: &WorldState, terrain: &TerrainMap, hall: (i32, i32), g
     }
     match ground {
         Some(g) => npc_site_fits(world, terrain, &NPC_VILLAGE, x, y, g, false),
-        None => npc_site_fits(world, terrain, &NPC_VILLAGE, x, y, &taken_ground(world, terrain), false),
+        None => {
+            npc_site_fits(world, terrain, &NPC_VILLAGE, x, y, &taken_ground(world, terrain), false)
+        }
     }
 }
 
@@ -299,32 +333,53 @@ fn site_still_fits(world: &WorldState, terrain: &TerrainMap, hall: (i32, i32), g
 /// it knows of yields.
 pub fn lacked_good(world: &WorldState, city: &City, home: (i32, i32), size: i32) -> Option<Good> {
     [Good::Wood, Good::Stone, Good::IronOre, Good::GoldOre].into_iter().find(|good| {
-        !world.nodes.iter().any(|n| node_good(n.kind) == *good && knows_node(city, home, (n.x as i32, n.y as i32), size))
+        !world.nodes.iter().any(|n| {
+            node_good(n.kind) == *good && knows_node(city, home, (n.x as i32, n.y as i32), size)
+        })
     })
-}
-
-/// Whether a tile is on a realm's territory (`computeTerritory(world, size).owners` of a realm).
-/// TODO(T86.11): ask the ported territory; until then no realm's territory keeps a daughter off.
-fn on_realm_territory(_world: &WorldState, _x: i32, _y: i32, _size: i32) -> bool {
-    false
 }
 
 /// A site for a city's daughter (`findFoundingSite`), by its town hall's tile: of
 /// `NPC_FOUND_SAMPLES` random tiles between `NPC_CITY_MIN_DISTANCE` and `NPC_FOUND_REACH` from its
 /// home, those where a village fits with no tile of it on a realm's territory; the one nearest a
 /// node of the good it lacks wins, else the one nearest home.
-pub fn find_founding_site(world: &WorldState, terrain: &TerrainMap, city: &City, home: &Building) -> Option<(i32, i32)> {
+pub fn find_founding_site(
+    world: &WorldState,
+    terrain: &TerrainMap,
+    city: &City,
+    home: &Building,
+) -> Option<(i32, i32)> {
     let size = terrain.size;
     let mut m = Mulberry32::new(f64::from(hash_str(&format!("{}:{}", city.id, world.tick))));
     let ground = taken_ground(world, terrain);
     let span = NPC_VILLAGE.size as i32 + 2 * FARM_RING;
+    let realms: HashSet<&String> = world.realms.iter().map(|r| &r.id).collect();
+    let owners: std::cell::OnceCell<crate::queries::territory::Territory> =
+        std::cell::OnceCell::new();
     let on_realm = |x: i32, y: i32| {
-        (0..span).any(|dy| (0..span).any(|dx| on_realm_territory(world, wrap(x - FARM_RING + dx, size), wrap(y - FARM_RING + dy, size), size)))
+        let owners = &owners
+            .get_or_init(|| crate::queries::territory::compute_territory(world, size))
+            .owners;
+        (0..span).any(|dy| {
+            (0..span).any(|dx| {
+                let t = csp_shared::terrain::tile_index(
+                    size,
+                    wrap(x - FARM_RING + dx, size),
+                    wrap(y - FARM_RING + dy, size),
+                );
+                owners.get(&t).is_some_and(|o| realms.contains(o))
+            })
+        })
     };
     let home_at = (home.x as i32, home.y as i32);
     let good = lacked_good(world, city, home_at, size);
     let nodes: Vec<(i32, i32)> = match good {
-        Some(g) => world.nodes.iter().filter(|n| node_good(n.kind) == g).map(|n| (n.x as i32, n.y as i32)).collect(),
+        Some(g) => world
+            .nodes
+            .iter()
+            .filter(|n| node_good(n.kind) == g)
+            .map(|n| (n.x as i32, n.y as i32))
+            .collect(),
         None => Vec::new(),
     };
     let score = |at: (i32, i32)| {
@@ -397,9 +452,15 @@ fn party_lacks(world: &WorldState, members: &[usize], size: f64) -> [Stock; 2] {
 /// the storage, they first take from it, as much as fits: Food for the walk, what the party still
 /// lacks of its materials, then Food for their first weeks; then they build the town hall on the
 /// site by the Build default.
-pub fn step_founders(world: &mut WorldState, city_id: &str, members: &[usize], storage: Option<usize>, size: i32) {
+pub fn step_founders(
+    world: &mut WorldState,
+    city_id: &str,
+    members: &[usize],
+    storage: Option<usize>,
+    size: i32,
+) {
     let plan = world.city_plans.get(city_id);
-    let Some(site) = plan.and_then(|p| p.founding_site.clone()) else { return };
+    let Some(site) = plan.and_then(|p| p.founding_site) else { return };
     let party_size = founding_party(plan).len() as f64;
     let site_at = (site.x as i32, site.y as i32);
     for &i in members {
@@ -416,13 +477,26 @@ pub fn step_founders(world: &mut WorldState, city_id: &str, members: &[usize], s
                 let on_way = (food_walk - carried_food(r)).max(0.0);
                 let stay = (food_walk + food_stay - carried_food(r) - on_way).max(0.0);
                 let [hall, rest] = party_lacks(world, members, party_size);
-                let parts = [Stock::from([(Good::Food, on_way)]), hall, rest, Stock::from([(Good::Food, stay)])];
+                let parts = [
+                    Stock::from([(Good::Food, on_way)]),
+                    hall,
+                    rest,
+                    Stock::from([(Good::Food, stay)]),
+                ];
                 if let Some(load) = load_for(world, i, &parts, store) {
                     let (sid, sx, sy) = (store.id.clone(), store.x, store.y);
                     let order = if is_at(at, placed(store), size) {
-                        ResidentOrder::PickUp(PickUpOrder { from: GoodsSpot::Storage { storage_id: sid }, goods: load })
+                        ResidentOrder::PickUp(PickUpOrder {
+                            from: GoodsSpot::Storage { storage_id: sid },
+                            goods: load,
+                        })
                     } else {
-                        ResidentOrder::WalkTo(WalkOrder { target: Tile { x: sx, y: sy }, path: None, progress: 0.0, army: None })
+                        ResidentOrder::WalkTo(WalkOrder {
+                            target: Tile { x: sx, y: sy },
+                            path: None,
+                            progress: 0.0,
+                            army: None,
+                        })
                     };
                     world.residents[i].order = Some(order);
                     continue;
@@ -462,7 +536,7 @@ fn load_for(world: &WorldState, i: usize, wanted: &[Stock], storage: &Building) 
 pub fn found_daughter(world: &mut WorldState, city_id: &str) -> Option<String> {
     let plan = world.city_plans.get(city_id)?;
     let party = founding_party(Some(plan));
-    let site = plan.founding_site.clone()?;
+    let site = plan.founding_site?;
     if party.is_empty() || !hall_stands(world, plan) {
         return None;
     }
@@ -474,12 +548,17 @@ pub fn found_daughter(world: &mut WorldState, city_id: &str) -> Option<String> {
     let daughter = daughter.id.clone();
     let ids: HashSet<&String> = party.iter().collect();
     for r in &mut world.residents {
-        if !ids.contains(&r.id) || r.city_id.as_deref() != Some(city_id) || r.owner.is_some() || r.health <= 0.0 {
+        if !ids.contains(&r.id)
+            || r.city_id.as_deref() != Some(city_id)
+            || r.owner.is_some()
+            || r.health <= 0.0
+        {
             continue;
         }
         r.city_id = Some(daughter.clone());
         // One gone back to the mother's storage for materials comes to the daughter instead.
-        let fetching = r.script.as_ref().and_then(|s| s.memory.get("fetch")).is_some_and(|v| !v.is_null());
+        let fetching =
+            r.script.as_ref().and_then(|s| s.memory.get("fetch")).is_some_and(|v| !v.is_null());
         if fetching {
             stop_work(r);
         }
@@ -503,7 +582,9 @@ pub fn npc_cities_have_halls(world: &WorldState) -> Vec<InvariantViolation> {
         .filter(|c| c.realm_id.is_none())
         .filter(|c| {
             !world.buildings.iter().find(|b| b.id == c.town_hall_id).is_some_and(|h| {
-                h.kind == BuildingKind::TownHall && h.site.is_none() && h.city_id.as_ref() == Some(&c.id)
+                h.kind == BuildingKind::TownHall
+                    && h.site.is_none()
+                    && h.city_id.as_ref() == Some(&c.id)
             })
         })
         .map(|c| InvariantViolation {

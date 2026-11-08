@@ -48,7 +48,9 @@ fn away_on_trade_org_business(world: &WorldState) -> HashSet<String> {
         .chain(world.traders.iter().flat_map(|t| t.driver_id.iter().chain(&t.escort_ids)))
         .cloned()
         .collect();
-    away.extend(world.punishments.iter().flat_map(|p| p.members.iter().map(|m| m.resident_id.clone())));
+    away.extend(
+        world.punishments.iter().flat_map(|p| p.members.iter().map(|m| m.resident_id.clone())),
+    );
     away.extend(world.supply_wagons.iter().filter_map(|w| w.driver_id.clone()));
     away
 }
@@ -68,7 +70,8 @@ fn trade_org_army_wanted(_world: &WorldState) -> f64 {
 /// the work it hands out passes its soldiers by. `size` is the map's.
 pub fn step_npc_defence(world: &mut WorldState, size: i32) {
     let away = away_on_trade_org_business(world);
-    let ids: Vec<String> = world.cities.iter().filter(|c| c.realm_id.is_none()).map(|c| c.id.clone()).collect();
+    let ids: Vec<String> =
+        world.cities.iter().filter(|c| c.realm_id.is_none()).map(|c| c.id.clone()).collect();
     for id in ids {
         let Some(city) = world.cities.iter().find(|c| c.id == id).cloned() else { continue };
         let people: Vec<usize> = (0..world.residents.len())
@@ -87,7 +90,8 @@ pub fn step_npc_defence(world: &mut WorldState, size: i32) {
             raise_occupied(world, &city, &occupation.realm_id, size);
         }
         let tick = world.tick as f64;
-        let adults = people.iter().filter(|&&i| can_work(world.residents[i].born_at, tick)).count() as f64;
+        let adults =
+            people.iter().filter(|&&i| can_work(world.residents[i].born_at, tick)).count() as f64;
         if city.trade_org == Some(TradeOrgCity::Hq) {
             // Its army's weapons come from its goods warehouse, which keeps them in stock.
             let goods = world.buildings.iter().position(|b| {
@@ -99,13 +103,19 @@ pub fn step_npc_defence(world: &mut WorldState, size: i32) {
         }
         if city.trade_org == Some(TradeOrgCity::Post) {
             // A trading post arms from its warehouse, as far as it holds weapons.
-            let warehouse = world.buildings.iter().position(|b| b.city_id.as_deref() == Some(id.as_str()) && b.kind == BuildingKind::Warehouse);
+            let warehouse = world.buildings.iter().position(|b| {
+                b.city_id.as_deref() == Some(id.as_str()) && b.kind == BuildingKind::Warehouse
+            });
             keep_soldiers(world, &city, &people, npc_soldier_target(adults), warehouse);
         }
         if city.trade_org.is_some() {
             continue;
         }
-        let storage = world.buildings.iter().position(|b| b.city_id.as_deref() == Some(id.as_str()) && b.kind == BuildingKind::Storage && b.site.is_none());
+        let storage = world.buildings.iter().position(|b| {
+            b.city_id.as_deref() == Some(id.as_str())
+                && b.kind == BuildingKind::Storage
+                && b.site.is_none()
+        });
         keep_soldiers(world, &city, &people, npc_soldier_target(adults), storage);
         watch_gates(world, &city, size);
     }
@@ -120,9 +130,19 @@ pub fn trade_org_army_target(adults: f64, wanted: f64) -> f64 {
 /// Attackers in a city's area (`attackersOf`), by their place in `world.residents`.
 pub fn attackers_of(world: &WorldState, city: &City, size: i32) -> Vec<usize> {
     let occupiers = occupiers_of(world, city, size);
-    let own = |id: &str| world.residents.iter().find(|x| x.id == id).is_some_and(|t| t.owner.is_none() && t.city_id.as_ref() == Some(&city.id));
+    let own = |id: &str| {
+        world
+            .residents
+            .iter()
+            .find(|x| x.id == id)
+            .is_some_and(|t| t.owner.is_none() && t.city_id.as_ref() == Some(&city.id))
+    };
     let own_wall = |id: &str| {
-        world.buildings.iter().any(|b| b.id == id && b.city_id.as_ref() == Some(&city.id) && (b.kind == BuildingKind::Wall || b.kind == BuildingKind::Gate))
+        world.buildings.iter().any(|b| {
+            b.id == id
+                && b.city_id.as_ref() == Some(&city.id)
+                && (b.kind == BuildingKind::Wall || b.kind == BuildingKind::Gate)
+        })
     };
     (0..world.residents.len())
         .filter(|&i| {
@@ -134,7 +154,9 @@ pub fn attackers_of(world: &WorldState, city: &City, size: i32) -> Vec<usize> {
                 return false;
             }
             let attacking = match &r.order {
-                Some(ResidentOrder::Attack(o)) => o.defending != Some(true) && (own(&o.target_id) || own_wall(&o.target_id)),
+                Some(ResidentOrder::Attack(o)) => {
+                    o.defending != Some(true) && (own(&o.target_id) || own_wall(&o.target_id))
+                }
                 Some(ResidentOrder::Climb(o)) => own_wall(&o.wall_id),
                 _ => false,
             };
@@ -149,7 +171,9 @@ pub fn thieves_of(world: &WorldState, city: &City, size: i32) -> Vec<usize> {
     (0..world.residents.len())
         .filter(|&i| {
             let r = &world.residents[i];
-            thieves.contains(&r.id) && r.health > 0.0 && in_city_area(world, &city.id, r.x as i32, r.y as i32, size)
+            thieves.contains(&r.id)
+                && r.health > 0.0
+                && in_city_area(world, &city.id, r.x as i32, r.y as i32, size)
         })
         .collect()
 }
@@ -166,7 +190,9 @@ fn fight_attackers(world: &mut WorldState, city: &City, people: &[usize], size: 
     }
     let occupiers = occupiers_of(world, city, size);
     for &i in people {
-        if matches!(world.residents[i].order, Some(ResidentOrder::Attack(_))) || !defends_city(world, city, &world.residents[i], size) {
+        if matches!(world.residents[i].order, Some(ResidentOrder::Attack(_)))
+            || !defends_city(world, city, &world.residents[i], size)
+        {
             continue;
         }
         go_after_nearest(world, i, &attackers, &occupiers, size);
@@ -175,31 +201,61 @@ fn fight_attackers(world: &mut WorldState, city: &City, people: &[usize], size: 
 
 /// Sends a city's defender after the nearest of `attackers` (`goAfterNearest`). Going after one of
 /// the `occupiers` of its town hall is defending it, no crime.
-pub fn go_after_nearest(world: &mut WorldState, i: usize, attackers: &[usize], occupiers: &[usize], size: i32) {
+pub fn go_after_nearest(
+    world: &mut WorldState,
+    i: usize,
+    attackers: &[usize],
+    occupiers: &[usize],
+    size: i32,
+) {
     let at = tile(world, i);
     let nearest = attackers
         .iter()
         .copied()
-        .reduce(|a, b| if wrap_distance(size, at, tile(world, b)) < wrap_distance(size, at, tile(world, a)) { b } else { a })
+        .reduce(|a, b| {
+            if wrap_distance(size, at, tile(world, b)) < wrap_distance(size, at, tile(world, a)) {
+                b
+            } else {
+                a
+            }
+        })
         .expect("an attacker");
     let target = world.residents[nearest].id.clone();
-    world.residents[i].order = Some(ResidentOrder::Attack(attack_order(&target, false, occupiers.contains(&nearest))));
+    world.residents[i].order =
+        Some(ResidentOrder::Attack(attack_order(&target, false, occupiers.contains(&nearest))));
 }
 
 /// An NPC city keeps `target` soldiers (`keepSoldiers`): its armed adults are its soldiers and stop
 /// working. While it has too few, it arms one more adult at a time: with a weapon from `storage`,
 /// else with a spear from its smithy.
-fn keep_soldiers(world: &mut WorldState, city: &City, people: &[usize], target: f64, storage: Option<usize>) {
+fn keep_soldiers(
+    world: &mut WorldState,
+    city: &City,
+    people: &[usize],
+    target: f64,
+    storage: Option<usize>,
+) {
     let tick = world.tick as f64;
     // The armed member of a founding party goes with it, not counted here.
-    let party: HashSet<String> = founding_party(world.city_plans.get(&city.id)).into_iter().collect();
-    let adults: Vec<usize> = people.iter().copied().filter(|&i| can_work(world.residents[i].born_at, tick) && !party.contains(&world.residents[i].id)).collect();
-    let soldiers: Vec<usize> = adults.iter().copied().filter(|&i| is_armed(&world.residents[i].carried)).collect();
+    let party: HashSet<String> =
+        founding_party(world.city_plans.get(&city.id)).into_iter().collect();
+    let adults: Vec<usize> = people
+        .iter()
+        .copied()
+        .filter(|&i| {
+            can_work(world.residents[i].born_at, tick) && !party.contains(&world.residents[i].id)
+        })
+        .collect();
+    let soldiers: Vec<usize> =
+        adults.iter().copied().filter(|&i| is_armed(&world.residents[i].carried)).collect();
     let no_storage = no_storage_yet(world, city);
     for &i in &soldiers {
         let r = &mut world.residents[i];
         let task = r.script.as_ref().and_then(|s| s.task);
-        if task == Some(Task::Alarm) || task == Some(Task::Train) || (task == Some(Task::Build) && no_storage) {
+        if task == Some(Task::Alarm)
+            || task == Some(Task::Train)
+            || (task == Some(Task::Build) && no_storage)
+        {
             continue;
         }
         if matches!(r.order, Some(ResidentOrder::WorkAt(_)) | Some(ResidentOrder::Build(_))) {
@@ -212,13 +268,22 @@ fn keep_soldiers(world: &mut WorldState, city: &City, people: &[usize], target: 
         return;
     }
     // Its traders are never made soldiers.
-    let traders: HashSet<String> = world.city_plans.get(&city.id).and_then(|p| p.traders.as_ref()).into_iter().flatten().map(|t| t.resident_id.clone()).collect();
+    let traders: HashSet<String> = world
+        .city_plans
+        .get(&city.id)
+        .and_then(|p| p.traders.as_ref())
+        .into_iter()
+        .flatten()
+        .map(|t| t.resident_id.clone())
+        .collect();
     let unarmed: Vec<usize> = adults
         .iter()
         .copied()
         .filter(|&i| {
             let r = &world.residents[i];
-            !is_armed(&r.carried) && !matches!(r.order, Some(ResidentOrder::Attack(_))) && !traders.contains(&r.id)
+            !is_armed(&r.carried)
+                && !matches!(r.order, Some(ResidentOrder::Attack(_)))
+                && !traders.contains(&r.id)
         })
         .collect();
     if unarmed.is_empty() {
@@ -227,7 +292,8 @@ fn keep_soldiers(world: &mut WorldState, city: &City, people: &[usize], target: 
     let smithy = world.buildings.iter().position(|b| {
         b.kind == BuildingKind::Smithy
             && b.site.is_none()
-            && (b.city_id.as_ref() == Some(&city.id) || city.workplace_ids.iter().flatten().any(|id| *id == b.id))
+            && (b.city_id.as_ref() == Some(&city.id)
+                || city.workplace_ids.iter().flatten().any(|id| *id == b.id))
     });
     if let Some(s) = smithy {
         if take_from_smithy(world, s, &unarmed) {
@@ -244,7 +310,8 @@ fn keep_soldiers(world: &mut WorldState, city: &City, people: &[usize], target: 
     let (Some(s), Some(st), Some(recipe)) = (smithy, storage, recipe) else { return };
     let input: Stock = recipe_input(recipe).into_iter().collect();
     // One carrying a child can't work, so can't forge what they would fetch.
-    let smiths: Vec<usize> = unarmed.iter().copied().filter(|&i| world.residents[i].carrying.is_none()).collect();
+    let smiths: Vec<usize> =
+        unarmed.iter().copied().filter(|&i| world.residents[i].carrying.is_none()).collect();
     if smithing(world, s, &smiths, &input) {
         return;
     }
@@ -274,31 +341,40 @@ fn take_from_smithy(world: &mut WorldState, smithy: usize, unarmed: &[usize]) ->
             }
     });
     let Some(i) = here else { return false };
-    world.residents[i].order = Some(ResidentOrder::PickUp(PickUpOrder { from: GoodsSpot::Ground, goods: Stock::from([(weapon, 1.0)]) }));
+    world.residents[i].order = Some(ResidentOrder::PickUp(PickUpOrder {
+        from: GoodsSpot::Ground,
+        goods: Stock::from([(weapon, 1.0)]),
+    }));
     true
 }
 
 /// Sends one unarmed adult to the storage for `goods`, unless one is on the way already (`fetch`).
 fn fetch(world: &mut WorldState, storage: usize, unarmed: &[usize], goods: &Stock) {
     let tick = world.tick as f64;
-    let room = |i: usize| stock_weight(&world.residents[i].carried) + stock_weight(goods) <= carry_capacity(&world.residents[i], tick);
+    let room = |i: usize| {
+        stock_weight(&world.residents[i].carried) + stock_weight(goods)
+            <= carry_capacity(&world.residents[i], tick)
+    };
     let unarmed: Vec<usize> = unarmed.iter().copied().filter(|&i| room(i)).collect();
     let sb = &world.buildings[storage];
     let at = |i: usize| is_at(tile(world, i), placed(sb), MAP_SIZE);
     if let Some(&i) = unarmed.iter().find(|&&i| world.residents[i].order.is_none() && at(i)) {
         let from = GoodsSpot::Storage { storage_id: sb.id.clone() };
-        world.residents[i].order = Some(ResidentOrder::PickUp(PickUpOrder { from, goods: goods.clone() }));
+        world.residents[i].order =
+            Some(ResidentOrder::PickUp(PickUpOrder { from, goods: goods.clone() }));
         return;
     }
     let coming = unarmed.iter().any(|&i| matches!(&world.residents[i].order, Some(ResidentOrder::WalkTo(o)) if o.target.x == sb.x && o.target.y == sb.y));
     if coming {
         return;
     }
-    let sent = unarmed
-        .iter()
-        .copied()
-        .find(|&i| world.residents[i].order.is_none())
-        .or_else(|| unarmed.iter().copied().find(|&i| matches!(world.residents[i].order, Some(ResidentOrder::WorkAt(_)))));
+    let sent =
+        unarmed.iter().copied().find(|&i| world.residents[i].order.is_none()).or_else(|| {
+            unarmed
+                .iter()
+                .copied()
+                .find(|&i| matches!(world.residents[i].order, Some(ResidentOrder::WorkAt(_))))
+        });
     if let Some(i) = sent {
         let to = (sb.x, sb.y);
         world.residents[i].script = None;
@@ -345,7 +421,10 @@ fn army_let_past(world: &WorldState, city: &City) -> HashSet<String> {
         return ids;
     }
     let org = city_organization(city);
-    let aimed_here = |pid: Option<&String>| pid.and_then(|id| world.punishments.iter().find(|p| &p.id == id)).is_some_and(|p| p.culprit_org == org);
+    let aimed_here = |pid: Option<&String>| {
+        pid.and_then(|id| world.punishments.iter().find(|p| &p.id == id))
+            .is_some_and(|p| p.culprit_org == org)
+    };
     for p in &world.punishments {
         if p.culprit_org != org {
             ids.extend(p.members.iter().map(|m| m.resident_id.clone()));
@@ -381,7 +460,8 @@ fn watch_gates(world: &mut WorldState, city: &City, size: i32) {
             && !allied(world, &city.id, wall_side(r).unwrap_or(""))
             && gates.iter().any(|&g| {
                 let b = &world.buildings[g];
-                wrap_distance(size, (r.x as i32, r.y as i32), (b.x as i32, b.y as i32)) <= NPC_GATE_WATCH_RANGE
+                wrap_distance(size, (r.x as i32, r.y as i32), (b.x as i32, b.y as i32))
+                    <= NPC_GATE_WATCH_RANGE
             })
     });
     for g in gates {
@@ -397,11 +477,20 @@ pub fn npc_gate_shut_to_its_punishers(world: &WorldState, size: i32) -> Vec<Inva
     let mut out = Vec::new();
     let reach = NPC_GATE_WATCH_RANGE - GATE_WATCH_SLACK;
     for p in &world.punishments {
-        let Some(city) = world.cities.iter().find(|c| for_sale(c) && city_organization(c) == p.culprit_org) else { continue };
+        let Some(city) =
+            world.cities.iter().find(|c| for_sale(c) && city_organization(c) == p.culprit_org)
+        else {
+            continue;
+        };
         let open: Vec<&Building> = world
             .buildings
             .iter()
-            .filter(|b| b.city_id.as_ref() == Some(&city.id) && b.kind == BuildingKind::Gate && b.site.is_none() && b.closed != Some(true))
+            .filter(|b| {
+                b.city_id.as_ref() == Some(&city.id)
+                    && b.kind == BuildingKind::Gate
+                    && b.site.is_none()
+                    && b.closed != Some(true)
+            })
             .collect();
         for m in &p.members {
             let Some(r) = world.residents.iter().find(|x| x.id == m.resident_id) else { continue };
@@ -409,10 +498,15 @@ pub fn npc_gate_shut_to_its_punishers(world: &WorldState, size: i32) -> Vec<Inva
                 continue;
             }
             let at = (r.x as i32, r.y as i32);
-            if let Some(gate) = open.iter().find(|g| wrap_distance(size, at, (g.x as i32, g.y as i32)) <= reach) {
+            if let Some(gate) =
+                open.iter().find(|g| wrap_distance(size, at, (g.x as i32, g.y as i32)) <= reach)
+            {
                 out.push(InvariantViolation {
                     invariant: "npc-gate-shut-to-its-punishers".into(),
-                    message: format!("gate {} of {} is open to {}, who has come to punish it", gate.id, city.id, r.id),
+                    message: format!(
+                        "gate {} of {} is open to {}, who has come to punish it",
+                        gate.id, city.id, r.id
+                    ),
                     entity_ids: vec![gate.id.clone(), r.id.clone(), p.id.clone()],
                 });
             }
