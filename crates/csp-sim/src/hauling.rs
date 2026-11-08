@@ -11,9 +11,12 @@ use csp_shared::world::{
 use serde_json::Value;
 
 use crate::carrying::{CarryAction, CarryKind};
+use crate::driving::{army_start, army_to_supply};
 use crate::goods_deps::{ordered_resident, realm_of, OrderSender};
+use crate::queries::army::army_spot;
+use crate::queries::combat::in_contact;
 use crate::queries::command::{commands, commands_carriage};
-use crate::queries::driving::{army_spot, carriage_can_go_to, drive_problem, in_contact};
+use crate::queries::driving::{carriage_can_go_to, drive_problem};
 use crate::queries::goods::{
     free_stock, goods_at_spot, haul_stop_spot, units_that_fit, units_that_fit_carriage,
 };
@@ -38,27 +41,6 @@ fn read_goods(goods: Option<&Value>, min: usize) -> Option<Vec<Good>> {
     seen.sort_by_key(|g| good_name(*g));
     seen.dedup();
     (seen.len() == out.len()).then_some(out)
-}
-
-/// The army of the realm a haul goes to (`armyToSupply`), or why not. TODO(T86.4): `driving.rs`.
-fn army_to_supply(
-    world: &WorldState,
-    realm_id: &str,
-    army_id: Option<&Value>,
-) -> Result<usize, String> {
-    let id = army_id.and_then(Value::as_str);
-    world
-        .armies
-        .iter()
-        .position(|a| Some(a.id.as_str()) == id && a.realm_id == realm_id)
-        .ok_or_else(|| "not one of your armies".into())
-}
-
-/// Where an army stands to start with (`armyStart`): its first member's tile. TODO(T86.4).
-fn army_start(world: &WorldState, army: usize) -> (f64, f64) {
-    let first = world.armies[army].member_ids.first();
-    let r = first.and_then(|id| world.residents.iter().find(|r| &r.id == id));
-    r.map_or((0.0, 0.0), |r| (r.x, r.y))
 }
 
 /// Checks a haul order (`haul.validate`): one of the Player's adult residents drives one of the
@@ -88,8 +70,8 @@ pub fn validate_haul(
     let carriage = carriage.expect("commanded");
     let army_id = o.get("armyId");
     if army_id.is_some() {
-        if let Err(e) = army_to_supply(world, &realm.id, army_id) {
-            return Some(e);
+        if let Err(e) = army_to_supply(world, &realm.id, army_id.and_then(Value::as_str)) {
+            return Some(e.into());
         }
     } else {
         let (x, y) = (o.get("x"), o.get("y"));
@@ -100,7 +82,7 @@ pub fn validate_haul(
         if x == r.x && y == r.y {
             return Some("the other stop must be another tile".into());
         }
-        if terrain.is_some_and(|t| !carriage_can_go_to(world, t, x, y)) {
+        if terrain.is_some_and(|t| !carriage_can_go_to(world, t, x as i32, y as i32)) {
             return Some("a carriage can’t go there".into());
         }
     }
@@ -149,7 +131,10 @@ pub fn apply_haul(world: &mut WorldState, _sender: &OrderSender, order: &OrderRe
         },
     };
     let (x, y) = match army {
-        Some(a) => army_start(world, a),
+        Some(a) => {
+            let t = army_start(world, &world.armies[a]);
+            (t.x, t.y)
+        }
         None => (
             o.get("x").and_then(Value::as_f64).unwrap_or(0.0),
             o.get("y").and_then(Value::as_f64).unwrap_or(0.0),
@@ -248,7 +233,7 @@ fn stand_with_army(
     let load = &world.carriages[k].load;
     if !o.goods.iter().any(|g| held(load, *g) > kept(o, *g)) {
         drive_on(haul_mut(world, ri), HaulStop::From);
-    } else if !in_contact(size, (r.x, r.y), spot) {
+    } else if !in_contact(size, (r.x as i32, r.y as i32), (spot.0 as i32, spot.1 as i32)) {
         drive_on(haul_mut(world, ri), HaulStop::To);
     }
 }

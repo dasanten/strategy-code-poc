@@ -1,6 +1,5 @@
-//! `apps/server/src/buying.test.ts`, one test per `it`. The city joining the realm is `joinRealm`
-//! of `capture.ts` (T86.7); until it lands here the two tests that need it are ignored, and the
-//! invariants (`checkInvariants`) come with T86.13.
+//! `apps/server/src/buying.test.ts`, one test per `it`. The invariants (`checkInvariants`) come
+//! with T86.13.
 
 mod common;
 mod goods_support;
@@ -163,7 +162,6 @@ fn fails_with_too_few_coins_at_the_town_hall() {
 }
 
 #[test]
-#[ignore = "needs joinRealm (capture.ts, T86.7)"]
 fn counts_only_coins_carried_on_the_town_hall_itself() {
     let mut s = default_setup();
     s.at_mut("p2").x = 23.0;
@@ -175,7 +173,6 @@ fn counts_only_coins_carried_on_the_town_hall_itself() {
 }
 
 #[test]
-#[ignore = "needs joinRealm (capture.ts, T86.7)"]
 fn with_enough_coins_the_coins_are_gone_and_the_city_joins_the_realm_with_everything_in_it() {
     let mut s = default_setup();
     assert_eq!(s.order(buy()), "ack");
