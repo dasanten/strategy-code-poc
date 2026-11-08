@@ -13,7 +13,7 @@ use csp_shared::world::{Good, HaulOrder, HaulPhase, HaulStop, ResidentOrder, Sto
 use csp_sim::goods_deps::drop_goods;
 use csp_sim::queries::goods::pile_at;
 use csp_sim::tick::Scratch;
-use goods_support::{building, open, player, realm, resident, step_walking, stock, Queue};
+use goods_support::{building, new_resident, open, player, realm, step_walking, stock, Queue};
 use serde_json::{json, Value};
 
 /// A square map drawn as text (sides join): . plains, ^ mountain, ~ lake (`draw`).
@@ -49,7 +49,7 @@ fn setup(terrain: TerrainMap) -> Setup {
     let mut world = goods_support::world_on(&terrain);
     world.nodes.clear();
     world.realms.push(realm("r1", 7, "w1"));
-    let mut w1 = resident("w1", Some("r1"), 2.0, 2.0);
+    let mut w1 = new_resident(1.0, "w1", Some("r1"), 2.0, 2.0);
     w1.carried = stock(json!({ "food": 2 }));
     world.residents.push(w1);
     let s = AVERAGE_HORSE_STATS;

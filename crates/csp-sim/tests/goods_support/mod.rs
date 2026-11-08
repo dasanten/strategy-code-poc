@@ -309,3 +309,22 @@ pub fn step_walking(world: &mut WorldState, terrain: &TerrainMap, scratch: &mut 
     let mut walk = StraightWalk { size: terrain.size };
     step_world(world, terrain, scratch, Some(&mut walk), None);
 }
+
+/// A resident as `newResident(mulberry32(seed), { id, owner, x, y, tick: 0 })` draws them: base
+/// stats `between` `STAT_BASE_MIN` and `STAT_BASE_MAX` in `STAT_NAMES`' order, then an age
+/// between `START_AGE_MIN` and `START_AGE_MAX`. The name and lifespan drawn after are left as
+/// `resident` gives them: no goods rule reads them.
+pub fn new_resident(seed: f64, id: &str, owner: Option<&str>, x: f64, y: f64) -> Resident {
+    use csp_shared::balance::{START_AGE_MAX, START_AGE_MIN, STAT_BASE_MAX, STAT_BASE_MIN};
+    let mut rand = csp_sim::random::Mulberry32::new(seed);
+    let mut between = |min: f64, max: f64| min + (rand.next() * (max - min + 1.0)).floor();
+    let base: Vec<f64> = (0..4).map(|_| between(STAT_BASE_MIN, STAT_BASE_MAX)).collect();
+    let age = START_AGE_MIN + rand.next() * (START_AGE_MAX - START_AGE_MIN);
+    let mut r = resident(id, owner, x, y);
+    r.stats.strength.base = base[0];
+    r.stats.endurance.base = base[1];
+    r.stats.agility.base = base[2];
+    r.stats.intellect.base = base[3];
+    r.born_at = -ticks_for_age(age).round();
+    r
+}

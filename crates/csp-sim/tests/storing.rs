@@ -14,7 +14,7 @@ use csp_shared::world::{
 use csp_sim::goods_deps::OrderSender;
 use csp_sim::queries::goods::units_that_fit;
 use csp_sim::tick::Scratch;
-use goods_support::{building, open, player, realm, resident, step_walking, stock, Queue};
+use goods_support::{building, new_resident, open, player, realm, step_walking, stock, Queue};
 use serde_json::{json, Value};
 
 const SIZE: i32 = 16;
@@ -40,7 +40,7 @@ fn setup() -> Setup {
         }))
         .unwrap(),
     );
-    let mut r = resident("w1", Some("r1"), 5.0, 5.0);
+    let mut r = new_resident(1.0, "w1", Some("r1"), 5.0, 5.0);
     r.carried = stock(json!({ "wood": 10, "food": 1 }));
     world.residents.push(r);
     for (id, x, y, s) in

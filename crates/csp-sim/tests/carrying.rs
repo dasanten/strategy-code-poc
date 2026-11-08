@@ -9,7 +9,7 @@ use csp_sim::goods_deps::OrderSender;
 use csp_sim::queries::goods::carry_capacity;
 use csp_sim::queries::residents::stock_weight;
 use csp_sim::tick::Scratch;
-use goods_support::{building, open, order, player, realm, resident, step, total, Queue};
+use goods_support::{building, new_resident, open, order, player, realm, step, total, Queue};
 use serde_json::{json, Value};
 
 struct Setup {
@@ -24,7 +24,7 @@ fn setup(stock: Value) -> Setup {
     let terrain = open(16);
     let mut world = goods_support::world_on(&terrain);
     world.realms.push(realm("r1", 7, "w1"));
-    let mut r = resident("w1", Some("r1"), 1.0, 1.0);
+    let mut r = new_resident(1.0, "w1", Some("r1"), 1.0, 1.0);
     r.stats.strength.base = 10.0;
     world.residents.push(r);
     let storage: Building = building(
@@ -122,7 +122,7 @@ mod pick_up_order {
     #[test]
     fn never_lets_two_residents_take_the_same_goods() {
         let mut s = default_setup();
-        s.world.residents.push(resident("w2", Some("r1"), 1.0, 1.0));
+        s.world.residents.push(goods_support::new_resident(2.0, "w2", Some("r1"), 1.0, 1.0));
         s.world.piles.push(
             serde_json::from_value(json!({ "id": "p1", "x": 1, "y": 1, "goods": { "food": 6 } }))
                 .unwrap(),

@@ -12,7 +12,7 @@ use csp_sim::buying::buy_orders_done;
 use csp_sim::queries::city::city_price;
 use csp_sim::sight::entities_in_sight;
 use csp_sim::tick::Scratch;
-use goods_support::{building, open, player, realm, resident, step, Queue};
+use goods_support::{building, new_resident, open, player, realm, step, Queue};
 use serde_json::{json, Value};
 
 /// What the NPC city of `setup` asks: two residents, its town hall, a house and a farm.
@@ -67,7 +67,8 @@ fn setup(coins: [f64; 2]) -> Setup {
         .buildings
         .push(building(json!({ "id": "farm", "kind": "farm", "cityId": "npc", "x": 23, "y": 23 })));
     let mut add = |id: &str, owner: Option<&str>, x: f64, y: f64, city: Option<&str>| {
-        let mut r: Resident = resident(id, owner, x, y);
+        let seed = world.residents.len() as f64 + 1.0;
+        let mut r: Resident = new_resident(seed, id, owner, x, y);
         r.city_id = city.map(str::to_string);
         r.born_at = -20.0 * 24.0 * 3600.0;
         r.lifespan = 60.0;
@@ -120,8 +121,8 @@ impl Setup {
     }
     /// The seen entity `id` as plain data, from r1's sight (`entitiesInSight`).
     fn seen(&mut self, id: &str) -> Option<Value> {
-        let index = self.scratch.index(&self.world, self.terrain.size).clone();
-        let seen = entities_in_sight(&self.world, &index, Some("r1"), None);
+        let index = self.scratch.index(&self.world, self.terrain.size);
+        let seen = entities_in_sight(&self.world, index, Some("r1"), None);
         seen.iter().map(|e| serde_json::to_value(e).unwrap()).find(|e| e["id"] == id)
     }
 }
