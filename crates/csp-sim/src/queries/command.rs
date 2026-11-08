@@ -10,10 +10,8 @@ pub fn commander_of_resident(world: &WorldState, r: &Resident) -> Option<String>
     commander_of(world, &r.id, r.owner.as_deref())
 }
 
-/// Whether the realm's Player may give the resident orders (`commands`).
-pub fn commands(world: &WorldState, realm_id: &str, r: Option<&Resident>) -> bool {
-    r.is_some_and(|r| commander_of_resident(world, r).as_deref() == Some(realm_id))
-}
+/// Whether the realm's Player may give the resident orders (`commands`, in `order_sender.rs`).
+pub use crate::order_sender::commands;
 
 /// Whether the realm's Player may give orders with the carriage (`commandsCarriage`).
 pub fn commands_carriage(world: &WorldState, realm_id: &str, k: Option<&Carriage>) -> bool {

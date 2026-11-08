@@ -12,8 +12,8 @@ use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{Building, Good, RealmEventWhat, Resident, Stock, TradeSide, WorldState};
 use csp_sim::goods_made::tally_goods;
 use csp_sim::queries::city::town_hall_of;
-use csp_sim::queries::goods::carry_capacity;
 use csp_sim::queries::js_round;
+use csp_sim::queries::residents::carry_capacity;
 use csp_sim::queries::residents::{good_weight, stock_weight};
 use csp_sim::queries::standing::{standing_of, TRADE_ORG};
 use csp_sim::queries::warehouse::{price_for, stock_floor, HQ_COIN_WAREHOUSE};
@@ -301,7 +301,6 @@ fn at_the_hq_takes_and_pays_coins_from_its_coin_warehouse() {
 /// the test passes in the TypeScript only because survival drops what they can't carry
 /// (`stepSurvival`, T86.3), 900 coins of it; `bought` is then undefined and the sale rejected.
 #[test]
-#[ignore = "needs survival dropping what a resident can't carry (T86.3)"]
 fn always_costs_coins_to_buy_and_sell_back_or_sell_and_buy_back() {
     let mut s = post();
     for good in ["food", "iron", "goldOre"] {

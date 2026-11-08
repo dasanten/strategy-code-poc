@@ -104,7 +104,8 @@ fn check(
     }
     match &spot {
         GoodsSpot::Storage { storage_id }
-            if storage_at(world, r.x, r.y).map(|s| &s.id) != Some(storage_id) =>
+            if storage_at(world, r.x as i32, r.y as i32, MAP_SIZE).map(|s| &s.id)
+                != Some(storage_id) =>
         {
             return Err("the resident is not at that storage".into());
         }
@@ -301,7 +302,7 @@ fn take(
 ) {
     let (x, y) = (world.residents[ri].x, world.residents[ri].y);
     let source = match a.spot {
-        GoodsSpot::Ground => pile_index_at(world, x, y).map(Holder::Pile),
+        GoodsSpot::Ground => pile_index_at(world, x as i32, y as i32, MAP_SIZE).map(Holder::Pile),
         _ => spot_holder(world, ri, &a.spot),
     };
     let Some(source) = source else { return };

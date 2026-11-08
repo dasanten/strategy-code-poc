@@ -4,8 +4,8 @@
 use csp_shared::balance::TRADE_ORG_REFUSES_TRADE_BELOW;
 use csp_shared::world::{City, Resident, TradeOrgCity, WorldState};
 
-use super::directive::directive_against;
 use super::standing::{standing_of, standing_organization, TRADE_ORG};
+use crate::directive::directive_against;
 
 /// Why nothing goes by caravan once the HQ is gone (`NO_CARAVANS`).
 pub const NO_CARAVANS: &str = "no caravans run since the Trade Org HQ fell";

@@ -28,7 +28,7 @@ pub fn world_on(terrain: &TerrainMap) -> WorldState {
 
 /// The sender of a Player's orders.
 pub fn player(user_id: u64) -> OrderSender {
-    OrderSender { user_id, npc_city_id: None }
+    OrderSender::player(user_id, "Mara")
 }
 
 /// A realm of Player `user_id` led by `leader_id`.

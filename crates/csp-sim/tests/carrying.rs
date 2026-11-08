@@ -6,7 +6,7 @@ mod goods_support;
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{Building, Good, ResidentOrder, Stock, WorldState};
 use csp_sim::goods_deps::OrderSender;
-use csp_sim::queries::goods::carry_capacity;
+use csp_sim::queries::residents::carry_capacity;
 use csp_sim::queries::residents::stock_weight;
 use csp_sim::tick::Scratch;
 use goods_support::{building, new_resident, open, order, player, realm, step, total, Queue};

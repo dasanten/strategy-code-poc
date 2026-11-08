@@ -5,25 +5,16 @@
 //! the tests that need them say so.
 
 use csp_shared::balance::{
-    REALM_LOG_LENGTH, STANDING_NPC_TRADE_COINS_PER_POINT, STANDING_RANGE,
-    STANDING_TRADE_COINS_PER_POINT,
+    STANDING_NPC_TRADE_COINS_PER_POINT, STANDING_RANGE, STANDING_TRADE_COINS_PER_POINT,
 };
 use csp_shared::world::{
-    Building, Carriage, City, Pile, Realm, RealmEvent, RealmEventWhat, Resident, Standing,
-    StandingMove, Stock, WorldState,
+    Building, Carriage, City, Realm, Resident, Standing, StandingMove, Stock, WorldState,
 };
 
-use crate::queries::goods::pile_tile;
 use crate::queries::js_round;
 use crate::queries::standing::{standing_of, standing_organization, TRADE_ORG};
 
-/// Who sends an order (`OrderSender`): a Player's account, or an NPC city running the default
-/// scripts. TODO(T86.2): `orders.rs`.
-#[derive(Debug, Clone, PartialEq)]
-pub struct OrderSender {
-    pub user_id: u64,
-    pub npc_city_id: Option<String>,
-}
+pub use crate::order_sender::OrderSender;
 
 /// The Player's realm (`realmOf`). TODO(T86.8): `starting_city.rs`.
 pub fn realm_of(world: &WorldState, user_id: u64) -> Option<&Realm> {
@@ -36,49 +27,16 @@ pub fn new_id(world: &mut WorldState, prefix: &str) -> String {
 }
 
 /// Where in `world.residents` the resident an order names is, if its sender may order them
-/// (`orderedResident`). TODO(T86.2): `order_sender.rs`.
+/// (`orderedResident`, in `order_sender.rs`), from the order's plain `residentId`.
 pub fn ordered_resident(
     world: &WorldState,
     sender: &OrderSender,
     resident_id: Option<&serde_json::Value>,
 ) -> Option<usize> {
-    let id = resident_id?.as_str()?;
-    let i = world.residents.iter().position(|r| r.id == id)?;
-    let r = &world.residents[i];
-    if let Some(city) = &sender.npc_city_id {
-        let runs = r.owner.is_none()
-            && r.city_id.as_deref() == Some(city.as_str())
-            && crate::queries::alliance::contract_of(world, &r.id).is_none();
-        return runs.then_some(i);
-    }
-    let realm = realm_of(world, sender.user_id)?;
-    crate::queries::command::commands(world, &realm.id, Some(r)).then_some(i)
+    crate::order_sender::ordered_resident(world, sender, resident_id.and_then(|v| v.as_str()))
 }
 
-/// Writes an event in a realm's log (`recordEvent`). TODO(T86.13): `events.rs`.
-pub fn record_event(world: &mut WorldState, realm_id: Option<&str>, what: RealmEventWhat) {
-    let Some(user_id) =
-        realm_id.and_then(|id| world.realms.iter().find(|r| r.id == id)).map(|r| r.user_id)
-    else {
-        return;
-    };
-    let seq = world.next_id;
-    world.next_id += 1;
-    world.events.push(RealmEvent { seq, tick: world.tick, user_id, what });
-    let mine = world.events.iter().filter(|e| e.user_id == user_id).count();
-    let keep = REALM_LOG_LENGTH as usize;
-    if mine > keep {
-        let mut drop = mine - keep;
-        world.events.retain(|e| {
-            if drop > 0 && e.user_id == user_id {
-                drop -= 1;
-                false
-            } else {
-                true
-            }
-        });
-    }
-}
+pub use crate::events::record_event;
 
 /// The Organization a resident belongs to (`organizationOf`). TODO(T86.7): `crimes.rs`.
 pub fn organization_of(r: &Resident) -> Option<String> {
@@ -159,26 +117,7 @@ pub fn collects_transfer_from(_world: &WorldState, _r: &Resident, _storage_id: &
     false
 }
 
-/// Puts goods down on a tile's pile (`dropGoods`). TODO(T86.3): `survival.rs`.
-pub fn drop_goods(world: &mut WorldState, x: f64, y: f64, stock: &Stock, size: i32) {
-    let goods: Vec<_> = stock.iter().filter(|(_, n)| **n > 0.0).map(|(g, n)| (*g, *n)).collect();
-    if goods.is_empty() {
-        return;
-    }
-    let at = pile_tile(world, x, y, size);
-    let i = match world.piles.iter().position(|p| p.x == at.0 && p.y == at.1) {
-        Some(i) => i,
-        None => {
-            let id = format!("pile{}", world.next_id);
-            world.next_id += 1;
-            world.piles.push(Pile { id, x: at.0, y: at.1, goods: Stock::new() });
-            world.piles.len() - 1
-        }
-    };
-    for (good, n) in goods {
-        *world.piles[i].goods.entry(good).or_insert(0.0) += n;
-    }
-}
+pub use crate::survival::drop_goods;
 
 /// Changes how `of` regards `toward` by `delta` (`changeStanding`). TODO(T86.7): `standing.rs`.
 pub fn change_standing(world: &mut WorldState, of: &str, toward: &str, delta: f64) {

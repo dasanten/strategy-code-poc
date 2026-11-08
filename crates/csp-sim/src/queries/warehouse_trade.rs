@@ -12,8 +12,9 @@ use serde_json::Value;
 
 use super::building::KEEPS_GOODS;
 use super::command::commands_carriage;
-use super::goods::{carry_capacity, free_stock};
+use super::goods::free_stock;
 use super::names::{held, held_in, placed, PRICED_GOODS};
+use super::residents::carry_capacity;
 use super::residents::{can_work, good_weight, stock_weight};
 use super::trade_org::{trade_org_hq, trade_org_refuses, NO_CARAVANS};
 use super::warehouse::{price_for, stock_floor, trade_coin_warehouse, warehouse_keeps};

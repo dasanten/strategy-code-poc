@@ -1,39 +1,48 @@
-//! Where goods are and how many more fit (`packages/shared/src/goods.ts`, with `freeStock` of
-//! `offers.ts`, `canHandle`/`carryCapacity` of `balance.ts` and the carriage room helpers of
-//! `carriages.ts`), read only.
+//! World queries of `packages/shared/src/goods.ts` about where goods are (ADR 0002: the game API
+//! orders and scripts share). `put_away_units`, which needs no world, is in `csp_shared::goods`.
+//! The rest, for the goods rules (T86.5): sites, Down residents, a spot's goods, free stock,
+//! carriage room, `canHandle`, `materialsNeeded` and moving units between two stocks.
 
-use csp_shared::balance::{
-    CARRY_BASE, CARRY_PER_STRENGTH, CHILD_GOODS, MAP_SIZE, OWN_FOOD, PASSENGER_WEIGHT,
-};
+use csp_shared::balance::{CHILD_GOODS, MAP_SIZE, OWN_FOOD, PASSENGER_WEIGHT};
 use csp_shared::footprint::covers;
-use csp_shared::world::{
-    Building, Carriage, Good, GoodsSpot, Pile, Resident, StatName, Stock, WorldState,
-};
+use csp_shared::world::{Building, Carriage, Good, GoodsSpot, Pile, Resident, Stock, WorldState};
 
-use super::building::{building_at, KEEPS_GOODS};
+use super::building::{pile_tile, KEEPS_GOODS};
 use super::carriages::{carriage_capacity, passengers_of};
 use super::names::{good_name, held, placed};
 use super::offers::offers_at;
-use super::residents::{can_work, good_weight, is_down, stat_value, stock_weight};
-
-/// The tile whose pile is reached from (x, y) (`pileTile`): on a building's footprint its
-/// north-west tile, elsewhere the tile itself.
-pub fn pile_tile(world: &WorldState, x: f64, y: f64, size: i32) -> (f64, f64) {
-    match building_at(world, x as i32, y as i32, size) {
-        Some(b) => (b.x, b.y),
-        None => (x, y),
-    }
+use super::residents::{can_work, carry_capacity, good_weight, is_down, stock_weight};
+/// Where in `world.piles` the pile reached from a tile lies, if goods lie there (`pileAt`): on a
+/// building's footprint the building's one pile (`CONTEXT.md`: A building's pile), elsewhere the
+/// goods on the tile. `size` is the map's (`MAP_SIZE` in the TypeScript).
+pub fn pile_index_at(world: &WorldState, x: i32, y: i32, size: i32) -> Option<usize> {
+    let (px, py) = pile_tile(world, x, y, size);
+    world.piles.iter().position(|p| p.x == f64::from(px) && p.y == f64::from(py))
 }
 
-/// Where in `world.piles` the pile reached from a tile lies (`pileAt`).
-pub fn pile_index_at(world: &WorldState, x: f64, y: f64) -> Option<usize> {
-    let at = pile_tile(world, x, y, MAP_SIZE);
-    world.piles.iter().position(|p| p.x == at.0 && p.y == at.1)
+/// The finished building with a storage whose footprint covers a tile, if there is one
+/// (`storageAt`): a storage, or a stable's storage for its horses' Food (`KEEPS_GOODS`).
+pub fn storage_at(world: &WorldState, x: i32, y: i32, size: i32) -> Option<&Building> {
+    world.buildings.iter().find(|b| {
+        KEEPS_GOODS.contains(&b.kind) && b.site.is_none() && covers(placed(b), x, y, size)
+    })
+}
+
+/// How many more whole units of a good fit in what the resident carries at `tick`
+/// (`unitsThatFit`).
+pub fn units_that_fit(r: &Resident, good: Good, tick: f64) -> f64 {
+    let room = carry_capacity(r, tick) - stock_weight(&r.carried);
+    (room / good_weight(good) + 1e-9).floor().max(0.0)
+}
+
+/// Units of Food a resident carries (`r.carried.food ?? 0`).
+pub fn carried_food(r: &Resident) -> f64 {
+    held(&r.carried, Good::Food)
 }
 
 /// The pile reached from a tile (`pileAt`).
 pub fn pile_at(world: &WorldState, x: f64, y: f64) -> Option<&Pile> {
-    pile_index_at(world, x, y).map(|i| &world.piles[i])
+    pile_index_at(world, x as i32, y as i32, MAP_SIZE).map(|i| &world.piles[i])
 }
 
 /// Where in `world.buildings` the finished building with a storage covering a tile stands
@@ -44,11 +53,6 @@ pub fn storage_index_at(world: &WorldState, x: f64, y: f64) -> Option<usize> {
             && b.site.is_none()
             && covers(placed(b), x as i32, y as i32, MAP_SIZE)
     })
-}
-
-/// The finished building with a storage covering a tile (`storageAt`).
-pub fn storage_at(world: &WorldState, x: f64, y: f64) -> Option<&Building> {
-    storage_index_at(world, x, y).map(|i| &world.buildings[i])
 }
 
 /// Where in `world.buildings` the construction site `site_id` is, if (x, y) is on its footprint
@@ -107,21 +111,10 @@ pub fn goods_at_spot<'w>(
             down_on(world, x, y, resident_id).map(|r| &r.carried)
         }
         GoodsSpot::Storage { storage_id } => {
-            let s = storage_at(world, x, y)?;
+            let s = storage_at(world, x as i32, y as i32, MAP_SIZE)?;
             (&s.id == storage_id).then(|| s.stock.as_ref().unwrap_or(&NO_GOODS))
         }
     }
-}
-
-/// How much a resident can carry at `tick`, in kg (`carryCapacity`).
-pub fn carry_capacity(r: &Resident, tick: f64) -> f64 {
-    CARRY_BASE + CARRY_PER_STRENGTH * stat_value(r, StatName::Strength, tick)
-}
-
-/// How many more whole units of a good fit in what the resident carries (`unitsThatFit`).
-pub fn units_that_fit(r: &Resident, good: Good, tick: f64) -> f64 {
-    let room = carry_capacity(r, tick) - stock_weight(&r.carried);
-    0f64.max((room / good_weight(good) + 1e-9).floor())
 }
 
 /// Whether a resident may handle these goods (`canHandle`): grown up, or only goods a child may
@@ -194,7 +187,7 @@ pub fn units_that_fit_carriage(world: &WorldState, carriage: &Carriage, good: Go
 /// Where a hauler at (x, y) loads and unloads (`haulStopSpot`): the storage there, else the
 /// ground.
 pub fn haul_stop_spot(world: &WorldState, x: f64, y: f64) -> GoodsSpot {
-    match storage_at(world, x, y) {
+    match storage_at(world, x as i32, y as i32, MAP_SIZE) {
         Some(s) => GoodsSpot::Storage { storage_id: s.id.clone() },
         None => GoodsSpot::Ground,
     }
@@ -240,4 +233,20 @@ pub fn materials_needed(site: &Building) -> Stock {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_support::resident;
+
+    #[test]
+    fn counts_the_whole_units_that_still_fit() {
+        let mut r = resident("r1");
+        r.stats.strength.base = 10.0;
+        // 10 + 2 * 10 kg.
+        assert_eq!(units_that_fit(&r, Good::Food, 0.0), (30.0 / good_weight(Good::Food)).floor());
+        r.carried.insert(Good::Stone, 1000.0);
+        assert_eq!(units_that_fit(&r, Good::Food, 0.0), 0.0);
+    }
 }
