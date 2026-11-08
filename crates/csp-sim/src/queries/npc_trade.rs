@@ -309,6 +309,11 @@ pub fn stock_of(goods: &[(Good, f64)]) -> Stock {
     goods.iter().copied().collect()
 }
 
+/// Whether an NPC city counts as big (`isBigNpcCity`): two steps of needs or more.
+pub fn is_big_npc_city(world: &WorldState, city: &City) -> bool {
+    npc_needs_scale(world, city) > 1.0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
