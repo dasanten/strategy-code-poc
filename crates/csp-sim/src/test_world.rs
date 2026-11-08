@@ -188,3 +188,17 @@ pub fn until_hit(world: &mut WorldState, size: i32, id: &str, limit: usize) -> O
     }
     None
 }
+
+/// `cityTerrain()` of `test-terrain.ts`: the seed-1 map of 1536 tiles, made once.
+pub fn city_terrain() -> &'static csp_shared::terrain::TerrainMap {
+    static TERRAIN: std::sync::OnceLock<csp_shared::terrain::TerrainMap> = std::sync::OnceLock::new();
+    TERRAIN.get_or_init(|| crate::terrain_gen::generate_terrain(1, 1536))
+}
+
+/// `worldWithCity()`: a fresh world on `cityTerrain` where Player 1 has founded their city.
+pub fn world_with_city() -> WorldState {
+    let terrain = city_terrain();
+    let mut world = crate::world::create_world(terrain, 1);
+    crate::starting_city::found_starting_city(&mut world, terrain, 1, None);
+    world
+}

@@ -253,3 +253,6 @@ fn give_birth(world: &mut WorldState, parent_id: &str) -> Option<String> {
     record_event(world, child.owner.as_deref(), what);
     Some(child.id)
 }
+
+#[cfg(test)]
+mod tests;

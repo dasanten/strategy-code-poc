@@ -2,34 +2,20 @@
 //! fixtures are `createWorld(cityTerrain())` with `foundStartingCity` for Players 1 to n, so the
 //! Rust world founded the same way must be the same world. `checkInvariants` is T86.13's.
 
-use std::sync::OnceLock;
 
 use csp_shared::balance::{
     ADULT_AGE, HOUSING_ROOM, MAX_HEALTH, MAX_HUNGER, START_CARRIED_FOOD, START_CITY_SIZE, START_FOOD, START_HORSES,
     START_RESIDENTS, START_STABLE_FOOD, STAT_BASE_MAX, STAT_BASE_MIN,
 };
-use csp_shared::terrain::{terrain_at, Terrain, TerrainMap};
+use csp_shared::terrain::{terrain_at, Terrain};
 use csp_shared::world::{BuildingKind, Good, ResidentOrder, WorldState};
 
 use super::*;
 use crate::queries::city_area::{in_city_area, is_city_building};
 use crate::queries::residents::age_in_years;
-use crate::terrain_gen::generate_terrain;
+use crate::test_world::{city_terrain, world_with_city};
 use crate::world::create_world;
 
-/// `cityTerrain()`: the seed-1 map of 1536 tiles, made once.
-fn city_terrain() -> &'static TerrainMap {
-    static TERRAIN: OnceLock<TerrainMap> = OnceLock::new();
-    TERRAIN.get_or_init(|| generate_terrain(1, 1536))
-}
-
-/// `worldWithCity()`: a fresh world on `cityTerrain` where Player 1 has founded their city.
-fn world_with_city() -> WorldState {
-    let terrain = city_terrain();
-    let mut world = create_world(terrain, 1);
-    found_starting_city(&mut world, terrain, 1, None);
-    world
-}
 
 fn fixture(name: &str) -> WorldState {
     let path = format!("{}/fixtures/sight/{name}.json", env!("CARGO_MANIFEST_DIR"));
