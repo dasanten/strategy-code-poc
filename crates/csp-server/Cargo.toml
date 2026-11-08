@@ -28,12 +28,14 @@ base64 = "0.22"
 getrandom = "0.4"
 indexmap.workspace = true
 scrypt = { version = "0.11", default-features = false }
+csp-lang.workspace = true
+# The machine line of the benchmarks (`machineLine`): CPU model and memory.
+sysinfo = { version = "0.37", default-features = false, features = ["system"] }
+# `bench-sim save` reads a copy of the database.
+tempfile = "3"
 
 [build-dependencies]
 serde_json.workspace = true
-
-[dev-dependencies]
-tempfile = "3"
 
 [lints]
 workspace = true

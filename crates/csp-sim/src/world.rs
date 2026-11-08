@@ -15,6 +15,7 @@ use csp_shared::terrain::{is_passable_terrain, terrain_at, wrap, TerrainMap};
 use csp_shared::world::WorldState;
 
 use crate::node_gen::place_resource_nodes;
+use crate::terrain_gen::{timed, untimed, StageTimer};
 use crate::tick::{reborrow, Scratch, TickPhase, TickTimer, Walk};
 
 /// How many breaking changes to the script views there are so far (`SCRIPT_VIEW_CHANGES.length`).
@@ -69,12 +70,24 @@ pub fn create_world(terrain: &TerrainMap, seed: i64) -> WorldState {
 /// trading posts placed (`place_trading_posts`), with a caravan for each (`place_caravans`) and
 /// wandering traders going round them (`place_traders`).
 pub fn generate_world(terrain: &TerrainMap, seed: i64) -> WorldState {
-    let mut world = create_world(terrain, seed);
-    place_trade_org_hq(&mut world, terrain);
-    place_npc_cities(&mut world, terrain);
-    place_trading_posts(&mut world, terrain);
-    place_caravans(&mut world);
-    place_traders(&mut world, terrain.size);
+    generate_world_timed(terrain, seed, &mut untimed)
+}
+
+/// `generate_world`, telling `timer` how long each stage took (`generateWorld`'s `time`), for
+/// `bench-world`.
+pub fn generate_world_timed(
+    terrain: &TerrainMap,
+    seed: i64,
+    timer: &mut StageTimer<'_>,
+) -> WorldState {
+    let mut world = timed(timer, "nodes", || create_world(terrain, seed));
+    timed(timer, "HQ", || place_trade_org_hq(&mut world, terrain));
+    timed(timer, "NPC cities", || place_npc_cities(&mut world, terrain));
+    timed(timer, "trading posts", || place_trading_posts(&mut world, terrain));
+    timed(timer, "caravans", || {
+        place_caravans(&mut world);
+        place_traders(&mut world, terrain.size);
+    });
     world
 }
 
