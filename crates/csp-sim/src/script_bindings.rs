@@ -1707,3 +1707,6 @@ fn requests_sound(
     }
     out
 }
+
+#[cfg(test)]
+mod tests;
