@@ -3,6 +3,7 @@
 //! TypeScript game is checked against the fixtures in `fixtures/`.
 
 pub mod armies;
+pub mod breeding;
 pub mod capture;
 pub mod cities;
 pub mod combat;
@@ -10,14 +11,19 @@ pub mod crimes;
 pub mod defence;
 pub mod explored;
 pub mod goods_made;
+pub mod leader;
 pub mod node_gen;
+pub mod pairing;
 pub mod pathfinding;
 mod pending;
 pub mod persuasion;
 pub mod queries;
 pub mod random;
+pub mod relocating;
+pub mod renaming;
 pub mod sight;
 pub mod standing;
+pub mod starting_city;
 pub mod terrain_gen;
 #[cfg(test)]
 mod test_world;

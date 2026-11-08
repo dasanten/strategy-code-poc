@@ -8,6 +8,7 @@
 
 pub mod alliance;
 pub mod army;
+pub mod breeding;
 pub mod building;
 pub mod carriages;
 pub mod city;
@@ -18,6 +19,7 @@ pub mod horses;
 pub mod names;
 pub mod npc_trade;
 pub mod offers;
+pub mod people;
 pub mod persuasion;
 pub mod residents;
 pub mod standing;

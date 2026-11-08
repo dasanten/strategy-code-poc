@@ -258,3 +258,6 @@ pub(crate) fn ordered_resident(
         None
     }
 }
+
+pub(crate) mod ground;
+pub(crate) mod people;

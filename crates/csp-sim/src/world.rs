@@ -15,12 +15,15 @@ use csp_shared::terrain::{is_passable_terrain, terrain_at, wrap, TerrainMap};
 use csp_shared::world::WorldState;
 
 use crate::armies::step_armies;
+use crate::breeding::{request_breeding, resolve_breeding};
 use crate::capture::{step_captures, Capture};
 use crate::combat::{request_strikes, resolve_strikes, CombatResult};
 use crate::crimes::step_crimes;
 use crate::defence::NoAlarms;
 use crate::node_gen::place_resource_nodes;
+use crate::pairing::{request_births, resolve_births};
 use crate::persuasion::step_persuasion;
+use crate::relocating::step_relocating;
 use crate::standing::step_standing;
 use crate::tick::{reborrow, Scratch, TickPhase, TickTimer, Walk};
 
@@ -209,7 +212,7 @@ fn step_rest(
     let size = terrain.size;
     // Relocating residents who stepped into their new city's area move in (`CONTEXT.md`:
     // Relocate).
-    step_relocating(world, terrain, scratch);
+    step_relocating(world, terrain);
     let strikes = request_strikes(world, size);
     let strikes_len = strikes.len();
     // TODO(T86.12): the alarm rules (`alarms.ts`) behind `Alarms`.
@@ -242,12 +245,12 @@ fn step_rest(
     resolve_work(world, work, scratch);
     step_teaching(world, size, scratch);
     step_training(world, size, scratch);
-    let breeding = request_breeding(world, scratch);
+    let breeding = request_breeding(world);
     let breeding_len = breeding.len();
-    resolve_breeding(world, breeding, size, scratch);
-    let births = request_births(world, scratch);
+    resolve_breeding(world, &breeding, size);
+    let births = request_births(world);
     let births_len = births.len();
-    resolve_births(world, births, scratch);
+    resolve_births(world, &births);
     world.tick += 1;
     step_aging(world, size, scratch);
     answer_demands(world, size, scratch);
@@ -396,23 +399,6 @@ fn step_workplace_settings(_world: &mut WorldState, _scratch: &mut Scratch) {}
 
 // `reviving.ts` (feeding someone Down); not in T86.7's list of modules, so still to port.
 fn step_feeding(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
-
-// T86.8 (`relocating.ts`, `breeding.ts`, `pairing.ts`).
-fn step_relocating(_world: &mut WorldState, _terrain: &TerrainMap, _scratch: &mut Scratch) {}
-fn request_breeding(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<NoAction> {
-    Vec::new()
-}
-fn resolve_breeding(
-    _world: &mut WorldState,
-    _breeding: Vec<NoAction>,
-    _size: i32,
-    _scratch: &mut Scratch,
-) {
-}
-fn request_births(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<NoAction> {
-    Vec::new()
-}
-fn resolve_births(_world: &mut WorldState, _births: Vec<NoAction>, _scratch: &mut Scratch) {}
 
 // T86.9 (`caravans.ts`, `traders.ts`, `trade-org-army.ts`, `trade-org-punishment.ts`,
 // `trade-org-debt.ts`, `trade-org-wrecks.ts`).
