@@ -3,13 +3,18 @@
 //! TypeScript game is checked against the fixtures in `fixtures/`.
 
 pub mod aging;
+pub mod directive;
 pub mod events;
 pub mod explored;
 pub mod goods_made;
 pub mod names;
 pub mod node_gen;
+pub mod order_sender;
+pub mod orders;
 pub mod pathfinding;
 pub mod queries;
+pub mod queue;
+pub mod queues;
 pub mod random;
 pub mod residents;
 pub mod sight;
