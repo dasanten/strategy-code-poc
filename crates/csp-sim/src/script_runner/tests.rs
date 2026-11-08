@@ -164,7 +164,7 @@ fn the_run_script_order_is_only_for_the_players_own_residents_and_scripts_that_c
     let ok = s.lib.create(MARA, "idle", "let x = 1");
     let broken = s.lib.create(MARA, "broken", "let = ");
     let theirs = s.lib.create(8, "theirs", "let x = 1");
-    let mut order = |s: &mut Setup, id: u64, who: &str| {
+    let order = |s: &mut Setup, id: u64, who: &str| {
         let o = json!({ "kind": "runScript", "residentId": who, "scriptId": id });
         s.orders.receive(&s.world, &sender(), &json!("q"), &o)
     };

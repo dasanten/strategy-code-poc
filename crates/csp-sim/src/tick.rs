@@ -20,6 +20,7 @@ use serde::{Serialize, Serializer};
 
 use crate::goods_made::{tally_goods, GoodsMade};
 use crate::sight::{InvariantViolation, SightCache};
+use crate::trading::TradeLedger;
 use crate::world::step_world;
 use crate::world_index::{world_index, WorldIndex};
 
@@ -299,6 +300,8 @@ pub struct Scratch {
     pub made: GoodsMade,
     /// The orders waiting scripts wait on (`waitingOn`, T86.12).
     pub waiting: crate::script_runner::Waiting,
+    /// The trades of the latest `resolveTrades`, for the invariants over them (`ledger`).
+    pub trades: TradeLedger,
 }
 
 impl Scratch {

@@ -18,10 +18,13 @@ use crate::aging::{step_aging, AgingResult};
 use crate::alarms::GameAlarms;
 use crate::armies::step_armies;
 use crate::building::{request_building, resolve_building};
+use crate::buying::resolve_purchases;
 use crate::capture::{step_captures, Capture};
+use crate::carrying::{request_carrying, resolve_carrying, CarryAction};
 use crate::climbing::{request_climbing, resolve_climbing};
 use crate::combat::{request_strikes, resolve_strikes, CombatResult};
 use crate::crimes::step_crimes;
+use crate::hauling::request_hauling;
 use crate::horses::step_horses;
 use crate::node_gen::place_resource_nodes;
 use crate::passengers::step_passengers;
@@ -32,10 +35,12 @@ use crate::script_views::SCRIPT_VIEW_CHANGES;
 use crate::spoilage::step_spoilage;
 use crate::standing::step_standing;
 use crate::stock_floor::step_stock_floor;
+use crate::storing::request_storing;
 use crate::survival::{keep_down_still, step_refill, step_survival, SurvivalResult};
 use crate::teaching::step_teaching;
 use crate::teardown::{request_tearing_down, resolve_tearing_down, Felled};
 use crate::tick::{reborrow, Scratch, TickPhase, TickTimer, Walk};
+use crate::trading::resolve_trades;
 use crate::training::step_training;
 use crate::work::{request_work, resolve_work};
 use crate::workplace_settings::step_workplace_settings;
@@ -238,16 +243,16 @@ fn step_rest(
     let climbs = request_climbing(world);
     let climbs_len = climbs.len();
     resolve_climbing(world, &climbs, terrain);
-    let mut carries = request_carrying(world, scratch);
-    carries.extend(request_storing(world, scratch));
-    carries.extend(request_hauling(world, size, scratch));
+    let mut carries = request_carrying(world);
+    carries.extend(request_storing(world));
+    carries.extend(request_hauling(world, size));
     carries.extend(request_road_materials(world, scratch));
     let carries_len = carries.len();
-    resolve_carrying(world, carries, size, scratch);
+    resolve_carrying(world, &carries, size);
     step_feeding(world, size, scratch);
     let payments = resolve_payments(world, scratch);
-    let purchases = resolve_purchases(world, size, scratch);
-    let trades = resolve_trades(world, size, scratch);
+    let purchases = resolve_purchases(world, size);
+    let trades = resolve_trades(world, size, &mut scratch.trades);
     let accepted = resolve_offers(world, scratch);
     let buy_offs = resolve_buy_offs(world, scratch);
     let debts_paid = resolve_debt_payments(world, scratch);
@@ -328,32 +333,10 @@ fn place_traders(_world: &mut WorldState, _size: i32) {}
 // T86.10 (`npc-cities.ts`): world generation.
 fn place_npc_cities(_world: &mut WorldState, _terrain: &TerrainMap) {}
 
-// T86.5 (`carrying.ts`, `storing.ts`, `hauling.ts`, `road-line.ts`'s materials, `buying.ts`,
-// `trading.ts`, `offers.ts`).
-fn request_carrying(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<NoAction> {
+// Carrying, storing, hauling, buying and trading are T86.5's (`carrying.rs`, `storing.rs`,
+// `hauling.rs`, `buying.rs`, `trading.rs`); road materials and offers are still to come.
+fn request_road_materials(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<CarryAction> {
     Vec::new()
-}
-fn request_storing(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<NoAction> {
-    Vec::new()
-}
-fn request_hauling(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) -> Vec<NoAction> {
-    Vec::new()
-}
-fn request_road_materials(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<NoAction> {
-    Vec::new()
-}
-fn resolve_carrying(
-    _world: &mut WorldState,
-    _carries: Vec<NoAction>,
-    _size: i32,
-    _scratch: &mut Scratch,
-) {
-}
-fn resolve_purchases(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) -> usize {
-    0
-}
-fn resolve_trades(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) -> usize {
-    0
 }
 fn resolve_offers(_world: &mut WorldState, _scratch: &mut Scratch) -> usize {
     0
