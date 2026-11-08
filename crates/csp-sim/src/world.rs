@@ -17,6 +17,7 @@ use csp_shared::world::{Horse, WorldState};
 use crate::aging::{step_aging, AgingResult};
 use crate::alliances::step_alliances;
 use crate::armies::step_armies;
+use crate::breeding::{request_breeding, resolve_breeding};
 use crate::building::{request_building, resolve_building};
 use crate::buying::resolve_purchases;
 use crate::capture::{step_captures, Capture};
@@ -30,8 +31,10 @@ use crate::directives::{resolve_buy_offs, step_directives, BuyOffRecord};
 use crate::hauling::request_hauling;
 use crate::horses::step_horses;
 use crate::node_gen::place_resource_nodes;
+use crate::pairing::{request_births, resolve_births};
 use crate::passengers::step_passengers;
 use crate::persuasion::step_persuasion;
+use crate::relocating::step_relocating;
 use crate::riding::step_riders;
 use crate::spoilage::step_spoilage;
 use crate::standing::step_standing;
@@ -240,7 +243,7 @@ fn step_rest(
     let size = terrain.size;
     // Relocating residents who stepped into their new city's area move in (`CONTEXT.md`:
     // Relocate).
-    step_relocating(world, terrain, scratch);
+    step_relocating(world, terrain);
     let strikes = request_strikes(world, size);
     let strikes_len = strikes.len();
     // TODO(T86.12): the alarm rules (`alarms.ts`) behind `Alarms`.
@@ -273,12 +276,12 @@ fn step_rest(
     resolve_work(world, &work, scratch);
     step_teaching(world, size);
     step_training(world, size);
-    let breeding = request_breeding(world, scratch);
+    let breeding = request_breeding(world);
     let breeding_len = breeding.len();
-    resolve_breeding(world, breeding, size, scratch);
-    let births = request_births(world, scratch);
+    resolve_breeding(world, &breeding, size);
+    let births = request_births(world);
     let births_len = births.len();
-    resolve_births(world, births, scratch);
+    resolve_births(world, &births);
     world.tick += 1;
     let aging = step_aging(world, size);
     answer_demands(world, size, scratch);
@@ -334,9 +337,6 @@ fn step_rest(
 // many it resolved. A ticket deletes its stubs and adds a `use` of its module.
 // ------------------------------------------------------------------------------------------------
 
-/// No action yet: what a stub request returns until its ticket ports it.
-type NoAction = ();
-
 // T86.9 (`trade-org.ts`, `trading-posts.ts`, `caravans.ts`, `traders.ts`): world generation.
 fn place_trade_org_hq(_world: &mut WorldState, _terrain: &TerrainMap) {}
 fn place_trading_posts(_world: &mut WorldState, _terrain: &TerrainMap) {}
@@ -362,23 +362,6 @@ fn step_workplace_settings(_world: &mut WorldState, _scratch: &mut Scratch) {}
 
 // `reviving.ts` (feeding someone Down); not in T86.7's list of modules, so still to port.
 fn step_feeding(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
-
-// T86.8 (`relocating.ts`, `breeding.ts`, `pairing.ts`).
-fn step_relocating(_world: &mut WorldState, _terrain: &TerrainMap, _scratch: &mut Scratch) {}
-fn request_breeding(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<NoAction> {
-    Vec::new()
-}
-fn resolve_breeding(
-    _world: &mut WorldState,
-    _breeding: Vec<NoAction>,
-    _size: i32,
-    _scratch: &mut Scratch,
-) {
-}
-fn request_births(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<NoAction> {
-    Vec::new()
-}
-fn resolve_births(_world: &mut WorldState, _births: Vec<NoAction>, _scratch: &mut Scratch) {}
 
 // T86.9 (`caravans.ts`, `traders.ts`, `trade-org-army.ts`, `trade-org-punishment.ts`,
 // `trade-org-debt.ts`, `trade-org-wrecks.ts`).
