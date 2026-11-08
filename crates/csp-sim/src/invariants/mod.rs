@@ -422,3 +422,8 @@ pub(crate) fn violation(invariant: &str, message: String, ids: &[&str]) -> Invar
         entity_ids: ids.iter().map(|s| s.to_string()).collect(),
     }
 }
+
+/// The world invariant with this name, to run on its own (`buildingsInPlace.check(...)`).
+pub fn invariant_named(name: &str) -> Option<Invariant> {
+    world_invariants().into_iter().find(|i| i.name == name)
+}
