@@ -28,6 +28,7 @@ use csp_shared::world::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::explored::ExploredTerrain;
 use crate::queries::alliance::{carriage_commander_of, sharing_sight};
 use crate::queries::carriages::{
     carriage_capacity, crew_ids_of, load_level, passengers_of, stands_still,
@@ -1077,10 +1078,19 @@ pub fn sent_inside_unseen(
 }
 
 /// What explores terrain for a Player (`ExploredTerrain.explore`): marks every tile within
-/// `radius` of (x, y) explored for them and gives the chunks that grew. The explored terrain
-/// (T85.4) implements it.
+/// `radius` of (x, y) explored for them and gives the chunks that grew. [`ExploredTerrain`] is
+/// the game's; tests may explore otherwise.
 pub trait Explore {
     fn explore(&mut self, user_id: u64, x: i32, y: i32, radius: i32) -> HashSet<usize>;
+}
+
+impl Explore for ExploredTerrain {
+    fn explore(&mut self, user_id: u64, x: i32, y: i32, radius: i32) -> HashSet<usize> {
+        ExploredTerrain::explore(self, user_id, x, y, radius)
+            .into_iter()
+            .map(|c| c as usize)
+            .collect()
+    }
 }
 
 /// Grows each Player's explored terrain from what they see: their residents and their

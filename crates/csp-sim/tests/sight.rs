@@ -303,6 +303,22 @@ impl Explore for Explored {
 
 mod sight_tracker {
     use super::*;
+    use csp_shared::terrain::TerrainMap;
+    use csp_sim::explored::ExploredTerrain;
+
+    #[test]
+    fn explores_the_games_explored_terrain_as_the_test_double_does() {
+        let (world, size) = world_with_city();
+        let terrain = TerrainMap { size, tiles: vec![0; (size * size) as usize] };
+        let mut explored = ExploredTerrain::new(terrain, &[]);
+        let mut double = Explored::new(size);
+        let index = WorldIndex::new(&world, size);
+        let grown = SightTracker::new().update(&world, &index, &mut explored);
+        assert_eq!(grown, SightTracker::new().update(&world, &index, &mut double));
+        let user = world.realms[0].user_id;
+        let r = &world.residents[0];
+        assert!(explored.is_explored(user, r.x as i32 + SIGHT_RANGE as i32, r.y as i32));
+    }
 
     #[test]
     fn explores_around_residents_again_only_when_they_reach_a_new_tile() {
