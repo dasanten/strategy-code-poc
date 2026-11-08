@@ -70,3 +70,18 @@ pub fn free_stock(world: &WorldState, storage_id: &str, stock: Option<&Stock>) -
     }
     free
 }
+
+/// The finished storage `storage_id` if it is the realm's, or by its id an NPC city's
+/// (`offerStorage`).
+pub fn offer_storage<'w>(
+    world: &'w WorldState,
+    realm_id: &str,
+    storage_id: &str,
+) -> Option<&'w csp_shared::world::Building> {
+    let b = world.buildings.iter().find(|x| x.id == storage_id)?;
+    if b.kind != csp_shared::world::BuildingKind::Storage || b.site.is_some() {
+        return None;
+    }
+    let owner = super::city::building_realm(world, b).or(b.city_id.as_deref());
+    (owner == Some(realm_id)).then_some(b)
+}

@@ -360,10 +360,9 @@ pub fn take_over(world: &mut WorldState, _thief: &str, realm_id: &str, taken: Ta
 
 // ---- T86.9 (`caravans.ts`, `trade-org-punishment.ts`) -------------------------------------------
 
-/// Caravan crews waiting for their escort (`waitingForEscort`).
-// TODO(T86.9): `caravans::waiting_for_escort`. Nobody waits until caravans land.
-pub fn waiting_for_escort(_world: &WorldState, _size: i32) -> HashSet<String> {
-    HashSet::new()
+/// Caravan crews waiting for their escort (`waitingForEscort`, in `caravans.rs`).
+pub fn waiting_for_escort(world: &WorldState, size: i32) -> HashSet<String> {
+    crate::caravans::waiting_for_escort(world, size)
 }
 
 /// The Trade Org's soldiers waiting on the road (`waitingOnTheRoad`).

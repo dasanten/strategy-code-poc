@@ -41,6 +41,7 @@ pub mod territory;
 pub mod trade_org;
 pub mod trade_quotes;
 pub mod trader_trade;
+pub mod transfer;
 pub mod walls;
 pub mod warehouse;
 pub mod warehouse_trade;

@@ -21,15 +21,20 @@ pub(crate) fn workplaces_of_city(_world: &WorldState, _city_id: &str, _size: i32
     Vec::new()
 }
 
-/// `joinTradeOrg` (TODO(T86.9), `caravans.ts`).
-pub(crate) fn join_trade_org(_world: &mut WorldState, _city_id: &str, _size: i32) {}
+/// `joinTradeOrg`, in `caravans.rs`.
+pub(crate) fn join_trade_org(world: &mut WorldState, city_id: &str, size: i32) {
+    crate::caravans::join_trade_org(world, city_id, size);
+}
 
-/// `leaveTradeOrg` (TODO(T86.9), `caravans.ts`): a post stops being one. Only a post does
-/// anything there, and none of this ticket's tests has one.
-pub(crate) fn leave_trade_org(_world: &mut WorldState, _city_id: &str) {}
+/// `leaveTradeOrg`, in `caravans.rs`.
+pub(crate) fn leave_trade_org(world: &mut WorldState, city_id: &str) {
+    crate::caravans::leave_trade_org(world, city_id);
+}
 
-/// `rejoinTradeOrg` (TODO(T86.9), `caravans.ts`).
-pub(crate) fn rejoin_trade_org(_world: &mut WorldState, _city_id: &str, _size: i32) {}
+/// `rejoinTradeOrg`, in `caravans.rs`.
+pub(crate) fn rejoin_trade_org(world: &mut WorldState, city_id: &str, size: i32) {
+    crate::caravans::rejoin_trade_org(world, city_id, size);
+}
 
 /// `hqFalls` (TODO(T86.9), `hq-fall.ts`).
 pub(crate) fn hq_falls(_world: &mut WorldState, _city_id: &str) {}
