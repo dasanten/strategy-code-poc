@@ -275,6 +275,7 @@ export async function benchSim(
 
 interface JsonFile {
   name: string
+  status?: string
   startTime: number
   endTime: number
 }
@@ -312,6 +313,8 @@ export function benchSuite(out: Out = print): void {
     `wall time ${wallS.toFixed(0)} s; ${report.testResults.length} files, ${report.numTotalTests} tests, ` +
       `${report.numFailedTests} failed (exit ${run.status})`,
   )
+  const failed = report.testResults.filter((f) => f.status === 'failed')
+  for (const f of failed) out(`failed: ${path.relative(root, f.name).replaceAll('\\', '/')}`)
   out('')
   table(
     ['ten slowest files', 'seconds'],
