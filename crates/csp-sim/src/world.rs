@@ -12,13 +12,39 @@
 use std::collections::HashSet;
 
 use csp_shared::terrain::{is_passable_terrain, terrain_at, wrap, TerrainMap};
-use csp_shared::world::WorldState;
+use csp_shared::world::{Horse, WorldState};
 
+use crate::aging::{step_aging, AgingResult};
+use crate::alliances::step_alliances;
+use crate::armies::step_armies;
+use crate::breeding::{request_breeding, resolve_breeding};
 use crate::building::{request_building, resolve_building};
+use crate::buying::resolve_purchases;
+use crate::capture::{step_captures, Capture};
+use crate::carrying::{request_carrying, resolve_carrying, CarryAction};
+use crate::climbing::{request_climbing, resolve_climbing};
+use crate::combat::{request_strikes, resolve_strikes, CombatResult};
+use crate::contracts::{resolve_payments, step_contracts};
+use crate::crimes::step_crimes;
+use crate::defence::NoAlarms;
+use crate::directives::{resolve_buy_offs, step_directives, BuyOffRecord};
+use crate::hauling::request_hauling;
+use crate::horses::step_horses;
 use crate::node_gen::place_resource_nodes;
+use crate::pairing::{request_births, resolve_births};
+use crate::passengers::step_passengers;
+use crate::persuasion::step_persuasion;
+use crate::relocating::step_relocating;
+use crate::riding::step_riders;
+use crate::spoilage::step_spoilage;
+use crate::standing::step_standing;
+use crate::stock_floor::step_stock_floor;
+use crate::storing::request_storing;
+use crate::survival::{keep_down_still, step_refill, step_survival, SurvivalResult};
 use crate::teaching::step_teaching;
 use crate::teardown::{request_tearing_down, resolve_tearing_down, Felled};
 use crate::tick::{reborrow, Scratch, TickPhase, TickTimer, Walk};
+use crate::trading::resolve_trades;
 use crate::training::step_training;
 use crate::work::{request_work, resolve_work};
 
@@ -120,12 +146,25 @@ pub fn nearest_free_tile(
 pub struct StepResult {
     /// Actions requested this tick.
     pub actions: usize,
+    /// What combat did (`combat`).
+    pub combat: CombatResult,
+    /// Cities captured this tick (`captures`).
+    pub captures: Vec<Capture>,
     /// Milliseconds the game-run cities spent planning (`planCity`; ADR 0016).
     pub npc_plan_ms: f64,
     /// The NPC cities' residents' scripts that ran this tick (`runNpcScripts`), for tick health.
     pub npc_script_runs: usize,
     /// Milliseconds spent noting who came into a City area (`stepOutsiders`), for tick health.
     pub outsiders_ms: f64,
+    /// What survival did (`survival`): who died of hunger, which realms ended.
+    pub survival: SurvivalResult,
+    /// The horses that died this tick (`stepHorses`).
+    pub horses_died: Vec<Horse>,
+    /// What aging did (`aging`): who died of old age, which realms ended, who grew up.
+    pub aging: AgingResult,
+    /// This tick's buy-offs (`resolveBuyOffs`), for the `buy-offs-sound` invariant; the TypeScript
+    /// keeps them beside the world in a `WeakMap`.
+    pub buy_offs: Vec<BuyOffRecord>,
 }
 
 /// Advances the world by one tick (`stepWorld`, ADR 0002): survival, horses, spoilage and the
@@ -152,11 +191,12 @@ pub fn step_world(
     let size = terrain.size;
     // What the scripts saw is gone once the world steps (`SightCache`).
     scratch.new_sight_phase();
-    time(timer, TickPhase::Rest, || {
-        step_survival(world, terrain, scratch);
-        step_horses(world, terrain, scratch);
-        step_spoilage(world, scratch);
-        step_stock_floor(world, scratch);
+    let (survival, horses_died) = time(timer, TickPhase::Rest, || {
+        let survival = step_survival(world, terrain, scratch);
+        let horses_died = step_horses(world, terrain);
+        step_spoilage(world);
+        step_stock_floor(world, &mut scratch.made);
+        (survival, horses_died)
     });
     let mut npc_plan_ms = 0.0;
     let npc_script_runs = time(timer, TickPhase::Npc, || {
@@ -169,7 +209,7 @@ pub fn step_world(
         npc_plan_ms = step_npc_cities(world, size, terrain, reborrow(&mut walking), scratch);
         let runs = run_npc_scripts(world, terrain, scratch);
         // Whatever the game's own cities gave someone Down ends before they act on it.
-        keep_down_still(world, scratch);
+        keep_down_still(world);
         runs
     });
     let steps = time(timer, TickPhase::Walking, || match reborrow(&mut walking) {
@@ -184,12 +224,12 @@ pub fn step_world(
         step_last_seen(world, size, scratch);
     });
     time(timer, TickPhase::Rest, || {
-        step_riders(world, scratch);
-        step_passengers(world, scratch);
+        step_riders(world);
+        step_passengers(world);
         // A fight or an army may have given someone Down an order; it ends with the tick.
-        keep_down_still(world, scratch);
+        keep_down_still(world);
     });
-    StepResult { npc_script_runs, npc_plan_ms, ..result }
+    StepResult { npc_script_runs, npc_plan_ms, survival, horses_died, ..result }
 }
 
 /// The rest of `step_world` once the residents walked (`stepRest`): everything else they do,
@@ -203,25 +243,26 @@ fn step_rest(
     let size = terrain.size;
     // Relocating residents who stepped into their new city's area move in (`CONTEXT.md`:
     // Relocate).
-    step_relocating(world, terrain, scratch);
-    let strikes = request_strikes(world, size, scratch);
+    step_relocating(world, terrain);
+    let strikes = request_strikes(world, size);
     let strikes_len = strikes.len();
-    resolve_strikes(world, strikes, size, scratch);
-    let climbs = request_climbing(world, scratch);
+    // TODO(T86.12): the alarm rules (`alarms.ts`) behind `Alarms`.
+    let combat = resolve_strikes(world, &strikes, size, &mut NoAlarms, &mut scratch.made);
+    let climbs = request_climbing(world);
     let climbs_len = climbs.len();
-    resolve_climbing(world, climbs, terrain, scratch);
-    let mut carries = request_carrying(world, scratch);
-    carries.extend(request_storing(world, scratch));
-    carries.extend(request_hauling(world, size, scratch));
+    resolve_climbing(world, &climbs, terrain);
+    let mut carries = request_carrying(world);
+    carries.extend(request_storing(world));
+    carries.extend(request_hauling(world, size));
     carries.extend(request_road_materials(world, scratch));
     let carries_len = carries.len();
-    resolve_carrying(world, carries, size, scratch);
+    resolve_carrying(world, &carries, size);
     step_feeding(world, size, scratch);
-    let payments = resolve_payments(world, scratch);
-    let purchases = resolve_purchases(world, size, scratch);
-    let trades = resolve_trades(world, size, scratch);
+    let payments = resolve_payments(world);
+    let purchases = resolve_purchases(world, size);
+    let trades = resolve_trades(world, size, &mut scratch.trades);
     let accepted = resolve_offers(world, scratch);
-    let buy_offs = resolve_buy_offs(world, scratch);
+    let (buy_offs, buy_off_records) = resolve_buy_offs(world);
     let debts_paid = resolve_debt_payments(world, scratch);
     let builds = request_building(world);
     let builds_len = builds.len();
@@ -235,26 +276,26 @@ fn step_rest(
     resolve_work(world, &work, scratch);
     step_teaching(world, size);
     step_training(world, size);
-    let breeding = request_breeding(world, scratch);
+    let breeding = request_breeding(world);
     let breeding_len = breeding.len();
-    resolve_breeding(world, breeding, size, scratch);
-    let births = request_births(world, scratch);
+    resolve_breeding(world, &breeding, size);
+    let births = request_births(world);
     let births_len = births.len();
-    resolve_births(world, births, scratch);
+    resolve_births(world, &births);
     world.tick += 1;
-    step_aging(world, size, scratch);
+    let aging = step_aging(world, size);
     answer_demands(world, size, scratch);
-    step_alliances(world, scratch);
-    step_captures(world, terrain, scratch);
-    step_refill(world, size, scratch);
-    step_directives(world, scratch);
-    step_crimes(world, size, scratch);
-    step_contracts(world, scratch);
+    step_alliances(world);
+    let captures = step_captures(world, size, &mut NoAlarms);
+    step_refill(world, size);
+    step_directives(world);
+    step_crimes(world, size);
+    step_contracts(world);
     step_demands(world, scratch);
-    step_standing(world, scratch);
+    step_standing(world);
     step_debts(world, scratch);
-    step_persuasion(world, size, scratch);
-    step_armies(world, size, scratch);
+    step_persuasion(world, size);
+    step_armies(world, size);
     // Who came into a City area, now that everyone has moved and nobody changes sides this tick.
     let outsiders_from = std::time::Instant::now();
     step_outsiders(world, size, scratch);
@@ -278,7 +319,15 @@ fn step_rest(
         + accepted
         + buy_offs
         + debts_paid;
-    StepResult { actions, outsiders_ms, ..StepResult::default() }
+    StepResult {
+        actions,
+        combat,
+        captures,
+        outsiders_ms,
+        aging,
+        buy_offs: buy_off_records,
+        ..StepResult::default()
+    }
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -287,9 +336,6 @@ fn step_rest(
 // actions it requested (counted in `StepResult::actions`), a resolve without a list returns how
 // many it resolved. A ticket deletes its stubs and adds a `use` of its module.
 // ------------------------------------------------------------------------------------------------
-
-/// No action yet: what a stub request returns until its ticket ports it.
-type NoAction = ();
 
 // T86.9 (`trade-org.ts`, `trading-posts.ts`, `caravans.ts`, `traders.ts`): world generation.
 fn place_trade_org_hq(_world: &mut WorldState, _terrain: &TerrainMap) {}
@@ -300,55 +346,10 @@ fn place_traders(_world: &mut WorldState, _size: i32) {}
 // T86.10 (`npc-cities.ts`): world generation.
 fn place_npc_cities(_world: &mut WorldState, _terrain: &TerrainMap) {}
 
-// T86.3 (`survival.ts`, `spoilage.ts`, `stock-floor.ts`, `aging.ts`).
-fn step_survival(_world: &mut WorldState, _terrain: &TerrainMap, _scratch: &mut Scratch) {}
-fn step_spoilage(_world: &mut WorldState, _scratch: &mut Scratch) {}
-fn step_stock_floor(_world: &mut WorldState, _scratch: &mut Scratch) {}
-fn keep_down_still(_world: &mut WorldState, _scratch: &mut Scratch) {}
-fn step_aging(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
-fn step_refill(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
-
-// T86.4 (`horses.ts`, `climbing.ts`, `riding.ts`, `passengers.ts`).
-fn step_horses(_world: &mut WorldState, _terrain: &TerrainMap, _scratch: &mut Scratch) {}
-fn request_climbing(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<NoAction> {
+// Carrying, storing, hauling, buying and trading are T86.5's (`carrying.rs`, `storing.rs`,
+// `hauling.rs`, `buying.rs`, `trading.rs`); road materials and offers are still to come.
+fn request_road_materials(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<CarryAction> {
     Vec::new()
-}
-fn resolve_climbing(
-    _world: &mut WorldState,
-    _climbs: Vec<NoAction>,
-    _terrain: &TerrainMap,
-    _scratch: &mut Scratch,
-) {
-}
-fn step_riders(_world: &mut WorldState, _scratch: &mut Scratch) {}
-fn step_passengers(_world: &mut WorldState, _scratch: &mut Scratch) {}
-
-// T86.5 (`carrying.ts`, `storing.ts`, `hauling.ts`, `road-line.ts`'s materials, `buying.ts`,
-// `trading.ts`, `offers.ts`).
-fn request_carrying(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<NoAction> {
-    Vec::new()
-}
-fn request_storing(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<NoAction> {
-    Vec::new()
-}
-fn request_hauling(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) -> Vec<NoAction> {
-    Vec::new()
-}
-fn request_road_materials(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<NoAction> {
-    Vec::new()
-}
-fn resolve_carrying(
-    _world: &mut WorldState,
-    _carries: Vec<NoAction>,
-    _size: i32,
-    _scratch: &mut Scratch,
-) {
-}
-fn resolve_purchases(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) -> usize {
-    0
-}
-fn resolve_trades(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) -> usize {
-    0
 }
 fn resolve_offers(_world: &mut WorldState, _scratch: &mut Scratch) -> usize {
     0
@@ -359,41 +360,8 @@ fn step_offers(_world: &mut WorldState, _scratch: &mut Scratch) {}
 // `workplace-settings.ts` is not ported yet (T86.6 left it: its ticket does not name it).
 fn step_workplace_settings(_world: &mut WorldState, _scratch: &mut Scratch) {}
 
-// T86.7 (`combat.ts`, `armies.ts`, `capture.ts`, `crimes.ts`, `standing.ts`, `persuasion.ts`,
-// `reviving.ts`).
-fn request_strikes(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) -> Vec<NoAction> {
-    Vec::new()
-}
-fn resolve_strikes(
-    _world: &mut WorldState,
-    _strikes: Vec<NoAction>,
-    _size: i32,
-    _scratch: &mut Scratch,
-) {
-}
+// `reviving.ts` (feeding someone Down); not in T86.7's list of modules, so still to port.
 fn step_feeding(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
-fn step_captures(_world: &mut WorldState, _terrain: &TerrainMap, _scratch: &mut Scratch) {}
-fn step_crimes(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
-fn step_standing(_world: &mut WorldState, _scratch: &mut Scratch) {}
-fn step_persuasion(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
-fn step_armies(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
-
-// T86.8 (`relocating.ts`, `breeding.ts`, `pairing.ts`).
-fn step_relocating(_world: &mut WorldState, _terrain: &TerrainMap, _scratch: &mut Scratch) {}
-fn request_breeding(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<NoAction> {
-    Vec::new()
-}
-fn resolve_breeding(
-    _world: &mut WorldState,
-    _breeding: Vec<NoAction>,
-    _size: i32,
-    _scratch: &mut Scratch,
-) {
-}
-fn request_births(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<NoAction> {
-    Vec::new()
-}
-fn resolve_births(_world: &mut WorldState, _births: Vec<NoAction>, _scratch: &mut Scratch) {}
 
 // T86.9 (`caravans.ts`, `traders.ts`, `trade-org-army.ts`, `trade-org-punishment.ts`,
 // `trade-org-debt.ts`, `trade-org-wrecks.ts`).
@@ -428,18 +396,9 @@ fn step_npc_cities(
 }
 fn step_outsiders(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
 
-// T86.11 (`alliances.ts`, `contracts.ts`, `demands.ts`, `directives.ts`).
-fn step_alliances(_world: &mut WorldState, _scratch: &mut Scratch) {}
-fn resolve_payments(_world: &mut WorldState, _scratch: &mut Scratch) -> usize {
-    0
-}
-fn step_contracts(_world: &mut WorldState, _scratch: &mut Scratch) {}
+// `demands.ts` (filed under T86.11 here, but named by no ticket; T86.14 or whoever ports it).
 fn answer_demands(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
 fn step_demands(_world: &mut WorldState, _scratch: &mut Scratch) {}
-fn step_directives(_world: &mut WorldState, _scratch: &mut Scratch) {}
-fn resolve_buy_offs(_world: &mut WorldState, _scratch: &mut Scratch) -> usize {
-    0
-}
 
 // T86.12 (`script-runner.ts`). Returns how many NPC scripts ran.
 fn run_npc_scripts(

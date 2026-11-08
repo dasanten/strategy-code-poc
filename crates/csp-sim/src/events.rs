@@ -1,29 +1,32 @@
-//! The Players' logs (`apps/server/src/events.ts`, `CONTEXT.md`: Events): what happened in a
-//! realm, kept in the world, the latest `REALM_LOG_LENGTH` of each Player's.
+//! The Players' realm logs (`apps/server/src/events.ts`): writing down what happened in a realm.
+//!
+//! Ported with the residents (T86.3), who write the most of it; T86.13 adds the rest of
+//! `events.ts` and the invariants over it here.
 
 use csp_shared::balance::REALM_LOG_LENGTH;
 use csp_shared::world::{RealmEvent, RealmEventWhat, WorldState};
 
 /// Writes down something that happened in a realm, in its Player's log (`recordEvent`); an event
-/// for no realm (a resident or city that belongs to nobody) is not kept.
+/// for no realm (a resident or city that belongs to nobody) is not kept. Each Player keeps their
+/// latest `REALM_LOG_LENGTH` events; the oldest go first.
 pub fn record_event(world: &mut WorldState, realm_id: Option<&str>, what: RealmEventWhat) {
-    let user = realm_id.and_then(|id| world.realms.iter().find(|r| r.id == id)).map(|r| r.user_id);
-    if let Some(user_id) = user {
+    let Some(realm_id) = realm_id else { return };
+    let user_id = world.realms.iter().find(|x| x.id == realm_id).map(|r| r.user_id);
+    if let Some(user_id) = user_id {
         record_player_event(world, user_id, what);
     }
 }
 
 /// Writes down something for a Player's log, whether they have a realm now or not
-/// (`recordPlayerEvent`). Each Player keeps their latest `REALM_LOG_LENGTH` events; the oldest go
-/// first.
+/// (`recordPlayerEvent`).
 pub fn record_player_event(world: &mut WorldState, user_id: u64, what: RealmEventWhat) {
     let seq = world.next_id;
     world.next_id += 1;
     world.events.push(RealmEvent { seq, tick: world.tick, user_id, what });
     let mine = world.events.iter().filter(|e| e.user_id == user_id).count();
-    let max = REALM_LOG_LENGTH as usize;
-    if mine > max {
-        let mut drop = mine - max;
+    let keep = REALM_LOG_LENGTH as usize;
+    if mine > keep {
+        let mut drop = mine - keep;
         world.events.retain(|e| {
             if drop > 0 && e.user_id == user_id {
                 drop -= 1;
@@ -43,48 +46,29 @@ pub fn events_for(world: &WorldState, user_id: u64, after: u64) -> Vec<&RealmEve
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::world::create_world;
-    use csp_shared::terrain::TerrainMap;
+    use csp_shared::world::Realm;
 
-    fn spoiled(units: f64) -> RealmEventWhat {
-        serde_json::from_value(serde_json::json!({ "kind": "foodSpoiled", "units": units }))
-            .unwrap()
-    }
-
-    fn units(e: &RealmEvent) -> f64 {
-        serde_json::to_value(e).unwrap()["units"].as_f64().unwrap()
-    }
-
-    /// `events.test.ts`' "keeps each Player's own events, the latest REALM_LOG_LENGTH of them",
-    /// on two bare realms instead of starting cities (T86.8); its invariant check is
-    /// `realm_logs_in_order`'s test.
     #[test]
-    fn keeps_each_players_own_events_the_latest_realm_log_length_of_them() {
-        let mut world = create_world(&TerrainMap { size: 16, tiles: vec![0; 256] }, 1);
-        for (id, user) in [("r1", 1), ("r2", 2)] {
-            world.realms.push(
-                serde_json::from_value(
-                    serde_json::json!({ "id": id, "userId": user, "leaderId": "x" }),
-                )
-                .unwrap(),
-            );
+    fn keeps_each_players_latest_events_and_none_for_no_realm() {
+        let mut world = crate::world::create_world(&crate::test_support::plains(16), 1);
+        world.realms.push(Realm {
+            id: "realm1".into(),
+            user_id: 7,
+            leader_id: "r1".into(),
+            name: None,
+            demands_sent_at: None,
+        });
+        let what = || RealmEventWhat::FoodSpoiled { units: 1.0 };
+        record_event(&mut world, None, what());
+        record_event(&mut world, Some("nobody"), what());
+        assert!(world.events.is_empty());
+        record_player_event(&mut world, 8, what());
+        for _ in 0..(REALM_LOG_LENGTH as usize + 5) {
+            record_event(&mut world, Some("realm1"), what());
         }
-        record_event(&mut world, Some("r2"), spoiled(1.0));
-        let max = REALM_LOG_LENGTH as usize;
-        for i in 0..max + 5 {
-            record_event(&mut world, Some("r1"), spoiled(i as f64));
-        }
-        let log: Vec<RealmEvent> = events_for(&world, 1, 0).into_iter().cloned().collect();
-        assert_eq!(log.len(), max);
-        assert_eq!(units(&log[0]), 5.0);
-        let theirs = events_for(&world, 2, 0);
-        assert_eq!(theirs.len(), 1);
-        assert_eq!(units(theirs[0]), 1.0);
-        let after: Vec<RealmEvent> =
-            events_for(&world, 1, log[1].seq).into_iter().cloned().collect();
-        assert_eq!(after, log[2..]);
-        // Nobody's events are kept for nobody.
-        record_event(&mut world, None, spoiled(9.0));
-        assert_eq!(world.events.len(), max + 1);
+        assert_eq!(events_for(&world, 7, 0).len(), REALM_LOG_LENGTH as usize);
+        assert_eq!(events_for(&world, 8, 0).len(), 1);
+        // The oldest went first: the first kept is the sixth written for the realm.
+        assert_eq!(events_for(&world, 7, 0)[0].seq, world.next_id - REALM_LOG_LENGTH as u64);
     }
 }

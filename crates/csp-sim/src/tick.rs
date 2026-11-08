@@ -21,6 +21,7 @@ use serde::{Serialize, Serializer};
 use crate::goods_made::{tally_goods, GoodsMade};
 use crate::invariants::{check_invariants, invariants_for_tick, world_invariants, Invariant};
 use crate::sight::{InvariantViolation, SightCache};
+use crate::trading::TradeLedger;
 use crate::world::step_world;
 use crate::world_index::{world_index, WorldIndex};
 
@@ -300,6 +301,8 @@ pub struct Scratch {
     pub made: GoodsMade,
     /// When each realm's Last seen was last refreshed (`refreshes`, `soon` of `last-seen.ts`).
     pub last_seen: crate::last_seen::LastSeenState,
+    /// The trades of the latest `resolveTrades`, for the invariants over them (`ledger`).
+    pub trades: TradeLedger,
 }
 
 impl Scratch {

@@ -12,8 +12,8 @@ use csp_shared::world::{
     BuildingKind, ConstructionSite, Good, ResidentOrder, ResourceKind, ResourceNode, Stock,
     WorldState,
 };
+use csp_sim::order_sender::OrderSender;
 use csp_sim::queries::building::{build_materials, build_problem, carriage_site_at, TerrainLookup};
-use csp_sim::stand_ins::OrderSender;
 use csp_sim::world::create_world;
 use serde_json::json;
 

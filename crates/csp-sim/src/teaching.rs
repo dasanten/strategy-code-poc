@@ -10,9 +10,10 @@ use csp_shared::world::{
     BuildingKind, OrderRequest, ResidentOrder, TeachOrder, TrainingSubject, WorldState,
 };
 
+use crate::order_sender::{npc_training_problem, ordered_resident, OrderSender};
 use crate::queries::building::{building_at, teach_problem, teacher_at};
 use crate::queries::names::placed;
-use crate::stand_ins::{npc_training_problem, ordered_resident, str_field, OrderSender};
+use crate::queue::field_str as str_field;
 
 /// The training subject an order's input names, if it names one (`isTrainingSubject`).
 pub fn subject_of(order: &OrderRequest) -> Option<TrainingSubject> {
@@ -32,6 +33,7 @@ pub fn validate_teach(
     };
     let r = &world.residents[ri];
     let problem = npc_training_problem(world, sender, r)
+        .map(String::from)
         .or_else(|| teach_problem(world, r, subject_of(order)));
     if problem.is_some() {
         return problem;

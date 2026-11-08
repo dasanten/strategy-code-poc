@@ -11,8 +11,8 @@ use csp_shared::world::{
     Stock, WorldState,
 };
 use csp_sim::building::{apply_build, validate_build};
+use csp_sim::order_sender::OrderSender;
 use csp_sim::road_line::{apply_line, validate_line, LineKind};
-use csp_sim::stand_ins::OrderSender;
 use csp_sim::teaching::{apply_teach, validate_teach};
 use csp_sim::teardown::{apply_tear_down, validate_tear_down};
 use csp_sim::tick::Scratch;
@@ -28,7 +28,7 @@ pub fn plains(size: i32) -> TerrainMap {
 
 /// A Player's sender (`{ userId, account }`).
 pub fn player(user_id: u64) -> OrderSender {
-    OrderSender { user_id, npc_city_id: None }
+    OrderSender::player(user_id, "Mara")
 }
 
 /// A realm.

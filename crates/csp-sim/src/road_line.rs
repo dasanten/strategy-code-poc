@@ -10,12 +10,13 @@ use csp_shared::world::{
     BuildingKind, LineOrder, LinePhase, OrderRequest, ResidentOrder, WorldState,
 };
 
+use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::queries::building::{
     build_problem, building_at, road_at, road_line, TerrainLookup, CARRYING_A_CHILD,
 };
 use crate::queries::names::kind_name;
 use crate::queries::residents::can_work;
-use crate::stand_ins::{commands, realm_of, str_field, OrderSender};
+use crate::queue::field_str as str_field;
 
 /// Which line order: a road line or a wall line (`LineOrder['kind']`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,7 +70,7 @@ pub fn validate_line(
     let (Some(realm), Some(r)) = (realm, r) else {
         return Some("not one of your residents".into());
     };
-    if !commands(world, &realm.id, r) {
+    if !commands(world, &realm.id, Some(r)) {
         return Some("not one of your residents".into());
     }
     if !can_work(r.born_at, world.tick as f64) {

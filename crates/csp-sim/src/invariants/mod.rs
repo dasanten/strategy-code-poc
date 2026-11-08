@@ -61,20 +61,31 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant { name: "horse-stats-sound", check: checks::horse_stats_sound },
         Invariant { name: "ages-in-range", check: checks::ages_in_range },
         Invariant { name: "realms-have-leaders", check: checks::realms_have_leaders },
-        // TODO(T86.8): `leadersServeNoOne` in `leader.ts`.
-        pending("leaders-serve-no-one"),
-        // TODO(T86.8): `residentNamesWellFormed` in `renaming.ts`.
-        pending("resident-names-well-formed"),
-        // TODO(T86.8): `cityNamesWellFormed` in `renaming.ts`.
-        pending("city-names-well-formed"),
-        // TODO(T86.8): `horseNamesWellFormed` in `renaming.ts`.
-        pending("horse-names-well-formed"),
-        // TODO(T86.8): `gameNamesUnique` in `names.ts`.
-        pending("game-names-unique"),
-        // TODO(T86.8): `cityGameNamesUnique` in `names.ts`.
-        pending("city-game-names-unique"),
-        // TODO(T86.8): `horseOffersOnce` in `horse-grant.ts`.
-        pending("horse-offers-once"),
+        Invariant {
+            name: "leaders-serve-no-one",
+            check: |w, _| crate::leader::leaders_serve_no_one(w),
+        },
+        Invariant {
+            name: "resident-names-well-formed",
+            check: |w, _| crate::renaming::resident_names_well_formed(w),
+        },
+        Invariant {
+            name: "city-names-well-formed",
+            check: |w, _| crate::renaming::city_names_well_formed(w),
+        },
+        Invariant {
+            name: "horse-names-well-formed",
+            check: |w, _| crate::renaming::horse_names_well_formed(w),
+        },
+        Invariant { name: "game-names-unique", check: |w, _| crate::names::game_names_unique(w) },
+        Invariant {
+            name: "city-game-names-unique",
+            check: |w, _| crate::names::city_game_names_unique(w),
+        },
+        Invariant {
+            name: "horse-offers-once",
+            check: |w, _| crate::horse_grant::horse_offers_once(w),
+        },
         // TODO(T86.6): `workplaceSettingsSound` in `workplace-settings.ts`.
         pending("workplace-settings-sound"),
         // TODO(T86.11): `waypointsSound` in `waypoints.ts`.
@@ -124,25 +135,20 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant { name: "alliances-sound", check: checks::alliances_sound },
         Invariant { name: "territory-sound", check: checks::territory_sound },
         Invariant { name: "dead-leave-loot", check: checks::dead_leave_loot },
-        // TODO(T86.3): `downDoNothing` in `survival.ts`.
-        pending("down-do-nothing"),
-        // TODO(T86.3): `awakeAlive` in `survival.ts`.
-        pending("awake-alive"),
-        // TODO(T86.4): `horsesDownLieStill` in `horses.ts`.
-        pending("horses-down-lie-still"),
+        Invariant { name: "down-do-nothing", check: |w, _| crate::survival::down_do_nothing(w) },
+        Invariant { name: "awake-alive", check: |w, _| crate::survival::awake_alive(w) },
+        Invariant {
+            name: "horses-down-lie-still",
+            check: |w, _| crate::horses::horses_down_lie_still(w),
+        },
         Invariant { name: "attack-orders-sound", check: checks::attack_orders_sound },
-        // TODO(T86.7): `armiesSound` in `armies.ts`.
-        pending("armies-sound"),
-        // TODO(T86.11): `contractsSound` in `contracts.ts`.
-        pending("contracts-sound"),
+        Invariant { name: "armies-sound", check: |w, _| crate::armies::armies_sound(w) },
+        Invariant { name: "contracts-sound", check: |w, _| crate::contracts::contracts_sound(w) },
         // TODO(T86.11): `demandsSound` in `demands.ts`.
         pending("demands-sound"),
-        // TODO(T86.5): `buyOrdersDone` in `buying.ts`.
-        pending("buy-orders-done"),
-        // TODO(T86.5): `cityPricesSound` in `buying.ts`.
-        pending("city-prices-sound"),
-        // TODO(T86.5): `tradeOrdersDone` in `trading.ts`.
-        pending("trade-orders-done"),
+        Invariant { name: "buy-orders-done", check: |w, _| crate::buying::buy_orders_done(w) },
+        Invariant { name: "city-prices-sound", check: |w, _| crate::buying::city_prices_sound(w) },
+        Invariant { name: "trade-orders-done", check: |w, _| crate::trading::trade_orders_done(w) },
         // TODO(T86.5): `tradesKeepGoods` in `trading.ts`.
         pending("trades-keep-goods"),
         // TODO(T86.5): `refusedTradeNothing` in `trading.ts`.
@@ -165,15 +171,20 @@ pub fn world_invariants() -> Vec<Invariant> {
         pending("deliveries-sound"),
         // TODO(T86.9): `transfersSound` in `transfers.ts`.
         pending("transfers-sound"),
-        // TODO(T86.7): `supplyLinesSound` in `armies.ts`.
-        pending("supply-lines-sound"),
+        Invariant {
+            name: "supply-lines-sound",
+            check: |w, _| crate::armies::supply_lines_sound(w),
+        },
         Invariant { name: "crimes-sound", check: checks::crimes_sound },
-        // TODO(T86.7): `standingsSound` in `standing.ts`.
-        pending("standings-sound"),
-        // TODO(T86.7): `joinRequestsSound` in `persuasion.ts`.
-        pending("join-requests-sound"),
-        // TODO(T86.7): `formerPlayersSound` in `standing.ts`.
-        pending("former-players-sound"),
+        Invariant { name: "standings-sound", check: |w, _| crate::standing::standings_sound(w) },
+        Invariant {
+            name: "join-requests-sound",
+            check: |w, _| crate::persuasion::join_requests_sound(w),
+        },
+        Invariant {
+            name: "former-players-sound",
+            check: |w, _| crate::standing::former_players_sound(w),
+        },
         Invariant { name: "gates-sound", check: checks::gates_sound },
         Invariant { name: "wall-damage-sound", check: checks::wall_damage_sound },
         Invariant { name: "climb-orders-sound", check: checks::climb_orders_sound },
@@ -202,12 +213,16 @@ pub fn world_invariants() -> Vec<Invariant> {
         pending("npc-gate-shut-to-its-punishers"),
         // TODO(T86.9): `supplyWagonsSound` in `supply-wagons.ts`.
         pending("supply-wagons-sound"),
-        // TODO(T86.11): `directivesSound` in `directives.ts`.
-        pending("directives-sound"),
+        Invariant {
+            name: "directives-sound",
+            check: |w, _| crate::directives::directives_sound(w),
+        },
         // TODO(T86.11): `buyOffsSound` in `directives.ts`.
         pending("buy-offs-sound"),
-        // TODO(T86.11): `buyOffOrdersDone` in `directives.ts`.
-        pending("buy-off-orders-done"),
+        Invariant {
+            name: "buy-off-orders-done",
+            check: |w, _| crate::directives::buy_off_orders_done(w),
+        },
         // TODO(T86.9): `debtsSound` in `trade-org-debt.ts`.
         pending("debts-sound"),
         // TODO(T86.9): `wrecksSound` in `trade-org-wrecks.ts`.
@@ -283,16 +298,23 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: checks::game_default_input_fetchers,
         },
         Invariant { name: "defaults-have-a-target", check: checks::game_default_targets },
-        // TODO(T86.2): `queuesSound` in `queues.ts`.
-        pending("queues-sound"),
-        // TODO(T86.7): `interruptedSound` in `defence.ts`.
-        pending("interrupted-runs-defence"),
-        // TODO(T86.7): `givenUnderAttackSound` in `defence.ts`.
-        pending("given-under-attack-sound"),
-        // TODO(T86.7): `struckDriverDrivesOn` in `defence.ts`.
-        pending("struck-driver-drives-on"),
-        // TODO(T86.7): `defenceScriptSound` in `defence.ts`.
-        pending("defence-script-sound"),
+        Invariant { name: "queues-sound", check: crate::queues::queues_sound },
+        Invariant {
+            name: "interrupted-runs-defence",
+            check: |w, _| crate::defence::interrupted_sound(w),
+        },
+        Invariant {
+            name: "given-under-attack-sound",
+            check: |w, _| crate::defence::given_under_attack_sound(w),
+        },
+        Invariant {
+            name: "struck-driver-drives-on",
+            check: |w, _| crate::defence::struck_driver_drives_on(w),
+        },
+        Invariant {
+            name: "defence-script-sound",
+            check: |w, _| crate::defence::defence_script_sound(w),
+        },
         // TODO(T86.7): `alarmsSound` in `alarms.ts`.
         pending("alarms-sound"),
         // TODO(T86.7): `alarmScriptSound` in `alarms.ts`.

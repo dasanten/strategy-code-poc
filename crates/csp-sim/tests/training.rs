@@ -16,10 +16,10 @@ use csp_shared::world::{
     BuildingKind, ConstructionSite, ResidentOrder, SkillName, Stat, StatName, Stock,
     TrainingSubject, WorldState,
 };
+use csp_sim::order_sender::OrderSender;
 use csp_sim::queries::balance::skill_of;
 use csp_sim::queries::building::trainees_of;
 use csp_sim::queries::residents::stat_value;
-use csp_sim::stand_ins::OrderSender;
 use csp_sim::world::create_world;
 use serde_json::{json, Value};
 
@@ -249,7 +249,7 @@ fn is_refused_for_another_realms_resident_and_for_a_citys_sender_not_its_own() {
     let (mut world, t, mut orders) = setup();
     at(&mut world, "a1").owner = Some("r2".into());
     assert_eq!(send(&mut world, &t, &mut orders, train("a1", "g1")), "not one of your residents");
-    let npc = OrderSender { user_id: 0, npc_city_id: Some("c9".into()) };
+    let npc = OrderSender { npc_city_id: Some("c9".into()), ..OrderSender::player(0, "Elm") };
     assert!(orders.receive(&world, &npc, train("a2", "g1"), &t).is_err());
 }
 
