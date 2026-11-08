@@ -4,8 +4,10 @@
 
 pub mod explored;
 pub mod node_gen;
+pub mod pathfinding;
 pub mod queries;
 pub mod random;
 pub mod sight;
 pub mod terrain_gen;
+pub mod walls;
 pub mod world_index;
