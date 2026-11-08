@@ -324,7 +324,9 @@ fn step_rest(
 type NoAction = ();
 
 // T86.9 (`trade-org.ts`, `trading-posts.ts`, `caravans.ts`, `traders.ts`): world generation.
-fn place_trade_org_hq(_world: &mut WorldState, _terrain: &TerrainMap) {}
+fn place_trade_org_hq(world: &mut WorldState, terrain: &TerrainMap) {
+    crate::trade_org::place_trade_org_hq(world, terrain);
+}
 fn place_trading_posts(world: &mut WorldState, terrain: &TerrainMap) {
     crate::trading_posts::place_trading_posts(world, terrain);
 }
