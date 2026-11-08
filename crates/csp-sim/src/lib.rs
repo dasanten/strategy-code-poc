@@ -2,9 +2,12 @@
 //! invariants. Pure over `csp_shared` data; the I/O shell is `csp-server`. Parity with the frozen
 //! TypeScript game is checked against the fixtures in `fixtures/`.
 
+pub mod admin_map;
 pub mod aging;
 pub mod alarms;
+pub mod alliances;
 pub mod armies;
+pub mod breeding;
 pub mod building;
 pub mod buying;
 pub mod capture;
@@ -12,10 +15,12 @@ pub mod carrying;
 pub mod cities;
 pub mod climbing;
 pub mod combat;
+pub mod contracts;
 pub mod crimes;
 pub mod default_scripts;
 pub mod defence;
 pub mod directive;
+pub mod directives;
 pub mod driving;
 pub mod events;
 pub mod explored;
@@ -27,6 +32,9 @@ pub mod hauling;
 pub mod holders;
 pub mod horse_grant;
 pub mod horses;
+pub mod invariants;
+pub mod last_seen;
+pub mod leader;
 pub mod movement_pending;
 #[cfg(test)]
 mod movement_test_world;
@@ -35,6 +43,7 @@ pub mod node_gen;
 pub mod order_kinds;
 pub mod order_sender;
 pub mod orders;
+pub mod pairing;
 pub mod passengers;
 pub mod pathfinding;
 mod pending;
@@ -44,6 +53,12 @@ pub mod queries;
 pub mod queue;
 pub mod queues;
 pub mod random;
+pub mod realm_pending;
+#[cfg(test)]
+mod realm_test_world;
+pub mod region_map;
+pub mod relocating;
+pub mod renaming;
 pub mod residents;
 pub mod riding;
 pub mod road_line;
@@ -61,12 +76,14 @@ pub mod sight;
 pub mod spoilage;
 mod stand_ins;
 pub mod standing;
+pub mod starting_city;
 pub mod stock_floor;
 pub mod storing;
 pub mod survival;
 pub mod teaching;
 pub mod teardown;
 pub mod terrain_gen;
+pub mod territory;
 #[cfg(test)]
 pub mod test_support;
 #[cfg(test)]

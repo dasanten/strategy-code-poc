@@ -9,9 +9,9 @@ publish.workspace = true
 [dependencies]
 csp-shared.workspace = true
 csp-lang.workspace = true
+indexmap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-indexmap.workspace = true
 
 [dev-dependencies]
 sha2.workspace = true

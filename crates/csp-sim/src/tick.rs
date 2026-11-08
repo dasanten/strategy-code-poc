@@ -19,6 +19,7 @@ use csp_shared::world::WorldState;
 use serde::{Serialize, Serializer};
 
 use crate::goods_made::{tally_goods, GoodsMade};
+use crate::invariants::{check_invariants, invariants_for_tick, world_invariants, Invariant};
 use crate::sight::{InvariantViolation, SightCache};
 use crate::trading::TradeLedger;
 use crate::world::step_world;
@@ -300,6 +301,8 @@ pub struct Scratch {
     pub made: GoodsMade,
     /// The orders waiting scripts wait on (`waitingOn`, T86.12).
     pub waiting: crate::script_runner::Waiting,
+    /// When each realm's Last seen was last refreshed (`refreshes`, `soon` of `last-seen.ts`).
+    pub last_seen: crate::last_seen::LastSeenState,
     /// The trades of the latest `resolveTrades`, for the invariants over them (`ledger`).
     pub trades: TradeLedger,
 }
@@ -365,71 +368,12 @@ impl<'a> TickOptions<'a> {
     }
 }
 
-/// Whether this tick gets the checks that need its before and after (the goods tally and the
-/// script runs), given the share of ticks to sample (`shouldCheckInvariants`).
-// TODO(T86.13): moves to `invariants.rs` with the invariants.
-pub fn should_check_invariants(sample_rate: f64, rand: &mut dyn FnMut() -> f64) -> bool {
-    sample_rate >= 1.0 || rand() < sample_rate
-}
+pub use crate::invariants::{goods_only_from_nothing_at_the_floor, should_check_invariants};
 
 /// The world invariants this tick checks (`invariantsForTick`): all of them with every tick
-/// sampled, else the slice for `tick % round`; here, the number of the slice, or `None` for none.
-// TODO(T86.13): returns the invariants themselves, and `check_invariants` runs them.
-fn invariant_slice(_tick: u64, _sample_rate: f64) -> Vec<()> {
-    Vec::new()
-}
-
-/// Runs the invariants of the slice (`checkInvariants`).
-// TODO(T86.13).
-fn check_invariants(
-    _world: &WorldState,
-    _terrain: &TerrainMap,
-    _slice: &[()],
-) -> Vec<InvariantViolation> {
-    Vec::new()
-}
-
-/// Goods appear from nothing only at the stock floor (`goodsOnlyFromNothingAtTheFloor`).
-// TODO(T86.13): moves to `invariants.rs` with the invariants.
-pub fn goods_only_from_nothing_at_the_floor(
-    before: &csp_shared::world::Stock,
-    world: &WorldState,
-    made: &csp_shared::world::Stock,
-) -> Vec<InvariantViolation> {
-    let after = tally_goods(world);
-    let mut out = Vec::new();
-    for (good, &n) in &after {
-        let grew =
-            n - before.get(good).copied().unwrap_or(0.0) - made.get(good).copied().unwrap_or(0.0);
-        if grew > 1e-9 {
-            out.push(InvariantViolation {
-                invariant: "goods-only-from-nothing-at-the-floor".into(),
-                message: format!(
-                    "{} {} appeared from nothing at tick {}",
-                    js_number(grew),
-                    good_name(*good),
-                    world.tick
-                ),
-                entity_ids: Vec::new(),
-            });
-        }
-    }
-    out
-}
-
-/// A good's name as the TypeScript writes it.
-fn good_name(good: csp_shared::world::Good) -> String {
-    serde_json::to_value(good).ok().and_then(|v| v.as_str().map(str::to_owned)).unwrap_or_default()
-}
-
-/// A number as JavaScript prints it in a template string: whole numbers without `.0`, others in
-/// their shortest form (Rust's `Display` gives the same digits below 1e21).
-fn js_number(n: f64) -> String {
-    if n.fract() == 0.0 && n.abs() < 1e21 {
-        format!("{n:.0}")
-    } else {
-        n.to_string()
-    }
+/// sampled, else the slice for `tick % round`.
+fn invariant_slice(tick: u64, sample_rate: f64) -> Vec<Invariant> {
+    invariants_for_tick(tick, sample_rate, &world_invariants())
 }
 
 thread_local! {
