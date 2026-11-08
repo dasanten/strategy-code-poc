@@ -57,6 +57,22 @@ pub fn recipe_for(kind: BuildingKind, makes: Option<&str>) -> Option<&'static Re
     }
 }
 
+/// Where goods lying on (x, y) are kept (`pileTile`, `CONTEXT.md`: A building's pile): on a
+/// building's footprint, its north-west tile, so goods anywhere on it are one pile; elsewhere the
+/// tile itself.
+pub fn pile_tile(world: &WorldState, x: i32, y: i32, size: i32) -> (i32, i32) {
+    match building_at(world, x, y, size) {
+        Some(b) => (b.x as i32, b.y as i32),
+        None => (x, y),
+    }
+}
+
+/// Where in `world.piles` a building's pile lies, if goods lie on its footprint (`buildingPile`,
+/// `CONTEXT.md`: A building's pile).
+pub fn building_pile_index(world: &WorldState, b: &Building) -> Option<usize> {
+    world.piles.iter().position(|p| p.x == b.x && p.y == b.y)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

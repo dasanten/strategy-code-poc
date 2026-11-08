@@ -7,13 +7,18 @@
 //! `MAP_SIZE`; these do the same, which only matters for a footprint across a smaller map's join.
 
 pub mod alliance;
+pub mod army;
 pub mod building;
 pub mod carriages;
 pub mod city;
+pub mod combat;
+pub mod crew;
 pub mod driving;
 pub mod estimates;
+pub mod goods;
 pub mod horse_market;
 pub mod horses;
+pub mod leader;
 pub mod names;
 pub mod npc_trade;
 pub mod offers;
@@ -22,6 +27,7 @@ pub mod residents;
 pub mod riding;
 pub mod standing;
 pub mod territory;
+pub mod trade_org;
 pub mod trader_trade;
 pub mod warehouse;
 
