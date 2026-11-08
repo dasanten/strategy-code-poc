@@ -528,3 +528,6 @@ pub fn alarm_script_sound(world: &WorldState) -> Vec<InvariantViolation> {
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests;
