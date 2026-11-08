@@ -219,3 +219,17 @@ pub fn site_of(world: &WorldState) -> Option<&Building> {
 pub fn close(got: f64, want: f64) {
     assert!((got - want).abs() < 0.005, "{got} is not close to {want}");
 }
+
+/// Adds a city with its town hall on (x, y) (`addCity` of `test-terrain.ts`).
+pub fn add_city(world: &mut WorldState, id: &str, realm_id: Option<&str>, x: f64, y: f64) {
+    let mut hall = building(&format!("{id}-hall"), BuildingKind::TownHall, x, y);
+    hall.city_id = Some(id.into());
+    let mut city = json!({
+        "id": id, "name": "Ashford", "realmId": realm_id, "townHallId": hall.id, "occupation": null
+    });
+    if realm_id.is_none() {
+        city["layout"] = json!("grid");
+    }
+    world.buildings.push(hall);
+    world.cities.push(serde_json::from_value(city).unwrap());
+}
