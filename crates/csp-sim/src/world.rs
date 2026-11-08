@@ -12,9 +12,13 @@
 use std::collections::HashSet;
 
 use csp_shared::terrain::{is_passable_terrain, terrain_at, wrap, TerrainMap};
-use csp_shared::world::WorldState;
+use csp_shared::world::{Horse, WorldState};
 
+use crate::climbing::{request_climbing, resolve_climbing};
+use crate::horses::step_horses;
 use crate::node_gen::place_resource_nodes;
+use crate::passengers::step_passengers;
+use crate::riding::step_riders;
 use crate::tick::{reborrow, Scratch, TickPhase, TickTimer, Walk};
 
 /// How many breaking changes to the script views there are so far (`SCRIPT_VIEW_CHANGES.length`).
@@ -121,6 +125,8 @@ pub struct StepResult {
     pub npc_script_runs: usize,
     /// Milliseconds spent noting who came into a City area (`stepOutsiders`), for tick health.
     pub outsiders_ms: f64,
+    /// The horses that died this tick (`stepHorses`).
+    pub horses_died: Vec<Horse>,
 }
 
 /// Advances the world by one tick (`stepWorld`, ADR 0002): survival, horses, spoilage and the
@@ -147,11 +153,12 @@ pub fn step_world(
     let size = terrain.size;
     // What the scripts saw is gone once the world steps (`SightCache`).
     scratch.new_sight_phase();
-    time(timer, TickPhase::Rest, || {
+    let horses_died = time(timer, TickPhase::Rest, || {
         step_survival(world, terrain, scratch);
-        step_horses(world, terrain, scratch);
+        let horses_died = step_horses(world, terrain);
         step_spoilage(world, scratch);
         step_stock_floor(world, scratch);
+        horses_died
     });
     let mut npc_plan_ms = 0.0;
     let npc_script_runs = time(timer, TickPhase::Npc, || {
@@ -179,12 +186,12 @@ pub fn step_world(
         step_last_seen(world, size, scratch);
     });
     time(timer, TickPhase::Rest, || {
-        step_riders(world, scratch);
-        step_passengers(world, scratch);
+        step_riders(world);
+        step_passengers(world);
         // A fight or an army may have given someone Down an order; it ends with the tick.
         keep_down_still(world, scratch);
     });
-    StepResult { npc_script_runs, npc_plan_ms, ..result }
+    StepResult { npc_script_runs, npc_plan_ms, horses_died, ..result }
 }
 
 /// The rest of `step_world` once the residents walked (`stepRest`): everything else they do,
@@ -202,9 +209,9 @@ fn step_rest(
     let strikes = request_strikes(world, size, scratch);
     let strikes_len = strikes.len();
     resolve_strikes(world, strikes, size, scratch);
-    let climbs = request_climbing(world, scratch);
+    let climbs = request_climbing(world);
     let climbs_len = climbs.len();
-    resolve_climbing(world, climbs, terrain, scratch);
+    resolve_climbing(world, &climbs, terrain);
     let mut carries = request_carrying(world, scratch);
     carries.extend(request_storing(world, scratch));
     carries.extend(request_hauling(world, size, scratch));
@@ -302,21 +309,6 @@ fn step_stock_floor(_world: &mut WorldState, _scratch: &mut Scratch) {}
 fn keep_down_still(_world: &mut WorldState, _scratch: &mut Scratch) {}
 fn step_aging(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
 fn step_refill(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
-
-// T86.4 (`horses.ts`, `climbing.ts`, `riding.ts`, `passengers.ts`).
-fn step_horses(_world: &mut WorldState, _terrain: &TerrainMap, _scratch: &mut Scratch) {}
-fn request_climbing(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<NoAction> {
-    Vec::new()
-}
-fn resolve_climbing(
-    _world: &mut WorldState,
-    _climbs: Vec<NoAction>,
-    _terrain: &TerrainMap,
-    _scratch: &mut Scratch,
-) {
-}
-fn step_riders(_world: &mut WorldState, _scratch: &mut Scratch) {}
-fn step_passengers(_world: &mut WorldState, _scratch: &mut Scratch) {}
 
 // T86.5 (`carrying.ts`, `storing.ts`, `hauling.ts`, `road-line.ts`'s materials, `buying.ts`,
 // `trading.ts`, `offers.ts`).
