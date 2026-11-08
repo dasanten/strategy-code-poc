@@ -71,6 +71,7 @@ dependencies = [
 name = "csp-lang"
 version = "0.0.0"
 dependencies = [
+ "indexmap",
  "serde",
  "serde_json",
  "thiserror",
