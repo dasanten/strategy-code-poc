@@ -1736,18 +1736,22 @@ fn fights_back(r: &Resident) -> bool {
 
 /// Where an NPC city's scout explores next (`scoutEdge`), and noting how its scouting ended
 /// (`scoutEnded`).
-// TODO(T86.10): `npc_scouts::{scout_edge, scout_ended}`; no ticket names `npc-scouts.ts` yet.
 fn scout_edge(
-    _world: &WorldState,
-    _city: &City,
-    _r: &Resident,
-    _can_enter: &dyn Fn(i32, i32) -> bool,
-    _skip: &[(i32, i32)],
+    world: &WorldState,
+    city: &City,
+    r: &Resident,
+    size: i32,
+    can_enter: &dyn Fn(i32, i32) -> bool,
+    skip: &[(i32, i32)],
 ) -> Option<(i32, i32)> {
-    None
+    crate::npc_scouts::scout_edge(world, city, r, size, can_enter, skip)
 }
 
-fn scout_ended(_world: &mut WorldState, _city_id: &str, _reason: Option<&str>) {}
+fn scout_ended(world: &mut WorldState, city_id: &str, reason: Option<&str>) {
+    if let Some(city) = world.cities.iter_mut().find(|c| c.id == city_id) {
+        crate::npc_scouts::scout_ended(city, reason);
+    }
+}
 
 /// An NPC city's residents run the game's default of their task (`runNpcScripts`, `CONTEXT.md`:
 /// NPC city, Default script; ADR 0009), through the same interpreter and game API as a Player's
@@ -1841,7 +1845,7 @@ fn run_city_scripts(
             let resident = &world_ref.residents[i];
             // A scout explores what their city doesn't know yet (`CONTEXT.md`: Scout).
             let edge = |can_enter: &dyn Fn(i32, i32) -> bool, skip: &[(i32, i32)]| {
-                scout_edge(world_ref, city, resident, can_enter, skip)
+                scout_edge(world_ref, city, resident, terrain.size, can_enter, skip)
             };
             let ctx = ScriptContext {
                 world: world_ref,
