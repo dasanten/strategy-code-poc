@@ -4,7 +4,7 @@
 
 use super::*;
 use crate::queues::tests::{me, setup};
-use csp_shared::world::Army;
+use csp_shared::world::{Army, GivenUnderAttack, ResidentOrder};
 use serde_json::json;
 
 fn rejected(reason: &str) -> OrderReply {

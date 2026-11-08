@@ -3,6 +3,28 @@
 
 use csp_shared::world::{Alliance, Carriage, MercenaryContract, WorldState};
 
+use super::standing::{TRADE_ORG, TRADE_ORG_NAME};
+
+/// Whether two realms stand together (`allied`): the same realm, or members of one alliance.
+pub fn allied(world: &WorldState, a: &str, b: &str) -> bool {
+    a == b || allied_realms(world, a).iter().any(|x| x == b)
+}
+
+/// How Players call a realm (`realmName`): by its realm name, else its Leader's name; the Trade
+/// Organization by its own.
+pub fn realm_name(world: &WorldState, realm_id: &str) -> String {
+    if realm_id == TRADE_ORG {
+        return TRADE_ORG_NAME.to_string();
+    }
+    let realm = world.realms.iter().find(|r| r.id == realm_id);
+    if let Some(name) = realm.and_then(|r| r.name.as_ref()) {
+        return name.clone();
+    }
+    realm
+        .and_then(|realm| world.residents.iter().find(|r| r.id == realm.leader_id))
+        .map_or_else(|| "a fallen realm".to_string(), |l| l.name.clone())
+}
+
 /// The alliance the realm or NPC city `realm_id` is a member of (`allianceOf`).
 pub fn alliance_of<'w>(world: &'w WorldState, realm_id: &str) -> Option<&'w Alliance> {
     world.alliances.iter().find(|a| a.members.iter().any(|m| m.realm_id == realm_id))

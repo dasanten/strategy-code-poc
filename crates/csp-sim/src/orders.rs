@@ -5,19 +5,15 @@
 //! registry the rule tickets add theirs to, one `kinds.insert(..)` line each; an order kind that
 //! acts on a tile is wrapped to get a passenger off first (`GETS_OFF_FIRST`) as it goes in.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 
-use csp_shared::balance::DEFEND_CALM_TICKS;
 use csp_shared::terrain::TerrainMap;
-use csp_shared::world::{
-    GivenUnderAttack, OrderRequest, Resident, ResidentOrder, Task, WorldState,
-};
+use csp_shared::world::{OrderRequest, WorldState};
 use serde::Serialize;
 use serde_json::Value;
 
 use crate::order_sender::OrderSender;
-use crate::queries::alliance::commander_of;
 use crate::queries::residents::is_down;
 use crate::queue::field_str;
 use crate::tick::{ApplyOrders, Scratch};
@@ -352,113 +348,13 @@ impl ApplyOrders for OrderQueue {
 }
 
 // ------------------------------------------------------------------------------------------------
-// Helpers of other modules `applyAll` needs, until their tickets port them.
+// The helpers `applyAll` needs from the conflict rules (T86.7).
 // ------------------------------------------------------------------------------------------------
 
-/// Whether `r` counts as under attack for an order given now (`underAttack`).
-// TODO(T86.7): `defence::under_attack`.
-fn under_attack(world: &WorldState, r: &Resident) -> bool {
-    let alarm = r.script.as_ref().is_some_and(|s| s.task == Some(Task::Alarm));
-    if r.interrupted.is_some() && !alarm {
-        return true;
-    }
-    r.struck.as_ref().is_some_and(|s| world.tick as f64 - s.tick < DEFEND_CALM_TICKS)
-}
+use crate::armies::{leave_on_own_orders, member_orders};
+use crate::defence::{note_given, under_attack};
 
-/// Whether a resident defends by script (`defendsByScript`): someone commands them and they are
-/// in no army.
-// TODO(T86.7): `defence::defends_by_script`.
-fn defends_by_script(world: &WorldState, r: &Resident) -> bool {
-    commander_of(world, &r.id, r.owner.as_deref()).is_some()
-        && !world.armies.iter().any(|a| a.member_ids.contains(&r.id))
-}
-
-/// The order kinds that go on until stopped (`GOES_ON_UNTIL_STOPPED`).
-fn goes_on_until_stopped(o: &ResidentOrder) -> bool {
-    matches!(
-        o,
-        ResidentOrder::Haul(_)
-            | ResidentOrder::WorkAt(_)
-            | ResidentOrder::Teach(_)
-            | ResidentOrder::Train(_)
-    )
-}
-
-/// Marks what a Player's order just gave the resident at `i` under attack (`noteGiven`). The
-/// TypeScript tells an order replaced by identity (`r.order === orderBefore`); here an order
-/// replaced by an equal one counts as unchanged.
-// TODO(T86.7): `defence::note_given`.
-fn note_given(
-    world: &mut WorldState,
-    i: usize,
-    was_under_attack: bool,
-    order_before: Option<&ResidentOrder>,
-) {
-    let r = &world.residents[i];
-    if r.order.as_ref() == order_before && r.script.is_none() && r.queue.is_none() {
-        return;
-    }
-    let defends = defends_by_script(world, r);
-    let r = &mut world.residents[i];
-    r.given_under_attack = None;
-    if !was_under_attack || !defends {
-        return;
-    }
-    if r.script.is_some()
-        || r.queue.is_some()
-        || r.order.as_ref().is_some_and(goes_on_until_stopped)
-    {
-        r.given_under_attack = Some(GivenUnderAttack::UntilCalm);
-    } else if r.order.is_some() {
-        r.given_under_attack = Some(GivenUnderAttack::UntilDone);
-    }
-}
-
-/// Each army member's order as it is now (`memberOrders`).
-// TODO(T86.7): `armies::member_orders`.
-fn member_orders(world: &WorldState) -> HashMap<String, Option<ResidentOrder>> {
-    let mut out = HashMap::new();
-    if world.armies.is_empty() {
-        return out;
-    }
-    let members: HashSet<&String> = world.armies.iter().flat_map(|a| &a.member_ids).collect();
-    for r in &world.residents {
-        if members.contains(&r.id) {
-            out.insert(r.id.clone(), r.order.clone());
-        }
-    }
-    out
-}
-
-/// Members whose order changed since `before` got an order of their own, and leave their army
-/// (`leaveOnOwnOrders`). As in [`note_given`], an order replaced by an equal one is no change.
-// TODO(T86.7): `armies::leave_on_own_orders`.
-pub(crate) fn leave_on_own_orders(
-    world: &mut WorldState,
-    before: &HashMap<String, Option<ResidentOrder>>,
-) {
-    if before.is_empty() {
-        return;
-    }
-    let left: HashSet<String> = world
-        .residents
-        .iter()
-        .filter(|r| before.get(&r.id).is_some_and(|o| *o != r.order))
-        .map(|r| r.id.clone())
-        .collect();
-    if !left.is_empty() {
-        leave_armies(world, &left);
-    }
-}
-
-/// Takes residents out of every army; an army left with nobody is gone (`leaveArmies`).
-// TODO(T86.7): `armies::leave_armies`.
-pub(crate) fn leave_armies(world: &mut WorldState, ids: &HashSet<String>) {
-    for a in &mut world.armies {
-        a.member_ids.retain(|id| !ids.contains(id));
-    }
-    world.armies.retain(|a| !a.member_ids.is_empty());
-}
+pub(crate) use crate::armies::leave_armies;
 
 #[cfg(test)]
 mod tests;
