@@ -6,17 +6,17 @@ use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 
 use csp_shared::balance::{
-    CITY_AREA_MARGIN, CITY_BUILDING_REACH, HOUSING_ROOM, OCCUPATION_GAME_DAYS,
+    CITY_AREA_MARGIN, CITY_BUILDING_REACH, FOOD_SURPLUS_DAYS, HOUSING_ROOM, OCCUPATION_GAME_DAYS,
 };
 use csp_shared::footprint::{footprints_near, is_at, near_footprint, FOOTPRINT};
 use csp_shared::terrain::{wrap, wrap_delta, wrap_distance};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
-    Building, BuildingKind, City, PunishmentHeading, Resident, TradeOrgCity, WorldState,
+    Building, BuildingKind, City, Good, PunishmentHeading, Resident, TradeOrgCity, WorldState,
 };
 
 use super::alliance::allied;
-use super::city::{city_residents, town_hall_of};
+use super::city::{city_food_use, city_residents, town_hall_of};
 use super::names::{kind_name, placed};
 use super::residents::is_armed;
 use super::standing::TRADE_ORG;
@@ -384,4 +384,70 @@ pub fn stands_occupying(world: &WorldState, city: &City, r: &Resident, size: i32
     }
     !hired_by_trade_org(world, &r.id)
         && (r.owner.is_some() || city_takers(world, city).contains(&r.id))
+}
+
+/// The Food of a storage that isn't set aside for its offers (`freeStock(world, b).food`).
+/// TODO(T86.5): `free_stock` once its goods queries land.
+fn free_food(world: &WorldState, b: &Building) -> f64 {
+    let stock = b.stock.as_ref().and_then(|s| s.get(&Good::Food)).copied().unwrap_or(0.0);
+    let aside: f64 = world
+        .offers
+        .iter()
+        .filter(|o| {
+            o.storage_id == b.id
+                && o.direct.as_ref().is_none_or(|d| d.carried.is_none())
+                && o.gives == Good::Food
+        })
+        .map(|o| o.times * o.gives_units)
+        .sum();
+    let any_aside = world.offers.iter().any(|o| {
+        o.storage_id == b.id
+            && o.direct.as_ref().is_none_or(|d| d.carried.is_none())
+            && o.gives == Good::Food
+    });
+    if !any_aside {
+        return stock;
+    }
+    let left = stock - aside;
+    if left > 0.0 {
+        left
+    } else {
+        0.0
+    }
+}
+
+/// Food in a city's storages, but for what is set aside for offers (`storedFood`).
+pub fn stored_food(world: &WorldState, city_id: &str) -> f64 {
+    world
+        .buildings
+        .iter()
+        .filter(|b| {
+            b.city_id.as_deref() == Some(city_id)
+                && b.kind == BuildingKind::Storage
+                && b.site.is_none()
+        })
+        .fold(0.0, |food, b| food + free_food(world, b))
+}
+
+/// Food all of a city's residents eat in `FOOD_SURPLUS_DAYS` game days (`surplusFoodLine`).
+pub fn surplus_food_line(world: &WorldState, city: &City) -> f64 {
+    city_food_use(world, city, FOOD_SURPLUS_DAYS)
+}
+
+/// Whether a city has a food surplus (`hasFoodSurplus`): its storages hold more Food than all its
+/// residents eat in `FOOD_SURPLUS_DAYS` game days.
+pub fn has_food_surplus(world: &WorldState, city: &City) -> bool {
+    stored_food(world, &city.id) > surplus_food_line(world, city)
+}
+
+/// The cities whose area the tile lies in (`citiesAt`), by index.
+pub fn cities_at(world: &WorldState, x: f64, y: f64, size: i32) -> Vec<usize> {
+    (0..world.cities.len())
+        .filter(|&i| in_city_area(world, &world.cities[i].id, x, y, size))
+        .collect()
+}
+
+/// Ticks left before the occupation of a city's town hall captures it (`occupationTicksLeft`).
+pub fn occupation_ticks_left(world: &WorldState, city: &City) -> Option<f64> {
+    city.occupation.as_ref().map(|o| 0f64.max(o.since + OCCUPATION_TICKS - world.tick as f64))
 }

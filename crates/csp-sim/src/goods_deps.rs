@@ -131,8 +131,8 @@ pub fn join_realm(world: &mut WorldState, city: usize, realm: &str, size: i32) -
     crate::capture::join_realm(world, &id, realm, size) as f64
 }
 
-/// Ends any breeding a horse is part of (`endBreedingOf`). TODO(T86.8): `breeding.rs`.
-pub fn end_breeding_of(_world: &mut WorldState, _horse_id: &str) {}
+/// Ends any breeding a horse is part of (`endBreedingOf`).
+pub use crate::breeding::end_breeding_of;
 
 pub use crate::transfers::hand_in;
 
