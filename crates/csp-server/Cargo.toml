@@ -23,6 +23,10 @@ serde_json.workspace = true
 thiserror.workspace = true
 rusqlite = { version = "0.37", features = ["bundled", "backup"] }
 sha2 = "0.10"
+base64 = "0.22"
+getrandom = "0.4"
+indexmap.workspace = true
+scrypt = { version = "0.11", default-features = false }
 
 [build-dependencies]
 serde_json.workspace = true
