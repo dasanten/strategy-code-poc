@@ -1,4 +1,4 @@
-//! Read-only world queries of `packages/shared` that sight calls (ADR 0002: the game API orders,
+﻿//! Read-only world queries of `packages/shared` that sight calls (ADR 0002: the game API orders,
 //! scripts and the UI share), ported with their rules unchanged (ADR 0030). Nothing here changes
 //! the world. Each module is named after its TypeScript file; each function keeps its TypeScript
 //! name in Rust spelling, so the rule tickets find them here instead of porting them again.
@@ -7,7 +7,9 @@
 //! `MAP_SIZE`; these do the same, which only matters for a footprint across a smaller map's join.
 
 pub mod alliance;
+pub mod balance;
 pub mod building;
+pub mod building_info;
 pub mod carriages;
 pub mod city;
 pub mod horse_market;
@@ -21,7 +23,7 @@ pub mod territory;
 pub mod trader_trade;
 pub mod warehouse;
 
-/// `Math.round`: halves round up, toward +∞ (`Math.round(-2.5)` is -2), unlike `f64::round`.
+/// `Math.round`: halves round up, toward +âˆž (`Math.round(-2.5)` is -2), unlike `f64::round`.
 pub fn js_round(x: f64) -> f64 {
     let floor = x.floor();
     if x - floor >= 0.5 {

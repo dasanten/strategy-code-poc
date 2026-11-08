@@ -14,8 +14,13 @@ use std::collections::HashSet;
 use csp_shared::terrain::{is_passable_terrain, terrain_at, wrap, TerrainMap};
 use csp_shared::world::WorldState;
 
+use crate::building::{request_building, resolve_building};
 use crate::node_gen::place_resource_nodes;
+use crate::teaching::step_teaching;
+use crate::teardown::{request_tearing_down, resolve_tearing_down, Felled};
 use crate::tick::{reborrow, Scratch, TickPhase, TickTimer, Walk};
+use crate::training::step_training;
+use crate::work::{request_work, resolve_work};
 
 /// How many breaking changes to the script views there are so far (`SCRIPT_VIEW_CHANGES.length`).
 // TODO(T86.12): `SCRIPT_VIEW_CHANGES.len()` once the script views are ported.
@@ -218,18 +223,18 @@ fn step_rest(
     let accepted = resolve_offers(world, scratch);
     let buy_offs = resolve_buy_offs(world, scratch);
     let debts_paid = resolve_debt_payments(world, scratch);
-    let builds = request_building(world, scratch);
+    let builds = request_building(world);
     let builds_len = builds.len();
-    resolve_building(world, builds, terrain, scratch);
-    let teardowns = request_tearing_down(world, scratch);
+    resolve_building(world, &builds, Some(terrain));
+    let teardowns = request_tearing_down(world);
     let teardowns_len = teardowns.len();
-    let wrecked = resolve_tearing_down(world, teardowns, terrain, scratch);
+    let wrecked = resolve_tearing_down(world, &teardowns, Some(terrain), scratch);
     count_wrecked(world, wrecked, scratch);
-    let work = request_work(world, scratch);
+    let work = request_work(world);
     let work_len = work.len();
-    resolve_work(world, work, scratch);
-    step_teaching(world, size, scratch);
-    step_training(world, size, scratch);
+    resolve_work(world, &work, scratch);
+    step_teaching(world, size);
+    step_training(world, size);
     let breeding = request_breeding(world, scratch);
     let breeding_len = breeding.len();
     resolve_breeding(world, breeding, size, scratch);
@@ -350,36 +355,8 @@ fn resolve_offers(_world: &mut WorldState, _scratch: &mut Scratch) -> usize {
 }
 fn step_offers(_world: &mut WorldState, _scratch: &mut Scratch) {}
 
-// T86.6 (`building.ts`, `teardown.ts`, `work.ts`, `teaching.ts`, `training.ts`,
-// `workplace-settings.ts`).
-fn request_building(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<NoAction> {
-    Vec::new()
-}
-fn resolve_building(
-    _world: &mut WorldState,
-    _builds: Vec<NoAction>,
-    _terrain: &TerrainMap,
-    _scratch: &mut Scratch,
-) {
-}
-fn request_tearing_down(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<NoAction> {
-    Vec::new()
-}
-/// Returns what was wrecked, for `count_wrecked` (T86.9).
-fn resolve_tearing_down(
-    _world: &mut WorldState,
-    _teardowns: Vec<NoAction>,
-    _terrain: &TerrainMap,
-    _scratch: &mut Scratch,
-) -> Vec<NoAction> {
-    Vec::new()
-}
-fn request_work(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<NoAction> {
-    Vec::new()
-}
-fn resolve_work(_world: &mut WorldState, _work: Vec<NoAction>, _scratch: &mut Scratch) {}
-fn step_teaching(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
-fn step_training(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
+// T86.6 (`building.ts`, `teardown.ts`, `work.ts`, `teaching.ts`, `training.ts`) is in its modules;
+// `workplace-settings.ts` is not ported yet (T86.6 left it: its ticket does not name it).
 fn step_workplace_settings(_world: &mut WorldState, _scratch: &mut Scratch) {}
 
 // T86.7 (`combat.ts`, `armies.ts`, `capture.ts`, `crimes.ts`, `standing.ts`, `persuasion.ts`,
@@ -434,7 +411,7 @@ fn resolve_debt_payments(_world: &mut WorldState, _scratch: &mut Scratch) -> usi
     0
 }
 fn step_debts(_world: &mut WorldState, _scratch: &mut Scratch) {}
-fn count_wrecked(_world: &mut WorldState, _wrecked: Vec<NoAction>, _scratch: &mut Scratch) {}
+fn count_wrecked(_world: &mut WorldState, _wrecked: Vec<Felled>, _scratch: &mut Scratch) {}
 
 // T86.10 (`npc-defence.ts`, `npc-hire.ts`, `npc-behaviour.ts`, `outsiders.ts`).
 fn step_npc_defence(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
