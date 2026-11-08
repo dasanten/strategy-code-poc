@@ -1,9 +1,9 @@
 //! `apps/server/src/deliveries.test.ts`, one test per `it`. Each starts from `setup()` of
 //! `deliveries.fixture.ts` as the TypeScript wrote it (`fixtures/trade/deliveries.json`): the
 //! trading post is an NPC village (`foundTradingPost`, T86.10) and Mara's city a starting city
-//! (`foundStartingCity`, T86.8), neither of which Rust lays out yet. The caravans carrying out
-//! deliveries over thousands of ticks need the NPC cities' own rules and default scripts (T86.10,
-//! T86.12) to run as in the TypeScript; they are left to T86.14.
+//! (`foundStartingCity`, T86.8), neither of which Rust lays out yet. The caravans walk with the
+//! ported `Walking` (T86.4); `checkInvariants` comes with T86.13, so the runs check
+//! `deliveries-sound`.
 
 mod common;
 #[path = "goods_support/mod.rs"]
@@ -311,5 +311,172 @@ mod caravans_carrying_out_deliveries {
         // Bringing what was bought into someone's storage is no crime.
         assert!(s.world.crimes.iter().all(|c| c.kind != CrimeKind::Theft), "{:?}", s.world.crimes);
         assert!(s.world.crimes.is_empty());
+    }
+
+    fn events<'w>(
+        w: &'w WorldState,
+        pick: impl Fn(&'w RealmEventWhat) -> bool,
+    ) -> Vec<&'w RealmEventWhat> {
+        w.events.iter().map(|e| &e.what).filter(|e| pick(e)).collect()
+    }
+
+    #[test]
+    fn pick_up_goods_sold_from_the_citys_storage_pay_there_and_bring_them_to_the_warehouse() {
+        let mut s = setup();
+        let si = s.world.buildings.iter().position(|b| b.id == s.storage().id).unwrap();
+        s.world.buildings[si].stock.get_or_insert_with(Stock::new).insert(Good::Stone, 40.0);
+        let stone = held_in(s.w().stock.as_ref(), Good::Stone);
+        let city = s.city_id();
+        assert_eq!(
+            s.order(json!({ "kind": "sell", "good": "stone", "units": 30, "cityId": city })),
+            "ack"
+        );
+        let collecting = std::cell::Cell::new(false);
+        let storage_id = s.world.buildings[si].id.clone();
+        run_until(
+            &mut s,
+            |w| {
+                let driver = w.caravans[0]
+                    .driver_id
+                    .as_deref()
+                    .and_then(|d| w.residents.iter().find(|r| r.id == d));
+                if driver.is_some_and(|d| csp_sim::deliveries::collects_from(w, d, &storage_id)) {
+                    collecting.set(true);
+                }
+                w.deliveries.is_empty()
+            },
+            20_000,
+        );
+        assert!(collecting.get());
+        let done = events(&s.world, |e| matches!(e, RealmEventWhat::Delivered { .. }));
+        let RealmEventWhat::Delivered { delivery, good, units, coins, .. } = done[0] else {
+            unreachable!()
+        };
+        assert_eq!((*delivery, *good, *units), (DeliveryKind::PickUp, Good::Stone, 30.0));
+        assert!(*coins > 0.0);
+        let st = s.world.buildings[si].stock.as_ref();
+        assert_eq!(held_in(st, Good::Stone), 10.0);
+        assert_eq!(held_in(st, Good::Coins), *coins);
+        // Taking what was sold to it is no theft.
+        assert!(s.world.crimes.is_empty());
+        run_until(&mut s, |w| w.caravans[0].job.is_none(), 10_000);
+        assert!(held_in(s.w().stock.as_ref(), Good::Stone) >= stone + 30.0 - 1.0);
+    }
+
+    #[test]
+    fn turn_back_from_a_city_behind_closed_gates_and_the_delivery_waits_for_the_next_caravan() {
+        let mut s = setup();
+        let city = s.city_id();
+        for b in &mut s.world.buildings {
+            if b.kind == BuildingKind::Gate && b.city_id.as_deref() == Some(city.as_str()) {
+                b.closed = Some(true);
+            }
+        }
+        s.order(json!({ "kind": "buy", "good": "iron", "units": 3, "cityId": city }));
+        let stuck = |w: &WorldState| {
+            w.events.iter().any(|e| matches!(e.what, RealmEventWhat::DeliveryStuck { .. }))
+        };
+        run_until(&mut s, stuck, 20_000);
+        let first = events(&s.world, |e| matches!(e, RealmEventWhat::DeliveryStuck { .. }));
+        let RealmEventWhat::DeliveryStuck { cancelled, units, .. } = first[0] else {
+            unreachable!()
+        };
+        assert_eq!((*cancelled, *units), (false, 3.0));
+        assert_eq!(s.world.deliveries.len(), 1);
+        assert_eq!(
+            (s.world.deliveries[0].caravan_id.clone(), s.world.deliveries[0].units),
+            (None, 3.0)
+        );
+        run_until(&mut s, |w| w.caravans[0].job.is_none(), 10_000);
+        assert_eq!(owed_by(&s.world, &s.w().id, Good::Iron), 3.0);
+    }
+
+    #[test]
+    fn drop_a_delivery_to_a_city_that_is_no_longer_the_realms() {
+        let mut s = setup();
+        let city = s.city_id();
+        s.order(json!({ "kind": "buy", "good": "iron", "units": 3, "cityId": city }));
+        let delivering = |w: &WorldState| {
+            w.caravans[0]
+                .job
+                .as_ref()
+                .is_some_and(|j| j.step == csp_shared::world::CaravanJobStep::Deliver)
+        };
+        run_until(&mut s, delivering, 20_000);
+        // The delivery's realm is another than the city's now, as when the city was taken.
+        s.world.realms.push(goods_support::realm("realm2", 8, "q1"));
+        s.world.residents.push(goods_support::new_resident(3.0, "q1", Some("realm2"), 5.0, 5.0));
+        s.world.deliveries[0].realm_id = "realm2".into();
+        let stuck = |w: &WorldState| {
+            w.events.iter().any(|e| matches!(e.what, RealmEventWhat::DeliveryStuck { .. }))
+        };
+        run_until(&mut s, stuck, 100);
+        let first = events(&s.world, |e| matches!(e, RealmEventWhat::DeliveryStuck { .. }));
+        assert!(matches!(first[0], RealmEventWhat::DeliveryStuck { cancelled: true, .. }));
+        assert!(s.world.deliveries.is_empty());
+    }
+
+    #[test]
+    fn let_go_of_a_delivery_when_the_caravan_breaks_up() {
+        let mut s = setup();
+        let city = s.city_id();
+        s.order(json!({ "kind": "buy", "good": "iron", "units": 3, "cityId": city }));
+        run_until(&mut s, |w| w.caravans[0].job.is_some(), 20_000);
+        let k = s.world.caravans[0].carriage_id.clone();
+        s.world.carriages.retain(|x| x.id != k);
+        step(&mut s.world, &s.terrain, &mut s.scratch);
+        assert!(s.world.caravans.is_empty());
+        assert_eq!(s.world.deliveries.len(), 1);
+        assert_eq!(s.world.deliveries[0].caravan_id, None);
+        assert_eq!(deliveries_sound(&s.world), vec![]);
+    }
+}
+
+mod deliveries_sound {
+    use super::*;
+    use csp_shared::world::{CaravanJob, CaravanJobStep, Delivery};
+
+    #[test]
+    fn flags_a_delivery_whose_caravan_carries_out_another() {
+        let mut s = setup();
+        let w = s.w().id.clone();
+        let city = s.world.cities.iter().find(|c| c.realm_id.is_some()).unwrap().clone();
+        s.world.deliveries.push(Delivery {
+            id: "delivery1".into(),
+            kind: DeliveryKind::Delivery,
+            realm_id: city.realm_id.clone().unwrap(),
+            warehouse_id: w,
+            city_id: city.id.clone(),
+            good: Good::Iron,
+            units: 2.0,
+            fee: 5.0,
+            caravan_id: Some(s.world.caravans[0].id.clone()),
+        });
+        assert_eq!(deliveries_sound(&s.world).len(), 1);
+        s.world.deliveries[0].units = 0.0;
+        s.world.deliveries[0].caravan_id = None;
+        assert_eq!(deliveries_sound(&s.world).len(), 1);
+    }
+
+    #[test]
+    fn flags_a_caravan_counting_more_on_board_than_its_carriage_holds() {
+        let mut s = setup();
+        let w = s.w().id.clone();
+        s.world.caravans[0].job = Some(CaravanJob {
+            delivery_id: "gone".into(),
+            kind: DeliveryKind::Delivery,
+            warehouse_id: w,
+            good: Good::Iron,
+            step: CaravanJobStep::Return,
+            units: 5.0,
+            coins: 0.0,
+            target: None,
+            to_pay: 0.0,
+            paid: 0.0,
+            fee: 0.0,
+            misses: 0.0,
+            robbed: 0.0,
+        });
+        assert_eq!(deliveries_sound(&s.world).len(), 1);
     }
 }
