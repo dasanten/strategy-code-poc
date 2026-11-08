@@ -210,3 +210,6 @@ pub fn former_players_sound(world: &WorldState) -> Vec<InvariantViolation> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod former_player_tests;
