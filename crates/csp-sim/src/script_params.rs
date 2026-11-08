@@ -450,3 +450,6 @@ pub fn param_default(p: &ScriptParam) -> Option<Value> {
         None => None,
     }
 }
+
+#[cfg(test)]
+mod tests;
