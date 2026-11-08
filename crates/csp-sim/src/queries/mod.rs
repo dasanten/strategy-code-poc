@@ -15,10 +15,12 @@ pub mod carriages;
 pub mod city;
 pub mod city_area;
 pub mod combat;
+pub mod command;
 pub mod crew;
 pub mod driving;
 pub mod estimates;
 pub mod goods;
+pub mod guard;
 pub mod horse_market;
 pub mod horses;
 pub mod leader;
@@ -32,9 +34,11 @@ pub mod riding;
 pub mod standing;
 pub mod territory;
 pub mod trade_org;
+pub mod trade_quotes;
 pub mod trader_trade;
 pub mod walls;
 pub mod warehouse;
+pub mod warehouse_trade;
 
 /// `Math.round`: halves round up, toward +âˆž (`Math.round(-2.5)` is -2), unlike `f64::round`.
 pub fn js_round(x: f64) -> f64 {
