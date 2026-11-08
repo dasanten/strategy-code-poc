@@ -14,8 +14,13 @@ use std::collections::HashSet;
 use csp_shared::terrain::{is_passable_terrain, terrain_at, wrap, TerrainMap};
 use csp_shared::world::WorldState;
 
+use crate::buying::resolve_purchases;
+use crate::carrying::{request_carrying, resolve_carrying, CarryAction};
+use crate::hauling::request_hauling;
 use crate::node_gen::place_resource_nodes;
+use crate::storing::request_storing;
 use crate::tick::{reborrow, Scratch, TickPhase, TickTimer, Walk};
+use crate::trading::resolve_trades;
 
 /// How many breaking changes to the script views there are so far (`SCRIPT_VIEW_CHANGES.length`).
 // TODO(T86.12): `SCRIPT_VIEW_CHANGES.len()` once the script views are ported.
@@ -205,16 +210,16 @@ fn step_rest(
     let climbs = request_climbing(world, scratch);
     let climbs_len = climbs.len();
     resolve_climbing(world, climbs, terrain, scratch);
-    let mut carries = request_carrying(world, scratch);
-    carries.extend(request_storing(world, scratch));
-    carries.extend(request_hauling(world, size, scratch));
+    let mut carries = request_carrying(world);
+    carries.extend(request_storing(world));
+    carries.extend(request_hauling(world, size));
     carries.extend(request_road_materials(world, scratch));
     let carries_len = carries.len();
-    resolve_carrying(world, carries, size, scratch);
+    resolve_carrying(world, &carries, size);
     step_feeding(world, size, scratch);
     let payments = resolve_payments(world, scratch);
-    let purchases = resolve_purchases(world, size, scratch);
-    let trades = resolve_trades(world, size, scratch);
+    let purchases = resolve_purchases(world, size);
+    let trades = resolve_trades(world, size, &mut scratch.trades);
     let accepted = resolve_offers(world, scratch);
     let buy_offs = resolve_buy_offs(world, scratch);
     let debts_paid = resolve_debt_payments(world, scratch);
@@ -318,32 +323,10 @@ fn resolve_climbing(
 fn step_riders(_world: &mut WorldState, _scratch: &mut Scratch) {}
 fn step_passengers(_world: &mut WorldState, _scratch: &mut Scratch) {}
 
-// T86.5 (`carrying.ts`, `storing.ts`, `hauling.ts`, `road-line.ts`'s materials, `buying.ts`,
-// `trading.ts`, `offers.ts`).
-fn request_carrying(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<NoAction> {
+// Carrying, storing, hauling, buying and trading are T86.5's (`carrying.rs`, `storing.rs`,
+// `hauling.rs`, `buying.rs`, `trading.rs`); road materials and offers are still to come.
+fn request_road_materials(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<CarryAction> {
     Vec::new()
-}
-fn request_storing(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<NoAction> {
-    Vec::new()
-}
-fn request_hauling(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) -> Vec<NoAction> {
-    Vec::new()
-}
-fn request_road_materials(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<NoAction> {
-    Vec::new()
-}
-fn resolve_carrying(
-    _world: &mut WorldState,
-    _carries: Vec<NoAction>,
-    _size: i32,
-    _scratch: &mut Scratch,
-) {
-}
-fn resolve_purchases(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) -> usize {
-    0
-}
-fn resolve_trades(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) -> usize {
-    0
 }
 fn resolve_offers(_world: &mut WorldState, _scratch: &mut Scratch) -> usize {
     0
