@@ -451,7 +451,10 @@ fn run_npc_scripts(
 }
 
 // T86.13 (`last-seen.ts`).
-fn step_last_seen(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
+fn step_last_seen(world: &mut WorldState, size: i32, scratch: &mut Scratch) {
+    let Scratch { last_seen, index, sight, .. } = scratch;
+    crate::last_seen::step_last_seen(world, size, last_seen, index, sight.as_mut());
+}
 
 #[cfg(test)]
 mod tests {

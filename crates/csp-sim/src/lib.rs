@@ -7,6 +7,7 @@ pub mod events;
 pub mod explored;
 pub mod goods_made;
 pub mod invariants;
+pub mod last_seen;
 pub mod node_gen;
 pub mod pathfinding;
 pub mod queries;
