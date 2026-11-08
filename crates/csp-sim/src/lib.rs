@@ -13,6 +13,7 @@ pub mod climbing;
 pub mod combat;
 pub mod crimes;
 pub mod defence;
+pub mod deliveries;
 pub mod directive;
 pub mod driving;
 pub mod events;
@@ -58,8 +59,10 @@ pub mod test_support;
 #[cfg(test)]
 mod test_world;
 pub mod tick;
+pub mod trade_org;
 pub mod trading;
 pub mod training;
+pub mod transfers;
 pub mod walk_time;
 pub mod walking;
 pub mod walls;
