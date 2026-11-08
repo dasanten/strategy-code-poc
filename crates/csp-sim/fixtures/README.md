@@ -19,6 +19,9 @@ Conventions:
 - `.bin` files are `TerrainMap.tiles`, one byte per tile, row by row (`y * size + x`).
 - World files are `{ terrain: { size, tiles: <base64> }, world: <JSON.stringify(world)> }`, so a
   Rust test needs nothing else.
+- `worlds/*.sight.json` is `entitiesInSight` of that world for every realm and city, by id;
+  `sight/*.json` are `{ size, world, sight }`, the same for the worlds `sight.test.ts` starts
+  from (sight needs only the map's size).
 - Numbers JSON cannot hold are written `{"$number": "NaN" | "Infinity" | "-Infinity" | "-0"}`.
 - Stepped worlds use a `Walking` whose path searches always finish within the tick (budget
   `Infinity` instead of `PATH_BUDGET_MS`), so where people stand never depends on the machine.
@@ -50,6 +53,10 @@ Conventions:
 | `save/live.json` | the live save’s tick, its format version, and the version its row was saved with |
 | `save/live.json.gz` | loadOrCreateWorld(db) then gzip(JSON.stringify(world)), as saveWorld stores it |
 | `save/version.json` | WORLD_FORMAT_VERSION of world-format.ts |
+| `sight/city.json` | createWorld(cityTerrain()) and foundStartingCity for players 1 to 1, with entitiesInSight for every realm and city |
+| `sight/three-realms.json` | createWorld(cityTerrain()) and foundStartingCity for players 1 to 3, with entitiesInSight for every realm and city |
+| `sight/two-realms.json` | createWorld(cityTerrain()) and foundStartingCity for players 1 to 2, with entitiesInSight for every realm and city |
+| `sight/visitors.json` | Player 1 visiting NPC cities and the Trade Org HQ on Plains (dumpVisitors), with entitiesInSight for every realm and city |
 | `terrain/1-256.bin` | generateTerrain(1, 256).tiles |
 | `terrain/1-512.bin` | generateTerrain(1, 512).tiles |
 | `terrain/1-5760.sha256` | sha256 of generateTerrain(1, 5760).tiles (--full) |
@@ -62,9 +69,13 @@ Conventions:
 | `worlds/hq-1.json` | hq() of trade-org.test.ts, then 1 × stepWorld(world, terrain, walking) with an unhurried Walking |
 | `worlds/hq-10080.json` | hq() of trade-org.test.ts, then 10080 × stepWorld(world, terrain, walking) with an unhurried Walking |
 | `worlds/hq-1440.json` | hq() of trade-org.test.ts, then 1440 × stepWorld(world, terrain, walking) with an unhurried Walking |
+| `worlds/hq-1440.sight.json` | entitiesInSight for every realm and city of hq() of trade-org.test.ts, then 1440 × stepWorld(world, terrain, walking) with an unhurried Walking |
 | `worlds/hq-60.json` | hq() of trade-org.test.ts, then 60 × stepWorld(world, terrain, walking) with an unhurried Walking |
+| `worlds/hq-60.sight.json` | entitiesInSight for every realm and city of hq() of trade-org.test.ts, then 60 × stepWorld(world, terrain, walking) with an unhurried Walking |
 | `worlds/village-0.json` | village() of npc-growth.fixture.ts, then 0 × stepWorld(world, terrain, walking) with an unhurried Walking |
 | `worlds/village-1.json` | village() of npc-growth.fixture.ts, then 1 × stepWorld(world, terrain, walking) with an unhurried Walking |
 | `worlds/village-10080.json` | village() of npc-growth.fixture.ts, then 10080 × stepWorld(world, terrain, walking) with an unhurried Walking |
 | `worlds/village-1440.json` | village() of npc-growth.fixture.ts, then 1440 × stepWorld(world, terrain, walking) with an unhurried Walking |
+| `worlds/village-1440.sight.json` | entitiesInSight for every realm and city of village() of npc-growth.fixture.ts, then 1440 × stepWorld(world, terrain, walking) with an unhurried Walking |
 | `worlds/village-60.json` | village() of npc-growth.fixture.ts, then 60 × stepWorld(world, terrain, walking) with an unhurried Walking |
+| `worlds/village-60.sight.json` | entitiesInSight for every realm and city of village() of npc-growth.fixture.ts, then 60 × stepWorld(world, terrain, walking) with an unhurried Walking |

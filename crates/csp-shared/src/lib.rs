@@ -5,6 +5,7 @@ pub mod balance;
 pub mod chunks;
 pub mod footprint;
 pub mod goods;
+pub mod protocol;
 pub mod terrain;
 pub mod time;
 pub mod world;

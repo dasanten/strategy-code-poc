@@ -42,6 +42,8 @@ fn world_fixtures() -> Vec<PathBuf> {
     let mut files: Vec<_> = entries
         .map(|e| e.unwrap().path())
         .filter(|p| p.extension().is_some_and(|x| x == "json"))
+        // What each side sees of a world (`*.sight.json`, T85.5) is not a world.
+        .filter(|p| !p.to_string_lossy().ends_with(".sight.json"))
         .collect();
     files.sort();
     assert!(!files.is_empty(), "no world fixtures in {}", dir.display());
