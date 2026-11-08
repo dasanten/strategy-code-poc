@@ -216,3 +216,6 @@ fn fail_relocating(
     let owner = r.owner.clone();
     record_event(world, owner.as_deref(), what);
 }
+
+#[cfg(test)]
+mod tests;
