@@ -17,12 +17,13 @@ use csp_shared::world::{
 };
 
 use crate::cities::{given_city_name, update_city_membership, CITY_NAMES};
-use crate::pending::ground::Ground;
-use crate::pending::people::{new_horse, new_resident, resident_name, Place};
-use crate::pending::record_event;
+use crate::events::record_event;
+use crate::horses::{new_horse, NewHorse};
+use crate::placing::Ground;
 use crate::queries::city::town_hall_of;
 use crate::queries::names::kind_name;
 use crate::random::{new_id, Mulberry32};
+use crate::residents::{new_resident, resident_name, NewResident};
 use crate::standing::welcome_former_player;
 
 /// The Player's realm, if they have one (`realmOf`), by index.
@@ -33,7 +34,8 @@ pub fn realm_of(world: &WorldState, user_id: u64) -> Option<usize> {
 /// The Leader's name from the game offered to a Player founding a realm (`suggestedLeaderName`).
 pub fn suggested_leader_name(world: &WorldState, user_id: u64) -> String {
     let seed = world.seed as f64 * 6151.0 + user_id as f64 * 31.0 + world.tick as f64;
-    resident_name(&mut Mulberry32::new(seed))
+    let mut m = Mulberry32::new(seed);
+    resident_name(&mut || m.next()).to_string()
 }
 
 /// How many tiles out from a starting city's wall its farm and stable stand (`FARM_RING`).
@@ -136,8 +138,12 @@ pub(crate) fn spots_outside(
                     .max(0)
                     .max((y - (cy + side - 1)).max(cy - (y + size - 1)).max(0));
                 ring >= out
-                    && ground
-                        .fits(kind, cx, cy, &|tx, ty| !lane(tx, ty) && !mine.contains(&(tx, ty)))
+                    && ground.fits(
+                        kind,
+                        cx,
+                        cy,
+                        Some(&|tx, ty| !lane(tx, ty) && !mine.contains(&(tx, ty))),
+                    )
             })
             .collect();
         let to_gate = |&(cx, cy): &(i32, i32)| {
@@ -149,17 +155,13 @@ pub(crate) fn spots_outside(
             (to_gate(a) - to_gate(b)).partial_cmp(&0.0).unwrap_or(std::cmp::Ordering::Equal)
         });
         let best = *free.first()?;
-        let size_map = ground_size(ground);
+        let size_map = ground.terrain.size;
         for t in footprint_tiles(Placed { kind: kind_name(kind), x: best.0, y: best.1 }, size_map) {
             mine.insert(t);
         }
         spots.push(best);
     }
     Some(spots)
-}
-
-fn ground_size(ground: &Ground) -> i32 {
-    ground.size()
 }
 
 /// Where a city may stand (`siteFits`): its square and the rings around it on open land, with no
@@ -225,7 +227,7 @@ pub fn find_city_site(
             })
         })
         .collect();
-    let ground = Ground::new(world, terrain, &[]);
+    let ground = Ground::new(world, terrain, []);
     let size = f64::from(terrain.size);
     let mut min_distance = CITY_MIN_DISTANCE;
     loop {
@@ -335,7 +337,7 @@ pub fn found_starting_city(
     }
     // Outside the wall, just past the city's area by the gate: the farm, and the stable next to it.
     let spots = {
-        let ground = Ground::new(world, terrain, &resident_tiles(world));
+        let ground = Ground::new(world, terrain, resident_tiles(world));
         spots_outside(&ground, &square, &[BuildingKind::Farm, BuildingKind::Stable], FARM_RING)
             .expect("the site fits a farm and a stable")
     };
@@ -354,8 +356,8 @@ pub fn found_starting_city(
     let mut residents = Vec::new();
     for i in 0..START_RESIDENTS as usize {
         let id = new_id("r", &mut world.next_id);
-        let place = Place {
-            id,
+        let place = NewResident {
+            id: &id,
             owner: Some(&realm_id),
             city_id: Some(&city_id),
             x: fx,
@@ -363,7 +365,7 @@ pub fn found_starting_city(
             tick: world.tick as f64,
         };
         let names_from = if i == 0 && leader_name.is_some() { None } else { Some(&mut taken) };
-        let mut r = new_resident(&mut rand, place, names_from);
+        let mut r = new_resident(&mut || rand.next(), &place, names_from);
         r.carried = [(Good::Food, START_CARRIED_FOOD)].into_iter().collect();
         r.order = Some(ResidentOrder::WorkAt(WorkOrder {
             building_id: farm_id.clone(),
@@ -411,8 +413,15 @@ pub fn found_starting_city(
     let (sx, sy) = (f64::from(sx), f64::from(sy));
     for _ in 0..START_HORSES as usize {
         let id = new_id("horse", &mut world.next_id);
-        let horse =
-            new_horse(&mut horse_rand, id, Some(&realm_id), None, (sx, sy), world.tick as f64);
+        let fields = NewHorse {
+            id,
+            realm_id: Some(realm_id.clone()),
+            city_id: None,
+            x: sx,
+            y: sy,
+            tick: world.tick as f64,
+        };
+        let horse = new_horse(&mut || horse_rand.next(), fields);
         world.horses.push(horse);
     }
     // The carriage stands at the stable, with one of the horses hitched to it.

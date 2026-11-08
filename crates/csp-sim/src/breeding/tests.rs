@@ -11,11 +11,16 @@ use csp_shared::world::{
 };
 
 use super::*;
-use crate::pending::people::HORSE_NAMES;
+use crate::horses::HORSE_NAMES;
+use crate::order_sender::{Account, OrderSender};
 use crate::test_world::{building, empty_world, live, live_mut, realm, resident};
 
 const SIZE: i32 = 16;
-const ME: Sender = Sender { user_id: 7, npc_city_id: None };
+const ME: OrderSender = OrderSender {
+    user_id: 7,
+    account: Account { name: String::new(), is_admin: false },
+    npc_city_id: None,
+};
 const TICKS: usize = STABLE_BREED_TICKS as usize;
 
 /// Realm r1 (Player 7) with Leader w1 at a finished stable at (8, 8), with plenty of Food, and

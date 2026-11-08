@@ -9,7 +9,8 @@ use csp_shared::world::{
     ResidentOrder, Tile, WorldState,
 };
 
-use crate::pending::{ordered_resident, record_event, Sender};
+use crate::events::record_event;
+use crate::order_sender::{ordered_resident, OrderSender};
 use crate::queries::city::town_hall_of;
 use crate::queries::city_area::{city_area_tiles, free_housing, in_city_area};
 use crate::queries::people::relocate_problem;
@@ -28,7 +29,7 @@ pub struct RelocateRequest {
 /// which must hold `r` and only residents the sender may order, each once. Indices.
 fn group_of(
     world: &WorldState,
-    sender: &Sender,
+    sender: &OrderSender,
     r: usize,
     ids: &Option<Option<Vec<String>>>,
 ) -> Option<Vec<usize>> {
@@ -45,7 +46,7 @@ fn group_of(
 /// on their way; an NPC city relocates nobody.
 pub fn validate_relocate(
     world: &WorldState,
-    sender: &Sender,
+    sender: &OrderSender,
     o: &RelocateRequest,
 ) -> Option<String> {
     let realm = if sender.npc_city_id.is_none() {

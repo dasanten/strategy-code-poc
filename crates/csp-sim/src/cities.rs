@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use csp_shared::world::{BuildingKind, City, CityLayout, WorldState};
 
-use crate::pending::unique_name;
+use crate::names::unique_name;
 use crate::random::hash_str;
 
 use crate::queries::city_area::{city_membership, is_city_building};

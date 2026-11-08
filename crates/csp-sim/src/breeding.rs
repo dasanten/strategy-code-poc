@@ -12,8 +12,9 @@ use csp_shared::world::{
     WorldState,
 };
 
-use crate::pending::people::horse_name;
-use crate::pending::{ordered_resident, record_event, Sender};
+use crate::events::record_event;
+use crate::horses::horse_name;
+use crate::order_sender::{ordered_resident, OrderSender};
 use crate::queries::breeding::{breed_problem, kept_breeding};
 use crate::queries::horses::{horses_in, HorseOwner};
 use crate::queries::js_round;
@@ -41,7 +42,7 @@ pub struct BreedRequest {
 }
 
 /// Whose horses the sender's residents breed (`ownerOf`): the Player's realm's, or the NPC city's.
-fn owner_of<'w>(world: &'w WorldState, sender: &'w Sender) -> Option<HorseOwner<'w>> {
+fn owner_of<'w>(world: &'w WorldState, sender: &'w OrderSender) -> Option<HorseOwner<'w>> {
     if let Some(city) = &sender.npc_city_id {
         return Some(HorseOwner::City(city));
     }
@@ -56,7 +57,7 @@ fn at(p: (f64, f64), b: &Building, size: i32) -> bool {
 /// stable, tends two fed horses of the Player's realm in it (`breedProblem`).
 pub fn validate_breed(
     world: &WorldState,
-    sender: &Sender,
+    sender: &OrderSender,
     o: &BreedRequest,
 ) -> Option<&'static str> {
     let r = ordered_resident(world, sender, o.resident_id.as_deref());
@@ -261,7 +262,7 @@ fn new_foal(world: &mut WorldState, si: usize, a: &Horse, b: &Horse) -> Horse {
     let stats = foal_stats(&mut rand, &a.stats, &b.stats);
     let stable = &world.buildings[si];
     Horse {
-        name: horse_name(&mut rand),
+        name: horse_name(&mut || rand.next()),
         id,
         realm_id: a.realm_id.clone(),
         city_id: a.city_id.clone(),

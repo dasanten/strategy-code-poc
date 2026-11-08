@@ -13,7 +13,8 @@ use csp_shared::terrain::wrap_distance;
 use csp_shared::world::{Army, ArmyOrder, Resident, ResidentOrder, Tile, WalkOrder, WorldState};
 
 use crate::combat::attack_order;
-use crate::queries::alliance::{commander_of, commands};
+use crate::order_sender::commands;
+use crate::queries::alliance::commander_of;
 use crate::queries::army::{army_of, ARMY_NAME_MAX_LENGTH};
 use crate::queries::combat::in_contact;
 use crate::sight::InvariantViolation;
@@ -478,7 +479,7 @@ fn carry_out(world: &mut WorldState, a: usize, members: &[usize], size: i32) {
                 if started && r.order.is_some() && !for_army(r.order.as_ref(), &army_id) {
                     continue;
                 }
-                if in_contact(size, (r.x, r.y), target) {
+                if in_contact(size, (r.x as i32, r.y as i32), (target.0 as i32, target.1 as i32)) {
                     if !started || for_army(r.order.as_ref(), &army_id) {
                         r.order = None;
                     }
@@ -486,7 +487,7 @@ fn carry_out(world: &mut WorldState, a: usize, members: &[usize], size: i32) {
                 }
                 let keeps = started
                     && matches!(&r.order, Some(ResidentOrder::WalkTo(w))
-                        if in_contact(size, (w.target.x, w.target.y), target) && w.army.is_some());
+                        if in_contact(size, (w.target.x as i32, w.target.y as i32), (target.0 as i32, target.1 as i32)) && w.army.is_some());
                 if !keeps {
                     r.order = Some(walk_for(&army_id, target.0, target.1));
                 }

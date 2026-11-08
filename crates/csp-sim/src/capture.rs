@@ -12,9 +12,11 @@ use csp_shared::world::{
 
 use crate::crimes::{city_organization, commit_crime, CrimeAgainst};
 use crate::defence::Alarms;
+use crate::events::record_event;
+use crate::names::{resident_names_taken, unique_name};
 use crate::pending::{
-    hq_falls, join_trade_org, leave_trade_org, note_city_taken, record_event, rejoin_trade_org,
-    resident_names_taken, unique_name, workplaces_of_city, CityTaken,
+    hq_falls, join_trade_org, leave_trade_org, note_city_taken, rejoin_trade_org,
+    workplaces_of_city, CityTaken,
 };
 use crate::queries::alliance::realm_name;
 use crate::queries::carriages::driven_carriage_id;

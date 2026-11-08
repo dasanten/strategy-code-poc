@@ -11,15 +11,24 @@ use csp_shared::world::{
 };
 
 use super::*;
-use crate::pending::die_all;
-use crate::pending::ground::Ground;
+use crate::order_sender::{Account, OrderSender};
+use crate::placing::Ground;
 use crate::queries::city::city_residents;
 use crate::queries::city_area::{city_area_tiles, housing_room, surplus_food_line};
 use crate::starting_city::found_starting_city;
+use crate::survival::die_all;
 use crate::test_world::{building, city_terrain, live, live_mut, resident, world_with_city};
 
-const ME: Sender = Sender { user_id: 1, npc_city_id: None };
-const STRANGER: Sender = Sender { user_id: 2, npc_city_id: None };
+const ME: OrderSender = OrderSender {
+    user_id: 1,
+    account: Account { name: String::new(), is_admin: false },
+    npc_city_id: None,
+};
+const STRANGER: OrderSender = OrderSender {
+    user_id: 2,
+    account: Account { name: String::new(), is_admin: false },
+    npc_city_id: None,
+};
 const WAIT_DAYS: usize = (PAIRING_WAIT_TICKS / TICKS_PER_GAME_DAY) as usize;
 const CARRYING_DAYS: usize = (CARRYING_TICKS / TICKS_PER_GAME_DAY) as usize;
 const DAYS_PER_YEAR: usize = (TICKS_PER_GAME_YEAR / TICKS_PER_GAME_DAY) as usize;
@@ -41,7 +50,7 @@ fn city_id(world: &WorldState) -> String {
 }
 
 /// Sends a pairing order from `sender` and applies it; the reason it was turned down, if it was.
-fn pair_up(world: &mut WorldState, a: &str, b: &str, sender: &Sender) -> Option<&'static str> {
+fn pair_up(world: &mut WorldState, a: &str, b: &str, sender: &OrderSender) -> Option<&'static str> {
     let o = PairRequest { resident_id: Some(a), partner_id: Some(b) };
     let reason = validate_pair(world, sender, &o);
     if reason.is_none() {
@@ -71,7 +80,7 @@ fn add_house(world: &mut WorldState) {
     let terrain = city_terrain();
     let city = city_id(world);
     for (x, y) in city_area_tiles(world, &city, terrain.size) {
-        if !Ground::new(world, terrain, &[]).fits(BuildingKind::House, x, y, &|_, _| true) {
+        if !Ground::new(world, terrain, []).fits(BuildingKind::House, x, y, None) {
             continue;
         }
         building(
@@ -88,7 +97,7 @@ fn add_house(world: &mut WorldState) {
 }
 
 fn die(world: &mut WorldState, id: &str) {
-    die_all(world, &[id.to_string()], DeathCause::Killed, city_terrain().size, &[]);
+    die_all(world, &[id.to_string()], DeathCause::Killed, city_terrain().size, None);
 }
 
 #[test]
@@ -158,7 +167,7 @@ fn pairs_two_adults_of_the_same_city_leaving_what_both_of_them_do_alone() {
 fn turns_down_children_a_resident_on_their_own_other_cities_and_other_players_residents() {
     let (mut world, ids) = setup(100_000.0);
     let (a, b) = (ids[0].clone(), ids[1].clone());
-    let reason = |world: &WorldState, x: &str, y: &str, sender: &Sender| {
+    let reason = |world: &WorldState, x: &str, y: &str, sender: &OrderSender| {
         validate_pair(world, sender, &PairRequest { resident_id: Some(x), partner_id: Some(y) })
     };
     assert!(reason(&world, &a, &a, &ME).unwrap().contains("themselves"));

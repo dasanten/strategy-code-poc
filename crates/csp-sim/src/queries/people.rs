@@ -10,9 +10,7 @@ use csp_shared::balance::{
 };
 use csp_shared::world::{City, Horse, Realm, Resident, ResidentOrder, WorldState};
 
-use super::alliance::{contract_of, handed_over_to};
-use super::city_area::{free_housing, in_city_area};
-use super::residents::can_work;
+use super::city_area::free_housing;
 
 /// Why a resident can't hold a working order while carrying a child (`CARRYING_A_CHILD`).
 pub const CARRYING_A_CHILD: &str = "carrying a child";
@@ -68,69 +66,6 @@ pub fn relocate_problem(
         return Some("no free housing".into());
     }
     Some(format!("free housing for {room} only"))
-}
-
-/// Whom a resident serves besides their own realm (`servesOthers`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Serves {
-    Contract,
-    AllianceArmy,
-}
-
-/// Whom a resident serves besides their own realm (`servesOthers`), if anyone.
-pub fn serves_others(world: &WorldState, resident_id: &str) -> Option<Serves> {
-    if handed_over_to(world, resident_id).is_some() {
-        return Some(Serves::AllianceArmy);
-    }
-    contract_of(world, resident_id).map(|_| Serves::Contract)
-}
-
-/// Why the realm's Leader can't hand the realm over to `target` now (`handOverProblem`).
-pub fn hand_over_problem(
-    world: &WorldState,
-    realm: &Realm,
-    leader: Option<&Resident>,
-    target: Option<&Resident>,
-    size: i32,
-) -> Option<String> {
-    let Some(leader) =
-        leader.filter(|l| l.id == realm.leader_id && l.owner.as_deref() == Some(realm.id.as_str()))
-    else {
-        return Some("only your Leader can hand over the realm".into());
-    };
-    let Some(target) =
-        target.filter(|t| t.owner.as_deref() == Some(realm.id.as_str()) && t.health > 0.0)
-    else {
-        return Some("not one of your residents".into());
-    };
-    if target.id == leader.id {
-        return Some(format!("{} is your Leader already", target.name));
-    }
-    if !can_work(target.born_at, world.tick as f64) {
-        return Some(format!("{} is a child", target.name));
-    }
-    match serves_others(world, &target.id) {
-        Some(Serves::Contract) => {
-            return Some(format!("{} is in a mercenary contract", target.name))
-        }
-        Some(Serves::AllianceArmy) => {
-            return Some(format!("{} is in the alliance army", target.name))
-        }
-        None => {}
-    }
-    // An offer could start once they lead, and a Leader is never hired out.
-    if world.contracts.iter().any(|c| c.resident_ids.contains(&target.id)) {
-        return Some(format!("{} is named in a mercenary contract offer", target.name));
-    }
-    let shared = world.cities.iter().any(|c| {
-        c.realm_id.as_deref() == Some(realm.id.as_str())
-            && in_city_area(world, &c.id, leader.x, leader.y, size)
-            && in_city_area(world, &c.id, target.x, target.y, size)
-    });
-    if !shared {
-        return Some(format!("{} must stand in the same city as your Leader", target.name));
-    }
-    None
 }
 
 /// What is wrong with a name a Player gives (`nameProblem`): text, trimmed not empty and at most

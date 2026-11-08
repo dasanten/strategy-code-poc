@@ -6,9 +6,9 @@
 use csp_shared::balance::MAP_SIZE;
 use csp_shared::world::{RealmEventWhat, WorldState};
 
-use crate::pending::record_event;
+use crate::events::record_event;
 use crate::queries::city_area::in_city_area;
-use crate::queries::people::{hand_over_problem, serves_others, Serves};
+use crate::queries::leader::{hand_over_problem, serves_others, ServesOthers as Serves};
 use crate::queries::residents::can_work;
 use crate::sight::InvariantViolation;
 
@@ -25,7 +25,7 @@ fn problem(world: &WorldState, user_id: u64, o: &HandOverRequest, size: i32) -> 
     };
     let leader = world.residents.iter().find(|r| Some(r.id.as_str()) == o.resident_id);
     let target = world.residents.iter().find(|r| Some(r.id.as_str()) == o.new_leader_id);
-    hand_over_problem(world, realm, leader, target, size)
+    hand_over_problem(world, (&realm.id, &realm.leader_id), leader, target, size)
 }
 
 /// `handOver.validate`; without a map, `MAP_SIZE`.

@@ -8,13 +8,15 @@ use std::collections::HashMap;
 use csp_shared::balance::{CARRYING_TICKS, PAIRING_WAIT_TICKS};
 use csp_shared::world::{Carrying, Pair, RealmEventWhat, Resident, ResidentOrder, WorldState};
 
-use crate::pending::people::{base_stats, new_child, Place};
-use crate::pending::{record_event, resident_names_taken, Sender};
-use crate::queries::alliance::commands;
+use crate::events::record_event;
+use crate::names::resident_names_taken;
+use crate::order_sender::commands;
+use crate::order_sender::OrderSender;
 use crate::queries::city_area::{free_housing, has_food_surplus};
 use crate::queries::people::CARRYING_A_CHILD;
 use crate::queries::residents::can_work;
 use crate::random::{hash_str, Mulberry32};
+use crate::residents::{base_stats, new_child, NewResident};
 
 /// An action a pair requests (`BirthAction`): one of them starts carrying, or a child is born.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,7 +50,11 @@ pub struct PairRequest<'a> {
 
 /// `pair.validate` (`CONTEXT.md`: Pairing): two adult residents of the same city, both the
 /// Player's, neither carrying a child.
-pub fn validate_pair(world: &WorldState, sender: &Sender, o: &PairRequest) -> Option<&'static str> {
+pub fn validate_pair(
+    world: &WorldState,
+    sender: &OrderSender,
+    o: &PairRequest,
+) -> Option<&'static str> {
     let realm = world.realms.iter().find(|r| r.user_id == sender.user_id);
     let mine = |id: Option<&str>| {
         let x = world.residents.iter().find(|y| Some(y.id.as_str()) == id);
@@ -219,8 +225,8 @@ fn give_birth(world: &mut WorldState, parent_id: &str) -> Option<String> {
     let parent = &world.residents[pi];
     let mut taken = resident_names_taken(world, parent.owner.as_deref(), parent.city_id.as_deref());
     let mut rand = Mulberry32::new(f64::from(hash_str(&format!("{}:{id}", world.seed))));
-    let place = Place {
-        id: id.clone(),
+    let place = NewResident {
+        id: &id,
         owner: parent.owner.as_deref(),
         city_id: parent.city_id.as_deref(),
         x: parent.x,
@@ -228,9 +234,9 @@ fn give_birth(world: &mut WorldState, parent_id: &str) -> Option<String> {
         tick: world.tick as f64,
     };
     let child = new_child(
-        &mut rand,
+        &mut || rand.next(),
         [&base_stats(parent), &carrying.partner_base],
-        place,
+        &place,
         Some(&mut taken),
     );
     let parent_name = parent.name.clone();

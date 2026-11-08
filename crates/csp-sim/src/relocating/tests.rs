@@ -8,15 +8,24 @@ use csp_shared::world::{BuildingKind, Carrying, Pair, RealmEventWhat, ResidentOr
 
 use super::*;
 use crate::cities::dissolve_city;
-use crate::pending::ground::Ground;
-use crate::pending::people::{base_stats, new_resident, Place};
+use crate::order_sender::{Account, OrderSender};
+use crate::placing::Ground;
 use crate::queries::city_area::{city_area_tiles, free_housing, in_city_area};
 use crate::queries::people::{relocate_problem, relocate_room, CARRYING_A_CHILD};
 use crate::random::Mulberry32;
+use crate::residents::{base_stats, new_resident, NewResident};
 use crate::test_world::{add_city, building, city_terrain, live, live_mut, world_with_city};
 
-const ME: Sender = Sender { user_id: 1, npc_city_id: None };
-const STRANGER: Sender = Sender { user_id: 2, npc_city_id: None };
+const ME: OrderSender = OrderSender {
+    user_id: 1,
+    account: Account { name: String::new(), is_admin: false },
+    npc_city_id: None,
+};
+const STRANGER: OrderSender = OrderSender {
+    user_id: 2,
+    account: Account { name: String::new(), is_admin: false },
+    npc_city_id: None,
+};
 
 /// A free Plains tile at least `far` tiles from every building, near home (`freePlains`).
 fn free_plains(world: &WorldState, terrain: &TerrainMap, far: f64) -> (f64, f64) {
@@ -61,9 +70,7 @@ fn add_houses(world: &mut WorldState, city: &str, n: usize) {
     for _ in 0..n {
         let free = city_area_tiles(world, city, terrain.size)
             .into_iter()
-            .find(|&(x, y)| {
-                Ground::new(world, terrain, &[]).fits(BuildingKind::House, x, y, &|_, _| true)
-            })
+            .find(|&(x, y)| Ground::new(world, terrain, []).fits(BuildingKind::House, x, y, None))
             .expect("a free tile in the city");
         building(
             world,
@@ -103,7 +110,12 @@ fn setup(houses: usize) -> Setup {
     Setup { world, first, second: "city-second".into(), ana }
 }
 
-fn relocate_by(world: &mut WorldState, r: &str, city: &str, sender: &Sender) -> Option<String> {
+fn relocate_by(
+    world: &mut WorldState,
+    r: &str,
+    city: &str,
+    sender: &OrderSender,
+) -> Option<String> {
     let o =
         RelocateRequest { resident_id: Some(r.into()), city_id: Some(city.into()), group: None };
     let reason = validate_relocate(world, sender, &o);
@@ -145,8 +157,9 @@ fn carry_child(world: &mut WorldState, r: &str, partner: &str) {
 /// Another resident of the realm, living in `city` (or homeless), standing at (x, y).
 fn add_resident(world: &mut WorldState, id: &str, city: Option<&str>, x: f64, y: f64) {
     let realm = world.realms[0].id.clone();
-    let place = Place { id: id.into(), owner: Some(&realm), city_id: city, x, y, tick: 0.0 };
-    let r = new_resident(&mut Mulberry32::new(id.len() as f64), place, None);
+    let place = NewResident { id, owner: Some(&realm), city_id: city, x, y, tick: 0.0 };
+    let mut m = Mulberry32::new(id.len() as f64);
+    let r = new_resident(&mut || m.next(), &place, None);
     world.residents.push(r);
 }
 
@@ -197,7 +210,11 @@ fn turns_it_down_for_someone_elses_resident_or_an_npc_citys() {
         Some("not one of your residents")
     );
     add_city(&mut world, "npc", None, 0.0, 0.0, None);
-    let npc = Sender { user_id: 0, npc_city_id: Some("npc".into()) };
+    let npc = OrderSender {
+        user_id: 0,
+        account: Account { name: String::new(), is_admin: false },
+        npc_city_id: Some("npc".into()),
+    };
     assert_eq!(
         relocate_by(&mut world, &ana, &second, &npc).as_deref(),
         Some("not one of your residents")

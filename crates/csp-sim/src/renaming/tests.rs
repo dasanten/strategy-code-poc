@@ -7,7 +7,7 @@ use csp_shared::balance::{
 use csp_shared::world::{DeathCause, RealmEventWhat, ResidentOrder, Tile, WalkOrder, WorldState};
 
 use super::*;
-use crate::pending::record_event;
+use crate::events::record_event;
 use crate::queries::alliance::realm_name;
 use crate::queries::residents::can_work;
 use crate::starting_city::found_starting_city;
