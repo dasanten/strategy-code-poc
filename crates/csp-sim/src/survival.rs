@@ -18,8 +18,8 @@ use csp_shared::footprint::{covers, is_at, near_footprint};
 use csp_shared::terrain::{ground_at, wrap_distance, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
-    Building, BuildingKind, CityLayout, DeathCause, FormerPlayer, Good, Realm, RealmEventWhat,
-    Resident, ResidentOrder, SelfManagedCity, Stock, Tile, WalkOrder, WorldState,
+    Building, BuildingKind, CityLayout, DeathCause, Good, Realm, RealmEventWhat, Resident,
+    ResidentOrder, SelfManagedCity, Stock, Tile, WalkOrder, WorldState,
 };
 
 use crate::events::record_event;
@@ -435,15 +435,12 @@ pub fn end_realm(world: &mut WorldState, realm_id: &str, size: i32) {
         .filter(|c| c.realm_id.as_deref() == Some(realm_id))
         .map(|c| c.id.clone())
         .collect();
-    let (seed, tick) = (world.seed, world.tick as f64);
+    let seed = world.seed;
     for c in world.cities.iter_mut().filter(|c| cities.contains(&c.id)) {
         c.realm_id = None;
         c.layout = Some(pick_layout(seed, &c.id));
     }
-    // `rememberFormerPlayer` of `standing.ts`. TODO(T86.7): call the ported one.
-    for c in world.cities.iter_mut().filter(|c| cities.contains(&c.id)) {
-        c.former_player = Some(FormerPlayer { user_id, tick });
-    }
+    crate::standing::remember_former_player(world, &cities, user_id);
     for i in 0..world.residents.len() {
         if world.residents[i].owner.as_deref() != Some(realm_id) {
             continue;
@@ -814,14 +811,7 @@ pub fn step_refill(world: &mut WorldState, size: i32) {
 // What other tickets' rules do here, until they are ported.
 // ------------------------------------------------------------------------------------------------
 
-/// Leaves the armies (`leaveArmies` of `armies.ts`): the residents `ids` leave every army, and an
-/// army left with nobody ends. TODO(T86.7): call the ported one.
-pub fn leave_armies(world: &mut WorldState, ids: &HashSet<String>) {
-    for a in &mut world.armies {
-        a.member_ids.retain(|id| !ids.contains(id));
-    }
-    world.armies.retain(|a| !a.member_ids.is_empty());
-}
+pub use crate::armies::leave_armies;
 
 /// Counts the armed soldiers killed against each directive's targets (`countSoldiersKilled` of
 /// `directives.ts`, `directiveTargets`). TODO(T86.11): call the ported one.
