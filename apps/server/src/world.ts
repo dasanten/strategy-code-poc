@@ -7,6 +7,7 @@ import {
   type TerrainMap,
   type WorldState,
 } from '@csp/shared'
+import { untimed, type StageTimer } from './terrain-gen.js'
 import { placeNpcCities } from './npc-cities.js'
 import { placeTradeOrgHq } from './trade-org.js'
 import { placeTradingPosts } from './trading-posts.js'
@@ -114,13 +115,19 @@ export function createWorld(terrain: TerrainMap, seed = 1): WorldState {
  * (`placeTradingPosts`), with a caravan for each (`placeCaravans`) and wandering traders going round
  * them (`placeTraders`).
  */
-export function generateWorld(terrain: TerrainMap, seed = 1): WorldState {
-  const world = createWorld(terrain, seed)
-  placeTradeOrgHq(world, terrain)
-  placeNpcCities(world, terrain)
-  placeTradingPosts(world, terrain)
-  placeCaravans(world)
-  placeTraders(world, terrain.size)
+export function generateWorld(
+  terrain: TerrainMap,
+  seed = 1,
+  time: StageTimer = untimed,
+): WorldState {
+  const world = time('nodes', () => createWorld(terrain, seed))
+  time('HQ', () => placeTradeOrgHq(world, terrain))
+  time('NPC cities', () => placeNpcCities(world, terrain))
+  time('trading posts', () => placeTradingPosts(world, terrain))
+  time('caravans', () => {
+    placeCaravans(world)
+    placeTraders(world, terrain.size)
+  })
   return world
 }
 

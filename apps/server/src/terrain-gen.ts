@@ -220,6 +220,13 @@ export function landGroups(map: TerrainMap): { group: Int32Array; sizes: number[
   return { group, sizes }
 }
 
+/**
+ * Runs one stage of generation and returns its result; a benchmark passes one that times it
+ * (`scripts/bench-ts.mts`). The default just runs it.
+ */
+export type StageTimer = <T>(stage: string, run: () => T) => T
+export const untimed: StageTimer = (_stage, run) => run()
+
 /** Lakes stay at least this many tiles from the sea, so they are inland. */
 const LAKE_COAST_MARGIN = 48
 
@@ -230,7 +237,11 @@ const LAKE_COAST_MARGIN = 48
  * cut off from the rest becomes water, so all land stays joined. Shares come from the balance
  * file.
  */
-export function generateTerrain(seed: number, size = MAP_SIZE): TerrainMap {
+export function generateTerrain(
+  seed: number,
+  size = MAP_SIZE,
+  time: StageTimer = untimed,
+): TerrainMap {
   const n = size * size
   const tiles = new Uint8Array(n)
   const xOf = (t: number) => t % size
@@ -238,106 +249,118 @@ export function generateTerrain(seed: number, size = MAP_SIZE): TerrainMap {
 
   // Seas: a few large blobs with ragged coasts. Each tile scores by how deep it lies inside the
   // nearest blob; the deepest share becomes sea.
-  let s = 0
-  const rand = () => hash(s++, 11, seed)
-  const seas = Array.from({ length: SEA_COUNT }, () => ({
-    x: rand() * size,
-    y: rand() * size,
-    r: size * (0.12 + rand() * 0.08),
-  }))
-  const seaScore = new Float32Array(n)
-  const coast = fbmField(size, 240, 4, seed + 5)
-  for (let t = 0; t < n; t++) {
-    const x = xOf(t)
-    const y = yOf(t)
-    let deepest = -Infinity
-    for (const sea of seas) {
-      const d = Math.hypot(wrapDelta(sea.x, x, size), wrapDelta(sea.y, y, size))
-      deepest = Math.max(deepest, 1 - d / sea.r)
+  time('seas', () => {
+    let s = 0
+    const rand = () => hash(s++, 11, seed)
+    const seas = Array.from({ length: SEA_COUNT }, () => ({
+      x: rand() * size,
+      y: rand() * size,
+      r: size * (0.12 + rand() * 0.08),
+    }))
+    const seaScore = new Float32Array(n)
+    const coast = fbmField(size, 240, 4, seed + 5)
+    for (let t = 0; t < n; t++) {
+      const x = xOf(t)
+      const y = yOf(t)
+      let deepest = -Infinity
+      for (const sea of seas) {
+        const d = Math.hypot(wrapDelta(sea.x, x, size), wrapDelta(sea.y, y, size))
+        deepest = Math.max(deepest, 1 - d / sea.r)
+      }
+      seaScore[t] = deepest + (coast[t]! - 0.5) * 0.6
     }
-    seaScore[t] = deepest + (coast[t]! - 0.5) * 0.6
-  }
-  const seaCut = quantile(seaScore, 1 - TERRAIN_SHARES.sea)
-  for (let t = 0; t < n; t++) if (seaScore[t]! >= seaCut) tiles[t] = Terrain.Sea
+    const seaCut = quantile(seaScore, 1 - TERRAIN_SHARES.sea)
+    for (let t = 0; t < n; t++) if (seaScore[t]! >= seaCut) tiles[t] = Terrain.Sea
+  })
 
   // Lakes: the lowest spots of a blobby field, only well away from the sea.
-  const fromSea = stepsFrom(size, (t) => tiles[t] === Terrain.Sea)
-  // Typed arrays filled up to a count, here and below: a full map has too many tiles for plain ones.
-  const lakeAt = new Int32Array(n)
-  const lakeTiles = new Float32Array(n)
-  let lakes = 0
-  const lakeNoise = fbmField(size, 360, 3, seed + 1)
-  for (let t = 0; t < n; t++) {
-    if (tiles[t] === Terrain.Sea || fromSea[t]! <= LAKE_COAST_MARGIN) continue
-    lakeAt[lakes] = t
-    lakeTiles[lakes++] = lakeNoise[t]!
-  }
-  const lakeField = lakeTiles.subarray(0, lakes)
-  const lakeCut = quantile(lakeField, (TERRAIN_SHARES.lake * n) / lakes)
-  for (let k = 0; k < lakes; k++) {
-    if (lakeField[k]! < lakeCut) tiles[lakeAt[k]!] = Terrain.Lake
-  }
+  time('lakes', () => {
+    const fromSea = stepsFrom(size, (t) => tiles[t] === Terrain.Sea)
+    // Typed arrays filled up to a count, here and below: a full map has too many tiles for plain ones.
+    const lakeAt = new Int32Array(n)
+    const lakeTiles = new Float32Array(n)
+    let lakes = 0
+    const lakeNoise = fbmField(size, 360, 3, seed + 1)
+    for (let t = 0; t < n; t++) {
+      if (tiles[t] === Terrain.Sea || fromSea[t]! <= LAKE_COAST_MARGIN) continue
+      lakeAt[lakes] = t
+      lakeTiles[lakes++] = lakeNoise[t]!
+    }
+    const lakeField = lakeTiles.subarray(0, lakes)
+    const lakeCut = quantile(lakeField, (TERRAIN_SHARES.lake * n) / lakes)
+    for (let k = 0; k < lakes; k++) {
+      if (lakeField[k]! < lakeCut) tiles[lakeAt[k]!] = Terrain.Lake
+    }
+  })
 
   // Mountains and hills: ridges of a noise field, strongest where a coarse mask lets ranges form.
   // The highest ridge tiles are mountains, the band below them hills.
   const isLand = (t: number) => tiles[t] !== Terrain.Sea && tiles[t] !== Terrain.Lake
   const relief = new Float32Array(n)
-  const landTiles = new Float32Array(n)
-  let landCount = 0
-  const ridges = fbmField(size, 640, 4, seed + 2)
-  const masks = fbmField(size, 1600, 2, seed + 3)
-  for (let t = 0; t < n; t++) {
-    if (!isLand(t)) continue
-    const ridge = 1 - Math.abs(2 * ridges[t]! - 1)
-    const mask = masks[t]!
-    relief[t] = ridge * ridge * mask
-    landTiles[landCount++] = relief[t]!
-  }
-  const reliefSorted = landTiles.subarray(0, landCount)
-  const mountainCut = quantile(reliefSorted, 1 - (TERRAIN_SHARES.mountain * n) / landCount)
-  const hillsCut = quantile(
-    reliefSorted,
-    1 - ((TERRAIN_SHARES.mountain + TERRAIN_SHARES.hills) * n) / landCount,
-  )
+  let mountainCut = 0
+  let hillsCut = 0
+  time('relief', () => {
+    const landTiles = new Float32Array(n)
+    let landCount = 0
+    const ridges = fbmField(size, 640, 4, seed + 2)
+    const masks = fbmField(size, 1600, 2, seed + 3)
+    for (let t = 0; t < n; t++) {
+      if (!isLand(t)) continue
+      const ridge = 1 - Math.abs(2 * ridges[t]! - 1)
+      const mask = masks[t]!
+      relief[t] = ridge * ridge * mask
+      landTiles[landCount++] = relief[t]!
+    }
+    const reliefSorted = landTiles.subarray(0, landCount)
+    mountainCut = quantile(reliefSorted, 1 - (TERRAIN_SHARES.mountain * n) / landCount)
+    hillsCut = quantile(
+      reliefSorted,
+      1 - ((TERRAIN_SHARES.mountain + TERRAIN_SHARES.hills) * n) / landCount,
+    )
+  })
 
   // Forest: patches of a separate field among the remaining land; plains everywhere else.
-  const growth = fbmField(size, 280, 4, seed + 4)
-  const flatTiles = new Float32Array(n)
-  let flat = 0
-  for (let t = 0; t < n; t++) {
-    if (!isLand(t) || relief[t]! >= hillsCut) continue
-    flatTiles[flat++] = growth[t]!
-  }
-  const forestCut = quantile(flatTiles.subarray(0, flat), 1 - (TERRAIN_SHARES.forest * n) / flat)
-  for (let t = 0; t < n; t++) {
-    if (!isLand(t)) continue
-    tiles[t] =
-      relief[t]! >= mountainCut
-        ? Terrain.Mountain
-        : relief[t]! >= hillsCut
-          ? Terrain.Hills
-          : growth[t]! >= forestCut
-            ? Terrain.Forest
-            : Terrain.Plains
-  }
+  time('forest', () => {
+    const growth = fbmField(size, 280, 4, seed + 4)
+    const flatTiles = new Float32Array(n)
+    let flat = 0
+    for (let t = 0; t < n; t++) {
+      if (!isLand(t) || relief[t]! >= hillsCut) continue
+      flatTiles[flat++] = growth[t]!
+    }
+    const forestCut = quantile(flatTiles.subarray(0, flat), 1 - (TERRAIN_SHARES.forest * n) / flat)
+    for (let t = 0; t < n; t++) {
+      if (!isLand(t)) continue
+      tiles[t] =
+        relief[t]! >= mountainCut
+          ? Terrain.Mountain
+          : relief[t]! >= hillsCut
+            ? Terrain.Hills
+            : growth[t]! >= forestCut
+              ? Terrain.Forest
+              : Terrain.Plains
+    }
+  })
 
   // All land joined: land cut off from the largest stretch becomes water as a whole, sea if it
   // touches the sea anywhere, lake otherwise.
   const map: TerrainMap = { size, tiles }
-  const { group, sizes } = landGroups(map)
-  const main = sizes.indexOf(Math.max(...sizes))
-  const bySea = new Uint8Array(sizes.length)
-  for (let t = 0; t < n; t++) {
-    const g = group[t]!
-    if (g !== -1 && g !== main && neighbours(size, t).some((nb) => tiles[nb] === Terrain.Sea)) {
-      bySea[g] = 1
+  time('joining', () => {
+    const { group, sizes } = landGroups(map)
+    const main = sizes.indexOf(Math.max(...sizes))
+    const bySea = new Uint8Array(sizes.length)
+    for (let t = 0; t < n; t++) {
+      const g = group[t]!
+      if (g !== -1 && g !== main && neighbours(size, t).some((nb) => tiles[nb] === Terrain.Sea)) {
+        bySea[g] = 1
+      }
     }
-  }
-  for (let t = 0; t < n; t++) {
-    const g = group[t]!
-    if (g === -1 || g === main) continue
-    tiles[t] = bySea[g] ? Terrain.Sea : Terrain.Lake
-  }
+    for (let t = 0; t < n; t++) {
+      const g = group[t]!
+      if (g === -1 || g === main) continue
+      tiles[t] = bySea[g] ? Terrain.Sea : Terrain.Lake
+    }
+  })
   return map
 }
 
