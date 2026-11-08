@@ -2,7 +2,12 @@
 pub mod admin_cli;
 pub mod auth;
 pub mod backup;
+pub mod config;
 pub mod db;
 pub mod explored;
+pub mod log;
+pub mod monitoring;
 pub mod saves;
+pub mod server;
+pub mod tick_window;
 pub mod world_format;
