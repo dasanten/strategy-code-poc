@@ -63,6 +63,8 @@ Conventions:
 | `terrain/1-64.bin` | generateTerrain(1, 64).tiles |
 | `terrain/42-256.bin` | generateTerrain(42, 256).tiles |
 | `terrain/7-1024.bin` | generateTerrain(7, 1024).tiles |
+| `trade/deliveries.json` | setup() of deliveries.fixture.ts |
+| `trade/transfers.json` | setup() of transfers.fixture.ts |
 | `worlds/generated-1-1024.json` | generateWorld(generateTerrain(1, 1024), 1) |
 | `worlds/generated-1-2880.json` | generateWorld(generateTerrain(1, 2880), 1) (not in git) |
 | `worlds/hq-0.json` | hq() of trade-org.test.ts, then 0 × stepWorld(world, terrain, walking) with an unhurried Walking |
