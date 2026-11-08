@@ -91,13 +91,14 @@ pub fn update_city_membership(world: &mut WorldState, size: i32) {
     crate::cities::update_city_membership(world, size);
 }
 
-/// Robs a caravan (`robCaravan`). TODO(T86.9): `caravans.rs`.
+/// Robs a caravan (`robCaravan`, in `caravans.rs`).
 pub fn rob_caravan(
-    _world: &mut WorldState,
-    _thief: usize,
-    _carriage_id: &str,
-    _robbed: &mut HashSet<String>,
+    world: &mut WorldState,
+    thief: usize,
+    carriage_id: &str,
+    robbed: &mut HashSet<String>,
 ) {
+    crate::caravans::rob_caravan(world, thief, carriage_id, robbed, false);
 }
 
 /// Robs a wandering trader (`robTrader`). TODO(T86.10): `traders.rs`.
