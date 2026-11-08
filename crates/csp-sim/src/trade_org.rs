@@ -4,6 +4,7 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::f64::consts::PI;
+use std::rc::Rc;
 
 use csp_shared::balance::{CITY_AREA_MARGIN, SIGHT_RANGE, START_CARRIED_FOOD, TRADE_ORG_HQ};
 use csp_shared::footprint::{footprint_tiles, Placed, FOOTPRINT};
@@ -104,14 +105,15 @@ pub struct HqLayout {
 
 thread_local! {
     /// Layouts worked out so far (`layouts`), by their middle tile.
-    static LAYOUTS: RefCell<HashMap<Tile, HqLayout>> = RefCell::new(HashMap::new());
+    static LAYOUTS: RefCell<HashMap<Tile, Rc<HqLayout>>> = RefCell::new(HashMap::new());
 }
 
 /// The HQ's shape around the middle tile (cx, cy) of its town hall (`hqLayout`), worked out once
 /// for each tile.
-pub fn hq_layout(cx: i32, cy: i32) -> HqLayout {
-    LAYOUTS
-        .with(|l| l.borrow_mut().entry((cx, cy)).or_insert_with(|| work_out_layout(cx, cy)).clone())
+pub fn hq_layout(cx: i32, cy: i32) -> Rc<HqLayout> {
+    LAYOUTS.with(|l| {
+        l.borrow_mut().entry((cx, cy)).or_insert_with(|| Rc::new(work_out_layout(cx, cy))).clone()
+    })
 }
 
 fn side(kind: &str) -> i32 {
