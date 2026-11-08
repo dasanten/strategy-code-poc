@@ -339,9 +339,15 @@ fn step_rest(
 // ------------------------------------------------------------------------------------------------
 
 // T86.9 (`trade-org.ts`, `trading-posts.ts`, `caravans.ts`, `traders.ts`): world generation.
-fn place_trade_org_hq(_world: &mut WorldState, _terrain: &TerrainMap) {}
-fn place_trading_posts(_world: &mut WorldState, _terrain: &TerrainMap) {}
-fn place_caravans(_world: &mut WorldState) {}
+fn place_trade_org_hq(world: &mut WorldState, terrain: &TerrainMap) {
+    crate::trade_org::place_trade_org_hq(world, terrain);
+}
+fn place_trading_posts(world: &mut WorldState, terrain: &TerrainMap) {
+    crate::trading_posts::place_trading_posts(world, terrain);
+}
+fn place_caravans(world: &mut WorldState) {
+    crate::caravans::place_caravans(world);
+}
 fn place_traders(_world: &mut WorldState, _size: i32) {}
 
 // T86.10 (`npc-cities.ts`): world generation.
@@ -362,7 +368,9 @@ fn step_feeding(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
 
 // T86.9 (`caravans.ts`, `traders.ts`, `trade-org-army.ts`, `trade-org-punishment.ts`,
 // `trade-org-debt.ts`, `trade-org-wrecks.ts`).
-fn step_caravans(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
+fn step_caravans(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
+    crate::caravans::step_caravans(world, size);
+}
 fn step_traders(
     _world: &mut WorldState,
     _size: i32,
