@@ -2,7 +2,7 @@
 //! `apps/server/src/sync.ts`): entities in sight that changed, and ids that left sight.
 //!
 //! The TypeScript keys its caches by object identity (`Map<readonly T[], Sent>`). Here a list is
-//! an `Arc<[T]>` and what a view was sent an `Arc` too, keyed by address while the round holds a
+//! an `Arc<Vec<T>>` and what a view was sent an `Arc` too, keyed by address while the round holds a
 //! clone (so no address is reused within the round): views that diff against one list end up
 //! holding one `Sent`, and from then on they share one diff, worked out once.
 
@@ -36,7 +36,7 @@ fn key<T: ?Sized>(a: &Arc<T>) -> usize {
 
 struct Known<T> {
     /// The list the diff was worked out against, kept so its address stays its own.
-    list: Arc<[T]>,
+    list: Arc<Vec<T>>,
     /// What views were sent before, kept for the same reason.
     _before: Sent,
     diff: Arc<Diff<T>>,
@@ -51,7 +51,7 @@ struct Known<T> {
 pub struct SyncRound<T> {
     json: ToJson<T>,
     /// Each list as JSON by id: what a view that diffed against it was sent afterwards.
-    lists: HashMap<usize, (Arc<[T]>, Sent)>,
+    lists: HashMap<usize, (Arc<Vec<T>>, Sent)>,
     /// The diff worked out from what views were sent before, by the address of that `Sent`.
     diffs: HashMap<usize, Known<T>>,
     /// Which `diffs` entry made each diff, by the diff's address.
@@ -72,7 +72,7 @@ impl<T> SyncRound<T> {
 
 impl<T: HasId + Clone> SyncRound<T> {
     /// The list as JSON by id, made once.
-    pub fn sent(&mut self, list: &Arc<[T]>) -> Sent {
+    pub fn sent(&mut self, list: &Arc<Vec<T>>) -> Sent {
         if let Some((_, sent)) = self.lists.get(&key(list)) {
             return Arc::clone(sent);
         }
@@ -83,7 +83,7 @@ impl<T: HasId + Clone> SyncRound<T> {
     }
 
     /// The diff of `before` against the list, worked out once per `before` and list.
-    pub fn diff(&mut self, before: &Sent, list: &Arc<[T]>) -> Arc<Diff<T>> {
+    pub fn diff(&mut self, before: &Sent, list: &Arc<Vec<T>>) -> Arc<Diff<T>> {
         if let Some(known) = self.diffs.get(&key(before)) {
             if Arc::ptr_eq(&known.list, list) {
                 return Arc::clone(&known.diff);
@@ -169,7 +169,7 @@ impl ClientView {
     /// What changed since the view was last sent, worked out in `round`.
     pub fn diff<T: HasId + Clone>(
         &mut self,
-        entities: &Arc<[T]>,
+        entities: &Arc<Vec<T>>,
         round: &mut SyncRound<T>,
     ) -> Arc<Diff<T>> {
         let diff = round.diff(&self.sent, entities);
@@ -178,7 +178,7 @@ impl ClientView {
     }
 
     /// [`ClientView::diff`] in a round of its own.
-    pub fn diff_alone<T: HasId + Clone + Serialize>(&mut self, entities: &Arc<[T]>) -> Diff<T> {
+    pub fn diff_alone<T: HasId + Clone + Serialize>(&mut self, entities: &Arc<Vec<T>>) -> Diff<T> {
         let mut round = SyncRound::default();
         (*self.diff(entities, &mut round)).clone()
     }
@@ -210,8 +210,8 @@ mod tests {
         Unit { id: id.into(), owner: "red", x, y: 0 }
     }
 
-    fn list(units: Vec<Unit>) -> Arc<[Unit]> {
-        units.into()
+    fn list(units: Vec<Unit>) -> Arc<Vec<Unit>> {
+        Arc::new(units)
     }
 
     fn diff(changed: Vec<Unit>, gone: &[&str]) -> Diff<Unit> {

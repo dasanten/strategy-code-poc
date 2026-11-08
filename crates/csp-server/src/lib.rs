@@ -9,6 +9,7 @@ pub mod explored;
 pub mod first_day;
 pub mod log;
 pub mod monitoring;
+pub mod realtime;
 pub mod saves;
 pub mod scripts;
 pub mod server;

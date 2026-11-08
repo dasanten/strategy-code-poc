@@ -7,7 +7,7 @@ use std::sync::Arc;
 use axum::body::{to_bytes, Body};
 use axum::http::{header, Request, StatusCode};
 use axum::Router;
-use csp_server::app::{build_app, AppOptions, LocalGame, SESSION_COOKIE};
+use csp_server::app::{build_app, AppOptions, SESSION_COOKIE};
 use csp_server::auth::{
     create_admin, create_invite_code, create_session, get_session_user, now_ms,
 };
@@ -251,7 +251,7 @@ async fn lets_admins_offer_horses_again_to_all_or_by_name_and_no_one_else() {
     let terrain = TerrainMap { size: 64, tiles: vec![0; 64 * 64] };
     let world = create_world(&terrain, 1);
     let explored = ExploredTerrain::new(terrain.clone(), &world.nodes);
-    let game = Arc::new(LocalGame::new(world, terrain, explored));
+    let game = game_thread(&db, world, terrain, explored);
     let mut opts = db.opts();
     opts.game = Some(game.clone());
     let app = build_app(opts);
@@ -267,43 +267,49 @@ async fn lets_admins_offer_horses_again_to_all_or_by_name_and_no_one_else() {
         tokens.push(token);
     }
     let (mara, tobin) = (ids[0], ids[1]);
-    let claimed = || game.state.lock().unwrap().0.horse_offers_claimed.clone();
-    let set_claimed = |c: Vec<u64>| game.state.lock().unwrap().0.horse_offers_claimed = c;
+    let claimed = || {
+        let game = game.clone();
+        async move { game.run(|g, _| g.world.horse_offers_claimed.clone()).await.unwrap() }
+    };
+    let set_claimed = |c: Vec<u64>| {
+        let game = game.clone();
+        async move { game.run(move |g, _| g.world.horse_offers_claimed = c).await.unwrap() }
+    };
     let reopen = |payload: Value, token: String| {
         let app = app.clone();
         async move {
             call(&app, "POST", "/api/admin/horse-offers/reopen", Some(&token), Some(payload)).await
         }
     };
-    set_claimed(vec![mara, tobin]);
+    set_claimed(vec![mara, tobin]).await;
 
     let refused = reopen(json!({ "name": "Mara" }), tokens[0].clone()).await;
     assert_eq!(refused.status, StatusCode::FORBIDDEN);
     assert_eq!(refused.error(), "not-admin");
-    assert_eq!(claimed(), [mara, tobin]);
+    assert_eq!(claimed().await, [mara, tobin]);
 
     for name in [json!("Nobody"), json!(""), json!(7)] {
         let unknown = reopen(json!({ "name": name }), admin.clone()).await;
         assert_eq!(unknown.status, StatusCode::NOT_FOUND);
         assert_eq!(unknown.json()["message"], "No account with that name.");
     }
-    assert_eq!(claimed(), [mara, tobin]);
+    assert_eq!(claimed().await, [mara, tobin]);
 
     // A Player who hasn't claimed is no error, and nothing to re-open.
     let none = reopen(json!({ "name": "Ilse" }), admin.clone()).await;
     assert_eq!(none.status, StatusCode::OK);
     assert_eq!(none.json(), json!({ "reopened": 0 }));
-    assert_eq!(claimed(), [mara, tobin]);
+    assert_eq!(claimed().await, [mara, tobin]);
 
     assert_eq!(
         reopen(json!({ "name": "mara" }), admin.clone()).await.json(),
         json!({ "reopened": 1 })
     );
-    assert_eq!(claimed(), [tobin]);
+    assert_eq!(claimed().await, [tobin]);
 
-    set_claimed(vec![mara, tobin]);
+    set_claimed(vec![mara, tobin]).await;
     assert_eq!(reopen(json!({}), admin.clone()).await.json(), json!({ "reopened": 2 }));
-    assert_eq!(claimed(), Vec::<u64>::new());
+    assert_eq!(claimed().await, Vec::<u64>::new());
     assert_eq!(reopen(json!({}), admin.clone()).await.json(), json!({ "reopened": 0 }));
 }
 
@@ -446,7 +452,7 @@ async fn serves_explored_chunks_one_at_a_time_and_in_batches_refusing_unexplored
     let conn = db.conn();
     let mara = add_user(&conn, "Mara");
     explored.explore(mara as u64, 5, 5, 2);
-    let game = Arc::new(LocalGame::new(world, terrain, explored));
+    let game = game_thread(&db, world, terrain, explored);
     let mut opts = db.opts();
     opts.game = Some(game);
     let app = build_app(opts);
@@ -806,4 +812,23 @@ async fn answers_health_and_tick_health_from_the_game_thread_between_ticks() {
 
     drop(app);
     Arc::try_unwrap(game).ok().expect("the app let go of the game").stop().await.unwrap();
+}
+
+/// The server's game thread on `world`, sharing the test's database file.
+fn game_thread(
+    db: &Db,
+    world: csp_shared::world::WorldState,
+    terrain: TerrainMap,
+    explored: ExploredTerrain,
+) -> Arc<csp_server::server::GameThread<NoLog>> {
+    use csp_server::server::{Game, GameThread, TickSettings};
+    let path = db.path.clone();
+    let settings =
+        TickSettings { invariant_sample_rate: 0.0, slow_tick_ms: 800.0, save_every_ticks: 30 };
+    let game = GameThread::spawn(
+        move || Ok((open_db(&path, None)?, Game::new(world, terrain, explored, NoLog))),
+        settings,
+    )
+    .unwrap();
+    Arc::new(game)
 }

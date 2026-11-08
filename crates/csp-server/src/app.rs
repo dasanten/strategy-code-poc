@@ -29,6 +29,9 @@ use csp_shared::chunks::{ADMIN_TERRAIN_OVERVIEW_PATH, TERRAIN_BATCH_MAX, TERRAIN
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::WorldState;
 use csp_sim::explored::ExploredTerrain;
+use csp_sim::orders::OrderQueue;
+use csp_sim::sight::SightTracker;
+use csp_sim::tick::Scratch;
 use rusqlite::Connection;
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -52,41 +55,25 @@ pub const SESSION_COOKIE: &str = "csp_session";
 /// Where the admin map asks for the world's seed and size (`ADMIN_MAP_INFO_PATH`).
 pub const ADMIN_MAP_INFO_PATH: &str = "/api/admin/map";
 
-/// The world, its terrain and the explored terrain, as a job between ticks sees them.
+/// The world and what the game keeps beside it, as a job between ticks sees them.
 pub struct GameView<'a> {
     pub world: &'a mut WorldState,
     pub terrain: &'a TerrainMap,
     pub explored: &'a mut ExploredTerrain,
+    /// Orders accepted since the last tick, applied at the start of the next.
+    pub orders: &'a mut OrderQueue,
+    pub sight: &'a mut SightTracker,
+    pub scratch: &'a mut Scratch,
 }
 
 /// Work on the game between ticks.
 pub type GameJob = Box<dyn for<'a> FnOnce(GameView<'a>) + Send>;
 
 /// How the HTTP side reaches the running game: a job runs between ticks, never during one. The
-/// server's game thread is one (`GameThread`); tests use [`LocalGame`].
+/// server's game thread (`GameThread`) is the one.
 pub trait GameHandle: Send + Sync + 'static {
     /// Runs `job` between ticks; resolves false if the game is gone and the job never ran.
     fn run_job(&self, job: GameJob) -> Pin<Box<dyn Future<Output = bool> + Send + '_>>;
-}
-
-/// A game held in a mutex, for tests and tools without a game thread.
-pub struct LocalGame {
-    pub state: Mutex<(WorldState, TerrainMap, ExploredTerrain)>,
-}
-
-impl LocalGame {
-    pub fn new(world: WorldState, terrain: TerrainMap, explored: ExploredTerrain) -> Self {
-        Self { state: Mutex::new((world, terrain, explored)) }
-    }
-}
-
-impl GameHandle for LocalGame {
-    fn run_job(&self, job: GameJob) -> Pin<Box<dyn Future<Output = bool> + Send + '_>> {
-        let mut guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
-        let (world, terrain, explored) = &mut *guard;
-        job(GameView { world, terrain, explored });
-        Box::pin(std::future::ready(true))
-    }
 }
 
 impl<L: crate::monitoring::LogSink + Send + Sync + 'static> GameHandle
@@ -99,6 +86,9 @@ impl<L: crate::monitoring::LogSink + Send + Sync + 'static> GameHandle
                     world: &mut g.world,
                     terrain: &g.terrain,
                     explored: &mut g.explored,
+                    orders: &mut g.orders,
+                    sight: &mut g.sight,
+                    scratch: &mut g.scratch,
                 })
             })
             .await
@@ -145,6 +135,8 @@ pub struct AppOptions {
     pub defaults: &'static Defaults,
     /// The last hour of tick health, for admins (T87.1); none without a tick loop.
     pub tick_health: Option<Arc<dyn Fn() -> Value + Send + Sync>>,
+    /// The WebSocket hub, served at `WS_PATH` with the game; without it there are no sockets.
+    pub realtime: Option<Arc<crate::realtime::Realtime>>,
 }
 
 impl AppOptions {
@@ -162,6 +154,7 @@ impl AppOptions {
             sockets: None,
             defaults: crate::scripts::game_defaults(),
             tick_health: None,
+            realtime: None,
         }
     }
 }
@@ -974,6 +967,14 @@ pub fn build_app(opts: AppOptions) -> Router {
         .route("/api/admin/invites", post(admin_invites))
         .route("/api/admin/password", post(admin_password))
         .route("/api/admin/tick-health", get(admin_tick_health));
+    if let (Some(rt), Some(game)) = (opts.realtime.clone(), state.game.clone()) {
+        api = api.route(
+            crate::realtime::WS_PATH,
+            get(move |headers: HeaderMap, ws: axum::extract::ws::WebSocketUpgrade| {
+                crate::realtime::upgrade(rt, game, headers, ws)
+            }),
+        );
+    }
     if state.game.is_some() {
         api = api
             .route("/api/terrain/{cx}/{cy}", get(terrain_chunk))

@@ -21,6 +21,7 @@ use std::{
 use csp_shared::{balance::MAP_SIZE, terrain::TerrainMap, world::WorldState, TICK_MS};
 use csp_sim::{
     explored::ExploredTerrain,
+    orders::{order_kinds, OrderQueue},
     sight::SightTracker,
     terrain_gen::generate_terrain,
     tick::{run_tick, Scratch, TickHealth, TickOptions, TickPhase, TickTimer},
@@ -35,12 +36,14 @@ use std::future::IntoFuture;
 
 use crate::{
     app::{build_app, AppOptions, GameHandle},
+    auth::SessionSockets,
     auth::{delete_expired_sessions, now_ms},
     backup::{backup_db, Reason},
     config::Config,
     db::{open_db, DbError},
     explored::{load_explored, save_explored},
     monitoring::{init_sentry, tag_world, LogSink, ServerReporter, TracingLog},
+    realtime::{Realtime, RealtimeOptions, SightCheck},
     saves::{load_or_create_world, SaveLog, SavesError, WorldSaver},
     tick_window::TickHealthWindow,
 };
@@ -106,10 +109,15 @@ impl From<&Config> for TickSettings {
 /// The running world and what the loop keeps beside it.
 pub struct Game<L: LogSink> {
     pub world: WorldState,
-    pub terrain: TerrainMap,
+    /// Shared with the order queue, whose orders check the land.
+    pub terrain: Arc<TerrainMap>,
     pub scratch: Scratch,
     pub explored: ExploredTerrain,
     pub sight: SightTracker,
+    /// Orders accepted from the sockets since the last tick, applied at the start of the next.
+    pub orders: OrderQueue,
+    /// The sockets, told of every tick in its broadcast phase; none until they are attached.
+    pub realtime: Option<Arc<Realtime>>,
     pub saver: WorldSaver<SaverLog<L>>,
     pub reporter: ServerReporter<Arc<L>>,
     log: Arc<L>,
@@ -118,12 +126,15 @@ pub struct Game<L: LogSink> {
 impl<L: LogSink> Game<L> {
     pub fn new(world: WorldState, terrain: TerrainMap, explored: ExploredTerrain, log: L) -> Self {
         let log = Arc::new(log);
+        let terrain = Arc::new(terrain);
         Self {
             world,
+            orders: OrderQueue::new(order_kinds(), Some(Arc::clone(&terrain))),
             terrain,
             scratch: Scratch::default(),
             explored,
             sight: SightTracker::new(),
+            realtime: None,
             saver: WorldSaver::new(SaverLog(Arc::clone(&log))),
             reporter: ServerReporter::new(Arc::clone(&log)),
             log,
@@ -140,17 +151,32 @@ impl<L: LogSink> Game<L> {
     /// in the tick's health.
     pub fn tick(&mut self, conn: &Connection, settings: TickSettings) -> Option<TickHealth> {
         self.saver.poll(conn);
-        let Game { world, terrain, scratch, explored, sight, saver, reporter, log } = self;
+        let Game {
+            world,
+            terrain,
+            scratch,
+            explored,
+            sight,
+            orders,
+            realtime,
+            saver,
+            reporter,
+            log,
+        } = self;
         let size = terrain.size;
+        let map: &TerrainMap = terrain;
         let mut finish = |timer: &TickTimer, world: &mut WorldState, scratch: &mut Scratch| {
             // TODO(Epic 86): `territory.update(world, terrain)` once territory is ported.
             timer.time(TickPhase::Territory, || ());
-            let _grown = timer.time(TickPhase::Sight, || {
+            let grown = timer.time(TickPhase::Sight, || {
                 let index = scratch.index(world, size);
                 sight.update(world, index, explored)
             });
-            // TODO(T87.6): `realtime.broadcastTick(grown)`.
-            timer.time(TickPhase::Broadcast, || ());
+            timer.time(TickPhase::Broadcast, || {
+                if let Some(rt) = realtime.as_ref() {
+                    rt.broadcast_tick(world, map, scratch, &grown, now_ms());
+                }
+            });
             if world.tick.is_multiple_of(settings.save_every_ticks) {
                 timer.time(TickPhase::Save, || {
                     saver.start(world);
@@ -166,9 +192,10 @@ impl<L: LogSink> Game<L> {
         };
         let mut opts =
             TickOptions::new(reporter, settings.invariant_sample_rate, settings.slow_tick_ms);
-        // TODO(Epic 86): orders, queues, scripts and walking once they implement the tick's traits.
+        opts.orders = Some(orders);
+        // TODO(Epic 86): queues, scripts and walking once they implement the tick's traits.
         opts.finish = Some(&mut finish);
-        let health = run_tick(world, terrain, scratch, opts);
+        let health = run_tick(world, map, scratch, opts);
         tag_world(world);
         health
     }
@@ -386,7 +413,42 @@ pub async fn run(config: Config) -> Result<(), ServerError> {
     crate::scripts::sync_default_scripts(&http_db, defaults)?;
     let window = Arc::clone(&game.tick_health);
     let clock = game.tick_clock;
+    // The sockets, with their own connection for sessions and the first-day card.
+    let realtime = Realtime::new(RealtimeOptions {
+        db: Arc::new(Mutex::new(open_db(&config.db_path, None)?)),
+        origins: config.origins.clone(),
+        limits: config.realtime.clone(),
+        // TODO(T86.13): the sampled sight checks report through the tick reporter's invariant
+        // violations once those are ported; until then they go to the log.
+        sight_check: Some(SightCheck {
+            sample_rate: config.invariant_sample_rate,
+            report: Box::new(|world, violations| {
+                for v in violations {
+                    TracingLog.log(
+                        Level::ERROR,
+                        json!({ "invariant": v.invariant, "entityIds": v.entity_ids, "tick": world.tick }),
+                        &v.message,
+                    );
+                }
+            }),
+            rand: Box::new(rand_unit),
+        }),
+        on_error: Some(Box::new(|error, user_id| {
+            TracingLog.log(
+                Level::ERROR,
+                json!({ "err": { "message": error }, "userId": user_id }),
+                "client message failed",
+            );
+        })),
+        now: None,
+    });
+    {
+        let rt = Arc::clone(&realtime);
+        game.run(move |g, _| g.realtime = Some(rt)).await;
+    }
     let mut opts = AppOptions::new(http_db);
+    opts.sockets = Some(Arc::clone(&realtime) as Arc<dyn SessionSockets + Send + Sync>);
+    opts.realtime = Some(Arc::clone(&realtime));
     opts.secure_cookies = config.secure_cookies;
     opts.trust_proxy = config.trust_proxy;
     opts.web_dist = config.web_dist.clone();
@@ -427,13 +489,26 @@ pub async fn run(config: Config) -> Result<(), ServerError> {
         stopped(stop_rx),
     )
     .await;
+    // The sockets close first, as `realtime.close()` before `app.close()`.
+    realtime.close();
     if let Ok(Err(e)) = http.await {
         TracingLog.log(Level::ERROR, json!({ "err": { "message": e.to_string() } }), "http failed");
     }
-    // HTTP has stopped and dropped its handle on the game, so the save has it alone.
-    let saved = match Arc::try_unwrap(game) {
-        Ok(game) => game.stop().await,
-        Err(_) => Err(ServerError::Io(std::io::Error::other("the game is still in use"))),
+    // HTTP and the sockets let go of the game once they have stopped, so the save has it alone.
+    let mut game = game;
+    let mut waited = 0;
+    let saved = loop {
+        match Arc::try_unwrap(game) {
+            Ok(alone) => break alone.stop().await,
+            Err(shared) if waited < 50 => {
+                game = shared;
+                waited += 1;
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+            Err(_) => {
+                break Err(ServerError::Io(std::io::Error::other("the game is still in use")))
+            }
+        }
     };
     if let Err(e) = &saved {
         TracingLog.log(
@@ -445,4 +520,15 @@ pub async fn run(config: Config) -> Result<(), ServerError> {
     // Flushes Sentry (up to its shutdown timeout, 2 s).
     drop(sentry);
     saved
+}
+
+/// A draw in [0, 1) for the sampled checks (`Math.random`): the clock's nanoseconds mixed.
+fn rand_unit() -> f64 {
+    let nanos =
+        SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
+    let mut z = (nanos as u64).wrapping_add(0x9E37_79B9_7F4A_7C15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^= z >> 31;
+    (z >> 11) as f64 / (1u64 << 53) as f64
 }
