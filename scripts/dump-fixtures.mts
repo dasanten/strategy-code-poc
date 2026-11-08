@@ -8,6 +8,8 @@
 //     --db <path>   a `world.db` to take the live save from (copied first, never written)
 //     --out <dir>   where to write (default `crates/csp-sim/fixtures`)
 //     --quick       small sizes and few ticks, for the script's own test
+//     --only <parts>  only these, comma-separated: balance, random, terrain, lang, paths, save,
+//                     worlds, generated, sight (default all); the README keeps every other file
 
 // The server's modules import each other in a circle that only resolves when `realtime.ts` comes
 // first, as it does when the server starts.
@@ -35,6 +37,7 @@ import * as balance from '../packages/shared/src/balance.ts'
 import {
   DEFAULT_SCRIPTS,
   MAP_SIZE,
+  NPC_TOWN,
   NPC_VILLAGE,
   Terrain,
   isPassableTerrain,
@@ -60,6 +63,7 @@ import {
 } from '../packages/lang/src/index.ts'
 import { openDb } from '../apps/server/src/db/index.ts'
 import { foundNpcCity } from '../apps/server/src/npc-cities.ts'
+import { giveNpcHorses } from '../apps/server/src/npc-horses.ts'
 import { placeResourceNodes } from '../apps/server/src/node-gen.ts'
 import {
   CARRIAGE_COSTS,
@@ -70,7 +74,9 @@ import {
 import { hash as nameHash, mulberry32 } from '../apps/server/src/residents.ts'
 import { loadOrCreateWorld } from '../apps/server/src/saves.ts'
 import { generateTerrain, hash as latticeHash } from '../apps/server/src/terrain-gen.ts'
-import { addCity } from '../apps/server/src/test-terrain.ts'
+import { entitiesInSight } from '../apps/server/src/sight.ts'
+import { foundStartingCity } from '../apps/server/src/starting-city.ts'
+import { addCity, cityTerrain } from '../apps/server/src/test-terrain.ts'
 import { foundTradeOrgHq } from '../apps/server/src/trade-org.ts'
 import { Walking } from '../apps/server/src/walking.ts'
 import { WORLD_FORMAT_VERSION } from '../apps/server/src/world-format.ts'
@@ -89,6 +95,8 @@ interface Options {
   full: boolean
   quick: boolean
   db: string | undefined
+  /** The parts to write (`--only`); undefined for all of them. */
+  only: Set<string> | undefined
 }
 
 function options(argv: string[]): Options {
@@ -101,6 +109,7 @@ function options(argv: string[]): Options {
     full: argv.includes('--full'),
     quick: argv.includes('--quick'),
     db: value('--db'),
+    only: value('--only') === undefined ? undefined : new Set(value('--only')!.split(',')),
   }
 }
 
@@ -114,6 +123,7 @@ function plan(o: Options) {
         ] as [number, number][],
         villageTicks: [0, 1, 60],
         hqTicks: [0, 1],
+        sightTicks: [60],
         generated: [128],
         pathMap: [1, 64] as [number, number],
         pathCount: 40,
@@ -128,6 +138,7 @@ function plan(o: Options) {
         ] as [number, number][],
         villageTicks: [0, 1, 60, 1440, 10080],
         hqTicks: [0, 1, 60, 1440, 10080],
+        sightTicks: [60, 1440],
         generated: [1024, 2880],
         pathMap: [1, 512] as [number, number],
         pathCount: 200,
@@ -329,23 +340,142 @@ class UnhurriedWalking extends Walking {
 const worldFile = (world: WorldState, terrain: TerrainMap) =>
   json({ terrain: { size: terrain.size, tiles: base64(terrain.tiles) }, world })
 
+/**
+ * What each side of a world sees (`entitiesInSight`), by side: every realm and every city, an NPC
+ * city and a Trade Org city seeing for itself as a realm does.
+ */
+function sightBySide(world: WorldState, terrain: TerrainMap): Record<string, unknown> {
+  const sides = [...world.realms.map((r) => r.id), ...world.cities.map((c) => c.id)]
+  return Object.fromEntries(sides.map((side) => [side, entitiesInSight(world, terrain, side)]))
+}
+
 function dumpStepped(
   name: string,
   setup: () => { world: WorldState; terrain: TerrainMap },
   from: string,
   ticks: number[],
+  sightTicks: number[],
+  parts: { worlds: boolean; sight: boolean },
 ): void {
+  const wanted = [
+    ...new Set([...(parts.worlds ? ticks : []), ...(parts.sight ? sightTicks : [])]),
+  ].sort((a, b) => a - b)
+  if (wanted.length === 0) return
   log(`worlds/${name}`)
   const { world, terrain } = setup()
   const walking = new UnhurriedWalking(terrain)
-  for (const at of ticks) {
+  for (const at of wanted) {
     while (world.tick < at) stepWorld(world, terrain, walking)
+    const stepped = `${from}, then ${at} × stepWorld(world, terrain, walking) with an unhurried Walking`
+    if (parts.worlds && ticks.includes(at)) {
+      write(`worlds/${name}-${at}.json`, worldFile(world, terrain), stepped)
+    }
+    if (parts.sight && sightTicks.includes(at)) {
+      write(
+        `worlds/${name}-${at}.sight.json`,
+        json(sightBySide(world, terrain)),
+        `entitiesInSight for every realm and city of ${stepped}`,
+      )
+    }
+  }
+}
+
+/**
+ * The worlds `sight.test.ts` starts from, on `cityTerrain()`: Player 1's starting city
+ * (`worldWithCity`), and two and three Players' far apart. Sight needs only the map's size, so
+ * the terrain is left out; what each side sees comes along.
+ */
+function dumpSightWorlds(): void {
+  log('sight')
+  const terrain = cityTerrain()
+  for (const [name, players] of [
+    ['city', 1],
+    ['two-realms', 2],
+    ['three-realms', 3],
+  ] as const) {
+    const world = createWorld(terrain)
+    for (let u = 1; u <= players; u++) foundStartingCity(world, terrain, u)
     write(
-      `worlds/${name}-${at}.json`,
-      worldFile(world, terrain),
-      `${from}, then ${at} × stepWorld(world, terrain, walking) with an unhurried Walking`,
+      `sight/${name}.json`,
+      json({ size: terrain.size, world, sight: sightBySide(world, terrain) }),
+      `createWorld(cityTerrain()) and foundStartingCity for players 1 to ${players}, with entitiesInSight for every realm and city`,
     )
   }
+  dumpVisitors()
+}
+
+/**
+ * Player 1's residents visiting NPC cities and the Trade Org HQ, so what a Player sees of them
+ * (prices, hire, horses, warehouse prices, standing) comes up: on Plains, the HQ, two villages and
+ * a town with their horses, Player 1's city, and one of their residents on each storage, stable and
+ * warehouse of the others, a horse of theirs in the town's stable. The villages hold Player 1 in
+ * low standing (one refuses them, one won't sell either), the town in high; an offer stands at
+ * their storage.
+ */
+function dumpVisitors(): void {
+  const terrain = plains(640)
+  const world = createWorld(terrain)
+  const rand = mulberry32(11)
+  foundTradeOrgHq(world, terrain, 320, 320, rand)
+  const [low, lowest, town] = [
+    foundNpcCity(world, terrain, NPC_VILLAGE, 60, 60, rand),
+    foundNpcCity(world, terrain, NPC_VILLAGE, 60, 500, rand),
+    foundNpcCity(world, terrain, NPC_TOWN, 500, 60, rand),
+  ]
+  // Their horses stand where their stable goes up; it stands there already, with some Food.
+  for (const c of [low, lowest, town]) {
+    giveNpcHorses(world, terrain, c)
+    const h = world.horses.find((x) => x.cityId === c.id)!
+    const [x, y] = [h.x - 1, h.y - 1]
+    world.buildings.push({
+      id: `${c.id}-stable`,
+      kind: 'stable',
+      cityId: c.id,
+      x,
+      y,
+      stock: { food: 10 },
+    })
+  }
+  const realm = foundStartingCity(world, terrain, 1)
+  world.standings.push(
+    { of: low.id, toward: realm.id, value: -30 },
+    { of: lowest.id, toward: realm.id, value: -70 },
+    { of: town.id, toward: realm.id, value: 40 },
+  )
+  const visited = world.buildings.filter(
+    (b) =>
+      world.cities.some((c) => c.id === b.cityId && c.realmId === null) &&
+      ['storage', 'stable', 'warehouse'].includes(b.kind),
+  )
+  const residents = world.residents.filter((r) => r.owner === realm.id)
+  visited.forEach((b, i) => {
+    const r = residents[1 + (i % (residents.length - 1))]!
+    if (i < residents.length - 1) Object.assign(r, { x: b.x, y: b.y, order: null })
+  })
+  const stable = world.buildings.find((b) => b.cityId === town.id && b.kind === 'stable')!
+  const horse = world.horses.find((h) => h.realmId === realm.id)!
+  Object.assign(horse, { x: stable.x + 1, y: stable.y })
+  const storage = world.buildings.find(
+    (b) =>
+      b.kind === 'storage' && world.cities.find((c) => c.id === b.cityId)?.realmId === realm.id,
+  )!
+  world.offers.push({
+    id: 'offer1',
+    realmId: realm.id,
+    storageId: storage.id,
+    x: storage.x,
+    y: storage.y,
+    gives: 'food',
+    givesUnits: 2,
+    wants: 'coins',
+    wantsUnits: 3,
+    times: 4,
+  })
+  write(
+    'sight/visitors.json',
+    json({ size: terrain.size, world, sight: sightBySide(world, terrain) }),
+    'Player 1 visiting NPC cities and the Trade Org HQ on Plains (dumpVisitors), with entitiesInSight for every realm and city',
+  )
 }
 
 function dumpGenerated(sizes: number[]): void {
@@ -766,21 +896,27 @@ function filesIn(dir: string, prefix = ''): string[] {
 }
 
 function writeIndex(): void {
-  const big = filesIn(out).filter((f) => statSync(join(out, f)).size > GIT_LIMIT)
+  // Files written before, by an earlier run with other options (`--full`, `--db`), stay listed.
+  const readme = join(out, 'README.md')
+  const earlier = new Map<string, string>()
+  // Those kept out of git stay listed and ignored where they were not made again (`--only`, or a
+  // checkout that never had them).
+  const missing: string[] = []
+  if (existsSync(readme)) {
+    for (const m of readFileSync(readme, 'utf8').matchAll(/^\| `([^`]+)` \| (.*) \|$/gm)) {
+      earlier.set(m[1]!, m[2]!.replace(/ \(not in git\)$/, ''))
+      if (m[2]!.endsWith(' (not in git)') && !existsSync(join(out, m[1]!))) missing.push(m[1]!)
+    }
+  }
+  const files = [...filesIn(out), ...missing].sort()
+  const big = files.filter((f) => missing.includes(f) || statSync(join(out, f)).size > GIT_LIMIT)
   writeFileSync(
     join(out, '.gitignore'),
     '# Over about 5 MB: regenerated by scripts/dump-fixtures.mts, kept out of git.\n' +
       big.map((f) => `/${f}\n`).join(''),
   )
-  // Files written before, by an earlier run with other options (`--full`, `--db`), stay listed.
-  const readme = join(out, 'README.md')
-  const earlier = new Map<string, string>()
-  if (existsSync(readme)) {
-    for (const m of readFileSync(readme, 'utf8').matchAll(/^\| `([^`]+)` \| (.*) \|$/gm))
-      earlier.set(m[1]!, m[2]!.replace(/ \(not in git\)$/, ''))
-  }
   const by = new Map(made.map((m) => [m.path, m.by]))
-  const rows = filesIn(out)
+  const rows = files
     .map((f) => {
       const what = by.get(f) ?? earlier.get(f) ?? 'unknown (not written by this script)'
       return `| \`${f}\` | ${what}${big.includes(f) ? ' (not in git)' : ''} |`
@@ -810,6 +946,9 @@ Conventions:
 - \`.bin\` files are \`TerrainMap.tiles\`, one byte per tile, row by row (\`y * size + x\`).
 - World files are \`{ terrain: { size, tiles: <base64> }, world: <JSON.stringify(world)> }\`, so a
   Rust test needs nothing else.
+- \`worlds/*.sight.json\` is \`entitiesInSight\` of that world for every realm and city, by id;
+  \`sight/*.json\` are \`{ size, world, sight }\`, the same for the worlds \`sight.test.ts\` starts
+  from (sight needs only the map's size).
 - Numbers JSON cannot hold are written \`{"$number": "NaN" | "Infinity" | "-Infinity" | "-0"}\`.
 - Stepped worlds use a \`Walking\` whose path searches always finish within the tick (budget
   \`Infinity\` instead of \`PATH_BUDGET_MS\`), so where people stand never depends on the machine.
@@ -836,15 +975,19 @@ async function main(): Promise<void> {
   out = o.out
   mkdirSync(out, { recursive: true })
   const started = performance.now()
-  dumpBalance()
-  dumpRandom()
-  dumpTerrain(p.maps)
-  dumpLang()
-  dumpPaths(p.pathMap[0], p.pathMap[1], p.pathCount)
-  await dumpSave(o.db)
-  dumpStepped('village', village, 'village() of npc-growth.fixture.ts', p.villageTicks)
-  dumpStepped('hq', hq, 'hq() of trade-org.test.ts', p.hqTicks)
-  dumpGenerated(p.generated)
+  const want = (part: string) => o.only === undefined || o.only.has(part)
+  if (want('balance')) dumpBalance()
+  if (want('random')) dumpRandom()
+  if (want('terrain')) dumpTerrain(p.maps)
+  if (want('lang')) dumpLang()
+  if (want('paths')) dumpPaths(p.pathMap[0], p.pathMap[1], p.pathCount)
+  if (want('save')) await dumpSave(o.db)
+  const parts = { worlds: want('worlds'), sight: want('sight') }
+  const [villageFrom, hqFrom] = ['village() of npc-growth.fixture.ts', 'hq() of trade-org.test.ts']
+  dumpStepped('village', village, villageFrom, p.villageTicks, p.sightTicks, parts)
+  dumpStepped('hq', hq, hqFrom, p.hqTicks, p.sightTicks, parts)
+  if (want('sight')) dumpSightWorlds()
+  if (want('generated')) dumpGenerated(p.generated)
   if (o.full) dumpFullTerrainHash()
   writeIndex()
   log(

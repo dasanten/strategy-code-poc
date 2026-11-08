@@ -130,6 +130,7 @@ dependencies = [
  "csp-shared",
  "serde",
  "serde_json",
+ "sha2",
 ]
 
 [[package]]
