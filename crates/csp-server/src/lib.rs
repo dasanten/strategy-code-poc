@@ -4,6 +4,7 @@ pub mod auth;
 pub mod backup;
 pub mod db;
 pub mod explored;
+pub mod first_day;
 pub mod saves;
 pub mod scripts;
 pub mod world_format;
