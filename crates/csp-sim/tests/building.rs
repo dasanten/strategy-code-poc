@@ -12,9 +12,9 @@ use csp_shared::world::{
     BuildingKind, ResidentOrder, ResourceKind, ResourceNode, SkillName, WorldState,
 };
 use csp_sim::building::BuildingPart;
+use csp_sim::order_sender::OrderSender;
 use csp_sim::queries::balance::{build_work, construction_learned};
 use csp_sim::queries::building::{build_materials, work_pace, working_on};
-use csp_sim::stand_ins::OrderSender;
 use serde_json::{json, Value};
 
 /// Plains, with forest at (3, 3) and (4, 4) and hills at (6, 6) and (10, 10).

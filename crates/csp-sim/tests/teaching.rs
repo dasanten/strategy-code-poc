@@ -9,8 +9,8 @@ use build_common::*;
 use csp_shared::terrain::TerrainMap;
 use csp_shared::time::TICKS_PER_GAME_YEAR;
 use csp_shared::world::{BuildingKind, ConstructionSite, ResidentOrder, Stock, WorldState};
+use csp_sim::order_sender::OrderSender;
 use csp_sim::queries::building::teacher_at;
-use csp_sim::stand_ins::OrderSender;
 use csp_sim::world::create_world;
 use serde_json::{json, Value};
 
@@ -116,7 +116,7 @@ fn is_refused_for_another_realms_resident_and_for_a_citys_sender_not_its_own() {
         send(&mut world, &t, &mut orders, teach("a2", "strength", "g1")),
         "not one of your residents"
     );
-    let npc = OrderSender { user_id: 0, npc_city_id: Some("c9".into()) };
+    let npc = OrderSender { npc_city_id: Some("c9".into()), ..OrderSender::player(0, "Elm") };
     assert!(orders.receive(&world, &npc, teach("a2", "strength", "g1"), &t).is_err());
 }
 

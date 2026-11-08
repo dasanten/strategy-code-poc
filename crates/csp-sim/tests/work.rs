@@ -1,8 +1,8 @@
 //! `apps/server/src/work.test.ts`, ported (T86.6). Left for the tickets whose rules they need:
 //! taking meals from a workplace's pile or a carriage there (survival, T86.3: "lets a worker
 //! running low take meals…", "catches a worker who runs low…", "lets a worker running low take
-//! meals from a carriage…", and the rival's meal in "lets another realm's workers take over");
-//! the starting-city runs (`a starting city`, T86.8 with T86.3); the invariant checks
+//! meals from a carriage…"; T86.3 has landed, so these come with the next ticket that touches
+//! work); the starting-city runs (`a starting city`, T86.8 with T86.3); the invariant checks
 //! (`checkInvariants`, `workOrdersOnWorkplaces`, `refilledWhenLow`, T86.13).
 
 mod build_common;
@@ -19,9 +19,9 @@ use csp_shared::world::{
     BuildingKind, Good, Pile, Resident, ResidentOrder, ResourceKind, ResourceNode, SkillName,
     Stock, WorldState,
 };
+use csp_sim::order_sender::OrderSender;
 use csp_sim::queries::balance::{skill_of, work_output};
 use csp_sim::queries::building::{holders_of, pile_tile};
-use csp_sim::stand_ins::OrderSender;
 use csp_sim::world::create_world;
 use serde_json::json;
 
@@ -362,8 +362,7 @@ fn lets_another_realms_workers_take_over_an_empty_workplace_and_its_output() {
     assert_eq!(holders_of(&world, &farm), ["r2"]);
     let before = at(&mut world, "w1").carried.get(&Good::Food).copied().unwrap_or(0.0);
     run(&mut world, &t, TICKS_PER_GAME_DAY as usize / 2);
-    // TODO(T86.3): the rival takes meals from the farm's pile (`s.carried.food > 0`).
-    assert!(piled(&world, 3, 3, Good::Food) > 0.0);
+    assert!(at(&mut world, "s1").carried.get(&Good::Food).copied().unwrap_or(0.0) > 0.0);
     assert_eq!(at(&mut world, "w1").carried.get(&Good::Food).copied().unwrap_or(0.0), before);
 }
 

@@ -9,6 +9,7 @@ use csp_shared::world::{
     Resident, ResidentOrder, SkillName, Stock, Tile, WorldState,
 };
 
+use crate::order_sender::{ordered_resident, OrderSender};
 use crate::queries::balance::{build_work, construction_learned, skill_of};
 use crate::queries::building::build_at_problem;
 use crate::queries::building::{
@@ -16,8 +17,10 @@ use crate::queries::building::{
     materials_needed, max_workers, site_work_of, work_needed, TerrainLookup, ON_PLAINS,
 };
 use crate::queries::names::{kind_of, placed};
-use crate::stand_ins::{found_city, gather_pile, new_id, update_city_membership};
-use crate::stand_ins::{ordered_resident, str_field, OrderSender};
+use crate::queue::field_str as str_field;
+use crate::random::new_id;
+use crate::stand_ins::{found_city, update_city_membership};
+use crate::survival::gather_pile;
 
 /// What an action asks of a construction site (`BuildAction.kind`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -126,7 +129,7 @@ pub fn finish_site(world: &mut WorldState, site: usize, r: &Resident) -> bool {
     if b.kind == BuildingKind::Carriage {
         let (x, y) = (b.x, b.y);
         world.buildings.remove(site);
-        let id = new_id(world, "carriage");
+        let id = new_id("carriage", &mut world.next_id);
         world.carriages.push(Carriage {
             id,
             realm_id: r.owner.clone(),
@@ -210,7 +213,7 @@ pub fn resolve_building(
             } else if build_problem(world, rx, ry, part.building, lookup).is_some() {
                 next_tile(&mut world.residents[ri]);
             } else {
-                let id = new_id(world, "b");
+                let id = new_id("b", &mut world.next_id);
                 let r = &world.residents[ri];
                 let site = Building {
                     id: id.clone(),
@@ -313,5 +316,67 @@ pub fn apply_build(world: &mut WorldState, order: &OrderRequest) {
             at: Tile { x: r.x, y: r.y },
             site_id: None,
         }));
+    }
+}
+
+type Validate = fn(&WorldState, &OrderSender, &OrderRequest, Option<&TerrainMap>) -> Option<String>;
+type Apply = fn(&mut WorldState, &OrderRequest, Option<&TerrainMap>);
+
+/// One of T86.6's order kinds for the order registry (`OrderKind`): its checks and what it sets.
+struct Kind {
+    validate: Validate,
+    apply: Apply,
+}
+
+impl crate::orders::OrderKind for Kind {
+    fn validate(
+        &self,
+        world: &WorldState,
+        sender: &OrderSender,
+        order: &OrderRequest,
+        terrain: Option<&TerrainMap>,
+    ) -> Option<String> {
+        (self.validate)(world, sender, order, terrain)
+    }
+
+    fn apply(
+        &self,
+        world: &mut WorldState,
+        _sender: &OrderSender,
+        order: &OrderRequest,
+        terrain: Option<&TerrainMap>,
+    ) {
+        (self.apply)(world, order, terrain)
+    }
+}
+
+/// Adds the order kinds of building, tearing down, lines, work, teaching and training to the
+/// registry (`orderKinds`' `build`, `tearDown`, `roadLine`, `wallLine`, `workAt`, `teach`,
+/// `train`).
+pub fn add_building_orders(kinds: &mut crate::orders::OrderKinds) {
+    use crate::road_line::{apply_line, validate_line, LineKind};
+    use crate::teaching::{apply_teach, validate_teach};
+    use crate::teardown::{apply_tear_down, validate_tear_down};
+    use crate::training::{apply_train, validate_train};
+    use crate::work::{apply_work_at, validate_work_at};
+    let kinds_of: [(&str, Validate, Apply); 7] = [
+        ("build", validate_build, |w, o, _| apply_build(w, o)),
+        ("tearDown", validate_tear_down, |w, o, _| apply_tear_down(w, o)),
+        (
+            "roadLine",
+            |w, s, o, t| validate_line(LineKind::RoadLine, w, s, o, t),
+            |w, o, t| apply_line(LineKind::RoadLine, w, o, t),
+        ),
+        (
+            "wallLine",
+            |w, s, o, t| validate_line(LineKind::WallLine, w, s, o, t),
+            |w, o, t| apply_line(LineKind::WallLine, w, o, t),
+        ),
+        ("workAt", |w, s, o, _| validate_work_at(w, s, o), |w, o, _| apply_work_at(w, o)),
+        ("teach", |w, s, o, _| validate_teach(w, s, o), |w, o, _| apply_teach(w, o)),
+        ("train", |w, s, o, _| validate_train(w, s, o), |w, o, _| apply_train(w, o)),
+    ];
+    for (name, validate, apply) in kinds_of {
+        kinds.insert(name, Kind { validate, apply });
     }
 }

@@ -11,10 +11,11 @@ use csp_shared::world::{
     TrainingSubject, WorldState,
 };
 
+use crate::order_sender::{npc_training_problem, ordered_resident, OrderSender};
 use crate::queries::balance::{skill_of, skill_value, subject_parts, training_gain};
 use crate::queries::building::{building_at, teacher_at, train_problem, trainees_of};
 use crate::queries::names::placed;
-use crate::stand_ins::{npc_training_problem, ordered_resident, str_field, OrderSender};
+use crate::queue::field_str as str_field;
 
 /// Checks a train order (`train.validate`): a grown resident of the sender's trains at the
 /// finished training ground they stand on. Of the game's cities only a big one's soldiers train.
@@ -27,7 +28,9 @@ pub fn validate_train(
         return Some("not one of your residents".into());
     };
     let r = &world.residents[ri];
-    let problem = npc_training_problem(world, sender, r).or_else(|| train_problem(world, r));
+    let problem = npc_training_problem(world, sender, r)
+        .map(String::from)
+        .or_else(|| train_problem(world, r));
     if problem.is_some() {
         return problem;
     }

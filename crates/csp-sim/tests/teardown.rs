@@ -13,9 +13,9 @@ use csp_shared::world::{
     BuildingKind, ConstructionSite, Good, ResourceKind, ResourceNode, Stock, WorldState,
 };
 use csp_sim::goods_made::tally_goods;
+use csp_sim::order_sender::OrderSender;
 use csp_sim::queries::balance::build_work;
 use csp_sim::queries::building::{build_materials, teardown_returns, teardown_work, BUILDABLE};
-use csp_sim::stand_ins::OrderSender;
 use serde_json::{json, Value};
 
 /// Plains, with forest at (3, 3) and hills at (7, 7).

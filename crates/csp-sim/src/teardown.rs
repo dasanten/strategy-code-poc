@@ -8,6 +8,7 @@ use csp_shared::world::{
     Building, OrderRequest, ResidentOrder, SkillName, TearDownOrder, Tile, WorldState,
 };
 
+use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::queries::balance::{build_work, construction_learned, skill_of};
 use crate::queries::building::{
     site_work_of, strands_on_mountain, teardown_left, teardown_returns, teardown_work,
@@ -15,8 +16,9 @@ use crate::queries::building::{
 use crate::queries::building::{tear_down_problem, CARRYING_A_CHILD};
 use crate::queries::names::placed;
 use crate::queries::residents::can_work;
-use crate::stand_ins::{commands, realm_of, str_field, OrderSender};
-use crate::stand_ins::{commit_tear_down_crime, dissolve_city, drop_goods, update_city_membership};
+use crate::queue::field_str as str_field;
+use crate::stand_ins::{commit_tear_down_crime, dissolve_city, update_city_membership};
+use crate::survival::drop_goods;
 use crate::tick::Scratch;
 
 /// An action a resident with a tear-down order requests: a tick's work (`TearDownAction`).
@@ -91,11 +93,11 @@ pub fn resolve_tearing_down(
             commit_tear_down_crime(world, &resident_id, &b, size);
             world.buildings.retain(|x| x.id != b.id);
             let returned = teardown_returns(&b);
-            drop_goods(world, b.x as i32, b.y as i32, &returned, size);
+            drop_goods(world, b.x, b.y, &returned, size);
             scratch.made.note(&returned);
             // What a stable kept for its horses stays on the tile too.
             if let Some(stock) = &b.stock {
-                drop_goods(world, b.x as i32, b.y as i32, stock, size);
+                drop_goods(world, b.x, b.y, stock, size);
             }
             if let Some(city) = world.cities.iter().find(|c| c.town_hall_id == b.id) {
                 let city_id = city.id.clone();
@@ -138,7 +140,7 @@ pub fn validate_tear_down(
     let (Some(realm), Some(r)) = (realm, r) else {
         return Some("not one of your residents".into());
     };
-    if !commands(world, &realm.id, r) {
+    if !commands(world, &realm.id, Some(r)) {
         return Some("not one of your residents".into());
     }
     if !can_work(r.born_at, world.tick as f64) {

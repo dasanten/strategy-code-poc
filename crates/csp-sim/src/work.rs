@@ -10,6 +10,7 @@ use csp_shared::world::{
     Building, Good, OrderRequest, Resident, ResidentOrder, Stock, Tile, WorkOrder, WorldState,
 };
 
+use crate::order_sender::{ordered_resident, OrderSender};
 use crate::queries::balance::{batch_work, skill_of, work_learned, work_output, workplace_skill};
 use crate::queries::building::{building_at, work_problem, CARRYING_A_CHILD};
 use crate::queries::building::{
@@ -18,7 +19,8 @@ use crate::queries::building::{
 };
 use crate::queries::names::{good_name, good_of, held, kind_name, placed};
 use crate::queries::residents::can_work;
-use crate::stand_ins::{drop_goods, ordered_resident, str_field, OrderSender};
+use crate::queue::field_str as str_field;
+use crate::survival::drop_goods;
 use crate::tick::Scratch;
 
 /// Checks a work-at order (`workAt.validate`): one of the sender's adult residents works the
@@ -206,6 +208,6 @@ fn use_up(world: &mut WorldState, place: &Building, recipe: &Recipe) {
 /// One unit of a workplace's good, left in its pile (`produce`).
 fn produce(world: &mut WorldState, place: &Building, good: Good, scratch: &mut Scratch) {
     let one = Stock::from([(good, 1.0)]);
-    drop_goods(world, place.x as i32, place.y as i32, &one, MAP_SIZE);
+    drop_goods(world, place.x, place.y, &one, MAP_SIZE);
     scratch.made.note(&one);
 }
