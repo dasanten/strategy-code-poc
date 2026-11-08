@@ -14,6 +14,9 @@ use std::collections::HashSet;
 use csp_shared::terrain::{is_passable_terrain, terrain_at, wrap, TerrainMap};
 use csp_shared::world::WorldState;
 
+use crate::alliances::step_alliances;
+use crate::contracts::{resolve_payments, step_contracts};
+use crate::directives::{resolve_buy_offs, step_directives, BuyOffRecord};
 use crate::node_gen::place_resource_nodes;
 use crate::tick::{reborrow, Scratch, TickPhase, TickTimer, Walk};
 
@@ -121,6 +124,9 @@ pub struct StepResult {
     pub npc_script_runs: usize,
     /// Milliseconds spent noting who came into a City area (`stepOutsiders`), for tick health.
     pub outsiders_ms: f64,
+    /// This tick's buy-offs (`resolveBuyOffs`), for the `buy-offs-sound` invariant; the TypeScript
+    /// keeps them beside the world in a `WeakMap`.
+    pub buy_offs: Vec<BuyOffRecord>,
 }
 
 /// Advances the world by one tick (`stepWorld`, ADR 0002): survival, horses, spoilage and the
@@ -212,11 +218,11 @@ fn step_rest(
     let carries_len = carries.len();
     resolve_carrying(world, carries, size, scratch);
     step_feeding(world, size, scratch);
-    let payments = resolve_payments(world, scratch);
+    let payments = resolve_payments(world);
     let purchases = resolve_purchases(world, size, scratch);
     let trades = resolve_trades(world, size, scratch);
     let accepted = resolve_offers(world, scratch);
-    let buy_offs = resolve_buy_offs(world, scratch);
+    let (buy_offs, buy_off_records) = resolve_buy_offs(world);
     let debts_paid = resolve_debt_payments(world, scratch);
     let builds = request_building(world, scratch);
     let builds_len = builds.len();
@@ -239,12 +245,12 @@ fn step_rest(
     world.tick += 1;
     step_aging(world, size, scratch);
     answer_demands(world, size, scratch);
-    step_alliances(world, scratch);
+    step_alliances(world);
     step_captures(world, terrain, scratch);
     step_refill(world, size, scratch);
-    step_directives(world, scratch);
+    step_directives(world);
     step_crimes(world, size, scratch);
-    step_contracts(world, scratch);
+    step_contracts(world);
     step_demands(world, scratch);
     step_standing(world, scratch);
     step_debts(world, scratch);
@@ -273,7 +279,7 @@ fn step_rest(
         + accepted
         + buy_offs
         + debts_paid;
-    StepResult { actions, outsiders_ms, ..StepResult::default() }
+    StepResult { actions, outsiders_ms, buy_offs: buy_off_records, ..StepResult::default() }
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -451,18 +457,9 @@ fn step_npc_cities(
 }
 fn step_outsiders(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
 
-// T86.11 (`alliances.ts`, `contracts.ts`, `demands.ts`, `directives.ts`).
-fn step_alliances(_world: &mut WorldState, _scratch: &mut Scratch) {}
-fn resolve_payments(_world: &mut WorldState, _scratch: &mut Scratch) -> usize {
-    0
-}
-fn step_contracts(_world: &mut WorldState, _scratch: &mut Scratch) {}
+// `demands.ts` (filed under T86.11 here, but named by no ticket; T86.14 or whoever ports it).
 fn answer_demands(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
 fn step_demands(_world: &mut WorldState, _scratch: &mut Scratch) {}
-fn step_directives(_world: &mut WorldState, _scratch: &mut Scratch) {}
-fn resolve_buy_offs(_world: &mut WorldState, _scratch: &mut Scratch) -> usize {
-    0
-}
 
 // T86.12 (`script-runner.ts`). Returns how many NPC scripts ran.
 fn run_npc_scripts(
