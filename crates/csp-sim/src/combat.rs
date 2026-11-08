@@ -520,3 +520,6 @@ fn react(world: &mut WorldState, ti: usize, ai: usize) {
     let (owner, what) = (t.owner.clone(), RealmEventWhat::Fled { resident_id: t.id.clone(), name: t.name.clone() });
     record_event(world, owner.as_deref(), what);
 }
+
+#[cfg(test)]
+mod tests;

@@ -18,3 +18,6 @@ pub mod standing;
 pub mod world_index;
 
 pub use pending::Sender;
+
+#[cfg(test)]
+mod test_world;
