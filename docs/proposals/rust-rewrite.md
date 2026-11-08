@@ -134,6 +134,147 @@ Ticketed the same day; the order was agreed with Daniel the same day (`docs/task
 
 ## Measurements
 
+Written by T84.7 (`scripts/bench-ts.mts`, run as `corepack pnpm exec tsx --conditions=source scripts/bench-ts.mts <what>`):
+the TypeScript game's speed before the port. The Rust `bench-world` and `bench-sim` print the same
+tables. Machine: AMD Ryzen 9 7900X (12 cores, 24 threads), 31 GiB, Windows 11, node 22.23.3, 2026-11-07.
+The machine was **not idle**: other sessions were building and testing, so read these as upper bounds
+(single-threaded runs lose less than the suite does).
+
+### TypeScript baseline (T84.7)
+
+**World generation, full size (5760x5760, seed 1)**, `world`. Load during the run: 8–17 node
+processes, CPU 45–80% (the run itself is single-threaded). About 21 s in all, far from the half hour
+the old numbers suggested; trading posts and seas are where it goes.
+
+| generateTerrain stage |   ms |  share |
+| :-------------------- | ---: | -----: |
+| seas                  | 5313 |  56.3% |
+| lakes                 | 1166 |  12.4% |
+| relief                |  967 |  10.2% |
+| forest                |  700 |   7.4% |
+| joining               | 1287 |  13.6% |
+| total                 | 9434 | 100.0% |
+
+| generateWorld stage |    ms |  share |
+| :------------------ | ----: | -----: |
+| nodes               |  2348 |  20.1% |
+| HQ                  | 79.68 |   0.7% |
+| NPC cities          |   432 |   3.7% |
+| trading posts       |  8820 |  75.5% |
+| caravans            |  7.76 |   0.1% |
+| total               | 11687 | 100.0% |
+
+made: 3310 nodes, 33 cities, 330 residents, 16 caravans, 6 traders
+
+**Ticks.** `sim <scene> [ticks]` steps the world through `runTick` with a `TickTimer`, invariants off,
+no Players' orders, queues or scripts (the NPC cities' scripts do run), walking on. Ticks include the
+JIT warm-up. The phases the server loop owns (`territory`, `sight`, `broadcast`, `save`) are not run
+here and print 0. Load: 8–30 node processes, CPU 45–100%.
+
+`village` (one village, `village()` of `npc-growth.fixture.ts`):
+
+| phase        | mean ms | p95 ms |
+| :----------- | ------: | -----: |
+| orders       |   0.000 |  0.000 |
+| queues       |   0.000 |  0.001 |
+| scripts      |   0.000 |  0.001 |
+| world        |    3.14 |  12.59 |
+| npc          |    2.48 |  10.49 |
+| walking      |   0.255 |  0.240 |
+| rest         |   0.385 |  0.600 |
+| lastSeen     |   0.005 |  0.008 |
+| invariants   |   0.000 |  0.000 |
+| territory    |   0.000 |  0.000 |
+| sight        |   0.000 |  0.000 |
+| broadcast    |   0.000 |  0.000 |
+| save         |   0.000 |  0.000 |
+| tick (total) |    3.14 |  12.60 |
+
+residents: 6 on average (6 to 6); ms per tick per resident: 0.524 mean, 2.10 p95
+
+`villages` (60 villages, `villages(60)` of `npc-plan.test.ts`):
+
+| phase        | mean ms | p95 ms |
+| :----------- | ------: | -----: |
+| orders       |   0.000 |  0.001 |
+| queues       |   0.003 |  0.001 |
+| scripts      |   0.001 |  0.001 |
+| world        |     218 |    393 |
+| npc          |     164 |    282 |
+| walking      |   31.62 |    116 |
+| rest         |   22.10 |  50.47 |
+| lastSeen     |   0.018 |  0.022 |
+| invariants   |   0.003 |  0.001 |
+| territory    |   0.000 |  0.000 |
+| sight        |   0.000 |  0.000 |
+| broadcast    |   0.000 |  0.000 |
+| save         |   0.000 |  0.000 |
+| tick (total) |     218 |    393 |
+
+residents: 360 on average (360 to 360); ms per tick per resident: 0.605 mean, 1.09 p95
+
+`hq` (the Trade Org HQ, `hq()` of `trade-org.test.ts`):
+
+| phase        | mean ms | p95 ms |
+| :----------- | ------: | -----: |
+| orders       |   0.000 |  0.001 |
+| queues       |   0.000 |  0.001 |
+| scripts      |   0.000 |  0.001 |
+| world        |   16.12 |  59.47 |
+| npc          |   14.48 |  56.49 |
+| walking      |   0.711 |  0.788 |
+| rest         |   0.886 |   1.16 |
+| lastSeen     |   0.031 |  0.010 |
+| invariants   |   0.000 |  0.000 |
+| territory    |   0.000 |  0.000 |
+| sight        |   0.000 |  0.000 |
+| broadcast    |   0.000 |  0.000 |
+| save         |   0.000 |  0.000 |
+| tick (total) |   16.14 |  59.48 |
+
+residents: 32 on average (32 to 32); ms per tick per resident: 0.504 mean, 1.86 p95
+
+`save` (newest save of a copy of a live-format world from 2026-11-01, full-size map; `DB_PATH` names
+the database):
+
+| phase        | mean ms | p95 ms |
+| :----------- | ------: | -----: |
+| orders       |   0.001 |  0.001 |
+| queues       |   0.000 |  0.001 |
+| scripts      |   0.001 |  0.001 |
+| world        |     214 |    219 |
+| npc          |     135 |    187 |
+| walking      |   52.25 |   7.11 |
+| rest         |   25.83 |  32.62 |
+| lastSeen     |   0.224 |  0.950 |
+| invariants   |   0.000 |  0.000 |
+| territory    |   0.000 |  0.000 |
+| sight        |   0.000 |  0.000 |
+| broadcast    |   0.000 |  0.000 |
+| save         |   0.000 |  0.000 |
+| tick (total) |     214 |    219 |
+
+residents: 338 on average (338 to 338); ms per tick per resident: 0.632 mean, 0.649 p95
+
+**Suite**, `suite` (`pnpm test` once with Vitest's JSON reporter, slow tests included, `maxWorkers` 50%).
+Load before the run: 1 node process, CPU 48%. A first run on a heavily loaded machine (15 node
+processes, CPU 100%) took 2774 s and failed 9 tests on timeouts, so it is not recorded. File times are
+wall times with several files running side by side.
+
+wall time 1716 s; 277 files, 4511 tests, 0 failed (exit 0)
+
+| ten slowest files                             | seconds |
+| :-------------------------------------------- | ------: |
+| apps/server/src/npc-big-city.test.ts          |  1714.0 |
+| apps/server/src/npc-roads.test.ts             |   780.5 |
+| apps/server/src/npc-training.test.ts          |   682.7 |
+| apps/server/src/posts-supplied.test.ts        |   384.4 |
+| apps/server/src/waiting-for-food.test.ts      |   316.8 |
+| apps/server/src/npc-far-nodes.test.ts         |   315.9 |
+| apps/server/src/trade-org-debt-demand.test.ts |   231.1 |
+| apps/server/src/npc-growth-village.test.ts    |   211.6 |
+| apps/server/src/trade-org.test.ts             |   194.6 |
+| apps/server/src/transfers-caravans.test.ts    |   192.1 |
 ### Explored map loading (T84.6, 2026-11-07)
 
 A copy of a worked world (5,760 tiles across, 180 × 180 chunks) with its Player's explored
