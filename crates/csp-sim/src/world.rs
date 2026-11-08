@@ -14,7 +14,14 @@ use std::collections::HashSet;
 use csp_shared::terrain::{is_passable_terrain, terrain_at, wrap, TerrainMap};
 use csp_shared::world::WorldState;
 
+use crate::armies::step_armies;
+use crate::capture::{step_captures, Capture};
+use crate::combat::{request_strikes, resolve_strikes, CombatResult};
+use crate::crimes::step_crimes;
+use crate::defence::NoAlarms;
 use crate::node_gen::place_resource_nodes;
+use crate::persuasion::step_persuasion;
+use crate::standing::step_standing;
 use crate::tick::{reborrow, Scratch, TickPhase, TickTimer, Walk};
 
 /// How many breaking changes to the script views there are so far (`SCRIPT_VIEW_CHANGES.length`).
@@ -115,6 +122,10 @@ pub fn nearest_free_tile(
 pub struct StepResult {
     /// Actions requested this tick.
     pub actions: usize,
+    /// What combat did (`combat`).
+    pub combat: CombatResult,
+    /// Cities captured this tick (`captures`).
+    pub captures: Vec<Capture>,
     /// Milliseconds the game-run cities spent planning (`planCity`; ADR 0016).
     pub npc_plan_ms: f64,
     /// The NPC cities' residents' scripts that ran this tick (`runNpcScripts`), for tick health.
@@ -199,9 +210,10 @@ fn step_rest(
     // Relocating residents who stepped into their new city's area move in (`CONTEXT.md`:
     // Relocate).
     step_relocating(world, terrain, scratch);
-    let strikes = request_strikes(world, size, scratch);
+    let strikes = request_strikes(world, size);
     let strikes_len = strikes.len();
-    resolve_strikes(world, strikes, size, scratch);
+    // TODO(T86.12): the alarm rules (`alarms.ts`) behind `Alarms`.
+    let combat = resolve_strikes(world, &strikes, size, &mut NoAlarms, &mut scratch.made);
     let climbs = request_climbing(world, scratch);
     let climbs_len = climbs.len();
     resolve_climbing(world, climbs, terrain, scratch);
@@ -240,16 +252,16 @@ fn step_rest(
     step_aging(world, size, scratch);
     answer_demands(world, size, scratch);
     step_alliances(world, scratch);
-    step_captures(world, terrain, scratch);
+    let captures = step_captures(world, size, &mut NoAlarms);
     step_refill(world, size, scratch);
     step_directives(world, scratch);
-    step_crimes(world, size, scratch);
+    step_crimes(world, size);
     step_contracts(world, scratch);
     step_demands(world, scratch);
-    step_standing(world, scratch);
+    step_standing(world);
     step_debts(world, scratch);
-    step_persuasion(world, size, scratch);
-    step_armies(world, size, scratch);
+    step_persuasion(world, size);
+    step_armies(world, size);
     // Who came into a City area, now that everyone has moved and nobody changes sides this tick.
     let outsiders_from = std::time::Instant::now();
     step_outsiders(world, size, scratch);
@@ -273,7 +285,7 @@ fn step_rest(
         + accepted
         + buy_offs
         + debts_paid;
-    StepResult { actions, outsiders_ms, ..StepResult::default() }
+    StepResult { actions, combat, captures, outsiders_ms, ..StepResult::default() }
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -382,24 +394,8 @@ fn step_teaching(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
 fn step_training(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
 fn step_workplace_settings(_world: &mut WorldState, _scratch: &mut Scratch) {}
 
-// T86.7 (`combat.ts`, `armies.ts`, `capture.ts`, `crimes.ts`, `standing.ts`, `persuasion.ts`,
-// `reviving.ts`).
-fn request_strikes(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) -> Vec<NoAction> {
-    Vec::new()
-}
-fn resolve_strikes(
-    _world: &mut WorldState,
-    _strikes: Vec<NoAction>,
-    _size: i32,
-    _scratch: &mut Scratch,
-) {
-}
+// `reviving.ts` (feeding someone Down); not in T86.7's list of modules, so still to port.
 fn step_feeding(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
-fn step_captures(_world: &mut WorldState, _terrain: &TerrainMap, _scratch: &mut Scratch) {}
-fn step_crimes(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
-fn step_standing(_world: &mut WorldState, _scratch: &mut Scratch) {}
-fn step_persuasion(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
-fn step_armies(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
 
 // T86.8 (`relocating.ts`, `breeding.ts`, `pairing.ts`).
 fn step_relocating(_world: &mut WorldState, _terrain: &TerrainMap, _scratch: &mut Scratch) {}
