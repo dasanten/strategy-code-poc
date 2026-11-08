@@ -1,12 +1,19 @@
 //! Walls and gates as the path searches see them (`CONTEXT.md`: Walls in combat): the `WallMap`
 //! and its step rules, ported from `packages/shared/src/walls.ts` (`WallTile`, `WallMap`,
-//! `strandedOnWall`, `mayStep`). Building a `WallMap` from the world (`wallMap`) needs the cities,
-//! alliances and standings and comes with the rules (Epic 1003).
+//! `strandedOnWall`, `mayStep`), and with the rules (T86.6) the rest of it: building the `WallMap`
+//! from the world (`wallMap`, `wallsKey`) and the world queries about walls and gates.
 
 use std::collections::{HashMap, HashSet};
 
-use csp_shared::terrain::wrap;
+use csp_shared::balance::{BROKEN_MATERIALS_RETURNED, WALL_ENCLOSES_MAX, WALL_STRENGTH};
+use csp_shared::terrain::{is_passable_terrain, tile_index, wrap, wrap_delta, TerrainMap};
+use csp_shared::world::{Building, BuildingKind, Resident, Stock, WorldState};
 use serde::Deserialize;
+
+use crate::queries::alliance::allied_realms;
+use crate::queries::building::build_materials;
+use crate::queries::city::npc_city_refuses;
+use crate::queries::standing::TRADE_ORG;
 
 /// Whether a wall tile is a wall or a gate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -158,6 +165,237 @@ pub fn may_step(
         return walls.inside.contains(&to) || own_wall_or_gate(walls, realm_id, to);
     }
     true
+}
+
+// The rest of `packages/shared/src/walls.ts` (T86.6): building the `WallMap` from the world, and
+// the world queries about walls and gates.
+
+/// Whose side a resident is on at walls and gates (`wallSide`): their realm, or their NPC city.
+pub fn wall_side(r: &Resident) -> Option<&str> {
+    r.owner.as_deref().or(r.city_id.as_deref())
+}
+
+/// Whether a building is a finished wall or gate (`isWallOrGate`).
+pub fn is_wall_or_gate(b: &Building) -> bool {
+    matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate) && b.site.is_none()
+}
+
+/// Whether a gate is closed (`isClosed`); a gate is open until its city's realm closes it.
+pub fn is_closed(b: &Building) -> bool {
+    b.kind == BuildingKind::Gate && b.closed == Some(true)
+}
+
+/// The sides each NPC city refuses, by city id, in the order of the standings (`shutOut`).
+pub fn shut_out(world: &WorldState) -> Vec<(String, Vec<String>)> {
+    let mut out: Vec<(String, Vec<String>)> = Vec::new();
+    for s in &world.standings {
+        let Some(city) = world.cities.iter().find(|c| c.id == s.of) else { continue };
+        if !npc_city_refuses(world, city, &s.toward) {
+            continue;
+        }
+        let sides: Vec<String> = if s.toward == TRADE_ORG {
+            world.cities.iter().filter(|c| c.trade_org.is_some()).map(|c| c.id.clone()).collect()
+        } else {
+            vec![s.toward.clone()]
+        };
+        match out.iter_mut().find(|(id, _)| *id == city.id) {
+            Some((_, have)) => {
+                have.extend(sides);
+                have.sort();
+            }
+            None => {
+                let mut sides = sides;
+                sides.sort();
+                out.push((city.id.clone(), sides));
+            }
+        }
+    }
+    out
+}
+
+/// A key that changes whenever what a `WallMap` is built from changes (`wallsKey`).
+pub fn walls_key(world: &WorldState) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    for b in world.buildings.iter().filter(|b| is_wall_or_gate(b)) {
+        let closed = if is_closed(b) { "!" } else { "" };
+        parts.push(format!(
+            "{}@{},{}:{}{closed}",
+            b.id,
+            b.x,
+            b.y,
+            b.city_id.as_deref().unwrap_or("")
+        ));
+    }
+    for c in &world.cities {
+        parts.push(format!("{}={}", c.id, c.realm_id.as_deref().unwrap_or("")));
+    }
+    for a in &world.alliances {
+        let members: Vec<&str> = a.members.iter().map(|m| m.realm_id.as_str()).collect();
+        parts.push(format!("{}+{}", a.id, members.join(",")));
+    }
+    for (city_id, sides) in shut_out(world) {
+        parts.push(format!("{city_id}-{}", sides.join(",")));
+    }
+    parts.join(";")
+}
+
+/// Builds the `WallMap` for the world on `terrain` (`wallMap`). A tile is inside when it can't
+/// reach far out (`WALL_ENCLOSES_MAX` tiles) on foot without crossing a wall or gate. The fills
+/// start beside each wall in the world's order, as the TypeScript's `Map` iterates them.
+pub fn wall_map(world: &WorldState, terrain: &TerrainMap) -> WallMap {
+    let size = terrain.size;
+    let shut = shut_out(world);
+    let mut sides: HashMap<String, Vec<String>> = HashMap::new();
+    let mut side = |realm_id: Option<&str>| -> Vec<String> {
+        let Some(realm_id) = realm_id else { return Vec::new() };
+        sides.entry(realm_id.to_string()).or_insert_with(|| allied_realms(world, realm_id)).clone()
+    };
+    let mut tiles: HashMap<usize, WallTile> = HashMap::new();
+    let mut order: Vec<usize> = Vec::new();
+    for b in world.buildings.iter().filter(|b| is_wall_or_gate(b)) {
+        // `(b.cityId && realms.get(b.cityId)) ?? null`: the city's realm, if the city has one.
+        let realm_id = b
+            .city_id
+            .as_deref()
+            .and_then(|id| world.cities.iter().find(|c| c.id == id))
+            .and_then(|c| c.realm_id.clone());
+        let realms = side(realm_id.as_deref().or(b.city_id.as_deref()));
+        let shut_to = match (&b.kind, &b.city_id) {
+            (BuildingKind::Gate, Some(city_id)) => shut
+                .iter()
+                .find(|(id, _)| id == city_id)
+                .map(|(_, s)| s.clone())
+                .unwrap_or_default(),
+            _ => Vec::new(),
+        };
+        let t = tile_index(size, b.x as i32, b.y as i32);
+        if !tiles.contains_key(&t) {
+            order.push(t);
+        }
+        let kind = if b.kind == BuildingKind::Gate { WallKind::Gate } else { WallKind::Wall };
+        tiles.insert(t, WallTile { kind, realm_id, realms, closed: is_closed(b), shut_to });
+    }
+    let passable = |t: usize| is_passable_terrain(terrain.tiles[t]);
+    let mut inside: HashSet<usize> = HashSet::new();
+    let mut outside: HashSet<usize> = HashSet::new();
+    for &w in &order {
+        for start in neighbours(size, w) {
+            let open = !tiles.contains_key(&start)
+                && passable(start)
+                && !inside.contains(&start)
+                && !outside.contains(&start);
+            if !open {
+                continue;
+            }
+            // Fill from beside the wall; a fill that grows too large, or runs into the outside, is out.
+            let mut seen: HashSet<usize> = HashSet::from([start]);
+            let mut todo = vec![start];
+            let mut out = false;
+            while !out {
+                let Some(t) = todo.pop() else { break };
+                for n in neighbours(size, t) {
+                    if seen.contains(&n) || tiles.contains_key(&n) || !passable(n) {
+                        continue;
+                    }
+                    if outside.contains(&n) || seen.len() as f64 >= WALL_ENCLOSES_MAX {
+                        out = true;
+                        break;
+                    }
+                    seen.insert(n);
+                    todo.push(n);
+                }
+            }
+            if out {
+                outside.extend(seen);
+            } else {
+                inside.extend(seen);
+            }
+        }
+    }
+    WallMap { size, tiles, inside }
+}
+
+/// Whether a resident stands on a wall of their own side or an ally's (`onOwnWall`).
+pub fn on_own_wall(world: &WorldState, r: &Resident) -> bool {
+    let wall = world
+        .buildings
+        .iter()
+        .find(|b| b.x == r.x && b.y == r.y && b.kind == BuildingKind::Wall && b.site.is_none());
+    let city = wall.and_then(|w| world.cities.iter().find(|c| Some(&c.id) == w.city_id.as_ref()));
+    let (Some(city), Some(side)) = (city, wall_side(r)) else { return false };
+    // An NPC city's walls are its own residents' and its allies' (`wallSide`).
+    let of = city.realm_id.as_deref().unwrap_or(&city.id);
+    of == side || allied_realms(world, of).iter().any(|m| m == side)
+}
+
+/// Damage a finished wall or gate takes before it falls (`wallStrength`).
+pub fn wall_strength(b: &Building) -> f64 {
+    if b.kind == BuildingKind::Gate {
+        WALL_STRENGTH.gate
+    } else {
+        WALL_STRENGTH.wall
+    }
+}
+
+/// Damage a wall or gate can still take before it falls (`wallStrengthLeft`).
+pub fn wall_strength_left(b: &Building) -> f64 {
+    0f64.max(wall_strength(b) - b.damage.unwrap_or(0.0))
+}
+
+/// Goods left on the tile of a broken wall or gate (`brokenReturns`).
+pub fn broken_returns(b: &Building) -> Stock {
+    let mut out = Stock::new();
+    for (good, units) in build_materials(b.kind) {
+        let back = (units * BROKEN_MATERIALS_RETURNED).floor();
+        if back > 0.0 {
+            out.insert(good, back);
+        }
+    }
+    out
+}
+
+/// The finished wall or gate `wall_id` a resident of `realm_id` may break or climb, or why not
+/// (`foreignWall`).
+pub fn foreign_wall<'w>(
+    world: &'w WorldState,
+    realm_id: Option<&str>,
+    wall_id: Option<&str>,
+) -> Result<&'w Building, String> {
+    let b = world.buildings.iter().find(|x| Some(x.id.as_str()) == wall_id);
+    let Some(b) = b.filter(|b| matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate)) else {
+        return Err("no such wall or gate".into());
+    };
+    if b.site.is_some() {
+        return Err("that wall is not finished yet".into());
+    }
+    let city = world.cities.iter().find(|c| Some(&c.id) == b.city_id.as_ref());
+    if let Some(own) = city.and_then(|c| c.realm_id.as_deref()) {
+        if Some(own) == realm_id {
+            return Err("that is one of your own walls".into());
+        }
+    }
+    Ok(b)
+}
+
+/// Where a climber at `from` comes down after climbing over the wall or gate at `wall`
+/// (`climbLanding`).
+pub fn climb_landing(
+    world: &WorldState,
+    terrain: &TerrainMap,
+    from: (i32, i32),
+    wall: (i32, i32),
+) -> (i32, i32) {
+    let size = terrain.size;
+    let x = wrap(wall.0 + wrap_delta(from.0, wall.0, size), size);
+    let y = wrap(wall.1 + wrap_delta(from.1, wall.1, size), size);
+    let t = tile_index(size, x, y);
+    // Walls and gates are 1×1 (`CONTEXT.md`: Footprint): their tile is their footprint.
+    let walled =
+        world.buildings.iter().any(|b| b.x as i32 == x && b.y as i32 == y && is_wall_or_gate(b));
+    if walled || !is_passable_terrain(terrain.tiles[t]) {
+        return wall;
+    }
+    (x, y)
 }
 
 #[cfg(test)]

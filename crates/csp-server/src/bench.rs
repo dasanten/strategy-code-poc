@@ -18,7 +18,7 @@ use csp_sim::tick::{
     run_tick, Scratch, ScriptErrorWhere, TickHealth, TickOptions, TickPhase, TickReporter,
     TICK_PHASES,
 };
-use csp_sim::world::{create_world, generate_world, generate_world_timed};
+use csp_sim::world::{create_world, generate_world};
 
 use crate::db::open_db;
 use crate::saves::load_or_create_world;
@@ -137,11 +137,19 @@ pub fn bench_world(size: i32, seed: i64, out: &mut Out<'_>) -> WorldBench {
         terrain_stages.push((stage, ms(took)))
     });
     let terrain_ms = ms(t0.elapsed());
+    // `generateWorld`'s stages after `nodes` (HQ, NPC cities, trading posts, caravans) are rules
+    // in `csp_sim::world` that the rule tickets are porting, so they are timed together here as
+    // the rest of `generate_world`; `nodes` (`create_world`) is timed apart, on its own world.
+    // TODO(T86.9, T86.10): a row per stage, once the placements are ported and can be timed.
     let t1 = Instant::now();
-    let world = generate_world_timed(&terrain, seed, &mut |stage, took| {
-        world_stages.push((stage, ms(took)))
-    });
-    let world_ms = ms(t1.elapsed());
+    create_world(&terrain, seed);
+    let nodes_ms = ms(t1.elapsed());
+    let t2 = Instant::now();
+    let world = generate_world(&terrain, seed);
+    let whole_ms = ms(t2.elapsed());
+    world_stages.push(("nodes", nodes_ms));
+    world_stages.push(("HQ, NPC cities, trading posts, caravans", (whole_ms - nodes_ms).max(0.0)));
+    let world_ms = nodes_ms + (whole_ms - nodes_ms).max(0.0);
     let rows = |stages: &[(&str, f64)], total: f64| -> Vec<Vec<String>> {
         let mut rows: Vec<Vec<String>> = stages
             .iter()
