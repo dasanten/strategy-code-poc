@@ -321,7 +321,7 @@ mod caravans_carrying_out_deliveries {
     }
 
     #[test]
-    #[ignore = "since merging T86.8 and T86.13 the run does not finish within 60 s: to diagnose (T86.9 PR)"]
+    #[ignore = "13-33 s: the NPC default scripts of the HQ run every tick (T86.14 makes the long runs fast)"]
     fn pick_up_goods_sold_from_the_citys_storage_pay_there_and_bring_them_to_the_warehouse() {
         let mut s = setup();
         let si = s.world.buildings.iter().position(|b| b.id == s.storage().id).unwrap();
@@ -365,7 +365,7 @@ mod caravans_carrying_out_deliveries {
     }
 
     #[test]
-    #[ignore = "since merging T86.8 and T86.13 the run does not finish within 60 s: to diagnose (T86.9 PR)"]
+    #[ignore = "13-33 s: the NPC default scripts of the HQ run every tick (T86.14 makes the long runs fast)"]
     fn turn_back_from_a_city_behind_closed_gates_and_the_delivery_waits_for_the_next_caravan() {
         let mut s = setup();
         let city = s.city_id();
@@ -394,7 +394,7 @@ mod caravans_carrying_out_deliveries {
     }
 
     #[test]
-    #[ignore = "since merging T86.8 and T86.13 the run does not finish within 60 s: to diagnose (T86.9 PR)"]
+    #[ignore = "13-33 s: the NPC default scripts of the HQ run every tick (T86.14 makes the long runs fast)"]
     fn drop_a_delivery_to_a_city_that_is_no_longer_the_realms() {
         let mut s = setup();
         let city = s.city_id();
@@ -420,7 +420,7 @@ mod caravans_carrying_out_deliveries {
     }
 
     #[test]
-    #[ignore = "since merging T86.8 and T86.13 the run does not finish within 60 s: to diagnose (T86.9 PR)"]
+    #[ignore = "13-33 s: the NPC default scripts of the HQ run every tick (T86.14 makes the long runs fast)"]
     fn let_go_of_a_delivery_when_the_caravan_breaks_up() {
         let mut s = setup();
         let city = s.city_id();
