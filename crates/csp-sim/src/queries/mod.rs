@@ -7,18 +7,24 @@
 //! `MAP_SIZE`; these do the same, which only matters for a footprint across a smaller map's join.
 
 pub mod alliance;
+pub mod army;
 pub mod building;
 pub mod carriages;
 pub mod city;
+pub mod city_area;
+pub mod combat;
 pub mod horse_market;
 pub mod horses;
 pub mod names;
 pub mod npc_trade;
 pub mod offers;
+pub mod persuasion;
 pub mod residents;
 pub mod standing;
 pub mod territory;
+pub mod trade_org;
 pub mod trader_trade;
+pub mod walls;
 pub mod warehouse;
 
 /// `Math.round`: halves round up, toward +∞ (`Math.round(-2.5)` is -2), unlike `f64::round`.
