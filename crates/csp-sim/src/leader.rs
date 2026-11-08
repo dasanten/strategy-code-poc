@@ -110,3 +110,6 @@ pub fn leaders_serve_no_one(world: &WorldState) -> Vec<InvariantViolation> {
     }
     out
 }
+
+#[cfg(test)]
+mod tests;
