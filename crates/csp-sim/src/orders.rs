@@ -141,6 +141,7 @@ impl OrderKinds {
 /// The order kinds that exist (`orderKinds`). Each rule ticket adds its kinds here.
 pub fn order_kinds() -> OrderKinds {
     let mut kinds = OrderKinds::default();
+    crate::building::add_building_orders(&mut kinds);
     crate::queues::add_queue_orders(&mut kinds);
     kinds
 }

@@ -3,6 +3,7 @@
 //! TypeScript game is checked against the fixtures in `fixtures/`.
 
 pub mod aging;
+pub mod building;
 pub mod climbing;
 pub mod directive;
 pub mod driving;
@@ -27,16 +28,22 @@ pub mod queues;
 pub mod random;
 pub mod residents;
 pub mod riding;
+pub mod road_line;
 pub mod sight;
 pub mod spoilage;
+mod stand_ins;
 pub mod stock_floor;
 pub mod survival;
+pub mod teaching;
+pub mod teardown;
 pub mod terrain_gen;
 #[cfg(test)]
 pub mod test_support;
 pub mod tick;
+pub mod training;
 pub mod walk_time;
 pub mod walking;
 pub mod walls;
+pub mod work;
 pub mod world;
 pub mod world_index;

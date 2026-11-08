@@ -8,7 +8,9 @@
 
 pub mod alliance;
 pub mod army;
+pub mod balance;
 pub mod building;
+pub mod building_info;
 pub mod carriages;
 pub mod city;
 pub mod combat;
@@ -31,7 +33,7 @@ pub mod trade_org;
 pub mod trader_trade;
 pub mod warehouse;
 
-/// `Math.round`: halves round up, toward +∞ (`Math.round(-2.5)` is -2), unlike `f64::round`.
+/// `Math.round`: halves round up, toward +âˆž (`Math.round(-2.5)` is -2), unlike `f64::round`.
 pub fn js_round(x: f64) -> f64 {
     let floor = x.floor();
     if x - floor >= 0.5 {
