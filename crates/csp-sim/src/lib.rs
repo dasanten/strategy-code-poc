@@ -32,6 +32,7 @@ pub mod terrain_gen;
 #[cfg(test)]
 pub mod test_support;
 pub mod tick;
+pub mod trade_org;
 pub mod trading;
 pub mod walls;
 pub mod world;
