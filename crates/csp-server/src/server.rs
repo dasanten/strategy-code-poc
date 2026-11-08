@@ -5,10 +5,12 @@
 //! The world lives in a [`Game`] behind a mutex: a tick takes it on the runtime's blocking
 //! threads, and anything else (the sockets, HTTP) reads it only between ticks.
 //!
-//! Not wired yet, each waiting for its port: HTTP (T87.5), WebSocket sync and the broadcast
-//! (T87.6), orders, queues, scripts and walking (Epic 86), territory, the default scripts' sync
-//! and the script library's invariant (`syncDefaultScripts`, `noteScriptViewChanges`,
-//! `checkScriptLibrary`).
+//! HTTP (`app.rs`) is served beside the loop, on its own database connection, and reaches the
+//! world through the game thread between ticks.
+//!
+//! Not wired yet, each waiting for its port: WebSocket sync and the broadcast (T87.6), orders,
+//! queues, scripts and walking (Epic 86), territory, `noteScriptViewChanges` and the script
+//! library's invariant at start and daily (`checkScriptLibrary`).
 
 use std::{
     path::{Path, PathBuf},
@@ -29,7 +31,10 @@ use serde_json::json;
 use tokio::sync::oneshot;
 use tracing::Level;
 
+use std::future::IntoFuture;
+
 use crate::{
+    app::{build_app, AppOptions, GameHandle},
     auth::{delete_expired_sessions, now_ms},
     backup::{backup_db, Reason},
     config::Config,
@@ -218,6 +223,8 @@ pub struct GameThread<L: LogSink> {
     pub tick_health: Arc<Mutex<TickHealthWindow>>,
     /// The world's tick and seed as it was loaded.
     pub started_at: (u64, i64),
+    /// When the tick health window's clock started (`ServerReporter::started`).
+    pub tick_clock: std::time::Instant,
 }
 
 fn thread_gone() -> ServerError {
@@ -240,7 +247,11 @@ impl<L: LogSink + 'static> GameThread<L> {
                     return;
                 }
             };
-            let _ = ready_tx.send(Ok((game.tick_health(), (game.world.tick, game.world.seed))));
+            let _ = ready_tx.send(Ok((
+                game.tick_health(),
+                (game.world.tick, game.world.seed),
+                game.reporter.started(),
+            )));
             for command in rx {
                 match command {
                     Command::Tick(reply) => {
@@ -254,8 +265,9 @@ impl<L: LogSink + 'static> GameThread<L> {
                 }
             }
         })?;
-        let (tick_health, started_at) = ready_rx.recv().map_err(|_| thread_gone())??;
-        Ok(Self { tx, thread: Some(thread), tick_health, started_at })
+        let (tick_health, started_at, tick_clock) =
+            ready_rx.recv().map_err(|_| thread_gone())??;
+        Ok(Self { tx, thread: Some(thread), tick_health, started_at, tick_clock })
     }
 
     /// Runs one tick and waits for it.
@@ -365,6 +377,43 @@ pub async fn run(config: Config) -> Result<(), ServerError> {
     .await
     .map_err(|e| ServerError::Io(std::io::Error::other(e.to_string())))??;
     let (tick, seed) = game.started_at;
+    let game = Arc::new(game);
+
+    // The HTTP side, on its own connection; the game thread has migrated the database already.
+    let http_db = open_db(&config.db_path, None)?;
+    let defaults = crate::scripts::game_defaults();
+    // Players who haven't edited a default script run the game's current default from now on.
+    crate::scripts::sync_default_scripts(&http_db, defaults)?;
+    let window = Arc::clone(&game.tick_health);
+    let clock = game.tick_clock;
+    let mut opts = AppOptions::new(http_db);
+    opts.secure_cookies = config.secure_cookies;
+    opts.trust_proxy = config.trust_proxy;
+    opts.web_dist = config.web_dist.clone();
+    opts.game = Some(Arc::clone(&game) as Arc<dyn GameHandle>);
+    opts.defaults = defaults;
+    opts.tick_health = Some(Arc::new(move || {
+        let now = clock.elapsed().as_secs_f64() * 1000.0;
+        let summary = window.lock().unwrap_or_else(|e| e.into_inner()).summary(now);
+        serde_json::to_value(summary).unwrap_or_default()
+    }));
+    let app = build_app(opts);
+    let listener = tokio::net::TcpListener::bind((config.host.as_str(), config.port)).await?;
+
+    // One signal stops both the loop and HTTP.
+    let (stop_tx, stop_rx) = tokio::sync::watch::channel(false);
+    tokio::spawn(async move {
+        shutdown_signal().await;
+        let _ = stop_tx.send(true);
+    });
+    let stopped = |mut rx: tokio::sync::watch::Receiver<bool>| async move {
+        let _ = rx.wait_for(|&stop| stop).await;
+    };
+    let http = tokio::spawn(
+        axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>())
+            .with_graceful_shutdown(stopped(stop_rx.clone()))
+            .into_future(),
+    );
     TracingLog.log(
         Level::INFO,
         json!({ "tick": tick, "seed": seed, "sentry": sentry.is_some() }),
@@ -375,10 +424,17 @@ pub async fn run(config: Config) -> Result<(), ServerError> {
         Duration::from_millis(TICK_MS),
         DAY,
         config.backup_dir.clone(),
-        shutdown_signal(),
+        stopped(stop_rx),
     )
     .await;
-    let saved = game.stop().await;
+    if let Ok(Err(e)) = http.await {
+        TracingLog.log(Level::ERROR, json!({ "err": { "message": e.to_string() } }), "http failed");
+    }
+    // HTTP has stopped and dropped its handle on the game, so the save has it alone.
+    let saved = match Arc::try_unwrap(game) {
+        Ok(game) => game.stop().await,
+        Err(_) => Err(ServerError::Io(std::io::Error::other("the game is still in use"))),
+    };
     if let Err(e) = &saved {
         TracingLog.log(
             Level::ERROR,
