@@ -14,7 +14,11 @@ use std::collections::HashSet;
 use csp_shared::terrain::{is_passable_terrain, terrain_at, wrap, TerrainMap};
 use csp_shared::world::WorldState;
 
+use crate::aging::{step_aging, AgingResult};
 use crate::node_gen::place_resource_nodes;
+use crate::spoilage::step_spoilage;
+use crate::stock_floor::step_stock_floor;
+use crate::survival::{keep_down_still, step_refill, step_survival, SurvivalResult};
 use crate::tick::{reborrow, Scratch, TickPhase, TickTimer, Walk};
 
 /// How many breaking changes to the script views there are so far (`SCRIPT_VIEW_CHANGES.length`).
@@ -121,6 +125,10 @@ pub struct StepResult {
     pub npc_script_runs: usize,
     /// Milliseconds spent noting who came into a City area (`stepOutsiders`), for tick health.
     pub outsiders_ms: f64,
+    /// What survival did (`survival`): who died of hunger, which realms ended.
+    pub survival: SurvivalResult,
+    /// What aging did (`aging`): who died of old age, which realms ended, who grew up.
+    pub aging: AgingResult,
 }
 
 /// Advances the world by one tick (`stepWorld`, ADR 0002): survival, horses, spoilage and the
@@ -147,11 +155,12 @@ pub fn step_world(
     let size = terrain.size;
     // What the scripts saw is gone once the world steps (`SightCache`).
     scratch.new_sight_phase();
-    time(timer, TickPhase::Rest, || {
-        step_survival(world, terrain, scratch);
+    let survival = time(timer, TickPhase::Rest, || {
+        let survival = step_survival(world, terrain, scratch);
         step_horses(world, terrain, scratch);
-        step_spoilage(world, scratch);
-        step_stock_floor(world, scratch);
+        step_spoilage(world);
+        step_stock_floor(world, &mut scratch.made);
+        survival
     });
     let mut npc_plan_ms = 0.0;
     let npc_script_runs = time(timer, TickPhase::Npc, || {
@@ -164,7 +173,7 @@ pub fn step_world(
         npc_plan_ms = step_npc_cities(world, size, terrain, reborrow(&mut walking), scratch);
         let runs = run_npc_scripts(world, terrain, scratch);
         // Whatever the game's own cities gave someone Down ends before they act on it.
-        keep_down_still(world, scratch);
+        keep_down_still(world);
         runs
     });
     let steps = time(timer, TickPhase::Walking, || match reborrow(&mut walking) {
@@ -182,9 +191,9 @@ pub fn step_world(
         step_riders(world, scratch);
         step_passengers(world, scratch);
         // A fight or an army may have given someone Down an order; it ends with the tick.
-        keep_down_still(world, scratch);
+        keep_down_still(world);
     });
-    StepResult { npc_script_runs, npc_plan_ms, ..result }
+    StepResult { npc_script_runs, npc_plan_ms, survival, ..result }
 }
 
 /// The rest of `step_world` once the residents walked (`stepRest`): everything else they do,
@@ -237,11 +246,11 @@ fn step_rest(
     let births_len = births.len();
     resolve_births(world, births, scratch);
     world.tick += 1;
-    step_aging(world, size, scratch);
+    let aging = step_aging(world, size);
     answer_demands(world, size, scratch);
     step_alliances(world, scratch);
     step_captures(world, terrain, scratch);
-    step_refill(world, size, scratch);
+    step_refill(world, size);
     step_directives(world, scratch);
     step_crimes(world, size, scratch);
     step_contracts(world, scratch);
@@ -273,7 +282,7 @@ fn step_rest(
         + accepted
         + buy_offs
         + debts_paid;
-    StepResult { actions, outsiders_ms, ..StepResult::default() }
+    StepResult { actions, outsiders_ms, aging, ..StepResult::default() }
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -294,14 +303,6 @@ fn place_traders(_world: &mut WorldState, _size: i32) {}
 
 // T86.10 (`npc-cities.ts`): world generation.
 fn place_npc_cities(_world: &mut WorldState, _terrain: &TerrainMap) {}
-
-// T86.3 (`survival.ts`, `spoilage.ts`, `stock-floor.ts`, `aging.ts`).
-fn step_survival(_world: &mut WorldState, _terrain: &TerrainMap, _scratch: &mut Scratch) {}
-fn step_spoilage(_world: &mut WorldState, _scratch: &mut Scratch) {}
-fn step_stock_floor(_world: &mut WorldState, _scratch: &mut Scratch) {}
-fn keep_down_still(_world: &mut WorldState, _scratch: &mut Scratch) {}
-fn step_aging(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
-fn step_refill(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
 
 // T86.4 (`horses.ts`, `climbing.ts`, `riding.ts`, `passengers.ts`).
 fn step_horses(_world: &mut WorldState, _terrain: &TerrainMap, _scratch: &mut Scratch) {}

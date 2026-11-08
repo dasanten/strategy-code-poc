@@ -2,9 +2,11 @@
 //! stats, Hunger, weapons, weights, Down, horse stats.
 
 use csp_shared::balance::{
-    ADULT_AGE, CARRIAGE_CAPACITY, CHILD_YEAR_DAYS, DECLINE_AGE, DECLINE_FLOOR, DECLINE_PER_YEAR,
-    GOOD_WEIGHT, HORSE_STAT_AVERAGE, HORSE_STRENGTH_EFFECT, HORSE_STRENGTH_LIMIT,
-    HUNGER_ENDURANCE_AVERAGE, HUNGER_ENDURANCE_EFFECT, HUNGER_ENDURANCE_LIMIT, WEAPON_ATTACK,
+    ADULT_AGE, AGILITY_AVERAGE, AGILITY_LIMIT, AGILITY_SPEED_EFFECT, AGILITY_TERRAIN_EFFECT,
+    CARRIAGE_CAPACITY, CARRY_BASE, CARRY_PER_STRENGTH, CHILD_YEAR_DAYS, DECLINE_AGE, DECLINE_FLOOR,
+    DECLINE_PER_YEAR, ENDURANCE_TERRAIN_EFFECT, GOOD_WEIGHT, HORSE_STAT_AVERAGE,
+    HORSE_STRENGTH_EFFECT, HORSE_STRENGTH_LIMIT, HUNGER_ENDURANCE_AVERAGE, HUNGER_ENDURANCE_EFFECT,
+    HUNGER_ENDURANCE_LIMIT, TERRAIN_FOOD, TERRAIN_SPEED, WALK_TICKS_PER_TILE, WEAPON_ATTACK,
 };
 use csp_shared::time::{TICKS_PER_GAME_DAY, TICKS_PER_GAME_YEAR};
 use csp_shared::world::{Good, Horse, HorseStats, Resident, StatName, Stock};
@@ -106,6 +108,39 @@ pub fn horse_age_in_years(horse: &Horse, tick: f64) -> f64 {
 /// Most weight a carriage holds behind `horse`, or without one (`carriageCapacityWith`).
 pub fn carriage_capacity_with(horse: Option<&Horse>) -> f64 {
     horse.map_or(CARRIAGE_CAPACITY, |h| CARRIAGE_CAPACITY * horse_strength_factor(&h.stats))
+}
+
+/// The most weight a resident can carry at `tick`, in kg (`carryCapacity`, `CONTEXT.md`: Carry
+/// capacity).
+pub fn carry_capacity(r: &Resident, tick: f64) -> f64 {
+    CARRY_BASE + CARRY_PER_STRENGTH * stat_value(r, StatName::Strength, tick)
+}
+
+/// How much of the usual food a resident needs on a tile of `terrain` at `tick` (`foodUse`,
+/// `CONTEXT.md`: Terrain, Hunger): their `hunger_factor`, times the terrain's extra food use
+/// softened by Endurance (by up to `HUNGER_ENDURANCE_LIMIT` of it, either way).
+pub fn food_use(r: &Resident, terrain: u8, tick: f64) -> f64 {
+    let extra = TERRAIN_FOOD.get(terrain).unwrap_or(1.0) - 1.0;
+    let away = stat_value(r, StatName::Endurance, tick) - HUNGER_ENDURANCE_AVERAGE;
+    let soften =
+        (-HUNGER_ENDURANCE_LIMIT).max(HUNGER_ENDURANCE_LIMIT.min(away * ENDURANCE_TERRAIN_EFFECT));
+    hunger_factor(r, tick) * (1.0 + extra * (1.0 - soften))
+}
+
+/// How many tiles per tick a resident walks onto a tile of `terrain` (`walkSpeed`, `CONTEXT.md`:
+/// Terrain, Stats): plains speed from Agility at `tick`, and the terrain's slowdown softened by
+/// Agility. A road's speed-up comes on top, as it is. Zero for terrain nobody can enter.
+pub fn walk_speed(r: &Resident, terrain: u8, tick: f64) -> f64 {
+    let base = match TERRAIN_SPEED.get(terrain) {
+        Some(b) if b != 0.0 => b,
+        _ => return 0.0,
+    };
+    let away = stat_value(r, StatName::Agility, tick) - AGILITY_AVERAGE;
+    let clamp = |v: f64| (-AGILITY_LIMIT).max(AGILITY_LIMIT.min(v));
+    let pace = 1.0 + clamp(away * AGILITY_SPEED_EFFECT);
+    let slowdown = (1.0 - base).max(0.0) * (1.0 - clamp(away * AGILITY_TERRAIN_EFFECT));
+    let speed_up = (base - 1.0).max(0.0);
+    (pace * (1.0 - slowdown + speed_up)) / WALK_TICKS_PER_TILE
 }
 
 #[cfg(test)]

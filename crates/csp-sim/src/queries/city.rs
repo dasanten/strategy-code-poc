@@ -2,13 +2,14 @@
 //! buying an NPC city (`CONTEXT.md`: Buying a city, NPC city reaction).
 
 use csp_shared::balance::{
-    CITY_PRICE_BY_BUILDING, CITY_PRICE_PER_RESIDENT, CITY_PRICE_STANDING_SWING, FOOD_PER_DAY,
-    NPC_CITY_REFUSES_STANDING, NPC_CITY_WONT_SELL_STANDING, STANDING_RANGE,
+    CITY_AREA_MARGIN, CITY_PRICE_BY_BUILDING, CITY_PRICE_PER_RESIDENT, CITY_PRICE_STANDING_SWING,
+    FOOD_PER_DAY, NPC_CITY_REFUSES_STANDING, NPC_CITY_WONT_SELL_STANDING, STANDING_RANGE,
 };
-use csp_shared::world::{Building, City, Resident, WorldState};
+use csp_shared::footprint::near_footprint;
+use csp_shared::world::{Building, BuildingKind, City, Resident, WorldState};
 
 use super::js_round;
-use super::names::kind_name;
+use super::names::{kind_name, placed};
 use super::residents::hunger_factor;
 use super::standing::standing_of;
 
@@ -62,4 +63,49 @@ pub fn city_price(world: &WorldState, city: &City, buyer_id: Option<&str>) -> f6
     };
     let standing = standing_of(world, &city.id, buyer);
     js_round(worth * (1.0 - (CITY_PRICE_STANDING_SWING * standing) / STANDING_RANGE))
+}
+
+/// The kinds that make a city's shape (`CITY_BUILDINGS`).
+pub const CITY_BUILDINGS: [BuildingKind; 6] = [
+    BuildingKind::TownHall,
+    BuildingKind::House,
+    BuildingKind::Storage,
+    BuildingKind::Warehouse,
+    BuildingKind::Wall,
+    BuildingKind::Gate,
+];
+
+/// Whether a building counts toward a city's shape: a finished city building (`isCityBuilding`).
+pub fn is_city_building(b: &Building) -> bool {
+    CITY_BUILDINGS.contains(&b.kind) && b.site.is_none()
+}
+
+/// Whether a tile lies in a city's area (`inCityArea`, `CONTEXT.md`: City area): within
+/// `CITY_AREA_MARGIN` of the footprint of one of its finished city buildings, the footprints
+/// included. `size` is the map's.
+pub fn in_city_area(world: &WorldState, city_id: &str, x: i32, y: i32, size: i32) -> bool {
+    world.buildings.iter().any(|b| {
+        b.city_id.as_deref() == Some(city_id)
+            && is_city_building(b)
+            && near_footprint(placed(b), (x, y), CITY_AREA_MARGIN as i32, size)
+    })
+}
+
+/// The realm a building belongs to (`buildingRealm`): its city's realm, or an outpost storage's
+/// own (`CONTEXT.md`: Outpost storage); `None` for one of no realm. A construction site laid out
+/// by a realm's resident is that realm's until it is finished.
+pub fn building_realm<'w>(world: &'w WorldState, b: &'w Building) -> Option<&'w str> {
+    if b.site.is_some() && b.realm_id.is_some() {
+        return b.realm_id.as_deref();
+    }
+    if let Some(city_id) = &b.city_id {
+        return world.cities.iter().find(|c| &c.id == city_id).and_then(|c| c.realm_id.as_deref());
+    }
+    b.realm_id.as_deref()
+}
+
+/// Whether a building is an outpost storage (`isOutpostStorage`, `CONTEXT.md`: Outpost storage):
+/// a finished storage of no city.
+pub fn is_outpost_storage(b: &Building) -> bool {
+    b.kind == BuildingKind::Storage && b.site.is_none() && b.city_id.is_none()
 }

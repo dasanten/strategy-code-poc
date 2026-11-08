@@ -2,14 +2,23 @@
 //! invariants. Pure over `csp_shared` data; the I/O shell is `csp-server`. Parity with the frozen
 //! TypeScript game is checked against the fixtures in `fixtures/`.
 
+pub mod aging;
+pub mod events;
 pub mod explored;
 pub mod goods_made;
+pub mod names;
 pub mod node_gen;
 pub mod pathfinding;
 pub mod queries;
 pub mod random;
+pub mod residents;
 pub mod sight;
+pub mod spoilage;
+pub mod stock_floor;
+pub mod survival;
 pub mod terrain_gen;
+#[cfg(test)]
+pub mod test_support;
 pub mod tick;
 pub mod walls;
 pub mod world;
