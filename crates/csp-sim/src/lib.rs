@@ -35,6 +35,7 @@ pub mod test_support;
 pub mod tick;
 pub mod trade_org;
 pub mod trading;
+pub mod transfers;
 pub mod walls;
 pub mod world;
 pub mod world_index;

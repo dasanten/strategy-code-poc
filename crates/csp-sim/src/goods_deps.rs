@@ -105,17 +105,9 @@ pub fn rob_trader(
 ) {
 }
 
-/// Whether a caravan resident collects a pick-up at the storage (`collectsFrom`).
-/// TODO(T86.9): `deliveries.rs`.
-pub fn collects_from(_world: &WorldState, _r: &Resident, _storage_id: &str) -> bool {
-    false
-}
+pub use crate::deliveries::collects_from;
 
-/// Whether a caravan resident collects a transfer at the storage (`collectsTransferFrom`).
-/// TODO(T86.9): `transfers.rs`.
-pub fn collects_transfer_from(_world: &WorldState, _r: &Resident, _storage_id: &str) -> bool {
-    false
-}
+pub use crate::transfers::collects_transfer_from;
 
 pub use crate::survival::drop_goods;
 
@@ -205,16 +197,24 @@ pub fn join_realm(_world: &mut WorldState, _city: usize, _realm: &str, _size: i3
 /// Ends any breeding a horse is part of (`endBreedingOf`). TODO(T86.8): `breeding.rs`.
 pub fn end_breeding_of(_world: &mut WorldState, _horse_id: &str) {}
 
-/// Hands in a transfer at a Trade Org warehouse (`handIn`), paying from `payer`; whether it was
-/// handed in. TODO(T86.9): `transfers.rs`; a no-op until then.
-pub fn hand_in(
-    _world: &mut WorldState,
-    _size: i32,
-    _resident: usize,
-    _realm: &str,
-    _order: &csp_shared::world::HandInOrder,
-    _warehouse: usize,
-    _payer: crate::holders::Holder,
-) -> bool {
-    false
+pub use crate::transfers::hand_in;
+
+/// Takes an offer out of the world (`endOffer`). TODO(offers): the lines in the realm logs it
+/// writes come with the offers port.
+pub fn end_offer(world: &mut WorldState, offer_id: &str) {
+    world.offers.retain(|o| o.id != offer_id);
+}
+
+/// A realm's name for the log (`realmName` of `alliance.ts`).
+pub fn realm_name(world: &WorldState, realm_id: &str) -> String {
+    if realm_id == TRADE_ORG {
+        return "the Trade Organization".into();
+    }
+    let realm = world.realms.iter().find(|r| r.id == realm_id);
+    if let Some(name) = realm.and_then(|r| r.name.clone()).filter(|n| !n.is_empty()) {
+        return name;
+    }
+    realm
+        .and_then(|r| world.residents.iter().find(|x| x.id == r.leader_id))
+        .map_or_else(|| "a fallen realm".into(), |l| l.name.clone())
 }
