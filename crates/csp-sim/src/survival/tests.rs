@@ -6,7 +6,7 @@ use csp_shared::balance::{
     ticks_for_age, ADULT_AGE, HUNGER_ENDURANCE_LIMIT, START_FOOD, TERRAIN_FOOD,
 };
 use csp_shared::terrain::{terrain_at, Terrain};
-use csp_shared::world::{Pile, Stat};
+use csp_shared::world::{FormerPlayer, Pile, Stat};
 
 use crate::aging::step_aging;
 use crate::queries::residents::{carry_capacity, is_down};

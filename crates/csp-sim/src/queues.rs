@@ -17,8 +17,8 @@ use csp_shared::balance::{MAP_SIZE, REALM_LOG_LENGTH};
 use csp_shared::terrain::TerrainMap;
 use csp_shared::time::TICKS_PER_GAME_HOUR;
 use csp_shared::world::{
-    Carriage, Interrupted, OrderEndedKind, OrderRequest, Queue, QueueStep, RealmEvent,
-    RealmEventWhat, Resident, WorldState,
+    Interrupted, OrderEndedKind, OrderRequest, Queue, QueueStep, RealmEvent, RealmEventWhat,
+    Resident, WorldState,
 };
 use serde_json::Value;
 
@@ -50,12 +50,7 @@ fn is_tile(p: &serde_json::Map<String, Value>) -> bool {
     p.contains_key("x") && p.contains_key("y")
 }
 
-/// The carriage's Organization (`carriageOrganization`): its realm, or for one of no realm its
-/// city; `None` for one of neither.
-// TODO(T86.7): `crimes::carriage_organization`.
-fn carriage_organization(k: &Carriage) -> Option<&str> {
-    k.realm_id.as_deref().or(k.city_id.as_deref())
-}
+use crate::crimes::carriage_organization;
 
 /// Why a step can't make sense wherever the resident stands when its turn comes
 /// (`stepPlaceProblem`, `CONTEXT.md`: Queue, Planning ahead): a tile it names is off the map, a
