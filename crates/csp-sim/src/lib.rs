@@ -2,6 +2,7 @@
 //! invariants. Pure over `csp_shared` data; the I/O shell is `csp-server`. Parity with the frozen
 //! TypeScript game is checked against the fixtures in `fixtures/`.
 
+pub mod explored;
 pub mod node_gen;
 pub mod random;
 pub mod terrain_gen;
