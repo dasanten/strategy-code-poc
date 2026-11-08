@@ -31,6 +31,7 @@ pub mod npc_coins;
 pub mod npc_revive;
 pub mod npc_scores;
 pub mod npc_scouts;
+pub mod npc_stable;
 pub mod order_sender;
 pub mod orders;
 pub mod passengers;
