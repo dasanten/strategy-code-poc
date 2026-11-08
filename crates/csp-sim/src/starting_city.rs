@@ -439,3 +439,6 @@ pub fn found_starting_city(
     record_event(world, Some(&realm_id), what);
     world.realms.len() - 1
 }
+
+#[cfg(test)]
+mod tests;
