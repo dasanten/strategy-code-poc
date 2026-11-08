@@ -5,4 +5,5 @@ pub mod backup;
 pub mod db;
 pub mod explored;
 pub mod saves;
+pub mod scripts;
 pub mod world_format;

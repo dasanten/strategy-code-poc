@@ -98,6 +98,7 @@ name = "csp-server"
 version = "0.0.0"
 dependencies = [
  "base64",
+ "csp-lang",
  "csp-shared",
  "csp-sim",
  "flate2",
