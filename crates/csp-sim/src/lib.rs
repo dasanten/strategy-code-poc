@@ -9,6 +9,7 @@ pub mod explored;
 pub mod goods_made;
 pub mod names;
 pub mod node_gen;
+pub mod npc_scores;
 pub mod pathfinding;
 pub mod queries;
 pub mod random;
