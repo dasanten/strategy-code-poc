@@ -14,7 +14,7 @@ use csp_shared::world::{
 
 use super::*;
 use crate::armies::{apply_army_order, validate_army_order, ArmyOrderKind, ArmyRequest};
-use crate::pending::Sender;
+use crate::order_sender::OrderSender;
 use crate::queries::combat::protection;
 use crate::queries::residents::{best_weapon, is_armed};
 use crate::test_world::{add_city, empty_world, live, live_mut, realm, resident, run, until_hit};
@@ -39,7 +39,7 @@ fn setup() -> WorldState {
 
 /// Sends an attack order from Player 7 and answers whether it was taken (`order`).
 fn order(world: &mut WorldState, resident_id: &str, target_id: &str) -> &'static str {
-    let sender = Sender { user_id: ME, npc_city_id: None };
+    let sender = OrderSender::player(ME, "Mara");
     let request =
         AttackRequest { resident_id: Some(resident_id.into()), target_id: Some(target_id.into()) };
     if let Some(reason) = validate_attack(world, &sender, &request, Some(SIZE)) {
@@ -106,10 +106,10 @@ fn agility_dodges_up_to_a_limit_intellect_speeds_up_learning_combat() {
 
 #[test]
 fn residents_are_in_contact_on_the_same_or_a_neighbouring_tile_across_the_maps_joins() {
-    assert!(in_contact(64, (3.0, 3.0), (3.0, 3.0)));
-    assert!(in_contact(64, (3.0, 3.0), (4.0, 4.0)));
-    assert!(!in_contact(64, (3.0, 3.0), (5.0, 3.0)));
-    assert!(in_contact(64, (0.0, 0.0), (63.0, 63.0)));
+    assert!(in_contact(64, (3, 3), (3, 3)));
+    assert!(in_contact(64, (3, 3), (4, 4)));
+    assert!(!in_contact(64, (3, 3), (5, 3)));
+    assert!(in_contact(64, (0, 0), (63, 63)));
 }
 
 #[test]
@@ -412,7 +412,6 @@ fn a_killed_resident_leaves_everything_they_carried_as_loot_and_the_fight_ends()
 }
 
 #[test]
-#[ignore = "needs endRealm (T86.3)"]
 fn killing_a_leader_ends_their_realm() {
     let mut world = setup();
     live_mut(&mut world, "b1").health = 1.0;

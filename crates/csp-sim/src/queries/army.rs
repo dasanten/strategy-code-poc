@@ -71,14 +71,15 @@ pub fn spare_food(world: &WorldState, carriage: &Carriage) -> f64 {
     0f64.max(held(&carriage.load, Good::Food) - keep)
 }
 
-/// The carriage a resident drives and the Food on it they may take as its driver
-/// (`driversFood`): all of it but the horse's share of what a haul route keeps on board.
-pub fn drivers_food<'w>(world: &'w WorldState, driver: &Resident) -> Option<(&'w Carriage, f64)> {
+/// Where in `world.carriages` the carriage a resident drives stands (a drive order or a haul
+/// route), and the Food on it they may take as its driver (`driversFood`): all of it, except the
+/// horse's share of what a haul route keeps on board (`HAUL_HORSE_FOOD`, at most its `keepFood`).
+pub fn drivers_food(world: &WorldState, driver: &Resident) -> Option<(usize, f64)> {
     let (carriage_id, keep) = match &driver.order {
         Some(ResidentOrder::Drive(o)) => (&o.carriage_id, 0.0),
         Some(ResidentOrder::Haul(o)) => (&o.carriage_id, o.keep_food.min(HAUL_HORSE_FOOD)),
         _ => return None,
     };
-    let carriage = world.carriages.iter().find(|k| k.id == *carriage_id)?;
-    Some((carriage, 0f64.max(held(&carriage.load, Good::Food) - keep)))
+    let i = world.carriages.iter().position(|k| &k.id == carriage_id)?;
+    Some((i, (held(&world.carriages[i].load, Good::Food) - keep).max(0.0)))
 }

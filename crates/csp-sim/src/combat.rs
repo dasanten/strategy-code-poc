@@ -18,9 +18,11 @@ use crate::crimes::{
     CrimeAgainst,
 };
 use crate::defence::{defends_by_script, end_hold_if_over, start_defence, Alarms};
+use crate::events::record_event;
 use crate::goods_made::GoodsMade;
-use crate::pending::{die_all, drop_goods, ordered_resident, record_event, Sender};
-use crate::queries::alliance::{commands, contract_of};
+use crate::order_sender::commands;
+use crate::order_sender::{ordered_resident, OrderSender};
+use crate::queries::alliance::contract_of;
 use crate::queries::carriages::{driven_carriage_id, stands_still};
 use crate::queries::city::town_hall_of;
 use crate::queries::city_area::{in_city_area, occupiers_of, stands_occupying};
@@ -33,6 +35,7 @@ use crate::queries::walls::{
     broken_returns, foreign_wall, is_wall_or_gate, on_own_wall, wall_strength, wall_strength_left,
 };
 use crate::random::{hash_str, Mulberry32};
+use crate::survival::{die_all, drop_goods};
 
 /// A blow a resident with an attack order requests once in contact with their target and ready
 /// (`StrikeAction`). The world checks and resolves it at the end of the tick.
@@ -179,7 +182,7 @@ pub struct AttackRequest {
 /// or of none. An NPC city's Alarm default gives it too. `size` is the map's, when known.
 pub fn validate_attack(
     world: &WorldState,
-    sender: &Sender,
+    sender: &OrderSender,
     order: &AttackRequest,
     size: Option<i32>,
 ) -> Option<&'static str> {
@@ -301,7 +304,7 @@ pub fn request_strikes(world: &mut WorldState, size: i32) -> Vec<StrikeAction> {
             continue;
         }
         let target = target.expect("not gone");
-        if !in_contact(size, me, spot_of(world, target)) {
+        if !in_contact(size, tile(me), tile(spot_of(world, target))) {
             continue;
         }
         let target_id = match target {
@@ -367,7 +370,7 @@ pub fn resolve_strikes(
             Target::Resident(t) => &world.residents[t].id,
             Target::Building(b) => &world.buildings[b].id,
         };
-        if o.target_id != *real_id || !in_contact(size, (a.x, a.y), spot) {
+        if o.target_id != *real_id || !in_contact(size, tile((a.x, a.y)), tile(spot)) {
             continue;
         }
         let started = o.started;
@@ -460,7 +463,8 @@ pub fn resolve_strikes(
         }
         react(world, ti, ai);
     }
-    let ended = die_all(world, &died, DeathCause::Killed, size, &killers);
+    let named = move |id: &str| killers.iter().find(|(k, _)| k == id).map(|(_, by)| by.clone());
+    let (_, ended) = die_all(world, &died, DeathCause::Killed, size, Some(&named));
     if !broken.is_empty() {
         update_city_membership(world, size);
     }
@@ -516,7 +520,7 @@ fn break_wall(
     commit_crime(world, size, CrimeKind::TearDown, &attacker_id, against);
     let b = world.buildings.remove(bi);
     let returned = broken_returns(&b);
-    drop_goods(world, b.x, b.y, &returned);
+    drop_goods(world, b.x, b.y, &returned, MAP_SIZE);
     made.note(&returned);
     Some(b)
 }

@@ -14,9 +14,8 @@ use super::residents::{best_weapon, stat_value};
 
 /// Whether two spots are in contact (`inContact`): on the same tile or one of the eight around
 /// it, the short way round the map of `size` tiles.
-pub fn in_contact(size: i32, a: (f64, f64), b: (f64, f64)) -> bool {
-    wrap_delta(a.0 as i32, b.0 as i32, size).abs() <= 1
-        && wrap_delta(a.1 as i32, b.1 as i32, size).abs() <= 1
+pub fn in_contact(size: i32, a: (i32, i32), b: (i32, i32)) -> bool {
+    wrap_delta(a.0, b.0, size).abs() <= 1 && wrap_delta(a.1, b.1, size).abs() <= 1
 }
 
 /// Damage a resident's protection takes off each blow (`protection`): a shield and armour, if

@@ -12,7 +12,7 @@ use csp_shared::world::{
     Stock, Victim, WorldState,
 };
 
-use crate::pending::record_event;
+use crate::events::record_event;
 use crate::queries::city_area::in_city_area;
 use crate::standing::change_standing;
 

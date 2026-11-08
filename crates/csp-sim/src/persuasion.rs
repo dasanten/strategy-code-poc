@@ -14,7 +14,7 @@ use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{City, JoinRequest, RealmEventWhat, WorldState};
 
 use crate::capture::join_realm;
-use crate::pending::record_event;
+use crate::events::record_event;
 use crate::queries::city::{for_sale, town_hall_of};
 use crate::queries::persuasion::{holds_high, persuaded_by, respect_seen_by};
 use crate::queries::standing::standing_of;

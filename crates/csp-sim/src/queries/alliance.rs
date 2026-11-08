@@ -1,18 +1,13 @@
 //! Alliance and command queries of `packages/shared/src/alliance.ts` and `contract.ts`: who sees
 //! with whom, and whose orders a resident or carriage takes.
 
-use csp_shared::world::{Alliance, Carriage, MercenaryContract, Resident, WorldState};
+use csp_shared::world::{Alliance, Carriage, MercenaryContract, WorldState};
 
 use super::standing::{TRADE_ORG, TRADE_ORG_NAME};
 
 /// Whether two realms stand together (`allied`): the same realm, or members of one alliance.
 pub fn allied(world: &WorldState, a: &str, b: &str) -> bool {
     a == b || allied_realms(world, a).iter().any(|x| x == b)
-}
-
-/// Whether the realm's Player may give the resident orders (`commands`).
-pub fn commands(world: &WorldState, realm_id: &str, r: Option<&Resident>) -> bool {
-    r.is_some_and(|r| commander_of(world, &r.id, r.owner.as_deref()).as_deref() == Some(realm_id))
 }
 
 /// How Players call a realm (`realmName`): by its realm name, else its Leader's name; the Trade
