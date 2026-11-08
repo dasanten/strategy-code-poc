@@ -15,6 +15,7 @@ use csp_shared::terrain::{is_passable_terrain, terrain_at, wrap, TerrainMap};
 use csp_shared::world::{Horse, WorldState};
 
 use crate::aging::{step_aging, AgingResult};
+use crate::alliances::step_alliances;
 use crate::armies::step_armies;
 use crate::building::{request_building, resolve_building};
 use crate::buying::resolve_purchases;
@@ -22,8 +23,10 @@ use crate::capture::{step_captures, Capture};
 use crate::carrying::{request_carrying, resolve_carrying, CarryAction};
 use crate::climbing::{request_climbing, resolve_climbing};
 use crate::combat::{request_strikes, resolve_strikes, CombatResult};
+use crate::contracts::{resolve_payments, step_contracts};
 use crate::crimes::step_crimes;
 use crate::defence::NoAlarms;
+use crate::directives::{resolve_buy_offs, step_directives, BuyOffRecord};
 use crate::hauling::request_hauling;
 use crate::horses::step_horses;
 use crate::node_gen::place_resource_nodes;
@@ -156,6 +159,9 @@ pub struct StepResult {
     pub horses_died: Vec<Horse>,
     /// What aging did (`aging`): who died of old age, which realms ended, who grew up.
     pub aging: AgingResult,
+    /// This tick's buy-offs (`resolveBuyOffs`), for the `buy-offs-sound` invariant; the TypeScript
+    /// keeps them beside the world in a `WeakMap`.
+    pub buy_offs: Vec<BuyOffRecord>,
 }
 
 /// Advances the world by one tick (`stepWorld`, ADR 0002): survival, horses, spoilage and the
@@ -249,11 +255,11 @@ fn step_rest(
     let carries_len = carries.len();
     resolve_carrying(world, &carries, size);
     step_feeding(world, size, scratch);
-    let payments = resolve_payments(world, scratch);
+    let payments = resolve_payments(world);
     let purchases = resolve_purchases(world, size);
     let trades = resolve_trades(world, size, &mut scratch.trades);
     let accepted = resolve_offers(world, scratch);
-    let buy_offs = resolve_buy_offs(world, scratch);
+    let (buy_offs, buy_off_records) = resolve_buy_offs(world);
     let debts_paid = resolve_debt_payments(world, scratch);
     let builds = request_building(world);
     let builds_len = builds.len();
@@ -276,12 +282,12 @@ fn step_rest(
     world.tick += 1;
     let aging = step_aging(world, size);
     answer_demands(world, size, scratch);
-    step_alliances(world, scratch);
+    step_alliances(world);
     let captures = step_captures(world, size, &mut NoAlarms);
     step_refill(world, size);
-    step_directives(world, scratch);
+    step_directives(world);
     step_crimes(world, size);
-    step_contracts(world, scratch);
+    step_contracts(world);
     step_demands(world, scratch);
     step_standing(world);
     step_debts(world, scratch);
@@ -310,7 +316,15 @@ fn step_rest(
         + accepted
         + buy_offs
         + debts_paid;
-    StepResult { actions, combat, captures, outsiders_ms, aging, ..StepResult::default() }
+    StepResult {
+        actions,
+        combat,
+        captures,
+        outsiders_ms,
+        aging,
+        buy_offs: buy_off_records,
+        ..StepResult::default()
+    }
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -399,18 +413,9 @@ fn step_npc_cities(
 }
 fn step_outsiders(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
 
-// T86.11 (`alliances.ts`, `contracts.ts`, `demands.ts`, `directives.ts`).
-fn step_alliances(_world: &mut WorldState, _scratch: &mut Scratch) {}
-fn resolve_payments(_world: &mut WorldState, _scratch: &mut Scratch) -> usize {
-    0
-}
-fn step_contracts(_world: &mut WorldState, _scratch: &mut Scratch) {}
+// `demands.ts` (filed under T86.11 here, but named by no ticket; T86.14 or whoever ports it).
 fn answer_demands(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
 fn step_demands(_world: &mut WorldState, _scratch: &mut Scratch) {}
-fn step_directives(_world: &mut WorldState, _scratch: &mut Scratch) {}
-fn resolve_buy_offs(_world: &mut WorldState, _scratch: &mut Scratch) -> usize {
-    0
-}
 
 // T86.12 (`script-runner.ts`). Returns how many NPC scripts ran.
 fn run_npc_scripts(
