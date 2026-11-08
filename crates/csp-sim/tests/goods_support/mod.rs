@@ -95,6 +95,8 @@ pub fn validate(
         "swap" => trading::validate_swap(world, sender, o),
         "buyHorse" => trading::validate_buy_horse(world, sender, o),
         "sellHorse" => trading::validate_sell_horse(world, sender, o),
+        "transfer" => csp_sim::transfers::validate_transfer(world, sender, o),
+        "handIn" => csp_sim::transfers::validate_hand_in(world, sender, o),
         k => panic!("no goods order kind {k}"),
     }
 }
@@ -114,6 +116,8 @@ pub fn apply(world: &mut WorldState, sender: &OrderSender, o: &OrderRequest, siz
         "swap" => trading::apply_swap(world, sender, o),
         "buyHorse" => trading::apply_buy_horse(world, sender, o),
         "sellHorse" => trading::apply_sell_horse(world, sender, o),
+        "transfer" => csp_sim::transfers::apply_transfer(world, sender, o, size),
+        "handIn" => csp_sim::transfers::apply_hand_in(world, sender, o),
         k => panic!("no goods order kind {k}"),
     }
 }

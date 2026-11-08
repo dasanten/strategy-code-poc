@@ -9,7 +9,7 @@
 //     --out <dir>   where to write (default `crates/csp-sim/fixtures`)
 //     --quick       small sizes and few ticks, for the script's own test
 //     --only <parts>  only these, comma-separated: balance, random, terrain, lang, paths, save,
-//                     worlds, generated, sight (default all); the README keeps every other file
+//                     worlds, generated, sight, trade (default all); the README keeps every other file
 
 // The server's modules import each other in a circle that only resolves when `realtime.ts` comes
 // first, as it does when the server starts.
@@ -35,11 +35,13 @@ import { gzipSync } from 'node:zlib'
 import ts from 'typescript'
 import * as balance from '../packages/shared/src/balance.ts'
 import {
+  AVERAGE_HORSE_STATS,
   DEFAULT_SCRIPTS,
   MAP_SIZE,
   NPC_TOWN,
   NPC_VILLAGE,
   Terrain,
+  deliveryStorage,
   isPassableTerrain,
   scriptCheckEnv,
   tileIndex,
@@ -71,13 +73,15 @@ import {
   WALKING_COSTS,
   type PathOptions,
 } from '../apps/server/src/pathfinding.ts'
-import { hash as nameHash, mulberry32 } from '../apps/server/src/residents.ts'
+import { placeCaravans } from '../apps/server/src/caravans.ts'
+import { hash as nameHash, mulberry32, newResident } from '../apps/server/src/residents.ts'
 import { loadOrCreateWorld } from '../apps/server/src/saves.ts'
 import { generateTerrain, hash as latticeHash } from '../apps/server/src/terrain-gen.ts'
 import { entitiesInSight } from '../apps/server/src/sight.ts'
 import { foundStartingCity } from '../apps/server/src/starting-city.ts'
 import { addCity, cityTerrain } from '../apps/server/src/test-terrain.ts'
 import { foundTradeOrgHq } from '../apps/server/src/trade-org.ts'
+import { foundTradingPost } from '../apps/server/src/trading-posts.ts'
 import { Walking } from '../apps/server/src/walking.ts'
 import { WORLD_FORMAT_VERSION } from '../apps/server/src/world-format.ts'
 import { createWorld, generateWorld, stepWorld } from '../apps/server/src/world.ts'
@@ -377,6 +381,59 @@ function dumpStepped(
         `entitiesInSight for every realm and city of ${stepped}`,
       )
     }
+  }
+}
+
+/**
+ * The worlds the Trade Organization's tests start from, which need a trading post
+ * (`foundTradingPost`, an NPC village) and starting cities (`foundStartingCity`) laid out first:
+ * `setup()` of `deliveries.fixture.ts` and of `transfers.fixture.ts`, rebuilt here (those files
+ * import vitest). Each is `{ size, world }`: the map is Plains, so only its size is kept.
+ */
+function dumpTradeWorlds(): void {
+  log('trade')
+  const p1 = (world: WorldState, owner: string, cityId: string, x: number, y: number) => {
+    const r = newResident(mulberry32(11), { id: 'p1', owner, cityId, x, y, tick: 0 })
+    r.bornAt = -20 * 24 * 3600
+    r.carried = { coins: 1_000 }
+    world.residents.push(r)
+  }
+  const base = () => {
+    const terrain = plains(512)
+    const world = createWorld(terrain)
+    const rand = mulberry32(5)
+    foundTradeOrgHq(world, terrain, 128, 128, rand)
+    const post = foundTradingPost(world, terrain, 320, 320, undefined, rand)
+    placeCaravans(world)
+    const warehouse = world.buildings.find((b) => b.kind === 'warehouse' && b.cityId === post.id)!
+    return { terrain, world, warehouse }
+  }
+  {
+    const { terrain, world, warehouse } = base()
+    // An average horse, so the caravan's loads are what the delivery numbers expect.
+    for (const h of world.horses) h.stats = { ...AVERAGE_HORSE_STATS }
+    const realm = foundStartingCity(world, terrain, 7)
+    const city = world.cities.find((c) => c.realmId === realm.id)!
+    p1(world, realm.id, city.id, warehouse.x, warehouse.y)
+    write(
+      'trade/deliveries.json',
+      json({ size: terrain.size, world }),
+      'setup() of deliveries.fixture.ts',
+    )
+  }
+  {
+    const { terrain, world, warehouse } = base()
+    const realm = foundStartingCity(world, terrain, 7)
+    foundStartingCity(world, terrain, 8)
+    const city = world.cities.find((c) => c.realmId === realm.id)!
+    // Coins for the fees of transfers picked up there.
+    deliveryStorage(world, city.id)!.stock!.coins = 2_000
+    p1(world, realm.id, city.id, warehouse.x, warehouse.y)
+    write(
+      'trade/transfers.json',
+      json({ size: terrain.size, world }),
+      'setup() of transfers.fixture.ts',
+    )
   }
 }
 
@@ -987,6 +1044,7 @@ async function main(): Promise<void> {
   dumpStepped('village', village, villageFrom, p.villageTicks, p.sightTicks, parts)
   dumpStepped('hq', hq, hqFrom, p.hqTicks, p.sightTicks, parts)
   if (want('sight')) dumpSightWorlds()
+  if (want('trade')) dumpTradeWorlds()
   if (want('generated')) dumpGenerated(p.generated)
   if (o.full) dumpFullTerrainHash()
   writeIndex()
