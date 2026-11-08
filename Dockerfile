@@ -19,8 +19,7 @@ COPY --from=planner /build/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json --package csp-server
 COPY Cargo.toml Cargo.lock ./
 COPY crates crates
-RUN cargo build --release --package csp-server \
-      --bin csp-server --bin csp-admin --bin check-fields
+RUN cargo build --release --package csp-server --bin csp-server --bin csp-admin
 
 # --- the client, built as before ------------------------------------------------------------
 FROM node:22.23.3-bookworm-slim AS web
@@ -49,8 +48,7 @@ ENV HOST=0.0.0.0 \
     WEB_DIST=/app/web \
     NODE_ENV=production
 WORKDIR /app
-COPY --from=rust /build/target/release/csp-server /build/target/release/csp-admin \
-     /build/target/release/check-fields /usr/local/bin/
+COPY --from=rust /build/target/release/csp-server /build/target/release/csp-admin /usr/local/bin/
 COPY --from=web /app/apps/web/dist ./web
 RUN mkdir -p /data /backups && chown node:node /data /backups
 USER node

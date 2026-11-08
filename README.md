@@ -117,8 +117,8 @@ to Daniel's server, where Caddy serves it over HTTPS (ADR 0007). One-time setup:
    `docker compose exec server csp-admin create <name>` for the admin and
    `docker compose exec server csp-admin invite` for invite codes.
 
-The image runs the Rust server (ADR 0030): a `cargo-chef` stage builds `csp-server`, `csp-admin`
-and `check-fields` in release, the client is built as before, and a slim Debian image runs them
+The image runs the Rust server (ADR 0030): a `cargo-chef` stage builds `csp-server` and `csp-admin`
+in release, the client is built as before, and a slim Debian image runs them
 as the same unprivileged user (uid 1000) with the same volumes, port and environment, so the
 compose file and the volumes from the TypeScript image stay as they are. CI's `rust` job runs
 `pnpm check:rust`'s steps beside `check`, on PRs into `dev` and `main` only (ADR 0009).
@@ -129,15 +129,10 @@ already ran, stop the server and copy the `-start` backup over `/data/world.db`.
 
 Before scripts see exactly their script views (ADR 0011), list the fields Players' active scripts
 read that the views don't declare, with each script and Player. It only reads, so it is safe while
-the server runs; the image must be one with the command (Epic 24 released):
-
-```sh
-docker compose exec server check-fields
-```
-
-Locally: `cargo run -p csp-server --bin check-fields` (reads `DB_PATH`, `data/world.db` by
-default). Until the script views are ported to Rust (T86.12) it says so and stops; the TypeScript
-`pnpm --filter @csp/server check:fields` still works.
+the server runs. The Rust image doesn't carry it yet: the Rust `check-fields` (T87.8) waits for
+the script views to be ported (T86.12), and goes into the image then. Until then, run the
+TypeScript one against a copy of the database: `pnpm --filter @csp/server check:fields` (reads
+`DB_PATH`, `data/world.db` by default).
 It finds reads from values the checker is sure of (`me`, a query's result, a `for … of` over one,
 a `let` holding one); a read through `memory` or a function's parameters isn't found.
 
