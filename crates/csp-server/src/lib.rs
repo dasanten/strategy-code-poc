@@ -3,3 +3,4 @@ pub mod admin_cli;
 pub mod auth;
 pub mod backup;
 pub mod db;
+pub mod explored;
