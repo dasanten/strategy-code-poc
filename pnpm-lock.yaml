@@ -113,6 +113,9 @@ importers:
       '@codemirror/view':
         specifier: ^6.43.14
         version: 6.43.14
+      '@csp/balance':
+        specifier: workspace:*
+        version: link:../../packages/balance
       '@csp/lang':
         specifier: workspace:*
         version: link:../../packages/lang
@@ -147,6 +150,12 @@ importers:
       vite:
         specifier: ^8.3.4
         version: 8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15)
+
+  packages/balance:
+    devDependencies:
+      '@csp/shared':
+        specifier: workspace:*
+        version: link:../shared
 
   packages/lang: {}
 

@@ -2,6 +2,7 @@
 //! Rust twin of `packages/shared`. Plain serialisable data; no I/O, no rules.
 
 pub mod balance;
+pub mod balance_export;
 pub mod chunks;
 pub mod footprint;
 pub mod goods;
