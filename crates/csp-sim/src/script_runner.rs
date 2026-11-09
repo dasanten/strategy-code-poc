@@ -56,7 +56,7 @@ use crate::workplace_settings::{
     WorkSettingsHost,
 };
 use crate::world_index::WorldIndex;
-use csp_lang::ParamType;
+use csp_lang::{ParamInfo, ParamType};
 
 /// What running scripts needs from outside the world (`ScriptHost`): the script library and the
 /// Players.
@@ -1388,7 +1388,7 @@ impl ScriptRunner {
         }
         let memory = memory_object(&running.memory);
         // A resident's picked param values; an army's params are never picked.
-        let declared: Vec<_> = script_params(&script.source);
+        let declared: Vec<_> = cached_params(&script.source).as_ref().clone();
         let picked: Vec<ParamWithValue> = match resident {
             Some(i) => param_values(world, i, running.script_id, &declared),
             None => {
@@ -1413,7 +1413,8 @@ impl ScriptRunner {
             ));
         }
         let size = self.terrain.size;
-        let index = WorldIndex::new(world, size);
+        let mut slot = scratch.index.take();
+        let index = crate::world_index::world_index(&mut slot, world, size);
         let host = self.host.clone();
         let explored = move |x: i32, y: i32| host.explored(user_id, x, y);
         let (requests, ended, end_reason, waited, logged, result) = {
@@ -1421,16 +1422,16 @@ impl ScriptRunner {
             let world_ref: &WorldState = world;
             let seen = || {
                 let mut cache = sight.borrow_mut();
-                entities_in_sight(world_ref, &index, Some(realm_id), cache.as_mut())
+                entities_in_sight(world_ref, index, Some(realm_id), cache.as_mut())
             };
             let eyes = || {
                 let mut cache = sight.borrow_mut();
-                sight_of(world_ref, &index, realm_id, cache.as_mut())
+                sight_of(world_ref, index, realm_id, cache.as_mut())
             };
             let ctx = ScriptContext {
                 world: world_ref,
                 terrain: &self.terrain,
-                index: &index,
+                index,
                 sender,
                 resident_id: (!r.army).then_some(r.id.as_str()),
                 army_id: r.army.then_some(r.id.as_str()),
@@ -1449,6 +1450,7 @@ impl ScriptRunner {
             scratch.sight = sight.into_inner();
             out
         };
+        scratch.index = slot;
         if let Some(v) = violations {
             let sound = if r.army { army_script_requests_sound } else { script_requests_sound };
             v.extend(sound(world, &self.terrain, sender, &r.id, &requests, &self.kinds));
@@ -1825,21 +1827,22 @@ fn run_city_scripts(
         let program = game_program(source);
         let memory = memory_object(&running.memory);
         // Nobody picks values for an NPC city: its defaults fall back on their own.
-        let params: Vec<ParamWithValue> = script_params(source)
-            .into_iter()
-            .map(|p| ParamWithValue { param: p, value: None })
+        let params: Vec<ParamWithValue> = cached_params(source)
+            .iter()
+            .map(|p| ParamWithValue { param: p.clone(), value: None })
             .collect();
-        let index = WorldIndex::new(world, terrain.size);
+        let mut slot = scratch.index.take();
+        let index = crate::world_index::world_index(&mut slot, world, terrain.size);
         let outcome = {
             let sight = RefCell::new(scratch.sight.take());
             let world_ref: &WorldState = world;
             let seen = || {
                 let mut cache = sight.borrow_mut();
-                entities_in_sight(world_ref, &index, Some(&city.id), cache.as_mut())
+                entities_in_sight(world_ref, index, Some(&city.id), cache.as_mut())
             };
             let eyes = || {
                 let mut cache = sight.borrow_mut();
-                sight_of(world_ref, &index, &city.id, cache.as_mut())
+                sight_of(world_ref, index, &city.id, cache.as_mut())
             };
             let explored = |_: i32, _: i32| true;
             let resident = &world_ref.residents[i];
@@ -1850,7 +1853,7 @@ fn run_city_scripts(
             let ctx = ScriptContext {
                 world: world_ref,
                 terrain,
-                index: &index,
+                index,
                 sender: &sender,
                 resident_id: Some(id),
                 army_id: None,
@@ -1869,6 +1872,7 @@ fn run_city_scripts(
             scratch.sight = sight.into_inner();
             outcome
         };
+        scratch.index = slot;
         let Some((requests, ended, end_reason, waited)) = outcome else { continue };
         // What it logs is dropped: no Player owns an NPC city's residents to read their script log.
         for order in &requests {
@@ -2134,3 +2138,26 @@ pub fn seen_by(world: &WorldState, size: i32, side: &str) -> Arc<Vec<SeenEntity>
 
 #[cfg(test)]
 mod tests;
+
+thread_local! {
+    /// The `param` lines of each script source seen (`scriptParams`), parsed once: the defaults
+    /// and a Player's active versions run every tick.
+    static PARAMS: RefCell<HashMap<String, Arc<Vec<ParamInfo>>>> = RefCell::new(HashMap::new());
+}
+
+/// A script's `param` lines with their comments (`scriptParams`), parsed once per source.
+fn cached_params(source: &str) -> Arc<Vec<ParamInfo>> {
+    PARAMS.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if let Some(params) = cache.get(source) {
+            return params.clone();
+        }
+        // Edited scripts leave old sources behind: start over once there are many.
+        if cache.len() >= 4096 {
+            cache.clear();
+        }
+        let params = Arc::new(script_params(source));
+        cache.insert(source.to_string(), params.clone());
+        params
+    })
+}
