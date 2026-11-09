@@ -799,3 +799,6 @@ pub fn traders_sound(world: &WorldState, terrain: &TerrainMap) -> Vec<InvariantV
     }
     out
 }
+
+#[cfg(test)]
+mod tests;
