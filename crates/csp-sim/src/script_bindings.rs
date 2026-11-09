@@ -249,9 +249,11 @@ pub fn view_value(data: &Json, ty: ScriptType) -> Value {
         }
         (Json::Object(record), ScriptType::View(view)) => {
             let fields = script_view(view).map_or(&[][..], |v| v.fields);
-            Value::frozen_fields(fields.iter().map(|f| {
-                (f.name, view_value(record.get(f.name).unwrap_or(&Json::Null), f.r#type))
-            }))
+            Value::frozen_fields(
+                fields.iter().map(|f| {
+                    (f.name, view_value(record.get(f.name).unwrap_or(&Json::Null), f.r#type))
+                }),
+            )
         }
         _ => Value::Null,
     }
