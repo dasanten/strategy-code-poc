@@ -339,13 +339,16 @@ pub struct Taken {
 /// leaves any alliance army.
 // TODO(T86.7): `stealing::take_over` (the crime, its events and the caravan, trader and supply
 // wagon follow-ups are T86.7's and T86.9's).
-pub fn take_over(world: &mut WorldState, _thief: &str, realm_id: &str, taken: Taken, _size: i32) {
+pub fn take_over(world: &mut WorldState, _thief: &str, realm_id: &str, taken: Taken, size: i32) {
     let mut ids = Vec::new();
     if let Some(i) = taken.carriage {
         let k = &mut world.carriages[i];
         k.realm_id = Some(realm_id.to_string());
         k.city_id = None;
-        ids.push(k.id.clone());
+        let id = k.id.clone();
+        // Its supply wagon's is gone for its army (`wagonStolen`).
+        crate::supply_wagons::wagon_stolen(world, &id, size);
+        ids.push(id);
     }
     if let Some(i) = taken.horse {
         let h = &mut world.horses[i];
@@ -366,9 +369,8 @@ pub fn waiting_for_escort(world: &WorldState, size: i32) -> HashSet<String> {
 }
 
 /// The Trade Org's soldiers waiting on the road (`waitingOnTheRoad`).
-// TODO(T86.9): `trade_org_punishment::waiting_on_the_road`. Nobody waits until it lands.
-pub fn waiting_on_the_road(_world: &WorldState, _size: i32) -> HashSet<String> {
-    HashSet::new()
+pub fn waiting_on_the_road(world: &WorldState, size: i32) -> HashSet<String> {
+    crate::trade_org_punishment::waiting_on_the_road(world, size)
 }
 
 // ---- T86.5 (`storing.ts`) --------------------------------------------------------------------------
