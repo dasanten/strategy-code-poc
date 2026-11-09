@@ -163,6 +163,38 @@ pub fn add_rule_orders(kinds: &mut OrderKinds) {
         );
     }
 
+    // T86.5: goods. Carrying and storing, which the default scripts ask for (`pickUp`, `drop`,
+    // `store`, `fetch`).
+    let size = |t: Option<&TerrainMap>| t.map_or(csp_shared::balance::MAP_SIZE, |t| t.size);
+    kinds.insert(
+        "pickUp",
+        fn_kind(
+            Box::new(|w, s, o, _| crate::carrying::validate_pick_up(w, s, o)),
+            Box::new(|w, s, o, _| crate::carrying::apply_pick_up(w, s, o)),
+        ),
+    );
+    kinds.insert(
+        "drop",
+        fn_kind(
+            Box::new(|w, s, o, _| crate::carrying::validate_drop(w, s, o)),
+            Box::new(|w, s, o, _| crate::carrying::apply_drop(w, s, o)),
+        ),
+    );
+    kinds.insert(
+        "store",
+        fn_kind(
+            Box::new(move |w, s, o, t| crate::storing::validate_store(w, s, o, size(t))),
+            Box::new(move |w, s, o, t| crate::storing::apply_store(w, s, o, size(t))),
+        ),
+    );
+    kinds.insert(
+        "fetch",
+        fn_kind(
+            Box::new(move |w, s, o, t| crate::storing::validate_fetch(w, s, o, size(t))),
+            Box::new(move |w, s, o, t| crate::storing::apply_fetch(w, s, o, size(t))),
+        ),
+    );
+
     // T86.7: conflict.
     kinds.insert(
         "attack",
