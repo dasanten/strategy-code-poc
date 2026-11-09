@@ -6,7 +6,7 @@ import {
   SCRIPT_MAX_STRING_LENGTH,
   SCRIPT_MEMORY_MAX,
   SCRIPT_STEP_BUDGET,
-} from '@csp/shared'
+} from '@csp/balance'
 
 /**
  * The Wiki's scripting topics (`CONTEXT.md`: Wiki, Script), kept as data so a test can check

@@ -8,11 +8,12 @@
   },
   "scripts": {
     "build": "tsc -b && pnpm --filter @csp/web build",
-    "typecheck": "tsc -b && pnpm --filter @csp/web typecheck",
+    "typecheck": "tsc -b && pnpm --filter @csp/web typecheck && pnpm --filter @csp/balance typecheck",
     "dev": "pnpm --parallel --filter @csp/server --filter @csp/web dev",
     "start": "pnpm --filter @csp/server start",
     "test": "vitest run",
     "check": "eslint . --cache --cache-location node_modules/.cache/eslint/ && pnpm typecheck && node scripts/check-tests.mjs",
+    "balance:rust": "cargo run -q -p csp-shared --bin write-balance",
     "check:rust": "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo nextest run --workspace",
     "lint": "eslint .",
     "format": "prettier --write ."

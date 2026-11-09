@@ -4,7 +4,6 @@ import {
   AVERAGE_HORSE_STATS,
   BUILD_MATERIALS,
   BUILD_WORK,
-  BUILDABLE,
   CARRIAGE_CAPACITY,
   COMBAT_SKILL_EFFECT,
   COMBAT_SKILL_LIMIT,
@@ -20,7 +19,6 @@ import {
   PRICE_REFERENCE_FLOORS,
   RECIPES,
   STANDING_DRIFT_PER_DAY,
-  STAT_NAMES,
   STRIKE_TICKS,
   TEARDOWN_MATERIALS_RETURNED,
   TEARDOWN_WORK_SHARE,
@@ -35,15 +33,12 @@ import {
   horseFoodFactor,
   Terrain,
   WALL_STRENGTH,
-  WAREHOUSE_BASE_PRICE,
   WAREHOUSE_FLOOR,
   WORK_SKILL_MAX,
   WORK_SKILL_PER_DAY,
   SKILL_MAX,
-  SKILL_NAMES,
   trainedCap,
   trainingGain,
-  type TrainingSubject,
   WORK_STRENGTH_AVERAGE,
   attackPower,
   batchWork,
@@ -58,6 +53,12 @@ import {
   transferFee,
   walkSpeed,
   workOutput,
+} from '@csp/balance'
+import {
+  BUILDABLE,
+  STAT_NAMES,
+  SKILL_NAMES,
+  type TrainingSubject,
   type BuildingKind,
   type CrimeKind,
   type Good,
@@ -69,7 +70,7 @@ import {
 
 /**
  * The Wiki's figures (`CONTEXT.md`: Wiki): everything it says worked out from the balance numbers
- * and functions in `@csp/shared`, so the page types no number itself and never goes stale.
+ * and formulas in `@csp/balance` (the JSON Rust writes), so the page types no number itself and never goes stale.
  */
 
 /** Where the Wiki lives, readable logged in or not. */
@@ -227,11 +228,11 @@ export const foodHalfLifeDays = Math.log(0.5) / Math.log(1 - FOOD_SPOIL_PER_DAY)
 
 // ---------- Prices ----------
 
-export type PricedGood = keyof typeof WAREHOUSE_BASE_PRICE
+export type PricedGood = Exclude<Good, 'coins'>
 
 /** What a warehouse sells and pays for a good when it holds `floors` times its stock floor. */
 export function priceAt(good: PricedGood, floors: number) {
-  const floor = WAREHOUSE_FLOOR[good]
+  const floor = WAREHOUSE_FLOOR[good]!
   return priceFor(good, floors * floor, floor)
 }
 
