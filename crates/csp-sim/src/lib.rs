@@ -63,6 +63,7 @@ pub mod npc_scouts;
 pub mod npc_stable;
 pub mod npc_trader;
 pub mod npc_training;
+pub mod offers;
 pub mod order_kinds;
 pub mod order_sender;
 pub mod orders;

@@ -361,10 +361,12 @@ fn place_npc_cities(world: &mut WorldState, terrain: &TerrainMap) {
 fn request_road_materials(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<CarryAction> {
     Vec::new()
 }
-fn resolve_offers(_world: &mut WorldState, _scratch: &mut Scratch) -> usize {
-    0
+fn resolve_offers(world: &mut WorldState, scratch: &mut Scratch) -> usize {
+    crate::offers::resolve_offers(world, &mut scratch.offers)
 }
-fn step_offers(_world: &mut WorldState, _scratch: &mut Scratch) {}
+fn step_offers(world: &mut WorldState, _scratch: &mut Scratch) {
+    crate::offers::step_offers(world);
+}
 
 // T86.9 (`caravans.ts`, `traders.ts`, `trade-org-army.ts`, `trade-org-punishment.ts`,
 // `trade-org-debt.ts`, `trade-org-wrecks.ts`).

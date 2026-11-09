@@ -473,6 +473,14 @@ pub fn add_later_rule_orders(kinds: &mut OrderKinds) {
 
     // reviving.ts (named by no rule ticket; T86.14).
     kinds.insert("feed", crate::reviving::Feed);
+    // Offers and Direct offers.
+    kinds.insert("postOffer", crate::offers::PostOffer);
+    kinds.insert("takeDownOffer", crate::offers::TakeDownOffer);
+    kinds.insert("acceptOffer", crate::offers::AcceptOffer);
+    kinds.insert("sendDirectOffer", crate::offers::SendDirectOffer);
+    kinds.insert("declineOffer", crate::offers::DeclineOffer);
+    kinds.insert("sendCarriedOffer", crate::offers::SendCarriedOffer);
+    kinds.insert("acceptCarriedOffer", crate::offers::AcceptCarriedOffer);
 
     // T86.11: realms.
     for (name, kind) in crate::alliances::alliance_orders() {
