@@ -500,7 +500,7 @@ fn goods_problem(
     if let Some(p) = demand_hand_over_problem(world, &d.to_id, d, how) {
         return Some(p);
     }
-    let Some(size) = size.filter(|_| d.from_id != TRADE_ORG) else { return None };
+    let size = size.filter(|_| d.from_id != TRADE_ORG)?;
     if how.and_then(|h| h.get("way")).and_then(Value::as_str) != Some("transfer") {
         return None;
     }
