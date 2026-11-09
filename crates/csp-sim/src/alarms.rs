@@ -7,8 +7,6 @@
 //!
 //! [`GameAlarms`] is T86.7's [`Alarms`] trait for the conflict rules.
 
-use std::collections::HashSet;
-
 use csp_shared::balance::{DEFEND_CALM_TICKS, SIGHT_RANGE};
 use csp_shared::footprint::is_at;
 use csp_shared::terrain::wrap_distance;
@@ -21,7 +19,7 @@ use serde_json::json;
 use crate::crimes::{city_organization, organization_of};
 use crate::defence::{end_hold_if_over, Alarms};
 use crate::queries::alliance::commander_of;
-use crate::queries::carriages::{crew_ids_of, driven_carriage_id};
+use crate::queries::carriages::driven_carriage_id;
 use crate::queries::city::town_hall_of;
 use crate::queries::city_area::{in_city_area, occupiers_of};
 use crate::queries::names::placed;
@@ -33,26 +31,8 @@ fn tile(x: f64, y: f64) -> (i32, i32) {
     (x as i32, y as i32)
 }
 
-/// The crews of the Trade Org caravans and wandering traders (`caravanCrew`).
-// TODO(T86.9): `caravans::caravan_crew`.
-fn caravan_crew(world: &WorldState) -> HashSet<String> {
-    let caravans =
-        world.caravans.iter().map(|c| crew_ids_of(c.driver_id.as_deref(), &c.escort_ids));
-    let traders = world.traders.iter().map(|t| crew_ids_of(t.driver_id.as_deref(), &t.escort_ids));
-    caravans.chain(traders).flatten().collect()
-}
-
-/// Those the Trade Org's punishments and supply wagons run (`punishers`).
-// TODO(T86.9): `trade_org::punishers`.
-fn punishers(world: &WorldState) -> HashSet<String> {
-    let mut ids: HashSet<String> = world
-        .punishments
-        .iter()
-        .flat_map(|p| p.members.iter().map(|m| m.resident_id.clone()))
-        .collect();
-    ids.extend(world.supply_wagons.iter().filter_map(|w| w.driver_id.clone()));
-    ids
-}
+use crate::caravans::caravan_crew;
+use crate::queries::trade_org::punishers;
 
 /// The residents an NPC city's plan sends founding (`foundingParty`).
 // TODO(T86.10): `npc_founding::founding_party`.

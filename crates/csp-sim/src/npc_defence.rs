@@ -39,19 +39,9 @@ fn tile(world: &WorldState, i: usize) -> (i32, i32) {
 }
 
 /// Everyone the Trade Organization runs away from their city (`caravanCrew`, `punishers`).
-/// TODO(T86.9): call the ported caravans and punishments.
 fn away_on_trade_org_business(world: &WorldState) -> HashSet<String> {
-    let mut away: HashSet<String> = world
-        .caravans
-        .iter()
-        .flat_map(|c| c.driver_id.iter().chain(&c.escort_ids))
-        .chain(world.traders.iter().flat_map(|t| t.driver_id.iter().chain(&t.escort_ids)))
-        .cloned()
-        .collect();
-    away.extend(
-        world.punishments.iter().flat_map(|p| p.members.iter().map(|m| m.resident_id.clone())),
-    );
-    away.extend(world.supply_wagons.iter().filter_map(|w| w.driver_id.clone()));
+    let mut away = crate::caravans::caravan_crew(world);
+    away.extend(crate::queries::trade_org::punishers(world));
     away
 }
 
@@ -59,12 +49,7 @@ fn away_on_trade_org_business(world: &WorldState) -> HashSet<String> {
 /// TODO(T86.12): call the ported alarms; until then nobody is alarmed by an occupation.
 fn raise_occupied(_world: &mut WorldState, _city: &City, _occupier: &str, _size: i32) {}
 
-/// How big the Trade Org army should be (`tradeOrgArmyWanted` of `trade-org.ts`): at least its
-/// size, more against the strongest armed Organization. TODO(T86.9): port `strongestArmed`; until
-/// then it is its size.
-fn trade_org_army_wanted(_world: &WorldState) -> f64 {
-    TRADE_ORG_ARMY.size
-}
+use crate::queries::trade_org::trade_org_army_wanted;
 
 /// One tick of NPC cities defending themselves (`stepNpcDefence`). Run before `step_npc_cities`, so
 /// the work it hands out passes its soldiers by. `size` is the map's.

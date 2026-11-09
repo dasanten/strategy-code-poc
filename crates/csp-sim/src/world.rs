@@ -380,7 +380,9 @@ fn step_traders(
     _scratch: &mut Scratch,
 ) {
 }
-fn step_trade_org_army(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
+fn step_trade_org_army(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
+    crate::trade_org_army::step_trade_org_army(world, size);
+}
 fn step_punishments(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
 fn resolve_debt_payments(_world: &mut WorldState, _scratch: &mut Scratch) -> usize {
     0

@@ -155,46 +155,7 @@ pub fn contract_side(world: &WorldState, r: &csp_shared::world::Resident) -> Opt
     city.realm_id.is_none().then(|| city.id.clone())
 }
 
-/// The Trade Org HQ's soldiers it can hire out (`spareSoldiers`): its living armed residents off
-/// the caravans, in no contract and on no punishment trip, by id, less the guard it keeps.
-// TODO(T86.9): `trade_org_army::spare_soldiers`.
-pub fn spare_soldiers(world: &WorldState) -> Vec<&csp_shared::world::Resident> {
-    use crate::queries::npc_trade::locale_compare;
-    use crate::queries::residents::is_armed;
-    let Some(hq) = trade_org_hq(world) else { return Vec::new() };
-    let mut crew: HashSet<&str> = HashSet::new();
-    for (driver, escorts) in world
-        .caravans
-        .iter()
-        .map(|c| (&c.driver_id, &c.escort_ids))
-        .chain(world.traders.iter().map(|t| (&t.driver_id, &t.escort_ids)))
-    {
-        crew.extend(driver.as_deref());
-        crew.extend(escorts.iter().map(String::as_str));
-    }
-    let mut named: HashSet<&str> =
-        world.contracts.iter().flat_map(|c| c.resident_ids.iter().map(String::as_str)).collect();
-    named.extend(
-        world.punishments.iter().flat_map(|p| p.members.iter().map(|m| m.resident_id.as_str())),
-    );
-    named.extend(world.supply_wagons.iter().filter_map(|w| w.driver_id.as_deref()));
-    let mut home: Vec<_> = world
-        .residents
-        .iter()
-        .filter(|r| {
-            r.owner.is_none()
-                && r.city_id.as_ref() == Some(&hq.id)
-                && r.health > 0.0
-                && is_armed(&r.carried)
-                && !crew.contains(r.id.as_str())
-                && !named.contains(r.id.as_str())
-        })
-        .collect();
-    home.sort_by(|a, b| locale_compare(&a.id, &b.id));
-    let keep = home.len().saturating_sub(csp_shared::balance::TRADE_ORG_ARMY.guard as usize);
-    home.truncate(keep);
-    home
-}
+pub use crate::trade_org_army::spare_soldiers;
 
 /// The realm a building is of (`buildingRealm`): a site's own realm, else its city's, else its own.
 // TODO(T86.6/T86.8): `queries::city::building_realm`.
