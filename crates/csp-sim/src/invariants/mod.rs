@@ -238,8 +238,7 @@ pub fn world_invariants() -> Vec<Invariant> {
         pending("debt-payments-sound"),
         // TODO(T86.9): `debtOrdersDone` in `trade-org-debt.ts`.
         pending("debt-orders-done"),
-        // TODO(T86.9): `hqRingsSound` in `hq-growth.ts`.
-        pending("hq-rings-sound"),
+        Invariant { name: "hq-rings-sound", check: crate::hq_growth::hq_rings_sound },
         // TODO(T86.10): `cityPlansSound` in `npc-plan.ts`.
         pending("city-plans-sound"),
         // TODO(T86.10): `foundingPartiesSound` in `npc-founding.ts`.
