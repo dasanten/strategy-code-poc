@@ -137,6 +137,12 @@ pub fn task_of(r: &Resident) -> Option<Task> {
     r.script.as_ref().and_then(|s| s.task)
 }
 
+mod invariants;
 mod run;
+#[cfg(test)]
+mod tests;
 
+pub use invariants::{
+    npc_idle_off_the_storage, npc_residents_kept_going, npc_road_crew_sized, npc_soldiers_on_posts,
+};
 pub use run::step_npc_cities;

@@ -376,3 +376,6 @@ pub fn give_horses_to_npc_cities(world: &mut WorldState, terrain: &TerrainMap) {
         give_npc_horses(world, terrain, &id);
     }
 }
+
+#[cfg(test)]
+mod tests;

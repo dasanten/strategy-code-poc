@@ -155,3 +155,6 @@ mod tests {
     // "a city shares out its adults by the scores" runs `planCity`: those tests come with
     // `npc_plan`.
 }
+
+#[cfg(test)]
+mod share_tests;
