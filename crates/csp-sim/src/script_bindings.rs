@@ -12,7 +12,7 @@
 //! builds plain objects, then turned into a script value through the query's view.
 
 use std::cell::OnceCell;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use csp_lang::interpreter::{CallError, Host, HostError};
@@ -244,16 +244,16 @@ pub fn view_value(data: &Json, ty: ScriptType) -> Value {
         (Json::String(s), ScriptType::String) => Value::string(s),
         (Json::Bool(b), ScriptType::Boolean) => Value::Bool(*b),
         (Json::Array(items), ScriptType::List(of)) => {
-            Value::list(items.iter().map(|d| view_value(d, *of)).collect()).freeze()
+            // Each item comes out frozen already.
+            Value::frozen_list(items.iter().map(|d| view_value(d, *of)).collect())
         }
         (Json::Object(record), ScriptType::View(view)) => {
             let fields = script_view(view).map_or(&[][..], |v| v.fields);
-            Value::object(
+            Value::frozen_fields(
                 fields.iter().map(|f| {
                     (f.name, view_value(record.get(f.name).unwrap_or(&Json::Null), f.r#type))
                 }),
             )
-            .freeze()
         }
         _ => Value::Null,
     }
@@ -360,12 +360,6 @@ fn js_stringify(v: &Json) -> String {
     }
 }
 
-/// What a native function of a run stands for.
-#[derive(Clone, Copy)]
-enum Native {
-    Binding(&'static ScriptBinding),
-}
-
 /// The game API bound for one run (`ScriptBindings`): the globals the interpreter asks for, and
 /// what the run asked for.
 pub struct ScriptBindings<'a> {
@@ -374,8 +368,6 @@ pub struct ScriptBindings<'a> {
     resident: Option<usize>,
     api: &'static [ScriptBinding],
     for_me: (&'static str, String),
-    globals: HashMap<String, Value>,
-    natives: Vec<Native>,
     random: f64,
     seen: OnceCell<Arc<Vec<SeenEntity>>>,
     eyes: OnceCell<Arc<Eyes>>,
@@ -417,14 +409,12 @@ pub fn bind_script(ctx: ScriptContext<'_>) -> Result<ScriptBindings<'_>, HostErr
         (None, None) => return Err(HostError("a script runs for a resident or an army".into())),
     };
     let random = tick_random(world);
-    let mut b = ScriptBindings {
+    let b = ScriptBindings {
         ctx,
         side,
         resident,
         api,
         for_me,
-        globals: HashMap::new(),
-        natives: Vec::new(),
         random,
         seen: OnceCell::new(),
         eyes: OnceCell::new(),
@@ -435,7 +425,6 @@ pub fn bind_script(ctx: ScriptContext<'_>) -> Result<ScriptBindings<'_>, HostErr
         waited: false,
         logged: Vec::new(),
     };
-    b.bind_globals();
     Ok(b)
 }
 
@@ -1570,28 +1559,25 @@ impl<'a> ScriptBindings<'a> {
         view_value(&Json::Object(data), ty)
     }
 
-    fn bind_globals(&mut self) {
-        let world = self.world();
-        let side = self.side.clone();
-        let debt = side.as_deref().map_or(0.0, |s| debt_of(world, s));
-        for b in self.api {
-            let value = match (b.is, b.name) {
-                (Is::Value, "me") => self.me_value(),
-                (Is::Value, "memory") => Value::Object(self.ctx.memory.clone()),
-                (Is::Value, "params") => self.params_value(),
-                (Is::Value, "debt") => Value::Number(debt),
-                (Is::Value, "tick") => Value::Number(world.tick as f64),
-                (Is::Value, "mapSize") => Value::Number(f64::from(self.size())),
-                (Is::Value, "random") => Value::Number(self.random),
-                (Is::Value, other) => panic!("no value {other} to bind"),
-                _ => {
-                    let id = self.natives.len() as u32;
-                    self.natives.push(Native::Binding(b));
-                    Value::native(b.name, id, b.cost as u64)
-                }
-            };
-            self.globals.insert(b.name.to_string(), value);
-        }
+    /// The global `name` of the API (`bindScript`'s globals), made when the script first reads it:
+    /// the interpreter asks at most once per name in a run, and the world doesn't change during
+    /// one, so this is what binding them all up front gave, without building the ones a run never
+    /// reads. A native function's id is its binding's place in the API.
+    fn bind_global(&self, name: &str) -> Option<Value> {
+        let (id, b) = self.api.iter().enumerate().find(|(_, b)| b.name == name)?;
+        Some(match (b.is, b.name) {
+            (Is::Value, "me") => self.me_value(),
+            (Is::Value, "memory") => Value::Object(self.ctx.memory.clone()),
+            (Is::Value, "params") => self.params_value(),
+            (Is::Value, "debt") => {
+                Value::Number(self.side.as_deref().map_or(0.0, |s| debt_of(self.world(), s)))
+            }
+            (Is::Value, "tick") => Value::Number(self.world().tick as f64),
+            (Is::Value, "mapSize") => Value::Number(f64::from(self.size())),
+            (Is::Value, "random") => Value::Number(self.random),
+            (Is::Value, other) => panic!("no value {other} to bind"),
+            _ => Value::native(b.name, id as u32, b.cost as u64),
+        })
     }
 
     /// The helpers (`scriptHelpers`): `floor(n)`, and `pickRandom(list)`.
@@ -1619,11 +1605,11 @@ impl<'a> ScriptBindings<'a> {
 
 impl Host for ScriptBindings<'_> {
     fn global(&mut self, name: &str) -> Option<Value> {
-        self.globals.get(name).cloned()
+        self.bind_global(name)
     }
 
     fn call(&mut self, function: &NativeFunction, args: Vec<Value>) -> Result<Value, CallError> {
-        let Some(&Native::Binding(b)) = self.natives.get(function.id as usize) else {
+        let Some(b) = self.api.get(function.id as usize).filter(|b| b.is != Is::Value) else {
             return Err(host_error(format!("no native function {}", function.name)));
         };
         if let Some(answer) = self.helper(b.name, &args) {
