@@ -72,3 +72,8 @@ fn answers_json_in_the_typescript_shapes() {
         1
     );
 }
+
+#[test]
+fn the_script_name_length_is_the_servers() {
+    assert_eq!(csp_lang_wasm::SCRIPT_NAME_MAX_LENGTH, csp_server::scripts::SCRIPT_NAME_MAX_LENGTH);
+}

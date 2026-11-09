@@ -14,6 +14,7 @@
   ],
   "paramsShape": "$params",
   "residentOrArmy": "residentOrArmy",
+  "scriptNameMaxLength": 40,
   "paramDescriptions": {
     "building": "One of my realm’s buildings, or a workplace or construction site of anyone’s I know: in sight, or as last seen.",
     "storage": "One of my realm’s storages or stables, or one of its carriages.",

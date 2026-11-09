@@ -205,6 +205,7 @@ pub fn script_data() -> String {
         "keywords": KEYWORDS,
         "paramsShape": PARAMS_SHAPE,
         "residentOrArmy": RESIDENT_OR_ARMY,
+        "scriptNameMaxLength": SCRIPT_NAME_MAX_LENGTH,
         "paramDescriptions": param_descriptions,
         "scriptViews": views,
         "scriptApi": SCRIPT_API.iter().map(binding_json).collect::<Vec<_>>(),
@@ -215,6 +216,10 @@ pub fn script_data() -> String {
     text.push('\n');
     text
 }
+
+/// Script names are at most this many characters (`SCRIPT_NAME_MAX_LENGTH`, the server's in
+/// `csp-server`, which this crate can't depend on; a test keeps the two the same).
+pub const SCRIPT_NAME_MAX_LENGTH: usize = 40;
 
 /// Where the `script-data` binary writes [`script_data`], from the repository root.
 pub const SCRIPT_DATA_PATH: &str = "packages/lang-wasm/script-data.json";
