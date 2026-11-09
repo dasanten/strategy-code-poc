@@ -402,7 +402,7 @@ mod caravans_carrying_out_transfers {
     }
 
     #[test]
-    #[ignore = "since merging T86.8 and T86.13 the run does not finish within 60 s: to diagnose (T86.9 PR)"]
+    #[ignore = "slow in the TypeScript too (`tags: ['slow']`): 20-30 s here with the HQ's default scripts every tick, for T86.14's long simulations"]
     fn take_what_the_senders_storage_holds_with_a_fee_for_what_it_takes() {
         let mut s = setup();
         let (st, to) = (s.storage_of(7), s.storage_of(8));
@@ -417,7 +417,7 @@ mod caravans_carrying_out_transfers {
     }
 
     #[test]
-    #[ignore = "since merging T86.8 and T86.13 the run does not finish within 60 s: to diagnose (T86.9 PR)"]
+    #[ignore = "slow in the TypeScript too (`tags: ['slow']`): 20-30 s here with the HQ's default scripts every tick, for T86.14's long simulations"]
     fn drop_a_transfer_the_senders_storage_holds_none_of() {
         let mut s = setup();
         let st = s.storage_of(7);

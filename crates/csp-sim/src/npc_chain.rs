@@ -277,3 +277,6 @@ pub fn warehouse_for<'w>(
         .into_iter()
         .find(|b| warehouse_keeps(world, b).iter().any(|g| kept.contains(g)))
 }
+
+#[cfg(test)]
+mod tests;
