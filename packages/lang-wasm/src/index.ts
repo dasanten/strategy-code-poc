@@ -110,6 +110,10 @@ export function loadLang(): Promise<void> {
   return loading
 }
 
+// In Node (Vitest, tools) the module loads as this file is imported, so code that runs there,
+// like the Wiki's tests, needs no `loadLang()`; a browser fetches it only on first use.
+if (WASM_URL.protocol === 'file:') await loadLang()
+
 /** Whether the checker has loaded, so the checks below can run. */
 export function isLangLoaded(): boolean {
   return loaded
