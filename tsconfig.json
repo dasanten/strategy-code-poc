@@ -3,6 +3,7 @@
   "references": [
     { "path": "packages/lang" },
     { "path": "packages/shared" },
+    { "path": "packages/shared-types" },
     { "path": "apps/server" }
   ]
 }

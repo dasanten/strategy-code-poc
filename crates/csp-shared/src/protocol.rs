@@ -6,6 +6,7 @@
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 use crate::world::horse_market::NpcHorseOffer;
 use crate::world::npc_trade::ShownNpcCityPrice;
@@ -14,13 +15,13 @@ use crate::world::protocol::Hire;
 use crate::world::warehouse::ShownWarehousePrice;
 use crate::world::{
     AlarmScriptId, ArmyOrder, Building, BuildingKind, Carrying, City, Good, Heading, HorseStats,
-    OrderEnded, Pair, Pile, Queue, ResidentOrder, ScriptParamValue, ScriptParamValues, SkillName,
-    Stat, StatRecord, Stock, Struck, Task, Tile,
+    OrderEnded, Pair, Pile, PricedGood, Queue, ResidentOrder, ScriptParamValue, ScriptParamValues,
+    SkillName, Stat, StatRecord, Stock, Struck, Task, Tile,
 };
 
 /// How heavily a carriage looks loaded to a Player who can't see its load (`LoadLevel`,
 /// `CONTEXT.md`: Seeing inside a storage).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum LoadLevel {
     Empty,
@@ -32,9 +33,11 @@ pub enum LoadLevel {
 
 /// The line a Build line task builds (`BuildLine`, `TaskMemory`): a road or wall from one tile to
 /// another.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
 pub struct BuildLine {
+    /// Only a road or a wall is built along a line.
+    #[ts(type = "\"road\" | \"wall\"")]
     pub building: BuildingKind,
     pub from: Tile,
     pub to: Tile,
@@ -42,27 +45,35 @@ pub struct BuildLine {
 
 /// What a Player sees of the script a resident runs (`SeenScript`): which one, and for the owning
 /// Player what goes into the resident's Doing line (`CONTEXT.md`: Doing).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SeenScript {
     pub script_id: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub task: Option<Task>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub building: Option<BuildingKind>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub doing: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub line: Option<BuildLine>,
     /// Always `true` when present (`waiting?: true`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "true")]
     pub waiting: Option<bool>,
     /// Always `true` when present (`site?: true`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "true")]
     pub site: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub settings_from: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub params: Option<IndexMap<String, ScriptParamValue>>,
 }
 
@@ -84,11 +95,12 @@ impl SeenScript {
 }
 
 /// What a defence script interrupted, as the owning Player sees it (`SeenInterrupted`).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
 pub struct SeenInterrupted {
     pub order: Option<ResidentOrder>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub script: Option<SeenScript>,
 }
 
@@ -96,12 +108,13 @@ pub struct SeenInterrupted {
 /// memory, script log and whether an order stands against blows; how they fare (hunger, health,
 /// when a strike or Down ends) only for their own realm and allies, their script params only for
 /// the realm commanding them.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SeenResident {
     pub id: String,
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "true")]
     pub game_name: Option<bool>,
     pub owner: Option<String>,
     pub city_id: Option<String>,
@@ -110,54 +123,72 @@ pub struct SeenResident {
     pub stats: StatRecord<Stat>,
     pub skills: IndexMap<SkillName, f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub health: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub hunger: Option<f64>,
     pub born_at: f64,
     pub lifespan: f64,
     pub carried: Stock,
     pub order: Option<ResidentOrder>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub order_ended: Option<OrderEnded>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub struck: Option<Struck>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub script: Option<SeenScript>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub interrupted: Option<SeenInterrupted>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub defence_script_id: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub alarm_script_id: Option<AlarmScriptId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub script_params: Option<ScriptParamValues>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub queue: Option<Queue>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub pair: Option<Pair>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub carrying: Option<Carrying>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub riding: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub aboard: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub down_until: Option<f64>,
     /// Set (to `true`) while they are Down, which anyone in sight sees.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "true")]
     pub down: Option<bool>,
 }
 
 /// A building as Players see it (`SeenBuilding`): its stock and a stable's breeding progress only
 /// when they see inside, a Trade Org warehouse's prices and a storage's offers either way.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct SeenBuilding {
     #[serde(flatten)]
     pub building: Building,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub prices: Option<Vec<ShownWarehousePrice>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub offers: Option<Vec<SeenOffer>>,
 }
 
@@ -165,32 +196,39 @@ pub struct SeenBuilding {
 /// who is in its area and whom it is alarmed by; who occupies it only with its town hall in sight;
 /// for an NPC city its price or that it won't sell, that it refuses them, what it would lend and
 /// its trade prices, and its horses in sight at its stables.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct SeenCity {
     #[serde(flatten)]
     pub city: City,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub price: Option<f64>,
     /// Always `true` when present.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "true")]
     pub wont_sell: Option<bool>,
     /// Always `true` when present.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "true")]
     pub refuses: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub hire: Option<Hire>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub trade: Option<Vec<ShownNpcCityPrice>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub horses: Option<Vec<NpcHorseOffer>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub horses_to_sell: Option<Vec<NpcHorseOffer>>,
 }
 
 /// A horse as Players see it (`SeenHorse`): its hunger and health, and when its Down ends, only for
 /// its own realm and allies; that it is Down for anyone.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SeenHorse {
     pub id: String,
@@ -200,45 +238,67 @@ pub struct SeenHorse {
     pub x: f64,
     pub y: f64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub hunger: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub health: Option<f64>,
     pub stats: HorseStats,
     pub born_at: f64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub down_until: Option<f64>,
     /// Set (to `true`) while it is Down.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "true")]
     pub down: Option<bool>,
 }
 
+/// What `SeenCarriage` is in TypeScript, written out: `Carriage` with a load or a load level, and
+/// `loadLevel`, `passengerIds` and `standsStill` optional as the TypeScript has them, though the
+/// server always sends them.
+#[derive(TS)]
+#[ts(
+    type = "(Carriage & { loadLevel?: LoadLevel } | Omit<Carriage, 'load'> & { load?: undefined, loadLevel: LoadLevel }) & { passengerIds?: string[], standsStill?: boolean }",
+    rename = "SeenCarriage"
+)]
+struct SeenCarriageTwin;
+
 /// A carriage as Players see it (`SeenCarriage`): how heavily it is loaded, its load only for
 /// those who see inside, who is aboard and whether anything moves it.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(as = "SeenCarriageTwin")]
 pub struct SeenCarriage {
     pub id: String,
+    #[serde(rename = "realmId")]
     pub realm_id: Option<String>,
+    #[serde(rename = "cityId")]
     pub city_id: Option<String>,
     pub x: f64,
     pub y: f64,
+    #[serde(rename = "horseId")]
     pub horse_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub load: Option<Stock>,
+    #[serde(rename = "loadLevel")]
     pub load_level: LoadLevel,
+    #[serde(rename = "passengerIds")]
     pub passenger_ids: Vec<String>,
+    #[serde(rename = "standsStill")]
     pub stands_still: bool,
 }
 
 /// Which script an army runs, without its memory.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ScriptIdOnly {
     pub script_id: u64,
 }
 
 /// An army as its Player sees it (`SeenArmy`): which script it runs, not its memory.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SeenArmy {
     pub id: String,
@@ -247,11 +307,12 @@ pub struct SeenArmy {
     pub member_ids: Vec<String>,
     pub order: Option<ArmyOrder>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub script: Option<ScriptIdOnly>,
 }
 
 /// A caravan as Players see it while its carriage or any of its crew is in sight (`SeenCaravan`).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SeenCaravan {
     pub id: String,
@@ -263,7 +324,7 @@ pub struct SeenCaravan {
 }
 
 /// Where a wandering trader stands at a stop, and until when (`StandingTrader`).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct StandingTrader {
     pub city_id: String,
@@ -274,19 +335,21 @@ pub struct StandingTrader {
 
 /// A wandering trader's price line as a Player saw it (`Shown<TraderPrice>`): what it holds only
 /// when they see inside its carriage.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
 pub struct ShownTraderPrice {
+    #[ts(as = "PricedGood")]
     pub good: Good,
     pub buy: f64,
     pub sell: f64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub stock: Option<f64>,
 }
 
 /// A wandering trader as Players see it (`SeenTrader`): where it stands and its prices while it
 /// stands at a stop.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SeenTrader {
     pub id: String,
@@ -296,13 +359,15 @@ pub struct SeenTrader {
     pub escort_ids: Vec<String>,
     pub heading: Heading,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub standing: Option<StandingTrader>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub prices: Option<Vec<ShownTraderPrice>>,
 }
 
 /// Something a Player sees (`SeenEntity`), tagged by `is`. Ids are unique across all of them.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(tag = "is", rename_all = "camelCase")]
 pub enum SeenEntity {
     /// Boxed: a resident carries far more than anything else seen.

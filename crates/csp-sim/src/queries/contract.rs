@@ -5,6 +5,7 @@
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{ContractSide, MercenaryContract, WorldState};
 use serde::Serialize;
+use ts_rs::TS;
 
 use crate::realm_pending::organization_label;
 
@@ -39,24 +40,25 @@ pub fn contract_pay_by(c: &MercenaryContract) -> Option<f64> {
 
 /// A side of a contract as a Player sees it (`RealmLabel`): its id and its name, and for an NPC
 /// city that may be an alliance member, `city`.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct RealmLabel {
     pub realm_id: String,
     pub realm: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "true")]
     pub city: Option<bool>,
 }
 
 /// A rented resident in a `ContractView`.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 pub struct ContractResident {
     pub id: String,
     pub name: String,
 }
 
 /// The storage a contract is paid into, where it stands.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 pub struct ContractStorage {
     pub id: String,
     pub x: f64,
@@ -64,7 +66,7 @@ pub struct ContractStorage {
 }
 
 /// A mercenary contract as one of its sides sees it (`ContractView`).
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct ContractView {
     pub id: String,

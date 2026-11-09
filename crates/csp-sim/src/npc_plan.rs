@@ -63,6 +63,19 @@ pub fn plan_due(world: &WorldState, city_id: &str) -> bool {
 /// there who belong to no realm, except a caravan's crew, a hired-out resident and a punisher. Those
 /// three don't go on with the city's Work default either.
 pub fn run_residents(world: &mut WorldState) -> IndexMap<String, Vec<usize>> {
+    let (out, away) = runners(world);
+    for i in away {
+        if world.residents[i].script.as_ref().is_some_and(|s| s.script_id == 0) {
+            world.residents[i].script = None;
+        }
+    }
+    out
+}
+
+/// What [`run_residents`] finds without changing the world: the residents each city runs, and
+/// those of its people away on other business, whose Work default it ends. The invariants read it
+/// (`runResidents` in a TypeScript invariant also ends those defaults; the step does that anyway).
+pub fn runners(world: &WorldState) -> (IndexMap<String, Vec<usize>>, Vec<usize>) {
     // `caravanCrew` (T86.9) and `punishers` (T86.9): who is away on the Trade Org's business.
     let mut away: HashSet<String> = world
         .caravans
@@ -76,21 +89,19 @@ pub fn run_residents(world: &mut WorldState) -> IndexMap<String, Vec<usize>> {
     );
     away.extend(world.supply_wagons.iter().filter_map(|w| w.driver_id.clone()));
     let mut out: IndexMap<String, Vec<usize>> = IndexMap::new();
-    for i in 0..world.residents.len() {
-        let r = &world.residents[i];
+    let mut gone = Vec::new();
+    for (i, r) in world.residents.iter().enumerate() {
         let Some(city) = r.city_id.clone() else { continue };
         if r.owner.is_some() {
             continue;
         }
         if away.contains(&r.id) || contract_of(world, &r.id).is_some() {
-            if world.residents[i].script.as_ref().is_some_and(|s| s.script_id == 0) {
-                world.residents[i].script = None;
-            }
+            gone.push(i);
             continue;
         }
         out.entry(city).or_default().push(i);
     }
-    out
+    (out, gone)
 }
 
 /// Whether a city's Food runs short (`foodShort`): its storages hold less than its residents eat
@@ -822,3 +833,13 @@ pub fn trade_org_sends_no_one(world: &WorldState) -> Vec<InvariantViolation> {
     }
     out
 }
+
+mod invariants;
+pub(crate) use invariants::violation;
+pub use invariants::{
+    city_plans_sound, npc_farmers_kept, npc_spare_hands_work, npc_surplus_capped,
+    npc_workplaces_bounded,
+};
+
+#[cfg(test)]
+mod tests;

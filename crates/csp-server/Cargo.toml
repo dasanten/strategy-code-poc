@@ -29,6 +29,7 @@ getrandom = "0.4"
 indexmap.workspace = true
 scrypt = { version = "0.11", default-features = false }
 csp-lang.workspace = true
+ts-rs.workspace = true
 axum = { version = "0.8", features = ["ws"] }
 tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "time", "signal", "sync", "fs"] }
 tower = { version = "0.5", features = ["util"] }

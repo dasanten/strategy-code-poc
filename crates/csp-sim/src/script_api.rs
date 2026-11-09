@@ -6,6 +6,7 @@
 
 use csp_lang::{ParamInfo, ParamType, PARAM_TYPES};
 use serde_json::Value;
+use ts_rs::TS;
 
 use crate::script_views::ScriptType;
 
@@ -13,7 +14,8 @@ pub use crate::script_tables::{ARMY_SCRIPT_API, PARAM_DESCRIPTIONS, SCRIPT_API};
 
 /// What a name of the game API is (`ScriptBinding.is`): a value read like a variable, a query or
 /// an action called.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, TS)]
+#[ts(rename_all = "lowercase")]
 pub enum Is {
     Value,
     Query,
@@ -22,11 +24,13 @@ pub enum Is {
 
 /// One name of the game API (`ScriptBinding`). `cost` is the steps one call costs on top of the
 /// 1 every evaluated node costs; `returns` is what a value holds or a call answers.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, TS)]
+#[ts(rename_all = "camelCase")]
 pub struct ScriptBinding {
     pub name: &'static str,
     pub is: Is,
     /// The arguments, by name; a `?` marks one that may be left out.
+    #[ts(type = "readonly string[]")]
     pub params: &'static [&'static str],
     pub cost: f64,
     pub description: &'static str,

@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+import * as balance from '@csp/balance'
 import {
   BATCHES_PER_DAY,
   BUILD_MATERIALS,
@@ -23,8 +24,7 @@ import {
   hungerFactor,
   teardownReturns,
   workOutput,
-  type Building,
-} from '@csp/shared'
+} from '@csp/balance'
 import {
   AVERAGE,
   buildCosts,
@@ -86,7 +86,7 @@ describe('wiki figures', () => {
     for (const b of buildCosts()) {
       expect(b.buildTicks).toBeCloseTo(BUILD_WORK[b.kind]! / buildWork(AVERAGE, 0))
       expect(b.teardownTicks).toBeLessThan(b.buildTicks)
-      expect(b.returned).toEqual(teardownReturns({ kind: b.kind } as Building))
+      expect(b.returned).toEqual(teardownReturns(b.kind))
     }
   })
 
@@ -138,6 +138,18 @@ describe('wiki page', () => {
     } while (source !== before)
     const text = source.replace(/<[^>]*>/g, ' ')
     expect(text.match(/[^\n]*\d[^\n]*/g) ?? []).toEqual([])
+  })
+
+  it('imports no number from @csp/shared: they come from the JSON Rust writes (@csp/balance)', () => {
+    for (const file of ['Wiki.tsx', 'wiki-view.ts', 'wiki-scripting.ts']) {
+      const source = fs.readFileSync(new URL(`./${file}`, import.meta.url), 'utf8')
+      const shared = [...source.matchAll(/import\s*\{([^}]*)\}\s*from\s*'@csp\/shared'/g)]
+        .flatMap((m) => m[1]!.split(','))
+        .map((name) => name.trim())
+        .filter((name) => name && !name.startsWith('type '))
+      // What stays on @csp/shared is lists and names (rules' words, not numbers): T88.2 and T88.3.
+      expect(shared.filter((name) => name in balance)).toEqual([])
+    }
   })
 
   it('changes when a balance number changes', () => {
