@@ -136,10 +136,9 @@ pub use crate::breeding::end_breeding_of;
 
 pub use crate::transfers::hand_in;
 
-/// Takes an offer out of the world (`endOffer`). TODO(offers): the lines in the realm logs it
-/// writes come with the offers port.
+/// Takes an offer used up out of the world, with its lines in the realm logs (`endOffer`).
 pub fn end_offer(world: &mut WorldState, offer_id: &str) {
-    world.offers.retain(|o| o.id != offer_id);
+    crate::offers::end_offer(world, offer_id, csp_shared::world::OfferEnd::UsedUp);
 }
 
 /// A realm's name for the log (`realmName` of `alliance.ts`).

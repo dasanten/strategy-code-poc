@@ -877,17 +877,9 @@ fn wagon_food(world: &WorldState, r: &Resident, size: i32) -> Option<usize> {
     near_with_food(world, r, i, size)
 }
 
-/// A realm's mercenary contracts end on its Leader's death (`endContractsOnLeaderDeath` of
-/// `contracts.ts`). TODO(T86.11): call the ported one; until then the contracts stay.
-fn end_contracts_on_leader_death(_world: &mut WorldState, _realm_id: &str) {}
-
-/// A realm's demands lapse on its Leader's death (`lapseDemandsOnLeaderDeath` of `demands.ts`).
-/// TODO(T86.11): call the ported one; until then the demands stay.
-fn lapse_demands_on_leader_death(_world: &mut WorldState, _realm_id: &str) {}
-
-/// A realm leaves its alliance on its Leader's death (`leaveOnLeaderDeath` of `alliances.ts`).
-/// TODO(T86.11): call the ported one; until then it stays a member.
-fn leave_on_leader_death(_world: &mut WorldState, _realm_id: &str) {}
+use crate::alliances::leave_on_leader_death;
+use crate::contracts::end_contracts_on_leader_death;
+use crate::demands::lapse_demands_on_leader_death;
 
 #[cfg(test)]
 mod self_managed_tests;
