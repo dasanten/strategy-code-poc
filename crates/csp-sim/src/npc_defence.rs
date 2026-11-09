@@ -499,3 +499,6 @@ pub fn npc_gate_shut_to_its_punishers(world: &WorldState, size: i32) -> Vec<Inva
     }
     out
 }
+
+#[cfg(test)]
+mod tests;

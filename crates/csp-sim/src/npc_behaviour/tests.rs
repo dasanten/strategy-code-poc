@@ -212,8 +212,14 @@ fn puts_residents_on_the_farms_first_when_food_runs_short() {
     let at = (farm.x + f64::from(FOOTPRINT.get("farm").unwrap()), farm.y);
     let size = terrain.size;
     terrain.tiles[(at.1 as i32 * size + at.0 as i32) as usize] = Terrain::Forest as u8;
-    world.nodes.push(ResourceNode { id: "n1".into(), kind: ResourceKind::Forest, x: at.0, y: at.1 });
-    let camp = crate::test_support::building("camp", BuildingKind::LumberCamp, Some(&city), at.0, at.1);
+    world.nodes.push(ResourceNode {
+        id: "n1".into(),
+        kind: ResourceKind::Forest,
+        x: at.0,
+        y: at.1,
+    });
+    let camp =
+        crate::test_support::building("camp", BuildingKind::LumberCamp, Some(&city), at.0, at.1);
     world.buildings.push(camp.clone());
     let r = &mut world.residents[0];
     (r.x, r.y, r.script) = (at.0, at.1, None);
@@ -257,4 +263,3 @@ fn a_players_city_whose_leader_died_runs_on_its_own_player_only_orders_ended() {
     step_npc_cities(&mut world, terrain.size, None, None);
     assert!(check_all(&world, terrain).iter().all(|v| v.invariant != "npc-orders-allowed"));
 }
-

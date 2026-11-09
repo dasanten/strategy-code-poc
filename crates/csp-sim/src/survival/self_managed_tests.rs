@@ -221,9 +221,8 @@ fn tells_the_player_what_became_of_each_city_and_where_it_stands() {
 
     end_realm(&mut world, &realm, terrain.size);
 
-    let living = |c: &str| {
-        world.residents.iter().filter(|r| r.city_id.as_deref() == Some(c)).count() as f64
-    };
+    let living =
+        |c: &str| world.residents.iter().filter(|r| r.city_id.as_deref() == Some(c)).count() as f64;
     let ((x1, y1), (x2, y2)) = (hall_of(&world, &first), hall_of(&world, &second));
     let name = world.cities.iter().find(|c| c.id == first).unwrap().name.clone();
     let event = serde_json::to_value(world.events.last().unwrap()).unwrap();

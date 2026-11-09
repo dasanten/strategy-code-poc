@@ -212,8 +212,7 @@ fn follow_run(f: &mut Fixture) -> (Option<String>, Option<Stock>) {
 
 #[test]
 #[ignore = "a trade run of 8 game days walked tick by tick: the NPC scripts cost ~70 µs a run to bind and interpret; T86.14 makes it fast"]
-fn a_village_with_60_surplus_wood_sends_one_resident_who_comes_back_with_iron_when_iron_is_short()
-{
+fn a_village_with_60_surplus_wood_sends_one_resident_who_comes_back_with_iron_when_iron_is_short() {
     let mut f = village_and_post(true);
     let wood_before = f.held(&f.warehouse.clone(), Good::Wood);
     let (trader, home) = follow_run(&mut f);
@@ -248,10 +247,10 @@ fn a_trader_who_dies_is_replaced_only_after_the_give_up_time() {
     let mut f = village_and_post(true);
     f.plan();
     let first = f.runs()[0].resident_id.clone();
-    assert_eq!(f.traders(), [first.clone()]);
+    assert_eq!(f.traders(), std::slice::from_ref(&first));
     // Two traders never: the next pass keeps the one out.
     f.plan();
-    assert_eq!(f.traders(), [first.clone()]);
+    assert_eq!(f.traders(), std::slice::from_ref(&first));
     f.world.residents.retain(|r| r.id != first);
     f.world.tick += (NPC_TRADER_GIVE_UP_DAYS * TICKS_PER_GAME_DAY / 2.0) as u64;
     f.plan();
@@ -542,7 +541,8 @@ fn flags_more_sent_than_its_size_allows_past_one_for_a_death() {
         .filter(|r| jobs.get(&r.id).is_none_or(|j| j.kind != CityJobKind::Trade))
         .map(|r| r.id.clone())
         .collect();
-    let extra = |f: &Fixture, id: &str| CityTrader { resident_id: id.into(), ..f.runs()[0].clone() };
+    let extra =
+        |f: &Fixture, id: &str| CityTrader { resident_id: id.into(), ..f.runs()[0].clone() };
     let one = extra(&f, &others[0]);
     f.runs_mut().push(one);
     assert_eq!(npc_traders_sound(&f.world), []);
@@ -556,7 +556,9 @@ fn does_not_flag_more_out_than_its_size_allows_now_sent_before_it_shrank() {
     let mut f = staged();
     let kept: HashSet<String> = f.runs().iter().map(|t| t.resident_id.clone()).collect();
     let city = f.city.clone();
-    f.world.residents.retain(|r| r.city_id.as_deref() != Some(city.as_str()) || kept.contains(&r.id));
+    f.world
+        .residents
+        .retain(|r| r.city_id.as_deref() != Some(city.as_str()) || kept.contains(&r.id));
     f.world.tick += 1;
     assert_eq!(npc_traders_sound(&f.world), []);
 }

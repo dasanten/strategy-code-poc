@@ -2,13 +2,13 @@
 //! city idle and short of nothing for a game week sends a founding party to a free site, which
 //! builds a town hall there and grows into a village of its own.
 
+use csp_shared::balance::ticks_for_age;
 use csp_shared::balance::{
     BUILD_MATERIALS, FOOD_PER_DAY, FOOD_SURPLUS_DAYS, NPC_CITY_MIN_DISTANCE,
     NPC_FOUND_GIVE_UP_DAYS, NPC_FOUND_PARTY_MOST, NPC_FOUND_REACH, NPC_FOUND_STANDING,
     NPC_FOUND_VILLAGE_RESIDENTS, NPC_FULL_DAYS, NPC_FULL_DAYS_LEAST, NPC_FULL_DIP_DAYS, NPC_TOWN,
     NPC_TRADE, NPC_VILLAGE, WALK_TICKS_PER_TILE,
 };
-use csp_shared::balance::ticks_for_age;
 use csp_shared::terrain::{tile_index, wrap_distance, Terrain, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
@@ -128,7 +128,12 @@ fn full_town(size: i32) -> Town {
 
 /// Runs the world for up to `ticks`, or until `done`, checking the invariants every game day
 /// (`run`).
-fn run(world: &mut WorldState, terrain: &TerrainMap, ticks: usize, done: &dyn Fn(&WorldState) -> bool) {
+fn run(
+    world: &mut WorldState,
+    terrain: &TerrainMap,
+    ticks: usize,
+    done: &dyn Fn(&WorldState) -> bool,
+) {
     let mut runner = Runner::new(terrain);
     for _ in 0..ticks {
         if done(world) {
@@ -241,7 +246,8 @@ fn a_big_city_founds_sooner_than_a_week_and_sends_more_with_more_materials() {
         .filter(|id| {
             t.world.residents.iter().any(|r| {
                 &r.id == *id
-                    && (held(&r.carried, Good::Spear) != 0.0 || held(&r.carried, Good::Sword) != 0.0)
+                    && (held(&r.carried, Good::Spear) != 0.0
+                        || held(&r.carried, Good::Sword) != 0.0)
             })
         })
         .count();
@@ -314,8 +320,15 @@ fn looks_for_its_daughter_on_no_realm_territory_near_a_node_of_what_it_lacks() {
     // realm's territory, so its sites would go there if nothing stopped them.
     let mx = (hall.x as i32 - 700 + terrain.size) % terrain.size;
     let mut m = Mulberry32::new(9.0);
-    let city =
-        found_npc_city(&mut world, &terrain, &NPC_VILLAGE, mx, hall.y as i32 - 14, &mut || m.next(), None);
+    let city = found_npc_city(
+        &mut world,
+        &terrain,
+        &NPC_VILLAGE,
+        mx,
+        hall.y as i32 - 14,
+        &mut || m.next(),
+        None,
+    );
     let home = npc_home(&world, &city).unwrap().clone();
     node(&mut world, &mut terrain, ResourceKind::Forest, home.x + 30.0, home.y);
     node(&mut world, &mut terrain, ResourceKind::Stone, hall.x - 40.0, hall.y);
@@ -393,17 +406,13 @@ fn founds_a_village_480_tiles_away_within_a_few_game_weeks_which_then_feeds_itse
     let people: Vec<_> =
         t.world.residents.iter().filter(|r| r.city_id.as_deref() == Some(&village)).collect();
     assert_eq!(people.len() as f64, NPC_VILLAGE.residents);
-    assert!(people.iter().any(|r| {
-        held(&r.carried, Good::Spear) != 0.0 || held(&r.carried, Good::Sword) != 0.0
-    }));
+    assert!(people
+        .iter()
+        .any(|r| { held(&r.carried, Good::Spear) != 0.0 || held(&r.carried, Good::Sword) != 0.0 }));
     // A founding party takes no horses (`CONTEXT.md`: NPC horses).
     assert!(t.world.horses.iter().all(|h| h.city_id.as_deref() != Some(&village)));
     let standing = |of: &str, toward: &str| {
-        t.world
-            .standings
-            .iter()
-            .find(|s| s.of == of && s.toward == toward)
-            .map_or(0.0, |s| s.value)
+        t.world.standings.iter().find(|s| s.of == of && s.toward == toward).map_or(0.0, |s| s.value)
     };
     assert!(standing(&mother, &village) > NPC_FOUND_STANDING - 1.0);
     assert!(standing(&village, &mother) > NPC_FOUND_STANDING - 1.0);
@@ -412,9 +421,10 @@ fn founds_a_village_480_tiles_away_within_a_few_game_weeks_which_then_feeds_itse
     // It builds its storage and a farm, and feeds itself from the farm.
     run(&mut t.world, &t.terrain, (20.0 * DAY) as usize, &|_| false);
     let has = |k: BuildingKind| {
-        t.world.buildings.iter().any(|b| {
-            b.kind == k && b.city_id.as_deref() == Some(&village) && b.site.is_none()
-        })
+        t.world
+            .buildings
+            .iter()
+            .any(|b| b.kind == k && b.city_id.as_deref() == Some(&village) && b.site.is_none())
     };
     assert!(has(BuildingKind::Storage));
     assert!(has(BuildingKind::Farm));
@@ -730,7 +740,9 @@ fn builds_its_storage_a_farm_and_a_house_in_that_order_then_walls_itself() {
     let walls = |w: &WorldState| -> Vec<Building> {
         w.buildings
             .iter()
-            .filter(|b| matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate) && b.site.is_none())
+            .filter(|b| {
+                matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate) && b.site.is_none()
+            })
             .cloned()
             .collect()
     };

@@ -23,7 +23,9 @@ use crate::npc_test_world::{plains, Runner};
 use crate::queries::building::recipe_for;
 use crate::queries::city::city_residents;
 use crate::queries::names::good_name;
-use crate::queries::npc_trade::{npc_city_stock, npc_reserve, npc_soldier_target, NPC_SMITHY_WEAPON};
+use crate::queries::npc_trade::{
+    npc_city_stock, npc_reserve, npc_soldier_target, NPC_SMITHY_WEAPON,
+};
 use crate::queries::residents::{can_work, is_armed};
 use crate::random::Mulberry32;
 use crate::world::create_world;
@@ -105,7 +107,9 @@ fn wants_weapons_for_its_soldiers_and_builds_up_from_the_node_mine_before_smelte
     let (mut world, terrain, city) = city_with(&NPC_TOWN, &[Forest, Stone, IronOre]);
     let home = npc_home(&world, &city).unwrap().clone();
     // Short of weapons, and the Iron and Wood to forge them.
-    assert!(npc_reserve(&world, city_of(&world, &city)).get(&NPC_SMITHY_WEAPON).copied() > Some(0.0));
+    assert!(
+        npc_reserve(&world, city_of(&world, &city)).get(&NPC_SMITHY_WEAPON).copied() > Some(0.0)
+    );
     let short = short_goods(&world, city_of(&world, &city), terrain.size, None);
     for g in [Good::Spear, Good::Iron, Good::Wood] {
         assert!(short.contains(&g), "{g:?} in {short:?}");
@@ -123,7 +127,13 @@ fn wants_weapons_for_its_soldiers_and_builds_up_from_the_node_mine_before_smelte
     assert_eq!(next(&world), Some(BuildingKind::Mine));
     // With its mine on the ore, though no ore in its storage yet, the smelter comes next.
     let ore = world.nodes.iter().find(|n| n.kind == IronOre).unwrap().clone();
-    world.buildings.push(crate::test_support::building("mine", BuildingKind::Mine, None, ore.x, ore.y));
+    world.buildings.push(crate::test_support::building(
+        "mine",
+        BuildingKind::Mine,
+        None,
+        ore.x,
+        ore.y,
+    ));
     city_mut(&mut world, &city).workplace_ids.get_or_insert_with(Vec::new).push("mine".into());
     assert_eq!(next(&world), Some(BuildingKind::Smelter));
     // A village with no ore in reach builds nothing for weapons at all.
@@ -199,8 +209,7 @@ fn a_smith_takes_the_iron_and_wood_for_spears_from_the_storage_before_setting_ou
     let smith = &mut world.residents[1];
     (smith.carried, smith.order, smith.script) =
         (Stock::from([(Good::Food, OWN_FOOD)]), None, None);
-    world.buildings[storage].stock =
-        Some(Stock::from([(Good::Food, 200.0), (Good::Wood, 100.0)]));
+    world.buildings[storage].stock = Some(Stock::from([(Good::Food, 200.0), (Good::Wood, 100.0)]));
     plan_city(&mut world, &city, Some(&terrain), None, None);
     step_npc_cities(&mut world, terrain.size, Some(&terrain), None);
     assert!(world.residents[1].script.is_none());
