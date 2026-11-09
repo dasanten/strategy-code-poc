@@ -6,7 +6,7 @@
 //! are named here with `pending` and that ticket; they check nothing until it lands, and the
 //! differential run (T86.14) turns them all on.
 
-mod checks;
+pub(crate) mod checks;
 
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{Stock, WorldState};
@@ -203,8 +203,10 @@ pub fn world_invariants() -> Vec<Invariant> {
         pending("trader-trades-keep-food"),
         // TODO(T86.9): `routeRobberiesSound` in `caravans.ts`.
         pending("route-robberies-sound"),
-        // TODO(T86.9): `tradeOrgArmySound` in `trade-org-army.ts`.
-        pending("trade-org-army-sound"),
+        Invariant {
+            name: "trade-org-army-sound",
+            check: |w, t| crate::trade_org_army::trade_org_army_sound(w, t.size),
+        },
         Invariant { name: "npc-hire-sound", check: |w, _| crate::npc_hire::npc_hire_sound(w) },
         // TODO(T86.9): `punishmentsSound` in `trade-org-punishment.ts`.
         pending("punishments-sound"),
@@ -236,14 +238,16 @@ pub fn world_invariants() -> Vec<Invariant> {
         pending("debt-payments-sound"),
         // TODO(T86.9): `debtOrdersDone` in `trade-org-debt.ts`.
         pending("debt-orders-done"),
-        // TODO(T86.9): `hqRingsSound` in `hq-growth.ts`.
-        pending("hq-rings-sound"),
-        // TODO(T86.10): `cityPlansSound` in `npc-plan.ts`.
-        pending("city-plans-sound"),
-        // TODO(T86.10): `foundingPartiesSound` in `npc-founding.ts`.
-        pending("founding-parties-sound"),
-        // TODO(T86.10): `fullWaitSound` in `npc-founding.ts`.
-        pending("full-wait-sound"),
+        Invariant { name: "hq-rings-sound", check: crate::hq_growth::hq_rings_sound },
+        Invariant { name: "city-plans-sound", check: |w, _t| crate::npc_plan::city_plans_sound(w) },
+        Invariant {
+            name: "founding-parties-sound",
+            check: |w, _t| crate::npc_founding::founding_parties_sound(w),
+        },
+        Invariant {
+            name: "full-wait-sound",
+            check: |w, _t| crate::npc_founding::full_wait_sound(w),
+        },
         Invariant {
             name: "coins-short-only-with-income",
             check: |w, t| crate::npc_coins::coins_short_only_with_income(w, t.size),
@@ -264,34 +268,49 @@ pub fn world_invariants() -> Vec<Invariant> {
             name: "inner-wall-leaves-a-way",
             check: |w, t| crate::npc_inner_wall::inner_wall_leaves_a_way(w, t),
         },
-        // TODO(T86.10): `npcFarmersKept` in `npc-plan.ts`.
-        pending("npc-farmers-kept"),
-        // TODO(T86.10): `npcSurplusCapped` in `npc-plan.ts`.
-        pending("npc-surplus-capped"),
-        // TODO(T86.10): `npcSpareHandsWork` in `npc-plan.ts`.
-        pending("npc-spare-hands-work"),
-        // TODO(T86.10): `npcWorkplacesBounded` in `npc-plan.ts`.
-        pending("npc-workplaces-bounded"),
-        // TODO(T86.10): `npcRoadCrewSized` in `npc-roads.ts`.
-        pending("npc-road-crew-sized"),
+        Invariant { name: "npc-farmers-kept", check: |w, _t| crate::npc_plan::npc_farmers_kept(w) },
+        Invariant {
+            name: "npc-surplus-capped",
+            check: |w, _t| crate::npc_plan::npc_surplus_capped(w),
+        },
+        Invariant {
+            name: "npc-spare-hands-work",
+            check: |w, _t| crate::npc_plan::npc_spare_hands_work(w),
+        },
+        Invariant {
+            name: "npc-workplaces-bounded",
+            check: |w, _t| crate::npc_plan::npc_workplaces_bounded(w),
+        },
+        Invariant {
+            name: "npc-road-crew-sized",
+            check: |w, _t| crate::npc_behaviour::npc_road_crew_sized(w),
+        },
         Invariant { name: "npc-roads-once", check: |w, _t| crate::npc_roads::npc_roads_once(w) },
         Invariant {
             name: "npc-revivers",
             check: |w, t| crate::npc_revive::npc_revivers(w, t.size),
         },
-        // TODO(T86.10): `npcScoutsSound` in `npc-scouts.ts`.
-        pending("npc-scouts-sound"),
+        Invariant {
+            name: "npc-scouts-sound",
+            check: |w, t| crate::npc_scouts::npc_scouts_sound(w, t),
+        },
         Invariant { name: "npc-one-feeder", check: |w, _t| crate::npc_stable::npc_one_feeder(w) },
         Invariant {
             name: "trade-org-breeds-no-horses",
             check: |w, _t| crate::npc_stable::trade_org_breeds_no_horses(w),
         },
-        // TODO(T86.10): `npcResidentsKeptGoing` in `npc-behaviour.ts`.
-        pending("npc-residents-kept-going"),
-        // TODO(T86.10): `npcIdleOffTheStorage` in `npc-behaviour.ts`.
-        pending("npc-idle-off-the-storage"),
-        // TODO(T86.10): `npcSoldiersOnPosts` in `npc-posts.ts`.
-        pending("npc-soldiers-on-posts"),
+        Invariant {
+            name: "npc-residents-kept-going",
+            check: |w, _t| crate::npc_behaviour::npc_residents_kept_going(w),
+        },
+        Invariant {
+            name: "npc-idle-off-the-storage",
+            check: |w, t| crate::npc_behaviour::npc_idle_off_the_storage(w, t),
+        },
+        Invariant {
+            name: "npc-soldiers-on-posts",
+            check: |w, t| crate::npc_behaviour::npc_soldiers_on_posts(w, t),
+        },
         Invariant {
             name: "npc-patrols-sound",
             check: |w, _t| crate::npc_patrols::npc_patrols_sound(w),
