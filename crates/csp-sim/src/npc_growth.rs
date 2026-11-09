@@ -42,35 +42,7 @@ use crate::queries::horses::{owns_horse, HorseOwner};
 use crate::queries::names::{held, held_in, kind_name, placed};
 use crate::queries::npc_trade::{is_big_npc_city, npc_city_stock, npc_needs_scale, npc_reserve};
 
-/// Hooks into the Trade Org HQ's own growth (`hq-growth.ts`), which T86.9 ports.
-mod hq {
-    use super::*;
-
-    /// Whether the HQ grows (`hqGrows`). TODO(T86.9): call the ported HQ growth; until then the HQ
-    /// grows no further.
-    pub fn hq_grows(_world: &WorldState, _adults: &[usize]) -> bool {
-        false
-    }
-
-    /// The HQ's next ring or house (`hqProject`). TODO(T86.9).
-    pub fn hq_project(
-        _world: &WorldState,
-        _city: &City,
-        _terrain: &TerrainMap,
-    ) -> Option<CityProject> {
-        None
-    }
-
-    /// Where the HQ puts a building of `kind` in its rings (`hqHouseTile`). TODO(T86.9).
-    pub fn hq_house_tile(
-        _world: &WorldState,
-        _hall: &Building,
-        _terrain: &TerrainMap,
-        _kind: BuildingKind,
-    ) -> Option<(i32, i32)> {
-        None
-    }
-}
+use crate::hq_growth as hq;
 
 /// A tile, relative to a city's home, the short way round the map (`Offset`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -510,7 +482,10 @@ pub fn chain_project(
             None
         };
         let t = match hall {
-            Some(hall) => hq::hq_house_tile(world, hall, terrain, kind),
+            Some(hall) => {
+                let outermost = hq::hq_rings(world, hall, terrain, None).outermost;
+                hq::hq_house_tile(world, hall, terrain, outermost, kind)
+            }
             None => house_tile(world, city, home, terrain, rings, kind),
         };
         return t.map(|t| build(kind, t));
