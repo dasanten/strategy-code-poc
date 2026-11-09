@@ -14,6 +14,7 @@
     "test": "vitest run",
     "check": "eslint . --cache --cache-location node_modules/.cache/eslint/ && pnpm typecheck && node scripts/check-tests.mjs",
     "check:rust": "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo nextest run --workspace",
+    "shadow-run": "tsx --conditions=source scripts/shadow-run.mts",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

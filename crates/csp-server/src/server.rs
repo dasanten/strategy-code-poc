@@ -8,13 +8,15 @@
 //! HTTP (`app.rs`) is served beside the loop, on its own database connection, and reaches the
 //! world through the game thread between ticks.
 //!
-//! Not wired yet, each waiting for its port: WebSocket sync and the broadcast (T87.6), orders,
-//! queues, scripts and walking (Epic 86), territory, `noteScriptViewChanges` and the script
-//! library's invariant at start and daily (`checkScriptLibrary`).
+//! The tick runs what `index.ts`'s does: orders, the Players' queues and scripts (through a
+//! [`GameHost`] on the database), walking, territory, sight, the broadcast and the save. Not
+//! wired yet: `noteScriptViewChanges` and the script library's invariant at start and daily
+//! (`checkScriptLibrary`).
 
 use std::{
+    cell::RefCell,
     path::{Path, PathBuf},
-    sync::{mpsc, Arc, Mutex},
+    sync::{mpsc, Arc, Mutex, PoisonError, RwLock},
     time::{Duration, SystemTime},
 };
 
@@ -22,9 +24,16 @@ use csp_shared::{balance::MAP_SIZE, terrain::TerrainMap, world::WorldState, TICK
 use csp_sim::{
     explored::ExploredTerrain,
     orders::{order_kinds, OrderQueue},
-    sight::SightTracker,
+    queues::QueueRunner,
+    script_runner::ScriptRunner,
+    sight::{InvariantViolation, SightTracker},
     terrain_gen::generate_terrain,
-    tick::{run_tick, Scratch, TickHealth, TickOptions, TickPhase, TickTimer},
+    territory::TerritoryTracker,
+    tick::{
+        run_tick, ApplyOrders, RunQueues, RunScripts, Scratch, TickHealth, TickOptions, TickPhase,
+        TickTimer, Walk,
+    },
+    walking::{Walking, PATH_BUDGET_MS},
     world::generate_world,
 };
 use rusqlite::Connection;
@@ -42,6 +51,7 @@ use crate::{
     config::Config,
     db::{open_db, DbError},
     explored::{load_explored, save_explored},
+    game_host::{server_order_kinds, GameHost, QueueSenders},
     monitoring::{init_sentry, tag_world, LogSink, ServerReporter, TracingLog},
     realtime::{Realtime, RealtimeOptions, SightCheck},
     saves::{load_or_create_world, SaveLog, SavesError, WorldSaver},
@@ -106,20 +116,84 @@ impl From<&Config> for TickSettings {
     }
 }
 
+/// Where in a tick the shadow run looks at the world (`scripts/shadow-run.mts`): after the
+/// orders, the queues, the scripts and the world's step (with its invariants), and once the
+/// loop's work after it (territory, sight, broadcast, save) is done.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProbePoint {
+    Orders,
+    Queues,
+    Scripts,
+    World,
+    End,
+}
+
+impl ProbePoint {
+    pub const ALL: [ProbePoint; 5] = [
+        ProbePoint::Orders,
+        ProbePoint::Queues,
+        ProbePoint::Scripts,
+        ProbePoint::World,
+        ProbePoint::End,
+    ];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            ProbePoint::Orders => "orders",
+            ProbePoint::Queues => "queues",
+            ProbePoint::Scripts => "scripts",
+            ProbePoint::World => "world",
+            ProbePoint::End => "end",
+        }
+    }
+}
+
+/// Looks at the world at each [`ProbePoint`] of a tick.
+pub type Probe = dyn FnMut(ProbePoint, &WorldState);
+
+/// The server's walking (`new Walking(terrain)`): path searches get `budget_ms` of wall-clock
+/// time a tick, [`PATH_BUDGET_MS`] in the game. The shadow run gives them no limit, so where a
+/// walker is after a search never depends on how fast the machine is.
+pub struct ServerWalking {
+    pub walking: Walking,
+    pub budget_ms: f64,
+}
+
+impl Walk for ServerWalking {
+    fn walk(&mut self, world: &mut WorldState, scratch: &mut Scratch) -> usize {
+        let steps = self.walking.request_steps(world, scratch, self.budget_ms);
+        self.walking.resolve(world, scratch, &steps);
+        steps.len()
+    }
+
+    fn ways(&mut self) -> Option<&mut dyn csp_sim::npc_roads::WayFinder> {
+        self.walking.ways()
+    }
+}
+
 /// The running world and what the loop keeps beside it.
 pub struct Game<L: LogSink> {
     pub world: WorldState,
     /// Shared with the order queue, whose orders check the land.
     pub terrain: Arc<TerrainMap>,
     pub scratch: Scratch,
-    pub explored: ExploredTerrain,
+    /// Shared with the script host: scripts ask what their Player has explored.
+    pub explored: Arc<RwLock<ExploredTerrain>>,
     pub sight: SightTracker,
     /// Orders accepted from the sockets since the last tick, applied at the start of the next.
     pub orders: OrderQueue,
+    /// The Players' queues and scripts; none until the game has its database
+    /// ([`Game::attach_scripts`]).
+    pub queues: Option<QueueRunner>,
+    pub scripts: Option<ScriptRunner>,
+    pub walking: ServerWalking,
+    pub territory: TerritoryTracker,
     /// The sockets, told of every tick in its broadcast phase; none until they are attached.
     pub realtime: Option<Arc<Realtime>>,
     pub saver: WorldSaver<SaverLog<L>>,
     pub reporter: ServerReporter<Arc<L>>,
+    /// Looks at the world through each tick, for the shadow run; none in the game.
+    pub probe: Option<Box<Probe>>,
     log: Arc<L>,
 }
 
@@ -130,13 +204,21 @@ impl<L: LogSink> Game<L> {
         Self {
             world,
             orders: OrderQueue::new(order_kinds(), Some(Arc::clone(&terrain))),
+            queues: None,
+            scripts: None,
+            walking: ServerWalking {
+                walking: Walking::new(Arc::clone(&terrain)),
+                budget_ms: PATH_BUDGET_MS,
+            },
+            territory: TerritoryTracker::default(),
             terrain,
             scratch: Scratch::default(),
-            explored,
+            explored: Arc::new(RwLock::new(explored)),
             sight: SightTracker::new(),
             realtime: None,
             saver: WorldSaver::new(SaverLog(Arc::clone(&log))),
             reporter: ServerReporter::new(Arc::clone(&log)),
+            probe: None,
             log,
         }
     }
@@ -158,19 +240,31 @@ impl<L: LogSink> Game<L> {
             explored,
             sight,
             orders,
+            queues,
+            scripts,
+            walking,
+            territory,
             realtime,
             saver,
             reporter,
+            probe,
             log,
         } = self;
         let size = terrain.size;
         let map: &TerrainMap = terrain;
+        let probe = RefCell::new(probe.as_deref_mut());
+        let look = |point: ProbePoint, world: &WorldState| {
+            if let Some(p) = probe.borrow_mut().as_mut() {
+                p(point, world);
+            }
+        };
         let mut finish = |timer: &TickTimer, world: &mut WorldState, scratch: &mut Scratch| {
-            // TODO(Epic 86): `territory.update(world, terrain)` once territory is ported.
-            timer.time(TickPhase::Territory, || ());
+            look(ProbePoint::World, world);
+            timer.time(TickPhase::Territory, || territory.update(world, map));
             let grown = timer.time(TickPhase::Sight, || {
                 let index = scratch.index(world, size);
-                sight.update(world, index, explored)
+                let mut explored = explored.write().unwrap_or_else(PoisonError::into_inner);
+                sight.update(world, index, &mut *explored)
             });
             timer.time(TickPhase::Broadcast, || {
                 if let Some(rt) = realtime.as_ref() {
@@ -180,7 +274,8 @@ impl<L: LogSink> Game<L> {
             if world.tick.is_multiple_of(settings.save_every_ticks) {
                 timer.time(TickPhase::Save, || {
                     saver.start(world);
-                    if let Err(e) = save_explored(conn, explored, now_ms()) {
+                    let mut explored = explored.write().unwrap_or_else(PoisonError::into_inner);
+                    if let Err(e) = save_explored(conn, &mut explored, now_ms()) {
                         log.log(
                             Level::ERROR,
                             json!({ "err": { "message": e.to_string() }, "tick": world.tick }),
@@ -189,15 +284,44 @@ impl<L: LogSink> Game<L> {
                     }
                 });
             }
+            look(ProbePoint::End, world);
         };
+        let mut orders = Probed { inner: orders, look: &look };
+        let mut queues = queues.as_mut().map(|inner| Probed { inner, look: &look });
+        let mut scripts = scripts.as_mut().map(|inner| Probed { inner, look: &look });
         let mut opts =
             TickOptions::new(reporter, settings.invariant_sample_rate, settings.slow_tick_ms);
-        opts.orders = Some(orders);
-        // TODO(Epic 86): queues, scripts and walking once they implement the tick's traits.
+        opts.orders = Some(&mut orders);
+        opts.queues = queues.as_mut().map(|q| q as &mut dyn RunQueues);
+        opts.scripts = scripts.as_mut().map(|s| s as &mut dyn RunScripts);
+        opts.walking = Some(walking);
         opts.finish = Some(&mut finish);
         let health = run_tick(world, map, scratch, opts);
         tag_world(world);
         health
+    }
+
+    /// Gives the game the Players' queues and scripts and the orders that need them, on the
+    /// database at `db` (a connection of the host's own): `index.ts`'s `scriptHost` and `kinds`.
+    pub fn attach_scripts(&mut self, db: Connection)
+    where
+        L: Send + Sync + 'static,
+    {
+        let host = Arc::new(GameHost::new(
+            db,
+            Arc::clone(&self.explored),
+            crate::scripts::game_defaults(),
+            Arc::clone(&self.log),
+        ));
+        let kinds = server_order_kinds(&host);
+        let terrain = Some(Arc::clone(&self.terrain));
+        self.orders = OrderQueue::new(kinds.clone(), terrain.clone());
+        self.queues = Some(QueueRunner::new(
+            Box::new(QueueSenders(Arc::clone(&host))),
+            kinds.clone(),
+            terrain,
+        ));
+        self.scripts = Some(ScriptRunner::new(Arc::clone(&self.terrain), host, kinds));
     }
 
     /// The daily jobs: expired sessions go, and a backup is written when there is a backup dir.
@@ -226,8 +350,45 @@ impl<L: LogSink> Game<L> {
     /// explored terrain.
     pub fn save_for_shutdown(&mut self, conn: &Connection) -> Result<(), ServerError> {
         self.saver.save_now(conn, &self.world)?;
-        save_explored(conn, &mut self.explored, now_ms())?;
+        let mut explored = self.explored.write().unwrap_or_else(PoisonError::into_inner);
+        save_explored(conn, &mut explored, now_ms())?;
         Ok(())
+    }
+}
+
+/// A phase of the tick, looked at once it has run.
+struct Probed<'a, T> {
+    inner: &'a mut T,
+    look: &'a dyn Fn(ProbePoint, &WorldState),
+}
+
+impl<T: ApplyOrders> ApplyOrders for Probed<'_, T> {
+    fn apply_all(&mut self, world: &mut WorldState, scratch: &mut Scratch) {
+        self.inner.apply_all(world, scratch);
+        (self.look)(ProbePoint::Orders, world);
+    }
+}
+
+impl<T: RunQueues> RunQueues for Probed<'_, T> {
+    fn run_all(&mut self, world: &mut WorldState, scratch: &mut Scratch) {
+        self.inner.run_all(world, scratch);
+        (self.look)(ProbePoint::Queues, world);
+    }
+}
+
+impl<T: RunScripts> RunScripts for Probed<'_, T> {
+    fn run_all(
+        &mut self,
+        world: &mut WorldState,
+        scratch: &mut Scratch,
+        check: bool,
+    ) -> Vec<InvariantViolation> {
+        let violations = self.inner.run_all(world, scratch, check);
+        (self.look)(ProbePoint::Scripts, world);
+        violations
+    }
+    fn runs(&self) -> usize {
+        self.inner.runs()
     }
 }
 
@@ -345,7 +506,9 @@ pub fn open_world(config: &Config) -> Result<(Connection, Game<TracingLog>), Ser
         load_or_create_world(&conn, |seed| generate_terrain(seed, MAP_SIZE), generate_world, 1)?;
     let explored = load_explored(&conn, terrain.clone(), &world.nodes)?;
     tag_world(&world);
-    Ok((conn, Game::new(world, terrain, explored, log)))
+    let mut game = Game::new(world, terrain, explored, log);
+    game.attach_scripts(open_db(&config.db_path, None)?);
+    Ok((conn, game))
 }
 
 /// Resolves on SIGINT, or SIGTERM where there is one.

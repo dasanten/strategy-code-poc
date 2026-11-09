@@ -82,10 +82,13 @@ impl<L: crate::monitoring::LogSink + Send + Sync + 'static> GameHandle
     fn run_job(&self, job: GameJob) -> Pin<Box<dyn Future<Output = bool> + Send + '_>> {
         Box::pin(async move {
             self.run(move |g, _conn| {
+                let explored = Arc::clone(&g.explored);
+                let mut explored =
+                    explored.write().unwrap_or_else(std::sync::PoisonError::into_inner);
                 job(GameView {
                     world: &mut g.world,
                     terrain: &g.terrain,
-                    explored: &mut g.explored,
+                    explored: &mut explored,
                     orders: &mut g.orders,
                     sight: &mut g.sight,
                     scratch: &mut g.scratch,
