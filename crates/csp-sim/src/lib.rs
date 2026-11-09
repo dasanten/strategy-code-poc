@@ -36,6 +36,7 @@ pub mod hauling;
 pub mod holders;
 pub mod horse_grant;
 pub mod horses;
+pub mod hq_fall;
 pub mod hq_growth;
 pub mod invariants;
 pub mod last_seen;

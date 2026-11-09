@@ -506,3 +506,6 @@ pub fn debt_orders_done(world: &WorldState) -> Vec<InvariantViolation> {
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests;

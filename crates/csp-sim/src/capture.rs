@@ -14,8 +14,9 @@ use csp_shared::world::{
 use crate::crimes::{city_organization, commit_crime, CrimeAgainst};
 use crate::defence::Alarms;
 use crate::events::record_event;
+use crate::hq_fall::hq_falls;
 use crate::names::{resident_names_taken, unique_name};
-use crate::pending::{hq_falls, join_trade_org, leave_trade_org, rejoin_trade_org};
+use crate::pending::{join_trade_org, leave_trade_org, rejoin_trade_org};
 use crate::queries::alliance::realm_name;
 use crate::queries::carriages::driven_carriage_id;
 use crate::queries::city::town_hall_of;

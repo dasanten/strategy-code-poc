@@ -191,8 +191,10 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant { name: "teachers-sound", check: checks::teachers_sound },
         Invariant { name: "trainees-sound", check: checks::trainees_sound },
         Invariant { name: "trade-org-sound", check: checks::trade_org_sound },
-        // TODO(T86.9): `nothingLeftOfTheHq` in `hq-fall.ts`.
-        pending("nothing-left-of-the-hq"),
+        Invariant {
+            name: "nothing-left-of-the-hq",
+            check: |w, _| crate::hq_fall::nothing_left_of_the_hq(w),
+        },
         // TODO(T86.9): `caravansSound` in `caravans.ts`.
         pending("caravans-sound"),
         // TODO(T86.9): `tradersSound` in `traders.ts`.

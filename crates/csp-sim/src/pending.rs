@@ -23,6 +23,3 @@ pub(crate) fn leave_trade_org(world: &mut WorldState, city_id: &str) {
 pub(crate) fn rejoin_trade_org(world: &mut WorldState, city_id: &str, size: i32) {
     crate::caravans::rejoin_trade_org(world, city_id, size);
 }
-
-/// `hqFalls` (TODO(T86.9), `hq-fall.ts`).
-pub(crate) fn hq_falls(_world: &mut WorldState, _city_id: &str) {}
