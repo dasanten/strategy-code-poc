@@ -18,10 +18,11 @@ use csp_shared::footprint::{covers, is_at, near_footprint};
 use csp_shared::terrain::{ground_at, wrap_distance, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
-    Building, BuildingKind, CityLayout, DeathCause, Good, Realm, RealmEventWhat, Resident,
-    ResidentOrder, SelfManagedCity, Stock, Tile, WalkOrder, WorldState,
+    Building, BuildingKind, DeathCause, Good, Realm, RealmEventWhat, Resident, ResidentOrder,
+    SelfManagedCity, Stock, Tile, WalkOrder, WorldState,
 };
 
+use crate::city_layout::pick_layout;
 use crate::events::record_event;
 use crate::queries::alliance::contract_of;
 use crate::queries::army::{army_of, drivers_food, spare_food};
@@ -34,7 +35,6 @@ use crate::queries::offers::free_stock;
 use crate::queries::residents::{can_work, food_use, is_armed};
 use crate::queries::standing::TRADE_ORG;
 use crate::queries::trade_org::trade_org_hq;
-use crate::random::hash_str;
 use crate::sight::InvariantViolation;
 use crate::tick::Scratch;
 
@@ -401,16 +401,6 @@ pub fn gather_pile(world: &mut WorldState, b: &Building, size: i32) {
     for p in gathered {
         drop_goods(world, b.x, b.y, &p.goods, size);
     }
-}
-
-/// The layouts an NPC city can get, in the TypeScript's order (`CITY_LAYOUTS`).
-const CITY_LAYOUTS: [CityLayout; 4] =
-    [CityLayout::Grid, CityLayout::Rings, CityLayout::MainStreet, CityLayout::Quarters];
-
-/// The layout a city gets when the game runs it (`pickLayout` of `city-layout.ts`): drawn from
-/// the world's seed and the city's id. TODO(T86.10): moves to the NPC cities' layout module.
-pub fn pick_layout(seed: i64, city_id: &str) -> CityLayout {
-    CITY_LAYOUTS[(hash_str(&format!("{seed}:layout:{city_id}")) % 4) as usize]
 }
 
 /// Leader death (`endRealm`, `CONTEXT.md`: Leader death, Self-managed city): the realm ends, its

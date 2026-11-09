@@ -239,6 +239,41 @@ pub fn walls_key(world: &WorldState) -> String {
     parts.join(";")
 }
 
+/// What `walls_key` is built from, hashed in place: the same parts in the same order, without
+/// building a string for each wall. `Walking` checks it every tick to know when to build its
+/// `WallMap` again, so it has to be cheap near a city with many walls. Two different inputs
+/// giving the same 64-bit hash is the only way it differs from comparing `walls_key`s.
+pub fn walls_fingerprint(world: &WorldState) -> u64 {
+    use std::hash::{DefaultHasher, Hash, Hasher};
+    let mut h = DefaultHasher::new();
+    for b in world.buildings.iter().filter(|b| is_wall_or_gate(b)) {
+        0u8.hash(&mut h);
+        b.id.hash(&mut h);
+        b.x.to_bits().hash(&mut h);
+        b.y.to_bits().hash(&mut h);
+        b.city_id.hash(&mut h);
+        is_closed(b).hash(&mut h);
+    }
+    for c in &world.cities {
+        1u8.hash(&mut h);
+        c.id.hash(&mut h);
+        c.realm_id.hash(&mut h);
+    }
+    for a in &world.alliances {
+        2u8.hash(&mut h);
+        a.id.hash(&mut h);
+        for m in &a.members {
+            m.realm_id.hash(&mut h);
+        }
+    }
+    for (city_id, sides) in shut_out(world) {
+        3u8.hash(&mut h);
+        city_id.hash(&mut h);
+        sides.hash(&mut h);
+    }
+    h.finish()
+}
+
 /// Builds the `WallMap` for the world on `terrain` (`wallMap`). A tile is inside when it can't
 /// reach far out (`WALL_ENCLOSES_MAX` tiles) on foot without crossing a wall or gate. The fills
 /// start beside each wall in the world's order, as the TypeScript's `Map` iterates them.
@@ -453,5 +488,95 @@ mod tests {
         let mut cut_off = ring();
         cut_off.inside.clear();
         assert!(stranded_on_wall(&cut_off, Some("r1"), 1));
+    }
+
+    /// A world with realm r1's city c1 and a wall and a gate of it, on plains.
+    fn walled() -> WorldState {
+        let terrain = TerrainMap {
+            size: 32,
+            tiles: vec![csp_shared::terrain::Terrain::Plains as u8; 32 * 32],
+        };
+        let mut world = crate::world::create_world(&terrain, 1);
+        let json = serde_json::json!({
+            "realms": [{"id": "r1", "userId": 1, "leaderId": "a1"}],
+            "cities": [{"id": "c1", "name": "Ashford", "realmId": "r1", "townHallId": "c1-hall", "occupation": null}],
+            "buildings": [
+                {"id": "c1-hall", "kind": "townHall", "cityId": "c1", "x": 8, "y": 8},
+                {"id": "w1", "kind": "wall", "cityId": "c1", "x": 5, "y": 5},
+                {"id": "g1", "kind": "gate", "cityId": "c1", "x": 6, "y": 5}
+            ]
+        });
+        world.realms = serde_json::from_value(json["realms"].clone()).expect("realms");
+        world.cities = serde_json::from_value(json["cities"].clone()).expect("cities");
+        world.buildings = serde_json::from_value(json["buildings"].clone()).expect("buildings");
+        world
+    }
+
+    #[test]
+    fn the_walls_fingerprint_changes_with_the_walls_and_stays_otherwise() {
+        let mut world = walled();
+        let fingerprint = walls_fingerprint(&world);
+        let key = walls_key(&world);
+        // What the wall map is not built from leaves it as it was.
+        world.tick += 100;
+        let mut road: Building = serde_json::from_value(serde_json::json!(
+            {"id": "rd1", "kind": "road", "cityId": "c1", "x": 9, "y": 9}
+        ))
+        .expect("a road");
+        world.buildings.push(road.clone());
+        assert_eq!(walls_fingerprint(&world), fingerprint);
+        assert_eq!(walls_key(&world), key);
+        // A wall added, a gate closed, a city changing hands, an alliance: each changes it, as it
+        // changes `walls_key`.
+        let mut seen = vec![fingerprint];
+        let changed = |world: &WorldState, seen: &mut Vec<u64>| {
+            let f = walls_fingerprint(world);
+            assert!(!seen.contains(&f), "the fingerprint changed");
+            assert_ne!(walls_key(world), key);
+            seen.push(f);
+        };
+        road.id = "w2".into();
+        road.kind = BuildingKind::Wall;
+        world.buildings.push(road);
+        changed(&world, &mut seen);
+        world.buildings.iter_mut().find(|b| b.id == "g1").expect("the gate").closed = Some(true);
+        changed(&world, &mut seen);
+        world.cities[0].realm_id = None;
+        changed(&world, &mut seen);
+        world.alliances.push(
+            serde_json::from_value(serde_json::json!({"id": "al1", "name": "North", "leaderId": "r1",
+                "members": [{"realmId": "r1", "joinedAt": 0, "leaving": null}], "invites": [], "army": []}))
+            .expect("an alliance"),
+        );
+        changed(&world, &mut seen);
+        // Back as it was, it is the same again.
+        world.alliances.clear();
+        world.cities[0].realm_id = Some("r1".into());
+        world.buildings.iter_mut().find(|b| b.id == "g1").expect("the gate").closed = None;
+        world.buildings.retain(|b| b.id != "w2");
+        assert_eq!(walls_fingerprint(&world), fingerprint);
+    }
+
+    /// Times `walls_key` against `walls_fingerprint` on a city ringed by walls, as near the HQ.
+    #[test]
+    #[ignore = "a timing to read, not a check"]
+    fn the_walls_fingerprint_is_cheaper_than_the_key() {
+        let mut world = walled();
+        for i in 0..2000 {
+            let wall = serde_json::json!({"id": format!("ring{i}"), "kind": "wall", "cityId": "c1", "x": i % 32, "y": i / 32});
+            world.buildings.push(serde_json::from_value(wall).expect("a wall"));
+        }
+        let time = |f: &dyn Fn()| {
+            let from = std::time::Instant::now();
+            for _ in 0..200 {
+                f();
+            }
+            from.elapsed().as_secs_f64() * 1000.0 / 200.0
+        };
+        let key = time(&|| drop(std::hint::black_box(walls_key(&world))));
+        let fingerprint = time(&|| {
+            std::hint::black_box(walls_fingerprint(&world));
+        });
+        println!("walls_key {key:.3} ms, walls_fingerprint {fingerprint:.3} ms a call, 2000 walls");
     }
 }
