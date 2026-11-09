@@ -12,7 +12,7 @@ use super::*;
 use crate::invariants::check_all;
 use crate::npc_cities::found_npc_city;
 use crate::queries::carriages::crew_ids_of;
-use crate::queries::names::held;
+use crate::queries::names::{held, held_in};
 use crate::queries::trade_quotes::{quote_trader_trade, trader_standing_at};
 use crate::queries::trader_trade::{trader_price_for, trader_prices, trader_stock};
 use crate::queries::warehouse_trade::{TradeHolder, TradeLimit};
@@ -451,4 +451,464 @@ fn sells_none_of_the_food_on_board() {
     let hands = TradeHolder { stock: &coins, room: 100.0 };
     let buy = quote_trader_trade(escorts(), &load, 400.0, hands, TradeSide::Buy, Good::Food, 50.0);
     assert_eq!(buy.units, 2.0);
+}
+
+// trading with a wandering trader at a stop
+
+struct AtStop {
+    world: WorldState,
+    terrain: TerrainMap,
+    city: String,
+    queue: crate::orders::OrderQueue,
+}
+
+/// A trader standing by an NPC village, and p1 of r1 on its tile.
+fn at_stop() -> AtStop {
+    let Fixture { mut world, terrain, .. } = fixture();
+    let c = village(&mut world, &terrain, 300, 500, 9.0);
+    world.realms.push(
+        serde_json::from_value(serde_json::json!({ "id": "r1", "userId": 7, "leaderId": "a1" }))
+            .unwrap(),
+    );
+    resident(&mut world, "a1", Some("r1"), 900.0, 900.0);
+    resident(&mut world, "p1", Some("r1"), 290.0, 490.0);
+    stand_at(&mut world, 0, &c, 290.0, 490.0, 500.0);
+    let ki = carriage_of(&world, 0);
+    world.carriages[ki].load =
+        Stock::from([(Good::Food, CARAVAN_FOOD), (Good::Wood, 40.0), (Good::Coins, 200.0)]);
+    let queue = crate::orders::OrderQueue::new(
+        crate::orders::order_kinds(),
+        Some(Arc::new(terrain.clone())),
+    );
+    AtStop { world, terrain, city: c, queue }
+}
+
+fn p1(world: &mut WorldState) -> &mut csp_shared::world::Resident {
+    world.residents.iter_mut().find(|r| r.id == "p1").unwrap()
+}
+
+fn step_once(s: &mut AtStop) {
+    for r in &mut s.world.residents {
+        r.hunger = 100.0;
+    }
+    let mut scratch = Scratch::default();
+    step_world(&mut s.world, &s.terrain, &mut scratch, None, None);
+    assert_eq!(check_all(&s.world, &s.terrain), vec![]);
+}
+
+fn order(s: &mut AtStop, mut o: serde_json::Value) -> String {
+    o["residentId"] = serde_json::json!("p1");
+    let sender = crate::order_sender::OrderSender::player(7, "Mara");
+    let answer = s.queue.receive(&s.world, &sender, &serde_json::json!("q"), &o);
+    s.queue.apply_all(&mut s.world);
+    match answer {
+        crate::orders::OrderReply::Ack { .. } => "ack".into(),
+        crate::orders::OrderReply::Rejected { reason, .. } => reason,
+    }
+}
+
+fn load(s: &AtStop) -> Stock {
+    s.world.carriages[carriage_of(&s.world, 0)].load.clone()
+}
+
+fn trade_org() -> &'static str {
+    crate::queries::standing::TRADE_ORG
+}
+
+#[test]
+fn buys_goods_from_its_load_into_their_hands_coins_the_other_way_with_standing() {
+    let mut s = at_stop();
+    p1(&mut s.world).carried = Stock::from([(Good::Coins, 100.0)]);
+    let price = trader_price_for(Good::Wood, 40.0).sell + trader_price_for(Good::Wood, 39.0).sell;
+    let o = serde_json::json!({ "kind": "buy", "good": "wood", "units": 2 });
+    assert_eq!(order(&mut s, o), "ack");
+    step_once(&mut s);
+    let carried = p1(&mut s.world).carried.clone();
+    assert_eq!(held(&carried, Good::Wood), 2.0);
+    assert_eq!(held(&carried, Good::Coins), 100.0 - price);
+    let l = load(&s);
+    assert_eq!(held(&l, Good::Food), CARAVAN_FOOD);
+    assert_eq!(held(&l, Good::Wood), 38.0);
+    assert_eq!(held(&l, Good::Coins), 200.0 + price);
+    assert!(crate::queries::standing::standing_of(&s.world, "r1", trade_org()) > 0.0);
+    let traded = s.world.events.iter().find_map(|e| match &e.what {
+        csp_shared::world::RealmEventWhat::Traded { with_trader, units, side, .. } => {
+            Some((*with_trader, *units, *side))
+        }
+        _ => None,
+    });
+    assert_eq!(traded, Some((Some(true), 2.0, TradeSide::Buy)));
+}
+
+#[test]
+fn sells_goods_onto_its_carriage_its_coins_into_their_hands() {
+    let mut s = at_stop();
+    p1(&mut s.world).carried = Stock::from([(Good::Iron, 2.0)]);
+    let o = serde_json::json!({ "kind": "sell", "good": "iron", "units": 2 });
+    assert_eq!(order(&mut s, o), "ack");
+    step_once(&mut s);
+    let carried = p1(&mut s.world).carried.clone();
+    assert!(!carried.contains_key(&Good::Iron));
+    assert_eq!(held(&load(&s), Good::Iron), 2.0);
+    assert!(held(&carried, Good::Coins) > 0.0);
+    assert_eq!(held(&load(&s), Good::Coins) + held(&carried, Good::Coins), 200.0);
+}
+
+#[test]
+fn trades_from_a_carriage_of_theirs_on_the_tile_instead_of_their_hands() {
+    let mut s = at_stop();
+    s.world.carriages.push(
+        serde_json::from_value(serde_json::json!({
+            "id": "own", "realmId": "r1", "cityId": null, "x": 290, "y": 490, "horseId": null,
+            "load": { "coins": 100 },
+        }))
+        .unwrap(),
+    );
+    let o = serde_json::json!({ "kind": "buy", "good": "wood", "units": 1, "carriageId": "own" });
+    assert_eq!(order(&mut s, o), "ack");
+    step_once(&mut s);
+    let own = s.world.carriages.iter().find(|k| k.id == "own").unwrap();
+    assert_eq!(held(&own.load, Good::Wood), 1.0);
+    assert_eq!(held(&load(&s), Good::Wood), 39.0);
+}
+
+#[test]
+fn refuses_one_not_on_its_tile_a_delivery_and_those_the_trade_organization_refuses() {
+    let mut s = at_stop();
+    p1(&mut s.world).carried = Stock::from([(Good::Coins, 100.0)]);
+    p1(&mut s.world).x += 1.0;
+    let buy = serde_json::json!({ "kind": "buy", "good": "wood", "units": 1 });
+    assert_eq!(order(&mut s, buy.clone()), "not at a Trade Org warehouse");
+    p1(&mut s.world).x -= 1.0;
+    let delivery = serde_json::json!({ "kind": "buy", "good": "wood", "units": 1, "cityId": "c" });
+    assert_eq!(order(&mut s, delivery), "a wandering trader delivers nothing");
+    let coins = serde_json::json!({ "kind": "buy", "good": "coins", "units": 1 });
+    assert_eq!(order(&mut s, coins), "not a good traders trade");
+    s.world.standings.push(
+        serde_json::from_value(
+            serde_json::json!({ "of": trade_org(), "toward": "r1", "value": -100 }),
+        )
+        .unwrap(),
+    );
+    let answer = order(&mut s, buy);
+    assert!(answer.contains("won\u{2019}t trade"), "{answer}");
+}
+
+#[test]
+fn doesnt_trade_before_it_stands_there_nor_once_it_goes_on() {
+    let mut s = at_stop();
+    p1(&mut s.world).carried = Stock::from([(Good::Coins, 100.0)]);
+    let buy = serde_json::json!({ "kind": "buy", "good": "wood", "units": 1 });
+    s.world.traders[0].stand.as_mut().unwrap().until = None;
+    assert_eq!(order(&mut s, buy.clone()), "not at a Trade Org warehouse");
+    let tick = s.world.tick as f64;
+    s.world.traders[0].stand.as_mut().unwrap().until = Some(tick);
+    assert_eq!(order(&mut s, buy), "not at a Trade Org warehouse");
+    // Nor with its crew gone.
+    s.world.traders[0].stand.as_mut().unwrap().until = Some(tick + 10.0);
+    s.world.traders[0].driver_id = None;
+    assert!(trader_standing_at(&s.world, 290.0, 490.0).is_none());
+}
+
+#[test]
+fn sells_none_of_the_food_on_board_and_the_invariant_catches_one_that_did() {
+    let mut s = at_stop();
+    p1(&mut s.world).carried = Stock::from([(Good::Coins, 500.0)]);
+    let o = serde_json::json!({ "kind": "buy", "good": "food", "units": 5 });
+    assert_eq!(order(&mut s, o), "ack");
+    step_once(&mut s);
+    assert_eq!(held(&load(&s), Good::Food), CARAVAN_FOOD);
+    assert!(!p1(&mut s.world).carried.contains_key(&Good::Food));
+    let mut ledger = crate::trading::TradeLedger::default();
+    ledger.records.push(crate::trading::TradeRecord {
+        resident_id: "p1".into(),
+        realm: Some("r1".into()),
+        refused: false,
+        before: Stock::new(),
+        after: Stock::new(),
+        npc_city_id: None,
+        kept_reserve: None,
+        trader_id: Some("x".into()),
+        kept_food: Some(false),
+        horse_id: None,
+        kept_pair: None,
+        wanted: None,
+    });
+    assert_eq!(crate::trading::trader_trades_keep_food(&ledger).len(), 1);
+}
+
+#[test]
+fn tells_the_realm_while_one_stands_at_one_of_its_cities_wherever_it_is() {
+    use crate::queries::trader_trade::trader_visits_to;
+    let mut s = at_stop();
+    s.world.realms.push(
+        serde_json::from_value(serde_json::json!({ "id": "r2", "userId": 8, "leaderId": "a2" }))
+            .unwrap(),
+    );
+    resident(&mut s.world, "a2", Some("r2"), 900.0, 910.0);
+    assert!(trader_visits_to(&s.world, "r1").is_empty());
+    let c = s.city.clone();
+    s.world.cities.iter_mut().find(|x| x.id == c).unwrap().realm_id = Some("r1".into());
+    let visits = trader_visits_to(&s.world, "r1");
+    assert_eq!(visits.len(), 1);
+    let v = &visits[0];
+    let t = &s.world.traders[0];
+    assert_eq!(v.trader_id, t.id);
+    assert_eq!(v.city_id, c);
+    assert_eq!(v.city, city(&s.world, &c).name);
+    assert_eq!((v.x, v.y), (290.0, 490.0));
+    assert_eq!(Some(v.until), t.stand.as_ref().unwrap().until);
+    assert!(trader_visits_to(&s.world, "r2").is_empty());
+    // A capture changes whom it tells.
+    crate::capture::capture_city(&mut s.world, &c, "r2", s.terrain.size);
+    assert!(trader_visits_to(&s.world, "r1").is_empty());
+    assert_eq!(trader_visits_to(&s.world, "r2").len(), 1);
+}
+
+#[test]
+fn names_its_prices_to_those_in_sight_what_it_holds_only_to_those_on_its_tile() {
+    use crate::sight::{entities_in_sight, sent_inside_unseen};
+    use crate::world_index::WorldIndex;
+    use csp_shared::protocol::SeenEntity;
+    let mut s = at_stop();
+    s.world.realms.push(
+        serde_json::from_value(serde_json::json!({ "id": "r3", "userId": 9, "leaderId": "b1" }))
+            .unwrap(),
+    );
+    resident(&mut s.world, "b1", Some("r3"), 300.0, 495.0);
+    let tid = s.world.traders[0].id.clone();
+    let size = s.terrain.size;
+    let seen = |w: &WorldState, realm: &str| {
+        let index = WorldIndex::new(w, size);
+        entities_in_sight(w, &index, Some(realm), None)
+            .iter()
+            .find(|e| matches!(e, SeenEntity::Trader(t) if t.id == tid))
+            .cloned()
+    };
+    let wood = |t: &csp_shared::protocol::SeenTrader| {
+        t.prices.as_ref().and_then(|p| p.iter().find(|l| l.good == Good::Wood).map(|l| l.stock))
+    };
+    let here = seen(&s.world, "r1").unwrap();
+    let SeenEntity::Trader(h) = &here else { unreachable!() };
+    assert_eq!(h.standing.as_ref().map(|s| (s.x, s.y)), Some((290.0, 490.0)));
+    assert_eq!(wood(h), Some(Some(40.0)));
+    let there = seen(&s.world, "r3").unwrap();
+    let SeenEntity::Trader(th) = &there else { unreachable!() };
+    assert_eq!(wood(th), Some(None));
+    assert!(th.prices.as_ref().is_some_and(|p| !p.is_empty()));
+    let index = WorldIndex::new(&s.world, size);
+    assert_eq!(sent_inside_unseen(&s.world, &index, "r3", std::slice::from_ref(&there)), vec![]);
+    // Sent what only those on its tile may see, the invariant catches it.
+    assert_eq!(sent_inside_unseen(&s.world, &index, "r3", std::slice::from_ref(&here)).len(), 1);
+    // On the way it names none.
+    s.world.traders[0].stand = None;
+    let SeenEntity::Trader(gone) = seen(&s.world, "r1").unwrap() else { unreachable!() };
+    assert!(gone.prices.is_none() && gone.standing.is_none());
+}
+
+// an NPC city and its visiting trader
+
+struct Visited {
+    world: WorldState,
+    terrain: TerrainMap,
+    city: String,
+    storage: String,
+    tile: (i32, i32),
+}
+
+/// A village with a surplus of Wood, short of Iron, and a trader standing at it.
+fn visited(extra: &[(Good, f64)]) -> Visited {
+    use crate::queries::npc_trade::npc_reserve;
+    let Fixture { mut world, terrain, .. } = fixture();
+    let c = village(&mut world, &terrain, 300, 500, 9.0);
+    let storage = crate::npc_behaviour::npc_home(&world, &c).unwrap().id.clone();
+    let si = world.buildings.iter().position(|b| b.id == storage).unwrap();
+    world.buildings[si].stock = Some(Stock::new());
+    let reserve = npc_reserve(&world, city(&world, &c));
+    world.buildings[si].stock = Some(Stock::from([
+        (Good::Food, held(&reserve, Good::Food) + 5.0),
+        (Good::Wood, held(&reserve, Good::Wood) + 30.0),
+        (Good::Stone, held(&reserve, Good::Stone)),
+        (Good::Coins, held(&reserve, Good::Coins)),
+    ]));
+    let ki = carriage_of(&world, 0);
+    let mut l = Stock::from([(Good::Food, CARAVAN_FOOD), (Good::Iron, 20.0), (Good::Coins, 500.0)]);
+    for &(g, n) in extra {
+        l.insert(g, n);
+    }
+    world.carriages[ki].load = l;
+    let hall = town_hall_of(&world, city(&world, &c)).unwrap();
+    let from = (hall.x - 100.0, hall.y);
+    let tile = stop_tile(&world, &terrain, city(&world, &c), from).unwrap();
+    stand_at(&mut world, 0, &c, f64::from(tile.0), f64::from(tile.1), TRADER_STOP_TICKS);
+    Visited { world, terrain, city: c, storage, tile }
+}
+
+fn plan(v: &mut Visited) {
+    crate::npc_plan::plan_city(&mut v.world, &v.city, Some(&v.terrain), None, None);
+}
+
+fn sent(world: &WorldState, c: &str) -> Option<csp_shared::world::CityTrader> {
+    world.city_plans.get(c).and_then(|p| p.traders.as_ref()).and_then(|t| t.first().cloned())
+}
+
+fn city_stock(world: &WorldState, c: &str, g: Good) -> f64 {
+    held(&crate::queries::npc_trade::npc_city_stock(world, city(world, c)), g)
+}
+
+fn set_storage(v: &mut Visited, stock: Stock) {
+    let si = v.world.buildings.iter().position(|b| b.id == v.storage).unwrap();
+    v.world.buildings[si].stock = Some(stock);
+}
+
+#[test]
+fn sends_a_spare_hand_never_a_soldier_who_sells_its_surplus_and_buys_what_it_is_short_of() {
+    let mut v = visited(&[]);
+    plan(&mut v);
+    let run = sent(&v.world, &v.city).unwrap();
+    assert_eq!(run.visiting_id.as_ref(), Some(&v.world.traders[0].id));
+    assert_eq!(run.warehouse_id, None);
+    assert!(held(&run.sells, Good::Wood) > 0.0);
+    assert!(held(&run.buys, Good::Iron) > 0.0);
+    let hand = v.world.residents.iter().find(|r| r.id == run.resident_id).unwrap();
+    assert!(!crate::queries::residents::is_armed(&hand.carried));
+    let ki = carriage_of(&v.world, 0);
+    let wood_before = city_stock(&v.world, &v.city, Good::Wood);
+    let load_before = held(&v.world.carriages[ki].load, Good::Wood);
+    let c = v.city.clone();
+    let more_wood = move |w: &WorldState| held(&w.carriages[ki].load, Good::Wood) > load_before;
+    run_until(&mut v.world, &v.terrain, &more_wood, 4000);
+    let less_iron = move |w: &WorldState| held(&w.carriages[ki].load, Good::Iron) < 20.0;
+    run_until(&mut v.world, &v.terrain, &less_iron, 4000);
+    run_until(&mut v.world, &v.terrain, &|w| city_stock(w, &c, Good::Iron) > 0.0, 4000);
+    assert!(city_stock(&v.world, &v.city, Good::Wood) < wood_before);
+    assert_eq!(check_all(&v.world, &v.terrain), vec![]);
+}
+
+#[test]
+fn counts_the_crew_as_nobody_to_fear_though_they_are_armed() {
+    let mut v = visited(&[]);
+    for ri in crew_of(&v.world, 0) {
+        v.world.residents[ri].carried = Stock::from([(Good::Spear, 1.0)]);
+    }
+    plan(&mut v);
+    let visiting = sent(&v.world, &v.city).and_then(|r| r.visiting_id);
+    assert_eq!(visiting, Some(v.world.traders[0].id.clone()));
+}
+
+#[test]
+fn sends_nobody_with_another_armed_outsider_in_its_area() {
+    let mut v = visited(&[]);
+    let (x, y) = (f64::from(v.tile.0), f64::from(v.tile.1));
+    let raider = resident(&mut v.world, "raider", Some("r9"), x, y);
+    v.world.residents[raider].carried = Stock::from([(Good::Spear, 1.0)]);
+    plan(&mut v);
+    assert_eq!(sent(&v.world, &v.city).and_then(|r| r.visiting_id), None);
+}
+
+#[test]
+fn makes_no_deal_when_there_is_none_to_make() {
+    let mut v = visited(&[(Good::Iron, 0.0), (Good::Coins, 0.0)]);
+    let reserve = crate::queries::npc_trade::npc_reserve(&v.world, city(&v.world, &v.city));
+    set_storage(&mut v, reserve);
+    let ki = carriage_of(&v.world, 0);
+    v.world.carriages[ki].load = Stock::from([(Good::Food, CARAVAN_FOOD)]);
+    plan(&mut v);
+    assert_eq!(sent(&v.world, &v.city).and_then(|r| r.visiting_id), None);
+}
+
+#[test]
+fn buys_food_from_it_when_food_runs_short_with_the_coins_it_has_above_its_reserve() {
+    let mut v = visited(&[(Good::Iron, 0.0), (Good::Food, CARAVAN_FOOD + 40.0)]);
+    let mut reserve = crate::queries::npc_trade::npc_reserve(&v.world, city(&v.world, &v.city));
+    let coins = held(&reserve, Good::Coins) + 200.0;
+    reserve.insert(Good::Food, 0.0);
+    reserve.insert(Good::Coins, coins);
+    set_storage(&mut v, reserve);
+    plan(&mut v);
+    assert!(sent(&v.world, &v.city).is_some_and(|r| held(&r.buys, Good::Food) > 0.0));
+    let ki = carriage_of(&v.world, 0);
+    let sold = move |w: &WorldState| held(&w.carriages[ki].load, Good::Food) < CARAVAN_FOOD + 40.0;
+    run_until(&mut v.world, &v.terrain, &sold, 4000);
+    assert!(held(&v.world.carriages[ki].load, Good::Food) >= CARAVAN_FOOD);
+    assert_eq!(check_all(&v.world, &v.terrain), vec![]);
+}
+
+#[test]
+fn never_deals_in_weapons_which_would_arm_the_hand() {
+    let mut v = visited(&[(Good::Iron, 0.0)]);
+    let mut reserve = crate::queries::npc_trade::npc_reserve(&v.world, city(&v.world, &v.city));
+    reserve.insert(Good::Sword, 5.0);
+    set_storage(&mut v, reserve);
+    let ki = carriage_of(&v.world, 0);
+    v.world.carriages[ki].load =
+        Stock::from([(Good::Food, CARAVAN_FOOD), (Good::Spear, 5.0), (Good::Coins, 500.0)]);
+    plan(&mut v);
+    if let Some(run) = sent(&v.world, &v.city) {
+        let mut dealt = run.sells.keys().chain(run.buys.keys());
+        assert!(dealt.all(|g| !matches!(g, Good::Spear | Good::Sword)));
+    }
+}
+
+#[test]
+fn takes_a_hand_home_when_the_trader_goes_on_before_they_get_there() {
+    let mut v = visited(&[]);
+    plan(&mut v);
+    let hand = sent(&v.world, &v.city).unwrap().resident_id;
+    v.world.traders[0].stand = None;
+    v.world.traders[0].calls = Some(Vec::new());
+    let si = v.world.buildings.iter().position(|b| b.id == v.storage).unwrap();
+    let wood = held_in(v.world.buildings[si].stock.as_ref(), Good::Wood);
+    let (c, h) = (v.city.clone(), hand.clone());
+    let home = move |w: &WorldState| sent(w, &c).is_none_or(|r| r.resident_id != h);
+    run_until(&mut v.world, &v.terrain, &home, 4000);
+    let r = v.world.residents.iter().find(|r| r.id == hand).unwrap();
+    assert!(!r.carried.contains_key(&Good::Wood));
+    assert_eq!(held_in(v.world.buildings[si].stock.as_ref(), Good::Wood), wood);
+    assert_eq!(check_all(&v.world, &v.terrain), vec![]);
+}
+
+// what holds trader stops together
+
+fn messages(world: &WorldState) -> String {
+    trader_stops_sound(world).into_iter().map(|v| v.message).collect::<Vec<_>>().join(",")
+}
+
+fn stand(city: &str, until: f64) -> Option<TraderStand> {
+    Some(TraderStand { city_id: city.into(), x: 1.0, y: 1.0, until: Some(until) })
+}
+
+#[test]
+fn catches_a_city_called_at_twice_too_long_a_stay_and_two_on_one_tile() {
+    let Fixture { mut world, post, .. } = fixture();
+    world.traders[0].calls = Some(vec!["a".into(), "a".into()]);
+    assert!(messages(&world).contains("twice"));
+    world.traders[0].calls = Some(Vec::new());
+    let tick = world.tick as f64;
+    world.traders[0].stand = stand(&post, tick + TRADER_STOP_TICKS + 1.0);
+    put(&mut world, 0, 1.0, 1.0);
+    assert!(messages(&world).contains("too long"));
+    world.traders[0].stand.as_mut().unwrap().until = Some(tick + 5.0);
+    let mut other = world.traders[0].clone();
+    other.id = "other".into();
+    world.traders.push(other);
+    assert!(messages(&world).contains("with another trader"));
+}
+
+#[test]
+fn catches_one_that_left_its_stop_with_time_to_stand() {
+    let Fixture { mut world, post, .. } = fixture();
+    let tick = world.tick as f64;
+    world.traders[0].stand = stand(&post, tick + 5.0);
+    put(&mut world, 0, 2.0, 2.0);
+    assert!(messages(&world).contains("left its stop"));
+}
+
+#[test]
+fn is_one_of_the_worlds_invariants() {
+    let Fixture { mut world, terrain, post, .. } = fixture();
+    let tick = world.tick as f64;
+    world.traders[0].stand = stand(&post, tick + 5.0);
+    put(&mut world, 0, 2.0, 2.0);
+    assert!(check_all(&world, &terrain).iter().any(|v| v.invariant == "trader-stops-sound"));
 }
