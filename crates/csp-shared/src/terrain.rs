@@ -8,9 +8,14 @@
 
 use std::collections::HashSet;
 
+use ts_rs::TS;
+
 /// Terrain types (`CONTEXT.md`: Terrain) as the byte stored per tile. These codes are persisted,
 /// so never renumber them; only add new ones.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, TS)]
+/// The twin is the number union `0 | 1 | ... | 6` (`Terrain` of `terrain.ts`, which is also a constant
+/// object the client keeps writing itself).
+#[ts(type = "0 | 1 | 2 | 3 | 4 | 5 | 6")]
 #[repr(u8)]
 pub enum Terrain {
     Plains = 0,

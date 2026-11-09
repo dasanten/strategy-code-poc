@@ -116,6 +116,7 @@ pub mod trading;
 pub mod trading_posts;
 pub mod training;
 pub mod transfers;
+pub mod views;
 pub mod walk_time;
 pub mod walking;
 pub mod walls;

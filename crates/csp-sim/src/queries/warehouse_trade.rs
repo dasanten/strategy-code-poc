@@ -9,6 +9,7 @@ use csp_shared::world::{
     TransferJobStep, WorldState,
 };
 use serde_json::Value;
+use ts_rs::TS;
 
 use super::building::KEEPS_GOODS;
 use super::command::commands_carriage;
@@ -31,7 +32,8 @@ pub fn trading_warehouse_at(world: &WorldState, x: f64, y: f64) -> Option<&Build
 
 /// What a trader trades with (`TradeHolder`): the goods in their hands or on their carriage, and
 /// the room left, in kg.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, TS)]
+#[ts(rename_all = "camelCase")]
 pub struct TradeHolder<'s> {
     pub stock: &'s Stock,
     pub room: f64,
@@ -48,7 +50,8 @@ pub fn load_of(carriage: &Carriage, capacity: f64) -> TradeHolder<'_> {
 }
 
 /// What stops a trade short of the units wanted (`TradeLimit`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, TS)]
+#[ts(rename_all = "camelCase")]
 pub enum TradeLimit {
     Coins,
     Held,
@@ -62,10 +65,12 @@ pub enum TradeLimit {
 
 /// What a trade moves (`TradeQuote`): `units` of the good one way, `coins` the other, and what
 /// stopped it short.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, TS)]
+#[ts(rename_all = "camelCase")]
 pub struct TradeQuote {
     pub units: f64,
     pub coins: f64,
+    #[ts(optional)]
     pub limit: Option<TradeLimit>,
 }
 
@@ -445,7 +450,8 @@ pub fn owed_by(world: &WorldState, warehouse_id: &str, good: Good) -> f64 {
 }
 
 /// What a delivery or pick-up moves (`DeliveryQuote`): units, the coins paid for them, the fee.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, TS)]
+#[ts(rename_all = "camelCase")]
 pub struct DeliveryQuote {
     pub units: f64,
     pub coins: f64,

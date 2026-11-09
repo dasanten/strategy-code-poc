@@ -8,6 +8,8 @@ pub mod goods;
 pub mod protocol;
 pub mod terrain;
 pub mod time;
+pub mod ts_aliases;
+pub mod views;
 pub mod world;
 
 /// Real milliseconds per tick: 1 real second is 1 game minute (`CONTEXT.md`: Game time).

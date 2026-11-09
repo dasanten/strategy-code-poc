@@ -9,6 +9,7 @@ use csp_shared::world::{
     Building, BuildingKind, City, Good, Horse, Resident, Stock, TradeSide, Trader, WorldState,
 };
 use serde_json::Value;
+use ts_rs::TS;
 
 use super::carriages::carriage_capacity;
 use super::city::{city_price, for_sale, npc_city_refuses, sells_to, town_hall_of};
@@ -231,13 +232,15 @@ pub fn npc_trade_problem(
 }
 
 /// What a swap moves, from the trader's side (`SwapQuote`).
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, TS)]
+#[ts(rename_all = "camelCase")]
 pub struct SwapQuote {
     pub units: f64,
     pub gives: f64,
     pub coins: f64,
     pub bought: f64,
     pub sold: f64,
+    #[ts(optional)]
     pub limit: Option<TradeLimit>,
 }
 

@@ -4,13 +4,17 @@
 //! `null`, when it is. The tables themselves are generated into [`crate::script_tables`].
 
 use serde_json::Value;
+use ts_rs::TS;
 
 pub use crate::script_tables::{SCRIPT_VIEWS, SCRIPT_VIEW_CHANGES};
 
 /// The kind of value a field or an API name holds (`ScriptType`): a plain value, a script view,
 /// or a list of either. `Any` is anything (`memory`, an object of the script's own making),
 /// never checked.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, TS)]
+#[ts(
+    type = "\"number\" | \"string\" | \"boolean\" | \"any\" | { view: ScriptViewName } | { list: ScriptType }"
+)]
 pub enum ScriptType {
     Number,
     String,
@@ -36,12 +40,14 @@ impl ScriptType {
 }
 
 /// A field of a script view (`ScriptField`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, TS)]
+#[ts(rename_all = "camelCase")]
 pub struct ScriptField {
     pub name: &'static str,
     pub r#type: ScriptType,
     pub description: &'static str,
     /// When the field is `null`; `None` when it never is.
+    #[ts(optional)]
     pub null_when: Option<&'static str>,
 }
 

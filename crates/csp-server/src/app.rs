@@ -35,6 +35,7 @@ use csp_sim::tick::Scratch;
 use rusqlite::Connection;
 use serde::Serialize;
 use serde_json::{json, Value};
+use ts_rs::TS;
 
 use crate::auth::{
     create_invite_code, create_session, delete_session, find_user_by_name, get_session_user,
@@ -468,9 +469,9 @@ fn chunk_param(s: &str) -> Option<i32> {
     (n.fract() == 0.0 && n.is_finite() && n.abs() < f64::from(i32::MAX)).then_some(n as i32)
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
-struct Account {
+pub struct Account {
     name: String,
     is_admin: bool,
 }

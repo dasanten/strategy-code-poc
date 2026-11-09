@@ -6,6 +6,7 @@
 use csp_lang::js::number_to_string;
 use csp_shared::world::{Directive, DirectiveGoal, Resident, WorldState};
 use serde::Serialize;
+use ts_rs::TS;
 
 use crate::queries::residents::is_armed;
 
@@ -68,7 +69,7 @@ pub fn goals_met(d: &Directive) -> bool {
 
 /// A directive's goal as every Player sees it: what it asks, not how far it has come
 /// (`DirectiveGoalView`).
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum DirectiveGoalView {
     City {
@@ -77,13 +78,14 @@ pub enum DirectiveGoalView {
     Soldiers {
         count: f64,
         #[serde(skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
         percent: Option<f64>,
     },
 }
 
 /// A directive as every Player sees it: its target, reason, goals and price, never who gave it
 /// (`DirectiveView`).
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct DirectiveView {
     pub id: String,

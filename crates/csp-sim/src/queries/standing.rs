@@ -6,6 +6,7 @@ use csp_shared::balance::{
 };
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{City, WorldState};
+use ts_rs::TS;
 
 use super::alliance::realm_name;
 
@@ -74,7 +75,8 @@ pub fn standing_of(world: &WorldState, of: &str, toward: &str) -> f64 {
 }
 
 /// What an Organization is, as a Player sees standing with it (`StandingView.is`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, TS)]
+#[ts(rename_all = "camelCase")]
 pub enum OrganizationIs {
     Realm,
     City,
@@ -83,7 +85,8 @@ pub enum OrganizationIs {
 
 /// One Organization as a Player sees standing with it (`StandingView`): how it regards their
 /// realm (`theirs`) and how their realm regards it (`yours`), both rounded to whole points.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, TS)]
+#[ts(rename_all = "camelCase")]
 pub struct StandingView {
     pub org: String,
     pub name: String,

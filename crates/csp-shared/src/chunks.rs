@@ -2,6 +2,7 @@
 //! `packages/shared/src/chunks.ts` and `terrain.ts`, byte for byte.
 
 use crate::world::ResourceKind;
+use ts_rs::TS;
 
 /// Terrain is served to clients in square chunks of this many tiles a side (ADR 0006).
 pub const CHUNK_SIZE: i32 = 32;
@@ -52,7 +53,7 @@ pub fn admin_terrain_chunk_path(cx: i32, cy: i32) -> String {
 }
 
 /// A resource node as a Player knows it from explored terrain, in map coordinates.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, TS)]
 pub struct KnownNode {
     pub kind: ResourceKind,
     pub x: i32,
@@ -60,11 +61,12 @@ pub struct KnownNode {
 }
 
 /// One chunk of explored terrain as the client gets it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, TS)]
 pub struct TerrainChunk {
     pub cx: i32,
     pub cy: i32,
     /// `CHUNK_TILES` terrain bytes, row-major; `UNEXPLORED` where the Player hasn't been.
+    #[ts(type = "Uint8Array")]
     pub tiles: Vec<u8>,
     /// Resource nodes on explored tiles of this chunk, in map coordinates.
     pub nodes: Vec<KnownNode>,

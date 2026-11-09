@@ -6,6 +6,7 @@
 //! here they are JSON values built the same way, key for key, so the wire shape is the same.
 
 use std::collections::{HashMap, HashSet};
+use ts_rs::TS;
 
 use csp_shared::terrain::wrap;
 use csp_shared::world::{BuildingKind, Caravan, City, RunningScript, Stock, Trader, WorldState};
@@ -48,7 +49,8 @@ pub trait AdminLookups {
 
 /// The rectangle of tiles whose entities an admin loads (`AdminViewRequest`), wrapping around the
 /// map's edges; with `cities_only`, just the cities whose town hall stands in it.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, TS)]
+#[ts(type = "{ x: number, y: number, w: number, h: number, citiesOnly?: boolean }")]
 pub struct AdminViewRequest {
     pub x: i32,
     pub y: i32,
@@ -298,7 +300,7 @@ fn trader_name(world: &WorldState, t: &Trader) -> String {
 }
 
 /// A spot on the jump list (`AdminPlace`).
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 pub struct AdminPlace {
     pub id: String,
     pub name: String,

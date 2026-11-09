@@ -21,6 +21,7 @@ use csp_shared::world::default_scripts::Task;
 use csp_sim::sight::InvariantViolation;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
+use ts_rs::TS;
 
 use crate::auth::{ApiErrorCode, AuthError, AuthFailure, AuthResult};
 
@@ -343,7 +344,7 @@ pub fn default_script_id(
 }
 
 /// A script in the Player's library (`ScriptSummary`).
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct ScriptSummary {
     pub id: i64,
@@ -356,22 +357,24 @@ pub struct ScriptSummary {
     /// A default script the Player hasn't edited, which follows the game's default.
     pub follows_default: bool,
     /// The active version's `param` lines; none while there is none.
+    #[ts(as = "Vec<csp_shared::views::ScriptParam>")]
     pub params: Vec<ParamInfo>,
 }
 
 /// One saved version of a script, with the syntax errors it has (at most one).
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct ScriptVersion {
     pub version: i64,
     pub source: String,
     /// Seconds since the epoch.
     pub saved_at: i64,
+    #[ts(type = "Array<{ message: string, line: number, column: number }>")]
     pub errors: Vec<Diagnostic>,
 }
 
 /// The game's side of a Player's default script (`GameDefault`).
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct GameDefault {
     /// The game's current default.
@@ -381,13 +384,14 @@ pub struct GameDefault {
 }
 
 /// A script with its whole history, oldest version first (`ScriptDetail`).
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct ScriptDetail {
     #[serde(flatten)]
     pub summary: ScriptSummary,
     pub versions: Vec<ScriptVersion>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub game_default: Option<GameDefault>,
 }
 

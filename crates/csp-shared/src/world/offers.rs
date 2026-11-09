@@ -1,12 +1,13 @@
 //! The world-state types of `packages/shared/src/offers.ts`.
 
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 use super::{DirectOfferTerms, Good};
 
 /// An offer as anyone in sight sees it (`SeenOffer = Offer & { rate }`): the fields of `Offer`
 /// with what it wants for one unit it gives.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SeenOffer {
     pub id: String,
@@ -20,6 +21,7 @@ pub struct SeenOffer {
     pub wants_units: f64,
     pub times: f64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub direct: Option<DirectOfferTerms>,
     pub rate: f64,
 }

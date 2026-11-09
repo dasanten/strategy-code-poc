@@ -152,6 +152,12 @@ importers:
 
   packages/shared: {}
 
+  packages/shared-types:
+    devDependencies:
+      '@csp/shared':
+        specifier: workspace:*
+        version: link:../shared
+
 packages:
 
   '@cacheable/memory@2.2.0':
