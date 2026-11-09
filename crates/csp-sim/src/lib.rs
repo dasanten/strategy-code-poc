@@ -22,6 +22,7 @@ pub mod crimes;
 pub mod default_scripts;
 pub mod defence;
 pub mod deliveries;
+pub mod demands;
 pub mod directive;
 pub mod directives;
 pub mod driving;

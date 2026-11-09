@@ -473,6 +473,10 @@ pub fn add_later_rule_orders(kinds: &mut OrderKinds) {
 
     // reviving.ts (named by no rule ticket; T86.14).
     kinds.insert("feed", crate::reviving::Feed);
+    // Demands.
+    kinds.insert("sendDemand", crate::demands::SendDemand);
+    kinds.insert("acceptDemand", crate::demands::AcceptDemand);
+    kinds.insert("declineDemand", crate::demands::DeclineDemand);
     // Offers and Direct offers.
     kinds.insert("postOffer", crate::offers::PostOffer);
     kinds.insert("takeDownOffer", crate::offers::TakeDownOffer);

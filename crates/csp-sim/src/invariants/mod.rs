@@ -144,8 +144,7 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant { name: "attack-orders-sound", check: checks::attack_orders_sound },
         Invariant { name: "armies-sound", check: |w, _| crate::armies::armies_sound(w) },
         Invariant { name: "contracts-sound", check: |w, _| crate::contracts::contracts_sound(w) },
-        // TODO(T86.11): `demandsSound` in `demands.ts`.
-        pending("demands-sound"),
+        Invariant { name: "demands-sound", check: |w, _| crate::demands::demands_sound(w) },
         Invariant { name: "buy-orders-done", check: |w, _| crate::buying::buy_orders_done(w) },
         Invariant { name: "city-prices-sound", check: |w, _| crate::buying::city_prices_sound(w) },
         Invariant { name: "trade-orders-done", check: |w, _| crate::trading::trade_orders_done(w) },

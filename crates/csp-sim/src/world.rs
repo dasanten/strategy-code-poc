@@ -411,9 +411,13 @@ fn step_npc_cities(
 }
 fn step_outsiders(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
 
-// `demands.ts` (filed under T86.11 here, but named by no ticket; T86.14 or whoever ports it).
-fn answer_demands(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
-fn step_demands(_world: &mut WorldState, _scratch: &mut Scratch) {}
+// `demands.ts`.
+fn answer_demands(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
+    crate::demands::answer_demands(world, size);
+}
+fn step_demands(world: &mut WorldState, _scratch: &mut Scratch) {
+    crate::demands::step_demands(world);
+}
 
 // T86.13 (`last-seen.ts`).
 fn step_last_seen(world: &mut WorldState, size: i32, scratch: &mut Scratch) {
