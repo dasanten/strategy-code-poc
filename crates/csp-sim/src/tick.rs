@@ -310,6 +310,10 @@ pub struct Scratch {
     pub last_seen: crate::last_seen::LastSeenState,
     /// The trades of the latest `resolveTrades`, for the invariants over them (`ledger`).
     pub trades: TradeLedger,
+    /// The offers accepted by the latest `resolveOffers`, for the invariants over them (`ledger`).
+    pub offers: crate::offers::OfferLedger,
+    /// The debt payments of the latest `resolveDebtPayments`, for its invariants (`ledger`).
+    pub debt_payments: crate::trade_org_debt::DebtLedger,
 }
 
 impl Scratch {
