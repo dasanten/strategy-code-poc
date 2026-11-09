@@ -9,6 +9,7 @@
 //! fine and come out as separate copies. The lists and objects on the current path are tracked,
 //! so a value that holds itself is found instead of overflowing the stack.
 
+use std::rc::Rc;
 use std::collections::HashSet;
 
 use crate::js;
@@ -120,7 +121,7 @@ impl Walk {
                     self.why = Some(NotPlain::Cycle);
                     return serde_json::Value::Null;
                 }
-                let entries: Vec<(String, Value)> =
+                let entries: Vec<(Rc<str>, Value)> =
                     object.borrow().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
                 self.size += 2 + entries.len().saturating_sub(1);
                 let mut out = serde_json::Map::new();
@@ -133,7 +134,7 @@ impl Walk {
                         break;
                     }
                     let plain = self.walk(item);
-                    out.insert(key.clone(), plain);
+                    out.insert(key.to_string(), plain);
                 }
                 self.path.remove(&object.addr());
                 serde_json::Value::Object(out)

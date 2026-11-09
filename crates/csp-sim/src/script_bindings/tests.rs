@@ -338,3 +338,39 @@ fn declare_every_field_the_games_default_scripts_read() {
         assert!(undeclared.is_empty(), "{task:?}: {undeclared:?}");
     }
 }
+
+/// Not a check: how long `me`, `building` and a run of a small script take, for the NPC script
+/// speed (T86.14). `cargo test -p csp-sim --lib bench_bindings -- --ignored --nocapture`.
+#[test]
+#[ignore = "a measurement, not a check"]
+fn bench_bindings() {
+    let (world, terrain) = setup();
+    let index = WorldIndex::new(&world, SIZE);
+    let sender = OrderSender::player(7, "Mara");
+    let seen = || entities_in_sight(&world, &index, Some("r1"), None);
+    let eyes = || sight_of(&world, &index, "r1", None);
+    let explored = |_: i32, _: i32| true;
+    let kinds = crate::orders::order_kinds();
+    let n = 20_000;
+    let from = std::time::Instant::now();
+    for _ in 0..n {
+        let ctx = ScriptContext {
+            world: &world,
+            terrain: &terrain,
+            index: &index,
+            sender: &sender,
+            resident_id: Some("a1"),
+            army_id: None,
+            memory: Object::new(),
+            seen: &seen,
+            eyes: &eyes,
+            explored: &explored,
+            kinds: &kinds,
+            edge: None,
+            params: None,
+        };
+        let mut bound = bind_script(ctx).unwrap();
+        std::hint::black_box(csp_lang::interpreter::Host::global(&mut bound, "me"));
+    }
+    eprintln!("BENCH me {:.2} us", from.elapsed().as_secs_f64() * 1e6 / n as f64);
+}
