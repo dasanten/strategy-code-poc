@@ -1,0 +1,3690 @@
+{
+  "keywords": [
+    "let",
+    "if",
+    "else",
+    "while",
+    "for",
+    "of",
+    "fn",
+    "return",
+    "true",
+    "false",
+    "null"
+  ],
+  "paramsShape": "$params",
+  "residentOrArmy": "residentOrArmy",
+  "paramDescriptions": {
+    "building": "One of my realm’s buildings, or a workplace or construction site of anyone’s I know: in sight, or as last seen.",
+    "storage": "One of my realm’s storages or stables, or one of its carriages.",
+    "number": "A whole number of zero or more, typed in; `= n` after the type gives it a default.",
+    "choice": "One of the words its line lists, `choice(north, east, south, west)`, picked from a list and read as that word; `= north` after the list gives it a default.",
+    "waypoint": "One of my waypoints, picked from a list or on the map, read as its `id`, `name`, `x` and `y`; unset once it is removed."
+  },
+  "scriptViews": {
+    "resident": {
+      "description": "A resident, as the Player sees them; `me` in a resident’s script.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "The resident’s id, unique in the world."
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "The resident’s name."
+        },
+        {
+          "name": "owner",
+          "type": "string",
+          "description": "The realm they belong to.",
+          "nullWhen": "for a resident of an NPC city or of nobody"
+        },
+        {
+          "name": "cityId",
+          "type": "string",
+          "description": "The city they live in.",
+          "nullWhen": "for a resident of no city"
+        },
+        {
+          "name": "x",
+          "type": "number",
+          "description": "The tile it stands on, from west to east."
+        },
+        {
+          "name": "y",
+          "type": "number",
+          "description": "The tile it stands on, from north to south."
+        },
+        {
+          "name": "stats",
+          "type": {
+            "view": "stats"
+          },
+          "description": "Strength, endurance, agility and intellect."
+        },
+        {
+          "name": "skills",
+          "type": {
+            "view": "skills"
+          },
+          "description": "What they have learned by doing."
+        },
+        {
+          "name": "health",
+          "type": "number",
+          "description": "0 is dead; full is 100.",
+          "nullWhen": "for a resident of another realm that isn’t allied"
+        },
+        {
+          "name": "hunger",
+          "type": "number",
+          "description": "Fully fed is 100, empty 0.",
+          "nullWhen": "for a resident of another realm that isn’t allied"
+        },
+        {
+          "name": "down",
+          "type": "boolean",
+          "description": "Whether they are Down: lying unconscious from hunger, doing nothing and taking no orders."
+        },
+        {
+          "name": "downUntil",
+          "type": "number",
+          "description": "The tick at which they die of hunger unless revived.",
+          "nullWhen": "unless they are Down, and for a resident of another realm that isn’t allied"
+        },
+        {
+          "name": "struckBy",
+          "type": "string",
+          "description": "The id of the resident who last struck them, a dodged blow too.",
+          "nullWhen": "until someone does, once that resident is gone, and for a resident of another realm that isn’t allied"
+        },
+        {
+          "name": "struckAt",
+          "type": "number",
+          "description": "The tick they were last struck.",
+          "nullWhen": "whenever `struckBy` is"
+        },
+        {
+          "name": "defenceScript",
+          "type": "number",
+          "description": "The id of the script they run when struck, picked on their card.",
+          "nullWhen": "for the Defend default, and for a resident of another Player"
+        },
+        {
+          "name": "alarmScript",
+          "type": "any",
+          "description": "What they run when an alarm reaches them, picked on their card: a script’s id, or \"none\" for nothing.",
+          "nullWhen": "for the Alarm default, and for a resident of another Player"
+        },
+        {
+          "name": "alarm",
+          "type": {
+            "view": "alarm"
+          },
+          "description": "The alarm their Alarm script runs for.",
+          "nullWhen": "except on `me` while my Alarm script runs"
+        },
+        {
+          "name": "knownThief",
+          "type": "boolean",
+          "description": "Whether my realm knows they stole from it, or one of my residents saw it. In my own City area, striking them is no crime.",
+          "nullWhen": "except from `residents()`"
+        },
+        {
+          "name": "bornAt",
+          "type": "number",
+          "description": "The tick they were born; may be before the world began."
+        },
+        {
+          "name": "age",
+          "type": "number",
+          "description": "Their age in game years.",
+          "nullWhen": "except on `me` and an army’s `members`"
+        },
+        {
+          "name": "lifespan",
+          "type": "number",
+          "description": "The age in game years at which they die of old age."
+        },
+        {
+          "name": "carried",
+          "type": {
+            "view": "goods"
+          },
+          "description": "The goods they carry."
+        },
+        {
+          "name": "order",
+          "type": {
+            "view": "residentOrder"
+          },
+          "description": "What they were ordered to do.",
+          "nullWhen": "when idle"
+        },
+        {
+          "name": "orderEnded",
+          "type": {
+            "view": "orderEnded"
+          },
+          "description": "How their last store, fetch or relocate order ended.",
+          "nullWhen": "until one ended, and after their next store, fetch or relocate order or an order from the UI"
+        },
+        {
+          "name": "queue",
+          "type": {
+            "view": "queue"
+          },
+          "description": "The queue they work through; `order` or `script` is its current step’s.",
+          "nullWhen": "when they have none, and for a resident of another realm"
+        },
+        {
+          "name": "pair",
+          "type": {
+            "view": "pair"
+          },
+          "description": "Their pair, to have a child.",
+          "nullWhen": "unless they are paired"
+        },
+        {
+          "name": "carrying",
+          "type": {
+            "view": "carrying"
+          },
+          "description": "The child they carry.",
+          "nullWhen": "unless they carry one"
+        },
+        {
+          "name": "riding",
+          "type": "string",
+          "description": "The id of the horse they ride.",
+          "nullWhen": "unless they ride one"
+        },
+        {
+          "name": "aboard",
+          "type": "string",
+          "description": "The id of the carriage they ride on as a passenger.",
+          "nullWhen": "unless they are aboard one"
+        },
+        {
+          "name": "script",
+          "type": {
+            "view": "runningScript"
+          },
+          "description": "The script they run.",
+          "nullWhen": "when they run none, and on `me` (a script’s own state is `memory`)"
+        }
+      ]
+    },
+    "army": {
+      "description": "An army of the Player’s realm; `me` in an army’s script.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "The army’s id, unique in the world."
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "The name the Player gave it."
+        },
+        {
+          "name": "realmId",
+          "type": "string",
+          "description": "The realm it belongs to."
+        },
+        {
+          "name": "memberIds",
+          "type": {
+            "list": "string"
+          },
+          "description": "Its residents’ ids; never empty."
+        },
+        {
+          "name": "members",
+          "type": {
+            "list": {
+              "view": "resident"
+            }
+          },
+          "description": "Its residents, as the Player sees them, with their `age`."
+        },
+        {
+          "name": "struckBy",
+          "type": "string",
+          "description": "Who last struck one of its members: the `struckBy` of the member struck last.",
+          "nullWhen": "until a member is struck, and once that attacker is gone"
+        },
+        {
+          "name": "struckAt",
+          "type": "number",
+          "description": "The tick one of its members was last struck.",
+          "nullWhen": "whenever `struckBy` is"
+        },
+        {
+          "name": "order",
+          "type": {
+            "view": "armyOrder"
+          },
+          "description": "What it was ordered to do.",
+          "nullWhen": "when idle"
+        }
+      ]
+    },
+    "stats": {
+      "description": "A resident’s stats.",
+      "fields": [
+        {
+          "name": "strength",
+          "type": {
+            "view": "stat"
+          },
+          "description": "Their strength."
+        },
+        {
+          "name": "endurance",
+          "type": {
+            "view": "stat"
+          },
+          "description": "Their endurance."
+        },
+        {
+          "name": "agility",
+          "type": {
+            "view": "stat"
+          },
+          "description": "Their agility."
+        },
+        {
+          "name": "intellect",
+          "type": {
+            "view": "stat"
+          },
+          "description": "Their intellect."
+        }
+      ]
+    },
+    "stat": {
+      "description": "One stat: what they were born with and what training added.",
+      "fields": [
+        {
+          "name": "base",
+          "type": "number",
+          "description": "What they were born with."
+        },
+        {
+          "name": "trained",
+          "type": "number",
+          "description": "What training added, at most the base."
+        }
+      ]
+    },
+    "skills": {
+      "description": "What a resident has learned by doing; a skill they haven’t learned is null (0).",
+      "fields": [
+        {
+          "name": "mining",
+          "type": "number",
+          "description": "How far they have learned mining.",
+          "nullWhen": "until they start learning it"
+        },
+        {
+          "name": "woodcutting",
+          "type": "number",
+          "description": "How far they have learned woodcutting.",
+          "nullWhen": "until they start learning it"
+        },
+        {
+          "name": "smelting",
+          "type": "number",
+          "description": "How far they have learned smelting.",
+          "nullWhen": "until they start learning it"
+        },
+        {
+          "name": "smithing",
+          "type": "number",
+          "description": "How far they have learned smithing.",
+          "nullWhen": "until they start learning it"
+        },
+        {
+          "name": "construction",
+          "type": "number",
+          "description": "How far they have learned construction.",
+          "nullWhen": "until they start learning it"
+        },
+        {
+          "name": "farming",
+          "type": "number",
+          "description": "How far they have learned farming.",
+          "nullWhen": "until they start learning it"
+        },
+        {
+          "name": "combat",
+          "type": "number",
+          "description": "How far they have learned combat.",
+          "nullWhen": "until they start learning it"
+        },
+        {
+          "name": "driving",
+          "type": "number",
+          "description": "How far they have learned driving.",
+          "nullWhen": "until they start learning it"
+        }
+      ]
+    },
+    "goods": {
+      "description": "Goods by kind, in units, like {food: 3, wood: 10}.",
+      "fields": [
+        {
+          "name": "food",
+          "type": "number",
+          "description": "Units of food.",
+          "nullWhen": "when there are none"
+        },
+        {
+          "name": "wood",
+          "type": "number",
+          "description": "Units of wood.",
+          "nullWhen": "when there are none"
+        },
+        {
+          "name": "stone",
+          "type": "number",
+          "description": "Units of stone.",
+          "nullWhen": "when there are none"
+        },
+        {
+          "name": "ironOre",
+          "type": "number",
+          "description": "Units of ironOre.",
+          "nullWhen": "when there are none"
+        },
+        {
+          "name": "iron",
+          "type": "number",
+          "description": "Units of iron.",
+          "nullWhen": "when there are none"
+        },
+        {
+          "name": "goldOre",
+          "type": "number",
+          "description": "Units of goldOre.",
+          "nullWhen": "when there are none"
+        },
+        {
+          "name": "coins",
+          "type": "number",
+          "description": "Units of coins.",
+          "nullWhen": "when there are none"
+        },
+        {
+          "name": "spear",
+          "type": "number",
+          "description": "Units of spear.",
+          "nullWhen": "when there are none"
+        },
+        {
+          "name": "sword",
+          "type": "number",
+          "description": "Units of sword.",
+          "nullWhen": "when there are none"
+        },
+        {
+          "name": "shield",
+          "type": "number",
+          "description": "Units of shield.",
+          "nullWhen": "when there are none"
+        },
+        {
+          "name": "armour",
+          "type": "number",
+          "description": "Units of armour.",
+          "nullWhen": "when there are none"
+        }
+      ]
+    },
+    "queue": {
+      "description": "A resident’s queue: steps done one after another. The current step’s order or script is the resident’s `order` or `script`.",
+      "fields": [
+        {
+          "name": "step",
+          "type": "number",
+          "description": "The current step, counted from 1."
+        },
+        {
+          "name": "steps",
+          "type": "number",
+          "description": "How many steps it holds."
+        },
+        {
+          "name": "loop",
+          "type": "boolean",
+          "description": "Whether the first step follows the last."
+        },
+        {
+          "name": "kind",
+          "type": "string",
+          "description": "The current step’s order: \"walkTo\", \"store\", \"task\", \"runScript\", …."
+        },
+        {
+          "name": "task",
+          "type": "string",
+          "description": "The task the current step gives.",
+          "nullWhen": "unless it gives a task"
+        },
+        {
+          "name": "scriptId",
+          "type": "number",
+          "description": "The script the current step runs.",
+          "nullWhen": "unless it runs a script"
+        },
+        {
+          "name": "minutes",
+          "type": "number",
+          "description": "The current step’s duration in game minutes.",
+          "nullWhen": "when it has none"
+        },
+        {
+          "name": "startedAt",
+          "type": "number",
+          "description": "The tick the current step started.",
+          "nullWhen": "until it has"
+        }
+      ]
+    },
+    "residentOrder": {
+      "description": "A resident’s order, as plain data; which fields it has depends on its `kind`, the others are null.",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "string",
+          "description": "The order: \"walkTo\", \"drive\", \"haul\", \"pickUp\", \"drop\", \"store\", \"fetch\", \"build\", \"tearDown\", \"workAt\", \"teach\", \"train\", \"breed\", \"attack\", \"climb\", \"roadLine\", \"wallLine\", \"pay\", \"buyCity\", \"trade\", \"swap\", \"buyHorse\", \"sellHorse\", \"handIn\", \"buyOff\", \"payDebt\", \"acceptOffer\" or \"relocate\" (on their way to `cityId`, to live there)."
+        },
+        {
+          "name": "target",
+          "type": {
+            "view": "tile"
+          },
+          "description": "Where a walk or drive goes, or the tile of the city’s area a relocation heads for.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "at",
+          "type": {
+            "view": "tile"
+          },
+          "description": "The tile a build, work, tear-down, breeding or climb is on.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "progress",
+          "type": "number",
+          "description": "How far into the next step or piece of work; for breeding, the ticks tended so far.",
+          "nullWhen": "for orders that have none"
+        },
+        {
+          "name": "buildingId",
+          "type": "string",
+          "description": "The building worked, taught or trained at, or torn down.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "subject",
+          "type": "string",
+          "description": "The stat or skill taught.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "learning",
+          "type": "string",
+          "description": "The stat or skill a trainee gained in on the last tick.",
+          "nullWhen": "while a trainee waits (no teacher, or at their ceiling), and for other orders"
+        },
+        {
+          "name": "building",
+          "type": "string",
+          "description": "The kind of building being built.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "siteId",
+          "type": "string",
+          "description": "The construction site being built.",
+          "nullWhen": "for other orders, and until it is laid out"
+        },
+        {
+          "name": "makes",
+          "type": "string",
+          "description": "What a smithy is to make.",
+          "nullWhen": "for other orders, and at other workplaces"
+        },
+        {
+          "name": "carriageId",
+          "type": "string",
+          "description": "The carriage driven, hauled with or traded from.",
+          "nullWhen": "for other orders, and when none"
+        },
+        {
+          "name": "stableId",
+          "type": "string",
+          "description": "The stable horses are bred at.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "horseIds",
+          "type": {
+            "list": "string"
+          },
+          "description": "The two horses being bred.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "targetId",
+          "type": "string",
+          "description": "Who is attacked.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "wallId",
+          "type": "string",
+          "description": "The wall or gate climbed.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "from",
+          "type": "any",
+          "description": "Where goods are picked up from (a spot), fetched from (a spot: a storage or carriage), or a haul’s first stop (a tile).",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "to",
+          "type": "any",
+          "description": "Where goods are dropped (a spot), stored (a spot: a storage or carriage), or a haul’s second stop (a tile).",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "goods",
+          "type": "any",
+          "description": "The goods picked up, dropped, stored or fetched, like {food: 3} (null units for a store or fetch of as many as there are), or the goods a haul takes to its second stop, as a list.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "returnGoods",
+          "type": {
+            "list": "string"
+          },
+          "description": "The goods a haul brings back.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "keepFood",
+          "type": "number",
+          "description": "The Food a haul keeps on board for the horse.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "stop",
+          "type": "string",
+          "description": "The haul stop a carriage is at or bound for: \"from\" or \"to\".",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "phase",
+          "type": "string",
+          "description": "A haul’s \"loading\" or \"driving\", a road line’s \"walking\" or \"building\", a store’s \"walking\", \"putting\" or \"refilling\", a fetch’s \"walking\" or \"taking\".",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "tiles",
+          "type": {
+            "list": "any"
+          },
+          "description": "The road line’s tiles still to build, as [x, y] pairs.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "side",
+          "type": "string",
+          "description": "A trade’s \"buy\" or \"sell\".",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "good",
+          "type": "string",
+          "description": "The good traded or handed in.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "units",
+          "type": "number",
+          "description": "The units traded, wanted in a swap or handed in.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "give",
+          "type": "string",
+          "description": "The good a swap gives.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "want",
+          "type": "string",
+          "description": "The good a swap wants.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "cityId",
+          "type": "string",
+          "description": "The city bought, a caravan trade’s city, or the city they relocate to.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "toCityId",
+          "type": "string",
+          "description": "Where handed-in goods go.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "contractId",
+          "type": "string",
+          "description": "The mercenary contract paid.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "weeks",
+          "type": "number",
+          "description": "The weeks paid.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "directiveId",
+          "type": "string",
+          "description": "The directive bought off.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "army",
+          "type": "string",
+          "description": "The army that gave this order.",
+          "nullWhen": "for an order of the resident’s own"
+        }
+      ]
+    },
+    "armyOrder": {
+      "description": "An army’s order; which fields it has depends on its `kind`, the others are null.",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "string",
+          "description": "The order: \"walkTo\", \"attack\", \"guard\" or \"follow\"."
+        },
+        {
+          "name": "target",
+          "type": {
+            "view": "tile"
+          },
+          "description": "Where a walk goes.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "at",
+          "type": {
+            "view": "tile"
+          },
+          "description": "Where it guards.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "targetId",
+          "type": "string",
+          "description": "Who it attacks or follows.",
+          "nullWhen": "for other orders"
+        },
+        {
+          "name": "started",
+          "type": "boolean",
+          "description": "Whether its members got their orders yet."
+        }
+      ]
+    },
+    "tile": {
+      "description": "A tile.",
+      "fields": [
+        {
+          "name": "x",
+          "type": "number",
+          "description": "From west to east."
+        },
+        {
+          "name": "y",
+          "type": "number",
+          "description": "From north to south."
+        }
+      ]
+    },
+    "orderEnded": {
+      "description": "How a resident’s last store, fetch or relocate order ended.",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "string",
+          "description": "The order: \"store\", \"fetch\" or \"relocate\"."
+        },
+        {
+          "name": "tick",
+          "type": "number",
+          "description": "The tick it ended."
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "description": "Why it ended before it was done: \"no way\", \"the storage is gone\" or \"the carriage is gone\"; for a relocate, why they didn’t move in: \"no free housing\", \"it is no longer your realm’s\" or \"the city is gone\".",
+          "nullWhen": "when it was done (a relocating resident moved in)"
+        }
+      ]
+    },
+    "pair": {
+      "description": "A resident’s pair, to have a child.",
+      "fields": [
+        {
+          "name": "partnerId",
+          "type": "string",
+          "description": "Who they are paired with."
+        },
+        {
+          "name": "since",
+          "type": "number",
+          "description": "The tick they paired."
+        }
+      ]
+    },
+    "carrying": {
+      "description": "A child a resident carries.",
+      "fields": [
+        {
+          "name": "since",
+          "type": "number",
+          "description": "The tick they started carrying it."
+        },
+        {
+          "name": "partnerId",
+          "type": "string",
+          "description": "The other parent."
+        },
+        {
+          "name": "partnerName",
+          "type": "string",
+          "description": "The other parent’s name."
+        },
+        {
+          "name": "partnerBase",
+          "type": "any",
+          "description": "The other parent’s base stats, like {strength: 5, …}."
+        }
+      ]
+    },
+    "runningScript": {
+      "description": "The script a resident runs.",
+      "fields": [
+        {
+          "name": "scriptId",
+          "type": "number",
+          "description": "The script in its Player’s library; 0 while it runs a default without one."
+        },
+        {
+          "name": "memory",
+          "type": "any",
+          "description": "Its memory, to read but not change.",
+          "nullWhen": "for a resident of another Player"
+        }
+      ]
+    },
+    "building": {
+      "description": "A building or construction site, as the Player sees it.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "The building’s id, unique in the world."
+        },
+        {
+          "name": "kind",
+          "type": "string",
+          "description": "What it is: \"townHall\", \"house\", \"storage\", \"warehouse\", \"wall\", \"gate\", \"farm\", \"stable\", \"mine\", \"quarry\", \"lumberCamp\", \"smelter\", \"mint\", \"smithy\", \"trainingGround\" or \"road\"."
+        },
+        {
+          "name": "cityId",
+          "type": "string",
+          "description": "The city it belongs to.",
+          "nullWhen": "for a building of no city, such as a workplace on a node"
+        },
+        {
+          "name": "realmId",
+          "type": "string",
+          "description": "The realm an outpost storage, a storage of no city, belongs to; for a construction site, the realm whose resident laid it out.",
+          "nullWhen": "for any other building, for a storage of no city that belongs to no realm, and for a site no realm’s resident laid out"
+        },
+        {
+          "name": "x",
+          "type": "number",
+          "description": "The tile it stands on, from west to east."
+        },
+        {
+          "name": "y",
+          "type": "number",
+          "description": "The tile it stands on, from north to south."
+        },
+        {
+          "name": "stock",
+          "type": {
+            "view": "goods"
+          },
+          "description": "The goods kept here; at a storage of my own, those not set aside for its offers, which I can’t take.",
+          "nullWhen": "for any building but a storage, warehouse or stable, and when the Player doesn’t see inside it"
+        },
+        {
+          "name": "site",
+          "type": {
+            "view": "site"
+          },
+          "description": "How far it has come while it is a construction site.",
+          "nullWhen": "once it is finished"
+        },
+        {
+          "name": "teardown",
+          "type": "number",
+          "description": "Work put into tearing it down so far.",
+          "nullWhen": "until someone starts"
+        },
+        {
+          "name": "closed",
+          "type": "boolean",
+          "description": "true for a gate its realm has closed.",
+          "nullWhen": "for an open gate and any other building"
+        },
+        {
+          "name": "damage",
+          "type": "number",
+          "description": "Damage a wall or gate has taken from blows.",
+          "nullWhen": "until someone strikes it"
+        },
+        {
+          "name": "prices",
+          "type": {
+            "list": {
+              "view": "price"
+            }
+          },
+          "description": "A Trade Org warehouse’s prices, one for each good it keeps.",
+          "nullWhen": "for any building but a Trade Org warehouse"
+        },
+        {
+          "name": "offers",
+          "type": {
+            "list": {
+              "view": "offer"
+            }
+          },
+          "description": "The offers standing at a storage, oldest first; anyone in sight sees them.",
+          "nullWhen": "for any building but a storage with an offer"
+        },
+        {
+          "name": "teacher",
+          "type": "string",
+          "description": "The resident teaching at a training ground.",
+          "nullWhen": "for any other building, and while nobody teaches there"
+        },
+        {
+          "name": "subject",
+          "type": "string",
+          "description": "The stat or skill a training ground teaches: \"strength\", \"endurance\", \"agility\", \"intellect\" or a skill such as \"combat\".",
+          "nullWhen": "for any other building, and while nobody teaches there"
+        },
+        {
+          "name": "trainees",
+          "type": {
+            "list": "string"
+          },
+          "description": "The residents training at a training ground; empty while nobody trains there.",
+          "nullWhen": "for any other building"
+        },
+        {
+          "name": "workSettings",
+          "type": {
+            "view": "workSettings"
+          },
+          "description": "My realm’s Workplace settings for a workplace, or a construction site of a workplace kind, set on its card; never another realm’s.",
+          "nullWhen": "for any other building, and while my realm has set none there"
+        }
+      ]
+    },
+    "workSettings": {
+      "description": "How my realm has a workplace worked (Workplace settings).",
+      "fields": [
+        {
+          "name": "scriptId",
+          "type": "number",
+          "description": "The work script: one of my Player’s scripts declaring `param workplace: building`.",
+          "nullWhen": "for the Work default"
+        },
+        {
+          "name": "params",
+          "type": "any",
+          "description": "Values set for the work script’s params, by name: a building’s or carriage’s id, or a number, like {storage: \"b12\", foodTake: 5}; a param not set is left out."
+        }
+      ]
+    },
+    "site": {
+      "description": "How far a construction site has come.",
+      "fields": [
+        {
+          "name": "delivered",
+          "type": {
+            "view": "goods"
+          },
+          "description": "Materials delivered so far."
+        },
+        {
+          "name": "work",
+          "type": "number",
+          "description": "Work put in so far."
+        }
+      ]
+    },
+    "price": {
+      "description": "A price for one good, at a Trade Org warehouse, an NPC city or a wandering trader.",
+      "fields": [
+        {
+          "name": "good",
+          "type": "string",
+          "description": "The good."
+        },
+        {
+          "name": "buy",
+          "type": "number",
+          "description": "What it pays for one unit."
+        },
+        {
+          "name": "sell",
+          "type": "number",
+          "description": "What it asks for one unit."
+        },
+        {
+          "name": "stock",
+          "type": "number",
+          "description": "What it holds.",
+          "nullWhen": "unless the Player sees inside"
+        },
+        {
+          "name": "forSale",
+          "type": "number",
+          "description": "Units an NPC city would sell.",
+          "nullWhen": "but at an NPC city"
+        },
+        {
+          "name": "wanted",
+          "type": "number",
+          "description": "Units an NPC city would buy.",
+          "nullWhen": "but at an NPC city"
+        }
+      ]
+    },
+    "trader": {
+      "description": "A wandering trader of the Trade Organization, as the Player sees it.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "The trader’s id, unique in the world."
+        },
+        {
+          "name": "carriageId",
+          "type": "string",
+          "description": "Its carriage."
+        },
+        {
+          "name": "driverId",
+          "type": "string",
+          "description": "The resident who drives it.",
+          "nullWhen": "with no crew left"
+        },
+        {
+          "name": "escortIds",
+          "type": {
+            "list": "string"
+          },
+          "description": "The residents who walk along with it."
+        },
+        {
+          "name": "postId",
+          "type": "string",
+          "description": "The trading post it goes to next.",
+          "nullWhen": "with no post left"
+        },
+        {
+          "name": "heading",
+          "type": "string",
+          "description": "Where it is bound: \"hq\" or \"post\"."
+        },
+        {
+          "name": "standing",
+          "type": {
+            "view": "traderStand"
+          },
+          "description": "Where it stands to trade.",
+          "nullWhen": "unless it stands at a stop"
+        },
+        {
+          "name": "prices",
+          "type": {
+            "list": {
+              "view": "price"
+            }
+          },
+          "description": "Its prices, one for each good, from what it carries.",
+          "nullWhen": "unless it stands at a stop"
+        }
+      ]
+    },
+    "traderStand": {
+      "description": "Where a wandering trader stands to trade: anyone on its tile can.",
+      "fields": [
+        {
+          "name": "cityId",
+          "type": "string",
+          "description": "The city it stands at."
+        },
+        {
+          "name": "x",
+          "type": "number",
+          "description": "The tile it stands on, from west to east."
+        },
+        {
+          "name": "y",
+          "type": "number",
+          "description": "The tile it stands on, from north to south."
+        },
+        {
+          "name": "until",
+          "type": "number",
+          "description": "The tick it goes on."
+        }
+      ]
+    },
+    "offer": {
+      "description": "What a Player posts at a storage of their realm: \"gives 10 Wood, wants 5 Stone\", some times over.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "The offer’s id, unique in the world."
+        },
+        {
+          "name": "realmId",
+          "type": "string",
+          "description": "The realm that posted it."
+        },
+        {
+          "name": "storageId",
+          "type": "string",
+          "description": "The storage it stands at; accept it on its tile."
+        },
+        {
+          "name": "x",
+          "type": "number",
+          "description": "The tile it stands on, from west to east."
+        },
+        {
+          "name": "y",
+          "type": "number",
+          "description": "The tile it stands on, from north to south."
+        },
+        {
+          "name": "gives",
+          "type": "string",
+          "description": "The good it gives; may be \"coins\"."
+        },
+        {
+          "name": "givesUnits",
+          "type": "number",
+          "description": "How much of it each time."
+        },
+        {
+          "name": "wants",
+          "type": "string",
+          "description": "The good it wants; may be \"coins\"."
+        },
+        {
+          "name": "wantsUnits",
+          "type": "number",
+          "description": "How much of it each time: 0 for goods set aside on accepting a demand, which want nothing back."
+        },
+        {
+          "name": "times",
+          "type": "number",
+          "description": "How many more times it can be accepted."
+        },
+        {
+          "name": "rate",
+          "type": "number",
+          "description": "What it wants for one unit it gives."
+        },
+        {
+          "name": "direct",
+          "type": {
+            "view": "directOffer"
+          },
+          "description": "Who it was sent to, when it is a direct offer.",
+          "nullWhen": "for an offer to anyone"
+        }
+      ]
+    },
+    "directOffer": {
+      "description": "What makes an offer a direct one: only one realm can accept it, for a set time.",
+      "fields": [
+        {
+          "name": "toId",
+          "type": "string",
+          "description": "The realm it was sent to, the only one who can accept it."
+        },
+        {
+          "name": "lapsesAt",
+          "type": "number",
+          "description": "The tick it lapses at, its goods then ordinary again."
+        },
+        {
+          "name": "carried",
+          "type": {
+            "view": "carriedOffer"
+          },
+          "description": "How the Trade Organization carries it, when it does.",
+          "nullWhen": "for one fetched in person"
+        }
+      ]
+    },
+    "carriedOffer": {
+      "description": "A direct offer the Trade Organization carries as two Transfers once accepted, nothing set aside.",
+      "fields": [
+        {
+          "name": "fromCityId",
+          "type": "string",
+          "description": "The sender’s city, where its goods are picked up."
+        },
+        {
+          "name": "toCityId",
+          "type": "string",
+          "description": "The other side’s city, where theirs are picked up."
+        },
+        {
+          "name": "feeBy",
+          "type": "string",
+          "description": "Who pays the fee: \"sender\" or \"split\"."
+        },
+        {
+          "name": "senderFee",
+          "type": "number",
+          "description": "What the sender pays when all of its goods are taken."
+        },
+        {
+          "name": "otherFee",
+          "type": "number",
+          "description": "What the other side pays when all of its goods are taken."
+        }
+      ]
+    },
+    "city": {
+      "description": "A city, as the Player sees it.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "The city’s id, unique in the world."
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "The city’s name, as the Player knows it."
+        },
+        {
+          "name": "realmId",
+          "type": "string",
+          "description": "The realm it belongs to.",
+          "nullWhen": "for an NPC city"
+        },
+        {
+          "name": "townHallId",
+          "type": "string",
+          "description": "Its town hall, which makes it a city."
+        },
+        {
+          "name": "tradeOrg",
+          "type": "string",
+          "description": "\"hq\" or \"post\" for a city of the Trade Organization.",
+          "nullWhen": "for any other city"
+        },
+        {
+          "name": "price",
+          "type": "number",
+          "description": "The Coins an NPC city asks the Player to buy it.",
+          "nullWhen": "for a realm’s city, and an NPC city that won’t sell"
+        },
+        {
+          "name": "wontSell",
+          "type": "boolean",
+          "description": "true when an NPC city holds the Player in too low standing to sell.",
+          "nullWhen": "otherwise"
+        },
+        {
+          "name": "refuses",
+          "type": "boolean",
+          "description": "true when an NPC city won’t trade with the Player, hire out to them or let their residents through its gates.",
+          "nullWhen": "otherwise"
+        },
+        {
+          "name": "hire",
+          "type": {
+            "view": "hire"
+          },
+          "description": "What an NPC city would lend the Player.",
+          "nullWhen": "for a realm’s city, and an NPC city that refuses them"
+        },
+        {
+          "name": "trade",
+          "type": {
+            "list": {
+              "view": "price"
+            }
+          },
+          "description": "An NPC city’s prices to the Player, one for each good.",
+          "nullWhen": "unless a storage of the NPC city is in sight"
+        },
+        {
+          "name": "horses",
+          "type": {
+            "list": {
+              "view": "horseOffer"
+            }
+          },
+          "description": "The horses in sight standing in an NPC city’s finished stables, with what it asks for each.",
+          "nullWhen": "unless a stable of the NPC city with a horse is in sight"
+        },
+        {
+          "name": "horsesToSell",
+          "type": {
+            "list": {
+              "view": "horseOffer"
+            }
+          },
+          "description": "The Player’s horses in sight standing in an NPC city’s finished stables, with what it pays for each.",
+          "nullWhen": "unless a stable of the NPC city with a horse of the Player’s is in sight"
+        },
+        {
+          "name": "occupation",
+          "type": {
+            "view": "occupation"
+          },
+          "description": "Who occupies its town hall and how long is left before the city is captured.",
+          "nullWhen": "unless its town hall is occupied and in sight"
+        }
+      ]
+    },
+    "occupation": {
+      "description": "A realm occupying a city’s town hall.",
+      "fields": [
+        {
+          "name": "realmId",
+          "type": "string",
+          "description": "The realm occupying it."
+        },
+        {
+          "name": "ticksLeft",
+          "type": "number",
+          "description": "Ticks it has to hold the town hall to capture the city."
+        }
+      ]
+    },
+    "alarm": {
+      "description": "Something that happened in a City area, that an Alarm script runs for.",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "string",
+          "description": "What happened: \"occupied\", the city’s town hall occupied; \"outsider\", someone of another realm, not allied, came into its area; \"theft\", someone stealing from the realm; \"attacked\", a wall or gate of the city or a resident of the realm struck."
+        },
+        {
+          "name": "cityId",
+          "type": "string",
+          "description": "The city whose area it happened in."
+        },
+        {
+          "name": "about",
+          "type": "string",
+          "description": "The id of the resident it is about: an occupier on the hall, the outsider who came, the thief, or the attacker."
+        },
+        {
+          "name": "realmId",
+          "type": "string",
+          "description": "The realm of who it is about.",
+          "nullWhen": "when they belong to no realm"
+        },
+        {
+          "name": "x",
+          "type": "number",
+          "description": "Where it happened, from west to east: the town hall, where the outsider stood, where the thief took it, or what was struck."
+        },
+        {
+          "name": "y",
+          "type": "number",
+          "description": "Where it happened, from north to south: the town hall, where the outsider stood, where the thief took it, or what was struck."
+        },
+        {
+          "name": "tick",
+          "type": "number",
+          "description": "The tick it happened."
+        }
+      ]
+    },
+    "hire": {
+      "description": "What an NPC city would lend.",
+      "fields": [
+        {
+          "name": "spare",
+          "type": "number",
+          "description": "How many residents it would lend."
+        },
+        {
+          "name": "pricePerResidentWeek",
+          "type": "number",
+          "description": "What it asks for each a week, in Coins."
+        }
+      ]
+    },
+    "horseOffer": {
+      "description": "A horse in an NPC city’s stable with a price on it, as its Trade section lists it: its own to buy, or the Player’s to sell.",
+      "fields": [
+        {
+          "name": "horseId",
+          "type": "string",
+          "description": "The horse’s id."
+        },
+        {
+          "name": "stableId",
+          "type": "string",
+          "description": "The id of the stable it stands in."
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Its name."
+        },
+        {
+          "name": "stats",
+          "type": {
+            "view": "horseStats"
+          },
+          "description": "Its Speed, Strength and Endurance."
+        },
+        {
+          "name": "bornAt",
+          "type": "number",
+          "description": "The tick it was born."
+        },
+        {
+          "name": "price",
+          "type": "number",
+          "description": "What the city asks of the Player for it, or pays, in Coins."
+        },
+        {
+          "name": "problem",
+          "type": "string",
+          "description": "Why the city won’t trade it with the Player, whoever goes there.",
+          "nullWhen": "when it would"
+        }
+      ]
+    },
+    "horse": {
+      "description": "A horse, as the Player sees it.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "The horse’s id, unique in the world."
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Its name, given by the game or its Player."
+        },
+        {
+          "name": "realmId",
+          "type": "string",
+          "description": "The realm it belongs to.",
+          "nullWhen": "for one of an NPC city or of nobody"
+        },
+        {
+          "name": "cityId",
+          "type": "string",
+          "description": "The NPC city it belongs to.",
+          "nullWhen": "for one of a realm or of nobody"
+        },
+        {
+          "name": "x",
+          "type": "number",
+          "description": "The tile it stands on, from west to east."
+        },
+        {
+          "name": "y",
+          "type": "number",
+          "description": "The tile it stands on, from north to south."
+        },
+        {
+          "name": "hunger",
+          "type": "number",
+          "description": "Fully fed is 100, empty 0.",
+          "nullWhen": "for one of another realm that isn’t allied"
+        },
+        {
+          "name": "health",
+          "type": "number",
+          "description": "0 is dead; full is 100.",
+          "nullWhen": "for one of another realm that isn’t allied"
+        },
+        {
+          "name": "down",
+          "type": "boolean",
+          "description": "Whether it is Down: lying unconscious from hunger until it eats Food in reach."
+        },
+        {
+          "name": "downUntil",
+          "type": "number",
+          "description": "The tick at which it dies of hunger unless it eats first.",
+          "nullWhen": "unless it is Down, and for one of another realm that isn’t allied"
+        },
+        {
+          "name": "stats",
+          "type": {
+            "view": "horseStats"
+          },
+          "description": "Speed, strength and endurance."
+        },
+        {
+          "name": "bornAt",
+          "type": "number",
+          "description": "The tick it was born; may be before the world began."
+        }
+      ]
+    },
+    "horseStats": {
+      "description": "A horse’s stats, whole numbers it was born with.",
+      "fields": [
+        {
+          "name": "speed",
+          "type": "number",
+          "description": "Its speed."
+        },
+        {
+          "name": "strength",
+          "type": "number",
+          "description": "Its strength."
+        },
+        {
+          "name": "endurance",
+          "type": "number",
+          "description": "Its endurance."
+        }
+      ]
+    },
+    "carriage": {
+      "description": "A carriage, as the Player sees it.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "The carriage’s id, unique in the world."
+        },
+        {
+          "name": "realmId",
+          "type": "string",
+          "description": "The realm it belongs to.",
+          "nullWhen": "for one of an NPC city or of nobody"
+        },
+        {
+          "name": "cityId",
+          "type": "string",
+          "description": "The NPC city it belongs to.",
+          "nullWhen": "for one of a realm or of nobody"
+        },
+        {
+          "name": "x",
+          "type": "number",
+          "description": "The tile it stands on, from west to east."
+        },
+        {
+          "name": "y",
+          "type": "number",
+          "description": "The tile it stands on, from north to south."
+        },
+        {
+          "name": "horseId",
+          "type": "string",
+          "description": "The horse hitched to it.",
+          "nullWhen": "when none is"
+        },
+        {
+          "name": "passengerIds",
+          "type": {
+            "list": "string"
+          },
+          "description": "The residents aboard it as passengers."
+        },
+        {
+          "name": "standsStill",
+          "type": "boolean",
+          "description": "Whether it stands still with nothing to move it: no driver driving it, or its horse Down or dead."
+        },
+        {
+          "name": "load",
+          "type": {
+            "view": "goods"
+          },
+          "description": "The goods on board.",
+          "nullWhen": "unless the Player sees inside"
+        },
+        {
+          "name": "loadLevel",
+          "type": "string",
+          "description": "How heavily it looks loaded: \"empty\", \"light\", \"half\", \"heavy\" or \"full\"."
+        }
+      ]
+    },
+    "pile": {
+      "description": "Goods lying on a tile.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "The pile’s id, unique in the world."
+        },
+        {
+          "name": "x",
+          "type": "number",
+          "description": "The tile it stands on, from west to east."
+        },
+        {
+          "name": "y",
+          "type": "number",
+          "description": "The tile it stands on, from north to south."
+        },
+        {
+          "name": "goods",
+          "type": {
+            "view": "goods"
+          },
+          "description": "The goods lying there."
+        }
+      ]
+    },
+    "node": {
+      "description": "A resource node.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "The node’s id, unique in the world."
+        },
+        {
+          "name": "kind",
+          "type": "string",
+          "description": "What it yields: \"forest\", \"stone\", \"ironOre\" or \"goldOre\"."
+        },
+        {
+          "name": "x",
+          "type": "number",
+          "description": "The tile it stands on, from west to east."
+        },
+        {
+          "name": "y",
+          "type": "number",
+          "description": "The tile it stands on, from north to south."
+        }
+      ]
+    },
+    "lastSeen": {
+      "description": "A building, construction site or city the Player has seen and that is out of their sight now, as they last saw it.",
+      "fields": [
+        {
+          "name": "is",
+          "type": "string",
+          "description": "\"building\" or \"city\"."
+        },
+        {
+          "name": "seenAt",
+          "type": "number",
+          "description": "The tick it was last in sight."
+        },
+        {
+          "name": "id",
+          "type": "string",
+          "description": "The building or city’s id, unique in the world."
+        },
+        {
+          "name": "kind",
+          "type": "string",
+          "description": "What it is: \"townHall\", \"house\", \"storage\", \"warehouse\", \"wall\", \"gate\", \"farm\", \"stable\", \"mine\", \"quarry\", \"lumberCamp\", \"smelter\", \"mint\", \"smithy\", \"trainingGround\" or \"road\".",
+          "nullWhen": "for a city"
+        },
+        {
+          "name": "cityId",
+          "type": "string",
+          "description": "The city it belongs to.",
+          "nullWhen": "for a city, for a building of no city, such as a workplace on a node"
+        },
+        {
+          "name": "x",
+          "type": "number",
+          "description": "The tile it stands on, from west to east.",
+          "nullWhen": "for a city"
+        },
+        {
+          "name": "y",
+          "type": "number",
+          "description": "The tile it stands on, from north to south.",
+          "nullWhen": "for a city"
+        },
+        {
+          "name": "stock",
+          "type": {
+            "view": "goods"
+          },
+          "description": "The goods kept here; at a storage of my own, those not set aside for its offers, which I can’t take.",
+          "nullWhen": "for a city, for any building but a storage, warehouse or stable, and when the Player doesn’t see inside it"
+        },
+        {
+          "name": "site",
+          "type": {
+            "view": "site"
+          },
+          "description": "How far it has come while it is a construction site.",
+          "nullWhen": "for a city, once it is finished"
+        },
+        {
+          "name": "teardown",
+          "type": "number",
+          "description": "Work put into tearing it down so far.",
+          "nullWhen": "for a city, until someone starts"
+        },
+        {
+          "name": "closed",
+          "type": "boolean",
+          "description": "true for a gate its realm has closed.",
+          "nullWhen": "for a city, for an open gate and any other building"
+        },
+        {
+          "name": "damage",
+          "type": "number",
+          "description": "Damage a wall or gate has taken from blows.",
+          "nullWhen": "for a city, until someone strikes it"
+        },
+        {
+          "name": "prices",
+          "type": {
+            "list": {
+              "view": "price"
+            }
+          },
+          "description": "A Trade Org warehouse’s prices, one for each good it keeps.",
+          "nullWhen": "for a city, for any building but a Trade Org warehouse"
+        },
+        {
+          "name": "offers",
+          "type": {
+            "list": {
+              "view": "offer"
+            }
+          },
+          "description": "The offers standing at a storage, oldest first; anyone in sight sees them.",
+          "nullWhen": "for a city, for any building but a storage with an offer"
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "The city’s name, as the Player knows it.",
+          "nullWhen": "for a building"
+        },
+        {
+          "name": "realmId",
+          "type": "string",
+          "description": "The realm a city, an outpost storage (a storage of no city) or a construction site belongs to.",
+          "nullWhen": "for an NPC city, and for any other building"
+        },
+        {
+          "name": "townHallId",
+          "type": "string",
+          "description": "Its town hall, which makes it a city.",
+          "nullWhen": "for a building"
+        },
+        {
+          "name": "tradeOrg",
+          "type": "string",
+          "description": "\"hq\" or \"post\" for a city of the Trade Organization.",
+          "nullWhen": "for a building, for any other city"
+        },
+        {
+          "name": "price",
+          "type": "number",
+          "description": "The Coins an NPC city asks the Player to buy it.",
+          "nullWhen": "for a building, for a realm’s city, and an NPC city that won’t sell"
+        },
+        {
+          "name": "wontSell",
+          "type": "boolean",
+          "description": "true when an NPC city holds the Player in too low standing to sell.",
+          "nullWhen": "for a building, otherwise"
+        },
+        {
+          "name": "refuses",
+          "type": "boolean",
+          "description": "true when an NPC city won’t trade with the Player, hire out to them or let their residents through its gates.",
+          "nullWhen": "for a building, otherwise"
+        },
+        {
+          "name": "hire",
+          "type": {
+            "view": "hire"
+          },
+          "description": "What an NPC city would lend the Player.",
+          "nullWhen": "for a building, for a realm’s city, and an NPC city that refuses them"
+        },
+        {
+          "name": "trade",
+          "type": {
+            "list": {
+              "view": "price"
+            }
+          },
+          "description": "An NPC city’s prices to the Player, one for each good.",
+          "nullWhen": "for a building, unless a storage of the NPC city is in sight"
+        },
+        {
+          "name": "horses",
+          "type": {
+            "list": {
+              "view": "horseOffer"
+            }
+          },
+          "description": "The horses in sight standing in an NPC city’s finished stables, with what it asks for each.",
+          "nullWhen": "for a building, unless a stable of the NPC city with a horse is in sight"
+        },
+        {
+          "name": "horsesToSell",
+          "type": {
+            "list": {
+              "view": "horseOffer"
+            }
+          },
+          "description": "The Player’s horses in sight standing in an NPC city’s finished stables, with what it pays for each.",
+          "nullWhen": "for a building, unless a stable of the NPC city with a horse of the Player’s is in sight"
+        },
+        {
+          "name": "occupation",
+          "type": {
+            "view": "occupation"
+          },
+          "description": "Who occupies its town hall and how long is left before the city is captured.",
+          "nullWhen": "for a building, unless its town hall is occupied and in sight"
+        }
+      ]
+    },
+    "directive": {
+      "description": "An admin directive in force.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "The directive’s id, unique in the world."
+        },
+        {
+          "name": "target",
+          "type": "string",
+          "description": "The realm or NPC city it names."
+        },
+        {
+          "name": "targetName",
+          "type": "string",
+          "description": "The target’s name."
+        },
+        {
+          "name": "withAlliance",
+          "type": "boolean",
+          "description": "Whether it names the target’s alliance too."
+        },
+        {
+          "name": "reason",
+          "type": "string",
+          "description": "Why it was given."
+        },
+        {
+          "name": "givenAt",
+          "type": "number",
+          "description": "The tick it was given."
+        },
+        {
+          "name": "goals",
+          "type": {
+            "list": {
+              "view": "directiveGoal"
+            }
+          },
+          "description": "What ends it."
+        },
+        {
+          "name": "price",
+          "type": "number",
+          "description": "The Coins the target can pay to buy it off.",
+          "nullWhen": "when it can’t be bought off"
+        }
+      ]
+    },
+    "directiveGoal": {
+      "description": "A goal of an admin directive.",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "string",
+          "description": "\"city\" or \"soldiers\"."
+        },
+        {
+          "name": "city",
+          "type": "string",
+          "description": "The city to destroy, by its name when the goal was set.",
+          "nullWhen": "for a soldiers goal"
+        },
+        {
+          "name": "count",
+          "type": "number",
+          "description": "Soldiers to kill.",
+          "nullWhen": "for a city goal"
+        },
+        {
+          "name": "percent",
+          "type": "number",
+          "description": "The share of its soldiers the count was set as.",
+          "nullWhen": "unless it was set as a share"
+        }
+      ]
+    },
+    "material": {
+      "description": "Materials a construction site still lacks.",
+      "fields": [
+        {
+          "name": "good",
+          "type": "string",
+          "description": "The good."
+        },
+        {
+          "name": "units",
+          "type": "number",
+          "description": "How many units it lacks."
+        }
+      ]
+    },
+    "lineTile": {
+      "description": "A tile of a Build line still to build.",
+      "fields": [
+        {
+          "name": "x",
+          "type": "number",
+          "description": "From west to east."
+        },
+        {
+          "name": "y",
+          "type": "number",
+          "description": "From north to south."
+        },
+        {
+          "name": "siteId",
+          "type": "string",
+          "description": "The construction site of the line’s road or wall on it.",
+          "nullWhen": "while none is laid out there"
+        }
+      ]
+    },
+    "waypoint": {
+      "description": "One of the Player’s waypoints: a named marker on a tile that only they see.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "The waypoint’s id, unique in the world."
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Its name; others may have the same."
+        },
+        {
+          "name": "x",
+          "type": "number",
+          "description": "From west to east."
+        },
+        {
+          "name": "y",
+          "type": "number",
+          "description": "From north to south."
+        }
+      ]
+    },
+    "demand": {
+      "description": "A demand my realm sent or was sent, waiting for an answer (`sendDemand`, `acceptDemand`, `declineDemand`).",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "The demand’s id, unique in the world."
+        },
+        {
+          "name": "fromId",
+          "type": "string",
+          "description": "The realm that sent it."
+        },
+        {
+          "name": "from",
+          "type": "string",
+          "description": "That realm’s name."
+        },
+        {
+          "name": "toId",
+          "type": "string",
+          "description": "The realm it was sent to, the only one who can answer it."
+        },
+        {
+          "name": "to",
+          "type": "string",
+          "description": "That realm’s name."
+        },
+        {
+          "name": "terms",
+          "type": "any",
+          "description": "What it asks for: `{ kind: \"city\", cityId, cityName }` or `{ kind: \"goods\", goods }`."
+        },
+        {
+          "name": "note",
+          "type": "string",
+          "description": "The sender’s words, as plain text."
+        },
+        {
+          "name": "sentAt",
+          "type": "number",
+          "description": "The tick it was sent."
+        },
+        {
+          "name": "deadline",
+          "type": "number",
+          "description": "The tick it lapses at, unanswered."
+        }
+      ]
+    }
+  },
+  "scriptApi": [
+    {
+      "name": "me",
+      "is": "value",
+      "params": [],
+      "cost": 0,
+      "description": "The resident running the script, as the Player sees them, with their `age`.",
+      "returns": {
+        "view": "resident"
+      }
+    },
+    {
+      "name": "memory",
+      "is": "value",
+      "params": [],
+      "cost": 0,
+      "description": "An object kept between ticks for whoever runs it; whatever is set on it stays.",
+      "returns": "any"
+    },
+    {
+      "name": "params",
+      "is": "value",
+      "params": [],
+      "cost": 0,
+      "description": "The values of the script’s `param` lines, picked on the resident card for whoever runs it: `params.name` for `param name: type`; a `number` param’s default (`param name: number = 3`) while none is set, else null.",
+      "returns": "any"
+    },
+    {
+      "name": "debt",
+      "is": "value",
+      "params": [],
+      "cost": 0,
+      "description": "The Coins my realm owes the Trade Organization, 0 when it owes nothing: what its army came for and couldn’t take, and what crimes cost it since.",
+      "returns": "number"
+    },
+    {
+      "name": "tick",
+      "is": "value",
+      "params": [],
+      "cost": 0,
+      "description": "The world tick this run is for.",
+      "returns": "number"
+    },
+    {
+      "name": "mapSize",
+      "is": "value",
+      "params": [],
+      "cost": 0,
+      "description": "Tiles along each side of the map; its opposite sides join.",
+      "returns": "number"
+    },
+    {
+      "name": "random",
+      "is": "value",
+      "params": [],
+      "cost": 0,
+      "description": "A number from 0 up to 1, drawn anew each tick and the same for every script that tick, so residents can agree on a random pick.",
+      "returns": "number"
+    },
+    {
+      "name": "residents",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The residents the Player sees, their own included; those of their own running a script with its `script.memory`, to read but not change.",
+      "returns": {
+        "list": {
+          "view": "resident"
+        }
+      }
+    },
+    {
+      "name": "buildings",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The buildings and construction sites the Player sees, roads included.",
+      "returns": {
+        "list": {
+          "view": "building"
+        }
+      }
+    },
+    {
+      "name": "cities",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The cities the Player sees any of.",
+      "returns": {
+        "list": {
+          "view": "city"
+        }
+      }
+    },
+    {
+      "name": "horses",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The horses the Player sees.",
+      "returns": {
+        "list": {
+          "view": "horse"
+        }
+      }
+    },
+    {
+      "name": "carriages",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The carriages the Player sees.",
+      "returns": {
+        "list": {
+          "view": "carriage"
+        }
+      }
+    },
+    {
+      "name": "traders",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The wandering traders the Player sees: those standing at a stop name where and their prices.",
+      "returns": {
+        "list": {
+          "view": "trader"
+        }
+      }
+    },
+    {
+      "name": "piles",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The piles of goods the Player sees.",
+      "returns": {
+        "list": {
+          "view": "pile"
+        }
+      }
+    },
+    {
+      "name": "nodes",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The resource nodes on terrain the Player has explored.",
+      "returns": {
+        "list": {
+          "view": "node"
+        }
+      }
+    },
+    {
+      "name": "nodesInSight",
+      "is": "query",
+      "params": [
+        "kind?"
+      ],
+      "cost": 20,
+      "description": "The resource nodes the Player sees now; with `kind` (\"forest\", \"stone\", \"ironOre\" or \"goldOre\"), only those of that kind.",
+      "returns": {
+        "list": {
+          "view": "node"
+        }
+      }
+    },
+    {
+      "name": "lastSeen",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The buildings, construction sites and cities the Player has seen and that are out of their sight now, as they last saw them: each with `is` (\"building\" or \"city\") and `seenAt`, the tick they were last seen.",
+      "returns": {
+        "list": {
+          "view": "lastSeen"
+        }
+      }
+    },
+    {
+      "name": "offers",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The offers standing at storages in sight, my realm’s own wherever they are, and direct offers sent to my realm wherever they are, oldest first.",
+      "returns": {
+        "list": {
+          "view": "offer"
+        }
+      }
+    },
+    {
+      "name": "directives",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The admin directives in force, which every Player sees: target, reason and the price to buy one off (null when it can’t be).",
+      "returns": {
+        "list": {
+          "view": "directive"
+        }
+      }
+    },
+    {
+      "name": "waypoints",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "My Player’s waypoints, oldest first: the named markers they put on the map, which only they see.",
+      "returns": {
+        "list": {
+          "view": "waypoint"
+        }
+      }
+    },
+    {
+      "name": "demands",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The demands my realm sent or was sent that wait for an answer, oldest first.",
+      "returns": {
+        "list": {
+          "view": "demand"
+        }
+      }
+    },
+    {
+      "name": "withMemory",
+      "is": "query",
+      "params": [
+        "key",
+        "value"
+      ],
+      "cost": 20,
+      "description": "My realm’s residents running a script whose `memory[key]` is `value`, as `residents()` shows them, with their `script.memory`.",
+      "returns": {
+        "list": {
+          "view": "resident"
+        }
+      }
+    },
+    {
+      "name": "building",
+      "is": "query",
+      "params": [
+        "id"
+      ],
+      "cost": 1,
+      "description": "The building or construction site with that id, if the Player sees it or it is one of my realm’s cities’; else null.",
+      "returns": {
+        "view": "building"
+      }
+    },
+    {
+      "name": "buildingAt",
+      "is": "query",
+      "params": [
+        "x",
+        "y"
+      ],
+      "cost": 1,
+      "description": "The building or construction site on a tile, roads and carriage sites left out, as `building(id)` gives it; null where there is none or the Player doesn’t see it.",
+      "returns": {
+        "view": "building"
+      }
+    },
+    {
+      "name": "inCityArea",
+      "is": "query",
+      "params": [
+        "cityId",
+        "x",
+        "y"
+      ],
+      "cost": 1,
+      "description": "Whether a tile lies in that city’s area, for a city of my realm’s or a tile the Player sees; false for any other.",
+      "returns": "boolean"
+    },
+    {
+      "name": "cityAreaAt",
+      "is": "query",
+      "params": [
+        "x",
+        "y"
+      ],
+      "cost": 1,
+      "description": "The id of the city whose area a tile lies in, one of my realm’s first where areas overlap; null where there is none, or the tile is the area of no city of my realm and the Player doesn’t see it.",
+      "returns": "string"
+    },
+    {
+      "name": "outsidersIn",
+      "is": "query",
+      "params": [
+        "cityId"
+      ],
+      "cost": 20,
+      "description": "The outsiders the Player sees in that city’s area: those of another realm, not allied, leaving out Trade Organization caravans and wandering traders with their crews.",
+      "returns": {
+        "list": {
+          "view": "resident"
+        }
+      }
+    },
+    {
+      "name": "pileAt",
+      "is": "query",
+      "params": [
+        "x",
+        "y"
+      ],
+      "cost": 1,
+      "description": "The goods lying on a tile, like {food: 3}, if the Player sees it; null where none lie or it isn’t seen.",
+      "returns": {
+        "view": "goods"
+      }
+    },
+    {
+      "name": "outputOf",
+      "is": "query",
+      "params": [
+        "building"
+      ],
+      "cost": 1,
+      "description": "The goods a workplace makes, as a list (at a smithy everything it can make); empty for any other building.",
+      "returns": {
+        "list": "string"
+      }
+    },
+    {
+      "name": "materialsNeeded",
+      "is": "query",
+      "params": [
+        "site"
+      ],
+      "cost": 1,
+      "description": "The materials a construction site still lacks, as a list like [{good: \"wood\", units: 12}]; empty once it has them all, and for a finished building.",
+      "returns": {
+        "list": {
+          "view": "material"
+        }
+      }
+    },
+    {
+      "name": "lineTiles",
+      "is": "query",
+      "params": [
+        "line",
+        "from?"
+      ],
+      "cost": 20,
+      "description": "The tiles of a Build line still to build, from its start to its end; with `from`, something with `x` and `y`, nearest first. `line` is like {building: \"wall\", from: {x: 3, y: 4}, to: {x: 8, y: 4}}, as the Build line task keeps it in `memory.line`, road or wall, straight or diagonal. Tiles the Player sees with one already, or that can’t take one, are left out.",
+      "returns": {
+        "list": {
+          "view": "lineTile"
+        }
+      }
+    },
+    {
+      "name": "terrainAt",
+      "is": "query",
+      "params": [
+        "x",
+        "y"
+      ],
+      "cost": 1,
+      "description": "The terrain of a tile (\"plains\", \"forest\", \"hills\", \"mountain\", \"lake\" or \"sea\"), or null where the Player hasn’t explored.",
+      "returns": "string"
+    },
+    {
+      "name": "distance",
+      "is": "query",
+      "params": [
+        "a",
+        "b"
+      ],
+      "cost": 1,
+      "description": "Tiles between two things with `x` and `y`, the short way round the map.",
+      "returns": "number"
+    },
+    {
+      "name": "floor",
+      "is": "query",
+      "params": [
+        "n"
+      ],
+      "cost": 1,
+      "description": "The whole number at or below `n`: `floor(2.7)` is 2, `floor(-2.5)` is -3.",
+      "returns": "number"
+    },
+    {
+      "name": "pickRandom",
+      "is": "query",
+      "params": [
+        "list"
+      ],
+      "cost": 1,
+      "description": "One item of a list, picked with `random`, so every script picking from the same list this tick picks the same; null for an empty list.",
+      "returns": "any"
+    },
+    {
+      "name": "fits",
+      "is": "query",
+      "params": [
+        "good"
+      ],
+      "cost": 1,
+      "description": "How many units of a good still fit in my hands.",
+      "returns": "number"
+    },
+    {
+      "name": "inputToFetch",
+      "is": "query",
+      "params": [
+        "workplace",
+        "makes?"
+      ],
+      "cost": 1,
+      "description": "At a smelter, mint or smithy I see, the goods it lacks for a batch of its recipe (the one making `makes`, else its only one) in its pile and its workers’ hands: of each, as many batches’ worth as fit in my hands, as a list like [{good: \"ironOre\", units: 24}]; empty while it has a batch’s, when none fits, and for any other building.",
+      "returns": {
+        "list": {
+          "view": "material"
+        }
+      }
+    },
+    {
+      "name": "breedingPair",
+      "is": "query",
+      "params": [
+        "stable"
+      ],
+      "cost": 1,
+      "description": "The two horses of mine I would `breed` in a stable I see, as ids like [\"h1\", \"h2\"]: a pair whose breeding it keeps first, else two fed ones standing in it; null while there are none.",
+      "returns": {
+        "list": "string"
+      }
+    },
+    {
+      "name": "storages",
+      "is": "query",
+      "params": [
+        "from?",
+        "goods?"
+      ],
+      "cost": 20,
+      "description": "The finished storages of my realm (of my city, for an NPC city’s resident); with `from`, something with `x` and `y`, nearest first by my `walkTime` from it; with `goods`, a list of goods, only those holding any of them.",
+      "returns": {
+        "list": {
+          "view": "building"
+        }
+      }
+    },
+    {
+      "name": "walkTime",
+      "is": "query",
+      "params": [
+        "a",
+        "b"
+      ],
+      "cost": 20,
+      "description": "About how many ticks I take to walk from one thing with `x` and `y` to another: the straight way across the terrain, diagonally where it slants, roads and walls left out.",
+      "returns": "number"
+    },
+    {
+      "name": "wayFood",
+      "is": "query",
+      "params": [
+        "a",
+        "b"
+      ],
+      "cost": 20,
+      "description": "About how many units of Food I eat on the way from one thing with `x` and `y` to another, the way `walkTime` reckons it, at what each tile’s terrain costs me; riding, my horse’s too, which it eats from the Food I carry.",
+      "returns": "number"
+    },
+    {
+      "name": "exploredEdge",
+      "is": "query",
+      "params": [
+        "from",
+        "toward?",
+        "skip?"
+      ],
+      "cost": 20,
+      "description": "The nearest tile to `from`, something with `x` and `y`, at the edge of my Player’s explored terrain: one they explored that I can go onto now (riding, one my horse can), beside one they haven’t. With `toward`, a compass direction (\"north\", \"northeast\", \"east\", \"southeast\", \"south\", \"southwest\", \"west\" or \"northwest\"), only tiles that way from `from`, at most 45° off it, the straightest first. With `skip`, a list of things with `x` and `y`, none within 8 tiles of them. Null with none within 192 tiles.",
+      "returns": {
+        "view": "tile"
+      }
+    },
+    {
+      "name": "crewTile",
+      "is": "query",
+      "params": [
+        "building"
+      ],
+      "cost": 1,
+      "description": "Where to stand at a building I see to work, build or breed there: the tile of its footprint with the fewest of my realm’s crew on it (those holding a work-at, build or breed order there, and those on their way with the tile in their `memory.at`), the nearest to me on ties, so my own tile while it is among the fewest; null for a building I don’t see.",
+      "returns": {
+        "view": "tile"
+      }
+    },
+    {
+      "name": "walkTo",
+      "is": "action",
+      "params": [
+        "x",
+        "y"
+      ],
+      "cost": 10,
+      "description": "Walk to a tile.",
+      "returns": "string"
+    },
+    {
+      "name": "drive",
+      "is": "action",
+      "params": [
+        "carriageId",
+        "x",
+        "y",
+        "horseId"
+      ],
+      "cost": 10,
+      "description": "Drive the carriage on my tile to a tile. Another realm’s carriage is stolen by that: it joins my realm at once, which is theft (see Standing). A carriage of mine with no horse of my realm there takes another realm’s only if I name it as `horseId`, which steals it too.",
+      "returns": "string"
+    },
+    {
+      "name": "mount",
+      "is": "action",
+      "params": [
+        "horseId"
+      ],
+      "cost": 10,
+      "description": "Get on a horse on my tile that pulls no carriage, and ride it. Another realm’s horse is stolen by that: it joins my realm at once, which is theft (see Standing).",
+      "returns": "string"
+    },
+    {
+      "name": "dismount",
+      "is": "action",
+      "params": [],
+      "cost": 10,
+      "description": "Get off the horse I ride; it stays on my tile.",
+      "returns": "string"
+    },
+    {
+      "name": "unhitch",
+      "is": "action",
+      "params": [
+        "carriage"
+      ],
+      "cost": 10,
+      "description": "Unhitch the horse from a carriage of my realm on my tile, by it or its id; the horse stands free there, and a driver stops.",
+      "returns": "string"
+    },
+    {
+      "name": "hitch",
+      "is": "action",
+      "params": [
+        "carriage",
+        "horse"
+      ],
+      "cost": 10,
+      "description": "Hitch a horse to a carriage of my realm on my tile, each by it or its id, at once: a horse of my realm on that tile that pulls no carriage, nobody rides and isn’t Down. A horse already hitched stands free there.",
+      "returns": "string"
+    },
+    {
+      "name": "board",
+      "is": "action",
+      "params": [
+        "carriageId"
+      ],
+      "cost": 10,
+      "description": "Get on a carriage of my realm on my tile as a passenger, and ride along with it.",
+      "returns": "string"
+    },
+    {
+      "name": "getOff",
+      "is": "action",
+      "params": [
+        "x?",
+        "y?"
+      ],
+      "cost": 10,
+      "description": "Get off the carriage I am aboard, onto its tile or the tile x, y right next to it.",
+      "returns": "string"
+    },
+    {
+      "name": "haul",
+      "is": "action",
+      "params": [
+        "carriageId",
+        "x",
+        "y",
+        "goods",
+        "returnGoods?",
+        "keepFood?"
+      ],
+      "cost": 10,
+      "description": "Drive a haul route between my tile and (x, y): `goods` there, `returnGoods` back.",
+      "returns": "string"
+    },
+    {
+      "name": "stop",
+      "is": "action",
+      "params": [],
+      "cost": 10,
+      "description": "Stop what I was ordered to do and stand idle.",
+      "returns": "string"
+    },
+    {
+      "name": "end",
+      "is": "action",
+      "params": [
+        "reason?"
+      ],
+      "cost": 10,
+      "description": "End this script: once this run is over I stand idle and run it no more, and in a queue its next step starts. With `reason`, short text (cut to 60 characters), my Player’s realm log says why, like “Ana stopped Work: no workplace on her tile”. It asks for no order.",
+      "returns": "string"
+    },
+    {
+      "name": "wait",
+      "is": "action",
+      "params": [],
+      "cost": 10,
+      "description": "Wait on my order: once this run is over I am not run again until it ends, is replaced or I am struck; then I run every tick again. With no order, it does nothing. It asks for no order.",
+      "returns": "string"
+    },
+    {
+      "name": "doing",
+      "is": "action",
+      "params": [
+        "text"
+      ],
+      "cost": 10,
+      "description": "Say what I’m doing, for my Player’s Doing line: the text (cut to 60 characters) shows instead of the one the game derives from my task and order, until I call it again; null gives the derived one back. Kept as `memory.doing`; it asks for no order.",
+      "returns": "string"
+    },
+    {
+      "name": "log",
+      "is": "action",
+      "params": [
+        "text"
+      ],
+      "cost": 10,
+      "description": "Add a line to my script log, with the game time: short text (cut to 60 characters) that my Player sees on my Script tab, and nobody else. I keep my last 20 lines across scripts; `end(reason)` adds its reason too. It asks for no order.",
+      "returns": "string"
+    },
+    {
+      "name": "pickUp",
+      "is": "action",
+      "params": [
+        "spot",
+        "goods"
+      ],
+      "cost": 10,
+      "description": "Take goods from a spot on my tile: {kind: \"ground\"}, {kind: \"storage\", storageId}, {kind: \"site\", siteId}, {kind: \"carriage\", carriageId} or a Down resident lying there, {kind: \"resident\", residentId}; goods like {food: 3}.",
+      "returns": "string"
+    },
+    {
+      "name": "drop",
+      "is": "action",
+      "params": [
+        "spot",
+        "goods"
+      ],
+      "cost": 10,
+      "description": "Put carried goods down at a spot on my tile.",
+      "returns": "string"
+    },
+    {
+      "name": "store",
+      "is": "action",
+      "params": [
+        "goods",
+        "to?",
+        "ownFood?"
+      ],
+      "cost": 10,
+      "description": "Walk to `to` (a storage, a stable or a carriage of mine; by default the nearest storage of my realm), put the goods down there and, at a storage with Food, top up my own food. Goods like {wood: 10}, or a list like [\"wood\"] for all I carry of them (Food beyond my own food). `ownFood`, units of Food, is the own food to keep and top up to instead of the usual. My order is \"store\" until done; then `me.orderEnded` says how it ended.",
+      "returns": "string"
+    },
+    {
+      "name": "fetch",
+      "is": "action",
+      "params": [
+        "goods",
+        "from?"
+      ],
+      "cost": 10,
+      "description": "Walk to `from` (a storage, a stable or a carriage of mine; by default the nearest storage or carriage of my realm holding any of the goods) and take the goods there, as much as fits. Goods like {wood: 10}, or a list like [\"wood\"] for as much as there is. My order is \"fetch\" until done; then `me.orderEnded` says how it ended.",
+      "returns": "string"
+    },
+    {
+      "name": "build",
+      "is": "action",
+      "params": [
+        "building"
+      ],
+      "cost": 10,
+      "description": "Lay out or join a construction site of that kind on my tile.",
+      "returns": "string"
+    },
+    {
+      "name": "tearDown",
+      "is": "action",
+      "params": [
+        "buildingId"
+      ],
+      "cost": 10,
+      "description": "Tear down the building or site on my tile.",
+      "returns": "string"
+    },
+    {
+      "name": "workAt",
+      "is": "action",
+      "params": [
+        "makes?"
+      ],
+      "cost": 10,
+      "description": "Work the workplace on my tile; at a smithy, say what to make.",
+      "returns": "string"
+    },
+    {
+      "name": "teach",
+      "is": "action",
+      "params": [
+        "subject"
+      ],
+      "cost": 10,
+      "description": "Teach a stat (\"strength\", \"endurance\", \"agility\", \"intellect\") or a skill (\"combat\", …) at the training ground on my tile, while I stand there. One teacher per ground.",
+      "returns": "string"
+    },
+    {
+      "name": "train",
+      "is": "action",
+      "params": [],
+      "cost": 10,
+      "description": "Train at the training ground on my tile, while I stand there: I learn its subject while a teacher is there, never past the teacher. Room for 6 trainees per ground.",
+      "returns": "string"
+    },
+    {
+      "name": "breed",
+      "is": "action",
+      "params": [
+        "stableId",
+        "horseIds"
+      ],
+      "cost": 10,
+      "description": "At the stable I stand at, tend two fed horses of mine in it, like [\"h1\", \"h2\"], until their foal is born.",
+      "returns": "string"
+    },
+    {
+      "name": "pair",
+      "is": "action",
+      "params": [
+        "partnerId"
+      ],
+      "cost": 10,
+      "description": "Pair with an adult of my city to have children.",
+      "returns": "string"
+    },
+    {
+      "name": "attack",
+      "is": "action",
+      "params": [
+        "targetId"
+      ],
+      "cost": 10,
+      "description": "Go after a resident I see and strike them, or strike a wall or gate of another realm until it falls.",
+      "returns": "string"
+    },
+    {
+      "name": "feed",
+      "is": "action",
+      "params": [
+        "targetId",
+        "units"
+      ],
+      "cost": 10,
+      "description": "Feed a resident who is Down or a horse that isn’t full, of any realm, on or next to my tile, with up to that many units of the Food in my hands. A resident gets it in their hands, eats at once and wakes at low health. A horse eats until it is full, and wakes if it was Down; the rest stays with me.",
+      "returns": "string"
+    },
+    {
+      "name": "climb",
+      "is": "action",
+      "params": [
+        "wallId"
+      ],
+      "cost": 10,
+      "description": "Climb over the wall or gate of another realm next to me.",
+      "returns": "string"
+    },
+    {
+      "name": "pay",
+      "is": "action",
+      "params": [
+        "contractId",
+        "weeks"
+      ],
+      "cost": 10,
+      "description": "On a mercenary contract’s storage, put in the coins for some weeks of it.",
+      "returns": "string"
+    },
+    {
+      "name": "buyCity",
+      "is": "action",
+      "params": [
+        "cityId"
+      ],
+      "cost": 10,
+      "description": "On an NPC city’s town hall, buy it with the coins my realm’s residents there carry.",
+      "returns": "string"
+    },
+    {
+      "name": "buy",
+      "is": "action",
+      "params": [
+        "good",
+        "units",
+        "carriageId?",
+        "cityId?"
+      ],
+      "cost": 10,
+      "description": "On a Trade Org warehouse, an NPC city’s storage or the tile of a wandering trader standing at a stop, buy up to `units` of a good at its prices with the coins in my hands, or on my carriage there. At a warehouse, with `cityId`, one of my realm’s cities, a caravan delivers them to its storage for a fee.",
+      "returns": "string"
+    },
+    {
+      "name": "sell",
+      "is": "action",
+      "params": [
+        "good",
+        "units",
+        "carriageId?",
+        "cityId?"
+      ],
+      "cost": 10,
+      "description": "On a Trade Org warehouse, an NPC city’s storage or the tile of a wandering trader standing at a stop, sell up to `units` of a good at its prices from my hands, or from my carriage there. At a warehouse, with `cityId` (and no carriage), a caravan picks them up from that city’s storage and pays there, less a fee.",
+      "returns": "string"
+    },
+    {
+      "name": "swap",
+      "is": "action",
+      "params": [
+        "give",
+        "want",
+        "units",
+        "carriageId?"
+      ],
+      "cost": 10,
+      "description": "On a Trade Org warehouse or an NPC city’s storage, get up to `units` of the good `want` for as much of the good `give` as pays for them at its prices, rounded up, from my hands, or from my carriage there. What is over comes back in Coins as far as it holds them. An NPC city swaps only its surplus for what it is short of.",
+      "returns": "string"
+    },
+    {
+      "name": "buyHorse",
+      "is": "action",
+      "params": [
+        "horse"
+      ],
+      "cost": 10,
+      "description": "At an NPC city’s finished stable, buy a horse standing in it that it can spare, by it or its id, with the coins in my hands; they go into its storage, and the horse joins my realm where it stands. `city.horses` lists its horses with their prices and why it won’t sell one.",
+      "returns": "string"
+    },
+    {
+      "name": "sellHorse",
+      "is": "action",
+      "params": [
+        "horse"
+      ],
+      "cost": 10,
+      "description": "At an NPC city’s finished stable, sell it a horse of my realm standing in it, by it or its id; the coins go into my hands, and it doesn’t go if I can’t carry them. The horse joins the city where it stands. `city.horsesToSell` lists my horses there with what it pays and why it won’t buy one.",
+      "returns": "string"
+    },
+    {
+      "name": "handIn",
+      "is": "action",
+      "params": [
+        "good",
+        "units",
+        "toCityId",
+        "carriageId?"
+      ],
+      "cost": 10,
+      "description": "On a Trade Org warehouse, hand in up to `units` of a good (coins too) from my hands, or from my carriage there, with the fee, for a caravan to bring to the storage of `toCityId`, a city of another realm.",
+      "returns": "string"
+    },
+    {
+      "name": "postOffer",
+      "is": "action",
+      "params": [
+        "storageId",
+        "gives",
+        "givesUnits",
+        "wants",
+        "wantsUnits",
+        "times"
+      ],
+      "cost": 10,
+      "description": "At a finished storage of my realm, wherever I am, post an offer: gives `givesUnits` of a good, wants `wantsUnits` of another (either may be \"coins\"), `times` over or as many times as goods not set aside there allow. Those goods are set aside at once.",
+      "returns": "string"
+    },
+    {
+      "name": "takeDownOffer",
+      "is": "action",
+      "params": [
+        "offerId"
+      ],
+      "cost": 10,
+      "description": "Take down an offer of my realm; what it set aside is ordinary goods again.",
+      "returns": "string"
+    },
+    {
+      "name": "acceptOffer",
+      "is": "action",
+      "params": [
+        "offerId",
+        "times",
+        "carriageId?"
+      ],
+      "cost": 10,
+      "description": "On the storage of another’s offer, accept it up to `times` times over, paying from and taking into my hands, or my carriage there, as many times as I can pay and carry. A direct offer only the realm it was sent to can accept.",
+      "returns": "string"
+    },
+    {
+      "name": "sendDirectOffer",
+      "is": "action",
+      "params": [
+        "toId",
+        "storageId",
+        "gives",
+        "givesUnits",
+        "wants",
+        "wantsUnits",
+        "times"
+      ],
+      "cost": 10,
+      "description": "Send a realm my realm knows of an offer at a finished storage of my realm, wherever I am, on the terms of `postOffer`. They see it at once wherever they are, and only they can accept it, on its storage’s tile, until it lapses.",
+      "returns": "string"
+    },
+    {
+      "name": "sendCarriedOffer",
+      "is": "action",
+      "params": [
+        "toId",
+        "fromCityId",
+        "toCityId",
+        "gives",
+        "givesUnits",
+        "wants",
+        "wantsUnits",
+        "times",
+        "feeBy"
+      ],
+      "cost": 10,
+      "description": "Send a realm my realm knows of an offer the Trade Organization carries, between a city of my realm and one of theirs whose storage my realm sees, on the terms of `postOffer` and within one load each way. `feeBy` is \"sender\" or \"split\". Nothing is set aside; only they can accept it, from anywhere, until it lapses.",
+      "returns": "string"
+    },
+    {
+      "name": "acceptCarriedOffer",
+      "is": "action",
+      "params": [
+        "offerId"
+      ],
+      "cost": 10,
+      "description": "Accept a carried direct offer sent to my realm, whole, wherever I am: it becomes two Transfers.",
+      "returns": "string"
+    },
+    {
+      "name": "declineOffer",
+      "is": "action",
+      "params": [
+        "offerId"
+      ],
+      "cost": 10,
+      "description": "Decline a direct offer sent to my realm, wherever I am; its sender hears, and what it set aside is ordinary goods again.",
+      "returns": "string"
+    },
+    {
+      "name": "buyOff",
+      "is": "action",
+      "params": [
+        "directiveId",
+        "carriageId?"
+      ],
+      "cost": 10,
+      "description": "On a Trade Org warehouse, pay the price of an admin directive against my realm with the coins in my hands, or on my carriage there, to end it.",
+      "returns": "string"
+    },
+    {
+      "name": "payDebt",
+      "is": "action",
+      "params": [
+        "coins",
+        "carriageId?"
+      ],
+      "cost": 10,
+      "description": "On a Trade Org warehouse, pay up to `coins` of my realm’s debt to the Trade Organization with the coins in my hands, or on my carriage there: what I hold, up to what is owed.",
+      "returns": "string"
+    },
+    {
+      "name": "handOver",
+      "is": "action",
+      "params": [
+        "newLeaderId"
+      ],
+      "cost": 10,
+      "description": "As my realm’s Leader, make another resident its Leader: an adult of my realm serving no one else (no mercenary contract, not in the alliance army), standing in the same city of my realm as I do. Free and at once; I stay on as an ordinary resident.",
+      "returns": "string"
+    },
+    {
+      "name": "rename",
+      "is": "action",
+      "params": [
+        "residentId",
+        "name",
+        "realmName?"
+      ],
+      "cost": 10,
+      "description": "Give a resident of my realm, me or my Leader included, a new name: free and at once, from anywhere. Renaming the Leader of a realm with no realm name yet needs `realmName` too, which names the realm; a named realm keeps its name.",
+      "returns": "string"
+    },
+    {
+      "name": "renameCity",
+      "is": "action",
+      "params": [
+        "cityId",
+        "name"
+      ],
+      "cost": 10,
+      "description": "Give a city of my realm a new name: free and at once, from anywhere. Others go on knowing it by its old name until they see it again.",
+      "returns": "string"
+    },
+    {
+      "name": "relocate",
+      "is": "action",
+      "params": [
+        "cityId"
+      ],
+      "cost": 10,
+      "description": "Walk to `cityId`, another city of my realm, and become its resident on stepping into its area, at once if I stand in it already: refused unless it has free housing for me, counting residents already relocating there, or while I carry a child. My order is \"relocate\" until done; then `me.orderEnded` says how it ended: reason null once I moved in, else why not (\"no free housing\", \"it is no longer your realm’s\" or \"the city is gone\"), and I keep my old city.",
+      "returns": "string"
+    },
+    {
+      "name": "renameHorse",
+      "is": "action",
+      "params": [
+        "horseId",
+        "name"
+      ],
+      "cost": 10,
+      "description": "Give a horse of my realm a new name: free and at once, from anywhere, like renaming a resident. Names need not be unique.",
+      "returns": "string"
+    },
+    {
+      "name": "claimHorses",
+      "is": "action",
+      "params": [],
+      "cost": 10,
+      "description": "Claim my Player’s Horse offer: two new horses for my realm, in its stable nearest the Leader’s city, or else by a storage or the Leader with Food by them. Free and at once; refused once claimed, unless an admin has offered horses again, or while my realm has no living Leader.",
+      "returns": "string"
+    },
+    {
+      "name": "sendDemand",
+      "is": "action",
+      "params": [
+        "realmId",
+        "terms",
+        "note",
+        "days"
+      ],
+      "cost": 10,
+      "description": "Send a realm my realm knows of a demand, wherever it is: `terms` is `{ kind: \"city\", cityId: id }` for a city of theirs I know of, or `{ kind: \"goods\", goods: { food: 5, coins: 20 } }`, with a note of at most 280 characters and a deadline 1 to 60 game days away. My realm sends at most 3 a game day. It is only words: nothing happens by itself when it is ignored. `realmId` can also be an NPC city I know of, or `\"trade-org\"`: the game answers within a game hour.",
+      "returns": "string"
+    },
+    {
+      "name": "acceptDemand",
+      "is": "action",
+      "params": [
+        "demandId",
+        "handOver"
+      ],
+      "cost": 10,
+      "description": "Accept a demand sent to my realm. A demand for a city hands it over at once, also my last one; a city no longer mine is refused. A demand for goods or Coins names how they go in `handOver`: `{ way: \"setAside\", storageId: id }`, at a storage of mine for the sender alone to fetch, or `{ way: \"transfer\", fromCityId: id, toCityId: id }`, by Transfers from a city of mine to one of theirs whose storage I see, for a fee I pay. What the storage holds goes, up to what was demanded; with none of it there, it is refused. For the Trade Organization’s demand for my debt, its caravan fetches what is set aside at a storage in a city for no fee, and a Transfer goes to its nearest warehouse whatever `toCityId` says; what they bring in comes off the debt.",
+      "returns": "string"
+    },
+    {
+      "name": "declineDemand",
+      "is": "action",
+      "params": [
+        "demandId"
+      ],
+      "cost": 10,
+      "description": "Decline a demand sent to my realm.",
+      "returns": "string"
+    },
+    {
+      "name": "roadLine",
+      "is": "action",
+      "params": [
+        "x",
+        "y"
+      ],
+      "cost": 10,
+      "description": "Build road on each tile of the line from my tile to (x, y), straight or diagonal, one after another, with the stone I carry.",
+      "returns": "string"
+    },
+    {
+      "name": "wallLine",
+      "is": "action",
+      "params": [
+        "x",
+        "y"
+      ],
+      "cost": 10,
+      "description": "Build wall on each tile of the line from my tile to (x, y), straight or diagonal, one after another, with the materials I carry; tiles with a wall or gate already are skipped.",
+      "returns": "string"
+    },
+    {
+      "name": "addWaypoint",
+      "is": "action",
+      "params": [
+        "x",
+        "y",
+        "name"
+      ],
+      "cost": 10,
+      "description": "Put a waypoint named `name` on tile (x, y) for my Player, after those they hold: free and at once, from anywhere. Refused once they hold 50, counting those this run added (one removed makes room from the next run), or for a name longer than 30 characters.",
+      "returns": "string"
+    },
+    {
+      "name": "removeWaypoint",
+      "is": "action",
+      "params": [
+        "waypoint"
+      ],
+      "cost": 10,
+      "description": "Remove one of my Player’s waypoints, by it or its id: free and at once.",
+      "returns": "string"
+    }
+  ],
+  "armyScriptApi": [
+    {
+      "name": "me",
+      "is": "value",
+      "params": [],
+      "cost": 0,
+      "description": "The army running the script: its `name`, `order`, `memberIds`, and its `members` as the Player sees them.",
+      "returns": {
+        "view": "army"
+      }
+    },
+    {
+      "name": "memory",
+      "is": "value",
+      "params": [],
+      "cost": 0,
+      "description": "An object kept between ticks for whoever runs it; whatever is set on it stays.",
+      "returns": "any"
+    },
+    {
+      "name": "params",
+      "is": "value",
+      "params": [],
+      "cost": 0,
+      "description": "The values of the script’s `param` lines, picked on the resident card for whoever runs it: `params.name` for `param name: type`; a `number` param’s default (`param name: number = 3`) while none is set, else null.",
+      "returns": "any"
+    },
+    {
+      "name": "debt",
+      "is": "value",
+      "params": [],
+      "cost": 0,
+      "description": "The Coins my realm owes the Trade Organization, 0 when it owes nothing: what its army came for and couldn’t take, and what crimes cost it since.",
+      "returns": "number"
+    },
+    {
+      "name": "tick",
+      "is": "value",
+      "params": [],
+      "cost": 0,
+      "description": "The world tick this run is for.",
+      "returns": "number"
+    },
+    {
+      "name": "mapSize",
+      "is": "value",
+      "params": [],
+      "cost": 0,
+      "description": "Tiles along each side of the map; its opposite sides join.",
+      "returns": "number"
+    },
+    {
+      "name": "random",
+      "is": "value",
+      "params": [],
+      "cost": 0,
+      "description": "A number from 0 up to 1, drawn anew each tick and the same for every script that tick, so residents can agree on a random pick.",
+      "returns": "number"
+    },
+    {
+      "name": "residents",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The residents the Player sees, their own included; those of their own running a script with its `script.memory`, to read but not change.",
+      "returns": {
+        "list": {
+          "view": "resident"
+        }
+      }
+    },
+    {
+      "name": "buildings",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The buildings and construction sites the Player sees, roads included.",
+      "returns": {
+        "list": {
+          "view": "building"
+        }
+      }
+    },
+    {
+      "name": "cities",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The cities the Player sees any of.",
+      "returns": {
+        "list": {
+          "view": "city"
+        }
+      }
+    },
+    {
+      "name": "horses",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The horses the Player sees.",
+      "returns": {
+        "list": {
+          "view": "horse"
+        }
+      }
+    },
+    {
+      "name": "carriages",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The carriages the Player sees.",
+      "returns": {
+        "list": {
+          "view": "carriage"
+        }
+      }
+    },
+    {
+      "name": "traders",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The wandering traders the Player sees: those standing at a stop name where and their prices.",
+      "returns": {
+        "list": {
+          "view": "trader"
+        }
+      }
+    },
+    {
+      "name": "piles",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The piles of goods the Player sees.",
+      "returns": {
+        "list": {
+          "view": "pile"
+        }
+      }
+    },
+    {
+      "name": "nodes",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The resource nodes on terrain the Player has explored.",
+      "returns": {
+        "list": {
+          "view": "node"
+        }
+      }
+    },
+    {
+      "name": "nodesInSight",
+      "is": "query",
+      "params": [
+        "kind?"
+      ],
+      "cost": 20,
+      "description": "The resource nodes the Player sees now; with `kind` (\"forest\", \"stone\", \"ironOre\" or \"goldOre\"), only those of that kind.",
+      "returns": {
+        "list": {
+          "view": "node"
+        }
+      }
+    },
+    {
+      "name": "lastSeen",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The buildings, construction sites and cities the Player has seen and that are out of their sight now, as they last saw them: each with `is` (\"building\" or \"city\") and `seenAt`, the tick they were last seen.",
+      "returns": {
+        "list": {
+          "view": "lastSeen"
+        }
+      }
+    },
+    {
+      "name": "offers",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The offers standing at storages in sight, my realm’s own wherever they are, and direct offers sent to my realm wherever they are, oldest first.",
+      "returns": {
+        "list": {
+          "view": "offer"
+        }
+      }
+    },
+    {
+      "name": "directives",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The admin directives in force, which every Player sees: target, reason and the price to buy one off (null when it can’t be).",
+      "returns": {
+        "list": {
+          "view": "directive"
+        }
+      }
+    },
+    {
+      "name": "waypoints",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "My Player’s waypoints, oldest first: the named markers they put on the map, which only they see.",
+      "returns": {
+        "list": {
+          "view": "waypoint"
+        }
+      }
+    },
+    {
+      "name": "demands",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The demands my realm sent or was sent that wait for an answer, oldest first.",
+      "returns": {
+        "list": {
+          "view": "demand"
+        }
+      }
+    },
+    {
+      "name": "withMemory",
+      "is": "query",
+      "params": [
+        "key",
+        "value"
+      ],
+      "cost": 20,
+      "description": "My realm’s residents running a script whose `memory[key]` is `value`, as `residents()` shows them, with their `script.memory`.",
+      "returns": {
+        "list": {
+          "view": "resident"
+        }
+      }
+    },
+    {
+      "name": "building",
+      "is": "query",
+      "params": [
+        "id"
+      ],
+      "cost": 1,
+      "description": "The building or construction site with that id, if the Player sees it or it is one of my realm’s cities’; else null.",
+      "returns": {
+        "view": "building"
+      }
+    },
+    {
+      "name": "buildingAt",
+      "is": "query",
+      "params": [
+        "x",
+        "y"
+      ],
+      "cost": 1,
+      "description": "The building or construction site on a tile, roads and carriage sites left out, as `building(id)` gives it; null where there is none or the Player doesn’t see it.",
+      "returns": {
+        "view": "building"
+      }
+    },
+    {
+      "name": "inCityArea",
+      "is": "query",
+      "params": [
+        "cityId",
+        "x",
+        "y"
+      ],
+      "cost": 1,
+      "description": "Whether a tile lies in that city’s area, for a city of my realm’s or a tile the Player sees; false for any other.",
+      "returns": "boolean"
+    },
+    {
+      "name": "cityAreaAt",
+      "is": "query",
+      "params": [
+        "x",
+        "y"
+      ],
+      "cost": 1,
+      "description": "The id of the city whose area a tile lies in, one of my realm’s first where areas overlap; null where there is none, or the tile is the area of no city of my realm and the Player doesn’t see it.",
+      "returns": "string"
+    },
+    {
+      "name": "outsidersIn",
+      "is": "query",
+      "params": [
+        "cityId"
+      ],
+      "cost": 20,
+      "description": "The outsiders the Player sees in that city’s area: those of another realm, not allied, leaving out Trade Organization caravans and wandering traders with their crews.",
+      "returns": {
+        "list": {
+          "view": "resident"
+        }
+      }
+    },
+    {
+      "name": "pileAt",
+      "is": "query",
+      "params": [
+        "x",
+        "y"
+      ],
+      "cost": 1,
+      "description": "The goods lying on a tile, like {food: 3}, if the Player sees it; null where none lie or it isn’t seen.",
+      "returns": {
+        "view": "goods"
+      }
+    },
+    {
+      "name": "outputOf",
+      "is": "query",
+      "params": [
+        "building"
+      ],
+      "cost": 1,
+      "description": "The goods a workplace makes, as a list (at a smithy everything it can make); empty for any other building.",
+      "returns": {
+        "list": "string"
+      }
+    },
+    {
+      "name": "materialsNeeded",
+      "is": "query",
+      "params": [
+        "site"
+      ],
+      "cost": 1,
+      "description": "The materials a construction site still lacks, as a list like [{good: \"wood\", units: 12}]; empty once it has them all, and for a finished building.",
+      "returns": {
+        "list": {
+          "view": "material"
+        }
+      }
+    },
+    {
+      "name": "lineTiles",
+      "is": "query",
+      "params": [
+        "line",
+        "from?"
+      ],
+      "cost": 20,
+      "description": "The tiles of a Build line still to build, from its start to its end; with `from`, something with `x` and `y`, nearest first. `line` is like {building: \"wall\", from: {x: 3, y: 4}, to: {x: 8, y: 4}}, as the Build line task keeps it in `memory.line`, road or wall, straight or diagonal. Tiles the Player sees with one already, or that can’t take one, are left out.",
+      "returns": {
+        "list": {
+          "view": "lineTile"
+        }
+      }
+    },
+    {
+      "name": "terrainAt",
+      "is": "query",
+      "params": [
+        "x",
+        "y"
+      ],
+      "cost": 1,
+      "description": "The terrain of a tile (\"plains\", \"forest\", \"hills\", \"mountain\", \"lake\" or \"sea\"), or null where the Player hasn’t explored.",
+      "returns": "string"
+    },
+    {
+      "name": "distance",
+      "is": "query",
+      "params": [
+        "a",
+        "b"
+      ],
+      "cost": 1,
+      "description": "Tiles between two things with `x` and `y`, the short way round the map.",
+      "returns": "number"
+    },
+    {
+      "name": "floor",
+      "is": "query",
+      "params": [
+        "n"
+      ],
+      "cost": 1,
+      "description": "The whole number at or below `n`: `floor(2.7)` is 2, `floor(-2.5)` is -3.",
+      "returns": "number"
+    },
+    {
+      "name": "pickRandom",
+      "is": "query",
+      "params": [
+        "list"
+      ],
+      "cost": 1,
+      "description": "One item of a list, picked with `random`, so every script picking from the same list this tick picks the same; null for an empty list.",
+      "returns": "any"
+    },
+    {
+      "name": "walkTo",
+      "is": "action",
+      "params": [
+        "x",
+        "y"
+      ],
+      "cost": 10,
+      "description": "The army walks to a tile together.",
+      "returns": "string"
+    },
+    {
+      "name": "guard",
+      "is": "action",
+      "params": [
+        "x",
+        "y"
+      ],
+      "cost": 10,
+      "description": "The army walks to a tile together and stays there.",
+      "returns": "string"
+    },
+    {
+      "name": "attack",
+      "is": "action",
+      "params": [
+        "targetId"
+      ],
+      "cost": 10,
+      "description": "The army goes after a resident of another realm in sight.",
+      "returns": "string"
+    },
+    {
+      "name": "follow",
+      "is": "action",
+      "params": [
+        "targetId"
+      ],
+      "cost": 10,
+      "description": "The army keeps in contact with a resident in sight.",
+      "returns": "string"
+    },
+    {
+      "name": "stop",
+      "is": "action",
+      "params": [],
+      "cost": 10,
+      "description": "The army stops: its order ends.",
+      "returns": "string"
+    },
+    {
+      "name": "addWaypoint",
+      "is": "action",
+      "params": [
+        "x",
+        "y",
+        "name"
+      ],
+      "cost": 10,
+      "description": "Put a waypoint named `name` on tile (x, y) for my Player, after those they hold: free and at once, from anywhere. Refused once they hold 50, counting those this run added (one removed makes room from the next run), or for a name longer than 30 characters.",
+      "returns": "string"
+    },
+    {
+      "name": "removeWaypoint",
+      "is": "action",
+      "params": [
+        "waypoint"
+      ],
+      "cost": 10,
+      "description": "Remove one of my Player’s waypoints, by it or its id: free and at once.",
+      "returns": "string"
+    }
+  ],
+  "defaultScripts": {
+    "work": {
+      "name": "Work",
+      "source": "// Work (default): work params.workplace, or while none is picked the\n// workplace on my tile when I start, kept in memory.workplaceId; with none I\n// end. params.storage is my main storage: params.output, params.input and\n// params.food each take its place for one use while picked. Once the pile\n// holds a full load, one of us, picked at random, stores it in\n// params.output, else params.storage, else the nearest storage of my realm,\n// brings back the Food the pile lacks of params.crewFood for the crew's\n// meals from params.food, else params.storage, else the nearest storage with\n// Food (none to a farm, whose pile keeps its own; crewFood 0 brings none)\n// and comes back. At a smelter, mint or smithy lacking the input for a\n// batch, one of us, picked at random, fetches a load at params.input, else\n// params.storage, while it holds some, else at the nearest storage of my\n// realm holding it, and puts it on the pile; not while one of us carries the\n// output, and with none anywhere we stand idle. At a smithy, memory.makes\n// says what to make. Meals come from the workplace's pile on their own,\n// without an order. Below\n// params.foodAt units of Food on me, while the pile holds none, I get Food\n// up to params.foodTake at params.food, else params.storage, else the\n// nearest storage of my realm with Food, and come back; storing a load tops\n// my food up to foodTake too. foodAt 0 turns getting food off. At the workplace we stand spread over\n// its footprint. A workplace still being built I build first, as Build would,\n// with materials from the nearest storage of my realm holding them, then work\n// it once it is finished.\nparam workplace: building // the workplace to work; none: the one I stand on\nparam storage: storage // my main storage, for output, inputs and Food; none: the nearest storage of my realm\nparam output: storage // where the output goes; none: my storage, else the nearest storage of my realm\nparam input: storage // where inputs come from; none: my storage, else the nearest storage holding them\nparam food: storage // where Food comes from; a carriage too; none: my storage, else the nearest storage with Food\nparam foodAt: number = 1 // get Food below this many units on me; 0 never\nparam foodTake: number = 3 // units of Food to take along\nparam crewFood: number = 20 // Food the pile keeps for the crew's meals; 0 none\nlet keepFood = 2 // Food a farm's pile keeps for our refills\n\nif (!pickWorkplace()) { return }\nlet workplace = building(memory.workplaceId)\nif (memory.siteId != null && buildFirst(workplace)) { return }\n// Where I stand at it: the footprint tile with the fewest of us (Spreading\n// over the footprint), picked when I set out and again whenever I stand idle\n// there; kept while I hold my order or am away, so I neither drift nor lose\n// my spot. One picked out of sight is where I last saw it, until I see it.\n// Already at work there, I keep the tile I stand on.\nif (memory.at == null && me.order != null && me.order.kind == \"workAt\") {\n  memory.at = {x: me.x, y: me.y}\n} else if (me.order == null && workplace != null && memory.carry == null && memory.food == null && memory.input == null) {\n  memory.at = crewTile(workplace)\n}\nif (memory.at == null && params.workplace != null) {\n  memory.at = {x: params.workplace.x, y: params.workplace.y}\n}\nif (memory.at == null || memory.stuck) { return }\nif (me.order != null && me.order.kind != \"workAt\") { // on my way\n  wait()\n  return\n}\n\nif (storeLoad()) { return }\nif (walkBack()) { return }\nif (workplace == null) { // here, and it isn't: torn down\n  end(\"the workplace is gone\")\n  return\n}\n// With Food on the pile my meals come from there; with none anywhere, I work on.\nlet food = me.carried.food || 0\nif (food < params.foodAt && !pileHoldsFood(workplace) && getFoodIfLow(params.food || params.storage, workplace)) {\n  memory.food = {walked: false}\n  return\n}\nif (me.order == null) {\n  if (memory.input != null) { // back with inputs: onto the pile\n    let load = carriedOf(me, memory.input.missing)\n    memory.input = null\n    if (load != null && drop({kind: \"ground\"}, load) == null) { return }\n  }\n  if (workAt(memory.makes) != null && heldBySomeoneElse(workplace)) {\n    end(\"the \" + workplace.kind + \" is held by someone else\")\n  }\n  return\n}\ncarryLoadOffIfFull(workplace)\n\n// Which workplace I work: the one picked, else the one I started on, kept in\n// memory.workplaceId. False once I end: neither is a workplace.\nfn pickWorkplace() {\n  if (params.workplace != null) {\n    if (!isWorkplace(params.workplace)) {\n      end(\"the \" + params.workplace.kind + \" is no workplace\")\n      return false\n    }\n    memory.workplaceId = params.workplace.id\n    if (params.workplace.site != null) { memory.siteId = params.workplace.id } // built first\n  }\n  if (memory.workplaceId == null) {\n    let here = buildingAt(me.x, me.y)\n    if (!isWorkplace(here)) {\n      end(\"no workplace on their tile\")\n      return false\n    }\n    memory.workplaceId = here.id\n    if (here.site != null) { memory.siteId = here.id } // built first\n  }\n  return true\n}\n\n// A building that makes goods, or the construction site of one.\nfn isWorkplace(b) {\n  return b != null && outputOf(b).length > 0\n}\n\n// A workplace still being built (Working a site), kept in memory.siteId: I\n// build it first, as Build would, and go on working it once it is finished.\n// True while I build it.\nfn buildFirst(site) {\n  if (memory.at == null) { // starting\n    if (site == null) {\n      end(\"the site is gone\")\n      return true\n    }\n    memory.at = crewTile(site)\n    log(\"building \" + placeName(site) + \" first, to work it\")\n  }\n  if (memory.stuck) { return true }\n  if (me.order != null && me.order.kind != \"build\") { // on my way\n    wait()\n    return true\n  }\n  if (me.x == memory.at.x && me.y == memory.at.y) {\n    if (site == null) { // here, and it isn't: torn down\n      end(\"the site is gone\")\n      return true\n    }\n    if (site.site == null) {\n      log(\"the \" + site.kind + \" is finished: working it\")\n      memory.siteId = null\n      memory.fetch = null\n      memory.food = null\n      return false\n    }\n  }\n  // Idle and not away, I stand where the fewest of us build (Spreading over\n  // the footprint).\n  if (me.order == null && site != null && memory.fetch == null && memory.food == null) {\n    memory.at = crewTile(site)\n  }\n  if (walkBack()) { return true }\n  if (memory.fetch != null) { memory.fetch = null } // back with it\n  if (bringCarried(site)) { return true }\n  // With no Food anywhere, I build on.\n  if (getFoodIfLow(params.food || params.storage, site)) {\n    memory.food = {walked: false}\n    return true\n  }\n  if (me.order == null) {\n    let problem = build(site.kind)\n    if (problem != null) { end(\"can't build the \" + site.kind + \": \" + problem) }\n    return true\n  }\n  fetchMissing(site, null)\n  return true\n}\n\n// Whether residents of another realm work it, so it has no room for me.\nfn heldBySomeoneElse(workplace) {\n  for (r of residents()) {\n    let o = r.order\n    if (r.owner != me.owner && o != null && o.kind == \"workAt\" && o.buildingId == workplace.id) {\n      return true\n    }\n  }\n  return false\n}\n\n// With a load picked up: store it, keeping my own food, then bring the\n// crew's Food. True once I set off. Logged now, not when picking it up: that\n// tick is our dearest already.\nfn storeLoad() {\n  let carry = memory.carry\n  if (carry == null) { return false }\n  if (carry.stored) { return bringCrewFood(carry) }\n  carry.stored = true\n  if (store(carry.goods, carry.storageId, params.foodTake) != null) {\n    carry.crewFood = 0 // not storing: no crew food either\n    return false\n  }\n  wait() // until it is stored\n  let to = building(carry.storageId)\n  if (carry.load != null && to != null) {\n    log(\"pile full: carrying \" + goodsText(carry.load, carry.goods) + \" to \" + placeName(to))\n  }\n  return true\n}\n\n// Crew food: with the load stored, I fetch the Food the pile lacks\n// (carry.crewFood) at params.food, else params.storage, while it holds Food,\n// else at the nearest storage of my realm with Food, before I walk back,\n// once, as much as fits. True once I set off, which I log.\nfn bringCrewFood(carry) {\n  if (carry.fetched) { return false }\n  carry.fetched = true\n  let units = carry.crewFood\n  if (units == null || units < 1) { return false }\n  let fit = fits(\"food\")\n  if (units > fit) { units = fit }\n  if (units < 1) { return false }\n  let from = params.food || params.storage\n  if (from == null || !holdsFood(from)) {\n    from = null\n    let stores = storages(me, [\"food\"]) // nearest first, holding some\n    if (stores.length > 0) { from = stores[0] }\n  }\n  if (from == null || fetch({food: units}, from.id) != null) { return false }\n  log(\"fetching \" + units + \" Food for the crew at \" + placeName(from))\n  return true\n}\n\n// Back with the crew's Food: I put it on the pile, keeping my own food up to\n// params.foodTake, once. True once I drop it, which I log.\nfn dropCrewFood() {\n  let carry = memory.carry\n  if (carry == null || !carry.fetched || carry.dropped) { return false }\n  carry.dropped = true\n  let food = me.carried.food\n  if (food == null) { return false }\n  let units = floor(food - params.foodTake)\n  if (units > carry.crewFood) { units = carry.crewFood }\n  if (units < 1) { return false }\n  if (drop({kind: \"ground\"}, {food: units}) != null) { return false }\n  log(\"put \" + units + \" Food on the pile for the crew\")\n  return true\n}\n\n// Away carrying a load off, fetching inputs or materials or getting food:\n// walk back to the workplace, once; with no way back I stay put. True until\n// I am there.\nfn walkBack() {\n  if (me.x == memory.at.x && me.y == memory.at.y) {\n    if (memory.carry != null) {\n      if (dropCrewFood()) { return true }\n      memory.carry = null\n    }\n    if (memory.food != null) { memory.food = null }\n    return false\n  }\n  let away = memory.carry\n  if (away == null) { away = memory.food }\n  if (away == null) { away = memory.input }\n  if (away == null) { away = memory.fetch }\n  if (away != null && away.walked) {\n    memory.stuck = true\n    log(\"no way back to the workplace\")\n  } else {\n    if (walkTo(memory.at.x, memory.at.y) == null) { wait() } // until I am there\n    if (away != null) { away.walked = true }\n  }\n  return true\n}\n\n// Once the pile holds a full load, one of us carries it off to params.output,\n// else params.storage, else the nearest storage of my realm. Until it does,\n// we fetch inputs we lack.\nfn carryLoadOffIfFull(workplace) {\n  let found = fullLoad(workplace)\n  if (found == null) {\n    fetchInputIfShort(workplace)\n    return\n  }\n  let to = params.output || params.storage\n  if (to == null) {\n    let stores = storages(workplace) // nearest first\n    if (stores.length == 0) { return } // none in reach: the pile grows\n    to = stores[0]\n  }\n  if (pickCarrier(workplace) != me.id) { return }\n  pickUp({kind: \"ground\"}, found.load)\n  memory.carry = {\n    storageId: to.id, goods: found.goods, load: found.load,\n    crewFood: crewFoodToBring(workplace, found.goods),\n  }\n}\n\n// Fetching inputs: lacking the input for a batch of my recipe, one of us,\n// picked at random, fetches a load at params.input, else params.storage,\n// while it holds some, else at the nearest storage of my realm holding it,\n// kept in memory.input until back, when I put it on the pile. With none\n// anywhere we stand idle.\nfn fetchInputIfShort(workplace) {\n  let missing = inputToFetch(workplace, memory.makes)\n  if (missing.length == 0) { return }\n  let goods = goodsOf(missing)\n  let from = null\n  if (params.input != null) { from = materialsFrom(workplace, goods, params.input) }\n  if (from == null && params.storage != null) {\n    from = materialsFrom(workplace, goods, params.storage)\n  }\n  if (from == null) { from = materialsFrom(workplace, goods, null) }\n  if (from == null || pickInputFetcher(workplace) != me.id) { return }\n  let load = {}\n  for (m of missing) { load[m.good] = m.units }\n  if (fetch(load, from.id) != null) { return }\n  wait() // until I have it\n  memory.input = {missing: missing}\n  log(\"fetching \" + goodsText(load, goods) + \" from \" + placeName(from))\n}\n\n// Who fetches inputs: one of us at work here, picked at random, so we all\n// pick the same one. Null while one of us fetches some or carries a load.\nfn pickInputFetcher(workplace) {\n  let workers = []\n  for (r of withMemory(\"workplaceId\", workplace.id)) {\n    let m = r.script.memory\n    if (m.input != null || m.carry != null) { return null }\n    if (r.order != null && r.order.kind == \"workAt\") { workers[workers.length] = r }\n  }\n  let fetcher = pickRandom(workers)\n  if (fetcher == null) { return null }\n  return fetcher.id\n}\n\n// The Food the pile lacks of params.crewFood, which I bring back for the\n// crew's meals; none with a load of Food (a farm's), whose pile keeps its own.\nfn crewFoodToBring(workplace, goods) {\n  if (params.crewFood < 1) { return 0 }\n  for (good of goods) {\n    if (good == \"food\") { return 0 }\n  }\n  let pile = pileAt(workplace.x, workplace.y)\n  let held = 0\n  if (pile != null && pile.food != null) { held = pile.food }\n  let units = floor(params.crewFood - held)\n  if (units < 1) { return 0 }\n  return units\n}\n\n// Whether the workplace's pile holds Food, where my meals come from on their\n// own (no need to go for Food).\nfn pileHoldsFood(workplace) {\n  let pile = pileAt(workplace.x, workplace.y)\n  return pile != null && pile.food != null && pile.food > 0\n}\n\n// What the pile holds of the workplace's goods, as {goods, load}, once one of\n// them makes a full load; else null. A farm's pile keeps keepFood for refills.\nfn fullLoad(workplace) {\n  let pile = pileAt(workplace.x, workplace.y)\n  let load = {}\n  let goods = []\n  let full = false\n  for (good of outputOf(workplace)) {\n    let units = 0\n    if (pile != null && pile[good] != null) { units = pile[good] }\n    if (good == \"food\") { units = units - keepFood }\n    if (units > 0) {\n      load[good] = units\n      goods[goods.length] = good\n      let fit = fits(good)\n      if (fit > 0 && units >= fit) { full = true }\n    }\n  }\n  if (!full) { return null }\n  return {goods: goods, load: load}\n}\n\n// Who carries the load: one of us at work here, picked at random, so we all\n// pick the same one. Null while one of us carries a load already.\nfn pickCarrier(workplace) {\n  let workers = []\n  for (r of withMemory(\"workplaceId\", workplace.id)) {\n    if (r.script.memory.carry != null) { return null }\n    if (r.order != null && r.order.kind == \"workAt\") { workers[workers.length] = r }\n  }\n  let carrier = pickRandom(workers)\n  if (carrier == null) { return null }\n  return carrier.id\n}\n\n// What I carry of what the site lacks goes in first. True once I drop it.\nfn bringCarried(site) {\n  let needed = materialsNeeded(site)\n  let mine = carriedOf(me, needed)\n  if (mine == null) { return false }\n  drop({kind: \"site\", siteId: site.id}, mine)\n  log(\"bringing \" + goodsText(mine, goodsOf(needed)) + \" to the site\")\n  return true\n}\n\n// While the site lacks materials, one of us fetches them, picked at random,\n// from source, or the nearest storage of my realm holding them while it is\n// null: my own food first, topped up to params.foodTake; then what is missing.\nfn fetchMissing(site, source) {\n  let missing = materialsNeeded(site)\n  if (missing.length == 0) { return }\n  let goods = goodsOf(missing)\n  let from = materialsFrom(site, goods, source)\n  if (from == null) { return } // none in storage: we just build\n  if (pickFetcher(site, missing) != me.id) { return }\n  let load = {}\n  let topUp = foodToTake()\n  if (topUp > 0) { load.food = topUp }\n  for (m of missing) { load[m.good] = m.units }\n  if (fetch(load, from.id) == null) {\n    wait() // until I have it\n    memory.fetch = {storageId: from.id, goods: load}\n    log(\"fetching \" + goodsText(load, goods) + \" at \" + placeName(from))\n  }\n}\n\n// Where materials come from: source while it holds some of goods, else,\n// while it is null, the nearest storage of my realm holding some.\nfn materialsFrom(site, goods, source) {\n  let from = source\n  if (from == null) {\n    let stores = storages(site, goods) // nearest first, holding some\n    if (stores.length == 0) { return null }\n    return stores[0]\n  }\n  let held = from.stock\n  if (held == null) { held = from.load } // a carriage\n  if (held == null) { return null }\n  for (g of goods) {\n    if (held[g] != null && held[g] > 0) { return from }\n  }\n  return null\n}\n\n// Who fetches: one of us building the site, picked at random, so we all pick\n// the same one. Null while one of us fetches, or brings some, already.\nfn pickFetcher(site, missing) {\n  let builders = []\n  for (r of withMemory(\"siteId\", site.id)) {\n    if (r.script.memory.fetch != null) { return null }\n    if (carriedOf(r, missing) != null) { return null }\n    if (r.order != null && r.order.kind == \"build\") { builders[builders.length] = r }\n  }\n  let fetcher = pickRandom(builders)\n  if (fetcher == null) { return null }\n  return fetcher.id\n}\n\n// What someone carries of what the site lacks; null if nothing.\nfn carriedOf(r, missing) {\n  let load = null\n  for (m of missing) {\n    let n = r.carried[m.good]\n    if (n != null && n > 0) {\n      if (n > m.units) { n = m.units }\n      if (load == null) { load = {} }\n      load[m.good] = n\n    }\n  }\n  return load\n}\n\n// The goods of what the site lacks.\nfn goodsOf(missing) {\n  let goods = []\n  for (m of missing) { goods[goods.length] = m.good }\n  return goods\n}\n\n// Getting food: below params.foodAt units of Food on me, fetch Food up to\n// params.foodTake at from while it holds Food, else at the nearest storage of\n// my realm with Food from near. True once I set off, which I log; I wait\n// until I have it.\nfn getFoodIfLow(from, near) {\n  let food = me.carried.food\n  if (food == null) { food = 0 }\n  if (food >= params.foodAt) { return false }\n  let units = floor(params.foodTake - food) // fetch takes whole units\n  if (units < 1) { return false }\n  let at = from\n  if (at == null || !holdsFood(at)) {\n    at = null\n    let stores = storages(near, [\"food\"]) // nearest first, holding some\n    if (stores.length > 0) { at = stores[0] }\n  }\n  if (at == null || fetch({food: units}, at.id) != null) { return false }\n  wait() // until I have it\n  log(\"low on Food (\" + floor(food) + \"): fetching \" + units + \" at \" + placeName(at))\n  return true\n}\n\n// Whether a storage, or a carriage, holds a whole unit of Food to fetch.\nfn holdsFood(at) {\n  let held = at.stock\n  if (held == null) { held = at.load } // a carriage\n  return held != null && held.food != null && held.food >= 1\n}\n\n// The Food that tops me up to params.foodTake, in whole units.\nfn foodToTake() {\n  let food = me.carried.food\n  if (food == null) { food = 0 }\n  let units = floor(params.foodTake - food)\n  if (units < 1) { return 0 }\n  return units\n}\n\n\n// A building or carriage for my log: \"the storage at 12,6\".\nfn placeName(b) {\n  let kind = b.kind\n  if (kind == null) { kind = \"carriage\" }\n  return \"the \" + kind + \" at \" + b.x + \",\" + b.y\n}\n\n// The units of goods in load for my log: \"10 stone, 4 wood\".\nfn goodsText(load, goods) {\n  let text = \"\"\n  for (g of goods) {\n    let n = load[g]\n    if (n != null && n >= 1) {\n      if (text != \"\") { text = text + \", \" }\n      text = text + floor(n) + \" \" + g\n    }\n  }\n  return text\n}\n"
+    },
+    "build": {
+      "name": "Build",
+      "source": "// Build (default): build a memory.building with the north-west tile of its\n// footprint at memory.at, laying out the site or joining the one there, as\n// the Build order gives it. Without one I join params.site, or while none is\n// picked the construction site on my tile when I start; with none I end.\n// While the site lacks materials, one of us building it, picked at random,\n// fetches a load of what is missing from params.source, or the nearest\n// storage of my realm that holds it while none is picked, and brings it\n// back. With none there we just build. Below params.foodAt units of Food on\n// me I get Food up to params.foodTake at params.food, else params.source,\n// else the nearest storage of my realm with Food, and come back; fetching\n// materials tops my food up to foodTake too. foodAt 0 turns getting food\n// off. At the site we stand spread over its footprint.\nparam site: building // the construction site to join; none: the one I stand on\nparam source: storage // where materials come from; a carriage too; none: the nearest storage holding some\nparam food: storage // where Food comes from; a carriage too; none: my source, else the nearest storage with Food\nparam foodAt: number = 1 // get Food below this many units on me; 0 never\nparam foodTake: number = 3 // units of Food to take along\n\nif (!pickSite()) { return }\nif (memory.stuck) { return }\nif (me.order != null && me.order.kind != \"build\") { // on my way\n  wait()\n  return\n}\n\nlet site = null\nif (memory.siteId != null) { site = building(memory.siteId) }\nif (endIfDone(site)) { return }\nspreadOut(site)\nif (walkBack()) { return }\nif (site != null && bringCarried(site)) { return }\n// With no Food anywhere, I build on.\nif (getFoodIfLow(params.food || params.source, me)) {\n  memory.food = {walked: false}\n  return\n}\nif (me.order == null) {\n  startBuilding()\n  return\n}\nif (me.order.siteId == null) { return } // laid out at the end of the tick\nmemory.siteId = me.order.siteId\nif (site != null) { fetchMissing(site, params.source) }\n\n// Which site I build: the Build order's, else the one picked, else the one I\n// started on. False once I end: neither is a construction site.\nfn pickSite() {\n  if (memory.building != null) { return true }\n  let join = params.site\n  if (join == null) { join = buildingAt(me.x, me.y) }\n  if (join == null || join.site == null) {\n    if (params.site != null) { end(\"the \" + params.site.kind + \" is no construction site\") }\n    else { end(\"no construction site on their tile\") }\n    return false\n  }\n  memory.building = join.kind\n  memory.at = crewTile(join)\n  memory.siteId = join.id\n  log(\"joining the site of \" + placeName(join))\n  return true\n}\n\n// At the site once it is laid out: finished or gone, building is done. True\n// once I end.\nfn endIfDone(site) {\n  if (memory.siteId == null) { return false }\n  if (me.x != memory.at.x || me.y != memory.at.y) { return false }\n  if (site != null && site.site != null) { return false }\n  if (site == null) { log(\"the site is gone\") }\n  else { log(\"the \" + site.kind + \" is finished\") }\n  end()\n  return true\n}\n\n// Where I stand at the site: the footprint tile with the fewest of us\n// (Spreading over the footprint), picked whenever I stand idle and not away;\n// a site another of us laid out at memory.at counts too. Laying out a new\n// site keeps the picked tile.\nfn spreadOut(site) {\n  if (me.order != null || memory.fetch != null || memory.food != null) { return }\n  if (site == null) { site = buildingAt(memory.at.x, memory.at.y) }\n  if (site != null && site.site != null && site.kind == memory.building) {\n    memory.at = crewTile(site)\n  }\n}\n\n// Not there yet, or away fetching or getting food: walk to the site, once;\n// with no way back I stay put. True until I am there.\nfn walkBack() {\n  if (me.x == memory.at.x && me.y == memory.at.y) {\n    if (memory.fetch != null) { memory.fetch = null }\n    if (memory.food != null) { memory.food = null }\n    return false\n  }\n  let away = memory.fetch\n  if (away == null) { away = memory.food }\n  if (away != null && away.walked) {\n    memory.stuck = true\n    log(\"no way back to the site\")\n  } else {\n    if (walkTo(memory.at.x, memory.at.y) == null) { wait() } // until I am there\n    if (away != null) { away.walked = true }\n  }\n  return true\n}\n\n// Laying out the site, or joining it. Turned down, such as with the tile\n// taken, build says why: done.\nfn startBuilding() {\n  let problem = build(memory.building)\n  if (problem != null) {\n    log(\"can't build: \" + problem)\n    end()\n  } else if (memory.siteId == null) {\n    log(\"laying out a \" + memory.building + \" at \" + memory.at.x + \",\" + memory.at.y)\n  }\n}\n\n// What I carry of what the site lacks goes in first. True once I drop it.\nfn bringCarried(site) {\n  let needed = materialsNeeded(site)\n  let mine = carriedOf(me, needed)\n  if (mine == null) { return false }\n  drop({kind: \"site\", siteId: site.id}, mine)\n  log(\"bringing \" + goodsText(mine, goodsOf(needed)) + \" to the site\")\n  return true\n}\n\n// While the site lacks materials, one of us fetches them, picked at random,\n// from source, or the nearest storage of my realm holding them while it is\n// null: my own food first, topped up to params.foodTake; then what is missing.\nfn fetchMissing(site, source) {\n  let missing = materialsNeeded(site)\n  if (missing.length == 0) { return }\n  let goods = goodsOf(missing)\n  let from = materialsFrom(site, goods, source)\n  if (from == null) { return } // none in storage: we just build\n  if (pickFetcher(site, missing) != me.id) { return }\n  let load = {}\n  let topUp = foodToTake()\n  if (topUp > 0) { load.food = topUp }\n  for (m of missing) { load[m.good] = m.units }\n  if (fetch(load, from.id) == null) {\n    wait() // until I have it\n    memory.fetch = {storageId: from.id, goods: load}\n    log(\"fetching \" + goodsText(load, goods) + \" at \" + placeName(from))\n  }\n}\n\n// Where materials come from: source while it holds some of goods, else,\n// while it is null, the nearest storage of my realm holding some.\nfn materialsFrom(site, goods, source) {\n  let from = source\n  if (from == null) {\n    let stores = storages(site, goods) // nearest first, holding some\n    if (stores.length == 0) { return null }\n    return stores[0]\n  }\n  let held = from.stock\n  if (held == null) { held = from.load } // a carriage\n  if (held == null) { return null }\n  for (g of goods) {\n    if (held[g] != null && held[g] > 0) { return from }\n  }\n  return null\n}\n\n// Who fetches: one of us building the site, picked at random, so we all pick\n// the same one. Null while one of us fetches, or brings some, already.\nfn pickFetcher(site, missing) {\n  let builders = []\n  for (r of withMemory(\"siteId\", site.id)) {\n    if (r.script.memory.fetch != null) { return null }\n    if (carriedOf(r, missing) != null) { return null }\n    if (r.order != null && r.order.kind == \"build\") { builders[builders.length] = r }\n  }\n  let fetcher = pickRandom(builders)\n  if (fetcher == null) { return null }\n  return fetcher.id\n}\n\n// What someone carries of what the site lacks; null if nothing.\nfn carriedOf(r, missing) {\n  let load = null\n  for (m of missing) {\n    let n = r.carried[m.good]\n    if (n != null && n > 0) {\n      if (n > m.units) { n = m.units }\n      if (load == null) { load = {} }\n      load[m.good] = n\n    }\n  }\n  return load\n}\n\n// The goods of what the site lacks.\nfn goodsOf(missing) {\n  let goods = []\n  for (m of missing) { goods[goods.length] = m.good }\n  return goods\n}\n\n// Getting food: below params.foodAt units of Food on me, fetch Food up to\n// params.foodTake at from while it holds Food, else at the nearest storage of\n// my realm with Food from near. True once I set off, which I log; I wait\n// until I have it.\nfn getFoodIfLow(from, near) {\n  let food = me.carried.food\n  if (food == null) { food = 0 }\n  if (food >= params.foodAt) { return false }\n  let units = floor(params.foodTake - food) // fetch takes whole units\n  if (units < 1) { return false }\n  let at = from\n  if (at == null || !holdsFood(at)) {\n    at = null\n    let stores = storages(near, [\"food\"]) // nearest first, holding some\n    if (stores.length > 0) { at = stores[0] }\n  }\n  if (at == null || fetch({food: units}, at.id) != null) { return false }\n  wait() // until I have it\n  log(\"low on Food (\" + floor(food) + \"): fetching \" + units + \" at \" + placeName(at))\n  return true\n}\n\n// Whether a storage, or a carriage, holds a whole unit of Food to fetch.\nfn holdsFood(at) {\n  let held = at.stock\n  if (held == null) { held = at.load } // a carriage\n  return held != null && held.food != null && held.food >= 1\n}\n\n// The Food that tops me up to params.foodTake, in whole units.\nfn foodToTake() {\n  let food = me.carried.food\n  if (food == null) { food = 0 }\n  let units = floor(params.foodTake - food)\n  if (units < 1) { return 0 }\n  return units\n}\n\n\n// A building or carriage for my log: \"the storage at 12,6\".\nfn placeName(b) {\n  let kind = b.kind\n  if (kind == null) { kind = \"carriage\" }\n  return \"the \" + kind + \" at \" + b.x + \",\" + b.y\n}\n\n// The units of goods in load for my log: \"10 stone, 4 wood\".\nfn goodsText(load, goods) {\n  let text = \"\"\n  for (g of goods) {\n    let n = load[g]\n    if (n != null && n >= 1) {\n      if (text != \"\") { text = text + \", \" }\n      text = text + floor(n) + \" \" + g\n    }\n  }\n  return text\n}\n"
+    },
+    "buildLine": {
+      "name": "Build line",
+      "source": "// Build line (default): build memory.line.building, road or wall, on each\n// tile of the line from memory.line.from to memory.line.to, straight or\n// diagonal, as the Build line order gives it; started without one I end.\n// Tiles that have one already, or can't take one, are skipped. I take the\n// nearest tile still to build that no other of us on this line has taken,\n// walk there, lay out its site or join the one there, and build it; with\n// every tile left taken I wait for the others to finish the line. What I\n// carry goes in first; lacking some, I fetch from params.source, or the\n// nearest storage of my realm holding them while none is picked, as much as\n// I can carry for this tile and my share of the next ones, topping my food\n// up to params.foodTake there. With none in any storage I\n// lay out each tile's site and go on to the next; once all are laid out I\n// end, saying why. Below params.foodAt units of Food on me I get Food up to\n// params.foodTake at params.food, else params.source, else the nearest\n// storage of my realm with Food, and come back. foodAt 0 turns getting food\n// off.\nparam source: storage // where materials come from; a carriage too; none: the nearest storage holding some\nparam food: storage // where Food comes from; a carriage too; none: my source, else the nearest storage with Food\nparam foodAt: number = 1 // get Food below this many units on me; 0 never\nparam foodTake: number = 3 // units of Food to take along\n\nif (memory.line == null) {\n  end(\"no line given\")\n  return\n}\nif (me.order != null && me.order.kind != \"build\") { // on my way\n  wait()\n  return\n}\n\nlet tiles = lineTiles(memory.line, me) // nearest first\nlet crew = withMemory(\"line\", memory.line) // all of us on this line, me too\nlet taken = takenByOthers(crew)\nif (me.order == null) {\n  let tile = pickTile(tiles, taken)\n  if (tile == null) {\n    endLine(tiles)\n    return\n  }\n  memory.waiting = null\n  if (walkThere(tile)) { return }\n  // With no Food anywhere, I build on.\n  if (getFoodIfLow(params.food || params.source, me)) { return }\n  startBuilding(tile)\n  return\n}\nif (me.order.siteId == null) { return } // laid out at the end of the tick\nlet site = building(me.order.siteId)\nif (site == null || bringCarried(site)) { return }\nif (getFoodIfLow(params.food || params.source, me)) { return }\nfetchMissing(site, tiles, crew, taken)\n\n// The tiles others of us on this line have taken, by \"x,y\".\nfn takenByOthers(crew) {\n  let taken = {}\n  for (r of crew) {\n    let at = r.script.memory.at\n    if (r.id != me.id && at != null) { taken[at.x + \",\" + at.y] = true }\n  }\n  return taken\n}\n\n// The tile I build next, kept in memory.at: the nearest still to build that\n// no other of us has taken, and while no storage holds materials the nearest\n// not laid out yet. Null once there is none.\nfn pickTile(tiles, taken) {\n  for (t of tiles) {\n    if ((memory.noStock == null || t.siteId == null) && taken[t.x + \",\" + t.y] == null) {\n      memory.at = {x: t.x, y: t.y}\n      return t\n    }\n  }\n  memory.at = null\n  return null\n}\n\n// No tile left to take: the line is built, every tile left is taken by\n// others of us, or every tile left is laid out and still no storage holds\n// materials. With others building the rest I wait for them to finish it;\n// with materials there again, I go on.\nfn endLine(tiles) {\n  if (tiles.length == 0) {\n    log(\"the \" + memory.line.building + \" line is finished\")\n    end()\n  } else if (memory.noStock == null) {\n    if (memory.waiting == null) {\n      log(\"the rest of the line is taken: waiting for it to be finished\")\n      memory.waiting = true\n    }\n  } else if (materialsFrom(me, memory.noStock) != null) {\n    log(\"there is \" + goodsNames(memory.noStock) + \" again: building the laid-out sites\")\n    memory.noStock = null\n  } else {\n    end(\"no \" + goodsNames(memory.noStock) + \" in any storage\")\n  }\n}\n\n// Not on the tile yet: walk there, once. True until I am there; with no way\n// there I end.\nfn walkThere(tile) {\n  if (me.x == tile.x && me.y == tile.y) {\n    memory.walkedTo = null\n    return false\n  }\n  let walked = memory.walkedTo\n  if (walked != null && walked.x == tile.x && walked.y == tile.y) {\n    end(\"no way to \" + tile.x + \",\" + tile.y)\n    return true\n  }\n  memory.walkedTo = {x: tile.x, y: tile.y}\n  let problem = walkTo(tile.x, tile.y)\n  if (problem == null) { wait() } // until I am there\n  else { end(\"can't walk to \" + tile.x + \",\" + tile.y + \": \" + problem) }\n  return true\n}\n\n// Laying out the tile's site, or joining the one there. Turned down, I end\n// saying why.\nfn startBuilding(tile) {\n  let problem = build(memory.line.building)\n  if (problem != null) {\n    end(\"can't build at \" + tile.x + \",\" + tile.y + \": \" + problem)\n  } else if (tile.siteId == null) {\n    log(\"laying out a \" + memory.line.building + \" at \" + tile.x + \",\" + tile.y)\n  }\n}\n\n// What I carry of what the site lacks goes in first. True once I drop it.\nfn bringCarried(site) {\n  let needed = materialsNeeded(site)\n  let mine = carriedOf(me, needed)\n  if (mine == null) { return false }\n  drop({kind: \"site\", siteId: site.id}, mine)\n  log(\"bringing \" + goodsText(mine, goodsOf(needed)) + \" to the site\")\n  return true\n}\n\n// Lacking materials for my tile: fetch them from params.source, or the\n// nearest storage holding them, for this tile and my share of the next ones\n// nobody has taken, as much as I can carry, with my food topped up to\n// params.foodTake. With none in any storage I leave the site laid out and go\n// on to the next tile.\nfn fetchMissing(site, tiles, crew, taken) {\n  let missing = materialsNeeded(site)\n  if (missing.length == 0) { return }\n  let goods = goodsOf(missing)\n  let from = materialsFrom(site, goods)\n  if (from == null) {\n    if (memory.noStock == null) {\n      log(\"no \" + goodsNames(goods) + \" in any storage: laying out the rest of the line\")\n    }\n    memory.noStock = goods\n    stop()\n    return\n  }\n  memory.noStock = null\n  let load = {}\n  let topUp = foodToTake()\n  if (topUp > 0) { load.food = topUp }\n  // My share of the next tiles still to build that no other of us has taken.\n  let free = 0\n  for (t of tiles) {\n    if (taken[t.x + \",\" + t.y] == null) { free = free + 1 }\n  }\n  let more = floor((free - 1) / crew.length)\n  for (m of missing) {\n    let perTile = m.units // what a tile takes: what this one lacks and has\n    let had = site.site.delivered[m.good]\n    if (had != null) { perTile = perTile + had }\n    let units = m.units + perTile * more\n    let room = fits(m.good)\n    if (units > room) { units = room }\n    load[m.good] = units\n  }\n  if (fetch(load, from.id) == null) {\n    wait() // until I have it\n    log(\"fetching \" + goodsText(load, goods) + \" at \" + placeName(from))\n  }\n}\n\n// Where materials come from: params.source while it holds some of goods,\n// else, while none is picked, the nearest storage of my realm holding some.\nfn materialsFrom(near, goods) {\n  let from = params.source\n  if (from == null) {\n    let stores = storages(near, goods) // nearest first, holding some\n    if (stores.length == 0) { return null }\n    return stores[0]\n  }\n  let held = from.stock\n  if (held == null) { held = from.load } // a carriage\n  if (held == null) { return null }\n  for (g of goods) {\n    if (held[g] != null && held[g] > 0) { return from }\n  }\n  return null\n}\n\n// What someone carries of what the site lacks; null if nothing.\nfn carriedOf(r, missing) {\n  let load = null\n  for (m of missing) {\n    let n = r.carried[m.good]\n    if (n != null && n > 0) {\n      if (n > m.units) { n = m.units }\n      if (load == null) { load = {} }\n      load[m.good] = n\n    }\n  }\n  return load\n}\n\n// The goods of what the site lacks.\nfn goodsOf(missing) {\n  let goods = []\n  for (m of missing) { goods[goods.length] = m.good }\n  return goods\n}\n\n// Goods by name for my log: \"stone\", or \"wood and stone\".\nfn goodsNames(goods) {\n  let text = \"\"\n  for (g of goods) {\n    if (text != \"\") { text = text + \" and \" }\n    text = text + g\n  }\n  return text\n}\n\n// Getting food: below params.foodAt units of Food on me, fetch Food up to\n// params.foodTake at from while it holds Food, else at the nearest storage of\n// my realm with Food from near. True once I set off, which I log; I wait\n// until I have it.\nfn getFoodIfLow(from, near) {\n  let food = me.carried.food\n  if (food == null) { food = 0 }\n  if (food >= params.foodAt) { return false }\n  let units = floor(params.foodTake - food) // fetch takes whole units\n  if (units < 1) { return false }\n  let at = from\n  if (at == null || !holdsFood(at)) {\n    at = null\n    let stores = storages(near, [\"food\"]) // nearest first, holding some\n    if (stores.length > 0) { at = stores[0] }\n  }\n  if (at == null || fetch({food: units}, at.id) != null) { return false }\n  wait() // until I have it\n  log(\"low on Food (\" + floor(food) + \"): fetching \" + units + \" at \" + placeName(at))\n  return true\n}\n\n// Whether a storage, or a carriage, holds a whole unit of Food to fetch.\nfn holdsFood(at) {\n  let held = at.stock\n  if (held == null) { held = at.load } // a carriage\n  return held != null && held.food != null && held.food >= 1\n}\n\n// The Food that tops me up to params.foodTake, in whole units.\nfn foodToTake() {\n  let food = me.carried.food\n  if (food == null) { food = 0 }\n  let units = floor(params.foodTake - food)\n  if (units < 1) { return 0 }\n  return units\n}\n\n\n// A building or carriage for my log: \"the storage at 12,6\".\nfn placeName(b) {\n  let kind = b.kind\n  if (kind == null) { kind = \"carriage\" }\n  return \"the \" + kind + \" at \" + b.x + \",\" + b.y\n}\n\n// The units of goods in load for my log: \"10 stone, 4 wood\".\nfn goodsText(load, goods) {\n  let text = \"\"\n  for (g of goods) {\n    let n = load[g]\n    if (n != null && n >= 1) {\n      if (text != \"\") { text = text + \", \" }\n      text = text + floor(n) + \" \" + g\n    }\n  }\n  return text\n}\n"
+    },
+    "haul": {
+      "name": "Haul",
+      "source": "// Haul (default): drive params.carriage, or while none is picked the carriage\n// on my tile when I start, on a haul route between memory.from and memory.to:\n// memory.goods there, memory.returnGoods back, memory.keepFood Food kept on\n// board for the horse and me. The route comes only from the Haul order; started\n// without one I end. The built-in haul order loads, drives and unloads, again\n// and again; this starts it at memory.from.\nparam carriage: storage // the carriage to drive; none: the one I stand on\n\nif (memory.to == null) {\n  end(\"no route given\")\n  return\n}\nif (!pickCarriage()) { return }\nif (me.order == null || me.order.kind != \"haul\") {\n  startRoute()\n  return\n}\nlogLeg()\n\n// Which carriage I drive: the one picked, else the one I started on. False\n// once I end: neither is a carriage.\nfn pickCarriage() {\n  if (params.carriage != null) {\n    if (params.carriage.kind != null) {\n      end(\"the \" + params.carriage.kind + \" is no carriage\")\n      return false\n    }\n    memory.carriageId = params.carriage.id\n  }\n  if (memory.carriageId == null) {\n    for (c of carriages()) {\n      if (c.x == me.x && c.y == me.y) { memory.carriageId = c.id }\n    }\n    if (memory.carriageId == null) {\n      end(\"no carriage on their tile\")\n      return false\n    }\n  }\n  return true\n}\n\n// The haul order, once I stand at memory.from.\nfn startRoute() {\n  if (me.x != memory.from.x || me.y != memory.from.y) { return }\n  haul(memory.carriageId, memory.to.x, memory.to.y, memory.goods, memory.returnGoods, memory.keepFood)\n}\n\n// Each leg of the route as it starts, for my log: loading at a stop, or\n// driving to one.\nfn logLeg() {\n  let leg = me.order.phase + \" \" + me.order.stop\n  if (memory.leg == leg) { return }\n  memory.leg = leg\n  let stop = memory.to\n  if (me.order.stop == \"from\") { stop = memory.from }\n  if (me.order.phase == \"loading\") { log(\"loading at \" + stop.x + \",\" + stop.y) }\n  else { log(\"driving to \" + stop.x + \",\" + stop.y) }\n}\n"
+    },
+    "tearDown": {
+      "name": "Tear down",
+      "source": "// Tear down (default): tear down params.building, or while none is picked\n// the building or site on my tile when I start, kept in memory.buildingId,\n// until it is gone; then end. With none I end. Away from it, I walk there\n// first. Below params.foodAt units of Food on me I get Food up to\n// params.foodTake at params.food, else params.source, else the nearest\n// storage of my realm with Food, and come back. foodAt 0 turns it off.\nparam building: building // the building or site to tear down; none: the one I stand on\nparam source: storage // my main storage, for Food; a carriage too; none: the nearest storage with Food\nparam food: storage // where Food comes from; a carriage too; none: my source, else the nearest storage with Food\nparam foodAt: number = 1 // get Food below this many units on me; 0 never\nparam foodTake: number = 3 // units of Food to take along\n\nif (memory.stuck) { return }\nif (!pickBuilding()) { return }\nif (memory.walked && me.order != null && me.order.kind == \"walkTo\") { // on my way\n  wait()\n  return\n}\nif (walkBack()) { return }\n// With no Food anywhere, I tear down on.\nlet x = me.x\nlet y = me.y\nif (getFoodIfLow(params.food || params.source, me)) {\n  memory.food = {walked: false, x: x, y: y}\n  return\n}\nif (me.order == null || me.order.kind != \"tearDown\") { startTearingDown() }\n\n// What I tear down: the one picked, else the one I started on, kept in\n// memory.buildingId. False once I end: there is none.\nfn pickBuilding() {\n  if (params.building != null) { memory.buildingId = params.building.id }\n  if (memory.buildingId == null) {\n    let here = buildingAt(me.x, me.y)\n    if (here == null) {\n      end(\"no building on their tile\")\n      return false\n    }\n    memory.buildingId = here.id\n  }\n  return true\n}\n\n// Away getting food: walk back to the tile I tear down from, once; with no\n// way back I stay put. True until I am there.\nfn walkBack() {\n  let away = memory.food\n  if (away == null) { return false }\n  if (me.order != null && me.order.kind != \"tearDown\") { // on my way\n    wait()\n    return true\n  }\n  if (me.x == away.x && me.y == away.y) {\n    memory.food = null\n    return false\n  }\n  if (away.walked) {\n    memory.stuck = true\n    log(\"no way back to where I tear down\")\n  } else {\n    if (walkTo(away.x, away.y) == null) { wait() } // until I am there\n    away.walked = true\n  }\n  return true\n}\n\n// Tearing it down; picked somewhere else, I walk there once first. Turned\n// down, such as with the building gone, tearDown says why: done.\nfn startTearingDown() {\n  let problem = tearDown(memory.buildingId)\n  let target = building(memory.buildingId)\n  if (target == null) { target = params.building } // picked out of sight: as last seen\n  if (problem == \"the resident is not at that building\" && target != null && !memory.walked) {\n    memory.walked = true\n    if (walkTo(target.x, target.y) == null) { wait() } // until I am there\n    log(\"walking to \" + placeName(target) + \" to tear it down\")\n    return\n  }\n  if (problem != null) {\n    log(problem)\n    end()\n  } else if (target != null) { log(\"tearing down \" + placeName(target)) }\n}\n\n// Getting food: below params.foodAt units of Food on me, fetch Food up to\n// params.foodTake at from while it holds Food, else at the nearest storage of\n// my realm with Food from near. True once I set off, which I log; I wait\n// until I have it.\nfn getFoodIfLow(from, near) {\n  let food = me.carried.food\n  if (food == null) { food = 0 }\n  if (food >= params.foodAt) { return false }\n  let units = floor(params.foodTake - food) // fetch takes whole units\n  if (units < 1) { return false }\n  let at = from\n  if (at == null || !holdsFood(at)) {\n    at = null\n    let stores = storages(near, [\"food\"]) // nearest first, holding some\n    if (stores.length > 0) { at = stores[0] }\n  }\n  if (at == null || fetch({food: units}, at.id) != null) { return false }\n  wait() // until I have it\n  log(\"low on Food (\" + floor(food) + \"): fetching \" + units + \" at \" + placeName(at))\n  return true\n}\n\n// Whether a storage, or a carriage, holds a whole unit of Food to fetch.\nfn holdsFood(at) {\n  let held = at.stock\n  if (held == null) { held = at.load } // a carriage\n  return held != null && held.food != null && held.food >= 1\n}\n\n// The Food that tops me up to params.foodTake, in whole units.\nfn foodToTake() {\n  let food = me.carried.food\n  if (food == null) { food = 0 }\n  let units = floor(params.foodTake - food)\n  if (units < 1) { return 0 }\n  return units\n}\n\n\n// A building or carriage for my log: \"the storage at 12,6\".\nfn placeName(b) {\n  let kind = b.kind\n  if (kind == null) { kind = \"carriage\" }\n  return \"the \" + kind + \" at \" + b.x + \",\" + b.y\n}\n\n// The units of goods in load for my log: \"10 stone, 4 wood\".\nfn goodsText(load, goods) {\n  let text = \"\"\n  for (g of goods) {\n    let n = load[g]\n    if (n != null && n >= 1) {\n      if (text != \"\") { text = text + \", \" }\n      text = text + floor(n) + \" \" + g\n    }\n  }\n  return text\n}\n"
+    },
+    "breed": {
+      "name": "Breed horses",
+      "source": "// Breed horses (default): in params.stable, or while none is picked the\n// stable I stand in when I start, kept in memory.stableId, tend the two\n// horses memory.horseIds until their foal is born; then end. Without a pair\n// given, I pick one in the stable: a pair whose breeding it keeps first,\n// else two fed horses of my realm in it; with none, or no stable, I end.\n// Away from the stable, walk there first; at it we stand spread over its\n// footprint. Before starting, take Food for the days of tending from the\n// stable, if it has some.\nparam stable: storage // the stable to breed in; none: the one I stand in\nlet needFood = 5 // Food I take along for my meals while tending\n\nif (memory.done == true) { end() }\nif (me.order != null && me.order.kind == \"breed\") {\n  memory.started = true\n  wait() // until the foal is born or the breeding stops\n  return\n}\nif (memory.started == true) {\n  // The foal was born, or the breeding stopped: done.\n  log(\"the breeding is over\")\n  end()\n  return\n}\nif (me.order != null && (me.order.kind == \"walkTo\" || me.order.kind == \"pickUp\")) {\n  wait()\n  return\n}\nif (!pickStable()) { return }\nlet stable = building(memory.stableId)\nif (stable == null) {\n  end(\"the stable is gone\")\n  return\n}\nif (!pickPair(stable)) { return }\nif (takeFood()) { return }\nif (walkToStable(stable)) { return }\nstartBreeding(stable)\n\n// Which two: those given, else picked once I stand in the stable. False while\n// I walk there, or once I end: there are no two to pick.\nfn pickPair(stable) {\n  if (memory.horseIds != null) { return true }\n  let here = buildingAt(me.x, me.y)\n  if ((here == null || here.id != stable.id) && walkToStable(stable)) { return false }\n  let pair = breedingPair(stable)\n  if (pair == null) {\n    end(\"no two fed horses here\")\n    return false\n  }\n  memory.horseIds = pair\n  return true\n}\n\n// Food for the days of tending, taken from the stable once, if it has some.\n// True once I take it.\nfn takeFood() {\n  if (memory.fed == true) { return false }\n  let food = me.carried.food\n  if (food == null) { food = 0 }\n  if (food >= needFood) { return false }\n  let units = needFood - food\n  let spot = {kind: \"storage\", storageId: memory.stableId}\n  if (pickUp(spot, {food: units}) != null) { return false }\n  memory.fed = true\n  log(\"taking \" + goodsText({food: units}, [\"food\"]) + \" from the stable\")\n  return true\n}\n\n// Breeding the two; away from the stable, I walk there once first. Turned\n// down, breed says why: done.\nfn startBreeding(stable) {\n  let problem = breed(memory.stableId, memory.horseIds)\n  if (problem == null) {\n    log(\"breeding two horses in \" + placeName(stable))\n    return\n  }\n  if (problem == \"not standing at that stable\" && walkToStable(stable)) { return }\n  log(problem)\n  end()\n}\n\n// Where I stand at it: the footprint tile with the fewest of us (Spreading\n// over the footprint), the nearest on ties. I walk there once, kept as\n// memory.at; still away from it after that, breed says why. True while I\n// set out.\nfn walkToStable(stable) {\n  if (memory.walked == true) { return false }\n  let at = crewTile(stable)\n  if (me.x == at.x && me.y == at.y) { return false }\n  memory.walked = true\n  memory.at = at\n  if (walkTo(at.x, at.y) == null) { wait() } // until I am there\n  log(\"walking to \" + placeName(stable))\n  return true\n}\n\n// Which stable: the one picked, else the one I started in, kept in\n// memory.stableId. False once I end: neither is a stable.\nfn pickStable() {\n  if (params.stable != null) {\n    if (params.stable.kind != \"stable\") {\n      end(\"the one picked is no stable\")\n      return false\n    }\n    memory.stableId = params.stable.id\n  }\n  if (memory.stableId == null) {\n    let here = buildingAt(me.x, me.y)\n    if (here == null || here.kind != \"stable\" || here.site != null) {\n      end(\"no stable here\")\n      return false\n    }\n    memory.stableId = here.id\n  }\n  return true\n}\n\n// A building or carriage for my log: \"the storage at 12,6\".\nfn placeName(b) {\n  let kind = b.kind\n  if (kind == null) { kind = \"carriage\" }\n  return \"the \" + kind + \" at \" + b.x + \",\" + b.y\n}\n\n// The units of goods in load for my log: \"10 stone, 4 wood\".\nfn goodsText(load, goods) {\n  let text = \"\"\n  for (g of goods) {\n    let n = load[g]\n    if (n != null && n >= 1) {\n      if (text != \"\") { text = text + \", \" }\n      text = text + floor(n) + \" \" + g\n    }\n  }\n  return text\n}\n"
+    },
+    "feedStable": {
+      "name": "Feed the stable",
+      "source": "// Feed the stable (default): keep Food for 10 game days for the\n// horses standing in params.stable, or while none is picked in the stable I\n// stand in when I start, kept in memory.stableId; with none, or once it is\n// gone, I end. Below that I fetch what is missing from params.source, or\n// the nearest storage of my realm with Food while none is picked, and store\n// it in the stable; otherwise I wait there. memory.spareFood, kept only by an\n// NPC city's feeder, is the most Food I may take now.\nparam stable: storage // the stable to feed; none: the one I stand in\nparam source: storage // where the Food comes from; a carriage too; none: the nearest storage with Food\nlet days = 10 // game days of Food to keep\nlet perHorse = 0.75 // Food a horse eats a game day\nlet side = 3 // tiles along each side of a stable\n\nif (!pickStable()) { return }\nlet stable = building(memory.stableId)\n// Kept for when it is out of sight.\nif (stable != null) { memory.at = {x: stable.x, y: stable.y} }\nif (me.order != null) { // on my way\n  wait()\n  return\n}\nif (stable == null) {\n  walkBackOrEnd()\n  return\n}\nif (storeFetched(stable)) { return }\nif (fetchIfLow(stable)) { return }\n// Enough, or none to fetch: wait at the stable.\nif (!inStable(stable, me) && walkTo(stable.x, stable.y) == null) { wait() }\n\n// Out of sight: back to it. There, and it isn't, it is torn down: I end.\nfn walkBackOrEnd() {\n  let at = memory.at\n  if (at != null && (me.x != at.x || me.y != at.y) && walkTo(at.x, at.y) == null) {\n    wait() // until I am there\n    return\n  }\n  end(\"the stable is gone\")\n}\n\n// Back with Food: what I fetched goes into the stable; my own food stays.\n// True once I store it.\nfn storeFetched(stable) {\n  let fetched = memory.fetched\n  if (fetched == null) { return false }\n  memory.fetched = null\n  let food = me.carried.food\n  if (food == null) { return false }\n  let got = floor(food - fetched.before)\n  if (got < 1 || store({food: got}, stable.id) != null) { return false }\n  wait() // until it is stored\n  say(\"storing \" + goodsText({food: got}, [\"food\"]) + \" in the stable\")\n  return true\n}\n\n// Below the Food to keep for the horses in it now: fetch what is missing.\n// True once I set off.\nfn fetchIfLow(stable) {\n  let held = 0\n  if (stable.stock != null && stable.stock.food != null) { held = stable.stock.food }\n  let need = horsesIn(stable) * days * perHorse - held\n  if (need <= 0) {\n    say(\"enough Food in the stable: waiting\")\n    return false\n  }\n  let from = foodFrom(stable)\n  if (from != null) {\n    let units = floor(need)\n    if (units < need) { units = units + 1 } // whole units, rounded up\n    if (memory.spareFood != null && units > memory.spareFood) { units = memory.spareFood }\n    let before = me.carried.food\n    if (before == null) { before = 0 }\n    if (units >= 1 && fetch({food: units}, from.id) == null) {\n      wait() // until I have it\n      memory.fetched = {before: before}\n      say(\"stable low (\" + floor(held) + \"): fetching \" + units + \" Food at \" + placeName(from))\n      return true\n    }\n  }\n  say(\"stable low (\" + floor(held) + \"): no Food to fetch, waiting\")\n  return false\n}\n\n// Where the Food comes from: params.source, else the nearest storage of my\n// realm with Food; null unless it holds a whole unit, or if it is the stable.\nfn foodFrom(stable) {\n  let from = params.source\n  if (from == null) {\n    let stores = storages(stable, [\"food\"]) // nearest first, holding some\n    if (stores.length == 0) { return null }\n    from = stores[0]\n  }\n  let held = from.stock\n  if (held == null) { held = from.load } // a carriage\n  if (from.id == stable.id || held == null || held.food == null || held.food < 1) { return null }\n  return from\n}\n\n// The horses standing in the stable.\nfn horsesIn(stable) {\n  let n = 0\n  for (h of horses()) {\n    if (inStable(stable, h)) { n = n + 1 }\n  }\n  return n\n}\n\n// Whether something with x and y stands on the stable's footprint.\nfn inStable(stable, t) {\n  let dx = (t.x - stable.x + mapSize) % mapSize\n  let dy = (t.y - stable.y + mapSize) % mapSize\n  return dx < side && dy < side\n}\n\n// A line for my log, once until I say something else: waiting stays one line.\nfn say(text) {\n  if (memory.said != text) { log(text) }\n  memory.said = text\n}\n\n// Which stable: the one picked, else the one I started in, kept in\n// memory.stableId. False once I end: neither is a stable.\nfn pickStable() {\n  if (params.stable != null) {\n    if (params.stable.kind != \"stable\") {\n      end(\"the one picked is no stable\")\n      return false\n    }\n    memory.stableId = params.stable.id\n  }\n  if (memory.stableId == null) {\n    let here = buildingAt(me.x, me.y)\n    if (here == null || here.kind != \"stable\" || here.site != null) {\n      end(\"no stable here\")\n      return false\n    }\n    memory.stableId = here.id\n  }\n  return true\n}\n\n// A building or carriage for my log: \"the storage at 12,6\".\nfn placeName(b) {\n  let kind = b.kind\n  if (kind == null) { kind = \"carriage\" }\n  return \"the \" + kind + \" at \" + b.x + \",\" + b.y\n}\n\n// The units of goods in load for my log: \"10 stone, 4 wood\".\nfn goodsText(load, goods) {\n  let text = \"\"\n  for (g of goods) {\n    let n = load[g]\n    if (n != null && n >= 1) {\n      if (text != \"\") { text = text + \", \" }\n      text = text + floor(n) + \" \" + g\n    }\n  }\n  return text\n}\n"
+    },
+    "train": {
+      "name": "Train",
+      "source": "// Train (default): train at params.ground, or while none is picked the\n// training ground I stand on when I start, kept in memory.groundId; with\n// none, or once it is gone, I end. Away from it I walk there first. With\n// memory.subject set, I end once the ground teaches something else. While\n// no teacher is there, or I have learned all the teacher can teach me, I\n// wait there. Meals come from the ground's pile on their own, without an\n// order. Below params.foodAt units of Food on me I get Food up to\n// params.foodTake at the nearest storage of my realm with Food, and come\n// back. foodAt 0 turns getting food off.\nparam ground: building // the training ground; none: the one I stand on\nparam foodAt: number = 1 // get Food below this many units on me; 0 never\nparam foodTake: number = 3 // units of Food to take along\n\nif (!pickGround()) { return }\nlet ground = building(memory.groundId)\n// Kept for when it is out of sight.\nif (ground != null) { memory.at = {x: ground.x, y: ground.y} }\nif (memory.at == null && params.ground != null) {\n  memory.at = {x: params.ground.x, y: params.ground.y}\n}\nif (memory.at == null || memory.stuck) { return }\nif (me.order != null && me.order.kind != \"train\") { return } // on my way\n\nif (walkBack()) { return }\nif (ground == null) { // here, and it isn't: torn down\n  end(\"the training ground is gone\")\n  return\n}\nif (memory.subject != null && ground.subject != null && ground.subject != memory.subject) {\n  end(\"the ground teaches \" + ground.subject + \", not \" + memory.subject)\n  return\n}\n// With no Food anywhere, I train on.\nif (getFoodIfLow(null, ground)) { return }\nif (me.order == null) {\n  let problem = train()\n  if (problem != null) { end(problem) }\n  return\n}\nif (ground.teacher == null) { doing(\"Waiting for a teacher\") }\nelse if (me.order.learning == null) { doing(\"Waiting: learned all I can here\") }\nelse { doing(null) } // the order says what I learn\n\n// Which ground I train at: the one picked, else the one I started on, kept in\n// memory.groundId. False once I end: neither is a training ground.\nfn pickGround() {\n  if (params.ground != null) {\n    if (!isGround(params.ground)) {\n      end(\"the \" + params.ground.kind + \" is no training ground\")\n      return false\n    }\n    memory.groundId = params.ground.id\n  }\n  if (memory.groundId == null) {\n    let here = buildingAt(me.x, me.y)\n    if (!isGround(here)) {\n      end(\"no training ground on their tile\")\n      return false\n    }\n    memory.groundId = here.id\n  }\n  return true\n}\n\n// A finished training ground.\nfn isGround(b) {\n  return b != null && b.kind == \"trainingGround\" && b.site == null\n}\n\n// Off the ground (not there yet, or back from getting food): walk to it,\n// once; with no way there I stay put. True until I am on it.\nfn walkBack() {\n  let here = buildingAt(me.x, me.y)\n  if (here != null && here.id == memory.groundId) {\n    if (memory.walked != null) { memory.walked = null }\n    return false\n  }\n  if (memory.walked == true) {\n    memory.stuck = true\n    log(\"no way to the training ground\")\n  } else {\n    memory.walked = true\n    walkTo(memory.at.x, memory.at.y)\n  }\n  return true\n}\n\n// Getting food: below params.foodAt units of Food on me, fetch Food up to\n// params.foodTake at from while it holds Food, else at the nearest storage of\n// my realm with Food from near. True once I set off, which I log; I wait\n// until I have it.\nfn getFoodIfLow(from, near) {\n  let food = me.carried.food\n  if (food == null) { food = 0 }\n  if (food >= params.foodAt) { return false }\n  let units = floor(params.foodTake - food) // fetch takes whole units\n  if (units < 1) { return false }\n  let at = from\n  if (at == null || !holdsFood(at)) {\n    at = null\n    let stores = storages(near, [\"food\"]) // nearest first, holding some\n    if (stores.length > 0) { at = stores[0] }\n  }\n  if (at == null || fetch({food: units}, at.id) != null) { return false }\n  wait() // until I have it\n  log(\"low on Food (\" + floor(food) + \"): fetching \" + units + \" at \" + placeName(at))\n  return true\n}\n\n// Whether a storage, or a carriage, holds a whole unit of Food to fetch.\nfn holdsFood(at) {\n  let held = at.stock\n  if (held == null) { held = at.load } // a carriage\n  return held != null && held.food != null && held.food >= 1\n}\n\n// The Food that tops me up to params.foodTake, in whole units.\nfn foodToTake() {\n  let food = me.carried.food\n  if (food == null) { food = 0 }\n  let units = floor(params.foodTake - food)\n  if (units < 1) { return 0 }\n  return units\n}\n\n// A building or carriage for my log: \"the storage at 12,6\".\nfn placeName(b) {\n  let kind = b.kind\n  if (kind == null) { kind = \"carriage\" }\n  return \"the \" + kind + \" at \" + b.x + \",\" + b.y\n}\n\n// The units of goods in load for my log: \"10 stone, 4 wood\".\nfn goodsText(load, goods) {\n  let text = \"\"\n  for (g of goods) {\n    let n = load[g]\n    if (n != null && n >= 1) {\n      if (text != \"\") { text = text + \", \" }\n      text = text + floor(n) + \" \" + g\n    }\n  }\n  return text\n}\n"
+    },
+    "explore": {
+      "name": "Explore",
+      "source": "// Explore (default): go into the unknown. I walk to the edge of what my\n// Player has explored, the nearest tile first: toward params.toward, or the\n// nearest to params.waypoint; with neither, the nearest to me. Standing\n// there I see past it. I set out with as much Food as I can carry, from\n// params.food while it holds Food, else the nearest storage of my realm\n// with Food. Before each way out I check the Food on me covers it and the\n// way back to that storage, plus margin units; riding, my horse eats from\n// it too. Once it doesn't, I turn back, refill there and go back out to\n// where I turned. With no edge left in reach, I walk back there and end.\n// With params.find, I look about each tick on my way out, and at every\n// stop: once my Player sees a node of that kind that none of their\n// waypoints marks, I put a waypoint on it (\"Gold ore node\"), walk back to\n// where I refill and end. Without it I go on until stopped.\nparam find: choice(forest, stone, ironOre, goldOre) // the node to find; none: just explore\nparam toward: choice(north, northeast, east, southeast, south, southwest, west, northwest) // the way to go; none: the nearest unexplored tiles first\nparam waypoint: waypoint // a waypoint to head for instead; none: go by toward\nparam food: storage // where to refill; a carriage too; none: the nearest storage with Food\nlet margin = 3 // units of Food kept beyond the way back\nlet skipMax = 10 // tiles with no way there that I keep leaving out\n\nif (params.find != null && memory.ending == null && found()) { return }\nif (me.order != null) { // on my way\n  if (params.find != null && memory.target != null) { return } // out: I look about each tick\n  wait()\n  return\n}\nif (memory.ending != null) { // back where I refill\n  end(memory.ending)\n  return\n}\nif (memory.skip == null) { memory.skip = [] }\nif (memory.fetching != null) {\n  if (!refilled()) { return }\n} else if (memory.target != null) {\n  arrived()\n}\nlet from = foodFrom()\nif (from == null) {\n  end(\"no Food to explore with\")\n  return\n}\nif (memory.turnedAt != null && goBackOut(from)) { return }\nlet edge = nextEdge()\nif (edge == null) {\n  endBack(\"nothing unexplored in reach\", from)\n} else if (memory.out != true && memory.full != true && fits(\"food\") >= 1) {\n  turnBack(from) // setting out\n} else if (covers(edge, from)) {\n  walkOut(edge)\n} else if (memory.full == true) { // refilled, and still short\n  endBack(\"nothing unexplored in reach of the Food I can carry\", from)\n} else {\n  turnBack(from)\n}\n\n// The edge to walk to next, leaving out tiles I found no way to.\nfn nextEdge() {\n  if (params.waypoint != null) { return exploredEdge(params.waypoint, null, memory.skip) }\n  return exploredEdge(me, params.toward, memory.skip)\n}\n\n// Whether the Food on me covers the way to a tile and from there back to\n// where I refill, plus margin.\nfn covers(to, from) {\n  return foodOnMe() >= wayFood(me, to) + wayFood(to, from) + margin\n}\n\nfn walkOut(edge) {\n  let problem = walkTo(edge.x, edge.y)\n  if (problem != null) {\n    end(\"can't walk out: \" + problem)\n    return\n  }\n  memory.target = {x: edge.x, y: edge.y}\n  memory.out = true\n  memory.full = null\n  waitOut() // until I am there\n}\n\n// Fetch as much Food as fits where I refill: setting out, or turning back\n// once I have been out.\nfn turnBack(from) {\n  let units = fits(\"food\")\n  let problem = fetch([\"food\"], from.id) // as much as fits\n  if (problem != null) {\n    end(\"can't fetch Food: \" + problem)\n    return\n  }\n  memory.fetching = true\n  if (memory.out == true) {\n    memory.turnedAt = {x: me.x, y: me.y}\n    log(\"turning back with \" + floor(foodOnMe()) + \" Food to \" + placeName(from))\n  } else {\n    log(\"setting out: fetching \" + units + \" Food at \" + placeName(from))\n  }\n  wait() // until I have it\n}\n\n// On my way out: with params.find I run each tick to look about, else I\n// wait till I am there.\nfn waitOut() {\n  if (params.find == null) { wait() }\n}\n\n// A node of the kind params.find asks for that my Player sees and none of\n// their waypoints marks: I put a waypoint on it and walk back to end. True\n// once I found one.\nfn found() {\n  let node = unmarked(nodesInSight(params.find))\n  if (node == null) { return false }\n  let name = nodeName(node.kind)\n  let reason = \"found a \" + name + \" at \" + node.x + \",\" + node.y\n  let problem = addWaypoint(node.x, node.y, name)\n  if (problem != null) {\n    log(\"no waypoint: \" + problem)\n    reason = reason + \", no waypoint added\"\n  }\n  log(reason)\n  memory.target = null\n  memory.fetching = null\n  memory.turnedAt = null\n  let from = foodFrom()\n  if (from == null) {\n    end(reason)\n  } else {\n    endBack(reason, from)\n  }\n  return true\n}\n\n// The first of nodes with none of my Player's waypoints on its tile; null\n// with none.\nfn unmarked(nodes) {\n  if (nodes.length == 0) { return null }\n  let marked = {}\n  for (w of waypoints()) { marked[w.x + \",\" + w.y] = true }\n  for (n of nodes) {\n    if (marked[n.x + \",\" + n.y] == null) { return n }\n  }\n  return null\n}\n\n// A waypoint's name for a node: \"Gold ore node\".\nfn nodeName(kind) {\n  if (kind == \"ironOre\") { return \"Iron ore node\" }\n  if (kind == \"goldOre\") { return \"Gold ore node\" }\n  if (kind == \"forest\") { return \"Forest node\" }\n  return \"Stone node\"\n}\n\n// Done: back where I refill first, so I never end out in the wild, then\n// end saying why.\nfn endBack(reason, from) {\n  let here = buildingAt(me.x, me.y)\n  let there = (here != null && here.id == from.id) || (me.x == from.x && me.y == from.y)\n  if (there || walkTo(from.x, from.y) != null) {\n    end(reason)\n    return\n  }\n  memory.ending = reason\n  log(\"done: walking back to \" + placeName(from))\n  wait() // until I am there\n}\n\n// Back from fetching Food: false once I end, as I couldn't.\nfn refilled() {\n  memory.fetching = null\n  let ended = me.orderEnded\n  if (ended != null && ended.kind == \"fetch\" && ended.reason != null) {\n    end(\"can't refill: \" + ended.reason)\n    return false\n  }\n  memory.full = true\n  return true\n}\n\n// Refilled: back out to where I turned, while the Food on me covers it.\n// True once I set off; otherwise I explore from here.\nfn goBackOut(from) {\n  let at = memory.turnedAt\n  memory.turnedAt = null\n  if ((me.x == at.x && me.y == at.y) || !covers(at, from)) { return false }\n  if (walkTo(at.x, at.y) != null) { return false }\n  memory.target = {x: at.x, y: at.y}\n  memory.full = null\n  log(\"going back out to \" + at.x + \",\" + at.y)\n  waitOut() // until I am there\n  return true\n}\n\n// My walk out ended. Short of the tile there was no way there: I leave it,\n// and the tiles near it, out from now on.\nfn arrived() {\n  let t = memory.target\n  memory.target = null\n  if (me.x == t.x && me.y == t.y) { return }\n  let i = memory.skipNext\n  if (i == null) { i = 0 }\n  memory.skip[i] = {x: t.x, y: t.y}\n  memory.skipNext = (i + 1) % skipMax\n  log(\"no way to \" + t.x + \",\" + t.y + \": leaving it out\")\n}\n\n// Where I refill: params.food while it holds Food, else the nearest storage\n// of my realm with Food; null with none.\nfn foodFrom() {\n  if (params.food != null && holdsFood(params.food)) { return params.food }\n  let stores = storages(me, [\"food\"]) // nearest first, holding some\n  if (stores.length > 0) { return stores[0] }\n  return null\n}\n\n// Whether a storage, or a carriage, holds a whole unit of Food to fetch.\nfn holdsFood(at) {\n  let held = at.stock\n  if (held == null) { held = at.load } // a carriage\n  return held != null && held.food != null && held.food >= 1\n}\n\nfn foodOnMe() {\n  let food = me.carried.food\n  if (food == null) { return 0 }\n  return food\n}\n\n// A building or carriage for my log: \"the storage at 12,6\".\nfn placeName(b) {\n  let kind = b.kind\n  if (kind == null) { kind = \"carriage\" }\n  return \"the \" + kind + \" at \" + b.x + \",\" + b.y\n}\n\n// The units of goods in load for my log: \"10 stone, 4 wood\".\nfn goodsText(load, goods) {\n  let text = \"\"\n  for (g of goods) {\n    let n = load[g]\n    if (n != null && n >= 1) {\n      if (text != \"\") { text = text + \", \" }\n      text = text + floor(n) + \" \" + g\n    }\n  }\n  return text\n}\n"
+    },
+    "defend": {
+      "name": "Defend",
+      "source": "// Defend (default): what I do when struck, in place of what I was doing,\n// which goes on once I end. Armed, I fight back at whoever struck me while\n// they are in sight, and end once they are dead, gone or out of sight; a\n// driver walks back to the carriage first, should the fight have led away.\n// Unarmed, I walk home to my city's town hall, and end there, or once no\n// blow has landed for calm ticks; but driving I end at once and drive on, and\n// aboard a carriage being driven I end at once and stay aboard.\nlet calm = 30 // ticks without a blow before I go back, fleeing\n\nif (armed()) {\n  // My drive waits while I fight: kept for the way back to my carriage.\n  if (holdsCarriage()) { memory.carriageId = me.order.carriageId }\n  fightBack()\n} else if (holdsCarriage() || betweenDrives() || aboardDriven()) {\n  end()\n} else {\n  fleeHome()\n}\n\n// Whether I drive a carriage, or haul with one.\nfn holdsCarriage() {\n  let o = me.order\n  return o != null && (o.kind == \"drive\" || o.kind == \"haul\")\n}\n\n// Between the drives of my queue: the next step comes once I end.\nfn betweenDrives() {\n  let q = me.queue\n  return me.order == null && q != null && (q.kind == \"drive\" || q.kind == \"haul\")\n}\n\n// Whether the carriage I am aboard is being driven.\nfn aboardDriven() {\n  if (me.aboard == null) { return false }\n  for (c of carriages()) {\n    if (c.id == me.aboard) { return !c.standsStill }\n  }\n  return false\n}\n\n// Whether I carry a weapon.\nfn armed() {\n  for (w of [\"spear\", \"sword\"]) {\n    let n = me.carried[w]\n    if (n != null && n > 0) { return true }\n  }\n  return false\n}\n\n// At whoever struck me, while they are in sight.\nfn fightBack() {\n  let foe = null\n  for (r of residents()) {\n    if (r.id == me.struckBy) { foe = r }\n  }\n  if (foe == null) {\n    if (!backToCarriage()) { end(\"the attacker is gone\") }\n    return\n  }\n  let o = me.order\n  if (o != null && o.kind == \"attack\" && o.targetId == foe.id) { return } // at it\n  let problem = attack(foe.id)\n  if (problem != null) {\n    if (!backToCarriage()) { end(\"can't fight back: \" + problem) }\n    return\n  }\n  doing(\"Defending: fighting back at \" + foe.name)\n  log(\"fighting back at \" + foe.name)\n}\n\n// The fight led me off my carriage: back to it, for my drive to go on. True\n// until I am there; false if I can't get there.\nfn backToCarriage() {\n  if (memory.carriageId == null) { return false }\n  for (c of carriages()) {\n    if (c.id == memory.carriageId) {\n      if (c.x == me.x && c.y == me.y) { return false }\n      if (me.order != null && me.order.kind == \"walkTo\") { return true } // on my way\n      if (walkTo(c.x, c.y) != null) { return false }\n      doing(\"Defending: back to the carriage\")\n      log(\"back to \" + placeName(c))\n      return true\n    }\n  }\n  return false\n}\n\n// Home to my city's town hall, until I am there or it has been calm.\nfn fleeHome() {\n  if (me.struckAt == null || tick - me.struckAt >= calm) {\n    end(\"no blow for a while\")\n    return\n  }\n  let hall = townHall()\n  if (hall == null) {\n    end(\"no home to flee to\")\n    return\n  }\n  let here = buildingAt(me.x, me.y)\n  if (here != null && here.id == hall.id) {\n    end(\"home\")\n    return\n  }\n  if (me.order != null && me.order.kind == \"walkTo\") { return } // on my way\n  let problem = walkTo(hall.x, hall.y)\n  if (problem != null) {\n    end(\"can't flee home: \" + problem)\n    return\n  }\n  doing(\"Defending: fleeing home\")\n  log(\"fleeing home to \" + placeName(hall))\n}\n\n// My city's town hall, if I see my city.\nfn townHall() {\n  for (c of cities()) {\n    if (c.id == me.cityId) { return building(c.townHallId) }\n  }\n  return null\n}\n\n// A building or carriage for my log: \"the storage at 12,6\".\nfn placeName(b) {\n  let kind = b.kind\n  if (kind == null) { kind = \"carriage\" }\n  return \"the \" + kind + \" at \" + b.x + \",\" + b.y\n}\n\n// The units of goods in load for my log: \"10 stone, 4 wood\".\nfn goodsText(load, goods) {\n  let text = \"\"\n  for (g of goods) {\n    let n = load[g]\n    if (n != null && n >= 1) {\n      if (text != \"\") { text = text + \", \" }\n      text = text + floor(n) + \" \" + g\n    }\n  }\n  return text\n}\n"
+    },
+    "alarm": {
+      "name": "Alarm",
+      "source": "// Alarm (default): what I do when an alarm reaches me, in place of what I was\n// doing, which goes on once I end. Armed, with the town hall occupied, I go\n// after the occupier while they stand in the city's area, and end once no armed\n// one of theirs is left there or in sight. For a theft I go after the thief, and\n// with a wall or neighbour attacked the attacker, until they are dead or have left\n// the area or sight. Striking someone occupying the hall, or a thief I know of, is\n// no crime in my own city's area, nor is striking back at an attacker; striking\n// anyone else is. For an armed outsider in the area I walk to the town hall and\n// stand there until no armed outsider is left, which blocks an occupation before\n// it starts; an unarmed outsider I only log. A theft, an attack or an occupation\n// takes me off the hall, and when I end for it I come back here while armed\n// outsiders remain. Unarmed, or for another alarm, I end at once.\nif (me.alarm == null || !armed(me)) {\n  end()\n} else if (me.alarm.kind == \"occupied\") {\n  let foe = occupier()\n  if (foe == null) {\n    end(\"the occupier is gone\")\n  } else {\n    memory.foeId = foe.id\n    goAfter(foe)\n  }\n} else if (me.alarm.kind == \"theft\") {\n  goAfterCulprit(\"the thief is gone\")\n} else if (me.alarm.kind == \"attacked\") {\n  goAfterCulprit(\"the attacker is gone\")\n} else if (me.alarm.kind == \"outsider\") {\n  onOutsider()\n} else {\n  end()\n}\n\n// Who came decides whether I go at all; once I do, any armed outsider keeps me.\nfn onOutsider() {\n  let about = null\n  let armedLeft = false\n  for (r of outsidersIn(me.alarm.cityId)) {\n    if (r.id == me.alarm.about) { about = r }\n    if (armed(r)) { armedLeft = true }\n  }\n  if (memory.holding == null) {\n    if (about == null) {\n      end()\n      return\n    }\n    if (!armed(about)) {\n      log(about.name + \" came into the area, unarmed\")\n      end()\n      return\n    }\n    memory.holding = true\n  }\n  if (!armedLeft) {\n    end(\"no armed outsider left in the area\")\n    return\n  }\n  holdHall()\n}\n\n// To the town hall of the alarm's city, and stay there.\nfn holdHall() {\n  let hall = null\n  for (c of cities()) {\n    if (c.id == me.alarm.cityId) { hall = building(c.townHallId) }\n  }\n  if (hall == null) {\n    end(\"no town hall to hold\")\n    return\n  }\n  let here = buildingAt(me.x, me.y)\n  if (here != null && here.id == hall.id) {\n    doing(\"On alarm: holding the town hall\")\n    return\n  }\n  if (me.order != null && me.order.kind == \"walkTo\") { return } // on my way\n  let problem = walkTo(hall.x, hall.y)\n  if (problem != null) {\n    end(\"can't reach the town hall: \" + problem)\n    return\n  }\n  doing(\"On alarm: going to hold the town hall\")\n  log(\"going to hold \" + placeName(hall))\n}\n\nfn goAfterCulprit(goneText) {\n  let foe = culprit()\n  if (foe == null) {\n    end(goneText)\n  } else {\n    goAfter(foe)\n  }\n}\n\nfn goAfter(foe) {\n  let o = me.order\n  if (o != null && o.kind == \"attack\" && o.targetId == foe.id) { return } // at it\n  let problem = attack(foe.id)\n  if (problem != null) {\n    end(\"can't go after \" + foe.name + \": \" + problem)\n    return\n  }\n  doing(\"On alarm: going after \" + foe.name)\n  log(\"going after \" + foe.name)\n}\n\n// The occupier I am after while they stand in the area, else another armed one\n// of theirs there.\nfn occupier() {\n  let after = memory.foeId\n  if (after == null) { after = me.alarm.about }\n  let realm = me.alarm.realmId\n  let other = null\n  for (r of residents()) {\n    if (r.owner == realm || r.id == after) {\n      if (armed(r) && inCityArea(me.alarm.cityId, r.x, r.y)) {\n        if (r.id == after) { return r }\n        other = r\n      }\n    }\n  }\n  return other\n}\n\n// Who the alarm is about, while I see them in the city's area.\nfn culprit() {\n  for (r of residents()) {\n    if (r.id == me.alarm.about && inCityArea(me.alarm.cityId, r.x, r.y)) { return r }\n  }\n  return null\n}\n\n// Whether they carry a weapon.\nfn armed(who) {\n  for (w of [\"spear\", \"sword\"]) {\n    let n = who.carried[w]\n    if (n != null && n > 0) { return true }\n  }\n  return false\n}\n\n// A building or carriage for my log: \"the storage at 12,6\".\nfn placeName(b) {\n  let kind = b.kind\n  if (kind == null) { kind = \"carriage\" }\n  return \"the \" + kind + \" at \" + b.x + \",\" + b.y\n}\n\n// The units of goods in load for my log: \"10 stone, 4 wood\".\nfn goodsText(load, goods) {\n  let text = \"\"\n  for (g of goods) {\n    let n = load[g]\n    if (n != null && n >= 1) {\n      if (text != \"\") { text = text + \", \" }\n      text = text + floor(n) + \" \" + g\n    }\n  }\n  return text\n}\n"
+    }
+  }
+}

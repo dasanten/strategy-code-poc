@@ -4,7 +4,7 @@ import prettier from 'eslint-config-prettier'
 
 export default tseslint.config(
   // `.claude/` holds other sessions' worktrees: whole copies of the repo that must not be linted.
-  { ignores: ['**/dist/**', '**/node_modules/**', '.claude/**'] },
+  { ignores: ['**/dist/**', '**/node_modules/**', '.claude/**', 'packages/lang-wasm/generated/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

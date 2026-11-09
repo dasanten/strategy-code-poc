@@ -37,3 +37,12 @@ opt-level = 3
 [profile.release]
 lto = "thin"
 codegen-units = 4
+
+# The editor's WebAssembly checker (`csp-lang-wasm`, T88.3): small over fast, built by
+# `pnpm wasm:build` with `--profile wasm`.
+[profile.wasm]
+inherits = "release"
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"

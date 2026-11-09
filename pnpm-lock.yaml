@@ -116,6 +116,9 @@ importers:
       '@csp/lang':
         specifier: workspace:*
         version: link:../../packages/lang
+      '@csp/lang-wasm':
+        specifier: workspace:*
+        version: link:../../packages/lang-wasm
       '@csp/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -149,6 +152,15 @@ importers:
         version: 8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15)
 
   packages/lang: {}
+
+  packages/lang-wasm:
+    devDependencies:
+      '@csp/lang':
+        specifier: workspace:*
+        version: link:../lang
+      '@csp/shared':
+        specifier: workspace:*
+        version: link:../shared
 
   packages/shared: {}
 
