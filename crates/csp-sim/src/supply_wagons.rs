@@ -671,3 +671,6 @@ pub fn supply_wagons_sound(world: &WorldState) -> Vec<InvariantViolation> {
     }
     out
 }
+
+#[cfg(test)]
+mod tests;
