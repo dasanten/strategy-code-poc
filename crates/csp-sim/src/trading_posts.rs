@@ -368,3 +368,6 @@ pub fn place_trading_posts(world: &mut WorldState, terrain: &TerrainMap) -> Vec<
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod chain_tests;
