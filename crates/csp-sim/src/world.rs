@@ -35,6 +35,7 @@ use crate::pairing::{request_births, resolve_births};
 use crate::passengers::step_passengers;
 use crate::persuasion::step_persuasion;
 use crate::relocating::step_relocating;
+use crate::reviving::step_feeding;
 use crate::riding::step_riders;
 use crate::script_runner::run_npc_scripts;
 use crate::script_views::SCRIPT_VIEW_CHANGES;
@@ -364,9 +365,6 @@ fn resolve_offers(_world: &mut WorldState, _scratch: &mut Scratch) -> usize {
     0
 }
 fn step_offers(_world: &mut WorldState, _scratch: &mut Scratch) {}
-
-// `reviving.ts` (feeding someone Down); not in T86.7's list of modules, so still to port.
-fn step_feeding(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
 
 // T86.9 (`caravans.ts`, `traders.ts`, `trade-org-army.ts`, `trade-org-punishment.ts`,
 // `trade-org-debt.ts`, `trade-org-wrecks.ts`).

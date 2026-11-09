@@ -85,6 +85,7 @@ pub mod region_map;
 pub mod relocating;
 pub mod renaming;
 pub mod residents;
+pub mod reviving;
 pub mod riding;
 pub mod road_line;
 pub mod script_api;

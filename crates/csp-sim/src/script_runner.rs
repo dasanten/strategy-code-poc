@@ -1413,7 +1413,8 @@ impl ScriptRunner {
             ));
         }
         let size = self.terrain.size;
-        let index = WorldIndex::new(world, size);
+        let mut slot = scratch.index.take();
+        let index = crate::world_index::world_index(&mut slot, world, size);
         let host = self.host.clone();
         let explored = move |x: i32, y: i32| host.explored(user_id, x, y);
         let (requests, ended, end_reason, waited, logged, result) = {
@@ -1421,16 +1422,16 @@ impl ScriptRunner {
             let world_ref: &WorldState = world;
             let seen = || {
                 let mut cache = sight.borrow_mut();
-                entities_in_sight(world_ref, &index, Some(realm_id), cache.as_mut())
+                entities_in_sight(world_ref, index, Some(realm_id), cache.as_mut())
             };
             let eyes = || {
                 let mut cache = sight.borrow_mut();
-                sight_of(world_ref, &index, realm_id, cache.as_mut())
+                sight_of(world_ref, index, realm_id, cache.as_mut())
             };
             let ctx = ScriptContext {
                 world: world_ref,
                 terrain: &self.terrain,
-                index: &index,
+                index,
                 sender,
                 resident_id: (!r.army).then_some(r.id.as_str()),
                 army_id: r.army.then_some(r.id.as_str()),
@@ -1449,6 +1450,7 @@ impl ScriptRunner {
             scratch.sight = sight.into_inner();
             out
         };
+        scratch.index = slot;
         if let Some(v) = violations {
             let sound = if r.army { army_script_requests_sound } else { script_requests_sound };
             v.extend(sound(world, &self.terrain, sender, &r.id, &requests, &self.kinds));
@@ -1830,17 +1832,18 @@ fn run_city_scripts(
             .cloned()
             .map(|p| ParamWithValue { param: p, value: None })
             .collect();
-        let index = WorldIndex::new(world, terrain.size);
+        let mut slot = scratch.index.take();
+        let index = crate::world_index::world_index(&mut slot, world, terrain.size);
         let outcome = {
             let sight = RefCell::new(scratch.sight.take());
             let world_ref: &WorldState = world;
             let seen = || {
                 let mut cache = sight.borrow_mut();
-                entities_in_sight(world_ref, &index, Some(&city.id), cache.as_mut())
+                entities_in_sight(world_ref, index, Some(&city.id), cache.as_mut())
             };
             let eyes = || {
                 let mut cache = sight.borrow_mut();
-                sight_of(world_ref, &index, &city.id, cache.as_mut())
+                sight_of(world_ref, index, &city.id, cache.as_mut())
             };
             let explored = |_: i32, _: i32| true;
             let resident = &world_ref.residents[i];
@@ -1851,7 +1854,7 @@ fn run_city_scripts(
             let ctx = ScriptContext {
                 world: world_ref,
                 terrain,
-                index: &index,
+                index,
                 sender: &sender,
                 resident_id: Some(id),
                 army_id: None,
@@ -1870,6 +1873,7 @@ fn run_city_scripts(
             scratch.sight = sight.into_inner();
             outcome
         };
+        scratch.index = slot;
         let Some((requests, ended, end_reason, waited)) = outcome else { continue };
         // What it logs is dropped: no Player owns an NPC city's residents to read their script log.
         for order in &requests {
