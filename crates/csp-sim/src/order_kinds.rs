@@ -483,6 +483,7 @@ pub fn add_later_rule_orders(kinds: &mut OrderKinds) {
     }
     kinds.insert("pay", Realmed(crate::contracts::Pay));
     kinds.insert("buyOff", Realmed(crate::directives::BuyOff));
+    kinds.insert("payDebt", crate::trade_org_debt::PayDebt);
 }
 
 /// A realm order kind (T86.11), written against its own stand-in sender.
