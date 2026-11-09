@@ -339,14 +339,19 @@ pub struct Taken {
 /// leaves any alliance army.
 // TODO(T86.7): `stealing::take_over` (the crime, its events and the caravan, trader and supply
 // wagon follow-ups are T86.7's and T86.9's).
-pub fn take_over(world: &mut WorldState, _thief: &str, realm_id: &str, taken: Taken, size: i32) {
+pub fn take_over(world: &mut WorldState, thief: &str, realm_id: &str, taken: Taken, size: i32) {
     let mut ids = Vec::new();
     if let Some(i) = taken.carriage {
         let k = &mut world.carriages[i];
         k.realm_id = Some(realm_id.to_string());
         k.city_id = None;
         let id = k.id.clone();
-        // Its supply wagon's is gone for its army (`wagonStolen`).
+        // A caravan's or trader's is replaced, a supply wagon's gone for its army
+        // (`caravanCarriageStolen`, `traderCarriageStolen`, `wagonStolen`).
+        if let Some(ti) = world.residents.iter().position(|r| r.id == thief) {
+            crate::caravans::caravan_carriage_stolen(world, ti, &id);
+            crate::traders::trader_carriage_stolen(world, ti, &id);
+        }
         crate::supply_wagons::wagon_stolen(world, &id, size);
         ids.push(id);
     }
