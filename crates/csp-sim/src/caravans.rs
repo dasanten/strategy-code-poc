@@ -1265,3 +1265,6 @@ pub fn hq_city(world: &WorldState) -> Option<&City> {
 pub fn building(world: &WorldState, i: usize) -> &Building {
     &world.buildings[i]
 }
+
+#[cfg(test)]
+mod escort_tests;
