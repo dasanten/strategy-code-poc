@@ -402,7 +402,7 @@ mod caravans_carrying_out_transfers {
     }
 
     #[test]
-    #[ignore = "since merging T86.8 and T86.13 the run does not finish within 60 s: to diagnose (T86.9 PR)"]
+    #[ignore = "13-33 s: the NPC default scripts of the HQ run every tick (T86.14 makes the long runs fast)"]
     fn take_what_the_senders_storage_holds_with_a_fee_for_what_it_takes() {
         let mut s = setup();
         let (st, to) = (s.storage_of(7), s.storage_of(8));
@@ -417,7 +417,7 @@ mod caravans_carrying_out_transfers {
     }
 
     #[test]
-    #[ignore = "since merging T86.8 and T86.13 the run does not finish within 60 s: to diagnose (T86.9 PR)"]
+    #[ignore = "13-33 s: the NPC default scripts of the HQ run every tick (T86.14 makes the long runs fast)"]
     fn drop_a_transfer_the_senders_storage_holds_none_of() {
         let mut s = setup();
         let st = s.storage_of(7);

@@ -112,6 +112,7 @@ pub mod test_support;
 mod test_world;
 pub mod tick;
 pub mod trade_org;
+pub mod trade_org_army;
 pub mod trading;
 pub mod trading_posts;
 pub mod training;

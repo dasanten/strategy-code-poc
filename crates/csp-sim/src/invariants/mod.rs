@@ -203,8 +203,10 @@ pub fn world_invariants() -> Vec<Invariant> {
         pending("trader-trades-keep-food"),
         // TODO(T86.9): `routeRobberiesSound` in `caravans.ts`.
         pending("route-robberies-sound"),
-        // TODO(T86.9): `tradeOrgArmySound` in `trade-org-army.ts`.
-        pending("trade-org-army-sound"),
+        Invariant {
+            name: "trade-org-army-sound",
+            check: |w, t| crate::trade_org_army::trade_org_army_sound(w, t.size),
+        },
         Invariant { name: "npc-hire-sound", check: |w, _| crate::npc_hire::npc_hire_sound(w) },
         // TODO(T86.9): `punishmentsSound` in `trade-org-punishment.ts`.
         pending("punishments-sound"),
