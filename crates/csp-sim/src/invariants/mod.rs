@@ -208,14 +208,18 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: |w, t| crate::trade_org_army::trade_org_army_sound(w, t.size),
         },
         Invariant { name: "npc-hire-sound", check: |w, _| crate::npc_hire::npc_hire_sound(w) },
-        // TODO(T86.9): `punishmentsSound` in `trade-org-punishment.ts`.
-        pending("punishments-sound"),
+        Invariant {
+            name: "punishments-sound",
+            check: |w, _| crate::trade_org_punishment::punishments_sound(w),
+        },
         Invariant {
             name: "npc-gate-shut-to-its-punishers",
             check: |w, t| crate::npc_defence::npc_gate_shut_to_its_punishers(w, t.size),
         },
-        // TODO(T86.9): `supplyWagonsSound` in `supply-wagons.ts`.
-        pending("supply-wagons-sound"),
+        Invariant {
+            name: "supply-wagons-sound",
+            check: |w, _| crate::supply_wagons::supply_wagons_sound(w),
+        },
         Invariant {
             name: "directives-sound",
             check: |w, _| crate::directives::directives_sound(w),

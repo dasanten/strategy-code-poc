@@ -338,6 +338,7 @@ pub fn with_debt_payments<T>(world: &WorldState, f: impl FnOnce(&mut Vec<DebtPay
 
 /// Debts hold together (`debtsSound`, `CONTEXT.md`: Trade Org debt; ADR 0004): each is positive,
 /// owed by an Organization that exists and isn't the Trade Organization, at most one for each.
+#[allow(clippy::neg_cmp_op_on_partial_ord)] // NaN fails it, as in the TypeScript.
 pub fn debts_sound(world: &WorldState) -> Vec<InvariantViolation> {
     let mut out = Vec::new();
     let mut fail = |message: String, org: &str| {

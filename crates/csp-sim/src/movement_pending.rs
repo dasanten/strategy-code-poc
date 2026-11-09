@@ -366,9 +366,8 @@ pub fn waiting_for_escort(world: &WorldState, size: i32) -> HashSet<String> {
 }
 
 /// The Trade Org's soldiers waiting on the road (`waitingOnTheRoad`).
-// TODO(T86.9): `trade_org_punishment::waiting_on_the_road`. Nobody waits until it lands.
-pub fn waiting_on_the_road(_world: &WorldState, _size: i32) -> HashSet<String> {
-    HashSet::new()
+pub fn waiting_on_the_road(world: &WorldState, size: i32) -> HashSet<String> {
+    crate::trade_org_punishment::waiting_on_the_road(world, size)
 }
 
 // ---- T86.5 (`storing.ts`) --------------------------------------------------------------------------

@@ -11,8 +11,8 @@
 use std::collections::HashSet;
 
 use csp_shared::balance::{
-    CARAVAN_SPREAD, DOWN_DAYS, FOOD_PER_DAY, HEAL_DAYS, HOME_FOOD_LOW, HUNGER_DAYS, MAP_SIZE,
-    MAX_HEALTH, MAX_HUNGER, MEAL_UNITS, OUTPOST_REFILL_REACH, OWN_FOOD, STARVE_DAYS, WAKE_HEALTH,
+    DOWN_DAYS, FOOD_PER_DAY, HEAL_DAYS, HOME_FOOD_LOW, HUNGER_DAYS, MAP_SIZE, MAX_HEALTH,
+    MAX_HUNGER, MEAL_UNITS, OUTPOST_REFILL_REACH, OWN_FOOD, STARVE_DAYS, WAKE_HEALTH,
 };
 use csp_shared::footprint::{covers, is_at, near_footprint};
 use csp_shared::terrain::{ground_at, wrap_distance, TerrainMap};
@@ -848,33 +848,11 @@ fn caravan_food(world: &WorldState, r: &Resident, size: i32) -> Option<usize> {
     crate::caravans::caravan_food(world, r, size)
 }
 
-/// The carriage at `i` if it has Food and stands within `CARAVAN_SPREAD` of the resident.
-fn near_with_food(world: &WorldState, r: &Resident, i: usize, size: i32) -> Option<usize> {
-    let k = &world.carriages[i];
-    if held(&k.load, Good::Food) <= 0.0 {
-        return None;
-    }
-    (wrap_distance(size, tile_of(r), (k.x as i32, k.y as i32)) <= CARAVAN_SPREAD).then_some(i)
-}
-
 /// For a resident of no realm driving a supply wagon or in its punishment, the wagon close by
-/// with Food (`wagonFood` of `supply-wagons.ts`). TODO(T86.9): call the ported one.
+/// with Food (`wagonFood` of `supply-wagons.ts`).
 fn wagon_food(world: &WorldState, r: &Resident, size: i32) -> Option<usize> {
-    if r.owner.is_some() || world.supply_wagons.is_empty() {
-        return None;
-    }
-    let wagon = world.supply_wagons.iter().find(|w| {
-        w.driver_id.as_ref() == Some(&r.id)
-            || w.punishment_id.as_ref().is_some_and(|pid| {
-                world
-                    .punishments
-                    .iter()
-                    .find(|p| &p.id == pid)
-                    .is_some_and(|p| p.members.iter().any(|m| m.resident_id == r.id))
-            })
-    })?;
-    let i = world.carriages.iter().position(|k| k.id == wagon.carriage_id)?;
-    near_with_food(world, r, i, size)
+    let ri = world.residents.iter().position(|x| x.id == r.id)?;
+    crate::supply_wagons::wagon_food(world, ri, size)
 }
 
 /// A realm's mercenary contracts end on its Leader's death (`endContractsOnLeaderDeath` of

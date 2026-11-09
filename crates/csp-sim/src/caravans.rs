@@ -545,6 +545,17 @@ pub fn of_trade_org(world: &WorldState, r: &Resident) -> bool {
 pub fn caravan_threats(world: &WorldState, c: Convoy, ki: usize, size: i32) -> Vec<usize> {
     let crew: HashSet<String> =
         crew_ids_of(c.driver_id(world).as_deref(), &c.escort_ids(world)).into_iter().collect();
+    crew_threats(world, &crew, ki, size)
+}
+
+/// `caravan_threats` for any crew by id with carriage `ki`, as a supply wagon and its soldiers
+/// (`caravanThreats` with a crew of its own).
+pub fn crew_threats(
+    world: &WorldState,
+    crew: &HashSet<String>,
+    ki: usize,
+    size: i32,
+) -> Vec<usize> {
     let k = &world.carriages[ki];
     (0..world.residents.len())
         .filter(|&i| {

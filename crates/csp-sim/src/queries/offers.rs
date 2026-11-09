@@ -85,3 +85,70 @@ pub fn offer_storage<'w>(
     let owner = super::city::building_realm(world, b).or(b.city_id.as_deref());
     (owner == Some(realm_id)).then_some(b)
 }
+
+/// What accepting an offer some times comes to (`OfferQuote`): how many times, what it gives and
+/// wants in all, and what held it below `wanted`, if anything.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct OfferQuote {
+    pub times: f64,
+    pub gives: f64,
+    pub wants: f64,
+    pub limit: Option<OfferLimit>,
+}
+
+/// What held an offer quote below what was wanted (`OfferQuote.limit`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OfferLimit {
+    Stock,
+    Coins,
+    Held,
+    Room,
+}
+
+/// Whether an offer gives for nothing (`wantsNothing`).
+pub fn wants_nothing(o: &Offer) -> bool {
+    o.wants_units == 0.0
+}
+
+/// How many times `holder` can accept the offer, up to `wanted` (`quoteOffer`): as often as it has
+/// left with `available` units of what it gives in its storage, as `holder` can pay for, and as
+/// what it gains in weight fits in their room.
+pub fn quote_offer(
+    offer: &Offer,
+    holder: &crate::queries::warehouse_trade::TradeHolder<'_>,
+    wanted: f64,
+    available: f64,
+) -> OfferQuote {
+    use crate::queries::residents::good_weight;
+    let left = offer.times.min((available / offer.gives_units).floor());
+    let paid = if wants_nothing(offer) {
+        f64::INFINITY
+    } else {
+        (holder.stock.get(&offer.wants).copied().unwrap_or(0.0) / offer.wants_units).floor()
+    };
+    let gain =
+        offer.gives_units * good_weight(offer.gives) - offer.wants_units * good_weight(offer.wants);
+    let fits =
+        if gain > 0.0 { ((holder.room.max(0.0) + 1e-9) / gain).floor() } else { f64::INFINITY };
+    let times = wanted.min(left).min(paid).min(fits);
+    let mut quote = OfferQuote {
+        times,
+        gives: times * offer.gives_units,
+        wants: times * offer.wants_units,
+        limit: None,
+    };
+    quote.limit = if times == wanted {
+        None
+    } else if times == left {
+        Some(OfferLimit::Stock)
+    } else if times == paid {
+        Some(if offer.wants == csp_shared::world::Good::Coins {
+            OfferLimit::Coins
+        } else {
+            OfferLimit::Held
+        })
+    } else {
+        Some(OfferLimit::Room)
+    };
+    quote
+}
