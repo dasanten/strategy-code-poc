@@ -44,11 +44,9 @@ pub struct ListData {
 #[derive(Clone)]
 pub struct Object(Rc<RefCell<ObjectData>>);
 
-/// An object's keys are shared strings: a host view's field names are made once and shared by
-/// every object of that view, so building one allocates no key.
 #[derive(Debug, Default)]
 pub struct ObjectData {
-    entries: IndexMap<Rc<str>, Value>,
+    entries: IndexMap<String, Value>,
     /// Read-only to the script (`Object.freeze` in the TypeScript).
     pub frozen: bool,
 }
@@ -107,7 +105,7 @@ impl ObjectData {
     }
 
     /// The entries in JavaScript's key order.
-    pub fn iter(&self) -> impl Iterator<Item = (&Rc<str>, &Value)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &Value)> {
         self.entries.iter()
     }
 
@@ -117,12 +115,12 @@ impl ObjectData {
     }
 
     /// Sets `key`, keeping its place if it is there and JavaScript's key order if it is new.
-    pub fn insert(&mut self, key: impl AsRef<str> + Into<Rc<str>>, value: Value) {
-        if let Some(slot) = self.entries.get_mut(key.as_ref()) {
+    pub fn insert(&mut self, key: impl Into<String>, value: Value) {
+        let key = key.into();
+        if let Some(slot) = self.entries.get_mut(&key) {
             *slot = value;
             return;
         }
-        let key: Rc<str> = key.into();
         match js::array_index(&key) {
             None => {
                 self.entries.insert(key, value);
@@ -199,9 +197,7 @@ impl Value {
     }
 
     /// An object with these entries, set in this order.
-    pub fn object<K: AsRef<str> + Into<Rc<str>>>(
-        entries: impl IntoIterator<Item = (K, Value)>,
-    ) -> Value {
+    pub fn object<K: Into<String>>(entries: impl IntoIterator<Item = (K, Value)>) -> Value {
         let object = Object::new();
         {
             let mut data = object.borrow_mut();
@@ -220,7 +216,7 @@ impl Value {
         let mut entries = IndexMap::with_capacity(fields.len());
         for (key, value) in fields {
             debug_assert!(js::array_index(key).is_none(), "a field name is no array index");
-            let old = entries.insert(field_name(key), value);
+            let old = entries.insert(key.to_string(), value);
             debug_assert!(old.is_none(), "field {key} twice");
         }
         Value::Object(Object(Rc::new(RefCell::new(ObjectData { entries, frozen: true }))))
@@ -328,15 +324,6 @@ impl Value {
             _ => self.strict_equals(other),
         }
     }
-}
-
-/// A host view's field name as a shared key, made once per name and thread (`frozen_fields`).
-fn field_name(name: &'static str) -> Rc<str> {
-    thread_local! {
-        static NAMES: RefCell<std::collections::HashMap<&'static str, Rc<str>>> =
-            RefCell::new(std::collections::HashMap::new());
-    }
-    NAMES.with(|names| names.borrow_mut().entry(name).or_insert_with(|| Rc::from(name)).clone())
 }
 
 /// `false`, `null`, `0` and `""` count as false; everything else as true.

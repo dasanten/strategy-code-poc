@@ -14,7 +14,7 @@ fn orders_object_keys_as_javascript_does() {
     let Exec { printed, .. } =
         exec("let o = {b: 1, \"2\": 2, a: 3, \"1\": 4}; o[\"0\"] = 5; out(o)");
     let key_order: Vec<String> = match &printed[0] {
-        csp_lang::Value::Object(o) => o.borrow().iter().map(|(k, _)| k.to_string()).collect(),
+        csp_lang::Value::Object(o) => o.borrow().iter().map(|(k, _)| k.clone()).collect(),
         other => panic!("{other:?}"),
     };
     assert_eq!(key_order, ["0", "1", "2", "b", "a"]);
