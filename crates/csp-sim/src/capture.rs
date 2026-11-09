@@ -15,8 +15,7 @@ use crate::defence::Alarms;
 use crate::events::record_event;
 use crate::names::{resident_names_taken, unique_name};
 use crate::pending::{
-    hq_falls, join_trade_org, leave_trade_org, note_city_taken, rejoin_trade_org,
-    workplaces_of_city, CityTaken,
+    hq_falls, join_trade_org, leave_trade_org, rejoin_trade_org, workplaces_of_city,
 };
 use crate::queries::alliance::realm_name;
 use crate::queries::carriages::driven_carriage_id;
@@ -26,6 +25,7 @@ use crate::queries::names::placed;
 use crate::queries::residents::is_armed;
 use crate::queries::standing::TRADE_ORG;
 use crate::queries::trade_org::trade_org_hq;
+use crate::trade_org_takes::{note_city_taken, CityTaken};
 
 /// A city that changed realm by capture this tick (`Capture`).
 #[derive(Debug, Clone, PartialEq)]

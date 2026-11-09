@@ -4,18 +4,6 @@
 
 use csp_shared::world::WorldState;
 
-/// A city the Trade Organization took (`CityTaken` of `trade-org-takes.ts`, TODO(T86.9)).
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct CityTaken {
-    pub city_id: String,
-    pub org: String,
-    pub trips: f64,
-    pub enough_trips: bool,
-}
-
-/// `noteCityTaken` (TODO(T86.9), `trade-org-takes.ts`): the ledger lives beside the world there.
-pub(crate) fn note_city_taken(_world: &mut WorldState, _taken: CityTaken) {}
-
 /// `workplacesOfCity` (TODO(T86.9), `trade-org-wrecks.ts`): building ids. None until it lands.
 pub(crate) fn workplaces_of_city(_world: &WorldState, _city_id: &str, _size: i32) -> Vec<String> {
     Vec::new()
