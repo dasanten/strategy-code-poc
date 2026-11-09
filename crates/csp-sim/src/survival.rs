@@ -891,3 +891,5 @@ fn leave_on_leader_death(_world: &mut WorldState, _realm_id: &str) {}
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod self_managed_tests;

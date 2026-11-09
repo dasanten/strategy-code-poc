@@ -6,7 +6,7 @@
 //! are named here with `pending` and that ticket; they check nothing until it lands, and the
 //! differential run (T86.14) turns them all on.
 
-mod checks;
+pub(crate) mod checks;
 
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{Stock, WorldState};
