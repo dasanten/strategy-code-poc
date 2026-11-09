@@ -39,7 +39,6 @@ const SIZE: i32 = 512;
 struct Fixture {
     world: WorldState,
     terrain: TerrainMap,
-    hq: String,
     realm: String,
     leader: String,
     city: String,
