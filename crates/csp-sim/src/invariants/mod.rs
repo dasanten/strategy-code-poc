@@ -159,14 +159,16 @@ pub fn world_invariants() -> Vec<Invariant> {
         pending("npc-horse-purchases-wanted"),
         // TODO(T86.5): `npcTradesKeepReserve` in `trading.ts`.
         pending("npc-trades-keep-reserve"),
-        // TODO(T86.5): `offersSound` in `offers.ts`.
-        pending("offers-sound"),
-        // TODO(T86.5): `offersKeepGoods` in `offers.ts`.
+        Invariant { name: "offers-sound", check: |w, _| crate::offers::offers_sound(w) },
+        // `offersKeepGoods` checks the scratch's offer ledger: `offers::offers_keep_goods`.
         pending("offers-keep-goods"),
-        // TODO(T86.5): `tradeOrgOnlyBuysFood` in `offers.ts`.
+        // `tradeOrgOnlyBuysFood` checks the scratch's offer ledger:
+        // `offers::trade_org_only_buys_food`.
         pending("trade-org-only-buys-food"),
-        // TODO(T86.5): `acceptOrdersDone` in `offers.ts`.
-        pending("accept-orders-done"),
+        Invariant {
+            name: "accept-orders-done",
+            check: |w, _| crate::offers::accept_orders_done(w),
+        },
         // TODO(T86.9): `deliveriesSound` in `deliveries.ts`.
         pending("deliveries-sound"),
         // TODO(T86.9): `transfersSound` in `transfers.ts`.
