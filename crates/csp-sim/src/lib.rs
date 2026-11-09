@@ -116,6 +116,7 @@ pub mod tick;
 pub mod trade_org;
 pub mod trade_org_army;
 pub mod trade_org_takes;
+pub mod trade_org_wrecks;
 pub mod trading;
 pub mod trading_posts;
 pub mod training;

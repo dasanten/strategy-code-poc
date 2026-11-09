@@ -386,7 +386,9 @@ fn resolve_debt_payments(_world: &mut WorldState, _scratch: &mut Scratch) -> usi
     0
 }
 fn step_debts(_world: &mut WorldState, _scratch: &mut Scratch) {}
-fn count_wrecked(_world: &mut WorldState, _wrecked: Vec<Felled>, _scratch: &mut Scratch) {}
+fn count_wrecked(world: &mut WorldState, wrecked: Vec<Felled>, _scratch: &mut Scratch) {
+    crate::trade_org_wrecks::count_wrecked(world, &wrecked);
+}
 
 // T86.10 (`npc-defence.ts`, `npc-hire.ts`, `npc-behaviour.ts`, `outsiders.ts`).
 fn step_npc_defence(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {

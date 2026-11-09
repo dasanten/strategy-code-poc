@@ -14,9 +14,7 @@ use crate::crimes::{city_organization, commit_crime, CrimeAgainst};
 use crate::defence::Alarms;
 use crate::events::record_event;
 use crate::names::{resident_names_taken, unique_name};
-use crate::pending::{
-    hq_falls, join_trade_org, leave_trade_org, rejoin_trade_org, workplaces_of_city,
-};
+use crate::pending::{hq_falls, join_trade_org, leave_trade_org, rejoin_trade_org};
 use crate::queries::alliance::realm_name;
 use crate::queries::carriages::driven_carriage_id;
 use crate::queries::city::town_hall_of;
@@ -177,7 +175,11 @@ fn take_city(world: &mut WorldState, city_id: &str, size: i32) {
     let Some(ci) = city_index(world, city_id) else { return };
     let from = world.cities[ci].realm_id.clone();
     let org = city_organization(&world.cities[ci]).to_string();
-    let worked = workplaces_of_city(world, city_id, size);
+    let worked: Vec<String> =
+        crate::trade_org_wrecks::workplaces_of_city(world, &world.cities[ci], size)
+            .into_iter()
+            .map(|i| world.buildings[i].id.clone())
+            .collect();
     let residents = change_hands(world, ci, None, size) as f64;
     let own: Vec<String> = worked
         .into_iter()

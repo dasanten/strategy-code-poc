@@ -4,11 +4,6 @@
 
 use csp_shared::world::WorldState;
 
-/// `workplacesOfCity` (TODO(T86.9), `trade-org-wrecks.ts`): building ids. None until it lands.
-pub(crate) fn workplaces_of_city(_world: &WorldState, _city_id: &str, _size: i32) -> Vec<String> {
-    Vec::new()
-}
-
 /// `joinTradeOrg`, in `caravans.rs`.
 pub(crate) fn join_trade_org(world: &mut WorldState, city_id: &str, size: i32) {
     crate::caravans::join_trade_org(world, city_id, size);

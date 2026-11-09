@@ -228,8 +228,7 @@ pub fn world_invariants() -> Vec<Invariant> {
         },
         // TODO(T86.9): `debtsSound` in `trade-org-debt.ts`.
         pending("debts-sound"),
-        // TODO(T86.9): `wrecksSound` in `trade-org-wrecks.ts`.
-        pending("wrecks-sound"),
+        Invariant { name: "wrecks-sound", check: |w, _| crate::trade_org_wrecks::wrecks_sound(w) },
         Invariant {
             name: "cities-taken-sound",
             check: |w, _| crate::trade_org_takes::cities_taken_sound(w),
