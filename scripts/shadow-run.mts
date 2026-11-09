@@ -5,6 +5,7 @@
 //
 //   corepack pnpm shadow-run <world.db> [--days 3] [--every 1440] [--out <dir>]
 //                            [--rust <shadow-step binary>] [--ignore <regex>]...
+//                            [--invariant-sample-rate 0.1]
 //
 // The TypeScript side is `apps/server/src/index.ts` without HTTP: the same tick (`runTick` with the
 // orders, the queues, the scripts, walking, territory, sight and the saves) on the same kind of
@@ -792,16 +793,19 @@ interface Args {
   every: number
   out?: string
   rust?: string
+  invariantSampleRate: number
   ignore: RegExp[]
 }
 
 function parseArgs(argv: string[]): Args {
   const usage =
-    'usage: shadow-run.mts <world.db> [--days 3] [--every 1440] [--out <dir>] [--rust <shadow-step>] [--ignore <regex>]...'
+    'usage: shadow-run.mts <world.db> [--days 3] [--every 1440] [--out <dir>] [--rust <shadow-step>] [--ignore <regex>]... [--invariant-sample-rate 0.1]'
   const args: Args = {
     source: '',
     days: 3,
     every: TICKS_PER_GAME_DAY,
+    // The live servers sample a tenth of the ticks (`INVARIANT_SAMPLE_RATE` in production).
+    invariantSampleRate: 0.1,
     ignore: ALLOWED_DIFFERENCES.map((a) => a.pattern),
   }
   for (let i = 0; i < argv.length; i++) {
@@ -816,6 +820,7 @@ function parseArgs(argv: string[]): Args {
     else if (a === '--out') args.out = value()
     else if (a === '--rust') args.rust = value()
     else if (a === '--ignore') args.ignore.push(new RegExp(value()))
+    else if (a === '--invariant-sample-rate') args.invariantSampleRate = Number(value())
     else if (!a.startsWith('--') && !args.source) args.source = a
     else throw new Error(usage)
   }
@@ -830,7 +835,7 @@ async function main(): Promise<void> {
   fs.mkdirSync(out, { recursive: true })
   const exe = args.rust ? path.resolve(args.rust) : buildRust()
   const settings: Settings = {
-    invariantSampleRate: config.invariantSampleRate,
+    invariantSampleRate: args.invariantSampleRate,
     slowTickMs: config.slowTickMs,
     saveEveryTicks: config.saveEveryTicks,
   }

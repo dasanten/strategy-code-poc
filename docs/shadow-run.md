@@ -47,6 +47,9 @@ Options:
 - `--every <ticks>`: compare this often, every game day (1440 ticks) by default.
 - `--out <dir>`: the output directory, a new temporary one by default.
 - `--rust <binary>`: an already built `shadow-step`, which skips the build.
+- `--invariant-sample-rate <r>`: the share of ticks that get the full invariant checks, 0.1 by
+  default as on the live servers, so the tick times compare with theirs. 1 checks every tick and
+  makes the TypeScript ticks several times slower.
 - `--ignore <regex>`: another path allowed to differ (indices written `[]`, e.g.
   `^world\.residents\[\]\.x$`), for a look past a known difference.
 
