@@ -47,7 +47,10 @@ interface Case {
 }
 
 const fixture = JSON.parse(
-  readFileSync(new URL('../../../crates/csp-sim/fixtures/lang/cases.json', import.meta.url), 'utf8'),
+  readFileSync(
+    new URL('../../../crates/csp-sim/fixtures/lang/cases.json', import.meta.url),
+    'utf8',
+  ),
 ) as { envs: Record<string, CheckEnv>; cases: Case[] }
 
 beforeAll(() => loadLang())

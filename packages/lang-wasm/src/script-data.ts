@@ -19,12 +19,7 @@ export type ScriptParamType = keyof typeof data.paramDescriptions
 
 /** What a field holds or a game API name answers. */
 export type ScriptType =
-  | 'number'
-  | 'string'
-  | 'boolean'
-  | 'any'
-  | { view: ScriptViewName }
-  | { list: ScriptType }
+  'number' | 'string' | 'boolean' | 'any' | { view: ScriptViewName } | { list: ScriptType }
 
 export interface ScriptField {
   name: string

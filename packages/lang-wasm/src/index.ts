@@ -51,7 +51,12 @@ export interface CheckResult {
 /** A token with the line and column (both 1-based) where it starts. */
 export type Token =
   | { type: 'number'; value: number; line: number; column: number }
-  | { type: 'string' | 'identifier' | 'keyword' | 'punctuator'; value: string; line: number; column: number }
+  | {
+      type: 'string' | 'identifier' | 'keyword' | 'punctuator'
+      value: string
+      line: number
+      column: number
+    }
   | { type: 'end'; line: number; column: number }
 
 /** A `param` line with the comment at its end, if it has one. */
@@ -129,7 +134,10 @@ export function checkNames(source: string, env: CheckEnv): CheckResult {
   const described = describeShape
     ? Object.fromEntries(Object.keys(env.shapes).map((s) => [s, describeShape(s)]))
     : undefined
-  const json = JSON.stringify({ ...plain, describedShapes: { ...described, ...env.describedShapes } })
+  const json = JSON.stringify({
+    ...plain,
+    describedShapes: { ...described, ...env.describedShapes },
+  })
   return JSON.parse(ready().checkNames(source, json)) as CheckResult
 }
 
@@ -144,8 +152,7 @@ export function checkGameNames(source: string, defaultScript: boolean): CheckRes
 /** A script's tokens; throws a `ScriptSyntaxError` where it doesn't lex. */
 export function tokenize(source: string): Token[] {
   const lexed = JSON.parse(ready().tokenize(source)) as
-    | { tokens: Token[] }
-    | { error: { message: string; line: number; column: number } }
+    { tokens: Token[] } | { error: { message: string; line: number; column: number } }
   if ('error' in lexed) {
     throw new ScriptSyntaxError(lexed.error.message, lexed.error.line, lexed.error.column)
   }

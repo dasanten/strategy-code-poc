@@ -30,7 +30,6 @@ await import('../../lang/src/checker.test.js')
 await import('../../lang/src/params.test.js')
 await import('../../lang/src/index.test.js')
 
-
 it('runs them through the WebAssembly checker', async () => {
   const lang = await import('../../lang/src/index.js')
   const wasm = await import('./index.js')

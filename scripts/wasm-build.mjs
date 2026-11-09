@@ -88,7 +88,9 @@ if (!existsSync(bindings) || statSync(built).mtimeMs > statSync(bindings).mtimeM
       bindings,
     ])
   } else {
-    console.log('wasm:build: wasm-opt is not installed; the wasm is as rustc and wasm-bindgen wrote it')
+    console.log(
+      'wasm:build: wasm-opt is not installed; the wasm is as rustc and wasm-bindgen wrote it',
+    )
   }
 }
 
