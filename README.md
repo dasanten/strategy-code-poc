@@ -114,8 +114,14 @@ to Daniel's server, where Caddy serves it over HTTPS (ADR 0007). One-time setup:
    `DEPLOY_ENABLED=true`, optionally `DEPLOY_DIR` and `VITE_SENTRY_DSN`. Until
    `DEPLOY_ENABLED` is set, CI only builds the image.
 4. After the first deploy, in the deploy directory:
-   `docker compose exec server node dist/cli/admin.js create <name>` for the admin and
-   `docker compose exec server node dist/cli/admin.js invite` for invite codes.
+   `docker compose exec server csp-admin create <name>` for the admin and
+   `docker compose exec server csp-admin invite` for invite codes.
+
+The image runs the Rust server (ADR 0030): a `cargo-chef` stage builds `csp-server` and `csp-admin`
+in release, the client is built as before, and a slim Debian image runs them
+as the same unprivileged user (uid 1000) with the same volumes, port and environment, so the
+compose file and the volumes from the TypeScript image stay as they are. CI's `rust` job runs
+`pnpm check:rust`'s steps beside `check`, on PRs into `dev` and `main` only (ADR 0009).
 
 Backups go to the `world-backups` volume before every start and daily, 14 days kept. To roll
 back, deploy the previous image tag (`IMAGE_TAG=<tag> docker compose up -d`) and, if a migration
@@ -123,13 +129,10 @@ already ran, stop the server and copy the `-start` backup over `/data/world.db`.
 
 Before scripts see exactly their script views (ADR 0011), list the fields Players' active scripts
 read that the views don't declare, with each script and Player. It only reads, so it is safe while
-the server runs; the image must be one with the command (Epic 24 released):
-
-```sh
-docker compose exec server node dist/cli/check-fields.js
-```
-
-Locally: `pnpm --filter @csp/server check:fields` (reads `DB_PATH`, `data/world.db` by default).
+the server runs. The Rust image doesn't carry it yet: the Rust `check-fields` (T87.8) waits for
+the script views to be ported (T86.12), and goes into the image then. Until then, run the
+TypeScript one against a copy of the database: `pnpm --filter @csp/server check:fields` (reads
+`DB_PATH`, `data/world.db` by default).
 It finds reads from values the checker is sure of (`me`, a query's result, a `for … of` over one,
 a `let` holding one); a read through `memory` or a function's parameters isn't found.
 

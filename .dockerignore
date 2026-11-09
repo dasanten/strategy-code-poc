@@ -5,3 +5,5 @@ data
 .env
 .git
 coverage
+**/target
+target
