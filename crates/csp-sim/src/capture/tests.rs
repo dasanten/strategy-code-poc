@@ -61,7 +61,7 @@ fn city_mut<'w>(world: &'w mut WorldState, id: &str) -> &'w mut csp_shared::worl
 /// One tick of the occupation step alone, so nobody walks or fights meanwhile.
 fn tick(world: &mut WorldState) -> Vec<Capture> {
     world.tick += 1;
-    step_captures(world, SIZE, &mut crate::defence::NoAlarms)
+    step_captures(world, SIZE, None, &mut crate::defence::NoAlarms)
 }
 
 /// `realm_id` has occupied the city's town hall for all but its last tick.

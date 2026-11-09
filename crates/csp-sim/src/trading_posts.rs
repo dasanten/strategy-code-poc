@@ -133,18 +133,32 @@ pub fn restore_warehouse(world: &mut WorldState, post_id: &str, size: i32) {
     });
 }
 
-/// Where a new building of `kind` goes in a city (`houseTile` of `npc-growth.ts`).
-/// TODO(T86.10): `npc_growth.rs`; until then none, so a taken city keeps its Food storage.
-fn house_tile(_world: &WorldState, _city_id: &str, _kind: BuildingKind) -> Option<(f64, f64)> {
-    None
+/// Where a new building of `kind` goes in a city (`houseTile` of `npc-growth.ts`), by its town
+/// hall; none without the terrain to lay it out on.
+fn house_tile(
+    world: &WorldState,
+    city_id: &str,
+    kind: BuildingKind,
+    terrain: Option<&TerrainMap>,
+) -> Option<(f64, f64)> {
+    let terrain = terrain?;
+    let city = world.cities.iter().find(|c| c.id == city_id)?;
+    let hall = town_hall_of(world, city)?;
+    crate::npc_growth::house_tile(world, city, hall, terrain, None, kind)
+        .map(|(x, y)| (f64::from(x), f64::from(y)))
 }
 
 /// A city taken by the Trade Organization's army gets its warehouses (`storagesBecomeWarehouses`):
 /// every finished storage becomes one with all its goods but the Food, which goes into a new
 /// storage near the town hall. With no room for a new building the storage holding the most Food
 /// stays one and takes all the Food.
-/// The TypeScript takes the terrain for `houseTile`; here the map size, until `houseTile` lands.
-pub fn storages_become_warehouses(world: &mut WorldState, city_id: &str, size: i32) {
+/// Without `terrain` (a test of the conflict rules alone) there is no room for a new building.
+pub fn storages_become_warehouses(
+    world: &mut WorldState,
+    city_id: &str,
+    size: i32,
+    terrain: Option<&TerrainMap>,
+) {
     let Some(city) = world.cities.iter().find(|c| c.id == city_id) else { return };
     if town_hall_of(world, city).is_none() {
         return;
@@ -166,7 +180,7 @@ pub fn storages_become_warehouses(world: &mut WorldState, city_id: &str, size: i
         }
     }
     let place = |world: &mut WorldState, kind: BuildingKind, stock: Stock| -> Option<usize> {
-        let (x, y) = house_tile(world, city_id, kind)?;
+        let (x, y) = house_tile(world, city_id, kind, terrain)?;
         let id = new_id(world, "b");
         world.buildings.push(Building {
             id,

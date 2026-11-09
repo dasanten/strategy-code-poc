@@ -288,7 +288,7 @@ fn step_rest(
     let aging = step_aging(world, size);
     answer_demands(world, size, scratch);
     step_alliances(world);
-    let captures = step_captures(world, size, &mut GameAlarms);
+    let captures = step_captures(world, size, Some(terrain), &mut GameAlarms);
     step_refill(world, size);
     step_directives(world);
     step_crimes(world, size);

@@ -5,6 +5,7 @@ use std::collections::HashSet;
 
 use csp_shared::balance::{OCCUPATION_GAME_DAYS, TRADE_ORG_DEBT_TRIPS};
 use csp_shared::footprint::is_at;
+use csp_shared::terrain::TerrainMap;
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
     BuildingKind, CrimeKind, DebtWhat, RealmEventWhat, ResidentOrder, TradeOrgCity, WorldState,
@@ -42,7 +43,12 @@ fn city_index(world: &WorldState, city_id: &str) -> Option<usize> {
 /// hall with none running; the first tick another realm or nobody does, it is broken; held
 /// `OCCUPATION_TICKS`, the city is captured, or for the Trade Organization taken. Both realms'
 /// logs say when one starts and when it is broken.
-pub fn step_captures(world: &mut WorldState, size: i32, alarms: &mut dyn Alarms) -> Vec<Capture> {
+pub fn step_captures(
+    world: &mut WorldState,
+    size: i32,
+    terrain: Option<&TerrainMap>,
+    alarms: &mut dyn Alarms,
+) -> Vec<Capture> {
     let mut captures = Vec::new();
     // A capture changes no city's place in the list; going by index keeps the TypeScript's order.
     for ci in 0..world.cities.len() {
@@ -76,7 +82,7 @@ pub fn step_captures(world: &mut WorldState, size: i32, alarms: &mut dyn Alarms)
             to: occupier.clone(),
         });
         if occupier == TRADE_ORG {
-            take_city(world, &city_id, size);
+            take_city(world, &city_id, size, terrain);
         } else {
             capture_city(world, &city_id, &occupier, size);
         }
@@ -171,7 +177,7 @@ pub fn capture_city(world: &mut WorldState, city_id: &str, captor: &str, size: i
 
 /// The Trade Organization's army held the town hall to the end (`takeCity`): the city joins it as
 /// a new trading post and that settles all the debt of its Organization. No crime.
-fn take_city(world: &mut WorldState, city_id: &str, size: i32) {
+fn take_city(world: &mut WorldState, city_id: &str, size: i32, terrain: Option<&TerrainMap>) {
     let Some(ci) = city_index(world, city_id) else { return };
     let from = world.cities[ci].realm_id.clone();
     let org = city_organization(&world.cities[ci]).to_string();
@@ -200,7 +206,7 @@ fn take_city(world: &mut WorldState, city_id: &str, size: i32) {
         }
     }
     city.workplace_ids = Some(ids);
-    join_trade_org(world, city_id, size);
+    join_trade_org(world, city_id, size, terrain);
     let city = &world.cities[ci];
     let what = RealmEventWhat::CityCaptured {
         city_id: city.id.clone(),

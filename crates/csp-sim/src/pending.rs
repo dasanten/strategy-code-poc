@@ -5,8 +5,13 @@
 use csp_shared::world::WorldState;
 
 /// `joinTradeOrg`, in `caravans.rs`.
-pub(crate) fn join_trade_org(world: &mut WorldState, city_id: &str, size: i32) {
-    crate::caravans::join_trade_org(world, city_id, size);
+pub(crate) fn join_trade_org(
+    world: &mut WorldState,
+    city_id: &str,
+    size: i32,
+    terrain: Option<&csp_shared::terrain::TerrainMap>,
+) {
+    crate::caravans::join_trade_org(world, city_id, size, terrain);
 }
 
 /// `leaveTradeOrg`, in `caravans.rs`.
