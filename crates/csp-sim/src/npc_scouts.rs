@@ -322,3 +322,6 @@ fn nearest_tile_in(
     }
     best.map(|b| (b.0, b.1))
 }
+
+mod invariants;
+pub use invariants::npc_scouts_sound;
