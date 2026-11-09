@@ -57,10 +57,8 @@ pub fn npc_scouts_sound(world: &WorldState, terrain: &TerrainMap) -> Vec<Invaria
     };
     let tick = world.tick as f64;
     for city in &world.cities {
-        let known = city
-            .scouted
-            .iter()
-            .flat_map(|s| s.sectors.iter().chain(s.no_way.iter().flatten()));
+        let known =
+            city.scouted.iter().flat_map(|s| s.sectors.iter().chain(s.no_way.iter().flatten()));
         if !known.into_iter().all(on_map) {
             fail(&city.id, "knows of a sector off the map");
         }

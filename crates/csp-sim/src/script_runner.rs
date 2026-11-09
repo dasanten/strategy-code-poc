@@ -1715,6 +1715,19 @@ thread_local! {
     static GAME_PROGRAMS: RefCell<HashMap<&'static str, Arc<Program>>> = RefCell::new(HashMap::new());
 }
 
+thread_local! {
+    /// The params the game's default scripts declare, by source: reading them parses the source,
+    /// once per script, not once per resident a tick.
+    static GAME_PARAMS: RefCell<HashMap<&'static str, Arc<Vec<csp_lang::ParamInfo>>>> =
+        RefCell::new(HashMap::new());
+}
+
+fn game_params(source: &'static str) -> Arc<Vec<csp_lang::ParamInfo>> {
+    GAME_PARAMS.with(|p| {
+        p.borrow_mut().entry(source).or_insert_with(|| Arc::new(script_params(source))).clone()
+    })
+}
+
 fn game_program(source: &'static str) -> Arc<Program> {
     GAME_PROGRAMS.with(|p| {
         p.borrow_mut()
@@ -1825,9 +1838,9 @@ fn run_city_scripts(
         let program = game_program(source);
         let memory = memory_object(&running.memory);
         // Nobody picks values for an NPC city: its defaults fall back on their own.
-        let params: Vec<ParamWithValue> = script_params(source)
-            .into_iter()
-            .map(|p| ParamWithValue { param: p, value: None })
+        let params: Vec<ParamWithValue> = game_params(source)
+            .iter()
+            .map(|p| ParamWithValue { param: p.clone(), value: None })
             .collect();
         let index = WorldIndex::new(world, terrain.size);
         let outcome = {

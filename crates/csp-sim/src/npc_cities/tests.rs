@@ -96,10 +96,7 @@ fn lays_each_one_out_with_a_town_hall_a_storage_houses_a_wall_with_a_gate_and_fa
         assert_eq!(count(BuildingKind::Wall), 4 * (kind.size as usize - 1) - 1);
         assert_eq!(count(BuildingKind::Farm), kind.farms as usize);
         let storage = own.iter().find(|b| b.kind == BuildingKind::Storage).unwrap();
-        assert_eq!(
-            serde_json::to_value(&storage.stock).unwrap(),
-            json!({ "food": kind.food })
-        );
+        assert_eq!(serde_json::to_value(&storage.stock).unwrap(), json!({ "food": kind.food }));
         // Every city building is part of the city; the farms lie outside its area.
         for b in &own {
             let inside = in_city_area(world, &c.id, b.x as i32, b.y as i32, terrain.size);

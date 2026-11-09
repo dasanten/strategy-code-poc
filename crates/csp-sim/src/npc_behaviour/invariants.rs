@@ -72,7 +72,10 @@ pub fn npc_residents_kept_going(world: &WorldState) -> Vec<InvariantViolation> {
 
 /// Invariant `npc-idle-off-the-storage` (`CONTEXT.md`: NPC city): an NPC city with a house has no
 /// crowd of idle residents standing on its storage; they wait at the houses.
-pub fn npc_idle_off_the_storage(world: &WorldState, terrain: &TerrainMap) -> Vec<InvariantViolation> {
+pub fn npc_idle_off_the_storage(
+    world: &WorldState,
+    terrain: &TerrainMap,
+) -> Vec<InvariantViolation> {
     let tick = world.tick as f64;
     let mut storages: HashMap<&str, &Building> = HashMap::new();
     let mut housed: HashSet<&str> = HashSet::new();
@@ -146,8 +149,7 @@ pub fn npc_road_crew_sized(world: &WorldState) -> Vec<InvariantViolation> {
         if crew.len() as f64 <= most {
             continue;
         }
-        let message =
-            format!("{} plans a road crew of {}, at most {most}", city.id, crew.len());
+        let message = format!("{} plans a road crew of {}, at most {most}", city.id, crew.len());
         let mut ids = vec![city.id.clone()];
         ids.extend(crew);
         out.push(violation("npc-road-crew-sized", message, ids));
@@ -179,7 +181,9 @@ pub fn npc_soldiers_on_posts(world: &WorldState, terrain: &TerrainMap) -> Vec<In
         let soldiers: Vec<usize> = free_soldiers(world, city, &adults)
             .into_iter()
             .filter(|&i| {
-                plan.jobs.get(&world.residents[i].id).is_some_and(|j| j.kind == CityJobKind::Soldier)
+                plan.jobs
+                    .get(&world.residents[i].id)
+                    .is_some_and(|j| j.kind == CityJobKind::Soldier)
             })
             .collect();
         if soldiers.is_empty() {

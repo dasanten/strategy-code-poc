@@ -29,7 +29,11 @@ pub fn founding_parties_sound(world: &WorldState) -> Vec<InvariantViolation> {
         for id in party {
             if let Some(other) = seen.get(&id) {
                 let message = format!("{id} is in the founding parties of {other} and {city_id}");
-                out.push(violation(NAME, message, vec![id.clone(), other.clone(), city_id.clone()]));
+                out.push(violation(
+                    NAME,
+                    message,
+                    vec![id.clone(), other.clone(), city_id.clone()],
+                ));
             }
             seen.insert(id.clone(), city_id.clone());
             let Some(r) = world.residents.iter().find(|r| r.id == id) else { continue };

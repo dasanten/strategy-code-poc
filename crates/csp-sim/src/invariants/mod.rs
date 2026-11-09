@@ -239,8 +239,14 @@ pub fn world_invariants() -> Vec<Invariant> {
         // TODO(T86.9): `hqRingsSound` in `hq-growth.ts`.
         pending("hq-rings-sound"),
         Invariant { name: "city-plans-sound", check: |w, _t| crate::npc_plan::city_plans_sound(w) },
-        Invariant { name: "founding-parties-sound", check: |w, _t| crate::npc_founding::founding_parties_sound(w) },
-        Invariant { name: "full-wait-sound", check: |w, _t| crate::npc_founding::full_wait_sound(w) },
+        Invariant {
+            name: "founding-parties-sound",
+            check: |w, _t| crate::npc_founding::founding_parties_sound(w),
+        },
+        Invariant {
+            name: "full-wait-sound",
+            check: |w, _t| crate::npc_founding::full_wait_sound(w),
+        },
         Invariant {
             name: "coins-short-only-with-income",
             check: |w, t| crate::npc_coins::coins_short_only_with_income(w, t.size),
@@ -262,24 +268,48 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: |w, t| crate::npc_inner_wall::inner_wall_leaves_a_way(w, t),
         },
         Invariant { name: "npc-farmers-kept", check: |w, _t| crate::npc_plan::npc_farmers_kept(w) },
-        Invariant { name: "npc-surplus-capped", check: |w, _t| crate::npc_plan::npc_surplus_capped(w) },
-        Invariant { name: "npc-spare-hands-work", check: |w, _t| crate::npc_plan::npc_spare_hands_work(w) },
-        Invariant { name: "npc-workplaces-bounded", check: |w, _t| crate::npc_plan::npc_workplaces_bounded(w) },
-        Invariant { name: "npc-road-crew-sized", check: |w, _t| crate::npc_behaviour::npc_road_crew_sized(w) },
+        Invariant {
+            name: "npc-surplus-capped",
+            check: |w, _t| crate::npc_plan::npc_surplus_capped(w),
+        },
+        Invariant {
+            name: "npc-spare-hands-work",
+            check: |w, _t| crate::npc_plan::npc_spare_hands_work(w),
+        },
+        Invariant {
+            name: "npc-workplaces-bounded",
+            check: |w, _t| crate::npc_plan::npc_workplaces_bounded(w),
+        },
+        Invariant {
+            name: "npc-road-crew-sized",
+            check: |w, _t| crate::npc_behaviour::npc_road_crew_sized(w),
+        },
         Invariant { name: "npc-roads-once", check: |w, _t| crate::npc_roads::npc_roads_once(w) },
         Invariant {
             name: "npc-revivers",
             check: |w, t| crate::npc_revive::npc_revivers(w, t.size),
         },
-        Invariant { name: "npc-scouts-sound", check: |w, t| crate::npc_scouts::npc_scouts_sound(w, t) },
+        Invariant {
+            name: "npc-scouts-sound",
+            check: |w, t| crate::npc_scouts::npc_scouts_sound(w, t),
+        },
         Invariant { name: "npc-one-feeder", check: |w, _t| crate::npc_stable::npc_one_feeder(w) },
         Invariant {
             name: "trade-org-breeds-no-horses",
             check: |w, _t| crate::npc_stable::trade_org_breeds_no_horses(w),
         },
-        Invariant { name: "npc-residents-kept-going", check: |w, _t| crate::npc_behaviour::npc_residents_kept_going(w) },
-        Invariant { name: "npc-idle-off-the-storage", check: |w, t| crate::npc_behaviour::npc_idle_off_the_storage(w, t) },
-        Invariant { name: "npc-soldiers-on-posts", check: |w, t| crate::npc_behaviour::npc_soldiers_on_posts(w, t) },
+        Invariant {
+            name: "npc-residents-kept-going",
+            check: |w, _t| crate::npc_behaviour::npc_residents_kept_going(w),
+        },
+        Invariant {
+            name: "npc-idle-off-the-storage",
+            check: |w, t| crate::npc_behaviour::npc_idle_off_the_storage(w, t),
+        },
+        Invariant {
+            name: "npc-soldiers-on-posts",
+            check: |w, t| crate::npc_behaviour::npc_soldiers_on_posts(w, t),
+        },
         Invariant {
             name: "npc-patrols-sound",
             check: |w, _t| crate::npc_patrols::npc_patrols_sound(w),

@@ -835,8 +835,11 @@ pub fn trade_org_sends_no_one(world: &WorldState) -> Vec<InvariantViolation> {
 }
 
 mod invariants;
+pub(crate) use invariants::violation;
 pub use invariants::{
     city_plans_sound, npc_farmers_kept, npc_spare_hands_work, npc_surplus_capped,
     npc_workplaces_bounded,
 };
-pub(crate) use invariants::violation;
+
+#[cfg(test)]
+mod tests;
