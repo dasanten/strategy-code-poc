@@ -227,18 +227,21 @@ pub fn world_invariants() -> Vec<Invariant> {
             name: "buy-off-orders-done",
             check: |w, _| crate::directives::buy_off_orders_done(w),
         },
-        // TODO(T86.9): `debtsSound` in `trade-org-debt.ts`.
-        pending("debts-sound"),
+        Invariant { name: "debts-sound", check: |w, _| crate::trade_org_debt::debts_sound(w) },
         // TODO(T86.9): `wrecksSound` in `trade-org-wrecks.ts`.
         pending("wrecks-sound"),
         // TODO(T86.9): `citiesTakenSound` in `trade-org-takes.ts`.
         pending("cities-taken-sound"),
-        // TODO(T86.9): `debtDemandsSound` in `trade-org-debt.ts`.
-        pending("debt-demands-sound"),
-        // TODO(T86.9): `debtPaymentsSound` in `trade-org-debt.ts`.
+        Invariant {
+            name: "debt-demands-sound",
+            check: |w, _| crate::trade_org_debt::debt_demands_sound(w),
+        },
+        // `debtPaymentsSound` checks the scratch's ledger: `trade_org_debt::debt_payments_sound`.
         pending("debt-payments-sound"),
-        // TODO(T86.9): `debtOrdersDone` in `trade-org-debt.ts`.
-        pending("debt-orders-done"),
+        Invariant {
+            name: "debt-orders-done",
+            check: |w, _| crate::trade_org_debt::debt_orders_done(w),
+        },
         Invariant { name: "hq-rings-sound", check: crate::hq_growth::hq_rings_sound },
         // TODO(T86.10): `cityPlansSound` in `npc-plan.ts`.
         pending("city-plans-sound"),

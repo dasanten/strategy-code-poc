@@ -384,10 +384,12 @@ fn step_trade_org_army(world: &mut WorldState, size: i32, _scratch: &mut Scratch
     crate::trade_org_army::step_trade_org_army(world, size);
 }
 fn step_punishments(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
-fn resolve_debt_payments(_world: &mut WorldState, _scratch: &mut Scratch) -> usize {
-    0
+fn resolve_debt_payments(world: &mut WorldState, scratch: &mut Scratch) -> usize {
+    crate::trade_org_debt::resolve_debt_payments(world, &mut scratch.debt_payments)
 }
-fn step_debts(_world: &mut WorldState, _scratch: &mut Scratch) {}
+fn step_debts(world: &mut WorldState, _scratch: &mut Scratch) {
+    crate::trade_org_debt::step_debts(world);
+}
 fn count_wrecked(_world: &mut WorldState, _wrecked: Vec<Felled>, _scratch: &mut Scratch) {}
 
 // T86.10 (`npc-defence.ts`, `npc-hire.ts`, `npc-behaviour.ts`, `outsiders.ts`).
