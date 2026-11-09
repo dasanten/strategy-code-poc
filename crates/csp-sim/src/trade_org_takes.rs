@@ -134,3 +134,6 @@ pub fn cities_taken_sound(world: &WorldState) -> Vec<InvariantViolation> {
     }
     out
 }
+
+#[cfg(test)]
+mod tests;
