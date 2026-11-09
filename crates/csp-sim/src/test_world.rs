@@ -160,7 +160,7 @@ pub fn step(world: &mut WorldState, size: i32) -> CombatResult {
     let strikes = request_strikes(world, size);
     let result = resolve_strikes(world, &strikes, size, &mut NoAlarms, &mut Default::default());
     world.tick += 1;
-    step_captures(world, size, &mut NoAlarms);
+    step_captures(world, size, None, &mut NoAlarms);
     step_crimes(world, size);
     step_standing(world);
     step_persuasion(world, size);
