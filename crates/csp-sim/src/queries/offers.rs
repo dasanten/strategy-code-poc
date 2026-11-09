@@ -86,40 +86,105 @@ pub fn offer_storage<'w>(
     (owner == Some(realm_id)).then_some(b)
 }
 
-/// What accepting an offer some times comes to (`OfferQuote`): how many times, what it gives and
-/// wants in all, and what held it below `wanted`, if anything.
+/// Whether an offer wants nothing back: a gift (`wantsNothing`).
+pub fn wants_nothing(o: &Offer) -> bool {
+    o.wants_units == 0.0
+}
+
+fn is_good(v: Option<&serde_json::Value>) -> Option<csp_shared::world::Good> {
+    v.and_then(serde_json::Value::as_str).and_then(super::names::good_of)
+}
+
+/// A whole number above 0 that JavaScript holds exactly (`isCount`).
+pub fn is_count(v: Option<&serde_json::Value>) -> bool {
+    v.and_then(serde_json::Value::as_f64)
+        .is_some_and(|n| n.fract() == 0.0 && n > 0.0 && n <= 9_007_199_254_740_991.0)
+}
+
+/// How many times over an offer of `gives_units` a time can be posted at a storage, of the
+/// `times` asked for (`timesToPost`): as many as there are goods not yet set aside.
+pub fn times_to_post(
+    world: &WorldState,
+    storage: &csp_shared::world::Building,
+    gives: csp_shared::world::Good,
+    gives_units: f64,
+    times: f64,
+) -> f64 {
+    let free = free_stock(world, &storage.id, storage.stock.as_ref());
+    times.min((free.get(&gives).copied().unwrap_or(0.0) / gives_units).floor())
+}
+
+/// Why an offer's terms won't do (`offerTermsProblem`): a good for a different good, in whole
+/// units. `fields` holds `gives`, `givesUnits`, `wants`, `wantsUnits` and `times`.
+pub fn offer_terms_problem(
+    fields: &serde_json::Map<String, serde_json::Value>,
+) -> Option<&'static str> {
+    let (Some(gives), Some(wants)) = (is_good(fields.get("gives")), is_good(fields.get("wants")))
+    else {
+        return Some("gives and wants must be goods");
+    };
+    if gives == wants {
+        return Some("an offer wants a different good than it gives");
+    }
+    if !["givesUnits", "wantsUnits", "times"].iter().all(|k| is_count(fields.get(*k))) {
+        return Some("units and times must be whole numbers");
+    }
+    None
+}
+
+/// Why `realm_id` can't post an offer on these terms (`postOfferProblem`, `CONTEXT.md`: Offer):
+/// at a finished storage of its own, on sound terms, with the goods for it once there and not
+/// already set aside.
+pub fn post_offer_problem(
+    world: &WorldState,
+    realm_id: &str,
+    fields: &serde_json::Map<String, serde_json::Value>,
+) -> Option<&'static str> {
+    let storage_id = fields.get("storageId").and_then(serde_json::Value::as_str).unwrap_or("");
+    let Some(storage) = offer_storage(world, realm_id, storage_id) else {
+        return Some("not a finished storage of yours");
+    };
+    if let Some(problem) = offer_terms_problem(fields) {
+        return Some(problem);
+    }
+    let gives = is_good(fields.get("gives")).expect("checked");
+    let num = |k: &str| fields.get(k).and_then(serde_json::Value::as_f64).unwrap_or(0.0);
+    if times_to_post(world, storage, gives, num("givesUnits"), num("times")) == 0.0 {
+        return Some("not enough of that good here that isn’t set aside");
+    }
+    None
+}
+
+/// Whether `side` may accept an offer in person, its own aside (`offerOpenTo`): anyone, unless it
+/// is a Direct offer to another realm or a carried one.
+pub fn offer_open_to(o: &Offer, side: &str) -> bool {
+    match &o.direct {
+        None => true,
+        Some(d) => d.to_id == side && d.carried.is_none(),
+    }
+}
+
+/// What accepting an offer moves (`OfferQuote`): `times` over, `gives` to the trader and `wants`
+/// from them, and what cut it short of the times wanted, if anything did.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OfferQuote {
     pub times: f64,
     pub gives: f64,
     pub wants: f64,
-    pub limit: Option<OfferLimit>,
+    pub limit: Option<super::warehouse_trade::TradeLimit>,
 }
 
-/// What held an offer quote below what was wanted (`OfferQuote.limit`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OfferLimit {
-    Stock,
-    Coins,
-    Held,
-    Room,
-}
-
-/// Whether an offer gives for nothing (`wantsNothing`).
-pub fn wants_nothing(o: &Offer) -> bool {
-    o.wants_units == 0.0
-}
-
-/// How many times `holder` can accept the offer, up to `wanted` (`quoteOffer`): as often as it has
-/// left with `available` units of what it gives in its storage, as `holder` can pay for, and as
-/// what it gains in weight fits in their room.
+/// What accepting an offer up to `wanted` times moves (`quoteOffer`): as many times as it still
+/// stands (`available` units of what it gives are in the storage), as the trader can pay, and as
+/// fits them, what they hand over making room. Pure: nothing moves.
 pub fn quote_offer(
     offer: &Offer,
-    holder: &crate::queries::warehouse_trade::TradeHolder<'_>,
+    holder: &super::warehouse_trade::TradeHolder<'_>,
     wanted: f64,
     available: f64,
 ) -> OfferQuote {
-    use crate::queries::residents::good_weight;
+    use super::residents::good_weight;
+    use super::warehouse_trade::TradeLimit;
     let left = offer.times.min((available / offer.gives_units).floor());
     let paid = if wants_nothing(offer) {
         f64::INFINITY
@@ -131,24 +196,78 @@ pub fn quote_offer(
     let fits =
         if gain > 0.0 { ((holder.room.max(0.0) + 1e-9) / gain).floor() } else { f64::INFINITY };
     let times = wanted.min(left).min(paid).min(fits);
-    let mut quote = OfferQuote {
+    let quote = |limit| OfferQuote {
         times,
         gives: times * offer.gives_units,
         wants: times * offer.wants_units,
-        limit: None,
+        limit,
     };
-    quote.limit = if times == wanted {
-        None
-    } else if times == left {
-        Some(OfferLimit::Stock)
-    } else if times == paid {
-        Some(if offer.wants == csp_shared::world::Good::Coins {
-            OfferLimit::Coins
-        } else {
-            OfferLimit::Held
-        })
-    } else {
-        Some(OfferLimit::Room)
+    if times == wanted {
+        return quote(None);
+    }
+    if times == left {
+        return quote(Some(TradeLimit::Stock));
+    }
+    if times == paid {
+        let coins = offer.wants == csp_shared::world::Good::Coins;
+        return quote(Some(if coins { TradeLimit::Coins } else { TradeLimit::Held }));
+    }
+    quote(Some(TradeLimit::Room))
+}
+
+/// Why `resident` of `side` can't accept an offer (`acceptOfferProblem`, `CONTEXT.md`: Offer):
+/// they are grown up and on its storage's tile, it isn't their own side's or a Direct offer to
+/// another realm, `times` is whole and positive, and they hold something to pay with in their
+/// hands or on `carriage_id`, a carriage on the tile that `side` commands.
+pub fn accept_offer_problem(
+    world: &WorldState,
+    side: &str,
+    resident: &csp_shared::world::Resident,
+    offer_id: Option<&serde_json::Value>,
+    times: Option<&serde_json::Value>,
+    carriage_id: Option<&serde_json::Value>,
+) -> Option<&'static str> {
+    use csp_shared::footprint::{covers, is_at};
+    let offer_id = offer_id.and_then(serde_json::Value::as_str);
+    let Some(offer) = world.offers.iter().find(|o| Some(o.id.as_str()) == offer_id) else {
+        return Some("that offer is gone");
     };
-    quote
+    if offer.realm_id == side {
+        return Some("that offer is your own");
+    }
+    if offer.direct.as_ref().is_some_and(|d| d.carried.is_some() && d.to_id == side) {
+        return Some("a carried offer is accepted from anywhere");
+    }
+    if !offer_open_to(offer, side) {
+        return Some("that offer is for another realm");
+    }
+    if !super::residents::can_work(resident.born_at, world.tick as f64) {
+        return Some("children can’t trade");
+    }
+    let storage = world.buildings.iter().find(|b| b.id == offer.storage_id);
+    let size = csp_shared::balance::MAP_SIZE;
+    let Some(storage) = storage
+        .filter(|s| covers(super::names::placed(s), resident.x as i32, resident.y as i32, size))
+    else {
+        return Some("not at that offer’s storage");
+    };
+    if !is_count(times) {
+        return Some("times must be a whole number");
+    }
+    let mut stock = &resident.carried;
+    if let Some(id) = carriage_id.filter(|v| !v.is_null()) {
+        let k = world.carriages.iter().find(|x| Some(x.id.as_str()) == id.as_str());
+        if !super::command::commands_carriage(world, side, k) {
+            return Some("not one of your carriages");
+        }
+        let k = k.expect("commanded");
+        if !is_at((k.x as i32, k.y as i32), super::names::placed(storage), size) {
+            return Some("that carriage is not at the storage");
+        }
+        stock = &k.load;
+    }
+    if stock.get(&offer.wants).copied().unwrap_or(0.0) < offer.wants_units {
+        return Some("not enough to pay for it even once");
+    }
+    None
 }

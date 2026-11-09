@@ -361,10 +361,12 @@ fn place_npc_cities(world: &mut WorldState, terrain: &TerrainMap) {
 fn request_road_materials(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<CarryAction> {
     Vec::new()
 }
-fn resolve_offers(_world: &mut WorldState, _scratch: &mut Scratch) -> usize {
-    0
+fn resolve_offers(world: &mut WorldState, scratch: &mut Scratch) -> usize {
+    crate::offers::resolve_offers(world, &mut scratch.offers)
 }
-fn step_offers(_world: &mut WorldState, _scratch: &mut Scratch) {}
+fn step_offers(world: &mut WorldState, _scratch: &mut Scratch) {
+    crate::offers::step_offers(world);
+}
 
 // T86.9 (`caravans.ts`, `traders.ts`, `trade-org-army.ts`, `trade-org-punishment.ts`,
 // `trade-org-debt.ts`, `trade-org-wrecks.ts`).
@@ -384,8 +386,8 @@ fn step_trade_org_army(world: &mut WorldState, size: i32, _scratch: &mut Scratch
 fn step_punishments(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
     crate::trade_org_punishment::step_punishments(world, size);
 }
-fn resolve_debt_payments(world: &mut WorldState, _scratch: &mut Scratch) -> usize {
-    crate::trade_org_debt::resolve_debt_payments(world)
+fn resolve_debt_payments(world: &mut WorldState, scratch: &mut Scratch) -> usize {
+    crate::trade_org_debt::resolve_debt_payments(world, &mut scratch.debt_payments)
 }
 fn step_debts(world: &mut WorldState, _scratch: &mut Scratch) {
     crate::trade_org_debt::step_debts(world);
@@ -415,9 +417,13 @@ fn step_npc_cities(
 }
 fn step_outsiders(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
 
-// `demands.ts` (filed under T86.11 here, but named by no ticket; T86.14 or whoever ports it).
-fn answer_demands(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
-fn step_demands(_world: &mut WorldState, _scratch: &mut Scratch) {}
+// `demands.ts`.
+fn answer_demands(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
+    crate::demands::answer_demands(world, size);
+}
+fn step_demands(world: &mut WorldState, _scratch: &mut Scratch) {
+    crate::demands::step_demands(world);
+}
 
 // T86.13 (`last-seen.ts`).
 fn step_last_seen(world: &mut WorldState, size: i32, scratch: &mut Scratch) {

@@ -244,16 +244,16 @@ pub fn view_value(data: &Json, ty: ScriptType) -> Value {
         (Json::String(s), ScriptType::String) => Value::string(s),
         (Json::Bool(b), ScriptType::Boolean) => Value::Bool(*b),
         (Json::Array(items), ScriptType::List(of)) => {
-            Value::list(items.iter().map(|d| view_value(d, *of)).collect()).freeze()
+            // Each item comes out frozen already.
+            Value::frozen_list(items.iter().map(|d| view_value(d, *of)).collect())
         }
         (Json::Object(record), ScriptType::View(view)) => {
             let fields = script_view(view).map_or(&[][..], |v| v.fields);
-            Value::object(
+            Value::frozen_fields(
                 fields.iter().map(|f| {
                     (f.name, view_value(record.get(f.name).unwrap_or(&Json::Null), f.r#type))
                 }),
             )
-            .freeze()
         }
         _ => Value::Null,
     }
@@ -575,6 +575,13 @@ impl<'a> ScriptBindings<'a> {
             let m = merge(merge(to_json(b), self.settings_at(&b.id)), self.offers_of(b));
             return Some(Json::Object(m));
         }
+        // What is in sight holds a building just when the eyes see its footprint (`places`):
+        // one out of sight is nothing, without working out all that is in sight.
+        self.side.as_ref()?;
+        let eyes = self.eyes.get_or_init(|| (self.ctx.eyes)());
+        if !eyes.building_seen(crate::queries::names::placed(b)) {
+            return None;
+        }
         let shown = self
             .seen()
             .iter()
@@ -627,7 +634,8 @@ impl<'a> ScriptBindings<'a> {
     /// A building by an id a query was given (`buildingById`).
     fn building_by(&self, v: Option<&Value>) -> Option<&'a Building> {
         let id = v.and_then(Value::as_str)?;
-        self.world().buildings.iter().find(|b| b.id == id)
+        // The first with the id, as `find` gives it, by the index.
+        self.ctx.index.building_by_id(self.world(), id)
     }
 
     /// The `id` of a thing a query was given, as a building.

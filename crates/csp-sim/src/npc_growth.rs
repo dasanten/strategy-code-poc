@@ -1275,3 +1275,6 @@ pub fn farm_tile(
     }
     None
 }
+
+#[cfg(test)]
+mod tests;

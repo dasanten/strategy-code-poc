@@ -970,3 +970,6 @@ pub fn npc_traders_sound(world: &WorldState) -> Vec<InvariantViolation> {
     }
     out
 }
+
+#[cfg(test)]
+mod tests;

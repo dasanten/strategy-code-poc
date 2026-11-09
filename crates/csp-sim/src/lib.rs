@@ -63,8 +63,11 @@ pub mod npc_roads;
 pub mod npc_scores;
 pub mod npc_scouts;
 pub mod npc_stable;
+#[cfg(test)]
+mod npc_test_world;
 pub mod npc_trader;
 pub mod npc_training;
+pub mod offers;
 pub mod order_kinds;
 pub mod order_sender;
 pub mod orders;
