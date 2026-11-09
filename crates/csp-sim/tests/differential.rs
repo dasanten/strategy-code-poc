@@ -78,10 +78,27 @@ fn differential(name: &str, ticks: &[u64]) -> Option<String> {
 
 #[test]
 fn the_village_steps_as_the_typescript_did() {
-    assert_eq!(differential("village", &[1, 60, 1440, 10080]), None);
+    assert_eq!(differential("village", &[1, 60, 1440]), None);
+}
+
+/// The village's long run, a game week: about 5 s alone and 8 s on a busy machine (2026-11-09),
+/// over the 5 s a test may take, so it stays out of the default suite with the HQ's.
+#[test]
+#[ignore = "5 to 8 s: the village's NPC default scripts over a game week"]
+fn the_village_steps_as_the_typescript_did_over_a_game_week() {
+    assert_eq!(differential("village", &[10080]), None);
 }
 
 #[test]
 fn the_trade_org_hq_steps_as_the_typescript_did() {
-    assert_eq!(differential("hq", &[1, 60, 1440, 10080]), None);
+    assert_eq!(differential("hq", &[1, 60]), None);
+}
+
+/// The HQ's long run, a game week: 25 to 40 s depending on the machine's load (2026-11-09), most
+/// of it the NPC default scripts, so it stays out of the default suite until they are faster.
+/// Run it with `cargo nextest run -p csp-sim --run-ignored only`.
+#[test]
+#[ignore = "25 to 40 s: the HQ's NPC default scripts over a game week"]
+fn the_trade_org_hq_steps_as_the_typescript_did_over_a_game_week() {
+    assert_eq!(differential("hq", &[1440, 10080]), None);
 }
