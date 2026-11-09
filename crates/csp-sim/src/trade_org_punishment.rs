@@ -1226,3 +1226,6 @@ pub fn punishments_sound(world: &WorldState) -> Vec<InvariantViolation> {
     }
     out
 }
+
+#[cfg(test)]
+mod tests;
