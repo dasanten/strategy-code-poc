@@ -27,7 +27,10 @@ fn base64(text: &str) -> Vec<u8> {
     let bytes: Vec<u8> = text.bytes().filter(|c| *c != b'=').collect();
     let mut out = Vec::with_capacity(bytes.len() * 3 / 4);
     for chunk in bytes.chunks(4) {
-        let n = chunk.iter().enumerate().fold(0u32, |n, (i, c)| n | u32::from(value(*c)) << (18 - 6 * i));
+        let n = chunk
+            .iter()
+            .enumerate()
+            .fold(0u32, |n, (i, c)| n | u32::from(value(*c)) << (18 - 6 * i));
         out.extend_from_slice(&n.to_be_bytes()[1..chunk.len()]);
     }
     out
@@ -47,7 +50,10 @@ impl Walk for Unhurried {
 fn load(name: &str) -> (WorldState, Arc<TerrainMap>) {
     let mut file = read_json(&format!("worlds/{name}.json"));
     let t = &file["terrain"];
-    let terrain = TerrainMap { size: t["size"].as_i64().unwrap() as i32, tiles: base64(t["tiles"].as_str().unwrap()) };
+    let terrain = TerrainMap {
+        size: t["size"].as_i64().unwrap() as i32,
+        tiles: base64(t["tiles"].as_str().unwrap()),
+    };
     let world = serde_json::from_value(file["world"].take()).unwrap();
     (world, Arc::new(terrain))
 }
@@ -78,4 +84,107 @@ fn the_village_steps_as_the_typescript_did() {
 #[test]
 fn the_trade_org_hq_steps_as_the_typescript_did() {
     assert_eq!(differential("hq", &[1, 60, 1440, 10080]), None);
+}
+
+#[test]
+#[ignore]
+fn debug_village_10080() {
+    let (mut world, terrain) = load("village-0");
+    let mut walking = Unhurried(Walking::new(terrain.clone()));
+    let mut scratch = Scratch::default();
+    while world.tick < 10080 {
+        step_world(&mut world, &terrain, &mut scratch, Some(&mut walking), None);
+    }
+    let want = normalised(&read_json("worlds/village-10080.json")["world"]);
+    let got = normalised(&serde_json::to_value(&world).unwrap());
+    for (k, v) in want.as_object().unwrap() {
+        let g = &got[k];
+        if v != g {
+            let ids = |x: &serde_json::Value| -> Vec<String> {
+                x.as_array()
+                    .map(|a| {
+                        a.iter()
+                            .map(|e| e.get("id").map_or(e.to_string(), |i| i.to_string()))
+                            .collect()
+                    })
+                    .unwrap_or_default()
+            };
+            println!("DIFF {k}: want {} got {}", ids(v).join(" "), ids(g).join(" "));
+            println!("  first: {:?}", first_difference(v, g, k));
+        }
+    }
+}
+
+#[test]
+#[ignore]
+fn debug_village_ids() {
+    let (mut world, terrain) = load("village-0");
+    let mut walking = Unhurried(Walking::new(terrain.clone()));
+    let mut scratch = Scratch::default();
+    let mut last = world.next_id;
+    while world.tick < 3888 {
+        step_world(&mut world, &terrain, &mut scratch, Some(&mut walking), None);
+        if world.tick >= 3878 && world.tick <= 3887 {
+            if world.tick == 3885 {
+                for r in world.residents.iter().filter(|x| {
+                    x.script.as_ref().is_some_and(|s| {
+                        s.memory.get("workplaceId") == Some(&serde_json::json!("b125"))
+                    })
+                }) {
+                    println!(
+                        "W {} {:?} {:?} {:?} {} {} {:?}",
+                        r.id,
+                        r.owner,
+                        r.city_id,
+                        r.order.as_ref().map(|o| serde_json::to_value(o).unwrap()["kind"].clone()),
+                        r.x,
+                        r.y,
+                        r.down_until
+                    );
+                }
+                for id in ["r123", "r124"] {
+                    let r = world.residents.iter().find(|r| r.id == id).unwrap();
+                    println!(
+                        "FIT {} {} carried={} cap={} city={:?} owner={:?}",
+                        id,
+                        csp_sim::queries::goods::units_that_fit(
+                            r,
+                            csp_shared::world::Good::Wood,
+                            world.tick as f64
+                        ),
+                        serde_json::to_string(&r.carried).unwrap(),
+                        csp_sim::queries::balance::carry_capacity(r, world.tick as f64),
+                        r.city_id,
+                        r.owner
+                    );
+                }
+                let st: Vec<_> = world
+                    .buildings
+                    .iter()
+                    .filter(|b| b.kind == csp_shared::world::BuildingKind::Storage)
+                    .map(|b| (b.id.clone(), b.city_id.clone(), b.site.is_some()))
+                    .collect();
+                println!(
+                    "STORAGES {:?} seed={} rnd={}",
+                    st,
+                    world.seed,
+                    csp_sim::script_bindings::tick_random(&world)
+                );
+            }
+            let r = world.residents.iter().find(|r| r.id == "r123").unwrap();
+            println!(
+                "R {} {} {} {} {} {}",
+                world.tick,
+                r.x,
+                r.y,
+                serde_json::to_string(&r.carried).unwrap(),
+                serde_json::to_string(&r.order).unwrap().chars().take(150).collect::<String>(),
+                serde_json::to_string(&r.script.as_ref().map(|s| &s.memory)).unwrap()
+            );
+        }
+        if world.next_id != last {
+            println!("IDS {} {}", world.tick, world.next_id);
+            last = world.next_id;
+        }
+    }
 }
