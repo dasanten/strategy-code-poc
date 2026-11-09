@@ -17,8 +17,8 @@ use csp_shared::world::{
 
 use crate::movement_pending::{
     army_driven_to, army_spot, attack_target, end_order, in_contact, int_field, ordered_resident,
-    place_tile, str_field, waiting_for_army, waiting_for_escort, waiting_on_the_road, wall_map,
-    wall_side, walls_key, OrderKind, OrderSender,
+    place_tile, str_field, waiting_for_army, waiting_for_escort, waiting_on_the_road, wall_side,
+    OrderKind, OrderSender,
 };
 use crate::pathfinding::{
     PathFinder, PathOptions, PathResult, Point, TerrainCosts, CARRIAGE_COSTS, WALKING_COSTS,
@@ -29,7 +29,7 @@ use crate::queries::pace::{drive_speed, driving_learned, ride_speed, walk_speed}
 use crate::queries::residents::is_down;
 use crate::queries::riding::horse_ridden;
 use crate::tick::{Scratch, Walk};
-use crate::walls::{may_step, stranded_on_wall, WallMap};
+use crate::walls::{may_step, stranded_on_wall, wall_map, walls_fingerprint, WallMap};
 
 /// Time the pathfinder may use per tick (`PATH_BUDGET_MS`, ADR 0004).
 pub const PATH_BUDGET_MS: f64 = 50.0;
@@ -345,7 +345,8 @@ pub struct Walking {
     searching: HashMap<String, String>,
     /// The order the searches were asked for in, as the TypeScript `Map` keeps it.
     searching_order: Vec<String>,
-    walls: Option<(String, Arc<WallMap>)>,
+    /// The wall map and the `walls_fingerprint` it was built at.
+    walls: Option<(u64, Arc<WallMap>)>,
     roads: Option<Rc<HashSet<usize>>>,
     /// A clock for the pathfinder's budget (milliseconds); the wall clock without one.
     clock: Option<Box<dyn FnMut() -> f64>>,
@@ -371,7 +372,7 @@ impl Walking {
 
     /// The walls and gates on the map, built again only when they change (`wallsOf`).
     fn walls_of(&mut self, world: &WorldState) -> Arc<WallMap> {
-        let key = walls_key(world);
+        let key = walls_fingerprint(world);
         if self.walls.as_ref().is_none_or(|(k, _)| *k != key) {
             self.walls = Some((key, Arc::new(wall_map(world, &self.terrain))));
         }
@@ -767,6 +768,10 @@ impl Walk for Walking {
         let steps = self.request_steps(world, scratch, PATH_BUDGET_MS);
         self.resolve(world, scratch, &steps);
         steps.len()
+    }
+
+    fn ways(&mut self) -> Option<&mut dyn crate::npc_roads::WayFinder> {
+        Some(self)
     }
 }
 

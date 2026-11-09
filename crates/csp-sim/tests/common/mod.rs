@@ -80,3 +80,34 @@ pub fn assert_same_json(what: &str, want: &Value, got: &Value) {
         panic!("{d}");
     }
 }
+
+/// Standard base64, as `Buffer.toString('base64')` writes it.
+pub fn base64(text: &str) -> Vec<u8> {
+    let value = |c: u8| match c {
+        b'A'..=b'Z' => c - b'A',
+        b'a'..=b'z' => c - b'a' + 26,
+        b'0'..=b'9' => c - b'0' + 52,
+        b'+' => 62,
+        b'/' => 63,
+        _ => panic!("not base64: {c}"),
+    };
+    let bytes: Vec<u8> = text.bytes().filter(|c| *c != b'=').collect();
+    let mut out = Vec::with_capacity(bytes.len() * 3 / 4);
+    for chunk in bytes.chunks(4) {
+        let n = chunk
+            .iter()
+            .enumerate()
+            .fold(0u32, |n, (i, c)| n | (u32::from(value(*c)) << (18 - 6 * i)));
+        out.extend_from_slice(&n.to_be_bytes()[1..chunk.len()]);
+    }
+    out
+}
+
+/// The terrain of a world fixture written `{ terrain: { size, tiles: <base64> }, world }`.
+pub fn terrain_of(file: &Value) -> csp_shared::terrain::TerrainMap {
+    let t = &file["terrain"];
+    csp_shared::terrain::TerrainMap {
+        size: t["size"].as_i64().expect("a size") as i32,
+        tiles: base64(t["tiles"].as_str().expect("tiles")),
+    }
+}

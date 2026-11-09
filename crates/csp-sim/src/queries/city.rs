@@ -109,3 +109,33 @@ pub fn building_realm<'w>(world: &'w WorldState, b: &'w Building) -> Option<&'w 
 pub fn is_outpost_storage(b: &Building) -> bool {
     b.kind == BuildingKind::Storage && b.site.is_none() && b.city_id.is_none()
 }
+
+/// Food in a city's finished storages that is not set aside for an offer (`storedFood`).
+pub fn stored_food(world: &WorldState, city: &City) -> f64 {
+    world
+        .buildings
+        .iter()
+        .filter(|b| {
+            b.city_id.as_ref() == Some(&city.id)
+                && b.kind == BuildingKind::Storage
+                && b.site.is_none()
+        })
+        .map(|b| {
+            super::names::held(
+                &super::offers::free_stock(world, &b.id, b.stock.as_ref()),
+                csp_shared::world::Good::Food,
+            )
+        })
+        .fold(0.0, |food, n| food + n)
+}
+
+/// Food all of a city's residents eat in `FOOD_SURPLUS_DAYS` game days (`surplusFoodLine`).
+pub fn surplus_food_line(world: &WorldState, city: &City) -> f64 {
+    city_food_use(world, city, csp_shared::balance::FOOD_SURPLUS_DAYS)
+}
+
+/// Whether a city has a food surplus (`hasFoodSurplus`, `CONTEXT.md`: Food surplus): its storages
+/// hold more Food than all its residents eat in `FOOD_SURPLUS_DAYS` game days.
+pub fn has_food_surplus(world: &WorldState, city: &City) -> bool {
+    stored_food(world, city) > surplus_food_line(world, city)
+}

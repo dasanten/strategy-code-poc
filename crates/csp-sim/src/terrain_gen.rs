@@ -58,7 +58,7 @@ fn wrap_delta_f(a: f64, b: f64, size: f64) -> f64 {
 /// by the larger, their squares Kahan-summed, then `sqrt(sum) * max`. Not the same rounding as
 /// `f64::hypot`, and the sea score depends on the last bit.
 #[inline]
-fn js_hypot(a: f64, b: f64) -> f64 {
+pub(crate) fn js_hypot(a: f64, b: f64) -> f64 {
     let (a, b) = (a.abs(), b.abs());
     if a.is_nan() || b.is_nan() {
         return if a == f64::INFINITY || b == f64::INFINITY { f64::INFINITY } else { f64::NAN };
