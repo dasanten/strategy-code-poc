@@ -597,3 +597,5 @@ pub fn npc_cities_have_halls(world: &WorldState) -> Vec<InvariantViolation> {
 
 mod invariants;
 pub use invariants::{founding_parties_sound, full_wait_sound};
+#[cfg(test)]
+mod tests;
