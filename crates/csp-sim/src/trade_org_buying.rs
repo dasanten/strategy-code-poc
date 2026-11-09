@@ -261,3 +261,6 @@ pub fn buy_food(
     own.insert(Good::Food, had + sale.units);
     true
 }
+
+#[cfg(test)]
+mod tests;
