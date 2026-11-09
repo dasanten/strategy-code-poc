@@ -293,3 +293,31 @@ The server answers a chunk in ~4 ms and a batch of 64 in ~5 ms, so per call the 
 the server. What remains: the TypeScript server's tick holds every request in flight for
 ~0.5 s once a second, and the client spends ~1.4 ms per chunk making its texture. Over a real
 network each request also pays a round trip, which batches pay 64 times less often.
+
+### Rust (T87.8, 2026-11-08)
+
+`cargo run --release -p csp-server --bin bench-world -- [size] [seed]` and
+`--bin bench-sim -- <village|villages|hq|save> [ticks]` print the tables above. Same machine,
+release build, **not idle** (other sessions building and testing). These are only first numbers:
+on `epic/87-rust-shell` terrain generation and resource nodes are ported, but the world's other
+placements (HQ, NPC cities, trading posts, caravans) and every rule of the world step are still
+the stubs of T86.1. The `sim` scenes therefore have no residents and their ticks cost microseconds.
+Rerun all four scenes once Epic 86 has landed.
+
+**World generation, full size (5760x5760, seed 1)**, `bench-world`:
+
+| generateTerrain stage |   ms |  share |
+| :-------------------- | ---: | -----: |
+| seas                  | 2271 |  45.0% |
+| lakes                 |  743 |  14.7% |
+| relief                |  990 |  19.6% |
+| forest                |  647 |  12.8% |
+| joining               |  382 |   7.6% |
+| total                 | 5043 | 100.0% |
+
+| generateWorld stage |  ms | TypeScript ms |
+| :------------------ | --: | ------------: |
+| nodes               | 176 |          2348 |
+
+Terrain takes 5.0 s against 9.4 s for the TypeScript, and the resource nodes (the same 3310) take
+0.18 s against 2.3 s.

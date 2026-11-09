@@ -5,6 +5,11 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
+build = "build.rs"
+
+[lib]
+name = "csp_server"
+path = "src/lib.rs"
 
 [[bin]]
 name = "csp-server"
@@ -15,6 +20,34 @@ csp-shared.workspace = true
 csp-sim.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+thiserror.workspace = true
+flate2.workspace = true
+rusqlite = { version = "0.37", features = ["bundled", "backup"] }
+sha2 = "0.10"
+base64 = "0.22"
+getrandom = "0.4"
+indexmap.workspace = true
+scrypt = { version = "0.11", default-features = false }
+csp-lang.workspace = true
+axum = { version = "0.8", features = ["ws"] }
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "time", "signal", "sync", "fs"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["fs"] }
+# The machine line of the benchmarks (`machineLine`): CPU model and memory.
+sysinfo = { version = "0.37", default-features = false, features = ["system"] }
+# `bench-sim save` reads a copy of the database.
+tempfile = "3"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["json", "env-filter", "fmt"] }
+sentry = { version = "0.49.5", default-features = false, features = ["backtrace", "contexts", "panic", "metrics", "reqwest", "rustls"] }
+dotenvy = "0.15.7"
+
+[build-dependencies]
+serde_json.workspace = true
+
+[dev-dependencies]
+tokio-tungstenite = "0.27"
+futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 
 [lints]
 workspace = true
