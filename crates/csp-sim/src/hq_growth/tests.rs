@@ -219,7 +219,7 @@ fn wants_a_multiple_of_the_strongest_sides_armed_residents_an_alliance_counted_t
 }
 
 #[test]
-#[ignore = "slow in the TypeScript too (`tags: ['slow']`), 56 s here, and it stops at 16 of 18 soldiers: to diagnose with T86.14's long simulations"]
+#[ignore = "slow in the TypeScript too (`tags: ['slow']`), 22 s here: T86.14's long simulations"]
 fn trains_more_soldiers_than_its_armys_size_when_a_player_grows_strong() {
     let mut s = setup();
     let goods = s

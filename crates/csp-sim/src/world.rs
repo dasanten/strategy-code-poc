@@ -288,7 +288,7 @@ fn step_rest(
     let aging = step_aging(world, size);
     answer_demands(world, size, scratch);
     step_alliances(world);
-    let captures = step_captures(world, size, &mut GameAlarms);
+    let captures = step_captures(world, size, Some(terrain), &mut GameAlarms);
     step_refill(world, size);
     step_directives(world);
     step_crimes(world, size);
@@ -383,14 +383,18 @@ fn step_traders(
 fn step_trade_org_army(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
     crate::trade_org_army::step_trade_org_army(world, size);
 }
-fn step_punishments(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
+fn step_punishments(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
+    crate::trade_org_punishment::step_punishments(world, size);
+}
 fn resolve_debt_payments(world: &mut WorldState, scratch: &mut Scratch) -> usize {
     crate::trade_org_debt::resolve_debt_payments(world, &mut scratch.debt_payments)
 }
 fn step_debts(world: &mut WorldState, _scratch: &mut Scratch) {
     crate::trade_org_debt::step_debts(world);
 }
-fn count_wrecked(_world: &mut WorldState, _wrecked: Vec<Felled>, _scratch: &mut Scratch) {}
+fn count_wrecked(world: &mut WorldState, wrecked: Vec<Felled>, _scratch: &mut Scratch) {
+    crate::trade_org_wrecks::count_wrecked(world, &wrecked);
+}
 
 // T86.10 (`npc-defence.ts`, `npc-hire.ts`, `npc-behaviour.ts`, `outsiders.ts`).
 fn step_npc_defence(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {

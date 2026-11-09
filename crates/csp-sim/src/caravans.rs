@@ -14,7 +14,7 @@ use csp_shared::balance::{
 };
 use csp_shared::footprint::{is_at, middle_of};
 use csp_shared::goods::WEAPONS;
-use csp_shared::terrain::wrap_distance;
+use csp_shared::terrain::{wrap_distance, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
     Building, BuildingKind, Caravan, CaravanStop, Carriage, City, DriveOrder, DropOrder, Good,
@@ -274,14 +274,17 @@ pub fn rejoin_trade_org(world: &mut WorldState, post_id: &str, size: i32) {
 }
 
 /// A city the Trade Organization's army took joins it as a new trading post (`joinTradeOrg`).
-/// The TypeScript passes the terrain, which only `houseTile` reads (a stand-in for now); here the
-/// map size.
-pub fn join_trade_org(world: &mut WorldState, city_id: &str, size: i32) {
+pub fn join_trade_org(
+    world: &mut WorldState,
+    city_id: &str,
+    size: i32,
+    terrain: Option<&TerrainMap>,
+) {
     let Some(city) = world.cities.iter_mut().find(|c| c.id == city_id) else { return };
     city.trade_org = Some(TradeOrgCity::Post);
     city.layout = None;
     city.former_player = None;
-    storages_become_warehouses(world, city_id, size);
+    storages_become_warehouses(world, city_id, size, terrain);
     for b in &mut world.buildings {
         if b.city_id.as_deref() == Some(city_id) && b.kind == BuildingKind::Gate {
             b.closed = None;
@@ -545,6 +548,17 @@ pub fn of_trade_org(world: &WorldState, r: &Resident) -> bool {
 pub fn caravan_threats(world: &WorldState, c: Convoy, ki: usize, size: i32) -> Vec<usize> {
     let crew: HashSet<String> =
         crew_ids_of(c.driver_id(world).as_deref(), &c.escort_ids(world)).into_iter().collect();
+    crew_threats(world, &crew, ki, size)
+}
+
+/// `caravan_threats` for any crew by id with carriage `ki`, as a supply wagon and its soldiers
+/// (`caravanThreats` with a crew of its own).
+pub fn crew_threats(
+    world: &WorldState,
+    crew: &HashSet<String>,
+    ki: usize,
+    size: i32,
+) -> Vec<usize> {
     let k = &world.carriages[ki];
     (0..world.residents.len())
         .filter(|&i| {
@@ -1251,3 +1265,6 @@ pub fn hq_city(world: &WorldState) -> Option<&City> {
 pub fn building(world: &WorldState, i: usize) -> &Building {
     &world.buildings[i]
 }
+
+#[cfg(test)]
+mod escort_tests;

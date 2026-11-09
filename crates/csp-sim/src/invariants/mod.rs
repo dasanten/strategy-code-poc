@@ -168,10 +168,11 @@ pub fn world_invariants() -> Vec<Invariant> {
             name: "accept-orders-done",
             check: |w, _| crate::offers::accept_orders_done(w),
         },
-        // TODO(T86.9): `deliveriesSound` in `deliveries.ts`.
-        pending("deliveries-sound"),
-        // TODO(T86.9): `transfersSound` in `transfers.ts`.
-        pending("transfers-sound"),
+        Invariant {
+            name: "deliveries-sound",
+            check: |w, _| crate::deliveries::deliveries_sound(w),
+        },
+        Invariant { name: "transfers-sound", check: |w, _| crate::transfers::transfers_sound(w) },
         Invariant {
             name: "supply-lines-sound",
             check: |w, _| crate::armies::supply_lines_sound(w),
@@ -192,31 +193,41 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant { name: "teachers-sound", check: checks::teachers_sound },
         Invariant { name: "trainees-sound", check: checks::trainees_sound },
         Invariant { name: "trade-org-sound", check: checks::trade_org_sound },
-        // TODO(T86.9): `nothingLeftOfTheHq` in `hq-fall.ts`.
-        pending("nothing-left-of-the-hq"),
-        // TODO(T86.9): `caravansSound` in `caravans.ts`.
-        pending("caravans-sound"),
+        Invariant {
+            name: "nothing-left-of-the-hq",
+            check: |w, _| crate::hq_fall::nothing_left_of_the_hq(w),
+        },
+        Invariant {
+            name: "caravans-sound",
+            check: |w, t| crate::caravans::caravans_sound(w, t.size),
+        },
         // TODO(T86.9): `tradersSound` in `traders.ts`.
         pending("traders-sound"),
         // TODO(T86.9): `traderStopsSound` in `trader-stops.ts`.
         pending("trader-stops-sound"),
         // TODO(T86.5): `traderTradesKeepFood` in `trading.ts`.
         pending("trader-trades-keep-food"),
-        // TODO(T86.9): `routeRobberiesSound` in `caravans.ts`.
-        pending("route-robberies-sound"),
+        Invariant {
+            name: "route-robberies-sound",
+            check: |w, _| crate::caravans::route_robberies_sound(w),
+        },
         Invariant {
             name: "trade-org-army-sound",
             check: |w, t| crate::trade_org_army::trade_org_army_sound(w, t.size),
         },
         Invariant { name: "npc-hire-sound", check: |w, _| crate::npc_hire::npc_hire_sound(w) },
-        // TODO(T86.9): `punishmentsSound` in `trade-org-punishment.ts`.
-        pending("punishments-sound"),
+        Invariant {
+            name: "punishments-sound",
+            check: |w, _| crate::trade_org_punishment::punishments_sound(w),
+        },
         Invariant {
             name: "npc-gate-shut-to-its-punishers",
             check: |w, t| crate::npc_defence::npc_gate_shut_to_its_punishers(w, t.size),
         },
-        // TODO(T86.9): `supplyWagonsSound` in `supply-wagons.ts`.
-        pending("supply-wagons-sound"),
+        Invariant {
+            name: "supply-wagons-sound",
+            check: |w, _| crate::supply_wagons::supply_wagons_sound(w),
+        },
         Invariant {
             name: "directives-sound",
             check: |w, _| crate::directives::directives_sound(w),
@@ -228,10 +239,11 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: |w, _| crate::directives::buy_off_orders_done(w),
         },
         Invariant { name: "debts-sound", check: |w, _| crate::trade_org_debt::debts_sound(w) },
-        // TODO(T86.9): `wrecksSound` in `trade-org-wrecks.ts`.
-        pending("wrecks-sound"),
-        // TODO(T86.9): `citiesTakenSound` in `trade-org-takes.ts`.
-        pending("cities-taken-sound"),
+        Invariant { name: "wrecks-sound", check: |w, _| crate::trade_org_wrecks::wrecks_sound(w) },
+        Invariant {
+            name: "cities-taken-sound",
+            check: |w, _| crate::trade_org_takes::cities_taken_sound(w),
+        },
         Invariant {
             name: "debt-demands-sound",
             check: |w, _| crate::trade_org_debt::debt_demands_sound(w),
