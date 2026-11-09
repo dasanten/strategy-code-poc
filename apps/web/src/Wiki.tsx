@@ -1,10 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import {
-  PARAM_DESCRIPTIONS,
-  WORKPLACE_PARAM,
   QUEUE_DEFAULT_STEP_MINUTES,
   QUEUE_MAX_STEPS,
-  SCRIPT_PARAM_TYPES,
   ADULT_AGE,
   AGILITY_LIMIT,
   AGILITY_SPEED_EFFECT,
@@ -162,7 +159,6 @@ import {
   NPC_TRADER_REACH,
   NPC_PLAN_TICKS,
   NPC_SURPLUS_CAP,
-  NPC_SMITHY_WEAPON,
   NPC_SOLDIER_SHARE,
   NPC_WAR_CHEST_PER_RESIDENT,
   NPC_TRADE,
@@ -274,6 +270,12 @@ import {
   carryCapacity,
   walkSpeed,
   workFactor,
+} from '@csp/balance'
+import {
+  PARAM_DESCRIPTIONS,
+  WORKPLACE_PARAM,
+  SCRIPT_PARAM_TYPES,
+  NPC_SMITHY_WEAPON,
   type BuildingKind,
   type CrimeKind,
   type Good,
@@ -975,8 +977,8 @@ export function Wiki() {
             {TERRAIN_NAMES.map((t) => (
               <tr key={t}>
                 <td>{t}</td>
-                <td>{pct(TERRAIN_SPEED[Terrain[t]])}</td>
-                <td>{pct(TERRAIN_FOOD[Terrain[t]])}</td>
+                <td>{pct(TERRAIN_SPEED[Terrain[t]]!)}</td>
+                <td>{pct(TERRAIN_FOOD[Terrain[t]]!)}</td>
                 <td>{t === 'Road' ? '—' : `× ${num(workFactor('road', Terrain[t]))}`}</td>
               </tr>
             ))}

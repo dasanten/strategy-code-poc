@@ -890,4 +890,6 @@ fn lapse_demands_on_leader_death(_world: &mut WorldState, _realm_id: &str) {}
 fn leave_on_leader_death(_world: &mut WorldState, _realm_id: &str) {}
 
 #[cfg(test)]
+mod self_managed_tests;
+#[cfg(test)]
 mod tests;

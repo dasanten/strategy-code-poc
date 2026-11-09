@@ -70,40 +70,41 @@ import { stepNpcCities } from '../../../../apps/server/src/npc-behaviour.ts'
 
 const TICKS = 360
 const AT = [1, 2, 30, 60, 61, 120, 180, 240, 300, 360]
-// The HQ grows by its own rings (`hq-growth.ts`, T86.9): its worlds join once that is ported.
-const stepped = ['village-0', 'village-1440', 'village-10080'].map((name) => {
-  const { terrain, world } = load(name)
-  const at: unknown[] = []
-  for (let t = 1; t <= TICKS; t++) {
-    stepNpcDefence(world, terrain.size)
-    stepNpcHire(world, terrain.size)
-    stepNpcCities(world, terrain.size, terrain)
-    world.tick++
-    if (AT.includes(t)) {
-      at.push(
-        JSON.parse(
-          JSON.stringify({
-            t,
-            nextId: world.nextId,
-            residents: world.residents.map((r) => ({
-              id: r.id,
-              cityId: r.cityId,
-              carried: r.carried,
-              order: r.order,
-              script: r.script ?? null,
-              pair: r.pair ?? null,
-            })),
-            cityPlans: world.cityPlans,
-            cities: world.cities,
-            buildings: world.buildings.map((b) => ({ id: b.id, closed: b.closed ?? null })),
-            horses: world.horses.length,
-          }),
-        ),
-      )
+const stepped = ['village-0', 'village-1440', 'village-10080', 'hq-0', 'hq-1440', 'hq-10080'].map(
+  (name) => {
+    const { terrain, world } = load(name)
+    const at: unknown[] = []
+    for (let t = 1; t <= TICKS; t++) {
+      stepNpcDefence(world, terrain.size)
+      stepNpcHire(world, terrain.size)
+      stepNpcCities(world, terrain.size, terrain)
+      world.tick++
+      if (AT.includes(t)) {
+        at.push(
+          JSON.parse(
+            JSON.stringify({
+              t,
+              nextId: world.nextId,
+              residents: world.residents.map((r) => ({
+                id: r.id,
+                cityId: r.cityId,
+                carried: r.carried,
+                order: r.order,
+                script: r.script ?? null,
+                pair: r.pair ?? null,
+              })),
+              cityPlans: world.cityPlans,
+              cities: world.cities,
+              buildings: world.buildings.map((b) => ({ id: b.id, closed: b.closed ?? null })),
+              horses: world.horses.length,
+            }),
+          ),
+        )
+      }
     }
-  }
-  return { name, at }
-})
+    return { name, at }
+  },
+)
 writeFileSync(`${process.argv[2]}/npc-stepped.json`, JSON.stringify(stepped))
 
 // ---- founded.json: a town and two villages founded on the 7-1024 map, with their horses. ----

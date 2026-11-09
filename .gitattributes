@@ -1,1 +1,2 @@
 crates/csp-server/migrations/** text eol=lf
+packages/balance/** text eol=lf
