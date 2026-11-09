@@ -249,11 +249,9 @@ pub fn view_value(data: &Json, ty: ScriptType) -> Value {
         }
         (Json::Object(record), ScriptType::View(view)) => {
             let fields = script_view(view).map_or(&[][..], |v| v.fields);
-            Value::frozen_fields(
-                fields.iter().map(|f| {
-                    (f.name, view_value(record.get(f.name).unwrap_or(&Json::Null), f.r#type))
-                }),
-            )
+            Value::frozen_fields(fields.iter().map(|f| {
+                (f.name, view_value(record.get(f.name).unwrap_or(&Json::Null), f.r#type))
+            }))
         }
         _ => Value::Null,
     }
@@ -1559,25 +1557,23 @@ impl<'a> ScriptBindings<'a> {
         view_value(&Json::Object(data), ty)
     }
 
-    /// The global `name` of the API (`bindScript`'s globals), made when the script first reads it:
-    /// the interpreter asks at most once per name in a run, and the world doesn't change during
-    /// one, so this is what binding them all up front gave, without building the ones a run never
-    /// reads. A native function's id is its binding's place in the API.
-    fn bind_global(&self, name: &str) -> Option<Value> {
-        let (id, b) = self.api.iter().enumerate().find(|(_, b)| b.name == name)?;
-        Some(match (b.is, b.name) {
+    /// The global `b`, the `id`th name of the API (`globals[name]`), made when the script first
+    /// reads it: the world doesn't change during a run, so it is what the TypeScript made up front.
+    fn global_value(&self, id: usize, b: &ScriptBinding) -> Value {
+        let world = self.world();
+        match (b.is, b.name) {
             (Is::Value, "me") => self.me_value(),
             (Is::Value, "memory") => Value::Object(self.ctx.memory.clone()),
             (Is::Value, "params") => self.params_value(),
             (Is::Value, "debt") => {
-                Value::Number(self.side.as_deref().map_or(0.0, |s| debt_of(self.world(), s)))
+                Value::Number(self.side.as_deref().map_or(0.0, |s| debt_of(world, s)))
             }
-            (Is::Value, "tick") => Value::Number(self.world().tick as f64),
+            (Is::Value, "tick") => Value::Number(world.tick as f64),
             (Is::Value, "mapSize") => Value::Number(f64::from(self.size())),
             (Is::Value, "random") => Value::Number(self.random),
             (Is::Value, other) => panic!("no value {other} to bind"),
             _ => Value::native(b.name, id as u32, b.cost as u64),
-        })
+        }
     }
 
     /// The helpers (`scriptHelpers`): `floor(n)`, and `pickRandom(list)`.
@@ -1605,18 +1601,19 @@ impl<'a> ScriptBindings<'a> {
 
 impl Host for ScriptBindings<'_> {
     fn global(&mut self, name: &str) -> Option<Value> {
-        self.bind_global(name)
+        let (id, b) = self.api.iter().enumerate().find(|(_, b)| b.name == name)?;
+        Some(self.global_value(id, b))
     }
 
     fn call(&mut self, function: &NativeFunction, args: Vec<Value>) -> Result<Value, CallError> {
-        let Some(b) = self.api.get(function.id as usize).filter(|b| b.is != Is::Value) else {
+        let Some(b) = self.api.get(function.id as usize) else {
             return Err(host_error(format!("no native function {}", function.name)));
         };
         if let Some(answer) = self.helper(b.name, &args) {
             return answer;
         }
         match b.is {
-            Is::Query => Ok(view_value(&self.query(b.name, &args)?, b.returns)),
+            Is::Query => self.query(b.name, &args).map(|d| view_value(&d, b.returns)),
             Is::Action => self.action(b.name, &args),
             Is::Value => Err(host_error(format!("{} is a value", b.name))),
         }
