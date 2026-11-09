@@ -1413,7 +1413,8 @@ impl ScriptRunner {
             ));
         }
         let size = self.terrain.size;
-        let index = WorldIndex::new(world, size);
+        scratch.index(world, size);
+        let index = scratch.index.take().expect("just built");
         let host = self.host.clone();
         let explored = move |x: i32, y: i32| host.explored(user_id, x, y);
         let (requests, ended, end_reason, waited, logged, result) = {
@@ -1447,6 +1448,7 @@ impl ScriptRunner {
             let out =
                 (bound.requests, bound.ended, bound.end_reason, bound.waited, bound.logged, result);
             scratch.sight = sight.into_inner();
+            scratch.index = Some(index);
             out
         };
         if let Some(v) = violations {
@@ -1830,7 +1832,8 @@ fn run_city_scripts(
             .cloned()
             .map(|p| ParamWithValue { param: p, value: None })
             .collect();
-        let index = WorldIndex::new(world, terrain.size);
+        scratch.index(world, terrain.size);
+        let index = scratch.index.take().expect("just built");
         let outcome = {
             let sight = RefCell::new(scratch.sight.take());
             let world_ref: &WorldState = world;
@@ -1868,6 +1871,7 @@ fn run_city_scripts(
                 (bound.requests, bound.ended, bound.end_reason, bound.waited)
             });
             scratch.sight = sight.into_inner();
+            scratch.index = Some(index);
             outcome
         };
         let Some((requests, ended, end_reason, waited)) = outcome else { continue };
