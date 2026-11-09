@@ -167,10 +167,11 @@ pub fn world_invariants() -> Vec<Invariant> {
         pending("trade-org-only-buys-food"),
         // TODO(T86.5): `acceptOrdersDone` in `offers.ts`.
         pending("accept-orders-done"),
-        // TODO(T86.9): `deliveriesSound` in `deliveries.ts`.
-        pending("deliveries-sound"),
-        // TODO(T86.9): `transfersSound` in `transfers.ts`.
-        pending("transfers-sound"),
+        Invariant {
+            name: "deliveries-sound",
+            check: |w, _| crate::deliveries::deliveries_sound(w),
+        },
+        Invariant { name: "transfers-sound", check: |w, _| crate::transfers::transfers_sound(w) },
         Invariant {
             name: "supply-lines-sound",
             check: |w, _| crate::armies::supply_lines_sound(w),
@@ -195,16 +196,20 @@ pub fn world_invariants() -> Vec<Invariant> {
             name: "nothing-left-of-the-hq",
             check: |w, _| crate::hq_fall::nothing_left_of_the_hq(w),
         },
-        // TODO(T86.9): `caravansSound` in `caravans.ts`.
-        pending("caravans-sound"),
+        Invariant {
+            name: "caravans-sound",
+            check: |w, t| crate::caravans::caravans_sound(w, t.size),
+        },
         // TODO(T86.9): `tradersSound` in `traders.ts`.
         pending("traders-sound"),
         // TODO(T86.9): `traderStopsSound` in `trader-stops.ts`.
         pending("trader-stops-sound"),
         // TODO(T86.5): `traderTradesKeepFood` in `trading.ts`.
         pending("trader-trades-keep-food"),
-        // TODO(T86.9): `routeRobberiesSound` in `caravans.ts`.
-        pending("route-robberies-sound"),
+        Invariant {
+            name: "route-robberies-sound",
+            check: |w, _| crate::caravans::route_robberies_sound(w),
+        },
         Invariant {
             name: "trade-org-army-sound",
             check: |w, t| crate::trade_org_army::trade_org_army_sound(w, t.size),
