@@ -208,6 +208,25 @@ impl Value {
         Value::Object(object)
     }
 
+    /// A frozen object of a host view's fields, set in this order: what
+    /// `Value::object(fields).freeze()` gives for fields whose values are frozen already, built
+    /// without checking each key. The keys are the view's own field names: distinct, and none an
+    /// array index, so their order is the order given.
+    pub fn frozen_fields(fields: impl ExactSizeIterator<Item = (&'static str, Value)>) -> Value {
+        let mut entries = IndexMap::with_capacity(fields.len());
+        for (key, value) in fields {
+            debug_assert!(js::array_index(key).is_none(), "a field name is no array index");
+            let old = entries.insert(key.to_string(), value);
+            debug_assert!(old.is_none(), "field {key} twice");
+        }
+        Value::Object(Object(Rc::new(RefCell::new(ObjectData { entries, frozen: true }))))
+    }
+
+    /// A frozen list of values that are frozen already: `Value::list(items).freeze()`.
+    pub fn frozen_list(items: Vec<Value>) -> Value {
+        Value::List(List(Rc::new(RefCell::new(ListData { items, frozen: true }))))
+    }
+
     pub fn native(name: &str, id: u32, cost: u64) -> Value {
         Value::Native(Rc::new(NativeFunction { name: name.to_string(), id, cost }))
     }

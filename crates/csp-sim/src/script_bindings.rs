@@ -244,16 +244,16 @@ pub fn view_value(data: &Json, ty: ScriptType) -> Value {
         (Json::String(s), ScriptType::String) => Value::string(s),
         (Json::Bool(b), ScriptType::Boolean) => Value::Bool(*b),
         (Json::Array(items), ScriptType::List(of)) => {
-            Value::list(items.iter().map(|d| view_value(d, *of)).collect()).freeze()
+            // Each item comes out frozen already.
+            Value::frozen_list(items.iter().map(|d| view_value(d, *of)).collect())
         }
         (Json::Object(record), ScriptType::View(view)) => {
             let fields = script_view(view).map_or(&[][..], |v| v.fields);
-            Value::object(
+            Value::frozen_fields(
                 fields.iter().map(|f| {
                     (f.name, view_value(record.get(f.name).unwrap_or(&Json::Null), f.r#type))
                 }),
             )
-            .freeze()
         }
         _ => Value::Null,
     }
