@@ -12,3 +12,7 @@ coverage/
 
 # Rust (ADR 0030)
 target/
+
+# The Rust shell's test database made by the TypeScript server (see its make-ts-db.mjs)
+!crates/csp-server/tests/data/
+!crates/csp-server/tests/data/ts-made.db

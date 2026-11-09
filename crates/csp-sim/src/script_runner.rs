@@ -56,7 +56,7 @@ use crate::workplace_settings::{
     WorkSettingsHost,
 };
 use crate::world_index::WorldIndex;
-use csp_lang::{ParamInfo, ParamType};
+use csp_lang::ParamType;
 
 /// What running scripts needs from outside the world (`ScriptHost`): the script library and the
 /// Players.
@@ -1388,7 +1388,7 @@ impl ScriptRunner {
         }
         let memory = memory_object(&running.memory);
         // A resident's picked param values; an army's params are never picked.
-        let declared: Vec<_> = cached_params(&script.source).as_ref().clone();
+        let declared = params_of(&script.source);
         let picked: Vec<ParamWithValue> = match resident {
             Some(i) => param_values(world, i, running.script_id, &declared),
             None => {
@@ -1827,9 +1827,10 @@ fn run_city_scripts(
         let program = game_program(source);
         let memory = memory_object(&running.memory);
         // Nobody picks values for an NPC city: its defaults fall back on their own.
-        let params: Vec<ParamWithValue> = cached_params(source)
+        let params: Vec<ParamWithValue> = params_of(source)
             .iter()
-            .map(|p| ParamWithValue { param: p.clone(), value: None })
+            .cloned()
+            .map(|p| ParamWithValue { param: p, value: None })
             .collect();
         let mut slot = scratch.index.take();
         let index = crate::world_index::world_index(&mut slot, world, terrain.size);
@@ -2140,24 +2141,21 @@ pub fn seen_by(world: &WorldState, size: i32, side: &str) -> Arc<Vec<SeenEntity>
 mod tests;
 
 thread_local! {
-    /// The `param` lines of each script source seen (`scriptParams`), parsed once: the defaults
-    /// and a Player's active versions run every tick.
-    static PARAMS: RefCell<HashMap<String, Arc<Vec<ParamInfo>>>> = RefCell::new(HashMap::new());
+    /// The params each script source declares (`scriptParams`), by source. Reading them parses
+    /// the source; a source's params never change, and every resident running it reads them
+    /// every tick, so each source is read once.
+    static SOURCE_PARAMS: RefCell<HashMap<String, Arc<Vec<csp_lang::ParamInfo>>>> =
+        RefCell::new(HashMap::new());
 }
 
-/// A script's `param` lines with their comments (`scriptParams`), parsed once per source.
-fn cached_params(source: &str) -> Arc<Vec<ParamInfo>> {
-    PARAMS.with(|cache| {
-        let mut cache = cache.borrow_mut();
-        if let Some(params) = cache.get(source) {
-            return params.clone();
-        }
-        // Edited scripts leave old sources behind: start over once there are many.
-        if cache.len() >= 4096 {
-            cache.clear();
+/// `script_params(source)`, read once per source (`SOURCE_PARAMS`).
+fn params_of(source: &str) -> Arc<Vec<csp_lang::ParamInfo>> {
+    SOURCE_PARAMS.with(|p| {
+        if let Some(found) = p.borrow().get(source) {
+            return found.clone();
         }
         let params = Arc::new(script_params(source));
-        cache.insert(source.to_string(), params.clone());
+        p.borrow_mut().insert(source.to_string(), params.clone());
         params
     })
 }

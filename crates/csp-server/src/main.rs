@@ -1,11 +1,27 @@
-//! The game server (ADR 0030): runs the world at one tick a second and serves the client. The
-//! tick loop, HTTP, WebSocket sync and storage arrive with Epic 87; until then this only says so.
+//! The game server (ADR 0030): runs the world at one tick a second (`apps/server/src/index.ts`).
+//! HTTP and WebSocket sync arrive with T87.5 and T87.6.
 
-fn main() {
-    println!(
-        "csp-server: the Rust backend is being built (ADR 0030); tick every {} ms",
-        csp_shared::TICK_MS
-    );
+use std::process::ExitCode;
+
+use csp_server::{config::Config, log::init_logging, server};
+
+#[tokio::main]
+async fn main() -> ExitCode {
+    let config = match Config::from_env() {
+        Ok(config) => config,
+        Err(e) => {
+            eprintln!("{e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    init_logging(&config.log_level, config.pretty_logs);
+    match server::run(config).await {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            tracing::error!("{e}");
+            ExitCode::FAILURE
+        }
+    }
 }
 
 #[cfg(test)]
