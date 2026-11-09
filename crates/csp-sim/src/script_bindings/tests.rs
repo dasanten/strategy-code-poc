@@ -372,5 +372,19 @@ fn bench_bindings() {
         let mut bound = bind_script(ctx).unwrap();
         std::hint::black_box(csp_lang::interpreter::Host::global(&mut bound, "me"));
     }
-    eprintln!("BENCH me {:.2} us", from.elapsed().as_secs_f64() * 1e6 / n as f64);
+    eprintln!("BENCH bind+me {:.2} us", from.elapsed().as_secs_f64() * 1e6 / n as f64);
+    let r = &world.residents[0];
+    let time = |label: &str, f: &dyn Fn()| {
+        let from = std::time::Instant::now();
+        for _ in 0..n {
+            f();
+        }
+        eprintln!("BENCH {label} {:.2} us", from.elapsed().as_secs_f64() * 1e6 / n as f64);
+    };
+    time("to_json", &|| drop(std::hint::black_box(to_json(r))));
+    let data = Json::Object(as_view(&world, to_json(r)));
+    time("as_view", &|| drop(std::hint::black_box(as_view(&world, to_json(r)))));
+    let ty = binding(SCRIPT_API, "me").unwrap().returns;
+    time("view_value", &|| drop(std::hint::black_box(view_value(&data, ty))));
+    time("from_json", &|| drop(std::hint::black_box(Value::from_json(&data))));
 }
