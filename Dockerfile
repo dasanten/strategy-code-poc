@@ -21,6 +21,16 @@ COPY Cargo.toml Cargo.lock ./
 COPY crates crates
 RUN cargo build --release --package csp-server --bin csp-server --bin csp-admin
 
+# --- the editor's WebAssembly checker (T88.3); wasm-bindgen-cli at the version in Cargo.lock --
+FROM chef AS wasm
+RUN rustup target add wasm32-unknown-unknown \
+    && cargo install wasm-bindgen-cli --version 0.2.130 --locked
+COPY Cargo.toml Cargo.lock ./
+COPY crates crates
+RUN cargo build --profile wasm --target wasm32-unknown-unknown --package csp-lang-wasm --lib \
+    && wasm-bindgen --target web --out-dir /wasm --out-name csp_lang_wasm \
+        target/wasm32-unknown-unknown/wasm/csp_lang_wasm.wasm
+
 # --- the client, built as before ------------------------------------------------------------
 FROM node:22.23.3-bookworm-slim AS web
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH
@@ -31,6 +41,9 @@ ARG VITE_SENTRY_DSN=""
 ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
 COPY . .
 RUN pnpm install --frozen-lockfile
+COPY --from=wasm /wasm packages/lang-wasm/generated
+# `pnpm build` would build the checker itself, and this stage has no Rust.
+ENV CSP_WASM_PREBUILT=1
 RUN pnpm build
 
 # --- the image ----------------------------------------------------------------------------------
