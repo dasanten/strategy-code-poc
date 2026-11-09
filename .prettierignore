@@ -1,6 +1,7 @@
 dist
 pnpm-lock.yaml
 apps/server/drizzle/meta
+packages/shared-types/src/generated
 packages/balance/balance.json
 packages/balance/balance.d.ts
 packages/balance/src/constants.ts

@@ -8,6 +8,7 @@ use csp_shared::protocol::BuildLine;
 use csp_shared::world::{BuildingKind, OrderRequest, Queue, Tile};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use ts_rs::TS;
 
 /// The order kinds a queue step can be (`QUEUE_STEP_KINDS`): the one-off actions and tasks the
 /// UI gives a resident, and running one of the Player's scripts. Never a queue.
@@ -84,12 +85,14 @@ pub fn step_line(order: &OrderRequest) -> Option<BuildLine> {
 
 /// A queue step as a request gives it (`QueueStepRequest`): `id` names a step already in the
 /// queue being edited.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 pub struct QueueStepRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub id: Option<u32>,
     pub order: OrderRequest,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub minutes: Option<f64>,
 }
 
@@ -195,7 +198,7 @@ pub(crate) fn js_string_of(v: Option<&Value>) -> String {
 
 /// What a script sees of a queue (`QueueView`, the `queue` script view): where it is and the
 /// current step.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct QueueView {
     /// The current step, counted from 1.
@@ -205,12 +208,16 @@ pub struct QueueView {
     /// The current step's order kind, and the task or script it runs, if any.
     pub kind: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub task: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub script_id: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub minutes: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub started_at: Option<f64>,
 }
 

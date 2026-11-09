@@ -4,6 +4,7 @@
 //! met, an admin lifts it, or the target buys it off where the admin allows it.
 
 use std::collections::HashSet;
+use ts_rs::TS;
 
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{
@@ -45,14 +46,14 @@ fn city_org(c: &City) -> &str {
 }
 
 /// A city by id and name, in a `DirectiveTarget`.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 pub struct NamedCity {
     pub id: String,
     pub name: String,
 }
 
 /// Whether a directive target is a realm or an NPC city.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum TargetIs {
     Realm,
@@ -60,12 +61,13 @@ pub enum TargetIs {
 }
 
 /// An Organization an admin can name (`DirectiveTarget` of `api.ts`).
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 pub struct DirectiveTarget {
     pub org: String,
     pub name: String,
     pub is: TargetIs,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub account: Option<String>,
     pub cities: Vec<NamedCity>,
     pub allies: Vec<String>,
@@ -121,7 +123,7 @@ pub fn directive_target_choices(
 
 /// A directive as admins see it (`AdminDirectiveView`), with who gave it and how far its goals
 /// have come.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct AdminDirectiveView {
     pub id: String,

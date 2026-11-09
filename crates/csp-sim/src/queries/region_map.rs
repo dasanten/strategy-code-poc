@@ -5,6 +5,7 @@ use csp_shared::chunks::{chunks_across, CHUNK_SIZE};
 use csp_shared::world::WorldState;
 use indexmap::IndexMap;
 use serde::Serialize;
+use ts_rs::TS;
 
 use super::alliance::alliance_of;
 use super::npc_trade::locale_compare;
@@ -12,7 +13,7 @@ use super::territory::{Territory, TRADE_ORGANIZATION};
 use crate::realm_pending::{realm_name, TRADE_ORG_NAME};
 
 /// An alliance a holder shows as part of.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 pub struct RegionAlliance {
     pub id: String,
     pub name: String,
@@ -20,7 +21,7 @@ pub struct RegionAlliance {
 
 /// An Organization holding territory on the Region map (`RegionHolder`), with the tiles it holds
 /// in what this update covers, as `y * size + x`.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 pub struct RegionHolder {
     pub id: String,
     pub name: String,
@@ -29,7 +30,7 @@ pub struct RegionHolder {
 }
 
 /// The Region map, or the chunks of it in `chunks` (`RegionMap`); `chunks` None replaces the whole.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 pub struct RegionMap {
     pub tick: u64,
     pub chunks: Option<Vec<i32>>,
