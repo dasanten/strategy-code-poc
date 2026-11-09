@@ -471,6 +471,9 @@ pub fn add_later_rule_orders(kinds: &mut OrderKinds) {
         ),
     );
 
+    // reviving.ts (named by no rule ticket; T86.14).
+    kinds.insert("feed", crate::reviving::Feed);
+
     // T86.11: realms.
     for (name, kind) in crate::alliances::alliance_orders() {
         kinds.insert(name, Realmed(kind));
