@@ -43,8 +43,10 @@ fn set_stock(v: &mut Village, stock: Stock) {
 }
 
 fn at_camp() -> RunningScript {
-    serde_json::from_value(json!({ "scriptId": 0, "task": "work", "memory": { "workplaceId": "camp" } }))
-        .unwrap()
+    serde_json::from_value(
+        json!({ "scriptId": 0, "task": "work", "memory": { "workplaceId": "camp" } }),
+    )
+    .unwrap()
 }
 
 fn plan(v: &mut Village) -> IndexMap<String, CityJob> {

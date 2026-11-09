@@ -24,9 +24,9 @@ use crate::world::create_world;
 /// The budget for the game-run cities' planning, in milliseconds per tick, averaged over two game
 /// hours of 60 villages (ADR 0016; ADR 0004): a smoke check against a regression, not a hard gate.
 /// The TypeScript's is 10 ms; the same run measured 6.2 ms there on a dev machine (2026-11-09).
-/// The Rust measured 1.5–1.8 ms on that machine, and 3.6 ms with other test runs loading it; 6 ms
-/// leaves room for a CI runner and still catches planning that gets much slower.
-const PLAN_BUDGET_MS: f64 = 6.0;
+/// The Rust measured 1.5–1.8 ms on that machine when idle, 3.6 ms with other test runs loading it
+/// and 7–11 ms with its CPU at 100%; the same 10 ms still catches planning many times slower.
+const PLAN_BUDGET_MS: f64 = 10.0;
 
 const PLAN_TICKS: usize = NPC_PLAN_TICKS as usize;
 
