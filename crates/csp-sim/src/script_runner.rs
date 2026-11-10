@@ -2143,6 +2143,8 @@ mod build_line_tests;
 pub(crate) mod default_host;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod working_site_tests;
 
 thread_local! {
     /// The params each script source declares (`scriptParams`), by source. Reading them parses
