@@ -228,14 +228,10 @@ fn an_npc_city_gets_one_when_it_comes_to_be_a_trading_post_none() {
     let city = found_npc_city(&mut world, &terrain, &NPC_VILLAGE, 20, 20, &mut || m.next(), None);
     assert_eq!(city_of(&world, &city).layout, Some(pick_layout(world.seed, &city)));
     let mut m = Mulberry32::new(8.0);
-    let post = crate::trading_posts::found_trading_post(
-        &mut world,
-        &terrain,
-        200,
-        200,
-        None,
-        &mut || m.next(),
-    );
+    let post =
+        crate::trading_posts::found_trading_post(&mut world, &terrain, 200, 200, None, &mut || {
+            m.next()
+        });
     assert_eq!(city_of(&world, &post).trade_org, Some(TradeOrgCity::Post));
     assert_eq!(city_of(&world, &post).layout, None);
     assert_eq!(check_all(&world, &terrain), vec![]);
@@ -259,7 +255,8 @@ fn a_self_managed_city_gets_one_when_its_leader_dies_and_loses_it_when_it_joins_
     let mut world = create_world(&terrain, 1);
     let ri = crate::starting_city::found_starting_city(&mut world, &terrain, 1, None);
     let realm = world.realms[ri].id.clone();
-    let city = world.cities.iter().find(|c| c.realm_id.as_ref() == Some(&realm)).unwrap().id.clone();
+    let city =
+        world.cities.iter().find(|c| c.realm_id.as_ref() == Some(&realm)).unwrap().id.clone();
     assert_eq!(city_of(&world, &city).layout, None);
     crate::survival::end_realm(&mut world, &realm, terrain.size);
     assert_eq!(city_of(&world, &city).layout, Some(pick_layout(world.seed, &city)));
@@ -394,7 +391,10 @@ fn a_migrated_city_loses_nothing_and_follows_the_layout_around_what_stands() {
     assert_eq!(world.buildings, before);
     assert_eq!(world.residents, residents);
     assert_eq!(city_of(&world, &city).layout, Some(pick_layout(world.seed, &city)));
-    assert_eq!(building_at(&world, lane.0, lane.1, terrain.size).map(|b| b.id.clone()), Some(old.id));
+    assert_eq!(
+        building_at(&world, lane.0, lane.1, terrain.size).map(|b| b.id.clone()),
+        Some(old.id)
+    );
     assert_eq!(check_all(&world, &terrain), vec![]);
     let home = npc_home(&world, &city).unwrap().clone();
     let t = next_tile(&world, &city, &home, &terrain, BuildingKind::House).unwrap();
@@ -409,16 +409,13 @@ fn the_migration_leaves_players_cities_and_the_trade_organizations_without_one()
     let mut world = create_world(&terrain, 1);
     let ri = crate::starting_city::found_starting_city(&mut world, &terrain, 1, None);
     let realm = world.realms[ri].id.clone();
-    let city = world.cities.iter().find(|c| c.realm_id.as_ref() == Some(&realm)).unwrap().id.clone();
+    let city =
+        world.cities.iter().find(|c| c.realm_id.as_ref() == Some(&realm)).unwrap().id.clone();
     let mut m = Mulberry32::new(8.0);
-    let post = crate::trading_posts::found_trading_post(
-        &mut world,
-        &terrain,
-        200,
-        200,
-        None,
-        &mut || m.next(),
-    );
+    let post =
+        crate::trading_posts::found_trading_post(&mut world, &terrain, 200, 200, None, &mut || {
+            m.next()
+        });
     assert_eq!(city_of(&world, &city).layout, None);
     assert_eq!(city_of(&world, &post).layout, None);
 }
@@ -435,13 +432,15 @@ fn a_daughter_with_just_its_town_hall_finds_room_for_its_storage_then_a_house() 
         world.cities[c].layout = Some(layout);
         let city = world.cities[c].id.clone();
         let hall = world.buildings[h].clone();
-        let storage = house_tile(&world, &world.cities[c], &hall, &terrain, None, BuildingKind::Storage)
-            .expect("room for a storage");
+        let storage =
+            house_tile(&world, &world.cities[c], &hall, &terrain, None, BuildingKind::Storage)
+                .expect("room for a storage");
         expect_follows(&world, &city, &hall, BuildingKind::Storage, storage, terrain.size);
         put(&mut world, &city, BuildingKind::Storage, storage.0, storage.1);
         let home = npc_home(&world, &city).unwrap().clone();
-        let house = house_tile(&world, city_of(&world, &city), &home, &terrain, None, BuildingKind::House)
-            .expect("room for a house");
+        let house =
+            house_tile(&world, city_of(&world, &city), &home, &terrain, None, BuildingKind::House)
+                .expect("room for a house");
         expect_follows(&world, &city, &home, BuildingKind::House, house, terrain.size);
     }
 }
@@ -628,7 +627,8 @@ fn goes_all_the_way_round_the_first_circle_closes_up() {
     let hall = hall_of(&world, &city, size);
     let houses = build(&mut world, &terrain, &city, &home, 60);
     let side = |(x, y): (i32, i32)| {
-        let a = (f64::from(y) + 0.5 - f64::from(hall.1)).atan2(f64::from(x) + 0.5 - f64::from(hall.0));
+        let a =
+            (f64::from(y) + 0.5 - f64::from(hall.1)).atan2(f64::from(x) + 0.5 - f64::from(hall.0));
         (((a + PI) / PI) * 4.0).floor() as i32
     };
     let first: HashSet<i32> = houses
@@ -642,9 +642,9 @@ fn goes_all_the_way_round_the_first_circle_closes_up() {
     let ground = |x: i32, y: i32| {
         plan.spot(BuildingKind::House, x, y)
             && circle_of(far_of(hall, BuildingKind::House, (x, y))) == 1
-            && tiles_of(BuildingKind::House, x, y, size)
-                .iter()
-                .all(|&(tx, ty)| !plan.street(tx, ty) && building_at(&world, tx, ty, size).is_none())
+            && tiles_of(BuildingKind::House, x, y, size).iter().all(|&(tx, ty)| {
+                !plan.street(tx, ty) && building_at(&world, tx, ty, size).is_none()
+            })
     };
     let reach = 2 * CITY_RING_STEP as i32;
     let mut left = Vec::new();
@@ -840,9 +840,7 @@ fn a_lake_leaves_a_gap_in_a_circle_which_goes_on_beyond_it() {
         .iter()
         .filter(|h| circle_of(far_of(hall, BuildingKind::House, xy(h))) == 1)
         .collect();
-    let angle = |h: &Building| {
-        (h.y + 0.5 - f64::from(pond.1)).atan2(h.x + 0.5 - f64::from(pond.0))
-    };
+    let angle = |h: &Building| (h.y + 0.5 - f64::from(pond.1)).atan2(h.x + 0.5 - f64::from(pond.0));
     let (px, py) = (f64::from(pond.0), f64::from(pond.1));
     assert!(first.iter().any(|h| h.x < px && h.y < py && angle(h) < 0.0));
     assert!(first.iter().any(|h| h.x > px && h.y > py));
@@ -880,4 +878,534 @@ fn a_lake_over_a_whole_circle_sends_it_on_to_the_next_and_the_lanes_stay_where_t
             i += 1;
         }
     }
+}
+
+// the Main street layout
+
+fn side_of(kind: BuildingKind) -> i32 {
+    FOOTPRINT.get(kind_name(kind)).unwrap_or(1) as i32
+}
+
+/// A new city of `kind` with the Main street layout (`mainStreetCity`). `prepare` readies the
+/// ground first.
+fn main_street_city(kind: &NpcCitySize, prepare: Option<&dyn Fn(&mut TerrainMap)>) -> Village {
+    new_city(CityLayout::MainStreet, kind, prepare)
+}
+
+/// Builds `kind` where the city wants it, `n` times, and says where they went (`build`).
+fn build_kind(v: &mut Village, n: usize, kind: BuildingKind) -> Vec<Building> {
+    let mut out = Vec::new();
+    for _ in 0..n {
+        let Some(t) = next_tile(&v.world, &v.city, &v.home, &v.terrain, kind) else { break };
+        no_build_problem(&v.world, t, kind, &v.terrain);
+        expect_follows(&v.world, &v.city, &v.home, kind, t, v.terrain.size);
+        out.push(put(&mut v.world, &v.city, kind, t.0, t.1));
+    }
+    out
+}
+
+/// Whether a building stands with its side on the main street, in the gate's column
+/// (`onStreet`).
+fn on_street(b: &Building, column: i32) -> bool {
+    let x = b.x as i32;
+    x == column + 1 || x + side_of(b.kind) == column
+}
+
+fn gate_xy(world: &WorldState, city: &str) -> (i32, i32) {
+    xy(world
+        .buildings
+        .iter()
+        .find(|b| b.kind == BuildingKind::Gate && b.city_id.as_deref() == Some(city))
+        .expect("a gate"))
+}
+
+fn near(home: &Building, b: &Building) -> i32 {
+    crate::npc_test_world::near_ring(home, b)
+}
+
+#[test]
+fn is_in_the_random_pick() {
+    assert!(CITY_LAYOUTS.contains(&CityLayout::MainStreet));
+}
+
+#[test]
+fn keeps_a_straight_street_free_from_the_gate_past_the_town_hall_and_on_beyond_the_home() {
+    let Village { world, terrain, city, home } = main_street_city(&NPC_VILLAGE, None);
+    let plan = plan_of(&world, &city, &home, terrain.size);
+    let gate = gate_xy(&world, &city);
+    let c = city_of(&world, &city);
+    let hall = world.buildings.iter().find(|b| b.id == c.town_hall_id).unwrap();
+    assert!((hall.y as i32) < gate.1);
+    for y in home.y as i32 - WALL - STEP..=gate.1 + STEP {
+        assert!(plan.street(gate.0, y));
+    }
+}
+
+fn houses_stand_on_its_street(kind: &NpcCitySize) {
+    let Village { world, terrain, city, home } = main_street_city(kind, None);
+    let gate = gate_xy(&world, &city);
+    let houses: Vec<&Building> = world
+        .buildings
+        .iter()
+        .filter(|b| b.kind == BuildingKind::House && b.city_id.as_deref() == Some(city.as_str()))
+        .collect();
+    assert_eq!(houses.len() as f64, kind.houses);
+    for h in houses {
+        expect_follows(&world, &city, &home, BuildingKind::House, xy(h), terrain.size);
+        assert!(on_street(h, gate.0));
+    }
+    assert!(world
+        .buildings
+        .iter()
+        .filter(|b| b.kind == BuildingKind::Wall || b.kind == BuildingKind::Gate)
+        .all(|b| b.city_id.as_deref() == Some(city.as_str())));
+    let rings = wall_rings(&world, city_of(&world, &city), &home, terrain.size);
+    assert_eq!(rings.map(|r| r.inner), Some((kind.size / 2.0).floor() as i32));
+    assert_eq!(check_all(&world, &terrain), vec![]);
+}
+
+#[test]
+fn a_new_villages_houses_stand_on_its_street_and_its_wall_stays_part_of_it() {
+    houses_stand_on_its_street(&NPC_VILLAGE);
+}
+
+#[test]
+fn a_new_towns_houses_stand_on_its_street_and_its_wall_stays_part_of_it() {
+    houses_stand_on_its_street(&NPC_TOWN);
+}
+
+#[test]
+fn fills_both_rows_on_the_street_nearest_home_first_before_going_further_back() {
+    let mut c = main_street_city(&NPC_VILLAGE, None);
+    let gate = gate_xy(&c.world, &c.city);
+    let built = build_kind(&mut c, 80, BuildingKind::House);
+    let first_back = built.iter().position(|b| !on_street(b, gate.0)).expect("one further back");
+    assert!(first_back > 0);
+    let row = &built[..first_back];
+    assert!(row.iter().any(|b| (b.x as i32) < gate.0));
+    assert!(row.iter().any(|b| (b.x as i32) > gate.0));
+    // A long row along the street, not a block.
+    let ys: Vec<i32> = row.iter().map(|b| b.y as i32).collect();
+    assert!(ys.iter().max().unwrap() - ys.iter().min().unwrap() > WALL);
+    let rings: Vec<i32> = row.iter().map(|b| near(&c.home, b)).collect();
+    let mut sorted = rings.clone();
+    sorted.sort();
+    assert_eq!(rings, sorted);
+    // Inside the wall, nothing on the street comes after the first one further back.
+    let inside: Vec<&Building> =
+        built[first_back..].iter().filter(|b| near(&c.home, b) < WALL).collect();
+    assert!(!inside.is_empty());
+    assert!(inside.iter().all(|b| !on_street(b, gate.0)));
+}
+
+#[test]
+fn every_building_has_a_street_beside_it() {
+    let mut c = main_street_city(&NPC_VILLAGE, None);
+    let plan = plan_of(&c.world, &c.city, &c.home, c.terrain.size);
+    let size = c.terrain.size;
+    for b in build_kind(&mut c, 80, BuildingKind::House) {
+        let beside = footprint_tiles(placed(&b), size).iter().any(|&(x, y)| {
+            [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
+                .iter()
+                .any(|&(sx, sy)| plan.street(sx, sy))
+        });
+        assert!(beside, "{}-wide at {},{}", side_of(b.kind), b.x, b.y);
+    }
+}
+
+#[test]
+fn leaves_side_lanes_across_the_street_and_the_buildings_further_back_line_them() {
+    let mut c = main_street_city(&NPC_VILLAGE, None);
+    let gate = gate_xy(&c.world, &c.city);
+    let plan = plan_of(&c.world, &c.city, &c.home, c.terrain.size);
+    let hy = c.home.y as i32;
+    let lanes: Vec<i32> =
+        (hy - WALL + 1..hy + WALL).filter(|&y| plan.street(gate.0 + 1, y)).collect();
+    assert!(lanes.len() > 1);
+    for w in lanes.windows(2) {
+        assert_eq!(w[1] - w[0], CITY_SIDE_LANE_GAP as i32 + 1);
+    }
+    for b in build_kind(&mut c, 80, BuildingKind::House).iter().filter(|h| !on_street(h, gate.0)) {
+        let (x, y) = xy(b);
+        assert!(plan.street(x, y - 1) || plan.street(x, y + side_of(b.kind)));
+    }
+}
+
+#[test]
+fn puts_every_kind_on_a_spot_and_each_fits_between_two_side_lanes() {
+    let mut c = main_street_city(&NPC_VILLAGE, None);
+    for kind in LAYOUT_KINDS {
+        assert!(f64::from(side_of(kind)) <= CITY_SIDE_LANE_GAP);
+        assert_eq!(build_kind(&mut c, 1, kind).len(), 1, "{kind:?}");
+    }
+}
+
+#[test]
+fn runs_along_a_gate_on_the_east_side() {
+    let Village { mut world, terrain, city, home } = main_street_city(&NPC_VILLAGE, None);
+    let (hx, hy) = (home.x as i32, home.y as i32);
+    move_gate(&mut world, &city, (f64::from(hx + WALL), f64::from(hy + 2)));
+    let plan = plan_of(&world, &city, &home, terrain.size);
+    for x in hx - WALL..=hx + WALL + STEP {
+        assert!(plan.street(x, hy + 2));
+    }
+    let t = next_tile(&world, &city, &home, &terrain, BuildingKind::House).unwrap();
+    assert!(t.1 == hy + 3 || t.1 + side_of(BuildingKind::House) == hy + 2, "{t:?}");
+}
+
+#[test]
+fn a_lake_takes_the_spots_it_covers_the_street_stays_straight_and_the_row_goes_on_past_it() {
+    // West of where the street runs, across the row on the street.
+    let lake = |x: i32, y: i32| (28..=33).contains(&x) && (24..=31).contains(&y);
+    let prepare = |terrain: &mut TerrainMap| {
+        for y in 0..terrain.size {
+            for x in 0..terrain.size {
+                if lake(x, y) {
+                    terrain.tiles[tile_index(terrain.size, x, y)] = Terrain::Lake as u8;
+                }
+            }
+        }
+    };
+    let mut c = main_street_city(&NPC_VILLAGE, Some(&prepare));
+    let gate = gate_xy(&c.world, &c.city);
+    let plan = plan_of(&c.world, &c.city, &c.home, c.terrain.size);
+    let mut built: Vec<Building> = c
+        .world
+        .buildings
+        .iter()
+        .filter(|b| b.kind == BuildingKind::House && b.city_id.as_deref() == Some(c.city.as_str()))
+        .cloned()
+        .collect();
+    built.extend(build_kind(&mut c, 40, BuildingKind::House));
+    for b in &built {
+        for (x, y) in footprint_tiles(placed(b), c.terrain.size) {
+            assert!(!lake(x, y));
+        }
+    }
+    // The street is where it would be without the lake.
+    assert_eq!(gate.0, c.home.x as i32);
+    for y in c.home.y as i32 - WALL..=gate.1 {
+        assert!(plan.street(gate.0, y));
+    }
+    // Beside the lake nothing, north and south of it the same row.
+    let west: Vec<&Building> =
+        built.iter().filter(|b| b.x as i32 + side_of(b.kind) == gate.0).collect();
+    assert!(west.iter().any(|b| b.y > 31.0));
+    assert!(!west.iter().any(|b| b.y >= 24.0 && b.y <= 30.0));
+    // The side away from the lake is unbothered.
+    let east: Vec<&Building> = built.iter().filter(|b| b.x as i32 == gate.0 + 1).collect();
+    assert!(east.iter().any(|b| b.y >= 24.0 && b.y <= 30.0));
+    assert_eq!(check_all(&c.world, &c.terrain), vec![]);
+}
+
+#[test]
+fn a_lake_over_the_street_leaves_the_street_where_it_is_and_houses_go_round() {
+    let lake = |x: i32, y: i32| (30..=38).contains(&x) && (23..=30).contains(&y);
+    let prepare = |terrain: &mut TerrainMap| {
+        for y in 23..=30 {
+            for x in 30..=38 {
+                terrain.tiles[tile_index(terrain.size, x, y)] = Terrain::Lake as u8;
+            }
+        }
+    };
+    let mut c = main_street_city(&NPC_VILLAGE, Some(&prepare));
+    let plan = plan_of(&c.world, &c.city, &c.home, c.terrain.size);
+    assert!(plan.street(c.home.x as i32, 27));
+    let built = build_kind(&mut c, 30, BuildingKind::House);
+    assert_eq!(built.len(), 30);
+    for b in &built {
+        for (x, y) in footprint_tiles(placed(b), c.terrain.size) {
+            assert!(!lake(x, y));
+        }
+    }
+    assert_eq!(check_all(&c.world, &c.terrain), vec![]);
+}
+
+#[test]
+fn grows_out_through_a_new_wall_in_line_with_its_street_and_nobody_is_walled_in() {
+    let mut c = main_street_city(&NPC_VILLAGE, None);
+    let size = c.terrain.size;
+    let built = build_kind(&mut c, 400, BuildingKind::House);
+    let Village { mut world, terrain, city, home } = c;
+    assert!(built.iter().any(|b| near(&home, b) > WALL));
+    let rings = wall_rings(&world, city_of(&world, &city), &home, size).unwrap();
+    assert_eq!((rings.inner, rings.outer, rings.expanding), (WALL, WALL + STEP, true));
+    let tiles = new_wall(&world, &home, &terrain, &rings);
+    let gates: Vec<(i32, i32)> =
+        tiles.iter().filter(|t| t.kind == BuildingKind::Gate).map(|t| (t.x, t.y)).collect();
+    assert_eq!(gates, vec![(home.x as i32, home.y as i32 + WALL + STEP)]);
+    for t in &tiles {
+        put(&mut world, &city, t.kind, t.x, t.y);
+    }
+    let before = plan_of(&world, &city, &home, size);
+    world.buildings.retain(|b| {
+        !((b.kind == BuildingKind::Wall || b.kind == BuildingKind::Gate)
+            && ring_from(&home, b.x as i32, b.y as i32) == WALL)
+    });
+    let rings = wall_rings(&world, city_of(&world, &city), &home, size).unwrap();
+    assert_eq!(rings.inner, WALL + STEP);
+    let inside = (home.x as i32, home.y as i32 + 2);
+    assert!(can_walk_out(&world, &terrain, &city, inside, WALL + STEP, &home));
+    // Same streets as before the wall moved.
+    let after = plan_of(&world, &city, &home, size);
+    let (hx, hy) = (home.x as i32, home.y as i32);
+    for y in hy - 30..=hy + 30 {
+        for x in hx - 30..=hx + 30 {
+            assert_eq!(after.street(x, y), before.street(x, y), "({x}, {y})");
+        }
+    }
+    assert_eq!(check_all(&world, &terrain), vec![]);
+}
+
+#[test]
+fn a_city_from_before_follows_it_around_what_stands_losing_nothing() {
+    let Village { mut world, terrain, city, home } = village(None);
+    city_mut(&mut world, &city).layout = Some(CityLayout::MainStreet);
+    // A house as a city put it before layouts, on what is now the street.
+    let at = (home.x as i32, home.y as i32 - 3);
+    let old = put(&mut world, &city, BuildingKind::House, at.0, at.1);
+    let before = world.buildings.clone();
+    let t = next_tile(&world, &city, &home, &terrain, BuildingKind::House).unwrap();
+    expect_follows(&world, &city, &home, BuildingKind::House, t, terrain.size);
+    assert_eq!(world.buildings, before);
+    let here = building_at(&world, at.0, at.1, terrain.size).map(|b| b.id.clone());
+    assert_eq!(here, Some(old.id));
+}
+
+// the Quarters layout
+
+/// A new city that picked the Quarters layout (`quartersVillage`).
+fn quarters_village(kind: &NpcCitySize) -> Village {
+    new_city(CityLayout::Quarters, kind, None)
+}
+
+/// Puts up buildings of `kind` where the city wants them until it has none left to give
+/// (`fillUp`).
+fn fill_up(
+    v: &mut Village,
+    kind: BuildingKind,
+    until: &dyn Fn(&Building) -> bool,
+) -> Vec<Building> {
+    let mut out = Vec::new();
+    for _ in 0..400 {
+        let Some(t) = next_tile(&v.world, &v.city, &v.home, &v.terrain, kind) else { break };
+        let b = put(&mut v.world, &v.city, kind, t.0, t.1);
+        out.push(b.clone());
+        if until(&b) {
+            break;
+        }
+    }
+    out
+}
+
+fn crossing(world: &WorldState, city: &str) -> (i32, i32) {
+    let c = city_of(world, city);
+    let hall = world.buildings.iter().find(|h| h.id == c.town_hall_id).unwrap();
+    middle_of(placed(hall), 200)
+}
+
+/// Where a building lies from the crossing of the streets, the middle of the town hall (`part`).
+fn part(world: &WorldState, city: &str, (x, y): (i32, i32)) -> &'static str {
+    let m = crossing(world, city);
+    if y < m.1 {
+        "north"
+    } else if x < m.0 {
+        "south-west"
+    } else {
+        "south-east"
+    }
+}
+
+#[test]
+fn is_one_a_new_city_can_get() {
+    assert!(CITY_LAYOUTS.contains(&CityLayout::Quarters));
+    let v = quarters_village(&NPC_VILLAGE);
+    assert_eq!(v.city().layout, Some(CityLayout::Quarters));
+}
+
+fn houses_stand_north(kind: &NpcCitySize) {
+    let made = quarters_village(kind);
+    expect_sound_new_city(&made, kind);
+    let city = made.city.as_str();
+    for h in made
+        .world
+        .buildings
+        .iter()
+        .filter(|b| b.kind == BuildingKind::House && b.city_id.as_deref() == Some(city))
+    {
+        assert_eq!(part(&made.world, city, xy(h)), "north");
+    }
+}
+
+#[test]
+fn a_new_villages_houses_stand_north_of_the_crossing_and_its_wall_stays_part_of_it() {
+    houses_stand_north(&NPC_VILLAGE);
+}
+
+#[test]
+fn a_new_towns_houses_stand_north_of_the_crossing_and_its_wall_stays_part_of_it() {
+    houses_stand_north(&NPC_TOWN);
+}
+
+#[test]
+fn puts_each_kind_in_its_own_part() {
+    let Village { world, terrain, city, home } = quarters_village(&NPC_VILLAGE);
+    for (kind, expected) in [
+        (BuildingKind::House, "north"),
+        (BuildingKind::Storage, "south-east"),
+        (BuildingKind::Smelter, "south-west"),
+        (BuildingKind::Smithy, "south-west"),
+        (BuildingKind::Mint, "south-west"),
+        (BuildingKind::Stable, "south-west"),
+    ] {
+        let t = next_tile(&world, &city, &home, &terrain, kind).unwrap();
+        expect_follows(&world, &city, &home, kind, t, terrain.size);
+        assert_eq!(part(&world, &city, t), expected, "{kind:?}");
+        // On its feet, it doesn't reach across a street into another part.
+        for tile in tiles_of(kind, t.0, t.1, terrain.size) {
+            assert_eq!(part(&world, &city, tile), expected, "{kind:?}");
+        }
+    }
+}
+
+#[test]
+fn keeps_streets_between_the_parts_and_the_way_out_of_its_gate_free() {
+    let Village { world, terrain, city, home } = quarters_village(&NPC_VILLAGE);
+    let plan = plan_of(&world, &city, &home, terrain.size);
+    let m = crossing(&world, &city);
+    for d in -WALL - STEP..=WALL + STEP {
+        assert!(plan.street(m.0 + d, m.1));
+        assert!(plan.street(m.0, m.1 + d));
+        assert!(plan.street(home.x as i32, home.y as i32 + d));
+    }
+    for kind in
+        [BuildingKind::House, BuildingKind::Storage, BuildingKind::Smelter, BuildingKind::Stable]
+    {
+        assert!(!plan.spot(kind, m.0, m.1 - 2));
+        assert_eq!(plan.spill(kind, m.0, m.1 - 2), Some(false));
+    }
+}
+
+#[test]
+fn quarters_leaves_a_lane_through_a_gate_wherever_it_stands() {
+    // city-layout.test.ts: the Quarters layout, leaves a lane through a gate wherever it stands.
+    let Village { mut world, terrain, city, home } = quarters_village(&NPC_VILLAGE);
+    let (hx, hy) = (home.x as i32, home.y as i32);
+    let g = world
+        .buildings
+        .iter()
+        .position(|b| b.kind == BuildingKind::Gate && b.city_id.as_deref() == Some(city.as_str()))
+        .unwrap();
+    let (ex, ey) = (f64::from(hx + WALL), f64::from(hy + 2));
+    let w = world.buildings.iter().position(|b| b.x == ex && b.y == ey).unwrap();
+    (world.buildings[g].x, world.buildings[g].y) = (ex, ey);
+    world.buildings[w].x = home.x;
+    let plan = plan_of(&world, &city, &home, terrain.size);
+    for dx in -WALL + 1..=WALL + STEP {
+        assert!(plan.street(hx + dx, hy + 2));
+    }
+}
+
+#[test]
+fn skips_a_spot_that_doesnt_fit_and_stays_in_its_part() {
+    let Village { world, mut terrain, city, home } = quarters_village(&NPC_VILLAGE);
+    let first = next_tile(&world, &city, &home, &terrain, BuildingKind::Smelter).unwrap();
+    terrain.tiles[tile_index(terrain.size, first.0, first.1)] = Terrain::Mountain as u8;
+    let next = next_tile(&world, &city, &home, &terrain, BuildingKind::Smelter).unwrap();
+    assert_ne!(next, first);
+    assert_eq!(part(&world, &city, next), "south-west");
+    expect_follows(&world, &city, &home, BuildingKind::Smelter, next, terrain.size);
+}
+
+#[test]
+fn a_full_part_goes_on_out_through_the_wall_in_its_own_part() {
+    let mut v = quarters_village(&NPC_VILLAGE);
+    let home = v.home.clone();
+    let built = fill_up(&mut v, BuildingKind::House, &|b| near(&home, b) >= WALL);
+    let last = built.last().unwrap();
+    assert!(near(&home, last) > WALL);
+    assert_eq!(part(&v.world, &v.city, xy(last)), "north");
+    for b in &built {
+        assert_eq!(part(&v.world, &v.city, xy(b)), "north");
+    }
+    let rings = wall_rings(&v.world, v.city(), &home, v.terrain.size).unwrap();
+    assert!(rings.expanding);
+    assert_eq!(check_all(&v.world, &v.terrain), vec![]);
+}
+
+#[test]
+fn a_part_full_inside_its_new_wall_waits_for_that_wall_and_doesnt_spill_over() {
+    let mut v = quarters_village(&NPC_VILLAGE);
+    let built = fill_up(&mut v, BuildingKind::House, &|_| false);
+    assert!(!built.is_empty());
+    for b in &built {
+        assert_eq!(part(&v.world, &v.city, xy(b)), "north");
+    }
+    let rings = wall_rings(&v.world, v.city(), &v.home, v.terrain.size).unwrap();
+    assert!(rings.expanding);
+    assert_eq!(next_tile(&v.world, &v.city, &v.home, &v.terrain, BuildingKind::House), None);
+    // Another part still has room for what belongs there.
+    let smelter = next_tile(&v.world, &v.city, &v.home, &v.terrain, BuildingKind::Smelter).unwrap();
+    assert_eq!(part(&v.world, &v.city, smelter), "south-west");
+}
+
+#[test]
+fn a_part_with_nowhere_left_to_go_spills_over_rather_than_stopping_the_city() {
+    let Village { world, mut terrain, city, home } = quarters_village(&NPC_VILLAGE);
+    let size = terrain.size;
+    // A lake on all of the north, as far as the city could reach.
+    let m = crossing(&world, &city);
+    let plan = plan_of(&world, &city, &home, size);
+    for y in 0..m.1 {
+        for x in 0..size {
+            if building_at(&world, x, y, size).is_some() || plan.street(x, y) {
+                continue;
+            }
+            terrain.tiles[tile_index(size, x, y)] = Terrain::Lake as u8;
+        }
+    }
+    let t = next_tile(&world, &city, &home, &terrain, BuildingKind::House).expect("a spot");
+    assert_ne!(part(&world, &city, t), "north");
+    assert!(!plan.spot(BuildingKind::House, t.0, t.1));
+    assert_eq!(plan.spill(BuildingKind::House, t.0, t.1), Some(true));
+    no_build_problem(&world, t, BuildingKind::House, &terrain);
+    // The workshops still take their own part first.
+    let smelter = next_tile(&world, &city, &home, &terrain, BuildingKind::Smelter).unwrap();
+    assert_eq!(part(&world, &city, smelter), "south-west");
+}
+
+#[test]
+fn a_kind_spills_over_as_well_when_only_another_part_has_room() {
+    let Village { world, mut terrain, city, home } = quarters_village(&NPC_VILLAGE);
+    let size = terrain.size;
+    // A lake everywhere but the storages' part.
+    let plan = plan_of(&world, &city, &home, size);
+    let m = crossing(&world, &city);
+    for y in 0..size {
+        for x in 0..size {
+            if building_at(&world, x, y, size).is_some() || plan.street(x, y) {
+                continue;
+            }
+            if y > m.1 && x > m.0 {
+                continue;
+            }
+            terrain.tiles[tile_index(size, x, y)] = Terrain::Lake as u8;
+        }
+    }
+    let stable = next_tile(&world, &city, &home, &terrain, BuildingKind::Stable).unwrap();
+    assert_eq!(part(&world, &city, stable), "south-east");
+    let house = next_tile(&world, &city, &home, &terrain, BuildingKind::House).unwrap();
+    assert_eq!(part(&world, &city, house), "south-east");
+}
+
+#[test]
+fn a_city_from_before_layouts_that_gets_it_keeps_what_stands_and_builds_around_it() {
+    let Village { mut world, terrain, city, home } = quarters_village(&NPC_VILLAGE);
+    let m = crossing(&world, &city);
+    let old = put(&mut world, &city, BuildingKind::House, m.0 - 4, m.1);
+    let t = next_tile(&world, &city, &home, &terrain, BuildingKind::House).unwrap();
+    expect_follows(&world, &city, &home, BuildingKind::House, t, terrain.size);
+    let here = building_at(&world, m.0 - 4, m.1, terrain.size).map(|b| b.id.clone());
+    assert_eq!(here, Some(old.id));
+    assert_eq!(check_all(&world, &terrain), vec![]);
 }
