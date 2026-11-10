@@ -323,3 +323,10 @@ impl ScriptHost for TaskHost {
 pub fn task_runner(terrain: &TerrainMap, task: Task) -> ScriptRunner {
     ScriptRunner::new(Arc::new(terrain.clone()), Arc::new(TaskHost { task }), order_kinds())
 }
+
+impl DefaultScripts {
+    /// How many scripts ran in the last `run_all`, waiting ones left out (`runner.runs`).
+    pub fn runs(&self) -> usize {
+        self.runner.runs
+    }
+}
