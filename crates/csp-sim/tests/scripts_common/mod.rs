@@ -155,3 +155,171 @@ pub fn as_numbers(v: &serde_json::Value) -> serde_json::Value {
         other => other.clone(),
     }
 }
+
+use csp_shared::world::Resident;
+use csp_sim::orders::{OrderQueue, OrderReply};
+use csp_sim::walking::Walking;
+use csp_sim::world::step_world;
+use serde_json::{json, Value};
+
+/// A world run as the game runs it, with the default scripts, queues and walking (the `setup`s of
+/// the script tests): `tick` is orders, queues, scripts (with their invariants), the world.
+pub struct Game {
+    pub world: WorldState,
+    pub terrain: TerrainMap,
+    pub scripts: DefaultScripts,
+    pub orders: OrderQueue,
+    pub queues: QueueRunner,
+    pub walking: Walking,
+    pub scratch: Scratch,
+    pub sender: OrderSender,
+}
+
+impl Game {
+    pub fn new(world: WorldState, terrain: TerrainMap, sender: OrderSender) -> Game {
+        let scripts = default_scripts(&terrain, vec![sender.clone()]);
+        let t = Arc::new(terrain.clone());
+        let orders = OrderQueue::new(scripts.kinds.clone(), Some(t.clone()));
+        let queues = scripts.queue_runner();
+        let walking = Walking::new(t);
+        Game {
+            world,
+            terrain,
+            scripts,
+            orders,
+            queues,
+            walking,
+            scratch: Scratch::default(),
+            sender,
+        }
+    }
+
+    /// One tick as the game runs it: residents fed, orders, queues, scripts, the world steps.
+    pub fn tick(&mut self) {
+        for r in &mut self.world.residents {
+            r.hunger = 100.0;
+        }
+        self.orders.apply_all(&mut self.world);
+        self.queues.run_all(&mut self.world, &mut self.scratch);
+        let broken = self.scripts.run_all(&mut self.world, &mut self.scratch);
+        assert!(broken.is_empty(), "{broken:?}");
+        step_world(
+            &mut self.world,
+            &self.terrain,
+            &mut self.scratch,
+            Some(&mut self.walking),
+            None,
+        );
+    }
+
+    /// Ticks until `done`, at most `max` ticks; it must be true then.
+    #[track_caller]
+    pub fn until(&mut self, max: usize, done: impl Fn(&Game) -> bool) {
+        for _ in 0..max {
+            if done(self) {
+                break;
+            }
+            self.tick();
+        }
+        assert!(done(self), "not done after {max} ticks, at tick {}", self.world.tick);
+    }
+
+    /// Sends an order for `resident_id`; it waits for the next tick.
+    pub fn give_to(&mut self, resident_id: &str, mut order: Value) -> OrderReply {
+        order["residentId"] = json!(resident_id);
+        self.orders.receive(&self.world, &self.sender, &json!("q"), &order)
+    }
+
+    pub fn r(&self, id: &str) -> &Resident {
+        self.world.residents.iter().find(|r| r.id == id).unwrap()
+    }
+
+    pub fn memory(&self, id: &str) -> Value {
+        Value::Object(self.r(id).script.as_ref().expect("running a script").memory.clone())
+    }
+
+    /// The realm events of one `kind`, as JSON.
+    pub fn events(&self, kind: &str) -> Vec<Value> {
+        self.world
+            .events
+            .iter()
+            .map(|e| serde_json::to_value(e).unwrap())
+            .filter(|v| v["kind"] == kind)
+            .collect()
+    }
+}
+
+/// `{ kind: 'ack' }` of an order's answer.
+pub fn acked(reply: &OrderReply) -> bool {
+    matches!(reply, OrderReply::Ack { .. })
+}
+
+/// The reason of a rejected order's answer.
+pub fn rejected(reply: &OrderReply) -> Option<&str> {
+    match reply {
+        OrderReply::Rejected { reason, .. } => Some(reason),
+        _ => None,
+    }
+}
+
+/// What `toMatchObject` checks: every field of `want` is in `got` with an equal value (objects
+/// by their fields, numbers by value, arrays whole).
+pub fn contains(got: &Value, want: &Value) -> bool {
+    match (got, want) {
+        (Value::Object(g), Value::Object(w)) => {
+            w.iter().all(|(k, v)| g.get(k).is_some_and(|x| contains(x, v)))
+        }
+        (Value::Array(g), Value::Array(w)) => {
+            g.len() == w.len() && g.iter().zip(w).all(|(x, y)| contains(x, y))
+        }
+        (Value::Number(g), Value::Number(w)) => g.as_f64() == w.as_f64(),
+        _ => got == want,
+    }
+}
+
+/// `expect(value).toMatchObject(want)`.
+#[track_caller]
+pub fn assert_matches(got: &Value, want: Value) {
+    assert!(contains(got, &want), "{got} does not match {want}");
+}
+
+/// A resident's order as JSON (`null` for none).
+pub fn order_json(r: &Resident) -> Value {
+    serde_json::to_value(&r.order).unwrap()
+}
+
+/// `serde_json::from_value` with the type inferred, for setting up state.
+pub fn from<T: serde::de::DeserializeOwned>(v: Value) -> T {
+    serde_json::from_value(v).unwrap()
+}
+
+/// A host whose every script is the default of one `task`, for tests of a single default without
+/// a library (`hostOf`).
+struct TaskHost {
+    task: Task,
+}
+
+impl ScriptHost for TaskHost {
+    fn script(&self, _: u64) -> Option<RunnableScript> {
+        let (name, source) = default_script(self.task);
+        Some(RunnableScript {
+            user_id: 1,
+            name: name.into(),
+            version: 1,
+            source: source.into(),
+            follows_default: true,
+            task: None,
+        })
+    }
+    fn sender(&self, user_id: u64) -> Option<OrderSender> {
+        Some(OrderSender::player(user_id, "Mara"))
+    }
+    fn explored(&self, _: u64, _: i32, _: i32) -> bool {
+        true
+    }
+}
+
+/// A runner of the scripts of `task`'s default (`new ScriptRunner(terrain, hostOf(task))`).
+pub fn task_runner(terrain: &TerrainMap, task: Task) -> ScriptRunner {
+    ScriptRunner::new(Arc::new(terrain.clone()), Arc::new(TaskHost { task }), order_kinds())
+}
