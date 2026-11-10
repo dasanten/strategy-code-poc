@@ -24,6 +24,40 @@ pub fn trader_standing(world: &WorldState, t: &Trader) -> Option<StandingTrader>
     Some(StandingTrader { city_id: s.city_id.clone(), x: s.x, y: s.y, until })
 }
 
+/// A wandering trader standing at one of a realm's cities (`TraderVisit`): where it stands and
+/// until when, which trader, and the city's name.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TraderVisit {
+    pub city_id: String,
+    pub x: f64,
+    pub y: f64,
+    pub until: f64,
+    pub trader_id: String,
+    pub city: String,
+}
+
+/// The wandering traders standing at the realm's cities now (`traderVisitsTo`), wherever its
+/// residents are.
+pub fn trader_visits_to(world: &WorldState, realm_id: &str) -> Vec<TraderVisit> {
+    world
+        .traders
+        .iter()
+        .filter_map(|t| {
+            let s = trader_standing(world, t)?;
+            let city = world.cities.iter().find(|c| c.id == s.city_id)?;
+            (city.realm_id.as_deref() == Some(realm_id)).then(|| TraderVisit {
+                city_id: s.city_id,
+                x: s.x,
+                y: s.y,
+                until: s.until,
+                trader_id: t.id.clone(),
+                city: city.name.clone(),
+            })
+        })
+        .collect()
+}
+
 /// What a trader has to trade of its load (`traderStock`): all of it but its crew's Food.
 pub fn trader_stock(escorts: usize, load: &Stock) -> Stock {
     let mut stock = load.clone();

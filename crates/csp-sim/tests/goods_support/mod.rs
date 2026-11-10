@@ -332,3 +332,18 @@ pub fn new_resident(seed: f64, id: &str, owner: Option<&str>, x: f64, y: f64) ->
     r.born_at = -ticks_for_age(age).round();
     r
 }
+
+/// A new adult resident as the TypeScript's `newResident(mulberry32(seed), fields)` draws it,
+/// lifespan and name included.
+pub fn drawn_resident(
+    seed: f64,
+    id: &str,
+    owner: Option<&str>,
+    city_id: Option<&str>,
+    x: f64,
+    y: f64,
+) -> Resident {
+    let mut m = csp_sim::random::Mulberry32::new(seed);
+    let fields = csp_sim::residents::NewResident { id, owner, city_id, x, y, tick: 0.0 };
+    csp_sim::residents::new_resident(&mut || m.next(), &fields, None)
+}

@@ -128,7 +128,7 @@ fn works_the_nearest_node_of_its_regions_most_common_resource() {
 }
 
 #[test]
-#[ignore = "slow in the TypeScript too (`tags: ['slow']`): T86.14's long simulations"]
+#[ignore = "16.8 s alone; see #1092"]
 fn left_alone_keeps_its_size_and_keeps_itself_fed() {
     let (mut world, terrain, id) = post();
     let mut walking = Walking::new(Arc::new(terrain.clone()));

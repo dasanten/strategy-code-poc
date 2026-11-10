@@ -1,5 +1,4 @@
-//! `apps/server/src/trade-org-takes.test.ts`, ported one to one. The traders' loops are not
-//! checked: `traders.ts` is not ported yet (`world.rs` keeps `place_traders` a stand-in).
+//! `apps/server/src/trade-org-takes.test.ts`, ported one to one.
 
 use std::sync::Arc;
 
@@ -59,6 +58,7 @@ fn fixture(coins: f64, trips: f64) -> Fixture {
     let hq = found_trade_org_hq(&mut world, &terrain, 128, 128, &mut || m.next());
     found_trading_post(&mut world, &terrain, 220, 128, None, &mut || m.next());
     place_caravans(&mut world);
+    crate::traders::place_traders(&mut world, SIZE);
     for h in &mut world.horses {
         h.stats = HorseStats {
             speed: AVERAGE_HORSE_STATS.speed,
@@ -420,10 +420,14 @@ fn becomes_a_working_post() {
     }
     let leader = w.residents.iter().find(|r| r.id == s.leader).unwrap();
     assert_eq!((leader.owner.as_ref(), leader.city_id.as_ref()), (Some(&s.realm), None));
-    // A caravan; the traders' loops come with the traders' port.
+    // A caravan, and traders' loops as they come round.
     assert_eq!(w.caravans.iter().filter(|k| k.post_id == c).count(), 1);
     run(&mut s, 100, &never);
     let w = &s.world;
+    assert!(!w.traders.is_empty());
+    for t in &w.traders {
+        assert!(t.r#loop.contains(&c), "{} {:?}", t.id, t.r#loop);
+    }
     assert!(w.cities.iter().any(|x| x.id == c && x.trade_org == Some(TradeOrgCity::Post)));
     // Its people are at work, the game running them now.
     let at_work = w
