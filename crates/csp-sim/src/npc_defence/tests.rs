@@ -622,7 +622,7 @@ fn an_npc_city_leaves_them_to_their_alarm_default_which_goes_after_an_armed_outs
     assert_eq!(p.attackers(), std::slice::from_ref(&o));
     p.defend();
     assert!(!attacking(p.r(&soldier)));
-    step_captures(&mut p.world, p.terrain.size, &mut GameAlarms);
+    step_captures(&mut p.world, p.terrain.size, Some(&p.terrain), &mut GameAlarms);
     let script = serde_json::to_value(&p.r(&soldier).script).unwrap();
     assert_eq!(script["task"], "alarm");
     assert_eq!(script["alarm"]["kind"], "occupied");
@@ -836,7 +836,7 @@ fn arm_soldiers_from_the_warehouse_so_one_armed_outsider_does_not_capture_the_po
     let o = p.r_mut("p1");
     (o.x, o.y) = (hall.x, hall.y);
     assert_eq!(p.occupier(), None);
-    assert_eq!(step_captures(&mut p.world, p.terrain.size, &mut GameAlarms), []);
+    assert_eq!(step_captures(&mut p.world, p.terrain.size, Some(&p.terrain), &mut GameAlarms), []);
     assert_eq!(p.citizens().len() as f64, TRADING_POST.residents);
 }
 

@@ -4,26 +4,14 @@
 
 use csp_shared::world::WorldState;
 
-/// A city the Trade Organization took (`CityTaken` of `trade-org-takes.ts`, TODO(T86.9)).
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct CityTaken {
-    pub city_id: String,
-    pub org: String,
-    pub trips: f64,
-    pub enough_trips: bool,
-}
-
-/// `noteCityTaken` (TODO(T86.9), `trade-org-takes.ts`): the ledger lives beside the world there.
-pub(crate) fn note_city_taken(_world: &mut WorldState, _taken: CityTaken) {}
-
-/// `workplacesOfCity` (TODO(T86.9), `trade-org-wrecks.ts`): building ids. None until it lands.
-pub(crate) fn workplaces_of_city(_world: &WorldState, _city_id: &str, _size: i32) -> Vec<String> {
-    Vec::new()
-}
-
 /// `joinTradeOrg`, in `caravans.rs`.
-pub(crate) fn join_trade_org(world: &mut WorldState, city_id: &str, size: i32) {
-    crate::caravans::join_trade_org(world, city_id, size);
+pub(crate) fn join_trade_org(
+    world: &mut WorldState,
+    city_id: &str,
+    size: i32,
+    terrain: Option<&csp_shared::terrain::TerrainMap>,
+) {
+    crate::caravans::join_trade_org(world, city_id, size, terrain);
 }
 
 /// `leaveTradeOrg`, in `caravans.rs`.
@@ -35,6 +23,3 @@ pub(crate) fn leave_trade_org(world: &mut WorldState, city_id: &str) {
 pub(crate) fn rejoin_trade_org(world: &mut WorldState, city_id: &str, size: i32) {
     crate::caravans::rejoin_trade_org(world, city_id, size);
 }
-
-/// `hqFalls` (TODO(T86.9), `hq-fall.ts`).
-pub(crate) fn hq_falls(_world: &mut WorldState, _city_id: &str) {}
