@@ -358,10 +358,10 @@ fn place_npc_cities(world: &mut WorldState, terrain: &TerrainMap) {
     crate::npc_cities::place_npc_cities(world, terrain);
 }
 
-// Carrying, storing, hauling, buying and trading are T86.5's (`carrying.rs`, `storing.rs`,
-// `hauling.rs`, `buying.rs`, `trading.rs`); road materials and offers are still to come.
-fn request_road_materials(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<CarryAction> {
-    Vec::new()
+// Road materials (`road-line.ts`) and offers (`offers.ts`); carrying, storing, hauling, buying and
+// trading are called from their own modules above.
+fn request_road_materials(world: &mut WorldState, _scratch: &mut Scratch) -> Vec<CarryAction> {
+    crate::road_line::request_road_materials(world)
 }
 fn resolve_offers(world: &mut WorldState, scratch: &mut Scratch) -> usize {
     crate::offers::resolve_offers(world, &mut scratch.offers)
@@ -413,7 +413,9 @@ fn step_npc_cities(
     let ways = walking.and_then(|w| w.ways());
     crate::npc_behaviour::step_npc_cities(world, size, Some(terrain), ways)
 }
-fn step_outsiders(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
+fn step_outsiders(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
+    crate::outsiders::step_outsiders(world, size);
+}
 
 // `demands.ts`.
 fn answer_demands(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {

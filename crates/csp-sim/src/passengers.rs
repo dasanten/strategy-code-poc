@@ -4,13 +4,14 @@
 use csp_shared::terrain::{is_passable_terrain, terrain_at, TerrainMap};
 use csp_shared::world::{OrderRequest, Resident, WorldState};
 
-use crate::movement_pending::{
-    in_contact, int_field, is_wall_or_gate, ordered_resident, str_field, OrderKind, OrderSender,
-};
+use crate::order_sender::{ordered_resident, OrderSender};
+use crate::orders::{int_field, str_field, OrderKind};
 use crate::queries::building::building_at;
 use crate::queries::carriages::driven_carriage_id;
+use crate::queries::combat::in_contact;
 use crate::queries::driving::{board_problem, carriage_of_resident};
 use crate::walking::WalkTo;
+use crate::walls::is_wall_or_gate;
 
 /// The board order (`board`): one of the Player's residents gets on a carriage of their realm on
 /// their tile that has room for them. What they were doing stops.
@@ -24,7 +25,9 @@ impl OrderKind for Board {
         order: &OrderRequest,
         _terrain: Option<&TerrainMap>,
     ) -> Option<String> {
-        let Some(r) = ordered_resident(world, sender, str_field(order, "residentId")) else {
+        let Some(r) = ordered_resident(world, sender, str_field(order, "residentId"))
+            .map(|i| &world.residents[i])
+        else {
             return Some("not one of your residents".into());
         };
         let carriage =
@@ -71,7 +74,7 @@ fn get_off_tile_problem(
     };
     let terrain = terrain?;
     let size = terrain.size;
-    if !in_contact(size, (r.x, r.y), (x, y)) {
+    if !in_contact(size, (r.x as i32, r.y as i32), (x as i32, y as i32)) {
         return Some("that tile is not next to the carriage".into());
     }
     if !is_passable_terrain(terrain_at(terrain, x as i32, y as i32)) {
@@ -95,7 +98,9 @@ impl OrderKind for GetOff {
         order: &OrderRequest,
         terrain: Option<&TerrainMap>,
     ) -> Option<String> {
-        let Some(r) = ordered_resident(world, sender, str_field(order, "residentId")) else {
+        let Some(r) = ordered_resident(world, sender, str_field(order, "residentId"))
+            .map(|i| &world.residents[i])
+        else {
             return Some("not one of your residents".into());
         };
         if r.aboard.is_none() {
@@ -172,7 +177,7 @@ pub const GETS_OFF_FIRST: [&str; 33] = [
 ];
 
 /// An order kind that first gets the ordered resident off their carriage (`getsOffFirst`).
-pub struct GetsOffFirst<K: OrderKind>(pub K);
+pub struct GetsOffFirst<K>(pub K);
 
 impl<K: OrderKind> OrderKind for GetsOffFirst<K> {
     fn validate(

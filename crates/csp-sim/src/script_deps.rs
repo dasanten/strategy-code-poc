@@ -36,9 +36,9 @@ pub fn crew_tile(
     crate::queries::crew::crew_tile(world, b, (&me.id, me.x as i32, me.y as i32), of_crew, size)
 }
 
-/// The demands a realm sent or was sent, as its scripts see them (`demandsFor`, flattened as the
-/// bindings give them: `fromId`, `from`, `toId`, `to`).
-// TODO(T86.11): `demands::demands_for`.
+/// The demands a realm sent or was sent, as its scripts see them: `demandsFor` of `demand.ts`,
+/// flattened as `script-bindings.ts` gives them (`fromId`, `from`, `toId`, `to`; the `city` mark
+/// of a label is dropped there, so it is never made here).
 pub fn demands_for(world: &WorldState, realm_id: &str) -> Vec<Value> {
     world
         .demands

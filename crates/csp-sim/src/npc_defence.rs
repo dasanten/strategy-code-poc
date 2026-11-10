@@ -46,8 +46,9 @@ fn away_on_trade_org_business(world: &WorldState) -> HashSet<String> {
 }
 
 /// Raises the alarm in a city whose town hall is occupied (`raiseOccupied` of `alarms.ts`).
-/// TODO(T86.12): call the ported alarms; until then nobody is alarmed by an occupation.
-fn raise_occupied(_world: &mut WorldState, _city: &City, _occupier: &str, _size: i32) {}
+fn raise_occupied(world: &mut WorldState, city: &City, occupier: &str, size: i32) {
+    crate::alarms::raise_occupied(world, &city.id, occupier, size);
+}
 
 use crate::queries::trade_org::trade_org_army_wanted;
 

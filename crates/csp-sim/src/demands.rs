@@ -789,7 +789,7 @@ pub fn demands_sound(world: &WorldState) -> Vec<InvariantViolation> {
                 format!(
                     "open demand {} has deadline {}, not ahead of {}",
                     d.id,
-                    crate::realm_pending::js_number(d.deadline),
+                    crate::queries::warehouse_trade::js_number(d.deadline),
                     world.tick
                 ),
                 &d.id,
@@ -822,5 +822,7 @@ pub fn demands_sound(world: &WorldState) -> Vec<InvariantViolation> {
     out
 }
 
+#[cfg(test)]
+mod answers_tests;
 #[cfg(test)]
 mod tests;
