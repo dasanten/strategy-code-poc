@@ -1,15 +1,15 @@
-import {
-  SHARES_A_TILE,
-  isDown,
-  type Army,
-  type Building,
-  type SeenCaravan,
-  type SeenTrader,
-  type SeenCarriage,
-  type SeenCity,
-  type SeenHorse,
-  type SeenResident,
-} from '@csp/shared'
+import { SHARES_A_TILE } from '../shared/building.js'
+import { isDown } from '../shared/world.js'
+import type {
+  Army,
+  Building,
+  SeenCaravan,
+  SeenTrader,
+  SeenCarriage,
+  SeenCity,
+  SeenHorse,
+  SeenResident,
+} from '@csp/shared-types'
 import { caravanParts } from '../caravans.js'
 import { ACTIVITY_ART, BASE_ART, PAINTED_UNIT_ART, UNIT_ART, paintedCell } from './art.js'
 import { tileToScreen, zoomTier, type Camera, type Size } from './camera.js'

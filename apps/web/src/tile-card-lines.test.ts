@@ -3,24 +3,22 @@ import {
   BATCHES_PER_DAY,
   BUILD_MATERIALS,
   BUILD_WORK,
-  FOOD_PER_DAY,
-  GOODS,
   HOUSING_ROOM,
-  MOUNTAIN_ROAD_WORK_FACTOR,
   RECIPES,
-  TICKS_PER_GAME_YEAR,
-  Terrain,
-  UNEXPLORED,
   WORK_OUTPUT_PER_DAY,
+} from './shared/narrowed.js'
+import {
+  FOOD_PER_DAY,
+  MOUNTAIN_ROAD_WORK_FACTOR,
+  TICKS_PER_GAME_YEAR,
   WORK_SKILL_EFFECT,
   WORK_STRENGTH_AVERAGE,
   hungerFactor,
-  teardownWork,
-  type Good,
-  type Pile,
-  type Resident,
-  type SeenBuilding,
-} from '@csp/shared'
+} from '@csp/balance'
+import { GOODS } from './shared/world.js'
+import { Terrain, UNEXPLORED } from './shared/terrain.js'
+import { teardownWork } from './shared/building.js'
+import type { Good, Pile, Resident, SeenBuilding } from '@csp/shared-types'
 import { describeTile, tileActions, tradesHere, type TileThings } from './selection-view.js'
 import { GOOD_LABELS } from './Residents.js'
 

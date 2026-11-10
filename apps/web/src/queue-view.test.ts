@@ -1,9 +1,6 @@
-import {
-  QUEUE_DEFAULT_STEP_MINUTES,
-  queueStepsProblem,
-  type OrderRequest,
-  type Queue,
-} from '@csp/shared'
+import { QUEUE_DEFAULT_STEP_MINUTES } from '@csp/balance'
+import { queueStepsProblem } from './shared/queue.js'
+import type { OrderRequest, Queue } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
   appendRequest,

@@ -1,14 +1,7 @@
 import { useState, type ReactNode } from 'react'
-import {
-  GOODS,
-  offerOpenTo,
-  wantsNothing,
-  type Good,
-  type Resident,
-  type SeenBuilding,
-  type SeenHorse,
-  type SeenOffer,
-} from '@csp/shared'
+import { GOODS } from './shared/world.js'
+import { offerOpenTo, wantsNothing } from './shared/offers.js'
+import type { Good, Resident, SeenBuilding, SeenHorse, SeenOffer } from '@csp/shared-types'
 import type { TradersView } from './city-view.js'
 import { GOOD_LABELS } from './Residents.js'
 import {

@@ -1,4 +1,4 @@
-import type { Diplomacy } from '@csp/shared'
+import type { Diplomacy } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import { commandsSeen } from './alliance-army.js'
 

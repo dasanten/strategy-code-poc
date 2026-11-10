@@ -1,13 +1,6 @@
-import {
-  TERRAIN_SPEED,
-  TICKS_PER_GAME_YEAR,
-  Terrain,
-  UNEXPLORED,
-  WALK_TICKS_PER_TILE,
-  type Building,
-  type ResidentOrder,
-  type ScriptSummary,
-} from '@csp/shared'
+import { TERRAIN_SPEED, TICKS_PER_GAME_YEAR, WALK_TICKS_PER_TILE } from '@csp/balance'
+import { Terrain, UNEXPLORED } from './shared/terrain.js'
+import type { Building, ResidentOrder, ScriptSummary } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import { arrivalOf, doingLine, interruptedLine, scriptLine, type DoingOf } from './doing-view.js'
 

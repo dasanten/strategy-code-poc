@@ -1,4 +1,4 @@
-import type { SeenHorse } from '@csp/shared'
+import type { SeenHorse } from '@csp/shared-types'
 import { horseDetail } from './selection-view.js'
 
 /**

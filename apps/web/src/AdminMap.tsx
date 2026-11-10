@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  adminTerrainChunkPath,
-  type AdminInspectTarget,
-  type AdminPlaces,
-  type AdminWorldView,
-  type MapInfo,
-} from '@csp/shared'
+import { adminTerrainChunkPath } from './shared/terrain.js'
+import type { AdminInspectTarget, AdminPlaces, AdminWorldView, MapInfo } from '@csp/shared-types'
 import { api, ApiFailure } from './api.js'
 import {
   ADMIN_MAP_REFRESH_MS,

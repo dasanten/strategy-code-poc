@@ -1,4 +1,5 @@
-import { MAX_HEALTH, MAX_HUNGER, statValue, ticksForAge, type Resident } from '@csp/shared'
+import { MAX_HEALTH, MAX_HUNGER, statValue, ticksForAge } from '@csp/balance'
+import type { Resident } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import { listedResidents, residentRow, rowWindow, scrollToRow } from './residents-list-view.js'
 

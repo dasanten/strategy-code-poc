@@ -1,4 +1,4 @@
-import type { ScriptRunError, ScriptRunSeen } from '@csp/shared'
+import type { ScriptRunError, ScriptRunSeen } from '@csp/shared-types'
 import { errorWhen, stepsText, waitingText } from './script-run-view.js'
 
 /**

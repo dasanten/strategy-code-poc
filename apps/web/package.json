@@ -19,7 +19,6 @@
     "@csp/balance": "workspace:*",
     "@csp/lang": "workspace:*",
     "@csp/lang-wasm": "workspace:*",
-    "@csp/shared": "workspace:*",
     "@csp/shared-types": "workspace:*",
     "@sentry/react": "^11.8.0",
     "codemirror": "^6.0.2",

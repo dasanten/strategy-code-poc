@@ -1,12 +1,7 @@
-import {
-  REALM_LOG_LENGTH,
-  TRADE_ORG_NAME,
-  timeLeft,
-  type DeliveryView,
-  type PunishmentEnd,
-  type RealmEvent,
-  type StandingMove,
-} from '@csp/shared'
+import { REALM_LOG_LENGTH } from '@csp/balance'
+import { TRADE_ORG_NAME } from './shared/trade-org.js'
+import { timeLeft } from './shared/estimates.js'
+import type { DeliveryView, PunishmentEnd, RealmEvent, StandingMove } from '@csp/shared-types'
 import { BUILDING_NAMES } from './city-view.js'
 import { formatMove } from './standing-view.js'
 
@@ -983,10 +978,10 @@ function punishedLine(e: Extract<RealmEvent, { kind: 'punished' }>): EventLine {
         text: e.takes
           ? `The Trade Organization is sending its army to ${e.city} to hold its town hall and take the city for the ${e.worth} Coins you owe. Paying in full at any of its warehouses stops it.`
           : e.wrecks
-          ? `The Trade Organization is sending its army to ${e.city} to tear down workplaces for the ${e.worth} Coins you owe.`
-          : e.directive === undefined
-            ? `The Trade Organization is sending its army to ${e.city} to take back ${e.worth} Coins' worth.`
-            : `By admin directive (${e.directive}), the Trade Organization is sending its army to ${e.city} to take ${e.worth} Coins' worth.`,
+            ? `The Trade Organization is sending its army to ${e.city} to tear down workplaces for the ${e.worth} Coins you owe.`
+            : e.directive === undefined
+              ? `The Trade Organization is sending its army to ${e.city} to take back ${e.worth} Coins' worth.`
+              : `By admin directive (${e.directive}), the Trade Organization is sending its army to ${e.city} to take ${e.worth} Coins' worth.`,
         tone: 'bad',
       }
     case 'arrived':

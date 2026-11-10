@@ -54,19 +54,18 @@ import {
   walkSpeed,
   workOutput,
 } from '@csp/balance'
-import {
-  BUILDABLE,
-  STAT_NAMES,
-  SKILL_NAMES,
-  type TrainingSubject,
-  type BuildingKind,
-  type CrimeKind,
-  type Good,
-  type Resident,
-  type SkillName,
-  type StatName,
-  type Stock,
-} from '@csp/shared'
+import { BUILDABLE } from './shared/building.js'
+import { STAT_NAMES, SKILL_NAMES } from './shared/world.js'
+import type {
+  TrainingSubject,
+  BuildingKind,
+  CrimeKind,
+  Good,
+  Resident,
+  SkillName,
+  StatName,
+  Stock,
+} from '@csp/shared-types'
 
 /**
  * The Wiki's figures (`CONTEXT.md`: Wiki): everything it says worked out from the balance numbers

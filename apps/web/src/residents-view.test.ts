@@ -4,9 +4,8 @@ import {
   PAIRING_WAIT_TICKS,
   TICKS_PER_GAME_DAY,
   ticksForAge,
-  type ContractView,
-  type Diplomacy,
-} from '@csp/shared'
+} from '@csp/balance'
+import type { ContractView, Diplomacy } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
   GROUP_LIST_MAX,

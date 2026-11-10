@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { OrderRequest } from '@csp/shared'
+import type { OrderRequest } from '@csp/shared-types'
 
 /**
  * The Customise button beside an order (`CONTEXT.md`: Before it starts): it gives the order the

@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import {
-  BUILDING_PURPOSE,
-  FOOTPRINT,
-  TRAINING_GROUND_MAX_TRAINEES,
-  WORKPLACE_MAX_WORKERS,
-  type Building,
-  type KnownNode,
-} from '@csp/shared'
+import { BUILDING_PURPOSE } from './shared/building-info.js'
+import { FOOTPRINT } from './shared/footprint.js'
+import { TRAINING_GROUND_MAX_TRAINEES } from '@csp/balance'
+import { WORKPLACE_MAX_WORKERS } from './shared/narrowed.js'
+import type { Building, KnownNode } from '@csp/shared-types'
 import { buildingInfoLines, buildingNodeKind } from './building-info-view.js'
 import { GOOD_LABELS, SKILL_LABELS } from './Residents.js'
 

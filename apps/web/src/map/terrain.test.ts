@@ -1,4 +1,5 @@
-import { CHUNK_SIZE, Terrain, UNEXPLORED, type TerrainChunk } from '@csp/shared'
+import { CHUNK_SIZE, Terrain, UNEXPLORED } from '../shared/terrain.js'
+import type { TerrainChunk } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import { TERRAIN_COLORS } from './palette.js'
 import {

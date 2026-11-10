@@ -1,10 +1,5 @@
-import {
-  WORKPLACE_PARAM,
-  isWorkScript,
-  type ScriptParam,
-  type ScriptSummary,
-  type WorkplaceSettings,
-} from '@csp/shared'
+import { WORKPLACE_PARAM, isWorkScript } from './shared/default-scripts.js'
+import type { ScriptParam, ScriptSummary, WorkplaceSettings } from '@csp/shared-types'
 
 /**
  * What the Work settings panel on a workplace's card offers (`CONTEXT.md`: Workplace settings):

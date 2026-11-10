@@ -1,10 +1,5 @@
-import {
-  cityMembership,
-  type Building,
-  type City,
-  type SeenCarriage,
-  type SeenResident,
-} from '@csp/shared'
+import { cityMembership } from '../shared/city.js'
+import type { Building, City, SeenCarriage, SeenResident } from '@csp/shared-types'
 import { tileToScreen, type Camera, type Size } from './camera.js'
 import { cityRelationship, type Tone, type Viewer } from './tokens.js'
 

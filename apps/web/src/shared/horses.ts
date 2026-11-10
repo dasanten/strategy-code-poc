@@ -1,0 +1,295 @@
+// Ported from packages/shared/src/horses.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
+// types come from @csp/shared-types and the balance numbers from @csp/balance.
+
+import { carriageCanGoTo } from './building.js'
+import {
+  carriagePulledBy,
+  drivenCarriageId,
+  takeProblem,
+  type StealingResident,
+} from './carriages.js'
+import { covers, isAt } from './footprint.js'
+import { pileAt } from './goods.js'
+import { type TerrainMap, wrap } from './terrain.js'
+import { isDown, type WorldState } from './world.js'
+import {
+  HORSE_REACH,
+  OWN_FOOD,
+  STABLE_BREED_DAYS,
+  STABLE_CAPACITY,
+  TICKS_PER_GAME_DAY,
+} from '@csp/balance'
+import type {
+  BreedOrder,
+  Building,
+  CarriageHorse,
+  Horse,
+  KeptBreeding,
+  Resident,
+  Stock,
+} from '@csp/shared-types'
+
+/** World queries about horses and stables (ADR 0002: the game API orders and scripts share). */
+
+/** Ticks a resident tends two horses at a stable before their foal is born (`STABLE_BREED_DAYS`). */
+export const STABLE_BREED_TICKS = STABLE_BREED_DAYS * TICKS_PER_GAME_DAY
+
+/** The finished stable whose footprint covers a tile, if there is one. */
+export function stableAt(
+  world: WorldState,
+  x: number,
+  y: number,
+  size?: number,
+): Building | undefined {
+  return world.buildings.find((b) => b.kind === 'stable' && !b.site && covers(b, x, y, size))
+}
+
+/** The horses standing on a tile. */
+export function horsesAt(world: WorldState, x: number, y: number): Horse[] {
+  return world.horses.filter((h) => h.x === x && h.y === y)
+}
+
+/**
+ * Where a horse finds Food it can eat, in the order it eats from them (`CONTEXT.md`: Horses have
+ * no inventory): the load of the carriage it pulls, then the storage of the stable it stands in,
+ * then the Food on the ground on its tile and within `HORSE_REACH` of it, then, for a ridden horse,
+ * its rider's carried Food while they have a unit to spare (`riderSpareFood`). Only places that
+ * hold Food the horse may eat are listed. `rider` saves looking up who rides it, for callers that
+ * know.
+ */
+export function horseFood(
+  world: WorldState,
+  horse: Horse,
+  mapSize: number,
+  rider: Pick<Resident, 'carried'> | undefined = riderOf(world, horse),
+): Stock[] {
+  const out: Stock[] = []
+  const load = carriagePulledBy(world, horse)?.load
+  if ((load?.food ?? 0) > 0) out.push(load!)
+  const stock = stableAt(world, horse.x, horse.y)?.stock
+  if ((stock?.food ?? 0) > 0) out.push(stock!)
+  for (let dy = -HORSE_REACH; dy <= HORSE_REACH; dy++) {
+    for (let dx = -HORSE_REACH; dx <= HORSE_REACH; dx++) {
+      const x = wrap(horse.x + dx, mapSize)
+      const y = wrap(horse.y + dy, mapSize)
+      const pile = pileAt(world, x, y)
+      if ((pile?.goods.food ?? 0) > 0 && !out.includes(pile!.goods)) out.push(pile!.goods)
+    }
+  }
+  if (rider && riderSpareFood(rider) >= 1) out.push(rider.carried)
+  return out
+}
+
+/**
+ * The Food a rider carries beyond their own food (`OWN_FOOD`), which the horse they ride may eat
+ * (`CONTEXT.md`: Riding): the rider never goes without for the horse.
+ */
+export function riderSpareFood(rider: Pick<Resident, 'carried'>): number {
+  return Math.max(0, (rider.carried.food ?? 0) - OWN_FOOD)
+}
+
+/** Whose horses a resident may breed (`CONTEXT.md`: Breeding): a realm's, or an NPC city's. */
+export type HorseOwner = { realmId: string } | { cityId: string }
+
+/** Whether a horse belongs to the realm or NPC city. */
+export function ownsHorse(owner: HorseOwner, h: Pick<Horse, 'realmId' | 'cityId'>): boolean {
+  return 'realmId' in owner
+    ? h.realmId === owner.realmId
+    : h.realmId === null && h.cityId === owner.cityId
+}
+
+/** The horses standing in a stable, hitched or not. */
+export function horsesIn<H extends { x: number; y: number }>(
+  horses: readonly H[],
+  stable: Building,
+): H[] {
+  return horses.filter((h) => isAt(h, stable))
+}
+
+/** The residents breeding at a stable (`BreedOrder`). */
+export function breedersAt<R extends Pick<Resident, 'order'>>(
+  residents: readonly R[],
+  stable: Building,
+): R[] {
+  return residents.filter((r) => r.order?.kind === 'breed' && r.order.stableId === stable.id)
+}
+
+/** The breeding progress the stable keeps for the two horses, in either order, if it keeps any. */
+export function keptBreeding(
+  stable: Pick<Building, 'breedings'>,
+  horseIds: readonly string[],
+): KeptBreeding | undefined {
+  return stable.breedings?.find(
+    (k) => horseIds.includes(k.horseIds[0]) && horseIds.includes(k.horseIds[1]),
+  )
+}
+
+/**
+ * The pair a resident breeding at the stable carries on with first (`CONTEXT.md`: Breeding): of
+ * the pairs it keeps progress for, the furthest along that they can breed (`breedProblem`), so
+ * both still fed and nobody else tending either; undefined when there is none.
+ */
+export function keptPair(
+  world: Pick<WorldState, 'horses' | 'residents'>,
+  stable: Building,
+  owner: HorseOwner,
+  breeder: Pick<Resident, 'id'> | undefined,
+): [string, string] | undefined {
+  const kept = [...(stable.breedings ?? [])].sort((a, b) => b.progress - a.progress)
+  const k = kept.find((x) => !breedProblem(world, stable, owner, breeder, x.horseIds))
+  return k && [k.horseIds[0], k.horseIds[1]]
+}
+
+/**
+ * Two fed horses of the owner's in a finished stable with room for a foal, which a resident there
+ * (`breeder`, when it is one) can breed (`CONTEXT.md`: Breeding), or undefined when there are
+ * none. A pair whose breeding the stable keeps comes first (`keptPair`).
+ */
+export function breedingPair(
+  world: Pick<WorldState, 'horses' | 'residents'>,
+  stable: Building,
+  owner: HorseOwner,
+  breeder?: Pick<Resident, 'id'>,
+): [Horse, Horse] | undefined {
+  const kept = keptPair(world, stable, owner, breeder)
+  if (kept) {
+    const [a, b] = kept.map((id) => world.horses.find((h) => h.id === id)!)
+    return [a!, b!]
+  }
+  const fed = horsesIn(world.horses, stable).filter((h) => ownsHorse(owner, h) && h.hunger > 0)
+  const pair = fed.slice(0, 2)
+  if (pair.length < 2) return undefined
+  return breedProblem(world, stable, owner, breeder, [pair[0]!.id, pair[1]!.id])
+    ? undefined
+    : [pair[0]!, pair[1]!]
+}
+
+/**
+ * Why a resident standing at the stable can't breed the two horses (`CONTEXT.md`: Breeding),
+ * undefined when they can: the stable must be finished, the horses two fed ones of the owner's
+ * standing in it, and the stable must have room for a foal. Horses another resident already
+ * breeds can't be bred twice. `breeder` is the resident who would, left out of that check.
+ */
+export function breedProblem(
+  world: Pick<WorldState, 'horses' | 'residents'>,
+  stable: Building,
+  owner: HorseOwner,
+  breeder: Pick<Resident, 'id'> | undefined,
+  horseIds: unknown,
+): string | undefined {
+  if (stable.kind !== 'stable') return 'not a stable'
+  if (stable.site) return 'the stable isn’t finished'
+  if (!Array.isArray(horseIds) || horseIds.length !== 2 || horseIds[0] === horseIds[1])
+    return 'pick two horses'
+  const horses = horseIds.map((id) => world.horses.find((h) => h.id === id))
+  if (horses.some((h) => !h || !isAt(h, stable))) return 'both horses must stand in the stable'
+  if (horses.some((h) => !ownsHorse(owner, h!))) return 'not horses of your realm'
+  if (horses.some((h) => h!.hunger <= 0)) return 'a hungry horse can’t breed'
+  if (horsesIn(world.horses, stable).length >= STABLE_CAPACITY)
+    return 'the stable has no room for a foal'
+  const taken = breedersAt(world.residents, stable).some(
+    (r) =>
+      r.id !== breeder?.id && (r.order as BreedOrder).horseIds.some((id) => horseIds.includes(id)),
+  )
+  if (taken) return 'those horses are already being bred'
+  return undefined
+}
+
+/** The horse a resident rides (`CONTEXT.md`: Riding), if they ride one. */
+export function horseRidden<H extends Pick<Horse, 'id'>>(
+  world: { horses: readonly H[] },
+  resident: Pick<Resident, 'riding'>,
+): H | undefined {
+  return resident.riding === undefined
+    ? undefined
+    : world.horses.find((h) => h.id === resident.riding)
+}
+
+/** The resident riding a horse, if anyone is. */
+export function riderOf<R extends Pick<Resident, 'riding'>>(
+  world: { residents: readonly R[] },
+  horse: Pick<Horse, 'id'>,
+): R | undefined {
+  return world.residents.find((r) => r.riding === horse.id)
+}
+
+/**
+ * Whether a horse is the resident's to ride: one of their realm, or for a resident of an NPC city
+ * one of that city.
+ */
+export function horseOfResident(
+  horse: Pick<Horse, 'realmId' | 'cityId'>,
+  resident: Pick<Resident, 'owner' | 'cityId'>,
+): boolean {
+  if (resident.owner !== null) return horse.realmId === resident.owner
+  return horse.realmId === null && resident.cityId !== null && horse.cityId === resident.cityId
+}
+
+/** What of the world the checks on mounting a horse look at: all a Player sees of it. */
+interface MountWorld<R> {
+  tick: number
+  residents: readonly R[]
+  carriages: readonly { horseId: string | null }[]
+}
+
+/** Why a resident can't get on a horse, whoever's it is (`mountProblem`, `mountOffProblem`). */
+function mountingProblem<R extends StealingResident>(
+  world: MountWorld<R>,
+  resident: R,
+  horse: CarriageHorse,
+): string | undefined {
+  if (resident.riding === horse.id) return 'already riding that horse'
+  if (resident.riding !== undefined) return 'already riding another horse'
+  if (horse.x !== resident.x || horse.y !== resident.y) {
+    return 'that horse is not on the resident’s tile'
+  }
+  if (carriagePulledBy(world, horse)) return 'that horse is hitched to a carriage'
+  if (isDown(horse)) return 'that horse is Down'
+  if (riderOf(world, horse)) return 'someone else rides that horse'
+  if (drivenCarriageId(resident) !== undefined) return 'a driver can’t ride'
+  return undefined
+}
+
+/**
+ * Why a resident can't steal another organization's horse for the realm `realmId` by mounting it
+ * now, or undefined when they can (`CONTEXT.md`: Stealing a carriage or horse): what mounting asks
+ * of any horse (`mountProblem`), and what taking asks of anything (`takeProblem`). The rider must
+ * be of that realm, since a rider's horse is their own realm's (`horseOfResident`): someone on loan
+ * to it steals none to ride.
+ */
+export function mountOffProblem<R extends StealingResident>(
+  world: MountWorld<R>,
+  thief: R,
+  horse: CarriageHorse,
+  realmId: string,
+): string | undefined {
+  if (thief.owner !== realmId) return 'not a horse of your realm'
+  return mountingProblem(world, thief, horse) ?? takeProblem(world, thief, horse, realmId, 'horse')
+}
+
+/**
+ * Why a resident can't mount a horse now, or undefined when they can (`CONTEXT.md`: Riding): the
+ * horse must be of their realm and on their tile, pull no carriage, not be Down (`CONTEXT.md`:
+ * Down), and nobody may ride it; the resident must ride no other horse and drive no carriage. A
+ * horse left on Mountain whose road was torn down can't be ridden there (`CONTEXT.md`: Road).
+ * With `commander`, the realm whose order it is, a horse of another organization may be stolen by
+ * that (`mountOffProblem`); without one it is refused.
+ */
+export function mountProblem(
+  world: WorldState,
+  resident: Resident,
+  horse: Horse | undefined,
+  terrain?: TerrainMap,
+  commander?: string | null,
+): string | undefined {
+  if (!horse) return 'no such horse'
+  const steals = !horseOfResident(horse, resident)
+  if (steals && !commander) return 'not a horse of your realm'
+  const problem = steals
+    ? mountOffProblem(world, resident, horse, commander!)
+    : mountingProblem(world, resident, horse)
+  if (problem) return problem
+  if (terrain && !carriageCanGoTo(world, terrain, horse.x, horse.y))
+    return 'a horse can’t be ridden on Mountain without a road'
+  return undefined
+}

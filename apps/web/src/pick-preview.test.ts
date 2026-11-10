@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { FOOTPRINT, ROAD_LINE_MAX_TILES, Terrain, type Building } from '@csp/shared'
+import { FOOTPRINT } from './shared/footprint.js'
+import { ROAD_LINE_MAX_TILES } from '@csp/balance'
+import { Terrain } from './shared/terrain.js'
+import type { Building } from '@csp/shared-types'
 import {
   pickPreview,
   previewPickOf,

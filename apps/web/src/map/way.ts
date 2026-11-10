@@ -1,4 +1,5 @@
-import { drivenCarriageId, type SeenResident } from '@csp/shared'
+import { drivenCarriageId } from '../shared/carriages.js'
+import type { SeenResident } from '@csp/shared-types'
 import { tileToScreen, type Camera, type Size } from './camera.js'
 
 /** A resident's way ahead: where it ends and the tiles along it (none once in contact). */

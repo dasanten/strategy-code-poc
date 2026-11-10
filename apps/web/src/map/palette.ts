@@ -1,4 +1,5 @@
-import { Terrain, UNEXPLORED, type BuildingKind, type ResourceKind } from '@csp/shared'
+import { Terrain, UNEXPLORED } from '../shared/terrain.js'
+import type { BuildingKind, ResourceKind } from '@csp/shared-types'
 import { THEME, hex, type Relationship } from '../theme.js'
 
 /** Roads, wide and light over the terrain (ADR 0008). */

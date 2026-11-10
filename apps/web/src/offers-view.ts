@@ -1,30 +1,25 @@
-import {
-  GOODS,
-  buildingRealm,
-  carriageCapacity,
-  carriedFeesOver,
-  freeStock,
-  handsOf,
-  loadOf,
-  offerOpenTo,
-  quoteOffer,
-  timesToPost,
-  transferLoad,
-  wantsNothing,
-  type CarriedFeeBy,
-  type CarriedWay,
-  type Carriage,
-  type City,
-  type DirectOfferView,
-  type Good,
-  type OfferQuote,
-  type Resident,
-  type SeenBuilding,
-  type SeenOffer,
-  type Stock,
-  type TradeHolder,
-  type TradeLimit,
-} from '@csp/shared'
+import { GOODS } from './shared/world.js'
+import { buildingRealm } from './shared/city.js'
+import { carriageCapacity } from './shared/carriages.js'
+import { carriedFeesOver } from './shared/direct-offer.js'
+import { freeStock, offerOpenTo, quoteOffer, timesToPost, wantsNothing } from './shared/offers.js'
+import { handsOf, loadOf } from './shared/warehouse.js'
+import { transferLoad } from './shared/transfer.js'
+import type {
+  CarriedFeeBy,
+  CarriedWay,
+  Carriage,
+  City,
+  DirectOfferView,
+  Good,
+  OfferQuote,
+  Resident,
+  SeenBuilding,
+  SeenOffer,
+  Stock,
+  TradeHolder,
+  TradeLimit,
+} from '@csp/shared-types'
 
 /** What is needed of the world to reckon with the offers the Player sees. */
 type Seen = { cities: readonly Pick<City, 'id' | 'realmId'>[]; buildings: SeenBuilding[] }

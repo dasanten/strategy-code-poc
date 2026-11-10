@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import type { AdminPlaces } from '@csp/shared'
+import type { AdminPlaces } from '@csp/shared-types'
 import { jumpList, type JumpEntry } from './admin-jump.js'
 
 /**

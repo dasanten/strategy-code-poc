@@ -122,9 +122,6 @@ importers:
       '@csp/lang-wasm':
         specifier: workspace:*
         version: link:../../packages/lang-wasm
-      '@csp/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@csp/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types

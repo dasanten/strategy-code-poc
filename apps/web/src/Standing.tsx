@@ -1,11 +1,6 @@
 import { useState } from 'react'
-import {
-  describeGoal,
-  type DirectiveView,
-  type JoinRequestView,
-  type OrderRequest,
-  type StandingView,
-} from '@csp/shared'
+import { describeGoal } from './shared/directive.js'
+import type { DirectiveView, JoinRequestView, OrderRequest, StandingView } from '@csp/shared-types'
 import {
   formatStanding,
   standingName,

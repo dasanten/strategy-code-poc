@@ -1,14 +1,7 @@
 import type { Graphics } from 'pixi.js'
-import {
-  FOOTPRINT,
-  LINE_BUILDING,
-  isLineOrder,
-  roadLine,
-  type Building,
-  type BuildingKind,
-  type OrderRequest,
-  type SeenResident,
-} from '@csp/shared'
+import { FOOTPRINT } from '../shared/footprint.js'
+import { LINE_BUILDING, isLineOrder, roadLine } from '../shared/building.js'
+import type { Building, BuildingKind, OrderRequest, SeenResident } from '@csp/shared-types'
 import { tileToScreen, type Camera, type Size } from './camera.js'
 import { ROAD_COLOR } from './palette.js'
 import { roadJoins, roadWidth, wallWidths } from './roads.js'

@@ -1,4 +1,5 @@
-import { CHUNK_SIZE, type RegionMap } from '@csp/shared'
+import { CHUNK_SIZE } from '../shared/terrain.js'
+import type { RegionMap } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
   applyRegionMap,

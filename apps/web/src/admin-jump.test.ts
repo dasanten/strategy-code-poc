@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AdminPlaces } from '@csp/shared'
+import type { AdminPlaces } from '@csp/shared-types'
 import { ADMIN_JUMP_FIGURE_SCALE, jumpList, jumpScale } from './admin-jump.js'
 import { ADMIN_LINK_SCALE } from './admin-map.js'
 

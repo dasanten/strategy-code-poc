@@ -1,4 +1,5 @@
-import { WAYPOINTS_MAX, type Waypoint } from '@csp/shared'
+import { WAYPOINTS_MAX } from '@csp/balance'
+import type { Waypoint } from '@csp/shared-types'
 
 /*
  * What the Waypoints drawer and the map's tile menu show (`CONTEXT.md`: Waypoint), as plain

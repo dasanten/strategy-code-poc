@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ResidentOrder, SeenResident } from '@csp/shared'
+import type { ResidentOrder, SeenResident } from '@csp/shared-types'
 import { ACTIVITY_ART, PAINTED_UNIT_ART, UNIT_ART, paintedCell } from './art.js'
 import { CLOSE_SCALE, FAR_SCALE, type Camera } from './camera.js'
 import { RELATIONSHIP_COLORS, type BadgeLayer, type TokenLayer } from './tokens.js'

@@ -1,11 +1,6 @@
-import {
-  TICKS_PER_GAME_DAY,
-  TICKS_PER_GAME_HOUR,
-  gameTime,
-  type Remembered,
-  type SeenBuilding,
-  type SeenCity,
-} from '@csp/shared'
+import { TICKS_PER_GAME_DAY } from '@csp/balance'
+import { TICKS_PER_GAME_HOUR, gameTime } from './shared/time.js'
+import type { Remembered, SeenBuilding, SeenCity } from '@csp/shared-types'
 
 /** A building or site as the Player last saw it, out of their sight now (`CONTEXT.md`: Last seen). */
 export type LastSeenBuilding = SeenBuilding & { seenAt: number }

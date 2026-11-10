@@ -1,20 +1,19 @@
 import { useState, type FormEvent } from 'react'
-import {
-  CONTRACT_MAX_DAYS,
-  TRADE_ORG,
-  TRADE_ORG_ARMY,
-  type Building,
-  type SeenCity,
-  type SeenHorse,
-  type ContractView,
-  type OrderRequest,
-  type RealmLabel,
-  type Resident,
-  type ScriptSummary,
-  ageInYears,
-  isAt,
-  type SeenResident,
-} from '@csp/shared'
+import { CONTRACT_MAX_DAYS, TRADE_ORG_ARMY } from '@csp/balance'
+import { TRADE_ORG } from './shared/trade-org.js'
+import type {
+  Building,
+  SeenCity,
+  SeenHorse,
+  ContractView,
+  OrderRequest,
+  RealmLabel,
+  Resident,
+  ScriptSummary,
+  SeenResident,
+} from '@csp/shared-types'
+import { ageInYears } from './shared/stats.js'
+import { isAt } from './shared/footprint.js'
 import {
   contractStatus,
   offerSummary,
