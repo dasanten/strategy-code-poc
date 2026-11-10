@@ -51,35 +51,6 @@ fn fn_kind(validate: Validate, apply: Apply) -> FnKind {
     FnKind { validate, apply }
 }
 
-/// A movement order kind (T86.4), written against its own stand-in sender.
-// TODO(T86.4): `movement_pending::{OrderKind, OrderSender}` give way to `orders`' and `order_sender`'s.
-struct Moved<K>(K);
-
-fn moved_sender(s: &OrderSender) -> crate::movement_pending::OrderSender {
-    crate::movement_pending::OrderSender { user_id: s.user_id, npc_city_id: s.npc_city_id.clone() }
-}
-
-impl<K: crate::movement_pending::OrderKind + Send + Sync> OrderKind for Moved<K> {
-    fn validate(
-        &self,
-        world: &WorldState,
-        sender: &OrderSender,
-        order: &OrderRequest,
-        terrain: Option<&TerrainMap>,
-    ) -> Option<String> {
-        self.0.validate(world, &moved_sender(sender), order, terrain)
-    }
-    fn apply(
-        &self,
-        world: &mut WorldState,
-        sender: &OrderSender,
-        order: &OrderRequest,
-        terrain: Option<&TerrainMap>,
-    ) {
-        self.0.apply(world, &moved_sender(sender), order, terrain)
-    }
-}
-
 fn text(order: &OrderRequest, key: &str) -> Option<String> {
     order.fields.get(key).and_then(Value::as_str).map(str::to_string)
 }
@@ -105,17 +76,17 @@ fn army_request(order: &OrderRequest) -> ArmyRequest {
 /// Adds the order kinds of the rule tickets merged so far.
 pub fn add_rule_orders(kinds: &mut OrderKinds) {
     // T86.4: movement.
-    kinds.insert("walkTo", Moved(crate::walking::WalkTo));
-    kinds.insert("drive", Moved(crate::driving::Drive));
-    kinds.insert("unhitch", Moved(crate::driving::Unhitch));
-    kinds.insert("hitch", Moved(crate::driving::Hitch));
-    kinds.insert("mount", Moved(crate::riding::Mount));
-    kinds.insert("dismount", Moved(crate::riding::Dismount));
-    kinds.insert("board", Moved(crate::passengers::Board));
-    kinds.insert("getOff", Moved(crate::passengers::GetOff));
-    kinds.insert("climb", Moved(crate::climbing::Climb));
-    kinds.insert("setGate", Moved(crate::gates::SetGate));
-    kinds.insert("claimHorses", Moved(crate::horse_grant::ClaimHorses));
+    kinds.insert("walkTo", crate::walking::WalkTo);
+    kinds.insert("drive", crate::driving::Drive);
+    kinds.insert("unhitch", crate::driving::Unhitch);
+    kinds.insert("hitch", crate::driving::Hitch);
+    kinds.insert("mount", crate::riding::Mount);
+    kinds.insert("dismount", crate::riding::Dismount);
+    kinds.insert("board", crate::passengers::Board);
+    kinds.insert("getOff", crate::passengers::GetOff);
+    kinds.insert("climb", crate::climbing::Climb);
+    kinds.insert("setGate", crate::gates::SetGate);
+    kinds.insert("claimHorses", crate::horse_grant::ClaimHorses);
 
     // T86.6: building and work.
     kinds.insert(
@@ -489,40 +460,11 @@ pub fn add_later_rule_orders(kinds: &mut OrderKinds) {
 
     // T86.11: realms.
     for (name, kind) in crate::alliances::alliance_orders() {
-        kinds.insert(name, Realmed(kind));
+        kinds.insert(name, kind);
     }
     for (name, kind) in crate::contracts::contract_orders() {
-        kinds.insert(name, Realmed(kind));
+        kinds.insert(name, kind);
     }
-    kinds.insert("pay", Realmed(crate::contracts::Pay));
-    kinds.insert("buyOff", Realmed(crate::directives::BuyOff));
-}
-
-/// A realm order kind (T86.11), written against its own stand-in sender.
-// TODO: `realm_pending::{OrderKind, OrderSender}` give way to `orders`' and `order_sender`'s.
-struct Realmed<K>(K);
-
-fn realm_sender(s: &OrderSender) -> crate::realm_pending::OrderSender {
-    crate::realm_pending::OrderSender { user_id: s.user_id, npc_city_id: s.npc_city_id.clone() }
-}
-
-impl<K: crate::realm_pending::OrderKind + Send + Sync> OrderKind for Realmed<K> {
-    fn validate(
-        &self,
-        world: &WorldState,
-        sender: &OrderSender,
-        order: &OrderRequest,
-        terrain: Option<&TerrainMap>,
-    ) -> Option<String> {
-        self.0.validate(world, &realm_sender(sender), order, terrain)
-    }
-    fn apply(
-        &self,
-        world: &mut WorldState,
-        sender: &OrderSender,
-        order: &OrderRequest,
-        terrain: Option<&TerrainMap>,
-    ) {
-        self.0.apply(world, &realm_sender(sender), order, terrain)
-    }
+    kinds.insert("pay", crate::contracts::Pay);
+    kinds.insert("buyOff", crate::directives::BuyOff);
 }

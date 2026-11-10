@@ -6,7 +6,7 @@ use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{ContractSide, MercenaryContract, WorldState};
 use serde::Serialize;
 
-use crate::realm_pending::organization_label;
+use crate::queries::standing::organization_label;
 
 /// Game days in a game week, the period a contract is paid for (`GAME_DAYS_PER_WEEK`).
 pub const GAME_DAYS_PER_WEEK: f64 = 7.0;

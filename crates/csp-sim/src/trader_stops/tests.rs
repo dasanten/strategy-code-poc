@@ -367,11 +367,11 @@ fn stolen_it_starts_over_at_the_hq_with_no_stop_to_make() {
     stand_at(&mut world, 0, &c, 290.0, 490.0, 500.0);
     resident(&mut world, "thief", Some("r1"), 290.0, 490.0);
     let ki = carriage_of(&world, 0);
-    crate::movement_pending::take_over(
+    crate::stealing::take_over(
         &mut world,
         "thief",
         "r1",
-        crate::movement_pending::Taken { carriage: Some(ki), horse: None },
+        crate::stealing::Taken { carriage: Some(ki), horse: None },
         terrain.size,
     );
     let t = &world.traders[0];

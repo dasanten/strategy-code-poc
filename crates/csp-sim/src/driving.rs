@@ -3,33 +3,18 @@
 
 use csp_shared::balance::MAP_SIZE;
 use csp_shared::terrain::TerrainMap;
-use csp_shared::world::{
-    Army, Carriage, DriveOrder, OrderRequest, ResidentOrder, Tile, WorldState,
-};
+use csp_shared::world::{Army, DriveOrder, OrderRequest, ResidentOrder, Tile, WorldState};
 
-use crate::movement_pending::{
-    commands, int_field, ordered_resident, realm_of, str_field, take_over, OrderKind, OrderSender,
-    Taken,
-};
+use crate::order_sender::{commands, ordered_resident, realm_of, OrderSender};
+use crate::orders::{int_field, str_field, OrderKind};
 use crate::queries::alliance::commander_of;
 use crate::queries::carriages::driver_of;
+use crate::queries::command::{commands_carriage, steals_carriage};
 use crate::queries::driving::{
     carriage_can_go_to, drive_off_problem, drive_problem, hitch_off_problem, hitch_problem,
     horse_to_steal, unhitch_problem,
 };
-
-/// Whether the realm commands the carriage (`commandsCarriage`): its own, or one handed to it.
-// TODO(T86.5): `queries::command::commands_carriage`.
-fn commands_carriage(world: &WorldState, realm_id: &str, carriage: &Carriage) -> bool {
-    crate::queries::alliance::carriage_commander_of(world, carriage).as_deref() == Some(realm_id)
-}
-
-/// Whether driving the carriage off steals it for the realm (`stealsCarriage`): another
-/// organization's carriage that the realm doesn't command.
-// TODO(T86.5): `queries::command::steals_carriage`.
-fn steals_carriage(world: &WorldState, realm_id: &str, carriage: &Carriage) -> bool {
-    !commands_carriage(world, realm_id, carriage) && carriage.realm_id.as_deref() != Some(realm_id)
-}
+use crate::stealing::{take_over, Taken};
 
 /// The realm's army a carriage goes after, or why it can't (`armyToSupply`).
 pub fn army_to_supply<'w>(
@@ -79,7 +64,7 @@ impl OrderKind for Drive {
             return Some("not one of your carriages".into());
         };
         let steals = steals_carriage(world, &realm.id, carriage);
-        if !steals && !commands_carriage(world, &realm.id, carriage) {
+        if !steals && !commands_carriage(world, &realm.id, Some(carriage)) {
             return Some("not one of your carriages".into());
         }
         if order.fields.contains_key("armyId") {
@@ -248,7 +233,9 @@ impl OrderKind for Unhitch {
         order: &OrderRequest,
         _terrain: Option<&TerrainMap>,
     ) -> Option<String> {
-        let Some(r) = ordered_resident(world, sender, str_field(order, "residentId")) else {
+        let Some(r) = ordered_resident(world, sender, str_field(order, "residentId"))
+            .map(|i| &world.residents[i])
+        else {
             return Some("not one of your residents".into());
         };
         let carriage =
@@ -298,7 +285,9 @@ impl OrderKind for Hitch {
         order: &OrderRequest,
         _terrain: Option<&TerrainMap>,
     ) -> Option<String> {
-        let Some(r) = ordered_resident(world, sender, str_field(order, "residentId")) else {
+        let Some(r) = ordered_resident(world, sender, str_field(order, "residentId"))
+            .map(|i| &world.residents[i])
+        else {
             return Some("not one of your residents".into());
         };
         let carriage =

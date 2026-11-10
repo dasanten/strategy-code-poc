@@ -9,7 +9,8 @@ use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{Building, BuildingKind, OrderRequest, Realm, Resident, WorldState};
 use serde_json::{json, Value};
 
-use crate::realm_pending::{OrderKind, OrderSender};
+use crate::order_sender::OrderSender;
+use crate::orders::OrderKind;
 use crate::world::create_world;
 
 /// Plains all over, `size` tiles a side.
@@ -91,7 +92,7 @@ pub fn send(
     o: Value,
 ) -> Result<(), String> {
     let o: OrderRequest = serde_json::from_value(o).expect("an order");
-    let sender = OrderSender { user_id, npc_city_id: None };
+    let sender = OrderSender::player(user_id, "Player");
     if let Some(reason) = kind.validate(world, &sender, &o, Some(terrain)) {
         return Err(reason);
     }

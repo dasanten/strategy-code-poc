@@ -156,7 +156,7 @@ fn goods_warehouse(s: &Setup) -> usize {
 }
 
 #[test]
-#[ignore = "slow in the TypeScript too (`tags: ['slow']`): T86.14's long simulations"]
+#[ignore = "23.6 s alone; see #1092"]
 fn is_built_by_the_hq_from_its_own_adults_and_its_goods_warehouse() {
     let mut s = setup();
     let g = goods_warehouse(&s);
@@ -303,7 +303,6 @@ fn inner_ring_gates(s: &Setup) -> Vec<usize> {
 }
 
 #[test]
-#[ignore = "a game day of the HQ's soldiers walking: T86.14's long simulations"]
 fn keeps_everyone_out_of_the_hqs_inner_ring_by_force_and_without_a_crime() {
     let mut s = setup();
     let hq = s.hq.clone();

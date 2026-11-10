@@ -269,7 +269,7 @@ fn goes_without_when_the_hq_has_nobody_free_to_drive_it() {
 }
 
 #[test]
-#[ignore = "5.4 s, over the 5 s limit: the trip to the city with the HQ's default scripts every tick (T86.14)"]
+#[ignore = "6.1 s alone; see #1092"]
 fn follows_the_army_along_the_road() {
     let mut s = default_setup();
     let off = set_off(&mut s, iron(10.0));
@@ -627,11 +627,11 @@ fn cant_be_stolen_while_its_driver_or_soldiers_hold_it_and_is_gone_for_them_once
     let ki = s.world.carriages.iter().position(|k| k.id == off.carriage).unwrap();
     let hid = off.carriage(&s.world).horse_id.clone();
     let hi = s.world.horses.iter().position(|h| Some(&h.id) == hid.as_ref());
-    crate::movement_pending::take_over(
+    crate::stealing::take_over(
         &mut s.world,
         "a2",
         "r1",
-        crate::movement_pending::Taken { carriage: Some(ki), horse: hi },
+        crate::stealing::Taken { carriage: Some(ki), horse: hi },
         SIZE,
     );
     assert_eq!(off.carriage(&s.world).realm_id.as_deref(), Some("r1"));

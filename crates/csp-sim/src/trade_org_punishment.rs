@@ -376,7 +376,7 @@ fn send_out_for_directives(world: &mut WorldState, size: i32) {
     let from = (hq_hall.x, hq_hall.y);
     for di in 0..world.directives.len() {
         let d = world.directives[di].clone();
-        for org in directive_targets(world, &d) {
+        for org in directive_targets(world, &d.target, d.with_alliance) {
             if world.punishments.iter().any(|p| p.culprit_org == org) {
                 continue;
             }
