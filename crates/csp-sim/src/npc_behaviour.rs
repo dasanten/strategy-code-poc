@@ -157,3 +157,5 @@ pub use invariants::{
     npc_idle_off_the_storage, npc_residents_kept_going, npc_road_crew_sized, npc_soldiers_on_posts,
 };
 pub use run::step_npc_cities;
+#[cfg(test)]
+mod crew_food_tests;

@@ -78,6 +78,8 @@ pub mod passengers;
 pub mod pathfinding;
 pub mod persuasion;
 pub mod placing;
+#[cfg(test)]
+mod poc_tests;
 pub mod queries;
 pub mod queue;
 pub mod queues;

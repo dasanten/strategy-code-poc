@@ -1268,3 +1268,7 @@ pub fn building(world: &WorldState, i: usize) -> &Building {
 
 #[cfg(test)]
 mod escort_tests;
+#[cfg(test)]
+mod route_tests;
+#[cfg(test)]
+mod waiting_tests;
