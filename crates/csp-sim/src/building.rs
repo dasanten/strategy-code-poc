@@ -9,6 +9,7 @@ use csp_shared::world::{
     Resident, ResidentOrder, SkillName, Stock, Tile, WorldState,
 };
 
+use crate::cities::update_city_membership;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::queries::balance::{build_work, construction_learned, skill_of};
 use crate::queries::building::build_at_problem;
@@ -19,8 +20,14 @@ use crate::queries::building::{
 use crate::queries::names::{kind_of, placed};
 use crate::queue::field_str as str_field;
 use crate::random::new_id;
-use crate::stand_ins::{found_city, update_city_membership};
 use crate::survival::gather_pile;
+
+/// Founds a city around the finished town hall `town_hall_id` (`foundCity` of `cities.ts`).
+fn found_city(world: &mut WorldState, town_hall_id: &str, realm_id: Option<&str>) {
+    if let Some(hall) = world.buildings.iter().position(|b| b.id == town_hall_id) {
+        crate::cities::found_city(world, hall, realm_id);
+    }
+}
 
 /// What an action asks of a construction site (`BuildAction.kind`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

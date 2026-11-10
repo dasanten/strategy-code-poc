@@ -8,6 +8,8 @@ use csp_shared::world::{
     Building, OrderRequest, ResidentOrder, SkillName, TearDownOrder, Tile, WorldState,
 };
 
+use crate::cities::{dissolve_city, update_city_membership};
+use crate::crimes::{building_organization, commit_crime, CrimeAgainst};
 use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::queries::balance::{build_work, construction_learned, skill_of};
 use crate::queries::building::{
@@ -17,9 +19,22 @@ use crate::queries::building::{tear_down_problem, CARRYING_A_CHILD};
 use crate::queries::names::placed;
 use crate::queries::residents::can_work;
 use crate::queue::field_str as str_field;
-use crate::stand_ins::{commit_tear_down_crime, dissolve_city, update_city_membership};
 use crate::survival::drop_goods;
 use crate::tick::Scratch;
+
+/// Taking down another Organization's building is a crime (`buildingOrganization`, `commitCrime`
+/// of `teardown.ts`), noted before the building goes.
+fn commit_tear_down_crime(
+    world: &mut WorldState,
+    resident_id: &str,
+    building: &Building,
+    size: i32,
+) {
+    let victim_org = building_organization(world, building);
+    let against =
+        CrimeAgainst { victim_org, building: Some(building.kind), ..CrimeAgainst::default() };
+    commit_crime(world, size, csp_shared::world::CrimeKind::TearDown, resident_id, against);
+}
 
 /// An action a resident with a tear-down order requests: a tick's work (`TearDownAction`).
 #[derive(Debug, Clone, PartialEq, Eq)]
