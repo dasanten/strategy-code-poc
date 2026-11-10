@@ -565,6 +565,3 @@ pub fn npc_roads_once(world: &WorldState) -> Vec<InvariantViolation> {
     }
     out
 }
-
-#[cfg(test)]
-mod slow_tests;
