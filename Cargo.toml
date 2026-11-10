@@ -39,9 +39,16 @@ opt-level = 3
 # spend most of their time in it.
 [profile.dev.package.csp-lang]
 opt-level = 3
+
 [profile.release]
 lto = "thin"
 codegen-units = 4
+
+# Release with symbols, so a CPU profile shows function names (`samply record`; see the README's
+# "Benchmarks and profiling"). Same optimisation as release, so the profile is the real one.
+[profile.profiling]
+inherits = "release"
+debug = true
 
 # The editor's WebAssembly checker (`csp-lang-wasm`, T88.3): small over fast, built by
 # `pnpm wasm:build` with `--profile wasm`.

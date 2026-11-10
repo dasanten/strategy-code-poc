@@ -88,6 +88,44 @@ checkout; copy it to `data/world.db` to keep playing it.
   step to `crates/csp-server/src/world_format.rs`, with a test. A save older than format 111 (the
   TypeScript freeze) is refused: run the last TypeScript image on it once first (see Deploy).
 
+## Benchmarks and profiling
+
+Every performance claim in a PR comes from the benchmarks (ADR 0030), run in release:
+
+```sh
+cargo run --release -p csp-server --bin bench-world -- [size] [seed]       # generation by stage
+cargo run --release -p csp-server --bin bench-sim -- <village|villages|hq|save> [ticks]
+```
+
+`bench-sim save` reads the newest save of the database at `DB_PATH` (it works on a copy of it).
+
+To see where the time goes, record a CPU profile of the same command with
+[samply](https://github.com/mstange/samply) (no code in the benchmarks; the profiler samples the
+process from outside). Build with the `profiling` profile (release plus debug symbols, in the
+workspace `Cargo.toml`) so the profile shows function names:
+
+```sh
+cargo install samply --locked
+cargo build --profile profiling -p csp-server --bin bench-sim --bin bench-world
+samply record --save-only -o village.json.gz target/profiling/bench-sim village
+samply load village.json.gz        # serves the Firefox Profiler on localhost and opens it
+```
+
+In the profiler, the Call Tree tab with "Invert call stack" ticked lists the functions by self
+time; the Flame Graph tab shows the same by stack. Without `--save-only`, `samply record` opens
+the profiler straight away. `bench-world` works the same way (`target/profiling/bench-world`).
+
+**Status: neither path has been run yet** (T89.3, #1129); the commands are from samply's
+documentation.
+
+- **Linux:** needs a C toolchain for the build (`sudo apt install build-essential`) and
+  `kernel.perf_event_paranoid` of 2 or lower, which sampling your own process needs. If samply
+  complains, `sudo sysctl kernel.perf_event_paranoid=1`.
+- **Windows:** samply records through ETW, so it needs the Windows Performance Toolkit (`xperf`;
+  the Windows ADK installer, tick only "Windows Performance Toolkit") and an elevated terminal
+  (it asks for elevation itself). The record command is the same. To have the profile carry its
+  symbols, add `--unstable-presymbolicate`, which writes a `.syms.json` beside it.
+
 ## Monitoring
 
 See ADR 0004. The server logs JSON lines (level via `LOG_LEVEL`). Set `SENTRY_DSN` (server) and
