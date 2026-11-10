@@ -10,6 +10,7 @@
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 use std::sync::Arc;
 
 use csp_lang::interpreter::{run, RunOptions, RunResult, ValueLimits};
@@ -1712,16 +1713,34 @@ pub fn running_scripts_sound(world: &WorldState) -> Vec<InvariantViolation> {
     out
 }
 
-thread_local! {
-    /// The game's default scripts as parsed, by source, for NPC cities (`gamePrograms`).
-    static GAME_PROGRAMS: RefCell<HashMap<&'static str, Arc<Program>>> = RefCell::new(HashMap::new());
+/// A task's default script as an NPC city runs it: parsed, with its params and no values picked.
+struct NpcDefault {
+    program: Arc<Program>,
+    params: Vec<ParamWithValue>,
 }
 
-fn game_program(source: &'static str) -> Arc<Program> {
-    GAME_PROGRAMS.with(|p| {
-        p.borrow_mut()
-            .entry(source)
-            .or_insert_with(|| Arc::new(parse(source).expect("the game's default scripts parse")))
+thread_local! {
+    /// The game's default scripts as parsed, by task, for NPC cities (`gamePrograms`). By task
+    /// rather than by source, so a run doesn't hash the whole source to find it (#1092).
+    static NPC_DEFAULTS: RefCell<HashMap<Task, Rc<NpcDefault>>> = RefCell::new(HashMap::new());
+}
+
+/// The default script of `task`, parsed once, with its params: nobody picks values for an NPC
+/// city, so its defaults fall back on their own.
+fn npc_default(task: Task) -> Rc<NpcDefault> {
+    NPC_DEFAULTS.with(|d| {
+        d.borrow_mut()
+            .entry(task)
+            .or_insert_with(|| {
+                let (_, source) = default_script(task);
+                let program = parse(source).expect("the game's default scripts parse");
+                let params = params_of(source)
+                    .iter()
+                    .cloned()
+                    .map(|p| ParamWithValue { param: p, value: None })
+                    .collect();
+                Rc::new(NpcDefault { program: Arc::new(program), params })
+            })
             .clone()
     })
 }
@@ -1823,15 +1842,8 @@ fn run_city_scripts(
             continue;
         }
         runs += 1;
-        let (_, source) = default_script(task);
-        let program = game_program(source);
+        let default = npc_default(task);
         let memory = memory_object(&running.memory);
-        // Nobody picks values for an NPC city: its defaults fall back on their own.
-        let params: Vec<ParamWithValue> = params_of(source)
-            .iter()
-            .cloned()
-            .map(|p| ParamWithValue { param: p, value: None })
-            .collect();
         let mut slot = scratch.index.take();
         let index = crate::world_index::world_index(&mut slot, world, terrain.size);
         let outcome = {
@@ -1864,10 +1876,10 @@ fn run_city_scripts(
                 explored: &explored,
                 kinds,
                 edge: Some(&edge),
-                params: Some(&params),
+                params: Some(&default.params),
             };
             let outcome = bind_script(ctx).ok().map(|mut bound| {
-                let _ = run(&program, &mut bound, &options(SCRIPT_STEP_BUDGET as u64));
+                let _ = run(&default.program, &mut bound, &options(SCRIPT_STEP_BUDGET as u64));
                 (bound.requests, bound.ended, bound.end_reason, bound.waited)
             });
             scratch.sight = sight.into_inner();

@@ -25,8 +25,9 @@ use csp_shared::protocol::SeenEntity;
 use csp_shared::terrain::{is_passable_terrain, terrain_at, wrap_distance, Terrain, TerrainMap};
 use csp_shared::world::{
     AlarmScriptId, Building, BuildingKind, Good, OrderRequest, Remembered, Resident, ResidentOrder,
-    Struck, Waypoint, WorldState,
+    SkillName, Stat, StatRecord, Struck, Waypoint, WorldState,
 };
+use indexmap::IndexMap;
 use serde_json::{json, Map, Value as Json};
 
 use crate::crimes::known_thieves;
@@ -238,6 +239,60 @@ fn field_value<T: serde::Serialize>(t: &T, ty: ScriptType) -> Value {
     view_value(&serde_json::to_value(t).unwrap_or(Json::Null), ty)
 }
 
+/// Numbers by name as a view of number fields, such as `goods` or `skills`: each field the
+/// number `named` gives it, `null` for none.
+fn numbers_view<K: Copy>(
+    view: &'static str,
+    entries: &IndexMap<K, f64>,
+    name_of: fn(K) -> &'static str,
+) -> Value {
+    let fields = script_view(view).map_or(&[][..], |v| v.fields);
+    Value::frozen_fields(fields.iter().map(|f| {
+        let n = entries.iter().find(|(k, _)| name_of(**k) == f.name);
+        (f.name, n.map_or(Value::Null, |(_, n)| number(*n)))
+    }))
+}
+
+/// A resident's `stats` as their view: each stat's `base` and `trained`.
+fn stats_view(stats: &StatRecord<Stat>) -> Value {
+    let stat = |s: &Stat| {
+        let fields = script_view("stat").map_or(&[][..], |v| v.fields);
+        Value::frozen_fields(fields.iter().map(|f| {
+            let n = match f.name {
+                "base" => number(s.base),
+                "trained" => number(s.trained),
+                _ => Value::Null,
+            };
+            (f.name, n)
+        }))
+    };
+    let fields = script_view("stats").map_or(&[][..], |v| v.fields);
+    Value::frozen_fields(fields.iter().map(|f| {
+        let v = match f.name {
+            "strength" => stat(&stats.strength),
+            "endurance" => stat(&stats.endurance),
+            "agility" => stat(&stats.agility),
+            "intellect" => stat(&stats.intellect),
+            _ => Value::Null,
+        };
+        (f.name, v)
+    }))
+}
+
+/// A skill's TypeScript name.
+fn skill_name(s: SkillName) -> &'static str {
+    match s {
+        SkillName::Mining => "mining",
+        SkillName::Woodcutting => "woodcutting",
+        SkillName::Smelting => "smelting",
+        SkillName::Smithing => "smithing",
+        SkillName::Construction => "construction",
+        SkillName::Farming => "farming",
+        SkillName::Combat => "combat",
+        SkillName::Driving => "driving",
+    }
+}
+
 /// A resident as `me` or an army's member sees itself (`asView` of its plain data, less its
 /// `script`, with its `age`), built field by field from the struct rather than through the whole
 /// resident as JSON: the same value, for a fraction of the cost (#1092). Its defence and Alarm
@@ -277,9 +332,9 @@ fn resident_view(world: &WorldState, r: &Resident, side: Option<&str>, alarm: bo
             "bornAt" => number(r.born_at),
             "age" => number(age_in_years(r.born_at, world.tick as f64)),
             "lifespan" => number(r.lifespan),
-            "stats" => field_value(&r.stats, f.r#type),
-            "skills" => field_value(&r.skills, f.r#type),
-            "carried" => field_value(&r.carried, f.r#type),
+            "stats" => stats_view(&r.stats),
+            "skills" => numbers_view("skills", &r.skills, skill_name),
+            "carried" => numbers_view("goods", &r.carried, good_name),
             "order" => field_value(&r.order, f.r#type),
             "orderEnded" => field_value(&r.order_ended, f.r#type),
             "queue" => match &r.queue {

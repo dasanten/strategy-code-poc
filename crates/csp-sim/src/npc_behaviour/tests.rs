@@ -266,7 +266,7 @@ fn a_players_city_whose_leader_died_runs_on_its_own_player_only_orders_ended() {
 
 /// Not a check: what one run of an NPC's default script costs, binding, interpreting and applying
 /// what it asked for (#1092), on the farm village of `carries_the_farms_output_to_the_storage`.
-/// `cargo test -p csp-sim --release --lib bench_npc_runs -- --ignored --nocapture`.
+/// `cargo test -p csp-sim --lib bench_npc_runs -- --ignored --nocapture`.
 #[test]
 #[ignore = "a measurement, not a check"]
 fn bench_npc_runs() {
