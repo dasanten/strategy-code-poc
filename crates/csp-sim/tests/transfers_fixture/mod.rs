@@ -7,7 +7,10 @@
 use std::sync::Arc;
 
 use csp_shared::terrain::TerrainMap;
-use csp_shared::world::{Building, BuildingKind, City, Good, Stock, TradeOrgCity, WorldState};
+use csp_shared::world::{
+    Building, BuildingKind, Caravan, City, Good, GoodsSpot, Stock, TradeOrgCity, WorldState,
+};
+use csp_sim::carrying::{resolve_carrying, CarryAction, CarryKind};
 use csp_sim::invariants::{check_invariants, world_invariants};
 use csp_sim::orders::{order_kinds, OrderQueue, OrderReply};
 use csp_sim::queries::warehouse_trade::delivery_storage;
@@ -55,14 +58,25 @@ pub fn answer(reply: OrderReply) -> String {
 
 /// `setup()`.
 pub fn setup() -> Fixture {
-    let (world, size, _) = common::load_world("trade/transfers.json");
+    load("trade/transfers.json")
+}
+
+/// `setup()` of `deliveries.fixture.ts`: the same world without Ivo, whose fields are left empty.
+pub fn deliveries() -> Fixture {
+    load("trade/deliveries.json")
+}
+
+fn load(path: &str) -> Fixture {
+    let (world, size, _) = common::load_world(path);
     let terrain = Arc::new(open(size));
+    let storage_of = |city: &str| delivery_storage(&world, city).unwrap().id.clone();
     let realm = realm_of(&world, MARA);
-    let other = realm_of(&world, IVO);
     let city = city_of(&world, &realm);
-    let to_city = city_of(&world, &other);
-    let storage = delivery_storage(&world, &city).unwrap().id.clone();
-    let to_storage = delivery_storage(&world, &to_city).unwrap().id.clone();
+    let storage = storage_of(&city);
+    let ivo = world.realms.iter().any(|r| r.user_id == IVO);
+    let other = if ivo { realm_of(&world, IVO) } else { String::new() };
+    let to_city = if ivo { city_of(&world, &other) } else { String::new() };
+    let to_storage = if ivo { storage_of(&to_city) } else { String::new() };
     Fixture {
         queue: OrderQueue::new(order_kinds(), Some(terrain.clone())),
         world,
@@ -182,6 +196,49 @@ impl Fixture {
         }
         assert!(done(&self.world), "not done after {t} ticks");
         assert_eq!(self.broken(), Vec::<String>::new());
+    }
+
+    /// The caravan carrying out a transfer, if any (`carrier`).
+    pub fn carrier(&self) -> Option<&Caravan> {
+        self.world.caravans.iter().find(|c| c.transfer.is_some())
+    }
+
+    /// Has a resident of Mara's realm (`id`, new if there is none) stand at the caravan's
+    /// carriage and take `goods` off it (`rob`). Returns the thief's index.
+    pub fn rob(&mut self, caravan_id: &str, goods: Stock, id: &str) -> usize {
+        let caravan = self.world.caravans.iter().find(|c| c.id == caravan_id).unwrap();
+        let carriage_id = caravan.carriage_id.clone();
+        let carriage = self.world.carriages.iter().find(|k| k.id == carriage_id).unwrap();
+        let (x, y) = (carriage.x, carriage.y);
+        let i = match self.world.residents.iter().position(|r| r.id == id) {
+            Some(i) => i,
+            None => {
+                let realm = self.world.realms[0].id.clone();
+                let city = city_of(&self.world, &realm);
+                let mut thief = super::goods_support::drawn_resident(
+                    17.0,
+                    id,
+                    Some(&realm),
+                    Some(&city),
+                    0.0,
+                    0.0,
+                );
+                thief.born_at = -20.0 * 24.0 * 3600.0;
+                self.world.residents.push(thief);
+                self.world.residents.len() - 1
+            }
+        };
+        self.world.residents[i].x = x;
+        self.world.residents[i].y = y;
+        let take = CarryAction {
+            kind: CarryKind::Take,
+            resident_id: id.into(),
+            spot: GoodsSpot::Carriage { carriage_id },
+            goods,
+        };
+        let size = self.size();
+        resolve_carrying(&mut self.world, &[take], size);
+        i
     }
 
     /// Every unit of a good in the world (`total`).

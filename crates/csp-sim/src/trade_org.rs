@@ -489,3 +489,6 @@ mod tests {
         assert_eq!(l.houses.len(), TRADE_ORG_HQ.houses as usize);
     }
 }
+
+#[cfg(test)]
+mod hq_run_tests;
