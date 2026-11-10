@@ -349,7 +349,9 @@ fn place_trading_posts(world: &mut WorldState, terrain: &TerrainMap) {
 fn place_caravans(world: &mut WorldState) {
     crate::caravans::place_caravans(world);
 }
-fn place_traders(_world: &mut WorldState, _size: i32) {}
+fn place_traders(world: &mut WorldState, size: i32) {
+    crate::traders::place_traders(world, size);
+}
 
 // T86.10 (`npc-cities.ts`): world generation.
 fn place_npc_cities(world: &mut WorldState, terrain: &TerrainMap) {
@@ -373,12 +375,8 @@ fn step_offers(world: &mut WorldState, _scratch: &mut Scratch) {
 fn step_caravans(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
     crate::caravans::step_caravans(world, size);
 }
-fn step_traders(
-    _world: &mut WorldState,
-    _size: i32,
-    _terrain: &TerrainMap,
-    _scratch: &mut Scratch,
-) {
+fn step_traders(world: &mut WorldState, size: i32, terrain: &TerrainMap, _scratch: &mut Scratch) {
+    crate::traders::step_traders(world, size, Some(terrain));
 }
 fn step_trade_org_army(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
     crate::trade_org_army::step_trade_org_army(world, size);

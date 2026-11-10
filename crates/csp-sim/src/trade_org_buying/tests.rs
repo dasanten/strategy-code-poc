@@ -1,11 +1,12 @@
-//! `apps/server/src/trade-org-buying.test.ts`, ported one to one. Taking a Player's Food offer is
-//! ignored: `acceptOffer` comes with `offers.ts`, which no ticket ports yet.
+//! `apps/server/src/trade-org-buying.test.ts`, ported one to one.
 
 use std::sync::Arc;
 
 use csp_shared::balance::{CRIME_STANDING_LOSS, NPC_VILLAGE, TRADE_ORG_ARMY};
 use csp_shared::terrain::{Terrain, TerrainMap};
-use csp_shared::world::{PunishmentHeading, ResidentOrder, SupplyWagon, WorldState};
+use csp_shared::world::{
+    PunishmentHeading, RealmEventWhat, ResidentOrder, SupplyWagon, WorldState,
+};
 use serde_json::json;
 
 use super::*;
@@ -13,6 +14,7 @@ use crate::caravans::new_caravan_carriage;
 use crate::invariants::check_all;
 use crate::npc_cities::found_npc_city;
 use crate::npc_defence::attackers_of;
+use crate::offers::{trade_org_only_buys_food, Accepted, OfferLedger};
 use crate::queries::standing::standing_of;
 use crate::random::Mulberry32;
 use crate::realm_test_world::plains;
@@ -362,7 +364,6 @@ fn buys_from_an_npc_city_it_passes_which_raises_its_standing_like_any_trade() {
 }
 
 #[test]
-#[ignore = "accepting an offer comes with `offers.ts`, which no ticket ports yet"]
 fn takes_a_players_food_offer_it_passes_and_the_player_hears_of_it() {
     let mut s = setup(open());
     food_offer(&mut s.world, "r2", 4.0);
@@ -372,8 +373,24 @@ fn takes_a_players_food_offer_it_passes_and_the_player_hears_of_it() {
     let place = s.building("off");
     assert_eq!(held_in(place.stock.as_ref(), Good::Coins), TRADE_ORG_PUNISH.purse - s.coins());
     assert_eq!(s.food() % 2.0, 0.0);
+    assert!(s
+        .world
+        .events
+        .iter()
+        .any(|e| matches!(e.what, RealmEventWhat::OfferTaken { .. }) && e.user_id == 8));
     assert!(standing_of(&s.world, "r2", TRADE_ORG) > 0.0);
     assert_eq!(taken_by(s.r(), &s.p().members[0].own), Stock::new());
+    // Food for Coins by a soldier is the one offer the Trade Organization takes.
+    let record = |food_for_coins| Accepted {
+        resident_id: s.r().id.clone(),
+        before: Stock::new(),
+        after: Stock::new(),
+        food_for_coins,
+    };
+    let mut ledger = OfferLedger { records: vec![record(true)] };
+    assert_eq!(trade_org_only_buys_food(&s.world, &ledger), vec![]);
+    ledger.records.push(record(false));
+    assert_eq!(trade_org_only_buys_food(&s.world, &ledger).len(), 1);
 }
 
 #[test]

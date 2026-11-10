@@ -11,7 +11,7 @@
 //!
 //! Waiting for their ports, each sent as an empty value of its shape until then: the alliance
 //! matters (`diplomacyFor`, `carriedWaysFor`, T86.11), the Region map (`regionMapFor`, T86.11),
-//! the traders at the realm's cities (`traderVisitsTo`, T86.9) and Last seen out of sight
+//! and Last seen out of sight
 //! (`lastSeenOutOfSight`, T86.13). Founding a starting city (`foundStartingCity`, T86.8) is
 //! refused until it is ported.
 
@@ -273,9 +273,9 @@ fn diplomacy_for(_world: &WorldState, _realm_id: &str, _seen: &[Seen]) -> Value 
 }
 
 /// The traders standing at the realm's cities (`traderVisitsTo`).
-// TODO(T86.9): `trader_visits_to` once the Trade Organization is ported.
-fn trader_visits_to(_world: &WorldState, _realm_id: &str) -> Value {
-    json!([])
+fn trader_visits_to(world: &WorldState, realm_id: &str) -> Value {
+    serde_json::to_value(csp_sim::queries::trader_trade::trader_visits_to(world, realm_id))
+        .expect("serialisable")
 }
 
 /// What the Player remembers out of sight (`lastSeenOutOfSight`).
