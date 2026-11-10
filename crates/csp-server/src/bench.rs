@@ -7,17 +7,24 @@
 //! prints its own.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use csp_shared::balance::{MAP_SIZE, NPC_VILLAGE};
 use csp_shared::terrain::{tile_index, Terrain, TerrainMap};
 use csp_shared::world::{ResourceKind, ResourceNode, WorldState};
+use csp_sim::caravans::place_caravans;
+use csp_sim::npc_cities::place_npc_cities;
 use csp_sim::sight::InvariantViolation;
 use csp_sim::terrain_gen::{generate_terrain, generate_terrain_timed};
 use csp_sim::tick::{
     run_tick, Scratch, ScriptErrorWhere, TickHealth, TickOptions, TickPhase, TickReporter,
     TICK_PHASES,
 };
+use csp_sim::trade_org::{found_trade_org_hq, place_trade_org_hq};
+use csp_sim::traders::place_traders;
+use csp_sim::trading_posts::place_trading_posts;
+use csp_sim::walking::Walking;
 use csp_sim::world::{create_world, generate_world};
 
 use crate::db::open_db;
@@ -137,19 +144,22 @@ pub fn bench_world(size: i32, seed: i64, out: &mut Out<'_>) -> WorldBench {
         terrain_stages.push((stage, ms(took)))
     });
     let terrain_ms = ms(t0.elapsed());
-    // `generateWorld`'s stages after `nodes` (HQ, NPC cities, trading posts, caravans) are rules
-    // in `csp_sim::world` that the rule tickets are porting, so they are timed together here as
-    // the rest of `generate_world`; `nodes` (`create_world`) is timed apart, on its own world.
-    // TODO(T86.9, T86.10): a row per stage, once the placements are ported and can be timed.
-    let t1 = Instant::now();
-    create_world(&terrain, seed);
-    let nodes_ms = ms(t1.elapsed());
-    let t2 = Instant::now();
-    let world = generate_world(&terrain, seed);
-    let whole_ms = ms(t2.elapsed());
-    world_stages.push(("nodes", nodes_ms));
-    world_stages.push(("HQ, NPC cities, trading posts, caravans", (whole_ms - nodes_ms).max(0.0)));
-    let world_ms = nodes_ms + (whole_ms - nodes_ms).max(0.0);
+    // `generateWorld`'s stages, each timed as `generateWorld`'s `time` does.
+    let mut time = |stage: &'static str, run: &mut dyn FnMut()| {
+        let t = Instant::now();
+        run();
+        world_stages.push((stage, ms(t.elapsed())));
+    };
+    let mut world = create_world(&terrain, 0);
+    time("nodes", &mut || world = create_world(&terrain, seed));
+    time("HQ", &mut || drop(place_trade_org_hq(&mut world, &terrain)));
+    time("NPC cities", &mut || drop(place_npc_cities(&mut world, &terrain)));
+    time("trading posts", &mut || drop(place_trading_posts(&mut world, &terrain)));
+    time("caravans", &mut || {
+        place_caravans(&mut world);
+        place_traders(&mut world, terrain.size);
+    });
+    let world_ms = world_stages.iter().map(|(_, ms)| ms).sum();
     let rows = |stages: &[(&str, f64)], total: f64| -> Vec<Vec<String>> {
         let mut rows: Vec<Vec<String>> = stages
             .iter()
@@ -217,27 +227,15 @@ fn plains(size: i32) -> TerrainMap {
 }
 
 /// Founds an NPC city of `kind` with its top-left corner at (x, y) (`foundNpcCity`).
-// TODO(T86.10): `csp_sim::npc_cities::found_npc_city` once the NPC cities are ported; until then
-// the scenes have no cities and `bench-sim` times an empty world.
 fn found_npc_city(
-    _world: &mut WorldState,
-    _terrain: &TerrainMap,
-    _kind: csp_shared::balance::NpcCitySize,
-    _x: i32,
-    _y: i32,
-    _rand: &mut dyn FnMut() -> f64,
+    world: &mut WorldState,
+    terrain: &TerrainMap,
+    kind: csp_shared::balance::NpcCitySize,
+    x: i32,
+    y: i32,
+    rand: &mut dyn FnMut() -> f64,
 ) {
-}
-
-/// Founds the Trade Org HQ at (x, y) (`foundTradeOrgHq`).
-// TODO(T86.9): `csp_sim::trade_org::found_trade_org_hq` once the Trade Organization is ported.
-fn found_trade_org_hq(
-    _world: &mut WorldState,
-    _terrain: &TerrainMap,
-    _x: i32,
-    _y: i32,
-    _rand: &mut dyn FnMut() -> f64,
-) {
+    csp_sim::npc_cities::found_npc_city(world, terrain, &kind, x, y, rand, None);
 }
 
 fn mulberry(seed: u32) -> impl FnMut() -> f64 {
@@ -370,9 +368,9 @@ pub struct SimBench {
 }
 
 /// Steps the scene through `run_tick` with the invariants off and prints the mean and p95 of every
-/// phase, the residents, and ms per tick per resident (`benchSim`). Players' queues, orders and
-/// scripts are not wired, so the NPC cities' residents' scripts are what runs; the phases that
-/// belong to the server loop (`finish`) are not run and print 0.
+/// phase, the residents, and ms per tick per resident (`benchSim`). As in the TypeScript, only
+/// walking is wired: no Player's orders, queues or scripts, so the NPC cities' residents' scripts
+/// are what runs; the phases that belong to the server loop (`finish`) are not run and print 0.
 pub fn bench_sim(name: SceneName, scene: Scene, ticks: usize, out: &mut Out<'_>) -> SimBench {
     let Scene { mut world, terrain } = scene;
     let mut scratch = Scratch::default();
@@ -382,9 +380,11 @@ pub fn bench_sim(name: SceneName, scene: Scene, ticks: usize, out: &mut Out<'_>)
     let mut totals = Vec::with_capacity(ticks);
     let mut residents = Vec::with_capacity(ticks);
     let start_residents = world.residents.len();
+    let terrain = Arc::new(terrain);
+    let mut walking = Walking::new(Arc::clone(&terrain));
     for i in 0..ticks {
-        // TODO(T86.4): `walking: Some(&mut Walking::new(&terrain))`, as the TypeScript bench does.
-        let opts = TickOptions::new(&mut reporter, 0.0, f64::INFINITY);
+        let mut opts = TickOptions::new(&mut reporter, 0.0, f64::INFINITY);
+        opts.walking = Some(&mut walking);
         let Some(health) = run_tick(&mut world, &terrain, &mut scratch, opts) else {
             panic!("tick {i} failed");
         };

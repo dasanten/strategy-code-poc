@@ -8,9 +8,8 @@
 //! HTTP (`app.rs`) is served beside the loop, on its own database connection, and reaches the
 //! world through the game thread between ticks.
 //!
-//! Not wired yet, each waiting for its port: WebSocket sync and the broadcast (T87.6), orders,
-//! queues, scripts and walking (Epic 86), territory, `noteScriptViewChanges` and the script
-//! library's invariant at start and daily (`checkScriptLibrary`).
+//! The game thread reads the script library on a connection of its own ([`Game::with_library`]),
+//! for the orders, queues and scripts that run the Players' scripts.
 
 use std::{
     path::{Path, PathBuf},
@@ -22,13 +21,21 @@ use csp_shared::{balance::MAP_SIZE, terrain::TerrainMap, world::WorldState, TICK
 use csp_sim::{
     explored::ExploredTerrain,
     orders::{order_kinds, OrderQueue},
+    queues::QueueRunner,
+    script_runner::ScriptRunner,
     sight::SightTracker,
     terrain_gen::generate_terrain,
-    tick::{run_tick, Scratch, TickHealth, TickOptions, TickPhase, TickTimer},
+    territory::TerritoryTracker,
+    tick::{
+        run_tick, RunQueues, RunScripts, Scratch, TickHealth, TickOptions, TickPhase, TickReporter,
+        TickTimer,
+    },
+    walking::Walking,
     world::generate_world,
 };
 use rusqlite::Connection;
 use serde_json::json;
+use std::sync::MutexGuard;
 use tokio::sync::oneshot;
 use tracing::Level;
 
@@ -42,9 +49,12 @@ use crate::{
     config::Config,
     db::{open_db, DbError},
     explored::{load_explored, save_explored},
+    field_check::note_script_view_changes,
+    game_scripts::{library_order_kinds, LibraryHost, ScriptErrors, SharedHost},
     monitoring::{init_sentry, tag_world, LogSink, ServerReporter, TracingLog},
-    realtime::{Realtime, RealtimeOptions, SightCheck},
+    realtime::{Realtime, RealtimeOptions, SightCheck, TickView},
     saves::{load_or_create_world, SaveLog, SavesError, WorldSaver},
+    scripts::{check_script_library, Defaults},
     tick_window::TickHealthWindow,
 };
 
@@ -112,10 +122,20 @@ pub struct Game<L: LogSink> {
     /// Shared with the order queue, whose orders check the land.
     pub terrain: Arc<TerrainMap>,
     pub scratch: Scratch,
-    pub explored: ExploredTerrain,
+    /// Shared with the script host, whose scripts ask what their Player explored.
+    pub explored: Arc<Mutex<ExploredTerrain>>,
     pub sight: SightTracker,
+    /// The world's territory, worked out again once a game hour (`TerritoryTracker`).
+    pub territory: TerritoryTracker,
     /// Orders accepted from the sockets since the last tick, applied at the start of the next.
     pub orders: OrderQueue,
+    /// Moves the residents' queues on; none until the script library is attached.
+    pub queues: Option<QueueRunner>,
+    /// Runs the residents' and armies' scripts; none until the script library is attached.
+    pub scripts: Option<ScriptRunner>,
+    pub walking: Walking,
+    /// The script library the game thread reads, once attached ([`Game::with_library`]).
+    pub library: Option<(Arc<LibraryHost>, &'static Defaults)>,
     /// The sockets, told of every tick in its broadcast phase; none until they are attached.
     pub realtime: Option<Arc<Realtime>>,
     pub saver: WorldSaver<SaverLog<L>>,
@@ -124,21 +144,72 @@ pub struct Game<L: LogSink> {
 }
 
 impl<L: LogSink> Game<L> {
+    /// The game without a script library: orders, walking and territory, but no script runs.
     pub fn new(world: WorldState, terrain: TerrainMap, explored: ExploredTerrain, log: L) -> Self {
         let log = Arc::new(log);
         let terrain = Arc::new(terrain);
         Self {
             world,
             orders: OrderQueue::new(order_kinds(), Some(Arc::clone(&terrain))),
+            walking: Walking::new(Arc::clone(&terrain)),
             terrain,
             scratch: Scratch::default(),
-            explored,
+            explored: Arc::new(Mutex::new(explored)),
             sight: SightTracker::new(),
+            territory: TerritoryTracker::default(),
+            queues: None,
+            scripts: None,
+            library: None,
             realtime: None,
             saver: WorldSaver::new(SaverLog(Arc::clone(&log))),
             reporter: ServerReporter::new(Arc::clone(&log)),
             log,
         }
+    }
+
+    /// Attaches the script library on `db` (`scriptHost`): the order kinds that need it, the
+    /// queue runner and the script runner, as `index.ts` builds them. Orders already waiting are
+    /// dropped, so attach it before the first socket connects.
+    pub fn with_library(
+        mut self,
+        db: Arc<Mutex<Connection>>,
+        defaults: &'static Defaults,
+        errors: Option<ScriptErrors>,
+    ) -> Self {
+        let host = Arc::new(LibraryHost::new(db, defaults, Arc::clone(&self.explored), errors));
+        let kinds = library_order_kinds(&host);
+        let terrain = Arc::clone(&self.terrain);
+        self.orders = OrderQueue::new(kinds.clone(), Some(Arc::clone(&terrain)));
+        self.queues = Some(QueueRunner::new(
+            Box::new(SharedHost(Arc::clone(&host))),
+            kinds.clone(),
+            Some(Arc::clone(&terrain)),
+        ));
+        self.scripts = Some(ScriptRunner::new(terrain, host.clone(), kinds));
+        self.library = Some((host, defaults));
+        self
+    }
+
+    /// The script library's invariants (`checkScriptLibrary`), reported as the tick's are: at
+    /// start and daily. Nothing without a library attached.
+    pub fn check_script_library(&mut self, conn: &Connection) {
+        let Some((_, defaults)) = self.library else { return };
+        match check_script_library(conn, defaults) {
+            Ok(violations) if !violations.is_empty() => {
+                self.reporter.invariant_violations(&self.world, &violations);
+            }
+            Ok(_) => {}
+            Err(e) => self.log.log(
+                Level::ERROR,
+                json!({ "err": { "message": e.to_string() } }),
+                "script library not checked",
+            ),
+        }
+    }
+
+    /// The explored terrain, locked: only the game thread takes it, between ticks or in one.
+    pub fn explored(&self) -> MutexGuard<'_, ExploredTerrain> {
+        self.explored.lock().unwrap_or_else(|e| e.into_inner())
     }
 
     /// The last hour of tick health, for admins.
@@ -157,30 +228,39 @@ impl<L: LogSink> Game<L> {
             scratch,
             explored,
             sight,
+            territory,
             orders,
+            queues,
+            scripts,
+            walking,
             realtime,
             saver,
             reporter,
             log,
+            ..
         } = self;
         let size = terrain.size;
         let map: &TerrainMap = terrain;
+        let explored: &Mutex<ExploredTerrain> = explored;
+        let lock = || explored.lock().unwrap_or_else(|e| e.into_inner());
         let mut finish = |timer: &TickTimer, world: &mut WorldState, scratch: &mut Scratch| {
-            // TODO(Epic 86): `territory.update(world, terrain)` once territory is ported.
-            timer.time(TickPhase::Territory, || ());
+            timer.time(TickPhase::Territory, || territory.update(world, map));
             let grown = timer.time(TickPhase::Sight, || {
                 let index = scratch.index(world, size);
-                sight.update(world, index, explored)
+                sight.update(world, index, &mut *lock())
             });
             timer.time(TickPhase::Broadcast, || {
                 if let Some(rt) = realtime.as_ref() {
-                    rt.broadcast_tick(world, map, scratch, &grown, now_ms());
+                    let explored = lock();
+                    let view =
+                        TickView { territory: territory.current.as_ref(), explored: &explored };
+                    rt.broadcast_tick(world, map, scratch, &grown, view, now_ms());
                 }
             });
             if world.tick.is_multiple_of(settings.save_every_ticks) {
                 timer.time(TickPhase::Save, || {
                     saver.start(world);
-                    if let Err(e) = save_explored(conn, explored, now_ms()) {
+                    if let Err(e) = save_explored(conn, &mut lock(), now_ms()) {
                         log.log(
                             Level::ERROR,
                             json!({ "err": { "message": e.to_string() }, "tick": world.tick }),
@@ -193,16 +273,18 @@ impl<L: LogSink> Game<L> {
         let mut opts =
             TickOptions::new(reporter, settings.invariant_sample_rate, settings.slow_tick_ms);
         opts.orders = Some(orders);
-        // TODO(Epic 86): queues, scripts and walking once they implement the tick's traits.
+        opts.queues = queues.as_mut().map(|q| q as &mut dyn RunQueues);
+        opts.scripts = scripts.as_mut().map(|s| s as &mut dyn RunScripts);
+        opts.walking = Some(walking);
         opts.finish = Some(&mut finish);
         let health = run_tick(world, map, scratch, opts);
         tag_world(world);
         health
     }
 
-    /// The daily jobs: expired sessions go, and a backup is written when there is a backup dir.
-    // TODO: `checkScriptLibrary` once the script library is ported.
-    pub fn daily(&self, conn: &Connection, backup_dir: Option<&Path>) {
+    /// The daily jobs: expired sessions go, the script library is checked, and a backup is
+    /// written when there is a backup dir.
+    pub fn daily(&mut self, conn: &Connection, backup_dir: Option<&Path>) {
         if let Err(e) = delete_expired_sessions(conn, now_ms()) {
             self.log.log(
                 Level::ERROR,
@@ -210,6 +292,8 @@ impl<L: LogSink> Game<L> {
                 "expired sessions not deleted",
             );
         }
+        // The script library lives in the database, so its invariant is checked here.
+        self.check_script_library(conn);
         if let Some(dir) = backup_dir {
             match backup_db(conn, dir, Reason::Daily, SystemTime::now()) {
                 Ok(file) => self.log.log(Level::INFO, json!({ "file": file }), "backup written"),
@@ -226,7 +310,8 @@ impl<L: LogSink> Game<L> {
     /// explored terrain.
     pub fn save_for_shutdown(&mut self, conn: &Connection) -> Result<(), ServerError> {
         self.saver.save_now(conn, &self.world)?;
-        save_explored(conn, &mut self.explored, now_ms())?;
+        let explored = Arc::clone(&self.explored);
+        save_explored(conn, &mut explored.lock().unwrap_or_else(|e| e.into_inner()), now_ms())?;
         Ok(())
     }
 }
@@ -345,7 +430,37 @@ pub fn open_world(config: &Config) -> Result<(Connection, Game<TracingLog>), Ser
         load_or_create_world(&conn, |seed| generate_terrain(seed, MAP_SIZE), generate_world, 1)?;
     let explored = load_explored(&conn, terrain.clone(), &world.nodes)?;
     tag_world(&world);
-    Ok((conn, Game::new(world, terrain, explored, log)))
+    let defaults = crate::scripts::game_defaults();
+    // Players who haven't edited a default script run the game's current default from now on.
+    crate::scripts::sync_default_scripts(&conn, defaults)?;
+    // The script host reads the library on a connection of its own, as the scripts run.
+    let library = Arc::new(Mutex::new(open_db(&config.db_path, None)?));
+    let mut game = Game::new(world, terrain, explored, log).with_library(
+        library,
+        defaults,
+        Some(reported_script_errors()),
+    );
+    // Players whose scripts read a field a script view dropped since the last start are told so.
+    if note_script_view_changes(&conn, &mut game.world)? {
+        game.saver.save_now(&conn, &game.world)?;
+    }
+    // The script library lives in the database, so its invariant is checked at start and daily.
+    game.check_script_library(&conn);
+    Ok((conn, game))
+}
+
+/// A tick reporter of its own for what is reported outside the tick's: the sampled sight checks
+/// and the game's errors running scripts, logged and sent to Sentry as the tick's are.
+fn side_reporter() -> Arc<Mutex<ServerReporter<TracingLog>>> {
+    Arc::new(Mutex::new(ServerReporter::new(TracingLog)))
+}
+
+/// Script errors of the game's own, reported as `reporter.scriptError`.
+fn reported_script_errors() -> ScriptErrors {
+    let reporter = side_reporter();
+    Box::new(move |world, error, at| {
+        reporter.lock().unwrap_or_else(|e| e.into_inner()).script_error(world, error, at);
+    })
 }
 
 /// Resolves on SIGINT, or SIGTERM where there is one.
@@ -409,8 +524,6 @@ pub async fn run(config: Config) -> Result<(), ServerError> {
     // The HTTP side, on its own connection; the game thread has migrated the database already.
     let http_db = open_db(&config.db_path, None)?;
     let defaults = crate::scripts::game_defaults();
-    // Players who haven't edited a default script run the game's current default from now on.
-    crate::scripts::sync_default_scripts(&http_db, defaults)?;
     let window = Arc::clone(&game.tick_health);
     let clock = game.tick_clock;
     // The sockets, with their own connection for sessions and the first-day card.
@@ -418,19 +531,18 @@ pub async fn run(config: Config) -> Result<(), ServerError> {
         db: Arc::new(Mutex::new(open_db(&config.db_path, None)?)),
         origins: config.origins.clone(),
         limits: config.realtime.clone(),
-        // TODO(T86.13): the sampled sight checks report through the tick reporter's invariant
-        // violations once those are ported; until then they go to the log.
+        // The sampled sight checks report as the tick's invariants do (`reporter`).
         sight_check: Some(SightCheck {
             sample_rate: config.invariant_sample_rate,
-            report: Box::new(|world, violations| {
-                for v in violations {
-                    TracingLog.log(
-                        Level::ERROR,
-                        json!({ "invariant": v.invariant, "entityIds": v.entity_ids, "tick": world.tick }),
-                        &v.message,
-                    );
-                }
-            }),
+            report: {
+                let reporter = side_reporter();
+                Box::new(move |world, violations| {
+                    reporter
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .invariant_violations(world, violations);
+                })
+            },
             rand: Box::new(rand_unit),
         }),
         on_error: Some(Box::new(|error, user_id| {

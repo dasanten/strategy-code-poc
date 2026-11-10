@@ -61,6 +61,8 @@ pub mod npc_revive;
 pub mod npc_roads;
 pub mod npc_scores;
 pub mod npc_scouts;
+#[cfg(test)]
+mod npc_slow;
 pub mod npc_stable;
 #[cfg(test)]
 mod npc_test_world;
@@ -74,7 +76,6 @@ pub mod outsiders;
 pub mod pairing;
 pub mod passengers;
 pub mod pathfinding;
-mod pending;
 pub mod persuasion;
 pub mod placing;
 #[cfg(test)]
@@ -104,7 +105,6 @@ pub mod script_views;
 pub mod scripts;
 pub mod sight;
 pub mod spoilage;
-mod stand_ins;
 pub mod standing;
 pub mod starting_city;
 pub mod stealing;

@@ -1,10 +1,10 @@
 //! The WebSocket side (`realtime.test.ts`), against a real server on a free port: the router,
 //! the hub and the game thread, as `index.ts` wires them, and a `tokio-tungstenite` client.
 //!
-//! Not ported yet, each waiting for what it tests: founding a starting city and the cases that
-//! start from one (T86.8; the realm is set up by hand here), Last seen out of sight (T86.13), the
-//! alliance matters and the Region map (T86.11), the Leader's death (T86.3/T86.8), and the
-//! script watch cases that need a running script (T86.12).
+//! Most cases set Daniel's realm up by hand; those about founding, Last seen and the Region map
+//! found it as a Player does. Not ported here: the Leader's death and the script watch cases that
+//! need a running script, which the game's script library would run (`with_library`).
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -14,7 +14,7 @@ use csp_server::config::{Origins, RealtimeLimits};
 use csp_server::db::open_db;
 use csp_server::monitoring::LogSink;
 use csp_server::realtime::{
-    Realtime, RealtimeOptions, WS_CLOSE_LOGGED_OUT, WS_CLOSE_TOO_MANY_REQUESTS,
+    Realtime, RealtimeOptions, TickView, WS_CLOSE_LOGGED_OUT, WS_CLOSE_TOO_MANY_REQUESTS,
 };
 use csp_server::server::{Game, GameThread, TickSettings};
 use csp_shared::terrain::{Terrain, TerrainMap};
@@ -113,11 +113,18 @@ impl Server {
 
     /// The tick message alone, without stepping the world (`broadcastTick`).
     async fn broadcast(&self) {
+        self.broadcast_grown(Default::default()).await;
+    }
+
+    /// The tick message with explored terrain grown in `grown`'s chunks for their Players.
+    async fn broadcast_grown(&self, grown: BTreeMap<u64, BTreeSet<usize>>) {
         let rt = Arc::clone(&self.realtime);
         self.game
             .run(move |g, _| {
-                let grown = Default::default();
-                rt.broadcast_tick(&g.world, &g.terrain, &mut g.scratch, &grown, now_ms());
+                let explored = g.explored.lock().unwrap();
+                let view =
+                    TickView { territory: g.territory.current.as_ref(), explored: &explored };
+                rt.broadcast_tick(&g.world, &g.terrain, &mut g.scratch, &grown, view, now_ms());
             })
             .await
             .unwrap();
@@ -151,9 +158,14 @@ impl Default for StartOptions {
     }
 }
 
+/// The side of the map a Player founds on (`cityTerrain`).
+const CITY_MAP: i32 = 256;
+
 /// A Plains map with Daniel's realm on it: his Leader and a second resident.
 fn world_for(user_id: i64, realm: bool) -> (WorldState, TerrainMap) {
-    let terrain = TerrainMap { size: 128, tiles: vec![Terrain::Plains as u8; 128 * 128] };
+    // A Player who founds gets a city with farms round it: the map is `cityTerrain`'s size then.
+    let size = if realm { 128 } else { CITY_MAP };
+    let terrain = TerrainMap { size, tiles: vec![Terrain::Plains as u8; (size * size) as usize] };
     let mut world = create_world(&terrain, 1);
     world.nodes.clear();
     if realm {
@@ -514,28 +526,207 @@ async fn sends_each_tab_the_same_and_welcomes_a_tab_that_connects_between_ticks_
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn asks_a_player_without_a_realm_to_name_it_and_their_leader_first() {
+async fn founds_nothing_on_connect_a_player_without_a_realm_names_it_and_their_leader_first() {
     let s = start(StartOptions { realm: false, ..StartOptions::default() }).await;
     let mut c = connect(&s).await;
     let founding = c.next("founding").await;
     assert_eq!(founding["account"], json!({ "name": "Daniel", "isAdmin": true }));
-    assert_eq!(s.world(|w| w.realms.len()).await, 0);
-    // Names are checked before anything is founded.
-    c.send(json!({ "type": "found", "requestId": "f1", "realmName": "  ", "leaderName": "Ada" }))
-        .await;
-    let refused = c.next("rejected").await;
-    assert_eq!(refused["requestId"], "f1");
-    assert!(refused["reason"].as_str().unwrap().starts_with("Realm name:"));
-    let long = "x".repeat(31);
-    c.send(
-        json!({ "type": "found", "requestId": "f2", "realmName": "Ironvale", "leaderName": long }),
-    )
-    .await;
-    assert!(c.next("rejected").await["reason"].as_str().unwrap().starts_with("Leader name:"));
-    // Orders wait for a realm.
+    let suggested = founding["leaderName"].as_str().unwrap();
+    assert!(!suggested.is_empty() && suggested.chars().all(char::is_alphanumeric), "{suggested}");
+    assert_eq!(s.world(|w| (w.realms.len(), w.cities.len())).await, (0, 0));
+    // Nothing to order around yet.
     c.send(json!({ "type": "order", "requestId": "o1", "order": { "kind": "wait", "ticks": 1 } }))
         .await;
-    assert_eq!(c.next("rejected").await["reason"], "no realm yet");
+    assert_eq!(
+        c.next("rejected").await,
+        json!({ "type": "rejected", "requestId": "o1", "reason": "no realm yet" })
+    );
+
+    let welcome = found(&mut c).await;
+    let (realm, leader, cities) = s
+        .world(|w| {
+            let realm = w.realms[0].clone();
+            let leader = w.residents.iter().find(|r| r.id == realm.leader_id).unwrap().name.clone();
+            (realm, leader, w.cities.len())
+        })
+        .await;
+    assert_eq!((realm.name.as_deref(), leader.as_str(), cities), (Some("Ironvale"), "Brann", 1));
+    assert_eq!(welcome["home"]["realmId"], json!(realm.id));
+    assert_eq!(welcome["home"]["leaderId"], json!(realm.leader_id));
+    // The log names the Leader as founded.
+    assert_eq!(welcome["events"][0]["kind"], "founded");
+    assert_eq!(welcome["events"][0]["name"], "Brann");
+    // Founded once: asking again changes nothing.
+    c.send(json!({ "type": "found", "requestId": "f2", "realmName": "X", "leaderName": "Y" }))
+        .await;
+    c.send(json!({ "type": "order", "requestId": "o2", "order": { "kind": "fly" } })).await;
+    assert_eq!(c.next("rejected").await["requestId"], "o2");
+    let realms = s.world(|w| w.realms.iter().map(|r| r.name.clone()).collect::<Vec<_>>()).await;
+    assert_eq!(realms, [Some("Ironvale".to_string())]);
+}
+
+/// Founds Daniel's realm "Ironvale" with Leader Brann from a socket waiting to; the welcome.
+async fn found(c: &mut Client) -> Value {
+    let names = json!({ "type": "found", "requestId": "f1", "realmName": "  Ironvale ", "leaderName": " Brann  " });
+    c.send(names).await;
+    c.next("welcome").await
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn refuses_to_found_with_an_empty_or_too_long_name() {
+    let s = start(StartOptions { realm: false, ..StartOptions::default() }).await;
+    let mut c = connect(&s).await;
+    c.next("founding").await;
+    let too_long = "x".repeat(31);
+    let tries = [
+        (json!("   "), json!("Brann"), "Realm name: needs a name"),
+        (json!(too_long), json!("Brann"), "Realm name: at most 30 characters"),
+        (json!("Ironvale"), json!(""), "Leader name: needs a name"),
+        (json!("Ironvale"), json!("y".repeat(31)), "Leader name: at most 30 characters"),
+        (json!(7), json!("Brann"), "Realm name: needs a name"),
+    ];
+    for (i, (realm_name, leader_name, reason)) in tries.into_iter().enumerate() {
+        let id = format!("f{i}");
+        c.send(json!({ "type": "found", "requestId": id, "realmName": realm_name, "leaderName": leader_name }))
+            .await;
+        assert_eq!(
+            c.next("rejected").await,
+            json!({ "type": "rejected", "requestId": id, "reason": reason })
+        );
+    }
+    assert_eq!(s.world(|w| (w.realms.len(), w.cities.len())).await, (0, 0));
+    // Exactly the longest name is fine.
+    let longest = "z".repeat(30);
+    c.send(json!({ "type": "found", "requestId": "ok", "realmName": longest, "leaderName": "B" }))
+        .await;
+    c.next("welcome").await;
+    assert_eq!(s.world(|w| w.realms[0].name.clone()).await, Some(longest));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn sends_what_left_sight_as_last_seen_and_drops_it_when_back_in_sight() {
+    let s = start(StartOptions { realm: false, ..StartOptions::default() }).await;
+    let mut first = connect(&s).await;
+    first.next("founding").await;
+    found(&mut first).await;
+    s.tick().await;
+    first.next("tick").await;
+    // Everyone walks far off: the city leaves sight and comes back as Last seen.
+    let homes = s
+        .world(|w| {
+            let homes: Vec<(f64, f64)> = w.residents.iter().map(|r| (r.x, r.y)).collect();
+            for r in &mut w.residents {
+                r.x = (r.x + f64::from(CITY_MAP) / 2.0) % f64::from(CITY_MAP);
+                r.order = None;
+            }
+            homes
+        })
+        .await;
+    s.tick().await;
+    let away = first.next("tick").await;
+    let (city, hall) =
+        s.world(|w| (w.cities[0].id.clone(), w.cities[0].town_hall_id.clone())).await;
+    let ids = |v: &Value| -> Vec<String> {
+        v.as_array().unwrap().iter().map(|e| e["id"].as_str().unwrap().to_owned()).collect()
+    };
+    assert!(away["gone"].as_array().unwrap().contains(&json!(hall)), "{away}");
+    let remembered = ids(&away["lastSeen"]["changed"]);
+    assert!(remembered.contains(&hall) && remembered.contains(&city), "{remembered:?}");
+    // A new connection gets it in the welcome, apart from what is in sight.
+    let mut second = connect(&s).await;
+    let welcome = second.next("welcome").await;
+    assert!(ids(&welcome["lastSeen"]).contains(&hall));
+    assert!(!ids(&welcome["entities"]).contains(&hall));
+    // Back home: in sight again, no longer Last seen.
+    s.world(move |w| {
+        for (r, (x, y)) in w.residents.iter_mut().zip(homes) {
+            (r.x, r.y) = (x, y);
+        }
+    })
+    .await;
+    s.tick().await;
+    let back = first.next("tick").await;
+    assert!(ids(&back["changed"]).contains(&hall));
+    assert!(back["lastSeen"]["gone"].as_array().unwrap().contains(&json!(hall)));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn sends_the_player_their_alliance_matters_on_connect_and_again_only_when_they_change() {
+    let s = start(StartOptions::default()).await;
+    let mut c = connect(&s).await;
+    let welcome = c.next("welcome").await;
+    let none = json!([]);
+    assert_eq!(
+        welcome["diplomacy"],
+        json!({
+            "alliance": null,
+            "invitations": none,
+            "realmsInSight": none,
+            "contracts": none,
+            "demands": none,
+            "knownRealms": none,
+            "knownNpcOrgs": [{ "realmId": "trade-org", "realm": "the Trade Organization" }],
+            "directOffers": none,
+            "directOfferRealms": none,
+            "deliveries": none,
+            "standings": none,
+            "joinRequests": none,
+            "directives": none,
+            // These test worlds have no Trade Org HQ.
+            "noCaravans": true,
+        })
+    );
+    s.broadcast().await;
+    assert!(c.next("tick").await.get("diplomacy").is_none());
+    s.world(|w| {
+        let north = json!({
+            "id": "alliance1", "name": "North", "leaderId": "r1",
+            "members": [{ "realmId": "r1", "joinedAt": 0, "leaving": null }],
+            "invites": [], "army": [],
+        });
+        w.alliances.push(serde_json::from_value(north).unwrap());
+    })
+    .await;
+    s.broadcast().await;
+    let tick = c.next("tick").await;
+    assert_eq!(tick["diplomacy"]["alliance"]["name"], "North");
+    assert_eq!(tick["diplomacy"]["alliance"]["leaderId"], "r1");
+    s.broadcast().await;
+    assert!(c.next("tick").await.get("diplomacy").is_none());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn sends_the_region_map_whole_when_territory_is_worked_out_then_the_chunks_explored() {
+    let s = start(StartOptions { realm: false, ..StartOptions::default() }).await;
+    let mut c = connect(&s).await;
+    c.next("founding").await;
+    let welcome = found(&mut c).await;
+    // Territory is worked out on the first tick after a start: nothing to show yet.
+    assert_eq!(welcome["region"], Value::Null);
+    let explored = welcome["exploredChunks"][0].as_u64().unwrap() as usize;
+    let (tick, realm) = s
+        .game
+        .run(|g, _| {
+            g.territory.update(&g.world, &g.terrain);
+            (g.world.tick, g.world.realms[0].id.clone())
+        })
+        .await
+        .unwrap();
+    s.broadcast().await;
+    let whole = c.next("tick").await;
+    assert_eq!(whole["region"]["tick"], json!(tick));
+    assert_eq!(whole["region"]["chunks"], Value::Null);
+    let holders: Vec<&Value> = whole["region"]["holders"].as_array().unwrap().iter().collect();
+    assert_eq!(holders.len(), 1);
+    assert_eq!((&holders[0]["id"], &holders[0]["name"]), (&json!(realm), &json!("Ironvale")));
+    assert_eq!(holders[0]["alliance"], Value::Null);
+    // Only once: the next tick has nothing new for it.
+    s.broadcast().await;
+    assert!(c.next("tick").await.get("region").is_none());
+    // Explored terrain grew in a chunk: that chunk goes out again.
+    let grown = [(s.user_id as u64, [explored].into_iter().collect())].into_iter().collect();
+    s.broadcast_grown(grown).await;
+    assert_eq!(c.next("tick").await["region"]["chunks"], json!([explored]));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -752,7 +943,10 @@ async fn closes_the_socket_of_a_session_that_ended_on_the_next_check() {
     s.game
         .run(move |g, _| {
             let grown = Default::default();
-            rt.broadcast_tick(&g.world, &g.terrain, &mut g.scratch, &grown, now_ms() + 61_000);
+            let explored = g.explored.lock().unwrap();
+            let view = TickView { territory: g.territory.current.as_ref(), explored: &explored };
+            let now = now_ms() + 61_000;
+            rt.broadcast_tick(&g.world, &g.terrain, &mut g.scratch, &grown, view, now);
         })
         .await;
     assert_eq!(a.close_code().await, WS_CLOSE_LOGGED_OUT);

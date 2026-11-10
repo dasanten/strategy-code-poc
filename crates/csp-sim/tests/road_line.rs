@@ -155,7 +155,6 @@ fn a_wall_line_skips_tiles_with_a_wall_or_gate_and_checks_the_rest_like_a_wall()
 }
 
 #[test]
-#[ignore = "needs request_road_materials: the world.rs stand-in puts no materials into a line's site"]
 fn builds_the_wall_line_that_skips_a_wall_or_gate() {
     let rows: Vec<String> =
         (0..10).map(|y| if y == 5 { ".^........".into() } else { ".".repeat(10) }).collect();
@@ -224,7 +223,6 @@ fn road_order(
 }
 
 #[test]
-#[ignore = "needs request_road_materials: the world.rs stand-in puts no materials into a line's site"]
 fn builds_the_line_of_road_tiles_one_after_another_then_is_done() {
     let map = open();
     let (mut world, mut orders) = setup(&map, 1.0, 1.0, 3.0 * stone());
@@ -254,7 +252,6 @@ fn builds_the_line_of_road_tiles_one_after_another_then_is_done() {
 }
 
 #[test]
-#[ignore = "needs request_road_materials: the world.rs stand-in puts no materials into a line's site"]
 fn skips_a_tile_that_has_a_road_already() {
     let map = open();
     let (mut world, mut orders) = setup(&map, 1.0, 1.0, 2.0 * stone());
@@ -287,7 +284,6 @@ fn waits_on_a_site_for_materials_it_doesnt_carry() {
 }
 
 #[test]
-#[ignore = "needs request_road_materials: the world.rs stand-in puts no materials into a line's site"]
 fn lays_out_and_builds_every_tile_of_a_line_across_mountain() {
     let mut rows = vec![".".repeat(10); 10];
     rows[1] = "..^^^.....".into();
@@ -327,7 +323,6 @@ fn is_checked_by_an_invariant() {
 }
 
 #[test]
-#[ignore = "needs request_road_materials: the world.rs stand-in puts no materials into a line's site"]
 fn builds_wall_diagonally_tile_by_tile_and_nobody_steps_diagonally_through_it() {
     let map = open();
     let (mut world, mut orders) = setup(&map, 1.0, 1.0, 0.0);

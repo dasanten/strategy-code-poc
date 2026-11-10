@@ -1,7 +1,6 @@
-//! The script library against a real database (`scripts.test.ts`). The game's default scripts
-//! arrive with T86.12; these tests use a stand-in default for every task, as the TypeScript tests
-//! only need each to be valid and the same until changed. The HTTP cases are in `tests/app.rs`;
-//! the Leader's-death case, which needs the world rules, waits for T86.8.
+//! The script library against a real database (`scripts.test.ts`), with the game's default
+//! scripts. The HTTP cases are in `tests/app.rs`. Not ported: the Leader's-death case, which is
+//! about the world (scripts outlast the realm), not the library.
 use csp_server::db::open_db;
 use csp_server::scripts::{
     activate_version, active_source, check_script_library, create_script, default_script_id,
