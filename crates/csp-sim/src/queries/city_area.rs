@@ -17,7 +17,8 @@ use csp_shared::world::{
 
 use super::alliance::allied;
 use super::city::{city_food_use, city_residents, town_hall_of};
-use super::names::{kind_name, placed};
+use super::goods::free_stock;
+use super::names::{held, kind_name, placed};
 use super::residents::is_armed;
 use super::standing::TRADE_ORG;
 
@@ -386,36 +387,6 @@ pub fn stands_occupying(world: &WorldState, city: &City, r: &Resident, size: i32
         && (r.owner.is_some() || city_takers(world, city).contains(&r.id))
 }
 
-/// The Food of a storage that isn't set aside for its offers (`freeStock(world, b).food`).
-/// TODO(T86.5): `free_stock` once its goods queries land.
-fn free_food(world: &WorldState, b: &Building) -> f64 {
-    let stock = b.stock.as_ref().and_then(|s| s.get(&Good::Food)).copied().unwrap_or(0.0);
-    let aside: f64 = world
-        .offers
-        .iter()
-        .filter(|o| {
-            o.storage_id == b.id
-                && o.direct.as_ref().is_none_or(|d| d.carried.is_none())
-                && o.gives == Good::Food
-        })
-        .map(|o| o.times * o.gives_units)
-        .sum();
-    let any_aside = world.offers.iter().any(|o| {
-        o.storage_id == b.id
-            && o.direct.as_ref().is_none_or(|d| d.carried.is_none())
-            && o.gives == Good::Food
-    });
-    if !any_aside {
-        return stock;
-    }
-    let left = stock - aside;
-    if left > 0.0 {
-        left
-    } else {
-        0.0
-    }
-}
-
 /// Food in a city's storages, but for what is set aside for offers (`storedFood`).
 pub fn stored_food(world: &WorldState, city_id: &str) -> f64 {
     world
@@ -426,7 +397,7 @@ pub fn stored_food(world: &WorldState, city_id: &str) -> f64 {
                 && b.kind == BuildingKind::Storage
                 && b.site.is_none()
         })
-        .fold(0.0, |food, b| food + free_food(world, b))
+        .fold(0.0, |food, b| food + held(&free_stock(world, &b.id, b.stock.as_ref()), Good::Food))
 }
 
 /// Food all of a city's residents eat in `FOOD_SURPLUS_DAYS` game days (`surplusFoodLine`).

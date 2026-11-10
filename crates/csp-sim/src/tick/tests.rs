@@ -1,11 +1,10 @@
-//! `tick.test.ts`. Its tests run on `worldWithCity`, a starting city whose eight residents work
-//! its farm; until the starting city (T86.8), work (T86.6), Last seen and the invariants (T86.13)
-//! are ported, these run on an empty world, and the eight work actions, the realm's one sight
-//! build and the lake invariant are left to those tickets (each marked `TODO(T86.n)` below).
+//! `tick.test.ts`. Its tests run on `worldWithCity` (`test_support::world_with_city`), a starting
+//! city whose eight residents work its farm; the ones that only need a world run on an empty one.
 
 use super::*;
+use crate::test_support::world_with_city;
 use crate::world::create_world;
-use csp_shared::terrain::Terrain;
+use csp_shared::terrain::{tile_index, Terrain};
 use csp_shared::world::{Good, Pile, Stock};
 use std::rc::Rc;
 
@@ -103,19 +102,18 @@ impl Walk for FakeWalking {
 
 #[test]
 fn reports_tick_health_with_resident_and_action_counts() {
-    let terrain = terrain();
-    let mut world = create_world(&terrain, 1);
+    let (mut world, terrain) = world_with_city();
     let mut reporter = FakeReporter::default();
     let mut opts = TickOptions::new(&mut reporter, 1.0, 800.0);
     opts.now = Some(clock(5.0));
     let health = run_tick(&mut world, &terrain, &mut Scratch::default(), opts).unwrap();
-    // TODO(T86.6, T86.8, T86.13): on `worldWithCity`, 8 residents, 8 work actions and the
-    // realm's one sight build for Last seen.
+    // Everyone starts working the farm: one work action each. Without a script runner, no script
+    // runs; Last seen works out once what the one realm sees.
     assert_eq!(health.tick, 1);
-    assert_eq!(health.residents, 0);
-    assert_eq!(health.actions, 0);
+    assert_eq!(health.residents, 8);
+    assert_eq!(health.actions, 8);
     assert_eq!(health.script_runs, 0);
-    assert_eq!(health.sight_builds, 0);
+    assert_eq!(health.sight_builds, 1);
     assert!(!health.slow);
     assert_eq!(reporter.health, vec![health]);
     assert!(reporter.violations.is_empty());
@@ -153,10 +151,60 @@ fn flags_a_tick_above_the_slow_tick_threshold() {
 }
 
 #[test]
-fn reports_invariant_violations_on_checked_ticks_only() {
-    // TODO(T86.13): the TypeScript puts every resident in a lake and looks for
-    // `nothing-on-impassable-terrain`, and spreads the world invariants over the ticks of a
-    // round; until the invariants are ported, a script invariant stands in for them.
+fn reports_the_world_invariants_on_checked_ticks_only() {
+    let (mut world, terrain) = everyone_in_a_lake();
+    let mut reporter = FakeReporter::default();
+    run_tick(
+        &mut world,
+        &terrain,
+        &mut Scratch::default(),
+        TickOptions::new(&mut reporter, 0.0, 800.0),
+    );
+    assert!(reporter.violations.is_empty());
+    run_tick(
+        &mut world,
+        &terrain,
+        &mut Scratch::default(),
+        TickOptions::new(&mut reporter, 1.0, 800.0),
+    );
+    assert_eq!(reporter.violations.len(), 1);
+    assert!(reporter.violations[0].iter().any(|v| v.invariant == "nothing-on-impassable-terrain"));
+}
+
+/// `worldWithCity` with every resident in a lake; nothing moves them out again.
+fn everyone_in_a_lake() -> (WorldState, TerrainMap) {
+    let (mut world, mut terrain) = world_with_city();
+    let (x, y) = (2, 3);
+    terrain.tiles[tile_index(terrain.size, x, y)] = Terrain::Lake as u8;
+    for r in &mut world.residents {
+        r.order = None;
+        (r.x, r.y) = (f64::from(x), f64::from(y));
+    }
+    (world, terrain)
+}
+
+#[test]
+fn spreads_the_world_invariants_over_the_ticks_of_a_round() {
+    let (mut world, terrain) = everyone_in_a_lake();
+    let mut reporter = FakeReporter::default();
+    let mut scratch = Scratch::default();
+    // A rate of 0.1 and no before-and-after checks drawn: one tick in ten finds them in the lake.
+    for _ in 0..10 {
+        let mut rand = || 1.0;
+        let mut opts = TickOptions::new(&mut reporter, 0.1, 800.0);
+        opts.rand = Some(&mut rand);
+        run_tick(&mut world, &terrain, &mut scratch, opts);
+    }
+    let found = reporter
+        .violations
+        .iter()
+        .filter(|v| v.iter().any(|v| v.invariant == "nothing-on-impassable-terrain"))
+        .count();
+    assert_eq!(found, 1);
+}
+
+#[test]
+fn reports_invariant_violations_a_script_runner_found_on_checked_ticks_only() {
     let terrain = terrain();
     let mut world = create_world(&terrain, 1);
     let mut reporter = FakeReporter::default();

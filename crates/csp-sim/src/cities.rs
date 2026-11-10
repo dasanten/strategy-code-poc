@@ -3,7 +3,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use csp_shared::world::{BuildingKind, City, CityLayout, WorldState};
+use csp_shared::world::{BuildingKind, City, WorldState};
 
 use crate::names::unique_name;
 use crate::random::hash_str;
@@ -68,13 +68,7 @@ pub fn given_city_name(world: &WorldState, drawn: &str) -> String {
     unique_name(drawn, &taken, &CITY_NAMES)
 }
 
-/// The layout a city gets (`pickLayout` of `city-layout.ts`), drawn from the world's seed and its
-/// id. TODO(T86.10): with the rest of `city-layout.ts`.
-pub fn pick_layout(seed: i64, city_id: &str) -> CityLayout {
-    const LAYOUTS: [CityLayout; 4] =
-        [CityLayout::Grid, CityLayout::Rings, CityLayout::MainStreet, CityLayout::Quarters];
-    LAYOUTS[hash_str(&format!("{seed}:layout:{city_id}")) as usize % LAYOUTS.len()]
-}
+pub use crate::city_layout::pick_layout;
 
 /// Founds a city around the town hall at `hall` just finished (`foundCity`), belonging to
 /// `realm_id`. Its name is drawn from its id; one of no realm gets a layout. Returns the city's

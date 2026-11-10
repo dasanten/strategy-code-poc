@@ -5,6 +5,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use csp_server::scripts::{create_script, game_defaults};
 use csp_server::{
     auth::{create_admin, create_session, find_user_by_name},
     db::open_db,
@@ -12,9 +13,11 @@ use csp_server::{
     server::{tick_loop, Game, GameThread, TickSettings},
 };
 use csp_shared::terrain::TerrainMap;
+use csp_sim::order_sender::OrderSender;
+use csp_sim::residents::{new_resident, NewResident};
 use csp_sim::{explored::ExploredTerrain, world::create_world};
 use rusqlite::Connection;
-use serde_json::Value;
+use serde_json::{json, Value};
 use tracing::Level;
 
 #[derive(Clone, Default)]
@@ -63,6 +66,38 @@ fn ticks_with_tick_health_and_saves_every_thirty_ticks() {
     assert_eq!(g.tick_health().lock().unwrap().len(), 30);
 }
 
+/// With the script library attached, a Player's run-script order is taken and their script runs
+/// on the next tick, as `index.ts` wires the script host into the orders and the runner.
+#[test]
+fn runs_a_players_script_from_the_library_once_attached() {
+    let library = open_db(":memory:", None).unwrap();
+    create_admin(&library, Some("Daniel"), Some("admin password")).unwrap();
+    let user = find_user_by_name(&library, "Daniel").unwrap().unwrap().id;
+    let defaults = game_defaults();
+    let source = Some("let x = 1\n");
+    let script = create_script(&library, defaults, user, Some("idle"), source).unwrap();
+    let mut g =
+        game(FakeLog::default()).with_library(Arc::new(Mutex::new(library)), defaults, None);
+    let mut rand = csp_sim::random::Mulberry32::new(1.0);
+    let mut next = || rand.next();
+    let fields =
+        NewResident { id: "a1", owner: Some("r1"), city_id: None, x: 10.0, y: 10.0, tick: 0.0 };
+    g.world.residents.push(new_resident(&mut next, &fields, None));
+    let realm = json!({ "id": "r1", "userId": user, "leaderId": "a1", "name": "Ironvale" });
+    g.world.realms.push(serde_json::from_value(realm).unwrap());
+
+    let order = json!({ "kind": "runScript", "residentId": "a1", "scriptId": script.summary.id });
+    let sender = OrderSender::player(user as u64, "Daniel");
+    let reply = g.orders.receive(&g.world, &sender, &json!("q"), &order);
+    assert_eq!(serde_json::to_value(&reply).unwrap()["type"], "ack", "{reply:?}");
+    let conn = open_db(":memory:", None).unwrap();
+    g.tick(&conn, SETTINGS).unwrap();
+    let running = g.world.residents[0].script.clone().expect("a running script");
+    assert_eq!(running.script_id, script.summary.id as u64);
+    assert!(running.last_run.is_some(), "it ran: {running:?}");
+    assert_eq!(running.last_error, None);
+}
+
 #[test]
 fn saves_the_world_for_shutdown() {
     let conn = open_db(":memory:", None).unwrap();
@@ -80,7 +115,7 @@ fn the_daily_jobs_delete_expired_sessions_and_write_a_backup() {
     let id = find_user_by_name(&conn, "Daniel").unwrap().unwrap().id;
     create_session(&conn, id, 0).unwrap(); // expired long ago
     let log = FakeLog::default();
-    let g = game(log.clone());
+    let mut g = game(log.clone());
     let backups = dir.path().join("backups");
     g.daily(&conn, Some(&backups));
     let sessions: i64 = conn.query_row("SELECT count(*) FROM sessions", [], |r| r.get(0)).unwrap();

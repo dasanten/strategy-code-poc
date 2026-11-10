@@ -146,13 +146,9 @@ fn lets_only_the_first_of_two_teach_orders_in_one_tick_teach() {
 fn ends_on_leaving_the_ground_or_taking_another_order_and_the_ground_teaches_nothing_then() {
     let (mut world, t, mut orders) = setup();
     assert_eq!(send(&mut world, &t, &mut orders, teach("a1", "strength", "g1")), "ack");
-    // TODO(T86.4): the walk order; given here as its order state.
-    at(&mut world, "a1").order = Some(
-        serde_json::from_value(json!({
-            "kind": "walkTo", "target": { "x": 10, "y": 10 }, "path": null, "progress": 0
-        }))
-        .unwrap(),
-    );
+    let walk = json!({ "kind": "walkTo", "residentId": "a1", "x": 10, "y": 10 });
+    assert_eq!(send(&mut world, &t, &mut orders, walk), "ack");
+    assert!(matches!(at(&mut world, "a1").order, Some(ResidentOrder::WalkTo(_))));
     assert!(teacher(&world).is_none());
     // Bo can teach now; pushed off the footprint, Bo's teaching ends too.
     assert_eq!(send(&mut world, &t, &mut orders, teach("a2", "strength", "g1")), "ack");

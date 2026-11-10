@@ -349,17 +349,19 @@ fn place_trading_posts(world: &mut WorldState, terrain: &TerrainMap) {
 fn place_caravans(world: &mut WorldState) {
     crate::caravans::place_caravans(world);
 }
-fn place_traders(_world: &mut WorldState, _size: i32) {}
+fn place_traders(world: &mut WorldState, size: i32) {
+    crate::traders::place_traders(world, size);
+}
 
 // T86.10 (`npc-cities.ts`): world generation.
 fn place_npc_cities(world: &mut WorldState, terrain: &TerrainMap) {
     crate::npc_cities::place_npc_cities(world, terrain);
 }
 
-// Carrying, storing, hauling, buying and trading are T86.5's (`carrying.rs`, `storing.rs`,
-// `hauling.rs`, `buying.rs`, `trading.rs`); road materials and offers are still to come.
-fn request_road_materials(_world: &mut WorldState, _scratch: &mut Scratch) -> Vec<CarryAction> {
-    Vec::new()
+// Road materials (`road-line.ts`) and offers (`offers.ts`); carrying, storing, hauling, buying and
+// trading are called from their own modules above.
+fn request_road_materials(world: &mut WorldState, _scratch: &mut Scratch) -> Vec<CarryAction> {
+    crate::road_line::request_road_materials(world)
 }
 fn resolve_offers(world: &mut WorldState, scratch: &mut Scratch) -> usize {
     crate::offers::resolve_offers(world, &mut scratch.offers)
@@ -373,12 +375,8 @@ fn step_offers(world: &mut WorldState, _scratch: &mut Scratch) {
 fn step_caravans(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
     crate::caravans::step_caravans(world, size);
 }
-fn step_traders(
-    _world: &mut WorldState,
-    _size: i32,
-    _terrain: &TerrainMap,
-    _scratch: &mut Scratch,
-) {
+fn step_traders(world: &mut WorldState, size: i32, terrain: &TerrainMap, _scratch: &mut Scratch) {
+    crate::traders::step_traders(world, size, Some(terrain));
 }
 fn step_trade_org_army(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
     crate::trade_org_army::step_trade_org_army(world, size);
@@ -415,7 +413,9 @@ fn step_npc_cities(
     let ways = walking.and_then(|w| w.ways());
     crate::npc_behaviour::step_npc_cities(world, size, Some(terrain), ways)
 }
-fn step_outsiders(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
+fn step_outsiders(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
+    crate::outsiders::step_outsiders(world, size);
+}
 
 // `demands.ts`.
 fn answer_demands(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {

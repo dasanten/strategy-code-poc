@@ -1,16 +1,19 @@
-//! `apps/server/src/road-line.test.ts`, ported (T86.6) as far as it runs without walking: the
-//! line's tiles and the order's checks. The tests that walk the line tile by tile (and the restart
-//! halfway, and the invariant) need walking, saves and the invariants (T86.4, T87, T86.13) and
-//! come with the differential run (T86.14).
+//! `apps/server/src/road-line.test.ts`, ported (T86.6): the line's tiles, the order's checks and
+//! the walks that build a line tile by tile, with every invariant checked after each tick. The
+//! restart halfway needs the saves of `csp-server` and is tested there.
 
 mod build_common;
 
 use build_common::*;
 use csp_shared::balance::{BUILD_MATERIALS, ROAD_LINE_MAX_TILES};
 use csp_shared::terrain::{Terrain, TerrainMap};
-use csp_shared::world::{BuildingKind, Good, Stock, WorldState};
-use csp_sim::queries::building::road_line;
+use csp_shared::world::{BuildingKind, Good, ResidentOrder, SkillName, Stock, WorldState};
+use csp_sim::invariants::invariant_named;
+use csp_sim::pathfinding::{PathFinder, PathOptions, PathResult, WALKING_COSTS};
+use csp_sim::queries::building::{road_at, road_line};
+use csp_sim::walls::wall_map;
 use serde_json::json;
+use std::sync::Arc;
 
 /// A square map drawn as text (sides join): . plains, ^ mountain, ~ lake.
 fn draw(rows: &[String]) -> TerrainMap {
@@ -149,5 +152,214 @@ fn a_wall_line_skips_tiles_with_a_wall_or_gate_and_checks_the_rest_like_a_wall()
         serde_json::to_value(&world.residents[0].order).unwrap()["tiles"],
         json!([[1.0, 1.0], [2.0, 1.0], [3.0, 1.0]])
     );
-    // TODO(T86.4): walking the line; the walls built on (1, 1) and (3, 1), the gate left.
+}
+
+#[test]
+fn builds_the_wall_line_that_skips_a_wall_or_gate() {
+    let rows: Vec<String> =
+        (0..10).map(|y| if y == 5 { ".^........".into() } else { ".".repeat(10) }).collect();
+    let map = draw(&rows);
+    let (mut world, mut orders) = setup(&map, 1.0, 1.0, 0.0);
+    world.buildings.push(building("old", BuildingKind::Gate, 2.0, 1.0));
+    let from = json!({ "x": 1, "y": 1 });
+    let o = line("wallLine", "w1", from, json!({ "x": 3, "y": 1 }));
+    assert_eq!(orders.receive(&world, &player(7), o, &map), Ok(()));
+    orders.apply_all(&mut world, &map);
+    at(&mut world, "w1").carried = Stock::from([(Good::Wood, 3.0 * wood())]);
+    run_walking(&mut world, &map, 40_000, |w| w.residents[0].order.is_none());
+    for x in [1, 3] {
+        let wall = wall_at(&world, x, 1).expect("a wall");
+        assert!(wall.site.is_none());
+    }
+    let on_2_1: Vec<&str> = world
+        .buildings
+        .iter()
+        .filter(|b| b.x == 2.0 && b.y == 1.0)
+        .map(|b| b.id.as_str())
+        .collect();
+    assert_eq!(on_2_1, ["old"]);
+}
+
+fn wood() -> f64 {
+    BUILD_MATERIALS.get("wall").unwrap().get("wood").unwrap()
+}
+
+fn wall_at(world: &WorldState, x: i32, y: i32) -> Option<&csp_shared::world::Building> {
+    world
+        .buildings
+        .iter()
+        .find(|b| b.kind == BuildingKind::Wall && b.x == f64::from(x) && b.y == f64::from(y))
+}
+
+fn finished(world: &WorldState, x: i32, y: i32) -> bool {
+    road_at(world, x, y).is_some_and(|b| b.site.is_none())
+}
+
+fn open() -> TerrainMap {
+    draw(&vec![".".repeat(10); 10])
+}
+
+fn order_json(world: &WorldState) -> serde_json::Value {
+    serde_json::to_value(&world.residents[0].order).unwrap()
+}
+
+/// Gives w1 a road order and runs the tick that starts it.
+fn road_order(
+    world: &mut WorldState,
+    orders: &mut Orders,
+    map: &TerrainMap,
+    from: (i32, i32),
+    to: (i32, i32),
+) -> Answer {
+    let o = line(
+        "roadLine",
+        "w1",
+        json!({ "x": from.0, "y": from.1 }),
+        json!({ "x": to.0, "y": to.1 }),
+    );
+    let answer = orders.receive(world, &player(7), o, map);
+    orders.apply_all(world, map);
+    answer
+}
+
+#[test]
+fn builds_the_line_of_road_tiles_one_after_another_then_is_done() {
+    let map = open();
+    let (mut world, mut orders) = setup(&map, 1.0, 1.0, 3.0 * stone());
+    assert_eq!(road_order(&mut world, &mut orders, &map, (2, 1), (4, 1)), Ok(()));
+    let o = order_json(&world);
+    assert_eq!(o["kind"], "roadLine");
+    assert_eq!(o["phase"], "walking");
+    assert_eq!(o["tiles"], json!([[2.0, 1.0], [3.0, 1.0], [4.0, 1.0]]));
+    let mut done_at: [Option<u64>; 5] = [None; 5];
+    run_walking(&mut world, &map, 20_000, |w| {
+        for x in [2usize, 3, 4] {
+            if done_at[x].is_none() && finished(w, x as i32, 1) {
+                done_at[x] = Some(w.tick);
+            }
+        }
+        w.residents[0].order.is_none()
+    });
+    assert!(world.residents[0].order.is_none());
+    for x in [2, 3, 4] {
+        assert!(finished(&world, x, 1));
+    }
+    assert!(done_at[2] < done_at[3] && done_at[3] < done_at[4]);
+    let r = &world.residents[0];
+    assert_eq!(r.carried.get(&Good::Stone).copied().unwrap_or(0.0), 0.0);
+    assert!(r.skills.get(&SkillName::Construction).copied().unwrap_or(0.0) > 0.0);
+    assert_eq!((r.x, r.y), (4.0, 1.0));
+}
+
+#[test]
+fn skips_a_tile_that_has_a_road_already() {
+    let map = open();
+    let (mut world, mut orders) = setup(&map, 1.0, 1.0, 2.0 * stone());
+    world.buildings.push(building("old", BuildingKind::Road, 2.0, 1.0));
+    road_order(&mut world, &mut orders, &map, (1, 1), (3, 1)).unwrap();
+    run_walking(&mut world, &map, 20_000, |w| w.residents[0].order.is_none());
+    let finished_roads =
+        world.buildings.iter().filter(|b| b.kind == BuildingKind::Road && b.site.is_none()).count();
+    assert_eq!(finished_roads, 3);
+    let on_2: Vec<&str> = world
+        .buildings
+        .iter()
+        .filter(|b| b.kind == BuildingKind::Road && b.x == 2.0)
+        .map(|b| b.id.as_str())
+        .collect();
+    assert_eq!(on_2, ["old"]);
+}
+
+#[test]
+fn waits_on_a_site_for_materials_it_doesnt_carry() {
+    let map = open();
+    let (mut world, mut orders) = setup(&map, 1.0, 1.0, 0.0);
+    road_order(&mut world, &mut orders, &map, (1, 1), (2, 1)).unwrap();
+    run_walking(&mut world, &map, 3000, |_| false);
+    let o = order_json(&world);
+    assert_eq!((o["kind"].clone(), o["phase"].clone()), (json!("roadLine"), json!("building")));
+    assert_eq!(o["tiles"], json!([[1.0, 1.0], [2.0, 1.0]]));
+    let site = road_at(&world, 1, 1).unwrap().site.as_ref().unwrap();
+    assert!(site.delivered.is_empty());
+}
+
+#[test]
+fn lays_out_and_builds_every_tile_of_a_line_across_mountain() {
+    let mut rows = vec![".".repeat(10); 10];
+    rows[1] = "..^^^.....".into();
+    let map = draw(&rows);
+    let (mut world, mut orders) = setup(&map, 1.0, 1.0, 5.0 * stone());
+    assert_eq!(road_order(&mut world, &mut orders, &map, (1, 1), (5, 1)), Ok(()));
+    let tiles: Vec<serde_json::Value> = (1..=5).map(|x| json!([f64::from(x), 1.0])).collect();
+    assert_eq!(order_json(&world)["tiles"], json!(tiles));
+    run_walking(&mut world, &map, 40_000, |w| w.residents[0].order.is_none());
+    assert!(world.residents[0].order.is_none());
+    for x in 1..=5 {
+        assert!(finished(&world, x, 1));
+    }
+}
+
+#[test]
+fn is_checked_by_an_invariant() {
+    let map = open();
+    let (mut world, _) = setup(&map, 1.0, 1.0, 3.0 * stone());
+    world.residents[0].order = Some(
+        serde_json::from_value(json!({
+            "kind": "roadLine", "tiles": [[1, 1], [3, 1]], "phase": "building", "path": null,
+            "progress": 0, "siteId": "nowhere"
+        }))
+        .unwrap(),
+    );
+    assert!(matches!(world.residents[0].order, Some(ResidentOrder::RoadLine(_))));
+    let found = invariant_named("line-orders-sound").unwrap().check(&world, &map);
+    let messages: Vec<&str> = found.iter().map(|v| v.message.as_str()).collect();
+    assert_eq!(
+        messages,
+        [
+            "resident w1 has a road order whose tile 1 is not a step on from the one before",
+            "resident w1 builds nowhere, which is not the road site on their tile and the order\u{2019}s next"
+        ]
+    );
+}
+
+#[test]
+fn builds_wall_diagonally_tile_by_tile_and_nobody_steps_diagonally_through_it() {
+    let map = open();
+    let (mut world, mut orders) = setup(&map, 1.0, 1.0, 0.0);
+    world.residents[0].carried = Stock::from([(Good::Wood, 4.0 * wood())]);
+    let o = line("wallLine", "w1", json!({ "x": 2, "y": 2 }), json!({ "x": 5, "y": 5 }));
+    assert_eq!(orders.receive(&world, &player(7), o, &map), Ok(()));
+    orders.apply_all(&mut world, &map);
+    let o = order_json(&world);
+    assert_eq!(o["kind"], "wallLine");
+    assert_eq!(o["tiles"], json!([[2.0, 2.0], [3.0, 3.0], [4.0, 4.0], [5.0, 5.0]]));
+    let mut done_at: [Option<u64>; 6] = [None; 6];
+    run_walking(&mut world, &map, 40_000, |w| {
+        for x in [2usize, 3, 4, 5] {
+            let finished = wall_at(w, x as i32, x as i32).is_some_and(|b| b.site.is_none());
+            if done_at[x].is_none() && finished {
+                done_at[x] = Some(w.tick);
+            }
+        }
+        w.residents[0].order.is_none()
+    });
+    assert!(world.residents[0].order.is_none());
+    for x in [2, 3, 4, 5] {
+        assert!(wall_at(&world, x, x).unwrap().site.is_none());
+    }
+    let order: Vec<u64> = [2, 3, 4, 5].iter().map(|&x| done_at[x].unwrap()).collect();
+    assert!(order.windows(2).all(|w| w[0] <= w[1]), "{order:?}");
+    assert_eq!(world.residents[0].carried.get(&Good::Wood).copied().unwrap_or(0.0), 0.0);
+
+    // From (4, 3) to (3, 4) is one diagonal step across the line, between the walls on (3, 3)
+    // and (4, 4): closed, so the way goes round an end of the line.
+    let mut finder = PathFinder::new(Arc::new(map.clone()));
+    finder.set_walls(Some(Arc::new(wall_map(&world, &map))));
+    match finder.find_path((4, 3), (3, 4), &WALKING_COSTS, PathOptions::default()) {
+        PathResult::Found { path, .. } => {
+            assert!(path.len() > 1);
+            assert!(!path.iter().any(|&(x, y)| wall_at(&world, x, y).is_some()));
+        }
+        other => panic!("no way found: {other:?}"),
+    }
 }

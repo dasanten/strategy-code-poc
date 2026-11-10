@@ -1,7 +1,8 @@
 //! What the integration tests share.
-use csp_server::scripts::{task_name, DefaultScript};
+use csp_server::scripts::{game_defaults, DefaultScript};
 use csp_shared::world::default_scripts::Task;
 
+#[allow(dead_code)] // Not every test file that shares this module uses it.
 pub const TASKS: [Task; 11] = [
     Task::Work,
     Task::Build,
@@ -16,18 +17,7 @@ pub const TASKS: [Task; 11] = [
     Task::Alarm,
 ];
 
-/// A stand-in for `DEFAULT_SCRIPTS` until the default scripts are ported (T86.12): a valid script
-/// of its own for every task, which is all the library's tests need of them.
+/// The game's default scripts (`DEFAULT_SCRIPTS`), as the library's tests use them.
 pub fn defaults() -> Vec<DefaultScript> {
-    TASKS
-        .iter()
-        .map(|&task| {
-            let name = task_name(task);
-            DefaultScript {
-                task,
-                name: format!("{}{}", name[..1].to_uppercase(), &name[1..]),
-                source: format!("// {name} (default)\nlet task = 1\n"),
-            }
-        })
-        .collect()
+    game_defaults().to_vec()
 }
