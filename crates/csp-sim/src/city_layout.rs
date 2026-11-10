@@ -493,3 +493,6 @@ pub fn city_layouts_sound(world: &WorldState) -> Vec<InvariantViolation> {
     }
     out
 }
+
+#[cfg(test)]
+mod tests;
