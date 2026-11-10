@@ -42,7 +42,7 @@ mod robbed_caravans {
     use super::*;
 
     #[test]
-    #[ignore = "24.8 s alone; see #1092"]
+    #[ignore = "19.9 s with eight at once; see #1092"]
     fn send_what_was_taken_of_a_delivery_again_and_all_of_it_arrives() {
         let mut s = deliveries();
         let city = s.city.clone();
@@ -79,7 +79,7 @@ mod robbed_caravans {
     }
 
     #[test]
-    #[ignore = "11.1 s alone; see #1092"]
+    #[ignore = "12.0 s with eight at once; see #1092"]
     fn send_a_delivery_again_that_robbers_took_all_of() {
         let mut s = deliveries();
         let city = s.city.clone();
@@ -95,7 +95,7 @@ mod robbed_caravans {
     }
 
     #[test]
-    #[ignore = "11.2 s alone; see #1092"]
+    #[ignore = "12.3 s with eight at once; see #1092"]
     fn fetch_coins_taken_from_a_pick_up_again_so_the_seller_is_paid_for_all_of_it() {
         let mut s = deliveries();
         let (city, storage) = (s.city.clone(), s.storage.clone());
@@ -115,7 +115,7 @@ mod robbed_caravans {
     }
 
     #[test]
-    #[ignore = "26.1 s alone; see #1092"]
+    #[ignore = "19.8 s with eight at once; see #1092"]
     fn fetch_coins_taken_while_a_pick_up_pays_and_pay_the_rest() {
         let mut s = deliveries();
         let (city, storage) = (s.city.clone(), s.storage.clone());

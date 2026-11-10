@@ -264,7 +264,7 @@ fn run(
 }
 
 #[test]
-#[ignore = "77 s alone; see #1092"]
+#[ignore = "58.1 s with eight at once; see #1092"]
 fn on_the_map_stands_down_for_the_founding_with_a_further_road_unfinished_and_then_founds() {
     let mut s = big_city(None, 1300);
     let city = s.city.clone();
@@ -399,7 +399,7 @@ fn on_the_map_stands_down_for_the_founding_with_a_further_road_unfinished_and_th
 }
 
 #[test]
-#[ignore = "178 s alone; see #1092"]
+#[ignore = "110.2 s with eight at once; see #1092"]
 fn a_big_city_lays_a_road_to_its_second_neighbour_on_the_map() {
     let (mut world, terrain, city, _) = town(&[(Good::Stone, 400.0)], 500, &BIG);
     let near = neighbour(&mut world, &terrain, 100, &[(Good::Stone, 400.0)]);
@@ -420,7 +420,7 @@ fn a_big_city_lays_a_road_to_its_second_neighbour_on_the_map() {
 }
 
 #[test]
-#[ignore = "22 s alone; see #1092"]
+#[ignore = "12.9 s with eight at once; see #1092"]
 fn on_the_map_finishes_a_road_to_a_far_workplace_round_a_lake() {
     let (mut world, mut terrain, city, place) = town(&[(Good::Stone, 400.0)], 300, &NPC_TOWN);
     let home = npc_home(&world, &city).expect("a home");
@@ -447,7 +447,7 @@ fn on_the_map_finishes_a_road_to_a_far_workplace_round_a_lake() {
 }
 
 #[test]
-#[ignore = "77 s alone; see #1092"]
+#[ignore = "66.6 s with eight at once; see #1092"]
 fn on_the_map_joins_two_cities_with_one_road_and_reaches_a_post_on_the_way() {
     // Past what they keep from their crews once they would be full (`CONTEXT.md`: NPC road).
     let (mut world, terrain, city, _) = town(&[(Good::Stone, 500.0)], 500, &NPC_TOWN);
@@ -480,7 +480,7 @@ fn on_the_map_joins_two_cities_with_one_road_and_reaches_a_post_on_the_way() {
 }
 
 #[test]
-#[ignore = "41 s alone; see #1092"]
+#[ignore = "38.3 s with eight at once; see #1092"]
 fn on_the_map_does_not_starve_its_crew_on_a_long_road() {
     let far = 700.0;
     let mut terrain = plains(1600);
@@ -533,7 +533,6 @@ fn on_the_map_does_not_starve_its_crew_on_a_long_road() {
 }
 
 #[test]
-#[ignore = "3 s alone, 6 s in a full run; see #1092"]
 fn on_the_map_never_takes_its_stone_below_the_reserve_and_goes_back_to_other_work() {
     let (mut world, terrain, city, _) = town(&[(Good::Stone, 3.0)], 300, &NPC_TOWN);
     let mut runner = Runner::new(&terrain);

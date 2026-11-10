@@ -24,7 +24,7 @@ const HQ: i32 = 128;
 const LEG: i32 = 600;
 
 #[test]
-#[ignore = "30.5 s alone; see #1092"]
+#[ignore = "20.6 s with eight at once; see #1092"]
 fn a_waiting_horse_doesnt_go_down_nor_the_hqs_people_go_hungry_for_it() {
     // `world({ posts: 3 })`: the HQ and three posts `LEG` tiles east of it, with their caravans.
     let terrain = plains(SIZE);
@@ -83,7 +83,7 @@ fn a_waiting_horse_doesnt_go_down_nor_the_hqs_people_go_hungry_for_it() {
 }
 
 #[test]
-#[ignore = "88.7 s alone; see #1092"]
+#[ignore = "66.5 s with eight at once; see #1092"]
 fn its_carriages_wait_then_leave_with_enough_nobody_goes_down_on_the_first_legs_and_supply_goes_on()
 {
     use crate::queries::city::town_hall_of;

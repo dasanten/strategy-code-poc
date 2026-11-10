@@ -156,7 +156,7 @@ fn goods_warehouse(s: &Setup) -> usize {
 }
 
 #[test]
-#[ignore = "23.6 s alone; see #1092"]
+#[ignore = "6.0 s alone; see #1092"]
 fn is_built_by_the_hq_from_its_own_adults_and_its_goods_warehouse() {
     let mut s = setup();
     let g = goods_warehouse(&s);

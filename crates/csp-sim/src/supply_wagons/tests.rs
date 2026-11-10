@@ -269,7 +269,6 @@ fn goes_without_when_the_hq_has_nobody_free_to_drive_it() {
 }
 
 #[test]
-#[ignore = "6.1 s alone; see #1092"]
 fn follows_the_army_along_the_road() {
     let mut s = default_setup();
     let off = set_off(&mut s, iron(10.0));
