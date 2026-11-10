@@ -132,7 +132,13 @@ impl Setup {
         self.orders.apply_all(&mut self.world);
         self.queues.run_all(&mut self.world, &mut self.scratch);
         assert_eq!(self.scripts.run_all(&mut self.world, &mut self.scratch), vec![]);
-        step_world(&mut self.world, &self.terrain, &mut self.scratch, Some(&mut self.walking), None);
+        step_world(
+            &mut self.world,
+            &self.terrain,
+            &mut self.scratch,
+            Some(&mut self.walking),
+            None,
+        );
     }
 
     fn give(&mut self, order: Value, resident_id: &str) {
@@ -189,7 +195,10 @@ fn find<'w>(world: &'w WorldState, id: &str) -> &'w Building {
 }
 
 fn as_building() -> Vec<ScriptParam> {
-    vec![serde_json::from_value(json!({ "name": "target", "type": "building", "line": 1, "column": 1 })).unwrap()]
+    vec![serde_json::from_value(
+        json!({ "name": "target", "type": "building", "line": 1, "column": 1 }),
+    )
+    .unwrap()]
 }
 
 mod build {
@@ -321,7 +330,12 @@ mod a_construction_site_is_the_realms_that_laid_it_out {
         assert_eq!(laid.city_id, None);
         assert_eq!(laid.realm_id.as_deref(), Some("r1"));
         assert_eq!(
-            start_params_problem(&s.world, "r1", &as_building(), Some(&json!({ "target": laid.id }))),
+            start_params_problem(
+                &s.world,
+                "r1",
+                &as_building(),
+                Some(&json!({ "target": laid.id }))
+            ),
             None
         );
         // Picked as Build's site, w1 walks over and joins it.
@@ -373,7 +387,10 @@ mod a_construction_site_is_the_realms_that_laid_it_out {
             let kind = s.world.buildings[i].kind;
             let b = &mut s.world.buildings[i];
             b.realm_id = Some("r1".into());
-            b.site = Some(ConstructionSite { delivered: build_materials(kind), work: build_work_of(kind) });
+            b.site = Some(ConstructionSite {
+                delivered: build_materials(kind),
+                work: build_work_of(kind),
+            });
             assert!(finish_site(&mut s.world, i, &w2));
             s.world.buildings[i].realm_id.clone()
         };
@@ -385,10 +402,8 @@ mod a_construction_site_is_the_realms_that_laid_it_out {
         gs.realm_id = Some("r9".into());
         gs.site = Some(ConstructionSite { delivered: Default::default(), work: 0.0 });
         s.world.buildings.push(gs);
-        let invariant = world_invariants()
-            .into_iter()
-            .find(|i| i.name == "outpost-storage-realms")
-            .unwrap();
+        let invariant =
+            world_invariants().into_iter().find(|i| i.name == "outpost-storage-realms").unwrap();
         let found: Vec<Vec<String>> =
             invariant.check(&s.world, &s.terrain).into_iter().map(|v| v.entity_ids).collect();
         assert_eq!(found, vec![vec!["gs".to_string()]]);
@@ -440,8 +455,10 @@ mod invariants {
         let script = |id: u64, memory: Value| {
             serde_json::from_value(json!({ "scriptId": id, "memory": memory })).unwrap()
         };
-        s.world.residents[0].script =
-            Some(script(script_of(Task::Build), json!({ "building": "house", "at": { "x": 6, "y": 6 } })));
+        s.world.residents[0].script = Some(script(
+            script_of(Task::Build),
+            json!({ "building": "house", "at": { "x": 6, "y": 6 } }),
+        ));
         s.world.residents[1].script = Some(script(script_of(Task::Build), json!({})));
         let found = defaults_have_a_target(&s.world, &|_| Some(Task::Build));
         assert_eq!(found.len(), 1);

@@ -3,8 +3,9 @@
 //! over them, and foals up to the number wanted for their size.
 
 use csp_shared::balance::{
-    HORSE_FOOD_PER_DAY, MAX_HUNGER, NpcCitySize, NPC_HORSES_BASE, NPC_RESIDENTS_PER_HORSE, NPC_START_HORSES,
-    NPC_START_HORSE_FOOD_DAYS, NPC_TOWN, NPC_VILLAGE, OWN_FOOD, STABLE_CAPACITY, TRADING_POST,
+    NpcCitySize, HORSE_FOOD_PER_DAY, MAX_HUNGER, NPC_HORSES_BASE, NPC_RESIDENTS_PER_HORSE,
+    NPC_START_HORSES, NPC_START_HORSE_FOOD_DAYS, NPC_TOWN, NPC_VILLAGE, OWN_FOOD, STABLE_CAPACITY,
+    TRADING_POST,
 };
 use csp_shared::footprint::is_at;
 use csp_shared::time::TICKS_PER_GAME_DAY;
@@ -15,14 +16,14 @@ use csp_shared::world::{
 use csp_shared::{footprint::Placed, terrain::TerrainMap};
 use serde_json::json;
 
-use super::{give_horses_to_npc_cities, give_npc_horses, found_npc_city};
+use super::{found_npc_city, give_horses_to_npc_cities, give_npc_horses};
 use crate::horses::{new_horse, NewHorse};
 use crate::invariants::check_all;
 use crate::npc_growth::next_project;
 use crate::npc_stable::trade_org_breeds_no_horses;
 use crate::npc_test_world::{plains, storage_of, village, Runner, Village};
-use crate::orders::{order_kinds, OrderQueue, OrderReply};
 use crate::order_sender::OrderSender;
+use crate::orders::{order_kinds, OrderQueue, OrderReply};
 use crate::queries::horses::{horses_in, owns_horse, HorseOwner};
 use crate::queries::names::placed;
 use crate::queries::npc_trade::{
@@ -135,7 +136,9 @@ mod with_horses {
                 let pile = world.piles.iter().find(|p| p.x == h.x && p.y == h.y);
                 assert_eq!(
                     pile.and_then(|p| p.goods.get(&Good::Food)).copied(),
-                    Some((NPC_START_HORSES * NPC_START_HORSE_FOOD_DAYS * HORSE_FOOD_PER_DAY).ceil())
+                    Some(
+                        (NPC_START_HORSES * NPC_START_HORSE_FOOD_DAYS * HORSE_FOOD_PER_DAY).ceil()
+                    )
                 );
             }
         }
@@ -267,7 +270,9 @@ mod the_stable_of_an_npc_city_with_horses {
             assert!(is_at((h.x as i32, h.y as i32), placed(&stable), 200));
             assert!(h.hunger > 0.0);
         }
-        assert!(stable.stock.as_ref().and_then(|s| s.get(&Good::Food)).copied().unwrap_or(0.0) > 0.0);
+        assert!(
+            stable.stock.as_ref().and_then(|s| s.get(&Good::Food)).copied().unwrap_or(0.0) > 0.0
+        );
     }
 
     #[test]
@@ -430,7 +435,8 @@ mod an_npc_city_breeding_its_horses {
         // With one horse of its own it breeds nothing.
         run(&mut v.world, &v.terrain, 30, |world| assert!(breeders(world).is_empty()));
 
-        let mut queue = OrderQueue::new(order_kinds(), Some(std::sync::Arc::new(v.terrain.clone())));
+        let mut queue =
+            OrderQueue::new(order_kinds(), Some(std::sync::Arc::new(v.terrain.clone())));
         let sender = OrderSender::player(7, "Mara");
         let answer = queue.receive(
             &v.world,

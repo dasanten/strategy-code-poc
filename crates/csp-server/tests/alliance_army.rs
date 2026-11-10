@@ -223,10 +223,10 @@ fn hands_over_soldiers_and_carriages_who_then_take_orders_only_from_the_alliance
     let seen = diplomacy_for(&t.world, &t.realm(TOBIN), [], vec![]).alliance.unwrap().army;
     let seen = serde_json::to_value(&seen).unwrap();
     let tobin = t.realm(TOBIN);
-    let want = |is: &str, id: &str| {
-        json!({ "is": is, "id": id, "realmId": tobin, "recallAt": null })
-    };
-    for (got, want) in seen.as_array().unwrap().iter().zip([want("resident", &s), want("carriage", &k)])
+    let want =
+        |is: &str, id: &str| json!({ "is": is, "id": id, "realmId": tobin, "recallAt": null });
+    for (got, want) in
+        seen.as_array().unwrap().iter().zip([want("resident", &s), want("carriage", &k)])
     {
         for (key, v) in want.as_object().unwrap() {
             assert_eq!(&got[key], v, "{key} of {got}");
@@ -246,19 +246,27 @@ fn takes_only_soldiers_and_carriages_of_a_member_each_once() {
         t.order(p, order)
     };
     let ash_soldier = t.soldier(ASH);
-    assert_eq!(hand(&mut t, ASH, json!({ "residentIds": [ash_soldier] })), "you are in no alliance");
+    assert_eq!(
+        hand(&mut t, ASH, json!({ "residentIds": [ash_soldier] })),
+        "you are in no alliance"
+    );
     t.r(&s).carried.shift_remove(&Good::Sword);
     assert!(hand(&mut t, TOBIN, json!({ "residentIds": [s] })).contains("is not a soldier"));
     t.r(&s).carried.insert(Good::Sword, 1.0);
     let mara_soldier = t.soldier(MARA);
-    assert!(hand(&mut t, TOBIN, json!({ "residentIds": [mara_soldier] })).contains("not all of them"));
+    assert!(
+        hand(&mut t, TOBIN, json!({ "residentIds": [mara_soldier] })).contains("not all of them")
+    );
     let mara_carriage = t.carriage(MARA);
-    assert!(hand(&mut t, TOBIN, json!({ "carriageIds": [mara_carriage] })).contains("not all of them"));
+    assert!(
+        hand(&mut t, TOBIN, json!({ "carriageIds": [mara_carriage] })).contains("not all of them")
+    );
     assert!(hand(&mut t, TOBIN, json!({ "residentIds": [s, s] })).contains("once"));
     assert_eq!(hand(&mut t, TOBIN, json!({})), "hand over at least one");
     assert_eq!(hand(&mut t, TOBIN, json!({ "residentIds": [s] })), "ok");
-    assert!(hand(&mut t, TOBIN, json!({ "residentIds": [s] }))
-        .contains("already in the alliance army"));
+    assert!(
+        hand(&mut t, TOBIN, json!({ "residentIds": [s] })).contains("already in the alliance army")
+    );
     t.order(TOBIN, json!({ "kind": "leaveAlliance" }));
     let tobin_carriage = t.carriage(TOBIN);
     assert_eq!(
@@ -301,10 +309,7 @@ fn recalls_everything_when_a_member_leaves_and_leaves_armies_it_made() {
     let mut t = setup();
     let s = t.soldier(TOBIN);
     let k = t.carriage(TOBIN);
-    t.order(
-        TOBIN,
-        json!({ "kind": "handOverToAlliance", "residentIds": [s], "carriageIds": [k] }),
-    );
+    t.order(TOBIN, json!({ "kind": "handOverToAlliance", "residentIds": [s], "carriageIds": [k] }));
     t.order(MARA, json!({ "kind": "formArmy", "name": "Guard", "residentIds": [s] }));
     t.order(TOBIN, json!({ "kind": "leaveAlliance" }));
     t.pass(ALLIANCE_LEAVE_DELAY);
@@ -340,10 +345,7 @@ fn sends_a_dead_leaders_alliance_army_soldiers_home_out_of_the_alliance_leaders_
     let mut t = setup();
     let s = t.soldier(TOBIN);
     let k = t.carriage(TOBIN);
-    t.order(
-        TOBIN,
-        json!({ "kind": "handOverToAlliance", "residentIds": [s], "carriageIds": [k] }),
-    );
+    t.order(TOBIN, json!({ "kind": "handOverToAlliance", "residentIds": [s], "carriageIds": [k] }));
     assert_eq!(
         t.order(MARA, json!({ "kind": "formArmy", "name": "Guard", "residentIds": [s] })),
         "ok"

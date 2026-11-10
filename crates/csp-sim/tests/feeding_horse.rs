@@ -96,7 +96,13 @@ impl Setup {
         for r in &mut self.world.residents {
             r.hunger = MAX_HUNGER;
         }
-        step_world(&mut self.world, &self.terrain, &mut self.scratch, Some(&mut self.walking), None);
+        step_world(
+            &mut self.world,
+            &self.terrain,
+            &mut self.scratch,
+            Some(&mut self.walking),
+            None,
+        );
         assert_sound(&self.world, &self.terrain);
     }
 
@@ -276,12 +282,7 @@ fn does_nothing_once_the_food_is_gone_or_another_filled_the_horse_first() {
     t.tick();
     // Whoever goes first fills it; the other keeps all their Food.
     let food = |t: &mut Setup, id: &str| {
-        at(&mut t.world, id)
-            .carried
-            .values()
-            .copied()
-            .next()
-            .unwrap_or(0.0)
+        at(&mut t.world, id).carried.values().copied().next().unwrap_or(0.0)
     };
     assert_eq!(food(&mut t, "a3") + food(&mut t, "a4"), 10.0);
 }

@@ -58,7 +58,12 @@ fn starving(world: &mut WorldState) {
 }
 
 /// Steps the world `ticks` times, residents kept fed, checking every invariant after each.
-fn run(world: &mut WorldState, terrain: &TerrainMap, ticks: usize, mut walking: Option<&mut Walking>) {
+fn run(
+    world: &mut WorldState,
+    terrain: &TerrainMap,
+    ticks: usize,
+    mut walking: Option<&mut Walking>,
+) {
     let mut scratch = Scratch::default();
     for _ in 0..ticks {
         for r in &mut world.residents {
@@ -137,9 +142,10 @@ fn wakes_from_food_on_a_tile_next_to_it_too() {
     let (mut world, terrain) = setup();
     starving(&mut world);
     run(&mut world, &terrain, 1, None);
-    world
-        .piles
-        .push(serde_json::from_value(json!({ "id": "p1", "x": 3, "y": 3, "goods": { "food": 1 } })).unwrap());
+    world.piles.push(
+        serde_json::from_value(json!({ "id": "p1", "x": 3, "y": 3, "goods": { "food": 1 } }))
+            .unwrap(),
+    );
     run(&mut world, &terrain, 1, None);
     assert!(!horse_down(&world));
     assert!(world.piles.is_empty());

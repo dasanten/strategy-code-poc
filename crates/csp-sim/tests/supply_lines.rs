@@ -152,7 +152,10 @@ fn feeds_army_members_from_a_carriage_of_their_realm_on_or_next_to_their_tile() 
     for soldier in s.soldiers() {
         assert_eq!(food(soldier), Some(HOME_FOOD_LOW));
     }
-    assert_eq!(s.world.carriages[0].load.get(&Good::Food).copied(), Some(10.0 - 2.0 * HOME_FOOD_LOW));
+    assert_eq!(
+        s.world.carriages[0].load.get(&Good::Food).copied(),
+        Some(10.0 - 2.0 * HOME_FOOD_LOW)
+    );
 }
 
 #[test]
@@ -208,9 +211,7 @@ fn take_only_the_players_own_army_as_a_stop_bringing_nothing_back() {
         s.order(haul(json!({ "armyId": army, "returnGoods": ["wood"] }))),
         Err("nothing comes back from an army".into())
     );
-    let drive = |army_id: &str| {
-        json!({ "kind": "drive", "residentId": "d1", "carriageId": "k1", "armyId": army_id })
-    };
+    let drive = |army_id: &str| json!({ "kind": "drive", "residentId": "d1", "carriageId": "k1", "armyId": army_id });
     assert_eq!(s.order(drive("nope")), Err("not one of your armies".into()));
     assert_eq!(s.order(drive(&army)), Ok(()));
     match &r(&s.world, "d1").order {

@@ -83,12 +83,15 @@ pub struct DefaultScripts {
     /// The order kinds with the run-script and task orders.
     pub kinds: OrderKinds,
     runner: ScriptRunner,
-
 }
 
 impl DefaultScripts {
     /// Runs every running script once, as the game does before the world steps.
-    pub fn run_all(&mut self, world: &mut WorldState, scratch: &mut Scratch) -> Vec<InvariantViolation> {
+    pub fn run_all(
+        &mut self,
+        world: &mut WorldState,
+        scratch: &mut Scratch,
+    ) -> Vec<InvariantViolation> {
         self.runner.run_all(world, scratch, true)
     }
 }

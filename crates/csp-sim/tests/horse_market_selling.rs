@@ -208,7 +208,10 @@ mod what_an_npc_city_pays_for_a_horse {
         let s = setup();
         let h = s.horse("mine").clone();
         let average = npc_horse_buy_price(&s.world, &s.city(), &h, Some("r1"));
-        let good = Horse { stats: HorseStats { speed: 15.0, strength: 15.0, endurance: 15.0 }, ..h.clone() };
+        let good = Horse {
+            stats: HorseStats { speed: 15.0, strength: 15.0, endurance: 15.0 },
+            ..h.clone()
+        };
         assert!(npc_horse_buy_price(&s.world, &s.city(), &good, Some("r1")) > average);
         let old = Horse { born_at: -10.0 * TICKS_PER_GAME_YEAR, ..h };
         assert!(npc_horse_buy_price(&s.world, &s.city(), &old, Some("r1")) < average);
@@ -272,7 +275,10 @@ mod selling_a_horse {
         let name = s.p1().name.clone();
         match s.sold_events().as_slice() {
             [RealmEventWhat::HorseSold { name: n, horse, city, coins, .. }] => {
-                assert_eq!((n, horse.as_str(), city.as_str(), *coins), (&name, "Horse mine", "Dunmere", price));
+                assert_eq!(
+                    (n, horse.as_str(), city.as_str(), *coins),
+                    (&name, "Horse mine", "Dunmere", price)
+                );
             }
             other => panic!("{other:?}"),
         }

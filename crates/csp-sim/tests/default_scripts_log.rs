@@ -9,8 +9,8 @@ use csp_shared::balance::MAX_HUNGER;
 use csp_shared::terrain::{Terrain, TerrainMap};
 use csp_shared::world::{Building, BuildingKind, Resident, ResidentOrder, Task, WorldState};
 use csp_sim::default_scripts::default_script;
-use csp_sim::orders::order_kinds;
 use csp_sim::order_sender::OrderSender;
+use csp_sim::orders::order_kinds;
 use csp_sim::script_runner::{ScriptHost, ScriptRunner};
 use csp_sim::scripts::RunnableScript;
 use csp_sim::tick::Scratch;
@@ -123,8 +123,10 @@ fn logs_once_when_getting_food_and_once_when_carrying_a_load_off_not_every_tick(
     let (mut world, terrain, camp) = camp_world();
     add_worker(&mut world, &camp, 3.0);
     world.piles.push(
-        serde_json::from_value(json!({ "id": "p", "x": camp.x, "y": camp.y, "goods": { "wood": 100 } }))
-            .unwrap(),
+        serde_json::from_value(
+            json!({ "id": "p", "x": camp.x, "y": camp.y, "goods": { "wood": 100 } }),
+        )
+        .unwrap(),
     );
     // The TypeScript's `done` sets `carried ||= …` before testing; the same here, in the closure.
     let seen = std::cell::Cell::new(false);
@@ -147,7 +149,10 @@ fn logs_once_when_getting_food_and_once_when_carrying_a_load_off_not_every_tick(
     let load = carry
         .strip_prefix("pile full: carrying ")
         .and_then(|t| t.strip_suffix(" wood to the storage at 12,10"));
-    assert!(load.is_some_and(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit())), "{carry}");
+    assert!(
+        load.is_some_and(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit())),
+        "{carry}"
+    );
     assert_eq!(log.len(), 2, "{log:?}");
     assert_sound(&world, &terrain);
 }
