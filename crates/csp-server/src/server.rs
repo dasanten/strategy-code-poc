@@ -12,6 +12,7 @@
 //! for the orders, queues and scripts that run the Players' scripts.
 
 use std::{
+    cell::RefCell,
     path::{Path, PathBuf},
     sync::{mpsc, Arc, Mutex},
     time::{Duration, SystemTime},
@@ -23,14 +24,14 @@ use csp_sim::{
     orders::{order_kinds, OrderQueue},
     queues::QueueRunner,
     script_runner::ScriptRunner,
-    sight::SightTracker,
+    sight::{InvariantViolation, SightTracker},
     terrain_gen::generate_terrain,
     territory::TerritoryTracker,
     tick::{
-        run_tick, RunQueues, RunScripts, Scratch, TickHealth, TickOptions, TickPhase, TickReporter,
-        TickTimer,
+        run_tick, ApplyOrders, RunQueues, RunScripts, Scratch, TickHealth, TickOptions, TickPhase,
+        TickReporter, TickTimer, Walk,
     },
-    walking::Walking,
+    walking::{Walking, PATH_BUDGET_MS},
     world::generate_world,
 };
 use rusqlite::Connection;
@@ -116,6 +117,33 @@ impl From<&Config> for TickSettings {
     }
 }
 
+/// Where in a tick the shadow run looks at the world (`scripts/shadow-run.mts`): after the
+/// orders, the queues, the scripts and the world's step (with its invariants), and once the
+/// loop's work after it (territory, sight, broadcast, save) is done.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProbePoint {
+    Orders,
+    Queues,
+    Scripts,
+    World,
+    End,
+}
+
+impl ProbePoint {
+    pub fn name(self) -> &'static str {
+        match self {
+            ProbePoint::Orders => "orders",
+            ProbePoint::Queues => "queues",
+            ProbePoint::Scripts => "scripts",
+            ProbePoint::World => "world",
+            ProbePoint::End => "end",
+        }
+    }
+}
+
+/// Looks at the world at each [`ProbePoint`] of a tick.
+pub type Probe = dyn FnMut(ProbePoint, &WorldState);
+
 /// The running world and what the loop keeps beside it.
 pub struct Game<L: LogSink> {
     pub world: WorldState,
@@ -140,6 +168,11 @@ pub struct Game<L: LogSink> {
     pub realtime: Option<Arc<Realtime>>,
     pub saver: WorldSaver<SaverLog<L>>,
     pub reporter: ServerReporter<Arc<L>>,
+    /// Wall-clock time a tick's path searches get, [`PATH_BUDGET_MS`]; the shadow run gives them
+    /// no limit, so where a walker is never depends on how fast the machine is.
+    pub path_budget_ms: f64,
+    /// Looks at the world through each tick, for the shadow run; none in the game.
+    pub probe: Option<Box<Probe>>,
     log: Arc<L>,
 }
 
@@ -163,6 +196,8 @@ impl<L: LogSink> Game<L> {
             realtime: None,
             saver: WorldSaver::new(SaverLog(Arc::clone(&log))),
             reporter: ServerReporter::new(Arc::clone(&log)),
+            path_budget_ms: PATH_BUDGET_MS,
+            probe: None,
             log,
         }
     }
@@ -237,13 +272,22 @@ impl<L: LogSink> Game<L> {
             saver,
             reporter,
             log,
+            path_budget_ms,
+            probe,
             ..
         } = self;
         let size = terrain.size;
         let map: &TerrainMap = terrain;
         let explored: &Mutex<ExploredTerrain> = explored;
         let lock = || explored.lock().unwrap_or_else(|e| e.into_inner());
+        let probe = RefCell::new(probe.as_deref_mut());
+        let look = |point: ProbePoint, world: &WorldState| {
+            if let Some(p) = probe.borrow_mut().as_mut() {
+                p(point, world);
+            }
+        };
         let mut finish = |timer: &TickTimer, world: &mut WorldState, scratch: &mut Scratch| {
+            look(ProbePoint::World, world);
             timer.time(TickPhase::Territory, || territory.update(world, map));
             let grown = timer.time(TickPhase::Sight, || {
                 let index = scratch.index(world, size);
@@ -269,13 +313,18 @@ impl<L: LogSink> Game<L> {
                     }
                 });
             }
+            look(ProbePoint::End, world);
         };
+        let mut orders = Probed { inner: orders, look: &look };
+        let mut queues = queues.as_mut().map(|inner| Probed { inner, look: &look });
+        let mut scripts = scripts.as_mut().map(|inner| Probed { inner, look: &look });
+        let mut walking = Budgeted { walking, budget_ms: *path_budget_ms };
         let mut opts =
             TickOptions::new(reporter, settings.invariant_sample_rate, settings.slow_tick_ms);
-        opts.orders = Some(orders);
+        opts.orders = Some(&mut orders);
         opts.queues = queues.as_mut().map(|q| q as &mut dyn RunQueues);
         opts.scripts = scripts.as_mut().map(|s| s as &mut dyn RunScripts);
-        opts.walking = Some(walking);
+        opts.walking = Some(&mut walking);
         opts.finish = Some(&mut finish);
         let health = run_tick(world, map, scratch, opts);
         tag_world(world);
@@ -317,6 +366,60 @@ impl<L: LogSink> Game<L> {
 }
 
 /// Work for the game thread between ticks: it gets the game and its connection.
+/// A phase of the tick, looked at once it has run (the shadow run's probe).
+struct Probed<'a, T: ?Sized> {
+    inner: &'a mut T,
+    look: &'a dyn Fn(ProbePoint, &WorldState),
+}
+
+impl<T: ApplyOrders + ?Sized> ApplyOrders for Probed<'_, T> {
+    fn apply_all(&mut self, world: &mut WorldState, scratch: &mut Scratch) {
+        self.inner.apply_all(world, scratch);
+        (self.look)(ProbePoint::Orders, world);
+    }
+}
+
+impl<T: RunQueues + ?Sized> RunQueues for Probed<'_, T> {
+    fn run_all(&mut self, world: &mut WorldState, scratch: &mut Scratch) {
+        self.inner.run_all(world, scratch);
+        (self.look)(ProbePoint::Queues, world);
+    }
+}
+
+impl<T: RunScripts + ?Sized> RunScripts for Probed<'_, T> {
+    fn run_all(
+        &mut self,
+        world: &mut WorldState,
+        scratch: &mut Scratch,
+        check: bool,
+    ) -> Vec<InvariantViolation> {
+        let violations = self.inner.run_all(world, scratch, check);
+        (self.look)(ProbePoint::Scripts, world);
+        violations
+    }
+    fn runs(&self) -> usize {
+        self.inner.runs()
+    }
+}
+
+/// Walking with a wall-clock budget for its path searches other than [`PATH_BUDGET_MS`].
+struct Budgeted<'a> {
+    walking: &'a mut Walking,
+    budget_ms: f64,
+}
+
+impl Walk for Budgeted<'_> {
+    fn walk(&mut self, world: &mut WorldState, scratch: &mut Scratch) -> usize {
+        let steps = self.walking.request_steps(world, scratch, self.budget_ms);
+        self.walking.resolve(world, scratch, &steps);
+        steps.len()
+    }
+
+    fn ways(&mut self) -> Option<&mut dyn csp_sim::npc_roads::WayFinder> {
+        self.walking.ways()
+    }
+}
+
 pub type Job<L> = Box<dyn FnOnce(&mut Game<L>, &Connection) + Send>;
 
 enum Command<L: LogSink> {

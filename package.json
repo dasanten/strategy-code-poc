@@ -18,6 +18,7 @@
     "wasm:build": "node scripts/wasm-build.mjs",
     "script-data:rust": "cargo run --quiet --package csp-lang-wasm --bin script-data",
     "check:rust": "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo nextest run --workspace",
+    "shadow-run": "tsx --conditions=source scripts/shadow-run.mts",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

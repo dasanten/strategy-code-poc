@@ -18,6 +18,7 @@ pub mod realtime;
 pub mod saves;
 pub mod scripts;
 pub mod server;
+pub mod shadow;
 pub mod sync;
 pub mod tick_window;
 pub mod wire;
