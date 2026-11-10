@@ -19,7 +19,7 @@ use csp_sim::order_sender::OrderSender;
 use csp_sim::orders::{order_kinds, OrderKinds, OrderQueue, OrderReply};
 use csp_sim::script_params::SetScriptParamOrder;
 use csp_sim::script_runner::{
-    DefaultScriptHost, RunScriptOrder, ScriptHost, ScriptRunner, SetAlarmScriptOrder,
+    ArmyRunScriptOrder, DefaultScriptHost, RunScriptOrder, ScriptHost, ScriptRunner, SetAlarmScriptOrder,
     SetDefenceScriptOrder, TaskOrder,
 };
 use csp_sim::scripts::{RunnableScript, ScriptLibrary};
@@ -38,12 +38,45 @@ pub fn default_script_id(user_id: u64, task: Task) -> u64 {
 pub struct Host {
     pub senders: Vec<OrderSender>,
     pub library: Mutex<HashMap<u64, RunnableScript>>,
+    /// Scripts saved with no version that can run, by id.
+    pub broken: Mutex<Vec<u64>>,
 }
 
 impl Host {
+    /// Saves a Player's new script under the next free id (`createScript`). Only a version that
+    /// parses becomes the active one, so a script with a syntax error has none that can run.
+    pub fn create_script(&self, user_id: u64, name: &str, source: &str) -> u64 {
+        let mut library = self.library.lock().unwrap();
+        let mut taken = self.broken.lock().unwrap();
+        let id = (1..).find(|id| !library.contains_key(id) && !taken.contains(id)).unwrap();
+        if csp_lang::check_script(source).is_empty() {
+            let script = RunnableScript {
+                user_id,
+                name: name.into(),
+                version: 1,
+                source: source.into(),
+                follows_default: false,
+                task: None,
+            };
+            library.insert(id, script);
+        } else {
+            taken.push(id);
+        }
+        id
+    }
+
+    /// Deletes a script (`deleteScript`).
+    pub fn delete_script(&self, id: u64) {
+        self.library.lock().unwrap().remove(&id);
+    }
+
     fn find(&self, id: u64) -> Option<RunnableScript> {
         if let Some(s) = self.library.lock().unwrap().get(&id) {
             return Some(s.clone());
+        }
+        // The Players' own scripts take ids below 100; a default's id names a Player.
+        if id < 100 {
+            return None;
         }
         let place = (id % 100) as usize;
         let task = *TASKS.get(place.checked_sub(1)?)?;
@@ -100,10 +133,18 @@ pub struct Tasks {
 }
 
 pub fn default_scripts(terrain: &TerrainMap, senders: Vec<OrderSender>) -> Tasks {
-    let host = Arc::new(Host { senders, library: Mutex::new(HashMap::new()) });
+    let host = Arc::new(Host {
+        senders,
+        library: Mutex::new(HashMap::new()),
+        broken: Mutex::new(Vec::new()),
+    });
     let script_host: Arc<dyn ScriptHost + Send + Sync> = host.clone();
     let mut kinds = order_kinds();
     kinds.insert("runScript", RunScriptOrder { host: script_host.clone() });
+    kinds.insert(
+        "armyRunScript",
+        ArmyRunScriptOrder { host: script_host.clone(), builtins: order_kinds() },
+    );
     kinds.insert("setDefenceScript", SetDefenceScriptOrder { host: script_host.clone() });
     kinds.insert("setAlarmScript", SetAlarmScriptOrder { host: script_host.clone() });
     kinds.insert("setScriptParam", SetScriptParamOrder { library: host.clone() });
