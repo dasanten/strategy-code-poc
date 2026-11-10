@@ -371,3 +371,5 @@ mod tests;
 
 #[cfg(test)]
 mod chain_tests;
+#[cfg(test)]
+mod supplied_tests;
