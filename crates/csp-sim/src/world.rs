@@ -442,6 +442,7 @@ mod tests {
         generate_terrain(1, 128)
     }
 
+    // world.test.ts: creates the same world from the same seed
     #[test]
     fn creates_the_same_world_from_the_same_seed() {
         let terrain = small_terrain();
@@ -449,6 +450,7 @@ mod tests {
         assert_eq!(generate_world(&terrain, 7), generate_world(&terrain, 7));
     }
 
+    // world.test.ts: starts with resource nodes and nobody yet
     #[test]
     fn starts_with_resource_nodes_and_nobody_yet() {
         // Nodes are a sixteenth per tile of what they were on the old grid: a small map has none.
@@ -466,6 +468,7 @@ mod tests {
         assert_eq!(world.script_view_changes, 1.0);
     }
 
+    // world.test.ts: advances the tick; nobody moves without an order
     #[test]
     fn advances_the_tick_nobody_moves_without_an_order() {
         let terrain = small_terrain();
@@ -477,6 +480,7 @@ mod tests {
         assert_eq!(world.tick, 50);
     }
 
+    // world.test.ts: finds the nearest free passable tile
     #[test]
     fn finds_the_nearest_free_passable_tile() {
         let terrain = small_terrain();
