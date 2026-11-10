@@ -11,7 +11,7 @@ import { StreamLanguage, syntaxTree } from '@codemirror/language'
 import { linter, lintGutter, type Diagnostic as LintDiagnostic } from '@codemirror/lint'
 import { EditorView, hoverTooltip } from '@codemirror/view'
 import { oneDark } from '@codemirror/theme-one-dark'
-import { checkScript, type Diagnostic } from '@csp/lang'
+import { checkScript, loadLang, type Diagnostic } from '@csp/lang-wasm'
 import {
   apiHover,
   diagnosticRange,
@@ -27,11 +27,13 @@ const language = StreamLanguage.define(scriptHighlighting)
 
 /**
  * Marks syntax errors inline in red, with the same check the server runs on every saved
- * version, and the checker's warnings in yellow, which never stop a version from running.
+ * version (the server's own checker, as WebAssembly, fetched when the first editor opens), and
+ * the checker's warnings in yellow, which never stop a version from running.
  */
 function diagnostics(defaultScript: boolean) {
   return linter(
-    (view): LintDiagnostic[] => {
+    async (view): Promise<LintDiagnostic[]> => {
+      await loadLang()
       const source = view.state.doc.toString()
       const mark = (severity: 'error' | 'warning') => (d: Diagnostic) => ({
         ...diagnosticRange(source, d),
@@ -58,9 +60,10 @@ function inText(context: CompletionContext): boolean {
  * value's script view where it is certain.
  */
 function names(defaultScript: boolean) {
-  return (context: CompletionContext): CompletionResult | null => {
+  return async (context: CompletionContext): Promise<CompletionResult | null> => {
     const word = context.matchBefore(/\w*/)
     if (!word || inText(context)) return null
+    await loadLang()
     const source = context.state.doc.toString()
     if (context.state.sliceDoc(word.from - 1, word.from) === '.') {
       const fields = fieldCompletions(source, word.from, word.to, { defaultScript })
@@ -76,7 +79,8 @@ function names(defaultScript: boolean) {
 
 /** Shows a game API name's parameters, cost and description, or a field's, on hover. */
 function apiTooltips(defaultScript: boolean) {
-  return hoverTooltip((view, pos) => {
+  return hoverTooltip(async (view, pos) => {
+    await loadLang()
     const source = view.state.doc.toString()
     const hover =
       apiHover(source, pos, { defaultScript }) ?? fieldHover(source, pos, { defaultScript })
@@ -135,6 +139,8 @@ export function ScriptEditor({
   onChangeRef.current = onChange
 
   useEffect(() => {
+    // Fetched once, while the editor paints; the lints, completions and hovers wait for it.
+    void loadLang()
     const view = new EditorView({
       doc: initialSource,
       parent: hostRef.current!,

@@ -9,7 +9,7 @@ import type {
   SeenResident,
   SeenTrader,
   Waypoint,
-} from '@csp/shared'
+} from '@csp/shared-types'
 import type { CityEmblem, FarMarker } from './far.js'
 import type { RegionState } from './region.js'
 

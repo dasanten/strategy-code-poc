@@ -1,4 +1,5 @@
-import { REALM_LOG_LENGTH, type RealmEvent } from '@csp/shared'
+import { REALM_LOG_LENGTH } from '@csp/balance'
+import type { RealmEvent } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import { appendEvents, describeDelivery, describeEvent, realmEnded } from './realm-log.js'
 

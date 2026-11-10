@@ -1,4 +1,4 @@
-import type { DirectOfferView, Good, Resident, SeenBuilding, SeenOffer } from '@csp/shared'
+import type { DirectOfferView, Good, Resident, SeenBuilding, SeenOffer } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
   acceptPreview,

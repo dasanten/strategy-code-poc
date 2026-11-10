@@ -1,4 +1,4 @@
-import { CHUNK_SIZE, chunksAcross, wrap, wrapDelta } from '@csp/shared'
+import { CHUNK_SIZE, chunksAcross, wrap, wrapDelta } from '../shared/terrain.js'
 
 /**
  * Where the map view looks: the tile at the centre of the screen and the pixels per tile. The

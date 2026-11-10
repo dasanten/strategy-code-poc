@@ -1,4 +1,4 @@
-import { aboutTime } from '@csp/shared'
+import { aboutTime } from './shared/estimates.js'
 import { describe, expect, it } from 'vitest'
 import {
   LANE_GAP,

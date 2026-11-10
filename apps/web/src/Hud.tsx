@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { formatGameTime, type FirstDay, type TraderVisit } from '@csp/shared'
+import { formatGameTime } from './shared/time.js'
+import type { FirstDay, TraderVisit } from '@csp/shared-types'
 import { DrawerStatus } from './drawer-head.js'
 import {
   DRAWERS,

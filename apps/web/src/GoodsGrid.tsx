@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
-import type { Good } from '@csp/shared'
+import type { Good } from '@csp/shared-types'
 import { GOOD_ART, GOOD_FILES, GOOD_LABELS, goodsAmount, type GoodsItem } from './goods-grid.js'
 import { LONG_PRESS_MS, longPresses } from './map/gestures.js'
 

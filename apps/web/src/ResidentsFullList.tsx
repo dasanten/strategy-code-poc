@@ -1,5 +1,12 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import type { Building, City, Resident, ScriptSummary, SeenHorse, SeenResident } from '@csp/shared'
+import type {
+  Building,
+  City,
+  Resident,
+  ScriptSummary,
+  SeenHorse,
+  SeenResident,
+} from '@csp/shared-types'
 import { doingLine, interruptedLine, scriptLine } from './doing-view.js'
 import { PanelHead } from './drawer-head.js'
 import {

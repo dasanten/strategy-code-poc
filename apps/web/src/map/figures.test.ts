@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Resident, ResidentOrder } from '@csp/shared'
+import type { Resident, ResidentOrder } from '@csp/shared-types'
 import { FIGURES_PER_TILE, residentActivity, tileFigures } from './figures.js'
 import type { Relationship } from './tokens.js'
 

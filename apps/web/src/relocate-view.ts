@@ -1,11 +1,6 @@
-import {
-  CARRYING_A_CHILD,
-  relocateProblem,
-  relocateRoom,
-  type Building,
-  type City,
-  type Resident,
-} from '@csp/shared'
+import { CARRYING_A_CHILD } from './shared/world.js'
+import { relocateProblem, relocateRoom } from './shared/relocate.js'
+import type { Building, City, Resident } from '@csp/shared-types'
 
 /**
  * What the Player knows that relocating needs (`CONTEXT.md`: Relocate): the cities and buildings

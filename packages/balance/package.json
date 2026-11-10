@@ -1,0 +1,13 @@
+{
+  "name": "@csp/balance",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The balance numbers the client reads, written by Rust (`pnpm balance:rust`), and the few formulas the Wiki works out from them (ADR 0030).",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

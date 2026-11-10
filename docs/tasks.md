@@ -59,6 +59,18 @@ the Alarm script) and Busy big cities (80, ADR 0029: the planner scores its jobs
 more to do), in that order, all ahead of Bandits. Tickets that need an earlier epic name it
 under Depends on, and wait for it to reach `dev`.
 
+**Decided with Daniel on 2026-11-07 (ADR 0030, `docs/proposals/rust-rewrite.md`): the backend is
+rewritten in Rust** on the branch `rust-backend`, and the TypeScript game is under a feature
+freeze (bugs only) until the cutover. The rewrite epics, in order: Rust foundations (84), Pure
+kernels (85, in parallel with 84), The rules (86), The shell (87), Client and cutover (88). Their
+branches come from and go into `rust-backend`. Epics 81 to 83 (measuring and TypeScript
+optimisations) are superseded by the rewrite, which includes their aims.
+
+**Cutover (T88.6, 2026-11-10):** the Rust backend supports every feature, `rust-backend` goes into
+`dev`, and the TypeScript server, `packages/shared` and `packages/lang` are deleted. **The feature
+freeze is lifted:** new epics branch from `dev` again (ADR 0009, 0010), and rule changes are
+Daniel's call as before.
+
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
 
@@ -142,6 +154,11 @@ I sleep.
 | 78  | [Balance and art](https://github.com/dasanten/strategy-code-poc/issues/937)                     | ticketed                |
 | 79  | [City guards](https://github.com/dasanten/strategy-code-poc/issues/941)                         | ticketed                |
 | 80  | [Busy big cities](https://github.com/dasanten/strategy-code-poc/issues/947)                     | ticketed                |
+| 84  | [Rust backend: foundations](https://github.com/dasanten/strategy-code-poc/issues/1001)          | ticketed                |
+| 85  | [Rust backend: pure kernels](https://github.com/dasanten/strategy-code-poc/issues/1002)         | ticketed                |
+| 86  | [Rust backend: the rules](https://github.com/dasanten/strategy-code-poc/issues/1003)            | scope only              |
+| 87  | [Rust backend: the shell](https://github.com/dasanten/strategy-code-poc/issues/1004)            | scope only              |
+| 88  | [Rust backend: client and cutover](https://github.com/dasanten/strategy-code-poc/issues/1005)   | scope only              |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
@@ -172,8 +189,8 @@ its tickets or closes.
 - **Release:** when Daniel asks, one PR `dev` → `main` lists the epics and bugs it ships, runs CI
   and is merged once green. Only merges into `main` deploy.
 - **Rules vs numbers:** a missing game rule becomes a `needs Daniel` question and lands in
-  `CONTEXT.md`. Balance numbers are picked in `packages/shared/src/balance.ts` and listed in the
-  PR for review.
+  `CONTEXT.md`. Balance numbers are picked in `crates/csp-shared/src/balance.rs` and listed in
+  the PR for review.
 - **Scope-only epics:** an epic without tickets lists its open rule questions. When the epic
   before it is nearly done, settle those questions with Daniel, then write its tickets.
 - **Every ticket:** use the terms in `CONTEXT.md`; keep scripting cheap (ADR 0002); new

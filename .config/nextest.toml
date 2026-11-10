@@ -1,0 +1,4 @@
+# A test over 5 s is a regression (ADR 0030); nextest says so, and kills one that hangs.
+[profile.default]
+slow-timeout = { period = "5s", terminate-after = 12 }
+fail-fast = false

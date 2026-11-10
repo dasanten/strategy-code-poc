@@ -1,26 +1,24 @@
 import { useEffect, useRef } from 'react'
-import {
-  CHILD_GOODS,
-  GOODS,
-  QUEUE_DEFAULT_STEP_MINUTES,
-  QUEUE_STEP_KINDS,
-  TICKS_PER_GAME_HOUR,
-  canWork,
-  neverEnds,
-  stepLine,
-  type Building,
-  type BuildingKind,
-  type City,
-  type Waypoint,
-  type Good,
-  type OrderRequest,
-  type Queue,
-  type QueueStep,
-  type QueueStepRequest,
-  type Resident,
-  type ScriptSummary,
-  type TrainingSubject,
-} from '@csp/shared'
+import { CHILD_GOODS } from './shared/narrowed.js'
+import { GOODS } from './shared/world.js'
+import { QUEUE_DEFAULT_STEP_MINUTES } from '@csp/balance'
+import { QUEUE_STEP_KINDS, neverEnds, stepLine } from './shared/queue.js'
+import { TICKS_PER_GAME_HOUR } from './shared/time.js'
+import { canWork } from './shared/stats.js'
+import type {
+  Building,
+  BuildingKind,
+  City,
+  Waypoint,
+  Good,
+  OrderRequest,
+  Queue,
+  QueueStep,
+  QueueStepRequest,
+  Resident,
+  ScriptSummary,
+  TrainingSubject,
+} from '@csp/shared-types'
 import { BUILDING_NAMES } from './city-view.js'
 import { GOOD_LABELS, subjectLabel } from './Residents.js'
 import { gonePlace } from './saved-queues.js'

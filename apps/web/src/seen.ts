@@ -1,4 +1,11 @@
-import type { Carriage, Horse, Resident, SeenCarriage, SeenHorse, SeenResident } from '@csp/shared'
+import type {
+  Carriage,
+  Horse,
+  Resident,
+  SeenCarriage,
+  SeenHorse,
+  SeenResident,
+} from '@csp/shared-types'
 
 /**
  * Whether the Player knows how a resident fares: one of their realm's or an ally's, or one they

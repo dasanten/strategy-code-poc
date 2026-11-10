@@ -1,15 +1,14 @@
-import {
-  TRADE_ORG,
-  TRADE_ORG_NAME,
-  type City,
-  type RealmEvent,
-  type SeenBuilding,
-  type SeenCity,
-  type SeenTrader,
-  type StandingMove,
-  type StandingView,
-  type TraderVisit,
-} from '@csp/shared'
+import { TRADE_ORG, TRADE_ORG_NAME } from './shared/trade-org.js'
+import type {
+  City,
+  RealmEvent,
+  SeenBuilding,
+  SeenCity,
+  SeenTrader,
+  StandingMove,
+  StandingView,
+  TraderVisit,
+} from '@csp/shared-types'
 import { npcStoragesInSight, traderStopsAt, warehousesInSight } from './city-view.js'
 import type { Relationship } from './theme.js'
 

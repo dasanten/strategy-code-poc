@@ -1,0 +1,53 @@
+# The Rust backend (ADR 0030): one workspace, four crates. `pnpm check:rust` runs fmt, clippy and
+# the tests.
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2021"
+license = "UNLICENSED"
+publish = false
+
+[workspace.dependencies]
+csp-shared = { path = "crates/csp-shared" }
+csp-lang = { path = "crates/csp-lang" }
+csp-sim = { path = "crates/csp-sim" }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order", "float_roundtrip"] }
+thiserror = "2"
+indexmap = { version = "2", features = ["serde"] }
+ts-rs = { version = "12", features = ["serde-json-impl", "indexmap-impl", "no-serde-warnings"] }
+flate2 = "1"
+sha2 = "0.10"
+
+[workspace.lints.clippy]
+all = "warn"
+
+# Fast tests are a requirement (ADR 0030): dependencies optimised even in dev, our crates lightly,
+# so a simulation test runs in seconds and an incremental build stays short.
+[profile.dev]
+opt-level = 1
+debug = "line-tables-only"
+incremental = true
+
+[profile.dev.package."*"]
+opt-level = 3
+
+# The script interpreter runs every resident's script every tick: the long simulations (T86.14)
+# spend most of their time in it.
+[profile.dev.package.csp-lang]
+opt-level = 3
+[profile.release]
+lto = "thin"
+codegen-units = 4
+
+# The editor's WebAssembly checker (`csp-lang-wasm`, T88.3): small over fast, built by
+# `pnpm wasm:build` with `--profile wasm`.
+[profile.wasm]
+inherits = "release"
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"

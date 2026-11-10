@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Building, BuildingKind, ResourceKind } from '@csp/shared'
+import type { Building, BuildingKind, ResourceKind } from '@csp/shared-types'
 import { buildingInfoLines } from './building-info-view.js'
 import { BUILDING_NAMES } from './map/palette.js'
 import { GOOD_LABELS, SKILL_LABELS } from './Residents.js'

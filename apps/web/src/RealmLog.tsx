@@ -1,4 +1,5 @@
-import { formatGameTime, type DeliveryView, type RealmEvent } from '@csp/shared'
+import { formatGameTime } from './shared/time.js'
+import type { DeliveryView, RealmEvent } from '@csp/shared-types'
 import { describeDelivery, describeEvent, type EventPlace } from './realm-log.js'
 import { PanelHead } from './drawer-head.js'
 

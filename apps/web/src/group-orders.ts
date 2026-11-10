@@ -1,27 +1,23 @@
-import {
-  CARRYING_A_CHILD,
-  GOODS,
-  boarderProblem,
-  canHandle,
-  canWork,
-  covers,
-  inContact,
-  NO_FOOD_TO_FEED,
-  isAt,
-  wrap,
-  wrapDelta,
-  type Building,
-  type BuildingKind,
-  type Carriage,
-  type Good,
-  type Horse,
-  type OrderRequest,
-  type Resident,
-  type ScriptSummary,
-  type StartParamValues,
-  type Stock,
-  type TrainingSubject,
-} from '@csp/shared'
+import { CARRYING_A_CHILD, GOODS } from './shared/world.js'
+import { boarderProblem } from './shared/carriages.js'
+import { canHandle, canWork } from './shared/stats.js'
+import { covers, isAt } from './shared/footprint.js'
+import { inContact } from './shared/combat.js'
+import { NO_FOOD_TO_FEED } from './shared/reviving.js'
+import { wrap, wrapDelta } from './shared/terrain.js'
+import type {
+  Building,
+  BuildingKind,
+  Carriage,
+  Good,
+  Horse,
+  OrderRequest,
+  Resident,
+  ScriptSummary,
+  StartParamValues,
+  Stock,
+  TrainingSubject,
+} from '@csp/shared-types'
 import { appendRequests, storeAll } from './queue-view.js'
 import { ACTION_KEYS, type ActionId, type CardAction, type OrderGroup } from './selection-view.js'
 

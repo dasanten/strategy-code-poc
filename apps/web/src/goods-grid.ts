@@ -1,4 +1,7 @@
-import { GOODS, OWN_FOOD, putAwayUnits, type Good, type Stock } from '@csp/shared'
+import { GOODS } from './shared/world.js'
+import { OWN_FOOD } from '@csp/balance'
+import { putAwayUnits } from './shared/goods.js'
+import type { Good, Stock } from '@csp/shared-types'
 
 /** Good names as the UI shows them. */
 export const GOOD_LABELS: Record<Good, string> = {

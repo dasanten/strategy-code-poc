@@ -30,7 +30,7 @@ Run `git fetch origin`, then show Daniel a short state, no more than a screen:
 1. **Grill** (as in the `grill-with-docs` skill): one question at a time, each with your
    recommended answer, until every rule is settled. Rules go into `CONTEXT.md` as they settle; a
    real decision with alternatives gets an ADR. Numbers are not questions: they are picked later
-   in `balance.ts`.
+   in `crates/csp-shared/src/balance.rs`.
 2. **Epic:** an issue labelled `epic`, titled `Epic <n>: <name>`, saying what Daniel can do at the
    end and how it shows in the browser.
 3. **Tickets:** thin vertical slices (as in the `to-issues` skill), added as sub-issues in work

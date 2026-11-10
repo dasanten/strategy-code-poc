@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Carriage, Resident, SeenCaravan } from '@csp/shared'
+import type { Carriage, Resident, SeenCaravan } from '@csp/shared-types'
 import { caravanAt, caravanParts } from './caravans.js'
 
 const caravan: SeenCaravan = {

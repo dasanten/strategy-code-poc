@@ -1,15 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import {
-  CHUNK_SIZE,
-  Terrain,
-  UNEXPLORED,
-  chunksAcross,
-  type Building,
-  type BuildingKind,
-  type City,
-  type SeenCarriage,
-  type SeenResident,
-} from '@csp/shared'
+import { CHUNK_SIZE, Terrain, UNEXPLORED, chunksAcross } from '../shared/terrain.js'
+import type { Building, BuildingKind, City, SeenCarriage, SeenResident } from '@csp/shared-types'
 import type { MapWorld } from './map-world.js'
 import {
   MINIMAP_MIN_SPAN,

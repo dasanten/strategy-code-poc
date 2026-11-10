@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { DIRECTIVE_BUY_OFF_PRICE } from '@csp/balance'
 import {
-  DIRECTIVE_BUY_OFF_PRICE,
   MAX_DIRECTIVE_GOALS,
   MAX_DIRECTIVE_REASON,
   MAX_DIRECTIVE_SOLDIERS,
   describeGoal,
-  formatGameTime,
   goalMet,
-  type Account,
-  type AdminDirectives,
-  type AdminDirectiveView,
-  type DirectiveGoalRequest,
-} from '@csp/shared'
+} from './shared/directive.js'
+import { formatGameTime } from './shared/time.js'
+import type {
+  Account,
+  AdminDirectives,
+  AdminDirectiveView,
+  DirectiveGoalRequest,
+} from '@csp/shared-types'
 import { api, ApiFailure } from './api.js'
 import { AdminMap } from './AdminMap.js'
 import {

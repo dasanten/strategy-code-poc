@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { BuildLine, LineOrder, Queue, SeenScript } from '@csp/shared'
+import type { BuildLine, Queue, SeenScript } from '@csp/shared-types'
+import type { LineOrder } from '../shared/world.js'
 import { plannedBuilding, plannedBuilds, plannedLines } from './plans.js'
 
 const size = 100

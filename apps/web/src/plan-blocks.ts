@@ -1,10 +1,6 @@
-import {
-  QUEUE_DEFAULT_STEP_MINUTES,
-  QUEUE_MAX_STEPS,
-  neverEnds,
-  queueStepsProblem,
-  type QueueStepRequest,
-} from '@csp/shared'
+import { QUEUE_DEFAULT_STEP_MINUTES, QUEUE_MAX_STEPS } from '@csp/balance'
+import { neverEnds, queueStepsProblem } from './shared/queue.js'
+import type { QueueStepRequest } from '@csp/shared-types'
 
 /**
  * Repeat blocks (`CONTEXT.md`: Repeat block): in the planner, some steps in a row wrapped with a

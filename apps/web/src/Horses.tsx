@@ -1,4 +1,6 @@
-import { MAX_HEALTH, MAX_HUNGER, horseAgeInYears, type SeenHorse } from '@csp/shared'
+import { MAX_HEALTH, MAX_HUNGER } from '@csp/balance'
+import { horseAgeInYears } from './shared/stats.js'
+import type { SeenHorse } from '@csp/shared-types'
 import { useEffect, useRef } from 'react'
 import { horseLines, type HorseGroup, type HorseLines } from './horses-view.js'
 import { horseAgeText } from './selection-view.js'

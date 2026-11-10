@@ -1,0 +1,21 @@
+[package]
+name = "csp-sim"
+description = "Everything that happens in a tick: terrain, pathfinding, sight, orders, scripts' game API, the world step, NPC cities, invariants (ADR 0030)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+csp-shared.workspace = true
+csp-lang.workspace = true
+indexmap.workspace = true
+ts-rs.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+sha2.workspace = true
+
+[lints]
+workspace = true

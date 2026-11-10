@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { DIAGONAL_STEP, TICK_MS, type ResidentOrder } from '@csp/shared'
+import { DIAGONAL_STEP, TICK_MS } from '@csp/balance'
+import type { ResidentOrder } from '@csp/shared-types'
 import {
   AHEAD_TICKS,
   EASE_MS,

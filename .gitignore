@@ -9,3 +9,13 @@ data/
 .env
 .DS_Store
 coverage/
+
+# Rust (ADR 0030)
+target/
+
+# The Rust shell's test database, made once by the TypeScript server before the cutover
+!crates/csp-server/tests/data/
+!crates/csp-server/tests/data/ts-made.db
+
+# The editor's WebAssembly checker, built by `pnpm wasm:build` (T88.3)
+packages/lang-wasm/generated/

@@ -31,20 +31,24 @@ branches from `origin/dev` instead (ADR 0010).
 - A missing **rule** (what happens) is not yours to invent: comment the question on the ticket,
   swap `in progress` for `needs Daniel`, and pick the next ticket.
 - A missing **number** is yours: pick a sensible value in the balance file
-  (`packages/shared/src/balance.ts`, one commented constant each) and list it in the PR.
+  (`crates/csp-shared/src/balance.rs`, one commented constant each; then `pnpm balance:rust`) and
+  list it in the PR.
 - New simulation rules come with invariants and tests (ADR 0004); a change to world state shape
-  bumps `WORLD_FORMAT_VERSION` with a migration and a test (ADR 0006); actions and queries go
+  bumps `WORLD_FORMAT_VERSION` with a migration in `crates/csp-server/src/world_format.rs` and a
+  test (ADR 0006); actions and queries go
   through the game API, orders only request actions (ADR 0002).
 - If the next ticket cannot ship without this one (or the reverse), do both in this PR.
 - Tick the ticket's "Done when" boxes as they become true (edit the issue body).
-- Before committing: `pnpm check origin/epic/<n>-<slug>` (a `bug`: `origin/dev`). It runs lint,
-  typecheck and the tests the change affects (ADR 0013).
+- Before committing: `pnpm check:rust` when the change touches `crates/`, and
+  `pnpm check origin/epic/<n>-<slug>` (a `bug`: `origin/dev`), which runs lint, typecheck and the
+  client tests the change affects (ADR 0013).
 
 ## 4. Pull request
 
 - Merge the latest epic branch into yours and run `pnpm check origin/epic/<n>-<slug>` again:
   ticket PRs get no CI, so this run is what lets the PR merge. Say in the PR body "Checked:
-  `pnpm check` against `<base>`", that it passed, and the test files it ran (its last line).
+  `pnpm check` against `<base>`" (and `pnpm check:rust`), that it passed, and the test files it
+  ran (its last line).
 - Push and open a ready-for-review PR (not a draft) against the epic branch (a `bug` against
   `dev`).
 - Title: what changed. Body: what and why, balance values chosen, anything to check, then one
