@@ -2138,6 +2138,10 @@ pub fn seen_by(world: &WorldState, size: i32, side: &str) -> Arc<Vec<SeenEntity>
 }
 
 #[cfg(test)]
+mod build_line_tests;
+#[cfg(test)]
+pub(crate) mod default_host;
+#[cfg(test)]
 mod tests;
 
 thread_local! {
