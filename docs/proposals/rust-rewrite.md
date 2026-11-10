@@ -321,3 +321,62 @@ Rerun all four scenes once Epic 86 has landed.
 
 Terrain takes 5.0 s against 9.4 s for the TypeScript, and the resource nodes (the same 3310) take
 0.18 s against 2.3 s.
+
+### Profiles (T89.3, 2026-11-10)
+
+Where the ticks of `bench-sim village` and `bench-sim save` spend their time: the ten hottest
+functions by **self time** (the innermost frame of each sample, std helpers that got inlined
+included), and for each the nearest `csp_` function that called it. Recorded in WSL2 (Ubuntu, same
+Ryzen 9 7900X, 24 threads) on the `profiling` build (release plus symbols), **not idle**: other
+sessions were building and testing (load average 2.5 to 3.3 while `village` ran, 0.9 rising to
+2.5 for `save`).
+
+The tables come from a throwaway [pprof-rs](https://github.com/tikv/pprof-rs) harness around
+`bench_sim` (not committed), not from samply: samply refuses to record in WSL2 while
+`kernel.perf_event_paranoid` is 2, and changing that needs root. pprof-rs samples with SIGPROF
+instead. It was asked for 1000 Hz and delivered about 250 samples a second, so the percentages
+rest on about 2,900 samples each. Only the ticks are sampled, not building the scene. Treat the
+shares as rough; the order of the top few is what to trust. The sampling slows the ticks a little
+(`village` 0.235 ms a tick, `save` 18.1 ms, against 0.209 and 17.6 from `bench-sim` alone a
+minute later).
+
+**`village`**, 50,000 ticks (600 give 29 samples), 11.8 s, 2,949 samples, 6 residents:
+
+| #   | Function (self time)                                    | Share | Called mostly from                           |
+| --- | ------------------------------------------------------- | ----: | -------------------------------------------- |
+| 1   | `alloc` (the allocator's entry)                         |  8.6% | `Building::clone`                            |
+| 2   | `free`                                                  |  5.6% | dropping a `Building`                        |
+| 3   | byte-slice equality (`SlicePartialEq<u8>`)              |  4.9% | `Interpreter::lookup` (a name comparison)    |
+| 4   | `dealloc`                                               |  4.7% | dropping a `Building`                        |
+| 5   | `IndexMap<Cow<str>, Value>::insert`                     |  4.4% | `Value::frozen_fields` (the script's views)  |
+| 6   | `copy_nonoverlapping<u8>` (memcpy)                      |  4.0% | `walls_fingerprint`                          |
+| 7   | `malloc`                                                |  3.1% | `FunctionHandle::new`, `FunctionDef` growth  |
+| 8   | `rotate_left<u64>` (SipHash)                            |  2.8% | the hash of a `String` key, `IndexMap::hash` |
+| 9   | `realloc`                                               |  2.6% | `FunctionDef` growth, `AreaIndex::add`       |
+| 10  | `Hasher::write` (SipHash)                               |  2.5% | `walls_fingerprint`                          |
+
+Allocation (rows 1, 2, 4, 7, 9) is 24.6% together, and hashing with the standard SipHash
+(rows 8, 10) another 5.3%. The two places in the game's own code that stand out are cloning and
+dropping whole `Building`s, and `walls_fingerprint`, which hashes the id of every wall, city and alliance on every tick.
+
+**`save`**, 600 ticks, 11.6 s, 2,890 samples, a world the Rust server made and ran for about 180
+ticks (330 residents, full 5760x5760 map; the TypeScript worlds in the old worktrees are format 67,
+below the 111 the Rust server reads), 18.1 ms a tick:
+
+| #   | Function (self time)                       | Share | Called mostly from                                                       |
+| --- | ------------------------------------------ | ----: | ------------------------------------------------------------------------ |
+| 1   | byte-slice equality (`SlicePartialEq<u8>`) | 21.8% | `run_city` (NPC behaviour), `town_hall_of`, `resolve_work`               |
+| 2   | `copy_nonoverlapping<u8>` (memcpy)         |  9.7% | `walls_fingerprint`                                                      |
+| 3   | `rotate_left<u64>` (SipHash)               |  6.1% | `wall_map`                                                               |
+| 4   | `pathfinding::regions_of`                  |  5.9% | `PathFinder::regions`                                                    |
+| 5   | `queries::names::placed`                   |  5.4% | `building_index_at`                                                      |
+| 6   | `alloc`                                    |  3.5% | `world_index::by_id`                                                     |
+| 7   | `usize` equality (`PartialEq`)             |  2.8% | `wall_map`                                                               |
+| 8   | `[u8]` equality (`PartialEq`)              |  2.5% | `run_city_scripts`, `step_npc_defence`                                   |
+| 9   | `dealloc`                                  |  2.4% | dropping a `WorldIndex`                                                  |
+| 10  | `free`                                     |  2.1% | dropping a `WorldIndex`                                                  |
+
+Strings compared by value are the first thing in a village with 330 residents: rows 1 and 8 are
+24.3%, the `town_hall_of`, `resolve_work` and `run_city` closures that look a building or a city up
+by comparing names. `walls_fingerprint` and `wall_map` account for about 11% (the part of rows 2, 3 and 7
+that comes from them), so looking things up by name is the first lead, the walls the second. `regions_of` and `placed` are 11.3% between them. These are leads for T89.6, not fixes.
