@@ -53,6 +53,7 @@ fn steps_a_few_ticks(name: SceneName, scene: Scene) {
     assert_eq!(start, 0);
 }
 
+// bench-ts.test.ts: sim village 10 runs and prints every phase
 #[test]
 fn the_village_scene_builds_and_steps_a_few_ticks() {
     steps_a_few_ticks(SceneName::Village, village());
