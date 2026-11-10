@@ -118,8 +118,14 @@ pub fn run(
         max_call_depth: options.max_call_depth,
         limits: options.limits,
         host,
-        scopes: vec![ScopeData { parent: None, bindings: Vec::new() }],
-        functions: Vec::new(),
+        // Room for a typical run's scopes and functions from the start, rather than growing to
+        // it one doubling at a time (T89.6).
+        scopes: {
+            let mut scopes = Vec::with_capacity(64);
+            scopes.push(ScopeData { parent: None, bindings: Vec::with_capacity(16) });
+            scopes
+        },
+        functions: Vec::with_capacity(32),
         run: Rc::new(()),
     };
     let outcome = interpreter.program(program);

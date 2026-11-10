@@ -2205,9 +2205,10 @@ mod working_site_tests;
 thread_local! {
     /// The params each script source declares (`scriptParams`), by source. Reading them parses
     /// the source; a source's params never change, and every resident running it reads them
-    /// every tick, so each source is read once.
-    static SOURCE_PARAMS: RefCell<HashMap<String, Arc<Vec<csp_lang::ParamInfo>>>> =
-        RefCell::new(HashMap::new());
+    /// every tick, so each source is read once. Looking a source up hashes all of it, so with
+    /// `FxHash` (T89.6).
+    static SOURCE_PARAMS: RefCell<rustc_hash::FxHashMap<String, Arc<Vec<csp_lang::ParamInfo>>>> =
+        RefCell::default();
 }
 
 /// `script_params(source)`, read once per source (`SOURCE_PARAMS`).
