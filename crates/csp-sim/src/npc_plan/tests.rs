@@ -275,20 +275,51 @@ fn plans_each_city_once_a_game_hour_about_one_city_per_tick() {
     assert_eq!(check_all(&world, &terrain), []);
 }
 
-#[test]
-fn keeps_a_full_maps_planning_inside_its_budget() {
-    let (mut world, terrain, _) = villages(60);
-    // The cities' own step, with the walking's way finder, as `stepWorld` runs it: the rest of the
-    // tick (the residents' scripts above all) would take the test past 5 s without adding to
-    // `npcPlanMs`.
+/// What two game hours of a full map's planning did (`budget_run`).
+struct BudgetRun {
+    world: WorldState,
+    terrain: TerrainMap,
+    cities: usize,
+    /// The milliseconds the cities' step reported, summed.
+    ms: f64,
+    /// The cities planned in each tick.
+    planned: Vec<usize>,
+}
+
+/// Two game hours of 60 villages: the cities' own step, with the walking's way finder, as
+/// `stepWorld` runs it. The rest of the tick (the residents' scripts above all) would take the test
+/// past 5 s without adding to `npcPlanMs`.
+fn budget_run() -> BudgetRun {
+    let (mut world, terrain, cities) = villages(60);
     let mut runner = Runner::new(&terrain);
-    let mut ms = 0.0;
+    let (mut ms, mut planned) = (0.0, Vec::new());
     for _ in 0..2 * PLAN_TICKS {
         let ways: &mut dyn crate::npc_roads::WayFinder = &mut runner.walking;
         ms += step_npc_cities(&mut world, terrain.size, Some(&terrain), Some(ways));
+        planned.push(planned_now(&world).len());
         world.tick += 1;
     }
-    let per_tick = ms / (2 * PLAN_TICKS) as f64;
+    BudgetRun { world, terrain, cities: cities.len(), ms, planned }
+}
+
+/// The budget's run, checked for the work it does rather than its time, so it holds on a loaded
+/// machine: each city planned once a game hour and spread out, never the whole map in one tick.
+/// The wall-clock budget is `keeps_a_full_maps_planning_inside_its_budget`, run alone.
+#[test]
+fn spreads_a_full_maps_planning_over_the_game_hour() {
+    let run = budget_run();
+    assert_eq!(run.planned.iter().sum::<usize>(), 2 * run.cities);
+    assert!(run.planned.iter().max().copied().unwrap_or(0) <= 6, "{:?}", run.planned);
+    assert_eq!(check_all(&run.world, &run.terrain), []);
+}
+
+/// Wall-clock, so only meaningful on an idle machine: `cargo nextest run -p csp-sim --run-ignored
+/// only npc_plan::tests::keeps_a_full_maps_planning_inside_its_budget`.
+#[test]
+#[ignore = "timing; run alone"]
+fn keeps_a_full_maps_planning_inside_its_budget() {
+    let run = budget_run();
+    let per_tick = run.ms / run.planned.len() as f64;
     eprintln!("planning: {per_tick:.3} ms a tick");
     assert!(per_tick < PLAN_BUDGET_MS, "{per_tick} ms a tick");
 }

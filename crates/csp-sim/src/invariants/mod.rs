@@ -201,10 +201,11 @@ pub fn world_invariants() -> Vec<Invariant> {
             name: "caravans-sound",
             check: |w, t| crate::caravans::caravans_sound(w, t.size),
         },
-        // TODO(T86.9): `tradersSound` in `traders.ts`.
-        pending("traders-sound"),
-        // TODO(T86.9): `traderStopsSound` in `trader-stops.ts`.
-        pending("trader-stops-sound"),
+        Invariant { name: "traders-sound", check: |w, t| crate::traders::traders_sound(w, t) },
+        Invariant {
+            name: "trader-stops-sound",
+            check: |w, _| crate::trader_stops::trader_stops_sound(w),
+        },
         // TODO(T86.5): `traderTradesKeepFood` in `trading.ts`.
         pending("trader-trades-keep-food"),
         Invariant {

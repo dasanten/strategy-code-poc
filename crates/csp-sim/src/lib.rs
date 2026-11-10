@@ -126,6 +126,8 @@ pub mod trade_org_debt;
 pub mod trade_org_punishment;
 pub mod trade_org_takes;
 pub mod trade_org_wrecks;
+pub mod trader_stops;
+pub mod traders;
 pub mod trading;
 pub mod trading_posts;
 pub mod training;

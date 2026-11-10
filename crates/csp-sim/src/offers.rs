@@ -1134,4 +1134,6 @@ pub fn accept_orders_done(world: &WorldState) -> Vec<InvariantViolation> {
 }
 
 #[cfg(test)]
+mod direct_tests;
+#[cfg(test)]
 mod tests;
