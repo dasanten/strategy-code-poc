@@ -40,7 +40,7 @@ fn owing(coins: f64) -> Fixture {
     s
 }
 
-fn debt<'w>(s: &'w Fixture) -> Option<&'w Debt> {
+fn debt(s: &Fixture) -> Option<&Debt> {
     s.world.debts.iter().find(|d| d.org == s.realm)
 }
 
