@@ -62,6 +62,8 @@ pub mod npc_revive;
 pub mod npc_roads;
 pub mod npc_scores;
 pub mod npc_scouts;
+#[cfg(test)]
+mod npc_slow;
 pub mod npc_stable;
 #[cfg(test)]
 mod npc_test_world;
