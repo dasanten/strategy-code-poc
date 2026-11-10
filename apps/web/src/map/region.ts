@@ -1,4 +1,5 @@
-import { CHUNK_SIZE, chunksAcross, type RegionHolder, type RegionMap } from '@csp/shared'
+import { CHUNK_SIZE, chunksAcross } from '../shared/terrain.js'
+import type { RegionHolder, RegionMap } from '@csp/shared-types'
 import type { ZoomTier } from './camera.js'
 
 /** An Organization on the Region map, without its tiles. */

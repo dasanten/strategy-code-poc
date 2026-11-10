@@ -2,11 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   CARRIAGE_CAPACITY,
   OCCUPATION_GAME_DAYS,
-  FOOTPRINT,
   MAP_SIZE,
   MAX_HEALTH,
   MAX_HUNGER,
-  MAX_WORKERS,
   STABLE_BREED_DAYS,
   STABLE_CAPACITY,
   STABLE_FEED_DAYS,
@@ -14,35 +12,35 @@ import {
   horseFoodFactor,
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_YEAR,
-  TICKS_PER_GAME_HOUR,
-  aboutTime,
+  PASSENGER_WEIGHT,
+  ticksForAge,
+} from '@csp/balance'
+import { FOOTPRINT, footprintTiles } from './shared/footprint.js'
+import { MAX_WORKERS, NODE_GOOD, buildMenu } from './shared/building.js'
+import { TICKS_PER_GAME_HOUR } from './shared/time.js'
+import { aboutTime, timeLeft } from './shared/estimates.js'
+import {
   BUILD_MATERIALS,
   BUILD_WORK,
-  NODE_GOOD,
-  NODE_WORKPLACE,
-  PASSENGER_WEIGHT,
-  stockWeight,
-  Terrain,
-  UNEXPLORED,
   WORK_OUTPUT_PER_DAY,
-  buildMenu,
-  ticksForAge,
-  timeLeft,
-  footprintTiles,
-  type Building,
-  type Carriage,
-  type City,
-  type ContractView,
-  type Diplomacy,
-  type Horse,
-  type CarriageHorse,
-  type HaulOrder,
-  type Pile,
-  type Resident,
-  type SeenResident,
-  type SeenHorse,
   AVERAGE_HORSE_STATS,
-} from '@csp/shared'
+} from './shared/narrowed.js'
+import { NODE_WORKPLACE, type HaulOrder } from './shared/world.js'
+import { stockWeight } from './shared/stats.js'
+import { Terrain, UNEXPLORED } from './shared/terrain.js'
+import type {
+  Building,
+  Carriage,
+  City,
+  ContractView,
+  Diplomacy,
+  Horse,
+  CarriageHorse,
+  Pile,
+  Resident,
+  SeenResident,
+  SeenHorse,
+} from '@csp/shared-types'
 import { BUILDING_NAMES } from './map/palette.js'
 import {
   ACTION_KEYS,

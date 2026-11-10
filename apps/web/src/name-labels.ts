@@ -1,4 +1,5 @@
-import { ageInYears, type City, type Resident } from '@csp/shared'
+import { ageInYears } from './shared/stats.js'
+import type { City, Resident } from '@csp/shared-types'
 
 type Named = Pick<Resident, 'id' | 'name' | 'bornAt' | 'cityId'>
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Building, BuildingKind, City, Resident } from '@csp/shared'
+import type { Building, BuildingKind, City, Resident } from '@csp/shared-types'
 import { CLOSE_SCALE, FAR_SCALE, tileToScreen, zoomTier } from './camera.js'
 import {
   EMBLEM_RADIUS,

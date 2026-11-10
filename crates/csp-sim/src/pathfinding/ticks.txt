@@ -1,0 +1,400 @@
+512 true/true 0 0 found 15 23.203771591186523
+512 true/true 4 0 unreachable
+512 true/true 5 0 unreachable
+512 true/true 8 6 found 251 222.4080352783203
+512 true/true 12 6 found 16 24.207256317138672
+512 true/true 16 9 found 129 160.90231323242188
+512 true/true 17 9 unreachable
+512 true/true 20 9 found 17 17.094755172729492
+512 true/true 24 10 unreachable
+512 true/true 25 10 unreachable
+512 true/true 28 10 found 34 39.79898452758789
+512 true/true 32 10 found 14 8.03553295135498
+512 true/true 36 13 found 150 214.1061553955078
+512 true/true 37 13 unreachable
+512 true/true 40 14 found 18 62.07978057861328
+512 true/true 44 14 unreachable
+512 true/true 45 14 unreachable
+512 true/true 48 19 found 194 272.5054016113281
+512 true/true 52 19 found 17 35.46918487548828
+512 true/true 56 46 found 308 270.11004638671875
+512 true/true 57 46 unreachable
+512 true/true 60 46 found 16 16.414213180541992
+512 true/true 64 46 unreachable
+512 true/true 65 46 unreachable
+512 true/true 68 51 found 212 152.70947265625
+512 true/true 72 51 found 15 30.30457878112793
+512 true/true 76 56 found 136 227.73826599121094
+512 true/true 77 56 unreachable
+512 true/true 80 56 found 13 6.914213180541992
+512 true/true 84 56 unreachable
+512 true/true 85 57 unreachable
+512 true/true 88 70 found 286 341.72222900390625
+512 true/true 92 70 found 16 9.656852722167969
+512 true/true 96 73 found 185 282.6327209472656
+512 true/true 97 74 unreachable
+512 true/true 100 74 found 13 22.713563919067383
+512 true/true 104 74 unreachable
+512 true/true 105 74 unreachable
+512 true/true 108 84 found 145 290.3976745605469
+512 true/true 112 84 found 20 20
+512 true/true 116 120 found 295 265.3428955078125
+512 true/true 117 120 found 22 25.120088577270508
+512 true/true 120 121 found 17 23.627412796020508
+512 true/true 124 121 unreachable
+512 true/true 125 164 unreachable
+512 true/true 128 188 found 376 245.6725311279297
+512 true/true 132 188 found 7 8.656853675842285
+512 true/true 136 210 found 268 380.2871398925781
+512 true/true 137 210 unreachable
+512 true/true 140 211 found 4 2.4142136573791504
+512 true/true 144 211 unreachable
+512 true/true 145 211 unreachable
+512 true/true 148 220 found 210 351.9391174316406
+512 true/true 152 220 found 5 11.094756126403809
+512 true/true 156 246 found 245 395.26214599609375
+512 true/true 157 247 unreachable
+512 true/true 160 247 found 18 30.448156356811523
+512 true/true 164 247 unreachable
+512 true/true 165 247 unreachable
+512 true/true 168 259 found 211 303.3086853027344
+512 true/true 172 259 found 16 16.828426361083984
+512 true/true 176 297 found 314 277.8938293457031
+512 true/true 177 298 unreachable
+512 true/true 180 298 found 16 36.85569763183594
+512 true/true 184 298 unreachable
+512 true/true 185 298 unreachable
+512 true/true 188 307 found 251 215.6070098876953
+512 true/true 192 307 found 18 29.26468849182129
+512 true/true 196 319 found 263 354.0887756347656
+512 true/true 197 320 unreachable
+512 true/false 2 0 found 18 36.90354919433594
+512 true/false 6 19 found 294 398.8366394042969
+512 true/false 7 20 unreachable
+512 true/false 10 20 found 19 58.876007080078125
+512 true/false 14 20 unreachable
+512 true/false 15 72 unreachable
+512 true/false 18 73 found 189 206.39698791503906
+512 true/false 22 73 found 14 27.100805282592773
+512 true/false 26 106 found 257 271.1238708496094
+512 true/false 27 106 unreachable
+512 true/false 30 106 found 17 21.556346893310547
+512 true/false 34 107 unreachable
+512 true/false 35 107 unreachable
+512 true/false 38 109 found 92 103.51258087158203
+512 true/false 42 109 found 15 23.79550552368164
+512 true/false 46 112 found 128 216.10691833496094
+512 true/false 47 112 unreachable
+512 true/false 50 112 found 13 8.98528003692627
+512 true/false 54 113 unreachable
+512 true/false 55 113 unreachable
+512 true/false 58 117 found 163 263.8360290527344
+512 true/false 62 117 found 7 15.80880069732666
+512 true/false 66 119 found 191 289.5989990234375
+512 true/false 67 120 unreachable
+512 true/false 70 120 found 19 28.918058395385742
+512 true/false 74 120 unreachable
+512 true/false 75 120 unreachable
+512 true/false 78 121 found 131 150.93971252441406
+512 true/false 82 121 found 13 14.714286804199219
+512 true/false 86 126 found 207 165.1400909423828
+512 true/false 87 126 unreachable
+512 true/false 90 126 found 2 2.4142136573791504
+512 true/false 94 126 unreachable
+512 true/false 95 126 unreachable
+512 true/false 98 133 found 231 297.09259033203125
+512 true/false 102 133 found 16 26.40754508972168
+512 true/false 106 142 found 190 318.0491943359375
+512 true/false 107 142 unreachable
+512 true/false 110 142 found 13 8.98528003692627
+512 true/false 114 143 unreachable
+512 true/false 115 143 unreachable
+512 true/false 118 145 found 139 235.56146240234375
+512 true/false 122 145 found 11 25.236892700195312
+512 true/false 126 186 found 316 475.0927429199219
+512 true/false 127 187 unreachable
+512 true/false 130 187 found 18 23.913850784301758
+512 true/false 134 187 unreachable
+512 true/false 135 187 unreachable
+512 true/false 138 187 found 69 79.39840698242188
+512 true/false 142 187 found 12 21.284992218017578
+512 true/false 146 194 found 204 194.01519775390625
+512 true/false 147 194 unreachable
+512 true/false 150 194 found 15 16.65685272216797
+512 true/false 154 194 unreachable
+512 true/false 155 195 unreachable
+512 true/false 158 195 found 120 75.53304290771484
+512 true/false 162 195 found 12 15.727919578552246
+512 true/false 166 203 found 227 339.64056396484375
+512 true/false 167 203 unreachable
+512 true/false 170 203 found 17 11.399493217468262
+512 true/false 174 204 unreachable
+512 true/false 175 204 unreachable
+512 true/false 178 219 found 272 378.8604431152344
+512 true/false 182 219 found 14 9.278173446655273
+512 true/false 186 226 found 199 332.70989990234375
+512 true/false 187 227 unreachable
+512 true/false 190 227 found 11 14.727920532226562
+512 true/false 194 227 unreachable
+512 true/false 195 227 unreachable
+512 true/false 198 234 found 273 320.220458984375
+512 false/true 1 0 found 9 9
+512 false/true 9 12 found 224 296.009521484375
+512 false/true 13 12 found 15 27.345909118652344
+512 false/true 21 12 found 16 49.264686584472656
+512 false/true 29 12 unreachable
+512 false/true 33 12 found 14 19.05841636657715
+512 false/true 41 12 found 4 9.42809009552002
+512 false/true 49 22 found 211 345.5647277832031
+512 false/true 53 22 found 19 42.71235656738281
+512 false/true 61 22 found 6 11.530096054077148
+512 false/true 69 32 found 230 342.1904296875
+512 false/true 73 33 found 10 10.414213180541992
+512 false/true 81 33 found 19 44.48876953125
+512 false/true 89 41 found 203 146.83534240722656
+512 false/true 93 41 found 15 24.387239456176758
+512 false/true 101 41 found 12 8.278173446655273
+512 false/true 109 53 found 255 328.7841491699219
+512 false/true 113 53 found 21 14.56615924835205
+512 false/true 121 53 found 17 28.4278507232666
+512 false/true 129 57 found 227 249.47802734375
+512 false/true 133 58 found 17 45.773746490478516
+512 false/true 141 58 found 11 15.142133712768555
+512 false/true 149 78 found 326 255.0650634765625
+512 false/true 153 78 found 17 31.386520385742188
+512 false/true 161 78 found 25 19.764907836914062
+512 false/true 169 85 found 252 296.3536071777344
+512 false/true 173 86 unreachable
+512 false/true 181 86 found 9 11.071066856384277
+512 false/true 189 93 found 279 358.05328369140625
+512 false/true 193 93 found 12 13.656852722167969
+512 false/false 3 0 found 20 29.163164138793945
+512 false/false 11 0 found 15 7.707106590270996
+512 false/false 19 1 found 195 237.6641082763672
+512 false/false 23 1 found 17 37.998313903808594
+512 false/false 31 1 found 16 22.213199615478516
+512 false/false 39 4 found 183 264.8683166503906
+512 false/false 43 4 found 15 30.30457878112793
+512 false/false 51 5 found 18 20.899492263793945
+512 false/false 59 16 found 230 174.6046142578125
+512 false/false 63 16 found 18 20.07106590270996
+512 false/false 71 16 found 20 11.863959312438965
+512 false/false 79 17 found 102 129.5938262939453
+512 false/false 83 18 found 2 1.4142135381698608
+512 false/false 91 18 found 18 30.496450424194336
+512 false/false 99 26 found 262 308.3958435058594
+512 false/false 103 27 found 17 28.41349220275879
+512 false/false 111 27 found 1 1.4142135381698608
+512 false/false 119 27 unreachable
+512 false/false 123 27 found 13 24.488765716552734
+512 false/false 131 27 found 5 2.9142136573791504
+512 false/false 139 32 found 160 271.0123596191406
+512 false/false 143 32 found 7 4.742640495300293
+512 false/false 151 32 found 12 14.899493217468262
+512 false/false 159 36 found 246 346.1203308105469
+512 false/false 163 36 found 6 6.828427314758301
+512 false/false 171 36 found 13 16.313705444335938
+512 false/false 179 44 found 302 241.1935577392578
+512 false/false 183 44 found 9 12.31370735168457
+512 false/false 191 44 found 13 8.156852722167969
+512 false/false 199 50 found 204 327.39459228515625
+64 true/true 0 0 found 15 23.203771591186523
+64 true/true 4 0 unreachable
+64 true/true 5 0 unreachable
+64 true/true 12 0 found 16 24.207256317138672
+64 true/true 32 0 found 14 8.03553295135498
+64 true/true 60 1 found 16 16.414213180541992
+64 true/true 72 1 found 15 30.30457878112793
+64 true/true 80 1 found 13 6.914213180541992
+64 true/true 100 2 found 13 22.713563919067383
+64 true/true 132 2 found 7 8.656853675842285
+64 true/true 140 2 found 4 2.4142136573791504
+64 true/true 152 3 found 5 11.094756126403809
+64 true/true 172 3 found 16 16.828426361083984
+64 true/true 8 11 found 251 222.4080352783203
+64 true/true 16 14 found 129 160.90231323242188
+64 true/true 17 15 unreachable
+64 true/true 20 15 found 17 17.094755172729492
+64 true/true 24 15 unreachable
+64 true/true 25 16 unreachable
+64 true/true 28 16 found 34 39.79898452758789
+64 true/true 36 20 found 150 214.1061553955078
+64 true/true 37 21 unreachable
+64 true/true 40 21 found 18 62.07978057861328
+64 true/true 44 21 unreachable
+64 true/true 45 21 unreachable
+64 true/true 48 29 found 194 272.5054016113281
+64 true/true 52 29 found 17 35.46918487548828
+64 true/true 56 66 found 308 270.11004638671875
+64 true/true 57 66 unreachable
+64 true/true 64 66 unreachable
+64 true/true 65 67 unreachable
+64 true/true 68 73 found 212 152.70947265625
+64 true/true 76 79 found 136 227.73826599121094
+64 true/true 77 80 unreachable
+64 true/true 84 80 unreachable
+64 true/true 85 80 unreachable
+64 true/true 88 99 found 286 341.72222900390625
+64 true/true 92 99 found 16 9.656852722167969
+64 true/true 96 104 found 185 282.6327209472656
+64 true/true 97 105 unreachable
+64 true/true 104 105 unreachable
+64 true/true 105 105 unreachable
+64 true/true 108 118 found 145 290.3976745605469
+64 true/true 112 118 found 20 20
+64 true/true 116 169 found 295 265.3428955078125
+64 true/true 117 170 found 22 25.120088577270508
+64 true/true 120 170 found 17 23.627412796020508
+64 true/true 124 170 unreachable
+64 true/true 125 230 unreachable
+64 true/true 128 264 found 376 245.6725311279297
+64 true/true 136 295 found 268 380.2871398925781
+64 true/true 137 295 unreachable
+64 true/true 144 296 unreachable
+64 true/true 145 296 unreachable
+64 true/true 148 309 found 210 351.9391174316406
+64 true/true 156 345 found 245 395.26214599609375
+64 true/true 157 346 unreachable
+64 true/true 160 346 found 18 30.448156356811523
+64 true/true 164 346 unreachable
+64 true/true 165 346 unreachable
+64 true/true 168 363 found 211 303.3086853027344
+64 true/true 176 416 found 314 277.8938293457031
+64 true/true 177 417 unreachable
+64 true/true 180 417 found 16 36.85569763183594
+64 true/true 184 417 unreachable
+64 true/true 185 418 unreachable
+64 true/true 188 429 found 251 215.6070098876953
+64 true/true 192 430 found 18 29.26468849182129
+64 true/true 196 447 found 263 354.0887756347656
+64 true/true 197 448 unreachable
+64 true/false 2 0 found 18 36.90354919433594
+64 true/false 22 0 found 14 27.100805282592773
+64 true/false 42 0 found 15 23.79550552368164
+64 true/false 50 0 found 13 8.98528003692627
+64 true/false 62 1 found 7 15.80880069732666
+64 true/false 82 1 found 13 14.714286804199219
+64 true/false 90 1 found 2 2.4142136573791504
+64 true/false 102 2 found 16 26.40754508972168
+64 true/false 110 2 found 13 8.98528003692627
+64 true/false 122 2 found 11 25.236892700195312
+64 true/false 130 3 found 18 23.913850784301758
+64 true/false 142 3 found 12 21.284992218017578
+64 true/false 150 3 found 15 16.65685272216797
+64 true/false 162 4 found 12 15.727919578552246
+64 true/false 182 4 found 14 9.278173446655273
+64 true/false 190 4 found 11 14.727920532226562
+64 true/false 6 30 found 294 398.8366394042969
+64 true/false 7 31 unreachable
+64 true/false 10 31 found 19 58.876007080078125
+64 true/false 14 31 unreachable
+64 true/false 15 104 unreachable
+64 true/false 18 105 found 189 206.39698791503906
+64 true/false 26 151 found 257 271.1238708496094
+64 true/false 27 152 unreachable
+64 true/false 30 152 found 17 21.556346893310547
+64 true/false 34 152 unreachable
+64 true/false 35 152 unreachable
+64 true/false 38 155 found 92 103.51258087158203
+64 true/false 46 159 found 128 216.10691833496094
+64 true/false 47 160 unreachable
+64 true/false 54 160 unreachable
+64 true/false 55 160 unreachable
+64 true/false 58 167 found 163 263.8360290527344
+64 true/false 66 170 found 191 289.5989990234375
+64 true/false 67 170 unreachable
+64 true/false 70 170 found 19 28.918058395385742
+64 true/false 74 171 unreachable
+64 true/false 75 171 unreachable
+64 true/false 78 172 found 131 150.93971252441406
+64 true/false 86 178 found 207 165.1400909423828
+64 true/false 87 179 unreachable
+64 true/false 94 179 unreachable
+64 true/false 95 179 unreachable
+64 true/false 98 188 found 231 297.09259033203125
+64 true/false 106 200 found 190 318.0491943359375
+64 true/false 107 201 unreachable
+64 true/false 114 201 unreachable
+64 true/false 115 201 unreachable
+64 true/false 118 205 found 139 235.56146240234375
+64 true/false 126 262 found 316 475.0927429199219
+64 true/false 127 263 unreachable
+64 true/false 134 263 unreachable
+64 true/false 135 263 unreachable
+64 true/false 138 263 found 69 79.39840698242188
+64 true/false 146 272 found 204 194.01519775390625
+64 true/false 147 273 unreachable
+64 true/false 154 273 unreachable
+64 true/false 155 273 unreachable
+64 true/false 158 274 found 120 75.53304290771484
+64 true/false 166 285 found 227 339.64056396484375
+64 true/false 167 285 unreachable
+64 true/false 170 285 found 17 11.399493217468262
+64 true/false 174 286 unreachable
+64 true/false 175 286 unreachable
+64 true/false 178 307 found 272 378.8604431152344
+64 true/false 186 317 found 199 332.70989990234375
+64 true/false 187 318 unreachable
+64 true/false 194 318 unreachable
+64 true/false 195 318 unreachable
+64 true/false 198 328 found 273 320.220458984375
+64 false/true 1 0 found 9 9
+64 false/true 13 0 found 15 27.345909118652344
+64 false/true 21 0 found 16 49.264686584472656
+64 false/true 33 1 found 14 19.05841636657715
+64 false/true 41 1 found 4 9.42809009552002
+64 false/true 61 1 found 6 11.530096054077148
+64 false/true 73 2 found 10 10.414213180541992
+64 false/true 93 2 found 15 24.387239456176758
+64 false/true 101 2 found 12 8.278173446655273
+64 false/true 141 3 found 11 15.142133712768555
+64 false/true 181 3 found 9 11.071066856384277
+64 false/true 193 3 found 12 13.656852722167969
+64 false/true 9 19 found 224 296.009521484375
+64 false/true 29 19 unreachable
+64 false/true 49 32 found 211 345.5647277832031
+64 false/true 53 32 found 19 42.71235656738281
+64 false/true 69 47 found 230 342.1904296875
+64 false/true 81 47 found 19 44.48876953125
+64 false/true 89 58 found 203 146.83534240722656
+64 false/true 109 75 found 255 328.7841491699219
+64 false/true 113 75 found 21 14.56615924835205
+64 false/true 121 76 found 17 28.4278507232666
+64 false/true 129 81 found 227 249.47802734375
+64 false/true 133 81 found 17 45.773746490478516
+64 false/true 149 110 found 326 255.0650634765625
+64 false/true 153 110 found 17 31.386520385742188
+64 false/true 161 110 found 25 19.764907836914062
+64 false/true 169 120 found 252 296.3536071777344
+64 false/true 173 120 unreachable
+64 false/true 189 131 found 279 358.05328369140625
+64 false/false 3 0 found 20 29.163164138793945
+64 false/false 11 0 found 15 7.707106590270996
+64 false/false 31 0 found 16 22.213199615478516
+64 false/false 43 0 found 15 30.30457878112793
+64 false/false 83 1 found 2 1.4142135381698608
+64 false/false 111 1 found 1 1.4142135381698608
+64 false/false 123 1 found 13 24.488765716552734
+64 false/false 131 2 found 5 2.9142136573791504
+64 false/false 143 2 found 7 4.742640495300293
+64 false/false 151 2 found 12 14.899493217468262
+64 false/false 163 3 found 6 6.828427314758301
+64 false/false 171 3 found 13 16.313705444335938
+64 false/false 183 3 found 9 12.31370735168457
+64 false/false 19 4 found 195 237.6641082763672
+64 false/false 23 4 found 17 37.998313903808594
+64 false/false 191 4 found 13 8.156852722167969
+64 false/false 39 8 found 183 264.8683166503906
+64 false/false 51 9 found 18 20.899492263793945
+64 false/false 59 24 found 230 174.6046142578125
+64 false/false 63 24 found 18 20.07106590270996
+64 false/false 71 25 found 20 11.863959312438965
+64 false/false 79 27 found 102 129.5938262939453
+64 false/false 91 27 found 18 30.496450424194336
+64 false/false 99 39 found 262 308.3958435058594
+64 false/false 103 39 found 17 28.41349220275879
+64 false/false 119 39 unreachable
+64 false/false 139 46 found 160 271.0123596191406
+64 false/false 159 51 found 246 346.1203308105469
+64 false/false 179 62 found 302 241.1935577392578
+64 false/false 199 70 found 204 327.39459228515625

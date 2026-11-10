@@ -1,15 +1,7 @@
-import {
-  GOODS,
-  TRADE_ORG,
-  goodsToHandOver,
-  transferLoadsFee,
-  type DemandTerms,
-  type DemandView,
-  type Good,
-  type RealmLabel,
-  type SeenCity,
-  type Stock,
-} from '@csp/shared'
+import { GOODS } from './shared/world.js'
+import { TRADE_ORG } from './shared/trade-org.js'
+import { goodsToHandOver, transferLoadsFee } from './shared/demand.js'
+import type { DemandTerms, DemandView, Good, RealmLabel, SeenCity, Stock } from '@csp/shared-types'
 import type { LastSeenCity } from './last-seen.js'
 import { goodsLine } from './realm-log.js'
 

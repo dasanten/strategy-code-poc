@@ -1,16 +1,10 @@
-import {
-  FOOTPRINT,
-  NODE_WORKPLACE,
-  ROAD_LINE_MAX_TILES,
-  UNEXPLORED,
-  aboutTime,
-  covers,
-  roadLine,
-  type BuildingKind,
-  type KnownNode,
-  type ScriptParamType,
-  type Terrain,
-} from '@csp/shared'
+import { FOOTPRINT, covers } from './shared/footprint.js'
+import { NODE_WORKPLACE } from './shared/world.js'
+import { ROAD_LINE_MAX_TILES } from '@csp/balance'
+import { UNEXPLORED, type Terrain } from './shared/terrain.js'
+import { aboutTime } from './shared/estimates.js'
+import { roadLine } from './shared/building.js'
+import type { BuildingKind, KnownNode, ScriptParamType } from '@csp/shared-types'
 import { BUILDING_NAMES, TERRAIN_NAMES } from './map/palette.js'
 import { previewPath, type Goer, type Point } from './map/path-preview.js'
 import { nextPick, planPickAt, type Plan, type PlanPick, type PlanWorld } from './plan-step.js'

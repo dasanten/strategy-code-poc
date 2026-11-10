@@ -1,5 +1,5 @@
-import { FOOTPRINT } from '@csp/shared'
-import type { BuildingKind, ResourceKind } from '@csp/shared'
+import { FOOTPRINT } from '../shared/footprint.js'
+import type { BuildingKind, ResourceKind } from '@csp/shared-types'
 import type { Activity } from './figures.js'
 
 /**

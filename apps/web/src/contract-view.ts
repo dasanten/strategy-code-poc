@@ -1,13 +1,7 @@
-import {
-  CONTRACT_MAX_DAYS,
-  TRADE_ORG,
-  TRADE_ORG_NAME,
-  formatGameTime,
-  type Building,
-  type City,
-  type ContractView,
-  type RealmLabel,
-} from '@csp/shared'
+import { CONTRACT_MAX_DAYS } from '@csp/balance'
+import { TRADE_ORG, TRADE_ORG_NAME } from './shared/trade-org.js'
+import { formatGameTime } from './shared/time.js'
+import type { Building, City, ContractView, RealmLabel } from '@csp/shared-types'
 
 /**
  * How a side of a contract is called: "the realm of Mara", the Trade Organization, or an NPC city

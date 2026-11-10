@@ -1,16 +1,7 @@
-import {
-  ADULT_AGE,
-  STAT_NAMES,
-  WEAPONS,
-  ageInYears,
-  bestWeapon,
-  isArmed,
-  statValue,
-  stockWeight,
-  type Resident,
-  type SkillName,
-  type Weapon,
-} from '@csp/shared'
+import { ADULT_AGE, statValue } from '@csp/balance'
+import { STAT_NAMES, WEAPONS } from './shared/world.js'
+import { ageInYears, bestWeapon, isArmed, stockWeight } from './shared/stats.js'
+import type { Resident, SkillName, Weapon } from '@csp/shared-types'
 import { GOOD_LABELS } from './goods-grid.js'
 import { SKILL_LABELS, STAT_LABELS } from './Residents.js'
 import { gearLine, learnedSkills, type ListedResident } from './residents-list-view.js'

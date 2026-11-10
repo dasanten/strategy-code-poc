@@ -1,14 +1,14 @@
 import { useState, type FormEvent } from 'react'
-import {
-  ALLIANCE_NAME_MAX_LENGTH,
-  formatGameTime,
-  isArmed,
-  type Diplomacy,
-  type OrderRequest,
-  type RealmLabel,
-  type SeenResident,
-  type SeenCarriage,
-} from '@csp/shared'
+import { ALLIANCE_NAME_MAX_LENGTH } from './shared/alliance.js'
+import { formatGameTime } from './shared/time.js'
+import { isArmed } from './shared/stats.js'
+import type {
+  Diplomacy,
+  OrderRequest,
+  RealmLabel,
+  SeenResident,
+  SeenCarriage,
+} from '@csp/shared-types'
 import { PanelHead } from './drawer-head.js'
 import { relationshipClass } from './theme.js'
 

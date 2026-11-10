@@ -1,15 +1,13 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
-import {
-  ARMY_NAME_MAX_LENGTH,
-  armyDrivenTo,
-  spareFood,
-  type Army,
-  type SeenCarriage,
-  type OrderRequest,
-  type Resident,
-  type ScriptSummary,
-  type SeenResident,
-} from '@csp/shared'
+import { ARMY_NAME_MAX_LENGTH, armyDrivenTo, spareFood } from './shared/army.js'
+import type {
+  Army,
+  SeenCarriage,
+  OrderRequest,
+  Resident,
+  ScriptSummary,
+  SeenResident,
+} from '@csp/shared-types'
 import { RunScript } from './Residents.js'
 import {
   ARMY_TABS,

@@ -1,18 +1,19 @@
 import {
   WORKPLACE_PARAM,
-  isParamChoice,
-  isParamNumber,
   isWorkScript,
   paramNeedsValue,
   targetParam,
-  type OrderRequest,
-  type ScriptParam,
-  type ScriptParamValue,
-  type ScriptParamValues,
-  type ScriptSummary,
-  type StartParamValues,
-  type WorkplaceSettings,
-} from '@csp/shared'
+} from './shared/default-scripts.js'
+import { isParamChoice, isParamNumber } from './shared/script-api.js'
+import type {
+  OrderRequest,
+  ScriptParam,
+  ScriptParamValue,
+  ScriptParamValues,
+  ScriptSummary,
+  StartParamValues,
+  WorkplaceSettings,
+} from '@csp/shared-types'
 
 /**
  * The form shown before a script starts (`CONTEXT.md`: Script parameter, Starting at once, Before
@@ -116,7 +117,7 @@ function fits(param: ScriptParam, value: ScriptParamValue | undefined): boolean 
  */
 export function startValues(
   params: readonly ScriptParam[],
-  kept: ScriptParamValues[string] | undefined,
+  kept: ScriptParamValues[number] | undefined,
   target?: string,
 ): StartValues {
   return Object.fromEntries(
@@ -133,7 +134,7 @@ export function startValues(
  */
 export function groupStartValues(
   params: readonly ScriptParam[],
-  keptByEach: readonly (ScriptParamValues[string] | undefined)[],
+  keptByEach: readonly (ScriptParamValues[number] | undefined)[],
   target?: string,
 ): StartValues {
   const each = keptByEach.map((kept) => startValues(params, kept, target))

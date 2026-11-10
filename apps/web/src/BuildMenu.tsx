@@ -1,12 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import {
-  BUILD_MATERIALS,
-  BUILDING_PURPOSE,
-  buildingWork,
-  workFactor,
-  type BuildingKind,
-  type ResourceNode,
-} from '@csp/shared'
+import { BUILD_MATERIALS } from './shared/narrowed.js'
+import { BUILDING_PURPOSE } from './shared/building-info.js'
+import { buildingWork, workFactor } from './shared/building.js'
+import type { BuildingKind, ResourceNode } from '@csp/shared-types'
 import { buildMenuGroups, canChooseKind, workSpan, type BuildMenuKind } from './build-menu-view.js'
 import { CustomiseButton, taskStart } from './Customise.js'
 import { goodsItems } from './goods-grid.js'

@@ -1,58 +1,54 @@
 import { offerStoragesOf } from './offers-view.js'
 import {
   deliveryStorage,
-  nearestWarehouse,
-  quoteTransfer,
-  transferTiles,
   handsOf,
   loadOf,
-  carriageCapacity,
-  type CarriageHorse,
   quoteDelivery,
   quotePickUp,
-  quoteSwap,
   quoteTrade,
-  quoteTraderTrade,
-  cutSwap,
-  noSwap,
-  npcSwapRates,
   tradeCoinWarehouse,
-  wrapDistance,
-  canWork,
-  aboutTime,
-  type Stock,
-  type Building,
-  type BuildingKind,
-  type Carriage,
-  GOOD_WEIGHT,
-  type DeliveryQuote,
-  type Good,
-  type NpcCityPrice,
-  type NpcHorseOffer,
-  type PricedGood,
-  type SwapQuote,
-  type SwapRate,
-  type TradeHolder,
-  type TradeLimit,
-  type TradeQuote,
-  type TradeSide,
-  type City,
-  type RealmLabel,
-  type Resident,
-  type SeenCity,
-  type WarehousePrice,
-  isAt,
-  occupationTicksLeft,
-  TICKS_PER_GAME_DAY,
-  type SeenResident,
-  type SeenCarriage,
-  type SeenTrader,
-  type TraderVisit,
-  type SeenBuilding,
-  type Shown,
-  TRADE_ORG,
-  TRADE_ORG_NAME,
-} from '@csp/shared'
+} from './shared/warehouse.js'
+import { nearestWarehouse, quoteTransfer, transferTiles } from './shared/transfer.js'
+import { carriageCapacity } from './shared/carriages.js'
+import type {
+  CarriageHorse,
+  Stock,
+  Building,
+  BuildingKind,
+  Carriage,
+  DeliveryQuote,
+  Good,
+  NpcCityPrice,
+  NpcHorseOffer,
+  PricedGood,
+  SwapQuote,
+  SwapRate,
+  TradeHolder,
+  TradeLimit,
+  TradeQuote,
+  TradeSide,
+  City,
+  RealmLabel,
+  Resident,
+  SeenCity,
+  WarehousePrice,
+  SeenResident,
+  SeenCarriage,
+  SeenTrader,
+  TraderVisit,
+  SeenBuilding,
+} from '@csp/shared-types'
+import { quoteSwap, cutSwap, noSwap, npcSwapRates } from './shared/swap.js'
+import { quoteTraderTrade } from './shared/trader-trade.js'
+import { wrapDistance } from './shared/terrain.js'
+import { canWork } from './shared/stats.js'
+import { aboutTime } from './shared/estimates.js'
+import { GOOD_WEIGHT } from './shared/narrowed.js'
+import { isAt } from './shared/footprint.js'
+import { occupationTicksLeft } from './shared/city.js'
+import { TICKS_PER_GAME_DAY } from '@csp/balance'
+import type { Shown } from './shared/protocol.js'
+import { TRADE_ORG, TRADE_ORG_NAME } from './shared/trade-org.js'
 import { faresKnown, loadKnown } from './seen.js'
 
 /** What the city inspector says about a city in sight, from what the Player sees of it. */

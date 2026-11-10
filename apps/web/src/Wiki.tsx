@@ -1,10 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import {
-  PARAM_DESCRIPTIONS,
-  WORKPLACE_PARAM,
   QUEUE_DEFAULT_STEP_MINUTES,
   QUEUE_MAX_STEPS,
-  SCRIPT_PARAM_TYPES,
   ADULT_AGE,
   AGILITY_LIMIT,
   AGILITY_SPEED_EFFECT,
@@ -162,7 +159,6 @@ import {
   NPC_TRADER_REACH,
   NPC_PLAN_TICKS,
   NPC_SURPLUS_CAP,
-  NPC_SMITHY_WEAPON,
   NPC_SOLDIER_SHARE,
   NPC_WAR_CHEST_PER_RESIDENT,
   NPC_TRADE,
@@ -274,15 +270,19 @@ import {
   carryCapacity,
   walkSpeed,
   workFactor,
-  type BuildingKind,
-  type CrimeKind,
-  type Good,
-  type Stock,
-  DEFAULT_SCRIPTS,
-  SCRIPT_VIEWS,
-  type ScriptType,
-  type ScriptViewName,
-} from '@csp/shared'
+} from '@csp/balance'
+import { PARAM_DESCRIPTIONS, DEFAULT_SCRIPTS, SCRIPT_VIEWS } from '@csp/lang-wasm'
+import { WORKPLACE_PARAM } from './shared/default-scripts.js'
+import { SCRIPT_PARAM_TYPES } from './shared/script-api.js'
+import { NPC_SMITHY_WEAPON } from './shared/npc-trade.js'
+import type {
+  BuildingKind,
+  CrimeKind,
+  Good,
+  Stock,
+  ScriptType,
+  ScriptViewName,
+} from '@csp/shared-types'
 import { BUILDING_NAMES } from './map/palette.js'
 import { GOOD_LABELS } from './Residents.js'
 import { GoodIcon } from './GoodsGrid.js'
@@ -975,8 +975,8 @@ export function Wiki() {
             {TERRAIN_NAMES.map((t) => (
               <tr key={t}>
                 <td>{t}</td>
-                <td>{pct(TERRAIN_SPEED[Terrain[t]])}</td>
-                <td>{pct(TERRAIN_FOOD[Terrain[t]])}</td>
+                <td>{pct(TERRAIN_SPEED[Terrain[t]]!)}</td>
+                <td>{pct(TERRAIN_FOOD[Terrain[t]]!)}</td>
                 <td>{t === 'Road' ? '—' : `× ${num(workFactor('road', Terrain[t]))}`}</td>
               </tr>
             ))}
@@ -2154,14 +2154,14 @@ export function Wiki() {
           It shares out its adults in this order: soldiers; farmers, as many as feed everyone (each
           eats {num(FOOD_PER_DAY)} Food a day, a farmer makes {num(WORK_OUTPUT_PER_DAY.food ?? 0)})
           and one more while it has no food surplus, a new farm when they don't fit; up to{' '}
-          {num(NPC_BUILDERS)} builders a step while it has a project; everyone else is a spare hand. A
-          farm is otherwise built only when Food is short of its reserve (
+          {num(NPC_BUILDERS)} builders a step while it has a project; everyone else is a spare hand.
+          A farm is otherwise built only when Food is short of its reserve (
           {days(NPC_TRADE.reserveFoodDays)} of Food for everyone) with every farm at its full crew
           of {num(WORKPLACE_MAX_WORKERS.farm ?? 0)}, never because spare hands filled the farms
-          working for surplus. It needs nobody idle for that: the new farm's farmers come from
-          those working for surplus and from its scouts first, and from other work only after them.
-          A farm already begun is finished before another. Spare hands go to the good the reserve
-          is shortest of, as a share of what it wants of it, filling one workplace's crew before the
+          working for surplus. It needs nobody idle for that: the new farm's farmers come from those
+          working for surplus and from its scouts first, and from other work only after them. A farm
+          already begun is finished before another. Spare hands go to the good the reserve is
+          shortest of, as a share of what it wants of it, filling one workplace's crew before the
           next. Without a workplace for that good, the city builds one: on the nearest fitting
           resource node it knows of, or a smelter, smithy or mint in its area like a house. With
           every workplace of another short good at its full crew and someone idle, it opens another

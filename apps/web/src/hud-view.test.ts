@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { TICKS_PER_GAME_DAY, type Building } from '@csp/shared'
+import { TICKS_PER_GAME_DAY } from '@csp/balance'
+import type { Building } from '@csp/shared-types'
 import {
   DRAWERS,
   DRAWER_WIDTH,

@@ -1,4 +1,5 @@
-import { ADULT_AGE, MAX_HEALTH, MAX_HUNGER, ticksForAge, type Resident } from '@csp/shared'
+import { ADULT_AGE, MAX_HEALTH, MAX_HUNGER, ticksForAge } from '@csp/balance'
+import type { Resident } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
   CHOICE_KEY,

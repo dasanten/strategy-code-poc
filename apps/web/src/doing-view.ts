@@ -1,24 +1,20 @@
-import {
-  Terrain,
-  UNEXPLORED,
-  arrivalTicks,
-  drivenCarriageId,
-  isDown,
-  timeLeft,
-  roadTiles,
-  tileIndex,
-  type ArrivalWorld,
-  type Building,
-  type City,
-  type GoodsPlace,
-  type GoodsWanted,
-  type Horse,
-  type Resident,
-  type ResidentOrder,
-  type ScriptSummary,
-  type SeenScript,
-  type Task,
-} from '@csp/shared'
+import { Terrain, UNEXPLORED, tileIndex } from './shared/terrain.js'
+import { arrivalTicks, timeLeft, type ArrivalWorld } from './shared/estimates.js'
+import { drivenCarriageId } from './shared/carriages.js'
+import { isDown } from './shared/world.js'
+import { roadTiles } from './shared/building.js'
+import type {
+  Building,
+  City,
+  GoodsPlace,
+  GoodsWanted,
+  Horse,
+  Resident,
+  ResidentOrder,
+  ScriptSummary,
+  SeenScript,
+  Task,
+} from '@csp/shared-types'
 import { BUILDING_NAMES } from './city-view.js'
 import { selectedWay } from './map/way.js'
 import { GOOD_LABELS, orderDoing } from './Residents.js'

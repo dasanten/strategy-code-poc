@@ -6,7 +6,7 @@ import type {
   AdminOrganization,
   AdminWorldView,
   Resident,
-} from '@csp/shared'
+} from '@csp/shared-types'
 import {
   inspectorCard,
   jumpInspectTarget,

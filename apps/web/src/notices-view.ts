@@ -1,10 +1,6 @@
-import {
-  FIRST_DAY_LINES,
-  aboutTime,
-  type FirstDay,
-  type FirstDayLine,
-  type TraderVisit,
-} from '@csp/shared'
+import { FIRST_DAY_LINES } from './shared/first-day.js'
+import { aboutTime } from './shared/estimates.js'
+import type { FirstDay, FirstDayLine, TraderVisit } from '@csp/shared-types'
 import { isWide, type OpenDrawer } from './hud-view.js'
 
 /**

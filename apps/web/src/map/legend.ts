@@ -1,4 +1,5 @@
-import { TICKS_PER_GAME_DAY, type RealmEvent } from '@csp/shared'
+import { TICKS_PER_GAME_DAY } from '@csp/balance'
+import type { RealmEvent } from '@csp/shared-types'
 import type { ZoomTier } from './camera.js'
 
 /*

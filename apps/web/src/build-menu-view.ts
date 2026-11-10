@@ -1,11 +1,8 @@
-import {
-  BUILD_GROUPS,
-  TICKS_PER_GAME_DAY,
-  TICKS_PER_GAME_HOUR,
-  buildMenu,
-  type BuildingKind,
-  type ResourceNode,
-} from '@csp/shared'
+import { BUILD_GROUPS } from './shared/building-info.js'
+import { TICKS_PER_GAME_DAY } from '@csp/balance'
+import { TICKS_PER_GAME_HOUR } from './shared/time.js'
+import { buildMenu } from './shared/building.js'
+import type { BuildingKind, ResourceNode } from '@csp/shared-types'
 import { BUILDING_NAMES } from './map/palette.js'
 
 /** Work in ticks as a span of game time: "2 game days", "1.5 game hours". */

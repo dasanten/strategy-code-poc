@@ -1,20 +1,10 @@
-import {
-  HORSE_HUNGRY_SHARE,
-  MAX_HEALTH,
-  MAX_HUNGER,
-  TICKS_PER_GAME_DAY,
-  drivenCarriageId,
-  horseAgeInYears,
-  isAt,
-  isDown,
-  timeLeft,
-  type Building,
-  type Carriage,
-  type City,
-  type Horse,
-  type Resident,
-  type SeenHorse,
-} from '@csp/shared'
+import { HORSE_HUNGRY_SHARE, MAX_HEALTH, MAX_HUNGER, TICKS_PER_GAME_DAY } from '@csp/balance'
+import { drivenCarriageId } from './shared/carriages.js'
+import { horseAgeInYears } from './shared/stats.js'
+import { isAt } from './shared/footprint.js'
+import { isDown } from './shared/world.js'
+import { timeLeft } from './shared/estimates.js'
+import type { Building, Carriage, City, Horse, Resident, SeenHorse } from '@csp/shared-types'
 import { nameLabels } from './name-labels.js'
 
 /** What a horse's card and row say can be done for it (`CONTEXT.md`: Feeding a horse). */

@@ -1,13 +1,7 @@
-import {
-  GOODS,
-  QUEUE_STEP_KINDS,
-  freeHousing,
-  queueStepsProblem,
-  stepLine,
-  type Building,
-  type Queue,
-  type QueueStepRequest,
-} from '@csp/shared'
+import { GOODS } from './shared/world.js'
+import { QUEUE_STEP_KINDS, queueStepsProblem, stepLine } from './shared/queue.js'
+import { freeHousing } from './shared/city.js'
+import type { Building, Queue, QueueStepRequest } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
   PLAN_STEPS,

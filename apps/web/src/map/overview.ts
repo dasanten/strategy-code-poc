@@ -1,4 +1,4 @@
-import { OVERVIEW_SCALE } from '@csp/shared'
+import { OVERVIEW_SCALE } from '../shared/terrain.js'
 import { TERRAIN_COLORS, VOID_COLOR } from './palette.js'
 
 /*

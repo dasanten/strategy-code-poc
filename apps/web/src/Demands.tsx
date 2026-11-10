@@ -4,21 +4,23 @@ import {
   DEMAND_DEFAULT_DAYS,
   DEMAND_MAX_DAYS,
   DEMAND_NOTE_MAX_LENGTH,
-  GOODS,
-  TRADE_ORG,
-  aboutTime,
-  citiesToCarryAt,
-  deliveryStorage,
-  demandNoteProblem,
-  type CarriedWay,
-  type DemandHandOver,
-  type DemandView,
-  type Good,
-  type OrderRequest,
-  type RealmLabel,
-  type SeenBuilding,
-  type SeenCity,
-} from '@csp/shared'
+} from '@csp/balance'
+import { GOODS } from './shared/world.js'
+import { TRADE_ORG } from './shared/trade-org.js'
+import { aboutTime } from './shared/estimates.js'
+import { citiesToCarryAt } from './shared/direct-offer.js'
+import { deliveryStorage } from './shared/warehouse.js'
+import { demandNoteProblem } from './shared/demand.js'
+import type {
+  CarriedWay,
+  DemandHandOver,
+  DemandView,
+  Good,
+  OrderRequest,
+  RealmLabel,
+  SeenBuilding,
+  SeenCity,
+} from '@csp/shared-types'
 import {
   answersByGame,
   citiesToDemandOf,

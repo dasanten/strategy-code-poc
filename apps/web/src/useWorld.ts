@@ -1,32 +1,30 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  WS_CLOSE_LOGGED_OUT,
-  WS_CLOSE_TOO_MANY_REQUESTS,
-  WS_PATH,
-  type SeenBuilding,
-  type Army,
-  type SeenCarriage,
-  type SeenCity,
-  type Diplomacy,
-  type FirstDay,
-  type SeenHorse,
-  type MapInfo,
-  type OrderRequest,
-  type Pile,
-  type RealmEvent,
-  type SeenResident,
-  type SeenCaravan,
-  type SeenTrader,
-  type TraderVisit,
-  type SeenEntity,
-  type Remembered,
-  type ScriptLogLine,
-  type ScriptMemory,
-  type ScriptRunSeen,
-  type ServerMessage,
-  type WorkplaceSettings,
-  type Waypoint,
-} from '@csp/shared'
+import { WS_CLOSE_LOGGED_OUT, WS_CLOSE_TOO_MANY_REQUESTS, WS_PATH } from './shared/protocol.js'
+import type {
+  SeenBuilding,
+  Army,
+  SeenCarriage,
+  SeenCity,
+  Diplomacy,
+  FirstDay,
+  SeenHorse,
+  MapInfo,
+  OrderRequest,
+  Pile,
+  RealmEvent,
+  SeenResident,
+  SeenCaravan,
+  SeenTrader,
+  TraderVisit,
+  SeenEntity,
+  Remembered,
+  ScriptLogLine,
+  ScriptMemory,
+  ScriptRunSeen,
+  ServerMessage,
+  WorkplaceSettings,
+  Waypoint,
+} from '@csp/shared-types'
 import { api } from './api.js'
 import { appendEvents } from './realm-log.js'
 import { applyRegionMap, type RegionState } from './map/region.js'
@@ -42,7 +40,7 @@ const THROTTLED_RETRY_MS = 10_000
 export interface ClientWorld {
   tick: number
   map: MapInfo
-  /** Chunks with explored terrain, loaded on demand from `terrainChunkPath`. */
+  /** Chunks with explored terrain, loaded on demand from `TERRAIN_BATCH_PATH`. */
   exploredChunks: ReadonlySet<number>
   /** Chunks whose explored terrain grew in the latest tick; any copy loaded before is stale. */
   grownChunks: readonly number[]

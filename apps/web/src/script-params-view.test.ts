@@ -1,5 +1,5 @@
-import { DEFAULT_SCRIPTS, type Building } from '@csp/shared'
-import { scriptParams } from '@csp/lang'
+import { DEFAULT_SCRIPTS, scriptParams } from '@csp/lang-wasm'
+import type { Building } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
   choiceLabel,

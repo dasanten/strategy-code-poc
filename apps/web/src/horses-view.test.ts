@@ -4,9 +4,9 @@ import {
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_YEAR,
   ticksForAge,
-  timeLeft,
-  type SeenHorse,
-} from '@csp/shared'
+} from '@csp/balance'
+import { timeLeft } from './shared/estimates.js'
+import type { SeenHorse } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import { FEED_HORSE_HINT, groupHorses, horseLines } from './horses-view.js'
 

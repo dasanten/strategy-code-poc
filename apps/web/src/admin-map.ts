@@ -1,12 +1,6 @@
-import {
-  ADMIN_VIEW_MAX_SIDE,
-  chunksAcross,
-  wrap,
-  type AdminPlaces,
-  type AdminViewRequest,
-  type AdminWorldView,
-  type MapInfo,
-} from '@csp/shared'
+import { ADMIN_VIEW_MAX_SIDE } from './shared/admin-map.js'
+import { chunksAcross, wrap } from './shared/terrain.js'
+import type { AdminPlaces, AdminViewRequest, AdminWorldView, MapInfo } from '@csp/shared-types'
 import { MAX_SCALE, visibleTiles, zoomTier, type Camera, type Size } from './map/camera.js'
 import { citySize, type CityEmblem, type FarMarker } from './map/far.js'
 import type { MapWorld } from './map/map-world.js'
