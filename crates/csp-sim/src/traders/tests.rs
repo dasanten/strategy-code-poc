@@ -544,7 +544,7 @@ fn is_sent_from_the_hq_armed_goes_round_its_loop_the_hq_and_all_and_supplies_the
     let mut scratch = Scratch::default();
     let mut farthest: f64 = 0.0;
     for t in 0..30_000 {
-        if reached.len() >= world.traders[0].r#loop.len() + 1 {
+        if reached.len() > world.traders[0].r#loop.len() {
             break;
         }
         let was =
