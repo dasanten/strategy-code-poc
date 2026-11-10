@@ -1,4 +1,4 @@
-import type { Diplomacy } from '@csp/shared'
+import type { Diplomacy } from '@csp/shared-types'
 
 /**
  * Whether the Player of `realmId` gives orders to a resident or carriage they see (`CONTEXT.md`:

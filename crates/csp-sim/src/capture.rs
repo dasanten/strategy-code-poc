@@ -5,19 +5,18 @@ use std::collections::HashSet;
 
 use csp_shared::balance::{OCCUPATION_GAME_DAYS, TRADE_ORG_DEBT_TRIPS};
 use csp_shared::footprint::is_at;
+use csp_shared::terrain::TerrainMap;
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
     BuildingKind, CrimeKind, DebtWhat, RealmEventWhat, ResidentOrder, TradeOrgCity, WorldState,
 };
 
+use crate::caravans::{join_trade_org, leave_trade_org, rejoin_trade_org};
 use crate::crimes::{city_organization, commit_crime, CrimeAgainst};
 use crate::defence::Alarms;
 use crate::events::record_event;
+use crate::hq_fall::hq_falls;
 use crate::names::{resident_names_taken, unique_name};
-use crate::pending::{
-    hq_falls, join_trade_org, leave_trade_org, note_city_taken, rejoin_trade_org,
-    workplaces_of_city, CityTaken,
-};
 use crate::queries::alliance::realm_name;
 use crate::queries::carriages::driven_carriage_id;
 use crate::queries::city::town_hall_of;
@@ -26,6 +25,7 @@ use crate::queries::names::placed;
 use crate::queries::residents::is_armed;
 use crate::queries::standing::TRADE_ORG;
 use crate::queries::trade_org::trade_org_hq;
+use crate::trade_org_takes::{note_city_taken, CityTaken};
 
 /// A city that changed realm by capture this tick (`Capture`).
 #[derive(Debug, Clone, PartialEq)]
@@ -44,7 +44,12 @@ fn city_index(world: &WorldState, city_id: &str) -> Option<usize> {
 /// hall with none running; the first tick another realm or nobody does, it is broken; held
 /// `OCCUPATION_TICKS`, the city is captured, or for the Trade Organization taken. Both realms'
 /// logs say when one starts and when it is broken.
-pub fn step_captures(world: &mut WorldState, size: i32, alarms: &mut dyn Alarms) -> Vec<Capture> {
+pub fn step_captures(
+    world: &mut WorldState,
+    size: i32,
+    terrain: Option<&TerrainMap>,
+    alarms: &mut dyn Alarms,
+) -> Vec<Capture> {
     let mut captures = Vec::new();
     // A capture changes no city's place in the list; going by index keeps the TypeScript's order.
     for ci in 0..world.cities.len() {
@@ -78,7 +83,7 @@ pub fn step_captures(world: &mut WorldState, size: i32, alarms: &mut dyn Alarms)
             to: occupier.clone(),
         });
         if occupier == TRADE_ORG {
-            take_city(world, &city_id, size);
+            take_city(world, &city_id, size, terrain);
         } else {
             capture_city(world, &city_id, &occupier, size);
         }
@@ -173,11 +178,15 @@ pub fn capture_city(world: &mut WorldState, city_id: &str, captor: &str, size: i
 
 /// The Trade Organization's army held the town hall to the end (`takeCity`): the city joins it as
 /// a new trading post and that settles all the debt of its Organization. No crime.
-fn take_city(world: &mut WorldState, city_id: &str, size: i32) {
+fn take_city(world: &mut WorldState, city_id: &str, size: i32, terrain: Option<&TerrainMap>) {
     let Some(ci) = city_index(world, city_id) else { return };
     let from = world.cities[ci].realm_id.clone();
     let org = city_organization(&world.cities[ci]).to_string();
-    let worked = workplaces_of_city(world, city_id, size);
+    let worked: Vec<String> =
+        crate::trade_org_wrecks::workplaces_of_city(world, &world.cities[ci], size)
+            .into_iter()
+            .map(|i| world.buildings[i].id.clone())
+            .collect();
     let residents = change_hands(world, ci, None, size) as f64;
     let own: Vec<String> = worked
         .into_iter()
@@ -198,7 +207,7 @@ fn take_city(world: &mut WorldState, city_id: &str, size: i32) {
         }
     }
     city.workplace_ids = Some(ids);
-    join_trade_org(world, city_id, size);
+    join_trade_org(world, city_id, size, terrain);
     let city = &world.cities[ci];
     let what = RealmEventWhat::CityCaptured {
         city_id: city.id.clone(),

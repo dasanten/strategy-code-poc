@@ -1,17 +1,7 @@
-import {
-  MAX_HEALTH,
-  MAX_HUNGER,
-  PROTECTION,
-  STAT_NAMES,
-  ageInYears,
-  bestWeapon,
-  carryCapacity,
-  statValue,
-  stockWeight,
-  type Resident,
-  type SkillName,
-  type StatName,
-} from '@csp/shared'
+import { MAX_HEALTH, MAX_HUNGER, carryCapacity, statValue } from '@csp/balance'
+import { PROTECTION, STAT_NAMES } from './shared/world.js'
+import { ageInYears, bestWeapon, stockWeight } from './shared/stats.js'
+import type { Resident, SkillName, StatName } from '@csp/shared-types'
 import { GOOD_LABELS } from './goods-grid.js'
 import { SKILL_LABELS } from './Residents.js'
 import { carryLine, goodsShort, type ResidentGroup } from './residents-view.js'

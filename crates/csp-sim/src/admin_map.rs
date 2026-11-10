@@ -6,6 +6,7 @@
 //! here they are JSON values built the same way, key for key, so the wire shape is the same.
 
 use std::collections::{HashMap, HashSet};
+use ts_rs::TS;
 
 use csp_shared::terrain::wrap;
 use csp_shared::world::{BuildingKind, Caravan, City, RunningScript, Stock, Trader, WorldState};
@@ -13,14 +14,15 @@ use serde::Serialize;
 use serde_json::{json, Map, Value};
 
 use crate::queries::alliance::alliance_of;
+use crate::queries::alliance::realm_name;
 use crate::queries::carriages::crew_ids_of;
 use crate::queries::city::town_hall_of;
 use crate::queries::names::{held, kind_name, ALL_GOODS};
 use crate::queries::npc_trade::locale_compare;
 use crate::queries::region_map::{region_map_for, RegionMap};
 use crate::queries::residents::is_armed;
+use crate::queries::standing::TRADE_ORG_NAME;
 use crate::queries::territory::{city_organization, Territory, TRADE_ORGANIZATION};
-use crate::realm_pending::{realm_name, TRADE_ORG_NAME};
 
 /// Where an admin loads the map they draw (`ADMIN_MAP_INFO_PATH`).
 pub const ADMIN_MAP_INFO_PATH: &str = "/api/admin/map";
@@ -48,7 +50,8 @@ pub trait AdminLookups {
 
 /// The rectangle of tiles whose entities an admin loads (`AdminViewRequest`), wrapping around the
 /// map's edges; with `cities_only`, just the cities whose town hall stands in it.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, TS)]
+#[ts(type = "{ x: number, y: number, w: number, h: number, citiesOnly?: boolean }")]
 pub struct AdminViewRequest {
     pub x: i32,
     pub y: i32,
@@ -298,7 +301,7 @@ fn trader_name(world: &WorldState, t: &Trader) -> String {
 }
 
 /// A spot on the jump list (`AdminPlace`).
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 pub struct AdminPlace {
     pub id: String,
     pub name: String,

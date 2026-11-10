@@ -83,16 +83,21 @@ fn site_index(world: &WorldState) -> Option<usize> {
     world.buildings.iter().position(|b| b.kind == BuildingKind::Carriage)
 }
 
-/// Delivers goods to the site, as the drop order would. TODO(T86.5): the drop order.
-fn deliver(world: &mut WorldState, from: &str, goods: &Stock) {
-    let si = site_index(world).unwrap();
-    for (g, n) in goods {
-        let r = at(world, from);
-        *r.carried.entry(*g).or_insert(0.0) -= n;
-        r.carried.retain(|_, v| *v > 0.0);
-        let s = world.buildings[si].site.as_mut().unwrap();
-        *s.delivered.entry(*g).or_insert(0.0) += n;
-    }
+/// Delivers goods to the site with the drop order, which runs the tick that carries it out.
+fn deliver(
+    world: &mut WorldState,
+    t: &TerrainMap,
+    orders: &mut Orders,
+    from: &str,
+    goods: &Stock,
+    sender: &OrderSender,
+) {
+    let site_id = world.buildings[site_index(world).unwrap()].id.clone();
+    let drop = json!({
+        "kind": "drop", "residentId": from, "spot": { "kind": "site", "siteId": site_id },
+        "goods": goods,
+    });
+    assert_eq!(send(world, t, orders, drop, sender), "ack");
 }
 
 #[test]
@@ -188,8 +193,7 @@ fn takes_its_materials_and_work_and_becomes_an_empty_unhitched_carriage_of_the_f
     for (g, n) in materials() {
         at(&mut world, "t1").carried.insert(g, n);
     }
-    deliver(&mut world, "t1", &materials());
-    run(&mut world, &t, 1);
+    deliver(&mut world, &t, &mut orders, "t1", &materials(), &them());
     assert_eq!(
         world.buildings[site_index(&world).unwrap()].site.as_ref().unwrap().delivered,
         materials()
@@ -212,8 +216,7 @@ fn leaves_all_its_delivered_materials_when_torn_down() {
     send(&mut world, &t, &mut orders, build("w1"), &me());
     let id = world.buildings[site_index(&world).unwrap()].id.clone();
     at(&mut world, "w1").carried.insert(Good::Wood, 10.0);
-    deliver(&mut world, "w1", &Stock::from([(Good::Wood, 10.0)]));
-    run(&mut world, &t, 1);
+    deliver(&mut world, &t, &mut orders, "w1", &Stock::from([(Good::Wood, 10.0)]), &me());
     let tear = json!({ "kind": "tearDown", "residentId": "w1", "buildingId": id });
     assert_eq!(send(&mut world, &t, &mut orders, tear, &me()), "ack");
     run(&mut world, &t, work().ceil() as usize);

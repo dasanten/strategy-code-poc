@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { RealmEvent } from '@csp/shared'
+import type { RealmEvent } from '@csp/shared-types'
 import {
   NEW_REALM_TICKS,
   isNewRealm,

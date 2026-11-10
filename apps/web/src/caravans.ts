@@ -1,4 +1,5 @@
-import { crewIdsOf, type SeenCaravan, type SeenCarriage, type SeenResident } from '@csp/shared'
+import { crewIdsOf } from './shared/carriages.js'
+import type { SeenCaravan, SeenCarriage, SeenResident } from '@csp/shared-types'
 
 /**
  * What of the Trade Org's caravans or wandering traders is in sight (`CONTEXT.md`: Caravan, Wandering

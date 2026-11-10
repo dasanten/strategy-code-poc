@@ -1,15 +1,15 @@
-import {
-  MAX_WORKERS,
-  buildingRealm,
-  isAt,
-  type Building,
-  type Carriage,
-  type City,
-  type ScriptParam,
-  type ScriptParamType,
-  type ScriptParamValue,
-  type Waypoint,
-} from '@csp/shared'
+import { MAX_WORKERS } from './shared/building.js'
+import { buildingRealm } from './shared/city.js'
+import { isAt } from './shared/footprint.js'
+import type {
+  Building,
+  Carriage,
+  City,
+  ScriptParam,
+  ScriptParamType,
+  ScriptParamValue,
+  Waypoint,
+} from '@csp/shared-types'
 import { BUILDING_NAMES } from './map/palette.js'
 
 /**

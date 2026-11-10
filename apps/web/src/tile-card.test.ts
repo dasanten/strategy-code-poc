@@ -1,18 +1,9 @@
 import { createElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import {
-  BATCHES_PER_DAY,
-  MAX_HEALTH,
-  MAX_HUNGER,
-  TICKS_PER_GAME_YEAR,
-  type Building,
-  type GoodsSpot,
-  type Horse,
-  type Resident,
-  type SeenResident,
-  type Stock,
-} from '@csp/shared'
+import { BATCHES_PER_DAY } from './shared/narrowed.js'
+import { MAX_HEALTH, MAX_HUNGER, TICKS_PER_GAME_YEAR } from '@csp/balance'
+import type { Building, GoodsSpot, Horse, Resident, SeenResident, Stock } from '@csp/shared-types'
 import { describeTile } from './selection-view.js'
 import { GOOD_LABELS, TileGoods } from './Residents.js'
 import { TileCard } from './SelectionCard.js'

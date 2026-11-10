@@ -1,4 +1,4 @@
-import { TICKS_PER_GAME_YEAR, ticksForAge } from '@csp/shared'
+import { TICKS_PER_GAME_YEAR, ticksForAge } from '@csp/balance'
 import { describe, expect, it } from 'vitest'
 import { labelled, nameLabels } from './name-labels.js'
 

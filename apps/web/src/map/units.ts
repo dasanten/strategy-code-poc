@@ -1,4 +1,4 @@
-import type { Army, City, Resident } from '@csp/shared'
+import type { Army, City, Resident } from '@csp/shared-types'
 import {
   cityRelationship,
   isLeader,

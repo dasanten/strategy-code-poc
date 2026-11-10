@@ -25,6 +25,10 @@
   ticket ports one module with its tests and proves parity against the fixtures in
   `crates/csp-sim/fixtures/` (written by `scripts/dump-fixtures.mts`, never by hand). No rule
   changes in the port. Rewrite epics branch from and merge into `rust-backend`, not `dev`.
+  The client's types are generated from the Rust crates (`ts-rs`, ADR 0030): after changing a type
+  the client sees, run `pnpm types:rust` and commit `packages/shared-types/src/generated/` (a Rust
+  test fails when it is stale; `packages/shared-types/src/twins.ts` checks each against its
+  `@csp/shared` twin until Epic 88 deletes that package).
   Before finishing a Rust ticket: `pnpm check:rust` (fmt, clippy with warnings as errors,
   `cargo nextest run`). A test over 5 s is a regression to fix, not to tag. Run cargo from
   PowerShell, or in bash with the MSVC `link.exe` ahead of Git's: `/usr/bin/link` is not a linker.

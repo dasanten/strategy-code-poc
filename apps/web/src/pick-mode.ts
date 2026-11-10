@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ROAD_LINE_MAX_TILES, type ScriptParam } from '@csp/shared'
+import { ROAD_LINE_MAX_TILES } from '@csp/balance'
+import type { ScriptParam } from '@csp/shared-types'
 import type { ArmyPick } from './Armies.js'
 import type { GroupPicking, Picking } from './Residents.js'
 import { nextPick, type Plan } from './plan-step.js'

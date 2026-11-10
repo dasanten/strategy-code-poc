@@ -1,4 +1,4 @@
-import type { ScriptSummary } from '@csp/shared'
+import type { ScriptSummary } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import { workScriptOf, workScripts, workSettingsParams } from './work-settings-view.js'
 

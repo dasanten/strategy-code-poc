@@ -2,8 +2,10 @@
 //! `CONTEXT.md`: Trading with an NPC city, Hiring from an NPC city, NPC reserve): its stock, its
 //! reserve, its prices, what it asks for its residents and whom it would lend.
 
+use csp_shared::world::PricedGood;
 use std::cmp::Ordering;
 use std::collections::HashSet;
+use ts_rs::TS;
 
 use csp_shared::balance::{
     BUILD_MATERIALS, CITY_PRICE_STANDING_SWING, HORSE_FOOD_PER_DAY, NPC_HORSES_BASE,
@@ -174,8 +176,10 @@ pub fn npc_price_for(good: Good, stock: f64, reserve: &Stock, swing: f64) -> Pri
 
 /// One line of an NPC city's prices (`NpcCityPrice`): the good, what it holds, its price, and
 /// what it would sell (above its reserve) and buy (what it lacks of it).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, TS)]
+#[ts(rename_all = "camelCase")]
 pub struct NpcCityPrice {
+    #[ts(as = "PricedGood")]
     pub good: Good,
     pub stock: f64,
     pub for_sale: f64,

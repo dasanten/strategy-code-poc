@@ -11,15 +11,15 @@
 use std::collections::HashSet;
 
 use csp_shared::balance::{
-    CARAVAN_SPREAD, DOWN_DAYS, FOOD_PER_DAY, HEAL_DAYS, HOME_FOOD_LOW, HUNGER_DAYS, MAP_SIZE,
-    MAX_HEALTH, MAX_HUNGER, MEAL_UNITS, OUTPOST_REFILL_REACH, OWN_FOOD, STARVE_DAYS, WAKE_HEALTH,
+    DOWN_DAYS, FOOD_PER_DAY, HEAL_DAYS, HOME_FOOD_LOW, HUNGER_DAYS, MAP_SIZE, MAX_HEALTH,
+    MAX_HUNGER, MEAL_UNITS, OUTPOST_REFILL_REACH, OWN_FOOD, STARVE_DAYS, WAKE_HEALTH,
 };
 use csp_shared::footprint::{covers, is_at, near_footprint};
 use csp_shared::terrain::{ground_at, wrap_distance, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
     Building, BuildingKind, DeathCause, Good, Realm, RealmEventWhat, Resident, ResidentOrder,
-    SelfManagedCity, Stock, Tile, WalkOrder, WorldState,
+    SelfManagedCity, Stock, WorldState,
 };
 
 use crate::city_layout::pick_layout;
@@ -32,7 +32,7 @@ use crate::queries::combat::in_contact;
 use crate::queries::goods::{carried_food, units_that_fit};
 use crate::queries::names::{held, held_in, placed};
 use crate::queries::offers::free_stock;
-use crate::queries::residents::{can_work, food_use, is_armed};
+use crate::queries::residents::{can_work, food_use};
 use crate::queries::standing::TRADE_ORG;
 use crate::queries::trade_org::trade_org_hq;
 use crate::sight::InvariantViolation;
@@ -300,7 +300,9 @@ pub fn die_all(
     killers: Option<&Killers>,
 ) -> (Vec<Resident>, Vec<Realm>) {
     if cause == DeathCause::Killed {
-        count_soldiers_killed(world, died);
+        let killed: Vec<Resident> =
+            world.residents.iter().filter(|r| died.contains(&r.id)).cloned().collect();
+        crate::directives::count_soldiers_killed(world, &killed);
     }
     // Every death is written down before any realm ends, so all of them reach the Player.
     for id in died {
@@ -515,44 +517,9 @@ pub fn nearest_city(
     best.map(|(id, _)| id.to_string())
 }
 
-/// The orders an NPC city gives itself (`NPC_ORDER_KINDS` of `npc-behaviour.ts`), which its
-/// residents keep when a realm ends. TODO(T86.10): moves to the NPC behaviour module.
-pub fn is_npc_order(o: &ResidentOrder) -> bool {
-    matches!(
-        o,
-        ResidentOrder::WalkTo(_)
-            | ResidentOrder::PickUp(_)
-            | ResidentOrder::Drop(_)
-            | ResidentOrder::Store(_)
-            | ResidentOrder::Fetch(_)
-            | ResidentOrder::WorkAt(_)
-            | ResidentOrder::Build(_)
-            | ResidentOrder::TearDown(_)
-            | ResidentOrder::Breed(_)
-            | ResidentOrder::Attack(_)
-            | ResidentOrder::Trade(_)
-            | ResidentOrder::Feed(_)
-            | ResidentOrder::Teach(_)
-            | ResidentOrder::Train(_)
-    )
-}
-
-/// Where an NPC city's residents go home to (`npcHome` of `npc-behaviour.ts`): its finished
-/// storage, else its town hall. TODO(T86.10): moves to the NPC behaviour module.
-pub fn npc_home<'w>(world: &'w WorldState, city_id: &str) -> Option<&'w Building> {
-    world
-        .buildings
-        .iter()
-        .find(|b| {
-            b.city_id.as_deref() == Some(city_id)
-                && b.kind == BuildingKind::Storage
-                && b.site.is_none()
-        })
-        .or_else(|| {
-            let hall = &world.cities.iter().find(|c| c.id == city_id)?.town_hall_id;
-            world.buildings.iter().find(|b| &b.id == hall)
-        })
-}
+// The NPC behaviour module's; `npc_home` is still reached from here too.
+use crate::npc_behaviour::walk_to;
+pub use crate::npc_behaviour::{is_npc_order, npc_home};
 
 /// Sends the resident at `i`, of an NPC city, who is away from it home (`walkHomeIfAway`,
 /// `npcHome`): one outside its area (`CONTEXT.md`: City area) who is not working one of its
@@ -574,10 +541,8 @@ pub fn walk_home_if_away(world: &mut WorldState, city_id: &str, i: usize, size: 
     if at_work || in_city_area(world, city_id, x, y, size) {
         return false;
     }
-    let target = Tile { x: home.x, y: home.y };
-    // `walkTo` of `npc-behaviour.ts`. TODO(T86.10): call the ported one.
-    world.residents[i].order =
-        Some(ResidentOrder::WalkTo(WalkOrder { target, path: None, progress: 0.0, army: None }));
+    let to = (home.x, home.y);
+    walk_to(&mut world.residents[i], to);
     true
 }
 
@@ -803,40 +768,6 @@ pub fn step_refill(world: &mut WorldState, size: i32) {
 
 pub use crate::armies::leave_armies;
 
-/// Counts the armed soldiers killed against each directive's targets (`countSoldiersKilled` of
-/// `directives.ts`, `directiveTargets`). TODO(T86.11): call the ported one.
-fn count_soldiers_killed(world: &mut WorldState, killed: &[String]) {
-    let killed: Vec<(Option<String>, Option<String>, bool)> = world
-        .residents
-        .iter()
-        .filter(|r| killed.contains(&r.id))
-        .map(|r| (r.owner.clone(), r.city_id.clone(), is_armed(&r.carried)))
-        .collect();
-    for i in 0..world.directives.len() {
-        let d = &world.directives[i];
-        let orgs: Vec<String> = if !d.with_alliance {
-            vec![d.target.clone()]
-        } else {
-            world
-                .alliances
-                .iter()
-                .find(|a| a.members.iter().any(|m| m.realm_id == d.target))
-                .map_or_else(
-                    || vec![d.target.clone()],
-                    |a| a.members.iter().map(|m| m.realm_id.clone()).collect(),
-                )
-        };
-        let n = killed
-            .iter()
-            .filter(|(owner, city, armed)| {
-                let org = owner.as_deref().or(city.as_deref()).unwrap_or("");
-                *armed && orgs.iter().any(|o| o == org)
-            })
-            .count();
-        world.directives[i].soldiers_killed += n as f64;
-    }
-}
-
 /// A dead resident leaves any caravan or wandering trader (`leaveCaravans`, in `caravans.rs`).
 fn leave_caravans(world: &mut WorldState, resident_id: &str) {
     crate::caravans::leave_caravans(world, resident_id);
@@ -848,46 +779,16 @@ fn caravan_food(world: &WorldState, r: &Resident, size: i32) -> Option<usize> {
     crate::caravans::caravan_food(world, r, size)
 }
 
-/// The carriage at `i` if it has Food and stands within `CARAVAN_SPREAD` of the resident.
-fn near_with_food(world: &WorldState, r: &Resident, i: usize, size: i32) -> Option<usize> {
-    let k = &world.carriages[i];
-    if held(&k.load, Good::Food) <= 0.0 {
-        return None;
-    }
-    (wrap_distance(size, tile_of(r), (k.x as i32, k.y as i32)) <= CARAVAN_SPREAD).then_some(i)
-}
-
 /// For a resident of no realm driving a supply wagon or in its punishment, the wagon close by
-/// with Food (`wagonFood` of `supply-wagons.ts`). TODO(T86.9): call the ported one.
+/// with Food (`wagonFood` of `supply-wagons.ts`).
 fn wagon_food(world: &WorldState, r: &Resident, size: i32) -> Option<usize> {
-    if r.owner.is_some() || world.supply_wagons.is_empty() {
-        return None;
-    }
-    let wagon = world.supply_wagons.iter().find(|w| {
-        w.driver_id.as_ref() == Some(&r.id)
-            || w.punishment_id.as_ref().is_some_and(|pid| {
-                world
-                    .punishments
-                    .iter()
-                    .find(|p| &p.id == pid)
-                    .is_some_and(|p| p.members.iter().any(|m| m.resident_id == r.id))
-            })
-    })?;
-    let i = world.carriages.iter().position(|k| k.id == wagon.carriage_id)?;
-    near_with_food(world, r, i, size)
+    let ri = world.residents.iter().position(|x| x.id == r.id)?;
+    crate::supply_wagons::wagon_food(world, ri, size)
 }
 
-/// A realm's mercenary contracts end on its Leader's death (`endContractsOnLeaderDeath` of
-/// `contracts.ts`). TODO(T86.11): call the ported one; until then the contracts stay.
-fn end_contracts_on_leader_death(_world: &mut WorldState, _realm_id: &str) {}
-
-/// A realm's demands lapse on its Leader's death (`lapseDemandsOnLeaderDeath` of `demands.ts`).
-/// TODO(T86.11): call the ported one; until then the demands stay.
-fn lapse_demands_on_leader_death(_world: &mut WorldState, _realm_id: &str) {}
-
-/// A realm leaves its alliance on its Leader's death (`leaveOnLeaderDeath` of `alliances.ts`).
-/// TODO(T86.11): call the ported one; until then it stays a member.
-fn leave_on_leader_death(_world: &mut WorldState, _realm_id: &str) {}
+use crate::alliances::leave_on_leader_death;
+use crate::contracts::end_contracts_on_leader_death;
+use crate::demands::lapse_demands_on_leader_death;
 
 #[cfg(test)]
 mod self_managed_tests;

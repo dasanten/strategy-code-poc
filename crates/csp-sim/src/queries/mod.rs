@@ -20,6 +20,8 @@ pub mod combat;
 pub mod command;
 pub mod contract;
 pub mod crew;
+pub mod demand;
+pub mod direct_offer;
 pub mod driving;
 pub mod estimates;
 pub mod goods;

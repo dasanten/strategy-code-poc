@@ -9,51 +9,48 @@ import {
 } from 'react'
 import {
   BUILDABLE,
-  firstDayShown,
-  type ClientFirstDayLine,
-  carriagePulledBy,
   holdersOf,
+  KEEPS_GOODS,
+  MAX_WORKERS,
+  SHARES_A_TILE,
+  takesWorkSettings,
+  roadTiles,
+} from './shared/building.js'
+import { firstDayShown } from './shared/first-day.js'
+import type {
+  ClientFirstDayLine,
+  Account,
+  Building,
+  BuildingKind,
+  Good,
+  GoodsSpot,
+  KnownNode,
+  OrderRequest,
+  Resident,
+  ScriptParam,
+  ScriptParamValues,
+  ScriptSummary,
+  StartParamValues,
+  Stock,
+  TrainingSubject,
+  SeenResident,
+} from '@csp/shared-types'
+import {
+  carriagePulledBy,
   carriageOfResident,
   driveOffProblem,
   hitchOffProblem,
   horseToSteal,
-  mountOffProblem,
-  horseOfResident,
-  horsesInNeed,
-  isDown,
-  riderOf,
   seatsLeft,
-  KEEPS_GOODS,
-  MAX_WORKERS,
-  isPassableTerrain,
-  isWallOrGate,
-  type Account,
-  type Building,
-  type BuildingKind,
-  type Good,
-  type GoodsSpot,
-  type KnownNode,
-  type OrderRequest,
-  type Resident,
-  type ScriptParam,
-  type ScriptParamValues,
-  type ScriptSummary,
-  type StartParamValues,
-  type Stock,
-  type TrainingSubject,
-  isAt,
-  SHARES_A_TILE,
-  takesWorkSettings,
-  targetParam,
-  covers,
-  type SeenResident,
-  HORSE_GRANT_HORSES,
-  UNEXPLORED,
-  Terrain,
-  roadTiles,
-  tileIndex,
-  wrap,
-} from '@csp/shared'
+} from './shared/carriages.js'
+import { mountOffProblem, horseOfResident, riderOf } from './shared/horses.js'
+import { horsesInNeed } from './shared/reviving.js'
+import { isDown } from './shared/world.js'
+import { isPassableTerrain, UNEXPLORED, Terrain, tileIndex, wrap } from './shared/terrain.js'
+import { isWallOrGate } from './shared/walls.js'
+import { isAt, covers } from './shared/footprint.js'
+import { targetParam } from './shared/default-scripts.js'
+import { HORSE_GRANT_HORSES } from '@csp/balance'
 import { AdminPage } from './AdminPanel.js'
 import { AlliancePanel } from './Alliance.js'
 import { commandsSeen } from './alliance-army.js'

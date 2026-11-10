@@ -1,5 +1,5 @@
 import { Container, Graphics, Sprite, Text } from 'pixi.js'
-import type { City, ResourceKind } from '@csp/shared'
+import type { City, ResourceKind } from '@csp/shared-types'
 import { THEME } from '../theme.js'
 import type { Atlas } from './atlas.js'
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { AdminInspectTarget, AdminInspection } from '@csp/shared'
+import type { AdminInspectTarget, AdminInspection } from '@csp/shared-types'
 import { api, ApiFailure } from './api.js'
 import { ADMIN_MAP_REFRESH_MS } from './admin-map.js'
 import { inspectorCard } from './admin-inspector.js'

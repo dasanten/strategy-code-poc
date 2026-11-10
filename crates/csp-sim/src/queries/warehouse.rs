@@ -6,7 +6,9 @@ use csp_shared::balance::{
     PRICE_REFERENCE_FLOORS, WAREHOUSE_BASE_PRICE, WAREHOUSE_FLOOR,
 };
 use csp_shared::world::warehouse::ShownWarehousePrice;
+use csp_shared::world::PricedGood;
 use csp_shared::world::{Building, BuildingKind, Good, Stock, TradeOrgCity, WorldState};
+use ts_rs::TS;
 
 use super::city::town_hall_of;
 use super::js_round;
@@ -92,8 +94,10 @@ pub fn price_for(good: Good, stock: f64, floor: f64) -> Price {
 }
 
 /// One line of a warehouse's prices (`WarehousePrice`): the good, how much it holds, its price.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, TS)]
+#[ts(rename_all = "camelCase")]
 pub struct WarehousePrice {
+    #[ts(as = "PricedGood")]
     pub good: Good,
     pub stock: f64,
     pub buy: f64,

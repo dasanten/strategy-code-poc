@@ -5,13 +5,14 @@
 use csp_shared::world::protocol::OrderRequest;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 /// Where the client reports a line done (POST `{ line }`) and dismisses the card (POST).
 pub const FIRST_DAY_PATH: &str = "/api/first-day";
 pub const FIRST_DAY_DISMISS_PATH: &str = "/api/first-day/dismiss";
 
 /// The card's lines, in its order (`FIRST_DAY_LINES`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum FirstDayLine {
     ClaimHorses,
@@ -26,6 +27,14 @@ pub const FIRST_DAY_LINES: [FirstDayLine; 4] = [
     FirstDayLine::GiveOrder,
     FirstDayLine::OpenWiki,
 ];
+
+/// `ClientFirstDayLine`: the lines the client may report.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum ClientFirstDayLine {
+    PickResident,
+    OpenWiki,
+}
 
 /// The lines the client reports; the server sees the others itself, as the orders come in, and
 /// ignores a report of them (`CLIENT_FIRST_DAY_LINES`).
@@ -55,7 +64,7 @@ impl FirstDayLine {
 
 /// A Player's first-day card: the lines ticked, in the card's order, and whether they dismissed
 /// it (`FirstDay`).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 pub struct FirstDay {
     pub done: Vec<FirstDayLine>,
     pub dismissed: bool,

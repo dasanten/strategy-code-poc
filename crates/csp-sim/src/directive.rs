@@ -6,6 +6,7 @@
 use csp_lang::js::number_to_string;
 use csp_shared::world::{Directive, DirectiveGoal, Resident, WorldState};
 use serde::Serialize;
+use ts_rs::TS;
 
 use crate::queries::residents::is_armed;
 
@@ -20,28 +21,34 @@ pub const MAX_DIRECTIVE_SOLDIERS: f64 = 10_000.0;
 
 /// The Organizations a directive names (`directiveTargets`): its target, and with
 /// `with_alliance` every member of the target's alliance as it stands now.
-pub fn directive_targets(world: &WorldState, d: &Directive) -> Vec<String> {
-    if !d.with_alliance {
-        return vec![d.target.clone()];
+pub fn directive_targets(world: &WorldState, target: &str, with_alliance: bool) -> Vec<String> {
+    if !with_alliance {
+        return vec![target.to_string()];
     }
-    let alliance =
-        world.alliances.iter().find(|a| a.members.iter().any(|m| m.realm_id == d.target));
+    let alliance = world.alliances.iter().find(|a| a.members.iter().any(|m| m.realm_id == target));
     match alliance {
         Some(a) => a.members.iter().map(|m| m.realm_id.clone()).collect(),
-        None => vec![d.target.clone()],
+        None => vec![target.to_string()],
     }
 }
 
 /// The directive that has the Trade Organization treat an Organization as one to punish, if any:
 /// the oldest naming it (`directiveAgainst`).
 pub fn directive_against<'w>(world: &'w WorldState, org: &str) -> Option<&'w Directive> {
-    world.directives.iter().find(|d| directive_targets(world, d).iter().any(|t| t == org))
+    world
+        .directives
+        .iter()
+        .find(|d| directive_targets(world, &d.target, d.with_alliance).iter().any(|t| t == org))
 }
 
 /// The soldiers of the Organizations a directive names (`directiveSoldiers`): armed residents of
 /// those realms, or of those NPC cities.
-pub fn directive_soldiers<'w>(world: &'w WorldState, d: &Directive) -> Vec<&'w Resident> {
-    let orgs = directive_targets(world, d);
+pub fn directive_soldiers<'w>(
+    world: &'w WorldState,
+    target: &str,
+    with_alliance: bool,
+) -> Vec<&'w Resident> {
+    let orgs = directive_targets(world, target, with_alliance);
     world
         .residents
         .iter()
@@ -68,7 +75,7 @@ pub fn goals_met(d: &Directive) -> bool {
 
 /// A directive's goal as every Player sees it: what it asks, not how far it has come
 /// (`DirectiveGoalView`).
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum DirectiveGoalView {
     City {
@@ -77,13 +84,14 @@ pub enum DirectiveGoalView {
     Soldiers {
         count: f64,
         #[serde(skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
         percent: Option<f64>,
     },
 }
 
 /// A directive as every Player sees it: its target, reason, goals and price, never who gave it
 /// (`DirectiveView`).
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct DirectiveView {
     pub id: String,

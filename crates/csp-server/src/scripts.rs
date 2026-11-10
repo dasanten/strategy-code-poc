@@ -12,8 +12,8 @@
 //! game default as a new version ([`ensure_default_scripts`]); once edited it stays theirs until
 //! they reset it. Default scripts can't be renamed or deleted.
 //!
-//! The game's defaults are a parameter ([`Defaults`]) rather than a constant: their sources are
-//! ported with the default scripts (T86.12), and [`game_defaults`] gives them from then on.
+//! The game's defaults are a parameter ([`Defaults`]) rather than a constant, so a test can give
+//! its own; [`game_defaults`] gives the game's (`DEFAULT_SCRIPTS`).
 
 use csp_lang::{check_script, script_params, Diagnostic, ParamInfo};
 use csp_shared::balance::{SCRIPT_LIBRARY_MAX_SCRIPTS, SCRIPT_MAX_VERSIONS};
@@ -21,6 +21,7 @@ use csp_shared::world::default_scripts::Task;
 use csp_sim::sight::InvariantViolation;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
+use ts_rs::TS;
 
 use crate::auth::{ApiErrorCode, AuthError, AuthFailure, AuthResult};
 
@@ -41,11 +42,19 @@ pub struct DefaultScript {
 /// The game's default scripts, one per task in `TASKS` order (`DEFAULT_SCRIPTS`).
 pub type Defaults = [DefaultScript];
 
-/// The game's current default scripts.
-// TODO(T86.12): `DEFAULT_SCRIPTS` once the default scripts are ported; until then a Player's
-// library has no default scripts.
+/// The game's current default scripts (`DEFAULT_SCRIPTS`), one per task in `TASKS` order.
 pub fn game_defaults() -> &'static Defaults {
-    &[]
+    static DEFAULTS: std::sync::LazyLock<Vec<DefaultScript>> = std::sync::LazyLock::new(|| {
+        csp_sim::default_scripts::DEFAULT_SCRIPTS
+            .iter()
+            .map(|&(task, name, source)| DefaultScript {
+                task,
+                name: name.to_owned(),
+                source: source.to_owned(),
+            })
+            .collect()
+    });
+    &DEFAULTS
 }
 
 /// A task's name as stored in `scripts.task` (`Task` in camelCase).
@@ -343,7 +352,7 @@ pub fn default_script_id(
 }
 
 /// A script in the Player's library (`ScriptSummary`).
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct ScriptSummary {
     pub id: i64,
@@ -356,22 +365,24 @@ pub struct ScriptSummary {
     /// A default script the Player hasn't edited, which follows the game's default.
     pub follows_default: bool,
     /// The active version's `param` lines; none while there is none.
+    #[ts(as = "Vec<csp_shared::views::ScriptParam>")]
     pub params: Vec<ParamInfo>,
 }
 
 /// One saved version of a script, with the syntax errors it has (at most one).
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct ScriptVersion {
     pub version: i64,
     pub source: String,
     /// Seconds since the epoch.
     pub saved_at: i64,
+    #[ts(type = "Array<{ message: string, line: number, column: number }>")]
     pub errors: Vec<Diagnostic>,
 }
 
 /// The game's side of a Player's default script (`GameDefault`).
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct GameDefault {
     /// The game's current default.
@@ -381,13 +392,14 @@ pub struct GameDefault {
 }
 
 /// A script with its whole history, oldest version first (`ScriptDetail`).
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct ScriptDetail {
     #[serde(flatten)]
     pub summary: ScriptSummary,
     pub versions: Vec<ScriptVersion>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub game_default: Option<GameDefault>,
 }
 
@@ -781,7 +793,7 @@ pub fn check_script_library(
         match task_of(Some(&task)) {
             None => out.push(fail(format!("is for no task: {task}"))),
             Some(t) => {
-                // A task the game has no default for yet (T86.12) is not checked.
+                // A task the given defaults leave out (a test's) is not checked.
                 let Some(d) = default_of(defaults, t) else { continue };
                 if follows
                     && source_of(conn, id, active_version)?.as_deref() != Some(d.source.as_str())

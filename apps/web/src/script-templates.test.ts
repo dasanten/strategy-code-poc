@@ -1,4 +1,5 @@
-import { DEFAULT_SCRIPTS, type ScriptSummary } from '@csp/shared'
+import { DEFAULT_SCRIPTS } from '@csp/lang-wasm'
+import type { ScriptSummary } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
   EMPTY_SCRIPT,

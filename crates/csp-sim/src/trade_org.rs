@@ -15,7 +15,6 @@ use csp_shared::world::{
 };
 
 use crate::goods_deps::{new_id, update_city_membership};
-use crate::names::unique_name;
 use crate::placing::{node_workplace, Ground};
 use crate::queries::building::node_corner;
 use crate::queries::city::town_hall_of;
@@ -161,22 +160,7 @@ fn work_out_layout(cx: i32, cy: i32) -> HqLayout {
 /// How far the HQ's ground reaches from its town hall: its outer ring and the farms beyond it
 /// (`HQ_FOOTPRINT`).
 pub fn hq_footprint() -> f64 {
-    TRADE_ORG_HQ.outer_radius + farm_ring()
-}
-
-/// The ring of farms round a city (`FARM_RING` of `starting-city.ts`). TODO(T86.8): import it.
-fn farm_ring() -> f64 {
-    1.0 + CITY_AREA_MARGIN
-}
-
-/// Where residents, horses, carriages and piles stand (`residentTiles` of `starting-city.ts`).
-/// TODO(T86.8): import it.
-fn resident_tiles(world: &WorldState) -> Vec<Tile> {
-    let r = world.residents.iter().map(|e| (e.x, e.y));
-    let h = world.horses.iter().map(|e| (e.x, e.y));
-    let k = world.carriages.iter().map(|e| (e.x, e.y));
-    let p = world.piles.iter().map(|e| (e.x, e.y));
-    r.chain(h).chain(k).chain(p).map(|(x, y)| (x as i32, y as i32)).collect()
+    TRADE_ORG_HQ.outer_radius + f64::from(FARM_RING)
 }
 
 /// The ground with what stands on it (`takenGround`).
@@ -340,35 +324,8 @@ pub fn nearest_free_node(
 const HQ_NODES: [ResourceKind; 4] =
     [ResourceKind::Forest, ResourceKind::Stone, ResourceKind::IronOre, ResourceKind::GoldOre];
 
-/// City names the game gives (`CITY_NAMES` of `cities.ts`). TODO(T86.8): import them.
-const CITY_NAMES: [&str; 20] = [
-    "Ashford",
-    "Brackenholt",
-    "Coldwater",
-    "Dunmere",
-    "Eastwick",
-    "Fallowby",
-    "Greyhaven",
-    "Hartwell",
-    "Ironside",
-    "Juniper",
-    "Kettleby",
-    "Larkspur",
-    "Millbrook",
-    "Northam",
-    "Oakhurst",
-    "Pinecrest",
-    "Quarrytown",
-    "Redbank",
-    "Stonebridge",
-    "Thornbury",
-];
-
-/// The name the game gives a new city (`givenCityName` of `cities.ts`). TODO(T86.8): import it.
-fn given_city_name(world: &WorldState, drawn: &str) -> String {
-    let taken: HashSet<String> = world.cities.iter().map(|c| c.name.clone()).collect();
-    unique_name(drawn, &taken, &CITY_NAMES)
-}
+use crate::cities::{given_city_name, CITY_NAMES};
+use crate::starting_city::{resident_tiles, FARM_RING};
 
 fn new_building(
     world: &mut WorldState,
@@ -532,3 +489,6 @@ mod tests {
         assert_eq!(l.houses.len(), TRADE_ORG_HQ.houses as usize);
     }
 }
+
+#[cfg(test)]
+mod hq_run_tests;

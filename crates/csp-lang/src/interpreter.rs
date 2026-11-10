@@ -512,6 +512,10 @@ impl<'p> Interpreter<'p, '_> {
     #[inline(never)]
     fn member(&mut self, e: &'p MemberExpression, scope: usize) -> Eval<Value> {
         let object = self.expression(&e.object, scope)?;
+        // An object's property is read by name, without making a string value of the key.
+        if let Value::Object(o) = &object {
+            return Ok(o.borrow().get(&e.property).cloned().unwrap_or(Value::Null));
+        }
         self.read(&object, &Value::string(&e.property), e.position())
     }
 

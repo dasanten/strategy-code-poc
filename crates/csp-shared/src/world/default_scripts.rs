@@ -1,9 +1,10 @@
 //! The world-state types of `packages/shared/src/default-scripts.ts`.
 
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 /// The tasks that run a default script (`TASKS`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum Task {
     Work,

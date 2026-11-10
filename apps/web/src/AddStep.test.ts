@@ -1,7 +1,8 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { MAX_HEALTH, MAX_HUNGER, TICKS_PER_GAME_DAY, type SeenHorse } from '@csp/shared'
+import { MAX_HEALTH, MAX_HUNGER, TICKS_PER_GAME_DAY } from '@csp/balance'
+import type { SeenHorse } from '@csp/shared-types'
 import { AddStep } from './AddStep.js'
 
 const horse = (h: Partial<SeenHorse>): SeenHorse => ({

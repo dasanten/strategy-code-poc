@@ -9,6 +9,7 @@ use csp_shared::world::{BuildingKind, Good, Horse, Resident, Stock, WorldState};
 
 use super::carriages::{carriage_pulled_by, driven_carriage_id};
 use super::driving::{carriage_can_go_to, take_problem};
+use super::goods::pile_index_at;
 use super::horses::rider_of;
 use super::names::{held, placed};
 use super::residents::is_down;
@@ -160,17 +161,6 @@ impl FoodPlace {
             FoodPlace::Rider(i) => &mut world.residents[i].carried,
         }
     }
-}
-
-/// Where the pile reached from a tile lies (`pileTile`): on a building's footprint its
-/// north-west tile, elsewhere the tile itself.
-// TODO(T86.5): `queries::goods::pile_index_at` once it lands.
-fn pile_index_at(world: &WorldState, x: i32, y: i32, size: i32) -> Option<usize> {
-    let (px, py) = match super::building::building_at(world, x, y, size) {
-        Some(b) => (b.x as i32, b.y as i32),
-        None => (x, y),
-    };
-    world.piles.iter().position(|p| p.x as i32 == px && p.y as i32 == py)
 }
 
 /// Where a horse finds Food it can eat, in the order it eats from them (`horseFood`): the load of

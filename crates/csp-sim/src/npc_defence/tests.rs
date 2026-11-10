@@ -25,8 +25,8 @@ use crate::queries::residents::{can_work, is_armed};
 use crate::queries::standing::TRADE_ORG;
 use crate::queries::walls::on_own_wall;
 use crate::random::Mulberry32;
-use crate::realm_pending::change_standing;
 use crate::residents::{new_resident, NewResident};
+use crate::standing::change_standing;
 use crate::trade_org::found_trade_org_hq;
 use crate::trade_org_army::step_trade_org_army;
 use crate::trading_posts::found_trading_post;
@@ -622,7 +622,7 @@ fn an_npc_city_leaves_them_to_their_alarm_default_which_goes_after_an_armed_outs
     assert_eq!(p.attackers(), std::slice::from_ref(&o));
     p.defend();
     assert!(!attacking(p.r(&soldier)));
-    step_captures(&mut p.world, p.terrain.size, &mut GameAlarms);
+    step_captures(&mut p.world, p.terrain.size, Some(&p.terrain), &mut GameAlarms);
     let script = serde_json::to_value(&p.r(&soldier).script).unwrap();
     assert_eq!(script["task"], "alarm");
     assert_eq!(script["alarm"]["kind"], "occupied");
@@ -812,7 +812,6 @@ fn beat_a_lone_occupier_before_the_city_falls_with_no_crime_and_every_invariant_
 // Trading posts defend themselves
 
 #[test]
-#[ignore = "2 game days walked tick by tick: the NPC scripts cost ~70 µs a run to bind and interpret; T86.14 makes it fast"]
 fn arm_soldiers_from_the_warehouse_so_one_armed_outsider_does_not_capture_the_post() {
     let mut p = post();
     let hall = p.at(BuildingKind::TownHall);
@@ -836,7 +835,7 @@ fn arm_soldiers_from_the_warehouse_so_one_armed_outsider_does_not_capture_the_po
     let o = p.r_mut("p1");
     (o.x, o.y) = (hall.x, hall.y);
     assert_eq!(p.occupier(), None);
-    assert_eq!(step_captures(&mut p.world, p.terrain.size, &mut GameAlarms), []);
+    assert_eq!(step_captures(&mut p.world, p.terrain.size, Some(&p.terrain), &mut GameAlarms), []);
     assert_eq!(p.citizens().len() as f64, TRADING_POST.residents);
 }
 

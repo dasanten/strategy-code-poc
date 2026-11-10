@@ -18,6 +18,7 @@ use indexmap::IndexMap;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
+use ts_rs::TS;
 
 const KEY_LENGTH: usize = 64;
 const DAY_MS: i64 = 24 * 60 * 60 * 1000;
@@ -38,7 +39,7 @@ pub const MIN_PASSWORD_LENGTH: usize = 10;
 pub const MAX_PASSWORD_LENGTH: usize = 200;
 
 /// `ApiErrorCode` of `packages/shared/src/api.ts`: what the API reports as `{ error, message }`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "kebab-case")]
 pub enum ApiErrorCode {
     InvalidInput,
@@ -54,6 +55,13 @@ pub enum ApiErrorCode {
     DefaultScript,
     ActiveVersion,
     LibraryFull,
+}
+
+/// The JSON body of a failure (`ApiError`), for the generated client types.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+pub struct ApiError {
+    pub error: ApiErrorCode,
+    pub message: String,
 }
 
 /// A failure the API reports to the client as `{ error, message }`.

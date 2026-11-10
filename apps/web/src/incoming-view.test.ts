@@ -1,4 +1,4 @@
-import type { DirectOfferView } from '@csp/shared'
+import type { DirectOfferView } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import { incomingItems, incomingNoticeLine } from './incoming-view.js'
 

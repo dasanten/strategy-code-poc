@@ -1,11 +1,6 @@
-import {
-  TRADE_ORG,
-  TRADE_ORG_NAME,
-  CONTRACT_MAX_DAYS,
-  type ContractView,
-  type Diplomacy,
-  type RealmEvent,
-} from '@csp/shared'
+import { TRADE_ORG, TRADE_ORG_NAME } from './shared/trade-org.js'
+import { CONTRACT_MAX_DAYS } from '@csp/balance'
+import type { ContractView, Diplomacy, RealmEvent } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import { commandsSeen } from './alliance-army.js'
 import {

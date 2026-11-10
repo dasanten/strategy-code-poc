@@ -4,7 +4,7 @@
 use csp_shared::world::{City, Realm, Resident, WorldState};
 
 use crate::queries::alliance::{commander_of, contract_of};
-use crate::queries::npc_trade::npc_needs_scale;
+use crate::queries::npc_trade::is_big_npc_city;
 use crate::queries::residents::is_armed;
 
 /// A Player's account as an order's sender carries it (`Account`).
@@ -46,9 +46,8 @@ pub fn npc_sender(city: &City) -> OrderSender {
 }
 
 /// The Player's realm, if they have one (`realmOf`).
-// TODO(T86.8): `starting_city::realm_of` once the starting city is ported.
-pub(crate) fn realm_of(world: &WorldState, user_id: u64) -> Option<&Realm> {
-    world.realms.iter().find(|r| r.user_id == user_id)
+pub fn realm_of(world: &WorldState, user_id: u64) -> Option<&Realm> {
+    crate::starting_city::realm_of(world, user_id).map(|i| &world.realms[i])
 }
 
 /// Whether the realm's Player may give the resident orders (`commands`).
@@ -80,12 +79,6 @@ pub fn ordered_resident(
     } else {
         None
     }
-}
-
-/// Whether an NPC city counts as big (`isBigNpcCity`): two steps of needs or more.
-// TODO(T86.10): from the NPC cities' module once it ports `isBigNpcCity`.
-fn is_big_npc_city(world: &WorldState, city: &City) -> bool {
-    npc_needs_scale(world, city) > 1.0
 }
 
 /// Why an NPC city's sender can't have a resident teach or train (`npcTrainingProblem`,

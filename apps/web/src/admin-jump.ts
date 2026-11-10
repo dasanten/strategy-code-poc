@@ -1,4 +1,4 @@
-import type { AdminPlace, AdminPlaces } from '@csp/shared'
+import type { AdminPlace, AdminPlaces } from '@csp/shared-types'
 import { CLOSE_SCALE } from './map/camera.js'
 import { ADMIN_LINK_SCALE } from './admin-map.js'
 

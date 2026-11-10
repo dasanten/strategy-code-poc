@@ -1,4 +1,4 @@
-import type { Waypoint } from '@csp/shared'
+import type { Waypoint } from '@csp/shared-types'
 import { tileToScreen, type Camera, type Size } from './camera.js'
 
 /*

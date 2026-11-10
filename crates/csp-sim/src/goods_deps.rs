@@ -16,9 +16,9 @@ pub use crate::order_sender::OrderSender;
 pub use crate::standing::{change_standing, raise_standing_both_ways};
 pub use crate::survival::drop_goods;
 
-/// The Player's realm (`realmOf`). TODO(T86.8): `starting_city.rs`.
+/// The Player's realm (`realmOf`, in `starting_city.rs`).
 pub fn realm_of(world: &WorldState, user_id: u64) -> Option<&Realm> {
-    world.realms.iter().find(|r| r.user_id == user_id)
+    crate::starting_city::realm_of(world, user_id).map(|i| &world.realms[i])
 }
 
 /// A new id from the world's counter (`newId`), by `random::new_id`.
@@ -76,8 +76,11 @@ pub fn commit_theft(
     crate::crimes::commit_crime(world, size, CrimeKind::Theft, &thief_id, against);
 }
 
-/// Raises the alarm of a theft (`raiseTheft`). TODO(T86.12): `alarms.rs`; a no-op until then.
-pub fn raise_theft(_world: &mut WorldState, _thief: usize, _victim_org: &str, _size: i32) {}
+/// Raises the alarm of a theft by resident `thief` (`raiseTheft`, in `alarms.rs`).
+pub fn raise_theft(world: &mut WorldState, thief: usize, victim_org: &str, size: i32) {
+    let thief_id = world.residents[thief].id.clone();
+    crate::alarms::raise_theft(world, &thief_id, victim_org, size);
+}
 
 /// Finishes a site with all its materials and work (`finishSite`, in `building.rs`), returning
 /// whether it did.
@@ -101,13 +104,14 @@ pub fn rob_caravan(
     crate::caravans::rob_caravan(world, thief, carriage_id, robbed, false);
 }
 
-/// Robs a wandering trader (`robTrader`). TODO(T86.10): `traders.rs`.
+/// Robs a wandering trader (`robTrader`, in `traders.rs`).
 pub fn rob_trader(
-    _world: &mut WorldState,
-    _thief: usize,
-    _carriage_id: &str,
-    _robbed: &mut HashSet<String>,
+    world: &mut WorldState,
+    thief: usize,
+    carriage_id: &str,
+    robbed: &mut HashSet<String>,
 ) {
+    crate::traders::rob_trader(world, thief, carriage_id, robbed, false);
 }
 
 pub use crate::deliveries::collects_from;
@@ -136,10 +140,9 @@ pub use crate::breeding::end_breeding_of;
 
 pub use crate::transfers::hand_in;
 
-/// Takes an offer out of the world (`endOffer`). TODO(offers): the lines in the realm logs it
-/// writes come with the offers port.
+/// Takes an offer used up out of the world, with its lines in the realm logs (`endOffer`).
 pub fn end_offer(world: &mut WorldState, offer_id: &str) {
-    world.offers.retain(|o| o.id != offer_id);
+    crate::offers::end_offer(world, offer_id, csp_shared::world::OfferEnd::UsedUp);
 }
 
 /// A realm's name for the log (`realmName` of `alliance.ts`).

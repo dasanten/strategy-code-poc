@@ -1,6 +1,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { transferLoadsFee, type DemandView, type SeenBuilding, type SeenCity } from '@csp/shared'
+import { transferLoadsFee } from './shared/demand.js'
+import type { DemandView, SeenBuilding, SeenCity } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
   citiesToDemandOf,

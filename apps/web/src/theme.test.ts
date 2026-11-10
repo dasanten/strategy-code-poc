@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Terrain } from '@csp/shared'
+import { Terrain } from './shared/terrain.js'
 import { LOADING_COLOR, RELATIONSHIP_COLORS, TERRAIN_COLORS, VOID_COLOR } from './map/palette.js'
 import { THEME, applyTheme, cssVariables, hex, relationshipClass } from './theme.js'
 

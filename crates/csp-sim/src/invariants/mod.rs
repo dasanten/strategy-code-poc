@@ -2,9 +2,10 @@
 //! must always keep. A broken invariant crashes nothing; it is reported as an error instead.
 //!
 //! The list is the TypeScript's `worldInvariants`, in its order, so a sampled tick checks the
-//! same slice (`invariants_for_tick`). Checks whose rule lives in a module another ticket ports
-//! are named here with `pending` and that ticket; they check nothing until it lands, and the
-//! differential run (T86.14) turns them all on.
+//! same slice (`invariants_for_tick`). A few checks read what the TypeScript keeps beside the world
+//! (the trades, offers, debt payments and buy-offs of the latest tick): they are named here with
+//! `ledgered` and run with [`Ledgers`] (`check_with`); without them they find nothing, as the
+//! TypeScript does before the first tick.
 
 pub(crate) mod checks;
 
@@ -12,9 +13,13 @@ use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{Stock, WorldState};
 use serde_json::Value;
 
+use crate::directives::BuyOffRecord;
 use crate::goods_made::tally_goods;
+use crate::offers::OfferLedger;
 use crate::queries::names::good_name;
 pub use crate::sight::InvariantViolation;
+use crate::trade_org_debt::DebtLedger;
+use crate::trading::TradeLedger;
 
 /// A rule the simulation must always keep (`Invariant`): its name, and the check that lists how
 /// the world breaks it.
@@ -30,20 +35,78 @@ impl std::fmt::Debug for Invariant {
     }
 }
 
+/// What the TypeScript keeps beside the world for the invariants over a tick's trades, offers,
+/// debt payments and buy-offs (`ledger`, `WeakMap`s keyed by the world). None is a ledger nothing
+/// wrote to yet.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Ledgers<'a> {
+    pub trades: Option<&'a TradeLedger>,
+    pub offers: Option<&'a OfferLedger>,
+    pub debt_payments: Option<&'a DebtLedger>,
+    pub buy_offs: &'a [BuyOffRecord],
+}
+
 impl Invariant {
-    /// What the world breaks of it now (`check`).
+    /// What the world breaks of it now (`check`), with no ledgers.
     pub fn check(&self, world: &WorldState, terrain: &TerrainMap) -> Vec<InvariantViolation> {
-        (self.check)(world, terrain)
+        self.check_with(world, terrain, &Ledgers::default())
     }
+
+    /// What the world and the latest tick's ledgers break of it (`check`).
+    pub fn check_with(
+        &self,
+        world: &WorldState,
+        terrain: &TerrainMap,
+        ledgers: &Ledgers,
+    ) -> Vec<InvariantViolation> {
+        match ledgered_check(self.name) {
+            Some(check) => check(world, ledgers),
+            None => (self.check)(world, terrain),
+        }
+    }
+}
+
+/// The checks over a tick's ledgers, by the name `ledgered` gave them.
+fn ledgered_check(name: &str) -> Option<fn(&WorldState, &Ledgers) -> Vec<InvariantViolation>> {
+    fn empty<T>(
+        ledger: Option<&T>,
+        check: fn(&T) -> Vec<InvariantViolation>,
+    ) -> Vec<InvariantViolation> {
+        ledger.map(check).unwrap_or_default()
+    }
+    Some(match name {
+        "trades-keep-goods" => |_, l| empty(l.trades, crate::trading::trades_keep_goods),
+        "refused-trade-nothing" => |_, l| empty(l.trades, crate::trading::refused_trade_nothing),
+        "npc-horse-sales-keep-pair" => {
+            |_, l| empty(l.trades, crate::trading::npc_horse_sales_keep_pair)
+        }
+        "npc-horse-purchases-wanted" => {
+            |_, l| empty(l.trades, crate::trading::npc_horse_purchases_wanted)
+        }
+        "npc-trades-keep-reserve" => {
+            |_, l| empty(l.trades, crate::trading::npc_trades_keep_reserve)
+        }
+        "trader-trades-keep-food" => {
+            |_, l| empty(l.trades, crate::trading::trader_trades_keep_food)
+        }
+        "offers-keep-goods" => |_, l| empty(l.offers, crate::offers::offers_keep_goods),
+        "trade-org-only-buys-food" => |w, l| {
+            l.offers.map(|o| crate::offers::trade_org_only_buys_food(w, o)).unwrap_or_default()
+        },
+        "debt-payments-sound" => {
+            |_, l| empty(l.debt_payments, crate::trade_org_debt::debt_payments_sound)
+        }
+        "buy-offs-sound" => |w, l| crate::directives::buy_offs_sound(w, l.buy_offs),
+        _ => return None,
+    })
 }
 
 fn nothing(_: &WorldState, _: &TerrainMap) -> Vec<InvariantViolation> {
     Vec::new()
 }
 
-/// An invariant whose rule another ticket ports: named, so the list keeps its order, and empty
-/// until that ticket lands.
-const fn pending(name: &'static str) -> Invariant {
+/// An invariant over a tick's ledgers (`ledgered_check`): named here so the list keeps its order.
+const fn ledgered(name: &'static str) -> Invariant {
     Invariant { name, check: nothing }
 }
 
@@ -86,10 +149,11 @@ pub fn world_invariants() -> Vec<Invariant> {
             name: "horse-offers-once",
             check: |w, _| crate::horse_grant::horse_offers_once(w),
         },
-        // TODO(T86.6): `workplaceSettingsSound` in `workplace-settings.ts`.
-        pending("workplace-settings-sound"),
-        // TODO(T86.11): `waypointsSound` in `waypoints.ts`.
-        pending("waypoints-sound"),
+        Invariant {
+            name: "workplace-settings-sound",
+            check: |w, _| crate::workplace_settings::workplace_settings_sound(w),
+        },
+        Invariant { name: "waypoints-sound", check: crate::waypoints::waypoints_sound },
         Invariant { name: "buildings-in-place", check: checks::buildings_in_place },
         Invariant { name: "cities-from-buildings", check: checks::cities_from_buildings },
         Invariant { name: "outpost-storage-realms", check: checks::outpost_storage_realms },
@@ -144,33 +208,30 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant { name: "attack-orders-sound", check: checks::attack_orders_sound },
         Invariant { name: "armies-sound", check: |w, _| crate::armies::armies_sound(w) },
         Invariant { name: "contracts-sound", check: |w, _| crate::contracts::contracts_sound(w) },
-        // TODO(T86.11): `demandsSound` in `demands.ts`.
-        pending("demands-sound"),
+        Invariant { name: "demands-sound", check: |w, _| crate::demands::demands_sound(w) },
         Invariant { name: "buy-orders-done", check: |w, _| crate::buying::buy_orders_done(w) },
         Invariant { name: "city-prices-sound", check: |w, _| crate::buying::city_prices_sound(w) },
         Invariant { name: "trade-orders-done", check: |w, _| crate::trading::trade_orders_done(w) },
-        // TODO(T86.5): `tradesKeepGoods` in `trading.ts`.
-        pending("trades-keep-goods"),
-        // TODO(T86.5): `refusedTradeNothing` in `trading.ts`.
-        pending("refused-trade-nothing"),
-        // TODO(T86.5): `npcHorseSalesKeepPair` in `trading.ts`.
-        pending("npc-horse-sales-keep-pair"),
-        // TODO(T86.5): `npcHorsePurchasesWanted` in `trading.ts`.
-        pending("npc-horse-purchases-wanted"),
-        // TODO(T86.5): `npcTradesKeepReserve` in `trading.ts`.
-        pending("npc-trades-keep-reserve"),
-        // TODO(T86.5): `offersSound` in `offers.ts`.
-        pending("offers-sound"),
-        // TODO(T86.5): `offersKeepGoods` in `offers.ts`.
-        pending("offers-keep-goods"),
-        // TODO(T86.5): `tradeOrgOnlyBuysFood` in `offers.ts`.
-        pending("trade-org-only-buys-food"),
-        // TODO(T86.5): `acceptOrdersDone` in `offers.ts`.
-        pending("accept-orders-done"),
-        // TODO(T86.9): `deliveriesSound` in `deliveries.ts`.
-        pending("deliveries-sound"),
-        // TODO(T86.9): `transfersSound` in `transfers.ts`.
-        pending("transfers-sound"),
+        ledgered("trades-keep-goods"),
+        ledgered("refused-trade-nothing"),
+        ledgered("npc-horse-sales-keep-pair"),
+        ledgered("npc-horse-purchases-wanted"),
+        ledgered("npc-trades-keep-reserve"),
+        Invariant { name: "offers-sound", check: |w, _| crate::offers::offers_sound(w) },
+        // `offersKeepGoods` checks the scratch's offer ledger: `offers::offers_keep_goods`.
+        ledgered("offers-keep-goods"),
+        // `tradeOrgOnlyBuysFood` checks the scratch's offer ledger:
+        // `offers::trade_org_only_buys_food`.
+        ledgered("trade-org-only-buys-food"),
+        Invariant {
+            name: "accept-orders-done",
+            check: |w, _| crate::offers::accept_orders_done(w),
+        },
+        Invariant {
+            name: "deliveries-sound",
+            check: |w, _| crate::deliveries::deliveries_sound(w),
+        },
+        Invariant { name: "transfers-sound", check: |w, _| crate::transfers::transfers_sound(w) },
         Invariant {
             name: "supply-lines-sound",
             check: |w, _| crate::armies::supply_lines_sound(w),
@@ -191,53 +252,66 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant { name: "teachers-sound", check: checks::teachers_sound },
         Invariant { name: "trainees-sound", check: checks::trainees_sound },
         Invariant { name: "trade-org-sound", check: checks::trade_org_sound },
-        // TODO(T86.9): `nothingLeftOfTheHq` in `hq-fall.ts`.
-        pending("nothing-left-of-the-hq"),
-        // TODO(T86.9): `caravansSound` in `caravans.ts`.
-        pending("caravans-sound"),
-        // TODO(T86.9): `tradersSound` in `traders.ts`.
-        pending("traders-sound"),
-        // TODO(T86.9): `traderStopsSound` in `trader-stops.ts`.
-        pending("trader-stops-sound"),
-        // TODO(T86.5): `traderTradesKeepFood` in `trading.ts`.
-        pending("trader-trades-keep-food"),
-        // TODO(T86.9): `routeRobberiesSound` in `caravans.ts`.
-        pending("route-robberies-sound"),
+        Invariant {
+            name: "nothing-left-of-the-hq",
+            check: |w, _| crate::hq_fall::nothing_left_of_the_hq(w),
+        },
+        Invariant {
+            name: "caravans-sound",
+            check: |w, t| crate::caravans::caravans_sound(w, t.size),
+        },
+        Invariant { name: "traders-sound", check: |w, t| crate::traders::traders_sound(w, t) },
+        Invariant {
+            name: "trader-stops-sound",
+            check: |w, _| crate::trader_stops::trader_stops_sound(w),
+        },
+        ledgered("trader-trades-keep-food"),
+        Invariant {
+            name: "route-robberies-sound",
+            check: |w, _| crate::caravans::route_robberies_sound(w),
+        },
         Invariant {
             name: "trade-org-army-sound",
             check: |w, t| crate::trade_org_army::trade_org_army_sound(w, t.size),
         },
         Invariant { name: "npc-hire-sound", check: |w, _| crate::npc_hire::npc_hire_sound(w) },
-        // TODO(T86.9): `punishmentsSound` in `trade-org-punishment.ts`.
-        pending("punishments-sound"),
+        Invariant {
+            name: "punishments-sound",
+            check: |w, _| crate::trade_org_punishment::punishments_sound(w),
+        },
         Invariant {
             name: "npc-gate-shut-to-its-punishers",
             check: |w, t| crate::npc_defence::npc_gate_shut_to_its_punishers(w, t.size),
         },
-        // TODO(T86.9): `supplyWagonsSound` in `supply-wagons.ts`.
-        pending("supply-wagons-sound"),
+        Invariant {
+            name: "supply-wagons-sound",
+            check: |w, _| crate::supply_wagons::supply_wagons_sound(w),
+        },
         Invariant {
             name: "directives-sound",
             check: |w, _| crate::directives::directives_sound(w),
         },
-        // TODO(T86.11): `buyOffsSound` in `directives.ts`.
-        pending("buy-offs-sound"),
+        ledgered("buy-offs-sound"),
         Invariant {
             name: "buy-off-orders-done",
             check: |w, _| crate::directives::buy_off_orders_done(w),
         },
-        // TODO(T86.9): `debtsSound` in `trade-org-debt.ts`.
-        pending("debts-sound"),
-        // TODO(T86.9): `wrecksSound` in `trade-org-wrecks.ts`.
-        pending("wrecks-sound"),
-        // TODO(T86.9): `citiesTakenSound` in `trade-org-takes.ts`.
-        pending("cities-taken-sound"),
-        // TODO(T86.9): `debtDemandsSound` in `trade-org-debt.ts`.
-        pending("debt-demands-sound"),
-        // TODO(T86.9): `debtPaymentsSound` in `trade-org-debt.ts`.
-        pending("debt-payments-sound"),
-        // TODO(T86.9): `debtOrdersDone` in `trade-org-debt.ts`.
-        pending("debt-orders-done"),
+        Invariant { name: "debts-sound", check: |w, _| crate::trade_org_debt::debts_sound(w) },
+        Invariant { name: "wrecks-sound", check: |w, _| crate::trade_org_wrecks::wrecks_sound(w) },
+        Invariant {
+            name: "cities-taken-sound",
+            check: |w, _| crate::trade_org_takes::cities_taken_sound(w),
+        },
+        Invariant {
+            name: "debt-demands-sound",
+            check: |w, _| crate::trade_org_debt::debt_demands_sound(w),
+        },
+        // `debtPaymentsSound` checks the scratch's ledger: `trade_org_debt::debt_payments_sound`.
+        ledgered("debt-payments-sound"),
+        Invariant {
+            name: "debt-orders-done",
+            check: |w, _| crate::trade_org_debt::debt_orders_done(w),
+        },
         Invariant { name: "hq-rings-sound", check: crate::hq_growth::hq_rings_sound },
         Invariant { name: "city-plans-sound", check: |w, _t| crate::npc_plan::city_plans_sound(w) },
         Invariant {
@@ -357,16 +431,20 @@ pub fn world_invariants() -> Vec<Invariant> {
             name: "defence-script-sound",
             check: |w, _| crate::defence::defence_script_sound(w),
         },
-        // TODO(T86.7): `alarmsSound` in `alarms.ts`.
-        pending("alarms-sound"),
-        // TODO(T86.7): `alarmScriptSound` in `alarms.ts`.
-        pending("alarm-script-sound"),
-        // TODO(T86.10): `outsidersSound` in `outsiders.ts`.
-        pending("outsiders-sound"),
-        // TODO(T86.7): `alarmedAttackersSound` in `alarms.ts`.
-        pending("alarmed-attackers-sound"),
-        // TODO(T86.12): `scriptLogsSound` in `script-log.ts`.
-        pending("script-logs-sound"),
+        Invariant { name: "alarms-sound", check: |w, _| crate::alarms::alarms_sound(w) },
+        Invariant {
+            name: "alarm-script-sound",
+            check: |w, _| crate::alarms::alarm_script_sound(w),
+        },
+        Invariant { name: "outsiders-sound", check: checks::outsiders_sound },
+        Invariant {
+            name: "alarmed-attackers-sound",
+            check: |w, _| crate::alarms::alarmed_attackers_sound(w),
+        },
+        Invariant {
+            name: "script-logs-sound",
+            check: |w, _| crate::script_log::script_logs_sound(w),
+        },
     ]
 }
 
@@ -377,6 +455,17 @@ pub fn check_invariants(
     invariants: &[Invariant],
 ) -> Vec<InvariantViolation> {
     invariants.iter().flat_map(|inv| inv.check(world, terrain)).collect()
+}
+
+/// Runs the invariants with the latest tick's ledgers (`checkInvariants`, whose ledger checks read
+/// what the TypeScript keeps beside the world).
+pub fn check_invariants_with(
+    world: &WorldState,
+    terrain: &TerrainMap,
+    invariants: &[Invariant],
+    ledgers: &Ledgers,
+) -> Vec<InvariantViolation> {
+    invariants.iter().flat_map(|inv| inv.check_with(world, terrain, ledgers)).collect()
 }
 
 /// Runs every world invariant (`checkInvariants(world, terrain)`).

@@ -18,7 +18,6 @@ use crate::default_scripts::target_param;
 use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::orders::OrderKind;
 use crate::queries::names::kind_name;
-use crate::queries::territory::city_organization;
 use crate::queue::field_str;
 use crate::script_api::{is_param_choice, is_param_number, ScriptParam};
 use crate::scripts::ScriptLibrary;
@@ -32,29 +31,8 @@ fn anyones_to_work(b: &Building) -> bool {
     b.site.is_some() || WORKPLACE_MAX_WORKERS.get(kind_name(b.kind)).is_some()
 }
 
-/// The Organization a building belongs to (`buildingOrganization`).
-// TODO(T86.7): `crimes::building_organization`.
-fn building_organization(world: &WorldState, b: &Building) -> Option<String> {
-    if b.site.is_some() && b.realm_id.is_some() {
-        return b.realm_id.clone();
-    }
-    match world.cities.iter().find(|c| Some(&c.id) == b.city_id.as_ref()) {
-        Some(city) => Some(city_organization(city).to_string()),
-        None => b.realm_id.clone(),
-    }
-}
-
-/// The Organization a carriage belongs to (`carriageOrganization`).
-// TODO(T86.7): `crimes::carriage_organization`.
-fn carriage_organization(k: &Carriage) -> Option<&str> {
-    k.realm_id.as_deref().or(k.city_id.as_deref())
-}
-
-/// A Player's waypoints (`waypointsOf`).
-// TODO(T86.11): `waypoints::waypoints_of`.
-fn waypoints_of(world: &WorldState, user_id: u64) -> &[Waypoint] {
-    world.waypoints.get(&user_id).map_or(&[], Vec::as_slice)
-}
+use crate::crimes::{building_organization, carriage_organization};
+use crate::waypoints::waypoints_of;
 
 /// Whether the realm's Player knows the building, in sight or last seen (`knows`).
 fn knows(world: &WorldState, realm_id: &str, b: &Building) -> bool {

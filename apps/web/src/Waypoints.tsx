@@ -1,10 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
-import {
-  WAYPOINT_NAME_MAX_LENGTH,
-  addWaypointProblem,
-  nameProblem,
-  type Waypoint,
-} from '@csp/shared'
+import { WAYPOINT_NAME_MAX_LENGTH } from '@csp/balance'
+import { addWaypointProblem } from './shared/waypoints.js'
+import { nameProblem } from './shared/names.js'
+import type { Waypoint } from '@csp/shared-types'
 import { PanelHead } from './drawer-head.js'
 import { menuSpot, suggestedWaypointName, waypointCount, waypointPlace } from './waypoints-view.js'
 

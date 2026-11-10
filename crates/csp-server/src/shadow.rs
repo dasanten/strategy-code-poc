@@ -11,11 +11,9 @@
 //!   `{"files":{point:path}}`.
 //! - `{"cmd":"stop"}` waits for a save in flight and ends.
 //!
-//! The game is the server's own ([`Game`] with its scripts attached, on its database) with one
-//! difference: path searches get no wall-clock budget ([`ServerWalking::budget_ms`]), so where a
-//! walker is never depends on how fast each side happened to be.
-//!
-//! [`ServerWalking::budget_ms`]: crate::server::ServerWalking
+//! The game is the server's own ([`Game`] with its script library, on its database, opened as
+//! `open_world` opens it) with one difference: path searches get no wall-clock budget
+//! ([`Game::path_budget_ms`]), so where a walker is never depends on how fast each side was.
 
 use std::{
     cell::RefCell,
@@ -35,6 +33,7 @@ use tracing::Level;
 use crate::{
     db::open_db,
     explored::load_explored,
+    field_check::note_script_view_changes,
     monitoring::LogSink,
     saves::load_or_create_world,
     scripts::{game_defaults, sync_default_scripts},
@@ -76,10 +75,27 @@ pub fn open_shadow(
     let (world, terrain) =
         load_or_create_world(&conn, |seed| generate_terrain(seed, MAP_SIZE), generate_world, 1)?;
     let explored = load_explored(&conn, terrain.clone(), &world.nodes)?;
-    sync_default_scripts(&conn, game_defaults())?;
-    let mut game = Game::new(world, terrain, explored, log);
-    game.walking.budget_ms = f64::INFINITY;
-    game.attach_scripts(open_db(db_path, None)?);
+    let defaults = game_defaults();
+    sync_default_scripts(&conn, defaults)?;
+    let library = Arc::new(Mutex::new(open_db(db_path, None)?));
+    // A script error of the game's own is a note, as the TypeScript side's reporter makes it.
+    let errors = log.clone();
+    let mut game = Game::new(world, terrain, explored, log).with_library(
+        library,
+        defaults,
+        Some(Box::new(move |_world, error, at| {
+            let message = match at.script_id {
+                None => format!("scripts of realm {} failed", at.realm_id),
+                Some(id) => format!("script {id} failed and ended"),
+            };
+            errors.log(Level::ERROR, json!({ "err": { "message": error } }), &message);
+        })),
+    );
+    game.path_budget_ms = f64::INFINITY;
+    if note_script_view_changes(&conn, &mut game.world)? {
+        game.saver.save_now(&conn, &game.world)?;
+    }
+    game.check_script_library(&conn);
     Ok((conn, game))
 }
 

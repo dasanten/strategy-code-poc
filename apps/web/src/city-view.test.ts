@@ -1,20 +1,16 @@
-import {
-  PRICED_GOODS,
-  deliveryFee,
-  OCCUPATION_GAME_DAYS,
-  OCCUPATION_TICKS,
-  TICKS_PER_GAME_DAY,
-  priceFor,
-  transferFee,
-  transferTiles,
-  WAREHOUSE_FLOOR,
-  type Building,
-  type City,
-  type NpcCityPrice,
-  type SeenBuilding,
-  type Resident,
-  type TradeLimit,
-} from '@csp/shared'
+import { PRICED_GOODS, deliveryFee, priceFor } from './shared/warehouse.js'
+import { OCCUPATION_GAME_DAYS, TICKS_PER_GAME_DAY } from '@csp/balance'
+import { OCCUPATION_TICKS } from './shared/city.js'
+import { transferFee, transferTiles } from './shared/transfer.js'
+import { WAREHOUSE_FLOOR } from './shared/narrowed.js'
+import type {
+  Building,
+  City,
+  NpcCityPrice,
+  SeenBuilding,
+  Resident,
+  TradeLimit,
+} from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
   buildingCount,
@@ -88,11 +84,13 @@ describe('city inspector', () => {
       occupation: { realmId: by, since },
     })
     expect(describeOccupation(city(null), 0, 'realm1', realms)).toBeUndefined()
-    expect(describeOccupation(occupied('realm1', 'trade-org', 100), 100, 'realm1', realms)).toEqual({
-      text: `Occupied by the Trade Organization, ${OCCUPATION_GAME_DAYS} game days left`,
-      warning: true,
-      realmId: 'trade-org',
-    })
+    expect(describeOccupation(occupied('realm1', 'trade-org', 100), 100, 'realm1', realms)).toEqual(
+      {
+        text: `Occupied by the Trade Organization, ${OCCUPATION_GAME_DAYS} game days left`,
+        warning: true,
+        realmId: 'trade-org',
+      },
+    )
     expect(describeOccupation(occupied(null, 'realm2', 100), 100, 'realm1', realms)).toEqual({
       text: `Occupied by Mara, ${OCCUPATION_GAME_DAYS} game days left`,
       warning: false,

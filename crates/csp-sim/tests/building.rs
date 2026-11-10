@@ -1,7 +1,5 @@
-//! `apps/server/src/building.test.ts`, ported (T86.6). The invariant checks it makes after each
-//! step (`checkInvariants`) and its `building invariants` block come with the invariants
-//! (T86.13); the two tests that deliver or take materials with the drop and pick-up orders put
-//! them in directly until those orders land (T86.5).
+//! `apps/server/src/building.test.ts`, ported (T86.6). Its `building invariants` block is in
+//! `invariants_rules.rs`.
 
 mod build_common;
 
@@ -9,7 +7,8 @@ use build_common::*;
 use csp_shared::balance::{BUILD_WORK, CONSTRUCTION_SKILL_EFFECT};
 use csp_shared::terrain::{Terrain, TerrainMap};
 use csp_shared::world::{
-    BuildingKind, ResidentOrder, ResourceKind, ResourceNode, SkillName, WorldState,
+    BuildingKind, Good, ResidentOrder, ResourceKind, ResourceNode, SkillName, Stat, Stock,
+    WorldState,
 };
 use csp_sim::building::BuildingPart;
 use csp_sim::order_sender::OrderSender;
@@ -161,16 +160,27 @@ fn needs_its_materials_too_only_what_it_still_needs() {
     assert!(world.buildings[si].site.is_some()); // all work in, but no wood yet
     let id = world.buildings[si].id.clone();
     assert_eq!(site_id_of(&mut world, "w1"), Some(id));
-    // TODO(T86.5): delivered with the drop order (and its rejection of goods the site needs none
-    // of); put in directly here.
-    let need = build_materials(BuildingKind::Quarry)[&csp_shared::world::Good::Wood];
-    world.buildings[si]
-        .site
-        .as_mut()
-        .unwrap()
-        .delivered
-        .insert(csp_shared::world::Good::Wood, need);
+    // Delivered with the drop order, only what it still needs.
+    let need = build_materials(BuildingKind::Quarry)[&Good::Wood];
+    resident(&mut world, "w2", 6.0, 6.0);
+    at(&mut world, "w2").stats.strength = Stat { base: 15.0, trained: 7.0 };
+    at(&mut world, "w2").carried = Stock::from([(Good::Wood, need + 5.0), (Good::Food, 3.0)]);
+    let id = world.buildings[si].id.clone();
+    let spot = json!({ "kind": "site", "siteId": id });
+    assert_eq!(
+        orders.receive(
+            &world,
+            &me(),
+            json!({ "kind": "drop", "residentId": "w2", "spot": spot, "goods": { "food": 3 } }),
+            &terrain
+        ),
+        Err("the construction site needs none of those goods".to_string())
+    );
+    let wood = json!({ "kind": "drop", "residentId": "w2", "spot": spot, "goods": { "wood": need + 5.0 } });
+    assert_eq!(orders.receive(&world, &me(), wood, &terrain), Ok(()));
+    orders.apply_all(&mut world, &terrain);
     run(&mut world, &terrain, 1);
+    assert_eq!(at(&mut world, "w2").carried, Stock::from([(Good::Wood, 5.0), (Good::Food, 3.0)]));
     assert!(world.buildings[si].site.is_none()); // the builder's work finished it in the tick
     assert!(at(&mut world, "w1").order.is_none());
 }

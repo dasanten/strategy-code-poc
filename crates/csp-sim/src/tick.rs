@@ -19,7 +19,9 @@ use csp_shared::world::WorldState;
 use serde::{Serialize, Serializer};
 
 use crate::goods_made::{tally_goods, GoodsMade};
-use crate::invariants::{check_invariants, invariants_for_tick, world_invariants, Invariant};
+use crate::invariants::{
+    check_invariants_with, invariants_for_tick, world_invariants, Invariant, Ledgers,
+};
 use crate::sight::{InvariantViolation, SightCache};
 use crate::trading::TradeLedger;
 use crate::world::step_world;
@@ -310,6 +312,10 @@ pub struct Scratch {
     pub last_seen: crate::last_seen::LastSeenState,
     /// The trades of the latest `resolveTrades`, for the invariants over them (`ledger`).
     pub trades: TradeLedger,
+    /// The offers accepted by the latest `resolveOffers`, for the invariants over them (`ledger`).
+    pub offers: crate::offers::OfferLedger,
+    /// The debt payments of the latest `resolveDebtPayments`, for its invariants (`ledger`).
+    pub debt_payments: crate::trade_org_debt::DebtLedger,
 }
 
 impl Scratch {
@@ -462,7 +468,13 @@ pub fn run_tick(
         if check || !slice.is_empty() {
             timer.time(TickPhase::Invariants, || {
                 let mut violations = script_violations;
-                violations.extend(check_invariants(world, terrain, &slice));
+                let ledgers = Ledgers {
+                    trades: Some(&scratch.trades),
+                    offers: Some(&scratch.offers),
+                    debt_payments: Some(&scratch.debt_payments),
+                    buy_offs: &step.buy_offs,
+                };
+                violations.extend(check_invariants_with(world, terrain, &slice, &ledgers));
                 if let Some(before) = &before {
                     let made = scratch.made.take();
                     violations.extend(goods_only_from_nothing_at_the_floor(before, world, &made));
