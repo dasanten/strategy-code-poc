@@ -37,7 +37,7 @@ fn town(size: i32) -> (WorldState, TerrainMap, String) {
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
+#[ignore = "14 s alone; see #1092"]
 fn a_scout_walks_out_past_the_set_reach_and_brings_what_they_saw_there_home() {
     let (mut world, terrain, city) = town(1300);
     let mut runner = Runner::new(&terrain);

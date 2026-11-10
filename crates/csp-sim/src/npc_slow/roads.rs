@@ -264,7 +264,7 @@ fn run(
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
+#[ignore = "77 s alone; see #1092"]
 fn on_the_map_stands_down_for_the_founding_with_a_further_road_unfinished_and_then_founds() {
     let mut s = big_city(None, 1300);
     let city = s.city.clone();
@@ -399,7 +399,7 @@ fn on_the_map_stands_down_for_the_founding_with_a_further_road_unfinished_and_th
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
+#[ignore = "178 s alone; see #1092"]
 fn a_big_city_lays_a_road_to_its_second_neighbour_on_the_map() {
     let (mut world, terrain, city, _) = town(&[(Good::Stone, 400.0)], 500, &BIG);
     let near = neighbour(&mut world, &terrain, 100, &[(Good::Stone, 400.0)]);
@@ -420,7 +420,7 @@ fn a_big_city_lays_a_road_to_its_second_neighbour_on_the_map() {
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
+#[ignore = "22 s alone; see #1092"]
 fn on_the_map_finishes_a_road_to_a_far_workplace_round_a_lake() {
     let (mut world, mut terrain, city, place) = town(&[(Good::Stone, 400.0)], 300, &NPC_TOWN);
     let home = npc_home(&world, &city).expect("a home");
@@ -447,7 +447,7 @@ fn on_the_map_finishes_a_road_to_a_far_workplace_round_a_lake() {
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
+#[ignore = "77 s alone; see #1092"]
 fn on_the_map_joins_two_cities_with_one_road_and_reaches_a_post_on_the_way() {
     // Past what they keep from their crews once they would be full (`CONTEXT.md`: NPC road).
     let (mut world, terrain, city, _) = town(&[(Good::Stone, 500.0)], 500, &NPC_TOWN);
@@ -480,7 +480,7 @@ fn on_the_map_joins_two_cities_with_one_road_and_reaches_a_post_on_the_way() {
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
+#[ignore = "41 s alone; see #1092"]
 fn on_the_map_does_not_starve_its_crew_on_a_long_road() {
     let far = 700.0;
     let mut terrain = plains(1600);
@@ -533,7 +533,7 @@ fn on_the_map_does_not_starve_its_crew_on_a_long_road() {
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
+#[ignore = "3 s alone, 6 s in a full run; see #1092"]
 fn on_the_map_never_takes_its_stone_below_the_reserve_and_goes_back_to_other_work() {
     let (mut world, terrain, city, _) = town(&[(Good::Stone, 3.0)], 300, &NPC_TOWN);
     let mut runner = Runner::new(&terrain);
@@ -605,26 +605,22 @@ fn streets_go_up_tile_by_tile(layout: CityLayout) {
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
 fn the_streets_of_grid_go_up_on_the_map_tile_by_tile_never_below_the_reserve() {
     assert_eq!(CITY_LAYOUTS[0], CityLayout::Grid);
     streets_go_up_tile_by_tile(CityLayout::Grid);
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
 fn the_streets_of_rings_go_up_on_the_map_tile_by_tile_never_below_the_reserve() {
     streets_go_up_tile_by_tile(CityLayout::Rings);
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
 fn the_streets_of_main_street_go_up_on_the_map_tile_by_tile_never_below_the_reserve() {
     streets_go_up_tile_by_tile(CityLayout::MainStreet);
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
 fn the_streets_of_quarters_go_up_on_the_map_tile_by_tile_never_below_the_reserve() {
     streets_go_up_tile_by_tile(CityLayout::Quarters);
 }

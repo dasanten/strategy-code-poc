@@ -167,7 +167,7 @@ impl Running {
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
+#[ignore = "62 s alone; see #1092"]
 fn goes_up_on_a_run_of_the_staged_city_one_only_with_no_invariant_broken() {
     let mut s = big_city(None, 240);
     let mut runner = Runner { walking: unhurried_walking(&s.terrain), scratch: Scratch::default() };
@@ -191,7 +191,7 @@ fn goes_up_on_a_run_of_the_staged_city_one_only_with_no_invariant_broken() {
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
+#[ignore = "7 s alone; see #1092"]
 fn walk_there_run_the_train_default_and_learn_the_hall_held_all_the_while_their_values_rising() {
     let mut run = Running::new();
     let soldiers = soldiers_of(&run.s.world, &run.s.city);
@@ -258,7 +258,7 @@ fn walk_there_run_the_train_default_and_learn_the_hall_held_all_the_while_their_
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
+#[ignore = "7 s alone; see #1092"]
 fn wait_with_no_teacher_and_leave_once_the_pass_finds_none() {
     let mut run = Running::new();
     run.step(DAY / 2);
@@ -283,7 +283,7 @@ fn wait_with_no_teacher_and_leave_once_the_pass_finds_none() {
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
+#[ignore = "nothing raises an outsider alarm yet: outsiders.ts is not ported; 6 s alone; see #1092"]
 fn are_taken_off_by_an_alarm_and_come_back_to_it_after() {
     let mut run = Running::new();
     run.step(DAY / 2);
@@ -331,7 +331,7 @@ fn are_taken_off_by_an_alarm_and_come_back_to_it_after() {
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
+#[ignore = "4 s alone, 12 s in a full run; see #1092"]
 fn are_kept_at_it_by_the_citys_defence_which_clears_any_other_script_from_its_soldiers() {
     let mut run = Running::new();
     run.step(DAY / 2);
@@ -345,7 +345,7 @@ fn are_kept_at_it_by_the_citys_defence_which_clears_any_other_script_from_its_so
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
+#[ignore = "57 s alone; see #1092"]
 fn leave_the_ground_at_the_end_of_their_turn_for_the_next_lot() {
     let mut run = Running::new();
     run.step(DAY / 2);
@@ -418,7 +418,7 @@ fn run_both(s: &mut BigCity, days: usize) -> Seen {
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
+#[ignore = "109 s alone; see #1092"]
 fn a_city_of_110_does_both_at_once_with_invariants_checked_and_the_hall_held() {
     let mut s = big_city(None, 240);
     with_ground(&mut s);
@@ -430,7 +430,7 @@ fn a_city_of_110_does_both_at_once_with_invariants_checked_and_the_hall_held() {
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
+#[ignore = "72 s alone; see #1092"]
 fn a_city_just_big_enough_keeps_its_hall_and_gates_with_its_wall_left_to_training() {
     let mut s = big_city(None, 240);
     with_ground(&mut s);

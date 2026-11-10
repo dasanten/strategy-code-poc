@@ -48,7 +48,7 @@ fn invariants_hold(s: &BigCity) {
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
+#[ignore = "344 s alone; see #1092"]
 fn with_no_room_and_no_warehouse_keeps_its_storage_clear_and_reports_its_jobs() {
     let mut staged = big_city(None, 240);
     let mut watch = BigCityWatch::new(HOLDS_FROM_DAY);
@@ -121,7 +121,7 @@ fn roomy_run() -> RoomyRun {
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
+#[ignore = "288 s alone; see #1092"]
 fn on_a_map_with_room_founds_a_daughter_unaided_and_goes_on_feeding_itself() {
     let run = roomy_run();
     eprintln!(
@@ -138,7 +138,7 @@ fn on_a_map_with_room_founds_a_daughter_unaided_and_goes_on_feeding_itself() {
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
+#[ignore = "271 s alone; see #1092"]
 fn on_a_map_with_room_holds_its_idle_share_keeps_its_storage_clear_and_its_farmers_steady() {
     let RoomyRun { hold, .. } = roomy_run();
     eprintln!("From day {HOLDS_FROM_DAY}, on a map with room:\n{}", big_city_hold_report(&hold));
@@ -148,7 +148,7 @@ fn on_a_map_with_room_holds_its_idle_share_keeps_its_storage_clear_and_its_farme
 }
 
 #[test]
-#[ignore = "TODO(time) alone; see #1092"]
+#[ignore = "475 s alone; see #1092"]
 fn with_only_the_farms_it_would_build_opens_more_until_food_is_no_longer_short_995() {
     let mut staged = big_city(None, 1300);
     let city = staged.city.clone();

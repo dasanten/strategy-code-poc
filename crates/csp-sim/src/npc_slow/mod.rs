@@ -1,6 +1,6 @@
 //! The slow simulations of `apps/server/src/npc-*.test.ts` (`tags: ['slow']`), one file per test
 //! file, kept apart from the modules' own tests so their ports don't collide. Each runs game days
-//! or weeks of `stepWorld`; each takes over 5 s here and is ignored with its time alone (#1092).
+//! or weeks of `stepWorld`. Those over 5 s here are ignored with their time alone (#1092); the few under it run.
 //! Test-only.
 
 use std::sync::Arc;
