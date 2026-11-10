@@ -227,9 +227,11 @@ pub fn observers_of(world: &WorldState, index: &WorldIndex, side: &str) -> Vec<S
         .residents
         .iter()
         .filter(|r| {
-            let by = index.commander_of(world, &r.id, r.owner.as_deref());
             let org = r.owner.as_deref().or(r.city_id.as_deref());
-            org.is_some_and(|o| members.contains(o)) || by.is_some_and(|b| members.contains(&b))
+            org.is_some_and(|o| members.contains(o))
+                || index
+                    .commander_ref(world, &r.id, r.owner.as_deref())
+                    .is_some_and(|b| members.contains(b))
         })
         .map(|r| Spot { x: r.x, y: r.y })
         .collect()

@@ -66,8 +66,6 @@ impl Revision {
 pub struct WorldIndex {
     size: i32,
     revision: Revision,
-    residents: OnceCell<HashMap<String, usize>>,
-    buildings: OnceCell<HashMap<String, usize>>,
     carriages: OnceCell<HashMap<String, usize>>,
     horses: OnceCell<HashMap<String, usize>>,
     commanders: OnceCell<HashMap<String, String>>,
@@ -104,8 +102,6 @@ impl WorldIndex {
         WorldIndex {
             size,
             revision: Revision::of(world),
-            residents: OnceCell::new(),
-            buildings: OnceCell::new(),
             carriages: OnceCell::new(),
             horses: OnceCell::new(),
             commanders: OnceCell::new(),
@@ -124,16 +120,15 @@ impl WorldIndex {
         self.size
     }
 
-    /// The resident with this id (`residentById`).
+    /// The resident with this id (`residentById`): through the positions kept across ticks
+    /// ([`resident_index`]), not a map of every id built again each tick (T89.6).
     pub fn resident_by_id<'w>(&self, world: &'w WorldState, id: &str) -> Option<&'w Resident> {
-        let positions = self.residents.get_or_init(|| by_id(world.residents.iter().map(|r| &r.id)));
-        lookup(&world.residents, positions, id, |r| &r.id)
+        resident_index(world, id).map(|i| &world.residents[i])
     }
 
-    /// The building with this id (`buildingById`).
+    /// The building with this id (`buildingById`), as [`building_by_id`] finds it.
     pub fn building_by_id<'w>(&self, world: &'w WorldState, id: &str) -> Option<&'w Building> {
-        let positions = self.buildings.get_or_init(|| by_id(world.buildings.iter().map(|b| &b.id)));
-        lookup(&world.buildings, positions, id, |b| &b.id)
+        building_by_id(world, id)
     }
 
     /// The carriage with this id (`carriageById`).
@@ -177,6 +172,16 @@ impl WorldIndex {
         id: &str,
         owner: Option<&str>,
     ) -> Option<String> {
+        self.commander_ref(world, id, owner).map(str::to_string)
+    }
+
+    /// [`Self::commander_of`] without copying the id, for a check made of every resident.
+    pub fn commander_ref<'a>(
+        &'a self,
+        world: &WorldState,
+        id: &str,
+        owner: Option<&'a str>,
+    ) -> Option<&'a str> {
         let commanders = self.commanders.get_or_init(|| {
             // An alliance army before a contract, and the first of each, as `commanderOf` finds
             // them.
@@ -195,7 +200,7 @@ impl WorldIndex {
             }
             commanders
         });
-        commanders.get(id).cloned().or_else(|| owner.map(str::to_string))
+        commanders.get(id).map(String::as_str).or(owner)
     }
 
     /// The tiles with a finished road, as `roadTiles` gives them. Road sites finish only as the

@@ -473,5 +473,5 @@ pub fn carried_for_order(world: &mut WorldState, ri: usize) {
 /// The building `id`, if it is finished: a storage a store or fetch order may use
 /// (`finishedStorage`).
 fn finished_storage<'w>(world: &'w WorldState, id: &str) -> Option<&'w Building> {
-    world.buildings.iter().find(|b| b.id == id).filter(|b| b.site.is_none())
+    crate::world_index::building_by_id(world, id).filter(|b| b.site.is_none())
 }

@@ -85,8 +85,8 @@ pub fn is_city_building(b: &Building) -> bool {
 /// included. `size` is the map's.
 pub fn in_city_area(world: &WorldState, city_id: &str, x: i32, y: i32, size: i32) -> bool {
     world.buildings.iter().any(|b| {
-        b.city_id.as_deref() == Some(city_id)
-            && is_city_building(b)
+        is_city_building(b)
+            && b.city_id.as_deref() == Some(city_id)
             && near_footprint(placed(b), (x, y), CITY_AREA_MARGIN as i32, size)
     })
 }

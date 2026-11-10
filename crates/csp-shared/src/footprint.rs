@@ -57,6 +57,12 @@ pub fn covers(b: Placed, x: i32, y: i32, size: i32) -> bool {
     dx < side && dy < side
 }
 
+/// Whether a footprint from (bx, by) could cover tile (x, y) at all, without its kind: false is
+/// sure, true needs [`covers`]. A cheap first look for a scan over many buildings.
+pub fn may_cover(bx: i32, by: i32, x: i32, y: i32, size: i32) -> bool {
+    wrap(x - bx, size) < LARGEST_SIDE && wrap(y - by, size) < LARGEST_SIDE
+}
+
 /// The largest side in `FOOTPRINT`.
 const LARGEST_SIDE: i32 = {
     let mut largest = 0;
