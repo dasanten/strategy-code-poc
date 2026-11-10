@@ -11,9 +11,5 @@
   },
   "dependencies": {
     "@csp/shared-types": "workspace:*"
-  },
-  "devDependencies": {
-    "@csp/lang": "workspace:*",
-    "@csp/shared": "workspace:*"
   }
 }

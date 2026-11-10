@@ -10,31 +10,34 @@
   are checked locally; only one PR per epic (and bug fixes) goes into `dev` and runs CI.
 - **Releases** (ADR 0010): `main` is the live game and every merge into it deploys. Epics and bugs
   collect on `dev`; a release is one PR `dev` → `main`, opened only when Daniel asks.
-- **Balance numbers** live in `packages/shared/src/balance.ts`; pick sensible values and list them
-  in the PR. Rules (what happens) are Daniel's call.
+- **Balance numbers** live in `crates/csp-shared/src/balance.rs`; pick sensible values and list
+  them in the PR, then run `pnpm balance:rust` and commit `packages/balance/` (the client's copy).
+  Rules (what happens) are Daniel's call.
 - **Wiki** (`/wiki`, `apps/web/src/Wiki.tsx`): a ticket that changes a rule also updates its wiki
-  section. Numbers come from `@csp/shared`, never typed into its text.
-- **Keep scripting cheap to add** (ADR 0002): everything goes through the game API in
-  `packages/shared`; orders only request actions; order state is plain serialisable data.
+  section. Numbers come from `@csp/balance`, never typed into its text.
+- **Keep scripting cheap to add** (ADR 0002): everything goes through the game API
+  (`crates/csp-sim/src/script_api.rs`, `script_tables.rs`); orders only request actions; order
+  state is plain serialisable data. After changing the script tables, run `pnpm script-data:rust`.
 - **World state is never reset** (ADR 0006): a change to its shape bumps `WORLD_FORMAT_VERSION`
-  and ships a migration step with a test.
+  (`crates/csp-shared/src/world/world_format.rs`) and ships a migration step in
+  `crates/csp-server/src/world_format.rs` with a test.
 - **Monitoring** (ADR 0004): new simulation rules come with invariants and tests.
-- **Rust backend (ADR 0030), on the branch `rust-backend`:** the server is being rewritten in Rust
-  in the cargo workspace at the root (`crates/csp-shared`, `csp-lang`, `csp-sim`, `csp-server`).
-  The TypeScript game is under a **feature freeze**: a frozen specification, bugs only. A rewrite
-  ticket ports one module with its tests and proves parity against the fixtures in
-  `crates/csp-sim/fixtures/` (written by `scripts/dump-fixtures.mts`, never by hand). No rule
-  changes in the port. Rewrite epics branch from and merge into `rust-backend`, not `dev`.
-  The client's types are generated from the Rust crates (`ts-rs`, ADR 0030): after changing a type
-  the client sees, run `pnpm types:rust` and commit `packages/shared-types/src/generated/` (a Rust
-  test fails when it is stale; `packages/shared-types/src/twins.ts` checks each against its
-  `@csp/shared` twin until Epic 88 deletes that package).
-  Before finishing a Rust ticket: `pnpm check:rust` (fmt, clippy with warnings as errors,
-  `cargo nextest run`). A test over 5 s is a regression to fix, not to tag. Run cargo from
-  PowerShell, or in bash with the MSVC `link.exe` ahead of Git's: `/usr/bin/link` is not a linker.
+- **The server is Rust (ADR 0030)**, in the cargo workspace at the root (`crates/csp-shared`,
+  `csp-lang`, `csp-lang-wasm`, `csp-sim`, `csp-server`); the client (`apps/web`) is TypeScript.
+  The TypeScript server, `packages/shared` and `packages/lang` were deleted at the cutover (T88.6;
+  the last commit with them is `848f58db`). The fixtures in `crates/csp-sim/fixtures/` are their
+  frozen output: never edit one to make a test pass; a rule change that a fixture comparison fails
+  on replaces that comparison with a Rust test of the new rule, and says so in the PR.
+  The client's types are generated from the crates (`ts-rs`): after changing a type the client
+  sees, run `pnpm types:rust` and commit `packages/shared-types/src/generated/` (a Rust test fails
+  when it is stale). Before finishing a change to the crates: `pnpm check:rust` (fmt, clippy with
+  warnings as errors, `cargo nextest run`). A test over 5 s is a regression to fix, not to tag.
+  Run cargo from PowerShell, or in bash with the MSVC `link.exe` ahead of Git's: `/usr/bin/link`
+  is not a linker.
 - Toolchain: the machine's default Node is too old. In bash run
   `eval "$(fnm env --shell bash)" && fnm use` first (from the repo root), and call pnpm as
   `corepack pnpm`. `gh` is at `C:\Program Files\GitHub CLI\gh.exe`.
 - Before finishing: `pnpm check <base>` (ADR 0013), with `<base>` the branch the change goes into
   (`origin/epic/<n>-<slug>`, or `origin/dev` for a bug). It runs lint, typecheck and only the
-  tests the change affects, and says what it ran. `pnpm test` is the full suite; CI runs it.
+  client tests the change affects, and says what it ran. `pnpm test` is the client's full suite;
+  CI runs it and `pnpm check:rust`'s steps.

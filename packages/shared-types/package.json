@@ -16,8 +16,5 @@
   },
   "scripts": {
     "build": "tsc -b"
-  },
-  "devDependencies": {
-    "@csp/shared": "workspace:*"
   }
 }

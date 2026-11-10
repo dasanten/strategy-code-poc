@@ -1,7 +1,13 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { checkScript, scriptParams } from '@csp/lang'
-import { ARMY_SCRIPT_API, DEFAULT_SCRIPTS, SCRIPT_API, SCRIPT_VIEWS } from '@csp/lang-wasm'
+import {
+  ARMY_SCRIPT_API,
+  checkScript,
+  DEFAULT_SCRIPTS,
+  SCRIPT_API,
+  SCRIPT_VIEWS,
+  scriptParams,
+} from '@csp/lang-wasm'
 import { describe, expect, it } from 'vitest'
 import { scriptWarnings } from './script-editor.js'
 import { paramNote } from './script-params-view.js'

@@ -1,42 +1,59 @@
 # Code Strategy PoC
 
-A persistent, real-time strategy world. Players run their realm through UI orders and, later,
-scripts in our own small language (ADR 0002). The server runs the world at 1 tick per second.
+A persistent, real-time strategy world. Players run their realm through UI orders and scripts in
+our own small language (ADR 0002). The server runs the world at 1 tick per second.
 
 Design decisions live in `docs/adr/`; the domain glossary is `CONTEXT.md`.
 
 ## Layout
 
-| Path              | What it is                                                                   |
-| ----------------- | ---------------------------------------------------------------------------- |
-| `packages/lang`   | The script language: lexer, parser, interpreter (public surface only so far) |
-| `packages/shared` | World types and the WebSocket protocol, shared by server and client          |
-| `apps/server`     | Fastify HTTP API, `ws` tick stream, the simulation loop, SQLite via Drizzle  |
-| `apps/web`        | Vite + React client: PixiJS tile map and a CodeMirror script editor          |
+The server is Rust (ADR 0030), the client TypeScript. One cargo workspace at the root:
+
+| Path                    | What it is                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------ |
+| `crates/csp-shared`     | World types, balance numbers (`src/balance.rs`), the wire protocol and helpers             |
+| `crates/csp-lang`       | The script language: lexer, parser, checker, interpreter with the step budget             |
+| `crates/csp-lang-wasm`  | `csp-lang`'s checker built to WebAssembly for the editor                                   |
+| `crates/csp-sim`        | Everything in a tick: terrain, pathfinding, orders, the world step, NPC cities, invariants |
+| `crates/csp-server`     | The I/O shell: HTTP, WebSocket sync, accounts, SQLite, saves, monitoring, admin CLI        |
+| `apps/web`              | Vite + React client: PixiJS tile map and a CodeMirror script editor                        |
+| `packages/shared-types` | The client's types, generated from the crates (`pnpm types:rust`)                          |
+| `packages/balance`      | The balance numbers the client reads, generated (`pnpm balance:rust`)                      |
+| `packages/lang-wasm`    | The editor's checker (`pnpm wasm:build`) and the script tables (`pnpm script-data:rust`)   |
+
+The TypeScript server, `packages/shared` and `packages/lang` were the frozen specification of the
+port and were deleted at the cutover (T88.6); the last commit with them is `848f58db`. The Rust
+tests still compare against what they wrote, in `crates/csp-sim/fixtures/` (frozen; see its
+README).
 
 ## Getting started
 
-Needs Node 22.12+ (Vite 8 needs it) and pnpm 10. The exact Node version is pinned in
-`.node-version` and pnpm in `package.json` (`packageManager`). With fnm and corepack:
+Needs:
+
+- Rust: rustup stable (`rust-toolchain.toml`) with the Visual Studio MSVC build tools on Windows
+  (the "Desktop development with C++" workload), `cargo install cargo-nextest --locked`, and for
+  the editor's checker `rustup target add wasm32-unknown-unknown` plus
+  `cargo install wasm-bindgen-cli --version <the wasm-bindgen version in Cargo.lock> --locked`.
+- Node 22.12+ (Vite 8 needs it) and pnpm 10, for the client. The exact Node version is pinned in
+  `.node-version` and pnpm in `package.json` (`packageManager`). With fnm and corepack:
 
 ```sh
 fnm use            # picks up .node-version (fnm install first if it's missing)
 corepack enable    # makes `pnpm` the pinned 10.x
 ```
 
-An older Node makes `pnpm install` stop with an error. No native build tools are needed:
-better-sqlite3 ships prebuilt binaries. Copy `.env.example` to `.env` for local settings.
+Copy `.env.example` to `.env` for local settings; server and client both read it.
 
 ```sh
 pnpm install
-pnpm dev        # server on :3000, client on http://localhost:5173 (proxies /api and /ws)
+pnpm dev        # Rust server on :3000, client on http://localhost:5173 (proxies /api and /ws)
 ```
 
 Signing up needs an invite code (ADR 0005). Create yourself an admin and a code:
 
 ```sh
-pnpm --filter @csp/server admin:create Daniel   # asks for a password (or set ADMIN_PASSWORD)
-pnpm --filter @csp/server admin:invite          # prints an invite code
+cargo run -p csp-server --bin csp-admin -- create Daniel   # asks for a password (or set ADMIN_PASSWORD)
+cargo run -p csp-server --bin csp-admin -- invite          # prints an invite code
 ```
 
 Admins can also create invite codes and reset passwords in the client.
@@ -44,61 +61,45 @@ Admins can also create invite codes and reset passwords in the client.
 Other scripts:
 
 ```sh
-pnpm build      # type-check and compile all packages, bundle the client
-pnpm start      # run the compiled server
-pnpm test       # Vitest, the full suite
-pnpm check [base]  # lint, typecheck and the tests affected by changes against base (default origin/dev)
-pnpm lint       # ESLint
-pnpm format     # Prettier
+pnpm check:rust    # cargo fmt --check, clippy with warnings as errors, cargo nextest run
+pnpm types:rust    # the client's types from the crates (commit packages/shared-types/src/generated)
+pnpm balance:rust  # the client's balance numbers from balance.rs
+pnpm build         # type-check and bundle the client
+pnpm start         # run the server in release
+pnpm test          # Vitest, the client's full suite
+pnpm check [base]  # lint, typecheck and the client tests affected by changes against base
+pnpm lint          # ESLint
+pnpm format        # Prettier
 ```
+
+A Rust test over 5 s is a regression to fix (nextest flags it); `cargo fmt --all` fixes
+formatting. Run cargo from PowerShell: in Git Bash `/usr/bin/link` shadows the MSVC linker, so put
+the MSVC `bin` directory ahead of Git's on `PATH` there.
 
 The server stores everything in `data/world.db` (override with `DB_PATH`). The world lives in
 memory and is saved as a gzipped snapshot every 30 ticks and on shutdown; old saves are pruned
-(ADR 0006).
+(ADR 0006). A dev world the TypeScript server made sits in `apps/server/data/world.db` of an older
+checkout; copy it to `data/world.db` to keep playing it.
 
-- **Table changes:** edit `apps/server/src/db/schema.ts`, then run
-  `pnpm --filter @csp/server db:generate` to add a migration; migrations run on startup.
+- **Table changes:** a new step in `crates/csp-server/src/db/migrations.rs`; migrations run on
+  startup.
 - **World state changes:** the world is never reset. Changing the shape of `WorldState` bumps
-  `WORLD_FORMAT_VERSION` in `apps/server/src/world-format.ts` and adds a migration step with a
-  test.
-
-## Rust backend
-
-The server is being rewritten in Rust (ADR 0030, Epic 84 onwards); the TypeScript game is frozen.
-One cargo workspace at the root, four crates:
-
-| Crate        | What it is for                                                                  |
-| ------------ | ------------------------------------------------------------------------------- |
-| `csp-shared` | World types, balance numbers, protocol and helpers; the Rust twin of `packages/shared` |
-| `csp-lang`   | The script language: lexer, parser, checker, interpreter with the step budget   |
-| `csp-sim`    | Everything in a tick: terrain, pathfinding, orders, the world step, NPC cities, invariants; fixtures in `crates/csp-sim/fixtures/` |
-| `csp-server` | The I/O shell: HTTP, WebSocket sync, accounts, SQLite, saves, monitoring, admin CLI |
-
-Toolchain: rustup stable (`rust-toolchain.toml`) with the Visual Studio MSVC build tools (the
-"Desktop development with C++" workload), plus `cargo install cargo-nextest --locked`. Check with:
-
-```bash
-pnpm check:rust
-```
-
-That runs `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings` and
-`cargo nextest run --workspace`; `cargo fmt --all` fixes formatting. A test over 5 s is a
-regression to fix (nextest flags it). Run cargo from PowerShell: in Git Bash `/usr/bin/link`
-shadows the MSVC linker, so put the MSVC `bin` directory ahead of Git's on `PATH` there.
+  `WORLD_FORMAT_VERSION` in `crates/csp-shared/src/world/world_format.rs` and adds a migration
+  step to `crates/csp-server/src/world_format.rs`, with a test. A save older than format 111 (the
+  TypeScript freeze) is refused: run the last TypeScript image on it once first (see Deploy).
 
 ## Monitoring
 
-See ADR 0004. The server logs JSON lines with pino (pretty-printed outside production; level via
-`LOG_LEVEL`). Set `SENTRY_DSN` (server) and `VITE_SENTRY_DSN` (client) to report to Sentry;
-without them reporting is off. Each tick runs the invariant checks in `apps/server/src/invariants.ts`
-(every tick in dev, 10% of ticks in production, `INVARIANT_SAMPLE_RATE` overrides) and reports tick
-duration and unit and action counts; a tick above 800 ms is logged and sent to Sentry as a warning.
-CI on GitHub Actions runs lint, typecheck and test on every push.
+See ADR 0004. The server logs JSON lines (level via `LOG_LEVEL`). Set `SENTRY_DSN` (server) and
+`VITE_SENTRY_DSN` (client) to report to Sentry; without them reporting is off. Each tick runs the
+invariant checks in `crates/csp-sim/src/invariants/` (every tick in dev, 10% of ticks in
+production, `INVARIANT_SAMPLE_RATE` overrides) and reports tick duration and unit and action
+counts; a tick above 800 ms is logged and sent to Sentry as a warning.
 
 ## How packages resolve each other
 
-Workspace packages export a `source` condition pointing at `src/index.ts`. Vite, Vitest and
-`tsx` use it, so dev needs no build step. `tsc -b` builds `dist/` for `pnpm start`.
+Workspace packages export a `source` condition pointing at `src/index.ts`. Vite and Vitest use it,
+so dev needs no build step.
 
 ## Deploy
 
@@ -117,27 +118,22 @@ to Daniel's server, where Caddy serves it over HTTPS (ADR 0007). One-time setup:
    `docker compose exec server csp-admin create <name>` for the admin and
    `docker compose exec server csp-admin invite` for invite codes.
 
-The image runs the Rust server (ADR 0030): a `cargo-chef` stage builds `csp-server` and `csp-admin`
-in release, the client is built as before, and a slim Debian image runs them
-as the same unprivileged user (uid 1000) with the same volumes, port and environment, so the
-compose file and the volumes from the TypeScript image stay as they are. CI's `rust` job runs
-`pnpm check:rust`'s steps beside `check`, on PRs into `dev` and `main` only (ADR 0009).
+The image runs the Rust server (ADR 0030): a `cargo-chef` stage builds `csp-server`, `csp-admin`
+and `check-fields` in release, a second Rust stage builds the editor's WebAssembly checker, the
+client is built as before, and a slim Debian image runs them as the same unprivileged user
+(uid 1000) with the same volumes, port and environment the TypeScript image had, so the compose
+file and the volumes stay as they are. CI's `rust` job runs `pnpm check:rust`'s steps beside
+`check`, on PRs into `dev` and `main` only (ADR 0009).
 
-Backups go to the `world-backups` volume before every start and daily, 14 days kept. To roll
-back, deploy the previous image tag (`IMAGE_TAG=<tag> docker compose up -d`) and, if a migration
-already ran, stop the server and copy the `-start` backup over `/data/world.db`.
+Backups go to the `world-backups` volume before every start (`world-<time>-start.db`) and daily,
+14 days kept.
+
+### Rolling back
+
+ROLLBACK_PLACEHOLDER
 
 Before scripts see exactly their script views (ADR 0011), list the fields Players' active scripts
 read that the views don't declare, with each script and Player. It only reads, so it is safe while
-the server runs. The Rust image doesn't carry it yet: the Rust `check-fields` (T87.8) waits for
-the script views to be ported (T86.12), and goes into the image then. Until then, run the
-TypeScript one against a copy of the database: `pnpm --filter @csp/server check:fields` (reads
-`DB_PATH`, `data/world.db` by default).
-It finds reads from values the checker is sure of (`me`, a query's result, a `for … of` over one,
-a `let` holding one); a read through `memory` or a function's parameters isn't found.
-
-## Status
-
-- Accounts, the tick loop, persistence, per-Player sync and deploy work end to end.
-- Units move randomly as a stand-in until the interpreter exists.
-- `checkScript` in `packages/lang` is a stub; the parser and interpreter are next.
+the server runs: `docker compose exec server check-fields` (reads `DB_PATH`). It finds reads from
+values the checker is sure of (`me`, a query's result, a `for … of` over one, a `let` holding one);
+a read through `memory` or a function's parameters isn't found.
