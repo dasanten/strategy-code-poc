@@ -321,7 +321,7 @@ mod caravans_carrying_out_deliveries {
     }
 
     #[test]
-    #[ignore = "22.7 s alone; see #1092"]
+    #[ignore = "6.1 s alone; see #1132"]
     fn pick_up_goods_sold_from_the_citys_storage_pay_there_and_bring_them_to_the_warehouse() {
         let mut s = setup();
         let si = s.world.buildings.iter().position(|b| b.id == s.storage().id).unwrap();
@@ -365,7 +365,6 @@ mod caravans_carrying_out_deliveries {
     }
 
     #[test]
-    #[ignore = "7.5 s alone; see #1092"]
     fn turn_back_from_a_city_behind_closed_gates_and_the_delivery_waits_for_the_next_caravan() {
         let mut s = setup();
         let city = s.city_id();
@@ -394,7 +393,6 @@ mod caravans_carrying_out_deliveries {
     }
 
     #[test]
-    #[ignore = "7.7 s alone; see #1092"]
     fn drop_a_delivery_to_a_city_that_is_no_longer_the_realms() {
         let mut s = setup();
         let city = s.city_id();
@@ -420,7 +418,6 @@ mod caravans_carrying_out_deliveries {
     }
 
     #[test]
-    #[ignore = "11.8 s alone; see #1092"]
     fn let_go_of_a_delivery_when_the_caravan_breaks_up() {
         let mut s = setup();
         let city = s.city_id();

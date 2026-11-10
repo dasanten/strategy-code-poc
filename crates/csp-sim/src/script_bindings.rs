@@ -67,6 +67,9 @@ use csp_lang::ParamType;
 /// the next place its scout goes. Takes whether one can go onto a tile, and the tiles to skip.
 pub type ScoutEdge<'a> = &'a dyn Fn(&dyn Fn(i32, i32) -> bool, &[(i32, i32)]) -> Option<(i32, i32)>;
 
+/// One building as the side sees it, if it does (`ScriptContext.place`).
+pub type PlaceInSight<'a> = &'a dyn Fn(&Building) -> Option<SeenEntity>;
+
 /// What one run of a resident's or army's script may look at and act for (`ScriptContext`).
 pub struct ScriptContext<'a> {
     pub world: &'a WorldState,
@@ -88,7 +91,7 @@ pub struct ScriptContext<'a> {
     pub places: Option<&'a dyn Fn() -> Arc<Vec<SeenEntity>>>,
     /// One building as `places` shows it, if it is in sight (`building_in_sight`): what
     /// `building(id)` needs, without the rest. Without it the building is looked for in `places`.
-    pub place: Option<&'a dyn Fn(&Building) -> Option<SeenEntity>>,
+    pub place: Option<PlaceInSight<'a>>,
     /// The side's eyes (`sightOf`); called at most once a run.
     pub eyes: &'a dyn Fn() -> Arc<Eyes>,
     /// Whether the Player has explored a tile.

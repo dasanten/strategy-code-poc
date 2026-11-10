@@ -128,7 +128,6 @@ fn works_the_nearest_node_of_its_regions_most_common_resource() {
 }
 
 #[test]
-#[ignore = "10.1 s with eight at once; see #1092"]
 fn left_alone_keeps_its_size_and_keeps_itself_fed() {
     let (mut world, terrain, id) = post();
     let mut walking = Walking::new(Arc::new(terrain.clone()));

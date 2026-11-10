@@ -208,7 +208,6 @@ fn sells_none_of_what_the_stable_lacks() {
 }
 
 #[test]
-#[ignore = "10 s alone; see #1092"]
 fn keeps_the_stable_fed_for_weeks_with_one_feeder_at_a_time() {
     let mut s = setup(0.0, 1000.0);
     let (mut most, mut lowest, mut feeder_ticks, mut went_hungry) = (0, f64::INFINITY, 0.0, false);
