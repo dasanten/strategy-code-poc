@@ -108,7 +108,7 @@ fn with_no_node_in_reach_builds_nothing_and_its_warehouse_is_left_to_what_is_bro
 }
 
 #[test]
-#[ignore = "slow in the TypeScript too (`tags: ['slow']`): up to fifty game days of a post's chain"]
+#[ignore = "15.0 s alone; see #1092"]
 fn with_an_iron_node_in_reach_builds_a_mine_and_its_ore_goes_into_the_warehouse() {
     let (mut world, terrain, c) = post(true);
     let store = warehouse(&world, &c);

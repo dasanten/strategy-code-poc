@@ -355,7 +355,7 @@ mod accepting_a_demand_for_goods_by_transfer {
     }
 
     #[test]
-    #[ignore = "slow in the TypeScript too; timed in the PR"]
+    #[ignore = "24.5 s alone; see #1092"]
     fn brings_them_to_the_senders_storage_by_caravan_the_fee_out_of_the_one_accepting() {
         let mut s = demanded(&[(Good::Iron, 10.0)]);
         let (from, to) = (s.xy(&s.to_storage), s.xy(&s.storage));

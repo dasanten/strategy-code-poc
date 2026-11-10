@@ -285,7 +285,7 @@ mod accepting {
     use super::*;
 
     #[test]
-    #[ignore = "slow in the TypeScript too; timed in the PR"]
+    #[ignore = "15.0 s alone; see #1092"]
     fn sets_the_coins_aside_for_a_caravan_which_fetches_them_for_no_fee_and_settles_the_debt() {
         let mut s = owing(OWED);
         let before = coins(&s);
@@ -329,7 +329,7 @@ mod accepting {
     }
 
     #[test]
-    #[ignore = "slow in the TypeScript too; timed in the PR"]
+    #[ignore = "14.1 s alone; see #1092"]
     fn sends_them_by_a_transfer_to_its_nearest_warehouse_for_the_fee_whoever_it_refuses() {
         let mut s = owing(OWED);
         let realm = s.realm.clone();
@@ -377,7 +377,7 @@ mod accepting {
     }
 
     #[test]
-    #[ignore = "slow in the TypeScript too; timed in the PR"]
+    #[ignore = "20.7 s alone; see #1092"]
     fn leaves_what_a_short_storage_doesnt_cover_owed_and_starts_the_next_step_at_the_deadline() {
         let mut s = owing(OWED);
         let storage = s.storage.clone();
@@ -411,7 +411,7 @@ mod accepting {
     }
 
     #[test]
-    #[ignore = "slow in the TypeScript too; timed in the PR"]
+    #[ignore = "20.8 s alone; see #1092"]
     fn takes_only_what_is_still_owed_when_the_caravan_gets_there() {
         let mut s = owing(OWED);
         let before = coins(&s);
@@ -448,7 +448,7 @@ mod accepting {
     }
 
     #[test]
-    #[ignore = "slow in the TypeScript too; timed in the PR"]
+    #[ignore = "12.2 s alone; see #1092"]
     fn leaves_it_owed_when_what_was_set_aside_is_taken_back() {
         let mut s = owing(OWED);
         let hand_over = set_aside(&s);
