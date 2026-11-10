@@ -93,7 +93,7 @@ impl Setup {
 
     /// The last event of Player `user_id`, as JSON.
     fn last_event(&self, user_id: u64) -> Value {
-        let e = self.world.events.iter().filter(|e| e.user_id == user_id).last();
+        let e = self.world.events.iter().rfind(|e| e.user_id == user_id);
         serde_json::to_value(e.expect("an event")).unwrap()
     }
 }

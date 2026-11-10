@@ -83,8 +83,8 @@ impl Setup {
 
     /// The stable of a city (the starting city's).
     fn stable(&self) -> Building {
-        let b = self.world.buildings.iter();
-        b.filter(|b| b.kind == BuildingKind::Stable && b.city_id.is_some()).next().unwrap().clone()
+        let mut b = self.world.buildings.iter();
+        b.find(|b| b.kind == BuildingKind::Stable && b.city_id.is_some()).unwrap().clone()
     }
 
     fn kill_leader(&mut self) {
@@ -275,8 +275,8 @@ fn is_in_the_script_api_claims_as_the_order_does_and_leaves_the_script_running()
     let mut s = setup();
     let realm = s.realm_id();
     let leader = s.leader_id();
-    let r = s.world.residents.iter_mut();
-    let r = r.filter(|x| x.owner.as_deref() == Some(&realm) && x.id != leader).next().unwrap();
+    let mut r = s.world.residents.iter_mut();
+    let r = r.find(|x| x.owner.as_deref() == Some(&realm) && x.id != leader).unwrap();
     r.script = Some(
         serde_json::from_value::<RunningScript>(json!({ "scriptId": 1, "memory": {} })).unwrap(),
     );
