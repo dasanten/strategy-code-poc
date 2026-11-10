@@ -245,7 +245,7 @@ mod once_it_has_heard_who_took_a_post {
             json!([{ "org": s.realm, "coins": WORTH, "cityId": post }])
         );
         let name = s.city(&post).name.clone();
-        let deadline = s.world.tick as f64 + TRADE_ORG_DEBT_DEMAND_DAYS * TICKS_PER_GAME_DAY as f64;
+        let deadline = s.world.tick as f64 + TRADE_ORG_DEBT_DEMAND_DAYS * TICKS_PER_GAME_DAY;
         assert_matches(
             s.post_demand(&post).expect("a demand"),
             json!({

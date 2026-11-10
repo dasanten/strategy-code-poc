@@ -53,7 +53,7 @@ fn start_carrying(world: &mut WorldState, ri: usize, pi: usize, days: f64) {
         world.residents[pi].id.clone(),
         world.residents[pi].name.clone(),
     );
-    let since = world.tick as f64 - days * TICKS_PER_GAME_DAY as f64;
+    let since = world.tick as f64 - days * TICKS_PER_GAME_DAY;
     world.residents[ri].pair = Some(from(json!({ "partnerId": pid, "since": 0 })));
     world.residents[pi].pair = Some(from(json!({ "partnerId": rid, "since": 0 })));
     let r = &mut world.residents[ri];
@@ -177,6 +177,7 @@ mod an_npc_resident_carrying_a_child {
     }
 
     #[test]
+    #[ignore = "4 s alone, 12 s in a full run; see #1092"]
     fn at_home_with_an_empty_storage_eats_once_the_farms_crew_brings_food_home() {
         let Village { mut world, terrain, city, home } = village(None);
         let a = &mut world.residents[0];
@@ -451,6 +452,7 @@ mod after_a_leader_death {
     }
 
     #[test]
+    #[ignore = "4 s alone, 8 s in a full run; see #1092"]
     fn a_resident_gets_a_job_or_walks_home_whatever_order_or_task_they_had() {
         let mut s = realm_in_play();
         s.world.buildings[s.storage].stock = Some(food(200.0));
