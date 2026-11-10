@@ -162,7 +162,6 @@ fn is_not_run_while_its_walk_lasts_and_runs_again_on_arrival() {
 }
 
 #[test]
-#[ignore = "port bug: `script_runner::Waiting` tells orders apart by kind, the TypeScript by identity, so a walk replaced by a walk keeps it waiting; see #1110"]
 fn runs_again_once_its_order_is_replaced() {
     let mut s = setup(THERE_AND_BACK);
     s.tick();

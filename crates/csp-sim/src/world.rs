@@ -232,6 +232,8 @@ pub fn step_world(
         // A fight or an army may have given someone Down an order; it ends with the tick.
         keep_down_still(world);
     });
+    // The orders the world advanced in place this tick are still the ones scripts wait on.
+    scratch.waiting.settle(world);
     StepResult { npc_script_runs, npc_plan_ms, survival, horses_died, ..result }
 }
 

@@ -797,13 +797,17 @@ impl OrderKind for ArmyRunScriptOrder {
     }
 }
 
-/// The order a waiting script waits on (`waitingOn`), by resident and script. The TypeScript
-/// keeps it by object identity (a replaced order is another object); here an order counts as the
-/// one waited on while it is of the same kind. Scratch memory, never saved: after a restart a
-/// waiting script runs once more and waits again.
+/// The order a waiting script waits on (`waitingOn`), by resident. The TypeScript keeps the order
+/// object itself, so the script wakes once the order is replaced by any other, even one of the
+/// same kind, while the world advancing the order in place keeps it. Rust orders have no
+/// identity, so this keeps the order's value as it stood at the end of the last world step
+/// (`settle`): that is when the world is done advancing orders in place (walking, work, fights),
+/// and before the next scripts run, so an order that differs from it then was replaced
+/// (by an order a Player sent, a queue's next step, or anything else that sets it). Scratch memory,
+/// never saved: after a restart a waiting script runs once more and waits again.
 #[derive(Debug, Default)]
 pub struct Waiting {
-    on: HashMap<String, std::mem::Discriminant<ResidentOrder>>,
+    on: HashMap<String, ResidentOrder>,
 }
 
 impl Waiting {
@@ -813,10 +817,7 @@ impl Waiting {
         let Some(running) = r.script.as_mut() else { return false };
         let Some(since) = running.waiting_since else { return false };
         let struck = r.struck.as_ref().is_some_and(|s| s.tick >= since);
-        let same = r
-            .order
-            .as_ref()
-            .is_some_and(|o| self.on.get(&r.id) == Some(&std::mem::discriminant(o)));
+        let same = r.order.as_ref().is_some_and(|o| self.on.get(&r.id) == Some(o));
         if same && !struck {
             return true;
         }
@@ -834,7 +835,27 @@ impl Waiting {
             return;
         }
         s.waiting_since = Some(tick);
-        self.on.insert(r.id.clone(), std::mem::discriminant(order));
+        self.on.insert(r.id.clone(), order.clone());
+    }
+
+    /// Takes the orders the world advanced in place this step as the ones still waited on
+    /// (`settle`), at the end of every world step. A waiting resident whose script ended, who
+    /// no longer waits or who is gone is forgotten.
+    pub fn settle(&mut self, world: &WorldState) {
+        if self.on.is_empty() {
+            return;
+        }
+        let mut kept = HashMap::with_capacity(self.on.len());
+        for r in &world.residents {
+            if !self.on.contains_key(&r.id) {
+                continue;
+            }
+            let waiting = r.script.as_ref().is_some_and(|s| s.waiting_since.is_some());
+            if let (true, Some(order)) = (waiting, &r.order) {
+                kept.insert(r.id.clone(), order.clone());
+            }
+        }
+        self.on = kept;
     }
 
     /// Invariant (`waiting-has-an-order`): every waiting script of `residents` has an order to
@@ -854,7 +875,7 @@ impl Waiting {
             };
             match &r.order {
                 None => fail("waits with no order".into()),
-                Some(o) if self.on.get(&r.id).is_some_and(|d| *d != std::mem::discriminant(o)) => {
+                Some(o) if self.on.get(&r.id).is_some_and(|w| w != o) => {
                     fail("waits past the end of the order it waited on".into())
                 }
                 _ => {}
