@@ -535,7 +535,7 @@ fn hall_of(world: &WorldState, city: &str, size: i32) -> (i32, i32) {
 
 /// How far the middle of a footprint lies from the middle of the town hall (`farOf`).
 fn far_of(hall: (i32, i32), kind: BuildingKind, (x, y): (i32, i32)) -> f64 {
-    let middle = f64::from(FOOTPRINT.get(kind_name(kind)).unwrap_or(1) as i32 - 1) / 2.0;
+    let middle = f64::from(FOOTPRINT.get(kind_name(kind)).unwrap_or(1) - 1) / 2.0;
     (f64::from(x) + middle - f64::from(hall.0)).hypot(f64::from(y) + middle - f64::from(hall.1))
 }
 
@@ -665,7 +665,7 @@ fn has_room_for_a_kind_all_the_way_round_every_circle() {
         let size = terrain.size;
         let hall = hall_of(&world, &city, size);
         let plan = plan_of(&world, &city, &home, size);
-        let middle = f64::from(FOOTPRINT.get(kind_name(kind)).unwrap_or(1) as i32 - 1) / 2.0;
+        let middle = f64::from(FOOTPRINT.get(kind_name(kind)).unwrap_or(1) - 1) / 2.0;
         let mut sides: HashMap<i32, HashSet<i32>> = HashMap::new();
         let reach = 4 * CITY_RING_STEP as i32;
         for y in hall.1 - reach..=hall.1 + reach {
@@ -883,7 +883,7 @@ fn a_lake_over_a_whole_circle_sends_it_on_to_the_next_and_the_lanes_stay_where_t
 // the Main street layout
 
 fn side_of(kind: BuildingKind) -> i32 {
-    FOOTPRINT.get(kind_name(kind)).unwrap_or(1) as i32
+    FOOTPRINT.get(kind_name(kind)).unwrap_or(1)
 }
 
 /// A new city of `kind` with the Main street layout (`mainStreetCity`). `prepare` readies the

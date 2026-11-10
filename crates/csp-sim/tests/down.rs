@@ -183,8 +183,8 @@ fn died_events(world: &WorldState, user: u64) -> Vec<(String, DeathCause, bool, 
 fn lasts_about_one_real_day() {
     assert_eq!(DOWN_TICKS, DOWN_DAYS * TICKS_PER_GAME_DAY);
     // One tick is one real second.
-    assert!(DOWN_TICKS / 3600.0 > 20.0);
-    assert!(DOWN_TICKS / 3600.0 < 28.0);
+    let hours = std::hint::black_box(DOWN_TICKS) / 3600.0;
+    assert!(hours > 20.0 && hours < 28.0, "{hours}");
 }
 
 #[test]
