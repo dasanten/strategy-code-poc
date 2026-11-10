@@ -22,7 +22,8 @@ fn setup() -> WorldState {
     building(&mut world, "f1", BuildingKind::Farm, Some("c1"), 6.0, 6.0);
     let w1 = resident(&mut world, "w1", Some("r1"), 6.0, 6.0);
     world.residents[w1].city_id = Some("c1".into());
-    world.residents[w1].carried = [(Good::Food, OWN_FOOD), (Good::Spear, 1.0)].into_iter().collect();
+    world.residents[w1].carried =
+        [(Good::Food, OWN_FOOD), (Good::Spear, 1.0)].into_iter().collect();
     let x1 = resident(&mut world, "x1", Some("r2"), 200.0, 200.0);
     world.residents[x1].carried = [(Good::Sword, 1.0)].into_iter().collect();
     resident(&mut world, "l2", Some("r2"), 220.0, 220.0);
@@ -202,7 +203,8 @@ fn reaches_only_those_at_home_who_see_them() {
 #[test]
 fn leaves_someone_already_attacking_at_it() {
     let mut world = setup();
-    live_mut(&mut world, "w1").order = Some(ResidentOrder::Attack(attack_order("l2", false, false)));
+    live_mut(&mut world, "w1").order =
+        Some(ResidentOrder::Attack(attack_order("l2", false, false)));
     enter(&mut world, "x1", 12.0, 9.0);
     step_outsiders(&mut world, SIZE);
     let w1 = live(&world, "w1").unwrap();

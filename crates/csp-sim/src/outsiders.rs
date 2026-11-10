@@ -69,8 +69,12 @@ impl AreaIndex {
 /// The world's area index (`areasBySquare`).
 fn areas_by_square(world: &WorldState, size: i32) -> AreaIndex {
     let across = (size / SQUARE_TILES).max(1);
-    let mut index =
-        AreaIndex { across, side: f64::from(size) / f64::from(across), size, squares: HashMap::new() };
+    let mut index = AreaIndex {
+        across,
+        side: f64::from(size) / f64::from(across),
+        size,
+        squares: HashMap::new(),
+    };
     let cities: HashMap<&str, usize> =
         world.cities.iter().enumerate().map(|(i, c)| (c.id.as_str(), i)).collect();
     for (bi, b) in world.buildings.iter().enumerate() {
@@ -177,7 +181,11 @@ pub fn step_outsiders(world: &mut WorldState, size: i32) {
         let city_id = world.cities[ci].id.clone();
         for armed in [true, false] {
             for id in &came {
-                let is = world.residents.iter().find(|r| &r.id == id).is_some_and(|r| is_armed(&r.carried));
+                let is = world
+                    .residents
+                    .iter()
+                    .find(|r| &r.id == id)
+                    .is_some_and(|r| is_armed(&r.carried));
                 if is == armed {
                     raise_outsider(world, &city_id, id, size);
                 }
@@ -201,7 +209,8 @@ pub fn note_outsiders_inside(world: &mut WorldState, size: i32) {
 /// none.
 pub fn outsiders_sound(world: &WorldState, size: i32) -> Vec<InvariantViolation> {
     let crew = caravan_crew(world);
-    let by_id: HashMap<&str, &Resident> = world.residents.iter().map(|r| (r.id.as_str(), r)).collect();
+    let by_id: HashMap<&str, &Resident> =
+        world.residents.iter().map(|r| (r.id.as_str(), r)).collect();
     let mut out = Vec::new();
     for city in &world.cities {
         let Some(list) = &city.outsiders else { continue };

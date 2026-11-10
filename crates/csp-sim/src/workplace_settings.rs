@@ -6,11 +6,9 @@
 use std::sync::Arc;
 
 use csp_lang::{script_params, ParamType};
-use csp_shared::balance::WORKPLACE_MAX_WORKERS;
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{
-    Building, OrderRequest, Resident, RunningScript, ScriptParamValue, Task, WorkplaceSettings,
-    WorldState,
+    OrderRequest, Resident, RunningScript, ScriptParamValue, Task, WorkplaceSettings, WorldState,
 };
 use serde_json::{json, Map, Value};
 
@@ -18,18 +16,13 @@ use crate::default_scripts::{is_work_script, WORKPLACE_PARAM};
 use crate::order_sender::{realm_of, OrderSender};
 use crate::orders::OrderKind;
 use crate::queries::alliance::commander_of;
-use crate::queries::names::kind_name;
 use crate::script_api::{is_param_number, ScriptParam};
 use crate::script_params::{param_target, set_start_params, start_params_problem, ParamWithValue};
 use crate::scripts::RunnableScript;
 use crate::sight::InvariantViolation;
 use crate::tick::Scratch;
 
-/// Whether a building takes workplace settings (`takesWorkSettings`): a workplace kind.
-// TODO(T86.6): `queries::building::takes_work_settings`.
-fn takes_work_settings(b: &Building) -> bool {
-    WORKPLACE_MAX_WORKERS.get(kind_name(b.kind)).is_some()
-}
+use crate::queries::building::takes_work_settings;
 
 /// Where the settings order finds the Player's scripts (`WorkSettingsHost`).
 pub trait WorkSettingsHost {
