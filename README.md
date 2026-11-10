@@ -115,16 +115,19 @@ In the profiler, the Call Tree tab with "Invert call stack" ticked lists the fun
 time; the Flame Graph tab shows the same by stack. Without `--save-only`, `samply record` opens
 the profiler straight away. `bench-world` works the same way (`target/profiling/bench-world`).
 
-**Status: neither path has been run yet** (T89.3, #1129); the commands are from samply's
-documentation.
+**Status:** the `record` step has not been run anywhere yet (T89.3, #1129); the commands are from
+samply's documentation. On WSL2 (Ubuntu) `cargo install samply` and the `profiling` build work, but
+samply refuses to record at the default `perf_event_paranoid` of 2. The tables in
+`docs/proposals/rust-rewrite.md` come from a throwaway pprof-rs harness instead.
 
-- **Linux:** needs a C toolchain for the build (`sudo apt install build-essential`) and
-  `kernel.perf_event_paranoid` of 2 or lower, which sampling your own process needs. If samply
-  complains, `sudo sysctl kernel.perf_event_paranoid=1`.
-- **Windows:** samply records through ETW, so it needs the Windows Performance Toolkit (`xperf`;
-  the Windows ADK installer, tick only "Windows Performance Toolkit") and an elevated terminal
-  (it asks for elevation itself). The record command is the same. To have the profile carry its
-  symbols, add `--unstable-presymbolicate`, which writes a `.syms.json` beside it.
+- **Linux, WSL2:** needs a C toolchain for the build (`sudo apt install build-essential`) and
+  `kernel.perf_event_paranoid` of 1 or lower:
+  `echo 1 | sudo tee /proc/sys/kernel/perf_event_paranoid` (system-wide; on WSL2 it resets when
+  WSL restarts).
+- **Windows (untested):** samply records through ETW, so it needs the Windows Performance Toolkit
+  (`xperf`; the Windows ADK installer, tick only "Windows Performance Toolkit") and an elevated
+  terminal (it asks for elevation itself). The record command is the same. To have the profile
+  carry its symbols, add `--unstable-presymbolicate`, which writes a `.syms.json` beside it.
 
 ## Monitoring
 
