@@ -177,6 +177,11 @@ fn build_houses(s: &mut Staged) {
 /// whole chain built with a free node of each good for a second, and every good at its reserve and
 /// half a village's surplus cap. Everyone starts free at home (`bigCity`).
 pub fn big_city(map_size: i32) -> Staged {
+    big_city_laid(None, map_size)
+}
+
+/// `big_city` whose houses follow `layout`, in place of the one it drew (`bigCity(layout)`).
+pub fn big_city_laid(layout: Option<csp_shared::world::CityLayout>, map_size: i32) -> Staged {
     let terrain = plains(map_size);
     let mut world = create_world(&terrain, 1);
     let size = NpcCitySize {
@@ -187,6 +192,9 @@ pub fn big_city(map_size: i32) -> Staged {
     };
     let mut m = Mulberry32::new(29.0);
     let city = found_npc_city(&mut world, &terrain, &size, 60, 60, &mut || m.next(), None);
+    if let Some(l) = layout {
+        world.cities.iter_mut().find(|c| c.id == city).unwrap().layout = Some(l);
+    }
     let home = npc_home(&world, &city).unwrap().id.clone();
     let mut s = Staged { world, terrain, city, home };
     let (hx, hy) = (s.home().x as i32, s.home().y as i32);
@@ -249,8 +257,9 @@ pub fn big_city(map_size: i32) -> Staged {
     s
 }
 
-/// One count of the big city (`BigCityCount`).
+/// One count of the big city (`BigCityCount`); its fields are read through `Debug`, in the report.
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct Count {
     pub day: f64,
     pub residents: usize,
@@ -346,8 +355,9 @@ pub fn run(
     counts
 }
 
-/// What the big city shows while it is watched (`BigCityHold`).
+/// What the big city shows while it is watched (`BigCityHold`), `farmers` for the report.
 #[derive(Debug, Default)]
+#[allow(dead_code)]
 pub struct Hold {
     pub idle_share: f64,
     pub longest_on_storage: f64,

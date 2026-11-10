@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use csp_shared::balance::{
-    build_materials, NpcCitySize, NPC_RESIDENTS_PER_NEEDS_STEP, NPC_SURPLUS_CAP, NPC_TOWN,
+    NpcCitySize, NPC_RESIDENTS_PER_NEEDS_STEP, NPC_SURPLUS_CAP, NPC_TOWN,
     NPC_VILLAGE,
 };
 use csp_shared::terrain::{terrain_at, tile_index, wrap_distance, Terrain, TerrainMap};
@@ -18,6 +18,7 @@ use serde_json::json;
 use super::WayFinder;
 use crate::city_layout::{streets_owed, GateAt};
 use crate::invariants::check_all;
+use crate::queries::building::build_materials;
 use crate::npc_behaviour::npc_home;
 use crate::npc_big_city::{big_city, Unhurried};
 use crate::npc_cities::found_npc_city;

@@ -2,7 +2,7 @@
 //! scouts found. The file's other cases are not ported yet.
 
 use csp_shared::balance::{
-    build_materials, CREW_FOOD, NPC_NODE_REACH, NPC_SURPLUS_CAP, NPC_TOWN,
+    CREW_FOOD, NPC_NODE_REACH, NPC_SURPLUS_CAP, NPC_TOWN,
 };
 use csp_shared::terrain::{tile_index, wrap_distance, Terrain, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_DAY;
@@ -10,6 +10,7 @@ use csp_shared::world::{Building, BuildingKind, Good, ResourceKind, ResourceNode
 use serde_json::{json, Value};
 
 use crate::invariants::check_all;
+use crate::queries::building::build_materials;
 use crate::npc_behaviour::npc_home;
 use crate::npc_cities::found_npc_city;
 use crate::npc_scouts::sector_of;
@@ -166,7 +167,7 @@ fn a_city_short_of_a_good_builds_on_a_far_node_and_its_crew_stays_fed_there() {
     // Thirty days at it, on the Food the carrier brings. What they bring keeps going out of the
     // store, so Wood stays short and the crew stays.
     let everyone = t.people().len();
-    let on_crew = |r: &&csp_shared::world::Resident| {
+    let on_crew = |r: &&&csp_shared::world::Resident| {
         r.script.as_ref().and_then(|s| s.memory.get("workplaceId")) == Some(&Value::from(place.id.clone()))
     };
     let pile = |w: &WorldState| building_pile(w, &place).map_or(0.0, |p| held(&p.goods, Good::Food));

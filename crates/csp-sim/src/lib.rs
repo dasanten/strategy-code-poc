@@ -53,6 +53,16 @@ pub mod npc_chain;
 pub mod npc_cities;
 #[cfg(test)]
 mod npc_far_nodes_tests;
+#[cfg(test)]
+mod npc_horses_tests;
+#[cfg(test)]
+mod npc_inner_wall_tests;
+#[cfg(test)]
+mod npc_scouts_tests;
+#[cfg(test)]
+mod npc_surplus_tests;
+#[cfg(test)]
+mod poc_tests;
 pub mod npc_coins;
 pub mod npc_defence;
 pub mod npc_founding;
