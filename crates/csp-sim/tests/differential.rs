@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::WorldState;
+use csp_sim::invariants::{check_invariants_with, world_invariants, Ledgers};
 use csp_sim::tick::{Scratch, Walk};
 use csp_sim::walking::Walking;
 use csp_sim::world::step_world;
@@ -58,14 +59,43 @@ fn load(name: &str) -> (WorldState, Arc<TerrainMap>) {
     (world, Arc::new(terrain))
 }
 
+/// How often the world invariants are checked on the way (every tick would take as long again as
+/// the stepping itself): at every checkpoint, and every this many ticks between them.
+const CHECK_EVERY: u64 = 60;
+
 /// Steps `name-0` to each of `ticks` and compares with `name-<tick>`; the first difference, if any.
+/// Every world invariant holds at each checkpoint and every `CHECK_EVERY` ticks.
 fn differential(name: &str, ticks: &[u64]) -> Option<String> {
     let (mut world, terrain) = load(&format!("{name}-0"));
     let mut walking = Unhurried(Walking::new(terrain.clone()));
     let mut scratch = Scratch::default();
+    let all = world_invariants();
     for &at in ticks {
         while world.tick < at {
-            step_world(&mut world, &terrain, &mut scratch, Some(&mut walking), None);
+            let step = step_world(&mut world, &terrain, &mut scratch, Some(&mut walking), None);
+            if world.tick % CHECK_EVERY == 0 || world.tick == at {
+                let ledgers = Ledgers {
+                    trades: Some(&scratch.trades),
+                    offers: Some(&scratch.offers),
+                    debt_payments: Some(&scratch.debt_payments),
+                    buy_offs: &step.buy_offs,
+                };
+                let found = check_invariants_with(&world, &terrain, &all, &ledgers);
+                if !found.is_empty() {
+                    let list: Vec<String> =
+                        found.iter().map(|v| format!("{}: {}", v.invariant, v.message)).collect();
+                    return Some(format!(
+                        "{name} at tick {}: {} invariants broken:
+{}",
+                        world.tick,
+                        found.len(),
+                        list.join(
+                            "
+"
+                        )
+                    ));
+                }
+            }
         }
         let want = normalised(&read_json(&format!("worlds/{name}-{at}.json"))["world"]);
         let got = normalised(&serde_json::to_value(&world).unwrap());
@@ -84,7 +114,7 @@ fn the_village_steps_as_the_typescript_did() {
 /// The village's long run, a game week: about 5 s alone and 8 s on a busy machine (2026-11-09),
 /// over the 5 s a test may take, so it stays out of the default suite with the HQ's.
 #[test]
-#[ignore = "5 to 8 s: the village's NPC default scripts over a game week"]
+#[ignore = "10 to 15 s: the village's NPC default scripts over a game week, invariants checked on the way"]
 fn the_village_steps_as_the_typescript_did_over_a_game_week() {
     assert_eq!(differential("village", &[10080]), None);
 }
@@ -98,7 +128,7 @@ fn the_trade_org_hq_steps_as_the_typescript_did() {
 /// of it the NPC default scripts, so it stays out of the default suite until they are faster.
 /// Run it with `cargo nextest run -p csp-sim --run-ignored only`.
 #[test]
-#[ignore = "25 to 40 s: the HQ's NPC default scripts over a game week"]
+#[ignore = "30 to 45 s: the HQ's NPC default scripts over a game week, invariants checked on the way"]
 fn the_trade_org_hq_steps_as_the_typescript_did_over_a_game_week() {
     assert_eq!(differential("hq", &[1440, 10080]), None);
 }

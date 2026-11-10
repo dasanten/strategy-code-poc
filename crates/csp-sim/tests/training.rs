@@ -282,8 +282,10 @@ fn keeps_training_over_a_long_run_the_teacher_switching_subjects() {
         if day == 3 {
             send(&mut world, &t, &mut orders, teach("combat"));
         }
-        // TODO(T86.13): `checkInvariants` after each quarter day.
-        run(&mut world, &t, TICKS_PER_GAME_DAY as usize);
+        for _ in 0..4 {
+            run(&mut world, &t, TICKS_PER_GAME_DAY as usize / 4);
+            assert_sound(&world, &t);
+        }
     }
     assert_eq!(trained(&mut world, "a1"), trained_cap(10.0));
     assert_eq!(skill_of(at(&mut world, "a2"), SkillName::Combat), 15.0);

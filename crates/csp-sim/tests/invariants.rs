@@ -1,8 +1,6 @@
 //! `apps/server/src/invariants.test.ts`, ported (T86.13). Its `worldWithCity()` is the fixture
 //! `sight/city.json` (`createWorld(cityTerrain())` and `foundStartingCity` for Player 1) on
-//! `cityTerrain()`, generated here (`generateTerrain(1, 1536)`), until the starting city (T86.8)
-//! lands. Left for the tickets whose rules they step: the 200 ticks of "hold on a fresh world
-//! and after many ticks" and the step of "catch a pick-up or drop order left over" (T86.14).
+//! `cityTerrain()`, generated here (`generateTerrain(1, 1536)`).
 
 mod common;
 
@@ -21,6 +19,8 @@ use csp_sim::queries::balance::carry_capacity;
 use csp_sim::queries::building::building_at;
 use csp_sim::queries::names::placed;
 use csp_sim::terrain_gen::generate_terrain;
+use csp_sim::tick::Scratch;
+use csp_sim::world::step_world;
 use serde_json::json;
 
 fn terrain() -> &'static TerrainMap {
@@ -64,8 +64,14 @@ fn off_footprints(world: &WorldState, x: f64, y: f64) -> (f64, f64) {
 }
 
 #[test]
-fn hold_on_a_fresh_world() {
-    assert_eq!(check(&world_with_city()), []);
+fn hold_on_a_fresh_world_and_after_many_ticks() {
+    let mut world = world_with_city();
+    assert_eq!(check(&world), []);
+    let mut scratch = Scratch::default();
+    for _ in 0..200 {
+        step_world(&mut world, terrain(), &mut scratch, None, None);
+    }
+    assert_eq!(check(&world), []);
 }
 
 #[test]
@@ -276,7 +282,8 @@ fn catch_a_pick_up_or_drop_order_left_over_after_its_tick() {
     );
     let (a, b) = (world.residents[0].id.clone(), world.residents[1].id.clone());
     assert_eq!(named(&check(&world)), [one("carry-orders-done", &a), one("carry-orders-done", &b)]);
-    // TODO(T86.5): a step resolves the orders and the check passes.
+    step_world(&mut world, terrain(), &mut Scratch::default(), None, None);
+    assert_eq!(check(&world), []);
 }
 
 #[test]
@@ -443,4 +450,155 @@ fn invariants_for_tick_runs_all_of_them_when_every_tick_is_sampled_none_at_a_rat
     assert!(invariants_for_tick(7, 0.0, &all).is_empty());
     // The TypeScript's list, by name and in order: 151 invariants.
     assert_eq!(all.len(), 151);
+}
+
+/// A starting city with everyone idle on the storage's tile, carrying nothing (`atHome` of
+/// `survival.test.ts`).
+fn at_home() -> WorldState {
+    let mut world = world_with_city();
+    let storage = find(&world, BuildingKind::Storage);
+    for r in &mut world.residents {
+        (r.x, r.y) = (storage.x, storage.y);
+        r.order = None;
+        r.carried = Stock::new();
+        r.stats.strength = Stat { base: 10.0, trained: 0.0 };
+    }
+    world
+}
+
+fn find(world: &WorldState, kind: BuildingKind) -> csp_shared::world::Building {
+    world.buildings.iter().find(|b| b.kind == kind).expect("a building of the kind").clone()
+}
+
+#[test]
+fn catch_a_resident_who_runs_low_on_food_where_there_is_more_until_the_refill_runs() {
+    let mut world = at_home();
+    let found =
+        csp_sim::invariants::invariant_named("refilled-when-low").unwrap().check(&world, terrain());
+    assert_eq!(found.len(), 8);
+    assert_eq!(
+        found[0].message,
+        format!("resident {} has only 0 food where there is more", world.residents[0].id)
+    );
+    csp_sim::survival::step_refill(&mut world, terrain().size);
+    let found =
+        csp_sim::invariants::invariant_named("refilled-when-low").unwrap().check(&world, terrain());
+    assert_eq!(found, []);
+}
+
+#[test]
+fn catch_a_territory_held_for_an_organization_that_does_not_exist() {
+    let mut world = world_with_city();
+    assert_eq!(
+        csp_sim::invariants::invariant_named("territory-sound").unwrap().check(&world, terrain()),
+        []
+    );
+    world.cities[0].realm_id = Some("ghost".into());
+    let found =
+        csp_sim::invariants::invariant_named("territory-sound").unwrap().check(&world, terrain());
+    assert!(!found.is_empty());
+    assert!(found.iter().all(|v| v.invariant == "territory-sound" && v.entity_ids == ["ghost"]));
+    assert!(found[0].message.starts_with("tile ("), "{}", found[0].message);
+    assert!(found[0].message.ends_with("belongs to ghost, which is no Organization"));
+}
+
+#[test]
+fn catch_a_city_building_that_belongs_to_another_city_than_its_chain_gives_it() {
+    let mut world = world_with_city();
+    let house = world.buildings.iter().position(|b| b.kind == BuildingKind::House).unwrap();
+    let (id, city) =
+        (world.buildings[house].id.clone(), world.buildings[house].city_id.clone().unwrap());
+    world.buildings[house].city_id = Some("elsewhere".into());
+    let found = csp_sim::invariants::invariant_named("cities-from-buildings")
+        .unwrap()
+        .check(&world, terrain());
+    assert_eq!(named(&found), [one("cities-from-buildings", &id)]);
+    assert_eq!(found[0].message, format!("{id} belongs to city elsewhere, but stands in {city}"));
+}
+
+/// A second realm's resident `x1` standing `at` the first tile outside the city's area.
+fn outsider_world() -> (WorldState, String) {
+    let mut world = world_with_city();
+    world.realms.push(
+        serde_json::from_value(json!({ "id": "r2", "userId": 8, "leaderId": "x1" })).unwrap(),
+    );
+    let mut x1 = world.residents[0].clone();
+    x1.id = "x1".into();
+    x1.owner = Some("r2".into());
+    x1.city_id = None;
+    x1.order = None;
+    (x1.x, x1.y) = (30.0, 30.0);
+    world.residents.push(x1);
+    let city = world.cities[0].id.clone();
+    (world, city)
+}
+
+#[test]
+fn catch_an_outsiders_list_that_is_wrong() {
+    let (mut world, city) = outsider_world();
+    let first = world.residents[0].id.clone();
+    let wrong = |world: &mut WorldState, list: &[&str]| -> Vec<String> {
+        world.cities[0].outsiders = Some(list.iter().map(|s| s.to_string()).collect());
+        csp_sim::invariants::invariant_named("outsiders-sound")
+            .unwrap()
+            .check(world, terrain())
+            .iter()
+            .map(|v| v.message.clone())
+            .collect()
+    };
+    assert_eq!(wrong(&mut world, &[]), [format!("{city} keeps an empty list of outsiders")]);
+    assert_eq!(wrong(&mut world, &["nobody"]), [format!("{city} lists nobody, who is gone")]);
+    assert_eq!(wrong(&mut world, &[&first]), [format!("{city} lists {first}, who is no outsider")]);
+    assert_eq!(
+        wrong(&mut world, &["x1"]),
+        [format!("{city} lists x1, who stands outside its area")]
+    );
+    // Next to the town hall, an outsider of another realm is inside its area.
+    let hall = find(&world, BuildingKind::TownHall);
+    let x1 = world.residents.iter_mut().find(|r| r.id == "x1").unwrap();
+    (x1.x, x1.y) = (hall.x, hall.y);
+    assert_eq!(wrong(&mut world, &["x1"]), Vec::<String>::new());
+    assert_eq!(wrong(&mut world, &["x1", "x1"]), [format!("{city} lists an outsider twice")]);
+    world.cities[0].trade_org = Some(csp_shared::world::TradeOrgCity::Post);
+    assert_eq!(
+        wrong(&mut world, &["x1"]),
+        [format!("{city} keeps outsiders, but keeps its own rules")]
+    );
+}
+
+#[test]
+fn catch_more_than_one_carrier_fetcher_and_input_fetcher_of_the_games_own_defaults() {
+    let mut world = world_with_city();
+    let script = |memory: serde_json::Value| -> csp_shared::world::RunningScript {
+        serde_json::from_value(json!({ "scriptId": 0, "task": "work", "memory": memory })).unwrap()
+    };
+    let (a, b) = (world.residents[0].id.clone(), world.residents[1].id.clone());
+    for (i, id) in [&a, &b].into_iter().enumerate() {
+        let r = world.residents.iter_mut().find(|r| &r.id == id).unwrap();
+        r.script = Some(script(json!({
+            "workplaceId": "farm1", "siteId": "site1", "carry": { "x": i }, "fetch": 1, "input": 1
+        })));
+    }
+    let names: Vec<String> =
+        ["one-carrier-at-a-time", "one-fetcher-at-a-time", "one-input-fetcher-at-a-time"]
+            .iter()
+            .flat_map(|n| {
+                csp_sim::invariants::world_invariants().into_iter().filter(move |i| i.name == *n)
+            })
+            .flat_map(|i| i.check(&world, terrain()))
+            .map(|v| v.invariant)
+            .collect();
+    assert_eq!(
+        names,
+        ["one-carrier-at-a-time", "one-fetcher-at-a-time", "one-input-fetcher-at-a-time"]
+    );
+    // A Player's own script, not the game's default, is checked where it runs.
+    world.residents[0].script.as_mut().unwrap().script_id = 5;
+    let names: Vec<String> = csp_sim::invariants::world_invariants()
+        .into_iter()
+        .filter(|i| i.name.starts_with("one-"))
+        .flat_map(|i| i.check(&world, terrain()))
+        .map(|v| v.invariant)
+        .collect();
+    assert_eq!(names, Vec::<String>::new());
 }
