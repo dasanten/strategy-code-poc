@@ -1108,3 +1108,6 @@ pub fn npc_trades_keep_reserve(ledger: &TradeLedger) -> Vec<InvariantViolation> 
         })
         .collect()
 }
+
+#[cfg(test)]
+mod swap_tests;

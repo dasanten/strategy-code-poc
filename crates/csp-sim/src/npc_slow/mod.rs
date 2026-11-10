@@ -13,7 +13,7 @@ use crate::random::new_id;
 use crate::walking::Walking;
 
 mod big_city;
-mod big_city_fixture;
+pub(crate) mod big_city_fixture;
 mod far_nodes;
 mod inner_wall;
 mod roads;

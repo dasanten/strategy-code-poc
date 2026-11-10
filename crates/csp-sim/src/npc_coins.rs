@@ -79,3 +79,6 @@ pub fn coins_short_only_with_income(world: &WorldState, size: i32) -> Vec<Invari
     }
     out
 }
+
+#[cfg(test)]
+mod tests;
