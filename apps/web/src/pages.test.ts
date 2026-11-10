@@ -53,6 +53,7 @@ describe('admin tabs', () => {
     expect(adminTabFor('/admin/map')).toBe('map')
     expect(adminTabFor('/admin/accounts/')).toBe('accounts')
     expect(adminTabFor('/admin/directives')).toBe('directives')
+    expect(adminTabFor('/admin/tick-health')).toBe('tick-health')
     expect(adminTabFor('/admin/nothing')).toBe('map')
     expect(adminTabPath('directives')).toBe('/admin/directives')
   })
