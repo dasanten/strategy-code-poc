@@ -1,7 +1,7 @@
 //! `apps/server/src/pairing.test.ts`, ported one to one where pairing itself runs it. Other order
 //! kinds' "carrying a child" checks (work, build, tear down, haul, lines) are theirs to test
-//! (T86.5, T86.6); the running-world test needs work and survival (T86.3, T86.6). `die` is the
-//! `die_all` stand-in; `buildProblem` for a house is the `Ground` stand-in plus the city's area.
+//! (T86.5, T86.6); the running-world test steps the whole world. `die` is the `die_all`
+//! stand-in; `buildProblem` for a house is the `Ground` stand-in plus the city's area.
 
 use csp_shared::balance::{CARRYING_TICKS, CHILD_STAT_SPREAD, HOUSING_ROOM, PAIRING_WAIT_TICKS};
 use csp_shared::time::{TICKS_PER_GAME_DAY, TICKS_PER_GAME_YEAR};
@@ -443,8 +443,38 @@ fn never_makes_a_base_stat_below_1() {
 }
 
 #[test]
-#[ignore = "needs the running world's work and survival (T86.3, T86.6)"]
-fn happens_in_the_running_world_the_partner_keeps_farming_while_the_other_carries() {}
+fn happens_in_the_running_world_the_partner_keeps_farming_while_the_other_carries() {
+    let (mut world, ids) = setup(3000.0);
+    let terrain = city_terrain();
+    let mut scratch = crate::tick::Scratch::default();
+    let mut step = |world: &mut WorldState| {
+        crate::world::step_world(world, terrain, &mut scratch, None, None);
+    };
+    let (a, b) = (ids[0].clone(), ids[1].clone());
+    let farm = world.buildings.iter().find(|x| x.kind == BuildingKind::Farm).unwrap().id.clone();
+    let farming = |world: &WorldState, id: &str| matches!(&live(world, id).unwrap().order, Some(ResidentOrder::WorkAt(w)) if w.building_id == farm);
+    assert_eq!(pair_up(&mut world, &a, &b, &ME), None);
+    // They paired a game year ago, long past the wait (as pairs from before it was shortened):
+    // carrying starts in the world's next tick.
+    for id in [&a, &b] {
+        live_mut(&mut world, id).pair.as_mut().unwrap().since -= TICKS_PER_GAME_YEAR;
+    }
+    step(&mut world);
+    let carrier = carrier_of(&world, &a, &b).expect("one of them carries");
+    let other = if carrier == a { b } else { a };
+    assert_eq!(live(&world, &carrier).unwrap().order, None);
+    assert!(farming(&world, &other), "{:?}", live(&world, &other).unwrap().order);
+    // Skip to the last day of carrying; the world runs it, the other partner working throughout.
+    live_mut(&mut world, &carrier).carrying.as_mut().unwrap().since -=
+        CARRYING_TICKS - TICKS_PER_GAME_DAY;
+    let before = world.residents.len();
+    for t in 0..TICKS_PER_GAME_DAY as usize + 1 {
+        step(&mut world);
+        assert!(farming(&world, &other), "tick {t}: {:?}", live(&world, &other).unwrap().order);
+    }
+    assert_eq!(world.residents.len(), before + 1);
+    assert_eq!(crate::invariants::check_all(&world, terrain), vec![]);
+}
 
 #[test]
 fn a_resident_of_no_city_cant_pair() {
