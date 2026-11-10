@@ -2150,7 +2150,13 @@ pub fn seen_by(world: &WorldState, size: i32, side: &str) -> Arc<Vec<SeenEntity>
 }
 
 #[cfg(test)]
+mod build_line_tests;
+#[cfg(test)]
+pub(crate) mod default_host;
+#[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod working_site_tests;
 
 thread_local! {
     /// The params each script source declares (`scriptParams`), by source. Reading them parses

@@ -258,4 +258,6 @@ pub fn waypoints_sound(world: &WorldState, terrain: &TerrainMap) -> Vec<Invarian
 }
 
 #[cfg(test)]
+mod places_tests;
+#[cfg(test)]
 mod tests;

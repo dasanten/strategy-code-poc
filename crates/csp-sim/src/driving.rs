@@ -322,4 +322,6 @@ impl OrderKind for Hitch {
 }
 
 #[cfg(test)]
+mod mountain_tests;
+#[cfg(test)]
 mod tests;
