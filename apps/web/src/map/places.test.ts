@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Building, ResidentOrder, SeenResident } from '@csp/shared'
+import type { Building, ResidentOrder, SeenResident } from '@csp/shared-types'
 import { pickedPlaces } from './places.js'
 
 const size = 1440

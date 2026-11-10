@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { MIN_PASSWORD_LENGTH, type Account } from '@csp/shared'
+import { MIN_PASSWORD_LENGTH } from './shared/api.js'
+import type { Account } from '@csp/shared-types'
 import { api, ApiFailure } from './api.js'
 import { WIKI_PATH } from './wiki-view.js'
 

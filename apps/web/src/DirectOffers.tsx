@@ -1,22 +1,22 @@
 import { useState, type ReactNode } from 'react'
-import {
-  DIRECT_OFFERS_TO_ONE_REALM,
-  TRADE_ORG,
-  aboutTime,
-  citiesToCarryAt,
-  deliveryStorage,
-  type CarriedFeeBy,
-  type CarriedWay,
-  type DirectOfferView,
-  type OrderRequest,
-  type RealmLabel,
-  type Resident,
-  type SeenBuilding,
-  type SeenCarriage,
-  type SeenCity,
-  type SeenHorse,
-  type SeenResident,
-} from '@csp/shared'
+import { DIRECT_OFFERS_TO_ONE_REALM } from '@csp/balance'
+import { TRADE_ORG } from './shared/trade-org.js'
+import { aboutTime } from './shared/estimates.js'
+import { citiesToCarryAt } from './shared/direct-offer.js'
+import { deliveryStorage } from './shared/warehouse.js'
+import type {
+  CarriedFeeBy,
+  CarriedWay,
+  DirectOfferView,
+  OrderRequest,
+  RealmLabel,
+  Resident,
+  SeenBuilding,
+  SeenCarriage,
+  SeenCity,
+  SeenHorse,
+  SeenResident,
+} from '@csp/shared-types'
 import { onTheWay, onTheWayLine, sendable, tradersAt } from './city-view.js'
 import { Sending } from './CityInspector.js'
 import { PanelHead } from './drawer-head.js'

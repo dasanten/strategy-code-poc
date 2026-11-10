@@ -1,10 +1,5 @@
-import {
-  SCRIPT_STEP_BUDGET,
-  type Resident,
-  type ScriptRunError,
-  type ScriptRunSteps,
-  type ScriptSummary,
-} from '@csp/shared'
+import { SCRIPT_STEP_BUDGET } from '@csp/balance'
+import type { Resident, ScriptRunError, ScriptRunSteps, ScriptSummary } from '@csp/shared-types'
 import { agoText } from './last-seen.js'
 
 /**

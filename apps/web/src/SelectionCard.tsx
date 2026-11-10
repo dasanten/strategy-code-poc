@@ -10,20 +10,18 @@ import {
   type FormEvent,
   type ReactNode,
 } from 'react'
-import {
-  CITY_NAME_MAX_LENGTH,
-  FEED_UNITS,
-  HORSE_NAME_MAX_LENGTH,
-  canHandle,
-  nameProblem,
-  type Building,
-  type BuildingKind,
-  type GoodsSpot,
-  type Resident,
-  type ResourceKind,
-  type Stock,
-  type Waypoint,
-} from '@csp/shared'
+import { CITY_NAME_MAX_LENGTH, FEED_UNITS, HORSE_NAME_MAX_LENGTH } from '@csp/balance'
+import { canHandle } from './shared/stats.js'
+import { nameProblem } from './shared/names.js'
+import type {
+  Building,
+  BuildingKind,
+  GoodsSpot,
+  Resident,
+  ResourceKind,
+  Stock,
+  Waypoint,
+} from '@csp/shared-types'
 import { BuildingInfo } from './BuildingInfo.js'
 import { CustomiseButton, taskStart } from './Customise.js'
 import { GoodIcon, GoodsGrid } from './GoodsGrid.js'

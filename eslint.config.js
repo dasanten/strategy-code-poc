@@ -22,5 +22,25 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   },
+  {
+    // The client no longer depends on `@csp/shared` (T88.2, ADR 0030): its types come from
+    // `@csp/shared-types`, its numbers from `@csp/balance` and its helpers live in
+    // `apps/web/src/shared/`.
+    files: ['apps/web/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@csp/shared', '@csp/shared/*'],
+              message:
+                'The client is off @csp/shared: use @csp/shared-types, @csp/balance or ./shared/.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   prettier,
 )

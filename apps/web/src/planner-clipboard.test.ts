@@ -1,9 +1,5 @@
-import {
-  QUEUE_DEFAULT_STEP_MINUTES,
-  type OrderRequest,
-  type Queue,
-  type QueueStepRequest,
-} from '@csp/shared'
+import { QUEUE_DEFAULT_STEP_MINUTES } from '@csp/balance'
+import type { OrderRequest, Queue, QueueStepRequest } from '@csp/shared-types'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { clear, copy, isEmpty, paste, pickStep } from './planner-clipboard.js'
 import { idsOf, insertItems, lastPicked, unroll, withIds, type PlanItem } from './plan-blocks.js'

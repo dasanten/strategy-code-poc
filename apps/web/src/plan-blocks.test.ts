@@ -1,11 +1,6 @@
-import {
-  QUEUE_DEFAULT_STEP_MINUTES,
-  QUEUE_MAX_STEPS,
-  queueStepsProblem,
-  type OrderRequest,
-  type Queue,
-  type QueueStepRequest,
-} from '@csp/shared'
+import { QUEUE_DEFAULT_STEP_MINUTES, QUEUE_MAX_STEPS } from '@csp/balance'
+import { queueStepsProblem } from './shared/queue.js'
+import type { OrderRequest, Queue, QueueStepRequest } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
   canMove,

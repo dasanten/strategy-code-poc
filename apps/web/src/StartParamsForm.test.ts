@@ -1,4 +1,4 @@
-import type { ScriptParam } from '@csp/shared'
+import type { ScriptParam } from '@csp/shared-types'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'

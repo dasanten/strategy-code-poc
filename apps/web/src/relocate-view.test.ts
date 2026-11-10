@@ -1,10 +1,6 @@
-import {
-  CARRYING_A_CHILD,
-  HOUSING_ROOM,
-  type Building,
-  type City,
-  type Resident,
-} from '@csp/shared'
+import { CARRYING_A_CHILD } from './shared/world.js'
+import { HOUSING_ROOM } from './shared/narrowed.js'
+import type { Building, City, Resident } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
   groupRelocateActionProblem,

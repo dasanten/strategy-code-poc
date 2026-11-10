@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { WAYPOINTS_MAX } from '@csp/shared'
+import { WAYPOINTS_MAX } from '@csp/balance'
 import { menuSpot, suggestedWaypointName, waypointCount, waypointPlace } from './waypoints-view.js'
 
 describe('the waypoints view', () => {

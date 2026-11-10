@@ -1,15 +1,14 @@
 import { Fragment, useState } from 'react'
-import {
-  FEED_UNITS,
-  GOODS,
-  HAUL_KEEP_FOOD,
-  type BuildingKind,
-  type Good,
-  type ResourceNode,
-  type ScriptSummary,
-  type SeenHorse,
-  type Stock,
-} from '@csp/shared'
+import { FEED_UNITS, HAUL_KEEP_FOOD } from '@csp/balance'
+import { GOODS } from './shared/world.js'
+import type {
+  BuildingKind,
+  Good,
+  ResourceNode,
+  ScriptSummary,
+  SeenHorse,
+  Stock,
+} from '@csp/shared-types'
 import { BuildMenu } from './BuildMenu.js'
 import { CustomiseButton, taskStart } from './Customise.js'
 import { HorsePick } from './HorsePick.js'

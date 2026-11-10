@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { ScriptParam, ScriptSummary, Waypoint, WorkplaceSettings } from '@csp/shared'
+import type { ScriptParam, ScriptSummary, Waypoint, WorkplaceSettings } from '@csp/shared-types'
 import { ScriptParamFields } from './ScriptParams.js'
 import { workScriptOf, workScripts, workSettingsParams } from './work-settings-view.js'
 

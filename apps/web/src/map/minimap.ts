@@ -1,12 +1,6 @@
-import {
-  CHUNK_SIZE,
-  UNEXPLORED,
-  cityAreaTiles,
-  wrap,
-  wrapDelta,
-  type Building,
-  type City,
-} from '@csp/shared'
+import { CHUNK_SIZE, UNEXPLORED, wrap, wrapDelta } from '../shared/terrain.js'
+import { cityAreaTiles } from '../shared/city.js'
+import type { Building, City } from '@csp/shared-types'
 import type { Camera, Size } from './camera.js'
 import { cityEmblems } from './far.js'
 import type { MapWorld } from './map-world.js'

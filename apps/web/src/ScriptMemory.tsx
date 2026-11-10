@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { SCRIPT_MEMORY_MAX, type ScriptMemory } from '@csp/shared'
+import { SCRIPT_MEMORY_MAX } from '@csp/balance'
+import type { ScriptMemory } from '@csp/shared-types'
 import { memoryRows } from './script-memory-view.js'
 
 /**

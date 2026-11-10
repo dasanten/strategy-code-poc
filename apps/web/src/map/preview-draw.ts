@@ -1,5 +1,5 @@
 import type { Graphics } from 'pixi.js'
-import { FOOTPRINT } from '@csp/shared'
+import { FOOTPRINT } from '../shared/footprint.js'
 import type { PickPreview } from '../pick-preview.js'
 import { tileToScreen, type Camera, type Size } from './camera.js'
 import { LEADER_COLOR, ROAD_COLOR, WALL_COLOR } from './palette.js'

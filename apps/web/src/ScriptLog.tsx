@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import { formatGameTime, type ScriptLogLine } from '@csp/shared'
+import { formatGameTime } from './shared/time.js'
+import type { ScriptLogLine } from '@csp/shared-types'
 
 /**
  * A resident's script log on their Script tab, newest first (`CONTEXT.md`: Script log): what

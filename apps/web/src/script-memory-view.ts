@@ -1,4 +1,4 @@
-import type { MemoryValue, ScriptMemory } from '@csp/shared'
+import type { MemoryValue, ScriptMemory } from '@csp/shared-types'
 
 /**
  * The Script tab's view of a running script's memory (`CONTEXT.md`: Debugging a script): a

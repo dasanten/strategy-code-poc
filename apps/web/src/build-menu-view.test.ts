@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import {
-  BUILDABLE,
-  Terrain,
-  buildMenu,
-  type Building,
-  type BuildingKind,
-  type City,
-  type KnownNode,
-} from '@csp/shared'
+import { BUILDABLE, buildMenu } from './shared/building.js'
+import { Terrain } from './shared/terrain.js'
+import type { Building, BuildingKind, City, KnownNode } from '@csp/shared-types'
 import { buildMenuGroups, canChooseKind, workSpan } from './build-menu-view.js'
 import { BUILDING_NAMES } from './map/palette.js'
 import { buildHereProblem } from './selection-view.js'

@@ -1,11 +1,5 @@
-import {
-  TRADE_ORG,
-  TRADE_ORG_NAME,
-  type RealmEvent,
-  type SeenBuilding,
-  type SeenCity,
-  type StandingView,
-} from '@csp/shared'
+import { TRADE_ORG, TRADE_ORG_NAME } from './shared/trade-org.js'
+import type { RealmEvent, SeenBuilding, SeenCity, StandingView } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
   formatMove,

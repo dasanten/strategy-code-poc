@@ -1,4 +1,4 @@
-import type { ScriptParam, ScriptSummary } from '@csp/shared'
+import type { ScriptParam, ScriptSummary } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
   canCustomise,

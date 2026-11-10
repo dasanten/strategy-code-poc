@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import {
-  ADMIN_VIEW_MAX_SIDE,
-  OVERVIEW_SCALE,
-  Terrain,
-  chunksAcross,
-  type AdminEntity,
-  type AdminPlaces,
-  type AdminWorldView,
-} from '@csp/shared'
+import { ADMIN_VIEW_MAX_SIDE } from './shared/admin-map.js'
+import { OVERVIEW_SCALE, Terrain, chunksAcross } from './shared/terrain.js'
+import type { AdminEntity, AdminPlaces, AdminWorldView } from '@csp/shared-types'
 import {
   ADMIN_LINK_SCALE,
   ADMIN_VIEW_MARGIN,

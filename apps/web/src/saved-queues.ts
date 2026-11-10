@@ -1,4 +1,4 @@
-import type { Building, OrderRequest } from '@csp/shared'
+import type { Building, OrderRequest } from '@csp/shared-types'
 import { copyItems, type PlanItem } from './plan-blocks.js'
 
 /**

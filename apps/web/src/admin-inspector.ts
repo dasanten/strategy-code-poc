@@ -1,23 +1,19 @@
-import {
-  BUILD_WORK,
-  CARRIAGE_CAPACITY,
-  GOODS,
-  HORSE_STAT_NAMES,
-  MAX_HEALTH,
-  MAX_HUNGER,
-  STAT_NAMES,
-  stockWeight,
-  type AdminInspectTarget,
-  type AdminInspection,
-  type AdminNamed,
-  type AdminOrganization,
-  type AdminScript,
-  type AdminWorldView,
-  type Army,
-  type Caravan,
-  type Trader,
-  type Stock,
-} from '@csp/shared'
+import { BUILD_WORK } from './shared/narrowed.js'
+import { CARRIAGE_CAPACITY, MAX_HEALTH, MAX_HUNGER } from '@csp/balance'
+import { GOODS, HORSE_STAT_NAMES, STAT_NAMES } from './shared/world.js'
+import { stockWeight } from './shared/stats.js'
+import type {
+  AdminInspectTarget,
+  AdminInspection,
+  AdminNamed,
+  AdminOrganization,
+  AdminScript,
+  AdminWorldView,
+  Army,
+  Caravan,
+  Trader,
+  Stock,
+} from '@csp/shared-types'
 import type { JumpEntry, JumpKind } from './admin-jump.js'
 import { buildingCount } from './city-view.js'
 import { BUILDING_NAMES } from './map/palette.js'

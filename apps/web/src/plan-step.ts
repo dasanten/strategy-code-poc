@@ -1,26 +1,23 @@
-import {
-  FEED_UNITS,
-  GOODS,
-  MAX_WORKERS,
-  RECIPES,
-  buildingRealm,
-  inCityArea,
-  isAt,
-  recipeGood,
-  relocateRoom,
-  type RelocateWorld,
-  type Building,
-  type BuildingKind,
-  type Carriage,
-  type City,
-  type Good,
-  type GoodsSpot,
-  type OrderRequest,
-  type SeenHorse,
-  type Stock,
-  type Task,
-  type TrainingSubject,
-} from '@csp/shared'
+import { FEED_UNITS } from '@csp/balance'
+import { GOODS } from './shared/world.js'
+import { MAX_WORKERS, recipeGood } from './shared/building.js'
+import { RECIPES } from './shared/narrowed.js'
+import { buildingRealm, inCityArea } from './shared/city.js'
+import { isAt } from './shared/footprint.js'
+import { relocateRoom, type RelocateWorld } from './shared/relocate.js'
+import type {
+  Building,
+  BuildingKind,
+  Carriage,
+  City,
+  Good,
+  GoodsSpot,
+  OrderRequest,
+  SeenHorse,
+  Stock,
+  Task,
+  TrainingSubject,
+} from '@csp/shared-types'
 import type { HaulSetup } from './Residents.js'
 import { anyonesToWork } from './script-params-view.js'
 

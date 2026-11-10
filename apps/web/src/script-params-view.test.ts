@@ -1,4 +1,5 @@
-import { DEFAULT_SCRIPTS, type Building } from '@csp/shared'
+import { DEFAULT_SCRIPTS } from '@csp/lang-wasm'
+import type { Building } from '@csp/shared-types'
 import { scriptParams } from '@csp/lang'
 import { describe, expect, it } from 'vitest'
 import {

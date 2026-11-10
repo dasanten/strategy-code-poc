@@ -1,36 +1,35 @@
 import { useEffect, useRef, useState } from 'react'
-import {
-  GOODS,
-  buildingRealm,
-  horseBuyerProblem,
-  horseSellerProblem,
-  isClosed,
-  noSwap,
-  type Building,
-  type NpcHorseOffer,
-  type SeenBuilding,
-  type Carriage,
-  type DeliveryQuote,
-  type Good,
-  type DirectiveView,
-  type NpcCityPrice,
-  type PricedGood,
-  type RealmEvent,
-  type RealmLabel,
-  type Resident,
-  type SeenCity,
-  type StandingView,
-  type TradeSide,
-  type SeenResident,
-  type Stock,
-  type SeenCarriage,
-  type SeenHorse,
-  type SeenTrader,
-  type TraderVisit,
-  aboutTime,
-  type SwapQuote,
-  type SwapRate,
-} from '@csp/shared'
+import { GOODS } from './shared/world.js'
+import { buildingRealm } from './shared/city.js'
+import { horseBuyerProblem, horseSellerProblem } from './shared/horse-market.js'
+import { isClosed } from './shared/walls.js'
+import { noSwap } from './shared/swap.js'
+import type {
+  Building,
+  NpcHorseOffer,
+  SeenBuilding,
+  Carriage,
+  DeliveryQuote,
+  Good,
+  DirectiveView,
+  NpcCityPrice,
+  PricedGood,
+  RealmEvent,
+  RealmLabel,
+  Resident,
+  SeenCity,
+  StandingView,
+  TradeSide,
+  SeenResident,
+  Stock,
+  SeenCarriage,
+  SeenHorse,
+  SeenTrader,
+  TraderVisit,
+  SwapQuote,
+  SwapRate,
+} from '@csp/shared-types'
+import { aboutTime } from './shared/estimates.js'
 import {
   buildingCount,
   describeBuying,

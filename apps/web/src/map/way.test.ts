@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { ResidentOrder } from '@csp/shared'
+import type { ResidentOrder } from '@csp/shared-types'
+import type { LineOrder } from '../shared/world.js'
 import type { Camera } from './camera.js'
 import { selectedWay, wayAhead, wayInView, wayLine, type Way } from './way.js'
 
@@ -41,7 +42,7 @@ describe('the selected resident’s way ahead', () => {
 
   it('is the way to the next tile of a road or wall line while walking, none while building', () => {
     for (const kind of ['roadLine', 'wallLine'] as const) {
-      const order: ResidentOrder = {
+      const order: LineOrder = {
         kind,
         tiles: [
           [7, 2],

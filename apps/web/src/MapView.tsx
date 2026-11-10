@@ -1,20 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Application, Container, Graphics, Sprite, Texture, TilingSprite } from 'pixi.js'
-import {
-  CHUNK_SIZE,
-  TERRAIN_SPEED,
-  Terrain,
-  UNEXPLORED,
-  chunksAcross,
-  cityAreaTiles,
-  wrap,
-  type Building,
-  type KnownNode,
-  type SeenResident,
-  type ResourceKind,
-  footprintKeys,
-  FOOTPRINT,
-} from '@csp/shared'
+import { CHUNK_SIZE, Terrain, UNEXPLORED, chunksAcross, wrap } from './shared/terrain.js'
+import { TERRAIN_SPEED } from '@csp/balance'
+import { cityAreaTiles } from './shared/city.js'
+import type { Building, KnownNode, SeenResident, ResourceKind } from '@csp/shared-types'
+import { footprintKeys, FOOTPRINT } from './shared/footprint.js'
 import {
   CLOSE_SCALE,
   zoomTier,

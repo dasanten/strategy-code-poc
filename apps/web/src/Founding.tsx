@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { REALM_NAME_MAX_LENGTH, RESIDENT_NAME_MAX_LENGTH, foundingProblem } from '@csp/shared'
+import { REALM_NAME_MAX_LENGTH, RESIDENT_NAME_MAX_LENGTH } from '@csp/balance'
+import { foundingProblem } from './shared/names.js'
 
 /**
  * The naming screen of a Player without a realm (first login, or after a Leader death): they name

@@ -1,19 +1,17 @@
-import {
-  GOODS,
-  TICKS_PER_GAME_DAY,
-  TRAINING_GROUND_MAX_TRAINEES,
-  buildingInfo,
-  footprintTiles,
-  materialsNeeded,
-  workNeeded,
-  type Building,
-  type BuildingKind,
-  type Good,
-  type KnownNode,
-  type ResourceKind,
-  type SkillName,
-  type Stock,
-} from '@csp/shared'
+import { GOODS } from './shared/world.js'
+import { TICKS_PER_GAME_DAY, TRAINING_GROUND_MAX_TRAINEES } from '@csp/balance'
+import { buildingInfo } from './shared/building-info.js'
+import { footprintTiles } from './shared/footprint.js'
+import { materialsNeeded, workNeeded } from './shared/building.js'
+import type {
+  Building,
+  BuildingKind,
+  Good,
+  KnownNode,
+  ResourceKind,
+  SkillName,
+  Stock,
+} from '@csp/shared-types'
 
 /** The kind of node under a building's footprint, if the Player knows one there. */
 export function buildingNodeKind(
