@@ -3,6 +3,7 @@
 //! Player's version of a task's default has the id `user_id * 100` plus the task's place in
 //! `TASKS`, from 1; Run script runs it by that id. Every Player has explored the whole map.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use csp_shared::terrain::TerrainMap;
@@ -27,10 +28,15 @@ pub fn default_script_id(user_id: u64, task: Task) -> u64 {
 
 struct Host {
     senders: Vec<OrderSender>,
+    /// Other scripts of theirs, by id.
+    library: HashMap<u64, RunnableScript>,
 }
 
 impl Host {
     fn runnable(&self, id: u64) -> Option<RunnableScript> {
+        if let Some(s) = self.library.get(&id) {
+            return Some(s.clone());
+        }
         let task = *TASKS.get(((id % 100) as usize).checked_sub(1)?)?;
         let (name, source) = default_script(task);
         Some(RunnableScript {
@@ -80,7 +86,16 @@ pub struct DefaultScripts {
 
 impl DefaultScripts {
     pub fn new(terrain: Arc<TerrainMap>, senders: &[OrderSender]) -> Self {
-        let host = Arc::new(Host { senders: senders.to_vec() });
+        Self::with_library(terrain, senders, HashMap::new())
+    }
+
+    /// With other scripts of the Players' in `library`, by id.
+    pub fn with_library(
+        terrain: Arc<TerrainMap>,
+        senders: &[OrderSender],
+        library: HashMap<u64, RunnableScript>,
+    ) -> Self {
+        let host = Arc::new(Host { senders: senders.to_vec(), library });
         let mut kinds = order_kinds();
         kinds.insert("runScript", RunScriptOrder { host: host.clone() });
         kinds.insert("setDefenceScript", SetDefenceScriptOrder { host: host.clone() });
