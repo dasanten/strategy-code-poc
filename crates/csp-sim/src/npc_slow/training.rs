@@ -283,7 +283,7 @@ fn wait_with_no_teacher_and_leave_once_the_pass_finds_none() {
 }
 
 #[test]
-#[ignore = "nothing raises an outsider alarm yet: outsiders.ts is not ported; 6 s alone; see #1092"]
+#[ignore = "4.2 to 6 s alone; see #1092"]
 fn are_taken_off_by_an_alarm_and_come_back_to_it_after() {
     let mut run = Running::new();
     run.step(DAY / 2);
