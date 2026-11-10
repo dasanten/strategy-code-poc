@@ -73,6 +73,19 @@ pub fn world_with_city() -> (WorldState, TerrainMap) {
     (crate::test_world::world_with_city(), crate::test_world::city_terrain().clone())
 }
 
+/// A generated world on `cityTerrain` where Player 1 has founded their starting city
+/// (`worldWithPost`), with its terrain. The world is generated once and cloned for each test.
+pub fn world_with_post() -> (WorldState, TerrainMap) {
+    static WORLD: std::sync::OnceLock<WorldState> = std::sync::OnceLock::new();
+    let terrain = crate::test_world::city_terrain();
+    let world = WORLD.get_or_init(|| {
+        let mut world = crate::world::generate_world(terrain, 1);
+        crate::starting_city::found_starting_city(&mut world, terrain, 1, None);
+        world
+    });
+    (world.clone(), terrain.clone())
+}
+
 /// A JSON value with every number as an `f64`, so a Rust `1.0` and a TypeScript `1` compare equal.
 pub fn as_numbers(v: &serde_json::Value) -> serde_json::Value {
     use serde_json::Value;

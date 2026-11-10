@@ -159,3 +159,5 @@ pub use invariants::{
 pub use run::step_npc_cities;
 #[cfg(test)]
 mod crew_food_tests;
+#[cfg(test)]
+mod kept_going_tests;

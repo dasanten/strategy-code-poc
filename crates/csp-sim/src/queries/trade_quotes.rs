@@ -18,7 +18,7 @@ use super::horse_market::{
 };
 use super::horses::{owns_horse, HorseOwner};
 use super::names::{held, held_in, placed, PRICED_GOODS};
-use super::npc_trade::{npc_city_stock, npc_price_for, npc_reserve, standing_swing};
+use super::npc_trade::{npc_city_stock, npc_price_for, npc_reserve, standing_swing, NpcCityPrice};
 use super::residents::{can_work, good_weight, stock_weight};
 use super::trade_org::trade_org_refuses;
 use super::trader_trade::{trader_standing, trader_stock};
@@ -700,4 +700,34 @@ pub fn buy_problem(
         ));
     }
     None
+}
+
+/// One of an NPC city's swap rates (`SwapRate`): `gives` units of `give` for `units` of `want`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SwapRate {
+    pub give: Good,
+    pub gives: f64,
+    pub want: Good,
+    pub units: f64,
+}
+
+/// An NPC city's swap rates from its prices (`npcSwapRates`, `CONTEXT.md`: Swap): each good it is
+/// short of against each it has spare, in small whole units. One unit given when it pays for at
+/// least one wanted, else as many as one wanted costs, rounded up; none when that is more than it
+/// is short of. The units got are what one given pays for, at least one and no more than is spare.
+pub fn npc_swap_rates(prices: &[NpcCityPrice]) -> Vec<SwapRate> {
+    let spare: Vec<&NpcCityPrice> = prices.iter().filter(|p| p.for_sale >= 1.0).collect();
+    let mut out = Vec::new();
+    for give in prices.iter().filter(|p| p.wanted >= 1.0) {
+        for want in &spare {
+            let one_pays = (give.buy / want.sell).floor();
+            let gives = if one_pays >= 1.0 { 1.0 } else { (want.sell / give.buy).ceil() };
+            if gives > give.wanted {
+                continue;
+            }
+            let units = one_pays.max(1.0).min(want.for_sale.floor());
+            out.push(SwapRate { give: give.good, gives, want: want.good, units });
+        }
+    }
+    out
 }

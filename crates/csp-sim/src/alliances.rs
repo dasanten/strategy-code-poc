@@ -660,4 +660,6 @@ pub fn step_alliances(world: &mut WorldState) {
 }
 
 #[cfg(test)]
+mod npc_tests;
+#[cfg(test)]
 mod tests;

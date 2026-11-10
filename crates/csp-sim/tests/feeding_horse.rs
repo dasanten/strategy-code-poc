@@ -2,7 +2,7 @@
 //! grown resident next to a horse that isn't full can Feed it.
 
 mod build_common;
-mod default_scripts_host;
+mod p_scripts_host;
 
 use build_common::*;
 use csp_shared::balance::{HORSE_FILL_PER_FOOD, HORSE_WAKE_HEALTH, MAX_HEALTH, MAX_HUNGER};
@@ -18,7 +18,7 @@ use csp_sim::scripts::RunnableScript;
 use csp_sim::tick::Scratch;
 use csp_sim::walking::Walking;
 use csp_sim::world::{create_world, step_world};
-use default_scripts_host::{default_scripts, DefaultScripts, Library};
+use p_scripts_host::{default_scripts, DefaultScripts, Library};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
