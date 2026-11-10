@@ -1,16 +1,21 @@
 //! `apps/server/src/crimes.test.ts`, ported one to one where the conflict phases run it
-//! (`test_world::step` in place of `stepWorld`). Thefts come from carrying (T86.5), tearing down
-//! from teardown (T86.6), and the `crimesSound` invariant is T86.13's.
+//! (`test_world::step` in place of `stepWorld`).
 
 use csp_shared::balance::{CRIME_MEMORY_DAYS, CRIME_STANDING_LOSS, SIGHT_RANGE};
 use csp_shared::time::TICKS_PER_GAME_DAY;
-use csp_shared::world::{CrimeKind, Good, RealmEvent, RealmEventWhat, ResidentOrder, WorldState};
+use csp_shared::world::{
+    BuildingKind, CrimeKind, Good, GoodsSpot, Pile, RealmEvent, RealmEventWhat, ResidentOrder,
+    Stock, TearDownOrder, Tile, WorldState,
+};
 
 use super::*;
+use crate::carrying::{resolve_carrying, CarryAction, CarryKind};
 use crate::combat::{apply_attack, attack_order, resolve_strikes, AttackRequest, StrikeAction};
 use crate::defence::NoAlarms;
 use crate::queries::standing::standing_of;
-use crate::test_world::{add_city, empty_world, live, live_mut, realm, resident, run};
+use crate::teardown::{resolve_tearing_down, TearDownAction};
+use crate::test_world::{add_city, building, empty_world, live, live_mut, realm, resident, run};
+use crate::tick::Scratch;
 
 const SIZE: i32 = 256;
 
@@ -210,17 +215,95 @@ fn a_killing_is_a_crime_the_dead_victim_no_witness() {
     assert!(world.crimes.is_empty());
 }
 
-#[test]
-#[ignore = "needs resolveCarrying (T86.5)"]
-fn taking_from_another_organizations_storage_is_theft_thefts_add_up_until_known() {}
+/// Steps the conflict phases `ticks` times and checks the crime invariant each tick (`run`).
+fn run_checked(world: &mut WorldState, ticks: usize) {
+    let terrain = crate::test_support::plains(SIZE);
+    for _ in 0..ticks {
+        run(world, SIZE, 1);
+        assert_eq!(crate::invariants::checks::crimes_sound(world, &terrain), vec![]);
+    }
+}
+
+/// A storage `id` of `city` on (20, 20) holding 9 Food.
+fn storage(world: &mut WorldState, city: &str) {
+    building(world, "s", BuildingKind::Storage, Some(city), 20.0, 20.0);
+    world.buildings.last_mut().unwrap().stock = Some(Stock::from([(Good::Food, 9.0)]));
+}
+
+fn take(spot: GoodsSpot, goods: Stock) -> CarryAction {
+    CarryAction { kind: CarryKind::Take, resident_id: "a1".into(), spot, goods }
+}
+
+fn from_storage() -> GoodsSpot {
+    GoodsSpot::Storage { storage_id: "s".into() }
+}
 
 #[test]
-#[ignore = "needs resolveCarrying (T86.5)"]
-fn taking_from_a_pile_or_ones_own_storage_is_no_crime() {}
+fn taking_from_another_organizations_storage_is_theft_thefts_add_up_until_known() {
+    let mut world = setup();
+    storage(&mut world, "c2");
+    resolve_carrying(&mut world, &[take(from_storage(), Stock::from([(Good::Food, 2.0)]))], SIZE);
+    resolve_carrying(&mut world, &[take(from_storage(), Stock::from([(Good::Food, 3.0)]))], SIZE);
+    assert_eq!(world.crimes.len(), 1);
+    let c = &world.crimes[0];
+    assert_eq!(c.kind, CrimeKind::Theft);
+    assert_eq!(c.goods, Some(Stock::from([(Good::Food, 5.0)])));
+    assert_eq!(c.witnesses, vec!["b1".to_string()]);
+    let b = live_mut(&mut world, "b1");
+    (b.x, b.y) = (40.0, 40.0);
+    run_checked(&mut world, 1);
+    assert!(matches!(&crime_log(&world, 8)[0].what,
+        RealmEventWhat::CrimeKnown { crime: CrimeKind::Theft, goods: Some(g), .. }
+            if *g == Stock::from([(Good::Food, 5.0)])));
+}
 
 #[test]
-#[ignore = "needs resolveTearingDown (T86.6)"]
-fn tearing_down_another_organizations_building_is_a_crime() {}
+fn taking_from_a_pile_or_ones_own_storage_is_no_crime() {
+    let mut world = setup();
+    storage(&mut world, "c1");
+    world.piles.push(Pile {
+        id: "p".into(),
+        x: 20.0,
+        y: 20.0,
+        goods: Stock::from([(Good::Wood, 2.0)]),
+    });
+    let actions = [
+        take(from_storage(), Stock::from([(Good::Food, 1.0)])),
+        take(GoodsSpot::Ground, Stock::from([(Good::Wood, 1.0)])),
+    ];
+    resolve_carrying(&mut world, &actions, SIZE);
+    assert_eq!(world.crimes, vec![]);
+}
+
+#[test]
+fn tearing_down_another_organizations_building_is_a_crime() {
+    let mut world = setup();
+    building(&mut world, "h", BuildingKind::House, Some("c2"), 20.0, 20.0);
+    world.buildings.last_mut().unwrap().teardown = Some(1e9);
+    live_mut(&mut world, "a1").order = Some(ResidentOrder::TearDown(TearDownOrder {
+        building_id: "h".into(),
+        at: Tile { x: 20.0, y: 20.0 },
+    }));
+    let terrain = crate::test_support::plains(SIZE);
+    let action = [TearDownAction { resident_id: "a1".into() }];
+    resolve_tearing_down(&mut world, &action, Some(&terrain), &mut Scratch::default());
+    let c = &world.crimes[0];
+    assert_eq!(
+        (c.kind, c.building, c.victim_org.as_str()),
+        (CrimeKind::TearDown, Some(BuildingKind::House), "r2")
+    );
+    let b = live_mut(&mut world, "b1");
+    (b.x, b.y) = (40.0, 40.0);
+    run_checked(&mut world, 1);
+    assert!(matches!(
+        &crime_log(&world, 8)[0].what,
+        RealmEventWhat::CrimeKnown {
+            crime: CrimeKind::TearDown,
+            building: Some(BuildingKind::House),
+            ..
+        }
+    ));
+}
 
 /// Thefts add up while not yet known, the part of the theft test `commit_crime` itself does.
 #[test]
