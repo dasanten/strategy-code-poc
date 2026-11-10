@@ -6,7 +6,7 @@ hashes and paths, as parsed JSON for worlds. Files over about 5 MB were kept out
 (`.gitignore`, marked "not in git" below).
 
 **Frozen since the cutover (T88.6).** The TypeScript game and the dumper are gone (the last commit
-with both is `848f58db`), so nothing here can be written again. Never edit a fixture to make a test
+with both is `21f7a29e`), so nothing here can be written again. Never edit a fixture to make a test
 pass: a failing comparison is a Rust bug until shown otherwise. When Daniel changes a rule and a
 fixture comparison fails because of it, the PR replaces that comparison with a Rust test of the new
 rule (or writes the fixture anew from Rust), and says so.

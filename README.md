@@ -12,7 +12,7 @@ The server is Rust (ADR 0030), the client TypeScript. One cargo workspace at the
 | Path                    | What it is                                                                                 |
 | ----------------------- | ------------------------------------------------------------------------------------------ |
 | `crates/csp-shared`     | World types, balance numbers (`src/balance.rs`), the wire protocol and helpers             |
-| `crates/csp-lang`       | The script language: lexer, parser, checker, interpreter with the step budget             |
+| `crates/csp-lang`       | The script language: lexer, parser, checker, interpreter with the step budget              |
 | `crates/csp-lang-wasm`  | `csp-lang`'s checker built to WebAssembly for the editor                                   |
 | `crates/csp-sim`        | Everything in a tick: terrain, pathfinding, orders, the world step, NPC cities, invariants |
 | `crates/csp-server`     | The I/O shell: HTTP, WebSocket sync, accounts, SQLite, saves, monitoring, admin CLI        |
@@ -22,7 +22,7 @@ The server is Rust (ADR 0030), the client TypeScript. One cargo workspace at the
 | `packages/lang-wasm`    | The editor's checker (`pnpm wasm:build`) and the script tables (`pnpm script-data:rust`)   |
 
 The TypeScript server, `packages/shared` and `packages/lang` were the frozen specification of the
-port and were deleted at the cutover (T88.6); the last commit with them is `848f58db`. The Rust
+port and were deleted at the cutover (T88.6); the last commit with them is `21f7a29e`. The Rust
 tests still compare against what they wrote, in `crates/csp-sim/fixtures/` (frozen; see its
 README).
 
@@ -130,7 +130,51 @@ Backups go to the `world-backups` volume before every start (`world-<time>-start
 
 ### Rolling back
 
-ROLLBACK_PLACEHOLDER
+Rolling back is the previous image plus the pre-deploy backup (ADR 0007). Image tags are the
+first 12 characters of the commit on `main` (GHCR lists them); the previous one is still on the
+server. In the deploy directory, with `IMAGE_TAG` set to the previous tag for every command:
+
+```bash
+export IMAGE_TAG=<previous tag>
+```
+
+1. Find the backup the bad deploy wrote as it started, before any migration: the `-start` file
+   whose time matches that deploy (the server's first log line, `backup written`, names it). Every
+   start writes one, so after more restarts it is no longer the newest.
+
+   ```bash
+   docker compose exec server sh -c 'ls -t /backups | head'
+   ```
+
+2. Stop the server:
+
+   ```bash
+   docker compose stop server
+   ```
+
+3. Put the backup over the live database, in a throwaway container on the server's volumes:
+
+   ```bash
+   docker compose run --rm --no-deps -T --entrypoint sh server -c 'cp /backups/<that file> /data/world.db && rm -f /data/world.db-wal /data/world.db-shm'
+   ```
+
+4. Start the previous image:
+
+   ```bash
+   docker compose up -d server
+   ```
+
+Without step 3 the previous server would run on what the newer one saved, and it refuses a newer
+world format or table migration. Ticks played since the bad deploy are lost with the restore.
+
+**Tested for the cutover (T88.6, 2026-11-10)**, locally with Docker and this compose file, both
+images tagged under the GHCR name: on a copy of a dev world (tick 2010, format 111) the TypeScript
+image of `main` ran and saved at tick 2102; the Rust image started on it (backup written, world at
+tick 2102) and saved at 2174. The TypeScript image then loads even the Rust save (tick 2174, no
+errors), and after steps 1 to 4 it ran from tick 2102 again, the world it had before the Rust
+deploy, with no errors. So the last TypeScript image is the rollback for the cutover. It is also
+the tool for a save older than format 111, which the Rust server refuses: run it once on that
+database (it migrates and saves on start), then start the Rust image.
 
 Before scripts see exactly their script views (ADR 0011), list the fields Players' active scripts
 read that the views don't declare, with each script and Player. It only reads, so it is safe while

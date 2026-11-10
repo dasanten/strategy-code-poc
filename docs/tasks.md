@@ -69,7 +69,7 @@ optimisations) are superseded by the rewrite, which includes their aims.
 **Cutover (T88.6, 2026-11-10):** the Rust backend supports every feature, `rust-backend` goes into
 `dev`, and the TypeScript server, `packages/shared` and `packages/lang` are deleted. **The feature
 freeze is lifted:** new epics branch from `dev` again (ADR 0009, 0010), and rule changes are
-Daniel's call as before. Epic 86's T86.15 (#1092, NPC script speed) may still land after it.
+Daniel's call as before.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.

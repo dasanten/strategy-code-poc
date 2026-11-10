@@ -25,7 +25,7 @@
 - **The server is Rust (ADR 0030)**, in the cargo workspace at the root (`crates/csp-shared`,
   `csp-lang`, `csp-lang-wasm`, `csp-sim`, `csp-server`); the client (`apps/web`) is TypeScript.
   The TypeScript server, `packages/shared` and `packages/lang` were deleted at the cutover (T88.6;
-  the last commit with them is `848f58db`). The fixtures in `crates/csp-sim/fixtures/` are their
+  the last commit with them is `21f7a29e`). The fixtures in `crates/csp-sim/fixtures/` are their
   frozen output: never edit one to make a test pass; a rule change that a fixture comparison fails
   on replaces that comparison with a Rust test of the new rule, and says so in the PR.
   The client's types are generated from the crates (`ts-rs`): after changing a type the client
