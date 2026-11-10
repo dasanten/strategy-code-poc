@@ -119,9 +119,15 @@ importers:
       '@csp/lang':
         specifier: workspace:*
         version: link:../../packages/lang
+      '@csp/lang-wasm':
+        specifier: workspace:*
+        version: link:../../packages/lang-wasm
       '@csp/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@csp/shared-types':
+        specifier: workspace:*
+        version: link:../../packages/shared-types
       '@sentry/react':
         specifier: ^11.8.0
         version: 11.8.0(react@19.3.1)
@@ -158,6 +164,19 @@ importers:
         version: link:../shared
 
   packages/lang: {}
+
+  packages/lang-wasm:
+    dependencies:
+      '@csp/shared-types':
+        specifier: workspace:*
+        version: link:../shared-types
+    devDependencies:
+      '@csp/lang':
+        specifier: workspace:*
+        version: link:../lang
+      '@csp/shared':
+        specifier: workspace:*
+        version: link:../shared
 
   packages/shared: {}
 

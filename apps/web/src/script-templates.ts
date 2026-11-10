@@ -1,4 +1,5 @@
-import { DEFAULT_SCRIPTS, type ScriptSummary, type Task } from '@csp/shared'
+import { DEFAULT_SCRIPTS } from '@csp/lang-wasm'
+import type { ScriptSummary, Task } from '@csp/shared-types'
 import { WIKI_PATH } from './wiki-view.js'
 
 /**

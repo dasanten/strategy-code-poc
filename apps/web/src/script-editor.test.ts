@@ -1,6 +1,6 @@
 import { StringStream } from '@codemirror/language'
-import { checkScript } from '@csp/lang'
-import { describe, expect, it } from 'vitest'
+import { checkScript, loadLang } from '@csp/lang-wasm'
+import { beforeAll, describe, expect, it } from 'vitest'
 import {
   apiHover,
   apiNames,
@@ -21,6 +21,9 @@ import {
   scriptHighlighting,
   versionStatus,
 } from './script-editor.js'
+
+// The checks that read a script run on the WebAssembly checker.
+beforeAll(() => loadLang())
 
 /** Runs the highlighter over source, giving each non-space token's text and style. */
 function highlight(source: string): [string, string | null][] {

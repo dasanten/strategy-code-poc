@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { checkScript } from '@csp/lang'
-import { SCRIPT_NAME_MAX_LENGTH, type ScriptDetail, type ScriptSummary } from '@csp/shared'
+import { checkScript, isLangLoaded, loadLang, SCRIPT_NAME_MAX_LENGTH } from '@csp/lang-wasm'
+import type { ScriptDetail, ScriptSummary } from '@csp/shared-types'
 import { api } from './api.js'
 import { ScriptEditor } from './ScriptEditor.js'
 import {
@@ -33,6 +33,23 @@ const DEFAULT_STATUS: Record<ReturnType<typeof defaultStatus>, string> = {
 }
 
 const DIFF_CLASS: Record<DiffLine['op'], string> = { ' ': '', '-': 'removed', '+': 'added' }
+
+/**
+ * Whether the script checker (WebAssembly, `@csp/lang-wasm`) has loaded; it starts loading on
+ * first use, and the component renders again once it has.
+ */
+function useLangLoaded(): boolean {
+  const [loaded, setLoaded] = useState(isLangLoaded)
+  useEffect(() => {
+    if (loaded) return
+    let live = true
+    void loadLang().then(() => live && setLoaded(true))
+    return () => {
+      live = false
+    }
+  }, [loaded])
+  return loaded
+}
 
 const TEMPLATE_GROUPS: readonly TemplateChoice['group'][] = [
   'Start',
@@ -105,6 +122,7 @@ export function ScriptLibrary({
   const [rename, setRename] = useState<string>()
   const [message, setMessage] = useState<string>()
   const [error, setError] = useState<string>()
+  const langLoaded = useLangLoaded()
 
   /** Runs a library call, showing its error, and refreshes the list afterwards. */
   const act = useCallback(
@@ -263,8 +281,9 @@ export function ScriptLibrary({
     if (done) startNew()
   }
 
-  const errors = checkScript(draft)
-  const warnings = scriptWarnings(draft, script?.task != null)
+  // Nothing to show until the checker has loaded, a moment after the library opens.
+  const errors = langLoaded ? checkScript(draft) : []
+  const warnings = langLoaded ? scriptWarnings(draft, script?.task != null) : []
   const unsaved = script ? hasUnsavedChanges(script.versions, draft) : true
   const choices = templateChoices(scripts)
 
@@ -463,7 +482,7 @@ export function ScriptLibrary({
           <p
             className={`diagnostics${errors.length > 0 ? ' has-errors' : warnings.length > 0 ? ' has-warnings' : ''}`}
           >
-            {diagnosticsText(errors, warnings)}
+            {langLoaded ? diagnosticsText(errors, warnings) : 'Checking…'}
           </p>
           {script && (
             <button type="button" className="primary" onClick={save} disabled={!unsaved}>

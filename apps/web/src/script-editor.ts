@@ -1,29 +1,29 @@
 import type { StreamParser, StringStream } from '@codemirror/language'
 import {
-  KEYWORDS,
-  PARAMS_SHAPE,
-  checkNames,
-  scriptParams,
-  tokenize,
-  type Diagnostic,
-  type Token,
-} from '@csp/lang'
-import {
   ARMY_SCRIPT_API,
+  KEYWORDS,
   PARAM_DESCRIPTIONS,
+  PARAMS_SHAPE,
   RESIDENT_OR_ARMY,
   SCRIPT_API,
   SCRIPT_VIEWS,
-  scriptCheckEnv,
-  type ScriptCheckEnv,
+  checkGameNames,
+  scriptParams,
+  tokenize,
+  type Diagnostic,
   type ScriptBinding,
-  type ScriptDetail,
   type ScriptField,
   type ScriptType,
   type ScriptViewName,
-  type ScriptSummary,
-  type ScriptVersion,
-} from '@csp/shared'
+  type Token,
+} from '@csp/lang-wasm'
+import type { ScriptDetail, ScriptSummary, ScriptVersion } from '@csp/shared-types'
+
+/*
+ * The checks below that read a script (warnings, names in scope, completions and hovers) run on
+ * the WebAssembly checker, so they need `loadLang()` from `@csp/lang-wasm` to have finished;
+ * highlighting doesn't.
+ */
 
 /** Where a block comment is still open at the end of a line. */
 export interface HighlightState {
@@ -32,11 +32,7 @@ export interface HighlightState {
 
 /** Whether a word is one of the language's keywords, as the lexer reads it. */
 function isKeyword(word: string): boolean {
-  try {
-    return tokenize(word)[0]?.type === 'keyword'
-  } catch {
-    return false
-  }
+  return KEYWORDS.includes(word)
 }
 
 /**
@@ -112,22 +108,13 @@ export function describeDiagnostic(d: Diagnostic): string {
   return `${d.line}:${d.column} ${d.message}`
 }
 
-const checkEnvs = new Map<boolean, ScriptCheckEnv>()
-
-/** What a script is checked against; a default script is checked as a resident's alone. */
-function checkEnvFor(defaultScript: boolean): ScriptCheckEnv {
-  let env = checkEnvs.get(defaultScript)
-  if (!env) checkEnvs.set(defaultScript, (env = scriptCheckEnv({ defaultScript })))
-  return env
-}
-
 /**
  * The checker's warnings for a script (`CONTEXT.md`: Script view): unknown names, calls with the
  * wrong number of arguments, fields a view doesn't have. They never stop a version from becoming
- * active; only syntax errors do.
+ * active; only syntax errors do. A default script is checked as a resident's alone.
  */
 export function scriptWarnings(source: string, defaultScript: boolean): Diagnostic[] {
-  return checkNames(source, checkEnvFor(defaultScript)).warnings
+  return checkGameNames(source, defaultScript).warnings
 }
 
 /** The editor's foot: syntax errors, or that there are none, then how many warnings. */
@@ -493,7 +480,7 @@ export function viewBefore(
     close === null ? null : `${before}\n${close}`,
   ]) {
     if (attempt === null) continue
-    const { reads } = checkNames(attempt, checkEnvFor(defaultScript))
+    const { reads } = checkGameNames(attempt, defaultScript)
     const read = reads.find((r) => r.field === PLACEHOLDER)
     if (read) return read.shape
   }

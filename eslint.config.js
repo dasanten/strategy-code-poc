@@ -11,6 +11,8 @@ export default tseslint.config(
       '.claude/**',
       // Written by `pnpm types:rust` from the Rust crates (ADR 0030).
       'packages/shared-types/src/generated/**',
+      // Written by `pnpm wasm:build` (T88.3).
+      'packages/lang-wasm/generated/**',
     ],
   },
   js.configs.recommended,

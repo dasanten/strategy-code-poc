@@ -8,13 +8,15 @@
   },
   "scripts": {
     "build": "tsc -b && pnpm --filter @csp/web build",
-    "typecheck": "tsc -b && pnpm --filter @csp/web typecheck && pnpm --filter @csp/balance typecheck",
+    "typecheck": "node scripts/wasm-build.mjs && tsc -b && pnpm --filter @csp/lang-wasm typecheck && pnpm --filter @csp/web typecheck && pnpm --filter @csp/balance typecheck",
     "dev": "pnpm --parallel --filter @csp/server --filter @csp/web dev",
     "start": "pnpm --filter @csp/server start",
-    "test": "vitest run",
+    "test": "node scripts/wasm-build.mjs && vitest run",
     "check": "eslint . --cache --cache-location node_modules/.cache/eslint/ && pnpm typecheck && node scripts/check-tests.mjs",
     "types:rust": "cargo run -q -p csp-server --bin export-types",
     "balance:rust": "cargo run -q -p csp-shared --bin write-balance",
+    "wasm:build": "node scripts/wasm-build.mjs",
+    "script-data:rust": "cargo run --quiet --package csp-lang-wasm --bin script-data",
     "check:rust": "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo nextest run --workspace",
     "lint": "eslint .",
     "format": "prettier --write ."
