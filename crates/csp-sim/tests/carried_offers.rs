@@ -69,7 +69,8 @@ fn carried_setup() -> Setup {
     let storage = delivery_storage(&world, &city).unwrap().id.clone();
     let to_storage = delivery_storage(&world, &to_city).unwrap().id.clone();
     let at = world.buildings.iter().find(|b| b.id == to_storage).map(|b| (b.x, b.y)).unwrap();
-    let mut watcher = goods_support::drawn_resident(23.0, "watcher", Some(&realm), None, at.0, at.1);
+    let mut watcher =
+        goods_support::drawn_resident(23.0, "watcher", Some(&realm), None, at.0, at.1);
     watcher.city_id = Some(city.clone());
     watcher.born_at = -20.0 * 24.0 * 3600.0;
     world.residents.push(watcher);
@@ -164,7 +165,10 @@ impl Setup {
     fn accepted(&mut self, fee_by: &str) {
         assert_eq!(self.send(fee_by, json!({})), "ack");
         let offer_id = self.world.offers[0].id.clone();
-        assert_eq!(self.as_ivo(json!({ "kind": "acceptCarriedOffer", "offerId": offer_id })), "ack");
+        assert_eq!(
+            self.as_ivo(json!({ "kind": "acceptCarriedOffer", "offerId": offer_id })),
+            "ack"
+        );
     }
 
     /// What each Transfer's fee comes to, both from the warehouse nearest its pick-up (`fullFees`).
@@ -307,14 +311,20 @@ mod sending_a_carried_direct_offer {
             })
         );
         let storage = s.b(&s.storage);
-        assert_eq!(free_stock(&s.world, &storage.id, storage.stock.as_ref()).get(&Good::Iron), Some(&40.0));
+        assert_eq!(
+            free_stock(&s.world, &storage.id, storage.stock.as_ref()).get(&Good::Iron),
+            Some(&40.0)
+        );
         assert!(offers_at(&s.world, &s.storage).is_empty());
         assert!(!offer_open_to(&offer, &s.other));
         let told = s.events("directOffer", IVO);
         assert_eq!(told.len(), 1);
         let name = |id: &str| s.world.cities.iter().find(|c| c.id == id).unwrap().name.clone();
         assert_eq!(told[0]["what"], "received");
-        assert_eq!(told[0]["carried"], json!({ "fromCity": name(&s.city), "toCity": name(&s.to_city), "fee": 0.0 }));
+        assert_eq!(
+            told[0]["carried"],
+            json!({ "fromCity": name(&s.city), "toCity": name(&s.to_city), "fee": 0.0 })
+        );
     }
 
     #[test]
@@ -383,21 +393,37 @@ mod answering_a_carried_direct_offer {
         assert_eq!(s.world.transfers.len(), 2);
         let (a, b) = (&s.world.transfers[0], &s.world.transfers[1]);
         assert_eq!(
-            (a.realm_id.as_str(), a.to_realm_id.as_str(), a.from_city_id.as_deref(), a.to_city_id.as_str()),
+            (
+                a.realm_id.as_str(),
+                a.to_realm_id.as_str(),
+                a.from_city_id.as_deref(),
+                a.to_city_id.as_str()
+            ),
             (s.realm.as_str(), s.other.as_str(), Some(s.city.as_str()), s.to_city.as_str())
         );
         assert_eq!((a.warehouse_id.as_str(), a.good, a.units), (near.as_str(), Good::Iron, 25.0));
         assert_eq!(a.carried_offer, Some(CarriedTransfer { unload_share: 0.0, due: 0.0 }));
         assert_eq!(
-            (b.realm_id.as_str(), b.to_realm_id.as_str(), b.from_city_id.as_deref(), b.to_city_id.as_str()),
+            (
+                b.realm_id.as_str(),
+                b.to_realm_id.as_str(),
+                b.from_city_id.as_deref(),
+                b.to_city_id.as_str()
+            ),
             (s.other.as_str(), s.realm.as_str(), Some(s.to_city.as_str()), s.city.as_str())
         );
-        assert_eq!((b.warehouse_id.as_str(), b.good, b.units), (to_near.as_str(), Good::Stone, 10.0));
+        assert_eq!(
+            (b.warehouse_id.as_str(), b.good, b.units),
+            (to_near.as_str(), Good::Stone, 10.0)
+        );
         assert_eq!(b.carried_offer, Some(CarriedTransfer { unload_share: 1.0, due: 0.0 }));
         assert_eq!(s.world.standings, standings);
         assert_eq!(s.events("directOffer", MARA).last().unwrap()["what"], "carriedAccepted");
         let to_ivo = s.events("directOffer", IVO).pop().unwrap();
-        assert_eq!((to_ivo["what"].as_str(), to_ivo["carried"]["fee"].as_f64()), (Some("youAccepted"), Some(0.0)));
+        assert_eq!(
+            (to_ivo["what"].as_str(), to_ivo["carried"]["fee"].as_f64()),
+            (Some("youAccepted"), Some(0.0))
+        );
         assert_eq!(check_invariants(&s.world, &s.terrain, &world_invariants()), vec![]);
     }
 
@@ -409,8 +435,12 @@ mod answering_a_carried_direct_offer {
         assert_eq!(s.as_ivo(json!({ "kind": "acceptCarriedOffer", "offerId": offer_id })), "ack");
         let units: Vec<f64> = s.world.transfers.iter().map(|t| t.units).collect();
         assert_eq!(units, vec![25.0, 10.0]);
-        let shares: Vec<f64> =
-            s.world.transfers.iter().map(|t| t.carried_offer.as_ref().unwrap().unload_share).collect();
+        let shares: Vec<f64> = s
+            .world
+            .transfers
+            .iter()
+            .map(|t| t.carried_offer.as_ref().unwrap().unload_share)
+            .collect();
         assert_eq!(shares, vec![0.5, 0.5]);
     }
 
@@ -424,7 +454,8 @@ mod answering_a_carried_direct_offer {
             "that offer wasn’t sent to you"
         );
         let at = s.xy(&s.storage);
-        let mut trader = goods_support::drawn_resident(29.0, "trader", Some(&s.other), None, at.0, at.1);
+        let mut trader =
+            goods_support::drawn_resident(29.0, "trader", Some(&s.other), None, at.0, at.1);
         trader.city_id = Some(s.to_city.clone());
         trader.born_at = -20.0 * 24.0 * 3600.0;
         trader.carried = [(Good::Stone, 10.0)].into_iter().collect();
@@ -447,7 +478,10 @@ mod answering_a_carried_direct_offer {
         assert_eq!(s.world.transfers, vec![]);
         let ended = s.events("offerEnded", MARA);
         assert_eq!(ended.len(), 1);
-        assert_eq!((ended[0]["why"].as_str(), ended[0]["carried"].as_bool()), (Some("declined"), Some(true)));
+        assert_eq!(
+            (ended[0]["why"].as_str(), ended[0]["carried"].as_bool()),
+            (Some("declined"), Some(true))
+        );
     }
 }
 
@@ -479,11 +513,18 @@ mod a_carried_direct_offer_standing {
         for lost in ["city", "toCity"] {
             let mut s = carried_setup();
             s.send("sender", json!({}));
-            s.world.residents.push(goods_support::new_resident(3.0, "q1", Some("realm3"), 5.0, 5.0));
+            s.world.residents.push(goods_support::new_resident(
+                3.0,
+                "q1",
+                Some("realm3"),
+                5.0,
+                5.0,
+            ));
             let realm = json!({ "id": "realm3", "userId": 9, "leaderId": "q1" });
             s.world.realms.push(serde_json::from_value::<Realm>(realm).unwrap());
             let id = if lost == "city" { s.city.clone() } else { s.to_city.clone() };
-            s.world.cities.iter_mut().find(|c| c.id == id).unwrap().realm_id = Some("realm3".into());
+            s.world.cities.iter_mut().find(|c| c.id == id).unwrap().realm_id =
+                Some("realm3".into());
             step_offers(&mut s.world);
             assert_eq!(s.world.offers, vec![], "{lost}");
             assert_eq!(s.events("offerEnded", MARA)[0]["why"], "storageLost");
@@ -635,10 +676,16 @@ mod the_caravans_of_a_carried_direct_offer {
         assert_eq!(sender + other, fee);
         let stuck = s.events("transferStuck", IVO);
         assert_eq!(stuck.len(), 1);
-        assert_eq!((stuck[0]["why"].as_str(), stuck[0]["good"].as_str()), (Some("nothing"), Some("stone")));
+        assert_eq!(
+            (stuck[0]["why"].as_str(), stuck[0]["good"].as_str()),
+            (Some("nothing"), Some("stone"))
+        );
         let stuck = s.events("transferStuck", MARA);
         assert_eq!(stuck.len(), 1);
-        assert_eq!((stuck[0]["why"].as_str(), stuck[0]["good"].as_str()), (Some("nothingCame"), Some("stone")));
+        assert_eq!(
+            (stuck[0]["why"].as_str(), stuck[0]["good"].as_str()),
+            (Some("nothingCame"), Some("stone"))
+        );
     }
 
     #[test]
@@ -656,7 +703,9 @@ mod the_caravans_of_a_carried_direct_offer {
             let c = w.caravans.iter().find(|x| {
                 x.transfer.as_ref().is_some_and(|t| t.step == TransferJobStep::UnloadFee)
             });
-            let driver = c.and_then(|c| c.driver_id.as_ref()).and_then(|id| w.residents.iter().find(|r| &r.id == id));
+            let driver = c
+                .and_then(|c| c.driver_id.as_ref())
+                .and_then(|id| w.residents.iter().find(|r| &r.id == id));
             collecting |= driver.is_some_and(|d| collects_transfer_from(w, d, &to_storage));
             w.transfers.is_empty()
         });
@@ -677,5 +726,8 @@ fn a_carried_offer_tells_its_place_by_its_delivery_storage() {
     s.send("sender", json!({}));
     let offer = &s.world.offers[0];
     let storage = delivery_storage(&s.world, &s.city).unwrap();
-    assert_eq!((offer.storage_id.as_str(), offer.x, offer.y), (storage.id.as_str(), storage.x, storage.y));
+    assert_eq!(
+        (offer.storage_id.as_str(), offer.x, offer.y),
+        (storage.id.as_str(), storage.x, storage.y)
+    );
 }

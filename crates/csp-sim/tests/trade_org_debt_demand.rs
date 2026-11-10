@@ -13,7 +13,9 @@ use csp_shared::balance::{
 };
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{BuildingKind, Debt, DebtStep, Demand, Good, WorldState};
-use csp_sim::demands::{answer_demands, demands_sound, lapse_demands_on_leader_death, step_demands};
+use csp_sim::demands::{
+    answer_demands, demands_sound, lapse_demands_on_leader_death, step_demands,
+};
 use csp_sim::hq_fall::{hq_falls, nothing_left_of_the_hq};
 use csp_sim::offers::{offers_sound, step_offers};
 use csp_sim::queries::goods::free_stock;
@@ -91,7 +93,10 @@ fn coins(s: &Fixture) -> f64 {
 }
 
 fn free_coins(s: &Fixture) -> f64 {
-    free_stock(&s.world, &s.storage, s.b(&s.storage).stock.as_ref()).get(&Good::Coins).copied().unwrap_or(0.0)
+    free_stock(&s.world, &s.storage, s.b(&s.storage).stock.as_ref())
+        .get(&Good::Coins)
+        .copied()
+        .unwrap_or(0.0)
 }
 
 fn owes(s: &Fixture) -> f64 {
@@ -184,7 +189,8 @@ mod the_trade_organization_demands_a_debt {
         let mut s = setup();
         let hq = trade_org_hq(&s.world).unwrap().id.clone();
         hq_falls(&mut s.world, &hq);
-        s.world.debts = vec![serde_json::from_value(json!({ "org": s.realm, "coins": 10 })).unwrap()];
+        s.world.debts =
+            vec![serde_json::from_value(json!({ "org": s.realm, "coins": 10 })).unwrap()];
         step_debts(&mut s.world);
         assert_eq!(s.world.demands, vec![]);
     }
@@ -353,7 +359,8 @@ mod accepting {
         let storage = s.storage.clone();
         s.run_until(20_000, |w| {
             let c = w.caravans.iter().find(|c| c.transfer.is_some());
-            let driver = c.and_then(|c| w.residents.iter().find(|r| Some(&r.id) == c.driver_id.as_ref()));
+            let driver =
+                c.and_then(|c| w.residents.iter().find(|r| Some(&r.id) == c.driver_id.as_ref()));
             collecting |= driver.is_some_and(|d| collects_transfer_from(w, d, &storage));
             !w.debts.iter().any(|d| d.org == realm)
         });

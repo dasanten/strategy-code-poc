@@ -235,7 +235,14 @@ mod how_much_respect_an_npc_city_yields_to {
         let soldiers = DEMAND_YIELD_RESPECT_MIN as usize;
         let mut s = setup(soldiers);
         for i in 0..soldiers {
-            let r = resident(&mut s.world, &format!("guard{i}"), None, 39.0, 40.0 + i as f64, Some("n1"));
+            let r = resident(
+                &mut s.world,
+                &format!("guard{i}"),
+                None,
+                39.0,
+                40.0 + i as f64,
+                Some("n1"),
+            );
             arm(&mut s.world, r);
         }
         assert_eq!(city_soldiers(&s.world, s.n1()), soldiers as f64 + 1.0);
@@ -255,7 +262,8 @@ mod how_much_respect_an_npc_city_yields_to {
     fn counts_the_senders_walls_in_its_sight_too() {
         let mut s = setup(1);
         for i in 0..needed() - 1 {
-            let wall = building(&format!("w{i}"), BuildingKind::Wall, Some("c1"), 36.0, 40.0 + i as f64);
+            let wall =
+                building(&format!("w{i}"), BuildingKind::Wall, Some("c1"), 36.0, 40.0 + i as f64);
             s.world.buildings.push(wall);
         }
         assert!(yields_to_demand(&s.world, s.n1(), "r1", SIZE));
@@ -384,7 +392,15 @@ mod a_demand_for_goods_of_an_npc_city {
             json!([{ "realmId": "n1", "storageId": "n1s", "gives": "food", "givesUnits": 1,
                 "wantsUnits": 0, "times": 5, "direct": { "toId": "r1", "lapsesAt": lapses_at } }]),
         );
-        assert_eq!(free_stock(&s.world, "n1s", s.world.buildings.iter().find(|b| b.id == "n1s").unwrap().stock.as_ref()).get(&Good::Food), Some(&35.0));
+        assert_eq!(
+            free_stock(
+                &s.world,
+                "n1s",
+                s.world.buildings.iter().find(|b| b.id == "n1s").unwrap().stock.as_ref()
+            )
+            .get(&Good::Food),
+            Some(&35.0)
+        );
         assert_matches(
             &s.last_log(),
             json!({ "what": "accepted", "otherIs": "city",

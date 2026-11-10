@@ -15,7 +15,7 @@ use crate::tick::Scratch;
 use crate::world::{create_world, step_world};
 use csp_shared::balance::{DIRECT_OFFERS_TO_ONE_REALM, MAX_HUNGER, OWN_FOOD};
 use csp_shared::time::TICKS_PER_GAME_YEAR;
-use csp_shared::world::{BuildingKind, Realm, Resident, Stat, Standing};
+use csp_shared::world::{BuildingKind, Realm, Resident, Standing, Stat};
 use serde_json::json;
 
 const SIZE: i32 = 128;
@@ -194,7 +194,9 @@ fn a_direct_offer_goes_only_to_another_realm_its_sender_knows_of() {
 #[test]
 fn a_direct_offer_needs_an_offer_that_could_be_posted_at_a_storage_of_the_sender() {
     let mut s = setup();
-    assert!(reason(s.send(json!({ "storageId": "c1-hall" }), &sender())).contains("storage of yours"));
+    assert!(
+        reason(s.send(json!({ "storageId": "c1-hall" }), &sender())).contains("storage of yours")
+    );
     assert!(reason(s.send(json!({ "gives": "stone" }), &sender())).contains("different good"));
     assert!(reason(s.send(json!({ "times": 0 }), &sender())).contains("whole numbers"));
     assert!(reason(s.send(json!({ "givesUnits": 500 }), &sender())).contains("not enough"));
@@ -219,10 +221,16 @@ fn accepting_takes_the_named_realms_resident_on_the_storage_and_the_sender_hears
     assert_eq!(s.accept("t2", &id), ack());
     s.tick();
     let t2 = s.world.residents.iter().find(|r| r.id == "t2").unwrap();
-    assert_eq!((t2.carried.get(&Good::Wood), t2.carried.get(&Good::Stone)), (Some(&10.0), Some(&15.0)));
+    assert_eq!(
+        (t2.carried.get(&Good::Wood), t2.carried.get(&Good::Stone)),
+        (Some(&10.0), Some(&15.0))
+    );
     assert_eq!(s.storage().stock, Some(stock(&[(Good::Wood, 90.0), (Good::Stone, 5.0)])));
     assert_eq!(s.offer(&id).times, 1.0);
-    let kinds: Vec<Value> = events_for(&s.world, 7, 0).iter().map(|e| serde_json::to_value(e).unwrap()["kind"].clone()).collect();
+    let kinds: Vec<Value> = events_for(&s.world, 7, 0)
+        .iter()
+        .map(|e| serde_json::to_value(e).unwrap()["kind"].clone())
+        .collect();
     assert!(kinds.contains(&json!("offerTaken")));
 }
 
@@ -276,9 +284,15 @@ fn a_direct_offer_ends_when_declined_and_the_sender_hears() {
     assert_eq!(s.world.offers, vec![]);
     assert_eq!(s.free(), stock(&[(Good::Wood, 100.0)]));
     let to_sender = s.last(7);
-    assert_eq!((to_sender["kind"].as_str(), to_sender["why"].as_str()), (Some("offerEnded"), Some("declined")));
+    assert_eq!(
+        (to_sender["kind"].as_str(), to_sender["why"].as_str()),
+        (Some("offerEnded"), Some("declined"))
+    );
     let to_named = s.last(8);
-    assert_eq!((to_named["kind"].as_str(), to_named["what"].as_str()), (Some("directOffer"), Some("declined")));
+    assert_eq!(
+        (to_named["kind"].as_str(), to_named["what"].as_str()),
+        (Some("directOffer"), Some("declined"))
+    );
     assert_eq!(reason(s.receive(&named(), decline)), "that offer is gone");
 }
 
@@ -354,7 +368,8 @@ fn offers_sound_flags_a_direct_offer_to_its_own_realm_or_outliving_its_time() {
     assert_eq!(broken.len(), 1);
     assert!(broken[0].message.contains("own realm"));
     let tick = s.world.tick as f64;
-    s.offer(&id).direct = Some(DirectOfferTerms { to_id: "r2".into(), lapses_at: tick, carried: None });
+    s.offer(&id).direct =
+        Some(DirectOfferTerms { to_id: "r2".into(), lapses_at: tick, carried: None });
     let broken = offers_sound(&s.world);
     assert_eq!(broken.len(), 1);
     assert!(broken[0].message.contains("outlived"));

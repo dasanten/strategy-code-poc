@@ -82,7 +82,10 @@ fn told(s: &Fixture, user: u64) -> Vec<Value> {
 }
 
 fn free(s: &Fixture, g: Good) -> f64 {
-    free_stock(&s.world, &s.to_storage, s.b(&s.to_storage).stock.as_ref()).get(&g).copied().unwrap_or(0.0)
+    free_stock(&s.world, &s.to_storage, s.b(&s.to_storage).stock.as_ref())
+        .get(&g)
+        .copied()
+        .unwrap_or(0.0)
 }
 
 fn refused(reason: String, part: &str) {
@@ -106,8 +109,12 @@ mod accepting_a_demand_for_goods_set_aside {
         let hand_over = set_aside(&s);
         assert_eq!(accept(&mut s, hand_over, "d1"), "ack");
         assert_eq!(s.world.demands, vec![]);
-        let terms: Vec<_> =
-            s.world.offers.iter().map(|o| (o.gives, o.times, o.gives_units, o.wants_units)).collect();
+        let terms: Vec<_> = s
+            .world
+            .offers
+            .iter()
+            .map(|o| (o.gives, o.times, o.gives_units, o.wants_units))
+            .collect();
         assert_eq!(terms, vec![(Good::Food, 5.0, 1.0, 0.0), (Good::Coins, 20.0, 1.0, 0.0)]);
         let lapses_at = s.world.tick as f64 + DIRECT_OFFER_DAYS * TICKS_PER_GAME_DAY;
         for o in &s.world.offers {
@@ -142,10 +149,11 @@ mod accepting_a_demand_for_goods_set_aside {
         stand(&mut s.world, "stranger", &third, at);
         stand(&mut s.world, "own", &other, at);
         stand(&mut s.world, "fetcher", &realm, at);
-        let accepting =
-            |resident: &str| json!({ "kind": "acceptOffer", "offerId": offer_id, "times": 4,
-                "residentId": resident });
-        let ask =|s: &mut Fixture, user: u64, resident: &str| {
+        let accepting = |resident: &str| {
+            json!({ "kind": "acceptOffer", "offerId": offer_id, "times": 4,
+                "residentId": resident })
+        };
+        let ask = |s: &mut Fixture, user: u64, resident: &str| {
             let sender = goods_support::player(user);
             answer(s.queue.receive(&s.world, &sender, &json!("q"), &accepting(resident)))
         };
@@ -180,7 +188,13 @@ mod accepting_a_demand_for_goods_set_aside {
             "residentId": "fetcher" });
         assert_eq!(s.order(o), "ack");
         let iron_of = |w: &WorldState| {
-            w.residents.iter().find(|r| r.id == "fetcher").unwrap().carried.get(&Good::Iron).copied()
+            w.residents
+                .iter()
+                .find(|r| r.id == "fetcher")
+                .unwrap()
+                .carried
+                .get(&Good::Iron)
+                .copied()
         };
         s.run_until(5, |w| iron_of(w).unwrap_or(0.0) > 0.0);
         let took = iron_of(&s.world).unwrap();
@@ -339,12 +353,21 @@ mod accepting_a_demand_for_goods_by_transfer {
             .iter()
             .map(|t| {
                 let v = serde_json::to_value(t).unwrap();
-                json!([v["realmId"], v["toRealmId"], v["fromCityId"], v["toCityId"], v["good"],
-                    v["units"]])
+                json!([
+                    v["realmId"],
+                    v["toRealmId"],
+                    v["fromCityId"],
+                    v["toCityId"],
+                    v["good"],
+                    v["units"]
+                ])
             })
             .collect();
         let (o, r, tc, c) = (&s.other, &s.realm, &s.to_city, &s.city);
-        assert_eq!(made, vec![json!([o, r, tc, c, "food", 5.0]), json!([o, r, tc, c, "iron", 10.0])]);
+        assert_eq!(
+            made,
+            vec![json!([o, r, tc, c, "food", 5.0]), json!([o, r, tc, c, "iron", 10.0])]
+        );
         assert_matches(
             told(&s, MARA).last().unwrap(),
             json!({ "what": "accepted", "handedOver": { "way": "transfer",

@@ -9,8 +9,8 @@ use csp_shared::balance::{
 use csp_shared::terrain::{Terrain, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
-    Building, BuildingKind, CityTrader, CityTraderOffer, DirectOfferTerms,
-    Good, Offer, Realm, Resident, Stock, TraderLeg, WorldState,
+    Building, BuildingKind, CityTrader, CityTraderOffer, DirectOfferTerms, Good, Offer, Realm,
+    Resident, Stock, TraderLeg, WorldState,
 };
 use serde_json::json;
 
@@ -29,9 +29,9 @@ use crate::random::Mulberry32;
 use crate::residents::{new_resident, NewResident};
 use crate::standing::change_standing;
 use crate::test_support::add_city;
+use crate::tick::Scratch;
 use crate::trading_posts::found_trading_post;
 use crate::world::{create_world, step_world};
-use crate::tick::Scratch;
 
 /// A map too big to wrap inside the reach.
 const SIZE: i32 = 2400;
@@ -63,7 +63,13 @@ fn reserve_of(world: &WorldState, city: &str) -> Stock {
 }
 
 /// A village whose storage holds its reserve, 60 Wood and 10 Stone over it, and is short of Iron.
-fn village(world: &mut WorldState, terrain: &TerrainMap, x: i32, y: i32, seed: f64) -> (String, String) {
+fn village(
+    world: &mut WorldState,
+    terrain: &TerrainMap,
+    x: i32,
+    y: i32,
+    seed: f64,
+) -> (String, String) {
     let mut m = Mulberry32::new(seed);
     let city = found_npc_city(world, terrain, &NPC_VILLAGE, x, y, &mut || m.next(), None);
     let storage = npc_home(world, &city).expect("a storage").id.clone();
@@ -89,7 +95,8 @@ fn player_storage(world: &mut WorldState, x: f64, y: f64) -> String {
     .unwrap();
     world.buildings.push(storage);
     let mut m = Mulberry32::new(1.0);
-    let fields = NewResident { id: "a1", owner: Some("r1"), city_id: None, x: x + 8.0, y, tick: 0.0 };
+    let fields =
+        NewResident { id: "a1", owner: Some("r1"), city_id: None, x: x + 8.0, y, tick: 0.0 };
     let mut leader: Resident = new_resident(&mut || m.next(), &fields, None);
     leader.city_id = Some("c1".into());
     world.residents.push(leader);
@@ -445,7 +452,8 @@ fn two_cities_at_one_offer_lose_no_goods_the_second_is_cut_down_and_carries_the_
     let offer = post(&mut world, &theirs, Good::Iron, 1.0, Good::Coins, 2.0, lacks + 1.0);
     let coins = world_holds(&world, Good::Coins);
     let iron_there = held_at(&world, &theirs, Good::Iron);
-    let chests = held_at(&world, &a_storage, Good::Coins) + held_at(&world, &b_storage, Good::Coins);
+    let chests =
+        held_at(&world, &a_storage, Good::Coins) + held_at(&world, &b_storage, Good::Coins);
     let mut out = false;
     run(&mut world, &terrain, 12, |w, scratch| {
         assert_eq!(offers_keep_goods(&scratch.offers), vec![]);
@@ -471,7 +479,8 @@ fn with_the_offer_gone_the_trader_comes_home_with_what_they_took_along() {
     let coins = s.held(&s.storage, Good::Coins);
     let city = s.city.clone();
     run(&mut s.world, &s.terrain, 2, |w, _| {
-        let walking = trader_of(w, &city).and_then(|t| t.offer).is_some_and(|o| o.leg == TraderLeg::Walking);
+        let walking =
+            trader_of(w, &city).and_then(|t| t.offer).is_some_and(|o| o.leg == TraderLeg::Walking);
         if walking {
             w.offers.retain(|o| o.id != offer);
         }
@@ -513,7 +522,9 @@ fn the_trade_organization_sends_nobody_to_an_offer_but_its_army() {
     let warehouse = world
         .buildings
         .iter_mut()
-        .find(|b| b.city_id.as_deref() == Some(post_id.as_str()) && b.kind == BuildingKind::Warehouse)
+        .find(|b| {
+            b.city_id.as_deref() == Some(post_id.as_str()) && b.kind == BuildingKind::Warehouse
+        })
         .unwrap();
     warehouse.stock = Some(Stock::new());
     post(&mut world, &theirs, Good::Wood, 100.0, Good::Coins, 1.0, 1.0);
@@ -523,7 +534,8 @@ fn the_trade_organization_sends_nobody_to_an_offer_but_its_army() {
     let mut scratch = Scratch::default();
     step_world(&mut world, &terrain, &mut scratch, None, None);
     assert_eq!(trade_org_only_buys_food(&world, &scratch.offers), vec![]);
-    let one = world.residents.iter().find(|r| r.city_id.as_deref() == Some(post_id.as_str())).unwrap();
+    let one =
+        world.residents.iter().find(|r| r.city_id.as_deref() == Some(post_id.as_str())).unwrap();
     scratch.offers.records.push(Accepted {
         resident_id: one.id.clone(),
         before: Stock::new(),
