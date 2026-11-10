@@ -29,7 +29,7 @@ fn total(world: &WorldState, g: Good) -> f64 {
 }
 
 #[test]
-#[ignore = "9.6 s alone; see #1092"]
+#[ignore = "7.2 s alone; see #1092"]
 fn carry_stock_from_the_hq_to_the_post_and_back_evening_out_with_the_escort_along() {
     let terrain = plains(512);
     let mut world = create_world(&terrain, 1);

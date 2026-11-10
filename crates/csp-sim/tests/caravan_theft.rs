@@ -51,7 +51,7 @@ mod stealing_a_caravans_carriage {
     use super::*;
 
     #[test]
-    #[ignore = "34.0 s alone; see #1092"]
+    #[ignore = "26.4 s with eight at once; see #1092"]
     fn gets_a_deliverys_goods_to_the_city_after_all() {
         let mut s = deliveries();
         let city = s.city.clone();

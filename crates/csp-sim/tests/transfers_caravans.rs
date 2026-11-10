@@ -39,7 +39,7 @@ mod caravans_carrying_out_transfers {
     use super::*;
 
     #[test]
-    #[ignore = "21.7 s alone; see #1092"]
+    #[ignore = "16.9 s with eight at once; see #1092"]
     fn turn_back_from_a_recipient_behind_closed_gates_the_warehouse_keeping_it_for_the_next_caravan(
     ) {
         let mut s = setup();
@@ -68,7 +68,7 @@ mod caravans_carrying_out_transfers {
     }
 
     #[test]
-    #[ignore = "12.7 s alone; see #1092"]
+    #[ignore = "13.1 s with eight at once; see #1092"]
     fn bring_coins_handed_in_at_a_warehouse_to_the_recipients_storage() {
         let mut s = setup();
         let before = s.held(&s.to_storage, Good::Coins).unwrap_or(0.0);
@@ -81,7 +81,7 @@ mod caravans_carrying_out_transfers {
     }
 
     #[test]
-    #[ignore = "13.0 s alone; see #1092"]
+    #[ignore = "13.5 s with eight at once; see #1092"]
     fn bring_a_transfer_back_to_the_sender_when_the_recipients_city_is_no_longer_theirs() {
         let mut s = setup();
         let storage = s.storage.clone();
@@ -109,7 +109,7 @@ mod caravans_carrying_out_transfers {
     }
 
     #[test]
-    #[ignore = "28.3 s alone; see #1092"]
+    #[ignore = "25.9 s with eight at once; see #1092"]
     fn send_again_what_robbers_took_of_a_transfer_and_all_of_it_arrives() {
         let mut s = setup();
         let storage = s.storage.clone();

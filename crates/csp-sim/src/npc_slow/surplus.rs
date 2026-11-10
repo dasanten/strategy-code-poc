@@ -13,7 +13,6 @@ use crate::random::Mulberry32;
 use crate::world::create_world;
 
 #[test]
-#[ignore = "6 s alone; see #1092"]
 fn spare_hands_keep_a_big_city_working_within_its_caps_on_the_map() {
     // `town()`: a town alone on Plains with a lumber camp and a quarry, its Food at its cap.
     let mut terrain = plains(400);

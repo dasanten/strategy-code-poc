@@ -388,3 +388,143 @@ fn bench_bindings() {
     time("view_value", &|| drop(std::hint::black_box(view_value(&data, ty))));
     time("from_json", &|| drop(std::hint::black_box(Value::from_json(&data))));
 }
+
+/// The worlds the TypeScript stepped (`fixtures/worlds`) with their map sizes, for checks over
+/// many real residents.
+fn fixture_worlds() -> Vec<(WorldState, i32)> {
+    ["village-0", "village-1440", "village-10080", "hq-0", "hq-1440", "hq-10080"]
+        .iter()
+        .map(|name| {
+            let path = format!("{}/fixtures/worlds/{name}.json", env!("CARGO_MANIFEST_DIR"));
+            let file: Json = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+            let size = file["terrain"]["size"].as_i64().expect("a size") as i32;
+            (from(file["world"].clone()), size)
+        })
+        .collect()
+}
+
+/// `me` built straight from the resident (#1092) is the value its plain data gives, for every
+/// resident of the stepped worlds and of the test world, seen by its own side, another and none,
+/// with what an alarm told it and without; and for the corners: struck by someone there or gone,
+/// defence and Alarm scripts picked or off, Down, numbers that aren't finite.
+#[test]
+fn me_from_the_struct_is_me_from_its_plain_data() {
+    let mut worlds: Vec<WorldState> = fixture_worlds().into_iter().map(|(w, _)| w).collect();
+    let (mut w, _) = setup();
+    let base = w.residents[0].clone();
+    let alarm = json!({ "kind": "theft", "cityId": "c1", "about": "b1", "realmId": "r2", "x": 1, "y": 2, "tick": 40 });
+    let variants: Vec<Json> = vec![
+        json!({ "struck": { "by": "b1", "tick": 44 } }),
+        json!({ "struck": { "by": "gone", "tick": 44 } }),
+        json!({ "defenceScriptId": 4, "alarmScriptId": "none" }),
+        json!({ "alarmScriptId": 9, "downUntil": 80 }),
+        json!({ "script": { "scriptId": 0, "task": "alarm", "memory": {}, "alarm": alarm } }),
+    ];
+    for (i, v) in variants.into_iter().enumerate() {
+        let mut data = serde_json::to_value(&base).unwrap();
+        for (k, x) in v.as_object().unwrap() {
+            data[k] = x.clone();
+        }
+        let mut r: Resident = from(data);
+        r.id = format!("v{i}");
+        w.residents.push(r);
+    }
+    let mut odd = base.clone();
+    odd.id = "odd".into();
+    (odd.x, odd.hunger, odd.down_until) = (f64::NAN, f64::INFINITY, Some(f64::NAN));
+    w.residents.push(odd);
+    worlds.push(w);
+    let ty = ScriptType::View("resident");
+    let mut checked = 0;
+    for world in &worlds {
+        for r in &world.residents {
+            for side in [r.owner.as_deref(), Some("elsewhere"), None] {
+                for alarm in [true, false] {
+                    let by_json = view_value(
+                        &Json::Object(as_view(world, resident_data(world, r, side, alarm))),
+                        ty,
+                    );
+                    let direct = resident_view(world, r, side, alarm);
+                    assert_eq!(
+                        format!("{direct:?}"),
+                        format!("{by_json:?}"),
+                        "{} {side:?} {alarm}",
+                        r.id
+                    );
+                    checked += 1;
+                }
+            }
+        }
+    }
+    assert!(checked > 500, "{checked}");
+}
+
+/// `building` and `pileAt` answered straight as script values (#1092) give what their plain data
+/// gives, for every building and every pile of the stepped worlds, asked by a resident of each
+/// realm and each NPC city.
+#[test]
+fn direct_queries_are_what_their_plain_data_gives() {
+    let mut checked = 0;
+    for (world, size) in fixture_worlds() {
+        let terrain =
+            TerrainMap { size, tiles: vec![Terrain::Plains as u8; (size * size) as usize] };
+        let index = WorldIndex::new(&world, size);
+        let kinds = crate::orders::order_kinds();
+        let mut askers: Vec<(OrderSender, String)> = Vec::new();
+        for realm in &world.realms {
+            if let Some(r) = world.residents.iter().find(|r| r.owner.as_ref() == Some(&realm.id)) {
+                askers.push((OrderSender::player(realm.user_id, "them"), r.id.clone()));
+            }
+        }
+        for city in world.cities.iter().filter(|c| c.realm_id.is_none()) {
+            let r = world
+                .residents
+                .iter()
+                .find(|r| r.owner.is_none() && r.city_id.as_ref() == Some(&city.id));
+            if let Some(r) = r {
+                askers.push((crate::order_sender::npc_sender(city), r.id.clone()));
+            }
+        }
+        for (sender, id) in &askers {
+            let side = sender.npc_city_id.clone().or_else(|| {
+                crate::order_sender::realm_of(&world, sender.user_id).map(|r| r.id.clone())
+            });
+            let seen = || entities_in_sight(&world, &index, side.as_deref(), None);
+            let eyes = || sight_of(&world, &index, side.as_deref().unwrap_or_default(), None);
+            let explored = |_: i32, _: i32| true;
+            let ctx = ScriptContext {
+                world: &world,
+                terrain: &terrain,
+                index: &index,
+                sender,
+                resident_id: Some(id),
+                army_id: None,
+                memory: Object::new(),
+                seen: &seen,
+                eyes: &eyes,
+                explored: &explored,
+                kinds: &kinds,
+                edge: None,
+                params: None,
+            };
+            let bound = bind_script(ctx).unwrap();
+            let mut ask = |name: &str, args: Vec<Value>| {
+                let ty = binding(SCRIPT_API, name).unwrap().returns;
+                let by_json = bound.query(name, &args).map(|d| view_value(&d, ty));
+                if let Some(direct) = bound.direct_query(name, &args) {
+                    assert_eq!(format!("{direct:?}"), format!("{by_json:?}"), "{name} {args:?}");
+                    checked += 1;
+                }
+            };
+            for b in &world.buildings {
+                ask("building", vec![Value::string(&b.id)]);
+            }
+            ask("building", vec![Value::string("nothing")]);
+            for p in &world.piles {
+                ask("pileAt", vec![Value::Number(p.x), Value::Number(p.y)]);
+            }
+            ask("pileAt", vec![Value::Number(0.5), Value::Number(1.0)]);
+        }
+    }
+    assert!(checked > 100, "{checked}");
+}
