@@ -111,10 +111,8 @@ fn the_village_steps_as_the_typescript_did() {
     assert_eq!(differential("village", &[1, 60, 1440]), None);
 }
 
-/// The village's long run, a game week: about 5 s alone and 8 s on a busy machine (2026-11-09),
-/// over the 5 s a test may take, so it stays out of the default suite with the HQ's.
+/// The village's long run, a game week: 3.3 s alone since #1092 made the NPC scripts faster.
 #[test]
-#[ignore = "10 to 15 s: the village's NPC default scripts over a game week, invariants checked on the way"]
 fn the_village_steps_as_the_typescript_did_over_a_game_week() {
     assert_eq!(differential("village", &[10080]), None);
 }
@@ -128,7 +126,7 @@ fn the_trade_org_hq_steps_as_the_typescript_did() {
 /// of it the NPC default scripts, so it stays out of the default suite until they are faster.
 /// Run it with `cargo nextest run -p csp-sim --run-ignored only`.
 #[test]
-#[ignore = "30 to 45 s: the HQ's NPC default scripts over a game week, invariants checked on the way"]
+#[ignore = "18.7 s with eight at once: the HQ's NPC default scripts over a game week, invariants checked on the way; see #1092"]
 fn the_trade_org_hq_steps_as_the_typescript_did_over_a_game_week() {
     assert_eq!(differential("hq", &[1440, 10080]), None);
 }

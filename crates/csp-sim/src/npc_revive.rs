@@ -246,3 +246,6 @@ pub fn npc_revivers(world: &WorldState, size: i32) -> Vec<InvariantViolation> {
     }
     out
 }
+
+#[cfg(test)]
+mod tests;

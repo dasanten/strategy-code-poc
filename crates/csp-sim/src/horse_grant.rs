@@ -266,6 +266,9 @@ fn free_tiles_around(
 }
 
 #[cfg(test)]
+mod offer_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::movement_test_world::{building, plains, resident, world_with_realm};

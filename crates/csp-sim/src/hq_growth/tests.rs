@@ -219,7 +219,7 @@ fn wants_a_multiple_of_the_strongest_sides_armed_residents_an_alliance_counted_t
 }
 
 #[test]
-#[ignore = "18.8 s alone; see #1092"]
+#[ignore = "6.8 s alone; see #1092"]
 fn trains_more_soldiers_than_its_armys_size_when_a_player_grows_strong() {
     let mut s = setup();
     let goods = s
@@ -343,7 +343,7 @@ fn builds_houses_between_its_rings_while_too_weak() {
 }
 
 #[test]
-#[ignore = "22.4 s alone; see #1092"]
+#[ignore = "5.4 s with eight at once; see #1092"]
 fn grows_a_new_outer_ring_once_it_has_no_room_for_houses_and_houses_beyond_the_old_one() {
     let mut s = weak();
     let size = s.terrain.size;

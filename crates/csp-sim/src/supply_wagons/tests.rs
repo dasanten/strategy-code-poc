@@ -269,7 +269,6 @@ fn goes_without_when_the_hq_has_nobody_free_to_drive_it() {
 }
 
 #[test]
-#[ignore = "6.1 s alone; see #1092"]
 fn follows_the_army_along_the_road() {
     let mut s = default_setup();
     let off = set_off(&mut s, iron(10.0));
@@ -809,7 +808,7 @@ fn ends_with_the_hq() {
 // the Trade Org army's longest trip
 
 #[test]
-#[ignore = "slow in the TypeScript too (`tags: ['slow']`): a trip across the full-size map, 10.5 s in release"]
+#[ignore = "20.6 s alone; see #1092"]
 fn reaches_the_farthest_city_on_a_real_size_map_and_gets_home_fed_with_no_food_but_its_own() {
     use csp_shared::balance::{FOOD_PER_DAY, MAP_SIZE, WALK_TICKS_PER_TILE};
     use csp_shared::world::Stat;
