@@ -101,13 +101,14 @@ pub fn rob_caravan(
     crate::caravans::rob_caravan(world, thief, carriage_id, robbed, false);
 }
 
-/// Robs a wandering trader (`robTrader`). TODO(T86.10): `traders.rs`.
+/// Robs a wandering trader (`robTrader`, in `traders.rs`).
 pub fn rob_trader(
-    _world: &mut WorldState,
-    _thief: usize,
-    _carriage_id: &str,
-    _robbed: &mut HashSet<String>,
+    world: &mut WorldState,
+    thief: usize,
+    carriage_id: &str,
+    robbed: &mut HashSet<String>,
 ) {
+    crate::traders::rob_trader(world, thief, carriage_id, robbed, false);
 }
 
 pub use crate::deliveries::collects_from;
