@@ -21,6 +21,8 @@ indexmap = { version = "2", features = ["serde"] }
 ts-rs = { version = "12", features = ["serde-json-impl", "indexmap-impl", "no-serde-warnings"] }
 flate2 = "1"
 sha2 = "0.10"
+# A fast hasher for the tick's scratch maps keyed by tile or id (T89.6); never for anything saved.
+rustc-hash = "2"
 
 [workspace.lints.clippy]
 all = "warn"

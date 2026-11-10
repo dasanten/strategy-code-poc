@@ -373,6 +373,7 @@ dependencies = [
  "csp-lang",
  "csp-shared",
  "indexmap",
+ "rustc-hash",
  "serde",
  "serde_json",
  "sha2",
