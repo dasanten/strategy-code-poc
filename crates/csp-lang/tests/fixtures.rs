@@ -85,9 +85,9 @@ fn printable(value: &Value) -> Json {
         Value::Function(f) => json!({ "$function": f.name() }),
         Value::Native(n) => json!({ "$native": n.name }),
         Value::List(list) => Json::Array(list.borrow().items.iter().map(printable).collect()),
-        Value::Object(object) => {
-            Json::Object(object.borrow().iter().map(|(k, v)| (k.clone(), printable(v))).collect())
-        }
+        Value::Object(object) => Json::Object(
+            object.borrow().iter().map(|(k, v)| (k.to_string(), printable(v))).collect(),
+        ),
         other => support::json(other),
     }
 }
