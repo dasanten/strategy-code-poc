@@ -14,8 +14,8 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::order_sender::OrderSender;
+use crate::passengers::{GetsOffFirst, GETS_OFF_FIRST};
 use crate::queries::residents::is_down;
-use crate::queue::field_str;
 use crate::tick::{ApplyOrders, Scratch};
 
 /// One kind of UI order (`OrderKind`, ADR 0002). `validate` runs when the order arrives and
@@ -37,50 +37,8 @@ pub trait OrderKind: Send + Sync {
         terrain: Option<&TerrainMap>,
     );
 }
-
-/// The orders that act on a tile, and so get a passenger off their carriage first
-/// (`GETS_OFF_FIRST`, `CONTEXT.md`: Passenger).
-// TODO(T86.4): moves to `passengers.rs` with `getsOffFirst`.
-pub const GETS_OFF_FIRST: [&str; 33] = [
-    "walkTo",
-    "relocate",
-    "drive",
-    "unhitch",
-    "hitch",
-    "haul",
-    "pickUp",
-    "drop",
-    "store",
-    "fetch",
-    "build",
-    "tearDown",
-    "workAt",
-    "teach",
-    "train",
-    "breed",
-    "attack",
-    "climb",
-    "mount",
-    "roadLine",
-    "wallLine",
-    "buyCity",
-    "buy",
-    "sell",
-    "swap",
-    "buyHorse",
-    "sellHorse",
-    "handIn",
-    "transfer",
-    "buyOff",
-    "payDebt",
-    "acceptOffer",
-    "feed",
-];
-
-/// An order kind that first gets the ordered resident off their carriage (`getsOffFirst`).
-struct GetsOffFirst(Arc<dyn OrderKind>);
-
-impl OrderKind for GetsOffFirst {
+/// A shared order kind is one too, so it can be wrapped (`getsOffFirst`).
+impl OrderKind for Arc<dyn OrderKind> {
     fn validate(
         &self,
         world: &WorldState,
@@ -88,7 +46,7 @@ impl OrderKind for GetsOffFirst {
         order: &OrderRequest,
         terrain: Option<&TerrainMap>,
     ) -> Option<String> {
-        self.0.validate(world, sender, order, terrain)
+        (**self).validate(world, sender, order, terrain)
     }
     fn apply(
         &self,
@@ -97,12 +55,28 @@ impl OrderKind for GetsOffFirst {
         order: &OrderRequest,
         terrain: Option<&TerrainMap>,
     ) {
-        let id = field_str(order, "residentId");
-        if let Some(r) = world.residents.iter_mut().find(|x| Some(x.id.as_str()) == id) {
-            r.aboard = None;
-        }
-        self.0.apply(world, sender, order, terrain);
+        (**self).apply(world, sender, order, terrain)
     }
+}
+
+/// A string field of an order, if it is one.
+pub fn str_field<'o>(order: &'o OrderRequest, name: &str) -> Option<&'o str> {
+    order.fields.get(name).and_then(Value::as_str)
+}
+
+/// A number field of an order, if it is one.
+pub fn num_field(order: &OrderRequest, name: &str) -> Option<f64> {
+    order.fields.get(name).and_then(Value::as_f64)
+}
+
+/// A whole-number field of an order (`Number.isInteger`), if it is one.
+pub fn int_field(order: &OrderRequest, name: &str) -> Option<f64> {
+    num_field(order, name).filter(|v| v.is_finite() && v.fract() == 0.0)
+}
+
+/// A boolean field of an order, if it is one.
+pub fn bool_field(order: &OrderRequest, name: &str) -> Option<bool> {
+    order.fields.get(name).and_then(Value::as_bool)
 }
 
 /// The order kinds by name (`Record<string, OrderKind>`). Only the kinds put in count, so a
@@ -144,11 +118,6 @@ pub fn order_kinds() -> OrderKinds {
     crate::order_kinds::add_later_rule_orders(&mut kinds);
     kinds
 }
-
-/// The army order kinds (`Object.keys(armyOrders)`): an order to an army, not to a resident.
-// TODO(T86.7): from `armies.rs` once it ports `armyOrders`.
-const ARMY_ORDERS: [&str; 7] =
-    ["formArmy", "disbandArmy", "armyWalkTo", "armyGuard", "armyAttack", "armyFollow", "armyStop"];
 
 /// The order kinds that leave a resident's script running (`keeps` in `applyAll`): pairing, the
 /// Leader handover, renaming and claiming the Horse offer change nobody's order, nor do picking a
@@ -273,7 +242,7 @@ impl OrderQueue {
             }
             let kind_name = order.kind.as_str();
             let keeps = keeps_script(kind_name);
-            let resident_id = field_str(&order, "residentId").map(str::to_string);
+            let resident_id = str_field(&order, "residentId").map(str::to_string);
             let ri = resident_id
                 .as_deref()
                 .and_then(|id| world.residents.iter().position(|x| x.id == id));
@@ -308,12 +277,13 @@ impl OrderQueue {
                 }
             }
             if kind_name != "armyRunScript" {
-                let army_id = field_str(&order, "armyId");
+                let army_id = str_field(&order, "armyId");
                 if let Some(a) = world.armies.iter_mut().find(|x| Some(x.id.as_str()) == army_id) {
                     a.script = None;
                 }
             }
-            let to_army = ARMY_ORDERS.contains(&kind_name) || kind_name == "armyRunScript";
+            let to_army = crate::armies::ArmyOrderKind::of(kind_name).is_some()
+                || kind_name == "armyRunScript";
             let before = if to_army { None } else { Some(member_orders(world)) };
             // Accepted by `receive`, so the kind exists.
             let kind = self.kinds.get(kind_name).expect("accepted orders have a kind").clone();

@@ -4,11 +4,11 @@
 use std::collections::HashSet;
 
 use csp_shared::balance::{
-    carriage_can_enter, Recipe, BUILD_MATERIALS, BUILD_WORK, CITY_AREA_MARGIN, MAP_SIZE,
-    MOUNTAIN_ROAD_WORK_FACTOR, RECIPES, TEARDOWN_MATERIALS_RETURNED, TEARDOWN_WORK_SHARE,
-    TRAINING_GROUND_MAX_TRAINEES, WORKPLACE_MAX_WORKERS,
+    carriage_can_enter, Recipe, BUILD_MATERIALS, BUILD_WORK, MAP_SIZE, MOUNTAIN_ROAD_WORK_FACTOR,
+    RECIPES, TEARDOWN_MATERIALS_RETURNED, TEARDOWN_WORK_SHARE, TRAINING_GROUND_MAX_TRAINEES,
+    WORKPLACE_MAX_WORKERS,
 };
-use csp_shared::footprint::{covers, footprint_tiles, is_at, near_footprint, Placed, FOOTPRINT};
+use csp_shared::footprint::{covers, footprint_tiles, is_at, Placed, FOOTPRINT};
 use csp_shared::terrain::{
     is_passable_terrain, terrain_at, tile_index, wrap, wrap_delta, Terrain, TerrainMap,
 };
@@ -331,27 +331,6 @@ impl TerrainLookup for TerrainMap {
     }
 }
 
-/// Whether (x, y) lies in some city's area (`citiesAt(...).length > 0`).
-// TODO(T86.8): `citiesAt` and `isCityBuilding` of `city.ts`, private here until cities land.
-fn in_some_city_area(world: &WorldState, x: i32, y: i32, size: i32) -> bool {
-    const CITY_BUILDINGS: [BuildingKind; 6] = [
-        BuildingKind::TownHall,
-        BuildingKind::House,
-        BuildingKind::Storage,
-        BuildingKind::Warehouse,
-        BuildingKind::Wall,
-        BuildingKind::Gate,
-    ];
-    world.cities.iter().any(|c| {
-        world.buildings.iter().any(|b| {
-            b.city_id.as_deref() == Some(c.id.as_str())
-                && CITY_BUILDINGS.contains(&b.kind)
-                && b.site.is_none()
-                && near_footprint(placed(b), (x, y), CITY_AREA_MARGIN as i32, size)
-        })
-    })
-}
-
 /// Why a building of this kind can't be laid out with the north-west tile of its footprint on
 /// (x, y) (`buildProblem`), or `None` if it can. Without `terrain` the terrain rules are not
 /// checked.
@@ -414,7 +393,9 @@ pub fn build_problem(
             return Some(format!("a {name} goes off any resource node, and not on Mountain"));
         }
         if IN_CITY_AREA.contains(&kind)
-            && !tiles.iter().all(|&(tx, ty)| in_some_city_area(world, tx, ty, size))
+            && !tiles.iter().all(|&(tx, ty)| {
+                !super::city_area::cities_at(world, f64::from(tx), f64::from(ty), size).is_empty()
+            })
         {
             return Some(format!("a {name} goes in a city’s area"));
         }

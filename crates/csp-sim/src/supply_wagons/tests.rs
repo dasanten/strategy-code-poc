@@ -627,11 +627,11 @@ fn cant_be_stolen_while_its_driver_or_soldiers_hold_it_and_is_gone_for_them_once
     let ki = s.world.carriages.iter().position(|k| k.id == off.carriage).unwrap();
     let hid = off.carriage(&s.world).horse_id.clone();
     let hi = s.world.horses.iter().position(|h| Some(&h.id) == hid.as_ref());
-    crate::movement_pending::take_over(
+    crate::stealing::take_over(
         &mut s.world,
         "a2",
         "r1",
-        crate::movement_pending::Taken { carriage: Some(ki), horse: hi },
+        crate::stealing::Taken { carriage: Some(ki), horse: hi },
         SIZE,
     );
     assert_eq!(off.carriage(&s.world).realm_id.as_deref(), Some("r1"));

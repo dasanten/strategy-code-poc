@@ -15,24 +15,40 @@ use csp_shared::world::{
     Tile, TilePath, WalkOrder, WorldState,
 };
 
-use crate::movement_pending::{
-    army_driven_to, army_spot, attack_target, end_order, in_contact, int_field, ordered_resident,
-    place_tile, str_field, waiting_for_army, waiting_for_escort, waiting_on_the_road, wall_side,
-    OrderKind, OrderSender,
-};
+use crate::armies::waiting_for_army;
+use crate::caravans::waiting_for_escort;
+use crate::order_sender::{ordered_resident, OrderSender};
+use crate::orders::{int_field, str_field, OrderKind};
 use crate::pathfinding::{
     PathFinder, PathOptions, PathResult, Point, TerrainCosts, CARRIAGE_COSTS, WALKING_COSTS,
 };
+use crate::queries::army::{army_driven_to, army_spot};
 use crate::queries::carriages::{horse_for, passengers_of};
 use crate::queries::driving::carriage_can_go_to;
 use crate::queries::pace::{drive_speed, driving_learned, ride_speed, walk_speed};
 use crate::queries::residents::is_down;
 use crate::queries::riding::horse_ridden;
+use crate::storing::{end_order, place_tile};
 use crate::tick::{Scratch, Walk};
+use crate::trade_org_punishment::waiting_on_the_road;
+use crate::walls::wall_side;
 use crate::walls::{may_step, stranded_on_wall, wall_map, walls_fingerprint, WallMap};
 
 /// Time the pathfinder may use per tick (`PATH_BUDGET_MS`, ADR 0004).
 pub const PATH_BUDGET_MS: f64 = 50.0;
+
+/// Whether two spots are in contact (`inContact`), on their whole tiles.
+fn in_contact(size: i32, a: (f64, f64), b: (f64, f64)) -> bool {
+    crate::queries::combat::in_contact(size, (a.0 as i32, a.1 as i32), (b.0 as i32, b.1 as i32))
+}
+
+/// Where an attack order's target stands (`attackTarget`): a resident, or a finished wall or gate.
+fn attack_target(world: &WorldState, target_id: &str) -> Option<(f64, f64)> {
+    match crate::combat::attack_target(world, target_id)? {
+        crate::combat::Target::Resident(i) => Some((world.residents[i].x, world.residents[i].y)),
+        crate::combat::Target::Building(i) => Some((world.buildings[i].x, world.buildings[i].y)),
+    }
+}
 
 /// An action a resident requests (`StepAction`): step onto the next tile, on foot, driving
 /// `carriage_id` there, or riding `horse_id` there. The world resolves it at the end of the tick.
@@ -56,7 +72,9 @@ impl OrderKind for WalkTo {
         order: &OrderRequest,
         terrain: Option<&TerrainMap>,
     ) -> Option<String> {
-        let Some(r) = ordered_resident(world, sender, str_field(order, "residentId")) else {
+        let Some(r) = ordered_resident(world, sender, str_field(order, "residentId"))
+            .map(|i| &world.residents[i])
+        else {
             return Some("not one of your residents".into());
         };
         let (Some(x), Some(y)) = (int_field(order, "x"), int_field(order, "y")) else {
@@ -620,7 +638,7 @@ impl Walking {
                     *p =
                         Some(path.into_iter().map(|(x, y)| (f64::from(x), f64::from(y))).collect());
                 }
-                _ => end_order(world, i, Some("no way")),
+                _ => end_order(world, i, Some("no way".into())),
             }
         }
     }

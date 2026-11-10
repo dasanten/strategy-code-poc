@@ -17,19 +17,25 @@ use csp_shared::world::{
 };
 use serde_json::Value;
 
+use crate::armies::leave_armies;
+use crate::events::record_event;
+use crate::npc_behaviour::walk_to;
+use crate::order_sender::{realm_of, OrderSender};
+use crate::orders::{str_field, OrderKind};
+use crate::queries::alliance::realm_name;
 use crate::queries::alliance::{commander_of, handed_over_to};
+use crate::queries::city::building_realm;
 use crate::queries::city::{for_sale, npc_city_refuses, town_hall_of};
 use crate::queries::contract::{contract_ends_at, contract_pay_by, contract_weeks};
 use crate::queries::names::{held, placed};
 use crate::queries::npc_trade::spare_residents;
+use crate::queries::standing::organization_label;
 use crate::queries::standing::TRADE_ORG;
+use crate::queries::trade_org::{contract_side, trade_org_hq};
 use crate::random::new_id;
-use crate::realm_pending::{
-    building_realm, change_standing, contract_side, leave_armies, organization_label,
-    raise_standing_both_ways, realm_name, realm_of, record_event, spare_soldiers, str_field,
-    trade_org_hq, walk_to, OrderKind, OrderSender,
-};
 use crate::sight::InvariantViolation;
+use crate::standing::{change_standing, raise_standing_both_ways};
+use crate::trade_org_army::spare_soldiers;
 
 /// The NPC city an id names, if it is one (`npcCity`: `forSale`).
 fn npc_city<'w>(world: &'w WorldState, id: Option<&str>) -> Option<&'w csp_shared::world::City> {
@@ -48,7 +54,7 @@ fn storage_realm(world: &WorldState, storage_id: Option<&str>) -> Option<String>
     match b.kind {
         BuildingKind::Storage => match city.filter(|c| for_sale(c)) {
             Some(c) => Some(c.id.clone()),
-            None => building_realm(world, b),
+            None => building_realm(world, b).map(str::to_string),
         },
         BuildingKind::Warehouse if city.is_some_and(|c| c.trade_org.is_some()) => {
             Some(TRADE_ORG.to_string())
@@ -542,7 +548,7 @@ fn send_home(world: &mut WorldState, ri: usize) {
     if let Some(hall) = hall {
         if !is_at((r.x as i32, r.y as i32), placed(hall), MAP_SIZE) {
             let (x, y) = (hall.x, hall.y);
-            walk_to(&mut world.residents[ri], x, y);
+            walk_to(&mut world.residents[ri], (x, y));
         }
     }
 }

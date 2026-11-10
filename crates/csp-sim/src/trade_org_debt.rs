@@ -22,8 +22,8 @@ use crate::orders::OrderKind;
 use crate::queries::alliance::commander_of;
 use crate::queries::standing::{standing_organization, TRADE_ORG};
 use crate::queries::trade_org::trade_org_hq;
+use crate::queries::warehouse_trade::js_number;
 use crate::queries::warehouse_trade::{buy_off_coin_warehouse_at, debt_of, pay_debt_problem};
-use crate::realm_pending::js_number;
 use crate::standing::organization_exists;
 
 /// How a debt first reads in the log (`first` of `oweTradeOrg`).
