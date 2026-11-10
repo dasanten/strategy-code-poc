@@ -47,8 +47,12 @@ mod movement_test_world;
 pub mod names;
 pub mod node_gen;
 pub mod npc_behaviour;
+#[cfg(test)]
+mod npc_big_city;
 pub mod npc_chain;
 pub mod npc_cities;
+#[cfg(test)]
+mod npc_far_nodes_tests;
 pub mod npc_coins;
 pub mod npc_defence;
 pub mod npc_founding;

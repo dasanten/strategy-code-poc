@@ -18,7 +18,6 @@ use crate::walking::Walking;
 use crate::world::{create_world, step_world};
 
 #[test]
-#[ignore = "timed in the PR"]
 fn have_one_of_their_residents_breed_their_horses_through_the_default_task() {
     let land = city_terrain();
     let mut world = create_world(&land, 1);

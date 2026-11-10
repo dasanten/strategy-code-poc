@@ -386,3 +386,6 @@ pub fn npc_trains_its_soldiers(world: &WorldState) -> Vec<InvariantViolation> {
     }
     out
 }
+
+#[cfg(test)]
+mod slow_tests;
