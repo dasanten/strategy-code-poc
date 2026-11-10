@@ -106,7 +106,7 @@ fn truthy(v: &Value) -> bool {
 }
 
 #[test]
-#[ignore = "a slow simulation (180 game days): T86.14 ports it under 5 s"]
+#[ignore = "53.6 s alone; see #1092"]
 fn tears_the_old_wall_down_only_after_the_new_one_is_finished() {
     let mut v = village(None);
     let size = v.terrain.size;
@@ -429,7 +429,7 @@ fn an_npc_citys_residents_stand_on_its_walls_others_dont() {
 // npc-growth-village.test.ts
 
 #[test]
-#[ignore = "a slow simulation (up to 240 game days): T86.14 ports it under 5 s"]
+#[ignore = "over 60 s alone; see #1092"]
 fn a_village_grows_in_residents_and_area_over_game_weeks() {
     let mut v = village(None);
     let size = v.terrain.size;

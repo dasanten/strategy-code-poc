@@ -442,7 +442,7 @@ fn tears_down_by_the_order_anyone_gives_and_takes_no_goods() {
 }
 
 #[test]
-#[ignore = "5.8-6.5 s, over the 5 s limit: three workplaces torn down, then the next army (T86.14)"]
+#[ignore = "7.1 s alone; see #1092"]
 fn with_none_left_goes_home_with_the_debt_still_owed_and_comes_again() {
     let owed = 5000.0;
     let mut s = setup(owed);

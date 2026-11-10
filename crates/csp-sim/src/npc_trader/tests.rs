@@ -211,7 +211,7 @@ fn follow_run(f: &mut Fixture) -> (Option<String>, Option<Stock>) {
 }
 
 #[test]
-#[ignore = "a trade run of 8 game days walked tick by tick: the NPC scripts cost ~70 µs a run to bind and interpret; T86.14 makes it fast"]
+#[ignore = "6.0 s alone; see #1092"]
 fn a_village_with_60_surplus_wood_sends_one_resident_who_comes_back_with_iron_when_iron_is_short() {
     let mut f = village_and_post(true);
     let wood_before = f.held(&f.warehouse.clone(), Good::Wood);
@@ -230,7 +230,7 @@ fn a_village_with_60_surplus_wood_sends_one_resident_who_comes_back_with_iron_wh
 }
 
 #[test]
-#[ignore = "a trade run of 8 game days walked tick by tick: the NPC scripts cost ~70 µs a run to bind and interpret; T86.14 makes it fast"]
+#[ignore = "11.2 s alone; see #1092"]
 fn with_nothing_short_it_has_no_node_for_the_trader_comes_back_with_coins() {
     let mut f = village_and_post(false);
     let coins_before = f.held(&f.storage.clone(), Good::Coins);
@@ -479,7 +479,7 @@ fn replaces_a_dead_trader_after_the_give_up_time_and_only_them() {
 }
 
 #[test]
-#[ignore = "two trade runs of 2 game days walked tick by tick: the NPC scripts cost ~70 µs a run to bind and interpret; T86.14 makes it fast"]
+#[ignore = "15.6 s alone; see #1092"]
 fn two_traders_walk_out_at_once_sell_their_own_loads_and_come_home() {
     let over = [(Good::Wood, 500.0), (Good::Stone, 500.0)];
     let mut f = city_and_post(2.0 * NPC_RESIDENTS_PER_TRADER, &over, 150.0);

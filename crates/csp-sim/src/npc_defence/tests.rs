@@ -812,7 +812,6 @@ fn beat_a_lone_occupier_before_the_city_falls_with_no_crime_and_every_invariant_
 // Trading posts defend themselves
 
 #[test]
-#[ignore = "2 game days walked tick by tick: the NPC scripts cost ~70 µs a run to bind and interpret; T86.14 makes it fast"]
 fn arm_soldiers_from_the_warehouse_so_one_armed_outsider_does_not_capture_the_post() {
     let mut p = post();
     let hall = p.at(BuildingKind::TownHall);
