@@ -70,6 +70,7 @@ pub mod offers;
 pub mod order_kinds;
 pub mod order_sender;
 pub mod orders;
+pub mod outsiders;
 pub mod pairing;
 pub mod passengers;
 pub mod pathfinding;

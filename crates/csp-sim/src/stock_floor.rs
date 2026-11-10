@@ -42,23 +42,52 @@ pub fn step_stock_floor(world: &mut WorldState, made: &mut GoodsMade) {
 mod tests {
     use super::*;
     use csp_shared::balance::{HQ_FLOOR_FACTOR, WAREHOUSE_FLOOR};
-    use csp_shared::world::{Good, TradeOrgCity};
+    use csp_shared::terrain::{tile_index, Terrain};
+    use csp_shared::world::{Good, ResourceKind, ResourceNode, TradeOrgCity};
 
-    use crate::test_support::{add_city, building, plains};
+    use crate::queries::city::town_hall_of;
+    use crate::queries::warehouse::HQ_COIN_WAREHOUSE;
+    use crate::random::Mulberry32;
+    use crate::test_support::plains;
+    use crate::trade_org::found_trade_org_hq;
     use crate::world::create_world;
 
-    /// The Trade Org HQ's two warehouses, coins and goods, on a small map, with the HQ standing
-    /// alone. TODO(T86.9): `foundTradeOrgHq`, as the TypeScript test does.
+    /// The Trade Org HQ founded at the middle of an open map with one node of each kind it works
+    /// (`hq`, `foundTradeOrgHq`): its coin warehouse, at `HQ_COIN_WAREHOUSE` from the town hall,
+    /// and its goods warehouse.
     fn hq() -> (WorldState, String, String) {
-        let mut world = create_world(&plains(128), 1);
-        add_city(&mut world, "hq", None, 60.0, 60.0);
-        world.cities[0].trade_org = Some(TradeOrgCity::Hq);
-        world.cities[0].layout = None;
-        // `HQ_COIN_WAREHOUSE` from the town hall.
-        let coins = building("coins", BuildingKind::Warehouse, Some("hq"), 64.0, 56.0);
-        let goods = building("goods", BuildingKind::Warehouse, Some("hq"), 56.0, 64.0);
-        world.buildings.extend([coins, goods]);
-        (world, "coins".into(), "goods".into())
+        const MID: i32 = 320;
+        let nodes = [
+            (ResourceKind::Forest, MID + 80, MID),
+            (ResourceKind::Stone, MID + 80, MID + 12),
+            (ResourceKind::IronOre, MID + 88, MID - 12),
+            (ResourceKind::GoldOre, MID + 96, MID),
+        ];
+        let mut terrain = plains(640);
+        for (kind, x, y) in nodes {
+            let t = if kind == ResourceKind::Forest { Terrain::Forest } else { Terrain::Hills };
+            terrain.tiles[tile_index(640, x, y)] = t as u8;
+        }
+        let mut world = create_world(&terrain, 1);
+        world.nodes = nodes
+            .iter()
+            .enumerate()
+            .map(|(i, &(kind, x, y))| ResourceNode {
+                id: format!("n{i}"),
+                kind,
+                x: f64::from(x),
+                y: f64::from(y),
+            })
+            .collect();
+        let mut m = Mulberry32::new(7.0);
+        let city = found_trade_org_hq(&mut world, &terrain, MID, MID, &mut || m.next());
+        let city = world.cities.iter().find(|c| c.id == city).expect("the HQ");
+        let hall = town_hall_of(&world, city).expect("its town hall");
+        let at = (hall.x + HQ_COIN_WAREHOUSE.0, hall.y + HQ_COIN_WAREHOUSE.1);
+        let warehouses = world.buildings.iter().filter(|b| b.kind == BuildingKind::Warehouse);
+        let (coins, goods): (Vec<_>, Vec<_>) = warehouses.partition(|b| (b.x, b.y) == at);
+        let (coins, goods) = (coins[0].id.clone(), goods[0].id.clone());
+        (world, coins, goods)
     }
 
     fn stock<'w>(world: &'w WorldState, id: &str) -> &'w Option<Stock> {

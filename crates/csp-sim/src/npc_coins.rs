@@ -7,6 +7,7 @@ use csp_shared::balance::NPC_TRADER_REACH;
 use csp_shared::terrain::wrap_distance;
 use csp_shared::world::{BuildingKind, City, Good, WorldState};
 
+use crate::npc_behaviour::npc_home;
 use crate::npc_chain::{makes, short_goods};
 use crate::npc_scouts::knows_node;
 use crate::queries::building::node_good;
@@ -14,7 +15,6 @@ use crate::queries::names::held;
 use crate::queries::npc_trade::{npc_city_stock, npc_reserve};
 use crate::queries::warehouse::trade_coin_warehouse;
 use crate::sight::InvariantViolation;
-use crate::survival::npc_home;
 
 /// Whether an NPC city can earn Coins (`earnsCoins`, `CONTEXT.md`: NPC reserve): it has gold or a
 /// mint of its own, or trade in reach. Of its own: a mint or a gold mine, finished or begun

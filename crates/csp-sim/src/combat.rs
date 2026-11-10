@@ -25,7 +25,7 @@ use crate::order_sender::{ordered_resident, OrderSender};
 use crate::queries::alliance::contract_of;
 use crate::queries::carriages::{driven_carriage_id, stands_still};
 use crate::queries::city::town_hall_of;
-use crate::queries::city_area::{in_city_area, occupiers_of, stands_occupying};
+use crate::queries::city_area::{in_city_area, stands_occupying};
 use crate::queries::combat::{attack_power, blow_damage, combat_learned, dodge_chance, in_contact};
 use crate::queries::names::placed;
 use crate::queries::residents::{is_armed, is_down};
@@ -237,28 +237,7 @@ pub fn validate_attack(
     }
 }
 
-/// `answersAttack` (TODO(T86.12): `alarms.ts`): whether `r` going after `target_id` answers the
-/// attack their Alarm script runs for.
-fn answers_attack(r: &Resident, target_id: &str) -> bool {
-    r.script
-        .as_ref()
-        .and_then(|s| s.alarm.as_ref())
-        .is_some_and(|a| a.kind == csp_shared::world::AlarmKind::Attacked && a.about == target_id)
-}
-
-/// `goesAfterOccupier` (TODO(T86.12): `alarms.ts`): whether `r`, of an NPC city, goes after
-/// `target_id` as one occupying their town hall for their Alarm script.
-fn goes_after_occupier(world: &WorldState, r: &Resident, target_id: &str, size: i32) -> bool {
-    let occupied = r.script.as_ref().and_then(|s| s.alarm.as_ref()).map(|a| a.kind)
-        == Some(csp_shared::world::AlarmKind::Occupied);
-    if r.owner.is_some() || !occupied {
-        return false;
-    }
-    let Some(city) = world.cities.iter().find(|c| r.city_id.as_ref() == Some(&c.id)) else {
-        return false;
-    };
-    occupiers_of(world, city, size).into_iter().any(|o| world.residents[o].id == target_id)
-}
+use crate::alarms::{answers_attack, goes_after_occupier};
 
 /// `attack.apply`: a defence script going after who struck them fights back, in a fight already
 /// logged; an Alarm script answering an attack, or going after an occupier, strikes back too.
