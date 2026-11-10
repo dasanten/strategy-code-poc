@@ -185,7 +185,7 @@ fn leaves_out_the_crews_of_a_caravan_and_of_a_wandering_trader() {
 fn reaches_only_those_at_home_who_see_them() {
     let mut world = setup();
     // The city reaches further east: a storage there, with w2 standing by it, out of sight of x1.
-    let far = f64::from(SIGHT_RANGE) + 20.0;
+    let far = SIGHT_RANGE + 20.0;
     building(&mut world, "st", BuildingKind::Storage, Some("c1"), 12.0 + far, 9.0);
     let faraway = resident(&mut world, "w2", Some("r1"), 12.0 + far, 9.0);
     world.residents[faraway].carried = [(Good::Spear, 1.0)].into_iter().collect();
