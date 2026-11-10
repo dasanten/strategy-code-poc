@@ -7,7 +7,7 @@ export const ADMIN_PATH = '/admin'
 export type Page = 'login' | 'game' | 'admin' | 'not-admin' | 'wiki'
 
 /** The admin panel's tabs, each at `/admin/<tab>`; `/admin` itself opens the map. */
-export const ADMIN_TABS = ['map', 'accounts', 'directives'] as const
+export const ADMIN_TABS = ['map', 'accounts', 'directives', 'tick-health'] as const
 export type AdminTab = (typeof ADMIN_TABS)[number]
 
 /** The path within the admin panel, if `pathname` is in it: '' for `/admin`, 'map' for `/admin/map`. */

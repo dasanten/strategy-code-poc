@@ -7,13 +7,15 @@ use std::collections::VecDeque;
 use csp_sim::tick::{Phases, TickHealth, TICK_PHASES};
 use indexmap::IndexMap;
 use serde::Serialize;
+use ts_rs::TS;
 
 /// How far back the window reaches, in ms.
 pub const WINDOW_MS: f64 = 60.0 * 60.0 * 1000.0;
 /// The short summary's reach, in ms.
 pub const MINUTE_MS: f64 = 60.0 * 1000.0;
 
-#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize)]
+/// p50, p95 and max of a stretch of ticks (`Percentiles`).
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, TS)]
 pub struct Percentiles {
     pub p50: f64,
     pub p95: f64,
@@ -32,23 +34,40 @@ pub fn percentiles(values: &mut [f64]) -> Percentiles {
     Percentiles { p50: rank(0.5), p95: rank(0.95), max: values[values.len() - 1] }
 }
 
-/// The ticks of one stretch of time, summed up.
-#[derive(Debug, Clone, PartialEq, Default, Serialize)]
+/// The ticks of one stretch of time, summed up (`WindowStats`).
+#[derive(Debug, Clone, PartialEq, Default, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct WindowStats {
     pub ticks: usize,
     /// Ticks over the slow-tick threshold.
     pub slow: usize,
     pub duration_ms: Percentiles,
-    /// Every phase, in the phases' order.
+    /// The residents in the world, per tick.
+    pub residents: Percentiles,
+    /// The scripts that ran, per tick (`TickHealth.script_runs`).
+    pub script_runs: Percentiles,
+    /// Every phase by its name, in the phases' order.
+    #[ts(as = "IndexMap<String, Percentiles>")]
     pub phases: IndexMap<&'static str, Percentiles>,
 }
 
-#[derive(Debug, Clone, PartialEq, Default, Serialize)]
+/// The last minute and the last hour of ticks (`TickHealthSummary`).
+#[derive(Debug, Clone, PartialEq, Default, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct TickHealthSummary {
     pub last_minute: WindowStats,
     pub last_hour: WindowStats,
+}
+
+/// What `GET /api/admin/tick-health` answers (`TickHealthResponse`): the summary, and the
+/// slow-tick threshold it was measured against.
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct TickHealthResponse {
+    /// A tick longer than this, in ms, is slow (`SLOW_TICK_MS`).
+    pub slow_tick_ms: f64,
+    #[serde(flatten)]
+    pub summary: TickHealthSummary,
 }
 
 #[derive(Debug, Clone)]
@@ -56,6 +75,8 @@ struct Entry {
     at_ms: f64,
     duration_ms: f64,
     phases: Phases,
+    residents: usize,
+    script_runs: usize,
     slow: bool,
 }
 
@@ -77,6 +98,8 @@ impl TickHealthWindow {
             at_ms,
             duration_ms: health.duration_ms,
             phases: health.phases,
+            residents: health.residents,
+            script_runs: health.script_runs,
             slow: health.slow,
         });
         while self.entries.front().is_some_and(|e| e.at_ms <= at_ms - WINDOW_MS) {
@@ -100,9 +123,16 @@ impl TickHealthWindow {
         }
     }
 
+    /// The summary before `now_ms` as admins get it, with the slow-tick threshold.
+    pub fn response(&self, now_ms: f64, slow_tick_ms: f64) -> TickHealthResponse {
+        TickHealthResponse { slow_tick_ms, summary: self.summary(now_ms) }
+    }
+
     fn stats(&self, after_ms: f64) -> WindowStats {
         let recent: Vec<&Entry> = self.entries.iter().filter(|e| e.at_ms > after_ms).collect();
-        let mut durations: Vec<f64> = recent.iter().map(|e| e.duration_ms).collect();
+        let of = |f: fn(&Entry) -> f64| {
+            percentiles(&mut recent.iter().map(|e| f(e)).collect::<Vec<_>>())
+        };
         let phases = TICK_PHASES
             .iter()
             .map(|&p| {
@@ -113,7 +143,9 @@ impl TickHealthWindow {
         WindowStats {
             ticks: recent.len(),
             slow: recent.iter().filter(|e| e.slow).count(),
-            duration_ms: percentiles(&mut durations),
+            duration_ms: of(|e| e.duration_ms),
+            residents: of(|e| e.residents as f64),
+            script_runs: of(|e| e.script_runs as f64),
             phases,
         }
     }
@@ -195,6 +227,30 @@ mod tests {
         assert!(
             TickHealthWindow::new().summary(0.0).last_hour.phases["save"] == Percentiles::default()
         );
+    }
+
+    #[test]
+    fn sums_up_residents_and_script_runs_per_tick() {
+        let mut w = TickHealthWindow::new();
+        for (s, (residents, runs)) in [(10, 2), (12, 0), (11, 9)].into_iter().enumerate() {
+            let mut h = health(1.0, false);
+            (h.residents, h.script_runs) = (residents, runs);
+            w.push(1000.0 * (s as f64 + 1.0), &h);
+        }
+        let s = w.summary(3000.0);
+        assert_eq!(s.last_minute.residents, Percentiles { p50: 11.0, p95: 12.0, max: 12.0 });
+        assert_eq!(s.last_minute.script_runs, Percentiles { p50: 2.0, p95: 9.0, max: 9.0 });
+    }
+
+    #[test]
+    fn answers_admins_with_the_slow_tick_threshold_beside_both_windows() {
+        let mut w = TickHealthWindow::new();
+        w.push(1000.0, &health(5.0, false));
+        let json = serde_json::to_value(w.response(1000.0, 800.0)).unwrap();
+        assert_eq!(json["slowTickMs"], 800.0);
+        assert_eq!(json["lastMinute"]["ticks"], 1);
+        assert_eq!(json["lastHour"]["durationMs"]["max"], 5.0);
+        assert_eq!(json["lastHour"]["scriptRuns"]["p50"], 0.0);
     }
 
     /// Phases in which only `phase` took time, `ms` of it: timed with a clock that moves `ms` on
