@@ -275,6 +275,7 @@ wall time 1716 s; 277 files, 4511 tests, 0 failed (exit 0)
 | apps/server/src/npc-growth-village.test.ts    |   211.6 |
 | apps/server/src/trade-org.test.ts             |   194.6 |
 | apps/server/src/transfers-caravans.test.ts    |   192.1 |
+
 ### Explored map loading (T84.6, 2026-11-07)
 
 A copy of a worked world (5,760 tiles across, 180 × 180 chunks) with its Player's explored
@@ -302,7 +303,7 @@ release build, **not idle** (other sessions building and testing). These are onl
 on `epic/87-rust-shell` terrain generation and resource nodes are ported, but the world's other
 placements (HQ, NPC cities, trading posts, caravans) and every rule of the world step are still
 the stubs of T86.1. The `sim` scenes therefore have no residents and their ticks cost microseconds.
-Rerun all four scenes once Epic 86 has landed.
+Rerun all four scenes once Epic 86 has landed (done in T89.2, below).
 
 **World generation, full size (5760x5760, seed 1)**, `bench-world`:
 
@@ -321,3 +322,141 @@ Rerun all four scenes once Epic 86 has landed.
 
 Terrain takes 5.0 s against 9.4 s for the TypeScript, and the resource nodes (the same 3310) take
 0.18 s against 2.3 s.
+
+### Rust after the port (T89.2, 2026-11-10)
+
+The same measurements as the TypeScript baseline, on `epic/89-rust-follow-ups` (every rule of Epic 86
+and the whole world generation ported), release build, same machine (AMD Ryzen 9 7900X, 12 cores,
+24 threads, 31 GiB, Windows 11). The TypeScript columns are the T84.7 numbers above, from 2026-11-07.
+**The machine was not idle**: three other sessions were building Rust. Each run waited for a moment
+when the CPU sampled under about 25% (the suite: 20%), and the load is noted per run as the
+instantaneous CPU % of all 24 threads and the count of other node and cargo/rustc/link processes.
+Read every number as an upper bound; the first, loaded runs are given at the end for comparison.
+
+**World generation, full size (5760x5760, seed 1)**, `bench-world`. Load: no node or cargo process,
+CPU 25–32%. About 7.8 s in all against 21.1 s for the TypeScript (2.7 times faster).
+
+| generateTerrain stage |   ms |  share | TypeScript ms |
+| :-------------------- | ---: | -----: | ------------: |
+| seas                  | 1542 |  39.0% |          5313 |
+| lakes                 |  521 |  13.2% |          1166 |
+| relief                |  895 |  22.6% |           967 |
+| forest                |  598 |  15.1% |           700 |
+| joining               |  388 |   9.8% |          1287 |
+| total                 | 3956 | 100.0% |          9434 |
+
+| generateWorld stage |   ms |  share | TypeScript ms |
+| :------------------ | ---: | -----: | ------------: |
+| nodes               |  174 |   4.5% |          2348 |
+| HQ                  | 9.96 |   0.3% |         79.68 |
+| NPC cities          |  116 |   3.0% |           432 |
+| trading posts       | 3540 |  92.2% |          8820 |
+| caravans            | 1.67 |   0.0% |          7.76 |
+| total               | 3841 | 100.0% |         11687 |
+
+made: 3310 nodes, 33 cities, 330 residents, 16 caravans, 6 traders (the same as the TypeScript)
+
+**The trading posts are 92% of `generateWorld`** (3.5 s; the TypeScript 8.8 s, so the port made them
+2.5 times faster where the nodes got 13 times faster). In `generateTerrain` (4.0 s against 9.4 s) the
+seas are still the biggest stage (39%), then relief (23%), which the port barely sped up.
+
+**Ticks.** `bench-sim <scene>`, 600 ticks, invariants off, no Players' orders, queues or scripts (the
+NPC cities' scripts run), walking on, as the TypeScript `sim`. `world` is the whole rule step, so
+`npc`, `walking`, `rest` and `lastSeen` are parts of it; the phases the server loop owns print 0 as
+before, and the phases that print 0 in every scene are left out of the tables.
+
+`village` (one village). Load: no other process, CPU 20–29%.
+
+| phase        | mean ms | p95 ms | TypeScript mean ms | TypeScript p95 ms |
+| :----------- | ------: | -----: | -----------------: | ----------------: |
+| world        |   0.164 |  0.246 |               3.14 |             12.59 |
+| npc          |   0.123 |  0.202 |               2.48 |             10.49 |
+| walking      |   0.016 |  0.010 |              0.255 |             0.240 |
+| rest         |   0.022 |  0.031 |              0.385 |             0.600 |
+| lastSeen     |   0.002 |  0.006 |              0.005 |             0.008 |
+| tick (total) |   0.165 |  0.247 |               3.14 |             12.60 |
+
+residents: 6; ms per tick per resident: 0.027 mean, 0.041 p95 (TypeScript 0.524, 2.10). 19 times faster.
+
+`villages` (60 villages). Load: 1 node and 1 cargo process, 2 other Rust processes; CPU 22% when it
+started, 69–99% while it ran (another session began a build).
+
+| phase        | mean ms | p95 ms | TypeScript mean ms | TypeScript p95 ms |
+| :----------- | ------: | -----: | -----------------: | ----------------: |
+| world        |   54.14 |    112 |                218 |               393 |
+| npc          |   33.11 |  52.74 |                164 |               282 |
+| walking      |   13.08 |  59.90 |              31.62 |               116 |
+| rest         |    7.81 |  12.72 |              22.10 |             50.47 |
+| lastSeen     |   0.061 |  0.096 |              0.018 |             0.022 |
+| tick (total) |   54.15 |    112 |                218 |               393 |
+
+residents: 360; ms per tick per resident: 0.150 mean, 0.311 p95 (TypeScript 0.605, 1.09). 4.0 times faster.
+
+`hq` (the Trade Org HQ). Load: 3 node and 2 cargo processes, CPU 13–26%.
+
+| phase        | mean ms | p95 ms | TypeScript mean ms | TypeScript p95 ms |
+| :----------- | ------: | -----: | -----------------: | ----------------: |
+| world        |   0.867 |   1.19 |              16.12 |             59.47 |
+| npc          |   0.718 |   1.00 |              14.48 |             56.49 |
+| walking      |   0.050 |  0.031 |              0.711 |             0.788 |
+| rest         |   0.091 |  0.136 |              0.886 |              1.16 |
+| lastSeen     |   0.006 |  0.052 |              0.031 |             0.010 |
+| tick (total) |   0.867 |   1.19 |              16.14 |             59.48 |
+
+residents: 32; ms per tick per resident: 0.027 mean, 0.037 p95 (TypeScript 0.504, 1.86). 19 times faster.
+
+`save` (the same copy of the live-format world from 2026-11-01 as the TypeScript `save`, full-size
+map, 338 residents). The Rust server reads only formats from 111 on (T88.6), so the copy's format 67
+was first migrated with the TypeScript server's last version (`21f7a29e`: `loadOrCreateWorld`, then
+`saveWorld`, on a scratch copy; the original `world.db` was not touched) and `DB_PATH` then named
+that copy. Load: 3 node and 2 cargo processes, CPU 10–17% at the start, 71% at the end.
+
+| phase        | mean ms | p95 ms | TypeScript mean ms | TypeScript p95 ms |
+| :----------- | ------: | -----: | -----------------: | ----------------: |
+| world        |   35.71 |  75.62 |                214 |               219 |
+| npc          |   18.08 |  22.39 |                135 |               187 |
+| walking      |   11.85 |  51.12 |              52.25 |              7.11 |
+| rest         |    5.12 |   6.20 |              25.83 |             32.62 |
+| lastSeen     |   0.606 |   1.42 |              0.224 |             0.950 |
+| tick (total) |   35.71 |  75.62 |                214 |               219 |
+
+residents: 338; ms per tick per resident: 0.106 mean, 0.224 p95 (TypeScript 0.632, 0.649). 6.0 times faster.
+
+A tick costs 0.03 ms per resident in a village or the HQ and 0.1–0.15 ms in the two big scenes; the
+real world (`save`) at 36 ms is well inside the one-second tick.
+
+**The dominant tick phase is `npc`**: 51% of the tick in `save` (18 of 36 ms), 61% in `villages`,
+75–83% in `village` and `hq`; then `walking` (33% in `save`, 24% in `villages`) and `rest` (14%).
+`walking` has the worst tail: its p95 is 4 to 5 times its mean in the two big scenes (51–60 ms
+against 12–13 ms), `npc`'s 1.2 to 1.6 times. Orders, queues, scripts and `lastSeen` are under 2%
+together.
+
+**Suite**, `cargo nextest run --workspace` (the `dev` profile, which is optimized with debug info; test binaries built beforehand, nextest's default
+profile, all threads). Load before the run: 4 node processes, no cargo process, CPU 59% (the wait had
+seen under 20%, then the sample at the start was higher). 2522 tests in 119 binaries: 2522 passed, 0
+failed, **107 ignored**. Nextest reports 40.8 s for the run; the command took 73 s from start to end.
+The TypeScript suite took 1716 s with 4511 tests, slow ones included; the Rust figure leaves the
+ignored ones out, so it is not like for like. Of the 107 ignored, **82 are ignored as slow** (78 say
+`see #1092`; 3 generate the full-size map or take long to generate it; 1 is slow in the TypeScript too)
+and **25 for another reason** (21 are empty stubs waiting for a port, `needs … (T86.n)`; 4 are timings
+and measurements). Nextest counts 26 tests over its 5 s slow-timeout; ADR 0030 calls each of them a
+regression to fix.
+
+| ten slowest tests                                                                                                       | seconds |
+| :---------------------------------------------------------------------------------------------------------------------- | ------: |
+| csp-sim npc_slow::training::walk_there_run_the_train_default_and_learn_the_hall_held_all_the_while_their_values_rising  |   13.59 |
+| csp-sim npc_slow::surplus::spare_hands_keep_a_big_city_working_within_its_caps_on_the_map                               |   12.67 |
+| csp-sim breeding::npc_tests::have_one_of_their_residents_breed_their_horses_through_the_default_task                    |   10.95 |
+| csp-sim npc_slow::training::are_taken_off_by_an_alarm_and_come_back_to_it_after                                         |    9.72 |
+| csp-sim npc_trader::tests::with_nothing_short_it_has_no_node_for_the_trader_comes_back_with_coins                       |    9.64 |
+| csp-sim traders::tests::takes_a_load_out_when_it_is_first_sent_as_at_any_stop                                           |    8.96 |
+| csp-sim trade_org_wrecks::tests::with_none_left_goes_home_with_the_debt_still_owed_and_comes_again                      |    8.41 |
+| csp-sim differential::the_village_steps_as_the_typescript_did_over_a_game_week                                          |    8.20 |
+| csp-sim traders::tests::stays_at_the_hqs_warehouse_with_no_post_left_not_shuttling_to_and_fro                           |    7.48 |
+| csp-sim npc_trader::offer_tests::two_cities_at_one_offer_lose_no_goods_the_second_is_cut_down_and_carries_the_rest_home |    6.88 |
+
+**The first, loaded runs** (taken before the quiet ones, kept to show the spread): `bench-world` 4763 ms
+terrain and 4946 ms world (9.7 s in all; CPU 17–91%, 2 cargo processes); `save` 106 ms mean and 244 ms
+p95 per tick (CPU 100%, 30–48 cargo/rustc/link processes, 4–5 node processes); `villages` 58 ms mean,
+125 ms p95; `village` 0.327 ms; `hq` 0.851 ms. Only `save`, which ran into a full build, moved much
+(3 times); the rest are within 20% of the quiet runs, `village` apart (2 times).
