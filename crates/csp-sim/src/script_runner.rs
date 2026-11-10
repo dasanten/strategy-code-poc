@@ -50,7 +50,9 @@ use crate::script_params::{
     with_target_param, ParamWithValue,
 };
 use crate::scripts::RunnableScript;
-use crate::sight::{entities_in_sight, sight_of, InvariantViolation, SightCache};
+use crate::sight::{
+    entities_in_sight, places_in_sight, sight_of, InvariantViolation, SightCache,
+};
 use crate::tick::{RunScripts, Scratch, ScriptErrorWhere};
 use crate::workplace_settings::{
     start_work_by_settings, with_work_settings, work_script_id, work_settings_of, WorkMemory,
@@ -1446,6 +1448,10 @@ impl ScriptRunner {
                 let mut cache = sight.borrow_mut();
                 entities_in_sight(world_ref, index, Some(realm_id), cache.as_mut())
             };
+            let places = || {
+                let mut cache = sight.borrow_mut();
+                places_in_sight(world_ref, index, realm_id, None, cache.as_mut()).seen
+            };
             let eyes = || {
                 let mut cache = sight.borrow_mut();
                 sight_of(world_ref, index, realm_id, cache.as_mut())
@@ -1459,6 +1465,7 @@ impl ScriptRunner {
                 army_id: r.army.then_some(r.id.as_str()),
                 memory: memory.clone(),
                 seen: &seen,
+                places: Some(&places),
                 eyes: &eyes,
                 explored: &explored,
                 kinds: &self.kinds,
@@ -1874,6 +1881,10 @@ fn run_city_scripts(
                 let mut cache = sight.borrow_mut();
                 entities_in_sight(world_ref, index, Some(&city.id), cache.as_mut())
             };
+            let places = || {
+                let mut cache = sight.borrow_mut();
+                places_in_sight(world_ref, index, &city.id, None, cache.as_mut()).seen
+            };
             let eyes = || {
                 let mut cache = sight.borrow_mut();
                 sight_of(world_ref, index, &city.id, cache.as_mut())
@@ -1893,6 +1904,7 @@ fn run_city_scripts(
                 army_id: None,
                 memory: memory.clone(),
                 seen: &seen,
+                places: Some(&places),
                 eyes: &eyes,
                 explored: &explored,
                 kinds,

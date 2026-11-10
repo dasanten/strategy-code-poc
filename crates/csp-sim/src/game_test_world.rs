@@ -177,6 +177,7 @@ pub fn run_script(
         army_id: None,
         memory: memory.clone(),
         seen: &seen,
+        places: None,
         eyes: &eyes,
         explored: &explored,
         kinds: &kinds,

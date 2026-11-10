@@ -82,6 +82,10 @@ pub struct ScriptContext<'a> {
     pub memory: Object,
     /// Everything the Player sees (`entitiesInSight`); called at most once a run.
     pub seen: &'a dyn Fn() -> Arc<Vec<SeenEntity>>,
+    /// The buildings and cities in `seen`, as it lists them (`placesInSight`): enough to show one
+    /// building without working out everything else in sight (T89.6). Called at most once a run;
+    /// without it a building is looked for in `seen`.
+    pub places: Option<&'a dyn Fn() -> Arc<Vec<SeenEntity>>>,
     /// The side's eyes (`sightOf`); called at most once a run.
     pub eyes: &'a dyn Fn() -> Arc<Eyes>,
     /// Whether the Player has explored a tile.
@@ -540,6 +544,7 @@ pub struct ScriptBindings<'a> {
     for_me: (&'static str, String),
     random: f64,
     seen: OnceCell<Arc<Vec<SeenEntity>>>,
+    places: OnceCell<Arc<Vec<SeenEntity>>>,
     eyes: OnceCell<Arc<Eyes>>,
     thieves: OnceCell<HashSet<String>>,
     /// The order requests the script's actions asked for and that were accepted, in order.
@@ -587,6 +592,7 @@ pub fn bind_script(ctx: ScriptContext<'_>) -> Result<ScriptBindings<'_>, HostErr
         for_me,
         random,
         seen: OnceCell::new(),
+        places: OnceCell::new(),
         eyes: OnceCell::new(),
         thieves: OnceCell::new(),
         requests: Vec::new(),
@@ -613,6 +619,15 @@ impl<'a> ScriptBindings<'a> {
 
     fn seen(&self) -> &Arc<Vec<SeenEntity>> {
         self.seen.get_or_init(|| (self.ctx.seen)())
+    }
+
+    /// What in sight a building or a city is looked for in: the places in sight, whose buildings
+    /// and cities are `seen`'s in the same order, or `seen` itself.
+    fn seen_places(&self) -> &Arc<Vec<SeenEntity>> {
+        match self.ctx.places {
+            Some(places) => self.places.get_or_init(places),
+            None => self.seen(),
+        }
     }
 
     /// Whether the side sees a tile (`inSight`).
@@ -753,7 +768,7 @@ impl<'a> ScriptBindings<'a> {
             return None;
         }
         let shown = self
-            .seen()
+            .seen_places()
             .iter()
             .find(|e| matches!(e, SeenEntity::Building(sb) if sb.building.id == b.id))?;
         Some(Json::Object(merge(untagged(shown), Some(self.building_extras(&b.id)))))
@@ -832,7 +847,7 @@ impl<'a> ScriptBindings<'a> {
     /// Who occupies a seen city's town hall and the ticks left (`occupationSeen`).
     fn occupation_seen(&self, id: &str) -> Map<String, Json> {
         let mut m = Map::new();
-        let city = self.seen().iter().find_map(|e| match e {
+        let city = self.seen_places().iter().find_map(|e| match e {
             SeenEntity::City(c) if c.city.id == id => Some(c),
             _ => None,
         });
