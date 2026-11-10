@@ -305,6 +305,7 @@ fn bind_every_name_in_the_army_script_api_every_army_order_but_forming_and_disba
         memory: csp_lang::Object::new(),
         seen: &seen,
         places: None,
+        place: None,
         eyes: &eyes,
         explored: &explored,
         kinds: &kinds,

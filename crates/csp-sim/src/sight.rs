@@ -782,6 +782,16 @@ impl SideSight {
             .clone()
     }
 
+    /// One building as `places` shows it, if it is in its sight, without working out the rest
+    /// (T89.6): `places` holds each building it sees as `seen_building` makes it, once.
+    pub fn place(&self, world: &WorldState, index: &WorldIndex, b: &Building) -> Option<SeenEntity> {
+        if self.observers.is_empty() || !self.eyes.building_seen(placed(b)) {
+            return None;
+        }
+        let insight = self.insight(world, index);
+        Some(SeenEntity::Building(seen_building(world, insight, b)))
+    }
+
     /// Everything in its sight.
     pub fn entities(&self, world: &WorldState, index: &WorldIndex) -> Arc<Vec<SeenEntity>> {
         if self.observers.is_empty() {
@@ -943,6 +953,18 @@ pub fn places_in_sight(
         eyes: s.eyes(),
         looking: s.looking(),
     })
+}
+
+/// A building as `places_in_sight` would show it to a side, if the side sees it: the one entry,
+/// not the whole list.
+pub fn building_in_sight(
+    world: &WorldState,
+    index: &WorldIndex,
+    side: &str,
+    b: &Building,
+    cache: Option<&mut SightCache>,
+) -> Option<SeenEntity> {
+    with_side(world, index, side, cache, |s| s.place(world, index, b))
 }
 
 /// Something in sight as JSON (`seenJson`): while a sight cache is open, made once per phase and

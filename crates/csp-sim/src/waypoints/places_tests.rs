@@ -139,6 +139,7 @@ impl Setup {
                 memory: memory.clone(),
                 seen: &seen,
                 places: None,
+                place: None,
                 eyes: &eyes,
                 explored: &explored,
                 kinds: &kinds,

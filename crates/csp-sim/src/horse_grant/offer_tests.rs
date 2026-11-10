@@ -244,6 +244,7 @@ fn claim_from_a_script(world: &WorldState, terrain: &TerrainMap, resident: &str)
         memory: memory.clone(),
         seen: &seen,
         places: None,
+        place: None,
         eyes: &eyes,
         explored: &explored,
         kinds: &kinds,

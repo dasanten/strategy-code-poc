@@ -51,7 +51,8 @@ use crate::script_params::{
 };
 use crate::scripts::RunnableScript;
 use crate::sight::{
-    entities_in_sight, places_in_sight, sight_of, InvariantViolation, SightCache,
+    building_in_sight, entities_in_sight, places_in_sight, sight_of, InvariantViolation,
+    SightCache,
 };
 use crate::tick::{RunScripts, Scratch, ScriptErrorWhere};
 use crate::workplace_settings::{
@@ -1452,6 +1453,10 @@ impl ScriptRunner {
                 let mut cache = sight.borrow_mut();
                 places_in_sight(world_ref, index, realm_id, None, cache.as_mut()).seen
             };
+            let place = |b: &csp_shared::world::Building| {
+                let mut cache = sight.borrow_mut();
+                building_in_sight(world_ref, index, realm_id, b, cache.as_mut())
+            };
             let eyes = || {
                 let mut cache = sight.borrow_mut();
                 sight_of(world_ref, index, realm_id, cache.as_mut())
@@ -1466,6 +1471,7 @@ impl ScriptRunner {
                 memory: memory.clone(),
                 seen: &seen,
                 places: Some(&places),
+                place: Some(&place),
                 eyes: &eyes,
                 explored: &explored,
                 kinds: &self.kinds,
@@ -1885,6 +1891,10 @@ fn run_city_scripts(
                 let mut cache = sight.borrow_mut();
                 places_in_sight(world_ref, index, &city.id, None, cache.as_mut()).seen
             };
+            let place = |b: &csp_shared::world::Building| {
+                let mut cache = sight.borrow_mut();
+                building_in_sight(world_ref, index, &city.id, b, cache.as_mut())
+            };
             let eyes = || {
                 let mut cache = sight.borrow_mut();
                 sight_of(world_ref, index, &city.id, cache.as_mut())
@@ -1905,6 +1915,7 @@ fn run_city_scripts(
                 memory: memory.clone(),
                 seen: &seen,
                 places: Some(&places),
+                place: Some(&place),
                 eyes: &eyes,
                 explored: &explored,
                 kinds,

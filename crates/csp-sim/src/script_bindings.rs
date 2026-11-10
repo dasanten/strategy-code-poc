@@ -86,6 +86,9 @@ pub struct ScriptContext<'a> {
     /// building without working out everything else in sight (T89.6). Called at most once a run;
     /// without it a building is looked for in `seen`.
     pub places: Option<&'a dyn Fn() -> Arc<Vec<SeenEntity>>>,
+    /// One building as `places` shows it, if it is in sight (`building_in_sight`): what
+    /// `building(id)` needs, without the rest. Without it the building is looked for in `places`.
+    pub place: Option<&'a dyn Fn(&Building) -> Option<SeenEntity>>,
     /// The side's eyes (`sightOf`); called at most once a run.
     pub eyes: &'a dyn Fn() -> Arc<Eyes>,
     /// Whether the Player has explored a tile.
@@ -767,11 +770,15 @@ impl<'a> ScriptBindings<'a> {
         if !eyes.building_seen(crate::queries::names::placed(b)) {
             return None;
         }
-        let shown = self
-            .seen_places()
-            .iter()
-            .find(|e| matches!(e, SeenEntity::Building(sb) if sb.building.id == b.id))?;
-        Some(Json::Object(merge(untagged(shown), Some(self.building_extras(&b.id)))))
+        let shown = match self.ctx.place {
+            Some(place) => place(b)?,
+            None => self
+                .seen_places()
+                .iter()
+                .find(|e| matches!(e, SeenEntity::Building(sb) if sb.building.id == b.id))?
+                .clone(),
+        };
+        Some(Json::Object(merge(untagged(&shown), Some(self.building_extras(&b.id)))))
     }
 
     /// One of the side's own buildings as `building(id)` gives it, built from the struct rather
