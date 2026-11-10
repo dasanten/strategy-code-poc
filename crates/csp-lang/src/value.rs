@@ -5,6 +5,7 @@
 //! change through one name shows through every other. A host value may be frozen (read-only to
 //! the script), as the TypeScript host froze its views with `Object.freeze`.
 
+use std::borrow::Cow;
 use std::cell::{Ref, RefCell, RefMut};
 use std::fmt;
 use std::rc::Rc;
@@ -46,7 +47,8 @@ pub struct Object(Rc<RefCell<ObjectData>>);
 
 #[derive(Debug, Default)]
 pub struct ObjectData {
-    entries: IndexMap<String, Value>,
+    /// A host view's keys are its static field names, held without a copy (#1092).
+    entries: IndexMap<Cow<'static, str>, Value>,
     /// Read-only to the script (`Object.freeze` in the TypeScript).
     pub frozen: bool,
 }
@@ -105,8 +107,8 @@ impl ObjectData {
     }
 
     /// The entries in JavaScript's key order.
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &Value)> {
-        self.entries.iter()
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &Value)> {
+        self.entries.iter().map(|(k, v)| (k.as_ref(), v))
     }
 
     /// Deletes `key` (`delete object[key]`), keeping the others' order; what it held, if any.
@@ -116,14 +118,14 @@ impl ObjectData {
 
     /// Sets `key`, keeping its place if it is there and JavaScript's key order if it is new.
     pub fn insert(&mut self, key: impl Into<String>, value: Value) {
-        let key = key.into();
-        if let Some(slot) = self.entries.get_mut(&key) {
+        let key: String = key.into();
+        if let Some(slot) = self.entries.get_mut(key.as_str()) {
             *slot = value;
             return;
         }
         match js::array_index(&key) {
             None => {
-                self.entries.insert(key, value);
+                self.entries.insert(Cow::Owned(key), value);
             }
             Some(index) => {
                 let at = self
@@ -131,7 +133,7 @@ impl ObjectData {
                     .keys()
                     .position(|k| js::array_index(k).is_none_or(|other| other > index))
                     .unwrap_or(self.entries.len());
-                self.entries.shift_insert(at, key, value);
+                self.entries.shift_insert(at, Cow::Owned(key), value);
             }
         }
     }
@@ -216,7 +218,7 @@ impl Value {
         let mut entries = IndexMap::with_capacity(fields.len());
         for (key, value) in fields {
             debug_assert!(js::array_index(key).is_none(), "a field name is no array index");
-            let old = entries.insert(key.to_string(), value);
+            let old = entries.insert(Cow::Borrowed(key), value);
             debug_assert!(old.is_none(), "field {key} twice");
         }
         Value::Object(Object(Rc::new(RefCell::new(ObjectData { entries, frozen: true }))))

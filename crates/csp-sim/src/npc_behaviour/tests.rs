@@ -81,7 +81,7 @@ fn order(v: serde_json::Value) -> Option<ResidentOrder> {
 }
 
 #[test]
-#[ignore = "45.7 s alone; see #1092"]
+#[ignore = "22.8 s with eight at once; see #1092"]
 fn a_village_left_alone_survives_ten_game_weeks() {
     let (mut world, terrain, city) = village();
     let mut runner = Runner::new(&terrain);
@@ -100,7 +100,6 @@ fn a_village_left_alone_survives_ten_game_weeks() {
 }
 
 #[test]
-#[ignore = "6.2 s alone; see #1092"]
 fn carries_the_farms_output_to_the_storage() {
     let (mut world, terrain, city) = village();
     let mut runner = Runner::new(&terrain);
@@ -262,4 +261,36 @@ fn a_players_city_whose_leader_died_runs_on_its_own_player_only_orders_ended() {
     assert_eq!(world.residents[1].order, work);
     step_npc_cities(&mut world, terrain.size, None, None);
     assert!(check_all(&world, terrain).iter().all(|v| v.invariant != "npc-orders-allowed"));
+}
+
+/// Not a check: what one run of an NPC's default script costs, binding, interpreting and applying
+/// what it asked for (#1092), on the farm village of `carries_the_farms_output_to_the_storage`.
+/// `cargo test -p csp-sim --lib bench_npc_runs -- --ignored --nocapture`.
+#[test]
+#[ignore = "a measurement, not a check"]
+fn bench_npc_runs() {
+    let (mut world, terrain, city) = village();
+    let mut runner = Runner::new(&terrain);
+    let s = storage_of(&world, &city);
+    world.buildings[s].stock = Some(Stock::new());
+    let mut snapshots = Vec::new();
+    for _ in 0..2 * TICKS_PER_GAME_DAY as usize {
+        runner.step(&mut world, &terrain);
+        if world.tick % 30 == 0 {
+            snapshots.push(world.clone());
+        }
+    }
+    // The best of ten passes, as the machine is often busy with other work.
+    let mut best = f64::INFINITY;
+    for _ in 0..10 {
+        let (mut runs, mut spent) = (0, std::time::Duration::ZERO);
+        for w in &snapshots {
+            let mut w = w.clone();
+            let from = std::time::Instant::now();
+            runs += run_npc_scripts(&mut w, &terrain, &mut Scratch::default());
+            spent += from.elapsed();
+        }
+        best = best.min(spent.as_secs_f64() * 1e6 / runs as f64);
+    }
+    eprintln!("BENCH npc run {best:.2} us");
 }

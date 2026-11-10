@@ -121,7 +121,7 @@ impl Walk {
                     return serde_json::Value::Null;
                 }
                 let entries: Vec<(String, Value)> =
-                    object.borrow().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+                    object.borrow().iter().map(|(k, v)| (k.to_string(), v.clone())).collect();
                 self.size += 2 + entries.len().saturating_sub(1);
                 let mut out = serde_json::Map::new();
                 for (key, item) in &entries {

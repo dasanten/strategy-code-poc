@@ -375,7 +375,7 @@ fn gives_a_wiped_out_party_up_after_the_give_up_days_and_may_found_again() {
 }
 
 #[test]
-#[ignore = "33.5 s alone; see #1092"]
+#[ignore = "32.4 s with eight at once; see #1092"]
 fn founds_a_village_480_tiles_away_within_a_few_game_weeks_which_then_feeds_itself() {
     let mut t = full_town(1300);
     let home = t.home();
@@ -720,7 +720,7 @@ fn has_a_founder_gone_back_for_materials_come_to_it_instead_once_the_town_hall_s
 }
 
 #[test]
-#[ignore = "11.6 s alone; see #1092"]
+#[ignore = "4.9 s alone; see #1092"]
 fn builds_its_storage_a_farm_and_a_house_in_that_order_then_walls_itself() {
     let mut terrain = plains(240);
     let mut world = create_world(&terrain, 1);
