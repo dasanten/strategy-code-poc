@@ -1,4 +1,4 @@
-﻿//! `script-views.test.ts` and the plain parts of `script-bindings.test.ts`: every value the
+//! `script-views.test.ts` and the plain parts of `script-bindings.test.ts`: every value the
 //! queries and `me` hand a script holds exactly its view. The TypeScript world here has horses,
 //! carriages and a wandering trader too, and adds fields of the server's own to its objects to see
 //! them dropped; Rust's world types can't hold an undeclared field, and the horse, carriage and

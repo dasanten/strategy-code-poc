@@ -1,4 +1,4 @@
-﻿//! `npc-behaviour.test.ts`.
+//! `npc-behaviour.test.ts`.
 
 use csp_shared::balance::{ticks_for_age, NPC_VILLAGE, OWN_FOOD, WORK_FOOD_KEPT};
 use csp_shared::footprint::{is_at, FOOTPRINT};
