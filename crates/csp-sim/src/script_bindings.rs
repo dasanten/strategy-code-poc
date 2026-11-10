@@ -521,6 +521,15 @@ fn js_stringify(v: &Json) -> String {
     }
 }
 
+/// How many sets of param lines `params` keeps the defaults of.
+const DEFAULT_PARAMS_KEPT: usize = 32;
+
+thread_local! {
+    /// `params` with no value picked, by its param lines.
+    static DEFAULT_PARAMS: std::cell::RefCell<Vec<(Vec<ParamWithValue>, Value)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
 /// The game API bound for one run (`ScriptBindings`): the globals the interpreter asks for, and
 /// what the run asked for.
 pub struct ScriptBindings<'a> {
@@ -1678,11 +1687,32 @@ impl<'a> ScriptBindings<'a> {
     }
 
     /// Each param as what it names (`params`), the number typed, the word picked or its default.
+    /// With no value picked, as for every NPC script, that is the defaults alone: made once for
+    /// the same param lines and shared, frozen, by the runs after (#1092).
     fn params_value(&self) -> Value {
+        let params = self.ctx.params.unwrap_or_default();
+        if !params.iter().all(|p| p.value.is_none()) {
+            return self.params_value_of(params);
+        }
+        DEFAULT_PARAMS.with(|cache| {
+            let mut cache = cache.borrow_mut();
+            if let Some((_, v)) = cache.iter().find(|(ps, _)| ps.as_slice() == params) {
+                return v.clone();
+            }
+            let v = self.params_value_of(params);
+            if cache.len() >= DEFAULT_PARAMS_KEPT {
+                cache.remove(0);
+            }
+            cache.push((params.to_vec(), v.clone()));
+            v
+        })
+    }
+
+    fn params_value_of(&self, params: &[ParamWithValue]) -> Value {
         let world = self.world();
         let side = self.side.as_deref();
         let mut entries: Vec<(String, Value)> = Vec::new();
-        for p in self.ctx.params.unwrap_or_default() {
+        for p in params {
             let decl = &p.param.param;
             let default = || match &decl.default {
                 Some(csp_lang::ParamDefault::Number(n)) => Value::Number(*n),
