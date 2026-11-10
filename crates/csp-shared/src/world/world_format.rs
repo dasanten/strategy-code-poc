@@ -1,13 +1,12 @@
-//! The save format of `apps/server/src/world-format.ts` (ADR 0006, ADR 0030): which version of
-//! `WorldState` a save holds. The Rust server reads the version of the TypeScript freeze;
-//! migrations from older ones are not ported (a save is migrated once by the TypeScript server
-//! before the cutover), and later ones come with Epic 1004.
+//! The save format (ADR 0006, ADR 0030): which version of `WorldState` a save holds. The Rust
+//! server migrates saves from the TypeScript freeze (format 111) on, in `csp-server`'s
+//! `world_format`; migrations from older ones are not ported (a save is migrated once by the
+//! TypeScript server before the cutover).
 
 use super::WorldState;
 
-/// `WORLD_FORMAT_VERSION` of `apps/server/src/world-format.ts` when this port was written. A test
-/// reads that file, so the two cannot drift apart unnoticed.
-pub const WORLD_FORMAT_VERSION: u32 = 111;
+/// The current save format. A bump comes with a migration step in `csp-server`'s `world_format`.
+pub const WORLD_FORMAT_VERSION: u32 = 112;
 
 /// Why a save does not load.
 #[derive(Debug, thiserror::Error)]

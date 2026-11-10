@@ -27,9 +27,28 @@ pub struct MigrationContext<'a> {
 pub type MigrationStep = fn(Value, &MigrationContext<'_>) -> Value;
 
 /// `migrations()[n]` turns a version-n save into version n + 1. Steps start at
-/// [`FREEZE_FORMAT_VERSION`]; none yet.
+/// [`FREEZE_FORMAT_VERSION`].
 pub fn migrations() -> BTreeMap<u32, MigrationStep> {
-    BTreeMap::new()
+    let mut steps: BTreeMap<u32, MigrationStep> = BTreeMap::new();
+    steps.insert(111, drop_remembered_breeding);
+    steps
+}
+
+/// 111 → 112: the TypeScript step 44 took a stable's own breeding progress (`breeding`) off every
+/// building, but not off the buildings Players remember (`lastSeen`, there since step 39), and
+/// TypeScript never read those back. A world remembered before step 44 still holds it there, and
+/// the Rust server refuses a field it doesn't know. It goes now, as it went from the buildings.
+fn drop_remembered_breeding(mut state: Value, _: &MigrationContext<'_>) -> Value {
+    if let Some(last_seen) = state.get_mut("lastSeen").and_then(Value::as_object_mut) {
+        for memory in last_seen.values_mut().filter_map(Value::as_array_mut) {
+            for e in memory.iter_mut().filter(|e| e["is"] == "building") {
+                if let Some(b) = e.as_object_mut() {
+                    b.remove("breeding");
+                }
+            }
+        }
+    }
+    state
 }
 
 /// Why a save cannot be brought to the current format.
@@ -123,8 +142,40 @@ mod tests {
     }
 
     #[test]
-    // Empty while the format is still the freeze's; it fills as formats are added.
-    #[allow(clippy::reversed_empty_ranges)]
+    fn step_111_drops_breeding_from_remembered_buildings_only() {
+        let terrain = ctx_terrain();
+        let ctx = MigrationContext { terrain: &terrain };
+        let save = json!({
+            "buildings": [{ "id": "b1", "breedings": [] }],
+            "lastSeen": {
+                "1": [
+                    { "is": "building", "id": "b1", "breeding": 3, "seenAt": 7 },
+                    { "is": "city", "id": "c1", "breeding": 3, "seenAt": 7 }
+                ],
+                "2": []
+            }
+        });
+        assert_eq!(
+            migrate_world_with(save, 111, &ctx, &migrations(), 112).unwrap(),
+            json!({
+                "buildings": [{ "id": "b1", "breedings": [] }],
+                "lastSeen": {
+                    "1": [
+                        { "is": "building", "id": "b1", "seenAt": 7 },
+                        { "is": "city", "id": "c1", "breeding": 3, "seenAt": 7 }
+                    ],
+                    "2": []
+                }
+            })
+        );
+        // A save with nothing remembered is left as it is.
+        assert_eq!(
+            migrate_world_with(json!({ "tick": 1 }), 111, &ctx, &migrations(), 112).unwrap(),
+            json!({ "tick": 1 })
+        );
+    }
+
+    #[test]
     fn has_no_steps_from_before_the_freeze_and_one_for_every_version_since() {
         let steps = migrations();
         assert!(steps.keys().all(|&v| v >= FREEZE_FORMAT_VERSION));

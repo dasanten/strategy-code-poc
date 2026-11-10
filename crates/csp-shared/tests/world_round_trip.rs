@@ -102,8 +102,9 @@ fn assert_round_trip(name: &str, input: &Value, world: &WorldState) {
 
 #[test]
 fn the_live_save_round_trips() {
-    let (version, json) = live_save();
-    let world = parse_save(version, &json).unwrap();
+    // Format 111; the steps since leave a save without remembered `breeding` as it is.
+    let (_, json) = live_save();
+    let world = parse_save(WORLD_FORMAT_VERSION, &json).unwrap();
     assert!(!world.residents.is_empty() && !world.buildings.is_empty());
     let input: Value = serde_json::from_slice(&json).unwrap();
     assert_round_trip("the live save", &input, &world);
@@ -132,11 +133,11 @@ fn a_save_of_another_version_is_refused() {
     }
 }
 
-/// The live-format save is the TypeScript server's last format (111, the freeze). A format bump
-/// after the cutover migrates it in `csp-server`'s `world_format`, with a test of its own.
+/// The live save is the TypeScript server's last format (111, the freeze). The format bumps since
+/// are migrated in `csp-server`'s `world_format`, each with a test of its own.
 #[test]
-fn the_live_save_is_the_current_format() {
-    assert_eq!(live_save().0, WORLD_FORMAT_VERSION);
+fn the_live_save_is_the_freeze_format() {
+    assert_eq!(live_save().0, 111);
 }
 
 /// Adds `extra` to the object at `pointer` of the live save and tries to load it.

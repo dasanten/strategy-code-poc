@@ -183,7 +183,8 @@ fn refuses_a_save_from_before_the_freeze_saying_to_run_the_typescript_server() {
 #[test]
 fn the_live_save_round_trips_through_the_database() {
     let (gz, version) = live_gz();
-    assert_eq!(*version, WORLD_FORMAT_VERSION);
+    // The TypeScript server's last format; migrated to the current one on load.
+    assert_eq!(*version, FREEZE_FORMAT_VERSION);
     let conn = db();
     let expected = live_world();
     // The row as the TypeScript server wrote it, with the terrain of its seed.
@@ -213,6 +214,42 @@ fn the_live_save_round_trips_through_the_database() {
         load_or_create_world(&conn, |_| panic!("generated"), |_, _| panic!("generated"), 1)
             .unwrap();
     assert_eq!(again, expected);
+}
+
+/// The production world at the cutover: a building remembered before the TypeScript step 44 still
+/// had a stable's old `breeding` progress, which the Rust server refused, so it never started.
+#[test]
+fn a_typescript_save_remembering_a_buildings_old_breeding_loads() {
+    let (gz, version) = live_gz();
+    let mut state: Value = serde_json::from_slice(&gunzip(gz).unwrap()).unwrap();
+    let tick = state["tick"].clone();
+    let mut remembered = state["buildings"][0].clone();
+    remembered["is"] = "building".into();
+    remembered["seenAt"] = tick;
+    remembered["breeding"] = 5.into();
+    let user = state["lastSeen"].as_object().unwrap().keys().next().unwrap().clone();
+    state["lastSeen"][&user].as_array_mut().unwrap().push(remembered);
+    // As it was: refused.
+    assert!(serde_json::from_value::<WorldState>(state.clone()).is_err());
+
+    let conn = db();
+    let seed = state["seed"].as_i64().unwrap();
+    conn.execute(
+        "INSERT INTO world_saves (tick, version, data) VALUES (1, ?1, ?2)",
+        params![version, gzip(&serde_json::to_vec(&state).unwrap()).unwrap()],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO terrain (id, seed, diameter, data) VALUES (1, ?1, 16, ?2)",
+        params![seed, small_terrain(seed).tiles],
+    )
+    .unwrap();
+    let (world, _) =
+        load_or_create_world(&conn, |_| panic!("generated"), |_, _| panic!("generated"), 1)
+            .unwrap();
+    // Remembered still, without the old progress.
+    let memory = &world.last_seen[&user.parse::<u64>().unwrap()];
+    assert_eq!(memory.len(), state["lastSeen"][&user].as_array().unwrap().len());
 }
 
 #[test]
