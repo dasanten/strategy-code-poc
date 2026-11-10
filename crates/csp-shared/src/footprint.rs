@@ -47,9 +47,28 @@ fn side_of(kind: &str) -> i32 {
 /// Whether the footprint of `b` covers tile (x, y) (`CONTEXT.md`: Footprint). `size` is the map's;
 /// it only matters for a footprint across a join.
 pub fn covers(b: Placed, x: i32, y: i32, size: i32) -> bool {
+    let (dx, dy) = (wrap(x - b.x, size), wrap(y - b.y, size));
+    // A scan for the building on a tile asks this of every building, nearly all far off: their
+    // side, a lookup by name, is only needed near enough for the largest footprint (T89.6).
+    if dx >= LARGEST_SIDE || dy >= LARGEST_SIDE {
+        return false;
+    }
     let side = side_of(b.kind);
-    wrap(x - b.x, size) < side && wrap(y - b.y, size) < side
+    dx < side && dy < side
 }
+
+/// The largest side in `FOOTPRINT`.
+const LARGEST_SIDE: i32 = {
+    let mut largest = 0;
+    let mut i = 0;
+    while i < FOOTPRINT.0.len() {
+        if FOOTPRINT.0[i].1 > largest {
+            largest = FOOTPRINT.0[i].1;
+        }
+        i += 1;
+    }
+    largest
+};
 
 /// Whether `p` stands at the building `b`: on any tile of its footprint (`CONTEXT.md`: At a building).
 pub fn is_at(p: (i32, i32), b: Placed, size: i32) -> bool {

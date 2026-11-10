@@ -42,6 +42,7 @@ use crate::queries::warehouse::warehouse_keeps;
 use crate::random::hash_str;
 use crate::survival::refill_source;
 use crate::walk_time::walk_time;
+use crate::world_index::{building_by_id, building_index};
 
 /// One tick of NPC city behaviour (`stepNpcCities`, `CONTEXT.md`: NPC city): each city run by the
 /// game keeps itself alive. Plans of cities the game no longer runs are dropped. Returns the
@@ -110,7 +111,7 @@ fn run_city(
     }
     let tick = world.tick as f64;
     let storage = world.buildings.iter().position(|b| {
-        b.city_id.as_deref() == Some(city_id) && b.kind == BuildingKind::Storage && b.site.is_none()
+        b.kind == BuildingKind::Storage && b.site.is_none() && b.city_id.as_deref() == Some(city_id)
     });
     // Its founding party moves to the daughter once the town hall stands, and goes by the founding
     // until then, apart from the rest.
@@ -265,7 +266,7 @@ fn run_city(
         let at = workplace_of(&world.residents[i]);
         let working = matches!(world.residents[i].order, Some(ResidentOrder::WorkAt(_)));
         if let Some(place) =
-            at.filter(|_| working).and_then(|id| world.buildings.iter().position(|b| b.id == id))
+            at.filter(|_| working).and_then(|id| building_index(world, &id))
         {
             let pb = &world.buildings[place];
             if processes(pb.kind)
@@ -457,7 +458,7 @@ fn run_city(
                 }
             }
             if let Some(bid) = job.as_ref().and_then(|j| j.building_id.clone()) {
-                if let Some(place) = world.buildings.iter().position(|b| b.id == bid) {
+                if let Some(place) = building_index(world, &bid) {
                     if world.buildings[place].site.is_none()
                         && places.room(&world.buildings[place]) > 0.0
                     {
@@ -813,7 +814,7 @@ fn send_to_warehouse(world: &mut WorldState, city: &City, i: usize) {
 /// What one batch uses up at the workplace that processes goods a job is at (`inputOf`).
 fn input_of(world: &WorldState, job: Option<&CityJob>) -> Option<Stock> {
     let id = job?.building_id.as_ref()?;
-    let place = world.buildings.iter().find(|b| &b.id == id)?;
+    let place = building_by_id(world, id)?;
     if !processes(place.kind) {
         return None;
     }
@@ -918,7 +919,7 @@ fn stowing(
                 .filter(|g| keeps.contains(g))
                 .map(|g| (*g, held(&r.carried, *g)))
                 .collect();
-            let to = world.buildings.iter().position(|b| b.id == to.id).expect("a warehouse");
+            let to = building_index(world, &to.id).expect("a warehouse");
             return Some((to, load));
         }
     }

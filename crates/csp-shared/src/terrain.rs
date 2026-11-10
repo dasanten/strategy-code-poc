@@ -54,8 +54,14 @@ pub struct TerrainMap {
 }
 
 /// A coordinate brought back onto the map: the sides join, so -1 is `size - 1`.
+#[inline]
 pub fn wrap(v: i32, size: i32) -> i32 {
-    v.rem_euclid(size)
+    // Most coordinates are on the map already: no division for them (T89.6).
+    if 0 <= v && v < size {
+        v
+    } else {
+        v.rem_euclid(size)
+    }
 }
 
 /// The shortest signed step from `a` to `b` along one direction of the map, the short way round.

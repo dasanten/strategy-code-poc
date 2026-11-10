@@ -15,7 +15,7 @@ use super::standing::standing_of;
 
 /// A city's town hall, if it stands (`townHallOf`).
 pub fn town_hall_of<'w>(world: &'w WorldState, city: &City) -> Option<&'w Building> {
-    world.buildings.iter().find(|b| b.id == city.town_hall_id)
+    crate::world_index::building_by_id(world, &city.town_hall_id)
 }
 
 /// The residents who live in a city, wherever they stand (`cityResidents`).

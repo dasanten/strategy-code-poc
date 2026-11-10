@@ -22,6 +22,7 @@ use crate::queries::residents::can_work;
 use crate::queue::field_str as str_field;
 use crate::survival::drop_goods;
 use crate::tick::Scratch;
+use crate::world_index::{building_index, resident_index};
 
 /// Checks a work-at order (`workAt.validate`): one of the sender's adult residents works the
 /// finished workplace on their tile until given another order; at a smithy the order names what
@@ -107,13 +108,13 @@ pub fn resolve_work(world: &mut WorldState, actions: &[WorkAction], scratch: &mu
     let mut workers: HashMap<String, f64> = HashMap::new();
     let tick = world.tick as f64;
     for a in actions {
-        let Some(ri) = world.residents.iter().position(|x| x.id == a.resident_id) else {
+        let Some(ri) = resident_index(world, &a.resident_id) else {
             continue;
         };
         let r = &world.residents[ri];
         let Some(ResidentOrder::WorkAt(o)) = &r.order else { continue };
         let (building_id, makes, at) = (o.building_id.clone(), o.makes, o.at);
-        let place = world.buildings.iter().position(|b| b.id == building_id);
+        let place = building_index(world, &building_id);
         let count = workers.get(&building_id).copied().unwrap_or(0.0);
         let fits = place.and_then(|pi| {
             let p = &world.buildings[pi];
