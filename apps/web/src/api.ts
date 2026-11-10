@@ -32,6 +32,7 @@ import type {
   ScriptDetail,
   ScriptSummary,
   SignUpRequest,
+  TickHealthResponse,
 } from '@csp/shared-types'
 
 /** A failed API call, with the server's message for the user. */
@@ -105,6 +106,8 @@ export const api = {
   // Offering horses again (`CONTEXT.md`: Horse offer).
   reopenHorseOffers: (req: ReopenHorseOffersRequest) =>
     call<HorseOffersReopened>('POST', '/api/admin/horse-offers/reopen', req),
+  // The live world's tick health, the last minute and the last hour (ADR 0004).
+  tickHealth: () => call<TickHealthResponse>('GET', '/api/admin/tick-health'),
   // The script library: saving keeps every version; one without syntax errors becomes active.
   scripts: () => call<ScriptSummary[]>('GET', '/api/scripts'),
   script: (id: number) => call<ScriptDetail>('GET', `/api/scripts/${id}`),

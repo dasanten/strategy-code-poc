@@ -1,24 +1,34 @@
-//! `apps/server/src/armies.test.ts`, the fast parts: the army orders and what the army gives its
-//! members. Where the TypeScript then walks them about it needs walking (T86.4); the Player's own
-//! `walkTo` and `stop` orders are the order queue's (T86.2), so a member's own order is set
-//! here between `member_orders` and `leave_on_own_orders`, as the queue does.
+//! `apps/server/src/armies.test.ts`: the army orders and what the army gives its members, with
+//! the conflict phases stepping; the cases where the army walks step the running game
+//! (`game_test_world`). Elsewhere a member's own order is set between `member_orders` and
+//! `leave_on_own_orders`, as the order queue does.
 
-use csp_shared::world::{Army, ResidentOrder, Tile, WalkOrder, WorldState};
+use csp_shared::balance::{ARMY_SPREAD, WALK_TICKS_PER_TILE};
+use csp_shared::world::{Army, ArmyOrder, ResidentOrder, Tile, WalkOrder, WorldState};
+use serde_json::json;
 
 use super::*;
+use crate::game_test_world::Game;
 use crate::test_world::{empty_world, live, live_mut, realm, resident, run};
 
 const SIZE: i32 = 64;
 const ME: u64 = 7;
 
-/// Realm r1 (Player 7, Leader a1) and realm r2 (Player 8, Leader b1).
+/// Realm r1 (Player 7, Leader a1) and realm r2 (Player 8, Leader b1), every stat 10.
 fn setup() -> WorldState {
     let mut world = empty_world();
     realm(&mut world, "r1", 7, "a1");
     realm(&mut world, "r2", 8, "b1");
-    resident(&mut world, "a1", Some("r1"), 10.0, 10.0);
-    resident(&mut world, "b1", Some("r2"), 30.0, 30.0);
+    agile(&mut world, "a1", Some("r1"), 10.0, 10.0, 10.0);
+    agile(&mut world, "b1", Some("r2"), 30.0, 30.0, 10.0);
     world
+}
+
+/// A grown resident of `owner` at (x, y) with every stat 10, or `agility` for Agility, as the
+/// TypeScript's `resident` makes them.
+fn agile(world: &mut WorldState, id: &str, owner: Option<&str>, x: f64, y: f64, agility: f64) {
+    resident(world, id, owner, x, y);
+    live_mut(world, id).stats.agility.base = agility;
 }
 
 fn send(world: &mut WorldState, kind: ArmyOrderKind, request: ArmyRequest) -> String {
@@ -66,9 +76,63 @@ fn forms_an_army_of_the_realms_own_residents_only() {
     assert!(armies_sound(&world).is_empty());
 }
 
+/// The whole running world, as the TypeScript steps it: walking, no scripts.
+fn game(world: WorldState) -> Game {
+    let mut game = Game::new(world, crate::test_support::plains(SIZE));
+    game.scripts_run = false;
+    game
+}
+
+/// The ticks until `fast` and `slow` each stand on x 30 (`arrivals`); kept `together`, they are
+/// never further apart than the army's spread.
+fn arrivals(game: &mut Game, together: bool) -> (usize, usize) {
+    let (mut fast, mut slow) = (None, None);
+    for t in 1..=1000 {
+        if fast.is_some() && slow.is_some() {
+            break;
+        }
+        game.tick();
+        for (id, got) in [("fast", &mut fast), ("slow", &mut slow)] {
+            if got.is_none() && game.r(id).x == 30.0 {
+                *got = Some(t);
+            }
+        }
+        let (f, s) = (game.r("fast"), game.r("slow"));
+        let gap = crate::npc_slow::wrap_distance_f(SIZE, (f.x, f.y), (s.x, s.y));
+        if together {
+            assert!(gap <= ARMY_SPREAD + 1.0, "{gap} apart at tick {t}");
+        }
+    }
+    (fast.expect("fast arrives"), slow.expect("slow arrives"))
+}
+
 #[test]
-#[ignore = "needs walking (T86.4)"]
-fn moves_at_the_pace_of_its_slowest_and_keeps_together() {}
+fn moves_at_the_pace_of_its_slowest_and_keeps_together() {
+    let mut world = setup();
+    agile(&mut world, "fast", Some("r1"), 10.0, 12.0, 25.0);
+    agile(&mut world, "slow", Some("r1"), 10.0, 12.0, 1.0);
+    // On their own, the fast one gets there well before the slow one.
+    let mut alone = game(world.clone());
+    for id in ["fast", "slow"] {
+        let walk = json!({ "kind": "walkTo", "residentId": id, "x": 30, "y": 12 });
+        assert_eq!(alone.order(ME, walk), "ack");
+    }
+    let apart = arrivals(&mut alone, false);
+    assert!((apart.1 - apart.0) as f64 > 3.0 * WALK_TICKS_PER_TILE, "{apart:?}");
+
+    let mut game = game(world);
+    let form = json!({ "kind": "formArmy", "name": "Foot", "residentIds": ["fast", "slow"] });
+    assert_eq!(game.order(ME, form), "ack");
+    let army = game.world.armies[0].id.clone();
+    let walk = json!({ "kind": "armyWalkTo", "armyId": army, "x": 30, "y": 12 });
+    assert_eq!(game.order(ME, walk), "ack");
+    let together = arrivals(&mut game, true);
+    // The army arrives when its slowest does, and its fast member barely before.
+    assert!(together.1 <= apart.1 + 5, "{together:?} against {apart:?}");
+    assert!(together.1 - together.0 < apart.1 - apart.0, "{together:?} against {apart:?}");
+    game.tick();
+    assert_eq!(game.world.armies[0].order, None);
+}
 
 #[test]
 fn loses_a_resident_who_is_given_an_order_of_their_own() {
@@ -125,8 +189,25 @@ fn attacks_a_resident_in_sight_together_but_not_one_of_its_own() {
 }
 
 #[test]
-#[ignore = "needs walking (T86.4)"]
-fn guards_a_tile_a_member_who_wandered_off_and_is_idle_walks_back() {}
+fn guards_a_tile_a_member_who_wandered_off_and_is_idle_walks_back() {
+    let mut world = setup();
+    agile(&mut world, "a2", Some("r1"), 10.0, 12.0, 10.0);
+    agile(&mut world, "a3", Some("r1"), 11.0, 12.0, 10.0);
+    let mut game = game(world);
+    let form = json!({ "kind": "formArmy", "name": "Watch", "residentIds": ["a2", "a3"] });
+    assert_eq!(game.order(ME, form), "ack");
+    let army = game.world.armies[0].id.clone();
+    let guard = json!({ "kind": "armyGuard", "armyId": army, "x": 14, "y": 12 });
+    assert_eq!(game.order(ME, guard), "ack");
+    game.run(300);
+    for id in ["a2", "a3"] {
+        assert_eq!((game.r(id).x, game.r(id).y), (14.0, 12.0), "{id}");
+    }
+    game.r_mut("a3").x = 12.0;
+    game.run(150);
+    assert_eq!((game.r("a3").x, game.r("a3").y), (14.0, 12.0));
+    assert!(matches!(game.world.armies[0].order, Some(ArmyOrder::Guard { .. })));
+}
 
 /// The checks and the end of the TypeScript test; the following is walking's (T86.4).
 #[test]

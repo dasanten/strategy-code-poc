@@ -1,17 +1,23 @@
-//! `apps/server/src/leader.test.ts`, ported one to one where the handover itself runs it. The
-//! alliance and contract orders are T86.11's, so an alliance or contract is set up as data here;
-//! the Leader's death is `dieAll`'s (T86.3); handing over from a script is the game API's (T86.12).
+//! `apps/server/src/leader.test.ts`, ported one to one. Where only the invariant is tested, an
+//! alliance or contract is set up as data.
+
+use std::sync::Arc;
 
 use csp_shared::world::{
-    Alliance, MercenaryContract, RealmEventWhat, Resident, ResidentOrder, Tile, WalkOrder,
-    WorldState,
+    Alliance, DeathCause, MercenaryContract, RealmEventWhat, Resident, ResidentOrder, Tile,
+    WalkOrder, WorldState,
 };
 
 use super::*;
 use crate::combat::attack_order;
+use crate::game_test_world::{player, run_script};
+use crate::invariants::check_all;
+use crate::orders::{order_kinds, OrderQueue, OrderReply};
 use crate::queries::alliance::alliance_of;
 use crate::queries::city::town_hall_of;
+use crate::script_api::{Is, SCRIPT_API};
 use crate::starting_city::found_starting_city;
+use crate::survival::die_all;
 use crate::test_world::{city_terrain, live, live_mut};
 use crate::world::create_world;
 
@@ -313,12 +319,64 @@ fn is_checked_again_when_it_applies() {
 }
 
 #[test]
-#[ignore = "needs dieAll ending a realm (T86.3)"]
-fn the_old_leaders_death_breaks_nothing_up_the_new_leaders_does() {}
+fn the_old_leaders_death_breaks_nothing_up_the_new_leaders_does() {
+    let Setup { mut world, realm, city, leader, heir, .. } = setup();
+    let terrain = city_terrain();
+    assert_eq!(hand_over(&mut world, &heir, &leader, MARA), "ok");
+    let (_, ended) = die_all(&mut world, &[leader], DeathCause::OldAge, terrain.size, None);
+    assert_eq!(ended, vec![]);
+    assert!(world.realms.iter().any(|r| r.id == realm));
+    let realm_of_city =
+        |world: &WorldState| world.cities.iter().find(|c| c.id == city).unwrap().realm_id.clone();
+    assert_eq!(realm_of_city(&world), Some(realm.clone()));
+    assert!(matches!(
+        world.events.last().unwrap().what,
+        RealmEventWhat::Died { leader: false, .. }
+    ));
+    assert_eq!(check_all(&world, terrain), vec![]);
+
+    let (_, ended) =
+        die_all(&mut world, std::slice::from_ref(&heir), DeathCause::OldAge, terrain.size, None);
+    assert_eq!(ended.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(), vec![realm.as_str()]);
+    assert!(!world.realms.iter().any(|r| r.id == realm));
+    assert_eq!(realm_of_city(&world), None);
+    assert!(world.events.iter().any(|e| matches!(&e.what,
+        RealmEventWhat::Died { leader: true, resident_id, .. } if *resident_id == heir)));
+}
 
 #[test]
-#[ignore = "needs the contract and alliance orders (T86.11)"]
-fn a_leader_cant_be_hired_out_or_handed_to_an_alliance_army() {}
+fn a_leader_cant_be_hired_out_or_handed_to_an_alliance_army() {
+    let Setup { mut world, realm, tobin, leader, .. } = setup();
+    let storage = world
+        .buildings
+        .iter()
+        .find(|b| b.kind == csp_shared::world::BuildingKind::Storage && b.city_id.is_some())
+        .unwrap()
+        .id
+        .clone();
+    let mut queue = OrderQueue::new(order_kinds(), Some(Arc::new(city_terrain().clone())));
+    let mut order = |world: &mut WorldState, o: serde_json::Value| -> String {
+        let answer = queue.receive(world, &player(MARA), &"q".into(), &o);
+        queue.apply_all(world);
+        match answer {
+            OrderReply::Ack { .. } => "ok".into(),
+            OrderReply::Rejected { reason, .. } => reason,
+        }
+    };
+    let offer = serde_json::json!({
+        "kind": "offerContract", "residentIds": [leader], "realmId": tobin, "days": 5,
+        "pricePerWeek": 3, "storageId": storage,
+    });
+    assert_eq!(order(&mut world, offer), "a Leader is never hired out");
+    let found = serde_json::json!({ "kind": "foundAlliance", "name": "North" });
+    assert_eq!(order(&mut world, found), "ok");
+    live_mut(&mut world, &leader).carried.insert(csp_shared::world::Good::Sword, 1.0);
+    let army = serde_json::json!({
+        "kind": "handOverToAlliance", "residentIds": [leader], "carriageIds": [],
+    });
+    assert_eq!(order(&mut world, army), format!("{} is your Leader", name(&world, &leader)));
+    assert_eq!(alliance_of(&world, &realm).unwrap().army, vec![]);
+}
 
 #[test]
 fn invariant_every_realms_leader_is_a_living_adult_of_that_realm_serving_no_one_else() {
@@ -335,6 +393,30 @@ fn invariant_every_realms_leader_is_a_living_adult_of_that_realm_serving_no_one_
     assert_eq!(leaders_serve_no_one(&world).len(), 1);
 }
 
+/// leader.test.ts: Leader handover from a script: is in the script API and does what the order
+/// does.
 #[test]
-#[ignore = "needs the game API (T86.12)"]
-fn leader_handover_from_a_script_is_in_the_script_api() {}
+fn leader_handover_from_a_script_is_in_the_script_api() {
+    assert!(SCRIPT_API.iter().any(|b| b.name == "handOver" && matches!(b.is, Is::Action)));
+    let Setup { mut world, realm, leader, heir, .. } = setup();
+    let terrain = city_terrain();
+    let mara = player(MARA);
+    // Only the Leader's script can hand over.
+    let source = format!("memory.answer = handOver(\"{leader}\")");
+    let (answer, requests) = run_script(&world, terrain, &mara, &heir, &source);
+    assert_eq!(answer, Some(serde_json::json!("only your Leader can hand over the realm")));
+    assert_eq!(requests, vec![]);
+
+    let source = format!("memory.answer = handOver(\"{heir}\")");
+    let (answer, requests) = run_script(&world, terrain, &mara, &leader, &source);
+    assert!(matches!(answer, None | Some(serde_json::Value::Null)), "{answer:?}");
+    let asked =
+        serde_json::json!([{ "kind": "handOver", "residentId": leader, "newLeaderId": heir }]);
+    assert_eq!(serde_json::to_value(&requests).unwrap(), asked);
+    let mut queue = OrderQueue::new(order_kinds(), Some(Arc::new(terrain.clone())));
+    let order = serde_json::to_value(&requests[0]).unwrap();
+    let reply = queue.receive(&world, &mara, &"q".into(), &order);
+    assert!(matches!(reply, OrderReply::Ack { .. }), "{reply:?}");
+    queue.apply_all(&mut world);
+    assert_eq!(leader_of(&world, &realm), heir);
+}
