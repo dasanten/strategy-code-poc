@@ -5,9 +5,9 @@ use csp_shared::balance::{CLIMB_TICKS, MAP_SIZE};
 use csp_shared::terrain::{wrap_delta, TerrainMap};
 use csp_shared::world::{BuildingKind, ClimbOrder, OrderRequest, ResidentOrder, Tile, WorldState};
 
-use crate::movement_pending::{
-    climb_landing, commands, foreign_wall, realm_of, str_field, OrderKind, OrderSender,
-};
+use crate::order_sender::{commands, realm_of, OrderSender};
+use crate::orders::{str_field, OrderKind};
+use crate::walls::{climb_landing, foreign_wall};
 
 /// An action a resident with a climb order requests: climb a tick further up the wall.
 #[derive(Debug, Clone, PartialEq)]
@@ -45,7 +45,7 @@ impl OrderKind for Climb {
         }
         let wall = match foreign_wall(world, Some(&realm.id), str_field(order, "wallId")) {
             Ok(w) => w,
-            Err(e) => return Some(e.into()),
+            Err(e) => return Some(e),
         };
         let size = terrain.map_or(MAP_SIZE, |t| t.size);
         if !besides(size, (r.x, r.y), (wall.x, wall.y)) {
@@ -115,9 +115,10 @@ pub fn resolve_climbing(world: &mut WorldState, actions: &[ClimbAction], terrain
             }
             continue;
         }
-        let to = climb_landing(world, terrain, from, wall_at);
+        let tile = |(x, y): (f64, f64)| (x as i32, y as i32);
+        let (x, y) = climb_landing(world, terrain, tile(from), tile(wall_at));
         let r = &mut world.residents[i];
-        (r.x, r.y) = to;
+        (r.x, r.y) = (f64::from(x), f64::from(y));
         r.order = None;
     }
 }

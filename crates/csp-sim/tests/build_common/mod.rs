@@ -1,23 +1,20 @@
 //! What the building, work and training tests share (T86.6): a small Plains map, a resident
-//! builder, and an order queue that takes the order kinds of T86.6 as `OrderQueue` does
-//! (receive checks, the next tick applies) until T86.2's `OrderQueue` lands.
+//! builder, and the game's `OrderQueue` (receive checks, the next tick applies).
 
 #![allow(dead_code)]
 
 use csp_shared::balance::ticks_for_age;
 use csp_shared::terrain::{Terrain, TerrainMap};
 use csp_shared::world::{
-    Building, BuildingKind, ConstructionSite, OrderRequest, Realm, Resident, Stat, StatRecord,
-    Stock, WorldState,
+    Building, BuildingKind, ConstructionSite, Realm, Resident, Stat, StatRecord, Stock, WorldState,
 };
-use csp_sim::building::{apply_build, validate_build};
+use std::sync::Arc;
+
+use csp_sim::invariants::check_all;
 use csp_sim::order_sender::OrderSender;
-use csp_sim::road_line::{apply_line, validate_line, LineKind};
-use csp_sim::teaching::{apply_teach, validate_teach};
-use csp_sim::teardown::{apply_tear_down, validate_tear_down};
+use csp_sim::orders::{order_kinds, OrderQueue, OrderReply};
 use csp_sim::tick::Scratch;
-use csp_sim::training::{apply_train, validate_train};
-use csp_sim::work::{apply_work_at, validate_work_at};
+use csp_sim::walking::Walking;
 use csp_sim::world::{create_world, step_world};
 use serde_json::{json, Value};
 
@@ -126,13 +123,19 @@ pub fn empty_world(terrain: &TerrainMap) -> WorldState {
 /// The answer to an order (`{ type: 'ack' }` or `{ type: 'rejected', reason }`).
 pub type Answer = Result<(), String>;
 
-/// Orders received and waiting for the next tick (`OrderQueue`, for T86.6's kinds).
+/// The game's own `OrderQueue`, made on the first order with the map the tests give it: orders
+/// received wait for the next tick, which applies them.
 #[derive(Default)]
 pub struct Orders {
-    pending: Vec<OrderRequest>,
+    queue: Option<OrderQueue>,
 }
 
 impl Orders {
+    fn queue(&mut self, terrain: &TerrainMap) -> &mut OrderQueue {
+        self.queue
+            .get_or_insert_with(|| OrderQueue::new(order_kinds(), Some(Arc::new(terrain.clone()))))
+    }
+
     /// Checks an order; an accepted one waits for `apply_all` (`receive`).
     pub fn receive(
         &mut self,
@@ -141,46 +144,20 @@ impl Orders {
         order: Value,
         terrain: &TerrainMap,
     ) -> Answer {
-        let order: OrderRequest = serde_json::from_value(order).unwrap();
-        let t = Some(terrain);
-        let problem = match order.kind.as_str() {
-            "build" => validate_build(world, sender, &order, t),
-            "tearDown" => validate_tear_down(world, sender, &order, t),
-            "roadLine" => validate_line(LineKind::RoadLine, world, sender, &order, t),
-            "wallLine" => validate_line(LineKind::WallLine, world, sender, &order, t),
-            "workAt" => validate_work_at(world, sender, &order),
-            "teach" => validate_teach(world, sender, &order),
-            "train" => validate_train(world, sender, &order),
-            other => panic!("no order kind {other} in T86.6's tests"),
-        };
-        match problem {
-            Some(reason) => Err(reason),
-            None => {
-                self.pending.push(order);
-                Ok(())
-            }
+        match self.queue(terrain).receive(world, sender, &json!("q"), &order) {
+            OrderReply::Ack { .. } => Ok(()),
+            OrderReply::Rejected { reason, .. } => Err(reason),
         }
     }
 
     /// Applies every waiting order, in the order received (`applyAll`).
     pub fn apply_all(&mut self, world: &mut WorldState, terrain: &TerrainMap) {
-        for order in std::mem::take(&mut self.pending) {
-            match order.kind.as_str() {
-                "build" => apply_build(world, &order),
-                "tearDown" => apply_tear_down(world, &order),
-                "roadLine" => apply_line(LineKind::RoadLine, world, &order, Some(terrain)),
-                "wallLine" => apply_line(LineKind::WallLine, world, &order, Some(terrain)),
-                "workAt" => apply_work_at(world, &order),
-                "teach" => apply_teach(world, &order),
-                "train" => apply_train(world, &order),
-                _ => unreachable!(),
-            }
-        }
+        self.queue(terrain).apply_all(world);
     }
 
     /// How many orders wait (`size`).
     pub fn len(&self) -> usize {
-        self.pending.len()
+        self.queue.as_ref().map_or(0, OrderQueue::len)
     }
 }
 
@@ -192,6 +169,39 @@ pub fn run(world: &mut WorldState, terrain: &TerrainMap, ticks: usize) {
             r.hunger = 100.0;
         }
         step_world(world, terrain, &mut scratch, None, None);
+    }
+}
+
+/// Every world invariant holds (`expect(checkInvariants(world, terrain)).toEqual([])`).
+#[track_caller]
+pub fn assert_sound(world: &WorldState, terrain: &TerrainMap) {
+    let broken: Vec<String> = check_all(world, terrain)
+        .iter()
+        .map(|v| format!("{}: {}", v.invariant, v.message))
+        .collect();
+    assert!(broken.is_empty(), "invariants broken at tick {}: {broken:?}", world.tick);
+}
+
+/// Steps the world, fed and walking, until `done` or `max` ticks; every invariant holds after
+/// each tick (`run` of the walking tests).
+#[track_caller]
+pub fn run_walking(
+    world: &mut WorldState,
+    terrain: &TerrainMap,
+    max: usize,
+    mut done: impl FnMut(&WorldState) -> bool,
+) {
+    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut scratch = Scratch::default();
+    for _ in 0..max {
+        if done(world) {
+            break;
+        }
+        for r in &mut world.residents {
+            r.hunger = 100.0;
+        }
+        step_world(world, terrain, &mut scratch, Some(&mut walking), None);
+        assert_sound(world, terrain);
     }
 }
 

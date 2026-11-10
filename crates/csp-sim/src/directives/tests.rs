@@ -545,7 +545,7 @@ fn is_refused_unless_the_admin_allows_it_to_the_target_with_the_whole_price_on_a
         let o: csp_shared::world::OrderRequest =
             serde_json::from_value(json!({"kind": "buyOff", "residentId": resident, "directiveId": directive, "carriageId": null}))
                 .expect("an order");
-        BuyOff.validate(world, &OrderSender { user_id: from, npc_city_id: None }, &o, None)
+        BuyOff.validate(world, &OrderSender::player(from, "Player"), &o, None)
     };
     assert_eq!(ask(&world, 7, "a1", &d).as_deref(), Some("it costs 300 coins"));
     // Bea's realm is named only through its alliance: the target pays, not its allies.

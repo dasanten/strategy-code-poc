@@ -7,8 +7,8 @@ use serde_json::json;
 
 use super::*;
 use crate::queries::region_map::{organization_name, region_map_for, RegionAlliance, RegionHolder};
+use crate::queries::standing::TRADE_ORG_NAME;
 use crate::queries::territory::{Territory, TRADE_ORGANIZATION};
-use crate::realm_pending::TRADE_ORG_NAME;
 use crate::realm_test_world::{add_city, plains, resident};
 use crate::world::create_world;
 

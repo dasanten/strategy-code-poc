@@ -57,7 +57,18 @@ pub fn run_by_npc_city(world: &WorldState, r: &Resident) -> bool {
 /// Where an NPC city's residents go home to (`npcHome`): its finished storage, else its town
 /// hall.
 pub fn npc_home<'w>(world: &'w WorldState, city_id: &str) -> Option<&'w Building> {
-    crate::survival::npc_home(world, city_id)
+    world
+        .buildings
+        .iter()
+        .find(|b| {
+            b.city_id.as_deref() == Some(city_id)
+                && b.kind == BuildingKind::Storage
+                && b.site.is_none()
+        })
+        .or_else(|| {
+            let hall = &world.cities.iter().find(|c| c.id == city_id)?.town_hall_id;
+            world.buildings.iter().find(|b| &b.id == hall)
+        })
 }
 
 /// Gives a resident an order to walk to a tile (`walkTo`).

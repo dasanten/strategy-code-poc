@@ -337,10 +337,46 @@ fn drives_to_where_the_army_is_when_far_behind_and_goes_after_it_step_by_step_on
     assert!(matches!(o, Some(ResidentOrder::Drive(d)) if d.army.as_ref() == Some(&off.p)), "{o:?}");
 }
 
+/// A busy world's pathfinder (bug #993): the walking with no budget a tick, so no search settles
+/// within the tick it starts (`requestSteps(world, 0)`).
+struct Busy<'a>(&'a mut Walking);
+
+impl crate::tick::Walk for Busy<'_> {
+    fn walk(&mut self, world: &mut WorldState, scratch: &mut Scratch) -> usize {
+        let steps = self.0.request_steps(world, scratch, 0.0);
+        self.0.resolve(world, scratch, &steps);
+        steps.len()
+    }
+
+    fn ways(&mut self) -> Option<&mut dyn crate::npc_roads::WayFinder> {
+        Some(&mut *self.0)
+    }
+}
+
 #[test]
-#[ignore = "not ported yet: it holds the pathfinder to no budget a tick (bug #993), which `Walking` doesn't let a test do"]
 fn stands_where_it_is_while_its_horse_is_down_its_driver_given_no_drive_order() {
-    let _ = horses_down_lie_still;
+    let mut s = default_setup();
+    let off = set_off(&mut s, iron(10.0));
+    let driver = off.driver(&s.world);
+    // Nothing on board for the horse, which goes Down next tick.
+    off.carriage_mut(&mut s.world).load.shift_remove(&Good::Food);
+    off.wagon_mut(&mut s.world).own_food = 0.0;
+    let horse = off.horse(&mut s.world);
+    horse.hunger = 0.0;
+    horse.health = 1e-9;
+    let from = (off.carriage(&s.world).x, off.carriage(&s.world).y);
+    let mut busy = Busy(&mut s.walking);
+    for _ in 0..3 * TRADE_ORG_PUNISH.wagon_retry_ticks as usize {
+        for r in &mut s.world.residents {
+            r.hunger = 100.0;
+        }
+        step_world(&mut s.world, &s.terrain, &mut s.scratch, Some(&mut busy), None);
+        let o = &at(&s.world, &driver).order;
+        assert!(o.is_none(), "{o:?}");
+        assert_eq!(horses_down_lie_still(&s.world), vec![]);
+    }
+    assert!(off.horse(&mut s.world).down_until.is_some());
+    assert_eq!((off.carriage(&s.world).x, off.carriage(&s.world).y), from);
 }
 
 #[test]
@@ -559,8 +595,62 @@ fn counts_no_more_than_is_left_on_it_so_a_robbed_army_takes_again() {
 }
 
 #[test]
-#[ignore = "not ported yet: stealing's `take_over` is still T86.7's stand-in and records no theft of the carriage"]
-fn cant_be_stolen_while_its_driver_or_soldiers_hold_it_and_is_gone_for_them_once_it_is() {}
+fn cant_be_stolen_while_its_driver_or_soldiers_hold_it_and_is_gone_for_them_once_it_is() {
+    let mut s = default_setup();
+    let off = set_off(&mut s, iron(10.0));
+    // Off on its own, with the soldiers out of its way, and stopped for a moment.
+    let park = (MID + 200.0, MID);
+    let k = off.carriage_mut(&mut s.world);
+    (k.x, k.y) = park;
+    let horse = off.horse(&mut s.world);
+    (horse.x, horse.y) = park;
+    resident(&mut s.world, "a2", park.0, park.1, Some("c1"));
+    let driver = off.driver(&s.world);
+    let d = at_mut(&mut s.world, &driver);
+    (d.x, d.y) = park;
+    let problem = |w: &WorldState| {
+        crate::queries::driving::drive_off_problem(w, at(w, "a2"), off.carriage(w), "r1", SIZE)
+    };
+    assert_eq!(problem(&s.world).as_deref(), Some("someone is driving that carriage"));
+    at_mut(&mut s.world, &driver).order = None;
+    assert_eq!(problem(&s.world).as_deref(), Some("its driver is still with that supply wagon"));
+    at_mut(&mut s.world, &driver).x = park.0 - 100.0;
+    let soldier = off.members(&s.world)[0].clone();
+    let r = at_mut(&mut s.world, &soldier);
+    let was = (r.x, r.y);
+    (r.x, r.y) = park;
+    assert_eq!(problem(&s.world).as_deref(), Some("its escort guards that supply wagon"));
+    let r = at_mut(&mut s.world, &soldier);
+    (r.x, r.y) = was;
+    assert_eq!(problem(&s.world), None);
+    let load = off.carriage(&s.world).load.clone();
+    let ki = s.world.carriages.iter().position(|k| k.id == off.carriage).unwrap();
+    let hid = off.carriage(&s.world).horse_id.clone();
+    let hi = s.world.horses.iter().position(|h| Some(&h.id) == hid.as_ref());
+    crate::stealing::take_over(
+        &mut s.world,
+        "a2",
+        "r1",
+        crate::stealing::Taken { carriage: Some(ki), horse: hi },
+        SIZE,
+    );
+    assert_eq!(off.carriage(&s.world).realm_id.as_deref(), Some("r1"));
+    assert_eq!(off.carriage(&s.world).load, load);
+    assert!(s.world.supply_wagons.is_empty());
+    let last = s.world.crimes.last().unwrap();
+    assert_eq!((last.kind, last.carriage), (CrimeKind::Theft, Some(true)));
+    assert!(!punishers(&s.world).contains(&driver));
+    // Its soldiers go on with what they carry.
+    assert_eq!(
+        s.world.punishments.iter().map(|x| x.id.clone()).collect::<Vec<_>>(),
+        std::slice::from_ref(&off.p)
+    );
+    let p = off.p.clone();
+    run(&mut s, 2000, &mut |w| {
+        w.punishments.iter().find(|x| x.id == p).is_some_and(|x| x.arrived_at.is_some())
+    });
+    assert!(off.p(&s.world).arrived_at.is_some());
+}
 
 #[test]
 fn has_a_soldier_take_over_from_a_driver_who_died_bringing_on_board_what_they_took() {
@@ -719,5 +809,129 @@ fn ends_with_the_hq() {
 // the Trade Org army's longest trip
 
 #[test]
-#[ignore = "not ported yet: slow in the TypeScript too (`tags: ['slow']`), a trip across the full-size map for T86.14's long simulations"]
-fn reaches_the_farthest_city_on_a_real_size_map_and_gets_home_fed_with_no_food_but_its_own() {}
+#[ignore = "slow in the TypeScript too (`tags: ['slow']`): a trip across the full-size map, 10.5 s in release"]
+fn reaches_the_farthest_city_on_a_real_size_map_and_gets_home_fed_with_no_food_but_its_own() {
+    use csp_shared::balance::{FOOD_PER_DAY, MAP_SIZE, WALK_TICKS_PER_TILE};
+    use csp_shared::world::Stat;
+    const HQ: f64 = 200.0;
+    let far = f64::from(MAP_SIZE / 2);
+    // As large as the real map, all Plains.
+    let big = plains(MAP_SIZE);
+    let mut world = create_world(&big, 1);
+    let mut m = Mulberry32::new(7.0);
+    let hq = found_trade_org_hq(&mut world, &big, HQ as i32, HQ as i32, &mut || m.next());
+    world.realms.push(
+        serde_json::from_value(json!({ "id": "r1", "userId": 7, "leaderId": "a1" })).unwrap(),
+    );
+    add_city(&mut world, "c1", Some("r1"), HQ + far, HQ + far, None);
+    // Coins and no Food: nothing to refill from at the city, and no posts on the way.
+    world.buildings.push(
+        serde_json::from_value(json!({
+            "id": "s1", "kind": "storage", "cityId": "c1", "x": HQ + far + 4.0, "y": HQ + far,
+            "stock": { "coins": 1000 },
+        }))
+        .unwrap(),
+    );
+    resident(&mut world, "a1", HQ + far - 4.0, HQ + far + 4.0, Some("c1"));
+    let people: Vec<String> =
+        hq_people(&world, &hq).into_iter().map(|i| world.residents[i].id.clone()).collect();
+    let guard = TRADE_ORG_ARMY.guard as usize;
+    let soldiers: Vec<String> = people[..guard + 4].to_vec();
+    let driver_to_be: Vec<String> = people[guard + 4..guard + 5].to_vec();
+    world.residents.retain(|r| {
+        r.city_id.as_deref() != Some(hq.as_str())
+            || soldiers.contains(&r.id)
+            || driver_to_be.contains(&r.id)
+    });
+    world.caravans.clear();
+    for r in &mut world.residents {
+        if !soldiers.contains(&r.id) && !driver_to_be.contains(&r.id) {
+            continue;
+        }
+        r.carried =
+            if soldiers.contains(&r.id) { stock(&[(Good::Spear, 1.0)]) } else { Stock::new() };
+        let average = Stat { base: 10.0, trained: 0.0 };
+        // Weak: they can't pack what the way there and back eats.
+        r.stats.strength = Stat { base: 5.0, trained: 0.0 };
+        r.stats.endurance = average.clone();
+        r.stats.agility = average;
+        r.born_at = -20.0 * 24.0 * 3600.0;
+        r.lifespan = 60.0;
+    }
+    // An HQ that has had time to fill its storage: it can pack for all of them.
+    let store = world
+        .buildings
+        .iter_mut()
+        .find(|b| b.city_id.as_deref() == Some(hq.as_str()) && b.kind == BuildingKind::Storage)
+        .unwrap();
+    store.stock.get_or_insert_with(Stock::new).insert(Good::Food, 1000.0);
+    let hq_city = world.cities.iter().find(|c| c.id == hq).unwrap().clone();
+    theft(&mut world, &hq_city, iron(10.0));
+    let worth = TRADE_ORG_PUNISH.times * worth_of(&iron(10.0));
+    let mut walking = Walking::new(Arc::new(big.clone()));
+    let mut scratch = Scratch::default();
+    let mut step_until =
+        |world: &mut WorldState, until: &dyn Fn(&WorldState) -> bool, most: usize| {
+            for _ in 0..most {
+                if until(world) {
+                    break;
+                }
+                step_world(world, &big, &mut scratch, Some(&mut walking), None);
+            }
+        };
+    step_until(&mut world, &|w| !w.punishments.is_empty(), 2);
+    let off = the_wagon(&world);
+    let ids = off.members(&world);
+    let driver = off.driver(&world);
+    let (wid, pid) = (off.wagon.clone(), off.p.clone());
+    step_until(
+        &mut world,
+        &|w| {
+            let loaded = w
+                .supply_wagons
+                .iter()
+                .find(|x| x.id == wid)
+                .is_some_and(|x| x.loaded == Some(true));
+            let packed = w
+                .punishments
+                .iter()
+                .find(|x| x.id == pid)
+                .is_some_and(|x| x.members.iter().all(|m| m.packed == Some(true)));
+            loaded && packed
+        },
+        2000,
+    );
+    step_until(&mut world, &|_| false, 2);
+    assert!(held(&off.carriage(&world).load, Good::Food) > 0.0);
+    // The way there and back eats more than any of them could pack.
+    let days = (2.0 * far * std::f64::consts::SQRT_2 * WALK_TICKS_PER_TILE) / TICKS_PER_GAME_DAY;
+    for id in &ids {
+        assert!(held(&at(&world, id).carried, Good::Food) < days * FOOD_PER_DAY);
+    }
+    let arrived = |w: &WorldState| {
+        w.punishments.iter().find(|x| x.id == pid).is_none_or(|x| x.arrived_at.is_some())
+    };
+    step_until(&mut world, &arrived, 120_000);
+    assert!(off.p(&world).arrived_at.is_some());
+    let c1 = world.cities.iter().find(|c| c.id == "c1").unwrap();
+    let hall = town_hall_of(&world, c1).unwrap();
+    let k = off.carriage(&world);
+    assert!(wrap_distance(MAP_SIZE, tile(k.x, k.y), tile(hall.x, hall.y)) < 100.0);
+    let home_fed = |w: &WorldState, id: &str| {
+        let r = at(w, id);
+        assert!(r.health > 0.0);
+        assert_eq!(r.down_until, None);
+        assert!(in_city_area(w, &hq, r.x, r.y, MAP_SIZE));
+    };
+    step_until(&mut world, &|w| w.punishments.is_empty(), 140_000);
+    assert!(world.punishments.is_empty());
+    for id in &ids {
+        home_fed(&world, id);
+    }
+    step_until(&mut world, &|w| w.supply_wagons.is_empty(), 40_000);
+    assert!(world.supply_wagons.is_empty());
+    home_fed(&world, &driver);
+    let s1 = world.buildings.iter().find(|b| b.id == "s1").unwrap();
+    assert_eq!(held_in(s1.stock.as_ref(), Good::Coins), 1000.0 - worth);
+    assert_eq!(check_all(&world, &big), vec![]);
+}

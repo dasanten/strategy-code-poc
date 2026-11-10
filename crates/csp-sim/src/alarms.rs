@@ -11,8 +11,8 @@ use csp_shared::balance::{DEFEND_CALM_TICKS, SIGHT_RANGE};
 use csp_shared::footprint::is_at;
 use csp_shared::terrain::wrap_distance;
 use csp_shared::world::{
-    Alarm, AlarmKind, AlarmScriptId, City, CityJobKind, Interrupted, Resident, ResidentOrder,
-    RunningScript, Task, WorldState,
+    Alarm, AlarmKind, AlarmScriptId, City, Interrupted, Resident, ResidentOrder, RunningScript,
+    Task, WorldState,
 };
 use serde_json::json;
 
@@ -34,25 +34,13 @@ fn tile(x: f64, y: f64) -> (i32, i32) {
 use crate::caravans::caravan_crew;
 use crate::queries::trade_org::punishers;
 
-/// The residents an NPC city's plan sends founding (`foundingParty`).
-// TODO(T86.10): `npc_founding::founding_party`.
-fn founding_party(world: &WorldState, city_id: &str) -> Vec<String> {
-    world.city_plans.get(city_id).map_or_else(Vec::new, |plan| {
-        plan.jobs
-            .iter()
-            .filter(|(_, j)| j.kind == CityJobKind::Found)
-            .map(|(id, _)| id.clone())
-            .collect()
-    })
-}
-
 /// Whether `r` of an NPC city goes by something other than their city (`runApart`): a caravan, a
 /// punishment or a founding, which would give them orders over their Alarm script's.
 fn run_apart(world: &WorldState, city: &City, r: &Resident) -> bool {
     if city.realm_id.is_some() {
         return false;
     }
-    founding_party(world, &city.id).contains(&r.id)
+    crate::npc_founding::founding_party(world.city_plans.get(&city.id)).contains(&r.id)
         || caravan_crew(world).contains(&r.id)
         || punishers(world).contains(&r.id)
 }
