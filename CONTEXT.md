@@ -1439,7 +1439,8 @@ The shared language of the game. Domain terms only — no implementation details
   step budget.
 - **Step budget:** how much work a script may do each tick, for each resident or army and for a
   whole realm. Out of budget, the script stops for that tick; what it already requested still
-  counts. Default scripts count like any other. NPC cities have no realm budget, only the one
+  counts. Default scripts count like any other. Declaring a function costs no step; calling it
+  does (Daniel, 2026-11-10). NPC cities have no realm budget, only the one
   for each resident. A script sees only what its Player sees: their sight, explored terrain and
   what they last saw (Last seen), told apart from what is in sight now.
 - **Value limits:** a single value a script holds is bounded: a string's length, a list's items and an
