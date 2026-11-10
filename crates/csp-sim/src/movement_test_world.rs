@@ -125,7 +125,7 @@ pub fn events_for(world: &WorldState, user_id: u64) -> Vec<&RealmEvent> {
 
 /// Movement's order kinds by name, the ones in `GETS_OFF_FIRST` getting a passenger off first, as
 /// `orderKinds` registers them (T86.2 keeps the real registry).
-fn order_kind(name: &str) -> Box<dyn crate::movement_pending::OrderKind> {
+fn order_kind(name: &str) -> Box<dyn crate::orders::OrderKind> {
     use crate::passengers::GetsOffFirst;
     match name {
         "walkTo" => Box::new(GetsOffFirst(crate::walking::WalkTo)),
@@ -158,7 +158,7 @@ pub fn order_from(
 ) -> Result<(), String> {
     let o: csp_shared::world::OrderRequest = serde_json::from_value(o).expect("an order");
     let kind = order_kind(&o.kind);
-    let sender = crate::movement_pending::OrderSender { user_id, npc_city_id: None };
+    let sender = crate::order_sender::OrderSender::player(user_id, "Player");
     if let Some(reason) = kind.validate(world, &sender, &o, Some(map)) {
         return Err(reason);
     }
@@ -196,16 +196,9 @@ pub fn walk_to(r: &mut Resident, x: f64, y: f64) {
     }));
 }
 
-/// Adds a Player city `id` of `realm_id` with its town hall `<id>-hall` at (x, y) (`addCity`).
-// TODO(T86.8): the test helper that comes with starting cities.
+/// Adds a city `id` of `realm_id` with its town hall `<id>-hall` at (x, y) (`addCity`).
 pub fn add_city(world: &mut WorldState, id: &str, realm_id: Option<&str>, x: f64, y: f64) {
-    let mut hall = building(&format!("{id}-hall"), BuildingKind::TownHall, x, y);
-    hall.city_id = Some(id.to_string());
-    world.buildings.push(hall);
-    let city = serde_json::json!({
-        "id": id, "name": "Ashford", "realmId": realm_id, "townHallId": format!("{id}-hall"), "occupation": null
-    });
-    world.cities.push(serde_json::from_value(city).expect("a city"));
+    crate::test_world::add_city(world, id, realm_id, x, y, None);
 }
 
 /// A realm `id` of Player `user_id` with Leader `leader_id`.

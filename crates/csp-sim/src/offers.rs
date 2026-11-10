@@ -1011,9 +1011,9 @@ pub fn offers_sound(world: &WorldState) -> Vec<InvariantViolation> {
                     o,
                     format!(
                         "has {} {} set aside where {} are held",
-                        crate::realm_pending::js_number(set),
+                        crate::queries::warehouse_trade::js_number(set),
                         good_name(o.gives),
-                        crate::realm_pending::js_number(holds)
+                        crate::queries::warehouse_trade::js_number(holds)
                     ),
                 );
             }
@@ -1075,9 +1075,9 @@ pub fn offers_keep_goods(ledger: &OfferLedger) -> Vec<InvariantViolation> {
                     message: format!(
                         "an offer accepted by {} turned {} {} into {}",
                         t.resident_id,
-                        crate::realm_pending::js_number(b),
+                        crate::queries::warehouse_trade::js_number(b),
                         good_name(g),
-                        crate::realm_pending::js_number(a)
+                        crate::queries::warehouse_trade::js_number(a)
                     ),
                     entity_ids: vec![t.resident_id.clone()],
                 });

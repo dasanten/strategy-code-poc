@@ -2,20 +2,16 @@
 //! how long a way takes and how much Food is eaten on it. The text helpers there (`aboutTime`,
 //! `timeLeft`, `workLeft`, ...) only word these for the client and stay with it.
 
-use csp_shared::balance::{
-    ENDURANCE_TERRAIN_EFFECT, FOOD_PER_DAY, HORSE_FOOD_PER_DAY, HUNGER_ENDURANCE_AVERAGE,
-    HUNGER_ENDURANCE_LIMIT, TERRAIN_FOOD,
-};
+use csp_shared::balance::{FOOD_PER_DAY, HORSE_FOOD_PER_DAY};
 use csp_shared::terrain::{step_length, Terrain};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
-    FetchPhase, HaulPhase, HorseStats, Resident, ResidentOrder, StatName, StorePhase, TilePath,
-    WorldState,
+    FetchPhase, HaulPhase, HorseStats, Resident, ResidentOrder, StorePhase, TilePath, WorldState,
 };
 
 use super::carriages::horse_for;
 use super::pace::{drive_speed, horse_food_factor, ride_speed, walk_speed};
-use super::residents::{hunger_factor, stat_value};
+use super::residents::food_use;
 use super::riding::horse_ridden;
 
 /// Ticks a way of `path` from `from` takes (`wayTicks`): each step its length at the pace onto
@@ -86,16 +82,6 @@ pub fn arrival_ticks(
         }
     };
     Some(way_ticks(size, (r.x, r.y), path, progress, &|x, y| pace(ground(x, y)), slowest))
-}
-
-/// How much of the usual food a resident needs on a tile of the given terrain (`foodUse`).
-// TODO(T86.3): `survival`'s `food_use` once it lands.
-fn food_use(r: &Resident, terrain: u8, tick: f64) -> f64 {
-    let extra = TERRAIN_FOOD.get(terrain).unwrap_or(1.0) - 1.0;
-    let away = stat_value(r, StatName::Endurance, tick) - HUNGER_ENDURANCE_AVERAGE;
-    let soften =
-        (-HUNGER_ENDURANCE_LIMIT).max(HUNGER_ENDURANCE_LIMIT.min(away * ENDURANCE_TERRAIN_EFFECT));
-    hunger_factor(r, tick) * (1.0 + extra * (1.0 - soften))
 }
 
 /// About how much Food a resident eats a tick on `terrain`, with the horse they ride

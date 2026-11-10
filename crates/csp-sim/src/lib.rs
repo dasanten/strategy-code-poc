@@ -41,7 +41,6 @@ pub mod hq_growth;
 pub mod invariants;
 pub mod last_seen;
 pub mod leader;
-pub mod movement_pending;
 #[cfg(test)]
 mod movement_test_world;
 pub mod names;
@@ -81,7 +80,6 @@ pub mod queries;
 pub mod queue;
 pub mod queues;
 pub mod random;
-pub mod realm_pending;
 #[cfg(test)]
 mod realm_test_world;
 pub mod region_map;
@@ -106,6 +104,7 @@ pub mod spoilage;
 mod stand_ins;
 pub mod standing;
 pub mod starting_city;
+pub mod stealing;
 pub mod stock_floor;
 pub mod storing;
 pub mod supply_wagons;

@@ -13,17 +13,19 @@ use csp_shared::world::{
 use serde::Serialize;
 use serde_json::Value;
 
+use crate::directive::{directive_soldiers, directive_targets, goals_met};
+use crate::events::record_event;
+use crate::order_sender::{realm_of, OrderSender};
+use crate::orders::{str_field, OrderKind};
 use crate::queries::alliance::{allied_realms, commander_of};
 use crate::queries::alliance_rules::is_alliance_city;
 use crate::queries::names::held;
 use crate::queries::npc_trade::locale_compare;
 use crate::queries::residents::is_armed;
+use crate::queries::standing::organization_label;
 use crate::queries::standing::{standing_organization, TRADE_ORG};
+use crate::queries::warehouse_trade::{buy_off_coin_warehouse_at, buy_off_problem, js_number};
 use crate::random::new_id;
-use crate::realm_pending::{
-    buy_off_coin_warehouse_at, buy_off_problem, directive_soldiers, directive_targets, goals_met,
-    js_number, organization_label, realm_of, record_event, str_field, OrderKind, OrderSender,
-};
 use crate::sight::InvariantViolation;
 
 /// The longest reason an admin can give, in characters (`MAX_DIRECTIVE_REASON`).
@@ -330,8 +332,8 @@ impl OrderKind for BuyOff {
             world,
             &realm.id,
             r,
-            str_field(order, "directiveId"),
-            str_field(order, "carriageId"),
+            order.fields.get("directiveId"),
+            order.fields.get("carriageId"),
         )
     }
 
@@ -373,14 +375,15 @@ pub fn resolve_buy_offs(world: &mut WorldState) -> (usize, Vec<BuyOffRecord>) {
         world.residents[ri].order = None;
         let r = &world.residents[ri];
         let Some(realm) = commander_of(world, &r.id, r.owner.as_deref()) else { continue };
-        if buy_off_problem(world, &realm, r, Some(&o.directive_id), o.carriage_id.as_deref())
-            .is_some()
-        {
+        let directive_id = Value::String(o.directive_id.clone());
+        let carriage_id = o.carriage_id.clone().map(Value::String);
+        if buy_off_problem(world, &realm, r, Some(&directive_id), carriage_id.as_ref()).is_some() {
             continue;
         }
         let (rid, name, rx, ry) = (r.id.clone(), r.name.clone(), r.x, r.y);
         let d = world.directives.iter().find(|x| x.id == o.directive_id).expect("checked").clone();
-        let wi = buy_off_coin_warehouse_at(world, rx, ry).expect("checked");
+        let w = buy_off_coin_warehouse_at(world, rx, ry).expect("checked").id.clone();
+        let wi = world.buildings.iter().position(|b| b.id == w).expect("checked");
         let price = d.price.expect("checked");
         let k =
             o.carriage_id.as_ref().and_then(|id| world.carriages.iter().position(|k| k.id == *id));

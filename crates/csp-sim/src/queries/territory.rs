@@ -13,7 +13,8 @@ use indexmap::IndexMap;
 use super::names::{kind_name, placed};
 use super::npc_trade::locale_compare;
 use super::residents::is_armed;
-use crate::realm_pending::{in_city_area, is_city_building, workers_of};
+use crate::queries::building::workers_of;
+use crate::queries::city_area::{in_city_area, is_city_building};
 
 /// The Trade Organization's id as an Organization projecting control (`TRADE_ORGANIZATION`).
 /// Not the same string as [`super::standing::TRADE_ORG`], as in the TypeScript.

@@ -4,7 +4,8 @@
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{BuildingKind, OrderRequest, WorldState};
 
-use crate::movement_pending::{bool_field, realm_of, str_field, OrderKind, OrderSender};
+use crate::order_sender::{realm_of, OrderSender};
+use crate::orders::{bool_field, str_field, OrderKind};
 
 /// Where in `world.buildings` the finished gate `gate_id` of one of the sender's cities stands, or
 /// why there is none (`ownGate`).
