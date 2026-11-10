@@ -72,7 +72,13 @@ impl Scenario {
     fn run_until(&mut self, ticks: usize, done: impl Fn(&Scenario) -> bool) {
         for _ in 0..ticks {
             self.queue.apply_all(&mut self.world);
-            step_world(&mut self.world, &self.terrain, &mut self.scratch, Some(&mut self.walking), None);
+            step_world(
+                &mut self.world,
+                &self.terrain,
+                &mut self.scratch,
+                Some(&mut self.walking),
+                None,
+            );
             if self.world.tick.is_multiple_of(150) {
                 assert_eq!(check_all(&self.world, &self.terrain), []);
             }
@@ -115,7 +121,9 @@ impl Scenario {
                 let take = left.min(units_that_fit(self.r(r), good, self.world.tick as f64));
                 let mut goods = serde_json::Map::new();
                 goods.insert(name.as_str().unwrap().into(), json!(take));
-                self.order(json!({ "kind": "pickUp", "residentId": r, "spot": from, "goods": goods }));
+                self.order(
+                    json!({ "kind": "pickUp", "residentId": r, "spot": from, "goods": goods }),
+                );
                 let one = [r.to_string()];
                 self.run_until(10, |s| s.idle(&one));
                 self.order(json!({ "kind": "drop", "residentId": r, "spot": to, "goods": goods }));
@@ -137,8 +145,13 @@ fn scenario() -> Scenario {
         h.stats.endurance = AVERAGE_HORSE_STATS.endurance;
     }
     let realm = world.realms[0].id.clone();
-    let si = world.buildings.iter().position(|b| b.kind == csp_shared::world::BuildingKind::Storage).unwrap();
-    let stable = world.buildings.iter().find(|b| b.kind == csp_shared::world::BuildingKind::Stable).unwrap();
+    let si = world
+        .buildings
+        .iter()
+        .position(|b| b.kind == csp_shared::world::BuildingKind::Storage)
+        .unwrap();
+    let stable =
+        world.buildings.iter().find(|b| b.kind == csp_shared::world::BuildingKind::Stable).unwrap();
     let stable = (stable.x, stable.y);
     let carriage = world.carriages[0].id.clone();
     // Stand-in for the lumber camp and quarry the realm would have run first, and for the
@@ -178,8 +191,12 @@ fn scenario() -> Scenario {
 
     // The Leader stays home on the farm. The five strongest of the rest go: the strongest drives;
     // the others mine.
-    let mut rest: Vec<&csp_shared::world::Resident> =
-        world.residents.iter().filter(|r| r.owner.as_deref() == Some(realm.as_str())).skip(1).collect();
+    let mut rest: Vec<&csp_shared::world::Resident> = world
+        .residents
+        .iter()
+        .filter(|r| r.owner.as_deref() == Some(realm.as_str()))
+        .skip(1)
+        .collect();
     rest.sort_by(|a, b| {
         stat_value(b, StatName::Strength, 0.0).total_cmp(&stat_value(a, StatName::Strength, 0.0))
     });
@@ -227,7 +244,12 @@ fn runs_a_realm_through_the_night_with_a_far_iron_mine_and_a_haul_route() {
     s.shift(&miners[0], &[(Good::Wood, 20.0)], in_storage.clone(), on_carriage.clone());
     s.shift(&miners[1], &[(Good::Wood, 20.0)], in_storage.clone(), on_carriage.clone());
     s.shift(&miners[2], &[(Good::Stone, 20.0)], in_storage.clone(), on_carriage.clone());
-    s.shift(&miners[3], &[(Good::Food, HORSE_FOOD + MINERS_NIGHT_FOOD)], in_storage.clone(), on_carriage.clone());
+    s.shift(
+        &miners[3],
+        &[(Good::Food, HORSE_FOOD + MINERS_NIGHT_FOOD)],
+        in_storage.clone(),
+        on_carriage.clone(),
+    );
     for m in &miners {
         s.order(json!({ "kind": "pickUp", "residentId": m, "spot": in_storage, "goods": { "food": MINER_FOOD } }));
     }

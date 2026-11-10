@@ -48,8 +48,6 @@ pub mod node_gen;
 pub mod npc_behaviour;
 pub mod npc_chain;
 pub mod npc_cities;
-#[cfg(test)]
-mod poc_tests;
 pub mod npc_coins;
 pub mod npc_defence;
 pub mod npc_founding;
@@ -79,6 +77,8 @@ pub mod pathfinding;
 mod pending;
 pub mod persuasion;
 pub mod placing;
+#[cfg(test)]
+mod poc_tests;
 pub mod queries;
 pub mod queue;
 pub mod queues;

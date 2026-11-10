@@ -49,7 +49,9 @@ fn a_lumber_camp_160_tiles_from_home_keeps_six_workers_at_work_for_30_game_days_
     let si = world
         .buildings
         .iter()
-        .position(|b| b.city_id.as_deref() == Some(city.as_str()) && b.kind == BuildingKind::Storage)
+        .position(|b| {
+            b.city_id.as_deref() == Some(city.as_str()) && b.kind == BuildingKind::Storage
+        })
         .unwrap();
     world.buildings[si].stock = Some(Stock::from([(Good::Food, 2000.0)]));
     let (sx, sy) = (world.buildings[si].x, world.buildings[si].y);
@@ -74,8 +76,7 @@ fn a_lumber_camp_160_tiles_from_home_keeps_six_workers_at_work_for_30_game_days_
     for id in crew {
         // `villager`: an adult of the city at the storage, idle, with the set-out Food on them.
         let mut m = Mulberry32::new(world.residents.len() as f64 + 11.0);
-        let fields =
-            NewResident { id, owner: None, city_id: Some(&city), x: sx, y: sy, tick: 0.0 };
+        let fields = NewResident { id, owner: None, city_id: Some(&city), x: sx, y: sy, tick: 0.0 };
         let mut r = new_resident(&mut || m.next(), &fields, None);
         r.stats.strength = Stat { base: 10.0, trained: 0.0 };
         // Average Agility: they walk a Plains tile in `WALK_TICKS_PER_TILE`.
@@ -87,7 +88,9 @@ fn a_lumber_camp_160_tiles_from_home_keeps_six_workers_at_work_for_30_game_days_
     }
     let size = terrain.size;
     let at_camp = |r: &Resident| is_at((r.x as i32, r.y as i32), placed(&camp), size);
-    let of = |w: &csp_shared::world::WorldState, id: &str| w.residents.iter().find(|r| r.id == id).cloned();
+    let of = |w: &csp_shared::world::WorldState, id: &str| {
+        w.residents.iter().find(|r| r.id == id).cloned()
+    };
     let mut runner = Runner::new(&terrain);
     let mut arrived = false;
     let mut last_pile_food = 0.0;

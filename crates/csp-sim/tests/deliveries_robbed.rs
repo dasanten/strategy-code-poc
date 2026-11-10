@@ -46,7 +46,10 @@ mod robbed_caravans {
     fn send_what_was_taken_of_a_delivery_again_and_all_of_it_arrives() {
         let mut s = deliveries();
         let city = s.city.clone();
-        assert_eq!(s.order(json!({ "kind": "buy", "good": "iron", "units": 6, "cityId": city })), "ack");
+        assert_eq!(
+            s.order(json!({ "kind": "buy", "good": "iron", "units": 6, "cityId": city })),
+            "ack"
+        );
         let before = s.held(&s.storage, Good::Iron).unwrap_or(0.0);
         s.run_until(20_000, |w| step_is(w, CaravanJobStep::Deliver));
         let caravan = caravan_id(&s);
@@ -55,7 +58,9 @@ mod robbed_caravans {
         assert_matches(&job(&s.world), json!({ "units": 2, "robbed": 4 }));
         // The warehouse keeps nothing for it until the caravan has delivered the rest.
         assert_eq!(owed_by(&s.world, &warehouse_id(&s), Good::Iron), 0.0);
-        s.run_until(20_000, |w| w.events.iter().any(|e| serde_json::to_value(e).unwrap()["kind"] == "deliveryRobbed"));
+        s.run_until(20_000, |w| {
+            w.events.iter().any(|e| serde_json::to_value(e).unwrap()["kind"] == "deliveryRobbed")
+        });
         assert_matches(
             &s.events("deliveryRobbed", MARA),
             json!([{ "good": "iron", "units": 4, "cityId": city }]),

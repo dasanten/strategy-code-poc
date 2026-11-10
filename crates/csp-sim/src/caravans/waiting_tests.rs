@@ -45,8 +45,11 @@ fn a_waiting_horse_doesnt_go_down_nor_the_hqs_people_go_hungry_for_it() {
 
     // The storage holds only what the HQ's own people are left, so no carriage gets more than a
     // ration (`peopleKeep`).
-    let crew: std::collections::HashSet<String> =
-        w.caravans.iter().flat_map(|c| crew_ids_of(c.driver_id.as_deref(), &c.escort_ids)).collect();
+    let crew: std::collections::HashSet<String> = w
+        .caravans
+        .iter()
+        .flat_map(|c| crew_ids_of(c.driver_id.as_deref(), &c.escort_ids))
+        .collect();
     let people = w
         .residents
         .iter()
@@ -70,7 +73,9 @@ fn a_waiting_horse_doesnt_go_down_nor_the_hqs_people_go_hungry_for_it() {
     let hungry: Vec<&String> = w
         .residents
         .iter()
-        .filter(|r| r.city_id.as_deref() == Some(hq.as_str()) && !crew.contains(&r.id) && r.hunger < 20.0)
+        .filter(|r| {
+            r.city_id.as_deref() == Some(hq.as_str()) && !crew.contains(&r.id) && r.hunger < 20.0
+        })
         .map(|r| &r.id)
         .collect();
     assert_eq!(hungry, Vec::<&String>::new());
@@ -79,8 +84,8 @@ fn a_waiting_horse_doesnt_go_down_nor_the_hqs_people_go_hungry_for_it() {
 
 #[test]
 #[ignore = "88.7 s alone; see #1092"]
-fn its_carriages_wait_then_leave_with_enough_nobody_goes_down_on_the_first_legs_and_supply_goes_on(
-) {
+fn its_carriages_wait_then_leave_with_enough_nobody_goes_down_on_the_first_legs_and_supply_goes_on()
+{
     use crate::queries::city::town_hall_of;
     use crate::queries::names::{held, placed};
     use crate::queries::residents::is_down;
@@ -115,9 +120,19 @@ fn its_carriages_wait_then_leave_with_enough_nobody_goes_down_on_the_first_legs_
     let convoys: Vec<(String, String, Vec<String>)> = w
         .caravans
         .iter()
-        .map(|c| (c.id.clone(), c.carriage_id.clone(), crew_ids_of(c.driver_id.as_deref(), &c.escort_ids)))
+        .map(|c| {
+            (
+                c.id.clone(),
+                c.carriage_id.clone(),
+                crew_ids_of(c.driver_id.as_deref(), &c.escort_ids),
+            )
+        })
         .chain(w.traders.iter().map(|t| {
-            (t.id.clone(), t.carriage_id.clone(), crew_ids_of(t.driver_id.as_deref(), &t.escort_ids))
+            (
+                t.id.clone(),
+                t.carriage_id.clone(),
+                crew_ids_of(t.driver_id.as_deref(), &t.escort_ids),
+            )
         }))
         .collect();
     let hq_city = w.cities.iter().find(|c| c.id == hq).unwrap().clone();

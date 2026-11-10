@@ -51,11 +51,21 @@ fn hold_food_weapons_and_coins_over_many_game_days_and_their_people_do_not_starv
     world.nodes = nodes
         .iter()
         .enumerate()
-        .map(|(i, &(kind, x, y))| ResourceNode { id: format!("n{i}"), kind, x: x as f64, y: y as f64 })
+        .map(|(i, &(kind, x, y))| ResourceNode {
+            id: format!("n{i}"),
+            kind,
+            x: x as f64,
+            y: y as f64,
+        })
         .collect();
     let mut m = Mulberry32::new(11.0);
     found_trade_org_hq(&mut world, &terrain, MID, MID, &mut || m.next());
-    let sites = [(MID - 180, MID - 180), (MID + 180, MID - 180), (MID + 180, MID + 180), (MID - 180, MID + 180)];
+    let sites = [
+        (MID - 180, MID - 180),
+        (MID + 180, MID - 180),
+        (MID + 180, MID + 180),
+        (MID - 180, MID + 180),
+    ];
     let posts: Vec<String> = sites
         .into_iter()
         .map(|(x, y)| found_trading_post(&mut world, &terrain, x, y, None, &mut || m.next()))
@@ -73,7 +83,9 @@ fn hold_food_weapons_and_coins_over_many_game_days_and_their_people_do_not_starv
     let people = |w: &csp_shared::world::WorldState| -> Vec<usize> {
         posts
             .iter()
-            .map(|p| w.residents.iter().filter(|r| r.city_id.as_deref() == Some(p.as_str())).count())
+            .map(|p| {
+                w.residents.iter().filter(|r| r.city_id.as_deref() == Some(p.as_str())).count()
+            })
             .collect()
     };
     let born = people(&world);
@@ -85,7 +97,11 @@ fn hold_food_weapons_and_coins_over_many_game_days_and_their_people_do_not_starv
             step_world(&mut world, &terrain, &mut scratch, Some(&mut walking), None);
         }
         let made = scratch.made.take();
-        assert_eq!(goods_only_from_nothing_at_the_floor(&before, &world, &made), vec![], "day {day}");
+        assert_eq!(
+            goods_only_from_nothing_at_the_floor(&before, &world, &made),
+            vec![],
+            "day {day}"
+        );
         assert_eq!(check_all(&world, &terrain), [], "day {day}");
         assert_eq!(people(&world), born, "day {day}");
         if day < SETTLE_DAYS {
@@ -95,7 +111,9 @@ fn hold_food_weapons_and_coins_over_many_game_days_and_their_people_do_not_starv
             let warehouse = world
                 .buildings
                 .iter()
-                .find(|b| b.kind == BuildingKind::Warehouse && b.city_id.as_deref() == Some(post.as_str()))
+                .find(|b| {
+                    b.kind == BuildingKind::Warehouse && b.city_id.as_deref() == Some(post.as_str())
+                })
                 .unwrap();
             let stock = warehouse.stock.clone().unwrap_or_default();
             assert!(held(&stock, Good::Food) >= floor("food"), "day {day}, {post}: {stock:?}");

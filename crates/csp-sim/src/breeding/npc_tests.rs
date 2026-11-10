@@ -7,7 +7,7 @@ use std::sync::Arc;
 use csp_shared::balance::{OWN_FOOD, STABLE_BREED_DAYS};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{BuildingKind, Good, Stock};
-use serde_json::{json, Value};
+use serde_json::json;
 
 use crate::invariants::check_all;
 use crate::survival::end_realm;
@@ -46,7 +46,7 @@ fn have_one_of_their_residents_breed_their_horses_through_the_default_task() {
     let breeding = world
         .residents
         .iter()
-        .filter(|r| serde_json::to_value(&r.script).unwrap()["task"] == Value::from("breed"))
+        .filter(|r| serde_json::to_value(&r.script).unwrap()["task"] == "breed")
         .count();
     assert_eq!(breeding, 1);
     for _ in 0..(STABLE_BREED_DAYS * TICKS_PER_GAME_DAY) as usize + 500 {

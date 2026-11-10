@@ -215,8 +215,14 @@ impl Fixture {
             None => {
                 let realm = self.world.realms[0].id.clone();
                 let city = city_of(&self.world, &realm);
-                let mut thief =
-                    super::goods_support::drawn_resident(17.0, id, Some(&realm), Some(&city), 0.0, 0.0);
+                let mut thief = super::goods_support::drawn_resident(
+                    17.0,
+                    id,
+                    Some(&realm),
+                    Some(&city),
+                    0.0,
+                    0.0,
+                );
                 thief.born_at = -20.0 * 24.0 * 3600.0;
                 self.world.residents.push(thief);
                 self.world.residents.len() - 1

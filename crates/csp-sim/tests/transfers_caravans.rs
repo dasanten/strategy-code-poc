@@ -40,8 +40,8 @@ mod caravans_carrying_out_transfers {
 
     #[test]
     #[ignore = "21.7 s alone; see #1092"]
-    fn turn_back_from_a_recipient_behind_closed_gates_the_warehouse_keeping_it_for_the_next_caravan()
-    {
+    fn turn_back_from_a_recipient_behind_closed_gates_the_warehouse_keeping_it_for_the_next_caravan(
+    ) {
         let mut s = setup();
         let storage = s.storage.clone();
         s.set(&storage, Good::Iron, Some(40.0));

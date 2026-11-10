@@ -277,6 +277,6 @@ fn new_foal(world: &mut WorldState, si: usize, a: &Horse, b: &Horse) -> Horse {
 }
 
 #[cfg(test)]
-mod tests;
-#[cfg(test)]
 mod npc_tests;
+#[cfg(test)]
+mod tests;

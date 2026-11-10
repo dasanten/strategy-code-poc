@@ -68,18 +68,16 @@ fn carry_stock_from_the_hq_to_the_post_and_back_evening_out_with_the_escort_alon
         if c.stop == CaravanStop::Warehouse || c.heading == Heading::Post {
             for id in &c.escort_ids {
                 let r = world.residents.iter().find(|x| &x.id == id).unwrap();
-                let d = wrap_distance(
-                    terrain.size,
-                    (r.x as i32, r.y as i32),
-                    (k.x as i32, k.y as i32),
-                );
+                let d =
+                    wrap_distance(terrain.size, (r.x as i32, r.y as i32), (k.x as i32, k.y as i32));
                 farthest = farthest.max(d);
             }
         }
         if t % 500 == 0 {
             assert_eq!(check_all(&world, &terrain), []);
         }
-        let post_wood = world.buildings[post_wh].stock.as_ref().map_or(0.0, |s| held(s, Good::Wood));
+        let post_wood =
+            world.buildings[post_wh].stock.as_ref().map_or(0.0, |s| held(s, Good::Wood));
         if c.heading == Heading::Hq && post_wood > 30.0 {
             reached_post = true;
         }
