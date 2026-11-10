@@ -92,6 +92,42 @@ fn printable(value: &Value) -> Json {
     }
 }
 
+/// The cases whose run declares functions, each by a piece of its source found in it alone, and
+/// how many declarations its run went through. The TypeScript charged a step for each; since
+/// T89.5 declaring a function costs none (`CONTEXT.md`: Step budget, Daniel, 2026-11-10), so the
+/// frozen result of each stands with its steps less that many, and nothing else changes. The
+/// fixture file itself stays as the TypeScript wrote it (ADR 0030).
+const FREE_DECLARATIONS: &[(&str, u64)] = &[
+    ("fn go(target) { return target + n + later + helper() }", 2),
+    ("fn move(a) { return a }\nmove(1)", 1),
+    ("fn f(h) { return h.whatever }", 1),
+    ("fn add(a, b) { return a + b }\nlet f = fn () { return }", 1),
+    ("fn f() { return\n1 }", 1),
+    ("fn f(a) { for (x of a) { while (x) { x = {k: [x]} } } }", 1),
+    ("out(add(2, 3)); fn add(a, b) { return a + b }", 1),
+    ("fn f(a, b) { out(b) } out(f(1))", 1),
+    ("fn f(a) {} f(1, 2)", 1),
+    ("fn counter() { let n = 0; return fn () { n = n + 1; return n } }", 1),
+    ("out(fib(15)); fn fib(n)", 1),
+    ("out(first([4, 5])); fn first(l) { for (x of l) { return x } }", 1),
+    ("fn f() { return f() } f()", 1),
+    ("let param = 1\nparam = param + 1\nfn f(param) { return param }", 1),
+];
+
+/// The frozen TypeScript result of a run, with the steps of the declarations it went through
+/// taken off (`FREE_DECLARATIONS`); `found` counts the cases each entry matched.
+fn expected_result(source: &str, typescript: &Json, found: &mut [usize]) -> Json {
+    let mut expected = typescript.clone();
+    for (i, (piece, declarations)) in FREE_DECLARATIONS.iter().enumerate() {
+        if source.contains(piece) {
+            found[i] += 1;
+            let steps = expected["steps"].as_u64().expect("a run's steps");
+            expected["steps"] = json!(steps - declarations);
+        }
+    }
+    expected
+}
+
 fn syntax_error(error: &csp_lang::ScriptSyntaxError) -> Json {
     json!({ "message": error.message, "line": error.line, "column": error.column })
 }
@@ -123,6 +159,7 @@ fn every_lang_fixture_case_matches_the_typescript() {
     assert!(!cases.is_empty());
     let mut failures = Vec::new();
     let mut ran = 0;
+    let mut found = vec![0; FREE_DECLARATIONS.len()];
     for case in cases {
         let source = case["source"].as_str().unwrap();
         let mut differs = |what: &str, actual: Json, expected: &Json| {
@@ -169,7 +206,8 @@ fn every_lang_fixture_case_matches_the_typescript() {
                 Ok(Value::Null)
             });
             let result = run(program, &mut globals, &options).expect("no host failure");
-            differs("run result", serde_json::to_value(&result).unwrap(), &expected["result"]);
+            let expected_result = expected_result(source, &expected["result"], &mut found);
+            differs("run result", serde_json::to_value(&result).unwrap(), &expected_result);
             differs("printed", Json::Array(printed.borrow().clone()), &expected["printed"]);
         }
     }
@@ -181,4 +219,8 @@ fn every_lang_fixture_case_matches_the_typescript() {
         failures.join("\n")
     );
     assert!(ran > 0, "no case ran");
+    // Each case with free declarations is one case, and still in the file.
+    for ((piece, _), n) in FREE_DECLARATIONS.iter().zip(&found) {
+        assert_eq!(*n, 1, "{piece:?} is in {n} cases");
+    }
 }

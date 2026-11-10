@@ -357,6 +357,46 @@ mod step_budget {
         assert_eq!(exec("let x = 1").result.steps(), 2);
     }
 
+    /// `CONTEXT.md`: Step budget (Daniel, 2026-11-10): declaring a function costs no step,
+    /// calling it does.
+    #[test]
+    fn declaring_a_function_costs_no_step_and_calling_it_does() {
+        let declarations = "fn a() {}\nfn b(x) { return x }\nfn c() { out(1) }";
+        assert_eq!(exec(declarations).result, RunResult::Done { steps: 0 });
+        // Declarations alone never run out of steps, even on a budget of none.
+        assert_eq!(
+            exec_with(declarations, with_steps(0), |_| {}).result,
+            RunResult::Done { steps: 0 }
+        );
+        // In a block, the block is the one step.
+        assert_eq!(exec("{ fn a() {} fn b() {} }").result.steps(), 1);
+        // A call: its statement, the call, the name, the body's block, the return, the number.
+        assert_eq!(exec("fn a() { return 1 }\na()").result.steps(), 6);
+        // The same as calling a function value, which costs its let and the value on top.
+        assert_eq!(exec("let a = fn () { return 1 }\na()").result.steps(), 6 + 2);
+        // A function declared and never called adds nothing.
+        assert_eq!(exec("fn a() { return 1 }\nfn unused() { return 2 }\na()").result.steps(), 6);
+    }
+
+    #[test]
+    fn a_declared_function_is_one_function_however_often_it_is_read_and_can_be_assigned_over() {
+        let Exec { printed, .. } = exec("let g = f\nout(g == f)\nfn f() {}\nf = 3\nout(f)");
+        assert_eq!(jsons(&printed), json!([true, 3]));
+        let Exec { printed, .. } = exec("fn f() {}\nf = 3\nout(f)");
+        assert_eq!(jsons(&printed), json!([3]));
+    }
+
+    #[test]
+    fn still_refuses_a_name_declared_twice_in_a_block_where_it_starts() {
+        let twice = exec("out(1)\nfn f() {}\nfn f() {}");
+        assert_eq!(status(&twice.result), "error");
+        let RunResult::Error { message, line, column, .. } = &twice.result else { unreachable!() };
+        assert_eq!((message.as_str(), *line, *column), ("\"f\" is already declared here", 3, 1));
+        // Refused as the block starts, before anything in it ran.
+        assert_eq!(jsons(&twice.printed), json!([]));
+        assert_eq!(error("fn f() {}\nlet f = 1"), "\"f\" is already declared here");
+    }
+
     #[test]
     fn charges_a_native_function_its_cost_on_top() {
         let Exec { result, .. } = exec_with("attack()", options(), |g| {
