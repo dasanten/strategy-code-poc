@@ -2,13 +2,13 @@
 //! anchor), for one full gold mine and the mint that strikes all it digs, with average workers of
 //! no skill. Balance numbers only, so no game time.
 
+use csp_shared::balance::Recipe;
 use csp_shared::balance::{
     NpcCitySize, BATCHES_PER_DAY, BUY_SHARE, CARRY_BASE, CARRY_PER_STRENGTH,
     CITY_PRICE_PER_RESIDENT, DIRECTIVE_BUY_OFF_PRICE, DIRECTIVE_PUNISH_WORTH, GOOD_WEIGHT,
     NPC_TOWN, NPC_VILLAGE, RECIPES, TRADE_ORG_LOSS, TRADE_ORG_PUNISH, WAREHOUSE_BASE_PRICE,
     WORKPLACE_MAX_WORKERS, WORKPLACE_WRECK_WORTH, WORK_OUTPUT_PER_DAY, WORK_STRENGTH_AVERAGE,
 };
-use csp_shared::balance::Recipe;
 use csp_shared::terrain::{Terrain, TerrainMap};
 use csp_sim::npc_cities::found_npc_city;
 use csp_sim::queries::city::city_price;
@@ -125,7 +125,7 @@ fn takes_as_much_for_an_admin_directive_as_for_a_killing() {
 #[test]
 fn offers_to_be_bought_off_for_what_an_average_residents_hands_can_bring() {
     assert!(DIRECTIVE_BUY_OFF_PRICE * GOOD_WEIGHT.get("coins").unwrap() <= average_hands());
-    assert!(DIRECTIVE_BUY_OFF_PRICE > DIRECTIVE_PUNISH_WORTH);
+    const { assert!(DIRECTIVE_BUY_OFF_PRICE > DIRECTIVE_PUNISH_WORTH) };
 }
 
 #[test]

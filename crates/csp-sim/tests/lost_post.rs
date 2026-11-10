@@ -298,7 +298,7 @@ fn drops_it_from_its_loop_goes_on_and_only_the_news_it_brings_causes_the_reactio
     f.put(&trader, &other, ox, oy);
     f.crimes();
     let crime = f.capture_of(&post).unwrap();
-    assert_eq!(crime.known_by, [crime.victim_org.clone()]);
+    assert_eq!(crime.known_by, std::slice::from_ref(&crime.victim_org));
     assert!(crime.witnesses.is_empty());
     assert_eq!(f.regard(), -CRIME_STANDING_LOSS.capture);
     // A debt for its worth, and no army of its own (`CONTEXT.md`: Trade Org debt).
@@ -317,8 +317,13 @@ fn drops_it_from_its_loop_goes_on_and_only_the_news_it_brings_causes_the_reactio
 #[test]
 fn tells_the_hq_just_the_same() {
     let mut f = fixture();
-    let (post, other, trader, leader, hq) =
-        (f.posts[0].clone(), f.posts[1].clone(), f.traders[0].clone(), f.leader.clone(), f.hq.clone());
+    let (post, other, trader, leader, hq) = (
+        f.posts[0].clone(),
+        f.posts[1].clone(),
+        f.traders[0].clone(),
+        f.leader.clone(),
+        f.hq.clone(),
+    );
     f.capture(&post, &leader);
     let (hx, hy) = f.hall(&post);
     f.put(&trader, &post, hx, hy);
@@ -355,8 +360,7 @@ fn remembers_it_from_when_the_news_came_however_long_the_post_stood_lost() {
 
 #[test]
 #[ignore = "22.6 s alone; see #1092"]
-fn drives_up_to_it_and_finds_out_running_the_whole_world_and_the_news_comes_in_by_the_next_post()
-{
+fn drives_up_to_it_and_finds_out_running_the_whole_world_and_the_news_comes_in_by_the_next_post() {
     let mut f = fixture();
     let (post, trader, leader) = (f.posts[0].clone(), f.traders[0].clone(), f.leader.clone());
     f.capture(&post, &leader);
@@ -528,7 +532,7 @@ fn bystander(f: &mut Fixture, post: &str) -> String {
         .clone();
     let (hx, hy) = f.hall(post);
     let r = f.r_mut(&id);
-    r.x = hx + f64::from(SIGHT_RANGE);
+    r.x = hx + SIGHT_RANGE;
     r.y = hy;
     id
 }
@@ -640,9 +644,7 @@ fn catch_a_capture_kept_with_no_way_left_to_hear_of_it_or_naming_no_post() {
     changed.post = None;
     f.world.crimes = vec![changed];
     let messages: Vec<String> = f.crimes_sound().into_iter().map(|v| v.message).collect();
-    let want = format!(
-        "crime {} names a post without being a capture, or the other way round",
-        crime.id
-    );
+    let want =
+        format!("crime {} names a post without being a capture, or the other way round", crime.id);
     assert!(messages.contains(&want), "{messages:?}");
 }

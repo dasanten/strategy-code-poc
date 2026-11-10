@@ -125,7 +125,9 @@ impl Staged {
     }
 
     fn remove_walls(&mut self) {
-        self.world.buildings.retain(|b| b.kind != BuildingKind::Wall && b.kind != BuildingKind::Gate);
+        self.world
+            .buildings
+            .retain(|b| b.kind != BuildingKind::Wall && b.kind != BuildingKind::Gate);
     }
 
     /// Those of `ids` not set off on a round (`npc-patrols.test.ts`) by the city's pass
@@ -300,8 +302,11 @@ fn keeps_one_on_the_hall_when_those_on_it_are_called_away() {
     let mut s = staged(10, 40.0);
     s.pass();
     s.arrive();
-    let on_hall: Vec<usize> =
-        s.soldiers().into_iter().filter(|&i| s.on_hall(s.tile_of(&s.world.residents[i].id))).collect();
+    let on_hall: Vec<usize> = s
+        .soldiers()
+        .into_iter()
+        .filter(|&i| s.on_hall(s.tile_of(&s.world.residents[i].id)))
+        .collect();
     assert_eq!(on_hall.len(), NPC_SOLDIERS_ON_HALL as usize);
     let alarm: Alarm = serde_json::from_value(json!({
         "kind": "outsider", "cityId": s.city, "about": "x", "realmId": null, "x": 0, "y": 0,
@@ -410,14 +415,8 @@ fn armed_outsider(world: &mut WorldState, at: (f64, f64)) -> String {
     let tick = world.tick as f64;
     let make = |world: &mut WorldState, id: &str, x: f64, y: f64| {
         let mut m = Mulberry32::new(world.residents.len() as f64 + 1.0);
-        let fields = csp_sim::residents::NewResident {
-            id,
-            owner: Some("r1"),
-            city_id: None,
-            x,
-            y,
-            tick,
-        };
+        let fields =
+            csp_sim::residents::NewResident { id, owner: Some("r1"), city_id: None, x, y, tick };
         let mut r = csp_sim::residents::new_resident(&mut || m.next(), &fields, None);
         r.born_at = tick - 20.0 * 24.0 * 3600.0;
         r.lifespan = 60.0;
@@ -458,7 +457,8 @@ fn an_alarm_takes_them_off_their_posts_to_the_hall_and_they_go_back() {
     let walls: Vec<Building> =
         s.world.buildings.iter().filter(|b| b.kind == BuildingKind::Wall).cloned().collect();
     let soldiers = s.soldier_ids();
-    let on_wall = |s: &Staged, id: &str| walls.iter().any(|w| is_at(s.tile_of(id), placed(w), SIZE));
+    let on_wall =
+        |s: &Staged, id: &str| walls.iter().any(|w| is_at(s.tile_of(id), placed(w), SIZE));
     let until = |s: &mut Staged, running: &mut Running, done: &dyn Fn(&Staged) -> bool| {
         for _ in 0..TICKS_PER_GAME_DAY as usize {
             if done(s) {

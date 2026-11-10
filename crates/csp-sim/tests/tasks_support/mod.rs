@@ -19,8 +19,8 @@ use csp_sim::order_sender::OrderSender;
 use csp_sim::orders::{order_kinds, OrderKinds, OrderQueue, OrderReply};
 use csp_sim::script_params::SetScriptParamOrder;
 use csp_sim::script_runner::{
-    ArmyRunScriptOrder, DefaultScriptHost, RunScriptOrder, ScriptHost, ScriptRunner, SetAlarmScriptOrder,
-    SetDefenceScriptOrder, TaskOrder,
+    ArmyRunScriptOrder, DefaultScriptHost, RunScriptOrder, ScriptHost, ScriptRunner,
+    SetAlarmScriptOrder, SetDefenceScriptOrder, TaskOrder,
 };
 use csp_sim::scripts::{RunnableScript, ScriptLibrary};
 use csp_sim::sight::InvariantViolation;
@@ -186,7 +186,13 @@ impl Game {
 
     /// One `stepWorld` with walking.
     pub fn step(&mut self) {
-        step_world(&mut self.world, &self.terrain, &mut self.scratch, Some(&mut self.walking), None);
+        step_world(
+            &mut self.world,
+            &self.terrain,
+            &mut self.scratch,
+            Some(&mut self.walking),
+            None,
+        );
     }
 
     /// Sends an order as `sender`, to be applied as the next tick begins; the answer must be an

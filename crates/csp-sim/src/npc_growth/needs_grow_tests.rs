@@ -26,7 +26,9 @@ use crate::npc_test_world::plains;
 use crate::queries::building::max_workers;
 use crate::queries::city::city_residents;
 use crate::queries::names::held;
-use crate::queries::npc_trade::{is_big_npc_city, npc_needs_scale, npc_reserve, npc_soldier_target};
+use crate::queries::npc_trade::{
+    is_big_npc_city, npc_needs_scale, npc_reserve, npc_soldier_target,
+};
 use crate::queries::residents::can_work;
 use crate::random::{new_id, Mulberry32};
 use crate::world::create_world;
@@ -180,7 +182,10 @@ impl T {
     }
 
     fn crew(&self, place: &str) -> Vec<String> {
-        self.residents().into_iter().filter(|id| self.works_at(id).as_deref() == Some(place)).collect()
+        self.residents()
+            .into_iter()
+            .filter(|id| self.works_at(id).as_deref() == Some(place))
+            .collect()
     }
 }
 

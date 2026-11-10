@@ -5,10 +5,10 @@
 mod goods_support;
 mod tasks_support;
 
+use csp_lang::interpreter::Host as _;
 use csp_shared::balance::{SCRIPT_REALM_STEP_BUDGET, SCRIPT_STEP_BUDGET};
 use csp_shared::time::TICKS_PER_GAME_YEAR;
 use csp_shared::world::{Army, ArmyOrder, OrderRequest};
-use csp_lang::interpreter::Host as _;
 use csp_sim::armies::ArmyOrderKind;
 use csp_sim::order_sender::OrderSender;
 use csp_sim::orders::OrderReply;
@@ -54,7 +54,9 @@ fn setup() -> Game {
 }
 
 fn army(id: &str, name: &str, realm_id: &str, members: &[&str]) -> Army {
-    from(json!({ "id": id, "name": name, "realmId": realm_id, "memberIds": members, "order": null }))
+    from(
+        json!({ "id": id, "name": name, "realmId": realm_id, "memberIds": members, "order": null }),
+    )
 }
 
 fn the_army(g: &Game) -> &Army {
@@ -343,7 +345,14 @@ fn invariant_an_armys_script_requests_only_its_own_army_orders() {
     let found: Vec<_> = bad
         .iter()
         .flat_map(|o| {
-            army_script_requests_sound(&g.world, &g.terrain, &sender(), "army1", &[request(o.clone())], &kinds)
+            army_script_requests_sound(
+                &g.world,
+                &g.terrain,
+                &sender(),
+                "army1",
+                &[request(o.clone())],
+                &kinds,
+            )
         })
         .collect();
     assert_eq!(found.len(), bad.len(), "{found:?}");
@@ -359,8 +368,7 @@ fn invariant_an_armys_running_script_is_sound() {
     let mut g = setup();
     let tick = g.world.tick;
     let army = g.world.armies.iter_mut().find(|a| a.id == "army1").unwrap();
-    army.script =
-        Some(from(json!({ "scriptId": 0, "memory": {}, "errorLoggedAt": tick + 5 })));
+    army.script = Some(from(json!({ "scriptId": 0, "memory": {}, "errorLoggedAt": tick + 5 })));
     let messages: Vec<String> =
         running_scripts_sound(&g.world).into_iter().map(|v| v.message).collect();
     assert_eq!(
