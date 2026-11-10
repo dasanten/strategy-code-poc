@@ -21,7 +21,7 @@ use crate::world::{create_world, step_world};
 const MID: i32 = 320;
 
 #[test]
-#[ignore = "86.7 s alone; see #1092"]
+#[ignore = "73.9 s alone; see #1092"]
 fn left_alone_keeps_itself_fed_over_seven_game_weeks() {
     // The HQ alone on a Plains map 640 across, with one node of each kind near it (`hq`).
     let mut terrain = plains(640);

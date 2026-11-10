@@ -202,7 +202,7 @@ fn scenario() -> Scenario {
 }
 
 #[test]
-#[ignore = "timed in the PR"]
+#[ignore = "14.9 s alone; see #1092"]
 fn runs_a_realm_through_the_night_with_a_far_iron_mine_and_a_haul_route() {
     let mut s = scenario();
     let (driver, miners, crew) = (s.driver.clone(), s.miners.clone(), s.crew());

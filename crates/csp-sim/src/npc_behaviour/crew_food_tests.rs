@@ -38,7 +38,7 @@ fn memory<'r>(r: &'r Resident, k: &str) -> Option<&'r Value> {
 }
 
 #[test]
-#[ignore = "76.6 s alone; see #1092"]
+#[ignore = "79.8 s alone; see #1092"]
 fn a_lumber_camp_160_tiles_from_home_keeps_six_workers_at_work_for_30_game_days_only_the_carrier_leaving(
 ) {
     // `village(400)`.

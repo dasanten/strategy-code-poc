@@ -14,7 +14,7 @@ use serde_json::json;
 use transfers_fixture::{deliveries, MARA};
 
 #[test]
-#[ignore = "24.3 s alone; see #1092"]
+#[ignore = "17.9 s alone; see #1092"]
 fn a_caravan_collecting_a_pick_up_leaves_them_alone_and_no_theft_comes_of_it() {
     let mut s = deliveries();
     let (storage, city, realm) = (s.storage.clone(), s.city.clone(), s.realm.clone());
