@@ -15,17 +15,19 @@ use csp_shared::world::{
     OrderRequest, RealmEventWhat, WorldState,
 };
 
+use crate::armies::leave_armies;
+use crate::events::record_event;
+use crate::order_sender::{realm_of, OrderSender};
+use crate::orders::{str_field, OrderKind};
+use crate::queries::alliance::realm_name;
 use crate::queries::alliance::{alliance_of, carriage_commander_of, commander_of, handed_over_to};
 use crate::queries::alliance_rules::{
     is_alliance_city, npc_city_accepts, npc_city_wants_out, ALLIANCE_NAME_MAX_LENGTH,
 };
 use crate::queries::carriages::driven_carriage_id;
 use crate::queries::residents::is_armed;
+use crate::queries::standing::organization_label;
 use crate::random::new_id;
-use crate::realm_pending::{
-    leave_armies, organization_label, realm_name, realm_of, record_event, str_field, OrderKind,
-    OrderSender,
-};
 
 type Check = fn(&WorldState, &str, &OrderRequest) -> Option<String>;
 type Act = fn(&mut WorldState, &str, &OrderRequest);

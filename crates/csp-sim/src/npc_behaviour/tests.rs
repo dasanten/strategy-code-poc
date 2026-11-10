@@ -81,7 +81,7 @@ fn order(v: serde_json::Value) -> Option<ResidentOrder> {
 }
 
 #[test]
-#[ignore = "a slow simulation (70 game days): T86.14 ports it under 5 s"]
+#[ignore = "45.7 s alone; see #1092"]
 fn a_village_left_alone_survives_ten_game_weeks() {
     let (mut world, terrain, city) = village();
     let mut runner = Runner::new(&terrain);
@@ -100,7 +100,7 @@ fn a_village_left_alone_survives_ten_game_weeks() {
 }
 
 #[test]
-#[ignore = "8 s (5 game days of one village): the NPC scripts cost ~70 µs a run to bind and interpret; T86.14 makes it fast"]
+#[ignore = "6.2 s alone; see #1092"]
 fn carries_the_farms_output_to_the_storage() {
     let (mut world, terrain, city) = village();
     let mut runner = Runner::new(&terrain);

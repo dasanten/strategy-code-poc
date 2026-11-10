@@ -11,11 +11,11 @@ use csp_shared::world::{
 };
 use serde_json::json;
 
-use crate::movement_pending::{wall_map, walls_key};
 use crate::movement_test_world::{add_city, building, order_from, plains, realm, resident};
 use crate::pathfinding::{PathFinder, PathOptions, PathResult, Point, WALKING_COSTS};
 use crate::tick::Scratch;
 use crate::walking::{StepAction, Walking};
+use crate::walls::{wall_map, walls_key};
 use crate::world::create_world;
 
 const GATE: (f64, f64) = (8.0, 11.0);

@@ -352,7 +352,7 @@ fn groups_realms_standing_together() {
         realms_standing_together(&world),
         vec![vec![realm(MARA), realm(TOBIN), realm(WREN)], vec![realm(ASH)]]
     );
-    assert_eq!(crate::realm_pending::realm_name(&world, &realm(MARA)), "Name of leader1");
+    assert_eq!(crate::queries::alliance::realm_name(&world, &realm(MARA)), "Name of leader1");
 }
 
 #[test]

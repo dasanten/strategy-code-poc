@@ -1,20 +1,24 @@
 //! The Horse grant and the Horse offer (`apps/server/src/horse-grant.ts`, `CONTEXT.md`: Horse
 //! grant, Horse offer): new horses for a Player realm, in its stable or by its storage or Leader.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use csp_shared::balance::{HORSE_GRANT_FOOD, HORSE_GRANT_HORSES};
-use csp_shared::footprint::{footprint_keys, middle_of, FOOTPRINT};
+use csp_shared::footprint::{middle_of, FOOTPRINT};
 use csp_shared::terrain::{wrap, wrap_distance, TerrainMap};
 use csp_shared::world::{
     BuildingKind, Good, HorsesWhere, OrderRequest, Pile, Realm, RealmEventWhat, WorldState,
 };
 
+use crate::events::record_event;
 use crate::horses::{new_horse, NewHorse};
-use crate::movement_pending::{realm_of, record_event, OrderKind, OrderSender};
+use crate::order_sender::{realm_of, OrderSender};
+use crate::orders::OrderKind;
+use crate::placing::Ground;
 use crate::queries::names::placed;
 use crate::random::{new_id, Mulberry32};
 use crate::sight::InvariantViolation;
+use crate::starting_city::resident_tiles;
 use crate::world::is_walkable;
 
 /// How far out from the storage or the Leader the grant looks for free tiles, in rings.
@@ -234,20 +238,7 @@ fn free_tiles_around(
     terrain: &TerrainMap,
     (ax, ay, side): (i32, i32, i32),
 ) -> Vec<(i32, i32)> {
-    // TODO(T86.5): `placing::Ground` (`free`, `node_at`); TODO(T86.8): `starting_city::resident_tiles`.
-    let mut taken: HashSet<String> = HashSet::new();
-    for b in &world.buildings {
-        if b.kind != BuildingKind::Road {
-            taken.extend(footprint_keys(placed(b), terrain.size));
-        }
-    }
-    let nodes: HashMap<String, ()> =
-        world.nodes.iter().map(|n| (format!("{},{}", n.x, n.y), ())).collect();
-    let at = |x: f64, y: f64| format!("{x},{y}");
-    taken.extend(world.residents.iter().map(|e| at(e.x, e.y)));
-    taken.extend(world.horses.iter().map(|e| at(e.x, e.y)));
-    taken.extend(world.carriages.iter().map(|e| at(e.x, e.y)));
-    taken.extend(world.piles.iter().map(|e| at(e.x, e.y)));
+    let ground = Ground::new(world, terrain, resident_tiles(world));
     let mut out = Vec::new();
     for ring in 1..=GRANT_REACH {
         for dy in -ring..side + ring {
@@ -258,8 +249,10 @@ fn free_tiles_around(
                     continue;
                 }
                 let (x, y) = (wrap(ax + dx, terrain.size), wrap(ay + dy, terrain.size));
-                let key = format!("{x},{y}");
-                if !is_walkable(terrain, x, y) || taken.contains(&key) || nodes.contains_key(&key) {
+                if !is_walkable(terrain, x, y)
+                    || !ground.free(x, y)
+                    || ground.node_at(x, y).is_some()
+                {
                     continue;
                 }
                 out.push((x, y));
@@ -302,7 +295,7 @@ mod tests {
     fn a_claim_needs_a_living_leader_and_counts_once() {
         let map = plains(16);
         let mut world = world_with_realm(&map);
-        let me = OrderSender { user_id: 7, npc_city_id: None };
+        let me = OrderSender::player(7, "Player");
         let claim: OrderRequest =
             serde_json::from_value(serde_json::json!({"kind": "claimHorses"})).expect("an order");
         assert_eq!(

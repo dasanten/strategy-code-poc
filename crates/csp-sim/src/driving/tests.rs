@@ -16,10 +16,10 @@ use serde_json::json;
 
 use super::*;
 use crate::horses::{step_horses, HORSE_DOWN_TICKS};
-use crate::movement_pending::OrderSender;
 use crate::movement_test_world::{
     carriage, draw, horse, order, order_from, resident, walk_out, world_with_realm,
 };
+use crate::order_sender::OrderSender;
 use crate::queries::carriages::carriage_capacity;
 use crate::queries::names::held;
 use crate::queries::pace::{drive_speed, horse_speed_factor};
@@ -68,7 +68,7 @@ fn drive_order(o: serde_json::Value) -> serde_json::Value {
 fn needs_an_adult_of_the_player_on_their_own_carriages_tile_with_a_horse_there() {
     let map = open();
     let mut world = setup(&map, 2.0, 2.0);
-    let sender = OrderSender { user_id: 7, npc_city_id: None };
+    let sender = OrderSender::player(7, "Player");
     let check = |world: &WorldState, o: serde_json::Value| {
         let o: OrderRequest = serde_json::from_value(drive_order(o)).expect("an order");
         Drive.validate(world, &sender, &o, Some(&map))
@@ -108,7 +108,7 @@ fn refuses_a_target_in_the_mountains_and_a_carriage_someone_else_drives() {
     let map = draw(&rows.iter().map(String::as_str).collect::<Vec<_>>());
     let mut world = setup(&map, 2.0, 2.0);
     world.residents.push(resident("w2", Some("r1"), 2.0, 2.0));
-    let sender = OrderSender { user_id: 7, npc_city_id: None };
+    let sender = OrderSender::player(7, "Player");
     let o = |id: &str, y: f64| -> OrderRequest {
         serde_json::from_value(
             json!({"kind": "drive", "residentId": id, "carriageId": "k1", "x": 2, "y": y}),
