@@ -168,6 +168,32 @@ struct Binding {
     constant: bool,
 }
 
+thread_local! {
+    /// Function names already made, by where the program holds them. A program run every tick
+    /// (an NPC default) declares the same functions each run: they share their name rather than
+    /// copying it each time (T89.6). Checked against the text, so a program freed and another
+    /// put where it was costs only a new copy.
+    static NAMES: std::cell::RefCell<std::collections::HashMap<(usize, usize), Rc<str>>> =
+        std::cell::RefCell::default();
+}
+
+/// The function name `name` as a shared string, the same one each run of its program.
+fn shared_name(name: &str) -> Rc<str> {
+    NAMES.with(|names| {
+        let mut names = names.borrow_mut();
+        let at = (name.as_ptr() as usize, name.len());
+        if let Some(shared) = names.get(&at).filter(|s| ***s == *name) {
+            return shared.clone();
+        }
+        if names.len() >= 4096 {
+            names.clear();
+        }
+        let shared: Rc<str> = Rc::from(name);
+        names.insert(at, shared.clone());
+        shared
+    })
+}
+
 /// The global scope, where the host's globals are kept once read.
 const GLOBALS: usize = 0;
 
@@ -280,7 +306,7 @@ impl<'p> Interpreter<'p, '_> {
         Value::Function(ScriptFunction(Rc::new(FunctionHandle {
             run: self.run.clone(),
             index: self.functions.len() - 1,
-            name: name.to_string(),
+            name: shared_name(name),
         })))
     }
 

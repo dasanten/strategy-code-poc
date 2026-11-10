@@ -6,6 +6,7 @@ use std::collections::{HashMap, HashSet};
 
 use csp_shared::balance::LAST_SEEN_EVERY_TICKS;
 use csp_shared::footprint::Placed;
+use csp_shared::protocol::SeenEntity;
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{Remembered, WorldState};
 use serde_json::Value;
@@ -101,6 +102,16 @@ fn seen_at_mut(e: &mut Remembered) -> &mut f64 {
     }
 }
 
+/// The `id` of something in sight as its plain data gives it: a building's or a city's own, which
+/// their plain data holds flattened, read without making that data each tick (T89.6).
+fn seen_id(e: &SeenEntity) -> Option<String> {
+    match e {
+        SeenEntity::Building(b) => Some(b.building.id.clone()),
+        SeenEntity::City(c) => Some(c.city.id.clone()),
+        _ => serde_json::to_value(e).ok()?.get("id")?.as_str().map(str::to_owned),
+    }
+}
+
 /// A remembered building or city as JSON, `seenAt` aside (`jsonOf`).
 fn json_of(e: &Remembered) -> Value {
     let mut v = serde_json::to_value(e).unwrap_or(Value::Null);
@@ -140,12 +151,7 @@ pub fn refresh_last_seen(
         }
         // `new Map(before.map(...))`, keeping the order things were first remembered in.
         let mut memory: Vec<Remembered> = before;
-        let in_sight: HashSet<String> = places
-            .seen
-            .iter()
-            .filter_map(|e| serde_json::to_value(e).ok())
-            .filter_map(|v| v.get("id").and_then(|i| i.as_str()).map(str::to_owned))
-            .collect();
+        let in_sight: HashSet<String> = places.seen.iter().filter_map(seen_id).collect();
         // Its spot is in sight again and it is not there any more.
         memory.retain(|e| match placed_of(e) {
             Some(p) => in_sight.contains(id_of(e)) || !places.sees(p),
@@ -210,12 +216,7 @@ pub fn last_seen_out_of_sight(
     if !places.looking {
         return memory;
     }
-    let in_sight: HashSet<String> = places
-        .seen
-        .iter()
-        .filter_map(|e| serde_json::to_value(e).ok())
-        .filter_map(|v| v.get("id").and_then(|i| i.as_str()).map(str::to_owned))
-        .collect();
+    let in_sight: HashSet<String> = places.seen.iter().filter_map(seen_id).collect();
     memory
         .into_iter()
         .filter(|e| !in_sight.contains(id_of(e)) && !placed_of(e).is_some_and(|p| places.sees(p)))
@@ -273,12 +274,7 @@ pub fn last_seen_in_sight(
 ) -> Vec<InvariantViolation> {
     let index = WorldIndex::new(world, terrain.size);
     let places = places_in_sight(world, &index, realm_id, None, None);
-    let in_sight: HashSet<String> = places
-        .seen
-        .iter()
-        .filter_map(|e| serde_json::to_value(e).ok())
-        .filter_map(|v| v.get("id").and_then(|i| i.as_str()).map(str::to_owned))
-        .collect();
+    let in_sight: HashSet<String> = places.seen.iter().filter_map(seen_id).collect();
     sent.iter()
         .filter(|e| in_sight.contains(id_of(e)) || placed_of(e).is_some_and(|p| places.sees(p)))
         .map(|e| {

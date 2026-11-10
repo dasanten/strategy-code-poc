@@ -246,6 +246,18 @@ fn field_value<T: serde::Serialize>(t: &T, ty: ScriptType) -> Value {
     view_value(&serde_json::to_value(t).unwrap_or(Json::Null), ty)
 }
 
+/// A resident's order as its view (`residentOrder`), through its plain data less the path of a
+/// moving order: the view has no `path`, and a walk's path can run to hundreds of tiles, each of
+/// which would become a JSON object only to be dropped (T89.6).
+fn order_value(order: Option<&ResidentOrder>, ty: ScriptType) -> Value {
+    let Some(order) = order else { return Value::Null };
+    let mut order = order.clone();
+    if let Some((path, _)) = crate::walking::order_path_mut(&mut order) {
+        *path = None;
+    }
+    field_value(&order, ty)
+}
+
 /// Numbers by name as a view of number fields, such as `goods` or `skills`: each field the
 /// number `named` gives it, `null` for none.
 fn numbers_view<K: Copy>(
@@ -342,7 +354,7 @@ fn resident_view(world: &WorldState, r: &Resident, side: Option<&str>, alarm: bo
             "stats" => stats_view(&r.stats),
             "skills" => numbers_view("skills", &r.skills, skill_name),
             "carried" => numbers_view("goods", &r.carried, good_name),
-            "order" => field_value(&r.order, f.r#type),
+            "order" => order_value(r.order.as_ref(), f.r#type),
             "orderEnded" => field_value(&r.order_ended, f.r#type),
             "queue" => match &r.queue {
                 Some(q) => field_value(&queue_view(q), f.r#type),

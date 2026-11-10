@@ -73,7 +73,7 @@ pub(crate) struct FunctionHandle {
     pub(crate) run: Rc<()>,
     pub(crate) index: usize,
     /// Its name, or `""` for a `fn (…) { … }` value.
-    pub(crate) name: String,
+    pub(crate) name: Rc<str>,
 }
 
 impl ScriptFunction {
