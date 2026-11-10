@@ -3,17 +3,20 @@
 //! script, listing each field it reads that the views don't declare, with the script and the
 //! Player. Read only, so `check-fields` is safe to run while the server is up.
 //!
-//! `noteScriptViewChanges` (the realm-log notes at start) is not here yet: it needs the realm
-//! events (T86.13) and the script views (T86.12), and belongs to the server's start (T87.1).
+//! At start, [`note_script_view_changes`] tells each Player whose script reads a field a script
+//! view dropped since the last start, in their realm log.
 
 use std::cmp::Ordering;
 use std::collections::{BTreeSet, HashMap};
 
 use csp_lang::{check_names, CheckEnv, PARAMS_SHAPE};
+use csp_shared::world::{DroppedFieldScript, RealmEventWhat, WorldState};
+use csp_sim::events::record_player_event;
+use csp_sim::script_views::{ViewChange, SCRIPT_VIEW_CHANGES};
+use indexmap::IndexMap;
 use rusqlite::Connection;
 
-/// The shape of `me` where it may be a resident or an army (`RESIDENT_OR_ARMY`).
-pub const RESIDENT_OR_ARMY: &str = "residentOrArmy";
+pub use csp_sim::script_check::RESIDENT_OR_ARMY;
 
 /// A field a Player's active script reads that its script view doesn't declare.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,10 +35,68 @@ pub struct UndeclaredRead {
 /// The names and shapes a script is checked against (`scriptCheckEnv`): a Player's own script
 /// (`default_script: false`) gets both the resident and the army API, a default script only the
 /// resident's.
-// TODO(T86.12): built from `SCRIPT_API`, `ARMY_SCRIPT_API` and `SCRIPT_VIEWS` once the script
-// views are ported; until then there is no environment and `check-fields` says so.
-pub fn script_check_env(_default_script: bool) -> Option<CheckEnv> {
-    None
+pub fn script_check_env(default_script: bool) -> CheckEnv {
+    csp_sim::script_check::script_check_env(default_script)
+}
+
+/// Tells each Player whose active script reads a field that a script view change since the last
+/// start dropped (`noteScriptViewChanges`): one `scriptFieldDropped` event per Player and field,
+/// naming the scripts. Notes the changes as told either way; true when there were any, so the
+/// world is saved.
+pub fn note_script_view_changes(
+    conn: &Connection,
+    world: &mut WorldState,
+) -> rusqlite::Result<bool> {
+    note_view_changes(conn, world, SCRIPT_VIEW_CHANGES)
+}
+
+/// [`note_script_view_changes`] over the given changes.
+pub fn note_view_changes(
+    conn: &Connection,
+    world: &mut WorldState,
+    changes: &[ViewChange],
+) -> rusqlite::Result<bool> {
+    let told = (world.script_view_changes.max(0.0) as usize).min(changes.len());
+    let pending = &changes[told..];
+    if pending.is_empty() {
+        return Ok(false);
+    }
+    world.script_view_changes = changes.len() as f64;
+    // A Player's own script's `me` may be a resident's or an army's: the note calls it `me`.
+    let views = |r: &UndeclaredRead| -> Vec<String> {
+        if r.view == RESIDENT_OR_ARMY {
+            vec!["resident".into(), "army".into()]
+        } else {
+            vec![r.view.clone()]
+        }
+    };
+    let dropped = |r: &UndeclaredRead| {
+        pending.iter().any(|c| match c {
+            ViewChange::Undeclared => true,
+            ViewChange::Dropped(fields) => {
+                views(r).iter().any(|v| fields.contains(&format!("{v}.{}", r.field).as_str()))
+            }
+        })
+    };
+    let (own, default) = (script_check_env(false), script_check_env(true));
+    let mut notes: IndexMap<(i64, String), IndexMap<i64, String>> = IndexMap::new();
+    for r in undeclared_field_reads(conn, [&own, &default])?.into_iter().filter(|r| dropped(r)) {
+        let view = if r.view == RESIDENT_OR_ARMY { "me" } else { r.view.as_str() };
+        let field = format!("{view}.{}", r.field);
+        notes.entry((r.user_id, field)).or_default().insert(r.script_id, r.script);
+    }
+    for ((user_id, field), scripts) in notes {
+        let scripts = scripts
+            .into_iter()
+            .map(|(id, name)| DroppedFieldScript { script_id: id as u64, name })
+            .collect();
+        record_player_event(
+            world,
+            user_id as u64,
+            RealmEventWhat::ScriptFieldDropped { field, scripts },
+        );
+    }
+    Ok(true)
 }
 
 /// Every undeclared field read of the Players' active scripts (`undeclaredFieldReads`), ordered

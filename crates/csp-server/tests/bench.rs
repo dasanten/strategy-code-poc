@@ -1,5 +1,7 @@
 //! The benchmarks build their worlds and step them (`bench-world`, `bench-sim`; T87.8).
-use csp_server::bench::{bench_sim, bench_world, hq, save_from, village, villages, SceneName};
+use csp_server::bench::{
+    bench_sim, bench_world, hq, save_from, village, villages, Scene, SceneName,
+};
 use csp_server::db::open_db;
 use csp_server::saves::{save_terrain, save_world};
 use csp_sim::terrain_gen::generate_terrain;
@@ -21,36 +23,52 @@ fn bench_world_times_every_stage_and_prints_both_tables() {
         s.iter().map(|(n, _)| *n).collect()
     }
     assert_eq!(stages(&made.terrain_stages), ["seas", "lakes", "relief", "forest", "joining"]);
-    assert_eq!(stages(&made.world_stages), ["nodes", "HQ, NPC cities, trading posts, caravans"]);
+    assert_eq!(
+        stages(&made.world_stages),
+        ["nodes", "HQ", "NPC cities", "trading posts", "caravans"]
+    );
     assert!(out[0].starts_with("world 64x64, seed 1: "), "{}", out[0]);
     assert!(out.iter().any(|l| l.starts_with("| generateTerrain stage |")));
     assert!(out.iter().any(|l| l.starts_with("| generateWorld stage ")));
     assert!(out.last().unwrap().starts_with(&format!("made: {} nodes, ", made.world.nodes.len())));
 }
 
+/// Steps a scene a few ticks and checks the table `bench_sim` prints.
+fn steps_a_few_ticks(name: SceneName, scene: Scene) {
+    let size = scene.terrain.size;
+    let start = scene.world.tick;
+    assert!(!scene.world.cities.is_empty(), "the {} scene has its cities", name.name());
+    let mut ran = None;
+    let out = lines(|out| ran = Some(bench_sim(name, scene, 3, out)));
+    let ran = ran.unwrap();
+    assert_eq!(ran.totals.len(), 3);
+    assert_eq!(ran.phases.len(), TICK_PHASES.len());
+    assert!(ran.phases.iter().all(|(_, xs)| xs.len() == 3));
+    let head = format!("sim {}, 3 ticks, invariants off, {size}x{size} map, ", name.name());
+    assert!(out[0].starts_with(&head), "{}", out[0]);
+    // One row per phase, the total, the header and the rule.
+    let rows = out.iter().filter(|l| l.starts_with('|')).count();
+    assert_eq!(rows, TICK_PHASES.len() + 3);
+    assert!(out.iter().any(|l| l.starts_with("| tick (total) |")));
+    assert_eq!(start, 0);
+}
+
 #[test]
-fn each_scene_builds_and_steps_a_few_ticks() {
-    for (name, scene) in [
-        (SceneName::Village, village()),
-        (SceneName::Villages, villages(60)),
-        (SceneName::Hq, hq()),
-    ] {
-        let size = scene.terrain.size;
-        let start = scene.world.tick;
-        let mut ran = None;
-        let out = lines(|out| ran = Some(bench_sim(name, scene, 3, out)));
-        let ran = ran.unwrap();
-        assert_eq!(ran.totals.len(), 3);
-        assert_eq!(ran.phases.len(), TICK_PHASES.len());
-        assert!(ran.phases.iter().all(|(_, xs)| xs.len() == 3));
-        let head = format!("sim {}, 3 ticks, invariants off, {size}x{size} map, ", name.name());
-        assert!(out[0].starts_with(&head), "{}", out[0]);
-        // One row per phase, the total, the header and the rule.
-        let rows = out.iter().filter(|l| l.starts_with('|')).count();
-        assert_eq!(rows, TICK_PHASES.len() + 3);
-        assert!(out.iter().any(|l| l.starts_with("| tick (total) |")));
-        assert_eq!(start, 0);
-    }
+fn the_village_scene_builds_and_steps_a_few_ticks() {
+    steps_a_few_ticks(SceneName::Village, village());
+}
+
+/// Four villages rather than the bench's 60, which take too long in a debug build.
+#[test]
+fn the_villages_scene_builds_and_steps_a_few_ticks() {
+    let scene = villages(4);
+    assert_eq!(scene.world.cities.len(), 4);
+    steps_a_few_ticks(SceneName::Villages, scene);
+}
+
+#[test]
+fn the_hq_scene_builds_and_steps_a_few_ticks() {
+    steps_a_few_ticks(SceneName::Hq, hq());
 }
 
 #[test]

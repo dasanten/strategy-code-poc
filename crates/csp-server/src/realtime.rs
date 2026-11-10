@@ -8,12 +8,6 @@
 //! in the order the frames came, and the tick message is made there during the tick's broadcast
 //! phase ([`Realtime::broadcast_tick`]). The clients' state lives in the [`Realtime`] hub, which
 //! both sides reach.
-//!
-//! Waiting for their ports, each sent as an empty value of its shape until then: the alliance
-//! matters (`diplomacyFor`, `carriedWaysFor`, T86.11), the Region map (`regionMapFor`, T86.11),
-//! and Last seen out of sight
-//! (`lastSeenOutOfSight`, T86.13). Founding a starting city (`foundStartingCity`, T86.8) is
-//! refused until it is ported.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -23,15 +17,24 @@ use axum::extract::ws::{CloseFrame, Message, Utf8Bytes, WebSocket, WebSocketUpgr
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use csp_shared::terrain::TerrainMap;
-use csp_shared::world::protocol::OrderRequest;
+use csp_shared::world::protocol::{OrderRequest, Remembered};
 use csp_shared::world::WorldState;
+use csp_sim::explored::ExploredTerrain;
+use csp_sim::last_seen::{
+    last_seen_in_sight, last_seen_on_cadence, last_seen_out_of_sight, LastSeenState,
+};
 use csp_sim::order_sender::{Account, OrderSender};
 use csp_sim::orders::OrderReply;
 use csp_sim::queries::alliance::commander_of;
 use csp_sim::queries::city::town_hall_of;
+use csp_sim::queries::people::founding_problem;
+use csp_sim::queries::region_map::{region_map_for, RegionMap};
+use csp_sim::queries::territory::Territory;
+use csp_sim::region_map::region_map_unsound;
 use csp_sim::sight::{
     entities_in_sight, sent_inside_unseen, sent_out_of_sight, with_sight, InvariantViolation,
 };
+use csp_sim::starting_city::{found_starting_city, suggested_leader_name, FoundingNames};
 use csp_sim::tick::Scratch;
 use csp_sim::world_index::{world_index, WorldIndex};
 use rusqlite::Connection;
@@ -41,6 +44,7 @@ use tokio::sync::mpsc;
 use crate::app::{cookie_value, GameHandle, GameView, SESSION_COOKIE};
 use crate::auth::{get_session_user, hash_token, now_ms, session_alive, SessionSockets};
 use crate::config::{Origins, RealtimeLimits};
+use crate::diplomacy::{carried_ways_for, diplomacy_for, realms_seen, storages_seen};
 use crate::first_day::{first_day_line_of, mark_first_day, read_first_day};
 use crate::sync::{ClientView, HasId, SyncRound};
 
@@ -62,6 +66,23 @@ impl HasId for csp_shared::protocol::SeenEntity {
 }
 
 type Seen = csp_shared::protocol::SeenEntity;
+
+impl HasId for Remembered {
+    fn id(&self) -> &str {
+        match self {
+            Remembered::Building(b) => &b.id,
+            Remembered::City(c) => &c.id,
+        }
+    }
+}
+
+/// What the broadcast reads beside the world: the territory worked out last, and the Players'
+/// explored terrain, for the Region map.
+#[derive(Clone, Copy)]
+pub struct TickView<'a> {
+    pub territory: Option<&'a Territory>,
+    pub explored: &'a ExploredTerrain,
+}
 
 /// What goes out on a socket.
 #[derive(Debug, Clone, PartialEq)]
@@ -98,8 +119,12 @@ struct Client {
     /// The residents and armies whose Script tab the Player has open, in the order asked.
     watching: Vec<(String, Watched)>,
     view: ClientView,
+    /// What was last sent of what the Player remembers out of sight.
+    last_seen_view: ClientView,
     last_event_seq: u64,
     last_diplomacy: String,
+    /// The territory's tick the last Region map sent was of; none before the first.
+    region_tick: Option<u64>,
     leader_id: String,
     realm_name: Option<String>,
     horse_offer: bool,
@@ -251,25 +276,12 @@ fn events_json(world: &WorldState, user_id: i64, after: u64) -> (Value, Option<u
     (serde_json::to_value(events).unwrap_or(Value::Array(vec![])), last)
 }
 
-/// The Player's alliance matters (`diplomacyFor`).
-// TODO(T86.11): `diplomacy_for` with `carried_ways_for` once alliances, contracts, demands and
-// offers are ported; until then the matters of a realm in no alliance with nothing open.
-fn diplomacy_for(_world: &WorldState, _realm_id: &str, _seen: &[Seen]) -> Value {
-    json!({
-        "alliance": null,
-        "invitations": [],
-        "realmsInSight": [],
-        "contracts": [],
-        "demands": [],
-        "knownRealms": [],
-        "knownNpcOrgs": [],
-        "directOffers": [],
-        "directOfferRealms": [],
-        "deliveries": [],
-        "standings": [],
-        "joinRequests": [],
-        "directives": [],
-    })
+/// The Player's alliance matters as their realm sees them, with the realms and storages among
+/// what they see (`diplomacyFor` with `carriedWaysFor`).
+fn diplomacy_of(world: &WorldState, size: i32, realm_id: &str, seen: &[Seen]) -> Value {
+    let ways = carried_ways_for(world, size, realm_id, storages_seen(seen));
+    let diplomacy = diplomacy_for(world, realm_id, realms_seen(seen), ways);
+    serde_json::to_value(diplomacy).expect("serialisable")
 }
 
 /// The traders standing at the realm's cities (`traderVisitsTo`).
@@ -278,62 +290,31 @@ fn trader_visits_to(world: &WorldState, realm_id: &str) -> Value {
         .expect("serialisable")
 }
 
-/// What the Player remembers out of sight (`lastSeenOutOfSight`).
-// TODO(T86.13): `last_seen_out_of_sight` once Last seen is ported.
-fn last_seen_out_of_sight(_world: &WorldState, _size: i32, _user_id: i64) -> Vec<Value> {
-    Vec::new()
-}
-
-/// The Region map to send a client, if any (`regionFor`).
-// TODO(T86.11): `region_map_for` once territory is ported; until then there is none.
-fn region_for(_client: &mut Client) -> Option<Value> {
-    None
-}
-
-/// A new realm and its starting city for a Player (`foundStartingCity`).
-// TODO(T86.8): `found_starting_city` once the starting city is ported; until then founding is
-// refused.
-fn found_starting_city(
-    _world: &mut WorldState,
-    _terrain: &TerrainMap,
-    _user_id: i64,
-    _realm_name: &str,
-    _leader_name: &str,
-) -> Option<String> {
-    None
-}
-
-/// The name the game suggests for a new Player's Leader (`suggestedLeaderName`).
-// TODO(T86.8): drawn from the names pool as `suggestedLeaderName` does.
-fn suggested_leader_name(_world: &WorldState, _user_id: i64) -> String {
-    String::new()
-}
-
-/// Why a realm name or a Leader name won't do (`nameProblem`), or none.
-fn name_problem(name: &Value, max: usize) -> Option<String> {
-    let Some(name) = name.as_str() else { return Some("give a name.".into()) };
-    let trimmed = name.trim();
-    if trimmed.is_empty() {
-        return Some("give a name.".into());
+/// The Region map to send a client, if any (`regionFor`): all of it when territory was worked out
+/// again since the last one went out, else the chunks whose explored terrain grew.
+fn region_for(
+    client: &mut Client,
+    world: &WorldState,
+    size: i32,
+    view: TickView<'_>,
+    grown: &[usize],
+) -> Option<RegionMap> {
+    let territory = view.territory?;
+    let fresh = Some(territory.tick) != client.region_tick;
+    if !fresh && grown.is_empty() {
+        return None;
     }
-    if trimmed.encode_utf16().count() > max {
-        return Some(format!("at most {max} characters."));
-    }
-    None
+    client.region_tick = Some(territory.tick);
+    let user_id = client.user_id as u64;
+    let is_explored = |x: i32, y: i32| view.explored.is_explored(user_id, x, y);
+    let chunks = (!fresh).then(|| grown.iter().map(|&c| c as i32).collect());
+    Some(region_map_for(world, territory, size, &is_explored, chunks))
 }
 
-/// Why the names given to found a realm won't do (`foundingProblem`), or none.
-// TODO(T86.8): the names' rules are `names.ts`'s; this is their first check only.
-fn founding_problem(realm_name: &Value, leader_name: &Value) -> Option<String> {
-    if let Some(p) = name_problem(realm_name, csp_shared::balance::REALM_NAME_MAX_LENGTH as usize) {
-        return Some(format!("Realm name: {p}"));
-    }
-    if let Some(p) =
-        name_problem(leader_name, csp_shared::balance::RESIDENT_NAME_MAX_LENGTH as usize)
-    {
-        return Some(format!("Leader name: {p}"));
-    }
-    None
+/// Why the names given to found a realm won't do (`foundingProblem`), or none: a name that is no
+/// string is none given.
+fn founding_problem_of(realm_name: &Value, leader_name: &Value) -> Option<String> {
+    founding_problem(realm_name.as_str(), leader_name.as_str())
 }
 
 /// The realms whose residents are among the entities, and the cities among them (`realmsSeen`).
@@ -434,6 +415,63 @@ impl Realtime {
         }
     }
 
+    /// Reports Last seen about to go to a realm's Player that is in their sight, or that is off
+    /// its cadence, as `check_sent` (`checkLastSeen`).
+    fn check_last_seen(
+        &self,
+        world: &WorldState,
+        terrain: &TerrainMap,
+        cadence: &LastSeenState,
+        realm_id: &str,
+        sent: &[Remembered],
+    ) {
+        let Some(check) = self.sampled() else { return };
+        let mut violations = if sent.is_empty() {
+            Vec::new()
+        } else {
+            last_seen_in_sight(world, terrain, realm_id, sent)
+        };
+        violations.extend(last_seen_on_cadence(world, cadence, realm_id));
+        if !violations.is_empty() {
+            (check.report)(world, &violations);
+        }
+    }
+
+    /// Reports a Region map about to go to a realm's Player that shows what they may not see, as
+    /// `check_sent` (`regionFor`'s check).
+    fn check_region(
+        &self,
+        world: &WorldState,
+        size: i32,
+        view: TickView<'_>,
+        client: &Client,
+        region: &RegionMap,
+    ) {
+        let Some(territory) = view.territory else { return };
+        let Some(check) = self.sampled() else { return };
+        let user_id = client.user_id as u64;
+        let is_explored = |x: i32, y: i32| view.explored.is_explored(user_id, x, y);
+        let violations =
+            region_map_unsound(region, territory, size, &is_explored, &client.realm_id);
+        if !violations.is_empty() {
+            (check.report)(world, &violations);
+        }
+    }
+
+    /// The Region map to send a client, if any, checked on sampled ticks.
+    fn region(
+        &self,
+        client: &mut Client,
+        world: &WorldState,
+        size: i32,
+        view: TickView<'_>,
+        grown: &[usize],
+    ) -> Option<Value> {
+        let region = region_for(client, world, size, view, grown)?;
+        self.check_region(world, size, view, client, &region);
+        Some(serde_json::to_value(region).expect("serialisable"))
+    }
+
     /// Starts sending a Player with a realm their world: the welcome now, then every tick.
     fn welcome(
         &self,
@@ -456,8 +494,10 @@ impl Realtime {
             realm_id: realm.id.clone(),
             watching: Vec::new(),
             view: ClientView::new(),
+            last_seen_view: ClientView::new(),
             last_event_seq: 0,
             last_diplomacy: String::new(),
+            region_tick: None,
             leader_id: realm.leader_id.clone(),
             realm_name: realm.name.clone(),
             horse_offer: !world.horse_offers_claimed.contains(&(user_id as u64)),
@@ -480,10 +520,14 @@ impl Realtime {
         let in_sight = entities_in_sight(world, index, Some(&realm.id), None);
         let entities = client.view.initial(&in_sight);
         self.check_sent(world, index, &realm.id, &entities);
-        let last_seen = last_seen_out_of_sight(world, size, user_id);
+        let remembered = last_seen_out_of_sight(world, index, user_id as u64);
+        let last_seen = client.last_seen_view.initial(&remembered);
+        self.check_last_seen(world, g.terrain, &g.scratch.last_seen, &realm.id, &last_seen);
+        // Their map is fresh from the next tick, not when the realm's turn comes round.
+        g.scratch.last_seen.refresh_soon(&realm.id);
         let (events, last) = events_json(world, user_id, 0);
         client.last_event_seq = last.unwrap_or(0);
-        let diplomacy = diplomacy_for(world, &realm.id, &entities);
+        let diplomacy = diplomacy_of(world, size, &realm.id, &entities);
         client.last_diplomacy = json_of(&diplomacy);
         let work_settings = world
             .workplace_settings
@@ -491,7 +535,8 @@ impl Realtime {
             .map_or_else(|| json!({}), |s| serde_json::to_value(s).unwrap_or(json!({})));
         client.last_work_settings = json_of(&work_settings);
         let first_day = read_first_day(&self.db(), user_id).ok();
-        let region = region_for(&mut client).unwrap_or(Value::Null);
+        let view = TickView { territory: g.territory, explored: &*g.explored };
+        let region = self.region(&mut client, world, size, view, &[]).unwrap_or(Value::Null);
         let welcome = json!({
             "type": "welcome",
             "account": user,
@@ -559,7 +604,7 @@ impl Realtime {
                 json!({
                     "type": "founding",
                     "account": user,
-                    "leaderName": suggested_leader_name(g.world, user_id),
+                    "leaderName": suggested_leader_name(g.world, user_id as u64),
                 }),
             ),
         }
@@ -612,34 +657,20 @@ impl Realtime {
                 msg.get("realmName").unwrap_or(&Value::Null),
                 msg.get("leaderName").unwrap_or(&Value::Null),
             );
-            if let Some(problem) = founding_problem(realm_name, leader_name) {
+            if let Some(problem) = founding_problem_of(realm_name, leader_name) {
                 return self.send_to(
                     socket,
                     json!({ "type": "rejected", "requestId": request_id(), "reason": problem }),
                 );
             }
             // Founded from another tab meanwhile: that realm stands, under the names given there.
-            let realm = match g.world.realms.iter().find(|r| r.user_id == user_id as u64) {
-                Some(r) => Some(r.id.clone()),
-                None => found_starting_city(
-                    g.world,
-                    g.terrain,
-                    user_id,
-                    realm_name.as_str().unwrap_or(""),
-                    leader_name.as_str().unwrap_or(""),
-                ),
+            let names = FoundingNames {
+                realm_name: realm_name.as_str().unwrap_or("").to_owned(),
+                leader_name: leader_name.as_str().unwrap_or("").to_owned(),
             };
-            return match realm {
-                Some(realm) => self.welcome(g, socket, user, user_id, &realm),
-                None => self.send_to(
-                    socket,
-                    json!({
-                        "type": "rejected",
-                        "requestId": request_id(),
-                        "reason": "founding a realm is not ported to the Rust server yet",
-                    }),
-                ),
-            };
+            let at = found_starting_city(g.world, g.terrain, user_id as u64, Some(&names));
+            let realm = g.world.realms[at].id.clone();
+            return self.welcome(g, socket, user, user_id, &realm);
         }
         if kind == Some("order") {
             if !has_client {
@@ -716,11 +747,13 @@ impl Realtime {
         terrain: &TerrainMap,
         scratch: &mut Scratch,
         explored: &BTreeMap<u64, BTreeSet<usize>>,
+        view: TickView<'_>,
         now: i64,
     ) {
         self.recheck_sessions(now);
         let size = terrain.size;
-        let Scratch { sight, index, .. } = scratch;
+        let Scratch { sight, index, last_seen: cadence, .. } = scratch;
+        let cadence = &*cadence;
         let index = world_index(index, world, size);
         with_sight(sight.as_mut(), size, |cache| {
             let mut round = SyncRound::<Seen>::default();
@@ -734,7 +767,22 @@ impl Realtime {
                 let mut tick = Map::new();
                 tick.insert("type".into(), json!("tick"));
                 tick.insert("tick".into(), json!(world.tick));
-                // TODO(T86.13): `lastSeen` when what is remembered out of sight changed.
+                let remembered =
+                    Arc::new(last_seen_out_of_sight(world, index, client.user_id as u64));
+                let remembered = client.last_seen_view.diff_alone(&remembered);
+                self.check_last_seen(
+                    world,
+                    terrain,
+                    cadence,
+                    &client.realm_id,
+                    &remembered.changed,
+                );
+                if !remembered.changed.is_empty() || !remembered.gone.is_empty() {
+                    tick.insert(
+                        "lastSeen".into(),
+                        json!({ "changed": remembered.changed, "gone": remembered.gone }),
+                    );
+                }
                 let grown: Vec<usize> = explored
                     .get(&(client.user_id as u64))
                     .map(|s| s.iter().copied().collect())
@@ -745,13 +793,13 @@ impl Realtime {
                     client.last_event_seq = last;
                 }
                 tick.insert("events".into(), events);
-                let diplomacy = diplomacy_for(world, &client.realm_id, &in_sight);
+                let diplomacy = diplomacy_of(world, size, &client.realm_id, &in_sight);
                 let diplomacy_json = json_of(&diplomacy);
                 if diplomacy_json != client.last_diplomacy {
                     client.last_diplomacy = diplomacy_json;
                     tick.insert("diplomacy".into(), diplomacy);
                 }
-                if let Some(region) = region_for(client) {
+                if let Some(region) = self.region(client, world, size, view, &grown) {
                     tick.insert("region".into(), region);
                 }
                 let realm = world.realms.iter().find(|r| r.id == client.realm_id);

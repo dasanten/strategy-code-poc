@@ -1,16 +1,22 @@
 //! The live-world check for undeclared fields (`field-check.test.ts`, the `check-fields` half).
 //!
-//! The game's checker environment (`scriptCheckEnv`) arrives with the script views (T86.12); these
-//! tests check against a small one with the names the TypeScript tests' scripts use. The case
-//! with the default scripts (`ensureDefaultScripts`) waits for the script library (T87.5) and the
-//! default scripts (T86.12); the realm-log notes (`noteScriptViewChanges`) for T86.13.
+//! The first tests check against a small environment with the names the TypeScript tests' scripts
+//! use; the rest against the game's own (`scriptCheckEnv`), with the realm-log notes
+//! (`noteScriptViewChanges`).
 use std::collections::HashMap;
 
 use csp_lang::{CheckEnv, CheckedGlobal, CheckedType};
 use csp_server::db::open_db;
 use csp_server::field_check::{
-    describe_undeclared_reads, undeclared_field_reads, UndeclaredRead, RESIDENT_OR_ARMY,
+    describe_undeclared_reads, note_script_view_changes, note_view_changes, script_check_env,
+    undeclared_field_reads, UndeclaredRead, RESIDENT_OR_ARMY,
 };
+use csp_server::scripts::{create_script, ensure_default_scripts, game_defaults};
+use csp_shared::terrain::TerrainMap;
+use csp_shared::world::{RealmEventWhat, WorldState};
+use csp_sim::events::events_for;
+use csp_sim::script_views::{ViewChange, SCRIPT_VIEW_CHANGES};
+use csp_sim::world::create_world;
 use rusqlite::{params, Connection};
 
 fn env() -> CheckEnv {
@@ -139,4 +145,81 @@ fn groups_the_report_by_field_and_counts_fields_and_players() {
         ]
         .join("\n")
     );
+}
+
+// ------------------------------------------------------------- against the game's own views
+
+fn game_reads(db: &Connection) -> Vec<UndeclaredRead> {
+    let (own, default) = (script_check_env(false), script_check_env(true));
+    undeclared_field_reads(db, [&own, &default]).unwrap()
+}
+
+#[test]
+fn lists_nothing_for_declared_fields_the_default_scripts_included() {
+    let db = open_db(":memory:", None).unwrap();
+    let tobin = add_user(&db, "Tobin");
+    ensure_default_scripts(&db, game_defaults(), tobin).unwrap();
+    let careful = Some("me.hunger + me.stats.strength.base\n");
+    create_script(&db, game_defaults(), tobin, Some("careful"), careful).unwrap();
+    // A version with a syntax error never runs, so it isn't checked.
+    create_script(&db, game_defaults(), tobin, Some("broken"), Some("me.nope = \n")).unwrap();
+    assert_eq!(game_reads(&db), []);
+}
+
+fn world(told: f64) -> WorldState {
+    let terrain = TerrainMap { size: 64, tiles: vec![0; 64 * 64] };
+    let mut w = create_world(&terrain, 1);
+    w.script_view_changes = told;
+    w
+}
+
+/// A Player's `scriptFieldDropped` events, as (field, [(script id, name)]).
+fn dropped(w: &WorldState, user: i64) -> Vec<(String, Vec<(u64, String)>)> {
+    events_for(w, user as u64, 0)
+        .into_iter()
+        .filter_map(|e| match &e.what {
+            RealmEventWhat::ScriptFieldDropped { field, scripts } => Some((
+                field.clone(),
+                scripts.iter().map(|s| (s.script_id, s.name.clone())).collect(),
+            )),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn notes_each_dropped_field_for_each_player_whose_scripts_read_it_naming_the_scripts() {
+    let db = open_db(":memory:", None).unwrap();
+    let mara = add_user(&db, "Mara");
+    let tobin = add_user(&db, "Tobin");
+    let d = game_defaults();
+    let a = create_script(&db, d, mara, Some("feeder"), Some("let h = me.plan\n")).unwrap();
+    let b = create_script(&db, d, mara, Some("miner"), Some("me.plan + me.plan\n")).unwrap();
+    create_script(&db, d, tobin, Some("careful"), Some("me.hunger\n")).unwrap();
+    let mut w = world(0.0);
+    // A Player without a realm is told too: the log is theirs, not their realm's.
+    assert!(note_script_view_changes(&db, &mut w).unwrap());
+    assert_eq!(w.script_view_changes, SCRIPT_VIEW_CHANGES.len() as f64);
+    let (a, b) = (a.summary.id as u64, b.summary.id as u64);
+    assert_eq!(
+        dropped(&w, mara),
+        [("me.plan".to_string(), vec![(a, "feeder".to_string()), (b, "miner".to_string())])]
+    );
+    assert_eq!(dropped(&w, tobin), []);
+    // Once told, never again.
+    assert!(!note_script_view_changes(&db, &mut w).unwrap());
+    assert_eq!(dropped(&w, mara).len(), 1);
+}
+
+#[test]
+fn notes_only_the_fields_a_later_change_drops() {
+    let db = open_db(":memory:", None).unwrap();
+    let mara = add_user(&db, "Mara");
+    let source = Some("me.plan + me.scheme\n");
+    create_script(&db, game_defaults(), mara, Some("feeder"), source).unwrap();
+    let mut w = world(1.0);
+    let changes = [ViewChange::Undeclared, ViewChange::Dropped(&["resident.scheme"])];
+    assert!(note_view_changes(&db, &mut w, &changes).unwrap());
+    let fields: Vec<String> = dropped(&w, mara).into_iter().map(|(f, _)| f).collect();
+    assert_eq!(fields, ["me.scheme"]);
 }

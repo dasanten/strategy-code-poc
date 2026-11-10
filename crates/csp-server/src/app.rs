@@ -6,9 +6,6 @@
 //! The accounts and the script library use the HTTP side's own database connection (SQLite in WAL
 //! mode lets the game thread's connection work beside it); the world and the explored terrain are
 //! read and changed between ticks through a [`GameHandle`].
-//!
-//! Not served yet, each waiting for its port: the admin directives, the admin map's world,
-//! places, inspection and territory (T86.11).
 
 use std::collections::HashMap;
 use std::future::Future;
@@ -18,7 +15,7 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
 use axum::body::Bytes;
-use axum::extract::{ConnectInfo, Path, Request, State};
+use axum::extract::{ConnectInfo, Path, Query, Request, State};
 use axum::http::{header, HeaderMap, HeaderValue, Method, StatusCode};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
@@ -28,6 +25,14 @@ use csp_shared::balance::SCRIPT_WRITES_PER_MINUTE;
 use csp_shared::chunks::{ADMIN_TERRAIN_OVERVIEW_PATH, TERRAIN_BATCH_MAX, TERRAIN_BATCH_PATH};
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::WorldState;
+use csp_sim::admin_map::{
+    admin_inspection, admin_places, admin_territory, admin_world_view, parse_admin_view,
+    AdminLookups, ADMIN_INSPECT_KINDS, ADMIN_INSPECT_PATH, ADMIN_PLACES_PATH, ADMIN_TERRITORY_PATH,
+    ADMIN_WORLD_PATH,
+};
+use csp_sim::directives::{
+    admin_directives, directive_target_choices, give_directive, lift_directive, set_directive_price,
+};
 use csp_sim::explored::ExploredTerrain;
 use csp_sim::orders::OrderQueue;
 use csp_sim::sight::SightTracker;
@@ -64,6 +69,8 @@ pub struct GameView<'a> {
     pub orders: &'a mut OrderQueue,
     pub sight: &'a mut SightTracker,
     pub scratch: &'a mut Scratch,
+    /// The territory worked out last, if any yet.
+    pub territory: Option<&'a csp_sim::queries::territory::Territory>,
 }
 
 /// Work on the game between ticks.
@@ -82,13 +89,17 @@ impl<L: crate::monitoring::LogSink + Send + Sync + 'static> GameHandle
     fn run_job(&self, job: GameJob) -> Pin<Box<dyn Future<Output = bool> + Send + '_>> {
         Box::pin(async move {
             self.run(move |g, _conn| {
+                // Held for the job: a job reads and receives orders but runs no script, the only
+                // thing that asks the script host what a Player explored.
+                let mut explored = g.explored.lock().unwrap_or_else(|e| e.into_inner());
                 job(GameView {
                     world: &mut g.world,
                     terrain: &g.terrain,
-                    explored: &mut g.explored,
+                    explored: &mut explored,
                     orders: &mut g.orders,
                     sight: &mut g.sight,
                     scratch: &mut g.scratch,
+                    territory: g.territory.current.as_ref(),
                 })
             })
             .await
@@ -893,6 +904,205 @@ async fn admin_horse_offers_reopen(
     Ok(Json(json!({ "reopened": reopened })).into_response())
 }
 
+/// What the admin map and directives look up by id (`AdminLookups`, `accountOf`): every account's
+/// and script's name, read from the HTTP side's connection before the game is asked.
+struct Lookups {
+    accounts: HashMap<u64, String>,
+    scripts: HashMap<u64, String>,
+}
+
+impl AdminLookups for Lookups {
+    fn account_of(&self, user_id: u64) -> Option<String> {
+        self.accounts.get(&user_id).cloned()
+    }
+    fn script_name(&self, script_id: u64) -> Option<String> {
+        self.scripts.get(&script_id).cloned()
+    }
+}
+
+async fn lookups(state: &AppState) -> ApiResult<Lookups> {
+    state
+        .db(|conn| {
+            let names = |sql: &str| -> rusqlite::Result<HashMap<u64, String>> {
+                conn.prepare(sql)?
+                    .query_map([], |r| Ok((r.get::<_, i64>(0)? as u64, r.get(1)?)))?
+                    .collect()
+            };
+            Ok(Lookups {
+                accounts: names("SELECT id, name FROM users")?,
+                scripts: names("SELECT id, name FROM scripts")?,
+            })
+        })
+        .await
+}
+
+fn game_gone() -> ApiFailure {
+    ApiFailure::Internal("the game is gone".into())
+}
+
+/// The entities in a rectangle of the map, each with its Organization (`adminWorldView`).
+async fn admin_world(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+    Query(query): Query<HashMap<String, String>>,
+) -> ApiResult<Response> {
+    user.admin()?;
+    let game = game_of(&state)?;
+    let lookups = lookups(&state).await?;
+    let view = with_game(game.as_ref(), move |g| {
+        let size = g.terrain.size;
+        parse_admin_view(&query, size).map(|v| admin_world_view(g.world, size, &v, &lookups))
+    })
+    .await
+    .ok_or_else(game_gone)?;
+    view.map(|v| Json(v).into_response()).map_err(|e| fail(ApiErrorCode::InvalidInput, e))
+}
+
+/// The world's cities and realms, to find on the admin map (`adminPlaces`).
+async fn admin_places_route(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+) -> ApiResult<Response> {
+    user.admin()?;
+    let game = game_of(&state)?;
+    let lookups = lookups(&state).await?;
+    let places = with_game(game.as_ref(), move |g| admin_places(g.world, &lookups))
+        .await
+        .ok_or_else(game_gone)?;
+    Ok(Json(places).into_response())
+}
+
+/// One thing in the world as the inspector shows it (`adminInspection`).
+async fn admin_inspect(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+    Path((kind, id)): Path<(String, String)>,
+) -> ApiResult<Response> {
+    user.admin()?;
+    let game = game_of(&state)?;
+    if !ADMIN_INSPECT_KINDS.contains(&kind.as_str()) {
+        return Err(fail(ApiErrorCode::InvalidInput, "Nothing of that kind to inspect."));
+    }
+    let lookups = lookups(&state).await?;
+    let found = with_game(game.as_ref(), move |g| admin_inspection(g.world, &kind, &id, &lookups))
+        .await
+        .ok_or_else(game_gone)?;
+    found
+        .map(|v| Json(v).into_response())
+        .ok_or_else(|| fail(ApiErrorCode::NotFound, "It is not there any more."))
+}
+
+/// The whole territory, for the admin map (`adminTerritory`).
+async fn admin_territory_route(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+) -> ApiResult<Response> {
+    user.admin()?;
+    let game = game_of(&state)?;
+    let region = with_game(game.as_ref(), |g| {
+        g.territory.map(|t| {
+            serde_json::to_value(admin_territory(g.world, t, g.terrain.size)).unwrap_or_default()
+        })
+    })
+    .await
+    .ok_or_else(game_gone)?;
+    region
+        .map(|v| Json(v).into_response())
+        .ok_or_else(|| fail(ApiErrorCode::NotFound, "Territory is not worked out yet."))
+}
+
+/// The directives in force and whom an admin can name (`AdminDirectives`).
+async fn admin_directives_list(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+) -> ApiResult<Response> {
+    user.admin()?;
+    let game = game_of(&state)?;
+    let lookups = lookups(&state).await?;
+    let shown = with_game(game.as_ref(), move |g| {
+        let account_of = |id: u64| lookups.account_of(id);
+        json!({
+            "directives": admin_directives(g.world),
+            "targets": directive_target_choices(g.world, &account_of),
+        })
+    })
+    .await
+    .ok_or_else(game_gone)?;
+    Ok(Json(shown).into_response())
+}
+
+/// The directive with this id as the admin panel shows it.
+fn admin_directive(world: &WorldState, id: &str) -> Value {
+    admin_directives(world)
+        .into_iter()
+        .find(|d| d.id == id)
+        .map_or(Value::Null, |d| serde_json::to_value(d).unwrap_or_default())
+}
+
+/// An admin gives a directive (`giveDirective`), in their name.
+async fn admin_directives_give(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+    body: Bytes,
+) -> ApiResult<Response> {
+    let admin = user.admin()?.name.clone();
+    let game = game_of(&state)?;
+    let b = JsonBody::parse(&body)?;
+    let input = json!({
+        "target": b.get("target"),
+        "withAlliance": b.get("withAlliance"),
+        "reason": b.get("reason"),
+        "goals": b.get("goals"),
+        "price": b.get("price"),
+    });
+    let given = with_game(game.as_ref(), move |g| {
+        give_directive(g.world, &input, &admin).map(|d| admin_directive(g.world, &d.id))
+    })
+    .await
+    .ok_or_else(game_gone)?;
+    let shown = given.map_err(|e| fail(ApiErrorCode::InvalidInput, e))?;
+    Ok((StatusCode::CREATED, Json(shown)).into_response())
+}
+
+/// An admin sets or clears a directive's buy-off price (`setDirectivePrice`).
+async fn admin_directives_price(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+    Path(id): Path<String>,
+    body: Bytes,
+) -> ApiResult<Response> {
+    user.admin()?;
+    let game = game_of(&state)?;
+    let price = JsonBody::parse(&body)?.get("price").cloned().unwrap_or(Value::Null);
+    let set = with_game(game.as_ref(), move |g| {
+        set_directive_price(g.world, &id, &price).map(|d| admin_directive(g.world, &d.id))
+    })
+    .await
+    .ok_or_else(game_gone)?;
+    match set {
+        Ok(shown) => Ok(Json(shown).into_response()),
+        Err(e) if e == "No such directive." => Err(fail(ApiErrorCode::NotFound, e)),
+        Err(e) => Err(fail(ApiErrorCode::InvalidInput, e)),
+    }
+}
+
+/// An admin lifts a directive (`liftDirective`).
+async fn admin_directives_lift(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+    Path(id): Path<String>,
+) -> ApiResult<Response> {
+    user.admin()?;
+    let game = game_of(&state)?;
+    let lifted = with_game(game.as_ref(), move |g| lift_directive(g.world, &id))
+        .await
+        .ok_or_else(game_gone)?;
+    if !lifted {
+        return Err(fail(ApiErrorCode::NotFound, "No such directive."));
+    }
+    Ok(StatusCode::NO_CONTENT.into_response())
+}
+
 async fn admin_tick_health(
     State(state): State<Shared>,
     Extension(user): Extension<User>,
@@ -982,10 +1192,18 @@ pub fn build_app(opts: AppOptions) -> Router {
             .route(ADMIN_TERRAIN_OVERVIEW_PATH, get(admin_overview))
             .route("/api/admin/terrain/{cx}/{cy}", get(admin_chunk))
             .route(ADMIN_MAP_INFO_PATH, get(admin_map_info))
-            .route("/api/admin/horse-offers/reopen", post(admin_horse_offers_reopen));
-        // TODO(T86.11): the admin directives (GET, POST `/api/admin/directives`, PATCH and DELETE
-        // `/api/admin/directives/{id}`) and the admin map's world, places, inspection and
-        // territory, once `directives.ts` and `admin-map.ts` are ported.
+            .route("/api/admin/horse-offers/reopen", post(admin_horse_offers_reopen))
+            // The admin map's world (`CONTEXT.md`: admin map), read between ticks.
+            .route(ADMIN_WORLD_PATH, get(admin_world))
+            .route(ADMIN_PLACES_PATH, get(admin_places_route))
+            .route(&format!("{ADMIN_INSPECT_PATH}/{{kind}}/{{id}}"), get(admin_inspect))
+            .route(ADMIN_TERRITORY_PATH, get(admin_territory_route))
+            // Admin directives (`CONTEXT.md`: Admin directive), given and lifted between ticks.
+            .route("/api/admin/directives", get(admin_directives_list).post(admin_directives_give))
+            .route(
+                "/api/admin/directives/{id}",
+                axum::routing::patch(admin_directives_price).delete(admin_directives_lift),
+            );
     }
 
     let mut app = api.merge(auth).merge(script_writes);

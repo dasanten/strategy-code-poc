@@ -16,10 +16,7 @@ use csp_server::field_check::{
 };
 
 fn main() -> ExitCode {
-    let (Some(own), Some(default)) = (script_check_env(false), script_check_env(true)) else {
-        eprintln!("check-fields: the script views are not ported to Rust yet (T86.12)");
-        return ExitCode::FAILURE;
-    };
+    let (own, default) = (script_check_env(false), script_check_env(true));
     let conn = match open_db(db_path(), None) {
         Ok(conn) => conn,
         Err(e) => {
