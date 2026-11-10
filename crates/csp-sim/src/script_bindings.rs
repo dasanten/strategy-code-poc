@@ -750,6 +750,65 @@ impl<'a> ScriptBindings<'a> {
         Some(Json::Object(merge(untagged(shown), Some(self.building_extras(&b.id)))))
     }
 
+    /// One of the side's own buildings as `building(id)` gives it, built from the struct rather
+    /// than through its plain data (#1092): the same value. `None` for one with offers, whose
+    /// `stock` and `offers` come from them; that one goes through its plain data.
+    fn own_building_view(&self, b: &Building) -> Option<Value> {
+        if self.offers_of(b).is_some() {
+            return None;
+        }
+        let settings = self
+            .side
+            .as_ref()
+            .filter(|_| !self.npc())
+            .and_then(|side| self.world().workplace_settings.get(side)?.get(&b.id));
+        let fields = script_view("building").map_or(&[][..], |v| v.fields);
+        Some(Value::frozen_fields(fields.iter().map(|f| {
+            let value = match f.name {
+                "id" => Value::string(&b.id),
+                "kind" => Value::string(kind_name(b.kind)),
+                "cityId" => text(b.city_id.as_ref()),
+                "realmId" => text(b.realm_id.as_ref()),
+                "x" => number(b.x),
+                "y" => number(b.y),
+                "stock" => {
+                    b.stock.as_ref().map_or(Value::Null, |s| numbers_view("goods", s, good_name))
+                }
+                "site" => field_value(&b.site, f.r#type),
+                "teardown" => b.teardown.map_or(Value::Null, number),
+                "closed" => b.closed.map_or(Value::Null, Value::Bool),
+                "damage" => b.damage.map_or(Value::Null, number),
+                "workSettings" => settings.map_or(Value::Null, |s| field_value(s, f.r#type)),
+                // A building's `prices` and `offers` come with its offers, `teacher`,
+                // `subject` and `trainees` with another's.
+                _ => Value::Null,
+            };
+            (f.name, value)
+        })))
+    }
+
+    /// The queries answered straight as script values, without plain data in between (#1092):
+    /// `building` of one of the side's own without offers, and `pileAt`. `None` for the rest.
+    fn direct_query(&self, name: &str, args: &[Value]) -> Option<Result<Value, CallError>> {
+        match name {
+            "building" => {
+                let Some(b) = self.building_by(args.first()) else { return Some(Ok(Value::Null)) };
+                if !self.own_building(b) {
+                    return None;
+                }
+                self.own_building_view(b).map(Ok)
+            }
+            "pileAt" => Some(tile(args.first(), args.get(1), "pileAt").map(|at| {
+                if !self.in_sight(at) {
+                    return Value::Null;
+                }
+                pile_at(self.world(), f64::from(at.0), f64::from(at.1), self.size())
+                    .map_or(Value::Null, |p| numbers_view("goods", &p.goods, good_name))
+            })),
+            _ => None,
+        }
+    }
+
     /// The building as the Player remembers it (`lastSaw`); an NPC city has no memory.
     fn last_saw(&self, b: &Building) -> Option<Json> {
         if self.npc() {
@@ -1759,7 +1818,10 @@ impl Host for ScriptBindings<'_> {
             return answer;
         }
         match b.is {
-            Is::Query => self.query(b.name, &args).map(|d| view_value(&d, b.returns)),
+            Is::Query => match self.direct_query(b.name, &args) {
+                Some(answer) => answer,
+                None => self.query(b.name, &args).map(|d| view_value(&d, b.returns)),
+            },
             Is::Action => self.action(b.name, &args),
             Is::Value => Err(host_error(format!("{} is a value", b.name))),
         }
