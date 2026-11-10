@@ -1,5 +1,5 @@
-//! The game server (ADR 0030): runs the world at one tick a second (`apps/server/src/index.ts`).
-//! HTTP and WebSocket sync arrive with T87.5 and T87.6.
+//! The game server (ADR 0030): runs the world at one tick a second (`apps/server/src/index.ts`),
+//! with HTTP and WebSocket sync beside it.
 
 use std::process::ExitCode;
 
