@@ -786,7 +786,12 @@ impl SideSight {
 
     /// One building as `places` shows it, if it is in its sight, without working out the rest
     /// (T89.6): `places` holds each building it sees as `seen_building` makes it, once.
-    pub fn place(&self, world: &WorldState, index: &WorldIndex, b: &Building) -> Option<SeenEntity> {
+    pub fn place(
+        &self,
+        world: &WorldState,
+        index: &WorldIndex,
+        b: &Building,
+    ) -> Option<SeenEntity> {
         if self.observers.is_empty() || !self.eyes.building_seen(placed(b)) {
             return None;
         }

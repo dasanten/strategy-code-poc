@@ -265,9 +265,7 @@ fn run_city(
         // they get their next job.
         let at = workplace_of(&world.residents[i]);
         let working = matches!(world.residents[i].order, Some(ResidentOrder::WorkAt(_)));
-        if let Some(place) =
-            at.filter(|_| working).and_then(|id| building_index(world, &id))
-        {
+        if let Some(place) = at.filter(|_| working).and_then(|id| building_index(world, &id)) {
             let pb = &world.buildings[place];
             if processes(pb.kind)
                 && !input_left(world, pb, i)

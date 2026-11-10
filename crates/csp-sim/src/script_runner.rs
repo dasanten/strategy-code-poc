@@ -51,8 +51,7 @@ use crate::script_params::{
 };
 use crate::scripts::RunnableScript;
 use crate::sight::{
-    building_in_sight, entities_in_sight, places_in_sight, sight_of, InvariantViolation,
-    SightCache,
+    building_in_sight, entities_in_sight, places_in_sight, sight_of, InvariantViolation, SightCache,
 };
 use crate::tick::{RunScripts, Scratch, ScriptErrorWhere};
 use crate::workplace_settings::{
