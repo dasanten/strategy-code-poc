@@ -13,7 +13,7 @@ use csp_shared::terrain::TerrainMap;
 use csp_shared::time::{TICKS_PER_GAME_DAY, TICKS_PER_GAME_YEAR};
 use csp_shared::world::{Good, Horse, HorseStats, RealmEventWhat, WorldState};
 
-use crate::movement_pending::record_event;
+use crate::events::record_event;
 use crate::queries::carriages::{carriage_pulled_by, driver_of};
 use crate::queries::horses::rider_of;
 use crate::queries::js_round;

@@ -7,13 +7,13 @@ use csp_shared::balance::MAP_SIZE;
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{OrderRequest, WorldState};
 
-use crate::movement_pending::{
-    ordered_resident, str_field, take_over, OrderKind, OrderSender, Taken,
-};
+use crate::order_sender::{ordered_resident, OrderSender};
+use crate::orders::{str_field, OrderKind};
 use crate::queries::alliance::commander_of;
 use crate::queries::carriages::carriage_pulled_by;
 use crate::queries::residents::is_down;
 use crate::queries::riding::{horse_of_resident, horse_ridden, mount_problem};
+use crate::stealing::{take_over, Taken};
 use crate::walking::order_path_mut;
 
 /// A path found before mounting or dismounting kept to the ground and walls of the other way of
@@ -39,7 +39,9 @@ impl OrderKind for Mount {
         order: &OrderRequest,
         terrain: Option<&TerrainMap>,
     ) -> Option<String> {
-        let Some(r) = ordered_resident(world, sender, str_field(order, "residentId")) else {
+        let Some(r) = ordered_resident(world, sender, str_field(order, "residentId"))
+            .map(|i| &world.residents[i])
+        else {
             return Some("not one of your residents".into());
         };
         let horse =
@@ -91,7 +93,9 @@ impl OrderKind for Dismount {
         order: &OrderRequest,
         _terrain: Option<&TerrainMap>,
     ) -> Option<String> {
-        let Some(r) = ordered_resident(world, sender, str_field(order, "residentId")) else {
+        let Some(r) = ordered_resident(world, sender, str_field(order, "residentId"))
+            .map(|i| &world.residents[i])
+        else {
             return Some("not one of your residents".into());
         };
         r.riding.is_none().then(|| "not riding".into())

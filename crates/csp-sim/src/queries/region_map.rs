@@ -10,7 +10,8 @@ use ts_rs::TS;
 use super::alliance::alliance_of;
 use super::npc_trade::locale_compare;
 use super::territory::{Territory, TRADE_ORGANIZATION};
-use crate::realm_pending::{realm_name, TRADE_ORG_NAME};
+use crate::queries::alliance::realm_name;
+use crate::queries::standing::TRADE_ORG_NAME;
 
 /// An alliance a holder shows as part of.
 #[derive(Debug, Clone, PartialEq, Serialize, TS)]

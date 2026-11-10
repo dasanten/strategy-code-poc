@@ -213,7 +213,7 @@ fn order(fields: serde_json::Value) -> OrderRequest {
 fn accepts_an_order_for_your_own_resident_and_applies_it_next_tick() {
     let open = open();
     let mut world = one_walker(&open, 1.0, 1.0, 10.0);
-    let sender = OrderSender { user_id: 7, npc_city_id: None };
+    let sender = OrderSender::player(7, "Player");
     let o = order(serde_json::json!({"kind": "walkTo", "residentId": "w1", "x": 4, "y": 1}));
     assert_eq!(WalkTo.validate(&world, &sender, &o, None), None);
     assert!(w1(&world).order.is_none());
@@ -233,8 +233,8 @@ fn accepts_an_order_for_your_own_resident_and_applies_it_next_tick() {
 fn rejects_someone_elses_resident_and_targets_that_arent_tiles() {
     let open = open();
     let world = one_walker(&open, 1.0, 1.0, 10.0);
-    let me = OrderSender { user_id: 7, npc_city_id: None };
-    let stranger = OrderSender { user_id: 8, npc_city_id: None };
+    let me = OrderSender::player(7, "Player");
+    let stranger = OrderSender::player(8, "Player");
     let o = |x: f64, id: &str| {
         order(serde_json::json!({"kind": "walkTo", "residentId": id, "x": x, "y": 2}))
     };

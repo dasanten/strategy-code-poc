@@ -13,15 +13,16 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use csp_shared::balance::{MAP_SIZE, REALM_LOG_LENGTH};
+use csp_shared::balance::MAP_SIZE;
 use csp_shared::terrain::TerrainMap;
 use csp_shared::time::TICKS_PER_GAME_HOUR;
 use csp_shared::world::{
-    Interrupted, OrderEndedKind, OrderRequest, Queue, QueueStep, RealmEvent, RealmEventWhat,
-    Resident, WorldState,
+    Interrupted, OrderEndedKind, OrderRequest, Queue, QueueStep, RealmEventWhat, Resident,
+    WorldState,
 };
 use serde_json::Value;
 
+use crate::events::record_event;
 use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::orders::{leave_armies, OrderKind, OrderKinds};
 use crate::queries::residents::is_down;
@@ -544,32 +545,6 @@ fn skipped(world: &mut WorldState, i: usize, reason: &str, queue_ended: bool) {
     };
     let realm_id = q.realm_id.clone();
     record_event(world, Some(&realm_id), what);
-}
-
-/// Writes down something that happened in a realm, in its Player's log (`recordEvent`); an event
-/// for no realm is not kept. Each Player keeps their latest `REALM_LOG_LENGTH` events.
-// TODO(T86.13): `events::record_event`.
-fn record_event(world: &mut WorldState, realm_id: Option<&str>, what: RealmEventWhat) {
-    let Some(user_id) =
-        realm_id.and_then(|id| world.realms.iter().find(|x| x.id == id)).map(|r| r.user_id)
-    else {
-        return;
-    };
-    let seq = world.next_id;
-    world.next_id += 1;
-    world.events.push(RealmEvent { seq, tick: world.tick, user_id, what });
-    let mine = world.events.iter().filter(|e| e.user_id == user_id).count();
-    if mine as f64 > REALM_LOG_LENGTH {
-        let mut drop = mine - REALM_LOG_LENGTH as usize;
-        world.events.retain(|e| {
-            if drop > 0 && e.user_id == user_id {
-                drop -= 1;
-                false
-            } else {
-                true
-            }
-        });
-    }
 }
 
 /// Invariant (`queues-sound`, ADR 0004): every queue has steps, its current step is one of them

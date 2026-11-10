@@ -7,9 +7,9 @@ use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{BuildingKind, ClimbOrder, ResidentOrder, Tile, WorldState};
 use serde_json::json;
 
-use crate::movement_pending::climb_landing;
 use crate::movement_test_world::{add_city, building, order_from, plains, realm, resident};
 use crate::tick::Scratch;
+use crate::walls::climb_landing;
 use crate::world::{create_world, step_world};
 
 /// A world with realm r1 (Player 7) and r2 (Player 8), and r1's city: a ring of wall from (5, 5)
@@ -108,6 +108,6 @@ fn with_no_room_beyond_the_climber_ends_up_on_the_wall() {
     let mut inner = building("w8-6", BuildingKind::Wall, 8.0, 6.0);
     inner.city_id = Some("c1".into());
     world.buildings.push(inner);
-    assert_eq!(climb_landing(&world, &terrain, (8.0, 4.0), (8.0, 5.0)), (8.0, 5.0));
-    assert_eq!(climb_landing(&world, &terrain, (7.0, 4.0), (7.0, 5.0)), (7.0, 6.0));
+    assert_eq!(climb_landing(&world, &terrain, (8, 4), (8, 5)), (8, 5));
+    assert_eq!(climb_landing(&world, &terrain, (7, 4), (7, 5)), (7, 6));
 }

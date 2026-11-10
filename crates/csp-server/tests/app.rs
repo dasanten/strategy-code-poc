@@ -1,7 +1,5 @@
 //! The HTTP routes (`app.test.ts`, the requests of `first-day.test.ts` and the script library API
 //! of `scripts.test.ts`), driven through the router as Fastify's `inject` drives the app.
-//!
-//! Not ported yet: the admin directives case, which waits for `directives.ts` (T86.11).
 use std::sync::Arc;
 
 use axum::body::{to_bytes, Body};
@@ -764,6 +762,94 @@ struct NoLog;
 
 impl csp_server::monitoring::LogSink for NoLog {
     fn log(&self, _: tracing::Level, _: Value, _: &str) {}
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn lets_admins_give_and_lift_directives_and_no_one_else() {
+    let db = Db::new();
+    let terrain = TerrainMap { size: 64, tiles: vec![0; 64 * 64] };
+    let world = create_world(&terrain, 1);
+    let explored = ExploredTerrain::new(terrain.clone(), &world.nodes);
+    let game = game_thread(&db, world, terrain, explored);
+    let mut opts = db.opts();
+    opts.game = Some(game.clone());
+    let app = build_app(opts);
+    create_admin(&db.conn(), Some("Daniel"), Some("admin password")).unwrap();
+    let admin = login_as(&app, "Daniel", "admin password").await;
+    let invite = call(&app, "POST", "/api/admin/invites", Some(&admin), None).await;
+    sign_up(&app, "Mara", invite.json()["code"].as_str().unwrap(), "correct horse").await;
+    let mara = login_as(&app, "Mara", "correct horse").await;
+    let mara_id = get_session_user(&db.conn(), Some(&mara), now_ms()).unwrap().unwrap().id;
+    let realm = json!({ "id": "r1", "userId": mara_id, "leaderId": "a1" });
+    game.run(move |g, _| g.world.realms.push(serde_json::from_value(realm).unwrap())).await;
+    let directives = || {
+        let game = game.clone();
+        async move { game.run(|g, _| g.world.directives.clone()).await.unwrap() }
+    };
+
+    let listed = call(&app, "GET", "/api/admin/directives", Some(&admin), None).await;
+    assert_eq!(
+        listed.json(),
+        json!({
+            "directives": [],
+            "targets": [{
+                "org": "r1", "name": "a fallen realm", "is": "realm", "account": "Mara",
+                "cities": [], "allies": [],
+            }],
+        })
+    );
+    let payload = json!({
+        "target": "r1",
+        "withAlliance": false,
+        "reason": "farms new Players",
+        "goals": [{ "kind": "soldiers", "count": 20 }],
+    });
+    let with = |key: &str, value: Value| {
+        let mut p = payload.clone();
+        p[key] = value;
+        p
+    };
+    let url = "/api/admin/directives";
+    let refused = call(&app, "POST", url, Some(&mara), Some(payload.clone())).await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+    let bad = call(&app, "POST", url, Some(&admin), Some(with("target", json!("nowhere")))).await;
+    assert_eq!(bad.status, StatusCode::BAD_REQUEST);
+    let no_goals = call(&app, "POST", url, Some(&admin), Some(with("goals", json!([])))).await;
+    assert_eq!(no_goals.status, StatusCode::BAD_REQUEST);
+
+    let given = call(&app, "POST", url, Some(&admin), Some(payload.clone())).await;
+    assert_eq!(given.status, StatusCode::CREATED);
+    let shown = given.json();
+    for key in ["target", "withAlliance", "reason"] {
+        assert_eq!(shown[key], payload[key], "{key}");
+    }
+    let goal = &shown["goals"][0];
+    assert_eq!(
+        (&goal["kind"], goal["count"].as_f64()),
+        (&json!("soldiers"), Some(20.0)),
+        "{shown}"
+    );
+    assert_eq!(shown["goals"].as_array().map(Vec::len), Some(1));
+    assert_eq!((&shown["givenBy"], &shown["soldiersKilled"]), (&json!("Daniel"), &json!(0.0)));
+    let now = directives().await;
+    assert_eq!(now.len(), 1);
+    assert_eq!(now[0].price, None);
+
+    let one = format!("{url}/{}", shown["id"].as_str().unwrap());
+    let priced = json!({ "price": 800 });
+    let refused = call(&app, "PATCH", &one, Some(&mara), Some(priced.clone())).await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+    let bad_price = call(&app, "PATCH", &one, Some(&admin), Some(json!({ "price": 0 }))).await;
+    assert_eq!(bad_price.status, StatusCode::BAD_REQUEST);
+    let set = call(&app, "PATCH", &one, Some(&admin), Some(priced)).await;
+    assert_eq!(set.status, StatusCode::OK);
+    assert_eq!(set.json()["price"], json!(800.0));
+    assert_eq!(directives().await[0].price, Some(800.0));
+
+    assert_eq!(call(&app, "DELETE", &one, Some(&mara), None).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(call(&app, "DELETE", &one, Some(&admin), None).await.status, StatusCode::NO_CONTENT);
+    assert_eq!(directives().await, []);
+    assert_eq!(call(&app, "DELETE", &one, Some(&admin), None).await.status, StatusCode::NOT_FOUND);
 }
 
 #[tokio::test(flavor = "multi_thread")]

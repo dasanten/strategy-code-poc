@@ -14,14 +14,15 @@ use serde::Serialize;
 use serde_json::{json, Map, Value};
 
 use crate::queries::alliance::alliance_of;
+use crate::queries::alliance::realm_name;
 use crate::queries::carriages::crew_ids_of;
 use crate::queries::city::town_hall_of;
 use crate::queries::names::{held, kind_name, ALL_GOODS};
 use crate::queries::npc_trade::locale_compare;
 use crate::queries::region_map::{region_map_for, RegionMap};
 use crate::queries::residents::is_armed;
+use crate::queries::standing::TRADE_ORG_NAME;
 use crate::queries::territory::{city_organization, Territory, TRADE_ORGANIZATION};
-use crate::realm_pending::{realm_name, TRADE_ORG_NAME};
 
 /// Where an admin loads the map they draw (`ADMIN_MAP_INFO_PATH`).
 pub const ADMIN_MAP_INFO_PATH: &str = "/api/admin/map";

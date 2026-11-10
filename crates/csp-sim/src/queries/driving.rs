@@ -7,10 +7,10 @@ use csp_shared::balance::{carriage_can_enter, CARAVAN_GUARD_RANGE, PASSENGER_WEI
 use csp_shared::terrain::{terrain_at, wrap_distance, Terrain, TerrainMap};
 use csp_shared::world::{BuildingKind, Carriage, Horse, Resident, WorldState};
 
-use super::carriages::{
-    carriage_capacity, driver_of, hitch_horse_problem, horse_for, passengers_of,
-};
-use super::residents::{can_work, is_armed, is_down, stock_weight};
+use super::carriages::{driver_of, hitch_horse_problem, horse_for, passengers_of};
+use super::goods::carriage_room;
+use super::guard::guarded_by;
+use super::residents::{can_work, is_armed, is_down};
 
 /// Whether a carriage can go onto a tile (`carriageCanGoTo`): its terrain, or a finished road.
 pub fn carriage_can_go_to(world: &WorldState, map: &TerrainMap, x: i32, y: i32) -> bool {
@@ -36,30 +36,6 @@ pub fn carriage_of_resident(
         return *realm_id == r.owner;
     }
     realm_id.is_none() && r.city_id.is_some() && *city_id == r.city_id
-}
-
-/// Whether armed residents guard something (`guardedBy`): one up, armed and `here` who `guards`
-/// it, and none who `breaks` the guard.
-// TODO(T86.5): `queries::guard::guarded_by` once it lands.
-fn guarded_by(
-    residents: &[Resident],
-    here: impl Fn(&Resident) -> bool,
-    guards: impl Fn(&Resident) -> bool,
-    breaks: impl Fn(&Resident) -> bool,
-) -> bool {
-    let mut guarded = false;
-    for r in residents {
-        if r.health <= 0.0 || is_down(r.down_until) || !is_armed(&r.carried) || !here(r) {
-            continue;
-        }
-        if breaks(r) {
-            return false;
-        }
-        if guards(r) {
-            guarded = true;
-        }
-    }
-    guarded
 }
 
 /// Why a resident can't take another organization's carriage or horse — standing at `at`, owned
@@ -344,15 +320,6 @@ pub fn hitch_problem(
         return Some("no such horse".to_string());
     };
     hitch_horse_problem(world, carriage, horse).map(str::to_string)
-}
-
-/// How much more weight fits on a carriage, in kg (`carriageRoom`).
-// TODO(T86.5): `queries::goods::carriage_room` once it lands.
-fn carriage_room(world: &WorldState, carriage: &Carriage) -> f64 {
-    let passengers = passengers_of(world, &carriage.id).len() as f64;
-    carriage_capacity(world, carriage)
-        - passengers * PASSENGER_WEIGHT
-        - stock_weight(&carriage.load)
 }
 
 /// Why a resident can't board a carriage now (`boardProblem`): `boarder_problem`, and room for

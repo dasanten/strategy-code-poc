@@ -9,33 +9,49 @@ use std::collections::{HashMap, HashSet};
 
 use csp_shared::balance::{
     carriage_can_enter, trained_cap, ALLIANCE_LEAVE_DELAY, ALLIANCE_RECALL_DELAY,
-    CARRIAGE_CAPACITY, CARRIAGE_MAX_CAPACITY, CARRYING_TICKS, CONSTRUCTION_SKILL_MAX,
-    CRIME_MEMORY_DAYS, GOOD_WEIGHT, LIFESPAN_MAX, LIFESPAN_MIN, MAX_HEALTH, MAX_HUNGER,
-    OCCUPATION_GAME_DAYS, PASSENGER_WEIGHT, REALM_LOG_LENGTH, REALM_NAME_MAX_LENGTH,
-    ROAD_LINE_MAX_TILES, STABLE_BREED_DAYS, TRAINING_GROUND_MAX_TRAINEES, WORK_SKILL_MAX,
+    CARRIAGE_CAPACITY, CARRIAGE_MAX_CAPACITY, CARRYING_TICKS, CITY_AREA_MARGIN,
+    CONSTRUCTION_SKILL_MAX, CRIME_MEMORY_DAYS, GOOD_WEIGHT, LIFESPAN_MAX, LIFESPAN_MIN, MAX_HEALTH,
+    MAX_HUNGER, MEAL_UNITS, OCCUPATION_GAME_DAYS, PASSENGER_WEIGHT, REALM_LOG_LENGTH,
+    REALM_NAME_MAX_LENGTH, ROAD_LINE_MAX_TILES, STABLE_BREED_DAYS, TRAINING_GROUND_MAX_TRAINEES,
+    WORK_SKILL_MAX,
 };
-use csp_shared::footprint::{footprint_tiles, is_at};
+use csp_shared::footprint::{footprint_tiles, is_at, near_footprint};
 use csp_shared::terrain::{
     beside_step, is_passable_terrain, step_length, terrain_at, tile_index, wrap_delta, Terrain,
     TerrainMap,
 };
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
-    BuildingKind, HaulPhase, HaulStop, LinePhase, ResidentOrder, ResourceKind, SkillName, Stock,
-    WorldState,
+    BuildingKind, Good, HaulPhase, HaulStop, LinePhase, ResidentOrder, ResourceKind, SkillName,
+    Stock, WorldState,
 };
 
 use super::{js_json, js_number, violation, InvariantViolation};
-use crate::queries::alliance::{allied_realms, carriage_commander_of, commander_of, contract_of};
+use crate::caravans::caravan_crew;
+use crate::npc_behaviour::{is_npc_order, run_by_npc_city};
+use crate::pairing::carrying_blocks;
+use crate::queries::alliance::{allied_realms, carriage_commander_of, commander_of};
 use crate::queries::balance::carry_capacity;
 use crate::queries::building::{
     build_materials, build_work_of, building_at, carriage_can_go_to, has_choice, line_building,
     line_order, materials_needed, max_workers, node_workplace, teardown_work, work_needed,
     workplace_good, BUILDABLE, KEEPS_GOODS, OFF_NODES, ON_PLAINS, PROCESSING, SHARES_A_TILE,
 };
-use crate::queries::names::{good_name, kind_name, placed};
+use crate::queries::city_area::{city_membership, is_city_building};
+use crate::queries::command::commander_of_resident;
+use crate::queries::goods::units_that_fit;
+use crate::queries::names::{good_name, held, kind_name, placed};
+use crate::queries::people::{js_trim, name_problem};
 use crate::queries::residents::{age_in_years, can_work, is_armed, stock_weight};
 use crate::queries::standing::TRADE_ORG;
+use crate::queries::territory::{
+    city_organization, compute_territory, control_at, control_sources,
+};
+use crate::script_runner::{
+    defaults_have_a_target, one_carrier_at_a_time, one_fetcher_at_a_time,
+    one_input_fetcher_at_a_time,
+};
+use crate::survival::{refill_source, refill_target};
 use crate::walls::{is_wall_or_gate, wall_strength};
 use crate::world::is_walkable;
 
@@ -55,19 +71,6 @@ pub(crate) fn kind_of(o: &ResidentOrder) -> String {
 /// At a building, on the whole map (`isAt(r, b)` with its default size).
 fn at_building(x: f64, y: f64, b: &csp_shared::world::Building) -> bool {
     is_at((x as i32, y as i32), placed(b), csp_shared::balance::MAP_SIZE)
-}
-
-/// Why a name won't do (`nameProblem`), counting characters as JavaScript does (UTF-16).
-// TODO(T86.8): `names.ts`.
-fn name_problem(name: &str, max_length: f64) -> Option<String> {
-    let trimmed = name.trim();
-    if trimmed.is_empty() {
-        return Some("needs a name".into());
-    }
-    if trimmed.encode_utf16().count() as f64 > max_length {
-        return Some(format!("at most {} characters", js_number(max_length)));
-    }
-    None
 }
 
 /// Nothing stands on impassable terrain.
@@ -132,7 +135,7 @@ pub fn realms_have_leaders(world: &WorldState, _: &TerrainMap) -> Out {
         }
         seen.insert(realm.user_id);
         if let Some(n) = &realm.name {
-            if n != n.trim() || name_problem(n, REALM_NAME_MAX_LENGTH).is_some() {
+            if n != js_trim(n) || name_problem(Some(n), REALM_NAME_MAX_LENGTH).is_some() {
                 problems.push(format!("has a bad name {}", js_json(n)));
             }
         }
@@ -258,7 +261,7 @@ pub fn buildings_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
 /// Every city has exactly one town hall, a finished one that belongs to it; every town hall makes
 /// a city; and every finished city building belongs to the city its chain gives it
 /// (`citiesFromBuildings`).
-pub fn cities_from_buildings(world: &WorldState, _: &TerrainMap) -> Out {
+pub fn cities_from_buildings(world: &WorldState, terrain: &TerrainMap) -> Out {
     let name = "cities-from-buildings";
     let mut out = Vec::new();
     let mut fail = |id: &str, m: String| out.push(violation(name, format!("{id} {m}"), &[id]));
@@ -276,6 +279,7 @@ pub fn cities_from_buildings(world: &WorldState, _: &TerrainMap) -> Out {
             _ => fail(&c.id, "has no town hall".into()),
         }
     }
+    let members = city_membership(world, terrain.size);
     for b in &world.buildings {
         if b.kind == BuildingKind::TownHall
             && b.site.is_none()
@@ -283,8 +287,18 @@ pub fn cities_from_buildings(world: &WorldState, _: &TerrainMap) -> Out {
         {
             fail(&b.id, "makes no city".into());
         }
+        if !is_city_building(b) {
+            continue;
+        }
+        let city = members.get(&b.id);
+        if b.city_id.as_ref() != city {
+            let say = |c: Option<&String>| c.map_or("null".to_string(), |c| c.clone());
+            fail(
+                &b.id,
+                format!("belongs to city {}, but stands in {}", say(b.city_id.as_ref()), say(city)),
+            );
+        }
     }
-    // TODO(T86.8): every finished city building belongs to the city `cityMembership` gives it.
     out
 }
 
@@ -1229,16 +1243,128 @@ pub fn haul_routes_sound(world: &WorldState, terrain: &TerrainMap) -> Out {
     out
 }
 
-/// Territory is derived soundly (`territorySound`).
-// TODO(T86.11): needs `computeTerritory`, `controlSources` and `controlAt` of `territory.ts`.
-pub fn territory_sound(_: &WorldState, _: &TerrainMap) -> Out {
-    Vec::new()
+/// How many of a territory's tiles `territory_sound` passes over for each it works out again
+/// (`TERRITORY_CHECK_STRIDE`).
+const TERRITORY_CHECK_STRIDE: usize = 37;
+
+/// Territory is derived soundly (`territorySound`, `CONTEXT.md`: Territory): every tile in it
+/// belongs to an Organization that exists (a realm, or a city of no realm) and lies within reach
+/// of one of that Organization's cities or guarded workplaces, and no other Organization projects
+/// as much control onto it. The control on a tile is worked out apart from the territory,
+/// straight from each source's tiles, for every `TERRITORY_CHECK_STRIDE`th tile of it.
+pub fn territory_sound(world: &WorldState, terrain: &TerrainMap) -> Out {
+    let name = "territory-sound";
+    let size = terrain.size;
+    let organizations: HashSet<&str> = world
+        .realms
+        .iter()
+        .map(|r| r.id.as_str())
+        .chain(world.cities.iter().filter(|c| c.realm_id.is_none()).map(city_organization))
+        .collect();
+    let sources = control_sources(world, size);
+    // Each source's tiles as a box round its first one, to pass over the sources out of reach.
+    struct Box {
+        o: (i32, i32),
+        x0: i32,
+        x1: i32,
+        y0: i32,
+        y1: i32,
+    }
+    let boxes: Vec<Box> = sources
+        .iter()
+        .map(|s| {
+            let o = s.tiles[0];
+            let dxs = s.tiles.iter().map(|t| wrap_delta(o.0, t.0, size));
+            let dys = s.tiles.iter().map(|t| wrap_delta(o.1, t.1, size));
+            let (x0, x1) = dxs.fold((i32::MAX, i32::MIN), |(lo, hi), v| (lo.min(v), hi.max(v)));
+            let (y0, y1) = dys.fold((i32::MAX, i32::MIN), |(lo, hi), v| (lo.min(v), hi.max(v)));
+            Box { o, x0, x1, y0, y1 }
+        })
+        .collect();
+    // Each Organization's control on a tile, worked out apart from the territory.
+    let control_at_tile = |x: i32, y: i32| -> indexmap::IndexMap<&str, f64> {
+        let mut control: indexmap::IndexMap<&str, f64> = indexmap::IndexMap::new();
+        for (k, s) in sources.iter().enumerate() {
+            let b = &boxes[k];
+            let dx = wrap_delta(b.o.0, x, size);
+            let dy = wrap_delta(b.o.1, y, size);
+            // Measured the short way round from its first tile, the box holds only while it and
+            // the reach take up less than half the map.
+            let small = f64::from((b.x1 - b.x0).max(b.y1 - b.y0)) + s.reach < f64::from(size) / 2.0;
+            let gap = f64::from((b.x0 - dx).max(0).max(dx - b.x1))
+                .hypot(f64::from((b.y0 - dy).max(0).max(dy - b.y1)));
+            if small && gap > s.reach {
+                continue;
+            }
+            // The nearest of its tiles, by squared distance, passing over those too far along a
+            // side.
+            let mut d2 = f64::INFINITY;
+            for t in &s.tiles {
+                let tx = f64::from(wrap_delta(t.0, x, size));
+                if tx * tx >= d2 {
+                    continue;
+                }
+                let ty = f64::from(wrap_delta(t.1, y, size));
+                d2 = d2.min(tx * tx + ty * ty);
+            }
+            let c = control_at(s.strength, s.reach, d2.sqrt());
+            if c > control.get(s.owner.as_str()).copied().unwrap_or(0.0) {
+                control.insert(s.owner.as_str(), c);
+            }
+        }
+        control
+    };
+    let mut out = Vec::new();
+    let mut fail = |key: &str, owner: &str, message: String| {
+        out.push(violation(name, format!("tile ({key}) {message}"), &[owner]));
+    };
+    for (i, (&index, owner)) in compute_territory(world, size).owners.iter().enumerate() {
+        let (x, y) = ((index % size as usize) as i32, (index / size as usize) as i32);
+        let key = format!("{x},{y}");
+        if !organizations.contains(owner.as_str()) {
+            fail(&key, owner, format!("belongs to {owner}, which is no Organization"));
+        }
+        if i % TERRITORY_CHECK_STRIDE != 0 {
+            continue;
+        }
+        let control = control_at_tile(x, y);
+        let own = control.get(owner.as_str()).copied().unwrap_or(0.0);
+        if own <= 0.0 {
+            fail(&key, owner, format!("belongs to {owner}, which projects no control there"));
+        }
+        for (other, c) in &control {
+            if *other != owner.as_str() && *c >= own {
+                fail(&key, owner, format!("belongs to {owner}, but {other} is as strong there"));
+            }
+        }
+    }
+    out
 }
 
-/// Nobody who refills runs low while their source has food (`refilledWhenLow`).
-// TODO(T86.3): needs `refillTarget` and `refillSource` of `survival.ts`.
-pub fn refilled_when_low(_: &WorldState, _: &TerrainMap) -> Out {
-    Vec::new()
+/// After a tick, nobody at home, near an outpost storage of their realm, at their workplace, or
+/// in an army or aboard as a passenger by a carriage runs low on food (a child at home: has less
+/// than their own food) while the storage, pile or carriage they refill from still has some and
+/// a meal would fit (`refilledWhenLow`, `stepRefill`, `refillTarget`).
+pub fn refilled_when_low(world: &WorldState, terrain: &TerrainMap) -> Out {
+    let name = "refilled-when-low";
+    let size = terrain.size;
+    world
+        .residents
+        .iter()
+        .filter(|r| {
+            held(&r.carried, Good::Food) < refill_target(world, r, size)
+                && refill_source(world, r, size).map_or(0.0, |s| s.food) > 0.0
+                && units_that_fit(r, Good::Food, world.tick as f64) >= MEAL_UNITS
+        })
+        .map(|r| {
+            let msg = format!(
+                "resident {} has only {} food where there is more",
+                r.id,
+                js_number(held(&r.carried, Good::Food))
+            );
+            violation(name, msg, &[&r.id])
+        })
+        .collect()
 }
 
 /// Every resident lives in a city that exists, or in none (`residentsInCities`).
@@ -1449,23 +1575,6 @@ pub fn city_workplaces_sound(world: &WorldState, _: &TerrainMap) -> Out {
     out
 }
 
-/// Whether a resident is run by an NPC city (`runByNpcCity`).
-// TODO(T86.10): `npc-behaviour.ts`.
-fn run_by_npc_city(world: &WorldState, r: &csp_shared::world::Resident) -> bool {
-    if r.owner.is_some() || contract_of(world, &r.id).is_some() {
-        return false;
-    }
-    let Some(city) = &r.city_id else { return false };
-    world.cities.iter().any(|c| &c.id == city && c.realm_id.is_none())
-}
-
-/// The kinds of order an NPC city's residents may hold (`NPC_ORDER_KINDS`).
-// TODO(T86.10): `npc-behaviour.ts`.
-const NPC_ORDER_KINDS: [&str; 14] = [
-    "walkTo", "pickUp", "drop", "store", "fetch", "workAt", "build", "tearDown", "breed", "attack",
-    "trade", "feed", "teach", "train",
-];
-
 /// An NPC city does nothing a Player's residents couldn't (`npcOrdersAllowed`).
 pub fn npc_orders_allowed(world: &WorldState, _: &TerrainMap) -> Out {
     let name = "npc-orders-allowed";
@@ -1483,8 +1592,7 @@ pub fn npc_orders_allowed(world: &WorldState, _: &TerrainMap) -> Out {
             continue;
         }
         let kind = kind_of(o);
-        let allowed = NPC_ORDER_KINDS.contains(&kind.as_str())
-            || (kind == "drive" && drivers.contains(r.id.as_str()));
+        let allowed = is_npc_order(o) || (kind == "drive" && drivers.contains(r.id.as_str()));
         if !allowed {
             out.push(violation(
                 name,
@@ -1561,11 +1669,6 @@ pub fn pairs_hold_together(world: &WorldState, _: &TerrainMap) -> Out {
     out
 }
 
-/// The orders a resident carrying a child doesn't hold (`CARRYING_BLOCKS`).
-// TODO(T86.8): `pairing.ts`.
-const CARRYING_BLOCKS: [&str; 8] =
-    ["workAt", "breed", "build", "roadLine", "wallLine", "tearDown", "haul", "relocate"];
-
 /// A resident carrying a child holds no order to work, build, tear down or haul, is grown, and
 /// gives birth in time (`carryingDoesntWork`).
 pub fn carrying_doesnt_work(world: &WorldState, _: &TerrainMap) -> Out {
@@ -1576,7 +1679,7 @@ pub fn carrying_doesnt_work(world: &WorldState, _: &TerrainMap) -> Out {
         let mut problems = Vec::new();
         if let Some(o) = &r.order {
             let kind = kind_of(o);
-            if CARRYING_BLOCKS.contains(&kind.as_str()) {
+            if carrying_blocks(o) {
                 problems.push(format!("holds a {kind} order while carrying a child"));
             }
         }
@@ -2137,28 +2240,115 @@ pub fn trade_org_sound(world: &WorldState, _: &TerrainMap) -> Out {
     out
 }
 
+/// Whether a resident runs the game's own default script (`r.script?.scriptId === 0`): an NPC
+/// city's residents; a Player's unedited ones are checked where their scripts run.
+fn runs_the_game_default(r: &csp_shared::world::Resident) -> bool {
+    r.script.as_ref().is_some_and(|s| s.script_id == 0)
+}
+
 /// At most one carrier of a workplace's output at once, among NPC cities' residents running the
 /// game's own Work default (`gameDefaultCarriers`).
-// TODO(T86.12): `oneCarrierAtATime` of `script-runner.ts`.
-pub fn game_default_carriers(_: &WorldState, _: &TerrainMap) -> Out {
-    Vec::new()
+pub fn game_default_carriers(world: &WorldState, _: &TerrainMap) -> Out {
+    one_carrier_at_a_time(world, &runs_the_game_default)
 }
 
 /// At most one fetcher of a site's materials at once (`gameDefaultFetchers`).
-// TODO(T86.12): `oneFetcherAtATime` of `script-runner.ts`.
-pub fn game_default_fetchers(_: &WorldState, _: &TerrainMap) -> Out {
-    Vec::new()
+pub fn game_default_fetchers(world: &WorldState, _: &TerrainMap) -> Out {
+    one_fetcher_at_a_time(world, &runs_the_game_default)
 }
 
 /// At most one fetcher of a processing workplace's inputs at once (`gameDefaultInputFetchers`).
-// TODO(T86.12): `oneInputFetcherAtATime` of `script-runner.ts`.
-pub fn game_default_input_fetchers(_: &WorldState, _: &TerrainMap) -> Out {
-    Vec::new()
+pub fn game_default_input_fetchers(world: &WorldState, _: &TerrainMap) -> Out {
+    one_input_fetcher_at_a_time(world, &runs_the_game_default)
 }
 
 /// Nobody runs Work, Build or Haul for longer than a tick without its target
 /// (`gameDefaultTargets`).
-// TODO(T86.12): `defaultsHaveATarget` of `script-runner.ts`.
-pub fn game_default_targets(_: &WorldState, _: &TerrainMap) -> Out {
-    Vec::new()
+pub fn game_default_targets(world: &WorldState, _: &TerrainMap) -> Out {
+    defaults_have_a_target(world, &|r| r.script.as_ref().filter(|s| s.script_id == 0)?.task)
+}
+
+/// Whether the city keeps track of outsiders: trading posts and the HQ keep their own rules
+/// (`watches` of `outsiders.ts`).
+fn watches(city: &csp_shared::world::City) -> bool {
+    city.trade_org.is_none()
+}
+
+/// Whether `r` counts as an outsider for `city`, wherever they stand (`outsiderTo` of
+/// `outsiders.ts`, `CONTEXT.md`: Alarm): of another realm, or of another NPC city, and not allied;
+/// someone hired by the city's realm or an ally of it is on its side.
+// Written here, beside the invariant that reads it, because the module that ports
+// `outsiders.ts` keeps its own.
+fn outsider_to(
+    world: &WorldState,
+    city: &csp_shared::world::City,
+    r: &csp_shared::world::Resident,
+) -> bool {
+    let Some(theirs) = r.owner.as_deref().or(r.city_id.as_deref()) else { return false };
+    let side = city.realm_id.as_deref().unwrap_or(&city.id);
+    if allied_ids(world, side, theirs) {
+        return false;
+    }
+    match commander_of_resident(world, r) {
+        None => true,
+        Some(by) => by == theirs || !allied_ids(world, side, &by),
+    }
+}
+
+fn allied_ids(world: &WorldState, a: &str, b: &str) -> bool {
+    crate::queries::alliance::allied(world, a, b)
+}
+
+/// A city's outsiders are there as of the tick that just ended: each one once, alive, of no side
+/// of the city's and standing in its area. A list is never left empty, and trading posts and the
+/// HQ keep none (`outsidersSound`, ADR 0004; `CONTEXT.md`: Alarm).
+pub fn outsiders_sound(world: &WorldState, terrain: &TerrainMap) -> Out {
+    let name = "outsiders-sound";
+    let crew = caravan_crew(world);
+    let mut out = Vec::new();
+    for city in &world.cities {
+        let Some(list) = &city.outsiders else { continue };
+        let mut problem = |message: String, ids: &[&str]| {
+            let mut entity_ids = vec![city.id.clone()];
+            entity_ids.extend(ids.iter().map(|s| s.to_string()));
+            out.push(InvariantViolation {
+                invariant: name.into(),
+                message: format!("{} {message}", city.id),
+                entity_ids,
+            });
+        };
+        if list.is_empty() {
+            problem("keeps an empty list of outsiders".into(), &[]);
+        }
+        if !watches(city) {
+            problem("keeps outsiders, but keeps its own rules".into(), &[]);
+        }
+        if list.iter().collect::<HashSet<_>>().len() != list.len() {
+            problem("lists an outsider twice".into(), &[]);
+        }
+        let area: Vec<&csp_shared::world::Building> = world
+            .buildings
+            .iter()
+            .filter(|b| b.city_id.as_ref() == Some(&city.id) && is_city_building(b))
+            .collect();
+        for id in list {
+            let Some(r) = world.residents.iter().rev().find(|r| &r.id == id) else {
+                problem(format!("lists {id}, who is gone"), &[id]);
+                continue;
+            };
+            if !outsider_to(world, city, r) || crew.contains(id) {
+                problem(format!("lists {id}, who is no outsider"), &[id]);
+            } else if !area.iter().any(|b| {
+                near_footprint(
+                    placed(b),
+                    (r.x as i32, r.y as i32),
+                    CITY_AREA_MARGIN as i32,
+                    terrain.size,
+                )
+            }) {
+                problem(format!("lists {id}, who stands outside its area"), &[id]);
+            }
+        }
+    }
+    out
 }
