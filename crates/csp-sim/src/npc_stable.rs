@@ -225,3 +225,6 @@ pub fn npc_one_feeder(world: &WorldState) -> Vec<InvariantViolation> {
     }
     out
 }
+
+#[cfg(test)]
+mod tests;
