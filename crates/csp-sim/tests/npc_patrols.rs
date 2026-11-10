@@ -219,7 +219,7 @@ mod patrols {
         let (walls, roads) = (tiles(BuildingKind::Wall), tiles(BuildingKind::Road));
         // The first stop is the walk they are on already.
         let first = match &r.order {
-            Some(ResidentOrder::WalkTo(w)) => w.target.clone(),
+            Some(ResidentOrder::WalkTo(w)) => w.target,
             other => panic!("{other:?}"),
         };
         let mut stops = vec![first];
@@ -557,7 +557,7 @@ mod in_the_running_world {
                     .iter()
                     .filter(|id| {
                         let r = by_id(&s.world, id);
-                        is_at((r.x as i32, r.y as i32), hall.clone(), SIZE)
+                        is_at((r.x as i32, r.y as i32), hall, SIZE)
                     })
                     .count();
                 assert!(held >= 1);
@@ -751,7 +751,7 @@ mod npc_patrols_sound_invariant {
     #[test]
     fn catches_too_many_at_once_one_on_two_rounds_and_a_round_too_long() {
         let mut s = on_posts(11);
-        let long: Vec<Tile> = (0..50).map(|_| stops()[0].clone()).collect();
+        let long: Vec<Tile> = (0..50).map(|_| stops()[0]).collect();
         s.world.city_plans.get_mut(&s.city).unwrap().patrols = Some(
             (0..NPC_PATROLS_MAX as usize + 1)
                 .map(|_| CityPatrol { resident_id: "same".into(), stops: long.clone() })
