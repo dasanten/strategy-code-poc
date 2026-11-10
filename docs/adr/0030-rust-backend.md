@@ -101,6 +101,10 @@ fast) are part of the rewrite, not separate work.
 - The explored map must load fast on the Rust server for a Player who has seen a lot: chunks are
   served in batches, not one HTTP request per 32×32 chunk (Epic 84, T84.6), and the client's
   `ChunkStore` asks in batches.
+- **Done (T88.6, 2026-11-10):** at feature parity `rust-backend` went into `dev`; `apps/server`,
+  `packages/shared` and `packages/lang` were deleted (the last commit with them is `21f7a29e`) and
+  the feature freeze ended. The fixtures stay as frozen goldens. The rollback path was tested
+  locally with Docker and is written down in `README.md` (Deploy, Rolling back).
 
 ## Alternatives considered
 

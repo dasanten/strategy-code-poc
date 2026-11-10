@@ -1,7 +1,8 @@
 # The production image (ADR 0007, ADR 0030): the Rust server (`csp-server`) with its admin
-# commands, and the built client, which the server serves. Built by CI; production never builds
-# anything. Same volumes, port, environment and unprivileged user as the TypeScript image, so
-# `deploy/compose.yml` and the volumes it already has stay as they are.
+# commands (`csp-admin`, `check-fields`), and the built client, which the server serves. Built by
+# CI; production never builds anything. Same volumes, port, environment and unprivileged user as
+# the TypeScript image had, so `deploy/compose.yml` and its volumes stay as they are, and rolling
+# back to a TypeScript image is the previous tag plus the `-start` backup (README, Deploy).
 
 # --- the Rust server, its dependencies cached apart from our crates (cargo-chef) ---------------
 FROM rust:1-bookworm AS chef
@@ -19,7 +20,7 @@ COPY --from=planner /build/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json --package csp-server
 COPY Cargo.toml Cargo.lock ./
 COPY crates crates
-RUN cargo build --release --package csp-server --bin csp-server --bin csp-admin
+RUN cargo build --release --package csp-server --bin csp-server --bin csp-admin --bin check-fields
 
 # --- the editor's WebAssembly checker (T88.3); wasm-bindgen-cli at the version in Cargo.lock --
 FROM chef AS wasm
@@ -61,7 +62,8 @@ ENV HOST=0.0.0.0 \
     WEB_DIST=/app/web \
     NODE_ENV=production
 WORKDIR /app
-COPY --from=rust /build/target/release/csp-server /build/target/release/csp-admin /usr/local/bin/
+COPY --from=rust /build/target/release/csp-server /build/target/release/csp-admin \
+    /build/target/release/check-fields /usr/local/bin/
 COPY --from=web /app/apps/web/dist ./web
 RUN mkdir -p /data /backups && chown node:node /data /backups
 USER node

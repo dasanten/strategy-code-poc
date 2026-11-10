@@ -10,8 +10,8 @@
 //! `MAP_SIZE`, an `i32` because a grid size is a tile count. Structured constants are structs
 //! (serialised under the TypeScript field names) or `Table`s keyed by the TypeScript string key.
 //! Helpers that take a world type (`Resident`, `Horse`, `Stock`) are not here: they come with the
-//! world types, in `csp-sim`. `tests/balance_table.rs` proves every value against the export of
-//! `balance.ts` (`crates/csp-sim/fixtures/balance.json`).
+//! world types, in `csp-sim`. Since the cutover (T88.6) the numbers live here; the client reads
+//! them from `packages/balance`, which `pnpm balance:rust` writes from this file.
 
 use serde::ser::{SerializeMap, Serializer};
 use serde::Serialize;
@@ -2172,9 +2172,8 @@ pub const DIRECT_OFFER_DAYS: f64 = 60.0;
 /// room to deal in several goods at once, and few enough that it can't flood the other's list.
 pub const DIRECT_OFFERS_TO_ONE_REALM: f64 = 5.0;
 
-/// Every exported constant of the table as JSON, keyed by its TypeScript name: the shape of
-/// `crates/csp-sim/fixtures/balance.json`, which `scripts/dump-fixtures.mts` writes from
-/// `balance.ts`. The fixture test compares the two field by field.
+/// Every exported constant of the table as JSON, keyed by its TypeScript name: what
+/// `pnpm balance:rust` writes to `packages/balance/balance.json` for the client.
 pub fn balance_json() -> Value {
     let mut m = Map::new();
     m.insert("MAP_SIZE".into(), json!(MAP_SIZE));
@@ -2537,72 +2536,6 @@ pub fn balance_json() -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// The export of `balance.ts`, written by `scripts/dump-fixtures.mts`.
-    const EXPORT: &str = include_str!("../../csp-sim/fixtures/balance.json");
-
-    /// Every number where `rust` and `ts` differ, named by its path, e.g.
-    /// `TRADE_ORG_PUNISH.walkMargin`; a key only one side has is named too.
-    fn diff(path: &str, rust: &Value, ts: &Value, out: &mut Vec<String>) {
-        match (rust, ts) {
-            (Value::Number(a), Value::Number(b)) => {
-                let (a, b) = (a.as_f64().unwrap(), b.as_f64().unwrap());
-                if a != b {
-                    out.push(format!("{path}: Rust {a}, TypeScript {b}"));
-                }
-            }
-            (Value::Object(a), Value::Object(b)) => {
-                for (key, value) in a {
-                    let at = if path.is_empty() { key.clone() } else { format!("{path}.{key}") };
-                    match b.get(key) {
-                        Some(other) => diff(&at, value, other, out),
-                        None => out.push(format!("{at}: in Rust, not in the TypeScript export")),
-                    }
-                }
-                for key in b.keys().filter(|key| !a.contains_key(*key)) {
-                    let at = if path.is_empty() { key.clone() } else { format!("{path}.{key}") };
-                    out.push(format!("{at}: in the TypeScript export, missing in Rust"));
-                }
-            }
-            (Value::Array(a), Value::Array(b)) => {
-                if a.len() != b.len() {
-                    out.push(format!("{path}: Rust has {} items, TypeScript {}", a.len(), b.len()));
-                }
-                for (i, (x, y)) in a.iter().zip(b).enumerate() {
-                    diff(&format!("{path}[{i}]"), x, y, out);
-                }
-            }
-            (a, b) if a == b => {}
-            (a, b) => out.push(format!("{path}: Rust {a}, TypeScript {b}")),
-        }
-    }
-
-    #[test]
-    fn the_table_equals_the_export_of_balance_ts() {
-        let export: Value = serde_json::from_str(EXPORT).expect("balance.json parses");
-        let mut problems = Vec::new();
-        diff("", &balance_json(), &export, &mut problems);
-        assert!(
-            problems.is_empty(),
-            "balance.rs drifted from balance.ts:\n{}",
-            problems.join("\n")
-        );
-    }
-
-    #[test]
-    fn the_comparison_names_a_drifted_number() {
-        let export: Value = serde_json::from_str(EXPORT).unwrap();
-        let mut rust = balance_json();
-        rust["TRADE_ORG_PUNISH"]["walkMargin"] = json!(1.5);
-        rust["NPC_SURPLUS_CAP"]["food"] = json!(1);
-        rust.as_object_mut().unwrap().remove("MAP_SIZE");
-        let mut problems = Vec::new();
-        diff("", &rust, &export, &mut problems);
-        assert_eq!(problems.len(), 3, "{problems:?}");
-        assert!(problems.iter().any(|p| p.starts_with("TRADE_ORG_PUNISH.walkMargin:")));
-        assert!(problems.iter().any(|p| p.starts_with("NPC_SURPLUS_CAP.food:")));
-        assert!(problems.iter().any(|p| p.starts_with("MAP_SIZE: in the TypeScript export")));
-    }
 
     #[test]
     fn weighs_goods_by_their_unit_weights() {

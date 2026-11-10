@@ -132,18 +132,10 @@ fn a_save_of_another_version_is_refused() {
     }
 }
 
+/// The live-format save is the TypeScript server's last format (111, the freeze). A format bump
+/// after the cutover migrates it in `csp-server`'s `world_format`, with a test of its own.
 #[test]
-fn the_version_is_the_typescript_servers() {
-    let ts =
-        std::fs::read_to_string(crate_dir().join("../../apps/server/src/world-format.ts")).unwrap();
-    let version: u32 = ts
-        .lines()
-        .find_map(|l| l.strip_prefix("export const WORLD_FORMAT_VERSION = "))
-        .unwrap()
-        .trim()
-        .parse()
-        .unwrap();
-    assert_eq!(version, WORLD_FORMAT_VERSION);
+fn the_live_save_is_the_current_format() {
     assert_eq!(live_save().0, WORLD_FORMAT_VERSION);
 }
 

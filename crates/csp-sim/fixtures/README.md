@@ -2,17 +2,14 @@
 
 Golden files written by `scripts/dump-fixtures.mts` from the TypeScript game at the feature
 freeze (ADR 0030). Rust tests compare against them: bit for bit for terrain, nodes, random numbers,
-hashes and paths, as parsed JSON for worlds. Nothing here is edited by hand; a fixture changes only
-when the script runs again. Files over about 5 MB are in `.gitignore` and marked "not in git"
-below; regenerate them (and everything else) from the repo root with
+hashes and paths, as parsed JSON for worlds. Files over about 5 MB were kept out of git
+(`.gitignore`, marked "not in git" below).
 
-```bash
-corepack pnpm exec tsx --conditions=source scripts/dump-fixtures.mts --full --db <path to world.db>
-```
-
-`--full` adds the hash of the full-size map, which takes minutes; `--db` takes the live save from
-a server's database (any worktree's `apps/server/data/world.db`; the script works on a copy).
-Without them those files are left as they are.
+**Frozen since the cutover (T88.6).** The TypeScript game and the dumper are gone (the last commit
+with both is `21f7a29e`), so nothing here can be written again. Never edit a fixture to make a test
+pass: a failing comparison is a Rust bug until shown otherwise. When Daniel changes a rule and a
+fixture comparison fails because of it, the PR replaces that comparison with a Rust test of the new
+rule (or writes the fixture anew from Rust), and says so.
 
 Conventions:
 
@@ -35,7 +32,6 @@ Conventions:
 
 | File | Made by |
 | --- | --- |
-| `balance.json` | every exported constant of packages/shared/src/balance.ts; `csp-shared`'s `balance::tests` compare the Rust table with it, every constant present on both sides |
 | `lang/cases.json` | tokenize, parse, checkScript, checkNames and run for every script in the lang tests and DEFAULT_SCRIPTS |
 | `nodes/1-256.json` | placeResourceNodes(generateTerrain(1, 256), 1) |
 | `nodes/1-512.json` | placeResourceNodes(generateTerrain(1, 512), 1) |

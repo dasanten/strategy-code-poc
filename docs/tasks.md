@@ -64,7 +64,12 @@ rewritten in Rust** on the branch `rust-backend`, and the TypeScript game is und
 freeze (bugs only) until the cutover. The rewrite epics, in order: Rust foundations (84), Pure
 kernels (85, in parallel with 84), The rules (86), The shell (87), Client and cutover (88). Their
 branches come from and go into `rust-backend`. Epics 81 to 83 (measuring and TypeScript
-optimisations) are superseded by the rewrite, which includes their aims. Everything else waits.
+optimisations) are superseded by the rewrite, which includes their aims.
+
+**Cutover (T88.6, 2026-11-10):** the Rust backend supports every feature, `rust-backend` goes into
+`dev`, and the TypeScript server, `packages/shared` and `packages/lang` are deleted. **The feature
+freeze is lifted:** new epics branch from `dev` again (ADR 0009, 0010), and rule changes are
+Daniel's call as before.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
@@ -184,8 +189,8 @@ its tickets or closes.
 - **Release:** when Daniel asks, one PR `dev` → `main` lists the epics and bugs it ships, runs CI
   and is merged once green. Only merges into `main` deploy.
 - **Rules vs numbers:** a missing game rule becomes a `needs Daniel` question and lands in
-  `CONTEXT.md`. Balance numbers are picked in `packages/shared/src/balance.ts` and listed in the
-  PR for review.
+  `CONTEXT.md`. Balance numbers are picked in `crates/csp-shared/src/balance.rs` and listed in
+  the PR for review.
 - **Scope-only epics:** an epic without tickets lists its open rule questions. When the epic
   before it is nearly done, settle those questions with Daniel, then write its tickets.
 - **Every ticket:** use the terms in `CONTEXT.md`; keep scripting cheap (ADR 0002); new
