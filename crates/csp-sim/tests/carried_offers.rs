@@ -69,7 +69,7 @@ fn carried_setup() -> Setup {
     let storage = delivery_storage(&world, &city).unwrap().id.clone();
     let to_storage = delivery_storage(&world, &to_city).unwrap().id.clone();
     let at = world.buildings.iter().find(|b| b.id == to_storage).map(|b| (b.x, b.y)).unwrap();
-    let mut watcher = goods_support::new_resident(23.0, "watcher", Some(&realm), at.0, at.1);
+    let mut watcher = goods_support::drawn_resident(23.0, "watcher", Some(&realm), None, at.0, at.1);
     watcher.city_id = Some(city.clone());
     watcher.born_at = -20.0 * 24.0 * 3600.0;
     world.residents.push(watcher);
@@ -314,7 +314,7 @@ mod sending_a_carried_direct_offer {
         assert_eq!(told.len(), 1);
         let name = |id: &str| s.world.cities.iter().find(|c| c.id == id).unwrap().name.clone();
         assert_eq!(told[0]["what"], "received");
-        assert_eq!(told[0]["carried"], json!({ "fromCity": name(&s.city), "toCity": name(&s.to_city), "fee": 0 }));
+        assert_eq!(told[0]["carried"], json!({ "fromCity": name(&s.city), "toCity": name(&s.to_city), "fee": 0.0 }));
     }
 
     #[test]
@@ -424,7 +424,7 @@ mod answering_a_carried_direct_offer {
             "that offer wasn’t sent to you"
         );
         let at = s.xy(&s.storage);
-        let mut trader = goods_support::new_resident(29.0, "trader", Some(&s.other), at.0, at.1);
+        let mut trader = goods_support::drawn_resident(29.0, "trader", Some(&s.other), None, at.0, at.1);
         trader.city_id = Some(s.to_city.clone());
         trader.born_at = -20.0 * 24.0 * 3600.0;
         trader.carried = [(Good::Stone, 10.0)].into_iter().collect();

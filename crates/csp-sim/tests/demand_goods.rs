@@ -30,7 +30,7 @@ fn stock(pairs: &[(Good, f64)]) -> Stock {
 /// A grown resident of `owner` on a tile, with nothing in hand.
 fn stand(world: &mut WorldState, id: &str, owner: &str, at: (f64, f64)) {
     let seed = world.residents.len() as f64 + 31.0;
-    let mut r = goods_support::new_resident(seed, id, Some(owner), at.0, at.1);
+    let mut r = goods_support::drawn_resident(seed, id, Some(owner), None, at.0, at.1);
     r.born_at = -20.0 * 24.0 * 3600.0;
     r.carried = Stock::new();
     world.residents.push(r);
@@ -82,7 +82,7 @@ fn told(s: &Fixture, user: u64) -> Vec<Value> {
 }
 
 fn free(s: &Fixture, g: Good) -> f64 {
-    free_stock(&s.world, &s.to_storage, None).get(&g).copied().unwrap_or(0.0)
+    free_stock(&s.world, &s.to_storage, s.b(&s.to_storage).stock.as_ref()).get(&g).copied().unwrap_or(0.0)
 }
 
 fn refused(reason: String, part: &str) {
@@ -145,7 +145,7 @@ mod accepting_a_demand_for_goods_set_aside {
         let accepting =
             |resident: &str| json!({ "kind": "acceptOffer", "offerId": offer_id, "times": 4,
                 "residentId": resident });
-        let mut ask = |s: &mut Fixture, user: u64, resident: &str| {
+        let ask =|s: &mut Fixture, user: u64, resident: &str| {
             let sender = goods_support::player(user);
             answer(s.queue.receive(&s.world, &sender, &json!("q"), &accepting(resident)))
         };

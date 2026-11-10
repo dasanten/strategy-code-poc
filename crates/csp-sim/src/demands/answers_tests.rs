@@ -90,6 +90,7 @@ fn setup(armed: usize) -> Setup {
     add_city(&mut world, "post", None, 90.0, 90.0);
     world.cities[2].name = "Saltmarsh".into();
     world.cities[2].trade_org = Some(TradeOrgCity::Post);
+    world.cities[2].layout = None;
     resident(&mut world, "a1", Some("r1"), 5.0, 5.0, Some("c1"));
     resident(&mut world, "b1", Some("r2"), 100.0, 40.0, None);
     let n1a = resident(&mut world, "n1a", None, 40.0, 40.0, Some("n1"));
@@ -383,7 +384,7 @@ mod a_demand_for_goods_of_an_npc_city {
             json!([{ "realmId": "n1", "storageId": "n1s", "gives": "food", "givesUnits": 1,
                 "wantsUnits": 0, "times": 5, "direct": { "toId": "r1", "lapsesAt": lapses_at } }]),
         );
-        assert_eq!(free_stock(&s.world, "n1s", None).get(&Good::Food), Some(&35.0));
+        assert_eq!(free_stock(&s.world, "n1s", s.world.buildings.iter().find(|b| b.id == "n1s").unwrap().stock.as_ref()).get(&Good::Food), Some(&35.0));
         assert_matches(
             &s.last_log(),
             json!({ "what": "accepted", "otherIs": "city",

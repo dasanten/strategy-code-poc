@@ -91,7 +91,7 @@ fn coins(s: &Fixture) -> f64 {
 }
 
 fn free_coins(s: &Fixture) -> f64 {
-    free_stock(&s.world, &s.storage, None).get(&Good::Coins).copied().unwrap_or(0.0)
+    free_stock(&s.world, &s.storage, s.b(&s.storage).stock.as_ref()).get(&Good::Coins).copied().unwrap_or(0.0)
 }
 
 fn owes(s: &Fixture) -> f64 {
