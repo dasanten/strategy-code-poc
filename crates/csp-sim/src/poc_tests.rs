@@ -18,11 +18,10 @@ use crate::pathfinding::{PathFinder, PathOptions, PathResult, CARRIAGE_COSTS};
 use crate::queries::goods::{pile_at, units_that_fit};
 use crate::queries::names::held;
 use crate::queries::residents::stat_value;
-use crate::starting_city::found_starting_city;
-use crate::test_support::city_terrain;
+use crate::test_support::world_with_city;
 use crate::tick::Scratch;
 use crate::walking::Walking;
-use crate::world::{create_world, step_world};
+use crate::world::step_world;
 
 /// Ticks in a real hour: walking and driving take real time.
 const REAL_HOUR: usize = 3600;
@@ -129,9 +128,7 @@ impl Scenario {
 }
 
 fn scenario() -> Scenario {
-    let terrain = city_terrain();
-    let mut world = create_world(&terrain, 1);
-    found_starting_city(&mut world, &terrain, 1, None);
+    let (mut world, terrain) = world_with_city();
     // An average horse, so the carriage holds the `CARRIAGE_CAPACITY` the loads below are sized
     // for.
     for h in &mut world.horses {

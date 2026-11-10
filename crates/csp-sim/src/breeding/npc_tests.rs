@@ -10,18 +10,15 @@ use csp_shared::world::{BuildingKind, Good, Stock};
 use serde_json::{json, Value};
 
 use crate::invariants::check_all;
-use crate::starting_city::found_starting_city;
 use crate::survival::end_realm;
-use crate::test_support::city_terrain;
+use crate::test_support::world_with_city;
 use crate::tick::Scratch;
 use crate::walking::Walking;
-use crate::world::{create_world, step_world};
+use crate::world::step_world;
 
 #[test]
 fn have_one_of_their_residents_breed_their_horses_through_the_default_task() {
-    let land = city_terrain();
-    let mut world = create_world(&land, 1);
-    found_starting_city(&mut world, &land, 1, None);
+    let (mut world, land) = world_with_city();
     let realm = world.realms[0].clone();
     let stable = world.buildings.iter().position(|b| b.kind == BuildingKind::Stable).unwrap();
     world.buildings[stable].stock = Some(Stock::from([(Good::Food, 10_000.0)]));
