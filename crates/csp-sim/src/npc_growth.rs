@@ -1277,4 +1277,6 @@ pub fn farm_tile(
 }
 
 #[cfg(test)]
+mod needs_grow_tests;
+#[cfg(test)]
 mod tests;

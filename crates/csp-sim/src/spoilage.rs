@@ -89,6 +89,8 @@ mod tests {
     use super::*;
     use csp_shared::world::Pile;
 
+    use crate::invariants::check_all;
+    use crate::npc_test_world::Runner;
     use crate::test_support::{same_json, world_with_city};
 
     /// Runs spoilage alone for some game days (`wait`).
@@ -105,6 +107,7 @@ mod tests {
         b.unwrap().stock.get_or_insert_with(Stock::new)
     }
 
+    // spoilage.test.ts: spoils the balance share of a storage’s food each game day, and nothing else
     #[test]
     fn spoils_the_balance_share_of_a_storages_food_each_game_day_and_nothing_else() {
         let (mut world, _) = world_with_city();
@@ -118,6 +121,7 @@ mod tests {
         assert_eq!(*storage(&mut world), spoiled);
     }
 
+    // spoilage.test.ts: spoils food carried by residents and carriages, and in piles
     #[test]
     fn spoils_food_carried_by_residents_and_carriages_and_in_piles() {
         let (mut world, _) = world_with_city();
@@ -134,6 +138,7 @@ mod tests {
         assert_eq!(world.piles[0].goods, Stock::from([(Good::Food, left), (Good::Iron, 2.0)]));
     }
 
+    // spoilage.test.ts: keeps small stocks in whole units and spoils them at the right rate on average
     #[test]
     fn keeps_small_stocks_in_whole_units_and_spoils_them_at_the_right_rate_on_average() {
         let (mut world, _) = world_with_city();
@@ -152,6 +157,7 @@ mod tests {
         assert!((lost - 10_000.0 * FOOD_SPOIL_PER_DAY).abs() < 50.0);
     }
 
+    // spoilage.test.ts: lets a pile of food rot away entirely
     #[test]
     fn lets_a_pile_of_food_rot_away_entirely() {
         let (mut world, _) = world_with_city();
@@ -161,6 +167,7 @@ mod tests {
         assert!(world.piles.is_empty());
     }
 
+    // spoilage.test.ts: spoils the same way given the same seed
     #[test]
     fn spoils_the_same_way_given_the_same_seed() {
         let run = || {
@@ -172,6 +179,35 @@ mod tests {
             world.residents.iter().map(|r| held(&r.carried, Good::Food)).collect::<Vec<_>>()
         };
         assert_eq!(run(), run());
+    }
+
+    // spoilage.test.ts: keeps the invariants over a game day
+    #[test]
+    fn keeps_the_invariants_over_a_game_day() {
+        let (mut world, terrain) = world_with_city();
+        world.residents[0].carried = Stock::from([(Good::Food, 3.0)]);
+        let mut runner = Runner::new(&terrain);
+        for _ in 0..TICKS_PER_GAME_DAY as usize {
+            runner.step(&mut world, &terrain);
+        }
+        assert_eq!(check_all(&world, &terrain), []);
+    }
+
+    // spoilage.test.ts: reports goods held in part units
+    #[test]
+    fn reports_goods_held_in_part_units() {
+        let (mut world, terrain) = world_with_city();
+        *storage(&mut world) = Stock::from([(Good::Food, 2.5)]);
+        let id = world
+            .buildings
+            .iter()
+            .find(|b| b.kind == csp_shared::world::BuildingKind::Storage)
+            .unwrap()
+            .id
+            .clone();
+        let found: Vec<(String, Vec<String>)> =
+            check_all(&world, &terrain).into_iter().map(|v| (v.invariant, v.entity_ids)).collect();
+        assert_eq!(found, [("goods-in-whole-units".to_string(), vec![id])]);
     }
 
     #[test]
@@ -244,7 +280,4 @@ mod tests {
             }
         }
     }
-
-    // "keeps the invariants over a game day" and "reports goods held in part units"
-    // (`goods-in-whole-units`) come with the step and the invariants (T86.13, T86.14).
 }

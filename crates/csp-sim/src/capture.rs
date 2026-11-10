@@ -423,3 +423,6 @@ fn comes_with_city(world: &WorldState, ci: usize, joining: &[usize], size: i32) 
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod what_joins_tests;
