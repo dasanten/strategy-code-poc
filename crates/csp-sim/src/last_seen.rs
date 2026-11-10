@@ -157,6 +157,11 @@ pub fn refresh_last_seen(
             Some(p) => in_sight.contains(id_of(e)) || !places.sees(p),
             None => true,
         });
+        // Where each id is remembered, the first with it, as a scan of the memory finds it (T89.6).
+        let mut at: HashMap<String, usize> = HashMap::new();
+        for (i, e) in memory.iter().enumerate() {
+            at.entry(id_of(e).to_string()).or_insert(i);
+        }
         for seen_now in places.seen.iter() {
             let Ok(mut v) = serde_json::to_value(seen_now) else { continue };
             // Who occupies a town hall is seen only while it is in sight, never remembered, and
@@ -173,7 +178,7 @@ pub fn refresh_last_seen(
                 }
             }
             let id = v.get("id").and_then(|i| i.as_str()).unwrap_or_default().to_string();
-            let was = memory.iter().position(|e| id_of(e) == id);
+            let was = at.get(&id).copied();
             if let Some(i) = was.filter(|&i| json_of(&memory[i]) == v) {
                 *seen_at_mut(&mut memory[i]) = world.tick as f64;
                 continue;
@@ -182,7 +187,10 @@ pub fn refresh_last_seen(
             let Ok(copy) = serde_json::from_value::<Remembered>(v) else { continue };
             match was {
                 Some(i) => memory[i] = copy,
-                None => memory.push(copy),
+                None => {
+                    at.entry(id).or_insert(memory.len());
+                    memory.push(copy);
+                }
             }
         }
         let cities: HashSet<String> = memory

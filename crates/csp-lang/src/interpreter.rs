@@ -173,7 +173,7 @@ thread_local! {
     /// (an NPC default) declares the same functions each run: they share their name rather than
     /// copying it each time (T89.6). Checked against the text, so a program freed and another
     /// put where it was costs only a new copy.
-    static NAMES: std::cell::RefCell<std::collections::HashMap<(usize, usize), Rc<str>>> =
+    static NAMES: std::cell::RefCell<rustc_hash::FxHashMap<(usize, usize), Rc<str>>> =
         std::cell::RefCell::default();
 }
 
