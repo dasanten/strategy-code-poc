@@ -1,4 +1,4 @@
-//! `script-views.test.ts` and the plain parts of `script-bindings.test.ts`: every value the
+﻿//! `script-views.test.ts` and the plain parts of `script-bindings.test.ts`: every value the
 //! queries and `me` hand a script holds exactly its view. The TypeScript world here has horses,
 //! carriages and a wandering trader too, and adds fields of the server's own to its objects to see
 //! them dropped; Rust's world types can't hold an undeclared field, and the horse, carriage and
@@ -387,4 +387,72 @@ fn bench_bindings() {
     let ty = binding(SCRIPT_API, "me").unwrap().returns;
     time("view_value", &|| drop(std::hint::black_box(view_value(&data, ty))));
     time("from_json", &|| drop(std::hint::black_box(Value::from_json(&data))));
+}
+
+/// The worlds the TypeScript stepped (`fixtures/worlds`), for checks over many real residents.
+fn fixture_worlds() -> Vec<WorldState> {
+    ["village-0", "village-1440", "village-10080", "hq-0", "hq-1440", "hq-10080"]
+        .iter()
+        .map(|name| {
+            let path = format!("{}/fixtures/worlds/{name}.json", env!("CARGO_MANIFEST_DIR"));
+            let file: Json = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+            from(file["world"].clone())
+        })
+        .collect()
+}
+
+/// `me` built straight from the resident (#1092) is the value its plain data gives, for every
+/// resident of the stepped worlds and of the test world, seen by its own side, another and none,
+/// with what an alarm told it and without; and for the corners: struck by someone there or gone,
+/// defence and Alarm scripts picked or off, Down, numbers that aren't finite.
+#[test]
+fn me_from_the_struct_is_me_from_its_plain_data() {
+    let mut worlds = fixture_worlds();
+    let (mut w, _) = setup();
+    let base = w.residents[0].clone();
+    let alarm = json!({ "kind": "theft", "cityId": "c1", "about": "b1", "realmId": "r2", "x": 1, "y": 2, "tick": 40 });
+    let variants: Vec<Json> = vec![
+        json!({ "struck": { "by": "b1", "tick": 44 } }),
+        json!({ "struck": { "by": "gone", "tick": 44 } }),
+        json!({ "defenceScriptId": 4, "alarmScriptId": "none" }),
+        json!({ "alarmScriptId": 9, "downUntil": 80 }),
+        json!({ "script": { "scriptId": 0, "task": "alarm", "memory": {}, "alarm": alarm } }),
+    ];
+    for (i, v) in variants.into_iter().enumerate() {
+        let mut data = serde_json::to_value(&base).unwrap();
+        for (k, x) in v.as_object().unwrap() {
+            data[k] = x.clone();
+        }
+        let mut r: Resident = from(data);
+        r.id = format!("v{i}");
+        w.residents.push(r);
+    }
+    let mut odd = base.clone();
+    odd.id = "odd".into();
+    (odd.x, odd.hunger, odd.down_until) = (f64::NAN, f64::INFINITY, Some(f64::NAN));
+    w.residents.push(odd);
+    worlds.push(w);
+    let ty = ScriptType::View("resident");
+    let mut checked = 0;
+    for world in &worlds {
+        for r in &world.residents {
+            for side in [r.owner.as_deref(), Some("elsewhere"), None] {
+                for alarm in [true, false] {
+                    let by_json = view_value(
+                        &Json::Object(as_view(world, resident_data(world, r, side, alarm))),
+                        ty,
+                    );
+                    let direct = resident_view(world, r, side, alarm);
+                    assert_eq!(
+                        format!("{direct:?}"),
+                        format!("{by_json:?}"),
+                        "{} {side:?} {alarm}",
+                        r.id
+                    );
+                    checked += 1;
+                }
+            }
+        }
+    }
+    assert!(checked > 500, "{checked}");
 }

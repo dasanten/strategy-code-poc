@@ -220,6 +220,112 @@ fn as_view(world: &WorldState, mut r: Map<String, Json>) -> Map<String, Json> {
     r
 }
 
+/// A number as plain data turns it: `null` when it isn't finite, as `JSON.stringify` writes it.
+fn number(n: f64) -> Value {
+    if n.is_finite() {
+        Value::Number(n)
+    } else {
+        Value::Null
+    }
+}
+
+fn text(s: Option<&String>) -> Value {
+    s.map_or(Value::Null, |s| Value::string(s))
+}
+
+/// A field of a world thing as a script value of its view type, through its plain data.
+fn field_value<T: serde::Serialize>(t: &T, ty: ScriptType) -> Value {
+    view_value(&serde_json::to_value(t).unwrap_or(Json::Null), ty)
+}
+
+/// A resident as `me` or an army's member sees itself (`asView` of its plain data, less its
+/// `script`, with its `age`), built field by field from the struct rather than through the whole
+/// resident as JSON: the same value, for a fraction of the cost (#1092). Its defence and Alarm
+/// scripts show to its own side only, and `alarm` (what an alarm told it) when `alarm` is set.
+fn resident_view(world: &WorldState, r: &Resident, side: Option<&str>, alarm: bool) -> Value {
+    let own = r.owner.as_deref() == side;
+    let struck = r.struck.as_ref().filter(|s| world.residents.iter().any(|x| x.id == s.by));
+    let down_until = r.down_until.map_or(Value::Null, number);
+    let fields = script_view("resident").map_or(&[][..], |v| v.fields);
+    Value::frozen_fields(fields.iter().map(|f| {
+        let value = match f.name {
+            "id" => Value::string(&r.id),
+            "name" => Value::string(&r.name),
+            "owner" => text(r.owner.as_ref()),
+            "cityId" => text(r.city_id.as_ref()),
+            "x" => number(r.x),
+            "y" => number(r.y),
+            "health" => number(r.health),
+            "hunger" => number(r.hunger),
+            "down" => Value::Bool(!down_until.is_null()),
+            "downUntil" => down_until.clone(),
+            "struckBy" => struck.map_or(Value::Null, |s| Value::string(&s.by)),
+            "struckAt" => struck.map_or(Value::Null, |s| number(s.tick)),
+            "defenceScript" => match r.defence_script_id.filter(|_| own) {
+                Some(id) => Value::Number(id as f64),
+                None => Value::Null,
+            },
+            "alarmScript" => match r.alarm_script_id.as_ref().filter(|_| own) {
+                Some(AlarmScriptId::Script(id)) => Value::Number(*id as f64),
+                Some(AlarmScriptId::Off(_)) => Value::string("none"),
+                None => Value::Null,
+            },
+            "alarm" => match r.script.as_ref().and_then(|s| s.alarm.as_ref()).filter(|_| alarm) {
+                Some(a) => field_value(a, f.r#type),
+                None => Value::Null,
+            },
+            "bornAt" => number(r.born_at),
+            "age" => number(age_in_years(r.born_at, world.tick as f64)),
+            "lifespan" => number(r.lifespan),
+            "stats" => field_value(&r.stats, f.r#type),
+            "skills" => field_value(&r.skills, f.r#type),
+            "carried" => field_value(&r.carried, f.r#type),
+            "order" => field_value(&r.order, f.r#type),
+            "orderEnded" => field_value(&r.order_ended, f.r#type),
+            "queue" => match &r.queue {
+                Some(q) => field_value(&queue_view(q), f.r#type),
+                None => Value::Null,
+            },
+            "pair" => field_value(&r.pair, f.r#type),
+            "carrying" => field_value(&r.carrying, f.r#type),
+            "riding" => text(r.riding.as_ref()),
+            "aboard" => text(r.aboard.as_ref()),
+            // `knownThief` is for others, and `script` is left out of `me`.
+            _ => Value::Null,
+        };
+        (f.name, value)
+    }))
+}
+
+/// A resident's plain data as `me` or an army's member shows it, before `asView`: without its
+/// `script`, its defence and Alarm scripts for its own side only, what an alarm told it with
+/// `alarm`, and its `age`. [`resident_view`] builds the same value without it.
+fn resident_data(
+    world: &WorldState,
+    r: &Resident,
+    side: Option<&str>,
+    alarm: bool,
+) -> Map<String, Json> {
+    let mut m = to_json(r);
+    m.shift_remove("script");
+    if r.owner.as_deref() != side {
+        m.shift_remove("defenceScriptId");
+        m.shift_remove("alarmScriptId");
+    }
+    if let Some(AlarmScriptId::Off(_)) = &r.alarm_script_id {
+        if r.owner.as_deref() == side {
+            m.insert("alarmScriptId".into(), json!("none"));
+        }
+    }
+    if alarm {
+        if let Some(a) = r.script.as_ref().and_then(|s| s.alarm.as_ref()) {
+            m.insert("alarm".into(), serde_json::to_value(a).unwrap_or(Json::Null));
+        }
+    }
+    m.insert("age".into(), json!(age_in_years(r.born_at, world.tick as f64)));
+    m
+}
+
 /// Who last struck any of `members` (`lastStruck`): the latest, if any was.
 fn last_struck<'r>(members: impl Iterator<Item = &'r Resident>) -> Option<&'r Struck> {
     let mut last: Option<&Struck> = None;
@@ -1516,55 +1622,30 @@ impl<'a> ScriptBindings<'a> {
     fn me_value(&self) -> Value {
         let world = self.world();
         let side = self.side.as_deref();
+        let Some(army_id) = self.ctx.army_id else {
+            return resident_view(world, self.me(), side, true);
+        };
         let ty = binding(self.api, "me").expect("every API has me").returns;
-        let tick = world.tick as f64;
-        let resident_data = |r: &Resident, alarm: bool| {
-            let mut m = to_json(r);
-            m.shift_remove("script");
-            if r.owner.as_deref() != side {
-                m.shift_remove("defenceScriptId");
-                m.shift_remove("alarmScriptId");
-            }
-            if let Some(AlarmScriptId::Off(_)) = &r.alarm_script_id {
-                if r.owner.as_deref() == side {
-                    m.insert("alarmScriptId".into(), json!("none"));
-                }
-            }
-            if alarm {
-                if let Some(a) = r.script.as_ref().and_then(|s| s.alarm.as_ref()) {
-                    m.insert("alarm".into(), serde_json::to_value(a).unwrap_or(Json::Null));
-                }
-            }
-            m.insert("age".into(), json!(age_in_years(r.born_at, tick)));
-            m
-        };
-        let data = match self.ctx.army_id {
-            Some(army_id) => {
-                let army =
-                    world.armies.iter().find(|a| a.id == army_id).expect("checked on binding");
-                let members: Vec<&Resident> = army
-                    .member_ids
+        let army = world.armies.iter().find(|a| a.id == army_id).expect("checked on binding");
+        let members: Vec<&Resident> = army
+            .member_ids
+            .iter()
+            .filter_map(|id| world.residents.iter().find(|r| &r.id == id))
+            .collect();
+        let mut m = to_json(army);
+        m.insert(
+            "members".into(),
+            Json::Array(
+                members
                     .iter()
-                    .filter_map(|id| world.residents.iter().find(|r| &r.id == id))
-                    .collect();
-                let mut m = to_json(army);
-                m.insert(
-                    "members".into(),
-                    Json::Array(
-                        members
-                            .iter()
-                            .map(|r| Json::Object(as_view(world, resident_data(r, false))))
-                            .collect(),
-                    ),
-                );
-                if let Some(s) = last_struck(members.iter().copied()) {
-                    m = merge(m, struck_view(world, s));
-                }
-                m
-            }
-            None => as_view(world, resident_data(self.me(), true)),
-        };
-        view_value(&Json::Object(data), ty)
+                    .map(|r| Json::Object(as_view(world, resident_data(world, r, side, false))))
+                    .collect(),
+            ),
+        );
+        if let Some(s) = last_struck(members.iter().copied()) {
+            m = merge(m, struck_view(world, s));
+        }
+        view_value(&Json::Object(m), ty)
     }
 
     /// The global `b`, the `id`th name of the API (`globals[name]`), made when the script first
