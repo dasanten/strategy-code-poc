@@ -102,10 +102,12 @@ mod tests {
     use csp_shared::balance::{
         ticks_for_age, ADULT_AGE, DECLINE_AGE, DECLINE_FLOOR, LIFESPAN_MAX, LIFESPAN_MIN,
     };
-    use csp_shared::terrain::Terrain;
+    use csp_shared::terrain::{Terrain, TerrainMap};
     use csp_shared::time::TICKS_PER_GAME_YEAR;
     use csp_shared::world::Pile;
 
+    use crate::invariants::check_all;
+    use crate::npc_test_world::Runner;
     use crate::queries::residents::{age_factor, hunger_factor, walk_speed};
     use crate::test_support::world_with_city;
 
@@ -114,6 +116,7 @@ mod tests {
         r.born_at = tick - ticks_for_age(years).ceil();
     }
 
+    // aging.test.ts: ages residents over simulated years until each dies of old age at their lifespan
     #[test]
     fn ages_residents_over_simulated_years_until_each_dies_at_their_lifespan() {
         let (mut world, terrain) = world_with_city();
@@ -132,6 +135,7 @@ mod tests {
             if ended.iter().any(|x| x.id == realm) {
                 realm_ended = Some(year);
             }
+            assert_eq!(check_all(&world, &terrain), []);
             year += 1;
         }
         assert_eq!(deaths.len(), lifespans.len());
@@ -146,8 +150,7 @@ mod tests {
         assert!(world.realms.is_empty());
     }
 
-    // "lets a resident die of old age in the running world": a `stepWorld` test, run by T86.14
-    // once the step is whole. Its rule, a death of old age dropping what was carried, is here:
+    /// The rule alone: a death of old age drops what was carried.
     #[test]
     fn lets_a_resident_die_of_old_age_dropping_what_they_carried() {
         let (mut world, terrain) = world_with_city();
@@ -168,6 +171,28 @@ mod tests {
         assert_eq!(piles[0].goods, Stock::from([(Good::Stone, 3.0)]));
     }
 
+    // aging.test.ts: lets a resident die of old age in the running world, dropping what they carried
+    #[test]
+    fn lets_a_resident_die_of_old_age_in_the_running_world_dropping_what_they_carried() {
+        let (mut world, terrain) = world_with_city();
+        let tick = world.tick as f64;
+        let r = &mut world.residents[1];
+        r.carried = Stock::from([(Good::Stone, 3.0)]);
+        r.lifespan = age_in_years(r.born_at, tick) + 5.0 / TICKS_PER_GAME_YEAR;
+        let (id, x, y) = (r.id.clone(), r.x, r.y);
+        let mut runner = Runner::new(&terrain);
+        for _ in 0..10 {
+            runner.step(&mut world, &terrain);
+        }
+        assert!(world.residents.iter().all(|r| r.id != id));
+        assert_eq!(world.residents.len(), 7);
+        assert_eq!(world.piles.len(), 1);
+        assert_eq!((world.piles[0].x, world.piles[0].y), (x, y));
+        assert_eq!(world.piles[0].goods, Stock::from([(Good::Stone, 3.0)]));
+        assert_eq!(check_all(&world, &terrain), []);
+    }
+
+    // aging.test.ts: does not let children work until they are grown
     #[test]
     fn does_not_let_children_work_until_they_are_grown() {
         let (mut world, _) = world_with_city();
@@ -193,6 +218,7 @@ mod tests {
         assert!(matches!(world.events.last().unwrap().what, RealmEventWhat::GrownUp { .. }));
     }
 
+    // aging.test.ts: makes stats decline late in life, down to a floor
     #[test]
     fn makes_stats_decline_late_in_life_down_to_a_floor() {
         let (mut world, _) = world_with_city();
@@ -222,6 +248,7 @@ mod tests {
         assert_eq!(at(200.0).0, DECLINE_FLOOR);
     }
 
+    // aging.test.ts: puts down what declining Strength can no longer carry, Food last
     #[test]
     fn puts_down_what_declining_strength_can_no_longer_carry_food_last() {
         let (mut world, terrain) = world_with_city();
@@ -232,6 +259,8 @@ mod tests {
         let stone = carry_capacity(r, tick).floor() - 5.0;
         r.carried = Stock::from([(Good::Food, 5.0), (Good::Stone, stone)]);
         assert!(stock_weight(&r.carried) <= carry_capacity(r, tick));
+        assert_eq!(check_all(&world, &terrain), []);
+        let r = &mut world.residents[1];
         aged(r, DECLINE_AGE + 10.0, tick);
         let (x, y) = (r.x, r.y);
         step_aging(&mut world, terrain.size);
@@ -243,8 +272,27 @@ mod tests {
         assert_eq!(world.piles.len(), 1);
         assert_eq!((world.piles[0].x, world.piles[0].y), (x, y));
         assert_eq!(world.piles[0].goods.keys().collect::<Vec<_>>(), [&Good::Stone]);
+        assert_eq!(check_all(&world, &terrain), []);
     }
 
-    // "is watched by an invariant: nobody outlives their lifespan" (`ages-in-range`) comes with
-    // the invariants (T86.13).
+    /// The violations as (invariant, entity ids).
+    fn violations(world: &WorldState, terrain: &TerrainMap) -> Vec<(String, Vec<String>)> {
+        check_all(world, terrain).into_iter().map(|v| (v.invariant, v.entity_ids)).collect()
+    }
+
+    // aging.test.ts: is watched by an invariant: nobody outlives their lifespan
+    #[test]
+    fn is_watched_by_an_invariant_nobody_outlives_their_lifespan() {
+        let (mut world, terrain) = world_with_city();
+        let tick = world.tick as f64;
+        let r = &mut world.residents[1];
+        let lifespan = r.lifespan;
+        aged(r, lifespan, tick);
+        let id = r.id.clone();
+        assert_eq!(violations(&world, &terrain), [("ages-in-range".into(), vec![id.clone()])]);
+        let r = &mut world.residents[1];
+        r.lifespan = LIFESPAN_MAX + 1.0;
+        aged(r, 20.0, tick);
+        assert_eq!(violations(&world, &terrain), [("ages-in-range".into(), vec![id])]);
+    }
 }
