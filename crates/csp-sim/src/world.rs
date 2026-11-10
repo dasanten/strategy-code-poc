@@ -413,7 +413,9 @@ fn step_npc_cities(
     let ways = walking.and_then(|w| w.ways());
     crate::npc_behaviour::step_npc_cities(world, size, Some(terrain), ways)
 }
-fn step_outsiders(_world: &mut WorldState, _size: i32, _scratch: &mut Scratch) {}
+fn step_outsiders(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
+    crate::outsiders::step_outsiders(world, size);
+}
 
 // `demands.ts`.
 fn answer_demands(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
