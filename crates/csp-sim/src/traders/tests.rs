@@ -9,15 +9,26 @@ use csp_shared::world::HorseStats;
 use serde_json::json;
 
 use super::*;
-use crate::caravans::hq_end;
+use crate::capture::capture_city;
+use crate::caravans::{hq_end, leave_trade_org};
+use crate::carrying::{resolve_carrying, CarryAction, CarryKind};
+use crate::hq_fall::nothing_left_of_the_hq;
 use crate::invariants::check_all;
+use crate::movement_pending::{take_over, Taken};
+use crate::queries::driving::drive_off_problem;
 use crate::random::Mulberry32;
 use crate::realm_test_world::plains;
+use crate::sight::entities_in_sight;
+use crate::starting_city::found_starting_city;
+use crate::survival::die;
 use crate::tick::Scratch;
 use crate::trade_org::found_trade_org_hq;
 use crate::trading_posts::found_trading_post;
 use crate::walking::Walking;
 use crate::world::{create_world, step_world};
+use crate::world_index::WorldIndex;
+use csp_shared::protocol::{SeenEntity, SeenTrader};
+use csp_shared::world::{CrimeKind, Resident};
 
 /// Where the fixture's trading posts stand, in the order they are founded.
 const SITES: [(i32, i32); 3] = [(220, 128), (220, 220), (128, 220)];
@@ -579,4 +590,856 @@ fn is_sent_from_the_hq_armed_goes_round_its_loop_the_hq_and_all_and_supplies_the
     assert!(farthest <= CARAVAN_SPREAD + 3.0);
     assert!(world.crimes.is_empty());
     assert_eq!(check_all(&world, &terrain), vec![]);
+}
+
+// a wandering trader at the HQ
+
+/// A trader come round to the HQ's goods warehouse, its escort armed and its Food topped up.
+/// Returns the goods and coin warehouses' indices.
+fn come_round(f: &mut Fixture) -> (usize, usize) {
+    let world = &mut f.world;
+    world.traders.truncate(1);
+    let goods = hq_end(world).warehouse.unwrap();
+    let hq = f.hq.clone();
+    let coins = world
+        .buildings
+        .iter()
+        .position(|b| {
+            b.city_id.as_deref() == Some(&hq) && held_in(b.stock.as_ref(), Good::Coins) > 0.0
+        })
+        .unwrap();
+    assert_ne!(coins, goods);
+    let (x, y) = (world.buildings[goods].x, world.buildings[goods].y);
+    put(world, 0, x, y);
+    world.traders[0].post_id = hq;
+    world.traders[0].stop = TraderStop::Warehouse;
+    for ri in crew_of(world, 0).into_iter().skip(1) {
+        world.residents[ri].carried.insert(Good::Spear, 1.0);
+    }
+    let ki = carriage_of(world, 0);
+    world.carriages[ki].load = stock(&[(Good::Food, CARAVAN_FOOD)]);
+    (goods, coins)
+}
+
+/// The stop after the HQ on a trader's loop.
+fn after_hq(t: &Trader, hq: &str) -> String {
+    let i = t.r#loop.iter().position(|p| p == hq).unwrap();
+    t.r#loop[(i + 1) % t.r#loop.len()].clone()
+}
+
+fn drives_to(world: &WorldState, ri: usize, x: f64, y: f64) -> bool {
+    matches!(&world.residents[ri].order, Some(ResidentOrder::Drive(d)) if d.target.x == x && d.target.y == y)
+}
+
+fn walks_to(world: &WorldState, ri: usize, x: f64, y: f64) -> bool {
+    matches!(&world.residents[ri].order, Some(ResidentOrder::WalkTo(w)) if w.target.x == x && w.target.y == y)
+}
+
+fn step_once(world: &mut WorldState, terrain: &TerrainMap) {
+    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    step_world(world, terrain, &mut Scratch::default(), Some(&mut walking), None);
+}
+
+#[test]
+fn comes_round_to_the_hq_from_the_post_before_it_on_its_loop() {
+    let Fixture { mut world, terrain, hq, .. } = fixture();
+    world.traders.truncate(1);
+    let t = &world.traders[0];
+    let i = t.r#loop.iter().position(|p| *p == hq).unwrap();
+    world.traders[0].post_id = t.r#loop[(i + t.r#loop.len() - 1) % t.r#loop.len()].clone();
+    let w = at_warehouse(&mut world, 0);
+    world.buildings[w].stock = Some(Stock::new());
+    let h = hq.clone();
+    run_until(&mut world, &terrain, &move |w| w.traders[0].post_id == h, 200);
+    assert_eq!(
+        (world.traders[0].heading, world.traders[0].stop),
+        (Heading::Post, TraderStop::Storage)
+    );
+    step_traders(&mut world, terrain.size, None);
+    let s = hq_end(&world).storage.unwrap();
+    let (sx, sy) = (world.buildings[s].x, world.buildings[s].y);
+    assert!(drives_to(&world, crew_of(&world, 0)[0], sx, sy));
+}
+
+#[test]
+fn loads_new_food_and_coins_there_and_carries_them_to_a_post() {
+    let mut f = fixture();
+    let (goods, coins) = come_round(&mut f);
+    let Fixture { mut world, terrain, hq, .. } = f;
+    world.buildings[goods].stock = Some(stock(&[(Good::Food, 100.0), (Good::Wood, 100.0)]));
+    world.buildings[coins].stock = Some(stock(&[(Good::Coins, 4_000.0)]));
+    let h = hq.clone();
+    run_until(&mut world, &terrain, &move |w| w.traders[0].post_id != h, 400);
+    let ki = carriage_of(&world, 0);
+    let l = &world.carriages[ki].load;
+    assert_eq!(
+        (held(l, Good::Food), held(l, Good::Wood), held(l, Good::Coins)),
+        (CARAVAN_FOOD + 50.0, 50.0, 2_000.0)
+    );
+    let g = world.buildings[goods].stock.as_ref();
+    assert_eq!((held_in(g, Good::Food), held_in(g, Good::Wood)), (50.0, 50.0));
+    assert_eq!(world.buildings[coins].stock, Some(stock(&[(Good::Coins, 2_000.0)])));
+    let t = &world.traders[0];
+    assert_eq!((t.heading, t.stop, t.plan.is_none()), (Heading::Post, TraderStop::Storage, true));
+    // And on to the next post on its loop, which has none of them.
+    let bound = t.post_id.clone();
+    assert_eq!(bound, after_hq(t, &hq));
+    let post = post_end(&world, &bound).warehouse.unwrap();
+    world.buildings[post].stock = Some(Stock::new());
+    let (px, py) = (world.buildings[post].x, world.buildings[post].y);
+    put(&mut world, 0, px, py);
+    world.traders[0].stop = TraderStop::Warehouse;
+    run_until(&mut world, &terrain, &move |w| w.traders[0].post_id != bound, 400);
+    let p = world.buildings[post].stock.as_ref();
+    assert_eq!(
+        (held_in(p, Good::Food), held_in(p, Good::Wood), held_in(p, Good::Coins)),
+        (25.0, 25.0, 1_000.0)
+    );
+    assert!(world.crimes.is_empty());
+    assert_eq!(check_all(&world, &terrain), vec![]);
+}
+
+#[test]
+fn moves_coins_only_at_the_coin_warehouse_and_other_goods_only_at_the_goods_warehouse() {
+    let mut f = fixture();
+    let (goods, coins) = come_round(&mut f);
+    let Fixture { mut world, terrain, hq, .. } = f;
+    world.buildings[goods].stock = Some(stock(&[(Good::Iron, 0.0)]));
+    world.buildings[coins].stock = Some(stock(&[(Good::Coins, 2_000.0)]));
+    let ki = carriage_of(&world, 0);
+    world.carriages[ki].load =
+        stock(&[(Good::Food, CARAVAN_FOOD), (Good::Iron, 40.0), (Good::Coins, 6_000.0)]);
+    let before = (total(&world, Good::Iron), total(&world, Good::Coins));
+    run_until(&mut world, &terrain, &|w| w.traders[0].stop == TraderStop::CoinWarehouse, 400);
+    // The goods are done, and nothing of the Coins has moved.
+    assert_eq!(world.buildings[goods].stock, Some(stock(&[(Good::Iron, 20.0)])));
+    let l = &world.carriages[ki].load;
+    assert_eq!((held(l, Good::Iron), held(l, Good::Coins)), (20.0, 6_000.0));
+    assert_eq!(world.buildings[coins].stock, Some(stock(&[(Good::Coins, 2_000.0)])));
+    plan_eq(world.traders[0].plan.as_ref().unwrap(), &[(Good::Coins, 2_000.0)], &[]);
+    step_once(&mut world, &terrain);
+    let (cx, cy) = (world.buildings[coins].x, world.buildings[coins].y);
+    assert!(drives_to(&world, crew_of(&world, 0)[0], cx, cy));
+    assert_eq!(check_all(&world, &terrain), vec![]);
+    run_until(&mut world, &terrain, &move |w| w.traders[0].post_id != hq, 400);
+    assert_eq!(world.buildings[coins].stock, Some(stock(&[(Good::Coins, 4_000.0)])));
+    let l = &world.carriages[ki].load;
+    assert_eq!((held(l, Good::Iron), held(l, Good::Coins)), (20.0, 4_000.0));
+    assert_eq!(world.buildings[goods].stock, Some(stock(&[(Good::Iron, 20.0)])));
+    assert_eq!((total(&world, Good::Iron), total(&world, Good::Coins)), before);
+    assert!(world.crimes.is_empty());
+}
+
+#[test]
+fn shares_the_room_on_the_carriage_between_the_goods_and_the_coins() {
+    let mut f = fixture();
+    let (goods, coins) = come_round(&mut f);
+    let Fixture { mut world, terrain, hq, .. } = f;
+    world.buildings[goods].stock = Some(stock(&[(Good::Wood, 4_000.0), (Good::Stone, 4_000.0)]));
+    world.buildings[coins].stock = Some(stock(&[(Good::Coins, 40_000.0)]));
+    run_until(&mut world, &terrain, &move |w| w.traders[0].post_id != hq, 2_000);
+    let l = &world.carriages[carriage_of(&world, 0)].load;
+    assert!(held(l, Good::Wood) > 0.0);
+    assert!(held(l, Good::Coins) > 0.0);
+    assert!(stock_weight(l) <= CARRIAGE_CAPACITY);
+    assert!(stock_weight(l) > CARRIAGE_CAPACITY - 10.0);
+}
+
+#[test]
+fn goes_on_from_the_goods_warehouse_with_no_coins_to_move() {
+    let mut f = fixture();
+    let (goods, coins) = come_round(&mut f);
+    let Fixture { mut world, terrain, hq, .. } = f;
+    world.buildings[goods].stock = Some(stock(&[(Good::Wood, 10.0)]));
+    world.buildings[coins].stock = Some(Stock::new());
+    let mut stops = Vec::new();
+    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut scratch = Scratch::default();
+    for _ in 0..100 {
+        if world.traders[0].post_id != hq {
+            break;
+        }
+        step_world(&mut world, &terrain, &mut scratch, Some(&mut walking), None);
+        stops.push(world.traders[0].stop);
+    }
+    assert_ne!(world.traders[0].post_id, hq);
+    assert!(!stops.contains(&TraderStop::CoinWarehouse));
+}
+
+#[test]
+fn leaves_what_is_kept_for_deliveries_alone_coins_too() {
+    let mut f = fixture();
+    let (goods, coins) = come_round(&mut f);
+    let Fixture { mut world, terrain, hq, .. } = f;
+    world.buildings[goods].stock = Some(stock(&[(Good::Wood, 100.0)]));
+    world.buildings[coins].stock = Some(stock(&[(Good::Coins, 1_000.0)]));
+    let wid = world.buildings[goods].id.clone();
+    for (id, good, units) in [("d1", "wood", 60), ("d2", "coins", 400)] {
+        world.deliveries.push(
+            serde_json::from_value(json!({
+                "id": id, "kind": "delivery", "realmId": "someone", "warehouseId": wid,
+                "cityId": "somewhere", "good": good, "units": units, "fee": 1, "caravanId": null,
+            }))
+            .unwrap(),
+        );
+    }
+    run_until(&mut world, &terrain, &move |w| w.traders[0].post_id != hq, 400);
+    let l = &world.carriages[carriage_of(&world, 0)].load;
+    assert_eq!(held_in(world.buildings[goods].stock.as_ref(), Good::Wood), 80.0);
+    assert_eq!(held(l, Good::Wood), 20.0);
+    assert_eq!(held_in(world.buildings[coins].stock.as_ref(), Good::Coins), 700.0);
+    assert_eq!(held(l, Good::Coins), 300.0);
+}
+
+#[test]
+fn makes_up_a_lost_escort_there_each_time_round_but_not_at_a_post() {
+    let mut f = fixture();
+    let (goods, coins) = come_round(&mut f);
+    let Fixture { mut world, terrain, hq, .. } = f;
+    world.buildings[goods].stock = Some(stock(&[(Good::Spear, 10.0)]));
+    world.buildings[coins].stock = Some(Stock::new());
+    let next = after_hq(&world.traders[0], &hq);
+    let post = post_end(&world, &next).warehouse.unwrap();
+    world.traders[0].post_id = next;
+    let (px, py) = (world.buildings[post].x, world.buildings[post].y);
+    put(&mut world, 0, px, py);
+    let escort = world.residents[crew_of(&world, 0)[1]].id.clone();
+    die(&mut world, &escort);
+    assert_eq!(world.traders[0].escort_ids.len() as f64, TRADER_ESCORTS - 1.0);
+    step_traders(&mut world, terrain.size, None);
+    assert_eq!(world.traders[0].escort_ids.len() as f64, TRADER_ESCORTS - 1.0);
+    // Back at the HQ.
+    world.traders[0].post_id = hq.clone();
+    let (gx, gy) = (world.buildings[goods].x, world.buildings[goods].y);
+    put(&mut world, 0, gx, gy);
+    world.traders[0].plan = None;
+    let left: HashSet<String> = world.traders[0].escort_ids.iter().cloned().collect();
+    step_traders(&mut world, terrain.size, None);
+    assert_eq!(world.traders[0].escort_ids.len() as f64, TRADER_ESCORTS);
+    assert_eq!(world.traders[0].post_id, hq);
+    // The new one is armed before it goes on.
+    let joined = world.traders[0].escort_ids.iter().find(|id| !left.contains(*id)).unwrap().clone();
+    run_until(&mut world, &terrain, &move |w| w.traders[0].post_id != hq, 400);
+    let r = world.residents.iter().find(|r| r.id == joined).unwrap();
+    assert_eq!(held(&r.carried, Good::Spear), 1.0);
+}
+
+#[test]
+fn back_for_a_new_carriage_when_bound_for_the_hq_goes_on_past_it_not_calling_twice() {
+    let mut f = fixture();
+    let (goods, coins) = come_round(&mut f);
+    let Fixture { mut world, terrain, hq, .. } = f;
+    world.buildings[goods].stock = Some(Stock::new());
+    world.buildings[coins].stock = Some(Stock::new());
+    world.traders[0].heading = Heading::Hq;
+    run_until(&mut world, &terrain, &|w| w.traders[0].heading == Heading::Post, 200);
+    assert_eq!(world.traders[0].post_id, after_hq(&world.traders[0], &hq));
+}
+
+#[test]
+fn takes_a_load_out_when_it_is_first_sent_as_at_any_stop() {
+    let Fixture { mut world, terrain, .. } = fixture();
+    world.traders.truncate(1);
+    let goods = hq_end(&world).warehouse.unwrap();
+    let st = world.buildings[goods].stock.get_or_insert_with(Stock::new);
+    st.insert(Good::Wood, 100.0);
+    st.insert(Good::Spear, 2.0);
+    let (gx, gy) = (world.buildings[goods].x, world.buildings[goods].y);
+    put(&mut world, 0, gx, gy);
+    world.traders[0].heading = Heading::Hq;
+    world.traders[0].stop = TraderStop::Warehouse;
+    let bound = world.traders[0].post_id.clone();
+    run_until(&mut world, &terrain, &|w| w.traders[0].heading == Heading::Post, 2_000);
+    assert_eq!(world.traders[0].post_id, bound);
+    let l = &world.carriages[carriage_of(&world, 0)].load;
+    assert!(held(l, Good::Wood) > 0.0);
+    assert!(held(l, Good::Coins) > 0.0);
+}
+
+// a wandering trader losing its crew
+
+#[test]
+fn has_a_surviving_escort_take_over_driving_when_its_driver_dies() {
+    let Fixture { mut world, terrain, .. } = fixture();
+    put(&mut world, 0, 300.0, 300.0);
+    let ids: Vec<String> =
+        crew_of(&world, 0).iter().map(|&ri| world.residents[ri].id.clone()).collect();
+    die(&mut world, &ids[0]);
+    assert_eq!(world.traders[0].driver_id.as_ref(), Some(&ids[1]));
+    assert_eq!(world.traders[0].escort_ids, vec![ids[2].clone()]);
+    step_traders(&mut world, terrain.size, None);
+    let next = world.residents.iter().find(|r| r.id == ids[1]).unwrap();
+    assert!(matches!(next.order, Some(ResidentOrder::Drive(_))));
+    assert_eq!(check_all(&world, &terrain), vec![]);
+}
+
+#[test]
+fn stands_with_no_crew_left_until_the_hq_sends_a_new_driver_on_foot() {
+    let Fixture { mut world, terrain, hq, .. } = fixture();
+    put(&mut world, 0, 300.0, 300.0);
+    let ids: Vec<String> =
+        crew_of(&world, 0).iter().map(|&ri| world.residents[ri].id.clone()).collect();
+    for id in &ids {
+        die(&mut world, id);
+    }
+    assert_eq!(world.traders[0].driver_id, None);
+    let ki = carriage_of(&world, 0);
+    // Nobody free at the HQ yet: each of its adults is at the bottom of the list.
+    let others: Vec<usize> = (0..world.residents.len())
+        .filter(|&i| world.residents[i].city_id.as_deref() == Some(&hq))
+        .collect();
+    let saved: Vec<f64> = others.iter().map(|&i| world.residents[i].health).collect();
+    for &i in &others {
+        world.residents[i].health = 0.0;
+    }
+    step_traders(&mut world, terrain.size, None);
+    assert_eq!(world.traders[0].driver_id, None);
+    for (&i, &h) in others.iter().zip(&saved) {
+        world.residents[i].health = h;
+    }
+    step_traders(&mut world, terrain.size, None);
+    let did = world.traders[0].driver_id.clone().unwrap();
+    let di = world.residents.iter().position(|r| r.id == did).unwrap();
+    assert_eq!(world.residents[di].owner, None);
+    assert_eq!(world.residents[di].city_id.as_deref(), Some(hq.as_str()));
+    assert!(walks_to(&world, di, 300.0, 300.0));
+    assert_eq!((world.carriages[ki].x, world.carriages[ki].y), (300.0, 300.0));
+    assert_eq!(traders_sound(&world, &terrain), vec![]);
+}
+
+#[test]
+fn has_its_escort_defend_it_against_someone_taking_goods_off_the_carriage() {
+    let Fixture { mut world, terrain, .. } = fixture();
+    put(&mut world, 0, 300.0, 300.0);
+    let eid = world.traders[0].escort_ids[0].clone();
+    let ei = world.residents.iter().position(|r| r.id == eid).unwrap();
+    world.residents[ei].carried.insert(Good::Sword, 1.0);
+    let mut m = Mulberry32::new(9.0);
+    let fields =
+        NewResident { id: "thief", owner: None, city_id: None, x: 300.0, y: 300.0, tick: 0.0 };
+    let mut thief = new_resident(&mut || m.next(), &fields, None);
+    let cid = world.traders[0].carriage_id.clone();
+    thief.order = Some(
+        serde_json::from_value(json!({
+            "kind": "pickUp", "from": { "kind": "carriage", "carriageId": cid }, "goods": { "food": 1 },
+        }))
+        .unwrap(),
+    );
+    world.residents.push(thief);
+    step_traders(&mut world, terrain.size, None);
+    let ei = world.residents.iter().position(|r| r.id == eid).unwrap();
+    assert!(
+        matches!(&world.residents[ei].order, Some(ResidentOrder::Attack(a)) if a.target_id == "thief"),
+        "{:?}",
+        world.residents[ei].order
+    );
+}
+
+#[test]
+fn counts_the_crew_as_run_by_the_trader_not_by_the_hqs_plans() {
+    let Fixture { mut world, terrain, hq, .. } = fixture();
+    step_once(&mut world, &terrain);
+    let crew = crew_of(&world, 0);
+    assert!(crew.iter().all(|&ri| world.residents[ri].city_id.as_deref() == Some(hq.as_str())));
+    assert!(!crew
+        .iter()
+        .any(|&ri| matches!(world.residents[ri].order, Some(ResidentOrder::WorkAt(_)))));
+}
+
+// robbing a wandering trader
+
+/// A trader out in the open with something on board, and a resident of Mara's on its tile.
+/// Returns the realm's id; the thief is `p1`.
+fn out_in_the_open(f: &mut Fixture) -> String {
+    let world = &mut f.world;
+    put(world, 0, 300.0, 300.0);
+    let ki = carriage_of(world, 0);
+    world.carriages[ki].load = stock(&[(Good::Food, 8.0), (Good::Iron, 4.0)]);
+    let ri = found_starting_city(world, &f.terrain, 7, None);
+    let realm = world.realms[ri].id.clone();
+    let mut m = Mulberry32::new(11.0);
+    let fields = NewResident {
+        id: "p1",
+        owner: Some(&realm),
+        city_id: None,
+        x: 300.0,
+        y: 300.0,
+        tick: world.tick as f64,
+    };
+    let thief = new_resident(&mut || m.next(), &fields, None);
+    world.residents.push(thief);
+    realm
+}
+
+fn take_off(world: &WorldState, who: &str, iron: f64) -> CarryAction {
+    CarryAction {
+        kind: CarryKind::Take,
+        resident_id: who.to_string(),
+        spot: GoodsSpot::Carriage { carriage_id: world.traders[0].carriage_id.clone() },
+        goods: stock(&[(Good::Iron, iron)]),
+    }
+}
+
+fn thief(world: &WorldState) -> &Resident {
+    world.residents.iter().find(|r| r.id == "p1").unwrap()
+}
+
+#[test]
+fn is_a_theft_against_the_trade_organization_with_nothing_sent_again() {
+    let mut f = fixture();
+    out_in_the_open(&mut f);
+    let Fixture { mut world, terrain, hq, .. } = f;
+    let a = take_off(&world, "p1", 2.0);
+    resolve_carrying(&mut world, &[a], terrain.size);
+    assert_eq!(held(&thief(&world).carried, Good::Iron), 2.0);
+    assert_eq!(world.crimes.len(), 1);
+    let c = &world.crimes[0];
+    assert_eq!(
+        (c.kind, c.victim_org.as_str(), c.goods.clone()),
+        (CrimeKind::Theft, hq.as_str(), Some(stock(&[(Good::Iron, 2.0)])))
+    );
+    assert_eq!(world.traders[0].robberies, 1.0);
+    // It owes nobody a delivery, and no caravan's route counts it.
+    assert!(world.deliveries.is_empty());
+    assert!(world.transfers.is_empty());
+    assert!(world.route_robberies.is_empty());
+    assert_eq!(held(&world.carriages[carriage_of(&world, 0)].load, Good::Iron), 2.0);
+}
+
+#[test]
+fn counts_one_robbery_a_tick_however_many_take_from_it() {
+    let mut f = fixture();
+    out_in_the_open(&mut f);
+    let Fixture { mut world, terrain, .. } = f;
+    let a = take_off(&world, "p1", 1.0);
+    resolve_carrying(&mut world, &[a.clone(), a], terrain.size);
+    assert_eq!(world.traders[0].robberies, 1.0);
+}
+
+#[test]
+fn is_no_robbery_when_one_of_the_trade_orgs_own_takes_from_it() {
+    let mut f = fixture();
+    out_in_the_open(&mut f);
+    let Fixture { mut world, terrain, .. } = f;
+    let driver = world.residents[crew_of(&world, 0)[0]].id.clone();
+    let a = take_off(&world, &driver, 1.0);
+    resolve_carrying(&mut world, &[a], terrain.size);
+    assert_eq!(world.traders[0].robberies, 0.0);
+    assert!(world.crimes.is_empty());
+}
+
+#[test]
+fn earns_it_more_escorts_made_up_at_the_hq_once_it_has_a_new_carriage() {
+    let mut f = fixture();
+    out_in_the_open(&mut f);
+    let Fixture { mut world, terrain, .. } = f;
+    let w = hq_end(&world).warehouse.unwrap();
+    world.traders[0].robberies = 2.0;
+    let (wx, wy) = (world.buildings[w].x, world.buildings[w].y);
+    put(&mut world, 0, wx, wy);
+    world.traders[0].heading = Heading::Hq;
+    step_traders(&mut world, terrain.size, None);
+    assert_eq!(world.traders[0].escort_ids.len() as f64, TRADER_ESCORTS + 1.0);
+    assert_eq!(traders_sound(&world, &terrain), vec![]);
+}
+
+#[test]
+fn refuses_to_drive_off_with_its_carriage_while_its_crew_hold_it() {
+    let mut f = fixture();
+    let realm = out_in_the_open(&mut f);
+    let Fixture { mut world, terrain, .. } = f;
+    let problem = |w: &WorldState| {
+        let k = &w.carriages[carriage_of(w, 0)];
+        drive_off_problem(w, thief(w), k, &realm, terrain.size)
+    };
+    assert_eq!(problem(&world).as_deref(), Some("its driver is still with that trader’s carriage"));
+    let crew = crew_of(&world, 0);
+    let ids: Vec<String> = crew.iter().map(|&ri| world.residents[ri].id.clone()).collect();
+    world.residents[crew[1]].carried.insert(Good::Spear, 1.0);
+    world.residents[crew[1]].x += 1.0;
+    world.residents[crew[0]].x += 1000.0;
+    world.residents[crew[2]].x += 1000.0;
+    assert_eq!(problem(&world).as_deref(), Some("its escort guards that trader’s carriage"));
+    die(&mut world, &ids[0]);
+    die(&mut world, &ids[2]);
+    // The one left has taken over driving.
+    assert_eq!(world.traders[0].driver_id.as_ref(), Some(&ids[1]));
+    die(&mut world, &ids[1]);
+    assert_eq!(problem(&world), None);
+}
+
+#[test]
+fn stolen_it_gets_a_new_carriage_and_horse_at_the_hq_bound_for_the_same_post() {
+    let mut f = fixture();
+    let realm = out_in_the_open(&mut f);
+    let Fixture { mut world, terrain, hq, .. } = f;
+    let stolen = world.traders[0].carriage_id.clone();
+    let tid = world.traders[0].id.clone();
+    let bound = world.traders[0].post_id.clone();
+    world.traders[0].stop = TraderStop::Warehouse;
+    let crew: Vec<String> =
+        crew_of(&world, 0).iter().map(|&ri| world.residents[ri].id.clone()).collect();
+    let ki = carriage_of(&world, 0);
+    take_over(&mut world, "p1", &realm, Taken { carriage: Some(ki), horse: None }, terrain.size);
+    let k = world.carriages.iter().find(|k| k.id == stolen).unwrap();
+    assert_eq!(k.realm_id.as_deref(), Some(realm.as_str()));
+    assert_eq!(k.city_id, None);
+    assert_eq!(k.load, stock(&[(Good::Food, 8.0), (Good::Iron, 4.0)]));
+    assert_eq!(world.crimes.len(), 1);
+    let c = &world.crimes[0];
+    assert_eq!(
+        (c.kind, c.victim_org.as_str(), c.carriage),
+        (CrimeKind::Theft, hq.as_str(), Some(true))
+    );
+    assert_eq!(world.traders[0].robberies, 1.0);
+    assert!(world.deliveries.is_empty());
+    assert!(world.traders.iter().any(|x| x.id == tid));
+    let fresh = carriage_of(&world, 0);
+    let w = hq_end(&world).warehouse.unwrap();
+    let k = &world.carriages[fresh];
+    assert_ne!(k.id, stolen);
+    assert_eq!((k.realm_id.as_deref(), k.city_id.as_deref()), (None, Some(hq.as_str())));
+    assert_eq!((k.x, k.y), (world.buildings[w].x, world.buildings[w].y));
+    assert!(k.load.is_empty());
+    let horse = world.horses.iter().find(|h| Some(&h.id) == k.horse_id.as_ref()).unwrap();
+    assert_eq!(horse.city_id.as_deref(), Some(hq.as_str()));
+    let t = &world.traders[0];
+    assert_eq!(
+        (t.heading, t.stop, &t.post_id, t.plan.is_none()),
+        (Heading::Hq, TraderStop::Storage, &bound, true)
+    );
+    // Its surviving crew walk back to it.
+    let (fx, fy) = (k.x, k.y);
+    step_traders(&mut world, terrain.size, None);
+    for id in &crew {
+        let ri = world.residents.iter().position(|r| &r.id == id).unwrap();
+        assert!(walks_to(&world, ri, fx, fy), "{:?}", world.residents[ri].order);
+    }
+    assert_eq!(traders_sound(&world, &terrain), vec![]);
+}
+
+// a wandering trader's loop
+
+#[test]
+fn keeps_a_post_that_leaves_the_trade_organization_until_it_gets_there() {
+    let Fixture { mut world, terrain, .. } = fixture();
+    let bound = world.traders[0].post_id.clone();
+    leave_trade_org(&mut world, &bound);
+    assert!(world.traders[0].r#loop.contains(&bound));
+    assert_eq!(world.traders[0].post_id, bound);
+    assert_eq!(traders_sound(&world, &terrain), vec![]);
+}
+
+#[test]
+fn drops_a_post_by_going_on_to_the_one_after_it() {
+    let Fixture { mut world, terrain, .. } = fixture();
+    let t = &world.traders[0];
+    let bound = t.post_id.clone();
+    let after =
+        t.r#loop[(t.r#loop.iter().position(|p| *p == bound).unwrap() + 1) % t.r#loop.len()].clone();
+    world.traders[0].plan =
+        Some(TraderPlan { leave: Stock::new(), take: stock(&[(Good::Wood, 1.0)]) });
+    world.traders[0].stop = TraderStop::Warehouse;
+    leave_trade_org(&mut world, &bound);
+    drop_from_loop(&mut world.traders[0], &bound);
+    let t = &world.traders[0];
+    assert!(!t.r#loop.contains(&bound));
+    assert_eq!(t.post_id, after);
+    assert_eq!((t.stop, t.plan.is_none()), (TraderStop::Storage, true));
+    assert_eq!(traders_sound(&world, &terrain), vec![]);
+}
+
+#[test]
+fn keeps_its_way_when_a_post_it_isnt_bound_for_drops_wrapping_round_the_end() {
+    let Fixture { mut world, posts, .. } = fixture();
+    let bound = world.traders[0].post_id.clone();
+    let other = posts.iter().find(|p| **p != bound).unwrap().clone();
+    world.traders[0].stop = TraderStop::Warehouse;
+    drop_from_loop(&mut world.traders[0], &other);
+    assert_eq!(world.traders[0].post_id, bound);
+    assert_eq!(world.traders[0].stop, TraderStop::Warehouse);
+    // The last of the loop goes: on to the first, the HQ.
+    let t = &mut world.traders[0];
+    let last = t.r#loop.last().unwrap().clone();
+    let first = t.r#loop[0].clone();
+    t.post_id = last.clone();
+    drop_from_loop(t, &last);
+    assert_eq!(t.post_id, first);
+    assert!(posts.iter().all(|p| world.cities.iter().any(|c| &c.id == p)));
+}
+
+#[test]
+fn holds_together_with_a_captured_post_on_it() {
+    let Fixture { mut world, terrain, posts, .. } = fixture();
+    let ri = found_starting_city(&mut world, &terrain, 7, None);
+    let realm = world.realms[ri].id.clone();
+    capture_city(&mut world, &posts[0], &realm, terrain.size);
+    assert!(world.traders[0].r#loop.contains(&posts[0]));
+    assert_eq!(check_all(&world, &terrain), vec![]);
+}
+
+#[test]
+fn takes_in_a_new_post_where_it_adds_the_least_way_the_rest_in_the_same_order() {
+    let Fixture { mut world, terrain, .. } = fixture();
+    let order = world.traders[0].r#loop.clone();
+    let bound = world.traders[0].post_id.clone();
+    let mut m = Mulberry32::new(3.0);
+    let post = found_trading_post(&mut world, &terrain, 320, 174, None, &mut || m.next());
+    step_traders(&mut world, terrain.size, None);
+    let t = &world.traders[0];
+    assert_eq!(t.r#loop.len(), order.len() + 1);
+    assert_eq!(t.r#loop.iter().filter(|id| **id != post).cloned().collect::<Vec<_>>(), order);
+    assert_eq!(t.post_id, bound);
+    // Beside the two posts on the east side of the square, so between them.
+    let n = t.r#loop.len();
+    let i = t.r#loop.iter().position(|p| *p == post).unwrap();
+    let mut neighbours = vec![t.r#loop[(i + n - 1) % n].clone(), t.r#loop[(i + 1) % n].clone()];
+    neighbours.sort();
+    let mut east: Vec<String> = t
+        .r#loop
+        .iter()
+        .filter(|id| {
+            let c = world.cities.iter().find(|c| &c.id == *id).unwrap();
+            let hall = town_hall_of(&world, c).unwrap();
+            hall.x > 200.0 && hall.x < 280.0
+        })
+        .cloned()
+        .collect();
+    east.sort();
+    assert_eq!(neighbours, east);
+    assert_eq!(traders_sound(&world, &terrain), vec![]);
+}
+
+#[test]
+fn goes_back_to_the_hq_with_no_post_left_and_out_again_when_there_is_one() {
+    let Fixture { mut world, terrain, hq, posts, traders } = fixture_at(&[(220, 128)]);
+    assert_eq!(world.traders.iter().map(|t| t.id.clone()).collect::<Vec<_>>(), traders[..1]);
+    put(&mut world, 0, 300.0, 300.0);
+    leave_trade_org(&mut world, &posts[0]);
+    drop_from_loop(&mut world.traders[0], &posts[0]);
+    let t = &world.traders[0];
+    assert_eq!((&t.r#loop, &t.post_id, t.stop), (&vec![hq.clone()], &hq, TraderStop::Storage));
+    assert_eq!(traders_sound(&world, &terrain), vec![]);
+    step_traders(&mut world, terrain.size, None);
+    let s = hq_end(&world).storage.unwrap();
+    let (sx, sy) = (world.buildings[s].x, world.buildings[s].y);
+    assert!(drives_to(&world, crew_of(&world, 0)[0], sx, sy));
+    let mut m = Mulberry32::new(3.0);
+    let post = found_trading_post(&mut world, &terrain, 128, 320, None, &mut || m.next());
+    step_traders(&mut world, terrain.size, None);
+    let t = &world.traders[0];
+    assert_eq!((&t.r#loop, &t.post_id), (&vec![hq.clone(), post], &hq));
+    assert_eq!(traders_sound(&world, &terrain), vec![]);
+}
+
+#[test]
+fn stays_at_the_hqs_warehouse_with_no_post_left_not_shuttling_to_and_fro() {
+    let Fixture { mut world, terrain, hq, posts, .. } = fixture_at(&[(220, 128)]);
+    leave_trade_org(&mut world, &posts[0]);
+    drop_from_loop(&mut world.traders[0], &posts[0]);
+    let w = hq_end(&world).warehouse.unwrap();
+    let (wx, wy) = (world.buildings[w].x, world.buildings[w].y);
+    put(&mut world, 0, wx, wy);
+    world.traders[0].stop = TraderStop::Warehouse;
+    for ri in crew_of(&world, 0) {
+        world.residents[ri].carried.insert(Good::Spear, 1.0);
+    }
+    step_traders(&mut world, terrain.size, None);
+    let t = &world.traders[0];
+    assert_eq!((t.stop, &t.post_id, t.plan.is_none()), (TraderStop::Warehouse, &hq, true));
+    assert_eq!(world.residents[crew_of(&world, 0)[0]].order, None);
+    // Given a post, it goes on from there.
+    let mut m = Mulberry32::new(3.0);
+    let post = found_trading_post(&mut world, &terrain, 128, 320, None, &mut || m.next());
+    run_until(&mut world, &terrain, &move |w| w.traders[0].post_id == post, 2_000);
+    assert_eq!(world.traders[0].heading, Heading::Post);
+}
+
+// wandering traders and the fall of the HQ
+
+#[test]
+fn ends_them_crew_carriage_horse_and_load_join_the_captor_where_they_stand() {
+    let Fixture { mut world, terrain, hq, .. } = fixture();
+    let ri = found_starting_city(&mut world, &terrain, 7, None);
+    let realm = world.realms[ri].id.clone();
+    put(&mut world, 0, 300.0, 300.0);
+    // Bound for the HQ, on its loop, makes no difference.
+    assert!(world.traders[0].r#loop.contains(&hq));
+    world.traders[0].post_id = hq.clone();
+    let ki = carriage_of(&world, 0);
+    let kid = world.carriages[ki].id.clone();
+    world.carriages[ki].load = stock(&[(Good::Iron, 3.0)]);
+    let crew: Vec<String> =
+        crew_of(&world, 0).iter().map(|&ri| world.residents[ri].id.clone()).collect();
+    let trader = world.traders[0].clone();
+    capture_city(&mut world, &hq, &realm, terrain.size);
+    assert!(trade_org_hq(&world).is_none());
+    assert!(world.traders.is_empty());
+    let k = world.carriages.iter().find(|k| k.id == kid).unwrap();
+    assert_eq!(k.realm_id.as_deref(), Some(realm.as_str()));
+    assert_eq!((k.x, k.y), (300.0, 300.0));
+    assert_eq!(k.load, stock(&[(Good::Iron, 3.0)]));
+    for id in &crew {
+        let r = world.residents.iter().find(|r| &r.id == id).unwrap();
+        assert_eq!((r.owner.as_deref(), r.x, r.y), (Some(realm.as_str()), 300.0, 300.0));
+    }
+    assert_eq!(nothing_left_of_the_hq(&world), vec![]);
+    assert_eq!(check_all(&world, &terrain), vec![]);
+    // And should one be left, the invariant says so.
+    world.traders.push(trader);
+    assert_eq!(
+        nothing_left_of_the_hq(&world).into_iter().map(|v| v.message).collect::<Vec<_>>(),
+        vec!["the world has no Trade Org HQ but still has wandering traders".to_string()]
+    );
+}
+
+#[test]
+fn ends_any_left_with_no_hq_on_the_next_tick() {
+    let Fixture { mut world, terrain, hq, .. } = fixture();
+    world.cities.retain(|c| c.id != hq);
+    assert!(!world.traders.is_empty());
+    step_traders(&mut world, terrain.size, None);
+    assert!(world.traders.is_empty());
+}
+
+// what is seen of a wandering trader
+
+#[test]
+fn is_what_is_seen_of_a_caravan_seen_through_its_carriage_and_crew() {
+    let Fixture { mut world, terrain, .. } = fixture();
+    let ri = found_starting_city(&mut world, &terrain, 7, None);
+    let realm = world.realms[ri].id.clone();
+    let size = terrain.size;
+    let seen = |w: &WorldState| -> Vec<SeenTrader> {
+        let index = WorldIndex::new(w, size);
+        entities_in_sight(w, &index, Some(&realm), None)
+            .iter()
+            .filter_map(|e| match e {
+                SeenEntity::Trader(t) => Some(t.clone()),
+                _ => None,
+            })
+            .collect()
+    };
+    assert_eq!(seen(&world), vec![]);
+    let mut m = Mulberry32::new(3.0);
+    let fields = NewResident {
+        id: "scout",
+        owner: Some(&realm),
+        city_id: None,
+        x: 300.0,
+        y: 300.0,
+        tick: world.tick as f64,
+    };
+    let scout = new_resident(&mut || m.next(), &fields, None);
+    world.residents.push(scout);
+    put(&mut world, 0, 300.0, 300.0);
+    let t = &world.traders[0];
+    assert_eq!(
+        seen(&world),
+        vec![SeenTrader {
+            id: t.id.clone(),
+            carriage_id: t.carriage_id.clone(),
+            driver_id: t.driver_id.clone(),
+            escort_ids: t.escort_ids.clone(),
+            post_id: t.post_id.clone(),
+            heading: Heading::Post,
+            standing: None,
+            prices: None,
+        }]
+    );
+}
+
+// the invariant on wandering traders
+
+fn messages(world: &WorldState, terrain: &TerrainMap) -> Vec<String> {
+    traders_sound(world, terrain).into_iter().map(|v| v.message).collect()
+}
+
+#[test]
+fn allows_the_hq_on_a_loop_but_catches_a_loop_naming_anything_else_or_a_stop_twice() {
+    let Fixture { mut world, terrain, hq, .. } = fixture();
+    assert!(world.traders[0].r#loop.contains(&hq));
+    assert_eq!(messages(&world, &terrain), Vec::<String>::new());
+    let ri = found_starting_city(&mut world, &terrain, 7, None);
+    let realm = world.realms[ri].id.clone();
+    world.traders[0].r#loop.push(realm.clone());
+    let id = world.traders[0].id.clone();
+    assert_eq!(
+        messages(&world, &terrain),
+        vec![format!("trader {id} has {realm} on its loop, which is no city")]
+    );
+    world.traders[0].r#loop.pop();
+    let first = world.traders[0].r#loop[0].clone();
+    world.traders[0].r#loop.push(first);
+    assert_eq!(
+        messages(&world, &terrain),
+        vec![format!("trader {id} has a stop twice on its loop")]
+    );
+}
+
+#[test]
+fn catches_a_loop_without_the_hq() {
+    let Fixture { mut world, terrain, hq, .. } = fixture();
+    world.traders[0].r#loop.retain(|p| *p != hq);
+    let id = world.traders[0].id.clone();
+    assert_eq!(messages(&world, &terrain), vec![format!("trader {id} has no HQ on its loop")]);
+}
+
+#[test]
+fn catches_making_for_a_coin_warehouse_at_a_post() {
+    let Fixture { mut world, terrain, .. } = fixture();
+    world.traders[0].heading = Heading::Post;
+    world.traders[0].stop = TraderStop::CoinWarehouse;
+    assert!(messages(&world, &terrain)[0].contains("makes for a coin warehouse"));
+}
+
+#[test]
+fn catches_going_to_a_post_off_its_loop() {
+    let Fixture { mut world, terrain, .. } = fixture();
+    world.traders[0].post_id = "nowhere".into();
+    assert!(messages(&world, &terrain)[0].contains("goes to nowhere"));
+}
+
+#[test]
+fn catches_crew_who_arent_of_the_hq_and_crew_shared_with_another() {
+    let Fixture { mut world, terrain, posts, .. } = fixture();
+    let ri = crew_of(&world, 0)[0];
+    let rid = world.residents[ri].id.clone();
+    world.residents[ri].city_id = Some(posts[0].clone());
+    let id = world.traders[0].id.clone();
+    assert_eq!(
+        messages(&world, &terrain),
+        vec![format!("trader {id} has crew {rid}, who isn't of the Trade Org HQ")]
+    );
+    world.residents[ri].city_id = Some(trade_org_hq(&world).unwrap().id.clone());
+    world.traders[1].escort_ids[0] = rid;
+    assert!(messages(&world, &terrain)[0].contains("twice or shared"));
+}
+
+#[test]
+fn catches_a_lost_carriage_a_driverless_crew_too_many_escorts_and_an_oversized_plan() {
+    let Fixture { mut world, terrain, .. } = fixture();
+    let ki = carriage_of(&world, 0);
+    world.carriages[ki].realm_id = Some("someone".into());
+    assert!(messages(&world, &terrain)[0].contains("isn't the Trade Org HQ's"));
+    world.carriages[ki].realm_id = None;
+    let driver = world.traders[0].driver_id.take();
+    assert!(messages(&world, &terrain)[0].contains("has no driver"));
+    world.traders[0].driver_id = driver;
+    world.traders[0].escort_ids.extend(["a", "b", "c"].map(String::from));
+    assert!(messages(&world, &terrain).join(",").contains("walks with"));
+    let n = world.traders[0].escort_ids.len();
+    world.traders[0].escort_ids.truncate(n - 3);
+    world.traders[0].plan = Some(TraderPlan {
+        leave: Stock::new(),
+        take: stock(&[(Good::Stone, CARRIAGE_CAPACITY * 2.0)]),
+    });
+    assert!(messages(&world, &terrain).join(",").contains("means to take"));
+}
+
+#[test]
+fn is_one_of_the_worlds_invariants() {
+    let Fixture { mut world, terrain, .. } = fixture();
+    world.traders[0].post_id = "nowhere".into();
+    assert!(check_all(&world, &terrain).iter().any(|v| v.invariant == "traders-sound"));
 }
