@@ -21,6 +21,7 @@ use crate::queries::residents::can_work;
 use crate::queue::field_str as str_field;
 use crate::survival::drop_goods;
 use crate::tick::Scratch;
+use crate::world_index::{building_index, resident_index};
 
 /// Taking down another Organization's building is a crime (`buildingOrganization`, `commitCrime`
 /// of `teardown.ts`), noted before the building goes.
@@ -75,13 +76,13 @@ pub fn resolve_tearing_down(
     let tick = world.tick as f64;
     let mut felled = Vec::new();
     for a in actions {
-        let Some(ri) = world.residents.iter().position(|x| x.id == a.resident_id) else {
+        let Some(ri) = resident_index(world, &a.resident_id) else {
             continue;
         };
         let r = &world.residents[ri];
         let Some(ResidentOrder::TearDown(o)) = &r.order else { continue };
         let (rx, ry) = (r.x as i32, r.y as i32);
-        let bi = world.buildings.iter().position(|x| x.id == o.building_id);
+        let bi = building_index(world, &o.building_id);
         let stays = (rx, ry) == (o.at.x as i32, o.at.y as i32);
         let Some(bi) = bi.filter(|&i| stays && is_at((rx, ry), placed(&world.buildings[i]), size))
         else {
@@ -124,19 +125,18 @@ pub fn resolve_tearing_down(
     if !felled.is_empty() {
         update_city_membership(world, size);
     }
-    let standing: std::collections::HashSet<String> =
-        world.buildings.iter().map(|b| b.id.clone()).collect();
-    for r in &mut world.residents {
-        let ends = match &r.order {
-            Some(ResidentOrder::TearDown(o)) => !standing.contains(&o.building_id),
-            Some(ResidentOrder::Build(o)) => {
-                o.site_id.as_ref().is_some_and(|s| !standing.contains(s))
-            }
+    // Orders on what is gone end: each looked up by id, rather than every building's id copied
+    // into a set each tick for the few on such an order (T89.6).
+    let gone = |id: &str| building_index(world, id).is_none();
+    let ends: Vec<usize> = (0..world.residents.len())
+        .filter(|&i| match &world.residents[i].order {
+            Some(ResidentOrder::TearDown(o)) => gone(&o.building_id),
+            Some(ResidentOrder::Build(o)) => o.site_id.as_deref().is_some_and(gone),
             _ => false,
-        };
-        if ends {
-            r.order = None;
-        }
+        })
+        .collect();
+    for i in ends {
+        world.residents[i].order = None;
     }
     felled
 }

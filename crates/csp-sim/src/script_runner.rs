@@ -1816,7 +1816,7 @@ pub fn run_npc_scripts(
     terrain: &TerrainMap,
     scratch: &mut Scratch,
 ) -> usize {
-    let kinds = order_kinds();
+    let kinds = npc_order_kinds();
     let npc: Vec<&City> = world.cities.iter().filter(|c| c.realm_id.is_none()).collect();
     let mut by_city: Vec<(City, Vec<String>)> = Vec::new();
     for r in &world.residents {
@@ -1839,13 +1839,20 @@ pub fn run_npc_scripts(
     let mut runs = 0;
     let mut waiting = std::mem::take(&mut scratch.waiting);
     for (city, people) in by_city {
-        runs += run_city_scripts(world, terrain, scratch, &mut waiting, &city, &people, &kinds);
+        runs += run_city_scripts(world, terrain, scratch, &mut waiting, &city, &people, kinds);
     }
     scratch.waiting = waiting;
     if opened {
         scratch.sight = None;
     }
     runs
+}
+
+/// The order kinds an NPC city's script requests go through. They are the same every tick and
+/// hold nothing that changes, so they are made once rather than every tick (T89.6).
+fn npc_order_kinds() -> &'static OrderKinds {
+    static KINDS: std::sync::OnceLock<OrderKinds> = std::sync::OnceLock::new();
+    KINDS.get_or_init(order_kinds)
 }
 
 /// Runs one NPC city's residents' scripts; returns how many ran (`runCityScripts`).
