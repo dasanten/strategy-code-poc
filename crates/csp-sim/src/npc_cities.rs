@@ -62,6 +62,45 @@ pub fn npc_site_fits(
     ground: &Ground,
     out_of_sight: bool,
 ) -> bool {
+    npc_site_fits_among(&SiteWorld::new(world), terrain, kind, x, y, ground, out_of_sight)
+}
+
+/// What `npc_site_fits` reads of the world besides the ground, taken once for a search that tries
+/// many sites: where every city's town hall stands and where every Player's resident stands.
+pub struct SiteWorld {
+    halls: Vec<(f64, f64)>,
+    players: Vec<(f64, f64)>,
+}
+
+impl SiteWorld {
+    pub fn new(world: &WorldState) -> Self {
+        SiteWorld {
+            halls: world
+                .cities
+                .iter()
+                .filter_map(|c| town_hall_of(world, c))
+                .map(|h| (h.x, h.y))
+                .collect(),
+            players: world
+                .residents
+                .iter()
+                .filter(|r| r.owner.is_some())
+                .map(|r| (r.x, r.y))
+                .collect(),
+        }
+    }
+}
+
+/// `npc_site_fits` with the world's halls and Players' residents already taken (`SiteWorld`).
+pub fn npc_site_fits_among(
+    among: &SiteWorld,
+    terrain: &TerrainMap,
+    kind: &NpcCitySize,
+    x: i32,
+    y: i32,
+    ground: &Ground,
+    out_of_sight: bool,
+) -> bool {
     let size = terrain.size;
     let centre = (f64::from(x) + kind.size / 2.0, f64::from(y) + kind.size / 2.0);
     // `wrapDistance` of the TypeScript, to a half tile.
@@ -77,17 +116,11 @@ pub fn npc_site_fits(
         };
         js_hypot(d(a.0, b.0), d(a.1, b.1))
     };
-    for c in &world.cities {
-        if let Some(hall) = town_hall_of(world, c) {
-            if dist((hall.x, hall.y), centre) < NPC_CITY_MIN_DISTANCE {
-                return false;
-            }
-        }
+    if among.halls.iter().any(|&hall| dist(hall, centre) < NPC_CITY_MIN_DISTANCE) {
+        return false;
     }
     let unseen = SIGHT_RANGE + footprint_radius(kind);
-    if out_of_sight
-        && world.residents.iter().any(|r| r.owner.is_some() && dist((r.x, r.y), centre) <= unseen)
-    {
+    if out_of_sight && among.players.iter().any(|&r| dist(r, centre) <= unseen) {
         return false;
     }
     let side = kind.size as i32;
@@ -130,10 +163,11 @@ pub fn find_npc_city_site(
         return None;
     }
     let ground = taken_ground(world, terrain);
+    let among = SiteWorld::new(world);
     for _ in 0..3000 {
         let x = FARM_RING + (rand() * f64::from(span)).floor() as i32;
         let y = FARM_RING + (rand() * f64::from(span)).floor() as i32;
-        if npc_site_fits(world, terrain, kind, x, y, &ground, true) {
+        if npc_site_fits_among(&among, terrain, kind, x, y, &ground, true) {
             return Some((x, y));
         }
     }

@@ -12,7 +12,7 @@ use csp_shared::world::{
 };
 
 use crate::goods_deps::{new_id, update_city_membership};
-use crate::npc_cities::{found_npc_city, npc_site_fits, taken_ground};
+use crate::npc_cities::{found_npc_city, npc_site_fits_among, taken_ground, SiteWorld};
 use crate::placing::{node_workplace, Ground};
 use crate::queries::city::town_hall_of;
 use crate::queries::names::{good_of, held_in, placed};
@@ -269,9 +269,10 @@ pub fn find_trading_post_site(
     }
     candidates.sort_by(|a, b| a.1.total_cmp(&b.1));
     let kind = post_size();
+    let among = SiteWorld::new(world);
     candidates
         .into_iter()
-        .find(|&((x, y), _)| npc_site_fits(world, terrain, &kind, x, y, ground, true))
+        .find(|&((x, y), _)| npc_site_fits_among(&among, terrain, &kind, x, y, ground, true))
         .map(|(at, _)| at)
 }
 
