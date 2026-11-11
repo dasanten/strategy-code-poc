@@ -163,9 +163,12 @@ fn failure(message: impl Into<String>, at: Position) -> Signal {
     Signal::Failure(Box::new((message.into(), at)))
 }
 
-struct Binding {
+struct Binding<'p> {
     value: Value,
     constant: bool,
+    /// A function declared here whose name hasn't been read yet: it is made when it first is,
+    /// so declaring costs nothing (`CONTEXT.md`: Step budget). `value` is null until then.
+    declared: Option<&'p FunctionDeclaration>,
 }
 
 thread_local! {
@@ -199,7 +202,7 @@ const GLOBALS: usize = 0;
 
 struct ScopeData<'p> {
     parent: Option<usize>,
-    bindings: Vec<(&'p str, Binding)>,
+    bindings: Vec<(&'p str, Binding<'p>)>,
 }
 
 struct FunctionDef<'p> {
@@ -268,7 +271,7 @@ impl<'p> Interpreter<'p, '_> {
         if bindings.iter().any(|(n, _)| *n == name) {
             return false;
         }
-        bindings.push((name, Binding { value, constant: false }));
+        bindings.push((name, Binding { value, constant: false, declared: None }));
         true
     }
 
@@ -283,7 +286,7 @@ impl<'p> Interpreter<'p, '_> {
             if s == GLOBALS {
                 let value = self.host.global(name)?;
                 let bindings = &mut self.scopes[GLOBALS].bindings;
-                bindings.push((name, Binding { value, constant: true }));
+                bindings.push((name, Binding { value, constant: true, declared: None }));
                 return Some((GLOBALS, bindings.len() - 1));
             }
             at = self.scopes[s].parent;
@@ -291,7 +294,7 @@ impl<'p> Interpreter<'p, '_> {
         None
     }
 
-    fn binding(&mut self, (scope, index): (usize, usize)) -> &mut Binding {
+    fn binding(&mut self, (scope, index): (usize, usize)) -> &mut Binding<'p> {
         &mut self.scopes[scope].bindings[index].1
     }
 
@@ -331,13 +334,18 @@ impl<'p> Interpreter<'p, '_> {
         Ok(())
     }
 
+    /// Declares a function as its block starts: no step (`CONTEXT.md`: Step budget, Daniel,
+    /// 2026-11-10), and the function itself is made only when its name is first read, so one
+    /// never called costs nothing at all. A name already declared in the block fails here, as
+    /// before.
     #[inline(never)]
     fn declare_function(&mut self, f: &'p FunctionDeclaration, scope: usize) -> Eval<()> {
-        self.step(f.position(), 1)?;
-        let function = self.new_function(&f.name, &f.params, &f.body, scope);
-        if !self.declare(scope, &f.name, function) {
+        let bindings = &mut self.scopes[scope].bindings;
+        if bindings.iter().any(|(n, _)| *n == f.name) {
             return Err(already_declared(&f.name, f.position()));
         }
+        bindings
+            .push((&f.name, Binding { value: Value::Null, constant: false, declared: Some(f) }));
         Ok(())
     }
 
@@ -485,7 +493,15 @@ impl<'p> Interpreter<'p, '_> {
     #[inline(never)]
     fn identifier(&mut self, e: &'p Identifier, scope: usize) -> Eval<Value> {
         match self.lookup(scope, &e.name) {
-            Some(at) => Ok(self.binding(at).value.clone()),
+            Some(at) => {
+                // A declared function is made the first time its name is read, in the scope it
+                // was declared in, and kept: every read after sees the same function.
+                if let Some(f) = self.binding(at).declared.take() {
+                    let function = self.new_function(&f.name, &f.params, &f.body, at.0);
+                    self.binding(at).value = function;
+                }
+                Ok(self.binding(at).value.clone())
+            }
             None => Err(not_defined(&e.name, e.position())),
         }
     }
@@ -677,7 +693,10 @@ impl<'p> Interpreter<'p, '_> {
                     );
                 }
                 let value = self.expression(&node.value, scope)?;
-                self.binding(at).value = value.clone();
+                let binding = self.binding(at);
+                // Assigned over before it was read, a declared function is never made.
+                binding.declared = None;
+                binding.value = value.clone();
                 Ok(value)
             }
             AssignTarget::Member(target) => {
