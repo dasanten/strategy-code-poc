@@ -239,6 +239,7 @@ export const SKILL_LABELS: Record<SkillName, string> = {
   farming: 'Farming',
   combat: 'Combat',
   driving: 'Driving',
+  seafaring: 'Seafaring',
 }
 
 /** A stat or skill a training ground teaches, as the UI names it: "Strength", "Combat". */
@@ -314,6 +315,7 @@ export type Picking =
   | false
   | 'walk'
   | 'drive'
+  | 'row'
   | 'driveOff'
   | 'hitchOff'
   | 'haul'
@@ -895,6 +897,11 @@ export function orderDoing(
   if (o?.kind === 'drive') {
     if (!o.path) return `Finding a way for the carriage to ${o.target.x}, ${o.target.y}`
     return `Driving to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
+  }
+  if (o?.kind === 'row') {
+    // `CONTEXT.md`: Rowing.
+    if (!o.path) return `Finding a way over the water to ${o.target.x}, ${o.target.y}`
+    return `Rowing to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
   }
   if (o?.kind === 'haul') {
     const what = o.goods.map((g) => GOOD_LABELS[g].toLowerCase()).join(', ')
@@ -1760,6 +1767,8 @@ export function ResidentCard({
   horseToRide,
   carriageToBoard,
   boatToBoard,
+  boatToRow,
+  onRowTo,
   onBoard,
   carriageToUnhitch,
   onUnhitch,
@@ -1852,6 +1861,10 @@ export function ResidentCard({
   carriageToBoard: { id: string } | undefined
   /** A boat of the realm beside the resident with room (`CONTEXT.md`: Beside a vessel), to board. */
   boatToBoard?: { id: string } | undefined
+  /** A boat of the realm the resident is aboard or beside, to row, and why they can't now (`CONTEXT.md`: Rowing). */
+  boatToRow?: { id: string; problem?: string }
+  /** Starts (or cancels) picking a tile to row the boat to. */
+  onRowTo?: () => void
   /** Orders the resident to board that carriage, or with none to get off the one they are on. */
   onBoard: (carriageId?: string) => void
   /**
@@ -2084,6 +2097,7 @@ export function ResidentCard({
     driving: r.order?.kind === 'drive' || r.order?.kind === 'haul',
     carriageToBoard: !!carriageToBoard,
     boatToBoard: !!boatToBoard,
+    ...(boatToRow ? { boatToRow: boatToRow.problem ? { problem: boatToRow.problem } : {} } : {}),
     carriageToUnhitch: !!carriageToUnhitch,
     horseToHitch: !!toHitch,
     carrying: !!r.carrying,
@@ -2106,6 +2120,7 @@ export function ResidentCard({
     }
     if (a.id === 'walk') onWalkTo()
     if (a.id === 'drive') onDriveTo()
+    if (a.id === 'row') onRowTo?.()
     if (a.id === 'driveOff') onDriveOff?.()
     if (a.id === 'hitchOff') onHitchOff?.()
     if (a.id === 'stealHorse') onStealHorse?.()

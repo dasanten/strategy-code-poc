@@ -336,6 +336,16 @@ pub fn step_passengers(world: &mut WorldState, map: &TerrainMap) {
             world.residents[i].aboard = None;
         }
     }
+    // A boat's rower who is no longer aboard it leaves its oars (`CONTEXT.md`: Rowing).
+    for vi in 0..world.vessels.len() {
+        let v = &world.vessels[vi];
+        let Some(rower) = v.rower_id.as_deref() else { continue };
+        let aboard =
+            world.residents.iter().any(|r| r.id == rower && r.aboard.as_deref() == Some(&v.id));
+        if !aboard {
+            world.vessels[vi].rower_id = None;
+        }
+    }
 }
 
 /// `step_passengers` for one aboard something that is no carriage: a vessel, or one that is gone.

@@ -1111,7 +1111,10 @@ pub fn vessel_passengers(world: &WorldState, terrain: &TerrainMap) -> Out {
         else {
             continue;
         };
-        *aboard.entry(&v.id).or_insert(0.0) += 1.0;
+        // Its rower is no passenger (`CONTEXT.md`: Rowing).
+        if v.rower_id.as_deref() != Some(r.id.as_str()) {
+            *aboard.entry(&v.id).or_insert(0.0) += 1.0;
+        }
         let at = format!("({}, {})", js_number(r.x), js_number(r.y));
         if v.x != r.x || v.y != r.y {
             let m = format!(
@@ -1140,7 +1143,32 @@ pub fn vessel_passengers(world: &WorldState, terrain: &TerrainMap) -> Out {
             fail(&[&r.id, &v.id], format!("resident {} rides aboard vessel {}", r.id, v.id));
         }
     }
+    // Whoever rows a boat is at its oars, aboard it and grown (`CONTEXT.md`: Rowing).
+    let tick = world.tick as f64;
+    for r in &world.residents {
+        let Some(ResidentOrder::Row(o)) = &r.order else { continue };
+        let at_oars = world.vessels.iter().any(|v| {
+            v.id == o.vessel_id
+                && v.rower_id.as_deref() == Some(r.id.as_str())
+                && r.aboard.as_deref() == Some(v.id.as_str())
+        });
+        if !at_oars {
+            let m =
+                format!("resident {} rows vessel {} without being at its oars", r.id, o.vessel_id);
+            fail(&[&r.id, &o.vessel_id], m);
+        }
+        if !can_work(r.born_at, tick) {
+            fail(&[&r.id], format!("child {} rows vessel {}", r.id, o.vessel_id));
+        }
+    }
     for v in &world.vessels {
+        if let Some(rower) = v.rower_id.as_deref() {
+            let aboard_it =
+                world.residents.iter().any(|r| r.id == rower && r.aboard.as_deref() == Some(&v.id));
+            if !aboard_it {
+                fail(&[&v.id], format!("vessel {} has rower {rower}, who is not aboard", v.id));
+            }
+        }
         let people = aboard.get(v.id.as_str()).copied().unwrap_or(0.0);
         let kg = stock_weight(&v.load) + people * PASSENGER_WEIGHT;
         if kg > vessel_capacity(v) + 1e-9 {
@@ -2243,14 +2271,21 @@ pub fn climb_orders_sound(world: &WorldState, _: &TerrainMap) -> Out {
 }
 
 /// Every step left on a moving order's path is a step the resident can take
-/// (`pathsAreSteps`).
+/// (`pathsAreSteps`); a rower's, a step their boat can take over water (`CONTEXT.md`: Rowing).
 pub fn paths_are_steps(world: &WorldState, terrain: &TerrainMap) -> Out {
     let name = "paths-are-steps";
     let size = terrain.size;
-    let enterable = |t: usize| is_passable_terrain(terrain.tiles[t]);
     let mut out = Vec::new();
     for r in &world.residents {
         let Some(o) = &r.order else { continue };
+        let rowing = matches!(o, ResidentOrder::Row(_));
+        let enterable = |t: usize| {
+            if rowing {
+                is_water(terrain.tiles[t])
+            } else {
+                is_passable_terrain(terrain.tiles[t])
+            }
+        };
         // `'path' in o && o.path`: any order with a path.
         let Ok(v) = serde_json::to_value(o) else { continue };
         let Some(path) = v.get("path").and_then(|p| p.as_array()) else { continue };

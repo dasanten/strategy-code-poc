@@ -290,6 +290,7 @@ pub fn order_kind(o: &ResidentOrder) -> &'static str {
         ResidentOrder::AcceptOffer(_) => "acceptOffer",
         ResidentOrder::Relocate(_) => "relocate",
         ResidentOrder::Feed(_) => "feed",
+        ResidentOrder::Row(_) => "row",
     }
 }
 
@@ -646,6 +647,8 @@ pub enum Holder {
     Pile(usize),
     /// A carriage's load, by its place in `world.carriages`.
     Carriage(usize),
+    /// A vessel's load, by its place in `world.vessels`.
+    Vessel(usize),
 }
 
 /// Goods a resident may take a meal from, and how many units of Food of them they may take
@@ -662,6 +665,7 @@ fn goods_of(world: &mut WorldState, holder: Holder) -> &mut Stock {
         Holder::Building(i) => world.buildings[i].stock.get_or_insert_with(Stock::new),
         Holder::Pile(i) => &mut world.piles[i].goods,
         Holder::Carriage(i) => &mut world.carriages[i].load,
+        Holder::Vessel(i) => &mut world.vessels[i].load,
     }
 }
 
@@ -723,6 +727,17 @@ pub fn refill_source(world: &WorldState, r: &Resident, size: i32) -> Option<Refi
         return whole(Holder::Carriage(i), &world.carriages[i].load);
     }
     let owner = r.owner.as_deref()?;
+    // Aboard a boat of their realm, its rower and passengers take a meal from its Food
+    // (`CONTEXT.md`: Rowing, Refilling from a carriage).
+    if let Some(vi) =
+        r.aboard.as_deref().and_then(|id| world.vessels.iter().position(|v| v.id == id))
+    {
+        if world.vessels[vi].realm_id.as_deref() == Some(owner) {
+            if let Some(source) = whole(Holder::Vessel(vi), &world.vessels[vi].load) {
+                return Some(source);
+            }
+        }
+    }
     if let Some((i, food)) = drivers_food(world, r) {
         if world.carriages[i].realm_id.as_deref() == Some(owner) && food > 0.0 {
             return Some(RefillSource { holder: Holder::Carriage(i), food });

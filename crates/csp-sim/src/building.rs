@@ -158,6 +158,7 @@ pub fn finish_site(
             x: f64::from(x),
             y: f64::from(y),
             load: Stock::new(),
+            rower_id: None,
         });
         return true;
     }

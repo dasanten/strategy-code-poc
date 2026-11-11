@@ -867,7 +867,7 @@ function CarriageBlock({
     ) : (
       r.name
     )
-  const { load, driver, passengers, route } = carriage
+  const { load, driver, rower, passengers, route } = carriage
   return (
     <section className="card-carriage" aria-label={carriage.title}>
       {head && (
@@ -894,6 +894,12 @@ function CarriageBlock({
           <>
             <dt>Driver</dt>
             <dd>{name(driver)}</dd>
+          </>
+        )}
+        {rower && (
+          <>
+            <dt>Rower</dt>
+            <dd>{name(rower)}</dd>
           </>
         )}
         {passengers && (

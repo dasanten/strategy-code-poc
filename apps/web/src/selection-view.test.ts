@@ -393,6 +393,27 @@ describe('the actions on a resident’s card', () => {
     expect(board({ aboard: true, carriageToBoard: true }).map((a) => a.label)).toEqual(['Get off'])
   })
 
+  it('offers rowing a boat of theirs to a picked tile, to grown residents on foot', () => {
+    const rowRow = (h: Parameters<typeof here>[0]) =>
+      residentActions(here(h)).filter((a) => a.id === 'row')
+    expect(rowRow({ boatToRow: {} })).toEqual([
+      expect.objectContaining({ label: 'Row boat to', key: 'D' }),
+    ])
+    expect(rowRow({ boatToRow: {}, picking: 'row' })[0]).toMatchObject({
+      label: 'Pick a tile…',
+      active: true,
+    })
+    expect(rowRow({ boatToRow: {}, adult: false })[0]).toMatchObject({
+      disabled: true,
+      reason: 'children can’t row',
+    })
+    expect(rowRow({ boatToRow: { problem: 'the boat is full' } })[0]).toMatchObject({
+      disabled: true,
+      reason: 'the boat is full',
+    })
+    expect(residentOrders(here()).missing.row).toBe('no boat of yours here')
+  })
+
   it('offers boarding a boat of the realm beside them, never on horseback', () => {
     const board = (h: Parameters<typeof here>[0]) =>
       residentActions(here(h)).filter((a) => a.id === 'board')
@@ -781,6 +802,11 @@ describe('the card for a tile', () => {
       weight: `${PASSENGER_WEIGHT} kg of it people`,
     })
     expect(card.carriage?.load.text).toBe(`${10 + PASSENGER_WEIGHT} / ${BOAT_CAPACITY} kg`)
+    // Its rower is named on a row of their own and weighs nothing against it.
+    const bo = { id: 'bo', name: 'Bo', x: 5, y: 5, aboard: 'boat1' } as SeenResident
+    const rowed = tile({ vessels: [{ ...boat, rowerId: 'bo' }], residents: [ana, bo] })
+    expect(rowed.carriage?.rower).toEqual({ id: 'bo', name: 'Bo', pick: true })
+    expect(rowed.carriage?.load.text).toBe(`${10 + PASSENGER_WEIGHT} / ${BOAT_CAPACITY} kg`)
   })
 
   it('lets the Player’s residents beside their boat board it, and its passengers get off', () => {

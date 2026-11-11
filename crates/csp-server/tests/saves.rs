@@ -286,6 +286,7 @@ fn a_world_with_a_boat_is_saved_and_loads_with_it_and_one_from_before_has_none()
         x: 3.0,
         y: 4.0,
         load: csp_shared::world::Stock::from([(csp_shared::world::Good::Wood, 5.0)]),
+        rower_id: None,
     });
     save_world(&conn, &world).unwrap();
     let (state, v) = latest_save(&conn).unwrap().unwrap();

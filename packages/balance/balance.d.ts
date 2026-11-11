@@ -408,6 +408,8 @@ export interface Balance {
     '1': number
     '2': number
     '3': number
+    '4': number
+    '5': number
     '6': number
     [key: string]: number
   }
@@ -441,6 +443,13 @@ export interface Balance {
   readonly CARRIAGE_MAX_CAPACITY: number
   readonly PASSENGER_WEIGHT: number
   readonly BOAT_CAPACITY: number
+  readonly ROW_SPEED: number
+  readonly ROW_STRENGTH_EFFECT: number
+  readonly ROW_STRENGTH_AVERAGE: number
+  readonly ROW_STRENGTH_LIMIT: number
+  readonly SEAFARING_SKILL_EFFECT: number
+  readonly SEAFARING_SKILL_LIMIT: number
+  readonly SEAFARING_SKILL_PER_DAY: number
   readonly FOOD_SPOIL_PER_DAY: number
   readonly REALM_LOG_LENGTH: number
   readonly CRIME_MEMORY_DAYS: number
@@ -942,6 +951,7 @@ export interface Balance {
     construction: number
     combat: number
     driving: number
+    seafaring: number
     [key: string]: number
   }
   readonly SKILL_PER_DAY: {
@@ -953,6 +963,7 @@ export interface Balance {
     construction: number
     combat: number
     driving: number
+    seafaring: number
     [key: string]: number
   }
   readonly ARMY_SPREAD: number

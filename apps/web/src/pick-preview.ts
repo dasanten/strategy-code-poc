@@ -38,6 +38,8 @@ const RESIDENT_PREVIEWS = {
   driveOff: { kind: 'way', goer: 'carriage' },
   hitchOff: { kind: 'way', goer: 'carriage' },
   haul: { kind: 'way', goer: 'carriage' },
+  // Over water, which the client finds no way for: the tile alone (`CONTEXT.md`: Rowing).
+  row: { kind: 'tile' },
   roadFrom: { kind: 'lineStart', building: 'road' },
   wallFrom: { kind: 'lineStart', building: 'wall' },
 } as const

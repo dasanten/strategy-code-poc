@@ -347,6 +347,13 @@ describe('doingLine', () => {
       progress: 0,
     }
     expect(soon({ order: drive }, 1200)).toBe('Driving to 4, 5 · about 20 min (a game day)')
+    const row: ResidentOrder = { kind: 'row', vesselId: 'boat1', target: at, path: [], progress: 0 }
+    expect(soon({ order: row, aboard: 'boat1' }, 60)).toBe(
+      'Rowing to 4, 5 · about 1 min (a game hour)',
+    )
+    expect(soon({ order: { ...row, path: null }, aboard: 'boat1' }, 60)).toBe(
+      'Finding a way over the water to 4, 5',
+    )
     const hauling = { ...haul, path: [[4, 5]] as [number, number][] }
     expect(soon({ order: hauling, script: { scriptId: 3 } }, 180)).toBe(
       'Hauling wood to 4, 5 · about 3 min (3 game hours)',

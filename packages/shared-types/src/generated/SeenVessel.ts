@@ -11,4 +11,8 @@ export type SeenVessel = { id: string, kind: VesselKind, realmId: string | null,
 /**
  * The residents aboard it as passengers (`CONTEXT.md`: Beside a vessel).
  */
-passengerIds: Array<string>, };
+passengerIds: Array<string>, 
+/**
+ * The one aboard at its oars, no passenger (`CONTEXT.md`: Rowing).
+ */
+rowerId?: string, };

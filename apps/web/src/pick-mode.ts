@@ -43,6 +43,7 @@ export function pickTarget(state: {
 const RESIDENT_PROMPTS: Record<Exclude<Picking, false>, string> = {
   walk: 'where to walk',
   drive: 'where to drive the carriage',
+  row: 'where to row the boat: water, or a shore to land at',
   driveOff: 'where to drive the carriage off to',
   hitchOff: 'where to drive the carriage',
   haul: 'where the haul route’s other stop is',

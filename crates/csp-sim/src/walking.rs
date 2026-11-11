@@ -8,7 +8,8 @@ use std::sync::Arc;
 
 use csp_shared::balance::carriage_can_enter;
 use csp_shared::terrain::{
-    beside_step, ground_at, is_passable_terrain, step_length, tile_index, TerrainMap,
+    beside_step, ground_at, is_passable_terrain, is_water, step_length, terrain_at, tile_index,
+    wrap, TerrainMap,
 };
 use csp_shared::world::{
     FetchOrder, FetchPhase, GoodsPlace, HaulPhase, HaulStop, LinePhase, OrderRequest,
@@ -24,11 +25,14 @@ use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::{int_field, str_field, OrderKind};
 use crate::pathfinding::{
     PathFinder, PathOptions, PathResult, Point, TerrainCosts, CARRIAGE_COSTS, WALKING_COSTS,
+    WATER_COSTS,
 };
 use crate::queries::army::{army_driven_to, army_spot};
 use crate::queries::carriages::{horse_for, passengers_of};
 use crate::queries::driving::carriage_can_go_to;
-use crate::queries::pace::{drive_speed, driving_learned, ride_speed, walk_speed};
+use crate::queries::pace::{
+    drive_speed, driving_learned, ride_speed, row_speed, seafaring_learned, walk_speed,
+};
 use crate::queries::residents::is_down;
 use crate::queries::riding::horse_ridden;
 use crate::storing::{end_order, place_tile};
@@ -54,13 +58,15 @@ fn attack_target(world: &WorldState, target_id: &str) -> Option<(f64, f64)> {
 }
 
 /// An action a resident requests (`StepAction`): step onto the next tile, on foot, driving
-/// `carriage_id` there, or riding `horse_id` there. The world resolves it at the end of the tick.
+/// `carriage_id` there, riding `horse_id` there, or rowing `vessel_id` there over water. The world
+/// resolves it at the end of the tick.
 #[derive(Debug, Clone, PartialEq)]
 pub struct StepAction {
     pub resident_id: String,
     pub to: (f64, f64),
     pub carriage_id: Option<String>,
     pub horse_id: Option<String>,
+    pub vessel_id: Option<String>,
 }
 
 /// The walk-to order (`walkTo`): one of the Player's residents walks to a tile. It only sets the
@@ -130,6 +136,7 @@ pub fn order_path_mut(o: &mut ResidentOrder) -> Option<(&mut Option<TilePath>, &
             Some((&mut o.path, &mut o.progress))
         }
         ResidentOrder::Relocate(o) => Some((&mut o.path, &mut o.progress)),
+        ResidentOrder::Row(o) => Some((&mut o.path, &mut o.progress)),
         _ => None,
     }
 }
@@ -149,7 +156,8 @@ fn is_moving(o: Option<&ResidentOrder>) -> bool {
             ResidentOrder::WalkTo(_)
             | ResidentOrder::Drive(_)
             | ResidentOrder::Attack(_)
-            | ResidentOrder::Relocate(_),
+            | ResidentOrder::Relocate(_)
+            | ResidentOrder::Row(_),
         ) => true,
         _ => false,
     }
@@ -169,6 +177,7 @@ fn move_path(o: Option<&ResidentOrder>) -> Option<&TilePath> {
         ResidentOrder::Attack(o) => o.path.as_ref(),
         ResidentOrder::RoadLine(o) | ResidentOrder::WallLine(o) => o.path.as_ref(),
         ResidentOrder::Relocate(o) => o.path.as_ref(),
+        ResidentOrder::Row(o) => o.path.as_ref(),
         _ => None,
     }
 }
@@ -202,6 +211,7 @@ fn kind_name(o: &ResidentOrder) -> &'static str {
         ResidentOrder::Store(_) => "store",
         ResidentOrder::Fetch(_) => "fetch",
         ResidentOrder::Relocate(_) => "relocate",
+        ResidentOrder::Row(_) => "row",
         _ => "other",
     }
 }
@@ -222,6 +232,7 @@ fn target_of(world: &WorldState, o: &ResidentOrder) -> Option<(f64, f64)> {
         ResidentOrder::WalkTo(o) => Some((o.target.x, o.target.y)),
         ResidentOrder::Drive(o) => Some((o.target.x, o.target.y)),
         ResidentOrder::Relocate(o) => Some((o.target.x, o.target.y)),
+        ResidentOrder::Row(o) => Some((o.target.x, o.target.y)),
         _ => None,
     }
 }
@@ -272,6 +283,10 @@ fn land_moving_passengers(world: &mut WorldState, terrain: &TerrainMap) {
             continue;
         }
         let o = r.order.as_ref().expect("a moving order");
+        // Rowing keeps them aboard: the boat moves, not they.
+        if matches!(o, ResidentOrder::Row(_)) {
+            continue;
+        }
         let target = target_of(world, o);
         if matches!(o, ResidentOrder::Attack(_))
             && target.is_some_and(|t| in_contact(size, (r.x, r.y), t))
@@ -287,9 +302,69 @@ fn land_moving_passengers(world: &mut WorldState, terrain: &TerrainMap) {
     }
 }
 
-/// Not driving a carriage: walking, or riding a horse (`onFoot`).
+/// Resolves a rower's step (`CONTEXT.md`: Rowing): the rower at the boat's oars, aboard it on its
+/// tile, moves it one Step over water, onto a tile with no other vessel, a diagonal step only where
+/// both straight tiles beside it are water too; everyone aboard goes along, so they see from its
+/// new tile. Whether it moved. A boat whose rower lost the oars or the boat, or that was steered
+/// at land, stops; one whose next tile holds another vessel waits, or stops beside it when that
+/// tile was the last.
+fn row_step(
+    world: &mut WorldState,
+    terrain: &TerrainMap,
+    i: usize,
+    vessel_id: &str,
+    to: (f64, f64),
+) -> bool {
+    let size = terrain.size;
+    let r = &world.residents[i];
+    let Some(vi) = world.vessels.iter().position(|v| v.id == vessel_id) else {
+        world.residents[i].order = None;
+        return false;
+    };
+    let v = &world.vessels[vi];
+    let at_oars = v.rower_id.as_deref() == Some(r.id.as_str())
+        && r.aboard.as_deref() == Some(vessel_id)
+        && v.x == r.x
+        && v.y == r.y;
+    let (vx, vy) = (v.x as i32, v.y as i32);
+    let (tx, ty) = (to.0 as i32, to.1 as i32);
+    let water = |x: i32, y: i32| is_water(terrain_at(terrain, x, y));
+    let corners = beside_step(size, vx, vy, tx, ty).into_iter().all(|t| is_water(terrain.tiles[t]));
+    if !at_oars || step_length(size, vx, vy, tx, ty) == 0.0 || !water(tx, ty) || !corners {
+        world.residents[i].order = None;
+        return false;
+    }
+    let (wx, wy) = (f64::from(wrap(tx, size)), f64::from(wrap(ty, size)));
+    if world.vessels.iter().any(|o| o.id != vessel_id && o.x == wx && o.y == wy) {
+        let last = move_path(world.residents[i].order.as_ref()).is_some_and(|p| p.len() == 1);
+        if last {
+            world.residents[i].order = None;
+        }
+        return false;
+    }
+    let length = step_length(size, vx, vy, tx, ty);
+    world.vessels[vi].x = wx;
+    world.vessels[vi].y = wy;
+    for r in world.residents.iter_mut().filter(|r| r.aboard.as_deref() == Some(vessel_id)) {
+        (r.x, r.y) = (wx, wy);
+    }
+    let Some((path, progress)) = move_path_mut(world.residents[i].order.as_mut()) else {
+        return true;
+    };
+    *progress -= length;
+    let Some(p) = path.as_mut() else { return true };
+    if !p.is_empty() {
+        p.remove(0);
+    }
+    if p.is_empty() {
+        arrive(world, i);
+    }
+    true
+}
+
+/// Not driving a carriage or rowing a boat: walking, or riding a horse (`onFoot`).
 fn on_foot(o: &ResidentOrder) -> bool {
-    !matches!(o, ResidentOrder::Drive(_) | ResidentOrder::Haul(_))
+    !matches!(o, ResidentOrder::Drive(_) | ResidentOrder::Haul(_) | ResidentOrder::Row(_))
 }
 
 /// A moving order got there (`arrive`): a walk or drive is done, a haul route starts on its stop,
@@ -552,6 +627,33 @@ impl Walking {
                 continue;
             }
             let o = r.order.as_ref().expect("a moving order");
+            // The rower sets the pace over water, Lake or Sea alike, and learns Seafaring
+            // (`CONTEXT.md`: Rowing, Seafaring).
+            if let ResidentOrder::Row(row) = o {
+                let vessel_id = row.vessel_id.clone();
+                let (gain, learned) = (row_speed(r, tick), seafaring_learned(r, tick));
+                let (rx, ry) = (r.x as i32, r.y as i32);
+                let r = &mut world.residents[i];
+                let (_, progress) = move_path_mut(r.order.as_mut()).expect("a moving order");
+                *progress += gain;
+                let progress = *progress;
+                let skill = r.skills.get(&SkillName::Seafaring).copied().unwrap_or(0.0);
+                r.skills.insert(SkillName::Seafaring, skill + learned);
+                let length = match step_length(size, rx, ry, next.0 as i32, next.1 as i32) {
+                    0.0 => 1.0,
+                    l => l,
+                };
+                if progress >= length {
+                    steps.push(StepAction {
+                        resident_id: r.id.clone(),
+                        to: next,
+                        carriage_id: None,
+                        horse_id: None,
+                        vessel_id: Some(vessel_id),
+                    });
+                }
+                continue;
+            }
             let ground = ground_at(&self.terrain, &roads, next.0 as i32, next.1 as i32);
             let foot = on_foot(o);
             let riding = if foot { horse_ridden(world, r) } else { None };
@@ -583,6 +685,7 @@ impl Walking {
                             to: next,
                             carriage_id: Some(carriage_id.clone()),
                             horse_id: None,
+                            vessel_id: None,
                         });
                         continue;
                     }
@@ -623,6 +726,7 @@ impl Walking {
                 to: next,
                 carriage_id: if foot { None } else { carriage_id },
                 horse_id,
+                vessel_id: None,
             });
         }
         steps
@@ -642,7 +746,15 @@ impl Walking {
             if self.searching.get(&r.id) != Some(&key) {
                 // A rider keeps to where a carriage can go, and off the walls (`CONTEXT.md`: Riding).
                 let walking = on_foot(o) && r.riding.is_none();
-                let costs: &TerrainCosts = if walking { &WALKING_COSTS } else { &CARRIAGE_COSTS };
+                // A boat goes over water only (`CONTEXT.md`: Rowing).
+                let rowing = matches!(o, ResidentOrder::Row(_));
+                let costs: &TerrainCosts = if rowing {
+                    &WATER_COSTS
+                } else if walking {
+                    &WALKING_COSTS
+                } else {
+                    &CARRIAGE_COSTS
+                };
                 // An attacker only needs to come into contact; so does a carriage going after an
                 // army, and one driven up to a wall or gate it may not pass.
                 let near = matches!(o, ResidentOrder::Attack(_))
@@ -717,6 +829,12 @@ impl Walking {
             world.residents.iter().enumerate().map(|(i, r)| (r.id.clone(), i)).collect();
         for step in steps {
             let Some(&i) = residents.get(&step.resident_id) else { continue };
+            if let Some(vid) = &step.vessel_id {
+                if row_step(world, &terrain, i, vid, step.to) {
+                    taken += 1;
+                }
+                continue;
+            }
             let r = &world.residents[i];
             let (rx, ry) = (r.x as i32, r.y as i32);
             let (tx, ty) = (step.to.0 as i32, step.to.1 as i32);
