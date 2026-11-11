@@ -2292,7 +2292,11 @@ export function ResidentCard({
               />
               {storage && (
                 <TileGoods
-                  title={storage.kind === 'stable' ? 'In the stable' : 'In the storage'}
+                  title={
+                    storage.kind === 'stable' || storage.kind === 'haven'
+                      ? `In the ${storage.kind}`
+                      : 'In the storage'
+                  }
                   stock={storage.stock}
                   spot={inStorage}
                   onPickUp={onPickUp}

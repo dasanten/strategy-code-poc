@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use csp_shared::balance::RECIPES;
 use csp_shared::footprint::{footprint_tiles, Placed};
-use csp_shared::terrain::{is_passable_terrain, terrain_at, Terrain, TerrainMap};
+use csp_shared::terrain::{is_passable_terrain, terrain_at, touches_water, Terrain, TerrainMap};
 use csp_shared::world::{BuildingKind, ResourceKind, ResourceNode, WorldState};
 
 use crate::queries::names::{kind_name, kind_of, placed};
@@ -26,7 +26,8 @@ pub fn processing() -> Vec<BuildingKind> {
     RECIPES.0.iter().filter_map(|(k, _)| kind_of(k)).collect()
 }
 
-/// Buildable kinds that go off any resource node and off mountains (`OFF_NODES`).
+/// Buildable kinds that go off any resource node and off mountains (`OFF_NODES`), havens on the shore
+/// besides.
 pub fn off_nodes() -> Vec<BuildingKind> {
     let mut kinds = processing();
     kinds.extend([
@@ -36,6 +37,7 @@ pub fn off_nodes() -> Vec<BuildingKind> {
         BuildingKind::Wall,
         BuildingKind::Gate,
         BuildingKind::TrainingGround,
+        BuildingKind::Haven,
     ]);
     kinds
 }
@@ -96,6 +98,11 @@ impl<'t> Ground<'t> {
     ) -> bool {
         let tiles = footprint_tiles(Placed { kind: kind_name(kind), x, y }, self.terrain.size);
         let mut nodes = 0;
+        let shore = kind != BuildingKind::Haven
+            || touches_water(&tiles, self.terrain.size, |tx, ty| terrain_at(self.terrain, tx, ty));
+        if !shore {
+            return false;
+        }
         for (tx, ty) in tiles {
             if self.taken.contains(&(tx, ty)) {
                 return false;

@@ -10,7 +10,8 @@ use csp_shared::balance::{
 };
 use csp_shared::footprint::{covers, footprint_tiles, is_at, Placed, FOOTPRINT};
 use csp_shared::terrain::{
-    is_passable_terrain, terrain_at, tile_index, wrap, wrap_delta, Terrain, TerrainMap,
+    is_passable_terrain, terrain_at, tile_index, touches_water, wrap, wrap_delta, Terrain,
+    TerrainMap,
 };
 use csp_shared::world::{
     Building, BuildingKind, Good, LineOrder, LinePhase, Pile, Resident, ResidentOrder,
@@ -24,9 +25,9 @@ use super::residents::{can_work, good_weight, stock_weight};
 /// Kinds that may share a tile with a building (`SHARES_A_TILE`): roads and carriage sites.
 pub const SHARES_A_TILE: [BuildingKind; 2] = [BuildingKind::Road, BuildingKind::Carriage];
 
-/// Kinds that keep goods (`KEEPS_GOODS`): storages, warehouses and stables.
-pub const KEEPS_GOODS: [BuildingKind; 3] =
-    [BuildingKind::Storage, BuildingKind::Warehouse, BuildingKind::Stable];
+/// Kinds that keep goods (`KEEPS_GOODS`): storages, warehouses, stables and havens.
+pub const KEEPS_GOODS: [BuildingKind; 4] =
+    [BuildingKind::Storage, BuildingKind::Warehouse, BuildingKind::Stable, BuildingKind::Haven];
 
 /// Where in `world.buildings` the building or construction site whose footprint covers (x, y)
 /// stands, if one does (`buildingAt`): the first in the world's order, roads and carriage sites
@@ -75,7 +76,7 @@ pub fn recipe_for(kind: BuildingKind, makes: Option<&str>) -> Option<&'static Re
 pub const CARRYING_A_CHILD: &str = "carrying a child";
 
 /// Kinds of building that can be built so far (`BUILDABLE`).
-pub const BUILDABLE: [BuildingKind; 16] = [
+pub const BUILDABLE: [BuildingKind; 17] = [
     BuildingKind::LumberCamp,
     BuildingKind::Quarry,
     BuildingKind::Mine,
@@ -92,6 +93,7 @@ pub const BUILDABLE: [BuildingKind; 16] = [
     BuildingKind::Gate,
     BuildingKind::Road,
     BuildingKind::Carriage,
+    BuildingKind::Haven,
 ];
 
 /// Workplaces that turn goods into other goods (`PROCESSING`, the keys of `RECIPES`).
@@ -99,7 +101,7 @@ pub const PROCESSING: [BuildingKind; 3] =
     [BuildingKind::Smelter, BuildingKind::Mint, BuildingKind::Smithy];
 
 /// Kinds that go on passable land but Mountain, off any resource node (`OFF_NODES`).
-pub const OFF_NODES: [BuildingKind; 9] = [
+pub const OFF_NODES: [BuildingKind; 10] = [
     BuildingKind::Smelter,
     BuildingKind::Mint,
     BuildingKind::Smithy,
@@ -109,7 +111,12 @@ pub const OFF_NODES: [BuildingKind; 9] = [
     BuildingKind::Wall,
     BuildingKind::Gate,
     BuildingKind::TrainingGround,
+    BuildingKind::Haven,
 ];
+
+/// Kinds that go on the shore, with a tile of their footprint touching Lake or Sea straight or
+/// diagonally (`ON_SHORE`, `CONTEXT.md`: Haven): havens.
+pub const ON_SHORE: [BuildingKind; 1] = [BuildingKind::Haven];
 
 /// Kinds that go wholly on Plains, off any resource node (`ON_PLAINS`): stables and farms.
 pub const ON_PLAINS: [BuildingKind; 2] = [BuildingKind::Stable, BuildingKind::Farm];
@@ -118,13 +125,14 @@ pub const ON_PLAINS: [BuildingKind; 2] = [BuildingKind::Stable, BuildingKind::Fa
 pub const IN_CITY_AREA: [BuildingKind; 1] = [BuildingKind::House];
 
 /// What a build menu offers off any resource node, in its order (`OFF_NODE_BUILDS`).
-pub const OFF_NODE_BUILDS: [BuildingKind; 11] = [
+pub const OFF_NODE_BUILDS: [BuildingKind; 12] = [
     BuildingKind::TownHall,
     BuildingKind::House,
     BuildingKind::Storage,
     BuildingKind::Wall,
     BuildingKind::Gate,
     BuildingKind::TrainingGround,
+    BuildingKind::Haven,
     BuildingKind::Stable,
     BuildingKind::Farm,
     BuildingKind::Smelter,
@@ -398,6 +406,11 @@ pub fn build_problem(
             })
         {
             return Some(format!("a {name} goes in a city’s area"));
+        }
+        if ON_SHORE.contains(&kind)
+            && terrain.is_some_and(|t| !touches_water(&tiles, size, |tx, ty| t.at(tx, ty)))
+        {
+            return Some(format!("a {name} goes on the shore, touching Lake or Sea"));
         }
     } else if nodes.len() != 1 || node_workplace(nodes[0].kind) != kind {
         return Some(format!("a {name} goes with one tile on a fitting resource node"));

@@ -36,6 +36,7 @@ pub fn building_purpose(kind: BuildingKind) -> String {
         BuildingKind::TrainingGround => "A training ground is where residents train a stat or a skill under a teacher; not on Mountain. Like a workplace, nobody owns it.".into(),
         BuildingKind::Road => "A road: residents walk and carriages drive faster on it, on any land (slower to build on Mountain), and it can run through a gate. Nobody owns it.".into(),
         BuildingKind::Carriage => "A carriage carries far more than any resident, pulled by a horse; built at a finished stable, on its tiles or right by them, and it belongs to the realm of whoever finishes it.".into(),
+        BuildingKind::Haven => "A haven is where boats and ships are built, with a storage anyone at it loads and unloads; on the shore, touching Lake or Sea, and not on Mountain. Like a stable, nobody owns it.".into(),
     }
 }
 
@@ -68,7 +69,10 @@ pub const BUILD_GROUPS: [BuildGroup; 6] = [
         ],
     },
     BuildGroup { name: "Defence", kinds: &[BuildingKind::Wall, BuildingKind::Gate] },
-    BuildGroup { name: "Transport", kinds: &[BuildingKind::Road, BuildingKind::Carriage] },
+    BuildGroup {
+        name: "Transport",
+        kinds: &[BuildingKind::Road, BuildingKind::Carriage, BuildingKind::Haven],
+    },
 ];
 
 /// Everything the ⓘ on a building's card says about its kind (`BuildingInfo`).

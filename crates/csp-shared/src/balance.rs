@@ -1571,6 +1571,9 @@ pub const BUILD_MATERIALS: Table<Table<f64>> = Table(&[
     // few paving stones, so mostly Wood and a little Stone, no iron; a bit more timber than a
     // stable, and buildable before any smelter.
     ("trainingGround", Table(&[("wood", 50.0), ("stone", 10.0)])),
+    // A haven (`CONTEXT.md`: Haven): timber jetties and slipways on stone footings at the shore, so
+    // mostly Wood and some Stone; a little more timber than a town hall, which covers as much.
+    ("haven", Table(&[("wood", 70.0), ("stone", 20.0)])),
     // A carriage, built at a stable (`CONTEXT.md`: Carriage): a wooden cart with iron fittings, so a
     // realm needs a smelter's iron for its second carriage.
     ("carriage", Table(&[("wood", 30.0), ("iron", 5.0)])),
@@ -1578,7 +1581,7 @@ pub const BUILD_MATERIALS: Table<Table<f64>> = Table(&[
 
 /// Work each kind of building needs, in ticks of one unskilled resident of average Strength: a
 /// lumber camp takes one such resident 2 game days, a quarry 3, a mine 4, a stable 3, a smelter 4,
-/// a mint 5, a smithy 5, a town hall 6, a training ground 3 (about a stable). A tile of wooden
+/// a mint 5, a smithy 5, a town hall 6, a training ground 3 (about a stable), a haven 4. A tile of wooden
 /// wall takes a sixteenth of a game day, a gate an eighth, a tile of road a sixteenth (a quarter of
 /// what a 40 m tile took), a house one game day, a storage two and a farm half of one; a carriage
 /// two. More or stronger workers finish it sooner (`buildWork`).
@@ -1598,6 +1601,7 @@ pub const BUILD_WORK: Table<f64> = Table(&[
     ("storage", 2.0 * TICKS_PER_GAME_DAY),
     ("farm", TICKS_PER_GAME_DAY / 2.0),
     ("trainingGround", 3.0 * TICKS_PER_GAME_DAY),
+    ("haven", 4.0 * TICKS_PER_GAME_DAY),
     ("carriage", 2.0 * TICKS_PER_GAME_DAY),
 ]);
 

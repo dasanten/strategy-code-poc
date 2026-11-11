@@ -156,7 +156,7 @@ describe('the preview under the pointer', () => {
     expect(storage.label).toBe('Ashford storage')
     const none = at({ kind: 'place', pick: 'storage' }, 2, 2)
     expect(none.place).toBeUndefined()
-    expect(none.label).toBe('Plains · no storage, stable or carriage there')
+    expect(none.label).toBe('Plains · no storage, stable, haven or carriage there')
     expect(at({ kind: 'param', type: 'storage' }, 10, 10).place).toBeDefined()
   })
 

@@ -949,10 +949,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const fail = (why: string) => setGroupError(why)
     const name = (b: Building) => BUILDING_NAMES[b.kind].toLowerCase()
     const realmId = world.home.realmId
-    // A storage, a stable or one of the realm's carriages, to store at or fetch from.
+    // A storage, a stable, a haven or one of the realm's carriages, to store at or fetch from.
     const place = (): Place | undefined => {
       const b = world.buildings.find(
-        (s) => (s.kind === 'storage' || s.kind === 'stable') && !s.site && covers(s, x, y),
+        (s) => ['storage', 'stable', 'haven'].includes(s.kind) && !s.site && covers(s, x, y),
       )
       if (b) return { id: b.id, name: name(b) }
       const k = world.carriages.find((c) => c.realmId === realmId && c.x === x && c.y === y)
@@ -1003,7 +1003,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       case 'storeAt':
       case 'fetchFrom': {
         const at = place()
-        if (!at) return fail('no storage, stable or carriage of yours there')
+        if (!at) return fail('no storage, stable, haven or carriage of yours there')
         if (mode === 'storeAt') return sendGroup({ kind: 'store', to: at })
         return sendGroup({ kind: 'fetch', good: groupPickWith.good ?? 'food', from: at })
       }
