@@ -669,10 +669,11 @@ pub async fn run(config: Config) -> Result<(), ServerError> {
     opts.web_dist = config.web_dist.clone();
     opts.game = Some(Arc::clone(&game) as Arc<dyn GameHandle>);
     opts.defaults = defaults;
+    let slow_tick_ms = config.slow_tick_ms;
     opts.tick_health = Some(Arc::new(move || {
         let now = clock.elapsed().as_secs_f64() * 1000.0;
-        let summary = window.lock().unwrap_or_else(|e| e.into_inner()).summary(now);
-        serde_json::to_value(summary).unwrap_or_default()
+        let response = window.lock().unwrap_or_else(|e| e.into_inner()).response(now, slow_tick_ms);
+        serde_json::to_value(response).unwrap_or_default()
     }));
     let app = build_app(opts);
     let listener = tokio::net::TcpListener::bind((config.host.as_str(), config.port)).await?;

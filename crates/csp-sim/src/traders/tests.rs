@@ -524,7 +524,7 @@ fn goes_on_after_too_many_drives_that_end_short_so_one_post_cant_hold_up_the_loo
 }
 
 #[test]
-#[ignore = "slow in the TypeScript too (`tags: ['slow']`): a trader's whole loop, T86.14's long simulations"]
+#[ignore = "8.6 s alone: a trader's whole loop, slow in the TypeScript too; see #1132"]
 fn is_sent_from_the_hq_armed_goes_round_its_loop_the_hq_and_all_and_supplies_the_posts() {
     let Fixture { mut world, terrain, posts, .. } = fixture();
     world.traders.truncate(1);

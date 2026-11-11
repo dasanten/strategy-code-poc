@@ -16,6 +16,7 @@ import type {
 } from '@csp/shared-types'
 import { api, ApiFailure } from './api.js'
 import { AdminMap } from './AdminMap.js'
+import { TickHealthPanel } from './TickHealth.js'
 import {
   ADMIN_TABS,
   adminDirectivePath,
@@ -30,11 +31,12 @@ const TAB_NAMES: Record<AdminTab, string> = {
   map: 'Map',
   accounts: 'Accounts',
   directives: 'Directives',
+  'tick-health': 'Tick health',
 }
 
 /**
  * The admin panel, a page apart from the game (`CONTEXT.md`: Admin), in tabs: the admin map, the
- * accounts and the admin directives, each at its own path. It never opens the admin's realm: the
+ * accounts, the admin directives and the tick health, each at its own path. It never opens the admin's realm: the
  * admin map's knowledge is the admin's, never their Player's.
  */
 export function AdminPage({ account, onLoggedOut }: { account: Account; onLoggedOut: () => void }) {
@@ -118,6 +120,8 @@ export function AdminPage({ account, onLoggedOut }: { account: Account; onLogged
         <main className="admin-main">
           {tab === 'accounts' ? (
             <AdminPanel />
+          ) : tab === 'tick-health' ? (
+            <TickHealthPanel />
           ) : (
             <DirectivesPanel key={directiveTarget} initialTarget={directiveTarget} />
           )}

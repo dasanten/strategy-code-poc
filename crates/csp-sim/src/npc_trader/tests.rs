@@ -477,7 +477,6 @@ fn replaces_a_dead_trader_after_the_give_up_time_and_only_them() {
 }
 
 #[test]
-#[ignore = "5.7 s alone; see #1092"]
 fn two_traders_walk_out_at_once_sell_their_own_loads_and_come_home() {
     let over = [(Good::Wood, 500.0), (Good::Stone, 500.0)];
     let mut f = city_and_post(2.0 * NPC_RESIDENTS_PER_TRADER, &over, 150.0);

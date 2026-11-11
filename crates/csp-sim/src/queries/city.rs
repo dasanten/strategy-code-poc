@@ -15,7 +15,7 @@ use super::standing::standing_of;
 
 /// A city's town hall, if it stands (`townHallOf`).
 pub fn town_hall_of<'w>(world: &'w WorldState, city: &City) -> Option<&'w Building> {
-    world.buildings.iter().find(|b| b.id == city.town_hall_id)
+    crate::world_index::building_by_id(world, &city.town_hall_id)
 }
 
 /// The residents who live in a city, wherever they stand (`cityResidents`).
@@ -85,8 +85,8 @@ pub fn is_city_building(b: &Building) -> bool {
 /// included. `size` is the map's.
 pub fn in_city_area(world: &WorldState, city_id: &str, x: i32, y: i32, size: i32) -> bool {
     world.buildings.iter().any(|b| {
-        b.city_id.as_deref() == Some(city_id)
-            && is_city_building(b)
+        is_city_building(b)
+            && b.city_id.as_deref() == Some(city_id)
             && near_footprint(placed(b), (x, y), CITY_AREA_MARGIN as i32, size)
     })
 }

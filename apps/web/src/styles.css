@@ -788,6 +788,36 @@ label > select {
   margin: 0;
   padding-left: 1.2rem;
 }
+/* The admin panel's Tick health tab (ADR 0004): the last minute beside the last hour. */
+.tick-health-windows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+}
+.tick-health-window {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.tick-health-window h3 {
+  margin: 0;
+}
+.tick-health table {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.tick-health th,
+.tick-health td {
+  padding: 2px 12px 2px 0;
+  text-align: right;
+}
+.tick-health tbody th {
+  text-align: left;
+  font-weight: normal;
+}
+.tick-health tr.slow {
+  color: var(--ui-bad);
+}
 /* The admin map fills the screen under the header (`CONTEXT.md`: admin map). */
 .admin-page {
   display: flex;
@@ -796,6 +826,7 @@ label > select {
 }
 .admin-tabs button {
   padding: 4px 14px;
+  white-space: nowrap;
 }
 .layout main.admin-map-main {
   position: relative;

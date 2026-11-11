@@ -71,6 +71,12 @@ optimisations) are superseded by the rewrite, which includes their aims.
 freeze is lifted:** new epics branch from `dev` again (ADR 0009, 0010), and rule changes are
 Daniel's call as before.
 
+**Rust follow-ups (Epic 89, 2026-11-10):** written with Daniel from an audit of what the rewrite
+left of Epics 81 and 82's aims: placeholder tests, measurements after the port, profiling, tick
+health on the admin panel, slow tests back in the suite. T89.1 (the 21 placeholder tests) should
+land before the next `dev` → `main` release. The epic's place against other new epics is not
+agreed yet.
+
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
 
@@ -159,6 +165,7 @@ I sleep.
 | 86  | [Rust backend: the rules](https://github.com/dasanten/strategy-code-poc/issues/1003)            | scope only              |
 | 87  | [Rust backend: the shell](https://github.com/dasanten/strategy-code-poc/issues/1004)            | scope only              |
 | 88  | [Rust backend: client and cutover](https://github.com/dasanten/strategy-code-poc/issues/1005)   | scope only              |
+| 89  | [Rust follow-ups](https://github.com/dasanten/strategy-code-poc/issues/1126)                    | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.

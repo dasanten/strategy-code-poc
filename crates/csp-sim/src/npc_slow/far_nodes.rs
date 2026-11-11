@@ -52,7 +52,7 @@ fn no_way(world: &WorldState, city: &str) -> Option<Vec<f64>> {
 }
 
 #[test]
-#[ignore = "39.6 s with eight at once; see #1092"]
+#[ignore = "16.7 s alone; see #1132"]
 fn a_road_follows_out_to_a_far_workplace() {
     let (mut world, terrain, city, node) = town_with_far_forest();
     let place = new_id("b", &mut world.next_id);
@@ -109,7 +109,7 @@ fn a_road_follows_out_to_a_far_workplace() {
 }
 
 #[test]
-#[ignore = "75.9 s with eight at once; see #1092"]
+#[ignore = "35.0 s alone; see #1132"]
 fn a_city_short_of_a_good_builds_on_a_far_node_and_its_crew_stays_fed_there() {
     let (mut world, terrain, city, node) = town_with_far_forest();
     let c = world.cities.iter().find(|c| c.id == city).expect("the city");
