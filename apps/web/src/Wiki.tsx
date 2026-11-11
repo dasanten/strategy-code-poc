@@ -1752,13 +1752,14 @@ export function Wiki() {
           <code>standsStill</code>.
         </p>
         <p>
-          <strong>Refilling from a carriage:</strong> passengers and the driver eat the food they
-          carry, and when they run low take a meal from the carriage's Food (passengers also from
-          another carriage of your realm on or next to their tile), as at home, so a carriage with
-          Food on board keeps them fed on a long drive. The Food a haul route keeps on board is left
-          for the horse and the driver: passengers don't touch it, and the driver leaves the horse's
-          share of {num(HAUL_HORSE_FOOD)}. On a carriage without Food they go hungry like anyone
-          away from home.
+          <strong>Refilling from a carriage:</strong> any of your residents on or next to a carriage
+          of your realm, the driver, passengers, or someone waiting or working beside it after the
+          drive, eats the food they carry, and when they run low takes a meal from the carriage's
+          Food, as at home, so a carriage with Food on board keeps them fed on a long drive and
+          wherever it is parked. The Food a haul route keeps on board is left for the horse and the
+          driver: others don't touch it, and the driver leaves the horse's share of{' '}
+          {num(HAUL_HORSE_FOOD)}. Beside a carriage without Food they go hungry like anyone away
+          from home.
         </p>
         <p>
           The group card boards everyone of the group standing on the carriage at once, until it is

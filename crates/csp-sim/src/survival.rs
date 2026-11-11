@@ -25,7 +25,7 @@ use csp_shared::world::{
 use crate::city_layout::pick_layout;
 use crate::events::record_event;
 use crate::queries::alliance::contract_of;
-use crate::queries::army::{army_of, drivers_food, spare_food};
+use crate::queries::army::{drivers_food, spare_food};
 use crate::queries::building::building_pile_index;
 use crate::queries::city::{building_realm, in_city_area, is_outpost_storage, town_hall_of};
 use crate::queries::combat::in_contact;
@@ -655,8 +655,9 @@ fn whole(holder: Holder, stock: &Stock) -> Option<RefillSource> {
 /// at it; on a caravan's crew, its carriage close by (`caravan_food`); in a Trade Org punishment
 /// or driving for it, its supply wagon close by (`wagon_food`); driving a carriage of their realm,
 /// that carriage, but not the horse's share of what a haul route keeps on board (`drivers_food`);
-/// in an army or aboard a carriage as a passenger, a carriage of their realm on or next to their
-/// tile, but not the Food a haul route keeps on board (`spare_food`). Elsewhere nowhere, and
+/// anyone of a realm (in an army, a passenger, a driver whose drive is over, someone beside a
+/// parked carriage), a carriage of their realm on or next to their tile, but not the Food a haul
+/// route keeps on board (`spare_food`). Elsewhere nowhere, and
 /// nowhere for a resident who is Down (`CONTEXT.md`: Down), who does nothing.
 pub fn refill_source(world: &WorldState, r: &Resident, size: i32) -> Option<RefillSource> {
     if r.down_until.is_some() {
@@ -703,9 +704,6 @@ pub fn refill_source(world: &WorldState, r: &Resident, size: i32) -> Option<Refi
         if world.carriages[i].realm_id.as_deref() == Some(owner) && food > 0.0 {
             return Some(RefillSource { holder: Holder::Carriage(i), food });
         }
-    }
-    if r.aboard.is_none() && army_of(world, &r.id).is_none() {
-        return None;
     }
     for (i, k) in world.carriages.iter().enumerate() {
         if k.realm_id.as_deref() != Some(owner)
