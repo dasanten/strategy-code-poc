@@ -107,6 +107,12 @@ impl DefaultScriptHost for LibraryHost {
     fn script(&self, script_id: u64) -> Option<RunnableScript> {
         self.runnable(script_id)
     }
+    /// The library tells scripts (`index.ts` gives the task order `script`): without this, a
+    /// task given with param values is refused as taking none, and Work at a workplace ignores
+    /// the work script its settings pick.
+    fn has_scripts(&self) -> bool {
+        true
+    }
 }
 
 impl WorkSettingsHost for LibraryHost {
