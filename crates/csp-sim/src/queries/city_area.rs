@@ -225,8 +225,8 @@ pub fn near_city_area(
 ) -> bool {
     let reach = (CITY_AREA_MARGIN + tiles) as i32;
     world.buildings.iter().any(|b| {
-        b.city_id.as_deref() == Some(city_id)
-            && is_city_building(b)
+        is_city_building(b)
+            && b.city_id.as_deref() == Some(city_id)
             && near_footprint(placed(b), (x as i32, y as i32), reach, size)
     })
 }

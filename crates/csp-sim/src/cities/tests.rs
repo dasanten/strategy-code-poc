@@ -1,23 +1,39 @@
 //! `apps/server/src/cities.test.ts`: city membership and the city area, ported one to one.
-//! Building a town hall, a wall or a storage is building's (T86.6), meals at home are refilling's
-//! (T86.3), the invariant `citiesFromBuildings` is T86.13's; a torn-down town hall's city is
-//! dissolved here directly (`dissolve_city`), as teardown will call it.
+//! A torn-down town hall's city is dissolved here directly (`dissolve_city`), as teardown calls
+//! it; storages laid out and finished are building's to test.
 
-use csp_shared::balance::{CITY_AREA_MARGIN, CITY_BUILDING_REACH};
-use csp_shared::world::{BuildingKind, ConstructionSite, Pair, WorldState};
+use csp_shared::balance::{CITY_AREA_MARGIN, CITY_BUILDING_REACH, HOME_FOOD_LOW};
+use csp_shared::terrain::TerrainMap;
+use csp_shared::world::{
+    BuildOrder, Building, BuildingKind, ConstructionSite, Good, Pair, ResidentOrder, Stock, Tile,
+    WorldState,
+};
 
 use super::*;
+use crate::invariants::check_all;
+use crate::order_sender::OrderSender;
+use crate::orders::{order_kinds, OrderQueue, OrderReply};
+use crate::queries::building::{build_materials, build_work_of};
 use crate::queries::city_area::{cities_at, in_city_area};
-use crate::test_world::{add_city, building, empty_world, live_mut, realm, resident};
+use crate::random::Mulberry32;
+use crate::residents::{new_resident, NewResident};
+use crate::test_world::{add_city, building, empty_world, live, live_mut, realm, resident};
+use crate::tick::Scratch;
 
 const SIZE: i32 = 160;
 const R: f64 = CITY_BUILDING_REACH;
 
-/// An empty world with realm r1 (Player 7) and its resident w1 at (1, 1).
+/// An empty world with realm r1 (Player 7) and its resident w1 at (1, 1), drawn as `newResident`
+/// draws one, with Strength 10.
 fn setup() -> WorldState {
     let mut world = empty_world();
     realm(&mut world, "r1", 7, "w1");
-    resident(&mut world, "w1", Some("r1"), 1.0, 1.0);
+    let mut m = Mulberry32::new(1.0);
+    let fields =
+        NewResident { id: "w1", owner: Some("r1"), city_id: None, x: 1.0, y: 1.0, tick: 0.0 };
+    let mut w1 = new_resident(&mut || m.next(), &fields, None);
+    w1.stats.strength = csp_shared::world::Stat { base: 10.0, trained: 0.0 };
+    world.residents.push(w1);
     world
 }
 
@@ -152,13 +168,81 @@ fn is_the_tiles_right_around_the_citys_buildings_footprints() {
     assert_eq!(cities_at(&world, 44.0, 41.0, SIZE), vec![0]);
 }
 
-#[test]
-#[ignore = "needs refilling at home (T86.3)"]
-fn is_where_residents_are_at_home_and_take_meals_from_the_storage() {}
+/// All Plains, `SIZE` tiles a side.
+fn terrain() -> TerrainMap {
+    crate::test_support::plains(SIZE)
+}
+
+/// One `stepWorld`, nobody walking.
+fn step_world(world: &mut WorldState) {
+    crate::world::step_world(world, &terrain(), &mut Scratch::default(), None, None);
+}
+
+/// Lays a site of `kind` at w1's tile with all its materials and all but a tick's work, and has w1
+/// build it (`nearlyBuilt`); the site's id.
+fn nearly_built(world: &mut WorldState, kind: BuildingKind) -> String {
+    let w1 = live(world, "w1").unwrap();
+    let (x, y) = (w1.x, w1.y);
+    let id = format!("site{}", world.buildings.len());
+    building(world, &id, kind, None, x, y);
+    let work = match build_work_of(kind) {
+        0.0 => 1.0,
+        w => w,
+    };
+    world.buildings.last_mut().unwrap().site =
+        Some(ConstructionSite { delivered: build_materials(kind), work: work - 1.0 });
+    live_mut(world, "w1").order = Some(ResidentOrder::Build(BuildOrder {
+        building: kind,
+        at: Tile { x, y },
+        site_id: Some(id.clone()),
+    }));
+    id
+}
+
+fn b<'w>(world: &'w WorldState, id: &str) -> &'w Building {
+    world.buildings.iter().find(|b| b.id == id).unwrap()
+}
 
 #[test]
-#[ignore = "needs building (T86.6)"]
-fn a_town_hall_can_be_built_and_founds_a_city_of_the_builders_realm() {}
+fn is_where_residents_are_at_home_and_take_meals_from_the_storage() {
+    let mut world = setup();
+    add_city(&mut world, "c1", Some("r1"), 40.0, 40.0, None);
+    let storage = put(&mut world, BuildingKind::Storage, 43.0, 40.0);
+    world.buildings.last_mut().unwrap().stock = Some(Stock::from([(Good::Food, 50.0)]));
+    // Out along a new stretch of wall, far from the storage, but in the city's area.
+    wall_east(&mut world, 45.0, 40.0, 10);
+    update_city_membership(&mut world, SIZE);
+    assert_eq!(b(&world, &storage).city_id, c1());
+    let w1 = live_mut(&mut world, "w1");
+    (w1.x, w1.y, w1.carried) = (54.0 + CITY_AREA_MARGIN, 41.0, Stock::default());
+    step_world(&mut world);
+    let food = |world: &WorldState| live(world, "w1").unwrap().carried.get(&Good::Food).copied();
+    assert!(food(&world).unwrap_or(0.0) >= HOME_FOOD_LOW);
+    // One step further out there is nothing.
+    let w1 = live_mut(&mut world, "w1");
+    (w1.x, w1.y, w1.carried) = (55.0 + CITY_AREA_MARGIN, 41.0, Stock::default());
+    step_world(&mut world);
+    assert_eq!(food(&world).unwrap_or(0.0), 0.0);
+    assert_eq!(check_all(&world, &terrain()), vec![]);
+}
+
+#[test]
+fn a_town_hall_can_be_built_and_founds_a_city_of_the_builders_realm() {
+    let mut world = setup();
+    let map = std::sync::Arc::new(terrain());
+    let mut q = OrderQueue::new(order_kinds(), Some(map));
+    let order = serde_json::json!({ "kind": "build", "residentId": "w1", "building": "townHall" });
+    let reply = q.receive(&world, &OrderSender::player(7, "Mara"), &"q".into(), &order);
+    assert!(matches!(reply, OrderReply::Ack { .. }), "{reply:?}");
+    let hall = nearly_built(&mut world, BuildingKind::TownHall);
+    step_world(&mut world);
+    assert_eq!(b(&world, &hall).site, None);
+    let cities: Vec<_> =
+        world.cities.iter().map(|c| (c.realm_id.as_deref(), c.town_hall_id.as_str())).collect();
+    assert_eq!(cities, vec![(Some("r1"), hall.as_str())]);
+    assert_eq!(b(&world, &hall).city_id.as_deref(), Some(world.cities[0].id.as_str()));
+    assert_eq!(check_all(&world, &terrain()), vec![]);
+}
 
 #[test]
 fn founds_a_city_around_a_town_hall_of_a_realm_and_names_it_from_its_id() {
@@ -183,8 +267,18 @@ fn founds_a_city_around_a_town_hall_of_a_realm_and_names_it_from_its_id() {
 }
 
 #[test]
-#[ignore = "needs building (T86.6)"]
-fn a_wall_built_near_it_grows_the_city() {}
+fn a_wall_built_near_it_grows_the_city() {
+    let mut world = setup();
+    add_city(&mut world, "c1", Some("r1"), 2.0, 1.0, None);
+    live_mut(&mut world, "w1").x = 4.0 + R;
+    let wall = nearly_built(&mut world, BuildingKind::Wall);
+    let out = 4.0 + R + CITY_AREA_MARGIN;
+    assert!(!in_city_area(&world, "c1", out, 1.0, SIZE));
+    step_world(&mut world);
+    assert_eq!(b(&world, &wall).city_id, c1());
+    assert!(in_city_area(&world, "c1", out, 1.0, SIZE));
+    assert_eq!(check_all(&world, &terrain()), vec![]);
+}
 
 /// The city's half of the TypeScript test: teardown finishing the hall is T86.6's.
 #[test]

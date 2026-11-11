@@ -3194,7 +3194,8 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
           Scripts run once a tick (a real second) for each resident or army running them. Each
           evaluated step costs one; asking for a list of things costs {num(SCRIPT_LIST_QUERY_COST)}{' '}
           more, a question about a tile {num(SCRIPT_TILE_QUERY_COST)} more, and requesting an action{' '}
-          {num(SCRIPT_ACTION_COST)} more.
+          {num(SCRIPT_ACTION_COST)} more. Declaring a function costs nothing; calling it costs the
+          steps of the call and of what the function does.
         </p>
         <ul>
           <li>Each resident's or army's script: {num(SCRIPT_STEP_BUDGET)} steps a tick.</li>

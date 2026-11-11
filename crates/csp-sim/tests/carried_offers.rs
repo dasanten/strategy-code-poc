@@ -622,7 +622,6 @@ mod the_caravans_of_a_carried_direct_offer {
     }
 
     #[test]
-    #[ignore = "10.8 s with eight at once; see #1092"]
     fn carry_both_ways_with_the_sender_paying_both_fees_and_no_crime() {
         let mut s = carried_setup();
         let (iron, stone) = s.full_fees();
@@ -646,7 +645,6 @@ mod the_caravans_of_a_carried_direct_offer {
     }
 
     #[test]
-    #[ignore = "12.6 s with eight at once; see #1092"]
     fn carry_both_ways_with_the_fee_split() {
         let mut s = carried_setup();
         let (iron, stone) = s.full_fees();
@@ -658,7 +656,6 @@ mod the_caravans_of_a_carried_direct_offer {
     }
 
     #[test]
-    #[ignore = "8.9 s with eight at once; see #1092"]
     fn take_what_is_there_of_goods_short_with_a_fee_for_what_they_take() {
         let mut s = carried_setup();
         s.set(&s.storage.clone(), Good::Iron, Some(6.0));
@@ -689,7 +686,6 @@ mod the_caravans_of_a_carried_direct_offer {
     }
 
     #[test]
-    #[ignore = "8.9 s with eight at once; see #1092"]
     fn leave_the_goods_delivered_when_the_storage_they_unload_at_is_short_of_coins() {
         let mut s = carried_setup();
         s.set(&s.to_storage.clone(), Good::Coins, None);

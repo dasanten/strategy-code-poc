@@ -1,18 +1,28 @@
-//! `apps/server/src/renaming.test.ts`, ported one to one. Renaming from a script is the game
-//! API's (T86.12); Last seen keeping a city's old name is T86.13's.
+//! `apps/server/src/renaming.test.ts`, ported one to one.
+
+use std::sync::Arc;
 
 use csp_shared::balance::{
     CITY_NAME_MAX_LENGTH, HORSE_NAME_MAX_LENGTH, REALM_NAME_MAX_LENGTH, RESIDENT_NAME_MAX_LENGTH,
 };
-use csp_shared::world::{DeathCause, RealmEventWhat, ResidentOrder, Tile, WalkOrder, WorldState};
+use csp_shared::world::{
+    DeathCause, OrderRequest, RealmEventWhat, ResidentOrder, Tile, WalkOrder, WorldState,
+};
+use serde_json::{json, Value};
 
 use super::*;
 use crate::events::record_event;
+use crate::game_test_world::{player, run_script};
+use crate::last_seen::{last_seen_out_of_sight, refresh_last_seen, LastSeenState};
+use crate::orders::{order_kinds, OrderQueue, OrderReply};
 use crate::queries::alliance::realm_name;
 use crate::queries::residents::can_work;
+use crate::script_api::{Is, SCRIPT_API};
+use crate::sight::entities_in_sight;
 use crate::starting_city::found_starting_city;
 use crate::test_world::{city_terrain, live, live_mut};
 use crate::world::create_world;
+use crate::world_index::WorldIndex;
 
 const MARA: u64 = 1;
 const TOBIN: u64 = 2;
@@ -226,9 +236,59 @@ fn a_realm_name_comes_only_with_renaming_the_leader() {
     assert_eq!(mara_realm(&world).name, None);
 }
 
+/// Runs `source` once as `resident`'s script, Mara's: `memory.answer` and the orders requested.
+fn script(world: &WorldState, resident: &str, source: &str) -> (Value, Vec<OrderRequest>) {
+    let (answer, requests) = run_script(world, city_terrain(), &player(MARA), resident, source);
+    (answer.unwrap_or(Value::Null), requests)
+}
+
+/// Sends the requests as Mara's orders, each taken, and applies them as the next tick would.
+fn apply(world: &mut WorldState, requests: &[OrderRequest]) {
+    let mut queue = OrderQueue::new(order_kinds(), Some(Arc::new(city_terrain().clone())));
+    for r in requests {
+        let order = serde_json::to_value(r).unwrap();
+        let reply = queue.receive(world, &player(MARA), &"q".into(), &order);
+        assert!(matches!(reply, OrderReply::Ack { .. }), "{reply:?}");
+    }
+    queue.apply_all(world);
+}
+
+fn as_json(requests: &[OrderRequest]) -> Value {
+    serde_json::to_value(requests).unwrap()
+}
+
 #[test]
-#[ignore = "needs the game API (T86.12)"]
-fn renaming_from_a_script_is_in_the_script_api_and_does_what_the_order_does() {}
+fn renaming_from_a_script_is_in_the_script_api_and_does_what_the_order_does() {
+    assert!(SCRIPT_API.iter().any(|b| b.name == "rename" && matches!(b.is, Is::Action)));
+    let Setup { mut world, leader, miner, stranger } = setup();
+    // Any resident's script can rename another resident of the realm.
+    let (answer, requests) =
+        script(&world, &leader, &format!("memory.answer = rename(\"{miner}\", \"Gerd\")"));
+    assert_eq!(answer, Value::Null);
+    assert_eq!(
+        as_json(&requests),
+        json!([{ "kind": "rename", "residentId": leader, "targetId": miner, "name": "Gerd" }])
+    );
+    apply(&mut world, &requests);
+    assert_eq!(live(&world, &miner).unwrap().name, "Gerd");
+
+    let (answer, requests) =
+        script(&world, &miner, &format!("memory.answer = rename(\"{stranger}\", \"Mine\")"));
+    assert_eq!(answer, json!("not one of your residents"));
+    assert_eq!(requests, vec![]);
+    let (answer, _) = script(&world, &miner, &format!("memory.answer = rename(\"{miner}\", \"\")"));
+    assert_eq!(answer, json!("Name: needs a name"));
+
+    // The Leader of an unnamed realm needs a realm name, from a script too.
+    let (answer, _) = script(&world, &leader, "memory.answer = rename(me.id, \"Queen\")");
+    assert!(answer.as_str().is_some_and(|a| a.starts_with("Realm name")), "{answer}");
+    let (answer, requests) =
+        script(&world, &leader, "memory.answer = rename(me.id, \"Queen\", \"Ironvale\")");
+    assert_eq!(answer, Value::Null);
+    apply(&mut world, &requests);
+    assert_eq!(live(&world, &leader).unwrap().name, "Queen");
+    assert_eq!(mara_realm(&world).name.as_deref(), Some("Ironvale"));
+}
 
 fn rename_horse(
     world: &mut WorldState,
@@ -502,13 +562,138 @@ fn keeps_a_citys_old_name_in_realm_log_entries_from_before() {
     assert_eq!(world.events, logged);
 }
 
+/// renaming.test.ts: is learnt by others only by sight: their Last seen keeps the old name.
 #[test]
-#[ignore = "needs Last seen (T86.13)"]
-fn a_new_city_name_is_learnt_by_others_only_by_sight() {}
+fn a_new_city_name_is_learnt_by_others_only_by_sight() {
+    let Setup { mut world, leader, stranger, .. } = setup();
+    let size = city_terrain().size;
+    let (city, _) = cities(&world, &stranger);
+    let hall_id = world.cities.iter().find(|c| c.id == city).unwrap().town_hall_id.clone();
+    let hall = world.buildings.iter().find(|b| b.id == hall_id).unwrap();
+    let (hx, hy) = (hall.x, hall.y);
+    let theirs = live(&world, &stranger).unwrap().owner.clone().unwrap();
+    let tobins: Vec<(String, f64, f64)> = world
+        .residents
+        .iter()
+        .filter(|r| r.owner.as_deref() == Some(theirs.as_str()))
+        .map(|r| (r.id.clone(), r.x, r.y))
+        .collect();
+    let realms: Vec<String> = world.realms.iter().map(|r| r.id.clone()).collect();
+    let mut state = LastSeenState::default();
+    let mut step = |world: &mut WorldState| {
+        world.tick += 1;
+        refresh_last_seen(world, size, &realms, &mut state, &mut None, None);
+    };
+    let at_hall = |world: &mut WorldState| {
+        for (id, _, _) in &tobins {
+            let r = live_mut(world, id);
+            (r.x, r.y) = (hx, hy + 3.0);
+        }
+    };
+    let go_home = |world: &mut WorldState| {
+        for (id, x, y) in &tobins {
+            let r = live_mut(world, id);
+            (r.x, r.y) = (*x, *y);
+        }
+    };
+    let remembered = |world: &WorldState| -> Option<Value> {
+        let index = WorldIndex::new(world, size);
+        last_seen_out_of_sight(world, &index, TOBIN)
+            .iter()
+            .map(|e| serde_json::to_value(e).unwrap())
+            .find(|e| e["id"] == json!(city))
+            .map(|e| e["name"].clone())
+    };
+    let in_sight = |world: &WorldState| -> Option<Value> {
+        let index = WorldIndex::new(world, size);
+        entities_in_sight(world, &index, Some(&theirs), None)
+            .iter()
+            .map(|e| serde_json::to_value(e).unwrap())
+            .find(|e| e["id"] == json!(city))
+    };
+    let before = city_name(&world, &city);
+    // Tobin's people stand at Mara's town hall, then go home.
+    at_hall(&mut world);
+    step(&mut world);
+    go_home(&mut world);
+    step(&mut world);
+    assert_eq!(remembered(&world), Some(json!(before)));
 
+    assert_eq!(rename_city(&mut world, &leader, &city, text("Ironhold"), MARA), "ok");
+    step(&mut world);
+    step(&mut world);
+    assert_eq!(remembered(&world), Some(json!(before)));
+    // What Tobin is sent of it keeps the old name too.
+    assert_eq!(in_sight(&world), None);
+
+    // Back in sight: Tobin sees the new name, and no longer remembers the old one.
+    at_hall(&mut world);
+    step(&mut world);
+    assert_eq!(remembered(&world), None);
+    assert_eq!(in_sight(&world).map(|e| e["name"].clone()), Some(json!("Ironhold")));
+    go_home(&mut world);
+    step(&mut world);
+    assert_eq!(remembered(&world), Some(json!("Ironhold")));
+}
+
+/// renaming.test.ts: Renaming a horse from a script: is in the script API, does what the order
+/// does, and scripts see the name.
 #[test]
-#[ignore = "needs the game API (T86.12)"]
-fn renaming_a_horse_or_a_city_from_a_script_is_in_the_script_api() {}
+fn renaming_a_horse_from_a_script_is_in_the_script_api_and_scripts_see_the_name() {
+    assert!(SCRIPT_API.iter().any(|b| b.name == "renameHorse" && matches!(b.is, Is::Action)));
+    let Setup { mut world, miner, stranger, .. } = setup();
+    let horse = own_horses(&world)[0].clone();
+    let theirs = live(&world, &stranger).unwrap().owner.clone();
+    let theirs = world.horses.iter().find(|h| h.realm_id == theirs).unwrap().id.clone();
+
+    let (answer, requests) =
+        script(&world, &miner, &format!("memory.answer = renameHorse(\"{horse}\", \"Grey\")"));
+    assert_eq!(answer, Value::Null);
+    assert_eq!(
+        as_json(&requests),
+        json!([{ "kind": "renameHorse", "residentId": miner, "horseId": horse, "name": "Grey" }])
+    );
+    apply(&mut world, &requests);
+    assert_eq!(horse_name_of(&world, &horse), "Grey");
+    // The horse script view carries the name (`CONTEXT.md`: Horse name).
+    let (seen, _) = script(&world, &miner, "memory.answer = horses()");
+    let seen = seen.as_array().unwrap().iter().find(|h| h["id"] == json!(horse)).cloned();
+    assert_eq!(seen.map(|h| h["name"].clone()), Some(json!("Grey")));
+
+    let (answer, requests) =
+        script(&world, &miner, &format!("memory.answer = renameHorse(\"{theirs}\", \"Mine\")"));
+    assert_eq!(answer, json!("not one of your horses"));
+    assert_eq!(requests, vec![]);
+    let (answer, _) =
+        script(&world, &miner, &format!("memory.answer = renameHorse(\"{horse}\", \"\")"));
+    assert_eq!(answer, json!("Name: needs a name"));
+}
+
+/// renaming.test.ts: Renaming a city from a script: is in the script API and does what the order
+/// does.
+#[test]
+fn renaming_a_city_from_a_script_is_in_the_script_api() {
+    assert!(SCRIPT_API.iter().any(|b| b.name == "renameCity" && matches!(b.is, Is::Action)));
+    let Setup { mut world, miner, stranger, .. } = setup();
+    let (city, theirs) = cities(&world, &stranger);
+    let (answer, requests) =
+        script(&world, &miner, &format!("memory.answer = renameCity(\"{city}\", \"Ironhold\")"));
+    assert_eq!(answer, Value::Null);
+    assert_eq!(
+        as_json(&requests),
+        json!([{ "kind": "renameCity", "residentId": miner, "cityId": city, "name": "Ironhold" }])
+    );
+    apply(&mut world, &requests[..1]);
+    assert_eq!(city_name(&world, &city), "Ironhold");
+
+    let (answer, requests) =
+        script(&world, &miner, &format!("memory.answer = renameCity(\"{theirs}\", \"Mine\")"));
+    assert_eq!(requests, vec![]);
+    assert_eq!(answer, json!("not one of your cities"));
+    let (answer, _) =
+        script(&world, &miner, &format!("memory.answer = renameCity(\"{city}\", \"\")"));
+    assert_eq!(answer, json!("Name: needs a name"));
+}
 
 #[test]
 fn city_names_well_formed_reports_an_empty_untrimmed_or_too_long_name() {

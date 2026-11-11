@@ -1,18 +1,22 @@
 //! `apps/server/src/capture.test.ts`, ported one to one where the conflict phases run it
-//! (`test_world::step` for `stepWorld`). The invariants (`cityResidentsInItsRealm`,
-//! `occupationsSound`) are T86.13's, refilling is T86.3's, trading posts are T86.9's.
+//! (`test_world::step` for `stepWorld`); refilling and the trading posts step the whole world.
 
 use csp_shared::balance::{MAX_HEALTH, MAX_HUNGER, OCCUPATION_GAME_DAYS};
+use csp_shared::terrain::TerrainMap;
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
-    BuildingKind, Carriage, Good, Horse, HorseStats, Occupation, Pair, RealmEventWhat,
-    ResidentOrder, WorldState,
+    BuildingKind, Carriage, Delivery, DeliveryKind, DriveOrder, Good, Heading, Horse, HorseStats,
+    Occupation, Pair, RealmEventWhat, ResidentOrder, Stock, Tile, WalkOrder, WorldState,
 };
 
 use super::*;
+use crate::caravans::route_end;
 use crate::combat::attack_order;
+use crate::invariants::check_all;
+use crate::queries::city::town_hall_of;
 use crate::queries::city_area::{defends_city, occupier_of, OCCUPATION_TICKS};
 use crate::test_world::{add_city, building, empty_world, live, live_mut, realm, resident, step};
+use crate::tick::Scratch;
 use csp_shared::world::{Alliance, AllianceMember};
 
 const SIZE: i32 = 64;
@@ -406,8 +410,19 @@ fn a_capture_ends_the_occupation_without_a_break_in_the_logs() {
 }
 
 #[test]
-#[ignore = "needs refilling (T86.3)"]
-fn its_occupiers_at_home_there_now_refill_from_its_storage_the_tick_it_is_captured() {}
+fn its_occupiers_at_home_there_now_refill_from_its_storage_the_tick_it_is_captured() {
+    let mut world = setup();
+    let land = crate::test_support::plains(SIZE);
+    building(&mut world, "s1", BuildingKind::Storage, Some("npc"), 24.0, 20.0);
+    world.buildings.last_mut().unwrap().stock = Some(Stock::from([(Good::Food, 50.0)]));
+    person(&mut world, "a2", Some("r1"), 21.0, 20.0, None);
+    live_mut(&mut world, "a2").carried = Stock::from([(Good::Sword, 1.0)]);
+    held_all_but_one_tick(&mut world, "npc", "r1");
+    crate::world::step_world(&mut world, &land, &mut Scratch::default(), None, None);
+    assert_eq!(city(&world, "npc").realm_id.as_deref(), Some("r1"));
+    assert!(live(&world, "a2").unwrap().carried.get(&Good::Food).copied().unwrap_or(0.0) > 0.0);
+    assert_eq!(check_all(&world, &land), vec![]);
+}
 
 #[test]
 fn takes_an_npc_city_with_its_own_horses_and_carriages_not_those_of_another_npc_city() {
@@ -511,14 +526,133 @@ fn a_pair_with_the_leader_ends_when_the_city_is_captured() {
     );
 }
 
+/// `worldWithPost()` and its first trading post.
+fn world_with_post() -> (WorldState, TerrainMap, String) {
+    let (world, land) = crate::test_support::world_with_post();
+    let post = crate::trading_posts::trading_posts(&world)[0].id.clone();
+    (world, land, post)
+}
+
+/// capture.test.ts: takes it out of the Trade Organization: its warehouse a storage, its orders
+/// to the HQ.
 #[test]
-#[ignore = "needs leaveTradeOrg and a trading post world (T86.9)"]
-fn capturing_a_trading_post_takes_it_out_of_the_trade_organization() {}
+fn capturing_a_trading_post_takes_it_out_of_the_trade_organization() {
+    let (mut world, land, post) = world_with_post();
+    let realm = world.realms[0].id.clone();
+    let home = world.cities.iter().find(|c| c.realm_id.as_deref() == Some(&realm)).unwrap();
+    let home = home.id.clone();
+    let warehouse = world
+        .buildings
+        .iter()
+        .find(|b| b.city_id.as_deref() == Some(&post) && b.kind == BuildingKind::Warehouse)
+        .unwrap()
+        .id
+        .clone();
+    assert!(world.caravans.iter().any(|c| c.post_id == post));
+    let goods = route_end(&world, &post, Heading::Hq).warehouse.unwrap();
+    let goods = world.buildings[goods].id.clone();
+    let delivery = Delivery {
+        id: "delivery1".into(),
+        kind: DeliveryKind::Delivery,
+        realm_id: realm.clone(),
+        warehouse_id: warehouse.clone(),
+        city_id: home,
+        good: Good::Wood,
+        units: 5.0,
+        fee: 10.0,
+        caravan_id: None,
+    };
+    world.deliveries.push(delivery.clone());
+    let people: Vec<String> = world
+        .residents
+        .iter()
+        .filter(|r| r.city_id.as_deref() == Some(&post))
+        .map(|r| r.id.clone())
+        .collect();
+    assert!(!people.is_empty());
+    capture_city(&mut world, &post, &realm, land.size);
+    assert_eq!(city(&world, &post).realm_id.as_deref(), Some(realm.as_str()));
+    assert_eq!(city(&world, &post).trade_org, None);
+    for id in &people {
+        assert_eq!(live(&world, id).unwrap().owner.as_deref(), Some(realm.as_str()), "{id}");
+    }
+    let wi = world.buildings.iter().position(|b| b.id == warehouse).unwrap();
+    assert_eq!(world.buildings[wi].kind, BuildingKind::Storage);
+    assert!(!world.caravans.iter().any(|c| c.post_id == post));
+    assert_eq!(world.deliveries, vec![Delivery { warehouse_id: goods, ..delivery }]);
+    // No stock floor any more: what it holds runs out like any storage's.
+    world.buildings[wi].stock = Some(Stock::default());
+    world.tick = TICKS_PER_GAME_DAY as u64 - 1;
+    crate::stock_floor::step_stock_floor(&mut world, &mut Default::default());
+    assert_eq!(world.buildings[wi].stock, Some(Stock::default()));
+    assert_eq!(check_all(&world, &land), vec![]);
+}
 
 #[test]
-#[ignore = "needs leaveTradeOrg and a trading post world (T86.9)"]
-fn occupying_a_posts_town_hall_the_full_time_captures_it_and_it_leaves_the_trade_organization() {}
+fn occupying_a_posts_town_hall_the_full_time_captures_it_and_it_leaves_the_trade_organization() {
+    let (mut world, land, post) = world_with_post();
+    let realm = world.realms[0].id.clone();
+    let hall = town_hall_of(&world, city(&world, &post)).unwrap();
+    let (hx, hy) = (hall.x, hall.y);
+    // Its own residents stand clear of the hall.
+    for r in &mut world.residents {
+        if r.city_id.as_deref() == Some(&post) {
+            r.x = hx - 3.0;
+        }
+    }
+    let r = world.residents.iter_mut().find(|x| x.owner.as_deref() == Some(&realm)).unwrap();
+    r.x = hx + 1.0;
+    r.y = hy + 1.0;
+    r.carried.insert(Good::Sword, 1.0);
+    assert_eq!(occupier_of(&world, city(&world, &post), land.size), Some(realm.clone()));
+    held_all_but_one_tick(&mut world, &post, &realm);
+    world.tick += 1;
+    let captures = step_captures(&mut world, land.size, None, &mut crate::defence::NoAlarms);
+    assert_eq!(captures, vec![capture(&post, &realm)]);
+    assert_eq!(city(&world, &post).realm_id.as_deref(), Some(realm.as_str()));
+    assert_eq!(occupation(&world, &post), None);
+    assert_eq!(city(&world, &post).trade_org, None);
+    assert!(!world.caravans.iter().any(|c| c.post_id == post));
+}
 
+/// capture.test.ts: ends its caravan’s errands: the crew stop what the caravan had them doing.
 #[test]
-#[ignore = "needs caravans (T86.9)"]
-fn capturing_a_post_ends_its_caravans_errands() {}
+fn capturing_a_post_ends_its_caravans_errands() {
+    let (mut world, land, post) = world_with_post();
+    let route = world.caravans.iter().find(|c| c.post_id == post).unwrap().clone();
+    let k = world.carriages.iter().find(|k| k.id == route.carriage_id).unwrap();
+    let (x, y) = (k.x, k.y);
+    let driver = route.driver_id.clone().unwrap();
+    let (walker, chaser) = (route.escort_ids[0].clone(), route.escort_ids[1].clone());
+    let realm = world.realms[0].id.clone();
+    let thief = world.residents.iter().find(|r| r.owner.as_deref() == Some(&realm)).unwrap();
+    let thief = thief.id.clone();
+    let target = Tile { x: x + 5.0, y };
+    live_mut(&mut world, &driver).order = Some(ResidentOrder::Drive(DriveOrder {
+        carriage_id: route.carriage_id.clone(),
+        target,
+        path: None,
+        progress: 0.0,
+        army: None,
+        near: None,
+    }));
+    live_mut(&mut world, &walker).order =
+        Some(ResidentOrder::WalkTo(WalkOrder { target, path: None, progress: 0.0, army: None }));
+    live_mut(&mut world, &chaser).order =
+        Some(ResidentOrder::Attack(attack_order(&thief, false, true)));
+
+    capture_city(&mut world, &post, &realm, land.size);
+
+    for id in [&driver, &walker, &chaser] {
+        assert_eq!(live(&world, id).unwrap().order, None, "{id}");
+    }
+    // Still the HQ's, which runs them from here, and the carriage stands where it stood.
+    let hq = crate::queries::trade_org::trade_org_hq(&world).unwrap().id.clone();
+    let d = live(&world, &driver).unwrap();
+    assert_eq!((d.owner.as_deref(), d.city_id.as_deref()), (None, Some(hq.as_str())));
+    let k = world.carriages.iter().find(|k| k.id == route.carriage_id).unwrap();
+    assert_eq!((k.x, k.y), (x, y));
+    assert_eq!(check_all(&world, &land), vec![]);
+    crate::world::step_world(&mut world, &land, &mut Scratch::default(), None, None);
+    assert_eq!(check_all(&world, &land), vec![]);
+}

@@ -8,7 +8,7 @@ use csp_shared::balance::{
     RECIPES, TEARDOWN_MATERIALS_RETURNED, TEARDOWN_WORK_SHARE, TRAINING_GROUND_MAX_TRAINEES,
     WORKPLACE_MAX_WORKERS,
 };
-use csp_shared::footprint::{covers, footprint_tiles, is_at, Placed, FOOTPRINT};
+use csp_shared::footprint::{covers, footprint_tiles, is_at, may_cover, Placed, FOOTPRINT};
 use csp_shared::terrain::{
     is_passable_terrain, terrain_at, tile_index, touches_water, wrap, wrap_delta, Terrain,
     TerrainMap,
@@ -33,10 +33,12 @@ pub const KEEPS_GOODS: [BuildingKind; 4] =
 /// stands, if one does (`buildingAt`): the first in the world's order, roads and carriage sites
 /// aside.
 pub fn building_index_at(world: &WorldState, x: i32, y: i32, size: i32) -> Option<usize> {
-    world
-        .buildings
-        .iter()
-        .position(|b| covers(placed(b), x, y, size) && !SHARES_A_TILE.contains(&b.kind))
+    world.buildings.iter().position(|b| {
+        // Nearly all are far off: their footprint needn't be worked out (T89.6).
+        may_cover(b.x as i32, b.y as i32, x, y, size)
+            && covers(placed(b), x, y, size)
+            && !SHARES_A_TILE.contains(&b.kind)
+    })
 }
 
 /// The building or construction site whose footprint covers (x, y) (`buildingAt`).

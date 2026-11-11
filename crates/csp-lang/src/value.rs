@@ -47,8 +47,9 @@ pub struct Object(Rc<RefCell<ObjectData>>);
 
 #[derive(Debug, Default)]
 pub struct ObjectData {
-    /// A host view's keys are its static field names, held without a copy (#1092).
-    entries: IndexMap<Cow<'static, str>, Value>,
+    /// A host view's keys are its static field names, held without a copy (#1092). Hashed with
+    /// `FxHash`, which leaves their order as it is and costs a fraction of SipHash (T89.6).
+    entries: IndexMap<Cow<'static, str>, Value, rustc_hash::FxBuildHasher>,
     /// Read-only to the script (`Object.freeze` in the TypeScript).
     pub frozen: bool,
 }
@@ -72,7 +73,7 @@ pub(crate) struct FunctionHandle {
     pub(crate) run: Rc<()>,
     pub(crate) index: usize,
     /// Its name, or `""` for a `fn (…) { … }` value.
-    pub(crate) name: String,
+    pub(crate) name: Rc<str>,
 }
 
 impl ScriptFunction {
@@ -215,7 +216,7 @@ impl Value {
     /// without checking each key. The keys are the view's own field names: distinct, and none an
     /// array index, so their order is the order given.
     pub fn frozen_fields(fields: impl ExactSizeIterator<Item = (&'static str, Value)>) -> Value {
-        let mut entries = IndexMap::with_capacity(fields.len());
+        let mut entries = IndexMap::with_capacity_and_hasher(fields.len(), Default::default());
         for (key, value) in fields {
             debug_assert!(js::array_index(key).is_none(), "a field name is no array index");
             let old = entries.insert(Cow::Borrowed(key), value);

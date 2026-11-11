@@ -254,7 +254,6 @@ mod the_stable_of_an_npc_city_with_horses {
     use super::*;
 
     #[test]
-    #[ignore = "11 s alone; see #1092"]
     fn goes_up_around_them_they_stand_in_it_fed_and_it_is_fed_from_then_on() {
         let mut v = village(None);
         let city = v.city.clone();
@@ -276,7 +275,7 @@ mod the_stable_of_an_npc_city_with_horses {
     }
 
     #[test]
-    #[ignore = "22 s alone; see #1092"]
+    #[ignore = "7.0 s alone; see #1132"]
     fn takes_its_time_from_a_village_with_no_wood_at_all_and_the_food_by_them_lasts() {
         let mut v = village(None);
         let city = v.city.clone();
@@ -352,7 +351,7 @@ mod an_npc_city_breeding_its_horses {
     }
 
     #[test]
-    #[ignore = "22 s alone; see #1092"]
+    #[ignore = "6.8 s alone; see #1132"]
     fn stops_at_the_number_it_wants() {
         let (mut v, stable) = stabled();
         let city = v.city.clone();

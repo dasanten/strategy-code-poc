@@ -359,7 +359,7 @@ fn remembers_it_from_when_the_news_came_however_long_the_post_stood_lost() {
 }
 
 #[test]
-#[ignore = "22.6 s alone; see #1092"]
+#[ignore = "5.7 s alone; see #1132"]
 fn drives_up_to_it_and_finds_out_running_the_whole_world_and_the_news_comes_in_by_the_next_post() {
     let mut f = fixture();
     let (post, trader, leader) = (f.posts[0].clone(), f.traders[0].clone(), f.leader.clone());
