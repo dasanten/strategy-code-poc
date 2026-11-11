@@ -23,6 +23,7 @@ import {
   TRADER_STOP_REACH,
   TRADER_STOP_TICKS,
   CARRIAGE_CAPACITY,
+  BOAT_CAPACITY,
   DIRECT_OFFERS_TO_ONE_REALM,
   DIRECT_OFFER_DAYS,
   PASSENGER_WEIGHT,
@@ -297,6 +298,7 @@ import {
   breakTicks,
   buildCosts,
   carriageCost,
+  boatCost,
   cityControl,
   coinsPerMintWorkerDay,
   crimeForgotten,
@@ -1884,17 +1886,34 @@ export function Wiki() {
           Boats and ships are what cross them, and they start at a haven.
         </p>
         <p>
-          A <b>haven</b> is a {num(FOOTPRINT.haven)} × {num(FOOTPRINT.haven)} building on the
-          shore: every tile of it on passable land, off Mountain and off resource nodes, and at least
-          one of its tiles touching Lake or Sea, straight or diagonally. The Build menu offers it
-          only where it fits. It is built from {goods(havenCost.materials)} and{' '}
+          A <b>haven</b> is a {num(FOOTPRINT.haven)} × {num(FOOTPRINT.haven)} building on the shore:
+          every tile of it on passable land, off Mountain and off resource nodes, and at least one
+          of its tiles touching Lake or Sea, straight or diagonally. The Build menu offers it only
+          where it fits. It is built from {goods(havenCost.materials)} and{' '}
           {duration(havenCost.buildTicks)} of one average resident's work.
         </p>
         <p>
           A haven has a <b>storage</b>: anyone standing at it puts goods in or takes them out, by
           hand, with Store and Fetch, or with a script, as at any storage. Like a stable it has no
-          owner of its own: it is the city's whose resident laid it out, and taking goods from it
-          is judged as taking from any storage of that city. NPC cities don't build havens.
+          owner of its own: it is the city's whose resident laid it out, and taking goods from it is
+          judged as taking from any storage of that city. NPC cities don't build havens.
+        </p>
+        <p>
+          <b>Building a boat.</b> A resident standing on a tile of a finished haven that touches the
+          water lays out a <b>boat site</b> there with Build (in the Build menu under Transport). It
+          is a construction site like any other: it takes {goods(boatCost().materials)} and{' '}
+          {duration(boatCost().buildTicks)} of one average resident's work, anyone may bring
+          materials or work on it, and torn down it leaves all its materials. Once finished the site
+          is gone, and an empty boat of the realm of whoever finished it floats on the nearest free
+          water tile next to it.
+        </p>
+        <p>
+          A boat always floats on a water tile, one boat to a tile. It carries a few residents and a
+          little cargo: {num(BOAT_CAPACITY)} kg in all, each passenger counting as{' '}
+          {num(PASSENGER_WEIGHT)} kg. It shows on the map to whoever sees its tile, like a carriage;
+          its card tells whose it is and how heavily it is loaded, and what it holds only to its own
+          realm and allies. Scripts see the boats in sight with <code>vessels()</code>. A boat of a
+          realm that ends belongs to nobody, as NPC cities don't use the water.
         </p>
       </Section>
 

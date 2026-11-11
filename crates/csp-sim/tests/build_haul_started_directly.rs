@@ -391,7 +391,7 @@ mod a_construction_site_is_the_realms_that_laid_it_out {
                 delivered: build_materials(kind),
                 work: build_work_of(kind),
             });
-            assert!(finish_site(&mut s.world, i, &w2));
+            assert!(finish_site(&mut s.world, i, &w2, None));
             s.world.buildings[i].realm_id.clone()
         };
         assert_eq!(done(&mut s, "hs"), None);

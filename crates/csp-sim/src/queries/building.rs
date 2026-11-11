@@ -22,8 +22,10 @@ use super::balance::{build_work, carry_capacity};
 use super::names::{good_name, good_of, held, kind_name, placed};
 use super::residents::{can_work, good_weight, stock_weight};
 
-/// Kinds that may share a tile with a building (`SHARES_A_TILE`): roads and carriage sites.
-pub const SHARES_A_TILE: [BuildingKind; 2] = [BuildingKind::Road, BuildingKind::Carriage];
+/// Kinds that may share a tile with a building (`SHARES_A_TILE`): roads, carriage sites and boat
+/// sites.
+pub const SHARES_A_TILE: [BuildingKind; 3] =
+    [BuildingKind::Road, BuildingKind::Carriage, BuildingKind::Boat];
 
 /// Kinds that keep goods (`KEEPS_GOODS`): storages, warehouses, stables and havens.
 pub const KEEPS_GOODS: [BuildingKind; 4] =
@@ -78,7 +80,7 @@ pub fn recipe_for(kind: BuildingKind, makes: Option<&str>) -> Option<&'static Re
 pub const CARRYING_A_CHILD: &str = "carrying a child";
 
 /// Kinds of building that can be built so far (`BUILDABLE`).
-pub const BUILDABLE: [BuildingKind; 17] = [
+pub const BUILDABLE: [BuildingKind; 18] = [
     BuildingKind::LumberCamp,
     BuildingKind::Quarry,
     BuildingKind::Mine,
@@ -96,6 +98,7 @@ pub const BUILDABLE: [BuildingKind; 17] = [
     BuildingKind::Road,
     BuildingKind::Carriage,
     BuildingKind::Haven,
+    BuildingKind::Boat,
 ];
 
 /// Workplaces that turn goods into other goods (`PROCESSING`, the keys of `RECIPES`).
@@ -222,8 +225,14 @@ pub fn carriage_site_at(world: &WorldState, x: i32, y: i32) -> Option<&Building>
     first_of_kind_at(world, x, y, BuildingKind::Carriage).map(|i| &world.buildings[i])
 }
 
+/// The boat site on a tile (`CONTEXT.md`: Building a boat).
+pub fn boat_site_at(world: &WorldState, x: i32, y: i32) -> Option<&Building> {
+    first_of_kind_at(world, x, y, BuildingKind::Boat).map(|i| &world.buildings[i])
+}
+
 /// Where in `world.buildings` what of `kind` stands on a tile is (`constructionAt`): its road
-/// for a road, its carriage site for a carriage, else its building (on the whole map).
+/// for a road, its carriage or boat site for a carriage or boat, else its building (on the whole
+/// map).
 pub fn construction_index_at(
     world: &WorldState,
     x: i32,
@@ -232,7 +241,7 @@ pub fn construction_index_at(
 ) -> Option<usize> {
     match kind {
         BuildingKind::Road => road_index_at(world, x, y),
-        BuildingKind::Carriage => first_of_kind_at(world, x, y, BuildingKind::Carriage),
+        BuildingKind::Carriage | BuildingKind::Boat => first_of_kind_at(world, x, y, kind),
         _ => building_index_at(world, x, y, MAP_SIZE),
     }
 }
@@ -380,6 +389,18 @@ pub fn build_problem(
         }
         if carriage_site_at(world, x, y).is_some() {
             return Some("there is already a carriage site on this tile".into());
+        }
+        return None;
+    }
+    if kind == BuildingKind::Boat {
+        // `CONTEXT.md`: Building a boat: on a haven tile that touches the water.
+        if super::vessels::haven_for(world, x, y, size).is_none()
+            || terrain.is_some_and(|t| !touches_water(&[(x, y)], size, |tx, ty| t.at(tx, ty)))
+        {
+            return Some("a boat is built on a tile of a finished haven touching the water".into());
+        }
+        if first_of_kind_at(world, x, y, BuildingKind::Boat).is_some() {
+            return Some("there is already a boat site on this tile".into());
         }
         return None;
     }

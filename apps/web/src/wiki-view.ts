@@ -314,7 +314,7 @@ export interface BuildCost {
  */
 export function buildCosts(): BuildCost[] {
   const pace = buildWork(AVERAGE, AT)
-  return BUILDABLE.filter((kind) => kind !== 'carriage').map((kind) => {
+  return BUILDABLE.filter((kind) => kind !== 'carriage' && kind !== 'boat').map((kind) => {
     const materials = BUILD_MATERIALS[kind] ?? {}
     const work = BUILD_WORK[kind] ?? 0
     const returned: Stock = {}
@@ -341,6 +341,17 @@ export function carriageCost(): { materials: Stock; buildTicks: number } {
   return {
     materials: BUILD_MATERIALS.carriage ?? {},
     buildTicks: (BUILD_WORK.carriage ?? 0) / buildWork(AVERAGE, AT),
+  }
+}
+
+/**
+ * What a boat takes to build at a haven (`CONTEXT.md`: Building a boat): its materials and the
+ * ticks one average builder takes, alone.
+ */
+export function boatCost(): { materials: Stock; buildTicks: number } {
+  return {
+    materials: BUILD_MATERIALS.boat ?? {},
+    buildTicks: (BUILD_WORK.boat ?? 0) / buildWork(AVERAGE, AT),
   }
 }
 

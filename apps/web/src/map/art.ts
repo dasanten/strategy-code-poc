@@ -25,6 +25,7 @@ export const BUILDING_ART: Record<BuildingKind, string> = {
   trainingGround: 'training-ground.svg',
   road: 'road.svg',
   carriage: 'cart.svg',
+  boat: 'boat.svg',
   haven: 'haven.svg',
 }
 
@@ -121,6 +122,7 @@ export const UNIT_ART = {
   person: 'person.svg',
   leader: 'crown.svg',
   carriage: 'cart.svg',
+  boat: 'boat.svg',
   horse: 'horse.svg',
   caravan: 'caravan.svg',
   army: 'army-banner.svg',

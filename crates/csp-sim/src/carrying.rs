@@ -5,6 +5,7 @@
 use std::collections::HashSet;
 
 use csp_shared::balance::MAP_SIZE;
+use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{
     DropOrder, GoodsSpot, OrderRequest, PickUpOrder, ResidentOrder, Stock, WorldState,
 };
@@ -239,6 +240,17 @@ struct Theft {
 /// take the same goods. A take or put of a pick-up or drop order ends it; a store or fetch order
 /// goes on or ends (`carried_for_order`). Thefts raise their alarms once all have carried.
 pub fn resolve_carrying(world: &mut WorldState, actions: &[CarryAction], size: i32) {
+    resolve_carrying_on(world, actions, size, None);
+}
+
+/// `resolve_carrying` with the map at hand, which the last materials put into a boat site need to
+/// float its boat (`finish_site`).
+pub fn resolve_carrying_on(
+    world: &mut WorldState,
+    actions: &[CarryAction],
+    size: i32,
+    terrain: Option<&TerrainMap>,
+) {
     let mut robbed = HashSet::new();
     let mut thefts = Vec::new();
     for a in actions {
@@ -247,7 +259,7 @@ pub fn resolve_carrying(world: &mut WorldState, actions: &[CarryAction], size: i
         };
         match a.kind {
             CarryKind::Take => take(world, ri, a, size, &mut robbed, &mut thefts),
-            CarryKind::Put => put(world, ri, a, size),
+            CarryKind::Put => put(world, ri, a, size, terrain),
         }
         let r = &mut world.residents[ri];
         if matches!(r.order, Some(ResidentOrder::PickUp(_) | ResidentOrder::Drop(_))) {
@@ -404,7 +416,13 @@ fn spot_organization(world: &WorldState, spot: &GoodsSpot) -> Option<String> {
 
 /// Puts down goods (`put`). The last materials delivered to a site that has all its work finish
 /// it (`finish_site`).
-fn put(world: &mut WorldState, ri: usize, a: &CarryAction, size: i32) {
+fn put(
+    world: &mut WorldState,
+    ri: usize,
+    a: &CarryAction,
+    size: i32,
+    terrain: Option<&TerrainMap>,
+) {
     // On the ground the goods go in the tile's pile; a storage or site that is gone takes nothing,
     // nor does a Down resident: Food goes into their hands by feeding (`CONTEXT.md`: Reviving).
     if matches!(a.spot, GoodsSpot::Resident { .. }) {
@@ -438,7 +456,7 @@ fn put(world: &mut WorldState, ri: usize, a: &CarryAction, size: i32) {
         drop_goods(world, x, y, &dropped, MAP_SIZE);
     }
     if let Some(Holder::Site(i)) = target {
-        if finish_site(world, i, ri) {
+        if finish_site(world, i, ri, terrain) {
             update_city_membership(world, size);
         }
     }

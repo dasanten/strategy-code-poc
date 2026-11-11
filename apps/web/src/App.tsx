@@ -1881,6 +1881,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 ...selectedTile,
                 buildings: world.buildings,
                 carriages: world.carriages,
+                vessels: world.vessels,
                 horses: world.horses,
                 piles: world.piles,
                 node: nodeAt?.(selectedTile.x, selectedTile.y),

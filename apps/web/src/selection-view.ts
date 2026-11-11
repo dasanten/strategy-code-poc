@@ -37,6 +37,7 @@ import {
   HORSE_FOOD_PER_DAY,
   HORSE_HUNGRY_SHARE,
   PASSENGER_WEIGHT,
+  BOAT_CAPACITY,
   MAP_SIZE,
   horseFoodFactor,
   MAX_HEALTH,
@@ -101,6 +102,7 @@ import type {
   SeenCaravan,
   SeenTrader,
   SeenCarriage,
+  SeenVessel,
   GoodsPlace,
   GoodsWanted,
   LoadLevel,
@@ -1004,6 +1006,8 @@ export interface TileThings {
   y: number
   buildings: SeenBuilding[]
   carriages: SeenCarriage[]
+  /** Boats on the water in sight (`CONTEXT.md`: Vessel). */
+  vessels?: SeenVessel[]
   horses: SeenHorse[]
   piles: Pile[]
   node: KnownNode | undefined
@@ -1506,6 +1510,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   const road = here(t.buildings).find((b) => b.kind === 'road')
   const carriageSite = here(t.buildings).find((b) => b.kind === 'carriage')
   const carriage = here(t.carriages)[0]
+  const boatSite = here(t.buildings).find((b) => b.kind === 'boat')
+  const vessel = here(t.vessels ?? [])[0]
   const pileTile = live ?? t
   const pile = t.piles.find((p) => p.x === pileTile.x && p.y === pileTile.y)
   const cityOf = (b: Building) => t.cities.find((c) => c.id === b.cityId)
@@ -1626,6 +1632,21 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     card ??= { title: 'Carriage site', what: 'building' }
     sites.push({ ...head, ...describeSite(carriageSite, t) })
     if (carriageSite.teardown) lines.push(teardownLine(carriageSite))
+  }
+  if (boatSite?.site) {
+    // A boat site has no owner either; on its haven's card under a head of its own
+    // (`CONTEXT.md`: Building a boat).
+    const head = card ? { title: 'Boat site' } : {}
+    card ??= { title: 'Boat site', what: 'building' }
+    sites.push({ ...head, ...describeSite(boatSite, t) })
+    if (boatSite.teardown) lines.push(teardownLine(boatSite))
+  }
+  if (vessel) {
+    // A boat on the water, on a card of its own (`CONTEXT.md`: Vessel): its owner first.
+    const rel = realmRelationship(vessel.realmId, null, t.cities, t.viewer)
+    card ??= { title: 'Boat', rel, what: 'carriage' }
+    lines.push(rel ? RELATIONSHIP_NAMES[rel] : 'Nobody’s')
+    carriageView = describeVessel(vessel, rel)
   }
   if (carriage) {
     const rel = realmRelationship(carriage.realmId, carriage.cityId, t.cities, t.viewer)
@@ -1776,6 +1797,22 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     ...(horsesToFeed.length > 0 ? { horsesToFeed } : {}),
     ...(lists.length > 0 ? { lists } : {}),
     ...(stableFood ? { stableFood } : {}),
+  }
+}
+
+/**
+ * A boat as rows and meters (`CONTEXT.md`: Vessel, Goods on cards): its load against what it
+ * holds and its goods when the Player sees inside (its own realm and allies), else only how
+ * heavily it is loaded.
+ */
+export function describeVessel(vessel: SeenVessel, rel: Relationship | undefined): CarriageView {
+  const weight = vessel.load ? stockWeight(vessel.load) : 0
+  return {
+    title: `Boat${rel ? ` (${RELATIONSHIP_NAMES[rel].toLowerCase()})` : ''}`,
+    load: vessel.load
+      ? { text: `${Math.round(weight)} / ${BOAT_CAPACITY} kg`, share: weight / BOAT_CAPACITY }
+      : { text: capital(LOAD_LEVEL_NAMES[vessel.loadLevel]) },
+    ...(vessel.load ? { goods: vessel.load } : {}),
   }
 }
 

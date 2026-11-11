@@ -440,6 +440,7 @@ export interface Balance {
   readonly HUNGRY_HORSE_PACE: number
   readonly CARRIAGE_MAX_CAPACITY: number
   readonly PASSENGER_WEIGHT: number
+  readonly BOAT_CAPACITY: number
   readonly FOOD_SPOIL_PER_DAY: number
   readonly REALM_LOG_LENGTH: number
   readonly CRIME_MEMORY_DAYS: number
@@ -574,6 +575,10 @@ export interface Balance {
       iron: number
       [key: string]: number
     }
+    boat: {
+      wood: number
+      [key: string]: number
+    }
     [key: string]: Record<string, never> | {
       wood: number
       [key: string]: number
@@ -621,6 +626,7 @@ export interface Balance {
     trainingGround: number
     haven: number
     carriage: number
+    boat: number
     [key: string]: number
   }
   readonly MOUNTAIN_ROAD_WORK_FACTOR: number
@@ -1033,6 +1039,7 @@ export interface Balance {
     gate: number
     road: number
     carriage: number
+    boat: number
     house: number
     storage: number
     smelter: number

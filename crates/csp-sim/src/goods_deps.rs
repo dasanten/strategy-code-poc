@@ -5,6 +5,7 @@
 
 use std::collections::HashSet;
 
+use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{
     Building, Carriage, City, CrimeKind, Realm, Resident, StandingMove, Stock, WorldState,
 };
@@ -84,9 +85,14 @@ pub fn raise_theft(world: &mut WorldState, thief: usize, victim_org: &str, size:
 
 /// Finishes a site with all its materials and work (`finishSite`, in `building.rs`), returning
 /// whether it did.
-pub fn finish_site(world: &mut WorldState, site: usize, by: usize) -> bool {
+pub fn finish_site(
+    world: &mut WorldState,
+    site: usize,
+    by: usize,
+    terrain: Option<&TerrainMap>,
+) -> bool {
     let r = world.residents[by].clone();
-    crate::building::finish_site(world, site, &r)
+    crate::building::finish_site(world, site, &r, terrain)
 }
 
 /// Updates who lives in which city (`updateCityMembership`, in `cities.rs`).

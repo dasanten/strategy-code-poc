@@ -115,7 +115,7 @@ describe('the Build menu', () => {
         .map((k) => k.kind)
     const off = open(menu())
     expect(off).not.toContain('lumberCamp')
-    expect(off.filter((k) => k !== 'road' && k !== 'carriage').sort()).toEqual(
+    expect(off.filter((k) => !['road', 'carriage', 'boat'].includes(k)).sort()).toEqual(
       [...buildMenu(undefined)].sort(),
     )
     expect(open(menu(forestAt(50, 50))).sort()).toEqual(['lumberCamp', 'road'])

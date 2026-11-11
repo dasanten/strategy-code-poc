@@ -469,6 +469,12 @@ pub fn end_realm(world: &mut WorldState, realm_id: &str, size: i32) {
         world.carriages[i].realm_id = None;
         world.carriages[i].city_id = nearest_city(world, &cities, at, size);
     }
+    // NPC cities don't use the water (`CONTEXT.md`: Haven), so the realm's boats belong to nobody.
+    for v in &mut world.vessels {
+        if v.realm_id.as_deref() == Some(realm_id) {
+            v.realm_id = None;
+        }
+    }
     // An outpost storage has no city to go with, so it belongs to nobody.
     for b in &mut world.buildings {
         if b.realm_id.as_deref() == Some(realm_id) {

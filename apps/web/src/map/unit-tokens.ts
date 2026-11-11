@@ -9,6 +9,7 @@ import type {
   SeenCity,
   SeenHorse,
   SeenResident,
+  SeenVessel,
 } from '@csp/shared-types'
 import { caravanParts } from '../caravans.js'
 import { ACTIVITY_ART, BASE_ART, PAINTED_UNIT_ART, UNIT_ART, paintedCell } from './art.js'
@@ -41,6 +42,7 @@ export interface UnitWorld {
   armies: readonly Pick<Army, 'id' | 'realmId' | 'memberIds'>[]
   caravans: readonly SeenCaravan[]
   traders?: readonly SeenTrader[]
+  vessels?: readonly SeenVessel[]
   cities: readonly Pick<SeenCity, 'id' | 'realmId' | 'tradeOrg'>[]
   buildings: readonly Pick<Building, 'kind' | 'x' | 'y'>[]
 }
@@ -203,6 +205,15 @@ export function drawUnits(
     const aboard = k.passengerIds ?? []
     if (aboard.length > 0) badge(`${aboard.length}`, ...p, r)
     for (const id of [k.id, ...aboard]) spots.set(id, { x: p[0], y: p[1], r })
+  }
+
+  // Boats on the water (`CONTEXT.md`: Vessel): alone on their tile, one vessel per tile.
+  for (const v of world.vessels ?? []) {
+    const p = at(...where(v.id, v.x, v.y))
+    if (!near(p)) continue
+    const r = unitRadius('boat', tile)
+    drawUnit(tokens, UNIT_ART.boat, ...p, r, entityRelationship(v, viewer, known))
+    spots.set(v.id, { x: p[0], y: p[1], r })
   }
 
   // People step to the lower right of a building or a cart on their tile.

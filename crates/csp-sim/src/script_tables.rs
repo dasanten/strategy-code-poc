@@ -1624,6 +1624,54 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
         ],
     },
     ScriptView {
+        name: "vessel",
+        description: "A boat on the water, as the Player sees it.",
+        fields: &[
+            ScriptField {
+                name: "id",
+                r#type: ScriptType::String,
+                description: "The vessel’s id, unique in the world.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "kind",
+                r#type: ScriptType::String,
+                description: "What it is: \"boat\".",
+                null_when: None,
+            },
+            ScriptField {
+                name: "realmId",
+                r#type: ScriptType::String,
+                description: "The realm it belongs to.",
+                null_when: Some("for one of nobody"),
+            },
+            ScriptField {
+                name: "x",
+                r#type: ScriptType::Number,
+                description: "The water tile it floats on, from west to east.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "y",
+                r#type: ScriptType::Number,
+                description: "The water tile it floats on, from north to south.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "load",
+                r#type: ScriptType::View("goods"),
+                description: "The goods on board.",
+                null_when: Some("unless the Player sees inside"),
+            },
+            ScriptField {
+                name: "loadLevel",
+                r#type: ScriptType::String,
+                description: "How heavily it looks loaded: \"empty\", \"light\", \"half\", \"heavy\" or \"full\".",
+                null_when: None,
+            },
+        ],
+    },
+    ScriptView {
         name: "pile",
         description: "Goods lying on a tile.",
         fields: &[
@@ -2163,6 +2211,14 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         cost: 20.0,
         description: "The carriages the Player sees.",
         returns: ScriptType::List(&ScriptType::View("carriage")),
+    },
+    ScriptBinding {
+        name: "vessels",
+        is: Is::Query,
+        params: &[],
+        cost: 20.0,
+        description: "The boats the Player sees on the water.",
+        returns: ScriptType::List(&ScriptType::View("vessel")),
     },
     ScriptBinding {
         name: "traders",
@@ -2975,6 +3031,14 @@ pub static ARMY_SCRIPT_API: &[ScriptBinding] = &[
         cost: 20.0,
         description: "The carriages the Player sees.",
         returns: ScriptType::List(&ScriptType::View("carriage")),
+    },
+    ScriptBinding {
+        name: "vessels",
+        is: Is::Query,
+        params: &[],
+        cost: 20.0,
+        description: "The boats the Player sees on the water.",
+        returns: ScriptType::List(&ScriptType::View("vessel")),
     },
     ScriptBinding {
         name: "traders",

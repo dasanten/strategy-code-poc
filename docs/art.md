@@ -136,7 +136,8 @@ node-forest, node-stone, node-iron-ore (rusty red rock), node-gold-ore (rock wit
 Small round tokens; change the prompt to "a small round token, top-down figure".
 
 - person (resident), leader (crown), carriage (cart with its horse hitched), horse, caravan (Trade
-  Org cart with turquoise cloth), army banner.
+  Org cart with turquoise cloth), army banner, boat (a rowing boat on water; for now the line art
+  `assets/map/boat.svg` on a round badge, with no painted cell yet).
 - Optional: soldier (a person with a spear), child, and carriage empty / half / full (others see
   only how heavily a carriage is loaded).
 

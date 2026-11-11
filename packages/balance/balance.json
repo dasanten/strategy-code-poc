@@ -384,6 +384,7 @@
   "HUNGRY_HORSE_PACE": 0.5,
   "CARRIAGE_MAX_CAPACITY": 600.0,
   "PASSENGER_WEIGHT": 70.0,
+  "BOAT_CAPACITY": 250.0,
   "FOOD_SPOIL_PER_DAY": 0.005,
   "REALM_LOG_LENGTH": 100.0,
   "CRIME_MEMORY_DAYS": 18.0,
@@ -498,6 +499,9 @@
     "carriage": {
       "wood": 30.0,
       "iron": 5.0
+    },
+    "boat": {
+      "wood": 20.0
     }
   },
   "BUILD_WORK": {
@@ -517,7 +521,8 @@
     "farm": 720.0,
     "trainingGround": 4320.0,
     "haven": 5760.0,
-    "carriage": 2880.0
+    "carriage": 2880.0,
+    "boat": 1440.0
   },
   "MOUNTAIN_ROAD_WORK_FACTOR": 4.0,
   "ROAD_LINE_MAX_TILES": 128.0,
@@ -764,6 +769,7 @@
     "gate": 1,
     "road": 1,
     "carriage": 1,
+    "boat": 1,
     "house": 2,
     "storage": 2,
     "smelter": 2,

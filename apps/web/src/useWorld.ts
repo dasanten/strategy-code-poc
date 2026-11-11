@@ -15,6 +15,7 @@ import type {
   SeenResident,
   SeenCaravan,
   SeenTrader,
+  SeenVessel,
   TraderVisit,
   SeenEntity,
   Remembered,
@@ -59,6 +60,8 @@ export interface ClientWorld {
   caravans: SeenCaravan[]
   /** The wandering traders in sight (`CONTEXT.md`: Wandering trader). */
   traders: SeenTrader[]
+  /** Boats on the water in sight (`CONTEXT.md`: Vessels in sight). */
+  vessels: SeenVessel[]
   /**
    * What the Player remembers out of their sight (`CONTEXT.md`: Last seen), kept apart from what
    * is in sight: never both at once.
@@ -94,6 +97,7 @@ function byKind(entities: Iterable<SeenEntity>) {
     armies: [] as Army[],
     caravans: [] as SeenCaravan[],
     traders: [] as SeenTrader[],
+    vessels: [] as SeenVessel[],
   }
   for (const { is, ...e } of entities) {
     if (is === 'resident') out.residents.push(e as SeenResident)
@@ -104,6 +108,7 @@ function byKind(entities: Iterable<SeenEntity>) {
     else if (is === 'army') out.armies.push(e as Army)
     else if (is === 'caravan') out.caravans.push(e as SeenCaravan)
     else if (is === 'trader') out.traders.push(e as SeenTrader)
+    else if (is === 'vessel') out.vessels.push(e as SeenVessel)
     else out.piles.push(e as Pile)
   }
   return out

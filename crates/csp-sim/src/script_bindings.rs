@@ -192,6 +192,7 @@ fn seen_is(e: &SeenEntity) -> &'static str {
         SeenEntity::Army(_) => "army",
         SeenEntity::Caravan(_) => "caravan",
         SeenEntity::Trader(_) => "trader",
+        SeenEntity::Vessel(_) => "vessel",
     }
 }
 
@@ -925,6 +926,7 @@ impl<'a> ScriptBindings<'a> {
             "cities" => self.seen_of("city", |s, id| Some(s.occupation_seen(id))),
             "horses" => self.seen_of("horse", |_, _| None),
             "carriages" => self.seen_of("carriage", |_, _| None),
+            "vessels" => self.seen_of("vessel", |_, _| None),
             "traders" => self.seen_of("trader", |_, _| None),
             "piles" => self.seen_of("pile", |_, _| None),
             "nodes" => Json::Array(

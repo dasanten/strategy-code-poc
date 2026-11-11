@@ -31,6 +31,7 @@ pub type MigrationStep = fn(Value, &MigrationContext<'_>) -> Value;
 pub fn migrations() -> BTreeMap<u32, MigrationStep> {
     let mut steps: BTreeMap<u32, MigrationStep> = BTreeMap::new();
     steps.insert(111, drop_remembered_breeding);
+    steps.insert(112, vessels_come_in);
     steps
 }
 
@@ -48,6 +49,14 @@ fn drop_remembered_breeding(mut state: Value, _: &MigrationContext<'_>) -> Value
             }
         }
     }
+    state
+}
+
+/// 112 → 113: vessels come into the world (`CONTEXT.md`: Vessel, T90.2), as `vessels`, left out
+/// of a save while there are none. A world from before has none, so it stays as it is; the bump is
+/// there so that a server of format 112, which refuses a field it doesn't know, never loads a
+/// world with boats in it.
+fn vessels_come_in(state: Value, _: &MigrationContext<'_>) -> Value {
     state
 }
 
@@ -173,6 +182,16 @@ mod tests {
             migrate_world_with(json!({ "tick": 1 }), 111, &ctx, &migrations(), 112).unwrap(),
             json!({ "tick": 1 })
         );
+    }
+
+    #[test]
+    fn step_112_brings_a_world_without_vessels_to_one_that_reads_as_having_none() {
+        let terrain = ctx_terrain();
+        let ctx = MigrationContext { terrain: &terrain };
+        let save = json!({ "tick": 3, "carriages": [{ "id": "k1" }] });
+        let migrated = migrate_world_with(save.clone(), 112, &ctx, &migrations(), 113).unwrap();
+        assert_eq!(migrated, save);
+        assert!(migrated.get("vessels").is_none_or(|v| v.as_array().is_some_and(Vec::is_empty)));
     }
 
     #[test]
