@@ -6,7 +6,7 @@ use csp_shared::balance::MAP_SIZE;
 use csp_shared::terrain::{terrain_at, TerrainMap};
 use csp_shared::world::{
     BuildOrder, Building, BuildingKind, Carriage, ConstructionSite, LinePhase, OrderRequest,
-    Resident, ResidentOrder, SkillName, Stock, Tile, WorldState,
+    Resident, ResidentOrder, SkillName, Stock, Tile, Vessel, VesselKind, WorldState,
 };
 
 use crate::cities::update_city_membership;
@@ -18,6 +18,7 @@ use crate::queries::building::{
     materials_needed, max_workers, site_work_of, work_needed, TerrainLookup, ON_PLAINS,
 };
 use crate::queries::names::{kind_of, placed};
+use crate::queries::vessels::launch_tile;
 use crate::queue::field_str as str_field;
 use crate::random::new_id;
 use crate::survival::gather_pile;
@@ -128,11 +129,37 @@ fn own_workplace(world: &mut WorldState, r: &Resident, kind: BuildingKind, id: &
 
 /// Makes the construction site at `site` in `world.buildings` the building once it has all its
 /// materials and work (`finishSite`); `r` is the resident who put the last of them in. Returns
-/// whether it was finished; the caller brings city membership up to date.
-pub fn finish_site(world: &mut WorldState, site: usize, r: &Resident) -> bool {
+/// whether it was finished; the caller brings city membership up to date. A boat site needs the
+/// map to float its boat: without it, or with no free water near, it waits finished but unlaunched
+/// until the next time someone works or delivers there with the map at hand.
+pub fn finish_site(
+    world: &mut WorldState,
+    site: usize,
+    r: &Resident,
+    terrain: Option<&TerrainMap>,
+) -> bool {
     let b = &world.buildings[site];
     if b.site.is_none() || work_needed(b) > 0.0 || !materials_needed(b).is_empty() {
         return false;
+    }
+    if b.kind == BuildingKind::Boat {
+        // `CONTEXT.md`: Building a boat: the site is gone, and an empty boat of the finisher's realm
+        // floats on the nearest free water tile next to it.
+        let Some((x, y)) = terrain.and_then(|t| launch_tile(world, t, b.x as i32, b.y as i32))
+        else {
+            return false;
+        };
+        world.buildings.remove(site);
+        let id = new_id("boat", &mut world.next_id);
+        world.vessels.push(Vessel {
+            id,
+            kind: VesselKind::Boat,
+            realm_id: r.owner.clone(),
+            x: f64::from(x),
+            y: f64::from(y),
+            load: Stock::new(),
+        });
+        return true;
     }
     if b.kind == BuildingKind::Carriage {
         let (x, y) = (b.x, b.y);
@@ -272,7 +299,7 @@ pub fn resolve_building(
         let kind = world.buildings[si].kind;
         let r = world.residents[ri].clone();
         // A road is no city building, so a tile of it changes no city (`updateCityMembership`).
-        finished = (finish_site(world, si, &r) && kind != BuildingKind::Road) || finished;
+        finished = (finish_site(world, si, &r, terrain) && kind != BuildingKind::Road) || finished;
     }
     if finished {
         update_city_membership(world, size);

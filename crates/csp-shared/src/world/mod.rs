@@ -901,6 +901,10 @@ pub struct WorldState {
     pub buildings: Vec<Building>,
     pub horses: Vec<Horse>,
     pub carriages: Vec<Carriage>,
+    /// Boats (and later ships) on the water (`CONTEXT.md`: Vessel). Left out of a save while there
+    /// are none, so a world from before format 113 reads as having none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub vessels: Vec<Vessel>,
     pub piles: Vec<Pile>,
     pub events: Vec<RealmEvent>,
     pub alliances: Vec<Alliance>,
@@ -2809,6 +2813,8 @@ pub enum BuildingKind {
     Road,
     Carriage,
     Haven,
+    /// A boat site (`CONTEXT.md`: Building a boat): finished, it is gone and a boat floats.
+    Boat,
 }
 
 /// A building or construction site (`Building`).
@@ -2888,6 +2894,26 @@ pub struct Carriage {
     pub x: f64,
     pub y: f64,
     pub horse_id: Option<String>,
+    pub load: Stock,
+}
+
+/// The kinds of vessel (`CONTEXT.md`: Vessel). Ships come with Epic 91.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum VesselKind {
+    Boat,
+}
+
+/// A boat or ship (`CONTEXT.md`: Vessel): always on a water tile, one vessel per tile, with the
+/// goods it carries. Those aboard are residents (`Resident::aboard`, from T90.3).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Vessel {
+    pub id: String,
+    pub kind: VesselKind,
+    pub realm_id: Option<String>,
+    pub x: f64,
+    pub y: f64,
     pub load: Stock,
 }
 

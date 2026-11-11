@@ -17,7 +17,7 @@ use csp_shared::balance::SIGHT_RANGE;
 use csp_shared::footprint::{footprint_tiles, Placed, FOOTPRINT};
 use csp_shared::protocol::{
     BuildLine, ScriptIdOnly, SeenArmy, SeenBuilding, SeenCaravan, SeenCarriage, SeenCity,
-    SeenEntity, SeenHorse, SeenInterrupted, SeenResident, SeenScript, SeenTrader,
+    SeenEntity, SeenHorse, SeenInterrupted, SeenResident, SeenScript, SeenTrader, SeenVessel,
 };
 use csp_shared::terrain::wrap_distance;
 use csp_shared::world::horse_market::NpcHorseOffer;
@@ -40,6 +40,7 @@ use crate::queries::npc_trade::{npc_city_prices, npc_hire_price, spare_residents
 use crate::queries::offers::{offers_at, seen_offer};
 use crate::queries::territory::city_organization;
 use crate::queries::trader_trade::{trader_prices, trader_standing};
+use crate::queries::vessels::vessel_load_level;
 use crate::queries::warehouse::{trade_coin_warehouse, warehouse_prices};
 use crate::world_index::WorldIndex;
 
@@ -543,6 +544,22 @@ fn everything_seen(
             out.push(SeenEntity::Carriage(seen_carriage(world, insight, k)));
         }
     }
+    // A vessel shows to whoever has its tile in sight, like a carriage (`CONTEXT.md`: Vessels in
+    // sight); its load only to its own realm and allies.
+    for v in &world.vessels {
+        if in_sight(v.x, v.y) {
+            let inside = insight.ours(world, v.realm_id.as_deref(), None);
+            out.push(SeenEntity::Vessel(SeenVessel {
+                id: v.id.clone(),
+                kind: v.kind,
+                realm_id: v.realm_id.clone(),
+                x: v.x,
+                y: v.y,
+                load: inside.then(|| v.load.clone()),
+                load_level: vessel_load_level(v),
+            }));
+        }
+    }
     for p in &world.piles {
         if in_sight(p.x, p.y) {
             out.push(SeenEntity::Pile(p.clone()));
@@ -1002,6 +1019,7 @@ fn spot_of(e: &SeenEntity) -> Option<Spot> {
         SeenEntity::Resident(r) => Some(Spot { x: r.x, y: r.y }),
         SeenEntity::Horse(h) => Some(Spot { x: h.x, y: h.y }),
         SeenEntity::Carriage(k) => Some(Spot { x: k.x, y: k.y }),
+        SeenEntity::Vessel(v) => Some(Spot { x: v.x, y: v.y }),
         SeenEntity::Pile(p) => Some(Spot { x: p.x, y: p.y }),
         SeenEntity::Building(b) => Some(Spot { x: b.building.x, y: b.building.y }),
         _ => None,
@@ -1091,6 +1109,11 @@ pub fn sent_inside_unseen(
                 told && !it.is_some_and(|it| {
                     insight.ours(world, it.realm_id.as_deref(), it.city_id.as_deref())
                 })
+            }
+            SeenEntity::Vessel(v) => {
+                let it = world.vessels.iter().find(|x| x.id == v.id);
+                v.load.is_some()
+                    && !it.is_some_and(|it| insight.ours(world, it.realm_id.as_deref(), None))
             }
             _ => false,
         })

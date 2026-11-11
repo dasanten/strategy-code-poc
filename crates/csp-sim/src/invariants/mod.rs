@@ -192,6 +192,7 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant { name: "children-dont-work", check: checks::children_dont_work },
         Invariant { name: "children-carry-only-food", check: checks::children_carry_only_food },
         Invariant { name: "carriages-in-place", check: checks::carriages_in_place },
+        Invariant { name: "vessels-in-place", check: checks::vessels_in_place },
         Invariant { name: "riders-on-horses", check: checks::riders_on_horses },
         Invariant { name: "passengers-aboard", check: checks::passengers_aboard },
         Invariant { name: "drivers-on-carriages", check: checks::drivers_on_carriages },

@@ -1293,6 +1293,11 @@ pub const CARRIAGE_MAX_CAPACITY: f64 = CARRIAGE_CAPACITY * (1.0 + HORSE_STRENGTH
 /// grown-up or child: five fit on a carriage behind an average horse, or four with some Food.
 pub const PASSENGER_WEIGHT: f64 = 70.0;
 
+/// Most weight a boat carries, in kg (`CONTEXT.md`: Boat): passengers at `PASSENGER_WEIGHT` and
+/// goods together, so three residents and a little cargo, or a single rower's worth of goods eight
+/// times over. Its rower doesn't count against it.
+pub const BOAT_CAPACITY: f64 = 250.0;
+
 // `drivingLearned` takes a world type (`Resident`, `Horse` or `Stock`): it is ported with the world types, in `csp-sim`.
 
 /// Share of the Food in one place (a storage, a resident's or carriage's load, a pile) that goes
@@ -1577,6 +1582,10 @@ pub const BUILD_MATERIALS: Table<Table<f64>> = Table(&[
     // A carriage, built at a stable (`CONTEXT.md`: Carriage): a wooden cart with iron fittings, so a
     // realm needs a smelter's iron for its second carriage.
     ("carriage", Table(&[("wood", 30.0), ("iron", 5.0)])),
+    // A boat, built at a haven (`CONTEXT.md`: Building a boat): planks, a thwart and oars, pegged
+    // rather than nailed, so all Wood and buildable before any smelter; two thirds of a carriage's
+    // timber.
+    ("boat", Table(&[("wood", 20.0)])),
 ]);
 
 /// Work each kind of building needs, in ticks of one unskilled resident of average Strength: a
@@ -1584,7 +1593,7 @@ pub const BUILD_MATERIALS: Table<Table<f64>> = Table(&[
 /// a mint 5, a smithy 5, a town hall 6, a training ground 3 (about a stable), a haven 4. A tile of wooden
 /// wall takes a sixteenth of a game day, a gate an eighth, a tile of road a sixteenth (a quarter of
 /// what a 40 m tile took), a house one game day, a storage two and a farm half of one; a carriage
-/// two. More or stronger workers finish it sooner (`buildWork`).
+/// two, a boat one. More or stronger workers finish it sooner (`buildWork`).
 pub const BUILD_WORK: Table<f64> = Table(&[
     ("lumberCamp", 2.0 * TICKS_PER_GAME_DAY),
     ("quarry", 3.0 * TICKS_PER_GAME_DAY),
@@ -1603,6 +1612,7 @@ pub const BUILD_WORK: Table<f64> = Table(&[
     ("trainingGround", 3.0 * TICKS_PER_GAME_DAY),
     ("haven", 4.0 * TICKS_PER_GAME_DAY),
     ("carriage", 2.0 * TICKS_PER_GAME_DAY),
+    ("boat", TICKS_PER_GAME_DAY),
 ]);
 
 /// How many times `BUILD_WORK.road` a road tile on Mountain takes (`CONTEXT.md`: Road): the same
@@ -2401,6 +2411,7 @@ pub fn balance_json() -> Value {
     m.insert("HUNGRY_HORSE_PACE".into(), json!(HUNGRY_HORSE_PACE));
     m.insert("CARRIAGE_MAX_CAPACITY".into(), json!(CARRIAGE_MAX_CAPACITY));
     m.insert("PASSENGER_WEIGHT".into(), json!(PASSENGER_WEIGHT));
+    m.insert("BOAT_CAPACITY".into(), json!(BOAT_CAPACITY));
     m.insert("FOOD_SPOIL_PER_DAY".into(), json!(FOOD_SPOIL_PER_DAY));
     m.insert("REALM_LOG_LENGTH".into(), json!(REALM_LOG_LENGTH));
     m.insert("CRIME_MEMORY_DAYS".into(), json!(CRIME_MEMORY_DAYS));

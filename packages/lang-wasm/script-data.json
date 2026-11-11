@@ -1600,6 +1600,50 @@
         }
       ]
     },
+    "vessel": {
+      "description": "A boat on the water, as the Player sees it.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "The vessel’s id, unique in the world."
+        },
+        {
+          "name": "kind",
+          "type": "string",
+          "description": "What it is: \"boat\"."
+        },
+        {
+          "name": "realmId",
+          "type": "string",
+          "description": "The realm it belongs to.",
+          "nullWhen": "for one of nobody"
+        },
+        {
+          "name": "x",
+          "type": "number",
+          "description": "The water tile it floats on, from west to east."
+        },
+        {
+          "name": "y",
+          "type": "number",
+          "description": "The water tile it floats on, from north to south."
+        },
+        {
+          "name": "load",
+          "type": {
+            "view": "goods"
+          },
+          "description": "The goods on board.",
+          "nullWhen": "unless the Player sees inside"
+        },
+        {
+          "name": "loadLevel",
+          "type": "string",
+          "description": "How heavily it looks loaded: \"empty\", \"light\", \"half\", \"heavy\" or \"full\"."
+        }
+      ]
+    },
     "pile": {
       "description": "Goods lying on a tile.",
       "fields": [
@@ -2144,6 +2188,18 @@
       "returns": {
         "list": {
           "view": "carriage"
+        }
+      }
+    },
+    {
+      "name": "vessels",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The boats the Player sees on the water.",
+      "returns": {
+        "list": {
+          "view": "vessel"
         }
       }
     },
@@ -3283,6 +3339,18 @@
       "returns": {
         "list": {
           "view": "carriage"
+        }
+      }
+    },
+    {
+      "name": "vessels",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The boats the Player sees on the water.",
+      "returns": {
+        "list": {
+          "view": "vessel"
         }
       }
     },

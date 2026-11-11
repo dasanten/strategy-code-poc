@@ -32,8 +32,8 @@ export interface BuildMenuGroup {
 /**
  * Every buildable kind under its group (`CONTEXT.md`: Build menu), with why it can't go on this
  * tile. `problem` is the placement rule as far as the Player knows. On top of it, a node's
- * workplace is only offered standing on that node, as `buildMenu` says; roads and carriages go by
- * `problem` alone.
+ * workplace is only offered standing on that node, as `buildMenu` says; roads, carriages and boats
+ * go by `problem` alone.
  */
 export function buildMenuGroups(
   node: Pick<ResourceNode, 'kind'> | undefined,
@@ -42,7 +42,7 @@ export function buildMenuGroups(
   const offered: readonly BuildingKind[] = [
     ...buildMenu(node),
     'road',
-    ...(node ? [] : (['carriage'] as const)),
+    ...(node ? [] : (['carriage', 'boat'] as const)),
   ]
   return BUILD_GROUPS.map((group) => ({
     name: group.name,

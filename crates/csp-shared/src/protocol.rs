@@ -16,7 +16,7 @@ use crate::world::warehouse::ShownWarehousePrice;
 use crate::world::{
     AlarmScriptId, ArmyOrder, Building, BuildingKind, Carrying, City, Good, Heading, HorseStats,
     OrderEnded, Pair, Pile, PricedGood, Queue, ResidentOrder, ScriptParamValue, ScriptParamValues,
-    SkillName, Stat, StatRecord, Stock, Struck, Task, Tile,
+    SkillName, Stat, StatRecord, Stock, Struck, Task, Tile, VesselKind,
 };
 
 /// How heavily a carriage looks loaded to a Player who can't see its load (`LoadLevel`,
@@ -290,6 +290,22 @@ pub struct SeenCarriage {
     pub stands_still: bool,
 }
 
+/// A vessel as Players see it (`CONTEXT.md`: Vessel, Vessels in sight): how heavily it is loaded,
+/// its load only for those who see inside (its own realm and allies, as for a carriage).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SeenVessel {
+    pub id: String,
+    pub kind: VesselKind,
+    pub realm_id: Option<String>,
+    pub x: f64,
+    pub y: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub load: Option<Stock>,
+    pub load_level: LoadLevel,
+}
+
 /// Which script an army runs, without its memory.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -383,6 +399,8 @@ pub enum SeenEntity {
     Caravan(SeenCaravan),
     /// A wandering trader, seen the same way.
     Trader(SeenTrader),
+    /// A boat (later a ship) on the water.
+    Vessel(SeenVessel),
 }
 
 impl SeenEntity {
@@ -398,6 +416,7 @@ impl SeenEntity {
             SeenEntity::Army(e) => &e.id,
             SeenEntity::Caravan(e) => &e.id,
             SeenEntity::Trader(e) => &e.id,
+            SeenEntity::Vessel(e) => &e.id,
         }
     }
 
@@ -413,6 +432,7 @@ impl SeenEntity {
             SeenEntity::Army(_) => "army",
             SeenEntity::Caravan(_) => "caravan",
             SeenEntity::Trader(_) => "trader",
+            SeenEntity::Vessel(_) => "vessel",
         }
     }
 }

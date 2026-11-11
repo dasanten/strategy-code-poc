@@ -77,13 +77,15 @@ export const BUILDABLE: readonly BuildingKind[] = [
   'road',
   'carriage',
   'haven',
+  'boat',
 ]
 
 /**
- * Kinds that share a tile with a building rather than taking it (`CONTEXT.md`: Road, Carriage):
- * roads and carriage sites, one of each per tile at most.
+ * Kinds that share a tile with a building rather than taking it (`CONTEXT.md`: Road, Carriage,
+ * Building a boat):
+ * roads, carriage sites and boat sites, one of each per tile at most.
  */
-export const SHARES_A_TILE: readonly BuildingKind[] = ['road', 'carriage']
+export const SHARES_A_TILE: readonly BuildingKind[] = ['road', 'carriage', 'boat']
 
 /** Workplaces that turn goods into other goods (`RECIPES`): smelters, mints and smithies. */
 export const PROCESSING = Object.keys(RECIPES) as readonly BuildingKind[]
@@ -221,9 +223,18 @@ export function carriageSiteAt(
   return world.buildings.find((b) => b.x === x && b.y === y && b.kind === 'carriage')
 }
 
+/** The boat site on a tile, if there is one (`CONTEXT.md`: Building a boat). */
+export function boatSiteAt(
+  world: Pick<WorldState, 'buildings'>,
+  x: number,
+  y: number,
+): Building | undefined {
+  return world.buildings.find((b) => b.x === x && b.y === y && b.kind === 'boat')
+}
+
 /**
- * What of `kind` stands on a tile, finished or not: its road for a road, its carriage site for a
- * carriage, else its building.
+ * What of `kind` stands on a tile, finished or not: its road for a road, its carriage or boat
+ * site for a carriage or boat, else its building.
  */
 export function constructionAt(
   world: WorldState,
@@ -233,6 +244,7 @@ export function constructionAt(
 ): Building | undefined {
   if (kind === 'road') return roadAt(world, x, y)
   if (kind === 'carriage') return carriageSiteAt(world, x, y)
+  if (kind === 'boat') return boatSiteAt(world, x, y)
   return buildingAt(world, x, y)
 }
 
@@ -381,6 +393,14 @@ export function buildProblem(
     const here = buildingAt(world, x, y, size)
     if (here && here.kind !== 'stable') return 'there is already a building there'
     if (carriageSiteAt(world, x, y)) return 'there is already a carriage site on this tile'
+    return undefined
+  }
+  if (kind === 'boat') {
+    // `CONTEXT.md`: Building a boat: on a haven tile that touches the water.
+    const haven = buildingAt(world, x, y, size)
+    if (haven?.kind !== 'haven' || haven.site || (at && !touchesWater([[x, y]], size, at)))
+      return 'a boat is built on a tile of a finished haven touching the water'
+    if (boatSiteAt(world, x, y)) return 'there is already a boat site on this tile'
     return undefined
   }
   const placed = { kind, x, y }

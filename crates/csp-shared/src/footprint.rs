@@ -15,6 +15,7 @@ pub const FOOTPRINT: Table<i32> = Table(&[
     ("gate", 1),
     ("road", 1),
     ("carriage", 1),
+    ("boat", 1),
     ("house", 2),
     ("storage", 2),
     ("smelter", 2),

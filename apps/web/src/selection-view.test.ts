@@ -13,6 +13,7 @@ import {
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_YEAR,
   PASSENGER_WEIGHT,
+  BOAT_CAPACITY,
   ticksForAge,
 } from '@csp/balance'
 import { FOOTPRINT, footprintTiles } from './shared/footprint.js'
@@ -728,6 +729,33 @@ const things = (more: Partial<TileThings> = {}): TileThings => ({
 const tile = (more: Partial<TileThings> = {}) => describeTile(things(more), GOOD_LABELS)
 
 describe('the card for a tile', () => {
+  it('shows a boat on the water with its owner and load, what it holds only to its own realm', () => {
+    const boat = {
+      id: 'v1',
+      kind: 'boat' as const,
+      realmId: 'me',
+      x: 5,
+      y: 5,
+      loadLevel: 'light' as const,
+    }
+    const ours = tile({ vessels: [{ ...boat, load: { wood: 10 } }] })
+    expect(ours).toMatchObject({ title: 'Boat', rel: 'own', what: 'carriage' })
+    expect(ours.lines[0]).toBe('Yours')
+    expect(ours.carriage).toMatchObject({ title: 'Boat (yours)', goods: { wood: 10 } })
+    expect(ours.carriage?.load.text).toMatch(new RegExp(`/ ${BOAT_CAPACITY} kg$`))
+    const theirs = tile({ vessels: [{ ...boat, realmId: 'r2' }] })
+    expect(theirs.carriage?.load).toEqual({ text: 'Lightly loaded' })
+    expect(theirs.carriage?.goods).toBeUndefined()
+  })
+
+  it('shows a boat site on a haven under a head of its own', () => {
+    const haven = building({ kind: 'haven', cityId: 'c-me', x: 4, y: 4 })
+    const site = building({ kind: 'boat', site: { delivered: {}, work: 0 } })
+    const card = tile({ buildings: [haven, site] })
+    expect(card.title).toBe('Eastmere haven')
+    expect(card.sites?.[0]).toMatchObject({ title: 'Boat site' })
+  })
+
   it('says who occupies a town hall in sight and the game days left (`CONTEXT.md`: Occupying a town hall)', () => {
     const hall = (cityId: string) => building({ kind: 'townHall', cityId, x: 4, y: 4 })
     const cities = [
