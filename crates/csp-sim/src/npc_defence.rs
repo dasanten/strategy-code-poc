@@ -432,7 +432,8 @@ fn watch_gates(world: &mut WorldState, city: &City, size: i32) {
     let gates: Vec<usize> = (0..world.buildings.len())
         .filter(|&i| {
             let b = &world.buildings[i];
-            b.city_id.as_ref() == Some(&city.id) && b.kind == BuildingKind::Gate && b.site.is_none()
+            // The kind first: cheaper than comparing the city's id.
+            b.kind == BuildingKind::Gate && b.site.is_none() && b.city_id.as_ref() == Some(&city.id)
         })
         .collect();
     if gates.is_empty() {

@@ -519,3 +519,54 @@ Strings compared by value are the first thing in a village with 330 residents: r
 24.3%, the `town_hall_of`, `resolve_work` and `run_city` closures that look a building or a city up
 by comparing names. `walls_fingerprint` and `wall_map` account for about 11% (the part of rows 2, 3 and 7
 that comes from them), so looking things up by name is the first lead, the walls the second. `regions_of` and `placed` are 11.3% between them. These are leads for T89.6, not fixes.
+
+### Slow tests back (T89.6, 2026-11-10)
+
+Each step takes a hot spot of the profiles above, or of the same pprof-rs harness run on a slow test
+in the dev profile, down without changing what the game does: both differentials and the lang
+fixture cases still match, and `csp-lang` still builds for `wasm32-unknown-unknown`. Same machine,
+`bench-sim` in release, each step against the one before it, the two binaries run alternately
+three times and the median taken; other sessions were building and testing at times, so the
+absolute numbers move between rows, the ratios within a row are what count.
+
+| step | what                                                                      |  village ms |       hq ms | villages ms |   save ms |
+| :--- | :------------------------------------------------------------------------ | ----------: | ----------: | ----------: | --------: |
+| 1    | FxHash for the wall map, `walls_fingerprint` and the shut-in fill         | 0.258→0.255 |   1.39→1.32 |   47.1→41.4 | 23.5→21.2 |
+| 2    | buildings and residents by id through a remembered position; `covers`     | 0.237→0.229 |   1.27→1.23 |   37.2→29.4 | 18.7→16.8 |
+| 3    | a script's building or city looked for in the places in sight             | 0.241→0.217 |   1.23→1.17 |   29.3→29.6 | 17.1→16.3 |
+| 4    | `building(id)` makes the one building's entry, not every place in sight   | 0.233→0.202 |   1.19→1.14 |   29.8→28.3 | 17.2→16.7 |
+| 5    | `WorldIndex` ids, `observers_of`, `building_index_at`, filters kind first | 0.269→0.239 |   1.55→1.42 |   36.1→30.7 | 16.3→15.8 |
+| 6    | FxHash for script objects and the params cache; a run's tables sized      | 0.136→0.126 | 0.802→0.752 |   22.7→22.2 | 13.2→12.4 |
+| 7    | the NPC order kinds made once; tear-down orders ended without an id set   | 0.145→0.114 | 0.806→0.764 |   23.8→23.8 | 14.8→13.2 |
+| 8    | `me.order` without its path; seen ids and function names without copies   | 0.094→0.100 | 0.654→0.636 |   19.6→19.5 | 10.5→10.6 |
+| 9    | Last seen by id; `is_armed` asks what is carried                          | 0.098→0.094 | 0.634→0.648 |   18.4→17.9 | 10.4→9.95 |
+
+Before and after, in one quiet stretch (CPU 48% at the start), mean ms a tick: `village` 0.165 →
+0.096 (1.7 times faster), `hq` 0.85 → 0.63 (1.4), `villages` 29.3 → 16.0 (1.8), `save` 14.8 →
+9.2 (1.6). Steps 8 and 9 aim at what the slow tests spend (Players' Last seen, long walks) more
+than at these scenes, which have no Player.
+
+**The suite.** Of the 86 ignored tests, 82 were ignored for time. Each was timed alone after the
+steps (`cargo nextest run -j 1`, dev profile): the 22 under 5 s are back in the default suite, and
+the 59 still over carry their time alone in their reason. The 82nd is the empty full-size
+starting-city stub, which waits for its port (T86.14) and was left as it was. So 60 are ignored for
+time now (64 in all, with the four timings and measurements). The target was half back (41); the
+22 are what these steps reach. Of the 59: the four big-city runs take 114–130 s alone, thirteen
+more 22–73 s, and the other 42 5.2–19 s, most of them caravan, delivery and transfer runs of the
+HQ world at 5.4–11 s.
+
+The default suite took 32.2 s by nextest with the 22 back (2568 tests), 27.5 s just before
+(2546), against 40.8 s in T89.2 under heavier load. Run 24 at once, 17 of the 22 print SLOW (over
+5 s) while the machine is full; alone they take 1.3–4.8 s.
+
+Raising `csp-sim` to `opt-level = 2` in the dev profile was tried and dropped: no faster on the
+same tests, and a full rebuild of the crate took 229 s against about 130.
+
+What is left, from the dev-profile profile of a delivery test after step 9: building the script
+views, `me` above all (about 15%: some 70 fields put into a fresh map each run), the interpreter's
+name lookup, and turning a seen building into plain data for `building(id)`.
+
+The five tests that held one wall-clock run to a bound (the interpreter's three value caps and
+the two ten-welcomes tests on explored terrain) now take the fastest of three tries, so a moment
+of load slows one try rather than failing the test. The planning budget had already been split
+into a work check in the suite and a timing run alone (#1119).

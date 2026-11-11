@@ -32,7 +32,7 @@ const DAYS: usize = 30;
 const SETTLE_DAYS: usize = 5;
 
 #[test]
-#[ignore = "121.0 s with eight at once; see #1092"]
+#[ignore = "48.5 s alone; see #1132"]
 fn hold_food_weapons_and_coins_over_many_game_days_and_their_people_do_not_starve() {
     // `posts()`: the HQ in the middle of an open map with its nodes beside it, and a post at each
     // corner of a square round it, with no node of its own.

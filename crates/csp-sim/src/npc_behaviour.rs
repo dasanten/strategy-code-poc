@@ -61,13 +61,13 @@ pub fn npc_home<'w>(world: &'w WorldState, city_id: &str) -> Option<&'w Building
         .buildings
         .iter()
         .find(|b| {
-            b.city_id.as_deref() == Some(city_id)
-                && b.kind == BuildingKind::Storage
+            b.kind == BuildingKind::Storage
                 && b.site.is_none()
+                && b.city_id.as_deref() == Some(city_id)
         })
         .or_else(|| {
             let hall = &world.cities.iter().find(|c| c.id == city_id)?.town_hall_id;
-            world.buildings.iter().find(|b| &b.id == hall)
+            crate::world_index::building_by_id(world, hall)
         })
 }
 

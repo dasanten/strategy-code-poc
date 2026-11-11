@@ -807,7 +807,7 @@ impl PathFinder {
         let table = &self.tables[req.table].costs;
         let size = ground.size as usize;
         let n = size * size;
-        let mut seen = HashSet::from([goal]);
+        let mut seen = rustc_hash::FxHashSet::from_iter([goal]);
         let mut todo = vec![goal];
         while let Some(t) = todo.pop() {
             let x = t % size;
