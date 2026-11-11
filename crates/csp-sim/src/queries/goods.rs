@@ -114,6 +114,13 @@ pub fn goods_at_spot<'w>(
             let s = storage_at(world, x as i32, y as i32, MAP_SIZE)?;
             (&s.id == storage_id).then(|| s.stock.as_ref().unwrap_or(&NO_GOODS))
         }
+        // From beside it (`CONTEXT.md`: Beside a vessel).
+        GoodsSpot::Vessel { vessel_id } => world
+            .vessels
+            .iter()
+            .find(|v| &v.id == vessel_id)
+            .filter(|v| super::vessels::beside_vessel(v, x, y))
+            .map(|v| &v.load),
     }
 }
 

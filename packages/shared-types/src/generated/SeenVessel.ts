@@ -7,4 +7,8 @@ import type { VesselKind } from "./VesselKind.js";
  * A vessel as Players see it (`CONTEXT.md`: Vessel, Vessels in sight): how heavily it is loaded,
  * its load only for those who see inside (its own realm and allies, as for a carriage).
  */
-export type SeenVessel = { id: string, kind: VesselKind, realmId: string | null, x: number, y: number, load?: { [key in Good]?: number }, loadLevel: LoadLevel, };
+export type SeenVessel = { id: string, kind: VesselKind, realmId: string | null, x: number, y: number, load?: { [key in Good]?: number }, loadLevel: LoadLevel, 
+/**
+ * The residents aboard it as passengers (`CONTEXT.md`: Beside a vessel).
+ */
+passengerIds: Array<string>, };

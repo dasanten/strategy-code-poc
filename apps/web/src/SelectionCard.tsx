@@ -38,6 +38,7 @@ import {
   thiefAmong,
   thiefOf,
   unhitcherOf,
+  boaterOf,
   type CardAction,
   type CarriageView,
   type CardList,
@@ -513,6 +514,7 @@ export function TileCard({
   onSelectResident,
   onOpenHorse,
   onUnhitch,
+  onBoard,
   onDriveOff,
   onHitchOff,
   onStealHorse,
@@ -553,6 +555,8 @@ export function TileCard({
   onOpenHorse: (id: string) => void
   /** Orders a resident to unhitch the horse from a carriage (`CONTEXT.md`: Hitched horse). */
   onUnhitch: (carriageId: string, residentId: string) => void
+  /** Orders a resident to board the boat beside them, or with none to get off (`CONTEXT.md`: Beside a vessel). */
+  onBoard?: (vesselId: string | undefined, residentId: string) => void
   /**
    * Has a resident on the tile start driving off in the carriage there, by picking where to
    * (`CONTEXT.md`: Stealing a carriage or horse).
@@ -700,6 +704,9 @@ export function TileCard({
             const unhitcher = unhitcherOf(card, actor)
             if (a.id === 'unhitch' && card.unhitch && unhitcher)
               onUnhitch(card.unhitch.carriageId, unhitcher)
+            const boater = boaterOf(card, actor)
+            if (a.id === 'board' && card.boat && boater)
+              onBoard?.(boater.getOff ? undefined : card.boat.vesselId, boater.id)
             const thief = thiefOf(card, actor)
             if (a.id === 'driveOff' && thief) onDriveOff(thief.id)
             const hitcher = thiefAmong(card.hitchOff?.residents, actor)

@@ -1915,6 +1915,30 @@ export function Wiki() {
           realm and allies. Scripts see the boats in sight with <code>vessels()</code>. A boat of a
           realm that ends belongs to nobody, as NPC cities don't use the water.
         </p>
+        <p>
+          <b>Beside a boat</b> means on a land tile touching its water tile, straight or diagonally.
+          A resident beside a boat of their realm <b>boards</b> it, children too (Board boat on
+          their card, or on the boat's card, or a script's <code>board(id)</code>), and steps onto
+          its water tile: on the map they ride inside it, which shows how many are aboard, and their
+          Doing line says "Aboard a boat". Each passenger counts as {num(PASSENGER_WEIGHT)} kg of
+          the {num(BOAT_CAPACITY)} kg it holds, so{' '}
+          {num(Math.floor(BOAT_CAPACITY / PASSENGER_WEIGHT))} residents fill an empty one. No horse
+          goes aboard: a rider dismounts first, and the driver of a carriage can't board.
+        </p>
+        <p>
+          A passenger <b>gets off</b> onto a free land tile beside the boat: one they pick (a
+          script's <code>getOff(x, y)</code>), or the first one there. Giving a passenger a walk or
+          an order that acts on a tile gets them off first, onto the shore nearest where they are
+          going. A boat away from every shore keeps its passengers aboard: they can't get off, and a
+          walk given to them ends. Walking never uses a boat. Down or dead, a passenger stays in the
+          boat, and what they carried stays in it.
+        </p>
+        <p>
+          <b>Loading.</b> Residents beside a boat put goods in it and take goods out, up to what it
+          holds with its passengers counted in: Store and Fetch with the boat as the place (they
+          walk to the shore beside it), or a pick-up or drop at <code>{'{kind: "vessel"}'}</code>{' '}
+          from a script. Residents and goods only: a boat takes no horse or carriage.
+        </p>
       </Section>
 
       <Section id="how-to-trade">

@@ -304,6 +304,8 @@ pub struct SeenVessel {
     #[ts(optional)]
     pub load: Option<Stock>,
     pub load_level: LoadLevel,
+    /// The residents aboard it as passengers (`CONTEXT.md`: Beside a vessel).
+    pub passenger_ids: Vec<String>,
 }
 
 /// Which script an army runs, without its memory.

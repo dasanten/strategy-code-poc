@@ -50,7 +50,8 @@ import { isPassableTerrain, UNEXPLORED, Terrain, tileIndex, wrap } from './share
 import { isWallOrGate } from './shared/walls.js'
 import { isAt, covers } from './shared/footprint.js'
 import { targetParam } from './shared/default-scripts.js'
-import { HORSE_GRANT_HORSES } from '@csp/balance'
+import { HORSE_GRANT_HORSES, PASSENGER_WEIGHT } from '@csp/balance'
+import { besideVessel, isVesselId, vesselOfResident, vesselRoom } from './shared/vessels.js'
 import { AdminPage } from './AdminPanel.js'
 import { AlliancePanel } from './Alliance.js'
 import { commandsSeen } from './alliance-army.js'
@@ -1262,15 +1263,17 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setOrderError(await sendOrder(order))
   }
   /**
-   * Orders the picked resident to board a carriage on their tile, or with none to get off the one
-   * they are aboard, onto its tile (`CONTEXT.md`: Passenger); with Shift held, appends it to their
-   * queue.
+   * Orders the picked resident to board a carriage on their tile or a boat beside them, or with
+   * none to get off the one they are aboard, onto its tile or the shore beside the boat
+   * (`CONTEXT.md`: Passenger, Beside a vessel); with Shift held, appends it to their queue.
    */
-  async function boardCarriage(carriageId?: string) {
-    if (!selected) return
-    const order = carriageId
-      ? { kind: 'board', residentId: selected.id, carriageId }
-      : { kind: 'getOff', residentId: selected.id }
+  async function boardCarriage(carriageId?: string, residentId = selected?.id) {
+    if (!residentId) return
+    const order = !carriageId
+      ? { kind: 'getOff', residentId }
+      : isVesselId(carriageId)
+        ? { kind: 'board', residentId, vesselId: carriageId }
+        : { kind: 'board', residentId, carriageId }
     setOrderError(await giveOrder(order))
   }
   /**
@@ -1963,6 +1966,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             )}
             actor={selected}
             onUnhitch={(carriageId, residentId) => void unhitch(carriageId, residentId)}
+            onBoard={(vesselId, residentId) => void boardCarriage(vesselId, residentId)}
             onDriveOff={(residentId) => {
               select([residentId])
               setPicking('driveOff')
@@ -2048,6 +2052,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               onTile(world.carriages.filter(loadKnown).filter((k) => !isStrangers(k))) ??
               onTile(world.carriages.filter(loadKnown))
             }
+            boat={world.vessels.find(
+              (v) =>
+                vesselOfResident(v, selected) &&
+                selected.aboard !== v.id &&
+                besideVessel(v, selected, world.map.size),
+            )}
             carriageTheirs={!ownCarriageHere && !!stealableHere}
             onDriveTo={() => setPicking((p) => (p === 'drive' ? false : 'drive'))}
             {...(stealableHere && {
@@ -2106,6 +2116,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             )}
             onRide={ride}
             carriageToBoard={onTile(world.carriages.filter((k) => carriageOfResident(k, selected)))}
+            boatToBoard={world.vessels.find(
+              (v) =>
+                vesselOfResident(v, selected) &&
+                besideVessel(v, selected, world.map.size) &&
+                (vesselRoom(v) ?? PASSENGER_WEIGHT) >= PASSENGER_WEIGHT - 1e-9,
+            )}
             onBoard={boardCarriage}
             carriageToUnhitch={onTile(
               world.carriages.filter((k) => carriageOfResident(k, selected) && k.horseId),

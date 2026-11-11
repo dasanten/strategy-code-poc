@@ -69,6 +69,7 @@ import {
   thiefOf,
   hitchChoice,
   unhitcherOf,
+  boaterOf,
   type ActionId,
   type CardAction,
   type ResidentHere,
@@ -390,6 +391,19 @@ describe('the actions on a resident’s card', () => {
       expect.objectContaining({ disabled: true, reason: 'the driver can’t board' }),
     ])
     expect(board({ aboard: true, carriageToBoard: true }).map((a) => a.label)).toEqual(['Get off'])
+  })
+
+  it('offers boarding a boat of the realm beside them, never on horseback', () => {
+    const board = (h: Parameters<typeof here>[0]) =>
+      residentActions(here(h)).filter((a) => a.id === 'board')
+    expect(board({ boatToBoard: true })).toEqual([
+      expect.objectContaining({ label: 'Board boat', key: 'K' }),
+    ])
+    expect(board({ boatToBoard: true, riding: true })).toEqual([
+      expect.objectContaining({ disabled: true, reason: 'no horse goes aboard: dismount first' }),
+    ])
+    expect(board({ aboard: true, boatToBoard: true }).map((a) => a.label)).toEqual(['Get off'])
+    expect(residentOrders(here()).missing.board).toBe('no carriage or boat of yours here')
   })
 
   it('gives every shown action its own key', () => {
@@ -737,6 +751,7 @@ describe('the card for a tile', () => {
       x: 5,
       y: 5,
       loadLevel: 'light' as const,
+      passengerIds: [],
     }
     const ours = tile({ vessels: [{ ...boat, load: { wood: 10 } }] })
     expect(ours).toMatchObject({ title: 'Boat', rel: 'own', what: 'carriage' })
@@ -746,6 +761,65 @@ describe('the card for a tile', () => {
     const theirs = tile({ vessels: [{ ...boat, realmId: 'r2' }] })
     expect(theirs.carriage?.load).toEqual({ text: 'Lightly loaded' })
     expect(theirs.carriage?.goods).toBeUndefined()
+  })
+
+  it('names a boat’s passengers, counted against what it holds', () => {
+    const ana = { id: 'ana', name: 'Ana', x: 5, y: 5, aboard: 'boat1' } as SeenResident
+    const boat = {
+      id: 'boat1',
+      kind: 'boat' as const,
+      realmId: 'me',
+      x: 5,
+      y: 5,
+      loadLevel: 'light' as const,
+      load: { wood: 10 },
+      passengerIds: ['ana'],
+    }
+    const card = tile({ vessels: [boat], residents: [ana] })
+    expect(card.carriage?.passengers).toEqual({
+      residents: [{ id: 'ana', name: 'Ana', pick: true }],
+      weight: `${PASSENGER_WEIGHT} kg of it people`,
+    })
+    expect(card.carriage?.load.text).toBe(`${10 + PASSENGER_WEIGHT} / ${BOAT_CAPACITY} kg`)
+  })
+
+  it('lets the Player’s residents beside their boat board it, and its passengers get off', () => {
+    const at = (id: string, x: number, more: Partial<SeenResident> = {}) =>
+      ({ id, name: id, owner: 'me', x, y: 5, order: null, ...more }) as SeenResident
+    const boat = {
+      id: 'boat1',
+      kind: 'boat' as const,
+      realmId: 'me',
+      x: 5,
+      y: 5,
+      loadLevel: 'empty' as const,
+      load: {},
+      passengerIds: ['cid'],
+    }
+    const ana = at('ana', 4)
+    const bo = at('bo', 6, { riding: 'h1' })
+    const cid = at('cid', 5, { aboard: 'boat1' })
+    const far = at('far', 2)
+    const card = tile({ vessels: [boat], residents: [ana, bo, cid, far] })
+    expect(card.boat).toEqual({
+      vesselId: 'boat1',
+      board: [
+        { id: 'ana', name: 'ana', problem: undefined },
+        { id: 'bo', name: 'bo', problem: 'no horse goes aboard: dismount first' },
+      ],
+      getOff: [{ id: 'cid', name: 'cid' }],
+    })
+    const action = (actor?: SeenResident) =>
+      tileActions(card, actor as unknown as Resident).find((a) => a.id === 'board')
+    expect(action(ana)).toMatchObject({ label: 'Board boat', key: ACTION_KEYS.board })
+    expect(action(bo)).toMatchObject({
+      disabled: true,
+      reason: 'no horse goes aboard: dismount first',
+    })
+    expect(action(cid)?.label).toBe('Get off')
+    expect(boaterOf(card, cid)).toEqual({ id: 'cid', getOff: true, problem: undefined })
+    // Someone else's boat offers nothing.
+    expect(tile({ vessels: [{ ...boat, realmId: 'r2' }], residents: [ana] }).boat).toBeUndefined()
   })
 
   it('shows a boat site on a haven under a head of its own', () => {

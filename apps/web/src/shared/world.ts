@@ -146,6 +146,8 @@ export interface WorldState {
   buildings: Building[]
   horses: Horse[]
   carriages: Carriage[]
+  /** Boats on the water (`CONTEXT.md`: Vessel), where the client has them. */
+  vessels?: { id: string; x: number; y: number; load?: Stock }[]
   /** Goods lying on the ground, at most one pile per tile. */
   piles: Pile[]
   /** Each Player's latest realm events, oldest first, at most `REALM_LOG_LENGTH` each. */

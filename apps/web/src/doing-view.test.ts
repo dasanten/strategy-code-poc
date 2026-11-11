@@ -303,6 +303,12 @@ describe('doingLine', () => {
     expect(line({ order: null, script: { scriptId: 5, doing: 'Guarding' } })).toBe('Guarding')
   })
 
+  it('says a boat’s passenger is aboard a boat', () => {
+    expect(doingLine({ order: null, aboard: 'boat7' }, { scripts, buildings, residents: [] })).toBe(
+      'Aboard a boat',
+    )
+  })
+
   it('says a passenger is aboard, and where the carriage is heading while it is driven', () => {
     const aboard = (residents: { order: ResidentOrder | null }[], more: Partial<DoingOf> = {}) =>
       doingLine({ order: null, aboard: 'k1', ...more }, { scripts, buildings, residents })
