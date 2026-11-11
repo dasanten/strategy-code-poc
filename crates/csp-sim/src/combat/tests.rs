@@ -1,11 +1,11 @@
-//! `apps/server/src/combat.test.ts`, ported one to one where the conflict phases alone run it.
-//! The TypeScript steps the whole world with the default scripts; here the conflict phases step
-//! (`test_world::step`), so a test that needs walking (T86.4) or the Defend default (T86.12)
-//! is kept, ignored, with what it waits for.
+//! `apps/server/src/combat.test.ts`, ported one to one. The TypeScript steps the whole world with
+//! the default scripts; most cases here step the conflict phases alone (`test_world::step`), and
+//! those that walk or flee by the Defend default step the running game (`game_test_world`).
 
 use csp_shared::balance::{
     AVERAGE_HORSE_STATS, BLOW_BASE, BLOW_PER_STRENGTH, COMBAT_SKILL_LIMIT, DODGE_LIMIT, MAX_HEALTH,
-    MAX_HUNGER, MIN_BLOW_DAMAGE, PROTECTION_DEFENCE, SIGHT_RANGE, STRIKE_TICKS, WEAPON_ATTACK,
+    MAX_HUNGER, MIN_BLOW_DAMAGE, PROTECTION_DEFENCE, SIGHT_RANGE, STRIKE_TICKS,
+    WALK_TICKS_PER_TILE, WEAPON_ATTACK,
 };
 use csp_shared::world::{
     Alliance, AllianceMember, Carriage, DeathCause, DriveOrder, Good, Horse, Interrupted,
@@ -14,6 +14,7 @@ use csp_shared::world::{
 
 use super::*;
 use crate::armies::{apply_army_order, validate_army_order, ArmyOrderKind, ArmyRequest};
+use crate::game_test_world::Game;
 use crate::order_sender::OrderSender;
 use crate::queries::combat::protection;
 use crate::queries::residents::{best_weapon, is_armed};
@@ -129,9 +130,32 @@ fn attacks_a_resident_of_another_realm_in_sight_with_one_of_your_own() {
     );
 }
 
+/// The whole running world, as the TypeScript steps it: the default scripts run before it steps,
+/// with the combat invariants checked each tick; walking only where the test walks.
+fn game(world: WorldState, walks: bool) -> Game {
+    let mut game = Game::new(world, crate::test_support::plains(SIZE))
+        .checking(&["dead-leave-loot", "attack-orders-sound"]);
+    game.walks = walks;
+    game
+}
+
+fn attack(resident_id: &str, target_id: &str) -> serde_json::Value {
+    serde_json::json!({ "kind": "attack", "residentId": resident_id, "targetId": target_id })
+}
+
 #[test]
-#[ignore = "needs walking (T86.4)"]
-fn walks_after_the_target_until_in_contact_then_strikes() {}
+fn walks_after_the_target_until_in_contact_then_strikes() {
+    let mut world = setup();
+    live_mut(&mut world, "b1").x = 16.0;
+    let mut game = game(world, true);
+    assert_eq!(game.order(ME, attack("a1", "b1")), "ack");
+    let hit = game.until_hit("b1", 600).expect("a blow lands");
+    // Five tiles to walk, the last one into contact, before the first blow.
+    assert!(hit as f64 > 4.0 * WALK_TICKS_PER_TILE, "{hit}");
+    let (a, b) = (game.r("a1"), game.r("b1"));
+    assert!(in_contact(SIZE, (a.x as i32, a.y as i32), (b.x as i32, b.y as i32)));
+    assert_eq!(a.x, 15.0);
+}
 
 #[test]
 fn ends_when_the_target_gets_out_of_the_attackers_sight() {
@@ -224,8 +248,24 @@ fn an_armed_resident_who_is_hit_fights_back_by_their_defence_script() {
 }
 
 #[test]
-#[ignore = "needs the Defend default script (T86.12)"]
-fn an_unarmed_resident_who_is_hit_flees_home_to_their_citys_town_hall() {}
+fn an_unarmed_resident_who_is_hit_flees_home_to_their_citys_town_hall() {
+    let mut world = setup();
+    add_city(&mut world, "c2", Some("r2"), 30.0, 30.0, None);
+    live_mut(&mut world, "b1").city_id = Some("c2".into());
+    let mut game = game(world, false);
+    assert_eq!(game.order(ME, attack("a1", "b1")), "ack");
+    assert!(game.until_hit("b1", 20).is_some());
+    game.tick();
+    let b = game.r("b1");
+    assert!(
+        matches!(&b.order, Some(ResidentOrder::WalkTo(w)) if w.target == Tile { x: 30.0, y: 30.0 }),
+        "{:?}",
+        b.order
+    );
+    let doing = b.script.as_ref().and_then(|s| s.memory.get("doing")).cloned();
+    assert_eq!(doing, Some(serde_json::json!("Defending: fleeing home")));
+    assert_eq!(game.until_hit("a1", 20), None);
+}
 
 #[test]
 fn a_resident_of_an_npc_city_reacts_by_built_in_orders_fighting_back_or_fleeing_home() {

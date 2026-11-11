@@ -314,7 +314,7 @@ mod stepping_diagonally {
         let gate = |closed: bool| {
             Some(Arc::new(WallMap {
                 size: 20,
-                tiles: HashMap::from([(at(4, 5), WallTile::gate(closed))]),
+                tiles: [(at(4, 5), WallTile::gate(closed))].into_iter().collect(),
                 inside: Default::default(),
             }))
         };

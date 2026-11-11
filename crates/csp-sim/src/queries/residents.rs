@@ -73,7 +73,9 @@ pub fn best_weapon(carried: &Stock) -> Option<Good> {
 
 /// Whether a resident is armed: carries a weapon (`isArmed`, `CONTEXT.md`: Soldier).
 pub fn is_armed(carried: &Stock) -> bool {
-    best_weapon(carried).is_some()
+    // What `best_weapon` would find something in, asked of the few goods carried rather than of
+    // every weapon by name (T89.6): a good's name names that good back (`good_of`).
+    carried.iter().any(|(g, n)| *n > 0.0 && WEAPON_ATTACK.get(good_name(*g)).is_some())
 }
 
 /// What a stock weighs, in kg (`stockWeight`).

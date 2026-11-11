@@ -399,7 +399,8 @@ impl Walking {
 
     /// Tells the pathfinder the finished roads and the walls, when they changed (`setGround`).
     fn set_ground(&mut self, world: &WorldState, roads: Rc<HashSet<usize>>) {
-        if self.roads.as_ref().is_none_or(|r| **r != *roads) {
+        // The same index as last time holds the same roads: no need to compare them tile by tile.
+        if self.roads.as_ref().is_none_or(|r| !Rc::ptr_eq(r, &roads) && **r != *roads) {
             self.finder.set_roads(roads.iter().copied());
         }
         self.roads = Some(roads);

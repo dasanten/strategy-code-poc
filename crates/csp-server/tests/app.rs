@@ -878,7 +878,7 @@ async fn answers_health_and_tick_health_from_the_game_thread_between_ticks() {
     opts.game = Some(game.clone());
     opts.tick_health = Some(Arc::new(move || {
         let now = clock.elapsed().as_secs_f64() * 1000.0;
-        serde_json::to_value(window.lock().unwrap().summary(now)).unwrap()
+        serde_json::to_value(window.lock().unwrap().response(now, settings.slow_tick_ms)).unwrap()
     }));
     let app = build_app(opts);
 
@@ -892,6 +892,7 @@ async fn answers_health_and_tick_health_from_the_game_thread_between_ticks() {
     assert_eq!(summary.status, StatusCode::OK);
     assert_eq!(summary.json()["lastMinute"]["ticks"], 2);
     assert_eq!(summary.json()["lastHour"]["ticks"], 2);
+    assert_eq!(summary.json()["slowTickMs"], 800.0);
     let mara = token_for(&conn, add_user(&conn, "Mara"));
     let refused = call(&app, "GET", "/api/admin/tick-health", Some(&mara), None).await;
     assert_eq!(refused.status, StatusCode::FORBIDDEN);

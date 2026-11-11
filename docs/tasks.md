@@ -69,7 +69,12 @@ optimisations) are superseded by the rewrite, which includes their aims.
 **Cutover (T88.6, 2026-11-10):** the Rust backend supports every feature, `rust-backend` goes into
 `dev`, and the TypeScript server, `packages/shared` and `packages/lang` are deleted. **The feature
 freeze is lifted:** new epics branch from `dev` again (ADR 0009, 0010), and rule changes are
-Daniel's call as before. Rust follow-ups (Epic 89) finish what the rewrite left.
+Daniel's call as before.
+
+**Rust follow-ups (Epic 89, 2026-11-10):** written with Daniel from an audit of what the rewrite
+left of Epics 81 and 82's aims: placeholder tests, measurements after the port, profiling, tick
+health on the admin panel, slow tests back in the suite. T89.1 (the 21 placeholder tests) should
+land before the next `dev` → `main` release. Merged into `dev` on 2026-11-11.
 
 **Agreed with Daniel on 2026-11-11:** Havens and boats (Epic 90, ADR 0031: Lake and Sea crossed by
 boats rowed from any shore), then Ships (91: crewed ships between havens, haul routes by water),

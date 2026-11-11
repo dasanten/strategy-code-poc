@@ -470,7 +470,7 @@ fn reports_a_punishment_that_doesnt_hold_together() {
 // the Trade Organization's punishment trip
 
 #[test]
-#[ignore = "21.3 s with eight at once; see #1092"]
+#[ignore = "10.4 s alone; see #1132"]
 fn walks_to_a_city_farther_than_its_time_there_robs_it_and_comes_home_alive() {
     use csp_shared::balance::{MAP_SIZE, WALK_TICKS_PER_TILE};
     // As large as the real map, all Plains.
@@ -579,7 +579,7 @@ fn walks_to_a_city_farther_than_its_time_there_robs_it_and_comes_home_alive() {
 }
 
 #[test]
-#[ignore = "59.5 s with eight at once; see #1092"]
+#[ignore = "40.5 s alone; see #1132"]
 fn sets_out_however_empty_the_storages_are_as_it_leaves_and_looks_when_it_arrives() {
     let mut s = setup(Stock::new());
     let hq = s.hq.clone();

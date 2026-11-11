@@ -664,7 +664,7 @@ mod tests {
     /// The full-size map: the TypeScript's hash, its time in release, and the tests of
     /// `terrain-gen.test.ts` that need it. Run with `cargo test --release -- --ignored`.
     #[test]
-    #[ignore = "generates the full-size map; run with --release -- --ignored"]
+    #[ignore = "6.8 s alone: generates the full-size map; see #1132"]
     fn generates_the_full_size_map_as_the_typescript_does() {
         use sha2::{Digest, Sha256};
         let from = Instant::now();
