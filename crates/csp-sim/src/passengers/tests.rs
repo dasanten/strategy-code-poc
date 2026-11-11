@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use csp_shared::balance::{CARRIAGE_CAPACITY, OWN_FOOD, PASSENGER_WEIGHT};
+use csp_shared::balance::{CARRIAGE_CAPACITY, HOME_FOOD_LOW, OWN_FOOD, PASSENGER_WEIGHT};
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{Good, Resident, WorldState};
 use serde_json::json;
@@ -205,4 +205,41 @@ fn get_passengers_off_a_carriage_that_is_gone_or_no_longer_of_their_realm() {
     world.carriages.clear();
     step_world(&mut world, &map, &mut scratch, None, None);
     assert_eq!([who(&world, "p1").aboard.clone(), who(&world, "p2").aboard.clone()], [None, None]);
+}
+
+/// One tick of the world, walking included.
+fn tick(world: &mut WorldState, map: &TerrainMap) {
+    let mut walking = Walking::new(Arc::new(map.clone()));
+    step_world(world, map, &mut Scratch::default(), Some(&mut walking), None);
+}
+
+fn food(world: &WorldState, id: &str) -> f64 {
+    who(world, id).carried.get(&Good::Food).copied().unwrap_or(0.0)
+}
+
+/// `CONTEXT.md`: Refilling from a carriage. The driver refills from it on the drive and, once it
+/// stands, still beside it, as does anyone of the realm next to it; nobody of another realm.
+#[test]
+fn the_driver_and_anyone_beside_a_parked_carriage_refill_from_it() {
+    let (mut world, map) = setup();
+    world.carriages[0].load = [(Good::Food, 20.0)].into_iter().collect();
+    who_mut(&mut world, "w1").carried.clear();
+    assert_eq!(drive(&mut world, &map, 12.0, 5.0), Ok(()));
+    tick(&mut world, &map);
+    assert_eq!(food(&world, "w1"), HOME_FOOD_LOW, "the driver refills on the drive");
+    until(&mut world, &map, "w1");
+    assert!(who(&world, "w1").order.is_none(), "the drive is over");
+    // p2 walked over beside the carriage; s1 of no realm stands on it.
+    who_mut(&mut world, "p2").aboard = None;
+    (who_mut(&mut world, "p2").x, who_mut(&mut world, "p2").y) = (13.0, 5.0);
+    let mut stranger = resident("s1", None, 12.0, 5.0);
+    stranger.carried.clear();
+    world.residents.push(stranger);
+    for id in ["w1", "p2"] {
+        who_mut(&mut world, id).carried.clear();
+    }
+    tick(&mut world, &map);
+    assert_eq!(food(&world, "w1"), HOME_FOOD_LOW, "the driver, the drive over");
+    assert_eq!(food(&world, "p2"), HOME_FOOD_LOW, "a resident of the realm next to it");
+    assert_eq!(food(&world, "s1"), 0.0, "nobody of another realm");
 }

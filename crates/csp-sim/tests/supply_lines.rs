@@ -159,15 +159,15 @@ fn feeds_army_members_from_a_carriage_of_their_realm_on_or_next_to_their_tile() 
 }
 
 #[test]
-fn feeds_nobody_outside_an_army_nor_from_a_carriage_further_off_or_of_another_realm() {
+fn feeds_anyone_of_the_realm_beside_it_but_not_from_a_carriage_further_off_or_of_another_realm() {
     let mut s = setup();
     add(&mut s.world, "x1", 31.0, 32.0);
     let k = &mut s.world.carriages[0];
     (k.x, k.y) = (32.0, 32.0);
     k.load = serde_json::from_value(json!({ "food": 10 })).unwrap();
     step_refill(&mut s.world, SIZE);
-    // x1 is beside it but in no army; s2 is two tiles off.
-    assert_eq!(food(r(&s.world, "x1")), None);
+    // x1 is beside it, in no army, and refills all the same; s2 is two tiles off.
+    assert_eq!(food(r(&s.world, "x1")), Some(HOME_FOOD_LOW));
     assert_eq!(food(r(&s.world, "s2")), None);
     let k = &mut s.world.carriages[0];
     k.x = 30.0;

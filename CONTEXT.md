@@ -1060,9 +1060,10 @@ The shared language of the game. Domain terms only — no implementation details
   takes a meal the same way from Food lying on the workplace's tile, or else from a carriage
   standing there. Anywhere else (travelling, building) there is no refill: they need food on
   them or a delivery.
-- **Refilling from a carriage:** a resident of an army, a passenger, or the driver, running low on food
-  takes a meal from a carriage of their own realm on or next to their tile, like refilling at
-  home.
+- **Refilling from a carriage:** any resident of a realm running low on food takes a meal from a
+  carriage of their own realm on or next to their tile, like refilling at home: the driver while
+  driving, and after the drive, passengers, army members, and anyone working or waiting beside a
+  parked carriage. The Food a haul route keeps on board is left for its horse and driver.
 - **Getting food:** in the Work, Build, Build line and Tear down defaults, a resident whose
   `foodAt` param is set and who carries less Food than that many units stops, walks to their
   `food` param, else their `storage` (Work) or `source` (Build, Build line, Tear down) param, or
