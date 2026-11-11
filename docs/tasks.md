@@ -69,7 +69,11 @@ optimisations) are superseded by the rewrite, which includes their aims.
 **Cutover (T88.6, 2026-11-10):** the Rust backend supports every feature, `rust-backend` goes into
 `dev`, and the TypeScript server, `packages/shared` and `packages/lang` are deleted. **The feature
 freeze is lifted:** new epics branch from `dev` again (ADR 0009, 0010), and rule changes are
-Daniel's call as before.
+Daniel's call as before. Rust follow-ups (Epic 89) finish what the rewrite left.
+
+**Agreed with Daniel on 2026-11-11:** Havens and boats (Epic 90, ADR 0031: Lake and Sea crossed by
+boats rowed from any shore), then Ships (91: crewed ships between havens, haul routes by water),
+both ahead of Bandits.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
@@ -159,6 +163,9 @@ I sleep.
 | 86  | [Rust backend: the rules](https://github.com/dasanten/strategy-code-poc/issues/1003)            | scope only              |
 | 87  | [Rust backend: the shell](https://github.com/dasanten/strategy-code-poc/issues/1004)            | scope only              |
 | 88  | [Rust backend: client and cutover](https://github.com/dasanten/strategy-code-poc/issues/1005)   | scope only              |
+| 89  | [Rust follow-ups](https://github.com/dasanten/strategy-code-poc/issues/1126)                    | ticketed                |
+| 90  | [Havens and boats](https://github.com/dasanten/strategy-code-poc/issues/1146)                   | ticketed                |
+| 91  | [Ships](https://github.com/dasanten/strategy-code-poc/issues/1153)                              | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
