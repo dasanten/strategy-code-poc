@@ -229,7 +229,7 @@ pub fn step_world(
     });
     time(timer, TickPhase::Rest, || {
         step_riders(world);
-        step_passengers(world);
+        step_passengers(world, terrain);
         // A fight or an army may have given someone Down an order; it ends with the tick.
         keep_down_still(world);
     });

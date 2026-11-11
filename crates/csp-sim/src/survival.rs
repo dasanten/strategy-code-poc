@@ -35,6 +35,7 @@ use crate::queries::offers::free_stock;
 use crate::queries::residents::{can_work, food_use};
 use crate::queries::standing::TRADE_ORG;
 use crate::queries::trade_org::trade_org_hq;
+use crate::queries::vessels::vessel_aboard;
 use crate::sight::InvariantViolation;
 use crate::tick::Scratch;
 
@@ -118,17 +119,21 @@ pub fn step_survival(
 }
 
 /// Puts the resident at `i` whose health hunger used up Down (`goDown`, `CONTEXT.md`: Down) until
-/// `DOWN_TICKS` from now: lying on their tile, so off any horse or carriage, their order, script
-/// and queue end, a defence script and what it interrupted too, and they leave any army, taking
-/// no orders. Their Player's realm log says so, with when they die.
+/// `DOWN_TICKS` from now: lying on their tile, so off any horse or carriage (aboard a vessel they
+/// stay aboard: `CONTEXT.md`: Fighting at a vessel), their order, script and queue end, a defence
+/// script and what it interrupted too, and they leave any army, taking no orders. Their Player's
+/// realm log says so, with when they die.
 pub fn go_down(world: &mut WorldState, i: usize) {
     let until = world.tick as f64 + DOWN_TICKS;
+    let aboard_vessel = vessel_aboard(world, &world.residents[i]).is_some();
     let r = &mut world.residents[i];
     r.health = 0.0;
     r.down_until = Some(until);
     hold_still(r);
     r.riding = None;
-    r.aboard = None;
+    if !aboard_vessel {
+        r.aboard = None;
+    }
     let (id, name, owner) = (r.id.clone(), r.name.clone(), r.owner.clone());
     leave_armies(world, &HashSet::from([id.clone()]));
     record_event(world, owner.as_deref(), RealmEventWhat::Down { resident_id: id, name, until });
@@ -175,7 +180,7 @@ pub fn keep_down_still(world: &mut WorldState) {
 }
 
 /// Invariant `down-do-nothing` (`CONTEXT.md`: Down): one who is Down has no order, script, queue
-/// or defence script, rides no horse or carriage and is in no army; their health stays at 0; and
+/// or defence script, rides no horse or carriage (a vessel they may lie in) and is in no army; their health stays at 0; and
 /// they die within `DOWN_TICKS` of going Down, not before the tick they are due.
 pub fn down_do_nothing(world: &WorldState) -> Vec<InvariantViolation> {
     let in_army: HashSet<&str> =
@@ -190,7 +195,10 @@ pub fn down_do_nothing(world: &WorldState) -> Vec<InvariantViolation> {
             r.queue.is_some().then(|| "has a queue".to_string()),
             r.interrupted.is_some().then(|| "was interrupted by a defence script".to_string()),
             r.riding.is_some().then(|| "rides a horse".to_string()),
-            r.aboard.is_some().then(|| "is aboard a carriage".to_string()),
+            r.aboard
+                .as_deref()
+                .filter(|id| world.carriages.iter().any(|k| k.id == *id))
+                .map(|_| "is aboard a carriage".to_string()),
             in_army.contains(r.id.as_str()).then(|| "is in an army".to_string()),
             (r.health != 0.0).then(|| format!("has health {}", js_number(r.health))),
             (!(until >= tick && until <= tick + DOWN_TICKS))
@@ -349,8 +357,17 @@ pub fn die(world: &mut WorldState, id: &str) -> Option<Resident> {
     let i = world.residents.iter().position(|x| x.id == id)?;
     let r = world.residents.remove(i);
     leave_caravans(world, &r.id);
-    // The TypeScript leaves out the map's size here, so it is `MAP_SIZE` (ported as it is).
-    drop_goods(world, r.x, r.y, &r.carried, MAP_SIZE);
+    // Dead aboard a vessel, what they carried stays in it: their own place there leaves room
+    // enough (`CONTEXT.md`: Fighting at a vessel).
+    let vessel = r.aboard.as_deref().and_then(|id| world.vessels.iter_mut().find(|v| v.id == id));
+    if let Some(v) = vessel {
+        for (good, n) in r.carried.iter().filter(|(_, n)| **n > 0.0) {
+            *v.load.entry(*good).or_insert(0.0) += n;
+        }
+    } else {
+        // The TypeScript leaves out the map's size here, so it is `MAP_SIZE` (ported as it is).
+        drop_goods(world, r.x, r.y, &r.carried, MAP_SIZE);
+    }
     if let Some(pair) = &r.pair {
         if let Some(partner) = world.residents.iter_mut().find(|x| x.id == pair.partner_id) {
             if partner.pair.as_ref().is_some_and(|p| p.partner_id == r.id) {

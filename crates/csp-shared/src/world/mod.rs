@@ -416,7 +416,8 @@ pub struct ScriptRunSteps {
     pub out_of_steps: Option<OutOfSteps>,
 }
 
-/// A place on the resident's own tile that goods are taken from or put (`GoodsSpot`).
+/// A place on the resident's own tile that goods are taken from or put (`GoodsSpot`), or a vessel
+/// beside them (`CONTEXT.md`: Beside a vessel).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(
     tag = "kind",
@@ -430,9 +431,11 @@ pub enum GoodsSpot {
     Site { site_id: String },
     Carriage { carriage_id: String },
     Resident { resident_id: String },
+    Vessel { vessel_id: String },
 }
 
-/// Where a store or fetch order takes goods to or from (`GoodsPlace`): a storage or a carriage.
+/// Where a store or fetch order takes goods to or from (`GoodsPlace`): a storage, a carriage, or a
+/// vessel, loaded from beside it (`CONTEXT.md`: Beside a vessel).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(
     tag = "kind",
@@ -443,6 +446,7 @@ pub enum GoodsSpot {
 pub enum GoodsPlace {
     Storage { storage_id: String },
     Carriage { carriage_id: String },
+    Vessel { vessel_id: String },
 }
 
 /// Walking to a tile.

@@ -5,6 +5,7 @@ import { KEEPS_GOODS, pileTile } from './building.js'
 import { covers } from './footprint.js'
 import { GOOD_WEIGHT } from './narrowed.js'
 import { stockWeight } from './stats.js'
+import { besideVessel } from './vessels.js'
 import { isDown, type WorldState } from './world.js'
 import { OWN_FOOD, carryCapacity } from '@csp/balance'
 import type { Building, Good, GoodsSpot, Pile, Resident, Stock } from '@csp/shared-types'
@@ -62,6 +63,11 @@ export function goodsAtSpot(
     return siteAt(world, x, y, spot.siteId)?.site!.delivered
   }
   if (spot.kind === 'resident') return downOn(world, x, y, spot.residentId)?.carried
+  if (spot.kind === 'vessel') {
+    // From beside it (`CONTEXT.md`: Beside a vessel).
+    const v = world.vessels?.find((b) => b.id === spot.vesselId)
+    return v && besideVessel(v, { x, y }) ? v.load : undefined
+  }
   const storage = storageAt(world, x, y)
   if (!storage || storage.id !== spot.storageId) return undefined
   return storage.stock ?? {}

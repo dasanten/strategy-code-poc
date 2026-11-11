@@ -188,7 +188,10 @@ export function drawUnits(
 
   // Passengers ride inside their carriage (`CONTEXT.md`: Passenger): its badge counts them, and
   // they are found at it.
-  const passengers = new Set(world.carriages.flatMap((k) => k.passengerIds ?? []))
+  const passengers = new Set([
+    ...world.carriages.flatMap((k) => k.passengerIds ?? []),
+    ...(world.vessels ?? []).flatMap((v) => v.passengerIds ?? []),
+  ])
   for (const k of world.carriages) {
     const aside = built.has(key(k))
     const p = at(...where(k.id, k.x, k.y), aside ? -0.28 : 0, aside ? 0.28 : 0)
@@ -213,7 +216,10 @@ export function drawUnits(
     if (!near(p)) continue
     const r = unitRadius('boat', tile)
     drawUnit(tokens, UNIT_ART.boat, ...p, r, entityRelationship(v, viewer, known))
-    spots.set(v.id, { x: p[0], y: p[1], r })
+    // Its passengers ride inside it, counted on it as on a cart (`CONTEXT.md`: Beside a vessel).
+    const aboard = v.passengerIds ?? []
+    if (aboard.length > 0) badge(`${aboard.length}`, ...p, r)
+    for (const id of [v.id, ...aboard]) spots.set(id, { x: p[0], y: p[1], r })
   }
 
   // People step to the lower right of a building or a cart on their tile.

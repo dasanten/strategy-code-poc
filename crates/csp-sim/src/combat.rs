@@ -527,6 +527,15 @@ fn with_caravan_carriage(world: &WorldState, t: &Resident) -> bool {
     carriage.is_some_and(|k| k.x == t.x && k.y == t.y)
 }
 
+/// Gets the resident at `ti` off the carriage they are aboard. Aboard a vessel they stay, on its
+/// water tile: should what they do next take them away, the walking puts them ashore first
+/// (`CONTEXT.md`: Fighting at a vessel, No ferrying by itself).
+fn off_carriage(world: &mut WorldState, ti: usize) {
+    if crate::queries::vessels::vessel_aboard(world, &world.residents[ti]).is_none() {
+        world.residents[ti].aboard = None;
+    }
+}
+
 /// The resident at `ti`, hit by the one at `ai` and still alive, reacts (`react`): a Player's
 /// resident runs their defence script; others, armed, fight back unless already attacking
 /// someone, off any carriage they are aboard; unarmed, they flee home to their city's town hall,
@@ -543,8 +552,8 @@ fn react(world: &mut WorldState, ti: usize, ai: usize) {
     if is_armed(&t.carried) {
         if !matches!(t.order, Some(ResidentOrder::Attack(_))) {
             let a_id = world.residents[ai].id.clone();
+            off_carriage(world, ti);
             let t = &mut world.residents[ti];
-            t.aboard = None;
             t.order = Some(ResidentOrder::Attack(attack_order(&a_id, true, true)));
         }
         return;
@@ -566,8 +575,8 @@ fn react(world: &mut WorldState, ti: usize, ai: usize) {
         return;
     }
     let (hx, hy) = (hall.x, hall.y);
+    off_carriage(world, ti);
     let t = &mut world.residents[ti];
-    t.aboard = None;
     t.order = Some(ResidentOrder::WalkTo(WalkOrder {
         target: Tile { x: hx, y: hy },
         path: None,

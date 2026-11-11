@@ -25,6 +25,7 @@ use crate::queries::goods::{
 };
 use crate::queries::guard::outpost_storage_guarded;
 use crate::queries::names::{good_of, held};
+use crate::queries::vessels::{beside_vessel, units_that_fit_vessel};
 use crate::storing::carried_for_order;
 
 /// Whether an action takes goods from a spot or puts carried goods there.
@@ -69,6 +70,7 @@ pub fn read_spot(spot: Option<&Value>) -> Option<GoodsSpot> {
         "carriage" => Some(GoodsSpot::Carriage { carriage_id: id("carriageId")? }),
         "storage" => Some(GoodsSpot::Storage { storage_id: id("storageId")? }),
         "site" => Some(GoodsSpot::Site { site_id: id("siteId")? }),
+        "vessel" => Some(GoodsSpot::Vessel { vessel_id: id("vesselId")? }),
         _ => None,
     }
 }
@@ -93,7 +95,7 @@ fn check(
     let r = &world.residents[ri];
     let Some(spot) = read_spot(o.get("spot")) else {
         return Err(
-            "the spot must be the ground, a storage, a construction site, a carriage or a Down resident"
+            "the spot must be the ground, a storage, a construction site, a carriage, a boat or a Down resident"
                 .into(),
         );
     };
@@ -115,6 +117,9 @@ fn check(
         }
         GoodsSpot::Carriage { .. } if goods_at_spot(world, r.x, r.y, &spot).is_none() => {
             return Err("that carriage is not on the resident’s tile".into());
+        }
+        GoodsSpot::Vessel { .. } if goods_at_spot(world, r.x, r.y, &spot).is_none() => {
+            return Err("that boat is not beside the resident".into());
         }
         GoodsSpot::Resident { resident_id }
             if down_index_on(world, r.x, r.y, resident_id).is_none() =>
@@ -288,6 +293,11 @@ fn spot_holder(world: &mut WorldState, ri: usize, spot: &GoodsSpot) -> Option<Ho
             .iter()
             .position(|k| &k.id == carriage_id && k.x == x && k.y == y)
             .map(Holder::Carriage),
+        GoodsSpot::Vessel { vessel_id } => world
+            .vessels
+            .iter()
+            .position(|v| &v.id == vessel_id && beside_vessel(v, x, y))
+            .map(Holder::Vessel),
         GoodsSpot::Resident { resident_id } => {
             down_index_on(world, x, y, resident_id).map(Holder::Resident)
         }
@@ -410,6 +420,9 @@ fn spot_organization(world: &WorldState, spot: &GoodsSpot) -> Option<String> {
         GoodsSpot::Carriage { carriage_id } => {
             world.carriages.iter().find(|k| &k.id == carriage_id).and_then(carriage_organization)
         }
+        GoodsSpot::Vessel { vessel_id } => {
+            world.vessels.iter().find(|v| &v.id == vessel_id).and_then(|v| v.realm_id.clone())
+        }
         _ => None,
     }
 }
@@ -443,6 +456,8 @@ fn put(
     for (&good, &wanted) in &a.goods {
         let fits = match target {
             Some(Holder::Carriage(k)) => units_that_fit_carriage(world, &world.carriages[k], good),
+            // Passengers count against what a vessel holds (`CONTEXT.md`: Beside a vessel).
+            Some(Holder::Vessel(v)) => units_that_fit_vessel(world, &world.vessels[v], good),
             _ => f64::INFINITY,
         };
         let carried = held(&world.residents[ri].carried, good);

@@ -20,6 +20,7 @@ use crate::queries::command::commander_of_resident;
 use crate::queries::command::steals_carriage;
 use crate::queries::goods::{can_handle, free_stock, put_away_units};
 use crate::queries::names::{good_of, held, placed};
+use crate::queries::vessels::{resident_beside_vessel, vessel_by_id};
 use csp_shared::balance::MAP_SIZE;
 
 /// `Number.MAX_SAFE_INTEGER`: a fetch of as many as there are.
@@ -80,6 +81,10 @@ fn named_place(world: &WorldState, side: Option<&str>, id: &Value) -> Option<Goo
         return ((PLACE_KINDS.contains(&b.kind) || own_warehouse) && b.site.is_none())
             .then(|| GoodsPlace::Storage { storage_id: b.id.clone() });
     }
+    if let Some(v) = vessel_by_id(world, key) {
+        return (side.is_some() && v.realm_id.as_deref() == side)
+            .then(|| GoodsPlace::Vessel { vessel_id: v.id.clone() });
+    }
     let k = world.carriages.iter().find(|x| x.id == key)?;
     (side.is_some() && carriage_organization(k).as_deref() == side)
         .then(|| GoodsPlace::Carriage { carriage_id: k.id.clone() })
@@ -91,6 +96,7 @@ pub fn place_tile(world: &WorldState, place: &GoodsPlace) -> Option<(f64, f64)> 
         GoodsPlace::Carriage { carriage_id } => {
             world.carriages.iter().find(|k| &k.id == carriage_id).map(|k| (k.x, k.y))
         }
+        GoodsPlace::Vessel { vessel_id } => vessel_by_id(world, vessel_id).map(|v| (v.x, v.y)),
         GoodsPlace::Storage { storage_id } => {
             finished_storage(world, storage_id).map(|b| (b.x, b.y))
         }
@@ -103,6 +109,7 @@ fn place_stock<'w>(world: &'w WorldState, place: &GoodsPlace) -> Option<Option<&
         GoodsPlace::Carriage { carriage_id } => {
             world.carriages.iter().find(|k| &k.id == carriage_id).map(|k| Some(&k.load))
         }
+        GoodsPlace::Vessel { vessel_id } => vessel_by_id(world, vessel_id).map(|v| Some(&v.load)),
         GoodsPlace::Storage { storage_id } => {
             finished_storage(world, storage_id).map(|b| b.stock.as_ref())
         }
@@ -117,6 +124,10 @@ fn at_place(world: &WorldState, r: &Resident, place: &GoodsPlace) -> bool {
             .iter()
             .find(|k| &k.id == carriage_id)
             .is_some_and(|k| k.x == r.x && k.y == r.y),
+        // From beside it (`CONTEXT.md`: Beside a vessel).
+        GoodsPlace::Vessel { vessel_id } => {
+            vessel_by_id(world, vessel_id).is_some_and(|v| resident_beside_vessel(v, r))
+        }
         GoodsPlace::Storage { storage_id } => finished_storage(world, storage_id)
             .is_some_and(|b| covers(placed(b), r.x as i32, r.y as i32, MAP_SIZE)),
     }
@@ -165,7 +176,7 @@ fn store_place(
     let side = side_of(world, sender);
     if let Some(to) = to.filter(|v| !v.is_null()) {
         return named_place(world, side.as_deref(), to)
-            .ok_or_else(|| "to must be a storage, a stable or a carriage of yours".into());
+            .ok_or_else(|| "to must be a storage, a stable, a carriage or a boat of yours".into());
     }
     let storages = world
         .buildings
@@ -195,8 +206,9 @@ fn fetch_place(
 ) -> Result<GoodsPlace, String> {
     let side = side_of(world, sender);
     if let Some(from) = from.filter(|v| !v.is_null()) {
-        return named_place(world, side.as_deref(), from)
-            .ok_or_else(|| "from must be a storage, a stable or a carriage of yours".into());
+        return named_place(world, side.as_deref(), from).ok_or_else(|| {
+            "from must be a storage, a stable, a carriage or a boat of yours".into()
+        });
     }
     let holds = |stock: &Stock| goods.keys().any(|g| held(stock, *g) > 0.0);
     let mut places: Vec<(f64, f64, GoodsPlace)> = world
@@ -379,6 +391,7 @@ pub fn request_storing(world: &mut WorldState) -> Vec<CarryAction> {
         if place_tile(world, &place).is_none() || carriage_lost(world, r, &place) {
             let reason = match place {
                 GoodsPlace::Carriage { .. } => "the carriage is gone",
+                GoodsPlace::Vessel { .. } => "the boat is gone",
                 GoodsPlace::Storage { .. } => "the storage is gone",
             };
             end_order(world, ri, Some(reason.into()));
@@ -415,6 +428,7 @@ pub fn request_storing(world: &mut WorldState) -> Vec<CarryAction> {
             GoodsPlace::Carriage { carriage_id } => {
                 GoodsSpot::Carriage { carriage_id: carriage_id.clone() }
             }
+            GoodsPlace::Vessel { vessel_id } => GoodsSpot::Vessel { vessel_id: vessel_id.clone() },
         };
         let (kind, goods) = match order {
             // As many as there are: take clips them to what is there and fits.
@@ -446,14 +460,14 @@ pub fn carried_for_order(world: &mut WorldState, ri: usize) {
                 GoodsPlace::Storage { .. } => {
                     place_stock(world, &o.to).flatten().map_or(0.0, |s| held(s, Good::Food))
                 }
-                GoodsPlace::Carriage { .. } => 0.0,
+                GoodsPlace::Carriage { .. } | GoodsPlace::Vessel { .. } => 0.0,
             };
             let is_storage = match &o.to {
                 GoodsPlace::Storage { storage_id } => world
                     .buildings
                     .iter()
                     .any(|b| &b.id == storage_id && b.kind == BuildingKind::Storage),
-                GoodsPlace::Carriage { .. } => false,
+                GoodsPlace::Carriage { .. } | GoodsPlace::Vessel { .. } => false,
             };
             if is_storage
                 && food > 0.0

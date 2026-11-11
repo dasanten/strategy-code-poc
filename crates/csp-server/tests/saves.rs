@@ -289,7 +289,7 @@ fn a_world_with_a_boat_is_saved_and_loads_with_it_and_one_from_before_has_none()
     });
     save_world(&conn, &world).unwrap();
     let (state, v) = latest_save(&conn).unwrap().unwrap();
-    assert_eq!(v, 113);
+    assert_eq!(v, WORLD_FORMAT_VERSION);
     assert_eq!(state["vessels"][0]["kind"], "boat");
     assert_eq!(load().vessels, world.vessels);
 }

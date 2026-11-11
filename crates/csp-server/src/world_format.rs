@@ -32,6 +32,7 @@ pub fn migrations() -> BTreeMap<u32, MigrationStep> {
     let mut steps: BTreeMap<u32, MigrationStep> = BTreeMap::new();
     steps.insert(111, drop_remembered_breeding);
     steps.insert(112, vessels_come_in);
+    steps.insert(113, goods_go_aboard);
     steps
 }
 
@@ -57,6 +58,14 @@ fn drop_remembered_breeding(mut state: Value, _: &MigrationContext<'_>) -> Value
 /// there so that a server of format 112, which refuses a field it doesn't know, never loads a
 /// world with boats in it.
 fn vessels_come_in(state: Value, _: &MigrationContext<'_>) -> Value {
+    state
+}
+
+/// 113 → 114: residents board vessels and load them (`CONTEXT.md`: Beside a vessel, T90.3): a
+/// passenger's `aboard` may name a vessel, and a store, fetch, pick-up or drop order a `vessel` place
+/// or spot. A world from before has none of them, so it stays as it is; the bump keeps a server of
+/// format 113, which refuses a kind it doesn't know, from loading one that has.
+fn goods_go_aboard(state: Value, _: &MigrationContext<'_>) -> Value {
     state
 }
 
@@ -192,6 +201,20 @@ mod tests {
         let migrated = migrate_world_with(save.clone(), 112, &ctx, &migrations(), 113).unwrap();
         assert_eq!(migrated, save);
         assert!(migrated.get("vessels").is_none_or(|v| v.as_array().is_some_and(Vec::is_empty)));
+    }
+
+    #[test]
+    fn step_113_keeps_a_world_whose_passengers_and_orders_know_no_vessel() {
+        let terrain = ctx_terrain();
+        let ctx = MigrationContext { terrain: &terrain };
+        let save = json!({
+            "tick": 3,
+            "residents": [{ "id": "w1", "aboard": "k1", "order": { "kind": "store",
+                "to": { "kind": "carriage", "carriageId": "k1" } } }],
+            "vessels": [{ "id": "v1" }],
+        });
+        let migrated = migrate_world_with(save.clone(), 113, &ctx, &migrations(), 114).unwrap();
+        assert_eq!(migrated, save);
     }
 
     #[test]

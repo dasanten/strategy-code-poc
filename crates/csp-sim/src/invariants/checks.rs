@@ -79,7 +79,14 @@ fn at_building(x: f64, y: f64, b: &csp_shared::world::Building) -> bool {
 pub fn nothing_on_impassable_terrain(world: &WorldState, terrain: &TerrainMap) -> Out {
     let name = "nothing-on-impassable-terrain";
     let mut things: Vec<(&str, f64, f64)> = Vec::new();
-    things.extend(world.residents.iter().map(|t| (t.id.as_str(), t.x, t.y)));
+    // A vessel's passenger stands on its water tile (`CONTEXT.md`: Beside a vessel); that it
+    // does is `vessel-passengers`.
+    let on_vessel = |r: &&csp_shared::world::Resident| {
+        r.aboard.as_deref().is_some_and(|id| world.vessels.iter().any(|v| v.id == id))
+    };
+    things.extend(
+        world.residents.iter().filter(|r| !on_vessel(r)).map(|t| (t.id.as_str(), t.x, t.y)),
+    );
     things.extend(world.horses.iter().map(|t| (t.id.as_str(), t.x, t.y)));
     things.extend(world.carriages.iter().map(|t| (t.id.as_str(), t.x, t.y)));
     things.extend(world.buildings.iter().map(|t| (t.id.as_str(), t.x, t.y)));
@@ -1071,8 +1078,8 @@ pub fn carriages_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
     out
 }
 
-/// A vessel always stands on a water tile, one vessel per tile, and holds no more than it can
-/// (`CONTEXT.md`: Vessel, Boat).
+/// A vessel always stands on a water tile, one vessel per tile (`CONTEXT.md`: Vessel, Boat). That
+/// it holds no more than it can, its passengers counted in, is `vessel-passengers`.
 pub fn vessels_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
     let name = "vessels-in-place";
     let mut out = Vec::new();
@@ -1087,15 +1094,63 @@ pub fn vessels_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
             let m = format!("vessel {} shares the water tile {at} with {other}", v.id);
             out.push(violation(name, m, &[&v.id, other]));
         }
-        let kg = stock_weight(&v.load);
+    }
+    out
+}
+
+/// A vessel's passenger stands on its water tile, never on land, is of its realm and neither
+/// drives nor rides; goods and passengers never weigh more than the vessel holds (`CONTEXT.md`:
+/// Beside a vessel, Passenger, What vessels carry).
+pub fn vessel_passengers(world: &WorldState, terrain: &TerrainMap) -> Out {
+    let name = "vessel-passengers";
+    let mut out = Vec::new();
+    let mut fail = |ids: &[&str], m: String| out.push(violation(name, m, ids));
+    let mut aboard: HashMap<&str, f64> = HashMap::new();
+    for r in &world.residents {
+        let Some(v) = r.aboard.as_deref().and_then(|id| world.vessels.iter().find(|v| v.id == id))
+        else {
+            continue;
+        };
+        *aboard.entry(&v.id).or_insert(0.0) += 1.0;
+        let at = format!("({}, {})", js_number(r.x), js_number(r.y));
+        if v.x != r.x || v.y != r.y {
+            let m = format!(
+                "resident {} at {at} is aboard vessel {} at ({}, {})",
+                r.id,
+                v.id,
+                js_number(v.x),
+                js_number(v.y)
+            );
+            fail(&[&r.id, &v.id], m);
+        }
+        if !is_water(terrain_at(terrain, r.x as i32, r.y as i32)) {
+            fail(
+                &[&r.id, &v.id],
+                format!("resident {} is aboard vessel {} on land at {at}", r.id, v.id),
+            );
+        }
+        if !of_resident(v.realm_id.as_deref(), None, r) {
+            let m = format!("resident {} is aboard vessel {} of another realm", r.id, v.id);
+            fail(&[&r.id, &v.id], m);
+        }
+        if driven_carriage_id(r).is_some() {
+            fail(&[&r.id, &v.id], format!("resident {} drives aboard vessel {}", r.id, v.id));
+        }
+        if r.riding.is_some() {
+            fail(&[&r.id, &v.id], format!("resident {} rides aboard vessel {}", r.id, v.id));
+        }
+    }
+    for v in &world.vessels {
+        let people = aboard.get(v.id.as_str()).copied().unwrap_or(0.0);
+        let kg = stock_weight(&v.load) + people * PASSENGER_WEIGHT;
         if kg > vessel_capacity(v) + 1e-9 {
             let m = format!(
-                "vessel {} holds {} kg, more than it can ({} kg)",
+                "vessel {} holds {} kg of goods and passengers, more than it can ({} kg)",
                 v.id,
                 js_number(kg),
                 js_number(vessel_capacity(v))
             );
-            out.push(violation(name, m, &[&v.id]));
+            fail(&[&v.id], m);
         }
     }
     out
@@ -1155,6 +1210,10 @@ pub fn passengers_aboard(world: &WorldState, _: &TerrainMap) -> Out {
     let mut aboard: HashMap<&str, f64> = HashMap::new();
     for r in &world.residents {
         let Some(on) = &r.aboard else { continue };
+        // Aboard a vessel: `vessel-passengers`.
+        if world.vessels.iter().any(|v| &v.id == on) {
+            continue;
+        }
         *aboard.entry(on).or_insert(0.0) += 1.0;
         let Some(k) = world.carriages.iter().find(|c| &c.id == on) else {
             fail(&[&r.id], format!("resident {} is aboard {on}, which doesn't exist", r.id));
