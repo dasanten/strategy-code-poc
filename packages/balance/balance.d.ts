@@ -564,6 +564,11 @@ export interface Balance {
       stone: number
       [key: string]: number
     }
+    haven: {
+      wood: number
+      stone: number
+      [key: string]: number
+    }
     carriage: {
       wood: number
       iron: number
@@ -614,6 +619,7 @@ export interface Balance {
     storage: number
     farm: number
     trainingGround: number
+    haven: number
     carriage: number
     [key: string]: number
   }
@@ -1039,6 +1045,7 @@ export interface Balance {
     warehouse: number
     stable: number
     trainingGround: number
+    haven: number
     farm: number
     [key: string]: number
   }

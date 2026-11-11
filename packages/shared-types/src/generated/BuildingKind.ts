@@ -3,4 +3,4 @@
 /**
  * The kinds of building (`BuildingKind`).
  */
-export type BuildingKind = "townHall" | "house" | "storage" | "warehouse" | "wall" | "gate" | "farm" | "stable" | "mine" | "quarry" | "lumberCamp" | "smelter" | "mint" | "smithy" | "trainingGround" | "road" | "carriage";
+export type BuildingKind = "townHall" | "house" | "storage" | "warehouse" | "wall" | "gate" | "farm" | "stable" | "mine" | "quarry" | "lumberCamp" | "smelter" | "mint" | "smithy" | "trainingGround" | "road" | "carriage" | "haven";

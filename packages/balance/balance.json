@@ -491,6 +491,10 @@
       "wood": 50.0,
       "stone": 10.0
     },
+    "haven": {
+      "wood": 70.0,
+      "stone": 20.0
+    },
     "carriage": {
       "wood": 30.0,
       "iron": 5.0
@@ -512,6 +516,7 @@
     "storage": 2880.0,
     "farm": 720.0,
     "trainingGround": 4320.0,
+    "haven": 5760.0,
     "carriage": 2880.0
   },
   "MOUNTAIN_ROAD_WORK_FACTOR": 4.0,
@@ -771,6 +776,7 @@
     "warehouse": 3,
     "stable": 3,
     "trainingGround": 3,
+    "haven": 3,
     "farm": 4
   }
 }

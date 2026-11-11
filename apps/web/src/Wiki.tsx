@@ -348,6 +348,7 @@ export const WIKI_TOPICS = [
   { id: 'work', title: 'Workplaces & output' },
   { id: 'building', title: 'Building & tearing down' },
   { id: 'transport', title: 'Carrying & transport' },
+  { id: 'water', title: 'Water & havens' },
   { id: 'how-to-trade', title: 'How to trade' },
   { id: 'trade', title: 'Trade & prices' },
   { id: 'standing', title: 'Standing & reactions' },
@@ -496,6 +497,7 @@ export function Wiki() {
   }, [])
   const avg = AVERAGE_STATS.strength
   const groundCost = buildCosts().find((b) => b.kind === 'trainingGround')!
+  const havenCost = buildCosts().find((b) => b.kind === 'haven')!
   const strong = wikiResident({ strength: avg * 1.5 }, { mining: WORK_SKILL_MAX / 10 })
   const strongAgile = wikiResident({ agility: avg * 1.5 })
   const plainsTicksPerTile = 1 / walkSpeed(AVERAGE, Terrain.Plains, 0)
@@ -1873,6 +1875,26 @@ export function Wiki() {
           one of them stands at another post or the HQ, the capture is a crime it knows of (see
           Standing), and it demands the city back with a debt for its worth. If they are killed on
           the way and no trader ever gets there, it never reacts.
+        </p>
+      </Section>
+
+      <Section id="water">
+        <p>
+          Lake and Sea are <b>water</b>. Nobody walks on them, and a walk always goes round on land.
+          Boats and ships are what cross them, and they start at a haven.
+        </p>
+        <p>
+          A <b>haven</b> is a {num(FOOTPRINT.haven)} × {num(FOOTPRINT.haven)} building on the
+          shore: every tile of it on passable land, off Mountain and off resource nodes, and at least
+          one of its tiles touching Lake or Sea, straight or diagonally. The Build menu offers it
+          only where it fits. It is built from {goods(havenCost.materials)} and{' '}
+          {duration(havenCost.buildTicks)} of one average resident's work.
+        </p>
+        <p>
+          A haven has a <b>storage</b>: anyone standing at it puts goods in or takes them out, by
+          hand, with Store and Fetch, or with a script, as at any storage. Like a stable it has no
+          owner of its own: it is the city's whose resident laid it out, and taking goods from it
+          is judged as taking from any storage of that city. NPC cities don't build havens.
         </p>
       </Section>
 

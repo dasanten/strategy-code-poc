@@ -313,7 +313,7 @@ export function planPickAt(
       if (ownCarriage) return { ...tile, spot: { kind: 'carriage', carriageId: ownCarriage.id } }
       if (!building) return { ...tile, spot: { kind: 'ground' } }
       if (building.site) return { ...tile, spot: { kind: 'site', siteId: building.id } }
-      if (['storage', 'stable'].includes(building.kind))
+      if (['storage', 'stable', 'haven'].includes(building.kind))
         return { ...tile, spot: { kind: 'storage', storageId: building.id } }
       return { ...tile, spot: { kind: 'ground' } }
     }
@@ -336,9 +336,9 @@ export function planPickAt(
       return b ? named(b) : 'no finished training ground there'
     }
     case 'storage': {
-      const b = here.find((x) => ['storage', 'stable'].includes(x.kind) && !x.site)
+      const b = here.find((x) => ['storage', 'stable', 'haven'].includes(x.kind) && !x.site)
       if (b) return named(b)
-      return ownCarriage ? { ...tile, id: ownCarriage.id } : 'no storage, stable or carriage there'
+      return ownCarriage ? { ...tile, id: ownCarriage.id } : 'no storage, stable, haven or carriage there'
     }
     case 'carriage':
       return ownCarriage ? { ...tile, id: ownCarriage.id } : 'no carriage of yours there'

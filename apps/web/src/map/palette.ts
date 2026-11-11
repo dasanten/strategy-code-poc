@@ -83,6 +83,7 @@ export const BUILDING_COLORS: Record<BuildingKind, number> = {
   trainingGround: 0xb8925a,
   road: ROAD_COLOR,
   carriage: 0xa0703f,
+  haven: 0x5f8fa8,
 }
 
 export const BUILDING_NAMES: Record<BuildingKind, string> = {
@@ -103,6 +104,7 @@ export const BUILDING_NAMES: Record<BuildingKind, string> = {
   trainingGround: 'Training ground',
   road: 'Road',
   carriage: 'Carriage',
+  haven: 'Haven',
 }
 /** A Trade Org caravan's carriage and crew (`CONTEXT.md`: Caravan). */
 export const CARAVAN_COLOR = RELATIONSHIP_COLORS.tradeOrg

@@ -27,6 +27,7 @@ pub const FOOTPRINT: Table<i32> = Table(&[
     ("warehouse", 3),
     ("stable", 3),
     ("trainingGround", 3),
+    ("haven", 3),
     ("farm", 4),
 ]);
 
@@ -167,6 +168,7 @@ mod tests {
             [side("townHall"), side("warehouse"), side("stable"), side("trainingGround")],
             [3, 3, 3, 3]
         );
+        assert_eq!(side("haven"), 3);
         assert_eq!(side("farm"), 4);
     }
 

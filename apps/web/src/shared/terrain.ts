@@ -71,6 +71,30 @@ export function terrainAt(map: TerrainMap, x: number, y: number): Terrain {
   return map.tiles[tileIndex(map.size, x, y)] as Terrain
 }
 
+/** Whether the terrain is water (`CONTEXT.md`: Water): Lake or Sea, where only vessels go. */
+export function isWater(t: number): boolean {
+  return t === Terrain.Lake || t === Terrain.Sea
+}
+
+/**
+ * Whether one of `tiles` touches water, straight or diagonally (`CONTEXT.md`: Haven): a Lake or
+ * Sea tile among the eight around it. `at` gives a tile's terrain.
+ */
+export function touchesWater(
+  tiles: readonly (readonly [number, number])[],
+  size: number,
+  at: (x: number, y: number) => number,
+): boolean {
+  return tiles.some(([x, y]) => {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if ((dx || dy) && isWater(at(wrap(x + dx, size), wrap(y + dy, size)))) return true
+      }
+    }
+    return false
+  })
+}
+
 /** Lake and Sea can't be entered. */
 export function isPassableTerrain(t: number): boolean {
   return (

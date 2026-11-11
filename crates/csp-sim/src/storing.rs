@@ -25,8 +25,10 @@ use csp_shared::balance::MAP_SIZE;
 /// `Number.MAX_SAFE_INTEGER`: a fetch of as many as there are.
 const AS_MANY_AS_THERE_ARE: f64 = 9_007_199_254_740_991.0;
 
-/// The buildings a store or fetch order goes to (`PLACE_KINDS`): a storage, or a stable's storage.
-const PLACE_KINDS: [BuildingKind; 2] = [BuildingKind::Storage, BuildingKind::Stable];
+/// The buildings a store or fetch order goes to (`PLACE_KINDS`): a storage, or a stable's or a
+/// haven's storage.
+const PLACE_KINDS: [BuildingKind; 3] =
+    [BuildingKind::Storage, BuildingKind::Stable, BuildingKind::Haven];
 
 /// The order's goods as plain data (`readWanted`): a list of known goods (as many as there are of
 /// each), or known goods with whole positive units or null. At least one.

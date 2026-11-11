@@ -2808,6 +2808,7 @@ pub enum BuildingKind {
     TrainingGround,
     Road,
     Carriage,
+    Haven,
 }
 
 /// A building or construction site (`Building`).

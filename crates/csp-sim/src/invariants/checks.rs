@@ -17,8 +17,8 @@ use csp_shared::balance::{
 };
 use csp_shared::footprint::{footprint_tiles, is_at, near_footprint};
 use csp_shared::terrain::{
-    beside_step, is_passable_terrain, step_length, terrain_at, tile_index, wrap_delta, Terrain,
-    TerrainMap,
+    beside_step, is_passable_terrain, step_length, terrain_at, tile_index, touches_water,
+    wrap_delta, Terrain, TerrainMap,
 };
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
@@ -35,7 +35,8 @@ use crate::queries::balance::carry_capacity;
 use crate::queries::building::{
     build_materials, build_work_of, building_at, carriage_can_go_to, has_choice, line_building,
     line_order, materials_needed, max_workers, node_workplace, teardown_work, work_needed,
-    workplace_good, BUILDABLE, KEEPS_GOODS, OFF_NODES, ON_PLAINS, PROCESSING, SHARES_A_TILE,
+    workplace_good, BUILDABLE, KEEPS_GOODS, OFF_NODES, ON_PLAINS, ON_SHORE, PROCESSING,
+    SHARES_A_TILE,
 };
 use crate::queries::city_area::{city_membership, is_city_building};
 use crate::queries::command::commander_of_resident;
@@ -220,6 +221,11 @@ pub fn buildings_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
             }
             if terrains.contains(&(Terrain::Mountain as u8)) {
                 fail(&b.id, format!("is a {kind} on Mountain"));
+            }
+            if ON_SHORE.contains(&b.kind)
+                && !touches_water(&footprint, size, |x, y| terrain_at(terrain, x, y))
+            {
+                fail(&b.id, format!("is a {kind} away from water"));
             }
             if PROCESSING.contains(&b.kind) {
                 if let Some(c) = city {

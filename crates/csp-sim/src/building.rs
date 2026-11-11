@@ -100,10 +100,11 @@ pub fn next_tile(r: &mut Resident) {
     }
 }
 
-/// The city a site is laid out for (`laidOutFor`, `CONTEXT.md`: Farm): a farm or stable belongs
-/// to the city of the resident who lays it out, while that city exists.
+/// The city a site is laid out for (`laidOutFor`, `CONTEXT.md`: Farm, Haven): a farm, stable or
+/// haven belongs to the city of the resident who lays it out, while that city exists, so taking
+/// from a haven's storage is judged as at any storage.
 fn laid_out_for(world: &WorldState, r: &Resident, kind: BuildingKind) -> Option<String> {
-    if !ON_PLAINS.contains(&kind) {
+    if !ON_PLAINS.contains(&kind) && kind != BuildingKind::Haven {
         return None;
     }
     let city_id = r.city_id.as_ref()?;

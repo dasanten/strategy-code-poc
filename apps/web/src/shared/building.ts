@@ -16,6 +16,7 @@ import {
   isPassableTerrain,
   terrainAt,
   tileIndex,
+  touchesWater,
   type TerrainMap,
   wrap,
   wrapDelta,
@@ -75,6 +76,7 @@ export const BUILDABLE: readonly BuildingKind[] = [
   'gate',
   'road',
   'carriage',
+  'haven',
 ]
 
 /**
@@ -109,8 +111,8 @@ export function hasChoice(kind: BuildingKind): boolean {
 
 /**
  * Buildable kinds that go on any passable terrain but Mountain, off any resource node
- * (`CONTEXT.md`: Where buildings go): the processing workplaces, the city buildings and training
- * grounds (`CONTEXT.md`: Training ground).
+ * (`CONTEXT.md`: Where buildings go): the processing workplaces, the city buildings, training
+ * grounds (`CONTEXT.md`: Training ground) and havens, which go on the shore besides (`ON_SHORE`).
  */
 export const OFF_NODES: readonly BuildingKind[] = [
   ...PROCESSING,
@@ -120,7 +122,14 @@ export const OFF_NODES: readonly BuildingKind[] = [
   'wall',
   'gate',
   'trainingGround',
+  'haven',
 ]
+
+/**
+ * Buildable kinds that go on the shore, with a tile of their footprint touching Lake or Sea
+ * straight or diagonally (`CONTEXT.md`: Haven): havens.
+ */
+export const ON_SHORE: readonly BuildingKind[] = ['haven']
 
 /** Buildable kinds that go on Plains, off any resource node: stables and farms. */
 export const ON_PLAINS: readonly BuildingKind[] = ['stable', 'farm']
@@ -152,9 +161,10 @@ export function buildMenu(node: Pick<ResourceNode, 'kind'> | undefined): Buildin
 
 /**
  * Kinds of building that keep goods in a storage of their own: storages, the Trade
- * Organization's warehouses (`CONTEXT.md`: Warehouse), and stables' Food.
+ * Organization's warehouses (`CONTEXT.md`: Warehouse), stables' Food, and havens (`CONTEXT.md`:
+ * Haven).
  */
-export const KEEPS_GOODS: readonly BuildingKind[] = ['storage', 'warehouse', 'stable']
+export const KEEPS_GOODS: readonly BuildingKind[] = ['storage', 'warehouse', 'stable', 'haven']
 
 /**
  * The building or construction site whose footprint covers a tile, if there is one (one per
@@ -387,6 +397,8 @@ export function buildProblem(
     const inCity = (t: [number, number]) => citiesAt(world, t[0], t[1], size).length > 0
     if (IN_CITY_AREA.includes(kind) && !tiles.every(inCity))
       return `a ${kind} goes in a city’s area`
+    if (ON_SHORE.includes(kind) && at && !touchesWater(tiles, size, at))
+      return `a ${kind} goes on the shore, touching Lake or Sea`
   } else if (nodes.length !== 1 || NODE_WORKPLACE[nodes[0]!.kind] !== kind)
     return `a ${kind} goes with one tile on a fitting resource node`
   if (tiles.some(([tx, ty]) => buildingAt(world, tx, ty, size)))
