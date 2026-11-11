@@ -144,6 +144,7 @@ pub enum SkillName {
     Farming,
     Combat,
     Driving,
+    Seafaring,
 }
 
 /// What a training ground teaches (`TrainingSubject`): a stat or a skill.
@@ -619,6 +620,17 @@ pub struct DriveOrder {
     pub near: Option<bool>,
 }
 
+/// Rowing a boat to a water tile (`CONTEXT.md`: Rowing): the rower is aboard and at its oars, and
+/// the boat goes a Step at a time over water along `path`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RowOrder {
+    pub vessel_id: String,
+    pub target: Tile,
+    pub path: Option<TilePath>,
+    pub progress: f64,
+}
+
 /// A haul route's stop.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -885,6 +897,7 @@ pub enum ResidentOrder {
     AcceptOffer(AcceptOfferOrder),
     Relocate(RelocateOrder),
     Feed(FeedOrder),
+    Row(RowOrder),
 }
 
 /// Everything in the world that changes, saved as snapshots (ADR 0006).
@@ -2919,6 +2932,11 @@ pub struct Vessel {
     pub x: f64,
     pub y: f64,
     pub load: Stock,
+    /// The one aboard at its oars, who rowed it last or rows it now (`CONTEXT.md`: Rowing): no
+    /// passenger, so not counted against what it holds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub rower_id: Option<String>,
 }
 
 /// What a resource node yields once worked (`ResourceKind`).

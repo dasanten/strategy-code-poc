@@ -143,6 +143,7 @@ export type ActionId =
   | 'unhitch'
   | 'hitch'
   | 'drive'
+  | 'row'
   | 'driveOff'
   | 'hitchOff'
   | 'stealHorse'
@@ -183,6 +184,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   unhitch: 'U',
   hitch: 'J',
   drive: 'D',
+  row: 'D',
   driveOff: 'D',
   hitchOff: 'D',
   stealHorse: 'M',
@@ -297,6 +299,11 @@ export interface ResidentHere {
   carriageToBoard?: boolean
   /** A boat of their realm beside them with room, to board (`CONTEXT.md`: Beside a vessel). */
   boatToBoard?: boolean
+  /**
+   * A boat of their realm they are aboard or beside, to row, with why they can't take its oars
+   * now, if so (`CONTEXT.md`: Rowing).
+   */
+  boatToRow?: { problem?: string }
   /** A carriage of their realm on their tile with a horse hitched, to unhitch (`CONTEXT.md`: Hitched horse). */
   carriageToUnhitch?: boolean
   /** A carriage of their realm on their tile and a horse to hitch to it (`hitchChoice`). */
@@ -477,6 +484,23 @@ function ordersOffered(h: ResidentHere): {
     miss('drive', why)
     miss('haul', why)
   }
+  // Rowing a boat of theirs they are aboard or beside (`CONTEXT.md`: Rowing); a carriage to drive
+  // on the same tile keeps the key.
+  if (h.boatToRow && !(drivable && h.adult)) {
+    const reason = !h.adult
+      ? 'children can’t row'
+      : h.riding
+        ? 'no horse goes aboard: dismount first'
+        : h.driving
+          ? 'the driver can’t row'
+          : h.boatToRow.problem
+    add(
+      row('row', '', {
+        ...picks('row', 'Row boat to'),
+        ...(reason ? { disabled: true as const, reason } : {}),
+      }),
+    )
+  } else miss('row', 'no boat of yours here')
   // Only ever on its own row, saying what it is (`CONTEXT.md`: Stealing a carriage or horse).
   if (h.driveOff) {
     const { problem } = h.driveOff
@@ -615,6 +639,7 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   unhitch: 'move',
   hitch: 'move',
   drive: 'move',
+  row: 'move',
   driveOff: 'move',
   hitchOff: 'move',
   stealHorse: 'move',
@@ -953,6 +978,8 @@ export interface CarriageView {
   /** Said instead of a horse row: "No horse hitched", or "Horse hitched" with it out of sight. */
   noHorse?: string
   driver?: NamedResident
+  /** A boat's rower, at its oars, no passenger (`CONTEXT.md`: Rowing). */
+  rower?: NamedResident
   /** Its passengers in sight, and what they weigh of what it holds: "160 kg of it people". */
   passengers?: { residents: NamedResident[]; weight: string }
   /**
@@ -1855,10 +1882,13 @@ export function describeVessel(
 ): CarriageView {
   // Its passengers, as many as are in sight, counted against what it holds (`CONTEXT.md`: Beside a
   // vessel).
-  const aboard = (vessel.passengerIds ?? []).flatMap((id) => {
+  const named = (id: string) => {
     const r = t?.residents?.find((x) => x.id === id)
     return r ? [{ id: r.id, name: r.name, pick: !t?.strangers.some((s) => s.id === r.id) }] : []
-  })
+  }
+  const aboard = (vessel.passengerIds ?? []).flatMap(named)
+  // Its rower is no passenger and weighs nothing against it (`CONTEXT.md`: Rowing).
+  const [rower] = vessel.rowerId ? named(vessel.rowerId) : []
   const people = (vessel.passengerIds ?? []).length * PASSENGER_WEIGHT
   const weight = vessel.load ? stockWeight(vessel.load) + people : 0
   const view: CarriageView = {
@@ -1871,6 +1901,7 @@ export function describeVessel(
   if (aboard.length > 0) {
     view.passengers = { residents: aboard, weight: `${Math.round(people)} kg of it people` }
   }
+  if (rower) view.rower = rower
   return view
 }
 

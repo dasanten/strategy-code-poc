@@ -1180,6 +1180,9 @@ pub const TERRAIN_FOOD: TerrainTable = TerrainTable(&[
     (Terrain::Forest as u8, 1.0),
     (Terrain::Hills as u8, 1.3),
     (Terrain::Mountain as u8, 2.0),
+    // Rowing or aboard a boat, as walking on Plains (`CONTEXT.md`: Rowing).
+    (Terrain::Lake as u8, 1.0),
+    (Terrain::Sea as u8, 1.0),
     // On a road residents eat as on Plains, whatever the terrain beneath.
     (Terrain::Road as u8, 1.0),
 ]);
@@ -1297,6 +1300,31 @@ pub const PASSENGER_WEIGHT: f64 = 70.0;
 /// goods together, so three residents and a little cargo, or a single rower's worth of goods eight
 /// times over. Its rower doesn't count against it.
 pub const BOAT_CAPACITY: f64 = 250.0;
+
+/// How fast an average rower moves a boat over water, as a share of walking on Plains
+/// (`CONTEXT.md`: Rowing): a little quicker than walking round the shore, so crossing pays off.
+pub const ROW_SPEED: f64 = 1.2;
+
+/// How much faster a boat goes for each point of its rower's Strength above
+/// `ROW_STRENGTH_AVERAGE`, and slower below it (`CONTEXT.md`: Seafaring: a stronger rower goes
+/// faster).
+pub const ROW_STRENGTH_EFFECT: f64 = 0.03;
+
+/// The Strength at which a rower moves a boat at `ROW_SPEED`.
+pub const ROW_STRENGTH_AVERAGE: f64 = 10.0;
+
+/// The furthest Strength speeds a boat up or slows it down, as a share of its speed.
+pub const ROW_STRENGTH_LIMIT: f64 = 0.3;
+
+/// How much faster a boat goes for each point of its rower's Seafaring skill.
+pub const SEAFARING_SKILL_EFFECT: f64 = 0.02;
+
+/// The furthest Seafaring speeds a boat up, as a share of its speed: a master rower, half as fast
+/// again, as a master driver.
+pub const SEAFARING_SKILL_LIMIT: f64 = 0.5;
+
+/// Seafaring a rower of average Intellect gains per game day of rowing, as Driving.
+pub const SEAFARING_SKILL_PER_DAY: f64 = 1.0;
 
 // `drivingLearned` takes a world type (`Resident`, `Horse` or `Stock`): it is ported with the world types, in `csp-sim`.
 
@@ -1910,6 +1938,7 @@ pub struct SkillValues {
     pub construction: f64,
     pub combat: f64,
     pub driving: f64,
+    pub seafaring: f64,
 }
 
 /// The most of each skill a resident can have (`CONTEXT.md`: Skill): where it stops making them
@@ -1923,6 +1952,7 @@ pub const SKILL_MAX: SkillValues = SkillValues {
     construction: CONSTRUCTION_SKILL_MAX,
     combat: COMBAT_SKILL_LIMIT / COMBAT_SKILL_EFFECT,
     driving: DRIVING_SKILL_LIMIT / DRIVING_SKILL_EFFECT,
+    seafaring: SEAFARING_SKILL_LIMIT / SEAFARING_SKILL_EFFECT,
 };
 
 /// Each skill learned by doing, in points per game day for a learner of average Intellect. Combat
@@ -1937,6 +1967,7 @@ pub const SKILL_PER_DAY: SkillValues = SkillValues {
     construction: CONSTRUCTION_SKILL_PER_DAY,
     combat: SKILL_MAX.combat / (TICKS_PER_GAME_YEAR / TICKS_PER_GAME_DAY),
     driving: DRIVING_SKILL_PER_DAY,
+    seafaring: SEAFARING_SKILL_PER_DAY,
 };
 
 // `trainingGain` takes a world type (`Resident`, `Horse` or `Stock`): it is ported with the world types, in `csp-sim`.
@@ -2412,6 +2443,13 @@ pub fn balance_json() -> Value {
     m.insert("CARRIAGE_MAX_CAPACITY".into(), json!(CARRIAGE_MAX_CAPACITY));
     m.insert("PASSENGER_WEIGHT".into(), json!(PASSENGER_WEIGHT));
     m.insert("BOAT_CAPACITY".into(), json!(BOAT_CAPACITY));
+    m.insert("ROW_SPEED".into(), json!(ROW_SPEED));
+    m.insert("ROW_STRENGTH_EFFECT".into(), json!(ROW_STRENGTH_EFFECT));
+    m.insert("ROW_STRENGTH_AVERAGE".into(), json!(ROW_STRENGTH_AVERAGE));
+    m.insert("ROW_STRENGTH_LIMIT".into(), json!(ROW_STRENGTH_LIMIT));
+    m.insert("SEAFARING_SKILL_EFFECT".into(), json!(SEAFARING_SKILL_EFFECT));
+    m.insert("SEAFARING_SKILL_LIMIT".into(), json!(SEAFARING_SKILL_LIMIT));
+    m.insert("SEAFARING_SKILL_PER_DAY".into(), json!(SEAFARING_SKILL_PER_DAY));
     m.insert("FOOD_SPOIL_PER_DAY".into(), json!(FOOD_SPOIL_PER_DAY));
     m.insert("REALM_LOG_LENGTH".into(), json!(REALM_LOG_LENGTH));
     m.insert("CRIME_MEMORY_DAYS".into(), json!(CRIME_MEMORY_DAYS));

@@ -40,7 +40,7 @@ use crate::queries::npc_trade::{npc_city_prices, npc_hire_price, spare_residents
 use crate::queries::offers::{offers_at, seen_offer};
 use crate::queries::territory::city_organization;
 use crate::queries::trader_trade::{trader_prices, trader_standing};
-use crate::queries::vessels::{vessel_load_level, vessel_passengers};
+use crate::queries::vessels::{rower_of, vessel_load_level, vessel_passengers};
 use crate::queries::warehouse::{trade_coin_warehouse, warehouse_prices};
 use crate::world_index::WorldIndex;
 
@@ -561,6 +561,7 @@ fn everything_seen(
                     .into_iter()
                     .map(|r| r.id.clone())
                     .collect(),
+                rower_id: rower_of(world, v).map(|r| r.id.clone()),
             }));
         }
     }

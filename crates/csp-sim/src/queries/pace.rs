@@ -6,8 +6,9 @@ use csp_shared::balance::{
     AGILITY_AVERAGE, AGILITY_LIMIT, AGILITY_SPEED_EFFECT, AGILITY_TERRAIN_EFFECT, CARRIAGE_SPEED,
     DRIVING_SKILL_EFFECT, DRIVING_SKILL_LIMIT, DRIVING_SKILL_PER_DAY, HORSE_ENDURANCE_EFFECT,
     HORSE_ENDURANCE_LIMIT, HORSE_HUNGRY_SHARE, HORSE_SPEED_EFFECT, HORSE_SPEED_LIMIT,
-    HORSE_STAT_AVERAGE, HUNGRY_HORSE_PACE, INTELLECT_AVERAGE, MAX_HUNGER, TERRAIN_SPEED,
-    WALK_TICKS_PER_TILE,
+    HORSE_STAT_AVERAGE, HUNGRY_HORSE_PACE, INTELLECT_AVERAGE, MAX_HUNGER, ROW_SPEED,
+    ROW_STRENGTH_AVERAGE, ROW_STRENGTH_EFFECT, ROW_STRENGTH_LIMIT, SEAFARING_SKILL_EFFECT,
+    SEAFARING_SKILL_LIMIT, SEAFARING_SKILL_PER_DAY, TERRAIN_SPEED, WALK_TICKS_PER_TILE,
 };
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{Horse, HorseStats, Resident, SkillName, StatName};
@@ -68,6 +69,27 @@ pub fn drive_speed(driver: &Resident, stats: &HorseStats, terrain: u8) -> f64 {
 pub fn ride_speed(rider: &Resident, horse: &Horse, terrain: u8) -> f64 {
     let hungry = horse.hunger < HORSE_HUNGRY_SHARE * MAX_HUNGER;
     drive_speed(rider, &horse.stats, terrain) * if hungry { HUNGRY_HORSE_PACE } else { 1.0 }
+}
+
+/// A resident's Seafaring skill (`CONTEXT.md`: Seafaring).
+pub fn seafaring_skill(r: &Resident) -> f64 {
+    r.skills.get(&SkillName::Seafaring).copied().unwrap_or(0.0)
+}
+
+/// How many tiles per tick a resident rows a boat (`CONTEXT.md`: Rowing, Seafaring): `ROW_SPEED`
+/// of walking on Plains, faster for a stronger rower and a more skilled one, the same on Lake and
+/// Sea.
+pub fn row_speed(r: &Resident, tick: f64) -> f64 {
+    let strength = stat_value(r, StatName::Strength, tick) - ROW_STRENGTH_AVERAGE;
+    let strong = 1.0 + clamp(strength * ROW_STRENGTH_EFFECT, ROW_STRENGTH_LIMIT);
+    let skilled = 1.0 + SEAFARING_SKILL_LIMIT.min(seafaring_skill(r) * SEAFARING_SKILL_EFFECT);
+    (ROW_SPEED * strong * skilled) / WALK_TICKS_PER_TILE
+}
+
+/// Seafaring a rower learns from one tick of rowing, as Driving is learned.
+pub fn seafaring_learned(r: &Resident, tick: f64) -> f64 {
+    let pace = stat_value(r, StatName::Intellect, tick) / INTELLECT_AVERAGE;
+    (SEAFARING_SKILL_PER_DAY / TICKS_PER_GAME_DAY) * pace
 }
 
 /// Driving skill a driver learns from one tick of driving (`drivingLearned`).

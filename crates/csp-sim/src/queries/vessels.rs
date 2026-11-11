@@ -48,16 +48,67 @@ pub fn vessel_aboard<'w>(world: &'w WorldState, r: &Resident) -> Option<&'w Vess
     vessel_by_id(world, r.aboard.as_deref()?)
 }
 
-/// The residents aboard a vessel (`CONTEXT.md`: Passenger).
-pub fn vessel_passengers<'w>(world: &'w WorldState, vessel_id: &str) -> Vec<&'w Resident> {
+/// Everyone aboard a vessel: its passengers and the one at its oars.
+pub fn aboard_vessel<'w>(world: &'w WorldState, vessel_id: &str) -> Vec<&'w Resident> {
     world.residents.iter().filter(|r| r.aboard.as_deref() == Some(vessel_id)).collect()
 }
 
+/// The passengers aboard a vessel (`CONTEXT.md`: Passenger, Rowing): everyone aboard but its rower.
+pub fn vessel_passengers<'w>(world: &'w WorldState, vessel_id: &str) -> Vec<&'w Resident> {
+    let rower = vessel_by_id(world, vessel_id).and_then(|v| v.rower_id.as_deref());
+    aboard_vessel(world, vessel_id).into_iter().filter(|r| Some(r.id.as_str()) != rower).collect()
+}
+
 /// What a vessel still holds, in kg (`CONTEXT.md`: Beside a vessel): its capacity less its goods
-/// and a fixed weight for each passenger, as on a carriage.
+/// and a fixed weight for each passenger, as on a carriage; its rower doesn't count (Rowing).
 pub fn vessel_room(world: &WorldState, v: &Vessel) -> f64 {
     let people = vessel_passengers(world, &v.id).len() as f64;
     vessel_capacity(v) - stock_weight(&v.load) - people * PASSENGER_WEIGHT
+}
+
+/// The resident at a vessel's oars, if they are aboard it (`CONTEXT.md`: Rowing).
+pub fn rower_of<'w>(world: &'w WorldState, v: &Vessel) -> Option<&'w Resident> {
+    let id = v.rower_id.as_deref()?;
+    world.residents.iter().find(|r| r.id == id && r.aboard.as_deref() == Some(v.id.as_str()))
+}
+
+/// Whether a vessel is being rowed now: its rower holds a row order for it.
+pub fn being_rowed(world: &WorldState, v: &Vessel) -> bool {
+    rower_of(world, v).is_some_and(|r| {
+        matches!(&r.order, Some(csp_shared::world::ResidentOrder::Row(o)) if o.vessel_id == v.id)
+    })
+}
+
+/// The water tile a row order to (x, y) goes to (`CONTEXT.md`: Rowing): a water tile itself;
+/// given a land tile, the free water tile beside it nearest the vessel (no other vessel on it),
+/// a straight one before a diagonal one as near. `None` for a land tile with no free water beside.
+pub fn row_target(
+    world: &WorldState,
+    map: &TerrainMap,
+    v: &Vessel,
+    x: i32,
+    y: i32,
+) -> Option<(i32, i32)> {
+    let (x, y) = (wrap(x, map.size), wrap(y, map.size));
+    if is_water(terrain_at(map, x, y)) {
+        return Some((x, y));
+    }
+    let from = (v.x as i32, v.y as i32);
+    let mut best: Option<((i32, i32), f64)> = None;
+    for (dx, dy) in AROUND {
+        let t = (wrap(x + dx, map.size), wrap(y + dy, map.size));
+        if !is_water(terrain_at(map, t.0, t.1)) {
+            continue;
+        }
+        if vessel_at(world, t.0, t.1).is_some_and(|o| o.id != v.id) {
+            continue;
+        }
+        let d = wrap_distance(map.size, t, from);
+        if best.is_none_or(|(_, b)| d < b - 1e-9) {
+            best = Some((t, d));
+        }
+    }
+    best.map(|(t, _)| t)
 }
 
 /// How many more whole units of a good fit on a vessel.

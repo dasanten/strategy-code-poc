@@ -349,6 +349,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 description: "How far they have learned driving.",
                 null_when: Some("until they start learning it"),
             },
+            ScriptField {
+                name: "seafaring",
+                r#type: ScriptType::Number,
+                description: "How far they have learned seafaring, by rowing.",
+                null_when: Some("until they start learning it"),
+            },
         ],
     },
     ScriptView {
@@ -1675,6 +1681,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 description: "The residents aboard it as passengers.",
                 null_when: None,
             },
+            ScriptField {
+                name: "rowerId",
+                r#type: ScriptType::String,
+                description: "The one aboard at its oars, who rows it or rowed it last; no passenger.",
+                null_when: Some("when nobody is at its oars"),
+            },
         ],
     },
     ScriptView {
@@ -2528,6 +2540,14 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         params: &["carriageId"],
         cost: 10.0,
         description: "Get on a carriage of my realm on my tile, or a boat of my realm beside me (on land touching its water tile), as a passenger, and go along with it. Riders dismount first: no horse goes aboard.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "row",
+        is: Is::Action,
+        params: &["vessel", "x", "y"],
+        cost: 10.0,
+        description: "Row a boat of my realm, by it or its id, to the water tile x, y, or to the nearest free water tile beside it when x, y is land. I must be aboard it or beside it (I board first), and grown. A Step at a time over water; my Strength and Seafaring set the pace, and rowing teaches Seafaring. My order is \"row\" until it gets there.",
         returns: ScriptType::String,
     },
     ScriptBinding {

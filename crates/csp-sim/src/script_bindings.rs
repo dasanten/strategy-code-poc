@@ -313,6 +313,7 @@ fn skill_name(s: SkillName) -> &'static str {
         SkillName::Farming => "farming",
         SkillName::Combat => "combat",
         SkillName::Driving => "driving",
+        SkillName::Seafaring => "seafaring",
     }
 }
 
@@ -1493,6 +1494,7 @@ impl<'a> ScriptBindings<'a> {
                 self.request("hitch", vec![("carriageId", place(0)?), ("horseId", place(1)?)])
             }
             "board" => self.request("board", vec![("carriageId", p(0)?)]),
+            "row" => self.request("row", vec![("vesselId", place(0)?), ("x", p(1)?), ("y", p(2)?)]),
             "getOff" => {
                 let given = a(0).filter(|v| !v.is_null()).or(a(1).filter(|v| !v.is_null()));
                 let input = if given.is_none() { vec![] } else { vec![("x", p(0)?), ("y", p(1)?)] };

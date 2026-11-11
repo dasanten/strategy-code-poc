@@ -427,6 +427,8 @@ describe('every resident order on the group card', () => {
     ...residentActions(everything(farm)),
     ...residentActions({ ...everything(stable), horseToRide: false, riding: true }),
     ...residentActions(everything(ground)),
+    // Beside a boat, with no carriage to drive (`CONTEXT.md`: Rowing).
+    ...residentActions({ ...everything(farm), carriage: undefined, boatToRow: {} }),
   ].map((a) => a.id)
 
   it('has a counterpart on the group card for each, or says why it goes to one resident only', () => {
@@ -446,6 +448,7 @@ describe('every resident order on the group card', () => {
       'makeLeader',
       'pair',
       'rename',
+      'row',
       'stealHorse',
     ])
   })

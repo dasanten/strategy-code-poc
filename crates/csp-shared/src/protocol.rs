@@ -306,6 +306,10 @@ pub struct SeenVessel {
     pub load_level: LoadLevel,
     /// The residents aboard it as passengers (`CONTEXT.md`: Beside a vessel).
     pub passenger_ids: Vec<String>,
+    /// The one aboard at its oars, no passenger (`CONTEXT.md`: Rowing).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub rower_id: Option<String>,
 }
 
 /// Which script an army runs, without its memory.

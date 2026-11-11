@@ -150,8 +150,13 @@ fn takes_a_diagonal_step_only_between_two_steppable_tiles_using_up_root_2_of_pro
             progress: 2.0,
             army: None,
         }));
-        let action =
-            StepAction { resident_id: "w1".into(), to: (x, y), carriage_id: None, horse_id: None };
+        let action = StepAction {
+            resident_id: "w1".into(),
+            to: (x, y),
+            carriage_id: None,
+            horse_id: None,
+            vessel_id: None,
+        };
         walking.resolve(world, &mut scratch, &[action])
     };
     let walk = |world: &WorldState| match &w1(world).order {

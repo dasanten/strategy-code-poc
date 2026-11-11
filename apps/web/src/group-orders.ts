@@ -754,6 +754,7 @@ export const GROUP_COUNTERPARTS: Record<
   unhitch: ['unhitch'],
   hitch: { none: 'one resident hitches one horse' },
   drive: ['drive'],
+  row: { none: 'one resident rows one boat' },
   driveOff: { none: 'one resident steals one carriage' },
   hitchOff: { none: 'one resident steals one horse' },
   stealHorse: { none: 'one resident steals one horse' },

@@ -62,6 +62,13 @@ import {
   DODGE_PER_AGILITY,
   DRIVING_SKILL_EFFECT,
   DRIVING_SKILL_LIMIT,
+  ROW_SPEED,
+  ROW_STRENGTH_AVERAGE,
+  ROW_STRENGTH_EFFECT,
+  ROW_STRENGTH_LIMIT,
+  SEAFARING_SKILL_EFFECT,
+  SEAFARING_SKILL_LIMIT,
+  SEAFARING_SKILL_PER_DAY,
   DRIVING_SKILL_PER_DAY,
   STARVE_DAYS,
   DOWN_DAYS,
@@ -1938,6 +1945,28 @@ export function Wiki() {
           holds with its passengers counted in: Store and Fetch with the boat as the place (they
           walk to the shore beside it), or a pick-up or drop at <code>{'{kind: "vessel"}'}</code>{' '}
           from a script. Residents and goods only: a boat takes no horse or carriage.
+        </p>
+        <p>
+          <b>Rowing.</b> A grown resident aboard a boat of their realm, or beside it (they board
+          first), rows it to a water tile: Row boat to on their card, then a tile on the map, or a
+          script's <code>row(boat, x, y)</code>. Given a land tile, the boat goes to the nearest
+          free water tile beside it. It goes a Step at a time over water only, Lake and Sea alike,
+          and a diagonal Step only where both straight tiles beside it are water too, so it never
+          squeezes between two pieces of land. The rower takes its oars and is no passenger: they
+          don't count against what it holds, and whoever was at the oars before becomes a passenger.
+          Everyone aboard goes along and sees from the boat's tile, so rowing along a coast explores
+          it. On the map the boat glides from tile to tile, and the rower's Doing line says where it
+          is heading. A boat nobody rows stays where it is; it never drifts. Walking never uses a
+          boat: a walk across water still goes round on land.
+        </p>
+        <p>
+          An average rower moves a boat {num(ROW_SPEED)} times as fast as walking on Plains. Each
+          point of Strength above {num(ROW_STRENGTH_AVERAGE)} makes it {pct(ROW_STRENGTH_EFFECT)}{' '}
+          faster (and each below, slower), at most {pct(ROW_STRENGTH_LIMIT)} either way. Rowing
+          teaches <b>Seafaring</b>, {num(SEAFARING_SKILL_PER_DAY)} a game day of rowing at average
+          Intellect, and each point of it makes the boat {pct(SEAFARING_SKILL_EFFECT)} faster, at
+          most {pct(SEAFARING_SKILL_LIMIT)}. Rowing costs food as walking on Plains does. The rower
+          and passengers eat their own food and, running low, take a meal from the boat's Food.
         </p>
       </Section>
 

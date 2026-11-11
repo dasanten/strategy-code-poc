@@ -190,7 +190,10 @@ export function drawUnits(
   // they are found at it.
   const passengers = new Set([
     ...world.carriages.flatMap((k) => k.passengerIds ?? []),
-    ...(world.vessels ?? []).flatMap((v) => v.passengerIds ?? []),
+    ...(world.vessels ?? []).flatMap((v) => [
+      ...(v.passengerIds ?? []),
+      ...(v.rowerId ? [v.rowerId] : []),
+    ]),
   ])
   for (const k of world.carriages) {
     const aside = built.has(key(k))
@@ -217,7 +220,7 @@ export function drawUnits(
     const r = unitRadius('boat', tile)
     drawUnit(tokens, UNIT_ART.boat, ...p, r, entityRelationship(v, viewer, known))
     // Its passengers ride inside it, counted on it as on a cart (`CONTEXT.md`: Beside a vessel).
-    const aboard = v.passengerIds ?? []
+    const aboard = [...(v.passengerIds ?? []), ...(v.rowerId ? [v.rowerId] : [])]
     if (aboard.length > 0) badge(`${aboard.length}`, ...p, r)
     for (const id of [v.id, ...aboard]) spots.set(id, { x: p[0], y: p[1], r })
   }

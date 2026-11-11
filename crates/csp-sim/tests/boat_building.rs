@@ -62,7 +62,15 @@ fn build(resident: &str) -> serde_json::Value {
 }
 
 fn boat(id: &str, x: f64, y: f64) -> Vessel {
-    Vessel { id: id.into(), kind: VesselKind::Boat, realm_id: None, x, y, load: Stock::new() }
+    Vessel {
+        id: id.into(),
+        kind: VesselKind::Boat,
+        realm_id: None,
+        x,
+        y,
+        load: Stock::new(),
+        rower_id: None,
+    }
 }
 
 /// A boat site on (19, 6) with all its materials and all but half a tick's work.

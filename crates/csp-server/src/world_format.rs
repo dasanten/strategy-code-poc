@@ -33,6 +33,7 @@ pub fn migrations() -> BTreeMap<u32, MigrationStep> {
     steps.insert(111, drop_remembered_breeding);
     steps.insert(112, vessels_come_in);
     steps.insert(113, goods_go_aboard);
+    steps.insert(114, boats_are_rowed);
     steps
 }
 
@@ -66,6 +67,13 @@ fn vessels_come_in(state: Value, _: &MigrationContext<'_>) -> Value {
 /// or spot. A world from before has none of them, so it stays as it is; the bump keeps a server of
 /// format 113, which refuses a kind it doesn't know, from loading one that has.
 fn goods_go_aboard(state: Value, _: &MigrationContext<'_>) -> Value {
+    state
+}
+
+/// 114 → 115: boats are rowed (`CONTEXT.md`: Rowing, Seafaring, T90.4): a vessel may name its
+/// `rowerId`, a resident a `row` order and the `seafaring` skill. A world from before has none of
+/// them, so it stays as it is; the bump keeps a server of format 114 from loading one that has.
+fn boats_are_rowed(state: Value, _: &MigrationContext<'_>) -> Value {
     state
 }
 
@@ -215,6 +223,20 @@ mod tests {
         });
         let migrated = migrate_world_with(save.clone(), 113, &ctx, &migrations(), 114).unwrap();
         assert_eq!(migrated, save);
+    }
+
+    #[test]
+    fn step_114_keeps_a_world_whose_boats_nobody_rowed() {
+        let terrain = ctx_terrain();
+        let ctx = MigrationContext { terrain: &terrain };
+        let save = json!({
+            "tick": 3,
+            "residents": [{ "id": "w1", "aboard": "boat1", "skills": { "driving": 2 } }],
+            "vessels": [{ "id": "boat1", "kind": "boat", "x": 4, "y": 5, "load": {} }],
+        });
+        let migrated = migrate_world_with(save.clone(), 114, &ctx, &migrations(), 115).unwrap();
+        assert_eq!(migrated, save);
+        assert!(migrated["vessels"][0].get("rowerId").is_none());
     }
 
     #[test]
