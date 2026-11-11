@@ -118,8 +118,14 @@ pub fn run(
         max_call_depth: options.max_call_depth,
         limits: options.limits,
         host,
-        scopes: vec![ScopeData { parent: None, bindings: Vec::new() }],
-        functions: Vec::new(),
+        // Room for a typical run's scopes and functions from the start, rather than growing to
+        // it one doubling at a time (T89.6).
+        scopes: {
+            let mut scopes = Vec::with_capacity(64);
+            scopes.push(ScopeData { parent: None, bindings: Vec::with_capacity(16) });
+            scopes
+        },
+        functions: Vec::with_capacity(32),
         run: Rc::new(()),
     };
     let outcome = interpreter.program(program);
@@ -157,9 +163,38 @@ fn failure(message: impl Into<String>, at: Position) -> Signal {
     Signal::Failure(Box::new((message.into(), at)))
 }
 
-struct Binding {
+struct Binding<'p> {
     value: Value,
     constant: bool,
+    /// A function declared here whose name hasn't been read yet: it is made when it first is,
+    /// so declaring costs nothing (`CONTEXT.md`: Step budget). `value` is null until then.
+    declared: Option<&'p FunctionDeclaration>,
+}
+
+thread_local! {
+    /// Function names already made, by where the program holds them. A program run every tick
+    /// (an NPC default) declares the same functions each run: they share their name rather than
+    /// copying it each time (T89.6). Checked against the text, so a program freed and another
+    /// put where it was costs only a new copy.
+    static NAMES: std::cell::RefCell<rustc_hash::FxHashMap<(usize, usize), Rc<str>>> =
+        std::cell::RefCell::default();
+}
+
+/// The function name `name` as a shared string, the same one each run of its program.
+fn shared_name(name: &str) -> Rc<str> {
+    NAMES.with(|names| {
+        let mut names = names.borrow_mut();
+        let at = (name.as_ptr() as usize, name.len());
+        if let Some(shared) = names.get(&at).filter(|s| ***s == *name) {
+            return shared.clone();
+        }
+        if names.len() >= 4096 {
+            names.clear();
+        }
+        let shared: Rc<str> = Rc::from(name);
+        names.insert(at, shared.clone());
+        shared
+    })
 }
 
 /// The global scope, where the host's globals are kept once read.
@@ -167,7 +202,7 @@ const GLOBALS: usize = 0;
 
 struct ScopeData<'p> {
     parent: Option<usize>,
-    bindings: Vec<(&'p str, Binding)>,
+    bindings: Vec<(&'p str, Binding<'p>)>,
 }
 
 struct FunctionDef<'p> {
@@ -236,7 +271,7 @@ impl<'p> Interpreter<'p, '_> {
         if bindings.iter().any(|(n, _)| *n == name) {
             return false;
         }
-        bindings.push((name, Binding { value, constant: false }));
+        bindings.push((name, Binding { value, constant: false, declared: None }));
         true
     }
 
@@ -251,7 +286,7 @@ impl<'p> Interpreter<'p, '_> {
             if s == GLOBALS {
                 let value = self.host.global(name)?;
                 let bindings = &mut self.scopes[GLOBALS].bindings;
-                bindings.push((name, Binding { value, constant: true }));
+                bindings.push((name, Binding { value, constant: true, declared: None }));
                 return Some((GLOBALS, bindings.len() - 1));
             }
             at = self.scopes[s].parent;
@@ -259,7 +294,7 @@ impl<'p> Interpreter<'p, '_> {
         None
     }
 
-    fn binding(&mut self, (scope, index): (usize, usize)) -> &mut Binding {
+    fn binding(&mut self, (scope, index): (usize, usize)) -> &mut Binding<'p> {
         &mut self.scopes[scope].bindings[index].1
     }
 
@@ -274,7 +309,7 @@ impl<'p> Interpreter<'p, '_> {
         Value::Function(ScriptFunction(Rc::new(FunctionHandle {
             run: self.run.clone(),
             index: self.functions.len() - 1,
-            name: name.to_string(),
+            name: shared_name(name),
         })))
     }
 
@@ -299,13 +334,18 @@ impl<'p> Interpreter<'p, '_> {
         Ok(())
     }
 
+    /// Declares a function as its block starts: no step (`CONTEXT.md`: Step budget, Daniel,
+    /// 2026-11-10), and the function itself is made only when its name is first read, so one
+    /// never called costs nothing at all. A name already declared in the block fails here, as
+    /// before.
     #[inline(never)]
     fn declare_function(&mut self, f: &'p FunctionDeclaration, scope: usize) -> Eval<()> {
-        self.step(f.position(), 1)?;
-        let function = self.new_function(&f.name, &f.params, &f.body, scope);
-        if !self.declare(scope, &f.name, function) {
+        let bindings = &mut self.scopes[scope].bindings;
+        if bindings.iter().any(|(n, _)| *n == f.name) {
             return Err(already_declared(&f.name, f.position()));
         }
+        bindings
+            .push((&f.name, Binding { value: Value::Null, constant: false, declared: Some(f) }));
         Ok(())
     }
 
@@ -453,7 +493,15 @@ impl<'p> Interpreter<'p, '_> {
     #[inline(never)]
     fn identifier(&mut self, e: &'p Identifier, scope: usize) -> Eval<Value> {
         match self.lookup(scope, &e.name) {
-            Some(at) => Ok(self.binding(at).value.clone()),
+            Some(at) => {
+                // A declared function is made the first time its name is read, in the scope it
+                // was declared in, and kept: every read after sees the same function.
+                if let Some(f) = self.binding(at).declared.take() {
+                    let function = self.new_function(&f.name, &f.params, &f.body, at.0);
+                    self.binding(at).value = function;
+                }
+                Ok(self.binding(at).value.clone())
+            }
             None => Err(not_defined(&e.name, e.position())),
         }
     }
@@ -645,7 +693,10 @@ impl<'p> Interpreter<'p, '_> {
                     );
                 }
                 let value = self.expression(&node.value, scope)?;
-                self.binding(at).value = value.clone();
+                let binding = self.binding(at);
+                // Assigned over before it was read, a declared function is never made.
+                binding.declared = None;
+                binding.value = value.clone();
                 Ok(value)
             }
             AssignTarget::Member(target) => {

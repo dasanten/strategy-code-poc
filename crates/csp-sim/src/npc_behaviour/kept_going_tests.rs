@@ -177,7 +177,6 @@ mod an_npc_resident_carrying_a_child {
     }
 
     #[test]
-    #[ignore = "4 s alone, 12 s in a full run; see #1092"]
     fn at_home_with_an_empty_storage_eats_once_the_farms_crew_brings_food_home() {
         let Village { mut world, terrain, city, home } = village(None);
         let a = &mut world.residents[0];
@@ -417,7 +416,6 @@ mod after_a_leader_death {
     use super::*;
 
     #[test]
-    #[ignore = "22 s alone; see #1092"]
     fn a_full_farm_carries_its_food_home_so_those_who_were_not_working_do_not_go_down() {
         let mut s = realm_in_play();
         s.fill_farm();
@@ -452,7 +450,6 @@ mod after_a_leader_death {
     }
 
     #[test]
-    #[ignore = "4 s alone, 8 s in a full run; see #1092"]
     fn a_resident_gets_a_job_or_walks_home_whatever_order_or_task_they_had() {
         let mut s = realm_in_play();
         s.world.buildings[s.storage].stock = Some(food(200.0));

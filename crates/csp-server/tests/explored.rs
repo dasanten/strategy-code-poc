@@ -102,10 +102,18 @@ fn ten_welcomes_on_a_full_size_map_take_well_under_a_second() {
     }
     save_explored(&conn, &mut before, 0).unwrap();
     let explored = load_explored(&conn, full, &[]).unwrap();
-    let start = Instant::now();
-    for _ in 0..10 {
-        explored.explored_chunks(id);
-    }
-    assert!(start.elapsed().as_millis() < 100);
+    // The fastest of three tries: a moment of load on a busy machine slows one try, not all
+    // three (T89.6), so the time stays a check of the work.
+    let welcomed_in = (0..3)
+        .map(|_| {
+            let start = Instant::now();
+            for _ in 0..10 {
+                std::hint::black_box(explored.explored_chunks(id));
+            }
+            start.elapsed().as_millis()
+        })
+        .min()
+        .expect("three tries");
+    assert!(welcomed_in < 100, "{welcomed_in} ms");
     assert_eq!(explored.explored_chunks(id), before.explored_chunks(id));
 }

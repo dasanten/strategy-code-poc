@@ -216,7 +216,7 @@ fn a_smith_takes_the_iron_and_wood_for_spears_from_the_storage_before_setting_ou
 }
 
 #[test]
-#[ignore = "32.1 s with eight at once; see #1092"]
+#[ignore = "13.9 s alone; see #1132"]
 fn a_town_with_forest_stone_and_iron_in_reach_builds_the_chain_and_arms_its_soldiers() {
     use ResourceKind::{Forest, IronOre, Stone};
     let (mut world, terrain, city) = city_with(&NPC_TOWN, &[Forest, Stone, IronOre]);
@@ -247,7 +247,7 @@ fn a_town_with_forest_stone_and_iron_in_reach_builds_the_chain_and_arms_its_sold
 }
 
 #[test]
-#[ignore = "15.9 s with eight at once; see #1092"]
+#[ignore = "6.7 s alone; see #1132"]
 fn a_village_with_no_iron_in_reach_stays_short_of_weapons_and_is_still_fed() {
     let (mut world, terrain, city) = city_with(&NPC_VILLAGE, &[ResourceKind::Forest]);
     let people = city_residents(&world, &city).len();

@@ -50,7 +50,9 @@ use crate::script_params::{
     with_target_param, ParamWithValue,
 };
 use crate::scripts::RunnableScript;
-use crate::sight::{entities_in_sight, sight_of, InvariantViolation, SightCache};
+use crate::sight::{
+    building_in_sight, entities_in_sight, places_in_sight, sight_of, InvariantViolation, SightCache,
+};
 use crate::tick::{RunScripts, Scratch, ScriptErrorWhere};
 use crate::workplace_settings::{
     start_work_by_settings, with_work_settings, work_script_id, work_settings_of, WorkMemory,
@@ -1446,6 +1448,14 @@ impl ScriptRunner {
                 let mut cache = sight.borrow_mut();
                 entities_in_sight(world_ref, index, Some(realm_id), cache.as_mut())
             };
+            let places = || {
+                let mut cache = sight.borrow_mut();
+                places_in_sight(world_ref, index, realm_id, None, cache.as_mut()).seen
+            };
+            let place = |b: &csp_shared::world::Building| {
+                let mut cache = sight.borrow_mut();
+                building_in_sight(world_ref, index, realm_id, b, cache.as_mut())
+            };
             let eyes = || {
                 let mut cache = sight.borrow_mut();
                 sight_of(world_ref, index, realm_id, cache.as_mut())
@@ -1459,6 +1469,8 @@ impl ScriptRunner {
                 army_id: r.army.then_some(r.id.as_str()),
                 memory: memory.clone(),
                 seen: &seen,
+                places: Some(&places),
+                place: Some(&place),
                 eyes: &eyes,
                 explored: &explored,
                 kinds: &self.kinds,
@@ -1804,7 +1816,7 @@ pub fn run_npc_scripts(
     terrain: &TerrainMap,
     scratch: &mut Scratch,
 ) -> usize {
-    let kinds = order_kinds();
+    let kinds = npc_order_kinds();
     let npc: Vec<&City> = world.cities.iter().filter(|c| c.realm_id.is_none()).collect();
     let mut by_city: Vec<(City, Vec<String>)> = Vec::new();
     for r in &world.residents {
@@ -1827,13 +1839,20 @@ pub fn run_npc_scripts(
     let mut runs = 0;
     let mut waiting = std::mem::take(&mut scratch.waiting);
     for (city, people) in by_city {
-        runs += run_city_scripts(world, terrain, scratch, &mut waiting, &city, &people, &kinds);
+        runs += run_city_scripts(world, terrain, scratch, &mut waiting, &city, &people, kinds);
     }
     scratch.waiting = waiting;
     if opened {
         scratch.sight = None;
     }
     runs
+}
+
+/// The order kinds an NPC city's script requests go through. They are the same every tick and
+/// hold nothing that changes, so they are made once rather than every tick (T89.6).
+fn npc_order_kinds() -> &'static OrderKinds {
+    static KINDS: std::sync::OnceLock<OrderKinds> = std::sync::OnceLock::new();
+    KINDS.get_or_init(order_kinds)
 }
 
 /// Runs one NPC city's residents' scripts; returns how many ran (`runCityScripts`).
@@ -1874,6 +1893,14 @@ fn run_city_scripts(
                 let mut cache = sight.borrow_mut();
                 entities_in_sight(world_ref, index, Some(&city.id), cache.as_mut())
             };
+            let places = || {
+                let mut cache = sight.borrow_mut();
+                places_in_sight(world_ref, index, &city.id, None, cache.as_mut()).seen
+            };
+            let place = |b: &csp_shared::world::Building| {
+                let mut cache = sight.borrow_mut();
+                building_in_sight(world_ref, index, &city.id, b, cache.as_mut())
+            };
             let eyes = || {
                 let mut cache = sight.borrow_mut();
                 sight_of(world_ref, index, &city.id, cache.as_mut())
@@ -1893,6 +1920,8 @@ fn run_city_scripts(
                 army_id: None,
                 memory: memory.clone(),
                 seen: &seen,
+                places: Some(&places),
+                place: Some(&place),
                 eyes: &eyes,
                 explored: &explored,
                 kinds,
@@ -2182,9 +2211,10 @@ mod working_site_tests;
 thread_local! {
     /// The params each script source declares (`scriptParams`), by source. Reading them parses
     /// the source; a source's params never change, and every resident running it reads them
-    /// every tick, so each source is read once.
-    static SOURCE_PARAMS: RefCell<HashMap<String, Arc<Vec<csp_lang::ParamInfo>>>> =
-        RefCell::new(HashMap::new());
+    /// every tick, so each source is read once. Looking a source up hashes all of it, so with
+    /// `FxHash` (T89.6).
+    static SOURCE_PARAMS: RefCell<rustc_hash::FxHashMap<String, Arc<Vec<csp_lang::ParamInfo>>>> =
+        RefCell::default();
 }
 
 /// `script_params(source)`, read once per source (`SOURCE_PARAMS`).

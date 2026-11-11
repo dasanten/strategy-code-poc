@@ -67,6 +67,9 @@ use csp_lang::ParamType;
 /// the next place its scout goes. Takes whether one can go onto a tile, and the tiles to skip.
 pub type ScoutEdge<'a> = &'a dyn Fn(&dyn Fn(i32, i32) -> bool, &[(i32, i32)]) -> Option<(i32, i32)>;
 
+/// One building as the side sees it, if it does (`ScriptContext.place`).
+pub type PlaceInSight<'a> = &'a dyn Fn(&Building) -> Option<SeenEntity>;
+
 /// What one run of a resident's or army's script may look at and act for (`ScriptContext`).
 pub struct ScriptContext<'a> {
     pub world: &'a WorldState,
@@ -82,6 +85,13 @@ pub struct ScriptContext<'a> {
     pub memory: Object,
     /// Everything the Player sees (`entitiesInSight`); called at most once a run.
     pub seen: &'a dyn Fn() -> Arc<Vec<SeenEntity>>,
+    /// The buildings and cities in `seen`, as it lists them (`placesInSight`): enough to show one
+    /// building without working out everything else in sight (T89.6). Called at most once a run;
+    /// without it a building is looked for in `seen`.
+    pub places: Option<&'a dyn Fn() -> Arc<Vec<SeenEntity>>>,
+    /// One building as `places` shows it, if it is in sight (`building_in_sight`): what
+    /// `building(id)` needs, without the rest. Without it the building is looked for in `places`.
+    pub place: Option<PlaceInSight<'a>>,
     /// The side's eyes (`sightOf`); called at most once a run.
     pub eyes: &'a dyn Fn() -> Arc<Eyes>,
     /// Whether the Player has explored a tile.
@@ -239,6 +249,18 @@ fn field_value<T: serde::Serialize>(t: &T, ty: ScriptType) -> Value {
     view_value(&serde_json::to_value(t).unwrap_or(Json::Null), ty)
 }
 
+/// A resident's order as its view (`residentOrder`), through its plain data less the path of a
+/// moving order: the view has no `path`, and a walk's path can run to hundreds of tiles, each of
+/// which would become a JSON object only to be dropped (T89.6).
+fn order_value(order: Option<&ResidentOrder>, ty: ScriptType) -> Value {
+    let Some(order) = order else { return Value::Null };
+    let mut order = order.clone();
+    if let Some((path, _)) = crate::walking::order_path_mut(&mut order) {
+        *path = None;
+    }
+    field_value(&order, ty)
+}
+
 /// Numbers by name as a view of number fields, such as `goods` or `skills`: each field the
 /// number `named` gives it, `null` for none.
 fn numbers_view<K: Copy>(
@@ -335,7 +357,7 @@ fn resident_view(world: &WorldState, r: &Resident, side: Option<&str>, alarm: bo
             "stats" => stats_view(&r.stats),
             "skills" => numbers_view("skills", &r.skills, skill_name),
             "carried" => numbers_view("goods", &r.carried, good_name),
-            "order" => field_value(&r.order, f.r#type),
+            "order" => order_value(r.order.as_ref(), f.r#type),
             "orderEnded" => field_value(&r.order_ended, f.r#type),
             "queue" => match &r.queue {
                 Some(q) => field_value(&queue_view(q), f.r#type),
@@ -540,6 +562,7 @@ pub struct ScriptBindings<'a> {
     for_me: (&'static str, String),
     random: f64,
     seen: OnceCell<Arc<Vec<SeenEntity>>>,
+    places: OnceCell<Arc<Vec<SeenEntity>>>,
     eyes: OnceCell<Arc<Eyes>>,
     thieves: OnceCell<HashSet<String>>,
     /// The order requests the script's actions asked for and that were accepted, in order.
@@ -587,6 +610,7 @@ pub fn bind_script(ctx: ScriptContext<'_>) -> Result<ScriptBindings<'_>, HostErr
         for_me,
         random,
         seen: OnceCell::new(),
+        places: OnceCell::new(),
         eyes: OnceCell::new(),
         thieves: OnceCell::new(),
         requests: Vec::new(),
@@ -613,6 +637,15 @@ impl<'a> ScriptBindings<'a> {
 
     fn seen(&self) -> &Arc<Vec<SeenEntity>> {
         self.seen.get_or_init(|| (self.ctx.seen)())
+    }
+
+    /// What in sight a building or a city is looked for in: the places in sight, whose buildings
+    /// and cities are `seen`'s in the same order, or `seen` itself.
+    fn seen_places(&self) -> &Arc<Vec<SeenEntity>> {
+        match self.ctx.places {
+            Some(places) => self.places.get_or_init(places),
+            None => self.seen(),
+        }
     }
 
     /// Whether the side sees a tile (`inSight`).
@@ -752,11 +785,15 @@ impl<'a> ScriptBindings<'a> {
         if !eyes.building_seen(crate::queries::names::placed(b)) {
             return None;
         }
-        let shown = self
-            .seen()
-            .iter()
-            .find(|e| matches!(e, SeenEntity::Building(sb) if sb.building.id == b.id))?;
-        Some(Json::Object(merge(untagged(shown), Some(self.building_extras(&b.id)))))
+        let shown = match self.ctx.place {
+            Some(place) => place(b)?,
+            None => self
+                .seen_places()
+                .iter()
+                .find(|e| matches!(e, SeenEntity::Building(sb) if sb.building.id == b.id))?
+                .clone(),
+        };
+        Some(Json::Object(merge(untagged(&shown), Some(self.building_extras(&b.id)))))
     }
 
     /// One of the side's own buildings as `building(id)` gives it, built from the struct rather
@@ -832,7 +869,7 @@ impl<'a> ScriptBindings<'a> {
     /// Who occupies a seen city's town hall and the ticks left (`occupationSeen`).
     fn occupation_seen(&self, id: &str) -> Map<String, Json> {
         let mut m = Map::new();
-        let city = self.seen().iter().find_map(|e| match e {
+        let city = self.seen_places().iter().find_map(|e| match e {
             SeenEntity::City(c) if c.city.id == id => Some(c),
             _ => None,
         });

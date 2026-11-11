@@ -516,7 +516,6 @@ fn a_soldier_on_the_hall_blocks_an_occupation_without_any_alarm() {
 }
 
 #[test]
-#[ignore = "9 s alone; see #1092"]
 fn those_on_posts_along_a_wall_stay_fed_from_the_storage() {
     let mut s = staged(6, 40.0);
     let mut running = Running::new(&s.terrain);

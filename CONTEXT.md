@@ -812,35 +812,35 @@ The shared language of the game. Domain terms only — no implementation details
      storage holding the most Food stays one and takes all the Food, and a city with no other has no
      warehouse. A city with no storage at all gets an empty storage and an empty warehouse. Workplaces
      its residents worked that aren't on its books stay the post's own, and its gates open as it joins.
-  Its army travels with a **supply wagon**, when the HQ has a free adult to drive it: a new Trade Org
-  carriage and horse, loaded at the HQ with Food for the whole trip as far as that leaves room for what
-  it takes. It follows the army (Supply line) and its soldiers refill from it, go to meet it when they
-  run out with it out of reach, and put on it what they take when it is near. It is robbed like a
-  caravan's: taking from it or stealing it is a crime and its soldiers go after those who do, and its
-  crew is lost like one (Caravan crew lost): a soldier takes over from a dead driver, unless they are
-  the last, and with no crew left the HQ sends a new driver on foot, who packs for the walk. Stolen,
-  or with its horse dead, it is gone for the army, which goes on with what it carries. It comes home
-  with them, or by itself once they are lost, and its whole load goes into the warehouses; the carriage
-  and horse go back into the HQ's stock. And short of Food on the way its army
-  buys some from a post, NPC city or Player's offer it passes. Each soldier packs Coins at the HQ for
-  this and hands in what is left back home. A soldier is short when the rest of the trip takes more
-  than they carry and their share of the wagon's Food; with Coins left, they go to such a place near
-  them and buy by the same trade anyone uses, cut down the same way, and carry on. An NPC city that
-  refuses the Trade Organization sells them nothing. They don't buy from the Organization they are
-  punishing, from one the Trade Organization refuses to trade with, or at an offer asking too much.
-  Coins and Food they brought or bought are their own: none of it counts as what the army took. With
-  no seller near they go on hungry. A captured post the Trade Organization
-  has heard of (Lost post found out) is a debt too, for its worth, added to what is owed: it demands
-  the city back. Returning it takes the post's worth off the debt; anything else owed stays, and gets
-  its own demand for Coins. A demand for Coins already open stays open and rises by the worth, and
-  refusing the post then leaves the next step to that demand's answer. With only the post's demand
-  out, no demand for Coins goes too. A city they no longer hold can't be given back, so news of it
-  makes an ordinary debt with a demand for Coins. Given back, its warehouse turns back with all it
-  holds; if they tore that down, another storage takes its place, keeping the one its people eat from,
-  and with none spare a new empty warehouse stands on the old spot. The post gets a caravan with a new
-  crew, carriage and horse. Armed residents left on its hall start a new occupation as anyone's do
-  (Occupying a town hall), and taking it again is a new crime. Admin directives go on as before, with
-  no debt.
+     Its army travels with a **supply wagon**, when the HQ has a free adult to drive it: a new Trade Org
+     carriage and horse, loaded at the HQ with Food for the whole trip as far as that leaves room for what
+     it takes. It follows the army (Supply line) and its soldiers refill from it, go to meet it when they
+     run out with it out of reach, and put on it what they take when it is near. It is robbed like a
+     caravan's: taking from it or stealing it is a crime and its soldiers go after those who do, and its
+     crew is lost like one (Caravan crew lost): a soldier takes over from a dead driver, unless they are
+     the last, and with no crew left the HQ sends a new driver on foot, who packs for the walk. Stolen,
+     or with its horse dead, it is gone for the army, which goes on with what it carries. It comes home
+     with them, or by itself once they are lost, and its whole load goes into the warehouses; the carriage
+     and horse go back into the HQ's stock. And short of Food on the way its army
+     buys some from a post, NPC city or Player's offer it passes. Each soldier packs Coins at the HQ for
+     this and hands in what is left back home. A soldier is short when the rest of the trip takes more
+     than they carry and their share of the wagon's Food; with Coins left, they go to such a place near
+     them and buy by the same trade anyone uses, cut down the same way, and carry on. An NPC city that
+     refuses the Trade Organization sells them nothing. They don't buy from the Organization they are
+     punishing, from one the Trade Organization refuses to trade with, or at an offer asking too much.
+     Coins and Food they brought or bought are their own: none of it counts as what the army took. With
+     no seller near they go on hungry. A captured post the Trade Organization
+     has heard of (Lost post found out) is a debt too, for its worth, added to what is owed: it demands
+     the city back. Returning it takes the post's worth off the debt; anything else owed stays, and gets
+     its own demand for Coins. A demand for Coins already open stays open and rises by the worth, and
+     refusing the post then leaves the next step to that demand's answer. With only the post's demand
+     out, no demand for Coins goes too. A city they no longer hold can't be given back, so news of it
+     makes an ordinary debt with a demand for Coins. Given back, its warehouse turns back with all it
+     holds; if they tore that down, another storage takes its place, keeping the one its people eat from,
+     and with none spare a new empty warehouse stands on the old spot. The post gets a caravan with a new
+     crew, carriage and horse. Armed residents left on its hall start a new occupation as anyone's do
+     (Occupying a town hall), and taking it again is a new crime. Admin directives go on as before, with
+     no debt.
 - **Trade Org army at an NPC gate:** an NPC city that doesn't refuse the Trade Organization keeps its
   gate open while only the Trade Organization's army is near, so its soldiers can walk in and buy
   like anyone. A city that refuses it shuts them out as it does anyone it refuses, and other armed
@@ -873,7 +873,6 @@ The shared language of the game. Domain terms only — no implementation details
     their next planning pass, within a game hour (ADR 0016); a city that has joined a realm by then
     lets the demand lapse.
 
-
 ## Bandits
 
 - **Bandit camp:** an Organization the game spawns in a remote spot out of every Player's sight,
@@ -898,7 +897,8 @@ The shared language of the game. Domain terms only — no implementation details
   in the world. Signs up with an invite code. _Avoid:_ user (in game rules), "the player" meaning
   the figure.
 - **Admin:** an account with admin rights: creates invite codes, resets passwords, gives
-  admin directives and offers horses again (Horse offer), in an admin panel apart from the game.
+  admin directives, offers horses again (Horse offer) and watches how long the live world's ticks
+  take (the tick health), in an admin panel apart from the game.
   Being an admin has nothing to do with
   the admin's own Player: it gives them no power in the world, and they play like anyone else.
   The one exception is knowledge: the admin panel shows the whole world (the **admin map**), so
@@ -1060,9 +1060,10 @@ The shared language of the game. Domain terms only — no implementation details
   takes a meal the same way from Food lying on the workplace's tile, or else from a carriage
   standing there. Anywhere else (travelling, building) there is no refill: they need food on
   them or a delivery.
-- **Refilling from a carriage:** a resident of an army, a passenger, or the driver, running low on food
-  takes a meal from a carriage of their own realm on or next to their tile, like refilling at
-  home.
+- **Refilling from a carriage:** any resident of a realm running low on food takes a meal from a
+  carriage of their own realm on or next to their tile, like refilling at home: the driver while
+  driving, and after the drive, passengers, army members, and anyone working or waiting beside a
+  parked carriage. The Food a haul route keeps on board is left for its horse and driver.
 - **Getting food:** in the Work, Build, Build line and Tear down defaults, a resident whose
   `foodAt` param is set and who carries less Food than that many units stops, walks to their
   `food` param, else their `storage` (Work) or `source` (Build, Build line, Tear down) param, or
@@ -1439,7 +1440,8 @@ The shared language of the game. Domain terms only — no implementation details
   step budget.
 - **Step budget:** how much work a script may do each tick, for each resident or army and for a
   whole realm. Out of budget, the script stops for that tick; what it already requested still
-  counts. Default scripts count like any other. NPC cities have no realm budget, only the one
+  counts. Default scripts count like any other. Declaring a function costs no step; calling it
+  does (Daniel, 2026-11-10). NPC cities have no realm budget, only the one
   for each resident. A script sees only what its Player sees: their sight, explored terrain and
   what they last saw (Last seen), told apart from what is in sight now.
 - **Value limits:** a single value a script holds is bounded: a string's length, a list's items and an

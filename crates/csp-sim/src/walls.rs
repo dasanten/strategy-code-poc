@@ -3,11 +3,12 @@
 //! `strandedOnWall`, `mayStep`), and with the rules (T86.6) the rest of it: building the `WallMap`
 //! from the world (`wallMap`, `wallsKey`) and the world queries about walls and gates.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use csp_shared::balance::{BROKEN_MATERIALS_RETURNED, WALL_ENCLOSES_MAX, WALL_STRENGTH};
 use csp_shared::terrain::{is_passable_terrain, tile_index, wrap, wrap_delta, TerrainMap};
 use csp_shared::world::{Building, BuildingKind, Resident, Stock, WorldState};
+use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Deserialize;
 
 use crate::queries::alliance::allied_realms;
@@ -64,13 +65,14 @@ impl WallTile {
 }
 
 /// The finished walls and gates on the map, by tile index, and the tiles they enclose. Nothing
-/// that uses it depends on the order of `tiles` or `inside`: only on what they hold.
+/// that uses it depends on the order of `tiles` or `inside`: only on what they hold, so they hash
+/// with the fast `FxHash`: every path search step asks them (T89.6).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct WallMap {
     pub size: i32,
-    pub tiles: HashMap<usize, WallTile>,
+    pub tiles: FxHashMap<usize, WallTile>,
     /// Tiles shut in by walls and gates (and impassable land): a wall ring's inside.
-    pub inside: HashSet<usize>,
+    pub inside: FxHashSet<usize>,
 }
 
 /// The four tiles next to tile index `t`, across the map's joins too, in `walls.ts`' order.
@@ -110,7 +112,7 @@ pub fn stranded_on_wall(walls: &WallMap, realm_id: Option<&str>, t: usize) -> bo
     if !own_wall(walls, realm_id, t) {
         return true;
     }
-    let mut seen = HashSet::from([t]);
+    let mut seen = FxHashSet::from_iter([t]);
     let mut todo = vec![t];
     while let Some(c) = todo.pop() {
         if walls.tiles[&c].kind == WallKind::Gate {
@@ -242,10 +244,11 @@ pub fn walls_key(world: &WorldState) -> String {
 /// What `walls_key` is built from, hashed in place: the same parts in the same order, without
 /// building a string for each wall. `Walking` checks it every tick to know when to build its
 /// `WallMap` again, so it has to be cheap near a city with many walls. Two different inputs
-/// giving the same 64-bit hash is the only way it differs from comparing `walls_key`s.
+/// giving the same 64-bit hash is the only way it differs from comparing `walls_key`s. It hashes
+/// with `FxHash`, several times cheaper than the standard SipHash (T89.6).
 pub fn walls_fingerprint(world: &WorldState) -> u64 {
-    use std::hash::{DefaultHasher, Hash, Hasher};
-    let mut h = DefaultHasher::new();
+    use std::hash::{Hash, Hasher};
+    let mut h = rustc_hash::FxHasher::default();
     for b in world.buildings.iter().filter(|b| is_wall_or_gate(b)) {
         0u8.hash(&mut h);
         b.id.hash(&mut h);
@@ -285,7 +288,7 @@ pub fn wall_map(world: &WorldState, terrain: &TerrainMap) -> WallMap {
         let Some(realm_id) = realm_id else { return Vec::new() };
         sides.entry(realm_id.to_string()).or_insert_with(|| allied_realms(world, realm_id)).clone()
     };
-    let mut tiles: HashMap<usize, WallTile> = HashMap::new();
+    let mut tiles: FxHashMap<usize, WallTile> = FxHashMap::default();
     let mut order: Vec<usize> = Vec::new();
     for b in world.buildings.iter().filter(|b| is_wall_or_gate(b)) {
         // `(b.cityId && realms.get(b.cityId)) ?? null`: the city's realm, if the city has one.
@@ -311,8 +314,8 @@ pub fn wall_map(world: &WorldState, terrain: &TerrainMap) -> WallMap {
         tiles.insert(t, WallTile { kind, realm_id, realms, closed: is_closed(b), shut_to });
     }
     let passable = |t: usize| is_passable_terrain(terrain.tiles[t]);
-    let mut inside: HashSet<usize> = HashSet::new();
-    let mut outside: HashSet<usize> = HashSet::new();
+    let mut inside: FxHashSet<usize> = FxHashSet::default();
+    let mut outside: FxHashSet<usize> = FxHashSet::default();
     for &w in &order {
         for start in neighbours(size, w) {
             let open = !tiles.contains_key(&start)
@@ -323,7 +326,7 @@ pub fn wall_map(world: &WorldState, terrain: &TerrainMap) -> WallMap {
                 continue;
             }
             // Fill from beside the wall; a fill that grows too large, or runs into the outside, is out.
-            let mut seen: HashSet<usize> = HashSet::from([start]);
+            let mut seen: FxHashSet<usize> = FxHashSet::from_iter([start]);
             let mut todo = vec![start];
             let mut out = false;
             while !out {
@@ -439,12 +442,12 @@ mod tests {
 
     /// A row of three tiles on a 9-wide map: inside (0), own wall (1), outside (2).
     fn ring() -> WallMap {
-        let mut tiles = HashMap::new();
+        let mut tiles = FxHashMap::default();
         tiles.insert(
             1,
             WallTile { realm_id: Some("r1".into()), realms: vec!["r1".into()], ..WallTile::wall() },
         );
-        WallMap { size: 9, tiles, inside: HashSet::from([0]) }
+        WallMap { size: 9, tiles, inside: FxHashSet::from_iter([0]) }
     }
 
     #[test]

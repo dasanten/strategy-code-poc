@@ -98,6 +98,49 @@ fn runs_a_players_script_from_the_library_once_attached() {
     assert_eq!(running.last_error, None);
 }
 
+/// A game with the script library attached, Daniel's realm `r1` and its resident `a1`.
+fn game_with_library() -> (Game<FakeLog>, OrderSender) {
+    let library = open_db(":memory:", None).unwrap();
+    create_admin(&library, Some("Daniel"), Some("admin password")).unwrap();
+    let user = find_user_by_name(&library, "Daniel").unwrap().unwrap().id;
+    let mut g =
+        game(FakeLog::default()).with_library(Arc::new(Mutex::new(library)), game_defaults(), None);
+    let mut rand = csp_sim::random::Mulberry32::new(1.0);
+    let mut next = || rand.next();
+    let fields =
+        NewResident { id: "a1", owner: Some("r1"), city_id: None, x: 10.0, y: 10.0, tick: -1e6 };
+    g.world.residents.push(new_resident(&mut next, &fields, None));
+    let realm = json!({ "id": "r1", "userId": user, "leaderId": "a1", "name": "Ironvale" });
+    g.world.realms.push(serde_json::from_value(realm).unwrap());
+    (g, OrderSender::player(user as u64, "Daniel"))
+}
+
+/// A task given with param values (from the form before it starts, or kept in a queue step) is
+/// checked against the Player's script in the library, not refused as taking none.
+#[test]
+fn a_task_with_params_is_taken_with_the_library_attached() {
+    let (mut g, sender) = game_with_library();
+    let order = json!({ "kind": "task", "residentId": "a1", "task": "explore", "params": {} });
+    let reply = g.orders.receive(&g.world, &sender, &json!("q"), &order);
+    assert_eq!(serde_json::to_value(&reply).unwrap()["type"], "ack", "{reply:?}");
+}
+
+/// A queue whose task step carries param values starts that step instead of skipping it.
+#[test]
+fn a_queue_step_with_params_starts_with_the_library_attached() {
+    let (mut g, sender) = game_with_library();
+    let step = json!({ "order": { "kind": "task", "task": "explore", "params": {} } });
+    let order = json!({ "kind": "queue", "residentId": "a1", "steps": [step] });
+    let reply = g.orders.receive(&g.world, &sender, &json!("q"), &order);
+    assert_eq!(serde_json::to_value(&reply).unwrap()["type"], "ack", "{reply:?}");
+    let conn = open_db(":memory:", None).unwrap();
+    g.tick(&conn, SETTINGS).unwrap();
+    let events = format!("{:?}", g.world.events);
+    assert!(!events.contains("QueueStepSkipped"), "no step was skipped: {events}");
+    let queue = g.world.residents[0].queue.as_ref().expect("the queue is still going");
+    assert_eq!(queue.started_at, Some(0.0), "its step started");
+}
+
 #[test]
 fn saves_the_world_for_shutdown() {
     let conn = open_db(":memory:", None).unwrap();

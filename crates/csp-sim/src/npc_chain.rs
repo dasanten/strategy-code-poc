@@ -211,9 +211,9 @@ pub fn trade_org_warehouses<'w>(world: &'w WorldState, city: &City) -> Vec<&'w B
         .buildings
         .iter()
         .filter(|b| {
-            b.city_id.as_ref() == Some(&city.id)
-                && b.kind == BuildingKind::Warehouse
+            b.kind == BuildingKind::Warehouse
                 && b.site.is_none()
+                && b.city_id.as_ref() == Some(&city.id)
         })
         .collect()
 }
@@ -259,7 +259,7 @@ pub fn chain_store<'w>(world: &'w WorldState, city: &City) -> Option<&'w Buildin
 /// Where in `world.buildings` the city's chain store stands (`chainStore`).
 pub fn chain_store_index(world: &WorldState, city: &City) -> Option<usize> {
     let store = chain_store(world, city)?;
-    world.buildings.iter().position(|b| b.id == store.id)
+    crate::world_index::building_index(world, &store.id)
 }
 
 /// The warehouse a Trade Org city's worker stores a load of `goods` in (`warehouseFor`): the

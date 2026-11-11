@@ -808,7 +808,7 @@ fn ends_with_the_hq() {
 // the Trade Org army's longest trip
 
 #[test]
-#[ignore = "20.6 s alone; see #1092"]
+#[ignore = "10.1 s alone; see #1132"]
 fn reaches_the_farthest_city_on_a_real_size_map_and_gets_home_fed_with_no_food_but_its_own() {
     use csp_shared::balance::{FOOD_PER_DAY, MAP_SIZE, WALK_TICKS_PER_TILE};
     use csp_shared::world::Stat;
