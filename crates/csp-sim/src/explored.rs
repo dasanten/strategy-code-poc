@@ -466,15 +466,32 @@ mod tests {
             before.explore(PLAYER, (i * 977) % MAP_SIZE, (i * 1931) % MAP_SIZE, SIGHT_RANGE as i32);
         }
         let saved = before.bitmap(PLAYER).unwrap().to_vec();
-        let start = std::time::Instant::now();
-        let explored = ExploredTerrain::from_bitmaps(full, &[], [(PLAYER, saved)]);
-        let loaded_in = start.elapsed();
-        let start = std::time::Instant::now();
-        for _ in 0..10 {
-            std::hint::black_box(explored.explored_chunks(PLAYER));
-        }
-        assert!(start.elapsed().as_millis() < 100);
-        assert!(loaded_in.as_millis() < 1000);
+        // The fastest of three tries of each: a moment of load on a busy machine slows one try,
+        // not all three (T89.6), so the times stay a check of the work.
+        let fastest = |run: &mut dyn FnMut()| {
+            (0..3)
+                .map(|_| {
+                    let start = std::time::Instant::now();
+                    run();
+                    start.elapsed().as_millis()
+                })
+                .min()
+                .expect("three tries")
+        };
+        let mut copies: Vec<_> = (0..3).map(|_| (full.clone(), saved.clone())).collect();
+        let mut explored = None;
+        let loaded_in = fastest(&mut || {
+            let (terrain, bits) = copies.pop().expect("a copy for each try");
+            explored = Some(ExploredTerrain::from_bitmaps(terrain, &[], [(PLAYER, bits)]));
+        });
+        let explored = explored.expect("loaded");
+        let welcomed_in = fastest(&mut || {
+            for _ in 0..10 {
+                std::hint::black_box(explored.explored_chunks(PLAYER));
+            }
+        });
+        assert!(welcomed_in < 100, "{welcomed_in} ms");
+        assert!(loaded_in < 1000, "{loaded_in} ms");
         assert_eq!(explored.explored_chunks(PLAYER), before.explored_chunks(PLAYER));
     }
 

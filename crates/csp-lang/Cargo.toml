@@ -1,4 +1,4 @@
-﻿[package]
+[package]
 name = "csp-lang"
 description = "The script language: lexer, parser, checker and interpreter with the step budget; the Rust twin of packages/lang (ADR 0030)."
 version.workspace = true
@@ -12,6 +12,7 @@ serde_json.workspace = true
 thiserror.workspace = true
 # Objects keep their keys in order (JavaScript's own-key order); serde_json already depends on it.
 indexmap = "2.2"
+rustc-hash.workspace = true
 
 [lints]
 workspace = true

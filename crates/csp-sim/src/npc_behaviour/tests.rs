@@ -81,7 +81,7 @@ fn order(v: serde_json::Value) -> Option<ResidentOrder> {
 }
 
 #[test]
-#[ignore = "22.8 s with eight at once; see #1092"]
+#[ignore = "10.8 s alone; see #1132"]
 fn a_village_left_alone_survives_ten_game_weeks() {
     let (mut world, terrain, city) = village();
     let mut runner = Runner::new(&terrain);

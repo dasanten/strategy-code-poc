@@ -118,8 +118,14 @@ pub fn run(
         max_call_depth: options.max_call_depth,
         limits: options.limits,
         host,
-        scopes: vec![ScopeData { parent: None, bindings: Vec::new() }],
-        functions: Vec::new(),
+        // Room for a typical run's scopes and functions from the start, rather than growing to
+        // it one doubling at a time (T89.6).
+        scopes: {
+            let mut scopes = Vec::with_capacity(64);
+            scopes.push(ScopeData { parent: None, bindings: Vec::with_capacity(16) });
+            scopes
+        },
+        functions: Vec::with_capacity(32),
         run: Rc::new(()),
     };
     let outcome = interpreter.program(program);
@@ -163,6 +169,32 @@ struct Binding<'p> {
     /// A function declared here whose name hasn't been read yet: it is made when it first is,
     /// so declaring costs nothing (`CONTEXT.md`: Step budget). `value` is null until then.
     declared: Option<&'p FunctionDeclaration>,
+}
+
+thread_local! {
+    /// Function names already made, by where the program holds them. A program run every tick
+    /// (an NPC default) declares the same functions each run: they share their name rather than
+    /// copying it each time (T89.6). Checked against the text, so a program freed and another
+    /// put where it was costs only a new copy.
+    static NAMES: std::cell::RefCell<rustc_hash::FxHashMap<(usize, usize), Rc<str>>> =
+        std::cell::RefCell::default();
+}
+
+/// The function name `name` as a shared string, the same one each run of its program.
+fn shared_name(name: &str) -> Rc<str> {
+    NAMES.with(|names| {
+        let mut names = names.borrow_mut();
+        let at = (name.as_ptr() as usize, name.len());
+        if let Some(shared) = names.get(&at).filter(|s| ***s == *name) {
+            return shared.clone();
+        }
+        if names.len() >= 4096 {
+            names.clear();
+        }
+        let shared: Rc<str> = Rc::from(name);
+        names.insert(at, shared.clone());
+        shared
+    })
 }
 
 /// The global scope, where the host's globals are kept once read.
@@ -277,7 +309,7 @@ impl<'p> Interpreter<'p, '_> {
         Value::Function(ScriptFunction(Rc::new(FunctionHandle {
             run: self.run.clone(),
             index: self.functions.len() - 1,
-            name: name.to_string(),
+            name: shared_name(name),
         })))
     }
 

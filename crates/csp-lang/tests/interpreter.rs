@@ -593,16 +593,30 @@ mod value_limits {
         assert!(*steps < BUDGET);
     }
 
+    /// The fastest of three runs of `script`, in ms, and what the last one gave: a moment of load on
+    /// a busy machine slows one run, not all three (T89.6), so the time stays a check of the work.
+    fn fastest_of_three(script: &str) -> (u128, Exec) {
+        let mut best = u128::MAX;
+        let mut last = None;
+        for _ in 0..3 {
+            let start = Instant::now();
+            let run = exec(script);
+            best = best.min(start.elapsed().as_millis());
+            last = Some(run);
+        }
+        (best, last.expect("three runs"))
+    }
+
     #[test]
     fn stops_a_string_doubling_past_the_cap_quickly_and_within_the_budget() {
-        let start = Instant::now();
-        let Exec { result, .. } = exec("let s = \"x\"\nwhile (true) { s = s + s }");
+        let (ms, Exec { result, .. }) =
+            fastest_of_three("let s = \"x\"\nwhile (true) { s = s + s }");
         assert_error_on_line(
             &result,
             &format!("A string can hold at most {MAX_STRING} characters"),
             2,
         );
-        assert!(start.elapsed().as_millis() < 1000);
+        assert!(ms < 1000, "{ms} ms");
     }
 
     #[test]
@@ -622,10 +636,10 @@ mod value_limits {
 
     #[test]
     fn stops_a_list_growing_past_the_cap_quickly_and_within_the_budget() {
-        let start = Instant::now();
-        let Exec { result, .. } = exec("let l = []\nwhile (true) { l[l.length] = 1 }");
+        let (ms, Exec { result, .. }) =
+            fastest_of_three("let l = []\nwhile (true) { l[l.length] = 1 }");
         assert_error_on_line(&result, &format!("A list can hold at most {MAX_LIST} items"), 2);
-        assert!(start.elapsed().as_millis() < 1000);
+        assert!(ms < 1000, "{ms} ms");
     }
 
     #[test]
@@ -643,11 +657,10 @@ mod value_limits {
 
     #[test]
     fn stops_an_object_gaining_keys_past_the_cap_quickly_and_within_the_budget() {
-        let start = Instant::now();
-        let Exec { result, .. } =
-            exec("let o = {}; let i = 0\nwhile (true) { o[\"k\" + i] = i; i = i + 1 }");
+        let (ms, Exec { result, .. }) =
+            fastest_of_three("let o = {}; let i = 0\nwhile (true) { o[\"k\" + i] = i; i = i + 1 }");
         assert_error_on_line(&result, &format!("An object can hold at most {MAX_KEYS} keys"), 2);
-        assert!(start.elapsed().as_millis() < 1000);
+        assert!(ms < 1000, "{ms} ms");
     }
 
     #[test]

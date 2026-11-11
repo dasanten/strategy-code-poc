@@ -521,7 +521,7 @@ mod in_the_running_world {
     }
 
     #[test]
-    #[ignore = "25 s alone; see #1092"]
+    #[ignore = "7.3 s alone; see #1132"]
     fn no_more_than_the_limit_walk_at_once_they_take_turns_and_nobody_starves() {
         let armed = NPC_SOLDIERS_ON_HALL as usize + 1 + 2 * NPC_SOLDIERS_PER_PATROL as usize;
         let mut s = staged(armed);
