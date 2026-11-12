@@ -25,6 +25,8 @@ export const BUILDING_ART: Record<BuildingKind, string> = {
   trainingGround: 'training-ground.svg',
   road: 'road.svg',
   carriage: 'cart.svg',
+  boat: 'boat.svg',
+  haven: 'haven.svg',
 }
 
 /**
@@ -60,6 +62,7 @@ export const PAINTED_SITE_ART = [25, 26, 27, 28] as const
 /** Building kinds with their own file in `assets/painted/` instead of a cell of the sheet. */
 export const PAINTED_BUILDING_IMAGE: Partial<Record<BuildingKind, string>> = {
   trainingGround: 'training-ground.svg',
+  haven: 'haven.svg',
 }
 
 /** The atlas key of a painted image; prefixed, as line art can have the same file name. */
@@ -119,6 +122,7 @@ export const UNIT_ART = {
   person: 'person.svg',
   leader: 'crown.svg',
   carriage: 'cart.svg',
+  boat: 'boat.svg',
   horse: 'horse.svg',
   caravan: 'caravan.svg',
   army: 'army-banner.svg',

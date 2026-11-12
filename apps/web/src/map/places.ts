@@ -48,7 +48,11 @@ export function orderAims(o: ResidentOrder | null | undefined): Aim[] {
     case 'store':
     case 'fetch': {
       const p = o.kind === 'store' ? o.to : o.from
-      return [{ id: p.kind === 'storage' ? p.storageId : p.carriageId }]
+      return [
+        {
+          id: p.kind === 'storage' ? p.storageId : p.kind === 'vessel' ? p.vesselId : p.carriageId,
+        },
+      ]
     }
     case 'haul':
       return o.toArmy === undefined ? [{ at: o.from }, { at: o.to }] : [{ at: o.from }]

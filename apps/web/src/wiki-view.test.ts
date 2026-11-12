@@ -29,6 +29,7 @@ import {
   AVERAGE,
   buildCosts,
   carriageCost,
+  boatCost,
   coinsPerMintWorkerDay,
   daysToWorkSkillMax,
   trainingDays,
@@ -95,6 +96,14 @@ describe('wiki figures', () => {
     expect(carriageCost()).toEqual({
       materials: BUILD_MATERIALS.carriage,
       buildTicks: BUILD_WORK.carriage! / buildWork(AVERAGE, 0),
+    })
+  })
+
+  it('lists a boat apart from the buildings, timed like them', () => {
+    expect(buildCosts().map((b) => b.kind)).not.toContain('boat')
+    expect(boatCost()).toEqual({
+      materials: BUILD_MATERIALS.boat,
+      buildTicks: BUILD_WORK.boat! / buildWork(AVERAGE, 0),
     })
   })
 

@@ -108,6 +108,7 @@ drawn across its footprint (see the table below); the construction sites go with
 | farm        | 4×4       | Tilled field rows, a small hut at one corner                    |
 | stable      | 3×3       | Stable, paddock fence, hay                                      |
 | training-ground | 3×3   | Fenced yard, a straw target, a weapon rack, a paved ring        |
+| haven       | 3×3       | Shore yard: a slipway with a boat, a jetty, a shed, crates      |
 | mine        | 2×2       | Mine entrance with timber frame, ore cart, rubble               |
 | quarry      | 2×2       | Cut stone pit with blocks and a crane                           |
 | lumber-camp | 2×2       | Log piles, a chopping block, a sawhorse                         |
@@ -118,9 +119,9 @@ drawn across its footprint (see the table below); the construction sites go with
 | gate        | 1×1       | Wooden gate in the palisade; one east–west, one north–south     |
 | road        | 1×1       | Packed light dirt road #e8cf97 (pieces below)                   |
 
-- **Training ground:** the one workplace not in the sheet. It is drawn by hand as
-  `apps/web/src/assets/painted/training-ground.svg` in the same style, and the registry points to
-  it with `PAINTED_BUILDING_IMAGE`. Its site still uses the 3×3 site cell.
+- **Training ground and haven:** the buildings not in the sheet. Each is drawn by hand as
+  `apps/web/src/assets/painted/<file>.svg` in the same style, and the registry points to
+  it with `PAINTED_BUILDING_IMAGE`. Their sites still use the 3×3 site cell.
 - **Wall and road pieces:** both join their neighbours, so each needs end, straight, corner,
   T-junction, cross and single post (6 each), asked for as one sprite sheet so they line up. A
   stone wall set for the Trade Org HQ is optional.
@@ -135,7 +136,8 @@ node-forest, node-stone, node-iron-ore (rusty red rock), node-gold-ore (rock wit
 Small round tokens; change the prompt to "a small round token, top-down figure".
 
 - person (resident), leader (crown), carriage (cart with its horse hitched), horse, caravan (Trade
-  Org cart with turquoise cloth), army banner.
+  Org cart with turquoise cloth), army banner, boat (a rowing boat on water; for now the line art
+  `assets/map/boat.svg` on a round badge, with no painted cell yet).
 - Optional: soldier (a person with a spear), child, and carriage empty / half / full (others see
   only how heavily a carriage is loaded).
 

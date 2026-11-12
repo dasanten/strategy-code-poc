@@ -46,15 +46,16 @@ fn run_apart(world: &WorldState, city: &City, r: &Resident) -> bool {
 }
 
 /// Whether an alarm can reach `r`, of the city's Organization and in its area (`canBeAlarmed`):
-/// army members, those hired out and those driving a carriage get none. Nor do those Down, or on
-/// a wall they are climbing. A trading post's and the HQ's keep their own rules, and those an NPC
-/// city doesn't run itself get none.
+/// army members, those hired out and those driving a carriage or rowing a boat get none. Nor do
+/// those Down, or on a wall they are climbing. A trading post's and the HQ's keep their own
+/// rules, and those an NPC city doesn't run itself get none.
 fn can_be_alarmed(world: &WorldState, city: &City, r: &Resident, size: i32) -> bool {
     city.trade_org.is_none()
         && organization_of(r) == Some(city_organization(city))
         && commander_of(world, &r.id, r.owner.as_deref()) == r.owner
         && in_city_area(world, &city.id, r.x, r.y, size)
         && driven_carriage_id(r).is_none()
+        && !matches!(r.order, Some(ResidentOrder::Row(_)))
         && !matches!(r.order, Some(ResidentOrder::Climb(_)))
         && !is_down(r.down_until)
         && !world.armies.iter().any(|a| a.member_ids.contains(&r.id))

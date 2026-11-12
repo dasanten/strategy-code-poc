@@ -17,6 +17,7 @@ import {
 import { horsesInNeed } from './shared/reviving.js'
 import { isDown, GOODS, STAT_NAMES, SKILL_NAMES } from './shared/world.js'
 import { inContact } from './shared/combat.js'
+import { isVesselId } from './shared/vessels.js'
 import {
   LINE_BUILDING,
   isLineOrder,
@@ -34,6 +35,8 @@ import {
 } from './shared/building.js'
 import {
   CARRIAGE_CAPACITY,
+  BOAT_CAPACITY,
+  PASSENGER_WEIGHT,
   CARRYING_DAYS,
   FEED_UNITS,
   HAUL_KEEP_FOOD,
@@ -58,6 +61,7 @@ import { wallStrength, wallStrengthLeft } from './shared/walls.js'
 import { putAwayUnits } from './shared/goods.js'
 import { nameProblem } from './shared/names.js'
 import type {
+  SeenVessel,
   Building,
   Carriage,
   City,
@@ -235,6 +239,7 @@ export const SKILL_LABELS: Record<SkillName, string> = {
   farming: 'Farming',
   combat: 'Combat',
   driving: 'Driving',
+  seafaring: 'Seafaring',
 }
 
 /** A stat or skill a training ground teaches, as the UI names it: "Strength", "Combat". */
@@ -310,7 +315,9 @@ export type Picking =
   | false
   | 'walk'
   | 'drive'
+  | 'row'
   | 'driveOff'
+  | 'rowOff'
   | 'hitchOff'
   | 'haul'
   | 'roadFrom'
@@ -892,6 +899,11 @@ export function orderDoing(
     if (!o.path) return `Finding a way for the carriage to ${o.target.x}, ${o.target.y}`
     return `Driving to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
   }
+  if (o?.kind === 'row') {
+    // `CONTEXT.md`: Rowing.
+    if (!o.path) return `Finding a way over the water to ${o.target.x}, ${o.target.y}`
+    return `Rowing to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
+  }
   if (o?.kind === 'haul') {
     const what = o.goods.map((g) => GOOD_LABELS[g].toLowerCase()).join(', ')
     const { x, y } = o[o.stop]
@@ -1159,6 +1171,7 @@ export function GroupCard({
   scripts,
   buildings,
   carriages = [],
+  boats = [],
   inSight = [],
   cities,
   arrivesIn,
@@ -1186,6 +1199,11 @@ export function GroupCard({
    * each, to board (`CONTEXT.md`: Passenger).
    */
   carriages?: { carriage: Pick<Carriage, 'id' | 'x' | 'y' | 'realmId' | 'cityId'>; seats: number }[]
+  /**
+   * The realm's boats someone of the group stands beside, with how many more passengers fit in
+   * each, to board (`CONTEXT.md`: Beside a vessel).
+   */
+  boats?: { vessel: Pick<SeenVessel, 'id' | 'x' | 'y'>; seats: number }[]
   /** Everyone in sight, to say where a passenger's carriage is heading (`doingLine`). */
   inSight?: readonly SeenResident[]
   /** The cities the Player knows, to name where a resident relocates to (`doingLine`). */
@@ -1251,6 +1269,7 @@ export function GroupCard({
   const picks: Partial<Record<GroupButton, Exclude<GroupPicking, false>>> = {
     walk: 'walk',
     drive: 'drive',
+    row: 'row',
     work: 'work',
     build: 'build',
     roadTo: 'roadFrom',
@@ -1279,6 +1298,7 @@ export function GroupCard({
     size: mapSize ?? 0,
     seen,
     carriages: carriages.length,
+    boats: boats.length,
     relocateProblem: relocate ? relocate.problem : 'your realm has no other city',
   })
   // Each row keeps its slot while the card is open (ADR 0019); a row picking a tile shows it.
@@ -1298,8 +1318,9 @@ export function GroupCard({
   })
   const act = (a: CardAction<GroupButton>) => {
     if (tab !== 'orders' && a.id !== 'script') showTab('orders')
-    // With one carriage to board it boards that; with several, a panel lists them.
-    if (a.id === 'board' && carriages.length === 1) {
+    // With one carriage or boat to board they board that; with several, a panel lists them.
+    if (a.id === 'board' && carriages.length + boats.length === 1) {
+      if (boats[0]) return onOrder({ kind: 'boardBoat', ...boats[0] })
       const { carriage, seats } = carriages[0]!
       return onOrder({ kind: 'board', carriage, seats })
     }
@@ -1336,8 +1357,22 @@ export function GroupCard({
                 Board at {carriage.x}, {carriage.y}
               </button>
             ))}
+            {boats.map(({ vessel, seats }) => (
+              <button
+                type="button"
+                key={vessel.id}
+                onClick={() => {
+                  setPanel(undefined)
+                  onOrder({ kind: 'boardBoat', vessel, seats })
+                }}
+              >
+                Board the boat at {vessel.x}, {vessel.y}
+              </button>
+            ))}
           </div>
-          <p className="muted small">Those standing on the carriage board it, until it is full.</p>
+          <p className="muted small">
+            Those standing on the carriage, or beside the boat, board it, until it is full.
+          </p>
         </section>
       )}
       {shown === 'feed' && (
@@ -1657,6 +1692,7 @@ export type GroupPicking =
   | 'work'
   | 'build'
   | 'drive'
+  | 'row'
   | 'haul'
   | 'roadFrom'
   | 'roadTo'
@@ -1740,6 +1776,7 @@ export function ResidentCard({
   walls,
   onClimb,
   carriage,
+  boat,
   carriageTheirs,
   onDriveTo,
   driveOff,
@@ -1754,6 +1791,11 @@ export function ResidentCard({
   onStop,
   horseToRide,
   carriageToBoard,
+  boatToBoard,
+  boatToRow,
+  rowOff,
+  onRowOff,
+  onRowTo,
   onBoard,
   carriageToUnhitch,
   onUnhitch,
@@ -1803,6 +1845,8 @@ export function ResidentCard({
   picking: Picking
   /** Starts (or cancels) picking a tile to walk to. */
   onWalkTo: () => void
+  /** A boat of their realm beside them, to load and unload (`CONTEXT.md`: Beside a vessel). */
+  boat?: SeenVessel
   /** A carriage on the resident's tile, if one is in sight. */
   carriage: Carriage | undefined
   /** That carriage is another organization's, not theirs to drive or haul with. */
@@ -1842,6 +1886,19 @@ export function ResidentCard({
   horseToRide: { id: string } | undefined
   /** A carriage of the realm on the resident's tile (`CONTEXT.md`: Passenger), to board. */
   carriageToBoard: { id: string } | undefined
+  /** A boat of the realm beside the resident with room (`CONTEXT.md`: Beside a vessel), to board. */
+  boatToBoard?: { id: string } | undefined
+  /** A boat of the realm the resident is aboard or beside, to row, and why they can't now (`CONTEXT.md`: Rowing). */
+  boatToRow?: { id: string; problem?: string }
+  /**
+   * Another organization's boat (or nobody's) beside the resident, to row off, and why it can't be
+   * taken now, if so (`CONTEXT.md`: Stealing a carriage or horse, its vessel part).
+   */
+  rowOff?: { problem: string | undefined }
+  /** Starts (or cancels) picking a tile to row that boat off to. */
+  onRowOff?: () => void
+  /** Starts (or cancels) picking a tile to row the boat to. */
+  onRowTo?: () => void
   /** Orders the resident to board that carriage, or with none to get off the one they are on. */
   onBoard: (carriageId?: string) => void
   /**
@@ -2021,6 +2078,7 @@ export function ResidentCard({
   const site = building?.site ? building : undefined
   const atSite: GoodsSpot = { kind: 'site', siteId: site?.id ?? '' }
   const onCarriage: GoodsSpot = { kind: 'carriage', carriageId: carriage?.id ?? '' }
+  const inBoat: GoodsSpot = { kind: 'vessel', vesselId: boat?.id ?? '' }
   const needed = site ? materialsNeeded(site) : {}
   const roadSite = road?.site ? road : undefined
   const atRoadSite: GoodsSpot = { kind: 'site', siteId: roadSite?.id ?? '' }
@@ -2053,6 +2111,7 @@ export function ResidentCard({
     carriageHorseDown: horses.some((h) => h.id === carriage?.horseId && isDown(h)),
     ...(carriageTheirs ? { carriageTheirs } : {}),
     ...(driveOff ? { driveOff } : {}),
+    ...(rowOff ? { rowOff } : {}),
     ...(hitchOff ? { hitchOff } : {}),
     ...(stealHorse ? { stealHorse } : {}),
     pile,
@@ -2072,6 +2131,8 @@ export function ResidentCard({
     aboard: r.aboard !== undefined,
     driving: r.order?.kind === 'drive' || r.order?.kind === 'haul',
     carriageToBoard: !!carriageToBoard,
+    boatToBoard: !!boatToBoard,
+    ...(boatToRow ? { boatToRow: boatToRow.problem ? { problem: boatToRow.problem } : {} } : {}),
     carriageToUnhitch: !!carriageToUnhitch,
     horseToHitch: !!toHitch,
     carrying: !!r.carrying,
@@ -2094,7 +2155,9 @@ export function ResidentCard({
     }
     if (a.id === 'walk') onWalkTo()
     if (a.id === 'drive') onDriveTo()
+    if (a.id === 'row') onRowTo?.()
     if (a.id === 'driveOff') onDriveOff?.()
+    if (a.id === 'rowOff') onRowOff?.()
     if (a.id === 'hitchOff') onHitchOff?.()
     if (a.id === 'stealHorse') onStealHorse?.()
     if (a.id === 'roadTo') onRoadTo()
@@ -2102,7 +2165,8 @@ export function ResidentCard({
     if (a.id === 'stop') onStop()
     if (a.id === 'ride') onRide(r.riding === undefined ? horseToRide?.id : undefined)
     if (a.id === 'unhitch' && carriageToUnhitch) onUnhitch(carriageToUnhitch.id)
-    if (a.id === 'board') onBoard(r.aboard === undefined ? carriageToBoard?.id : undefined)
+    if (a.id === 'board')
+      onBoard(r.aboard === undefined ? (carriageToBoard ?? boatToBoard)?.id : undefined)
     if (a.id === 'feedStable' && building) onFeedStable(building.id)
     if (a.id === 'train' && building) onTrain(building.id)
     if (a.id === 'explore') onExplore()
@@ -2266,6 +2330,7 @@ export function ResidentCard({
                     ? [{ label: 'Deliver to road', spot: atRoadSite }]
                     : []),
                   ...(carriage ? [{ label: 'Load', spot: onCarriage }] : []),
+                  ...(boat ? [{ label: 'Load into boat', spot: inBoat }] : []),
                 ]}
                 onAct={onDrop}
               />
@@ -2277,6 +2342,7 @@ export function ResidentCard({
             carriageSite ||
             roadSite ||
             carriage ||
+            boat ||
             downHere.length > 0) && (
             <section className="inspector-block" aria-label="On this tile">
               <div className="panel-head">
@@ -2292,7 +2358,11 @@ export function ResidentCard({
               />
               {storage && (
                 <TileGoods
-                  title={storage.kind === 'stable' ? 'In the stable' : 'In the storage'}
+                  title={
+                    storage.kind === 'stable' || storage.kind === 'haven'
+                      ? `In the ${storage.kind}`
+                      : 'In the storage'
+                  }
                   stock={storage.stock}
                   spot={inStorage}
                   onPickUp={onPickUp}
@@ -2331,6 +2401,17 @@ export function ResidentCard({
                   title={`On the carriage · ${kg(stockWeight(carriage.load))} / ${kg(CARRIAGE_CAPACITY)}${carriage.horseId ? '' : ' · no horse hitched'}`}
                   stock={carriage.load}
                   spot={onCarriage}
+                  onPickUp={onPickUp}
+                  refused={refused}
+                />
+              )}
+              {boat?.load && (
+                // From beside it; its passengers count against what it holds (`CONTEXT.md`: Beside
+                // a vessel).
+                <TileGoods
+                  title={`In the boat · ${kg(stockWeight(boat.load) + boat.passengerIds.length * PASSENGER_WEIGHT)} / ${kg(BOAT_CAPACITY)}`}
+                  stock={boat.load}
+                  spot={inBoat}
                   onPickUp={onPickUp}
                   refused={refused}
                 />
@@ -2633,7 +2714,7 @@ export function ResidentCard({
             <li>
               {child ? 'Child' : 'Adult'} · {age} years · {home}
               {r.riding ? ' · on horseback' : ''}
-              {r.aboard ? ' · aboard a carriage' : ''}
+              {r.aboard ? (isVesselId(r.aboard) ? ' · aboard a boat' : ' · aboard a carriage') : ''}
             </li>
             {grown && <li>{capitalised(grown)}</li>}
             {family && <li>{family}</li>}

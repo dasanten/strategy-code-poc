@@ -121,6 +121,25 @@ pub fn terrain_at(map: &TerrainMap, x: i32, y: i32) -> u8 {
     map.tiles[tile_index(map.size, x, y)]
 }
 
+/// Whether the terrain is water (`CONTEXT.md`: Water): Lake or Sea, where nobody walks and only
+/// boats and ships go.
+pub fn is_water(t: u8) -> bool {
+    matches!(Terrain::from_byte(t), Some(Terrain::Lake | Terrain::Sea))
+}
+
+/// Whether one of `tiles` touches water, straight or diagonally (`CONTEXT.md`: Haven): a Lake or
+/// Sea tile among the eight around it. `at` gives the terrain byte of a tile; coordinates past a
+/// side continue on the other.
+pub fn touches_water(tiles: &[(i32, i32)], size: i32, at: impl Fn(i32, i32) -> u8) -> bool {
+    tiles.iter().any(|&(x, y)| {
+        (-1..=1).any(|dy| {
+            (-1..=1).any(|dx| {
+                (dx, dy) != (0, 0) && is_water(at(wrap(x + dx, size), wrap(y + dy, size)))
+            })
+        })
+    })
+}
+
 /// Lake and Sea can't be entered.
 pub fn is_passable_terrain(t: u8) -> bool {
     matches!(
@@ -217,5 +236,27 @@ mod tests {
         }
         assert!(!is_passable_terrain(Terrain::Lake as u8));
         assert!(!is_passable_terrain(Terrain::Sea as u8));
+    }
+
+    #[test]
+    fn calls_lake_and_sea_water() {
+        assert!(is_water(Terrain::Lake as u8));
+        assert!(is_water(Terrain::Sea as u8));
+        for t in [Terrain::Plains, Terrain::Mountain, Terrain::Road] {
+            assert!(!is_water(t as u8));
+        }
+    }
+
+    #[test]
+    fn finds_water_touching_a_tile_straight_or_diagonally_and_across_the_joins() {
+        let mut tiles = vec![Terrain::Plains as u8; 64];
+        tiles[tile_index(8, 7, 7)] = Terrain::Lake as u8;
+        let map = TerrainMap { size: 8, tiles };
+        let at = |x, y| terrain_at(&map, x, y);
+        assert!(touches_water(&[(6, 6)], 8, at), "diagonal");
+        assert!(touches_water(&[(7, 6)], 8, at), "straight");
+        assert!(touches_water(&[(0, 0)], 8, at), "across the join");
+        assert!(!touches_water(&[(5, 5)], 8, at), "two tiles away");
+        assert!(touches_water(&[(3, 3), (6, 7)], 8, at), "any of the tiles");
     }
 }

@@ -252,6 +252,49 @@ fn a_typescript_save_remembering_a_buildings_old_breeding_loads() {
     assert_eq!(memory.len(), state["lastSeen"][&user].as_array().unwrap().len());
 }
 
+/// Format 113 (T90.2): the live save, from before vessels, loads with none; a world with a boat
+/// is saved with it and loads back with it, and a server of format 112 would refuse that save.
+#[test]
+fn a_world_with_a_boat_is_saved_and_loads_with_it_and_one_from_before_has_none() {
+    let (gz, version) = live_gz();
+    let conn = db();
+    let expected = live_world();
+    assert!(expected.vessels.is_empty());
+    conn.execute(
+        "INSERT INTO world_saves (tick, version, data) VALUES (?1, ?2, ?3)",
+        params![expected.tick as i64, version, gz],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO terrain (id, seed, diameter, data) VALUES (1, ?1, 16, ?2)",
+        params![expected.seed, small_terrain(expected.seed).tiles],
+    )
+    .unwrap();
+    let load = || {
+        load_or_create_world(&conn, |_| panic!("generated"), |_, _| panic!("generated"), 1)
+            .unwrap()
+            .0
+    };
+    let mut world = load();
+    assert!(world.vessels.is_empty());
+
+    world.tick += 1;
+    world.vessels.push(csp_shared::world::Vessel {
+        id: "boat1".into(),
+        kind: csp_shared::world::VesselKind::Boat,
+        realm_id: Some("r1".into()),
+        x: 3.0,
+        y: 4.0,
+        load: csp_shared::world::Stock::from([(csp_shared::world::Good::Wood, 5.0)]),
+        rower_id: None,
+    });
+    save_world(&conn, &world).unwrap();
+    let (state, v) = latest_save(&conn).unwrap().unwrap();
+    assert_eq!(v, WORLD_FORMAT_VERSION);
+    assert_eq!(state["vessels"][0]["kind"], "boat");
+    assert_eq!(load().vessels, world.vessels);
+}
+
 #[test]
 fn keeps_the_newest_saves_and_one_per_hour_for_a_week() {
     let conn = db();

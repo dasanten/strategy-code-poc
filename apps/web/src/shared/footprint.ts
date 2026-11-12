@@ -17,6 +17,7 @@ export const FOOTPRINT: Record<BuildingKind, number> = {
   gate: 1,
   road: 1,
   carriage: 1,
+  boat: 1,
   house: 2,
   storage: 2,
   smelter: 2,
@@ -29,6 +30,7 @@ export const FOOTPRINT: Record<BuildingKind, number> = {
   warehouse: 3,
   stable: 3,
   trainingGround: 3,
+  haven: 3,
   farm: 4,
 }
 

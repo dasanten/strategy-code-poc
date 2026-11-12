@@ -1180,6 +1180,9 @@ pub const TERRAIN_FOOD: TerrainTable = TerrainTable(&[
     (Terrain::Forest as u8, 1.0),
     (Terrain::Hills as u8, 1.3),
     (Terrain::Mountain as u8, 2.0),
+    // Rowing or aboard a boat, as walking on Plains (`CONTEXT.md`: Rowing).
+    (Terrain::Lake as u8, 1.0),
+    (Terrain::Sea as u8, 1.0),
     // On a road residents eat as on Plains, whatever the terrain beneath.
     (Terrain::Road as u8, 1.0),
 ]);
@@ -1292,6 +1295,36 @@ pub const CARRIAGE_MAX_CAPACITY: f64 = CARRIAGE_CAPACITY * (1.0 + HORSE_STRENGTH
 /// What each passenger counts for against what a carriage holds, in kg (`CONTEXT.md`: Passenger),
 /// grown-up or child: five fit on a carriage behind an average horse, or four with some Food.
 pub const PASSENGER_WEIGHT: f64 = 70.0;
+
+/// Most weight a boat carries, in kg (`CONTEXT.md`: Boat): passengers at `PASSENGER_WEIGHT` and
+/// goods together, so three residents and a little cargo, or a single rower's worth of goods eight
+/// times over. Its rower doesn't count against it.
+pub const BOAT_CAPACITY: f64 = 250.0;
+
+/// How fast an average rower moves a boat over water, as a share of walking on Plains
+/// (`CONTEXT.md`: Rowing): a little quicker than walking round the shore, so crossing pays off.
+pub const ROW_SPEED: f64 = 1.2;
+
+/// How much faster a boat goes for each point of its rower's Strength above
+/// `ROW_STRENGTH_AVERAGE`, and slower below it (`CONTEXT.md`: Seafaring: a stronger rower goes
+/// faster).
+pub const ROW_STRENGTH_EFFECT: f64 = 0.03;
+
+/// The Strength at which a rower moves a boat at `ROW_SPEED`.
+pub const ROW_STRENGTH_AVERAGE: f64 = 10.0;
+
+/// The furthest Strength speeds a boat up or slows it down, as a share of its speed.
+pub const ROW_STRENGTH_LIMIT: f64 = 0.3;
+
+/// How much faster a boat goes for each point of its rower's Seafaring skill.
+pub const SEAFARING_SKILL_EFFECT: f64 = 0.02;
+
+/// The furthest Seafaring speeds a boat up, as a share of its speed: a master rower, half as fast
+/// again, as a master driver.
+pub const SEAFARING_SKILL_LIMIT: f64 = 0.5;
+
+/// Seafaring a rower of average Intellect gains per game day of rowing, as Driving.
+pub const SEAFARING_SKILL_PER_DAY: f64 = 1.0;
 
 // `drivingLearned` takes a world type (`Resident`, `Horse` or `Stock`): it is ported with the world types, in `csp-sim`.
 
@@ -1571,17 +1604,24 @@ pub const BUILD_MATERIALS: Table<Table<f64>> = Table(&[
     // few paving stones, so mostly Wood and a little Stone, no iron; a bit more timber than a
     // stable, and buildable before any smelter.
     ("trainingGround", Table(&[("wood", 50.0), ("stone", 10.0)])),
+    // A haven (`CONTEXT.md`: Haven): timber jetties and slipways on stone footings at the shore, so
+    // mostly Wood and some Stone; a little more timber than a town hall, which covers as much.
+    ("haven", Table(&[("wood", 70.0), ("stone", 20.0)])),
     // A carriage, built at a stable (`CONTEXT.md`: Carriage): a wooden cart with iron fittings, so a
     // realm needs a smelter's iron for its second carriage.
     ("carriage", Table(&[("wood", 30.0), ("iron", 5.0)])),
+    // A boat, built at a haven (`CONTEXT.md`: Building a boat): planks, a thwart and oars, pegged
+    // rather than nailed, so all Wood and buildable before any smelter; two thirds of a carriage's
+    // timber.
+    ("boat", Table(&[("wood", 20.0)])),
 ]);
 
 /// Work each kind of building needs, in ticks of one unskilled resident of average Strength: a
 /// lumber camp takes one such resident 2 game days, a quarry 3, a mine 4, a stable 3, a smelter 4,
-/// a mint 5, a smithy 5, a town hall 6, a training ground 3 (about a stable). A tile of wooden
+/// a mint 5, a smithy 5, a town hall 6, a training ground 3 (about a stable), a haven 4. A tile of wooden
 /// wall takes a sixteenth of a game day, a gate an eighth, a tile of road a sixteenth (a quarter of
 /// what a 40 m tile took), a house one game day, a storage two and a farm half of one; a carriage
-/// two. More or stronger workers finish it sooner (`buildWork`).
+/// two, a boat one. More or stronger workers finish it sooner (`buildWork`).
 pub const BUILD_WORK: Table<f64> = Table(&[
     ("lumberCamp", 2.0 * TICKS_PER_GAME_DAY),
     ("quarry", 3.0 * TICKS_PER_GAME_DAY),
@@ -1598,7 +1638,9 @@ pub const BUILD_WORK: Table<f64> = Table(&[
     ("storage", 2.0 * TICKS_PER_GAME_DAY),
     ("farm", TICKS_PER_GAME_DAY / 2.0),
     ("trainingGround", 3.0 * TICKS_PER_GAME_DAY),
+    ("haven", 4.0 * TICKS_PER_GAME_DAY),
     ("carriage", 2.0 * TICKS_PER_GAME_DAY),
+    ("boat", TICKS_PER_GAME_DAY),
 ]);
 
 /// How many times `BUILD_WORK.road` a road tile on Mountain takes (`CONTEXT.md`: Road): the same
@@ -1896,6 +1938,7 @@ pub struct SkillValues {
     pub construction: f64,
     pub combat: f64,
     pub driving: f64,
+    pub seafaring: f64,
 }
 
 /// The most of each skill a resident can have (`CONTEXT.md`: Skill): where it stops making them
@@ -1909,6 +1952,7 @@ pub const SKILL_MAX: SkillValues = SkillValues {
     construction: CONSTRUCTION_SKILL_MAX,
     combat: COMBAT_SKILL_LIMIT / COMBAT_SKILL_EFFECT,
     driving: DRIVING_SKILL_LIMIT / DRIVING_SKILL_EFFECT,
+    seafaring: SEAFARING_SKILL_LIMIT / SEAFARING_SKILL_EFFECT,
 };
 
 /// Each skill learned by doing, in points per game day for a learner of average Intellect. Combat
@@ -1923,6 +1967,7 @@ pub const SKILL_PER_DAY: SkillValues = SkillValues {
     construction: CONSTRUCTION_SKILL_PER_DAY,
     combat: SKILL_MAX.combat / (TICKS_PER_GAME_YEAR / TICKS_PER_GAME_DAY),
     driving: DRIVING_SKILL_PER_DAY,
+    seafaring: SEAFARING_SKILL_PER_DAY,
 };
 
 // `trainingGain` takes a world type (`Resident`, `Horse` or `Stock`): it is ported with the world types, in `csp-sim`.
@@ -2397,6 +2442,14 @@ pub fn balance_json() -> Value {
     m.insert("HUNGRY_HORSE_PACE".into(), json!(HUNGRY_HORSE_PACE));
     m.insert("CARRIAGE_MAX_CAPACITY".into(), json!(CARRIAGE_MAX_CAPACITY));
     m.insert("PASSENGER_WEIGHT".into(), json!(PASSENGER_WEIGHT));
+    m.insert("BOAT_CAPACITY".into(), json!(BOAT_CAPACITY));
+    m.insert("ROW_SPEED".into(), json!(ROW_SPEED));
+    m.insert("ROW_STRENGTH_EFFECT".into(), json!(ROW_STRENGTH_EFFECT));
+    m.insert("ROW_STRENGTH_AVERAGE".into(), json!(ROW_STRENGTH_AVERAGE));
+    m.insert("ROW_STRENGTH_LIMIT".into(), json!(ROW_STRENGTH_LIMIT));
+    m.insert("SEAFARING_SKILL_EFFECT".into(), json!(SEAFARING_SKILL_EFFECT));
+    m.insert("SEAFARING_SKILL_LIMIT".into(), json!(SEAFARING_SKILL_LIMIT));
+    m.insert("SEAFARING_SKILL_PER_DAY".into(), json!(SEAFARING_SKILL_PER_DAY));
     m.insert("FOOD_SPOIL_PER_DAY".into(), json!(FOOD_SPOIL_PER_DAY));
     m.insert("REALM_LOG_LENGTH".into(), json!(REALM_LOG_LENGTH));
     m.insert("CRIME_MEMORY_DAYS".into(), json!(CRIME_MEMORY_DAYS));

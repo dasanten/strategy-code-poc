@@ -22,7 +22,7 @@ use crate::breeding::{request_breeding, resolve_breeding};
 use crate::building::{request_building, resolve_building};
 use crate::buying::resolve_purchases;
 use crate::capture::{step_captures, Capture};
-use crate::carrying::{request_carrying, resolve_carrying, CarryAction};
+use crate::carrying::{request_carrying, resolve_carrying_on, CarryAction};
 use crate::climbing::{request_climbing, resolve_climbing};
 use crate::combat::{request_strikes, resolve_strikes, CombatResult};
 use crate::contracts::{resolve_payments, step_contracts};
@@ -69,6 +69,7 @@ pub fn create_world(terrain: &TerrainMap, seed: i64) -> WorldState {
         buildings: Vec::new(),
         horses: Vec::new(),
         carriages: Vec::new(),
+        vessels: Vec::new(),
         piles: Vec::new(),
         events: Vec::new(),
         alliances: Vec::new(),
@@ -228,7 +229,7 @@ pub fn step_world(
     });
     time(timer, TickPhase::Rest, || {
         step_riders(world);
-        step_passengers(world);
+        step_passengers(world, terrain);
         // A fight or an army may have given someone Down an order; it ends with the tick.
         keep_down_still(world);
     });
@@ -260,7 +261,7 @@ fn step_rest(
     carries.extend(request_hauling(world, size));
     carries.extend(request_road_materials(world, scratch));
     let carries_len = carries.len();
-    resolve_carrying(world, &carries, size);
+    resolve_carrying_on(world, &carries, size, Some(terrain));
     step_feeding(world, size, scratch);
     let payments = resolve_payments(world);
     let purchases = resolve_purchases(world, size);

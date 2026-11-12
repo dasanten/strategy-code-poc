@@ -184,7 +184,7 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
             ScriptField {
                 name: "aboard",
                 r#type: ScriptType::String,
-                description: "The id of the carriage they ride on as a passenger.",
+                description: "The id of the carriage or boat they are aboard as a passenger.",
                 null_when: Some("unless they are aboard one"),
             },
             ScriptField {
@@ -347,6 +347,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 name: "driving",
                 r#type: ScriptType::Number,
                 description: "How far they have learned driving.",
+                null_when: Some("until they start learning it"),
+            },
+            ScriptField {
+                name: "seafaring",
+                r#type: ScriptType::Number,
+                description: "How far they have learned seafaring, by rowing.",
                 null_when: Some("until they start learning it"),
             },
         ],
@@ -1624,6 +1630,66 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
         ],
     },
     ScriptView {
+        name: "vessel",
+        description: "A boat on the water, as the Player sees it.",
+        fields: &[
+            ScriptField {
+                name: "id",
+                r#type: ScriptType::String,
+                description: "The vessel’s id, unique in the world.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "kind",
+                r#type: ScriptType::String,
+                description: "What it is: \"boat\".",
+                null_when: None,
+            },
+            ScriptField {
+                name: "realmId",
+                r#type: ScriptType::String,
+                description: "The realm it belongs to.",
+                null_when: Some("for one of nobody"),
+            },
+            ScriptField {
+                name: "x",
+                r#type: ScriptType::Number,
+                description: "The water tile it floats on, from west to east.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "y",
+                r#type: ScriptType::Number,
+                description: "The water tile it floats on, from north to south.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "load",
+                r#type: ScriptType::View("goods"),
+                description: "The goods on board.",
+                null_when: Some("unless the Player sees inside"),
+            },
+            ScriptField {
+                name: "loadLevel",
+                r#type: ScriptType::String,
+                description: "How heavily it looks loaded: \"empty\", \"light\", \"half\", \"heavy\" or \"full\".",
+                null_when: None,
+            },
+            ScriptField {
+                name: "passengerIds",
+                r#type: ScriptType::List(&ScriptType::String),
+                description: "The residents aboard it as passengers.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "rowerId",
+                r#type: ScriptType::String,
+                description: "The one aboard at its oars, who rows it or rowed it last; no passenger.",
+                null_when: Some("when nobody is at its oars"),
+            },
+        ],
+    },
+    ScriptView {
         name: "pile",
         description: "Goods lying on a tile.",
         fields: &[
@@ -2165,6 +2231,14 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         returns: ScriptType::List(&ScriptType::View("carriage")),
     },
     ScriptBinding {
+        name: "vessels",
+        is: Is::Query,
+        params: &[],
+        cost: 20.0,
+        description: "The boats the Player sees on the water.",
+        returns: ScriptType::List(&ScriptType::View("vessel")),
+    },
+    ScriptBinding {
         name: "traders",
         is: Is::Query,
         params: &[],
@@ -2465,7 +2539,15 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Action,
         params: &["carriageId"],
         cost: 10.0,
-        description: "Get on a carriage of my realm on my tile as a passenger, and ride along with it.",
+        description: "Get on a carriage of my realm on my tile, or a boat of my realm beside me (on land touching its water tile), as a passenger, and go along with it. Riders dismount first: no horse goes aboard.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "row",
+        is: Is::Action,
+        params: &["vessel", "x", "y"],
+        cost: 10.0,
+        description: "Row a boat of my realm, by it or its id, to the water tile x, y, or to the nearest free water tile beside it when x, y is land. I must be aboard it or beside it (I board first), and grown. A Step at a time over water; my Strength and Seafaring set the pace, and rowing teaches Seafaring. My order is \"row\" until it gets there.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -2473,7 +2555,7 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Action,
         params: &["x?", "y?"],
         cost: 10.0,
-        description: "Get off the carriage I am aboard, onto its tile or the tile x, y right next to it.",
+        description: "Get off the carriage I am aboard, onto its tile or the tile x, y right next to it; off a boat, onto the free land tile x, y beside it, or without one the first free one.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -2529,7 +2611,7 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Action,
         params: &["spot", "goods"],
         cost: 10.0,
-        description: "Take goods from a spot on my tile: {kind: \"ground\"}, {kind: \"storage\", storageId}, {kind: \"site\", siteId}, {kind: \"carriage\", carriageId} or a Down resident lying there, {kind: \"resident\", residentId}; goods like {food: 3}.",
+        description: "Take goods from a spot on my tile: {kind: \"ground\"}, {kind: \"storage\", storageId}, {kind: \"site\", siteId}, {kind: \"carriage\", carriageId}, a boat beside me, {kind: \"vessel\", vesselId}, or a Down resident lying there, {kind: \"resident\", residentId}; goods like {food: 3}.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -2537,7 +2619,7 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Action,
         params: &["spot", "goods"],
         cost: 10.0,
-        description: "Put carried goods down at a spot on my tile.",
+        description: "Put carried goods down at a spot on my tile, or in a boat beside me ({kind: \"vessel\", vesselId}), as far as they fit.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -2545,7 +2627,7 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Action,
         params: &["goods", "to?", "ownFood?"],
         cost: 10.0,
-        description: "Walk to `to` (a storage, a stable or a carriage of mine; by default the nearest storage of my realm), put the goods down there and, at a storage with Food, top up my own food. Goods like {wood: 10}, or a list like [\"wood\"] for all I carry of them (Food beyond my own food). `ownFood`, units of Food, is the own food to keep and top up to instead of the usual. My order is \"store\" until done; then `me.orderEnded` says how it ended.",
+        description: "Walk to `to` (a storage, a stable or a carriage of mine, or beside a boat of mine; by default the nearest storage of my realm), put the goods down there and, at a storage with Food, top up my own food. Goods like {wood: 10}, or a list like [\"wood\"] for all I carry of them (Food beyond my own food). `ownFood`, units of Food, is the own food to keep and top up to instead of the usual. My order is \"store\" until done; then `me.orderEnded` says how it ended.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -2553,7 +2635,7 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Action,
         params: &["goods", "from?"],
         cost: 10.0,
-        description: "Walk to `from` (a storage, a stable or a carriage of mine; by default the nearest storage or carriage of my realm holding any of the goods) and take the goods there, as much as fits. Goods like {wood: 10}, or a list like [\"wood\"] for as much as there is. My order is \"fetch\" until done; then `me.orderEnded` says how it ended.",
+        description: "Walk to `from` (a storage, a stable or a carriage of mine, or beside a boat of mine; by default the nearest storage or carriage of my realm holding any of the goods) and take the goods there, as much as fits. Goods like {wood: 10}, or a list like [\"wood\"] for as much as there is. My order is \"fetch\" until done; then `me.orderEnded` says how it ended.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -2975,6 +3057,14 @@ pub static ARMY_SCRIPT_API: &[ScriptBinding] = &[
         cost: 20.0,
         description: "The carriages the Player sees.",
         returns: ScriptType::List(&ScriptType::View("carriage")),
+    },
+    ScriptBinding {
+        name: "vessels",
+        is: Is::Query,
+        params: &[],
+        cost: 20.0,
+        description: "The boats the Player sees on the water.",
+        returns: ScriptType::List(&ScriptType::View("vessel")),
     },
     ScriptBinding {
         name: "traders",

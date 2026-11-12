@@ -43,6 +43,7 @@ pub fn skill_value(values: &SkillValues, skill: SkillName) -> f64 {
         SkillName::Farming => values.farming,
         SkillName::Combat => values.combat,
         SkillName::Driving => values.driving,
+        SkillName::Seafaring => values.seafaring,
     }
 }
 

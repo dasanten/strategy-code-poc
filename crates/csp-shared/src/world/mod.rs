@@ -144,6 +144,7 @@ pub enum SkillName {
     Farming,
     Combat,
     Driving,
+    Seafaring,
 }
 
 /// What a training ground teaches (`TrainingSubject`): a stat or a skill.
@@ -416,7 +417,8 @@ pub struct ScriptRunSteps {
     pub out_of_steps: Option<OutOfSteps>,
 }
 
-/// A place on the resident's own tile that goods are taken from or put (`GoodsSpot`).
+/// A place on the resident's own tile that goods are taken from or put (`GoodsSpot`), or a vessel
+/// beside them (`CONTEXT.md`: Beside a vessel).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(
     tag = "kind",
@@ -430,9 +432,11 @@ pub enum GoodsSpot {
     Site { site_id: String },
     Carriage { carriage_id: String },
     Resident { resident_id: String },
+    Vessel { vessel_id: String },
 }
 
-/// Where a store or fetch order takes goods to or from (`GoodsPlace`): a storage or a carriage.
+/// Where a store or fetch order takes goods to or from (`GoodsPlace`): a storage, a carriage, or a
+/// vessel, loaded from beside it (`CONTEXT.md`: Beside a vessel).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(
     tag = "kind",
@@ -443,6 +447,7 @@ pub enum GoodsSpot {
 pub enum GoodsPlace {
     Storage { storage_id: String },
     Carriage { carriage_id: String },
+    Vessel { vessel_id: String },
 }
 
 /// Walking to a tile.
@@ -613,6 +618,17 @@ pub struct DriveOrder {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional, type = "true")]
     pub near: Option<bool>,
+}
+
+/// Rowing a boat to a water tile (`CONTEXT.md`: Rowing): the rower is aboard and at its oars, and
+/// the boat goes a Step at a time over water along `path`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RowOrder {
+    pub vessel_id: String,
+    pub target: Tile,
+    pub path: Option<TilePath>,
+    pub progress: f64,
 }
 
 /// A haul route's stop.
@@ -881,6 +897,7 @@ pub enum ResidentOrder {
     AcceptOffer(AcceptOfferOrder),
     Relocate(RelocateOrder),
     Feed(FeedOrder),
+    Row(RowOrder),
 }
 
 /// Everything in the world that changes, saved as snapshots (ADR 0006).
@@ -901,6 +918,10 @@ pub struct WorldState {
     pub buildings: Vec<Building>,
     pub horses: Vec<Horse>,
     pub carriages: Vec<Carriage>,
+    /// Boats (and later ships) on the water (`CONTEXT.md`: Vessel). Left out of a save while there
+    /// are none, so a world from before format 113 reads as having none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub vessels: Vec<Vessel>,
     pub piles: Vec<Pile>,
     pub events: Vec<RealmEvent>,
     pub alliances: Vec<Alliance>,
@@ -1632,6 +1653,10 @@ pub struct Crime {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub horse: Option<String>,
+    /// A boat taken, as `carriage` (`CONTEXT.md`: Stealing a carriage or horse, its vessel part).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "true")]
+    pub boat: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub building: Option<BuildingKind>,
@@ -1913,6 +1938,10 @@ pub enum RealmEventWhat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         horse: Option<String>,
+        /// A boat, stolen like a carriage (`CONTEXT.md`: Stealing a carriage or horse).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional, type = "true")]
+        boat: Option<bool>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         building: Option<BuildingKind>,
@@ -1926,6 +1955,10 @@ pub enum RealmEventWhat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         horse: Option<String>,
+        /// A boat, stolen like a carriage (`CONTEXT.md`: Stealing a carriage or horse).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional, type = "true")]
+        boat: Option<bool>,
     },
     TransportTaken {
         resident_id: String,
@@ -1939,6 +1972,10 @@ pub enum RealmEventWhat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         horse: Option<String>,
+        /// A boat, stolen like a carriage (`CONTEXT.md`: Stealing a carriage or horse).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional, type = "true")]
+        boat: Option<bool>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         goods: Option<Stock>,
@@ -2808,6 +2845,9 @@ pub enum BuildingKind {
     TrainingGround,
     Road,
     Carriage,
+    Haven,
+    /// A boat site (`CONTEXT.md`: Building a boat): finished, it is gone and a boat floats.
+    Boat,
 }
 
 /// A building or construction site (`Building`).
@@ -2888,6 +2928,31 @@ pub struct Carriage {
     pub y: f64,
     pub horse_id: Option<String>,
     pub load: Stock,
+}
+
+/// The kinds of vessel (`CONTEXT.md`: Vessel). Ships come with Epic 91.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum VesselKind {
+    Boat,
+}
+
+/// A boat or ship (`CONTEXT.md`: Vessel): always on a water tile, one vessel per tile, with the
+/// goods it carries. Those aboard are residents (`Resident::aboard`, from T90.3).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Vessel {
+    pub id: String,
+    pub kind: VesselKind,
+    pub realm_id: Option<String>,
+    pub x: f64,
+    pub y: f64,
+    pub load: Stock,
+    /// The one aboard at its oars, who rowed it last or rows it now (`CONTEXT.md`: Rowing): no
+    /// passenger, so not counted against what it holds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub rower_id: Option<String>,
 }
 
 /// What a resource node yields once worked (`ResourceKind`).

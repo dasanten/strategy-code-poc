@@ -42,6 +42,9 @@ export const BUILDING_PURPOSE: Record<BuildingKind, string> = {
   road: 'A road: residents walk and carriages drive faster on it, on any land (slower to build on Mountain), and it can run through a gate. Nobody owns it.',
   carriage:
     'A carriage carries far more than any resident, pulled by a horse; built at a finished stable, on its tiles or right by them, and it belongs to the realm of whoever finishes it.',
+  haven:
+    'A haven is where boats and ships are built, with a storage anyone at it loads and unloads; on the shore, touching Lake or Sea, and not on Mountain. Like a stable, nobody owns it.',
+  boat: 'A boat is rowed over Lake and Sea with a few residents and a little cargo aboard; built on a tile of a finished haven that touches the water, it floats on the nearest free water tile next to it and belongs to the realm of whoever finishes it.',
 }
 
 /**
@@ -54,7 +57,7 @@ export const BUILD_GROUPS: readonly { name: string; kinds: readonly BuildingKind
   { name: 'Industry', kinds: ['smelter', 'mint', 'smithy'] },
   { name: 'City', kinds: ['townHall', 'house', 'storage', 'trainingGround'] },
   { name: 'Defence', kinds: ['wall', 'gate'] },
-  { name: 'Transport', kinds: ['road', 'carriage'] },
+  { name: 'Transport', kinds: ['road', 'carriage', 'haven', 'boat'] },
 ]
 
 /** Everything the ⓘ on a building's card says about its kind, numbers from the balance. */

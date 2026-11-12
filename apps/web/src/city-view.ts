@@ -83,6 +83,8 @@ export const BUILDING_NAMES: Record<BuildingKind, string> = {
   trainingGround: 'training ground',
   road: 'road',
   carriage: 'carriage site',
+  boat: 'boat site',
+  haven: 'haven',
 }
 
 /** "3 houses", "1 storage". */

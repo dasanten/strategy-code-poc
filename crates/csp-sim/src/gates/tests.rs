@@ -122,7 +122,13 @@ fn a_walker_finds_a_new_way_when_a_gate_closes_before_them() {
     }
     world.residents[0].y = 12.0;
     gate(&mut world).closed = Some(true);
-    let step = StepAction { resident_id: "b1".into(), to: GATE, carriage_id: None, horse_id: None };
+    let step = StepAction {
+        resident_id: "b1".into(),
+        to: GATE,
+        carriage_id: None,
+        horse_id: None,
+        vessel_id: None,
+    };
     walking.resolve(&mut world, &mut scratch, &[step]);
     assert_eq!((world.residents[0].x, world.residents[0].y), (8.0, 12.0));
     let o = walk(&world).expect("still walking");

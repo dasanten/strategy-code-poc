@@ -24,7 +24,8 @@ use crate::scripts::ScriptLibrary;
 use crate::sight::InvariantViolation;
 
 /// The buildings a storage param may name besides carriages: those a store or fetch goes to.
-const STORAGE_KINDS: [BuildingKind; 2] = [BuildingKind::Storage, BuildingKind::Stable];
+const STORAGE_KINDS: [BuildingKind; 3] =
+    [BuildingKind::Storage, BuildingKind::Stable, BuildingKind::Haven];
 
 /// A workplace or construction site, which anyone may work (`anyonesToWork`).
 fn anyones_to_work(b: &Building) -> bool {

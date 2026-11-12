@@ -8,8 +8,9 @@ import type { SeenCity } from "./SeenCity.js";
 import type { SeenHorse } from "./SeenHorse.js";
 import type { SeenResident } from "./SeenResident.js";
 import type { SeenTrader } from "./SeenTrader.js";
+import type { SeenVessel } from "./SeenVessel.js";
 
 /**
  * Something a Player sees (`SeenEntity`), tagged by `is`. Ids are unique across all of them.
  */
-export type SeenEntity = { "is": "resident" } & SeenResident | { "is": "building" } & SeenBuilding | { "is": "city" } & SeenCity | { "is": "horse" } & SeenHorse | { "is": "carriage" } & SeenCarriage | { "is": "pile" } & Pile | { "is": "army" } & SeenArmy | { "is": "caravan" } & SeenCaravan | { "is": "trader" } & SeenTrader;
+export type SeenEntity = { "is": "resident" } & SeenResident | { "is": "building" } & SeenBuilding | { "is": "city" } & SeenCity | { "is": "horse" } & SeenHorse | { "is": "carriage" } & SeenCarriage | { "is": "pile" } & Pile | { "is": "army" } & SeenArmy | { "is": "caravan" } & SeenCaravan | { "is": "trader" } & SeenTrader | { "is": "vessel" } & SeenVessel;

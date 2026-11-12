@@ -205,7 +205,7 @@
         {
           "name": "aboard",
           "type": "string",
-          "description": "The id of the carriage they ride on as a passenger.",
+          "description": "The id of the carriage or boat they are aboard as a passenger.",
           "nullWhen": "unless they are aboard one"
         },
         {
@@ -371,6 +371,12 @@
           "name": "driving",
           "type": "number",
           "description": "How far they have learned driving.",
+          "nullWhen": "until they start learning it"
+        },
+        {
+          "name": "seafaring",
+          "type": "number",
+          "description": "How far they have learned seafaring, by rowing.",
           "nullWhen": "until they start learning it"
         }
       ]
@@ -1600,6 +1606,63 @@
         }
       ]
     },
+    "vessel": {
+      "description": "A boat on the water, as the Player sees it.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "The vessel’s id, unique in the world."
+        },
+        {
+          "name": "kind",
+          "type": "string",
+          "description": "What it is: \"boat\"."
+        },
+        {
+          "name": "realmId",
+          "type": "string",
+          "description": "The realm it belongs to.",
+          "nullWhen": "for one of nobody"
+        },
+        {
+          "name": "x",
+          "type": "number",
+          "description": "The water tile it floats on, from west to east."
+        },
+        {
+          "name": "y",
+          "type": "number",
+          "description": "The water tile it floats on, from north to south."
+        },
+        {
+          "name": "load",
+          "type": {
+            "view": "goods"
+          },
+          "description": "The goods on board.",
+          "nullWhen": "unless the Player sees inside"
+        },
+        {
+          "name": "loadLevel",
+          "type": "string",
+          "description": "How heavily it looks loaded: \"empty\", \"light\", \"half\", \"heavy\" or \"full\"."
+        },
+        {
+          "name": "passengerIds",
+          "type": {
+            "list": "string"
+          },
+          "description": "The residents aboard it as passengers."
+        },
+        {
+          "name": "rowerId",
+          "type": "string",
+          "description": "The one aboard at its oars, who rows it or rowed it last; no passenger.",
+          "nullWhen": "when nobody is at its oars"
+        }
+      ]
+    },
     "pile": {
       "description": "Goods lying on a tile.",
       "fields": [
@@ -2148,6 +2211,18 @@
       }
     },
     {
+      "name": "vessels",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The boats the Player sees on the water.",
+      "returns": {
+        "list": {
+          "view": "vessel"
+        }
+      }
+    },
+    {
       "name": "traders",
       "is": "query",
       "params": [],
@@ -2600,7 +2675,19 @@
         "carriageId"
       ],
       "cost": 10,
-      "description": "Get on a carriage of my realm on my tile as a passenger, and ride along with it.",
+      "description": "Get on a carriage of my realm on my tile, or a boat of my realm beside me (on land touching its water tile), as a passenger, and go along with it. Riders dismount first: no horse goes aboard.",
+      "returns": "string"
+    },
+    {
+      "name": "row",
+      "is": "action",
+      "params": [
+        "vessel",
+        "x",
+        "y"
+      ],
+      "cost": 10,
+      "description": "Row a boat of my realm, by it or its id, to the water tile x, y, or to the nearest free water tile beside it when x, y is land. I must be aboard it or beside it (I board first), and grown. A Step at a time over water; my Strength and Seafaring set the pace, and rowing teaches Seafaring. My order is \"row\" until it gets there.",
       "returns": "string"
     },
     {
@@ -2611,7 +2698,7 @@
         "y?"
       ],
       "cost": 10,
-      "description": "Get off the carriage I am aboard, onto its tile or the tile x, y right next to it.",
+      "description": "Get off the carriage I am aboard, onto its tile or the tile x, y right next to it; off a boat, onto the free land tile x, y beside it, or without one the first free one.",
       "returns": "string"
     },
     {
@@ -2683,7 +2770,7 @@
         "goods"
       ],
       "cost": 10,
-      "description": "Take goods from a spot on my tile: {kind: \"ground\"}, {kind: \"storage\", storageId}, {kind: \"site\", siteId}, {kind: \"carriage\", carriageId} or a Down resident lying there, {kind: \"resident\", residentId}; goods like {food: 3}.",
+      "description": "Take goods from a spot on my tile: {kind: \"ground\"}, {kind: \"storage\", storageId}, {kind: \"site\", siteId}, {kind: \"carriage\", carriageId}, a boat beside me, {kind: \"vessel\", vesselId}, or a Down resident lying there, {kind: \"resident\", residentId}; goods like {food: 3}.",
       "returns": "string"
     },
     {
@@ -2694,7 +2781,7 @@
         "goods"
       ],
       "cost": 10,
-      "description": "Put carried goods down at a spot on my tile.",
+      "description": "Put carried goods down at a spot on my tile, or in a boat beside me ({kind: \"vessel\", vesselId}), as far as they fit.",
       "returns": "string"
     },
     {
@@ -2706,7 +2793,7 @@
         "ownFood?"
       ],
       "cost": 10,
-      "description": "Walk to `to` (a storage, a stable or a carriage of mine; by default the nearest storage of my realm), put the goods down there and, at a storage with Food, top up my own food. Goods like {wood: 10}, or a list like [\"wood\"] for all I carry of them (Food beyond my own food). `ownFood`, units of Food, is the own food to keep and top up to instead of the usual. My order is \"store\" until done; then `me.orderEnded` says how it ended.",
+      "description": "Walk to `to` (a storage, a stable or a carriage of mine, or beside a boat of mine; by default the nearest storage of my realm), put the goods down there and, at a storage with Food, top up my own food. Goods like {wood: 10}, or a list like [\"wood\"] for all I carry of them (Food beyond my own food). `ownFood`, units of Food, is the own food to keep and top up to instead of the usual. My order is \"store\" until done; then `me.orderEnded` says how it ended.",
       "returns": "string"
     },
     {
@@ -2717,7 +2804,7 @@
         "from?"
       ],
       "cost": 10,
-      "description": "Walk to `from` (a storage, a stable or a carriage of mine; by default the nearest storage or carriage of my realm holding any of the goods) and take the goods there, as much as fits. Goods like {wood: 10}, or a list like [\"wood\"] for as much as there is. My order is \"fetch\" until done; then `me.orderEnded` says how it ended.",
+      "description": "Walk to `from` (a storage, a stable or a carriage of mine, or beside a boat of mine; by default the nearest storage or carriage of my realm holding any of the goods) and take the goods there, as much as fits. Goods like {wood: 10}, or a list like [\"wood\"] for as much as there is. My order is \"fetch\" until done; then `me.orderEnded` says how it ended.",
       "returns": "string"
     },
     {
@@ -3283,6 +3370,18 @@
       "returns": {
         "list": {
           "view": "carriage"
+        }
+      }
+    },
+    {
+      "name": "vessels",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The boats the Player sees on the water.",
+      "returns": {
+        "list": {
+          "view": "vessel"
         }
       }
     },

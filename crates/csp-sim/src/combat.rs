@@ -31,6 +31,7 @@ use crate::queries::names::placed;
 use crate::queries::residents::{is_armed, is_down};
 use crate::queries::standing::TRADE_ORG;
 use crate::queries::trade_org::{in_inner_ring, of_trade_org_hq, trade_org_hq};
+use crate::queries::vessels::{being_rowed, between_vessels, vessel_aboard};
 use crate::queries::walls::{
     broken_returns, foreign_wall, is_wall_or_gate, on_own_wall, wall_strength, wall_strength_left,
 };
@@ -72,6 +73,18 @@ fn spot_of(world: &WorldState, t: Target) -> (f64, f64) {
 
 fn tile(p: (f64, f64)) -> (i32, i32) {
     (p.0 as i32, p.1 as i32)
+}
+
+/// Whether the resident at `ai` can strike the target (`CONTEXT.md`: Combat, Fighting at a
+/// vessel): in contact with it, and not from one vessel at someone aboard another. Those aboard a
+/// vessel are reached from beside it, as if it were the next land tile.
+fn reaches(world: &WorldState, size: i32, ai: usize, t: Target) -> bool {
+    let a = &world.residents[ai];
+    in_contact(size, tile((a.x, a.y)), tile(spot_of(world, t)))
+        && match t {
+            Target::Resident(ti) => !between_vessels(world, a, &world.residents[ti]),
+            Target::Building(_) => true,
+        }
 }
 
 /// A fresh attack order on `target_id` (`attackOrder`); `started` when the fight is already in
@@ -283,7 +296,7 @@ pub fn request_strikes(world: &mut WorldState, size: i32) -> Vec<StrikeAction> {
             continue;
         }
         let target = target.expect("not gone");
-        if !in_contact(size, tile(me), tile(spot_of(world, target))) {
+        if !reaches(world, size, ri, target) {
             continue;
         }
         let target_id = match target {
@@ -344,12 +357,11 @@ pub fn resolve_strikes(
         }
         let a = &world.residents[ai];
         let Some(ResidentOrder::Attack(o)) = &a.order else { continue };
-        let spot = spot_of(world, target);
         let real_id = match target {
             Target::Resident(t) => &world.residents[t].id,
             Target::Building(b) => &world.buildings[b].id,
         };
-        if o.target_id != *real_id || !in_contact(size, tile((a.x, a.y)), tile(spot)) {
+        if o.target_id != *real_id || !reaches(world, size, ai, target) {
             continue;
         }
         let started = o.started;
@@ -527,10 +539,20 @@ fn with_caravan_carriage(world: &WorldState, t: &Resident) -> bool {
     carriage.is_some_and(|k| k.x == t.x && k.y == t.y)
 }
 
+/// Gets the resident at `ti` off the carriage they are aboard. Aboard a vessel they stay, on its
+/// water tile: should what they do next take them away, the walking puts them ashore first
+/// (`CONTEXT.md`: Fighting at a vessel, No ferrying by itself).
+fn off_carriage(world: &mut WorldState, ti: usize) {
+    if crate::queries::vessels::vessel_aboard(world, &world.residents[ti]).is_none() {
+        world.residents[ti].aboard = None;
+    }
+}
+
 /// The resident at `ti`, hit by the one at `ai` and still alive, reacts (`react`): a Player's
 /// resident runs their defence script; others, armed, fight back unless already attacking
 /// someone, off any carriage they are aboard; unarmed, they flee home to their city's town hall,
-/// but a driver drives on and a passenger stays aboard a carriage being driven.
+/// but a driver drives on and a passenger stays aboard a carriage being driven, and so a rower
+/// rows on and a passenger stays aboard a boat being rowed.
 fn react(world: &mut WorldState, ti: usize, ai: usize) {
     let t = &world.residents[ti];
     if matches!(t.order, Some(ResidentOrder::Climb(_))) {
@@ -543,19 +565,24 @@ fn react(world: &mut WorldState, ti: usize, ai: usize) {
     if is_armed(&t.carried) {
         if !matches!(t.order, Some(ResidentOrder::Attack(_))) {
             let a_id = world.residents[ai].id.clone();
+            off_carriage(world, ti);
             let t = &mut world.residents[ti];
-            t.aboard = None;
             t.order = Some(ResidentOrder::Attack(attack_order(&a_id, true, true)));
         }
         return;
     }
-    if driven_carriage_id(t).is_some() || with_caravan_carriage(world, t) {
+    let rowing = matches!(t.order, Some(ResidentOrder::Row(_)));
+    if driven_carriage_id(t).is_some() || rowing || with_caravan_carriage(world, t) {
         return;
     }
     if let Some(carriage) = world.carriages.iter().find(|k| t.aboard.as_ref() == Some(&k.id)) {
         if !stands_still(world, carriage) {
             return;
         }
+    }
+    // A boat being rowed is the way out too (`CONTEXT.md`: Fighting at a vessel).
+    if vessel_aboard(world, t).is_some_and(|v| being_rowed(world, v)) {
+        return;
     }
     let Some(city) = world.cities.iter().find(|c| t.city_id.as_ref() == Some(&c.id)) else {
         return;
@@ -566,8 +593,8 @@ fn react(world: &mut WorldState, ti: usize, ai: usize) {
         return;
     }
     let (hx, hy) = (hall.x, hall.y);
+    off_carriage(world, ti);
     let t = &mut world.residents[ti];
-    t.aboard = None;
     t.order = Some(ResidentOrder::WalkTo(WalkOrder {
         target: Tile { x: hx, y: hy },
         path: None,

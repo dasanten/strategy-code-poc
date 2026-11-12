@@ -262,6 +262,43 @@ describe('Add step', () => {
     ])
   })
 
+  it('boards a boat from the shore picked, rows it, gets off and loads it (`CONTEXT.md`: Beside a vessel)', () => {
+    // A lake over x 10..14, y 8..12, with the realm's boat v1 at (10, 10) and r2's v2 at (12, 10).
+    const lake: PlanWorld = {
+      ...w,
+      vessels: [
+        { id: 'v1', x: 10, y: 10, realmId: 'r1' },
+        { id: 'v2', x: 12, y: 10, realmId: 'r2' },
+      ],
+      water: (x, y) => x >= 10 && x <= 14 && y >= 8 && y <= 12,
+    }
+    const plan = (kind: Plan['kind'], ...taps: [number, number][]) =>
+      taps.reduce<Plan>((p, [x, y]) => pickInto(lake, p, { x, y }), { kind, picked: [] })
+    // Only the realm's boat, and a shore tile to board from, are picked.
+    expect(plan('boardBoat', [12, 10]).error).toBe('no boat of yours there')
+    expect(plan('boardBoat', [10, 10], [11, 10]).error).toBe(
+      'that is water: pick the shore beside the boat',
+    )
+    // Boarding goes after a walk to the shore picked; rowing and getting off need no walk.
+    const board = planOrder(plan('boardBoat', [10, 10], [9, 10]))!
+    expect(board).toEqual({ order: { kind: 'board', vesselId: 'v1' }, at: { x: 9, y: 10 } })
+    const row = planOrder(plan('row', [10, 10], [15, 10]))!
+    expect(row).toEqual({ order: { kind: 'row', vesselId: 'v1', x: 15, y: 10 } })
+    let request = appendRequest(inCity, board.order, board.at)!
+    const queued = { ...inCity, queue: kept(request.steps as QueueStepRequest[]) }
+    request = appendRequest(queued, row.order, row.at)!
+    expect(request.steps).toEqual([
+      { id: 1, order: { kind: 'walkTo', x: 9, y: 10 } },
+      { id: 2, order: { kind: 'board', vesselId: 'v1' } },
+      { order: { kind: 'row', vesselId: 'v1', x: 15, y: 10 } },
+    ])
+    // Store and Fetch load and unload it from beside it, walking there themselves.
+    expect(planOrder(plan('store', [10, 10]))).toEqual({
+      order: { kind: 'store', goods: [...GOODS], to: 'v1' },
+    })
+    expect(plan('pickUp', [10, 10]).error).toBe('a boat: Store or Fetch to load it')
+  })
+
   it('feeds someone Down picked on the map, after a walk to their tile (`CONTEXT.md`: Reviving)', () => {
     const seen: PlanWorld = { ...w, toFeed: [{ id: 'ana', x: 12, y: 12 }] }
     const nobody = pickInto(seen, { kind: 'feed', picked: [] }, { x: 13, y: 12 })

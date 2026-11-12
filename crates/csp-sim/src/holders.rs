@@ -7,7 +7,7 @@ use csp_shared::world::{Good, Stock, WorldState};
 use crate::queries::goods::move_goods;
 
 /// Where a stock is kept: a pile's goods, a building's stock, a site's delivered materials, a
-/// carriage's load or what a resident carries.
+/// carriage's or a vessel's load or what a resident carries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Holder {
     Pile(usize),
@@ -15,6 +15,7 @@ pub enum Holder {
     Site(usize),
     Carriage(usize),
     Resident(usize),
+    Vessel(usize),
 }
 
 /// The stock a holder keeps, to change. A building without a stock gets an empty one
@@ -26,6 +27,7 @@ pub fn stock_mut(world: &mut WorldState, h: Holder) -> &mut Stock {
         Holder::Site(i) => &mut world.buildings[i].site.as_mut().expect("a site").delivered,
         Holder::Carriage(i) => &mut world.carriages[i].load,
         Holder::Resident(i) => &mut world.residents[i].carried,
+        Holder::Vessel(i) => &mut world.vessels[i].load,
     }
 }
 
@@ -37,6 +39,7 @@ pub fn stock_of(world: &WorldState, h: Holder) -> Stock {
         Holder::Site(i) => world.buildings[i].site.as_ref().expect("a site").delivered.clone(),
         Holder::Carriage(i) => world.carriages[i].load.clone(),
         Holder::Resident(i) => world.residents[i].carried.clone(),
+        Holder::Vessel(i) => world.vessels[i].load.clone(),
     }
 }
 

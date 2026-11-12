@@ -13,6 +13,7 @@ import {
   TICKS_PER_GAME_DAY,
   TICKS_PER_GAME_YEAR,
   PASSENGER_WEIGHT,
+  BOAT_CAPACITY,
   ticksForAge,
 } from '@csp/balance'
 import { FOOTPRINT, footprintTiles } from './shared/footprint.js'
@@ -68,6 +69,7 @@ import {
   thiefOf,
   hitchChoice,
   unhitcherOf,
+  boaterOf,
   type ActionId,
   type CardAction,
   type ResidentHere,
@@ -306,6 +308,18 @@ describe('the actions on a resident’s card', () => {
       active: true,
     })
     expect(residentOrders(here()).missing.driveOff).toBe('no carriage of another realm here')
+    // A rival's boat beside them likewise, on a row of its own (`CONTEXT.md`: its vessel part).
+    const rowOff = (h: ResidentHere) => residentActions(h).find((a) => a.id === 'rowOff')
+    expect(rowOff(here({ rowOff: { problem: undefined } }))).toEqual({
+      id: 'rowOff',
+      label: 'Row off (theft)',
+      key: 'D',
+    })
+    expect(rowOff(here({ rowOff: { problem: 'someone is aboard that boat' } }))).toMatchObject({
+      disabled: true,
+      reason: 'someone is aboard that boat',
+    })
+    expect(residentOrders(here()).missing.rowOff).toBe('no boat of another realm beside them')
     const mount = (h: ResidentHere) => residentActions(h).find((a) => a.id === 'stealHorse')
     expect(mount(here({ stealHorse: { problem: undefined } }))).toEqual({
       id: 'stealHorse',
@@ -389,6 +403,40 @@ describe('the actions on a resident’s card', () => {
       expect.objectContaining({ disabled: true, reason: 'the driver can’t board' }),
     ])
     expect(board({ aboard: true, carriageToBoard: true }).map((a) => a.label)).toEqual(['Get off'])
+  })
+
+  it('offers rowing a boat of theirs to a picked tile, to grown residents on foot', () => {
+    const rowRow = (h: Parameters<typeof here>[0]) =>
+      residentActions(here(h)).filter((a) => a.id === 'row')
+    expect(rowRow({ boatToRow: {} })).toEqual([
+      expect.objectContaining({ label: 'Row boat to', key: 'D' }),
+    ])
+    expect(rowRow({ boatToRow: {}, picking: 'row' })[0]).toMatchObject({
+      label: 'Pick a tile…',
+      active: true,
+    })
+    expect(rowRow({ boatToRow: {}, adult: false })[0]).toMatchObject({
+      disabled: true,
+      reason: 'children can’t row',
+    })
+    expect(rowRow({ boatToRow: { problem: 'the boat is full' } })[0]).toMatchObject({
+      disabled: true,
+      reason: 'the boat is full',
+    })
+    expect(residentOrders(here()).missing.row).toBe('no boat of yours here')
+  })
+
+  it('offers boarding a boat of the realm beside them, never on horseback', () => {
+    const board = (h: Parameters<typeof here>[0]) =>
+      residentActions(here(h)).filter((a) => a.id === 'board')
+    expect(board({ boatToBoard: true })).toEqual([
+      expect.objectContaining({ label: 'Board boat', key: 'K' }),
+    ])
+    expect(board({ boatToBoard: true, riding: true })).toEqual([
+      expect.objectContaining({ disabled: true, reason: 'no horse goes aboard: dismount first' }),
+    ])
+    expect(board({ aboard: true, boatToBoard: true }).map((a) => a.label)).toEqual(['Get off'])
+    expect(residentOrders(here()).missing.board).toBe('no carriage or boat of yours here')
   })
 
   it('gives every shown action its own key', () => {
@@ -728,6 +776,98 @@ const things = (more: Partial<TileThings> = {}): TileThings => ({
 const tile = (more: Partial<TileThings> = {}) => describeTile(things(more), GOOD_LABELS)
 
 describe('the card for a tile', () => {
+  it('shows a boat on the water with its owner and load, what it holds only to its own realm', () => {
+    const boat = {
+      id: 'v1',
+      kind: 'boat' as const,
+      realmId: 'me',
+      x: 5,
+      y: 5,
+      loadLevel: 'light' as const,
+      passengerIds: [],
+    }
+    const ours = tile({ vessels: [{ ...boat, load: { wood: 10 } }] })
+    expect(ours).toMatchObject({ title: 'Boat', rel: 'own', what: 'carriage' })
+    expect(ours.lines[0]).toBe('Yours')
+    expect(ours.carriage).toMatchObject({ title: 'Boat (yours)', goods: { wood: 10 } })
+    expect(ours.carriage?.load.text).toMatch(new RegExp(`/ ${BOAT_CAPACITY} kg$`))
+    const theirs = tile({ vessels: [{ ...boat, realmId: 'r2' }] })
+    expect(theirs.carriage?.load).toEqual({ text: 'Lightly loaded' })
+    expect(theirs.carriage?.goods).toBeUndefined()
+  })
+
+  it('names a boat’s passengers, counted against what it holds', () => {
+    const ana = { id: 'ana', name: 'Ana', x: 5, y: 5, aboard: 'boat1' } as SeenResident
+    const boat = {
+      id: 'boat1',
+      kind: 'boat' as const,
+      realmId: 'me',
+      x: 5,
+      y: 5,
+      loadLevel: 'light' as const,
+      load: { wood: 10 },
+      passengerIds: ['ana'],
+    }
+    const card = tile({ vessels: [boat], residents: [ana] })
+    expect(card.carriage?.passengers).toEqual({
+      residents: [{ id: 'ana', name: 'Ana', pick: true }],
+      weight: `${PASSENGER_WEIGHT} kg of it people`,
+    })
+    expect(card.carriage?.load.text).toBe(`${10 + PASSENGER_WEIGHT} / ${BOAT_CAPACITY} kg`)
+    // Its rower is named on a row of their own and weighs nothing against it.
+    const bo = { id: 'bo', name: 'Bo', x: 5, y: 5, aboard: 'boat1' } as SeenResident
+    const rowed = tile({ vessels: [{ ...boat, rowerId: 'bo' }], residents: [ana, bo] })
+    expect(rowed.carriage?.rower).toEqual({ id: 'bo', name: 'Bo', pick: true })
+    expect(rowed.carriage?.load.text).toBe(`${10 + PASSENGER_WEIGHT} / ${BOAT_CAPACITY} kg`)
+  })
+
+  it('lets the Player’s residents beside their boat board it, and its passengers get off', () => {
+    const at = (id: string, x: number, more: Partial<SeenResident> = {}) =>
+      ({ id, name: id, owner: 'me', x, y: 5, order: null, ...more }) as SeenResident
+    const boat = {
+      id: 'boat1',
+      kind: 'boat' as const,
+      realmId: 'me',
+      x: 5,
+      y: 5,
+      loadLevel: 'empty' as const,
+      load: {},
+      passengerIds: ['cid'],
+    }
+    const ana = at('ana', 4)
+    const bo = at('bo', 6, { riding: 'h1' })
+    const cid = at('cid', 5, { aboard: 'boat1' })
+    const far = at('far', 2)
+    const card = tile({ vessels: [boat], residents: [ana, bo, cid, far] })
+    expect(card.boat).toEqual({
+      vesselId: 'boat1',
+      board: [
+        { id: 'ana', name: 'ana', problem: undefined },
+        { id: 'bo', name: 'bo', problem: 'no horse goes aboard: dismount first' },
+      ],
+      getOff: [{ id: 'cid', name: 'cid' }],
+    })
+    const action = (actor?: SeenResident) =>
+      tileActions(card, actor as unknown as Resident).find((a) => a.id === 'board')
+    expect(action(ana)).toMatchObject({ label: 'Board boat', key: ACTION_KEYS.board })
+    expect(action(bo)).toMatchObject({
+      disabled: true,
+      reason: 'no horse goes aboard: dismount first',
+    })
+    expect(action(cid)?.label).toBe('Get off')
+    expect(boaterOf(card, cid)).toEqual({ id: 'cid', getOff: true, problem: undefined })
+    // Someone else's boat offers nothing.
+    expect(tile({ vessels: [{ ...boat, realmId: 'r2' }], residents: [ana] }).boat).toBeUndefined()
+  })
+
+  it('shows a boat site on a haven under a head of its own', () => {
+    const haven = building({ kind: 'haven', cityId: 'c-me', x: 4, y: 4 })
+    const site = building({ kind: 'boat', site: { delivered: {}, work: 0 } })
+    const card = tile({ buildings: [haven, site] })
+    expect(card.title).toBe('Eastmere haven')
+    expect(card.sites?.[0]).toMatchObject({ title: 'Boat site' })
+  })
+
   it('says who occupies a town hall in sight and the game days left (`CONTEXT.md`: Occupying a town hall)', () => {
     const hall = (cityId: string) => building({ kind: 'townHall', cityId, x: 4, y: 4 })
     const cities = [

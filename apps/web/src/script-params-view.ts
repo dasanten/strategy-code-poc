@@ -33,7 +33,7 @@ export interface ParamWorld {
 }
 
 /** The buildings a storage param may name besides carriages: those a store or fetch goes to. */
-const STORAGE_KINDS: readonly string[] = ['storage', 'stable']
+const STORAGE_KINDS: readonly string[] = ['storage', 'stable', 'haven']
 
 const ownBuilding = (w: ParamWorld, b: Building) => buildingRealm(w, b) === w.realmId
 

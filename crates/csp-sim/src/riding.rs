@@ -74,7 +74,13 @@ impl OrderKind for Mount {
             if !horse_of_resident(&world.horses[h], &world.residents[i]) {
                 let thief = world.residents[i].id.clone();
                 let size = terrain.map_or(MAP_SIZE, |t| t.size);
-                take_over(world, &thief, c, Taken { carriage: None, horse: Some(h) }, size);
+                take_over(
+                    world,
+                    &thief,
+                    c,
+                    Taken { carriage: None, horse: Some(h), vessel: None },
+                    size,
+                );
             }
         }
         world.residents[i].riding = Some(hid.to_string());

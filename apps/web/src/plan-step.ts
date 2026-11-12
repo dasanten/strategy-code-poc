@@ -14,6 +14,7 @@ import type {
   GoodsSpot,
   OrderRequest,
   SeenHorse,
+  SeenVessel,
   Stock,
   Task,
   TrainingSubject,
@@ -38,6 +39,8 @@ export type PlanPick =
   | 'stable'
   | 'ground'
   | 'carriage'
+  | 'vessel'
+  | 'shore'
   | 'horse'
   | 'city'
   | 'toFeed'
@@ -66,6 +69,8 @@ export type PlanStepId =
   | 'mount'
   | 'dismount'
   | 'board'
+  | 'boardBoat'
+  | 'row'
   | 'getOff'
   | 'unhitch'
   | 'hitch'
@@ -101,6 +106,22 @@ export const PLAN_STEPS: readonly PlanKind[] = [
     id: 'board',
     label: 'Board a carriage',
     picks: [{ pick: 'carriage', prompt: 'the carriage to board' }],
+  },
+  {
+    id: 'boardBoat',
+    label: 'Board a boat',
+    picks: [
+      { pick: 'vessel', prompt: 'the boat to board' },
+      { pick: 'shore', prompt: 'the shore to board it from, beside where the boat will be' },
+    ],
+  },
+  {
+    id: 'row',
+    label: 'Row the boat',
+    picks: [
+      { pick: 'vessel', prompt: 'the boat to row' },
+      { pick: 'tile', prompt: 'where to row it: water, or the shore to land at' },
+    ],
   },
   { id: 'getOff', label: 'Get off', picks: [] },
   {
@@ -167,12 +188,12 @@ export const PLAN_STEPS: readonly PlanKind[] = [
   {
     id: 'store',
     label: 'Store what they carry',
-    picks: [{ pick: 'storage', prompt: 'the storage, stable or carriage to store at' }],
+    picks: [{ pick: 'storage', prompt: 'the storage, stable, carriage or boat to store at' }],
   },
   {
     id: 'fetch',
     label: 'Fetch',
-    picks: [{ pick: 'storage', prompt: 'the storage, stable or carriage to fetch from' }],
+    picks: [{ pick: 'storage', prompt: 'the storage, stable, carriage or boat to fetch from' }],
     ask: 'goods',
   },
   {
@@ -276,6 +297,10 @@ export interface PlanWorld {
   /** The buildings the Player remembers out of sight (`CONTEXT.md`: Last seen). */
   lastSeen: readonly Building[]
   carriages: readonly Pick<Carriage, 'id' | 'x' | 'y' | 'realmId'>[]
+  /** The vessels in sight, to board, row or load the realm's (`CONTEXT.md`: Beside a vessel). */
+  vessels?: readonly Pick<SeenVessel, 'id' | 'x' | 'y' | 'realmId'>[]
+  /** Whether a tile is known to be water, where nobody stands to board (`CONTEXT.md`: Water). */
+  water?: (x: number, y: number) => boolean
   horses: readonly Pick<SeenHorse, 'id' | 'x' | 'y' | 'realmId'>[]
   cities: readonly Pick<City, 'id' | 'realmId'>[]
   realmId: string
@@ -305,15 +330,18 @@ export function planPickAt(
   const ownCarriage = w.carriages.find(
     (k) => k.x === at.x && k.y === at.y && k.realmId === w.realmId,
   )
+  const ownBoat = w.vessels?.find((v) => v.x === at.x && v.y === at.y && v.realmId === w.realmId)
   const named = (b: Building): Picked => ({ ...tile, id: b.id, building: b.kind })
   switch (pick) {
     case 'tile':
       return building?.site ? { ...tile, building: building.kind } : tile
     case 'spot': {
+      // Loading a boat is Store and Fetch, which walk beside it themselves.
+      if (ownBoat) return 'a boat: Store or Fetch to load it'
       if (ownCarriage) return { ...tile, spot: { kind: 'carriage', carriageId: ownCarriage.id } }
       if (!building) return { ...tile, spot: { kind: 'ground' } }
       if (building.site) return { ...tile, spot: { kind: 'site', siteId: building.id } }
-      if (['storage', 'stable'].includes(building.kind))
+      if (['storage', 'stable', 'haven'].includes(building.kind))
         return { ...tile, spot: { kind: 'storage', storageId: building.id } }
       return { ...tile, spot: { kind: 'ground' } }
     }
@@ -336,12 +364,20 @@ export function planPickAt(
       return b ? named(b) : 'no finished training ground there'
     }
     case 'storage': {
-      const b = here.find((x) => ['storage', 'stable'].includes(x.kind) && !x.site)
+      const b = here.find((x) => ['storage', 'stable', 'haven'].includes(x.kind) && !x.site)
       if (b) return named(b)
-      return ownCarriage ? { ...tile, id: ownCarriage.id } : 'no storage, stable or carriage there'
+      if (ownBoat) return { ...tile, id: ownBoat.id }
+      return ownCarriage
+        ? { ...tile, id: ownCarriage.id }
+        : 'no storage, stable, haven, carriage or boat there'
     }
     case 'carriage':
       return ownCarriage ? { ...tile, id: ownCarriage.id } : 'no carriage of yours there'
+    case 'vessel':
+      return ownBoat ? { ...tile, id: ownBoat.id } : 'no boat of yours there'
+    case 'shore':
+      // Whether the boat is beside it then is checked when the step's turn comes.
+      return w.water?.(at.x, at.y) ? 'that is water: pick the shore beside the boat' : tile
     case 'horse': {
       const h = w.horses.find((x) => x.x === at.x && x.y === at.y && x.realmId === w.realmId)
       return h ? { ...tile, id: h.id } : 'no horse of yours there'
@@ -447,6 +483,12 @@ export function planOrder(
       return { order: { kind: 'dismount' } }
     case 'board':
       return { order: { kind: 'board', carriageId: p.id }, at }
+    case 'boardBoat':
+      // From beside it: a walk to the shore picked goes first (`CONTEXT.md`: Beside a vessel).
+      return { order: { kind: 'board', vesselId: p.id }, at: { x: q.x, y: q.y } }
+    case 'row':
+      // Aboard or beside it already, as a step before saw to (`CONTEXT.md`: Rowing).
+      return { order: { kind: 'row', vesselId: p.id, x: q.x, y: q.y } }
     case 'getOff':
       return { order: { kind: 'getOff' } }
     case 'explore':

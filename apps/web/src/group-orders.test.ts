@@ -252,6 +252,66 @@ describe('group orders', () => {
     expect(skipped).toEqual([{ id: 'b', name: 'B', why: 'not aboard' }])
   })
 
+  it('boards a boat together from beside it, until it is full, and gets them off together', () => {
+    // Boat v1 on the water at (10, 10): a and b on the shore beside it, c too far.
+    const v1 = { id: 'v1', x: 10, y: 10 }
+    const rs = [
+      resident('a', 9, 10),
+      resident('b', 11, 11),
+      resident('far', 13, 10),
+      resident('rider', 9, 9, { riding: 'h1' }),
+      resident('c', 10, 9),
+    ]
+    const board = send({ kind: 'boardBoat', vessel: v1, seats: 2 }, rs)
+    expect(board.requests.map((q) => q.order)).toEqual([
+      { kind: 'board', vesselId: 'v1', residentId: 'a' },
+      { kind: 'board', vesselId: 'v1', residentId: 'b' },
+    ])
+    expect(board.skipped).toEqual([
+      { id: 'far', name: 'FAR', why: 'not beside the boat' },
+      { id: 'rider', name: 'RIDER', why: 'no horse goes aboard: dismount first' },
+      { id: 'c', name: 'C', why: 'the boat is full' },
+    ])
+    // Aboard, they all get off with one order, onto the shore beside it.
+    const aboard = rs.map((r) =>
+      ['a', 'b'].includes(r.id) ? { ...r, aboard: 'v1', x: 10, y: 10 } : r,
+    )
+    const off = send({ kind: 'getOff' }, aboard)
+    expect(off.requests.map((q) => q.residentId)).toEqual(['a', 'b'])
+    expect(off.requests.every((q) => q.order.kind === 'getOff')).toBe(true)
+  })
+
+  it('rows each boat with one of them, the one aboard first; the others go along', () => {
+    const vessels = [
+      { id: 'v1', x: 10, y: 10 },
+      { id: 'v2', x: 20, y: 20 },
+    ]
+    const rs = [
+      resident('beside', 9, 10),
+      resident('aboard', 10, 10, { aboard: 'v1' }),
+      resident('also', 10, 10, { aboard: 'v1' }),
+      child('kid', 19, 20),
+      resident('v2rower', 21, 21),
+      resident('far', 0, 0),
+    ]
+    const sent = groupRequests({ kind: 'row', x: 30, y: 30 }, rs, {
+      tick: TICK,
+      size: SIZE,
+      free: everywhere,
+      seen: { vessels },
+    })
+    expect(sent.requests.map((q) => q.order)).toEqual([
+      { kind: 'row', vesselId: 'v1', x: 30, y: 30, residentId: 'aboard' },
+      { kind: 'row', vesselId: 'v2', x: 30, y: 30, residentId: 'v2rower' },
+    ])
+    expect(sent.skipped.map((x) => [x.id, x.why])).toEqual([
+      ['kid', 'a child'],
+      ['far', 'no boat here'],
+      ['beside', 'another of them rows the boat'],
+      ['also', 'another of them rows the boat'],
+    ])
+  })
+
   it('shows a number param’s default only when every script declares the same one', () => {
     const foodAt = (d?: number) => ({
       name: 'foodAt',
@@ -427,6 +487,13 @@ describe('every resident order on the group card', () => {
     ...residentActions(everything(farm)),
     ...residentActions({ ...everything(stable), horseToRide: false, riding: true }),
     ...residentActions(everything(ground)),
+    // Beside a boat, with no carriage to drive (`CONTEXT.md`: Rowing).
+    ...residentActions({
+      ...everything(farm),
+      carriage: undefined,
+      boatToRow: {},
+      rowOff: { problem: undefined },
+    }),
   ].map((a) => a.id)
 
   it('has a counterpart on the group card for each, or says why it goes to one resident only', () => {
@@ -446,6 +513,7 @@ describe('every resident order on the group card', () => {
       'makeLeader',
       'pair',
       'rename',
+      'rowOff',
       'stealHorse',
     ])
   })
@@ -493,6 +561,8 @@ const everyOrder = {
     resident('d', 4, 5),
   ],
   seen: {
+    // D stands beside boat v1, to row.
+    vessels: [{ id: 'v1', x: 3, y: 6 }],
     toFeed: [{ id: 'd', x: 4, y: 5 }],
     horses: [{ id: 'h2', x: 4, y: 4 }],
     carriages: [{ id: 'k1', x: 4, y: 4, horseId: 'h1' }],
@@ -529,9 +599,10 @@ describe('the group card’s rows', () => {
     expect(ids).toEqual(expect.arrayContaining(['walk', 'work', 'build', 'script', 'fetch']))
     expect(missing).toMatchObject({
       stop: 'none of them has an order',
-      board: 'nobody stands on a carriage of your realm',
+      board: 'nobody stands on a carriage or beside a boat of your realm',
       dismount: 'none of them rides',
-      getOff: 'none of them is aboard a carriage',
+      getOff: 'none of them is aboard a carriage or boat',
+      row: 'none of them is aboard or beside a boat of your realm',
       unhitch: 'no hitched horse where they stand',
       mount: 'no free horse where they stand',
       drive: 'nobody stands on a carriage of your realm',
@@ -563,6 +634,10 @@ describe('the group card’s rows', () => {
       label: 'Board carriage…',
       opens: true,
     })
+    const boat = groupRows(here([resident('a', 4, 4)], { boats: 1 })).actions
+    expect(boat.find((a) => a.id === 'board')).toMatchObject({ label: 'Board boat' })
+    const both = groupRows(here([resident('a', 4, 4)], { carriages: 1, boats: 1 })).actions
+    expect(both.find((a) => a.id === 'board')).toMatchObject({ label: 'Board…', opens: true })
   })
 
   it('greys Relocate out with why when they can’t relocate at all', () => {

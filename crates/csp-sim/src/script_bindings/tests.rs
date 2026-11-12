@@ -70,6 +70,10 @@ fn setup() -> (WorldState, TerrainMap) {
         y: 10.0,
         goods: [(csp_shared::world::Good::Food, 5.0)].into_iter().collect(),
     });
+    // A boat (`CONTEXT.md`: Vessel); the map is all Plains, which no script query here minds.
+    w.vessels.push(from(
+        json!({ "id": "v1", "kind": "boat", "realmId": "r1", "x": 11, "y": 13, "load": { "wood": 2 } }),
+    ));
     w.directives.push(from::<Directive>(json!({
         "id": "d1", "target": "r2", "withAlliance": false, "reason": "raiding", "givenBy": "admin", "givenAt": 1,
         "goals": [{ "kind": "city", "cityId": "c2", "city": "Brill", "met": false }, { "kind": "soldiers", "count": 2, "percent": 10 }],
@@ -147,6 +151,7 @@ fn describe_every_field_of_everything_the_queries_and_me_hand_a_script() {
         ("cities", "cities()"),
         ("horses", "horses()"),
         ("carriages", "carriages()"),
+        ("vessels", "vessels()"),
         ("traders", "traders()"),
         ("piles", "piles()"),
         ("nodes", "nodes()"),
@@ -218,6 +223,7 @@ fn describe_every_field_of_everything_the_queries_and_me_hand_a_script() {
     }
     assert_ne!(out["materialsNeeded"], json!([]));
     assert_eq!(ids("storages"), ["s1", "os1"]);
+    assert_eq!(ids("vessels"), ["v1"]);
     // A queue shows where it is, not its steps.
     let queue = json!({ "step": 1, "steps": 1, "loop": true, "kind": "runScript", "task": null, "scriptId": 1, "minutes": 30, "startedAt": 40 });
     assert_eq!(out["me"]["queue"], queue);

@@ -408,6 +408,8 @@ export interface Balance {
     '1': number
     '2': number
     '3': number
+    '4': number
+    '5': number
     '6': number
     [key: string]: number
   }
@@ -440,6 +442,14 @@ export interface Balance {
   readonly HUNGRY_HORSE_PACE: number
   readonly CARRIAGE_MAX_CAPACITY: number
   readonly PASSENGER_WEIGHT: number
+  readonly BOAT_CAPACITY: number
+  readonly ROW_SPEED: number
+  readonly ROW_STRENGTH_EFFECT: number
+  readonly ROW_STRENGTH_AVERAGE: number
+  readonly ROW_STRENGTH_LIMIT: number
+  readonly SEAFARING_SKILL_EFFECT: number
+  readonly SEAFARING_SKILL_LIMIT: number
+  readonly SEAFARING_SKILL_PER_DAY: number
   readonly FOOD_SPOIL_PER_DAY: number
   readonly REALM_LOG_LENGTH: number
   readonly CRIME_MEMORY_DAYS: number
@@ -564,9 +574,18 @@ export interface Balance {
       stone: number
       [key: string]: number
     }
+    haven: {
+      wood: number
+      stone: number
+      [key: string]: number
+    }
     carriage: {
       wood: number
       iron: number
+      [key: string]: number
+    }
+    boat: {
+      wood: number
       [key: string]: number
     }
     [key: string]: Record<string, never> | {
@@ -614,7 +633,9 @@ export interface Balance {
     storage: number
     farm: number
     trainingGround: number
+    haven: number
     carriage: number
+    boat: number
     [key: string]: number
   }
   readonly MOUNTAIN_ROAD_WORK_FACTOR: number
@@ -930,6 +951,7 @@ export interface Balance {
     construction: number
     combat: number
     driving: number
+    seafaring: number
     [key: string]: number
   }
   readonly SKILL_PER_DAY: {
@@ -941,6 +963,7 @@ export interface Balance {
     construction: number
     combat: number
     driving: number
+    seafaring: number
     [key: string]: number
   }
   readonly ARMY_SPREAD: number
@@ -1027,6 +1050,7 @@ export interface Balance {
     gate: number
     road: number
     carriage: number
+    boat: number
     house: number
     storage: number
     smelter: number
@@ -1039,6 +1063,7 @@ export interface Balance {
     warehouse: number
     stable: number
     trainingGround: number
+    haven: number
     farm: number
     [key: string]: number
   }

@@ -31,7 +31,7 @@ impl GoodsMade {
 }
 
 /// Every unit of every good in the world (`tallyGoods`): in buildings' storages, delivered to
-/// construction sites, carried by residents, loaded on carriages and lying in piles.
+/// construction sites, carried by residents, loaded on carriages and boats, and lying in piles.
 pub fn tally_goods(world: &WorldState) -> Stock {
     let mut tally = Stock::new();
     let mut add = |stock: &Stock| {
@@ -53,6 +53,9 @@ pub fn tally_goods(world: &WorldState) -> Stock {
     for k in &world.carriages {
         add(&k.load);
     }
+    for v in &world.vessels {
+        add(&v.load);
+    }
     for p in &world.piles {
         add(&p.goods);
     }
@@ -62,6 +65,7 @@ pub fn tally_goods(world: &WorldState) -> Stock {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::queries::names::held;
     use csp_shared::world::Good;
 
     fn stock(entries: &[(Good, f64)]) -> Stock {
@@ -75,5 +79,21 @@ mod tests {
         made.note(&stock(&[(Good::Wood, 1.0), (Good::Food, -1.0)]));
         assert_eq!(made.take(), stock(&[(Good::Wood, 3.0)]));
         assert_eq!(made.take(), Stock::new());
+    }
+
+    #[test]
+    fn counts_what_a_boat_holds() {
+        let mut world = crate::world::create_world(&crate::test_support::plains(8), 1);
+        let before = held(&tally_goods(&world), Good::Wood);
+        world.vessels.push(csp_shared::world::Vessel {
+            id: "boat1".into(),
+            kind: csp_shared::world::VesselKind::Boat,
+            realm_id: None,
+            x: 0.0,
+            y: 0.0,
+            load: stock(&[(Good::Wood, 4.0)]),
+            rower_id: None,
+        });
+        assert_eq!(held(&tally_goods(&world), Good::Wood), before + 4.0);
     }
 }

@@ -186,7 +186,7 @@ mod pick_up_order {
         assert_eq!(reason(pick(json!({ "goods": {} })), me), bad);
         assert_eq!(
             reason(pick(json!({ "spot": { "kind": "roof" }, "goods": { "food": 1 } })), me),
-            r("the spot must be the ground, a storage, a construction site, a carriage or a Down resident")
+            r("the spot must be the ground, a storage, a construction site, a carriage, a boat or a Down resident")
         );
         assert_eq!(
             reason(

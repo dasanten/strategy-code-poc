@@ -43,7 +43,9 @@ export function pickTarget(state: {
 const RESIDENT_PROMPTS: Record<Exclude<Picking, false>, string> = {
   walk: 'where to walk',
   drive: 'where to drive the carriage',
+  row: 'where to row the boat: water, or a shore to land at',
   driveOff: 'where to drive the carriage off to',
+  rowOff: 'where to row the boat off to: water, or a shore to land at',
   hitchOff: 'where to drive the carriage',
   haul: 'where the haul route’s other stop is',
   roadFrom: 'where the road starts',
@@ -57,14 +59,15 @@ const GROUP_PROMPTS: Record<Exclude<GroupPicking, false>, string> = {
   work: 'the workplace they work',
   build: 'where to build, or a site to join',
   drive: 'where they drive the carriages',
+  row: 'where they row the boats: water, or a shore to land at',
   haul: 'where the haul route’s other stop is',
   roadFrom: 'where the road starts',
   roadTo: 'where the road ends',
   wallFrom: 'where the wall starts',
   wallTo: 'where the wall ends',
   tearDown: 'the building they tear down',
-  storeAt: 'the storage, stable or carriage they store at',
-  fetchFrom: 'the storage, stable or carriage they fetch from',
+  storeAt: 'the storage, stable, carriage or boat they store at',
+  fetchFrom: 'the storage, stable, carriage or boat they fetch from',
   attack: 'whom they attack, or the wall or gate they break',
   climb: 'the wall or gate they climb',
 }
@@ -86,6 +89,7 @@ const PARAM_PROMPTS: Record<ScriptParam['type'], string> = {
 /** What picking a tile does for the picked resident, said under the banner where it needs more. */
 const RESIDENT_HINTS: Partial<Record<Exclude<Picking, false>, string>> = {
   driveOff: 'This is theft: the carriage, its load and its horse join your realm at once.',
+  rowOff: 'This is theft: the boat and its load join your realm at once.',
   hitchOff: 'This is theft: the horse joins your realm at once and is hitched to your carriage.',
   roadFrom: 'Then where it ends; the resident walks there and builds along the line.',
   roadTo: `Builds road along the line, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, fetching stone from storage; with none, the sites are laid out for later.`,
@@ -99,6 +103,7 @@ export const GROUP_HINTS: Record<Exclude<GroupPicking, false>, string> = {
   work: 'Those standing at the workplace there work it.',
   build: 'Then pick what to build on their card.',
   drive: 'Each standing on a carriage drives it there.',
+  row: 'One of them aboard or beside each boat rows it there; the others aboard go along.',
   haul: 'Each standing on a carriage hauls between there and their tile.',
   roadFrom: 'Then where it ends; they share the line, each building a tile of their own.',
   roadTo: `They share the road line, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, each building the nearest tile nobody else has taken and fetching stone from storage.`,

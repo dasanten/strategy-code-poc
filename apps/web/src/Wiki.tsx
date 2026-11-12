@@ -23,6 +23,7 @@ import {
   TRADER_STOP_REACH,
   TRADER_STOP_TICKS,
   CARRIAGE_CAPACITY,
+  BOAT_CAPACITY,
   DIRECT_OFFERS_TO_ONE_REALM,
   DIRECT_OFFER_DAYS,
   PASSENGER_WEIGHT,
@@ -61,6 +62,13 @@ import {
   DODGE_PER_AGILITY,
   DRIVING_SKILL_EFFECT,
   DRIVING_SKILL_LIMIT,
+  ROW_SPEED,
+  ROW_STRENGTH_AVERAGE,
+  ROW_STRENGTH_EFFECT,
+  ROW_STRENGTH_LIMIT,
+  SEAFARING_SKILL_EFFECT,
+  SEAFARING_SKILL_LIMIT,
+  SEAFARING_SKILL_PER_DAY,
   DRIVING_SKILL_PER_DAY,
   STARVE_DAYS,
   DOWN_DAYS,
@@ -297,6 +305,7 @@ import {
   breakTicks,
   buildCosts,
   carriageCost,
+  boatCost,
   cityControl,
   coinsPerMintWorkerDay,
   crimeForgotten,
@@ -348,6 +357,7 @@ export const WIKI_TOPICS = [
   { id: 'work', title: 'Workplaces & output' },
   { id: 'building', title: 'Building & tearing down' },
   { id: 'transport', title: 'Carrying & transport' },
+  { id: 'water', title: 'Water & havens' },
   { id: 'how-to-trade', title: 'How to trade' },
   { id: 'trade', title: 'Trade & prices' },
   { id: 'standing', title: 'Standing & reactions' },
@@ -496,6 +506,7 @@ export function Wiki() {
   }, [])
   const avg = AVERAGE_STATS.strength
   const groundCost = buildCosts().find((b) => b.kind === 'trainingGround')!
+  const havenCost = buildCosts().find((b) => b.kind === 'haven')!
   const strong = wikiResident({ strength: avg * 1.5 }, { mining: WORK_SKILL_MAX / 10 })
   const strongAgile = wikiResident({ agility: avg * 1.5 })
   const plainsTicksPerTile = 1 / walkSpeed(AVERAGE, Terrain.Plains, 0)
@@ -685,7 +696,8 @@ export function Wiki() {
           renaming, which are about one resident. Nothing ties them together afterwards; each goes
           on alone. The card shows the orders some of them can take where they stand, as rows with
           the same keys as on a resident's card; while it stays open, an order none of them can take
-          any more stays greyed out, saying why (“nobody stands on a carriage of your realm”).
+          any more stays greyed out, saying why (“nobody stands on a carriage or beside a boat of
+          your realm”).
         </p>
         <ul>
           <li>
@@ -729,7 +741,9 @@ export function Wiki() {
           <li>
             <strong>Board carriage</strong> (with several carriages of your realm where some of them
             stand, pick one) puts those on its tile aboard, in the group's order, until it is full;{' '}
-            <strong>Get off</strong> gets every passenger among them off. See Passengers.
+            <strong>Get off</strong> gets every passenger among them off. See Passengers. A boat of
+            your realm beside some of them is boarded the same way (Board boat), and{' '}
+            <strong>Row boats to</strong> has one of them row each boat there; see Water.
           </li>
         </ul>
         <p>
@@ -1498,7 +1512,8 @@ export function Wiki() {
           hauling and group orders. Its owner's realm log says at once that it is gone and where it
           was last; who took it they learn only from a witness (see Standing). One that belongs to
           nobody is simply yours. A carriage handed over to an alliance army is its commander's to
-          drive, which is no theft.
+          drive, which is no theft. A boat is stolen the same way, by rowing it off from beside it
+          (see Water &amp; havens).
         </p>
         <p>
           A carriage's card shows its load as a bar against what it holds (its passengers counted
@@ -1873,6 +1888,121 @@ export function Wiki() {
           one of them stands at another post or the HQ, the capture is a crime it knows of (see
           Standing), and it demands the city back with a debt for its worth. If they are killed on
           the way and no trader ever gets there, it never reacts.
+        </p>
+      </Section>
+
+      <Section id="water">
+        <p>
+          Lake and Sea are <b>water</b>. Nobody walks on them, and a walk always goes round on land.
+          Boats and ships are what cross them, and they start at a haven.
+        </p>
+        <p>
+          A <b>haven</b> is a {num(FOOTPRINT.haven)} × {num(FOOTPRINT.haven)} building on the shore:
+          every tile of it on passable land, off Mountain and off resource nodes, and at least one
+          of its tiles touching Lake or Sea, straight or diagonally. The Build menu offers it only
+          where it fits. It is built from {goods(havenCost.materials)} and{' '}
+          {duration(havenCost.buildTicks)} of one average resident's work.
+        </p>
+        <p>
+          A haven has a <b>storage</b>: anyone standing at it puts goods in or takes them out, by
+          hand, with Store and Fetch, or with a script, as at any storage. Like a stable it has no
+          owner of its own: it is the city's whose resident laid it out, and taking goods from it is
+          judged as taking from any storage of that city. NPC cities don't build havens.
+        </p>
+        <p>
+          <b>Building a boat.</b> A resident standing on a tile of a finished haven that touches the
+          water lays out a <b>boat site</b> there with Build (in the Build menu under Transport). It
+          is a construction site like any other: it takes {goods(boatCost().materials)} and{' '}
+          {duration(boatCost().buildTicks)} of one average resident's work, anyone may bring
+          materials or work on it, and torn down it leaves all its materials. Once finished the site
+          is gone, and an empty boat of the realm of whoever finished it floats on the nearest free
+          water tile next to it.
+        </p>
+        <p>
+          A boat always floats on a water tile, one boat to a tile. It carries a few residents and a
+          little cargo: {num(BOAT_CAPACITY)} kg in all, each passenger counting as{' '}
+          {num(PASSENGER_WEIGHT)} kg. It shows on the map to whoever sees its tile, like a carriage;
+          its card tells whose it is and how heavily it is loaded, and what it holds only to its own
+          realm and allies. Scripts see the boats in sight with <code>vessels()</code>. A boat of a
+          realm that ends belongs to nobody, as NPC cities don't use the water.
+        </p>
+        <p>
+          <b>Beside a boat</b> means on a land tile touching its water tile, straight or diagonally.
+          A resident beside a boat of their realm <b>boards</b> it, children too (Board boat on
+          their card, or on the boat's card, or a script's <code>board(id)</code>), and steps onto
+          its water tile: on the map they ride inside it, which shows how many are aboard, and their
+          Doing line says "Aboard a boat". Each passenger counts as {num(PASSENGER_WEIGHT)} kg of
+          the {num(BOAT_CAPACITY)} kg it holds, so{' '}
+          {num(Math.floor(BOAT_CAPACITY / PASSENGER_WEIGHT))} residents fill an empty one. No horse
+          goes aboard: a rider dismounts first, and the driver of a carriage can't board.
+        </p>
+        <p>
+          A passenger <b>gets off</b> onto a free land tile beside the boat: one they pick (a
+          script's <code>getOff(x, y)</code>), or the first one there. Giving a passenger a walk or
+          an order that acts on a tile gets them off first, onto the shore nearest where they are
+          going. A boat away from every shore keeps its passengers aboard: they can't get off, and a
+          walk given to them ends. Walking never uses a boat. Down or dead, a passenger stays in the
+          boat, and what they carried stays in it.
+        </p>
+        <p>
+          <b>Loading.</b> Residents beside a boat put goods in it and take goods out, up to what it
+          holds with its passengers counted in: Store and Fetch with the boat as the place (they
+          walk to the shore beside it), or a pick-up or drop at <code>{'{kind: "vessel"}'}</code>{' '}
+          from a script. Residents and goods only: a boat takes no horse or carriage.
+        </p>
+        <p>
+          <b>Rowing.</b> A grown resident aboard a boat of their realm, or beside it (they board
+          first), rows it to a water tile: Row boat to on their card, then a tile on the map, or a
+          script's <code>row(boat, x, y)</code>. Given a land tile, the boat goes to the nearest
+          free water tile beside it. It goes a Step at a time over water only, Lake and Sea alike,
+          and a diagonal Step only where both straight tiles beside it are water too, so it never
+          squeezes between two pieces of land. The rower takes its oars and is no passenger: they
+          don't count against what it holds, and whoever was at the oars before becomes a passenger.
+          Everyone aboard goes along and sees from the boat's tile, so rowing along a coast explores
+          it. On the map the boat glides from tile to tile, and the rower's Doing line says where it
+          is heading. A boat nobody rows stays where it is; it never drifts. Walking never uses a
+          boat: a walk across water still goes round on land.
+        </p>
+        <p>
+          An average rower moves a boat {num(ROW_SPEED)} times as fast as walking on Plains. Each
+          point of Strength above {num(ROW_STRENGTH_AVERAGE)} makes it {pct(ROW_STRENGTH_EFFECT)}{' '}
+          faster (and each below, slower), at most {pct(ROW_STRENGTH_LIMIT)} either way. Rowing
+          teaches <b>Seafaring</b>, {num(SEAFARING_SKILL_PER_DAY)} a game day of rowing at average
+          Intellect, and each point of it makes the boat {pct(SEAFARING_SKILL_EFFECT)} faster, at
+          most {pct(SEAFARING_SKILL_LIMIT)}. Rowing costs food as walking on Plains does. The rower
+          and passengers eat their own food and, running low, take a meal from the boat's Food.
+        </p>
+        <p>
+          <b>Boats in queues and groups.</b> Boarding, rowing, getting off and loading are queue
+          steps like any other, so a queue can take a resident across a lake and back, and a saved
+          queue keeps them. With Add step, <b>Board a boat</b> picks the boat, then the shore tile
+          to board it from (a walk there goes first): beside the boat now, or beside where an
+          earlier step rows it. <b>Row the boat</b> picks the boat, then where to row it; it needs
+          them aboard or beside it already, so it usually follows Board a boat. <b>Get off</b> lands
+          them on the shore beside the boat, and Store and Fetch take the boat as their place. A
+          step that can't be done when its turn comes (the boat isn't beside them) is skipped and
+          noted in the realm log. On the group card, <b>Board boat</b> boards those beside a boat of
+          your realm until it is full, <b>Get off</b> gets everyone aboard off together, and{' '}
+          <b>Row boats to</b> has one of them row each boat (the first already aboard it, else the
+          first beside it) while the others aboard go along: board, row, get off, and the whole crew
+          is across.
+        </p>
+        <p>
+          <b>Stealing a boat.</b> A grown resident beside another realm's boat can row it off as a
+          carriage is driven off: <strong>Row off (theft)</strong> on their card, then a tile, or a
+          script's <code>row(boat, x, y)</code> naming that boat. The boat joins your realm at once
+          with its load, and they take its oars. It can't be taken while someone rows it or anyone
+          is aboard, nor while an armed resident of its owner stands beside it and none of your
+          realm does. Boat and load are one theft, known through a witness like a carriage's: its
+          owner's realm log says at once that it is gone and where it was last. A boat of nobody is
+          simply yours.
+        </p>
+        <p>
+          <b>Fighting at a boat.</b> Those aboard can be attacked by anyone beside it, as if the
+          boat were the next land tile, and fight back from aboard; Down or dead, they stay in it.
+          There are no fights between boats and none from open water, so a boat away from every
+          shore is out of reach: an attack on someone aboard it finds no way and ends. An alarm at
+          home doesn't reach whoever is rowing.
         </p>
       </Section>
 

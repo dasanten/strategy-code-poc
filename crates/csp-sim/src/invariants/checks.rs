@@ -17,8 +17,8 @@ use csp_shared::balance::{
 };
 use csp_shared::footprint::{footprint_tiles, is_at, near_footprint};
 use csp_shared::terrain::{
-    beside_step, is_passable_terrain, step_length, terrain_at, tile_index, wrap_delta, Terrain,
-    TerrainMap,
+    beside_step, is_passable_terrain, is_water, step_length, terrain_at, tile_index, touches_water,
+    wrap_delta, Terrain, TerrainMap,
 };
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
@@ -35,7 +35,8 @@ use crate::queries::balance::carry_capacity;
 use crate::queries::building::{
     build_materials, build_work_of, building_at, carriage_can_go_to, has_choice, line_building,
     line_order, materials_needed, max_workers, node_workplace, teardown_work, work_needed,
-    workplace_good, BUILDABLE, KEEPS_GOODS, OFF_NODES, ON_PLAINS, PROCESSING, SHARES_A_TILE,
+    workplace_good, BUILDABLE, KEEPS_GOODS, OFF_NODES, ON_PLAINS, ON_SHORE, PROCESSING,
+    SHARES_A_TILE,
 };
 use crate::queries::city_area::{city_membership, is_city_building};
 use crate::queries::command::commander_of_resident;
@@ -47,6 +48,7 @@ use crate::queries::standing::TRADE_ORG;
 use crate::queries::territory::{
     city_organization, compute_territory, control_at, control_sources,
 };
+use crate::queries::vessels::vessel_capacity;
 use crate::script_runner::{
     defaults_have_a_target, one_carrier_at_a_time, one_fetcher_at_a_time,
     one_input_fetcher_at_a_time,
@@ -77,7 +79,14 @@ fn at_building(x: f64, y: f64, b: &csp_shared::world::Building) -> bool {
 pub fn nothing_on_impassable_terrain(world: &WorldState, terrain: &TerrainMap) -> Out {
     let name = "nothing-on-impassable-terrain";
     let mut things: Vec<(&str, f64, f64)> = Vec::new();
-    things.extend(world.residents.iter().map(|t| (t.id.as_str(), t.x, t.y)));
+    // A vessel's passenger stands on its water tile (`CONTEXT.md`: Beside a vessel); that it
+    // does is `vessel-passengers`.
+    let on_vessel = |r: &&csp_shared::world::Resident| {
+        r.aboard.as_deref().is_some_and(|id| world.vessels.iter().any(|v| v.id == id))
+    };
+    things.extend(
+        world.residents.iter().filter(|r| !on_vessel(r)).map(|t| (t.id.as_str(), t.x, t.y)),
+    );
     things.extend(world.horses.iter().map(|t| (t.id.as_str(), t.x, t.y)));
     things.extend(world.carriages.iter().map(|t| (t.id.as_str(), t.x, t.y)));
     things.extend(world.buildings.iter().map(|t| (t.id.as_str(), t.x, t.y)));
@@ -104,6 +113,7 @@ pub fn positions_on_map(world: &WorldState, terrain: &TerrainMap) -> Out {
     things.extend(world.residents.iter().map(|t| (t.id.as_str(), t.x, t.y)));
     things.extend(world.horses.iter().map(|t| (t.id.as_str(), t.x, t.y)));
     things.extend(world.carriages.iter().map(|t| (t.id.as_str(), t.x, t.y)));
+    things.extend(world.vessels.iter().map(|t| (t.id.as_str(), t.x, t.y)));
     things.extend(world.buildings.iter().map(|t| (t.id.as_str(), t.x, t.y)));
     things.extend(world.nodes.iter().map(|t| (t.id.as_str(), t.x, t.y)));
     things.extend(world.piles.iter().map(|t| (t.id.as_str(), t.x, t.y)));
@@ -214,12 +224,36 @@ pub fn buildings_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
                     fail(&b.id, format!("is a carriage site on a {}", kind_name(under.kind)));
                 }
             }
+        } else if b.kind == BuildingKind::Boat {
+            // `CONTEXT.md`: Building a boat: on a haven tile that touches the water.
+            if b.site.is_none() {
+                fail(&b.id, "is a finished boat site".into());
+            }
+            if building_at(world, b.x as i32, b.y as i32, size)
+                .is_none_or(|h| h.kind != BuildingKind::Haven)
+            {
+                fail(&b.id, "is a boat site off any haven".into());
+            }
+            if !touches_water(&footprint, size, |x, y| terrain_at(terrain, x, y)) {
+                fail(&b.id, "is a boat site away from water".into());
+            }
+            if let Some(c) = city {
+                fail(&b.id, format!("is a boat site of city {c}"));
+            }
+            if b.stock.is_some() {
+                fail(&b.id, "is a boat site with a stock".into());
+            }
         } else if OFF_NODES.contains(&b.kind) {
             if !nodes.is_empty() {
                 fail(&b.id, format!("is a {kind} on a resource node"));
             }
             if terrains.contains(&(Terrain::Mountain as u8)) {
                 fail(&b.id, format!("is a {kind} on Mountain"));
+            }
+            if ON_SHORE.contains(&b.kind)
+                && !touches_water(&footprint, size, |x, y| terrain_at(terrain, x, y))
+            {
+                fail(&b.id, format!("is a {kind} away from water"));
             }
             if PROCESSING.contains(&b.kind) {
                 if let Some(c) = city {
@@ -715,6 +749,7 @@ pub fn goods_in_whole_units(world: &WorldState, _: &TerrainMap) -> Out {
             .filter_map(|b| b.site.as_ref().map(|s| (b.id.as_str(), Some(&s.delivered)))),
     );
     holders.extend(world.carriages.iter().map(|k| (k.id.as_str(), Some(&k.load))));
+    holders.extend(world.vessels.iter().map(|v| (v.id.as_str(), Some(&v.load))));
     holders.extend(world.piles.iter().map(|p| (p.id.as_str(), Some(&p.goods))));
     holders
         .into_iter()
@@ -1043,6 +1078,112 @@ pub fn carriages_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
     out
 }
 
+/// A vessel always stands on a water tile, one vessel per tile (`CONTEXT.md`: Vessel, Boat). That
+/// it holds no more than it can, its passengers counted in, is `vessel-passengers`.
+pub fn vessels_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
+    let name = "vessels-in-place";
+    let mut out = Vec::new();
+    let mut on: HashMap<(i32, i32), &str> = HashMap::new();
+    for v in &world.vessels {
+        let (x, y) = (v.x as i32, v.y as i32);
+        let at = format!("({}, {})", js_number(v.x), js_number(v.y));
+        if !is_water(terrain_at(terrain, x, y)) {
+            out.push(violation(name, format!("vessel {} is on land at {at}", v.id), &[&v.id]));
+        }
+        if let Some(other) = on.insert((x, y), &v.id) {
+            let m = format!("vessel {} shares the water tile {at} with {other}", v.id);
+            out.push(violation(name, m, &[&v.id, other]));
+        }
+    }
+    out
+}
+
+/// A vessel's passenger stands on its water tile, never on land, is of its realm and neither
+/// drives nor rides; goods and passengers never weigh more than the vessel holds (`CONTEXT.md`:
+/// Beside a vessel, Passenger, What vessels carry).
+pub fn vessel_passengers(world: &WorldState, terrain: &TerrainMap) -> Out {
+    let name = "vessel-passengers";
+    let mut out = Vec::new();
+    let mut fail = |ids: &[&str], m: String| out.push(violation(name, m, ids));
+    let mut aboard: HashMap<&str, f64> = HashMap::new();
+    for r in &world.residents {
+        let Some(v) = r.aboard.as_deref().and_then(|id| world.vessels.iter().find(|v| v.id == id))
+        else {
+            continue;
+        };
+        // Its rower is no passenger (`CONTEXT.md`: Rowing).
+        if v.rower_id.as_deref() != Some(r.id.as_str()) {
+            *aboard.entry(&v.id).or_insert(0.0) += 1.0;
+        }
+        let at = format!("({}, {})", js_number(r.x), js_number(r.y));
+        if v.x != r.x || v.y != r.y {
+            let m = format!(
+                "resident {} at {at} is aboard vessel {} at ({}, {})",
+                r.id,
+                v.id,
+                js_number(v.x),
+                js_number(v.y)
+            );
+            fail(&[&r.id, &v.id], m);
+        }
+        if !is_water(terrain_at(terrain, r.x as i32, r.y as i32)) {
+            fail(
+                &[&r.id, &v.id],
+                format!("resident {} is aboard vessel {} on land at {at}", r.id, v.id),
+            );
+        }
+        if !of_resident(v.realm_id.as_deref(), None, r) {
+            let m = format!("resident {} is aboard vessel {} of another realm", r.id, v.id);
+            fail(&[&r.id, &v.id], m);
+        }
+        if driven_carriage_id(r).is_some() {
+            fail(&[&r.id, &v.id], format!("resident {} drives aboard vessel {}", r.id, v.id));
+        }
+        if r.riding.is_some() {
+            fail(&[&r.id, &v.id], format!("resident {} rides aboard vessel {}", r.id, v.id));
+        }
+    }
+    // Whoever rows a boat is at its oars, aboard it and grown (`CONTEXT.md`: Rowing).
+    let tick = world.tick as f64;
+    for r in &world.residents {
+        let Some(ResidentOrder::Row(o)) = &r.order else { continue };
+        let at_oars = world.vessels.iter().any(|v| {
+            v.id == o.vessel_id
+                && v.rower_id.as_deref() == Some(r.id.as_str())
+                && r.aboard.as_deref() == Some(v.id.as_str())
+        });
+        if !at_oars {
+            let m =
+                format!("resident {} rows vessel {} without being at its oars", r.id, o.vessel_id);
+            fail(&[&r.id, &o.vessel_id], m);
+        }
+        if !can_work(r.born_at, tick) {
+            fail(&[&r.id], format!("child {} rows vessel {}", r.id, o.vessel_id));
+        }
+    }
+    for v in &world.vessels {
+        if let Some(rower) = v.rower_id.as_deref() {
+            let aboard_it =
+                world.residents.iter().any(|r| r.id == rower && r.aboard.as_deref() == Some(&v.id));
+            if !aboard_it {
+                fail(&[&v.id], format!("vessel {} has rower {rower}, who is not aboard", v.id));
+            }
+        }
+        let people = aboard.get(v.id.as_str()).copied().unwrap_or(0.0);
+        let kg = stock_weight(&v.load) + people * PASSENGER_WEIGHT;
+        if kg > vessel_capacity(v) + 1e-9 {
+            let m = format!(
+                "vessel {} holds {} kg of goods and passengers, more than it can ({} kg)",
+                v.id,
+                js_number(kg),
+                js_number(vessel_capacity(v))
+            );
+            fail(&[&v.id], m);
+        }
+    }
+    out
+}
+
 /// A rider's horse exists, stands with them, is of their realm and pulls no carriage, no horse
 /// has two riders, and a ridden horse stands where a carriage could (`ridersOnHorses`).
 pub fn riders_on_horses(world: &WorldState, terrain: &TerrainMap) -> Out {
@@ -1097,6 +1238,10 @@ pub fn passengers_aboard(world: &WorldState, _: &TerrainMap) -> Out {
     let mut aboard: HashMap<&str, f64> = HashMap::new();
     for r in &world.residents {
         let Some(on) = &r.aboard else { continue };
+        // Aboard a vessel: `vessel-passengers`.
+        if world.vessels.iter().any(|v| &v.id == on) {
+            continue;
+        }
         *aboard.entry(on).or_insert(0.0) += 1.0;
         let Some(k) = world.carriages.iter().find(|c| &c.id == on) else {
             fail(&[&r.id], format!("resident {} is aboard {on}, which doesn't exist", r.id));
@@ -1429,6 +1574,11 @@ pub fn owners_exist(world: &WorldState, _: &TerrainMap) -> Out {
         .iter()
         .map(|h| (&h.id, &h.realm_id, &h.city_id))
         .chain(world.carriages.iter().map(|k| (&k.id, &k.realm_id, &k.city_id)));
+    for v in &world.vessels {
+        if let Some(realm) = v.realm_id.as_deref().filter(|o| !realms.contains(o)) {
+            problem(&v.id, format!("belongs to ended realm {realm}"));
+        }
+    }
     for (id, realm, city) in things {
         if let Some(realm) = realm.as_deref().filter(|o| !realms.contains(o)) {
             problem(id, format!("belongs to ended realm {realm}"));
@@ -2121,14 +2271,21 @@ pub fn climb_orders_sound(world: &WorldState, _: &TerrainMap) -> Out {
 }
 
 /// Every step left on a moving order's path is a step the resident can take
-/// (`pathsAreSteps`).
+/// (`pathsAreSteps`); a rower's, a step their boat can take over water (`CONTEXT.md`: Rowing).
 pub fn paths_are_steps(world: &WorldState, terrain: &TerrainMap) -> Out {
     let name = "paths-are-steps";
     let size = terrain.size;
-    let enterable = |t: usize| is_passable_terrain(terrain.tiles[t]);
     let mut out = Vec::new();
     for r in &world.residents {
         let Some(o) = &r.order else { continue };
+        let rowing = matches!(o, ResidentOrder::Row(_));
+        let enterable = |t: usize| {
+            if rowing {
+                is_water(terrain.tiles[t])
+            } else {
+                is_passable_terrain(terrain.tiles[t])
+            }
+        };
         // `'path' in o && o.path`: any order with a path.
         let Ok(v) = serde_json::to_value(o) else { continue };
         let Some(path) = v.get("path").and_then(|p| p.as_array()) else { continue };

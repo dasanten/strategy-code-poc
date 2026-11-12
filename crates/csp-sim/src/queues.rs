@@ -52,6 +52,17 @@ fn is_tile(p: &serde_json::Map<String, Value>) -> bool {
 }
 
 use crate::crimes::carriage_organization;
+use crate::queries::vessels::vessel_by_id;
+
+/// Why a step can't name the vessel `id` (`CONTEXT.md`: Beside a vessel, Rowing): it must be
+/// there and the realm's. A step never steals one, as it never steals a carriage.
+fn vessel_problem(world: &WorldState, realm_id: &str, id: &str) -> Option<&'static str> {
+    match vessel_by_id(world, id) {
+        None => Some("no such boat"),
+        Some(v) if v.realm_id.as_deref() != Some(realm_id) => Some("not a boat of your realm"),
+        Some(_) => None,
+    }
+}
 
 /// Why a step can't make sense wherever the resident stands when its turn comes
 /// (`stepPlaceProblem`, `CONTEXT.md`: Queue, Planning ahead): a tile it names is off the map, a
@@ -98,14 +109,30 @@ pub fn step_place_problem(
             other => other,
         })
         .collect();
-    let spot_carriage = f.get("spot").and_then(|s| s.get("carriageId"));
+    let spot = f.get("spot");
+    let spot_carriage = spot.and_then(|s| s.get("carriageId"));
+    // A boat a step boards, rows or loads must be the realm's, as a carriage must
+    // (`CONTEXT.md`: Beside a vessel, Rowing); a board's `carriageId` may name one too.
+    let vessel_ids = [f.get("vesselId"), spot.and_then(|s| s.get("vesselId"))];
+    for id in vessel_ids.into_iter().flatten() {
+        let Some(id) = id.as_str() else { continue };
+        if let Some(problem) = vessel_problem(world, realm_id, id) {
+            return Some(problem);
+        }
+    }
     // A building a step names may be gone by now, as one a saved queue kept after it was torn
     // down (`CONTEXT.md`: Saved queue): the step is given, and skipped when its turn comes. So
-    // may a store's or fetch's storage, which no carriage is.
+    // may a store's or fetch's storage, which no carriage or boat is.
     let ids =
         [f.get("carriageId"), spot_carriage].into_iter().flatten().chain(places.iter().copied());
     for id in ids {
         let Some(id) = id.as_str() else { continue };
+        if vessel_by_id(world, id).is_some() {
+            if let Some(problem) = vessel_problem(world, realm_id, id) {
+                return Some(problem);
+            }
+            continue;
+        }
         let k = world.carriages.iter().find(|x| x.id == id);
         let is_place = places.iter().any(|p| p.as_str() == Some(id));
         match k {
@@ -588,3 +615,6 @@ pub fn queues_sound(world: &WorldState, _terrain: &TerrainMap) -> Vec<InvariantV
 
 #[cfg(test)]
 pub(crate) mod tests;
+
+#[cfg(test)]
+mod boat_tests;
