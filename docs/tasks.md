@@ -80,6 +80,11 @@ land before the next `dev` → `main` release. Merged into `dev` on 2026-11-11.
 boats rowed from any shore), then Ships (91: crewed ships between havens, haul routes by water),
 both ahead of Bandits.
 
+**Agreed with Daniel on 2026-11-12:** Faster map loading (Epic 99, ADR 0034: explored terrain by
+level for the minimap and the far zoom, compressed and kept in the browser, with Last seen and the
+Region map sending only what changed) runs alongside the open epics, ahead of Bandits. It changes
+no rule.
+
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
 
@@ -171,6 +176,7 @@ I sleep.
 | 89  | [Rust follow-ups](https://github.com/dasanten/strategy-code-poc/issues/1126)                    | ticketed                |
 | 90  | [Havens and boats](https://github.com/dasanten/strategy-code-poc/issues/1146)                   | ticketed                |
 | 91  | [Ships](https://github.com/dasanten/strategy-code-poc/issues/1153)                              | ticketed                |
+| 99  | [Faster map loading](https://github.com/dasanten/strategy-code-poc/issues/1198)                 | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.

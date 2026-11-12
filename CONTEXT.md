@@ -641,7 +641,10 @@ The shared language of the game. Domain terms only — no implementation details
   own realm and its allies. Others see that it is there.
 - **Explored terrain:** tiles a Player has ever had in sight. Their terrain and resource nodes stay
   known, and so do the buildings on them (see Last seen); people, horses, carriages, armies and
-  goods on them do not.
+  goods on them do not. Where the map shows explored terrain coarser than tile by tile (zoomed far
+  out, on the minimap), a square shows the most common terrain among the tiles the Player explored
+  in it, and stays unexplored only while they explored none of it: nothing of an unexplored tile
+  is ever shown (ADR 0034).
 - **Last seen:** a building or construction site a Player has had in sight (their own included)
   stays on their map after it leaves their sight, as it was when they last saw it: where it
   stands, what it is, who held it and which city it belonged to (by that city's name then), along with whatever else they
