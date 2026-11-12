@@ -80,6 +80,13 @@ land before the next `dev` → `main` release. Merged into `dev` on 2026-11-11.
 boats rowed from any shore), then Ships (91: crewed ships between havens, haul routes by water),
 both ahead of Bandits.
 
+**Agreed with Daniel on 2026-11-12,** from an evaluation of the NPC planner: Cities that can't be
+talked over (Epic 96, ADR 0033: an NPC city yields only to a force that stays, and lends only what
+it can spare), then Goods get used (97: lasting outlets for a big NPC city's goods and work for its
+soldiers, the fix for its idle crowd), then NPC cities with intent (98: stance, threat memory,
+temperament, acting first), in that order, all ahead of Bandits. They touch NPC rules only and run
+alongside Ships (91) and the UI epics (92 to 95).
+
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
 
@@ -171,6 +178,9 @@ I sleep.
 | 89  | [Rust follow-ups](https://github.com/dasanten/strategy-code-poc/issues/1126)                    | ticketed                |
 | 90  | [Havens and boats](https://github.com/dasanten/strategy-code-poc/issues/1146)                   | ticketed                |
 | 91  | [Ships](https://github.com/dasanten/strategy-code-poc/issues/1153)                              | ticketed                |
+| 96  | [Cities that can't be talked over](https://github.com/dasanten/strategy-code-poc/issues/1188)   | ticketed                |
+| 97  | [Goods get used](https://github.com/dasanten/strategy-code-poc/issues/1189)                     | scope only              |
+| 98  | [NPC cities with intent](https://github.com/dasanten/strategy-code-poc/issues/1190)             | scope only              |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
