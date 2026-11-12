@@ -7,7 +7,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::queries::vessels::floats_on;
+use crate::queries::vessels::{floats_on, vessel_of_resident};
 use csp_shared::balance::{
     carriage_can_enter, trained_cap, ALLIANCE_LEAVE_DELAY, ALLIANCE_RECALL_DELAY,
     CARRIAGE_CAPACITY, CARRIAGE_MAX_CAPACITY, CARRYING_TICKS, CITY_AREA_MARGIN,
@@ -24,7 +24,7 @@ use csp_shared::terrain::{
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
     BuildingKind, Good, HaulPhase, HaulStop, LinePhase, ResidentOrder, ResourceKind, SkillName,
-    Stock, WorldState,
+    Stock, VesselKind, WorldState,
 };
 
 use super::{js_json, js_number, violation, InvariantViolation};
@@ -1135,8 +1135,8 @@ pub fn vessel_passengers(world: &WorldState, terrain: &TerrainMap) -> Out {
         else {
             continue;
         };
-        // Its rower is no passenger (`CONTEXT.md`: Rowing).
-        if v.rower_id.as_deref() != Some(r.id.as_str()) {
+        // Its rower and its crew are no passengers (`CONTEXT.md`: Rowing, Crew).
+        if v.rower_id.as_deref() != Some(r.id.as_str()) && !v.crew_ids.contains(&r.id) {
             *aboard.entry(&v.id).or_insert(0.0) += 1.0;
         }
         let at = format!("({}, {})", js_number(r.x), js_number(r.y));
@@ -1203,6 +1203,40 @@ pub fn vessel_passengers(world: &WorldState, terrain: &TerrainMap) -> Out {
                 js_number(vessel_capacity(v))
             );
             fail(&[&v.id], m);
+        }
+    }
+    out
+}
+
+/// Only a ship has a crew, and each of its crew is a grown resident of its realm aboard it, once,
+/// and of no other vessel's crew (`CONTEXT.md`: Crew).
+pub fn ship_crew(world: &WorldState, _terrain: &TerrainMap) -> Out {
+    let name = "ship-crew";
+    let mut out = Vec::new();
+    let mut fail = |ids: &[&str], m: String| out.push(violation(name, m, ids));
+    let mut crewing: HashMap<&str, &str> = HashMap::new();
+    let tick = world.tick as f64;
+    for v in &world.vessels {
+        if !v.crew_ids.is_empty() && v.kind != VesselKind::Ship {
+            fail(&[&v.id], format!("boat {} has a crew", v.id));
+        }
+        for id in &v.crew_ids {
+            if let Some(other) = crewing.insert(id, &v.id) {
+                fail(&[id, &v.id], format!("resident {id} crews both {other} and {}", v.id));
+            }
+            let Some(r) = world.residents.iter().find(|r| &r.id == id) else {
+                fail(&[&v.id], format!("ship {} has crew {id}, who is gone", v.id));
+                continue;
+            };
+            if r.aboard.as_deref() != Some(v.id.as_str()) {
+                fail(&[id, &v.id], format!("crew {id} of ship {} is not aboard it", v.id));
+            }
+            if !vessel_of_resident(v, r) {
+                fail(&[id, &v.id], format!("crew {id} of ship {} is not of its realm", v.id));
+            }
+            if !can_work(r.born_at, tick) {
+                fail(&[id, &v.id], format!("child {id} crews ship {}", v.id));
+            }
         }
     }
     out
