@@ -123,7 +123,10 @@ fn nothing_boards_an_undocked_ship_nor_from_off_its_haven() {
     // Off the haven, though the tile touches the ship's water.
     world.residents[0].y = 8.0;
     world.residents[0].x = 19.0;
-    assert_eq!(board(&mut world, "w1", false), Err("not at the haven the ship is docked at".into()));
+    assert_eq!(
+        board(&mut world, "w1", false),
+        Err("not at the haven the ship is docked at".into())
+    );
     world.residents[0].x = 17.0;
     world.residents[0].y = 5.0;
     world.vessels[0].x = 22.0;
@@ -248,8 +251,10 @@ fn loading_stops_at_what_the_ship_holds_and_the_rest_stays_in_the_haven() {
 #[test]
 fn nobody_loads_an_undocked_ship_nor_from_off_its_haven() {
     let mut world = setup();
-    let o = || json!({ "kind": "load", "residentId": "w1", "vesselId": "s1",
-        "goods": { "ironOre": 5 } });
+    let o = || {
+        json!({ "kind": "load", "residentId": "w1", "vesselId": "s1",
+        "goods": { "ironOre": 5 } })
+    };
     world.residents[0].x = 19.0;
     world.residents[0].y = 8.0;
     assert_eq!(give(&mut world, 7, o()), Err("not at the haven the ship is docked at".into()));

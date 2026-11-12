@@ -14,9 +14,7 @@ use csp_shared::world::{
 };
 use csp_sim::invariants::check_all;
 use csp_sim::queries::building::{build_materials, build_problem, ship_site_at, BUILDABLE};
-use csp_sim::queries::vessels::{
-    launch_tile, vessel_at, vessel_capacity, vessel_room,
-};
+use csp_sim::queries::vessels::{launch_tile, vessel_at, vessel_capacity, vessel_room};
 use csp_sim::rowing::row_problem;
 use serde_json::json;
 
@@ -78,7 +76,16 @@ fn build(resident: &str) -> serde_json::Value {
 }
 
 fn vessel(id: &str, kind: VesselKind, x: f64, y: f64) -> Vessel {
-    Vessel { id: id.into(), kind, realm_id: None, x, y, load: Stock::new(), rower_id: None, crew_ids: Vec::new() }
+    Vessel {
+        id: id.into(),
+        kind,
+        realm_id: None,
+        x,
+        y,
+        load: Stock::new(),
+        rower_id: None,
+        crew_ids: Vec::new(),
+    }
 }
 
 /// A ship site on (19, 6) with all its materials and all but half a tick's work.

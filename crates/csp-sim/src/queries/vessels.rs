@@ -105,7 +105,9 @@ pub fn docked_at<'w>(world: &'w WorldState, v: &Vessel) -> Option<&'w Building> 
     }
     let at = (v.x as i32, v.y as i32);
     world.buildings.iter().find(|b| {
-        b.kind == BuildingKind::Haven && b.site.is_none() && near_footprint(placed(b), at, 1, MAP_SIZE)
+        b.kind == BuildingKind::Haven
+            && b.site.is_none()
+            && near_footprint(placed(b), at, 1, MAP_SIZE)
     })
 }
 
