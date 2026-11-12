@@ -10,6 +10,7 @@
 //! both sides reach.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::io::Write;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -37,6 +38,7 @@ use csp_sim::sight::{
 use csp_sim::starting_city::{found_starting_city, suggested_leader_name, FoundingNames};
 use csp_sim::tick::Scratch;
 use csp_sim::world_index::{world_index, WorldIndex};
+use flate2::{write::GzEncoder, Compression};
 use rusqlite::Connection;
 use serde_json::{json, Map, Value};
 use tokio::sync::mpsc;
@@ -54,6 +56,20 @@ pub const WS_PATH: &str = "/ws";
 pub const WS_CLOSE_TOO_MANY_REQUESTS: u16 = 4429;
 /// The close code of a socket whose session ended (`WS_CLOSE_LOGGED_OUT`).
 pub const WS_CLOSE_LOGGED_OUT: u16 = 4001;
+/// The close code of a socket whose client speaks an older protocol than the server serves
+/// (ADR 0034): the client shows "The game was updated" with a Reload button instead of
+/// reconnecting.
+pub const WS_CLOSE_UPDATED: u16 = 4426;
+/// The protocol version this server speaks (ADR 0034). A client names the version it speaks with
+/// the query flag `v` when it connects (`/ws?v=1`); one that names none speaks version 0, the
+/// protocol from before versions. Raise it when a message changes shape.
+pub const PROTOCOL_VERSION: u32 = 1;
+/// The oldest protocol version the server still serves; an older client is closed with
+/// [`WS_CLOSE_UPDATED`]. Raise it with [`PROTOCOL_VERSION`] when the old shape is no longer sent.
+pub const MIN_PROTOCOL_VERSION: u32 = 0;
+const _: () = assert!(PROTOCOL_VERSION.checked_sub(MIN_PROTOCOL_VERSION).is_some());
+/// The first protocol version whose large messages travel gzipped as binary frames.
+const COMPRESSED_FROM_VERSION: u32 = 1;
 /// The most scripts one client watches at once (`SCRIPT_WATCH_MAX`).
 pub const SCRIPT_WATCH_MAX: usize = 20;
 /// How often each client's session is checked again after the handshake (`SESSION_RECHECK_MS`).
@@ -915,15 +931,53 @@ fn refuse(status: StatusCode, reason: &'static str) -> Response {
     (status, reason).into_response()
 }
 
-/// The WebSocket upgrade at `WS_PATH` (`verifyClient` and `connection`).
+/// The protocol version a client names in its upgrade's query (`v=<n>`); 0 when it names none,
+/// as a client from before protocol versions does.
+pub fn protocol_of(query: Option<&str>) -> u32 {
+    query
+        .into_iter()
+        .flat_map(|q| q.split('&'))
+        .find_map(|pair| pair.strip_prefix("v="))
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0)
+}
+
+/// The frame a message goes out as: to a client of a version that takes them, a message longer
+/// than `compress_over` bytes as a binary frame of its gzipped JSON; anything else as text.
+/// Runs on the socket's own task, never on the game thread or under the hub's lock.
+pub fn frame_of(json: String, protocol: u32, compress_over: usize) -> Message {
+    if protocol < COMPRESSED_FROM_VERSION || json.len() <= compress_over {
+        return Message::Text(Utf8Bytes::from(json));
+    }
+    let mut gz = GzEncoder::new(Vec::with_capacity(json.len() / 8), Compression::default());
+    // Writing into a Vec cannot fail.
+    gz.write_all(json.as_bytes()).expect("gzip into memory");
+    Message::Binary(gz.finish().expect("gzip into memory").into())
+}
+
+/// The WebSocket upgrade at `WS_PATH` (`verifyClient` and `connection`). `query` is the upgrade
+/// request's query, which names the client's protocol version.
 pub async fn upgrade(
     realtime: Arc<Realtime>,
     game: Arc<dyn GameHandle>,
     headers: HeaderMap,
+    query: Option<String>,
     ws: WebSocketUpgrade,
 ) -> Response {
     if !origin_allowed(&headers, &realtime.origins) {
         return refuse(StatusCode::FORBIDDEN, "Origin not allowed");
+    }
+    let protocol = protocol_of(query.as_deref());
+    if !(MIN_PROTOCOL_VERSION..).contains(&protocol) {
+        // A browser cannot read a refused upgrade's status, so the socket opens and is closed
+        // with a code of its own: the tab is from before a deploy and is to reload.
+        return ws.on_upgrade(|mut socket| async move {
+            let frame = CloseFrame {
+                code: WS_CLOSE_UPDATED,
+                reason: Utf8Bytes::from_static("The game was updated"),
+            };
+            let _ = socket.send(Message::Close(Some(frame))).await;
+        });
     }
     let header = headers.get(header::COOKIE).and_then(|v| v.to_str().ok());
     let token = cookie_value(header, SESSION_COOKIE);
@@ -947,7 +1001,7 @@ pub async fn upgrade(
     let max = realtime.limits.max_payload_bytes;
     ws.max_message_size(max)
         .max_frame_size(max)
-        .on_upgrade(move |socket| serve(realtime, game, socket, user, token_hash))
+        .on_upgrade(move |socket| serve(realtime, game, socket, user, token_hash, protocol))
 }
 
 /// One socket, from its welcome to its close.
@@ -957,7 +1011,9 @@ async fn serve(
     mut socket: WebSocket,
     user: crate::auth::SessionUser,
     token_hash: String,
+    protocol: u32,
 ) {
+    let compress_over = realtime.limits.compress_over_bytes;
     let (out, mut outgoing) = mpsc::unbounded_channel::<Outgoing>();
     let id = {
         let mut hub = realtime.hub();
@@ -982,7 +1038,7 @@ async fn serve(
         tokio::select! {
             sent = outgoing.recv() => match sent {
                 Some(Outgoing::Text(json)) => {
-                    if socket.send(Message::Text(Utf8Bytes::from(json))).await.is_err() {
+                    if socket.send(frame_of(json, protocol, compress_over)).await.is_err() {
                         break;
                     }
                 }
@@ -1022,4 +1078,32 @@ async fn serve(
     let mut hub = realtime.hub();
     hub.sessions.shift_remove(&id);
     hub.clients.shift_remove(&id);
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Read;
+
+    use super::*;
+
+    #[test]
+    fn reads_the_protocol_version_from_the_query_and_takes_none_as_version_0() {
+        assert_eq!(protocol_of(None), 0);
+        assert_eq!(protocol_of(Some("")), 0);
+        assert_eq!(protocol_of(Some("v=1")), 1);
+        assert_eq!(protocol_of(Some("x=2&v=7")), 7);
+        assert_eq!(protocol_of(Some("v=new")), 0);
+    }
+
+    #[test]
+    fn gzips_only_a_long_message_and_only_for_a_client_that_takes_it() {
+        let long = format!("{{\"type\":\"welcome\",\"pad\":\"{}\"}}", "x".repeat(200));
+        assert_eq!(frame_of(long.clone(), 0, 100), Message::Text(Utf8Bytes::from(long.clone())));
+        assert_eq!(frame_of("{}".into(), 1, 100), Message::Text(Utf8Bytes::from("{}")));
+        let Message::Binary(bytes) = frame_of(long.clone(), 1, 100) else { panic!("not binary") };
+        let mut back = String::new();
+        flate2::read::GzDecoder::new(&bytes[..]).read_to_string(&mut back).unwrap();
+        assert_eq!(back, long);
+        assert!(bytes.len() < long.len());
+    }
 }

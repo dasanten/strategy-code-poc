@@ -84,3 +84,10 @@ T84.6 measured the client at about 1.4 ms a chunk for its texture, and 4.3 s to 
 in batches on one machine without a network.
 
 Each ticket of Epic 99 adds its before and after below.
+
+| Ticket                        | Before                                    | After                                                                   |
+| ----------------------------- | ----------------------------------------- | ----------------------------------------------------------------------- |
+| T99.3 (WebSocket compression) | the welcome: 63,201 bytes as a text frame | 12,990 bytes as a gzipped binary frame (21%); only messages over 8 KiB |
+
+T99.3 measured on 2026-11-12 on a copy of a dev world (tick about 810, a Player with one young
+city), with a Node WebSocket client against the server: the same welcome at protocol 0 and 1.

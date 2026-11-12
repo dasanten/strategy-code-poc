@@ -14,7 +14,8 @@ use csp_server::config::{Origins, RealtimeLimits};
 use csp_server::db::open_db;
 use csp_server::monitoring::LogSink;
 use csp_server::realtime::{
-    Realtime, RealtimeOptions, TickView, WS_CLOSE_LOGGED_OUT, WS_CLOSE_TOO_MANY_REQUESTS,
+    Realtime, RealtimeOptions, TickView, MIN_PROTOCOL_VERSION, PROTOCOL_VERSION,
+    WS_CLOSE_LOGGED_OUT, WS_CLOSE_TOO_MANY_REQUESTS, WS_CLOSE_UPDATED,
 };
 use csp_server::server::{Game, GameThread, TickSettings};
 use csp_shared::terrain::{Terrain, TerrainMap};
@@ -48,6 +49,7 @@ fn limits() -> RealtimeLimits {
         messages_per_second: 10,
         connections_per_user: 3,
         pending_orders_per_realm: 50,
+        compress_over_bytes: 8 * 1024,
     }
 }
 
@@ -260,6 +262,25 @@ struct Client {
     socket: Socket,
     got: Vec<Value>,
     closed: Option<u16>,
+    /// The type of every message read so far, and whether it came as a binary (gzipped) frame.
+    frames: Vec<(String, bool)>,
+}
+
+/// The JSON a data frame holds: a text frame's own, a binary frame's gunzipped; none for others.
+fn json_of(frames: &mut Vec<(String, bool)>, msg: &Message) -> Option<(Value, String)> {
+    let (text, binary) = match msg {
+        Message::Text(text) => (text.to_string(), false),
+        Message::Binary(bytes) => {
+            let mut text = String::new();
+            std::io::Read::read_to_string(&mut flate2::read::GzDecoder::new(&bytes[..]), &mut text)
+                .expect("a binary frame is gzipped JSON");
+            (text, true)
+        }
+        _ => return None,
+    };
+    let v: Value = serde_json::from_str(&text).unwrap();
+    frames.push((v["type"].as_str().unwrap_or_default().to_owned(), binary));
+    Some((v, text))
 }
 
 /// The status a refused upgrade answered with, or the open socket.
@@ -272,7 +293,7 @@ async fn open(url: &str, token: Option<&str>, origin: Option<&str>) -> Result<Cl
         req.headers_mut().insert("origin", origin.parse().unwrap());
     }
     match tokio_tungstenite::connect_async(req).await {
-        Ok((socket, _)) => Ok(Client { socket, got: Vec::new(), closed: None }),
+        Ok((socket, _)) => Ok(Client { socket, got: Vec::new(), closed: None, frames: Vec::new() }),
         Err(tokio_tungstenite::tungstenite::Error::Http(res)) => Err(res.status().as_u16()),
         Err(e) => panic!("unexpected: {e}"),
     }
@@ -294,8 +315,8 @@ impl Client {
                 .await
                 .unwrap_or_else(|_| panic!("no {kind} message; got {:?}", self.got));
             match msg {
-                Some(Ok(Message::Text(text))) => {
-                    let v: Value = serde_json::from_str(&text).unwrap();
+                Some(Ok(m @ (Message::Text(_) | Message::Binary(_)))) => {
+                    let (v, _) = json_of(&mut self.frames, &m).unwrap();
                     if v["type"] == kind {
                         return v;
                     }
@@ -323,8 +344,8 @@ impl Client {
                 Ok(Some(Ok(Message::Close(frame)))) => {
                     return frame.map_or(1005, |f| u16::from(f.code));
                 }
-                Ok(Some(Ok(Message::Text(text)))) => {
-                    self.got.push(serde_json::from_str(&text).unwrap())
+                Ok(Some(Ok(m @ (Message::Text(_) | Message::Binary(_))))) => {
+                    self.got.push(json_of(&mut self.frames, &m).unwrap().0)
                 }
                 Ok(Some(Ok(_))) => {}
                 Ok(Some(Err(_))) | Ok(None) => return 1006,
@@ -454,6 +475,90 @@ async fn caps_a_realms_orders_waiting_for_the_next_tick_and_takes_more_once_it_r
     assert_eq!(s.applied.lock().unwrap().len(), 2);
     c.send(order("o4")).await;
     assert_eq!(c.next("ack").await["requestId"], "o4");
+}
+
+// ----------------------------------------------------------------- protocol version (ADR 0034)
+
+/// Connects naming protocol version `v`.
+async fn connect_speaking(s: &Server, v: u32) -> Client {
+    open(&format!("{}?v={v}", s.url), Some(&s.token), None)
+        .await
+        .unwrap_or_else(|status| panic!("refused: {status}"))
+}
+
+/// The next data frame's JSON as sent, waiting up to 2 s.
+async fn raw_next(c: &mut Client) -> (Value, String) {
+    loop {
+        let msg = tokio::time::timeout(Duration::from_secs(2), c.socket.next())
+            .await
+            .expect("a message")
+            .expect("open")
+            .unwrap();
+        if let Some(got) = json_of(&mut c.frames, &msg) {
+            return got;
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn sends_a_new_client_a_large_welcome_gzipped_and_a_small_message_as_text() {
+    // A low threshold: this test's welcome is a few KB, an order's ack a few dozen bytes.
+    let mut l = limits();
+    l.compress_over_bytes = 300;
+    let s = start(StartOptions { limits: l, ..StartOptions::default() }).await;
+    let mut old = connect(&s).await;
+    let (_, as_text) = raw_next(&mut old).await;
+    assert!(as_text.len() > 300, "the welcome is {} bytes", as_text.len());
+    let mut new = connect_speaking(&s, PROTOCOL_VERSION).await;
+    let (welcome, gunzipped) = raw_next(&mut new).await;
+    assert_eq!(welcome["type"], "welcome");
+    assert_eq!(new.frames, vec![("welcome".to_owned(), true)]);
+    assert_eq!(gunzipped, as_text, "the binary frame gunzips to the JSON sent as text");
+    new.send(
+        json!({ "type": "order", "requestId": "o1", "order": { "kind": "wait", "ticks": 1 } }),
+    )
+    .await;
+    new.next("ack").await;
+    assert_eq!(new.frames.last(), Some(&("ack".to_owned(), false)));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn sends_a_client_that_names_no_version_text_only_as_before() {
+    let mut l = limits();
+    l.compress_over_bytes = 300;
+    let s = start(StartOptions { limits: l, ..StartOptions::default() }).await;
+    let mut c = connect(&s).await;
+    c.next("welcome").await;
+    s.broadcast().await;
+    c.next("tick").await;
+    c.send(json!({ "type": "order", "requestId": "o1", "order": { "kind": "wait", "ticks": 1 } }))
+        .await;
+    c.next("ack").await;
+    assert!(c.frames.iter().all(|(_, binary)| !binary), "{:?}", c.frames);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn closes_a_client_older_than_the_server_serves_with_the_updated_code() {
+    let s = start(StartOptions::default()).await;
+    let Some(old) = MIN_PROTOCOL_VERSION.checked_sub(1) else {
+        // Every version is still served: a client naming none gets its welcome.
+        connect(&s).await.next("welcome").await;
+        return;
+    };
+    let mut c = connect_speaking(&s, old).await;
+    assert_eq!(c.close_code().await, WS_CLOSE_UPDATED);
+}
+
+#[test]
+fn the_client_speaks_the_servers_protocol_version_and_knows_its_close_code() {
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../apps/web/src/shared/protocol.ts");
+    let protocol = std::fs::read_to_string(path).unwrap();
+    let has = |line: String| protocol.lines().any(|l| l.trim() == line);
+    assert!(
+        has(format!("export const PROTOCOL_VERSION = {PROTOCOL_VERSION}")),
+        "apps/web/src/shared/protocol.ts names another PROTOCOL_VERSION than the server's"
+    );
+    assert!(has(format!("export const WS_CLOSE_UPDATED = {WS_CLOSE_UPDATED}")));
 }
 
 // --------------------------------------------------------------------------------- the world
