@@ -125,10 +125,15 @@ pub fn rower_of<'w>(world: &'w WorldState, v: &Vessel) -> Option<&'w Resident> {
     world.residents.iter().find(|r| r.id == id && r.aboard.as_deref() == Some(v.id.as_str()))
 }
 
-/// Whether a vessel is being rowed now: its rower holds a row order for it.
+/// Whether a vessel is being moved now: its rower holds a row order for it, or one aboard a ship
+/// a sail order.
 pub fn being_rowed(world: &WorldState, v: &Vessel) -> bool {
     rower_of(world, v).is_some_and(|r| {
         matches!(&r.order, Some(csp_shared::world::ResidentOrder::Row(o)) if o.vessel_id == v.id)
+    }) || world.residents.iter().any(|r| {
+        // A ship under sail, by its captain (`CONTEXT.md`: Sailing).
+        r.aboard.as_deref() == Some(v.id.as_str())
+            && matches!(&r.order, Some(csp_shared::world::ResidentOrder::Sail(o)) if o.vessel_id == v.id)
     })
 }
 
@@ -311,7 +316,9 @@ pub fn row_off_problem(
 /// Why a resident can't board a vessel now (`CONTEXT.md`: Beside a vessel, Passenger, What
 /// vessels carry, Docked, Crew): a vessel of their realm beside them (a ship only docked, from
 /// its haven), with room for one more passenger; not a rider (no horse goes aboard) or a driver.
-/// As crew (`as_crew`), only aboard a ship and only grown, and they take no room.
+/// As crew (`as_crew`), only aboard a ship and only grown, and they take no room. Another
+/// organization's docked ship (or nobody's) takes them as crew to sail it off, unguarded and with
+/// nobody of another realm aboard (`board_to_steal_problem`).
 pub fn board_vessel_problem(
     world: &WorldState,
     r: &Resident,
@@ -319,14 +326,24 @@ pub fn board_vessel_problem(
     as_crew: bool,
 ) -> Option<String> {
     let name = vessel_name(v);
+    let stealing = as_crew && v.kind == VesselKind::Ship && !vessel_of_resident(v, r);
+    let strangers = v.kind == VesselKind::Ship
+        && aboard_vessel(world, &v.id).iter().any(|o| o.owner.is_none() || o.owner != r.owner);
     let problem = if r.aboard.as_deref() == Some(v.id.as_str()) {
         format!("already aboard that {name}")
     } else if r.aboard.is_some() {
         "already aboard another carriage or boat".into()
     } else if as_crew && v.kind != VesselKind::Ship {
         "only a ship takes a crew".into()
-    } else if !vessel_of_resident(v, r) {
+    } else if !vessel_of_resident(v, r) && !(stealing && r.owner.is_some()) {
         format!("not a {name} of your realm")
+    } else if strangers {
+        "someone of another realm is aboard that ship".into()
+    } else if let Some(p) = stealing
+        .then(|| board_to_steal_problem(world, r, v, r.owner.as_deref().unwrap_or("")))
+        .flatten()
+    {
+        p.into()
     } else if v.kind == VesselKind::Ship && docked_at(world, v).is_none() {
         "the ship is not docked at a haven".into()
     } else if !beside_vessel(world, v, r.x, r.y) {
@@ -408,4 +425,85 @@ pub fn launch_tile(
         }
     }
     None
+}
+
+/// Where a sail order to (x, y) takes a ship (`CONTEXT.md`: Sailing): a Sea tile itself; a tile of
+/// a finished haven, the free Sea tile touching its footprint nearest the ship, where it docks.
+/// Why not otherwise: Lake, other land, or a haven with no free Sea beside it.
+pub fn sail_target(
+    world: &WorldState,
+    map: &TerrainMap,
+    v: &Vessel,
+    x: i32,
+    y: i32,
+) -> Result<(i32, i32), &'static str> {
+    let size = map.size;
+    let (x, y) = (wrap(x, size), wrap(y, size));
+    let t = terrain_at(map, x, y);
+    if is_sea(t) {
+        return Ok((x, y));
+    }
+    if is_water(t) {
+        return Err("a ship sails only on the Sea, never onto a Lake");
+    }
+    let Some(haven) = haven_for(world, x, y, size) else {
+        return Err("a ship sails to a haven or a Sea tile");
+    };
+    let from = (v.x as i32, v.y as i32);
+    let side = csp_shared::footprint::FOOTPRINT.get("haven").unwrap_or(3);
+    let (hx, hy) = (haven.x as i32, haven.y as i32);
+    let mut best: Option<((i32, i32), f64)> = None;
+    for dy in -1..=side {
+        for dx in -1..=side {
+            let t = (wrap(hx + dx, size), wrap(hy + dy, size));
+            if covers(placed(haven), t.0, t.1, size) || !is_sea(terrain_at(map, t.0, t.1)) {
+                continue;
+            }
+            if vessel_at(world, t.0, t.1).is_some_and(|o| o.id != v.id) {
+                continue;
+            }
+            let d = wrap_distance(size, t, from);
+            if best.is_none_or(|(_, b)| d < b - 1e-9) {
+                best = Some((t, d));
+            }
+        }
+    }
+    best.map(|(t, _)| t).ok_or("no free Sea beside that haven")
+}
+
+/// Why residents of the realm `realm_id` can't board another organization's docked ship (or
+/// nobody's) as its crew to sail it off (`CONTEXT.md`: Sailing: stealing a ship takes sailing it
+/// off with a minimum crew of the thief's realm aboard): nobody of another realm aboard, and not
+/// guarded: an armed resident of its owner on its haven and none of the thief's realm, the thief
+/// themselves included.
+pub fn board_to_steal_problem(
+    world: &WorldState,
+    thief: &Resident,
+    v: &Vessel,
+    realm_id: &str,
+) -> Option<&'static str> {
+    if aboard_vessel(world, &v.id).iter().any(|r| r.owner.as_deref() != Some(realm_id)) {
+        return Some("someone else is aboard that ship");
+    }
+    if guarded_by(
+        &world.residents,
+        |r| resident_beside_vessel(world, v, r),
+        |r| vessel_of_resident(v, r),
+        |r| r.id == thief.id || r.owner.as_deref() == Some(realm_id),
+    ) {
+        return Some("an armed resident guards that ship");
+    }
+    None
+}
+
+/// Whether `a` and `b` meet across a docked ship (`CONTEXT.md`: Fighting at a vessel, Docked):
+/// one aboard a ship and the other on land on the haven it is docked at, as beside a ship means
+/// at its haven.
+pub fn across_docked_ship(world: &WorldState, a: &Resident, b: &Resident) -> bool {
+    let at = |aboard: &Resident, ashore: &Resident| {
+        vessel_aboard(world, aboard).is_some_and(|v| {
+            v.kind == VesselKind::Ship && resident_beside_vessel(world, v, ashore)
+        }) && ashore.aboard.is_none()
+    };
+    at(a, b) || at(b, a)
 }

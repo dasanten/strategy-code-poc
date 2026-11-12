@@ -18,7 +18,7 @@ use csp_shared::balance::{
 };
 use csp_shared::footprint::{footprint_tiles, is_at, near_footprint};
 use csp_shared::terrain::{
-    beside_step, is_passable_terrain, is_water, step_length, terrain_at, tile_index, touches_sea,
+    beside_step, is_passable_terrain, is_sea, is_water, step_length, terrain_at, tile_index, touches_sea,
     touches_water, wrap_delta, Terrain, TerrainMap,
 };
 use csp_shared::time::TICKS_PER_GAME_DAY;
@@ -1231,7 +1231,13 @@ pub fn ship_crew(world: &WorldState, _terrain: &TerrainMap) -> Out {
             if r.aboard.as_deref() != Some(v.id.as_str()) {
                 fail(&[id, &v.id], format!("crew {id} of ship {} is not aboard it", v.id));
             }
-            if !vessel_of_resident(v, r) {
+            // A crew of another realm is taking it (`CONTEXT.md`: Sailing), with nobody else aboard.
+            let taking = world
+                .residents
+                .iter()
+                .filter(|o| o.aboard.as_deref() == Some(v.id.as_str()))
+                .all(|o| o.owner.is_some() && o.owner == r.owner);
+            if !vessel_of_resident(v, r) && !taking {
                 fail(&[id, &v.id], format!("crew {id} of ship {} is not of its realm", v.id));
             }
             if !can_work(r.born_at, tick) {
@@ -2337,8 +2343,11 @@ pub fn paths_are_steps(world: &WorldState, terrain: &TerrainMap) -> Out {
     for r in &world.residents {
         let Some(o) = &r.order else { continue };
         let rowing = matches!(o, ResidentOrder::Row(_));
+        let sailing = matches!(o, ResidentOrder::Sail(_));
         let enterable = |t: usize| {
-            if rowing {
+            if sailing {
+                is_sea(terrain.tiles[t])
+            } else if rowing {
                 is_water(terrain.tiles[t])
             } else {
                 is_passable_terrain(terrain.tiles[t])

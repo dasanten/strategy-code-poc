@@ -621,7 +621,8 @@ pub struct DriveOrder {
 }
 
 /// Rowing a boat to a water tile (`CONTEXT.md`: Rowing): the rower is aboard and at its oars, and
-/// the boat goes a Step at a time over water along `path`.
+/// the boat goes a Step at a time over water along `path`. Sailing a ship (`Sail`) holds the same:
+/// the captain is one of its crew, and the ship goes over Sea only (`CONTEXT.md`: Sailing).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RowOrder {
@@ -898,6 +899,8 @@ pub enum ResidentOrder {
     Relocate(RelocateOrder),
     Feed(FeedOrder),
     Row(RowOrder),
+    /// Sailing a ship to a Sea tile or a haven, its captain one of its crew (`CONTEXT.md`: Sailing).
+    Sail(RowOrder),
 }
 
 /// Everything in the world that changes, saved as snapshots (ADR 0006).
