@@ -12,7 +12,10 @@ use csp_shared::protocol::LoadLevel;
 use csp_shared::terrain::{
     is_passable_terrain, is_sea, is_water, terrain_at, wrap, wrap_distance, TerrainMap,
 };
-use csp_shared::world::{Building, BuildingKind, Good, Resident, Vessel, VesselKind, WorldState};
+use csp_shared::world::{
+    Building, BuildingKind, Good, HaulPhase, Resident, ResidentOrder, Vessel, VesselKind,
+    WorldState,
+};
 
 use super::building::building_at;
 use super::carriages::load_level;
@@ -125,11 +128,30 @@ pub fn rower_of<'w>(world: &'w WorldState, v: &Vessel) -> Option<&'w Resident> {
     world.residents.iter().find(|r| r.id == id && r.aboard.as_deref() == Some(v.id.as_str()))
 }
 
-/// Whether a vessel is being rowed now: its rower holds a row order for it.
+/// Whether a vessel is being rowed now: its rower holds a row order for it, or rows it on a haul
+/// route by water to the next stop.
 pub fn being_rowed(world: &WorldState, v: &Vessel) -> bool {
-    rower_of(world, v).is_some_and(|r| {
-        matches!(&r.order, Some(csp_shared::world::ResidentOrder::Row(o)) if o.vessel_id == v.id)
-    })
+    rower_of(world, v).is_some_and(|r| rowing_now(r) == Some(v.id.as_str()))
+}
+
+/// The vessel a resident rows this moment, if any: by a row order, or on a haul route by water
+/// on its way to a stop (`CONTEXT.md`: Rowing, Haul route by water).
+pub fn rowing_now(r: &Resident) -> Option<&str> {
+    match &r.order {
+        Some(ResidentOrder::Row(o)) => Some(&o.vessel_id),
+        Some(ResidentOrder::HaulByWater(o)) if o.phase == HaulPhase::Driving => Some(&o.vessel_id),
+        _ => None,
+    }
+}
+
+/// The vessel a resident is ordered to row, if any: by a row order, or on a haul route by water
+/// whatever its phase, as a haul route's driver drives its carriage at a stop too.
+pub fn rowed_vessel_id(r: &Resident) -> Option<&str> {
+    match &r.order {
+        Some(ResidentOrder::Row(o)) => Some(&o.vessel_id),
+        Some(ResidentOrder::HaulByWater(o)) => Some(&o.vessel_id),
+        _ => None,
+    }
 }
 
 /// The water tile a row order to (x, y) goes to (`CONTEXT.md`: Rowing): a water tile itself;

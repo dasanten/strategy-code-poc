@@ -108,7 +108,7 @@ pub fn apply(world: &mut WorldState, sender: &OrderSender, o: &OrderRequest, siz
         "drop" => carrying::apply_drop(world, sender, o),
         "store" => storing::apply_store(world, sender, o, size),
         "fetch" => storing::apply_fetch(world, sender, o, size),
-        "haul" => hauling::apply_haul(world, sender, o),
+        "haul" => hauling::apply_haul(world, sender, o, None),
         "stop" => hauling::apply_stop(world, sender, o),
         "buyCity" => buying::apply_buy_city(world, sender, o),
         "buy" => trading::apply_trade(world, sender, o, TradeSide::Buy),

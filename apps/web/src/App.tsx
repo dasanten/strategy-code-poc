@@ -855,9 +855,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       setOrderError(await giveOrder(order, false))
       return
     }
-    if (mode === 'haul' && carriage && haulSetup) {
+    // With no carriage of theirs here, the boat beside them (`CONTEXT.md`: Haul route by water).
+    const hauled = carriage ?? boatToRow
+    if (mode === 'haul' && hauled && haulSetup) {
       // The Haul task: they run the Player's Haul (default) script (`CONTEXT.md`: Default script).
-      const order = { kind: 'task', task: 'haul', residentId: selected.id, carriageId: carriage.id }
+      const order = { kind: 'task', task: 'haul', residentId: selected.id, carriageId: hauled.id }
       setOrderError(await giveOrder({ ...order, x, y, ...haulSetup }))
       return
     }

@@ -302,10 +302,7 @@ pub fn add_later_rule_orders(kinds: &mut OrderKinds) {
     );
     kinds.insert(
         "haul",
-        fn_kind(
-            Box::new(crate::hauling::validate_haul),
-            Box::new(|w, s, o, _| crate::hauling::apply_haul(w, s, o)),
-        ),
+        fn_kind(Box::new(crate::hauling::validate_haul), Box::new(crate::hauling::apply_haul)),
     );
     kinds.insert(
         "stop",

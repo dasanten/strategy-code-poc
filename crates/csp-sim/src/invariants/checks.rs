@@ -7,7 +7,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::queries::vessels::{floats_on, vessel_of_resident};
+use crate::queries::vessels::{floats_on, rowing_now, vessel_of_resident};
 use csp_shared::balance::{
     carriage_can_enter, trained_cap, ALLIANCE_LEAVE_DELAY, ALLIANCE_RECALL_DELAY,
     CARRIAGE_CAPACITY, CARRIAGE_MAX_CAPACITY, CARRYING_TICKS, CITY_AREA_MARGIN,
@@ -1170,19 +1170,19 @@ pub fn vessel_passengers(world: &WorldState, terrain: &TerrainMap) -> Out {
     // Whoever rows a boat is at its oars, aboard it and grown (`CONTEXT.md`: Rowing).
     let tick = world.tick as f64;
     for r in &world.residents {
-        let Some(ResidentOrder::Row(o)) = &r.order else { continue };
+        let Some(vessel_id) = rowing_now(r) else { continue };
         let at_oars = world.vessels.iter().any(|v| {
-            v.id == o.vessel_id
+            v.id == vessel_id
                 && v.rower_id.as_deref() == Some(r.id.as_str())
                 && r.aboard.as_deref() == Some(v.id.as_str())
         });
         if !at_oars {
             let m =
-                format!("resident {} rows vessel {} without being at its oars", r.id, o.vessel_id);
-            fail(&[&r.id, &o.vessel_id], m);
+                format!("resident {} rows vessel {} without being at its oars", r.id, vessel_id);
+            fail(&[&r.id, vessel_id], m);
         }
         if !can_work(r.born_at, tick) {
-            fail(&[&r.id], format!("child {} rows vessel {}", r.id, o.vessel_id));
+            fail(&[&r.id], format!("child {} rows vessel {}", r.id, vessel_id));
         }
     }
     for v in &world.vessels {
@@ -1441,6 +1441,68 @@ pub fn haul_routes_sound(world: &WorldState, terrain: &TerrainMap) -> Out {
         }
         if o.phase == HaulPhase::Driving && o.moving.is_some() {
             fail("holds goods for the route while driving".into());
+        }
+    }
+    out
+}
+
+/// Haul routes by water stay sound (`CONTEXT.md`: Haul route by water): two different stops on
+/// land, goods that go one way each, Food kept that fits on the vessel; at a stop the rower stands
+/// on it, or is still aboard having just come alongside it; rowing on, they hold nothing for the
+/// route and row to a water tile.
+pub fn water_haul_routes_sound(world: &WorldState, terrain: &TerrainMap) -> Out {
+    let name = "water-haul-routes-sound";
+    let mut out = Vec::new();
+    for r in &world.residents {
+        let Some(ResidentOrder::HaulByWater(o)) = &r.order else { continue };
+        let mut fail = |m: String| {
+            out.push(violation(name, format!("resident {} {m}", r.id), &[&r.id, &o.vessel_id]))
+        };
+        let (from, to) = (o.from, o.to);
+        if from.x == to.x && from.y == to.y {
+            fail("hauls between one tile and itself".into());
+        }
+        for s in [from, to] {
+            if !is_passable_terrain(terrain_at(terrain, s.x as i32, s.y as i32)) {
+                let (x, y) = (js_number(s.x), js_number(s.y));
+                fail(format!("hauls by water to ({x}, {y}), which is no land"));
+            }
+        }
+        if o.goods.is_empty() {
+            fail("hauls no goods".into());
+        }
+        if o.return_goods.iter().any(|g| o.goods.contains(g)) {
+            fail("hauls a good both ways".into());
+        }
+        let v = world.vessels.iter().find(|v| v.id == o.vessel_id);
+        let food_kg = GOOD_WEIGHT.get("food").unwrap_or(0.0);
+        let capacity = v.map_or(f64::INFINITY, vessel_capacity);
+        if o.keep_food < 0.0 || o.keep_food * food_kg > capacity {
+            fail(format!("keeps {} Food for the rower", js_number(o.keep_food)));
+        }
+        let stop = if o.stop == HaulStop::From { from } else { to };
+        let aboard = v.is_some_and(|v| r.aboard.as_deref() == Some(v.id.as_str()));
+        match o.phase {
+            HaulPhase::Loading => {
+                let on_stop = r.aboard.is_none() && r.x == stop.x && r.y == stop.y;
+                if !on_stop && !aboard {
+                    fail(format!(
+                        "loads at a stop but stands at ({}, {})",
+                        js_number(r.x),
+                        js_number(r.y)
+                    ));
+                }
+            }
+            HaulPhase::Driving => {
+                if o.moving.is_some() {
+                    fail("holds goods for the route while rowing".into());
+                }
+                let water =
+                    o.water.is_some_and(|w| is_water(terrain_at(terrain, w.x as i32, w.y as i32)));
+                if !water {
+                    fail("rows to no water tile".into());
+                }
+            }
         }
     }
     out
@@ -2336,7 +2398,7 @@ pub fn paths_are_steps(world: &WorldState, terrain: &TerrainMap) -> Out {
     let mut out = Vec::new();
     for r in &world.residents {
         let Some(o) = &r.order else { continue };
-        let rowing = matches!(o, ResidentOrder::Row(_));
+        let rowing = rowing_now(r).is_some();
         let enterable = |t: usize| {
             if rowing {
                 is_water(terrain.tiles[t])

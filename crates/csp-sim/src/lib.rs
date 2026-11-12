@@ -142,6 +142,7 @@ pub mod views;
 pub mod walk_time;
 pub mod walking;
 pub mod walls;
+pub mod water_hauling;
 pub mod waypoints;
 pub mod work;
 pub mod workplace_settings;

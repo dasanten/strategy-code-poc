@@ -507,7 +507,7 @@
         {
           "name": "kind",
           "type": "string",
-          "description": "The order: \"walkTo\", \"drive\", \"haul\", \"pickUp\", \"drop\", \"store\", \"fetch\", \"build\", \"tearDown\", \"workAt\", \"teach\", \"train\", \"breed\", \"attack\", \"climb\", \"roadLine\", \"wallLine\", \"pay\", \"buyCity\", \"trade\", \"swap\", \"buyHorse\", \"sellHorse\", \"handIn\", \"buyOff\", \"payDebt\", \"acceptOffer\" or \"relocate\" (on their way to `cityId`, to live there)."
+          "description": "The order: \"walkTo\", \"drive\", \"haul\", \"pickUp\", \"drop\", \"store\", \"fetch\", \"build\", \"tearDown\", \"workAt\", \"teach\", \"train\", \"breed\", \"attack\", \"climb\", \"roadLine\", \"wallLine\", \"pay\", \"buyCity\", \"trade\", \"swap\", \"buyHorse\", \"sellHorse\", \"handIn\", \"buyOff\", \"payDebt\", \"acceptOffer\", \"relocate\" (on their way to `cityId`, to live there), \"row\" or \"haulByWater\" (a haul route rowing a boat)."
         },
         {
           "name": "target",
@@ -574,6 +574,12 @@
           "nullWhen": "for other orders, and when none"
         },
         {
+          "name": "vesselId",
+          "type": "string",
+          "description": "The boat rowed, or rowed on a haul route by water.",
+          "nullWhen": "for other orders"
+        },
+        {
           "name": "stableId",
           "type": "string",
           "description": "The stable horses are bred at.",
@@ -634,7 +640,7 @@
         {
           "name": "stop",
           "type": "string",
-          "description": "The haul stop a carriage is at or bound for: \"from\" or \"to\".",
+          "description": "The haul stop a carriage or boat is at or bound for: \"from\" or \"to\".",
           "nullWhen": "for other orders"
         },
         {
@@ -2736,7 +2742,7 @@
         "keepFood?"
       ],
       "cost": 10,
-      "description": "Drive a haul route between my tile and (x, y): `goods` there, `returnGoods` back.",
+      "description": "Drive a haul route between my tile and (x, y): `goods` there, `returnGoods` back. Given a boat beside me (its id as `carriageId`), row it instead between my tile and the shore or haven (x, y), loading by hand at each.",
       "returns": "string"
     },
     {
@@ -3779,7 +3785,7 @@
     },
     "haul": {
       "name": "Haul",
-      "source": "// Haul (default): drive params.carriage, or while none is picked the carriage\n// on my tile when I start, on a haul route between memory.from and memory.to:\n// memory.goods there, memory.returnGoods back, memory.keepFood Food kept on\n// board for the horse and me. The route comes only from the Haul order; started\n// without one I end. The built-in haul order loads, drives and unloads, again\n// and again; this starts it at memory.from.\nparam carriage: storage // the carriage to drive; none: the one I stand on\n\nif (memory.to == null) {\n  end(\"no route given\")\n  return\n}\nif (!pickCarriage()) { return }\nif (me.order == null || me.order.kind != \"haul\") {\n  startRoute()\n  return\n}\nlogLeg()\n\n// Which carriage I drive: the one picked, else the one I started on. False\n// once I end: neither is a carriage.\nfn pickCarriage() {\n  if (params.carriage != null) {\n    if (params.carriage.kind != null) {\n      end(\"the \" + params.carriage.kind + \" is no carriage\")\n      return false\n    }\n    memory.carriageId = params.carriage.id\n  }\n  if (memory.carriageId == null) {\n    for (c of carriages()) {\n      if (c.x == me.x && c.y == me.y) { memory.carriageId = c.id }\n    }\n    if (memory.carriageId == null) {\n      end(\"no carriage on their tile\")\n      return false\n    }\n  }\n  return true\n}\n\n// The haul order, once I stand at memory.from.\nfn startRoute() {\n  if (me.x != memory.from.x || me.y != memory.from.y) { return }\n  haul(memory.carriageId, memory.to.x, memory.to.y, memory.goods, memory.returnGoods, memory.keepFood)\n}\n\n// Each leg of the route as it starts, for my log: loading at a stop, or\n// driving to one.\nfn logLeg() {\n  let leg = me.order.phase + \" \" + me.order.stop\n  if (memory.leg == leg) { return }\n  memory.leg = leg\n  let stop = memory.to\n  if (me.order.stop == \"from\") { stop = memory.from }\n  if (me.order.phase == \"loading\") { log(\"loading at \" + stop.x + \",\" + stop.y) }\n  else { log(\"driving to \" + stop.x + \",\" + stop.y) }\n}\n"
+      "source": "// Haul (default): drive params.carriage, or while none is picked the carriage\n// on my tile when I start, on a haul route between memory.from and memory.to:\n// memory.goods there, memory.returnGoods back, memory.keepFood Food kept on\n// board for the horse and me. The route comes only from the Haul order; started\n// without one I end. The built-in haul order loads, drives and unloads, again\n// and again; this starts it at memory.from. Given a boat (memory.carriageId),\n// I row it instead, from the shore beside it (a haul route by water).\nparam carriage: storage // the carriage to drive; none: the one I stand on\n\nif (memory.to == null) {\n  end(\"no route given\")\n  return\n}\nif (!pickCarriage()) { return }\nif (me.order == null || (me.order.kind != \"haul\" && me.order.kind != \"haulByWater\")) {\n  startRoute()\n  return\n}\nlogLeg()\n\n// Which carriage I drive: the one picked, else the one I started on. False\n// once I end: neither is a carriage.\nfn pickCarriage() {\n  if (params.carriage != null) {\n    if (params.carriage.kind != null) {\n      end(\"the \" + params.carriage.kind + \" is no carriage\")\n      return false\n    }\n    memory.carriageId = params.carriage.id\n  }\n  if (memory.carriageId == null) {\n    for (c of carriages()) {\n      if (c.x == me.x && c.y == me.y) { memory.carriageId = c.id }\n    }\n    if (memory.carriageId == null) {\n      end(\"no carriage on their tile\")\n      return false\n    }\n  }\n  return true\n}\n\n// The haul order, once I stand at memory.from.\nfn startRoute() {\n  if (me.x != memory.from.x || me.y != memory.from.y) { return }\n  haul(memory.carriageId, memory.to.x, memory.to.y, memory.goods, memory.returnGoods, memory.keepFood)\n}\n\n// Each leg of the route as it starts, for my log: loading at a stop, or\n// driving (rowing) to one.\nfn logLeg() {\n  let leg = me.order.phase + \" \" + me.order.stop\n  if (memory.leg == leg) { return }\n  memory.leg = leg\n  let stop = memory.to\n  if (me.order.stop == \"from\") { stop = memory.from }\n  if (me.order.phase == \"loading\") { log(\"loading at \" + stop.x + \",\" + stop.y) }\n  else if (me.order.kind == \"haulByWater\") { log(\"rowing to \" + stop.x + \",\" + stop.y) }\n  else { log(\"driving to \" + stop.x + \",\" + stop.y) }\n}\n"
     },
     "tearDown": {
       "name": "Tear down",

@@ -915,6 +915,18 @@ export function orderDoing(
       o.stop === 'to' ? `Hauling ${what} to` : back ? `Hauling ${back} back to` : 'Driving back to'
     return o.path ? `${leg} ${x}, ${y} · ${left(o.path)}` : `${leg} ${x}, ${y}`
   }
+  if (o?.kind === 'haulByWater') {
+    // `CONTEXT.md`: Haul route by water.
+    const what = o.goods.map((g) => GOOD_LABELS[g].toLowerCase()).join(', ')
+    const { x, y } = o[o.stop]
+    if (o.phase === 'loading') {
+      return o.stop === 'from' ? `Loading ${what} at ${x}, ${y}` : `Unloading ${what} at ${x}, ${y}`
+    }
+    const back = o.returnGoods.map((g) => GOOD_LABELS[g].toLowerCase()).join(', ')
+    const leg =
+      o.stop === 'to' ? `Rowing ${what} to` : back ? `Rowing ${back} back to` : 'Rowing back to'
+    return o.path ? `${leg} ${x}, ${y} · ${left(o.path)}` : `${leg} ${x}, ${y}`
+  }
   if (o?.kind === 'pickUp') return 'Picking up goods'
   if (o?.kind === 'drop') return 'Putting down goods'
   if (o?.kind === 'feed') return 'Feeding'
@@ -2208,10 +2220,11 @@ export function ResidentCard({
   // The open order's panel, right under the row that opened it (`ActionRows`).
   const openPanel = shown && (
     <div className="sel-panel">
-      {shown === 'haul' && carriage && (
+      {shown === 'haul' && (carriage || boatToRow) && (
         <HaulBlock
           adult={!child}
-          onRoute={r.order?.kind === 'haul'}
+          onRoute={r.order?.kind === 'haul' || r.order?.kind === 'haulByWater'}
+          byWater={!carriage}
           picking={picking === 'haul'}
           onHaulTo={onHaulTo}
         />
@@ -2829,13 +2842,15 @@ export function ResidentCard({
 }
 
 /**
- * Setting up a haul route with the carriage on the resident's tile (`CONTEXT.md`: Haul route):
- * which goods go from here to the other stop, which come back, and how much Food stays on board
- * for the horse, then the other stop on the map.
+ * Setting up a haul route with the carriage on the resident's tile (`CONTEXT.md`: Haul route), or
+ * the boat beside them (Haul route by water): which goods go from here to the other stop, which
+ * come back, and how much Food stays on board for the horse or the rower, then the other stop on
+ * the map.
  */
 function HaulBlock({
   adult,
   onRoute,
+  byWater = false,
   picking,
   onHaulTo,
 }: {
@@ -2843,6 +2858,8 @@ function HaulBlock({
   adult: boolean
   /** Already hauling on a route. */
   onRoute: boolean
+  /** With the boat beside them, rowed between shores or havens. */
+  byWater?: boolean
   /** The map is waiting for the route's other stop. */
   picking: boolean
   onHaulTo: (setup: HaulSetup) => void
@@ -2880,7 +2897,7 @@ function HaulBlock({
         </div>
       ))}
       <label className="small">
-        Food kept for the horse{' '}
+        {byWater ? 'Food kept for the rower' : 'Food kept for the horse'}{' '}
         <input
           type="number"
           min={0}
@@ -2907,12 +2924,22 @@ function HaulBlock({
           give={() => onHaulTo({ goods, returnGoods, keepFood })}
         />
       </div>
-      <p className="muted small">
-        The driver loads the picked goods here, drives them to the other stop and unloads them,
-        brings the goods picked to come back, again and again until stopped. A stop with a storage
-        loads and unloads there, else on the ground. The horse eats from the carriage’s load; its
-        Food is topped up wherever there is some.
-      </p>
+      {byWater ? (
+        <p className="muted small">
+          The rower loads the picked goods into the boat from this shore, rows them to the other
+          stop (a shore tile or a haven, with free water beside it), gets off and unloads them,
+          brings the goods picked to come back, again and again until stopped. A haven loads and
+          unloads at its storage, a shore on the ground. The rower takes meals from the boat’s Food,
+          topped up wherever there is some.
+        </p>
+      ) : (
+        <p className="muted small">
+          The driver loads the picked goods here, drives them to the other stop and unloads them,
+          brings the goods picked to come back, again and again until stopped. A stop with a storage
+          loads and unloads there, else on the ground. The horse eats from the carriage’s load; its
+          Food is topped up wherever there is some.
+        </p>
+      )}
     </section>
   )
 }
