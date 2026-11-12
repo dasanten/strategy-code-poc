@@ -154,6 +154,26 @@ impl ExploredTerrain {
         grown
     }
 
+    /// Marks every tile of the map as explored by the Player (`csp-admin explore --all`, a dev
+    /// tool for staging a far-explored Player).
+    pub fn explore_all(&mut self, user_id: u64) {
+        let tiles = self.terrain.size as usize * self.terrain.size as usize;
+        let mut bits = vec![0xff; tiles.div_ceil(8)];
+        // Bits past the last tile stay clear, as `explore` leaves them.
+        if !tiles.is_multiple_of(8) {
+            *bits.last_mut().expect("a map has tiles") = (1u8 << (tiles % 8)) - 1;
+        }
+        let n = chunks_across(self.terrain.size) as u32;
+        self.chunks.insert(user_id, (0..n * n).collect());
+        self.bits.insert(user_id, bits);
+        self.dirty.insert(user_id);
+    }
+
+    /// How many tiles the Player has explored.
+    pub fn explored_tiles(&self, user_id: u64) -> usize {
+        self.bits.get(&user_id).map_or(0, |b| b.iter().map(|b| b.count_ones() as usize).sum())
+    }
+
     pub fn is_explored(&self, user_id: u64, x: i32, y: i32) -> bool {
         let t = tile_index(self.terrain.size, x, y);
         self.bits.get(&user_id).and_then(|b| b.get(t >> 3)).is_some_and(|b| b & (1 << (t & 7)) != 0)
