@@ -377,6 +377,12 @@
 .queue-block-count {
   width: 4em;
 }
+/* A resident's queue draft, marked as not running yet (`CONTEXT.md`: Queue draft). */
+.queue-draft-mark {
+  color: var(--ui-warn);
+  font-weight: 600;
+  margin: 0 0 4px;
+}
 /* How many steps the plan becomes after repeats, warned when over what a queue holds. */
 .queue-unrolled-over {
   color: var(--ui-warn);

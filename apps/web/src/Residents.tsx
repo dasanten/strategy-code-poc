@@ -794,14 +794,15 @@ export function PasteSteps({ onPaste }: { onPaste: (steps: PlanItem[]) => void }
 }
 
 /**
- * Give and Discard under a plan held in this browser (`QueuePlan`): on a resident's card while it
- * has repeat blocks, and on the group card. A plan that can't be given (no steps, more steps after
+ * Give and Discard under a plan held in this browser (`QueuePlan`): Start queue and Discard draft
+ * under a resident's queue draft, Give to all on the group card. A plan that can't be given (no steps, more steps after
  * repeats than a queue holds, a step that never ends before another) says why, by how much when
  * it is too long, and Give waits.
  */
 export function GivePlan({
   plan,
   give,
+  discard = 'Discard plan',
   note,
   onGive,
   onDiscard,
@@ -809,6 +810,8 @@ export function GivePlan({
   plan: Pick<QueuePlan, 'items'>
   /** The Give button's label. */
   give: string
+  /** The Discard button's label. */
+  discard?: string
   /** What giving does, said while it can be given. */
   note: string
   onGive: () => void
@@ -822,7 +825,7 @@ export function GivePlan({
           {give}
         </button>
         <button type="button" onClick={onDiscard}>
-          Discard plan
+          {discard}
         </button>
       </div>
       <p className={`small ${problem && plan.items.length > 0 ? 'queue-unrolled-over' : 'muted'}`}>
@@ -1828,6 +1831,7 @@ export function ResidentCard({
   queuePlan,
   onPlanQueue,
   onGivePlan,
+  onDraftQueue,
   addStep,
   collapsed = false,
 }: {
@@ -2036,16 +2040,19 @@ export function ResidentCard({
   /** Orders the resident to store what they carry at the nearest storage (`STORE_ALL`). */
   onStore?: () => void
   /**
-   * Edits the resident's queue to these steps, and loop when given (`CONTEXT.md`: Queue); with a
-   * repeat block among them, opens a plan of them to give instead (`CONTEXT.md`: Repeat block).
+   * Edits the resident's queue to these steps, and loop when given (`CONTEXT.md`: Queue); for a
+   * resident with no queue, or with a repeat block among them, opens a draft of them instead
+   * (`CONTEXT.md`: Queue draft).
    */
   onEditQueue?: (items: PlanItem[], loop?: boolean) => void
-  /** The plan with repeat blocks waiting to be given to the resident, if one is open. */
+  /** The resident's queue draft waiting for Start queue, if one is open. */
   queuePlan?: QueuePlan
-  /** Edits or discards (undefined) that plan. */
+  /** Edits or discards (undefined) that draft. */
   onPlanQueue?: (plan: QueuePlan | undefined) => void
-  /** Gives the resident the plan unrolled, as their queue. */
+  /** Start queue: gives the resident the draft unrolled, as their queue. */
   onGivePlan?: () => void
+  /** Edit as draft: copies the running queue into a draft; the queue runs on. */
+  onDraftQueue?: () => void
   /** The queue planner's Add step (`AddStep`), under the queue. */
   addStep?: ReactNode
   /** Shrunk to its header while the map waits for a target (ADR 0012: pick mode). */
@@ -2619,8 +2626,13 @@ export function ResidentCard({
       {tab === 'queue' &&
         (queuePlan && onPlanQueue ? (
           <>
+            <p className="small queue-draft-mark">
+              {r.queue
+                ? 'Draft, not started: the queue runs on until you start it.'
+                : 'Draft, not started'}
+            </p>
             <QueueBlock
-              title="Plan"
+              title="Draft"
               queue={queuePlan}
               currentId={r.queue?.steps[r.queue.current]?.id}
               doing={doingLine(r, {
@@ -2641,37 +2653,48 @@ export function ResidentCard({
             />
             <GivePlan
               plan={queuePlan}
-              give="Give"
-              note="Give makes their queue this plan, each repeat block that many copies of its steps; the step they are on keeps going if it is still in it."
+              give="Start queue"
+              discard="Discard draft"
+              note="Start queue makes their queue this draft, each repeat block that many copies of its steps; the step they are on keeps going if it is still in it."
               onGive={() => onGivePlan?.()}
               onDiscard={() => onPlanQueue(undefined)}
             />
           </>
         ) : r.queue && onEditQueue ? (
-          <QueueBlock
-            queue={planOf(r.queue)}
-            currentId={r.queue.steps[r.queue.current]?.id}
-            doing={doingLine(r, {
-              scripts,
-              buildings,
-              residents,
-              horses,
-              cities,
-              arrives: arrivesIn?.(r),
-            })}
-            scripts={scripts}
-            buildings={buildings}
-            lastSeen={lastSeen}
-            waypoints={waypoints}
-            cities={cities}
-            onEdit={onEditQueue}
-            realm={realmId}
-          />
+          <>
+            <QueueBlock
+              queue={planOf(r.queue)}
+              currentId={r.queue.steps[r.queue.current]?.id}
+              doing={doingLine(r, {
+                scripts,
+                buildings,
+                residents,
+                horses,
+                cities,
+                arrives: arrivesIn?.(r),
+              })}
+              scripts={scripts}
+              buildings={buildings}
+              lastSeen={lastSeen}
+              waypoints={waypoints}
+              cities={cities}
+              onEdit={onEditQueue}
+              realm={realmId}
+            />
+            {onDraftQueue && (
+              <div className="order-buttons">
+                <button type="button" onClick={onDraftQueue}>
+                  Edit as draft
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <>
             <p className="muted small">
-              Nothing queued. Hold Shift with any order to queue it, plan steps with Add step, paste
-              copied ones or load a saved queue.
+              Nothing queued. Plan steps with Add step, paste copied ones or load a saved queue:
+              they wait as a draft until you press Start queue. Hold Shift with any order to queue
+              it at once.
             </p>
             {onEditQueue && <PasteSteps onPaste={(steps) => onEditQueue(steps)} />}
             {onEditQueue && (

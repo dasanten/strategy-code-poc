@@ -117,8 +117,8 @@ import { Founding } from './Founding.js'
 import {
   appendRequest,
   appendToEach,
-  editPlan,
-  EMPTY_PLAN,
+  draftEdit,
+  draftFor,
   givePlan,
   giveToAll,
   planOf,
@@ -129,7 +129,7 @@ import {
 } from './queue-view.js'
 import { AddStep } from './AddStep.js'
 import { GroupPlanner } from './GroupPlanner.js'
-import { hasBlocks, type PlanItem } from './plan-blocks.js'
+import { type PlanItem } from './plan-blocks.js'
 import {
   planHorses,
   nextPick,
@@ -362,8 +362,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // The queue planned on the group card, held here until given to all (`CONTEXT.md`: Planning
   // for a group); with none open, a step planned for a group goes onto each one's own queue.
   const [groupPlan, setGroupPlan] = useState<QueuePlan>()
-  // Plans with repeat blocks waiting to be given, by resident (`CONTEXT.md`: Repeat block): they
-  // stay while other cards are open, until given or discarded.
+  // Queue drafts waiting for Start queue, by resident (`CONTEXT.md`: Queue draft): they stay
+  // while other cards are open, until started or discarded, and are lost on reloading the page.
   const [queuePlans, setQueuePlans] = useState<Record<string, QueuePlan>>({})
   const planQueue = (id: string, plan: QueuePlan | undefined) =>
     setQueuePlans((plans) => {
@@ -916,9 +916,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       return
     }
     if (!selected) return
-    const open = queuePlans[selected.id]
-    if (open) {
-      planQueue(selected.id, planStep(open, order, at))
+    // A resident with no queue, or with a draft open, gets the step onto the draft
+    // (`CONTEXT.md`: Queue draft); a running queue gets it at once.
+    const draft = draftFor(selected, queuePlans[selected.id])
+    if (draft) {
+      planQueue(selected.id, planStep(draft, order, at))
       return
     }
     const request = { ...order, residentId: selected.id }
@@ -2342,14 +2344,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 await giveOrder({ ...storeAll(selected, world.tick), residentId: selected.id }),
               )
             }
-            // A paste into the planner of a resident with no queue starts one; steps wrapped in
-            // a repeat block open a plan to give instead.
+            // A paste or load for a resident with no queue, or steps wrapped in a repeat block,
+            // opens a draft (`CONTEXT.md`: Queue draft); other edits change the running queue.
             onEditQueue={async (items: PlanItem[], loop?: boolean) => {
-              if (!hasBlocks(items))
-                return setOrderError(await sendOrder(givePlan(selected, { items, loop })))
-              const from = selected.queue ? planOf(selected.queue) : EMPTY_PLAN
-              planQueue(selected.id, editPlan(from, items, loop))
+              const draft = draftEdit(selected, items, loop)
+              if (draft) return planQueue(selected.id, draft)
+              setOrderError(await sendOrder(givePlan(selected, { items, loop })))
             }}
+            onDraftQueue={() => selected.queue && planQueue(selected.id, planOf(selected.queue))}
             queuePlan={queuePlans[selected.id]}
             onPlanQueue={(plan) => planQueue(selected.id, plan)}
             onGivePlan={async () => {
