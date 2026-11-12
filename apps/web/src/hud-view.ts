@@ -2,24 +2,45 @@ import { buildingRealm } from './shared/city.js'
 import type { Building, City, Good } from '@csp/shared-types'
 import { agoText } from './last-seen.js'
 
+/** The groups of the tool rail, in rail order (`CONTEXT.md`: Tool rail). */
+export const RAIL_GROUPS = [
+  { id: 'people', label: 'People' },
+  { id: 'diplomacy', label: 'Diplomacy' },
+  { id: 'realm', label: 'Realm' },
+] as const
+
+export type RailGroupId = (typeof RAIL_GROUPS)[number]['id']
+
 /**
- * The drawers the tool rail opens over the map (ADR 0008), in rail order. Cities holds the city
- * inspector until selecting a city shows it on the selection card.
+ * The drawers the tool rail opens over the map (ADR 0008), in rail order, each in its group
+ * (`CONTEXT.md`: Tool rail). Cities holds the city inspector until selecting a city shows it on the
+ * selection card.
  */
 export const DRAWERS = [
-  { id: 'residents', label: 'Residents' },
-  { id: 'horses', label: 'Horses' },
-  { id: 'waypoints', label: 'Waypoints' },
-  { id: 'armies', label: 'Armies' },
-  { id: 'contracts', label: 'Contracts' },
-  { id: 'demands', label: 'Demands' },
-  { id: 'directOffers', label: 'Direct offers' },
-  { id: 'alliance', label: 'Alliance' },
-  { id: 'standing', label: 'Standing' },
-  { id: 'cities', label: 'Cities' },
-  { id: 'scripts', label: 'Scripts', wide: true },
-  { id: 'realmLog', label: 'Realm log' },
-] as const satisfies readonly { id: string; label: string; wide?: boolean }[]
+  { id: 'residents', label: 'Residents', group: 'people' },
+  { id: 'horses', label: 'Horses', group: 'people' },
+  { id: 'armies', label: 'Armies', group: 'people' },
+  { id: 'contracts', label: 'Contracts', group: 'diplomacy' },
+  { id: 'demands', label: 'Demands', group: 'diplomacy' },
+  { id: 'directOffers', label: 'Direct offers', group: 'diplomacy' },
+  { id: 'alliance', label: 'Alliance', group: 'diplomacy' },
+  { id: 'standing', label: 'Standing', group: 'diplomacy' },
+  { id: 'cities', label: 'Cities', group: 'realm' },
+  { id: 'waypoints', label: 'Waypoints', group: 'realm' },
+  { id: 'scripts', label: 'Scripts', group: 'realm', wide: true },
+  { id: 'realmLog', label: 'Realm log', group: 'realm' },
+] as const satisfies readonly { id: string; label: string; group: RailGroupId; wide?: boolean }[]
+
+export type Drawer = (typeof DRAWERS)[number]
+
+/** The rail's groups with their drawers, both in rail order; the rail draws a divider between them. */
+export function railGroups(): { id: RailGroupId; label: string; drawers: Drawer[] }[] {
+  return RAIL_GROUPS.map((g) => ({
+    id: g.id,
+    label: g.label,
+    drawers: DRAWERS.filter((d) => d.group === g.id),
+  }))
+}
 
 export type DrawerId = (typeof DRAWERS)[number]['id']
 

@@ -182,6 +182,18 @@ button.hud-logout {
   background: var(--ui-bar);
   border-right: 1px solid var(--ui-line);
 }
+.hud-rail-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.hud-rail-divider {
+  width: 24px;
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px solid var(--ui-line-strong);
+}
 .hud-rail button {
   position: relative;
   width: 36px;
@@ -567,6 +579,19 @@ button.hud-logout {
   border: 1px solid var(--ui-line);
   border-left: 0;
   border-radius: 0 0 10px 0;
+}
+.hud-menu-heading {
+  margin: 0;
+  padding: 8px 10px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-muted);
+}
+.hud-menu-heading:not(:first-child) {
+  margin-top: 6px;
+  border-top: 1px solid var(--ui-line);
 }
 .hud-menu > button {
   display: flex;

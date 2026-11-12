@@ -1,9 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { formatGameTime } from './shared/time.js'
 import type { FirstDay, TraderVisit } from '@csp/shared-types'
 import { DrawerStatus } from './drawer-head.js'
 import {
   DRAWERS,
+  railGroups,
   DRAWER_WIDTH,
   KEY_GOODS,
   drawerWidth,
@@ -284,18 +285,23 @@ export function ToolRail({
 }) {
   return (
     <nav className="hud-rail" aria-label="Tools">
-      {DRAWERS.map((d) => (
-        <button
-          key={d.id}
-          type="button"
-          className={open === d.id ? 'on' : ''}
-          aria-pressed={open === d.id}
-          aria-label={d.label}
-          data-tip={d.label}
-          onClick={() => onToggle(d.id)}
-        >
-          <Icon name={d.id} size={20} />
-        </button>
+      {railGroups().map((g, i) => (
+        <div key={g.id} className="hud-rail-group" role="group" aria-label={g.label}>
+          {i > 0 && <hr className="hud-rail-divider" aria-hidden="true" />}
+          {g.drawers.map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              className={open === d.id ? 'on' : ''}
+              aria-pressed={open === d.id}
+              aria-label={d.label}
+              data-tip={d.label}
+              onClick={() => onToggle(d.id)}
+            >
+              <Icon name={d.id} size={20} />
+            </button>
+          ))}
+        </div>
       ))}
     </nav>
   )
@@ -349,19 +355,24 @@ export function PhoneMenu({
         <>
           <div className="hud-menu-backdrop" onClick={() => setShown(false)} />
           <nav className="hud-menu" aria-label="Menu">
-            {DRAWERS.map((d) => (
-              <button
-                key={d.id}
-                type="button"
-                className={open === d.id ? 'on' : ''}
-                aria-pressed={open === d.id}
-                onClick={() => {
-                  onToggle(d.id)
-                  setShown(false)
-                }}
-              >
-                <Icon name={d.id} size={18} /> {d.label}
-              </button>
+            {railGroups().map((g) => (
+              <Fragment key={g.id}>
+                <h2 className="hud-menu-heading">{g.label}</h2>
+                {g.drawers.map((d) => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    className={open === d.id ? 'on' : ''}
+                    aria-pressed={open === d.id}
+                    onClick={() => {
+                      onToggle(d.id)
+                      setShown(false)
+                    }}
+                  >
+                    <Icon name={d.id} size={18} /> {d.label}
+                  </button>
+                ))}
+              </Fragment>
             ))}
             {goods && <Goods goods={goods} className="hud-menu-goods" />}
             {leader && (
