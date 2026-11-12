@@ -1776,6 +1776,20 @@ button.residents-row.selected:hover {
   color: var(--ui-muted);
   font-weight: 400;
 }
+/* A Cities drawer row (`CONTEXT.md`: Cities drawer): whose it is in that relation's colour, and
+   under the name an own city's residents against housing and key goods, or when last seen. */
+.city-list > li > button .city-row-whose {
+  color: var(--rel, var(--ui-muted));
+}
+.city-row-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0;
+  padding: 0 8px;
+  color: var(--ui-muted);
+}
 .city-details {
   margin: 4px 0 0;
   padding: 0 8px;

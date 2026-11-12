@@ -1833,6 +1833,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             directives={world.diplomacy.directives}
             debt={world.diplomacy.debt ?? 0}
             noCaravans={world.diplomacy.noCaravans === true}
+            allies={new Set(world.diplomacy.alliance?.members.map((m) => m.realmId))}
             openId={openCityId}
             onOpen={(id) => {
               setOpenCityId(id)
