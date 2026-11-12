@@ -17,7 +17,7 @@ use crate::queries::vessels::{vessel_passengers, vessel_room};
 
 /// A Lake over x 2..=15, y 2..=8, with a headland of land at x = 9 from the north shore down to
 /// y = 6, so a boat west of it goes round its tip to get east of it.
-fn lake() -> TerrainMap {
+pub(super) fn lake() -> TerrainMap {
     let mut rows: Vec<String> = Vec::new();
     for y in 0..20 {
         let row: String = (0..20)
@@ -37,7 +37,7 @@ fn lake() -> TerrainMap {
     draw(&rows)
 }
 
-fn boat(id: &str, x: f64, y: f64) -> Vessel {
+pub(super) fn boat(id: &str, x: f64, y: f64) -> Vessel {
     Vessel {
         id: id.into(),
         kind: VesselKind::Boat,
@@ -51,7 +51,7 @@ fn boat(id: &str, x: f64, y: f64) -> Vessel {
 
 /// Realm r1 (Player 7) with residents w1, p1, p2 on the west shore at (1, 4), each with their own
 /// food, and its empty boat v1 on the Lake at (2, 4).
-fn game_on(map: TerrainMap, at: (f64, f64), boat_at: (f64, f64)) -> Game {
+pub(super) fn game_on(map: TerrainMap, at: (f64, f64), boat_at: (f64, f64)) -> Game {
     let mut world = world_with_realm(&map);
     for id in ["w1", "p1", "p2"] {
         let mut r = resident(id, Some("r1"), at.0, at.1);
@@ -75,12 +75,12 @@ fn board(game: &mut Game, id: &str) -> String {
     game.order(7, json!({"kind": "board", "residentId": id, "vesselId": "v1"}))
 }
 
-fn v1(game: &Game) -> &Vessel {
+pub(super) fn v1(game: &Game) -> &Vessel {
     game.world.vessels.iter().find(|v| v.id == "v1").expect("boat v1")
 }
 
 /// Ticks until w1's order is done, at most `max` ticks; the ticks taken.
-fn until_done(game: &mut Game, id: &str, max: usize) -> usize {
+pub(super) fn until_done(game: &mut Game, id: &str, max: usize) -> usize {
     for t in 0..max {
         if game.r(id).order.is_none() {
             return t;
@@ -171,9 +171,6 @@ fn only_a_grown_resident_of_its_realm_rows_it() {
     let mut game = game();
     game.r_mut("p1").born_at = game.world.tick as f64;
     assert_eq!(row(&mut game, "p1", 5, 4), "children can’t row");
-    game.world.vessels[0].realm_id = None;
-    assert_eq!(row(&mut game, "w1", 5, 4), "not a boat of your realm");
-    game.world.vessels[0].realm_id = Some("r1".into());
     game.r_mut("w1").x = 0.0;
     assert_eq!(row(&mut game, "w1", 5, 4), "that boat is not beside the resident");
 }

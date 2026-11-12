@@ -1653,6 +1653,10 @@ pub struct Crime {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub horse: Option<String>,
+    /// A boat taken, as `carriage` (`CONTEXT.md`: Stealing a carriage or horse, its vessel part).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "true")]
+    pub boat: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub building: Option<BuildingKind>,
@@ -1934,6 +1938,10 @@ pub enum RealmEventWhat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         horse: Option<String>,
+        /// A boat, stolen like a carriage (`CONTEXT.md`: Stealing a carriage or horse).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional, type = "true")]
+        boat: Option<bool>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         building: Option<BuildingKind>,
@@ -1947,6 +1955,10 @@ pub enum RealmEventWhat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         horse: Option<String>,
+        /// A boat, stolen like a carriage (`CONTEXT.md`: Stealing a carriage or horse).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional, type = "true")]
+        boat: Option<bool>,
     },
     TransportTaken {
         resident_id: String,
@@ -1960,6 +1972,10 @@ pub enum RealmEventWhat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         horse: Option<String>,
+        /// A boat, stolen like a carriage (`CONTEXT.md`: Stealing a carriage or horse).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional, type = "true")]
+        boat: Option<bool>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         goods: Option<Stock>,

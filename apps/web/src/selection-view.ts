@@ -145,6 +145,7 @@ export type ActionId =
   | 'drive'
   | 'row'
   | 'driveOff'
+  | 'rowOff'
   | 'hitchOff'
   | 'stealHorse'
   | 'haul'
@@ -186,6 +187,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   drive: 'D',
   row: 'D',
   driveOff: 'D',
+  rowOff: 'D',
   hitchOff: 'D',
   stealHorse: 'M',
   haul: 'H',
@@ -250,6 +252,11 @@ export interface ResidentHere {
    * so (`CONTEXT.md`: Stealing a carriage or horse).
    */
   driveOff?: { problem: string | undefined }
+  /**
+   * Another organization's boat (or nobody's) beside them, to row off, and why it can't be taken
+   * now, if so (`CONTEXT.md`: Stealing a carriage or horse, its vessel part).
+   */
+  rowOff?: { problem: string | undefined }
   /**
    * Their realm's carriage on their tile with no horse of the realm's to pull it, and another
    * organization's free horse there to steal for it, and why they can't now, if so (`CONTEXT.md`:
@@ -353,6 +360,9 @@ export const HORSE_DOWN_NO_DRIVE = 'its horse is Down'
 
 /** The action that steals a carriage, which says so (`CONTEXT.md`: Stealing a carriage or horse). */
 export const DRIVE_OFF_LABEL = 'Drive off (theft)'
+
+/** The action that steals a boat by rowing it off, which says so (its vessel part). */
+export const ROW_OFF_LABEL = 'Row off (theft)'
 
 /** The action that steals a horse by driving off with it hitched, which says so. */
 export const HITCH_OFF_LABEL = 'Drive with their horse (theft)'
@@ -511,6 +521,16 @@ function ordersOffered(h: ResidentHere): {
       }),
     )
   } else miss('driveOff', 'no carriage of another realm here')
+  // A boat likewise, from beside it (`CONTEXT.md`: Stealing a carriage or horse, its vessel part).
+  if (h.rowOff) {
+    const { problem } = h.rowOff
+    add(
+      row('rowOff', '', {
+        ...picks('rowOff', ROW_OFF_LABEL),
+        ...(problem ? { disabled: true as const, reason: problem } : {}),
+      }),
+    )
+  } else miss('rowOff', 'no boat of another realm beside them')
   if (h.hitchOff) {
     const { problem } = h.hitchOff
     add(
@@ -641,6 +661,7 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   drive: 'move',
   row: 'move',
   driveOff: 'move',
+  rowOff: 'move',
   hitchOff: 'move',
   stealHorse: 'move',
   haul: 'move',

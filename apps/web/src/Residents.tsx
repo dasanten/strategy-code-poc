@@ -317,6 +317,7 @@ export type Picking =
   | 'drive'
   | 'row'
   | 'driveOff'
+  | 'rowOff'
   | 'hitchOff'
   | 'haul'
   | 'roadFrom'
@@ -1768,6 +1769,8 @@ export function ResidentCard({
   carriageToBoard,
   boatToBoard,
   boatToRow,
+  rowOff,
+  onRowOff,
   onRowTo,
   onBoard,
   carriageToUnhitch,
@@ -1863,6 +1866,13 @@ export function ResidentCard({
   boatToBoard?: { id: string } | undefined
   /** A boat of the realm the resident is aboard or beside, to row, and why they can't now (`CONTEXT.md`: Rowing). */
   boatToRow?: { id: string; problem?: string }
+  /**
+   * Another organization's boat (or nobody's) beside the resident, to row off, and why it can't be
+   * taken now, if so (`CONTEXT.md`: Stealing a carriage or horse, its vessel part).
+   */
+  rowOff?: { problem: string | undefined }
+  /** Starts (or cancels) picking a tile to row that boat off to. */
+  onRowOff?: () => void
   /** Starts (or cancels) picking a tile to row the boat to. */
   onRowTo?: () => void
   /** Orders the resident to board that carriage, or with none to get off the one they are on. */
@@ -2077,6 +2087,7 @@ export function ResidentCard({
     carriageHorseDown: horses.some((h) => h.id === carriage?.horseId && isDown(h)),
     ...(carriageTheirs ? { carriageTheirs } : {}),
     ...(driveOff ? { driveOff } : {}),
+    ...(rowOff ? { rowOff } : {}),
     ...(hitchOff ? { hitchOff } : {}),
     ...(stealHorse ? { stealHorse } : {}),
     pile,
@@ -2122,6 +2133,7 @@ export function ResidentCard({
     if (a.id === 'drive') onDriveTo()
     if (a.id === 'row') onRowTo?.()
     if (a.id === 'driveOff') onDriveOff?.()
+    if (a.id === 'rowOff') onRowOff?.()
     if (a.id === 'hitchOff') onHitchOff?.()
     if (a.id === 'stealHorse') onStealHorse?.()
     if (a.id === 'roadTo') onRoadTo()

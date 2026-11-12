@@ -3,8 +3,10 @@
 
 import { BOAT_CAPACITY, MAP_SIZE, PASSENGER_WEIGHT } from '@csp/balance'
 import type { Resident, SeenVessel } from '@csp/shared-types'
+import type { StealingResident } from './carriages.js'
+import { guardedBy } from './city.js'
 import { inContact } from './combat.js'
-import { stockWeight } from './stats.js'
+import { canWork, stockWeight } from './stats.js'
 
 /** Whether an id names a vessel: the server names each after its kind, as "boat12". */
 export function isVesselId(id: string | undefined): boolean {
@@ -56,4 +58,34 @@ export function boardBoatProblem(
   const room = vesselRoom(v)
   if (room !== undefined && room < PASSENGER_WEIGHT - 1e-9) return 'the boat is full'
   return undefined
+}
+
+/**
+ * Why a resident can't row off in another organization's boat (or nobody's) for the realm
+ * `realmId` now, or undefined when they can (`CONTEXT.md`: Stealing a carriage or horse, its
+ * vessel part): grown, beside it and aboard nothing, on no horse and driving nothing; nobody may
+ * row it or be aboard; and it mustn't be guarded: an armed resident of its owner beside it and none
+ * of the thief's realm, the thief themselves included. `size` is the map's.
+ */
+export function rowOffProblem<R extends StealingResident>(
+  world: { tick: number; residents: readonly R[] },
+  thief: R,
+  v: Pick<SeenVessel, 'id' | 'x' | 'y' | 'realmId' | 'passengerIds' | 'rowerId'>,
+  realmId: string,
+  size = MAP_SIZE,
+): string | undefined {
+  if (!canWork(thief, world.tick)) return 'children can’t steal'
+  if (thief.aboard !== undefined) return 'aboard another carriage or boat'
+  if (!besideVessel(v, thief, size)) return 'that boat is not beside the resident'
+  if (thief.order?.kind === 'drive' || thief.order?.kind === 'haul') return 'the driver can’t row'
+  if (thief.riding !== undefined) return 'no horse goes aboard: dismount first'
+  if (v.rowerId !== undefined) return 'someone is rowing that boat'
+  if (v.passengerIds.length > 0) return 'someone is aboard that boat'
+  const guarded = guardedBy(
+    world.residents,
+    (r) => r.aboard !== v.id && besideVessel(v, r, size),
+    (r) => vesselOfResident(v, r),
+    (r) => r.id === thief.id || r.owner === realmId,
+  )
+  return guarded ? 'an armed resident guards that boat' : undefined
 }
