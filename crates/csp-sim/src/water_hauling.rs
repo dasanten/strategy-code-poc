@@ -187,7 +187,7 @@ pub fn request_water_hauling(world: &mut WorldState, map: &TerrainMap) -> Vec<Ca
         let (sx, sy) = (stop.x as i32, stop.y as i32);
         let r = &world.residents[ri];
         let v = &world.vessels[vi];
-        if !beside_vessel(v, stop.x, stop.y) {
+        if !beside_vessel(world, v, stop.x, stop.y) {
             end_order(world, ri, Some("the boat is not beside the stop".into()));
             continue;
         }

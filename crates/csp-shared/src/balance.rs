@@ -1305,6 +1305,10 @@ pub const BOAT_CAPACITY: f64 = 250.0;
 /// `PASSENGER_WEIGHT` and goods together, five carriages' worth. Its crew don't count against it.
 pub const SHIP_CAPACITY: f64 = 2000.0;
 
+/// The fewest crew aboard a ship for it to sail (`CONTEXT.md`: Crew, Sailing): a captain and three
+/// hands to work the sails, so a small realm can man one but it takes a few of its residents.
+pub const SHIP_MIN_CREW: f64 = 4.0;
+
 /// How fast an average rower moves a boat over water, as a share of walking on Plains
 /// (`CONTEXT.md`: Rowing): a little quicker than walking round the shore, so crossing pays off.
 pub const ROW_SPEED: f64 = 1.2;
@@ -2452,6 +2456,7 @@ pub fn balance_json() -> Value {
     m.insert("PASSENGER_WEIGHT".into(), json!(PASSENGER_WEIGHT));
     m.insert("BOAT_CAPACITY".into(), json!(BOAT_CAPACITY));
     m.insert("SHIP_CAPACITY".into(), json!(SHIP_CAPACITY));
+    m.insert("SHIP_MIN_CREW".into(), json!(SHIP_MIN_CREW));
     m.insert("ROW_SPEED".into(), json!(ROW_SPEED));
     m.insert("ROW_STRENGTH_EFFECT".into(), json!(ROW_STRENGTH_EFFECT));
     m.insert("ROW_STRENGTH_AVERAGE".into(), json!(ROW_STRENGTH_AVERAGE));

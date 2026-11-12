@@ -86,6 +86,7 @@ pub fn add_rule_orders(kinds: &mut OrderKinds) {
     kinds.insert("getOff", crate::passengers::GetOff);
     // T90.4: rowing.
     kinds.insert("row", crate::rowing::Row);
+    kinds.insert("load", crate::loading::Load);
     kinds.insert("climb", crate::climbing::Climb);
     kinds.insert("setGate", crate::gates::SetGate);
     kinds.insert("claimHorses", crate::horse_grant::ClaimHorses);

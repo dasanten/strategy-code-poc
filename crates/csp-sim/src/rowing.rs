@@ -32,7 +32,7 @@ pub fn row_problem(world: &WorldState, r: &Resident, v: &Vessel) -> Option<Strin
         "not a boat of your realm"
     } else if r.aboard.is_some() && !aboard_it {
         "aboard another carriage or boat"
-    } else if !aboard_it && !beside_vessel(v, r.x, r.y) {
+    } else if !aboard_it && !beside_vessel(world, v, r.x, r.y) {
         "that boat is not beside the resident"
     } else if driven_carriage_id(r).is_some() {
         "the driver can’t row"

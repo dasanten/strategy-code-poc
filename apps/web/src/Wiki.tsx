@@ -25,6 +25,7 @@ import {
   CARRIAGE_CAPACITY,
   BOAT_CAPACITY,
   SHIP_CAPACITY,
+  SHIP_MIN_CREW,
   DIRECT_OFFERS_TO_ONE_REALM,
   DIRECT_OFFER_DAYS,
   PASSENGER_WEIGHT,
@@ -1938,8 +1939,34 @@ export function Wiki() {
           hands, and like a boat site anyone may bring materials or work on it. Once finished the
           site is gone, and an empty ship of the realm of whoever finished it floats on the nearest
           free Sea tile next to it. It shows on the map on a token of its own, to whoever sees its
-          tile; its card tells whose it is, its load, and who is aboard. Crew, docking and sailing
-          come later; until then a ship stays where it was launched.
+          tile; its card tells whose it is, its load, and who is aboard. Sailing comes later; until
+          then a ship stays where it was launched.
+        </p>
+        <p>
+          <b>Docked.</b> A ship on a water tile touching a haven, straight or diagonally, is docked
+          there; one launched at a haven is docked at it. Only docked, and only from that haven, do
+          residents board it, get off it or load it: for a ship, beside it means standing anywhere
+          on the haven it is docked at, and getting off lands on a free tile of that haven. A ship
+          out at sea takes nobody on and lets nobody off. Store and Fetch with a docked ship as the
+          place walk onto its haven.
+        </p>
+        <p>
+          <b>Crew.</b> Residents of the ship's realm board it as its <b>crew</b> rather than as
+          passengers: Board ship… on their card opens the choice (As crew or As passenger), the
+          group card offers Crew the ship and Board the ship, a queue step Board a ship as crew, and
+          a script <code>board(ship.id, true)</code>. Only grown residents crew a ship, and crew
+          don't count against what it holds, while each passenger counts as {num(PASSENGER_WEIGHT)}{' '}
+          kg as on a boat. A ship sails only with at least {num(SHIP_MIN_CREW)} crew aboard; its
+          card names its crew and says whether it can sail. Getting off, one of the crew is its crew
+          no more.
+        </p>
+        <p>
+          <b>Loading a ship.</b> Those standing on the haven a ship is docked at move goods straight
+          between the haven's storage and the ship, as many as there are and fit, at once: Load ship
+          and Unload in the Goods panel, or a script's <code>loadShip(ship, goods)</code> and{' '}
+          <code>unloadShip(ship, goods)</code>. Taking goods from another city's haven this way is
+          judged as taking from its storage. Goods can also go aboard by hand, as onto a boat, from
+          the haven.
         </p>
         <p>
           <b>Beside a boat</b> means on a land tile touching its water tile, straight or diagonally.

@@ -867,7 +867,7 @@ function CarriageBlock({
     ) : (
       r.name
     )
-  const { load, driver, rower, passengers, route } = carriage
+  const { load, driver, rower, crew, passengers, route } = carriage
   return (
     <section className="card-carriage" aria-label={carriage.title}>
       {head && (
@@ -900,6 +900,21 @@ function CarriageBlock({
           <>
             <dt>Rower</dt>
             <dd>{name(rower)}</dd>
+          </>
+        )}
+        {crew && (
+          <>
+            <dt>Crew</dt>
+            <dd>
+              {crew.residents.map((p, j) => (
+                <Fragment key={p.id}>
+                  {j > 0 && ', '}
+                  {name(p)}
+                </Fragment>
+              ))}
+              {crew.residents.length > 0 && ' '}
+              <span className="muted">· {crew.sail}</span>
+            </dd>
           </>
         )}
         {passengers && (

@@ -2981,6 +2981,11 @@ pub struct Vessel {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub rower_id: Option<String>,
+    /// Those aboard a ship as its crew rather than as passengers (`CONTEXT.md`: Crew): of its
+    /// realm, aboard it, and not counted against what it holds. A boat has none. Left out of a
+    /// save while empty (format 117).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub crew_ids: Vec<String>,
 }
 
 /// What a resource node yields once worked (`ResourceKind`).

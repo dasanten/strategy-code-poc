@@ -2543,9 +2543,25 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
     ScriptBinding {
         name: "board",
         is: Is::Action,
-        params: &["carriageId"],
+        params: &["carriageId", "asCrew?"],
         cost: 10.0,
-        description: "Get on a carriage of my realm on my tile, or a boat of my realm beside me (on land touching its water tile), as a passenger, and go along with it. Riders dismount first: no horse goes aboard.",
+        description: "Get on a carriage of my realm on my tile, or a boat of my realm beside me (on land touching its water tile), or a ship of my realm docked at the haven I stand on, as a passenger, and go along with it. With `asCrew` true, aboard a ship as one of its crew, who sail it and take no room (grown only). Riders dismount first: no horse goes aboard.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "loadShip",
+        is: Is::Action,
+        params: &["ship", "goods"],
+        cost: 10.0,
+        description: "Move goods like {iron: 20} from the storage of the haven I stand on straight onto a ship of my realm docked there, by it or its id, as many as there are and fit, at once.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "unloadShip",
+        is: Is::Action,
+        params: &["ship", "goods"],
+        cost: 10.0,
+        description: "Move goods like {ironOre: 40} off a ship of my realm, by it or its id, straight into the storage of the haven it is docked at and I stand on, as many as are aboard, at once.",
         returns: ScriptType::String,
     },
     ScriptBinding {

@@ -296,7 +296,7 @@ fn spot_holder(world: &mut WorldState, ri: usize, spot: &GoodsSpot) -> Option<Ho
         GoodsSpot::Vessel { vessel_id } => world
             .vessels
             .iter()
-            .position(|v| &v.id == vessel_id && beside_vessel(v, x, y))
+            .position(|v| &v.id == vessel_id && beside_vessel(world, v, x, y))
             .map(Holder::Vessel),
         GoodsSpot::Resident { resident_id } => {
             down_index_on(world, x, y, resident_id).map(Holder::Resident)
