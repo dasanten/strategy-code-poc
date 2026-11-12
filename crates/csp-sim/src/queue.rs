@@ -12,9 +12,10 @@ use ts_rs::TS;
 
 /// The order kinds a queue step can be (`QUEUE_STEP_KINDS`): the one-off actions and tasks the
 /// UI gives a resident, and running one of the Player's scripts. Never a queue.
-pub const QUEUE_STEP_KINDS: [&str; 23] = [
+pub const QUEUE_STEP_KINDS: [&str; 24] = [
     "walkTo",
     "drive",
+    "row",
     "unhitch",
     "hitch",
     "board",

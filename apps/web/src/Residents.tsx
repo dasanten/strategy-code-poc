@@ -1170,6 +1170,7 @@ export function GroupCard({
   scripts,
   buildings,
   carriages = [],
+  boats = [],
   inSight = [],
   cities,
   arrivesIn,
@@ -1197,6 +1198,11 @@ export function GroupCard({
    * each, to board (`CONTEXT.md`: Passenger).
    */
   carriages?: { carriage: Pick<Carriage, 'id' | 'x' | 'y' | 'realmId' | 'cityId'>; seats: number }[]
+  /**
+   * The realm's boats someone of the group stands beside, with how many more passengers fit in
+   * each, to board (`CONTEXT.md`: Beside a vessel).
+   */
+  boats?: { vessel: Pick<SeenVessel, 'id' | 'x' | 'y'>; seats: number }[]
   /** Everyone in sight, to say where a passenger's carriage is heading (`doingLine`). */
   inSight?: readonly SeenResident[]
   /** The cities the Player knows, to name where a resident relocates to (`doingLine`). */
@@ -1262,6 +1268,7 @@ export function GroupCard({
   const picks: Partial<Record<GroupButton, Exclude<GroupPicking, false>>> = {
     walk: 'walk',
     drive: 'drive',
+    row: 'row',
     work: 'work',
     build: 'build',
     roadTo: 'roadFrom',
@@ -1290,6 +1297,7 @@ export function GroupCard({
     size: mapSize ?? 0,
     seen,
     carriages: carriages.length,
+    boats: boats.length,
     relocateProblem: relocate ? relocate.problem : 'your realm has no other city',
   })
   // Each row keeps its slot while the card is open (ADR 0019); a row picking a tile shows it.
@@ -1309,8 +1317,9 @@ export function GroupCard({
   })
   const act = (a: CardAction<GroupButton>) => {
     if (tab !== 'orders' && a.id !== 'script') showTab('orders')
-    // With one carriage to board it boards that; with several, a panel lists them.
-    if (a.id === 'board' && carriages.length === 1) {
+    // With one carriage or boat to board they board that; with several, a panel lists them.
+    if (a.id === 'board' && carriages.length + boats.length === 1) {
+      if (boats[0]) return onOrder({ kind: 'boardBoat', ...boats[0] })
       const { carriage, seats } = carriages[0]!
       return onOrder({ kind: 'board', carriage, seats })
     }
@@ -1347,8 +1356,22 @@ export function GroupCard({
                 Board at {carriage.x}, {carriage.y}
               </button>
             ))}
+            {boats.map(({ vessel, seats }) => (
+              <button
+                type="button"
+                key={vessel.id}
+                onClick={() => {
+                  setPanel(undefined)
+                  onOrder({ kind: 'boardBoat', vessel, seats })
+                }}
+              >
+                Board the boat at {vessel.x}, {vessel.y}
+              </button>
+            ))}
           </div>
-          <p className="muted small">Those standing on the carriage board it, until it is full.</p>
+          <p className="muted small">
+            Those standing on the carriage, or beside the boat, board it, until it is full.
+          </p>
         </section>
       )}
       {shown === 'feed' && (
@@ -1668,6 +1691,7 @@ export type GroupPicking =
   | 'work'
   | 'build'
   | 'drive'
+  | 'row'
   | 'haul'
   | 'roadFrom'
   | 'roadTo'

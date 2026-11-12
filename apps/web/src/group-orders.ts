@@ -1,5 +1,6 @@
 import { CARRYING_A_CHILD, GOODS } from './shared/world.js'
 import { boarderProblem } from './shared/carriages.js'
+import { besideVessel, boardBoatProblem } from './shared/vessels.js'
 import { canHandle, canWork } from './shared/stats.js'
 import { covers, isAt } from './shared/footprint.js'
 import { inContact } from './shared/combat.js'
@@ -14,6 +15,7 @@ import type {
   OrderRequest,
   Resident,
   ScriptSummary,
+  SeenVessel,
   StartParamValues,
   Stock,
   TrainingSubject,
@@ -50,7 +52,19 @@ export type GroupOrder =
       carriage: Pick<Carriage, 'id' | 'x' | 'y' | 'realmId' | 'cityId'>
       seats: number
     }
+  /**
+   * Boards the boat (`CONTEXT.md`: Beside a vessel): those beside it, in the group's order, until
+   * its `seats` are taken.
+   */
+  | { kind: 'boardBoat'; vessel: Pick<SeenVessel, 'id' | 'x' | 'y'>; seats: number }
+  /** Those aboard a carriage or boat get off it (`CONTEXT.md`: Passenger, Beside a vessel). */
   | { kind: 'getOff' }
+  /**
+   * One of them rows each boat of the realm some of them are aboard or beside there (`CONTEXT.md`:
+   * Rowing): the first aboard it, else the first beside it. The rest are skipped; those aboard go
+   * along.
+   */
+  | { kind: 'row'; x: number; y: number }
   /**
    * Sets a number param (`CONTEXT.md`: Script parameter), or clears it with null, for each one
    * running one of `scriptIds`, the scripts that declare it.
@@ -168,6 +182,8 @@ export interface GroupSeen {
   horses?: readonly Pick<Horse, 'id' | 'x' | 'y'>[]
   /** The realm's carriages, to drive or haul with, and whether a horse is hitched to unhitch. */
   carriages?: readonly (Pick<Carriage, 'id' | 'x' | 'y'> & Partial<Pick<Carriage, 'horseId'>>)[]
+  /** The realm's boats, to row (`CONTEXT.md`: Rowing). */
+  vessels?: readonly Pick<SeenVessel, 'id' | 'x' | 'y'>[]
   /** The buildings in sight, to find the stable each one stands in. */
   buildings?: readonly Pick<Building, 'id' | 'kind' | 'x' | 'y' | 'site'>[]
   /**
@@ -224,6 +240,7 @@ const ADULTS_ONLY: GroupOrder['kind'][] = [
   'tearDown',
   'breed',
   'drive',
+  'row',
   'haul',
   'unhitch',
   'feed',
@@ -253,6 +270,35 @@ function groundOf(r: GroupResident, seen: GroupSeen, size: number) {
 /** Those to Feed in sight on or next to a resident's tile, but the resident. */
 function toFeedNear(r: GroupResident, seen: GroupSeen, size: number) {
   return seen.toFeed?.filter((d) => d.id !== r.id && inContact(size, r, d)) ?? []
+}
+
+/**
+ * The realm's boats a resident could row (`CONTEXT.md`: Rowing): the one they are aboard, or,
+ * aboard nothing, those beside them.
+ */
+function boatsOf(r: GroupResident, seen: GroupSeen, size: number) {
+  const boats = seen.vessels ?? []
+  if (r.aboard !== undefined) return boats.filter((v) => v.id === r.aboard)
+  return boats.filter((v) => besideVessel(v, r, size))
+}
+
+/**
+ * Who of them rows which boat (`CONTEXT.md`: Rowing): one rower a boat, the first of them aboard
+ * it, else the first beside it. By resident id, the boat's id.
+ */
+function rowersOf(going: readonly GroupResident[], seen: GroupSeen, size: number) {
+  const rowers = new Map<string, string>()
+  const taken = new Set<string>()
+  for (const aboard of [true, false]) {
+    for (const r of going) {
+      if ((r.aboard !== undefined) !== aboard) continue
+      const boat = boatsOf(r, seen, size).find((v) => !taken.has(v.id))
+      if (!boat) continue
+      taken.add(boat.id)
+      rowers.set(r.id, boat.id)
+    }
+  }
+  return rowers
 }
 
 /** The finished stable a resident stands in, if they stand in one. */
@@ -307,6 +353,10 @@ export function groupSkip(
       if (order.kind === 'drive' && r.riding !== undefined) return 'dismount first to drive'
       if (onTile(r, seen.carriages).length === 0) return 'no carriage here'
       break
+    case 'row':
+      if (r.riding !== undefined) return 'no horse goes aboard: dismount first'
+      if (boatsOf(r, seen, size).length === 0) return 'no boat here'
+      break
     case 'teach':
     case 'train':
       if (!groundOf(r, seen, size)) return 'not at a training ground'
@@ -329,6 +379,12 @@ export function groupSkip(
   if (order.kind === 'board') {
     const why = boarderProblem({ ...r, order: r.order ?? null }, order.carriage)
     return why === 'that carriage is not on the resident’s tile' ? 'not there' : why
+  }
+  if (order.kind === 'boardBoat') {
+    // Room is told by the seats left (`groupRequests`).
+    const driving = r.order?.kind === 'drive' || r.order?.kind === 'haul'
+    const boarder = { ...r, driving, ...(r.riding === undefined ? {} : { riding: r.riding }) }
+    return boardBoatProblem(boarder, { ...order.vessel, passengerIds: [] })
   }
   if (order.kind === 'getOff' && r.aboard === undefined) return 'not aboard'
   if (order.kind === 'work' && !isAt(r, order.workplace, size))
@@ -431,7 +487,8 @@ export function groupRequests(
     })
     return { requests: queued ? appended(requests, residents) : requests, skipped }
   }
-  let seats = order.kind === 'board' ? order.seats : 0
+  let seats = order.kind === 'board' || order.kind === 'boardBoat' ? order.seats : 0
+  const rowers = order.kind === 'row' ? rowersOf(going, seen, size) : new Map<string, string>()
   // Horses and carriages handed out so far: one each.
   const taken = new Set<string>()
   // Who of them teaches at each training ground so far, by its id.
@@ -451,6 +508,19 @@ export function groupRequests(
         }
         send(r, { kind: 'board', carriageId: order.carriage.id })
         break
+      case 'boardBoat':
+        if (!queued && seats-- <= 0) {
+          skip(r, 'the boat is full')
+          break
+        }
+        send(r, { kind: 'board', vesselId: order.vessel.id })
+        break
+      case 'row': {
+        const boat = rowers.get(r.id)
+        if (boat) send(r, { kind: 'row', vesselId: boat, x: order.x, y: order.y })
+        else skip(r, 'another of them rows the boat')
+        break
+      }
       case 'getOff':
         send(r, { kind: 'getOff' })
         break
@@ -675,6 +745,7 @@ export type GroupButton =
   | 'getOff'
   | 'unhitch'
   | 'drive'
+  | 'row'
   | 'haul'
   | 'explore'
   | 'work'
@@ -710,6 +781,7 @@ export const GROUP_BUTTONS: readonly { id: GroupButton; label: string; group: Or
   { id: 'getOff', label: 'Get off', group: 'move' },
   { id: 'unhitch', label: 'Unhitch horses', group: 'move' },
   { id: 'drive', label: 'Drive carriages to', group: 'move' },
+  { id: 'row', label: 'Row boats to', group: 'move' },
   { id: 'haul', label: 'Haul route…', group: 'move' },
   { id: 'relocate', label: 'Relocate…', group: 'move' },
   { id: 'explore', label: 'Explore', group: 'move' },
@@ -754,7 +826,7 @@ export const GROUP_COUNTERPARTS: Record<
   unhitch: ['unhitch'],
   hitch: { none: 'one resident hitches one horse' },
   drive: ['drive'],
-  row: { none: 'one resident rows one boat' },
+  row: ['row'],
   driveOff: { none: 'one resident steals one carriage' },
   hitchOff: { none: 'one resident steals one horse' },
   stealHorse: { none: 'one resident steals one horse' },
@@ -793,6 +865,7 @@ export const GROUP_KEYS: Record<GroupButton, string> = {
   getOff: ACTION_KEYS.board,
   unhitch: ACTION_KEYS.unhitch,
   drive: ACTION_KEYS.drive,
+  row: ACTION_KEYS.row,
   haul: ACTION_KEYS.haul,
   relocate: ACTION_KEYS.relocate,
   explore: ACTION_KEYS.explore,
@@ -831,6 +904,8 @@ export interface GroupHere {
   seen: GroupSeen
   /** How many carriages of the realm some of them stand on, to board (`CONTEXT.md`: Passenger). */
   carriages: number
+  /** How many boats of the realm some of them stand beside, to board (`CONTEXT.md`: Beside a vessel). */
+  boats?: number
   /** Why they can't be told to relocate at all, if they can't (`CONTEXT.md`: Relocate). */
   relocateProblem: string | undefined
 }
@@ -848,7 +923,8 @@ const GROUP_REASONS: Record<string, string> = {
   'not at a training ground': 'none of them is on a training ground',
   'not at a stable': 'none of them is in a stable',
   'carries nothing': 'none of them carries anything',
-  'not aboard': 'none of them is aboard a carriage',
+  'not aboard': 'none of them is aboard a carriage or boat',
+  'no boat here': 'none of them is aboard or beside a boat of your realm',
   'nobody to feed nearby': 'nobody to feed next to them',
   [NO_FOOD_TO_FEED]: 'none of them has Food in hand',
 }
@@ -877,6 +953,7 @@ export function groupRows(h: GroupHere): {
 } {
   const actions: CardAction<GroupButton>[] = []
   const missing: Partial<Record<GroupButton, string>> = {}
+  const boats = h.boats ?? 0
   const somewhere = { id: '', kind: 'farm' as const, x: 0, y: 0 }
   // An order like the one the button gives, its target aside: queued, the place is not checked.
   const like: Partial<Record<GroupButton, { order: GroupOrder; queued?: true }>> = {
@@ -885,6 +962,7 @@ export function groupRows(h: GroupHere): {
     getOff: { order: { kind: 'getOff' } },
     unhitch: { order: { kind: 'unhitch' } },
     drive: { order: { kind: 'drive', x: 0, y: 0 } },
+    row: { order: { kind: 'row', x: 0, y: 0 } },
     haul: {
       order: { kind: 'haul', x: 0, y: 0, goods: [], returnGoods: [], keepFood: 0 },
     },
@@ -922,12 +1000,13 @@ export function groupRows(h: GroupHere): {
     })
     if (id === 'stop' && !h.residents.some((r) => r.order || r.script))
       missing.stop = 'none of them has an order'
-    else if (id === 'board' && h.carriages === 0)
-      missing.board = 'nobody stands on a carriage of your realm'
+    else if (id === 'board' && h.carriages + boats === 0)
+      missing.board = 'nobody stands on a carriage or beside a boat of your realm'
     else if (whys.length > 0 && whys.every((w) => w !== undefined))
       missing[id] = groupReason(whys as string[])
-    else if (id === 'board' && h.carriages > 1)
-      actions.push({ ...row, label: 'Board carriage…', opens: true })
+    else if (id === 'board' && h.carriages + boats > 1)
+      actions.push({ ...row, label: boats > 0 ? 'Board…' : 'Board carriage…', opens: true })
+    else if (id === 'board' && boats === 1) actions.push({ ...row, label: 'Board boat' })
     else if (id === 'relocate' && h.relocateProblem)
       actions.push({ ...row, disabled: true, reason: h.relocateProblem })
     else actions.push(row)
