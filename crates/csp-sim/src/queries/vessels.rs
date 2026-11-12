@@ -4,10 +4,10 @@
 
 use std::collections::{HashSet, VecDeque};
 
-use csp_shared::balance::{BOAT_CAPACITY, MAP_SIZE, PASSENGER_WEIGHT};
+use csp_shared::balance::{BOAT_CAPACITY, MAP_SIZE, PASSENGER_WEIGHT, SHIP_CAPACITY};
 use csp_shared::protocol::LoadLevel;
 use csp_shared::terrain::{
-    is_passable_terrain, is_water, terrain_at, wrap, wrap_distance, TerrainMap,
+    is_passable_terrain, is_sea, is_water, terrain_at, wrap, wrap_distance, TerrainMap,
 };
 use csp_shared::world::{Building, BuildingKind, Good, Resident, Vessel, VesselKind, WorldState};
 
@@ -31,10 +31,11 @@ pub fn vessel_at(world: &WorldState, x: i32, y: i32) -> Option<&Vessel> {
     world.vessels.iter().find(|v| v.x as i32 == x && v.y as i32 == y)
 }
 
-/// Most weight a vessel carries, in kg (`CONTEXT.md`: Boat).
+/// Most weight a vessel carries, in kg (`CONTEXT.md`: Boat, Ship).
 pub fn vessel_capacity(v: &Vessel) -> f64 {
     match v.kind {
         VesselKind::Boat => BOAT_CAPACITY,
+        VesselKind::Ship => SHIP_CAPACITY,
     }
 }
 
@@ -124,8 +125,13 @@ pub fn vessel_of_resident(v: &Vessel, r: &Resident) -> bool {
 }
 
 /// Whether (x, y) is beside the vessel (`CONTEXT.md`: Beside a vessel): touching its water tile,
-/// straight or diagonally. The vessel's own tile is not beside it.
+/// straight or diagonally. The vessel's own tile is not beside it. Nothing is beside a ship yet:
+/// for a ship it means at the haven it is docked at (`CONTEXT.md`: Docked), which comes with
+/// T91.2, so until then nobody boards, loads or steals one.
 pub fn beside_vessel(v: &Vessel, x: f64, y: f64) -> bool {
+    if v.kind == VesselKind::Ship {
+        return false;
+    }
     let (vx, vy) = (v.x as i32, v.y as i32);
     let (x, y) = (x as i32, y as i32);
     (x, y) != (vx, vy) && in_contact(MAP_SIZE, (x, y), (vx, vy))
@@ -217,7 +223,10 @@ pub fn row_off_problem(
     v: &Vessel,
     realm_id: &str,
 ) -> Option<String> {
-    let problem = if !can_work(thief.born_at, world.tick as f64) {
+    let problem = if v.kind == VesselKind::Ship {
+        // `CONTEXT.md`: Sailing: a ship is stolen by sailing it off with a crew, never rowed.
+        "a ship is sailed, not rowed"
+    } else if !can_work(thief.born_at, world.tick as f64) {
         "children can’t steal"
     } else if thief.aboard.is_some() {
         "aboard another carriage or boat"
@@ -273,17 +282,33 @@ pub fn vessel_load_level(v: &Vessel) -> LoadLevel {
     load_level(&v.load, vessel_capacity(v))
 }
 
-/// The finished haven a boat site on (x, y) is laid out on (`CONTEXT.md`: Building a boat): one
-/// whose footprint covers the tile.
+/// The finished haven a boat or ship site on (x, y) is laid out on (`CONTEXT.md`: Building a
+/// boat, Building a ship): one whose footprint covers the tile.
 pub fn haven_for(world: &WorldState, x: i32, y: i32, size: i32) -> Option<&Building> {
     building_at(world, x, y, size).filter(|b| b.kind == BuildingKind::Haven && b.site.is_none())
 }
 
-/// Where a boat finished at a site on (x, y) floats (`CONTEXT.md`: Building a boat): the nearest
-/// free water tile next to the site, a straight one before a diagonal one. With every water tile
-/// next to it taken, the nearest free one further out over the water they join. `None` if there
-/// is none within `LAUNCH_SEARCH` water tiles, or the site touches no water.
-pub fn launch_tile(world: &WorldState, map: &TerrainMap, x: i32, y: i32) -> Option<(i32, i32)> {
+/// Whether a vessel of this kind may be on terrain `t` (`CONTEXT.md`: Vessel, Ship): a boat on
+/// any water, a ship on Sea only.
+pub fn floats_on(kind: VesselKind, t: u8) -> bool {
+    match kind {
+        VesselKind::Boat => is_water(t),
+        VesselKind::Ship => is_sea(t),
+    }
+}
+
+/// Where a vessel of `kind` finished at a site on (x, y) floats (`CONTEXT.md`: Building a boat,
+/// Building a ship): the nearest free tile it may be on (water for a boat, Sea for a ship) next to
+/// the site, a straight one before a diagonal one. With every such tile next to it taken, the
+/// nearest free one further out over the water they join. `None` if there is none within
+/// `LAUNCH_SEARCH` tiles, or the site touches none.
+pub fn launch_tile(
+    world: &WorldState,
+    map: &TerrainMap,
+    x: i32,
+    y: i32,
+    kind: VesselKind,
+) -> Option<(i32, i32)> {
     let size = map.size;
     let taken: HashSet<(i32, i32)> =
         world.vessels.iter().map(|v| (v.x as i32, v.y as i32)).collect();
@@ -291,7 +316,7 @@ pub fn launch_tile(world: &WorldState, map: &TerrainMap, x: i32, y: i32) -> Opti
     let mut queue: VecDeque<(i32, i32)> = VecDeque::new();
     let push = |t: (i32, i32), seen: &mut HashSet<(i32, i32)>, q: &mut VecDeque<_>| {
         let t = (wrap(t.0, size), wrap(t.1, size));
-        if seen.insert(t) && is_water(terrain_at(map, t.0, t.1)) {
+        if seen.insert(t) && floats_on(kind, terrain_at(map, t.0, t.1)) {
             q.push_back(t);
         }
     };

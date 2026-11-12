@@ -2848,6 +2848,8 @@ pub enum BuildingKind {
     Haven,
     /// A boat site (`CONTEXT.md`: Building a boat): finished, it is gone and a boat floats.
     Boat,
+    /// A ship site (`CONTEXT.md`: Building a ship): finished, it is gone and a ship floats on Sea.
+    Ship,
 }
 
 /// A building or construction site (`Building`).
@@ -2930,11 +2932,13 @@ pub struct Carriage {
     pub load: Stock,
 }
 
-/// The kinds of vessel (`CONTEXT.md`: Vessel). Ships come with Epic 91.
+/// The kinds of vessel (`CONTEXT.md`: Vessel): a rowed boat, on Lake and Sea, or a sailed ship, on
+/// Sea only (`CONTEXT.md`: Ship).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum VesselKind {
     Boat,
+    Ship,
 }
 
 /// A boat or ship (`CONTEXT.md`: Vessel): always on a water tile, one vessel per tile, with the

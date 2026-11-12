@@ -1631,7 +1631,7 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
     },
     ScriptView {
         name: "vessel",
-        description: "A boat on the water, as the Player sees it.",
+        description: "A boat or ship on the water, as the Player sees it.",
         fields: &[
             ScriptField {
                 name: "id",
@@ -1642,7 +1642,7 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
             ScriptField {
                 name: "kind",
                 r#type: ScriptType::String,
-                description: "What it is: \"boat\".",
+                description: "What it is: \"boat\" or \"ship\".",
                 null_when: None,
             },
             ScriptField {
@@ -2235,7 +2235,7 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Query,
         params: &[],
         cost: 20.0,
-        description: "The boats the Player sees on the water.",
+        description: "The boats and ships the Player sees on the water.",
         returns: ScriptType::List(&ScriptType::View("vessel")),
     },
     ScriptBinding {
@@ -3063,7 +3063,7 @@ pub static ARMY_SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Query,
         params: &[],
         cost: 20.0,
-        description: "The boats the Player sees on the water.",
+        description: "The boats and ships the Player sees on the water.",
         returns: ScriptType::List(&ScriptType::View("vessel")),
     },
     ScriptBinding {

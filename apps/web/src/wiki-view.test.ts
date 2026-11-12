@@ -30,6 +30,7 @@ import {
   buildCosts,
   carriageCost,
   boatCost,
+  shipCost,
   coinsPerMintWorkerDay,
   daysToWorkSkillMax,
   trainingDays,
@@ -105,6 +106,16 @@ describe('wiki figures', () => {
       materials: BUILD_MATERIALS.boat,
       buildTicks: BUILD_WORK.boat! / buildWork(AVERAGE, 0),
     })
+  })
+
+  it('lists a ship apart from the buildings, far more work than a boat', () => {
+    expect(buildCosts().map((b) => b.kind)).not.toContain('ship')
+    expect(shipCost()).toEqual({
+      materials: BUILD_MATERIALS.ship,
+      buildTicks: BUILD_WORK.ship! / buildWork(AVERAGE, 0),
+    })
+    expect(shipCost().buildTicks).toBeGreaterThan(boatCost().buildTicks)
+    expect(shipCost().materials.iron).toBeGreaterThan(0)
   })
 
   it('moves more goods by carriage on plains than on foot, and none into mountains', () => {

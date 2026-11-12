@@ -14,6 +14,7 @@ import {
   TICKS_PER_GAME_YEAR,
   PASSENGER_WEIGHT,
   BOAT_CAPACITY,
+  SHIP_CAPACITY,
   ticksForAge,
 } from '@csp/balance'
 import { FOOTPRINT, footprintTiles } from './shared/footprint.js'
@@ -794,6 +795,40 @@ describe('the card for a tile', () => {
     const theirs = tile({ vessels: [{ ...boat, realmId: 'r2' }] })
     expect(theirs.carriage?.load).toEqual({ text: 'Lightly loaded' })
     expect(theirs.carriage?.goods).toBeUndefined()
+  })
+
+  it('shows a ship on a card of its own, its load against what a ship holds', () => {
+    const ship = {
+      id: 'ship1',
+      kind: 'ship' as const,
+      realmId: 'me',
+      x: 5,
+      y: 5,
+      loadLevel: 'empty' as const,
+      load: {},
+      passengerIds: [],
+    }
+    const ours = tile({ vessels: [ship] })
+    expect(ours).toMatchObject({ title: 'Ship', rel: 'own', what: 'carriage' })
+    expect(ours.carriage).toMatchObject({ title: 'Ship (yours)' })
+    expect(ours.carriage?.load.text).toBe(`0 / ${SHIP_CAPACITY} kg`)
+    // Nobody boards it from the shore: that waits for docking at a haven.
+    const ana = { id: 'ana', name: 'ana', owner: 'me', x: 4, y: 5, order: null } as SeenResident
+    expect(tile({ vessels: [ship], residents: [ana] }).boat).toBeUndefined()
+  })
+
+  it('shows a ship site on its haven’s card under a head of its own', () => {
+    const haven = { id: 'h1', kind: 'haven', x: 3, y: 3, cityId: null } as Building
+    const site = {
+      id: 's1',
+      kind: 'ship',
+      x: 5,
+      y: 5,
+      site: { delivered: {}, work: 0 },
+    } as unknown as Building
+    const card = tile({ buildings: [haven, site] })
+    expect(card.sites?.map((s) => s.title)).toContain('Ship site')
+    expect(tile({ buildings: [site] }).title).toBe('Ship site')
   })
 
   it('names a boat’s passengers, counted against what it holds', () => {
