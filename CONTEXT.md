@@ -1567,11 +1567,51 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   copies on a clipboard in the browser, Paste inserts them after the picked step, in the same
   planner or another resident's or a group's. The clipboard survives switching cards, not
   reloading the page.
-- **Repeat block:** in the planner, some steps in a row wrapped with a count, nestable. It is a
-  planner thing only: when the queue is given, the block becomes that many plain copies of its
-  steps, so the queue, the server and scripts see only steps. A queue holds at most so many
-  steps (a balance number); the planner says when a plan would exceed it. A running queue shows
-  the copies, the current one marked. The whole-queue loop stays as it is.
+- **Queue draft:** steps added in the planner for a resident with no queue collect as a draft, kept
+  in the browser like a group's plan: nothing runs until the Player presses Start queue, which
+  gives it. An order queued with Shift still starts a queue at once. A running queue is edited
+  live as before; Edit as draft copies it into a draft, the queue runs on untouched, and Start
+  queue replaces it (the step they are on keeps going if it is still in it). Discard draft throws
+  the draft away. A draft is lost on reloading the page.
+- **Clear:** the planner's Clear empties a draft. On a running queue it removes everything but
+  the step the resident is on and turns loop off, so they finish that step and the queue ends;
+  Stop is still how to halt at once.
+- **Repeat block:** some steps in a row wrapped in a block, nestable, and part of the queue itself
+  (ADR 0032): the server runs it and a running queue shows it with its round ("2 of 3"). It
+  repeats a count of times, forever, or until a condition holds, checked before each round. A
+  round in which no step could start ends the block, so a block never spins. A queue holds at
+  most so many steps and blocks as written, and blocks nest only so deep (balance numbers); the
+  planner says when a plan would exceed either. The whole-queue loop stays the queue's own
+  switch, drawn as the outermost bracket.
+- **If block:** a block with a condition, an optional Else part, nestable like a repeat block.
+  When its turn comes the condition is checked once: true runs its steps, false its Else steps or
+  nothing. It is not checked again while they run.
+- **Wait until:** a step that ends once its condition holds; the resident stands idle meanwhile.
+  With a duration it also ends when that is up.
+- **Condition:** what a Wait until, an If block or a Repeat until asks. It is about the resident
+  themself or one place of their own realm, never anything a Player couldn't know: they (or the
+  carriage or vessel they drive) carry at least or less than so many of a good, or are full or
+  empty; a storage, workplace pile or site of the realm, picked on the map, holds at least or
+  less than so many of a good; their hunger or health is above or below a share; they are mounted
+  or aboard, or not; the game hour is before or after an hour. A condition on a place that is
+  gone or no longer the realm's counts as false and is noted in the realm log. In a group's plan
+  each member checks it for themself. Scripts see the step a resident is on and its number among
+  the steps counted top to bottom, as before; blocks, rounds and conditions they don't see.
+- **Planner blocks:** the planner draws the queue as stacked blocks: a step is one line with its
+  icon, the place by name (a building, waypoint or city; a bare tile as coordinates) and its
+  duration only when it has or needs one; loop, repeat and If are brackets around their steps.
+  Add step is a palette grouped as the Orders tab is (Move, Work & build, Goods, Scripts) plus
+  Flow (Repeat, If, Wait until), and a step can be added between two others.
+- **Tool rail:** the rail groups its drawers as People (Residents, Horses, Armies), Diplomacy
+  and Realm (Cities, Waypoints, Scripts, Realm log). Diplomacy is one drawer with a tab each for
+  Contracts, Demands, Direct offers, Alliance and Standing. A rail button and a tab show a mark
+  while their drawer holds something the Player hasn't seen: what a notice would announce, and
+  new lines of the realm log.
+- **Cities drawer:** lists the cities the Player knows as Your cities, Others in sight and Last
+  seen. A row shows the name, whose it is in that relation's colour, and for the Player's own
+  cities residents against housing and the key goods in its storages. Opening a row centres the
+  map on the city and outlines its area, as picking it on the map does, and shows it in sections:
+  Overview (residents, housing, buildings by kind without walls and roads), Stock, Trade, Gates.
 - **Action:** a request (move, pick up, attack, …) that the world resolves at the end of a tick.
   The world only checks whether it's physically possible.
 - **Tick:** one step of the world, one per second.
