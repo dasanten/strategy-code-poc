@@ -928,8 +928,14 @@ export function orderDoing(
       return o.stop === 'from' ? `Loading ${what} at ${x}, ${y}` : `Unloading ${what} at ${x}, ${y}`
     }
     const back = o.returnGoods.map((g) => GOOD_LABELS[g].toLowerCase()).join(', ')
+    // A ship's captain sails it (`CONTEXT.md`: Sailing); the server names its id after its kind.
+    const doing = o.vesselId.startsWith('ship') ? 'Sailing' : 'Rowing'
     const leg =
-      o.stop === 'to' ? `Rowing ${what} to` : back ? `Rowing ${back} back to` : 'Rowing back to'
+      o.stop === 'to'
+        ? `${doing} ${what} to`
+        : back
+          ? `${doing} ${back} back to`
+          : `${doing} back to`
     return o.path ? `${leg} ${x}, ${y} · ${left(o.path)}` : `${leg} ${x}, ${y}`
   }
   if (o?.kind === 'pickUp') return 'Picking up goods'
@@ -2237,6 +2243,7 @@ export function ResidentCard({
           adult={!child}
           onRoute={r.order?.kind === 'haul' || r.order?.kind === 'haulByWater'}
           byWater={!carriage}
+          ship={!carriage && !!boatToRow?.ship}
           picking={picking === 'haul'}
           onHaulTo={onHaulTo}
         />
@@ -2863,6 +2870,7 @@ function HaulBlock({
   adult,
   onRoute,
   byWater = false,
+  ship = false,
   picking,
   onHaulTo,
 }: {
@@ -2872,6 +2880,8 @@ function HaulBlock({
   onRoute: boolean
   /** With the boat beside them, rowed between shores or havens. */
   byWater?: boolean
+  /** With a ship docked at their haven, sailed between havens by its crew. */
+  ship?: boolean
   /** The map is waiting for the route's other stop. */
   picking: boolean
   onHaulTo: (setup: HaulSetup) => void
@@ -2909,7 +2919,11 @@ function HaulBlock({
         </div>
       ))}
       <label className="small">
-        {byWater ? 'Food kept for the rower' : 'Food kept for the horse'}{' '}
+        {ship
+          ? 'Food kept for the crew'
+          : byWater
+            ? 'Food kept for the rower'
+            : 'Food kept for the horse'}{' '}
         <input
           type="number"
           min={0}
@@ -2936,7 +2950,14 @@ function HaulBlock({
           give={() => onHaulTo({ goods, returnGoods, keepFood })}
         />
       </div>
-      {byWater ? (
+      {ship ? (
+        <p className="muted small">
+          The captain moves the picked goods straight from this haven onto the ship, sails it with
+          the crew to the other haven, gets off and unloads them there, brings the goods picked to
+          come back, again and again until stopped; the rest of the crew stays aboard. The crew take
+          meals from the ship’s Food, topped up at any haven with some.
+        </p>
+      ) : byWater ? (
         <p className="muted small">
           The rower loads the picked goods into the boat from this shore, rows them to the other
           stop (a shore tile or a haven, with free water beside it), gets off and unloads them,

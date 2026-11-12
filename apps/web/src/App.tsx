@@ -1402,6 +1402,22 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       const problem = short > 0 ? `the ship needs ${short} more crew to sail` : undefined
       return { id: crewed.id, ship: true, ...(problem ? { problem } : {}) }
     }
+    // On the haven a ship of theirs is docked at, they may take it on a haul route as its captain
+    // (`CONTEXT.md`: Haul route by water), with enough crew aboard once they board too.
+    const docked =
+      selected.aboard === undefined
+        ? world.vessels.find(
+            (v) =>
+              v.kind === 'ship' &&
+              vesselOfResident(v, selected) &&
+              besideVessel(v, selected, world.map.size, world.buildings),
+          )
+        : undefined
+    if (docked) {
+      const short = crewShort(docked) - 1
+      const problem = short > 0 ? `the ship needs ${short} more crew aboard to sail` : undefined
+      return { id: docked.id, ship: true, ...(problem ? { problem } : {}) }
+    }
     // A ship is sailed, never rowed (`CONTEXT.md`: Sailing).
     const mine = world.vessels.filter((v) => v.kind !== 'ship' && vesselOfResident(v, selected))
     const aboard = mine.find((v) => v.id === selected.aboard)

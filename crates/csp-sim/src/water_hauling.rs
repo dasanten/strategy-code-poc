@@ -5,24 +5,35 @@
 //! oars and row to the other stop (the steps are the walking's, as for the row order).
 //!
 //! The order is the `haul` order naming a vessel (`vesselId`, or a vessel's id as `carriageId`);
-//! the resident then holds a `haulByWater` order. A ship's route (T91.4) comes with sailing:
-//! until then `row_problem` refuses it.
+//! the resident then holds a `haulByWater` order.
+//!
+//! A ship's route runs between two havens (`CONTEXT.md`: Haul route by water, Docked): its captain
+//! gets off onto the haven at each stop and moves the goods straight between its storage and the
+//! ship, as those at a haven do; leaving, they board again as one of its crew and sail it to the
+//! other haven, docking there, while the rest of the crew stays aboard. It sails only with the
+//! fewest crew it takes, the captain among them.
 
-use csp_shared::balance::GOOD_WEIGHT;
+use csp_shared::balance::{GOOD_WEIGHT, SHIP_MIN_CREW};
 use csp_shared::terrain::{is_passable_terrain, terrain_at, wrap, TerrainMap};
 use csp_shared::world::{
-    Good, GoodsSpot, HaulPhase, HaulStop, OrderRequest, ResidentOrder, Tile, Vessel,
-    WaterHaulOrder, WorldState,
+    Good, GoodsSpot, HaulPhase, HaulStop, OrderRequest, Resident, ResidentOrder, Stock, Tile,
+    Vessel, VesselKind, WaterHaulOrder, WorldState,
 };
 use serde_json::Value;
 
 use crate::carrying::CarryAction;
 use crate::hauling::{read_goods, stop_action, OnBoard, RouteGoods, CARRYING_A_CHILD};
+use crate::loading::move_straight;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::{int_field, str_field};
+use crate::queries::carriages::driven_carriage_id;
+use crate::queries::goods::free_stock;
 use crate::queries::goods::haul_stop_spot;
+use crate::queries::names::held;
+use crate::queries::residents::can_work;
 use crate::queries::vessels::{
-    beside_vessel, row_target, shore_problem, units_that_fit_vessel, vessel_by_id, vessel_capacity,
+    beside_vessel, docked_at, haven_for, row_target, sail_target, shore_problem,
+    units_that_fit_vessel, vessel_by_id, vessel_capacity, vessel_crew, vessel_of_resident,
 };
 use crate::queries::warehouse_trade::is_integer;
 use crate::rowing::row_problem;
@@ -48,6 +59,13 @@ pub fn water_stop_problem(
 ) -> Option<&'static str> {
     if !is_passable_terrain(terrain_at(map, x, y)) {
         return Some("a stop must be a shore tile or a haven");
+    }
+    // A ship's stops are havens it docks at (`CONTEXT.md`: Haul route by water).
+    if v.kind == VesselKind::Ship {
+        if haven_for(world, x, y, map.size).is_none() {
+            return Some("a ship's stops are havens");
+        }
+        return sail_target(world, map, v, x, y).err();
     }
     let Some((wx, wy)) = row_target(world, map, v, x, y) else {
         return Some("no free water beside that tile");
@@ -79,7 +97,7 @@ pub fn validate_water_haul(
     if r.aboard.is_some() {
         return Some("the route starts on the shore beside the boat: get off first".into());
     }
-    if let Some(p) = row_problem(world, r, v) {
+    if let Some(p) = route_problem(world, r, v) {
         return Some(p);
     }
     let o = &order.fields;
@@ -109,6 +127,42 @@ pub fn validate_water_haul(
         return Some("the Food kept for the rower must be whole units that fit on the boat".into());
     }
     None
+}
+
+/// Why a resident can't take a vessel on a haul route now: a boat as they would row it
+/// (`row_problem`); a ship as its captain, grown, of its realm, on the haven it is docked at, on no
+/// horse and driving nothing, with enough of its crew aboard to sail once they board too
+/// (`CONTEXT.md`: Haul route by water, Crew).
+fn route_problem(world: &WorldState, r: &Resident, v: &Vessel) -> Option<String> {
+    if v.kind == VesselKind::Boat {
+        return row_problem(world, r, v);
+    }
+    let problem = if !can_work(r.born_at, world.tick as f64) {
+        "children can’t sail".to_string()
+    } else if !vessel_of_resident(v, r) {
+        "not a ship of your realm".into()
+    } else if docked_at(world, v).is_none() {
+        "the ship is not docked at a haven".into()
+    } else if r.aboard.as_deref() != Some(v.id.as_str()) && !beside_vessel(world, v, r.x, r.y) {
+        "the route starts on the haven the ship is docked at".into()
+    } else if driven_carriage_id(r).is_some() {
+        "the driver can’t sail".into()
+    } else if r.riding.is_some() {
+        "no horse goes aboard: dismount first".into()
+    } else {
+        let short = (SHIP_MIN_CREW as usize).saturating_sub(captain_and_crew(world, v, r));
+        if short == 0 {
+            return None;
+        }
+        format!("the ship needs {short} more crew aboard to sail")
+    };
+    Some(problem)
+}
+
+/// How many crew a ship sails with once its captain `r` is one of them.
+fn captain_and_crew(world: &WorldState, v: &Vessel, r: &Resident) -> usize {
+    let crew = vessel_crew(world, v);
+    crew.len() + usize::from(!crew.iter().any(|c| c.id == r.id))
 }
 
 /// Gives a haul order with a vessel: the rower starts loading at the tile they stand on.
@@ -197,10 +251,13 @@ pub fn request_water_hauling(world: &mut WorldState, map: &TerrainMap) -> Vec<Ca
                 end_order(world, ri, Some("no getting off onto the stop".into()));
                 continue;
             }
+            let rid = world.residents[ri].id.clone();
             let v = &mut world.vessels[vi];
-            if v.rower_id.as_deref() == Some(world.residents[ri].id.as_str()) {
+            if v.rower_id.as_deref() == Some(rid.as_str()) {
                 v.rower_id = None;
             }
+            // A ship's captain leaves its crew while ashore (`CONTEXT.md`: Crew).
+            v.crew_ids.retain(|c| *c != rid);
             let r = &mut world.residents[ri];
             r.aboard = None;
             (r.x, r.y) = (f64::from(wrap(sx, map.size)), f64::from(wrap(sy, map.size)));
@@ -210,45 +267,61 @@ pub fn request_water_hauling(world: &mut WorldState, map: &TerrainMap) -> Vec<Ca
             end_order(world, ri, Some("not at the stop".into()));
             continue;
         }
-        let spot = haul_stop_spot(world, stop.x, stop.y);
-        let route = RouteGoods {
-            goods: &o.goods,
-            return_goods: &o.return_goods,
-            keep_food: o.keep_food,
-            stop: o.stop,
-        };
-        let fits = |g: Good| units_that_fit_vessel(world, v, g);
-        let board = OnBoard {
-            spot: GoodsSpot::Vessel { vessel_id: v.id.clone() },
-            load: &v.load,
-            fits: &fits,
-        };
-        let action = stop_action(world, ri, o.moving.as_ref(), &route, &board, &spot);
-        let loaded = route.loaded(board.load);
-        if let Some((action, moving)) = action {
-            route_mut(world, ri).moving = moving;
-            actions.push(action);
-            continue;
-        }
-        route_mut(world, ri).moving = None;
-        // It leaves the first stop once it has goods on board and nothing more to load there.
-        if o.stop == HaulStop::From && !loaded {
-            continue;
+        if v.kind == VesselKind::Ship {
+            if !load_ship_at_stop(world, ri, vi, &o, map) {
+                continue;
+            }
+        } else {
+            let spot = haul_stop_spot(world, stop.x, stop.y);
+            let route = RouteGoods {
+                goods: &o.goods,
+                return_goods: &o.return_goods,
+                keep_food: o.keep_food,
+                stop: o.stop,
+            };
+            let fits = |g: Good| units_that_fit_vessel(world, v, g);
+            let board = OnBoard {
+                spot: GoodsSpot::Vessel { vessel_id: v.id.clone() },
+                load: &v.load,
+                fits: &fits,
+            };
+            let action = stop_action(world, ri, o.moving.as_ref(), &route, &board, &spot);
+            let loaded = route.loaded(board.load);
+            if let Some((action, moving)) = action {
+                route_mut(world, ri).moving = moving;
+                actions.push(action);
+                continue;
+            }
+            route_mut(world, ri).moving = None;
+            // It leaves the first stop once it has goods on board and nothing more to load there.
+            if o.stop == HaulStop::From && !loaded {
+                continue;
+            }
         }
         let next = if o.stop == HaulStop::From { HaulStop::To } else { HaulStop::From };
         let other = stop_tile(&o, next);
         let (r, v) = (&world.residents[ri], &world.vessels[vi]);
         // Every water tile beside the other stop taken by another vessel: it waits for one.
-        let Some((wx, wy)) = row_target(world, map, v, other.x as i32, other.y as i32) else {
+        let target = match v.kind {
+            VesselKind::Boat => row_target(world, map, v, other.x as i32, other.y as i32),
+            VesselKind::Ship => sail_target(world, map, v, other.x as i32, other.y as i32).ok(),
+        };
+        let Some((wx, wy)) = target else {
             continue;
         };
-        if let Some(p) = row_problem(world, r, v) {
+        if let Some(p) = route_problem(world, r, v) {
             end_order(world, ri, Some(p));
             continue;
         }
+        let rid = world.residents[ri].id.clone();
         let v = &mut world.vessels[vi];
         let (vid, vx, vy) = (v.id.clone(), v.x, v.y);
-        v.rower_id = Some(world.residents[ri].id.clone());
+        // A boat's rower takes the oars; a ship's captain boards as one of its crew.
+        match v.kind {
+            VesselKind::Boat => v.rower_id = Some(rid),
+            VesselKind::Ship if !v.crew_ids.contains(&rid) => v.crew_ids.push(rid),
+            VesselKind::Ship => {}
+        }
         let r = &mut world.residents[ri];
         r.aboard = Some(vid);
         (r.x, r.y) = (vx, vy);
@@ -262,5 +335,65 @@ pub fn request_water_hauling(world: &mut WorldState, map: &TerrainMap) -> Vec<Ca
     actions
 }
 
+/// A ship's captain at a stop moves the route's goods straight between the haven's storage and
+/// the ship (`CONTEXT.md`: Docked): first the goods for this stop off, then the Food kept on board
+/// topped up, then the goods for the other stop on, as much as there is and fits. Whether the ship
+/// leaves now: at the first stop only once it has goods for the other on board; with none there
+/// yet it waits.
+fn load_ship_at_stop(
+    world: &mut WorldState,
+    ri: usize,
+    vi: usize,
+    o: &WaterHaulOrder,
+    map: &TerrainMap,
+) -> bool {
+    let Some(haven) = docked_at(world, &world.vessels[vi]).map(|h| h.id.clone()) else {
+        return false;
+    };
+    let ship = GoodsSpot::Vessel { vessel_id: world.vessels[vi].id.clone() };
+    let storage = GoodsSpot::Storage { storage_id: haven.clone() };
+    let route = RouteGoods {
+        goods: &o.goods,
+        return_goods: &o.return_goods,
+        keep_food: o.keep_food,
+        stop: o.stop,
+    };
+    let (unloading, loading) = match o.stop {
+        HaulStop::To => (&o.goods, &o.return_goods),
+        HaulStop::From => (&o.return_goods, &o.goods),
+    };
+    let size = map.size;
+    let kept = |g: Good| if g == Good::Food { o.keep_food } else { 0.0 };
+    for &good in unloading {
+        let units = held(&world.vessels[vi].load, good) - kept(good);
+        if units > 0.0 {
+            let goods = Stock::from([(good, units)]);
+            move_straight(world, ri, &ship, &storage, goods, size, Some(map));
+        }
+    }
+    let there = |world: &WorldState| {
+        let b = world.buildings.iter().find(|b| b.id == haven);
+        free_stock(world, &haven, b.and_then(|b| b.stock.as_ref()))
+    };
+    let food = (o.keep_food - held(&world.vessels[vi].load, Good::Food))
+        .min(held(&there(world), Good::Food));
+    if food > 0.0 {
+        let goods = Stock::from([(Good::Food, food)]);
+        move_straight(world, ri, &storage, &ship, goods, size, Some(map));
+    }
+    for &good in loading {
+        let units = held(&there(world), good);
+        if units > 0.0 {
+            let goods = Stock::from([(good, units)]);
+            move_straight(world, ri, &storage, &ship, goods, size, Some(map));
+        }
+    }
+    route_mut(world, ri).moving = None;
+    o.stop != HaulStop::From || route.loaded(&world.vessels[vi].load)
+}
+
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod ship_tests;

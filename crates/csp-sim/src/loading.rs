@@ -111,7 +111,7 @@ impl OrderKind for Load {
 
 /// Moves up to `goods` from the spot `from` to the spot `to`, both at the resident's place, a
 /// handful at a time through their hands; what `to` won't take goes back to `from`.
-fn move_straight(
+pub(crate) fn move_straight(
     world: &mut WorldState,
     ri: usize,
     from: &GoodsSpot,

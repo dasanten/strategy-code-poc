@@ -2068,8 +2068,22 @@ export function Wiki() {
           stop. The boat leaves the first stop once it has goods on board and nothing more to load
           there; with none there yet it waits. The route ends when the boat isn't beside the stop
           any more (rowed off by someone else) or the rower can't get off onto it, and goes on until
-          stopped otherwise. The rower's Doing line says what they load or where they row. A ship's
-          haul route comes with sailing.
+          stopped otherwise. The rower's Doing line says what they load or where they row.
+        </p>
+        <p>
+          <b>Haul route by ship.</b> A ship runs a haul route between two havens. A grown resident
+          standing on the haven a ship of your realm is docked at picks <strong>Haul route…</strong>{' '}
+          on their card (or <b>Haul route by boat or ship</b> with Add step, or a script's{' '}
+          <code>haul(ship, x, y, goods)</code>), then a tile of the other haven; they are its
+          captain. With them aboard it must have at least {num(SHIP_MIN_CREW)} crew, so the others
+          board as crew first. At each haven the captain gets off and moves the goods straight
+          between the haven's storage and the ship, as many as there are and fit, at once: first the
+          goods for that haven off, then the Food kept on board for the crew topped up, then the
+          goods for the other haven on. Then they board again as one of the crew and sail to the
+          other haven, docking on the free Sea beside it; the rest of the crew stays aboard all the
+          while and eats from the ship's Food. Goods go both ways as for a carriage, ore home and
+          Food out, say. The ship leaves the first haven once it has goods for the other aboard;
+          with none there yet it waits. Sailing on each time teaches Seafaring to the whole crew.
         </p>
         <p>
           <b>Stealing a boat.</b> A grown resident beside another realm's boat can row it off as a

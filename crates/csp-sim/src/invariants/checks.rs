@@ -1167,14 +1167,17 @@ pub fn vessel_passengers(world: &WorldState, terrain: &TerrainMap) -> Out {
             fail(&[&r.id, &v.id], format!("resident {} rides aboard vessel {}", r.id, v.id));
         }
     }
-    // Whoever rows a boat is at its oars, aboard it and grown (`CONTEXT.md`: Rowing).
+    // Whoever rows a boat is at its oars, aboard it and grown (`CONTEXT.md`: Rowing); a ship's
+    // captain on a haul route is one of its crew aboard it (Haul route by water).
     let tick = world.tick as f64;
     for r in &world.residents {
         let Some(vessel_id) = rowing_now(r) else { continue };
         let at_oars = world.vessels.iter().any(|v| {
-            v.id == vessel_id
-                && v.rower_id.as_deref() == Some(r.id.as_str())
-                && r.aboard.as_deref() == Some(v.id.as_str())
+            let helm = match v.kind {
+                VesselKind::Boat => v.rower_id.as_deref() == Some(r.id.as_str()),
+                VesselKind::Ship => v.crew_ids.contains(&r.id),
+            };
+            v.id == vessel_id && helm && r.aboard.as_deref() == Some(v.id.as_str())
         });
         if !at_oars {
             let m =
@@ -2405,7 +2408,11 @@ pub fn paths_are_steps(world: &WorldState, terrain: &TerrainMap) -> Out {
     for r in &world.residents {
         let Some(o) = &r.order else { continue };
         let rowing = rowing_now(r).is_some();
-        let sailing = matches!(o, ResidentOrder::Sail(_));
+        // A ship's, sailed or on a haul route, a step over Sea (`CONTEXT.md`: Sailing).
+        let on_ship = rowing_now(r).is_some_and(|id| {
+            world.vessels.iter().any(|v| v.id == id && v.kind == VesselKind::Ship)
+        });
+        let sailing = matches!(o, ResidentOrder::Sail(_)) || on_ship;
         let enterable = |t: usize| {
             if sailing {
                 is_sea(terrain.tiles[t])
