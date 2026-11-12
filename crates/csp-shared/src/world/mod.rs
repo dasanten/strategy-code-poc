@@ -684,6 +684,29 @@ pub struct HaulOrder {
     pub moving: Option<HaulMoving>,
 }
 
+/// A haul route by water (`CONTEXT.md`: Haul route by water): the rower rows a vessel between
+/// two stops on land, havens or shore tiles, again and again. At a stop they stand on it, beside
+/// the vessel, and load by hand like a carriage's driver; leaving, they board, take the oars and
+/// row to the free water tile beside the other stop (`water`). Its phase `driving` is the rowing.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct WaterHaulOrder {
+    pub vessel_id: String,
+    pub from: Tile,
+    pub to: Tile,
+    pub goods: Vec<Good>,
+    pub return_goods: Vec<Good>,
+    /// Food kept on board for the rower.
+    pub keep_food: f64,
+    pub stop: HaulStop,
+    pub phase: HaulPhase,
+    /// The water tile beside the stop it is rowed to, set as it leaves a stop.
+    pub water: Option<Tile>,
+    pub path: Option<TilePath>,
+    pub progress: f64,
+    pub moving: Option<HaulMoving>,
+}
+
 /// Attacking a resident, wall or gate (`CONTEXT.md`: Combat).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -898,6 +921,7 @@ pub enum ResidentOrder {
     Relocate(RelocateOrder),
     Feed(FeedOrder),
     Row(RowOrder),
+    HaulByWater(WaterHaulOrder),
 }
 
 /// Everything in the world that changes, saved as snapshots (ADR 0006).

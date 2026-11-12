@@ -297,6 +297,15 @@ describe('Add step', () => {
       order: { kind: 'store', goods: [...GOODS], to: 'v1' },
     })
     expect(plan('pickUp', [10, 10]).error).toBe('a boat: Store or Fetch to load it')
+    // A haul route by boat: the boat, the first stop (walked to first), then the other one, as
+    // the Haul task with the boat as its carriage (`CONTEXT.md`: Haul route by water).
+    const route = plan('haulBoat', [10, 10], [9, 10], [15, 10])
+    expect(planAsk(route)).toBe('haul')
+    const setup = { goods: ['wood' as const], returnGoods: [], keepFood: 2 }
+    expect(planOrder(route, { ask: 'haul', setup })).toEqual({
+      order: { kind: 'task', task: 'haul', carriageId: 'v1', x: 15, y: 10, ...setup },
+      at: { x: 9, y: 10 },
+    })
   })
 
   it('feeds someone Down picked on the map, after a walk to their tile (`CONTEXT.md`: Reviving)', () => {

@@ -63,6 +63,7 @@ export type PlanStepId =
   | 'teach'
   | 'train'
   | 'haul'
+  | 'haulBoat'
   | 'drive'
   | 'road'
   | 'wall'
@@ -224,6 +225,17 @@ export const PLAN_STEPS: readonly PlanKind[] = [
     ask: 'haul',
   },
   {
+    // `CONTEXT.md`: Haul route by water: it starts on the shore beside the boat.
+    id: 'haulBoat',
+    label: 'Haul route by boat',
+    picks: [
+      { pick: 'vessel', prompt: 'the boat to haul with' },
+      { pick: 'shore', prompt: 'the first stop: the shore or haven beside where the boat will be' },
+      { pick: 'tile', prompt: 'the other stop: a shore tile or haven with water beside it' },
+    ],
+    ask: 'haul',
+  },
+  {
     id: 'relocate',
     label: 'Relocate',
     picks: [{ pick: 'city', prompt: 'the city of yours to relocate to' }],
@@ -243,6 +255,7 @@ export const PLAN_TASKS: Partial<Readonly<Record<PlanStepId, Task>>> = {
   breed: 'breed',
   train: 'train',
   haul: 'haul',
+  haulBoat: 'haul',
   explore: 'explore',
 }
 
@@ -541,6 +554,13 @@ export function planOrder(
       const setup = a?.ask === 'haul' ? a.setup : {}
       const order = { kind: 'task', task: 'haul', carriageId: p.id, x: q.x, y: q.y, ...setup }
       return { order, at }
+    }
+    case 'haulBoat': {
+      // A walk to the first stop goes first; the boat is given as the Haul task's carriage.
+      const setup = a?.ask === 'haul' ? a.setup : {}
+      const to = plan.picked[2] as Picked
+      const order = { kind: 'task', task: 'haul', carriageId: p.id, x: to.x, y: to.y, ...setup }
+      return { order, at: { x: q.x, y: q.y } }
     }
     case 'relocate':
       return { order: { kind: 'relocate', cityId: p.id } }

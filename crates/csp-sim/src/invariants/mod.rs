@@ -198,6 +198,7 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant { name: "vessel-passengers", check: checks::vessel_passengers },
         Invariant { name: "drivers-on-carriages", check: checks::drivers_on_carriages },
         Invariant { name: "haul-routes-sound", check: checks::haul_routes_sound },
+        Invariant { name: "water-haul-routes-sound", check: checks::water_haul_routes_sound },
         Invariant { name: "alliances-sound", check: checks::alliances_sound },
         Invariant { name: "territory-sound", check: checks::territory_sound },
         Invariant { name: "dead-leave-loot", check: checks::dead_leave_loot },

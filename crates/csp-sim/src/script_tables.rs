@@ -490,7 +490,7 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
             ScriptField {
                 name: "kind",
                 r#type: ScriptType::String,
-                description: "The order: \"walkTo\", \"drive\", \"haul\", \"pickUp\", \"drop\", \"store\", \"fetch\", \"build\", \"tearDown\", \"workAt\", \"teach\", \"train\", \"breed\", \"attack\", \"climb\", \"roadLine\", \"wallLine\", \"pay\", \"buyCity\", \"trade\", \"swap\", \"buyHorse\", \"sellHorse\", \"handIn\", \"buyOff\", \"payDebt\", \"acceptOffer\" or \"relocate\" (on their way to `cityId`, to live there).",
+                description: "The order: \"walkTo\", \"drive\", \"haul\", \"pickUp\", \"drop\", \"store\", \"fetch\", \"build\", \"tearDown\", \"workAt\", \"teach\", \"train\", \"breed\", \"attack\", \"climb\", \"roadLine\", \"wallLine\", \"pay\", \"buyCity\", \"trade\", \"swap\", \"buyHorse\", \"sellHorse\", \"handIn\", \"buyOff\", \"payDebt\", \"acceptOffer\", \"relocate\" (on their way to `cityId`, to live there), \"row\" or \"haulByWater\" (a haul route rowing a boat).",
                 null_when: None,
             },
             ScriptField {
@@ -554,6 +554,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 null_when: Some("for other orders, and when none"),
             },
             ScriptField {
+                name: "vesselId",
+                r#type: ScriptType::String,
+                description: "The boat rowed, or rowed on a haul route by water.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
                 name: "stableId",
                 r#type: ScriptType::String,
                 description: "The stable horses are bred at.",
@@ -610,7 +616,7 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
             ScriptField {
                 name: "stop",
                 r#type: ScriptType::String,
-                description: "The haul stop a carriage is at or bound for: \"from\" or \"to\".",
+                description: "The haul stop a carriage or boat is at or bound for: \"from\" or \"to\".",
                 null_when: Some("for other orders"),
             },
             ScriptField {
@@ -2563,7 +2569,7 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Action,
         params: &["carriageId", "x", "y", "goods", "returnGoods?", "keepFood?"],
         cost: 10.0,
-        description: "Drive a haul route between my tile and (x, y): `goods` there, `returnGoods` back.",
+        description: "Drive a haul route between my tile and (x, y): `goods` there, `returnGoods` back. Given a boat beside me (its id as `carriageId`), row it instead between my tile and the shore or haven (x, y), loading by hand at each.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -4115,7 +4121,8 @@ fn goodsText(load, goods) {
 // memory.goods there, memory.returnGoods back, memory.keepFood Food kept on
 // board for the horse and me. The route comes only from the Haul order; started
 // without one I end. The built-in haul order loads, drives and unloads, again
-// and again; this starts it at memory.from.
+// and again; this starts it at memory.from. Given a boat (memory.carriageId),
+// I row it instead, from the shore beside it (a haul route by water).
 param carriage: storage // the carriage to drive; none: the one I stand on
 
 if (memory.to == null) {
@@ -4123,7 +4130,7 @@ if (memory.to == null) {
   return
 }
 if (!pickCarriage()) { return }
-if (me.order == null || me.order.kind != "haul") {
+if (me.order == null || (me.order.kind != "haul" && me.order.kind != "haulByWater")) {
   startRoute()
   return
 }
@@ -4158,7 +4165,7 @@ fn startRoute() {
 }
 
 // Each leg of the route as it starts, for my log: loading at a stop, or
-// driving to one.
+// driving (rowing) to one.
 fn logLeg() {
   let leg = me.order.phase + " " + me.order.stop
   if (memory.leg == leg) { return }
@@ -4166,6 +4173,7 @@ fn logLeg() {
   let stop = memory.to
   if (me.order.stop == "from") { stop = memory.from }
   if (me.order.phase == "loading") { log("loading at " + stop.x + "," + stop.y) }
+  else if (me.order.kind == "haulByWater") { log("rowing to " + stop.x + "," + stop.y) }
   else { log("driving to " + stop.x + "," + stop.y) }
 }
 "#,

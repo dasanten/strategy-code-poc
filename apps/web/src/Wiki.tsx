@@ -2003,6 +2003,24 @@ export function Wiki() {
           is across.
         </p>
         <p>
+          <b>Haul route by boat.</b> A boat runs a haul route as a carriage does, between two stops
+          on land: shore tiles or a haven, each with free water beside it. A grown resident standing
+          on the shore beside a boat of your realm picks <strong>Haul route…</strong> on their card,
+          the goods to take and to bring back and the Food kept on board for them (
+          {num(HAUL_KEEP_FOOD)} unless you pick another amount), then the other stop on the map; the
+          tile they stand on is the first stop. With Add step it is <b>Haul route by boat</b>: the
+          boat, the first stop (a walk there goes first), then the other one. A script gives it with{' '}
+          <code>haul(boat, x, y, goods)</code> from the shore beside the boat. At each stop the
+          rower gets off onto it and loads and unloads by hand from beside the boat, like a
+          carriage's driver: at a haven from and into its storage, at a shore from and onto the pile
+          on the tile. Then they board, take the oars and row to the free water beside the other
+          stop. The boat leaves the first stop once it has goods on board and nothing more to load
+          there; with none there yet it waits. The route ends when the boat isn't beside the stop
+          any more (rowed off by someone else) or the rower can't get off onto it, and goes on until
+          stopped otherwise. The rower's Doing line says what they load or where they row. A ship's
+          haul route comes with sailing.
+        </p>
+        <p>
           <b>Stealing a boat.</b> A grown resident beside another realm's boat can row it off as a
           carriage is driven off: <strong>Row off (theft)</strong> on their card, then a tile, or a
           script's <code>row(boat, x, y)</code> naming that boat. The boat joins your realm at once
