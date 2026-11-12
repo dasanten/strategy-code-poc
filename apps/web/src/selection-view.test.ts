@@ -308,6 +308,18 @@ describe('the actions on a resident’s card', () => {
       active: true,
     })
     expect(residentOrders(here()).missing.driveOff).toBe('no carriage of another realm here')
+    // A rival's boat beside them likewise, on a row of its own (`CONTEXT.md`: its vessel part).
+    const rowOff = (h: ResidentHere) => residentActions(h).find((a) => a.id === 'rowOff')
+    expect(rowOff(here({ rowOff: { problem: undefined } }))).toEqual({
+      id: 'rowOff',
+      label: 'Row off (theft)',
+      key: 'D',
+    })
+    expect(rowOff(here({ rowOff: { problem: 'someone is aboard that boat' } }))).toMatchObject({
+      disabled: true,
+      reason: 'someone is aboard that boat',
+    })
+    expect(residentOrders(here()).missing.rowOff).toBe('no boat of another realm beside them')
     const mount = (h: ResidentHere) => residentActions(h).find((a) => a.id === 'stealHorse')
     expect(mount(here({ stealHorse: { problem: undefined } }))).toEqual({
       id: 'stealHorse',

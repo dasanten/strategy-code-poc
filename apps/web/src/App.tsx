@@ -58,7 +58,13 @@ import { isWallOrGate } from './shared/walls.js'
 import { isAt, covers } from './shared/footprint.js'
 import { targetParam } from './shared/default-scripts.js'
 import { HORSE_GRANT_HORSES, PASSENGER_WEIGHT } from '@csp/balance'
-import { besideVessel, isVesselId, vesselOfResident, vesselRoom } from './shared/vessels.js'
+import {
+  besideVessel,
+  isVesselId,
+  rowOffProblem,
+  vesselOfResident,
+  vesselRoom,
+} from './shared/vessels.js'
 import { AdminPage } from './AdminPanel.js'
 import { AlliancePanel } from './Alliance.js'
 import { commandsSeen } from './alliance-army.js'
@@ -821,9 +827,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     // Driving and hauling keep to the realm's; only Drive off takes another's (`CONTEXT.md`:
     // Stealing a carriage or horse), whatever else stands on the tile.
     const carriage = ownCarriageHere
-    if (mode === 'row' && boatToRow) {
-      // To the water tile, or the free water beside a land tile (`CONTEXT.md`: Rowing).
-      const order = { kind: 'row', residentId: selected.id, vesselId: boatToRow.id, x, y }
+    const rowed = mode === 'row' ? boatToRow : mode === 'rowOff' ? boatToSteal : undefined
+    if (rowed) {
+      // To the water tile, or the free water beside a land tile (`CONTEXT.md`: Rowing); another
+      // organization's boat is stolen by it (Stealing a carriage or horse).
+      const order = { kind: 'row', residentId: selected.id, vesselId: rowed.id, x, y }
       setOrderError(await giveOrder(order))
       return
     }
@@ -1388,6 +1396,18 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     return full ? { id: beside.id, problem: 'the boat is full' } : { id: beside.id }
   })()
   const stealableHere = onTile(world?.carriages.filter(isStrangers))
+  // Another organization's boat, or nobody's, beside the picked resident of the realm's, to row
+  // off (`CONTEXT.md`: Stealing a carriage or horse, its vessel part).
+  const boatToSteal = ((): { id: string; problem: string | undefined } | undefined => {
+    if (!selected || !world || selected.owner !== world.home.realmId) return undefined
+    if (selected.aboard !== undefined) return undefined
+    const size = world.map.size
+    const v = world.vessels.find(
+      (v) => v.realmId !== world.home.realmId && besideVessel(v, selected, size),
+    )
+    if (!v) return undefined
+    return { id: v.id, problem: rowOffProblem(world, selected, v, world.home.realmId, size) }
+  })()
   // Another organization's horses for the picked resident (`CONTEXT.md`: Stealing a carriage or
   // horse): a free one to mount, and one to pull the realm's own carriage that has none of its own.
   const unhorsedHere = onTile(
@@ -2180,6 +2200,10 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onBoard={boardCarriage}
             {...(boatToRow ? { boatToRow } : {})}
             onRowTo={() => setPicking((p) => (p === 'row' ? false : 'row'))}
+            {...(boatToSteal && {
+              rowOff: { problem: boatToSteal.problem },
+              onRowOff: () => setPicking((p) => (p === 'rowOff' ? false : 'rowOff')),
+            })}
             carriageToUnhitch={onTile(
               world.carriages.filter((k) => carriageOfResident(k, selected) && k.horseId),
             )}

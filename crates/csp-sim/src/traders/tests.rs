@@ -1080,7 +1080,13 @@ fn stolen_it_gets_a_new_carriage_and_horse_at_the_hq_bound_for_the_same_post() {
     let crew: Vec<String> =
         crew_of(&world, 0).iter().map(|&ri| world.residents[ri].id.clone()).collect();
     let ki = carriage_of(&world, 0);
-    take_over(&mut world, "p1", &realm, Taken { carriage: Some(ki), horse: None }, terrain.size);
+    take_over(
+        &mut world,
+        "p1",
+        &realm,
+        Taken { carriage: Some(ki), horse: None, vessel: None },
+        terrain.size,
+    );
     let k = world.carriages.iter().find(|k| k.id == stolen).unwrap();
     assert_eq!(k.realm_id.as_deref(), Some(realm.as_str()));
     assert_eq!(k.city_id, None);

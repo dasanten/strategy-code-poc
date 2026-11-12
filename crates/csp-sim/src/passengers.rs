@@ -6,6 +6,7 @@
 use csp_shared::terrain::{is_passable_terrain, terrain_at, TerrainMap};
 use csp_shared::world::{OrderRequest, Resident, WorldState};
 
+use crate::combat::{attack_target, Target};
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::{int_field, str_field, OrderKind};
 use crate::queries::building::building_at;
@@ -13,8 +14,8 @@ use crate::queries::carriages::driven_carriage_id;
 use crate::queries::combat::in_contact;
 use crate::queries::driving::{board_problem, carriage_of_resident};
 use crate::queries::vessels::{
-    board_vessel_problem, landing_tile, shore_problem, vessel_aboard, vessel_by_id,
-    vessel_of_resident,
+    between_vessels, board_vessel_problem, landing_tile, shore_problem, vessel_aboard,
+    vessel_by_id, vessel_of_resident,
 };
 use crate::walking::WalkTo;
 use crate::walls::is_wall_or_gate;
@@ -253,7 +254,10 @@ impl<K: OrderKind> OrderKind for GetsOffFirst<K> {
         let r = world.residents.iter().find(|x| Some(x.id.as_str()) == id)?;
         let v = vessel_aboard(world, r)?;
         let map = terrain?;
-        landing_tile(world, map, v, order_tile(order))
+        if fights_from_aboard(world, r, order, map.size) {
+            return None;
+        }
+        landing_tile(world, map, v, order_tile(order).or_else(|| attack_tile(world, order)))
             .is_none()
             .then(|| "no shore beside the boat to get off onto".into())
     }
@@ -268,8 +272,12 @@ impl<K: OrderKind> OrderKind for GetsOffFirst<K> {
         let id = str_field(order, "residentId");
         if let Some(i) = world.residents.iter().position(|x| Some(x.id.as_str()) == id) {
             if vessel_aboard(world, &world.residents[i]).is_some() {
+                let toward = order_tile(order).or_else(|| attack_tile(world, order));
+                let stays = terrain.is_some_and(|map| {
+                    fights_from_aboard(world, &world.residents[i], order, map.size)
+                });
                 let landed =
-                    terrain.is_some_and(|map| get_off_vessel(world, i, map, order_tile(order)));
+                    stays || terrain.is_some_and(|map| get_off_vessel(world, i, map, toward));
                 if !landed {
                     return;
                 }
@@ -279,6 +287,29 @@ impl<K: OrderKind> OrderKind for GetsOffFirst<K> {
         }
         self.0.apply(world, sender, order, terrain);
     }
+}
+
+/// The tile an attack order's target stands on, if it is one and that target is there.
+fn attack_tile(world: &WorldState, order: &OrderRequest) -> Option<(i32, i32)> {
+    if order.kind != "attack" {
+        return None;
+    }
+    let (x, y) = match attack_target(world, str_field(order, "targetId")?)? {
+        Target::Resident(t) => (world.residents[t].x, world.residents[t].y),
+        Target::Building(b) => (world.buildings[b].x, world.buildings[b].y),
+    };
+    Some((x as i32, y as i32))
+}
+
+/// Whether a vessel's passenger fights the target of an attack order from aboard (`CONTEXT.md`:
+/// Fighting at a vessel): it is beside the vessel, or aboard it too, as if the vessel were the
+/// next land tile; never someone aboard another vessel. They stay aboard for it.
+fn fights_from_aboard(world: &WorldState, r: &Resident, order: &OrderRequest, size: i32) -> bool {
+    let Some(at) = attack_tile(world, order) else { return false };
+    let across = str_field(order, "targetId")
+        .and_then(|id| world.residents.iter().find(|t| t.id == id))
+        .is_some_and(|t| between_vessels(world, r, t));
+    !across && in_contact(size, (r.x as i32, r.y as i32), at)
 }
 
 /// The tile an order acts on, if it names one.

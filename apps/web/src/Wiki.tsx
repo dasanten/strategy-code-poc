@@ -1512,7 +1512,8 @@ export function Wiki() {
           hauling and group orders. Its owner's realm log says at once that it is gone and where it
           was last; who took it they learn only from a witness (see Standing). One that belongs to
           nobody is simply yours. A carriage handed over to an alliance army is its commander's to
-          drive, which is no theft.
+          drive, which is no theft. A boat is stolen the same way, by rowing it off from beside it
+          (see Water &amp; havens).
         </p>
         <p>
           A carriage's card shows its load as a bar against what it holds (its passengers counted
@@ -1985,6 +1986,23 @@ export function Wiki() {
           <b>Row boats to</b> has one of them row each boat (the first already aboard it, else the
           first beside it) while the others aboard go along: board, row, get off, and the whole crew
           is across.
+        </p>
+        <p>
+          <b>Stealing a boat.</b> A grown resident beside another realm's boat can row it off as a
+          carriage is driven off: <strong>Row off (theft)</strong> on their card, then a tile, or a
+          script's <code>row(boat, x, y)</code> naming that boat. The boat joins your realm at once
+          with its load, and they take its oars. It can't be taken while someone rows it or anyone
+          is aboard, nor while an armed resident of its owner stands beside it and none of your
+          realm does. Boat and load are one theft, known through a witness like a carriage's: its
+          owner's realm log says at once that it is gone and where it was last. A boat of nobody is
+          simply yours.
+        </p>
+        <p>
+          <b>Fighting at a boat.</b> Those aboard can be attacked by anyone beside it, as if the
+          boat were the next land tile, and fight back from aboard; Down or dead, they stay in it.
+          There are no fights between boats and none from open water, so a boat away from every
+          shore is out of reach: an attack on someone aboard it finds no way and ends. An alarm at
+          home doesn't reach whoever is rowing.
         </p>
       </Section>
 

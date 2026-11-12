@@ -150,7 +150,11 @@ impl OrderKind for Drive {
                 });
                 let thief = r.id.clone();
                 let realm = realm.to_string();
-                let taken = Taken { carriage: Some(k), horse: if together { horse } else { None } };
+                let taken = Taken {
+                    carriage: Some(k),
+                    horse: if together { horse } else { None },
+                    vessel: None,
+                };
                 take_over(world, &thief, &realm, taken, size);
                 if let Some(h) = stolen {
                     if !together {
@@ -158,7 +162,7 @@ impl OrderKind for Drive {
                             world,
                             &thief,
                             &realm,
-                            Taken { carriage: None, horse: Some(h) },
+                            Taken { carriage: None, horse: Some(h), vessel: None },
                             size,
                         );
                     }
@@ -182,7 +186,7 @@ impl OrderKind for Drive {
                         world,
                         &thief,
                         &realm,
-                        Taken { carriage: None, horse: Some(h) },
+                        Taken { carriage: None, horse: Some(h), vessel: None },
                         size,
                     );
                     world.carriages[k].horse_id = Some(world.horses[h].id.clone());

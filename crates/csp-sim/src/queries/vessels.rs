@@ -15,7 +15,8 @@ use super::building::building_at;
 use super::carriages::load_level;
 use super::combat::in_contact;
 use super::driving::carriage_of_resident;
-use super::residents::{good_weight, stock_weight};
+use super::guard::guarded_by;
+use super::residents::{can_work, good_weight, stock_weight};
 use crate::walls::is_wall_or_gate;
 
 /// The eight tiles around one, the four straight ones first, so the nearest come first.
@@ -187,6 +188,60 @@ pub fn landing_tile(
         }
     }
     best.map(|(t, _)| t)
+}
+
+/// Whether a fight between `a` and `b` would be one between vessels, which there is none of
+/// (`CONTEXT.md`: Fighting at a vessel): each aboard a vessel, not the same one. Those aboard
+/// reach only those beside their vessel, and those aboard with them.
+pub fn between_vessels(world: &WorldState, a: &Resident, b: &Resident) -> bool {
+    match (vessel_aboard(world, a), vessel_aboard(world, b)) {
+        (Some(va), Some(vb)) => va.id != vb.id,
+        _ => false,
+    }
+}
+
+/// Whether a resident of the realm `realm_id` rowing the vessel off would steal it (`CONTEXT.md`:
+/// Stealing a carriage or horse): another organization's, or nobody's.
+pub fn steals_vessel(v: &Vessel, realm_id: &str) -> bool {
+    v.realm_id.as_deref() != Some(realm_id)
+}
+
+/// Why a resident can't row off in another organization's vessel for the realm `realm_id` now
+/// (`CONTEXT.md`: Stealing a carriage or horse, its vessel part): grown, beside it and aboard
+/// nothing, on no horse and driving nothing; nobody may row it or be aboard; and it mustn't be
+/// guarded: an armed resident of its owner beside it and none of the thief's realm, the thief
+/// themselves included.
+pub fn row_off_problem(
+    world: &WorldState,
+    thief: &Resident,
+    v: &Vessel,
+    realm_id: &str,
+) -> Option<String> {
+    let problem = if !can_work(thief.born_at, world.tick as f64) {
+        "children can’t steal"
+    } else if thief.aboard.is_some() {
+        "aboard another carriage or boat"
+    } else if !beside_vessel(v, thief.x, thief.y) {
+        "that boat is not beside the resident"
+    } else if super::carriages::driven_carriage_id(thief).is_some() {
+        "the driver can’t row"
+    } else if thief.riding.is_some() {
+        "no horse goes aboard: dismount first"
+    } else if rower_of(world, v).is_some() {
+        "someone is rowing that boat"
+    } else if !aboard_vessel(world, &v.id).is_empty() {
+        "someone is aboard that boat"
+    } else if guarded_by(
+        &world.residents,
+        |r| resident_beside_vessel(v, r),
+        |r| vessel_of_resident(v, r),
+        |r| r.id == thief.id || r.owner.as_deref() == Some(realm_id),
+    ) {
+        "an armed resident guards that boat"
+    } else {
+        return None;
+    };
+    Some(problem.to_string())
 }
 
 /// Why a resident can't board a vessel now (`CONTEXT.md`: Beside a vessel, Passenger, What

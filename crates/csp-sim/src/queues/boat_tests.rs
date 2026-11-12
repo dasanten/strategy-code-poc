@@ -197,6 +197,21 @@ fn a_step_naming_a_boat_that_isnt_there_or_isnt_the_realms_is_turned_down() {
 }
 
 #[test]
+fn a_row_step_never_steals_a_boat_that_is_no_longer_the_realms() {
+    let mut s = setup();
+    let steps = json!([step(json!({ "kind": "row", "vesselId": "v1", "x": 10, "y": 5 }))]);
+    assert_eq!(s.queue("w1", steps), "ack");
+    // Taken by realm r2 after the step was planned, beside w1: rowing it off would steal it back.
+    let v1 = s.game.world.vessels.iter_mut().find(|v| v.id == "v1").expect("boat v1");
+    v1.realm_id = Some("r2".into());
+    s.until_queues_end(20);
+    assert_eq!(s.skips(), vec!["row: not a boat of your realm".to_string()]);
+    assert_eq!(s.v1().realm_id.as_deref(), Some("r2"));
+    assert_eq!((s.v1().x, s.v1().y), (2.0, 4.0));
+    assert_eq!(s.game.r("w1").aboard, None);
+}
+
+#[test]
 fn a_boat_step_that_cant_start_where_they_stand_is_skipped() {
     let mut s = setup();
     // Not beside the boat: boarding is skipped, and rowing then too.
