@@ -25,6 +25,7 @@ use crate::queries::city_area::{in_city_area, occupiers_of};
 use crate::queries::names::placed;
 use crate::queries::residents::{is_armed, is_down};
 use crate::queries::standing::TRADE_ORG;
+use crate::queries::vessels::rowed_vessel_id;
 use crate::sight::InvariantViolation;
 
 fn tile(x: f64, y: f64) -> (i32, i32) {
@@ -55,7 +56,7 @@ fn can_be_alarmed(world: &WorldState, city: &City, r: &Resident, size: i32) -> b
         && commander_of(world, &r.id, r.owner.as_deref()) == r.owner
         && in_city_area(world, &city.id, r.x, r.y, size)
         && driven_carriage_id(r).is_none()
-        && !matches!(r.order, Some(ResidentOrder::Row(_) | ResidentOrder::Sail(_)))
+        && rowed_vessel_id(r).is_none()
         && !matches!(r.order, Some(ResidentOrder::Climb(_)))
         && !is_down(r.down_until)
         && !world.armies.iter().any(|a| a.member_ids.contains(&r.id))

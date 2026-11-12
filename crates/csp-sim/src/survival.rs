@@ -264,6 +264,7 @@ pub fn order_kind(o: &ResidentOrder) -> &'static str {
         ResidentOrder::WalkTo(_) => "walkTo",
         ResidentOrder::Drive(_) => "drive",
         ResidentOrder::Haul(_) => "haul",
+        ResidentOrder::HaulByWater(_) => "haulByWater",
         ResidentOrder::PickUp(_) => "pickUp",
         ResidentOrder::Drop(_) => "drop",
         ResidentOrder::Store(_) => "store",

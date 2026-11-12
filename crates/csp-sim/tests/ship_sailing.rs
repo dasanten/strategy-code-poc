@@ -231,6 +231,13 @@ mod stealing {
         assert_eq!(give(&mut world, 8, o), Ok(()));
         assert_eq!(s1(&world).realm_id.as_deref(), Some("r2"));
         assert!(world.crimes.iter().any(|c| c.victim_org == "r1"), "{:?}", world.crimes);
+        // Known as a ship, not a boat, in the crime and the realm logs.
+        let theft = world.crimes.iter().find(|c| c.victim_org == "r1").unwrap();
+        assert_eq!((theft.boat, theft.ship), (Some(true), Some(true)));
+        assert!(world.events.iter().any(|e| matches!(
+            e.what,
+            csp_shared::world::RealmEventWhat::TransportGone { ship: Some(true), .. }
+        )));
         run_walking(&mut world, &t, 3000, |w| !sailing(w));
         assert_eq!((s1(&world).x, s1(&world).y), (25.0, 20.0));
         assert_sound(&world, &t);

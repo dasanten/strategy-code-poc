@@ -766,6 +766,11 @@ describe('realm log', () => {
     expect(describeEvent(taken).text).toBe(
       'Vex took a boat, loaded with 5 Food, from the realm of Ada at (4, 5). It is yours now.',
     )
+    // A ship is named one (`CONTEXT.md`: Sailing).
+    expect(describeEvent({ ...gone, ship: true }).text).toBe(
+      'Your ship is gone. It was last at (4, 5).',
+    )
+    expect(describeEvent({ ...taken, ship: true }).text).toMatch(/^Vex took a ship, loaded/)
   })
 
   it('describes crimes a witness brought home, with who did them', () => {

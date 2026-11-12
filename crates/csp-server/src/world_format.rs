@@ -96,9 +96,10 @@ fn ships_take_a_crew(state: Value, _: &MigrationContext<'_>) -> Value {
     state
 }
 
-/// 117 → 118: ships are sailed (`CONTEXT.md`: Sailing, T91.3): a resident may hold a `sail` order.
-/// A world from before has none, so it stays as it is; the bump keeps a server of format 117, which
-/// refuses an order kind it does not know, from loading one that has.
+/// 117 → 118: ships are sailed (`CONTEXT.md`: Sailing, T91.3): a resident may hold a `sail` order,
+/// and a crime or realm log line about a stolen ship says `ship`. A world from before has neither,
+/// so it stays as it is; the bump keeps a server of format 117, which refuses an order kind or field
+/// it does not know, from loading one that has. (A `haulByWater` order, T91.5, came in at 117.)
 fn ships_are_sailed(state: Value, _: &MigrationContext<'_>) -> Value {
     state
 }

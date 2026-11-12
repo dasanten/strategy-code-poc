@@ -363,6 +363,9 @@ export function residentActions(h: ResidentHere): CardAction[] {
 /** Why a carriage whose horse is Down can't be driven (`CONTEXT.md`: Down). */
 export const HORSE_DOWN_NO_DRIVE = 'its horse is Down'
 
+/** Why a haul route by water can't start aboard (`CONTEXT.md`: Haul route by water). */
+export const HAUL_STARTS_ASHORE = 'the route starts on the shore beside the boat: get off first'
+
 /** The action that steals a carriage, which says so (`CONTEXT.md`: Stealing a carriage or horse). */
 export const DRIVE_OFF_LABEL = 'Drive off (theft)'
 
@@ -498,7 +501,8 @@ function ordersOffered(h: ResidentHere): {
         ? 'children can’t drive'
         : 'no carriage here'
     miss('drive', why)
-    miss('haul', why)
+    // A boat of theirs beside them hauls instead (`CONTEXT.md`: Haul route by water).
+    if (!h.boatToRow || !h.adult) miss('haul', why)
   }
   // Rowing a boat of theirs they are aboard or beside (`CONTEXT.md`: Rowing); a carriage to drive
   // on the same tile keeps the key.
@@ -516,6 +520,14 @@ function ordersOffered(h: ResidentHere): {
         ...(reason ? { disabled: true as const, reason } : {}),
       }),
     )
+    // A haul route by water starts on the shore beside the boat, the first stop
+    // (`CONTEXT.md`: Haul route by water).
+    if (h.adult && !reason && !h.aboard && !h.carrying) {
+      const label = h.picking === 'haul' ? 'Pick the other stop…' : 'Haul route…'
+      add(row('haul', label, { opens: true }))
+    } else if (h.adult) {
+      miss('haul', h.carrying ? CARRYING_A_CHILD : h.aboard ? HAUL_STARTS_ASHORE : (reason ?? ''))
+    }
   } else miss('row', 'no boat or ship of yours here')
   // Only ever on its own row, saying what it is (`CONTEXT.md`: Stealing a carriage or horse).
   if (h.driveOff) {

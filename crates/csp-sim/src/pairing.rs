@@ -37,6 +37,7 @@ pub fn carrying_blocks(o: &ResidentOrder) -> bool {
             | ResidentOrder::WallLine(_)
             | ResidentOrder::TearDown(_)
             | ResidentOrder::Haul(_)
+            | ResidentOrder::HaulByWater(_)
             | ResidentOrder::Relocate(_)
     )
 }

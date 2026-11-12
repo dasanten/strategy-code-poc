@@ -31,7 +31,9 @@ use crate::queries::names::placed;
 use crate::queries::residents::{is_armed, is_down};
 use crate::queries::standing::TRADE_ORG;
 use crate::queries::trade_org::{in_inner_ring, of_trade_org_hq, trade_org_hq};
-use crate::queries::vessels::{across_docked_ship, being_rowed, between_vessels, vessel_aboard};
+use crate::queries::vessels::{
+    across_docked_ship, being_rowed, between_vessels, rowed_vessel_id, vessel_aboard,
+};
 use crate::queries::walls::{
     broken_returns, foreign_wall, is_wall_or_gate, on_own_wall, wall_strength, wall_strength_left,
 };
@@ -575,7 +577,7 @@ fn react(world: &mut WorldState, ti: usize, ai: usize) {
         }
         return;
     }
-    let rowing = matches!(t.order, Some(ResidentOrder::Row(_) | ResidentOrder::Sail(_)));
+    let rowing = rowed_vessel_id(t).is_some();
     if driven_carriage_id(t).is_some() || rowing || with_caravan_carriage(world, t) {
         return;
     }

@@ -73,6 +73,7 @@ import {
   unhitcherOf,
   boaterOf,
   type ActionId,
+  HAUL_STARTS_ASHORE,
   type CardAction,
   type ResidentHere,
   type TileCard,
@@ -437,6 +438,26 @@ describe('the actions on a resident’s card', () => {
       reason: 'the boat is full',
     })
     expect(residentOrders(here()).missing.row).toBe('no boat or ship of yours here')
+  })
+
+  it('offers a haul route by boat from the shore beside it (`CONTEXT.md`: Haul route by water)', () => {
+    const haul = (h: Parameters<typeof here>[0]) =>
+      residentActions(here(h)).filter((a) => a.id === 'haul')
+    expect(haul({ boatToRow: {} })).toEqual([
+      expect.objectContaining({ label: 'Haul route…', opens: true }),
+    ])
+    expect(haul({ boatToRow: {}, picking: 'haul' })[0]).toMatchObject({
+      label: 'Pick the other stop…',
+    })
+    // Aboard, the route can't start: its first stop is the shore they stand on.
+    expect(haul({ boatToRow: {}, aboard: true })).toEqual([])
+    expect(residentOrders(here({ boatToRow: {}, aboard: true })).missing.haul).toBe(
+      HAUL_STARTS_ASHORE,
+    )
+    expect(residentOrders(here({ boatToRow: { problem: 'the boat is full' } })).missing.haul).toBe(
+      'the boat is full',
+    )
+    expect(haul({ boatToRow: {}, adult: false })).toEqual([])
   })
 
   it('offers boarding a boat of the realm beside them, never on horseback', () => {
