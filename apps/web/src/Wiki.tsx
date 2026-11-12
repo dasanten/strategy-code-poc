@@ -1474,7 +1474,8 @@ export function Wiki() {
           Strength {num(strong.stats.strength.base)}. A carriage behind an average horse carries{' '}
           {num(CARRIAGE_CAPACITY)} kg; each point of its driver's Driving skill makes it{' '}
           {pct(DRIVING_SKILL_EFFECT)} faster, at most {pct(DRIVING_SKILL_LIMIT)}, learned at{' '}
-          {num(DRIVING_SKILL_PER_DAY)} a game day of driving. Carriages can't enter mountains.
+          {num(DRIVING_SKILL_PER_DAY)} a game day of driving. Carriages enter mountains only along a finished road, so a
+          road over a ridge opens a pass for them.
         </p>
         <p>
           A carriage is built at a finished stable: a resident there lays out a carriage site on a
