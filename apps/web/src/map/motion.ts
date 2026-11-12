@@ -271,7 +271,9 @@ export function motionTokens(
   for (const r of world.residents) {
     const carriage = drivenCarriageId(r)
     if (carriage !== undefined) byCarriage.set(carriage, goingOf(r.order))
-    if (r.order?.kind === 'row' || r.order?.kind === 'haulByWater') {
+    // A boat goes the way its rower rows (on a haul route too), a ship the way its captain sails
+    // (`CONTEXT.md`: Rowing, Haul route by water, Sailing).
+    if (r.order?.kind === 'row' || r.order?.kind === 'haulByWater' || r.order?.kind === 'sail') {
       byCarriage.set(r.order.vesselId, goingOf(r.order))
     }
     if (r.riding !== undefined) byHorse.set(r.riding, goingOf(r.order))

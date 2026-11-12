@@ -1506,6 +1506,9 @@ impl<'a> ScriptBindings<'a> {
                 self.request("load", input)
             }
             "row" => self.request("row", vec![("vesselId", place(0)?), ("x", p(1)?), ("y", p(2)?)]),
+            "sail" => {
+                self.request("sail", vec![("vesselId", place(0)?), ("x", p(1)?), ("y", p(2)?)])
+            }
             "getOff" => {
                 let given = a(0).filter(|v| !v.is_null()).or(a(1).filter(|v| !v.is_null()));
                 let input = if given.is_none() { vec![] } else { vec![("x", p(0)?), ("y", p(1)?)] };

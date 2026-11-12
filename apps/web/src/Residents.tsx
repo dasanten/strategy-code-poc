@@ -904,6 +904,11 @@ export function orderDoing(
     if (!o.path) return `Finding a way over the water to ${o.target.x}, ${o.target.y}`
     return `Rowing to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
   }
+  if (o?.kind === 'sail') {
+    // `CONTEXT.md`: Sailing.
+    if (!o.path) return `Finding a way over the Sea to ${o.target.x}, ${o.target.y}`
+    return `Sailing to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
+  }
   if (o?.kind === 'haul') {
     const what = o.goods.map((g) => GOOD_LABELS[g].toLowerCase()).join(', ')
     const { x, y } = o[o.stop]
@@ -1914,7 +1919,7 @@ export function ResidentCard({
   /** A boat of the realm beside the resident with room (`CONTEXT.md`: Beside a vessel), to board. */
   boatToBoard?: { id: string; kind?: VesselKind } | undefined
   /** A boat of the realm the resident is aboard or beside, to row, and why they can't now (`CONTEXT.md`: Rowing). */
-  boatToRow?: { id: string; problem?: string }
+  boatToRow?: { id: string; problem?: string; ship?: boolean }
   /**
    * Another organization's boat (or nobody's) beside the resident, to row off, and why it can't be
    * taken now, if so (`CONTEXT.md`: Stealing a carriage or horse, its vessel part).
@@ -2163,7 +2168,14 @@ export function ResidentCard({
     carriageToBoard: !!carriageToBoard,
     boatToBoard: !!boatToBoard,
     shipToBoard: boatToBoard?.kind === 'ship',
-    ...(boatToRow ? { boatToRow: boatToRow.problem ? { problem: boatToRow.problem } : {} } : {}),
+    ...(boatToRow
+      ? {
+          boatToRow: {
+            ...(boatToRow.problem ? { problem: boatToRow.problem } : {}),
+            ...(boatToRow.ship ? { ship: true } : {}),
+          },
+        }
+      : {}),
     carriageToUnhitch: !!carriageToUnhitch,
     horseToHitch: !!toHitch,
     carrying: !!r.carrying,

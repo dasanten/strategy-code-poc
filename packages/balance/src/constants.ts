@@ -226,6 +226,7 @@ export const PASSENGER_WEIGHT = balance.PASSENGER_WEIGHT
 export const BOAT_CAPACITY = balance.BOAT_CAPACITY
 export const SHIP_CAPACITY = balance.SHIP_CAPACITY
 export const SHIP_MIN_CREW = balance.SHIP_MIN_CREW
+export const SAIL_SPEED = balance.SAIL_SPEED
 export const ROW_SPEED = balance.ROW_SPEED
 export const ROW_STRENGTH_EFFECT = balance.ROW_STRENGTH_EFFECT
 export const ROW_STRENGTH_AVERAGE = balance.ROW_STRENGTH_AVERAGE

@@ -621,7 +621,8 @@ pub struct DriveOrder {
 }
 
 /// Rowing a boat to a water tile (`CONTEXT.md`: Rowing): the rower is aboard and at its oars, and
-/// the boat goes a Step at a time over water along `path`.
+/// the boat goes a Step at a time over water along `path`. Sailing a ship (`Sail`) holds the same:
+/// the captain is one of its crew, and the ship goes over Sea only (`CONTEXT.md`: Sailing).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RowOrder {
@@ -922,6 +923,8 @@ pub enum ResidentOrder {
     Feed(FeedOrder),
     Row(RowOrder),
     HaulByWater(WaterHaulOrder),
+    /// Sailing a ship to a Sea tile or a haven, its captain one of its crew (`CONTEXT.md`: Sailing).
+    Sail(RowOrder),
 }
 
 /// Everything in the world that changes, saved as snapshots (ADR 0006).
@@ -1681,6 +1684,10 @@ pub struct Crime {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional, type = "true")]
     pub boat: Option<bool>,
+    /// The boat taken is a ship (`CONTEXT.md`: Sailing), so the log names it one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "true")]
+    pub ship: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub building: Option<BuildingKind>,
@@ -1966,6 +1973,10 @@ pub enum RealmEventWhat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional, type = "true")]
         boat: Option<bool>,
+        /// The boat taken is a ship (`CONTEXT.md`: Sailing), so the log names it one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional, type = "true")]
+        ship: Option<bool>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         building: Option<BuildingKind>,
@@ -1983,6 +1994,10 @@ pub enum RealmEventWhat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional, type = "true")]
         boat: Option<bool>,
+        /// The boat taken is a ship (`CONTEXT.md`: Sailing), so the log names it one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional, type = "true")]
+        ship: Option<bool>,
     },
     TransportTaken {
         resident_id: String,
@@ -2000,6 +2015,10 @@ pub enum RealmEventWhat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional, type = "true")]
         boat: Option<bool>,
+        /// The boat taken is a ship (`CONTEXT.md`: Sailing), so the log names it one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional, type = "true")]
+        ship: Option<bool>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         goods: Option<Stock>,

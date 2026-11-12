@@ -36,6 +36,7 @@ pub fn migrations() -> BTreeMap<u32, MigrationStep> {
     steps.insert(114, boats_are_rowed);
     steps.insert(115, boats_are_stolen);
     steps.insert(116, ships_take_a_crew);
+    steps.insert(117, ships_are_sailed);
     steps
 }
 
@@ -92,6 +93,14 @@ fn boats_are_stolen(state: Value, _: &MigrationContext<'_>) -> Value {
 /// as it is; the bump keeps a server of format 116, which refuses a field it does not know, from
 /// loading one that has.
 fn ships_take_a_crew(state: Value, _: &MigrationContext<'_>) -> Value {
+    state
+}
+
+/// 117 → 118: ships are sailed (`CONTEXT.md`: Sailing, T91.3): a resident may hold a `sail` order,
+/// and a crime or realm log line about a stolen ship says `ship`. A world from before has neither,
+/// so it stays as it is; the bump keeps a server of format 117, which refuses an order kind or field
+/// it does not know, from loading one that has. (A `haulByWater` order, T91.5, came in at 117.)
+fn ships_are_sailed(state: Value, _: &MigrationContext<'_>) -> Value {
     state
 }
 
@@ -270,6 +279,20 @@ mod tests {
         let migrated = migrate_world_with(save.clone(), 115, &ctx, &migrations(), 116).unwrap();
         assert_eq!(migrated, save);
         assert!(migrated["crimes"][0].get("boat").is_none());
+    }
+
+    #[test]
+    fn step_117_keeps_a_world_whose_ships_nobody_sailed() {
+        let terrain = ctx_terrain();
+        let ctx = MigrationContext { terrain: &terrain };
+        let save = json!({
+            "tick": 3,
+            "residents": [{ "id": "w1", "aboard": "ship1", "order": null }],
+            "vessels": [{ "id": "ship1", "kind": "ship", "realmId": "r1", "x": 4, "y": 5,
+                "load": {}, "crewIds": ["w1"] }],
+        });
+        let migrated = migrate_world_with(save.clone(), 117, &ctx, &migrations(), 118).unwrap();
+        assert_eq!(migrated, save);
     }
 
     #[test]

@@ -97,6 +97,7 @@ pub mod reviving;
 pub mod riding;
 pub mod road_line;
 pub mod rowing;
+pub mod sailing;
 pub mod script_api;
 pub mod script_bindings;
 pub mod script_check;

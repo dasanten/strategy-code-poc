@@ -2573,6 +2573,14 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         returns: ScriptType::String,
     },
     ScriptBinding {
+        name: "sail",
+        is: Is::Action,
+        params: &["ship", "x", "y"],
+        cost: 10.0,
+        description: "Sail a ship, by it or its id, to the Sea tile x, y, or to the haven on x, y, docking on the free Sea tile beside it nearest the ship. I must be aboard it as one of its crew, with at least the fewest crew it sails with aboard. A Step at a time over Sea only, never onto a Lake; the crew's Seafaring sets the pace, and sailing teaches it to all of them. My order is \"sail\" until it gets there.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
         name: "getOff",
         is: Is::Action,
         params: &["x?", "y?"],

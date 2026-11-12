@@ -315,7 +315,7 @@ export interface ResidentHere {
    * A boat of their realm they are aboard or beside, to row, with why they can't take its oars
    * now, if so (`CONTEXT.md`: Rowing).
    */
-  boatToRow?: { problem?: string }
+  boatToRow?: { problem?: string; ship?: boolean }
   /** A carriage of their realm on their tile with a horse hitched, to unhitch (`CONTEXT.md`: Hitched horse). */
   carriageToUnhitch?: boolean
   /** A carriage of their realm on their tile and a horse to hitch to it (`hitchChoice`). */
@@ -516,7 +516,7 @@ function ordersOffered(h: ResidentHere): {
           : h.boatToRow.problem
     add(
       row('row', '', {
-        ...picks('row', 'Row boat to'),
+        ...picks('row', h.boatToRow.ship ? 'Sail ship to' : 'Row boat to'),
         ...(reason ? { disabled: true as const, reason } : {}),
       }),
     )
@@ -528,7 +528,7 @@ function ordersOffered(h: ResidentHere): {
     } else if (h.adult) {
       miss('haul', h.carrying ? CARRYING_A_CHILD : h.aboard ? HAUL_STARTS_ASHORE : (reason ?? ''))
     }
-  } else miss('row', 'no boat of yours here')
+  } else miss('row', 'no boat or ship of yours here')
   // Only ever on its own row, saying what it is (`CONTEXT.md`: Stealing a carriage or horse).
   if (h.driveOff) {
     const { problem } = h.driveOff

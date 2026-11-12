@@ -26,6 +26,7 @@ import {
   BOAT_CAPACITY,
   SHIP_CAPACITY,
   SHIP_MIN_CREW,
+  SAIL_SPEED,
   DIRECT_OFFERS_TO_ONE_REALM,
   DIRECT_OFFER_DAYS,
   PASSENGER_WEIGHT,
@@ -1939,8 +1940,7 @@ export function Wiki() {
           hands, and like a boat site anyone may bring materials or work on it. Once finished the
           site is gone, and an empty ship of the realm of whoever finished it floats on the nearest
           free Sea tile next to it. It shows on the map on a token of its own, to whoever sees its
-          tile; its card tells whose it is, its load, and who is aboard. Sailing comes later; until
-          then a ship stays where it was launched.
+          tile; its card tells whose it is, its load, and who is aboard.
         </p>
         <p>
           <b>Docked.</b> A ship on a water tile touching a haven, straight or diagonally, is docked
@@ -1967,6 +1967,30 @@ export function Wiki() {
           <code>unloadShip(ship, goods)</code>. Taking goods from another city's haven this way is
           judged as taking from its storage. Goods can also go aboard by hand, as onto a boat, from
           the haven.
+        </p>
+        <p>
+          <b>Sailing.</b> One of the crew aboard, its <b>captain</b>, sails the ship: Sail ship to
+          on their card, then a tile, a queue step Sail the ship, or a script's{' '}
+          <code>sail(ship, x, y)</code>. Given a Sea tile it sails there; given a tile of a haven,
+          it docks on the free Sea tile beside that haven nearest it. It goes a Step at a time over
+          Sea only, never onto a Lake, so a lake haven builds boats, not ships. It sails only with
+          at least {num(SHIP_MIN_CREW)} crew aboard, and stops where it is if fewer are left. An
+          unskilled crew sails it {num(SAIL_SPEED)} times as fast as walking on Plains; their
+          average <b>Seafaring</b> makes it faster as a rower's does a boat, and every tick of
+          sailing teaches Seafaring to the whole crew. Everyone aboard goes along and sees from the
+          ship's tile. Crew and passengers eat their own food and, running low, take a meal from the
+          ship's Food, as on a boat.
+        </p>
+        <p>
+          <b>Stealing a ship.</b> Residents of your realm on the haven another realm's ship is
+          docked at board it as crew, if nobody of another realm is aboard and no armed resident of
+          its owner stands on the haven while none of yours does; with at least {num(SHIP_MIN_CREW)}{' '}
+          of them aboard, sailing it off steals it with its load, known through a witness like a
+          boat's theft.
+        </p>
+        <p>
+          <b>Fighting at a ship.</b> Those aboard a docked ship can be attacked from anywhere on its
+          haven, and fight back at those on it; out at sea, as with a boat, nobody reaches them.
         </p>
         <p>
           <b>Beside a boat</b> means on a land tile touching its water tile, straight or diagonally.

@@ -60,6 +60,7 @@ import { targetParam } from './shared/default-scripts.js'
 import { HORSE_GRANT_HORSES, PASSENGER_WEIGHT } from '@csp/balance'
 import {
   besideVessel,
+  crewShort,
   isVesselId,
   rowOffProblem,
   vesselOfResident,
@@ -832,7 +833,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (rowed) {
       // To the water tile, or the free water beside a land tile (`CONTEXT.md`: Rowing); another
       // organization's boat is stolen by it (Stealing a carriage or horse).
-      const order = { kind: 'row', residentId: selected.id, vesselId: rowed.id, x, y }
+      // A ship is sailed by one of its crew, to Sea or to a haven (`CONTEXT.md`: Sailing).
+      const kind = 'ship' in rowed && rowed.ship ? 'sail' : 'row'
+      const order = { kind, residentId: selected.id, vesselId: rowed.id, x, y }
       setOrderError(await giveOrder(order))
       return
     }
@@ -1388,8 +1391,17 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const ownCarriageHere = onTile(world?.carriages.filter((k) => !isStrangers(k)))
   // The boat of the realm the picked resident is aboard, else one beside them, to row
   // (`CONTEXT.md`: Rowing); boarding from beside it, the one at its oars becomes a passenger.
-  const boatToRow = ((): { id: string; problem?: string } | undefined => {
+  const boatToRow = ((): { id: string; problem?: string; ship?: boolean } | undefined => {
     if (!selected || !world) return undefined
+    // One of a ship's crew aboard it sails it, with enough crew (`CONTEXT.md`: Sailing).
+    const crewed = world.vessels.find(
+      (v) => v.kind === 'ship' && v.id === selected.aboard && v.crewIds.includes(selected.id),
+    )
+    if (crewed) {
+      const short = crewShort(crewed)
+      const problem = short > 0 ? `the ship needs ${short} more crew to sail` : undefined
+      return { id: crewed.id, ship: true, ...(problem ? { problem } : {}) }
+    }
     // A ship is sailed, never rowed (`CONTEXT.md`: Sailing).
     const mine = world.vessels.filter((v) => v.kind !== 'ship' && vesselOfResident(v, selected))
     const aboard = mine.find((v) => v.id === selected.aboard)

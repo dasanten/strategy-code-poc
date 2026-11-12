@@ -277,6 +277,12 @@ describe('Add step', () => {
       order: { kind: 'board', vesselId: 'ship1', asCrew: true },
       at: { x: 8, y: 10 },
     })
+    // Then sailing it to a tile, from aboard: no walk (`CONTEXT.md`: Sailing).
+    const sail = [
+      [10, 10],
+      [14, 3],
+    ].reduce<Plan>((p, [x, y]) => pickInto(sea, p, { x: x!, y: y! }), { kind: 'sail', picked: [] })
+    expect(planOrder(sail)).toEqual({ order: { kind: 'sail', vesselId: 'ship1', x: 14, y: 3 } })
   })
 
   it('boards a boat from the shore picked, rows it, gets off and loads it (`CONTEXT.md`: Beside a vessel)', () => {

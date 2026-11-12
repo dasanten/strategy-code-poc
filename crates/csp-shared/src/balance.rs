@@ -1309,6 +1309,11 @@ pub const SHIP_CAPACITY: f64 = 2000.0;
 /// hands to work the sails, so a small realm can man one but it takes a few of its residents.
 pub const SHIP_MIN_CREW: f64 = 4.0;
 
+/// How fast a ship sails with an unskilled crew, as a share of walking on Plains (`CONTEXT.md`:
+/// Sailing): faster than a boat is rowed, as wind does the work; the crew's Seafaring adds to it as
+/// it does to rowing (`SEAFARING_SKILL_EFFECT`, from their average).
+pub const SAIL_SPEED: f64 = 1.6;
+
 /// How fast an average rower moves a boat over water, as a share of walking on Plains
 /// (`CONTEXT.md`: Rowing): a little quicker than walking round the shore, so crossing pays off.
 pub const ROW_SPEED: f64 = 1.2;
@@ -2457,6 +2462,7 @@ pub fn balance_json() -> Value {
     m.insert("BOAT_CAPACITY".into(), json!(BOAT_CAPACITY));
     m.insert("SHIP_CAPACITY".into(), json!(SHIP_CAPACITY));
     m.insert("SHIP_MIN_CREW".into(), json!(SHIP_MIN_CREW));
+    m.insert("SAIL_SPEED".into(), json!(SAIL_SPEED));
     m.insert("ROW_SPEED".into(), json!(ROW_SPEED));
     m.insert("ROW_STRENGTH_EFFECT".into(), json!(ROW_STRENGTH_EFFECT));
     m.insert("ROW_STRENGTH_AVERAGE".into(), json!(ROW_STRENGTH_AVERAGE));

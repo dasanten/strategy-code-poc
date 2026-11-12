@@ -73,6 +73,7 @@ export type PlanStepId =
   | 'boardBoat'
   | 'boardCrew'
   | 'row'
+  | 'sail'
   | 'getOff'
   | 'unhitch'
   | 'hitch'
@@ -131,6 +132,14 @@ export const PLAN_STEPS: readonly PlanKind[] = [
     picks: [
       { pick: 'vessel', prompt: 'the boat to row' },
       { pick: 'tile', prompt: 'where to row it: water, or the shore to land at' },
+    ],
+  },
+  {
+    id: 'sail',
+    label: 'Sail the ship',
+    picks: [
+      { pick: 'vessel', prompt: 'the ship to sail' },
+      { pick: 'tile', prompt: 'where to sail it: the Sea, or a haven to dock at' },
     ],
   },
   { id: 'getOff', label: 'Get off', picks: [] },
@@ -514,6 +523,9 @@ export function planOrder(
     case 'row':
       // Aboard or beside it already, as a step before saw to (`CONTEXT.md`: Rowing).
       return { order: { kind: 'row', vesselId: p.id, x: q.x, y: q.y } }
+    case 'sail':
+      // Aboard it as one of its crew already, as a step before saw to (`CONTEXT.md`: Sailing).
+      return { order: { kind: 'sail', vesselId: p.id, x: q.x, y: q.y } }
     case 'getOff':
       return { order: { kind: 'getOff' } }
     case 'explore':
