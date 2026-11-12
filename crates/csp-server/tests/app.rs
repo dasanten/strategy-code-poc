@@ -495,6 +495,86 @@ async fn serves_explored_chunks_one_at_a_time_and_in_batches_refusing_unexplored
     assert_eq!(admin_chunk.status, StatusCode::FORBIDDEN);
 }
 
+/// The raw response to a terrain request asking for `encoding` (none: no `Accept-Encoding`).
+async fn terrain_as(
+    app: &Router,
+    token: &str,
+    batch: bool,
+    encoding: Option<&str>,
+) -> (Option<String>, Vec<u8>) {
+    use tower::ServiceExt;
+    let mut req = Request::builder()
+        .method(if batch { "POST" } else { "GET" })
+        .uri(if batch { "/api/terrain/chunks" } else { "/api/terrain/0/0" })
+        .header(header::COOKIE, format!("{SESSION_COOKIE}={token}"));
+    if let Some(encoding) = encoding {
+        req = req.header(header::ACCEPT_ENCODING, encoding);
+    }
+    let body = if batch {
+        req = req.header(header::CONTENT_TYPE, "application/json");
+        Body::from(json!({ "chunks": [0, 1, 2] }).to_string())
+    } else {
+        Body::empty()
+    };
+    let res = app.clone().oneshot(req.body(body).unwrap()).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(res.headers()[header::CONTENT_TYPE], "application/octet-stream");
+    let got = res.headers().get(header::CONTENT_ENCODING).map(|v| v.to_str().unwrap().to_owned());
+    (got, to_bytes(res.into_body(), usize::MAX).await.unwrap().to_vec())
+}
+
+fn decode(encoding: &str, bytes: &[u8]) -> Vec<u8> {
+    use std::io::Read;
+    let mut out = Vec::new();
+    match encoding {
+        "gzip" => flate2::read::GzDecoder::new(bytes).read_to_end(&mut out).unwrap(),
+        "zstd" => zstd::stream::read::Decoder::new(bytes).unwrap().read_to_end(&mut out).unwrap(),
+        other => panic!("unexpected encoding {other}"),
+    };
+    out
+}
+
+#[tokio::test]
+async fn sends_terrain_compressed_when_the_request_accepts_it_and_plain_otherwise() {
+    let db = Db::new();
+    let terrain = TerrainMap { size: 128, tiles: (0..128 * 128).map(|i| (i % 7) as u8).collect() };
+    let world = create_world(&terrain, 1);
+    let mut explored = ExploredTerrain::new(terrain.clone(), &world.nodes);
+    let conn = db.conn();
+    let mara = add_user(&conn, "Mara");
+    explored.explore(mara as u64, 40, 10, 30);
+    let game = game_thread(&db, world, terrain, explored);
+    let mut opts = db.opts();
+    opts.game = Some(game);
+    let app = build_app(opts);
+    let token = token_for(&conn, mara);
+
+    for batch in [false, true] {
+        // Without the header, the bytes served before compression.
+        let (none, plain) = terrain_as(&app, &token, batch, None).await;
+        assert_eq!(none, None);
+        assert!(plain.len() >= 1024);
+        for encoding in ["gzip", "zstd"] {
+            let (got, bytes) = terrain_as(&app, &token, batch, Some(encoding)).await;
+            assert_eq!(got.as_deref(), Some(encoding), "batch {batch}");
+            assert!(
+                bytes.len() < plain.len() / 4,
+                "{encoding}: {} of {}",
+                bytes.len(),
+                plain.len()
+            );
+            assert_eq!(decode(encoding, &bytes), plain, "{encoding}, batch {batch}");
+        }
+        // A browser's list: zstd where it is offered, else gzip; never one it did not offer.
+        let (got, _) = terrain_as(&app, &token, batch, Some("gzip, deflate, br, zstd")).await;
+        assert_eq!(got.as_deref(), Some("zstd"));
+        let (got, _) = terrain_as(&app, &token, batch, Some("gzip, deflate, br")).await;
+        assert_eq!(got.as_deref(), Some("gzip"));
+        let (got, _) = terrain_as(&app, &token, batch, Some("br")).await;
+        assert_eq!(got, None);
+    }
+}
+
 // -------------------------------------------------------------------------- script library API
 
 #[tokio::test]
