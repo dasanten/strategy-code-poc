@@ -46,7 +46,14 @@ import {
 import { mountOffProblem, horseOfResident, riderOf } from './shared/horses.js'
 import { horsesInNeed } from './shared/reviving.js'
 import { isDown } from './shared/world.js'
-import { isPassableTerrain, UNEXPLORED, Terrain, tileIndex, wrap } from './shared/terrain.js'
+import {
+  isPassableTerrain,
+  isWater,
+  UNEXPLORED,
+  Terrain,
+  tileIndex,
+  wrap,
+} from './shared/terrain.js'
 import { isWallOrGate } from './shared/walls.js'
 import { isAt, covers } from './shared/footprint.js'
 import { targetParam } from './shared/default-scripts.js'
@@ -260,9 +267,20 @@ function targetOnTile(
   return paramOnTile(paramWorld(world), param.type, at)
 }
 
-/** What the queue planner's map picks need of the world (`plan-step`). */
-function planWorld(world: NonNullable<ReturnType<typeof useWorld>['world']>): PlanWorld {
-  return { ...paramWorld(world), horses: world.horses, toFeed: toFeed(world) }
+/**
+ * What the queue planner's map picks need of the world (`plan-step`), with what is known of the
+ * terrain to tell the water from the shore.
+ */
+function planWorld(
+  world: NonNullable<ReturnType<typeof useWorld>['world']>,
+  terrainAt?: (x: number, y: number) => number | undefined,
+): PlanWorld {
+  const water = (x: number, y: number) => {
+    const t = terrainAt?.(x, y)
+    return t !== undefined && isWater(t)
+  }
+  const { vessels } = world
+  return { ...paramWorld(world), vessels, water, horses: world.horses, toFeed: toFeed(world) }
 }
 
 /**
@@ -412,9 +430,21 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           : [],
       )
     : []
+  // The realm's boats someone of the group stands beside, to board with the places left in each
+  // (`CONTEXT.md`: Beside a vessel).
+  const groupBoats = world
+    ? world.vessels.flatMap((v) => {
+        const room = vesselRoom(v)
+        if (room === undefined) return []
+        if (!group.some((r) => vesselOfResident(v, r) && besideVessel(v, r, world.map.size)))
+          return []
+        return [{ vessel: v, seats: Math.max(0, Math.floor(room / PASSENGER_WEIGHT + 1e-9)) }]
+      })
+    : []
   // What group orders need of what the Player sees (`GroupSeen`).
   const groupSeen: GroupSeen = world
     ? {
+        vessels: world.vessels.filter((v) => v.realmId === world.home.realmId),
         // Free horses of the realm, to mount (`CONTEXT.md`: Riding).
         horses: world.horses.filter(
           (h) =>
@@ -784,7 +814,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     }
     if (plan && nextPick(plan)) {
       if (!world) return
-      const next = pickInto(planWorld(world), plan, { x, y })
+      const next = pickInto(planWorld(world, terrainAt), plan, { x, y })
       if (nextPick(next) || planAsk(next)) setPlan(next)
       else await addPlanned(next)
       return
@@ -970,6 +1000,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         (s) => ['storage', 'stable', 'haven'].includes(s.kind) && !s.site && covers(s, x, y),
       )
       if (b) return { id: b.id, name: name(b) }
+      // A boat is loaded from beside it (`CONTEXT.md`: Beside a vessel).
+      const v = world.vessels.find((s) => s.realmId === realmId && s.x === x && s.y === y)
+      if (v) return { id: v.id, name: 'boat' }
       const k = world.carriages.find((c) => c.realmId === realmId && c.x === x && c.y === y)
       return k && { id: k.id, name: 'carriage' }
     }
@@ -994,6 +1027,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       }
       case 'drive':
         return sendGroup({ kind: 'drive', x, y })
+      case 'row':
+        return sendGroup({ kind: 'row', x, y })
       case 'haul':
         if (!groupPickWith.haul) return
         return sendGroup({ kind: 'haul', x, y, ...groupPickWith.haul })
@@ -1018,7 +1053,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       case 'storeAt':
       case 'fetchFrom': {
         const at = place()
-        if (!at) return fail('no storage, stable, haven or carriage of yours there')
+        if (!at) return fail('no storage, stable, haven, carriage or boat of yours there')
         if (mode === 'storeAt') return sendGroup({ kind: 'store', to: at })
         return sendGroup({ kind: 'fetch', good: groupPickWith.good ?? 'food', from: at })
       }
@@ -2351,6 +2386,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             scripts={scripts}
             buildings={world.buildings}
             carriages={groupCarriages}
+            boats={groupBoats}
             inSight={world.residents}
             arrivesIn={arrivesIn || undefined}
             horses={world.horses}

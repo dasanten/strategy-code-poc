@@ -16,6 +16,7 @@ import type { BuildLine, OrderRequest, Queue, QueueStepRequest } from '@csp/shar
 export const QUEUE_STEP_KINDS: readonly string[] = [
   'walkTo',
   'drive',
+  'row',
   'unhitch',
   'hitch',
   'board',

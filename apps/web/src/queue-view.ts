@@ -5,6 +5,7 @@ import { QUEUE_DEFAULT_STEP_MINUTES } from '@csp/balance'
 import { QUEUE_STEP_KINDS, neverEnds, stepLine } from './shared/queue.js'
 import { TICKS_PER_GAME_HOUR } from './shared/time.js'
 import { canWork } from './shared/stats.js'
+import { isVesselId } from './shared/vessels.js'
 import type {
   Building,
   BuildingKind,
@@ -350,8 +351,10 @@ export function stepLabel(
     const was = lastSeen.find((b) => b.id === id)?.kind
     return was ? `the ${BUILDING_NAMES[was]} (as last seen)` : 'the building'
   }
-  // A storage or stable in sight a store or fetch names, if it names one; a carriage goes unnamed.
+  // A storage or stable in sight a store or fetch names, if it names one, or a boat; a carriage
+  // goes unnamed.
   const named = (word: string, id: unknown) => {
+    if (typeof id === 'string' && isVesselId(id)) return `${word} the boat`
     const kind = buildings.find((b) => b.id === id)?.kind
     return kind ? `${word} the ${BUILDING_NAMES[kind]}` : ''
   }
@@ -361,7 +364,11 @@ export function stepLabel(
     case 'drive':
       return `Drive the carriage to ${at(order)}`
     case 'board':
-      return 'Board the carriage'
+      return order.vesselId !== undefined || isVesselId(order.carriageId as string | undefined)
+        ? 'Board the boat'
+        : 'Board the carriage'
+    case 'row':
+      return `Row the boat to ${at(order)}`
     case 'unhitch':
       return 'Unhitch the horse'
     case 'hitch':

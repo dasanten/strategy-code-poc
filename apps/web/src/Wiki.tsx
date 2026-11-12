@@ -696,7 +696,8 @@ export function Wiki() {
           renaming, which are about one resident. Nothing ties them together afterwards; each goes
           on alone. The card shows the orders some of them can take where they stand, as rows with
           the same keys as on a resident's card; while it stays open, an order none of them can take
-          any more stays greyed out, saying why (“nobody stands on a carriage of your realm”).
+          any more stays greyed out, saying why (“nobody stands on a carriage or beside a boat of
+          your realm”).
         </p>
         <ul>
           <li>
@@ -740,7 +741,9 @@ export function Wiki() {
           <li>
             <strong>Board carriage</strong> (with several carriages of your realm where some of them
             stand, pick one) puts those on its tile aboard, in the group's order, until it is full;{' '}
-            <strong>Get off</strong> gets every passenger among them off. See Passengers.
+            <strong>Get off</strong> gets every passenger among them off. See Passengers. A boat of
+            your realm beside some of them is boarded the same way (Board boat), and{' '}
+            <strong>Row boats to</strong> has one of them row each boat there; see Water.
           </li>
         </ul>
         <p>
@@ -1968,6 +1971,21 @@ export function Wiki() {
           Intellect, and each point of it makes the boat {pct(SEAFARING_SKILL_EFFECT)} faster, at
           most {pct(SEAFARING_SKILL_LIMIT)}. Rowing costs food as walking on Plains does. The rower
           and passengers eat their own food and, running low, take a meal from the boat's Food.
+        </p>
+        <p>
+          <b>Boats in queues and groups.</b> Boarding, rowing, getting off and loading are queue
+          steps like any other, so a queue can take a resident across a lake and back, and a saved
+          queue keeps them. With Add step, <b>Board a boat</b> picks the boat, then the shore tile
+          to board it from (a walk there goes first): beside the boat now, or beside where an
+          earlier step rows it. <b>Row the boat</b> picks the boat, then where to row it; it needs
+          them aboard or beside it already, so it usually follows Board a boat. <b>Get off</b> lands
+          them on the shore beside the boat, and Store and Fetch take the boat as their place. A
+          step that can't be done when its turn comes (the boat isn't beside them) is skipped and
+          noted in the realm log. On the group card, <b>Board boat</b> boards those beside a boat of
+          your realm until it is full, <b>Get off</b> gets everyone aboard off together, and{' '}
+          <b>Row boats to</b> has one of them row each boat (the first already aboard it, else the
+          first beside it) while the others aboard go along: board, row, get off, and the whole crew
+          is across.
         </p>
         <p>
           <b>Stealing a boat.</b> A grown resident beside another realm's boat can row it off as a
