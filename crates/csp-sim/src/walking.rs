@@ -17,7 +17,7 @@ use csp_shared::world::{
 };
 
 use crate::passengers::get_off_vessel;
-use crate::queries::vessels::vessel_aboard;
+use crate::queries::vessels::{between_vessels, vessel_aboard};
 
 use crate::armies::waiting_for_army;
 use crate::caravans::waiting_for_escort;
@@ -288,7 +288,17 @@ fn land_moving_passengers(world: &mut WorldState, terrain: &TerrainMap) {
             continue;
         }
         let target = target_of(world, o);
+        // Not at someone aboard another vessel: there are no fights between vessels.
+        let across = match o {
+            ResidentOrder::Attack(a) => world
+                .residents
+                .iter()
+                .find(|t| t.id == a.target_id)
+                .is_some_and(|t| between_vessels(world, r, t)),
+            _ => false,
+        };
         if matches!(o, ResidentOrder::Attack(_))
+            && !across
             && target.is_some_and(|t| in_contact(size, (r.x, r.y), t))
         {
             continue;
@@ -740,6 +750,11 @@ impl Walking {
                 continue;
             }
             let o = o.expect("a moving order");
+            // One aboard a vessel still attacking here fights from aboard, in contact
+            // (`land_moving_passengers`): there is no way to find from the water.
+            if matches!(o, ResidentOrder::Attack(_)) && vessel_aboard(world, r).is_some() {
+                continue;
+            }
             let Some(target) = target_of(world, o) else { continue };
             // A new order for a resident replaces any search for their old one.
             let key = search_key(world, r.riding.is_some(), o);

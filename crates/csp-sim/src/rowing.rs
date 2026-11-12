@@ -2,19 +2,21 @@
 //! boat of their realm, or beside it (boarding first), takes its oars and rows it to a water tile.
 //! The steps themselves are found and taken by the walking (`walking.rs`), over water only.
 
-use csp_shared::balance::PASSENGER_WEIGHT;
+use csp_shared::balance::{MAP_SIZE, PASSENGER_WEIGHT};
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{
     OrderRequest, Resident, ResidentOrder, RowOrder, Tile, Vessel, WorldState,
 };
 
-use crate::order_sender::{ordered_resident, OrderSender};
+use crate::order_sender::{ordered_resident, realm_of, OrderSender};
 use crate::orders::{int_field, str_field, OrderKind};
 use crate::queries::carriages::driven_carriage_id;
 use crate::queries::residents::can_work;
 use crate::queries::vessels::{
-    beside_vessel, row_target, vessel_by_id, vessel_of_resident, vessel_room,
+    beside_vessel, row_off_problem, row_target, steals_vessel, vessel_by_id, vessel_of_resident,
+    vessel_room,
 };
+use crate::stealing::{take_over, Taken};
 
 /// Why a resident can't take a vessel's oars now (`CONTEXT.md`: Rowing): grown, of its realm,
 /// aboard it or beside it, on no horse and driving nothing. One boarding from beside it who would
@@ -45,13 +47,14 @@ pub fn row_problem(world: &WorldState, r: &Resident, v: &Vessel) -> Option<Strin
     Some(problem.to_string())
 }
 
-/// A checked row order: the rower and the boat, by their places in the world, and the water tile
-/// to row to (with the map at hand).
-type Checked = (usize, usize, Option<(i32, i32)>);
+/// A checked row order: the rower and the boat, by their places in the world, the water tile to
+/// row to (with the map at hand), and the realm that steals the boat by it, if it does.
+type Checked = (usize, usize, Option<(i32, i32)>, Option<String>);
 
 /// The row order (`row`): one of the Player's residents rows a boat (`vesselId`) to (x, y), or the
 /// nearest free water tile beside it when it is land. Beside the boat, they board it first. They
-/// take its oars, and the one at them before becomes a passenger.
+/// take its oars, and the one at them before becomes a passenger. Naming another organization's
+/// boat beside them steals it with its load (`CONTEXT.md`: Stealing a carriage or horse).
 pub struct Row;
 
 impl Row {
@@ -68,7 +71,18 @@ impl Row {
         let Some(v) = str_field(order, "vesselId").and_then(|id| vessel_by_id(world, id)) else {
             return Err("no such boat".into());
         };
-        if let Some(p) = row_problem(world, &world.residents[i], v) {
+        // Another organization's boat, or nobody's, is stolen by rowing it off, only by a
+        // resident of the ordering realm itself (`CONTEXT.md`: Stealing a carriage or horse).
+        let r = &world.residents[i];
+        let thief_realm = realm_of(world, sender.user_id)
+            .filter(|_| sender.npc_city_id.is_none())
+            .map(|realm| realm.id.clone())
+            .filter(|realm| r.owner.as_deref() == Some(realm.as_str()) && steals_vessel(v, realm));
+        let problem = match &thief_realm {
+            Some(realm) => row_off_problem(world, r, v, realm),
+            None => row_problem(world, r, v),
+        };
+        if let Some(p) = problem {
             return Err(p);
         }
         let (Some(x), Some(y)) = (int_field(order, "x"), int_field(order, "y")) else {
@@ -82,7 +96,7 @@ impl Row {
             None => None,
         };
         let vi = world.vessels.iter().position(|x| x.id == v.id).expect("a vessel of the world");
-        Ok((i, vi, to))
+        Ok((i, vi, to, thief_realm))
     }
 }
 
@@ -105,7 +119,14 @@ impl OrderKind for Row {
         terrain: Option<&TerrainMap>,
     ) {
         // Taken or rowed by someone else since the order came: it goes nowhere.
-        let Ok((i, vi, to)) = Row::check(world, sender, order, terrain) else { return };
+        let Ok((i, vi, to, thief_realm)) = Row::check(world, sender, order, terrain) else {
+            return;
+        };
+        if let Some(realm) = thief_realm {
+            let (thief, size) =
+                (world.residents[i].id.clone(), terrain.map_or(MAP_SIZE, |t| t.size));
+            take_over(world, &thief, &realm, Taken { vessel: Some(vi), ..Taken::default() }, size);
+        }
         let (x, y) = to.unwrap_or_else(|| {
             (
                 int_field(order, "x").unwrap_or(0.0) as i32,
@@ -129,3 +150,6 @@ impl OrderKind for Row {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod theft_tests;

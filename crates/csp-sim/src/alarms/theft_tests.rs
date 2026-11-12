@@ -395,12 +395,24 @@ fn takes_goods_from_a_carriage_a_carriage_and_a_horse_as_thefts_too() {
     };
     let by_horse = rung(&|s| {
         s.world.horses.push(horse());
-        take_over(&mut s.world, "x1", "r2", Taken { carriage: None, horse: Some(0) }, SIZE);
+        take_over(
+            &mut s.world,
+            "x1",
+            "r2",
+            Taken { carriage: None, horse: Some(0), vessel: None },
+            SIZE,
+        );
     });
     assert_eq!(by_horse, "theft");
     let by_carriage = rung(&|s| {
         s.world.carriages.push(carriage("k1"));
-        take_over(&mut s.world, "x1", "r2", Taken { carriage: Some(0), horse: None }, SIZE);
+        take_over(
+            &mut s.world,
+            "x1",
+            "r2",
+            Taken { carriage: Some(0), horse: None, vessel: None },
+            SIZE,
+        );
     });
     assert_eq!(by_carriage, "theft");
     let from_load = rung(&|s| {
