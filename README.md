@@ -73,8 +73,11 @@ pnpm format        # Prettier
 ```
 
 A Rust test over 5 s is a regression to fix (nextest flags it); `cargo fmt --all` fixes
-formatting. Run cargo from PowerShell: in Git Bash `/usr/bin/link` shadows the MSVC linker, so put
-the MSVC `bin` directory ahead of Git's on `PATH` there.
+formatting. Each crate's integration tests build into one test binary: `tests/all.rs` lists every
+file in `tests/`, and a test fails when a file is missing from it. One binary instead of one per
+file makes a rebuild after a change to `csp-sim` about three times faster on Windows. Cargo links
+with `rust-lld` on Windows (`.cargo/config.toml`), so it works from Git Bash too, where
+`/usr/bin/link` used to shadow the MSVC linker.
 
 The server stores everything in `data/world.db` (override with `DB_PATH`). The world lives in
 memory and is saved as a gzipped snapshot every 30 ticks and on shutdown; old saves are pruned

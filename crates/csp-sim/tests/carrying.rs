@@ -1,6 +1,7 @@
 //! `apps/server/src/carrying.test.ts`, one test per `it`.
 
 mod common;
+#[macro_use]
 mod goods_support;
 
 use csp_shared::terrain::TerrainMap;
