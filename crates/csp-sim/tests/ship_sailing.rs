@@ -10,9 +10,7 @@ use build_common::{
 };
 use csp_shared::balance::{OWN_FOOD, SHIP_MIN_CREW};
 use csp_shared::terrain::{tile_index, Terrain, TerrainMap};
-use csp_shared::world::{
-    Good, ResidentOrder, SkillName, Stock, Vessel, VesselKind, WorldState,
-};
+use csp_shared::world::{Good, ResidentOrder, SkillName, Stock, Vessel, VesselKind, WorldState};
 use csp_sim::queries::pace::sail_speed;
 use csp_sim::queries::vessels::{docked_at, sail_target};
 use serde_json::{json, Value};
@@ -140,7 +138,10 @@ fn sails_to_a_sea_tile_and_lets_nobody_off_out_there() {
 #[test]
 fn needs_the_minimum_crew_and_a_captain_among_them() {
     let mut world = setup();
-    assert_eq!(sail(&mut world, "p1", 25, 20), Err("only one of its crew aboard sails a ship".into()));
+    assert_eq!(
+        sail(&mut world, "p1", 25, 20),
+        Err("only one of its crew aboard sails a ship".into())
+    );
     world.vessels[0].crew_ids.pop();
     assert_eq!(
         sail(&mut world, "w1", 25, 20),
@@ -154,7 +155,10 @@ fn goes_over_sea_only_never_onto_a_lake_or_land() {
     let t = terrain();
     let world = setup();
     let v = s1(&world);
-    assert_eq!(sail_target(&world, &t, v, 25, 32), Err("a ship sails only on the Sea, never onto a Lake"));
+    assert_eq!(
+        sail_target(&world, &t, v, 25, 32),
+        Err("a ship sails only on the Sea, never onto a Lake")
+    );
     assert_eq!(sail_target(&world, &t, v, 10, 10), Err("a ship sails to a haven or a Sea tile"));
     let mut world = setup();
     assert!(sail(&mut world, "w1", 25, 32).is_err());
@@ -206,7 +210,11 @@ mod stealing {
     }
 
     fn crew_board(world: &mut WorldState, who: &str) -> Result<(), String> {
-        give(world, 8, json!({ "kind": "board", "residentId": who, "vesselId": "s1", "asCrew": true }))
+        give(
+            world,
+            8,
+            json!({ "kind": "board", "residentId": who, "vesselId": "s1", "asCrew": true }),
+        )
     }
 
     #[test]

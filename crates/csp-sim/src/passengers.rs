@@ -14,8 +14,8 @@ use crate::queries::carriages::driven_carriage_id;
 use crate::queries::combat::in_contact;
 use crate::queries::driving::{board_problem, carriage_of_resident};
 use crate::queries::vessels::{
-    across_docked_ship, between_vessels, board_vessel_problem, landing_tile, shore_problem, vessel_aboard,
-    vessel_by_id, vessel_of_resident,
+    across_docked_ship, between_vessels, board_vessel_problem, landing_tile, shore_problem,
+    vessel_aboard, vessel_by_id, vessel_of_resident,
 };
 use crate::walking::WalkTo;
 use crate::walls::is_wall_or_gate;
@@ -322,7 +322,8 @@ fn attack_tile(world: &WorldState, order: &OrderRequest) -> Option<(i32, i32)> {
 /// next land tile; never someone aboard another vessel. They stay aboard for it.
 fn fights_from_aboard(world: &WorldState, r: &Resident, order: &OrderRequest, size: i32) -> bool {
     let Some(at) = attack_tile(world, order) else { return false };
-    let target = str_field(order, "targetId").and_then(|id| world.residents.iter().find(|t| t.id == id));
+    let target =
+        str_field(order, "targetId").and_then(|id| world.residents.iter().find(|t| t.id == id));
     let across = target.is_some_and(|t| between_vessels(world, r, t));
     // From a docked ship, anyone on its haven (`CONTEXT.md`: Fighting at a vessel).
     let haven = target.is_some_and(|t| across_docked_ship(world, r, t));
@@ -430,10 +431,9 @@ fn step_vessel_passenger(world: &mut WorldState, i: usize, map: &TerrainMap) {
             world.residents[i].aboard = None;
         } else {
             // A thief crew aboard a ship they are taking stay too (`CONTEXT.md`: Sailing).
-            let stays =
-                (vessel_of_resident(v, r) || v.crew_ids.contains(&r.id))
-                    && driven_carriage_id(r).is_none()
-                    && r.riding.is_none();
+            let stays = (vessel_of_resident(v, r) || v.crew_ids.contains(&r.id))
+                && driven_carriage_id(r).is_none()
+                && r.riding.is_none();
             if !stays {
                 get_off_vessel(world, i, map, None);
             }

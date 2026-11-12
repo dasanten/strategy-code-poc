@@ -501,9 +501,9 @@ pub fn board_to_steal_problem(
 /// at its haven.
 pub fn across_docked_ship(world: &WorldState, a: &Resident, b: &Resident) -> bool {
     let at = |aboard: &Resident, ashore: &Resident| {
-        vessel_aboard(world, aboard).is_some_and(|v| {
-            v.kind == VesselKind::Ship && resident_beside_vessel(world, v, ashore)
-        }) && ashore.aboard.is_none()
+        vessel_aboard(world, aboard)
+            .is_some_and(|v| v.kind == VesselKind::Ship && resident_beside_vessel(world, v, ashore))
+            && ashore.aboard.is_none()
     };
     at(a, b) || at(b, a)
 }

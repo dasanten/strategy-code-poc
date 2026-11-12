@@ -18,8 +18,8 @@ use csp_shared::balance::{
 };
 use csp_shared::footprint::{footprint_tiles, is_at, near_footprint};
 use csp_shared::terrain::{
-    beside_step, is_passable_terrain, is_sea, is_water, step_length, terrain_at, tile_index, touches_sea,
-    touches_water, wrap_delta, Terrain, TerrainMap,
+    beside_step, is_passable_terrain, is_sea, is_water, step_length, terrain_at, tile_index,
+    touches_sea, touches_water, wrap_delta, Terrain, TerrainMap,
 };
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{

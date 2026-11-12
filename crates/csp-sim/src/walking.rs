@@ -8,8 +8,8 @@ use std::sync::Arc;
 
 use csp_shared::balance::carriage_can_enter;
 use csp_shared::terrain::{
-    beside_step, ground_at, is_passable_terrain, step_length, terrain_at, tile_index,
-    wrap, TerrainMap,
+    beside_step, ground_at, is_passable_terrain, step_length, terrain_at, tile_index, wrap,
+    TerrainMap,
 };
 use csp_shared::world::{
     FetchOrder, FetchPhase, GoodsPlace, HaulPhase, HaulStop, LinePhase, OrderRequest,
@@ -18,7 +18,9 @@ use csp_shared::world::{
 };
 
 use crate::passengers::get_off_vessel;
-use crate::queries::vessels::{across_docked_ship, between_vessels, crew_short, floats_on, vessel_aboard, vessel_crew};
+use crate::queries::vessels::{
+    across_docked_ship, between_vessels, crew_short, floats_on, vessel_aboard, vessel_crew,
+};
 
 use crate::armies::waiting_for_army;
 use crate::caravans::waiting_for_escort;
@@ -396,7 +398,13 @@ fn row_step(
 
 /// Not driving a carriage or rowing a boat: walking, or riding a horse (`onFoot`).
 fn on_foot(o: &ResidentOrder) -> bool {
-    !matches!(o, ResidentOrder::Drive(_) | ResidentOrder::Haul(_) | ResidentOrder::Row(_) | ResidentOrder::Sail(_))
+    !matches!(
+        o,
+        ResidentOrder::Drive(_)
+            | ResidentOrder::Haul(_)
+            | ResidentOrder::Row(_)
+            | ResidentOrder::Sail(_)
+    )
 }
 
 /// A moving order got there (`arrive`): a walk or drive is done, a haul route starts on its stop,
@@ -680,7 +688,8 @@ impl Walking {
                         .iter()
                         .filter_map(|c| world.residents.iter().position(|x| x.id == c.id))
                         .collect();
-                    let gain = sail_speed(&crew.iter().map(|&c| &world.residents[c]).collect::<Vec<_>>());
+                    let gain =
+                        sail_speed(&crew.iter().map(|&c| &world.residents[c]).collect::<Vec<_>>());
                     for c in crew {
                         let learned = seafaring_learned(&world.residents[c], tick);
                         let skills = &mut world.residents[c].skills;
