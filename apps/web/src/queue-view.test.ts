@@ -6,8 +6,11 @@ import {
   appendRequest,
   appendRequests,
   appendToEach,
+  draftEdit,
+  draftFor,
   editPlan,
   EMPTY_PLAN,
+  givePlan,
   giveToAll,
   planOf,
   planStep,
@@ -314,5 +317,73 @@ describe('the group planner', () => {
         steps: [{ id: 1, order: { kind: 'walkTo', x: 2, y: 2 } }, walkMine, step],
       },
     ])
+  })
+})
+
+describe('the queue draft', () => {
+  // A looped three-step draft for an idle resident: walk to the mine, work it, store.
+  const mine = { x: 30, y: 4 }
+  const workMine: OrderRequest = { kind: 'task', task: 'work', workplaceId: 'm1' }
+  const store: OrderRequest = { kind: 'store', goods: STORE_ALL.goods, to: 's9' }
+
+  it('collects steps added for a resident with no queue, giving nothing until Start queue', () => {
+    expect(draftFor(idle, undefined)).toEqual(EMPTY_PLAN)
+    // Steps go onto the open draft; the resident still has no queue and no order was made.
+    const built = planStep(planStep(draftFor(idle, undefined)!, workMine, mine), store)
+    const open = editPlan(built, built.items, true)
+    expect(draftFor(idle, open)).toBe(open)
+    expect(idle.queue).toBeUndefined()
+    expect(unroll(open.items)).toHaveLength(3)
+    // Start queue gives it as a new looped queue.
+    expect(givePlan(idle, open)).toEqual({
+      kind: 'queue',
+      residentId: 'w1',
+      steps: [
+        { order: { kind: 'walkTo', ...mine } },
+        { order: workMine, minutes: QUEUE_DEFAULT_STEP_MINUTES },
+        { order: store },
+      ],
+      loop: true,
+    })
+  })
+
+  it('opens a draft for a paste or load into a resident with no queue', () => {
+    const draft = draftEdit(idle, [{ order: walkHome }, { order: store }])
+    expect(draft?.items.map((s) => ('order' in s ? s.order.kind : 'block'))).toEqual([
+      'walkTo',
+      'store',
+    ])
+  })
+
+  it('edits a running queue live, unless a repeat block is in it', () => {
+    const running = shiftQueue(idle, [walkHome, work])
+    expect(draftFor(running, undefined)).toBeUndefined()
+    const steps = planOf(running.queue!).items
+    expect(draftEdit(running, steps.slice(1))).toBeUndefined()
+    const wrapped = draftEdit(running, [{ repeat: 2, items: steps }])
+    expect(wrapped?.nextStepId).toBe(running.queue!.nextStepId + 1)
+  })
+
+  it('Edit as draft leaves the running queue untouched until Start queue', () => {
+    const running = shiftQueue(idle, [walkHome, work, { ...walkHome, x: 1 }])
+    const queue = structuredClone(running.queue!)
+    let draft = planOf(running.queue!)
+    // Steps added and removed go onto the draft, never to the server.
+    expect(draftFor(running, draft)).toBe(draft)
+    draft = planStep(draft, store)
+    draft = editPlan(draft, removeItem(draft.items, 1), true)
+    expect(running.queue).toEqual(queue)
+    // Start queue replaces it; the steps it keeps keep their ids, so the current one goes on.
+    const started = givePlan(running, draft)
+    expect(started.kind).toBe('editQueue')
+    const kept = running.queue!.steps.slice(1).map((s) => s.id)
+    expect((started.steps as { id?: number }[]).map((s) => s.id)).toEqual([...kept, undefined])
+    expect(started.loop).toBe(true)
+  })
+
+  it('still queues an order given with Shift at once', () => {
+    expect(appendRequest(idle, walkHome)?.kind).toBe('queue')
+    const running = shiftQueue(idle, [walkHome])
+    expect(appendRequest(running, work)?.kind).toBe('editQueue')
   })
 })

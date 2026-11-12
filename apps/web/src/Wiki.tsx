@@ -788,11 +788,20 @@ export function Wiki() {
           build is the same Build menu as on the card; a kind dimmed because the tile lacks
           something today, such as a city's area, can still be added, for a step before it may bring
           that. A step that has to be done on its tile goes after a walk there, unless the step
-          before already walks there. It works on a resident with no queue too, and starts one.
-          Adding a step only checks that it could make sense (the place is there as you last knew
-          it, and a carriage or horse is yours). A workplace or construction site can be anyone's,
-          in sight or as last seen, since a workplace has no owner: queue Work at a far mine and
-          they walk there and work it. Whether a step can start is checked when its turn comes.
+          before already walks there. Adding a step only checks that it could make sense (the place
+          is there as you last knew it, and a carriage or horse is yours). A workplace or
+          construction site can be anyone's, in sight or as last seen, since a workplace has no
+          owner: queue Work at a far mine and they walk there and work it. Whether a step can start
+          is checked when its turn comes.
+        </p>
+        <p>
+          For a resident with no queue, the steps you add, paste or load collect as a{' '}
+          <strong>draft</strong>, marked “Draft, not started”: nothing runs until you press{' '}
+          <strong>Start queue</strong>, which gives it. <strong>Discard draft</strong> throws it
+          away. A running queue is edited live; <strong>Edit as draft</strong> copies it into a
+          draft while the queue runs on untouched, and Start queue replaces it (the step they are on
+          keeps going if it is still in it). A draft is kept in this browser and lost on reloading
+          the page.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while you give an order (a button, its key, or a tile picked on the
@@ -834,13 +843,13 @@ export function Wiki() {
           times until you type another count. The block shows its count with its steps indented
           under it; it is picked, moved, copied, pasted, saved and removed as one,
           <strong> Unwrap</strong> puts its steps back as they were, and a block can hold another.
-          Repeat blocks are the planner's own: on a resident's card, wrapping steps opens a plan of
-          their queue that waits for <strong>Give</strong> (or Discard), and giving it, or Give to
-          all on a group's plan, makes each block that many plain copies of its steps, so the queue,
-          the server and your scripts only ever see steps. The running queue lists the copies, the
-          current one marked. A queue holds at most {num(QUEUE_MAX_STEPS)} steps after repeats; the
-          planner counts them and won't give a plan over that, saying by how much. Loop still loops
-          the whole queue.
+          Repeat blocks are the planner's own: on a resident's card, wrapping steps of a running
+          queue opens a draft of it that waits for <strong>Start queue</strong>, and starting it, or
+          Give to all on a group's plan, makes each block that many plain copies of its steps, so
+          the queue, the server and your scripts only ever see steps. The running queue lists the
+          copies, the current one marked. A queue holds at most {num(QUEUE_MAX_STEPS)} steps after
+          repeats; the planner counts them and won't give a plan over that, saying by how much. Loop
+          still loops the whole queue.
         </p>
         <p>
           A step ends when it is done (the walk arrives, the goods are stored, the script calls{' '}

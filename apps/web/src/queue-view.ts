@@ -23,7 +23,7 @@ import type {
 import { BUILDING_NAMES } from './city-view.js'
 import { GOOD_LABELS, subjectLabel } from './Residents.js'
 import { gonePlace } from './saved-queues.js'
-import { timedItems, unroll, withIds, type PlanItem } from './plan-blocks.js'
+import { hasBlocks, timedItems, unroll, withIds, type PlanItem } from './plan-blocks.js'
 import { realTimeOf } from './wiki-view.js'
 
 /**
@@ -138,8 +138,8 @@ export function appendToEach(
 
 /**
  * A queue planned in this browser until it is given: on the group card (`CONTEXT.md`: Group,
- * Planning for a group), or on a resident's card once a step is wrapped in a repeat block
- * (`CONTEXT.md`: Repeat block). Its items are steps and repeat blocks with ids of the plan's own,
+ * Planning for a group), or on a resident's card as a draft until Start queue (`CONTEXT.md`:
+ * Queue draft). Its items are steps and repeat blocks with ids of the plan's own,
  * and those of a resident's queue it was planned from.
  */
 export interface QueuePlan {
@@ -169,7 +169,35 @@ export function planStep(plan: QueuePlan, order: OrderRequest, at?: Tile): Queue
   return editPlan(plan, [...plan.items, ...stepsAfter(unroll(plan.items).at(-1), order, at)])
 }
 
-/** A resident's queue as a plan, to wrap its steps in a repeat block before giving it back. */
+/**
+ * The draft a step planned for a resident goes onto (`CONTEXT.md`: Queue draft): the open one,
+ * or a new one when they have no queue. None while a queue runs and no draft is open: the step is
+ * added to the running queue at once.
+ */
+export function draftFor(
+  r: Partial<Pick<Resident, 'queue'>>,
+  draft: QueuePlan | undefined,
+): QueuePlan | undefined {
+  return draft ?? (r.queue ? undefined : EMPTY_PLAN)
+}
+
+/**
+ * The draft an edit of a resident's planner with no draft open (a paste, a load, steps wrapped in
+ * a repeat block) makes, or none when it edits the running queue live: a resident with no queue
+ * gets a draft, and so does a running queue once a repeat block is in it, which only Start queue
+ * can give.
+ */
+export function draftEdit(
+  r: Partial<Pick<Resident, 'queue'>>,
+  items: readonly PlanItem[],
+  loop?: boolean,
+): QueuePlan | undefined {
+  if (!r.queue) return editPlan(EMPTY_PLAN, items, loop)
+  if (hasBlocks(items)) return editPlan(planOf(r.queue), items, loop)
+  return undefined
+}
+
+/** A resident's queue as a plan: Edit as draft, or wrapping its steps in a repeat block. */
 export function planOf(q: Pick<Queue, 'steps' | 'loop' | 'nextStepId'>): QueuePlan {
   return { items: stepsOf(q), loop: q.loop, nextStepId: q.nextStepId }
 }
