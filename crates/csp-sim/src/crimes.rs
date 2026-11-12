@@ -79,6 +79,8 @@ pub struct CrimeAgainst {
     pub horse: Option<String>,
     /// A boat taken (`CONTEXT.md`: Stealing a carriage or horse, its vessel part).
     pub boat: bool,
+    /// The boat taken is a ship, for the log to name it so.
+    pub ship: bool,
     pub building: Option<BuildingKind>,
     pub post: Option<String>,
 }
@@ -96,7 +98,8 @@ pub fn commit_crime(
 ) {
     let Some(culprit) = world.residents.iter().find(|r| r.id == culprit_id) else { return };
     let Some(org) = organization_of(culprit).map(str::to_string) else { return };
-    let CrimeAgainst { victim_org, victim, goods, carriage, horse, boat, building, post } = against;
+    let CrimeAgainst { victim_org, victim, goods, carriage, horse, boat, ship, building, post } =
+        against;
     let Some(victim_org) = victim_org else { return };
     if victim_org == org {
         return;
@@ -164,6 +167,7 @@ pub fn commit_crime(
         goods,
         carriage: carriage.then_some(true),
         boat: boat.then_some(true),
+        ship: ship.then_some(true),
         horse,
         building,
         post,
@@ -320,6 +324,7 @@ fn learn(world: &mut WorldState, ci: usize, org: &str) {
             carriage: crime.carriage,
             horse: crime.horse,
             boat: crime.boat,
+            ship: crime.ship,
             building: crime.building,
         },
     );

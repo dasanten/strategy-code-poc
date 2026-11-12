@@ -1301,6 +1301,19 @@ pub const PASSENGER_WEIGHT: f64 = 70.0;
 /// times over. Its rower doesn't count against it.
 pub const BOAT_CAPACITY: f64 = 250.0;
 
+/// Most weight a ship carries, in kg (`CONTEXT.md`: Ship: far more than a carriage): passengers at
+/// `PASSENGER_WEIGHT` and goods together, five carriages' worth. Its crew don't count against it.
+pub const SHIP_CAPACITY: f64 = 2000.0;
+
+/// The fewest crew aboard a ship for it to sail (`CONTEXT.md`: Crew, Sailing): a captain and three
+/// hands to work the sails, so a small realm can man one but it takes a few of its residents.
+pub const SHIP_MIN_CREW: f64 = 4.0;
+
+/// How fast a ship sails with an unskilled crew, as a share of walking on Plains (`CONTEXT.md`:
+/// Sailing): faster than a boat is rowed, as wind does the work; the crew's Seafaring adds to it as
+/// it does to rowing (`SEAFARING_SKILL_EFFECT`, from their average).
+pub const SAIL_SPEED: f64 = 1.6;
+
 /// How fast an average rower moves a boat over water, as a share of walking on Plains
 /// (`CONTEXT.md`: Rowing): a little quicker than walking round the shore, so crossing pays off.
 pub const ROW_SPEED: f64 = 1.2;
@@ -1614,6 +1627,9 @@ pub const BUILD_MATERIALS: Table<Table<f64>> = Table(&[
     // rather than nailed, so all Wood and buildable before any smelter; two thirds of a carriage's
     // timber.
     ("boat", Table(&[("wood", 20.0)])),
+    // A ship, built at a haven on the Sea (`CONTEXT.md`: Building a ship): a hull, a mast and
+    // rigging, iron-fastened, so Wood and some Iron; six boats' timber.
+    ("ship", Table(&[("wood", 120.0), ("iron", 15.0)])),
 ]);
 
 /// Work each kind of building needs, in ticks of one unskilled resident of average Strength: a
@@ -1621,7 +1637,7 @@ pub const BUILD_MATERIALS: Table<Table<f64>> = Table(&[
 /// a mint 5, a smithy 5, a town hall 6, a training ground 3 (about a stable), a haven 4. A tile of wooden
 /// wall takes a sixteenth of a game day, a gate an eighth, a tile of road a sixteenth (a quarter of
 /// what a 40 m tile took), a house one game day, a storage two and a farm half of one; a carriage
-/// two, a boat one. More or stronger workers finish it sooner (`buildWork`).
+/// two, a boat one, a ship ten. More or stronger workers finish it sooner (`buildWork`).
 pub const BUILD_WORK: Table<f64> = Table(&[
     ("lumberCamp", 2.0 * TICKS_PER_GAME_DAY),
     ("quarry", 3.0 * TICKS_PER_GAME_DAY),
@@ -1641,6 +1657,7 @@ pub const BUILD_WORK: Table<f64> = Table(&[
     ("haven", 4.0 * TICKS_PER_GAME_DAY),
     ("carriage", 2.0 * TICKS_PER_GAME_DAY),
     ("boat", TICKS_PER_GAME_DAY),
+    ("ship", 10.0 * TICKS_PER_GAME_DAY),
 ]);
 
 /// How many times `BUILD_WORK.road` a road tile on Mountain takes (`CONTEXT.md`: Road): the same
@@ -2443,6 +2460,9 @@ pub fn balance_json() -> Value {
     m.insert("CARRIAGE_MAX_CAPACITY".into(), json!(CARRIAGE_MAX_CAPACITY));
     m.insert("PASSENGER_WEIGHT".into(), json!(PASSENGER_WEIGHT));
     m.insert("BOAT_CAPACITY".into(), json!(BOAT_CAPACITY));
+    m.insert("SHIP_CAPACITY".into(), json!(SHIP_CAPACITY));
+    m.insert("SHIP_MIN_CREW".into(), json!(SHIP_MIN_CREW));
+    m.insert("SAIL_SPEED".into(), json!(SAIL_SPEED));
     m.insert("ROW_SPEED".into(), json!(ROW_SPEED));
     m.insert("ROW_STRENGTH_EFFECT".into(), json!(ROW_STRENGTH_EFFECT));
     m.insert("ROW_STRENGTH_AVERAGE".into(), json!(ROW_STRENGTH_AVERAGE));

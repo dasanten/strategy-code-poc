@@ -8,30 +8,35 @@ use std::sync::Arc;
 
 use csp_shared::balance::carriage_can_enter;
 use csp_shared::terrain::{
-    beside_step, ground_at, is_passable_terrain, is_water, step_length, terrain_at, tile_index,
-    wrap, TerrainMap,
+    beside_step, ground_at, is_passable_terrain, step_length, terrain_at, tile_index, wrap,
+    TerrainMap,
 };
 use csp_shared::world::{
     FetchOrder, FetchPhase, GoodsPlace, HaulPhase, HaulStop, LinePhase, OrderRequest,
-    ResidentOrder, SkillName, StoreOrder, StorePhase, Tile, TilePath, WalkOrder, WorldState,
+    ResidentOrder, SkillName, StoreOrder, StorePhase, Tile, TilePath, VesselKind, WalkOrder,
+    WorldState,
 };
 
 use crate::passengers::get_off_vessel;
-use crate::queries::vessels::{between_vessels, vessel_aboard};
+use crate::queries::vessels::{
+    across_docked_ship, beside_vessel, between_vessels, crew_short, floats_on, row_target,
+    vessel_aboard, vessel_crew,
+};
+use crate::water_hauling::stop_tile;
 
 use crate::armies::waiting_for_army;
 use crate::caravans::waiting_for_escort;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::{int_field, str_field, OrderKind};
 use crate::pathfinding::{
-    PathFinder, PathOptions, PathResult, Point, TerrainCosts, CARRIAGE_COSTS, WALKING_COSTS,
-    WATER_COSTS,
+    PathFinder, PathOptions, PathResult, Point, TerrainCosts, CARRIAGE_COSTS, SEA_COSTS,
+    WALKING_COSTS, WATER_COSTS,
 };
 use crate::queries::army::{army_driven_to, army_spot};
 use crate::queries::carriages::{horse_for, passengers_of};
 use crate::queries::driving::carriage_can_go_to;
 use crate::queries::pace::{
-    drive_speed, driving_learned, ride_speed, row_speed, seafaring_learned, walk_speed,
+    drive_speed, driving_learned, ride_speed, row_speed, sail_speed, seafaring_learned, walk_speed,
 };
 use crate::queries::residents::is_down;
 use crate::queries::riding::horse_ridden;
@@ -136,7 +141,8 @@ pub fn order_path_mut(o: &mut ResidentOrder) -> Option<(&mut Option<TilePath>, &
             Some((&mut o.path, &mut o.progress))
         }
         ResidentOrder::Relocate(o) => Some((&mut o.path, &mut o.progress)),
-        ResidentOrder::Row(o) => Some((&mut o.path, &mut o.progress)),
+        ResidentOrder::Row(o) | ResidentOrder::Sail(o) => Some((&mut o.path, &mut o.progress)),
+        ResidentOrder::HaulByWater(o) => Some((&mut o.path, &mut o.progress)),
         _ => None,
     }
 }
@@ -147,6 +153,7 @@ pub fn order_path_mut(o: &mut ResidentOrder) -> Option<(&mut Option<TilePath>, &
 fn is_moving(o: Option<&ResidentOrder>) -> bool {
     match o {
         Some(ResidentOrder::Haul(o)) => o.phase == HaulPhase::Driving,
+        Some(ResidentOrder::HaulByWater(o)) => o.phase == HaulPhase::Driving,
         Some(ResidentOrder::RoadLine(o) | ResidentOrder::WallLine(o)) => {
             o.phase == LinePhase::Walking
         }
@@ -157,7 +164,8 @@ fn is_moving(o: Option<&ResidentOrder>) -> bool {
             | ResidentOrder::Drive(_)
             | ResidentOrder::Attack(_)
             | ResidentOrder::Relocate(_)
-            | ResidentOrder::Row(_),
+            | ResidentOrder::Row(_)
+            | ResidentOrder::Sail(_),
         ) => true,
         _ => false,
     }
@@ -177,7 +185,8 @@ fn move_path(o: Option<&ResidentOrder>) -> Option<&TilePath> {
         ResidentOrder::Attack(o) => o.path.as_ref(),
         ResidentOrder::RoadLine(o) | ResidentOrder::WallLine(o) => o.path.as_ref(),
         ResidentOrder::Relocate(o) => o.path.as_ref(),
-        ResidentOrder::Row(o) => o.path.as_ref(),
+        ResidentOrder::Row(o) | ResidentOrder::Sail(o) => o.path.as_ref(),
+        ResidentOrder::HaulByWater(o) => o.path.as_ref(),
         _ => None,
     }
 }
@@ -212,6 +221,8 @@ fn kind_name(o: &ResidentOrder) -> &'static str {
         ResidentOrder::Fetch(_) => "fetch",
         ResidentOrder::Relocate(_) => "relocate",
         ResidentOrder::Row(_) => "row",
+        ResidentOrder::Sail(_) => "sail",
+        ResidentOrder::HaulByWater(_) => "haulByWater",
         _ => "other",
     }
 }
@@ -232,7 +243,8 @@ fn target_of(world: &WorldState, o: &ResidentOrder) -> Option<(f64, f64)> {
         ResidentOrder::WalkTo(o) => Some((o.target.x, o.target.y)),
         ResidentOrder::Drive(o) => Some((o.target.x, o.target.y)),
         ResidentOrder::Relocate(o) => Some((o.target.x, o.target.y)),
-        ResidentOrder::Row(o) => Some((o.target.x, o.target.y)),
+        ResidentOrder::Row(o) | ResidentOrder::Sail(o) => Some((o.target.x, o.target.y)),
+        ResidentOrder::HaulByWater(o) => o.water.map(|t| (t.x, t.y)),
         _ => None,
     }
 }
@@ -257,14 +269,33 @@ fn js(v: f64) -> String {
     }
 }
 
-/// Whether a store or fetch order goes to a vessel, which is loaded from beside it (`CONTEXT.md`:
-/// Beside a vessel): its walk ends next to the vessel's water tile.
-fn goes_beside_vessel(o: &ResidentOrder) -> bool {
-    matches!(
-        o,
-        ResidentOrder::Store(StoreOrder { to: GoodsPlace::Vessel { .. }, .. })
-            | ResidentOrder::Fetch(FetchOrder { from: GoodsPlace::Vessel { .. }, .. })
-    )
+/// Whether a store or fetch order goes to a boat, which is loaded from beside it (`CONTEXT.md`:
+/// Beside a vessel): its walk ends next to the boat's water tile. One to a ship walks onto the
+/// haven it is docked at, as to a storage (`CONTEXT.md`: Docked).
+fn goes_beside_vessel(world: &WorldState, o: &ResidentOrder) -> bool {
+    let id = match o {
+        ResidentOrder::Store(StoreOrder { to: GoodsPlace::Vessel { vessel_id }, .. })
+        | ResidentOrder::Fetch(FetchOrder { from: GoodsPlace::Vessel { vessel_id }, .. }) => {
+            vessel_id
+        }
+        _ => return false,
+    };
+    world.vessels.iter().any(|v| &v.id == id && v.kind == VesselKind::Boat)
+}
+
+/// The vessel an order rows, if it rows one: a row order, or a haul route by water rowing to its
+/// next stop (`CONTEXT.md`: Rowing, Haul route by water).
+fn rowed_vessel(o: &ResidentOrder) -> Option<&str> {
+    match o {
+        ResidentOrder::Row(o) => Some(&o.vessel_id),
+        ResidentOrder::HaulByWater(o) if o.phase == HaulPhase::Driving => Some(&o.vessel_id),
+        _ => None,
+    }
+}
+
+/// Whether the vessel of an id is a ship, which sails over Sea only (`CONTEXT.md`: Ship).
+fn is_ship(world: &WorldState, vessel_id: &str) -> bool {
+    world.vessels.iter().any(|v| v.id == vessel_id && v.kind == VesselKind::Ship)
 }
 
 /// Nobody walks off a vessel's water tile (`CONTEXT.md`: Water, No ferrying by itself): a
@@ -283,8 +314,8 @@ fn land_moving_passengers(world: &mut WorldState, terrain: &TerrainMap) {
             continue;
         }
         let o = r.order.as_ref().expect("a moving order");
-        // Rowing keeps them aboard: the boat moves, not they.
-        if matches!(o, ResidentOrder::Row(_)) {
+        // Rowing and sailing keep them aboard: the vessel moves, not they.
+        if rowed_vessel(o).is_some() || matches!(o, ResidentOrder::Sail(_)) {
             continue;
         }
         let target = target_of(world, o);
@@ -297,9 +328,18 @@ fn land_moving_passengers(world: &mut WorldState, terrain: &TerrainMap) {
                 .is_some_and(|t| between_vessels(world, r, t)),
             _ => false,
         };
+        // From a docked ship, anyone on its haven is in reach (`CONTEXT.md`: Fighting at a vessel).
+        let haven = match o {
+            ResidentOrder::Attack(a) => world
+                .residents
+                .iter()
+                .find(|t| t.id == a.target_id)
+                .is_some_and(|t| across_docked_ship(world, r, t)),
+            _ => false,
+        };
         if matches!(o, ResidentOrder::Attack(_))
             && !across
-            && target.is_some_and(|t| in_contact(size, (r.x, r.y), t))
+            && (haven || target.is_some_and(|t| in_contact(size, (r.x, r.y), t)))
         {
             continue;
         }
@@ -332,14 +372,20 @@ fn row_step(
         return false;
     };
     let v = &world.vessels[vi];
-    let at_oars = v.rower_id.as_deref() == Some(r.id.as_str())
-        && r.aboard.as_deref() == Some(vessel_id)
-        && v.x == r.x
-        && v.y == r.y;
+    // A boat's rower is at its oars; a ship's captain is one of its crew, and it has enough of them
+    // (`CONTEXT.md`: Sailing).
+    let helm = match v.kind {
+        VesselKind::Boat => v.rower_id.as_deref() == Some(r.id.as_str()),
+        VesselKind::Ship => v.crew_ids.contains(&r.id) && crew_short(world, v) == 0,
+    };
+    let at_oars = helm && r.aboard.as_deref() == Some(vessel_id) && v.x == r.x && v.y == r.y;
     let (vx, vy) = (v.x as i32, v.y as i32);
     let (tx, ty) = (to.0 as i32, to.1 as i32);
-    let water = |x: i32, y: i32| is_water(terrain_at(terrain, x, y));
-    let corners = beside_step(size, vx, vy, tx, ty).into_iter().all(|t| is_water(terrain.tiles[t]));
+    // A boat over any water, a ship over Sea only.
+    let kind = v.kind;
+    let water = |x: i32, y: i32| floats_on(kind, terrain_at(terrain, x, y));
+    let corners =
+        beside_step(size, vx, vy, tx, ty).into_iter().all(|t| floats_on(kind, terrain.tiles[t]));
     if !at_oars || step_length(size, vx, vy, tx, ty) == 0.0 || !water(tx, ty) || !corners {
         world.residents[i].order = None;
         return false;
@@ -348,7 +394,11 @@ fn row_step(
     if world.vessels.iter().any(|o| o.id != vessel_id && o.x == wx && o.y == wy) {
         let last = move_path(world.residents[i].order.as_ref()).is_some_and(|p| p.len() == 1);
         if last {
-            world.residents[i].order = None;
+            if let Some(ResidentOrder::HaulByWater(_)) = &world.residents[i].order {
+                water_stop_taken(world, terrain, i, vi);
+            } else {
+                world.residents[i].order = None;
+            }
         }
         return false;
     }
@@ -372,9 +422,38 @@ fn row_step(
     true
 }
 
+/// A haul route by water whose water tile beside the stop another vessel took just before it got
+/// there: a boat already beside the stop has arrived; else it heads for another free water tile
+/// beside the stop, or waits for one.
+fn water_stop_taken(world: &mut WorldState, terrain: &TerrainMap, i: usize, vi: usize) {
+    let Some(ResidentOrder::HaulByWater(o)) = &world.residents[i].order else { return };
+    let stop = stop_tile(o, o.stop);
+    let v = &world.vessels[vi];
+    if beside_vessel(world, v, stop.x, stop.y) {
+        arrive(world, i);
+        return;
+    }
+    let to = row_target(world, terrain, v, stop.x as i32, stop.y as i32);
+    let Some(ResidentOrder::HaulByWater(o)) = &mut world.residents[i].order else { return };
+    if let Some((x, y)) = to.map(|(x, y)| (f64::from(x), f64::from(y))) {
+        if o.water.is_some_and(|w| w.x != x || w.y != y) {
+            o.water = Some(Tile { x, y });
+            o.path = None;
+            o.progress = 0.0;
+        }
+    }
+}
+
 /// Not driving a carriage or rowing a boat: walking, or riding a horse (`onFoot`).
 fn on_foot(o: &ResidentOrder) -> bool {
-    !matches!(o, ResidentOrder::Drive(_) | ResidentOrder::Haul(_) | ResidentOrder::Row(_))
+    !matches!(
+        o,
+        ResidentOrder::Drive(_)
+            | ResidentOrder::Haul(_)
+            | ResidentOrder::Row(_)
+            | ResidentOrder::Sail(_)
+            | ResidentOrder::HaulByWater(_)
+    )
 }
 
 /// A moving order got there (`arrive`): a walk or drive is done, a haul route starts on its stop,
@@ -413,6 +492,12 @@ fn arrive(world: &mut WorldState, i: usize) {
         }
         ResidentOrder::Haul(o) => {
             o.phase = HaulPhase::Loading;
+            o.path = None;
+            o.progress = 0.0;
+        }
+        ResidentOrder::HaulByWater(o) => {
+            o.phase = HaulPhase::Loading;
+            o.water = None;
             o.path = None;
             o.progress = 0.0;
         }
@@ -604,7 +689,7 @@ impl Walking {
                     (target_of(world, o), move_path(Some(o)).and_then(|p| p.last()))
                 {
                     // To a vessel the way ends beside it (`CONTEXT.md`: Beside a vessel).
-                    let ends_there = if goes_beside_vessel(o) {
+                    let ends_there = if goes_beside_vessel(world, o) {
                         in_contact(size, *end, to) && *end != to
                     } else {
                         end.0 == to.0 && end.1 == to.1
@@ -637,18 +722,53 @@ impl Walking {
                 continue;
             }
             let o = r.order.as_ref().expect("a moving order");
-            // The rower sets the pace over water, Lake or Sea alike, and learns Seafaring
-            // (`CONTEXT.md`: Rowing, Seafaring).
-            if let ResidentOrder::Row(row) = o {
-                let vessel_id = row.vessel_id.clone();
-                let (gain, learned) = (row_speed(r, tick), seafaring_learned(r, tick));
+            // The rower sets the pace over water, Lake or Sea alike, and learns Seafaring; a
+            // ship's crew set its pace over Sea, and all of them learn Seafaring (`CONTEXT.md`:
+            // Rowing, Sailing, Seafaring).
+            let sailed = match o {
+                ResidentOrder::Sail(s) => Some(s.vessel_id.as_str()),
+                _ => None,
+            };
+            if let Some(vessel_id) = rowed_vessel(o).or(sailed) {
+                // A ship on a haul route by water is sailed as well (`CONTEXT.md`: Haul route by
+                // water).
+                let sailing = sailed.is_some() || is_ship(world, vessel_id);
+                let vessel_id = vessel_id.to_string();
                 let (rx, ry) = (r.x as i32, r.y as i32);
+                let gain = if sailing {
+                    let Some(v) = world.vessels.iter().find(|v| v.id == vessel_id) else {
+                        world.residents[i].order = None;
+                        continue;
+                    };
+                    // Below the fewest crew it takes, the ship stops where it is.
+                    if crew_short(world, v) > 0 {
+                        world.residents[i].order = None;
+                        continue;
+                    }
+                    let crew: Vec<usize> = vessel_crew(world, v)
+                        .iter()
+                        .filter_map(|c| world.residents.iter().position(|x| x.id == c.id))
+                        .collect();
+                    let gain =
+                        sail_speed(&crew.iter().map(|&c| &world.residents[c]).collect::<Vec<_>>());
+                    for c in crew {
+                        let learned = seafaring_learned(&world.residents[c], tick);
+                        let skills = &mut world.residents[c].skills;
+                        let skill = skills.get(&SkillName::Seafaring).copied().unwrap_or(0.0);
+                        skills.insert(SkillName::Seafaring, skill + learned);
+                    }
+                    gain
+                } else {
+                    let (gain, learned) = (row_speed(r, tick), seafaring_learned(r, tick));
+                    let skills = &mut world.residents[i].skills;
+                    let skill = skills.get(&SkillName::Seafaring).copied().unwrap_or(0.0);
+                    skills.insert(SkillName::Seafaring, skill + learned);
+                    gain
+                };
                 let r = &mut world.residents[i];
                 let (_, progress) = move_path_mut(r.order.as_mut()).expect("a moving order");
                 *progress += gain;
                 let progress = *progress;
-                let skill = r.skills.get(&SkillName::Seafaring).copied().unwrap_or(0.0);
-                r.skills.insert(SkillName::Seafaring, skill + learned);
                 let length = match step_length(size, rx, ry, next.0 as i32, next.1 as i32) {
                     0.0 => 1.0,
                     l => l,
@@ -761,10 +881,14 @@ impl Walking {
             if self.searching.get(&r.id) != Some(&key) {
                 // A rider keeps to where a carriage can go, and off the walls (`CONTEXT.md`: Riding).
                 let walking = on_foot(o) && r.riding.is_none();
-                // A boat goes over water only (`CONTEXT.md`: Rowing).
-                let rowing = matches!(o, ResidentOrder::Row(_));
+                // A boat goes over water only, a ship over Sea only (`CONTEXT.md`: Rowing,
+                // Sailing).
+                let ship_route = rowed_vessel(o).is_some_and(|id| is_ship(world, id));
+                let rowing = rowed_vessel(o).is_some() && !ship_route;
                 let costs: &TerrainCosts = if rowing {
                     &WATER_COSTS
+                } else if matches!(o, ResidentOrder::Sail(_)) || ship_route {
+                    &SEA_COSTS
                 } else if walking {
                     &WALKING_COSTS
                 } else {
@@ -775,7 +899,7 @@ impl Walking {
                 let near = matches!(o, ResidentOrder::Attack(_))
                     || army_driven_to(r).is_some()
                     || matches!(o, ResidentOrder::Drive(d) if d.near == Some(true))
-                    || goes_beside_vessel(o);
+                    || goes_beside_vessel(world, o);
                 let options = PathOptions {
                     realm_id: wall_side(r).map(str::to_string),
                     on_walls: walking,
