@@ -5,6 +5,9 @@
 //!
 //! `bench-ts.mts suite` (the TypeScript test suite's wall time) has no twin: `cargo nextest run`
 //! prints its own.
+//!
+//! `bench-broadcast` (T99.7, no twin) times the Broadcast phase with Players connected, one of
+//! them remembering every building; its results go under ADR 0034's Measurements.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -421,6 +424,144 @@ pub fn bench_sim(name: SceneName, scene: Scene, ticks: usize, out: &mut Out<'_>)
     SimBench { phases, totals, residents }
 }
 
+// ----------------------------------------------------------------------------------- broadcast
+
+/// What `bench_broadcast` measured: the Broadcast phase's ms, tick by tick.
+pub struct BroadcastBench {
+    pub broadcast: Vec<f64>,
+    /// How many things the first Player remembers.
+    pub remembered: usize,
+}
+
+/// A Player's realm on the scene for each of `clients` Players (users 1 to `clients`), and the
+/// first Player remembering every building and city of the world as it stands, as if they had
+/// been everywhere. Returns how many things they remember.
+fn players_on(world: &mut WorldState, terrain: &TerrainMap, clients: usize) -> usize {
+    use csp_shared::world::Remembered;
+    for user in 1..=clients as u64 {
+        csp_sim::starting_city::found_starting_city(world, terrain, user, None);
+    }
+    let seen = |mut v: serde_json::Value, is: &str| {
+        let o = v.as_object_mut().expect("an object");
+        o.insert("is".into(), is.into());
+        o.insert("seenAt".into(), 0.into());
+        serde_json::from_value::<Remembered>(v).expect("remembered")
+    };
+    let mut memory: Vec<Remembered> = world
+        .buildings
+        .iter()
+        .map(|b| seen(serde_json::to_value(b).expect("a building"), "building"))
+        .collect();
+    memory.extend(
+        world.cities.iter().map(|c| seen(serde_json::to_value(c).expect("a city"), "city")),
+    );
+    let remembered = memory.len();
+    world.last_seen.insert(1, memory);
+    remembered
+}
+
+/// Steps the scene as `bench_sim` does with `clients` Players connected, one socket each, and
+/// times the Broadcast phase: what goes to every socket after the tick, Last seen with it
+/// (T99.7). The first Player remembers every building; the others only what they see.
+pub fn bench_broadcast(
+    name: SceneName,
+    scene: Scene,
+    clients: usize,
+    ticks: usize,
+    out: &mut Out<'_>,
+) -> BroadcastBench {
+    use crate::realtime::{Outgoing, Realtime, RealtimeOptions, TickView};
+    use csp_sim::explored::ExploredTerrain;
+    use csp_sim::orders::OrderQueue;
+    use csp_sim::sight::SightTracker;
+
+    let Scene { mut world, terrain } = scene;
+    let remembered = players_on(&mut world, &terrain, clients);
+    let conn = open_db(":memory:", None).expect("a database");
+    let realtime = Realtime::new(RealtimeOptions {
+        db: Arc::new(std::sync::Mutex::new(conn)),
+        origins: crate::config::Origins { allowed: Vec::new(), allow_missing: true },
+        limits: crate::config::RealtimeLimits {
+            max_payload_bytes: 1 << 20,
+            message_burst: 20,
+            messages_per_second: 10,
+            connections_per_user: 5,
+            pending_orders_per_realm: 50,
+        },
+        sight_check: None,
+        on_error: None,
+        now: None,
+    });
+    let mut scratch = Scratch::default();
+    let mut explored = ExploredTerrain::new(terrain.clone(), &world.nodes);
+    let mut orders = OrderQueue::new(Default::default(), None);
+    let mut sight = SightTracker::new();
+    let mut sockets = Vec::new();
+    for user in 1..=clients as i64 {
+        let (socket, rx) = realtime.attach(user);
+        let mut g = crate::app::GameView {
+            world: &mut world,
+            terrain: &terrain,
+            explored: &mut explored,
+            orders: &mut orders,
+            sight: &mut sight,
+            scratch: &mut scratch,
+            territory: None,
+        };
+        let account = serde_json::json!({ "name": format!("player {user}"), "isAdmin": false });
+        realtime.connected(&mut g, socket, &account, user);
+        sockets.push(rx);
+    }
+    // Sessions are checked once a minute from the hub's start: never, at this clock.
+    let since = crate::auth::now_ms();
+    let mut reporter = Quiet;
+    let terrain = Arc::new(terrain);
+    let mut walking = Walking::new(Arc::clone(&terrain));
+    let mut broadcast = Vec::with_capacity(ticks);
+    let mut bytes = 0usize;
+    for i in 0..ticks {
+        let mut finish =
+            |timer: &csp_sim::tick::TickTimer, world: &mut WorldState, scratch: &mut Scratch| {
+                let grown = {
+                    let index = scratch.index(world, terrain.size);
+                    sight.update(world, index, &mut explored)
+                };
+                timer.time(TickPhase::Broadcast, || {
+                    let view = TickView { territory: None, explored: &explored };
+                    realtime.broadcast_tick(world, &terrain, scratch, &grown, view, since);
+                });
+            };
+        let mut opts = TickOptions::new(&mut reporter, 0.0, f64::INFINITY);
+        opts.walking = Some(&mut walking);
+        opts.finish = Some(&mut finish);
+        let Some(health) = run_tick(&mut world, &terrain, &mut scratch, opts) else {
+            panic!("tick {i} failed");
+        };
+        broadcast.push(health.phases.get(TickPhase::Broadcast));
+        for rx in &mut sockets {
+            while let Ok(m) = rx.try_recv() {
+                if let Outgoing::Text(t) = m {
+                    bytes += t.len();
+                }
+            }
+        }
+    }
+    out(&format!(
+        "broadcast {}, {ticks} ticks, {clients} clients, the first remembering {remembered} \
+         buildings and cities, {}x{} map: {}",
+        name.name(),
+        terrain.size,
+        terrain.size,
+        machine_line()
+    ));
+    out("");
+    let row = vec!["broadcast".to_string(), fmt(mean(&broadcast)), fmt(p95(&broadcast))];
+    table(&["phase", "mean ms", "p95 ms"], &[row], out);
+    out("");
+    out(&format!("{:.1} KB sent a tick on average", bytes as f64 / ticks.max(1) as f64 / 1024.0));
+    BroadcastBench { broadcast, remembered }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -462,5 +603,15 @@ mod tests {
         assert_eq!(civil_from_days(0), (1970, 1, 1));
         assert_eq!(civil_from_days(20_765), (2026, 11, 8));
         assert_eq!(civil_from_days(11_016), (2000, 2, 29));
+    }
+
+    #[test]
+    fn times_the_broadcast_with_players_connected_one_remembering_every_building() {
+        let out = lines(|out| {
+            let bench = bench_broadcast(SceneName::Village, village(), 2, 3, out);
+            assert_eq!(bench.broadcast.len(), 3);
+            assert!(bench.remembered > 0);
+        });
+        assert!(out[0].starts_with("broadcast village, 3 ticks, 2 clients"), "{}", out[0]);
     }
 }

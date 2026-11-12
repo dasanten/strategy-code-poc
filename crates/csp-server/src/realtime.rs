@@ -21,7 +21,8 @@ use csp_shared::world::protocol::{OrderRequest, Remembered};
 use csp_shared::world::WorldState;
 use csp_sim::explored::ExploredTerrain;
 use csp_sim::last_seen::{
-    last_seen_in_sight, last_seen_on_cadence, last_seen_out_of_sight, LastSeenState,
+    last_seen_in_sight, last_seen_on_cadence, last_seen_out_of_sight, LastSeenState, OutOfSight,
+    OutOfSightDiff,
 };
 use csp_sim::order_sender::{Account, OrderSender};
 use csp_sim::orders::OrderReply;
@@ -119,8 +120,10 @@ struct Client {
     /// The residents and armies whose Script tab the Player has open, in the order asked.
     watching: Vec<(String, Watched)>,
     view: ClientView,
-    /// What was last sent of what the Player remembers out of sight.
-    last_seen_view: ClientView,
+    /// What the welcome sent of what the Player remembers out of sight, until the first tick
+    /// after it, which sends the difference from it; from then on the socket gets what its
+    /// realm's other sockets get (`Hub::last_seen`, T99.7).
+    last_seen_welcome: Option<ClientView>,
     last_event_seq: u64,
     last_diplomacy: String,
     /// The territory's tick the last Region map sent was of; none before the first.
@@ -140,6 +143,9 @@ struct Hub {
     sessions: indexmap::IndexMap<u64, Session>,
     clients: indexmap::IndexMap<u64, Client>,
     last_session_check: i64,
+    /// Each connected realm's Last seen out of sight as its sockets were last sent it, kept from
+    /// what changed (T99.7) and shared by its sockets.
+    last_seen: HashMap<String, OutOfSight>,
 }
 
 /// Where the sampled sight checks report what they found.
@@ -346,6 +352,18 @@ impl Realtime {
         self.db.lock().unwrap_or_else(|e| e.into_inner())
     }
 
+    /// A socket with no WebSocket behind it, what goes out on it coming out of the receiver: for
+    /// `bench-broadcast`, which connects Players without a network. [`Realtime::connected`]
+    /// welcomes it as any other.
+    pub fn attach(&self, user_id: i64) -> (u64, mpsc::UnboundedReceiver<Outgoing>) {
+        let (out, outgoing) = mpsc::unbounded_channel::<Outgoing>();
+        let mut hub = self.hub();
+        hub.next_id += 1;
+        let id = hub.next_id;
+        hub.sessions.insert(id, Session { token_hash: String::new(), user_id, out });
+        (id, outgoing)
+    }
+
     /// How many sockets an account holds open, with or without a realm (the connection cap).
     fn sockets_of(&self, user_id: i64) -> usize {
         self.hub().sessions.values().filter(|s| s.user_id == user_id).count()
@@ -494,7 +512,7 @@ impl Realtime {
             realm_id: realm.id.clone(),
             watching: Vec::new(),
             view: ClientView::new(),
-            last_seen_view: ClientView::new(),
+            last_seen_welcome: None,
             last_event_seq: 0,
             last_diplomacy: String::new(),
             region_tick: None,
@@ -521,7 +539,9 @@ impl Realtime {
         let entities = client.view.initial(&in_sight);
         self.check_sent(world, index, &realm.id, &entities);
         let remembered = last_seen_out_of_sight(world, index, user_id as u64);
-        let last_seen = client.last_seen_view.initial(&remembered);
+        let mut welcome_view = ClientView::new();
+        let last_seen = welcome_view.initial(&remembered);
+        client.last_seen_welcome = Some(welcome_view);
         self.check_last_seen(world, g.terrain, &g.scratch.last_seen, &realm.id, &last_seen);
         // Their map is fresh from the next tick, not when the realm's turn comes round.
         g.scratch.last_seen.refresh_soon(&realm.id);
@@ -753,12 +773,16 @@ impl Realtime {
         self.recheck_sessions(now);
         let size = terrain.size;
         let Scratch { sight, index, last_seen: cadence, .. } = scratch;
+        // What the refreshes changed in each Player's memory since the last broadcast.
+        let changes = cadence.take_changes();
         let cadence = &*cadence;
         let index = world_index(index, world, size);
         with_sight(sight.as_mut(), size, |cache| {
             let mut round = SyncRound::<Seen>::default();
             let mut hub = self.hub();
-            let Hub { sessions, clients, .. } = &mut *hub;
+            let Hub { sessions, clients, last_seen: out_of_sight, .. } = &mut *hub;
+            // Each realm's Last seen diff this tick, worked out once for its sockets.
+            let mut remembered_now: HashMap<String, Arc<OutOfSightDiff>> = HashMap::new();
             for (socket, client) in clients.iter_mut() {
                 let Some(session) = sessions.get(socket) else { continue };
                 let in_sight = entities_in_sight(world, index, Some(&client.realm_id), Some(cache));
@@ -767,21 +791,34 @@ impl Realtime {
                 let mut tick = Map::new();
                 tick.insert("type".into(), json!("tick"));
                 tick.insert("tick".into(), json!(world.tick));
-                let remembered =
-                    Arc::new(last_seen_out_of_sight(world, index, client.user_id as u64));
-                let remembered = client.last_seen_view.diff_alone(&remembered);
-                self.check_last_seen(
-                    world,
-                    terrain,
-                    cadence,
-                    &client.realm_id,
-                    &remembered.changed,
+                let user_id = client.user_id as u64;
+                let shared = Arc::clone(
+                    remembered_now.entry(client.realm_id.clone()).or_insert_with(|| {
+                        Arc::new(match out_of_sight.get_mut(&client.realm_id) {
+                            Some(kept) => {
+                                kept.update(world, index, Some(&mut *cache), changes.get(&user_id))
+                            }
+                            None => {
+                                let kept =
+                                    OutOfSight::new(world, index, Some(&mut *cache), user_id);
+                                out_of_sight.insert(client.realm_id.clone(), kept);
+                                OutOfSightDiff::default()
+                            }
+                        })
+                    }),
                 );
-                if !remembered.changed.is_empty() || !remembered.gone.is_empty() {
-                    tick.insert(
-                        "lastSeen".into(),
-                        json!({ "changed": remembered.changed, "gone": remembered.gone }),
-                    );
+                // A socket's first tick after its welcome sends the difference from what the
+                // welcome sent; from then on it is in step with its realm's.
+                let own = client.last_seen_welcome.take().map(|mut welcome| {
+                    welcome.diff_alone(&Arc::new(last_seen_out_of_sight(world, index, user_id)))
+                });
+                let (changed, gone) = match &own {
+                    Some(own) => (&own.changed, &own.gone),
+                    None => (&shared.changed, &shared.gone),
+                };
+                self.check_last_seen(world, terrain, cadence, &client.realm_id, changed);
+                if !changed.is_empty() || !gone.is_empty() {
+                    tick.insert("lastSeen".into(), json!({ "changed": changed, "gone": gone }));
                 }
                 let grown: Vec<usize> = explored
                     .get(&(client.user_id as u64))
@@ -851,6 +888,8 @@ impl Realtime {
                 send_script_memory(world, session, client);
                 send_script_logs(world, session, client);
             }
+            // A realm with no socket left starts afresh when one connects again.
+            out_of_sight.retain(|realm, _| remembered_now.contains_key(realm));
         });
     }
 

@@ -67,20 +67,37 @@ Before, on 2026-11-12, on a copy of a worked dev world (5,760 tiles across, 34 c
 buildings, tick 870), with Node's zlib and SQLite and the client's own code on the dev machine.
 The live game was not measured: `csp-admin map-stats` (T99.1) prints the same for any world.
 
-| What                                            | Measured                                                                                           |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| The whole map at full detail                    | 32,400 chunks, 507 batch requests, 32 MB; 0.45 MB gzipped or zstd-compressed                       |
-| A batch of 64 chunks                            | 64.5 KB; 1.0 KB gzipped (0.7 ms) or zstd-compressed (0.35 ms); 0.7 KB with brotli                  |
-| Chunks of a single terrain                      | 69%                                                                                                |
-| The whole map at level 3 (8 × 8 tiles a byte)   | 506 KB; 27 KB gzipped                                                                              |
-| The whole map at level 5 (32 × 32 tiles a byte) | 32 KB; 4 KB gzipped                                                                                |
-| Painting one chunk's texture (`terrainPixels`)  | 1.1 ms and 64 KB: 5,000 chunks take 5.5 s and 313 MB, the whole map 36 s and 2 GB                  |
-| Last seen                                       | about 96 bytes of JSON an entry; 0.43 MB for every building of that world                          |
+| What                                            | Measured                                                                                            |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| The whole map at full detail                    | 32,400 chunks, 507 batch requests, 32 MB; 0.45 MB gzipped or zstd-compressed                        |
+| A batch of 64 chunks                            | 64.5 KB; 1.0 KB gzipped (0.7 ms) or zstd-compressed (0.35 ms); 0.7 KB with brotli                   |
+| Chunks of a single terrain                      | 69%                                                                                                 |
+| The whole map at level 3 (8 × 8 tiles a byte)   | 506 KB; 27 KB gzipped                                                                               |
+| The whole map at level 5 (32 × 32 tiles a byte) | 32 KB; 4 KB gzipped                                                                                 |
+| Painting one chunk's texture (`terrainPixels`)  | 1.1 ms and 64 KB: 5,000 chunks take 5.5 s and 313 MB, the whole map 36 s and 2 GB                   |
+| Last seen                                       | about 96 bytes of JSON an entry; 0.43 MB for every building of that world                           |
 | Region map                                      | about 25 KB of JSON for a village, up to 0.85 MB for all 34 cities, 260 KB for a city at full reach |
-| A Player's explored terrain                     | a 4 MB bitmap whatever they explored; one Player's 31 chunks gzip to 4.8 KB                        |
-| Saving one exploring Player's bitmap            | 6 ms and 72 KB of write-ahead log with one walking scout, 728 KB with ten scouts apart             |
+| A Player's explored terrain                     | a 4 MB bitmap whatever they explored; one Player's 31 chunks gzip to 4.8 KB                         |
+| Saving one exploring Player's bitmap            | 6 ms and 72 KB of write-ahead log with one walking scout, 728 KB with ten scouts apart              |
 
 T84.6 measured the client at about 1.4 ms a chunk for its texture, and 4.3 s to load 2,997 chunks
 in batches on one machine without a network.
 
 Each ticket of Epic 99 adds its before and after below.
+
+### T99.7: Last seen costs a tick only what changed
+
+`bench-broadcast villages <clients> 100` (60 NPC villages on a 432 × 432 map, a Player's realm
+for each client, the first Player remembering every building and city: 7,200 with 1 client,
+7,680 with 5), release build, on the dev machine on 2026-11-12 while other sessions were building.
+The Broadcast phase, before and after; the bytes sent are the same (12.2 KB a tick with 1 client,
+54.6 KB with 5).
+
+| Broadcast phase | Before: mean, p95  | After: mean, p95   |
+| --------------- | ------------------ | ------------------ |
+| 1 client        | 28.07 ms, 86.99 ms | 5.55 ms, 12.09 ms  |
+| 5 clients       | 42.29 ms, 73.76 ms | 11.79 ms, 14.82 ms |
+
+With 5,000 remembered buildings and nothing changing, a tick now copies none of them and turns
+none into JSON (tested by counting); before, every tick turned all of them into JSON for every
+socket.
