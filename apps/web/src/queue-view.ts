@@ -373,6 +373,8 @@ export function stepLabel(
     }
     case 'row':
       return `Row the boat to ${at(order)}`
+    case 'sail':
+      return `Sail the ship to ${at(order)}`
     case 'unhitch':
       return 'Unhitch the horse'
     case 'hitch':

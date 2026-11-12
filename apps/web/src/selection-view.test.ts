@@ -407,6 +407,17 @@ describe('the actions on a resident’s card', () => {
     expect(board({ aboard: true, carriageToBoard: true }).map((a) => a.label)).toEqual(['Get off'])
   })
 
+  it('offers one of a ship’s crew aboard it sailing it to a picked tile', () => {
+    const sailRow = (h: Parameters<typeof here>[0]) =>
+      residentActions(here(h)).filter((a) => a.id === 'row')
+    expect(sailRow({ boatToRow: { ship: true } })).toEqual([
+      expect.objectContaining({ label: 'Sail ship to', key: 'D' }),
+    ])
+    expect(
+      sailRow({ boatToRow: { ship: true, problem: 'the ship needs 2 more crew to sail' } })[0],
+    ).toMatchObject({ disabled: true, reason: 'the ship needs 2 more crew to sail' })
+  })
+
   it('offers rowing a boat of theirs to a picked tile, to grown residents on foot', () => {
     const rowRow = (h: Parameters<typeof here>[0]) =>
       residentActions(here(h)).filter((a) => a.id === 'row')
