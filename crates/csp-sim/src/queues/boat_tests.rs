@@ -179,8 +179,14 @@ fn a_step_naming_a_boat_that_isnt_there_or_isnt_the_realms_is_turned_down() {
     let mut s = setup();
     for (order, reason) in [
         (json!({ "kind": "board", "vesselId": "v9" }), "step 1: no such boat"),
-        (json!({ "kind": "row", "vesselId": "v2", "x": 5, "y": 5 }), "step 1: not a boat of your realm"),
-        (json!({ "kind": "store", "to": "v2", "goods": ["wood"] }), "step 1: not a boat of your realm"),
+        (
+            json!({ "kind": "row", "vesselId": "v2", "x": 5, "y": 5 }),
+            "step 1: not a boat of your realm",
+        ),
+        (
+            json!({ "kind": "store", "to": "v2", "goods": ["wood"] }),
+            "step 1: not a boat of your realm",
+        ),
         (
             json!({ "kind": "pickUp", "spot": { "kind": "vessel", "vesselId": "v2" }, "goods": { "wood": 1 } }),
             "step 1: not a boat of your realm",
