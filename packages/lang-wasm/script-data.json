@@ -2754,7 +2754,7 @@
         "keepFood?"
       ],
       "cost": 10,
-      "description": "Drive a haul route between my tile and (x, y): `goods` there, `returnGoods` back. Given a boat beside me (its id as `carriageId`), row it instead between my tile and the shore or haven (x, y), loading by hand at each.",
+      "description": "Drive a haul route between my tile and (x, y): `goods` there, `returnGoods` back. Given a boat beside me (its id as `carriageId`), row it instead between my tile and the shore or haven (x, y), loading by hand at each. Given a ship docked at the haven I stand on, I am its captain: I sail it between this haven and the haven at (x, y) with its crew aboard, moving the goods straight between each haven's storage and the ship.",
       "returns": "string"
     },
     {

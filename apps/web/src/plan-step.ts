@@ -243,13 +243,21 @@ export const PLAN_STEPS: readonly PlanKind[] = [
     ask: 'haul',
   },
   {
-    // `CONTEXT.md`: Haul route by water: it starts on the shore beside the boat.
+    // `CONTEXT.md`: Haul route by water: it starts on the shore beside the boat, a ship's on the
+    // haven it is docked at, and a ship's stops are havens.
     id: 'haulBoat',
-    label: 'Haul route by boat',
+    label: 'Haul route by boat or ship',
     picks: [
-      { pick: 'vessel', prompt: 'the boat to haul with' },
-      { pick: 'shore', prompt: 'the first stop: the shore or haven beside where the boat will be' },
-      { pick: 'tile', prompt: 'the other stop: a shore tile or haven with water beside it' },
+      { pick: 'vessel', prompt: 'the boat or ship to haul with' },
+      {
+        pick: 'shore',
+        prompt:
+          'the first stop: the shore or haven beside where the boat will be (a ship: a haven)',
+      },
+      {
+        pick: 'tile',
+        prompt: 'the other stop: a shore tile or haven with water beside it (a ship: a haven)',
+      },
     ],
     ask: 'haul',
   },

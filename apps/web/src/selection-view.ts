@@ -514,12 +514,17 @@ function ordersOffered(h: ResidentHere): {
         : h.driving
           ? 'the driver can’t row'
           : h.boatToRow.problem
-    add(
-      row('row', '', {
-        ...picks('row', h.boatToRow.ship ? 'Sail ship to' : 'Row boat to'),
-        ...(reason ? { disabled: true as const, reason } : {}),
-      }),
-    )
+    // A ship is sailed by one of its crew aboard (`CONTEXT.md`: Sailing); ashore on its haven
+    // they take it on a haul route instead.
+    if (h.boatToRow.ship && !h.aboard) miss('row', 'board the ship as crew to sail it')
+    else {
+      add(
+        row('row', '', {
+          ...picks('row', h.boatToRow.ship ? 'Sail ship to' : 'Row boat to'),
+          ...(reason ? { disabled: true as const, reason } : {}),
+        }),
+      )
+    }
     // A haul route by water starts on the shore beside the boat, the first stop
     // (`CONTEXT.md`: Haul route by water).
     if (h.adult && !reason && !h.aboard && !h.carrying) {

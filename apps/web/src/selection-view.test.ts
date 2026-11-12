@@ -408,14 +408,35 @@ describe('the actions on a resident’s card', () => {
     expect(board({ aboard: true, carriageToBoard: true }).map((a) => a.label)).toEqual(['Get off'])
   })
 
+  it('offers a haul route, not sailing, to one on the haven their ship is docked at', () => {
+    const ids = (h: Parameters<typeof here>[0]) => residentActions(here(h)).map((a) => a.id)
+    const ashore = ids({ boatToRow: { ship: true } })
+    expect(ashore).toContain('haul')
+    expect(ashore).not.toContain('row')
+    expect(residentOrders(here({ boatToRow: { ship: true } })).missing.row).toBe(
+      'board the ship as crew to sail it',
+    )
+    // Too few crew aboard to sail once they board: no route either, saying why.
+    const short = {
+      boatToRow: { ship: true, problem: 'the ship needs 1 more crew aboard to sail' },
+    }
+    expect(ids(short)).not.toContain('haul')
+    expect(residentOrders(here(short)).missing.haul).toBe(
+      'the ship needs 1 more crew aboard to sail',
+    )
+  })
+
   it('offers one of a ship’s crew aboard it sailing it to a picked tile', () => {
     const sailRow = (h: Parameters<typeof here>[0]) =>
       residentActions(here(h)).filter((a) => a.id === 'row')
-    expect(sailRow({ boatToRow: { ship: true } })).toEqual([
+    expect(sailRow({ aboard: true, boatToRow: { ship: true } })).toEqual([
       expect.objectContaining({ label: 'Sail ship to', key: 'D' }),
     ])
     expect(
-      sailRow({ boatToRow: { ship: true, problem: 'the ship needs 2 more crew to sail' } })[0],
+      sailRow({
+        aboard: true,
+        boatToRow: { ship: true, problem: 'the ship needs 2 more crew to sail' },
+      })[0],
     ).toMatchObject({ disabled: true, reason: 'the ship needs 2 more crew to sail' })
   })
 

@@ -172,9 +172,9 @@ fn refuses_stops_a_boat_cant_serve_and_rowers_who_cant_row() {
     // Not to an army.
     let army = json!({"vesselId": "v1", "armyId": "a1"});
     assert_eq!(refusal(&mut game, army), "a boat hauls between stops on land, not to an army");
-    // A ship is sailed, not rowed (T91.4 brings its haul route).
+    // A ship's route runs between havens it docks at (T91.4, ship_tests): this one is at none.
     game.world.vessels[0].kind = VesselKind::Ship;
-    assert_eq!(refusal(&mut game, ok.clone()), "a ship is sailed, not rowed");
+    assert_eq!(refusal(&mut game, ok.clone()), "the ship is not docked at a haven");
     game.world.vessels[0].kind = VesselKind::Boat;
     // Aboard, the route can't start: it starts on the shore.
     assert_eq!(

@@ -293,6 +293,11 @@ fn rowed_vessel(o: &ResidentOrder) -> Option<&str> {
     }
 }
 
+/// Whether the vessel of an id is a ship, which sails over Sea only (`CONTEXT.md`: Ship).
+fn is_ship(world: &WorldState, vessel_id: &str) -> bool {
+    world.vessels.iter().any(|v| v.id == vessel_id && v.kind == VesselKind::Ship)
+}
+
 /// Nobody walks off a vessel's water tile (`CONTEXT.md`: Water, No ferrying by itself): a
 /// vessel's passenger whose order has them walk, however they got it, gets off onto the shore
 /// beside it nearest where they go first (`get_off_vessel`); with no shore there the order ends
@@ -725,7 +730,9 @@ impl Walking {
                 _ => None,
             };
             if let Some(vessel_id) = rowed_vessel(o).or(sailed) {
-                let sailing = sailed.is_some();
+                // A ship on a haul route by water is sailed as well (`CONTEXT.md`: Haul route by
+                // water).
+                let sailing = sailed.is_some() || is_ship(world, vessel_id);
                 let vessel_id = vessel_id.to_string();
                 let (rx, ry) = (r.x as i32, r.y as i32);
                 let gain = if sailing {
@@ -876,10 +883,11 @@ impl Walking {
                 let walking = on_foot(o) && r.riding.is_none();
                 // A boat goes over water only, a ship over Sea only (`CONTEXT.md`: Rowing,
                 // Sailing).
-                let rowing = rowed_vessel(o).is_some();
+                let ship_route = rowed_vessel(o).is_some_and(|id| is_ship(world, id));
+                let rowing = rowed_vessel(o).is_some() && !ship_route;
                 let costs: &TerrainCosts = if rowing {
                     &WATER_COSTS
-                } else if matches!(o, ResidentOrder::Sail(_)) {
+                } else if matches!(o, ResidentOrder::Sail(_)) || ship_route {
                     &SEA_COSTS
                 } else if walking {
                     &WALKING_COSTS
