@@ -124,7 +124,7 @@ import { faresKnown, horseFaresKnown } from './seen.js'
 import { FEED_HORSE_HINT, horseDownLine, horseNeed } from './horses-view.js'
 import { lastSeenText, type LastSeenBuilding } from './last-seen.js'
 import { describeOccupation, type OccupationView } from './city-view.js'
-import { besideVessel, boardBoatProblem, vesselCapacity } from './shared/vessels.js'
+import { besideVessel, boardBoatProblem, crewShort, vesselCapacity } from './shared/vessels.js'
 import type { Picking } from './Residents.js'
 
 /**
@@ -307,6 +307,11 @@ export interface ResidentHere {
   /** A boat of their realm beside them with room, to board (`CONTEXT.md`: Beside a vessel). */
   boatToBoard?: boolean
   /**
+   * The vessel to board is a ship docked at their haven: Board opens a choice, as crew or as a
+   * passenger (`CONTEXT.md`: Crew).
+   */
+  shipToBoard?: boolean
+  /**
    * A boat of their realm they are aboard or beside, to row, with why they can't take its oars
    * now, if so (`CONTEXT.md`: Rowing).
    */
@@ -464,7 +469,8 @@ function ordersOffered(h: ResidentHere): {
         ? 'no horse goes aboard: dismount first'
         : ''
     const refused = reason ? { disabled: true as const, reason } : {}
-    add(row('board', 'Board boat', refused))
+    if (h.shipToBoard) add(row('board', 'Board ship…', { ...refused, opens: true }))
+    else add(row('board', 'Board boat', refused))
   } else miss('board', 'no carriage or boat of yours here')
   if (h.adult && h.carriageToUnhitch) add(row('unhitch', 'Unhitch horse'))
   else miss('unhitch', h.adult ? 'no hitched horse here' : 'children can’t unhitch')
@@ -922,6 +928,8 @@ export interface TileCard {
    */
   boat?: {
     vesselId: string
+    /** "Boat" or "Ship", for its Board action. */
+    name?: string
     board: { id: string; name: string; problem: string | undefined }[]
     getOff: { id: string; name: string }[]
   }
@@ -1001,6 +1009,11 @@ export interface CarriageView {
   driver?: NamedResident
   /** A boat's rower, at its oars, no passenger (`CONTEXT.md`: Rowing). */
   rower?: NamedResident
+  /**
+   * A ship's crew in sight, no passengers, and whether it can sail: "can sail", or "needs 2 more
+   * crew to sail" (`CONTEXT.md`: Crew).
+   */
+  crew?: { residents: NamedResident[]; sail: string }
   /** Its passengers in sight, and what they weigh of what it holds: "160 kg of it people". */
   passengers?: { residents: NamedResident[]; weight: string }
   /**
@@ -1726,24 +1739,31 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     card ??= { title: VESSEL_NAMES[vessel.kind], rel, what: 'carriage' }
     lines.push(rel ? RELATIONSHIP_NAMES[rel] : 'Nobody’s')
     carriageView = describeVessel(vessel, rel, t)
-    // The Player's residents beside it board it, and its passengers of theirs get off
-    // (`CONTEXT.md`: Beside a vessel).
+    // The Player's residents beside it board it, a ship's from the haven it is docked at, and its
+    // passengers of theirs get off (`CONTEXT.md`: Beside a vessel, Docked).
     const mine = (t.residents ?? []).filter(
       (r) => !t.strangers.some((s) => s.id === r.id) && !isDown(r),
     )
     const viewerRealm = t.viewer.realmId
     if (viewerRealm && vessel.realmId === viewerRealm) {
       const board = mine
-        .filter((r) => r.aboard === undefined && besideVessel(vessel, r, t.mapSize ?? MAP_SIZE))
+        .filter(
+          (r) =>
+            r.aboard === undefined && besideVessel(vessel, r, t.mapSize ?? MAP_SIZE, t.buildings),
+        )
         .map((r) => ({
           id: r.id,
           name: r.name,
-          problem: boardBoatProblem({ ...r, driving: !!drivenCarriageId(r) }, vessel),
+          problem: boardBoatProblem({ ...r, driving: !!drivenCarriageId(r) }, vessel, {
+            buildings: t.buildings,
+            size: t.mapSize ?? MAP_SIZE,
+          }),
         }))
       const getOff = mine
         .filter((r) => r.aboard === vessel.id)
         .map(({ id, name }) => ({ id, name }))
-      if (board.length > 0 || getOff.length > 0) boat = { vesselId: vessel.id, board, getOff }
+      const name = VESSEL_NAMES[vessel.kind]
+      if (board.length > 0 || getOff.length > 0) boat = { vesselId: vessel.id, name, board, getOff }
     }
   }
   if (carriage) {
@@ -1935,6 +1955,13 @@ export function describeVessel(
     view.passengers = { residents: aboard, weight: `${Math.round(people)} kg of it people` }
   }
   if (rower) view.rower = rower
+  if (vessel.kind === 'ship') {
+    const short = crewShort(vessel)
+    view.crew = {
+      residents: (vessel.crewIds ?? []).flatMap(named),
+      sail: short === 0 ? 'can sail' : `needs ${short} more crew to sail`,
+    }
+  }
   return view
 }
 
@@ -2408,7 +2435,7 @@ export function tileActions(
   if (boater) {
     actions.push({
       id: 'board',
-      label: boater.getOff ? 'Get off' : 'Board boat',
+      label: boater.getOff ? 'Get off' : `Board ${(card.boat?.name ?? 'Boat').toLowerCase()}`,
       key: ACTION_KEYS.board,
       ...(boater.problem ? { disabled: true as const, reason: boater.problem } : {}),
     })

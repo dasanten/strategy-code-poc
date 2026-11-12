@@ -14,9 +14,7 @@ use csp_shared::world::{
 };
 use csp_sim::invariants::check_all;
 use csp_sim::queries::building::{build_materials, build_problem, ship_site_at, BUILDABLE};
-use csp_sim::queries::vessels::{
-    board_vessel_problem, launch_tile, vessel_at, vessel_capacity, vessel_room,
-};
+use csp_sim::queries::vessels::{launch_tile, vessel_at, vessel_capacity, vessel_room};
 use csp_sim::rowing::row_problem;
 use serde_json::json;
 
@@ -78,7 +76,16 @@ fn build(resident: &str) -> serde_json::Value {
 }
 
 fn vessel(id: &str, kind: VesselKind, x: f64, y: f64) -> Vessel {
-    Vessel { id: id.into(), kind, realm_id: None, x, y, load: Stock::new(), rower_id: None }
+    Vessel {
+        id: id.into(),
+        kind,
+        realm_id: None,
+        x,
+        y,
+        load: Stock::new(),
+        rower_id: None,
+        crew_ids: Vec::new(),
+    }
 }
 
 /// A ship site on (19, 6) with all its materials and all but half a tick's work.
@@ -209,17 +216,15 @@ fn floats_on_the_nearest_free_sea_tile_never_on_the_lake() {
     assert_sound(&world, &t);
 }
 
-/// Boarding, loading and sailing a ship come with docking and sailing (T91.2, T91.3); until then
-/// nobody rows one, boards it or loads it, from any shore.
+/// A ship is sailed, never rowed (`CONTEXT.md`: Sailing); boarding it is docking's (T91.2).
 #[test]
-fn is_never_rowed_and_nobody_boards_it_from_the_shore() {
+fn is_never_rowed() {
     let mut world = setup();
     let mut ship = vessel("s1", VesselKind::Ship, 20.0, 7.0);
     ship.realm_id = Some("r1".into());
     world.vessels.push(ship);
     let (w1, s1) = (&world.residents[0], &world.vessels[0]);
     assert_eq!(row_problem(&world, w1, s1).as_deref(), Some("a ship is sailed, not rowed"));
-    assert!(board_vessel_problem(&world, w1, s1).is_some());
     assert_eq!(vessel_room(&world, s1), SHIP_CAPACITY);
 }
 

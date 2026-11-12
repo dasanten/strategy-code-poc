@@ -430,14 +430,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           : [],
       )
     : []
-  // The realm's boats someone of the group stands beside, to board with the places left in each
-  // (`CONTEXT.md`: Beside a vessel).
+  // The realm's boats someone of the group stands beside, and its ships docked at a haven one of
+  // them stands on, to board with the places left in each (`CONTEXT.md`: Beside a vessel, Docked).
   const groupBoats = world
     ? world.vessels.flatMap((v) => {
         const room = vesselRoom(v)
         if (room === undefined) return []
-        if (!group.some((r) => vesselOfResident(v, r) && besideVessel(v, r, world.map.size)))
-          return []
+        const beside = (r: SeenResident) =>
+          vesselOfResident(v, r) && besideVessel(v, r, world.map.size, world.buildings)
+        if (!group.some(beside)) return []
         return [{ vessel: v, seats: Math.max(0, Math.floor(room / PASSENGER_WEIGHT + 1e-9)) }]
       })
     : []
@@ -1318,12 +1319,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
    * none to get off the one they are aboard, onto its tile or the shore beside the boat
    * (`CONTEXT.md`: Passenger, Beside a vessel); with Shift held, appends it to their queue.
    */
-  async function boardCarriage(carriageId?: string, residentId = selected?.id) {
+  async function boardCarriage(carriageId?: string, residentId = selected?.id, asCrew = false) {
     if (!residentId) return
     const order = !carriageId
       ? { kind: 'getOff', residentId }
       : isVesselId(carriageId)
-        ? { kind: 'board', residentId, vesselId: carriageId }
+        ? { kind: 'board', residentId, vesselId: carriageId, ...(asCrew ? { asCrew } : {}) }
         : { kind: 'board', residentId, carriageId }
     setOrderError(await giveOrder(order))
   }
@@ -1387,7 +1388,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // (`CONTEXT.md`: Rowing); boarding from beside it, the one at its oars becomes a passenger.
   const boatToRow = ((): { id: string; problem?: string } | undefined => {
     if (!selected || !world) return undefined
-    const mine = world.vessels.filter((v) => vesselOfResident(v, selected))
+    // A ship is sailed, never rowed (`CONTEXT.md`: Sailing).
+    const mine = world.vessels.filter((v) => v.kind !== 'ship' && vesselOfResident(v, selected))
     const aboard = mine.find((v) => v.id === selected.aboard)
     if (aboard) return { id: aboard.id }
     if (selected.aboard !== undefined) return undefined
@@ -1405,7 +1407,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (selected.aboard !== undefined) return undefined
     const size = world.map.size
     const v = world.vessels.find(
-      (v) => v.realmId !== world.home.realmId && besideVessel(v, selected, size),
+      (v) =>
+        v.kind !== 'ship' && v.realmId !== world.home.realmId && besideVessel(v, selected, size),
     )
     if (!v) return undefined
     return { id: v.id, problem: rowOffProblem(world, selected, v, world.home.realmId, size) }
@@ -2133,7 +2136,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               (v) =>
                 vesselOfResident(v, selected) &&
                 selected.aboard !== v.id &&
-                besideVessel(v, selected, world.map.size),
+                besideVessel(v, selected, world.map.size, world.buildings),
             )}
             carriageTheirs={!ownCarriageHere && !!stealableHere}
             onDriveTo={() => setPicking((p) => (p === 'drive' ? false : 'drive'))}
@@ -2196,10 +2199,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             boatToBoard={world.vessels.find(
               (v) =>
                 vesselOfResident(v, selected) &&
-                besideVessel(v, selected, world.map.size) &&
-                (vesselRoom(v) ?? PASSENGER_WEIGHT) >= PASSENGER_WEIGHT - 1e-9,
+                besideVessel(v, selected, world.map.size, world.buildings) &&
+                // A ship with no room left still takes crew (`CONTEXT.md`: Crew).
+                (v.kind === 'ship' ||
+                  (vesselRoom(v) ?? PASSENGER_WEIGHT) >= PASSENGER_WEIGHT - 1e-9),
             )}
-            onBoard={boardCarriage}
+            onBoard={(id, asCrew) => void boardCarriage(id, undefined, asCrew)}
             {...(boatToRow ? { boatToRow } : {})}
             onRowTo={() => setPicking((p) => (p === 'row' ? false : 'row'))}
             {...(boatToSteal && {
@@ -2235,6 +2240,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             carriageSite={carriageSiteHere}
             node={nodeAt?.(selected.x, selected.y)}
             onPickUp={(spot, goods) => carry('pickUp', spot, goods)}
+            onLoad={async (vesselId, goods, unload) =>
+              setOrderError(
+                await giveOrder({ kind: 'load', residentId: selected.id, vesselId, goods, unload }),
+              )
+            }
             onDrop={(spot, goods) => carry('drop', spot, goods)}
             onBuild={build}
             buildProblem={buildProblemAt(world, selected.x, selected.y)}

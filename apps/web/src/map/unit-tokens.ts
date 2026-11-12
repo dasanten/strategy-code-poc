@@ -221,8 +221,13 @@ export function drawUnits(
     const kind = v.kind === 'ship' ? 'ship' : 'boat'
     const r = unitRadius(kind, tile)
     drawUnit(tokens, UNIT_ART[kind], ...p, r, entityRelationship(v, viewer, known))
-    // Its passengers ride inside it, counted on it as on a cart (`CONTEXT.md`: Beside a vessel).
-    const aboard = [...(v.passengerIds ?? []), ...(v.rowerId ? [v.rowerId] : [])]
+    // Its passengers, rower and crew ride inside it, counted on it as on a cart (`CONTEXT.md`:
+    // Beside a vessel, Crew).
+    const aboard = [
+      ...(v.passengerIds ?? []),
+      ...(v.rowerId ? [v.rowerId] : []),
+      ...(v.crewIds ?? []),
+    ]
     if (aboard.length > 0) badge(`${aboard.length}`, ...p, r)
     for (const id of [v.id, ...aboard]) spots.set(id, { x: p[0], y: p[1], r })
   }

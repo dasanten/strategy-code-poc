@@ -36,6 +36,7 @@ fn boat(id: &str, realm: Option<&str>, x: f64, y: f64) -> Vessel {
         y,
         load: Stock::new(),
         rower_id: None,
+        crew_ids: Vec::new(),
     }
 }
 

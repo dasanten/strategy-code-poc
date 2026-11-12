@@ -13,7 +13,8 @@ use csp_shared::terrain::{
 };
 use csp_shared::world::{
     FetchOrder, FetchPhase, GoodsPlace, HaulPhase, HaulStop, LinePhase, OrderRequest,
-    ResidentOrder, SkillName, StoreOrder, StorePhase, Tile, TilePath, WalkOrder, WorldState,
+    ResidentOrder, SkillName, StoreOrder, StorePhase, Tile, TilePath, VesselKind, WalkOrder,
+    WorldState,
 };
 
 use crate::passengers::get_off_vessel;
@@ -257,14 +258,18 @@ fn js(v: f64) -> String {
     }
 }
 
-/// Whether a store or fetch order goes to a vessel, which is loaded from beside it (`CONTEXT.md`:
-/// Beside a vessel): its walk ends next to the vessel's water tile.
-fn goes_beside_vessel(o: &ResidentOrder) -> bool {
-    matches!(
-        o,
-        ResidentOrder::Store(StoreOrder { to: GoodsPlace::Vessel { .. }, .. })
-            | ResidentOrder::Fetch(FetchOrder { from: GoodsPlace::Vessel { .. }, .. })
-    )
+/// Whether a store or fetch order goes to a boat, which is loaded from beside it (`CONTEXT.md`:
+/// Beside a vessel): its walk ends next to the boat's water tile. One to a ship walks onto the
+/// haven it is docked at, as to a storage (`CONTEXT.md`: Docked).
+fn goes_beside_vessel(world: &WorldState, o: &ResidentOrder) -> bool {
+    let id = match o {
+        ResidentOrder::Store(StoreOrder { to: GoodsPlace::Vessel { vessel_id }, .. })
+        | ResidentOrder::Fetch(FetchOrder { from: GoodsPlace::Vessel { vessel_id }, .. }) => {
+            vessel_id
+        }
+        _ => return false,
+    };
+    world.vessels.iter().any(|v| &v.id == id && v.kind == VesselKind::Boat)
 }
 
 /// Nobody walks off a vessel's water tile (`CONTEXT.md`: Water, No ferrying by itself): a
@@ -604,7 +609,7 @@ impl Walking {
                     (target_of(world, o), move_path(Some(o)).and_then(|p| p.last()))
                 {
                     // To a vessel the way ends beside it (`CONTEXT.md`: Beside a vessel).
-                    let ends_there = if goes_beside_vessel(o) {
+                    let ends_there = if goes_beside_vessel(world, o) {
                         in_contact(size, *end, to) && *end != to
                     } else {
                         end.0 == to.0 && end.1 == to.1
@@ -775,7 +780,7 @@ impl Walking {
                 let near = matches!(o, ResidentOrder::Attack(_))
                     || army_driven_to(r).is_some()
                     || matches!(o, ResidentOrder::Drive(d) if d.near == Some(true))
-                    || goes_beside_vessel(o);
+                    || goes_beside_vessel(world, o);
                 let options = PathOptions {
                     realm_id: wall_side(r).map(str::to_string),
                     on_walls: walking,

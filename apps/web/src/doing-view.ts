@@ -146,14 +146,15 @@ function doingOfOrder(
 }
 
 /**
- * A passenger's line (`CONTEXT.md`: Passenger): "Aboard a boat" on a vessel; "Aboard a carriage",
+ * A passenger's line (`CONTEXT.md`: Passenger): "Aboard a boat" or "Aboard a ship" on a vessel
+ * (whose id the server names after its kind); "Aboard a carriage",
  * and "· heading to 4, 5" while its driver drives it there.
  */
 function aboardLine(
   r: Pick<DoingOf, 'aboard'>,
   residents: readonly Pick<Resident, 'order'>[],
 ): string {
-  if (isVesselId(r.aboard)) return 'Aboard a boat'
+  if (isVesselId(r.aboard)) return r.aboard!.startsWith('ship') ? 'Aboard a ship' : 'Aboard a boat'
   const to = selectedWay({ order: null, aboard: r.aboard }, residents)?.target
   return to ? `Aboard a carriage · heading to ${to.x}, ${to.y}` : 'Aboard a carriage'
 }

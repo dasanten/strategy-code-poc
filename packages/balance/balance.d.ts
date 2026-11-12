@@ -444,6 +444,7 @@ export interface Balance {
   readonly PASSENGER_WEIGHT: number
   readonly BOAT_CAPACITY: number
   readonly SHIP_CAPACITY: number
+  readonly SHIP_MIN_CREW: number
   readonly ROW_SPEED: number
   readonly ROW_STRENGTH_EFFECT: number
   readonly ROW_STRENGTH_AVERAGE: number

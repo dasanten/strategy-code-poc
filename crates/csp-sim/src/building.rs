@@ -166,6 +166,7 @@ pub fn finish_site(
             y: f64::from(y),
             load: Stock::new(),
             rower_id: None,
+            crew_ids: Vec::new(),
         });
         return true;
     }

@@ -262,6 +262,23 @@ describe('Add step', () => {
     ])
   })
 
+  it('crews a ship from the tile of its haven picked (`CONTEXT.md`: Crew)', () => {
+    const sea: PlanWorld = {
+      ...w,
+      vessels: [{ id: 'ship1', x: 10, y: 10, realmId: 'r1' }],
+      water: (x) => x >= 10,
+    }
+    const plan = (...taps: [number, number][]) =>
+      taps.reduce<Plan>((p, [x, y]) => pickInto(sea, p, { x, y }), {
+        kind: 'boardCrew',
+        picked: [],
+      })
+    expect(planOrder(plan([10, 10], [8, 10]))).toEqual({
+      order: { kind: 'board', vesselId: 'ship1', asCrew: true },
+      at: { x: 8, y: 10 },
+    })
+  })
+
   it('boards a boat from the shore picked, rows it, gets off and loads it (`CONTEXT.md`: Beside a vessel)', () => {
     // A lake over x 10..14, y 8..12, with the realm's boat v1 at (10, 10) and r2's v2 at (12, 10).
     const lake: PlanWorld = {
