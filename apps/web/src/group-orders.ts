@@ -53,10 +53,15 @@ export type GroupOrder =
       seats: number
     }
   /**
-   * Boards the boat (`CONTEXT.md`: Beside a vessel): those beside it, in the group's order, until
-   * its `seats` are taken.
+   * Boards the boat or docked ship (`CONTEXT.md`: Beside a vessel, Docked): those beside it, in
+   * the group's order, until its `seats` are taken; with `asCrew`, a ship's crew, who take none.
    */
-  | { kind: 'boardBoat'; vessel: Pick<SeenVessel, 'id' | 'x' | 'y'>; seats: number }
+  | {
+      kind: 'boardBoat'
+      vessel: Pick<SeenVessel, 'id' | 'x' | 'y'> & Partial<Pick<SeenVessel, 'kind' | 'dockedAt'>>
+      seats: number
+      asCrew?: boolean
+    }
   /** Those aboard a carriage or boat get off it (`CONTEXT.md`: Passenger, Beside a vessel). */
   | { kind: 'getOff' }
   /**
@@ -182,8 +187,8 @@ export interface GroupSeen {
   horses?: readonly Pick<Horse, 'id' | 'x' | 'y'>[]
   /** The realm's carriages, to drive or haul with, and whether a horse is hitched to unhitch. */
   carriages?: readonly (Pick<Carriage, 'id' | 'x' | 'y'> & Partial<Pick<Carriage, 'horseId'>>)[]
-  /** The realm's boats, to row (`CONTEXT.md`: Rowing). */
-  vessels?: readonly Pick<SeenVessel, 'id' | 'x' | 'y'>[]
+  /** The realm's boats, to row (`CONTEXT.md`: Rowing), and its ships. */
+  vessels?: readonly (Pick<SeenVessel, 'id' | 'x' | 'y'> & Partial<Pick<SeenVessel, 'kind'>>)[]
   /** The buildings in sight, to find the stable each one stands in. */
   buildings?: readonly Pick<Building, 'id' | 'kind' | 'x' | 'y' | 'site'>[]
   /**
@@ -277,7 +282,8 @@ function toFeedNear(r: GroupResident, seen: GroupSeen, size: number) {
  * aboard nothing, those beside them.
  */
 function boatsOf(r: GroupResident, seen: GroupSeen, size: number) {
-  const boats = seen.vessels ?? []
+  // A ship is sailed, never rowed (`CONTEXT.md`: Sailing).
+  const boats = (seen.vessels ?? []).filter((v) => v.kind !== 'ship')
   if (r.aboard !== undefined) return boats.filter((v) => v.id === r.aboard)
   return boats.filter((v) => besideVessel(v, r, size))
 }
@@ -384,7 +390,11 @@ export function groupSkip(
     // Room is told by the seats left (`groupRequests`).
     const driving = r.order?.kind === 'drive' || r.order?.kind === 'haul'
     const boarder = { ...r, driving, ...(r.riding === undefined ? {} : { riding: r.riding }) }
-    return boardBoatProblem(boarder, { ...order.vessel, passengerIds: [] })
+    return boardBoatProblem(
+      boarder,
+      { ...order.vessel, passengerIds: [] },
+      { size, ...(seen.buildings ? { buildings: seen.buildings } : {}), asCrew: !!order.asCrew },
+    )
   }
   if (order.kind === 'getOff' && r.aboard === undefined) return 'not aboard'
   if (order.kind === 'work' && !isAt(r, order.workplace, size))
@@ -509,11 +519,16 @@ export function groupRequests(
         send(r, { kind: 'board', carriageId: order.carriage.id })
         break
       case 'boardBoat':
-        if (!queued && seats-- <= 0) {
-          skip(r, 'the boat is full')
+        // Crew take no room (`CONTEXT.md`: Crew).
+        if (!order.asCrew && !queued && seats-- <= 0) {
+          skip(r, `the ${order.vessel.kind === 'ship' ? 'ship' : 'boat'} is full`)
           break
         }
-        send(r, { kind: 'board', vesselId: order.vessel.id })
+        send(r, {
+          kind: 'board',
+          vesselId: order.vessel.id,
+          ...(order.asCrew ? { asCrew: true } : {}),
+        })
         break
       case 'row': {
         const boat = rowers.get(r.id)
