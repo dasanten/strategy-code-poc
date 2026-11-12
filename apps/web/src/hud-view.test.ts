@@ -10,6 +10,8 @@ import {
   goodsOldText,
   goodsPickCities,
   goodsPickOf,
+  RAIL_GROUPS,
+  railGroups,
   rememberGoodsPick,
   rememberedDrawerWidth,
   rememberedGoodsPick,
@@ -38,6 +40,19 @@ describe('drawers', () => {
     ])
       expect(labels).toContain(tool)
     expect(new Set(DRAWERS.map((d) => d.id)).size).toBe(DRAWERS.length)
+  })
+
+  it('puts every drawer in exactly one group, in rail order', () => {
+    const groups = railGroups()
+    expect(groups.map((g) => g.id)).toEqual(RAIL_GROUPS.map((g) => g.id))
+    expect(groups.flatMap((g) => g.drawers.map((d) => d.id))).toEqual(DRAWERS.map((d) => d.id))
+    expect(
+      Object.fromEntries(groups.map((g) => [g.label, g.drawers.map((d) => d.label)])),
+    ).toEqual({
+      People: ['Residents', 'Horses', 'Armies'],
+      Diplomacy: ['Contracts', 'Demands', 'Direct offers', 'Alliance', 'Standing'],
+      Realm: ['Cities', 'Waypoints', 'Scripts', 'Realm log'],
+    })
   })
 
   it('opens the clicked drawer when none is open', () => {
