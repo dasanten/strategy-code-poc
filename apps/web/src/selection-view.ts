@@ -516,7 +516,7 @@ function ordersOffered(h: ResidentHere): {
         ...(reason ? { disabled: true as const, reason } : {}),
       }),
     )
-  } else miss('row', 'no boat of yours here')
+  } else miss('row', 'no boat or ship of yours here')
   // Only ever on its own row, saying what it is (`CONTEXT.md`: Stealing a carriage or horse).
   if (h.driveOff) {
     const { problem } = h.driveOff

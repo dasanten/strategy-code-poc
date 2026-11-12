@@ -436,7 +436,7 @@ describe('the actions on a resident’s card', () => {
       disabled: true,
       reason: 'the boat is full',
     })
-    expect(residentOrders(here()).missing.row).toBe('no boat of yours here')
+    expect(residentOrders(here()).missing.row).toBe('no boat or ship of yours here')
   })
 
   it('offers boarding a boat of the realm beside them, never on horseback', () => {
