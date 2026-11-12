@@ -207,10 +207,16 @@ pub fn validate_attack(
     };
     let side = npc.or(realm.map(|r| r.id.as_str()));
     let Some(side) = side else { return Some("not one of your residents") };
-    if ordered_resident(world, sender, order.resident_id.as_deref()).is_none() {
+    let Some(me) = ordered_resident(world, sender, order.resident_id.as_deref()) else {
         return Some("not one of your residents");
-    }
+    };
+    let me = &world.residents[me];
     let target_id = order.target_id.as_deref();
+    if let Some(t) = target_id.filter(|t| !fights_back(me, t)) {
+        if let Some(no) = crate::lent::refusal(world, me, t) {
+            return Some(no);
+        }
+    }
     let resident = world.residents.iter().find(|x| Some(x.id.as_str()) == target_id);
     if resident.is_some_and(|r| organization_of(r) == Some(side)) {
         return Some("that is one of your own residents");
@@ -252,6 +258,14 @@ pub fn validate_attack(
 
 use crate::alarms::{answers_attack, goes_after_occupier};
 
+/// Whether `r`, running their defence script, goes after `target_id`, who struck them: fighting
+/// back, never a crime, and allowed even against the city that lent them.
+fn fights_back(r: &Resident, target_id: &str) -> bool {
+    r.interrupted.is_some()
+        && r.script.as_ref().and_then(|s| s.task) != Some(Task::Alarm)
+        && r.struck.as_ref().is_some_and(|s| s.by == target_id)
+}
+
 /// `attack.apply`: a defence script going after who struck them fights back, in a fight already
 /// logged; an Alarm script answering an attack, or going after an occupier, strikes back too.
 pub fn apply_attack(world: &mut WorldState, order: &AttackRequest, size: Option<i32>) {
@@ -262,9 +276,7 @@ pub fn apply_attack(world: &mut WorldState, order: &AttackRequest, size: Option<
     };
     let Some(i) = world.residents.iter().position(|x| x.id == resident_id) else { return };
     let r = &world.residents[i];
-    let defending = r.interrupted.is_some()
-        && r.script.as_ref().and_then(|s| s.task) != Some(Task::Alarm)
-        && r.struck.as_ref().is_some_and(|s| s.by == target_id);
+    let defending = fights_back(r, target_id);
     let no_crime = answers_attack(r, target_id)
         || size.is_some_and(|size| goes_after_occupier(world, r, target_id, size));
     world.residents[i].order =

@@ -2492,9 +2492,13 @@ export function Wiki() {
         <p>
           An NPC city sells only what it holds above this reserve and buys only what it is short of.
           It lends residents at {num(NPC_TRADE.pricePerResidentWeek)} coins each a game week,
-          keeping {pct(NPC_TRADE.defenceShare)} of its adults at home. The Trade Organization hires
-          out soldiers at {num(TRADE_ORG_ARMY.pricePerSoldierWeek)} coins each a game week. A
-          contract runs at most {days(CONTRACT_MAX_DAYS)}.
+          keeping {pct(NPC_TRADE.defenceShare)} of its adults at home. Those it lends never act
+          against it: they refuse an order to attack its residents, walls or gates, to climb its
+          walls or to tear down its buildings, whether you give it by hand, in a queue, to a group
+          or an army or from a script, and they can't occupy its town hall nor count as your
+          fighters toward it. Struck by one of its own, they still defend themselves. The Trade
+          Organization hires out soldiers at {num(TRADE_ORG_ARMY.pricePerSoldierWeek)} coins each a
+          game week. A contract runs at most {days(CONTRACT_MAX_DAYS)}.
         </p>
         <p>
           An NPC city shuts its gates while anyone armed who isn't of the city or its alliance

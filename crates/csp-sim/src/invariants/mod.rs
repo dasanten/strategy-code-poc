@@ -277,6 +277,7 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: |w, t| crate::trade_org_army::trade_org_army_sound(w, t.size),
         },
         Invariant { name: "npc-hire-sound", check: |w, _| crate::npc_hire::npc_hire_sound(w) },
+        Invariant { name: "lent-never-turn", check: |w, _| crate::lent::lent_never_turn(w) },
         Invariant {
             name: "punishments-sound",
             check: |w, _| crate::trade_org_punishment::punishments_sound(w),

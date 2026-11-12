@@ -167,6 +167,9 @@ pub fn validate_tear_down(
     let Some(building_id) = str_field(order, "buildingId") else {
         return Some("which building?".into());
     };
+    if let Some(no) = crate::lent::refusal(world, r, building_id) {
+        return Some(no.into());
+    }
     tear_down_problem(world, r.x as i32, r.y as i32, building_id, terrain)
 }
 
