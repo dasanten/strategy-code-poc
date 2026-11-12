@@ -108,8 +108,10 @@ export function StandingPanel({
       )}
       <p className="muted small">
         Known crimes lower it, trade and paid contract weeks raise it, and it drifts back to
-        neutral. An NPC city that holds you in high standing and sees more of your armed residents
-        and walls than it has soldiers asks to join you.
+        neutral. An NPC city that holds you in high standing asks to join you while your armed
+        residents near it outweigh its soldiers and walls. Respect counts them by weapon, armour,
+        shield and Combat skill, only in its City area or in sight of its people at home; your walls
+        and residents it lent you don't count.
       </p>
     </section>
   )

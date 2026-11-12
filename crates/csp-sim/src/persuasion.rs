@@ -9,15 +9,18 @@
 
 use std::collections::HashSet;
 
-use csp_shared::balance::{PERSUADE_ASK_AGAIN_DAYS, PERSUADE_CHECK_TICKS};
+use csp_shared::balance::{PERSUADE_ASK_AGAIN_DAYS, PERSUADE_CHECK_TICKS, RESPECT_PER_WALL};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{City, JoinRequest, RealmEventWhat, WorldState};
 
 use crate::capture::join_realm;
 use crate::events::record_event;
 use crate::queries::city::{for_sale, town_hall_of};
-use crate::queries::persuasion::{holds_high, persuaded_by, respect_seen_by};
+use crate::queries::persuasion::{
+    city_strength, fighter_strength, holds_high, persuaded_by, respect_seen_by,
+};
 use crate::queries::standing::standing_of;
+use crate::queries::walls::{is_wall_or_gate, wall_side};
 use crate::sight::InvariantViolation;
 
 /// The city a realm can still be asked by (`askable`): an NPC city that isn't gone.
@@ -239,6 +242,48 @@ pub fn join_requests_sound(world: &WorldState) -> Vec<InvariantViolation> {
                 "{} asks {} to join without holding it in high standing",
                 q.city_id, q.realm_id
             ));
+        }
+    }
+    out
+}
+
+/// Invariant (`respectSound`, ADR 0033): where an NPC city weighs respect, for each demand sent to
+/// it and each ask of it to join a realm, both sides are a number and not below nothing, its own
+/// side at least its walls and gates, and what the realm shows near it never more than the
+/// strength of all its armed residents.
+pub fn respect_sound(world: &WorldState, size: i32) -> Vec<InvariantViolation> {
+    let mut pairs: Vec<(&str, &str)> =
+        world.demands.iter().map(|d| (d.to_id.as_str(), d.from_id.as_str())).collect();
+    pairs.extend(world.join_requests.iter().map(|q| (q.city_id.as_str(), q.realm_id.as_str())));
+    let mut out = Vec::new();
+    for (city_id, realm_id) in pairs {
+        let Some(city) = askable(world, city_id) else { continue };
+        let seen = respect_seen_by(world, city, realm_id, size);
+        let own = city_strength(world, city);
+        let walls = world
+            .buildings
+            .iter()
+            .filter(|b| is_wall_or_gate(b) && b.city_id.as_deref() == Some(city_id))
+            .count() as f64;
+        let all: f64 = world
+            .residents
+            .iter()
+            .filter(|r| r.health > 0.0 && wall_side(r) == Some(realm_id))
+            .map(fighter_strength)
+            .sum();
+        // `!(x >= y)`: NaN fails too.
+        let at_least = |x: f64, y: f64| x.partial_cmp(&y).is_some_and(|o| o.is_ge());
+        if !at_least(seen, 0.0)
+            || !at_least(all + 1e-9, seen)
+            || !at_least(own, RESPECT_PER_WALL * walls)
+        {
+            out.push(InvariantViolation {
+                invariant: "respect-sound".into(),
+                message: format!(
+                    "{city_id} weighs {seen} of {realm_id}'s {all} against its own {own} with {walls} walls"
+                ),
+                entity_ids: vec![city_id.to_string(), realm_id.to_string()],
+            });
         }
     }
     out
