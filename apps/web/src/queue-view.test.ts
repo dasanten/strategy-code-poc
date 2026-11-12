@@ -6,6 +6,7 @@ import {
   appendRequest,
   appendRequests,
   appendToEach,
+  clearedItems,
   draftEdit,
   draftFor,
   editPlan,
@@ -385,5 +386,39 @@ describe('the queue draft', () => {
     expect(appendRequest(idle, walkHome)?.kind).toBe('queue')
     const running = shiftQueue(idle, [walkHome])
     expect(appendRequest(running, work)?.kind).toBe('editQueue')
+  })
+})
+
+describe('Clear', () => {
+  const store: OrderRequest = { kind: 'store', goods: STORE_ALL.goods, to: 's9' }
+
+  it('empties a draft', () => {
+    const built = planStep(planStep(EMPTY_PLAN, walkHome), store)
+    // A draft has no current step, even one copied from a running queue.
+    expect(editPlan(built, clearedItems(built.items)).items).toEqual([])
+  })
+
+  it('keeps only the current step of a running looped queue and turns loop off', () => {
+    const five = shiftQueue(idle, [
+      walkHome,
+      { ...walkHome, x: 1 },
+      { ...walkHome, x: 2 },
+      { ...walkHome, x: 3 },
+      { ...walkHome, x: 4 },
+    ])
+    const running = { ...five, queue: { ...five.queue!, loop: true, current: 2 } }
+    const current = running.queue.steps[2]!
+    const items = clearedItems(planOf(running.queue).items, current.id)
+    expect(givePlan(running, { items, loop: false })).toEqual({
+      kind: 'editQueue',
+      residentId: 'w1',
+      steps: [{ id: current.id, order: current.order }],
+      loop: false,
+    })
+  })
+
+  it('empties a group plan', () => {
+    const plan = planStep(planStep(EMPTY_PLAN, walkHome), store)
+    expect(editPlan(plan, clearedItems(plan.items)).items).toEqual([])
   })
 })

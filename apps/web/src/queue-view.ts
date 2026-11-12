@@ -197,6 +197,16 @@ export function draftEdit(
   return undefined
 }
 
+/**
+ * The items the planner's Clear leaves (`CONTEXT.md`: Clear): none in a draft or a group's plan;
+ * in a running queue only the step the resident is on (`currentId`), so they finish it and the
+ * queue ends once loop is off too.
+ */
+export function clearedItems(items: readonly PlanItem[], currentId?: number): PlanItem[] {
+  if (currentId === undefined) return []
+  return unroll(items).filter((s) => s.id === currentId)
+}
+
 /** A resident's queue as a plan: Edit as draft, or wrapping its steps in a repeat block. */
 export function planOf(q: Pick<Queue, 'steps' | 'loop' | 'nextStepId'>): QueuePlan {
   return { items: stepsOf(q), loop: q.loop, nextStepId: q.nextStepId }

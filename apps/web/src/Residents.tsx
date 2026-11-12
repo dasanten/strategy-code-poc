@@ -123,6 +123,7 @@ import { workSpan } from './build-menu-view.js'
 import { doingLine, interruptedLine, scriptLine } from './doing-view.js'
 import { type RelocateChoice } from './relocate-view.js'
 import {
+  clearedItems,
   editPlan,
   planOf,
   realMinutes,
@@ -412,10 +413,13 @@ export function QueueBlock({
   onEdit,
   title = 'Queue',
   realm,
+  running = false,
 }: {
   queue: Pick<QueuePlan, 'items' | 'loop' | 'nextStepId'>
   /** The id of the step being done, in a running queue. */
   currentId?: number
+  /** The resident's running queue, not a draft or a group's plan: Clear asks and keeps the current step. */
+  running?: boolean
   doing?: string
   scripts: ScriptSummary[]
   buildings: Building[]
@@ -459,6 +463,18 @@ export function QueueBlock({
     const given = edit(wrapped)
     setPicked(newIds(q.items, given.items))
   }
+  // Clear (`CONTEXT.md`: Clear): empties a draft or a group's plan; on a running queue, asked
+  // once, keeps only the current step with loop off, so the queue ends after it.
+  const clear = () => {
+    if (!running) {
+      edit([])
+      return
+    }
+    const ok = window.confirm(
+      'Clear the queue? They finish the step they are on, then the queue ends. Stop halts them at once.',
+    )
+    if (ok) edit(clearedItems(q.items, currentId), false)
+  }
   // Ctrl+C and Ctrl+V while the list has focus, not while typing in a field.
   const onKey = (e: KeyboardEvent) => {
     if (!(e.ctrlKey || e.metaKey) || e.altKey) return
@@ -500,6 +516,18 @@ export function QueueBlock({
           onClick={repeat}
         >
           Repeat
+        </button>
+        <button
+          type="button"
+          disabled={q.items.length === 0}
+          title={
+            running
+              ? 'Remove every step but the current one and turn loop off: the queue ends after it'
+              : 'Remove every step'
+          }
+          onClick={clear}
+        >
+          Clear
         </button>
         <span className="small muted">
           {picked.length === 0 ? 'Tap a step to pick it' : `${picked.length} picked`}
@@ -616,7 +644,8 @@ export function QueueBlock({
         a range), then Copy; Paste puts the copies after the picked step. Repeat wraps the picked
         steps in a block done so many times in a row; giving the queue makes it that many copies, up
         to {QUEUE_MAX_STEPS} steps in all. Save keeps the steps in this browser under a name; Load
-        adds a saved queue’s steps at the end.
+        adds a saved queue’s steps at the end. Clear empties a draft; on a running queue it keeps
+        only the current step and turns loop off, so the queue ends after it.
       </p>
     </section>
   )
@@ -2665,6 +2694,7 @@ export function ResidentCard({
             <QueueBlock
               queue={planOf(r.queue)}
               currentId={r.queue.steps[r.queue.current]?.id}
+              running
               doing={doingLine(r, {
                 scripts,
                 buildings,
