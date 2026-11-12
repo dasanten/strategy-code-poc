@@ -91,6 +91,7 @@ import {
   type GoodsPick,
   type OpenDrawer,
 } from './hud-view.js'
+import { cityPlace, cityScale } from './cities-drawer-view.js'
 import {
   CentredDialog,
   Drawer,
@@ -501,8 +502,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const [scriptToOpen, setScriptToOpen] = useState<ScriptToOpen>()
   // A place to show on the map, such as one from the realm log or a resident picked in the list:
   // asked for, then centred between the open drawer and the selection card once they are drawn.
-  const [toShow, setToShow] = useState<{ x: number; y: number }>()
-  const [focus, setFocus] = useState<{ x: number; y: number; cover: Covered }>()
+  // A place to show on the map; `zoom` picks the zoom from the one now (the zoom stays without).
+  const [toShow, setToShow] = useState<{ x: number; y: number; zoom?: (scale: number) => number }>()
+  const [focus, setFocus] = useState<{
+    x: number
+    y: number
+    zoom?: (scale: number) => number
+    cover: Covered
+  }>()
   // The drawer open over the map, if any (ADR 0008: one at a time).
   const [openDrawer, setOpenDrawer] = useState<OpenDrawer>()
   // The notice of demands sent to the realm (`CONTEXT.md`: Demand), until the Player dismisses it
@@ -1827,7 +1834,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             debt={world.diplomacy.debt ?? 0}
             noCaravans={world.diplomacy.noCaravans === true}
             openId={openCityId}
-            onOpen={setOpenCityId}
+            onOpen={(id) => {
+              setOpenCityId(id)
+              // Opening a row shows the city on the map, outlined (`CONTEXT.md`: Cities drawer).
+              const at = id && cityPlace(id, knownCities, knownBuildings)
+              if (at) setToShow({ ...at, zoom: cityScale })
+            }}
             scrollTo={tradeAt}
             standings={world.diplomacy.standings}
             events={world.events}
