@@ -213,12 +213,14 @@ export function drawUnits(
     for (const id of [k.id, ...aboard]) spots.set(id, { x: p[0], y: p[1], r })
   }
 
-  // Boats on the water (`CONTEXT.md`: Vessel): alone on their tile, one vessel per tile.
+  // Boats and ships on the water (`CONTEXT.md`: Vessel): alone on their tile, one vessel per
+  // tile, a ship on a bigger token of its own.
   for (const v of world.vessels ?? []) {
     const p = at(...where(v.id, v.x, v.y))
     if (!near(p)) continue
-    const r = unitRadius('boat', tile)
-    drawUnit(tokens, UNIT_ART.boat, ...p, r, entityRelationship(v, viewer, known))
+    const kind = v.kind === 'ship' ? 'ship' : 'boat'
+    const r = unitRadius(kind, tile)
+    drawUnit(tokens, UNIT_ART[kind], ...p, r, entityRelationship(v, viewer, known))
     // Its passengers ride inside it, counted on it as on a cart (`CONTEXT.md`: Beside a vessel).
     const aboard = [...(v.passengerIds ?? []), ...(v.rowerId ? [v.rowerId] : [])]
     if (aboard.length > 0) badge(`${aboard.length}`, ...p, r)

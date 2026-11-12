@@ -7,6 +7,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use crate::queries::vessels::floats_on;
 use csp_shared::balance::{
     carriage_can_enter, trained_cap, ALLIANCE_LEAVE_DELAY, ALLIANCE_RECALL_DELAY,
     CARRIAGE_CAPACITY, CARRIAGE_MAX_CAPACITY, CARRYING_TICKS, CITY_AREA_MARGIN,
@@ -17,8 +18,8 @@ use csp_shared::balance::{
 };
 use csp_shared::footprint::{footprint_tiles, is_at, near_footprint};
 use csp_shared::terrain::{
-    beside_step, is_passable_terrain, is_water, step_length, terrain_at, tile_index, touches_water,
-    wrap_delta, Terrain, TerrainMap,
+    beside_step, is_passable_terrain, is_water, step_length, terrain_at, tile_index, touches_sea,
+    touches_water, wrap_delta, Terrain, TerrainMap,
 };
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
@@ -242,6 +243,25 @@ pub fn buildings_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
             }
             if b.stock.is_some() {
                 fail(&b.id, "is a boat site with a stock".into());
+            }
+        } else if b.kind == BuildingKind::Ship {
+            // `CONTEXT.md`: Building a ship: on a haven tile that touches Sea.
+            if b.site.is_none() {
+                fail(&b.id, "is a finished ship site".into());
+            }
+            if building_at(world, b.x as i32, b.y as i32, size)
+                .is_none_or(|h| h.kind != BuildingKind::Haven)
+            {
+                fail(&b.id, "is a ship site off any haven".into());
+            }
+            if !touches_sea(&footprint, size, |x, y| terrain_at(terrain, x, y)) {
+                fail(&b.id, "is a ship site away from the Sea".into());
+            }
+            if let Some(c) = city {
+                fail(&b.id, format!("is a ship site of city {c}"));
+            }
+            if b.stock.is_some() {
+                fail(&b.id, "is a ship site with a stock".into());
             }
         } else if OFF_NODES.contains(&b.kind) {
             if !nodes.is_empty() {
@@ -1078,8 +1098,9 @@ pub fn carriages_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
     out
 }
 
-/// A vessel always stands on a water tile, one vessel per tile (`CONTEXT.md`: Vessel, Boat). That
-/// it holds no more than it can, its passengers counted in, is `vessel-passengers`.
+/// A vessel always stands on a water tile, one vessel per tile (`CONTEXT.md`: Vessel, Boat), and a
+/// ship on Sea, never Lake (`CONTEXT.md`: Ship). That it holds no more than it can, its passengers
+/// counted in, is `vessel-passengers`.
 pub fn vessels_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
     let name = "vessels-in-place";
     let mut out = Vec::new();
@@ -1087,8 +1108,11 @@ pub fn vessels_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
     for v in &world.vessels {
         let (x, y) = (v.x as i32, v.y as i32);
         let at = format!("({}, {})", js_number(v.x), js_number(v.y));
-        if !is_water(terrain_at(terrain, x, y)) {
+        let t = terrain_at(terrain, x, y);
+        if !is_water(t) {
             out.push(violation(name, format!("vessel {} is on land at {at}", v.id), &[&v.id]));
+        } else if !floats_on(v.kind, t) {
+            out.push(violation(name, format!("ship {} is on a Lake at {at}", v.id), &[&v.id]));
         }
         if let Some(other) = on.insert((x, y), &v.id) {
             let m = format!("vessel {} shares the water tile {at} with {other}", v.id);

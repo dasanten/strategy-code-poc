@@ -5,7 +5,7 @@
 use csp_shared::balance::{MAP_SIZE, PASSENGER_WEIGHT};
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{
-    OrderRequest, Resident, ResidentOrder, RowOrder, Tile, Vessel, WorldState,
+    OrderRequest, Resident, ResidentOrder, RowOrder, Tile, Vessel, VesselKind, WorldState,
 };
 
 use crate::order_sender::{ordered_resident, realm_of, OrderSender};
@@ -23,7 +23,10 @@ use crate::stealing::{take_over, Taken};
 /// put its rower among the passengers needs room for them.
 pub fn row_problem(world: &WorldState, r: &Resident, v: &Vessel) -> Option<String> {
     let aboard_it = r.aboard.as_deref() == Some(v.id.as_str());
-    let problem = if !can_work(r.born_at, world.tick as f64) {
+    let problem = if v.kind == VesselKind::Ship {
+        // `CONTEXT.md`: Sailing: a ship is sailed by its crew, never rowed.
+        "a ship is sailed, not rowed"
+    } else if !can_work(r.born_at, world.tick as f64) {
         "children can’t row"
     } else if !vessel_of_resident(v, r) {
         "not a boat of your realm"

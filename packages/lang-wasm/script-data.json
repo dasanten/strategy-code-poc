@@ -1607,7 +1607,7 @@
       ]
     },
     "vessel": {
-      "description": "A boat on the water, as the Player sees it.",
+      "description": "A boat or ship on the water, as the Player sees it.",
       "fields": [
         {
           "name": "id",
@@ -1617,7 +1617,7 @@
         {
           "name": "kind",
           "type": "string",
-          "description": "What it is: \"boat\"."
+          "description": "What it is: \"boat\" or \"ship\"."
         },
         {
           "name": "realmId",
@@ -2215,7 +2215,7 @@
       "is": "query",
       "params": [],
       "cost": 20,
-      "description": "The boats the Player sees on the water.",
+      "description": "The boats and ships the Player sees on the water.",
       "returns": {
         "list": {
           "view": "vessel"
@@ -3378,7 +3378,7 @@
       "is": "query",
       "params": [],
       "cost": 20,
-      "description": "The boats the Player sees on the water.",
+      "description": "The boats and ships the Player sees on the water.",
       "returns": {
         "list": {
           "view": "vessel"

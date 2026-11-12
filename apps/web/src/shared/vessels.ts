@@ -1,8 +1,8 @@
 // Vessels for the client (`CONTEXT.md`: Water, Beside a vessel), as the crates' `queries/vessels.rs`
 // says them: who stands beside one, whether one is theirs, and what room it has left.
 
-import { BOAT_CAPACITY, MAP_SIZE, PASSENGER_WEIGHT } from '@csp/balance'
-import type { Resident, SeenVessel } from '@csp/shared-types'
+import { BOAT_CAPACITY, MAP_SIZE, PASSENGER_WEIGHT, SHIP_CAPACITY } from '@csp/balance'
+import type { Resident, SeenVessel, VesselKind } from '@csp/shared-types'
 import type { StealingResident } from './carriages.js'
 import { guardedBy } from './city.js'
 import { inContact } from './combat.js'
@@ -15,14 +15,21 @@ export function isVesselId(id: string | undefined): boolean {
 
 /**
  * Whether (x, y) is beside the vessel (`CONTEXT.md`: Beside a vessel): touching its water tile,
- * straight or diagonally, and not the tile itself.
+ * straight or diagonally, and not the tile itself. Nothing is beside a ship yet: for a ship it
+ * means at the haven it is docked at (`CONTEXT.md`: Docked), as the server will say with T91.2.
  */
 export function besideVessel(
-  v: { x: number; y: number },
+  v: { x: number; y: number; kind?: VesselKind },
   at: { x: number; y: number },
   size = MAP_SIZE,
 ): boolean {
+  if (v.kind === 'ship') return false
   return !(v.x === at.x && v.y === at.y) && inContact(size, v, at)
+}
+
+/** Most weight a vessel carries, in kg (`CONTEXT.md`: Boat, Ship). */
+export function vesselCapacity(kind: VesselKind | undefined): number {
+  return kind === 'ship' ? SHIP_CAPACITY : BOAT_CAPACITY
 }
 
 /** Whether the vessel is of the resident's realm; one of nobody is no one's. */
@@ -37,9 +44,11 @@ export function vesselOfResident(
  * What the vessel still holds in kg, when its load is seen (`CONTEXT.md`: Beside a vessel): what
  * it can carry less its goods and a fixed weight for each passenger.
  */
-export function vesselRoom(v: Pick<SeenVessel, 'load' | 'passengerIds'>): number | undefined {
+export function vesselRoom(
+  v: Pick<SeenVessel, 'load' | 'passengerIds'> & { kind?: VesselKind },
+): number | undefined {
   if (!v.load) return undefined
-  return BOAT_CAPACITY - stockWeight(v.load) - v.passengerIds.length * PASSENGER_WEIGHT
+  return vesselCapacity(v.kind) - stockWeight(v.load) - v.passengerIds.length * PASSENGER_WEIGHT
 }
 
 /**

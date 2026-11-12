@@ -1001,7 +1001,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       )
       if (b) return { id: b.id, name: name(b) }
       // A boat is loaded from beside it (`CONTEXT.md`: Beside a vessel).
-      const v = world.vessels.find((s) => s.realmId === realmId && s.x === x && s.y === y)
+      const v = world.vessels.find(
+        (s) => s.kind === 'boat' && s.realmId === realmId && s.x === x && s.y === y,
+      )
       if (v) return { id: v.id, name: 'boat' }
       const k = world.carriages.find((c) => c.realmId === realmId && c.x === x && c.y === y)
       return k && { id: k.id, name: 'carriage' }

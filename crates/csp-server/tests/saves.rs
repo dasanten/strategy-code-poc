@@ -288,10 +288,21 @@ fn a_world_with_a_boat_is_saved_and_loads_with_it_and_one_from_before_has_none()
         load: csp_shared::world::Stock::from([(csp_shared::world::Good::Wood, 5.0)]),
         rower_id: None,
     });
+    // A ship is a vessel of another kind (T91.1): no new field, so no new format.
+    world.vessels.push(csp_shared::world::Vessel {
+        id: "ship2".into(),
+        kind: csp_shared::world::VesselKind::Ship,
+        realm_id: Some("r1".into()),
+        x: 5.0,
+        y: 4.0,
+        load: csp_shared::world::Stock::new(),
+        rower_id: None,
+    });
     save_world(&conn, &world).unwrap();
     let (state, v) = latest_save(&conn).unwrap().unwrap();
     assert_eq!(v, WORLD_FORMAT_VERSION);
     assert_eq!(state["vessels"][0]["kind"], "boat");
+    assert_eq!(state["vessels"][1]["kind"], "ship");
     assert_eq!(load().vessels, world.vessels);
 }
 

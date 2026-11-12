@@ -37,7 +37,6 @@ import {
   HORSE_FOOD_PER_DAY,
   HORSE_HUNGRY_SHARE,
   PASSENGER_WEIGHT,
-  BOAT_CAPACITY,
   MAP_SIZE,
   horseFoodFactor,
   MAX_HEALTH,
@@ -103,6 +102,7 @@ import type {
   SeenTrader,
   SeenCarriage,
   SeenVessel,
+  VesselKind,
   GoodsPlace,
   GoodsWanted,
   LoadLevel,
@@ -124,7 +124,7 @@ import { faresKnown, horseFaresKnown } from './seen.js'
 import { FEED_HORSE_HINT, horseDownLine, horseNeed } from './horses-view.js'
 import { lastSeenText, type LastSeenBuilding } from './last-seen.js'
 import { describeOccupation, type OccupationView } from './city-view.js'
-import { besideVessel, boardBoatProblem } from './shared/vessels.js'
+import { besideVessel, boardBoatProblem, vesselCapacity } from './shared/vessels.js'
 import type { Picking } from './Residents.js'
 
 /**
@@ -1581,6 +1581,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   const carriageSite = here(t.buildings).find((b) => b.kind === 'carriage')
   const carriage = here(t.carriages)[0]
   const boatSite = here(t.buildings).find((b) => b.kind === 'boat')
+  const shipSite = here(t.buildings).find((b) => b.kind === 'ship')
   const vessel = here(t.vessels ?? [])[0]
   const pileTile = live ?? t
   const pile = t.piles.find((p) => p.x === pileTile.x && p.y === pileTile.y)
@@ -1712,10 +1713,17 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     sites.push({ ...head, ...describeSite(boatSite, t) })
     if (boatSite.teardown) lines.push(teardownLine(boatSite))
   }
+  if (shipSite?.site) {
+    // A ship site likewise (`CONTEXT.md`: Building a ship).
+    const head = card ? { title: 'Ship site' } : {}
+    card ??= { title: 'Ship site', what: 'building' }
+    sites.push({ ...head, ...describeSite(shipSite, t) })
+    if (shipSite.teardown) lines.push(teardownLine(shipSite))
+  }
   if (vessel) {
-    // A boat on the water, on a card of its own (`CONTEXT.md`: Vessel): its owner first.
+    // A boat or ship on the water, on a card of its own (`CONTEXT.md`: Vessel): its owner first.
     const rel = realmRelationship(vessel.realmId, null, t.cities, t.viewer)
-    card ??= { title: 'Boat', rel, what: 'carriage' }
+    card ??= { title: VESSEL_NAMES[vessel.kind], rel, what: 'carriage' }
     lines.push(rel ? RELATIONSHIP_NAMES[rel] : 'Nobody’s')
     carriageView = describeVessel(vessel, rel, t)
     // The Player's residents beside it board it, and its passengers of theirs get off
@@ -1891,10 +1899,13 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   }
 }
 
+/** What each kind of vessel is called on its card (`CONTEXT.md`: Vessel). */
+export const VESSEL_NAMES: Record<VesselKind, string> = { boat: 'Boat', ship: 'Ship' }
+
 /**
- * A boat as rows and meters (`CONTEXT.md`: Vessel, Goods on cards): its load against what it
- * holds and its goods when the Player sees inside (its own realm and allies), else only how
- * heavily it is loaded.
+ * A boat or ship as rows and meters (`CONTEXT.md`: Vessel, Goods on cards): its load against what
+ * it holds and its goods when the Player sees inside (its own realm and allies), else only how
+ * heavily it is loaded; who is aboard.
  */
 export function describeVessel(
   vessel: SeenVessel,
@@ -1912,10 +1923,11 @@ export function describeVessel(
   const [rower] = vessel.rowerId ? named(vessel.rowerId) : []
   const people = (vessel.passengerIds ?? []).length * PASSENGER_WEIGHT
   const weight = vessel.load ? stockWeight(vessel.load) + people : 0
+  const capacity = vesselCapacity(vessel.kind)
   const view: CarriageView = {
-    title: `Boat${rel ? ` (${RELATIONSHIP_NAMES[rel].toLowerCase()})` : ''}`,
+    title: `${VESSEL_NAMES[vessel.kind]}${rel ? ` (${RELATIONSHIP_NAMES[rel].toLowerCase()})` : ''}`,
     load: vessel.load
-      ? { text: `${Math.round(weight)} / ${BOAT_CAPACITY} kg`, share: weight / BOAT_CAPACITY }
+      ? { text: `${Math.round(weight)} / ${capacity} kg`, share: weight / capacity }
       : { text: capital(LOAD_LEVEL_NAMES[vessel.loadLevel]) },
     ...(vessel.load ? { goods: vessel.load } : {}),
   }

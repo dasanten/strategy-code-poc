@@ -224,6 +224,7 @@ export const HUNGRY_HORSE_PACE = balance.HUNGRY_HORSE_PACE
 export const CARRIAGE_MAX_CAPACITY = balance.CARRIAGE_MAX_CAPACITY
 export const PASSENGER_WEIGHT = balance.PASSENGER_WEIGHT
 export const BOAT_CAPACITY = balance.BOAT_CAPACITY
+export const SHIP_CAPACITY = balance.SHIP_CAPACITY
 export const ROW_SPEED = balance.ROW_SPEED
 export const ROW_STRENGTH_EFFECT = balance.ROW_STRENGTH_EFFECT
 export const ROW_STRENGTH_AVERAGE = balance.ROW_STRENGTH_AVERAGE

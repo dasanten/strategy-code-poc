@@ -24,6 +24,7 @@ import {
   TRADER_STOP_TICKS,
   CARRIAGE_CAPACITY,
   BOAT_CAPACITY,
+  SHIP_CAPACITY,
   DIRECT_OFFERS_TO_ONE_REALM,
   DIRECT_OFFER_DAYS,
   PASSENGER_WEIGHT,
@@ -306,6 +307,7 @@ import {
   buildCosts,
   carriageCost,
   boatCost,
+  shipCost,
   cityControl,
   coinsPerMintWorkerDay,
   crimeForgotten,
@@ -1925,6 +1927,19 @@ export function Wiki() {
           its card tells whose it is and how heavily it is loaded, and what it holds only to its own
           realm and allies. Scripts see the boats in sight with <code>vessels()</code>. A boat of a
           realm that ends belongs to nobody, as NPC cities don't use the water.
+        </p>
+        <p>
+          <b>Building a ship.</b> A <b>ship</b> is the big vessel of the Sea: it carries far more
+          than a carriage, {num(SHIP_CAPACITY)} kg in all, sails with a crew and goes only on Sea,
+          never onto a Lake. A resident standing on a tile of a finished haven that touches the Sea
+          lays out a <b>ship site</b> there with Build (under Transport); a haven on a Lake alone
+          builds boats only. The site takes {goods(shipCost().materials)} and{' '}
+          {duration(shipCost().buildTicks)} of one average resident's work, so it is a job for many
+          hands, and like a boat site anyone may bring materials or work on it. Once finished the
+          site is gone, and an empty ship of the realm of whoever finished it floats on the nearest
+          free Sea tile next to it. It shows on the map on a token of its own, to whoever sees its
+          tile; its card tells whose it is, its load, and who is aboard. Crew, docking and sailing
+          come later; until then a ship stays where it was launched.
         </p>
         <p>
           <b>Beside a boat</b> means on a land tile touching its water tile, straight or diagonally.
