@@ -60,6 +60,7 @@ import { wallStrength, wallStrengthLeft } from './shared/walls.js'
 import { putAwayUnits } from './shared/goods.js'
 import { nameProblem } from './shared/names.js'
 import type {
+  QueueStepRequest,
   SeenVessel,
   VesselKind,
   Building,
@@ -95,8 +96,10 @@ import {
   useEffect,
   useRef,
   useState,
+  type DragEvent,
   type FormEvent,
   type KeyboardEvent,
+  type MouseEvent,
   type ReactNode,
 } from 'react'
 import {
@@ -139,9 +142,12 @@ import { copy, paste, pickStep, useClipboardEmpty } from './planner-clipboard.js
 import {
   followInsert,
   InsertPointContext,
-  insertPoints,
   PlannerFlowContext,
+  REPEAT_ICON,
+  STEP_KIND_TYPE,
 } from './step-palette-view.js'
+import { canMoveTo, insertPoints, moveItems } from './queue-brackets-view.js'
+import type { PlanStepId } from './plan-step.js'
 import {
   canMove,
   capProblem,
@@ -163,6 +169,7 @@ import {
   withIds,
   wrap,
   type PlanItem,
+  type RepeatBlock,
 } from './plan-blocks.js'
 import {
   browserStorage,
@@ -469,7 +476,8 @@ export function QueueBlock({
     if (next !== insertAt) setInsertAt(next)
     seenIds.current = ids
   }, [ids.join(',')])
-  const inserts = insertPoints(rows)
+  const inserts = insertPoints(q.items)
+  const dragging = dragged !== undefined
   const edit = (items: PlanItem[], loop?: boolean) => {
     const given = withIds(items, q.nextStepId)
     onEdit(given.items, loop)
@@ -529,14 +537,6 @@ export function QueueBlock({
   return (
     <section className="inspector-block" aria-label={title}>
       <div className="order-buttons queue-tools">
-        <label className="small queue-loop">
-          <input
-            type="checkbox"
-            checked={q.loop}
-            onChange={(e) => edit(q.items, e.target.checked)}
-          />{' '}
-          Loop
-        </label>
         <button type="button" disabled={picked.length === 0} onClick={copyPicked}>
           Copy
         </button>
@@ -584,13 +584,15 @@ export function QueueBlock({
       {help && (
         <p className="muted small">
           Tap a step to pick it (Shift for a range), then Copy; Paste puts the copies after the
-          picked step. Drag a step to move it, or focus it and press Alt+↑ or Alt+↓. Working,
-          hauling, teaching and training never end on their own, so they need a duration unless they
-          are last: tap the duration to set it. Repeat wraps the picked steps in a block done so
-          many times in a row; giving the queue makes it that many copies, up to {QUEUE_MAX_STEPS}{' '}
-          steps in all. Saved… keeps the steps in this browser under a name, and loads a saved
-          queue’s steps at the end. Clear empties a draft; on a running queue it keeps only the
-          current step and turns loop off, so the queue ends after it.
+          picked step. Drag a step or block to move it, into or out of a bracket, or pick it and tap
+          Move here; focus it and press Alt+↑ or Alt+↓. Drag a step kind from Add step to put it
+          where you drop it. Loop is the outer bracket, its switch in its head. Working, hauling,
+          teaching and training never end on their own, so they need a duration unless they are
+          last: tap the duration to set it. Repeat wraps the picked steps in a block done so many
+          times in a row; giving the queue makes it that many copies, up to {QUEUE_MAX_STEPS} steps
+          in all. Saved… keeps the steps in this browser under a name, and loads a saved queue’s
+          steps at the end. Clear empties a draft; on a running queue it keeps only the current step
+          and turns loop off, so the queue ends after it.
         </p>
       )}
       {hasBlocks(q.items) && (
@@ -598,34 +600,25 @@ export function QueueBlock({
           {over ? `Too long: ${over}.` : `${unrolled} steps after repeats.`}
         </p>
       )}
-      <ol className="queue-steps" tabIndex={-1} onKeyDown={onKey}>
-        {rows.map((row) => (
-          <Fragment key={row.id}>
-            {stepItem(row)}
-            {palette && inserts.includes(row.id) && (
-              <li className={`queue-insert${insertAt === row.id ? ' set' : ''}`}>
-                <button
-                  type="button"
-                  aria-label={
-                    insertAt === row.id
-                      ? 'Add new steps at the end again'
-                      : 'Add the next step here'
-                  }
-                  title={
-                    insertAt === row.id
-                      ? 'New steps go here; tap to add at the end'
-                      : 'Add the next step here'
-                  }
-                  aria-pressed={insertAt === row.id}
-                  onClick={() => setInsertAt(insertAt === row.id ? undefined : row.id)}
-                >
-                  {insertAt === row.id ? '+ next step goes here' : '+'}
-                </button>
-              </li>
-            )}
-          </Fragment>
-        ))}
-      </ol>
+      <div className={`queue-bracket queue-loop-bracket${q.loop ? ' on' : ''}`}>
+        <div className="queue-bracket-head">
+          <label className="small queue-loop">
+            <input
+              type="checkbox"
+              checked={q.loop}
+              onChange={(e) => edit(q.items, e.target.checked)}
+            />{' '}
+            <span aria-hidden="true">⟲</span> Loop
+          </label>
+          <span className="small muted">
+            {q.loop ? 'from the top again after the last step' : 'ends after the last step'}
+          </span>
+        </div>
+        <ol className="queue-steps" tabIndex={-1} onKeyDown={onKey}>
+          {renderItems(q.items, 0)}
+          {(picked.length > 0 || dragging) && point(undefined)}
+        </ol>
+      </div>
       {palette && (
         <PlannerFlowContext.Provider
           value={{
@@ -639,85 +632,166 @@ export function QueueBlock({
     </section>
   )
 
-  function stepItem(row: (typeof rows)[number]) {
-    const isPicked = picked.includes(row.id)
-    const step =
-      row.kind === 'step'
-        ? stepRow({ ...row.step, id: row.id }, row.id === currentId, names)
-        : undefined
-    if (step) n++
+  // The items of one bracket, each followed by its "+" point where it has one.
+  function renderItems(items: readonly PlanItem[], depth: number): ReactNode[] {
+    return items.map((item) => (
+      <Fragment key={item.id}>
+        {isBlock(item) ? blockItem(item, depth) : stepItem(item, depth)}
+        {inserts.includes(item.id!) && point(item.id!)}
+      </Fragment>
+    ))
+  }
+
+  // What a row does when something is dropped on it or on a point: a step or block dragged in
+  // the planner moves there; a step kind dragged from the palette is planned there.
+  function dropAt(e: DragEvent, after: number | undefined, onto?: number) {
+    e.preventDefault()
+    e.stopPropagation()
+    const kind = e.dataTransfer.getData(STEP_KIND_TYPE)
+    if (kind && kept?.start) kept.start(kind as PlanStepId, after)
+    else if (dragged !== undefined && onto !== undefined && dragged !== onto)
+      edit(dropItem(q.items, dragged, onto))
+    else if (dragged !== undefined && onto === undefined) edit(moveItems(q.items, [dragged], after))
+    setDragged(undefined)
+  }
+  function accepts(e: DragEvent) {
+    if (dragged !== undefined || e.dataTransfer.types.includes(STEP_KIND_TYPE)) e.preventDefault()
+  }
+
+  // A "+" between two items: where the next step added goes, or, with steps picked, where they
+  // move to (`after` undefined: the end of the queue).
+  function point(after: number | undefined) {
+    const moving = picked.length > 0
+    const set = !moving && after !== undefined && insertAt === after
+    const canMove = moving && canMoveTo(q.items, picked, after)
+    if (!moving && !palette && !dragging) return null
+    if (moving && !canMove) return null
+    const label = moving ? 'Move here' : set ? '+ next step goes here' : '+'
     return (
       <li
-        key={row.id}
-        className={`queue-step${row.kind === 'block' ? ' queue-block' : ''}${step?.current ? ' current' : ''}${isPicked ? ' picked' : ''}`}
-        style={row.depth > 0 ? { marginLeft: `${row.depth * 1.25}em` } : undefined}
-        aria-current={step?.current ? 'step' : undefined}
-        aria-selected={isPicked}
-        tabIndex={0}
-        onKeyDown={(e) => onRowKey(e, row.id)}
-        // Shift+tap picks a range rather than selecting text.
-        onMouseDown={(e) => e.shiftKey && e.preventDefault()}
-        onClick={(e) => {
-          // The row's own buttons and fields do their own thing.
-          if ((e.target as HTMLElement).closest('button, input, label')) return
-          setPicked(pickStep(picked, ids, row.id, e.shiftKey))
-        }}
-        draggable
-        onDragStart={(e) => {
-          e.stopPropagation()
-          setDragged(row.id)
-        }}
-        onDragEnd={() => setDragged(undefined)}
-        onDragOver={(e) => dragged !== undefined && e.preventDefault()}
-        onDrop={(e) => {
-          e.preventDefault()
-          if (dragged !== undefined && dragged !== row.id) edit(dropItem(q.items, dragged, row.id))
-          setDragged(undefined)
-        }}
+        key={`point-${after ?? 'end'}`}
+        className={`queue-insert${set ? ' set' : ''}${moving ? ' move' : ''}`}
+        onDragOver={accepts}
+        onDrop={(e) => dropAt(e, after)}
       >
-        <div className="queue-step-head">
-          {step ? (
-            <>
-              <span className="queue-step-icon" aria-hidden="true">
-                {STEP_ICONS[step.group]}
-              </span>
-              <span
-                className="small queue-step-label"
-                title={step.gone ? `${step.gone}: it will be skipped` : step.label}
-              >
-                {n}. {step.label}
-                {step.gone && <span className="queue-step-gone"> · {step.gone}</span>}
-              </span>
-              {showsMinutes(step, row.id === lastStepId) && (
-                <DurationChip
-                  row={step}
-                  onSet={(minutes) => edit(timeItem(q.items, row.id, minutes))}
-                />
-              )}
-            </>
-          ) : (
-            <RepeatCount
-              repeat={row.kind === 'block' ? row.repeat : 1}
-              steps={row.kind === 'block' ? row.steps : 0}
-              onSet={(count) => edit(setRepeat(q.items, row.id, count))}
-            />
-          )}
+        <button
+          type="button"
+          aria-label={
+            moving
+              ? `Move the picked steps ${after === undefined ? 'to the end' : 'here'}`
+              : set
+                ? 'Add new steps at the end again'
+                : 'Add the next step here'
+          }
+          aria-pressed={moving ? undefined : set}
+          onClick={() => {
+            if (moving) {
+              edit(moveItems(q.items, picked, after))
+              setPicked([])
+            } else if (after !== undefined) setInsertAt(set ? undefined : after)
+          }}
+        >
+          {moving && after === undefined ? 'Move to the end' : label}
+        </button>
+      </li>
+    )
+  }
+
+  // Tapping picks it (Shift+tap a range), dragging moves it, Alt+↑/↓ too.
+  function rowProps(id: number) {
+    return {
+      'aria-selected': picked.includes(id),
+      tabIndex: 0,
+      onKeyDown: (e: KeyboardEvent) => onRowKey(e, id),
+      // Shift+tap picks a range rather than selecting text.
+      onMouseDown: (e: MouseEvent) => e.shiftKey && e.preventDefault(),
+      onClick: (e: MouseEvent) => {
+        // The row's own buttons and fields do their own thing.
+        if ((e.target as HTMLElement).closest('button, input, label')) return
+        e.stopPropagation()
+        setPicked(pickStep(picked, ids, id, e.shiftKey))
+      },
+      draggable: true,
+      onDragStart: (e: DragEvent) => {
+        e.stopPropagation()
+        e.dataTransfer.effectAllowed = 'move'
+        setDragged(id)
+      },
+      onDragEnd: () => setDragged(undefined),
+      onDragOver: accepts,
+      onDrop: (e: DragEvent) => dropAt(e, id, id),
+    }
+  }
+
+  // A repeat block: a bracket with its count, Unwrap and remove in its head, its items inside.
+  function blockItem(block: RepeatBlock, depth: number) {
+    const id = block.id!
+    const isPicked = picked.includes(id)
+    return (
+      <li
+        className={`queue-bracket queue-repeat-bracket${isPicked ? ' picked' : ''}`}
+        data-depth={depth}
+      >
+        <div className="queue-bracket-head" {...rowProps(id)}>
+          <span className="queue-step-icon" aria-hidden="true">
+            {REPEAT_ICON}
+          </span>
+          <RepeatCount
+            repeat={block.repeat}
+            steps={stepCount(block.items)}
+            onSet={(count) => edit(setRepeat(q.items, id, count))}
+          />
           <span className="buttons">
-            {row.kind === 'block' && (
-              <button type="button" onClick={() => edit(unwrap(q.items, row.id))}>
-                Unwrap
-              </button>
-            )}
+            <button type="button" onClick={() => edit(unwrap(q.items, id))}>
+              Unwrap
+            </button>
             <button
               type="button"
-              aria-label={row.kind === 'block' ? 'Remove the block and its steps' : 'Remove'}
-              onClick={() => edit(removeItem(q.items, row.id))}
+              aria-label="Remove the block and its steps"
+              onClick={() => edit(removeItem(q.items, id))}
             >
               ✕
             </button>
           </span>
         </div>
-        {step?.current && doing && <span className="small muted">{doing}</span>}
+        <ol className="queue-steps">{renderItems(block.items, depth + 1)}</ol>
+      </li>
+    )
+  }
+
+  function stepItem(item: QueueStepRequest, depth: number) {
+    const id = item.id!
+    const isPicked = picked.includes(id)
+    const step = stepRow({ ...item, id }, id === currentId, names)
+    n++
+    return (
+      <li
+        className={`queue-step${step.current ? ' current' : ''}${isPicked ? ' picked' : ''}`}
+        data-depth={depth}
+        aria-current={step.current ? 'step' : undefined}
+        {...rowProps(id)}
+      >
+        <div className="queue-step-head">
+          <span className="queue-step-icon" aria-hidden="true">
+            {STEP_ICONS[step.group]}
+          </span>
+          <span
+            className="small queue-step-label"
+            title={step.gone ? `${step.gone}: it will be skipped` : step.label}
+          >
+            {n}. {step.label}
+            {step.gone && <span className="queue-step-gone"> · {step.gone}</span>}
+          </span>
+          {showsMinutes(step, id === lastStepId) && (
+            <DurationChip row={step} onSet={(minutes) => edit(timeItem(q.items, id, minutes))} />
+          )}
+          <span className="buttons">
+            <button type="button" aria-label="Remove" onClick={() => edit(removeItem(q.items, id))}>
+              ✕
+            </button>
+          </span>
+        </div>
+        {step.current && doing && <span className="small muted">{doing}</span>}
       </li>
     )
   }

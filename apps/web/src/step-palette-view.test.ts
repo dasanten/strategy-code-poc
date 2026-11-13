@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { PLAN_STEPS } from './plan-step.js'
-import { followInsert, insertPoints, PALETTE_GROUPS, PLAN_STEP_ICONS } from './step-palette-view.js'
+import { followInsert, PALETTE_GROUPS, PLAN_STEP_ICONS } from './step-palette-view.js'
 
 /** The Add step palette (`CONTEXT.md`: Planner blocks). */
 
@@ -30,15 +30,6 @@ describe('the palette groups', () => {
 })
 
 describe('the insert point', () => {
-  const step = (id: number) => ({ id, kind: 'step' as const })
-  const block = (id: number) => ({ id, kind: 'block' as const })
-
-  it('sits between two steps, never after the last row or a block’s head', () => {
-    expect(insertPoints([step(1), step(2), step(3)])).toEqual([1, 2])
-    expect(insertPoints([step(1), block(4), step(2), step(3)])).toEqual([1, 2])
-    expect(insertPoints([step(1)])).toEqual([])
-  })
-
   it('moves after the step just added there, so the next one follows it', () => {
     // Fetch (id 7) added between 1 and 2, after its walk (id 6).
     expect(followInsert([1, 2, 3], [1, 6, 7, 2, 3], 1)).toBe(7)
