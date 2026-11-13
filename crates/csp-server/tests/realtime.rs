@@ -759,6 +759,32 @@ async fn sends_what_left_sight_as_last_seen_and_drops_it_when_back_in_sight() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn sends_every_tab_of_a_realm_the_same_last_seen_tick_for_tick() {
+    let s = start(StartOptions { realm: false, ..StartOptions::default() }).await;
+    let mut first = connect(&s).await;
+    first.next("founding").await;
+    found(&mut first).await;
+    let mut second = connect(&s).await;
+    second.next("welcome").await;
+    // Everyone walks far off and back, twice: the city leaves sight, comes back, leaves again.
+    let mut sent = 0;
+    for by in [0.0, 0.5, 0.5, 0.0, 0.5, 0.0, 0.5, 0.5] {
+        s.world(move |w| {
+            for r in &mut w.residents {
+                r.x = (r.x + by * f64::from(CITY_MAP)) % f64::from(CITY_MAP);
+                r.order = None;
+            }
+        })
+        .await;
+        s.tick().await;
+        let (a, b) = (first.next("tick").await, second.next("tick").await);
+        assert_eq!(a["lastSeen"], b["lastSeen"], "tick {}", a["tick"]);
+        sent += usize::from(!a["lastSeen"].is_null());
+    }
+    assert!(sent >= 3, "{sent} ticks sent Last seen");
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn sends_the_player_their_alliance_matters_on_connect_and_again_only_when_they_change() {
     let s = start(StartOptions::default()).await;
     let mut c = connect(&s).await;

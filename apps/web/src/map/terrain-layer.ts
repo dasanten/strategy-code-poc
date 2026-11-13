@@ -11,33 +11,37 @@ import {
   terrainPixels,
   type TerrainMark,
 } from './terrain.js'
+import { ShownTextures } from './shown-textures.js'
 
 /** Marks are drawn at this many pixels per tile and scaled with the view, so curves stay round. */
 const MARK_UNIT = 16
-/** How long one frame may spend making textures again whose edges were waiting for a neighbour. */
-const REFRESH_BUDGET_MS = 4
 
 interface Entry {
   chunk: TerrainChunk
   sprite: Sprite
   /** The chunk's terrain marks, made the first time they are on screen. */
   marks?: Graphics
-  /** Neighbours the texture's edges were waiting for. */
+}
+
+/** A chunk's painted texture, and the neighbours its edges were waiting for. */
+interface Painted {
+  texture: Texture
   missing: Set<number>
 }
 
 /**
- * The terrain of the loaded chunks (ADR 0006, ADR 0008): one painted texture per chunk, and its
- * terrain marks above it when zoomed in, both drawn only while on screen. A chunk's edges blend
- * into the chunks around it, so a texture is made again when a neighbour it waited for arrives.
+ * The terrain of the loaded chunks (ADR 0006, ADR 0008, ADR 0034): a loaded chunk keeps its
+ * terrain bytes, and its texture is painted when it first comes on screen, within a budget a
+ * frame; only so many textures are kept (`ShownTextures`). Its terrain marks show above it when
+ * zoomed in, both drawn only while on screen. A chunk's edges blend into the chunks around it, so
+ * a texture is painted again, while on screen, when a neighbour it waited for arrives.
  */
 export class TerrainLayer {
   readonly container = new Container()
   private readonly textures = new Container()
   private readonly marks = new Container()
   private readonly entries = new Map<number, Entry>()
-  /** Chunks whose texture is out of date because a neighbour arrived or changed. */
-  private readonly stale = new Set<number>()
+  private readonly painted: ShownTextures<Painted>
   private readonly across: number
 
   constructor(
@@ -47,52 +51,59 @@ export class TerrainLayer {
   ) {
     this.across = chunksAcross(mapSize)
     this.container.addChild(this.textures, this.marks)
+    this.painted = new ShownTextures<Painted>({
+      paint: (i) => this.texture(this.entries.get(i)!.chunk),
+      drop: (i, p) => {
+        const e = this.entries.get(i)
+        if (e?.sprite.texture === p.texture) e.sprite.texture = Texture.EMPTY
+        p.texture.destroy(true)
+      },
+    })
   }
 
-  /** Shows a chunk that loaded, or its newer picture after explored terrain grew. */
+  /** Takes in a chunk that loaded, or its newer picture after explored terrain grew. */
   set(chunk: TerrainChunk): void {
     const index = chunk.cy * this.across + chunk.cx
     const old = this.entries.get(index)
-    const { texture, missing } = this.texture(chunk)
     if (old) {
-      old.sprite.texture.destroy(true)
-      old.sprite.texture = texture
       old.marks?.destroy({ children: true })
-      Object.assign(old, { chunk, marks: undefined, missing })
+      Object.assign(old, { chunk, marks: undefined })
+      this.painted.changed(index)
     } else {
-      const sprite = new Sprite(texture)
+      const sprite = new Sprite(Texture.EMPTY)
+      sprite.visible = false
       this.textures.addChild(sprite)
-      this.entries.set(index, { chunk, sprite, missing })
+      this.entries.set(index, { chunk, sprite })
     }
-    this.stale.delete(index)
     // The chunks around it blend into it: they need it again if they waited for it or it changed.
     for (const n of this.around(chunk.cx, chunk.cy)) {
-      const e = this.entries.get(n)
-      if (e && (old || e.missing.has(index))) this.stale.add(n)
+      const p = this.painted.texture(n)
+      if (p && (old || p.missing.has(index))) this.painted.changed(n)
     }
+  }
+
+  /** The loaded chunks among `indices` that have no texture yet: the map shows them as loading. */
+  unpainted(indices: readonly number[]): number[] {
+    return indices.filter((i) => this.entries.has(i) && !this.painted.has(i))
+  }
+
+  /** How many chunk textures are painted and kept. */
+  get texturesKept(): number {
+    return this.painted.size
   }
 
   /**
-   * Places the chunks in `shown` for the camera and hides the rest. Returns true while textures
-   * on screen still wait to be made again, so the caller draws another frame.
+   * Paints what is on screen and has no texture yet, or a stale one, as the budget allows, places
+   * the chunks in `shown` for the camera and hides the rest. Returns true while chunks on screen
+   * still wait to be painted, so the caller draws another frame.
    */
   draw(cam: Camera, view: Size, shown: ReadonlySet<number>): boolean {
-    const started = performance.now()
-    for (const i of this.stale) {
-      if (!shown.has(i)) continue
-      if (performance.now() - started > REFRESH_BUDGET_MS) return this.place(cam, view, shown, true)
-      this.stale.delete(i)
-      const e = this.entries.get(i)!
-      const { texture, missing } = this.texture(e.chunk)
-      e.sprite.texture.destroy(true)
-      e.sprite.texture = texture
-      e.missing = missing
-    }
-    return this.place(cam, view, shown, false)
+    const busy = this.painted.show([...shown].filter((i) => this.entries.has(i)))
+    return this.place(cam, view, shown, busy)
   }
 
   destroy(): void {
-    for (const e of this.entries.values()) e.sprite.texture.destroy(true)
+    this.painted.clear()
     this.container.destroy({ children: true })
   }
 
@@ -100,10 +111,12 @@ export class TerrainLayer {
     const marked = cam.scale >= MARK_SCALE
     this.marks.visible = marked
     for (const [i, e] of this.entries) {
-      const visible = shown.has(i)
+      const painted = shown.has(i) ? this.painted.texture(i) : undefined
+      const visible = painted !== undefined
       e.sprite.visible = visible
       if (e.marks) e.marks.visible = visible && marked
       if (!visible) continue
+      if (e.sprite.texture !== painted.texture) e.sprite.texture = painted.texture
       const [sx, sy] = chunkToScreen(cam, view, this.mapSize, i % this.across, e.chunk.cy)
       e.sprite.position.set(sx, sy)
       e.sprite.scale.set(cam.scale / TERRAIN_TEXELS)

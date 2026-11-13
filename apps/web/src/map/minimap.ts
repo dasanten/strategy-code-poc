@@ -1,4 +1,13 @@
-import { CHUNK_SIZE, UNEXPLORED, wrap, wrapDelta } from '../shared/terrain.js'
+import {
+  CHUNK_SIZE,
+  TERRAIN_BATCH_MAX,
+  TERRAIN_LEVEL_MAX,
+  UNEXPLORED,
+  chunksAcross,
+  levelChunksAcross,
+  wrap,
+  wrapDelta,
+} from '../shared/terrain.js'
 import { cityAreaTiles } from '../shared/city.js'
 import type { Building, City } from '@csp/shared-types'
 import type { Camera, Size } from './camera.js'
@@ -99,6 +108,67 @@ export function minimapView(
   const k = side / frame.span
   const [width, height] = [(view.width / cam.scale) * k, (view.height / cam.scale) * k]
   return { x: cx - width / 2, y: cy - height / 2, width, height }
+}
+
+/** How many terrain pixels the minimap draws across: one a tile, at most one a screen pixel. */
+export function minimapRes(frame: MinimapFrame): number {
+  return Math.min(MINIMAP_SIDE, Math.ceil(frame.span))
+}
+
+/** The chunk of `level` and the byte in it that a tile shows as (ADR 0034). */
+function levelByte(
+  x: number,
+  y: number,
+  across: number,
+  level: number,
+): { chunk: number; at: number } {
+  const [sx, sy] = [x >> level, y >> level]
+  return {
+    chunk:
+      Math.floor(sy / CHUNK_SIZE) * levelChunksAcross(across, level) + Math.floor(sx / CHUNK_SIZE),
+    at: (sy % CHUNK_SIZE) * CHUNK_SIZE + (sx % CHUNK_SIZE),
+  }
+}
+
+/**
+ * The chunks of `level` the minimap's terrain is drawn from: those holding the tile at the middle
+ * of one of its pixels. Tiles are on the map, so padding past its side is never among them.
+ */
+export function minimapChunks(frame: MinimapFrame, mapSize: number, level: number): number[] {
+  const res = minimapRes(frame)
+  const across = chunksAcross(mapSize)
+  const found = new Set<number>()
+  for (let py = 0; py < res; py++) {
+    for (let px = 0; px < res; px++) {
+      const { x, y } = minimapToTile(frame, mapSize, res, px + 0.5, py + 0.5)
+      found.add(levelByte(x, y, across, level).chunk)
+    }
+  }
+  return [...found]
+}
+
+/**
+ * The level the minimap draws its terrain from (ADR 0034): the finest whose chunks for its frame
+ * fit in one batch request, so it costs about one request however much is explored.
+ */
+export function minimapLevel(frame: MinimapFrame, mapSize: number): number {
+  for (let level = 0; level < TERRAIN_LEVEL_MAX; level++) {
+    if (minimapChunks(frame, mapSize, level).length <= TERRAIN_BATCH_MAX) return level
+  }
+  return TERRAIN_LEVEL_MAX
+}
+
+/** A tile's explored terrain as `level` shows it, from the chunks loaded so far. */
+export function terrainAtLevel(
+  mapSize: number,
+  level: number,
+  get: (index: number, level: number) => { tiles: Uint8Array } | undefined,
+): (x: number, y: number) => number | undefined {
+  const across = chunksAcross(mapSize)
+  return (x, y) => {
+    const { chunk, at } = levelByte(x, y, across, level)
+    return get(chunk, level)?.tiles[at]
+  }
 }
 
 /**
