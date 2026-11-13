@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { TICKS_PER_GAME_DAY } from '@csp/balance'
 import type { Building } from '@csp/shared-types'
 import {
+  DIPLOMACY_TABS,
   DRAWERS,
   DRAWER_WIDTH,
+  NO_DRAWER,
   MIN_OPEN_MAP,
   drawerWidth,
   goodsLabel,
@@ -17,6 +19,9 @@ import {
   rememberedGoodsPick,
   isWide,
   keyGoods,
+  openDiplomacy,
+  showsTab,
+  withOpen,
   showBeside,
   toggleDrawer,
   type OpenDrawer,
@@ -30,11 +35,8 @@ describe('drawers', () => {
       'Horses',
       'Waypoints',
       'Armies',
-      'Contracts',
-      'Demands',
-      'Direct offers',
-      'Alliance',
-      'Standing',
+      'Diplomacy',
+      'Cities',
       'Scripts',
       'Realm log',
     ])
@@ -46,13 +48,48 @@ describe('drawers', () => {
     const groups = railGroups()
     expect(groups.map((g) => g.id)).toEqual(RAIL_GROUPS.map((g) => g.id))
     expect(groups.flatMap((g) => g.drawers.map((d) => d.id))).toEqual(DRAWERS.map((d) => d.id))
-    expect(
-      Object.fromEntries(groups.map((g) => [g.label, g.drawers.map((d) => d.label)])),
-    ).toEqual({
-      People: ['Residents', 'Horses', 'Armies'],
-      Diplomacy: ['Contracts', 'Demands', 'Direct offers', 'Alliance', 'Standing'],
-      Realm: ['Cities', 'Waypoints', 'Scripts', 'Realm log'],
-    })
+    expect(Object.fromEntries(groups.map((g) => [g.label, g.drawers.map((d) => d.label)]))).toEqual(
+      {
+        People: ['Residents', 'Horses', 'Armies'],
+        Diplomacy: ['Diplomacy'],
+        Realm: ['Cities', 'Waypoints', 'Scripts', 'Realm log'],
+      },
+    )
+  })
+
+  it('has one Diplomacy drawer, with a tab each for its five parts', () => {
+    expect(DRAWERS.filter((d) => d.group === 'diplomacy').map((d) => d.id)).toEqual(['diplomacy'])
+    expect(DIPLOMACY_TABS.map((t) => t.label)).toEqual([
+      'Contracts',
+      'Demands',
+      'Direct offers',
+      'Alliance',
+      'Standing',
+    ])
+  })
+
+  it('starts the Diplomacy drawer on its first tab', () => {
+    expect(withOpen(NO_DRAWER, 'diplomacy')).toEqual({ open: 'diplomacy', tab: 'contracts' })
+  })
+
+  it("lands a notice's Open on its tab, whatever was open before", () => {
+    const demands = openDiplomacy('demands')
+    expect(demands).toEqual({ open: 'diplomacy', tab: 'demands' })
+    expect(showsTab(demands, 'demands')).toBe(true)
+    expect(showsTab(demands, 'directOffers')).toBe(false)
+    const offers = openDiplomacy('directOffers')
+    expect(showsTab(offers, 'directOffers')).toBe(true)
+    expect(showsTab(offers, 'demands')).toBe(false)
+  })
+
+  it('remembers the Diplomacy tab while the drawer is closed or another is open', () => {
+    let drawers = openDiplomacy('standing')
+    drawers = withOpen(drawers, undefined)
+    expect(showsTab(drawers, 'standing')).toBe(false)
+    drawers = withOpen(drawers, toggleDrawer(drawers.open, 'residents'))
+    drawers = withOpen(drawers, toggleDrawer(drawers.open, 'diplomacy'))
+    expect(drawers).toEqual({ open: 'diplomacy', tab: 'standing' })
+    expect(showsTab(drawers, 'standing')).toBe(true)
   })
 
   it('opens the clicked drawer when none is open', () => {

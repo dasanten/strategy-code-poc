@@ -564,6 +564,13 @@ export function Wiki() {
           the same order.
         </p>
         <p>
+          The tool rail on the left opens drawers over the map, one at a time, in three groups:
+          People (Residents, Horses, Armies), Diplomacy, and Realm (Cities, Waypoints, Scripts,
+          Realm log). The Diplomacy drawer has a tab each for Contracts, Demands, Direct offers,
+          Alliance and Standing; it reopens on the tab you left it on, and a notice’s Open takes you
+          to its tab.
+        </p>
+        <p>
           The Residents drawer’s Open full list button opens the list across the screen, with
           everyone’s age, city, stats, skills, gear, what they carry, hunger, health and what they
           are doing. On a phone each resident is a small card. Tap one to open that resident’s card,
@@ -2033,16 +2040,16 @@ export function Wiki() {
         </p>
         <h3>Direct offers</h3>
         <p>
-          Under <strong>Direct offers</strong> on the tool rail you can send an offer to one realm
-          you know of: one you see residents of, an ally, one whose city you have seen, one with a
-          standing either way, or your side in a contract, demand or direct offer. Name a storage of
-          yours, and the goods are set aside there as for any offer. They hear at once wherever they
-          are, with a notice and the place, and only they can accept it: someone of theirs goes to
-          the storage and takes it in person, as with any offer, or they decline it from anywhere.
-          Anyone else in sight of the storage sees it, and that it is for another realm. It lapses
-          after {num(DIRECT_OFFER_DAYS)} game days. Declined, lapsed or taken down, the goods are
-          ordinary again and both of you are told. At most {num(DIRECT_OFFERS_TO_ONE_REALM)} can
-          stand to one realm.
+          Under <strong>Direct offers</strong> in the Diplomacy drawer you can send an offer to one
+          realm you know of: one you see residents of, an ally, one whose city you have seen, one
+          with a standing either way, or your side in a contract, demand or direct offer. Name a
+          storage of yours, and the goods are set aside there as for any offer. They hear at once
+          wherever they are, with a notice and the place, and only they can accept it: someone of
+          theirs goes to the storage and takes it in person, as with any offer, or they decline it
+          from anywhere. Anyone else in sight of the storage sees it, and that it is for another
+          realm. It lapses after {num(DIRECT_OFFER_DAYS)} game days. Declined, lapsed or taken down,
+          the goods are ordinary again and both of you are told. At most{' '}
+          {num(DIRECT_OFFERS_TO_ONE_REALM)} can stand to one realm.
         </p>
         <p>
           Or have the Trade Organization carry it, while the HQ stands. Name a city of yours and a
@@ -2707,9 +2714,9 @@ export function Wiki() {
           A demand tells another realm what you want and by when: <strong>a named city</strong> of
           theirs, or <strong>goods or Coins</strong>, with a note of at most{' '}
           {num(DEMAND_NOTE_MAX_LENGTH)} characters and a deadline of up to {days(DEMAND_MAX_DAYS)}.
-          Open <strong>Demands</strong> on the tool rail to send one or to answer one. Scripts can
-          too (<code>sendDemand</code>, <code>acceptDemand</code>, <code>declineDemand</code>,{' '}
-          <code>demands</code>).
+          Open <strong>Demands</strong> in the Diplomacy drawer to send one or to answer one.
+          Scripts can too (<code>sendDemand</code>, <code>acceptDemand</code>,{' '}
+          <code>declineDemand</code>, <code>demands</code>).
         </p>
         <ul>
           <li>
@@ -2718,7 +2725,7 @@ export function Wiki() {
             in a contract, demand or Direct offer.
           </li>
           <li>
-            It arrives at once, wherever they are, in their Demands drawer and as a notice. A realm
+            It arrives at once, wherever they are, on their Demands tab and as a notice. A realm
             sends at most {num(DEMANDS_PER_GAME_DAY)} a game day, scripts included.
           </li>
           <li>

@@ -296,6 +296,31 @@ button.hud-logout {
   font-size: 12px;
   color: var(--ui-muted);
 }
+.diplomacy-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--ui-line);
+}
+.diplomacy-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12px;
+}
+.diplomacy-tabs button:hover {
+  background: var(--ui-raised-hover);
+}
+.diplomacy-tabs button.on {
+  background: var(--rel-own);
+  color: var(--ui-ink);
+}
 .hud-drawer-head button {
   padding: 2px 8px;
   border: 0;

@@ -1,8 +1,17 @@
-import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import {
+  Fragment,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import { formatGameTime } from './shared/time.js'
 import type { FirstDay, TraderVisit } from '@csp/shared-types'
 import { DrawerStatus } from './drawer-head.js'
 import {
+  DIPLOMACY_TABS,
   DRAWERS,
   railGroups,
   DRAWER_WIDTH,
@@ -11,6 +20,7 @@ import {
   goodsLabel,
   isWide,
   rememberedDrawerWidth,
+  type DiplomacyTab,
   type DrawerId,
   type GoodsPick,
   type KeyGood,
@@ -24,7 +34,7 @@ import { WIKI_PATH } from './wiki-view.js'
 /** The HUD over the full-screen map (ADR 0008): top bar, tool rail, drawers and dialogs. */
 
 /** Line-art icons, 24×24 in `currentColor`, for the rail and the top bar. */
-const ICONS: Record<DrawerId | KeyGood | 'crown', ReactNode> = {
+const ICONS: Record<DrawerId | DiplomacyTab | KeyGood | 'crown', ReactNode> = {
   residents: (
     <>
       <circle cx="12" cy="6" r="3.2" fill="currentColor" />
@@ -55,6 +65,12 @@ const ICONS: Record<DrawerId | KeyGood | 'crown', ReactNode> = {
       <path d="M6 4h12v14a2 2 0 0 1-2 2H6" />
       <path d="M6 4a2 2 0 0 0 0 4h2M6 20a2 2 0 0 1 0-4h10" />
       <path d="M10 8h6M10 12h6" />
+    </>
+  ),
+  diplomacy: (
+    <>
+      <path d="M3 5h12v8H8l-3 3v-3H3z" />
+      <path d="M17 9h4v8h-2v3l-3-3h-5v-2" />
     </>
   ),
   demands: (
@@ -440,6 +456,56 @@ export function Drawer({
       </div>
       <DrawerStatus.Provider value={status}>{children}</DrawerStatus.Provider>
     </section>
+  )
+}
+
+/**
+ * The Diplomacy drawer's tabs (`CONTEXT.md`: Tool rail). Every tab's panel stays mounted and only
+ * the picked one shows, so a panel keeps what the Player typed into it; only that one puts its
+ * count beside the drawer's title.
+ */
+export function DiplomacyTabs({
+  tab,
+  onTab,
+  panels,
+}: {
+  tab: DiplomacyTab
+  onTab: (tab: DiplomacyTab) => void
+  panels: Record<DiplomacyTab, ReactNode>
+}) {
+  const status = useContext(DrawerStatus)
+  return (
+    <>
+      <div className="diplomacy-tabs" role="tablist" aria-label="Diplomacy">
+        {DIPLOMACY_TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            id={`diplomacy-tab-${t.id}`}
+            aria-selected={tab === t.id}
+            aria-controls={`diplomacy-panel-${t.id}`}
+            className={tab === t.id ? 'on' : ''}
+            onClick={() => onTab(t.id)}
+          >
+            <Icon name={t.id} size={15} /> {t.label}
+          </button>
+        ))}
+      </div>
+      {DIPLOMACY_TABS.map((t) => (
+        <div
+          key={t.id}
+          role="tabpanel"
+          id={`diplomacy-panel-${t.id}`}
+          aria-labelledby={`diplomacy-tab-${t.id}`}
+          hidden={tab !== t.id}
+        >
+          <DrawerStatus.Provider value={tab === t.id ? status : null}>
+            {panels[t.id]}
+          </DrawerStatus.Provider>
+        </div>
+      ))}
+    </>
   )
 }
 
