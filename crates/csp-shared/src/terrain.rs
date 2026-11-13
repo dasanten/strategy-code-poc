@@ -131,11 +131,30 @@ pub fn is_water(t: u8) -> bool {
 /// Sea tile among the eight around it. `at` gives the terrain byte of a tile; coordinates past a
 /// side continue on the other.
 pub fn touches_water(tiles: &[(i32, i32)], size: i32, at: impl Fn(i32, i32) -> u8) -> bool {
+    touches(tiles, size, at, is_water)
+}
+
+/// Whether the terrain is Sea (`CONTEXT.md`: Ship: it sails only on Sea, never onto Lake).
+pub fn is_sea(t: u8) -> bool {
+    t == Terrain::Sea as u8
+}
+
+/// Whether one of `tiles` touches Sea, straight or diagonally (`CONTEXT.md`: Building a ship).
+pub fn touches_sea(tiles: &[(i32, i32)], size: i32, at: impl Fn(i32, i32) -> u8) -> bool {
+    touches(tiles, size, at, is_sea)
+}
+
+/// Whether one of `tiles` has a tile of terrain `what` among the eight around it.
+fn touches(
+    tiles: &[(i32, i32)],
+    size: i32,
+    at: impl Fn(i32, i32) -> u8,
+    what: fn(u8) -> bool,
+) -> bool {
     tiles.iter().any(|&(x, y)| {
         (-1..=1).any(|dy| {
-            (-1..=1).any(|dx| {
-                (dx, dy) != (0, 0) && is_water(at(wrap(x + dx, size), wrap(y + dy, size)))
-            })
+            (-1..=1)
+                .any(|dx| (dx, dy) != (0, 0) && what(at(wrap(x + dx, size), wrap(y + dy, size))))
         })
     })
 }

@@ -119,7 +119,7 @@ pub fn goods_at_spot<'w>(
             .vessels
             .iter()
             .find(|v| &v.id == vessel_id)
-            .filter(|v| super::vessels::beside_vessel(v, x, y))
+            .filter(|v| super::vessels::beside_vessel(world, v, x, y))
             .map(|v| &v.load),
     }
 }

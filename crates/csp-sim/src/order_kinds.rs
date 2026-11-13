@@ -86,6 +86,8 @@ pub fn add_rule_orders(kinds: &mut OrderKinds) {
     kinds.insert("getOff", crate::passengers::GetOff);
     // T90.4: rowing.
     kinds.insert("row", crate::rowing::Row);
+    kinds.insert("load", crate::loading::Load);
+    kinds.insert("sail", crate::sailing::Sail);
     kinds.insert("climb", crate::climbing::Climb);
     kinds.insert("setGate", crate::gates::SetGate);
     kinds.insert("claimHorses", crate::horse_grant::ClaimHorses);
@@ -301,10 +303,7 @@ pub fn add_later_rule_orders(kinds: &mut OrderKinds) {
     );
     kinds.insert(
         "haul",
-        fn_kind(
-            Box::new(crate::hauling::validate_haul),
-            Box::new(|w, s, o, _| crate::hauling::apply_haul(w, s, o)),
-        ),
+        fn_kind(Box::new(crate::hauling::validate_haul), Box::new(crate::hauling::apply_haul)),
     );
     kinds.insert(
         "stop",

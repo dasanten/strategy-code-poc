@@ -63,6 +63,7 @@ export type PlanStepId =
   | 'teach'
   | 'train'
   | 'haul'
+  | 'haulBoat'
   | 'drive'
   | 'road'
   | 'wall'
@@ -70,7 +71,9 @@ export type PlanStepId =
   | 'dismount'
   | 'board'
   | 'boardBoat'
+  | 'boardCrew'
   | 'row'
+  | 'sail'
   | 'getOff'
   | 'unhitch'
   | 'hitch'
@@ -116,11 +119,27 @@ export const PLAN_STEPS: readonly PlanKind[] = [
     ],
   },
   {
+    id: 'boardCrew',
+    label: 'Board a ship as crew',
+    picks: [
+      { pick: 'vessel', prompt: 'the ship to crew' },
+      { pick: 'shore', prompt: 'the tile of the haven it is docked at to board it from' },
+    ],
+  },
+  {
     id: 'row',
     label: 'Row the boat',
     picks: [
       { pick: 'vessel', prompt: 'the boat to row' },
       { pick: 'tile', prompt: 'where to row it: water, or the shore to land at' },
+    ],
+  },
+  {
+    id: 'sail',
+    label: 'Sail the ship',
+    picks: [
+      { pick: 'vessel', prompt: 'the ship to sail' },
+      { pick: 'tile', prompt: 'where to sail it: the Sea, or a haven to dock at' },
     ],
   },
   { id: 'getOff', label: 'Get off', picks: [] },
@@ -224,6 +243,25 @@ export const PLAN_STEPS: readonly PlanKind[] = [
     ask: 'haul',
   },
   {
+    // `CONTEXT.md`: Haul route by water: it starts on the shore beside the boat, a ship's on the
+    // haven it is docked at, and a ship's stops are havens.
+    id: 'haulBoat',
+    label: 'Haul route by boat or ship',
+    picks: [
+      { pick: 'vessel', prompt: 'the boat or ship to haul with' },
+      {
+        pick: 'shore',
+        prompt:
+          'the first stop: the shore or haven beside where the boat will be (a ship: a haven)',
+      },
+      {
+        pick: 'tile',
+        prompt: 'the other stop: a shore tile or haven with water beside it (a ship: a haven)',
+      },
+    ],
+    ask: 'haul',
+  },
+  {
     id: 'relocate',
     label: 'Relocate',
     picks: [{ pick: 'city', prompt: 'the city of yours to relocate to' }],
@@ -243,6 +281,7 @@ export const PLAN_TASKS: Partial<Readonly<Record<PlanStepId, Task>>> = {
   breed: 'breed',
   train: 'train',
   haul: 'haul',
+  haulBoat: 'haul',
   explore: 'explore',
 }
 
@@ -490,9 +529,15 @@ export function planOrder(
     case 'boardBoat':
       // From beside it: a walk to the shore picked goes first (`CONTEXT.md`: Beside a vessel).
       return { order: { kind: 'board', vesselId: p.id }, at: { x: q.x, y: q.y } }
+    case 'boardCrew':
+      // From its haven: a walk there goes first (`CONTEXT.md`: Docked, Crew).
+      return { order: { kind: 'board', vesselId: p.id, asCrew: true }, at: { x: q.x, y: q.y } }
     case 'row':
       // Aboard or beside it already, as a step before saw to (`CONTEXT.md`: Rowing).
       return { order: { kind: 'row', vesselId: p.id, x: q.x, y: q.y } }
+    case 'sail':
+      // Aboard it as one of its crew already, as a step before saw to (`CONTEXT.md`: Sailing).
+      return { order: { kind: 'sail', vesselId: p.id, x: q.x, y: q.y } }
     case 'getOff':
       return { order: { kind: 'getOff' } }
     case 'explore':
@@ -545,6 +590,13 @@ export function planOrder(
       const setup = a?.ask === 'haul' ? a.setup : {}
       const order = { kind: 'task', task: 'haul', carriageId: p.id, x: q.x, y: q.y, ...setup }
       return { order, at }
+    }
+    case 'haulBoat': {
+      // A walk to the first stop goes first; the boat is given as the Haul task's carriage.
+      const setup = a?.ask === 'haul' ? a.setup : {}
+      const to = plan.picked[2] as Picked
+      const order = { kind: 'task', task: 'haul', carriageId: p.id, x: to.x, y: to.y, ...setup }
+      return { order, at: { x: q.x, y: q.y } }
     }
     case 'relocate':
       return { order: { kind: 'relocate', cityId: p.id } }

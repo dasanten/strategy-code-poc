@@ -24,6 +24,9 @@ import {
   TRADER_STOP_TICKS,
   CARRIAGE_CAPACITY,
   BOAT_CAPACITY,
+  SHIP_CAPACITY,
+  SHIP_MIN_CREW,
+  SAIL_SPEED,
   DIRECT_OFFERS_TO_ONE_REALM,
   DIRECT_OFFER_DAYS,
   PASSENGER_WEIGHT,
@@ -306,6 +309,7 @@ import {
   buildCosts,
   carriageCost,
   boatCost,
+  shipCost,
   cityControl,
   coinsPerMintWorkerDay,
   crimeForgotten,
@@ -1493,7 +1497,8 @@ export function Wiki() {
           Strength {num(strong.stats.strength.base)}. A carriage behind an average horse carries{' '}
           {num(CARRIAGE_CAPACITY)} kg; each point of its driver's Driving skill makes it{' '}
           {pct(DRIVING_SKILL_EFFECT)} faster, at most {pct(DRIVING_SKILL_LIMIT)}, learned at{' '}
-          {num(DRIVING_SKILL_PER_DAY)} a game day of driving. Carriages can't enter mountains.
+          {num(DRIVING_SKILL_PER_DAY)} a game day of driving. Carriages enter mountains only along a finished road, so a
+          road over a ridge opens a pass for them.
         </p>
         <p>
           A carriage is built at a finished stable: a resident there lays out a carriage site on a
@@ -1950,6 +1955,68 @@ export function Wiki() {
           realm that ends belongs to nobody, as NPC cities don't use the water.
         </p>
         <p>
+          <b>Building a ship.</b> A <b>ship</b> is the big vessel of the Sea: it carries far more
+          than a carriage, {num(SHIP_CAPACITY)} kg in all, sails with a crew and goes only on Sea,
+          never onto a Lake. A resident standing on a tile of a finished haven that touches the Sea
+          lays out a <b>ship site</b> there with Build (under Transport); a haven on a Lake alone
+          builds boats only. The site takes {goods(shipCost().materials)} and{' '}
+          {duration(shipCost().buildTicks)} of one average resident's work, so it is a job for many
+          hands, and like a boat site anyone may bring materials or work on it. Once finished the
+          site is gone, and an empty ship of the realm of whoever finished it floats on the nearest
+          free Sea tile next to it. It shows on the map on a token of its own, to whoever sees its
+          tile; its card tells whose it is, its load, and who is aboard.
+        </p>
+        <p>
+          <b>Docked.</b> A ship on a water tile touching a haven, straight or diagonally, is docked
+          there; one launched at a haven is docked at it. Only docked, and only from that haven, do
+          residents board it, get off it or load it: for a ship, beside it means standing anywhere
+          on the haven it is docked at, and getting off lands on a free tile of that haven. A ship
+          out at sea takes nobody on and lets nobody off. Store and Fetch with a docked ship as the
+          place walk onto its haven.
+        </p>
+        <p>
+          <b>Crew.</b> Residents of the ship's realm board it as its <b>crew</b> rather than as
+          passengers: Board ship… on their card opens the choice (As crew or As passenger), the
+          group card offers Crew the ship and Board the ship, a queue step Board a ship as crew, and
+          a script <code>board(ship.id, true)</code>. Only grown residents crew a ship, and crew
+          don't count against what it holds, while each passenger counts as {num(PASSENGER_WEIGHT)}{' '}
+          kg as on a boat. A ship sails only with at least {num(SHIP_MIN_CREW)} crew aboard; its
+          card names its crew and says whether it can sail. Getting off, one of the crew is its crew
+          no more.
+        </p>
+        <p>
+          <b>Loading a ship.</b> Those standing on the haven a ship is docked at move goods straight
+          between the haven's storage and the ship, as many as there are and fit, at once: Load ship
+          and Unload in the Goods panel, or a script's <code>loadShip(ship, goods)</code> and{' '}
+          <code>unloadShip(ship, goods)</code>. Taking goods from another city's haven this way is
+          judged as taking from its storage. Goods can also go aboard by hand, as onto a boat, from
+          the haven.
+        </p>
+        <p>
+          <b>Sailing.</b> One of the crew aboard, its <b>captain</b>, sails the ship: Sail ship to
+          on their card, then a tile, a queue step Sail the ship, or a script's{' '}
+          <code>sail(ship, x, y)</code>. Given a Sea tile it sails there; given a tile of a haven,
+          it docks on the free Sea tile beside that haven nearest it. It goes a Step at a time over
+          Sea only, never onto a Lake, so a lake haven builds boats, not ships. It sails only with
+          at least {num(SHIP_MIN_CREW)} crew aboard, and stops where it is if fewer are left. An
+          unskilled crew sails it {num(SAIL_SPEED)} times as fast as walking on Plains; their
+          average <b>Seafaring</b> makes it faster as a rower's does a boat, and every tick of
+          sailing teaches Seafaring to the whole crew. Everyone aboard goes along and sees from the
+          ship's tile. Crew and passengers eat their own food and, running low, take a meal from the
+          ship's Food, as on a boat.
+        </p>
+        <p>
+          <b>Stealing a ship.</b> Residents of your realm on the haven another realm's ship is
+          docked at board it as crew, if nobody of another realm is aboard and no armed resident of
+          its owner stands on the haven while none of yours does; with at least {num(SHIP_MIN_CREW)}{' '}
+          of them aboard, sailing it off steals it with its load, known through a witness like a
+          boat's theft.
+        </p>
+        <p>
+          <b>Fighting at a ship.</b> Those aboard a docked ship can be attacked from anywhere on its
+          haven, and fight back at those on it; out at sea, as with a boat, nobody reaches them.
+        </p>
+        <p>
           <b>Beside a boat</b> means on a land tile touching its water tile, straight or diagonally.
           A resident beside a boat of their realm <b>boards</b> it, children too (Board boat on
           their card, or on the boat's card, or a script's <code>board(id)</code>), and steps onto
@@ -2009,6 +2076,38 @@ export function Wiki() {
           <b>Row boats to</b> has one of them row each boat (the first already aboard it, else the
           first beside it) while the others aboard go along: board, row, get off, and the whole crew
           is across.
+        </p>
+        <p>
+          <b>Haul route by boat.</b> A boat runs a haul route as a carriage does, between two stops
+          on land: shore tiles or a haven, each with free water beside it. A grown resident standing
+          on the shore beside a boat of your realm picks <strong>Haul route…</strong> on their card,
+          the goods to take and to bring back and the Food kept on board for them (
+          {num(HAUL_KEEP_FOOD)} unless you pick another amount), then the other stop on the map; the
+          tile they stand on is the first stop. With Add step it is <b>Haul route by boat</b>: the
+          boat, the first stop (a walk there goes first), then the other one. A script gives it with{' '}
+          <code>haul(boat, x, y, goods)</code> from the shore beside the boat. At each stop the
+          rower gets off onto it and loads and unloads by hand from beside the boat, like a
+          carriage's driver: at a haven from and into its storage, at a shore from and onto the pile
+          on the tile. Then they board, take the oars and row to the free water beside the other
+          stop. The boat leaves the first stop once it has goods on board and nothing more to load
+          there; with none there yet it waits. The route ends when the boat isn't beside the stop
+          any more (rowed off by someone else) or the rower can't get off onto it, and goes on until
+          stopped otherwise. The rower's Doing line says what they load or where they row.
+        </p>
+        <p>
+          <b>Haul route by ship.</b> A ship runs a haul route between two havens. A grown resident
+          standing on the haven a ship of your realm is docked at picks <strong>Haul route…</strong>{' '}
+          on their card (or <b>Haul route by boat or ship</b> with Add step, or a script's{' '}
+          <code>haul(ship, x, y, goods)</code>), then a tile of the other haven; they are its
+          captain. With them aboard it must have at least {num(SHIP_MIN_CREW)} crew, so the others
+          board as crew first. At each haven the captain gets off and moves the goods straight
+          between the haven's storage and the ship, as many as there are and fit, at once: first the
+          goods for that haven off, then the Food kept on board for the crew topped up, then the
+          goods for the other haven on. Then they board again as one of the crew and sail to the
+          other haven, docking on the free Sea beside it; the rest of the crew stays aboard all the
+          while and eats from the ship's Food. Goods go both ways as for a carriage, ore home and
+          Food out, say. The ship leaves the first haven once it has goods for the other aboard;
+          with none there yet it waits. Sailing on each time teaches Seafaring to the whole crew.
         </p>
         <p>
           <b>Stealing a boat.</b> A grown resident beside another realm's boat can row it off as a
