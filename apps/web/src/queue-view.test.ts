@@ -16,6 +16,8 @@ import {
   planOf,
   planStep,
   queueRows,
+  showsMinutes,
+  stepGroup,
   STORE_ALL,
   stepLabel,
   type Queued,
@@ -137,7 +139,7 @@ describe('the queue list', () => {
 
   it('lists the steps, the current one, durations and real time', () => {
     expect(queueRows(q, names)).toEqual([
-      { id: 1, label: 'Walk to 6, 6', current: false, endless: false },
+      { id: 1, label: 'Walk to 6, 6', current: false, endless: false, group: 'move' },
       {
         id: 2,
         label: 'Work the farm',
@@ -145,9 +147,10 @@ describe('the queue list', () => {
         minutes: QUEUE_DEFAULT_STEP_MINUTES,
         real: '1 min',
         endless: true,
+        group: 'work',
       },
-      { id: 3, label: 'Store what they carry', current: false, endless: false },
-      { id: 4, label: 'Walk to 9, 3', current: false, endless: false },
+      { id: 3, label: 'Store what they carry', current: false, endless: false, group: 'goods' },
+      { id: 4, label: 'Walk to 9, 3', current: false, endless: false, group: 'move' },
     ])
     expect(q.loop).toBe(true)
   })
@@ -223,10 +226,41 @@ describe('step labels', () => {
 
   it('names the waypoint a step at its tile goes to', () => {
     const waypoints = [{ name: 'Pass', x: 12, y: 6 }]
-    expect(stepLabel({ kind: 'walkTo', x: 12, y: 6 }, { waypoints })).toBe('Walk to Pass (12, 6)')
+    expect(stepLabel({ kind: 'walkTo', x: 12, y: 6 }, { waypoints })).toBe('Walk to Pass')
     expect(stepLabel({ kind: 'walkTo', x: 12, y: 7 }, { waypoints })).toBe('Walk to 12, 7')
     // A removed waypoint leaves the step where it was: its tile.
     expect(stepLabel({ kind: 'walkTo', x: 12, y: 6 }, {})).toBe('Walk to 12, 6')
+  })
+
+  it('names a building at a step’s tile with its city, and its city on a step acting on it', () => {
+    const cities = [{ id: 'c1', name: 'Quarrytown IV' }]
+    const farm = { id: 'f1', kind: 'farm' as const, x: 10, y: 20, cityId: 'c1' }
+    // A farm covers more than its corner tile.
+    expect(stepLabel({ kind: 'walkTo', x: 11, y: 21 }, { buildings: [farm], cities })).toBe(
+      'Walk to Farm, Quarrytown IV',
+    )
+    expect(
+      stepLabel({ kind: 'task', task: 'work', workplaceId: 'f1' }, { buildings: [farm], cities }),
+    ).toBe('Work the farm in Quarrytown IV')
+    expect(
+      stepLabel(
+        { ...STORE_ALL, to: 's1' },
+        { buildings: [{ ...buildings[0]!, cityId: 'c1' }], cities },
+      ),
+    ).toBe('Store what they carry at the storage in Quarrytown IV')
+    // One out of sight is named as last seen; one with no city known, without it.
+    expect(stepLabel({ kind: 'walkTo', x: 10, y: 20 }, { lastSeen: [farm], cities })).toBe(
+      'Walk to Farm, Quarrytown IV (as last seen)',
+    )
+    expect(stepLabel({ kind: 'walkTo', x: 10, y: 20 }, { buildings: [farm] })).toBe('Walk to Farm')
+    // A waypoint on the tile goes first; a bare tile falls back to coordinates.
+    const waypoints = [{ name: 'Gate', x: 10, y: 20 }]
+    expect(stepLabel({ kind: 'walkTo', x: 10, y: 20 }, { buildings: [farm], waypoints })).toBe(
+      'Walk to Gate',
+    )
+    expect(stepLabel({ kind: 'walkTo', x: 40, y: 40 }, { buildings: [farm], cities })).toBe(
+      'Walk to 40, 40',
+    )
   })
 
   it('names the city a Relocate step goes to', () => {
@@ -420,5 +454,27 @@ describe('Clear', () => {
   it('empties a group plan', () => {
     const plan = planStep(planStep(EMPTY_PLAN, walkHome), store)
     expect(editPlan(plan, clearedItems(plan.items)).items).toEqual([])
+  })
+})
+
+describe('the duration chip', () => {
+  const step = (minutes: number | undefined, endless: boolean) => ({ minutes, endless })
+  it('shows when a step has a duration', () => {
+    expect(showsMinutes(step(10, false), false)).toBe(true)
+    expect(showsMinutes(step(10, true), true)).toBe(true)
+  })
+  it('shows when a step that never ends needs one, not being last', () => {
+    expect(showsMinutes(step(undefined, true), false)).toBe(true)
+    expect(showsMinutes(step(undefined, true), true)).toBe(false)
+  })
+  it('hides on a step that ends on its own with none', () => {
+    expect(showsMinutes(step(undefined, false), false)).toBe(false)
+  })
+  it('groups steps by the Orders tab kind for their icon', () => {
+    expect(stepGroup({ kind: 'walkTo', x: 1, y: 1 })).toBe('move')
+    expect(stepGroup({ kind: 'task', task: 'explore' })).toBe('move')
+    expect(stepGroup(STORE_ALL)).toBe('goods')
+    expect(stepGroup({ kind: 'task', task: 'work', workplaceId: 'f1' })).toBe('work')
+    expect(stepGroup({ kind: 'runScript', scriptId: 'x' })).toBe('scripts')
   })
 })

@@ -817,8 +817,13 @@ export function Wiki() {
         </p>
         <p>
           The resident's card lists the queue with the current step marked and what they are doing
-          in it. Drag a step or use its arrows to reorder it, remove it, type a duration in game
-          minutes (the real time shows beside it) or clear it, and switch loop on or off.
+          in it, each step on one line with an icon for its kind of order and its place by name: a
+          building with its city (“Walk to Farm, Quarrytown IV”), a waypoint or a city, or the
+          tile's coordinates when nothing is there. A step's duration shows as a chip when it has
+          one, or when it needs one; tap it to type the duration in game minutes (the real time
+          shows beside it), empty it to clear it. Drag a step to reorder it, or focus it and press{' '}
+          <kbd>Alt</kbd>+<kbd>↑</kbd> or <kbd>Alt</kbd>+<kbd>↓</kbd>; remove it with ✕, and switch
+          loop on or off. The planner's <strong>?</strong> shows how it works.
         </p>
         <p>
           To reuse steps, tap one in the planner to pick it (<kbd>Shift</kbd>+tap picks a range;
@@ -831,13 +836,15 @@ export function Wiki() {
           step keeps its places and the walk before it, and is checked again when its turn comes.
         </p>
         <p>
-          To keep a plan, <strong>Save…</strong> it under a name, such as “Mine run”; saving under a
-          name already taken asks before it overwrites. <strong>Load…</strong> lists the saved
-          queues with their step count and date, to load one or delete it; loading adds its steps
-          after the planned ones, in any resident's planner or a group's. Saved queues are kept in
-          this browser, as saved groups are: the server never sees them, and another browser has its
-          own. A saved step keeps its places, so one whose building is gone from the map (torn down,
-          say) is flagged in the planner; it is still given, and skipped when its turn comes.
+          To keep a plan, open the planner's <strong>Saved…</strong> and save it under a name, such
+          as “Mine run”; saving under a name already taken asks before it overwrites. Saved… also
+          lists the saved queues with their step count and date, to load one or delete it (a
+          resident with nothing queued has <strong>Load…</strong> for the same list); loading adds
+          its steps after the planned ones, in any resident's planner or a group's. Saved queues are
+          kept in this browser, as saved groups are: the server never sees them, and another browser
+          has its own. A saved step keeps its places, so one whose building is gone from the map
+          (torn down, say) is flagged in the planner; it is still given, and skipped when its turn
+          comes.
         </p>
         <p>
           To do some steps several times in a row, pick them (in a row) and press{' '}

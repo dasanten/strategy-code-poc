@@ -127,9 +127,11 @@ import {
   editPlan,
   planOf,
   realMinutes,
+  showsMinutes,
   stepRow,
   type QueuePlan,
   type QueueRow,
+  type StepGroup,
 } from './queue-view.js'
 import { copy, paste, pickStep, useClipboardEmpty } from './planner-clipboard.js'
 import {
@@ -435,6 +437,8 @@ export function QueueBlock({
   realm?: string
 }) {
   const [dragged, setDragged] = useState<number>()
+  // The planner's help, behind its "?".
+  const [help, setHelp] = useState(false)
   // The steps and blocks picked for the clipboard, by id; one removed since drops out.
   const [pickedIds, setPicked] = useState<number[]>([])
   const clipboardEmpty = useClipboardEmpty()
@@ -488,11 +492,19 @@ export function QueueBlock({
   }
   const unrolled = stepCount(q.items)
   const over = capProblem(q.items)
+  const lastStepId = rows.filter((row) => row.kind === 'step').at(-1)?.id
+  // Alt+↑ and Alt+↓ move the focused step or block (drag does too).
+  const onRowKey = (e: KeyboardEvent, id: number) => {
+    if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
+    const by = e.key === 'ArrowUp' ? -1 : 1
+    e.preventDefault()
+    e.stopPropagation()
+    if (canMove(q.items, id, by)) edit(moveItem(q.items, id, by))
+  }
   let n = 0
   return (
     <section className="inspector-block" aria-label={title}>
-      <div className="panel-head">
-        <h3>{title}</h3>
+      <div className="order-buttons queue-tools">
         <label className="small queue-loop">
           <input
             type="checkbox"
@@ -501,8 +513,6 @@ export function QueueBlock({
           />{' '}
           Loop
         </label>
-      </div>
-      <div className="order-buttons queue-tools">
         <button type="button" disabled={picked.length === 0} onClick={copyPicked}>
           Copy
         </button>
@@ -529,16 +539,35 @@ export function QueueBlock({
         >
           Clear
         </button>
-        <span className="small muted">
-          {picked.length === 0 ? 'Tap a step to pick it' : `${picked.length} picked`}
-        </span>
+        {realm && (
+          <SavedQueueTools
+            realm={realm}
+            steps={q.items}
+            onLoad={(loaded) => add(undefined, loaded)}
+            oneButton
+          />
+        )}
+        <button
+          type="button"
+          aria-label="How the planner works"
+          aria-expanded={help}
+          onClick={() => setHelp(!help)}
+        >
+          ?
+        </button>
+        {picked.length > 0 && <span className="small muted">{picked.length} picked</span>}
       </div>
-      {realm && (
-        <SavedQueueTools
-          realm={realm}
-          steps={q.items}
-          onLoad={(loaded) => add(undefined, loaded)}
-        />
+      {help && (
+        <p className="muted small">
+          Tap a step to pick it (Shift for a range), then Copy; Paste puts the copies after the
+          picked step. Drag a step to move it, or focus it and press Alt+↑ or Alt+↓. Working,
+          hauling, teaching and training never end on their own, so they need a duration unless they
+          are last: tap the duration to set it. Repeat wraps the picked steps in a block done so
+          many times in a row; giving the queue makes it that many copies, up to {QUEUE_MAX_STEPS}{' '}
+          steps in all. Saved… keeps the steps in this browser under a name, and loads a saved
+          queue’s steps at the end. Clear empties a draft; on a running queue it keeps only the
+          current step and turns loop off, so the queue ends after it.
+        </p>
       )}
       {hasBlocks(q.items) && (
         <p className={`small ${over ? 'queue-unrolled-over' : 'muted'}`}>
@@ -560,6 +589,8 @@ export function QueueBlock({
               style={row.depth > 0 ? { marginLeft: `${row.depth * 1.25}em` } : undefined}
               aria-current={step?.current ? 'step' : undefined}
               aria-selected={isPicked}
+              tabIndex={0}
+              onKeyDown={(e) => onRowKey(e, row.id)}
               // Shift+tap picks a range rather than selecting text.
               onMouseDown={(e) => e.shiftKey && e.preventDefault()}
               onClick={(e) => {
@@ -583,9 +614,24 @@ export function QueueBlock({
             >
               <div className="queue-step-head">
                 {step ? (
-                  <span className="small">
-                    {n}. {step.label}
-                  </span>
+                  <>
+                    <span className="queue-step-icon" aria-hidden="true">
+                      {STEP_ICONS[step.group]}
+                    </span>
+                    <span
+                      className="small queue-step-label"
+                      title={step.gone ? `${step.gone}: it will be skipped` : step.label}
+                    >
+                      {n}. {step.label}
+                      {step.gone && <span className="queue-step-gone"> · {step.gone}</span>}
+                    </span>
+                    {showsMinutes(step, row.id === lastStepId) && (
+                      <DurationChip
+                        row={step}
+                        onSet={(minutes) => edit(timeItem(q.items, row.id, minutes))}
+                      />
+                    )}
+                  </>
                 ) : (
                   <RepeatCount
                     repeat={row.kind === 'block' ? row.repeat : 1}
@@ -601,22 +647,6 @@ export function QueueBlock({
                   )}
                   <button
                     type="button"
-                    aria-label="Move up"
-                    disabled={!canMove(q.items, row.id, -1)}
-                    onClick={() => edit(moveItem(q.items, row.id, -1))}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Move down"
-                    disabled={!canMove(q.items, row.id, 1)}
-                    onClick={() => edit(moveItem(q.items, row.id, 1))}
-                  >
-                    ↓
-                  </button>
-                  <button
-                    type="button"
                     aria-label={row.kind === 'block' ? 'Remove the block and its steps' : 'Remove'}
                     onClick={() => edit(removeItem(q.items, row.id))}
                   >
@@ -624,29 +654,11 @@ export function QueueBlock({
                   </button>
                 </span>
               </div>
-              {step?.gone && (
-                <span className="small queue-step-gone">{step.gone}: it will be skipped</span>
-              )}
-              {step?.current && <span className="small muted">{doing}</span>}
-              {step && (
-                <StepMinutes
-                  row={step}
-                  onSet={(minutes) => edit(timeItem(q.items, row.id, minutes))}
-                />
-              )}
+              {step?.current && doing && <span className="small muted">{doing}</span>}
             </li>
           )
         })}
       </ol>
-      <p className="muted small">
-        Drag a step or use the arrows to reorder. Working, hauling, teaching and training never end
-        on their own, so they need a duration unless they are last. Tap a step to pick it (Shift for
-        a range), then Copy; Paste puts the copies after the picked step. Repeat wraps the picked
-        steps in a block done so many times in a row; giving the queue makes it that many copies, up
-        to {QUEUE_MAX_STEPS} steps in all. Save keeps the steps in this browser under a name; Load
-        adds a saved queue’s steps at the end. Clear empties a draft; on a running queue it keeps
-        only the current step and turns loop off, so the queue ends after it.
-      </p>
     </section>
   )
 }
@@ -710,19 +722,22 @@ export function SavedQueueTools({
   realm,
   steps,
   onLoad,
+  oneButton = false,
 }: {
   realm: string
   steps: readonly PlanItem[]
   onLoad: (steps: PlanItem[]) => void
+  /** One "Saved…" button opening both, for the planner's one-row toolbar. */
+  oneButton?: boolean
 }) {
-  const [open, setOpen] = useState<'save' | 'load'>()
+  const [open, setOpen] = useState<'save' | 'load' | 'both'>()
   const [name, setName] = useState('')
   const [queues, setQueues] = useState(() => readQueues(browserStorage(), realm))
   const keep = (next: SavedQueues) => {
     storeQueues(browserStorage(), realm, next)
     setQueues(next)
   }
-  const toggle = (panel: 'save' | 'load') => {
+  const toggle = (panel: 'save' | 'load' | 'both') => {
     // Read again: another planner may have saved since.
     setQueues(readQueues(browserStorage(), realm))
     setOpen(open === panel ? undefined : panel)
@@ -739,16 +754,28 @@ export function SavedQueueTools({
   return (
     <div className="saved-queues">
       <div className="order-buttons">
-        {steps.length > 0 && (
+        {oneButton && (
+          <button
+            type="button"
+            title="Save these steps under a name, or load saved ones"
+            aria-expanded={open === 'both'}
+            onClick={() => toggle('both')}
+          >
+            Saved…
+          </button>
+        )}
+        {!oneButton && steps.length > 0 && (
           <button type="button" aria-expanded={open === 'save'} onClick={() => toggle('save')}>
             Save…
           </button>
         )}
-        <button type="button" aria-expanded={open === 'load'} onClick={() => toggle('load')}>
-          Load…
-        </button>
+        {!oneButton && (
+          <button type="button" aria-expanded={open === 'load'} onClick={() => toggle('load')}>
+            Load…
+          </button>
+        )}
       </div>
-      {open === 'save' && (
+      {(open === 'save' || (open === 'both' && steps.length > 0)) && (
         <form className="saved-queues-save" onSubmit={onSave}>
           <input
             aria-label="Name to save the queue under"
@@ -766,7 +793,7 @@ export function SavedQueueTools({
           )}
         </form>
       )}
-      {open === 'load' &&
+      {(open === 'load' || open === 'both') &&
         (saved.length === 0 ? (
           <p className="muted small">No queues saved in this browser yet.</p>
         ) : (
@@ -864,42 +891,62 @@ export function GivePlan({
   )
 }
 
-/** A step's duration in game minutes, with real time beside; set on Enter or leaving the field. */
-function StepMinutes({
+/** A step's icon by the kind of order it is, as the Orders tab groups them. */
+const STEP_ICONS: Record<StepGroup, string> = {
+  move: '➜',
+  work: '⚒',
+  goods: '▣',
+  scripts: '{}',
+}
+
+/**
+ * A step's duration as a chip (`CONTEXT.md`: Planner blocks): "10 min · 10 s", or "Duration?"
+ * flagged while a step that never ends has none; tapped, it turns into a field of game minutes,
+ * set on Enter or leaving it, cleared when emptied.
+ */
+function DurationChip({
   row,
   onSet,
 }: {
   row: QueueRow
   onSet: (minutes: number | undefined) => void
 }) {
+  const [editing, setEditing] = useState(false)
   const [text, setText] = useState(row.minutes === undefined ? '' : String(row.minutes))
   useEffect(() => setText(row.minutes === undefined ? '' : String(row.minutes)), [row.minutes])
   const typed = Math.floor(Number(text))
   const commit = () => {
+    setEditing(false)
     const minutes = text.trim() === '' || !(typed > 0) ? undefined : typed
     if (minutes !== row.minutes) onSet(minutes)
   }
+  if (!editing)
+    return (
+      <button
+        type="button"
+        className={`small queue-step-chip${row.minutes === undefined ? ' needed' : ''}`}
+        title="Duration in game minutes"
+        onClick={() => setEditing(true)}
+      >
+        {row.minutes === undefined ? 'Duration?' : `${row.minutes} min · ${row.real}`}
+      </button>
+    )
   return (
     <label className="small queue-step-minutes">
-      Duration{' '}
       <input
         type="number"
         min={1}
         step={1}
         placeholder="none"
+        aria-label="Duration in game minutes"
+        autoFocus
         value={text}
         onChange={(e) => setText(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => e.key === 'Enter' && commit()}
-        style={{ width: '5em' }}
-      />{' '}
-      game min
-      {typed > 0 && <span className="muted"> · {realMinutes(typed)} real</span>}
-      {row.minutes !== undefined && (
-        <button type="button" onClick={() => onSet(undefined)}>
-          Clear
-        </button>
-      )}
+        style={{ width: '4.5em' }}
+      />
+      min{typed > 0 && <span className="muted"> · {realMinutes(typed)}</span>}
     </label>
   )
 }

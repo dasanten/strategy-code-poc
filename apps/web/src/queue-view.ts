@@ -6,6 +6,7 @@ import { QUEUE_STEP_KINDS, neverEnds, stepLine } from './shared/queue.js'
 import { TICKS_PER_GAME_HOUR } from './shared/time.js'
 import { canWork } from './shared/stats.js'
 import { isVesselId } from './shared/vessels.js'
+import { covers } from './shared/footprint.js'
 import type {
   Building,
   BuildingKind,
@@ -328,7 +329,51 @@ export interface QueueRow {
   endless: boolean
   /** Why its place is gone, if it is: "the workplace is gone" (`CONTEXT.md`: Saved queue). */
   gone?: string
+  /** The Orders tab heading its kind of order is under, which picks its icon. */
+  group: StepGroup
 }
+
+/** The Orders tab's kinds of order a step's icon shows (`CONTEXT.md`: Planner blocks). */
+export type StepGroup = 'move' | 'work' | 'goods' | 'scripts'
+
+/** Which kind each order is; one not listed is work. */
+const STEP_GROUP: Partial<Record<OrderRequest['kind'], StepGroup>> = {
+  walkTo: 'move',
+  drive: 'move',
+  board: 'move',
+  row: 'move',
+  unhitch: 'move',
+  hitch: 'move',
+  getOff: 'move',
+  mount: 'move',
+  dismount: 'move',
+  relocate: 'move',
+  pickUp: 'goods',
+  drop: 'goods',
+  store: 'goods',
+  fetch: 'goods',
+  feed: 'goods',
+  haul: 'goods',
+  runScript: 'scripts',
+}
+
+/** The kind of order a step is, for its icon: Explore moves, Haul is goods. */
+export function stepGroup(order: OrderRequest): StepGroup {
+  if (order.kind === 'task' && order.task === 'explore') return 'move'
+  if (order.kind === 'task' && order.task === 'haul') return 'goods'
+  return STEP_GROUP[order.kind] ?? 'work'
+}
+
+/**
+ * Whether a step's duration chip shows (`CONTEXT.md`: Planner blocks): when it has a duration,
+ * or needs one, never ending on its own and not being the last step.
+ */
+export function showsMinutes(row: Pick<QueueRow, 'minutes' | 'endless'>, last: boolean): boolean {
+  return row.minutes !== undefined || (row.endless && !last)
+}
+
+/** A building as step labels name it: by kind, with its city, found by id or by a tile it covers. */
+type NamedBuilding = Pick<Building, 'id' | 'kind'> & Partial<Pick<Building, 'x' | 'y' | 'cityId'>>
 
 /**
  * What step labels name: the Player's scripts, the buildings in sight and those last seen, and
@@ -336,8 +381,8 @@ export interface QueueRow {
  */
 export interface StepNames {
   scripts?: readonly Pick<ScriptSummary, 'id' | 'name'>[]
-  buildings?: readonly Pick<Building, 'id' | 'kind'>[]
-  lastSeen?: readonly Pick<Building, 'id' | 'kind'>[]
+  buildings?: readonly NamedBuilding[]
+  lastSeen?: readonly NamedBuilding[]
   cities?: readonly Pick<City, 'id' | 'name'>[]
   /** The Player's waypoints: a step at one's tile names it (`CONTEXT.md`: Waypoint). */
   waypoints?: readonly Pick<Waypoint, 'name' | 'x' | 'y'>[]
@@ -367,34 +412,53 @@ export function stepRow(
     ...(s.minutes === undefined ? {} : { minutes: s.minutes, real: realMinutes(s.minutes) }),
     endless: neverEnds(s.order),
     ...(gone ? { gone } : {}),
+    group: stepGroup(s.order),
   }
 }
 
 /** A duration in game minutes as real time, "10 s", "1 min". */
 export const realMinutes = (minutes: number) => realTimeOf(minutes * TICKS_PER_GAME_MINUTE)
 
-/** What a queue step does, as the card lists it: "Work the farm", "Walk to 12, 6". */
+/**
+ * What a queue step does, as the card lists it, its place by name (`CONTEXT.md`: Planner blocks):
+ * "Work the farm in Quarrytown IV", "Walk to Farm, Quarrytown IV", "Walk to Pass" (a waypoint),
+ * "Walk to 12, 6" (a bare tile).
+ */
 export function stepLabel(
   order: OrderRequest,
   { scripts = [], buildings = [], lastSeen = [], cities = [], waypoints = [] }: StepNames,
 ): string {
+  const cityOf = (b: NamedBuilding) => cities.find((c) => c.id === b.cityId)?.name
+  // A tile by name: a waypoint on it, else a building covering it with its city, else coordinates.
   const at = (p: unknown) => {
     const { x, y } = p as { x: number; y: number }
     const marked = waypoints.find((w) => w.x === x && w.y === y)
-    return marked ? `${marked.name} (${x}, ${y})` : `${x}, ${y}`
+    if (marked) return marked.name
+    const onIt = (b: NamedBuilding) =>
+      b.x !== undefined && b.y !== undefined && covers({ kind: b.kind, x: b.x, y: b.y }, x, y)
+    const seen = buildings.find(onIt)
+    const was = seen ? undefined : lastSeen.find(onIt)
+    const b = seen ?? was
+    if (!b) return `${x}, ${y}`
+    const name = capitalised(BUILDING_NAMES[b.kind])
+    const city = cityOf(b)
+    return `${name}${city ? `, ${city}` : ''}${was ? ' (as last seen)' : ''}`
   }
   const building = (id: unknown) => {
-    const kind = buildings.find((b) => b.id === id)?.kind
-    if (kind) return `the ${BUILDING_NAMES[kind]}`
-    const was = lastSeen.find((b) => b.id === id)?.kind
-    return was ? `the ${BUILDING_NAMES[was]} (as last seen)` : 'the building'
+    const seen = buildings.find((b) => b.id === id)
+    const b = seen ?? lastSeen.find((l) => l.id === id)
+    if (!b) return 'the building'
+    const city = cityOf(b)
+    return `the ${BUILDING_NAMES[b.kind]}${city ? ` in ${city}` : ''}${seen ? '' : ' (as last seen)'}`
   }
   // A storage or stable in sight a store or fetch names, if it names one, or a boat; a carriage
   // goes unnamed.
   const named = (word: string, id: unknown) => {
     if (typeof id === 'string' && isVesselId(id)) return `${word} the boat`
-    const kind = buildings.find((b) => b.id === id)?.kind
-    return kind ? `${word} the ${BUILDING_NAMES[kind]}` : ''
+    const b = buildings.find((b) => b.id === id)
+    if (!b) return ''
+    const city = cityOf(b)
+    return `${word} the ${BUILDING_NAMES[b.kind]}${city ? ` in ${city}` : ''}`
   }
   switch (order.kind) {
     case 'walkTo':
@@ -472,6 +536,8 @@ export function stepLabel(
   }
   return order.kind
 }
+
+const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 function dropVerb(spot: unknown): string {
   const kind = (spot as { kind?: string } | undefined)?.kind
