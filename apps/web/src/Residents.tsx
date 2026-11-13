@@ -156,7 +156,7 @@ import {
 } from './step-palette-view.js'
 import { canMoveTo, insertPoints, moveItems } from './queue-brackets-view.js'
 import type { Plan, PlanStepId } from './plan-step.js'
-import { conditionLabel, draftOf } from './condition-view.js'
+import { conditionLabel, draftOf, type ConditionNames } from './condition-view.js'
 import {
   canMove,
   DEFAULT_REPEAT,
@@ -524,6 +524,11 @@ export function QueueBlock({
   // An If planned with Flow's If or a block's Change, its condition set (`CONTEXT.md`: If block):
   // the steps picked when it was started are wrapped, or the block's condition changes.
   const ifDone = (plan: Plan, condition: Condition) => {
+    // A repeat block's Until (`CONTEXT.md`: Repeat block): it repeats until the condition holds.
+    if (plan.until && plan.blockId !== undefined) {
+      edit(setRepeat(q.items, plan.blockId, { until: condition }))
+      return
+    }
     if (plan.blockId !== undefined) {
       edit(setCondition(q.items, plan.blockId, condition))
       return
@@ -785,8 +790,19 @@ export function QueueBlock({
           <RepeatCount
             repeat={block.repeat}
             steps={stepCount(block.items)}
+            names={names}
             {...(rounds?.has(id) ? { round: rounds.get(id) } : {})}
             onSet={(count) => edit(setRepeat(q.items, id, count))}
+            {...(kept?.start
+              ? {
+                  onUntil: (until?: Condition) =>
+                    kept.start?.('if', undefined, {
+                      blockId: id,
+                      until: true,
+                      ...(until ? { condition: draftOf(until) } : {}),
+                    }),
+                }
+              : {})}
           />
           <span className="buttons">
             <button type="button" onClick={() => edit(unwrap(q.items, id))}>
@@ -927,39 +943,62 @@ function newIds(before: readonly PlanItem[], after: readonly PlanItem[]): number
 }
 
 /**
- * A repeat block's count, set on Enter or leaving the field, or forever, with how many steps it
- * repeats; in a running queue, the round the block is on ("round 2 of 3").
+ * A repeat block's head (`CONTEXT.md`: Repeat block): how it repeats, a count (set on Enter or
+ * leaving the field), forever, or until a condition holds (set on the card's condition editor,
+ * `onUntil`), with how many steps it repeats; in a running queue, the round the block is on
+ * ("round 2 of 3").
  */
 function RepeatCount({
   repeat,
   steps,
+  names,
   round,
   onSet,
+  onUntil,
 }: {
   repeat: Repeat
   steps: number
+  names: ConditionNames
   /** The round it is on, while the resident's current step is inside it. */
   round?: number
-  onSet: (repeat: number | 'forever') => void
+  onSet: (repeat: Repeat) => void
+  /** Opens the condition editor for its Until, with the condition it has, if any. */
+  onUntil?: (until?: Condition) => void
 }) {
-  const forever = repeat === 'forever'
-  // The count the field shows, kept while forever is on so turning it off goes back to it.
-  const [last, setLast] = useState(forever ? DEFAULT_REPEAT : repeat)
+  const count = typeof repeat === 'number' ? repeat : undefined
+  const until = typeof repeat === 'object' ? repeat.until : undefined
+  const mode = count !== undefined ? 'times' : until ? 'until' : 'forever'
+  // The count the field shows, kept while another mode is on so going back to it keeps it.
+  const [last, setLast] = useState(count ?? DEFAULT_REPEAT)
   const [text, setText] = useState(String(last))
   useEffect(() => {
-    if (repeat === 'forever') return
-    setLast(repeat)
-    setText(String(repeat))
-  }, [repeat])
+    if (count === undefined) return
+    setLast(count)
+    setText(String(count))
+  }, [count])
   const commit = () => {
     const typed = Math.floor(Number(text))
-    if (typed >= 1 && typed !== repeat) onSet(Math.min(typed, QUEUE_MAX_REPEAT))
+    if (typed >= 1 && typed !== count) onSet(Math.min(typed, QUEUE_MAX_REPEAT))
     else setText(String(last))
+  }
+  const pick = (to: string) => {
+    if (to === 'times') onSet(last)
+    else if (to === 'forever') onSet('forever')
+    else onUntil?.()
   }
   return (
     <span className="small queue-step-minutes">
       <label>
-        Repeat ×
+        Repeat{' '}
+        <select aria-label="How it repeats" value={mode} onChange={(e) => pick(e.target.value)}>
+          <option value="times">×</option>
+          <option value="forever">forever</option>
+          <option value="until" disabled={!onUntil}>
+            until…
+          </option>
+        </select>
+      </label>{' '}
+      {mode === 'times' && (
         <input
           className="queue-block-count"
           aria-label="Times to repeat"
@@ -968,29 +1007,30 @@ function RepeatCount({
           max={QUEUE_MAX_REPEAT}
           step={1}
           value={text}
-          disabled={forever}
           onChange={(e) => setText(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => e.key === 'Enter' && commit()}
         />
-      </label>{' '}
-      <label>
-        <input
-          type="checkbox"
-          checked={forever}
-          onChange={(e) => onSet(e.target.checked ? 'forever' : last)}
-        />{' '}
-        forever
-      </label>{' '}
+      )}
+      {until && (
+        <>
+          <span className="queue-step-label">{conditionLabel(until, names)}</span>{' '}
+          {onUntil && (
+            <button type="button" title="Change the condition" onClick={() => onUntil(until)}>
+              Change
+            </button>
+          )}
+        </>
+      )}{' '}
       {round !== undefined && (
         <strong className="queue-block-round">
           round {round}
-          {forever ? '' : ` of ${repeat}`}
+          {count === undefined ? '' : ` of ${count}`}
         </strong>
       )}{' '}
       <span className="muted">
         {steps} step{steps === 1 ? '' : 's'}
-        {forever ? ' each round' : ` each, ${steps * repeat} in all`}
+        {count === undefined ? ' each round' : ` each, ${steps * count} in all`}
       </span>
     </span>
   )

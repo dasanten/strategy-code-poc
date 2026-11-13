@@ -341,8 +341,9 @@ pub enum Branch {
     Else,
 }
 
-/// Some steps in a row done again and again (`CONTEXT.md`: Repeat block): a count of rounds, or
-/// forever. A round in which none of its steps could start ends it.
+/// Some steps in a row done again and again (`CONTEXT.md`: Repeat block): a count of rounds,
+/// forever, or until a condition holds, asked before each round. A round in which none of its
+/// steps could start ends it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
 pub struct RepeatBlock {
@@ -360,12 +361,21 @@ pub struct RepeatBlock {
     pub started: bool,
 }
 
-/// How often a repeat block runs: a count of rounds, or `"forever"`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+/// How often a repeat block runs: a count of rounds, `"forever"`, or `{ "until": condition }`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(untagged)]
 pub enum Repeat {
     Times(u32),
     Forever(Forever),
+    Until(RepeatUntil),
+}
+
+/// A Repeat until's condition (`Repeat::Until`, `CONTEXT.md`: Repeat block): asked before each
+/// round, the block runs no more rounds once it holds.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct RepeatUntil {
+    pub until: Condition,
 }
 
 /// The literal `"forever"` of `Repeat`.
@@ -376,11 +386,25 @@ pub enum Forever {
 }
 
 impl Repeat {
-    /// Whether another round follows round `round`.
-    pub fn more_after(self, round: u32) -> bool {
+    /// The most rounds the count allows: a Repeat until's count never ends it, its condition
+    /// does ([`Repeat::until`]).
+    pub fn most(&self) -> u32 {
         match self {
-            Repeat::Times(n) => round < n,
-            Repeat::Forever(_) => true,
+            Repeat::Times(n) => *n,
+            Repeat::Forever(_) | Repeat::Until(_) => u32::MAX,
+        }
+    }
+
+    /// Whether the count allows another round after round `round`.
+    pub fn more_after(&self, round: u32) -> bool {
+        round < self.most()
+    }
+
+    /// A Repeat until's condition.
+    pub fn until(&self) -> Option<&Condition> {
+        match self {
+            Repeat::Until(u) => Some(&u.until),
+            _ => None,
         }
     }
 }

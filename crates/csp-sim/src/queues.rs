@@ -28,8 +28,8 @@ use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::orders::{leave_armies, OrderKind, OrderKinds};
 use crate::queries::residents::is_down;
 use crate::queue::{
-    field_str, queue_steps_problem, request_ifs, request_steps, runs_script, QueueItemRequest,
-    QueueStepRequest, QUEUE_STEP_KINDS, WAIT_UNTIL,
+    field_str, queue_steps_problem, request_conditions, request_steps, runs_script,
+    QueueItemRequest, QueueStepRequest, QUEUE_STEP_KINDS, WAIT_UNTIL,
 };
 use crate::queue_tree::{
     advance, begin, block_ids, depth_of, ids_of, kept_items, mark_started, rounds_of,
@@ -252,7 +252,7 @@ impl OrderKind for QueueOrder {
         queue_steps_problem(raw).or_else(|| {
             let items = items_of(order);
             places_problem(world, &realm_id, &request_steps(&items), |_| true, terrain)
-                .or_else(|| ifs_problem(world, &realm_id, &items, false))
+                .or_else(|| conditions_problem(world, &realm_id, &items, false))
         })
     }
 
@@ -343,7 +343,7 @@ impl OrderKind for EditQueueOrder {
         // skipped when its turn comes, and can still be edited until then.
         let items = items_of(order);
         places_problem(world, &realm_id, &request_steps(&items), |s| s.id.is_none(), terrain)
-            .or_else(|| ifs_problem(world, &realm_id, &items, true))
+            .or_else(|| conditions_problem(world, &realm_id, &items, true))
     }
 
     fn apply(
@@ -655,20 +655,18 @@ fn asked(
     }
 }
 
-/// Why one of the If blocks among `items` can't be asked by the realm (`CONTEXT.md`: Condition):
-/// the place its condition names must be the realm's. With `only_new`, the blocks already in the
-/// queue (with an id) are left out, as steps already there are.
-fn ifs_problem(
+/// Why the condition of one of the If blocks or Repeat untils among `items` can't be asked by the
+/// realm (`CONTEXT.md`: Condition): the place it names must be the realm's. With `only_new`, the
+/// blocks already in the queue (with an id) are left out, as steps already there are.
+fn conditions_problem(
     world: &WorldState,
     realm_id: &str,
     items: &[QueueItemRequest],
     only_new: bool,
 ) -> Option<String> {
-    request_ifs(items)
-        .into_iter()
-        .filter(|b| !only_new || b.id.is_none())
-        .find_map(|b| condition_place_problem(world, realm_id, &b.r#if))
-        .map(|p| format!("an If block: {p}"))
+    request_conditions(items).into_iter().filter(|b| !only_new || b.id.is_none()).find_map(|b| {
+        condition_place_problem(world, realm_id, b.condition).map(|p| format!("{}: {p}", b.block))
+    })
 }
 
 /// Why the step that started at `started_at` ended in a failure (`failureOf`): a store or fetch

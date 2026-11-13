@@ -41,6 +41,7 @@ pub fn migrations() -> BTreeMap<u32, MigrationStep> {
     steps.insert(119, queues_hold_blocks);
     steps.insert(120, waits_note_gone_places);
     steps.insert(121, queues_hold_if_blocks);
+    steps.insert(122, repeat_blocks_run_until);
     steps
 }
 
@@ -147,6 +148,13 @@ fn waits_note_gone_places(state: Value, _: &MigrationContext<'_>) -> Value {
 /// If block, with the part it runs while the current step is inside it. A world from before has
 /// none, so the save stays as it is; the bump keeps a server of format 121 from loading one.
 fn queues_hold_if_blocks(state: Value, _: &MigrationContext<'_>) -> Value {
+    state
+}
+
+/// 122 → 123: a repeat block may repeat until a condition holds (`CONTEXT.md`: Repeat block; ADR
+/// 0032, T95.4): its `repeat` may be `{ "until": condition }`. A world from before has none, so
+/// the save stays as it is; the bump keeps a server of format 122 from loading one.
+fn repeat_blocks_run_until(state: Value, _: &MigrationContext<'_>) -> Value {
     state
 }
 
@@ -424,6 +432,21 @@ mod tests {
                 "current": 2, "startedAt": 2, "loop": false, "nextStepId": 3 } }],
         });
         let migrated = migrate_world_with(save.clone(), 121, &ctx, &migrations(), 122).unwrap();
+        assert_eq!(migrated, save);
+    }
+
+    #[test]
+    fn step_122_keeps_a_world_whose_repeat_blocks_count_their_rounds() {
+        let terrain = ctx_terrain();
+        let ctx = MigrationContext { terrain: &terrain };
+        let walk = json!({ "id": 2, "order": { "kind": "walkTo", "x": 1, "y": 1 } });
+        let save = json!({
+            "tick": 3,
+            "residents": [{ "id": "w1", "queue": { "realmId": "r1",
+                "items": [{ "id": 1, "repeat": "forever", "items": [walk], "round": 4 }],
+                "current": 2, "startedAt": 2, "loop": false, "nextStepId": 3 } }],
+        });
+        let migrated = migrate_world_with(save.clone(), 122, &ctx, &migrations(), 123).unwrap();
         assert_eq!(migrated, save);
     }
 

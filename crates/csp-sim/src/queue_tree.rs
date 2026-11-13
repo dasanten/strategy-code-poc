@@ -12,7 +12,7 @@
 use std::collections::HashMap;
 
 use csp_shared::world::{
-    Branch, Condition, IfBlock, OrderRequest, Queue, QueueItem, QueueStep, Repeat, RepeatBlock,
+    Branch, Condition, IfBlock, OrderRequest, Queue, QueueItem, QueueStep, RepeatBlock,
 };
 
 use crate::queue::{QueueItemRequest, QueueStepRequest};
@@ -66,7 +66,7 @@ pub fn kept_items(reqs: &[QueueItemRequest], next_id: &mut u32, rounds: &Rounds)
                     let (round, started) = rounds.get(&id).copied().unwrap_or((0, false));
                     QueueItem::Repeat(RepeatBlock {
                         id,
-                        repeat: b.repeat,
+                        repeat: b.repeat.clone(),
                         items: kept_items(&b.items, next_id, rounds),
                         round,
                         started,
@@ -161,8 +161,9 @@ pub enum Advance {
 
 /// Goes from the item at `path` (which may be just past the end of its list) to the step that
 /// runs next, which becomes current (`CONTEXT.md`: Repeat block, If block): a step is it; a repeat
-/// block is entered (round 1); an If block asks its condition once and enters its items when it
-/// holds, its Else part when it doesn't, or is passed over without one. Past the end of a block's
+/// block is entered (round 1), or passed over when it repeats until a condition that holds; an If
+/// block asks its condition once and enters its items when it holds, its Else part when it
+/// doesn't, or is passed over without one. Past the end of a block's
 /// list it goes on as the block says (`advance`); past the end of the queue, back to its top when
 /// it loops and a step started in this pass.
 fn settle(q: &mut Queue, mut path: Vec<Seg>, ask: Ask<'_>) -> Advance {
@@ -181,7 +182,12 @@ fn settle(q: &mut Queue, mut path: Vec<Seg>, ask: Ask<'_>) -> Advance {
             }
             crossed = true;
             match item_at_mut(&mut q.items, &path) {
-                QueueItem::Repeat(b) if b.started && b.repeat.more_after(b.round) => {
+                // A round that started nothing ends the block without asking its condition.
+                QueueItem::Repeat(b)
+                    if b.started
+                        && b.repeat.more_after(b.round)
+                        && !b.repeat.until().is_some_and(&mut *ask) =>
+                {
                     b.round += 1;
                     b.started = false;
                     path.push(TOP);
@@ -203,9 +209,14 @@ fn settle(q: &mut Queue, mut path: Vec<Seg>, ask: Ask<'_>) -> Advance {
                 return Advance::Moved { crossed };
             }
             QueueItem::Repeat(b) => {
+                crossed = true;
+                // A Repeat until whose condition holds when its turn comes runs no round.
+                if b.repeat.until().is_some_and(&mut *ask) {
+                    path.last_mut().expect("an item").at += 1;
+                    continue;
+                }
                 b.round = 1;
                 b.started = false;
-                crossed = true;
                 path.last_mut().expect("an item").part = 0;
                 path.push(TOP);
             }
@@ -240,9 +251,10 @@ pub fn begin(q: &mut Queue, ask: Ask<'_>) -> Advance {
 
 /// Moves the queue on from its current step (`CONTEXT.md`: Repeat block, If block): to the next
 /// item in its list; at the end of a block's round, to the block's next round when a step started
-/// in this one and the count allows, else past the block; at the end of an If block's part, past
-/// the block; at the end of the queue, back to its top when it loops and a step started in this
-/// pass. An If block reached on the way asks its condition once.
+/// in this one, the count allows and a Repeat until's condition doesn't hold, else past the block;
+/// at the end of an If block's part, past the block; at the end of the queue, back to its top when
+/// it loops and a step started in this pass. An If block or Repeat until reached on the way asks
+/// its condition.
 pub fn advance(q: &mut Queue, ask: Ask<'_>) -> Advance {
     let Some(mut path) = path_to(&q.items, q.current) else { return Advance::Ended };
     q.started_at = None;
@@ -284,11 +296,7 @@ pub fn settle_rounds(q: &mut Queue) {
                 QueueItem::Step(_) => {}
                 QueueItem::Repeat(b) => {
                     if here.is_some() {
-                        let most = match b.repeat {
-                            Repeat::Times(n) => n,
-                            Repeat::Forever(_) => u32::MAX,
-                        };
-                        b.round = b.round.clamp(1, most.max(1));
+                        b.round = b.round.clamp(1, b.repeat.most().max(1));
                     } else {
                         b.round = 0;
                         b.started = false;
@@ -370,10 +378,7 @@ pub fn rounds_problem(q: &Queue) -> Option<String> {
             let here = on_path.filter(|p| p.len() > 1 && p[0].at == i);
             match item {
                 QueueItem::Repeat(b) => {
-                    let within = match b.repeat {
-                        Repeat::Times(n) => b.round <= n,
-                        Repeat::Forever(_) => true,
-                    };
+                    let within = b.round <= b.repeat.most();
                     if here.is_some() && (b.round == 0 || !within) {
                         return Some(format!(
                             "runs round {} of block {} around its step",

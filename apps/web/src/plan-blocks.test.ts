@@ -33,7 +33,7 @@ import {
   wrap,
   type PlanItem,
 } from './plan-blocks.js'
-import { branchesOf, editPlan, givePlan, planOf } from './queue-view.js'
+import { branchesOf, editPlan, givePlan, planOf, roundsOf } from './queue-view.js'
 
 /** Repeat blocks (`CONTEXT.md`: Repeat block, ADR 0032): wrapped steps the queue keeps as blocks. */
 
@@ -394,5 +394,57 @@ describe('If blocks', () => {
       { id: 5, if: hungry, items: [run[0]], else: [run[1]] },
     ])
     expect([...branchesOf(queue)]).toEqual([[5, 'else']])
+  })
+})
+
+describe('Repeat until', () => {
+  const stocked: Condition = {
+    kind: 'stock',
+    placeId: 's1',
+    good: 'food',
+    compare: 'atLeast',
+    amount: 100,
+  }
+
+  it('sets a block to repeat until a condition holds, and back to a count or forever', () => {
+    const plan = withIds(wrap(run, [1, 2])!, 5).items
+    const until = setRepeat(plan, 5, { until: stocked })
+    expect(until[0]).toEqual({ id: 5, repeat: { until: stocked }, items: [run[0], run[1]] })
+    expect(setRepeat(until, 5, 3)[0]).toMatchObject({ repeat: 3 })
+    expect(setRepeat(until, 5, 'forever')[0]).toMatchObject({ repeat: 'forever' })
+    // Its steps repeat, so work in it needs a duration unless it ends on its own.
+    expect(timedItems([{ repeat: { until: stocked }, items: [{ order: work }] }])).toEqual([
+      { repeat: { until: stocked }, items: [{ order: work, minutes: QUEUE_DEFAULT_STEP_MINUTES }] },
+    ])
+  })
+
+  it('is checked as the server checks it', () => {
+    const step = { order: walk(1, 1) }
+    expect(queueStepsProblem([{ repeat: { until: stocked }, items: [step] }])).toBeUndefined()
+    expect(queueStepsProblem([{ repeat: { until: { kind: 'weather' } }, items: [step] }])).toBe(
+      'a Repeat until: that is no condition',
+    )
+    expect(queueStepsProblem([{ repeat: {}, items: [step] }])).toBe(
+      'a Repeat until needs a condition',
+    )
+    expect(queueStepsProblem([{ repeat: { until: stocked, times: 2 }, items: [step] }])).toBe(
+      'a Repeat until holds only its condition',
+    )
+    expect(queueStepsProblem([{ repeat: [], items: [step] }])).toBe(
+      `a repeat block repeats from 1 to ${QUEUE_MAX_REPEAT} times, or forever`,
+    )
+  })
+
+  it('reads the round a running Repeat until is on, with no count', () => {
+    const queue: Queue = {
+      realmId: 'r1',
+      items: [{ id: 5, repeat: { until: stocked }, items: [run[0]!], round: 7 }],
+      current: 1,
+      startedAt: 0,
+      loop: false,
+      nextStepId: 6,
+    }
+    expect(planOf(queue).items).toEqual([{ id: 5, repeat: { until: stocked }, items: [run[0]] }])
+    expect([...roundsOf(queue)]).toEqual([[5, 7]])
   })
 })

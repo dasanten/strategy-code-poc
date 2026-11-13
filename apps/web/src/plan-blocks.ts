@@ -15,7 +15,10 @@ import type { Condition, QueueStepRequest, Repeat } from '@csp/shared-types'
  * Steps and blocks share one id space, so the planner picks, moves and removes either by id.
  */
 
-/** Some steps in a row wrapped with a count: they run `repeat` times in a row, or forever. */
+/**
+ * Some steps in a row wrapped with a count: they run `repeat` times in a row, forever, or until a
+ * condition holds.
+ */
 export interface RepeatBlock {
   id?: number
   repeat: Repeat
@@ -118,15 +121,18 @@ export function planProblem(items: readonly PlanItem[]): string | undefined {
   return capProblem(items) ?? queueStepsProblem(items)
 }
 
-/** The count a block repeats, as the planner's field gives it: a whole number in range, or forever. */
-export function repeatOf(count: number | 'forever'): Repeat {
-  if (count === 'forever') return 'forever'
+/**
+ * How a block repeats, as the planner's head gives it: a whole number in range, forever, or until
+ * a condition holds (`CONTEXT.md`: Repeat block).
+ */
+export function repeatOf(count: Repeat): Repeat {
+  if (typeof count !== 'number') return structuredClone(count)
   return Math.min(QUEUE_MAX_REPEAT, Math.max(1, Math.floor(count)))
 }
 
 /** A block's own fields, without its id or its lists: its count, or its condition. */
 function headOf(b: Block): Omit<RepeatBlock, 'id' | 'items'> | Omit<IfBlock, 'id' | 'items'> {
-  return isIf(b) ? { if: structuredClone(b.if) } : { repeat: b.repeat }
+  return isIf(b) ? { if: structuredClone(b.if) } : { repeat: structuredClone(b.repeat) }
 }
 
 /** A fresh copy of the items, sharing nothing, with or without their ids. */
@@ -206,9 +212,9 @@ export function topPicked(items: readonly PlanItem[], picked: readonly number[])
 
 /**
  * The items with the picked ones wrapped in a block, where they were: one repeating `repeat` times
- * (or forever), or with `repeat` a condition, an If block. Undefined unless they sit in a row in
- * one list (a block's or the plan's). The block has no id yet: the planner gives it one
- * (`withIds`).
+ * (or forever, or until a condition holds), or with `repeat` a condition, an If block. Undefined
+ * unless they sit in a row in one list (a block's or the plan's). The block has no id yet: the
+ * planner gives it one (`withIds`).
  */
 export function wrap(
   items: readonly PlanItem[],
@@ -224,7 +230,9 @@ export function wrap(
       if (!tops.every((t, i) => list[at + i] === t)) return [...list]
       done = true
       const block: Block =
-        typeof repeat === 'object' ? { if: repeat, items: [...tops] } : { repeat, items: [...tops] }
+        typeof repeat === 'object' && 'kind' in repeat
+          ? { if: repeat, items: [...tops] }
+          : { repeat, items: [...tops] }
       return [...list.slice(0, at), block, ...list.slice(at + tops.length)]
     }
     return list.map((item) => (isBlock(item) ? mapParts(item, into) : item))
@@ -242,12 +250,8 @@ export function unwrap(items: readonly PlanItem[], id: number): PlanItem[] {
   })
 }
 
-/** The items with block `id` repeating `repeat` times (a whole number in range) or forever. */
-export function setRepeat(
-  items: readonly PlanItem[],
-  id: number,
-  repeat: number | 'forever',
-): PlanItem[] {
+/** The items with block `id` repeating `repeat` times (a whole number in range), forever or until. */
+export function setRepeat(items: readonly PlanItem[], id: number, repeat: Repeat): PlanItem[] {
   const n = repeatOf(repeat)
   return items.map((item) => {
     if (!isBlock(item)) return item

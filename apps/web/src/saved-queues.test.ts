@@ -222,4 +222,17 @@ describe('saved repeat blocks', () => {
       expect(parseQueues(text)).toEqual({})
     }
   })
+
+  it('keeps a Repeat until with its condition, and drops one whose condition is no condition', () => {
+    const until = { until: { kind: 'mounted', is: true } } as const
+    const storage = memory()
+    const steps: PlanItem[] = [{ repeat: until, items: [mineRun[0]!] }]
+    storeQueues(storage, 'r1', save({}, 'Until', steps, 1000))
+    expect(load(readQueues(storage, 'r1'), 'Until')[0]).toMatchObject({ repeat: until })
+    const walk = { order: { kind: 'walkTo', x: 1, y: 1 } }
+    const bad = [{ repeat: { until: { kind: 'weather' } }, items: [walk] }]
+    const entry = { name: 'Bad', steps: bad, savedAt: 5 }
+    const text = JSON.stringify({ version: SAVED_QUEUES_VERSION, queues: { Bad: entry } })
+    expect(parseQueues(text)).toEqual({})
+  })
 })

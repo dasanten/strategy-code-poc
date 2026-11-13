@@ -112,8 +112,9 @@ function savedQueue(name: string, entry: unknown): SavedQueue | undefined {
 function isItem(s: unknown): s is PlanItem {
   if (isObject(s) && 'repeat' in s) {
     const { repeat, items } = s
+    const until = isObject(repeat) && conditionProblem(repeat.until) === undefined
     return (
-      (repeat === 'forever' || (Number.isInteger(repeat) && (repeat as number) >= 1)) &&
+      (repeat === 'forever' || until || (Number.isInteger(repeat) && (repeat as number) >= 1)) &&
       Array.isArray(items) &&
       items.length > 0 &&
       items.every(isItem)

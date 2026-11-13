@@ -123,7 +123,7 @@ export function AddStep({
     )
   }
   if (plan && ask) {
-    const label = PLAN_STEPS.find((k) => k.id === plan.kind)!.label
+    const label = plan.until ? 'Repeat until' : PLAN_STEPS.find((k) => k.id === plan.kind)!.label
     return (
       <section className="inspector-block" aria-label="Add step">
         <div className="panel-head">
@@ -170,7 +170,7 @@ export function AddStep({
             draft={plan.condition}
             names={conditionNames}
             action={plan.kind !== 'if' ? 'Add' : plan.blockId === undefined ? 'Wrap in If' : 'Set'}
-            lead={plan.kind === 'if' ? 'If' : 'Wait until'}
+            lead={plan.kind !== 'if' ? 'Wait until' : plan.until ? 'Repeat until' : 'If'}
             onPickPlace={(draft) => onPlan(pickPlace(plan, draft))}
             onDone={(condition) => {
               // An If is no step: the planner it sits under puts the block in.
