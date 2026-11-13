@@ -215,3 +215,25 @@ welcome's gzip and a few KB after it, where the plain list was 183 KB. A second 
 every chunk kept at the same count from IndexedDB, so it makes no terrain request for what the
 first visit loaded, at any level; after exploring further only the grown chunks, and the coarse
 chunks holding them, are fetched. Requests and bytes in the browser are not measured yet.
+
+### In the browser, the whole epic (2026-11-13)
+
+Checked by the coordinator on the epic branch merged with `dev`: a release server and Vite's dev
+client on a copy of the dev world above, for a Player who founded a realm there and was then
+staged with `csp-admin explore --all`, in a 1280 × 800 window with the minimap open. The worker
+tickets' numbers above stay as they were; these are the browser's.
+
+| What                                               | Measured                                                      |
+| -------------------------------------------------- | ------------------------------------------------------------- |
+| First visit, empty browser cache: terrain requests | 2 (was 507 batches for every explored chunk)                  |
+| A batch of 64 level-0 chunks over the wire         | 1.2 KB zstd-compressed for 66 KB of terrain                   |
+| Second visit: terrain requests                     | none; the minimap is drawn from the browser's copy within 2 s |
+| Zoomed all the way out                             | 3 requests, 10 KB, drawn within about 1.1 s                   |
+| Zooming back in to tile detail                     | 4 requests, 11 KB; sharp, no holes                            |
+| JavaScript heap with the whole map explored        | about 120 MB after load, 270 MB after zooming out and in      |
+| Logging out                                        | the browser's copy goes from 322 chunks to none               |
+
+An order (claiming the Horse offer), ticks and reconnecting across page loads worked over the
+compressed socket. The home view's terrain appeared 2 to 5 s after a page load, in Vite's
+unbundled dev client, so that time is not comparable with a built client. Not checked: a Region
+map following a growing city, and the time of the home view before the epic.
