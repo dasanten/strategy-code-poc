@@ -109,6 +109,8 @@ describe('the Customise button', () => {
         tick: 0,
         cities: [],
         onPickCity: () => {},
+        open: true,
+        onOpen: () => {},
       }),
     )
     expect(html).toContain('aria-label="Customise script 3"')

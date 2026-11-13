@@ -33,6 +33,8 @@ const breedAsk = (horses: SeenHorse[], tick = 0) =>
       tick,
       cities: [],
       onPickCity: () => {},
+      open: false,
+      onOpen: () => {},
     }),
   )
     // The text as read, without the tags React splits it with.
@@ -59,5 +61,38 @@ describe('picking two horses to breed in the planner', () => {
 
   it('says so when fewer than two horses are there', () => {
     expect(breedAsk([horse({})])).toContain('Fewer than two horses')
+  })
+})
+
+/** The palette open, with nothing being planned (`CONTEXT.md`: Planner blocks). */
+const palette = () =>
+  renderToStaticMarkup(
+    createElement(AddStep, {
+      plan: undefined,
+      onStart: () => {},
+      onAnswer: () => {},
+      onCancel: () => {},
+      scripts: [],
+      buildTile: { node: undefined, terrain: undefined, problem: () => undefined },
+      horses: [],
+      tick: 0,
+      cities: [],
+      onPickCity: () => {},
+      open: true,
+      onOpen: () => {},
+    }),
+  ).replace(/<!-- -->/g, '')
+
+describe('the Add step palette', () => {
+  it('groups the steps as the Orders tab does, plus Flow, each with its icon', () => {
+    const html = palette()
+    const headings = [...html.matchAll(/<h4[^>]*>([^<]*)<\/h4>/g)].map((m) => m[1])
+    expect(headings).toEqual(['Move', 'Work &amp; build', 'Goods', 'Scripts', 'Flow'])
+    expect(html).toContain('🧭</span> Explore')
+    expect(html).toContain('📥</span> Fetch')
+  })
+
+  it('offers Repeat only under a planner with steps picked', () => {
+    expect(palette()).toMatch(/<button type="button" disabled=""[^>]*>.*Repeat/)
   })
 })

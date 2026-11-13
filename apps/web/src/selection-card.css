@@ -198,16 +198,76 @@
   flex: none;
   font-size: 0.75rem;
 }
-/* Add step: a step's chip with its Customise beside it. */
-.chip-with {
-  display: inline-flex;
-  gap: 2px;
+/* The Add step palette (`CONTEXT.md`: Planner blocks): step kinds grouped as the Orders tab is,
+   each a compact button with its icon, Customise a small ⚙ on its step. */
+.step-palette {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
 }
-.chip-with button.customise {
-  padding: 4px 10px;
-  border: 1px solid #3a424a;
+.step-palette-group h4 {
+  margin: 0 0 3px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.step-palette-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 3px;
+}
+.step-palette-item {
+  display: flex;
+  min-width: 0;
+}
+.step-palette-item > button:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 30px;
+  padding: 2px 6px;
+  text-align: left;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.step-palette-item button.customise-small {
+  flex: none;
+  min-width: 26px;
+  min-height: 30px;
+  padding: 0 4px;
+  margin-left: -1px;
+  font-size: 12px;
+}
+/* An insert point between two steps: "+" to add the next step there, faint until hovered. */
+.queue-insert {
+  list-style: none;
+  display: flex;
+  justify-content: center;
+  height: 0;
+  position: relative;
+  z-index: 1;
+}
+.queue-insert button {
+  position: absolute;
+  top: -11px;
+  min-width: 22px;
+  min-height: 18px;
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 16px;
   border-radius: 999px;
-  font-size: 0.75rem;
+  opacity: 0.35;
+}
+.queue-insert button:hover,
+.queue-insert button:focus-visible,
+.queue-insert.set button {
+  opacity: 1;
+}
+.queue-insert.set button {
+  color: var(--ui-live);
+  border-color: var(--ui-live);
 }
 .sel-actions button {
   display: grid;

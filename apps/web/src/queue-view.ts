@@ -24,7 +24,14 @@ import type {
 import { BUILDING_NAMES } from './city-view.js'
 import { GOOD_LABELS, subjectLabel } from './Residents.js'
 import { gonePlace } from './saved-queues.js'
-import { hasBlocks, timedItems, unroll, withIds, type PlanItem } from './plan-blocks.js'
+import {
+  hasBlocks,
+  insertItems,
+  timedItems,
+  unroll,
+  withIds,
+  type PlanItem,
+} from './plan-blocks.js'
 import { realTimeOf } from './wiki-view.js'
 
 /**
@@ -163,11 +170,26 @@ export function editPlan(plan: QueuePlan, items: readonly PlanItem[], loop?: boo
 }
 
 /**
- * The plan with a step planned with Add step added last, after a walk to `at` when it acts on
- * that tile, as a resident's own queue gets it (`appendRequest`).
+ * The plan with a step planned with Add step added last, or after the step or block `after` (the
+ * planner's insert point, `CONTEXT.md`: Planner blocks), after a walk to `at` when it acts on
+ * that tile and the step before doesn't already walk there, as a resident's own queue gets it
+ * (`appendRequest`).
  */
-export function planStep(plan: QueuePlan, order: OrderRequest, at?: Tile): QueuePlan {
-  return editPlan(plan, [...plan.items, ...stepsAfter(unroll(plan.items).at(-1), order, at)])
+export function planStep(
+  plan: QueuePlan,
+  order: OrderRequest,
+  at?: Tile,
+  after?: number,
+): QueuePlan {
+  const added = stepsAfter(stepBefore(plan.items, after), order, at)
+  return editPlan(plan, insertItems(plan.items, after, added))
+}
+
+/** The step a step inserted after `after` (or at the end) follows: the last one up to there. */
+function stepBefore(items: readonly PlanItem[], after: number | undefined) {
+  const mark = -1
+  const marked = unroll(insertItems(items, after, [{ id: mark, order: { kind: 'dismount' } }]))
+  return marked[marked.findIndex((s) => s.id === mark) - 1]
 }
 
 /**
@@ -275,8 +297,8 @@ function actsHere(order: OrderRequest): boolean {
     )
   )
     return true
-  // A Build line walks to its line itself (`CONTEXT.md`: Build line).
-  if (order.kind !== 'task' || order.task === 'buildLine') return false
+  // A Build line walks to its line itself (`CONTEXT.md`: Build line); Explore acts on no place.
+  if (order.kind !== 'task' || order.task === 'buildLine' || order.task === 'explore') return false
   // A Build task laid out somewhere else (`at`) walks there itself.
   return order.task !== 'build' || order.at === undefined
 }
@@ -342,6 +364,7 @@ const STEP_GROUP: Partial<Record<OrderRequest['kind'], StepGroup>> = {
   drive: 'move',
   board: 'move',
   row: 'move',
+  sail: 'move',
   unhitch: 'move',
   hitch: 'move',
   getOff: 'move',
@@ -353,14 +376,14 @@ const STEP_GROUP: Partial<Record<OrderRequest['kind'], StepGroup>> = {
   store: 'goods',
   fetch: 'goods',
   feed: 'goods',
-  haul: 'goods',
+  haul: 'move',
   runScript: 'scripts',
 }
 
-/** The kind of order a step is, for its icon: Explore moves, Haul is goods. */
+/** The kind of order a step is, for its icon: as the Orders tab groups it: Explore and Haul move. */
 export function stepGroup(order: OrderRequest): StepGroup {
   if (order.kind === 'task' && order.task === 'explore') return 'move'
-  if (order.kind === 'task' && order.task === 'haul') return 'goods'
+  if (order.kind === 'task' && order.task === 'haul') return 'move'
   return STEP_GROUP[order.kind] ?? 'work'
 }
 
