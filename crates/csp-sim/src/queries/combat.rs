@@ -31,12 +31,20 @@ pub fn protection(r: &Resident) -> f64 {
 /// How hard a resident strikes at `tick` (`attackPower`): from Strength and the best weapon they
 /// carry, harder with Combat skill.
 pub fn attack_power(r: &Resident, tick: f64) -> f64 {
-    let weapon =
-        best_weapon(&r.carried).and_then(|w| WEAPON_ATTACK.get(good_name(w))).unwrap_or(0.0);
-    let raw = BLOW_BASE + BLOW_PER_STRENGTH * stat_value(r, StatName::Strength, tick) + weapon;
+    let raw = BLOW_BASE + BLOW_PER_STRENGTH * stat_value(r, StatName::Strength, tick);
+    (raw + weapon_attack(r)) * combat_skill_factor(r)
+}
+
+/// What the best weapon a resident carries adds to each blow (`weaponAttack`): nothing unarmed.
+pub fn weapon_attack(r: &Resident) -> f64 {
+    best_weapon(&r.carried).and_then(|w| WEAPON_ATTACK.get(good_name(w))).unwrap_or(0.0)
+}
+
+/// What a resident's Combat skill multiplies each blow by (`combatSkillFactor`): 1 unskilled, up
+/// to `1 + COMBAT_SKILL_LIMIT`.
+pub fn combat_skill_factor(r: &Resident) -> f64 {
     let combat = r.skills.get(&SkillName::Combat).copied().unwrap_or(0.0);
-    let skill = COMBAT_SKILL_LIMIT.min(combat * COMBAT_SKILL_EFFECT);
-    raw * (1.0 + skill)
+    1.0 + COMBAT_SKILL_LIMIT.min(combat * COMBAT_SKILL_EFFECT)
 }
 
 /// Damage a blow from `attacker` does to `defender` when it lands (`blowDamage`).

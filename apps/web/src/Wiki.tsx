@@ -45,6 +45,7 @@ import {
   CITY_QUARTER_ROWS,
   CLIMB_TICKS,
   COMBAT_SKILL_EFFECT,
+  COMBAT_SKILL_LIMIT,
   COMBAT_SKILL_PER_BLOW,
   CONSTRUCTION_SKILL_EFFECT,
   CONSTRUCTION_SKILL_MAX,
@@ -231,6 +232,7 @@ import {
   DEMAND_TRADE_ORG_STANDING_LOSS,
   DEMAND_YIELD_RESPECT_MIN,
   DEMAND_YIELD_RESPECT_TIMES,
+  RESPECT_PER_WALL,
   STANDING_RANGE,
   STANDING_NPC_TRADE_COINS_PER_POINT,
   STANDING_TRADE_COINS_PER_POINT,
@@ -283,6 +285,7 @@ import { PARAM_DESCRIPTIONS, DEFAULT_SCRIPTS, SCRIPT_VIEWS } from '@csp/lang-was
 import { WORKPLACE_PARAM } from './shared/default-scripts.js'
 import { SCRIPT_PARAM_TYPES } from './shared/script-api.js'
 import { NPC_SMITHY_WEAPON } from './shared/npc-trade.js'
+import { fighterStrength } from './shared/persuasion.js'
 import type {
   BuildingKind,
   CrimeKind,
@@ -342,6 +345,13 @@ import {
   SCRIPT_LANGUAGE,
 } from './wiki-scripting.js'
 import { apiNames, type ApiName } from './script-editor.js'
+
+/** An untrained fighter with a spear and a fully trained, armoured one, as respect weighs them. */
+const UNTRAINED_SPEAR = { carried: { spear: 1 }, skills: {} }
+const TRAINED_AND_ARMOURED = {
+  carried: { sword: 1, shield: 1, armour: 1 },
+  skills: { combat: COMBAT_SKILL_MAX },
+}
 
 /** The Wiki's topics, in order, each a section with its own anchor (`/wiki#food`). */
 export const WIKI_TOPICS = [
@@ -2604,8 +2614,9 @@ export function Wiki() {
             itself to you.
           </li>
           <li>
-            At {signed(PERSUADE_STANDING)} and with enough respect an NPC city asks to join you;
-            declined, it asks again after {days(PERSUADE_ASK_AGAIN_DAYS)}.
+            At {signed(PERSUADE_STANDING)}, and while your fighters near it outweigh its own side
+            (Respect, below), an NPC city asks to join you; declined, it asks again after{' '}
+            {days(PERSUADE_ASK_AGAIN_DAYS)}.
           </li>
           <li>
             An NPC city joins an alliance when it holds every member at{' '}
@@ -2700,6 +2711,19 @@ export function Wiki() {
           Leaving an alliance takes {realSeconds(ALLIANCE_LEAVE_DELAY)}; soldiers recalled from its
           army are back under their owner's command after {realSeconds(ALLIANCE_RECALL_DELAY)}.
         </p>
+        <h3>Respect</h3>
+        <p>
+          What an NPC city weighs when you demand it or it thinks of joining you. On your side only
+          your armed residents count, and only while they stand in its City area or in sight of one
+          of its people who is at home there: what its scouts and traders see far away doesn't
+          count, nor do your walls, nor residents it lent you. Each counts by strength, as combat
+          weighs them: their best weapon's blow, harder with Combat skill (up to{' '}
+          {num(1 + COMBAT_SKILL_LIMIT)} times), plus what their shield and armour take off a blow.
+          An untrained resident with a spear counts {num(fighterStrength(UNTRAINED_SPEAR))}; one
+          with a sword, shield and armour and full Combat skill counts{' '}
+          {num(fighterStrength(TRAINED_AND_ARMOURED))}. On its side count its soldiers, weighed the
+          same way, and {num(RESPECT_PER_WALL)} for each of its own finished wall and gate tiles.
+        </p>
       </Section>
 
       <Section id="demands">
@@ -2745,13 +2769,13 @@ export function Wiki() {
           <li>
             <strong>An NPC city answers for itself</strong> within a game hour, when it next plans.
             You can send one to any NPC city you have seen or have a standing with. It gives in when
-            the armed residents and walls of yours in its sight come to at least{' '}
-            {num(DEMAND_YIELD_RESPECT_TIMES)} times its soldiers, and at least{' '}
-            {num(DEMAND_YIELD_RESPECT_MIN)}, so an army at the gate can win a city without a fight.
-            Those out of its sight don't count. It joins your realm as a persuaded city does, or
-            sets what it holds of the goods aside at its storage for you alone to fetch. Otherwise,
-            or with none of the goods there, it declines, and its standing toward you drops by{' '}
-            {num(DEMAND_DECLINED_STANDING_LOSS)}.
+            the strength of your fighters near it (Respect, under Standing) comes to at least{' '}
+            {num(DEMAND_YIELD_RESPECT_TIMES)} times its own side, and at least{' '}
+            {num(DEMAND_YIELD_RESPECT_MIN)}, so a real army at the gate can win a city without a
+            fight, and a crowd with spears can't. Your walls and fighters out of its sight don't
+            count. It joins your realm as a persuaded city does, or sets what it holds of the goods
+            aside at its storage for you alone to fetch. Otherwise, or with none of the goods there,
+            it declines, and its standing toward you drops by {num(DEMAND_DECLINED_STANDING_LOSS)}.
           </li>
           <li>
             <strong>The Trade Organization always declines</strong>, within a game hour, and being

@@ -5,7 +5,7 @@ import { isAllianceCity, sharingSight } from './alliance.js'
 import { forSale } from './city.js'
 import { GOOD_WEIGHT } from './narrowed.js'
 import { freeStock, offerStorage } from './offers.js'
-import { citySoldiers, respectSeenBy } from './persuasion.js'
+import { cityStrength, respectSeenBy } from './persuasion.js'
 import { organizationLabel } from './standing.js'
 import { NO_CARAVANS, TRADE_ORG, tradeOrgHq } from './trade-org.js'
 import { pickUpTransferProblem, transferFee, transferLoad, transferWarehouses } from './transfer.js'
@@ -129,22 +129,27 @@ export function npcOrgsKnownTo(
 }
 
 /**
- * Whether an NPC city gives in to a realm's demand (`CONTEXT.md`: Demand): the respect it sees from
- * the realm, its armed residents and walls in the city's sight, far outweighs its soldiers. `size`
- * is the map's.
+ * Whether an NPC city gives in to a realm's demand (`CONTEXT.md`: Demand, Respect; ADR 0033): the
+ * respect it sees from the realm, the strength of its fighters near the city, is at least
+ * `DEMAND_YIELD_RESPECT_TIMES` its own side and at least `DEMAND_YIELD_RESPECT_MIN`. `size` is the
+ * map's.
  */
 export function yieldsToDemand(
-  world: Pick<WorldState, 'residents' | 'buildings' | 'cities'>,
+  world: Pick<WorldState, 'residents' | 'buildings' | 'contracts'>,
   city: City,
   realmId: string,
   size: number,
 ): boolean {
   if (!forSale(city)) return false
-  const needed = Math.max(
-    DEMAND_YIELD_RESPECT_MIN,
-    DEMAND_YIELD_RESPECT_TIMES * citySoldiers(world, city),
-  )
-  return respectSeenBy(world, city, realmId, size) >= needed
+  return respectSeenBy(world, city, realmId, size) >= demandYieldNeeded(world, city)
+}
+
+/** The respect an NPC city must see from a realm to yield to its demand. */
+export function demandYieldNeeded(
+  world: Pick<WorldState, 'residents' | 'buildings'>,
+  city: City,
+): number {
+  return Math.max(DEMAND_YIELD_RESPECT_MIN, DEMAND_YIELD_RESPECT_TIMES * cityStrength(world, city))
 }
 
 /**

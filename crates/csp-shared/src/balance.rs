@@ -2190,14 +2190,22 @@ pub const TRADE_ORG_DEBT_TRIPS: f64 = 2.0;
 /// The deadline the Demands form starts with, in game days: a game week.
 pub const DEMAND_DEFAULT_DAYS: f64 = 7.0;
 
-/// How many times its soldiers the respect an NPC city sees from a realm must be before it yields to
-/// that realm's demand (`CONTEXT.md`: Demand): "far outweighs", so an army at the gate wins it and a
-/// few spears more than it has soldiers don't. Persuading a city takes only more than its soldiers.
-pub const DEMAND_YIELD_RESPECT_TIMES: f64 = 3.0;
+/// How many times its own side, by strength, the respect an NPC city sees from a realm must be
+/// before it yields to that realm's demand (`CONTEXT.md`: Demand, Respect; ADR 0033): "far
+/// outweighs". More than three, so three times its soldiers' number in residents geared and trained
+/// like them isn't enough: it takes better gear or training, or many more. Persuading a city takes
+/// only more than its own side.
+pub const DEMAND_YIELD_RESPECT_TIMES: f64 = 4.0;
 
-/// The least respect an NPC city yields to a demand for, however few soldiers it has (`CONTEXT.md`:
-/// Demand): a small band, so a city without soldiers doesn't give in to one person with a spear.
-pub const DEMAND_YIELD_RESPECT_MIN: f64 = 5.0;
+/// The least respect an NPC city yields to a demand for, however weak its own side (`CONTEXT.md`:
+/// Demand): five untrained residents with spears (5 each), so a city without soldiers doesn't give
+/// in to one or two.
+pub const DEMAND_YIELD_RESPECT_MIN: f64 = 25.0;
+
+/// What each finished wall or gate tile of an NPC city adds to its own side when it weighs respect
+/// (`CONTEXT.md`: Respect; ADR 0033): a twentieth of an untrained resident with a spear, so a
+/// village ringed by some forty tiles counts two soldiers more.
+pub const RESPECT_PER_WALL: f64 = 0.25;
 
 /// What an NPC city's standing toward a realm drops by when it declines that realm's demand
 /// (`CONTEXT.md`: Demand): as much as a theft, so three in a game day shut its gates.
@@ -2579,6 +2587,7 @@ pub fn balance_json() -> Value {
     m.insert("DEMAND_DEFAULT_DAYS".into(), json!(DEMAND_DEFAULT_DAYS));
     m.insert("DEMAND_YIELD_RESPECT_TIMES".into(), json!(DEMAND_YIELD_RESPECT_TIMES));
     m.insert("DEMAND_YIELD_RESPECT_MIN".into(), json!(DEMAND_YIELD_RESPECT_MIN));
+    m.insert("RESPECT_PER_WALL".into(), json!(RESPECT_PER_WALL));
     m.insert("DEMAND_DECLINED_STANDING_LOSS".into(), json!(DEMAND_DECLINED_STANDING_LOSS));
     m.insert("DEMAND_TRADE_ORG_STANDING_LOSS".into(), json!(DEMAND_TRADE_ORG_STANDING_LOSS));
     m.insert("DIRECT_OFFER_DAYS".into(), json!(DIRECT_OFFER_DAYS));

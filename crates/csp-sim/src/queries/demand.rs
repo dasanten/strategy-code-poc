@@ -19,7 +19,7 @@ use super::alliance_rules::is_alliance_city;
 use super::city::for_sale;
 use super::names::good_of;
 use super::offers::{free_stock, offer_storage};
-use super::persuasion::{city_soldiers, respect_seen_by};
+use super::persuasion::{city_strength, respect_seen_by};
 use super::residents::good_weight;
 use super::standing::TRADE_ORG;
 use super::trade_org::{trade_org_hq, NO_CARAVANS};
@@ -177,16 +177,20 @@ pub fn npc_orgs_known_to<'a>(
     std::iter::once(TRADE_ORG.to_string()).chain(cities).collect()
 }
 
-/// Whether an NPC city gives in to a realm's demand (`yieldsToDemand`, `CONTEXT.md`: Demand): the
-/// respect it sees from the realm, its armed residents and walls in the city's sight, far
-/// outweighs its soldiers.
+/// Whether an NPC city gives in to a realm's demand (`yieldsToDemand`, `CONTEXT.md`: Demand,
+/// Respect; ADR 0033): the respect it sees from the realm, the strength of its fighters near the
+/// city, is at least `DEMAND_YIELD_RESPECT_TIMES` its own side and at least
+/// `DEMAND_YIELD_RESPECT_MIN`.
 pub fn yields_to_demand(world: &WorldState, city: &City, realm_id: &str, size: i32) -> bool {
     if !for_sale(city) {
         return false;
     }
-    let needed =
-        DEMAND_YIELD_RESPECT_MIN.max(DEMAND_YIELD_RESPECT_TIMES * city_soldiers(world, city));
-    respect_seen_by(world, city, realm_id, size) >= needed
+    respect_seen_by(world, city, realm_id, size) >= demand_yield_needed(world, city)
+}
+
+/// The respect an NPC city must see from a realm to yield to its demand (`demandYieldNeeded`).
+pub fn demand_yield_needed(world: &WorldState, city: &City) -> f64 {
+    DEMAND_YIELD_RESPECT_MIN.max(DEMAND_YIELD_RESPECT_TIMES * city_strength(world, city))
 }
 
 /// How the one accepting a demand hands over its goods (`DemandHandOver`): set aside at a storage

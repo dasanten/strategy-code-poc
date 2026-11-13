@@ -6,9 +6,9 @@ use crate::invariants::{check_invariants, world_invariants};
 use crate::npc_plan::plan_due;
 use crate::offers::{offers_sound, step_offers};
 use crate::orders::{order_kinds, OrderQueue, OrderReply};
-use crate::queries::demand::{npc_orgs_known_to, yields_to_demand};
+use crate::queries::demand::{demand_yield_needed, npc_orgs_known_to, yields_to_demand};
 use crate::queries::goods::free_stock;
-use crate::queries::persuasion::{city_soldiers, respect_seen_by};
+use crate::queries::persuasion::{city_strength, respect_seen_by};
 use crate::queries::standing::standing_of;
 use crate::random::Mulberry32;
 use crate::residents::{new_resident, NewResident};
@@ -17,11 +17,12 @@ use crate::tick::Scratch;
 use crate::walking::Walking;
 use crate::world::{create_world, step_world};
 use csp_shared::balance::{
-    DEMAND_DECLINED_STANDING_LOSS, DEMAND_TRADE_ORG_STANDING_LOSS, DEMAND_YIELD_RESPECT_MIN,
-    DEMAND_YIELD_RESPECT_TIMES, DIRECT_OFFER_DAYS, NPC_PLAN_TICKS, SIGHT_RANGE,
+    BLOW_BASE, DEMAND_DECLINED_STANDING_LOSS, DEMAND_TRADE_ORG_STANDING_LOSS,
+    DEMAND_YIELD_RESPECT_MIN, DEMAND_YIELD_RESPECT_TIMES, DIRECT_OFFER_DAYS, NPC_PLAN_TICKS,
+    RESPECT_PER_WALL, SIGHT_RANGE, SKILL_MAX, WEAPON_ATTACK,
 };
 use csp_shared::time::TICKS_PER_GAME_DAY;
-use csp_shared::world::{BuildingKind, JoinRequest, Realm, Standing, TradeOrgCity};
+use csp_shared::world::{BuildingKind, JoinRequest, Realm, SkillName, Standing, TradeOrgCity};
 use serde_json::json;
 use std::sync::Arc;
 
@@ -60,12 +61,16 @@ fn army(world: &mut WorldState, n: usize, x: f64, y: f64, owner: &str) {
     }
 }
 
-fn needed() -> usize {
-    DEMAND_YIELD_RESPECT_MIN.max(DEMAND_YIELD_RESPECT_TIMES) as usize
+/// What an untrained resident with only a spear weighs (`fighter_strength`).
+fn spear() -> f64 {
+    BLOW_BASE + WEAPON_ATTACK.get("spear").unwrap()
 }
 
+/// More untrained residents with swords than Oakford, with its one soldier, needs to yield.
 fn enough() -> usize {
-    DEMAND_YIELD_RESPECT_MIN as usize + 5
+    let sword = BLOW_BASE + WEAPON_ATTACK.get("sword").unwrap();
+    let needed = DEMAND_YIELD_RESPECT_MIN.max(DEMAND_YIELD_RESPECT_TIMES * spear());
+    (needed / sword).ceil() as usize + 2
 }
 
 struct Setup {
@@ -220,22 +225,12 @@ impl Setup {
 mod how_much_respect_an_npc_city_yields_to {
     use super::*;
 
-    #[test]
-    fn takes_far_more_than_its_soldiers_more_than_persuading_a_city_does() {
-        let mut s = setup(needed() - 1);
-        assert_eq!(city_soldiers(&s.world, s.n1()), 1.0);
-        assert!(!yields_to_demand(&s.world, s.n1(), "r1", SIZE));
-        let r = resident(&mut s.world, "one-more", Some("r1"), 44.0, 40.0, None);
-        arm(&mut s.world, r);
-        assert!(yields_to_demand(&s.world, s.n1(), "r1", SIZE));
-    }
-
-    #[test]
-    fn grows_with_its_soldiers() {
-        let soldiers = DEMAND_YIELD_RESPECT_MIN as usize;
-        let mut s = setup(soldiers);
-        for i in 0..soldiers {
-            let r = resident(
+    /// Oakford with three soldiers with spears (n1a and two guards), and `n` of r1's untrained
+    /// residents with spears at its gate.
+    fn village(n: usize) -> Setup {
+        let mut s = setup(0);
+        for i in 0..2 {
+            let g = resident(
                 &mut s.world,
                 &format!("guard{i}"),
                 None,
@@ -243,30 +238,124 @@ mod how_much_respect_an_npc_city_yields_to {
                 40.0 + i as f64,
                 Some("n1"),
             );
+            arm(&mut s.world, g);
+        }
+        for i in 0..n {
+            let r =
+                resident(&mut s.world, &format!("p{i}"), Some("r1"), 45.0, 40.0 + i as f64, None);
             arm(&mut s.world, r);
         }
-        assert_eq!(city_soldiers(&s.world, s.n1()), soldiers as f64 + 1.0);
+        s
+    }
+
+    fn r1_at_the_gate(s: &Setup) -> Vec<usize> {
+        (0..s.world.residents.len()).filter(|&i| s.world.residents[i].id.starts_with('p')).collect()
+    }
+
+    #[test]
+    fn nine_untrained_spears_dont_make_a_village_of_three_soldiers_yield() {
+        let s = village(9);
+        assert_eq!(city_strength(&s.world, s.n1()), 3.0 * spear());
         assert!(!yields_to_demand(&s.world, s.n1(), "r1", SIZE));
     }
 
     #[test]
-    fn is_not_one_person_with_a_spear_even_where_it_has_no_soldiers() {
-        let mut s = setup(1);
-        let n1a = s.world.residents.iter().position(|r| r.id == "n1a").unwrap();
-        s.world.residents[n1a].carried = Stock::default();
-        assert_eq!(city_soldiers(&s.world, s.n1()), 0.0);
-        assert!(!yields_to_demand(&s.world, s.n1(), "r1", SIZE));
-    }
-
-    #[test]
-    fn counts_the_senders_walls_in_its_sight_too() {
-        let mut s = setup(1);
-        for i in 0..needed() - 1 {
-            let wall =
-                building(&format!("w{i}"), BuildingKind::Wall, Some("c1"), 36.0, 40.0 + i as f64);
-            s.world.buildings.push(wall);
+    fn a_trained_and_armoured_force_of_the_same_number_does() {
+        let mut s = village(9);
+        for i in r1_at_the_gate(&s) {
+            let r = &mut s.world.residents[i];
+            r.carried.insert(Good::Shield, 1.0);
+            r.carried.insert(Good::Armour, 1.0);
+            r.skills.insert(SkillName::Combat, SKILL_MAX.combat);
         }
         assert!(yields_to_demand(&s.world, s.n1(), "r1", SIZE));
+    }
+
+    #[test]
+    fn takes_far_more_than_persuading_a_city_does() {
+        let mut s = village(4);
+        assert!(respect_seen_by(&s.world, s.n1(), "r1", SIZE) > city_strength(&s.world, s.n1()));
+        assert!(!yields_to_demand(&s.world, s.n1(), "r1", SIZE));
+        let more = (DEMAND_YIELD_RESPECT_TIMES * 3.0) as usize;
+        s = village(more);
+        assert!(yields_to_demand(&s.world, s.n1(), "r1", SIZE));
+    }
+
+    #[test]
+    fn its_own_walls_and_gates_raise_what_it_takes() {
+        let mut s = village((DEMAND_YIELD_RESPECT_TIMES * 3.0) as usize);
+        assert!(yields_to_demand(&s.world, s.n1(), "r1", SIZE));
+        let before = demand_yield_needed(&s.world, s.n1());
+        for i in 0..4 {
+            let wall =
+                building(&format!("nw{i}"), BuildingKind::Wall, Some("n1"), 43.0, 36.0 + i as f64);
+            s.world.buildings.push(wall);
+        }
+        assert_eq!(
+            demand_yield_needed(&s.world, s.n1()),
+            before + DEMAND_YIELD_RESPECT_TIMES * 4.0 * RESPECT_PER_WALL
+        );
+        assert!(!yields_to_demand(&s.world, s.n1(), "r1", SIZE));
+    }
+
+    #[test]
+    fn is_not_a_few_spears_even_where_it_has_no_soldiers() {
+        let mut s = setup(0);
+        let n1a = s.world.residents.iter().position(|r| r.id == "n1a").unwrap();
+        s.world.residents[n1a].carried = Stock::default();
+        assert_eq!(city_strength(&s.world, s.n1()), 0.0);
+        let few = (DEMAND_YIELD_RESPECT_MIN / spear()).ceil() as usize;
+        for i in 0..few {
+            let r =
+                resident(&mut s.world, &format!("p{i}"), Some("r1"), 45.0, 40.0 + i as f64, None);
+            arm(&mut s.world, r);
+            assert_eq!(yields_to_demand(&s.world, s.n1(), "r1", SIZE), i + 1 == few);
+        }
+    }
+
+    #[test]
+    fn the_senders_walls_add_nothing() {
+        let mut s = setup(0);
+        for i in 0..40 {
+            let wall =
+                building(&format!("w{i}"), BuildingKind::Wall, Some("c1"), 36.0, 20.0 + i as f64);
+            s.world.buildings.push(wall);
+        }
+        assert_eq!(respect_seen_by(&s.world, s.n1(), "r1", SIZE), 0.0);
+        assert!(!yields_to_demand(&s.world, s.n1(), "r1", SIZE));
+    }
+
+    #[test]
+    fn a_force_seen_only_by_its_scout_far_from_home_adds_nothing() {
+        let mut s = setup(0);
+        army(&mut s.world, enough(), 100.0, 40.0, "r1");
+        let n1b = s.world.residents.iter().position(|r| r.id == "n1b").unwrap();
+        (s.world.residents[n1b].x, s.world.residents[n1b].y) = (101.0, 40.0);
+        assert_eq!(respect_seen_by(&s.world, s.n1(), "r1", SIZE), 0.0);
+        assert!(!yields_to_demand(&s.world, s.n1(), "r1", SIZE));
+        // The same force at the gate wins it.
+        let s = setup(enough());
+        assert!(yields_to_demand(&s.world, s.n1(), "r1", SIZE));
+    }
+
+    #[test]
+    fn residents_it_lent_the_sender_dont_count() {
+        let mut s = village(0);
+        let mut ids = Vec::new();
+        for i in 0..enough() {
+            let id = format!("lent{i}");
+            let r = resident(&mut s.world, &id, None, 45.0, 40.0 + i as f64, Some("n1"));
+            s.world.residents[r].carried = [(Good::Sword, 1.0)].into_iter().collect();
+            ids.push(id);
+        }
+        let contract = json!({
+            "id": "k1", "lenderId": "n1", "hirerId": "r1", "offeredBy": "lender",
+            "residentIds": ids, "days": 7, "pricePerWeek": 5, "storageId": "n1s",
+            "startedAt": 0, "paidWeeks": 1,
+        });
+        s.world.contracts.push(serde_json::from_value(contract).unwrap());
+        assert_eq!(respect_seen_by(&s.world, s.n1(), "r1", SIZE), 0.0);
+        assert!(!yields_to_demand(&s.world, s.n1(), "r1", SIZE));
     }
 }
 

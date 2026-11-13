@@ -473,9 +473,10 @@ export function DemandsPanel({
       <p className="muted small">
         A demand arrives at once, wherever they are. A realm sends at most {DEMANDS_PER_GAME_DAY} a
         game day. It is only words: what you threaten is yours to carry out, or not. An NPC city
-        answers within a game hour: it gives in only to far more of your armed residents and walls
-        in its sight than it has soldiers, and otherwise thinks less of you. The Trade Organization
-        always declines, and being asked costs standing.
+        answers within a game hour: it gives in only when your armed residents near it, by weapon,
+        armour and Combat skill, far outweigh its soldiers and walls (your walls don't count), and
+        otherwise thinks less of you. The Trade Organization always declines, and being asked costs
+        standing.
       </p>
       {error && <p className="error">{error}</p>}
     </section>
