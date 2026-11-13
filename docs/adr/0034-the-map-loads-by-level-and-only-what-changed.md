@@ -155,3 +155,13 @@ browser.
 
 A frame paints at most 4 ms of textures (at least one); loaded chunks still waiting for theirs
 show the loading grey.
+
+### T99.5: coarse levels for the minimap (2026-11-13)
+
+The staged Player (`explore --all`) with the minimap open, counted from the code rather than in
+the browser: the minimap's frame is the whole map, so it now draws from level 5 (six chunks
+across) and asks for its 36 chunks in one request of 37 KB, where it asked for all 32,400
+level-0 chunks in 507 requests of 32 MB. A fresh realm's frame (96 tiles) stays at level 0. On
+the server (release build, the dev machine), a batch of 64 coarse chunks over fully explored
+terrain takes about 1 ms; the first batch of each level takes 21 to 47 ms more, once, to work out
+that level's squares for the whole map. Time in the browser is not measured yet.

@@ -490,6 +490,35 @@ async fn serves_explored_chunks_one_at_a_time_and_in_batches_refusing_unexplored
         (StatusCode::BAD_REQUEST, "invalid-input")
     );
 
+    // Coarse levels (ADR 0034): one chunk of level 1 holds the whole 64-tile map; an unknown
+    // level is refused.
+    let coarse = call(
+        &app,
+        "POST",
+        "/api/terrain/chunks",
+        Some(&token),
+        Some(json!({ "chunks": [0, 1], "level": 1 })),
+    )
+    .await;
+    assert_eq!(coarse.status, StatusCode::OK);
+    let chunks = csp_shared::chunks::decode_chunk_batch(&coarse.body);
+    assert_eq!(chunks.iter().map(|(i, b)| (*i, b.len())).collect::<Vec<_>>(), [(0, 1024)]);
+    for level in [json!(6), json!(-1), json!(1.5), json!("1")] {
+        let refused = call(
+            &app,
+            "POST",
+            "/api/terrain/chunks",
+            Some(&token),
+            Some(json!({ "chunks": [0], "level": level })),
+        )
+        .await;
+        assert_eq!(
+            (refused.status, refused.error().as_str()),
+            (StatusCode::BAD_REQUEST, "invalid-input"),
+            "level {level}"
+        );
+    }
+
     // The admin map's terrain is for admins only.
     let admin_chunk = call(&app, "GET", "/api/admin/terrain/1/1", Some(&token), None).await;
     assert_eq!(admin_chunk.status, StatusCode::FORBIDDEN);

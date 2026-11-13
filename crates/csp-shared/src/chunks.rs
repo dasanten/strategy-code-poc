@@ -27,6 +27,11 @@ pub const TERRAIN_BATCH_PATH: &str = "/api/terrain/chunks";
 /// The most chunks one [`TERRAIN_BATCH_PATH`] request may ask for.
 pub const TERRAIN_BATCH_MAX: usize = 64;
 
+/// The coarsest level explored terrain is served at (ADR 0034). At level `k` one byte stands for
+/// a square of `2^k × 2^k` tiles and a chunk is `CHUNK_SIZE × CHUNK_SIZE` such squares; level 0 is
+/// one byte a tile. A [`TERRAIN_BATCH_PATH`] request names its level as `level`, 0 if none.
+pub const TERRAIN_LEVEL_MAX: u8 = 5;
+
 /// Where an admin loads the whole map's terrain for the far zoom: `overview_across(size)`² bytes,
 /// row-major, each the most common terrain of its `OVERVIEW_SCALE`² tiles.
 pub const ADMIN_TERRAIN_OVERVIEW_PATH: &str = "/api/admin/terrain/overview";
@@ -34,6 +39,18 @@ pub const ADMIN_TERRAIN_OVERVIEW_PATH: &str = "/api/admin/terrain/overview";
 /// How many chunks fit across the map. Chunk `i` is at `(i % n, ⌊i / n⌋)`.
 pub fn chunks_across(size: i32) -> i32 {
     (size + CHUNK_SIZE - 1).div_euclid(CHUNK_SIZE)
+}
+
+/// How many squares of `level` fit across the map: the last one may reach past its side.
+pub fn squares_across(size: i32, level: u8) -> i32 {
+    let side = 1 << level;
+    (size + side - 1).div_euclid(side)
+}
+
+/// How many chunks of `level` fit across the map (level 0 is [`chunks_across`]). Chunk `i` of a
+/// level is at `(i % n, ⌊i / n⌋)`; squares past the map's side are padding.
+pub fn level_chunks_across(size: i32, level: u8) -> i32 {
+    (squares_across(size, level) + CHUNK_SIZE - 1).div_euclid(CHUNK_SIZE)
 }
 
 /// How many overview bytes fit across the map.
@@ -166,6 +183,7 @@ mod tests {
         assert_eq!(OVERVIEW_SCALE, 8);
         assert_eq!(NODE_KINDS, ["forest", "stone", "ironOre", "goldOre"]);
         assert_eq!(TERRAIN_BATCH_MAX, 64);
+        assert_eq!(TERRAIN_LEVEL_MAX, 5);
     }
 
     #[test]
@@ -175,6 +193,11 @@ mod tests {
         assert_eq!(chunks_across(32), 1);
         assert_eq!(overview_across(MAP_SIZE), 720);
         assert_eq!(overview_across(9), 2);
+        assert_eq!(level_chunks_across(MAP_SIZE, 0), 180);
+        assert_eq!(level_chunks_across(MAP_SIZE, 3), 23);
+        assert_eq!(level_chunks_across(MAP_SIZE, 5), 6);
+        assert_eq!(squares_across(MAP_SIZE, 5), 180);
+        assert_eq!(squares_across(9, 1), 5);
     }
 
     #[test]
