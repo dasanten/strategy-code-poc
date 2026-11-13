@@ -208,8 +208,9 @@ pub fn same(a: &Stock, b: &Stock) -> bool {
     a.len() == b.len() && a.iter().all(|(g, n)| b.get(g) == Some(n))
 }
 
-/// Asserts a stock holds just these goods: `assert_stock!(r.carried, { "food": 5 })`.
-#[macro_export]
+/// Asserts a stock holds just these goods: `assert_stock!(r.carried, { "food": 5 })`. A test file
+/// takes it with `#[macro_use] mod goods_support;`.
+#[allow(unused_macros)]
 macro_rules! assert_stock {
     ($got:expr, $want:tt) => {{
         let want: csp_shared::world::Stock =
