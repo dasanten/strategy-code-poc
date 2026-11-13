@@ -44,6 +44,33 @@ export function cityEmblems(
   viewer: Viewer,
   mapSize: number,
 ): CityEmblem[] {
+  return emblemPlaces(world, mapSize).map(({ city, ...place }) => ({
+    ...place,
+    rel: cityRelationship(city, viewer)!,
+  }))
+}
+
+type EmblemPlace = Omit<CityEmblem, 'rel'> & { city: City }
+
+/** Each city's emblem but its relationship, kept while the lists of cities and buildings are. */
+const places = new WeakMap<
+  readonly Building[],
+  WeakMap<readonly City[], { mapSize: number; places: EmblemPlace[] }>
+>()
+
+/**
+ * Where each city's emblem stands and how big it is. Working out which city each building
+ * belongs to takes milliseconds for a Player who remembers many cities, so it is done once for
+ * each list of cities and buildings, not every frame.
+ */
+function emblemPlaces(
+  world: { cities: readonly City[]; buildings: readonly Building[] },
+  mapSize: number,
+): EmblemPlace[] {
+  const byCities = places.get(world.buildings) ?? new WeakMap()
+  places.set(world.buildings, byCities)
+  const kept = byCities.get(world.cities)
+  if (kept?.mapSize === mapSize) return kept.places
   const members = cityMembership(
     { cities: [...world.cities], buildings: [...world.buildings] },
     mapSize,
@@ -54,20 +81,22 @@ export function cityEmblems(
     if (b.kind === 'house' && cityId) houses.set(cityId, (houses.get(cityId) ?? 0) + 1)
   }
   const byId = new Map(world.buildings.map((b) => [b.id, b]))
-  return world.cities.flatMap((c) => {
+  const out = world.cities.flatMap((c) => {
     const hall = byId.get(c.townHallId)
     if (!hall) return []
     return [
       {
+        city: c,
         id: c.id,
         name: c.name,
         x: hall.x,
         y: hall.y,
         size: citySize(houses.get(c.id) ?? 0),
-        rel: cityRelationship(c, viewer)!,
       },
     ]
   })
+  byCities.set(world.cities, { mapSize, places: out })
+  return out
 }
 
 /** A small marker for an army or a caravan. */
