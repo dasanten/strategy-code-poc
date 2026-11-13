@@ -621,7 +621,8 @@ pub struct DriveOrder {
 }
 
 /// Rowing a boat to a water tile (`CONTEXT.md`: Rowing): the rower is aboard and at its oars, and
-/// the boat goes a Step at a time over water along `path`.
+/// the boat goes a Step at a time over water along `path`. Sailing a ship (`Sail`) holds the same:
+/// the captain is one of its crew, and the ship goes over Sea only (`CONTEXT.md`: Sailing).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RowOrder {
@@ -679,6 +680,29 @@ pub struct HaulOrder {
     pub keep_food: f64,
     pub stop: HaulStop,
     pub phase: HaulPhase,
+    pub path: Option<TilePath>,
+    pub progress: f64,
+    pub moving: Option<HaulMoving>,
+}
+
+/// A haul route by water (`CONTEXT.md`: Haul route by water): the rower rows a vessel between
+/// two stops on land, havens or shore tiles, again and again. At a stop they stand on it, beside
+/// the vessel, and load by hand like a carriage's driver; leaving, they board, take the oars and
+/// row to the free water tile beside the other stop (`water`). Its phase `driving` is the rowing.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct WaterHaulOrder {
+    pub vessel_id: String,
+    pub from: Tile,
+    pub to: Tile,
+    pub goods: Vec<Good>,
+    pub return_goods: Vec<Good>,
+    /// Food kept on board for the rower.
+    pub keep_food: f64,
+    pub stop: HaulStop,
+    pub phase: HaulPhase,
+    /// The water tile beside the stop it is rowed to, set as it leaves a stop.
+    pub water: Option<Tile>,
     pub path: Option<TilePath>,
     pub progress: f64,
     pub moving: Option<HaulMoving>,
@@ -898,6 +922,9 @@ pub enum ResidentOrder {
     Relocate(RelocateOrder),
     Feed(FeedOrder),
     Row(RowOrder),
+    HaulByWater(WaterHaulOrder),
+    /// Sailing a ship to a Sea tile or a haven, its captain one of its crew (`CONTEXT.md`: Sailing).
+    Sail(RowOrder),
 }
 
 /// Everything in the world that changes, saved as snapshots (ADR 0006).
@@ -1657,6 +1684,10 @@ pub struct Crime {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional, type = "true")]
     pub boat: Option<bool>,
+    /// The boat taken is a ship (`CONTEXT.md`: Sailing), so the log names it one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "true")]
+    pub ship: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub building: Option<BuildingKind>,
@@ -1942,6 +1973,10 @@ pub enum RealmEventWhat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional, type = "true")]
         boat: Option<bool>,
+        /// The boat taken is a ship (`CONTEXT.md`: Sailing), so the log names it one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional, type = "true")]
+        ship: Option<bool>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         building: Option<BuildingKind>,
@@ -1959,6 +1994,10 @@ pub enum RealmEventWhat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional, type = "true")]
         boat: Option<bool>,
+        /// The boat taken is a ship (`CONTEXT.md`: Sailing), so the log names it one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional, type = "true")]
+        ship: Option<bool>,
     },
     TransportTaken {
         resident_id: String,
@@ -1976,6 +2015,10 @@ pub enum RealmEventWhat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional, type = "true")]
         boat: Option<bool>,
+        /// The boat taken is a ship (`CONTEXT.md`: Sailing), so the log names it one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional, type = "true")]
+        ship: Option<bool>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         goods: Option<Stock>,
@@ -2848,6 +2891,8 @@ pub enum BuildingKind {
     Haven,
     /// A boat site (`CONTEXT.md`: Building a boat): finished, it is gone and a boat floats.
     Boat,
+    /// A ship site (`CONTEXT.md`: Building a ship): finished, it is gone and a ship floats on Sea.
+    Ship,
 }
 
 /// A building or construction site (`Building`).
@@ -2930,11 +2975,13 @@ pub struct Carriage {
     pub load: Stock,
 }
 
-/// The kinds of vessel (`CONTEXT.md`: Vessel). Ships come with Epic 91.
+/// The kinds of vessel (`CONTEXT.md`: Vessel): a rowed boat, on Lake and Sea, or a sailed ship, on
+/// Sea only (`CONTEXT.md`: Ship).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum VesselKind {
     Boat,
+    Ship,
 }
 
 /// A boat or ship (`CONTEXT.md`: Vessel): always on a water tile, one vessel per tile, with the
@@ -2953,6 +3000,11 @@ pub struct Vessel {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub rower_id: Option<String>,
+    /// Those aboard a ship as its crew rather than as passengers (`CONTEXT.md`: Crew): of its
+    /// realm, aboard it, and not counted against what it holds. A boat has none. Left out of a
+    /// save while empty (format 117).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub crew_ids: Vec<String>,
 }
 
 /// What a resource node yields once worked (`ResourceKind`).

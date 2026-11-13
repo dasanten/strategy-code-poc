@@ -67,23 +67,55 @@ Before, on 2026-11-12, on a copy of a worked dev world (5,760 tiles across, 34 c
 buildings, tick 870), with Node's zlib and SQLite and the client's own code on the dev machine.
 The live game was not measured: `csp-admin map-stats` (T99.1) prints the same for any world.
 
-| What                                            | Measured                                                                                           |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| The whole map at full detail                    | 32,400 chunks, 507 batch requests, 32 MB; 0.45 MB gzipped or zstd-compressed                       |
-| A batch of 64 chunks                            | 64.5 KB; 1.0 KB gzipped (0.7 ms) or zstd-compressed (0.35 ms); 0.7 KB with brotli                  |
-| Chunks of a single terrain                      | 69%                                                                                                |
-| The whole map at level 3 (8 × 8 tiles a byte)   | 506 KB; 27 KB gzipped                                                                              |
-| The whole map at level 5 (32 × 32 tiles a byte) | 32 KB; 4 KB gzipped                                                                                |
-| Painting one chunk's texture (`terrainPixels`)  | 1.1 ms and 64 KB: 5,000 chunks take 5.5 s and 313 MB, the whole map 36 s and 2 GB                  |
-| Last seen                                       | about 96 bytes of JSON an entry; 0.43 MB for every building of that world                          |
+| What                                            | Measured                                                                                            |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| The whole map at full detail                    | 32,400 chunks, 507 batch requests, 32 MB; 0.45 MB gzipped or zstd-compressed                        |
+| A batch of 64 chunks                            | 64.5 KB; 1.0 KB gzipped (0.7 ms) or zstd-compressed (0.35 ms); 0.7 KB with brotli                   |
+| Chunks of a single terrain                      | 69%                                                                                                 |
+| The whole map at level 3 (8 × 8 tiles a byte)   | 506 KB; 27 KB gzipped                                                                               |
+| The whole map at level 5 (32 × 32 tiles a byte) | 32 KB; 4 KB gzipped                                                                                 |
+| Painting one chunk's texture (`terrainPixels`)  | 1.1 ms and 64 KB: 5,000 chunks take 5.5 s and 313 MB, the whole map 36 s and 2 GB                   |
+| Last seen                                       | about 96 bytes of JSON an entry; 0.43 MB for every building of that world                           |
 | Region map                                      | about 25 KB of JSON for a village, up to 0.85 MB for all 34 cities, 260 KB for a city at full reach |
-| A Player's explored terrain                     | a 4 MB bitmap whatever they explored; one Player's 31 chunks gzip to 4.8 KB                        |
-| Saving one exploring Player's bitmap            | 6 ms and 72 KB of write-ahead log with one walking scout, 728 KB with ten scouts apart             |
+| A Player's explored terrain                     | a 4 MB bitmap whatever they explored; one Player's 31 chunks gzip to 4.8 KB                         |
+| Saving one exploring Player's bitmap            | 6 ms and 72 KB of write-ahead log with one walking scout, 728 KB with ten scouts apart              |
 
 T84.6 measured the client at about 1.4 ms a chunk for its texture, and 4.3 s to load 2,997 chunks
 in batches on one machine without a network.
 
 Each ticket of Epic 99 adds its before and after below.
+
+### T99.1: the staged Player (2026-11-12)
+
+`csp-admin map-stats` on a copy of the dev world the numbers above were measured on, for its
+Player `havencheck`, before and after `csp-admin explore havencheck --all --yes` (release build,
+the dev machine). Every later ticket compares with "after". `explore` adds no Last seen: that
+Player remembers nothing out of sight either way.
+
+| What                        | Before                    | After `explore --all`             |
+| --------------------------- | ------------------------- | --------------------------------- |
+| Explored                    | 16,867 tiles in 31 chunks | 33,177,600 tiles in 32,400 chunks |
+| Region map                  | 1 holder, 5,013 tiles     | 18 holders, 294,966 tiles         |
+| Welcome                     | 58.0 KB, 11.2 KB gzipped  | 2.78 MB, 577 KB gzipped           |
+| Welcome: `exploredChunks`   | 156 B                     | 183 KB                            |
+| Welcome: `entities`         | 16.5 KB                   | 16.5 KB                           |
+| Welcome: `lastSeen`         | 2 B                       | 2 B                               |
+| Welcome: `region`           | 40.2 KB                   | 2.58 MB                           |
+| Welcome: the rest           | 1.1 KB                    | 1.1 KB                            |
+| `map-stats` / `explore` run | 0.3 s                     | 2.3 s; `explore --all` 1.8 s      |
+
+### T99.2: terrain responses travel compressed
+
+Measured on 2026-11-12 through the server's own router (`CompressionLayer` at its default levels),
+on the full map generated from seed 1 with one Player who explored all of it, asking for every chunk
+in batches of 64. Not checked in a browser's Network tab.
+
+| What                         | Before (uncompressed) | After, gzip         | After, zstd         |
+| ---------------------------- | --------------------- | ------------------- | ------------------- |
+| The whole map at full detail | 32,400 chunks, 32 MB  | 0.43 MB (77 times smaller) | 0.45 MB (75 times smaller) |
+| A batch of 64 chunks         | 64.5 KB               | 0.7 KB              | 0.8 KB              |
+
+### T99.3: large WebSocket messages travel gzipped
 
 | Ticket                        | Before                                    | After                                                                   |
 | ----------------------------- | ----------------------------------------- | ----------------------------------------------------------------------- |

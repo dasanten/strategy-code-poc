@@ -47,7 +47,7 @@ use crate::app::{cookie_value, GameHandle, GameView, SESSION_COOKIE};
 use crate::auth::{get_session_user, hash_token, now_ms, session_alive, SessionSockets};
 use crate::config::{Origins, RealtimeLimits};
 use crate::diplomacy::{carried_ways_for, diplomacy_for, realms_seen, storages_seen};
-use crate::first_day::{first_day_line_of, mark_first_day, read_first_day};
+use crate::first_day::{first_day_line_of, mark_first_day, read_first_day, FirstDay};
 use crate::sync::{ClientView, HasId, SyncRound};
 
 /// Where the client opens its socket (`WS_PATH`).
@@ -338,6 +338,112 @@ fn json_of<T: serde::Serialize>(v: &T) -> String {
     serde_json::to_string(v).unwrap_or_default()
 }
 
+/// What a welcome is made from: the world, the map's side, its index and the broadcast's view.
+pub type WelcomeFrom<'a> = (&'a WorldState, i32, &'a WorldIndex, TickView<'a>);
+
+/// A welcome as built, with what the checks look at and the client it starts.
+struct Welcome {
+    message: Value,
+    client: Client,
+    entities: Vec<Seen>,
+    last_seen: Vec<Remembered>,
+    region: Option<RegionMap>,
+}
+
+/// The welcome for a Player with a realm, and the client that sends them every tick after it;
+/// none if the realm is gone. Their residents have looked around already.
+fn build_welcome(
+    (world, size, index, view): WelcomeFrom<'_>,
+    realm_id: &str,
+    user_id: i64,
+    account: &Value,
+    first_day: Option<FirstDay>,
+) -> Option<Welcome> {
+    let realm = world.realms.iter().find(|r| r.id == realm_id)?;
+    let mut client = Client {
+        user_id,
+        realm_id: realm.id.clone(),
+        watching: Vec::new(),
+        view: ClientView::new(),
+        last_seen_view: ClientView::new(),
+        last_event_seq: 0,
+        last_diplomacy: String::new(),
+        region_tick: None,
+        leader_id: realm.leader_id.clone(),
+        realm_name: realm.name.clone(),
+        horse_offer: !world.horse_offers_claimed.contains(&(user_id as u64)),
+        last_work_settings: String::new(),
+        last_waypoints: json_of(
+            &world.waypoints.get(&(user_id as u64)).cloned().unwrap_or_default(),
+        ),
+        last_trader_visits: json_of(&trader_visits_to(world, &realm.id)),
+    };
+    // The view starts at the town hall of the realm's first city, or with the Leader if it has
+    // none left.
+    let city = world.cities.iter().find(|c| c.realm_id.as_deref() == Some(realm.id.as_str()));
+    let leader = world.residents.iter().find(|r| r.id == realm.leader_id);
+    let (x, y) = city
+        .and_then(|c| town_hall_of(world, c))
+        .map(|b| (b.x, b.y))
+        .or_else(|| leader.map(|r| (r.x, r.y)))
+        .unwrap_or((0.0, 0.0));
+    let in_sight = entities_in_sight(world, index, Some(&realm.id), None);
+    let entities = client.view.initial(&in_sight);
+    let remembered = last_seen_out_of_sight(world, index, user_id as u64);
+    let last_seen = client.last_seen_view.initial(&remembered);
+    let (events, last) = events_json(world, user_id, 0);
+    client.last_event_seq = last.unwrap_or(0);
+    let diplomacy = diplomacy_of(world, size, &realm.id, &entities);
+    client.last_diplomacy = json_of(&diplomacy);
+    let work_settings = world
+        .workplace_settings
+        .get(&realm.id)
+        .map_or_else(|| json!({}), |s| serde_json::to_value(s).unwrap_or(json!({})));
+    client.last_work_settings = json_of(&work_settings);
+    let region = region_for(&mut client, world, size, view, &[]);
+    let region_json =
+        region.as_ref().map_or(Value::Null, |r| serde_json::to_value(r).expect("serialisable"));
+    let message = json!({
+        "type": "welcome",
+        "account": account,
+        "tick": world.tick,
+        "map": { "seed": world.seed, "size": size },
+        "exploredChunks": view.explored.explored_chunks(user_id as u64),
+        "home": {
+            "realmId": realm.id,
+            "leaderId": realm.leader_id,
+            "realmName": client.realm_name,
+            "cityId": city.map(|c| c.id.clone()),
+            "x": x,
+            "y": y,
+        },
+        "entities": entities,
+        "lastSeen": last_seen,
+        "events": events,
+        "diplomacy": diplomacy,
+        "region": region_json,
+        "horseOffer": client.horse_offer,
+        "waypoints": world.waypoints.get(&(user_id as u64)).cloned().unwrap_or_default(),
+        "traderVisits": trader_visits_to(world, &realm.id),
+        "firstDay": first_day,
+        "workSettings": work_settings,
+    });
+    Some(Welcome { message, client, entities, last_seen, region })
+}
+
+/// The welcome a Player with a realm is sent, as [`Realtime`] sends it, for `csp-admin
+/// map-stats` to measure: their residents have looked around already, and `account` is the
+/// account as the socket's session gives it. None if the realm is gone.
+pub fn welcome_message(
+    from: WelcomeFrom<'_>,
+    realm_id: &str,
+    user_id: i64,
+    account: &Value,
+    first_day: Option<FirstDay>,
+) -> Option<Value> {
+    build_welcome(from, realm_id, user_id, account, first_day).map(|w| w.message)
+}
+
 impl Realtime {
     pub fn new(opts: RealtimeOptions) -> Arc<Self> {
         let start = std::time::Instant::now();
@@ -504,84 +610,24 @@ impl Realtime {
             g.sight.update(g.world, index, g.explored);
         }
         let world = &*g.world;
-        let Some(realm) = world.realms.iter().find(|r| r.id == realm_id) else { return };
-        let mut client = Client {
-            user_id,
-            realm_id: realm.id.clone(),
-            watching: Vec::new(),
-            view: ClientView::new(),
-            last_seen_view: ClientView::new(),
-            last_event_seq: 0,
-            last_diplomacy: String::new(),
-            region_tick: None,
-            leader_id: realm.leader_id.clone(),
-            realm_name: realm.name.clone(),
-            horse_offer: !world.horse_offers_claimed.contains(&(user_id as u64)),
-            last_work_settings: String::new(),
-            last_waypoints: json_of(
-                &world.waypoints.get(&(user_id as u64)).cloned().unwrap_or_default(),
-            ),
-            last_trader_visits: json_of(&trader_visits_to(world, &realm.id)),
-        };
-        // The view starts at the town hall of the realm's first city, or with the Leader if it
-        // has none left.
-        let city = world.cities.iter().find(|c| c.realm_id.as_deref() == Some(realm.id.as_str()));
-        let leader = world.residents.iter().find(|r| r.id == realm.leader_id);
-        let (x, y) = city
-            .and_then(|c| town_hall_of(world, c))
-            .map(|b| (b.x, b.y))
-            .or_else(|| leader.map(|r| (r.x, r.y)))
-            .unwrap_or((0.0, 0.0));
         let index = world_index(&mut g.scratch.index, world, size);
-        let in_sight = entities_in_sight(world, index, Some(&realm.id), None);
-        let entities = client.view.initial(&in_sight);
-        self.check_sent(world, index, &realm.id, &entities);
-        let remembered = last_seen_out_of_sight(world, index, user_id as u64);
-        let last_seen = client.last_seen_view.initial(&remembered);
-        self.check_last_seen(world, g.terrain, &g.scratch.last_seen, &realm.id, &last_seen);
-        // Their map is fresh from the next tick, not when the realm's turn comes round.
-        g.scratch.last_seen.refresh_soon(&realm.id);
-        let (events, last) = events_json(world, user_id, 0);
-        client.last_event_seq = last.unwrap_or(0);
-        let diplomacy = diplomacy_of(world, size, &realm.id, &entities);
-        client.last_diplomacy = json_of(&diplomacy);
-        let work_settings = world
-            .workplace_settings
-            .get(&realm.id)
-            .map_or_else(|| json!({}), |s| serde_json::to_value(s).unwrap_or(json!({})));
-        client.last_work_settings = json_of(&work_settings);
         let first_day = read_first_day(&self.db(), user_id).ok();
         let view = TickView { territory: g.territory, explored: &*g.explored };
-        let region = self.region(&mut client, world, size, view, &[]).unwrap_or(Value::Null);
-        let welcome = json!({
-            "type": "welcome",
-            "account": user,
-            "tick": world.tick,
-            "map": { "seed": world.seed, "size": size },
-            "exploredChunks": g.explored.explored_chunks(user_id as u64),
-            "home": {
-                "realmId": realm.id,
-                "leaderId": realm.leader_id,
-                "realmName": client.realm_name,
-                "cityId": city.map(|c| c.id.clone()),
-                "x": x,
-                "y": y,
-            },
-            "entities": entities,
-            "lastSeen": last_seen,
-            "events": events,
-            "diplomacy": diplomacy,
-            "region": region,
-            "horseOffer": client.horse_offer,
-            "waypoints": world.waypoints.get(&(user_id as u64)).cloned().unwrap_or_default(),
-            "traderVisits": trader_visits_to(world, &realm.id),
-            "firstDay": first_day,
-            "workSettings": work_settings,
-        });
+        let parts = (world, size, index, view);
+        let Some(welcome) = build_welcome(parts, realm_id, user_id, user, first_day) else {
+            return;
+        };
+        self.check_sent(world, index, realm_id, &welcome.entities);
+        self.check_last_seen(world, g.terrain, &g.scratch.last_seen, realm_id, &welcome.last_seen);
+        if let Some(region) = &welcome.region {
+            self.check_region(world, size, view, &welcome.client, region);
+        }
+        // Their map is fresh from the next tick, not when the realm's turn comes round.
+        g.scratch.last_seen.refresh_soon(realm_id);
         let mut hub = self.hub();
         if let Some(s) = hub.sessions.get(&socket) {
-            s.send(welcome.to_string());
-            hub.clients.insert(socket, client);
+            s.send(welcome.message.to_string());
+            hub.clients.insert(socket, welcome.client);
         }
     }
 

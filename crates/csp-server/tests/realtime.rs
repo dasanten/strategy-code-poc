@@ -384,6 +384,20 @@ async fn refuses_a_socket_from_another_origin_and_takes_the_allowed_ones_and_its
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn upgrades_a_socket_whose_request_accepts_compressed_responses() {
+    // A browser sends `Accept-Encoding` on the upgrade too; the API's compression leaves it alone.
+    let s = start(StartOptions::default()).await;
+    let mut req = s.url.as_str().into_client_request().unwrap();
+    req.headers_mut().insert("cookie", format!("csp_session={}", s.token).parse().unwrap());
+    req.headers_mut().insert("accept-encoding", "gzip, deflate, br, zstd".parse().unwrap());
+    let (socket, res) = tokio_tungstenite::connect_async(req).await.unwrap();
+    assert_eq!(res.status().as_u16(), 101);
+    assert!(res.headers().get("content-encoding").is_none());
+    let mut client = Client { socket, got: Vec::new(), closed: None };
+    client.next("welcome").await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn lets_a_socket_without_an_origin_in_only_where_the_policy_allows_it() {
     let strict = start(StartOptions {
         origins: Origins { allowed: vec![], allow_missing: false },
@@ -1060,4 +1074,47 @@ async fn closes_the_socket_of_a_session_that_ended_on_the_next_check() {
 /// A realm event, any will do.
 fn hungry() -> csp_shared::world::RealmEventWhat {
     csp_shared::world::RealmEventWhat::Hungry { resident_id: "a1".into(), name: "Ada".into() }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn map_stats_prints_the_bytes_of_the_welcome_the_server_sends_part_by_part() {
+    use csp_server::explored::save_explored;
+    use csp_server::map_tools::{map_stats, WelcomeBytes};
+    use csp_server::saves::{save_terrain, save_world};
+    let s = start(StartOptions { realm: false, ..StartOptions::default() }).await;
+    let mut c = connect(&s).await;
+    c.next("founding").await;
+    found(&mut c).await;
+    s.tick().await;
+    // Territory worked out and the world saved, as a running server has it.
+    s.game
+        .run(|g, conn| {
+            g.territory.update(&g.world, &g.terrain);
+            save_terrain(conn, g.world.seed, &g.terrain).unwrap();
+            save_world(conn, &g.world).unwrap();
+            save_explored(conn, &mut g.explored.lock().unwrap(), now_ms()).unwrap();
+        })
+        .await
+        .unwrap();
+    let mut second = connect(&s).await;
+    let welcome = second.next("welcome").await;
+    assert!(welcome["region"]["holders"].as_array().is_some_and(|h| !h.is_empty()));
+    let stats = map_stats(&s.conn()).unwrap();
+    assert_eq!(stats.len(), 1);
+    let daniel = &stats[0];
+    assert_eq!((daniel.user_id, daniel.name.as_str()), (s.user_id, "Daniel"));
+    assert_eq!(daniel.welcome, WelcomeBytes::of(&welcome));
+    let w = daniel.welcome;
+    assert_eq!(w.total, welcome.to_string().len());
+    assert_eq!(w.explored_chunks + w.entities + w.last_seen + w.region + w.rest, w.total);
+    assert_eq!(w.region, welcome["region"].to_string().len());
+    assert_eq!(daniel.explored_chunks, welcome["exploredChunks"].as_array().unwrap().len());
+    let holders = welcome["region"]["holders"].as_array().unwrap();
+    assert_eq!(daniel.region_holders, holders.len());
+    let tiles: usize = holders.iter().map(|h| h["tiles"].as_array().unwrap().len()).sum();
+    assert_eq!(daniel.region_tiles, tiles);
+    // Nothing was written: the same save, the same explored terrain.
+    let saves: i64 =
+        s.conn().query_row("SELECT count(*) FROM world_saves", [], |r| r.get(0)).unwrap();
+    assert_eq!(saves, 1);
 }

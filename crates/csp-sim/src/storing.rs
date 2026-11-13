@@ -8,7 +8,7 @@ use csp_shared::terrain::wrap_distance;
 use csp_shared::world::{
     Building, BuildingKind, FetchOrder, FetchPhase, Good, GoodsPlace, GoodsSpot, GoodsWanted,
     OrderEnded, OrderEndedKind, OrderRequest, Resident, ResidentOrder, Stock, StoreOrder,
-    StorePhase, WorldState,
+    StorePhase, VesselKind, WorldState,
 };
 use serde_json::Value;
 
@@ -20,7 +20,7 @@ use crate::queries::command::commander_of_resident;
 use crate::queries::command::steals_carriage;
 use crate::queries::goods::{can_handle, free_stock, put_away_units};
 use crate::queries::names::{good_of, held, placed};
-use crate::queries::vessels::{resident_beside_vessel, vessel_by_id};
+use crate::queries::vessels::{docked_at, resident_beside_vessel, vessel_by_id};
 use csp_shared::balance::MAP_SIZE;
 
 /// `Number.MAX_SAFE_INTEGER`: a fetch of as many as there are.
@@ -96,7 +96,15 @@ pub fn place_tile(world: &WorldState, place: &GoodsPlace) -> Option<(f64, f64)> 
         GoodsPlace::Carriage { carriage_id } => {
             world.carriages.iter().find(|k| &k.id == carriage_id).map(|k| (k.x, k.y))
         }
-        GoodsPlace::Vessel { vessel_id } => vessel_by_id(world, vessel_id).map(|v| (v.x, v.y)),
+        // A ship is loaded at the haven it is docked at, and at sea from nowhere (`CONTEXT.md`:
+        // Docked); a boat from beside its water tile.
+        GoodsPlace::Vessel { vessel_id } => {
+            let v = vessel_by_id(world, vessel_id)?;
+            match v.kind {
+                VesselKind::Boat => Some((v.x, v.y)),
+                VesselKind::Ship => docked_at(world, v).map(|h| (h.x, h.y)),
+            }
+        }
         GoodsPlace::Storage { storage_id } => {
             finished_storage(world, storage_id).map(|b| (b.x, b.y))
         }
@@ -126,7 +134,7 @@ fn at_place(world: &WorldState, r: &Resident, place: &GoodsPlace) -> bool {
             .is_some_and(|k| k.x == r.x && k.y == r.y),
         // From beside it (`CONTEXT.md`: Beside a vessel).
         GoodsPlace::Vessel { vessel_id } => {
-            vessel_by_id(world, vessel_id).is_some_and(|v| resident_beside_vessel(v, r))
+            vessel_by_id(world, vessel_id).is_some_and(|v| resident_beside_vessel(world, v, r))
         }
         GoodsPlace::Storage { storage_id } => finished_storage(world, storage_id)
             .is_some_and(|b| covers(placed(b), r.x as i32, r.y as i32, MAP_SIZE)),
