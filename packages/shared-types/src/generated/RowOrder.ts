@@ -3,6 +3,7 @@ import type { Tile } from "./Tile.js";
 
 /**
  * Rowing a boat to a water tile (`CONTEXT.md`: Rowing): the rower is aboard and at its oars, and
- * the boat goes a Step at a time over water along `path`.
+ * the boat goes a Step at a time over water along `path`. Sailing a ship (`Sail`) holds the same:
+ * the captain is one of its crew, and the ship goes over Sea only (`CONTEXT.md`: Sailing).
  */
 export type RowOrder = { vesselId: string, target: Tile, path: Array<[number, number]> | null, progress: number, };
