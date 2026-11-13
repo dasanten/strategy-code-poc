@@ -1,7 +1,7 @@
 import { QUEUE_MAX_STEPS } from '@csp/balance'
 import type { OrderRequest } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
-import { capProblem, idsOf, stepCount, type PlanItem } from './plan-blocks.js'
+import { capProblem, depthOf, idsOf, itemCount, stepCount, type PlanItem } from './plan-blocks.js'
 import { canMoveTo, insertPoints, moveItems } from './queue-brackets-view.js'
 
 /** The planner's brackets (`CONTEXT.md`: Planner blocks, Repeat block). */
@@ -59,22 +59,29 @@ describe('moving picked steps and blocks', () => {
   })
 })
 
-describe('the step cap after repeats', () => {
-  it('counts a nested block’s copies, wherever it is dropped', () => {
+describe('the size of a queue as written', () => {
+  it('counts a nested block once, however often it repeats, wherever it is dropped', () => {
     const nested = moveItems(
       [walk(1), block(10, [walk(2)], 3), block(20, [walk(5), walk(6)], 4)],
       [20],
       2,
     )
-    // Walk 1, then 3 × (walk 2 + 4 × (walks 5, 6)) = 1 + 3 × 9.
-    expect(stepCount(nested)).toBe(28)
-    const many: OrderRequest = { kind: 'walkTo', x: 0, y: 0 }
-    const over = [block(30, [{ id: 31, order: many }], QUEUE_MAX_STEPS + 1)]
-    expect(capProblem(over)).toBeDefined()
+    // Walk 1, block 10 with walk 2 and block 20 with walks 5 and 6: 4 steps, 6 items.
+    expect(stepCount(nested)).toBe(4)
+    expect(itemCount(nested)).toBe(6)
+    expect(depthOf(nested)).toBe(2)
     expect(capProblem(nested)).toBeUndefined()
-    // One more round of the outer block puts it over: 1 + 6 × 9.
-    const tripled = nested.map((item) => ('items' in item ? { ...item, repeat: 6 } : item))
-    expect(stepCount(tripled)).toBe(55)
-    expect(capProblem(tripled)).toContain(String(55 - QUEUE_MAX_STEPS))
+    // Repeating more costs nothing; more steps than a queue holds do.
+    const many: OrderRequest = { kind: 'walkTo', x: 0, y: 0 }
+    const once = [block(30, [{ id: 31, order: many }], QUEUE_MAX_STEPS + 1)]
+    expect(capProblem(once)).toBeUndefined()
+    const over = [
+      block(
+        30,
+        Array.from({ length: QUEUE_MAX_STEPS }, (_, i) => walk(40 + i)),
+        2,
+      ),
+    ]
+    expect(capProblem(over)).toContain(`${QUEUE_MAX_STEPS + 1} steps and blocks, 1 more`)
   })
 })

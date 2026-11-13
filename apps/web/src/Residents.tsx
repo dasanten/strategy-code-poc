@@ -50,6 +50,8 @@ import {
   REALM_NAME_MAX_LENGTH,
   RESIDENT_NAME_MAX_LENGTH,
   QUEUE_MAX_STEPS,
+  QUEUE_MAX_REPEAT,
+  QUEUE_MAX_DEPTH,
   FOAL_STAT_SPREAD,
   STABLE_BREED_DAYS,
 } from '@csp/balance'
@@ -61,6 +63,7 @@ import { putAwayUnits } from './shared/goods.js'
 import { nameProblem } from './shared/names.js'
 import type {
   QueueStepRequest,
+  Repeat,
   SeenVessel,
   VesselKind,
   Building,
@@ -131,6 +134,7 @@ import {
   clearedItems,
   editPlan,
   planOf,
+  roundsOf,
   realMinutes,
   showsMinutes,
   stepRow,
@@ -150,10 +154,12 @@ import { canMoveTo, insertPoints, moveItems } from './queue-brackets-view.js'
 import type { PlanStepId } from './plan-step.js'
 import {
   canMove,
+  DEFAULT_REPEAT,
   capProblem,
   dropItem,
   hasBlocks,
   idsOf,
+  itemCount,
   insertItems,
   isBlock,
   lastPicked,
@@ -432,12 +438,15 @@ export function QueueBlock({
   realm,
   running = false,
   palette,
+  rounds,
 }: {
   queue: Pick<QueuePlan, 'items' | 'loop' | 'nextStepId'>
   /** The Add step palette, right under the steps (`CONTEXT.md`: Planner blocks). */
   palette?: ReactNode
   /** The id of the step being done, in a running queue. */
   currentId?: number
+  /** The round each block around the current step is on, by block id, in a running queue. */
+  rounds?: ReadonlyMap<number, number>
   /** The resident's running queue, not a draft or a group's plan: Clear asks and keeps the current step. */
   running?: boolean
   doing?: string
@@ -522,7 +531,7 @@ export function QueueBlock({
     if (key === 'c') copyPicked()
     else pasteSteps()
   }
-  const unrolled = stepCount(q.items)
+  const written = itemCount(q.items)
   const over = capProblem(q.items)
   const lastStepId = rows.filter((row) => row.kind === 'step').at(-1)?.id
   // Alt+↑ and Alt+↓ move the focused step or block (drag does too).
@@ -589,15 +598,17 @@ export function QueueBlock({
           where you drop it. Loop is the outer bracket, its switch in its head. Working, hauling,
           teaching and training never end on their own, so they need a duration unless they are
           last: tap the duration to set it. Repeat wraps the picked steps in a block done so many
-          times in a row; giving the queue makes it that many copies, up to {QUEUE_MAX_STEPS} steps
-          in all. Saved… keeps the steps in this browser under a name, and loads a saved queue’s
-          steps at the end. Clear empties a draft; on a running queue it keeps only the current step
-          and turns loop off, so the queue ends after it.
+          times in a row, or forever; a round in which none of its steps could start ends it, and a
+          running queue shows the round it is on. A queue holds up to {QUEUE_MAX_STEPS} steps and
+          blocks as written, nested up to {QUEUE_MAX_DEPTH} deep. Saved… keeps the steps in this
+          browser under a name, and loads a saved queue’s steps at the end. Clear empties a draft;
+          on a running queue it keeps only the current step and turns loop off, so the queue ends
+          after it.
         </p>
       )}
       {hasBlocks(q.items) && (
         <p className={`small ${over ? 'queue-unrolled-over' : 'muted'}`}>
-          {over ? `Too long: ${over}.` : `${unrolled} steps after repeats.`}
+          {over ? `Too long: ${over}.` : `${written} of ${QUEUE_MAX_STEPS} steps and blocks.`}
         </p>
       )}
       <div className={`queue-bracket queue-loop-bracket${q.loop ? ' on' : ''}`}>
@@ -739,6 +750,7 @@ export function QueueBlock({
           <RepeatCount
             repeat={block.repeat}
             steps={stepCount(block.items)}
+            {...(rounds?.has(id) ? { round: rounds.get(id) } : {})}
             onSet={(count) => edit(setRepeat(q.items, id, count))}
           />
           <span className="buttons">
@@ -808,48 +820,80 @@ function newIds(before: readonly PlanItem[], after: readonly PlanItem[]): number
   return fresh(after)
 }
 
-/** A repeat block's count, set on Enter or leaving the field, with how many steps it repeats. */
+/**
+ * A repeat block's count, set on Enter or leaving the field, or forever, with how many steps it
+ * repeats; in a running queue, the round the block is on ("round 2 of 3").
+ */
 function RepeatCount({
   repeat,
   steps,
+  round,
   onSet,
 }: {
-  repeat: number
+  repeat: Repeat
   steps: number
-  onSet: (repeat: number) => void
+  /** The round it is on, while the resident's current step is inside it. */
+  round?: number
+  onSet: (repeat: number | 'forever') => void
 }) {
-  const [text, setText] = useState(String(repeat))
-  useEffect(() => setText(String(repeat)), [repeat])
+  const forever = repeat === 'forever'
+  // The count the field shows, kept while forever is on so turning it off goes back to it.
+  const [last, setLast] = useState(forever ? DEFAULT_REPEAT : repeat)
+  const [text, setText] = useState(String(last))
+  useEffect(() => {
+    if (repeat === 'forever') return
+    setLast(repeat)
+    setText(String(repeat))
+  }, [repeat])
   const commit = () => {
     const typed = Math.floor(Number(text))
-    if (typed >= 1 && typed !== repeat) onSet(typed)
-    else setText(String(repeat))
+    if (typed >= 1 && typed !== repeat) onSet(Math.min(typed, QUEUE_MAX_REPEAT))
+    else setText(String(last))
   }
   return (
-    <label className="small queue-step-minutes">
-      Repeat ×
-      <input
-        className="queue-block-count"
-        aria-label="Times to repeat"
-        type="number"
-        min={1}
-        step={1}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => e.key === 'Enter' && commit()}
-      />
+    <span className="small queue-step-minutes">
+      <label>
+        Repeat ×
+        <input
+          className="queue-block-count"
+          aria-label="Times to repeat"
+          type="number"
+          min={1}
+          max={QUEUE_MAX_REPEAT}
+          step={1}
+          value={text}
+          disabled={forever}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => e.key === 'Enter' && commit()}
+        />
+      </label>{' '}
+      <label>
+        <input
+          type="checkbox"
+          checked={forever}
+          onChange={(e) => onSet(e.target.checked ? 'forever' : last)}
+        />{' '}
+        forever
+      </label>{' '}
+      {round !== undefined && (
+        <strong className="queue-block-round">
+          round {round}
+          {forever ? '' : ` of ${repeat}`}
+        </strong>
+      )}{' '}
       <span className="muted">
-        {steps} step{steps === 1 ? '' : 's'} each, {steps * repeat} in all
+        {steps} step{steps === 1 ? '' : 's'}
+        {forever ? ' each round' : ` each, ${steps * repeat} in all`}
       </span>
-    </label>
+    </span>
   )
 }
 
 /**
  * Save and Load for a queue planner (`CONTEXT.md`: Saved queue): Save keeps `steps` in this
  * browser under a name, asking before it overwrites one saved under the same name; Load lists the
- * saved queues, each with its step count after repeats and date, to load (`onLoad` gets fresh
+ * saved queues, each with its step count as written and date, to load (`onLoad` gets fresh
  * copies of its steps and blocks) or delete. With no steps, only Load shows.
  */
 export function SavedQueueTools({
@@ -2300,7 +2344,7 @@ export function ResidentCard({
   queuePlan?: QueuePlan
   /** Edits or discards (undefined) that draft. */
   onPlanQueue?: (plan: QueuePlan | undefined) => void
-  /** Start queue: gives the resident the draft unrolled, as their queue. */
+  /** Start queue: gives the resident the draft, its repeat blocks as they are, as their queue. */
   onGivePlan?: () => void
   /** Edit as draft: copies the running queue into a draft; the queue runs on. */
   onDraftQueue?: () => void
@@ -2937,7 +2981,7 @@ export function ResidentCard({
             <QueueBlock
               title="Draft"
               queue={queuePlan}
-              currentId={r.queue?.steps[r.queue.current]?.id}
+              currentId={r.queue?.current}
               doing={doingLine(r, {
                 scripts,
                 buildings,
@@ -2959,7 +3003,7 @@ export function ResidentCard({
               plan={queuePlan}
               give="Start queue"
               discard="Discard draft"
-              note="Start queue makes their queue this draft, each repeat block that many copies of its steps; the step they are on keeps going if it is still in it."
+              note="Start queue makes their queue this draft, repeat blocks and all; the step they are on keeps going if it is still in it."
               onGive={() => onGivePlan?.()}
               onDiscard={() => onPlanQueue(undefined)}
             />
@@ -2968,7 +3012,8 @@ export function ResidentCard({
           <>
             <QueueBlock
               queue={planOf(r.queue)}
-              currentId={r.queue.steps[r.queue.current]?.id}
+              currentId={r.queue.current}
+              rounds={roundsOf(r.queue)}
               running
               doing={doingLine(r, {
                 scripts,

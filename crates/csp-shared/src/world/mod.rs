@@ -250,18 +250,113 @@ pub enum NoScript {
     None,
 }
 
-/// A queue (`CONTEXT.md`: Queue): steps done one after another.
+/// A queue (`CONTEXT.md`: Queue, Repeat block; ADR 0032): a tree of steps and repeat blocks,
+/// worked through top to bottom.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Queue {
     pub realm_id: String,
-    pub steps: Vec<QueueStep>,
-    /// An index into `steps`; the server's invariant checks `Number.isInteger`.
+    /// The queue's steps and blocks as written, top to bottom.
+    pub items: Vec<QueueItem>,
+    /// The id of the step being done, or started next, somewhere in `items`.
     pub current: u32,
     pub started_at: Option<f64>,
     pub r#loop: bool,
-    /// Step ids: counted up from `steps.length + 1` with `++` only.
+    /// Ids of steps and blocks, one id space: counted up with `++` only.
     pub next_step_id: u32,
+    /// Whether a step started since the queue last began from its top: a looping queue whose
+    /// pass started none ends, as a block's empty round does (`CONTEXT.md`: Repeat block).
+    #[serde(default, skip_serializing_if = "is_false")]
+    #[ts(as = "Option<bool>", optional)]
+    pub started: bool,
+}
+
+fn is_false(b: &bool) -> bool {
+    !*b
+}
+
+fn is_zero(n: &u32) -> bool {
+    *n == 0
+}
+
+/// One item of a queue: a step, or a repeat block of more.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(untagged)]
+pub enum QueueItem {
+    Step(QueueStep),
+    Repeat(RepeatBlock),
+}
+
+/// Some steps in a row done again and again (`CONTEXT.md`: Repeat block): a count of rounds, or
+/// forever. A round in which none of its steps could start ends it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct RepeatBlock {
+    pub id: u32,
+    pub repeat: Repeat,
+    pub items: Vec<QueueItem>,
+    /// The round being run, from 1, while the current step is inside the block; 0 (left out)
+    /// otherwise.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    #[ts(as = "Option<u32>", optional)]
+    pub round: u32,
+    /// Whether a step started in this round.
+    #[serde(default, skip_serializing_if = "is_false")]
+    #[ts(as = "Option<bool>", optional)]
+    pub started: bool,
+}
+
+/// How often a repeat block runs: a count of rounds, or `"forever"`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(untagged)]
+pub enum Repeat {
+    Times(u32),
+    Forever(Forever),
+}
+
+/// The literal `"forever"` of `Repeat`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+pub enum Forever {
+    #[serde(rename = "forever")]
+    Forever,
+}
+
+impl Repeat {
+    /// Whether another round follows round `round`.
+    pub fn more_after(self, round: u32) -> bool {
+        match self {
+            Repeat::Times(n) => round < n,
+            Repeat::Forever(_) => true,
+        }
+    }
+}
+
+impl Queue {
+    /// The steps top to bottom as written, each once whatever its blocks repeat.
+    pub fn steps(&self) -> Vec<&QueueStep> {
+        let mut out = Vec::new();
+        collect_steps(&self.items, &mut out);
+        out
+    }
+
+    /// The current step, if `current` names one.
+    pub fn current_step(&self) -> Option<&QueueStep> {
+        self.steps().into_iter().find(|s| s.id == self.current)
+    }
+
+    /// The current step's place among the steps top to bottom, from 0.
+    pub fn current_index(&self) -> Option<usize> {
+        self.steps().iter().position(|s| s.id == self.current)
+    }
+}
+
+fn collect_steps<'a>(items: &'a [QueueItem], out: &mut Vec<&'a QueueStep>) {
+    for item in items {
+        match item {
+            QueueItem::Step(s) => out.push(s),
+            QueueItem::Repeat(b) => collect_steps(&b.items, out),
+        }
+    }
 }
 
 /// One step of a queue.

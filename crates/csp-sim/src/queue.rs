@@ -1,11 +1,14 @@
-//! Queues (`CONTEXT.md`: Queue): which orders can be steps and how a step list is checked
-//! (`packages/shared/src/queue.ts`). Here rather than in `csp-shared` because the step check
-//! measures an order as `JSON.stringify` writes it, which `csp-lang`'s JavaScript helpers know.
+//! Queues (`CONTEXT.md`: Queue, Repeat block): which orders can be steps and how a queue's items
+//! are checked (`packages/shared/src/queue.ts`). Here rather than in `csp-shared` because the step
+//! check measures an order as `JSON.stringify` writes it, which `csp-lang`'s JavaScript helpers
+//! know.
 
 use csp_lang::js::{json_string, number_to_string, utf16_len};
-use csp_shared::balance::{QUEUE_MAX_STEPS, QUEUE_STEP_MAX_CHARS};
+use csp_shared::balance::{
+    QUEUE_MAX_DEPTH, QUEUE_MAX_REPEAT, QUEUE_MAX_STEPS, QUEUE_STEP_MAX_CHARS,
+};
 use csp_shared::protocol::BuildLine;
-use csp_shared::world::{BuildingKind, OrderRequest, Queue, Tile};
+use csp_shared::world::{BuildingKind, OrderRequest, Queue, Repeat, Tile};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ts_rs::TS;
@@ -85,6 +88,51 @@ pub fn step_line(order: &OrderRequest) -> Option<BuildLine> {
     Some(BuildLine { building, from, to })
 }
 
+/// A queue item as a request gives it: a repeat block of more, or a step. Told apart by `repeat`,
+/// as the planner's `isBlock` does.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(untagged)]
+pub enum QueueItemRequest {
+    Repeat(RepeatBlockRequest),
+    Step(QueueStepRequest),
+}
+
+/// A repeat block as a request gives it (`CONTEXT.md`: Repeat block): `id` names a block already
+/// in the queue being edited, which keeps its round.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct RepeatBlockRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub id: Option<u32>,
+    pub repeat: Repeat,
+    pub items: Vec<QueueItemRequest>,
+}
+
+impl QueueItemRequest {
+    pub fn id(&self) -> Option<u32> {
+        match self {
+            QueueItemRequest::Repeat(b) => b.id,
+            QueueItemRequest::Step(s) => s.id,
+        }
+    }
+}
+
+/// The steps among `items`, top to bottom.
+pub fn request_steps(items: &[QueueItemRequest]) -> Vec<&QueueStepRequest> {
+    fn walk<'a>(items: &'a [QueueItemRequest], out: &mut Vec<&'a QueueStepRequest>) {
+        for item in items {
+            match item {
+                QueueItemRequest::Step(s) => out.push(s),
+                QueueItemRequest::Repeat(b) => walk(&b.items, out),
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(items, &mut out);
+    out
+}
+
 /// A queue step as a request gives it (`QueueStepRequest`): `id` names a step already in the
 /// queue being edited.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -124,19 +172,91 @@ pub fn json_length(v: &Value) -> usize {
     }
 }
 
-/// Why a list of queue steps can't be given, if it can't (`queueStepsProblem`): each must be an
-/// order a step can be (`QUEUE_STEP_KINDS`), at most `QUEUE_MAX_STEPS` of them, with a duration
-/// in whole game minutes if any; one that never ends needs a duration unless it is the last. A
-/// Build line step carries its whole line (`step_line`) and ends on its own once the line is
-/// built or laid out. Takes the steps as the request sent them, any JSON.
-pub fn queue_steps_problem(steps: Option<&Value>) -> Option<String> {
-    let Some(Value::Array(steps)) = steps else {
+/// A step of a request's items as `walk_items` finds it: its JSON, and whether a block around it
+/// repeats it.
+struct WalkedStep<'a> {
+    step: &'a Value,
+    repeated: bool,
+}
+
+/// Walks a request's items (`CONTEXT.md`: Repeat block): counts steps and blocks as written,
+/// collects the steps top to bottom, and notes the first block that is malformed or nests too
+/// deep.
+fn walk_items<'a>(
+    items: &'a [Value],
+    depth: u32,
+    repeated: bool,
+    count: &mut usize,
+    steps: &mut Vec<WalkedStep<'a>>,
+    problem: &mut Option<String>,
+) {
+    for item in items {
+        *count += 1;
+        let block = item.as_object().filter(|o| o.contains_key("repeat"));
+        let Some(block) = block else {
+            steps.push(WalkedStep { step: item, repeated });
+            continue;
+        };
+        let mut set = |p: String| {
+            if problem.is_none() {
+                *problem = Some(p);
+            }
+        };
+        if f64::from(depth + 1) > QUEUE_MAX_DEPTH {
+            set(format!("blocks nest at most {} deep", number_to_string(QUEUE_MAX_DEPTH)));
+        }
+        if block.keys().any(|k| !["id", "repeat", "items"].contains(&k.as_str())) {
+            set("a repeat block holds only its id, count and items".into());
+        }
+        let repeat = block.get("repeat");
+        let once = repeat.and_then(Value::as_f64) == Some(1.0);
+        let count_ok = match repeat {
+            Some(Value::String(s)) => s == "forever",
+            Some(v) => v
+                .as_f64()
+                .is_some_and(|n| n.fract() == 0.0 && (1.0..=QUEUE_MAX_REPEAT).contains(&n)),
+            None => false,
+        };
+        if !count_ok {
+            set(format!(
+                "a repeat block repeats from 1 to {} times, or forever",
+                number_to_string(QUEUE_MAX_REPEAT)
+            ));
+        }
+        match block.get("items") {
+            Some(Value::Array(inner)) if !inner.is_empty() => {
+                walk_items(inner, depth + 1, repeated || !once, count, steps, problem);
+            }
+            _ => set("a repeat block needs a step".into()),
+        }
+    }
+}
+
+/// Why a queue's items can't be given, if they can't (`queueStepsProblem`, `CONTEXT.md`: Repeat
+/// block): steps and repeat blocks, at most `QUEUE_MAX_STEPS` of them as written, blocks nested at
+/// most `QUEUE_MAX_DEPTH` deep, each repeating a whole number of times up to `QUEUE_MAX_REPEAT` or
+/// forever, never empty. Each step must be an order a step can be (`QUEUE_STEP_KINDS`), with a
+/// duration in whole game minutes if any; one that never ends needs a duration unless it is the
+/// last step and no block around it repeats it. A Build line step carries its whole line
+/// (`step_line`) and ends on its own once the line is built or laid out. Steps are numbered top
+/// to bottom. Takes the items as the request sent them, any JSON.
+pub fn queue_steps_problem(items: Option<&Value>) -> Option<String> {
+    let Some(Value::Array(items)) = items else {
         return Some("the steps must be a list".into());
     };
-    if steps.len() as f64 > QUEUE_MAX_STEPS {
-        return Some(format!("a queue holds at most {} steps", number_to_string(QUEUE_MAX_STEPS)));
+    let (mut count, mut steps, mut problem) = (0, Vec::new(), None);
+    walk_items(items, 0, false, &mut count, &mut steps, &mut problem);
+    if count as f64 > QUEUE_MAX_STEPS {
+        return Some(format!(
+            "a queue holds at most {} steps and blocks",
+            number_to_string(QUEUE_MAX_STEPS)
+        ));
     }
-    for (i, step) in steps.iter().enumerate() {
+    if problem.is_some() {
+        return problem;
+    }
+    let total = steps.len();
+    for (i, WalkedStep { step, repeated }) in steps.into_iter().enumerate() {
         let n = i + 1;
         let order = step.as_object().and_then(|s| s.get("order"));
         let Some(Value::Object(fields)) = order else {
@@ -169,7 +289,7 @@ pub fn queue_steps_problem(steps: Option<&Value>) -> Option<String> {
                 _ => return Some(format!("step {n}'s duration must be a whole number of minutes")),
             },
         };
-        if minutes.is_none() && never_ends(&order) && n < steps.len() {
+        if minutes.is_none() && never_ends(&order) && (n < total || repeated) {
             return Some(format!(
                 "step {n} never ends on its own: give it a duration or make it the last"
             ));
@@ -223,12 +343,15 @@ pub struct QueueView {
     pub started_at: Option<f64>,
 }
 
-/// What a script sees of a queue (`queueView`).
+/// What a script sees of a queue (`queueView`): the current step and its number among the steps
+/// top to bottom, as written. Blocks and rounds it doesn't see (ADR 0032).
 pub fn queue_view(q: &Queue) -> QueueView {
-    let step = &q.steps[q.current as usize];
+    let steps = q.steps();
+    let at = q.current_index().unwrap_or(0);
+    let step = steps[at];
     QueueView {
-        step: q.current + 1,
-        steps: q.steps.len(),
+        step: at as u32 + 1,
+        steps: steps.len(),
         r#loop: q.r#loop,
         kind: step.order.kind.clone(),
         task: field_str(&step.order, "task").map(str::to_string),
@@ -263,7 +386,7 @@ mod tests {
         let many: Vec<_> = (0..51).map(|_| walk.clone()).collect();
         assert_eq!(
             queue_steps_problem(Some(&Value::Array(many))).as_deref(),
-            Some("a queue holds at most 50 steps")
+            Some("a queue holds at most 50 steps and blocks")
         );
         assert_eq!(
             queue_steps_problem(Some(&json!([{ "order": { "kind": "workAt" } }, walk.clone()])))

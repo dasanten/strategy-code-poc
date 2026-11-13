@@ -1,24 +1,31 @@
-import { QUEUE_DEFAULT_STEP_MINUTES, QUEUE_MAX_STEPS } from '@csp/balance'
+import {
+  QUEUE_DEFAULT_STEP_MINUTES,
+  QUEUE_MAX_DEPTH,
+  QUEUE_MAX_REPEAT,
+  QUEUE_MAX_STEPS,
+} from '@csp/balance'
 import { queueStepsProblem } from './shared/queue.js'
 import type { OrderRequest, Queue, QueueStepRequest } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
   canMove,
   capProblem,
+  depthOf,
   dropItem,
   idsOf,
   insertItems,
+  itemCount,
   lastPicked,
   moveItem,
   planProblem,
   planRows,
+  planSteps,
   removeItem,
   setRepeat,
   stepCount,
   timedItems,
   timeItem,
   topPicked,
-  unroll,
   unwrap,
   withIds,
   wrap,
@@ -26,7 +33,7 @@ import {
 } from './plan-blocks.js'
 import { editPlan, givePlan, planOf } from './queue-view.js'
 
-/** Repeat blocks (`CONTEXT.md`: Repeat block): wrapped steps, unrolled when the queue is given. */
+/** Repeat blocks (`CONTEXT.md`: Repeat block, ADR 0032): wrapped steps the queue keeps as blocks. */
 
 const walk = (x: number, y: number): OrderRequest => ({ kind: 'walkTo', x, y })
 const work: OrderRequest = { kind: 'task', task: 'work', workplaceId: 'm1' }
@@ -40,26 +47,17 @@ const run: (QueueStepRequest & { id: number })[] = [
   { id: 4, order: store },
 ]
 
-const orders = (steps: readonly { order: OrderRequest }[]) => steps.map((s) => s.order)
-
-describe('unrolling', () => {
-  it('makes a block that many plain copies of its steps, in a row', () => {
-    const plan = wrap(run, [3, 4], 5)!
-    expect(stepCount(plan)).toBe(12)
-    const steps = unroll(plan)
-    expect(steps).toHaveLength(12)
-    expect(orders(steps.slice(2, 6))).toEqual([walk(9, 3), store, walk(9, 3), store])
-    // Steps only: no block reaches the queue.
-    expect(steps.every((s) => 'order' in s && !('repeat' in s))).toBe(true)
-    expect(queueStepsProblem(steps)).toBeUndefined()
+describe('blocks as written', () => {
+  it('keeps a block as one, its steps once, whatever it repeats', () => {
+    const plan = wrap(run, [3, 4], 100)!
+    expect(stepCount(plan)).toBe(4)
+    expect(itemCount(plan)).toBe(5)
+    expect(planSteps(plan).map((s) => s.id)).toEqual([1, 2, 3, 4])
+    // The server takes the block as it is.
+    expect(queueStepsProblem(plan)).toBeUndefined()
   })
 
-  it('keeps ids on the first copy only, so whoever keeps the queue numbers the rest', () => {
-    const steps = unroll(wrap(run, [1, 2], 3)!)
-    expect(steps.map((s) => s.id)).toEqual([1, 2, undefined, undefined, undefined, undefined, 3, 4])
-  })
-
-  it('unrolls nested blocks, inner ones each time round the outer', () => {
+  it('nests blocks, and counts how deep', () => {
     // (walk, (work) x2, walk home) x3, store.
     const inner = withIds(wrap(run, [2], 2)!, 5).items
     const outer = withIds(wrap(inner, [1, 5, 3], 3)!, 6).items
@@ -71,38 +69,23 @@ describe('unrolling', () => {
       ['step', 1],
       ['step', 0],
     ])
-    expect(stepCount(outer)).toBe(3 * (1 + 2 + 1) + 1)
-    expect(orders(unroll(outer).slice(0, 5))).toEqual([
-      walk(30, 4),
-      work,
-      work,
-      walk(9, 3),
-      walk(30, 4),
-    ])
-    expect(orders(unroll(outer)).at(-1)).toEqual(store)
-  })
-
-  it('a block repeated once is its steps, and copies share nothing', () => {
-    const once = setRepeat(withIds(wrap(run, [1, 2])!, 5).items, 5, 1)
-    expect(unroll(once)).toEqual(run)
-    const steps = unroll(withIds(wrap(run, [1])!, 5).items)
-    steps[1]!.order.x = 99
-    expect(steps[0]!.order.x).toBe(30)
-    expect(run[0]!.order).toEqual(walk(30, 4))
+    expect(depthOf(outer)).toBe(2)
+    expect(itemCount(outer)).toBe(6)
   })
 
   it('gives work repeated after itself a duration, as a step followed by another', () => {
     const plan: PlanItem[] = [{ repeat: 3, items: [{ order: work }] }]
-    const steps = unroll(plan)
-    expect(steps.map((s) => s.minutes)).toEqual([
-      QUEUE_DEFAULT_STEP_MINUTES,
-      QUEUE_DEFAULT_STEP_MINUTES,
-      undefined,
-    ])
-    expect(queueStepsProblem(steps)).toBeUndefined()
-    // The planner shows it too: only the very last step may go without one.
-    expect(timedItems(plan)).toEqual([
+    expect(queueStepsProblem(plan)).toBe(
+      'step 1 never ends on its own: give it a duration or make it the last',
+    )
+    // The planner gives it one: only the very last step may go without.
+    const timed = timedItems(plan)
+    expect(timed).toEqual([
       { repeat: 3, items: [{ order: work, minutes: QUEUE_DEFAULT_STEP_MINUTES }] },
+    ])
+    expect(queueStepsProblem(timed)).toBeUndefined()
+    expect(timedItems([{ repeat: 'forever', items: [{ order: work }] }])).toEqual([
+      { repeat: 'forever', items: [{ order: work, minutes: QUEUE_DEFAULT_STEP_MINUTES }] },
     ])
     expect(timedItems([{ order: walk(1, 1) }, { order: work }])).toEqual([
       { order: walk(1, 1) },
@@ -112,18 +95,36 @@ describe('unrolling', () => {
 })
 
 describe('the cap', () => {
-  it('counts the steps after repeats against what a queue holds, saying by how much', () => {
-    const fits: PlanItem[] = [{ repeat: QUEUE_MAX_STEPS / 2, items: run.slice(2) }]
-    expect(stepCount(fits)).toBe(QUEUE_MAX_STEPS)
+  it('counts steps and blocks as written against what a queue holds, saying by how much', () => {
+    const steps = (n: number): PlanItem[] =>
+      Array.from({ length: n }, (_, i) => ({ order: walk(i, 1) }))
+    // A block of many rounds counts once.
+    const fits: PlanItem[] = [{ repeat: QUEUE_MAX_REPEAT, items: steps(QUEUE_MAX_STEPS - 1) }]
+    expect(itemCount(fits)).toBe(QUEUE_MAX_STEPS)
     expect(capProblem(fits)).toBeUndefined()
     expect(planProblem(fits)).toBeUndefined()
-    const over: PlanItem[] = [...fits, { order: walk(1, 1) }, { order: walk(2, 2) }]
+    const over: PlanItem[] = [...fits, ...steps(2)]
     expect(capProblem(over)).toBe(
-      `${QUEUE_MAX_STEPS + 2} steps after repeats, 2 more than a queue holds (${QUEUE_MAX_STEPS})`,
+      `${QUEUE_MAX_STEPS + 2} steps and blocks, 2 more than a queue holds (${QUEUE_MAX_STEPS})`,
     )
     expect(planProblem(over)).toBe(capProblem(over))
-    // Unrolled, the server would refuse it just so.
-    expect(queueStepsProblem(unroll(over))).toBe(`a queue holds at most ${QUEUE_MAX_STEPS} steps`)
+    // The server would refuse it just so.
+    expect(queueStepsProblem(over)).toBe(
+      `a queue holds at most ${QUEUE_MAX_STEPS} steps and blocks`,
+    )
+  })
+
+  it('refuses blocks nested too deep, a count out of range and an empty block', () => {
+    let deep: PlanItem[] = [{ order: walk(1, 1) }]
+    for (let i = 0; i <= QUEUE_MAX_DEPTH; i++) deep = [{ repeat: 2, items: deep }]
+    expect(capProblem(deep)).toBe(
+      `blocks nested ${QUEUE_MAX_DEPTH + 1} deep, deeper than a queue allows (${QUEUE_MAX_DEPTH})`,
+    )
+    expect(queueStepsProblem(deep)).toBe(`blocks nest at most ${QUEUE_MAX_DEPTH} deep`)
+    const count = `a repeat block repeats from 1 to ${QUEUE_MAX_REPEAT} times, or forever`
+    expect(queueStepsProblem([{ repeat: 0, items: [{ order: walk(1, 1) }] }])).toBe(count)
+    expect(queueStepsProblem([{ repeat: 'always', items: [{ order: walk(1, 1) }] }])).toBe(count)
+    expect(queueStepsProblem([{ repeat: 2, items: [] }])).toBe('a repeat block needs a step')
   })
 
   it('refuses an empty plan, and one a step of which the server would refuse', () => {
@@ -165,9 +166,14 @@ describe('editing blocks', () => {
     expect(unwrap(plan, 5)).toEqual(run)
   })
 
-  it('sets the count, at least once', () => {
-    expect(stepCount(setRepeat(plan, 5, 4))).toBe(2 + 8)
-    expect(stepCount(setRepeat(plan, 5, 0))).toBe(2 + 2)
+  it('sets the count, at least once and at most the cap, or forever', () => {
+    const block = (items: PlanItem[]) => items.find((i) => i.id === 5)
+    expect(block(setRepeat(plan, 5, 4))).toMatchObject({ repeat: 4 })
+    expect(block(setRepeat(plan, 5, 0))).toMatchObject({ repeat: 1 })
+    expect(block(setRepeat(plan, 5, QUEUE_MAX_REPEAT + 1))).toMatchObject({
+      repeat: QUEUE_MAX_REPEAT,
+    })
+    expect(block(setRepeat(plan, 5, 'forever'))).toMatchObject({ repeat: 'forever' })
   })
 
   it('moves a block and a step within their own list', () => {
@@ -195,7 +201,11 @@ describe('editing blocks', () => {
 
   it('times a step inside a block', () => {
     const timed = timeItem(plan, 3, 15)
-    expect(unroll(timed).filter((s) => s.minutes === 15)).toHaveLength(2)
+    expect(
+      planSteps(timed)
+        .filter((s) => s.minutes === 15)
+        .map((s) => s.id),
+    ).toEqual([3])
   })
 
   it('pastes after the last picked item, into its list, or at the end', () => {
@@ -227,15 +237,15 @@ describe('giving a resident a plan', () => {
   /** A running queue of the run: ids 1 to 4, on the work step. */
   const queue: Queue = {
     realmId: 'r1',
-    steps: run,
-    current: 1,
+    items: run,
+    current: 2,
     startedAt: 0,
     loop: false,
     nextStepId: 5,
   }
   const r = { id: 'w1', queue }
 
-  it('edits the queue to the steps unrolled, keeping the ones it has', () => {
+  it('edits the queue to the plan, its blocks as they are, keeping the steps it has', () => {
     // Repeat x5 the walk home and store, as the epic plans it.
     const plan = editPlan(
       planOf(queue),
@@ -243,11 +253,32 @@ describe('giving a resident a plan', () => {
     )
     const order = givePlan(r, plan)
     expect(order.kind).toBe('editQueue')
-    const steps = order.steps as { id?: number; order: OrderRequest }[]
-    expect(steps).toHaveLength(2 + 10)
-    // The current step (2) keeps its id, so it keeps going; the copies get new ones from the server.
-    expect(steps.map((s) => s.id)).toEqual([1, 2, 3, 4, ...Array(8).fill(undefined)])
-    expect(queueStepsProblem(steps)).toBeUndefined()
+    // The current step (2) keeps its id, so it keeps going; the block is new, so it has none.
+    expect(order.steps).toEqual([
+      { id: 1, order: walk(30, 4) },
+      { id: 2, order: work, minutes: 60 },
+      {
+        repeat: 5,
+        items: [
+          { id: 3, order: walk(9, 3) },
+          { id: 4, order: store },
+        ],
+      },
+    ])
+    expect(queueStepsProblem(order.steps)).toBeUndefined()
+  })
+
+  it('keeps a block the queue has by its id, so it keeps its round', () => {
+    const withBlock: Queue = {
+      ...queue,
+      items: [run[0]!, { id: 5, repeat: 3, round: 2, items: [run[1]!] }],
+      nextStepId: 6,
+    }
+    const order = givePlan({ id: 'w1', queue: withBlock }, planOf(withBlock))
+    expect(order.steps).toEqual([
+      { id: 1, order: walk(30, 4) },
+      { id: 5, repeat: 3, items: [{ id: 2, order: work, minutes: 60 }] },
+    ])
   })
 
   it('drops ids the queue has no longer, and starts a queue when it has ended', () => {
@@ -263,14 +294,11 @@ describe('giving a resident a plan', () => {
         },
       ],
     }
-    expect((givePlan(r, plan).steps as { id?: number }[]).map((s) => s.id)).toEqual([
-      2,
-      undefined,
-      undefined,
-      undefined,
+    expect(givePlan(r, plan).steps).toEqual([
+      { repeat: 2, items: [{ id: 2, order: work }, { order: store }] },
     ])
     const ended = givePlan({ id: 'w1' }, plan)
     expect(ended).toMatchObject({ kind: 'queue', residentId: 'w1' })
-    expect((ended.steps as { id?: number }[]).every((s) => s.id === undefined)).toBe(true)
+    expect(ended.steps).toEqual([{ repeat: 2, items: [{ order: work }, { order: store }] }])
   })
 })

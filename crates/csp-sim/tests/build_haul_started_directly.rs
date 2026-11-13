@@ -246,7 +246,7 @@ mod build {
         );
         s.until(100, |s| s.building("w2").as_deref() == Some("fs"));
         assert_eq!(s.building("w2").as_deref(), Some("fs"));
-        assert_eq!(s.r("w2").queue.as_ref().unwrap().current, 1);
+        assert_eq!(s.r("w2").queue.as_ref().unwrap().current_index(), Some(1));
         assert_eq!(s.stopped(), Vec::<String>::new());
     }
 

@@ -1,8 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { CHILD_GOODS } from './shared/narrowed.js'
 import { GOODS } from './shared/world.js'
-import { QUEUE_DEFAULT_STEP_MINUTES } from '@csp/balance'
-import { QUEUE_STEP_KINDS, neverEnds, stepLine } from './shared/queue.js'
+import { QUEUE_STEP_KINDS, neverEnds, queueSteps, stepLine } from './shared/queue.js'
 import { TICKS_PER_GAME_HOUR } from './shared/time.js'
 import { canWork } from './shared/stats.js'
 import { isVesselId } from './shared/vessels.js'
@@ -15,6 +14,7 @@ import type {
   Good,
   OrderRequest,
   Queue,
+  QueueItem,
   QueueStep,
   QueueStepRequest,
   Resident,
@@ -25,10 +25,11 @@ import { BUILDING_NAMES } from './city-view.js'
 import { GOOD_LABELS, subjectLabel } from './Residents.js'
 import { gonePlace } from './saved-queues.js'
 import {
-  hasBlocks,
+  find,
   insertItems,
+  isBlock,
+  planSteps,
   timedItems,
-  unroll,
   withIds,
   type PlanItem,
 } from './plan-blocks.js'
@@ -76,8 +77,8 @@ export function appendRequest(
   at: Tile = { x: r.x, y: r.y },
 ): OrderRequest | undefined {
   if (!QUEUE_STEP_KINDS.includes(order.kind)) return undefined
-  const before: QueueStepRequest[] = r.queue
-    ? stepsOf(r.queue)
+  const before: PlanItem[] = r.queue
+    ? itemsOf(r.queue)
     : r.order?.kind === 'walkTo' && !r.script
       ? [{ order: { kind: 'walkTo', ...r.order.target } }]
       : []
@@ -88,11 +89,11 @@ export function appendRequest(
 }
 
 /**
- * The steps with `order` added last, after a walk to `at` when it acts on its tile and the step
- * before doesn't already walk there; a step that never ends gets a duration once another follows.
+ * The items with `order` added last, after a walk to `at` when it acts on its tile and the last
+ * step doesn't already walk there; a step that never ends gets a duration once another follows.
  */
-function withStep(before: QueueStepRequest[], order: OrderRequest, at: Tile | undefined) {
-  return timed([...before, ...stepsAfter(before.at(-1), order, at)])
+function withStep(before: PlanItem[], order: OrderRequest, at: Tile | undefined) {
+  return timedItems([...before, ...stepsAfter(planSteps(before).at(-1), order, at)])
 }
 
 /**
@@ -188,7 +189,7 @@ export function planStep(
 /** The step a step inserted after `after` (or at the end) follows: the last one up to there. */
 function stepBefore(items: readonly PlanItem[], after: number | undefined) {
   const mark = -1
-  const marked = unroll(insertItems(items, after, [{ id: mark, order: { kind: 'dismount' } }]))
+  const marked = planSteps(insertItems(items, after, [{ id: mark, order: { kind: 'dismount' } }]))
   return marked[marked.findIndex((s) => s.id === mark) - 1]
 }
 
@@ -206,9 +207,8 @@ export function draftFor(
 
 /**
  * The draft an edit of a resident's planner with no draft open (a paste, a load, steps wrapped in
- * a repeat block) makes, or none when it edits the running queue live: a resident with no queue
- * gets a draft, and so does a running queue once a repeat block is in it, which only Start queue
- * can give.
+ * a repeat block) makes, or none when it edits the running queue live: only a resident with no
+ * queue gets a draft. A running queue takes repeat blocks as they are (ADR 0032).
  */
 export function draftEdit(
   r: Partial<Pick<Resident, 'queue'>>,
@@ -216,7 +216,6 @@ export function draftEdit(
   loop?: boolean,
 ): QueuePlan | undefined {
   if (!r.queue) return editPlan(EMPTY_PLAN, items, loop)
-  if (hasBlocks(items)) return editPlan(planOf(r.queue), items, loop)
   return undefined
 }
 
@@ -227,24 +226,22 @@ export function draftEdit(
  */
 export function clearedItems(items: readonly PlanItem[], currentId?: number): PlanItem[] {
   if (currentId === undefined) return []
-  return unroll(items).filter((s) => s.id === currentId)
+  const step = find(items, currentId)
+  return step && !isBlock(step) ? [step] : []
 }
 
-/** A resident's queue as a plan: Edit as draft, or wrapping its steps in a repeat block. */
-export function planOf(q: Pick<Queue, 'steps' | 'loop' | 'nextStepId'>): QueuePlan {
-  return { items: stepsOf(q), loop: q.loop, nextStepId: q.nextStepId }
+/** A resident's queue as a plan: Edit as draft, and the running queue's planner. */
+export function planOf(q: Pick<Queue, 'items' | 'loop' | 'nextStepId'>): QueuePlan {
+  return { items: itemsOf(q), loop: q.loop, nextStepId: q.nextStepId }
 }
 
 /**
- * Give to all: each member's queue becomes a copy of the plan unrolled, one `queue` request each,
- * ending what they do. A member who can't do a step gets it anyway and skips it when its turn
- * comes.
+ * Give to all: each member's queue becomes a copy of the plan, its repeat blocks as they are, one
+ * `queue` request each, ending what they do. A member who can't do a step gets it anyway and
+ * skips it when its turn comes.
  */
 export function giveToAll(plan: QueuePlan, residents: readonly Pick<Resident, 'id'>[]) {
-  const steps = unroll(plan.items).map(({ order, minutes }) => ({
-    order,
-    ...(minutes === undefined ? {} : { minutes }),
-  }))
+  const steps = keepIds(plan.items, new Set())
   return residents.map((r): OrderRequest => ({
     kind: 'queue',
     residentId: r.id,
@@ -254,39 +251,59 @@ export function giveToAll(plan: QueuePlan, residents: readonly Pick<Resident, 'i
 }
 
 /**
- * The order giving a resident the plan, unrolled: an edit of the queue they work through, keeping
- * the steps it still has (the current one keeps going), or a new queue when it has ended since.
+ * The order giving a resident the plan, its repeat blocks as they are: an edit of the queue they
+ * work through, keeping the steps and blocks it still has (the current step keeps going, each
+ * block its round), or a new queue when it has ended since.
  */
 export function givePlan(
   r: Pick<Resident, 'id'> & Partial<Pick<Resident, 'queue'>>,
   plan: Pick<QueuePlan, 'items'> & { loop?: boolean },
 ): OrderRequest {
-  const kept = new Set(r.queue?.steps.map((s) => s.id))
-  const steps = unroll(plan.items).map((s) => {
-    if (s.id === undefined || kept.has(s.id)) return s
-    const fresh = { ...s }
-    delete fresh.id
-    return fresh
+  const kept = new Set(r.queue ? idsOfQueue(r.queue.items) : [])
+  return queueRequest(r, keepIds(plan.items, kept), plan.loop)
+}
+
+/** The items with the ids in `kept` and no others: a step or block new to the queue has none. */
+function keepIds(items: readonly PlanItem[], kept: ReadonlySet<number>): PlanItem[] {
+  return items.map((item): PlanItem => {
+    const id = item.id !== undefined && kept.has(item.id) ? { id: item.id } : {}
+    if (isBlock(item)) return { ...id, repeat: item.repeat, items: keepIds(item.items, kept) }
+    const minutes = item.minutes === undefined ? {} : { minutes: item.minutes }
+    return { ...id, order: item.order, ...minutes }
   })
-  return queueRequest(r, steps, plan.loop)
 }
 
-/** The queue's steps as an edit-queue request keeps them: each by its id. */
-export function stepsOf(q: Pick<Queue, 'steps'>): QueueStepRequest[] {
-  return q.steps.map((s) => ({
-    id: s.id,
-    order: s.order,
-    ...(s.minutes === undefined ? {} : { minutes: s.minutes }),
-  }))
+/** Every id in a queue's items, steps and blocks. */
+function idsOfQueue(items: readonly QueueItem[]): number[] {
+  return items.flatMap((item) => [item.id, ...('repeat' in item ? idsOfQueue(item.items) : [])])
 }
 
-/** The steps with every one that never ends on its own, and isn't last, given a duration. */
-function timed(steps: QueueStepRequest[]): QueueStepRequest[] {
-  return steps.map((s, i) =>
-    s.minutes === undefined && neverEnds(s.order) && i < steps.length - 1
-      ? { ...s, minutes: QUEUE_DEFAULT_STEP_MINUTES }
-      : s,
-  )
+/**
+ * The queue's items as an edit-queue request keeps them: each step and block by its id, without
+ * the rounds the server counts.
+ */
+export function itemsOf(q: Pick<Queue, 'items'>): PlanItem[] {
+  const keep = (items: readonly QueueItem[]): PlanItem[] =>
+    items.map((item) => {
+      if ('repeat' in item) return { id: item.id, repeat: item.repeat, items: keep(item.items) }
+      const minutes = item.minutes === undefined ? {} : { minutes: item.minutes }
+      return { id: item.id, order: item.order, ...minutes }
+    })
+  return keep(q.items)
+}
+
+/** The round each block around the current step is on, by block id; other blocks run none. */
+export function roundsOf(q: Pick<Queue, 'items'>): Map<number, number> {
+  const out = new Map<number, number>()
+  const walk = (items: readonly QueueItem[]) => {
+    for (const item of items) {
+      if (!('repeat' in item)) continue
+      if (item.round) out.set(item.id, item.round)
+      walk(item.items)
+    }
+  }
+  walk(q.items)
+  return out
 }
 
 /** Orders that act on the tile they are given for (by the card, their own): they only start there. */
@@ -320,7 +337,7 @@ function withoutResident(order: OrderRequest): OrderRequest {
  */
 export function queueRequest(
   r: Pick<Resident, 'id'> & Partial<Pick<Resident, 'queue'>>,
-  steps: QueueStepRequest[],
+  steps: PlanItem[],
   loop?: boolean,
 ): OrderRequest {
   if (r.queue) return editRequest(r, steps, loop)
@@ -330,7 +347,7 @@ export function queueRequest(
 /** The order editing the resident's queue to these steps. */
 export function editRequest(
   r: Pick<Resident, 'id'>,
-  steps: QueueStepRequest[],
+  steps: PlanItem[],
   loop?: boolean,
 ): OrderRequest {
   return { kind: 'editQueue', residentId: r.id, steps, ...(loop === undefined ? {} : { loop }) }
@@ -416,8 +433,8 @@ export interface StepNames {
  * place is gone from the map is flagged (`gonePlace`), as a saved queue's step loaded after its
  * workplace was torn down.
  */
-export function queueRows(q: Pick<Queue, 'steps' | 'current'>, names: StepNames = {}): QueueRow[] {
-  return q.steps.map((s, i) => stepRow(s, i === q.current, names))
+export function queueRows(q: Pick<Queue, 'items' | 'current'>, names: StepNames = {}): QueueRow[] {
+  return queueSteps(q.items).map((s) => stepRow(s, s.id === q.current, names))
 }
 
 /** One step as the card lists it, in a queue or a plan's repeat block. */

@@ -112,8 +112,7 @@ function isItem(s: unknown): s is PlanItem {
   if (isObject(s) && 'repeat' in s) {
     const { repeat, items } = s
     return (
-      Number.isInteger(repeat) &&
-      (repeat as number) >= 1 &&
+      (repeat === 'forever' || (Number.isInteger(repeat) && (repeat as number) >= 1)) &&
       Array.isArray(items) &&
       items.length > 0 &&
       items.every(isItem)
