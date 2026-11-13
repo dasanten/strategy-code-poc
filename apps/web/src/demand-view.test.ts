@@ -434,7 +434,7 @@ describe('the Demands drawer', () => {
     const html = panel([])
     expect(html).toContain('Ashby (NPC city)')
     expect(html).toContain('The Trade Organization')
-    expect(html).toContain('answers within a game hour')
+    expect(html).toContain('until then it wavers')
     const sent = panel([
       demand('a', 'r1', 'n1', {
         to: { realmId: 'n1', realm: 'Ashby', city: true },
@@ -442,8 +442,17 @@ describe('the Demands drawer', () => {
       }),
     ])
     expect(sent).toContain('Ashby, to join you')
-    expect(sent).toContain('The answer comes within a game hour.')
+    expect(sent).toContain('wavering: the time starts again from nothing')
     expect(sent).not.toContain('Lapses in')
+    const wavering = panel([
+      demand('a', 'r1', 'n1', {
+        to: { realmId: 'n1', realm: 'Ashby', city: true },
+        terms: { kind: 'city', cityId: 'n1', cityName: 'Ashby' },
+        deadline: 9000,
+        wavering: 600,
+      }),
+    ])
+    expect(wavering).toContain('Ashby is wavering: it gives in after')
   })
 
   it('offers no Transfer once the HQ has fallen', () => {
