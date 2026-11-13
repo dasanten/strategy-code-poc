@@ -33,7 +33,8 @@ ts-rs.workspace = true
 axum = { version = "0.8", features = ["ws"] }
 tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "time", "signal", "sync", "fs"] }
 tower = { version = "0.5", features = ["util"] }
-tower-http = { version = "0.6", features = ["fs"] }
+# The server compresses its own API responses (ADR 0034): Caddy leaves binary types alone.
+tower-http = { version = "0.6", features = ["fs", "compression-gzip", "compression-zstd"] }
 # The machine line of the benchmarks (`machineLine`): CPU model and memory.
 sysinfo = { version = "0.37", default-features = false, features = ["system"] }
 # `bench-sim save` reads a copy of the database.
@@ -49,6 +50,9 @@ serde_json.workspace = true
 [dev-dependencies]
 tokio-tungstenite = "0.27"
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
+# Decoding the compressed responses in the tests.
+flate2 = "1"
+zstd = "0.13"
 
 [lints]
 workspace = true

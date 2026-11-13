@@ -104,6 +104,17 @@ Player remembers nothing out of sight either way.
 | Welcome: the rest           | 1.1 KB                    | 1.1 KB                            |
 | `map-stats` / `explore` run | 0.3 s                     | 2.3 s; `explore --all` 1.8 s      |
 
+### T99.2: terrain responses travel compressed
+
+Measured on 2026-11-12 through the server's own router (`CompressionLayer` at its default levels),
+on the full map generated from seed 1 with one Player who explored all of it, asking for every chunk
+in batches of 64. Not checked in a browser's Network tab.
+
+| What                         | Before (uncompressed) | After, gzip                | After, zstd                |
+| ---------------------------- | --------------------- | -------------------------- | -------------------------- |
+| The whole map at full detail | 32,400 chunks, 32 MB  | 0.43 MB (77 times smaller) | 0.45 MB (75 times smaller) |
+| A batch of 64 chunks         | 64.5 KB               | 0.7 KB                     | 0.8 KB                     |
+
 ### T99.5: coarse levels for the minimap (2026-11-13)
 
 The staged Player (`explore --all`) with the minimap open, counted from the code rather than in

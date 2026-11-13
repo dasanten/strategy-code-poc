@@ -363,6 +363,20 @@ async fn refuses_a_socket_from_another_origin_and_takes_the_allowed_ones_and_its
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn upgrades_a_socket_whose_request_accepts_compressed_responses() {
+    // A browser sends `Accept-Encoding` on the upgrade too; the API's compression leaves it alone.
+    let s = start(StartOptions::default()).await;
+    let mut req = s.url.as_str().into_client_request().unwrap();
+    req.headers_mut().insert("cookie", format!("csp_session={}", s.token).parse().unwrap());
+    req.headers_mut().insert("accept-encoding", "gzip, deflate, br, zstd".parse().unwrap());
+    let (socket, res) = tokio_tungstenite::connect_async(req).await.unwrap();
+    assert_eq!(res.status().as_u16(), 101);
+    assert!(res.headers().get("content-encoding").is_none());
+    let mut client = Client { socket, got: Vec::new(), closed: None };
+    client.next("welcome").await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn lets_a_socket_without_an_origin_in_only_where_the_policy_allows_it() {
     let strict = start(StartOptions {
         origins: Origins { allowed: vec![], allow_missing: false },
