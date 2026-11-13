@@ -1,0 +1,5 @@
+# Link with LLVM's linker on Windows. It ships with the Rust toolchain, so cargo works from Git Bash
+# too (where `/usr/bin/link` shadows MSVC's `link.exe`), and it links the test binaries a little
+# faster. Linux (CI, Docker) keeps its default.
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld.exe"

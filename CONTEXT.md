@@ -1290,7 +1290,9 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
 - **Haul route by water:** the Haul route with a vessel: a ship between two havens, its captain
   loading at the first, sailing, unloading at the second and coming back while the rest of the
   crew stays aboard; a boat with havens or shore tiles as stops, loading at a shore from the pile
-  beside it. Until it ships (Epic 91) rowing is a hand or script order.
+  beside it. Boats have haul routes now (T91.5): the rower starts on the shore beside the boat,
+  gets off at each stop to load and unload it by hand from beside it, then boards and rows on.
+  A ship's haul route comes with T91.4.
 - **Ship:** a big sailed vessel, built at a haven, carrying far more than a carriage. It sails
   only on Sea, needs a crew of several residents, and docks only at a haven: loading, unloading,
   boarding and getting off happen there. A haul route runs between two havens.

@@ -449,8 +449,9 @@ fn invariants_for_tick_runs_all_of_them_when_every_tick_is_sampled_none_at_a_rat
     assert_eq!(names(&invariants_for_tick(7, 1.0, &all)), names(&all));
     assert!(invariants_for_tick(7, 0.0, &all).is_empty());
     // The TypeScript's list, by name and in order, 151 invariants, `vessels-in-place` (T90.2),
-    // `respect-sound` (T96.1) and `lent-never-turn` (T96.4).
-    assert_eq!(all.len(), 155);
+    // `water-haul-routes-sound` (T91.5), `ship-crew` (T91.2), `respect-sound` (T96.1) and
+    // `lent-never-turn` (T96.4).
+    assert_eq!(all.len(), 157);
 }
 
 /// A starting city with everyone idle on the storage's tile, carrying nothing (`atHome` of

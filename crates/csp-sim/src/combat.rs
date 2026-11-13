@@ -31,7 +31,9 @@ use crate::queries::names::placed;
 use crate::queries::residents::{is_armed, is_down};
 use crate::queries::standing::TRADE_ORG;
 use crate::queries::trade_org::{in_inner_ring, of_trade_org_hq, trade_org_hq};
-use crate::queries::vessels::{being_rowed, between_vessels, vessel_aboard};
+use crate::queries::vessels::{
+    across_docked_ship, being_rowed, between_vessels, rowed_vessel_id, vessel_aboard,
+};
 use crate::queries::walls::{
     broken_returns, foreign_wall, is_wall_or_gate, on_own_wall, wall_strength, wall_strength_left,
 };
@@ -77,14 +79,18 @@ fn tile(p: (f64, f64)) -> (i32, i32) {
 
 /// Whether the resident at `ai` can strike the target (`CONTEXT.md`: Combat, Fighting at a
 /// vessel): in contact with it, and not from one vessel at someone aboard another. Those aboard a
-/// vessel are reached from beside it, as if it were the next land tile.
+/// vessel are reached from beside it, as if it were the next land tile; those aboard a docked ship
+/// from anywhere on its haven, and the other way round.
 fn reaches(world: &WorldState, size: i32, ai: usize, t: Target) -> bool {
     let a = &world.residents[ai];
-    in_contact(size, tile((a.x, a.y)), tile(spot_of(world, t)))
-        && match t {
-            Target::Resident(ti) => !between_vessels(world, a, &world.residents[ti]),
-            Target::Building(_) => true,
+    let contact = in_contact(size, tile((a.x, a.y)), tile(spot_of(world, t)));
+    match t {
+        Target::Resident(ti) => {
+            let b = &world.residents[ti];
+            (contact || across_docked_ship(world, a, b)) && !between_vessels(world, a, b)
         }
+        Target::Building(_) => contact,
+    }
 }
 
 /// A fresh attack order on `target_id` (`attackOrder`); `started` when the fight is already in
@@ -583,7 +589,7 @@ fn react(world: &mut WorldState, ti: usize, ai: usize) {
         }
         return;
     }
-    let rowing = matches!(t.order, Some(ResidentOrder::Row(_)));
+    let rowing = rowed_vessel_id(t).is_some();
     if driven_carriage_id(t).is_some() || rowing || with_caravan_carriage(world, t) {
         return;
     }
