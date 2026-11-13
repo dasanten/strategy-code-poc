@@ -103,3 +103,18 @@ Player remembers nothing out of sight either way.
 | Welcome: `region`           | 40.2 KB                   | 2.58 MB                           |
 | Welcome: the rest           | 1.1 KB                    | 1.1 KB                            |
 | `map-stats` / `explore` run | 0.3 s                     | 2.3 s; `explore --all` 1.8 s      |
+
+### T99.4: chunk textures are painted when first shown
+
+Worked out from the per-chunk cost measured above (1.1 ms and 64 KB a texture) for the staged
+Player with the minimap open, which loads all 32,400 explored chunks. Not yet measured in the
+browser.
+
+| Textures painted                        | Before                    | After                                           |
+| --------------------------------------- | ------------------------- | ----------------------------------------------- |
+| Every explored chunk loaded             | 32,400: about 36 s, 2 GB  | none for chunks never on screen                 |
+| The home view (1920 × 1080, start zoom) | painted with all the rest | about 24: about 26 ms over a few frames, 1.5 MB |
+| Kept at most                            | every loaded chunk        | 1,024 (64 MB) besides those on screen           |
+
+A frame paints at most 4 ms of textures (at least one); loaded chunks still waiting for theirs
+show the loading grey.
