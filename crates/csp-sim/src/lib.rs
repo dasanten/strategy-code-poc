@@ -17,6 +17,7 @@ pub mod cities;
 pub mod city_layout;
 pub mod climbing;
 pub mod combat;
+pub mod conditions;
 pub mod contracts;
 pub mod crimes;
 pub mod default_scripts;

@@ -738,3 +738,147 @@ fn queues_sound_finds_a_round_beyond_its_count_or_away_from_the_step() {
     s.r_mut().queue.as_mut().unwrap().current = 3;
     assert_eq!(messages(&s), vec!["w1's queue runs round 3 of block 1 away from its step"]);
 }
+
+/// An outpost storage `s1` of realm r1 at (8, 8) holding `wood`, and `s2` of realm r2.
+fn storages(s: &mut Setup, wood: f64) {
+    let mut s1 = crate::test_support::building(
+        "s1",
+        csp_shared::world::BuildingKind::Storage,
+        None,
+        8.0,
+        8.0,
+    );
+    s1.realm_id = Some("r1".into());
+    s1.stock = Some(csp_shared::world::Stock::from([(csp_shared::world::Good::Wood, wood)]));
+    let mut s2 = s1.clone();
+    s2.id = "s2".into();
+    s2.realm_id = Some("r2".into());
+    s2.x = 2.0;
+    s.world.buildings.extend([s1, s2]);
+}
+
+fn wood_in(place: &str, amount: u32) -> Value {
+    json!({ "kind": "stock", "placeId": place, "good": "wood", "compare": "atLeast",
+        "amount": amount })
+}
+
+fn wait_until(condition: Value) -> Value {
+    json!({ "order": { "kind": "waitUntil", "condition": condition } })
+}
+
+fn set_wood(s: &mut Setup, wood: f64) {
+    let b = s.world.buildings.iter_mut().find(|b| b.id == "s1").unwrap();
+    b.stock = Some(csp_shared::world::Stock::from([(csp_shared::world::Good::Wood, wood)]));
+}
+
+#[test]
+fn a_wait_until_stands_idle_until_its_condition_holds_then_goes_on() {
+    let mut s = setup();
+    storages(&mut s, 5.0);
+    assert_eq!(
+        s.give(json!({ "kind": "queue", "steps": [walk(7, 6), wait_until(wood_in("s1", 20)),
+            walk(9, 6)] })),
+        ack()
+    );
+    for _ in 0..10 {
+        s.tick();
+    }
+    // At (7, 6), idle on the Wait until.
+    assert_eq!((s.r().x, s.r().y), (7.0, 6.0));
+    assert_eq!(s.r().queue.as_ref().unwrap().current_index(), Some(1));
+    assert!(s.r().order.is_none());
+    set_wood(&mut s, 20.0);
+    s.tick();
+    let Some(ResidentOrder::WalkTo(w)) = &s.r().order else { panic!("walking on") };
+    assert_eq!(w.target, Tile { x: 9.0, y: 6.0 });
+    assert_eq!(s.r().queue.as_ref().unwrap().current_index(), Some(2));
+    assert_eq!(s.skips(), vec![]);
+}
+
+#[test]
+fn a_wait_until_with_a_duration_ends_when_it_is_up() {
+    let mut s = setup();
+    storages(&mut s, 5.0);
+    let mut wait = wait_until(wood_in("s1", 20));
+    wait["minutes"] = json!(2);
+    s.give(json!({ "kind": "queue", "steps": [wait, walk(9, 6)] }));
+    s.tick();
+    let started = s.r().queue.as_ref().unwrap().started_at.unwrap();
+    while (s.world.tick as f64) <= started + 2.0 * TICKS_PER_GAME_MINUTE - 1.0 {
+        s.tick();
+        assert!(s.r().order.is_none(), "still waiting at tick {}", s.world.tick);
+    }
+    s.tick();
+    let Some(ResidentOrder::WalkTo(_)) = &s.r().order else { panic!("walking on") };
+}
+
+#[test]
+fn a_wait_until_already_true_ends_the_tick_after_it_started() {
+    let mut s = setup();
+    storages(&mut s, 30.0);
+    s.give(json!({ "kind": "queue", "steps": [wait_until(wood_in("s1", 20)), walk(9, 6)] }));
+    s.tick();
+    assert_eq!(s.r().queue.as_ref().unwrap().current_index(), Some(0));
+    s.tick();
+    assert_eq!(s.r().queue.as_ref().unwrap().current_index(), Some(1));
+    // A looping queue of nothing but a wait that holds starts it once a tick, never more.
+    let mut s = setup();
+    storages(&mut s, 30.0);
+    s.give(json!({ "kind": "queue", "loop": true, "steps": [wait_until(wood_in("s1", 20))] }));
+    for _ in 0..5 {
+        s.tick();
+        let q = s.r().queue.as_ref().unwrap();
+        assert_eq!(q.started_at, Some(s.world.tick as f64 - 1.0));
+    }
+}
+
+#[test]
+fn a_wait_on_a_place_gone_waits_on_and_notes_it_once() {
+    let mut s = setup();
+    storages(&mut s, 5.0);
+    s.give(json!({ "kind": "queue", "steps": [wait_until(wood_in("s1", 1)), walk(9, 6)] }));
+    s.tick();
+    s.world.buildings.retain(|b| b.id != "s1");
+    for _ in 0..5 {
+        s.tick();
+    }
+    assert_eq!(s.r().queue.as_ref().unwrap().current_index(), Some(0));
+    let notes: Vec<_> = s
+        .world
+        .events
+        .iter()
+        .filter_map(|e| match &e.what {
+            RealmEventWhat::ConditionPlaceGone { resident_id, place_id, .. } => {
+                Some((resident_id.clone(), place_id.clone()))
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(notes, vec![("w1".to_string(), "s1".to_string())]);
+}
+
+#[test]
+fn a_wait_until_is_checked_when_given_and_asks_nothing_about_another_realm() {
+    let mut s = setup();
+    storages(&mut s, 5.0);
+    let give = |s: &mut Setup, step: Value| s.give(json!({ "kind": "queue", "steps": [step] }));
+    assert_eq!(
+        give(&mut s, wait_until(wood_in("s2", 1))),
+        rejected("step 1: not a storage, workplace or site of your realm")
+    );
+    assert_eq!(
+        give(&mut s, json!({ "order": { "kind": "waitUntil" } })),
+        rejected("step 1: needs a condition")
+    );
+    assert_eq!(
+        give(&mut s, json!({ "order": { "kind": "waitUntil", "condition": wood_in("s1", 1),
+            "x": 1 } })),
+        rejected("step 1: a Wait until holds only its condition")
+    );
+    assert_eq!(give(&mut s, wait_until(wood_in("s1", 1))), ack());
+    // An edit adding one is checked the same way.
+    s.tick();
+    let edit = json!({ "kind": "editQueue", "steps": [{ "id": 1, "order": { "kind": "waitUntil",
+        "condition": wood_in("s1", 1) } }, wait_until(wood_in("s2", 1))] });
+    assert_eq!(s.give(edit), rejected("step 2: not a storage, workplace or site of your realm"));
+}
