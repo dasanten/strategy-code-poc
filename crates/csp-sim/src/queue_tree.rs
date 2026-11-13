@@ -186,7 +186,7 @@ fn settle(q: &mut Queue, mut path: Vec<Seg>, ask: Ask<'_>) -> Advance {
                 QueueItem::Repeat(b)
                     if b.started
                         && b.repeat.more_after(b.round)
-                        && !b.repeat.until().is_some_and(|c| ask(c)) =>
+                        && !b.repeat.until().is_some_and(&mut *ask) =>
                 {
                     b.round += 1;
                     b.started = false;
@@ -211,7 +211,7 @@ fn settle(q: &mut Queue, mut path: Vec<Seg>, ask: Ask<'_>) -> Advance {
             QueueItem::Repeat(b) => {
                 crossed = true;
                 // A Repeat until whose condition holds when its turn comes runs no round.
-                if b.repeat.until().is_some_and(|c| ask(c)) {
+                if b.repeat.until().is_some_and(&mut *ask) {
                     path.last_mut().expect("an item").at += 1;
                     continue;
                 }
