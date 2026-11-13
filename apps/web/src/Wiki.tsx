@@ -801,7 +801,9 @@ export function Wiki() {
           away. A running queue is edited live; <strong>Edit as draft</strong> copies it into a
           draft while the queue runs on untouched, and Start queue replaces it (the step they are on
           keeps going if it is still in it). A draft is kept in this browser and lost on reloading
-          the page.
+          the page. <strong>Clear</strong> empties a draft or a group's plan. On a running queue it
+          asks first, then removes every step but the one the resident is on and turns loop off, so
+          they finish that step and the queue ends; <strong>Stop</strong> still halts them at once.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while you give an order (a button, its key, or a tile picked on the
