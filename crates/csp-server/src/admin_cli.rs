@@ -5,8 +5,11 @@ use std::path::PathBuf;
 use rusqlite::Connection;
 
 use crate::auth::{create_admin, create_invite_code, AuthFailure};
+use crate::map_tools::{describe_map_stats, explore, map_stats, Reach};
 
-pub const USAGE: &str = "usage: admin create <name> | admin invite";
+pub const USAGE: &str = "usage: admin create <name> | admin invite \
+                         | admin explore <player> (--radius <tiles> | --all) [--yes] \
+                         | admin map-stats";
 
 /// The database the server uses (`config.dbPath`, `.env` included): `DB_PATH`, or
 /// `data/world.db` from where it runs.
@@ -38,6 +41,21 @@ pub fn run(
         [command, ..] if command == "invite" => {
             create_invite_code(conn, None).map_err(|e| e.to_string())
         }
+        [command, player, rest @ ..] if command == "explore" => {
+            let yes = rest.iter().any(|a| a == "--yes");
+            let reach = match rest.iter().position(|a| a == "--radius") {
+                Some(i) => Reach::Radius(
+                    rest.get(i + 1)
+                        .and_then(|r| r.parse().ok())
+                        .filter(|r| *r >= 0)
+                        .ok_or_else(|| USAGE.to_owned())?,
+                ),
+                None if rest.iter().any(|a| a == "--all") => Reach::All,
+                None => return Err(USAGE.to_owned()),
+            };
+            explore(conn, player, reach, yes)
+        }
+        [command] if command == "map-stats" => Ok(describe_map_stats(&map_stats(conn)?)),
         _ => Err(USAGE.to_owned()),
     }
 }
