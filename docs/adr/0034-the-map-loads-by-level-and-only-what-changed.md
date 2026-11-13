@@ -165,3 +165,20 @@ level-0 chunks in 507 requests of 32 MB. A fresh realm's frame (96 tiles) stays 
 the server (release build, the dev machine), a batch of 64 coarse chunks over fully explored
 terrain takes about 1 ms; the first batch of each level takes 21 to 47 ms more, once, to work out
 that level's squares for the whole map. Time in the browser is not measured yet.
+
+### T99.10: terrain is read without the game thread (2026-11-13)
+
+On the full map generated from seed 1, test build (optimised) on the dev machine, under load
+from other sessions: what a terrain request now holds the explored terrain's lock for, which is
+the longest a tick can wait for one. Before, every request was a job on the game thread: it waited
+behind a running tick and the jobs ahead of it, and the tick behind it waited for the whole job.
+
+| A batch of 64 chunks, under the lock     | Fully explored Player | A disc of radius 600 explored |
+| ---------------------------------------- | --------------------- | ----------------------------- |
+| Level 0                                  | 0.22 ms               | 0.12 ms                       |
+| Levels 1 to 5                            | 1.5 to 2.6 ms         | 1.0 to 1.8 ms                 |
+| A level's squares, once, outside the lock | 31 to 85 ms           | the same                      |
+
+The admin map's chunks and overview take no lock at all. The map's terrain is held once (the
+game, the order queue, walking, the script runner and the explored terrain share one `Arc`); the
+explored terrain no longer keeps its own copy, 33 MB less.

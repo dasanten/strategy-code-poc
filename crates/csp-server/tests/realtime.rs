@@ -204,7 +204,7 @@ async fn start(opts: StartOptions) -> Server {
     let game = GameThread::spawn(
         move || {
             let explored = ExploredTerrain::new(terrain.clone(), &world.nodes);
-            let mut game = Game::new(world, terrain, explored, NoLog);
+            let mut game = Game::new(world, explored, NoLog);
             let mut kinds = OrderKinds::default();
             kinds.insert("wait", Wait(kinds_applied));
             kinds.insert("claimHorses", Wait(Arc::new(Mutex::new(Vec::new()))));
