@@ -31,7 +31,9 @@ use csp_sim::orders::OrderReply;
 use csp_sim::queries::alliance::commander_of;
 use csp_sim::queries::city::town_hall_of;
 use csp_sim::queries::people::founding_problem;
-use csp_sim::queries::region_map::{region_map_for, RegionMap};
+use csp_sim::queries::region_map::{
+    region_update, RegionChanges, RegionIndex, RegionMap, RegionSent,
+};
 use csp_sim::queries::territory::Territory;
 use csp_sim::region_map::region_map_unsound;
 use csp_sim::sight::{
@@ -63,19 +65,19 @@ pub const WS_CLOSE_LOGGED_OUT: u16 = 4001;
 /// reconnecting.
 pub const WS_CLOSE_UPDATED: u16 = 4426;
 /// The protocol version this server speaks (ADR 0034). A client names the version it speaks with
-/// the query flag `v` when it connects (`/ws?v=1`); one that names none speaks version 0, the
+/// the query flag `v` when it connects (`/ws?v=2`); one that names none speaks version 0, the
 /// protocol from before versions. Raise it when a message changes shape.
-pub const PROTOCOL_VERSION: u32 = 2;
+pub const PROTOCOL_VERSION: u32 = 3;
 /// The oldest protocol version the server still serves; an older client is closed with
 /// [`WS_CLOSE_UPDATED`]. Raise it with [`PROTOCOL_VERSION`] when the old shape is no longer sent.
-pub const MIN_PROTOCOL_VERSION: u32 = 0;
+pub const MIN_PROTOCOL_VERSION: u32 = 2;
 const _: () = assert!(PROTOCOL_VERSION.checked_sub(MIN_PROTOCOL_VERSION).is_some());
 /// The first protocol version whose large messages travel gzipped as binary frames.
 const COMPRESSED_FROM_VERSION: u32 = 1;
 /// The first protocol version whose welcome lists explored chunks with their counts
 /// (`exploredCounts`, `encode_explored_counts`) in place of the plain `exploredChunks`, and whose
 /// ticks send the counts of the chunks that grew: the client keeps terrain by them (ADR 0034).
-pub const COUNTS_FROM_VERSION: u32 = 2;
+pub const COUNTS_FROM_VERSION: u32 = 3;
 /// The most scripts one client watches at once (`SCRIPT_WATCH_MAX`).
 pub const SCRIPT_WATCH_MAX: usize = 20;
 /// How often each client's session is checked again after the handshake (`SESSION_RECHECK_MS`).
@@ -151,8 +153,8 @@ struct Client {
     last_seen_welcome: Option<ClientView>,
     last_event_seq: u64,
     last_diplomacy: String,
-    /// The territory's tick the last Region map sent was of; none before the first.
-    region_tick: Option<u64>,
+    /// What the Player was last sent of the Region map.
+    region: RegionSent,
     leader_id: String,
     realm_name: Option<String>,
     horse_offer: bool,
@@ -171,6 +173,35 @@ struct Hub {
     /// Each connected realm's Last seen out of sight as its sockets were last sent it, kept from
     /// what changed (T99.7) and shared by its sockets.
     last_seen: HashMap<String, OutOfSight>,
+    /// The latest working-out of territory by chunk, shared by every client's Region map.
+    region: Option<RegionCache>,
+}
+
+/// One working-out of territory by chunk, and the chunks that changed since the one before it
+/// (the territory's tick it changed from): worked out once for every client (ADR 0034).
+struct RegionCache {
+    index: RegionIndex,
+    changed: Option<(u64, BTreeSet<i32>)>,
+}
+
+impl RegionCache {
+    /// Keeps the cache at `territory`'s working-out.
+    fn update(
+        cache: &mut Option<RegionCache>,
+        world: &WorldState,
+        territory: &Territory,
+        size: i32,
+    ) {
+        if cache.as_ref().is_some_and(|c| c.index.tick == territory.tick) {
+            return;
+        }
+        let index = RegionIndex::new(world, territory, size);
+        let changed = cache.take().map(|before| {
+            let chunks = index.changed_since(&before.index);
+            (before.index.tick, chunks)
+        });
+        *cache = Some(RegionCache { index, changed });
+    }
 }
 
 /// Where the sampled sight checks report what they found.
@@ -321,25 +352,22 @@ fn trader_visits_to(world: &WorldState, realm_id: &str) -> Value {
         .expect("serialisable")
 }
 
-/// The Region map to send a client, if any (`regionFor`): all of it when territory was worked out
-/// again since the last one went out, else the chunks whose explored terrain grew.
+/// The Region map update to send a client, if any (`regionFor`): all of it first, then only the
+/// chunks where what they may see changed, because territory was worked out again or their
+/// explored terrain grew (ADR 0034).
 fn region_for(
     client: &mut Client,
-    world: &WorldState,
-    size: i32,
-    view: TickView<'_>,
+    cache: Option<&RegionCache>,
+    explored: &ExploredTerrain,
     grown: &[usize],
 ) -> Option<RegionMap> {
-    let territory = view.territory?;
-    let fresh = Some(territory.tick) != client.region_tick;
-    if !fresh && grown.is_empty() {
-        return None;
-    }
-    client.region_tick = Some(territory.tick);
+    let cache = cache?;
     let user_id = client.user_id as u64;
-    let is_explored = |x: i32, y: i32| view.explored.is_explored(user_id, x, y);
-    let chunks = (!fresh).then(|| grown.iter().map(|&c| c as i32).collect());
-    Some(region_map_for(world, territory, size, &is_explored, chunks))
+    let is_explored = |x: i32, y: i32| explored.is_explored(user_id, x, y);
+    let changes =
+        cache.changed.as_ref().map(|(from, chunks)| RegionChanges { from: *from, chunks });
+    let grown: Vec<i32> = grown.iter().map(|&c| c as i32).collect();
+    region_update(&cache.index, changes, &grown, &mut client.region, &is_explored)
 }
 
 /// Why the names given to found a realm won't do (`foundingProblem`), or none: a name that is no
@@ -385,7 +413,7 @@ fn build_welcome(
         last_seen_welcome: None,
         last_event_seq: 0,
         last_diplomacy: String::new(),
-        region_tick: None,
+        region: RegionSent::default(),
         leader_id: realm.leader_id.clone(),
         realm_name: realm.name.clone(),
         horse_offer: !world.horse_offers_claimed.contains(&(user_id as u64)),
@@ -419,7 +447,11 @@ fn build_welcome(
         .get(&realm.id)
         .map_or_else(|| json!({}), |s| serde_json::to_value(s).unwrap_or(json!({})));
     client.last_work_settings = json_of(&work_settings);
-    let region = region_for(&mut client, world, size, view, &[]);
+    let mut cache = None;
+    if let Some(territory) = view.territory {
+        RegionCache::update(&mut cache, world, territory, size);
+    }
+    let region = region_for(&mut client, cache.as_ref(), view.explored, &[]);
     let region_json =
         region.as_ref().map_or(Value::Null, |r| serde_json::to_value(r).expect("serialisable"));
     let message = json!({
@@ -626,12 +658,11 @@ impl Realtime {
     fn region(
         &self,
         client: &mut Client,
-        world: &WorldState,
-        size: i32,
-        view: TickView<'_>,
+        cache: Option<&RegionCache>,
+        (world, size, view): (&WorldState, i32, TickView<'_>),
         grown: &[usize],
     ) -> Option<Value> {
-        let region = region_for(client, world, size, view, grown)?;
+        let region = region_for(client, cache, view.explored, grown)?;
         self.check_region(world, size, view, client, &region);
         Some(serde_json::to_value(region).expect("serialisable"))
     }
@@ -866,9 +897,14 @@ impl Realtime {
         with_sight(sight.as_mut(), size, |cache| {
             let mut round = SyncRound::<Seen>::default();
             let mut hub = self.hub();
-            let Hub { sessions, clients, last_seen: out_of_sight, .. } = &mut *hub;
+            let Hub { sessions, clients, last_seen: out_of_sight, region: region_cache, .. } =
+                &mut *hub;
             // Each realm's Last seen diff this tick, worked out once for its sockets.
             let mut remembered_now: HashMap<String, Arc<OutOfSightDiff>> = HashMap::new();
+            if let Some(territory) = view.territory {
+                RegionCache::update(region_cache, world, territory, size);
+            }
+            let region_cache = region_cache.as_ref();
             for (socket, client) in clients.iter_mut() {
                 let Some(session) = sessions.get(socket) else { continue };
                 let in_sight = entities_in_sight(world, index, Some(&client.realm_id), Some(cache));
@@ -931,7 +967,8 @@ impl Realtime {
                     client.last_diplomacy = diplomacy_json;
                     tick.insert("diplomacy".into(), diplomacy);
                 }
-                if let Some(region) = self.region(client, world, size, view, &grown) {
+                if let Some(region) = self.region(client, region_cache, (world, size, view), &grown)
+                {
                     tick.insert("region".into(), region);
                 }
                 let realm = world.realms.iter().find(|r| r.id == client.realm_id);

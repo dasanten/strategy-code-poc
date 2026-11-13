@@ -249,7 +249,7 @@ async fn lets_admins_offer_horses_again_to_all_or_by_name_and_no_one_else() {
     let terrain = TerrainMap { size: 64, tiles: vec![0; 64 * 64] };
     let world = create_world(&terrain, 1);
     let explored = ExploredTerrain::new(terrain.clone(), &world.nodes);
-    let game = game_thread(&db, world, terrain, explored);
+    let game = game_thread(&db, world, explored);
     let mut opts = db.opts();
     opts.game = Some(game.clone());
     let app = build_app(opts);
@@ -450,7 +450,7 @@ async fn serves_explored_chunks_one_at_a_time_and_in_batches_refusing_unexplored
     let conn = db.conn();
     let mara = add_user(&conn, "Mara");
     explored.explore(mara as u64, 5, 5, 2);
-    let game = game_thread(&db, world, terrain, explored);
+    let game = game_thread(&db, world, explored);
     let mut opts = db.opts();
     opts.game = Some(game);
     let app = build_app(opts);
@@ -524,6 +524,75 @@ async fn serves_explored_chunks_one_at_a_time_and_in_batches_refusing_unexplored
     assert_eq!(admin_chunk.status, StatusCode::FORBIDDEN);
 }
 
+#[tokio::test]
+async fn serves_terrain_while_the_game_thread_is_busy_and_what_a_tick_explored_on_the_next_request()
+{
+    use csp_shared::chunks::ADMIN_TERRAIN_OVERVIEW_PATH;
+    use std::time::Duration;
+
+    let db = Db::new();
+    let terrain = TerrainMap { size: 128, tiles: (0..128 * 128).map(|i| (i % 7) as u8).collect() };
+    let world = create_world(&terrain, 1);
+    let mut explored = ExploredTerrain::new(terrain, &world.nodes);
+    let conn = db.conn();
+    let mara = add_user(&conn, "Mara");
+    explored.explore(mara as u64, 40, 10, 30);
+    // What the explored terrain itself gives: the bytes the routes served as jobs on the game.
+    let before = explored.clone();
+    let game = game_thread(&db, world, explored);
+    let mut opts = db.opts();
+    opts.game = Some(game.clone());
+    let app = build_app(opts);
+    create_admin(&conn, Some("Daniel"), Some("admin password")).unwrap();
+    let admin = login_as(&app, "Daniel", "admin password").await;
+    let token = token_for(&conn, mara);
+    let batch = |level: u8| json!({ "chunks": [0, 1, 2, 3, 5], "level": level });
+
+    // A long job holds the game thread until it is let go.
+    let (started, running) = tokio::sync::oneshot::channel();
+    let (release, held) = std::sync::mpsc::channel::<()>();
+    let busy = tokio::spawn({
+        let game = game.clone();
+        async move {
+            game.run(move |_, _| {
+                started.send(()).unwrap();
+                held.recv().unwrap();
+            })
+            .await
+        }
+    });
+    running.await.unwrap();
+
+    let answered = tokio::time::timeout(Duration::from_secs(5), async {
+        let id = mara as u64;
+        for level in [0, 2] {
+            let got =
+                call(&app, "POST", "/api/terrain/chunks", Some(&token), Some(batch(level))).await;
+            assert_eq!(got.status, StatusCode::OK);
+            assert_eq!(got.body, before.chunks_at(id, level, &[0, 1, 2, 3, 5]), "level {level}");
+        }
+        let one = call(&app, "GET", "/api/terrain/1/0", Some(&token), None).await;
+        assert_eq!(Some(one.body), before.chunk(id, 1, 0));
+        let whole = call(&app, "GET", "/api/admin/terrain/3/2", Some(&admin), None).await;
+        assert_eq!(Some(whole.body), before.whole_chunk(3, 2));
+        let overview = call(&app, "GET", ADMIN_TERRAIN_OVERVIEW_PATH, Some(&admin), None).await;
+        assert_eq!(overview.body, before.overview());
+    })
+    .await;
+    release.send(()).unwrap();
+    busy.await.unwrap().expect("the job ran");
+    assert!(answered.is_ok(), "terrain waited for the game thread");
+
+    // Terrain explored on the game thread (as sight explores in a tick) is served next time.
+    let far = call(&app, "GET", "/api/terrain/3/3", Some(&token), None).await;
+    assert_eq!(far.status, StatusCode::FORBIDDEN);
+    game.run(move |g, _| g.explored().explore(mara as u64, 110, 110, 4)).await.unwrap();
+    let far = call(&app, "GET", "/api/terrain/3/3", Some(&token), None).await;
+    assert_eq!(far.status, StatusCode::OK);
+    let grown = game.run(move |g, _| g.explored().chunk(mara as u64, 3, 3)).await.unwrap();
+    assert_eq!(Some(far.body), grown);
+}
+
 /// The raw response to a terrain request asking for `encoding` (none: no `Accept-Encoding`).
 async fn terrain_as(
     app: &Router,
@@ -572,7 +641,7 @@ async fn sends_terrain_compressed_when_the_request_accepts_it_and_plain_otherwis
     let conn = db.conn();
     let mara = add_user(&conn, "Mara");
     explored.explore(mara as u64, 40, 10, 30);
-    let game = game_thread(&db, world, terrain, explored);
+    let game = game_thread(&db, world, explored);
     let mut opts = db.opts();
     opts.game = Some(game);
     let app = build_app(opts);
@@ -879,7 +948,7 @@ async fn lets_admins_give_and_lift_directives_and_no_one_else() {
     let terrain = TerrainMap { size: 64, tiles: vec![0; 64 * 64] };
     let world = create_world(&terrain, 1);
     let explored = ExploredTerrain::new(terrain.clone(), &world.nodes);
-    let game = game_thread(&db, world, terrain, explored);
+    let game = game_thread(&db, world, explored);
     let mut opts = db.opts();
     opts.game = Some(game.clone());
     let app = build_app(opts);
@@ -973,7 +1042,7 @@ async fn answers_health_and_tick_health_from_the_game_thread_between_ticks() {
             let terrain = TerrainMap { size: 64, tiles: vec![0; 64 * 64] };
             let world = create_world(&terrain, 1);
             let explored = ExploredTerrain::new(terrain.clone(), &world.nodes);
-            Ok((open_db(&path, None)?, Game::new(world, terrain, explored, NoLog)))
+            Ok((open_db(&path, None)?, Game::new(world, explored, NoLog)))
         },
         settings,
     )
@@ -1014,7 +1083,6 @@ async fn answers_health_and_tick_health_from_the_game_thread_between_ticks() {
 fn game_thread(
     db: &Db,
     world: csp_shared::world::WorldState,
-    terrain: TerrainMap,
     explored: ExploredTerrain,
 ) -> Arc<csp_server::server::GameThread<NoLog>> {
     use csp_server::server::{Game, GameThread, TickSettings};
@@ -1022,7 +1090,7 @@ fn game_thread(
     let settings =
         TickSettings { invariant_sample_rate: 0.0, slow_tick_ms: 800.0, save_every_ticks: 30 };
     let game = GameThread::spawn(
-        move || Ok((open_db(&path, None)?, Game::new(world, terrain, explored, NoLog))),
+        move || Ok((open_db(&path, None)?, Game::new(world, explored, NoLog))),
         settings,
     )
     .unwrap();

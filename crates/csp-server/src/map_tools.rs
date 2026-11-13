@@ -201,11 +201,22 @@ pub fn map_stats(conn: &Connection) -> Result<Vec<PlayerMap>, String> {
             explored_chunks: explored.explored_chunks(realm.user_id).len(),
             last_seen: welcome["lastSeen"].as_array().map_or(0, Vec::len),
             region_holders: holders.len(),
-            region_tiles: holders.iter().map(|h| h["tiles"].as_array().map_or(0, Vec::len)).sum(),
+            region_tiles: region_held_tiles(&welcome["region"]),
             welcome: WelcomeBytes::of(&welcome),
         });
     }
     Ok(out)
+}
+
+/// The tiles a Region map update shows held: its runs' lengths, the runs held by nobody left out.
+pub fn region_held_tiles(region: &Value) -> usize {
+    let chunks = region["chunks"].as_array().map_or(&[][..], Vec::as_slice);
+    chunks
+        .iter()
+        .flat_map(|c| c["runs"].as_array().map_or(&[][..], Vec::as_slice).chunks(2))
+        .filter(|run| run.get(1).and_then(Value::as_i64).is_some_and(|h| h >= 0))
+        .map(|run| run[0].as_u64().unwrap_or(0) as usize)
+        .sum()
 }
 
 /// `map-stats` as printed: one block per Player.
