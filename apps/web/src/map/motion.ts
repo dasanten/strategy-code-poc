@@ -250,7 +250,7 @@ export class Motion {
 export function goingOf(order: ResidentOrder | null | undefined): Going | undefined {
   const o = order
   if (!o || !('path' in o) || !o.path || o.path.length === 0) return undefined
-  if (o.kind === 'haul' && o.phase !== 'driving') return undefined
+  if ((o.kind === 'haul' || o.kind === 'haulByWater') && o.phase !== 'driving') return undefined
   if ((isLineOrder(o) || o.kind === 'store' || o.kind === 'fetch') && o.phase !== 'walking') {
     return undefined
   }
@@ -271,7 +271,11 @@ export function motionTokens(
   for (const r of world.residents) {
     const carriage = drivenCarriageId(r)
     if (carriage !== undefined) byCarriage.set(carriage, goingOf(r.order))
-    if (r.order?.kind === 'row') byCarriage.set(r.order.vesselId, goingOf(r.order))
+    // A boat goes the way its rower rows (on a haul route too), a ship the way its captain sails
+    // (`CONTEXT.md`: Rowing, Haul route by water, Sailing).
+    if (r.order?.kind === 'row' || r.order?.kind === 'haulByWater' || r.order?.kind === 'sail') {
+      byCarriage.set(r.order.vesselId, goingOf(r.order))
+    }
     if (r.riding !== undefined) byHorse.set(r.riding, goingOf(r.order))
   }
   for (const k of world.carriages) {

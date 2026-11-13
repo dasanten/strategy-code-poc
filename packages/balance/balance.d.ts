@@ -443,6 +443,9 @@ export interface Balance {
   readonly CARRIAGE_MAX_CAPACITY: number
   readonly PASSENGER_WEIGHT: number
   readonly BOAT_CAPACITY: number
+  readonly SHIP_CAPACITY: number
+  readonly SHIP_MIN_CREW: number
+  readonly SAIL_SPEED: number
   readonly ROW_SPEED: number
   readonly ROW_STRENGTH_EFFECT: number
   readonly ROW_STRENGTH_AVERAGE: number
@@ -588,6 +591,11 @@ export interface Balance {
       wood: number
       [key: string]: number
     }
+    ship: {
+      wood: number
+      iron: number
+      [key: string]: number
+    }
     [key: string]: Record<string, never> | {
       wood: number
       [key: string]: number
@@ -636,6 +644,7 @@ export interface Balance {
     haven: number
     carriage: number
     boat: number
+    ship: number
     [key: string]: number
   }
   readonly MOUNTAIN_ROAD_WORK_FACTOR: number
@@ -1052,6 +1061,7 @@ export interface Balance {
     road: number
     carriage: number
     boat: number
+    ship: number
     house: number
     storage: number
     smelter: number

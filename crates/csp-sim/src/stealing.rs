@@ -44,6 +44,10 @@ pub fn take_over(world: &mut WorldState, thief: &str, realm_id: &str, taken: Tak
     };
     let carriage = taken.carriage.is_some().then_some(true);
     let boat = taken.vessel.is_some().then_some(true);
+    let ship = taken
+        .vessel
+        .is_some_and(|i| world.vessels[i].kind == csp_shared::world::VesselKind::Ship)
+        .then_some(true);
     let horse = taken.horse.map(|i| world.horses[i].name.clone());
     let goods = match taken {
         Taken { carriage: Some(i), .. } => goods_of(&world.carriages[i].load),
@@ -81,6 +85,7 @@ pub fn take_over(world: &mut WorldState, thief: &str, realm_id: &str, taken: Tak
             carriage: carriage.is_some(),
             horse: horse.clone(),
             boat: boat.is_some(),
+            ship: ship.is_some(),
             ..Default::default()
         },
     );
@@ -90,7 +95,7 @@ pub fn take_over(world: &mut WorldState, thief: &str, realm_id: &str, taken: Tak
     crate::events::record_event(
         world,
         victim_org.as_deref(),
-        RealmEventWhat::TransportGone { x, y, carriage, horse: horse.clone(), boat },
+        RealmEventWhat::TransportGone { x, y, carriage, horse: horse.clone(), boat, ship },
     );
     if let Some(t) = world.residents.iter().find(|r| r.id == thief) {
         let (resident_id, name) = (t.id.clone(), t.name.clone());
@@ -106,6 +111,7 @@ pub fn take_over(world: &mut WorldState, thief: &str, realm_id: &str, taken: Tak
                 carriage,
                 horse,
                 boat,
+                ship,
                 goods,
             },
         );

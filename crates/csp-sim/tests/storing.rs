@@ -4,6 +4,7 @@
 //! (`no way`) with T86.4's `Walking`.
 
 mod common;
+#[macro_use]
 mod goods_support;
 
 use csp_shared::balance::OWN_FOOD;

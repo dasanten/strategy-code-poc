@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" color="#fff" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <title>ship</title>
+  <path d="M2 14h20l-3 4H5z"/>
+  <path d="M12 3v11"/>
+  <path d="M12 4l6 8h-6"/>
+  <path d="M12 6l-5 6h5"/>
+  <path d="M3 21c2-1.2 4-1.2 6 0s4 1.2 6 0 4-1.2 6 0"/>
+</svg>
