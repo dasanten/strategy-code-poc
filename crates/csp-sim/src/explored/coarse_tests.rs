@@ -83,7 +83,8 @@ fn the_last_chunks_of_a_level_are_padded_not_joined() {
             bits[t >> 3] &= !(1 << (t & 7));
         }
     }
-    let partly = ExploredTerrain::from_bitmaps(partly.terrain.clone(), &[], [(PLAYER, bits)]);
+    let partly =
+        ExploredTerrain::from_bitmaps(Arc::clone(partly.map().terrain()), &[], [(PLAYER, bits)]);
     for explored in [&whole, &partly] {
         for level in 3..=TERRAIN_LEVEL_MAX {
             let squares = squares_across(size, level);
@@ -171,7 +172,7 @@ fn a_batch_over_fully_explored_chunks_reads_no_tiles() {
     }
     assert_eq!(explored.tiles_read(), 0);
     // Partly explored chunks are counted tile by tile, and agree with the bitmap.
-    let mut partly = ExploredTerrain::new(explored.terrain.clone(), &[]);
+    let mut partly = ExploredTerrain::new(Arc::clone(explored.map().terrain()), &[]);
     partly.explore(PLAYER, 100, 100, 120);
     for level in 1..=TERRAIN_LEVEL_MAX {
         let across = level_chunks_across(320, level);

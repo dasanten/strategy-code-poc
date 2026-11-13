@@ -188,3 +188,20 @@ more than 300 chunks on screen (`MAX_CHUNKS_ON_SCREEN`, tested). A coarse chunk'
 T99.8 measured on 2026-11-13 on the same copy of a dev world (tick about 870 to 1,100, one
 Player with one young city), with a Node WebSocket client listening for 150 s, about two and a
 half game hours.
+
+### T99.10: terrain is read without the game thread (2026-11-13)
+
+On the full map generated from seed 1, test build (optimised) on the dev machine, under load
+from other sessions: what a terrain request now holds the explored terrain's lock for, which is
+the longest a tick can wait for one. Before, every request was a job on the game thread: it waited
+behind a running tick and the jobs ahead of it, and the tick behind it waited for the whole job.
+
+| A batch of 64 chunks, under the lock     | Fully explored Player | A disc of radius 600 explored |
+| ---------------------------------------- | --------------------- | ----------------------------- |
+| Level 0                                  | 0.22 ms               | 0.12 ms                       |
+| Levels 1 to 5                            | 1.5 to 2.6 ms         | 1.0 to 1.8 ms                 |
+| A level's squares, once, outside the lock | 31 to 85 ms           | the same                      |
+
+The admin map's chunks and overview take no lock at all. The map's terrain is held once (the
+game, the order queue, walking, the script runner and the explored terrain share one `Arc`); the
+explored terrain no longer keeps its own copy, 33 MB less.
