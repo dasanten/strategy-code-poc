@@ -393,7 +393,7 @@ async fn upgrades_a_socket_whose_request_accepts_compressed_responses() {
     let (socket, res) = tokio_tungstenite::connect_async(req).await.unwrap();
     assert_eq!(res.status().as_u16(), 101);
     assert!(res.headers().get("content-encoding").is_none());
-    let mut client = Client { socket, got: Vec::new(), closed: None };
+    let mut client = Client { socket, got: Vec::new(), closed: None, frames: Vec::new() };
     client.next("welcome").await;
 }
 
