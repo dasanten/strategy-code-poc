@@ -407,7 +407,7 @@ pub fn admin_places(world: &WorldState, lookups: &dyn AdminLookups) -> Value {
 
 /// The whole map's territory (`adminTerritory`): the Region map without the explored filter.
 pub fn admin_territory(world: &WorldState, territory: &Territory, size: i32) -> RegionMap {
-    region_map_for(world, territory, size, &|_, _| true, None)
+    region_map_for(world, territory, size, &|_, _| true)
 }
 
 /// One thing in the world as the admin map's inspector shows it (`adminInspection`), or None when

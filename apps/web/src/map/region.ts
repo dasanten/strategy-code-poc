@@ -2,8 +2,8 @@ import { CHUNK_SIZE, chunksAcross } from '../shared/terrain.js'
 import type { RegionHolder, RegionMap } from '@csp/shared-types'
 import type { ZoomTier } from './camera.js'
 
-/** An Organization on the Region map, without its tiles. */
-export type RegionHolderInfo = Omit<RegionHolder, 'tiles'>
+/** An Organization on the Region map. */
+export type RegionHolderInfo = RegionHolder
 
 /** The client's copy of the Region map (`CONTEXT.md`: Region map). */
 export interface RegionState {
@@ -16,32 +16,59 @@ export interface RegionState {
   changed: readonly number[] | null
 }
 
+/** A chunk's corner and its width and height, clipped to the map. */
+function chunkBox(chunk: number, size: number) {
+  const across = chunksAcross(size)
+  const [x0, y0] = [(chunk % across) * CHUNK_SIZE, Math.floor(chunk / across) * CHUNK_SIZE]
+  return { x0, y0, w: Math.min(CHUNK_SIZE, size - x0), h: Math.min(CHUNK_SIZE, size - y0) }
+}
+
 /**
- * Applies a Region map update from the server: a whole map replaces the copy, a part replaces
- * just its chunks. `size` is the map's.
+ * Applies a Region map update from the server (ADR 0034): a whole one replaces the copy, a part
+ * replaces just its chunks and clears those it names as gone. Each chunk comes as runs of one
+ * holder along its rows. `size` is the map's.
  */
 export function applyRegionMap(
   state: RegionState | null,
   update: RegionMap,
   size: number,
 ): RegionState {
-  const whole = update.chunks === null || state === null
+  const whole = update.whole || state === null
   const holders = new Map(whole ? [] : state.holders)
   const owners = new Map(whole ? [] : state.owners)
-  if (!whole) {
-    const across = chunksAcross(size)
-    for (const c of update.chunks!) {
-      const [x0, y0] = [(c % across) * CHUNK_SIZE, Math.floor(c / across) * CHUNK_SIZE]
-      for (let y = y0; y < Math.min(size, y0 + CHUNK_SIZE); y++) {
-        for (let x = x0; x < Math.min(size, x0 + CHUNK_SIZE); x++) owners.delete(y * size + x)
-      }
+  for (const holder of update.holders) holders.set(holder.id, holder)
+  const clear = (chunk: number) => {
+    const { x0, y0, w, h } = chunkBox(chunk, size)
+    for (let y = y0; y < y0 + h; y++) {
+      for (let x = x0; x < x0 + w; x++) owners.delete(y * size + x)
     }
   }
-  for (const { tiles, ...holder } of update.holders) {
-    holders.set(holder.id, holder)
-    for (const t of tiles) owners.set(t, holder.id)
+  if (!whole) {
+    for (const c of update.gone) clear(c)
+    for (const { chunk } of update.chunks) clear(chunk)
   }
-  return { tick: update.tick, holders, owners, changed: whole ? null : update.chunks }
+  for (const { chunk, runs } of update.chunks) {
+    const { x0, y0, w, h } = chunkBox(chunk, size)
+    let at = 0
+    for (let r = 0; r + 1 < runs.length; r += 2) {
+      const [length, holder] = [runs[r]!, runs[r + 1]!]
+      const id = holder >= 0 ? update.holders[holder]?.id : undefined
+      if (id !== undefined) {
+        for (let i = at; i < Math.min(at + length, w * h); i++) {
+          owners.set((y0 + Math.floor(i / w)) * size + x0 + (i % w), id)
+        }
+      }
+      at += length
+    }
+  }
+  // A holder that changed alliance changes colour wherever it holds: everything is redrawn.
+  const recoloured = update.holders.some((h) => {
+    const before = state?.holders.get(h.id)
+    return before !== undefined && colourKey(before) !== colourKey(h)
+  })
+  const changed =
+    whole || recoloured ? null : [...update.chunks.map((c) => c.chunk), ...update.gone]
+  return { tick: update.tick, holders, owners, changed }
 }
 
 /** What shares a colour on the Region map: an alliance's members, or an Organization alone. */
