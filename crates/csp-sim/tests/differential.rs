@@ -79,6 +79,7 @@ fn differential(name: &str, ticks: &[u64]) -> Option<String> {
                     offers: Some(&scratch.offers),
                     debt_payments: Some(&scratch.debt_payments),
                     buy_offs: &step.buy_offs,
+                    lent_gear: &scratch.lent_gear,
                 };
                 let found = check_invariants_with(&world, &terrain, &all, &ledgers);
                 if !found.is_empty() {

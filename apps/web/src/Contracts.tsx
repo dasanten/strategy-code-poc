@@ -293,8 +293,10 @@ export function ContractsPanel({
                 onChange={(e) => setCount(Number(e.target.value))}
               />{' '}
               <span className="muted small">
-                it can spare {npc.hire!.spare}, at least {npc.hire!.pricePerResidentWeek} Coins a
-                week each
+                {npc.hire!.spare === 0
+                  ? 'it can spare nobody now: it lends only its spare hands, and nobody while it weighs a demand, its town hall is occupied or your armed residents are near it'
+                  : `it can spare ${npc.hire!.spare}`}
+                , at least {npc.hire!.pricePerResidentWeek} Coins a week each
               </span>
             </span>
           </label>
