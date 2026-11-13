@@ -295,9 +295,12 @@ export function TopBar({
 export function ToolRail({
   open,
   onToggle,
+  marked = NONE_MARKED,
 }: {
   open: OpenDrawer
   onToggle: (id: DrawerId) => void
+  /** The drawers holding something the Player hasn't seen (`unseenMarks`). */
+  marked?: ReadonlySet<DrawerId>
 }) {
   return (
     <nav className="hud-rail" aria-label="Tools">
@@ -310,17 +313,26 @@ export function ToolRail({
               type="button"
               className={open === d.id ? 'on' : ''}
               aria-pressed={open === d.id}
-              aria-label={d.label}
+              aria-label={marked.has(d.id) ? `${d.label}, something new` : d.label}
               data-tip={d.label}
               onClick={() => onToggle(d.id)}
             >
               <Icon name={d.id} size={20} />
+              {marked.has(d.id) && <UnseenMark />}
             </button>
           ))}
         </div>
       ))}
     </nav>
   )
+}
+
+/** No drawer or tab marked. */
+const NONE_MARKED: ReadonlySet<never> = new Set()
+
+/** The small mark on a rail button or tab whose drawer holds something the Player hasn't seen. */
+function UnseenMark() {
+  return <span className="unseen-mark" aria-hidden="true" />
 }
 
 /**
@@ -330,6 +342,7 @@ export function ToolRail({
 export function PhoneMenu({
   open,
   onToggle,
+  marked = NONE_MARKED,
   goods,
   leader,
   account,
@@ -338,6 +351,8 @@ export function PhoneMenu({
 }: {
   open: OpenDrawer
   onToggle: (id: DrawerId) => void
+  /** The drawers holding something the Player hasn't seen (`unseenMarks`). */
+  marked?: ReadonlySet<DrawerId>
   goods?: GoodsShown
   leader?: string
   account: string
@@ -359,13 +374,14 @@ export function PhoneMenu({
       <button
         type="button"
         className="hud-menu-button"
-        aria-label="Menu"
+        aria-label={marked.size > 0 ? 'Menu, something new' : 'Menu'}
         aria-expanded={shown}
         onClick={() => setShown((s) => !s)}
       >
         <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24">
           <path d="M4 6h16M4 12h16M4 18h16" />
         </svg>
+        {marked.size > 0 && <UnseenMark />}
       </button>
       {shown && (
         <>
@@ -386,6 +402,7 @@ export function PhoneMenu({
                     }}
                   >
                     <Icon name={d.id} size={18} /> {d.label}
+                    {marked.has(d.id) && <UnseenMark />}
                   </button>
                 ))}
               </Fragment>
@@ -467,10 +484,13 @@ export function Drawer({
 export function DiplomacyTabs({
   tab,
   onTab,
+  marked = NONE_MARKED,
   panels,
 }: {
   tab: DiplomacyTab
   onTab: (tab: DiplomacyTab) => void
+  /** The tabs holding something the Player hasn't seen (`unseenMarks`). */
+  marked?: ReadonlySet<DiplomacyTab>
   panels: Record<DiplomacyTab, ReactNode>
 }) {
   const status = useContext(DrawerStatus)
@@ -489,6 +509,7 @@ export function DiplomacyTabs({
             onClick={() => onTab(t.id)}
           >
             <Icon name={t.id} size={15} /> {t.label}
+            {marked.has(t.id) && <UnseenMark />}
           </button>
         ))}
       </div>
