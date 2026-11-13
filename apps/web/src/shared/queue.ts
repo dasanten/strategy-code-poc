@@ -1,8 +1,20 @@
 // Ported from packages/shared/src/queue.ts for the client (T88.2, ADR 0030). Plain TypeScript: the
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
-import { QUEUE_MAX_STEPS, QUEUE_STEP_MAX_CHARS } from '@csp/balance'
-import type { BuildLine, OrderRequest, Queue, QueueStepRequest } from '@csp/shared-types'
+import {
+  QUEUE_MAX_DEPTH,
+  QUEUE_MAX_REPEAT,
+  QUEUE_MAX_STEPS,
+  QUEUE_STEP_MAX_CHARS,
+} from '@csp/balance'
+import type {
+  BuildLine,
+  OrderRequest,
+  Queue,
+  QueueItem,
+  QueueStep,
+  QueueStepRequest,
+} from '@csp/shared-types'
 
 /**
  * Queues (`CONTEXT.md`: Queue): which orders can be steps and how a step list is checked, shared
@@ -74,16 +86,59 @@ export function stepLine(order: OrderRequest): BuildLine | undefined {
   return { building, from, to }
 }
 
+/** A step of a queue's items as `walkItems` finds it, and whether a block around it repeats it. */
+interface WalkedStep {
+  step: unknown
+  repeated: boolean
+}
+
+/** Whether an item as sent is a repeat block rather than a step: it has `repeat`. */
+function isBlockLike(item: unknown): item is Record<string, unknown> {
+  return typeof item === 'object' && item !== null && !Array.isArray(item) && 'repeat' in item
+}
+
 /**
- * Why a list of queue steps can't be given, if it can't: each must be an order a step can be
- * (`QUEUE_STEP_KINDS`), at most `QUEUE_MAX_STEPS` of them, with a duration in whole game minutes
- * if any; one that never ends needs a duration unless it is the last. A Build line step carries
- * its whole line (`stepLine`) and ends on its own once the line is built or laid out.
+ * Why a queue's items can't be given, if they can't (`CONTEXT.md`: Repeat block): steps and
+ * repeat blocks, at most `QUEUE_MAX_STEPS` of them as written, blocks nested at most
+ * `QUEUE_MAX_DEPTH` deep, each repeating a whole number of times up to `QUEUE_MAX_REPEAT` or
+ * forever, never empty. Each step must be an order a step can be (`QUEUE_STEP_KINDS`), with a
+ * duration in whole game minutes if any; one that never ends needs a duration unless it is the
+ * last step and no block around it repeats it. A Build line step carries its whole line
+ * (`stepLine`) and ends on its own once the line is built or laid out. Steps are numbered top to
+ * bottom.
  */
-export function queueStepsProblem(steps: unknown): string | undefined {
-  if (!Array.isArray(steps)) return 'the steps must be a list'
-  if (steps.length > QUEUE_MAX_STEPS) return `a queue holds at most ${QUEUE_MAX_STEPS} steps`
-  for (const [i, step] of steps.entries()) {
+export function queueStepsProblem(items: unknown): string | undefined {
+  if (!Array.isArray(items)) return 'the steps must be a list'
+  let count = 0
+  let problem: string | undefined
+  const steps: WalkedStep[] = []
+  const set = (p: string) => (problem ??= p)
+  const walk = (list: readonly unknown[], depth: number, repeated: boolean) => {
+    for (const item of list) {
+      count++
+      if (!isBlockLike(item)) {
+        steps.push({ step: item, repeated })
+        continue
+      }
+      if (depth + 1 > QUEUE_MAX_DEPTH) set(`blocks nest at most ${QUEUE_MAX_DEPTH} deep`)
+      if (Object.keys(item).some((k) => !['id', 'repeat', 'items'].includes(k)))
+        set('a repeat block holds only its id, count and items')
+      const { repeat, items: inner } = item
+      const countOk =
+        repeat === 'forever' ||
+        (typeof repeat === 'number' &&
+          Number.isInteger(repeat) &&
+          repeat >= 1 &&
+          repeat <= QUEUE_MAX_REPEAT)
+      if (!countOk) set(`a repeat block repeats from 1 to ${QUEUE_MAX_REPEAT} times, or forever`)
+      if (Array.isArray(inner) && inner.length > 0) walk(inner, depth + 1, repeated || repeat !== 1)
+      else set('a repeat block needs a step')
+    }
+  }
+  walk(items, 0, false)
+  if (count > QUEUE_MAX_STEPS) return `a queue holds at most ${QUEUE_MAX_STEPS} steps and blocks`
+  if (problem) return problem
+  for (const [i, { step, repeated }] of steps.entries()) {
     const n = i + 1
     const s = step as Partial<QueueStepRequest> | null
     const order = s?.order
@@ -97,15 +152,25 @@ export function queueStepsProblem(steps: unknown): string | undefined {
     const minutes = s!.minutes
     if (minutes !== undefined && !(Number.isInteger(minutes) && minutes > 0))
       return `step ${n}'s duration must be a whole number of minutes`
-    if (minutes === undefined && neverEnds(order) && n < steps.length)
+    if (minutes === undefined && neverEnds(order) && (n < steps.length || repeated))
       return `step ${n} never ends on its own: give it a duration or make it the last`
   }
   return undefined
 }
 
+/** The steps of a queue's items top to bottom, as written: each once, whatever its blocks repeat. */
+export function queueSteps(items: readonly QueueItem[]): QueueStep[] {
+  return items.flatMap((item) => ('repeat' in item ? queueSteps(item.items) : [item]))
+}
+
+/** The current step's place among the queue's steps top to bottom, from 0; -1 if none. */
+export function currentIndex(q: Pick<Queue, 'items' | 'current'>): number {
+  return queueSteps(q.items).findIndex((s) => s.id === q.current)
+}
+
 /** What a script sees of a queue (the `queue` script view): where it is and the current step. */
 export interface QueueView {
-  /** The current step, counted from 1. */
+  /** The current step, counted from 1 among the steps top to bottom. */
   step: number
   steps: number
   loop: boolean
@@ -118,10 +183,12 @@ export interface QueueView {
 }
 
 export function queueView(q: Queue): QueueView {
-  const { order, minutes } = q.steps[q.current]!
+  const steps = queueSteps(q.items)
+  const at = Math.max(0, currentIndex(q))
+  const { order, minutes } = steps[at]!
   return {
-    step: q.current + 1,
-    steps: q.steps.length,
+    step: at + 1,
+    steps: steps.length,
     loop: q.loop,
     kind: order.kind,
     ...(typeof order.task === 'string' ? { task: order.task } : {}),

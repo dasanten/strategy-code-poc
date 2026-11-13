@@ -1,5 +1,5 @@
 import { GOODS } from './shared/world.js'
-import { QUEUE_STEP_KINDS, queueStepsProblem, stepLine } from './shared/queue.js'
+import { QUEUE_STEP_KINDS, queueSteps, queueStepsProblem, stepLine } from './shared/queue.js'
 import { freeHousing } from './shared/city.js'
 import type { Building, Queue, QueueStepRequest } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
@@ -68,7 +68,7 @@ function planned(kind: Plan['kind'], ...taps: [number, number][]): Plan {
 function kept(steps: QueueStepRequest[]): Queue {
   return {
     realmId: 'r1',
-    steps: steps.map((s, i) => ({
+    items: steps.map((s, i) => ({
       ...s,
       id: s.id ?? i + 1,
     })),
@@ -179,13 +179,13 @@ describe('Add step', () => {
       const request = appendRequest(r, order, at)!
       r = { ...r, queue: kept(request.steps as QueueStepRequest[]) }
     }
-    expect(r.queue!.steps.map((s) => s.order)).toEqual([
+    expect(queueSteps(r.queue!.items).map((s) => s.order)).toEqual([
       { kind: 'walkTo', x: 20, y: 20 },
       { kind: 'task', task: 'work', workplaceId: 'f1' },
       { kind: 'store', goods: [...GOODS], to: 's1' },
     ])
     // The work gets a duration once a step follows it.
-    expect(r.queue!.steps[1]!.minutes).toBeGreaterThan(0)
+    expect(queueSteps(r.queue!.items)[1]!.minutes).toBeGreaterThan(0)
   })
 
   it('picks only what could make sense, and says why not', () => {

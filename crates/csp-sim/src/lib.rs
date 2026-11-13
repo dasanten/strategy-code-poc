@@ -86,6 +86,7 @@ pub mod placing;
 mod poc_tests;
 pub mod queries;
 pub mod queue;
+pub mod queue_tree;
 pub mod queues;
 pub mod random;
 #[cfg(test)]

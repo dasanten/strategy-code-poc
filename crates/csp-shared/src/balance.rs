@@ -2135,10 +2135,18 @@ pub const SCRIPT_MAX_VERSIONS: f64 = 40.0;
 /// only a script hammering the API ever meets it.
 pub const SCRIPT_WRITES_PER_MINUTE: f64 = 60.0;
 
-/// The most steps a queue holds (`CONTEXT.md`: Queue, Repeat block): a day's round, or a few steps
-/// repeated ten times over. With `QUEUE_STEP_MAX_CHARS` a full queue still fits the socket's
-/// largest frame (`realtime.maxPayloadBytes`).
+/// The most steps and blocks a queue holds as written (`CONTEXT.md`: Queue, Repeat block): a day's
+/// round with a few blocks; a block counts once however often it repeats. With
+/// `QUEUE_STEP_MAX_CHARS` a full queue still fits the socket's largest frame
+/// (`realtime.maxPayloadBytes`).
 pub const QUEUE_MAX_STEPS: f64 = 50.0;
+
+/// How deep a queue's blocks nest (`CONTEXT.md`: Repeat block): a block in a block in a block.
+pub const QUEUE_MAX_DEPTH: f64 = 3.0;
+
+/// The most rounds a repeat block counts (`CONTEXT.md`: Repeat block); for more, it repeats
+/// forever.
+pub const QUEUE_MAX_REPEAT: f64 = 1000.0;
 
 /// The most a queue step's order request may hold, in characters of its JSON.
 pub const QUEUE_STEP_MAX_CHARS: f64 = 1000.0;
@@ -2594,6 +2602,8 @@ pub fn balance_json() -> Value {
     m.insert("SCRIPT_MAX_VERSIONS".into(), json!(SCRIPT_MAX_VERSIONS));
     m.insert("SCRIPT_WRITES_PER_MINUTE".into(), json!(SCRIPT_WRITES_PER_MINUTE));
     m.insert("QUEUE_MAX_STEPS".into(), json!(QUEUE_MAX_STEPS));
+    m.insert("QUEUE_MAX_DEPTH".into(), json!(QUEUE_MAX_DEPTH));
+    m.insert("QUEUE_MAX_REPEAT".into(), json!(QUEUE_MAX_REPEAT));
     m.insert("QUEUE_STEP_MAX_CHARS".into(), json!(QUEUE_STEP_MAX_CHARS));
     m.insert("QUEUE_DEFAULT_STEP_MINUTES".into(), json!(QUEUE_DEFAULT_STEP_MINUTES));
     m.insert("REALM_NAME_MAX_LENGTH".into(), json!(REALM_NAME_MAX_LENGTH));

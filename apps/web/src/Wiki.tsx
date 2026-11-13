@@ -2,6 +2,8 @@ import { useEffect, type ReactNode } from 'react'
 import {
   QUEUE_DEFAULT_STEP_MINUTES,
   QUEUE_MAX_STEPS,
+  QUEUE_MAX_DEPTH,
+  QUEUE_MAX_REPEAT,
   ADULT_AGE,
   AGILITY_LIMIT,
   AGILITY_SPEED_EFFECT,
@@ -797,12 +799,12 @@ export function Wiki() {
 
       <Section id="queues">
         <p>
-          A queue gives a resident a list of steps to do one after another, up to{' '}
-          {num(QUEUE_MAX_STEPS)} of them. A step is any order you could give them on its own: walk
-          to, pick up, drop, store, fetch, drive, hitch or unhitch a horse, mount or dismount, board
-          or get off a carriage, work, build, haul, feed the stable, breed horses, tear down, Build
-          line (road or wall), relocate to another of your cities, or run one of your scripts with
-          its params.
+          A queue gives a resident a list of steps to do one after another, some of them wrapped in
+          repeat blocks, up to {num(QUEUE_MAX_STEPS)} steps and blocks in all. A step is any order
+          you could give them on its own: walk to, pick up, drop, store, fetch, drive, hitch or
+          unhitch a horse, mount or dismount, board or get off a carriage, work, build, haul, feed
+          the stable, breed horses, tear down, Build line (road or wall), relocate to another of
+          your cities, or run one of your scripts with its params.
         </p>
         <p>
           To plan ahead, use <strong>Add step</strong> right under the queue's steps on the
@@ -883,17 +885,21 @@ export function Wiki() {
         <p>
           To do some steps several times in a row, pick them (in a row) and press{' '}
           <strong>Repeat</strong>: they are wrapped in a repeat block, done {num(DEFAULT_REPEAT)}{' '}
-          times until you type another count. The block is a bracket inside Loop's, its count in its
-          head and its steps inside; it is picked, moved (into another block too), copied, pasted,
-          saved and removed as one,
-          <strong> Unwrap</strong> puts its steps back as they were, and a block can hold another.
-          Repeat blocks are the planner's own: on a resident's card, wrapping steps of a running
-          queue opens a draft of it that waits for <strong>Start queue</strong>, and starting it, or
-          Give to all on a group's plan, makes each block that many plain copies of its steps, so
-          the queue, the server and your scripts only ever see steps. The running queue lists the
-          copies, the current one marked. A queue holds at most {num(QUEUE_MAX_STEPS)} steps after
-          repeats; the planner counts them and won't give a plan over that, saying by how much. Loop
-          still loops the whole queue.
+          times until you type another count (up to {num(QUEUE_MAX_REPEAT)}), or tick{' '}
+          <strong>forever</strong>. The block is a bracket inside Loop's, its count in its head and
+          its steps inside; it is picked, moved (into another block too), copied, pasted, saved and
+          removed as one,
+          <strong> Unwrap</strong> puts its steps back as they were, and a block can hold another,
+          up to {num(QUEUE_MAX_DEPTH)} deep. The block is part of the queue itself: wrapping steps
+          of a running queue edits it live, and the resident does the block's steps round after
+          round. The running queue shows the round the block is on (“round 2 of 3”), and an edit
+          keeps it. A round in which none of its steps could start ends the block, so a block whose
+          steps all fail never spins: the queue goes on after it. A queue holds at most{' '}
+          {num(QUEUE_MAX_STEPS)} steps and blocks as written: “repeat 100 times” of two steps is
+          three. The planner counts them and won't give a plan over that, saying by how much. Loop
+          still loops the whole queue; a looping queue that got through all its steps without
+          starting one ends. Your scripts see a queue as before: the step the resident is on and its
+          number among the steps counted top to bottom, not the blocks or their rounds.
         </p>
         <p>
           A step ends when it is done (the walk arrives, the goods are stored, the script calls{' '}

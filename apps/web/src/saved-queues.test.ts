@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { stepLine } from './shared/queue.js'
 import type { QueueStepRequest } from '@csp/shared-types'
 import { stepRow } from './queue-view.js'
-import { planRows, stepCount, unroll, withIds, type PlanItem } from './plan-blocks.js'
+import { planRows, planSteps, stepCount, withIds, type PlanItem } from './plan-blocks.js'
 import {
   SAVED_QUEUES_VERSION,
   gonePlace,
@@ -160,7 +160,7 @@ describe('steps whose place is gone', () => {
 
   it('flags a loaded step in the planner when its workplace was torn down', () => {
     const queues = save({}, 'Mine run', mineRun, 1000)
-    const steps = unroll(withIds(load(queues, 'Mine run'), 1).items)
+    const steps = planSteps(withIds(load(queues, 'Mine run'), 1).items)
     const rowsOf = (lastSeen?: never[]) =>
       steps.map((s) => stepRow({ ...s, id: s.id! }, false, { buildings: [], lastSeen }))
     // The mine (b1) is torn down: neither in sight nor last seen.
@@ -183,7 +183,8 @@ describe('saved repeat blocks', () => {
     const storage = memory()
     storeQueues(storage, 'r1', save({}, 'Mine run', repeated, 1000))
     const loaded = load(readQueues(storage, 'r1'), 'Mine run')
-    expect(stepCount(loaded)).toBe(2 + 10)
+    // Its steps as written: the block repeats them on the server.
+    expect(stepCount(loaded)).toBe(4)
     expect(planRows(withIds(loaded, 1).items).map((r) => [r.kind, r.depth])).toEqual([
       ['step', 0],
       ['step', 0],

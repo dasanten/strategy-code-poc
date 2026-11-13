@@ -201,7 +201,7 @@ fn moves_the_resident_in_then_the_next_step_starts() {
     assert!(relocating_to(&s, "c2"));
     s.step_until(|g| g.r("a1").city_id.as_deref() == Some("c2"));
     s.step();
-    assert_eq!(s.r("a1").queue.as_ref().map(|q| q.current), Some(1));
+    assert_eq!(s.r("a1").queue.as_ref().and_then(|q| q.current_index()), Some(1));
     match &s.r("a1").order {
         Some(ResidentOrder::WalkTo(o)) => assert_eq!((o.target.x, o.target.y), (44.0, 10.0)),
         other => panic!("not walking: {other:?}"),
@@ -240,7 +240,7 @@ fn that_fails_on_arrival_goes_in_the_realm_log_once_and_the_next_step_starts() {
     s.give(json!({ "kind": "queue", "steps": [relocate_step("c2"), walk(44, 10)] }));
     s.step();
     s.world.cities.iter_mut().find(|c| c.id == "c2").unwrap().realm_id = Some("r2".into());
-    s.step_until(|g| g.r("a1").queue.as_ref().map(|q| q.current) == Some(1));
+    s.step_until(|g| g.r("a1").queue.as_ref().and_then(|q| q.current_index()) == Some(1));
     assert_eq!(s.r("a1").city_id.as_deref(), Some("c1"));
     assert_eq!(s.events("relocateFailed").len(), 1);
     assert_eq!(s.events("queueStepSkipped"), Vec::<Value>::new());

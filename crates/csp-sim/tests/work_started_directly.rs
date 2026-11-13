@@ -169,7 +169,7 @@ fn as_a_queue_step_works_the_workplace_the_resident_stands_on_when_the_step_star
     }
     assert_eq!((s.r("w1").x, s.r("w1").y), (6.0, 14.0));
     assert_eq!(s.working_on("w1").as_deref(), Some("f2"));
-    assert_eq!(s.r("w1").queue.as_ref().map(|q| q.current), Some(1));
+    assert_eq!(s.r("w1").queue.as_ref().and_then(|q| q.current_index()), Some(1));
     assert_eq!(s.stopped(), Vec::<String>::new());
 }
 

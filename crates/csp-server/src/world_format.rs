@@ -38,6 +38,7 @@ pub fn migrations() -> BTreeMap<u32, MigrationStep> {
     steps.insert(116, ships_take_a_crew);
     steps.insert(117, ships_are_sailed);
     steps.insert(118, cities_remember_who_outweighs_them);
+    steps.insert(119, queues_hold_blocks);
     steps
 }
 
@@ -110,6 +111,25 @@ fn ships_are_sailed(state: Value, _: &MigrationContext<'_>) -> Value {
 /// nobody, so every city starts from nothing and counts from its next planning pass: the save stays
 /// as it is, and the bump keeps a server of format 118 from loading a world that remembers.
 fn cities_remember_who_outweighs_them(state: Value, _: &MigrationContext<'_>) -> Value {
+    state
+}
+
+/// 119 → 120: queues hold blocks (`CONTEXT.md`: Repeat block, ADR 0032, T95.1): a queue's `steps`
+/// become its `items`, a tree of steps and repeat blocks, and `current` names the current step by
+/// its id rather than its place. A saved queue becomes the same steps with no blocks, on the same
+/// step.
+fn queues_hold_blocks(mut state: Value, _: &MigrationContext<'_>) -> Value {
+    let Some(residents) = state.get_mut("residents").and_then(Value::as_array_mut) else {
+        return state;
+    };
+    for q in residents.iter_mut().filter_map(|r| r.get_mut("queue")) {
+        let Some(q) = q.as_object_mut() else { continue };
+        let steps = q.remove("steps").unwrap_or(Value::Array(Vec::new()));
+        let at = q.get("current").and_then(Value::as_u64).unwrap_or(0) as usize;
+        let current = steps.get(at).and_then(|s| s.get("id")).cloned().unwrap_or(Value::from(0));
+        q.insert("items".into(), steps);
+        q.insert("current".into(), current);
+    }
     state
 }
 
@@ -332,6 +352,33 @@ mod tests {
         let migrated = migrate_world_with(save.clone(), 116, &ctx, &migrations(), 117).unwrap();
         assert_eq!(migrated, save);
         assert!(migrated["vessels"][0].get("crewIds").is_none());
+    }
+
+    #[test]
+    fn step_119_makes_a_saved_queue_the_same_steps_with_no_blocks_on_the_same_step() {
+        let terrain = ctx_terrain();
+        let ctx = MigrationContext { terrain: &terrain };
+        let walk = |id: u32| json!({ "id": id, "order": { "kind": "walkTo", "x": id, "y": 1 } });
+        let save = json!({
+            "tick": 3,
+            "residents": [
+                { "id": "w1", "queue": { "realmId": "r1", "steps": [walk(4), walk(7)],
+                    "current": 1, "startedAt": 2, "loop": true, "nextStepId": 8 } },
+                { "id": "w2", "queue": null },
+                { "id": "w3" },
+            ],
+        });
+        let migrated = migrate_world_with(save, 119, &ctx, &migrations(), 120).unwrap();
+        assert_eq!(
+            migrated["residents"][0]["queue"],
+            json!({ "realmId": "r1", "items": [walk(4), walk(7)], "current": 7, "startedAt": 2,
+                "loop": true, "nextStepId": 8 })
+        );
+        assert_eq!(migrated["residents"][1]["queue"], Value::Null);
+        // It reads as a queue of the new format.
+        let q: csp_shared::world::Queue =
+            serde_json::from_value(migrated["residents"][0]["queue"].clone()).unwrap();
+        assert_eq!(q.current_index(), Some(1));
     }
 
     #[test]

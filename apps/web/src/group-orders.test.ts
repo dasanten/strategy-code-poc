@@ -369,8 +369,8 @@ describe('group orders with Shift held', () => {
     const working = resident('b', 6, 6, {
       queue: {
         realmId: 'r1',
-        steps: [{ id: 3, order: { kind: 'task', task: 'work', workplaceId: 'farm' } }],
-        current: 0,
+        items: [{ id: 3, order: { kind: 'task', task: 'work', workplaceId: 'farm' } }],
+        current: 3,
         startedAt: 0,
         loop: true,
         nextStepId: 4,

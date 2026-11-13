@@ -1015,6 +1015,8 @@ export interface Balance {
   readonly SCRIPT_MAX_VERSIONS: number
   readonly SCRIPT_WRITES_PER_MINUTE: number
   readonly QUEUE_MAX_STEPS: number
+  readonly QUEUE_MAX_DEPTH: number
+  readonly QUEUE_MAX_REPEAT: number
   readonly QUEUE_STEP_MAX_CHARS: number
   readonly QUEUE_DEFAULT_STEP_MINUTES: number
   readonly REALM_NAME_MAX_LENGTH: number

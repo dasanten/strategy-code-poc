@@ -1,19 +1,24 @@
-import { QUEUE_DEFAULT_STEP_MINUTES, QUEUE_MAX_STEPS } from '@csp/balance'
+import {
+  QUEUE_DEFAULT_STEP_MINUTES,
+  QUEUE_MAX_DEPTH,
+  QUEUE_MAX_REPEAT,
+  QUEUE_MAX_STEPS,
+} from '@csp/balance'
 import { neverEnds, queueStepsProblem } from './shared/queue.js'
-import type { QueueStepRequest } from '@csp/shared-types'
+import type { QueueStepRequest, Repeat } from '@csp/shared-types'
 
 /**
- * Repeat blocks (`CONTEXT.md`: Repeat block): in the planner, some steps in a row wrapped with a
- * count, nestable. A plan is a list of steps and blocks; when it is given, `unroll` makes each
- * block that many plain copies of its steps, so the queue, the server and scripts only ever see
- * steps. Steps and blocks share one id space within a plan, so the planner picks, moves and
- * removes either by id.
+ * Repeat blocks (`CONTEXT.md`: Repeat block, ADR 0032): some steps in a row wrapped with a count
+ * or forever, nestable. A plan is a tree of steps and blocks, and the queue given from it is the
+ * same tree: the server runs the blocks, and a block counts once towards a queue's size however
+ * often it repeats. Steps and blocks share one id space, so the planner picks, moves and removes
+ * either by id.
  */
 
-/** Some steps in a row wrapped with a count: they run `repeat` times in a row. */
+/** Some steps in a row wrapped with a count: they run `repeat` times in a row, or forever. */
 export interface RepeatBlock {
   id?: number
-  repeat: number
+  repeat: Repeat
   items: PlanItem[]
 }
 
@@ -32,47 +37,53 @@ export function hasBlocks(items: readonly PlanItem[]): boolean {
   return items.some(isBlock)
 }
 
-/**
- * The plain steps the plan becomes: each block its steps `repeat` times over. The first copy of
- * every step keeps its id, so a step of a running queue stays that step (and the current one keeps
- * going); the other copies have none, so whoever keeps the queue gives them new ones. A step that
- * never ends on its own gets a duration once another follows it, as every planner edit does.
- */
-export function unroll(items: readonly PlanItem[]): QueueStepRequest[] {
-  return timed(unrolled(items, true))
+/** The plan's steps top to bottom, as written: each once, whatever its blocks repeat. */
+export function planSteps(items: readonly PlanItem[]): QueueStepRequest[] {
+  return items.flatMap((item) => (isBlock(item) ? planSteps(item.items) : [item]))
 }
 
-function unrolled(items: readonly PlanItem[], keepIds: boolean): QueueStepRequest[] {
-  return items.flatMap((item) => {
-    if (!isBlock(item)) return [keepIds ? copyStep(item) : withoutId(item)]
-    return Array.from({ length: item.repeat }, (_, k) =>
-      unrolled(item.items, keepIds && k === 0),
-    ).flat()
-  })
-}
-
-/** How many steps the plan becomes once unrolled. */
+/** How many steps the plan holds as written. */
 export function stepCount(items: readonly PlanItem[]): number {
-  return items.reduce((n, item) => n + (isBlock(item) ? item.repeat * stepCount(item.items) : 1), 0)
+  return planSteps(items).length
+}
+
+/** How many steps and blocks the plan holds as written: what a queue's size counts. */
+export function itemCount(items: readonly PlanItem[]): number {
+  return items.reduce((n, item) => n + 1 + (isBlock(item) ? itemCount(item.items) : 0), 0)
+}
+
+/** How deep the plan's blocks nest: 0 for steps alone. */
+export function depthOf(items: readonly PlanItem[]): number {
+  return Math.max(0, ...items.map((item) => (isBlock(item) ? 1 + depthOf(item.items) : 0)))
 }
 
 /**
- * Why the plan can't be given for its size, if it can't: more steps after repeats than a queue
- * holds (`QUEUE_MAX_STEPS`), saying by how much.
+ * Why the plan can't be given for its size, if it can't: more steps and blocks than a queue holds
+ * (`QUEUE_MAX_STEPS`), saying by how much, or blocks nested deeper than `QUEUE_MAX_DEPTH`.
  */
 export function capProblem(items: readonly PlanItem[]): string | undefined {
-  const n = stepCount(items)
-  if (n <= QUEUE_MAX_STEPS) return undefined
-  return `${n} steps after repeats, ${n - QUEUE_MAX_STEPS} more than a queue holds (${QUEUE_MAX_STEPS})`
+  const n = itemCount(items)
+  if (n > QUEUE_MAX_STEPS)
+    return `${n} steps and blocks, ${n - QUEUE_MAX_STEPS} more than a queue holds (${QUEUE_MAX_STEPS})`
+  const depth = depthOf(items)
+  if (depth > QUEUE_MAX_DEPTH)
+    return `blocks nested ${depth} deep, deeper than a queue allows (${QUEUE_MAX_DEPTH})`
+  return undefined
 }
 
 /**
- * Why the plan can't be given, if it can't: no steps, more steps after repeats than a queue holds
- * (`capProblem`), or a step the server would refuse once unrolled (`queueStepsProblem`).
+ * Why the plan can't be given, if it can't: no steps, more steps and blocks than a queue holds or
+ * nested too deep (`capProblem`), or anything else the server would refuse (`queueStepsProblem`).
  */
 export function planProblem(items: readonly PlanItem[]): string | undefined {
   if (stepCount(items) === 0) return 'no steps yet'
-  return capProblem(items) ?? queueStepsProblem(unroll(items))
+  return capProblem(items) ?? queueStepsProblem(items)
+}
+
+/** The count a block repeats, as the planner's field gives it: a whole number in range, or forever. */
+export function repeatOf(count: number | 'forever'): Repeat {
+  if (count === 'forever') return 'forever'
+  return Math.min(QUEUE_MAX_REPEAT, Math.max(1, Math.floor(count)))
 }
 
 /** A fresh copy of the items, sharing nothing, with or without their ids. */
@@ -115,7 +126,7 @@ export function idsOf(items: readonly PlanItem[]): number[] {
 /** One row of the planner's list: a step, or the head of a block, with how deep it sits. */
 export type PlanRow =
   | { kind: 'step'; id: number; depth: number; step: QueueStepRequest }
-  | { kind: 'block'; id: number; depth: number; repeat: number; steps: number }
+  | { kind: 'block'; id: number; depth: number; repeat: Repeat; steps: number }
 
 /** The plan as the planner lists it: each block's head, then its items one deeper. */
 export function planRows(items: readonly PlanItem[], depth = 0): PlanRow[] {
@@ -179,9 +190,13 @@ export function unwrap(items: readonly PlanItem[], id: number): PlanItem[] {
   })
 }
 
-/** The items with block `id` repeating `repeat` times, at least once. */
-export function setRepeat(items: readonly PlanItem[], id: number, repeat: number): PlanItem[] {
-  const n = Math.max(1, Math.floor(repeat))
+/** The items with block `id` repeating `repeat` times (a whole number in range) or forever. */
+export function setRepeat(
+  items: readonly PlanItem[],
+  id: number,
+  repeat: number | 'forever',
+): PlanItem[] {
+  const n = repeatOf(repeat)
   return items.map((item) => {
     if (!isBlock(item)) return item
     if (item.id === id) return { ...item, repeat: n }
@@ -310,20 +325,11 @@ export function timedItems(items: readonly PlanItem[]): PlanItem[] {
   return time(items)
 }
 
-/** The step the plan unrolls to last, if no block around it repeats it. */
+/** The step the plan runs last, if no block around it repeats it. */
 function lastStep(items: readonly PlanItem[]): QueueStepRequest | undefined {
   const item = items.at(-1)
   if (!item || !isBlock(item)) return item
   return item.repeat === 1 ? lastStep(item.items) : undefined
-}
-
-/** The steps with every one that never ends on its own, and isn't last, given a duration. */
-function timed(steps: QueueStepRequest[]): QueueStepRequest[] {
-  return steps.map((s, i) =>
-    s.minutes === undefined && neverEnds(s.order) && i < steps.length - 1
-      ? { ...s, minutes: QUEUE_DEFAULT_STEP_MINUTES }
-      : s,
-  )
 }
 
 function copyStep(s: QueueStepRequest): QueueStepRequest {
