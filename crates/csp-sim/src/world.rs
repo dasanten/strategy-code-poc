@@ -33,7 +33,7 @@ use crate::horses::step_horses;
 use crate::node_gen::place_resource_nodes;
 use crate::pairing::{request_births, resolve_births};
 use crate::passengers::step_passengers;
-use crate::persuasion::step_persuasion;
+use crate::persuasion::{step_outweighed, step_persuasion};
 use crate::relocating::step_relocating;
 use crate::reviving::step_feeding;
 use crate::riding::step_riders;
@@ -251,6 +251,9 @@ fn step_rest(
     // Relocating residents who stepped into their new city's area move in (`CONTEXT.md`:
     // Relocate).
     step_relocating(world, terrain);
+    // A lent resident never acts against the city that lent them (`CONTEXT.md`: Hiring from an
+    // NPC city).
+    crate::lent::drop_orders_against_lender(world);
     let strikes = request_strikes(world, size);
     let strikes_len = strikes.len();
     let combat = resolve_strikes(world, &strikes, size, &mut GameAlarms, &mut scratch.made);
@@ -311,6 +314,9 @@ fn step_rest(
     step_workplace_settings(world, scratch);
     // Offers follow what this tick took from their storages, or the storages themselves.
     step_offers(world, scratch);
+    // NPC cities weigh who outweighs them at their planning pass, once nothing else changes this
+    // tick (ADR 0033).
+    step_outweighed(world, size);
     let actions = steps
         + strikes_len
         + climbs_len
@@ -403,8 +409,8 @@ fn count_wrecked(world: &mut WorldState, wrecked: Vec<Felled>, _scratch: &mut Sc
 fn step_npc_defence(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
     crate::npc_defence::step_npc_defence(world, size);
 }
-fn step_npc_hire(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
-    crate::npc_hire::step_npc_hire(world, size);
+fn step_npc_hire(world: &mut WorldState, size: i32, scratch: &mut Scratch) {
+    scratch.lent_gear = crate::npc_hire::step_npc_hire(world, size);
 }
 /// Returns the milliseconds the cities spent planning.
 fn step_npc_cities(

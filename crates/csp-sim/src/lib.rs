@@ -43,6 +43,7 @@ pub mod hq_growth;
 pub mod invariants;
 pub mod last_seen;
 pub mod leader;
+pub mod lent;
 pub mod loading;
 #[cfg(test)]
 mod movement_test_world;

@@ -5,7 +5,7 @@ import { isAllianceCity, sharingSight } from './alliance.js'
 import { forSale } from './city.js'
 import { GOOD_WEIGHT } from './narrowed.js'
 import { freeStock, offerStorage } from './offers.js'
-import { citySoldiers, respectSeenBy } from './persuasion.js'
+import { cityStrength, respectSeenBy } from './persuasion.js'
 import { organizationLabel } from './standing.js'
 import { NO_CARAVANS, TRADE_ORG, tradeOrgHq } from './trade-org.js'
 import { pickUpTransferProblem, transferFee, transferLoad, transferWarehouses } from './transfer.js'
@@ -16,6 +16,7 @@ import {
   DEMAND_NOTE_MAX_LENGTH,
   DEMAND_YIELD_RESPECT_MIN,
   DEMAND_YIELD_RESPECT_TIMES,
+  OUTWEIGH_HOLD_DAYS,
   TICKS_PER_GAME_DAY,
 } from '@csp/balance'
 import type { City, DemandHandOver, DemandView, Good, RealmLabel, Stock } from '@csp/shared-types'
@@ -129,22 +130,27 @@ export function npcOrgsKnownTo(
 }
 
 /**
- * Whether an NPC city gives in to a realm's demand (`CONTEXT.md`: Demand): the respect it sees from
- * the realm, its armed residents and walls in the city's sight, far outweighs its soldiers. `size`
- * is the map's.
+ * Whether an NPC city gives in to a realm's demand (`CONTEXT.md`: Demand, Respect; ADR 0033): the
+ * respect it sees from the realm, the strength of its fighters near the city, is at least
+ * `DEMAND_YIELD_RESPECT_TIMES` its own side and at least `DEMAND_YIELD_RESPECT_MIN`. `size` is the
+ * map's.
  */
 export function yieldsToDemand(
-  world: Pick<WorldState, 'residents' | 'buildings' | 'cities'>,
+  world: Pick<WorldState, 'residents' | 'buildings' | 'contracts'>,
   city: City,
   realmId: string,
   size: number,
 ): boolean {
   if (!forSale(city)) return false
-  const needed = Math.max(
-    DEMAND_YIELD_RESPECT_MIN,
-    DEMAND_YIELD_RESPECT_TIMES * citySoldiers(world, city),
-  )
-  return respectSeenBy(world, city, realmId, size) >= needed
+  return respectSeenBy(world, city, realmId, size) >= demandYieldNeeded(world, city)
+}
+
+/** The respect an NPC city must see from a realm to yield to its demand. */
+export function demandYieldNeeded(
+  world: Pick<WorldState, 'residents' | 'buildings'>,
+  city: City,
+): number {
+  return Math.max(DEMAND_YIELD_RESPECT_MIN, DEMAND_YIELD_RESPECT_TIMES * cityStrength(world, city))
 }
 
 /**
@@ -252,9 +258,24 @@ export function demandHandOverProblem(
     : undefined
 }
 
+/**
+ * How long an NPC city still wavers over a demand (`CONTEXT.md`: Demand; ADR 0033): while the
+ * sender's force far outweighs it, the ticks left before it gives in; null while it doesn't, and
+ * for a demand to anyone else.
+ */
+export function demandWavering(
+  world: Pick<WorldState, 'cities' | 'tick'>,
+  d: Pick<Demand, 'toId' | 'fromId'>,
+): number | null {
+  const city = world.cities.find((c) => c.id === d.toId)
+  if (!city || !forSale(city)) return null
+  const since = city.outweighed?.find((o) => o.realmId === d.fromId)?.farSince
+  if (since === undefined) return null
+  return Math.max(0, since + OUTWEIGH_HOLD_DAYS * TICKS_PER_GAME_DAY - world.tick)
+}
 /** The demands waiting for an answer that the realm sent or was sent, oldest first. */
 export function demandsFor(
-  world: Pick<WorldState, 'demands' | 'realms' | 'residents' | 'cities'>,
+  world: Pick<WorldState, 'demands' | 'realms' | 'residents' | 'cities' | 'tick'>,
   realmId: string,
 ): DemandView[] {
   const label = (id: string): RealmLabel => ({
@@ -272,5 +293,6 @@ export function demandsFor(
       note: d.note,
       sentAt: d.sentAt,
       deadline: d.deadline,
+      wavering: demandWavering(world, d),
     }))
 }

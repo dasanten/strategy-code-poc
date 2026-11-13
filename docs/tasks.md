@@ -80,6 +80,13 @@ land before the next `dev` → `main` release. Merged into `dev` on 2026-11-11.
 boats rowed from any shore), then Ships (91: crewed ships between havens, haul routes by water),
 both ahead of Bandits.
 
+**Agreed with Daniel on 2026-11-12,** from an evaluation of the NPC planner: Cities that can't be
+talked over (Epic 96, ADR 0033: an NPC city yields only to a force that stays, and lends only what
+it can spare), then Goods get used (97: lasting outlets for a big NPC city's goods and work for its
+soldiers, the fix for its idle crowd), then NPC cities with intent (98: stance, threat memory,
+temperament, acting first), in that order, all ahead of Bandits. They touch NPC rules only and run
+alongside Ships (91) and the UI epics (92 to 95).
+
 **Agreed with Daniel on 2026-11-12,** from a UX review of the left menus and the queue editor:
 Queue planner rework (Epic 92: drafts, Clear, one-line steps, a grouped palette, blocks and
 brackets), Cities drawer (93) and Clearer menus (94: rail groups, one Diplomacy drawer, unseen
@@ -181,6 +188,9 @@ I sleep.
 | 93  | [Cities drawer](https://github.com/dasanten/strategy-code-poc/issues/1169)                      | ticketed                |
 | 94  | [Clearer menus](https://github.com/dasanten/strategy-code-poc/issues/1170)                      | ticketed                |
 | 95  | [Queue conditions](https://github.com/dasanten/strategy-code-poc/issues/1171)                   | ticketed                |
+| 96  | [Cities that can't be talked over](https://github.com/dasanten/strategy-code-poc/issues/1188)   | ticketed                |
+| 97  | [Goods get used](https://github.com/dasanten/strategy-code-poc/issues/1189)                     | scope only              |
+| 98  | [NPC cities with intent](https://github.com/dasanten/strategy-code-poc/issues/1190)             | scope only              |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.
