@@ -245,6 +245,10 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: |w, _| crate::persuasion::join_requests_sound(w),
         },
         Invariant {
+            name: "respect-sound",
+            check: |w, t| crate::persuasion::respect_sound(w, t.size),
+        },
+        Invariant {
             name: "former-players-sound",
             check: |w, _| crate::standing::former_players_sound(w),
         },
