@@ -4,18 +4,18 @@
 //! water tile, stepping on from a land tile beside it and off onto a free one.
 
 use csp_shared::terrain::{is_passable_terrain, terrain_at, TerrainMap};
-use csp_shared::world::{OrderRequest, Resident, WorldState};
+use csp_shared::world::{OrderRequest, Resident, Vessel, VesselKind, WorldState};
 
 use crate::combat::{attack_target, Target};
 use crate::order_sender::{ordered_resident, OrderSender};
-use crate::orders::{int_field, str_field, OrderKind};
+use crate::orders::{bool_field, int_field, str_field, OrderKind};
 use crate::queries::building::building_at;
 use crate::queries::carriages::driven_carriage_id;
 use crate::queries::combat::in_contact;
 use crate::queries::driving::{board_problem, carriage_of_resident};
 use crate::queries::vessels::{
-    between_vessels, board_vessel_problem, landing_tile, shore_problem, vessel_aboard,
-    vessel_by_id, vessel_of_resident,
+    across_docked_ship, between_vessels, board_vessel_problem, landing_tile, shore_problem,
+    vessel_aboard, vessel_by_id, vessel_of_resident,
 };
 use crate::walking::WalkTo;
 use crate::walls::is_wall_or_gate;
@@ -27,9 +27,15 @@ fn board_target(order: &OrderRequest) -> Option<&str> {
     str_field(order, "vesselId").or_else(|| str_field(order, "carriageId"))
 }
 
+/// Whether a board order takes the resident aboard a ship as crew (`asCrew`, `CONTEXT.md`: Crew).
+fn as_crew(order: &OrderRequest) -> bool {
+    bool_field(order, "asCrew") == Some(true)
+}
+
 /// The board order (`board`): one of the Player's residents gets on a carriage of their realm on
-/// their tile, or a vessel of their realm beside them (onto its water tile), that has room for
-/// them. What they were doing stops.
+/// their tile, or a vessel of their realm beside them (onto its water tile; a ship from the haven
+/// it is docked at), that has room for them; with `asCrew`, aboard a ship as one of its crew
+/// (`CONTEXT.md`: Crew). What they were doing stops.
 pub struct Board;
 
 impl OrderKind for Board {
@@ -47,7 +53,10 @@ impl OrderKind for Board {
         };
         let id = board_target(order);
         if let Some(v) = id.and_then(|id| vessel_by_id(world, id)) {
-            return board_vessel_problem(world, r, v);
+            return board_vessel_problem(world, r, v, as_crew(order));
+        }
+        if as_crew(order) {
+            return Some("only a ship takes a crew".into());
         }
         let carriage = world.carriages.iter().find(|k| Some(k.id.as_str()) == id);
         board_problem(world, r, carriage)
@@ -70,14 +79,23 @@ impl OrderKind for Board {
         let cid = board_target(order);
         if let Some(v) = cid.and_then(|id| vessel_by_id(world, id)) {
             // Two residents ordered onto the last room in the same tick: the first one boards.
-            if board_vessel_problem(world, &world.residents[i], v).is_some() {
+            let crew = as_crew(order);
+            if board_vessel_problem(world, &world.residents[i], v, crew).is_some() {
                 return;
             }
             let (id, x, y) = (v.id.clone(), v.x, v.y);
+            if crew {
+                let rid = world.residents[i].id.clone();
+                let vi = world.vessels.iter().position(|v| v.id == id).expect("a vessel");
+                world.vessels[vi].crew_ids.push(rid);
+            }
             let r = &mut world.residents[i];
             r.aboard = Some(id);
             (r.x, r.y) = (x, y);
             r.order = None;
+            return;
+        }
+        if as_crew(order) {
             return;
         }
         let carriage = world.carriages.iter().find(|k| Some(k.id.as_str()) == cid);
@@ -140,9 +158,7 @@ impl OrderKind for GetOff {
             let terrain = terrain?;
             let given = order.fields.contains_key("x") || order.fields.contains_key("y");
             if !given {
-                return landing_tile(world, terrain, v, None)
-                    .is_none()
-                    .then(|| "no shore beside the boat to get off onto".into());
+                return landing_tile(world, terrain, v, None).is_none().then(|| no_shore(v));
             }
             let (Some(x), Some(y)) = (int_field(order, "x"), int_field(order, "y")) else {
                 return Some("the target must be a tile".into());
@@ -259,7 +275,7 @@ impl<K: OrderKind> OrderKind for GetsOffFirst<K> {
         }
         landing_tile(world, map, v, order_tile(order).or_else(|| attack_tile(world, order)))
             .is_none()
-            .then(|| "no shore beside the boat to get off onto".into())
+            .then(|| no_shore(v))
     }
 
     fn apply(
@@ -306,10 +322,12 @@ fn attack_tile(world: &WorldState, order: &OrderRequest) -> Option<(i32, i32)> {
 /// next land tile; never someone aboard another vessel. They stay aboard for it.
 fn fights_from_aboard(world: &WorldState, r: &Resident, order: &OrderRequest, size: i32) -> bool {
     let Some(at) = attack_tile(world, order) else { return false };
-    let across = str_field(order, "targetId")
-        .and_then(|id| world.residents.iter().find(|t| t.id == id))
-        .is_some_and(|t| between_vessels(world, r, t));
-    !across && in_contact(size, (r.x as i32, r.y as i32), at)
+    let target =
+        str_field(order, "targetId").and_then(|id| world.residents.iter().find(|t| t.id == id));
+    let across = target.is_some_and(|t| between_vessels(world, r, t));
+    // From a docked ship, anyone on its haven (`CONTEXT.md`: Fighting at a vessel).
+    let haven = target.is_some_and(|t| across_docked_ship(world, r, t));
+    !across && (haven || in_contact(size, (r.x as i32, r.y as i32), at))
 }
 
 /// The tile an order acts on, if it names one.
@@ -320,8 +338,22 @@ fn order_tile(order: &OrderRequest) -> Option<(i32, i32)> {
     }
 }
 
-/// Puts the resident at `i` off whatever they are aboard, onto `tile`.
+/// Why nobody gets off a vessel with no land to get off onto (`CONTEXT.md`: Beside a vessel; a
+/// ship only at a haven).
+fn no_shore(v: &Vessel) -> String {
+    match v.kind {
+        VesselKind::Boat => "no shore beside the boat to get off onto".into(),
+        VesselKind::Ship => "the ship is not docked at a haven".into(),
+    }
+}
+
+/// Puts the resident at `i` off whatever they are aboard, onto `tile`; one of a ship's crew is
+/// its crew no more (`CONTEXT.md`: Crew).
 fn land(world: &mut WorldState, i: usize, tile: (i32, i32), size: i32) {
+    let id = world.residents[i].id.clone();
+    for v in &mut world.vessels {
+        v.crew_ids.retain(|c| *c != id);
+    }
     let r = &mut world.residents[i];
     r.aboard = None;
     r.x = f64::from(csp_shared::terrain::wrap(tile.0, size));
@@ -377,6 +409,17 @@ pub fn step_passengers(world: &mut WorldState, map: &TerrainMap) {
             world.vessels[vi].rower_id = None;
         }
     }
+    // A ship's crew who are no longer aboard it are no longer its crew (`CONTEXT.md`: Crew).
+    for vi in 0..world.vessels.len() {
+        if world.vessels[vi].crew_ids.is_empty() {
+            continue;
+        }
+        let id = world.vessels[vi].id.clone();
+        let residents = &world.residents;
+        world.vessels[vi]
+            .crew_ids
+            .retain(|c| residents.iter().any(|r| &r.id == c && r.aboard.as_deref() == Some(&id)));
+    }
 }
 
 /// `step_passengers` for one aboard something that is no carriage: a vessel, or one that is gone.
@@ -387,8 +430,10 @@ fn step_vessel_passenger(world: &mut WorldState, i: usize, map: &TerrainMap) {
             // Somehow off its tile: no longer aboard, and on land.
             world.residents[i].aboard = None;
         } else {
-            let stays =
-                vessel_of_resident(v, r) && driven_carriage_id(r).is_none() && r.riding.is_none();
+            // A thief crew aboard a ship they are taking stay too (`CONTEXT.md`: Sailing).
+            let stays = (vessel_of_resident(v, r) || v.crew_ids.contains(&r.id))
+                && driven_carriage_id(r).is_none()
+                && r.riding.is_none();
             if !stays {
                 get_off_vessel(world, i, map, None);
             }

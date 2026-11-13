@@ -32,8 +32,9 @@
   sees, run `pnpm types:rust` and commit `packages/shared-types/src/generated/` (a Rust test fails
   when it is stale). Before finishing a change to the crates: `pnpm check:rust` (fmt, clippy with
   warnings as errors, `cargo nextest run`). A test over 5 s is a regression to fix, not to tag.
-  Run cargo from PowerShell, or in bash with the MSVC `link.exe` ahead of Git's: `/usr/bin/link`
-  is not a linker.
+  Each crate's integration tests build into one binary: a new file in `tests/` goes into that
+  crate's `tests/all.rs` (a test fails when one is missing). Cargo links with `rust-lld`
+  (`.cargo/config.toml`), so it runs from PowerShell or bash alike.
 - Toolchain: the machine's default Node is too old. In bash run
   `eval "$(fnm env --shell bash)" && fnm use` first (from the repo root), and call pnpm as
   `corepack pnpm`. `gh` is at `C:\Program Files\GitHub CLI\gh.exe`.
