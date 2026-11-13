@@ -7,10 +7,10 @@ use csp_shared::balance::{BLOW_BASE, PERSUADE_STANDING, RESPECT_PER_WALL, SIGHT_
 use csp_shared::terrain::wrap_distance;
 use csp_shared::world::{City, Resident, WorldState};
 
-use super::alliance::contract_of;
 use super::city::for_sale;
 use super::city_area::city_area_tiles;
 use super::combat::{combat_skill_factor, protection, weapon_attack};
+use super::contract::is_lent_by;
 use super::residents::is_armed;
 use super::standing::standing_of;
 use super::walls::{is_wall_or_gate, wall_side};
@@ -39,12 +39,6 @@ pub fn fighter_strength(r: &Resident) -> f64 {
     (BLOW_BASE + weapon_attack(r)) * combat_skill_factor(r) + protection(r)
 }
 
-/// Whether the resident is lent by the city under a started contract (`lentBy`, Hiring from an
-/// NPC city): they never count as the hirer's fighters toward it.
-fn lent_by(world: &WorldState, city: &City, r: &Resident) -> bool {
-    contract_of(world, &r.id).is_some_and(|c| c.lender_id == city.id)
-}
-
 /// The respect an NPC city sees from an Organization (`respectSeenBy`, ADR 0033): the strength of
 /// its armed residents standing in the city's area or in sight of one of the city's residents who
 /// is at home, in that area. The Organization's walls don't count, nor what the city's people see
@@ -67,7 +61,7 @@ pub fn respect_seen_by(world: &WorldState, city: &City, org: &str, size: i32) ->
             r.health > 0.0
                 && wall_side(r) == Some(org)
                 && is_armed(&r.carried)
-                && !lent_by(world, city, r)
+                && !is_lent_by(world, &r.id, &city.id)
                 && near(tile(r))
         })
         .map(fighter_strength)

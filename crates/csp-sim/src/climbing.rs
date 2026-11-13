@@ -47,6 +47,9 @@ impl OrderKind for Climb {
             Ok(w) => w,
             Err(e) => return Some(e),
         };
+        if let Some(no) = crate::lent::refusal(world, r, &wall.id) {
+            return Some(no.into());
+        }
         let size = terrain.map_or(MAP_SIZE, |t| t.size);
         if !besides(size, (r.x, r.y), (wall.x, wall.y)) {
             return Some("stand next to the wall to climb it".into());

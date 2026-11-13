@@ -3,11 +3,27 @@
 //! sides sees it. `contractOf` is T85.5's, in `alliance.rs`.
 
 use csp_shared::time::TICKS_PER_GAME_DAY;
-use csp_shared::world::{ContractSide, MercenaryContract, WorldState};
+use csp_shared::world::{City, ContractSide, MercenaryContract, WorldState};
 use serde::Serialize;
 use ts_rs::TS;
 
+use crate::queries::alliance::contract_of;
+use crate::queries::city::for_sale;
 use crate::queries::standing::organization_label;
+
+/// The NPC city that lent the resident under a started contract, if one did (`CONTEXT.md`:
+/// Hiring from an NPC city).
+pub fn lending_city<'w>(world: &'w WorldState, resident_id: &str) -> Option<&'w City> {
+    let c = contract_of(world, resident_id)?;
+    world.cities.iter().find(|x| x.id == c.lender_id && for_sale(x))
+}
+
+/// Whether the NPC city `city_id` lent the resident (`CONTEXT.md`: Hiring from an NPC city).
+/// Such a resident never acts against that city and never counts as the hirer's fighter toward
+/// it (Respect): a one-line filter for whoever weighs the hirer's force.
+pub fn is_lent_by(world: &WorldState, resident_id: &str, city_id: &str) -> bool {
+    lending_city(world, resident_id).is_some_and(|c| c.id == city_id)
+}
 
 /// Game days in a game week, the period a contract is paid for (`GAME_DAYS_PER_WEEK`).
 pub const GAME_DAYS_PER_WEEK: f64 = 7.0;
