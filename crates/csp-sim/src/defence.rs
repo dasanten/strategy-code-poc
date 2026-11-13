@@ -9,8 +9,8 @@
 
 use csp_shared::balance::DEFEND_CALM_TICKS;
 use csp_shared::world::{
-    GivenUnderAttack, Interrupted, InterruptedAlarm, Resident, ResidentOrder, RunningScript, Task,
-    WorldState,
+    GivenUnderAttack, HaulPhase, Interrupted, InterruptedAlarm, Resident, ResidentOrder,
+    RunningScript, Task, WorldState,
 };
 
 use crate::queries::alliance::commander_of;
@@ -134,6 +134,14 @@ fn same_order(now: Option<&ResidentOrder>, kept: Option<&ResidentOrder>) -> bool
                 && a.return_goods == b.return_goods
                 && a.keep_food == b.keep_food
         }
+        (Some(ResidentOrder::HaulByWater(a)), Some(ResidentOrder::HaulByWater(b))) => {
+            a.vessel_id == b.vessel_id
+                && a.from == b.from
+                && a.to == b.to
+                && a.goods == b.goods
+                && a.return_goods == b.return_goods
+                && a.keep_food == b.keep_food
+        }
         _ => now == kept,
     }
 }
@@ -148,6 +156,16 @@ fn order_going_on(world: &WorldState, i: usize, o: Option<ResidentOrder>) -> Opt
     let id = match &o {
         ResidentOrder::Drive(d) => d.carriage_id.clone(),
         ResidentOrder::Haul(h) => h.carriage_id.clone(),
+        // A haul route by water rowing on needs its rower still at the oars (`CONTEXT.md`:
+        // Rowing); at a stop it goes on from where they stand, or ends there.
+        ResidentOrder::HaulByWater(h) => {
+            let at_oars = world.vessels.iter().any(|v| {
+                v.id == h.vessel_id
+                    && v.rower_id.as_deref() == Some(r.id.as_str())
+                    && r.aboard.as_deref() == Some(v.id.as_str())
+            });
+            return (h.phase == HaulPhase::Loading || at_oars).then_some(o);
+        }
         _ => return Some(o),
     };
     let carriage = world.carriages.iter().find(|k| k.id == id)?;
@@ -184,6 +202,7 @@ fn clear_path(o: &mut ResidentOrder) {
         ResidentOrder::WalkTo(x) => clear!(x),
         ResidentOrder::Drive(x) => clear!(x),
         ResidentOrder::Haul(x) => clear!(x),
+        ResidentOrder::HaulByWater(x) => clear!(x),
         ResidentOrder::Store(x) => clear!(x),
         ResidentOrder::Fetch(x) => clear!(x),
         ResidentOrder::Attack(x) => clear!(x),
@@ -218,6 +237,7 @@ fn goes_on_until_stopped(o: &ResidentOrder) -> bool {
     matches!(
         o,
         ResidentOrder::Haul(_)
+            | ResidentOrder::HaulByWater(_)
             | ResidentOrder::WorkAt(_)
             | ResidentOrder::Teach(_)
             | ResidentOrder::Train(_)

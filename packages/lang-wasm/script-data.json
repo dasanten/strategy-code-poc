@@ -507,7 +507,7 @@
         {
           "name": "kind",
           "type": "string",
-          "description": "The order: \"walkTo\", \"drive\", \"haul\", \"pickUp\", \"drop\", \"store\", \"fetch\", \"build\", \"tearDown\", \"workAt\", \"teach\", \"train\", \"breed\", \"attack\", \"climb\", \"roadLine\", \"wallLine\", \"pay\", \"buyCity\", \"trade\", \"swap\", \"buyHorse\", \"sellHorse\", \"handIn\", \"buyOff\", \"payDebt\", \"acceptOffer\" or \"relocate\" (on their way to `cityId`, to live there)."
+          "description": "The order: \"walkTo\", \"drive\", \"haul\", \"pickUp\", \"drop\", \"store\", \"fetch\", \"build\", \"tearDown\", \"workAt\", \"teach\", \"train\", \"breed\", \"attack\", \"climb\", \"roadLine\", \"wallLine\", \"pay\", \"buyCity\", \"trade\", \"swap\", \"buyHorse\", \"sellHorse\", \"handIn\", \"buyOff\", \"payDebt\", \"acceptOffer\", \"relocate\" (on their way to `cityId`, to live there), \"row\" or \"haulByWater\" (a haul route rowing a boat)."
         },
         {
           "name": "target",
@@ -574,6 +574,12 @@
           "nullWhen": "for other orders, and when none"
         },
         {
+          "name": "vesselId",
+          "type": "string",
+          "description": "The boat rowed, or rowed on a haul route by water.",
+          "nullWhen": "for other orders"
+        },
+        {
           "name": "stableId",
           "type": "string",
           "description": "The stable horses are bred at.",
@@ -634,7 +640,7 @@
         {
           "name": "stop",
           "type": "string",
-          "description": "The haul stop a carriage is at or bound for: \"from\" or \"to\".",
+          "description": "The haul stop a carriage or boat is at or bound for: \"from\" or \"to\".",
           "nullWhen": "for other orders"
         },
         {
@@ -1607,7 +1613,7 @@
       ]
     },
     "vessel": {
-      "description": "A boat on the water, as the Player sees it.",
+      "description": "A boat or ship on the water, as the Player sees it.",
       "fields": [
         {
           "name": "id",
@@ -1617,7 +1623,7 @@
         {
           "name": "kind",
           "type": "string",
-          "description": "What it is: \"boat\"."
+          "description": "What it is: \"boat\" or \"ship\"."
         },
         {
           "name": "realmId",
@@ -2221,7 +2227,7 @@
       "is": "query",
       "params": [],
       "cost": 20,
-      "description": "The boats the Player sees on the water.",
+      "description": "The boats and ships the Player sees on the water.",
       "returns": {
         "list": {
           "view": "vessel"
@@ -2678,10 +2684,33 @@
       "name": "board",
       "is": "action",
       "params": [
-        "carriageId"
+        "carriageId",
+        "asCrew?"
       ],
       "cost": 10,
-      "description": "Get on a carriage of my realm on my tile, or a boat of my realm beside me (on land touching its water tile), as a passenger, and go along with it. Riders dismount first: no horse goes aboard.",
+      "description": "Get on a carriage of my realm on my tile, or a boat of my realm beside me (on land touching its water tile), or a ship of my realm docked at the haven I stand on, as a passenger, and go along with it. With `asCrew` true, aboard a ship as one of its crew, who sail it and take no room (grown only). Riders dismount first: no horse goes aboard.",
+      "returns": "string"
+    },
+    {
+      "name": "loadShip",
+      "is": "action",
+      "params": [
+        "ship",
+        "goods"
+      ],
+      "cost": 10,
+      "description": "Move goods like {iron: 20} from the storage of the haven I stand on straight onto a ship of my realm docked there, by it or its id, as many as there are and fit, at once.",
+      "returns": "string"
+    },
+    {
+      "name": "unloadShip",
+      "is": "action",
+      "params": [
+        "ship",
+        "goods"
+      ],
+      "cost": 10,
+      "description": "Move goods like {ironOre: 40} off a ship of my realm, by it or its id, straight into the storage of the haven it is docked at and I stand on, as many as are aboard, at once.",
       "returns": "string"
     },
     {
@@ -2694,6 +2723,18 @@
       ],
       "cost": 10,
       "description": "Row a boat of my realm, by it or its id, to the water tile x, y, or to the nearest free water tile beside it when x, y is land. I must be aboard it or beside it (I board first), and grown. A Step at a time over water; my Strength and Seafaring set the pace, and rowing teaches Seafaring. My order is \"row\" until it gets there.",
+      "returns": "string"
+    },
+    {
+      "name": "sail",
+      "is": "action",
+      "params": [
+        "ship",
+        "x",
+        "y"
+      ],
+      "cost": 10,
+      "description": "Sail a ship, by it or its id, to the Sea tile x, y, or to the haven on x, y, docking on the free Sea tile beside it nearest the ship. I must be aboard it as one of its crew, with at least the fewest crew it sails with aboard. A Step at a time over Sea only, never onto a Lake; the crew's Seafaring sets the pace, and sailing teaches it to all of them. My order is \"sail\" until it gets there.",
       "returns": "string"
     },
     {
@@ -2719,7 +2760,7 @@
         "keepFood?"
       ],
       "cost": 10,
-      "description": "Drive a haul route between my tile and (x, y): `goods` there, `returnGoods` back.",
+      "description": "Drive a haul route between my tile and (x, y): `goods` there, `returnGoods` back. Given a boat beside me (its id as `carriageId`), row it instead between my tile and the shore or haven (x, y), loading by hand at each. Given a ship docked at the haven I stand on, I am its captain: I sail it between this haven and the haven at (x, y) with its crew aboard, moving the goods straight between each haven's storage and the ship.",
       "returns": "string"
     },
     {
@@ -3384,7 +3425,7 @@
       "is": "query",
       "params": [],
       "cost": 20,
-      "description": "The boats the Player sees on the water.",
+      "description": "The boats and ships the Player sees on the water.",
       "returns": {
         "list": {
           "view": "vessel"
@@ -3762,7 +3803,7 @@
     },
     "haul": {
       "name": "Haul",
-      "source": "// Haul (default): drive params.carriage, or while none is picked the carriage\n// on my tile when I start, on a haul route between memory.from and memory.to:\n// memory.goods there, memory.returnGoods back, memory.keepFood Food kept on\n// board for the horse and me. The route comes only from the Haul order; started\n// without one I end. The built-in haul order loads, drives and unloads, again\n// and again; this starts it at memory.from.\nparam carriage: storage // the carriage to drive; none: the one I stand on\n\nif (memory.to == null) {\n  end(\"no route given\")\n  return\n}\nif (!pickCarriage()) { return }\nif (me.order == null || me.order.kind != \"haul\") {\n  startRoute()\n  return\n}\nlogLeg()\n\n// Which carriage I drive: the one picked, else the one I started on. False\n// once I end: neither is a carriage.\nfn pickCarriage() {\n  if (params.carriage != null) {\n    if (params.carriage.kind != null) {\n      end(\"the \" + params.carriage.kind + \" is no carriage\")\n      return false\n    }\n    memory.carriageId = params.carriage.id\n  }\n  if (memory.carriageId == null) {\n    for (c of carriages()) {\n      if (c.x == me.x && c.y == me.y) { memory.carriageId = c.id }\n    }\n    if (memory.carriageId == null) {\n      end(\"no carriage on their tile\")\n      return false\n    }\n  }\n  return true\n}\n\n// The haul order, once I stand at memory.from.\nfn startRoute() {\n  if (me.x != memory.from.x || me.y != memory.from.y) { return }\n  haul(memory.carriageId, memory.to.x, memory.to.y, memory.goods, memory.returnGoods, memory.keepFood)\n}\n\n// Each leg of the route as it starts, for my log: loading at a stop, or\n// driving to one.\nfn logLeg() {\n  let leg = me.order.phase + \" \" + me.order.stop\n  if (memory.leg == leg) { return }\n  memory.leg = leg\n  let stop = memory.to\n  if (me.order.stop == \"from\") { stop = memory.from }\n  if (me.order.phase == \"loading\") { log(\"loading at \" + stop.x + \",\" + stop.y) }\n  else { log(\"driving to \" + stop.x + \",\" + stop.y) }\n}\n"
+      "source": "// Haul (default): drive params.carriage, or while none is picked the carriage\n// on my tile when I start, on a haul route between memory.from and memory.to:\n// memory.goods there, memory.returnGoods back, memory.keepFood Food kept on\n// board for the horse and me. The route comes only from the Haul order; started\n// without one I end. The built-in haul order loads, drives and unloads, again\n// and again; this starts it at memory.from. Given a boat (memory.carriageId),\n// I row it instead, from the shore beside it (a haul route by water).\nparam carriage: storage // the carriage to drive; none: the one I stand on\n\nif (memory.to == null) {\n  end(\"no route given\")\n  return\n}\nif (!pickCarriage()) { return }\nif (me.order == null || (me.order.kind != \"haul\" && me.order.kind != \"haulByWater\")) {\n  startRoute()\n  return\n}\nlogLeg()\n\n// Which carriage I drive: the one picked, else the one I started on. False\n// once I end: neither is a carriage.\nfn pickCarriage() {\n  if (params.carriage != null) {\n    if (params.carriage.kind != null) {\n      end(\"the \" + params.carriage.kind + \" is no carriage\")\n      return false\n    }\n    memory.carriageId = params.carriage.id\n  }\n  if (memory.carriageId == null) {\n    for (c of carriages()) {\n      if (c.x == me.x && c.y == me.y) { memory.carriageId = c.id }\n    }\n    if (memory.carriageId == null) {\n      end(\"no carriage on their tile\")\n      return false\n    }\n  }\n  return true\n}\n\n// The haul order, once I stand at memory.from.\nfn startRoute() {\n  if (me.x != memory.from.x || me.y != memory.from.y) { return }\n  haul(memory.carriageId, memory.to.x, memory.to.y, memory.goods, memory.returnGoods, memory.keepFood)\n}\n\n// Each leg of the route as it starts, for my log: loading at a stop, or\n// driving (rowing) to one.\nfn logLeg() {\n  let leg = me.order.phase + \" \" + me.order.stop\n  if (memory.leg == leg) { return }\n  memory.leg = leg\n  let stop = memory.to\n  if (me.order.stop == \"from\") { stop = memory.from }\n  if (me.order.phase == \"loading\") { log(\"loading at \" + stop.x + \",\" + stop.y) }\n  else if (me.order.kind == \"haulByWater\") { log(\"rowing to \" + stop.x + \",\" + stop.y) }\n  else { log(\"driving to \" + stop.x + \",\" + stop.y) }\n}\n"
     },
     "tearDown": {
       "name": "Tear down",

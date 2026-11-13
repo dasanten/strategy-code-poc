@@ -72,6 +72,14 @@ pub static WATER_COSTS: LazyLock<TerrainCosts> = LazyLock::new(|| {
     TerrainCosts(costs)
 });
 
+/// Costs for a ship (`CONTEXT.md`: Sailing): Sea only, never Lake and no land at all; diagonal
+/// steps as for a boat.
+pub static SEA_COSTS: LazyLock<TerrainCosts> = LazyLock::new(|| {
+    let mut costs = [f64::INFINITY; 256];
+    costs[Terrain::Sea as usize] = 1.0;
+    TerrainCosts(costs)
+});
+
 /// Side of the window that short paths are searched in (`PathFinder`), in tiles. A path whose ends
 /// lie within a quarter of it along each direction counts as short.
 pub const LOCAL_SIDE: i32 = 1024;

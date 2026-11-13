@@ -1493,8 +1493,22 @@ impl<'a> ScriptBindings<'a> {
             "hitch" => {
                 self.request("hitch", vec![("carriageId", place(0)?), ("horseId", place(1)?)])
             }
-            "board" => self.request("board", vec![("carriageId", p(0)?)]),
+            "board" => {
+                let mut input = vec![("carriageId", p(0)?)];
+                if a(1).is_some_and(|v| !v.is_null()) {
+                    input.push(("asCrew", p(1)?));
+                }
+                self.request("board", input)
+            }
+            "loadShip" | "unloadShip" => {
+                let unload = Some(Json::Bool(name == "unloadShip"));
+                let input = vec![("vesselId", place(0)?), ("goods", p(1)?), ("unload", unload)];
+                self.request("load", input)
+            }
             "row" => self.request("row", vec![("vesselId", place(0)?), ("x", p(1)?), ("y", p(2)?)]),
+            "sail" => {
+                self.request("sail", vec![("vesselId", place(0)?), ("x", p(1)?), ("y", p(2)?)])
+            }
             "getOff" => {
                 let given = a(0).filter(|v| !v.is_null()).or(a(1).filter(|v| !v.is_null()));
                 let input = if given.is_none() { vec![] } else { vec![("x", p(0)?), ("y", p(1)?)] };

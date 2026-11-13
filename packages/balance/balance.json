@@ -387,6 +387,9 @@
   "CARRIAGE_MAX_CAPACITY": 600.0,
   "PASSENGER_WEIGHT": 70.0,
   "BOAT_CAPACITY": 250.0,
+  "SHIP_CAPACITY": 2000.0,
+  "SHIP_MIN_CREW": 4.0,
+  "SAIL_SPEED": 1.6,
   "ROW_SPEED": 1.2,
   "ROW_STRENGTH_EFFECT": 0.03,
   "ROW_STRENGTH_AVERAGE": 10.0,
@@ -511,6 +514,10 @@
     },
     "boat": {
       "wood": 20.0
+    },
+    "ship": {
+      "wood": 120.0,
+      "iron": 15.0
     }
   },
   "BUILD_WORK": {
@@ -531,7 +538,8 @@
     "trainingGround": 4320.0,
     "haven": 5760.0,
     "carriage": 2880.0,
-    "boat": 1440.0
+    "boat": 1440.0,
+    "ship": 14400.0
   },
   "MOUNTAIN_ROAD_WORK_FACTOR": 4.0,
   "ROAD_LINE_MAX_TILES": 128.0,
@@ -783,6 +791,7 @@
     "road": 1,
     "carriage": 1,
     "boat": 1,
+    "ship": 1,
     "house": 2,
     "storage": 2,
     "smelter": 2,

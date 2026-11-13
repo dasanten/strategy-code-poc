@@ -35,7 +35,9 @@ pub fn migrations() -> BTreeMap<u32, MigrationStep> {
     steps.insert(113, goods_go_aboard);
     steps.insert(114, boats_are_rowed);
     steps.insert(115, boats_are_stolen);
-    steps.insert(116, cities_remember_who_outweighs_them);
+    steps.insert(116, ships_take_a_crew);
+    steps.insert(117, ships_are_sailed);
+    steps.insert(118, cities_remember_who_outweighs_them);
     steps
 }
 
@@ -87,10 +89,26 @@ fn boats_are_stolen(state: Value, _: &MigrationContext<'_>) -> Value {
     state
 }
 
-/// 116 → 117: an NPC city remembers since when each realm's force near it has outweighed it
+/// 116 → 117: ships take a crew (`CONTEXT.md`: Crew, Docked, T91.2): a vessel may list its
+/// `crewIds`, left out of a save while it has none. A world from before has no crew, so it stays
+/// as it is; the bump keeps a server of format 116, which refuses a field it does not know, from
+/// loading one that has.
+fn ships_take_a_crew(state: Value, _: &MigrationContext<'_>) -> Value {
+    state
+}
+
+/// 117 → 118: ships are sailed (`CONTEXT.md`: Sailing, T91.3): a resident may hold a `sail` order,
+/// and a crime or realm log line about a stolen ship says `ship`. A world from before has neither,
+/// so it stays as it is; the bump keeps a server of format 117, which refuses an order kind or field
+/// it does not know, from loading one that has. (A `haulByWater` order, T91.5, came in at 117.)
+fn ships_are_sailed(state: Value, _: &MigrationContext<'_>) -> Value {
+    state
+}
+
+/// 118 → 119: an NPC city remembers since when each realm's force near it has outweighed it
 /// (`City.outweighed`, `CONTEXT.md`: Respect; ADR 0033, T96.2). A world from before remembers
 /// nobody, so every city starts from nothing and counts from its next planning pass: the save stays
-/// as it is, and the bump keeps a server of format 116 from loading a world that remembers.
+/// as it is, and the bump keeps a server of format 118 from loading a world that remembers.
 fn cities_remember_who_outweighs_them(state: Value, _: &MigrationContext<'_>) -> Value {
     state
 }
@@ -273,7 +291,21 @@ mod tests {
     }
 
     #[test]
-    fn step_116_keeps_a_world_whose_cities_remember_nobody_outweighing_them() {
+    fn step_117_keeps_a_world_whose_ships_nobody_sailed() {
+        let terrain = ctx_terrain();
+        let ctx = MigrationContext { terrain: &terrain };
+        let save = json!({
+            "tick": 3,
+            "residents": [{ "id": "w1", "aboard": "ship1", "order": null }],
+            "vessels": [{ "id": "ship1", "kind": "ship", "realmId": "r1", "x": 4, "y": 5,
+                "load": {}, "crewIds": ["w1"] }],
+        });
+        let migrated = migrate_world_with(save.clone(), 117, &ctx, &migrations(), 118).unwrap();
+        assert_eq!(migrated, save);
+    }
+
+    #[test]
+    fn step_118_keeps_a_world_whose_cities_remember_nobody_outweighing_them() {
         let terrain = ctx_terrain();
         let ctx = MigrationContext { terrain: &terrain };
         let save = json!({
@@ -282,9 +314,24 @@ mod tests {
                 "occupation": null, "layout": "grid" }],
             "demands": [{ "id": "d1", "fromId": "r1", "toId": "n1" }],
         });
-        let migrated = migrate_world_with(save.clone(), 116, &ctx, &migrations(), 117).unwrap();
+        let migrated = migrate_world_with(save.clone(), 118, &ctx, &migrations(), 119).unwrap();
         assert_eq!(migrated, save);
         assert!(migrated["cities"][0].get("outweighed").is_none());
+    }
+
+    #[test]
+    fn step_116_keeps_a_world_whose_ships_have_no_crew() {
+        let terrain = ctx_terrain();
+        let ctx = MigrationContext { terrain: &terrain };
+        let save = json!({
+            "tick": 3,
+            "residents": [{ "id": "w1", "aboard": "ship1" }],
+            "vessels": [{ "id": "ship1", "kind": "ship", "realmId": "r1", "x": 4, "y": 5,
+                "load": {} }],
+        });
+        let migrated = migrate_world_with(save.clone(), 116, &ctx, &migrations(), 117).unwrap();
+        assert_eq!(migrated, save);
+        assert!(migrated["vessels"][0].get("crewIds").is_none());
     }
 
     #[test]

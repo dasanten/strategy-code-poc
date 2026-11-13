@@ -22,13 +22,14 @@ use crate::queries::goods::{
 };
 use crate::queries::names::{good_name, good_of, held};
 use crate::queries::warehouse_trade::is_integer;
+use crate::water_hauling::{apply_water_haul, validate_water_haul, vessel_of_haul};
 
 /// Why a resident carrying a child can't take an order that needs their hands
 /// (`CARRYING_A_CHILD`).
 pub const CARRYING_A_CHILD: &str = "carrying a child";
 
 /// The order's goods as plain data (`readGoods`): known goods, each once, at least `min`.
-fn read_goods(goods: Option<&Value>, min: usize) -> Option<Vec<Good>> {
+pub(crate) fn read_goods(goods: Option<&Value>, min: usize) -> Option<Vec<Good>> {
     let list = goods?.as_array()?;
     if list.len() < min {
         return None;
@@ -51,6 +52,10 @@ pub fn validate_haul(
     order: &OrderRequest,
     terrain: Option<&TerrainMap>,
 ) -> Option<String> {
+    // With a vessel it is a haul route by water (`CONTEXT.md`: Haul route by water).
+    if let Some(v) = vessel_of_haul(world, order) {
+        return validate_water_haul(world, sender, order, terrain, v);
+    }
     let o = &order.fields;
     let realm = realm_of(world, sender.user_id);
     let id = o.get("residentId").and_then(Value::as_str);
@@ -110,7 +115,15 @@ pub fn validate_haul(
 
 /// Gives a haul order (`haul.apply`). Of two drivers ordered onto one carriage in the same tick
 /// the first one drives it.
-pub fn apply_haul(world: &mut WorldState, _sender: &OrderSender, order: &OrderRequest) {
+pub fn apply_haul(
+    world: &mut WorldState,
+    sender: &OrderSender,
+    order: &OrderRequest,
+    terrain: Option<&TerrainMap>,
+) {
+    if vessel_of_haul(world, order).is_some() {
+        return apply_water_haul(world, sender, order, terrain);
+    }
     let o = &order.fields;
     let id = o.get("residentId").and_then(Value::as_str);
     let cid = o.get("carriageId").and_then(Value::as_str);
@@ -183,6 +196,40 @@ pub fn apply_stop(world: &mut WorldState, _sender: &OrderSender, order: &OrderRe
     }
 }
 
+/// What a haul route moves, by land or by water (`HaulOrder`, `WaterHaulOrder`): the goods to
+/// the second stop, those back, the Food kept on board, and the stop it stands at.
+pub(crate) struct RouteGoods<'a> {
+    pub goods: &'a [Good],
+    pub return_goods: &'a [Good],
+    pub keep_food: f64,
+    pub stop: HaulStop,
+}
+
+impl RouteGoods<'_> {
+    /// How much of a good the route leaves on board when unloading: the Food kept for the horse
+    /// and driver, or for the rower.
+    fn kept(&self, good: Good) -> f64 {
+        if good == Good::Food {
+            self.keep_food
+        } else {
+            0.0
+        }
+    }
+
+    /// Whether any of the goods for the second stop are on board, past what stays there.
+    pub(crate) fn loaded(&self, load: &Stock) -> bool {
+        self.goods.iter().any(|g| held(load, *g) > self.kept(*g))
+    }
+}
+
+/// What a haul route loads onto: the carriage or the vessel as a spot, what it holds, and how
+/// many more units of a good fit on it.
+pub(crate) struct OnBoard<'a> {
+    pub spot: GoodsSpot,
+    pub load: &'a Stock,
+    pub fits: &'a dyn Fn(Good) -> f64,
+}
+
 /// One take a hauler requests next at a stop (`Transfer`).
 struct Transfer {
     good: Good,
@@ -199,12 +246,12 @@ fn drive_on(o: &mut HaulOrder, stop: HaulStop) {
     o.progress = 0.0;
 }
 
-/// How much of a good the route leaves on board when unloading: the Food kept for the horse.
-fn kept(o: &HaulOrder, good: Good) -> f64 {
-    if good == Good::Food {
-        o.keep_food
-    } else {
-        0.0
+fn route_of(o: &HaulOrder) -> RouteGoods<'_> {
+    RouteGoods {
+        goods: &o.goods,
+        return_goods: &o.return_goods,
+        keep_food: o.keep_food,
+        stop: o.stop,
     }
 }
 
@@ -230,8 +277,7 @@ fn stand_with_army(
         world.residents[ri].order = None;
         return;
     };
-    let load = &world.carriages[k].load;
-    if !o.goods.iter().any(|g| held(load, *g) > kept(o, *g)) {
+    if !route_of(o).loaded(&world.carriages[k].load) {
         drive_on(haul_mut(world, ri), HaulStop::From);
     } else if !in_contact(size, (r.x as i32, r.y as i32), (spot.0 as i32, spot.1 as i32)) {
         drive_on(haul_mut(world, ri), HaulStop::To);
@@ -242,14 +288,12 @@ fn stand_with_army(
 fn next_transfer(
     world: &WorldState,
     ri: usize,
-    o: &HaulOrder,
-    k: usize,
+    route: &RouteGoods,
+    board: &OnBoard,
     spot: &GoodsSpot,
 ) -> Option<Transfer> {
     let r = &world.residents[ri];
-    let carriage = &world.carriages[k];
-    let load = &carriage.load;
-    let on_carriage = GoodsSpot::Carriage { carriage_id: carriage.id.clone() };
+    let load = board.load;
     let held_there = goods_at_spot(world, r.x, r.y, spot).cloned().unwrap_or_default();
     // A haul route leaves what is set aside for an offer alone (`CONTEXT.md`: Offer).
     let there: Stock = match spot {
@@ -258,19 +302,18 @@ fn next_transfer(
     };
     let tick = world.tick as f64;
     let hands = |g: Good| units_that_fit(r, g, tick);
-    let loadable =
-        |g: Good| held(&there, g).min(hands(g)).min(units_that_fit_carriage(world, carriage, g));
-    let (unloading, loading) = match o.stop {
-        HaulStop::To => (&o.goods, &o.return_goods),
-        HaulStop::From => (&o.return_goods, &o.goods),
+    let loadable = |g: Good| held(&there, g).min(hands(g)).min((board.fits)(g));
+    let (unloading, loading) = match route.stop {
+        HaulStop::To => (route.goods, route.return_goods),
+        HaulStop::From => (route.return_goods, route.goods),
     };
     for &good in unloading {
-        let units = (held(load, good) - kept(o, good)).min(hands(good));
+        let units = (held(load, good) - route.kept(good)).min(hands(good));
         if units > 0.0 {
-            return Some(Transfer { good, units, from: on_carriage, onto: Onto::Stop });
+            return Some(Transfer { good, units, from: board.spot.clone(), onto: Onto::Stop });
         }
     }
-    let food = (o.keep_food - held(load, Good::Food)).min(loadable(Good::Food));
+    let food = (route.keep_food - held(load, Good::Food)).min(loadable(Good::Food));
     if food > 0.0 {
         return Some(Transfer {
             good: Good::Food,
@@ -286,6 +329,40 @@ fn next_transfer(
         }
     }
     None
+}
+
+/// The hauler's take or put at their stop this tick, by hand between the stop's `spot` and what
+/// they load onto: first the goods they took last tick (`moving`) go where they were taken for,
+/// then the next take. With it, what `moving` becomes; `None` once nothing is left to move there.
+pub(crate) fn stop_action(
+    world: &WorldState,
+    ri: usize,
+    moving: Option<&HaulMoving>,
+    route: &RouteGoods,
+    board: &OnBoard,
+    spot: &GoodsSpot,
+) -> Option<(CarryAction, Option<HaulMoving>)> {
+    let r = &world.residents[ri];
+    if let Some(HaulMoving { good, before, onto }) = moving {
+        let carrying = held(&r.carried, *good) - before;
+        let to = match onto {
+            Onto::Carriage => board.spot.clone(),
+            Onto::Stop => spot.clone(),
+        };
+        if carrying > 0.0 {
+            let goods = Stock::from([(*good, carrying)]);
+            let put =
+                CarryAction { kind: CarryKind::Put, resident_id: r.id.clone(), spot: to, goods };
+            return Some((put, None));
+        }
+    }
+    let next = next_transfer(world, ri, route, board, spot)?;
+    let before = held(&r.carried, next.good);
+    let moving = HaulMoving { good: next.good, before, onto: next.onto };
+    let goods = Stock::from([(next.good, next.units)]);
+    let take =
+        CarryAction { kind: CarryKind::Take, resident_id: r.id.clone(), spot: next.from, goods };
+    Some((take, Some(moving)))
 }
 
 /// Requests this tick's takes and puts for residents on haul routes who stand at a stop
@@ -310,42 +387,22 @@ pub fn request_hauling(world: &mut WorldState, size: i32) -> Vec<CarryAction> {
             }
         }
         let spot = haul_stop_spot(world, x, y);
-        let id = world.residents[ri].id.clone();
-        if let Some(HaulMoving { good, before, onto }) = o.moving.clone() {
-            haul_mut(world, ri).moving = None;
-            let carrying = held(&world.residents[ri].carried, good) - before;
-            let to = match onto {
-                Onto::Carriage => {
-                    GoodsSpot::Carriage { carriage_id: world.carriages[k].id.clone() }
-                }
-                Onto::Stop => spot.clone(),
-            };
-            if carrying > 0.0 {
-                let goods = Stock::from([(good, carrying)]);
-                actions.push(CarryAction {
-                    kind: CarryKind::Put,
-                    resident_id: id,
-                    spot: to,
-                    goods,
-                });
-                continue;
-            }
-        }
-        if let Some(next) = next_transfer(world, ri, &o, k, &spot) {
-            let before = held(&world.residents[ri].carried, next.good);
-            haul_mut(world, ri).moving =
-                Some(HaulMoving { good: next.good, before, onto: next.onto });
-            let goods = Stock::from([(next.good, next.units)]);
-            actions.push(CarryAction {
-                kind: CarryKind::Take,
-                resident_id: id,
-                spot: next.from,
-                goods,
-            });
+        let route = route_of(&o);
+        let carriage = &world.carriages[k];
+        let fits = |g: Good| units_that_fit_carriage(world, carriage, g);
+        let board = OnBoard {
+            spot: GoodsSpot::Carriage { carriage_id: carriage.id.clone() },
+            load: &carriage.load,
+            fits: &fits,
+        };
+        let action = stop_action(world, ri, o.moving.as_ref(), &route, &board, &spot);
+        let loaded = route.loaded(board.load);
+        if let Some((action, moving)) = action {
+            haul_mut(world, ri).moving = moving;
+            actions.push(action);
             continue;
         }
-        let load = &world.carriages[k].load;
-        let loaded = o.goods.iter().any(|g| held(load, *g) > kept(&o, *g));
+        haul_mut(world, ri).moving = None;
         if o.stop == HaulStop::From && !loaded {
             continue;
         }
