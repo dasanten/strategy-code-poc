@@ -354,11 +354,10 @@ fn walk_if<'a>(
 /// block): steps and repeat blocks, at most `QUEUE_MAX_STEPS` of them as written, blocks nested at
 /// most `QUEUE_MAX_DEPTH` deep, each repeating a whole number of times up to `QUEUE_MAX_REPEAT`,
 /// forever or until a condition holds, never empty. Each step must be an order a step can be
-/// (`QUEUE_STEP_KINDS`), with a
-/// duration in whole game minutes if any; one that never ends needs a duration unless it is the
-/// last step and no block around it repeats it. A Build line step carries its whole line
-/// (`step_line`) and ends on its own once the line is built or laid out. Steps are numbered top
-/// to bottom. Takes the items as the request sent them, any JSON.
+/// (`QUEUE_STEP_KINDS`), with a duration in whole game minutes if any; one that never ends needs
+/// a duration unless it is the last step and no block around it repeats it. A Build line step
+/// carries its whole line (`step_line`) and ends on its own once the line is built or laid out.
+/// Steps are numbered top to bottom. Takes the items as the request sent them, any JSON.
 pub fn queue_steps_problem(items: Option<&Value>) -> Option<String> {
     let Some(Value::Array(items)) = items else {
         return Some("the steps must be a list".into());

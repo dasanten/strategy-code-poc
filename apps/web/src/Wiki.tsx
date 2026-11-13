@@ -886,10 +886,10 @@ export function Wiki() {
         <p>
           To do some steps several times in a row, pick them (in a row) and press{' '}
           <strong>Repeat</strong>: they are wrapped in a repeat block, done {num(DEFAULT_REPEAT)}{' '}
-          times until you type another count (up to {num(QUEUE_MAX_REPEAT)}), or tick{' '}
-          <strong>forever</strong>. The block is a bracket inside Loop's, its count in its head and
-          its steps inside; it is picked, moved (into another block too), copied, pasted, saved and
-          removed as one,
+          times until you type another count (up to {num(QUEUE_MAX_REPEAT)}), or pick{' '}
+          <strong>forever</strong> or <strong>until…</strong> in its head. The block is a bracket
+          inside Loop's, its count in its head and its steps inside; it is picked, moved (into
+          another block too), copied, pasted, saved and removed as one,
           <strong> Unwrap</strong> puts its steps back as they were, and a block can hold another,
           up to {num(QUEUE_MAX_DEPTH)} deep. The block is part of the queue itself: wrapping steps
           of a running queue edits it live, and the resident does the block's steps round after
@@ -901,6 +901,18 @@ export function Wiki() {
           still loops the whole queue; a looping queue that got through all its steps without
           starting one ends. Your scripts see a queue as before: the step the resident is on and its
           number among the steps counted top to bottom, not the blocks or their rounds.
+        </p>
+        <p>
+          <strong>Repeat until</strong> repeats the block until a condition holds (the same
+          conditions as Wait until, below), set on the card when you pick <strong>until…</strong>;{' '}
+          <strong>Change</strong> in the head sets another. The condition is checked before each
+          round: when the block's turn comes, and again after each round. Once it holds, the block
+          runs no more rounds and the queue goes on after it; a round already begun runs to its end.
+          If it holds when the block's turn comes, the block runs no round at all. It has no count,
+          so the running queue shows just the round it is on (“round 4”), and a round in which none
+          of its steps could start still ends it. For example, “repeat until the storage holds 100
+          Wood: fetch, haul” keeps hauling until the storage is full enough. A condition on a place
+          gone, or no longer your realm's, counts as false and is noted in your realm log.
         </p>
         <p>
           To do some steps only sometimes, pick them (in a row) and press <strong>If</strong> in Add

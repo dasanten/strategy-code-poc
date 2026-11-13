@@ -103,8 +103,9 @@ function isBlockLike(item: unknown): item is Record<string, unknown> {
 /**
  * Why a queue's items can't be given, if they can't (`CONTEXT.md`: Repeat block): steps and
  * repeat blocks, at most `QUEUE_MAX_STEPS` of them as written, blocks nested at most
- * `QUEUE_MAX_DEPTH` deep, each repeating a whole number of times up to `QUEUE_MAX_REPEAT` or
- * forever, never empty. Each step must be an order a step can be (`QUEUE_STEP_KINDS`), with a
+ * `QUEUE_MAX_DEPTH` deep, each repeating a whole number of times up to `QUEUE_MAX_REPEAT`,
+ * forever or until a condition holds, never empty. Each step must be an order a step can be
+ * (`QUEUE_STEP_KINDS`), with a
  * duration in whole game minutes if any; one that never ends needs a duration unless it is the
  * last step and no block around it repeats it. A Build line step carries its whole line
  * (`stepLine`) and ends on its own once the line is built or laid out. Steps are numbered top to
@@ -131,7 +132,18 @@ export function queueStepsProblem(items: unknown): string | undefined {
       if (Object.keys(item).some((k) => !['id', 'repeat', 'items'].includes(k)))
         set('a repeat block holds only its id, count and items')
       const { repeat, items: inner } = item
+      const until = typeof repeat === 'object' && repeat !== null && !Array.isArray(repeat)
+      if (until) {
+        // A Repeat until (`CONTEXT.md`: Repeat block): `{ until: condition }`.
+        if (Object.keys(repeat).some((k) => k !== 'until'))
+          set('a Repeat until holds only its condition')
+        else {
+          const p = conditionProblem((repeat as { until?: unknown }).until)
+          if (p) set(p === 'needs a condition' ? `a Repeat until ${p}` : `a Repeat until: ${p}`)
+        }
+      }
       const countOk =
+        until ||
         repeat === 'forever' ||
         (typeof repeat === 'number' &&
           Number.isInteger(repeat) &&

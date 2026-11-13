@@ -335,6 +335,11 @@ export interface Plan {
   wrap?: number[]
   /** For an If: the block whose condition changes, rather than a new one. */
   blockId?: number
+  /**
+   * With `blockId`: the block is a repeat block, and the condition set is what it repeats until
+   * (`CONTEXT.md`: Repeat block).
+   */
+  until?: boolean
 }
 
 /** The pick of the place a condition asks about (`CONTEXT.md`: Condition). */
