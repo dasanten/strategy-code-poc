@@ -487,6 +487,7 @@ pub fn bench_broadcast(
             messages_per_second: 10,
             connections_per_user: 5,
             pending_orders_per_realm: 50,
+            compress_over_bytes: 8 * 1024,
         },
         sight_check: None,
         on_error: None,

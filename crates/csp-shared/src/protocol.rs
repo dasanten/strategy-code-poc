@@ -310,6 +310,12 @@ pub struct SeenVessel {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub rower_id: Option<String>,
+    /// A ship's crew aboard, no passengers (`CONTEXT.md`: Crew); a boat has none.
+    pub crew_ids: Vec<String>,
+    /// The haven a ship is docked at (`CONTEXT.md`: Docked); none for a boat or a ship at sea.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub docked_at: Option<String>,
 }
 
 /// Which script an army runs, without its memory.

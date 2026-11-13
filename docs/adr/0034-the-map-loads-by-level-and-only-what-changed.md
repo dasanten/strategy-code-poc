@@ -85,6 +85,45 @@ in batches on one machine without a network.
 
 Each ticket of Epic 99 adds its before and after below.
 
+### T99.1: the staged Player (2026-11-12)
+
+`csp-admin map-stats` on a copy of the dev world the numbers above were measured on, for its
+Player `havencheck`, before and after `csp-admin explore havencheck --all --yes` (release build,
+the dev machine). Every later ticket compares with "after". `explore` adds no Last seen: that
+Player remembers nothing out of sight either way.
+
+| What                        | Before                    | After `explore --all`             |
+| --------------------------- | ------------------------- | --------------------------------- |
+| Explored                    | 16,867 tiles in 31 chunks | 33,177,600 tiles in 32,400 chunks |
+| Region map                  | 1 holder, 5,013 tiles     | 18 holders, 294,966 tiles         |
+| Welcome                     | 58.0 KB, 11.2 KB gzipped  | 2.78 MB, 577 KB gzipped           |
+| Welcome: `exploredChunks`   | 156 B                     | 183 KB                            |
+| Welcome: `entities`         | 16.5 KB                   | 16.5 KB                           |
+| Welcome: `lastSeen`         | 2 B                       | 2 B                               |
+| Welcome: `region`           | 40.2 KB                   | 2.58 MB                           |
+| Welcome: the rest           | 1.1 KB                    | 1.1 KB                            |
+| `map-stats` / `explore` run | 0.3 s                     | 2.3 s; `explore --all` 1.8 s      |
+
+### T99.2: terrain responses travel compressed
+
+Measured on 2026-11-12 through the server's own router (`CompressionLayer` at its default levels),
+on the full map generated from seed 1 with one Player who explored all of it, asking for every chunk
+in batches of 64. Not checked in a browser's Network tab.
+
+| What                         | Before (uncompressed) | After, gzip                | After, zstd                |
+| ---------------------------- | --------------------- | -------------------------- | -------------------------- |
+| The whole map at full detail | 32,400 chunks, 32 MB  | 0.43 MB (77 times smaller) | 0.45 MB (75 times smaller) |
+| A batch of 64 chunks         | 64.5 KB               | 0.7 KB                     | 0.8 KB                     |
+
+### T99.3: large WebSocket messages travel gzipped
+
+| Ticket                        | Before                                    | After                                                                  |
+| ----------------------------- | ----------------------------------------- | ---------------------------------------------------------------------- |
+| T99.3 (WebSocket compression) | the welcome: 63,201 bytes as a text frame | 12,990 bytes as a gzipped binary frame (21%); only messages over 8 KiB |
+
+T99.3 measured on 2026-11-12 on a copy of a dev world (tick about 810, a Player with one young
+city), with a Node WebSocket client against the server: the same welcome at protocol 0 and 1.
+
 ### T99.7: Last seen costs a tick only what changed
 
 `bench-broadcast villages <clients> 100` (60 NPC villages on a 432 × 432 map, a Player's realm

@@ -307,6 +307,9 @@ describe('doingLine', () => {
     expect(doingLine({ order: null, aboard: 'boat7' }, { scripts, buildings, residents: [] })).toBe(
       'Aboard a boat',
     )
+    expect(doingLine({ order: null, aboard: 'ship3' }, { scripts, buildings, residents: [] })).toBe(
+      'Aboard a ship',
+    )
   })
 
   it('says a passenger is aboard, and where the carriage is heading while it is driven', () => {

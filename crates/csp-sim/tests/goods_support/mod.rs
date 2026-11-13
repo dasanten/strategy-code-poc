@@ -108,7 +108,7 @@ pub fn apply(world: &mut WorldState, sender: &OrderSender, o: &OrderRequest, siz
         "drop" => carrying::apply_drop(world, sender, o),
         "store" => storing::apply_store(world, sender, o, size),
         "fetch" => storing::apply_fetch(world, sender, o, size),
-        "haul" => hauling::apply_haul(world, sender, o),
+        "haul" => hauling::apply_haul(world, sender, o, None),
         "stop" => hauling::apply_stop(world, sender, o),
         "buyCity" => buying::apply_buy_city(world, sender, o),
         "buy" => trading::apply_trade(world, sender, o, TradeSide::Buy),
@@ -208,8 +208,9 @@ pub fn same(a: &Stock, b: &Stock) -> bool {
     a.len() == b.len() && a.iter().all(|(g, n)| b.get(g) == Some(n))
 }
 
-/// Asserts a stock holds just these goods: `assert_stock!(r.carried, { "food": 5 })`.
-#[macro_export]
+/// Asserts a stock holds just these goods: `assert_stock!(r.carried, { "food": 5 })`. A test file
+/// takes it with `#[macro_use] mod goods_support;`.
+#[allow(unused_macros)]
 macro_rules! assert_stock {
     ($got:expr, $want:tt) => {{
         let want: csp_shared::world::Stock =

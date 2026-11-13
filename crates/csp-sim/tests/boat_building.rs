@@ -70,6 +70,7 @@ fn boat(id: &str, x: f64, y: f64) -> Vessel {
         y,
         load: Stock::new(),
         rower_id: None,
+        crew_ids: Vec::new(),
     }
 }
 
@@ -190,11 +191,11 @@ fn floats_on_the_nearest_free_water_tile_when_the_next_one_is_taken() {
     let mut world = setup();
     world.vessels.push(boat("v1", 20.0, 6.0));
     // Straight east is taken: the diagonals come next, north first.
-    assert_eq!(launch_tile(&world, &t, 19, 6), Some((20, 5)));
+    assert_eq!(launch_tile(&world, &t, 19, 6, VesselKind::Boat), Some((20, 5)));
     world.vessels.push(boat("v2", 20.0, 5.0));
     world.vessels.push(boat("v3", 20.0, 7.0));
     // Every water tile next to it taken: the nearest free one further out.
-    assert_eq!(launch_tile(&world, &t, 19, 6), Some((21, 6)));
+    assert_eq!(launch_tile(&world, &t, 19, 6, VesselKind::Boat), Some((21, 6)));
     nearly_done(&mut world);
     work_on_it(&mut world, &t);
     assert!(vessel_at(&world, 21, 6).is_some());
