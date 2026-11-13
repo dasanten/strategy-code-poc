@@ -60,10 +60,12 @@ pub fn encode_explored_counts(counts: impl IntoIterator<Item = (u32, u16)>) -> V
 /// The chunks and counts of an [`encode_explored_counts`] list.
 pub fn decode_explored_counts(list: &[u32]) -> Vec<(u32, u16)> {
     let mut at = 0;
-    list.chunks_exact(2)
-        .map(|pair| {
-            at += pair[0];
-            (at, pair[1] as u16)
+    list.as_chunks::<2>()
+        .0
+        .iter()
+        .map(|&[step, count]| {
+            at += step;
+            (at, count as u16)
         })
         .collect()
 }
