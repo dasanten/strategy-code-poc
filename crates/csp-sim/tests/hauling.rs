@@ -5,6 +5,7 @@
 //! through the database (T87); here the restart is a round trip of the world through its JSON.
 
 mod common;
+#[macro_use]
 mod goods_support;
 
 use csp_shared::balance::{AVERAGE_HORSE_STATS, CARRIAGE_CAPACITY, MAX_HEALTH, MAX_HUNGER};

@@ -454,7 +454,8 @@ export function stepLabel(
   // A storage or stable in sight a store or fetch names, if it names one, or a boat; a carriage
   // goes unnamed.
   const named = (word: string, id: unknown) => {
-    if (typeof id === 'string' && isVesselId(id)) return `${word} the boat`
+    if (typeof id === 'string' && isVesselId(id))
+      return `${word} the ${id.startsWith('ship') ? 'ship' : 'boat'}`
     const b = buildings.find((b) => b.id === id)
     if (!b) return ''
     const city = cityOf(b)
@@ -465,12 +466,17 @@ export function stepLabel(
       return `Walk to ${at(order)}`
     case 'drive':
       return `Drive the carriage to ${at(order)}`
-    case 'board':
-      return order.vesselId !== undefined || isVesselId(order.carriageId as string | undefined)
-        ? 'Board the boat'
-        : 'Board the carriage'
+    case 'board': {
+      const vessel = (order.vesselId ?? order.carriageId) as string | undefined
+      if (!isVesselId(vessel)) return 'Board the carriage'
+      // Named after its kind, as the server names its ids (`isVesselId`).
+      if (vessel!.startsWith('ship')) return order.asCrew ? 'Crew the ship' : 'Board the ship'
+      return 'Board the boat'
+    }
     case 'row':
       return `Row the boat to ${at(order)}`
+    case 'sail':
+      return `Sail the ship to ${at(order)}`
     case 'unhitch':
       return 'Unhitch the horse'
     case 'hitch':

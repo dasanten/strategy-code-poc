@@ -17,7 +17,7 @@ import {
 import { horsesInNeed } from './shared/reviving.js'
 import { isDown, GOODS, STAT_NAMES, SKILL_NAMES } from './shared/world.js'
 import { inContact } from './shared/combat.js'
-import { isVesselId } from './shared/vessels.js'
+import { isVesselId, vesselCapacity, vesselName } from './shared/vessels.js'
 import {
   LINE_BUILDING,
   isLineOrder,
@@ -35,7 +35,6 @@ import {
 } from './shared/building.js'
 import {
   CARRIAGE_CAPACITY,
-  BOAT_CAPACITY,
   PASSENGER_WEIGHT,
   CARRYING_DAYS,
   FEED_UNITS,
@@ -62,6 +61,7 @@ import { putAwayUnits } from './shared/goods.js'
 import { nameProblem } from './shared/names.js'
 import type {
   SeenVessel,
+  VesselKind,
   Building,
   Carriage,
   City,
@@ -983,6 +983,11 @@ export function orderDoing(
     if (!o.path) return `Finding a way over the water to ${o.target.x}, ${o.target.y}`
     return `Rowing to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
   }
+  if (o?.kind === 'sail') {
+    // `CONTEXT.md`: Sailing.
+    if (!o.path) return `Finding a way over the Sea to ${o.target.x}, ${o.target.y}`
+    return `Sailing to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
+  }
   if (o?.kind === 'haul') {
     const what = o.goods.map((g) => GOOD_LABELS[g].toLowerCase()).join(', ')
     const { x, y } = o[o.stop]
@@ -992,6 +997,24 @@ export function orderDoing(
     const back = o.returnGoods.map((g) => GOOD_LABELS[g].toLowerCase()).join(', ')
     const leg =
       o.stop === 'to' ? `Hauling ${what} to` : back ? `Hauling ${back} back to` : 'Driving back to'
+    return o.path ? `${leg} ${x}, ${y} · ${left(o.path)}` : `${leg} ${x}, ${y}`
+  }
+  if (o?.kind === 'haulByWater') {
+    // `CONTEXT.md`: Haul route by water.
+    const what = o.goods.map((g) => GOOD_LABELS[g].toLowerCase()).join(', ')
+    const { x, y } = o[o.stop]
+    if (o.phase === 'loading') {
+      return o.stop === 'from' ? `Loading ${what} at ${x}, ${y}` : `Unloading ${what} at ${x}, ${y}`
+    }
+    const back = o.returnGoods.map((g) => GOOD_LABELS[g].toLowerCase()).join(', ')
+    // A ship's captain sails it (`CONTEXT.md`: Sailing); the server names its id after its kind.
+    const doing = o.vesselId.startsWith('ship') ? 'Sailing' : 'Rowing'
+    const leg =
+      o.stop === 'to'
+        ? `${doing} ${what} to`
+        : back
+          ? `${doing} ${back} back to`
+          : `${doing} back to`
     return o.path ? `${leg} ${x}, ${y} · ${left(o.path)}` : `${leg} ${x}, ${y}`
   }
   if (o?.kind === 'pickUp') return 'Picking up goods'
@@ -1282,7 +1305,10 @@ export function GroupCard({
    * The realm's boats someone of the group stands beside, with how many more passengers fit in
    * each, to board (`CONTEXT.md`: Beside a vessel).
    */
-  boats?: { vessel: Pick<SeenVessel, 'id' | 'x' | 'y'>; seats: number }[]
+  boats?: {
+    vessel: Pick<SeenVessel, 'id' | 'x' | 'y'> & Partial<Pick<SeenVessel, 'kind' | 'dockedAt'>>
+    seats: number
+  }[]
   /** Everyone in sight, to say where a passenger's carriage is heading (`doingLine`). */
   inSight?: readonly SeenResident[]
   /** The cities the Player knows, to name where a resident relocates to (`doingLine`). */
@@ -1397,8 +1423,10 @@ export function GroupCard({
   })
   const act = (a: CardAction<GroupButton>) => {
     if (tab !== 'orders' && a.id !== 'script') showTab('orders')
-    // With one carriage or boat to board they board that; with several, a panel lists them.
-    if (a.id === 'board' && carriages.length + boats.length === 1) {
+    // With one carriage or boat to board they board that; with several, or a ship (as crew or as
+    // passengers, `CONTEXT.md`: Crew), a panel lists them.
+    const ship = boats.some((b) => b.vessel.kind === 'ship')
+    if (a.id === 'board' && carriages.length + boats.length === 1 && !ship) {
       if (boats[0]) return onOrder({ kind: 'boardBoat', ...boats[0] })
       const { carriage, seats } = carriages[0]!
       return onOrder({ kind: 'board', carriage, seats })
@@ -1436,21 +1464,28 @@ export function GroupCard({
                 Board at {carriage.x}, {carriage.y}
               </button>
             ))}
-            {boats.map(({ vessel, seats }) => (
-              <button
-                type="button"
-                key={vessel.id}
-                onClick={() => {
-                  setPanel(undefined)
-                  onOrder({ kind: 'boardBoat', vessel, seats })
-                }}
-              >
-                Board the boat at {vessel.x}, {vessel.y}
-              </button>
-            ))}
+            {boats.flatMap(({ vessel, seats }) => {
+              const board = (asCrew: boolean, label: string) => (
+                <button
+                  type="button"
+                  key={`${vessel.id}-${asCrew}`}
+                  onClick={() => {
+                    setPanel(undefined)
+                    onOrder({ kind: 'boardBoat', vessel, seats, ...(asCrew ? { asCrew } : {}) })
+                  }}
+                >
+                  {label}
+                </button>
+              )
+              const at = `${vessel.x}, ${vessel.y}`
+              return vessel.kind === 'ship'
+                ? [board(true, `Crew the ship at ${at}`), board(false, `Board the ship at ${at}`)]
+                : [board(false, `Board the boat at ${at}`)]
+            })}
           </div>
           <p className="muted small">
-            Those standing on the carriage, or beside the boat, board it, until it is full.
+            Those standing on the carriage, or beside the boat, board it, until it is full; a ship's
+            from the haven it is docked at, as its crew (who take no room) or as passengers.
           </p>
         </section>
       )}
@@ -1827,6 +1862,7 @@ export function ResidentCard({
   pile,
   storage,
   onPickUp,
+  onLoad,
   onDrop,
   building,
   road,
@@ -1967,9 +2003,9 @@ export function ResidentCard({
   /** A carriage of the realm on the resident's tile (`CONTEXT.md`: Passenger), to board. */
   carriageToBoard: { id: string } | undefined
   /** A boat of the realm beside the resident with room (`CONTEXT.md`: Beside a vessel), to board. */
-  boatToBoard?: { id: string } | undefined
+  boatToBoard?: { id: string; kind?: VesselKind } | undefined
   /** A boat of the realm the resident is aboard or beside, to row, and why they can't now (`CONTEXT.md`: Rowing). */
-  boatToRow?: { id: string; problem?: string }
+  boatToRow?: { id: string; problem?: string; ship?: boolean }
   /**
    * Another organization's boat (or nobody's) beside the resident, to row off, and why it can't be
    * taken now, if so (`CONTEXT.md`: Stealing a carriage or horse, its vessel part).
@@ -1980,7 +2016,7 @@ export function ResidentCard({
   /** Starts (or cancels) picking a tile to row the boat to. */
   onRowTo?: () => void
   /** Orders the resident to board that carriage, or with none to get off the one they are on. */
-  onBoard: (carriageId?: string) => void
+  onBoard: (carriageId?: string, asCrew?: boolean) => void
   /**
    * A carriage of the realm on the resident's tile with a horse hitched to it, to unhitch
    * (`CONTEXT.md`: Hitched horse).
@@ -2024,6 +2060,11 @@ export function ResidentCard({
   storage: Building | undefined
   /** Orders the resident to take goods from a spot on their tile. */
   onPickUp: (from: GoodsSpot, goods: Stock) => void
+  /**
+   * Moves goods straight between the haven's storage and the ship docked there, onto the ship or
+   * with `unload` off it (`CONTEXT.md`: Docked).
+   */
+  onLoad?: (vesselId: string, goods: Stock, unload: boolean) => void
   /** Orders the resident to put carried goods at a spot on their tile. */
   onDrop: (to: GoodsSpot, goods: Stock) => void
   /** The building or construction site on the resident's tile, if one is in sight. */
@@ -2215,7 +2256,15 @@ export function ResidentCard({
     driving: r.order?.kind === 'drive' || r.order?.kind === 'haul',
     carriageToBoard: !!carriageToBoard,
     boatToBoard: !!boatToBoard,
-    ...(boatToRow ? { boatToRow: boatToRow.problem ? { problem: boatToRow.problem } : {} } : {}),
+    shipToBoard: boatToBoard?.kind === 'ship',
+    ...(boatToRow
+      ? {
+          boatToRow: {
+            ...(boatToRow.problem ? { problem: boatToRow.problem } : {}),
+            ...(boatToRow.ship ? { ship: true } : {}),
+          },
+        }
+      : {}),
     carriageToUnhitch: !!carriageToUnhitch,
     horseToHitch: !!toHitch,
     carrying: !!r.carrying,
@@ -2272,10 +2321,12 @@ export function ResidentCard({
   // The open order's panel, right under the row that opened it (`ActionRows`).
   const openPanel = shown && (
     <div className="sel-panel">
-      {shown === 'haul' && carriage && (
+      {shown === 'haul' && (carriage || boatToRow) && (
         <HaulBlock
           adult={!child}
-          onRoute={r.order?.kind === 'haul'}
+          onRoute={r.order?.kind === 'haul' || r.order?.kind === 'haulByWater'}
+          byWater={!carriage}
+          ship={!carriage && !!boatToRow?.ship}
           picking={picking === 'haul'}
           onHaulTo={onHaulTo}
         />
@@ -2353,6 +2404,27 @@ export function ResidentCard({
           mapSize={mapSize}
           onTeach={(subject) => onTeach(building.id, subject)}
         />
+      )}
+      {shown === 'board' && boatToBoard && (
+        <section className="inspector-block" aria-label="Board ship">
+          <p className="muted small">
+            Crew sail the ship and take no room; a passenger rides along and counts against its
+            load.
+          </p>
+          <div className="order-buttons">
+            <button
+              type="button"
+              disabled={child}
+              title={child ? 'children can’t crew a ship' : undefined}
+              onClick={() => onBoard(boatToBoard.id, true)}
+            >
+              As crew
+            </button>
+            <button type="button" onClick={() => onBoard(boatToBoard.id, false)}>
+              As passenger
+            </button>
+          </div>
+        </section>
       )}
       {shown === 'hitch' && toHitch && (
         <HitchBlock
@@ -2489,15 +2561,36 @@ export function ResidentCard({
                 />
               )}
               {boat?.load && (
-                // From beside it; its passengers count against what it holds (`CONTEXT.md`: Beside
-                // a vessel).
+                // From beside it, a ship's from its haven; its passengers count against what it
+                // holds (`CONTEXT.md`: Beside a vessel, Docked).
                 <TileGoods
-                  title={`In the boat · ${kg(stockWeight(boat.load) + boat.passengerIds.length * PASSENGER_WEIGHT)} / ${kg(BOAT_CAPACITY)}`}
+                  title={`In the ${vesselName(boat)} · ${kg(stockWeight(boat.load) + boat.passengerIds.length * PASSENGER_WEIGHT)} / ${kg(vesselCapacity(boat.kind))}`}
                   stock={boat.load}
                   spot={inBoat}
                   onPickUp={onPickUp}
                   refused={refused}
                 />
+              )}
+              {storage && boat?.kind === 'ship' && storage.id === boat.dockedAt && onLoad && (
+                // Straight between the haven's storage and the ship (`CONTEXT.md`: Docked).
+                <>
+                  <TileGoods
+                    title="From the haven onto the ship"
+                    stock={storage.stock}
+                    spot={inStorage}
+                    label="Load ship"
+                    onPickUp={(_, goods) => onLoad(boat.id, goods, false)}
+                    refused={refused}
+                  />
+                  <TileGoods
+                    title="From the ship into the haven"
+                    stock={boat.load}
+                    spot={inBoat}
+                    label="Unload"
+                    onPickUp={(_, goods) => onLoad(boat.id, goods, true)}
+                    refused={refused}
+                  />
+                </>
               )}
               {downHere.map((d) => (
                 <TileGoods
@@ -2868,13 +2961,16 @@ export function ResidentCard({
 }
 
 /**
- * Setting up a haul route with the carriage on the resident's tile (`CONTEXT.md`: Haul route):
- * which goods go from here to the other stop, which come back, and how much Food stays on board
- * for the horse, then the other stop on the map.
+ * Setting up a haul route with the carriage on the resident's tile (`CONTEXT.md`: Haul route), or
+ * the boat beside them (Haul route by water): which goods go from here to the other stop, which
+ * come back, and how much Food stays on board for the horse or the rower, then the other stop on
+ * the map.
  */
 function HaulBlock({
   adult,
   onRoute,
+  byWater = false,
+  ship = false,
   picking,
   onHaulTo,
 }: {
@@ -2882,6 +2978,10 @@ function HaulBlock({
   adult: boolean
   /** Already hauling on a route. */
   onRoute: boolean
+  /** With the boat beside them, rowed between shores or havens. */
+  byWater?: boolean
+  /** With a ship docked at their haven, sailed between havens by its crew. */
+  ship?: boolean
   /** The map is waiting for the route's other stop. */
   picking: boolean
   onHaulTo: (setup: HaulSetup) => void
@@ -2919,7 +3019,11 @@ function HaulBlock({
         </div>
       ))}
       <label className="small">
-        Food kept for the horse{' '}
+        {ship
+          ? 'Food kept for the crew'
+          : byWater
+            ? 'Food kept for the rower'
+            : 'Food kept for the horse'}{' '}
         <input
           type="number"
           min={0}
@@ -2946,12 +3050,29 @@ function HaulBlock({
           give={() => onHaulTo({ goods, returnGoods, keepFood })}
         />
       </div>
-      <p className="muted small">
-        The driver loads the picked goods here, drives them to the other stop and unloads them,
-        brings the goods picked to come back, again and again until stopped. A stop with a storage
-        loads and unloads there, else on the ground. The horse eats from the carriage’s load; its
-        Food is topped up wherever there is some.
-      </p>
+      {ship ? (
+        <p className="muted small">
+          The captain moves the picked goods straight from this haven onto the ship, sails it with
+          the crew to the other haven, gets off and unloads them there, brings the goods picked to
+          come back, again and again until stopped; the rest of the crew stays aboard. The crew take
+          meals from the ship’s Food, topped up at any haven with some.
+        </p>
+      ) : byWater ? (
+        <p className="muted small">
+          The rower loads the picked goods into the boat from this shore, rows them to the other
+          stop (a shore tile or a haven, with free water beside it), gets off and unloads them,
+          brings the goods picked to come back, again and again until stopped. A haven loads and
+          unloads at its storage, a shore on the ground. The rower takes meals from the boat’s Food,
+          topped up wherever there is some.
+        </p>
+      ) : (
+        <p className="muted small">
+          The driver loads the picked goods here, drives them to the other stop and unloads them,
+          brings the goods picked to come back, again and again until stopped. A stop with a storage
+          loads and unloads there, else on the ground. The horse eats from the carriage’s load; its
+          Food is topped up wherever there is some.
+        </p>
+      )}
     </section>
   )
 }
@@ -3861,11 +3982,14 @@ export function TileGoods({
   spot,
   onPickUp,
   refused,
+  label = 'Pick up',
 }: {
   title: string
   stock: Stock | undefined
   spot: GoodsSpot
   onPickUp: (from: GoodsSpot, goods: Stock) => void
+  /** The button's label: "Pick up", or what else takes them. */
+  label?: string
   /** Whether the resident may not pick up this good, as a child anything but Food. */
   refused: (good: Good) => boolean
 }) {
@@ -3881,7 +4005,7 @@ export function TileGoods({
           units={units}
           byDefault={units}
           disabled={refused(good)}
-          actions={[{ label: 'Pick up', spot }]}
+          actions={[{ label, spot }]}
           onAct={onPickUp}
         />
       ))}
