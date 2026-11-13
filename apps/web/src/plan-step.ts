@@ -305,6 +305,8 @@ export interface Picked {
 export interface Plan {
   kind: PlanStepId
   picked: Picked[]
+  /** The step or block it goes after, set by the planner's insert point; at the end without. */
+  after?: number
   /** Why the last tap picked nothing, said under the banner. */
   error?: string
 }
@@ -469,7 +471,7 @@ export function planCities(seen: RelocateWorld, realmId: string): PlanCity[] {
  */
 export function pickCity(plan: Plan, city: Pick<PlanCity, 'id' | 'x' | 'y'>): Plan {
   if (nextPick(plan)?.pick !== 'city') return plan
-  return { kind: plan.kind, picked: [...plan.picked, { x: city.x, y: city.y, id: city.id }] }
+  return { ...plan, picked: [...plan.picked, { x: city.x, y: city.y, id: city.id }] }
 }
 
 /** The plan with a tap on the map picked into it, or why the tap picked nothing. */
@@ -478,7 +480,9 @@ export function pickInto(w: PlanWorld, plan: Plan, at: { x: number; y: number })
   if (!next) return plan
   const picked = planPickAt(w, next.pick, at)
   if (typeof picked === 'string') return { ...plan, error: picked }
-  return { kind: plan.kind, picked: [...plan.picked, picked] }
+  const kept = { ...plan }
+  delete kept.error
+  return { ...kept, picked: [...plan.picked, picked] }
 }
 
 /** What the card's ask answered: goods with units, a kind to build, two horses, and so on. */

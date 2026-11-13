@@ -87,6 +87,12 @@ soldiers, the fix for its idle crowd), then NPC cities with intent (98: stance, 
 temperament, acting first), in that order, all ahead of Bandits. They touch NPC rules only and run
 alongside Ships (91) and the UI epics (92 to 95).
 
+**Agreed with Daniel on 2026-11-12,** from a UX review of the left menus and the queue editor:
+Queue planner rework (Epic 92: drafts, Clear, one-line steps, a grouped palette, blocks and
+brackets), Cities drawer (93) and Clearer menus (94: rail groups, one Diplomacy drawer, unseen
+marks) run side by side, all client only; then Queue conditions (95, ADR 0032: repeat blocks on the
+server, If blocks, Wait until), which needs Epic 92 on `dev`. All ahead of Bandits.
+
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
 
@@ -178,6 +184,10 @@ I sleep.
 | 89  | [Rust follow-ups](https://github.com/dasanten/strategy-code-poc/issues/1126)                    | ticketed                |
 | 90  | [Havens and boats](https://github.com/dasanten/strategy-code-poc/issues/1146)                   | ticketed                |
 | 91  | [Ships](https://github.com/dasanten/strategy-code-poc/issues/1153)                              | ticketed                |
+| 92  | [Queue planner rework](https://github.com/dasanten/strategy-code-poc/issues/1168)               | ticketed                |
+| 93  | [Cities drawer](https://github.com/dasanten/strategy-code-poc/issues/1169)                      | ticketed                |
+| 94  | [Clearer menus](https://github.com/dasanten/strategy-code-poc/issues/1170)                      | ticketed                |
+| 95  | [Queue conditions](https://github.com/dasanten/strategy-code-poc/issues/1171)                   | ticketed                |
 | 96  | [Cities that can't be talked over](https://github.com/dasanten/strategy-code-poc/issues/1188)   | ticketed                |
 | 97  | [Goods get used](https://github.com/dasanten/strategy-code-poc/issues/1189)                     | scope only              |
 | 98  | [NPC cities with intent](https://github.com/dasanten/strategy-code-poc/issues/1190)             | scope only              |

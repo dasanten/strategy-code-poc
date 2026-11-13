@@ -579,6 +579,16 @@ export function Wiki() {
           the same order.
         </p>
         <p>
+          The tool rail on the left opens drawers over the map, one at a time, in three groups:
+          People (Residents, Horses, Armies), Diplomacy, and Realm (Cities, Waypoints, Scripts,
+          Realm log). The Diplomacy drawer has a tab each for Contracts, Demands, Direct offers,
+          Alliance and Standing; it reopens on the tab you left it on, and a notice’s Open takes you
+          to its tab. A small dot on a rail button or tab says it holds something you haven’t seen
+          yet: a demand, Direct offer or contract offer sent to you, or Realm log lines newer than
+          the last time you had the log open. Opening it there clears the dot. On a phone the menu
+          button shows the dot too.
+        </p>
+        <p>
           The Residents drawer’s Open full list button opens the list across the screen, with
           everyone’s age, city, stats, skills, gear, what they carry, hunger, health and what they
           are doing. On a phone each resident is a small card. Tap one to open that resident’s card,
@@ -795,19 +805,35 @@ export function Wiki() {
           its params.
         </p>
         <p>
-          To plan ahead, use <strong>Add step</strong> under the queue on the resident's card: it
-          lists every kind of step. One that acts on a place (work a workplace, build, store at or
-          fetch from a storage, pick up, feed the stable, breed, …) has you pick that place on the
-          map, anywhere, not only where the resident stands now; one that needs more (which goods,
-          what to build, what a smithy makes, which script) asks for it on the card after. What to
-          build is the same Build menu as on the card; a kind dimmed because the tile lacks
-          something today, such as a city's area, can still be added, for a step before it may bring
-          that. A step that has to be done on its tile goes after a walk there, unless the step
-          before already walks there. It works on a resident with no queue too, and starts one.
-          Adding a step only checks that it could make sense (the place is there as you last knew
-          it, and a carriage or horse is yours). A workplace or construction site can be anyone's,
-          in sight or as last seen, since a workplace has no owner: queue Work at a far mine and
-          they walk there and work it. Whether a step can start is checked when its turn comes.
+          To plan ahead, use <strong>Add step</strong> right under the queue's steps on the
+          resident's card: a palette of every kind of step, each with its icon, grouped as the
+          Orders tab is (Move, Work &amp; build, Goods, Scripts), plus Flow with{' '}
+          <strong>Repeat</strong> for the picked steps. Customise is the small ⚙ beside a step. New
+          steps go at the end; tap the <strong>+</strong> between two steps to add the next ones
+          there instead, and tap it again to go back to the end. One that acts on a place (work a
+          workplace, build, store at or fetch from a storage, pick up, feed the stable, breed, …)
+          has you pick that place on the map, anywhere, not only where the resident stands now; one
+          that needs more (which goods, what to build, what a smithy makes, which script) asks for
+          it on the card after. What to build is the same Build menu as on the card; a kind dimmed
+          because the tile lacks something today, such as a city's area, can still be added, for a
+          step before it may bring that. A step that has to be done on its tile goes after a walk
+          there, unless the step before already walks there; one that acts on no place (Explore,
+          Dismount, Get off, Run script) gets no walk. Adding a step only checks that it could make
+          sense (the place is there as you last knew it, and a carriage or horse is yours). A
+          workplace or construction site can be anyone's, in sight or as last seen, since a
+          workplace has no owner: queue Work at a far mine and they walk there and work it. Whether
+          a step can start is checked when its turn comes.
+        </p>
+        <p>
+          For a resident with no queue, the steps you add, paste or load collect as a{' '}
+          <strong>draft</strong>, marked “Draft, not started”: nothing runs until you press{' '}
+          <strong>Start queue</strong>, which gives it. <strong>Discard draft</strong> throws it
+          away. A running queue is edited live; <strong>Edit as draft</strong> copies it into a
+          draft while the queue runs on untouched, and Start queue replaces it (the step they are on
+          keeps going if it is still in it). A draft is kept in this browser and lost on reloading
+          the page. <strong>Clear</strong> empties a draft or a group's plan. On a running queue it
+          asks first, then removes every step but the one the resident is on and turns loop off, so
+          they finish that step and the queue ends; <strong>Stop</strong> still halts them at once.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while you give an order (a button, its key, or a tile picked on the
@@ -821,8 +847,17 @@ export function Wiki() {
         </p>
         <p>
           The resident's card lists the queue with the current step marked and what they are doing
-          in it. Drag a step or use its arrows to reorder it, remove it, type a duration in game
-          minutes (the real time shows beside it) or clear it, and switch loop on or off.
+          in it, each step on one line with an icon for its kind of order and its place by name: a
+          building with its city (“Walk to Farm, Quarrytown IV”), a waypoint or a city, or the
+          tile's coordinates when nothing is there. A step's duration shows as a chip when it has
+          one, or when it needs one; tap it to type the duration in game minutes (the real time
+          shows beside it), empty it to clear it. The steps sit in a bracket, <strong>Loop</strong>,
+          with its switch in its head: on, the first step follows the last. Drag a step to reorder
+          it, also into or out of a repeat block's bracket, or focus it and press <kbd>Alt</kbd>+
+          <kbd>↑</kbd> or <kbd>Alt</kbd>+<kbd>↓</kbd>. On a phone, tap the steps to move to pick
+          them, then tap <strong>Move here</strong> where they go. A step kind dragged from Add step
+          and dropped between two steps is planned there. Remove a step with ✕. The planner's{' '}
+          <strong>?</strong> shows how it works.
         </p>
         <p>
           To reuse steps, tap one in the planner to pick it (<kbd>Shift</kbd>+tap picks a range;
@@ -835,27 +870,30 @@ export function Wiki() {
           step keeps its places and the walk before it, and is checked again when its turn comes.
         </p>
         <p>
-          To keep a plan, <strong>Save…</strong> it under a name, such as “Mine run”; saving under a
-          name already taken asks before it overwrites. <strong>Load…</strong> lists the saved
-          queues with their step count and date, to load one or delete it; loading adds its steps
-          after the planned ones, in any resident's planner or a group's. Saved queues are kept in
-          this browser, as saved groups are: the server never sees them, and another browser has its
-          own. A saved step keeps its places, so one whose building is gone from the map (torn down,
-          say) is flagged in the planner; it is still given, and skipped when its turn comes.
+          To keep a plan, open the planner's <strong>Saved…</strong> and save it under a name, such
+          as “Mine run”; saving under a name already taken asks before it overwrites. Saved… also
+          lists the saved queues with their step count and date, to load one or delete it (a
+          resident with nothing queued has <strong>Load…</strong> for the same list); loading adds
+          its steps after the planned ones, in any resident's planner or a group's. Saved queues are
+          kept in this browser, as saved groups are: the server never sees them, and another browser
+          has its own. A saved step keeps its places, so one whose building is gone from the map
+          (torn down, say) is flagged in the planner; it is still given, and skipped when its turn
+          comes.
         </p>
         <p>
           To do some steps several times in a row, pick them (in a row) and press{' '}
           <strong>Repeat</strong>: they are wrapped in a repeat block, done {num(DEFAULT_REPEAT)}{' '}
-          times until you type another count. The block shows its count with its steps indented
-          under it; it is picked, moved, copied, pasted, saved and removed as one,
+          times until you type another count. The block is a bracket inside Loop's, its count in its
+          head and its steps inside; it is picked, moved (into another block too), copied, pasted,
+          saved and removed as one,
           <strong> Unwrap</strong> puts its steps back as they were, and a block can hold another.
-          Repeat blocks are the planner's own: on a resident's card, wrapping steps opens a plan of
-          their queue that waits for <strong>Give</strong> (or Discard), and giving it, or Give to
-          all on a group's plan, makes each block that many plain copies of its steps, so the queue,
-          the server and your scripts only ever see steps. The running queue lists the copies, the
-          current one marked. A queue holds at most {num(QUEUE_MAX_STEPS)} steps after repeats; the
-          planner counts them and won't give a plan over that, saying by how much. Loop still loops
-          the whole queue.
+          Repeat blocks are the planner's own: on a resident's card, wrapping steps of a running
+          queue opens a draft of it that waits for <strong>Start queue</strong>, and starting it, or
+          Give to all on a group's plan, makes each block that many plain copies of its steps, so
+          the queue, the server and your scripts only ever see steps. The running queue lists the
+          copies, the current one marked. A queue holds at most {num(QUEUE_MAX_STEPS)} steps after
+          repeats; the planner counts them and won't give a plan over that, saying by how much. Loop
+          still loops the whole queue.
         </p>
         <p>
           A step ends when it is done (the walk arrives, the goods are stored, the script calls{' '}
@@ -2143,16 +2181,16 @@ export function Wiki() {
         </p>
         <h3>Direct offers</h3>
         <p>
-          Under <strong>Direct offers</strong> on the tool rail you can send an offer to one realm
-          you know of: one you see residents of, an ally, one whose city you have seen, one with a
-          standing either way, or your side in a contract, demand or direct offer. Name a storage of
-          yours, and the goods are set aside there as for any offer. They hear at once wherever they
-          are, with a notice and the place, and only they can accept it: someone of theirs goes to
-          the storage and takes it in person, as with any offer, or they decline it from anywhere.
-          Anyone else in sight of the storage sees it, and that it is for another realm. It lapses
-          after {num(DIRECT_OFFER_DAYS)} game days. Declined, lapsed or taken down, the goods are
-          ordinary again and both of you are told. At most {num(DIRECT_OFFERS_TO_ONE_REALM)} can
-          stand to one realm.
+          Under <strong>Direct offers</strong> in the Diplomacy drawer you can send an offer to one
+          realm you know of: one you see residents of, an ally, one whose city you have seen, one
+          with a standing either way, or your side in a contract, demand or direct offer. Name a
+          storage of yours, and the goods are set aside there as for any offer. They hear at once
+          wherever they are, with a notice and the place, and only they can accept it: someone of
+          theirs goes to the storage and takes it in person, as with any offer, or they decline it
+          from anywhere. Anyone else in sight of the storage sees it, and that it is for another
+          realm. It lapses after {num(DIRECT_OFFER_DAYS)} game days. Declined, lapsed or taken down,
+          the goods are ordinary again and both of you are told. At most{' '}
+          {num(DIRECT_OFFERS_TO_ONE_REALM)} can stand to one realm.
         </p>
         <p>
           Or have the Trade Organization carry it, while the HQ stands. Name a city of yours and a
@@ -2843,9 +2881,9 @@ export function Wiki() {
           A demand tells another realm what you want and by when: <strong>a named city</strong> of
           theirs, or <strong>goods or Coins</strong>, with a note of at most{' '}
           {num(DEMAND_NOTE_MAX_LENGTH)} characters and a deadline of up to {days(DEMAND_MAX_DAYS)}.
-          Open <strong>Demands</strong> on the tool rail to send one or to answer one. Scripts can
-          too (<code>sendDemand</code>, <code>acceptDemand</code>, <code>declineDemand</code>,{' '}
-          <code>demands</code>).
+          Open <strong>Demands</strong> in the Diplomacy drawer to send one or to answer one.
+          Scripts can too (<code>sendDemand</code>, <code>acceptDemand</code>,{' '}
+          <code>declineDemand</code>, <code>demands</code>).
         </p>
         <ul>
           <li>
@@ -2854,7 +2892,7 @@ export function Wiki() {
             in a contract, demand or Direct offer.
           </li>
           <li>
-            It arrives at once, wherever they are, in their Demands drawer and as a notice. A realm
+            It arrives at once, wherever they are, on their Demands tab and as a notice. A realm
             sends at most {num(DEMANDS_PER_GAME_DAY)} a game day, scripts included.
           </li>
           <li>
