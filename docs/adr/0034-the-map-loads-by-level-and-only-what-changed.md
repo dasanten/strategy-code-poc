@@ -175,3 +175,16 @@ most 64 chunks of 1 KB each. Before, the staged Player's whole map at full detai
 level-0 chunk on screen, 32,400 chunks in 507 requests, each painted. No zoom on that screen puts
 more than 300 chunks on screen (`MAX_CHUNKS_ON_SCREEN`, tested). A coarse chunk's texture is
 32 × 32 texels (4 KB), not 128 × 128 (64 KB). Time and memory in the browser are not measured yet.
+
+### T99.8: the Region map travels per chunk, only where it changed
+
+| What                                  | Before (whole, as tile lists)                       | After (per chunk, as runs)                    |
+| ------------------------------------- | --------------------------------------------------- | --------------------------------------------- |
+| Region map in the welcome             | 40,206 bytes of JSON                                | 1,830 bytes                                   |
+| Region map per game hour, nothing new | 40,206 bytes (all of it again), 11.4 KB gzipped     | nothing                                       |
+| Chunks whose explored terrain grew    | a small update every 10 ticks or so (46 to 61 bytes) | only where what the Player sees there changed |
+| The whole welcome, gzipped            | 12,975 bytes                                        | 4,552 bytes                                   |
+
+T99.8 measured on 2026-11-13 on the same copy of a dev world (tick about 870 to 1,100, one
+Player with one young city), with a Node WebSocket client listening for 150 s, about two and a
+half game hours.
