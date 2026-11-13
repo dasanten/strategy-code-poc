@@ -110,16 +110,33 @@ Measured on 2026-11-12 through the server's own router (`CompressionLayer` at it
 on the full map generated from seed 1 with one Player who explored all of it, asking for every chunk
 in batches of 64. Not checked in a browser's Network tab.
 
-| What                         | Before (uncompressed) | After, gzip         | After, zstd         |
-| ---------------------------- | --------------------- | ------------------- | ------------------- |
+| What                         | Before (uncompressed) | After, gzip                | After, zstd                |
+| ---------------------------- | --------------------- | -------------------------- | -------------------------- |
 | The whole map at full detail | 32,400 chunks, 32 MB  | 0.43 MB (77 times smaller) | 0.45 MB (75 times smaller) |
-| A batch of 64 chunks         | 64.5 KB               | 0.7 KB              | 0.8 KB              |
+| A batch of 64 chunks         | 64.5 KB               | 0.7 KB                     | 0.8 KB                     |
 
 ### T99.3: large WebSocket messages travel gzipped
 
-| Ticket                        | Before                                    | After                                                                   |
-| ----------------------------- | ----------------------------------------- | ----------------------------------------------------------------------- |
+| Ticket                        | Before                                    | After                                                                  |
+| ----------------------------- | ----------------------------------------- | ---------------------------------------------------------------------- |
 | T99.3 (WebSocket compression) | the welcome: 63,201 bytes as a text frame | 12,990 bytes as a gzipped binary frame (21%); only messages over 8 KiB |
 
 T99.3 measured on 2026-11-12 on a copy of a dev world (tick about 810, a Player with one young
 city), with a Node WebSocket client against the server: the same welcome at protocol 0 and 1.
+
+### T99.7: Last seen costs a tick only what changed
+
+`bench-broadcast villages <clients> 100` (60 NPC villages on a 432 × 432 map, a Player's realm
+for each client, the first Player remembering every building and city: 7,200 with 1 client,
+7,680 with 5), release build, on the dev machine on 2026-11-12 while other sessions were building.
+The Broadcast phase, before and after; the bytes sent are the same (12.2 KB a tick with 1 client,
+54.6 KB with 5).
+
+| Broadcast phase | Before: mean, p95  | After: mean, p95   |
+| --------------- | ------------------ | ------------------ |
+| 1 client        | 28.07 ms, 86.99 ms | 5.55 ms, 12.09 ms  |
+| 5 clients       | 42.29 ms, 73.76 ms | 11.79 ms, 14.82 ms |
+
+With 5,000 remembered buildings and nothing changing, a tick now copies none of them and turns
+none into JSON (tested by counting); before, every tick turned all of them into JSON for every
+socket.
