@@ -212,8 +212,9 @@ button.hud-logout {
   background: var(--rel-own);
   color: var(--ui-ink);
 }
-.hud-rail button:hover::after,
-.hud-rail button:focus-visible::after {
+/* Not on the open drawer's own button: there it would cover the drawer's title. */
+.hud-rail button:not(.on):hover::after,
+.hud-rail button:not(.on):focus-visible::after {
   content: attr(data-tip);
   position: absolute;
   left: 44px;
@@ -2576,4 +2577,20 @@ button.residents-row.selected:hover {
 }
 .diplomacy-tabs button.on .unseen-mark {
   background: var(--ui-ink);
+}
+/* The legend keeps clear of an open drawer: beside it, or out of sight beside a wide or full one
+   and on a phone, where drawers fill the screen. */
+.game:has(.hud-drawer:not([hidden])) .game-map .map-legend-panel,
+.game:has(.hud-drawer:not([hidden])) .game-map .map-legend-button {
+  left: calc(
+    var(--rail-w) + min(var(--drawer-w, 380px), calc(100vw - var(--rail-w))) + 12px
+  );
+}
+.game:has(.hud-drawer.wide:not([hidden])) .game-map .map-legend-panel,
+.game:has(.hud-drawer.wide:not([hidden])) .game-map .map-legend-button,
+.game:has(.hud-drawer.full:not([hidden])) .game-map .map-legend-panel,
+.game:has(.hud-drawer.full:not([hidden])) .game-map .map-legend-button,
+.game.phone:has(.hud-drawer:not([hidden])) .game-map .map-legend-panel,
+.game.phone:has(.hud-drawer:not([hidden])) .game-map .map-legend-button {
+  display: none;
 }
