@@ -1178,14 +1178,6 @@ pub fn build_app(opts: AppOptions) -> Router {
         .route("/api/admin/invites", post(admin_invites))
         .route("/api/admin/password", post(admin_password))
         .route("/api/admin/tick-health", get(admin_tick_health));
-    if let (Some(rt), Some(game)) = (opts.realtime.clone(), state.game.clone()) {
-        api = api.route(
-            crate::realtime::WS_PATH,
-            get(move |headers: HeaderMap, ws: axum::extract::ws::WebSocketUpgrade| {
-                crate::realtime::upgrade(rt, game, headers, ws)
-            }),
-        );
-    }
     if state.game.is_some() {
         api = api
             .route("/api/terrain/{cx}/{cy}", get(terrain_chunk))
@@ -1207,7 +1199,21 @@ pub fn build_app(opts: AppOptions) -> Router {
             );
     }
 
-    let mut app = api.merge(auth).merge(script_writes);
+    // API responses go out compressed when the request accepts it (ADR 0034): terrain is
+    // `application/octet-stream`, which Caddy does not compress. The layer compresses as the body
+    // is sent, on the HTTP threads, never in a job on the game thread. Routes added after it (the
+    // WebSocket upgrade, the built client's files) stay as they are.
+    let mut app = api.merge(auth).merge(script_writes).layer(
+        tower_http::compression::CompressionLayer::new().gzip(true).zstd(true).no_br().no_deflate(),
+    );
+    if let (Some(rt), Some(game)) = (opts.realtime.clone(), state.game.clone()) {
+        app = app.route(
+            crate::realtime::WS_PATH,
+            get(move |headers: HeaderMap, ws: axum::extract::ws::WebSocketUpgrade| {
+                crate::realtime::upgrade(rt, game, headers, ws)
+            }),
+        );
+    }
     app = match opts.web_dist.filter(|d| d.is_dir()) {
         Some(dir) => {
             let index = Arc::new(dir.join("index.html"));
