@@ -22,6 +22,8 @@ export interface MapWorld {
   map: { size: number }
   /** Chunks whose terrain may be loaded; any copy of `grownChunks` loaded before is stale. */
   exploredChunks: ReadonlySet<number>
+  /** How many tiles of each explored chunk are explored, where the browser keeps terrain (ADR 0034). */
+  exploredCounts?: ReadonlyMap<number, number>
   grownChunks: readonly number[]
   /** Whose realm is "own", its Leader, and where the view centres. */
   home: { realmId: string; leaderId: string | null; cityId?: string | null; x: number; y: number }

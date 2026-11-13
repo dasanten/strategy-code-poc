@@ -527,7 +527,14 @@ async fn sends_a_new_client_a_large_welcome_gzipped_and_a_small_message_as_text(
     let (welcome, gunzipped) = raw_next(&mut new).await;
     assert_eq!(welcome["type"], "welcome");
     assert_eq!(new.frames, vec![("welcome".to_owned(), true)]);
-    assert_eq!(gunzipped, as_text, "the binary frame gunzips to the JSON sent as text");
+    // The binary frame gunzips to the JSON an older client gets as text, but for explored
+    // terrain, which a new client gets with its counts.
+    let (mut new_json, mut old_json): (Value, Value) =
+        (serde_json::from_str(&gunzipped).unwrap(), serde_json::from_str(&as_text).unwrap());
+    assert_eq!(new_json, welcome);
+    assert!(new_json.as_object_mut().unwrap().remove("exploredCounts").is_some());
+    assert!(old_json.as_object_mut().unwrap().remove("exploredChunks").is_some());
+    assert_eq!(new_json, old_json);
     new.send(
         json!({ "type": "order", "requestId": "o1", "order": { "kind": "wait", "ticks": 1 } }),
     )
@@ -1122,7 +1129,7 @@ async fn map_stats_prints_the_bytes_of_the_welcome_the_server_sends_part_by_part
         })
         .await
         .unwrap();
-    let mut second = connect(&s).await;
+    let mut second = connect_speaking(&s, PROTOCOL_VERSION).await;
     let welcome = second.next("welcome").await;
     assert!(welcome["region"]["holders"].as_array().is_some_and(|h| !h.is_empty()));
     let stats = map_stats(&s.conn()).unwrap();
@@ -1134,7 +1141,7 @@ async fn map_stats_prints_the_bytes_of_the_welcome_the_server_sends_part_by_part
     assert_eq!(w.total, welcome.to_string().len());
     assert_eq!(w.explored_chunks + w.entities + w.last_seen + w.region + w.rest, w.total);
     assert_eq!(w.region, welcome["region"].to_string().len());
-    assert_eq!(daniel.explored_chunks, welcome["exploredChunks"].as_array().unwrap().len());
+    assert_eq!(daniel.explored_chunks * 2, welcome["exploredCounts"].as_array().unwrap().len());
     let holders = welcome["region"]["holders"].as_array().unwrap();
     assert_eq!(daniel.region_holders, holders.len());
     let tiles: usize = holders.iter().map(|h| h["tiles"].as_array().unwrap().len()).sum();
@@ -1143,4 +1150,64 @@ async fn map_stats_prints_the_bytes_of_the_welcome_the_server_sends_part_by_part
     let saves: i64 =
         s.conn().query_row("SELECT count(*) FROM world_saves", [], |r| r.get(0)).unwrap();
     assert_eq!(saves, 1);
+}
+
+/// A list of `encode_explored_counts` as JSON, read back.
+fn counts_of(v: &Value) -> Vec<(u32, u16)> {
+    let list: Vec<u32> = serde_json::from_value(v.clone()).unwrap();
+    csp_shared::chunks::decode_explored_counts(&list)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn tells_a_client_of_the_counts_version_how_much_of_each_chunk_is_explored_as_it_grows() {
+    let s = start(StartOptions::default()).await;
+    let user = s.user_id as u64;
+    let mut c = connect_speaking(&s, PROTOCOL_VERSION).await;
+    let welcome = c.next("welcome").await;
+    assert!(welcome.get("exploredChunks").is_none());
+    let explored = s.game.run(move |g, _| g.explored.lock().unwrap().explored_counts(user)).await;
+    let sent = counts_of(&welcome["exploredCounts"]);
+    assert!(!sent.is_empty());
+    assert_eq!(Some(sent.clone()), explored);
+    // Every count is the chunk's explored tiles, counted from the bitmap.
+    let scanned = s
+        .game
+        .run(move |g, _| {
+            let ex = g.explored.lock().unwrap();
+            sent.iter()
+                .map(|&(c, _)| {
+                    let (cx, cy) = ((c % 4) as i32 * 32, (c / 4) as i32 * 32);
+                    let mut n = 0u16;
+                    for y in cy..cy + 32 {
+                        for x in cx..cx + 32 {
+                            n += u16::from(ex.is_explored(user, x, y));
+                        }
+                    }
+                    (c, n)
+                })
+                .collect::<Vec<_>>()
+        })
+        .await
+        .unwrap();
+    assert_eq!(Some(scanned), explored);
+    // The Player explores further: the tick tells the grown chunks' new counts.
+    let grown =
+        s.game.run(move |g, _| g.explored.lock().unwrap().explore(user, 70, 70, 20)).await.unwrap();
+    assert!(!grown.is_empty());
+    let set: BTreeSet<usize> = grown.iter().map(|&c| c as usize).collect();
+    s.broadcast_grown([(user, set)].into_iter().collect()).await;
+    let tick = c.next("tick").await;
+    let counts = counts_of(&tick["exploredCounts"]);
+    assert_eq!(counts.iter().map(|&(c, _)| c).collect::<Vec<_>>(), grown);
+    let now = s.game.run(move |g, _| g.explored.lock().unwrap().explored_counts(user)).await;
+    for (c, n) in &counts {
+        assert!(now.as_ref().unwrap().contains(&(*c, *n)));
+    }
+    // A tick with nothing grown sends no counts; an older client never gets them.
+    s.broadcast().await;
+    assert!(c.next("tick").await.get("exploredCounts").is_none());
+    let mut old = connect(&s).await;
+    let welcome = old.next("welcome").await;
+    assert!(welcome.get("exploredCounts").is_none());
+    assert!(welcome["exploredChunks"].as_array().is_some_and(|l| !l.is_empty()));
 }

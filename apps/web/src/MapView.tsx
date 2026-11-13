@@ -21,7 +21,8 @@ import {
   type Covered,
   type Size,
 } from './map/camera.js'
-import { ChunkStore, chunkByChunk, exploredChunkBatches } from './map/chunks.js'
+import { ChunkStore, chunkByChunk, exploredChunkBatches, type ChunkSource } from './map/chunks.js'
+import { cachedSource, countsAt, openTerrainCache } from './map/terrain-cache.js'
 import { selectedWay, wayInView, wayLine } from './map/way.js'
 import { TerrainLayer } from './map/terrain-layer.js'
 import { CoarseLayer, type LevelChunk } from './map/coarse-layer.js'
@@ -169,6 +170,7 @@ export function MapView({
   onTerrainLoaded,
   focus,
   terrainPath,
+  keepTerrainFor,
   start,
   onView,
   newRealm = false,
@@ -219,6 +221,11 @@ export function MapView({
   focus?: { x: number; y: number; scale?: number; cover?: Covered }
   /** Where terrain chunks load from; the Player's explored terrain by default. */
   terrainPath?: (cx: number, cy: number) => string
+  /**
+   * Whose explored terrain the browser keeps between visits (ADR 0034): the Player in the world
+   * of that seed. None keeps nothing (the admin map).
+   */
+  keepTerrainFor?: { seed: number; player: string }
   /** Where the view starts, instead of the home city at the starting zoom. */
   start?: Camera
   /** Called with the camera and the screen's size whenever the view moves or resizes. */
@@ -253,6 +260,7 @@ export function MapView({
   onViewRef.current = onView
   const startRef = useRef(start)
   const terrainPathRef = useRef(terrainPath)
+  const keepTerrainForRef = useRef(keepTerrainFor)
   const overviewRef = useRef<(overview: Uint8Array | null) => void>(() => {})
   const redrawRef = useRef<() => void>(() => {})
   const motionRef = useRef<(world: MapWorld) => void>(() => {})
@@ -379,6 +387,27 @@ export function MapView({
     let ready = false
     let frame = 0
 
+    // The terrain this browser kept for the Player, used where it is at the count of explored
+    // tiles the chunk has now (ADR 0034). The counts of a level are worked out again when the
+    // Player's counts change.
+    let counts: {
+      from?: ReadonlyMap<number, number>
+      levels: Map<number, ReadonlyMap<number, number>>
+    } = { levels: new Map() }
+    const countOf = (i: number, level: number) => {
+      const all = worldRef.current.exploredCounts
+      if (!all) return undefined
+      if (counts.from !== all) counts = { from: all, levels: new Map() }
+      let at = counts.levels.get(level)
+      if (!at) counts.levels.set(level, (at = countsAt(all, across, level)))
+      return at.get(i)
+    }
+    const keptTerrain = (source: ChunkSource): ChunkSource => {
+      const keep = keepTerrainForRef.current
+      if (!keep) return source
+      return cachedSource(source, openTerrainCache(keep.seed, keep.player), countOf)
+    }
+
     const store = new ChunkStore(
       () => worldRef.current.exploredChunks,
       across,
@@ -408,7 +437,7 @@ export function MapView({
       },
       terrainPathRef.current
         ? chunkByChunk(terrainPathRef.current, across)
-        : exploredChunkBatches(),
+        : keptTerrain(exploredChunkBatches()),
     )
     // Zoomed out, the coarse levels of explored terrain, under the full-detail chunks (ADR 0034).
     const coarseLayer = new CoarseLayer(mapSize, (i, level) => store.get(i, level))

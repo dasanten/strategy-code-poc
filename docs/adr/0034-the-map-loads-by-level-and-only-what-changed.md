@@ -175,3 +175,13 @@ most 64 chunks of 1 KB each. Before, the staged Player's whole map at full detai
 level-0 chunk on screen, 32,400 chunks in 507 requests, each painted. No zoom on that screen puts
 more than 300 chunks on screen (`MAX_CHUNKS_ON_SCREEN`, tested). A coarse chunk's texture is
 32 × 32 texels (4 KB), not 128 × 128 (64 KB). Time and memory in the browser are not measured yet.
+
+### T99.9: explored terrain stays in the browser (2026-11-13)
+
+Counted from the code, not measured in the browser. The welcome to a client of protocol version 2
+lists each explored chunk with its count of explored tiles, as steps between indices and counts:
+for the staged Player (`explore --all`) 32,400 pairs `1,1024`, about 230 KB of JSON before the
+welcome's gzip and a few KB after it, where the plain list was 183 KB. A second page load answers
+every chunk kept at the same count from IndexedDB, so it makes no terrain request for what the
+first visit loaded, at any level; after exploring further only the grown chunks, and the coarse
+chunks holding them, are fetched. Requests and bytes in the browser are not measured yet.

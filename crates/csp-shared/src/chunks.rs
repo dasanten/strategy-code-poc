@@ -41,6 +41,33 @@ pub fn chunks_across(size: i32) -> i32 {
     (size + CHUNK_SIZE - 1).div_euclid(CHUNK_SIZE)
 }
 
+/// A Player's explored chunks with how many of each one's tiles they explored, as the welcome and
+/// the tick send them (ADR 0034): for each chunk in index order, the step from the index before
+/// (from 0 for the first) and its count, flat in one list. Terrain never changes and explored
+/// terrain only grows, so a chunk at the same count is the same bytes, and the client's cache
+/// keys on it. A coarse chunk's count is the sum over the level-0 chunks in it.
+pub fn encode_explored_counts(counts: impl IntoIterator<Item = (u32, u16)>) -> Vec<u32> {
+    let mut out = Vec::new();
+    let mut last = 0;
+    for (index, count) in counts {
+        out.push(index - last);
+        out.push(u32::from(count));
+        last = index;
+    }
+    out
+}
+
+/// The chunks and counts of an [`encode_explored_counts`] list.
+pub fn decode_explored_counts(list: &[u32]) -> Vec<(u32, u16)> {
+    let mut at = 0;
+    list.chunks_exact(2)
+        .map(|pair| {
+            at += pair[0];
+            (at, pair[1] as u16)
+        })
+        .collect()
+}
+
 /// How many squares of `level` fit across the map: the last one may reach past its side.
 pub fn squares_across(size: i32, level: u8) -> i32 {
     let side = 1 << level;
@@ -198,6 +225,15 @@ mod tests {
         assert_eq!(level_chunks_across(MAP_SIZE, 5), 6);
         assert_eq!(squares_across(MAP_SIZE, 5), 180);
         assert_eq!(squares_across(9, 1), 5);
+    }
+
+    #[test]
+    fn explored_counts_go_as_steps_and_come_back() {
+        let counts = [(3, 1024), (4, 12), (180, 1), (32_399, 1024)];
+        let list = encode_explored_counts(counts);
+        assert_eq!(list, [3, 1024, 1, 12, 176, 1, 32_219, 1024]);
+        assert_eq!(decode_explored_counts(&list), counts);
+        assert!(encode_explored_counts([]).is_empty());
     }
 
     #[test]

@@ -30,6 +30,7 @@ import type {
 import { api } from './api.js'
 import { appendEvents } from './realm-log.js'
 import { applyRegionMap, type RegionState } from './map/region.js'
+import { decodeExploredCounts } from './shared/chunks.js'
 import { lastSeenByKind, type LastSeen } from './last-seen.js'
 
 /**
@@ -47,6 +48,8 @@ export interface ClientWorld {
   map: MapInfo
   /** Chunks with explored terrain, loaded on demand from `TERRAIN_BATCH_PATH`. */
   exploredChunks: ReadonlySet<number>
+  /** How many tiles of each explored chunk are explored: the browser keeps terrain by it (ADR 0034). */
+  exploredCounts: ReadonlyMap<number, number>
   /** Chunks whose explored terrain grew in the latest tick; any copy loaded before is stale. */
   grownChunks: readonly number[]
   /** The Player's realm and home city, where the view starts. */
@@ -183,9 +186,13 @@ export function useWorld(onLoggedOut: () => void) {
           }
           entities = new Map(msg.entities.map((e) => [e.id, e]))
           remembered = new Map(msg.lastSeen.map((e) => [e.id, e]))
+          const exploredCounts = decodeExploredCounts(msg.exploredCounts ?? [])
           setWorld({
             map: msg.map,
-            exploredChunks: new Set(msg.exploredChunks),
+            exploredCounts,
+            exploredChunks: new Set(
+              msg.exploredCounts ? exploredCounts.keys() : msg.exploredChunks,
+            ),
             grownChunks: [],
             home: msg.home,
             tick: msg.tick,
@@ -227,6 +234,9 @@ export function useWorld(onLoggedOut: () => void) {
             const grown = msg.explored
             const exploredChunks =
               grown.length > 0 ? new Set([...w.exploredChunks, ...grown]) : w.exploredChunks
+            const exploredCounts = msg.exploredCounts
+              ? new Map([...w.exploredCounts, ...decodeExploredCounts(msg.exploredCounts)])
+              : w.exploredCounts
             const seen = changed ? byKind(entities.values()) : {}
             const lastSeen = msg.lastSeen ? { lastSeen: lastSeenByKind(remembered.values()) } : {}
             const events = appendEvents(w.events, msg.events)
@@ -243,6 +253,7 @@ export function useWorld(onLoggedOut: () => void) {
               },
               tick: msg.tick,
               exploredChunks,
+              exploredCounts,
               grownChunks: grown,
               events,
               diplomacy,
