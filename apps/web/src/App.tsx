@@ -74,6 +74,16 @@ import { demandNoticeLine, demandSides } from './demand-view.js'
 import { DemandsPanel } from './Demands.js'
 import { DirectOffersPanel } from './DirectOffers.js'
 import { incomingItems, incomingNoticeLine } from './incoming-view.js'
+import {
+  NOTHING_SEEN,
+  newestLine,
+  rememberLogSeen,
+  rememberedLogSeen,
+  seeTab,
+  sentToRealm,
+  unseenMarks,
+  type SeenIds,
+} from './unseen-view.js'
 import { StandingPanel } from './Standing.js'
 import { TileMenu, WaypointsPanel } from './Waypoints.js'
 import { api } from './api.js'
@@ -552,6 +562,40 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     if (offersShown) putIncomingAway()
   }, [offersShown, putIncomingAway])
   const incomingNotice = incomingNoticeLine(incoming, incomingPutAway, offersShown)
+  // What the Player hasn't seen in a drawer yet, for the marks on the rail and the Diplomacy tabs
+  // (`CONTEXT.md`: Tool rail): what was sent to the realm, seen once its tab was in front of them,
+  // and realm log lines newer than the last one they had open.
+  const [seenIds, setSeenIds] = useState<SeenIds>(NOTHING_SEEN)
+  const sent = useMemo(
+    () =>
+      world
+        ? sentToRealm(world.diplomacy, world.home.realmId)
+        : { contracts: [], demands: [], directOffers: [] },
+    [world],
+  )
+  const tabShown = openDrawer === 'diplomacy' ? drawers.tab : undefined
+  useEffect(() => {
+    if (tabShown === 'contracts' || tabShown === 'demands' || tabShown === 'directOffers') {
+      setSeenIds((s) => seeTab(s, tabShown, sent[tabShown]))
+    }
+  }, [tabShown, sent])
+  const [logSeenUpTo, setLogSeenUpTo] = useState<number | null>(null)
+  const events = world?.events
+  useEffect(() => {
+    if (!events || !homeRealm) return
+    const newest = newestLine(events)
+    if (openDrawer === 'realmLog' && newest !== null) {
+      setLogSeenUpTo((upTo) => {
+        if (upTo !== null && upTo >= newest) return upTo
+        rememberLogSeen(homeRealm, newest)
+        return newest
+      })
+    } else {
+      // Until the log was open in this browser, what it held on arrival counts as seen.
+      setLogSeenUpTo((upTo) => upTo ?? rememberedLogSeen(homeRealm) ?? newest ?? -1)
+    }
+  }, [events, homeRealm, openDrawer])
+  const marks = unseenMarks(sent, seenIds, events ?? [], logSeenUpTo)
   const closeDrawer = useCallback(() => setOpenDrawer(undefined), [setOpenDrawer])
   // The Residents drawer opened fully (`CONTEXT.md`: Residents list); closing it goes back.
   const [residentsFull, setResidentsFull] = useState(false)
@@ -1604,6 +1648,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         <PhoneMenu
           open={openDrawer}
           onToggle={(id) => setOpenDrawer((open) => toggleDrawer(open, id))}
+          marked={marks.rail}
           goods={goods}
           leader={leader?.name}
           account={account.name}
@@ -1614,6 +1659,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         <ToolRail
           open={openDrawer}
           onToggle={(id) => setOpenDrawer((open) => toggleDrawer(open, id))}
+          marked={marks.rail}
         />
       )}
       {residentsPanel &&
@@ -1720,6 +1766,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           <DiplomacyTabs
             tab={drawers.tab}
             onTab={(tab) => setDrawers(openDiplomacy(tab))}
+            marked={marks.tabs}
             panels={{
               contracts: (
                 <ContractsPanel

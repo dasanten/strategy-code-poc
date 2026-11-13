@@ -2554,3 +2554,26 @@ button.residents-row.selected:hover {
 .incoming-list strong {
   overflow-wrap: anywhere;
 }
+/* A drawer or tab holding something the Player hasn't seen (`CONTEXT.md`: Tool rail). */
+.unseen-mark {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--rel-own);
+  box-shadow: 0 0 0 2px var(--ui-bar);
+}
+.hud-rail .unseen-mark,
+.hud-menu-button .unseen-mark {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+.hud-menu .unseen-mark,
+.diplomacy-tabs .unseen-mark {
+  margin-left: 2px;
+  box-shadow: none;
+}
+.diplomacy-tabs button.on .unseen-mark {
+  background: var(--ui-ink);
+}

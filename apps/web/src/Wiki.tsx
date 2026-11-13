@@ -568,7 +568,10 @@ export function Wiki() {
           People (Residents, Horses, Armies), Diplomacy, and Realm (Cities, Waypoints, Scripts,
           Realm log). The Diplomacy drawer has a tab each for Contracts, Demands, Direct offers,
           Alliance and Standing; it reopens on the tab you left it on, and a notice’s Open takes you
-          to its tab.
+          to its tab. A small dot on a rail button or tab says it holds something you haven’t seen
+          yet: a demand, Direct offer or contract offer sent to you, or Realm log lines newer than
+          the last time you had the log open. Opening it there clears the dot. On a phone the menu
+          button shows the dot too.
         </p>
         <p>
           The Residents drawer’s Open full list button opens the list across the screen, with
