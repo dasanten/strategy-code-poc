@@ -10,6 +10,7 @@ import type {
   Building,
   BuildingKind,
   City,
+  Condition,
   Waypoint,
   Good,
   OrderRequest,
@@ -34,6 +35,8 @@ import {
   type PlanItem,
 } from './plan-blocks.js'
 import { realTimeOf } from './wiki-view.js'
+import { conditionLabel } from './condition-view.js'
+import { conditionProblem } from './shared/condition.js'
 
 /**
  * Queues on the resident card (`CONTEXT.md`: Queue): holding Shift while giving an order appends
@@ -373,7 +376,7 @@ export interface QueueRow {
 }
 
 /** The Orders tab's kinds of order a step's icon shows (`CONTEXT.md`: Planner blocks). */
-export type StepGroup = 'move' | 'work' | 'goods' | 'scripts'
+export type StepGroup = 'move' | 'work' | 'goods' | 'scripts' | 'flow'
 
 /** Which kind each order is; one not listed is work. */
 const STEP_GROUP: Partial<Record<OrderRequest['kind'], StepGroup>> = {
@@ -395,6 +398,7 @@ const STEP_GROUP: Partial<Record<OrderRequest['kind'], StepGroup>> = {
   feed: 'goods',
   haul: 'move',
   runScript: 'scripts',
+  waitUntil: 'flow',
 }
 
 /** The kind of order a step is, for its icon: as the Orders tab groups it: Explore and Haul move. */
@@ -558,6 +562,10 @@ export function stepLabel(
       return `Relocate to ${cities.find((c) => c.id === order.cityId)?.name ?? 'another city'}`
     case 'feed':
       return `Feed: ${String(order.units)} Food`
+    case 'waitUntil':
+      return conditionProblem(order.condition)
+        ? 'Wait until'
+        : `Wait until ${conditionLabel(order.condition as Condition, { buildings, lastSeen, cities })}`
     case 'runScript': {
       const script = scripts.find((s) => s.id === order.scriptId)
       return `Run ${script?.name ?? 'a script'}`

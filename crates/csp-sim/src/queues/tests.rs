@@ -871,8 +871,11 @@ fn a_wait_until_is_checked_when_given_and_asks_nothing_about_another_realm() {
         rejected("step 1: needs a condition")
     );
     assert_eq!(
-        give(&mut s, json!({ "order": { "kind": "waitUntil", "condition": wood_in("s1", 1),
-            "x": 1 } })),
+        give(
+            &mut s,
+            json!({ "order": { "kind": "waitUntil", "condition": wood_in("s1", 1),
+            "x": 1 } })
+        ),
         rejected("step 1: a Wait until holds only its condition")
     );
     assert_eq!(give(&mut s, wait_until(wood_in("s1", 1))), ack());

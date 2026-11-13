@@ -58,6 +58,10 @@ pub fn condition_place_problem(
     }
 }
 
+/// The kinds of building that keep a stock, empty or not: what a condition calls a storage.
+const STOCKED: [BuildingKind; 4] =
+    [BuildingKind::Storage, BuildingKind::Warehouse, BuildingKind::Stable, BuildingKind::Haven];
+
 /// The goods a place of the realm holds (`placeStock`): a construction site's delivered goods, a
 /// storage's stock, or the pile at a workplace. `None` when the building is gone, isn't the
 /// realm's or is none of these.
@@ -69,7 +73,7 @@ pub fn place_stock(world: &WorldState, realm_id: &str, place_id: &str) -> Option
     if let Some(site) = &b.site {
         return Some(site.delivered.clone());
     }
-    if b.stock.is_some() || matches!(b.kind, BuildingKind::Storage | BuildingKind::Warehouse) {
+    if b.stock.is_some() || STOCKED.contains(&b.kind) {
         return Some(b.stock.clone().unwrap_or_default());
     }
     if max_workers(b.kind).is_some() {
@@ -90,7 +94,10 @@ struct Load {
 fn load_of(world: &WorldState, ri: usize, realm_id: &str, vehicle: bool) -> Option<Load> {
     let r = &world.residents[ri];
     if !vehicle {
-        return Some(Load { goods: r.carried.clone(), capacity: carry_capacity(r, world.tick as f64) });
+        return Some(Load {
+            goods: r.carried.clone(),
+            capacity: carry_capacity(r, world.tick as f64),
+        });
     }
     let carriage = |id: &str| world.carriages.iter().find(|k| k.id == id);
     let driven = driven_carriage_id(r).and_then(carriage);
@@ -101,9 +108,10 @@ fn load_of(world: &WorldState, ri: usize, realm_id: &str, vehicle: bool) -> Opti
     if let Some(v) = aboard.and_then(|id| world.vessels.iter().find(|v| v.id == id)) {
         return Some(Load { goods: v.load.clone(), capacity: vessel_capacity(v) });
     }
-    let here = world.carriages.iter().find(|k| {
-        k.x == r.x && k.y == r.y && k.realm_id.as_deref() == Some(realm_id)
-    })?;
+    let here = world
+        .carriages
+        .iter()
+        .find(|k| k.x == r.x && k.y == r.y && k.realm_id.as_deref() == Some(realm_id))?;
     Some(Load { goods: here.load.clone(), capacity: carriage_capacity(world, here) })
 }
 

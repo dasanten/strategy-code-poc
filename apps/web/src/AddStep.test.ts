@@ -35,6 +35,8 @@ const breedAsk = (horses: SeenHorse[], tick = 0) =>
       onPickCity: () => {},
       open: false,
       onOpen: () => {},
+      onPlan: () => {},
+      conditionNames: {},
     }),
   )
     // The text as read, without the tags React splits it with.
@@ -80,6 +82,8 @@ const palette = () =>
       onPickCity: () => {},
       open: true,
       onOpen: () => {},
+      onPlan: () => {},
+      conditionNames: {},
     }),
   ).replace(/<!-- -->/g, '')
 

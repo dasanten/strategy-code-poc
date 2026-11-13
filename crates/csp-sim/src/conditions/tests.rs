@@ -76,8 +76,7 @@ fn what_they_carry_at_least_or_less_than_full_or_empty() {
 fn what_the_carriage_or_vessel_they_drive_carries() {
     let mut w = world();
     let full = json!({ "kind": "load", "vehicle": true, "load": "full" });
-    let stone =
-        json!({ "kind": "carries", "vehicle": true, "good": "stone", "compare": "atLeast", "amount": 5 });
+    let stone = json!({ "kind": "carries", "vehicle": true, "good": "stone", "compare": "atLeast", "amount": 5 });
     // With no carriage or boat to ask about, it is false.
     assert_eq!(asks(&w, json!({ "kind": "load", "vehicle": true, "load": "empty" })), Holds::No);
     // A carriage of their realm on their tile.
@@ -115,8 +114,11 @@ fn what_the_carriage_or_vessel_they_drive_carries() {
 fn what_a_storage_workplace_pile_or_site_of_the_realm_holds() {
     let w = world();
     let stock = |place: &str, good: &str, compare: &str, amount: u32| {
-        asks(&w, json!({ "kind": "stock", "placeId": place, "good": good, "compare": compare,
-            "amount": amount }))
+        asks(
+            &w,
+            json!({ "kind": "stock", "placeId": place, "good": good, "compare": compare,
+            "amount": amount }),
+        )
     };
     assert_eq!(stock("s1", "wood", "atLeast", 20), Holds::Yes);
     assert_eq!(stock("s1", "wood", "atLeast", 21), Holds::No);

@@ -15,6 +15,7 @@ import type {
   QueueStep,
   QueueStepRequest,
 } from '@csp/shared-types'
+import { conditionProblem } from './condition.js'
 
 /**
  * Queues (`CONTEXT.md`: Queue): which orders can be steps and how a step list is checked, shared
@@ -51,6 +52,7 @@ export const QUEUE_STEP_KINDS: readonly string[] = [
   'feed',
   'task',
   'runScript',
+  'waitUntil',
 ]
 
 /** Steps that run a script (a task's default or the Player's own) rather than a built-in order. */
@@ -147,6 +149,12 @@ export function queueStepsProblem(items: unknown): string | undefined {
     if (typeof order.kind !== 'string' || !QUEUE_STEP_KINDS.includes(order.kind))
       return `step ${n}: ${String(order.kind)} can't be a queue step`
     if (JSON.stringify(order).length > QUEUE_STEP_MAX_CHARS) return `step ${n} is too long`
+    if (order.kind === 'waitUntil') {
+      if (Object.keys(order).some((k) => k !== 'kind' && k !== 'condition'))
+        return `step ${n}: a Wait until holds only its condition`
+      const problem = conditionProblem(order.condition)
+      if (problem) return `step ${n}: ${problem}`
+    }
     if (order.kind === 'task' && order.task === 'buildLine' && !stepLine(order))
       return `step ${n}: a Build line step needs road or wall and its two ends`
     const minutes = s!.minutes

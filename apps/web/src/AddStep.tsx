@@ -12,6 +12,8 @@ import type {
 import { BuildMenu } from './BuildMenu.js'
 import { CustomiseButton, taskStart } from './Customise.js'
 import { HorsePick } from './HorsePick.js'
+import { ConditionEditor } from './ConditionEditor.js'
+import type { ConditionNames } from './condition-view.js'
 import { GOOD_LABELS, SubjectPicker } from './Residents.js'
 import {
   makesAt,
@@ -19,6 +21,7 @@ import {
   PLAN_STEPS,
   PLAN_TASKS,
   planAsk,
+  pickPlace,
   type Plan,
   type PlanAnswer,
   type PlanCity,
@@ -52,6 +55,8 @@ export function AddStep({
   onPickCity,
   open,
   onOpen,
+  onPlan,
+  conditionNames,
 }: {
   /** The step being planned, if one is. */
   plan: Plan | undefined
@@ -79,6 +84,10 @@ export function AddStep({
   /** Whether the palette is open: kept by the card, so it stays open as the queue appears. */
   open: boolean
   onOpen: (open: boolean) => void
+  /** Changes the step being planned: a Wait until's editor has the map pick a place. */
+  onPlan: (plan: Plan) => void
+  /** What a condition's place is named by: the buildings and cities known. */
+  conditionNames: ConditionNames
 }) {
   // Repeat and the insert point of the planner this palette sits under, if it is in one.
   const flow = useContext(PlannerFlowContext)
@@ -154,6 +163,15 @@ export function AddStep({
             horses={horses}
             tick={tick}
             onAnswer={(horseId) => onAnswer({ ask, horseId })}
+          />
+        )}
+        {ask === 'condition' && (
+          <ConditionEditor
+            draft={plan.condition}
+            names={conditionNames}
+            action="Add"
+            onPickPlace={(draft) => onPlan(pickPlace(plan, draft))}
+            onDone={(condition) => onAnswer({ ask, condition })}
           />
         )}
         {ask === 'haul' && <HaulAsk onAnswer={(setup) => onAnswer({ ask, setup })} />}
@@ -245,6 +263,15 @@ export function AddStep({
                   onClick={() => flow?.repeat?.()}
                 >
                   <span aria-hidden="true">{REPEAT_ICON}</span> Repeat
+                </button>
+              </span>
+              <span className="step-palette-item">
+                <button
+                  type="button"
+                  title="A step that ends once its condition holds; meanwhile they stand idle"
+                  onClick={() => onStart('waitUntil', flow?.after)}
+                >
+                  <span aria-hidden="true">{PLAN_STEP_ICONS.waitUntil}</span> Wait until
                 </button>
               </span>
             </div>

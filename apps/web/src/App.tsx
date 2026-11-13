@@ -1042,6 +1042,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         onStart={(kind, after) => void startPlan(kind, after)}
         open={paletteOpen}
         onOpen={setPaletteOpen}
+        onPlan={setPlan}
+        conditionNames={{
+          buildings: w.buildings,
+          lastSeen: w.lastSeen.buildings,
+          cities: knownCities,
+        }}
         onAnswer={(answer) => plan && void addPlanned(plan, answer)}
         onCancel={() => setPlan(undefined)}
         scripts={scripts}
