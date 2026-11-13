@@ -140,3 +140,18 @@ The Broadcast phase, before and after; the bytes sent are the same (12.2 KB a ti
 With 5,000 remembered buildings and nothing changing, a tick now copies none of them and turns
 none into JSON (tested by counting); before, every tick turned all of them into JSON for every
 socket.
+
+### T99.4: chunk textures are painted when first shown
+
+Worked out from the per-chunk cost measured above (1.1 ms and 64 KB a texture) for the staged
+Player with the minimap open, which loads all 32,400 explored chunks. Not yet measured in the
+browser.
+
+| Textures painted                        | Before                    | After                                           |
+| --------------------------------------- | ------------------------- | ----------------------------------------------- |
+| Every explored chunk loaded             | 32,400: about 36 s, 2 GB  | none for chunks never on screen                 |
+| The home view (1920 × 1080, start zoom) | painted with all the rest | about 24: about 26 ms over a few frames, 1.5 MB |
+| Kept at most                            | every loaded chunk        | 1,024 (64 MB) besides those on screen           |
+
+A frame paints at most 4 ms of textures (at least one); loaded chunks still waiting for theirs
+show the loading grey.
