@@ -63,8 +63,12 @@ function acceptedGoodsLine(
   }
 }
 
-/** A stolen carriage, horse or boat as the log names it: "a carriage with Rowan", "Rowan", "a boat". */
-function transportLine(e: { carriage?: true; horse?: string; boat?: true }): string {
+/**
+ * A stolen carriage, horse, boat or ship as the log names it: "a carriage with Rowan", "Rowan",
+ * "a boat", "a ship".
+ */
+function transportLine(e: { carriage?: true; horse?: string; boat?: true; ship?: true }): string {
+  if (e.ship) return 'a ship'
   if (e.boat) return 'a boat'
   if (!e.carriage) return e.horse ?? 'a horse'
   return `a carriage${e.horse === undefined ? '' : ` with ${e.horse}`}`
@@ -119,11 +123,13 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
     }
     case 'transportGone': {
       const place = `(${e.x}, ${e.y})`
-      const what = e.boat
-        ? 'Your boat'
-        : e.carriage
-          ? `Your carriage${e.horse === undefined ? '' : `, with ${e.horse},`}`
-          : (e.horse ?? 'Your horse')
+      const what = e.ship
+        ? 'Your ship'
+        : e.boat
+          ? 'Your boat'
+          : e.carriage
+            ? `Your carriage${e.horse === undefined ? '' : `, with ${e.horse},`}`
+            : (e.horse ?? 'Your horse')
       return {
         text: `${what} is gone. It was last at ${place}.`,
         tone: 'bad',

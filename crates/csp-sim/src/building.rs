@@ -142,23 +142,31 @@ pub fn finish_site(
     if b.site.is_none() || work_needed(b) > 0.0 || !materials_needed(b).is_empty() {
         return false;
     }
-    if b.kind == BuildingKind::Boat {
-        // `CONTEXT.md`: Building a boat: the site is gone, and an empty boat of the finisher's realm
-        // floats on the nearest free water tile next to it.
-        let Some((x, y)) = terrain.and_then(|t| launch_tile(world, t, b.x as i32, b.y as i32))
+    let vessel = match b.kind {
+        BuildingKind::Boat => Some(VesselKind::Boat),
+        BuildingKind::Ship => Some(VesselKind::Ship),
+        _ => None,
+    };
+    if let Some(kind) = vessel {
+        // `CONTEXT.md`: Building a boat, Building a ship: the site is gone, and an empty vessel of
+        // the finisher's realm floats on the nearest free water tile next to it (Sea for a ship).
+        let Some((x, y)) =
+            terrain.and_then(|t| launch_tile(world, t, b.x as i32, b.y as i32, kind))
         else {
             return false;
         };
         world.buildings.remove(site);
-        let id = new_id("boat", &mut world.next_id);
+        let prefix = if kind == VesselKind::Ship { "ship" } else { "boat" };
+        let id = new_id(prefix, &mut world.next_id);
         world.vessels.push(Vessel {
             id,
-            kind: VesselKind::Boat,
+            kind,
             realm_id: r.owner.clone(),
             x: f64::from(x),
             y: f64::from(y),
             load: Stock::new(),
             rower_id: None,
+            crew_ids: Vec::new(),
         });
         return true;
     }

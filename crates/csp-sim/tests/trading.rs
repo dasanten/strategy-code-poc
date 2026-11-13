@@ -4,6 +4,7 @@
 //! fixture. Each step checks `goodsOnlyFromNothingAtTheFloor`; `checkInvariants` comes with T86.13.
 
 mod common;
+#[macro_use]
 mod goods_support;
 
 use csp_shared::balance::{CARRIAGE_CAPACITY, STANDING_TRADE_COINS_PER_POINT, TRADING_POST};

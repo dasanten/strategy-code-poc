@@ -262,6 +262,29 @@ describe('Add step', () => {
     ])
   })
 
+  it('crews a ship from the tile of its haven picked (`CONTEXT.md`: Crew)', () => {
+    const sea: PlanWorld = {
+      ...w,
+      vessels: [{ id: 'ship1', x: 10, y: 10, realmId: 'r1' }],
+      water: (x) => x >= 10,
+    }
+    const plan = (...taps: [number, number][]) =>
+      taps.reduce<Plan>((p, [x, y]) => pickInto(sea, p, { x, y }), {
+        kind: 'boardCrew',
+        picked: [],
+      })
+    expect(planOrder(plan([10, 10], [8, 10]))).toEqual({
+      order: { kind: 'board', vesselId: 'ship1', asCrew: true },
+      at: { x: 8, y: 10 },
+    })
+    // Then sailing it to a tile, from aboard: no walk (`CONTEXT.md`: Sailing).
+    const sail = [
+      [10, 10],
+      [14, 3],
+    ].reduce<Plan>((p, [x, y]) => pickInto(sea, p, { x: x!, y: y! }), { kind: 'sail', picked: [] })
+    expect(planOrder(sail)).toEqual({ order: { kind: 'sail', vesselId: 'ship1', x: 14, y: 3 } })
+  })
+
   it('boards a boat from the shore picked, rows it, gets off and loads it (`CONTEXT.md`: Beside a vessel)', () => {
     // A lake over x 10..14, y 8..12, with the realm's boat v1 at (10, 10) and r2's v2 at (12, 10).
     const lake: PlanWorld = {
@@ -297,6 +320,15 @@ describe('Add step', () => {
       order: { kind: 'store', goods: [...GOODS], to: 'v1' },
     })
     expect(plan('pickUp', [10, 10]).error).toBe('a boat: Store or Fetch to load it')
+    // A haul route by boat: the boat, the first stop (walked to first), then the other one, as
+    // the Haul task with the boat as its carriage (`CONTEXT.md`: Haul route by water).
+    const route = plan('haulBoat', [10, 10], [9, 10], [15, 10])
+    expect(planAsk(route)).toBe('haul')
+    const setup = { goods: ['wood' as const], returnGoods: [], keepFood: 2 }
+    expect(planOrder(route, { ask: 'haul', setup })).toEqual({
+      order: { kind: 'task', task: 'haul', carriageId: 'v1', x: 15, y: 10, ...setup },
+      at: { x: 9, y: 10 },
+    })
   })
 
   it('feeds someone Down picked on the map, after a walk to their tile (`CONTEXT.md`: Reviving)', () => {

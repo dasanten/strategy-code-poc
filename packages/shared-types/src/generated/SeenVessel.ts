@@ -15,4 +15,12 @@ passengerIds: Array<string>,
 /**
  * The one aboard at its oars, no passenger (`CONTEXT.md`: Rowing).
  */
-rowerId?: string, };
+rowerId?: string, 
+/**
+ * A ship's crew aboard, no passengers (`CONTEXT.md`: Crew); a boat has none.
+ */
+crewIds: Array<string>, 
+/**
+ * The haven a ship is docked at (`CONTEXT.md`: Docked); none for a boat or a ship at sea.
+ */
+dockedAt?: string, };
