@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { Application, Container, Graphics, Sprite, Texture, TilingSprite } from 'pixi.js'
 import { CHUNK_SIZE, Terrain, UNEXPLORED, chunksAcross, wrap } from './shared/terrain.js'
 import { TERRAIN_SPEED } from '@csp/balance'
-import { cityAreaTiles } from './shared/city.js'
+import { structuresOf } from './map/structures.js'
 import type { Building, KnownNode, SeenResident, ResourceKind } from '@csp/shared-types'
-import { footprintKeys, FOOTPRINT } from './shared/footprint.js'
+import { FOOTPRINT } from './shared/footprint.js'
 import {
   CLOSE_SCALE,
   zoomTier,
@@ -877,11 +877,10 @@ export function MapView({
       }
 
       // A node under a building's footprint shows as the building.
-      const built = new Set(
-        [...worldRef.current.buildings, ...(worldRef.current.lastSeen?.buildings ?? [])]
-          .filter((b) => b.kind !== 'road')
-          .flatMap((b) => footprintKeys(b, worldRef.current.map.size)),
-      )
+      const inSight = structuresOf(worldRef.current.buildings, mapSize).built
+      const seen = worldRef.current.lastSeen
+      const seenBuilt = seen && structuresOf(seen.buildings, mapSize).built
+      const built = { has: (key: string) => inSight.has(key) || !!seenBuilt?.has(key) }
       const r = tokenRadius(cam.scale)
       for (const i of onScreen) {
         for (const n of nodes[i] ?? []) {
@@ -1661,11 +1660,19 @@ function drawStructures(
   // Each city's area, faintly, from the buildings in sight (`CONTEXT.md`: City area).
   const onScreen = ([sx, sy]: readonly number[]) =>
     sx! > -tile && sy! > -tile && sx! < view.width && sy! < view.height
+  const structures = structuresOf(buildings, size)
   for (const c of cities) {
+    const area = structures.areas.get(c.id)
+    if (!area) continue
+    // An area off screen is not looked at tile by tile.
+    const [ax, ay] = tileToScreen(cam, view, size, area.x, area.y)
+    const reach = (area.reach + 1) * tile
+    if (ax + reach < 0 || ay + reach < 0 || ax - reach > view.width || ay - reach > view.height)
+      continue
     let any = false
-    for (const key of cityAreaTiles(world, c, size)) {
-      const [x, y] = key.split(',').map(Number) as [number, number]
-      const b = box(x, y)
+    const { tiles } = area
+    for (let i = 0; i < tiles.length; i += 2) {
+      const b = box(tiles[i]!, tiles[i + 1]!)
       if (onScreen(b)) {
         under.rect(...b)
         any = true
@@ -1675,9 +1682,7 @@ function drawStructures(
   }
   // Roads under the buildings, as a wide light band through the middle of the tile joined to the
   // roads next to it (`CONTEXT.md`: Road, ADR 0008); a road site, and the step onto it, are faint.
-  const roads = new Map(
-    buildings.filter((b) => b.kind === 'road').map((b) => [`${b.x},${b.y}`, b] as const),
-  )
+  const roads = structures.roads
   const roadAt = (x: number, y: number) => roads.get(`${(x + size) % size},${(y + size) % size}`)
   const w = roadWidth(tile)
   const inSight = ([sx, sy]: readonly number[]) =>
@@ -1718,9 +1723,7 @@ function drawStructures(
 
   // Walls and gates as joined lines in the owner's colour over a dark edge (ADR 0008); a wall
   // site shows faintly.
-  const walls = new Set(
-    buildings.filter((b) => b.kind === 'wall' || b.kind === 'gate').map((b) => `${b.x},${b.y}`),
-  )
+  const walls = structures.walls
   const wallAt = (x: number, y: number) => walls.has(`${(x + size) % size},${(y + size) % size}`)
   const { edge, band } = wallWidths(tile)
   const lines = new Map<string, [number, number, number, number][]>()
