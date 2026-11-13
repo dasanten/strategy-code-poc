@@ -165,3 +165,13 @@ level-0 chunks in 507 requests of 32 MB. A fresh realm's frame (96 tiles) stays 
 the server (release build, the dev machine), a batch of 64 coarse chunks over fully explored
 terrain takes about 1 ms; the first batch of each level takes 21 to 47 ms more, once, to work out
 that level's squares for the whole map. Time in the browser is not measured yet.
+
+### T99.6: the map draws coarse levels zoomed out (2026-11-13)
+
+Counted from the code, not measured in the browser. The map draws the coarsest level whose
+squares are at most 6 screen pixels (`LEVEL_SQUARE_PX`), so from 3 pixels a tile down. Zoomed all
+the way out on a 1920 × 1080 screen it draws level 4: 12 × 8 chunks on screen, two requests of at
+most 64 chunks of 1 KB each. Before, the staged Player's whole map at full detail was every
+level-0 chunk on screen, 32,400 chunks in 507 requests, each painted. No zoom on that screen puts
+more than 300 chunks on screen (`MAX_CHUNKS_ON_SCREEN`, tested). A coarse chunk's texture is
+32 × 32 texels (4 KB), not 128 × 128 (64 KB). Time and memory in the browser are not measured yet.
