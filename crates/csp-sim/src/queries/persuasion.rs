@@ -10,10 +10,10 @@ use csp_shared::terrain::wrap_distance;
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{City, Outweighed, Resident, WorldState};
 
-use super::alliance::contract_of;
 use super::city::for_sale;
 use super::city_area::city_area_tiles;
 use super::combat::{combat_skill_factor, protection, weapon_attack};
+use super::contract::is_lent_by;
 use super::residents::is_armed;
 use super::standing::standing_of;
 use super::walls::{is_wall_or_gate, wall_side};
@@ -42,12 +42,6 @@ pub fn fighter_strength(r: &Resident) -> f64 {
     (BLOW_BASE + weapon_attack(r)) * combat_skill_factor(r) + protection(r)
 }
 
-/// Whether the resident is lent by the city under a started contract (`lentBy`, Hiring from an
-/// NPC city): they never count as the hirer's fighters toward it.
-fn lent_by(world: &WorldState, city: &City, r: &Resident) -> bool {
-    contract_of(world, &r.id).is_some_and(|c| c.lender_id == city.id)
-}
-
 /// The respect an NPC city sees from each Organization near it (`respectBySide`, ADR 0033), by
 /// the side their armed residents fight on (`wall_side`), as `respect_seen_by` weighs it. Those
 /// with nothing near are left out.
@@ -67,7 +61,7 @@ pub fn respect_by_side<'w>(world: &'w WorldState, city: &City, size: i32) -> Has
         if side == city.id
             || r.health <= 0.0
             || !is_armed(&r.carried)
-            || lent_by(world, city, r)
+            || is_lent_by(world, &r.id, &city.id)
             || !near(tile(r))
         {
             continue;

@@ -251,6 +251,9 @@ fn step_rest(
     // Relocating residents who stepped into their new city's area move in (`CONTEXT.md`:
     // Relocate).
     step_relocating(world, terrain);
+    // A lent resident never acts against the city that lent them (`CONTEXT.md`: Hiring from an
+    // NPC city).
+    crate::lent::drop_orders_against_lender(world);
     let strikes = request_strikes(world, size);
     let strikes_len = strikes.len();
     let combat = resolve_strikes(world, &strikes, size, &mut GameAlarms, &mut scratch.made);
