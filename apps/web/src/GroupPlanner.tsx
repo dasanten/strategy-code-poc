@@ -65,6 +65,7 @@ export function GroupPlanner({
           waypoints={waypoints}
           onEdit={(items, loop) => onPlan(editPlan(plan, items, loop))}
           realm={realm}
+          palette={addStep}
         />
       ) : (
         <>
@@ -77,9 +78,9 @@ export function GroupPlanner({
             steps={[]}
             onLoad={(items) => onPlan(editPlan(plan, items))}
           />
+          {addStep}
         </>
       )}
-      {addStep}
       <GivePlan
         plan={plan}
         give="Give to all"

@@ -135,8 +135,8 @@ import { Founding } from './Founding.js'
 import {
   appendRequest,
   appendToEach,
-  editPlan,
-  EMPTY_PLAN,
+  draftEdit,
+  draftFor,
   givePlan,
   giveToAll,
   planOf,
@@ -146,8 +146,9 @@ import {
   type QueuePlan,
 } from './queue-view.js'
 import { AddStep } from './AddStep.js'
+import { InsertPointContext, type InsertPoint } from './step-palette-view.js'
 import { GroupPlanner } from './GroupPlanner.js'
-import { hasBlocks, type PlanItem } from './plan-blocks.js'
+import { type PlanItem } from './plan-blocks.js'
 import {
   planHorses,
   nextPick,
@@ -377,11 +378,21 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   // The step being planned with the queue planner's Add step (`CONTEXT.md`: Queue, Planning
   // ahead): the map picks its places, then the card asks for what more it needs.
   const [plan, setPlan] = useState<Plan>()
+  // Whether the Add step palette is open; kept here so it stays open as a draft appears.
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  // The planner's insert point, by whose planner it is (a resident's id, or the group's), kept
+  // here so it lasts while the card folds away for a pick (`CONTEXT.md`: Planner blocks).
+  const [insertPoint, setInsertPoint] = useState<{ owner: string; at: number | undefined }>()
+  const insertFor = (owner: string): InsertPoint => ({
+    at: insertPoint?.owner === owner ? insertPoint.at : undefined,
+    set: (at) => setInsertPoint({ owner, at }),
+    start: (kind, after) => void startPlan(kind, after),
+  })
   // The queue planned on the group card, held here until given to all (`CONTEXT.md`: Planning
   // for a group); with none open, a step planned for a group goes onto each one's own queue.
   const [groupPlan, setGroupPlan] = useState<QueuePlan>()
-  // Plans with repeat blocks waiting to be given, by resident (`CONTEXT.md`: Repeat block): they
-  // stay while other cards are open, until given or discarded.
+  // Queue drafts waiting for Start queue, by resident (`CONTEXT.md`: Queue draft): they stay
+  // while other cards are open, until started or discarded, and are lost on reloading the page.
   const [queuePlans, setQueuePlans] = useState<Record<string, QueuePlan>>({})
   const planQueue = (id: string, plan: QueuePlan | undefined) =>
     setQueuePlans((plans) => {
@@ -949,11 +960,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
    * Starts planning a step with Add step (`CONTEXT.md`: Queue, Planning ahead): the map picks its
    * places first; one that needs neither is added at once.
    */
-  async function startPlan(kind: PlanStepId) {
+  async function startPlan(kind: PlanStepId, after?: number) {
     setPicking(false)
     setGroupPicking(false)
     setParamPick(undefined)
-    const fresh: Plan = { kind, picked: [] }
+    const fresh: Plan = { kind, picked: [], ...(after === undefined ? {} : { after }) }
     if (nextPick(fresh) || planAsk(fresh)) setPlan(fresh)
     else await addPlanned(fresh)
   }
@@ -973,20 +984,35 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     )
     // Customise on a step, or a param it can't go without (`CONTEXT.md`: Before it starts).
     const add = (params?: StartParamValues) =>
-      addStepOrder({ ...order, ...(params && { params }) }, at)
+      addStepOrder({ ...order, ...(params && { params }) }, at, planned.after)
     if (!opensForm(order, keptBy, add)) await add()
   }
-  /** Appends a planned step's order to the open plan or queue (`addPlanned`). */
-  async function addStepOrder(order: OrderRequest, at: { x: number; y: number } | undefined) {
+  /**
+   * Appends a planned step's order to the open plan or queue (`addPlanned`), or puts it after
+   * `after`, the planner's insert point (`CONTEXT.md`: Planner blocks).
+   */
+  async function addStepOrder(
+    order: OrderRequest,
+    at: { x: number; y: number } | undefined,
+    after?: number,
+  ) {
     if (group.length > 1) {
-      if (groupPlan) setGroupPlan(planStep(groupPlan, order, at))
+      if (groupPlan) setGroupPlan(planStep(groupPlan, order, at, after))
       else await sendToGroup(appendToEach(group, order, at), [])
       return
     }
     if (!selected) return
-    const open = queuePlans[selected.id]
-    if (open) {
-      planQueue(selected.id, planStep(open, order, at))
+    // A resident with no queue, or with a draft open, gets the step onto the draft
+    // (`CONTEXT.md`: Queue draft); a running queue gets it at once.
+    const draft = draftFor(selected, queuePlans[selected.id])
+    if (draft) {
+      planQueue(selected.id, planStep(draft, order, at, after))
+      return
+    }
+    // Into a running queue between two steps: an edit of it with the step in place.
+    if (after !== undefined && selected.queue) {
+      const placed = planStep(planOf(selected.queue), order, at, after)
+      setOrderError(await sendOrder(givePlan(selected, placed)))
       return
     }
     const request = { ...order, residentId: selected.id }
@@ -1012,7 +1038,9 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     return (
       <AddStep
         plan={plan}
-        onStart={(kind) => void startPlan(kind)}
+        onStart={(kind, after) => void startPlan(kind, after)}
+        open={paletteOpen}
+        onOpen={setPaletteOpen}
         onAnswer={(answer) => plan && void addPlanned(plan, answer)}
         onCancel={() => setPlan(undefined)}
         scripts={scripts}
@@ -2220,266 +2248,282 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           pinnedPeek={pick !== undefined && pick.kind !== 'army'}
           hidden={hideCard}
         >
-          <ResidentCard
-            key={selected.id}
-            resident={selected}
-            arrivesIn={arrivesIn || undefined}
-            leaderId={world.home.leaderId}
-            cities={knownCities}
-            tick={world.tick}
-            picking={picking}
-            onWalkTo={() => setPicking((p) => (p === 'walk' ? false : 'walk'))}
-            carriage={
-              onTile(world.carriages.filter(loadKnown).filter((k) => !isStrangers(k))) ??
-              onTile(world.carriages.filter(loadKnown))
-            }
-            boat={world.vessels.find(
-              (v) =>
-                vesselOfResident(v, selected) &&
-                selected.aboard !== v.id &&
-                besideVessel(v, selected, world.map.size, world.buildings),
-            )}
-            carriageTheirs={!ownCarriageHere && !!stealableHere}
-            onDriveTo={() => setPicking((p) => (p === 'drive' ? false : 'drive'))}
-            {...(stealableHere && {
-              driveOff: {
-                problem: driveOffProblem(
-                  world,
-                  selected,
-                  stealableHere,
-                  world.home.realmId,
-                  world.map.size,
-                ),
-              },
-              onDriveOff: () => setPicking((p) => (p === 'driveOff' ? false : 'driveOff')),
-            })}
-            {...(unhorsedHere &&
-              horseToHitch && {
-                hitchOff: {
-                  problem: hitchOffProblem(
+          <InsertPointContext.Provider value={insertFor(selected.id)}>
+            <ResidentCard
+              key={selected.id}
+              resident={selected}
+              arrivesIn={arrivesIn || undefined}
+              leaderId={world.home.leaderId}
+              cities={knownCities}
+              tick={world.tick}
+              picking={picking}
+              onWalkTo={() => setPicking((p) => (p === 'walk' ? false : 'walk'))}
+              carriage={
+                onTile(world.carriages.filter(loadKnown).filter((k) => !isStrangers(k))) ??
+                onTile(world.carriages.filter(loadKnown))
+              }
+              boat={world.vessels.find(
+                (v) =>
+                  vesselOfResident(v, selected) &&
+                  selected.aboard !== v.id &&
+                  besideVessel(v, selected, world.map.size, world.buildings),
+              )}
+              carriageTheirs={!ownCarriageHere && !!stealableHere}
+              onDriveTo={() => setPicking((p) => (p === 'drive' ? false : 'drive'))}
+              {...(stealableHere && {
+                driveOff: {
+                  problem: driveOffProblem(
                     world,
                     selected,
-                    { ...unhorsedHere, realmId: world.home.realmId },
-                    horseToHitch.id,
+                    stealableHere,
+                    world.home.realmId,
+                    world.map.size,
                   ),
                 },
-                onHitchOff: () => setPicking((p) => (p === 'hitchOff' ? false : 'hitchOff')),
+                onDriveOff: () => setPicking((p) => (p === 'driveOff' ? false : 'driveOff')),
               })}
-            {...(looseStrangers && {
-              stealHorse: {
-                problem: mountOffProblem(world, selected, looseStrangers, world.home.realmId),
-              },
-              onStealHorse: () =>
-                void giveOrder(
-                  { kind: 'mount', residentId: selected.id, horseId: looseStrangers.id },
-                  false,
-                ).then(setOrderError),
-            })}
-            onRoadTo={() =>
-              setPicking((p) => (p === 'roadFrom' || p === 'roadTo' ? false : 'roadFrom'))
-            }
-            onWallTo={() =>
-              setPicking((p) => (p === 'wallFrom' || p === 'wallTo' ? false : 'wallFrom'))
-            }
-            onHaulTo={(setup) => {
-              setHaulSetup(setup)
-              setPicking((p) => (p === 'haul' ? false : 'haul'))
-            }}
-            onStop={stop}
-            horseToRide={onTile(
-              world.horses.filter(
-                (h) =>
-                  horseOfResident(h, selected) &&
-                  !carriagePulledBy(world, h) &&
-                  !riderOf(world, h) &&
-                  !isDown(h),
-              ),
-            )}
-            onRide={ride}
-            carriageToBoard={onTile(world.carriages.filter((k) => carriageOfResident(k, selected)))}
-            boatToBoard={world.vessels.find(
-              (v) =>
-                vesselOfResident(v, selected) &&
-                besideVessel(v, selected, world.map.size, world.buildings) &&
-                // A ship with no room left still takes crew (`CONTEXT.md`: Crew).
-                (v.kind === 'ship' ||
-                  (vesselRoom(v) ?? PASSENGER_WEIGHT) >= PASSENGER_WEIGHT - 1e-9),
-            )}
-            onBoard={(id, asCrew) => void boardCarriage(id, undefined, asCrew)}
-            {...(boatToRow ? { boatToRow } : {})}
-            onRowTo={() => setPicking((p) => (p === 'row' ? false : 'row'))}
-            {...(boatToSteal && {
-              rowOff: { problem: boatToSteal.problem },
-              onRowOff: () => setPicking((p) => (p === 'rowOff' ? false : 'rowOff')),
-            })}
-            carriageToUnhitch={onTile(
-              world.carriages.filter((k) => carriageOfResident(k, selected) && k.horseId),
-            )}
-            onUnhitch={unhitch}
-            toHitch={hitchChoice(world, selected)}
-            onHitch={hitch}
-            scripts={scripts}
-            buildings={world.buildings}
-            lastSeen={world.lastSeen.buildings}
-            waypoints={world.waypoints}
-            onRunScript={runScript}
-            onSetDefenceScript={setDefenceScript}
-            onSetAlarmScript={setAlarmScript}
-            onEditScript={(id) => openScript(id)}
-            orderError={orderError}
-            pile={world.piles.find(
-              (p) => p.x === (buildingHere ?? selected).x && p.y === (buildingHere ?? selected).y,
-            )}
-            storage={
-              buildingHere && KEEPS_GOODS.includes(buildingHere.kind) && !buildingHere.site
-                ? buildingHere
-                : undefined
-            }
-            building={buildingHere}
-            road={roadHere}
-            terrain={terrainAt?.(selected.x, selected.y)}
-            carriageSite={carriageSiteHere}
-            node={nodeAt?.(selected.x, selected.y)}
-            onPickUp={(spot, goods) => carry('pickUp', spot, goods)}
-            onLoad={async (vesselId, goods, unload) =>
-              setOrderError(
-                await giveOrder({ kind: 'load', residentId: selected.id, vesselId, goods, unload }),
-              )
-            }
-            onDrop={(spot, goods) => carry('drop', spot, goods)}
-            onBuild={build}
-            buildProblem={buildProblemAt(world, selected.x, selected.y)}
-            workers={workersHere(world.residents, buildingHere)}
-            holders={heldBy(world.residents, buildingHere)}
-            realmId={world.home.realmId}
-            onWork={work}
-            onFeedStable={feedStable}
-            onTrain={train}
-            onExplore={explore}
-            onTeach={teach}
-            onTearDown={tearDown}
-            horses={world.horses}
-            onBreed={breed}
-            residents={own}
-            onPair={pair}
-            others={world.residents.filter((r) => !own.some((o) => o.id === r.id))}
-            mapSize={world.map.size}
-            onAttack={attack}
-            onFeed={(targetId, units) => void feed(targetId, units)}
-            walls={world.buildings.filter(
-              (b) =>
-                isWallOrGate(b) &&
-                world.cities.find((c) => c.id === b.cityId)?.realmId !== world.home.realmId,
-            )}
-            onClimb={climb}
-            makeLeader={
-              selected.owner === world.home.realmId && selected.id !== world.home.leaderId
-                ? {
-                    problem: makeLeaderProblem(
-                      {
-                        tick: world.tick,
-                        diplomacy: world.diplomacy,
-                        cities: world.cities,
-                        buildings: world.buildings,
-                        mapSize: world.map.size,
-                      },
-                      { id: world.home.realmId, leaderId: world.home.leaderId },
-                      leader,
+              {...(unhorsedHere &&
+                horseToHitch && {
+                  hitchOff: {
+                    problem: hitchOffProblem(
+                      world,
                       selected,
+                      { ...unhorsedHere, realmId: world.home.realmId },
+                      horseToHitch.id,
                     ),
-                  }
-                : undefined
-            }
-            leaderName={leader?.name}
-            onMakeLeader={makeLeader}
-            relocate={relocateFor(selected)}
-            onRelocate={relocate}
-            rename={
-              selected.owner === world.home.realmId
-                ? {
-                    needsRealmName:
-                      selected.id === world.home.leaderId && world.home.realmName === null,
-                  }
-                : undefined
-            }
-            onRename={rename}
-            sections={cardSections}
-            onSections={(s) => {
-              rememberTab(s.tab)
-              setCardSections(s)
-            }}
-            scriptParams={
-              selected.script && (
-                <ScriptParamFields
-                  params={scripts.find((s) => s.id === selected.script!.scriptId)?.params ?? []}
-                  // As seen: the values picked for the script they run come with it.
-                  values={world.residents.find((r) => r.id === selected.id)?.script?.params ?? {}}
-                  // Working by a workplace's settings, what they don't override reads its values.
-                  workplace={(() => {
-                    const from = world.residents.find((r) => r.id === selected.id)?.script
-                      ?.settingsFrom
-                    return from === undefined ? undefined : (world.workSettings[from]?.params ?? {})
-                  })()}
-                  label={(id) => paramValueLabel(paramWorld(world), id)}
-                  target={targetParam(
-                    scripts.find((s) => s.id === selected.script!.scriptId) ?? {},
-                  )}
-                  onTile={targetOnTile(
-                    world,
-                    scripts.find((s) => s.id === selected.script!.scriptId),
-                    selected,
-                  )}
-                  waypoints={world.waypoints}
-                  picking={paramPick?.name}
-                  onPick={(p) => {
-                    setPicking(false)
-                    setParamPick((now) => (now?.name === p.name ? undefined : p))
-                  }}
-                  onNumber={(name, value) => void setScriptParam(name, { value })}
-                  onChoose={(p, value) =>
-                    void setScriptParam(
-                      p.name,
-                      p.type === 'choice' ? { value } : { targetId: value },
-                    )
-                  }
-                  onClear={(name) => void setScriptParam(name, { targetId: null })}
+                  },
+                  onHitchOff: () => setPicking((p) => (p === 'hitchOff' ? false : 'hitchOff')),
+                })}
+              {...(looseStrangers && {
+                stealHorse: {
+                  problem: mountOffProblem(world, selected, looseStrangers, world.home.realmId),
+                },
+                onStealHorse: () =>
+                  void giveOrder(
+                    { kind: 'mount', residentId: selected.id, horseId: looseStrangers.id },
+                    false,
+                  ).then(setOrderError),
+              })}
+              onRoadTo={() =>
+                setPicking((p) => (p === 'roadFrom' || p === 'roadTo' ? false : 'roadFrom'))
+              }
+              onWallTo={() =>
+                setPicking((p) => (p === 'wallFrom' || p === 'wallTo' ? false : 'wallFrom'))
+              }
+              onHaulTo={(setup) => {
+                setHaulSetup(setup)
+                setPicking((p) => (p === 'haul' ? false : 'haul'))
+              }}
+              onStop={stop}
+              horseToRide={onTile(
+                world.horses.filter(
+                  (h) =>
+                    horseOfResident(h, selected) &&
+                    !carriagePulledBy(world, h) &&
+                    !riderOf(world, h) &&
+                    !isDown(h),
+                ),
+              )}
+              onRide={ride}
+              carriageToBoard={onTile(
+                world.carriages.filter((k) => carriageOfResident(k, selected)),
+              )}
+              boatToBoard={world.vessels.find(
+                (v) =>
+                  vesselOfResident(v, selected) &&
+                  besideVessel(v, selected, world.map.size, world.buildings) &&
+                  // A ship with no room left still takes crew (`CONTEXT.md`: Crew).
+                  (v.kind === 'ship' ||
+                    (vesselRoom(v) ?? PASSENGER_WEIGHT) >= PASSENGER_WEIGHT - 1e-9),
+              )}
+              onBoard={(id, asCrew) => void boardCarriage(id, undefined, asCrew)}
+              {...(boatToRow ? { boatToRow } : {})}
+              onRowTo={() => setPicking((p) => (p === 'row' ? false : 'row'))}
+              {...(boatToSteal && {
+                rowOff: { problem: boatToSteal.problem },
+                onRowOff: () => setPicking((p) => (p === 'rowOff' ? false : 'rowOff')),
+              })}
+              carriageToUnhitch={onTile(
+                world.carriages.filter((k) => carriageOfResident(k, selected) && k.horseId),
+              )}
+              onUnhitch={unhitch}
+              toHitch={hitchChoice(world, selected)}
+              onHitch={hitch}
+              scripts={scripts}
+              buildings={world.buildings}
+              lastSeen={world.lastSeen.buildings}
+              waypoints={world.waypoints}
+              onRunScript={runScript}
+              onSetDefenceScript={setDefenceScript}
+              onSetAlarmScript={setAlarmScript}
+              onEditScript={(id) => openScript(id)}
+              orderError={orderError}
+              pile={world.piles.find(
+                (p) => p.x === (buildingHere ?? selected).x && p.y === (buildingHere ?? selected).y,
+              )}
+              storage={
+                buildingHere && KEEPS_GOODS.includes(buildingHere.kind) && !buildingHere.site
+                  ? buildingHere
+                  : undefined
+              }
+              building={buildingHere}
+              road={roadHere}
+              terrain={terrainAt?.(selected.x, selected.y)}
+              carriageSite={carriageSiteHere}
+              node={nodeAt?.(selected.x, selected.y)}
+              onPickUp={(spot, goods) => carry('pickUp', spot, goods)}
+              onLoad={async (vesselId, goods, unload) =>
+                setOrderError(
+                  await giveOrder({
+                    kind: 'load',
+                    residentId: selected.id,
+                    vesselId,
+                    goods,
+                    unload,
+                  }),
+                )
+              }
+              onDrop={(spot, goods) => carry('drop', spot, goods)}
+              onBuild={build}
+              buildProblem={buildProblemAt(world, selected.x, selected.y)}
+              workers={workersHere(world.residents, buildingHere)}
+              holders={heldBy(world.residents, buildingHere)}
+              realmId={world.home.realmId}
+              onWork={work}
+              onFeedStable={feedStable}
+              onTrain={train}
+              onExplore={explore}
+              onTeach={teach}
+              onTearDown={tearDown}
+              horses={world.horses}
+              onBreed={breed}
+              residents={own}
+              onPair={pair}
+              others={world.residents.filter((r) => !own.some((o) => o.id === r.id))}
+              mapSize={world.map.size}
+              onAttack={attack}
+              onFeed={(targetId, units) => void feed(targetId, units)}
+              walls={world.buildings.filter(
+                (b) =>
+                  isWallOrGate(b) &&
+                  world.cities.find((c) => c.id === b.cityId)?.realmId !== world.home.realmId,
+              )}
+              onClimb={climb}
+              makeLeader={
+                selected.owner === world.home.realmId && selected.id !== world.home.leaderId
+                  ? {
+                      problem: makeLeaderProblem(
+                        {
+                          tick: world.tick,
+                          diplomacy: world.diplomacy,
+                          cities: world.cities,
+                          buildings: world.buildings,
+                          mapSize: world.map.size,
+                        },
+                        { id: world.home.realmId, leaderId: world.home.leaderId },
+                        leader,
+                        selected,
+                      ),
+                    }
+                  : undefined
+              }
+              leaderName={leader?.name}
+              onMakeLeader={makeLeader}
+              relocate={relocateFor(selected)}
+              onRelocate={relocate}
+              rename={
+                selected.owner === world.home.realmId
+                  ? {
+                      needsRealmName:
+                        selected.id === world.home.leaderId && world.home.realmName === null,
+                    }
+                  : undefined
+              }
+              onRename={rename}
+              sections={cardSections}
+              onSections={(s) => {
+                rememberTab(s.tab)
+                setCardSections(s)
+              }}
+              scriptParams={
+                selected.script && (
+                  <ScriptParamFields
+                    params={scripts.find((s) => s.id === selected.script!.scriptId)?.params ?? []}
+                    // As seen: the values picked for the script they run come with it.
+                    values={world.residents.find((r) => r.id === selected.id)?.script?.params ?? {}}
+                    // Working by a workplace's settings, what they don't override reads its values.
+                    workplace={(() => {
+                      const from = world.residents.find((r) => r.id === selected.id)?.script
+                        ?.settingsFrom
+                      return from === undefined
+                        ? undefined
+                        : (world.workSettings[from]?.params ?? {})
+                    })()}
+                    label={(id) => paramValueLabel(paramWorld(world), id)}
+                    target={targetParam(
+                      scripts.find((s) => s.id === selected.script!.scriptId) ?? {},
+                    )}
+                    onTile={targetOnTile(
+                      world,
+                      scripts.find((s) => s.id === selected.script!.scriptId),
+                      selected,
+                    )}
+                    waypoints={world.waypoints}
+                    picking={paramPick?.name}
+                    onPick={(p) => {
+                      setPicking(false)
+                      setParamPick((now) => (now?.name === p.name ? undefined : p))
+                    }}
+                    onNumber={(name, value) => void setScriptParam(name, { value })}
+                    onChoose={(p, value) =>
+                      void setScriptParam(
+                        p.name,
+                        p.type === 'choice' ? { value } : { targetId: value },
+                      )
+                    }
+                    onClear={(name) => void setScriptParam(name, { targetId: null })}
+                  />
+                )
+              }
+              scriptMemory={selected.script && scriptDebug(selected.id, selected.script.scriptId)}
+              scriptLog={
+                <ScriptLog
+                  id={selected.id}
+                  lines={scriptLogs.get(selected.id)}
+                  watch={watchScript}
                 />
-              )
-            }
-            scriptMemory={selected.script && scriptDebug(selected.id, selected.script.scriptId)}
-            scriptLog={
-              <ScriptLog id={selected.id} lines={scriptLogs.get(selected.id)} watch={watchScript} />
-            }
-            onStore={async () =>
-              setOrderError(
-                await giveOrder({ ...storeAll(selected, world.tick), residentId: selected.id }),
-              )
-            }
-            // A paste into the planner of a resident with no queue starts one; steps wrapped in
-            // a repeat block open a plan to give instead.
-            onEditQueue={async (items: PlanItem[], loop?: boolean) => {
-              if (!hasBlocks(items))
-                return setOrderError(await sendOrder(givePlan(selected, { items, loop })))
-              const from = selected.queue ? planOf(selected.queue) : EMPTY_PLAN
-              planQueue(selected.id, editPlan(from, items, loop))
-            }}
-            queuePlan={queuePlans[selected.id]}
-            onPlanQueue={(plan) => planQueue(selected.id, plan)}
-            onGivePlan={async () => {
-              const plan = queuePlans[selected.id]
-              if (!plan) return
-              planQueue(selected.id, undefined)
-              setOrderError(await sendOrder(givePlan(selected, plan)))
-            }}
-            addStep={addStep(world)}
-            onClose={() => {
-              setSelectedIds([])
-              setPicking(false)
-              setParamPick(undefined)
-              setPlan(undefined)
-            }}
-            collapsed={pick !== undefined && pick.kind !== 'army' && !picksCity}
-          />
+              }
+              onStore={async () =>
+                setOrderError(
+                  await giveOrder({ ...storeAll(selected, world.tick), residentId: selected.id }),
+                )
+              }
+              // A paste or load for a resident with no queue, or steps wrapped in a repeat block,
+              // opens a draft (`CONTEXT.md`: Queue draft); other edits change the running queue.
+              onEditQueue={async (items: PlanItem[], loop?: boolean) => {
+                const draft = draftEdit(selected, items, loop)
+                if (draft) return planQueue(selected.id, draft)
+                setOrderError(await sendOrder(givePlan(selected, { items, loop })))
+              }}
+              onDraftQueue={() => selected.queue && planQueue(selected.id, planOf(selected.queue))}
+              queuePlan={queuePlans[selected.id]}
+              onPlanQueue={(plan) => planQueue(selected.id, plan)}
+              onGivePlan={async () => {
+                const plan = queuePlans[selected.id]
+                if (!plan) return
+                planQueue(selected.id, undefined)
+                setOrderError(await sendOrder(givePlan(selected, plan)))
+              }}
+              addStep={addStep(world)}
+              onClose={() => {
+                setSelectedIds([])
+                setPicking(false)
+                setParamPick(undefined)
+                setPlan(undefined)
+              }}
+              collapsed={pick !== undefined && pick.kind !== 'army' && !picksCity}
+            />
+          </InsertPointContext.Provider>
         </CardSheet>
       )}
       {world && group.length > 1 && !selectedTile && (
@@ -2536,17 +2580,19 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onPick={(id) => select([id])}
             onClose={() => select([])}
             planner={
-              <GroupPlanner
-                plan={groupPlan}
-                onPlan={setGroupPlan}
-                onGive={() => void giveGroupPlan()}
-                addStep={addStep(world)}
-                scripts={scripts}
-                buildings={world.buildings}
-                lastSeen={world.lastSeen.buildings}
-                waypoints={world.waypoints}
-                realm={world.home.realmId}
-              />
+              <InsertPointContext.Provider value={insertFor('group')}>
+                <GroupPlanner
+                  plan={groupPlan}
+                  onPlan={setGroupPlan}
+                  onGive={() => void giveGroupPlan()}
+                  addStep={addStep(world)}
+                  scripts={scripts}
+                  buildings={world.buildings}
+                  lastSeen={world.lastSeen.buildings}
+                  waypoints={world.waypoints}
+                  realm={world.home.realmId}
+                />
+              </InsertPointContext.Provider>
             }
             collapsed={pick?.kind === 'group' || (pick?.kind === 'plan' && !picksCity)}
           />

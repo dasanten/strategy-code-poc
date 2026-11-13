@@ -27,6 +27,7 @@ export function CustomiseButton({
   of,
   give,
   disabled,
+  small = false,
 }: {
   /** The order as far as it names the script it starts, to tell if there is anything to show. */
   order: OrderRequest
@@ -35,18 +36,21 @@ export function CustomiseButton({
   /** What the order's own button runs. */
   give: () => void
   disabled?: boolean
+  /** A small ⚙ beside its step in the Add step palette, not a button of its own size. */
+  small?: boolean
 }) {
   const customising = useContext(CustomiseContext)
   if (!customising?.can(order)) return null
   return (
     <button
       type="button"
-      className="customise"
+      className={small ? 'customise customise-small' : 'customise'}
       aria-label={`Customise ${of}`}
+      title={small ? 'Customise' : undefined}
       disabled={disabled}
       onClick={() => customising.give(give)}
     >
-      Customise
+      {small ? '⚙' : 'Customise'}
     </button>
   )
 }
