@@ -114,3 +114,12 @@ in batches of 64. Not checked in a browser's Network tab.
 | ---------------------------- | --------------------- | ------------------- | ------------------- |
 | The whole map at full detail | 32,400 chunks, 32 MB  | 0.43 MB (77 times smaller) | 0.45 MB (75 times smaller) |
 | A batch of 64 chunks         | 64.5 KB               | 0.7 KB              | 0.8 KB              |
+
+### T99.3: large WebSocket messages travel gzipped
+
+| Ticket                        | Before                                    | After                                                                   |
+| ----------------------------- | ----------------------------------------- | ----------------------------------------------------------------------- |
+| T99.3 (WebSocket compression) | the welcome: 63,201 bytes as a text frame | 12,990 bytes as a gzipped binary frame (21%); only messages over 8 KiB |
+
+T99.3 measured on 2026-11-12 on a copy of a dev world (tick about 810, a Player with one young
+city), with a Node WebSocket client against the server: the same welcome at protocol 0 and 1.

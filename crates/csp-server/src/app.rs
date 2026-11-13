@@ -1209,9 +1209,13 @@ pub fn build_app(opts: AppOptions) -> Router {
     if let (Some(rt), Some(game)) = (opts.realtime.clone(), state.game.clone()) {
         app = app.route(
             crate::realtime::WS_PATH,
-            get(move |headers: HeaderMap, ws: axum::extract::ws::WebSocketUpgrade| {
-                crate::realtime::upgrade(rt, game, headers, ws)
-            }),
+            get(
+                move |headers: HeaderMap,
+                      axum::extract::RawQuery(query): axum::extract::RawQuery,
+                      ws: axum::extract::ws::WebSocketUpgrade| {
+                    crate::realtime::upgrade(rt, game, headers, query, ws)
+                },
+            ),
         );
     }
     app = match opts.web_dist.filter(|d| d.is_dir()) {
