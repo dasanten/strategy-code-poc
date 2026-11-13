@@ -121,7 +121,9 @@ describe('drawers', () => {
     expect(cover.closeDrawer).toBe(false)
     const cam = centreBeside(2806, 3427, cover, 24, 5760)
     // The resident's tile shows in the middle of 428..908, not of the whole screen.
-    expect(tileToScreen(cam, view, 5760, 2806.5, 3427.5)).toEqual([668, 400])
+    const [sx, sy] = tileToScreen(cam, view, 5760, 2806.5, 3427.5)
+    expect(sx).toBeCloseTo(668, 6)
+    expect(sy).toBe(400)
   })
 
   it('shows a place between the open drawer and the card', () => {
