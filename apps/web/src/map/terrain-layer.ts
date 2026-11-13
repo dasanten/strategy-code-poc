@@ -43,6 +43,8 @@ export class TerrainLayer {
   private readonly entries = new Map<number, Entry>()
   private readonly painted: ShownTextures<Painted>
   private readonly across: number
+  /** The chunks placed last frame. */
+  private lastShown: ReadonlySet<number> = new Set()
 
   constructor(
     private readonly mapSize: number,
@@ -110,7 +112,13 @@ export class TerrainLayer {
   private place(cam: Camera, view: Size, shown: ReadonlySet<number>, busy: boolean): boolean {
     const marked = cam.scale >= MARK_SCALE
     this.marks.visible = marked
-    for (const [i, e] of this.entries) {
+    // Only the chunks shown now or last frame: zoomed out to a coarse level, none of the loaded
+    // chunks is looked at (ADR 0034).
+    const touched = new Set([...this.lastShown, ...shown])
+    this.lastShown = shown
+    for (const i of touched) {
+      const e = this.entries.get(i)
+      if (!e) continue
       const painted = shown.has(i) ? this.painted.texture(i) : undefined
       const visible = painted !== undefined
       e.sprite.visible = visible
