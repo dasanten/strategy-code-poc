@@ -1,16 +1,26 @@
 import { describe, expect, it } from 'vitest'
-import { CHUNK_SIZE, Terrain, UNEXPLORED, chunksAcross } from '../shared/terrain.js'
+import {
+  CHUNK_SIZE,
+  TERRAIN_BATCH_MAX,
+  TERRAIN_LEVEL_MAX,
+  Terrain,
+  UNEXPLORED,
+  chunksAcross,
+} from '../shared/terrain.js'
 import type { Building, BuildingKind, City, SeenCarriage, SeenResident } from '@csp/shared-types'
 import type { MapWorld } from './map-world.js'
 import {
   MINIMAP_MIN_SPAN,
   minimapDots,
+  minimapChunks,
   minimapFrame,
+  minimapLevel,
   minimapOpenAtStart,
   minimapPixels,
   minimapToTile,
   minimapView,
   rememberMinimapOpen,
+  terrainAtLevel,
   tileToMinimap,
 } from './minimap.js'
 import { TERRAIN_COLORS } from './palette.js'
@@ -144,6 +154,50 @@ describe('minimap terrain', () => {
     expect([...pixels.slice(0, 4)]).toEqual([c >> 16, (c >> 8) & 0xff, c & 0xff, 255])
     expect(pixels[7]).toBe(0)
     expect(pixels[11]).toBe(0)
+  })
+})
+
+describe('minimap level (ADR 0034)', () => {
+  const big = 5760
+
+  it('stays at full detail for a small frame, as before', () => {
+    const frame = { x: 1000, y: 1000, span: MINIMAP_MIN_SPAN }
+    expect(minimapLevel(frame, big)).toBe(0)
+    expect(minimapChunks(frame, big, 0).length).toBeLessThanOrEqual(16)
+  })
+
+  it('picks the finest level whose chunks for the frame fit in one batch', () => {
+    const frame = { x: 1000, y: 5700, span: 1500 }
+    const level = minimapLevel(frame, big)
+    expect(level).toBe(3)
+    expect(minimapChunks(frame, big, level).length).toBeLessThanOrEqual(TERRAIN_BATCH_MAX)
+    expect(minimapChunks(frame, big, level - 1).length).toBeGreaterThan(TERRAIN_BATCH_MAX)
+  })
+
+  it('draws the whole map from the coarsest level, every chunk of it and no padding', () => {
+    const frame = { x: 2880, y: 2880, span: big }
+    expect(minimapLevel(frame, big)).toBe(TERRAIN_LEVEL_MAX)
+    // Six level-5 chunks across, the last one partly padding.
+    const chunks = minimapChunks(frame, big, TERRAIN_LEVEL_MAX).sort((a, b) => a - b)
+    expect(chunks).toEqual(Array.from({ length: 36 }, (_, i) => i))
+  })
+
+  it('reads a tile from the square of its level that holds it', () => {
+    // Level 2 on a 256-tile map: 64 squares across, 2 chunks of 32 squares.
+    const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(UNEXPLORED)
+    tiles[3 * CHUNK_SIZE + 1] = Terrain.Hills
+    const asked: Array<[number, number]> = []
+    const at = terrainAtLevel(size, 2, (i, level) => {
+      asked.push([i, level])
+      return i === 3 ? { tiles } : undefined
+    })
+    // Tile (133, 140) is in square (33, 35): chunk (1, 1), byte (1, 3).
+    expect(at(133, 140)).toBe(Terrain.Hills)
+    expect(at(132, 141)).toBe(Terrain.Hills)
+    expect(at(136, 140)).toBe(UNEXPLORED)
+    expect(at(0, 0)).toBeUndefined()
+    expect(asked[0]).toEqual([3, 2])
+    expect(asked.at(-1)).toEqual([0, 2])
   })
 })
 

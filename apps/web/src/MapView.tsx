@@ -38,12 +38,16 @@ import {
 import {
   MINIMAP_SIDE,
   minimapDots,
+  minimapChunks,
   minimapFrame,
+  minimapLevel,
   minimapOpenAtStart,
   minimapPixels,
+  minimapRes,
   minimapToTile,
   minimapView,
   rememberMinimapOpen,
+  terrainAtLevel,
   tileToMinimap,
   type MinimapDot,
   type MinimapFrame,
@@ -335,6 +339,9 @@ export function MapView({
     const borders = new Map<number, Map<number, BorderRun[]>>()
     // The minimap: its frame, its terrain as a picture made again when chunks load, and its dots.
     let miniFrame: MinimapFrame | undefined
+    // The level its terrain is drawn from and that level's chunks it needs (ADR 0034).
+    let miniLevel = 0
+    let miniChunks: number[] = []
     let miniExplored: ReadonlySet<number> | undefined
     let miniTerrain: HTMLCanvasElement | undefined
     let miniDots: { world: MapWorld; dots: MinimapDot[] } | undefined
@@ -368,7 +375,13 @@ export function MapView({
     const store = new ChunkStore(
       () => worldRef.current.exploredChunks,
       across,
-      (chunk) => {
+      (chunk, level) => {
+        // Coarse chunks are the minimap's alone.
+        if (level !== 0) {
+          if (level === miniLevel) miniTerrain = undefined
+          redraw()
+          return
+        }
         terrainLayer.set(chunk)
         nodes[chunk.cy * across + chunk.cx] = chunk.nodes
         onNodesLoadedRef.current?.((x, y) =>
@@ -382,7 +395,7 @@ export function MapView({
               (y % CHUNK_SIZE) * CHUNK_SIZE + (x % CHUNK_SIZE)
             ],
         )
-        miniTerrain = undefined
+        if (miniLevel === 0) miniTerrain = undefined
         redraw()
       },
       terrainPathRef.current
@@ -484,15 +497,10 @@ export function MapView({
         )
         sprite.scale.set(cam.scale)
       }
-      // The minimap's chunks load too; the store asks for the nearest to the view first.
-      const forMinimap =
-        minimapOpenRef.current && !admin
-          ? [...worldRef.current.exploredChunks].filter((i) => !shown.has(i))
-          : []
-      store.want([...onScreen, ...forMinimap], {
-        cx: cam.x / CHUNK_SIZE,
-        cy: cam.y / CHUNK_SIZE,
-      })
+      // The minimap's chunks load after those on screen, at the level that fits its frame
+      // (ADR 0034): about one request, however much is explored.
+      const forMinimap = minimapOpenRef.current && !admin ? [planMinimap()] : []
+      store.want(onScreen, { cx: cam.x / CHUNK_SIZE, cy: cam.y / CHUNK_SIZE }, forMinimap)
       const notHere = store.waiting(onScreen)
       waiting.clear()
       for (const i of notHere) {
@@ -530,30 +538,35 @@ export function MapView({
       }
     }
 
+    /** The minimap's frame, level and chunks, worked out again when explored terrain grew. */
+    function planMinimap(): { level: number; indices: number[]; frame: MinimapFrame } {
+      const world = worldRef.current
+      if (world.exploredChunks !== miniExplored || !miniFrame) {
+        miniExplored = world.exploredChunks
+        miniFrame = minimapFrame(miniExplored, world.home, mapSize)
+        miniLevel = minimapLevel(miniFrame, mapSize)
+        miniChunks = minimapChunks(miniFrame, mapSize, miniLevel)
+        miniTerrain = undefined
+      }
+      return { level: miniLevel, indices: miniChunks, frame: miniFrame }
+    }
+
     /** The minimap (`map/minimap.ts`): explored terrain, dots and the view's rectangle. */
     function drawMinimap(view: Size) {
       const canvas = minimapRef.current
       const world = worldRef.current
       const ctx = canvas?.getContext('2d')
       if (!canvas || !ctx || world.admin) return
-      if (world.exploredChunks !== miniExplored || !miniFrame) {
-        miniExplored = world.exploredChunks
-        miniFrame = minimapFrame(miniExplored, world.home, mapSize)
-        miniTerrain = undefined
-      }
-      const frame = miniFrame
+      const { frame, level } = planMinimap()
       if (!miniTerrain) {
-        const res = Math.min(MINIMAP_SIDE, Math.ceil(frame.span))
+        const res = minimapRes(frame)
         miniTerrain = document.createElement('canvas')
         miniTerrain.width = miniTerrain.height = res
         const pixels = minimapPixels(
           frame,
           mapSize,
           res,
-          (x, y) =>
-            store.get(Math.floor(y / CHUNK_SIZE) * across + Math.floor(x / CHUNK_SIZE))?.tiles[
-              (y % CHUNK_SIZE) * CHUNK_SIZE + (x % CHUNK_SIZE)
-            ],
+          terrainAtLevel(mapSize, level, (i, l) => store.get(i, l)),
         )
         miniTerrain.getContext('2d')?.putImageData(new ImageData(pixels, res, res), 0, 0)
       }

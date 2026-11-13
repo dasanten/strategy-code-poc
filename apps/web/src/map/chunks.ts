@@ -1,4 +1,10 @@
-import { TERRAIN_BATCH_MAX, TERRAIN_BATCH_PATH } from '../shared/terrain.js'
+import {
+  TERRAIN_BATCH_MAX,
+  TERRAIN_BATCH_PATH,
+  TERRAIN_LEVEL_MAX,
+  coarseChunkOf,
+  levelChunksAcross,
+} from '../shared/terrain.js'
 import { decodeChunk, decodeChunkBatch } from '../shared/chunks.js'
 import type { TerrainChunk } from '@csp/shared-types'
 
@@ -9,24 +15,32 @@ const MAX_IN_FLIGHT = 6
 export interface ChunkSource {
   /** The most chunks one request asks for. */
   batch: number
-  /** Asks for these chunks; answers those it has, each with its index and `encodeChunk` bytes. */
-  load(indices: number[]): Promise<Array<[number, Uint8Array]>>
+  /**
+   * Asks for these chunks of `level` (ADR 0034; 0 is full detail); answers those it has, each
+   * with its index and `encodeChunk` bytes.
+   */
+  load(indices: number[], level: number): Promise<Array<[number, Uint8Array]>>
 }
 
-/** The Player's explored terrain, up to `TERRAIN_BATCH_MAX` chunks a request. */
+/** The Player's explored terrain, up to `TERRAIN_BATCH_MAX` chunks of one level a request. */
 export function exploredChunkBatches(
   post: (path: string, body: string) => Promise<ArrayBuffer> = defaultPost,
 ): ChunkSource {
   return {
     batch: TERRAIN_BATCH_MAX,
-    load: async (indices) =>
+    load: async (indices, level) =>
       decodeChunkBatch(
-        new Uint8Array(await post(TERRAIN_BATCH_PATH, JSON.stringify({ chunks: indices }))),
+        new Uint8Array(
+          await post(
+            TERRAIN_BATCH_PATH,
+            JSON.stringify(level === 0 ? { chunks: indices } : { chunks: indices, level }),
+          ),
+        ),
       ),
   }
 }
 
-/** One chunk a request from `path`: the admin map's terrain (`adminTerrainChunkPath`). */
+/** One chunk a request from `path`: the admin map's terrain (`adminTerrainChunkPath`), level 0. */
 export function chunkByChunk(
   path: (cx: number, cy: number) => string,
   across: number,
@@ -50,10 +64,23 @@ export interface ChunkView {
   cy: number
 }
 
+/** Chunks of a coarse level to load after the level-0 ones, in the order given. */
+export interface LevelWish {
+  level: number
+  indices: readonly number[]
+}
+
+/** A chunk's key in the store: its index and its level together. */
+const keyOf = (index: number, level: number) => index * 8 + level
+const levelOf = (key: number) => key % 8
+const indexOf = (key: number) => Math.floor(key / 8)
+
 /**
- * The client's copy of explored terrain, loaded in batches as the view needs it (ADR 0006).
- * Only chunks the server listed as explored are asked for, nearest to the view first; each is
- * loaded once, and again after `forget` when its explored terrain grew.
+ * The client's copy of explored terrain, loaded in batches as the view needs it (ADR 0006), at
+ * full detail (level 0) or at a coarse level (ADR 0034), each level kept apart. Only chunks the
+ * server listed as explored are asked for (a coarse chunk counts as explored when a level-0 chunk
+ * in it is), nearest to the view first; each is loaded once, and again after `forget` when its
+ * explored terrain grew, at every level.
  */
 export class ChunkStore {
   private chunks = new Map<number, TerrainChunk>()
@@ -64,28 +91,52 @@ export class ChunkStore {
   private queue: number[] = []
   private inFlight = 0
   private stopped = false
+  /** The explored chunks of each coarse level, for the set of level-0 chunks they came from. */
+  private coarse: { from?: ReadonlySet<number>; levels: Map<number, Set<number>> } = {
+    levels: new Map(),
+  }
 
   constructor(
     private readonly explored: () => ReadonlySet<number>,
     private readonly across: number,
-    private readonly onLoaded: (chunk: TerrainChunk) => void,
+    private readonly onLoaded: (chunk: TerrainChunk, level: number) => void,
     private readonly source: ChunkSource = exploredChunkBatches(),
   ) {}
 
-  get(index: number): TerrainChunk | undefined {
-    return this.chunks.get(index)
+  get(index: number, level = 0): TerrainChunk | undefined {
+    return this.chunks.get(keyOf(index, level))
+  }
+
+  /** The explored chunks of `level`: those holding an explored level-0 chunk. */
+  exploredAt(level: number): ReadonlySet<number> {
+    const explored = this.explored()
+    if (level === 0) return explored
+    if (this.coarse.from !== explored) this.coarse = { from: explored, levels: new Map() }
+    let set = this.coarse.levels.get(level)
+    if (!set) {
+      set = new Set([...explored].map((i) => coarseChunkOf(i, this.across, level)))
+      this.coarse.levels.set(level, set)
+    }
+    return set
   }
 
   /**
-   * Asks for the given chunks, nearest to `view` first (or in the order given without one);
-   * drops earlier wishes that weren't started.
+   * Asks for the given level-0 chunks, nearest to `view` first (or in the order given without
+   * one), then the chunks of coarse levels in `more`; drops earlier wishes that weren't started.
    */
-  want(indices: number[], view?: ChunkView): void {
-    const explored = this.explored()
-    const queue = indices.filter(
-      (i) =>
-        explored.has(i) && !this.requested.has(i) && (!this.chunks.has(i) || this.outdated.has(i)),
-    )
+  want(indices: number[], view?: ChunkView, more: readonly LevelWish[] = []): void {
+    const wanted = (level: number) => {
+      const explored = this.exploredAt(level)
+      return (i: number) => {
+        const key = keyOf(i, level)
+        return (
+          explored.has(i) &&
+          !this.requested.has(key) &&
+          (!this.chunks.has(key) || this.outdated.has(key))
+        )
+      }
+    }
+    const queue = indices.filter(wanted(0))
     if (view) {
       const away = (i: number) =>
         Math.hypot(
@@ -95,7 +146,10 @@ export class ChunkStore {
       const distance = new Map(queue.map((i) => [i, away(i)]))
       queue.sort((a, b) => distance.get(a)! - distance.get(b)!)
     }
-    this.queue = queue
+    this.queue = queue.map((i) => keyOf(i, 0))
+    for (const { level, indices } of more) {
+      this.queue.push(...indices.filter(wanted(level)).map((i) => keyOf(i, level)))
+    }
     this.pump()
   }
 
@@ -103,16 +157,22 @@ export class ChunkStore {
    * The explored chunks among these that are not here yet, so the map has nothing to draw there:
    * it shows them as loading. A chunk loading again after `forget` keeps its older copy meanwhile.
    */
-  waiting(indices: readonly number[]): number[] {
-    const explored = this.explored()
-    return indices.filter((i) => explored.has(i) && !this.chunks.has(i))
+  waiting(indices: readonly number[], level = 0): number[] {
+    const explored = this.exploredAt(level)
+    return indices.filter((i) => explored.has(i) && !this.chunks.has(keyOf(i, level)))
   }
 
-  /** Marks these chunks as outdated, so the next `want` loads them again. */
+  /**
+   * Marks these level-0 chunks, and the coarse chunks holding them, as outdated, so the next
+   * `want` loads them again.
+   */
   forget(indices: readonly number[]): void {
     for (const i of indices) {
-      if (this.chunks.has(i)) this.outdated.add(i)
-      this.requested.delete(i)
+      for (let level = 0; level <= TERRAIN_LEVEL_MAX; level++) {
+        const key = keyOf(level === 0 ? i : coarseChunkOf(i, this.across, level), level)
+        if (this.chunks.has(key)) this.outdated.add(key)
+        this.requested.delete(key)
+      }
     }
   }
 
@@ -124,29 +184,36 @@ export class ChunkStore {
   private pump(): void {
     let next = 0
     while (!this.stopped && this.inFlight < MAX_IN_FLIGHT && next < this.queue.length) {
+      // One request asks for chunks of one level.
+      const level = levelOf(this.queue[next]!)
       const batch: number[] = []
-      while (batch.length < this.source.batch && next < this.queue.length) {
-        const index = this.queue[next++]!
-        if (this.requested.has(index)) continue
-        this.requested.add(index)
-        batch.push(index)
+      while (
+        batch.length < this.source.batch &&
+        next < this.queue.length &&
+        levelOf(this.queue[next]!) === level
+      ) {
+        const key = this.queue[next++]!
+        if (this.requested.has(key)) continue
+        this.requested.add(key)
+        batch.push(indexOf(key))
       }
-      if (batch.length === 0) break
+      if (batch.length === 0) continue
       this.inFlight++
+      const across = levelChunksAcross(this.across, level)
       this.source
-        .load(batch)
+        .load(batch, level)
         .then((found) => {
           if (this.stopped) return
           for (const [index, bytes] of found) {
             if (!batch.includes(index)) continue
-            const chunk = decodeChunk(index % this.across, Math.floor(index / this.across), bytes)
-            this.chunks.set(index, chunk)
-            this.outdated.delete(index)
-            this.onLoaded(chunk)
+            const chunk = decodeChunk(index % across, Math.floor(index / across), bytes)
+            this.chunks.set(keyOf(index, level), chunk)
+            this.outdated.delete(keyOf(index, level))
+            this.onLoaded(chunk, level)
           }
         })
         .catch(() => {
-          for (const index of batch) this.requested.delete(index)
+          for (const index of batch) this.requested.delete(keyOf(index, level))
         })
         .finally(() => {
           this.inFlight--

@@ -10,17 +10,20 @@ const tiles = () => new Uint8Array(CHUNK_SIZE * CHUNK_SIZE)
  * request is recorded as the chunks it asked for.
  */
 function store(explored: number[], { across = 2, batch = 64 } = {}) {
-  const pending: Array<{ indices: number[]; resolve: (r: Array<[number, Uint8Array]>) => void }> =
-    []
+  const pending: Array<{
+    indices: number[]
+    level: number
+    resolve: (r: Array<[number, Uint8Array]>) => void
+  }> = []
   const loaded: number[] = []
   const source: ChunkSource = {
     batch,
-    load: (indices) => new Promise((resolve) => pending.push({ indices, resolve })),
+    load: (indices, level) => new Promise((resolve) => pending.push({ indices, level, resolve })),
   }
   const chunks = new ChunkStore(
     () => new Set(explored),
     across,
-    (c) => loaded.push(c.cy * across + c.cx),
+    (c, level) => loaded.push(level === 0 ? c.cy * across + c.cx : -1),
     source,
   )
   /** Answers the oldest request still open, with all its chunks or only `only`. */
@@ -29,7 +32,8 @@ function store(explored: number[], { across = 2, batch = 64 } = {}) {
     req.resolve(req.indices.filter((i) => !only || only.includes(i)).map((i) => [i, tiles()]))
     await new Promise((resolve) => setTimeout(resolve))
   }
-  return { chunks, answer, loaded, asked: () => pending.map((p) => p.indices) }
+  const levels = () => pending.map((p) => p.level)
+  return { chunks, answer, loaded, levels, asked: () => pending.map((p) => p.indices) }
 }
 
 describe('ChunkStore', () => {
@@ -122,14 +126,63 @@ describe('ChunkStore', () => {
   })
 })
 
+describe('ChunkStore by level (ADR 0034)', () => {
+  // A 4-across map; level-0 chunks 0 and 5 are explored. At level 1 (2 across) both are in
+  // coarse chunk 0; at level 2 (1 across) too.
+  it('keeps the levels apart and asks for each level in its own request', async () => {
+    const { chunks, answer, asked, levels } = store([0, 5], { across: 4 })
+    chunks.want([0, 1], undefined, [{ level: 1, indices: [0, 1, 2, 3] }])
+    // Coarse chunks 1 to 3 hold nothing explored, so they are not asked for.
+    expect(asked()).toEqual([[0], [0]])
+    expect(levels()).toEqual([0, 1])
+    await answer()
+    expect(chunks.get(0)).toBeDefined()
+    expect(chunks.get(0, 1)).toBeUndefined()
+    expect(chunks.waiting([0], 1)).toEqual([0])
+    await answer()
+    expect(chunks.get(0, 1)).toBeDefined()
+    expect(chunks.waiting([0], 1)).toEqual([])
+    // Each level is loaded once.
+    chunks.want([0], undefined, [{ level: 1, indices: [0] }])
+    expect(asked()).toEqual([])
+    expect(chunks.exploredAt(1)).toEqual(new Set([0]))
+    expect(chunks.exploredAt(2)).toEqual(new Set([0]))
+  })
+
+  it('loads the coarse chunks in use again when a chunk in them grew', async () => {
+    const { chunks, answer, asked, levels } = store([0, 5, 15], { across: 4 })
+    chunks.want([0], undefined, [{ level: 1, indices: [0, 3] }])
+    await answer()
+    await answer()
+    // Chunk 5 grew: its coarse chunk 0 loads again, coarse chunk 3 (of chunk 15) does not, and
+    // level-0 chunk 0 neither.
+    chunks.forget([5])
+    expect(chunks.get(0, 1)).toBeDefined()
+    chunks.want([0], undefined, [{ level: 1, indices: [0, 3] }])
+    expect(asked()).toEqual([[0]])
+    expect(levels()).toEqual([1])
+  })
+})
+
 describe('chunk sources', () => {
+  it('names the level in the request, none at full detail', async () => {
+    const sent: string[] = []
+    const source = exploredChunkBatches(async (_, body) => {
+      sent.push(body)
+      return new ArrayBuffer(0)
+    })
+    await source.load([3], 0)
+    await source.load([3], 2)
+    expect(sent).toEqual(['{"chunks":[3]}', '{"chunks":[3],"level":2}'])
+  })
+
   it('posts the indices to the batch endpoint and reads the chunks from its body', async () => {
     const sent: Array<[string, string]> = []
     const source = exploredChunkBatches(async (path, body) => {
       sent.push([path, body])
       return encodeChunkBatch([[3, tiles()]]).buffer as ArrayBuffer
     })
-    expect(await source.load([3, 4])).toEqual([[3, tiles()]])
+    expect(await source.load([3, 4], 0)).toEqual([[3, tiles()]])
     expect(sent).toEqual([[TERRAIN_BATCH_PATH, '{"chunks":[3,4]}']])
   })
 
@@ -144,7 +197,7 @@ describe('chunk sources', () => {
       },
     )
     expect(source.batch).toBe(1)
-    expect(await source.load([6])).toEqual([[6, tiles()]])
+    expect(await source.load([6], 0)).toEqual([[6, tiles()]])
     expect(asked).toEqual(['/admin/2/1'])
   })
 })

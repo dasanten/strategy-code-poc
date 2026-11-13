@@ -128,6 +128,28 @@ export const TERRAIN_BATCH_PATH = '/api/terrain/chunks'
 export const TERRAIN_BATCH_MAX = 64
 
 /**
+ * The coarsest level explored terrain is served at (ADR 0034). At level `k` one byte stands for a
+ * square of `2^k × 2^k` tiles, the most common terrain the Player explored in it, and a chunk is
+ * `CHUNK_SIZE × CHUNK_SIZE` squares; level 0 is one byte a tile. A `TERRAIN_BATCH_PATH` request
+ * names its level as `level`, 0 if none.
+ */
+export const TERRAIN_LEVEL_MAX = 5
+
+/**
+ * How many chunks of `level` fit across a map `across` level-0 chunks wide. Chunk `i` of a level
+ * is at `(i % n, ⌊i / n⌋)`; squares past the map's side are padding.
+ */
+export function levelChunksAcross(across: number, level: number): number {
+  return Math.ceil(across / 2 ** level)
+}
+
+/** The chunk of `level` that holds level-0 chunk `i`, on a map `across` level-0 chunks wide. */
+export function coarseChunkOf(i: number, across: number, level: number): number {
+  const [cx, cy] = [i % across, Math.floor(i / across)]
+  return (cy >> level) * levelChunksAcross(across, level) + (cx >> level)
+}
+
+/**
  * Where an admin loads any chunk of terrain, explored or not (`CONTEXT.md`: admin map): the same
  * format as `terrainChunkPath`, with every tile and every resource node in it.
  */

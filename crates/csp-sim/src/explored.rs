@@ -5,11 +5,13 @@
 //!
 //! The bit layout is the TypeScript's: tile `t = y * size + x` is bit `t & 7` of byte `t >> 3`.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::OnceLock;
 
 use csp_shared::chunks::{
-    chunks_across, encode_chunk, encode_chunk_batch, overview_across, KnownNode, CHUNK_SIZE,
-    CHUNK_TILES, OVERVIEW_SCALE, UNEXPLORED,
+    chunks_across, encode_chunk, encode_chunk_batch, level_chunks_across, squares_across,
+    KnownNode, CHUNK_SIZE, CHUNK_TILES, OVERVIEW_SCALE, TERRAIN_LEVEL_MAX, UNEXPLORED,
 };
 use csp_shared::terrain::{tile_index, wrap, TerrainMap};
 use csp_shared::world::ResourceNode;
@@ -20,14 +22,31 @@ use csp_shared::world::ResourceNode;
 pub struct ExploredTerrain {
     terrain: TerrainMap,
     bits: HashMap<u64, Vec<u8>>,
-    /// Per Player, the chunks in which they explored at least one tile: kept beside the bitmap so
-    /// a welcome looks them up instead of scanning every tile of the map. Scratch memory, rebuilt
-    /// from the bitmap on load.
-    chunks: HashMap<u64, BTreeSet<u32>>,
+    /// Per Player, the chunks in which they explored at least one tile, each with how many of its
+    /// tiles they explored: kept beside the bitmap so a welcome looks them up instead of scanning
+    /// every tile of the map, and a coarse chunk knows which chunks are fully explored. Scratch
+    /// memory, rebuilt from the bitmap on load.
+    chunks: HashMap<u64, BTreeMap<u32, u16>>,
     dirty: BTreeSet<u64>,
     /// Resource nodes by chunk index; nodes never move, so this is built once.
     nodes_by_chunk: HashMap<u32, Vec<KnownNode>>,
     overview: Option<Vec<u8>>,
+    /// Per coarse level (1 to `TERRAIN_LEVEL_MAX`), the most common terrain of every square of
+    /// the whole map, as `coarse_squares` makes it: terrain never changes, so each is made once,
+    /// when first asked for, and used for every fully explored chunk.
+    squares: [OnceLock<Vec<u8>>; TERRAIN_LEVEL_MAX as usize],
+    /// Tiles read one by one to answer coarse chunks, for the tests to count.
+    tiles_read: TilesRead,
+}
+
+/// A count of tiles read, cloned as its value.
+#[derive(Debug, Default)]
+struct TilesRead(AtomicU64);
+
+impl Clone for TilesRead {
+    fn clone(&self) -> Self {
+        TilesRead(AtomicU64::new(self.0.load(Ordering::Relaxed)))
+    }
 }
 
 impl ExploredTerrain {
@@ -46,6 +65,8 @@ impl ExploredTerrain {
             dirty: BTreeSet::new(),
             nodes_by_chunk,
             overview: None,
+            squares: Default::default(),
+            tiles_read: TilesRead::default(),
         }
     }
 
@@ -63,14 +84,15 @@ impl ExploredTerrain {
         explored
     }
 
-    /// The chunks with an explored tile in a bitmap: only its non-zero bytes are looked at.
-    fn chunks_in(&self, bits: &[u8]) -> BTreeSet<u32> {
+    /// The chunks with an explored tile in a bitmap, with how many: only its non-zero bytes are
+    /// looked at.
+    fn chunks_in(&self, bits: &[u8]) -> BTreeMap<u32, u16> {
         let size = self.terrain.size as usize;
         let n = chunks_across(self.terrain.size) as usize;
         let chunk = CHUNK_SIZE as usize;
         let last = size * size - 1;
         let chunk_of = |t: usize| (t / size / chunk) * n + (t % size) / chunk;
-        let mut found = BTreeSet::new();
+        let mut found: BTreeMap<u32, u16> = BTreeMap::new();
         for (i, &byte) in bits.iter().enumerate() {
             if byte == 0 {
                 continue;
@@ -79,16 +101,27 @@ impl ExploredTerrain {
             let c = chunk_of(first);
             // On a map whose side is a whole number of bytes, a byte's eight tiles share one chunk.
             if c == chunk_of((first + 7).min(last)) {
-                found.insert(c as u32);
+                *found.entry(c as u32).or_default() += byte.count_ones() as u16;
                 continue;
             }
             for b in 0..8 {
                 if byte & (1 << b) != 0 {
-                    found.insert(chunk_of(first + b) as u32);
+                    *found.entry(chunk_of(first + b) as u32).or_default() += 1;
                 }
             }
         }
         found
+    }
+
+    /// How many tiles of a chunk lie on the map: all of them but at the edge of a map whose side
+    /// isn't a whole number of chunks.
+    fn tiles_on_map(&self, chunk: u32) -> u16 {
+        let size = self.terrain.size;
+        let n = chunks_across(size) as u32;
+        let (cx, cy) = ((chunk % n) as i32, (chunk / n) as i32);
+        let w = (size - cx * CHUNK_SIZE).min(CHUNK_SIZE);
+        let h = (size - cy * CHUNK_SIZE).min(CHUNK_SIZE);
+        (w * h) as u16
     }
 
     /// The Player's bitmap, to save: `ceil(size² / 8)` bytes. None if they explored nothing.
@@ -110,6 +143,7 @@ impl ExploredTerrain {
             .bits
             .entry(user_id)
             .or_insert_with(|| vec![0; (size as usize * size as usize).div_ceil(8)]);
+        let counts = self.chunks.entry(user_id).or_default();
         let n = chunks_across(size);
         let mut grown: Vec<u32> = Vec::new();
         let r2 = radius * radius;
@@ -136,6 +170,7 @@ impl ExploredTerrain {
                 if bits[i] & bit == 0 {
                     bits[i] |= bit;
                     let c = (chunk_row + col.div_euclid(CHUNK_SIZE)) as u32;
+                    *counts.entry(c).or_default() += 1;
                     // Rows come in chunk order, so a repeat is almost always the last one.
                     if grown.last() != Some(&c) {
                         grown.push(c);
@@ -150,7 +185,6 @@ impl ExploredTerrain {
         grown.sort_unstable();
         grown.dedup();
         self.dirty.insert(user_id);
-        self.chunks.entry(user_id).or_default().extend(grown.iter().copied());
         grown
     }
 
@@ -164,7 +198,8 @@ impl ExploredTerrain {
             *bits.last_mut().expect("a map has tiles") = (1u8 << (tiles % 8)) - 1;
         }
         let n = chunks_across(self.terrain.size) as u32;
-        self.chunks.insert(user_id, (0..n * n).collect());
+        let counts = (0..n * n).map(|c| (c, self.tiles_on_map(c))).collect();
+        self.chunks.insert(user_id, counts);
         self.bits.insert(user_id, bits);
         self.dirty.insert(user_id);
     }
@@ -201,7 +236,7 @@ impl ExploredTerrain {
         let mut out: Vec<(u32, Vec<u8>)> = Vec::new();
         for &i in indices {
             let Ok(i) = u32::try_from(i) else { continue };
-            if !known.contains(&i) || out.iter().any(|(seen, _)| *seen == i) {
+            if !known.contains_key(&i) || out.iter().any(|(seen, _)| *seen == i) {
                 continue;
             }
             let (cx, cy) = (i64::from(i) % n, i64::from(i) / n);
@@ -216,6 +251,162 @@ impl ExploredTerrain {
     /// `encode_chunk_batch`. The caller refuses more than `TERRAIN_BATCH_MAX` indices.
     pub fn chunks(&self, user_id: u64, indices: &[i64]) -> Vec<u8> {
         encode_chunk_batch(&self.chunk_batch(user_id, indices))
+    }
+
+    /// The body that answers a batch request at `level` (ADR 0034): `chunks` at level 0, else
+    /// the coarse chunks among `indices` (see `level_chunks_across`) in which the Player explored
+    /// something, in the order asked and once each, encoded by `encode_chunk_batch`. The caller
+    /// refuses a level above `TERRAIN_LEVEL_MAX`.
+    pub fn chunks_at(&self, user_id: u64, level: u8, indices: &[i64]) -> Vec<u8> {
+        if level == 0 {
+            return self.chunks(user_id, indices);
+        }
+        let n = i64::from(level_chunks_across(self.terrain.size, level));
+        let mut out: Vec<(u32, Vec<u8>)> = Vec::new();
+        for &i in indices {
+            let Ok(i) = u32::try_from(i) else { continue };
+            if out.iter().any(|(seen, _)| *seen == i) {
+                continue;
+            }
+            let (cx, cy) = (i64::from(i) % n, i64::from(i) / n);
+            if let Some(bytes) = self.coarse_chunk(user_id, level, cx as i32, cy as i32) {
+                out.push((i, bytes));
+            }
+        }
+        encode_chunk_batch(&out)
+    }
+
+    /// One chunk of `level` (1 to `TERRAIN_LEVEL_MAX`) as the Player knows it (ADR 0034;
+    /// `CONTEXT.md`: Explored terrain): `CHUNK_TILES` bytes, one a square of `2^level` tiles a
+    /// side, each the most common terrain among the tiles of the square the Player explored (the
+    /// lower code on a tie), `UNEXPLORED` where they explored none of it and past the map's side.
+    /// No resource nodes. None when they explored nothing in it, or for a chunk off the level.
+    ///
+    /// A square lies inside one chunk of level 0. Where they explored all of that chunk the
+    /// square is looked up in `coarse_squares`, worked out once for the whole map; only the
+    /// squares of partly explored chunks are counted tile by tile.
+    pub fn coarse_chunk(&self, user_id: u64, level: u8, cx: i32, cy: i32) -> Option<Vec<u8>> {
+        let size = self.terrain.size;
+        let across = level_chunks_across(size, level);
+        if level == 0 || level > TERRAIN_LEVEL_MAX || cx < 0 || cy < 0 {
+            return None;
+        }
+        if cx >= across || cy >= across {
+            return None;
+        }
+        let known = self.chunks.get(&user_id)?;
+        let side = 1 << level;
+        let squares = squares_across(size, level);
+        // Squares a side of one level-0 chunk.
+        let per = CHUNK_SIZE / side;
+        let n = chunks_across(size);
+        let bits = self.bits.get(&user_id).map(Vec::as_slice).unwrap_or_default();
+        let mut whole: Option<&[u8]> = None;
+        let mut tally = Tally::new();
+        let mut out = vec![UNEXPLORED; CHUNK_TILES];
+        let mut any = false;
+        for qy in 0..CHUNK_SIZE {
+            let sy = cy * CHUNK_SIZE + qy;
+            if sy >= squares {
+                break;
+            }
+            for qx in 0..CHUNK_SIZE {
+                let sx = cx * CHUNK_SIZE + qx;
+                if sx >= squares {
+                    break;
+                }
+                let c = ((sy / per) * n + sx / per) as u32;
+                let Some(&count) = known.get(&c) else { continue };
+                let t = if count == self.tiles_on_map(c) {
+                    let whole = *whole.get_or_insert_with(|| self.coarse_squares(level));
+                    whole[(sy * squares + sx) as usize]
+                } else {
+                    self.explored_square(bits, side, sx, sy, &mut tally)
+                };
+                if t != UNEXPLORED {
+                    out[(qy * CHUNK_SIZE + qx) as usize] = t;
+                    any = true;
+                }
+            }
+        }
+        any.then_some(out)
+    }
+
+    /// The most common terrain of every square of `level` across the whole map, row-major,
+    /// `squares_across(size, level)` a side: made on first use and kept.
+    fn coarse_squares(&self, level: u8) -> &[u8] {
+        self.squares[usize::from(level) - 1]
+            .get_or_init(|| most_common_squares(&self.terrain, 1 << level))
+    }
+
+    /// The most common terrain among the tiles of square (sx, sy), `side` tiles a side, that the
+    /// bitmap marks explored; `UNEXPLORED` if none.
+    fn explored_square(&self, bits: &[u8], side: i32, sx: i32, sy: i32, tally: &mut Tally) -> u8 {
+        let TerrainMap { size, tiles } = &self.terrain;
+        let size = *size;
+        let mut read = 0;
+        for y in sy * side..size.min((sy + 1) * side) {
+            for x in sx * side..size.min((sx + 1) * side) {
+                let t = (y * size + x) as usize;
+                read += 1;
+                if bits.get(t >> 3).is_some_and(|b| b & (1 << (t & 7)) != 0) {
+                    tally.add(tiles[t]);
+                }
+            }
+        }
+        self.tiles_read.0.fetch_add(read, Ordering::Relaxed);
+        tally.take().unwrap_or(UNEXPLORED)
+    }
+
+    /// Tiles read one by one to answer coarse chunks so far.
+    pub fn tiles_read(&self) -> u64 {
+        self.tiles_read.0.load(Ordering::Relaxed)
+    }
+
+    /// What is wrong with a coarse chunk sent to the Player (ADR 0004, ADR 0034), worked out tile
+    /// by tile from their bitmap: a square shows a terrain only if one of their explored tiles in
+    /// it has that terrain, and is `UNEXPLORED` exactly when none is explored (and past the map's
+    /// side). Empty when it is sound.
+    pub fn coarse_chunk_unsound(
+        &self,
+        user_id: u64,
+        level: u8,
+        cx: i32,
+        cy: i32,
+        bytes: &[u8],
+    ) -> Vec<String> {
+        let TerrainMap { size, tiles } = &self.terrain;
+        let size = *size;
+        let side = 1 << level;
+        let squares = squares_across(size, level);
+        let mut wrong = Vec::new();
+        for qy in 0..CHUNK_SIZE {
+            for qx in 0..CHUNK_SIZE {
+                let (sx, sy) = (cx * CHUNK_SIZE + qx, cy * CHUNK_SIZE + qy);
+                let shown = bytes.get((qy * CHUNK_SIZE + qx) as usize).copied();
+                let mut known = BTreeSet::new();
+                if sx < squares && sy < squares {
+                    for y in sy * side..size.min((sy + 1) * side) {
+                        for x in sx * side..size.min((sx + 1) * side) {
+                            if self.is_explored(user_id, x, y) {
+                                known.insert(tiles[(y * size + x) as usize]);
+                            }
+                        }
+                    }
+                }
+                let sound = match shown {
+                    Some(UNEXPLORED) => known.is_empty(),
+                    Some(t) => known.contains(&t),
+                    None => false,
+                };
+                if !sound {
+                    wrong.push(format!(
+                        "level {level} square ({sx}, {sy}) shows {shown:?}, the Player knows {known:?} there"
+                    ));
+                }
+            }
+        }
+        wrong
     }
 
     /// One chunk of terrain as it is, for admins only (`CONTEXT.md`: admin map): every tile and
@@ -268,7 +459,7 @@ impl ExploredTerrain {
 
     /// The chunks in which the Player has explored at least one tile (see `chunks_across`), sorted.
     pub fn explored_chunks(&self, user_id: u64) -> Vec<u32> {
-        self.chunks.get(&user_id).map(|s| s.iter().copied().collect()).unwrap_or_default()
+        self.chunks.get(&user_id).map(|s| s.keys().copied().collect()).unwrap_or_default()
     }
 }
 
@@ -276,31 +467,63 @@ impl ExploredTerrain {
 /// `OVERVIEW_SCALE`² tiles, the terrain most of them have (the lower code on a tie). A square at
 /// the edge of a map whose side isn't a whole number of squares counts only the tiles it has.
 pub fn terrain_overview(terrain: &TerrainMap) -> Vec<u8> {
+    most_common_squares(terrain, OVERVIEW_SCALE)
+}
+
+/// The whole map in squares of `side` tiles a side, row-major: each the terrain most of its
+/// tiles have (the lower code on a tie), a square at the edge of a map whose side isn't a whole
+/// number of squares counting only the tiles it has.
+pub fn most_common_squares(terrain: &TerrainMap, side: i32) -> Vec<u8> {
     let TerrainMap { size, tiles } = terrain;
     let size = *size;
-    let n = overview_across(size);
+    let n = (size + side - 1).div_euclid(side);
     let mut out = vec![0u8; (n * n) as usize];
-    let mut counts = [0u32; 256];
-    for oy in 0..n {
-        for ox in 0..n {
-            counts.fill(0);
-            let y_end = size.min((oy + 1) * OVERVIEW_SCALE);
-            let x_end = size.min((ox + 1) * OVERVIEW_SCALE);
-            for y in oy * OVERVIEW_SCALE..y_end {
-                for x in ox * OVERVIEW_SCALE..x_end {
-                    counts[usize::from(tiles[(y * size + x) as usize])] += 1;
+    let mut tally = Tally::new();
+    for sy in 0..n {
+        for sx in 0..n {
+            for y in sy * side..size.min((sy + 1) * side) {
+                for x in sx * side..size.min((sx + 1) * side) {
+                    tally.add(tiles[(y * size + x) as usize]);
                 }
             }
-            let mut best = 0;
-            for t in 1..counts.len() {
-                if counts[t] > counts[best] {
-                    best = t;
-                }
-            }
-            out[(oy * n + ox) as usize] = best as u8;
+            out[(sy * n + sx) as usize] = tally.take().unwrap_or(0);
         }
     }
     out
+}
+
+/// Counts terrain codes to find the most common, the lower code on a tie; reset by `take`, which
+/// clears only the codes it saw.
+struct Tally {
+    counts: [u32; 256],
+    seen: Vec<u8>,
+}
+
+impl Tally {
+    fn new() -> Self {
+        Tally { counts: [0; 256], seen: Vec::new() }
+    }
+
+    fn add(&mut self, t: u8) {
+        let c = &mut self.counts[usize::from(t)];
+        if *c == 0 {
+            self.seen.push(t);
+        }
+        *c += 1;
+    }
+
+    /// The most common code counted since the last call, none if none.
+    fn take(&mut self) -> Option<u8> {
+        let mut best: Option<(u32, u8)> = None;
+        for &t in &self.seen {
+            let c = std::mem::take(&mut self.counts[usize::from(t)]);
+            if best.is_none_or(|(bc, bt)| c > bc || (c == bc && t < bt)) {
+                best = Some((c, t));
+            }
+        }
+        self.seen.clear();
+        best.map(|(_, t)| t)
+    }
 }
 
 #[cfg(test)]
@@ -308,7 +531,7 @@ mod tests {
     use std::collections::HashSet;
 
     use csp_shared::balance::{MAP_SIZE, SIGHT_RANGE};
-    use csp_shared::chunks::{decode_chunk, decode_chunk_batch};
+    use csp_shared::chunks::{decode_chunk, decode_chunk_batch, overview_across};
     use csp_shared::terrain::{terrain_at, Terrain};
     use csp_shared::world::ResourceKind;
 
@@ -626,3 +849,6 @@ mod tests {
     const TS_BATCH_HASH: u32 = 4_241_600_182;
     const TS_CHUNKS: [u32; 5] = [4, 5, 7, 8, 11];
 }
+
+#[cfg(test)]
+mod coarse_tests;

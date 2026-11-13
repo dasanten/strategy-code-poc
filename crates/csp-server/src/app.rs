@@ -22,7 +22,9 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, post};
 use axum::{Extension, Json, Router};
 use csp_shared::balance::SCRIPT_WRITES_PER_MINUTE;
-use csp_shared::chunks::{ADMIN_TERRAIN_OVERVIEW_PATH, TERRAIN_BATCH_MAX, TERRAIN_BATCH_PATH};
+use csp_shared::chunks::{
+    ADMIN_TERRAIN_OVERVIEW_PATH, TERRAIN_BATCH_MAX, TERRAIN_BATCH_PATH, TERRAIN_LEVEL_MAX,
+};
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::WorldState;
 use csp_sim::admin_map::{
@@ -650,6 +652,19 @@ async fn terrain_batch(
             ))
         }
     };
+    // No level is level 0, full detail (ADR 0034).
+    let level = match b.get("level") {
+        None | Some(Value::Null) => 0,
+        Some(v) => match v.as_u64() {
+            Some(l) if l <= u64::from(TERRAIN_LEVEL_MAX) => l as u8,
+            _ => {
+                return Err(fail(
+                    ApiErrorCode::InvalidInput,
+                    format!("Ask for a level from 0 to {TERRAIN_LEVEL_MAX}."),
+                ))
+            }
+        },
+    };
     // Anything but a whole number is no chunk's index, and is left out.
     let indices: Vec<i64> = wanted
         .iter()
@@ -658,7 +673,7 @@ async fn terrain_batch(
             _ => -1,
         })
         .collect();
-    let bytes = with_game(game.as_ref(), move |g| g.explored.chunks(id, &indices))
+    let bytes = with_game(game.as_ref(), move |g| g.explored.chunks_at(id, level, &indices))
         .await
         .ok_or_else(|| ApiFailure::Internal("the game is gone".into()))?;
     Ok(octets(bytes))
