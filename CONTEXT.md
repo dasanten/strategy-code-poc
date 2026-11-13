@@ -718,9 +718,16 @@ The shared language of the game. Domain terms only — no implementation details
   Player asks it for a number of its residents for some game days, paid into its storage. It
   accepts at once when the price per resident and week is at least its asking price (moved by
   its standing like its trade prices) and it can spare them, and declines otherwise. It lends
-  only adults it can spare: it keeps its farmers to feed the city and a share of its adults at
-  home to defend it, and lends idle adults first, then workers from its other workplaces. Its
-  lent residents take weapons and armour from its storage along, as far as it has them. Paying
+  only its spare hands (Spare hands' work): adults idle, on a road crew, scouting or working for
+  surplus. Its farmers, those working for a good short of its reserve and its builders with a
+  project stay, and so does a share of its adults at home to defend it. Its lent residents take
+  weapons and armour along only from its surplus, what its storages hold above its reserve (NPC
+  reserve); with none spare they go unarmed. It lends nobody while it feels threatened: while it
+  weighs a demand (Demand), while its town hall is occupied, or while armed residents of the
+  hirer stand in its area or in sight of it. Those it lends never act against it: they refuse an
+  order to attack its residents, walls or gates, to climb its walls or to tear down its buildings,
+  they can't occupy its town hall, and they never count as the hirer's fighters toward it
+  (Respect). Paying
   and ending go as in any mercenary contract: each week in advance into that storage, an unpaid
   week breaks it and costs standing, a paid one raises it, and at the end they walk home.
 - **Trade Org army:** a large army of normal residents of the Trade Org HQ, for hire like any
@@ -776,11 +783,18 @@ The shared language of the game. Domain terms only — no implementation details
 - **NPC city reaction:** at low standing an NPC city won't trade with you or hire out to you
   (Trading with an NPC city, Hiring from an NPC city) and keeps its gates shut to your residents; the lower it is, the more it asks to be bought, and at
   very low standing it won't sell at all.
-- **Persuading a city:** an NPC city that holds you in high standing and sees enough respect from
-  you (more of your armed residents and walls in its sight than it has soldiers) asks to join
-  your realm. You accept or decline.
+- **Persuading a city:** an NPC city that holds you in high standing and has seen enough respect
+  from you for a set time (your fighters near it outweighing its own side without a break, Respect)
+  asks to join your realm. You accept or decline.
 - **Respect:** how dangerous a place looks to others, judged from the armed residents and walls
-  they can see. Not stored; NPC cities and bandits avoid targets with high respect.
+  they can see. Bandits avoid targets with high respect. **What an NPC city weighs** when a realm
+  demands it or it thinks of joining one (ADR 0033): on the realm's side only its armed residents
+  standing in the city's area or in sight of it, seen by a resident of the city who is at home,
+  each by their strength as combat counts it (weapon, armour and shield, Combat skill); the realm's
+  walls don't count, nor what the city's people see far from home, nor residents the city lent the
+  realm. On its own side its soldiers, weighed the same way, and its finished walls and gates. The
+  city remembers since when a realm has outweighed it without a break; the first planning pass it
+  doesn't, that time starts again from nothing.
 - **Trade Org reaction:** below one standing threshold it refuses to trade; below a lower one it
   sends its army to take back the value and punish: to the culprit's city nearest the crime, to
   carry home twice what it lost (coins first), fighting whoever resists. It leaves once it has what
@@ -869,13 +883,17 @@ The shared language of the game. Domain terms only — no implementation details
     what it holds is what goes; with none of it there they can't accept that way. A city no longer
     theirs can't be handed over. Handing over is the Player's own choice, also for their last city,
     which goes as losing it to capture does: no crime and no standing lost.
-  - **An NPC city** accepts when the respect it sees from the sender (their armed residents and
-    walls in its sight) far outweighs its soldiers, so an army at the gate can take a city without a
-    fight; otherwise it declines and its standing toward the sender drops. It carries out goods the
+  - **An NPC city** accepts once the sender's fighters near it have far outweighed its own side
+    (Respect) without a break for a set time, so an army that stays at the gate can take a city
+    without a fight. With none of the sender's fighters near it declines at once; otherwise it waits,
+    **wavering**, and declines when the deadline comes first. Declining drops its standing toward the
+    sender. Both sides see in the Demands drawer that it wavers and how long is left, or that the
+    time has started again. It carries out goods the
     same way: set aside at its storage, for the sender alone to fetch; with none of them there it
     declines. **The Trade Organization** always declines, and being asked costs standing. A Player
-    knows of an NPC city as of a realm, and everyone knows of the Trade Organization. Both answer at
-    their next planning pass, within a game hour (ADR 0016); a city that has joined a realm by then
+    knows of an NPC city as of a realm, and everyone knows of the Trade Organization. Both look at a
+    demand at their planning pass, within a game hour (ADR 0016), where the Trade Organization
+    answers and an NPC city answers or goes on wavering; a city that has joined a realm by then
     lets the demand lapse.
 
 ## Bandits
@@ -1572,11 +1590,51 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   copies on a clipboard in the browser, Paste inserts them after the picked step, in the same
   planner or another resident's or a group's. The clipboard survives switching cards, not
   reloading the page.
-- **Repeat block:** in the planner, some steps in a row wrapped with a count, nestable. It is a
-  planner thing only: when the queue is given, the block becomes that many plain copies of its
-  steps, so the queue, the server and scripts see only steps. A queue holds at most so many
-  steps (a balance number); the planner says when a plan would exceed it. A running queue shows
-  the copies, the current one marked. The whole-queue loop stays as it is.
+- **Queue draft:** steps added in the planner for a resident with no queue collect as a draft, kept
+  in the browser like a group's plan: nothing runs until the Player presses Start queue, which
+  gives it. An order queued with Shift still starts a queue at once. A running queue is edited
+  live as before; Edit as draft copies it into a draft, the queue runs on untouched, and Start
+  queue replaces it (the step they are on keeps going if it is still in it). Discard draft throws
+  the draft away. A draft is lost on reloading the page.
+- **Clear:** the planner's Clear empties a draft. On a running queue it removes everything but
+  the step the resident is on and turns loop off, so they finish that step and the queue ends;
+  Stop is still how to halt at once.
+- **Repeat block:** some steps in a row wrapped in a block, nestable, and part of the queue itself
+  (ADR 0032): the server runs it and a running queue shows it with its round ("2 of 3"). It
+  repeats a count of times, forever, or until a condition holds, checked before each round. A
+  round in which no step could start ends the block, so a block never spins. A queue holds at
+  most so many steps and blocks as written, and blocks nest only so deep (balance numbers); the
+  planner says when a plan would exceed either. The whole-queue loop stays the queue's own
+  switch, drawn as the outermost bracket.
+- **If block:** a block with a condition, an optional Else part, nestable like a repeat block.
+  When its turn comes the condition is checked once: true runs its steps, false its Else steps or
+  nothing. It is not checked again while they run.
+- **Wait until:** a step that ends once its condition holds; the resident stands idle meanwhile.
+  With a duration it also ends when that is up.
+- **Condition:** what a Wait until, an If block or a Repeat until asks. It is about the resident
+  themself or one place of their own realm, never anything a Player couldn't know: they (or the
+  carriage or vessel they drive) carry at least or less than so many of a good, or are full or
+  empty; a storage, workplace pile or site of the realm, picked on the map, holds at least or
+  less than so many of a good; their hunger or health is above or below a share; they are mounted
+  or aboard, or not; the game hour is before or after an hour. A condition on a place that is
+  gone or no longer the realm's counts as false and is noted in the realm log. In a group's plan
+  each member checks it for themself. Scripts see the step a resident is on and its number among
+  the steps counted top to bottom, as before; blocks, rounds and conditions they don't see.
+- **Planner blocks:** the planner draws the queue as stacked blocks: a step is one line with its
+  icon, the place by name (a building, waypoint or city; a bare tile as coordinates) and its
+  duration only when it has or needs one; loop, repeat and If are brackets around their steps.
+  Add step is a palette grouped as the Orders tab is (Move, Work & build, Goods, Scripts) plus
+  Flow (Repeat, If, Wait until), and a step can be added between two others.
+- **Tool rail:** the rail groups its drawers as People (Residents, Horses, Armies), Diplomacy
+  and Realm (Cities, Waypoints, Scripts, Realm log). Diplomacy is one drawer with a tab each for
+  Contracts, Demands, Direct offers, Alliance and Standing. A rail button and a tab show a mark
+  while their drawer holds something the Player hasn't seen: what a notice would announce, and
+  new lines of the realm log.
+- **Cities drawer:** lists the cities the Player knows as Your cities, Others in sight and Last
+  seen. A row shows the name, whose it is in that relation's colour, and for the Player's own
+  cities residents against housing and the key goods in its storages. Opening a row centres the
+  map on the city and outlines its area, as picking it on the map does, and shows it in sections:
+  Overview (residents, housing, buildings by kind without walls and roads), Stock, Trade, Gates.
 - **Action:** a request (move, pick up, attack, …) that the world resolves at the end of a tick.
   The world only checks whether it's physically possible.
 - **Tick:** one step of the world, one per second.

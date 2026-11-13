@@ -36,7 +36,7 @@ use crate::queries::carriages::{
 use crate::queries::city::{city_price, for_sale, npc_city_refuses, sells_to};
 use crate::queries::horse_market::{horses_to_sell, npc_horse_offers};
 use crate::queries::names::{kind_name, kind_of, placed};
-use crate::queries::npc_trade::{npc_city_prices, npc_hire_price, spare_residents};
+use crate::queries::npc_trade::{hire_spare, npc_city_prices, npc_hire_price};
 use crate::queries::offers::{offers_at, seen_offer};
 use crate::queries::territory::city_organization;
 use crate::queries::trader_trade::{trader_prices, trader_standing};
@@ -696,7 +696,8 @@ fn places(
             (None, None)
         } else {
             let hire = Hire {
-                spare: spare_residents(world, c, None).len() as f64,
+                // None while it feels threatened by the viewer (ADR 0033).
+                spare: hire_spare(world, c, side, eyes.size),
                 price_per_resident_week: npc_hire_price(world, c, side),
             };
             let trade = seen_storages.contains(c.id.as_str()).then(|| {
@@ -735,6 +736,9 @@ fn places(
         shown.scouted = None;
         shown.outsiders = None;
         shown.alarmed_attackers = None;
+        // Since when it has felt outweighed is its own mind (ADR 0033); demands show what it
+        // means to their sides.
+        shown.outweighed = None;
         out.push(SeenEntity::City(SeenCity {
             city: shown,
             price,

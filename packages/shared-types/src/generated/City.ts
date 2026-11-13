@@ -3,9 +3,16 @@ import type { CityLayout } from "./CityLayout.js";
 import type { CityScouted } from "./CityScouted.js";
 import type { FormerPlayer } from "./FormerPlayer.js";
 import type { Occupation } from "./Occupation.js";
+import type { Outweighed } from "./Outweighed.js";
 import type { TradeOrgCity } from "./TradeOrgCity.js";
 
 /**
  * A settlement (`CONTEXT.md`: City).
  */
-export type City = { id: string, name: string, gameName?: true, realmId: string | null, townHallId: string, tradeOrg?: TradeOrgCity, workplaceIds?: Array<string>, scouted?: CityScouted, formerPlayer?: FormerPlayer, occupation: Occupation | null, outsiders?: Array<string>, alarmedAttackers?: { [key in string]: number }, layout?: CityLayout, };
+export type City = { id: string, name: string, gameName?: true, realmId: string | null, townHallId: string, tradeOrg?: TradeOrgCity, workplaceIds?: Array<string>, scouted?: CityScouted, formerPlayer?: FormerPlayer, occupation: Occupation | null, outsiders?: Array<string>, alarmedAttackers?: { [key in string]: number }, layout?: CityLayout, 
+/**
+ * For an NPC city, the realms whose fighters near it have outweighed it without a break, and
+ * since when (`CONTEXT.md`: Respect; ADR 0033), as of its last planning pass. Left out while
+ * there are none.
+ */
+outweighed?: Array<Outweighed>, };

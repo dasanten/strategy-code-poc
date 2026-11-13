@@ -216,9 +216,16 @@ export function MapView({
   /**
    * A tile to centre the view on, such as a place named in the realm log, and the zoom to show it
    * at (the zoom in place if none); a new object each time. `cover` is how much of the map the
-   * open drawer and the selection card cover, to centre the tile between them.
+   * open drawer and the selection card cover, to centre the tile between them. `zoom` picks the
+   * zoom from the one now, in place of `scale`.
    */
-  focus?: { x: number; y: number; scale?: number; cover?: Covered }
+  focus?: {
+    x: number
+    y: number
+    scale?: number
+    zoom?: (scale: number) => number
+    cover?: Covered
+  }
   /** Where terrain chunks load from; the Player's explored terrain by default. */
   terrainPath?: (cx: number, cy: number) => string
   /**
@@ -269,7 +276,12 @@ export function MapView({
   const controlsRef = useRef<{
     zoom(factor: number): void
     centre(): void
-    goTo(x: number, y: number, scale?: number, cover?: Covered): void
+    goTo(
+      x: number,
+      y: number,
+      scale?: number | ((now: number) => number),
+      cover?: Covered,
+    ): void
   } | null>(null)
   const [hover, setHover] = useState<Hover | null>(null)
   const [scale, setScale] = useState(START_SCALE)
@@ -304,7 +316,8 @@ export function MapView({
   }, [minimapOpen])
 
   useEffect(() => {
-    if (focus) controlsRef.current?.goTo(focus.x, focus.y, focus.scale, focus.cover)
+    if (focus)
+      controlsRef.current?.goTo(focus.x, focus.y, focus.zoom ?? focus.scale, focus.cover)
   }, [focus])
 
   // The Region map changes once a game hour, and where explored terrain grows.
@@ -1181,7 +1194,13 @@ export function MapView({
             x,
             y,
             cover,
-            scale === undefined ? cam.scale : clampScale(scale, mapSize, size()),
+            scale === undefined
+              ? cam.scale
+              : clampScale(
+                  typeof scale === 'function' ? scale(cam.scale) : scale,
+                  mapSize,
+                  size(),
+                ),
             mapSize,
           ),
         ),

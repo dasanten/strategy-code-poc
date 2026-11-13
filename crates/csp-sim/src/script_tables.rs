@@ -2131,6 +2131,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 description: "The tick it lapses at, unanswered.",
                 null_when: None,
             },
+            ScriptField {
+                name: "wavering",
+                r#type: ScriptType::Number,
+                description: "For a demand to an NPC city: while the sender’s force near it far outweighs it, the ticks left before it gives in. It starts again from nothing after a planning pass it doesn’t.",
+                null_when: Some("the sender’s force doesn’t far outweigh the city now, or it was sent to anyone else"),
+            },
         ],
     },
 ];

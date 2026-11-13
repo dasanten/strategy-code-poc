@@ -37,6 +37,7 @@ pub fn migrations() -> BTreeMap<u32, MigrationStep> {
     steps.insert(115, boats_are_stolen);
     steps.insert(116, ships_take_a_crew);
     steps.insert(117, ships_are_sailed);
+    steps.insert(118, cities_remember_who_outweighs_them);
     steps
 }
 
@@ -101,6 +102,14 @@ fn ships_take_a_crew(state: Value, _: &MigrationContext<'_>) -> Value {
 /// so it stays as it is; the bump keeps a server of format 117, which refuses an order kind or field
 /// it does not know, from loading one that has. (A `haulByWater` order, T91.5, came in at 117.)
 fn ships_are_sailed(state: Value, _: &MigrationContext<'_>) -> Value {
+    state
+}
+
+/// 118 → 119: an NPC city remembers since when each realm's force near it has outweighed it
+/// (`City.outweighed`, `CONTEXT.md`: Respect; ADR 0033, T96.2). A world from before remembers
+/// nobody, so every city starts from nothing and counts from its next planning pass: the save stays
+/// as it is, and the bump keeps a server of format 118 from loading a world that remembers.
+fn cities_remember_who_outweighs_them(state: Value, _: &MigrationContext<'_>) -> Value {
     state
 }
 
@@ -293,6 +302,21 @@ mod tests {
         });
         let migrated = migrate_world_with(save.clone(), 117, &ctx, &migrations(), 118).unwrap();
         assert_eq!(migrated, save);
+    }
+
+    #[test]
+    fn step_118_keeps_a_world_whose_cities_remember_nobody_outweighing_them() {
+        let terrain = ctx_terrain();
+        let ctx = MigrationContext { terrain: &terrain };
+        let save = json!({
+            "tick": 3,
+            "cities": [{ "id": "n1", "name": "Oakford", "realmId": null, "townHallId": "n1-hall",
+                "occupation": null, "layout": "grid" }],
+            "demands": [{ "id": "d1", "fromId": "r1", "toId": "n1" }],
+        });
+        let migrated = migrate_world_with(save.clone(), 118, &ctx, &migrations(), 119).unwrap();
+        assert_eq!(migrated, save);
+        assert!(migrated["cities"][0].get("outweighed").is_none());
     }
 
     #[test]

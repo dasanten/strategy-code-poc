@@ -18,7 +18,9 @@ use csp_sim::queries::alliance::{alliance_of, realm_name, sharing_sight};
 use csp_sim::queries::alliance_rules::is_alliance_city;
 use csp_sim::queries::city::town_hall_of;
 use csp_sim::queries::contract::{contracts_for, ContractView, RealmLabel};
-use csp_sim::queries::demand::{answered_by_game, npc_orgs_known_to, realms_known_to, AnsweredBy};
+use csp_sim::queries::demand::{
+    answered_by_game, demand_wavering, npc_orgs_known_to, realms_known_to, AnsweredBy,
+};
 use csp_sim::queries::direct_offer::cities_to_carry_at;
 use csp_sim::queries::offers::seen_offer;
 use csp_sim::queries::standing::{
@@ -82,6 +84,10 @@ pub struct DemandView {
     pub note: String,
     pub sent_at: f64,
     pub deadline: f64,
+    /// For a demand to an NPC city: while the sender's force near it far outweighs it, the ticks left
+    /// before it gives in; `null` while it doesn't, and the time starts from nothing once it does
+    /// (`CONTEXT.md`: Demand; ADR 0033). `null` for any other demand.
+    pub wavering: Option<f64>,
 }
 
 /// A Direct offer as its two sides see it, wherever they are (`DirectOfferView`): with who sent
@@ -213,6 +219,7 @@ pub fn demands_for(world: &WorldState, realm_id: &str) -> Vec<DemandView> {
             note: d.note.clone(),
             sent_at: d.sent_at,
             deadline: d.deadline,
+            wavering: demand_wavering(world, d),
         })
         .collect()
 }

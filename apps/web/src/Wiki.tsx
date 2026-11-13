@@ -48,6 +48,7 @@ import {
   CITY_QUARTER_ROWS,
   CLIMB_TICKS,
   COMBAT_SKILL_EFFECT,
+  COMBAT_SKILL_LIMIT,
   COMBAT_SKILL_PER_BLOW,
   CONSTRUCTION_SKILL_EFFECT,
   CONSTRUCTION_SKILL_MAX,
@@ -234,6 +235,8 @@ import {
   DEMAND_TRADE_ORG_STANDING_LOSS,
   DEMAND_YIELD_RESPECT_MIN,
   DEMAND_YIELD_RESPECT_TIMES,
+  RESPECT_PER_WALL,
+  OUTWEIGH_HOLD_DAYS,
   STANDING_RANGE,
   STANDING_NPC_TRADE_COINS_PER_POINT,
   STANDING_TRADE_COINS_PER_POINT,
@@ -286,6 +289,7 @@ import { PARAM_DESCRIPTIONS, DEFAULT_SCRIPTS, SCRIPT_VIEWS } from '@csp/lang-was
 import { WORKPLACE_PARAM } from './shared/default-scripts.js'
 import { SCRIPT_PARAM_TYPES } from './shared/script-api.js'
 import { NPC_SMITHY_WEAPON } from './shared/npc-trade.js'
+import { fighterStrength } from './shared/persuasion.js'
 import type {
   BuildingKind,
   CrimeKind,
@@ -346,6 +350,13 @@ import {
   SCRIPT_LANGUAGE,
 } from './wiki-scripting.js'
 import { apiNames, type ApiName } from './script-editor.js'
+
+/** An untrained fighter with a spear and a fully trained, armoured one, as respect weighs them. */
+const UNTRAINED_SPEAR = { carried: { spear: 1 }, skills: {} }
+const TRAINED_AND_ARMOURED = {
+  carried: { sword: 1, shield: 1, armour: 1 },
+  skills: { combat: COMBAT_SKILL_MAX },
+}
 
 /** The Wiki's topics, in order, each a section with its own anchor (`/wiki#food`). */
 export const WIKI_TOPICS = [
@@ -568,6 +579,16 @@ export function Wiki() {
           the same order.
         </p>
         <p>
+          The tool rail on the left opens drawers over the map, one at a time, in three groups:
+          People (Residents, Horses, Armies), Diplomacy, and Realm (Cities, Waypoints, Scripts,
+          Realm log). The Diplomacy drawer has a tab each for Contracts, Demands, Direct offers,
+          Alliance and Standing; it reopens on the tab you left it on, and a notice’s Open takes you
+          to its tab. A small dot on a rail button or tab says it holds something you haven’t seen
+          yet: a demand, Direct offer or contract offer sent to you, or Realm log lines newer than
+          the last time you had the log open. Opening it there clears the dot. On a phone the menu
+          button shows the dot too.
+        </p>
+        <p>
           The Residents drawer’s Open full list button opens the list across the screen, with
           everyone’s age, city, stats, skills, gear, what they carry, hunger, health and what they
           are doing. On a phone each resident is a small card. Tap one to open that resident’s card,
@@ -784,19 +805,35 @@ export function Wiki() {
           its params.
         </p>
         <p>
-          To plan ahead, use <strong>Add step</strong> under the queue on the resident's card: it
-          lists every kind of step. One that acts on a place (work a workplace, build, store at or
-          fetch from a storage, pick up, feed the stable, breed, …) has you pick that place on the
-          map, anywhere, not only where the resident stands now; one that needs more (which goods,
-          what to build, what a smithy makes, which script) asks for it on the card after. What to
-          build is the same Build menu as on the card; a kind dimmed because the tile lacks
-          something today, such as a city's area, can still be added, for a step before it may bring
-          that. A step that has to be done on its tile goes after a walk there, unless the step
-          before already walks there. It works on a resident with no queue too, and starts one.
-          Adding a step only checks that it could make sense (the place is there as you last knew
-          it, and a carriage or horse is yours). A workplace or construction site can be anyone's,
-          in sight or as last seen, since a workplace has no owner: queue Work at a far mine and
-          they walk there and work it. Whether a step can start is checked when its turn comes.
+          To plan ahead, use <strong>Add step</strong> right under the queue's steps on the
+          resident's card: a palette of every kind of step, each with its icon, grouped as the
+          Orders tab is (Move, Work &amp; build, Goods, Scripts), plus Flow with{' '}
+          <strong>Repeat</strong> for the picked steps. Customise is the small ⚙ beside a step. New
+          steps go at the end; tap the <strong>+</strong> between two steps to add the next ones
+          there instead, and tap it again to go back to the end. One that acts on a place (work a
+          workplace, build, store at or fetch from a storage, pick up, feed the stable, breed, …)
+          has you pick that place on the map, anywhere, not only where the resident stands now; one
+          that needs more (which goods, what to build, what a smithy makes, which script) asks for
+          it on the card after. What to build is the same Build menu as on the card; a kind dimmed
+          because the tile lacks something today, such as a city's area, can still be added, for a
+          step before it may bring that. A step that has to be done on its tile goes after a walk
+          there, unless the step before already walks there; one that acts on no place (Explore,
+          Dismount, Get off, Run script) gets no walk. Adding a step only checks that it could make
+          sense (the place is there as you last knew it, and a carriage or horse is yours). A
+          workplace or construction site can be anyone's, in sight or as last seen, since a
+          workplace has no owner: queue Work at a far mine and they walk there and work it. Whether
+          a step can start is checked when its turn comes.
+        </p>
+        <p>
+          For a resident with no queue, the steps you add, paste or load collect as a{' '}
+          <strong>draft</strong>, marked “Draft, not started”: nothing runs until you press{' '}
+          <strong>Start queue</strong>, which gives it. <strong>Discard draft</strong> throws it
+          away. A running queue is edited live; <strong>Edit as draft</strong> copies it into a
+          draft while the queue runs on untouched, and Start queue replaces it (the step they are on
+          keeps going if it is still in it). A draft is kept in this browser and lost on reloading
+          the page. <strong>Clear</strong> empties a draft or a group's plan. On a running queue it
+          asks first, then removes every step but the one the resident is on and turns loop off, so
+          they finish that step and the queue ends; <strong>Stop</strong> still halts them at once.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while you give an order (a button, its key, or a tile picked on the
@@ -810,8 +847,17 @@ export function Wiki() {
         </p>
         <p>
           The resident's card lists the queue with the current step marked and what they are doing
-          in it. Drag a step or use its arrows to reorder it, remove it, type a duration in game
-          minutes (the real time shows beside it) or clear it, and switch loop on or off.
+          in it, each step on one line with an icon for its kind of order and its place by name: a
+          building with its city (“Walk to Farm, Quarrytown IV”), a waypoint or a city, or the
+          tile's coordinates when nothing is there. A step's duration shows as a chip when it has
+          one, or when it needs one; tap it to type the duration in game minutes (the real time
+          shows beside it), empty it to clear it. The steps sit in a bracket, <strong>Loop</strong>,
+          with its switch in its head: on, the first step follows the last. Drag a step to reorder
+          it, also into or out of a repeat block's bracket, or focus it and press <kbd>Alt</kbd>+
+          <kbd>↑</kbd> or <kbd>Alt</kbd>+<kbd>↓</kbd>. On a phone, tap the steps to move to pick
+          them, then tap <strong>Move here</strong> where they go. A step kind dragged from Add step
+          and dropped between two steps is planned there. Remove a step with ✕. The planner's{' '}
+          <strong>?</strong> shows how it works.
         </p>
         <p>
           To reuse steps, tap one in the planner to pick it (<kbd>Shift</kbd>+tap picks a range;
@@ -824,27 +870,30 @@ export function Wiki() {
           step keeps its places and the walk before it, and is checked again when its turn comes.
         </p>
         <p>
-          To keep a plan, <strong>Save…</strong> it under a name, such as “Mine run”; saving under a
-          name already taken asks before it overwrites. <strong>Load…</strong> lists the saved
-          queues with their step count and date, to load one or delete it; loading adds its steps
-          after the planned ones, in any resident's planner or a group's. Saved queues are kept in
-          this browser, as saved groups are: the server never sees them, and another browser has its
-          own. A saved step keeps its places, so one whose building is gone from the map (torn down,
-          say) is flagged in the planner; it is still given, and skipped when its turn comes.
+          To keep a plan, open the planner's <strong>Saved…</strong> and save it under a name, such
+          as “Mine run”; saving under a name already taken asks before it overwrites. Saved… also
+          lists the saved queues with their step count and date, to load one or delete it (a
+          resident with nothing queued has <strong>Load…</strong> for the same list); loading adds
+          its steps after the planned ones, in any resident's planner or a group's. Saved queues are
+          kept in this browser, as saved groups are: the server never sees them, and another browser
+          has its own. A saved step keeps its places, so one whose building is gone from the map
+          (torn down, say) is flagged in the planner; it is still given, and skipped when its turn
+          comes.
         </p>
         <p>
           To do some steps several times in a row, pick them (in a row) and press{' '}
           <strong>Repeat</strong>: they are wrapped in a repeat block, done {num(DEFAULT_REPEAT)}{' '}
-          times until you type another count. The block shows its count with its steps indented
-          under it; it is picked, moved, copied, pasted, saved and removed as one,
+          times until you type another count. The block is a bracket inside Loop's, its count in its
+          head and its steps inside; it is picked, moved (into another block too), copied, pasted,
+          saved and removed as one,
           <strong> Unwrap</strong> puts its steps back as they were, and a block can hold another.
-          Repeat blocks are the planner's own: on a resident's card, wrapping steps opens a plan of
-          their queue that waits for <strong>Give</strong> (or Discard), and giving it, or Give to
-          all on a group's plan, makes each block that many plain copies of its steps, so the queue,
-          the server and your scripts only ever see steps. The running queue lists the copies, the
-          current one marked. A queue holds at most {num(QUEUE_MAX_STEPS)} steps after repeats; the
-          planner counts them and won't give a plan over that, saying by how much. Loop still loops
-          the whole queue.
+          Repeat blocks are the planner's own: on a resident's card, wrapping steps of a running
+          queue opens a draft of it that waits for <strong>Start queue</strong>, and starting it, or
+          Give to all on a group's plan, makes each block that many plain copies of its steps, so
+          the queue, the server and your scripts only ever see steps. The running queue lists the
+          copies, the current one marked. A queue holds at most {num(QUEUE_MAX_STEPS)} steps after
+          repeats; the planner counts them and won't give a plan over that, saying by how much. Loop
+          still loops the whole queue.
         </p>
         <p>
           A step ends when it is done (the walk arrives, the goods are stored, the script calls{' '}
@@ -1474,8 +1523,8 @@ export function Wiki() {
           Strength {num(strong.stats.strength.base)}. A carriage behind an average horse carries{' '}
           {num(CARRIAGE_CAPACITY)} kg; each point of its driver's Driving skill makes it{' '}
           {pct(DRIVING_SKILL_EFFECT)} faster, at most {pct(DRIVING_SKILL_LIMIT)}, learned at{' '}
-          {num(DRIVING_SKILL_PER_DAY)} a game day of driving. Carriages enter mountains only along a finished road, so a
-          road over a ridge opens a pass for them.
+          {num(DRIVING_SKILL_PER_DAY)} a game day of driving. Carriages enter mountains only along a
+          finished road, so a road over a ridge opens a pass for them.
         </p>
         <p>
           A carriage is built at a finished stable: a resident there lays out a carriage site on a
@@ -2132,16 +2181,16 @@ export function Wiki() {
         </p>
         <h3>Direct offers</h3>
         <p>
-          Under <strong>Direct offers</strong> on the tool rail you can send an offer to one realm
-          you know of: one you see residents of, an ally, one whose city you have seen, one with a
-          standing either way, or your side in a contract, demand or direct offer. Name a storage of
-          yours, and the goods are set aside there as for any offer. They hear at once wherever they
-          are, with a notice and the place, and only they can accept it: someone of theirs goes to
-          the storage and takes it in person, as with any offer, or they decline it from anywhere.
-          Anyone else in sight of the storage sees it, and that it is for another realm. It lapses
-          after {num(DIRECT_OFFER_DAYS)} game days. Declined, lapsed or taken down, the goods are
-          ordinary again and both of you are told. At most {num(DIRECT_OFFERS_TO_ONE_REALM)} can
-          stand to one realm.
+          Under <strong>Direct offers</strong> in the Diplomacy drawer you can send an offer to one
+          realm you know of: one you see residents of, an ally, one whose city you have seen, one
+          with a standing either way, or your side in a contract, demand or direct offer. Name a
+          storage of yours, and the goods are set aside there as for any offer. They hear at once
+          wherever they are, with a notice and the place, and only they can accept it: someone of
+          theirs goes to the storage and takes it in person, as with any offer, or they decline it
+          from anywhere. Anyone else in sight of the storage sees it, and that it is for another
+          realm. It lapses after {num(DIRECT_OFFER_DAYS)} game days. Declined, lapsed or taken down,
+          the goods are ordinary again and both of you are told. At most{' '}
+          {num(DIRECT_OFFERS_TO_ONE_REALM)} can stand to one realm.
         </p>
         <p>
           Or have the Trade Organization carry it, while the HQ stands. Name a city of yours and a
@@ -2590,10 +2639,20 @@ export function Wiki() {
         </p>
         <p>
           An NPC city sells only what it holds above this reserve and buys only what it is short of.
-          It lends residents at {num(NPC_TRADE.pricePerResidentWeek)} coins each a game week,
-          keeping {pct(NPC_TRADE.defenceShare)} of its adults at home. The Trade Organization hires
-          out soldiers at {num(TRADE_ORG_ARMY.pricePerSoldierWeek)} coins each a game week. A
-          contract runs at most {days(CONTRACT_MAX_DAYS)}.
+          It lends residents at {num(NPC_TRADE.pricePerResidentWeek)} coins each a game week, but
+          only its spare hands: those its plan has idle, on a road crew, scouting or working for
+          surplus. Its farmers, those working for a good short of its reserve and its builders stay,
+          and so do {pct(NPC_TRADE.defenceShare)} of its adults at home, its soldiers among them.
+          They take weapons and armour along only from what its storages hold above its reserve;
+          with none spare they come unarmed. It lends nobody while it weighs a demand, while its
+          town hall is occupied, or while your armed residents stand in its City area or in sight of
+          it. Those it lends never act against it: they refuse an order to attack its residents,
+          walls or gates, to climb its walls or to tear down its buildings, whether you give it by
+          hand, in a queue, to a group or an army or from a script, and they can't occupy its town
+          hall nor count as your fighters toward it. Struck by one of its own, they still defend
+          themselves. The Trade Organization hires out soldiers at{' '}
+          {num(TRADE_ORG_ARMY.pricePerSoldierWeek)} coins each a game week. A contract runs at most{' '}
+          {days(CONTRACT_MAX_DAYS)}.
         </p>
         <p>
           An NPC city shuts its gates while anyone armed who isn't of the city or its alliance
@@ -2703,8 +2762,9 @@ export function Wiki() {
             itself to you.
           </li>
           <li>
-            At {signed(PERSUADE_STANDING)} and with enough respect an NPC city asks to join you;
-            declined, it asks again after {days(PERSUADE_ASK_AGAIN_DAYS)}.
+            At {signed(PERSUADE_STANDING)}, and once your fighters near it have outweighed its own
+            side for {days(OUTWEIGH_HOLD_DAYS)} without a break (Respect, below), an NPC city asks
+            to join you; declined, it asks again after {days(PERSUADE_ASK_AGAIN_DAYS)}.
           </li>
           <li>
             An NPC city joins an alliance when it holds every member at{' '}
@@ -2799,6 +2859,21 @@ export function Wiki() {
           Leaving an alliance takes {realSeconds(ALLIANCE_LEAVE_DELAY)}; soldiers recalled from its
           army are back under their owner's command after {realSeconds(ALLIANCE_RECALL_DELAY)}.
         </p>
+        <h3>Respect</h3>
+        <p>
+          What an NPC city weighs when you demand it or it thinks of joining you. On your side only
+          your armed residents count, and only while they stand in its City area or in sight of one
+          of its people who is at home there: what its scouts and traders see far away doesn't
+          count, nor do your walls, nor residents it lent you. Each counts by strength, as combat
+          weighs them: their best weapon's blow, harder with Combat skill (up to{' '}
+          {num(1 + COMBAT_SKILL_LIMIT)} times), plus what their shield and armour take off a blow.
+          An untrained resident with a spear counts {num(fighterStrength(UNTRAINED_SPEAR))}; one
+          with a sword, shield and armour and full Combat skill counts{' '}
+          {num(fighterStrength(TRAINED_AND_ARMOURED))}. On its side count its soldiers, weighed the
+          same way, and {num(RESPECT_PER_WALL)} for each of its own finished wall and gate tiles. It
+          weighs this at its planning pass, once a game hour, and remembers since when each realm
+          has outweighed it; the first pass one doesn't, that time starts again from nothing.
+        </p>
       </Section>
 
       <Section id="demands">
@@ -2806,9 +2881,9 @@ export function Wiki() {
           A demand tells another realm what you want and by when: <strong>a named city</strong> of
           theirs, or <strong>goods or Coins</strong>, with a note of at most{' '}
           {num(DEMAND_NOTE_MAX_LENGTH)} characters and a deadline of up to {days(DEMAND_MAX_DAYS)}.
-          Open <strong>Demands</strong> on the tool rail to send one or to answer one. Scripts can
-          too (<code>sendDemand</code>, <code>acceptDemand</code>, <code>declineDemand</code>,{' '}
-          <code>demands</code>).
+          Open <strong>Demands</strong> in the Diplomacy drawer to send one or to answer one.
+          Scripts can too (<code>sendDemand</code>, <code>acceptDemand</code>,{' '}
+          <code>declineDemand</code>, <code>demands</code>).
         </p>
         <ul>
           <li>
@@ -2817,7 +2892,7 @@ export function Wiki() {
             in a contract, demand or Direct offer.
           </li>
           <li>
-            It arrives at once, wherever they are, in their Demands drawer and as a notice. A realm
+            It arrives at once, wherever they are, on their Demands tab and as a notice. A realm
             sends at most {num(DEMANDS_PER_GAME_DAY)} a game day, scripts included.
           </li>
           <li>
@@ -2842,14 +2917,19 @@ export function Wiki() {
             holds is what goes. With none of it there you can't accept that way.
           </li>
           <li>
-            <strong>An NPC city answers for itself</strong> within a game hour, when it next plans.
-            You can send one to any NPC city you have seen or have a standing with. It gives in when
-            the armed residents and walls of yours in its sight come to at least{' '}
-            {num(DEMAND_YIELD_RESPECT_TIMES)} times its soldiers, and at least{' '}
-            {num(DEMAND_YIELD_RESPECT_MIN)}, so an army at the gate can win a city without a fight.
-            Those out of its sight don't count. It joins your realm as a persuaded city does, or
-            sets what it holds of the goods aside at its storage for you alone to fetch. Otherwise,
-            or with none of the goods there, it declines, and its standing toward you drops by{' '}
+            <strong>An NPC city weighs it at its planning passes</strong>, one each game hour. You
+            can send one to any NPC city you have seen or have a standing with. It gives in once the
+            strength of your fighters near it (Respect, under Standing) has come to at least{' '}
+            {num(DEMAND_YIELD_RESPECT_TIMES)} times its own side, and at least{' '}
+            {num(DEMAND_YIELD_RESPECT_MIN)}, for {days(OUTWEIGH_HOLD_DAYS)} without a break: a real
+            army that stays at the gate wins a city without a fight, a crowd with spears or an army
+            walking through doesn't. Until then it <strong>wavers</strong>, and the Demands drawer
+            shows how long is left; a planning pass on which your force doesn't outweigh it that far
+            starts the time again from nothing. Your walls and fighters out of its sight don't
+            count. It joins your realm as a persuaded city does, or sets what it holds of the goods
+            aside at its storage for you alone to fetch. With none of your fighters near it declines
+            at its next pass; it declines too when the deadline comes first, or with none of the
+            goods there. Declining drops its standing toward you by{' '}
             {num(DEMAND_DECLINED_STANDING_LOSS)}.
           </li>
           <li>

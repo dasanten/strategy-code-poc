@@ -5,6 +5,7 @@
 use csp_shared::world::{Building, Pile, Resident, Stock, WorldState};
 use serde_json::{json, Value};
 
+use crate::queries::demand::demand_wavering;
 use crate::queries::standing::organization_label;
 
 /// The goods of a storage that aren't set aside for its offers (`freeStock`).
@@ -51,6 +52,7 @@ pub fn demands_for(world: &WorldState, realm_id: &str) -> Vec<Value> {
                 "note": d.note,
                 "sentAt": d.sent_at,
                 "deadline": d.deadline,
+                "wavering": demand_wavering(world, d),
                 "fromId": d.from_id,
                 "from": organization_label(world, &d.from_id),
                 "toId": d.to_id,

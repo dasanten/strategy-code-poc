@@ -62,6 +62,10 @@ pub struct DemandView {
     pub note: String,
     pub sent_at: f64,
     pub deadline: f64,
+    /// For a demand to an NPC city: while the sender's force near it far outweighs it, the ticks left
+    /// before it gives in; `null` while it doesn't, and the time starts from nothing once it does
+    /// (`CONTEXT.md`: Demand; ADR 0033). `null` for any other demand.
+    pub wavering: Option<f64>,
 }
 
 /// An NPC city asking the realm to join it (`JoinRequestView`).
