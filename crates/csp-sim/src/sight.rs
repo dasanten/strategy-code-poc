@@ -731,6 +731,9 @@ fn places(
         shown.scouted = None;
         shown.outsiders = None;
         shown.alarmed_attackers = None;
+        // Since when it has felt outweighed is its own mind (ADR 0033); demands show what it
+        // means to their sides.
+        shown.outweighed = None;
         out.push(SeenEntity::City(SeenCity {
             city: shown,
             price,

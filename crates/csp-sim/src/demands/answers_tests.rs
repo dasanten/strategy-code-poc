@@ -6,9 +6,12 @@ use crate::invariants::{check_invariants, world_invariants};
 use crate::npc_plan::plan_due;
 use crate::offers::{offers_sound, step_offers};
 use crate::orders::{order_kinds, OrderQueue, OrderReply};
-use crate::queries::demand::{demand_yield_needed, npc_orgs_known_to, yields_to_demand};
+use crate::persuasion::{outweighed_now, outweighed_sound, step_outweighed};
+use crate::queries::demand::{
+    demand_wavering, demand_yield_needed, npc_orgs_known_to, yields_to_demand,
+};
 use crate::queries::goods::free_stock;
-use crate::queries::persuasion::{city_strength, respect_seen_by};
+use crate::queries::persuasion::{city_strength, outweigh_hold_ticks, respect_seen_by};
 use crate::queries::standing::standing_of;
 use crate::random::Mulberry32;
 use crate::residents::{new_resident, NewResident};
@@ -180,19 +183,33 @@ impl Setup {
         }
     }
 
-    /// Steps demands until `who` answers, at its next planning pass.
+    /// Steps demands, and NPC cities weighing who outweighs them, until `who` answers: at a
+    /// planning pass, or at the deadline at the latest. Nobody moves meanwhile.
     fn until_answered(&mut self, who: &str) {
         let done = |w: &WorldState| !w.demands.iter().any(|d| d.to_id == who);
-        let mut i = 0.0;
-        while i <= NPC_PLAN_TICKS && !done(&self.world) {
+        let last = self.world.demands.iter().map(|d| d.deadline).fold(0.0, f64::max);
+        while self.world.tick as f64 <= last && !done(&self.world) {
             answer_demands(&mut self.world, SIZE);
             assert_eq!(demands_sound(&self.world), vec![]);
             if !done(&self.world) {
+                step_outweighed(&mut self.world, SIZE);
+                assert_eq!(outweighed_sound(&self.world, SIZE), vec![]);
                 self.world.tick += 1;
             }
-            i += 1.0;
         }
         assert!(done(&self.world));
+    }
+
+    /// As if r1's force had stood where it stands for `OUTWEIGH_HOLD_DAYS` already: n1 remembers it.
+    fn stayed(&mut self) {
+        let hold = outweigh_hold_ticks();
+        let mut now = outweighed_now(&self.world, self.n1(), SIZE);
+        for o in &mut now {
+            o.since -= hold;
+            o.far_since = o.far_since.map(|f| f - hold);
+        }
+        let ci = self.world.cities.iter().position(|c| c.id == "n1").unwrap();
+        self.world.cities[ci].outweighed = Some(now).filter(|v| !v.is_empty());
     }
 
     fn log(&self) -> Vec<Value> {
@@ -211,6 +228,7 @@ impl Setup {
 
     /// Steps the whole world through a planning pass, the invariants holding each tick.
     fn run(&mut self) {
+        self.stayed();
         let terrain = self.terrain.clone();
         let mut walking = Walking::new(terrain.clone());
         let mut scratch = Scratch::default();
@@ -561,7 +579,8 @@ mod over_ticks_of_the_whole_world {
 
     #[test]
     fn declines_and_holds_together() {
-        let mut s = setup(1);
+        // With none of r1's fighters near, n1 declines at its pass, without wavering.
+        let mut s = setup(0);
         s.order(with(goods_demand(), "realmId", json!(TRADE_ORG)));
         s.order(city_demand());
         s.run();
@@ -657,7 +676,7 @@ mod its_invariant {
     #[test]
     fn catches_a_demand_the_game_has_left_unanswered_too_long() {
         let mut s = setup(1);
-        s.order(goods_demand());
+        s.order(with(goods_demand(), "realmId", json!(TRADE_ORG)));
         s.world.tick += NPC_PLAN_TICKS as u64 + 1;
         let found = demands_sound(&s.world);
         assert!(found[0].message.contains("waited longer than a planning pass"), "{found:?}");
@@ -678,5 +697,101 @@ mod its_invariant {
         });
         let found = demands_sound(&s.world);
         assert!(found[0].message.contains("does not exist"), "{found:?}");
+    }
+}
+
+mod a_force_that_stays {
+    use super::*;
+    use crate::script_deps::demands_for;
+
+    impl Setup {
+        /// Steps demands and NPC cities weighing who outweighs them for `n` ticks.
+        fn ticks(&mut self, n: u64) {
+            for _ in 0..n {
+                answer_demands(&mut self.world, SIZE);
+                step_outweighed(&mut self.world, SIZE);
+                assert_eq!(outweighed_sound(&self.world, SIZE), vec![]);
+                self.world.tick += 1;
+            }
+        }
+
+        fn wavering(&self) -> Option<f64> {
+            let d = self.world.demands.iter().find(|d| d.to_id == "n1")?;
+            demand_wavering(&self.world, d)
+        }
+
+        fn move_r1(&mut self, dx: f64) {
+            // All but r1s0, who stays at the gate.
+            for r in self
+                .world
+                .residents
+                .iter_mut()
+                .filter(|r| r.id.starts_with("r1s") && r.id != "r1s0")
+            {
+                r.x += dx;
+            }
+        }
+    }
+
+    #[test]
+    fn gets_the_city_once_it_has_stayed_the_whole_time() {
+        let mut s = setup(enough());
+        s.order(city_demand());
+        let sent = s.world.tick as f64;
+        s.until_answered("n1");
+        assert_eq!(s.n1_realm(), Some("r1"));
+        assert!(s.world.tick as f64 - sent >= outweigh_hold_ticks());
+        assert!(s.world.tick as f64 - sent <= outweigh_hold_ticks() + NPC_PLAN_TICKS);
+    }
+
+    #[test]
+    fn wavers_and_shows_how_long_is_left_then_starts_again_after_a_pass_away() {
+        let mut s = setup(enough());
+        s.order(city_demand());
+        assert_eq!(s.wavering(), None);
+        s.ticks(NPC_PLAN_TICKS as u64 + 1);
+        let left = s.wavering().expect("wavering after a pass");
+        assert!(
+            left > outweigh_hold_ticks() - NPC_PLAN_TICKS - 1.0 && left <= outweigh_hold_ticks()
+        );
+        // Scripts and the Demands drawer see the same.
+        assert_matches(&demands_for(&s.world, "r1"), json!([{ "toId": "n1", "wavering": left }]));
+        s.ticks(outweigh_hold_ticks() as u64 / 2);
+        assert!(s.wavering().unwrap() < left);
+        // Most away for a planning pass: the time is forgotten.
+        s.move_r1(60.0);
+        s.ticks(NPC_PLAN_TICKS as u64);
+        assert_eq!(s.wavering(), None);
+        assert_eq!(s.world.demands.len(), 1, "r1s0 is still near: it waits");
+        assert_matches(&demands_for(&s.world, "r1"), json!([{ "wavering": null }]));
+        // Back: it starts again from nothing.
+        s.move_r1(-60.0);
+        s.ticks(NPC_PLAN_TICKS as u64);
+        assert!(s.wavering().unwrap() > outweigh_hold_ticks() - NPC_PLAN_TICKS - 1.0);
+        assert_eq!(s.n1_realm(), None);
+    }
+
+    #[test]
+    fn declines_when_the_deadline_comes_first_and_its_standing_drops() {
+        let mut s = setup(enough());
+        s.order(with(city_demand(), "days", json!(1)));
+        let deadline = s.world.demands[0].deadline;
+        s.until_answered("n1");
+        assert_eq!(s.world.tick as f64, deadline);
+        assert_eq!(s.n1_realm(), None);
+        assert_eq!(standing_of(&s.world, "n1", "r1"), -DEMAND_DECLINED_STANDING_LOSS);
+        assert_matches(&s.last_log(), json!({ "what": "declined", "otherIs": "city" }));
+    }
+
+    #[test]
+    fn declines_at_once_with_none_of_the_senders_fighters_near() {
+        let mut s = setup(0);
+        let sword = resident(&mut s.world, "away", Some("r1"), 110.0, 110.0, None);
+        arm(&mut s.world, sword);
+        s.order(city_demand());
+        let sent = s.world.tick as f64;
+        s.until_answered("n1");
+        assert!(s.world.tick as f64 - sent <= NPC_PLAN_TICKS);
+        assert_eq!(standing_of(&s.world, "n1", "r1"), -DEMAND_DECLINED_STANDING_LOSS);
     }
 }

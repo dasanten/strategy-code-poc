@@ -233,6 +233,7 @@ import {
   DEMAND_YIELD_RESPECT_MIN,
   DEMAND_YIELD_RESPECT_TIMES,
   RESPECT_PER_WALL,
+  OUTWEIGH_HOLD_DAYS,
   STANDING_RANGE,
   STANDING_NPC_TRADE_COINS_PER_POINT,
   STANDING_TRADE_COINS_PER_POINT,
@@ -2614,9 +2615,9 @@ export function Wiki() {
             itself to you.
           </li>
           <li>
-            At {signed(PERSUADE_STANDING)}, and while your fighters near it outweigh its own side
-            (Respect, below), an NPC city asks to join you; declined, it asks again after{' '}
-            {days(PERSUADE_ASK_AGAIN_DAYS)}.
+            At {signed(PERSUADE_STANDING)}, and once your fighters near it have outweighed its own
+            side for {days(OUTWEIGH_HOLD_DAYS)} without a break (Respect, below), an NPC city asks
+            to join you; declined, it asks again after {days(PERSUADE_ASK_AGAIN_DAYS)}.
           </li>
           <li>
             An NPC city joins an alliance when it holds every member at{' '}
@@ -2722,7 +2723,9 @@ export function Wiki() {
           An untrained resident with a spear counts {num(fighterStrength(UNTRAINED_SPEAR))}; one
           with a sword, shield and armour and full Combat skill counts{' '}
           {num(fighterStrength(TRAINED_AND_ARMOURED))}. On its side count its soldiers, weighed the
-          same way, and {num(RESPECT_PER_WALL)} for each of its own finished wall and gate tiles.
+          same way, and {num(RESPECT_PER_WALL)} for each of its own finished wall and gate tiles. It
+          weighs this at its planning pass, once a game hour, and remembers since when each realm
+          has outweighed it; the first pass one doesn't, that time starts again from nothing.
         </p>
       </Section>
 
@@ -2767,15 +2770,20 @@ export function Wiki() {
             holds is what goes. With none of it there you can't accept that way.
           </li>
           <li>
-            <strong>An NPC city answers for itself</strong> within a game hour, when it next plans.
-            You can send one to any NPC city you have seen or have a standing with. It gives in when
-            the strength of your fighters near it (Respect, under Standing) comes to at least{' '}
+            <strong>An NPC city weighs it at its planning passes</strong>, one each game hour. You
+            can send one to any NPC city you have seen or have a standing with. It gives in once the
+            strength of your fighters near it (Respect, under Standing) has come to at least{' '}
             {num(DEMAND_YIELD_RESPECT_TIMES)} times its own side, and at least{' '}
-            {num(DEMAND_YIELD_RESPECT_MIN)}, so a real army at the gate can win a city without a
-            fight, and a crowd with spears can't. Your walls and fighters out of its sight don't
+            {num(DEMAND_YIELD_RESPECT_MIN)}, for {days(OUTWEIGH_HOLD_DAYS)} without a break: a real
+            army that stays at the gate wins a city without a fight, a crowd with spears or an army
+            walking through doesn't. Until then it <strong>wavers</strong>, and the Demands drawer
+            shows how long is left; a planning pass on which your force doesn't outweigh it that far
+            starts the time again from nothing. Your walls and fighters out of its sight don't
             count. It joins your realm as a persuaded city does, or sets what it holds of the goods
-            aside at its storage for you alone to fetch. Otherwise, or with none of the goods there,
-            it declines, and its standing toward you drops by {num(DEMAND_DECLINED_STANDING_LOSS)}.
+            aside at its storage for you alone to fetch. With none of your fighters near it declines
+            at its next pass; it declines too when the deadline comes first, or with none of the
+            goods there. Declining drops its standing toward you by{' '}
+            {num(DEMAND_DECLINED_STANDING_LOSS)}.
           </li>
           <li>
             <strong>The Trade Organization always declines</strong>, within a game hour, and being

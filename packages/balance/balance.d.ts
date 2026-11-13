@@ -1026,6 +1026,7 @@ export interface Balance {
   readonly DEMAND_YIELD_RESPECT_TIMES: number
   readonly DEMAND_YIELD_RESPECT_MIN: number
   readonly RESPECT_PER_WALL: number
+  readonly OUTWEIGH_HOLD_DAYS: number
   readonly DEMAND_DECLINED_STANDING_LOSS: number
   readonly DEMAND_TRADE_ORG_STANDING_LOSS: number
   readonly DIRECT_OFFER_DAYS: number

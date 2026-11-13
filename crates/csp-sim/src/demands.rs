@@ -28,13 +28,14 @@ use crate::queries::alliance_rules::is_alliance_city;
 use crate::queries::city::for_sale;
 use crate::queries::demand::{
     answered_by_game, demand_hand_over, demand_hand_over_problem, demand_note_problem,
-    demands_counted, demands_left, goods_handed_over, goods_to_hand_over, npc_orgs_known_to,
-    realms_known_to, transfer_loads, yields_to_demand, AnsweredBy, DemandHandOver,
+    demands_counted, demands_left, gives_in_to_demand, goods_handed_over, goods_to_hand_over,
+    npc_orgs_known_to, realms_known_to, transfer_loads, AnsweredBy, DemandHandOver,
 };
 use crate::queries::goods::free_stock;
 use crate::queries::names::good_of;
 use crate::queries::npc_trade::npc_storages;
 use crate::queries::offers::offer_storage;
+use crate::queries::persuasion::respect_seen_by;
 use crate::queries::standing::{organization_label, standing_organization, TRADE_ORG};
 use crate::queries::warehouse_trade::delivery_storage;
 use crate::sight::{sight_of, Spot};
@@ -697,13 +698,20 @@ fn city_gives_in(world: &mut WorldState, city_id: &str, d: &Demand, size: i32) {
 }
 
 /// The game's answer to a demand (`answerAsGame`, `CONTEXT.md`: Demand), at the next planning pass
-/// of who it was sent to (ADR 0016). The Trade Organization always declines; an NPC city gives in
-/// to respect that far outweighs its soldiers, and otherwise declines. A city that is no NPC city
-/// any more lapses it.
+/// of who it was sent to (ADR 0016). The Trade Organization always declines. An NPC city gives in
+/// once the sender's force near it has far outweighed its own side without a break for
+/// `OUTWEIGH_HOLD_DAYS` (ADR 0033), declines at once with none of the sender's fighters near, and
+/// otherwise waits, wavering, and declines when the deadline comes first. A city that is no NPC
+/// city any more lapses it.
 fn answer_as_game(world: &mut WorldState, d: &Demand, size: i32) {
     let city = world.cities.iter().find(|c| c.id == d.to_id);
     if d.to_id != TRADE_ORG && !city.is_some_and(for_sale) {
         answered(world, d, Answer::Lapsed, None);
+        return;
+    }
+    // A city still wavering when the deadline comes declines, before the demand would lapse.
+    if city.is_some() && world.tick as f64 >= d.deadline {
+        game_declines(world, d, DEMAND_DECLINED_STANDING_LOSS);
         return;
     }
     if !plan_due(world, &d.to_id) {
@@ -713,10 +721,10 @@ fn answer_as_game(world: &mut WorldState, d: &Demand, size: i32) {
         game_declines(world, d, DEMAND_TRADE_ORG_STANDING_LOSS);
         return;
     };
-    if yields_to_demand(world, city, &d.from_id, size) {
+    if gives_in_to_demand(world, city, &d.from_id, size) {
         let id = city.id.clone();
         city_gives_in(world, &id, d, size);
-    } else {
+    } else if respect_seen_by(world, city, &d.from_id, size) == 0.0 {
         game_declines(world, d, DEMAND_DECLINED_STANDING_LOSS);
     }
 }
@@ -775,7 +783,8 @@ pub fn demands_sound(world: &WorldState) -> Vec<InvariantViolation> {
                 report(format!("demand {} has realm {realm}, which does not exist", d.id), &d.id);
             }
         }
-        if by_game && tick - d.sent_at > NPC_PLAN_TICKS {
+        // An NPC city may waver until the deadline (ADR 0033); the Trade Organization answers at once.
+        if d.to_id == TRADE_ORG && tick - d.sent_at > NPC_PLAN_TICKS {
             report(
                 format!(
                     "demand {} to {} waited longer than a planning pass for its answer",

@@ -35,6 +35,7 @@ pub fn migrations() -> BTreeMap<u32, MigrationStep> {
     steps.insert(113, goods_go_aboard);
     steps.insert(114, boats_are_rowed);
     steps.insert(115, boats_are_stolen);
+    steps.insert(116, cities_remember_who_outweighs_them);
     steps
 }
 
@@ -83,6 +84,14 @@ fn boats_are_rowed(state: Value, _: &MigrationContext<'_>) -> Value {
 /// from before has no such mark, so it stays as it is; the bump keeps a server of format 115,
 /// which refuses a field it does not know, from loading one that has.
 fn boats_are_stolen(state: Value, _: &MigrationContext<'_>) -> Value {
+    state
+}
+
+/// 116 → 117: an NPC city remembers since when each realm's force near it has outweighed it
+/// (`City.outweighed`, `CONTEXT.md`: Respect; ADR 0033, T96.2). A world from before remembers
+/// nobody, so every city starts from nothing and counts from its next planning pass: the save stays
+/// as it is, and the bump keeps a server of format 116 from loading a world that remembers.
+fn cities_remember_who_outweighs_them(state: Value, _: &MigrationContext<'_>) -> Value {
     state
 }
 
@@ -261,6 +270,21 @@ mod tests {
         let migrated = migrate_world_with(save.clone(), 115, &ctx, &migrations(), 116).unwrap();
         assert_eq!(migrated, save);
         assert!(migrated["crimes"][0].get("boat").is_none());
+    }
+
+    #[test]
+    fn step_116_keeps_a_world_whose_cities_remember_nobody_outweighing_them() {
+        let terrain = ctx_terrain();
+        let ctx = MigrationContext { terrain: &terrain };
+        let save = json!({
+            "tick": 3,
+            "cities": [{ "id": "n1", "name": "Oakford", "realmId": null, "townHallId": "n1-hall",
+                "occupation": null, "layout": "grid" }],
+            "demands": [{ "id": "d1", "fromId": "r1", "toId": "n1" }],
+        });
+        let migrated = migrate_world_with(save.clone(), 116, &ctx, &migrations(), 117).unwrap();
+        assert_eq!(migrated, save);
+        assert!(migrated["cities"][0].get("outweighed").is_none());
     }
 
     #[test]

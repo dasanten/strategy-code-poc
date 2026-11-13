@@ -14,6 +14,7 @@ import {
   setAsidePreview,
   termsLine,
   transferPreview,
+  waitLine,
 } from './demand-view.js'
 import { DemandsPanel } from './Demands.js'
 import type { LastSeenCity } from './last-seen.js'
@@ -32,6 +33,7 @@ const demand = (
   note: 'Pay up',
   sentAt: 0,
   deadline: 1440,
+  wavering: null,
   ...over,
 })
 const noSet = new Set<string>()
@@ -545,5 +547,23 @@ describe('the realm log', () => {
       /lapsed: the Leader of the realm of Tobin died\.$/,
     )
     expect(line('lapsed', false, 'receiver')).toMatch(/lapsed: your Leader died\.$/)
+  })
+})
+
+describe('how a sent demand waits (ADR 0033)', () => {
+  const city = { realmId: 'n1', realm: 'Oakford', city: true as const }
+  it('says an NPC city wavers and how long is left while the force stays', () => {
+    const d = demand('d1', 'r1', 'n1', { to: city, deadline: 4320, wavering: 720 })
+    expect(waitLine(d, 0)).toMatch(/^Oakford is wavering: it gives in after .+ more/)
+  })
+  it('says the time starts again from nothing while it does not waver', () => {
+    const d = demand('d1', 'r1', 'n1', { to: city, deadline: 4320 })
+    expect(waitLine(d, 0)).toMatch(/^Oakford isn't wavering: the time starts again from nothing/)
+  })
+  it('keeps the Trade Organization and realms as they were', () => {
+    expect(waitLine(demand('d1', 'r1', 'trade-org'), 0)).toBe(
+      'The answer comes within a game hour.',
+    )
+    expect(waitLine(demand('d1', 'r1', 'r2'), 0)).toMatch(/^Lapses in /)
   })
 })

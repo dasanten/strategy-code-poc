@@ -19,7 +19,7 @@ use super::alliance_rules::is_alliance_city;
 use super::city::for_sale;
 use super::names::good_of;
 use super::offers::{free_stock, offer_storage};
-use super::persuasion::{city_strength, respect_seen_by};
+use super::persuasion::{city_strength, respect_seen_by, ticks_until_yield};
 use super::residents::good_weight;
 use super::standing::TRADE_ORG;
 use super::trade_org::{trade_org_hq, NO_CARAVANS};
@@ -177,15 +177,31 @@ pub fn npc_orgs_known_to<'a>(
     std::iter::once(TRADE_ORG.to_string()).chain(cities).collect()
 }
 
-/// Whether an NPC city gives in to a realm's demand (`yieldsToDemand`, `CONTEXT.md`: Demand,
-/// Respect; ADR 0033): the respect it sees from the realm, the strength of its fighters near the
-/// city, is at least `DEMAND_YIELD_RESPECT_TIMES` its own side and at least
-/// `DEMAND_YIELD_RESPECT_MIN`.
+/// Whether the realm's force near an NPC city far outweighs it now (`yieldsToDemand`, `CONTEXT.md`:
+/// Demand, Respect; ADR 0033): the respect it sees from the realm, the strength of its fighters near
+/// the city, is at least `DEMAND_YIELD_RESPECT_TIMES` its own side and at least
+/// `DEMAND_YIELD_RESPECT_MIN`. It gives in only once that has held (`gives_in_to_demand`).
 pub fn yields_to_demand(world: &WorldState, city: &City, realm_id: &str, size: i32) -> bool {
     if !for_sale(city) {
         return false;
     }
     respect_seen_by(world, city, realm_id, size) >= demand_yield_needed(world, city)
+}
+
+/// Whether an NPC city gives in to a realm's demand at its planning pass (`givesInToDemand`, ADR
+/// 0033): the realm's force has far outweighed it for `OUTWEIGH_HOLD_DAYS` without a break, as of
+/// its last pass, and still does.
+pub fn gives_in_to_demand(world: &WorldState, city: &City, realm_id: &str, size: i32) -> bool {
+    ticks_until_yield(world, city, realm_id) == Some(0.0)
+        && yields_to_demand(world, city, realm_id, size)
+}
+
+/// How long an NPC city still wavers over a demand (`demandWavering`, `CONTEXT.md`: Demand; ADR 0033):
+/// while the sender's force far outweighs it, the ticks left before it gives in; `None` while it
+/// doesn't, and for a demand to anyone else.
+pub fn demand_wavering(world: &WorldState, d: &Demand) -> Option<f64> {
+    let city = world.cities.iter().find(|c| c.id == d.to_id).filter(|c| for_sale(c))?;
+    ticks_until_yield(world, city, &d.from_id)
 }
 
 /// The respect an NPC city must see from a realm to yield to its demand (`demandYieldNeeded`).
