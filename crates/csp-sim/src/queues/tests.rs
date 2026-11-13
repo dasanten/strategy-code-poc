@@ -1070,3 +1070,76 @@ fn targets(
     }
     out
 }
+
+fn until(condition: Value, items: Vec<Value>) -> Value {
+    block(json!({ "until": condition }), items)
+}
+
+#[test]
+fn a_repeat_until_runs_rounds_until_its_condition_holds_before_one() {
+    let tree = || until(wood_in("s1", 20), vec![walk(9, 6), walk(6, 9)]);
+    // Without the wood it goes round and round.
+    let mut s = setup();
+    storages(&mut s, 5.0);
+    assert_eq!(s.give(json!({ "kind": "queue", "steps": [tree(), walk(6, 20)] })), ack());
+    let been = targets(&mut s, 40, |_, _| {});
+    assert_eq!(been[..4], [(9.0, 6.0), (6.0, 9.0), (9.0, 6.0), (6.0, 9.0)]);
+    // The wood comes during the first round: the round runs to its end, then the block ends.
+    let mut s = setup();
+    storages(&mut s, 5.0);
+    s.give(json!({ "kind": "queue", "steps": [tree(), walk(6, 20)] }));
+    let been = targets(&mut s, 40, |s, t| {
+        if t == 1 {
+            set_wood(s, 30.0)
+        }
+    });
+    assert_eq!(been, vec![(9.0, 6.0), (6.0, 9.0), (6.0, 20.0)]);
+}
+
+#[test]
+fn a_repeat_until_that_holds_at_the_start_runs_no_round() {
+    let mut s = setup();
+    storages(&mut s, 30.0);
+    let tree = until(wood_in("s1", 20), vec![walk(9, 6)]);
+    s.give(json!({ "kind": "queue", "steps": [tree, walk(6, 20)] }));
+    assert_eq!(targets(&mut s, 20, |_, _| {}), vec![(6.0, 20.0)]);
+    // As all the queue, there is nothing to do: the queue ends at once.
+    let mut s = setup();
+    storages(&mut s, 30.0);
+    s.give(json!({ "kind": "queue", "steps": [until(wood_in("s1", 20), vec![walk(9, 6)])] }));
+    s.tick();
+    assert!(s.r().queue.is_none());
+}
+
+#[test]
+fn repeat_untils_are_checked_when_given_and_edited() {
+    let mut s = setup();
+    storages(&mut s, 5.0);
+    let give = |s: &mut Setup, item: Value| s.give(json!({ "kind": "queue", "steps": [item] }));
+    assert_eq!(
+        give(&mut s, until(wood_in("s2", 1), vec![walk(9, 6)])),
+        rejected("a Repeat until: not a storage, workplace or site of your realm")
+    );
+    assert_eq!(
+        give(&mut s, until(json!({ "kind": "weather" }), vec![walk(9, 6)])),
+        rejected("a Repeat until: that is no condition")
+    );
+    assert_eq!(
+        give(&mut s, block(json!({ "until": wood_in("s1", 1), "times": 2 }), vec![walk(9, 6)])),
+        rejected("a Repeat until holds only its condition")
+    );
+    // Its steps repeat: one that never ends needs a duration.
+    let work = json!({ "order": { "kind": "workAt", "buildingId": "s1" } });
+    assert_eq!(
+        give(&mut s, until(wood_in("s1", 1), vec![work])),
+        rejected("step 1 never ends on its own: give it a duration or make it the last")
+    );
+    // An edit adding one asks of its place too.
+    assert_eq!(give(&mut s, walk(9, 6)), ack());
+    s.tick();
+    let edit = json!({ "kind": "editQueue", "steps": [until(wood_in("s2", 1), vec![walk(6, 9)])] });
+    assert_eq!(
+        s.give(edit),
+        rejected("a Repeat until: not a storage, workplace or site of your realm")
+    );
+}

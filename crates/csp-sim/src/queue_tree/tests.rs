@@ -1,5 +1,5 @@
 use super::*;
-use csp_shared::world::Forever;
+use csp_shared::world::{Forever, Repeat, RepeatUntil};
 use serde_json::json;
 
 fn step(id: u32) -> QueueItem {
@@ -230,4 +230,65 @@ fn rounds_problem_finds_an_if_on_the_wrong_branch() {
     assert_eq!(depth_of(&q.items), 1);
     assert_eq!(ids_of(&q.items), vec![1, 2, 3, 4]);
     assert_eq!(block_ids(&q.items), vec![1]);
+}
+
+fn until(id: u32, items: Vec<QueueItem>) -> QueueItem {
+    let until = serde_json::from_value(json!({ "kind": "mounted", "is": true })).unwrap();
+    block(id, Repeat::Until(RepeatUntil { until }), items)
+}
+
+#[test]
+fn a_repeat_until_ends_before_a_round_once_its_condition_holds() {
+    // Asked when its turn comes and after each round: no, no, yes.
+    let tree = vec![until(1, vec![step(2), step(3)]), step(4)];
+    assert_eq!(run_asking(tree, false, &[false, false, true], 100), vec![2, 3, 2, 3, 4]);
+    // It has no count: it goes on as long as the condition doesn't hold.
+    let tree = vec![until(1, vec![step(2)])];
+    let answers = [vec![false; 1500], vec![true]].concat();
+    assert_eq!(run_asking(tree, false, &answers, 2000).len(), 1500);
+}
+
+#[test]
+fn a_repeat_until_never_runs_when_its_condition_holds_at_the_start() {
+    let tree = || vec![step(1), until(2, vec![step(3)]), step(4)];
+    assert_eq!(run_asking(tree(), false, &[true], 100), vec![1, 4]);
+    // As the first item, and as the whole queue: then there is nothing to run.
+    assert_eq!(run_asking(vec![until(2, vec![step(3)]), step(4)], false, &[true], 100), vec![4]);
+    assert_eq!(run_asking(vec![until(2, vec![step(3)])], false, &[true], 100), Vec::<u32>::new());
+    // A looping queue of it ends rather than spins once it holds.
+    assert_eq!(run_asking(vec![until(2, vec![step(3)])], true, &[false, true, true], 100), vec![3]);
+}
+
+#[test]
+fn a_repeat_until_still_ends_after_a_round_that_started_nothing_without_asking() {
+    let mut q = Queue {
+        realm_id: "r".into(),
+        next_step_id: 4,
+        items: vec![until(1, vec![step(2)]), step(3)],
+        current: 0,
+        started_at: None,
+        r#loop: false,
+        started: false,
+    };
+    begin(&mut q, &mut |_| false);
+    assert_eq!(q.current, 2);
+    // Step 2 never started: the round ends the block, and its condition isn't asked.
+    assert_eq!(
+        advance(&mut q, &mut |_| panic!("a round that started nothing doesn't ask")),
+        Advance::Moved { crossed: true }
+    );
+    assert_eq!((q.current, rounds_problem(&q)), (3, None));
+}
+
+#[test]
+fn a_repeat_until_keeps_any_round_through_an_edit() {
+    let mut q = queue(vec![step(3)], false);
+    q.items = vec![until(1, vec![step(2)])];
+    begin(&mut q, &mut |_| false);
+    assert_eq!(q.current, 2);
+    let QueueItem::Repeat(b) = &mut q.items[0] else { panic!("a repeat block") };
+    b.round = 5000;
+    assert_eq!(rounds_problem(&q), None);
+    settle_rounds(&mut q);
+    assert_eq!(rounds_of(&q.items)[&1].0, 5000);
 }

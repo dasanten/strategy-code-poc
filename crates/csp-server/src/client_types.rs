@@ -213,6 +213,7 @@ fn client_roots(cfg: &Config) -> io::Result<()> {
         csp_shared::world::RepeatBlock,
         csp_shared::world::Repeat,
         csp_shared::world::Forever,
+        csp_shared::world::RepeatUntil,
         csp_shared::world::IfBlock,
         csp_shared::world::Branch,
         csp_shared::world::Condition,

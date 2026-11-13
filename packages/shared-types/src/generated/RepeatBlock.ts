@@ -3,8 +3,9 @@ import type { QueueItem } from "./QueueItem.js";
 import type { Repeat } from "./Repeat.js";
 
 /**
- * Some steps in a row done again and again (`CONTEXT.md`: Repeat block): a count of rounds, or
- * forever. A round in which none of its steps could start ends it.
+ * Some steps in a row done again and again (`CONTEXT.md`: Repeat block): a count of rounds,
+ * forever, or until a condition holds, asked before each round. A round in which none of its
+ * steps could start ends it.
  */
 export type RepeatBlock = { id: number, repeat: Repeat, items: Array<QueueItem>, 
 /**
