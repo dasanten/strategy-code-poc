@@ -806,9 +806,9 @@ impl PathFinder {
         // as sharp as it can, so searches stay short.
         let table = &self.tables[req.table].costs;
         let mut cheapest = f64::INFINITY;
-        for t in 0..256usize {
+        for (t, &cost) in table.0.iter().enumerate() {
             if t != Terrain::Road as usize || self.ground.has_roads() {
-                cheapest = cheapest.min(table.0[t]);
+                cheapest = cheapest.min(cost);
             }
         }
         req.cheapest = cheapest;
