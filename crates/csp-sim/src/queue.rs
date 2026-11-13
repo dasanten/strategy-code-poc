@@ -9,7 +9,7 @@ use csp_shared::balance::{
     QUEUE_MAX_DEPTH, QUEUE_MAX_REPEAT, QUEUE_MAX_STEPS, QUEUE_STEP_MAX_CHARS,
 };
 use csp_shared::protocol::BuildLine;
-use csp_shared::world::{BuildingKind, OrderRequest, Queue, Repeat, Tile};
+use csp_shared::world::{BuildingKind, Condition, OrderRequest, Queue, Repeat, Tile};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ts_rs::TS;
@@ -94,12 +94,13 @@ pub fn step_line(order: &OrderRequest) -> Option<BuildLine> {
     Some(BuildLine { building, from, to })
 }
 
-/// A queue item as a request gives it: a repeat block of more, or a step. Told apart by `repeat`,
-/// as the planner's `isBlock` does.
+/// A queue item as a request gives it: a repeat block of more, an If block, or a step. Told apart
+/// by `repeat` and `if`, as the planner's `isBlock` and `isIf` do.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(untagged)]
 pub enum QueueItemRequest {
     Repeat(RepeatBlockRequest),
+    If(IfBlockRequest),
     Step(QueueStepRequest),
 }
 
@@ -115,22 +116,62 @@ pub struct RepeatBlockRequest {
     pub items: Vec<QueueItemRequest>,
 }
 
+/// An If block as a request gives it (`CONTEXT.md`: If block): its condition, its items and an
+/// optional Else part. `id` names a block already in the queue being edited.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct IfBlockRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub id: Option<u32>,
+    pub r#if: Condition,
+    pub items: Vec<QueueItemRequest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub r#else: Option<Vec<QueueItemRequest>>,
+}
+
 impl QueueItemRequest {
     pub fn id(&self) -> Option<u32> {
         match self {
             QueueItemRequest::Repeat(b) => b.id,
+            QueueItemRequest::If(b) => b.id,
             QueueItemRequest::Step(s) => s.id,
         }
     }
 }
 
-/// The steps among `items`, top to bottom.
+/// The steps among `items`, top to bottom (an If block's items before its Else part).
 pub fn request_steps(items: &[QueueItemRequest]) -> Vec<&QueueStepRequest> {
     fn walk<'a>(items: &'a [QueueItemRequest], out: &mut Vec<&'a QueueStepRequest>) {
         for item in items {
             match item {
                 QueueItemRequest::Step(s) => out.push(s),
                 QueueItemRequest::Repeat(b) => walk(&b.items, out),
+                QueueItemRequest::If(b) => {
+                    walk(&b.items, out);
+                    walk(b.r#else.as_deref().unwrap_or_default(), out);
+                }
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(items, &mut out);
+    out
+}
+
+/// The If blocks among `items`, outermost first.
+pub fn request_ifs(items: &[QueueItemRequest]) -> Vec<&IfBlockRequest> {
+    fn walk<'a>(items: &'a [QueueItemRequest], out: &mut Vec<&'a IfBlockRequest>) {
+        for item in items {
+            match item {
+                QueueItemRequest::Step(_) => {}
+                QueueItemRequest::Repeat(b) => walk(&b.items, out),
+                QueueItemRequest::If(b) => {
+                    out.push(b);
+                    walk(&b.items, out);
+                    walk(b.r#else.as_deref().unwrap_or_default(), out);
+                }
             }
         }
     }
@@ -198,19 +239,24 @@ fn walk_items<'a>(
 ) {
     for item in items {
         *count += 1;
-        let block = item.as_object().filter(|o| o.contains_key("repeat"));
+        let block = item.as_object().filter(|o| o.contains_key("repeat") || o.contains_key("if"));
         let Some(block) = block else {
             steps.push(WalkedStep { step: item, repeated });
             continue;
         };
+        if f64::from(depth + 1) > QUEUE_MAX_DEPTH && problem.is_none() {
+            *problem =
+                Some(format!("blocks nest at most {} deep", number_to_string(QUEUE_MAX_DEPTH)));
+        }
+        if block.contains_key("if") {
+            walk_if(block, depth, repeated, count, steps, problem);
+            continue;
+        }
         let mut set = |p: String| {
             if problem.is_none() {
                 *problem = Some(p);
             }
         };
-        if f64::from(depth + 1) > QUEUE_MAX_DEPTH {
-            set(format!("blocks nest at most {} deep", number_to_string(QUEUE_MAX_DEPTH)));
-        }
         if block.keys().any(|k| !["id", "repeat", "items"].contains(&k.as_str())) {
             set("a repeat block holds only its id, count and items".into());
         }
@@ -235,6 +281,44 @@ fn walk_items<'a>(
             }
             _ => set("a repeat block needs a step".into()),
         }
+    }
+}
+
+/// Walks an If block of a request (`CONTEXT.md`: If block): its condition, its items and an
+/// optional Else part, each part holding a step. Its steps are repeated when a block around it
+/// repeats them.
+fn walk_if<'a>(
+    block: &'a serde_json::Map<String, Value>,
+    depth: u32,
+    repeated: bool,
+    count: &mut usize,
+    steps: &mut Vec<WalkedStep<'a>>,
+    problem: &mut Option<String>,
+) {
+    let set = |problem: &mut Option<String>, p: String| {
+        if problem.is_none() {
+            *problem = Some(p);
+        }
+    };
+    if block.keys().any(|k| !["id", "if", "items", "else"].contains(&k.as_str())) {
+        set(problem, "an If block holds only its id, condition, items and Else part".into());
+    }
+    if let Err(p) = condition_of(block.get("if")) {
+        let sep = if p == "needs a condition" { " " } else { ": " };
+        set(problem, format!("an If block{sep}{p}"));
+    }
+    match block.get("items") {
+        Some(Value::Array(inner)) if !inner.is_empty() => {
+            walk_items(inner, depth + 1, repeated, count, steps, problem);
+        }
+        _ => set(problem, "an If block needs a step".into()),
+    }
+    match block.get("else") {
+        None => {}
+        Some(Value::Array(inner)) if !inner.is_empty() => {
+            walk_items(inner, depth + 1, repeated, count, steps, problem);
+        }
+        _ => set(problem, "an If block's Else part needs a step".into()),
     }
 }
 

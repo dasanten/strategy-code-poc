@@ -1,14 +1,19 @@
-//! Walking a queue's tree (`CONTEXT.md`: Queue, Repeat block; ADR 0032): which step comes after
-//! the current one, how rounds are counted, and how an edited tree keeps its rounds. Plain data in,
-//! plain data out: the runner in [`crate::queues`] applies what a step requests.
+//! Walking a queue's tree (`CONTEXT.md`: Queue, Repeat block, If block; ADR 0032): which step
+//! comes after the current one, how rounds are counted, which part of an If block runs, and how an
+//! edited tree keeps its rounds. Plain data in, plain data out: the runner in [`crate::queues`]
+//! applies what a step requests and answers the conditions an If block asks ([`Ask`]).
 //!
-//! A block's `round` is set (from 1) exactly while the current step is inside it; every other
-//! block has round 0. `started` notes that a step started in the round (or, on the queue, since it
-//! last began from its top); a round that ends without one ends its block, so a block never spins.
+//! A repeat block's `round` is set (from 1) exactly while the current step is inside it; every
+//! other block has round 0. `started` notes that a step started in the round (or, on the queue,
+//! since it last began from its top); a round that ends without one ends its block, so a block
+//! never spins. An If block's `branch` is set exactly while the current step is inside it, to the
+//! part it is in.
 
 use std::collections::HashMap;
 
-use csp_shared::world::{OrderRequest, Queue, QueueItem, QueueStep, Repeat, RepeatBlock};
+use csp_shared::world::{
+    Branch, Condition, IfBlock, OrderRequest, Queue, QueueItem, QueueStep, Repeat, RepeatBlock,
+};
 
 use crate::queue::{QueueItemRequest, QueueStepRequest};
 
@@ -19,17 +24,22 @@ pub fn kept_order(order: &OrderRequest) -> OrderRequest {
     kept
 }
 
-/// A block's round and whether a step started in it, by block id.
+/// Answers whether a condition holds for the resident now (`CONTEXT.md`: Condition).
+pub type Ask<'a> = &'a mut dyn FnMut(&Condition) -> bool;
+
+/// A repeat block's round and whether a step started in it, by block id.
 pub type Rounds = HashMap<u32, (u32, bool)>;
 
-/// The rounds of every block in `items`.
+/// The rounds of every repeat block in `items`.
 pub fn rounds_of(items: &[QueueItem]) -> Rounds {
     let mut out = Rounds::new();
     fn walk(items: &[QueueItem], out: &mut Rounds) {
         for item in items {
             if let QueueItem::Repeat(b) = item {
                 out.insert(b.id, (b.round, b.started));
-                walk(&b.items, out);
+            }
+            for part in item.parts() {
+                walk(part, out);
             }
         }
     }
@@ -38,7 +48,8 @@ pub fn rounds_of(items: &[QueueItem]) -> Rounds {
 }
 
 /// The items a request gives, kept: each without an id gets `next_id++`, in the order listed (a
-/// block before its items); a block keeps the round it had under its id in `rounds`.
+/// block before its items, an If block's items before its Else part); a repeat block keeps the
+/// round it had under its id in `rounds`. An If block's branch is set by [`settle_rounds`].
 pub fn kept_items(reqs: &[QueueItemRequest], next_id: &mut u32, rounds: &Rounds) -> Vec<QueueItem> {
     reqs.iter()
         .map(|item| {
@@ -61,6 +72,12 @@ pub fn kept_items(reqs: &[QueueItemRequest], next_id: &mut u32, rounds: &Rounds)
                         started,
                     })
                 }
+                QueueItemRequest::If(b) => {
+                    let id = id();
+                    let items = kept_items(&b.items, next_id, rounds);
+                    let r#else = b.r#else.as_ref().map(|e| kept_items(e, next_id, rounds));
+                    QueueItem::If(IfBlock { id, r#if: b.r#if.clone(), items, r#else, branch: None })
+                }
             }
         })
         .collect()
@@ -70,77 +87,66 @@ fn kept_step(id: u32, s: &QueueStepRequest) -> QueueStep {
     QueueStep { id, order: kept_order(&s.order), minutes: s.minutes }
 }
 
-/// The path of indices to step `id`, from the top list down.
-pub fn path_to(items: &[QueueItem], id: u32) -> Option<Vec<usize>> {
-    for (i, item) in items.iter().enumerate() {
-        match item {
-            QueueItem::Step(s) if s.id == id => return Some(vec![i]),
-            QueueItem::Step(_) => {}
-            QueueItem::Repeat(b) => {
-                if let Some(mut rest) = path_to(&b.items, id) {
-                    rest.insert(0, i);
-                    return Some(rest);
-                }
+/// One step of a path down the tree: the item's place in its list, and which of its parts
+/// (`QueueItem::parts`) the path goes on into: 0 for a block's items, 1 for an If block's Else.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Seg {
+    pub at: usize,
+    pub part: usize,
+}
+
+const TOP: Seg = Seg { at: 0, part: 0 };
+
+/// The path to step `id`, from the top list down.
+pub fn path_to(items: &[QueueItem], id: u32) -> Option<Vec<Seg>> {
+    for (at, item) in items.iter().enumerate() {
+        if let QueueItem::Step(s) = item {
+            if s.id == id {
+                return Some(vec![Seg { at, part: 0 }]);
+            }
+            continue;
+        }
+        for (part, list) in item.parts().into_iter().enumerate() {
+            if let Some(mut rest) = path_to(list, id) {
+                rest.insert(0, Seg { at, part });
+                return Some(rest);
             }
         }
     }
     None
 }
 
-/// The list the last index of `path` points into: the top list, or a block's items.
-fn list_at<'a>(items: &'a [QueueItem], parent: &[usize]) -> &'a [QueueItem] {
+/// The list the last segment of a path points into, given the segments before it.
+fn list_at<'a>(items: &'a [QueueItem], parent: &[Seg]) -> &'a [QueueItem] {
     let mut list = items;
-    for &i in parent {
-        match &list[i] {
-            QueueItem::Repeat(b) => list = &b.items,
-            QueueItem::Step(_) => unreachable!("a path goes through blocks"),
-        }
+    for s in parent {
+        list = list[s.at].parts()[s.part];
     }
     list
 }
 
-fn item_at_mut<'a>(items: &'a mut [QueueItem], path: &[usize]) -> &'a mut QueueItem {
-    let (&last, parent) = path.split_last().expect("a path has an item");
+/// A block's part to change: its items, or an If block's Else part.
+fn part_mut(item: &mut QueueItem, part: usize) -> &mut Vec<QueueItem> {
+    match item {
+        QueueItem::Repeat(b) => &mut b.items,
+        QueueItem::If(b) => {
+            if part == 0 {
+                &mut b.items
+            } else {
+                b.r#else.as_mut().expect("the path goes into the Else part")
+            }
+        }
+        QueueItem::Step(_) => unreachable!("a path goes through blocks"),
+    }
+}
+
+fn item_at_mut<'a>(items: &'a mut [QueueItem], path: &[Seg]) -> &'a mut QueueItem {
+    let (last, parent) = path.split_last().expect("a path has an item");
     let mut list = items;
-    for &i in parent {
-        match &mut list[i] {
-            QueueItem::Repeat(b) => list = &mut b.items,
-            QueueItem::Step(_) => unreachable!("a path goes through blocks"),
-        }
+    for s in parent {
+        list = part_mut(&mut list[s.at], s.part);
     }
-    &mut list[last]
-}
-
-fn block_at_mut<'a>(items: &'a mut [QueueItem], path: &[usize]) -> &'a mut RepeatBlock {
-    match item_at_mut(items, path) {
-        QueueItem::Repeat(b) => b,
-        QueueItem::Step(_) => unreachable!("the path names a block"),
-    }
-}
-
-/// Goes down from the item at `path` to its first step, entering each block on the way (round 1);
-/// the step becomes current. True when a block was entered.
-fn descend(q: &mut Queue, mut path: Vec<usize>) -> bool {
-    let mut entered = false;
-    loop {
-        match item_at_mut(&mut q.items, &path) {
-            QueueItem::Step(s) => {
-                q.current = s.id;
-                return entered;
-            }
-            QueueItem::Repeat(b) => {
-                b.round = 1;
-                b.started = false;
-                entered = true;
-                path.push(0);
-            }
-        }
-    }
-}
-
-/// Makes the queue's first step current, entering the blocks around it.
-pub fn begin(q: &mut Queue) {
-    descend(q, vec![0]);
+    &mut list[last.at]
 }
 
 /// Where the queue went from its current step.
@@ -153,87 +159,164 @@ pub enum Advance {
     Ended,
 }
 
-/// Moves the queue on from its current step (`CONTEXT.md`: Repeat block): to the next item in its
-/// list; at the end of a block's round, to the block's next round when a step started in this one
-/// and the count allows, else past the block; at the end of the queue, back to its top when it
-/// loops and a step started in this pass.
-pub fn advance(q: &mut Queue) -> Advance {
-    let Some(mut path) = path_to(&q.items, q.current) else { return Advance::Ended };
-    q.started_at = None;
+/// Goes from the item at `path` (which may be just past the end of its list) to the step that
+/// runs next, which becomes current (`CONTEXT.md`: Repeat block, If block): a step is it; a repeat
+/// block is entered (round 1); an If block asks its condition once and enters its items when it
+/// holds, its Else part when it doesn't, or is passed over without one. Past the end of a block's
+/// list it goes on as the block says (`advance`); past the end of the queue, back to its top when
+/// it loops and a step started in this pass.
+fn settle(q: &mut Queue, mut path: Vec<Seg>, ask: Ask<'_>) -> Advance {
     let mut crossed = false;
     loop {
-        let last = path.pop().expect("a path has an item");
-        if last + 1 < list_at(&q.items, &path).len() {
-            path.push(last + 1);
-            break;
-        }
-        if path.is_empty() {
-            if !q.r#loop || !q.started {
-                return Advance::Ended;
+        let (last, parent) = path.split_last().expect("a path has an item");
+        if last.at >= list_at(&q.items, parent).len() {
+            path.pop();
+            if path.is_empty() {
+                if !q.r#loop || !q.started {
+                    return Advance::Ended;
+                }
+                q.started = false;
+                path.push(TOP);
+                continue;
             }
-            q.started = false;
-            path.push(0);
-            break;
+            crossed = true;
+            match item_at_mut(&mut q.items, &path) {
+                QueueItem::Repeat(b) if b.started && b.repeat.more_after(b.round) => {
+                    b.round += 1;
+                    b.started = false;
+                    path.push(TOP);
+                    continue;
+                }
+                QueueItem::Repeat(b) => {
+                    b.round = 0;
+                    b.started = false;
+                }
+                QueueItem::If(b) => b.branch = None,
+                QueueItem::Step(_) => unreachable!("a path goes through blocks"),
+            }
+            path.last_mut().expect("a block").at += 1;
+            continue;
         }
-        crossed = true;
-        let b = block_at_mut(&mut q.items, &path);
-        if b.started && b.repeat.more_after(b.round) {
-            b.round += 1;
-            b.started = false;
-            path.push(0);
-            break;
+        match item_at_mut(&mut q.items, &path) {
+            QueueItem::Step(s) => {
+                q.current = s.id;
+                return Advance::Moved { crossed };
+            }
+            QueueItem::Repeat(b) => {
+                b.round = 1;
+                b.started = false;
+                crossed = true;
+                path.last_mut().expect("an item").part = 0;
+                path.push(TOP);
+            }
+            QueueItem::If(b) => {
+                crossed = true;
+                let branch = if ask(&b.r#if) {
+                    Some(Branch::Then)
+                } else if b.r#else.is_some() {
+                    Some(Branch::Else)
+                } else {
+                    None
+                };
+                b.branch = branch;
+                let here = path.last_mut().expect("an item");
+                match branch {
+                    Some(branch) => {
+                        here.part = usize::from(branch == Branch::Else);
+                        path.push(TOP);
+                    }
+                    None => here.at += 1,
+                }
+            }
         }
-        b.round = 0;
-        b.started = false;
     }
-    let entered = descend(q, path);
-    Advance::Moved { crossed: crossed || entered }
 }
 
-/// Notes that the current step started: in the queue's pass and in each block's round around it.
+/// Makes the queue's first step current, entering the blocks around it and asking the If blocks
+/// on the way. `Ended` when there is no step to run: every If on the way passed over.
+pub fn begin(q: &mut Queue, ask: Ask<'_>) -> Advance {
+    settle(q, vec![TOP], ask)
+}
+
+/// Moves the queue on from its current step (`CONTEXT.md`: Repeat block, If block): to the next
+/// item in its list; at the end of a block's round, to the block's next round when a step started
+/// in this one and the count allows, else past the block; at the end of an If block's part, past
+/// the block; at the end of the queue, back to its top when it loops and a step started in this
+/// pass. An If block reached on the way asks its condition once.
+pub fn advance(q: &mut Queue, ask: Ask<'_>) -> Advance {
+    let Some(mut path) = path_to(&q.items, q.current) else { return Advance::Ended };
+    q.started_at = None;
+    path.last_mut().expect("a path has an item").at += 1;
+    settle(q, path, ask)
+}
+
+/// Notes that the current step started: in the queue's pass and in each repeat block's round
+/// around it.
 pub fn mark_started(q: &mut Queue) {
     q.started = true;
     let Some(path) = path_to(&q.items, q.current) else { return };
     for depth in 1..path.len() {
-        block_at_mut(&mut q.items, &path[..depth]).started = true;
+        if let QueueItem::Repeat(b) = item_at_mut(&mut q.items, &path[..depth]) {
+            b.started = true;
+        }
     }
 }
 
-/// Puts the rounds right after an edit: each block around the current step is in a round, at
-/// least the first and at most its count; every other block is in none.
+/// The part of a block a path is in: what an If block's `branch` is while the path is inside it.
+fn branch_of(part: usize) -> Branch {
+    if part == 0 {
+        Branch::Then
+    } else {
+        Branch::Else
+    }
+}
+
+/// Puts the rounds and branches right after an edit: each repeat block around the current step
+/// is in a round, at least the first and at most its count, and each If block around it in the
+/// part it is in; every other block is in none.
 pub fn settle_rounds(q: &mut Queue) {
     let path = path_to(&q.items, q.current).unwrap_or_default();
-    fn walk(items: &mut [QueueItem], on_path: Option<&[usize]>) {
+    fn walk(items: &mut [QueueItem], on_path: Option<&[Seg]>) {
         for (i, item) in items.iter_mut().enumerate() {
-            let QueueItem::Repeat(b) = item else { continue };
-            let inner = on_path.filter(|p| p.len() > 1 && p[0] == i).map(|p| &p[1..]);
-            if inner.is_some() {
-                let most = match b.repeat {
-                    Repeat::Times(n) => n,
-                    Repeat::Forever(_) => u32::MAX,
-                };
-                b.round = b.round.clamp(1, most.max(1));
-            } else {
-                b.round = 0;
-                b.started = false;
+            let here = on_path.filter(|p| p.len() > 1 && p[0].at == i);
+            let inner = |part: usize| here.filter(|p| p[0].part == part).map(|p| &p[1..]);
+            match item {
+                QueueItem::Step(_) => {}
+                QueueItem::Repeat(b) => {
+                    if here.is_some() {
+                        let most = match b.repeat {
+                            Repeat::Times(n) => n,
+                            Repeat::Forever(_) => u32::MAX,
+                        };
+                        b.round = b.round.clamp(1, most.max(1));
+                    } else {
+                        b.round = 0;
+                        b.started = false;
+                    }
+                    walk(&mut b.items, inner(0));
+                }
+                QueueItem::If(b) => {
+                    b.branch = here.map(|p| branch_of(p[0].part));
+                    walk(&mut b.items, inner(0));
+                    if let Some(e) = &mut b.r#else {
+                        walk(e, inner(1));
+                    }
+                }
             }
-            walk(&mut b.items, inner);
         }
     }
     walk(&mut q.items, Some(&path));
 }
 
-/// The ids of every step and block, in the order listed (a block before its items).
+/// The ids of every step and block, in the order listed (a block before its items, an If
+/// block's items before its Else part).
 pub fn ids_of(items: &[QueueItem]) -> Vec<u32> {
     let mut out = Vec::new();
     fn walk(items: &[QueueItem], out: &mut Vec<u32>) {
         for item in items {
-            match item {
-                QueueItem::Step(s) => out.push(s.id),
-                QueueItem::Repeat(b) => {
-                    out.push(b.id);
-                    walk(&b.items, out);
-                }
+            out.push(item.id());
+            for part in item.parts() {
+                walk(part, out);
             }
         }
     }
@@ -243,17 +326,14 @@ pub fn ids_of(items: &[QueueItem]) -> Vec<u32> {
 
 /// The ids of the blocks among `items`.
 pub fn block_ids(items: &[QueueItem]) -> Vec<u32> {
-    let steps: Vec<u32> = collect_step_ids(items);
-    ids_of(items).into_iter().filter(|id| !steps.contains(id)).collect()
-}
-
-fn collect_step_ids(items: &[QueueItem]) -> Vec<u32> {
     let mut out = Vec::new();
     fn walk(items: &[QueueItem], out: &mut Vec<u32>) {
         for item in items {
-            match item {
-                QueueItem::Step(s) => out.push(s.id),
-                QueueItem::Repeat(b) => walk(&b.items, out),
+            if !matches!(item, QueueItem::Step(_)) {
+                out.push(item.id());
+            }
+            for part in item.parts() {
+                walk(part, out);
             }
         }
     }
@@ -267,39 +347,62 @@ pub fn depth_of(items: &[QueueItem]) -> u32 {
         .iter()
         .map(|item| match item {
             QueueItem::Step(_) => 0,
-            QueueItem::Repeat(b) => 1 + depth_of(&b.items),
+            block => 1 + block.parts().into_iter().map(depth_of).max().unwrap_or(0),
         })
         .max()
         .unwrap_or(0)
 }
 
-/// What is wrong with the blocks' rounds, if anything (the invariant's half on rounds): a block
-/// around the current step runs a round within its count, every other block none, and none is
-/// empty.
+/// What is wrong with the blocks' rounds and branches, if anything (the invariant's half on
+/// them): a repeat block around the current step runs a round within its count, every other none;
+/// an If block around it is in the part holding it, every other in none; and no block's items
+/// (nor an Else part) are empty.
 pub fn rounds_problem(q: &Queue) -> Option<String> {
     let path = path_to(&q.items, q.current)?;
-    fn walk(items: &[QueueItem], on_path: Option<&[usize]>) -> Option<String> {
+    fn walk(items: &[QueueItem], on_path: Option<&[Seg]>) -> Option<String> {
         for (i, item) in items.iter().enumerate() {
-            let QueueItem::Repeat(b) = item else { continue };
-            if b.items.is_empty() {
-                return Some(format!("has an empty block {}", b.id));
+            if let QueueItem::Step(_) = item {
+                continue;
             }
-            let inner = on_path.filter(|p| p.len() > 1 && p[0] == i).map(|p| &p[1..]);
-            let within = match b.repeat {
-                Repeat::Times(n) => b.round <= n,
-                Repeat::Forever(_) => true,
-            };
-            if inner.is_some() && (b.round == 0 || !within) {
-                return Some(format!("runs round {} of block {} around its step", b.round, b.id));
+            if item.parts().iter().any(|p| p.is_empty()) {
+                return Some(format!("has an empty block {}", item.id()));
             }
-            if inner.is_none() && (b.round != 0 || b.started) {
-                return Some(format!(
-                    "runs round {} of block {} away from its step",
-                    b.round, b.id
-                ));
+            let here = on_path.filter(|p| p.len() > 1 && p[0].at == i);
+            match item {
+                QueueItem::Repeat(b) => {
+                    let within = match b.repeat {
+                        Repeat::Times(n) => b.round <= n,
+                        Repeat::Forever(_) => true,
+                    };
+                    if here.is_some() && (b.round == 0 || !within) {
+                        return Some(format!(
+                            "runs round {} of block {} around its step",
+                            b.round, b.id
+                        ));
+                    }
+                    if here.is_none() && (b.round != 0 || b.started) {
+                        return Some(format!(
+                            "runs round {} of block {} away from its step",
+                            b.round, b.id
+                        ));
+                    }
+                }
+                QueueItem::If(b) => {
+                    let should = here.map(|p| branch_of(p[0].part));
+                    if b.branch != should {
+                        return Some(format!(
+                            "has If block {} on {:?} where its step is in {:?}",
+                            b.id, b.branch, should
+                        ));
+                    }
+                }
+                QueueItem::Step(_) => {}
             }
-            if let Some(p) = walk(&b.items, inner) {
-                return Some(p);
+            for (part, list) in item.parts().into_iter().enumerate() {
+                let inner = here.filter(|p| p[0].part == part).map(|p| &p[1..]);
+                if let Some(p) = walk(list, inner) {
+                    return Some(p);
+                }
             }
         }
         None
@@ -308,107 +411,4 @@ pub fn rounds_problem(q: &Queue) -> Option<String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use csp_shared::world::Forever;
-    use serde_json::json;
-
-    fn step(id: u32) -> QueueItem {
-        QueueItem::Step(QueueStep {
-            id,
-            order: serde_json::from_value(json!({ "kind": "walkTo", "x": 1, "y": 1 })).unwrap(),
-            minutes: None,
-        })
-    }
-
-    fn block(id: u32, repeat: Repeat, items: Vec<QueueItem>) -> QueueItem {
-        QueueItem::Repeat(RepeatBlock { id, repeat, items, round: 0, started: false })
-    }
-
-    fn queue(items: Vec<QueueItem>, r#loop: bool) -> Queue {
-        let mut q = Queue {
-            realm_id: "r".into(),
-            next_step_id: ids_of(&items).into_iter().max().unwrap_or(0) + 1,
-            items,
-            current: 0,
-            started_at: None,
-            r#loop,
-            started: false,
-        };
-        begin(&mut q);
-        q
-    }
-
-    /// The steps the queue runs, every one starting, until it ends or `most` are done.
-    fn run(q: &mut Queue, most: usize) -> Vec<u32> {
-        let mut out = vec![];
-        loop {
-            out.push(q.current);
-            mark_started(q);
-            assert_eq!(rounds_problem(q), None);
-            if out.len() == most || advance(q) == Advance::Ended {
-                return out;
-            }
-        }
-    }
-
-    #[test]
-    fn a_nested_repeat_runs_its_rounds() {
-        let inner = block(3, Repeat::Times(2), vec![step(4)]);
-        let mut q =
-            queue(vec![step(1), block(2, Repeat::Times(2), vec![inner, step(5)]), step(6)], false);
-        assert_eq!(run(&mut q, 100), vec![1, 4, 4, 5, 4, 4, 5, 6]);
-    }
-
-    #[test]
-    fn forever_runs_until_a_round_starts_nothing() {
-        let mut q =
-            queue(vec![block(1, Repeat::Forever(Forever::Forever), vec![step(2), step(3)])], false);
-        assert_eq!(run(&mut q, 7), vec![2, 3, 2, 3, 2, 3, 2]);
-        // A round in which no step starts ends the block, and with it this queue.
-        let mut q =
-            queue(vec![block(1, Repeat::Forever(Forever::Forever), vec![step(2)]), step(3)], false);
-        assert_eq!(advance(&mut q), Advance::Moved { crossed: true });
-        assert_eq!(q.current, 3);
-    }
-
-    #[test]
-    fn a_looping_queue_ends_after_a_pass_that_started_nothing() {
-        let mut q = queue(vec![step(1), step(2)], true);
-        assert_eq!(advance(&mut q), Advance::Moved { crossed: false });
-        assert_eq!(advance(&mut q), Advance::Ended);
-        let mut q = queue(vec![step(1), step(2)], true);
-        assert_eq!(run(&mut q, 5), vec![1, 2, 1, 2, 1]);
-    }
-
-    #[test]
-    fn an_edit_keeps_the_rounds_by_id_and_settles_them() {
-        let mut q = queue(vec![block(1, Repeat::Times(5), vec![step(2), step(3)])], false);
-        run(&mut q, 5);
-        assert_eq!(rounds_of(&q.items)[&1].0, 3);
-        // Lowered below the round it is on, it runs its last round.
-        let reqs: Vec<QueueItemRequest> = serde_json::from_value(json!([
-            { "id": 1, "repeat": 2, "items": [{ "id": 2, "order": { "kind": "walkTo" } }] },
-            { "repeat": 4, "items": [{ "order": { "kind": "walkTo" } }] },
-        ]))
-        .unwrap();
-        let mut next = q.next_step_id;
-        q.items = kept_items(&reqs, &mut next, &rounds_of(&q.items));
-        q.current = 2;
-        settle_rounds(&mut q);
-        assert_eq!(rounds_problem(&q), None);
-        assert_eq!(rounds_of(&q.items)[&1].0, 2);
-        assert_eq!(rounds_of(&q.items)[&4].0, 0);
-        assert_eq!(ids_of(&q.items), vec![1, 2, 4, 5]);
-    }
-
-    #[test]
-    fn rounds_problem_finds_a_round_out_of_its_count_or_away_from_the_step() {
-        let mut q = queue(vec![block(1, Repeat::Times(2), vec![step(2)]), step(3)], false);
-        assert_eq!(rounds_problem(&q), None);
-        block_at_mut(&mut q.items, &[0]).round = 3;
-        assert!(rounds_problem(&q).unwrap().contains("round 3 of block 1 around"));
-        q.current = 3;
-        assert!(rounds_problem(&q).unwrap().contains("away from its step"));
-    }
-}
+mod tests;

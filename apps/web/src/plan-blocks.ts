@@ -5,14 +5,14 @@ import {
   QUEUE_MAX_STEPS,
 } from '@csp/balance'
 import { neverEnds, queueStepsProblem } from './shared/queue.js'
-import type { QueueStepRequest, Repeat } from '@csp/shared-types'
+import type { Condition, QueueStepRequest, Repeat } from '@csp/shared-types'
 
 /**
- * Repeat blocks (`CONTEXT.md`: Repeat block, ADR 0032): some steps in a row wrapped with a count
- * or forever, nestable. A plan is a tree of steps and blocks, and the queue given from it is the
- * same tree: the server runs the blocks, and a block counts once towards a queue's size however
- * often it repeats. Steps and blocks share one id space, so the planner picks, moves and removes
- * either by id.
+ * Repeat blocks and If blocks (`CONTEXT.md`: Repeat block, If block, ADR 0032): some steps in a
+ * row wrapped with a count or forever, or with a condition and an optional Else part, nestable. A
+ * plan is a tree of steps and blocks, and the queue given from it is the same tree: the server
+ * runs the blocks, and a block counts once towards a queue's size however often it repeats.
+ * Steps and blocks share one id space, so the planner picks, moves and removes either by id.
  */
 
 /** Some steps in a row wrapped with a count: they run `repeat` times in a row, or forever. */
@@ -22,14 +22,47 @@ export interface RepeatBlock {
   items: PlanItem[]
 }
 
-/** What a plan holds: a step, or a repeat block of more. */
-export type PlanItem = QueueStepRequest | RepeatBlock
+/** Some steps run only when `if` holds as their turn comes, and an optional Else part run when not. */
+export interface IfBlock {
+  id?: number
+  if: Condition
+  items: PlanItem[]
+  else?: PlanItem[]
+}
+
+/** A block of steps: a repeat block or an If block. */
+export type Block = RepeatBlock | IfBlock
+
+/** What a plan holds: a step, or a block of more. */
+export type PlanItem = QueueStepRequest | Block
 
 /** The count a new block gets. */
 export const DEFAULT_REPEAT = 2
 
-export function isBlock(item: PlanItem): item is RepeatBlock {
-  return 'repeat' in item
+export function isBlock(item: PlanItem): item is Block {
+  return 'repeat' in item || 'if' in item
+}
+
+export function isIf(item: PlanItem): item is IfBlock {
+  return 'if' in item
+}
+
+/** A block's lists: its items, and an If block's Else part when it has one. */
+export function partsOf(b: Block): PlanItem[][] {
+  return isIf(b) && b.else ? [b.items, b.else] : [b.items]
+}
+
+/** Every item right inside a block: its items, then an If block's Else part. */
+export function inner(b: Block): PlanItem[] {
+  return partsOf(b).flat()
+}
+
+/** The block with each of its lists changed by `f`, its items before its Else part. */
+export function mapParts(b: Block, f: (list: PlanItem[]) => PlanItem[]): Block {
+  if (!isIf(b)) return { ...b, items: f(b.items) }
+  const out: IfBlock = { ...b, items: f(b.items) }
+  if (b.else) out.else = f(b.else)
+  return out
 }
 
 /** Whether any item is a block. */
@@ -39,7 +72,7 @@ export function hasBlocks(items: readonly PlanItem[]): boolean {
 
 /** The plan's steps top to bottom, as written: each once, whatever its blocks repeat. */
 export function planSteps(items: readonly PlanItem[]): QueueStepRequest[] {
-  return items.flatMap((item) => (isBlock(item) ? planSteps(item.items) : [item]))
+  return items.flatMap((item) => (isBlock(item) ? planSteps(inner(item)) : [item]))
 }
 
 /** How many steps the plan holds as written. */
@@ -49,12 +82,17 @@ export function stepCount(items: readonly PlanItem[]): number {
 
 /** How many steps and blocks the plan holds as written: what a queue's size counts. */
 export function itemCount(items: readonly PlanItem[]): number {
-  return items.reduce((n, item) => n + 1 + (isBlock(item) ? itemCount(item.items) : 0), 0)
+  return items.reduce((n, item) => n + 1 + (isBlock(item) ? itemCount(inner(item)) : 0), 0)
 }
 
 /** How deep the plan's blocks nest: 0 for steps alone. */
 export function depthOf(items: readonly PlanItem[]): number {
-  return Math.max(0, ...items.map((item) => (isBlock(item) ? 1 + depthOf(item.items) : 0)))
+  return Math.max(
+    0,
+    ...items.map((item) =>
+      isBlock(item) ? 1 + Math.max(...partsOf(item).map((part) => depthOf(part))) : 0,
+    ),
+  )
 }
 
 /**
@@ -86,19 +124,32 @@ export function repeatOf(count: number | 'forever'): Repeat {
   return Math.min(QUEUE_MAX_REPEAT, Math.max(1, Math.floor(count)))
 }
 
+/** A block's own fields, without its id or its lists: its count, or its condition. */
+function headOf(b: Block): Omit<RepeatBlock, 'id' | 'items'> | Omit<IfBlock, 'id' | 'items'> {
+  return isIf(b) ? { if: structuredClone(b.if) } : { repeat: b.repeat }
+}
+
 /** A fresh copy of the items, sharing nothing, with or without their ids. */
 export function copyItems(items: readonly PlanItem[], keepIds = true): PlanItem[] {
   return items.map((item) => {
     if (!isBlock(item)) return keepIds ? copyStep(item) : withoutId(item)
-    const block: RepeatBlock = { repeat: item.repeat, items: copyItems(item.items, keepIds) }
+    const block = mapParts({ ...headOf(item), items: item.items, ...elseOf(item) } as Block, (l) =>
+      copyItems(l, keepIds),
+    )
     return keepIds && item.id !== undefined ? { id: item.id, ...block } : block
   })
 }
 
+/** An If block's Else part as a field to spread, if it has one. */
+function elseOf(b: Block): Pick<IfBlock, 'else'> {
+  return isIf(b) && b.else ? { else: b.else } : {}
+}
+
 /**
  * The items with every step and block lacking an id given one, from `nextStepId` on (or past the
- * highest id they have) in the order they are listed (a block before its steps), and the id the
- * next one gets. Without blocks that is the order the server's `editQueue` gives them out in.
+ * highest id they have) in the order they are listed (a block before its steps, an If block's
+ * items before its Else part), and the id the next one gets. That is the order the server's
+ * `editQueue` gives them out in.
  */
 export function withIds(
   items: readonly PlanItem[],
@@ -109,7 +160,8 @@ export function withIds(
     list.map((item) => {
       const id = item.id ?? next++
       if (!isBlock(item)) return { ...copyStep(item), id }
-      return { id, repeat: item.repeat, items: give(item.items) }
+      const block = { ...headOf(item), items: item.items, ...elseOf(item) } as Block
+      return { id, ...mapParts(block, give) }
     })
   const given = give(items)
   return { items: given, nextStepId: next }
@@ -119,7 +171,7 @@ export function withIds(
 export function idsOf(items: readonly PlanItem[]): number[] {
   return items.flatMap((item) => [
     ...(item.id === undefined ? [] : [item.id]),
-    ...(isBlock(item) ? idsOf(item.items) : []),
+    ...(isBlock(item) ? idsOf(inner(item)) : []),
   ])
 }
 
@@ -127,42 +179,41 @@ export function idsOf(items: readonly PlanItem[]): number[] {
 export type PlanRow =
   | { kind: 'step'; id: number; depth: number; step: QueueStepRequest }
   | { kind: 'block'; id: number; depth: number; repeat: Repeat; steps: number }
+  | { kind: 'if'; id: number; depth: number; if: Condition; steps: number }
 
 /** The plan as the planner lists it: each block's head, then its items one deeper. */
 export function planRows(items: readonly PlanItem[], depth = 0): PlanRow[] {
   return items.flatMap((item): PlanRow[] => {
     if (!isBlock(item)) return [{ kind: 'step', id: item.id!, depth, step: item }]
-    const head: PlanRow = {
-      kind: 'block',
-      id: item.id!,
-      depth,
-      repeat: item.repeat,
-      steps: stepCount(item.items),
-    }
-    return [head, ...planRows(item.items, depth + 1)]
+    const steps = stepCount(inner(item))
+    const head: PlanRow = isIf(item)
+      ? { kind: 'if', id: item.id!, depth, if: item.if, steps }
+      : { kind: 'block', id: item.id!, depth, repeat: item.repeat, steps }
+    return [head, ...planRows(inner(item), depth + 1)]
   })
 }
 
 /**
  * The picked items that act as one: those not inside a picked block, in the order listed. Copy
- * copies these, and Repeat wraps them.
+ * copies these, and Repeat and If wrap them.
  */
 export function topPicked(items: readonly PlanItem[], picked: readonly number[]): PlanItem[] {
   return items.flatMap((item) => {
     if (item.id !== undefined && picked.includes(item.id)) return [item]
-    return isBlock(item) ? topPicked(item.items, picked) : []
+    return isBlock(item) ? topPicked(inner(item), picked) : []
   })
 }
 
 /**
- * The items with the picked ones wrapped in a block repeating `repeat` times, where they were;
- * undefined unless they sit in a row in one list (a block's or the plan's). The block has no id
- * yet: the planner gives it one (`withIds`).
+ * The items with the picked ones wrapped in a block, where they were: one repeating `repeat` times
+ * (or forever), or with `repeat` a condition, an If block. Undefined unless they sit in a row in
+ * one list (a block's or the plan's). The block has no id yet: the planner gives it one
+ * (`withIds`).
  */
 export function wrap(
   items: readonly PlanItem[],
   picked: readonly number[],
-  repeat = DEFAULT_REPEAT,
+  repeat: Repeat | Condition = DEFAULT_REPEAT,
 ): PlanItem[] | undefined {
   const tops = topPicked(items, picked)
   if (tops.length === 0) return undefined
@@ -172,21 +223,22 @@ export function wrap(
     if (at >= 0) {
       if (!tops.every((t, i) => list[at + i] === t)) return [...list]
       done = true
-      const block: RepeatBlock = { repeat, items: [...tops] }
+      const block: Block =
+        typeof repeat === 'object' ? { if: repeat, items: [...tops] } : { repeat, items: [...tops] }
       return [...list.slice(0, at), block, ...list.slice(at + tops.length)]
     }
-    return list.map((item) => (isBlock(item) ? { ...item, items: into(item.items) } : item))
+    return list.map((item) => (isBlock(item) ? mapParts(item, into) : item))
   }
   const wrapped = into(items)
   return done ? wrapped : undefined
 }
 
-/** The items with the block `id` replaced by its own items. */
+/** The items with the block `id` replaced by its own items (an If block's Else part after them). */
 export function unwrap(items: readonly PlanItem[], id: number): PlanItem[] {
   return items.flatMap((item) => {
     if (!isBlock(item)) return [item]
-    if (item.id === id) return item.items
-    return [{ ...item, items: unwrap(item.items, id) }]
+    if (item.id === id) return inner(item)
+    return [mapParts(item, (l) => unwrap(l, id))]
   })
 }
 
@@ -199,18 +251,64 @@ export function setRepeat(
   const n = repeatOf(repeat)
   return items.map((item) => {
     if (!isBlock(item)) return item
-    if (item.id === id) return { ...item, repeat: n }
-    return { ...item, items: setRepeat(item.items, id, n) }
+    if (item.id === id && !isIf(item)) return { ...item, repeat: n }
+    return mapParts(item, (l) => setRepeat(l, id, n))
   })
 }
 
-/** The items without `id`; a block left empty goes too. */
+/** The items with If block `id` asking `condition` (`CONTEXT.md`: If block). */
+export function setCondition(
+  items: readonly PlanItem[],
+  id: number,
+  condition: Condition,
+): PlanItem[] {
+  return items.map((item) => {
+    if (!isBlock(item)) return item
+    if (item.id === id && isIf(item)) return { ...item, if: condition }
+    return mapParts(item, (l) => setCondition(l, id, condition))
+  })
+}
+
+/**
+ * The items with the picked ones moved to the end of If block `id`'s Else part, which it gets if
+ * it has none; undefined when nothing is picked or the block itself or anything in it is.
+ */
+export function intoElse(
+  items: readonly PlanItem[],
+  picked: readonly number[],
+  id: number,
+): PlanItem[] | undefined {
+  const target = find(items, id)
+  if (!target || !isIf(target)) return undefined
+  const moved = topPicked(items, picked)
+  const within = new Set([id, ...idsOf(inner(target))])
+  if (moved.length === 0 || moved.some((m) => m.id === undefined || within.has(m.id)))
+    return undefined
+  const rest = moved.reduce<PlanItem[]>((list, m) => removeItem(list, m.id!), [...items])
+  const put = (list: readonly PlanItem[]): PlanItem[] =>
+    list.map((item) => {
+      if (!isBlock(item)) return item
+      if (item.id === id && isIf(item)) return { ...item, else: [...(item.else ?? []), ...moved] }
+      return mapParts(item, put)
+    })
+  return put(rest)
+}
+
+/**
+ * The items without `id`. A repeat block left empty goes too; an If block whose items are left
+ * empty goes, its Else part's steps put in its place; an Else part left empty goes.
+ */
 export function removeItem(items: readonly PlanItem[], id: number): PlanItem[] {
   return items.flatMap((item): PlanItem[] => {
     if (item.id === id) return []
     if (!isBlock(item)) return [item]
-    const rest = removeItem(item.items, id)
-    return rest.length === 0 ? [] : [{ ...item, items: rest }]
+    const kept = mapParts(item, (l) => removeItem(l, id))
+    if (isIf(kept)) {
+      if (kept.else?.length === 0) delete kept.else
+      if (kept.items.length === 0) return kept.else ?? []
+      return [kept]
+    }
+    return kept.items.length === 0 ? [] : [kept]
   })
 }
 
@@ -221,7 +319,7 @@ export function timeItem(
   minutes: number | undefined,
 ): PlanItem[] {
   return items.map((item) => {
-    if (isBlock(item)) return { ...item, items: timeItem(item.items, id, minutes) }
+    if (isBlock(item)) return mapParts(item, (l) => timeItem(l, id, minutes))
     if (item.id !== id) return item
     const step = { ...item, minutes }
     if (minutes === undefined) delete step.minutes
@@ -233,9 +331,7 @@ export function timeItem(
 export function moveItem(items: readonly PlanItem[], id: number, by: -1 | 1): PlanItem[] {
   const i = items.findIndex((item) => item.id === id)
   if (i < 0) {
-    return items.map((item) =>
-      isBlock(item) ? { ...item, items: moveItem(item.items, id, by) } : item,
-    )
+    return items.map((item) => (isBlock(item) ? mapParts(item, (l) => moveItem(l, id, by)) : item))
   }
   const j = i + by
   if (j < 0 || j >= items.length) return [...items]
@@ -248,7 +344,7 @@ export function moveItem(items: readonly PlanItem[], id: number, by: -1 | 1): Pl
 export function canMove(items: readonly PlanItem[], id: number, by: -1 | 1): boolean {
   const i = items.findIndex((item) => item.id === id)
   if (i >= 0) return i + by >= 0 && i + by < items.length
-  return items.some((item) => isBlock(item) && canMove(item.items, id, by))
+  return items.some((item) => isBlock(item) && partsOf(item).some((l) => canMove(l, id, by)))
 }
 
 /**
@@ -257,7 +353,7 @@ export function canMove(items: readonly PlanItem[], id: number, by: -1 | 1): boo
  */
 export function dropItem(items: readonly PlanItem[], id: number, onto: number): PlanItem[] {
   const dragged = find(items, id)
-  if (!dragged || id === onto || (isBlock(dragged) && idsOf(dragged.items).includes(onto)))
+  if (!dragged || id === onto || (isBlock(dragged) && idsOf(inner(dragged)).includes(onto)))
     return [...items]
   // Its place among the items once the dragged one is out, as in a flat list.
   const flatBefore = idsOf(items)
@@ -286,7 +382,7 @@ function insertAt(
 ): PlanItem[] {
   return items.flatMap((item): PlanItem[] => {
     if (item.id === at) return after ? [item, ...added] : [...added, item]
-    return isBlock(item) ? [{ ...item, items: insertAt(item.items, at, added, after) }] : [item]
+    return isBlock(item) ? [mapParts(item, (l) => insertAt(l, at, added, after))] : [item]
   })
 }
 
@@ -294,7 +390,7 @@ function insertAt(
 export function find(items: readonly PlanItem[], id: number): PlanItem | undefined {
   for (const item of items) {
     if (item.id === id) return item
-    const inside = isBlock(item) ? find(item.items, id) : undefined
+    const inside = isBlock(item) ? find(inner(item), id) : undefined
     if (inside) return inside
   }
   return undefined
@@ -318,17 +414,21 @@ export function timedItems(items: readonly PlanItem[]): PlanItem[] {
   const last = lastStep(items)
   const time = (list: readonly PlanItem[]): PlanItem[] =>
     list.map((item) => {
-      if (isBlock(item)) return { ...item, items: time(item.items) }
+      if (isBlock(item)) return mapParts(item, time)
       if (item === last || item.minutes !== undefined || !neverEnds(item.order)) return item
       return { ...item, minutes: QUEUE_DEFAULT_STEP_MINUTES }
     })
   return time(items)
 }
 
-/** The step the plan runs last, if no block around it repeats it. */
+/**
+ * The step listed last, if no block around it repeats it: as the server counts, an If block's
+ * Else part comes after its items.
+ */
 function lastStep(items: readonly PlanItem[]): QueueStepRequest | undefined {
   const item = items.at(-1)
   if (!item || !isBlock(item)) return item
+  if (isIf(item)) return lastStep(item.else ?? item.items)
   return item.repeat === 1 ? lastStep(item.items) : undefined
 }
 

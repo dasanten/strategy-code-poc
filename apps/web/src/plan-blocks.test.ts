@@ -5,7 +5,7 @@ import {
   QUEUE_MAX_STEPS,
 } from '@csp/balance'
 import { queueStepsProblem } from './shared/queue.js'
-import type { OrderRequest, Queue, QueueStepRequest } from '@csp/shared-types'
+import type { Condition, OrderRequest, Queue, QueueStepRequest } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
   canMove,
@@ -14,6 +14,7 @@ import {
   dropItem,
   idsOf,
   insertItems,
+  intoElse,
   itemCount,
   lastPicked,
   moveItem,
@@ -21,6 +22,7 @@ import {
   planRows,
   planSteps,
   removeItem,
+  setCondition,
   setRepeat,
   stepCount,
   timedItems,
@@ -31,7 +33,7 @@ import {
   wrap,
   type PlanItem,
 } from './plan-blocks.js'
-import { editPlan, givePlan, planOf } from './queue-view.js'
+import { branchesOf, editPlan, givePlan, planOf } from './queue-view.js'
 
 /** Repeat blocks (`CONTEXT.md`: Repeat block, ADR 0032): wrapped steps the queue keeps as blocks. */
 
@@ -300,5 +302,97 @@ describe('giving a resident a plan', () => {
     const ended = givePlan({ id: 'w1' }, plan)
     expect(ended).toMatchObject({ kind: 'queue', residentId: 'w1' })
     expect(ended.steps).toEqual([{ repeat: 2, items: [{ order: work }, { order: store }] }])
+  })
+})
+
+describe('If blocks', () => {
+  const hungry: Condition = { kind: 'need', need: 'hunger', side: 'below', share: 0.5 }
+  const fetchFood: OrderRequest = { kind: 'fetch', goods: { food: 5 }, from: 's1' }
+
+  it('wraps the picked steps under a condition, and moves others into its Else part', () => {
+    const plan = withIds(wrap(run, [1, 2], hungry)!, 5).items
+    expect(plan[0]).toEqual({ id: 5, if: hungry, items: [run[0], run[1]] })
+    const withElse = intoElse(plan, [3], 5)!
+    expect(withElse).toEqual([
+      { id: 5, if: hungry, items: [run[0], run[1]], else: [run[2]] },
+      run[3],
+    ])
+    // Not the block itself, nor what is in it.
+    expect(intoElse(plan, [5], 5)).toBeUndefined()
+    expect(intoElse(plan, [1], 5)).toBeUndefined()
+    expect(planSteps(withElse).map((s) => s.id)).toEqual([1, 2, 3, 4])
+    expect([itemCount(withElse), depthOf(withElse)]).toEqual([5, 1])
+    expect(planProblem(withElse)).toBeUndefined()
+    expect(planRows(withElse).map((r) => [r.kind, r.id, r.depth])).toEqual([
+      ['if', 5, 0],
+      ['step', 1, 1],
+      ['step', 2, 1],
+      ['step', 3, 1],
+      ['step', 4, 0],
+    ])
+  })
+
+  it('changes its condition, and unwraps into its items then its Else part', () => {
+    const plan: PlanItem[] = [{ id: 5, if: hungry, items: [run[0]!], else: [run[1]!] }]
+    const sated: Condition = { ...hungry, side: 'above' }
+    expect(setCondition(plan, 5, sated)).toEqual([{ ...plan[0], if: sated }])
+    expect(unwrap(plan, 5)).toEqual([run[0], run[1]])
+  })
+
+  it('drops an Else part left empty, and puts the Else steps in its place once its items go', () => {
+    const plan: PlanItem[] = [{ id: 5, if: hungry, items: [run[0]!], else: [run[1]!] }]
+    expect(removeItem(plan, 2)).toEqual([{ id: 5, if: hungry, items: [run[0]] }])
+    expect(removeItem(plan, 1)).toEqual([run[1]])
+  })
+
+  it('gives ids to a block, then its items, then its Else part, as the server does', () => {
+    const plan: PlanItem[] = [
+      { if: hungry, items: [{ order: fetchFood }], else: [{ order: work, minutes: 60 }] },
+    ]
+    expect(idsOf(withIds(plan, 1).items)).toEqual([1, 2, 3])
+  })
+
+  it('times a step that never ends unless it is the last listed, the Else part counted last', () => {
+    const plan: PlanItem[] = [{ if: hungry, items: [{ order: work }], else: [{ order: work }] }]
+    const timed = timedItems(plan)
+    expect(timed).toEqual([
+      {
+        if: hungry,
+        items: [{ order: work, minutes: QUEUE_DEFAULT_STEP_MINUTES }],
+        else: [{ order: work }],
+      },
+    ])
+    expect(queueStepsProblem(timed)).toBeUndefined()
+  })
+
+  it('is checked as the server checks it', () => {
+    const step = { order: walk(1, 1) }
+    expect(queueStepsProblem([{ if: hungry, items: [step] }])).toBeUndefined()
+    expect(queueStepsProblem([{ if: hungry, items: [] }])).toBe('an If block needs a step')
+    expect(queueStepsProblem([{ if: hungry, items: [step], else: [] }])).toBe(
+      "an If block's Else part needs a step",
+    )
+    expect(queueStepsProblem([{ if: { kind: 'weather' }, items: [step] }])).toBe(
+      'an If block: that is no condition',
+    )
+    expect(queueStepsProblem([{ if: hungry, items: [step], repeat: 2 }])).toBe(
+      'an If block holds only its id, condition, items and Else part',
+    )
+  })
+
+  it('gives a resident the plan with its If blocks, and reads the part the queue runs', () => {
+    const queue: Queue = {
+      realmId: 'r1',
+      items: [{ id: 5, if: hungry, items: [run[0]!], else: [run[1]!], branch: 'else' }],
+      current: 2,
+      startedAt: 0,
+      loop: false,
+      nextStepId: 6,
+    }
+    expect(planOf(queue).items).toEqual([{ id: 5, if: hungry, items: [run[0]], else: [run[1]] }])
+    expect(givePlan({ id: 'w1', queue }, planOf(queue)).steps).toEqual([
+      { id: 5, if: hungry, items: [run[0]], else: [run[1]] },
+    ])
+    expect([...branchesOf(queue)]).toEqual([[5, 'else']])
   })
 })

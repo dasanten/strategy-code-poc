@@ -285,6 +285,60 @@ fn is_zero(n: &u32) -> bool {
 pub enum QueueItem {
     Step(QueueStep),
     Repeat(RepeatBlock),
+    If(IfBlock),
+}
+
+impl QueueItem {
+    /// The step's or block's id.
+    pub fn id(&self) -> u32 {
+        match self {
+            QueueItem::Step(s) => s.id,
+            QueueItem::Repeat(b) => b.id,
+            QueueItem::If(b) => b.id,
+        }
+    }
+
+    /// The lists of items a block holds: a repeat block's items, an If block's items and its
+    /// Else part; none for a step.
+    pub fn parts(&self) -> Vec<&[QueueItem]> {
+        match self {
+            QueueItem::Step(_) => vec![],
+            QueueItem::Repeat(b) => vec![&b.items],
+            QueueItem::If(b) => {
+                let mut out: Vec<&[QueueItem]> = vec![&b.items];
+                if let Some(e) = &b.r#else {
+                    out.push(e);
+                }
+                out
+            }
+        }
+    }
+}
+
+/// A block whose steps run only when its condition holds (`CONTEXT.md`: If block), with an
+/// optional Else part run when it doesn't. The condition is checked once, when its turn comes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct IfBlock {
+    pub id: u32,
+    pub r#if: Condition,
+    pub items: Vec<QueueItem>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub r#else: Option<Vec<QueueItem>>,
+    /// The part being run while the current step is inside the block: `then` (`items`) or
+    /// `else`; left out otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub branch: Option<Branch>,
+}
+
+/// Which part of an If block runs (`IfBlock::branch`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum Branch {
+    Then,
+    Else,
 }
 
 /// Some steps in a row done again and again (`CONTEXT.md`: Repeat block): a count of rounds, or
@@ -354,7 +408,11 @@ fn collect_steps<'a>(items: &'a [QueueItem], out: &mut Vec<&'a QueueStep>) {
     for item in items {
         match item {
             QueueItem::Step(s) => out.push(s),
-            QueueItem::Repeat(b) => collect_steps(&b.items, out),
+            block => {
+                for part in block.parts() {
+                    collect_steps(part, out);
+                }
+            }
         }
     }
 }

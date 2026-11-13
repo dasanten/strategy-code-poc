@@ -1,8 +1,10 @@
 import {
   find,
   idsOf,
+  inner,
   insertItems,
   isBlock,
+  partsOf,
   removeItem,
   topPicked,
   type PlanItem,
@@ -20,7 +22,7 @@ import {
  */
 export function insertPoints(items: readonly PlanItem[]): number[] {
   const after = (list: readonly PlanItem[]): number[] =>
-    list.flatMap((item) => [...(isBlock(item) ? after(item.items) : []), item.id!])
+    list.flatMap((item) => [...(isBlock(item) ? partsOf(item).flatMap(after) : []), item.id!])
   return after(items).filter((id) => id !== items.at(-1)?.id)
 }
 
@@ -36,7 +38,7 @@ export function canMoveTo(
   const moved = topPicked(items, ids)
   if (moved.length === 0) return false
   if (after === undefined) return true
-  return !moved.some((m) => m.id === after || (isBlock(m) && idsOf(m.items).includes(after)))
+  return !moved.some((m) => m.id === after || (isBlock(m) && idsOf(inner(m)).includes(after)))
 }
 
 /**

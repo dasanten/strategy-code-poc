@@ -28,8 +28,8 @@ use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::orders::{leave_armies, OrderKind, OrderKinds};
 use crate::queries::residents::is_down;
 use crate::queue::{
-    field_str, queue_steps_problem, request_steps, runs_script, QueueItemRequest, QueueStepRequest,
-    QUEUE_STEP_KINDS, WAIT_UNTIL,
+    field_str, queue_steps_problem, request_ifs, request_steps, runs_script, QueueItemRequest,
+    QueueStepRequest, QUEUE_STEP_KINDS, WAIT_UNTIL,
 };
 use crate::queue_tree::{
     advance, begin, block_ids, depth_of, ids_of, kept_items, mark_started, rounds_of,
@@ -252,6 +252,7 @@ impl OrderKind for QueueOrder {
         queue_steps_problem(raw).or_else(|| {
             let items = items_of(order);
             places_problem(world, &realm_id, &request_steps(&items), |_| true, terrain)
+                .or_else(|| ifs_problem(world, &realm_id, &items, false))
         })
     }
 
@@ -272,10 +273,9 @@ impl OrderKind for QueueOrder {
         // A queue is an order of their own, so they leave their army (`CONTEXT.md`: Army).
         let id = world.residents[i].id.clone();
         leave_armies(world, &HashSet::from([id]));
-        let r = &mut world.residents[i];
-        r.order = None;
+        world.residents[i].order = None;
         let mut q = Queue {
-            realm_id,
+            realm_id: realm_id.clone(),
             items,
             current: 0,
             started_at: None,
@@ -283,8 +283,13 @@ impl OrderKind for QueueOrder {
             next_step_id,
             started: false,
         };
-        begin(&mut q);
-        r.queue = Some(q);
+        // An If block first in the queue asks its condition now: its turn has come.
+        let mut gone = Vec::new();
+        let outcome = begin(&mut q, &mut |c| asked(world, i, &realm_id, c, &mut gone));
+        world.residents[i].queue = (outcome != Advance::Ended).then_some(q);
+        for place_id in gone {
+            place_gone(world, i, &realm_id, &place_id, world.tick as f64);
+        }
     }
 }
 
@@ -338,6 +343,7 @@ impl OrderKind for EditQueueOrder {
         // skipped when its turn comes, and can still be edited until then.
         let items = items_of(order);
         places_problem(world, &realm_id, &request_steps(&items), |s| s.id.is_none(), terrain)
+            .or_else(|| ifs_problem(world, &realm_id, &items, true))
     }
 
     fn apply(
@@ -388,12 +394,14 @@ impl OrderKind for EditQueueOrder {
 /// The ids a request's items carry, with whether each is a block's, top to bottom.
 fn sent_ids<'a>(items: &'a [Value], out: &mut Vec<(&'a Value, bool)>) {
     for item in items {
-        let block = item.get("repeat").is_some();
+        let block = item.get("repeat").is_some() || item.get("if").is_some();
         if let Some(id) = item.get("id") {
             out.push((id, block));
         }
-        if let Some(Value::Array(inner)) = item.get("items").filter(|_| block) {
-            sent_ids(inner, out);
+        for part in ["items", "else"] {
+            if let Some(Value::Array(inner)) = item.get(part).filter(|_| block) {
+                sent_ids(inner, out);
+            }
         }
     }
 }
@@ -498,7 +506,7 @@ impl QueueRunner {
                     None => r.order.is_none(),
                 };
                 if let Some(Holds::PlaceGone(place_id)) = held {
-                    place_gone(world, i, &place_id, started_at);
+                    place_gone(world, i, &realm_id, &place_id, started_at);
                 }
                 if !time_up && !done {
                     continue;
@@ -509,7 +517,7 @@ impl QueueRunner {
                 } else if let Some(failure) = failure_of(r, started_at) {
                     skipped(world, i, &failure, false);
                 }
-                match next(&mut world.residents[i]) {
+                match next(world, i, &realm_id) {
                     Advance::Ended => continue,
                     Advance::Moved { crossed: c } => crossed = c,
                 }
@@ -578,7 +586,12 @@ impl QueueRunner {
             // Where the queue goes next, found before the skip is noted so the note can say
             // the queue ended.
             let mut moved = q.clone();
-            let outcome = advance(&mut moved);
+            let realm_id = q.realm_id.clone();
+            let mut gone = Vec::new();
+            let outcome = advance(&mut moved, &mut |c| asked(world, i, &realm_id, c, &mut gone));
+            for place_id in gone {
+                place_gone(world, i, &realm_id, &place_id, world.tick as f64);
+            }
             // None could start: every step failed in a row, or a looping queue's pass started
             // none. Past the last step of one that doesn't loop it simply ends.
             let none = failed.len() >= len || (outcome == Advance::Ended && moved.r#loop);
@@ -609,14 +622,53 @@ impl RunQueues for QueueRunner {
     }
 }
 
-/// Moves the queue to its next step (`next`, [`advance`]); it ends instead past its last step.
-fn next(r: &mut Resident) -> Advance {
-    let Some(q) = r.queue.as_mut() else { return Advance::Ended };
-    let outcome = advance(q);
-    if outcome == Advance::Ended {
-        r.queue = None;
+/// Moves the queue of the resident at `i` to its next step (`next`, [`advance`]), asking the If
+/// blocks it reaches; it ends instead past its last step.
+fn next(world: &mut WorldState, i: usize, realm_id: &str) -> Advance {
+    let Some(mut q) = world.residents[i].queue.take() else { return Advance::Ended };
+    let mut gone = Vec::new();
+    let outcome = advance(&mut q, &mut |c| asked(world, i, realm_id, c, &mut gone));
+    world.residents[i].queue = (outcome != Advance::Ended).then_some(q);
+    for place_id in gone {
+        place_gone(world, i, realm_id, &place_id, world.tick as f64);
     }
     outcome
+}
+
+/// Whether a condition an If block asks holds for the resident at `i` of the realm `realm_id`
+/// (`CONTEXT.md`: If block, Condition): a place gone or no longer the realm's is false, and goes
+/// into `gone` to be noted in the realm log.
+fn asked(
+    world: &WorldState,
+    i: usize,
+    realm_id: &str,
+    c: &csp_shared::world::Condition,
+    gone: &mut Vec<String>,
+) -> bool {
+    match condition_holds(world, i, realm_id, c) {
+        Holds::Yes => true,
+        Holds::No => false,
+        Holds::PlaceGone(place_id) => {
+            gone.push(place_id);
+            false
+        }
+    }
+}
+
+/// Why one of the If blocks among `items` can't be asked by the realm (`CONTEXT.md`: Condition):
+/// the place its condition names must be the realm's. With `only_new`, the blocks already in the
+/// queue (with an id) are left out, as steps already there are.
+fn ifs_problem(
+    world: &WorldState,
+    realm_id: &str,
+    items: &[QueueItemRequest],
+    only_new: bool,
+) -> Option<String> {
+    request_ifs(items)
+        .into_iter()
+        .filter(|b| !only_new || b.id.is_none())
+        .find_map(|b| condition_place_problem(world, realm_id, &b.r#if))
+        .map(|p| format!("an If block: {p}"))
 }
 
 /// Why the step that started at `started_at` ended in a failure (`failureOf`): a store or fetch
@@ -636,21 +688,22 @@ fn failure_of(r: &Resident, started_at: f64) -> Option<String> {
 /// Notes in the realm log that a condition the resident at `i` waits on asks about a place that
 /// is gone or no longer the realm's (`CONTEXT.md`: Condition): once for each wait that started at
 /// `since`, not every tick it is asked.
-fn place_gone(world: &mut WorldState, i: usize, place_id: &str, since: f64) {
+fn place_gone(world: &mut WorldState, i: usize, realm_id: &str, place_id: &str, since: f64) {
     let r = &world.residents[i];
     let noted = world.events.iter().any(|e| {
         e.tick as f64 >= since
             && matches!(&e.what, RealmEventWhat::ConditionPlaceGone { resident_id, place_id: p, .. }
                 if *resident_id == r.id && p == place_id)
     });
-    let Some(q) = r.queue.as_ref().filter(|_| !noted) else { return };
+    if noted {
+        return;
+    }
     let what = RealmEventWhat::ConditionPlaceGone {
         resident_id: r.id.clone(),
         name: r.name.clone(),
         place_id: place_id.to_string(),
     };
-    let realm_id = q.realm_id.clone();
-    record_event(world, Some(&realm_id), what);
+    record_event(world, Some(realm_id), what);
 }
 
 /// Notes in the realm log that the resident at `i` skipped their current step (`skipped`).

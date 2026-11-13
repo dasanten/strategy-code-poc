@@ -145,3 +145,29 @@ export function placeName(
   const city = cities.find((c) => c.id === b.cityId)?.name
   return `the ${BUILDING_NAMES[b.kind]}${city ? ` in ${city}` : ''}${seen ? '' : ' (as last seen)'}`
 }
+
+/** The draft the editor starts from to change a condition: its fields over a fresh draft's. */
+export function draftOf(c: Condition): ConditionDraft {
+  const d: ConditionDraft = { ...NEW_DRAFT, kind: c.kind }
+  switch (c.kind) {
+    case 'carries':
+      return {
+        ...d,
+        vehicle: c.vehicle ?? false,
+        good: c.good,
+        compare: c.compare,
+        amount: c.amount,
+      }
+    case 'load':
+      return { ...d, vehicle: c.vehicle ?? false, load: c.load }
+    case 'stock':
+      return { ...d, placeId: c.placeId, good: c.good, compare: c.compare, amount: c.amount }
+    case 'need':
+      return { ...d, need: c.need, needSide: c.side, share: c.share }
+    case 'mounted':
+    case 'aboard':
+      return { ...d, is: c.is }
+    case 'hour':
+      return { ...d, hourSide: c.side, hour: c.hour }
+  }
+}

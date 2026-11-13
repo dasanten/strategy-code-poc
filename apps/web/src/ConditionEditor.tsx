@@ -22,6 +22,7 @@ export function ConditionEditor({
   draft: initial,
   names,
   action,
+  lead = 'Wait until',
   onPickPlace,
   onDone,
 }: {
@@ -30,6 +31,8 @@ export function ConditionEditor({
   names: ConditionNames
   /** The button's word: "Add". */
   action: string
+  /** What the condition is read after: "Wait until", "If". */
+  lead?: string
   /** Has the map pick the place to ask about, the draft kept. */
   onPickPlace: (draft: ConditionDraft) => void
   onDone: (condition: Condition) => void
@@ -183,7 +186,7 @@ export function ConditionEditor({
         {condition
           ? problem
             ? `Can’t add it yet: ${problem}.`
-            : `Wait until ${conditionLabel(condition, names)}.`
+            : `${lead} ${conditionLabel(condition, names)}.`
           : 'Pick the storage, workplace or site of yours to ask about.'}
       </p>
       <div className="order-buttons">

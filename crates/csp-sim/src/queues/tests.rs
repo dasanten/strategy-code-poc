@@ -543,6 +543,10 @@ fn step_mut(q: &mut Queue, i: usize) -> &mut csp_shared::world::QueueStep {
             match item {
                 csp_shared::world::QueueItem::Step(s) => out.push(s),
                 csp_shared::world::QueueItem::Repeat(b) => walk(&mut b.items, out),
+                csp_shared::world::QueueItem::If(b) => {
+                    walk(&mut b.items, out);
+                    walk(b.r#else.as_deref_mut().unwrap_or_default(), out);
+                }
             }
         }
     }
@@ -884,4 +888,185 @@ fn a_wait_until_is_checked_when_given_and_asks_nothing_about_another_realm() {
     let edit = json!({ "kind": "editQueue", "steps": [{ "id": 1, "order": { "kind": "waitUntil",
         "condition": wood_in("s1", 1) } }, wait_until(wood_in("s2", 1))] });
     assert_eq!(s.give(edit), rejected("step 2: not a storage, workplace or site of your realm"));
+}
+
+fn if_block(condition: Value, items: Vec<Value>, r#else: Option<Vec<Value>>) -> Value {
+    let mut b = json!({ "if": condition, "items": items });
+    if let Some(e) = r#else {
+        b["else"] = json!(e);
+    }
+    b
+}
+
+/// The walk target w1 has, if walking.
+fn walking_to(s: &Setup) -> Option<(f64, f64)> {
+    match &s.r().order {
+        Some(ResidentOrder::WalkTo(w)) => Some((w.target.x, w.target.y)),
+        _ => None,
+    }
+}
+
+#[test]
+fn an_if_block_runs_its_steps_when_true_and_its_else_when_false() {
+    for (wood, to) in [(30.0, (9.0, 6.0)), (5.0, (6.0, 9.0))] {
+        let mut s = setup();
+        storages(&mut s, wood);
+        let iff = if_block(wood_in("s1", 20), vec![walk(9, 6)], Some(vec![walk(6, 9)]));
+        assert_eq!(s.give(json!({ "kind": "queue", "steps": [iff] })), ack());
+        s.tick();
+        assert_eq!(walking_to(&s), Some(to), "with {wood} wood");
+    }
+    // False without Else, the block is passed over.
+    let mut s = setup();
+    storages(&mut s, 5.0);
+    let iff = if_block(wood_in("s1", 20), vec![walk(9, 6)], None);
+    s.give(json!({ "kind": "queue", "steps": [iff, walk(6, 9)] }));
+    s.tick();
+    assert_eq!(walking_to(&s), Some((6.0, 9.0)));
+    // An If that is all the queue, false without Else: nothing to do, the queue ends at once.
+    let mut s = setup();
+    storages(&mut s, 5.0);
+    s.give(
+        json!({ "kind": "queue", "steps": [if_block(wood_in("s1", 20), vec![walk(9, 6)], None)] }),
+    );
+    s.tick();
+    assert!(s.r().queue.is_none());
+    assert_eq!(walking_to(&s), None);
+}
+
+#[test]
+fn an_if_block_is_asked_once_when_its_turn_comes_not_while_its_steps_run() {
+    let mut s = setup();
+    storages(&mut s, 30.0);
+    let iff = if_block(wood_in("s1", 20), vec![walk(9, 6), walk(9, 9)], Some(vec![walk(6, 9)]));
+    s.give(json!({ "kind": "queue", "steps": [iff] }));
+    // The wood goes while the first step runs: the second still runs, as its part was picked.
+    let been = targets(&mut s, 20, |s, t| {
+        if t == 1 {
+            set_wood(s, 0.0)
+        }
+    });
+    assert_eq!(been, vec![(9.0, 6.0), (9.0, 9.0)]);
+}
+
+#[test]
+fn an_if_block_in_a_repeat_block_is_asked_each_round() {
+    let mut s = setup();
+    storages(&mut s, 30.0);
+    let iff = if_block(wood_in("s1", 20), vec![walk(9, 6)], Some(vec![walk(6, 9)]));
+    s.give(json!({ "kind": "queue", "steps": [block(json!(2), vec![iff])] }));
+    // Round 2 asks again and takes Else.
+    let been = targets(&mut s, 20, |s, t| {
+        if t == 1 {
+            set_wood(s, 0.0)
+        }
+    });
+    assert_eq!(been, vec![(9.0, 6.0), (6.0, 9.0)]);
+}
+
+#[test]
+fn a_live_edit_inside_a_branch_keeps_it() {
+    let mut s = setup();
+    storages(&mut s, 5.0);
+    let iff = if_block(wood_in("s1", 20), vec![walk(9, 6)], Some(vec![walk(30, 6), walk(6, 9)]));
+    s.give(json!({ "kind": "queue", "steps": [iff] }));
+    s.tick();
+    let q = s.r().queue.clone().unwrap();
+    // Ids: the If 1, its step 2, Else 3 and 4. On step 3, a step goes into Else after it.
+    assert_eq!(q.current, 3);
+    set_wood(&mut s, 30.0);
+    let edit = json!({ "kind": "editQueue", "steps": [{ "id": 1, "if": wood_in("s1", 20),
+        "items": [{ "id": 2, "order": { "kind": "walkTo", "x": 9, "y": 6 } }],
+        "else": [{ "id": 3, "order": { "kind": "walkTo", "x": 30, "y": 6 } },
+            walk(7, 20), { "id": 4, "order": { "kind": "walkTo", "x": 6, "y": 9 } }] }] });
+    assert_eq!(s.give(edit), ack());
+    s.tick();
+    let q = s.r().queue.clone().unwrap();
+    assert_eq!(q.current, 3);
+    let csp_shared::world::QueueItem::If(b) = &q.items[0] else { panic!("an If") };
+    assert_eq!(b.branch, Some(csp_shared::world::Branch::Else));
+    // Once the step it is on ends, the Else part goes on with the step added, though the wood is
+    // there now: the block is not asked again.
+    let been = targets(&mut s, 40, |s, t| {
+        if t == 0 {
+            s.r_mut().order = None
+        }
+    });
+    assert_eq!(been, vec![(7.0, 20.0), (6.0, 9.0)]);
+}
+
+#[test]
+fn an_if_on_a_place_gone_takes_else_and_is_noted() {
+    let mut s = setup();
+    storages(&mut s, 30.0);
+    s.world.buildings.retain(|b| b.id != "s1");
+    // Gone before it is given, the queue is refused; gone after, it counts as false.
+    let iff = || if_block(wood_in("s1", 20), vec![walk(9, 6)], Some(vec![walk(6, 9)]));
+    assert_eq!(
+        s.give(json!({ "kind": "queue", "steps": [iff()] })),
+        rejected("an If block: not a storage, workplace or site of your realm")
+    );
+    let mut s = setup();
+    storages(&mut s, 30.0);
+    s.give(json!({ "kind": "queue", "steps": [walk(6, 20), iff()] }));
+    let gone = |s: &mut Setup, t: usize| {
+        if t == 1 {
+            s.world.buildings.retain(|b| b.id != "s1");
+        }
+    };
+    assert_eq!(targets(&mut s, 40, gone), vec![(6.0, 20.0), (6.0, 9.0)]);
+    let noted = s.world.events.iter().any(|e| {
+        matches!(&e.what, RealmEventWhat::ConditionPlaceGone { place_id, .. } if place_id == "s1")
+    });
+    assert!(noted);
+}
+
+#[test]
+fn if_blocks_are_checked_when_given() {
+    let mut s = setup();
+    storages(&mut s, 5.0);
+    let give = |s: &mut Setup, item: Value| s.give(json!({ "kind": "queue", "steps": [item] }));
+    assert_eq!(
+        give(&mut s, if_block(wood_in("s2", 1), vec![walk(9, 6)], None)),
+        rejected("an If block: not a storage, workplace or site of your realm")
+    );
+    assert_eq!(
+        give(&mut s, json!({ "if": wood_in("s1", 1), "items": [] })),
+        rejected("an If block needs a step")
+    );
+    assert_eq!(
+        give(&mut s, if_block(wood_in("s1", 1), vec![walk(9, 6)], Some(vec![]))),
+        rejected("an If block's Else part needs a step")
+    );
+    assert_eq!(
+        give(&mut s, json!({ "if": { "kind": "weather" }, "items": [walk(9, 6)] })),
+        rejected("an If block: that is no condition")
+    );
+    assert_eq!(
+        give(&mut s, json!({ "items": [walk(9, 6)], "if": wood_in("s1", 1), "repeat": 2 })),
+        rejected("an If block holds only its id, condition, items and Else part")
+    );
+    // An If counts as a block towards nesting.
+    let deep = (0..4).fold(walk(9, 6), |inner, _| if_block(wood_in("s1", 1), vec![inner], None));
+    assert_eq!(give(&mut s, deep), rejected("blocks nest at most 3 deep"));
+}
+
+/// The walk targets w1 takes, each once in a row, over the next `ticks` ticks, with `each` run
+/// before every tick.
+fn targets(
+    s: &mut Setup,
+    ticks: usize,
+    mut each: impl FnMut(&mut Setup, usize),
+) -> Vec<(f64, f64)> {
+    let mut out: Vec<(f64, f64)> = Vec::new();
+    for t in 0..ticks {
+        each(s, t);
+        s.tick();
+        if let Some(to) = walking_to(s) {
+            if out.last() != Some(&to) {
+                out.push(to);
+            }
+        }
+    }
+    out
 }

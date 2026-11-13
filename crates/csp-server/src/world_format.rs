@@ -40,6 +40,7 @@ pub fn migrations() -> BTreeMap<u32, MigrationStep> {
     steps.insert(118, cities_remember_who_outweighs_them);
     steps.insert(119, queues_hold_blocks);
     steps.insert(120, waits_note_gone_places);
+    steps.insert(121, queues_hold_if_blocks);
     steps
 }
 
@@ -139,6 +140,13 @@ fn queues_hold_blocks(mut state: Value, _: &MigrationContext<'_>) -> Value {
 /// (`ConditionPlaceGone`). A world from before has neither, so the save stays as it is; the bump
 /// keeps a server of format 120 from loading a world that waits.
 fn waits_note_gone_places(state: Value, _: &MigrationContext<'_>) -> Value {
+    state
+}
+
+/// 121 → 122: queues hold If blocks (`CONTEXT.md`: If block; ADR 0032, T95.3): an item may be an
+/// If block, with the part it runs while the current step is inside it. A world from before has
+/// none, so the save stays as it is; the bump keeps a server of format 121 from loading one.
+fn queues_hold_if_blocks(state: Value, _: &MigrationContext<'_>) -> Value {
     state
 }
 
@@ -401,6 +409,21 @@ mod tests {
                 "current": 1, "startedAt": 2, "loop": false, "nextStepId": 2 } }],
         });
         let migrated = migrate_world_with(save.clone(), 120, &ctx, &migrations(), 121).unwrap();
+        assert_eq!(migrated, save);
+    }
+
+    #[test]
+    fn step_121_keeps_a_world_whose_queues_hold_no_if_blocks() {
+        let terrain = ctx_terrain();
+        let ctx = MigrationContext { terrain: &terrain };
+        let walk = json!({ "id": 2, "order": { "kind": "walkTo", "x": 1, "y": 1 } });
+        let save = json!({
+            "tick": 3,
+            "residents": [{ "id": "w1", "queue": { "realmId": "r1",
+                "items": [{ "id": 1, "repeat": 2, "items": [walk], "round": 1 }],
+                "current": 2, "startedAt": 2, "loop": false, "nextStepId": 3 } }],
+        });
+        let migrated = migrate_world_with(save.clone(), 121, &ctx, &migrations(), 122).unwrap();
         assert_eq!(migrated, save);
     }
 

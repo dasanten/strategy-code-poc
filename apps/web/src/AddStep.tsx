@@ -169,9 +169,15 @@ export function AddStep({
           <ConditionEditor
             draft={plan.condition}
             names={conditionNames}
-            action="Add"
+            action={plan.kind !== 'if' ? 'Add' : plan.blockId === undefined ? 'Wrap in If' : 'Set'}
+            lead={plan.kind === 'if' ? 'If' : 'Wait until'}
             onPickPlace={(draft) => onPlan(pickPlace(plan, draft))}
-            onDone={(condition) => onAnswer({ ask, condition })}
+            onDone={(condition) => {
+              // An If is no step: the planner it sits under puts the block in.
+              if (plan.kind !== 'if') return onAnswer({ ask, condition })
+              flow?.ifDone?.(plan, condition)
+              onCancel()
+            }}
           />
         )}
         {ask === 'haul' && <HaulAsk onAnswer={(setup) => onAnswer({ ask, setup })} />}
@@ -263,6 +269,20 @@ export function AddStep({
                   onClick={() => flow?.repeat?.()}
                 >
                   <span aria-hidden="true">{REPEAT_ICON}</span> Repeat
+                </button>
+              </span>
+              <span className="step-palette-item">
+                <button
+                  type="button"
+                  disabled={!flow?.wrapIf}
+                  title={
+                    flow?.wrapIf
+                      ? 'Run the picked steps only when a condition holds'
+                      : 'Pick steps in a row in the planner to put them under an If'
+                  }
+                  onClick={() => flow?.wrapIf?.()}
+                >
+                  <span aria-hidden="true">{PLAN_STEP_ICONS.if}</span> If
                 </button>
               </span>
               <span className="step-palette-item">
