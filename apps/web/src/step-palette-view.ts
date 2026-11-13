@@ -54,6 +54,9 @@ export const PALETTE_GROUPS: readonly PaletteGroup[] = [
   { id: 'scripts', label: ORDER_GROUP_LABELS.scripts, steps: ['runScript'] },
 ]
 
+/** The step kinds in Flow, beside Repeat: shaping the queue rather than an order (`CONTEXT.md`: Wait until). */
+export const FLOW_STEPS: readonly PlanStepId[] = ['waitUntil']
+
 /** Each step kind's icon in the palette. */
 export const PLAN_STEP_ICONS: Record<PlanStepId, string> = {
   walk: '🚶',
@@ -87,6 +90,7 @@ export const PLAN_STEP_ICONS: Record<PlanStepId, string> = {
   drop: '📤',
   feed: '🍞',
   runScript: '📜',
+  waitUntil: '⏳',
 }
 
 /** The Flow group's Repeat's icon. */

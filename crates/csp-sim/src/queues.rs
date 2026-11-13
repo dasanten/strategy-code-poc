@@ -22,13 +22,14 @@ use csp_shared::world::{
 };
 use serde_json::Value;
 
+use crate::conditions::{condition_holds, condition_of, condition_place_problem, Holds};
 use crate::events::record_event;
 use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::orders::{leave_armies, OrderKind, OrderKinds};
 use crate::queries::residents::is_down;
 use crate::queue::{
     field_str, queue_steps_problem, request_steps, runs_script, QueueItemRequest, QueueStepRequest,
-    QUEUE_STEP_KINDS,
+    QUEUE_STEP_KINDS, WAIT_UNTIL,
 };
 use crate::queue_tree::{
     advance, begin, block_ids, depth_of, ids_of, kept_items, mark_started, rounds_of,
@@ -172,6 +173,16 @@ fn places_problem(
     let size = terrain.map_or(MAP_SIZE, |t| t.size);
     for (i, s) in steps.iter().enumerate() {
         if !checked(s) {
+            continue;
+        }
+        // A Wait until's condition asks only about places of the realm (`CONTEXT.md`: Condition).
+        if s.order.kind == WAIT_UNTIL {
+            let problem = condition_of(s.order.fields.get("condition"))
+                .ok()
+                .and_then(|c| condition_place_problem(world, realm_id, &c));
+            if let Some(problem) = problem {
+                return Some(format!("step {}: {problem}", i + 1));
+            }
             continue;
         }
         if let Some(problem) = step_place_problem(world, realm_id, &s.order, size) {
@@ -475,11 +486,24 @@ impl QueueRunner {
                 let time_up = step
                     .minutes
                     .is_some_and(|m| world.tick as f64 - started_at >= m * TICKS_PER_GAME_MINUTE);
-                let done =
-                    if runs_script(&step.order) { r.script.is_none() } else { r.order.is_none() };
+                // A Wait until is done once its condition holds, checked from the tick after it
+                // started, so one that already holds can't spin (`CONTEXT.md`: Wait until).
+                let held = (step.order.kind == WAIT_UNTIL).then(|| {
+                    condition_of(step.order.fields.get("condition"))
+                        .map_or(Holds::No, |c| condition_holds(world, i, &realm_id, &c))
+                });
+                let done = match &held {
+                    Some(h) => h.yes(),
+                    None if runs_script(&step.order) => r.script.is_none(),
+                    None => r.order.is_none(),
+                };
+                if let Some(Holds::PlaceGone(place_id)) = held {
+                    place_gone(world, i, &place_id, started_at);
+                }
                 if !time_up && !done {
                     continue;
                 }
+                let r = &world.residents[i];
                 if time_up {
                     stop_step(&mut world.residents[i]);
                 } else if let Some(failure) = failure_of(r, started_at) {
@@ -507,6 +531,19 @@ impl QueueRunner {
             let Some(q) = &r.queue else { return };
             let step = q.current_step().expect("current names a step");
             let step_id = step.id;
+            // A Wait until always starts: the resident stops what they did and stands idle
+            // until it ends (`CONTEXT.md`: Wait until).
+            if step.order.kind == WAIT_UNTIL {
+                let tick = world.tick as f64;
+                let r = &mut world.residents[i];
+                stop_step(r);
+                r.order_ended = None;
+                if let Some(q) = r.queue.as_mut() {
+                    q.started_at = Some(tick);
+                    mark_started(q);
+                }
+                return;
+            }
             let mut order = step.order.clone();
             order.fields.insert("residentId".into(), Value::String(r.id.clone()));
             let kind = self.kinds.get(&order.kind).cloned();
@@ -594,6 +631,26 @@ fn failure_of(r: &Resident, started_at: f64) -> Option<String> {
     } else {
         None
     }
+}
+
+/// Notes in the realm log that a condition the resident at `i` waits on asks about a place that
+/// is gone or no longer the realm's (`CONTEXT.md`: Condition): once for each wait that started at
+/// `since`, not every tick it is asked.
+fn place_gone(world: &mut WorldState, i: usize, place_id: &str, since: f64) {
+    let r = &world.residents[i];
+    let noted = world.events.iter().any(|e| {
+        e.tick as f64 >= since
+            && matches!(&e.what, RealmEventWhat::ConditionPlaceGone { resident_id, place_id: p, .. }
+                if *resident_id == r.id && p == place_id)
+    });
+    let Some(q) = r.queue.as_ref().filter(|_| !noted) else { return };
+    let what = RealmEventWhat::ConditionPlaceGone {
+        resident_id: r.id.clone(),
+        name: r.name.clone(),
+        place_id: place_id.to_string(),
+    };
+    let realm_id = q.realm_id.clone();
+    record_event(world, Some(&realm_id), what);
 }
 
 /// Notes in the realm log that the resident at `i` skipped their current step (`skipped`).

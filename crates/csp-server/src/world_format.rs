@@ -39,6 +39,7 @@ pub fn migrations() -> BTreeMap<u32, MigrationStep> {
     steps.insert(117, ships_are_sailed);
     steps.insert(118, cities_remember_who_outweighs_them);
     steps.insert(119, queues_hold_blocks);
+    steps.insert(120, waits_note_gone_places);
     steps
 }
 
@@ -130,6 +131,14 @@ fn queues_hold_blocks(mut state: Value, _: &MigrationContext<'_>) -> Value {
         q.insert("items".into(), steps);
         q.insert("current".into(), current);
     }
+    state
+}
+
+/// 120 → 121: queues wait on conditions (`CONTEXT.md`: Wait until, Condition; ADR 0032, T95.2):
+/// a step may be a Wait until, and the realm log notes a condition on a place that is gone
+/// (`ConditionPlaceGone`). A world from before has neither, so the save stays as it is; the bump
+/// keeps a server of format 120 from loading a world that waits.
+fn waits_note_gone_places(state: Value, _: &MigrationContext<'_>) -> Value {
     state
 }
 
@@ -379,6 +388,20 @@ mod tests {
         let q: csp_shared::world::Queue =
             serde_json::from_value(migrated["residents"][0]["queue"].clone()).unwrap();
         assert_eq!(q.current_index(), Some(1));
+    }
+
+    #[test]
+    fn step_120_keeps_a_world_whose_queues_wait_on_nothing() {
+        let terrain = ctx_terrain();
+        let ctx = MigrationContext { terrain: &terrain };
+        let walk = json!({ "id": 1, "order": { "kind": "walkTo", "x": 1, "y": 1 } });
+        let save = json!({
+            "tick": 3,
+            "residents": [{ "id": "w1", "queue": { "realmId": "r1", "items": [walk],
+                "current": 1, "startedAt": 2, "loop": false, "nextStepId": 2 } }],
+        });
+        let migrated = migrate_world_with(save.clone(), 120, &ctx, &migrations(), 121).unwrap();
+        assert_eq!(migrated, save);
     }
 
     #[test]

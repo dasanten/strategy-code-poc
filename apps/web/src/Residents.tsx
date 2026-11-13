@@ -1075,6 +1075,7 @@ const STEP_ICONS: Record<StepGroup, string> = {
   work: '⚒',
   goods: '▣',
   scripts: '{}',
+  flow: '⏳',
 }
 
 /**

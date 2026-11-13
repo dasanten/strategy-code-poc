@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { PLAN_STEPS } from './plan-step.js'
-import { followInsert, PALETTE_GROUPS, PLAN_STEP_ICONS } from './step-palette-view.js'
+import { FLOW_STEPS, followInsert, PALETTE_GROUPS, PLAN_STEP_ICONS } from './step-palette-view.js'
 
 /** The Add step palette (`CONTEXT.md`: Planner blocks). */
 
@@ -8,6 +8,11 @@ describe('the palette groups', () => {
   it('puts every kind of step in exactly one group, each with an icon', () => {
     for (const k of PLAN_STEPS) {
       const groups = PALETTE_GROUPS.filter((g) => g.steps.includes(k.id))
+      if (FLOW_STEPS.includes(k.id)) {
+        expect(groups, k.id).toEqual([])
+        expect(PLAN_STEP_ICONS[k.id], k.id).toBeTruthy()
+        continue
+      }
       expect(
         groups.map((g) => g.id),
         k.id,
@@ -15,7 +20,7 @@ describe('the palette groups', () => {
       expect(PLAN_STEP_ICONS[k.id], k.id).toBeTruthy()
     }
     const listed = PALETTE_GROUPS.flatMap((g) => g.steps)
-    expect(listed).toHaveLength(PLAN_STEPS.length)
+    expect(listed).toHaveLength(PLAN_STEPS.length - FLOW_STEPS.length)
   })
 
   it('groups as the Orders tab does', () => {

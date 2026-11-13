@@ -359,6 +359,86 @@ fn collect_steps<'a>(items: &'a [QueueItem], out: &mut Vec<&'a QueueStep>) {
     }
 }
 
+/// What a Wait until, an If block or a Repeat until asks (`CONTEXT.md`: Condition): something
+/// about the resident themself or one place of their own realm. Plain data, checked by the server.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub enum Condition {
+    /// They, or with `vehicle` the carriage or vessel they drive, carry at least or less than
+    /// `amount` of `good`.
+    Carries {
+        #[serde(default, skip_serializing_if = "is_false")]
+        #[ts(as = "Option<bool>", optional)]
+        vehicle: bool,
+        good: Good,
+        compare: Compare,
+        amount: f64,
+    },
+    /// They, or with `vehicle` the carriage or vessel they drive, are full or empty.
+    Load {
+        #[serde(default, skip_serializing_if = "is_false")]
+        #[ts(as = "Option<bool>", optional)]
+        vehicle: bool,
+        load: LoadState,
+    },
+    /// A storage, workplace pile or site of the realm holds at least or less than `amount` of
+    /// `good`. `place_id` is the building's id.
+    Stock { place_id: String, good: Good, compare: Compare, amount: f64 },
+    /// Their hunger meter or health is above or below `share` of full (0 to 1).
+    Need { need: NeedName, side: Side, share: f64 },
+    /// They are mounted (or, with `is` false, not).
+    Mounted { is: bool },
+    /// They are aboard a boat or ship (or, with `is` false, not).
+    Aboard { is: bool },
+    /// The game hour is before `hour`, or `hour` or later.
+    Hour { side: HourSide, hour: f64 },
+}
+
+/// At least or less than an amount (`Condition`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum Compare {
+    AtLeast,
+    LessThan,
+}
+
+/// Full or empty (`Condition::Load`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum LoadState {
+    Full,
+    Empty,
+}
+
+/// The resident's hunger meter or health (`Condition::Need`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum NeedName {
+    Hunger,
+    Health,
+}
+
+/// Above or below a share (`Condition::Need`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum Side {
+    Above,
+    Below,
+}
+
+/// Before or after an hour (`Condition::Hour`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum HourSide {
+    Before,
+    After,
+}
+
 /// One step of a queue.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
@@ -2658,6 +2738,13 @@ pub enum RealmEventWhat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional, type = "true")]
         queue_ended: Option<bool>,
+    },
+    /// A condition of the resident's queue asked about a place that is gone or no longer the
+    /// realm's, and counted as false (`CONTEXT.md`: Condition).
+    ConditionPlaceGone {
+        resident_id: String,
+        name: String,
+        place_id: String,
     },
     RelocateFailed {
         resident_id: String,

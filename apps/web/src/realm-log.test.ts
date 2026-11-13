@@ -346,6 +346,20 @@ describe('realm log', () => {
     )
   })
 
+  it('describes a condition on a place gone', () => {
+    const gone = {
+      kind: 'conditionPlaceGone',
+      residentId: 'r1',
+      name: 'Mara',
+      placeId: 's1',
+      seq: 9,
+      ...at,
+    } as const
+    expect(describeEvent(gone).text).toBe(
+      'Mara’s queue asks about a place that is gone or no longer yours: the condition counts as false.',
+    )
+  })
+
   it('describes fights, flight and deaths in them', () => {
     const fight = { kind: 'fight', residentId: 'r1', name: 'Mara', otherId: 'r9', seq: 6 } as const
     expect(describeEvent({ ...fight, other: 'Tobin', attacker: true, ...at })).toEqual({

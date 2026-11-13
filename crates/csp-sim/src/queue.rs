@@ -3,6 +3,7 @@
 //! check measures an order as `JSON.stringify` writes it, which `csp-lang`'s JavaScript helpers
 //! know.
 
+use crate::conditions::condition_of;
 use csp_lang::js::{json_string, number_to_string, utf16_len};
 use csp_shared::balance::{
     QUEUE_MAX_DEPTH, QUEUE_MAX_REPEAT, QUEUE_MAX_STEPS, QUEUE_STEP_MAX_CHARS,
@@ -15,7 +16,7 @@ use ts_rs::TS;
 
 /// The order kinds a queue step can be (`QUEUE_STEP_KINDS`): the one-off actions and tasks the
 /// UI gives a resident, and running one of the Player's scripts. Never a queue.
-pub const QUEUE_STEP_KINDS: [&str; 25] = [
+pub const QUEUE_STEP_KINDS: [&str; 26] = [
     "walkTo",
     "drive",
     "row",
@@ -41,7 +42,12 @@ pub const QUEUE_STEP_KINDS: [&str; 25] = [
     "feed",
     "task",
     "runScript",
+    "waitUntil",
 ];
+
+/// The step kind of a Wait until (`CONTEXT.md`: Wait until): the queue runner keeps it, no order
+/// kind does. Its order carries only its `condition`.
+pub const WAIT_UNTIL: &str = "waitUntil";
 
 /// Steps that run a script (a task's default or the Player's own) rather than a built-in order
 /// (`runsScript`).
@@ -272,6 +278,14 @@ pub fn queue_steps_problem(items: Option<&Value>) -> Option<String> {
         let order = OrderRequest { kind: kind_str.to_string(), fields: rest };
         if json_length(&Value::Object(fields.clone())) as f64 > QUEUE_STEP_MAX_CHARS {
             return Some(format!("step {n} is too long"));
+        }
+        if order.kind == WAIT_UNTIL {
+            if order.fields.keys().any(|k| k != "condition") {
+                return Some(format!("step {n}: a Wait until holds only its condition"));
+            }
+            if let Err(problem) = condition_of(order.fields.get("condition")) {
+                return Some(format!("step {n}: {problem}"));
+            }
         }
         if order.kind == "task"
             && field_str(&order, "task") == Some("buildLine")

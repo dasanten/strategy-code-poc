@@ -810,21 +810,21 @@ export function Wiki() {
           To plan ahead, use <strong>Add step</strong> right under the queue's steps on the
           resident's card: a palette of every kind of step, each with its icon, grouped as the
           Orders tab is (Move, Work &amp; build, Goods, Scripts), plus Flow with{' '}
-          <strong>Repeat</strong> for the picked steps. Customise is the small ⚙ beside a step. New
-          steps go at the end; tap the <strong>+</strong> between two steps to add the next ones
-          there instead, and tap it again to go back to the end. One that acts on a place (work a
-          workplace, build, store at or fetch from a storage, pick up, feed the stable, breed, …)
-          has you pick that place on the map, anywhere, not only where the resident stands now; one
-          that needs more (which goods, what to build, what a smithy makes, which script) asks for
-          it on the card after. What to build is the same Build menu as on the card; a kind dimmed
-          because the tile lacks something today, such as a city's area, can still be added, for a
-          step before it may bring that. A step that has to be done on its tile goes after a walk
-          there, unless the step before already walks there; one that acts on no place (Explore,
-          Dismount, Get off, Run script) gets no walk. Adding a step only checks that it could make
-          sense (the place is there as you last knew it, and a carriage or horse is yours). A
-          workplace or construction site can be anyone's, in sight or as last seen, since a
-          workplace has no owner: queue Work at a far mine and they walk there and work it. Whether
-          a step can start is checked when its turn comes.
+          <strong>Repeat</strong> for the picked steps and <strong>Wait until</strong>. Customise is
+          the small ⚙ beside a step. New steps go at the end; tap the <strong>+</strong> between two
+          steps to add the next ones there instead, and tap it again to go back to the end. One that
+          acts on a place (work a workplace, build, store at or fetch from a storage, pick up, feed
+          the stable, breed, …) has you pick that place on the map, anywhere, not only where the
+          resident stands now; one that needs more (which goods, what to build, what a smithy makes,
+          which script) asks for it on the card after. What to build is the same Build menu as on
+          the card; a kind dimmed because the tile lacks something today, such as a city's area, can
+          still be added, for a step before it may bring that. A step that has to be done on its
+          tile goes after a walk there, unless the step before already walks there; one that acts on
+          no place (Explore, Dismount, Get off, Run script) gets no walk. Adding a step only checks
+          that it could make sense (the place is there as you last knew it, and a carriage or horse
+          is yours). A workplace or construction site can be anyone's, in sight or as last seen,
+          since a workplace has no owner: queue Work at a far mine and they walk there and work it.
+          Whether a step can start is checked when its turn comes.
         </p>
         <p>
           For a resident with no queue, the steps you add, paste or load collect as a{' '}
@@ -900,6 +900,44 @@ export function Wiki() {
           still loops the whole queue; a looping queue that got through all its steps without
           starting one ends. Your scripts see a queue as before: the step the resident is on and its
           number among the steps counted top to bottom, not the blocks or their rounds.
+        </p>
+        <p>
+          <strong>Wait until</strong>, in Add step's Flow, is a step that ends once its condition
+          holds; meanwhile the resident stands idle where they are. With a duration it also ends
+          when that is up, whether the condition holds or not. Its condition is set on the card:
+          pick the kind, then its fields. A condition is about the resident themself or one place of
+          your own realm, never anything you couldn't know:
+        </p>
+        <ul>
+          <li>
+            <strong>Carrying</strong>: they, or the carriage or boat they drive, carry at least or
+            less than so many of a good. The carriage or boat is the one they drive or are aboard,
+            else a carriage of yours on their tile; with none, the condition is false.
+          </li>
+          <li>
+            <strong>Full or empty</strong>: they, or that carriage or boat, are full (not room left
+            for one more unit of what they hold) or empty.
+          </li>
+          <li>
+            <strong>Stock at a place</strong>: a storage, workplace pile or construction site of
+            your realm, picked on the map, holds at least or less than so many of a good.
+          </li>
+          <li>
+            <strong>Hunger or health</strong>: their hunger meter or health is above or below a
+            share of full.
+          </li>
+          <li>
+            <strong>Mounted</strong> or <strong>Aboard</strong>: they are, or are not.
+          </li>
+          <li>
+            <strong>Game hour</strong>: it is before an hour, or that hour or later.
+          </li>
+        </ul>
+        <p>
+          The condition is checked from the tick after the wait started, so a wait whose condition
+          already holds lasts a tick. A condition on a place that is gone, or no longer your
+          realm's, counts as false and is noted once in your realm log. In a group's plan each
+          member checks the condition for themself.
         </p>
         <p>
           A step ends when it is done (the walk arrives, the goods are stored, the script calls{' '}
