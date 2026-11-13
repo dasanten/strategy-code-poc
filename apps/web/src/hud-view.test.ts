@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { TICKS_PER_GAME_DAY } from '@csp/balance'
 import type { Building } from '@csp/shared-types'
+import { centreBeside, tileToScreen } from './map/camera.js'
 import {
   DIPLOMACY_TABS,
   DRAWERS,
@@ -111,6 +112,18 @@ describe('drawers', () => {
 
   it('makes only the Scripts drawer wide', () => {
     expect(DRAWERS.filter((d) => isWide(d.id)).map((d) => d.id)).toEqual(['scripts'])
+  })
+
+  it('centres a resident picked in the drawer in the map left free beside the drawer and card', () => {
+    // The Residents drawer covers 428 px on the left, the card 372 px on the right, of 1280.
+    const view = { width: 1280, height: 800 }
+    const cover = showBeside(view.width, 428, 372)
+    expect(cover.closeDrawer).toBe(false)
+    const cam = centreBeside(2806, 3427, cover, 24, 5760)
+    // The resident's tile shows in the middle of 428..908, not of the whole screen.
+    const [sx, sy] = tileToScreen(cam, view, 5760, 2806.5, 3427.5)
+    expect(sx).toBeCloseTo(668, 6)
+    expect(sy).toBe(400)
   })
 
   it('shows a place between the open drawer and the card', () => {
