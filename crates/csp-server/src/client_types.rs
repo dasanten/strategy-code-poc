@@ -200,6 +200,7 @@ fn client_roots(cfg: &Config) -> io::Result<()> {
         csp_shared::world::GoodsPlace,
         csp_shared::world::GoodsSpot,
         csp_shared::world::HaulOrder,
+        csp_shared::world::WaterHaulOrder,
         csp_shared::world::Horse,
         csp_shared::world::LineOrder,
         csp_shared::world::MercenaryContract,

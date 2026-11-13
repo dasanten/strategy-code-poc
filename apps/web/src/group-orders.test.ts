@@ -281,6 +281,26 @@ describe('group orders', () => {
     expect(off.requests.every((q) => q.order.kind === 'getOff')).toBe(true)
   })
 
+  it('crews a docked ship from its haven, taking no seats; nobody rows it', () => {
+    // Ship s1 at (10, 10), docked at haven h1 covering (6, 9)–(8, 11).
+    const s1 = { id: 's1', x: 10, y: 10, kind: 'ship' as const, dockedAt: 'h1' }
+    const seen: GroupSeen = { buildings: [{ id: 'h1', kind: 'haven', x: 6, y: 9 }] }
+    const rs = [resident('a', 6, 9), resident('b', 7, 10), resident('shore', 9, 10)]
+    const at = (order: GroupOrder) =>
+      groupRequests(order, rs, { tick: TICK, size: SIZE, free: everywhere, seen })
+    const crew = at({ kind: 'boardBoat', vessel: s1, seats: 0, asCrew: true })
+    expect(crew.requests.map((q) => q.order)).toEqual([
+      { kind: 'board', vesselId: 's1', asCrew: true, residentId: 'a' },
+      { kind: 'board', vesselId: 's1', asCrew: true, residentId: 'b' },
+    ])
+    expect(crew.skipped).toEqual([
+      { id: 'shore', name: 'SHORE', why: 'not at the haven the ship is docked at' },
+    ])
+    // As passengers they take seats.
+    const passengers = at({ kind: 'boardBoat', vessel: s1, seats: 1 })
+    expect(passengers.skipped.map((s) => s.why)).toContain('the ship is full')
+  })
+
   it('rows each boat with one of them, the one aboard first; the others go along', () => {
     const vessels = [
       { id: 'v1', x: 10, y: 10 },

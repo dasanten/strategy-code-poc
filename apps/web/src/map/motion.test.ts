@@ -353,6 +353,27 @@ describe('motionTokens', () => {
     for (const t of tokens) expect(t.way, t.id).toEqual({ path: [[6, 5]], progress: 0.3 })
   })
 
+  it('moves a ship and everyone aboard along the way its captain sails (CONTEXT.md: Sailing)', () => {
+    const sail: ResidentOrder = {
+      kind: 'sail',
+      vesselId: 'ship1',
+      target: { x: 9, y: 9 },
+      path: [[6, 5]],
+      progress: 0.4,
+    }
+    const tokens = motionTokens({
+      residents: [
+        resident('c', sail, { aboard: 'ship1' }),
+        resident('h', null, { aboard: 'ship1' }),
+      ],
+      horses: [],
+      carriages: [],
+      vessels: [{ id: 'ship1', x: 5, y: 5 } as never],
+    })
+    expect(tokens).toHaveLength(3)
+    for (const t of tokens) expect(t.way, t.id).toEqual({ path: [[6, 5]], progress: 0.4 })
+  })
+
   it('moves a ridden horse along the way of its rider', () => {
     const tokens = motionTokens({
       residents: [resident('r', walk([[6, 5]]), { riding: 'h' })],

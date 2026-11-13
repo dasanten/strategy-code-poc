@@ -5,6 +5,8 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
+# One test binary for all of `tests/` (see tests/all.rs).
+autotests = false
 
 [dependencies]
 serde.workspace = true
@@ -12,6 +14,10 @@ serde_json.workspace = true
 indexmap.workspace = true
 ts-rs.workspace = true
 thiserror.workspace = true
+
+[[test]]
+name = "all"
+path = "tests/all.rs"
 
 [dev-dependencies]
 flate2.workspace = true
