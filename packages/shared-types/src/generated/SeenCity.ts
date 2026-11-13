@@ -5,6 +5,7 @@ import type { FormerPlayer } from "./FormerPlayer.js";
 import type { Hire } from "./Hire.js";
 import type { NpcHorseOffer } from "./NpcHorseOffer.js";
 import type { Occupation } from "./Occupation.js";
+import type { Outweighed } from "./Outweighed.js";
 import type { ShownNpcCityPrice } from "./ShownNpcCityPrice.js";
 import type { TradeOrgCity } from "./TradeOrgCity.js";
 
@@ -22,4 +23,10 @@ wontSell?: true,
 /**
  * Always `true` when present.
  */
-refuses?: true, hire?: Hire, trade?: Array<ShownNpcCityPrice>, horses?: Array<NpcHorseOffer>, horsesToSell?: Array<NpcHorseOffer>, id: string, name: string, gameName?: true, realmId: string | null, townHallId: string, tradeOrg?: TradeOrgCity, workplaceIds?: Array<string>, scouted?: CityScouted, formerPlayer?: FormerPlayer, occupation: Occupation | null, outsiders?: Array<string>, alarmedAttackers?: { [key in string]: number }, layout?: CityLayout, };
+refuses?: true, hire?: Hire, trade?: Array<ShownNpcCityPrice>, horses?: Array<NpcHorseOffer>, horsesToSell?: Array<NpcHorseOffer>, id: string, name: string, gameName?: true, realmId: string | null, townHallId: string, tradeOrg?: TradeOrgCity, workplaceIds?: Array<string>, scouted?: CityScouted, formerPlayer?: FormerPlayer, occupation: Occupation | null, outsiders?: Array<string>, alarmedAttackers?: { [key in string]: number }, layout?: CityLayout, 
+/**
+ * For an NPC city, the realms whose fighters near it have outweighed it without a break, and
+ * since when (`CONTEXT.md`: Respect; ADR 0033), as of its last planning pass. Left out while
+ * there are none.
+ */
+outweighed?: Array<Outweighed>, };

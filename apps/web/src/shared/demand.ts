@@ -16,6 +16,7 @@ import {
   DEMAND_NOTE_MAX_LENGTH,
   DEMAND_YIELD_RESPECT_MIN,
   DEMAND_YIELD_RESPECT_TIMES,
+  OUTWEIGH_HOLD_DAYS,
   TICKS_PER_GAME_DAY,
 } from '@csp/balance'
 import type { City, DemandHandOver, DemandView, Good, RealmLabel, Stock } from '@csp/shared-types'
@@ -257,9 +258,24 @@ export function demandHandOverProblem(
     : undefined
 }
 
+/**
+ * How long an NPC city still wavers over a demand (`CONTEXT.md`: Demand; ADR 0033): while the
+ * sender's force far outweighs it, the ticks left before it gives in; null while it doesn't, and
+ * for a demand to anyone else.
+ */
+export function demandWavering(
+  world: Pick<WorldState, 'cities' | 'tick'>,
+  d: Pick<Demand, 'toId' | 'fromId'>,
+): number | null {
+  const city = world.cities.find((c) => c.id === d.toId)
+  if (!city || !forSale(city)) return null
+  const since = city.outweighed?.find((o) => o.realmId === d.fromId)?.farSince
+  if (since === undefined) return null
+  return Math.max(0, since + OUTWEIGH_HOLD_DAYS * TICKS_PER_GAME_DAY - world.tick)
+}
 /** The demands waiting for an answer that the realm sent or was sent, oldest first. */
 export function demandsFor(
-  world: Pick<WorldState, 'demands' | 'realms' | 'residents' | 'cities'>,
+  world: Pick<WorldState, 'demands' | 'realms' | 'residents' | 'cities' | 'tick'>,
   realmId: string,
 ): DemandView[] {
   const label = (id: string): RealmLabel => ({
@@ -277,5 +293,6 @@ export function demandsFor(
       note: d.note,
       sentAt: d.sentAt,
       deadline: d.deadline,
+      wavering: demandWavering(world, d),
     }))
 }

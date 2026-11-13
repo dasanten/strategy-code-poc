@@ -3,14 +3,18 @@
 //! check after a city joins is T86.13's. Respect by strength near the city is ADR 0033's (T96.1).
 
 use csp_shared::balance::{
-    BLOW_BASE, COMBAT_SKILL_LIMIT, PERSUADE_ASK_AGAIN_DAYS, PERSUADE_CHECK_TICKS,
+    BLOW_BASE, COMBAT_SKILL_LIMIT, NPC_PLAN_TICKS, PERSUADE_ASK_AGAIN_DAYS, PERSUADE_CHECK_TICKS,
     PERSUADE_STANDING, PROTECTION_DEFENCE, RESPECT_PER_WALL, SIGHT_RANGE, SKILL_MAX, WEAPON_ATTACK,
 };
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{BuildingKind, Good, JoinRequest, RealmEventWhat, SkillName, WorldState};
 
 use super::*;
-use crate::queries::persuasion::{city_strength, fighter_strength, persuaded_by, respect_seen_by};
+use crate::queries::city::for_sale;
+use crate::queries::persuasion::{
+    city_strength, fighter_strength, outweigh_hold_ticks, outweighed_by, persuaded_by,
+    respect_seen_by,
+};
 use crate::standing::{change_standing, step_standing};
 use crate::test_world::{add_city, building, empty_world, realm, resident};
 
@@ -67,10 +71,27 @@ fn n1(world: &WorldState) -> &csp_shared::world::City {
     world.cities.iter().find(|c| c.id == "n1").unwrap()
 }
 
-/// Steps persuasion at the next check and checks its invariant.
+/// As if every force near an NPC city had stood where it stands for `OUTWEIGH_HOLD_DAYS` already.
+fn stayed(world: &mut WorldState) {
+    let hold = outweigh_hold_ticks();
+    for ci in 0..world.cities.len() {
+        if !for_sale(&world.cities[ci]) {
+            continue;
+        }
+        let mut now = outweighed_now(world, &world.cities[ci], SIZE);
+        for o in &mut now {
+            o.since -= hold;
+            o.far_since = o.far_since.map(|f| f - hold);
+        }
+        world.cities[ci].outweighed = Some(now).filter(|v| !v.is_empty());
+    }
+}
+
+/// Steps persuasion at the next check, the forces near having stayed, and checks its invariant.
 fn check(world: &mut WorldState) {
     let every = PERSUADE_CHECK_TICKS as u64;
     world.tick = (world.tick + 1).div_ceil(every) * every;
+    stayed(world);
     step_persuasion(world, SIZE);
     assert!(join_requests_sound(world).is_empty());
 }
@@ -206,6 +227,7 @@ fn needs_high_standing_and_more_respect_than_the_citys_own_side() {
     change_standing(&mut world, "n1", "r1", PERSUADE_STANDING);
     assert!(!persuaded_by(&world, n1(&world), "r1", SIZE));
     world.residents[s].carried.insert(Good::Shield, 1.0);
+    stayed(&mut world);
     assert!(persuaded_by(&world, n1(&world), "r1", SIZE));
     change_standing(&mut world, "n1", "r1", -1.0);
     assert!(!persuaded_by(&world, n1(&world), "r1", SIZE));
@@ -384,4 +406,42 @@ fn respect_is_caught_by_its_invariant_when_a_weight_goes_below_nothing() {
     s0.skills.insert(SkillName::Combat, -100.0);
     let found: Vec<_> = respect_sound(&world, SIZE).into_iter().map(|v| v.entity_ids).collect();
     assert_eq!(found, vec![vec!["n1".to_string(), "r1".to_string()]]);
+}
+
+/// Steps NPC cities weighing who outweighs them and persuasion for `n` ticks, checking both
+/// invariants.
+fn ticks(world: &mut WorldState, n: u64) {
+    for _ in 0..n {
+        step_persuasion(world, SIZE);
+        step_outweighed(world, SIZE);
+        assert_eq!(outweighed_sound(world, SIZE), vec![]);
+        assert!(join_requests_sound(world).is_empty());
+        world.tick += 1;
+    }
+}
+
+#[test]
+fn asks_only_once_the_force_has_outweighed_it_for_the_hold_and_starts_again_after_a_break() {
+    let mut world = setup(2, 0);
+    change_standing(&mut world, "n1", "r1", 60.0);
+    let hold = outweigh_hold_ticks() as u64;
+    let pass = NPC_PLAN_TICKS as u64;
+    ticks(&mut world, hold / 2);
+    assert!(outweighed_by(n1(&world), "r1").is_some());
+    // Away for a planning pass: forgotten.
+    for r in world.residents.iter_mut().filter(|r| r.id.starts_with('s')) {
+        r.x += 60.0;
+    }
+    ticks(&mut world, pass);
+    assert!(outweighed_by(n1(&world), "r1").is_none());
+    for r in world.residents.iter_mut().filter(|r| r.id.starts_with('s')) {
+        r.x -= 60.0;
+    }
+    let back = world.tick;
+    ticks(&mut world, hold);
+    assert_eq!(world.join_requests, vec![], "not a full hold since it came back");
+    ticks(&mut world, pass + PERSUADE_CHECK_TICKS as u64);
+    assert_eq!(world.join_requests.len(), 1);
+    let asked = world.join_requests[0].at as u64;
+    assert!(asked >= back + hold);
 }

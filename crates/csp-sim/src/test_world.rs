@@ -137,6 +137,7 @@ pub fn add_city(
         occupation: None,
         outsiders: None,
         alarmed_attackers: None,
+        outweighed: None,
         layout: (realm_id.is_none() && trade_org.is_none()).then_some(CityLayout::Grid),
     });
 }

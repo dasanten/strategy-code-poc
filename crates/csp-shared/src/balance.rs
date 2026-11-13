@@ -2224,6 +2224,12 @@ pub const DEMAND_YIELD_RESPECT_MIN: f64 = 25.0;
 /// village ringed by some forty tiles counts two soldiers more.
 pub const RESPECT_PER_WALL: f64 = 0.25;
 
+/// How long, in game days, a realm's force near an NPC city must outweigh it without a break before
+/// it yields to that realm's demand or asks to join it (`CONTEXT.md`: Demand, Persuading a city;
+/// ADR 0033): a game day, so an army has to camp at the gate (24 planning passes) and others
+/// have time to come to help, and one army can't collect villages by walking through.
+pub const OUTWEIGH_HOLD_DAYS: f64 = 1.0;
+
 /// What an NPC city's standing toward a realm drops by when it declines that realm's demand
 /// (`CONTEXT.md`: Demand): as much as a theft, so three in a game day shut its gates.
 pub const DEMAND_DECLINED_STANDING_LOSS: f64 = 10.0;
@@ -2608,6 +2614,7 @@ pub fn balance_json() -> Value {
     m.insert("DEMAND_YIELD_RESPECT_TIMES".into(), json!(DEMAND_YIELD_RESPECT_TIMES));
     m.insert("DEMAND_YIELD_RESPECT_MIN".into(), json!(DEMAND_YIELD_RESPECT_MIN));
     m.insert("RESPECT_PER_WALL".into(), json!(RESPECT_PER_WALL));
+    m.insert("OUTWEIGH_HOLD_DAYS".into(), json!(OUTWEIGH_HOLD_DAYS));
     m.insert("DEMAND_DECLINED_STANDING_LOSS".into(), json!(DEMAND_DECLINED_STANDING_LOSS));
     m.insert("DEMAND_TRADE_ORG_STANDING_LOSS".into(), json!(DEMAND_TRADE_ORG_STANDING_LOSS));
     m.insert("DIRECT_OFFER_DAYS".into(), json!(DIRECT_OFFER_DAYS));

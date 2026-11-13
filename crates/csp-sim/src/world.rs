@@ -33,7 +33,7 @@ use crate::horses::step_horses;
 use crate::node_gen::place_resource_nodes;
 use crate::pairing::{request_births, resolve_births};
 use crate::passengers::step_passengers;
-use crate::persuasion::step_persuasion;
+use crate::persuasion::{step_outweighed, step_persuasion};
 use crate::relocating::step_relocating;
 use crate::reviving::step_feeding;
 use crate::riding::step_riders;
@@ -314,6 +314,9 @@ fn step_rest(
     step_workplace_settings(world, scratch);
     // Offers follow what this tick took from their storages, or the storages themselves.
     step_offers(world, scratch);
+    // NPC cities weigh who outweighs them at their planning pass, once nothing else changes this
+    // tick (ADR 0033).
+    step_outweighed(world, size);
     let actions = steps
         + strikes_len
         + climbs_len

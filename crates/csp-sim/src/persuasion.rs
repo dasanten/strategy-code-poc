@@ -11,13 +11,16 @@ use std::collections::HashSet;
 
 use csp_shared::balance::{PERSUADE_ASK_AGAIN_DAYS, PERSUADE_CHECK_TICKS, RESPECT_PER_WALL};
 use csp_shared::time::TICKS_PER_GAME_DAY;
-use csp_shared::world::{City, JoinRequest, RealmEventWhat, WorldState};
+use csp_shared::world::{City, JoinRequest, Outweighed, RealmEventWhat, WorldState};
 
 use crate::capture::join_realm;
 use crate::events::record_event;
+use crate::npc_plan::plan_due;
 use crate::queries::city::{for_sale, town_hall_of};
+use crate::queries::demand::demand_yield_needed;
 use crate::queries::persuasion::{
-    city_strength, fighter_strength, holds_high, persuaded_by, respect_seen_by,
+    city_strength, fighter_strength, holds_high, outweighed_by, persuaded_by, respect_by_side,
+    respect_seen_by,
 };
 use crate::queries::standing::standing_of;
 use crate::queries::walls::{is_wall_or_gate, wall_side};
@@ -283,6 +286,114 @@ pub fn respect_sound(world: &WorldState, size: i32) -> Vec<InvariantViolation> {
                     "{city_id} weighs {seen} of {realm_id}'s {all} against its own {own} with {walls} walls"
                 ),
                 entity_ids: vec![city_id.to_string(), realm_id.to_string()],
+            });
+        }
+    }
+    out
+}
+
+/// What an NPC city would remember at a planning pass now (`outweighedNow`, ADR 0033): each realm
+/// whose force near it outweighs its own side, in the world's order of realms, keeping since when
+/// from `before` while it went on without a break, and since when it has far outweighed it.
+pub fn outweighed_now(world: &WorldState, city: &City, size: i32) -> Vec<Outweighed> {
+    let tick = world.tick as f64;
+    let seen = respect_by_side(world, city, size);
+    let own = city_strength(world, city);
+    let needed = demand_yield_needed(world, city);
+    world
+        .realms
+        .iter()
+        .filter_map(|realm| {
+            let respect = seen.get(realm.id.as_str()).copied().unwrap_or(0.0);
+            if respect <= own {
+                return None;
+            }
+            let before = outweighed_by(city, &realm.id);
+            let far = respect >= needed;
+            Some(Outweighed {
+                realm_id: realm.id.clone(),
+                since: before.map_or(tick, |o| o.since),
+                far_since: far.then(|| before.and_then(|o| o.far_since).unwrap_or(tick)),
+            })
+        })
+        .collect()
+}
+
+/// One tick of NPC cities weighing who outweighs them (`stepOutweighed`, `CONTEXT.md`: Respect;
+/// ADR 0033), after everyone has moved and changed sides: at its planning pass an NPC city
+/// remembers, per realm, since when that realm's force has outweighed it without a break, and the
+/// first pass it doesn't, forgets it. A city that is no NPC city any more, or a realm that is gone,
+/// is forgotten at once. `size` is the map's.
+pub fn step_outweighed(world: &mut WorldState, size: i32) {
+    let realms: HashSet<String> = world.realms.iter().map(|r| r.id.clone()).collect();
+    for ci in 0..world.cities.len() {
+        let city = &world.cities[ci];
+        let now = if !for_sale(city) {
+            None
+        } else if plan_due(world, &city.id) {
+            Some(outweighed_now(world, city, size))
+        } else if city.outweighed.iter().flatten().any(|o| !realms.contains(&o.realm_id)) {
+            city.outweighed.clone().map(|mut v| {
+                v.retain(|o| realms.contains(&o.realm_id));
+                v
+            })
+        } else {
+            continue;
+        };
+        world.cities[ci].outweighed = now.filter(|v| !v.is_empty());
+    }
+}
+
+/// Invariant (`outweighedSound`, ADR 0033): only an NPC city remembers being outweighed, each time
+/// toward a realm that exists, at most once per realm, started no later than now, the far one no
+/// earlier than the other; and at a city's planning pass, what it remembers is what it sees.
+pub fn outweighed_sound(world: &WorldState, size: i32) -> Vec<InvariantViolation> {
+    let mut out = Vec::new();
+    let tick = world.tick as f64;
+    let realms: HashSet<&str> = world.realms.iter().map(|r| r.id.as_str()).collect();
+    for city in &world.cities {
+        let Some(list) = &city.outweighed else { continue };
+        let mut report = |message: String| {
+            out.push(InvariantViolation {
+                invariant: "outweighed-sound".into(),
+                message,
+                entity_ids: vec![city.id.clone()],
+            })
+        };
+        if !for_sale(city) {
+            report(format!("{} is no NPC city but remembers being outweighed", city.id));
+            continue;
+        }
+        if list.is_empty() {
+            report(format!("{} keeps an empty list of who outweighs it", city.id));
+        }
+        let mut seen = HashSet::new();
+        for o in list {
+            let r = &o.realm_id;
+            if !realms.contains(r.as_str()) {
+                report(format!("{} remembers {r}, which does not exist", city.id));
+            }
+            if !seen.insert(r.as_str()) {
+                report(format!("{} remembers {r} twice", city.id));
+            }
+            let in_order = |a: f64, b: f64| a.partial_cmp(&b).is_some_and(|o| o.is_le());
+            if !in_order(o.since, tick)
+                || o.far_since.is_some_and(|f| !in_order(o.since, f) || !in_order(f, tick))
+            {
+                report(format!(
+                    "{} remembers {r} outweighing it from a time out of order",
+                    city.id
+                ));
+            }
+        }
+    }
+    for city in world.cities.iter().filter(|c| for_sale(c) && plan_due(world, &c.id)) {
+        let now = outweighed_now(world, city, size);
+        if city.outweighed.as_deref().unwrap_or_default() != now.as_slice() {
+            out.push(InvariantViolation {
+                invariant: "outweighed-sound".into(),
+                message: format!("{} at its planning pass remembers not what it sees", city.id),
+                entity_ids: vec![city.id.clone()],
             });
         }
     }
