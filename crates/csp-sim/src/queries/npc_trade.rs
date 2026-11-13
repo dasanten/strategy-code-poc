@@ -15,7 +15,7 @@ use csp_shared::balance::{
 use csp_shared::goods::WEAPONS;
 use csp_shared::world::npc_trade::ShownNpcCityPrice;
 use csp_shared::world::{
-    Building, BuildingKind, City, Good, Resident, ResidentOrder, Stock, WorldState,
+    Building, BuildingKind, City, CityJob, CityJobKind, Good, Resident, Stock, WorldState,
 };
 
 use super::building::recipe_for;
@@ -23,9 +23,11 @@ use super::city::{city_food_use, city_residents, for_sale};
 use super::horses::{horses_in, owns_horse, HorseOwner};
 use super::js_round;
 use super::names::{good_name, good_of, held, held_in, PRICED_GOODS};
+use super::persuasion::respect_seen_by;
 use super::residents::{can_work, is_armed};
 use super::standing::standing_of;
 use super::warehouse::{price_for, Price};
+use crate::npc_chain::{chain_good, reserve_lacks};
 
 /// An NPC city's finished storages (`npcStorages`): where it trades and is paid.
 pub fn npc_storages<'w>(world: &'w WorldState, city: &City) -> Vec<&'w Building> {
@@ -240,9 +242,26 @@ pub fn npc_hire_price(world: &WorldState, city: &City, hirer_id: &str) -> f64 {
     1f64.max(js_round(NPC_TRADE.price_per_resident_week * (1.0 - swing)))
 }
 
-/// The residents an NPC city would lend now, in the order it lends them (`spareResidents`):
-/// living adults in no contract but `except`, never its farmers or soldiers, nor so many that
-/// fewer than `NPC_TRADE.defence_share` of its adults stay. Idle ones first, then by id.
+/// Whether the city's plan has the resident as a spare hand (`spareHand`, `CONTEXT.md`: Spare
+/// hands' work; ADR 0033): idle, on a road crew, scouting, or working for surplus at a workplace
+/// whose good isn't short of its reserve. With no job planned yet they count as idle. Farmers,
+/// those working for a short good, builders with a project, soldiers, traders, a founding party
+/// and the rest of its plan stay.
+fn spare_hand(job: Option<&CityJob>, workplace_short: impl Fn(&str) -> bool) -> bool {
+    let Some(job) = job else { return true };
+    match job.kind {
+        CityJobKind::Idle | CityJobKind::Road | CityJobKind::Scout => true,
+        CityJobKind::Work => job.building_id.as_deref().is_some_and(|b| !workplace_short(b)),
+        _ => false,
+    }
+}
+
+/// The residents an NPC city would lend now, in the order it lends them (`spareResidents`,
+/// `CONTEXT.md`: Hiring from an NPC city; ADR 0033): living, unarmed adults in no contract but
+/// `except` whom its plan has as spare hands (`spare_hand`), nor so many that fewer than
+/// `NPC_TRADE.defence_share` of its adults (its soldiers among them) stay besides those its plan
+/// keeps busy. Idle ones
+/// first, then by id.
 pub fn spare_residents<'w>(
     world: &'w WorldState,
     city: &City,
@@ -257,13 +276,19 @@ pub fn spare_residents<'w>(
         .filter(|c| Some(c.id.as_str()) != except)
         .flat_map(|c| c.resident_ids.iter().map(String::as_str))
         .collect();
-    let farms: HashSet<&str> = world
-        .buildings
-        .iter()
-        .filter(|b| b.kind == BuildingKind::Farm)
-        .map(|b| b.id.as_str())
+    let plan = world.city_plans.get(&city.id);
+    let short: HashSet<Good> = reserve_lacks(world, city, plan.and_then(|p| p.project.as_ref()))
+        .into_iter()
+        .map(|s| s.good)
         .collect();
-    let farming = |r: &Resident| matches!(&r.order, Some(ResidentOrder::WorkAt(o)) if farms.contains(o.building_id.as_str()));
+    let workplace_short = |id: &str| {
+        world
+            .buildings
+            .iter()
+            .find(|b| b.id == id)
+            .and_then(|b| chain_good(world, b))
+            .is_some_and(|g| short.contains(&g))
+    };
     let tick = world.tick as f64;
     let adults: Vec<&Resident> = world
         .residents
@@ -276,16 +301,54 @@ pub fn spare_residents<'w>(
                 && !busy.contains(r.id.as_str())
         })
         .collect();
-    let farmers = adults.iter().filter(|r| farming(r)).count() as f64;
+    let job = |r: &Resident| plan.and_then(|p| p.jobs.get(&r.id));
+    let mut candidates: Vec<&Resident> = adults
+        .iter()
+        .copied()
+        .filter(|r| !is_armed(&r.carried) && spare_hand(job(r), workplace_short))
+        .collect();
     let staying = (NPC_TRADE.defence_share * adults.len() as f64 - 1e-9).ceil();
-    let working = |r: &Resident| u8::from(matches!(r.order, Some(ResidentOrder::WorkAt(_))));
-    let mut candidates: Vec<&Resident> =
-        adults.iter().copied().filter(|r| !farming(r) && !is_armed(&r.carried)).collect();
-    candidates
-        .sort_by(|a, b| working(a).cmp(&working(b)).then_with(|| locale_compare(&a.id, &b.id)));
-    let take = (adults.len() as f64 - farmers - staying).max(0.0) as usize;
+    // Its soldiers count toward the share at home; the rest its plan keeps busy come on top.
+    let armed = adults.iter().filter(|r| is_armed(&r.carried)).count();
+    let kept_busy = (adults.len() - candidates.len() - armed) as f64;
+    let idle = |r: &Resident| u8::from(!job(r).is_some_and(|j| j.kind != CityJobKind::Idle));
+    candidates.sort_by(|a, b| idle(b).cmp(&idle(a)).then_with(|| locale_compare(&a.id, &b.id)));
+    let take = (adults.len() as f64 - kept_busy - staying).max(0.0) as usize;
     candidates.truncate(take);
     candidates
+}
+
+/// Why an NPC city feels threatened by the hirer and lends it nobody (`npcHireThreat`, `CONTEXT.md`:
+/// Hiring from an NPC city; ADR 0033): it weighs a demand, its town hall is occupied, or armed
+/// residents of the hirer stand in its area or in sight of it. `size` is the map's.
+pub fn npc_hire_threat(
+    world: &WorldState,
+    city: &City,
+    hirer_id: &str,
+    size: i32,
+) -> Option<String> {
+    if world.demands.iter().any(|d| d.to_id == city.id) {
+        return Some(format!("{} is weighing a demand and lends nobody", city.name));
+    }
+    if city.occupation.is_some() {
+        return Some(format!("{}\u{2019}s town hall is occupied: it lends nobody", city.name));
+    }
+    if respect_seen_by(world, city, hirer_id, size) > 0.0 {
+        return Some(format!(
+            "{} lends nobody while your armed residents stand near it",
+            city.name
+        ));
+    }
+    None
+}
+
+/// How many residents an NPC city would lend the hirer now (`hireSpare`): none while it feels
+/// threatened by it, else its spare residents.
+pub fn hire_spare(world: &WorldState, city: &City, hirer_id: &str, size: i32) -> f64 {
+    if npc_hire_threat(world, city, hirer_id, size).is_some() {
+        return 0.0;
+    }
+    spare_residents(world, city, None).len() as f64
 }
 
 /// `a.localeCompare(b)` for ids, as ICU's root collation orders ASCII: punctuation and symbols
@@ -347,12 +410,16 @@ pub fn npc_hire_problem(
     count: f64,
     price_per_week: f64,
     except: Option<&str>,
+    size: i32,
 ) -> Option<String> {
     if !for_sale(city) {
         return Some("only NPC cities hire out their residents".into());
     }
     if super::city::npc_city_refuses(world, city, hirer_id) {
         return Some(format!("{} won\u{2019}t hire out to you", city.name));
+    }
+    if let Some(threat) = npc_hire_threat(world, city, hirer_id, size) {
+        return Some(threat);
     }
     let spare = spare_residents(world, city, except).len() as f64;
     if spare < count {

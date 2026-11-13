@@ -406,8 +406,8 @@ fn count_wrecked(world: &mut WorldState, wrecked: Vec<Felled>, _scratch: &mut Sc
 fn step_npc_defence(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
     crate::npc_defence::step_npc_defence(world, size);
 }
-fn step_npc_hire(world: &mut WorldState, size: i32, _scratch: &mut Scratch) {
-    crate::npc_hire::step_npc_hire(world, size);
+fn step_npc_hire(world: &mut WorldState, size: i32, scratch: &mut Scratch) {
+    scratch.lent_gear = crate::npc_hire::step_npc_hire(world, size);
 }
 /// Returns the milliseconds the cities spent planning.
 fn step_npc_cities(

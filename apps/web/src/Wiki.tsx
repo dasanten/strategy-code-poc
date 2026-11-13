@@ -1485,8 +1485,8 @@ export function Wiki() {
           Strength {num(strong.stats.strength.base)}. A carriage behind an average horse carries{' '}
           {num(CARRIAGE_CAPACITY)} kg; each point of its driver's Driving skill makes it{' '}
           {pct(DRIVING_SKILL_EFFECT)} faster, at most {pct(DRIVING_SKILL_LIMIT)}, learned at{' '}
-          {num(DRIVING_SKILL_PER_DAY)} a game day of driving. Carriages enter mountains only along a finished road, so a
-          road over a ridge opens a pass for them.
+          {num(DRIVING_SKILL_PER_DAY)} a game day of driving. Carriages enter mountains only along a
+          finished road, so a road over a ridge opens a pass for them.
         </p>
         <p>
           A carriage is built at a finished stable: a resident there lays out a carriage site on a
@@ -2601,10 +2601,15 @@ export function Wiki() {
         </p>
         <p>
           An NPC city sells only what it holds above this reserve and buys only what it is short of.
-          It lends residents at {num(NPC_TRADE.pricePerResidentWeek)} coins each a game week,
-          keeping {pct(NPC_TRADE.defenceShare)} of its adults at home. The Trade Organization hires
-          out soldiers at {num(TRADE_ORG_ARMY.pricePerSoldierWeek)} coins each a game week. A
-          contract runs at most {days(CONTRACT_MAX_DAYS)}.
+          It lends residents at {num(NPC_TRADE.pricePerResidentWeek)} coins each a game week, but
+          only its spare hands: those its plan has idle, on a road crew, scouting or working for
+          surplus. Its farmers, those working for a good short of its reserve and its builders stay,
+          and so do {pct(NPC_TRADE.defenceShare)} of its adults at home, its soldiers among them.
+          They take weapons and armour along only from what its storages hold above its reserve;
+          with none spare they come unarmed. It lends nobody while it weighs a demand, while its
+          town hall is occupied, or while your armed residents stand in its City area or in sight of
+          it. The Trade Organization hires out soldiers at {num(TRADE_ORG_ARMY.pricePerSoldierWeek)}{' '}
+          coins each a game week. A contract runs at most {days(CONTRACT_MAX_DAYS)}.
         </p>
         <p>
           An NPC city shuts its gates while anyone armed who isn't of the city or its alliance

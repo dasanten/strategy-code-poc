@@ -316,6 +316,9 @@ pub struct Scratch {
     pub offers: crate::offers::OfferLedger,
     /// The debt payments of the latest `resolveDebtPayments`, for its invariants (`ledger`).
     pub debt_payments: crate::trade_org_debt::DebtLedger,
+    /// What lent residents took from their NPC city's storages in the latest `stepNpcHire`, for
+    /// `npc-lending-keeps-reserve`.
+    pub lent_gear: Vec<crate::npc_hire::LentGear>,
 }
 
 impl Scratch {
@@ -472,6 +475,7 @@ pub fn run_tick(
                     trades: Some(&scratch.trades),
                     offers: Some(&scratch.offers),
                     debt_payments: Some(&scratch.debt_payments),
+                    lent_gear: &scratch.lent_gear,
                     buy_offs: &step.buy_offs,
                 };
                 violations.extend(check_invariants_with(world, terrain, &slice, &ledgers));
