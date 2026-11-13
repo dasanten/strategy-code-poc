@@ -10,6 +10,7 @@ import type {
   BuildingKind,
   Carriage,
   City,
+  Condition,
   Good,
   GoodsSpot,
   OrderRequest,
@@ -21,6 +22,7 @@ import type {
 } from '@csp/shared-types'
 import type { HaulSetup } from './Residents.js'
 import { anyonesToWork } from './script-params-view.js'
+import { NEW_DRAFT, type ConditionDraft } from './condition-view.js'
 
 /**
  * The queue planner's Add step (`CONTEXT.md`: Queue, Planning ahead): every kind of step a queue
@@ -44,10 +46,20 @@ export type PlanPick =
   | 'horse'
   | 'city'
   | 'toFeed'
+  | 'place'
 
 /** What a planned step asks for on the card once its places are picked. */
 export type PlanAsk =
-  'goods' | 'buildingKind' | 'makes' | 'horses' | 'horse' | 'haul' | 'script' | 'subject' | 'units'
+  | 'goods'
+  | 'buildingKind'
+  | 'makes'
+  | 'horses'
+  | 'horse'
+  | 'haul'
+  | 'script'
+  | 'subject'
+  | 'units'
+  | 'condition'
 
 export type PlanStepId =
   | 'walk'
@@ -81,6 +93,8 @@ export type PlanStepId =
   | 'feed'
   | 'explore'
   | 'runScript'
+  | 'waitUntil'
+  | 'if'
 
 /** One kind of step Add step offers. */
 export interface PlanKind {
@@ -268,6 +282,10 @@ export const PLAN_STEPS: readonly PlanKind[] = [
   },
   { id: 'explore', label: 'Explore', picks: [] },
   { id: 'runScript', label: 'Run script', picks: [], ask: 'script' },
+  // Flow: its condition is set on the card, a place it asks about picked on the map (`nextPick`).
+  { id: 'waitUntil', label: 'Wait until', picks: [], ask: 'condition' },
+  // Flow: an If block around the picked steps (`Plan.wrap`), or a block's condition (`blockId`).
+  { id: 'if', label: 'If', picks: [], ask: 'condition' },
 ]
 
 /** The task a kind of step gives, whose Customise (`CONTEXT.md`: Before it starts) it offers. */
@@ -309,11 +327,42 @@ export interface Plan {
   after?: number
   /** Why the last tap picked nothing, said under the banner. */
   error?: string
+  /** A Wait until's condition as the card's editor holds it, kept while the map picks a place. */
+  condition?: ConditionDraft
+  /** Whether the map is picking the place a Wait until's condition asks about. */
+  placing?: boolean
+  /** For an If: the steps and blocks it wraps, by id, as picked when it was started. */
+  wrap?: number[]
+  /** For an If: the block whose condition changes, rather than a new one. */
+  blockId?: number
+  /**
+   * With `blockId`: the block is a repeat block, and the condition set is what it repeats until
+   * (`CONTEXT.md`: Repeat block).
+   */
+  until?: boolean
 }
+
+/** The pick of the place a condition asks about (`CONTEXT.md`: Condition). */
+const PLACE_PICK = {
+  pick: 'place',
+  prompt: 'the storage, workplace or site of yours to ask about',
+} as const
 
 /** The next place the plan picks on the map, if it still needs one. */
 export function nextPick(plan: Plan): PlanKind['picks'][number] | undefined {
+  // A Wait until picks a place only when its editor asks for one.
+  if (plan.kind === 'waitUntil' || plan.kind === 'if') return plan.placing ? PLACE_PICK : undefined
   return planKind(plan.kind).picks[plan.picked.length]
+}
+
+/**
+ * The plan with its condition's draft kept and the map set to pick the place it asks about:
+ * picked, the card's editor shows again with it.
+ */
+export function pickPlace(plan: Plan, condition: ConditionDraft): Plan {
+  const kept = { ...plan, condition, placing: true, picked: [] }
+  delete kept.error
+  return kept
 }
 
 /** What the card asks for once every place is picked; undefined when the step needs nothing. */
@@ -435,8 +484,19 @@ export function planPickAt(
       const r = w.toFeed?.find((x) => x.x === at.x && x.y === at.y)
       return r ? { ...tile, id: r.id } : 'nobody to feed there'
     }
+    case 'place': {
+      // What a condition asks about: a storage, workplace or site of the realm's own
+      // (`CONTEXT.md`: Condition), never another realm's.
+      const b = here.find(
+        (x) => own(x) && (x.site || STOCKED.includes(x.kind) || MAX_WORKERS[x.kind] !== undefined),
+      )
+      return b ? named(b) : 'no storage, workplace or site of yours there'
+    }
   }
 }
+
+/** The kinds of building that keep a stock: what a condition calls a storage (as the server). */
+const STOCKED: readonly BuildingKind[] = ['storage', 'warehouse', 'stable', 'haven']
 
 /** A city of the realm as Add step lists it to pick (Relocate): its town hall's tile, if known. */
 export interface PlanCity {
@@ -482,6 +542,11 @@ export function pickInto(w: PlanWorld, plan: Plan, at: { x: number; y: number })
   if (typeof picked === 'string') return { ...plan, error: picked }
   const kept = { ...plan }
   delete kept.error
+  // The place a condition asks about goes into its draft, and the editor shows again.
+  if (next.pick === 'place') {
+    delete kept.placing
+    return { ...kept, condition: { ...(plan.condition ?? NEW_DRAFT), placeId: picked.id! } }
+  }
   return { ...kept, picked: [...plan.picked, picked] }
 }
 
@@ -496,6 +561,7 @@ export type PlanAnswer =
   | { ask: 'script'; scriptId: number }
   | { ask: 'subject'; subject: TrainingSubject }
   | { ask: 'units'; units: number }
+  | { ask: 'condition'; condition: Condition }
 
 /** Where a step acts, for the walk put before it (`appendRequest`'s `at`). */
 type At = { x: number; y: number }
@@ -607,6 +673,14 @@ export function planOrder(
     }
     case 'runScript':
       return { order: { kind: 'runScript', scriptId: a?.ask === 'script' ? a.scriptId : null } }
+    case 'waitUntil':
+      // They stand idle where they are until it holds (`CONTEXT.md`: Wait until).
+      return {
+        order: { kind: 'waitUntil', condition: a?.ask === 'condition' ? a.condition : null },
+      }
+    case 'if':
+      // No step: the planner puts the block in (`PlannerFlow.ifDone`).
+      return undefined
   }
 }
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { stepLine } from './shared/queue.js'
 import type { QueueStepRequest } from '@csp/shared-types'
 import { stepRow } from './queue-view.js'
-import { planRows, stepCount, unroll, withIds, type PlanItem } from './plan-blocks.js'
+import { planRows, planSteps, stepCount, withIds, type PlanItem } from './plan-blocks.js'
 import {
   SAVED_QUEUES_VERSION,
   gonePlace,
@@ -160,7 +160,7 @@ describe('steps whose place is gone', () => {
 
   it('flags a loaded step in the planner when its workplace was torn down', () => {
     const queues = save({}, 'Mine run', mineRun, 1000)
-    const steps = unroll(withIds(load(queues, 'Mine run'), 1).items)
+    const steps = planSteps(withIds(load(queues, 'Mine run'), 1).items)
     const rowsOf = (lastSeen?: never[]) =>
       steps.map((s) => stepRow({ ...s, id: s.id! }, false, { buildings: [], lastSeen }))
     // The mine (b1) is torn down: neither in sight nor last seen.
@@ -183,7 +183,8 @@ describe('saved repeat blocks', () => {
     const storage = memory()
     storeQueues(storage, 'r1', save({}, 'Mine run', repeated, 1000))
     const loaded = load(readQueues(storage, 'r1'), 'Mine run')
-    expect(stepCount(loaded)).toBe(2 + 10)
+    // Its steps as written: the block repeats them on the server.
+    expect(stepCount(loaded)).toBe(4)
     expect(planRows(withIds(loaded, 1).items).map((r) => [r.kind, r.depth])).toEqual([
       ['step', 0],
       ['step', 0],
@@ -220,5 +221,18 @@ describe('saved repeat blocks', () => {
       const text = JSON.stringify({ version: SAVED_QUEUES_VERSION, queues: { Bad: entry(steps) } })
       expect(parseQueues(text)).toEqual({})
     }
+  })
+
+  it('keeps a Repeat until with its condition, and drops one whose condition is no condition', () => {
+    const until = { until: { kind: 'mounted', is: true } } as const
+    const storage = memory()
+    const steps: PlanItem[] = [{ repeat: until, items: [mineRun[0]!] }]
+    storeQueues(storage, 'r1', save({}, 'Until', steps, 1000))
+    expect(load(readQueues(storage, 'r1'), 'Until')[0]).toMatchObject({ repeat: until })
+    const walk = { order: { kind: 'walkTo', x: 1, y: 1 } }
+    const bad = [{ repeat: { until: { kind: 'weather' } }, items: [walk] }]
+    const entry = { name: 'Bad', steps: bad, savedAt: 5 }
+    const text = JSON.stringify({ version: SAVED_QUEUES_VERSION, queues: { Bad: entry } })
+    expect(parseQueues(text)).toEqual({})
   })
 })

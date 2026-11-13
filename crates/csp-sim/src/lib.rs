@@ -17,6 +17,7 @@ pub mod cities;
 pub mod city_layout;
 pub mod climbing;
 pub mod combat;
+pub mod conditions;
 pub mod contracts;
 pub mod crimes;
 pub mod default_scripts;
@@ -86,6 +87,7 @@ pub mod placing;
 mod poc_tests;
 pub mod queries;
 pub mod queue;
+pub mod queue_tree;
 pub mod queues;
 pub mod random;
 #[cfg(test)]

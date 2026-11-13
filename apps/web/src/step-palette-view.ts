@@ -1,6 +1,7 @@
 import { createContext } from 'react'
 import { ORDER_GROUP_LABELS } from './selection-view.js'
-import type { PlanStepId } from './plan-step.js'
+import type { Condition } from '@csp/shared-types'
+import type { Plan, PlanStepId } from './plan-step.js'
 
 /**
  * The queue planner's Add step palette (`CONTEXT.md`: Planner blocks): every kind of step grouped
@@ -54,6 +55,9 @@ export const PALETTE_GROUPS: readonly PaletteGroup[] = [
   { id: 'scripts', label: ORDER_GROUP_LABELS.scripts, steps: ['runScript'] },
 ]
 
+/** The step kinds in Flow, beside Repeat: shaping the queue rather than an order (`CONTEXT.md`: Wait until). */
+export const FLOW_STEPS: readonly PlanStepId[] = ['waitUntil', 'if']
+
 /** Each step kind's icon in the palette. */
 export const PLAN_STEP_ICONS: Record<PlanStepId, string> = {
   walk: '🚶',
@@ -87,6 +91,8 @@ export const PLAN_STEP_ICONS: Record<PlanStepId, string> = {
   drop: '📤',
   feed: '🍞',
   runScript: '📜',
+  waitUntil: '⏳',
+  if: '🔀',
 }
 
 /** The Flow group's Repeat's icon. */
@@ -98,6 +104,10 @@ export const REPEAT_ICON = '🔁'
  */
 export interface PlannerFlow {
   repeat?: () => void
+  /** Plans an If block around the picked steps: its condition is set first. */
+  wrapIf?: () => void
+  /** Puts the If block planned into the plan with its condition: the picked steps wrapped, or a block's condition changed. */
+  ifDone?: (plan: Plan, condition: Condition) => void
   after?: number
 }
 
@@ -127,7 +137,7 @@ export interface InsertPoint {
   at: number | undefined
   set: (at: number | undefined) => void
   /** Plans a step of this kind to go after `after`: a kind dragged from the palette and dropped. */
-  start?: (kind: PlanStepId, after: number | undefined) => void
+  start?: (kind: PlanStepId, after: number | undefined, extra?: Partial<Plan>) => void
 }
 
 /** What a step kind dragged from the palette carries (`DataTransfer` type). */

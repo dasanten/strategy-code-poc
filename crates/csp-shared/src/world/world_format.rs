@@ -6,7 +6,7 @@
 use super::WorldState;
 
 /// The current save format. A bump comes with a migration step in `csp-server`'s `world_format`.
-pub const WORLD_FORMAT_VERSION: u32 = 119;
+pub const WORLD_FORMAT_VERSION: u32 = 123;
 
 /// Why a save does not load.
 #[derive(Debug, thiserror::Error)]

@@ -2,6 +2,8 @@ import { useEffect, type ReactNode } from 'react'
 import {
   QUEUE_DEFAULT_STEP_MINUTES,
   QUEUE_MAX_STEPS,
+  QUEUE_MAX_DEPTH,
+  QUEUE_MAX_REPEAT,
   ADULT_AGE,
   AGILITY_LIMIT,
   AGILITY_SPEED_EFFECT,
@@ -797,32 +799,33 @@ export function Wiki() {
 
       <Section id="queues">
         <p>
-          A queue gives a resident a list of steps to do one after another, up to{' '}
-          {num(QUEUE_MAX_STEPS)} of them. A step is any order you could give them on its own: walk
-          to, pick up, drop, store, fetch, drive, hitch or unhitch a horse, mount or dismount, board
-          or get off a carriage, work, build, haul, feed the stable, breed horses, tear down, Build
-          line (road or wall), relocate to another of your cities, or run one of your scripts with
-          its params.
+          A queue gives a resident a list of steps to do one after another, some of them wrapped in
+          repeat blocks, up to {num(QUEUE_MAX_STEPS)} steps and blocks in all. A step is any order
+          you could give them on its own: walk to, pick up, drop, store, fetch, drive, hitch or
+          unhitch a horse, mount or dismount, board or get off a carriage, work, build, haul, feed
+          the stable, breed horses, tear down, Build line (road or wall), relocate to another of
+          your cities, or run one of your scripts with its params.
         </p>
         <p>
           To plan ahead, use <strong>Add step</strong> right under the queue's steps on the
           resident's card: a palette of every kind of step, each with its icon, grouped as the
           Orders tab is (Move, Work &amp; build, Goods, Scripts), plus Flow with{' '}
-          <strong>Repeat</strong> for the picked steps. Customise is the small ⚙ beside a step. New
-          steps go at the end; tap the <strong>+</strong> between two steps to add the next ones
-          there instead, and tap it again to go back to the end. One that acts on a place (work a
-          workplace, build, store at or fetch from a storage, pick up, feed the stable, breed, …)
-          has you pick that place on the map, anywhere, not only where the resident stands now; one
-          that needs more (which goods, what to build, what a smithy makes, which script) asks for
-          it on the card after. What to build is the same Build menu as on the card; a kind dimmed
-          because the tile lacks something today, such as a city's area, can still be added, for a
-          step before it may bring that. A step that has to be done on its tile goes after a walk
-          there, unless the step before already walks there; one that acts on no place (Explore,
-          Dismount, Get off, Run script) gets no walk. Adding a step only checks that it could make
-          sense (the place is there as you last knew it, and a carriage or horse is yours). A
-          workplace or construction site can be anyone's, in sight or as last seen, since a
-          workplace has no owner: queue Work at a far mine and they walk there and work it. Whether
-          a step can start is checked when its turn comes.
+          <strong>Repeat</strong> and <strong>If</strong> for the picked steps, and{' '}
+          <strong>Wait until</strong>. Customise is the small ⚙ beside a step. New steps go at the
+          end; tap the <strong>+</strong> between two steps to add the next ones there instead, and
+          tap it again to go back to the end. One that acts on a place (work a workplace, build,
+          store at or fetch from a storage, pick up, feed the stable, breed, …) has you pick that
+          place on the map, anywhere, not only where the resident stands now; one that needs more
+          (which goods, what to build, what a smithy makes, which script) asks for it on the card
+          after. What to build is the same Build menu as on the card; a kind dimmed because the tile
+          lacks something today, such as a city's area, can still be added, for a step before it may
+          bring that. A step that has to be done on its tile goes after a walk there, unless the
+          step before already walks there; one that acts on no place (Explore, Dismount, Get off,
+          Run script) gets no walk. Adding a step only checks that it could make sense (the place is
+          there as you last knew it, and a carriage or horse is yours). A workplace or construction
+          site can be anyone's, in sight or as last seen, since a workplace has no owner: queue Work
+          at a far mine and they walk there and work it. Whether a step can start is checked when
+          its turn comes.
         </p>
         <p>
           For a resident with no queue, the steps you add, paste or load collect as a{' '}
@@ -883,17 +886,87 @@ export function Wiki() {
         <p>
           To do some steps several times in a row, pick them (in a row) and press{' '}
           <strong>Repeat</strong>: they are wrapped in a repeat block, done {num(DEFAULT_REPEAT)}{' '}
-          times until you type another count. The block is a bracket inside Loop's, its count in its
-          head and its steps inside; it is picked, moved (into another block too), copied, pasted,
-          saved and removed as one,
-          <strong> Unwrap</strong> puts its steps back as they were, and a block can hold another.
-          Repeat blocks are the planner's own: on a resident's card, wrapping steps of a running
-          queue opens a draft of it that waits for <strong>Start queue</strong>, and starting it, or
-          Give to all on a group's plan, makes each block that many plain copies of its steps, so
-          the queue, the server and your scripts only ever see steps. The running queue lists the
-          copies, the current one marked. A queue holds at most {num(QUEUE_MAX_STEPS)} steps after
-          repeats; the planner counts them and won't give a plan over that, saying by how much. Loop
-          still loops the whole queue.
+          times until you type another count (up to {num(QUEUE_MAX_REPEAT)}), or pick{' '}
+          <strong>forever</strong> or <strong>until…</strong> in its head. The block is a bracket
+          inside Loop's, its count in its head and its steps inside; it is picked, moved (into
+          another block too), copied, pasted, saved and removed as one,
+          <strong> Unwrap</strong> puts its steps back as they were, and a block can hold another,
+          up to {num(QUEUE_MAX_DEPTH)} deep. The block is part of the queue itself: wrapping steps
+          of a running queue edits it live, and the resident does the block's steps round after
+          round. The running queue shows the round the block is on (“round 2 of 3”), and an edit
+          keeps it. A round in which none of its steps could start ends the block, so a block whose
+          steps all fail never spins: the queue goes on after it. A queue holds at most{' '}
+          {num(QUEUE_MAX_STEPS)} steps and blocks as written: “repeat 100 times” of two steps is
+          three. The planner counts them and won't give a plan over that, saying by how much. Loop
+          still loops the whole queue; a looping queue that got through all its steps without
+          starting one ends. Your scripts see a queue as before: the step the resident is on and its
+          number among the steps counted top to bottom, not the blocks or their rounds.
+        </p>
+        <p>
+          <strong>Repeat until</strong> repeats the block until a condition holds (the same
+          conditions as Wait until, below), set on the card when you pick <strong>until…</strong>;{' '}
+          <strong>Change</strong> in the head sets another. The condition is checked before each
+          round: when the block's turn comes, and again after each round. Once it holds, the block
+          runs no more rounds and the queue goes on after it; a round already begun runs to its end.
+          If it holds when the block's turn comes, the block runs no round at all. It has no count,
+          so the running queue shows just the round it is on (“round 4”), and a round in which none
+          of its steps could start still ends it. For example, “repeat until the storage holds 100
+          Wood: fetch, haul” keeps hauling until the storage is full enough. A condition on a place
+          gone, or no longer your realm's, counts as false and is noted in your realm log.
+        </p>
+        <p>
+          To do some steps only sometimes, pick them (in a row) and press <strong>If</strong> in Add
+          step's Flow, then set its condition (the same conditions as Wait until, below): they are
+          wrapped in an If block, a bracket with the condition in its head. When its turn comes the
+          condition is checked once: if it holds, the block's steps run; if not, they are passed
+          over. To do something else instead, pick other steps and press the block's{' '}
+          <strong>Else</strong>: they move into its Else part, a second part of the bracket, run
+          when the condition doesn't hold. The condition is not checked again while the block's
+          steps run, whatever changes meanwhile. <strong>Change</strong> sets another condition,{' '}
+          <strong>Unwrap</strong> puts its steps (then its Else steps) back where it was. An If
+          block nests with repeat blocks and counts as a block towards the queue's size and depth;
+          inside a repeat block it is checked again each round. A running queue marks the part it is
+          running. A condition on a place gone, or no longer your realm's, counts as false (so the
+          Else part runs) and is noted in your realm log. Your scripts see the steps counted top to
+          bottom, the Else part's after the block's own.
+        </p>
+        <p>
+          <strong>Wait until</strong>, in Add step's Flow, is a step that ends once its condition
+          holds; meanwhile the resident stands idle where they are. With a duration it also ends
+          when that is up, whether the condition holds or not. Its condition is set on the card:
+          pick the kind, then its fields. A condition is about the resident themself or one place of
+          your own realm, never anything you couldn't know:
+        </p>
+        <ul>
+          <li>
+            <strong>Carrying</strong>: they, or the carriage or boat they drive, carry at least or
+            less than so many of a good. The carriage or boat is the one they drive or are aboard,
+            else a carriage of yours on their tile; with none, the condition is false.
+          </li>
+          <li>
+            <strong>Full or empty</strong>: they, or that carriage or boat, are full (not room left
+            for one more unit of what they hold) or empty.
+          </li>
+          <li>
+            <strong>Stock at a place</strong>: a storage, workplace pile or construction site of
+            your realm, picked on the map, holds at least or less than so many of a good.
+          </li>
+          <li>
+            <strong>Hunger or health</strong>: their hunger meter or health is above or below a
+            share of full.
+          </li>
+          <li>
+            <strong>Mounted</strong> or <strong>Aboard</strong>: they are, or are not.
+          </li>
+          <li>
+            <strong>Game hour</strong>: it is before an hour, or that hour or later.
+          </li>
+        </ul>
+        <p>
+          The condition is checked from the tick after the wait started, so a wait whose condition
+          already holds lasts a tick. A condition on a place that is gone, or no longer your
+          realm's, counts as false and is noted once in your realm log. In a group's plan each
+          member checks the condition for themself.
         </p>
         <p>
           A step ends when it is done (the walk arrives, the goods are stored, the script calls{' '}

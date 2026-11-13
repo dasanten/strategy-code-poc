@@ -217,7 +217,7 @@ fn ends_their_order_script_and_queue_gets_them_off_their_horse_and_out_of_their_
     ana.script = Some(serde_json::from_value(json!({ "scriptId": 3, "memory": {} })).unwrap());
     ana.queue = Some(
         serde_json::from_value(json!({
-            "realmId": "r1", "steps": [], "current": 0, "startedAt": null, "loop": false,
+            "realmId": "r1", "items": [], "current": 0, "startedAt": null, "loop": false,
             "nextStepId": 1,
         }))
         .unwrap(),

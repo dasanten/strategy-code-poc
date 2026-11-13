@@ -1,5 +1,5 @@
 import { QUEUE_DEFAULT_STEP_MINUTES } from '@csp/balance'
-import { queueStepsProblem } from './shared/queue.js'
+import { queueSteps, queueStepsProblem } from './shared/queue.js'
 import type { OrderRequest, Queue } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
@@ -22,7 +22,15 @@ import {
   stepLabel,
   type Queued,
 } from './queue-view.js'
-import { dropItem, idsOf, moveItem, removeItem, timeItem, unroll } from './plan-blocks.js'
+import {
+  dropItem,
+  idsOf,
+  moveItem,
+  planSteps,
+  removeItem,
+  timedItems,
+  timeItem,
+} from './plan-blocks.js'
 
 /** Queues on the resident card (`CONTEXT.md`: Queue): Shift-append and the queue list. */
 
@@ -35,8 +43,9 @@ function queueOf(request: OrderRequest, current = 0): Queue {
   const steps = request.steps as { id?: number; order: OrderRequest; minutes?: number }[]
   return {
     realmId: 'r1',
-    steps: steps.map((s, i) => ({ ...s, id: s.id ?? i + 1 })),
-    current,
+    items: steps.map((s, i) => ({ ...s, id: s.id ?? i + 1 })),
+    // `current` counts from 0 here; the server names the step by its id.
+    current: steps[current]?.id ?? current + 1,
     startedAt: 0,
     loop: request.loop === true,
     nextStepId: steps.length + 1,
@@ -134,7 +143,7 @@ describe('Shift-append', () => {
 describe('the queue list', () => {
   // Work the farm, store, walk home: the browser check's round.
   const round = shiftQueue(idle, [work, { ...STORE_ALL, residentId: 'w1' }, walkHome])
-  const q = { ...round.queue!, current: 1, loop: true }
+  const q = { ...round.queue!, current: 2, loop: true }
   const names = { buildings: [{ id: 'f1', kind: 'farm' as const }] }
 
   it('lists the steps, the current one, durations and real time', () => {
@@ -182,7 +191,7 @@ describe('the queue list', () => {
 
   it('gives work moved off the end a duration', () => {
     const last = shiftQueue(idle, [walkHome, work])
-    const moved = unroll(moveItem(planOf(last.queue!).items, 3, -1))
+    const moved = planSteps(timedItems(moveItem(planOf(last.queue!).items, 3, -1)))
     expect(moved.map((s) => [s.id, s.minutes])).toEqual([
       [1, undefined],
       [3, QUEUE_DEFAULT_STEP_MINUTES],
@@ -300,17 +309,20 @@ describe('the group planner', () => {
     expect(planStep(looped, store).items.at(-1)!.id).toBe(4)
   })
 
-  it('Give to all unrolls repeat blocks into plain steps', () => {
+  it('Give to all gives repeat blocks as they are, without the plan’s ids', () => {
     const repeated = editPlan(plan, [{ repeat: 3, items: plan.items }])
     const [request] = giveToAll(repeated, members.slice(0, 1))
-    const steps = request!.steps as { order: OrderRequest }[]
-    expect(steps).toHaveLength(9)
-    expect(steps.map((s) => s.order).slice(3, 6)).toEqual([
-      { kind: 'walkTo', ...mine },
-      workMine,
-      store,
+    expect(request!.steps).toEqual([
+      {
+        repeat: 3,
+        items: [
+          { order: { kind: 'walkTo', ...mine } },
+          { order: workMine, minutes: QUEUE_DEFAULT_STEP_MINUTES },
+          { order: store },
+        ],
+      },
     ])
-    expect(queueStepsProblem(steps)).toBeUndefined()
+    expect(queueStepsProblem(request!.steps)).toBeUndefined()
   })
 
   it('Give to all sends one queue request per member with the same steps', () => {
@@ -368,7 +380,7 @@ describe('the queue draft', () => {
     const open = editPlan(built, built.items, true)
     expect(draftFor(idle, open)).toBe(open)
     expect(idle.queue).toBeUndefined()
-    expect(unroll(open.items)).toHaveLength(3)
+    expect(planSteps(open.items)).toHaveLength(3)
     // Start queue gives it as a new looped queue.
     expect(givePlan(idle, open)).toEqual({
       kind: 'queue',
@@ -390,13 +402,16 @@ describe('the queue draft', () => {
     ])
   })
 
-  it('edits a running queue live, unless a repeat block is in it', () => {
+  it('edits a running queue live, repeat blocks and all', () => {
     const running = shiftQueue(idle, [walkHome, work])
     expect(draftFor(running, undefined)).toBeUndefined()
     const steps = planOf(running.queue!).items
     expect(draftEdit(running, steps.slice(1))).toBeUndefined()
-    const wrapped = draftEdit(running, [{ repeat: 2, items: steps }])
-    expect(wrapped?.nextStepId).toBe(running.queue!.nextStepId + 1)
+    // A repeat block goes to the server as it is (ADR 0032): no draft.
+    expect(draftEdit(running, [{ repeat: 2, items: steps }])).toBeUndefined()
+    expect(givePlan(running, { items: [{ repeat: 2, items: steps }] }).steps).toEqual([
+      { repeat: 2, items: steps },
+    ])
   })
 
   it('Edit as draft leaves the running queue untouched until Start queue', () => {
@@ -411,7 +426,9 @@ describe('the queue draft', () => {
     // Start queue replaces it; the steps it keeps keep their ids, so the current one goes on.
     const started = givePlan(running, draft)
     expect(started.kind).toBe('editQueue')
-    const kept = running.queue!.steps.slice(1).map((s) => s.id)
+    const kept = queueSteps(running.queue!.items)
+      .slice(1)
+      .map((s) => s.id)
     expect((started.steps as { id?: number }[]).map((s) => s.id)).toEqual([...kept, undefined])
     expect(started.loop).toBe(true)
   })
@@ -440,8 +457,8 @@ describe('Clear', () => {
       { ...walkHome, x: 3 },
       { ...walkHome, x: 4 },
     ])
-    const running = { ...five, queue: { ...five.queue!, loop: true, current: 2 } }
-    const current = running.queue.steps[2]!
+    const running = { ...five, queue: { ...five.queue!, loop: true, current: 3 } }
+    const current = queueSteps(running.queue.items)[2]!
     const items = clearedItems(planOf(running.queue).items, current.id)
     expect(givePlan(running, { items, loop: false })).toEqual({
       kind: 'editQueue',
@@ -488,7 +505,7 @@ describe('adding a step between two others', () => {
   it('puts it after the insert point, keeping the rest', () => {
     // A Fetch walks to its storage itself.
     const placed = planStep(three, fetch, storage, 1)
-    expect(unroll(placed.items).map((s) => [s.id, s.order.kind])).toEqual([
+    expect(planSteps(placed.items).map((s) => [s.id, s.order.kind])).toEqual([
       [1, 'walkTo'],
       [4, 'fetch'],
       [2, 'store'],
@@ -498,7 +515,7 @@ describe('adding a step between two others', () => {
 
   it('puts a walk before a step done on its tile, unless the step before walks there', () => {
     const pickUp: OrderRequest = { kind: 'pickUp', goods: { wood: 5 } }
-    expect(unroll(planStep(three, pickUp, storage, 1).items).map((s) => s.order.kind)).toEqual([
+    expect(planSteps(planStep(three, pickUp, storage, 1).items).map((s) => s.order.kind)).toEqual([
       'walkTo',
       'walkTo',
       'pickUp',
@@ -508,7 +525,11 @@ describe('adding a step between two others', () => {
     const atStorage = planStep(EMPTY_PLAN, { kind: 'walkTo', ...storage })
     const two = planStep(atStorage, { kind: 'dismount' })
     const placed = planStep(two, pickUp, storage, 1)
-    expect(unroll(placed.items).map((s) => s.order.kind)).toEqual(['walkTo', 'pickUp', 'dismount'])
+    expect(planSteps(placed.items).map((s) => s.order.kind)).toEqual([
+      'walkTo',
+      'pickUp',
+      'dismount',
+    ])
   })
 
   it('goes into a running queue as one edit with the step in place', () => {

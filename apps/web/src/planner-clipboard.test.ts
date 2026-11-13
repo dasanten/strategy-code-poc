@@ -2,7 +2,16 @@ import { QUEUE_DEFAULT_STEP_MINUTES } from '@csp/balance'
 import type { OrderRequest, Queue, QueueStepRequest } from '@csp/shared-types'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { clear, copy, isEmpty, paste, pickStep } from './planner-clipboard.js'
-import { idsOf, insertItems, lastPicked, unroll, withIds, type PlanItem } from './plan-blocks.js'
+import {
+  idsOf,
+  insertItems,
+  lastPicked,
+  planSteps,
+  timedItems,
+  withIds,
+  type PlanItem,
+} from './plan-blocks.js'
+import { queueSteps } from './shared/queue.js'
 import { editPlan, EMPTY_PLAN, givePlan, planOf } from './queue-view.js'
 
 /** The planner clipboard (`CONTEXT.md`: Planner clipboard): pick, copy and paste steps. */
@@ -14,8 +23,9 @@ const work: OrderRequest = { kind: 'task', task: 'work', workplaceId: 'f1' }
 function queueOf(...steps: { order: OrderRequest; minutes?: number }[]): Queue {
   return {
     realmId: 'r1',
-    steps: steps.map((s, i) => ({ ...s, id: i + 1 })),
-    current: 0,
+    items: steps.map((s, i) => ({ ...s, id: i + 1 })),
+
+    current: 1,
     startedAt: 0,
     loop: false,
     nextStepId: steps.length + 1,
@@ -23,6 +33,7 @@ function queueOf(...steps: { order: OrderRequest; minutes?: number }[]): Queue {
 }
 
 const q = queueOf({ order: walk(20, 20) }, { order: work, minutes: 30 }, { order: walk(9, 3) })
+const qs = queueSteps(q.items)
 
 describe('planner clipboard', () => {
   beforeEach(clear)
@@ -30,7 +41,7 @@ describe('planner clipboard', () => {
   it('starts empty, and is empty again once cleared', () => {
     expect(isEmpty()).toBe(true)
     expect(paste()).toEqual([])
-    copy(q.steps)
+    copy(qs)
     expect(isEmpty()).toBe(false)
     clear()
     expect(isEmpty()).toBe(true)
@@ -38,12 +49,12 @@ describe('planner clipboard', () => {
 
   it('keeps a Build line step’s two tiles', () => {
     const line = { building: 'road', from: { x: 3, y: 4 }, to: { x: 8, y: 4 } }
-    copy(queueOf({ order: { kind: 'task', task: 'buildLine', ...line } }).steps)
+    copy(queueOf({ order: { kind: 'task', task: 'buildLine', ...line } }).items)
     expect(paste()).toEqual([{ order: { kind: 'task', task: 'buildLine', ...line } }])
   })
 
   it('pastes equal steps with no ids, places and durations kept', () => {
-    copy(q.steps)
+    copy(qs)
     const pasted = paste()
     expect(pasted).toEqual([
       { order: walk(20, 20) },
@@ -54,11 +65,11 @@ describe('planner clipboard', () => {
   })
 
   it('pastes fresh copies each time, sharing nothing with the queue or each other', () => {
-    copy(q.steps)
+    copy(qs)
     const a = paste() as QueueStepRequest[]
     const b = paste() as QueueStepRequest[]
     expect(a).not.toBe(b)
-    expect(a[0]!.order).not.toBe(q.steps[0]!.order)
+    expect(a[0]!.order).not.toBe(qs[0]!.order)
     expect(a[0]!.order).not.toBe(b[0]!.order)
     // Changing a copy changes neither the clipboard nor the other.
     a[0]!.order.x = 99
@@ -67,8 +78,8 @@ describe('planner clipboard', () => {
   })
 
   it('copying again replaces what was on the clipboard', () => {
-    copy(q.steps)
-    copy([q.steps[2]!])
+    copy(qs)
+    copy([qs[2]!])
     expect(paste()).toEqual([{ order: walk(9, 3) }])
   })
 
@@ -138,12 +149,12 @@ describe('paste position', () => {
   })
 
   it('inserts the pasted steps after that position, timing a step that never ends', () => {
-    copy([q.steps[1]!, q.steps[2]!])
-    const pasted = unroll(insertItems(steps, 1, paste()))
+    copy([qs[1]!, qs[2]!])
+    const pasted = planSteps(timedItems(insertItems(steps, 1, paste())))
     expect(pasted.map((s) => s.id)).toEqual([1, undefined, undefined, 2, 3])
     expect(pasted.map((s) => s.order)).toEqual([walk(20, 20), work, walk(9, 3), work, walk(9, 3)])
     // Into an empty planner, they are the plan.
-    expect(unroll(insertItems([], undefined, paste())).map((s) => s.order)).toEqual([
+    expect(planSteps(timedItems(insertItems([], undefined, paste()))).map((s) => s.order)).toEqual([
       work,
       walk(9, 3),
     ])
@@ -152,13 +163,13 @@ describe('paste position', () => {
       { id: 1, order: work },
       { id: 2, order: walk(1, 1) },
     ])
-    const atEnd = unroll(insertItems(steps, undefined, paste()))
+    const atEnd = planSteps(timedItems(insertItems(steps, undefined, paste())))
     expect(atEnd[3]).toEqual({ order: work, minutes: QUEUE_DEFAULT_STEP_MINUTES })
     expect(atEnd[4]).toEqual({ order: walk(1, 1) })
   })
 
   it('the pasted steps get the next ids, as the server gives them, so a second paste goes after', () => {
-    copy([q.steps[0]!, q.steps[2]!])
+    copy([qs[0]!, qs[2]!])
     const given = withIds(insertItems(steps, undefined, paste()), q.nextStepId)
     expect(idsOf(given.items)).toEqual([1, 2, 3, 4, 5])
     // A group's plan hands them out just so.
@@ -166,7 +177,7 @@ describe('paste position', () => {
     expect(idsOf(plan.items)).toEqual([1, 2])
     const again = editPlan(plan, insertItems(plan.items, lastPicked(plan.items, [1, 2]), paste()))
     expect(idsOf(again.items)).toEqual([1, 2, 3, 4])
-    expect(unroll(again.items).map((s) => s.order)).toEqual([
+    expect(planSteps(again.items).map((s) => s.order)).toEqual([
       walk(20, 20),
       walk(9, 3),
       walk(20, 20),
@@ -175,7 +186,7 @@ describe('paste position', () => {
   })
 
   it('a resident with no queue gets one from the paste, one with a queue an edit', () => {
-    copy(q.steps)
+    copy(qs)
     expect(givePlan({ id: 'w1' }, { items: paste() })).toMatchObject({
       kind: 'queue',
       residentId: 'w1',

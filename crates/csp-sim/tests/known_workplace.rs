@@ -241,7 +241,7 @@ fn takes_a_work_step_at_it_in_a_queue_after_a_walk_there() {
         s.tick();
     }
     assert!(s.works_f9(), "{:?}", s.w1().order);
-    assert_eq!(s.w1().queue.as_ref().map(|q| q.current), Some(1));
+    assert_eq!(s.w1().queue.as_ref().and_then(|q| q.current_index()), Some(1));
     // The task fills the param, which the card shows.
     let params = serde_json::to_value(&s.w1().script_params).unwrap();
     assert_eq!(params[work().to_string()]["workplace"], json!("f9"));

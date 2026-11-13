@@ -720,6 +720,11 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         tone: 'warn',
       }
     }
+    case 'conditionPlaceGone':
+      return {
+        text: `${e.name}’s queue asks about a place that is gone or no longer yours: the condition counts as false.`,
+        tone: 'warn',
+      }
     case 'relocateFailed':
       return {
         text:

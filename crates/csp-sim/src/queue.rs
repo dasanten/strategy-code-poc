@@ -1,18 +1,22 @@
-//! Queues (`CONTEXT.md`: Queue): which orders can be steps and how a step list is checked
-//! (`packages/shared/src/queue.ts`). Here rather than in `csp-shared` because the step check
-//! measures an order as `JSON.stringify` writes it, which `csp-lang`'s JavaScript helpers know.
+//! Queues (`CONTEXT.md`: Queue, Repeat block): which orders can be steps and how a queue's items
+//! are checked (`packages/shared/src/queue.ts`). Here rather than in `csp-shared` because the step
+//! check measures an order as `JSON.stringify` writes it, which `csp-lang`'s JavaScript helpers
+//! know.
 
+use crate::conditions::condition_of;
 use csp_lang::js::{json_string, number_to_string, utf16_len};
-use csp_shared::balance::{QUEUE_MAX_STEPS, QUEUE_STEP_MAX_CHARS};
+use csp_shared::balance::{
+    QUEUE_MAX_DEPTH, QUEUE_MAX_REPEAT, QUEUE_MAX_STEPS, QUEUE_STEP_MAX_CHARS,
+};
 use csp_shared::protocol::BuildLine;
-use csp_shared::world::{BuildingKind, OrderRequest, Queue, Tile};
+use csp_shared::world::{BuildingKind, Condition, OrderRequest, Queue, Repeat, Tile};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ts_rs::TS;
 
 /// The order kinds a queue step can be (`QUEUE_STEP_KINDS`): the one-off actions and tasks the
 /// UI gives a resident, and running one of the Player's scripts. Never a queue.
-pub const QUEUE_STEP_KINDS: [&str; 25] = [
+pub const QUEUE_STEP_KINDS: [&str; 26] = [
     "walkTo",
     "drive",
     "row",
@@ -38,7 +42,12 @@ pub const QUEUE_STEP_KINDS: [&str; 25] = [
     "feed",
     "task",
     "runScript",
+    "waitUntil",
 ];
+
+/// The step kind of a Wait until (`CONTEXT.md`: Wait until): the queue runner keeps it, no order
+/// kind does. Its order carries only its `condition`.
+pub const WAIT_UNTIL: &str = "waitUntil";
 
 /// Steps that run a script (a task's default or the Player's own) rather than a built-in order
 /// (`runsScript`).
@@ -85,6 +94,111 @@ pub fn step_line(order: &OrderRequest) -> Option<BuildLine> {
     Some(BuildLine { building, from, to })
 }
 
+/// A queue item as a request gives it: a repeat block of more, an If block, or a step. Told apart
+/// by `repeat` and `if`, as the planner's `isBlock` and `isIf` do.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(untagged)]
+pub enum QueueItemRequest {
+    Repeat(RepeatBlockRequest),
+    If(IfBlockRequest),
+    Step(QueueStepRequest),
+}
+
+/// A repeat block as a request gives it (`CONTEXT.md`: Repeat block): `id` names a block already
+/// in the queue being edited, which keeps its round.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct RepeatBlockRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub id: Option<u32>,
+    pub repeat: Repeat,
+    pub items: Vec<QueueItemRequest>,
+}
+
+/// An If block as a request gives it (`CONTEXT.md`: If block): its condition, its items and an
+/// optional Else part. `id` names a block already in the queue being edited.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct IfBlockRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub id: Option<u32>,
+    pub r#if: Condition,
+    pub items: Vec<QueueItemRequest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub r#else: Option<Vec<QueueItemRequest>>,
+}
+
+impl QueueItemRequest {
+    pub fn id(&self) -> Option<u32> {
+        match self {
+            QueueItemRequest::Repeat(b) => b.id,
+            QueueItemRequest::If(b) => b.id,
+            QueueItemRequest::Step(s) => s.id,
+        }
+    }
+}
+
+/// The steps among `items`, top to bottom (an If block's items before its Else part).
+pub fn request_steps(items: &[QueueItemRequest]) -> Vec<&QueueStepRequest> {
+    fn walk<'a>(items: &'a [QueueItemRequest], out: &mut Vec<&'a QueueStepRequest>) {
+        for item in items {
+            match item {
+                QueueItemRequest::Step(s) => out.push(s),
+                QueueItemRequest::Repeat(b) => walk(&b.items, out),
+                QueueItemRequest::If(b) => {
+                    walk(&b.items, out);
+                    walk(b.r#else.as_deref().unwrap_or_default(), out);
+                }
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(items, &mut out);
+    out
+}
+
+/// A condition a block of a request asks (`request_conditions`).
+pub struct BlockCondition<'a> {
+    /// The block's id, if it is one already in the queue.
+    pub id: Option<u32>,
+    pub condition: &'a Condition,
+    /// Which block asks it, as a problem names it: "an If block" or "a Repeat until".
+    pub block: &'static str,
+}
+
+/// The conditions the blocks among `items` ask (an If block's, a Repeat until's), outermost
+/// first.
+pub fn request_conditions(items: &[QueueItemRequest]) -> Vec<BlockCondition<'_>> {
+    fn walk<'a>(items: &'a [QueueItemRequest], out: &mut Vec<BlockCondition<'a>>) {
+        for item in items {
+            match item {
+                QueueItemRequest::Step(_) => {}
+                QueueItemRequest::Repeat(b) => {
+                    if let Some(c) = b.repeat.until() {
+                        out.push(BlockCondition {
+                            id: b.id,
+                            condition: c,
+                            block: "a Repeat until",
+                        });
+                    }
+                    walk(&b.items, out);
+                }
+                QueueItemRequest::If(b) => {
+                    out.push(BlockCondition { id: b.id, condition: &b.r#if, block: "an If block" });
+                    walk(&b.items, out);
+                    walk(b.r#else.as_deref().unwrap_or_default(), out);
+                }
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(items, &mut out);
+    out
+}
+
 /// A queue step as a request gives it (`QueueStepRequest`): `id` names a step already in the
 /// queue being edited.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
@@ -124,19 +238,143 @@ pub fn json_length(v: &Value) -> usize {
     }
 }
 
-/// Why a list of queue steps can't be given, if it can't (`queueStepsProblem`): each must be an
-/// order a step can be (`QUEUE_STEP_KINDS`), at most `QUEUE_MAX_STEPS` of them, with a duration
-/// in whole game minutes if any; one that never ends needs a duration unless it is the last. A
-/// Build line step carries its whole line (`step_line`) and ends on its own once the line is
-/// built or laid out. Takes the steps as the request sent them, any JSON.
-pub fn queue_steps_problem(steps: Option<&Value>) -> Option<String> {
-    let Some(Value::Array(steps)) = steps else {
+/// A step of a request's items as `walk_items` finds it: its JSON, and whether a block around it
+/// repeats it.
+struct WalkedStep<'a> {
+    step: &'a Value,
+    repeated: bool,
+}
+
+/// Walks a request's items (`CONTEXT.md`: Repeat block): counts steps and blocks as written,
+/// collects the steps top to bottom, and notes the first block that is malformed or nests too
+/// deep.
+fn walk_items<'a>(
+    items: &'a [Value],
+    depth: u32,
+    repeated: bool,
+    count: &mut usize,
+    steps: &mut Vec<WalkedStep<'a>>,
+    problem: &mut Option<String>,
+) {
+    for item in items {
+        *count += 1;
+        let block = item.as_object().filter(|o| o.contains_key("repeat") || o.contains_key("if"));
+        let Some(block) = block else {
+            steps.push(WalkedStep { step: item, repeated });
+            continue;
+        };
+        if f64::from(depth + 1) > QUEUE_MAX_DEPTH && problem.is_none() {
+            *problem =
+                Some(format!("blocks nest at most {} deep", number_to_string(QUEUE_MAX_DEPTH)));
+        }
+        if block.contains_key("if") {
+            walk_if(block, depth, repeated, count, steps, problem);
+            continue;
+        }
+        let mut set = |p: String| {
+            if problem.is_none() {
+                *problem = Some(p);
+            }
+        };
+        if block.keys().any(|k| !["id", "repeat", "items"].contains(&k.as_str())) {
+            set("a repeat block holds only its id, count and items".into());
+        }
+        let repeat = block.get("repeat");
+        let once = repeat.and_then(Value::as_f64) == Some(1.0);
+        let count_ok = match repeat {
+            Some(Value::String(s)) => s == "forever",
+            Some(Value::Object(until)) => {
+                if until.keys().any(|k| k != "until") {
+                    set("a Repeat until holds only its condition".into());
+                } else if let Err(p) = condition_of(until.get("until")) {
+                    let sep = if p == "needs a condition" { " " } else { ": " };
+                    set(format!("a Repeat until{sep}{p}"));
+                }
+                true
+            }
+            Some(v) => v
+                .as_f64()
+                .is_some_and(|n| n.fract() == 0.0 && (1.0..=QUEUE_MAX_REPEAT).contains(&n)),
+            None => false,
+        };
+        if !count_ok {
+            set(format!(
+                "a repeat block repeats from 1 to {} times, or forever",
+                number_to_string(QUEUE_MAX_REPEAT)
+            ));
+        }
+        match block.get("items") {
+            Some(Value::Array(inner)) if !inner.is_empty() => {
+                walk_items(inner, depth + 1, repeated || !once, count, steps, problem);
+            }
+            _ => set("a repeat block needs a step".into()),
+        }
+    }
+}
+
+/// Walks an If block of a request (`CONTEXT.md`: If block): its condition, its items and an
+/// optional Else part, each part holding a step. Its steps are repeated when a block around it
+/// repeats them.
+fn walk_if<'a>(
+    block: &'a serde_json::Map<String, Value>,
+    depth: u32,
+    repeated: bool,
+    count: &mut usize,
+    steps: &mut Vec<WalkedStep<'a>>,
+    problem: &mut Option<String>,
+) {
+    let set = |problem: &mut Option<String>, p: String| {
+        if problem.is_none() {
+            *problem = Some(p);
+        }
+    };
+    if block.keys().any(|k| !["id", "if", "items", "else"].contains(&k.as_str())) {
+        set(problem, "an If block holds only its id, condition, items and Else part".into());
+    }
+    if let Err(p) = condition_of(block.get("if")) {
+        let sep = if p == "needs a condition" { " " } else { ": " };
+        set(problem, format!("an If block{sep}{p}"));
+    }
+    match block.get("items") {
+        Some(Value::Array(inner)) if !inner.is_empty() => {
+            walk_items(inner, depth + 1, repeated, count, steps, problem);
+        }
+        _ => set(problem, "an If block needs a step".into()),
+    }
+    match block.get("else") {
+        None => {}
+        Some(Value::Array(inner)) if !inner.is_empty() => {
+            walk_items(inner, depth + 1, repeated, count, steps, problem);
+        }
+        _ => set(problem, "an If block's Else part needs a step".into()),
+    }
+}
+
+/// Why a queue's items can't be given, if they can't (`queueStepsProblem`, `CONTEXT.md`: Repeat
+/// block): steps and repeat blocks, at most `QUEUE_MAX_STEPS` of them as written, blocks nested at
+/// most `QUEUE_MAX_DEPTH` deep, each repeating a whole number of times up to `QUEUE_MAX_REPEAT`,
+/// forever or until a condition holds, never empty. Each step must be an order a step can be
+/// (`QUEUE_STEP_KINDS`), with a duration in whole game minutes if any; one that never ends needs
+/// a duration unless it is the last step and no block around it repeats it. A Build line step
+/// carries its whole line (`step_line`) and ends on its own once the line is built or laid out.
+/// Steps are numbered top to bottom. Takes the items as the request sent them, any JSON.
+pub fn queue_steps_problem(items: Option<&Value>) -> Option<String> {
+    let Some(Value::Array(items)) = items else {
         return Some("the steps must be a list".into());
     };
-    if steps.len() as f64 > QUEUE_MAX_STEPS {
-        return Some(format!("a queue holds at most {} steps", number_to_string(QUEUE_MAX_STEPS)));
+    let (mut count, mut steps, mut problem) = (0, Vec::new(), None);
+    walk_items(items, 0, false, &mut count, &mut steps, &mut problem);
+    if count as f64 > QUEUE_MAX_STEPS {
+        return Some(format!(
+            "a queue holds at most {} steps and blocks",
+            number_to_string(QUEUE_MAX_STEPS)
+        ));
     }
-    for (i, step) in steps.iter().enumerate() {
+    if problem.is_some() {
+        return problem;
+    }
+    let total = steps.len();
+    for (i, WalkedStep { step, repeated }) in steps.into_iter().enumerate() {
         let n = i + 1;
         let order = step.as_object().and_then(|s| s.get("order"));
         let Some(Value::Object(fields)) = order else {
@@ -152,6 +390,14 @@ pub fn queue_steps_problem(steps: Option<&Value>) -> Option<String> {
         let order = OrderRequest { kind: kind_str.to_string(), fields: rest };
         if json_length(&Value::Object(fields.clone())) as f64 > QUEUE_STEP_MAX_CHARS {
             return Some(format!("step {n} is too long"));
+        }
+        if order.kind == WAIT_UNTIL {
+            if order.fields.keys().any(|k| k != "condition") {
+                return Some(format!("step {n}: a Wait until holds only its condition"));
+            }
+            if let Err(problem) = condition_of(order.fields.get("condition")) {
+                return Some(format!("step {n}: {problem}"));
+            }
         }
         if order.kind == "task"
             && field_str(&order, "task") == Some("buildLine")
@@ -169,7 +415,7 @@ pub fn queue_steps_problem(steps: Option<&Value>) -> Option<String> {
                 _ => return Some(format!("step {n}'s duration must be a whole number of minutes")),
             },
         };
-        if minutes.is_none() && never_ends(&order) && n < steps.len() {
+        if minutes.is_none() && never_ends(&order) && (n < total || repeated) {
             return Some(format!(
                 "step {n} never ends on its own: give it a duration or make it the last"
             ));
@@ -223,12 +469,15 @@ pub struct QueueView {
     pub started_at: Option<f64>,
 }
 
-/// What a script sees of a queue (`queueView`).
+/// What a script sees of a queue (`queueView`): the current step and its number among the steps
+/// top to bottom, as written. Blocks and rounds it doesn't see (ADR 0032).
 pub fn queue_view(q: &Queue) -> QueueView {
-    let step = &q.steps[q.current as usize];
+    let steps = q.steps();
+    let at = q.current_index().unwrap_or(0);
+    let step = steps[at];
     QueueView {
-        step: q.current + 1,
-        steps: q.steps.len(),
+        step: at as u32 + 1,
+        steps: steps.len(),
         r#loop: q.r#loop,
         kind: step.order.kind.clone(),
         task: field_str(&step.order, "task").map(str::to_string),
@@ -263,7 +512,7 @@ mod tests {
         let many: Vec<_> = (0..51).map(|_| walk.clone()).collect();
         assert_eq!(
             queue_steps_problem(Some(&Value::Array(many))).as_deref(),
-            Some("a queue holds at most 50 steps")
+            Some("a queue holds at most 50 steps and blocks")
         );
         assert_eq!(
             queue_steps_problem(Some(&json!([{ "order": { "kind": "workAt" } }, walk.clone()])))

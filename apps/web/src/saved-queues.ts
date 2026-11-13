@@ -1,5 +1,6 @@
 import type { Building, OrderRequest } from '@csp/shared-types'
 import { copyItems, type PlanItem } from './plan-blocks.js'
+import { conditionProblem } from './shared/condition.js'
 
 /**
  * Saved queues (`CONTEXT.md`: Saved queue): the planner's steps saved under a name, to load onto
@@ -111,12 +112,19 @@ function savedQueue(name: string, entry: unknown): SavedQueue | undefined {
 function isItem(s: unknown): s is PlanItem {
   if (isObject(s) && 'repeat' in s) {
     const { repeat, items } = s
+    const until = isObject(repeat) && conditionProblem(repeat.until) === undefined
     return (
-      Number.isInteger(repeat) &&
-      (repeat as number) >= 1 &&
+      (repeat === 'forever' || until || (Number.isInteger(repeat) && (repeat as number) >= 1)) &&
       Array.isArray(items) &&
       items.length > 0 &&
       items.every(isItem)
+    )
+  }
+  if (isObject(s) && 'if' in s) {
+    const { items, else: other } = s
+    const part = (l: unknown) => Array.isArray(l) && l.length > 0 && l.every(isItem)
+    return (
+      conditionProblem(s.if) === undefined && part(items) && (other === undefined || part(other))
     )
   }
   if (!isObject(s) || !isObject(s.order) || typeof s.order.kind !== 'string') return false

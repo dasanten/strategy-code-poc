@@ -14,37 +14,32 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use csp_shared::balance::MAP_SIZE;
+use csp_shared::balance::{QUEUE_MAX_DEPTH, QUEUE_MAX_STEPS};
 use csp_shared::terrain::TerrainMap;
 use csp_shared::time::TICKS_PER_GAME_HOUR;
 use csp_shared::world::{
-    Interrupted, OrderEndedKind, OrderRequest, Queue, QueueStep, RealmEventWhat, Resident,
-    WorldState,
+    Interrupted, OrderEndedKind, OrderRequest, Queue, RealmEventWhat, Resident, WorldState,
 };
 use serde_json::Value;
 
+use crate::conditions::{condition_holds, condition_of, condition_place_problem, Holds};
 use crate::events::record_event;
 use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::orders::{leave_armies, OrderKind, OrderKinds};
 use crate::queries::residents::is_down;
 use crate::queue::{
-    field_str, queue_steps_problem, runs_script, QueueStepRequest, QUEUE_STEP_KINDS,
+    field_str, queue_steps_problem, request_conditions, request_steps, runs_script,
+    QueueItemRequest, QueueStepRequest, QUEUE_STEP_KINDS, WAIT_UNTIL,
+};
+use crate::queue_tree::{
+    advance, begin, block_ids, depth_of, ids_of, kept_items, mark_started, rounds_of,
+    rounds_problem, settle_rounds, Advance, Rounds,
 };
 use crate::sight::InvariantViolation;
 use crate::tick::{RunQueues, Scratch};
 
 /// Ticks in a game minute.
 const TICKS_PER_GAME_MINUTE: f64 = TICKS_PER_GAME_HOUR / 60.0;
-
-/// The step's order as kept: plain data, without whom it is for (`keptOrder`).
-fn kept_order(order: &OrderRequest) -> OrderRequest {
-    let mut kept = order.clone();
-    kept.fields.shift_remove("residentId");
-    kept
-}
-
-fn kept_step(id: u32, s: &QueueStepRequest) -> QueueStep {
-    QueueStep { id, order: kept_order(&s.order), minutes: s.minutes }
-}
 
 /// A tile as an order names it, `{ x, y }`, rather than a place by its id (`isTile`).
 fn is_tile(p: &serde_json::Map<String, Value>) -> bool {
@@ -171,13 +166,23 @@ pub fn step_place_problem(
 fn places_problem(
     world: &WorldState,
     realm_id: &str,
-    steps: &[QueueStepRequest],
+    steps: &[&QueueStepRequest],
     checked: impl Fn(&QueueStepRequest) -> bool,
     terrain: Option<&TerrainMap>,
 ) -> Option<String> {
     let size = terrain.map_or(MAP_SIZE, |t| t.size);
     for (i, s) in steps.iter().enumerate() {
         if !checked(s) {
+            continue;
+        }
+        // A Wait until's condition asks only about places of the realm (`CONTEXT.md`: Condition).
+        if s.order.kind == WAIT_UNTIL {
+            let problem = condition_of(s.order.fields.get("condition"))
+                .ok()
+                .and_then(|c| condition_place_problem(world, realm_id, &c));
+            if let Some(problem) = problem {
+                return Some(format!("step {}: {problem}", i + 1));
+            }
             continue;
         }
         if let Some(problem) = step_place_problem(world, realm_id, &s.order, size) {
@@ -203,8 +208,8 @@ fn queued_resident(
     }
 }
 
-/// The steps a request sends, once `queue_steps_problem` passed them.
-fn steps_of(order: &OrderRequest) -> Vec<QueueStepRequest> {
+/// The items a request sends, steps and blocks, once `queue_steps_problem` passed them.
+fn items_of(order: &OrderRequest) -> Vec<QueueItemRequest> {
     order
         .fields
         .get("steps")
@@ -244,8 +249,11 @@ impl OrderKind for QueueOrder {
         if loop_of(order).is_err() {
             return Some("loop must be true or false".into());
         }
-        queue_steps_problem(raw)
-            .or_else(|| places_problem(world, &realm_id, &steps_of(order), |_| true, terrain))
+        queue_steps_problem(raw).or_else(|| {
+            let items = items_of(order);
+            places_problem(world, &realm_id, &request_steps(&items), |_| true, terrain)
+                .or_else(|| conditions_problem(world, &realm_id, &items, false))
+        })
     }
 
     fn apply(
@@ -259,20 +267,29 @@ impl OrderKind for QueueOrder {
         else {
             return;
         };
-        let steps = steps_of(order);
+        // Steps and blocks get their ids from 1 in the order listed, a block before its items.
+        let mut next_step_id = 1;
+        let items = kept_items(&items_of(order), &mut next_step_id, &Rounds::new());
         // A queue is an order of their own, so they leave their army (`CONTEXT.md`: Army).
         let id = world.residents[i].id.clone();
         leave_armies(world, &HashSet::from([id]));
-        let r = &mut world.residents[i];
-        r.order = None;
-        r.queue = Some(Queue {
-            realm_id,
-            steps: steps.iter().enumerate().map(|(n, s)| kept_step(n as u32 + 1, s)).collect(),
+        world.residents[i].order = None;
+        let mut q = Queue {
+            realm_id: realm_id.clone(),
+            items,
             current: 0,
             started_at: None,
             r#loop: loop_of(order) == Ok(Some(true)),
-            next_step_id: steps.len() as u32 + 1,
-        });
+            next_step_id,
+            started: false,
+        };
+        // An If block first in the queue asks its condition now: its turn has come.
+        let mut gone = Vec::new();
+        let outcome = begin(&mut q, &mut |c| asked(world, i, &realm_id, c, &mut gone));
+        world.residents[i].queue = (outcome != Advance::Ended).then_some(q);
+        for place_id in gone {
+            place_gone(world, i, &realm_id, &place_id, world.tick as f64);
+        }
     }
 }
 
@@ -305,20 +322,28 @@ impl OrderKind for EditQueueOrder {
             return Some(problem);
         }
         let raw: Vec<Value> = order.fields["steps"].as_array().cloned().unwrap_or_default();
-        // A step's `id` as sent: anything there counts as given, as `s.id === undefined` does.
-        let ids: Vec<&Value> = raw.iter().filter_map(|s| s.get("id")).collect();
-        let distinct: HashSet<String> = ids.iter().map(|v| v.to_string()).collect();
+        // An item's `id` as sent, and whether it is a block: anything there counts as given, as
+        // `s.id === undefined` does.
+        let mut ids: Vec<(&Value, bool)> = Vec::new();
+        sent_ids(&raw, &mut ids);
+        let distinct: HashSet<String> = ids.iter().map(|(v, _)| v.to_string()).collect();
         if distinct.len() != ids.len() {
             return Some("a step is in the list twice".into());
         }
-        let known =
-            |v: &Value| v.as_f64().is_some_and(|id| q.steps.iter().any(|s| s.id as f64 == id));
-        if !ids.iter().all(|v| known(v)) {
+        let steps: Vec<u32> = q.steps().iter().map(|s| s.id).collect();
+        let blocks = block_ids(&q.items);
+        let known = |v: &Value, block: bool| {
+            let list = if block { &blocks } else { &steps };
+            v.as_f64().is_some_and(|id| list.iter().any(|&s| f64::from(s) == id))
+        };
+        if !ids.iter().all(|&(v, block)| known(v, block)) {
             return Some("no such step in the queue".into());
         }
         // Only the steps added are checked: one already there whose place is gone since is
         // skipped when its turn comes, and can still be edited until then.
-        places_problem(world, &realm_id, &steps_of(order), |s| s.id.is_none(), terrain)
+        let items = items_of(order);
+        places_problem(world, &realm_id, &request_steps(&items), |s| s.id.is_none(), terrain)
+            .or_else(|| conditions_problem(world, &realm_id, &items, true))
     }
 
     fn apply(
@@ -333,40 +358,50 @@ impl OrderKind for EditQueueOrder {
         };
         let r = &mut world.residents[i];
         let Some(q) = r.queue.as_mut() else { return };
-        let current = q.steps[q.current as usize].id;
-        let steps: Vec<QueueStep> = steps_of(order)
-            .iter()
-            .map(|s| {
-                let id = s.id.unwrap_or_else(|| {
-                    q.next_step_id += 1;
-                    q.next_step_id - 1
-                });
-                kept_step(id, s)
-            })
-            .collect();
+        // The current step's number top to bottom, for the step in its place should it go.
+        let at = q.current_index().unwrap_or(0);
+        let rounds = rounds_of(&q.items);
+        q.items = kept_items(&items_of(order), &mut q.next_step_id, &rounds);
         if let Ok(Some(l)) = loop_of(order) {
             q.r#loop = l;
         }
-        let kept = steps.iter().position(|s| s.id == current);
-        let len = steps.len() as u32;
-        q.steps = steps;
-        if let Some(kept) = kept {
-            // The current step keeps going, but with the request and duration as edited.
-            q.current = kept as u32;
+        let steps: Vec<u32> = q.steps().iter().map(|s| s.id).collect();
+        if steps.contains(&q.current) {
+            // The current step keeps going, but with the request and duration as edited; each
+            // block keeps its round by its id.
+            settle_rounds(q);
             return;
         }
         // The current step was removed: it stops, and the one in its place starts.
-        let ends = q.current >= len && !(q.r#loop && len > 0);
-        if q.current >= len && !ends {
-            q.current = 0;
-        }
+        let next = match steps.get(at) {
+            Some(&id) => Some(id),
+            None if q.r#loop => steps.first().copied(),
+            None => None,
+        };
         stop_step(r);
-        if ends {
+        let Some(next) = next else {
             r.queue = None;
             return;
-        }
+        };
         if let Some(q) = r.queue.as_mut() {
+            q.current = next;
             q.started_at = None;
+            settle_rounds(q);
+        }
+    }
+}
+
+/// The ids a request's items carry, with whether each is a block's, top to bottom.
+fn sent_ids<'a>(items: &'a [Value], out: &mut Vec<(&'a Value, bool)>) {
+    for item in items {
+        let block = item.get("repeat").is_some() || item.get("if").is_some();
+        if let Some(id) = item.get("id") {
+            out.push((id, block));
+        }
+        for part in ["items", "else"] {
+            if let Some(Value::Array(inner)) = item.get(part).filter(|_| block) {
+                sent_ids(inner, out);
+            }
         }
     }
 }
@@ -452,37 +487,71 @@ impl QueueRunner {
                 continue;
             }
             let q = r.queue.as_ref().expect("checked above");
+            // Whether the queue already moved across a block's edge this tick.
+            let mut crossed = false;
             if let Some(started_at) = q.started_at {
-                let step = &q.steps[q.current as usize];
+                let step = q.current_step().expect("current names a step");
                 let time_up = step
                     .minutes
                     .is_some_and(|m| world.tick as f64 - started_at >= m * TICKS_PER_GAME_MINUTE);
-                let done =
-                    if runs_script(&step.order) { r.script.is_none() } else { r.order.is_none() };
+                // A Wait until is done once its condition holds, checked from the tick after it
+                // started, so one that already holds can't spin (`CONTEXT.md`: Wait until).
+                let held = (step.order.kind == WAIT_UNTIL).then(|| {
+                    condition_of(step.order.fields.get("condition"))
+                        .map_or(Holds::No, |c| condition_holds(world, i, &realm_id, &c))
+                });
+                let done = match &held {
+                    Some(h) => h.yes(),
+                    None if runs_script(&step.order) => r.script.is_none(),
+                    None => r.order.is_none(),
+                };
+                if let Some(Holds::PlaceGone(place_id)) = held {
+                    place_gone(world, i, &realm_id, &place_id, started_at);
+                }
                 if !time_up && !done {
                     continue;
                 }
+                let r = &world.residents[i];
                 if time_up {
                     stop_step(&mut world.residents[i]);
                 } else if let Some(failure) = failure_of(r, started_at) {
                     skipped(world, i, &failure, false);
                 }
-                if !next(&mut world.residents[i]) {
-                    continue;
+                match next(world, i, &realm_id) {
+                    Advance::Ended => continue,
+                    Advance::Moved { crossed: c } => crossed = c,
                 }
             }
-            self.start(world, i, &sender);
+            self.start(world, i, &sender, crossed);
         }
     }
 
     /// Starts the current step, checked as if given on its own; one that can't start is skipped,
-    /// and the next one tried. When none of the queue's steps can start, the queue ends.
-    fn start(&self, world: &mut WorldState, i: usize, sender: &OrderSender) {
-        let len = world.residents[i].queue.as_ref().map_or(0, |q| q.steps.len());
-        for tried in 1..=len {
+    /// and the next one tried. When none of the queue's steps can start, the queue ends. A queue
+    /// moves across a block's edge at most once a tick (ADR 0032): the step past a second one
+    /// is tried next tick. `crossed` is whether it already moved across one this tick.
+    fn start(&self, world: &mut WorldState, i: usize, sender: &OrderSender, mut crossed: bool) {
+        let len = world.residents[i].queue.as_ref().map_or(0, |q| q.steps().len());
+        // The steps tried and skipped in a row this tick, each once.
+        let mut failed = HashSet::new();
+        loop {
             let r = &world.residents[i];
             let Some(q) = &r.queue else { return };
-            let step = &q.steps[q.current as usize];
+            let step = q.current_step().expect("current names a step");
+            let step_id = step.id;
+            // A Wait until always starts: the resident stops what they did and stands idle
+            // until it ends (`CONTEXT.md`: Wait until).
+            if step.order.kind == WAIT_UNTIL {
+                let tick = world.tick as f64;
+                let r = &mut world.residents[i];
+                stop_step(r);
+                r.order_ended = None;
+                if let Some(q) = r.queue.as_mut() {
+                    q.started_at = Some(tick);
+                    mark_started(q);
+                }
+                return;
+            }
             let mut order = step.order.clone();
             order.fields.insert("residentId".into(), Value::String(r.id.clone()));
             let kind = self.kinds.get(&order.kind).cloned();
@@ -509,15 +578,39 @@ impl QueueRunner {
                     world.residents.iter_mut().find(|x| x.id == id).and_then(|r| r.queue.as_mut())
                 {
                     q.started_at = Some(tick);
+                    mark_started(q);
                 }
                 return;
             };
-            let none = tried == len;
+            failed.insert(step_id);
+            // Where the queue goes next, found before the skip is noted so the note can say
+            // the queue ended.
+            let mut moved = q.clone();
+            let realm_id = q.realm_id.clone();
+            let mut gone = Vec::new();
+            let outcome = advance(&mut moved, &mut |c| asked(world, i, &realm_id, c, &mut gone));
+            for place_id in gone {
+                place_gone(world, i, &realm_id, &place_id, world.tick as f64);
+            }
+            // None could start: every step failed in a row, or a looping queue's pass started
+            // none. Past the last step of one that doesn't loop it simply ends.
+            let none = failed.len() >= len || (outcome == Advance::Ended && moved.r#loop);
             skipped(world, i, &reason, none);
-            if none {
-                world.residents[i].queue = None;
-            } else if !next(&mut world.residents[i]) {
+            let r = &mut world.residents[i];
+            let Advance::Moved { crossed: c } = outcome else {
+                r.queue = None;
                 return;
+            };
+            if none {
+                r.queue = None;
+                return;
+            }
+            r.queue = Some(moved);
+            if c {
+                if crossed {
+                    return;
+                }
+                crossed = true;
             }
         }
     }
@@ -529,19 +622,51 @@ impl RunQueues for QueueRunner {
     }
 }
 
-/// Moves the queue to its next step (`next`); false when it ended instead.
-fn next(r: &mut Resident) -> bool {
-    let Some(q) = r.queue.as_mut() else { return false };
-    q.started_at = None;
-    if (q.current as usize) + 1 < q.steps.len() {
-        q.current += 1;
-    } else if q.r#loop {
-        q.current = 0;
-    } else {
-        r.queue = None;
-        return false;
+/// Moves the queue of the resident at `i` to its next step (`next`, [`advance`]), asking the If
+/// blocks it reaches; it ends instead past its last step.
+fn next(world: &mut WorldState, i: usize, realm_id: &str) -> Advance {
+    let Some(mut q) = world.residents[i].queue.take() else { return Advance::Ended };
+    let mut gone = Vec::new();
+    let outcome = advance(&mut q, &mut |c| asked(world, i, realm_id, c, &mut gone));
+    world.residents[i].queue = (outcome != Advance::Ended).then_some(q);
+    for place_id in gone {
+        place_gone(world, i, realm_id, &place_id, world.tick as f64);
     }
-    true
+    outcome
+}
+
+/// Whether a condition an If block asks holds for the resident at `i` of the realm `realm_id`
+/// (`CONTEXT.md`: If block, Condition): a place gone or no longer the realm's is false, and goes
+/// into `gone` to be noted in the realm log.
+fn asked(
+    world: &WorldState,
+    i: usize,
+    realm_id: &str,
+    c: &csp_shared::world::Condition,
+    gone: &mut Vec<String>,
+) -> bool {
+    match condition_holds(world, i, realm_id, c) {
+        Holds::Yes => true,
+        Holds::No => false,
+        Holds::PlaceGone(place_id) => {
+            gone.push(place_id);
+            false
+        }
+    }
+}
+
+/// Why the condition of one of the If blocks or Repeat untils among `items` can't be asked by the
+/// realm (`CONTEXT.md`: Condition): the place it names must be the realm's. With `only_new`, the
+/// blocks already in the queue (with an id) are left out, as steps already there are.
+fn conditions_problem(
+    world: &WorldState,
+    realm_id: &str,
+    items: &[QueueItemRequest],
+    only_new: bool,
+) -> Option<String> {
+    request_conditions(items).into_iter().filter(|b| !only_new || b.id.is_none()).find_map(|b| {
+        condition_place_problem(world, realm_id, b.condition).map(|p| format!("{}: {p}", b.block))
+    })
 }
 
 /// Why the step that started at `started_at` ended in a failure (`failureOf`): a store or fetch
@@ -558,15 +683,37 @@ fn failure_of(r: &Resident, started_at: f64) -> Option<String> {
     }
 }
 
+/// Notes in the realm log that a condition the resident at `i` waits on asks about a place that
+/// is gone or no longer the realm's (`CONTEXT.md`: Condition): once for each wait that started at
+/// `since`, not every tick it is asked.
+fn place_gone(world: &mut WorldState, i: usize, realm_id: &str, place_id: &str, since: f64) {
+    let r = &world.residents[i];
+    let noted = world.events.iter().any(|e| {
+        e.tick as f64 >= since
+            && matches!(&e.what, RealmEventWhat::ConditionPlaceGone { resident_id, place_id: p, .. }
+                if *resident_id == r.id && p == place_id)
+    });
+    if noted {
+        return;
+    }
+    let what = RealmEventWhat::ConditionPlaceGone {
+        resident_id: r.id.clone(),
+        name: r.name.clone(),
+        place_id: place_id.to_string(),
+    };
+    record_event(world, Some(realm_id), what);
+}
+
 /// Notes in the realm log that the resident at `i` skipped their current step (`skipped`).
 fn skipped(world: &mut WorldState, i: usize, reason: &str, queue_ended: bool) {
     let r = &world.residents[i];
     let Some(q) = &r.queue else { return };
+    let (Some(at), Some(step)) = (q.current_index(), q.current_step()) else { return };
     let what = RealmEventWhat::QueueStepSkipped {
         resident_id: r.id.clone(),
         name: r.name.clone(),
-        step: f64::from(q.current + 1),
-        order: q.steps[q.current as usize].order.kind.clone(),
+        step: at as f64 + 1.0,
+        order: step.order.kind.clone(),
         reason: reason.to_string(),
         queue_ended: queue_ended.then_some(true),
     };
@@ -574,9 +721,10 @@ fn skipped(world: &mut WorldState, i: usize, reason: &str, queue_ended: bool) {
     record_event(world, Some(&realm_id), what);
 }
 
-/// Invariant (`queues-sound`, ADR 0004): every queue has steps, its current step is one of them
-/// and started no later than now, its step ids are unique and below `nextStepId`, and no step is
-/// a queue.
+/// Invariant (`queues-sound`, ADR 0004, ADR 0032): every queue has steps, `current` names one of
+/// them and it started no later than now, the blocks around it run a round within their counts and
+/// the others none, the queue holds no more steps and blocks than a queue may and nests them no
+/// deeper, its ids are unique and below `nextStepId`, and no step is a queue.
 pub fn queues_sound(world: &WorldState, _terrain: &TerrainMap) -> Vec<InvariantViolation> {
     let mut out = Vec::new();
     for r in &world.residents {
@@ -588,8 +736,16 @@ pub fn queues_sound(world: &WorldState, _terrain: &TerrainMap) -> Vec<InvariantV
                 entity_ids: vec![r.id.clone()],
             });
         };
-        if q.current as usize >= q.steps.len() {
-            fail(format!("is at step {} of {}", q.current, q.steps.len()));
+        let steps = q.steps();
+        if q.current_step().is_none() {
+            fail(format!("is at step id {}, not one of its {} steps", q.current, steps.len()));
+        } else if let Some(problem) = rounds_problem(q) {
+            fail(problem);
+        }
+        let written = ids_of(&q.items).len();
+        let depth = depth_of(&q.items);
+        if written as f64 > QUEUE_MAX_STEPS || f64::from(depth) > QUEUE_MAX_DEPTH {
+            fail(format!("holds {written} steps and blocks, nested {depth} deep"));
         }
         if let Some(s) = q.started_at.filter(|&s| s > world.tick as f64) {
             fail(format!(
@@ -598,13 +754,13 @@ pub fn queues_sound(world: &WorldState, _terrain: &TerrainMap) -> Vec<InvariantV
                 world.tick
             ));
         }
-        let ids: Vec<u32> = q.steps.iter().map(|s| s.id).collect();
+        let ids = ids_of(&q.items);
         let distinct: HashSet<u32> = ids.iter().copied().collect();
         if distinct.len() != ids.len() || ids.iter().any(|&id| id >= q.next_step_id) {
             let list: Vec<String> = ids.iter().map(u32::to_string).collect();
             fail(format!("has step ids {} with {} next", list.join(", "), q.next_step_id));
         }
-        for s in &q.steps {
+        for s in steps {
             if !QUEUE_STEP_KINDS.contains(&s.order.kind.as_str()) {
                 fail(format!("holds a {} step", s.order.kind));
             }
