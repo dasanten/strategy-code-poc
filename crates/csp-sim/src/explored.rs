@@ -505,6 +505,20 @@ impl ExploredTerrain {
     pub fn explored_chunks(&self, user_id: u64) -> Vec<u32> {
         self.chunks.get(&user_id).map(|s| s.keys().copied().collect()).unwrap_or_default()
     }
+
+    /// The chunks in which the Player has explored at least one tile, each with how many of its
+    /// tiles they explored, sorted (ADR 0034: the client keeps chunks by this count).
+    pub fn explored_counts(&self, user_id: u64) -> Vec<(u32, u16)> {
+        self.chunks
+            .get(&user_id)
+            .map(|s| s.iter().map(|(&c, &n)| (c, n)).collect())
+            .unwrap_or_default()
+    }
+
+    /// How many tiles of the chunk the Player has explored.
+    pub fn explored_count(&self, user_id: u64, chunk: u32) -> u16 {
+        self.chunks.get(&user_id).and_then(|s| s.get(&chunk)).copied().unwrap_or(0)
+    }
 }
 
 /// The whole map downsampled for the admin map (`ADMIN_TERRAIN_OVERVIEW_PATH`): one byte per

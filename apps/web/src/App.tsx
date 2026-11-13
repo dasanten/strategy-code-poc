@@ -78,6 +78,7 @@ import { incomingItems, incomingNoticeLine } from './incoming-view.js'
 import { StandingPanel } from './Standing.js'
 import { TileMenu, WaypointsPanel } from './Waypoints.js'
 import { api } from './api.js'
+import { clearTerrainCache } from './map/terrain-cache.js'
 import { CityInspector } from './CityInspector.js'
 import {
   goodsOldText,
@@ -1524,6 +1525,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
 
   async function logout() {
     await api.logout().catch(() => {})
+    // The explored terrain this browser kept is the Player's alone (ADR 0034).
+    await clearTerrainCache()
     onLoggedOut()
   }
 
@@ -1574,6 +1577,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         {world ? (
           <MapView
             world={world}
+            keepTerrainFor={{ seed: world.map.seed, player: account.name }}
             selectedIds={selectedIds}
             onSelect={(id) => select([id])}
             onSelectMany={select}

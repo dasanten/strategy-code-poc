@@ -178,12 +178,12 @@ more than 300 chunks on screen (`MAX_CHUNKS_ON_SCREEN`, tested). A coarse chunk'
 
 ### T99.8: the Region map travels per chunk, only where it changed
 
-| What                                  | Before (whole, as tile lists)                       | After (per chunk, as runs)                    |
-| ------------------------------------- | --------------------------------------------------- | --------------------------------------------- |
-| Region map in the welcome             | 40,206 bytes of JSON                                | 1,830 bytes                                   |
-| Region map per game hour, nothing new | 40,206 bytes (all of it again), 11.4 KB gzipped     | nothing                                       |
+| What                                  | Before (whole, as tile lists)                        | After (per chunk, as runs)                    |
+| ------------------------------------- | ---------------------------------------------------- | --------------------------------------------- |
+| Region map in the welcome             | 40,206 bytes of JSON                                 | 1,830 bytes                                   |
+| Region map per game hour, nothing new | 40,206 bytes (all of it again), 11.4 KB gzipped      | nothing                                       |
 | Chunks whose explored terrain grew    | a small update every 10 ticks or so (46 to 61 bytes) | only where what the Player sees there changed |
-| The whole welcome, gzipped            | 12,975 bytes                                        | 4,552 bytes                                   |
+| The whole welcome, gzipped            | 12,975 bytes                                         | 4,552 bytes                                   |
 
 T99.8 measured on 2026-11-13 on the same copy of a dev world (tick about 870 to 1,100, one
 Player with one young city), with a Node WebSocket client listening for 150 s, about two and a
@@ -196,12 +196,22 @@ from other sessions: what a terrain request now holds the explored terrain's loc
 the longest a tick can wait for one. Before, every request was a job on the game thread: it waited
 behind a running tick and the jobs ahead of it, and the tick behind it waited for the whole job.
 
-| A batch of 64 chunks, under the lock     | Fully explored Player | A disc of radius 600 explored |
-| ---------------------------------------- | --------------------- | ----------------------------- |
-| Level 0                                  | 0.22 ms               | 0.12 ms                       |
-| Levels 1 to 5                            | 1.5 to 2.6 ms         | 1.0 to 1.8 ms                 |
+| A batch of 64 chunks, under the lock      | Fully explored Player | A disc of radius 600 explored |
+| ----------------------------------------- | --------------------- | ----------------------------- |
+| Level 0                                   | 0.22 ms               | 0.12 ms                       |
+| Levels 1 to 5                             | 1.5 to 2.6 ms         | 1.0 to 1.8 ms                 |
 | A level's squares, once, outside the lock | 31 to 85 ms           | the same                      |
 
 The admin map's chunks and overview take no lock at all. The map's terrain is held once (the
 game, the order queue, walking, the script runner and the explored terrain share one `Arc`); the
 explored terrain no longer keeps its own copy, 33 MB less.
+
+### T99.9: explored terrain stays in the browser (2026-11-13)
+
+Counted from the code, not measured in the browser. The welcome to a client of protocol version 3
+lists each explored chunk with its count of explored tiles, as steps between indices and counts:
+for the staged Player (`explore --all`) 32,400 pairs `1,1024`, about 230 KB of JSON before the
+welcome's gzip and a few KB after it, where the plain list was 183 KB. A second page load answers
+every chunk kept at the same count from IndexedDB, so it makes no terrain request for what the
+first visit loaded, at any level; after exploring further only the grown chunks, and the coarse
+chunks holding them, are fetched. Requests and bytes in the browser are not measured yet.

@@ -17,6 +17,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use axum::extract::ws::{CloseFrame, Message, Utf8Bytes, WebSocket, WebSocketUpgrade};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
+use csp_shared::chunks::encode_explored_counts;
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::protocol::{OrderRequest, Remembered};
 use csp_shared::world::WorldState;
@@ -66,13 +67,17 @@ pub const WS_CLOSE_UPDATED: u16 = 4426;
 /// The protocol version this server speaks (ADR 0034). A client names the version it speaks with
 /// the query flag `v` when it connects (`/ws?v=2`); one that names none speaks version 0, the
 /// protocol from before versions. Raise it when a message changes shape.
-pub const PROTOCOL_VERSION: u32 = 2;
+pub const PROTOCOL_VERSION: u32 = 3;
 /// The oldest protocol version the server still serves; an older client is closed with
 /// [`WS_CLOSE_UPDATED`]. Raise it with [`PROTOCOL_VERSION`] when the old shape is no longer sent.
 pub const MIN_PROTOCOL_VERSION: u32 = 2;
 const _: () = assert!(PROTOCOL_VERSION.checked_sub(MIN_PROTOCOL_VERSION).is_some());
 /// The first protocol version whose large messages travel gzipped as binary frames.
 const COMPRESSED_FROM_VERSION: u32 = 1;
+/// The first protocol version whose welcome lists explored chunks with their counts
+/// (`exploredCounts`, `encode_explored_counts`) in place of the plain `exploredChunks`, and whose
+/// ticks send the counts of the chunks that grew: the client keeps terrain by them (ADR 0034).
+pub const COUNTS_FROM_VERSION: u32 = 3;
 /// The most scripts one client watches at once (`SCRIPT_WATCH_MAX`).
 pub const SCRIPT_WATCH_MAX: usize = 20;
 /// How often each client's session is checked again after the handshake (`SESSION_RECHECK_MS`).
@@ -115,6 +120,8 @@ struct Session {
     token_hash: String,
     user_id: i64,
     out: mpsc::UnboundedSender<Outgoing>,
+    /// The protocol version its client speaks.
+    protocol: u32,
 }
 
 impl Session {
@@ -134,6 +141,8 @@ struct Watched {
 /// A client with a realm (`Client`).
 struct Client {
     user_id: i64,
+    /// The protocol version its socket speaks.
+    protocol: u32,
     realm_id: String,
     /// The residents and armies whose Script tab the Player has open, in the order asked.
     watching: Vec<(String, Watched)>,
@@ -392,10 +401,12 @@ fn build_welcome(
     user_id: i64,
     account: &Value,
     first_day: Option<FirstDay>,
+    protocol: u32,
 ) -> Option<Welcome> {
     let realm = world.realms.iter().find(|r| r.id == realm_id)?;
     let mut client = Client {
         user_id,
+        protocol,
         realm_id: realm.id.clone(),
         watching: Vec::new(),
         view: ClientView::new(),
@@ -448,7 +459,6 @@ fn build_welcome(
         "account": account,
         "tick": world.tick,
         "map": { "seed": world.seed, "size": size },
-        "exploredChunks": view.explored.explored_chunks(user_id as u64),
         "home": {
             "realmId": realm.id,
             "leaderId": realm.leader_id,
@@ -468,6 +478,15 @@ fn build_welcome(
         "firstDay": first_day,
         "workSettings": work_settings,
     });
+    let mut message = message;
+    // Explored terrain: the chunks with their counts, or the plain list for an older client.
+    let user = user_id as u64;
+    if protocol >= COUNTS_FROM_VERSION {
+        message["exploredCounts"] =
+            json!(encode_explored_counts(view.explored.explored_counts(user)));
+    } else {
+        message["exploredChunks"] = json!(view.explored.explored_chunks(user));
+    }
     Some(Welcome { message, client, entities, last_seen, region })
 }
 
@@ -481,7 +500,7 @@ pub fn welcome_message(
     account: &Value,
     first_day: Option<FirstDay>,
 ) -> Option<Value> {
-    build_welcome(from, realm_id, user_id, account, first_day).map(|w| w.message)
+    build_welcome(from, realm_id, user_id, account, first_day, PROTOCOL_VERSION).map(|w| w.message)
 }
 
 impl Realtime {
@@ -516,7 +535,10 @@ impl Realtime {
         let mut hub = self.hub();
         hub.next_id += 1;
         let id = hub.next_id;
-        hub.sessions.insert(id, Session { token_hash: String::new(), user_id, out });
+        hub.sessions.insert(
+            id,
+            Session { token_hash: String::new(), user_id, out, protocol: PROTOCOL_VERSION },
+        );
         (id, outgoing)
     }
 
@@ -665,7 +687,9 @@ impl Realtime {
         let first_day = read_first_day(&self.db(), user_id).ok();
         let view = TickView { territory: g.territory, explored: &*g.explored };
         let parts = (world, size, index, view);
-        let Some(welcome) = build_welcome(parts, realm_id, user_id, user, first_day) else {
+        let protocol = self.hub().sessions.get(&socket).map_or(PROTOCOL_VERSION, |s| s.protocol);
+        let Some(welcome) = build_welcome(parts, realm_id, user_id, user, first_day, protocol)
+        else {
             return;
         };
         self.check_sent(world, index, realm_id, &welcome.entities);
@@ -922,6 +946,15 @@ impl Realtime {
                     .get(&(client.user_id as u64))
                     .map(|s| s.iter().copied().collect())
                     .unwrap_or_default();
+                // A client that keeps terrain by count gets the grown chunks' new counts too.
+                if client.protocol >= COUNTS_FROM_VERSION && !grown.is_empty() {
+                    let user = client.user_id as u64;
+                    let counts = grown.iter().map(|&c| {
+                        let c = c as u32;
+                        (c, view.explored.explored_count(user, c))
+                    });
+                    tick.insert("exploredCounts".into(), json!(encode_explored_counts(counts)));
+                }
                 tick.insert("explored".into(), json!(grown));
                 let (events, last) = events_json(world, client.user_id, client.last_event_seq);
                 if let Some(last) = last {
@@ -1141,7 +1174,7 @@ async fn serve(
         let mut hub = realtime.hub();
         hub.next_id += 1;
         let id = hub.next_id;
-        hub.sessions.insert(id, Session { token_hash, user_id: user.id, out });
+        hub.sessions.insert(id, Session { token_hash, user_id: user.id, out, protocol });
         id
     };
     let account = json!({ "name": user.name, "isAdmin": user.is_admin });

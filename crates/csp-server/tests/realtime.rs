@@ -14,8 +14,8 @@ use csp_server::config::{Origins, RealtimeLimits};
 use csp_server::db::open_db;
 use csp_server::monitoring::LogSink;
 use csp_server::realtime::{
-    Realtime, RealtimeOptions, TickView, MIN_PROTOCOL_VERSION, PROTOCOL_VERSION,
-    WS_CLOSE_LOGGED_OUT, WS_CLOSE_TOO_MANY_REQUESTS, WS_CLOSE_UPDATED,
+    Realtime, RealtimeOptions, TickView, COUNTS_FROM_VERSION, MIN_PROTOCOL_VERSION,
+    PROTOCOL_VERSION, WS_CLOSE_LOGGED_OUT, WS_CLOSE_TOO_MANY_REQUESTS, WS_CLOSE_UPDATED,
 };
 use csp_server::server::{Game, GameThread, TickSettings};
 use csp_shared::terrain::{Terrain, TerrainMap};
@@ -583,7 +583,7 @@ async fn welcomes_a_logged_in_player_then_sends_only_changes() {
         welcome["entities"].as_array().unwrap().iter().map(|e| e["id"].as_str().unwrap()).collect();
     assert_eq!(ids, ["a1", "a2"]);
     // Explored terrain: what the residents see, not the whole map.
-    let explored = welcome["exploredChunks"].as_array().unwrap().len();
+    let explored = counts_of(&welcome["exploredCounts"]).len();
     assert!(explored > 0 && explored < 16, "{explored}");
     assert_eq!(welcome["events"], json!([]));
     assert_eq!(welcome["horseOffer"], true);
@@ -837,7 +837,7 @@ async fn sends_the_region_map_whole_when_territory_is_worked_out_then_the_chunks
     let welcome = found(&mut c).await;
     // Territory is worked out on the first tick after a start: nothing to show yet.
     assert_eq!(welcome["region"], Value::Null);
-    let explored = welcome["exploredChunks"][0].as_u64().unwrap() as usize;
+    let explored = counts_of(&welcome["exploredCounts"])[0].0 as usize;
     let (tick, realm) = s
         .game
         .run(|g, _| {
@@ -1136,7 +1136,7 @@ async fn map_stats_prints_the_bytes_of_the_welcome_the_server_sends_part_by_part
     assert_eq!(w.total, welcome.to_string().len());
     assert_eq!(w.explored_chunks + w.entities + w.last_seen + w.region + w.rest, w.total);
     assert_eq!(w.region, welcome["region"].to_string().len());
-    assert_eq!(daniel.explored_chunks, welcome["exploredChunks"].as_array().unwrap().len());
+    assert_eq!(daniel.explored_chunks * 2, welcome["exploredCounts"].as_array().unwrap().len());
     let holders = welcome["region"]["holders"].as_array().unwrap();
     assert_eq!(daniel.region_holders, holders.len());
     assert_eq!(daniel.region_tiles, region_held_tiles(&welcome["region"]));
@@ -1145,4 +1145,64 @@ async fn map_stats_prints_the_bytes_of_the_welcome_the_server_sends_part_by_part
     let saves: i64 =
         s.conn().query_row("SELECT count(*) FROM world_saves", [], |r| r.get(0)).unwrap();
     assert_eq!(saves, 1);
+}
+
+/// A list of `encode_explored_counts` as JSON, read back.
+fn counts_of(v: &Value) -> Vec<(u32, u16)> {
+    let list: Vec<u32> = serde_json::from_value(v.clone()).unwrap();
+    csp_shared::chunks::decode_explored_counts(&list)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn tells_a_client_of_the_counts_version_how_much_of_each_chunk_is_explored_as_it_grows() {
+    let s = start(StartOptions::default()).await;
+    let user = s.user_id as u64;
+    let mut c = connect(&s).await;
+    let welcome = c.next("welcome").await;
+    assert!(welcome.get("exploredChunks").is_none());
+    let explored = s.game.run(move |g, _| g.explored.lock().unwrap().explored_counts(user)).await;
+    let sent = counts_of(&welcome["exploredCounts"]);
+    assert!(!sent.is_empty());
+    assert_eq!(Some(sent.clone()), explored);
+    // Every count is the chunk's explored tiles, counted from the bitmap.
+    let scanned = s
+        .game
+        .run(move |g, _| {
+            let ex = g.explored.lock().unwrap();
+            sent.iter()
+                .map(|&(c, _)| {
+                    let (cx, cy) = ((c % 4) as i32 * 32, (c / 4) as i32 * 32);
+                    let mut n = 0u16;
+                    for y in cy..cy + 32 {
+                        for x in cx..cx + 32 {
+                            n += u16::from(ex.is_explored(user, x, y));
+                        }
+                    }
+                    (c, n)
+                })
+                .collect::<Vec<_>>()
+        })
+        .await
+        .unwrap();
+    assert_eq!(Some(scanned), explored);
+    // The Player explores further: the tick tells the grown chunks' new counts.
+    let grown =
+        s.game.run(move |g, _| g.explored.lock().unwrap().explore(user, 70, 70, 20)).await.unwrap();
+    assert!(!grown.is_empty());
+    let set: BTreeSet<usize> = grown.iter().map(|&c| c as usize).collect();
+    s.broadcast_grown([(user, set)].into_iter().collect()).await;
+    let tick = c.next("tick").await;
+    let counts = counts_of(&tick["exploredCounts"]);
+    assert_eq!(counts.iter().map(|&(c, _)| c).collect::<Vec<_>>(), grown);
+    let now = s.game.run(move |g, _| g.explored.lock().unwrap().explored_counts(user)).await;
+    for (c, n) in &counts {
+        assert!(now.as_ref().unwrap().contains(&(*c, *n)));
+    }
+    // A tick with nothing grown sends no counts; an older client never gets them.
+    s.broadcast().await;
+    assert!(c.next("tick").await.get("exploredCounts").is_none());
+    let mut old = connect_speaking(&s, Some(COUNTS_FROM_VERSION - 1)).await;
+    let welcome = old.next("welcome").await;
+    assert!(welcome.get("exploredCounts").is_none());
+    assert!(welcome["exploredChunks"].as_array().is_some_and(|l| !l.is_empty()));
 }

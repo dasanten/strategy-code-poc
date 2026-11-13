@@ -132,9 +132,10 @@ impl WelcomeBytes {
     /// A welcome measured by part.
     pub fn of(welcome: &Value) -> Self {
         let text = welcome.to_string();
-        let part = |key: &str| welcome[key].to_string().len();
-        let (explored_chunks, entities, last_seen, region) =
-            (part("exploredChunks"), part("entities"), part("lastSeen"), part("region"));
+        let part = |key: &str| welcome.get(key).map_or(0, |v| v.to_string().len());
+        // Explored terrain as the welcome lists it: with counts (ADR 0034), or plainly before.
+        let explored_chunks = part("exploredCounts") + part("exploredChunks");
+        let (entities, last_seen, region) = (part("entities"), part("lastSeen"), part("region"));
         WelcomeBytes {
             explored_chunks,
             entities,
@@ -229,7 +230,7 @@ pub fn describe_map_stats(players: &[PlayerMap]) -> String {
         out.push(format!(
             "{} (#{})\n  explored: {} tiles in {} chunks\n  Last seen out of sight: {} entries, \
              {} of JSON\n  Region map: {} holders, {} tiles, {} of JSON\n  welcome: {} ({} \
-             gzipped): exploredChunks {}, entities {}, lastSeen {}, region {}, the rest {}",
+             gzipped): explored terrain {}, entities {}, lastSeen {}, region {}, the rest {}",
             p.name,
             p.user_id,
             p.explored_tiles,

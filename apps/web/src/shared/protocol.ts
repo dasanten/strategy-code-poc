@@ -31,4 +31,4 @@ export const WS_CLOSE_UPDATED = 4426
  * The protocol version this client speaks, named when it connects (`/ws?v=…`, ADR 0034). The
  * server's `PROTOCOL_VERSION` (`crates/csp-server/src/realtime.rs`) is the same; a Rust test checks.
  */
-export const PROTOCOL_VERSION = 2
+export const PROTOCOL_VERSION = 3
