@@ -490,7 +490,7 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
             ScriptField {
                 name: "kind",
                 r#type: ScriptType::String,
-                description: "The order: \"walkTo\", \"drive\", \"haul\", \"pickUp\", \"drop\", \"store\", \"fetch\", \"build\", \"tearDown\", \"workAt\", \"teach\", \"train\", \"breed\", \"attack\", \"climb\", \"roadLine\", \"wallLine\", \"pay\", \"buyCity\", \"trade\", \"swap\", \"buyHorse\", \"sellHorse\", \"handIn\", \"buyOff\", \"payDebt\", \"acceptOffer\" or \"relocate\" (on their way to `cityId`, to live there).",
+                description: "The order: \"walkTo\", \"drive\", \"haul\", \"pickUp\", \"drop\", \"store\", \"fetch\", \"build\", \"tearDown\", \"workAt\", \"teach\", \"train\", \"breed\", \"attack\", \"climb\", \"roadLine\", \"wallLine\", \"pay\", \"buyCity\", \"trade\", \"swap\", \"buyHorse\", \"sellHorse\", \"handIn\", \"buyOff\", \"payDebt\", \"acceptOffer\", \"relocate\" (on their way to `cityId`, to live there), \"row\" or \"haulByWater\" (a haul route rowing a boat).",
                 null_when: None,
             },
             ScriptField {
@@ -554,6 +554,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 null_when: Some("for other orders, and when none"),
             },
             ScriptField {
+                name: "vesselId",
+                r#type: ScriptType::String,
+                description: "The boat rowed, or rowed on a haul route by water.",
+                null_when: Some("for other orders"),
+            },
+            ScriptField {
                 name: "stableId",
                 r#type: ScriptType::String,
                 description: "The stable horses are bred at.",
@@ -610,7 +616,7 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
             ScriptField {
                 name: "stop",
                 r#type: ScriptType::String,
-                description: "The haul stop a carriage is at or bound for: \"from\" or \"to\".",
+                description: "The haul stop a carriage or boat is at or bound for: \"from\" or \"to\".",
                 null_when: Some("for other orders"),
             },
             ScriptField {
@@ -1631,7 +1637,7 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
     },
     ScriptView {
         name: "vessel",
-        description: "A boat on the water, as the Player sees it.",
+        description: "A boat or ship on the water, as the Player sees it.",
         fields: &[
             ScriptField {
                 name: "id",
@@ -1642,7 +1648,7 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
             ScriptField {
                 name: "kind",
                 r#type: ScriptType::String,
-                description: "What it is: \"boat\".",
+                description: "What it is: \"boat\" or \"ship\".",
                 null_when: None,
             },
             ScriptField {
@@ -2235,7 +2241,7 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Query,
         params: &[],
         cost: 20.0,
-        description: "The boats the Player sees on the water.",
+        description: "The boats and ships the Player sees on the water.",
         returns: ScriptType::List(&ScriptType::View("vessel")),
     },
     ScriptBinding {
@@ -2537,9 +2543,25 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
     ScriptBinding {
         name: "board",
         is: Is::Action,
-        params: &["carriageId"],
+        params: &["carriageId", "asCrew?"],
         cost: 10.0,
-        description: "Get on a carriage of my realm on my tile, or a boat of my realm beside me (on land touching its water tile), as a passenger, and go along with it. Riders dismount first: no horse goes aboard.",
+        description: "Get on a carriage of my realm on my tile, or a boat of my realm beside me (on land touching its water tile), or a ship of my realm docked at the haven I stand on, as a passenger, and go along with it. With `asCrew` true, aboard a ship as one of its crew, who sail it and take no room (grown only). Riders dismount first: no horse goes aboard.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "loadShip",
+        is: Is::Action,
+        params: &["ship", "goods"],
+        cost: 10.0,
+        description: "Move goods like {iron: 20} from the storage of the haven I stand on straight onto a ship of my realm docked there, by it or its id, as many as there are and fit, at once.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "unloadShip",
+        is: Is::Action,
+        params: &["ship", "goods"],
+        cost: 10.0,
+        description: "Move goods like {ironOre: 40} off a ship of my realm, by it or its id, straight into the storage of the haven it is docked at and I stand on, as many as are aboard, at once.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -2548,6 +2570,14 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         params: &["vessel", "x", "y"],
         cost: 10.0,
         description: "Row a boat of my realm, by it or its id, to the water tile x, y, or to the nearest free water tile beside it when x, y is land. I must be aboard it or beside it (I board first), and grown. A Step at a time over water; my Strength and Seafaring set the pace, and rowing teaches Seafaring. My order is \"row\" until it gets there.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "sail",
+        is: Is::Action,
+        params: &["ship", "x", "y"],
+        cost: 10.0,
+        description: "Sail a ship, by it or its id, to the Sea tile x, y, or to the haven on x, y, docking on the free Sea tile beside it nearest the ship. I must be aboard it as one of its crew, with at least the fewest crew it sails with aboard. A Step at a time over Sea only, never onto a Lake; the crew's Seafaring sets the pace, and sailing teaches it to all of them. My order is \"sail\" until it gets there.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -2563,7 +2593,7 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Action,
         params: &["carriageId", "x", "y", "goods", "returnGoods?", "keepFood?"],
         cost: 10.0,
-        description: "Drive a haul route between my tile and (x, y): `goods` there, `returnGoods` back.",
+        description: "Drive a haul route between my tile and (x, y): `goods` there, `returnGoods` back. Given a boat beside me (its id as `carriageId`), row it instead between my tile and the shore or haven (x, y), loading by hand at each. Given a ship docked at the haven I stand on, I am its captain: I sail it between this haven and the haven at (x, y) with its crew aboard, moving the goods straight between each haven's storage and the ship.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -3063,7 +3093,7 @@ pub static ARMY_SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Query,
         params: &[],
         cost: 20.0,
-        description: "The boats the Player sees on the water.",
+        description: "The boats and ships the Player sees on the water.",
         returns: ScriptType::List(&ScriptType::View("vessel")),
     },
     ScriptBinding {
@@ -4115,7 +4145,8 @@ fn goodsText(load, goods) {
 // memory.goods there, memory.returnGoods back, memory.keepFood Food kept on
 // board for the horse and me. The route comes only from the Haul order; started
 // without one I end. The built-in haul order loads, drives and unloads, again
-// and again; this starts it at memory.from.
+// and again; this starts it at memory.from. Given a boat (memory.carriageId),
+// I row it instead, from the shore beside it (a haul route by water).
 param carriage: storage // the carriage to drive; none: the one I stand on
 
 if (memory.to == null) {
@@ -4123,7 +4154,7 @@ if (memory.to == null) {
   return
 }
 if (!pickCarriage()) { return }
-if (me.order == null || me.order.kind != "haul") {
+if (me.order == null || (me.order.kind != "haul" && me.order.kind != "haulByWater")) {
   startRoute()
   return
 }
@@ -4158,7 +4189,7 @@ fn startRoute() {
 }
 
 // Each leg of the route as it starts, for my log: loading at a stop, or
-// driving to one.
+// driving (rowing) to one.
 fn logLeg() {
   let leg = me.order.phase + " " + me.order.stop
   if (memory.leg == leg) { return }
@@ -4166,6 +4197,7 @@ fn logLeg() {
   let stop = memory.to
   if (me.order.stop == "from") { stop = memory.from }
   if (me.order.phase == "loading") { log("loading at " + stop.x + "," + stop.y) }
+  else if (me.order.kind == "haulByWater") { log("rowing to " + stop.x + "," + stop.y) }
   else { log("driving to " + stop.x + "," + stop.y) }
 }
 "#,

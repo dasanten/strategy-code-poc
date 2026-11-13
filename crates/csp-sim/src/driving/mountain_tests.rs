@@ -225,6 +225,33 @@ fn goes_round_to_a_pass_when_that_is_the_only_way_never_onto_bare_mountain() {
 }
 
 #[test]
+fn takes_a_mountain_road_over_a_longer_way_round_by_a_pass() {
+    // A pass at x = 12 and a road at x = 2: straight down the road is 8 tiles, round by the pass
+    // about 15. Carriage and rider both cross by the road.
+    let over = |tiles: Vec<(f64, f64)>| -> Vec<(f64, f64)> {
+        tiles.into_iter().filter(|&(_, y)| y == 6.0).collect()
+    };
+    let mut driving = setup(with_pass(), 2.0, 2.0);
+    driving.road(2, 6, false);
+    driving.r("w1").order = drive_to(2, 10);
+    let tiles = driving.run(20_000);
+    assert_eq!(driving.carriage_at(), (2.0, 10.0));
+    assert_eq!(over(tiles), [(2.0, 6.0)]);
+
+    let mut riding = setup(with_pass(), 2.0, 2.0);
+    riding.world.carriages.clear();
+    riding.r("w1").riding = Some("h1".into());
+    riding.road(2, 6, false);
+    riding.r("w1").order = set_order(
+        json!({ "kind": "walkTo", "target": { "x": 2, "y": 10 }, "path": null, "progress": 0 }),
+    );
+    let tiles = riding.run(20_000);
+    assert_eq!((riding.w1().x, riding.w1().y), (2.0, 10.0));
+    assert_eq!(riding.w1().riding.as_deref(), Some("h1"));
+    assert_eq!(over(tiles), [(2.0, 6.0)]);
+}
+
+#[test]
 fn hauls_over_the_road_context_md_haul_route() {
     let mut s = setup(ridge(), 2.0, 2.0);
     s.road(2, 6, false);
