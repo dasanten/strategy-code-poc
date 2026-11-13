@@ -4,6 +4,9 @@ import type { Building, City } from '@csp/shared-types'
 import {
   CITY_SCALE,
   cityLists,
+  cityOverview,
+  citySections,
+  cityStock,
   cityPlace,
   cityScale,
   type CitiesKnown,
@@ -192,5 +195,75 @@ describe('opening a city in the Cities drawer', () => {
     expect(showBeside(1280, 428, 0)).toEqual({ left: 428, right: 0, closeDrawer: false })
     // A phone has no map beside the drawer: it closes so the city shows.
     expect(showBeside(375, 375, 0)).toEqual({ left: 0, right: 0, closeDrawer: true })
+  })
+})
+
+describe('an opened city’s sections', () => {
+  const ids = (facts: Parameters<typeof citySections>[0]) => citySections(facts).map((s) => s.title)
+
+  it('gives an own city Overview, Stock, Trade and Gates', () => {
+    expect(ids({ own: true, stock: 3, trade: true, gates: 2 })).toEqual([
+      'Overview',
+      'Stock',
+      'Trade',
+      'Gates',
+    ])
+  })
+
+  it('leaves out an own city’s sections with nothing to show', () => {
+    expect(ids({ own: true, stock: 0, trade: false, gates: 0 })).toEqual(['Overview'])
+  })
+
+  it('gives an NPC city Overview and Trade, never Stock or Gates', () => {
+    expect(ids({ own: false, stock: 4, trade: true, gates: 1 })).toEqual(['Overview', 'Trade'])
+  })
+
+  it('gives a last-seen city its Overview, and Trade only with prices remembered', () => {
+    expect(ids({ own: false, stock: 0, trade: true, gates: 0 })).toEqual(['Overview', 'Trade'])
+    expect(ids({ own: false, stock: 0, trade: false, gates: 0 })).toEqual(['Overview'])
+  })
+})
+
+describe('an opened city’s Overview and Stock', () => {
+  const buildings = [
+    building('t', 'townHall', 'c1'),
+    building('h1', 'house', 'c1'),
+    building('h2', 'house', 'c1'),
+    building('h3', 'house', 'c1', { site: { needs: {}, has: {} } }),
+    building('w1', 'wall', 'c1'),
+    building('r1', 'road', 'c1'),
+    building('s1', 'storage', 'c1', { stock: { food: 4, iron: 2 } }),
+    building('s2', 'warehouse', 'c1', { stock: { food: 1, coins: 9 } }),
+    building('st', 'stable', 'c1', { stock: { food: 50 } }),
+    building('x', 'storage', 'c2', { stock: { wood: 7 } }),
+  ]
+
+  it('counts residents, housing and finished buildings by kind, without walls and roads', () => {
+    const o = cityOverview(
+      { id: 'c1' },
+      { residents: [{ cityId: 'c1' }, { cityId: 'c2' }], buildings: buildings as Building[] },
+    )
+    expect(o.residents).toBe(1)
+    expect(o.housing).toBe(
+      ['townHall', 'house', 'house', 'storage', 'warehouse', 'stable', 'wall', 'road'].reduce(
+        (n, k) => n + (HOUSING_ROOM[k as Building['kind']] ?? 0),
+        0,
+      ),
+    )
+    expect(o.buildings).toEqual([
+      ['house', 2],
+      ['townHall', 1],
+      ['storage', 1],
+      ['warehouse', 1],
+      ['stable', 1],
+    ])
+  })
+
+  it('adds up every good in the city’s storages and warehouses, not its stable', () => {
+    expect(cityStock({ id: 'c1' }, buildings as Building[])).toEqual([
+      { good: 'food', amount: 5 },
+      { good: 'iron', amount: 2 },
+      { good: 'coins', amount: 9 },
+    ])
   })
 })

@@ -1,4 +1,4 @@
-import type { Building, City, RealmLabel, Resident } from '@csp/shared-types'
+import type { Building, BuildingKind, City, Good, RealmLabel, Resident } from '@csp/shared-types'
 import { describeCity, describeOccupation, type OccupationView } from './city-view.js'
 import type { GoodsItem } from './goods-grid.js'
 import { KEY_GOODS, keyGoods } from './hud-view.js'
@@ -6,6 +6,7 @@ import { agoText } from './last-seen.js'
 import { FAR_SCALE } from './map/camera.js'
 import { cityRelationship, type Viewer } from './map/tokens.js'
 import { housingRoom } from './shared/city.js'
+import { GOODS } from './shared/world.js'
 import type { Relationship } from './theme.js'
 
 /** The Cities drawer's lists, in this order (`CONTEXT.md`: Cities drawer). */
@@ -33,6 +34,80 @@ export interface CityRow {
   /** A city last seen: how long ago, "3 days ago". */
   ago?: string
   occupation?: OccupationView
+}
+
+/** The sections an opened city shows, in this order (`CONTEXT.md`: Cities drawer). */
+export const CITY_SECTIONS = [
+  { id: 'overview', title: 'Overview' },
+  { id: 'stock', title: 'Stock' },
+  { id: 'trade', title: 'Trade' },
+  { id: 'gates', title: 'Gates' },
+] as const
+export type CitySectionId = (typeof CITY_SECTIONS)[number]['id']
+
+/**
+ * Which sections an opened city shows: Overview always, Stock and Gates for the Player's own city
+ * with goods in its storages or gates, Trade where there is anything of the Trade section to show.
+ * A section with nothing to show is left out.
+ */
+export function citySections(facts: {
+  own: boolean
+  /** Kinds of good in its storages. */
+  stock: number
+  /** Whether the Trade section has anything to show here. */
+  trade: boolean
+  gates: number
+}): (typeof CITY_SECTIONS)[number][] {
+  const shows: Record<CitySectionId, boolean> = {
+    overview: true,
+    stock: facts.own && facts.stock > 0,
+    trade: facts.trade,
+    gates: facts.own && facts.gates > 0,
+  }
+  return CITY_SECTIONS.filter((s) => shows[s.id])
+}
+
+/** Building kinds the Overview leaves out: they say little about a city and come in hundreds. */
+const NOT_IN_OVERVIEW: readonly BuildingKind[] = ['wall', 'road']
+
+/** An opened city's Overview: residents in sight who live there, its housing, buildings by kind. */
+export interface CityOverview {
+  residents: number
+  housing: number
+  /** Finished buildings by kind, most first, walls and roads left out. */
+  buildings: [BuildingKind, number][]
+}
+
+export function cityOverview(
+  city: Pick<City, 'id'>,
+  seen: { residents: readonly Pick<Resident, 'cityId'>[]; buildings: readonly Building[] },
+): CityOverview {
+  const counts = new Map<BuildingKind, number>()
+  for (const b of seen.buildings)
+    if (b.cityId === city.id && !b.site && !NOT_IN_OVERVIEW.includes(b.kind))
+      counts.set(b.kind, (counts.get(b.kind) ?? 0) + 1)
+  return {
+    residents: seen.residents.filter((r) => r.cityId === city.id).length,
+    housing: housingRoom(seen, city),
+    buildings: [...counts].sort((a, b) => b[1] - a[1]),
+  }
+}
+
+/**
+ * An opened city's Stock: every good in its finished storages and warehouses together, in the
+ * goods' order, as the icon grid shows it. A stable's storage is left out: its Food is its horses'.
+ */
+export function cityStock(city: Pick<City, 'id'>, buildings: readonly Building[]): GoodsItem[] {
+  const totals = new Map<Good, number>()
+  for (const b of buildings) {
+    if (b.cityId !== city.id || b.site || (b.kind !== 'storage' && b.kind !== 'warehouse')) continue
+    for (const [good, n] of Object.entries(b.stock ?? {}) as [Good, number][])
+      totals.set(good, (totals.get(good) ?? 0) + n)
+  }
+  return GOODS.filter((g) => (totals.get(g) ?? 0) > 0).map((good) => ({
+    good,
+    amount: totals.get(good)!,
+  }))
 }
 
 /** The relation colour a city's row takes (`relationshipClass`), as its map emblem does. */
