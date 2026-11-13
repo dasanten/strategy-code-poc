@@ -79,7 +79,14 @@ import { lastSeenText, type LastSeen } from './last-seen.js'
 import { horseStatsText } from './selection-view.js'
 import { HOW_TO_TRADE_PATH } from './wiki-view.js'
 import { PanelHead } from './drawer-head.js'
-import { cityLists, type CityRow } from './cities-drawer-view.js'
+import {
+  cityLists,
+  cityOverview,
+  citySections,
+  cityStock,
+  type CityRow,
+  type CitySectionId,
+} from './cities-drawer-view.js'
 import { relationshipClass } from './theme.js'
 import { tradeStandingLine } from './standing-view.js'
 
@@ -241,30 +248,64 @@ export function CityInspector({
   const list = useRef<HTMLElement>(null)
   useEffect(() => {
     if (!scrollTo) return
-    list.current
-      ?.querySelector(`[data-trade-at="${CSS.escape(scrollTo.buildingId)}"]`)
-      ?.scrollIntoView({ block: 'start' })
+    const at = list.current?.querySelector(`[data-trade-at="${CSS.escape(scrollTo.buildingId)}"]`)
+    // Trade here lands on the Trade section, opened again if the Player had folded it.
+    const section = at?.closest('details')
+    if (section) section.open = true
+    at?.scrollIntoView({ block: 'start' })
   }, [scrollTo])
-  /** A city in sight, Player's own or another's, with what opens under it. */
+  /** A city in sight, Player's own or another's, opened in sections (`CONTEXT.md`: Cities drawer). */
   const inSightItem = (row: CityRow) => {
     const v = views.find((c) => c.id === row.id)!
-    return (
-      <li key={v.id} className={relationshipClass(row.rel)}>
-        <CityRowHead row={row} open={openId === v.id} onOpen={onOpen} />
-        {openId === v.id && (
+    const head = <CityRowHead row={row} open={openId === v.id} onOpen={onOpen} />
+    if (openId !== v.id)
+      return (
+        <li key={v.id} className={relationshipClass(row.rel)}>
+          {head}
+        </li>
+      )
+    const city = cities.find((c) => c.id === v.id)!
+    const own = city.realmId === realmId
+    const seen = { cities, buildings, traders }
+    const overview = cityOverview(city, { residents, buildings })
+    const stock = own ? cityStock(city, buildings) : []
+    const gates = own
+      ? buildings.filter((b) => b.kind === 'gate' && !b.site && b.cityId === v.id)
+      : []
+    const howToTrade = tradesHere(city, seen, realmId, traderVisits)
+    const standing = tradeStandingLine(city, seen, traderVisits, standings, events)
+    const trade =
+      howToTrade ||
+      standing !== undefined ||
+      warehousesInSight(city, { cities, buildings }).length > 0 ||
+      (!noCaravans && takesTransfers(city, { buildings }, realmId)) ||
+      npcStoragesInSight(city, { buildings }).length > 0 ||
+      npcStablesInSight(city, { buildings }).length > 0 ||
+      traderStopsAt(v, traders, traderVisits).length > 0 ||
+      offerStoragesOf(v, { cities, buildings }, realmId).length > 0
+    const body: Record<CitySectionId, ReactNode> = {
+      overview: (
+        <>
           <p className="city-details">
-            {v.residents} {v.residents === 1 ? 'resident' : 'residents'} in sight
-            {v.buildings.length > 0 &&
-              ` · ${v.buildings.map(([k, n]) => buildingCount(k, n)).join(', ')}`}
+            {overview.residents} {overview.residents === 1 ? 'resident' : 'residents'} in sight ·
+            housing for {overview.housing}
           </p>
-        )}
-        {openId === v.id &&
-          tradesHere(
-            cities.find((c) => c.id === v.id)!,
-            { cities, buildings, traders },
-            realmId,
-            traderVisits,
-          ) && (
+          {overview.buildings.length > 0 && (
+            <p className="city-details">
+              {overview.buildings.map(([k, n]) => buildingCount(k, n)).join(', ')}
+            </p>
+          )}
+          <Reaction city={city} />
+          <Buying
+            buy={describeBuying(city, { residents, buildings }, realmId)}
+            onBuy={(buyerId) => onBuyCity(buyerId, v.id)}
+          />
+        </>
+      ),
+      stock: <GoodsGrid items={stock} label={`Stock in ${v.name}`} />,
+      trade: (
+        <>
+          {howToTrade && (
             <p className="small trade-wiki">
               {/* A new tab, so the game keeps running behind it (`CONTEXT.md`: Wiki). */}
               <a href={HOW_TO_TRADE_PATH} target="_blank" rel="noopener">
@@ -272,19 +313,8 @@ export function CityInspector({
               </a>
             </p>
           )}
-        {openId === v.id && (
-          <TradeStanding
-            line={tradeStandingLine(
-              cities.find((c) => c.id === v.id)!,
-              { cities, buildings, traders },
-              traderVisits,
-              standings,
-              events,
-            )}
-          />
-        )}
-        {openId === v.id &&
-          warehousesInSight(
+          <TradeStanding line={standing} />
+          {warehousesInSight(
             cities.find((c) => c.id === v.id)!,
             { cities, buildings },
           ).map((w) => (
@@ -354,24 +384,22 @@ export function CityInspector({
               />
             </div>
           ))}
-        {openId === v.id &&
-          !noCaravans &&
-          takesTransfers(
-            cities.find((c) => c.id === v.id)!,
-            { buildings },
-            realmId,
-          ) && (
-            <Transferring
-              to={v}
-              fromCities={deliveryCities({ cities, buildings }, realmId)}
-              preview={(from, good, units) =>
-                previewTransfer({ cities, buildings }, from, v.id, good, units, mapSize)
-              }
-              onTransfer={onTransfer}
-            />
-          )}
-        {openId === v.id &&
-          npcStoragesInSight(
+          {!noCaravans &&
+            takesTransfers(
+              cities.find((c) => c.id === v.id)!,
+              { buildings },
+              realmId,
+            ) && (
+              <Transferring
+                to={v}
+                fromCities={deliveryCities({ cities, buildings }, realmId)}
+                preview={(from, good, units) =>
+                  previewTransfer({ cities, buildings }, from, v.id, good, units, mapSize)
+                }
+                onTransfer={onTransfer}
+              />
+            )}
+          {npcStoragesInSight(
             cities.find((c) => c.id === v.id)!,
             { buildings },
           ).map((s) => (
@@ -417,8 +445,7 @@ export function CityInspector({
               />
             </div>
           ))}
-        {openId === v.id &&
-          npcStablesInSight(
+          {npcStablesInSight(
             cities.find((c) => c.id === v.id)!,
             { buildings },
           ).map((s) => (
@@ -433,8 +460,7 @@ export function CityInspector({
               />
             </div>
           ))}
-        {openId === v.id &&
-          traderStopsAt(v, traders, traderVisits).map((s) => (
+          {traderStopsAt(v, traders, traderVisits).map((s) => (
             <div key={s.id} data-trade-at={s.id}>
               {!s.unseen && (
                 <Prices
@@ -478,24 +504,19 @@ export function CityInspector({
               )}
             </div>
           ))}
-        {openId === v.id && offerStoragesOf(v, { cities, buildings }, realmId).map(offersAt)}
-        {openId === v.id && <Reaction city={cities.find((c) => c.id === v.id)!} />}
-        {openId === v.id && (
-          <Buying
-            buy={describeBuying(
-              cities.find((c) => c.id === v.id)!,
-              { residents, buildings },
-              realmId,
-            )}
-            onBuy={(buyerId) => onBuyCity(buyerId, v.id)}
-          />
-        )}
-        {openId === v.id && cities.find((c) => c.id === v.id)?.realmId === realmId && (
-          <Gates
-            gates={buildings.filter((b) => b.kind === 'gate' && !b.site && b.cityId === v.id)}
-            onSetGate={onSetGate}
-          />
-        )}
+          {offerStoragesOf(v, { cities, buildings }, realmId).map(offersAt)}
+        </>
+      ),
+      gates: <Gates gates={gates} onSetGate={onSetGate} />,
+    }
+    return (
+      <li key={v.id} className={relationshipClass(row.rel)}>
+        {head}
+        {citySections({ own, stock: stock.length, trade, gates: gates.length }).map((s) => (
+          <CitySection key={s.id} title={s.title}>
+            {body[s.id]}
+          </CitySection>
+        ))}
       </li>
     )
   }
@@ -533,8 +554,6 @@ export function CityInspector({
               row={row}
               city={lastSeen.cities.find((c) => c.id === row.id)!}
               lastSeen={lastSeen}
-              realmId={realmId}
-              realms={realms}
               tick={tick}
               open={openId === row.id}
               onOpen={onOpen}
@@ -543,6 +562,16 @@ export function CityInspector({
         </CityList>
       )}
     </section>
+  )
+}
+
+/** One headed section of an opened city, open until the Player folds it (`CONTEXT.md`: Cities drawer). */
+function CitySection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <details className="city-section" open>
+      <summary>{title}</summary>
+      <div className="city-section-body">{children}</div>
+    </details>
   )
 }
 
@@ -620,8 +649,6 @@ function RememberedCity({
   row,
   city,
   lastSeen,
-  realmId,
-  realms,
   tick,
   open,
   onOpen,
@@ -629,32 +656,53 @@ function RememberedCity({
   row: CityRow
   city: LastSeen['cities'][number]
   lastSeen: LastSeen
-  realmId: string
-  realms: RealmLabel[]
   tick: number
   open: boolean
   onOpen: (id: string | undefined) => void
 }) {
-  const v = describeCity(city, { residents: [], buildings: lastSeen.buildings }, realmId, realms)
+  if (!open)
+    return (
+      <li className={relationshipClass(row.rel)}>
+        <CityRowHead row={row} open={open} onOpen={onOpen} />
+      </li>
+    )
+  const overview = cityOverview(city, { residents: [], buildings: lastSeen.buildings })
+  const warehouses = warehousesInSight(city, lastSeen)
+  const storages = npcStoragesInSight(city, lastSeen)
+  const body: Partial<Record<CitySectionId, ReactNode>> = {
+    overview: (
+      <>
+        <p className="city-details">{lastSeenText(city.seenAt, tick)}</p>
+        <p className="city-details">Housing for {overview.housing}</p>
+        {overview.buildings.length > 0 && (
+          <p className="city-details">
+            {overview.buildings.map(([k, n]) => buildingCount(k, n)).join(', ')}
+          </p>
+        )}
+      </>
+    ),
+    trade: (
+      <>
+        {warehouses.map((w) => (
+          <Prices key={w.id} warehouse={w} lists={tradeLists(w, lastSeen)} />
+        ))}
+        {storages.map((s) => (
+          <Prices key={s.id} warehouse={s} lists={tradeLists(s, lastSeen)} place="Storage" />
+        ))}
+      </>
+    ),
+  }
+  const trade = warehouses.length + storages.length > 0
   return (
     <li className={relationshipClass(row.rel)}>
       <CityRowHead row={row} open={open} onOpen={onOpen} />
-      {open && (
-        <div className="last-seen">
-          <p className="city-details">{lastSeenText(city.seenAt, tick)}</p>
-          {v.buildings.length > 0 && (
-            <p className="city-details">
-              {v.buildings.map(([k, n]) => buildingCount(k, n)).join(', ')}
-            </p>
-          )}
-          {warehousesInSight(city, lastSeen).map((w) => (
-            <Prices key={w.id} warehouse={w} lists={tradeLists(w, lastSeen)} />
-          ))}
-          {npcStoragesInSight(city, lastSeen).map((s) => (
-            <Prices key={s.id} warehouse={s} lists={tradeLists(s, lastSeen)} place="Storage" />
-          ))}
-        </div>
-      )}
+      <div className="last-seen">
+        {citySections({ own: false, stock: 0, trade, gates: 0 }).map((s) => (
+          <CitySection key={s.id} title={s.title}>
+            {body[s.id]}
+          </CitySection>
+        ))}
+      </div>
     </li>
   )
 }

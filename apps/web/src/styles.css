@@ -1790,6 +1790,26 @@ button.residents-row.selected:hover {
   padding: 0 8px;
   color: var(--ui-muted);
 }
+/* An opened city's headed, collapsible sections (`CONTEXT.md`: Cities drawer). */
+.city-section {
+  margin: 6px 0 0;
+  border-top: 1px solid var(--ui-line);
+}
+.city-section > summary {
+  cursor: pointer;
+  padding: 6px 8px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ui-muted);
+}
+.city-section-body {
+  padding-bottom: 4px;
+}
+.city-section-body > .goods-grid {
+  padding: 4px 8px 0;
+}
 .city-details {
   margin: 4px 0 0;
   padding: 0 8px;
