@@ -8,6 +8,7 @@ import { isVesselId } from './shared/vessels.js'
 import { covers } from './shared/footprint.js'
 import type {
   Building,
+  Branch,
   BuildingKind,
   City,
   Condition,
@@ -29,9 +30,12 @@ import {
   find,
   insertItems,
   isBlock,
+  isIf,
+  mapParts,
   planSteps,
   timedItems,
   withIds,
+  type Block,
   type PlanItem,
 } from './plan-blocks.js'
 import { realTimeOf } from './wiki-view.js'
@@ -270,7 +274,15 @@ export function givePlan(
 function keepIds(items: readonly PlanItem[], kept: ReadonlySet<number>): PlanItem[] {
   return items.map((item): PlanItem => {
     const id = item.id !== undefined && kept.has(item.id) ? { id: item.id } : {}
-    if (isBlock(item)) return { ...id, repeat: item.repeat, items: keepIds(item.items, kept) }
+    if (isBlock(item)) {
+      const head = isIf(item) ? { if: item.if } : { repeat: item.repeat }
+      const block = {
+        ...head,
+        items: item.items,
+        ...(isIf(item) && item.else ? { else: item.else } : {}),
+      }
+      return { ...id, ...mapParts(block as Block, (l) => keepIds(l, kept)) }
+    }
     const minutes = item.minutes === undefined ? {} : { minutes: item.minutes }
     return { ...id, order: item.order, ...minutes }
   })
@@ -278,7 +290,7 @@ function keepIds(items: readonly PlanItem[], kept: ReadonlySet<number>): PlanIte
 
 /** Every id in a queue's items, steps and blocks. */
 function idsOfQueue(items: readonly QueueItem[]): number[] {
-  return items.flatMap((item) => [item.id, ...('repeat' in item ? idsOfQueue(item.items) : [])])
+  return items.flatMap((item) => [item.id, ...idsOfQueue(queueParts(item).flat())])
 }
 
 /**
@@ -289,6 +301,10 @@ export function itemsOf(q: Pick<Queue, 'items'>): PlanItem[] {
   const keep = (items: readonly QueueItem[]): PlanItem[] =>
     items.map((item) => {
       if ('repeat' in item) return { id: item.id, repeat: item.repeat, items: keep(item.items) }
+      if ('if' in item) {
+        const other = item.else ? { else: keep(item.else) } : {}
+        return { id: item.id, if: item.if, items: keep(item.items), ...other }
+      }
       const minutes = item.minutes === undefined ? {} : { minutes: item.minutes }
       return { id: item.id, order: item.order, ...minutes }
     })
@@ -300,9 +316,8 @@ export function roundsOf(q: Pick<Queue, 'items'>): Map<number, number> {
   const out = new Map<number, number>()
   const walk = (items: readonly QueueItem[]) => {
     for (const item of items) {
-      if (!('repeat' in item)) continue
-      if (item.round) out.set(item.id, item.round)
-      walk(item.items)
+      if ('repeat' in item && item.round) out.set(item.id, item.round)
+      for (const part of queueParts(item)) walk(part)
     }
   }
   walk(q.items)
@@ -636,4 +651,24 @@ export function useShiftHeld(): { readonly current: boolean } {
     }
   }, [])
   return held
+}
+
+/** A queue item's lists: a block's items, and an If block's Else part; none for a step. */
+function queueParts(item: QueueItem): QueueItem[][] {
+  if ('repeat' in item) return [item.items]
+  if ('if' in item) return item.else ? [item.items, item.else] : [item.items]
+  return []
+}
+
+/** The part each If block around the current step runs, by block id (`CONTEXT.md`: If block). */
+export function branchesOf(q: Pick<Queue, 'items'>): Map<number, Branch> {
+  const out = new Map<number, Branch>()
+  const walk = (items: readonly QueueItem[]) => {
+    for (const item of items) {
+      if ('if' in item && item.branch) out.set(item.id, item.branch)
+      for (const part of queueParts(item)) walk(part)
+    }
+  }
+  walk(q.items)
+  return out
 }

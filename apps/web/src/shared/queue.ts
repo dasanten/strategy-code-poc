@@ -94,9 +94,10 @@ interface WalkedStep {
   repeated: boolean
 }
 
-/** Whether an item as sent is a repeat block rather than a step: it has `repeat`. */
+/** Whether an item as sent is a block rather than a step: it has `repeat` or `if`. */
 function isBlockLike(item: unknown): item is Record<string, unknown> {
-  return typeof item === 'object' && item !== null && !Array.isArray(item) && 'repeat' in item
+  if (typeof item !== 'object' || item === null || Array.isArray(item)) return false
+  return 'repeat' in item || 'if' in item
 }
 
 /**
@@ -123,6 +124,10 @@ export function queueStepsProblem(items: unknown): string | undefined {
         continue
       }
       if (depth + 1 > QUEUE_MAX_DEPTH) set(`blocks nest at most ${QUEUE_MAX_DEPTH} deep`)
+      if ('if' in item) {
+        walkIf(item, depth, repeated)
+        continue
+      }
       if (Object.keys(item).some((k) => !['id', 'repeat', 'items'].includes(k)))
         set('a repeat block holds only its id, count and items')
       const { repeat, items: inner } = item
@@ -136,6 +141,19 @@ export function queueStepsProblem(items: unknown): string | undefined {
       if (Array.isArray(inner) && inner.length > 0) walk(inner, depth + 1, repeated || repeat !== 1)
       else set('a repeat block needs a step')
     }
+  }
+  // An If block (`CONTEXT.md`: If block): its condition, its items and an optional Else part.
+  const walkIf = (item: Record<string, unknown>, depth: number, repeated: boolean) => {
+    if (Object.keys(item).some((k) => !['id', 'if', 'items', 'else'].includes(k)))
+      set('an If block holds only its id, condition, items and Else part')
+    const p = conditionProblem(item.if)
+    if (p) set(p === 'needs a condition' ? `an If block ${p}` : `an If block: ${p}`)
+    const { items: inner, else: other } = item
+    if (Array.isArray(inner) && inner.length > 0) walk(inner, depth + 1, repeated)
+    else set('an If block needs a step')
+    if (other === undefined) return
+    if (Array.isArray(other) && other.length > 0) walk(other, depth + 1, repeated)
+    else set("an If block's Else part needs a step")
   }
   walk(items, 0, false)
   if (count > QUEUE_MAX_STEPS) return `a queue holds at most ${QUEUE_MAX_STEPS} steps and blocks`
@@ -168,7 +186,11 @@ export function queueStepsProblem(items: unknown): string | undefined {
 
 /** The steps of a queue's items top to bottom, as written: each once, whatever its blocks repeat. */
 export function queueSteps(items: readonly QueueItem[]): QueueStep[] {
-  return items.flatMap((item) => ('repeat' in item ? queueSteps(item.items) : [item]))
+  return items.flatMap((item) => {
+    if ('repeat' in item) return queueSteps(item.items)
+    if ('if' in item) return [...queueSteps(item.items), ...queueSteps(item.else ?? [])]
+    return [item]
+  })
 }
 
 /** The current step's place among the queue's steps top to bottom, from 0; -1 if none. */

@@ -507,6 +507,25 @@
   background: color-mix(in srgb, var(--ui-live) 14%, transparent);
   outline: 1px solid var(--ui-line-strong);
 }
+/* An If block (`CONTEXT.md`: If block): its Else part sits under a second head in the bracket. */
+.queue-if-bracket {
+  border-color: var(--ui-live);
+}
+.queue-if-bracket > .queue-bracket-head {
+  cursor: grab;
+}
+.queue-if-bracket.picked > .queue-bracket-head {
+  background: color-mix(in srgb, var(--ui-live) 14%, transparent);
+  outline: 1px solid var(--ui-line-strong);
+}
+.queue-if-bracket > .queue-else-head {
+  cursor: default;
+  border-radius: 0;
+}
+.queue-branch {
+  color: var(--ui-live);
+  font-weight: 600;
+}
 /* With steps picked, the "+" points are where they move to. */
 .queue-insert.move button {
   opacity: 1;

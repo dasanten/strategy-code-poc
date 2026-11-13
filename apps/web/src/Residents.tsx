@@ -62,6 +62,8 @@ import { wallStrength, wallStrengthLeft } from './shared/walls.js'
 import { putAwayUnits } from './shared/goods.js'
 import { nameProblem } from './shared/names.js'
 import type {
+  Branch,
+  Condition,
   QueueStepRequest,
   Repeat,
   SeenVessel,
@@ -134,6 +136,7 @@ import {
   clearedItems,
   editPlan,
   planOf,
+  branchesOf,
   roundsOf,
   realMinutes,
   showsMinutes,
@@ -147,11 +150,13 @@ import {
   followInsert,
   InsertPointContext,
   PlannerFlowContext,
+  PLAN_STEP_ICONS,
   REPEAT_ICON,
   STEP_KIND_TYPE,
 } from './step-palette-view.js'
 import { canMoveTo, insertPoints, moveItems } from './queue-brackets-view.js'
-import type { PlanStepId } from './plan-step.js'
+import type { Plan, PlanStepId } from './plan-step.js'
+import { conditionLabel, draftOf } from './condition-view.js'
 import {
   canMove,
   DEFAULT_REPEAT,
@@ -160,7 +165,12 @@ import {
   hasBlocks,
   idsOf,
   itemCount,
+  inner,
   insertItems,
+  intoElse,
+  isIf,
+  setCondition,
+  type IfBlock,
   isBlock,
   lastPicked,
   moveItem,
@@ -439,6 +449,7 @@ export function QueueBlock({
   running = false,
   palette,
   rounds,
+  branches,
 }: {
   queue: Pick<QueuePlan, 'items' | 'loop' | 'nextStepId'>
   /** The Add step palette, right under the steps (`CONTEXT.md`: Planner blocks). */
@@ -447,6 +458,8 @@ export function QueueBlock({
   currentId?: number
   /** The round each block around the current step is on, by block id, in a running queue. */
   rounds?: ReadonlyMap<number, number>
+  /** The part each If block around the current step runs, by block id, in a running queue. */
+  branches?: ReadonlyMap<number, Branch>
   /** The resident's running queue, not a draft or a group's plan: Clear asks and keeps the current step. */
   running?: boolean
   doing?: string
@@ -506,6 +519,18 @@ export function QueueBlock({
   const repeat = () => {
     if (!wrapped) return
     const given = edit(wrapped)
+    setPicked(newIds(q.items, given.items))
+  }
+  // An If planned with Flow's If or a block's Change, its condition set (`CONTEXT.md`: If block):
+  // the steps picked when it was started are wrapped, or the block's condition changes.
+  const ifDone = (plan: Plan, condition: Condition) => {
+    if (plan.blockId !== undefined) {
+      edit(setCondition(q.items, plan.blockId, condition))
+      return
+    }
+    const into = wrap(q.items, plan.wrap ?? [], condition)
+    if (!into) return
+    const given = edit(into)
     setPicked(newIds(q.items, given.items))
   }
   // Clear (`CONTEXT.md`: Clear): empties a draft or a group's plan; on a running queue, asked
@@ -599,11 +624,13 @@ export function QueueBlock({
           teaching and training never end on their own, so they need a duration unless they are
           last: tap the duration to set it. Repeat wraps the picked steps in a block done so many
           times in a row, or forever; a round in which none of its steps could start ends it, and a
-          running queue shows the round it is on. A queue holds up to {QUEUE_MAX_STEPS} steps and
-          blocks as written, nested up to {QUEUE_MAX_DEPTH} deep. Saved… keeps the steps in this
-          browser under a name, and loads a saved queue’s steps at the end. Clear empties a draft;
-          on a running queue it keeps only the current step and turns loop off, so the queue ends
-          after it.
+          running queue shows the round it is on. If (in Add step’s Flow) puts the picked steps
+          under a condition, checked once when its turn comes; Else moves other picked steps into
+          its Else part, run when the condition doesn’t hold. A queue holds up to {QUEUE_MAX_STEPS}{' '}
+          steps and blocks as written, nested up to {QUEUE_MAX_DEPTH} deep. Saved… keeps the steps
+          in this browser under a name, and loads a saved queue’s steps at the end. Clear empties a
+          draft; on a running queue it keeps only the current step and turns loop off, so the queue
+          ends after it.
         </p>
       )}
       {hasBlocks(q.items) && (
@@ -634,6 +661,10 @@ export function QueueBlock({
         <PlannerFlowContext.Provider
           value={{
             ...(wrapped ? { repeat } : {}),
+            ...(wrapped && kept?.start
+              ? { wrapIf: () => kept.start?.('if', undefined, { wrap: picked }) }
+              : {}),
+            ifDone,
             ...(insertAt === undefined ? {} : { after: insertAt }),
           }}
         >
@@ -647,7 +678,11 @@ export function QueueBlock({
   function renderItems(items: readonly PlanItem[], depth: number): ReactNode[] {
     return items.map((item) => (
       <Fragment key={item.id}>
-        {isBlock(item) ? blockItem(item, depth) : stepItem(item, depth)}
+        {isIf(item)
+          ? ifItem(item, depth)
+          : isBlock(item)
+            ? blockItem(item, depth)
+            : stepItem(item, depth)}
         {inserts.includes(item.id!) && point(item.id!)}
       </Fragment>
     ))
@@ -771,6 +806,77 @@ export function QueueBlock({
     )
   }
 
+  // An If block: a bracket with its condition, Change, Else, Unwrap and remove in its head, its
+  // items inside, and its Else part as a second part under its own head. In a running queue the
+  // part being run is marked.
+  function ifItem(block: IfBlock, depth: number) {
+    const id = block.id!
+    const isPicked = picked.includes(id)
+    const taken = branches?.get(id)
+    const toElse = intoElse(q.items, picked, id)
+    const runs = <span className="queue-branch small"> · running</span>
+    return (
+      <li
+        className={`queue-bracket queue-if-bracket${isPicked ? ' picked' : ''}`}
+        data-depth={depth}
+      >
+        <div className="queue-bracket-head" {...rowProps(id)}>
+          <span className="queue-step-icon" aria-hidden="true">
+            {PLAN_STEP_ICONS.if}
+          </span>
+          <span className="small queue-step-label">
+            If {conditionLabel(block.if, names)}
+            {taken === 'then' && runs}
+          </span>
+          <span className="buttons">
+            {kept?.start && (
+              <button
+                type="button"
+                title="Change the condition"
+                onClick={() =>
+                  kept.start?.('if', undefined, { blockId: id, condition: draftOf(block.if) })
+                }
+              >
+                Change
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={!toElse}
+              title={
+                toElse
+                  ? 'Move the picked steps into the Else part'
+                  : 'Pick steps outside the block to move them into its Else part'
+              }
+              onClick={() => toElse && edit(toElse)}
+            >
+              Else
+            </button>
+            <button type="button" onClick={() => edit(unwrap(q.items, id))}>
+              Unwrap
+            </button>
+            <button
+              type="button"
+              aria-label="Remove the block and its steps"
+              onClick={() => edit(removeItem(q.items, id))}
+            >
+              ✕
+            </button>
+          </span>
+        </div>
+        <ol className="queue-steps">{renderItems(block.items, depth + 1)}</ol>
+        {block.else && (
+          <>
+            <div className="queue-bracket-head queue-else-head small">
+              Else{taken === 'else' && runs}
+            </div>
+            <ol className="queue-steps">{renderItems(block.else, depth + 1)}</ol>
+          </>
+        )}
+      </li>
+    )
+  }
+
   function stepItem(item: QueueStepRequest, depth: number) {
     const id = item.id!
     const isPicked = picked.includes(id)
@@ -815,7 +921,7 @@ function newIds(before: readonly PlanItem[], after: readonly PlanItem[]): number
   const fresh = (items: readonly PlanItem[]): number[] =>
     items.flatMap((item) => {
       if (item.id !== undefined && !had.has(item.id)) return [item.id]
-      return isBlock(item) ? fresh(item.items) : []
+      return isBlock(item) ? fresh(inner(item)) : []
     })
   return fresh(after)
 }
@@ -3015,6 +3121,7 @@ export function ResidentCard({
               queue={planOf(r.queue)}
               currentId={r.queue.current}
               rounds={roundsOf(r.queue)}
+              branches={branchesOf(r.queue)}
               running
               doing={doingLine(r, {
                 scripts,

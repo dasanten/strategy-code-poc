@@ -81,6 +81,9 @@ function kept(steps: QueueStepRequest[]): Queue {
   }
 }
 
+/** The kinds Add step plans as steps: an If is a block the planner puts in, not a step. */
+const STEP_KINDS = PLAN_STEPS.filter((k) => k.id !== 'if')
+
 describe('Add step', () => {
   it('offers every kind of step a queue holds', () => {
     const answers: Record<PlanAsk, PlanAnswer> = {
@@ -96,7 +99,7 @@ describe('Add step', () => {
       condition: { ask: 'condition', condition: { kind: 'mounted', is: true } },
     }
     const kinds = new Set(
-      PLAN_STEPS.map((k) => {
+      STEP_KINDS.map((k) => {
         const picked = k.picks.map(() => ({
           x: 0,
           y: 0,
@@ -125,7 +128,7 @@ describe('Add step', () => {
       units: { ask: 'units', units: 2 },
       condition: { ask: 'condition', condition: { kind: 'mounted', is: true } },
     }
-    for (const k of PLAN_STEPS) {
+    for (const k of STEP_KINDS) {
       const picked = k.picks.map(() => ({ x: 0, y: 0, id: 'x', spot: { kind: 'ground' as const } }))
       const plan: Plan = { kind: k.id, picked }
       const ask = planAsk(plan)

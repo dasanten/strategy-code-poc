@@ -387,7 +387,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const insertFor = (owner: string): InsertPoint => ({
     at: insertPoint?.owner === owner ? insertPoint.at : undefined,
     set: (at) => setInsertPoint({ owner, at }),
-    start: (kind, after) => void startPlan(kind, after),
+    start: (kind, after, extra) => void startPlan(kind, after, extra),
   })
   // The queue planned on the group card, held here until given to all (`CONTEXT.md`: Planning
   // for a group); with none open, a step planned for a group goes onto each one's own queue.
@@ -961,11 +961,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
    * Starts planning a step with Add step (`CONTEXT.md`: Queue, Planning ahead): the map picks its
    * places first; one that needs neither is added at once.
    */
-  async function startPlan(kind: PlanStepId, after?: number) {
+  async function startPlan(kind: PlanStepId, after?: number, extra?: Partial<Plan>) {
     setPicking(false)
     setGroupPicking(false)
     setParamPick(undefined)
-    const fresh: Plan = { kind, picked: [], ...(after === undefined ? {} : { after }) }
+    const fresh: Plan = { kind, picked: [], ...(after === undefined ? {} : { after }), ...extra }
     if (nextPick(fresh) || planAsk(fresh)) setPlan(fresh)
     else await addPlanned(fresh)
   }
