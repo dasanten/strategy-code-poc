@@ -124,6 +124,23 @@ in batches of 64. Not checked in a browser's Network tab.
 T99.3 measured on 2026-11-12 on a copy of a dev world (tick about 810, a Player with one young
 city), with a Node WebSocket client against the server: the same welcome at protocol 0 and 1.
 
+### T99.7: Last seen costs a tick only what changed
+
+`bench-broadcast villages <clients> 100` (60 NPC villages on a 432 × 432 map, a Player's realm
+for each client, the first Player remembering every building and city: 7,200 with 1 client,
+7,680 with 5), release build, on the dev machine on 2026-11-12 while other sessions were building.
+The Broadcast phase, before and after; the bytes sent are the same (12.2 KB a tick with 1 client,
+54.6 KB with 5).
+
+| Broadcast phase | Before: mean, p95  | After: mean, p95   |
+| --------------- | ------------------ | ------------------ |
+| 1 client        | 28.07 ms, 86.99 ms | 5.55 ms, 12.09 ms  |
+| 5 clients       | 42.29 ms, 73.76 ms | 11.79 ms, 14.82 ms |
+
+With 5,000 remembered buildings and nothing changing, a tick now copies none of them and turns
+none into JSON (tested by counting); before, every tick turned all of them into JSON for every
+socket.
+
 ### T99.4: chunk textures are painted when first shown
 
 Worked out from the per-chunk cost measured above (1.1 ms and 64 KB a texture) for the staged
