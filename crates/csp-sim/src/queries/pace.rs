@@ -7,8 +7,9 @@ use csp_shared::balance::{
     DRIVING_SKILL_EFFECT, DRIVING_SKILL_LIMIT, DRIVING_SKILL_PER_DAY, HORSE_ENDURANCE_EFFECT,
     HORSE_ENDURANCE_LIMIT, HORSE_HUNGRY_SHARE, HORSE_SPEED_EFFECT, HORSE_SPEED_LIMIT,
     HORSE_STAT_AVERAGE, HUNGRY_HORSE_PACE, INTELLECT_AVERAGE, MAX_HUNGER, ROW_SPEED,
-    ROW_STRENGTH_AVERAGE, ROW_STRENGTH_EFFECT, ROW_STRENGTH_LIMIT, SEAFARING_SKILL_EFFECT,
-    SEAFARING_SKILL_LIMIT, SEAFARING_SKILL_PER_DAY, TERRAIN_SPEED, WALK_TICKS_PER_TILE,
+    ROW_STRENGTH_AVERAGE, ROW_STRENGTH_EFFECT, ROW_STRENGTH_LIMIT, SAIL_SPEED,
+    SEAFARING_SKILL_EFFECT, SEAFARING_SKILL_LIMIT, SEAFARING_SKILL_PER_DAY, TERRAIN_SPEED,
+    WALK_TICKS_PER_TILE,
 };
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{Horse, HorseStats, Resident, SkillName, StatName};
@@ -86,7 +87,21 @@ pub fn row_speed(r: &Resident, tick: f64) -> f64 {
     (ROW_SPEED * strong * skilled) / WALK_TICKS_PER_TILE
 }
 
-/// Seafaring a rower learns from one tick of rowing, as Driving is learned.
+/// How far a ship sails in one tick, in tiles (`CONTEXT.md`: Sailing, Seafaring): `SAIL_SPEED`
+/// times walking on Plains, faster for a crew skilled at Seafaring on average, as a rower's skill
+/// speeds a boat. Without crew, the unskilled pace.
+pub fn sail_speed(crew: &[&Resident]) -> f64 {
+    let skill = if crew.is_empty() {
+        0.0
+    } else {
+        crew.iter().map(|r| seafaring_skill(r)).sum::<f64>() / crew.len() as f64
+    };
+    let skilled = 1.0 + SEAFARING_SKILL_LIMIT.min(skill * SEAFARING_SKILL_EFFECT);
+    (SAIL_SPEED * skilled) / WALK_TICKS_PER_TILE
+}
+
+/// Seafaring a rower learns from one tick of rowing, as Driving is learned; each of a ship's crew
+/// learns as much from a tick of sailing.
 pub fn seafaring_learned(r: &Resident, tick: f64) -> f64 {
     let pace = stat_value(r, StatName::Intellect, tick) / INTELLECT_AVERAGE;
     (SEAFARING_SKILL_PER_DAY / TICKS_PER_GAME_DAY) * pace

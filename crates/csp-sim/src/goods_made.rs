@@ -93,6 +93,7 @@ mod tests {
             y: 0.0,
             load: stock(&[(Good::Wood, 4.0)]),
             rower_id: None,
+            crew_ids: Vec::new(),
         });
         assert_eq!(held(&tally_goods(&world), Good::Wood), before + 4.0);
     }

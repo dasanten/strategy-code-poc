@@ -16,6 +16,7 @@ import {
   isPassableTerrain,
   terrainAt,
   tileIndex,
+  touchesSea,
   touchesWater,
   type TerrainMap,
   wrap,
@@ -78,14 +79,15 @@ export const BUILDABLE: readonly BuildingKind[] = [
   'carriage',
   'haven',
   'boat',
+  'ship',
 ]
 
 /**
  * Kinds that share a tile with a building rather than taking it (`CONTEXT.md`: Road, Carriage,
- * Building a boat):
- * roads, carriage sites and boat sites, one of each per tile at most.
+ * Building a boat, Building a ship): roads, carriage sites, boat sites and ship sites, one of each
+ * per tile at most.
  */
-export const SHARES_A_TILE: readonly BuildingKind[] = ['road', 'carriage', 'boat']
+export const SHARES_A_TILE: readonly BuildingKind[] = ['road', 'carriage', 'boat', 'ship']
 
 /** Workplaces that turn goods into other goods (`RECIPES`): smelters, mints and smithies. */
 export const PROCESSING = Object.keys(RECIPES) as readonly BuildingKind[]
@@ -232,9 +234,18 @@ export function boatSiteAt(
   return world.buildings.find((b) => b.x === x && b.y === y && b.kind === 'boat')
 }
 
+/** The ship site on a tile, if there is one (`CONTEXT.md`: Building a ship). */
+export function shipSiteAt(
+  world: Pick<WorldState, 'buildings'>,
+  x: number,
+  y: number,
+): Building | undefined {
+  return world.buildings.find((b) => b.x === x && b.y === y && b.kind === 'ship')
+}
+
 /**
- * What of `kind` stands on a tile, finished or not: its road for a road, its carriage or boat
- * site for a carriage or boat, else its building.
+ * What of `kind` stands on a tile, finished or not: its road for a road, its carriage, boat or
+ * ship site for a carriage, boat or ship, else its building.
  */
 export function constructionAt(
   world: WorldState,
@@ -245,6 +256,7 @@ export function constructionAt(
   if (kind === 'road') return roadAt(world, x, y)
   if (kind === 'carriage') return carriageSiteAt(world, x, y)
   if (kind === 'boat') return boatSiteAt(world, x, y)
+  if (kind === 'ship') return shipSiteAt(world, x, y)
   return buildingAt(world, x, y)
 }
 
@@ -401,6 +413,14 @@ export function buildProblem(
     if (haven?.kind !== 'haven' || haven.site || (at && !touchesWater([[x, y]], size, at)))
       return 'a boat is built on a tile of a finished haven touching the water'
     if (boatSiteAt(world, x, y)) return 'there is already a boat site on this tile'
+    return undefined
+  }
+  if (kind === 'ship') {
+    // `CONTEXT.md`: Building a ship: on a haven tile that touches Sea.
+    const haven = buildingAt(world, x, y, size)
+    if (haven?.kind !== 'haven' || haven.site || (at && !touchesSea([[x, y]], size, at)))
+      return 'a ship is built on a tile of a finished haven touching the Sea'
+    if (shipSiteAt(world, x, y)) return 'there is already a ship site on this tile'
     return undefined
   }
   const placed = { kind, x, y }

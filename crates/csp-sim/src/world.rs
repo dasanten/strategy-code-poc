@@ -49,6 +49,7 @@ use crate::teardown::{request_tearing_down, resolve_tearing_down, Felled};
 use crate::tick::{reborrow, Scratch, TickPhase, TickTimer, Walk};
 use crate::trading::resolve_trades;
 use crate::training::step_training;
+use crate::water_hauling::request_water_hauling;
 use crate::work::{request_work, resolve_work};
 use crate::workplace_settings::step_workplace_settings;
 
@@ -259,6 +260,7 @@ fn step_rest(
     let mut carries = request_carrying(world);
     carries.extend(request_storing(world));
     carries.extend(request_hauling(world, size));
+    carries.extend(request_water_hauling(world, terrain));
     carries.extend(request_road_materials(world, scratch));
     let carries_len = carries.len();
     resolve_carrying_on(world, &carries, size, Some(terrain));
