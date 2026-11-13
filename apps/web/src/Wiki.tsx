@@ -50,6 +50,7 @@ import {
   CITY_QUARTER_ROWS,
   CLIMB_TICKS,
   COMBAT_SKILL_EFFECT,
+  COMBAT_SKILL_LIMIT,
   COMBAT_SKILL_PER_BLOW,
   CONSTRUCTION_SKILL_EFFECT,
   CONSTRUCTION_SKILL_MAX,
@@ -236,6 +237,8 @@ import {
   DEMAND_TRADE_ORG_STANDING_LOSS,
   DEMAND_YIELD_RESPECT_MIN,
   DEMAND_YIELD_RESPECT_TIMES,
+  RESPECT_PER_WALL,
+  OUTWEIGH_HOLD_DAYS,
   STANDING_RANGE,
   STANDING_NPC_TRADE_COINS_PER_POINT,
   STANDING_TRADE_COINS_PER_POINT,
@@ -288,6 +291,7 @@ import { PARAM_DESCRIPTIONS, DEFAULT_SCRIPTS, SCRIPT_VIEWS } from '@csp/lang-was
 import { WORKPLACE_PARAM } from './shared/default-scripts.js'
 import { SCRIPT_PARAM_TYPES } from './shared/script-api.js'
 import { NPC_SMITHY_WEAPON } from './shared/npc-trade.js'
+import { fighterStrength } from './shared/persuasion.js'
 import type {
   BuildingKind,
   CrimeKind,
@@ -348,6 +352,13 @@ import {
   SCRIPT_LANGUAGE,
 } from './wiki-scripting.js'
 import { apiNames, type ApiName } from './script-editor.js'
+
+/** An untrained fighter with a spear and a fully trained, armoured one, as respect weighs them. */
+const UNTRAINED_SPEAR = { carried: { spear: 1 }, skills: {} }
+const TRAINED_AND_ARMOURED = {
+  carried: { sword: 1, shield: 1, armour: 1 },
+  skills: { combat: COMBAT_SKILL_MAX },
+}
 
 /** The Wiki's topics, in order, each a section with its own anchor (`/wiki#food`). */
 export const WIKI_TOPICS = [
@@ -2634,10 +2645,20 @@ export function Wiki() {
         </p>
         <p>
           An NPC city sells only what it holds above this reserve and buys only what it is short of.
-          It lends residents at {num(NPC_TRADE.pricePerResidentWeek)} coins each a game week,
-          keeping {pct(NPC_TRADE.defenceShare)} of its adults at home. The Trade Organization hires
-          out soldiers at {num(TRADE_ORG_ARMY.pricePerSoldierWeek)} coins each a game week. A
-          contract runs at most {days(CONTRACT_MAX_DAYS)}.
+          It lends residents at {num(NPC_TRADE.pricePerResidentWeek)} coins each a game week, but
+          only its spare hands: those its plan has idle, on a road crew, scouting or working for
+          surplus. Its farmers, those working for a good short of its reserve and its builders stay,
+          and so do {pct(NPC_TRADE.defenceShare)} of its adults at home, its soldiers among them.
+          They take weapons and armour along only from what its storages hold above its reserve;
+          with none spare they come unarmed. It lends nobody while it weighs a demand, while its
+          town hall is occupied, or while your armed residents stand in its City area or in sight of
+          it. Those it lends never act against it: they refuse an order to attack its residents,
+          walls or gates, to climb its walls or to tear down its buildings, whether you give it by
+          hand, in a queue, to a group or an army or from a script, and they can't occupy its town
+          hall nor count as your fighters toward it. Struck by one of its own, they still defend
+          themselves. The Trade Organization hires out soldiers at{' '}
+          {num(TRADE_ORG_ARMY.pricePerSoldierWeek)} coins each a game week. A contract runs at most{' '}
+          {days(CONTRACT_MAX_DAYS)}.
         </p>
         <p>
           An NPC city shuts its gates while anyone armed who isn't of the city or its alliance
@@ -2747,8 +2768,9 @@ export function Wiki() {
             itself to you.
           </li>
           <li>
-            At {signed(PERSUADE_STANDING)} and with enough respect an NPC city asks to join you;
-            declined, it asks again after {days(PERSUADE_ASK_AGAIN_DAYS)}.
+            At {signed(PERSUADE_STANDING)}, and once your fighters near it have outweighed its own
+            side for {days(OUTWEIGH_HOLD_DAYS)} without a break (Respect, below), an NPC city asks
+            to join you; declined, it asks again after {days(PERSUADE_ASK_AGAIN_DAYS)}.
           </li>
           <li>
             An NPC city joins an alliance when it holds every member at{' '}
@@ -2843,6 +2865,21 @@ export function Wiki() {
           Leaving an alliance takes {realSeconds(ALLIANCE_LEAVE_DELAY)}; soldiers recalled from its
           army are back under their owner's command after {realSeconds(ALLIANCE_RECALL_DELAY)}.
         </p>
+        <h3>Respect</h3>
+        <p>
+          What an NPC city weighs when you demand it or it thinks of joining you. On your side only
+          your armed residents count, and only while they stand in its City area or in sight of one
+          of its people who is at home there: what its scouts and traders see far away doesn't
+          count, nor do your walls, nor residents it lent you. Each counts by strength, as combat
+          weighs them: their best weapon's blow, harder with Combat skill (up to{' '}
+          {num(1 + COMBAT_SKILL_LIMIT)} times), plus what their shield and armour take off a blow.
+          An untrained resident with a spear counts {num(fighterStrength(UNTRAINED_SPEAR))}; one
+          with a sword, shield and armour and full Combat skill counts{' '}
+          {num(fighterStrength(TRAINED_AND_ARMOURED))}. On its side count its soldiers, weighed the
+          same way, and {num(RESPECT_PER_WALL)} for each of its own finished wall and gate tiles. It
+          weighs this at its planning pass, once a game hour, and remembers since when each realm
+          has outweighed it; the first pass one doesn't, that time starts again from nothing.
+        </p>
       </Section>
 
       <Section id="demands">
@@ -2886,14 +2923,19 @@ export function Wiki() {
             holds is what goes. With none of it there you can't accept that way.
           </li>
           <li>
-            <strong>An NPC city answers for itself</strong> within a game hour, when it next plans.
-            You can send one to any NPC city you have seen or have a standing with. It gives in when
-            the armed residents and walls of yours in its sight come to at least{' '}
-            {num(DEMAND_YIELD_RESPECT_TIMES)} times its soldiers, and at least{' '}
-            {num(DEMAND_YIELD_RESPECT_MIN)}, so an army at the gate can win a city without a fight.
-            Those out of its sight don't count. It joins your realm as a persuaded city does, or
-            sets what it holds of the goods aside at its storage for you alone to fetch. Otherwise,
-            or with none of the goods there, it declines, and its standing toward you drops by{' '}
+            <strong>An NPC city weighs it at its planning passes</strong>, one each game hour. You
+            can send one to any NPC city you have seen or have a standing with. It gives in once the
+            strength of your fighters near it (Respect, under Standing) has come to at least{' '}
+            {num(DEMAND_YIELD_RESPECT_TIMES)} times its own side, and at least{' '}
+            {num(DEMAND_YIELD_RESPECT_MIN)}, for {days(OUTWEIGH_HOLD_DAYS)} without a break: a real
+            army that stays at the gate wins a city without a fight, a crowd with spears or an army
+            walking through doesn't. Until then it <strong>wavers</strong>, and the Demands drawer
+            shows how long is left; a planning pass on which your force doesn't outweigh it that far
+            starts the time again from nothing. Your walls and fighters out of its sight don't
+            count. It joins your realm as a persuaded city does, or sets what it holds of the goods
+            aside at its storage for you alone to fetch. With none of your fighters near it declines
+            at its next pass; it declines too when the deadline comes first, or with none of the
+            goods there. Declining drops its standing toward you by{' '}
             {num(DEMAND_DECLINED_STANDING_LOSS)}.
           </li>
           <li>

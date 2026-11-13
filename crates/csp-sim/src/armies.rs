@@ -193,7 +193,15 @@ fn check(
                 {
                     Some("that is one of your own residents".into())
                 }
-                _ => None,
+                Some(t) => {
+                    // A member lent by the target's city won't go after them (`CONTEXT.md`:
+                    // Hiring from an NPC city).
+                    army.member_ids.iter().find_map(|id| {
+                        let m = world.residents.iter().find(|r| &r.id == id)?;
+                        crate::lent::refusal(world, m, &t.id).map(|no| format!("{}, {no}", m.name))
+                    })
+                }
+                None => None,
             }
         }
         ArmyFollow => {

@@ -13,6 +13,7 @@ pub mod field_check;
 pub mod first_day;
 pub mod game_scripts;
 pub mod log;
+pub mod map_tools;
 pub mod monitoring;
 pub mod realtime;
 pub mod saves;

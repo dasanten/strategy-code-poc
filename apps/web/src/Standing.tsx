@@ -9,6 +9,8 @@ import {
 } from './standing-view.js'
 import { PanelHead } from './drawer-head.js'
 import { relationshipClass } from './theme.js'
+import { aboutTime } from './shared/estimates.js'
+import { OUTWEIGH_HOLD_DAYS, TICKS_PER_GAME_DAY } from '@csp/balance'
 
 /**
  * Standing (`CONTEXT.md`: Standing): how other Organizations regard the Player's realm, and how
@@ -108,8 +110,11 @@ export function StandingPanel({
       )}
       <p className="muted small">
         Known crimes lower it, trade and paid contract weeks raise it, and it drifts back to
-        neutral. An NPC city that holds you in high standing and sees more of your armed residents
-        and walls than it has soldiers asks to join you.
+        neutral. An NPC city that holds you in high standing asks to join you once your armed
+        residents near it have outweighed its soldiers and walls for{' '}
+        {aboutTime(OUTWEIGH_HOLD_DAYS * TICKS_PER_GAME_DAY)} without a break. Respect counts them by
+        weapon, armour, shield and Combat skill, only in its City area or in sight of its people at
+        home; your walls and residents it lent you don't count.
       </p>
     </section>
   )

@@ -42,7 +42,24 @@ fn game(log: FakeLog) -> Game<FakeLog> {
     let terrain = TerrainMap { size: 64, tiles: vec![0; 64 * 64] };
     let world = create_world(&terrain, 1);
     let explored = ExploredTerrain::new(terrain.clone(), &world.nodes);
-    Game::new(world, terrain, explored, log)
+    Game::new(world, explored, log)
+}
+
+#[test]
+fn holds_the_maps_terrain_once_for_the_game_the_explored_terrain_and_the_http_side() {
+    let g = game(FakeLog::default());
+    assert!(Arc::ptr_eq(&g.terrain, g.explored().map().terrain()));
+    let thread = GameThread::spawn(
+        move || {
+            let g = game(FakeLog::default());
+            assert!(Arc::ptr_eq(&g.terrain, g.explored().map().terrain()));
+            Ok((open_db(":memory:", None)?, g))
+        },
+        SETTINGS,
+    )
+    .unwrap();
+    // The HTTP side's map and explored terrain are the game's, the same one copy.
+    assert!(Arc::ptr_eq(thread.explored.lock().unwrap().map(), &thread.map));
 }
 
 fn ticks(conn: &Connection) -> Vec<i64> {

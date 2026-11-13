@@ -2093,6 +2093,12 @@
           "name": "deadline",
           "type": "number",
           "description": "The tick it lapses at, unanswered."
+        },
+        {
+          "name": "wavering",
+          "type": "number",
+          "description": "For a demand to an NPC city: while the sender’s force near it far outweighs it, the ticks left before it gives in. It starts again from nothing after a planning pass it doesn’t.",
+          "nullWhen": "the sender’s force doesn’t far outweigh the city now, or it was sent to anyone else"
         }
       ]
     }

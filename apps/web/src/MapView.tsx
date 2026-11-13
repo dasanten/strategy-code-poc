@@ -21,9 +21,17 @@ import {
   type Covered,
   type Size,
 } from './map/camera.js'
-import { ChunkStore, chunkByChunk, exploredChunkBatches } from './map/chunks.js'
+import { ChunkStore, chunkByChunk, exploredChunkBatches, type ChunkSource } from './map/chunks.js'
+import { cachedSource, countsAt, openTerrainCache } from './map/terrain-cache.js'
 import { selectedWay, wayInView, wayLine } from './map/way.js'
 import { TerrainLayer } from './map/terrain-layer.js'
+import { CoarseLayer, type LevelChunk } from './map/coarse-layer.js'
+import {
+  coarserCover,
+  levelChunkToScreen,
+  levelForScale,
+  visibleLevelChunks,
+} from './map/levels.js'
 import {
   holderAt,
   holderLabel,
@@ -38,12 +46,16 @@ import {
 import {
   MINIMAP_SIDE,
   minimapDots,
+  minimapChunks,
   minimapFrame,
+  minimapLevel,
   minimapOpenAtStart,
   minimapPixels,
+  minimapRes,
   minimapToTile,
   minimapView,
   rememberMinimapOpen,
+  terrainAtLevel,
   tileToMinimap,
   type MinimapDot,
   type MinimapFrame,
@@ -158,6 +170,7 @@ export function MapView({
   onTerrainLoaded,
   focus,
   terrainPath,
+  keepTerrainFor,
   start,
   onView,
   newRealm = false,
@@ -215,6 +228,11 @@ export function MapView({
   }
   /** Where terrain chunks load from; the Player's explored terrain by default. */
   terrainPath?: (cx: number, cy: number) => string
+  /**
+   * Whose explored terrain the browser keeps between visits (ADR 0034): the Player in the world
+   * of that seed. None keeps nothing (the admin map).
+   */
+  keepTerrainFor?: { seed: number; player: string }
   /** Where the view starts, instead of the home city at the starting zoom. */
   start?: Camera
   /** Called with the camera and the screen's size whenever the view moves or resizes. */
@@ -249,6 +267,7 @@ export function MapView({
   onViewRef.current = onView
   const startRef = useRef(start)
   const terrainPathRef = useRef(terrainPath)
+  const keepTerrainForRef = useRef(keepTerrainFor)
   const overviewRef = useRef<(overview: Uint8Array | null) => void>(() => {})
   const redrawRef = useRef<() => void>(() => {})
   const motionRef = useRef<(world: MapWorld) => void>(() => {})
@@ -348,6 +367,9 @@ export function MapView({
     const borders = new Map<number, Map<number, BorderRun[]>>()
     // The minimap: its frame, its terrain as a picture made again when chunks load, and its dots.
     let miniFrame: MinimapFrame | undefined
+    // The level its terrain is drawn from and that level's chunks it needs (ADR 0034).
+    let miniLevel = 0
+    let miniChunks: number[] = []
     let miniExplored: ReadonlySet<number> | undefined
     let miniTerrain: HTMLCanvasElement | undefined
     let miniDots: { world: MapWorld; dots: MinimapDot[] } | undefined
@@ -378,10 +400,38 @@ export function MapView({
     let ready = false
     let frame = 0
 
+    // The terrain this browser kept for the Player, used where it is at the count of explored
+    // tiles the chunk has now (ADR 0034). The counts of a level are worked out again when the
+    // Player's counts change.
+    let counts: {
+      from?: ReadonlyMap<number, number>
+      levels: Map<number, ReadonlyMap<number, number>>
+    } = { levels: new Map() }
+    const countOf = (i: number, level: number) => {
+      const all = worldRef.current.exploredCounts
+      if (!all) return undefined
+      if (counts.from !== all) counts = { from: all, levels: new Map() }
+      let at = counts.levels.get(level)
+      if (!at) counts.levels.set(level, (at = countsAt(all, across, level)))
+      return at.get(i)
+    }
+    const keptTerrain = (source: ChunkSource): ChunkSource => {
+      const keep = keepTerrainForRef.current
+      if (!keep) return source
+      return cachedSource(source, openTerrainCache(keep.seed, keep.player), countOf)
+    }
+
     const store = new ChunkStore(
       () => worldRef.current.exploredChunks,
       across,
-      (chunk) => {
+      (chunk, level) => {
+        // Coarse chunks are drawn zoomed out (ADR 0034) and on the minimap.
+        if (level !== 0) {
+          coarseLayer.set(chunk, level)
+          if (level === miniLevel) miniTerrain = undefined
+          redraw()
+          return
+        }
         terrainLayer.set(chunk)
         nodes[chunk.cy * across + chunk.cx] = chunk.nodes
         onNodesLoadedRef.current?.((x, y) =>
@@ -395,13 +445,15 @@ export function MapView({
               (y % CHUNK_SIZE) * CHUNK_SIZE + (x % CHUNK_SIZE)
             ],
         )
-        miniTerrain = undefined
+        if (miniLevel === 0) miniTerrain = undefined
         redraw()
       },
       terrainPathRef.current
         ? chunkByChunk(terrainPathRef.current, across)
-        : exploredChunkBatches(),
+        : keptTerrain(exploredChunkBatches()),
     )
+    // Zoomed out, the coarse levels of explored terrain, under the full-detail chunks (ADR 0034).
+    const coarseLayer = new CoarseLayer(mapSize, (i, level) => store.get(i, level))
 
     function redraw() {
       if (!ready || frame) return
@@ -468,10 +520,13 @@ export function MapView({
       const far = zoomTier(cam.scale) === 'far'
       const admin = worldRef.current.admin
       // Only chunks on screen are drawn, each at its copy nearest the view's centre (the map's
-      // sides join); nearer chunks are loaded first. The admin map's far tier draws the overview
-      // instead, so zooming out over the whole map loads no chunks.
+      // sides join); nearer chunks are loaded first. Zoomed out, a coarse level of explored
+      // terrain is drawn instead (ADR 0034), so a frame costs about the same at any zoom. The
+      // admin map's far tier draws the overview instead, and it loads level 0 only.
       const fromOverview = far && admin !== undefined
-      const onScreen = fromOverview ? [] : visibleChunks(cam, view, mapSize)
+      const level = admin ? 0 : levelForScale(cam.scale)
+      const onScreen = fromOverview || level > 0 ? [] : visibleChunks(cam, view, mapSize)
+      const coarseOnScreen = level > 0 ? visibleLevelChunks(cam, view, mapSize, level) : []
       const shown = new Set(onScreen)
       // Far out, territory fills (ADR 0008: far tier), nearer in only its borders show; on the
       // admin map only when toggled.
@@ -483,36 +538,56 @@ export function MapView({
       regionLayer.visible = look === 'fill'
       drawBorders(look === 'borders' ? onScreen : [], view)
       terrainLayer.container.visible = !fromOverview
+      coarseLayer.container.visible = !fromOverview
       if (overviewSprite) {
         overviewSprite.visible = fromOverview
         if (fromOverview) placeOverview(overviewSprite, view)
       }
       // Terrain whose edges still wait to be redone asks for another frame.
       if (!fromOverview && terrainLayer.draw(cam, view, shown)) redraw()
+      const side = CHUNK_SIZE * cam.scale
       for (const [i, sprite] of regionSprites) {
-        sprite.visible = shown.has(i)
+        const [sx, sy] = chunkToScreen(cam, view, mapSize, i % across, Math.floor(i / across))
+        sprite.visible = sx < view.width && sy < view.height && sx + side > 0 && sy + side > 0
         if (!sprite.visible) continue
-        sprite.position.set(
-          ...chunkToScreen(cam, view, mapSize, i % across, Math.floor(i / across)),
-        )
+        sprite.position.set(sx, sy)
         sprite.scale.set(cam.scale)
       }
-      // The minimap's chunks load too; the store asks for the nearest to the view first.
-      const forMinimap =
-        minimapOpenRef.current && !admin
-          ? [...worldRef.current.exploredChunks].filter((i) => !shown.has(i))
-          : []
-      store.want([...onScreen, ...forMinimap], {
-        cx: cam.x / CHUNK_SIZE,
-        cy: cam.y / CHUNK_SIZE,
-      })
-      const notHere = store.waiting(onScreen)
-      waiting.clear()
-      for (const i of notHere) {
-        const [sx, sy] = chunkToScreen(cam, view, mapSize, i % across, Math.floor(i / across))
-        waiting.rect(sx, sy, CHUNK_SIZE * cam.scale, CHUNK_SIZE * cam.scale)
+      // The minimap's chunks load after those on screen, at the level that fits its frame
+      // (ADR 0034): about one request, however much is explored.
+      const forMinimap = minimapOpenRef.current && !admin ? [planMinimap()] : []
+      const here = level > 0 ? [{ level, indices: coarseOnScreen }] : []
+      store.want(onScreen, { cx: cam.x / CHUNK_SIZE, cy: cam.y / CHUNK_SIZE }, [
+        ...here,
+        ...forMinimap,
+      ])
+      // Chunks on screen still loading, or loaded and still to be painted (ADR 0034): a coarser
+      // chunk already loaded shows under them, so there is no hole; failing that, grey.
+      const notHere = level > 0 ? store.waiting(coarseOnScreen, level) : store.waiting(onScreen)
+      const unpainted =
+        level > 0
+          ? coarseLayer
+              .unpainted(coarseOnScreen.map((index) => ({ level, index })))
+              .map((c) => c.index)
+          : terrainLayer.unpainted(onScreen)
+      const covers = new Map<string, LevelChunk>()
+      const grey: number[] = []
+      for (const i of [...notHere, ...unpainted]) {
+        const cover = coarserCover(mapSize, level, i, (j, k) => store.get(j, k) !== undefined)
+        if (cover) covers.set(`${cover.level}:${cover.index}`, cover)
+        else grey.push(i)
       }
-      if (notHere.length > 0) waiting.fill(LOADING_COLOR)
+      const coarse: LevelChunk[] = [
+        ...covers.values(),
+        ...coarseOnScreen.map((index) => ({ level, index })),
+      ]
+      if (coarseLayer.draw(cam, view, fromOverview ? [] : coarse)) redraw()
+      waiting.clear()
+      for (const i of grey) {
+        const r = levelChunkToScreen(cam, view, mapSize, level, i)
+        waiting.rect(r.x, r.y, r.width, r.height)
+      }
+      if (grey.length > 0) waiting.fill(LOADING_COLOR)
       setLoading(notHere.length > 0)
       drawOverlay(overlay, cam, view, onScreen)
       drawMinimap(view)
@@ -543,30 +618,35 @@ export function MapView({
       }
     }
 
+    /** The minimap's frame, level and chunks, worked out again when explored terrain grew. */
+    function planMinimap(): { level: number; indices: number[]; frame: MinimapFrame } {
+      const world = worldRef.current
+      if (world.exploredChunks !== miniExplored || !miniFrame) {
+        miniExplored = world.exploredChunks
+        miniFrame = minimapFrame(miniExplored, world.home, mapSize)
+        miniLevel = minimapLevel(miniFrame, mapSize)
+        miniChunks = minimapChunks(miniFrame, mapSize, miniLevel)
+        miniTerrain = undefined
+      }
+      return { level: miniLevel, indices: miniChunks, frame: miniFrame }
+    }
+
     /** The minimap (`map/minimap.ts`): explored terrain, dots and the view's rectangle. */
     function drawMinimap(view: Size) {
       const canvas = minimapRef.current
       const world = worldRef.current
       const ctx = canvas?.getContext('2d')
       if (!canvas || !ctx || world.admin) return
-      if (world.exploredChunks !== miniExplored || !miniFrame) {
-        miniExplored = world.exploredChunks
-        miniFrame = minimapFrame(miniExplored, world.home, mapSize)
-        miniTerrain = undefined
-      }
-      const frame = miniFrame
+      const { frame, level } = planMinimap()
       if (!miniTerrain) {
-        const res = Math.min(MINIMAP_SIDE, Math.ceil(frame.span))
+        const res = minimapRes(frame)
         miniTerrain = document.createElement('canvas')
         miniTerrain.width = miniTerrain.height = res
         const pixels = minimapPixels(
           frame,
           mapSize,
           res,
-          (x, y) =>
-            store.get(Math.floor(y / CHUNK_SIZE) * across + Math.floor(x / CHUNK_SIZE))?.tiles[
-              (y % CHUNK_SIZE) * CHUNK_SIZE + (x % CHUNK_SIZE)
-            ],
+          terrainAtLevel(mapSize, level, (i, l) => store.get(i, l)),
         )
         miniTerrain.getContext('2d')?.putImageData(new ImageData(pixels, res, res), 0, 0)
       }
@@ -1152,6 +1232,7 @@ export function MapView({
       })
       app.stage.addChild(
         waiting,
+        coarseLayer.container,
         terrainLayer.container,
         regionLayer,
         borderLayer,
@@ -1185,6 +1266,7 @@ export function MapView({
       controlsRef.current = null
       if (ready) {
         terrainLayer.destroy()
+        coarseLayer.destroy()
         overviewSprite?.texture.destroy(true)
         for (const sprite of regionSprites.values()) sprite.texture.destroy(true)
         app.destroy(true, { children: true })

@@ -641,7 +641,10 @@ The shared language of the game. Domain terms only — no implementation details
   own realm and its allies. Others see that it is there.
 - **Explored terrain:** tiles a Player has ever had in sight. Their terrain and resource nodes stay
   known, and so do the buildings on them (see Last seen); people, horses, carriages, armies and
-  goods on them do not.
+  goods on them do not. Where the map shows explored terrain coarser than tile by tile (zoomed far
+  out, on the minimap), a square shows the most common terrain among the tiles the Player explored
+  in it, and stays unexplored only while they explored none of it: nothing of an unexplored tile
+  is ever shown (ADR 0034).
 - **Last seen:** a building or construction site a Player has had in sight (their own included)
   stays on their map after it leaves their sight, as it was when they last saw it: where it
   stands, what it is, who held it and which city it belonged to (by that city's name then), along with whatever else they
@@ -715,9 +718,16 @@ The shared language of the game. Domain terms only — no implementation details
   Player asks it for a number of its residents for some game days, paid into its storage. It
   accepts at once when the price per resident and week is at least its asking price (moved by
   its standing like its trade prices) and it can spare them, and declines otherwise. It lends
-  only adults it can spare: it keeps its farmers to feed the city and a share of its adults at
-  home to defend it, and lends idle adults first, then workers from its other workplaces. Its
-  lent residents take weapons and armour from its storage along, as far as it has them. Paying
+  only its spare hands (Spare hands' work): adults idle, on a road crew, scouting or working for
+  surplus. Its farmers, those working for a good short of its reserve and its builders with a
+  project stay, and so does a share of its adults at home to defend it. Its lent residents take
+  weapons and armour along only from its surplus, what its storages hold above its reserve (NPC
+  reserve); with none spare they go unarmed. It lends nobody while it feels threatened: while it
+  weighs a demand (Demand), while its town hall is occupied, or while armed residents of the
+  hirer stand in its area or in sight of it. Those it lends never act against it: they refuse an
+  order to attack its residents, walls or gates, to climb its walls or to tear down its buildings,
+  they can't occupy its town hall, and they never count as the hirer's fighters toward it
+  (Respect). Paying
   and ending go as in any mercenary contract: each week in advance into that storage, an unpaid
   week breaks it and costs standing, a paid one raises it, and at the end they walk home.
 - **Trade Org army:** a large army of normal residents of the Trade Org HQ, for hire like any
@@ -773,11 +783,18 @@ The shared language of the game. Domain terms only — no implementation details
 - **NPC city reaction:** at low standing an NPC city won't trade with you or hire out to you
   (Trading with an NPC city, Hiring from an NPC city) and keeps its gates shut to your residents; the lower it is, the more it asks to be bought, and at
   very low standing it won't sell at all.
-- **Persuading a city:** an NPC city that holds you in high standing and sees enough respect from
-  you (more of your armed residents and walls in its sight than it has soldiers) asks to join
-  your realm. You accept or decline.
+- **Persuading a city:** an NPC city that holds you in high standing and has seen enough respect
+  from you for a set time (your fighters near it outweighing its own side without a break, Respect)
+  asks to join your realm. You accept or decline.
 - **Respect:** how dangerous a place looks to others, judged from the armed residents and walls
-  they can see. Not stored; NPC cities and bandits avoid targets with high respect.
+  they can see. Bandits avoid targets with high respect. **What an NPC city weighs** when a realm
+  demands it or it thinks of joining one (ADR 0033): on the realm's side only its armed residents
+  standing in the city's area or in sight of it, seen by a resident of the city who is at home,
+  each by their strength as combat counts it (weapon, armour and shield, Combat skill); the realm's
+  walls don't count, nor what the city's people see far from home, nor residents the city lent the
+  realm. On its own side its soldiers, weighed the same way, and its finished walls and gates. The
+  city remembers since when a realm has outweighed it without a break; the first planning pass it
+  doesn't, that time starts again from nothing.
 - **Trade Org reaction:** below one standing threshold it refuses to trade; below a lower one it
   sends its army to take back the value and punish: to the culprit's city nearest the crime, to
   carry home twice what it lost (coins first), fighting whoever resists. It leaves once it has what
@@ -866,13 +883,17 @@ The shared language of the game. Domain terms only — no implementation details
     what it holds is what goes; with none of it there they can't accept that way. A city no longer
     theirs can't be handed over. Handing over is the Player's own choice, also for their last city,
     which goes as losing it to capture does: no crime and no standing lost.
-  - **An NPC city** accepts when the respect it sees from the sender (their armed residents and
-    walls in its sight) far outweighs its soldiers, so an army at the gate can take a city without a
-    fight; otherwise it declines and its standing toward the sender drops. It carries out goods the
+  - **An NPC city** accepts once the sender's fighters near it have far outweighed its own side
+    (Respect) without a break for a set time, so an army that stays at the gate can take a city
+    without a fight. With none of the sender's fighters near it declines at once; otherwise it waits,
+    **wavering**, and declines when the deadline comes first. Declining drops its standing toward the
+    sender. Both sides see in the Demands drawer that it wavers and how long is left, or that the
+    time has started again. It carries out goods the
     same way: set aside at its storage, for the sender alone to fetch; with none of them there it
     declines. **The Trade Organization** always declines, and being asked costs standing. A Player
-    knows of an NPC city as of a realm, and everyone knows of the Trade Organization. Both answer at
-    their next planning pass, within a game hour (ADR 0016); a city that has joined a realm by then
+    knows of an NPC city as of a realm, and everyone knows of the Trade Organization. Both look at a
+    demand at their planning pass, within a game hour (ADR 0016), where the Trade Organization
+    answers and an NPC city answers or goes on wavering; a city that has joined a realm by then
     lets the demand lapse.
 
 ## Bandits

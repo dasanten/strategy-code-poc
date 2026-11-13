@@ -20,7 +20,7 @@ use std::{
 
 use csp_shared::{balance::MAP_SIZE, terrain::TerrainMap, world::WorldState, TICK_MS};
 use csp_sim::{
-    explored::ExploredTerrain,
+    explored::{ExploredTerrain, MapTerrain},
     orders::{order_kinds, OrderQueue},
     queues::QueueRunner,
     script_runner::ScriptRunner,
@@ -177,10 +177,11 @@ pub struct Game<L: LogSink> {
 }
 
 impl<L: LogSink> Game<L> {
-    /// The game without a script library: orders, walking and territory, but no script runs.
-    pub fn new(world: WorldState, terrain: TerrainMap, explored: ExploredTerrain, log: L) -> Self {
+    /// The game without a script library: orders, walking and territory, but no script runs. The
+    /// map's terrain is the explored terrain's copy, so the server holds it once (ADR 0034).
+    pub fn new(world: WorldState, explored: ExploredTerrain, log: L) -> Self {
         let log = Arc::new(log);
-        let terrain = Arc::new(terrain);
+        let terrain = Arc::clone(explored.map().terrain());
         Self {
             world,
             orders: OrderQueue::new(order_kinds(), Some(Arc::clone(&terrain))),
@@ -242,7 +243,8 @@ impl<L: LogSink> Game<L> {
         }
     }
 
-    /// The explored terrain, locked: only the game thread takes it, between ticks or in one.
+    /// The explored terrain, locked. The game thread takes it between ticks or in one, the script
+    /// host as scripts ask, and the HTTP workers for as long as a terrain request takes to copy.
     pub fn explored(&self) -> MutexGuard<'_, ExploredTerrain> {
         self.explored.lock().unwrap_or_else(|e| e.into_inner())
     }
@@ -440,6 +442,11 @@ pub struct GameThread<L: LogSink> {
     pub started_at: (u64, i64),
     /// When the tick health window's clock started (`ServerReporter::started`).
     pub tick_clock: std::time::Instant,
+    /// The explored terrain, shared with the game: terrain requests read it on the HTTP
+    /// workers, not as jobs between ticks (ADR 0034).
+    pub explored: Arc<Mutex<ExploredTerrain>>,
+    /// The map's terrain, the one copy the game and the explored terrain hold.
+    pub map: Arc<MapTerrain>,
 }
 
 fn thread_gone() -> ServerError {
@@ -466,6 +473,8 @@ impl<L: LogSink + 'static> GameThread<L> {
                 game.tick_health(),
                 (game.world.tick, game.world.seed),
                 game.reporter.started(),
+                Arc::clone(&game.explored),
+                Arc::clone(game.explored().map()),
             )));
             for command in rx {
                 match command {
@@ -480,9 +489,9 @@ impl<L: LogSink + 'static> GameThread<L> {
                 }
             }
         })?;
-        let (tick_health, started_at, tick_clock) =
+        let (tick_health, started_at, tick_clock, explored, map) =
             ready_rx.recv().map_err(|_| thread_gone())??;
-        Ok(Self { tx, thread: Some(thread), tick_health, started_at, tick_clock })
+        Ok(Self { tx, thread: Some(thread), tick_health, started_at, tick_clock, explored, map })
     }
 
     /// Runs one tick and waits for it.
@@ -531,14 +540,14 @@ pub fn open_world(config: &Config) -> Result<(Connection, Game<TracingLog>), Ser
     let conn = open_db(&config.db_path, Some(&mut backup))?;
     let (world, terrain) =
         load_or_create_world(&conn, |seed| generate_terrain(seed, MAP_SIZE), generate_world, 1)?;
-    let explored = load_explored(&conn, terrain.clone(), &world.nodes)?;
+    let explored = load_explored(&conn, terrain, &world.nodes)?;
     tag_world(&world);
     let defaults = crate::scripts::game_defaults();
     // Players who haven't edited a default script run the game's current default from now on.
     crate::scripts::sync_default_scripts(&conn, defaults)?;
     // The script host reads the library on a connection of its own, as the scripts run.
     let library = Arc::new(Mutex::new(open_db(&config.db_path, None)?));
-    let mut game = Game::new(world, terrain, explored, log).with_library(
+    let mut game = Game::new(world, explored, log).with_library(
         library,
         defaults,
         Some(reported_script_errors()),

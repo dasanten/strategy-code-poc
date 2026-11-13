@@ -9,4 +9,10 @@ export type DemandView = { id: string, from: RealmLabel, to: RealmLabel, terms: 
 /**
  * The sender's words: plain text, never markup.
  */
-note: string, sentAt: number, deadline: number, };
+note: string, sentAt: number, deadline: number, 
+/**
+ * For a demand to an NPC city: while the sender's force near it far outweighs it, the ticks left
+ * before it gives in; `null` while it doesn't, and the time starts from nothing once it does
+ * (`CONTEXT.md`: Demand; ADR 0033). `null` for any other demand.
+ */
+wavering: number | null, };

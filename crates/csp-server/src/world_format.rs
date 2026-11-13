@@ -37,7 +37,8 @@ pub fn migrations() -> BTreeMap<u32, MigrationStep> {
     steps.insert(115, boats_are_stolen);
     steps.insert(116, ships_take_a_crew);
     steps.insert(117, ships_are_sailed);
-    steps.insert(118, queues_hold_blocks);
+    steps.insert(118, cities_remember_who_outweighs_them);
+    steps.insert(119, queues_hold_blocks);
     steps
 }
 
@@ -105,7 +106,15 @@ fn ships_are_sailed(state: Value, _: &MigrationContext<'_>) -> Value {
     state
 }
 
-/// 118 → 119: queues hold blocks (`CONTEXT.md`: Repeat block, ADR 0032, T95.1): a queue's `steps`
+/// 118 → 119: an NPC city remembers since when each realm's force near it has outweighed it
+/// (`City.outweighed`, `CONTEXT.md`: Respect; ADR 0033, T96.2). A world from before remembers
+/// nobody, so every city starts from nothing and counts from its next planning pass: the save stays
+/// as it is, and the bump keeps a server of format 118 from loading a world that remembers.
+fn cities_remember_who_outweighs_them(state: Value, _: &MigrationContext<'_>) -> Value {
+    state
+}
+
+/// 119 → 120: queues hold blocks (`CONTEXT.md`: Repeat block, ADR 0032, T95.1): a queue's `steps`
 /// become its `items`, a tree of steps and repeat blocks, and `current` names the current step by
 /// its id rather than its place. A saved queue becomes the same steps with no blocks, on the same
 /// step.
@@ -316,6 +325,21 @@ mod tests {
     }
 
     #[test]
+    fn step_118_keeps_a_world_whose_cities_remember_nobody_outweighing_them() {
+        let terrain = ctx_terrain();
+        let ctx = MigrationContext { terrain: &terrain };
+        let save = json!({
+            "tick": 3,
+            "cities": [{ "id": "n1", "name": "Oakford", "realmId": null, "townHallId": "n1-hall",
+                "occupation": null, "layout": "grid" }],
+            "demands": [{ "id": "d1", "fromId": "r1", "toId": "n1" }],
+        });
+        let migrated = migrate_world_with(save.clone(), 118, &ctx, &migrations(), 119).unwrap();
+        assert_eq!(migrated, save);
+        assert!(migrated["cities"][0].get("outweighed").is_none());
+    }
+
+    #[test]
     fn step_116_keeps_a_world_whose_ships_have_no_crew() {
         let terrain = ctx_terrain();
         let ctx = MigrationContext { terrain: &terrain };
@@ -331,7 +355,7 @@ mod tests {
     }
 
     #[test]
-    fn step_118_makes_a_saved_queue_the_same_steps_with_no_blocks_on_the_same_step() {
+    fn step_119_makes_a_saved_queue_the_same_steps_with_no_blocks_on_the_same_step() {
         let terrain = ctx_terrain();
         let ctx = MigrationContext { terrain: &terrain };
         let walk = |id: u32| json!({ "id": id, "order": { "kind": "walkTo", "x": id, "y": 1 } });
@@ -344,7 +368,7 @@ mod tests {
                 { "id": "w3" },
             ],
         });
-        let migrated = migrate_world_with(save, 118, &ctx, &migrations(), 119).unwrap();
+        let migrated = migrate_world_with(save, 119, &ctx, &migrations(), 120).unwrap();
         assert_eq!(
             migrated["residents"][0]["queue"],
             json!({ "realmId": "r1", "items": [walk(4), walk(7)], "current": 7, "startedAt": 2,

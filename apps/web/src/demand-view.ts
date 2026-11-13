@@ -1,3 +1,5 @@
+import { OUTWEIGH_HOLD_DAYS, TICKS_PER_GAME_DAY } from '@csp/balance'
+import { aboutTime } from './shared/estimates.js'
 import { GOODS } from './shared/world.js'
 import { TRADE_ORG } from './shared/trade-org.js'
 import { goodsToHandOver, transferLoadsFee } from './shared/demand.js'
@@ -24,6 +26,27 @@ export function sentLine(d: Pick<DemandView, 'to' | 'terms'>): string {
   return `${termsLine(d.terms)} from ${them}`
 }
 
+/**
+ * How a demand the realm sent waits for its answer (`CONTEXT.md`: Demand; ADR 0033). The Trade
+ * Organization answers within a game hour. An NPC city wavers while the sender's force near it far
+ * outweighs it, giving in once that has held without a break; otherwise the time starts again
+ * from nothing, and it declines at the deadline, or within a game hour with none of the sender's
+ * fighters near.
+ */
+export function waitLine(
+  d: Pick<DemandView, 'to' | 'deadline' | 'wavering'>,
+  tick: number,
+): string {
+  const lapses = aboutTime(d.deadline - tick)
+  if (!answersByGame(d.to)) return `Lapses in ${lapses}.`
+  if (d.to.realmId === TRADE_ORG) return 'The answer comes within a game hour.'
+  if (d.wavering !== null) {
+    return d.wavering < d.deadline - tick
+      ? `${d.to.realm} is wavering: it gives in after ${aboutTime(d.wavering)} more if your force stays near it.`
+      : `${d.to.realm} is wavering, but your force would have to stay longer than the ${lapses} left before it declines.`
+  }
+  return `${d.to.realm} isn't wavering: the time starts again from nothing once your fighters near it far outweigh it, for ${aboutTime(OUTWEIGH_HOLD_DAYS * TICKS_PER_GAME_DAY)} without a break. It declines in ${lapses}, or within a game hour with none of them near.`
+}
 /** The demands sent to the realm, and those it sent, each oldest first. */
 export function demandSides(
   demands: readonly DemandView[],

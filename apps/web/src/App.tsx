@@ -88,6 +88,7 @@ import {
 import { StandingPanel } from './Standing.js'
 import { TileMenu, WaypointsPanel } from './Waypoints.js'
 import { api } from './api.js'
+import { clearTerrainCache } from './map/terrain-cache.js'
 import { CityInspector } from './CityInspector.js'
 import {
   goodsOldText,
@@ -1614,6 +1615,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
 
   async function logout() {
     await api.logout().catch(() => {})
+    // The explored terrain this browser kept is the Player's alone (ADR 0034).
+    await clearTerrainCache()
     onLoggedOut()
   }
 
@@ -1655,7 +1658,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   }
 
   // A Player without a realm names it before the world shows (`CONTEXT.md`: Realm name).
-  if (founding && !world) return <Founding leaderName={founding.leaderName} onFound={found} />
+  if (founding && !world && status !== 'updated')
+    return <Founding leaderName={founding.leaderName} onFound={found} />
 
   const game = (
     <div className={phone ? 'game phone' : 'game'}>
@@ -1663,6 +1667,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         {world ? (
           <MapView
             world={world}
+            keepTerrainFor={{ seed: world.map.seed, player: account.name }}
             selectedIds={selectedIds}
             onSelect={(id) => select([id])}
             onSelectMany={select}
@@ -2627,6 +2632,16 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           }}
           onCancel={() => setStarting(undefined)}
         />
+      )}
+      {status === 'updated' && (
+        <CentredDialog title="The game was updated">
+          <p>A new version of the game is out. Reload the page to play on.</p>
+          <div className="hud-dialog-actions">
+            <button type="button" className="primary" onClick={() => window.location.reload()}>
+              Reload
+            </button>
+          </div>
+        </CentredDialog>
       )}
       {world && realmEnded(world.events) && (
         <CentredDialog title="Your realm has ended">

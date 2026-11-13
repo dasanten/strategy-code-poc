@@ -14,8 +14,10 @@ use csp_shared::world::{
 use crate::contracts::{cannot_start, start_contract};
 use crate::events::record_event;
 use crate::queries::city::{for_sale, in_city_area};
-use crate::queries::names::{good_of, held};
-use crate::queries::npc_trade::{npc_hire_problem, npc_storages, spare_residents};
+use crate::queries::names::{good_name, good_of, held};
+use crate::queries::npc_trade::{
+    npc_city_stock, npc_hire_problem, npc_reserve, npc_storages, spare_residents,
+};
 use crate::queries::residents::{can_work, carry_capacity, good_weight, is_armed, stock_weight};
 use crate::queries::standing::organization_label;
 use crate::sight::InvariantViolation;
@@ -28,8 +30,10 @@ fn lender_city<'w>(world: &'w WorldState, c: &MercenaryContract) -> Option<&'w C
 /// One tick of hiring from NPC cities (`stepNpcHire`): each NPC city answers every ask for its
 /// residents at once. It accepts when it has no `npc_hire_problem` with the ask and the residents
 /// and storage are still its own; its lent residents then arm themselves. Otherwise it declines,
-/// which the hirer hears of. Run before `step_npc_cities`. `size` is the map's.
-pub fn step_npc_hire(world: &mut WorldState, size: i32) {
+/// which the hirer hears of. Run before `step_npc_cities`. `size` is the map's. What lent residents
+/// took along, for the ledger.
+pub fn step_npc_hire(world: &mut WorldState, size: i32) -> Vec<LentGear> {
+    let mut took = Vec::new();
     let ids: Vec<String> = world.contracts.iter().map(|c| c.id.clone()).collect();
     for id in ids {
         let Some(c) = world.contracts.iter().find(|c| c.id == id).cloned() else { continue };
@@ -37,10 +41,10 @@ pub fn step_npc_hire(world: &mut WorldState, size: i32) {
             continue;
         }
         let Some(city) = lender_city(world, &c).cloned() else { continue };
-        if accepts(world, &city, &c) {
+        if accepts(world, &city, &c, size) {
             let i = world.contracts.iter().position(|x| x.id == id).expect("the contract");
             start_contract(world, i);
-            arm_lent(world, &city, &c, size);
+            took.extend(arm_lent(world, &city, &c, size));
             continue;
         }
         world.contracts.retain(|x| x.id != id);
@@ -55,13 +59,15 @@ pub fn step_npc_hire(world: &mut WorldState, size: i32) {
         };
         record_event(world, Some(&c.hirer_id), what);
     }
+    took
 }
 
 /// Whether the city accepts the ask (`accepts`): no problem with it, and each resident asked for
 /// is spare.
-fn accepts(world: &WorldState, city: &City, c: &MercenaryContract) -> bool {
+fn accepts(world: &WorldState, city: &City, c: &MercenaryContract, size: i32) -> bool {
     let n = c.resident_ids.len() as f64;
-    if npc_hire_problem(world, city, &c.hirer_id, n, c.price_per_week, Some(&c.id)).is_some() {
+    if npc_hire_problem(world, city, &c.hirer_id, n, c.price_per_week, Some(&c.id), size).is_some()
+    {
         return false;
     }
     if cannot_start(world, c).is_some() {
@@ -81,16 +87,41 @@ fn by_strength() -> Vec<Good> {
     weapons.into_iter().map(|(g, _)| g).collect()
 }
 
-/// The city's lent residents take weapons and armour from its storages along (`armLent`), as far
-/// as it has them and they can carry them: each one at home in its area takes its best weapon if
-/// unarmed, then one of each kind of protection they lack.
-fn arm_lent(world: &mut WorldState, city: &City, c: &MercenaryContract, size: i32) {
+/// A weapon or piece of protection a lent resident took from the lender's storage
+/// (`LentGear`), with what the city held of it after and its reserve of it before, for
+/// `npc-lending-keeps-reserve`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LentGear {
+    pub contract_id: String,
+    pub city_id: String,
+    pub resident_id: String,
+    pub good: Good,
+    pub left: f64,
+    pub reserve: f64,
+}
+
+/// The city's lent residents take weapons and armour from its storages along (`armLent`,
+/// `CONTEXT.md`: Hiring from an NPC city; ADR 0033), only from its surplus, what it holds above
+/// its reserve (NPC reserve), and as far as they can carry them: each one at home in its area
+/// takes its best weapon if unarmed, then one of each kind of protection they lack. With none
+/// spare they go unarmed. What they took, for the ledger.
+fn arm_lent(
+    world: &mut WorldState,
+    city: &City,
+    c: &MercenaryContract,
+    size: i32,
+) -> Vec<LentGear> {
     let storages: Vec<String> =
         npc_storages(world, city).into_iter().map(|b| b.id.clone()).collect();
     let tick = world.tick as f64;
-    let take = |world: &mut WorldState, i: usize, good: Good| -> bool {
+    let mut took = Vec::new();
+    let mut take = |world: &mut WorldState, i: usize, good: Good| -> bool {
         let r = &world.residents[i];
         if stock_weight(&r.carried) + good_weight(good) > carry_capacity(r, tick) + 1e-9 {
+            return false;
+        }
+        let reserve = held(&npc_reserve(world, city), good);
+        if held(&npc_city_stock(world, city), good) - reserve < 1.0 {
             return false;
         }
         let from = storages.iter().find_map(|id| {
@@ -108,6 +139,14 @@ fn arm_lent(world: &mut WorldState, city: &City, c: &MercenaryContract, size: i3
             stock.insert(good, left);
         }
         *world.residents[i].carried.entry(good).or_insert(0.0) += 1.0;
+        took.push(LentGear {
+            contract_id: c.id.clone(),
+            city_id: city.id.clone(),
+            resident_id: world.residents[i].id.clone(),
+            good,
+            left: held(&npc_city_stock(world, city), good),
+            reserve,
+        });
         true
     };
     for id in &c.resident_ids {
@@ -129,6 +168,28 @@ fn arm_lent(world: &mut WorldState, city: &City, c: &MercenaryContract, size: i3
             }
         }
     }
+    took
+}
+
+/// Ledgered invariant `npc-lending-keeps-reserve` (`CONTEXT.md`: Hiring from an NPC city; ADR
+/// 0004, 0033): lending never takes a storage's weapons or armour under the city's reserve.
+pub fn npc_lending_keeps_reserve(ledger: &[LentGear]) -> Vec<InvariantViolation> {
+    ledger
+        .iter()
+        .filter(|g| g.left + 1e-9 < g.reserve)
+        .map(|g| InvariantViolation {
+            invariant: "npc-lending-keeps-reserve".into(),
+            message: format!(
+                "{} lent {} {} under its reserve ({} left of {})",
+                g.city_id,
+                g.resident_id,
+                good_name(g.good),
+                g.left,
+                g.reserve
+            ),
+            entity_ids: vec![g.contract_id.clone(), g.resident_id.clone()],
+        })
+        .collect()
 }
 
 /// Invariant `npc-hire-sound` (`CONTEXT.md`: Hiring from an NPC city; ADR 0004): an NPC city never

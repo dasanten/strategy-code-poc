@@ -53,8 +53,14 @@ pub enum ServerMessage {
         account: Account,
         tick: u64,
         map: MapInfo,
-        /// Chunks with explored terrain, to load from `TERRAIN_BATCH_PATH`.
-        explored_chunks: Vec<i32>,
+        /// Chunks with explored terrain, to load from `TERRAIN_BATCH_PATH`: to a client of a
+        /// protocol version before `COUNTS_FROM_VERSION` only.
+        #[ts(optional)]
+        explored_chunks: Option<Vec<i32>>,
+        /// The chunks with explored terrain and how many of each one's tiles are explored, as
+        /// `encode_explored_counts` lists them: to a client of `COUNTS_FROM_VERSION` or later.
+        #[ts(optional)]
+        explored_counts: Option<Vec<u32>>,
         home: WelcomeHome,
         /// Everything the Player's residents see.
         entities: Vec<SeenEntity>,
@@ -81,6 +87,10 @@ pub enum ServerMessage {
         #[ts(optional)]
         last_seen: Option<LastSeenChange>,
         explored: Vec<i32>,
+        /// The new counts of the chunks in `explored`, as `encode_explored_counts` lists them: to a
+        /// client of `COUNTS_FROM_VERSION` or later, when some grew.
+        #[ts(optional)]
+        explored_counts: Option<Vec<u32>>,
         events: Vec<RealmEvent>,
         #[ts(optional)]
         diplomacy: Option<Diplomacy>,

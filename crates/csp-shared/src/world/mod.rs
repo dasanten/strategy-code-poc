@@ -2942,6 +2942,27 @@ pub struct City {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub layout: Option<CityLayout>,
+    /// For an NPC city, the realms whose fighters near it have outweighed it without a break, and
+    /// since when (`CONTEXT.md`: Respect; ADR 0033), as of its last planning pass. Left out while
+    /// there are none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub outweighed: Option<Vec<Outweighed>>,
+}
+
+/// Since when a realm's fighters near an NPC city have outweighed it without a break
+/// (`City.outweighed`, `CONTEXT.md`: Respect, Persuading a city, Demand; ADR 0033).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Outweighed {
+    pub realm_id: String,
+    /// The planning pass from which they have outweighed its own side (enough to persuade it).
+    pub since: f64,
+    /// The planning pass from which they have far outweighed it (enough for a demand), if they
+    /// do now.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub far_since: Option<f64>,
 }
 
 /// The layouts an NPC city can get (`CITY_LAYOUTS`).
