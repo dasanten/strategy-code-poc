@@ -511,8 +511,15 @@
 .queue-if-bracket {
   border-color: var(--ui-live);
 }
+/* Its condition reads in full: the head's buttons wrap below it when the card is narrow. */
 .queue-if-bracket > .queue-bracket-head {
   cursor: grab;
+  flex-wrap: wrap;
+  padding-block: 2px;
+}
+.queue-if-bracket > .queue-bracket-head > .queue-step-label {
+  flex: 1 1 14em;
+  white-space: normal;
 }
 .queue-if-bracket.picked > .queue-bracket-head {
   background: color-mix(in srgb, var(--ui-live) 14%, transparent);
