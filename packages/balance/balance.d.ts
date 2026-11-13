@@ -408,6 +408,8 @@ export interface Balance {
     '1': number
     '2': number
     '3': number
+    '4': number
+    '5': number
     '6': number
     [key: string]: number
   }
@@ -440,6 +442,17 @@ export interface Balance {
   readonly HUNGRY_HORSE_PACE: number
   readonly CARRIAGE_MAX_CAPACITY: number
   readonly PASSENGER_WEIGHT: number
+  readonly BOAT_CAPACITY: number
+  readonly SHIP_CAPACITY: number
+  readonly SHIP_MIN_CREW: number
+  readonly SAIL_SPEED: number
+  readonly ROW_SPEED: number
+  readonly ROW_STRENGTH_EFFECT: number
+  readonly ROW_STRENGTH_AVERAGE: number
+  readonly ROW_STRENGTH_LIMIT: number
+  readonly SEAFARING_SKILL_EFFECT: number
+  readonly SEAFARING_SKILL_LIMIT: number
+  readonly SEAFARING_SKILL_PER_DAY: number
   readonly FOOD_SPOIL_PER_DAY: number
   readonly REALM_LOG_LENGTH: number
   readonly CRIME_MEMORY_DAYS: number
@@ -564,7 +577,21 @@ export interface Balance {
       stone: number
       [key: string]: number
     }
+    haven: {
+      wood: number
+      stone: number
+      [key: string]: number
+    }
     carriage: {
+      wood: number
+      iron: number
+      [key: string]: number
+    }
+    boat: {
+      wood: number
+      [key: string]: number
+    }
+    ship: {
       wood: number
       iron: number
       [key: string]: number
@@ -614,7 +641,10 @@ export interface Balance {
     storage: number
     farm: number
     trainingGround: number
+    haven: number
     carriage: number
+    boat: number
+    ship: number
     [key: string]: number
   }
   readonly MOUNTAIN_ROAD_WORK_FACTOR: number
@@ -930,6 +960,7 @@ export interface Balance {
     construction: number
     combat: number
     driving: number
+    seafaring: number
     [key: string]: number
   }
   readonly SKILL_PER_DAY: {
@@ -941,6 +972,7 @@ export interface Balance {
     construction: number
     combat: number
     driving: number
+    seafaring: number
     [key: string]: number
   }
   readonly ARMY_SPREAD: number
@@ -983,6 +1015,8 @@ export interface Balance {
   readonly SCRIPT_MAX_VERSIONS: number
   readonly SCRIPT_WRITES_PER_MINUTE: number
   readonly QUEUE_MAX_STEPS: number
+  readonly QUEUE_MAX_DEPTH: number
+  readonly QUEUE_MAX_REPEAT: number
   readonly QUEUE_STEP_MAX_CHARS: number
   readonly QUEUE_DEFAULT_STEP_MINUTES: number
   readonly REALM_NAME_MAX_LENGTH: number
@@ -1002,6 +1036,8 @@ export interface Balance {
   readonly DEMAND_DEFAULT_DAYS: number
   readonly DEMAND_YIELD_RESPECT_TIMES: number
   readonly DEMAND_YIELD_RESPECT_MIN: number
+  readonly RESPECT_PER_WALL: number
+  readonly OUTWEIGH_HOLD_DAYS: number
   readonly DEMAND_DECLINED_STANDING_LOSS: number
   readonly DEMAND_TRADE_ORG_STANDING_LOSS: number
   readonly DIRECT_OFFER_DAYS: number
@@ -1027,6 +1063,8 @@ export interface Balance {
     gate: number
     road: number
     carriage: number
+    boat: number
+    ship: number
     house: number
     storage: number
     smelter: number
@@ -1039,6 +1077,7 @@ export interface Balance {
     warehouse: number
     stable: number
     trainingGround: number
+    haven: number
     farm: number
     [key: string]: number
   }

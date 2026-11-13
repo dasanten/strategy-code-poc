@@ -7,7 +7,7 @@ import { editPlan, EMPTY_PLAN, type QueuePlan } from './queue-view.js'
  * The queue planner on the group card (`CONTEXT.md`: Group, Planning for a group). With no plan
  * open, Add step adds the step to each member's own queue. A plan open is a queue held in this
  * browser, edited as a resident's queue is (Add step, reorder, durations, loop, repeat blocks);
- * Give to all makes each member's queue a copy of it, its repeat blocks unrolled. Their queues
+ * Give to all makes each member's queue a copy of it, its repeat blocks as they are. Their queues
  * stay their own afterwards.
  */
 export function GroupPlanner({
@@ -65,6 +65,7 @@ export function GroupPlanner({
           waypoints={waypoints}
           onEdit={(items, loop) => onPlan(editPlan(plan, items, loop))}
           realm={realm}
+          palette={addStep}
         />
       ) : (
         <>
@@ -77,9 +78,9 @@ export function GroupPlanner({
             steps={[]}
             onLoad={(items) => onPlan(editPlan(plan, items))}
           />
+          {addStep}
         </>
       )}
-      {addStep}
       <GivePlan
         plan={plan}
         give="Give to all"

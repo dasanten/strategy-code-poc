@@ -1,6 +1,7 @@
 import { Terrain, UNEXPLORED, tileIndex } from './shared/terrain.js'
 import { arrivalTicks, timeLeft, type ArrivalWorld } from './shared/estimates.js'
 import { drivenCarriageId } from './shared/carriages.js'
+import { isVesselId } from './shared/vessels.js'
 import { isDown } from './shared/world.js'
 import { roadTiles } from './shared/building.js'
 import type {
@@ -145,13 +146,15 @@ function doingOfOrder(
 }
 
 /**
- * A passenger's line (`CONTEXT.md`: Passenger): "Aboard a carriage", and "· heading to 4, 5"
- * while its driver drives it there.
+ * A passenger's line (`CONTEXT.md`: Passenger): "Aboard a boat" or "Aboard a ship" on a vessel
+ * (whose id the server names after its kind); "Aboard a carriage",
+ * and "· heading to 4, 5" while its driver drives it there.
  */
 function aboardLine(
   r: Pick<DoingOf, 'aboard'>,
   residents: readonly Pick<Resident, 'order'>[],
 ): string {
+  if (isVesselId(r.aboard)) return r.aboard!.startsWith('ship') ? 'Aboard a ship' : 'Aboard a boat'
   const to = selectedWay({ order: null, aboard: r.aboard }, residents)?.target
   return to ? `Aboard a carriage · heading to ${to.x}, ${to.y}` : 'Aboard a carriage'
 }
@@ -244,9 +247,10 @@ function goodsLine(goods: GoodsWanted): string {
   return parts.length === 1 ? parts[0]! : `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`
 }
 
-/** "the storage", "the stable", "the carriage". */
+/** "the storage", "the stable", "the carriage", "the boat". */
 function placeLine(place: GoodsPlace, buildings: readonly Pick<Building, 'id' | 'kind'>[]): string {
   if (place.kind === 'carriage') return 'the carriage'
+  if (place.kind === 'vessel') return 'the boat'
   const kind = buildings.find((b) => b.id === place.storageId)?.kind
   return `the ${kind ? BUILDING_NAMES[kind] : 'storage'}`
 }

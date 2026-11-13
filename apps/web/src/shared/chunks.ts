@@ -65,3 +65,17 @@ export function decodeChunk(cx: number, cy: number, bytes: Uint8Array): TerrainC
   }
   return { cx, cy, tiles: bytes.slice(0, size), nodes }
 }
+
+/**
+ * The chunks and their counts of explored tiles in an `encode_explored_counts` list (ADR 0034):
+ * for each chunk, the step from the index before (from 0 for the first), then its count.
+ */
+export function decodeExploredCounts(list: readonly number[]): Map<number, number> {
+  const out = new Map<number, number>()
+  let at = 0
+  for (let i = 0; i + 1 < list.length; i += 2) {
+    at += list[i]!
+    out.set(at, list[i + 1]!)
+  }
+  return out
+}

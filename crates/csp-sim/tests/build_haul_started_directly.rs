@@ -246,7 +246,7 @@ mod build {
         );
         s.until(100, |s| s.building("w2").as_deref() == Some("fs"));
         assert_eq!(s.building("w2").as_deref(), Some("fs"));
-        assert_eq!(s.r("w2").queue.as_ref().unwrap().current, 1);
+        assert_eq!(s.r("w2").queue.as_ref().unwrap().current_index(), Some(1));
         assert_eq!(s.stopped(), Vec::<String>::new());
     }
 
@@ -391,7 +391,7 @@ mod a_construction_site_is_the_realms_that_laid_it_out {
                 delivered: build_materials(kind),
                 work: build_work_of(kind),
             });
-            assert!(finish_site(&mut s.world, i, &w2));
+            assert!(finish_site(&mut s.world, i, &w2, None));
             s.world.buildings[i].realm_id.clone()
         };
         assert_eq!(done(&mut s, "hs"), None);

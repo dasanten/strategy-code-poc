@@ -61,8 +61,9 @@ fn setup() -> (WorldState, TerrainMap) {
     let a1 = &mut w.residents[0];
     a1.script = Some(from(json!({ "scriptId": 1, "memory": { "role": "gatherer" } })));
     a1.queue = Some(from(json!({
-        "realmId": "r1", "steps": [{ "id": 1, "order": { "kind": "runScript", "scriptId": 1 }, "minutes": 30 }],
-        "current": 0, "startedAt": 40, "loop": true, "nextStepId": 2
+        "realmId": "r1", "items": [{ "id": 1, "repeat": 3, "round": 2, "items": [
+            { "id": 2, "order": { "kind": "runScript", "scriptId": 1 }, "minutes": 30 }] }],
+        "current": 2, "startedAt": 40, "loop": true, "nextStepId": 3
     })));
     w.piles.push(Pile {
         id: "p1".into(),
@@ -70,6 +71,10 @@ fn setup() -> (WorldState, TerrainMap) {
         y: 10.0,
         goods: [(csp_shared::world::Good::Food, 5.0)].into_iter().collect(),
     });
+    // A boat (`CONTEXT.md`: Vessel); the map is all Plains, which no script query here minds.
+    w.vessels.push(from(
+        json!({ "id": "v1", "kind": "boat", "realmId": "r1", "x": 11, "y": 13, "load": { "wood": 2 } }),
+    ));
     w.directives.push(from::<Directive>(json!({
         "id": "d1", "target": "r2", "withAlliance": false, "reason": "raiding", "givenBy": "admin", "givenAt": 1,
         "goals": [{ "kind": "city", "cityId": "c2", "city": "Brill", "met": false }, { "kind": "soldiers", "count": 2, "percent": 10 }],
@@ -147,6 +152,7 @@ fn describe_every_field_of_everything_the_queries_and_me_hand_a_script() {
         ("cities", "cities()"),
         ("horses", "horses()"),
         ("carriages", "carriages()"),
+        ("vessels", "vessels()"),
         ("traders", "traders()"),
         ("piles", "piles()"),
         ("nodes", "nodes()"),
@@ -218,7 +224,8 @@ fn describe_every_field_of_everything_the_queries_and_me_hand_a_script() {
     }
     assert_ne!(out["materialsNeeded"], json!([]));
     assert_eq!(ids("storages"), ["s1", "os1"]);
-    // A queue shows where it is, not its steps.
+    assert_eq!(ids("vessels"), ["v1"]);
+    // A queue shows where it is, not its steps, nor the repeat block around them (ADR 0032).
     let queue = json!({ "step": 1, "steps": 1, "loop": true, "kind": "runScript", "task": null, "scriptId": 1, "minutes": 30, "startedAt": 40 });
     assert_eq!(out["me"]["queue"], queue);
     let a1 = out["residents"].as_array().unwrap().iter().find(|r| r["id"] == "a1").unwrap();

@@ -630,7 +630,7 @@ fn cant_be_stolen_while_its_driver_or_soldiers_hold_it_and_is_gone_for_them_once
         &mut s.world,
         "a2",
         "r1",
-        crate::stealing::Taken { carriage: Some(ki), horse: hi },
+        crate::stealing::Taken { carriage: Some(ki), horse: hi, vessel: None },
         SIZE,
     );
     assert_eq!(off.carriage(&s.world).realm_id.as_deref(), Some("r1"));

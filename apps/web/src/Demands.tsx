@@ -4,6 +4,8 @@ import {
   DEMAND_DEFAULT_DAYS,
   DEMAND_MAX_DAYS,
   DEMAND_NOTE_MAX_LENGTH,
+  OUTWEIGH_HOLD_DAYS,
+  TICKS_PER_GAME_DAY,
 } from '@csp/balance'
 import { GOODS } from './shared/world.js'
 import { TRADE_ORG } from './shared/trade-org.js'
@@ -22,7 +24,6 @@ import type {
   SeenCity,
 } from '@csp/shared-types'
 import {
-  answersByGame,
   citiesToDemandOf,
   debtTransferPreview,
   demandSides,
@@ -35,6 +36,7 @@ import {
   transferPreview,
   type GoodsLine,
   type HandOverPreview,
+  waitLine,
 } from './demand-view.js'
 import { PanelHead } from './drawer-head.js'
 import { GOOD_LABELS } from './goods-grid.js'
@@ -329,11 +331,7 @@ export function DemandsPanel({
                 <span>
                   <strong>{sentLine(d)}</strong>
                   <DemandNote note={d.note} />
-                  <span className="muted small">
-                    {answersByGame(d.to)
-                      ? 'The answer comes within a game hour.'
-                      : `Lapses in ${aboutTime(d.deadline - tick)}.`}
-                  </span>
+                  <span className="muted small">{waitLine(d, tick)}</span>
                 </span>
               </li>
             ))}
@@ -473,9 +471,12 @@ export function DemandsPanel({
       <p className="muted small">
         A demand arrives at once, wherever they are. A realm sends at most {DEMANDS_PER_GAME_DAY} a
         game day. It is only words: what you threaten is yours to carry out, or not. An NPC city
-        answers within a game hour: it gives in only to far more of your armed residents and walls
-        in its sight than it has soldiers, and otherwise thinks less of you. The Trade Organization
-        always declines, and being asked costs standing.
+        gives in only once your armed residents near it, by weapon, armour and Combat skill, have
+        far outweighed its soldiers and walls for{' '}
+        {aboutTime(OUTWEIGH_HOLD_DAYS * TICKS_PER_GAME_DAY)} without a break (your walls don't
+        count); until then it wavers. With none of them near, or when the deadline comes first, it
+        declines and thinks less of you. The Trade Organization always declines, and being asked
+        costs standing.
       </p>
       {error && <p className="error">{error}</p>}
     </section>

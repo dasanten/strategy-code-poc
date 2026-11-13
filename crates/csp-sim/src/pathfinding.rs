@@ -62,6 +62,24 @@ pub static WALKING_COSTS: LazyLock<TerrainCosts> =
 pub static CARRIAGE_COSTS: LazyLock<TerrainCosts> =
     LazyLock::new(|| TerrainCosts::from_speeds(CARRIAGE_SPEED));
 
+/// Costs for a boat (`CONTEXT.md`: Rowing): Lake and Sea alike, and no land at all. A diagonal
+/// step goes only where both straight tiles beside it are water too, so it never squeezes between
+/// two land tiles.
+pub static WATER_COSTS: LazyLock<TerrainCosts> = LazyLock::new(|| {
+    let mut costs = [f64::INFINITY; 256];
+    costs[Terrain::Lake as usize] = 1.0;
+    costs[Terrain::Sea as usize] = 1.0;
+    TerrainCosts(costs)
+});
+
+/// Costs for a ship (`CONTEXT.md`: Sailing): Sea only, never Lake and no land at all; diagonal
+/// steps as for a boat.
+pub static SEA_COSTS: LazyLock<TerrainCosts> = LazyLock::new(|| {
+    let mut costs = [f64::INFINITY; 256];
+    costs[Terrain::Sea as usize] = 1.0;
+    TerrainCosts(costs)
+});
+
 /// Side of the window that short paths are searched in (`PathFinder`), in tiles. A path whose ends
 /// lie within a quarter of it along each direction counts as short.
 pub const LOCAL_SIDE: i32 = 1024;
@@ -567,7 +585,7 @@ impl PathFinder {
             epoch: Instant::now(),
         };
         // Labelled up front for the usual travellers, so no tick waits on it.
-        for costs in [&*WALKING_COSTS, &*CARRIAGE_COSTS] {
+        for costs in [&*WALKING_COSTS, &*CARRIAGE_COSTS, &*WATER_COSTS] {
             let i = finder.table_of(costs);
             finder.regions(i);
         }

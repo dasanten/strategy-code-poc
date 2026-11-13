@@ -7,6 +7,7 @@
 
 mod common;
 #[path = "goods_support/mod.rs"]
+#[macro_use]
 mod goods_support;
 
 use csp_shared::balance::{DELIVERY_FEE_BASE, DELIVERY_LOAD};

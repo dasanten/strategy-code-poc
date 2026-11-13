@@ -77,6 +77,10 @@ pub struct CrimeAgainst {
     pub goods: Option<Stock>,
     pub carriage: bool,
     pub horse: Option<String>,
+    /// A boat taken (`CONTEXT.md`: Stealing a carriage or horse, its vessel part).
+    pub boat: bool,
+    /// The boat taken is a ship, for the log to name it so.
+    pub ship: bool,
     pub building: Option<BuildingKind>,
     pub post: Option<String>,
 }
@@ -94,7 +98,8 @@ pub fn commit_crime(
 ) {
     let Some(culprit) = world.residents.iter().find(|r| r.id == culprit_id) else { return };
     let Some(org) = organization_of(culprit).map(str::to_string) else { return };
-    let CrimeAgainst { victim_org, victim, goods, carriage, horse, building, post } = against;
+    let CrimeAgainst { victim_org, victim, goods, carriage, horse, boat, ship, building, post } =
+        against;
     let Some(victim_org) = victim_org else { return };
     if victim_org == org {
         return;
@@ -122,11 +127,12 @@ pub fn commit_crime(
             .and_then(|id| world.residents.iter().find(|r| r.id == id))
             .map(|v| Victim { resident_id: v.id.clone(), name: v.name.clone() }),
     );
-    if kind == CrimeKind::Theft && !carriage && horse.is_none() {
+    if kind == CrimeKind::Theft && !carriage && horse.is_none() && !boat {
         let open = world.crimes.iter_mut().find(|c| {
             c.kind == CrimeKind::Theft
                 && c.carriage.is_none()
                 && c.horse.is_none()
+                && c.boat.is_none()
                 && c.culprit.resident_id == culprit_id
                 && c.victim_org == victim_org
                 && c.x == cx
@@ -160,6 +166,8 @@ pub fn commit_crime(
         victim,
         goods,
         carriage: carriage.then_some(true),
+        boat: boat.then_some(true),
+        ship: ship.then_some(true),
         horse,
         building,
         post,
@@ -315,6 +323,8 @@ fn learn(world: &mut WorldState, ci: usize, org: &str) {
             goods: crime.goods,
             carriage: crime.carriage,
             horse: crime.horse,
+            boat: crime.boat,
+            ship: crime.ship,
             building: crime.building,
         },
     );

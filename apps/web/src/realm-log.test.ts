@@ -346,6 +346,20 @@ describe('realm log', () => {
     )
   })
 
+  it('describes a condition on a place gone', () => {
+    const gone = {
+      kind: 'conditionPlaceGone',
+      residentId: 'r1',
+      name: 'Mara',
+      placeId: 's1',
+      seq: 9,
+      ...at,
+    } as const
+    expect(describeEvent(gone).text).toBe(
+      'Mara’s queue asks about a place that is gone or no longer yours: the condition counts as false.',
+    )
+  })
+
   it('describes fights, flight and deaths in them', () => {
     const fight = { kind: 'fight', residentId: 'r1', name: 'Mara', otherId: 'r9', seq: 6 } as const
     expect(describeEvent({ ...fight, other: 'Tobin', attacker: true, ...at })).toEqual({
@@ -746,6 +760,31 @@ describe('realm log', () => {
     expect(describeEvent({ ...taken, from: null }).text).toBe(
       'Vex took a carriage from nobody at (4, 5). It is yours now.',
     )
+  })
+
+  it('says a boat was stolen, taken or gone, as a carriage is', () => {
+    const gone = { kind: 'transportGone', x: 4, y: 5, boat: true, seq: 9, ...at } as const
+    expect(describeEvent(gone).text).toBe('Your boat is gone. It was last at (4, 5).')
+    const taken = {
+      kind: 'transportTaken',
+      residentId: 'r9',
+      name: 'Vex',
+      x: 4,
+      y: 5,
+      from: 'the realm of Ada',
+      boat: true,
+      goods: { food: 5 },
+      seq: 9,
+      ...at,
+    } as const
+    expect(describeEvent(taken).text).toBe(
+      'Vex took a boat, loaded with 5 Food, from the realm of Ada at (4, 5). It is yours now.',
+    )
+    // A ship is named one (`CONTEXT.md`: Sailing).
+    expect(describeEvent({ ...gone, ship: true }).text).toBe(
+      'Your ship is gone. It was last at (4, 5).',
+    )
+    expect(describeEvent({ ...taken, ship: true }).text).toMatch(/^Vex took a ship, loaded/)
   })
 
   it('describes crimes a witness brought home, with who did them', () => {

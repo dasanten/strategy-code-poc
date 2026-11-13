@@ -17,7 +17,7 @@ use csp_shared::balance::SIGHT_RANGE;
 use csp_shared::footprint::{footprint_tiles, Placed, FOOTPRINT};
 use csp_shared::protocol::{
     BuildLine, ScriptIdOnly, SeenArmy, SeenBuilding, SeenCaravan, SeenCarriage, SeenCity,
-    SeenEntity, SeenHorse, SeenInterrupted, SeenResident, SeenScript, SeenTrader,
+    SeenEntity, SeenHorse, SeenInterrupted, SeenResident, SeenScript, SeenTrader, SeenVessel,
 };
 use csp_shared::terrain::wrap_distance;
 use csp_shared::world::horse_market::NpcHorseOffer;
@@ -36,10 +36,13 @@ use crate::queries::carriages::{
 use crate::queries::city::{city_price, for_sale, npc_city_refuses, sells_to};
 use crate::queries::horse_market::{horses_to_sell, npc_horse_offers};
 use crate::queries::names::{kind_name, kind_of, placed};
-use crate::queries::npc_trade::{npc_city_prices, npc_hire_price, spare_residents};
+use crate::queries::npc_trade::{hire_spare, npc_city_prices, npc_hire_price};
 use crate::queries::offers::{offers_at, seen_offer};
 use crate::queries::territory::city_organization;
 use crate::queries::trader_trade::{trader_prices, trader_standing};
+use crate::queries::vessels::{
+    docked_at, rower_of, vessel_crew, vessel_load_level, vessel_passengers,
+};
 use crate::queries::warehouse::{trade_coin_warehouse, warehouse_prices};
 use crate::world_index::WorldIndex;
 
@@ -543,6 +546,29 @@ fn everything_seen(
             out.push(SeenEntity::Carriage(seen_carriage(world, insight, k)));
         }
     }
+    // A vessel shows to whoever has its tile in sight, like a carriage (`CONTEXT.md`: Vessels in
+    // sight); its load only to its own realm and allies.
+    for v in &world.vessels {
+        if in_sight(v.x, v.y) {
+            let inside = insight.ours(world, v.realm_id.as_deref(), None);
+            out.push(SeenEntity::Vessel(SeenVessel {
+                id: v.id.clone(),
+                kind: v.kind,
+                realm_id: v.realm_id.clone(),
+                x: v.x,
+                y: v.y,
+                load: inside.then(|| v.load.clone()),
+                load_level: vessel_load_level(v),
+                passenger_ids: vessel_passengers(world, &v.id)
+                    .into_iter()
+                    .map(|r| r.id.clone())
+                    .collect(),
+                rower_id: rower_of(world, v).map(|r| r.id.clone()),
+                crew_ids: vessel_crew(world, v).into_iter().map(|r| r.id.clone()).collect(),
+                docked_at: docked_at(world, v).map(|h| h.id.clone()),
+            }));
+        }
+    }
     for p in &world.piles {
         if in_sight(p.x, p.y) {
             out.push(SeenEntity::Pile(p.clone()));
@@ -670,7 +696,8 @@ fn places(
             (None, None)
         } else {
             let hire = Hire {
-                spare: spare_residents(world, c, None).len() as f64,
+                // None while it feels threatened by the viewer (ADR 0033).
+                spare: hire_spare(world, c, side, eyes.size),
                 price_per_resident_week: npc_hire_price(world, c, side),
             };
             let trade = seen_storages.contains(c.id.as_str()).then(|| {
@@ -709,6 +736,9 @@ fn places(
         shown.scouted = None;
         shown.outsiders = None;
         shown.alarmed_attackers = None;
+        // Since when it has felt outweighed is its own mind (ADR 0033); demands show what it
+        // means to their sides.
+        shown.outweighed = None;
         out.push(SeenEntity::City(SeenCity {
             city: shown,
             price,
@@ -1002,6 +1032,7 @@ fn spot_of(e: &SeenEntity) -> Option<Spot> {
         SeenEntity::Resident(r) => Some(Spot { x: r.x, y: r.y }),
         SeenEntity::Horse(h) => Some(Spot { x: h.x, y: h.y }),
         SeenEntity::Carriage(k) => Some(Spot { x: k.x, y: k.y }),
+        SeenEntity::Vessel(v) => Some(Spot { x: v.x, y: v.y }),
         SeenEntity::Pile(p) => Some(Spot { x: p.x, y: p.y }),
         SeenEntity::Building(b) => Some(Spot { x: b.building.x, y: b.building.y }),
         _ => None,
@@ -1091,6 +1122,11 @@ pub fn sent_inside_unseen(
                 told && !it.is_some_and(|it| {
                     insight.ours(world, it.realm_id.as_deref(), it.city_id.as_deref())
                 })
+            }
+            SeenEntity::Vessel(v) => {
+                let it = world.vessels.iter().find(|x| x.id == v.id);
+                v.load.is_some()
+                    && !it.is_some_and(|it| insight.ours(world, it.realm_id.as_deref(), None))
             }
             _ => false,
         })

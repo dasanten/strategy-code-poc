@@ -1,6 +1,7 @@
 import type { Graphics } from 'pixi.js'
 import { FOOTPRINT } from '../shared/footprint.js'
 import { LINE_BUILDING, isLineOrder, roadLine } from '../shared/building.js'
+import { currentIndex, queueSteps } from '../shared/queue.js'
 import type { Building, BuildingKind, OrderRequest, SeenResident } from '@csp/shared-types'
 import { tileToScreen, type Camera, type Size } from './camera.js'
 import { ROAD_COLOR } from './palette.js'
@@ -69,10 +70,9 @@ export function plannedLines(
   }
   const q = r.queue
   if (q) {
-    const waiting = [
-      ...q.steps.slice(q.current + 1),
-      ...(q.loop ? q.steps.slice(0, q.current) : []),
-    ]
+    const steps = queueSteps(q.items)
+    const at = currentIndex(q)
+    const waiting = [...steps.slice(at + 1), ...(q.loop ? steps.slice(0, at) : [])]
     for (const { order } of waiting) {
       const line = queuedLine(order, size)
       if (line) out.push(line)
@@ -114,7 +114,9 @@ export function plannedBuilds(
   }
   const q = r.queue
   if (q) {
-    const waiting = [...q.steps.slice(q.current), ...(q.loop ? q.steps.slice(0, q.current) : [])]
+    const steps = queueSteps(q.items)
+    const at = currentIndex(q)
+    const waiting = [...steps.slice(at), ...(q.loop ? steps.slice(0, at) : [])]
     for (const { order } of waiting) {
       const build = queuedBuild(order)
       if (build) out.push(build)

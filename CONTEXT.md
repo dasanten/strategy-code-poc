@@ -50,8 +50,8 @@ The shared language of the game. Domain terms only — no implementation details
   straight tiles beside it could be stepped onto as well, so no wall, gate in the way, Lake, Sea
   or (for a carriage) Mountain without a road may stand on either. Two wall tiles touching at a corner close
   the way like a straight stretch.
-- No rivers and no water vehicles (for now), so all land is joined: any tile can be reached on
-  foot from any other, if only the long way round.
+- No rivers, so all land is joined: any tile can be reached on foot from any other, if only the
+  long way round. Boats and ships (Water) cross Lake and Sea; nobody walks on them.
 
 ## Resources and goods
 
@@ -140,11 +140,11 @@ The shared language of the game. Domain terms only — no implementation details
   can't be ridden on bare Mountain.
 - **Footprint:** the square of tiles a building or construction site covers, the same for every
   building of a kind: Wall, Gate and Road 1×1; House, Storage, Smelter, Mint, Smithy, Mine,
-  Quarry and Lumber camp 2×2; Town hall, Warehouse, Stable and Training ground 3×3; Farm 4×4. A site covers its
+  Quarry and Lumber camp 2×2; Town hall, Warehouse, Stable, Training ground and Haven 3×3; Farm 4×4. A site covers its
   building's footprint from the moment it is laid out. Footprints are never turned.
 - **Where buildings go:** one building per tile: every tile of a footprint must be free and
   passable. Mines, quarries and lumber camps go with one tile of their footprint on a resource
-  node of their kind; farms and stables wholly on Plains; everything else on any passable terrain
+  node of their kind; farms and stables wholly on Plains; havens on the shore (Haven); everything else on any passable terrain
   except Mountain. Only a node's workplace covers a node. Anyone can build anywhere else,
   including in another Organization's territory.
 - **At a building:** standing on any tile of its footprint. Wherever a rule says "on a
@@ -641,7 +641,10 @@ The shared language of the game. Domain terms only — no implementation details
   own realm and its allies. Others see that it is there.
 - **Explored terrain:** tiles a Player has ever had in sight. Their terrain and resource nodes stay
   known, and so do the buildings on them (see Last seen); people, horses, carriages, armies and
-  goods on them do not.
+  goods on them do not. Where the map shows explored terrain coarser than tile by tile (zoomed far
+  out, on the minimap), a square shows the most common terrain among the tiles the Player explored
+  in it, and stays unexplored only while they explored none of it: nothing of an unexplored tile
+  is ever shown (ADR 0034).
 - **Last seen:** a building or construction site a Player has had in sight (their own included)
   stays on their map after it leaves their sight, as it was when they last saw it: where it
   stands, what it is, who held it and which city it belonged to (by that city's name then), along with whatever else they
@@ -715,9 +718,16 @@ The shared language of the game. Domain terms only — no implementation details
   Player asks it for a number of its residents for some game days, paid into its storage. It
   accepts at once when the price per resident and week is at least its asking price (moved by
   its standing like its trade prices) and it can spare them, and declines otherwise. It lends
-  only adults it can spare: it keeps its farmers to feed the city and a share of its adults at
-  home to defend it, and lends idle adults first, then workers from its other workplaces. Its
-  lent residents take weapons and armour from its storage along, as far as it has them. Paying
+  only its spare hands (Spare hands' work): adults idle, on a road crew, scouting or working for
+  surplus. Its farmers, those working for a good short of its reserve and its builders with a
+  project stay, and so does a share of its adults at home to defend it. Its lent residents take
+  weapons and armour along only from its surplus, what its storages hold above its reserve (NPC
+  reserve); with none spare they go unarmed. It lends nobody while it feels threatened: while it
+  weighs a demand (Demand), while its town hall is occupied, or while armed residents of the
+  hirer stand in its area or in sight of it. Those it lends never act against it: they refuse an
+  order to attack its residents, walls or gates, to climb its walls or to tear down its buildings,
+  they can't occupy its town hall, and they never count as the hirer's fighters toward it
+  (Respect). Paying
   and ending go as in any mercenary contract: each week in advance into that storage, an unpaid
   week breaks it and costs standing, a paid one raises it, and at the end they walk home.
 - **Trade Org army:** a large army of normal residents of the Trade Org HQ, for hire like any
@@ -764,6 +774,8 @@ The shared language of the game. Domain terms only — no implementation details
   carriage, the horse and the load together; taking back what was stolen from you is theft like
   any other. The victim's realm log says at once that it is gone and where it was last; who took
   it becomes known only through a witness. Taking one that belongs to nobody is no crime.
+  **A vessel** is stolen the same way by a grown resident beside it rowing (or sailing) it off,
+  with its load; "on its tile" reads "beside it" for its guards.
 - **Standing:** how one organization regards another. Known crimes lower it; trade and kept
   contracts raise it; it slowly drifts back to neutral. Standing is per organization, so allies
   don't suffer for each other's crimes. A Player sees their standing toward others but it does
@@ -771,11 +783,18 @@ The shared language of the game. Domain terms only — no implementation details
 - **NPC city reaction:** at low standing an NPC city won't trade with you or hire out to you
   (Trading with an NPC city, Hiring from an NPC city) and keeps its gates shut to your residents; the lower it is, the more it asks to be bought, and at
   very low standing it won't sell at all.
-- **Persuading a city:** an NPC city that holds you in high standing and sees enough respect from
-  you (more of your armed residents and walls in its sight than it has soldiers) asks to join
-  your realm. You accept or decline.
+- **Persuading a city:** an NPC city that holds you in high standing and has seen enough respect
+  from you for a set time (your fighters near it outweighing its own side without a break, Respect)
+  asks to join your realm. You accept or decline.
 - **Respect:** how dangerous a place looks to others, judged from the armed residents and walls
-  they can see. Not stored; NPC cities and bandits avoid targets with high respect.
+  they can see. Bandits avoid targets with high respect. **What an NPC city weighs** when a realm
+  demands it or it thinks of joining one (ADR 0033): on the realm's side only its armed residents
+  standing in the city's area or in sight of it, seen by a resident of the city who is at home,
+  each by their strength as combat counts it (weapon, armour and shield, Combat skill); the realm's
+  walls don't count, nor what the city's people see far from home, nor residents the city lent the
+  realm. On its own side its soldiers, weighed the same way, and its finished walls and gates. The
+  city remembers since when a realm has outweighed it without a break; the first planning pass it
+  doesn't, that time starts again from nothing.
 - **Trade Org reaction:** below one standing threshold it refuses to trade; below a lower one it
   sends its army to take back the value and punish: to the culprit's city nearest the crime, to
   carry home twice what it lost (coins first), fighting whoever resists. It leaves once it has what
@@ -864,13 +883,17 @@ The shared language of the game. Domain terms only — no implementation details
     what it holds is what goes; with none of it there they can't accept that way. A city no longer
     theirs can't be handed over. Handing over is the Player's own choice, also for their last city,
     which goes as losing it to capture does: no crime and no standing lost.
-  - **An NPC city** accepts when the respect it sees from the sender (their armed residents and
-    walls in its sight) far outweighs its soldiers, so an army at the gate can take a city without a
-    fight; otherwise it declines and its standing toward the sender drops. It carries out goods the
+  - **An NPC city** accepts once the sender's fighters near it have far outweighed its own side
+    (Respect) without a break for a set time, so an army that stays at the gate can take a city
+    without a fight. With none of the sender's fighters near it declines at once; otherwise it waits,
+    **wavering**, and declines when the deadline comes first. Declining drops its standing toward the
+    sender. Both sides see in the Demands drawer that it wavers and how long is left, or that the
+    time has started again. It carries out goods the
     same way: set aside at its storage, for the sender alone to fetch; with none of them there it
     declines. **The Trade Organization** always declines, and being asked costs standing. A Player
-    knows of an NPC city as of a realm, and everyone knows of the Trade Organization. Both answer at
-    their next planning pass, within a game hour (ADR 0016); a city that has joined a realm by then
+    knows of an NPC city as of a realm, and everyone knows of the Trade Organization. Both look at a
+    demand at their planning pass, within a game hour (ADR 0016), where the Trade Organization
+    answers and an NPC city answers or goes on wavering; a city that has joined a realm by then
     lets the demand lapse.
 
 ## Bandits
@@ -973,7 +996,7 @@ The shared language of the game. Domain terms only — no implementation details
 - **Base value:** what a resident is born with. The only part children inherit.
 - **Trained bonus:** what training adds on top of the base value. Capped relative to the base,
   so birth still matters. Never inherited.
-- **Skill:** something learned by doing or training (Mining, Woodcutting, Smelting, Smithing, Construction, Farming, Combat, Driving, …). Starts at 0,
+- **Skill:** something learned by doing or training (Mining, Woodcutting, Smelting, Smithing, Construction, Farming, Combat, Driving, Seafaring, …). Starts at 0,
   never inherited. Not a stat. Work skills (Mining, Woodcutting, Smelting, Smithing, Farming)
   and Construction run from 0 to 100: each point adds 1 % to output or building work, so a
   skilled resident does at most twice what an unskilled one does; an average learner takes about
@@ -1220,6 +1243,79 @@ The shared language of the game. Domain terms only — no implementation details
   unloads there, else on the ground; the driver loads by hand like anyone. Some Food stays on
   board for the horse, topped up at any stop that has Food. The carriage leaves the first stop
   once it has goods on board and nothing more to load; with no goods there yet it waits.
+
+## Water
+
+Settled with Daniel on 2026-11-11 (Epics 90 and 91).
+
+- **Water:** Lake and Sea tiles. Residents never step onto them; boats and ships move only on
+  them.
+- **Haven:** a building on the shore where boats and ships are built, the stable of the water.
+  Footprint 3×3, on passable land other than Mountain, with at least one footprint tile touching a
+  Lake or Sea tile, straight or diagonally. Built of mostly Wood and some Stone. It has a storage,
+  so ships load and unload there as a carriage does at a storage. Like a stable it has no owner:
+  any boat lands there and anyone at it loads or unloads, and taking goods from its storage is
+  judged as at any storage. NPC cities don't build havens, boats or ships (for now).
+- **Boat:** a small rowed vessel, built at a haven. It needs no horse: a rower moves it, as a
+  driver moves a carriage. It carries a few residents and a little cargo, on Lake and Sea, and
+  lands at any shore.
+- **Vessel:** a boat or a ship. A vessel always stands on a water tile, one vessel per tile.
+- **Building a boat:** a resident at a finished haven lays out a **boat site** on a haven tile
+  that touches the water. It is a construction site like any other (materials, mostly Wood, and
+  work; fetching materials, no owner, finished by anyone, torn down leaving all its materials).
+  Once finished it is gone, and an empty boat of the realm of the resident who finished it floats
+  on the nearest free water tile next to that site.
+- **Beside a vessel:** on a land tile touching the vessel's water tile, straight or diagonally.
+  Residents beside a vessel **board** it (card, group card, queue step, script) and put goods on
+  it or take goods off, up to what it holds; passengers count as a fixed weight against that, as
+  on a carriage. A passenger **gets off** onto a free land tile beside it. A boat does this at
+  any shore; a ship only at a haven (Ship).
+- **Seafaring:** the skill of moving a vessel. Rowing (and later sailing) teaches it; a more
+  skilled rower goes faster, and so does a stronger one.
+- **Rowing:** an order (as a script could do it) for a grown resident aboard a boat of their
+  realm, or beside it (they board first), to row it to a water tile; given a land tile, it goes to
+  the nearest free water tile beside it. The boat moves a Step at a time over water, and a
+  diagonal Step can't squeeze between two land tiles. The rower isn't a passenger and doesn't
+  count against the load, like a carriage's driver. A boat nobody rows stays where it is; it
+  never drifts. Rowing costs food as walking on Plains does. The rower and passengers eat their
+  own food and, running low, take a meal from the boat's Food (Refilling from a carriage).
+  Rowing off in another organization's boat steals it (Stealing a carriage or horse).
+- **No ferrying by itself:** walking never uses a vessel; a walk still goes round on land.
+  Crossing water is always boarding, rowing (or sailing) and getting off, by the Player or a
+  script. Giving a passenger a walk or an order that acts on a tile gets them off first, as on a
+  carriage.
+- **Vessels in sight:** a vessel shows to whoever has its tile in sight, like a carriage; those
+  aboard see from its tile as usual, so rowing along a coast explores it.
+- **Fighting at a vessel:** those aboard can be attacked by anyone beside it, as if the vessel
+  were the next land tile, and fight back; Down or dead, they stay aboard. There are no fights
+  between vessels and none from open water (for now), so a vessel away from every shore is out of
+  reach.
+- **Haul route by water:** the Haul route with a vessel: a ship between two havens, its captain
+  loading at the first, sailing, unloading at the second and coming back while the rest of the
+  crew stays aboard; a boat with havens or shore tiles as stops, loading at a shore from the pile
+  beside it. Boats have haul routes now (T91.5): the rower starts on the shore beside the boat,
+  gets off at each stop to load and unload it by hand from beside it, then boards and rows on.
+  A ship's haul route comes with T91.4.
+- **Ship:** a big sailed vessel, built at a haven, carrying far more than a carriage. It sails
+  only on Sea, needs a crew of several residents, and docks only at a haven: loading, unloading,
+  boarding and getting off happen there. A haul route runs between two havens.
+- **Building a ship:** as Building a boat, with a **ship site** at a haven touching Sea, on a
+  haven tile that touches Sea. It takes Wood and some Iron and far more work than a boat. The ship
+  floats on the nearest free Sea tile next to the site.
+- **Docked:** a ship on a water tile touching a haven's footprint. Only docked, and only from
+  that haven, do residents board it, get off it or load it; those at the haven move goods
+  straight between the haven's storage and the ship. Beside a vessel means, for a ship, at the
+  haven it is docked at.
+- **Crew:** residents of the ship's realm aboard as crew rather than as passengers (boarding as
+  crew is its own choice on the card, queue step or script). Crew don't count against the load. A
+  ship sails only with at least a minimum crew aboard (a balance number). The crew's Seafaring
+  makes it faster, and sailing teaches Seafaring to the whole crew. Crew and passengers eat as on
+  a boat.
+- **Sailing:** an order (as a script could do it) for one of the crew, the **captain**, to sail
+  the ship to a haven (docking there) or a Sea tile, a Step at a time over Sea only, never onto
+  Lake. Stealing a ship takes sailing it off with a minimum crew of the thief's realm aboard.
+- **What vessels carry:** residents and goods only. No horse or carriage goes aboard (for now);
+  residents a ship brings to a far coast arrive on foot.
 
 ## Starting city
 
@@ -1494,11 +1590,51 @@ The shared language of the game. Domain terms only — no implementation details
   copies on a clipboard in the browser, Paste inserts them after the picked step, in the same
   planner or another resident's or a group's. The clipboard survives switching cards, not
   reloading the page.
-- **Repeat block:** in the planner, some steps in a row wrapped with a count, nestable. It is a
-  planner thing only: when the queue is given, the block becomes that many plain copies of its
-  steps, so the queue, the server and scripts see only steps. A queue holds at most so many
-  steps (a balance number); the planner says when a plan would exceed it. A running queue shows
-  the copies, the current one marked. The whole-queue loop stays as it is.
+- **Queue draft:** steps added in the planner for a resident with no queue collect as a draft, kept
+  in the browser like a group's plan: nothing runs until the Player presses Start queue, which
+  gives it. An order queued with Shift still starts a queue at once. A running queue is edited
+  live as before; Edit as draft copies it into a draft, the queue runs on untouched, and Start
+  queue replaces it (the step they are on keeps going if it is still in it). Discard draft throws
+  the draft away. A draft is lost on reloading the page.
+- **Clear:** the planner's Clear empties a draft. On a running queue it removes everything but
+  the step the resident is on and turns loop off, so they finish that step and the queue ends;
+  Stop is still how to halt at once.
+- **Repeat block:** some steps in a row wrapped in a block, nestable, and part of the queue itself
+  (ADR 0032): the server runs it and a running queue shows it with its round ("2 of 3"). It
+  repeats a count of times, forever, or until a condition holds, checked before each round. A
+  round in which no step could start ends the block, so a block never spins. A queue holds at
+  most so many steps and blocks as written, and blocks nest only so deep (balance numbers); the
+  planner says when a plan would exceed either. The whole-queue loop stays the queue's own
+  switch, drawn as the outermost bracket.
+- **If block:** a block with a condition, an optional Else part, nestable like a repeat block.
+  When its turn comes the condition is checked once: true runs its steps, false its Else steps or
+  nothing. It is not checked again while they run.
+- **Wait until:** a step that ends once its condition holds; the resident stands idle meanwhile.
+  With a duration it also ends when that is up.
+- **Condition:** what a Wait until, an If block or a Repeat until asks. It is about the resident
+  themself or one place of their own realm, never anything a Player couldn't know: they (or the
+  carriage or vessel they drive) carry at least or less than so many of a good, or are full or
+  empty; a storage, workplace pile or site of the realm, picked on the map, holds at least or
+  less than so many of a good; their hunger or health is above or below a share; they are mounted
+  or aboard, or not; the game hour is before or after an hour. A condition on a place that is
+  gone or no longer the realm's counts as false and is noted in the realm log. In a group's plan
+  each member checks it for themself. Scripts see the step a resident is on and its number among
+  the steps counted top to bottom, as before; blocks, rounds and conditions they don't see.
+- **Planner blocks:** the planner draws the queue as stacked blocks: a step is one line with its
+  icon, the place by name (a building, waypoint or city; a bare tile as coordinates) and its
+  duration only when it has or needs one; loop, repeat and If are brackets around their steps.
+  Add step is a palette grouped as the Orders tab is (Move, Work & build, Goods, Scripts) plus
+  Flow (Repeat, If, Wait until), and a step can be added between two others.
+- **Tool rail:** the rail groups its drawers as People (Residents, Horses, Armies), Diplomacy
+  and Realm (Cities, Waypoints, Scripts, Realm log). Diplomacy is one drawer with a tab each for
+  Contracts, Demands, Direct offers, Alliance and Standing. A rail button and a tab show a mark
+  while their drawer holds something the Player hasn't seen: what a notice would announce, and
+  new lines of the realm log.
+- **Cities drawer:** lists the cities the Player knows as Your cities, Others in sight and Last
+  seen. A row shows the name, whose it is in that relation's colour, and for the Player's own
+  cities residents against housing and the key goods in its storages. Opening a row centres the
+  map on the city and outlines its area, as picking it on the map does, and shows it in sections:
+  Overview (residents, housing, buildings by kind without walls and roads), Stock, Trade, Gates.
 - **Action:** a request (move, pick up, attack, …) that the world resolves at the end of a tick.
   The world only checks whether it's physically possible.
 - **Tick:** one step of the world, one per second.

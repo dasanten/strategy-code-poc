@@ -10,7 +10,8 @@ use csp_shared::balance::{
 };
 use csp_shared::footprint::{covers, footprint_tiles, is_at, may_cover, Placed, FOOTPRINT};
 use csp_shared::terrain::{
-    is_passable_terrain, terrain_at, tile_index, wrap, wrap_delta, Terrain, TerrainMap,
+    is_passable_terrain, terrain_at, tile_index, touches_sea, touches_water, wrap, wrap_delta,
+    Terrain, TerrainMap,
 };
 use csp_shared::world::{
     Building, BuildingKind, Good, LineOrder, LinePhase, Pile, Resident, ResidentOrder,
@@ -21,12 +22,14 @@ use super::balance::{build_work, carry_capacity};
 use super::names::{good_name, good_of, held, kind_name, placed};
 use super::residents::{can_work, good_weight, stock_weight};
 
-/// Kinds that may share a tile with a building (`SHARES_A_TILE`): roads and carriage sites.
-pub const SHARES_A_TILE: [BuildingKind; 2] = [BuildingKind::Road, BuildingKind::Carriage];
+/// Kinds that may share a tile with a building (`SHARES_A_TILE`): roads, carriage sites, boat
+/// sites and ship sites.
+pub const SHARES_A_TILE: [BuildingKind; 4] =
+    [BuildingKind::Road, BuildingKind::Carriage, BuildingKind::Boat, BuildingKind::Ship];
 
-/// Kinds that keep goods (`KEEPS_GOODS`): storages, warehouses and stables.
-pub const KEEPS_GOODS: [BuildingKind; 3] =
-    [BuildingKind::Storage, BuildingKind::Warehouse, BuildingKind::Stable];
+/// Kinds that keep goods (`KEEPS_GOODS`): storages, warehouses, stables and havens.
+pub const KEEPS_GOODS: [BuildingKind; 4] =
+    [BuildingKind::Storage, BuildingKind::Warehouse, BuildingKind::Stable, BuildingKind::Haven];
 
 /// Where in `world.buildings` the building or construction site whose footprint covers (x, y)
 /// stands, if one does (`buildingAt`): the first in the world's order, roads and carriage sites
@@ -77,7 +80,7 @@ pub fn recipe_for(kind: BuildingKind, makes: Option<&str>) -> Option<&'static Re
 pub const CARRYING_A_CHILD: &str = "carrying a child";
 
 /// Kinds of building that can be built so far (`BUILDABLE`).
-pub const BUILDABLE: [BuildingKind; 16] = [
+pub const BUILDABLE: [BuildingKind; 19] = [
     BuildingKind::LumberCamp,
     BuildingKind::Quarry,
     BuildingKind::Mine,
@@ -94,6 +97,9 @@ pub const BUILDABLE: [BuildingKind; 16] = [
     BuildingKind::Gate,
     BuildingKind::Road,
     BuildingKind::Carriage,
+    BuildingKind::Haven,
+    BuildingKind::Boat,
+    BuildingKind::Ship,
 ];
 
 /// Workplaces that turn goods into other goods (`PROCESSING`, the keys of `RECIPES`).
@@ -101,7 +107,7 @@ pub const PROCESSING: [BuildingKind; 3] =
     [BuildingKind::Smelter, BuildingKind::Mint, BuildingKind::Smithy];
 
 /// Kinds that go on passable land but Mountain, off any resource node (`OFF_NODES`).
-pub const OFF_NODES: [BuildingKind; 9] = [
+pub const OFF_NODES: [BuildingKind; 10] = [
     BuildingKind::Smelter,
     BuildingKind::Mint,
     BuildingKind::Smithy,
@@ -111,7 +117,12 @@ pub const OFF_NODES: [BuildingKind; 9] = [
     BuildingKind::Wall,
     BuildingKind::Gate,
     BuildingKind::TrainingGround,
+    BuildingKind::Haven,
 ];
+
+/// Kinds that go on the shore, with a tile of their footprint touching Lake or Sea straight or
+/// diagonally (`ON_SHORE`, `CONTEXT.md`: Haven): havens.
+pub const ON_SHORE: [BuildingKind; 1] = [BuildingKind::Haven];
 
 /// Kinds that go wholly on Plains, off any resource node (`ON_PLAINS`): stables and farms.
 pub const ON_PLAINS: [BuildingKind; 2] = [BuildingKind::Stable, BuildingKind::Farm];
@@ -120,13 +131,14 @@ pub const ON_PLAINS: [BuildingKind; 2] = [BuildingKind::Stable, BuildingKind::Fa
 pub const IN_CITY_AREA: [BuildingKind; 1] = [BuildingKind::House];
 
 /// What a build menu offers off any resource node, in its order (`OFF_NODE_BUILDS`).
-pub const OFF_NODE_BUILDS: [BuildingKind; 11] = [
+pub const OFF_NODE_BUILDS: [BuildingKind; 12] = [
     BuildingKind::TownHall,
     BuildingKind::House,
     BuildingKind::Storage,
     BuildingKind::Wall,
     BuildingKind::Gate,
     BuildingKind::TrainingGround,
+    BuildingKind::Haven,
     BuildingKind::Stable,
     BuildingKind::Farm,
     BuildingKind::Smelter,
@@ -214,8 +226,19 @@ pub fn carriage_site_at(world: &WorldState, x: i32, y: i32) -> Option<&Building>
     first_of_kind_at(world, x, y, BuildingKind::Carriage).map(|i| &world.buildings[i])
 }
 
+/// The boat site on a tile (`CONTEXT.md`: Building a boat).
+pub fn boat_site_at(world: &WorldState, x: i32, y: i32) -> Option<&Building> {
+    first_of_kind_at(world, x, y, BuildingKind::Boat).map(|i| &world.buildings[i])
+}
+
+/// The ship site on a tile (`CONTEXT.md`: Building a ship).
+pub fn ship_site_at(world: &WorldState, x: i32, y: i32) -> Option<&Building> {
+    first_of_kind_at(world, x, y, BuildingKind::Ship).map(|i| &world.buildings[i])
+}
+
 /// Where in `world.buildings` what of `kind` stands on a tile is (`constructionAt`): its road
-/// for a road, its carriage site for a carriage, else its building (on the whole map).
+/// for a road, its carriage, boat or ship site for a carriage, boat or ship, else its building
+/// (on the whole map).
 pub fn construction_index_at(
     world: &WorldState,
     x: i32,
@@ -224,7 +247,9 @@ pub fn construction_index_at(
 ) -> Option<usize> {
     match kind {
         BuildingKind::Road => road_index_at(world, x, y),
-        BuildingKind::Carriage => first_of_kind_at(world, x, y, BuildingKind::Carriage),
+        BuildingKind::Carriage | BuildingKind::Boat | BuildingKind::Ship => {
+            first_of_kind_at(world, x, y, kind)
+        }
         _ => building_index_at(world, x, y, MAP_SIZE),
     }
 }
@@ -375,6 +400,31 @@ pub fn build_problem(
         }
         return None;
     }
+    if kind == BuildingKind::Boat {
+        // `CONTEXT.md`: Building a boat: on a haven tile that touches the water.
+        if super::vessels::haven_for(world, x, y, size).is_none()
+            || terrain.is_some_and(|t| !touches_water(&[(x, y)], size, |tx, ty| t.at(tx, ty)))
+        {
+            return Some("a boat is built on a tile of a finished haven touching the water".into());
+        }
+        if first_of_kind_at(world, x, y, BuildingKind::Boat).is_some() {
+            return Some("there is already a boat site on this tile".into());
+        }
+        return None;
+    }
+    if kind == BuildingKind::Ship {
+        // `CONTEXT.md`: Building a ship: on a haven tile that touches Sea (so at a haven touching
+        // Sea); a lake haven builds boats only.
+        if super::vessels::haven_for(world, x, y, size).is_none()
+            || terrain.is_some_and(|t| !touches_sea(&[(x, y)], size, |tx, ty| t.at(tx, ty)))
+        {
+            return Some("a ship is built on a tile of a finished haven touching the Sea".into());
+        }
+        if first_of_kind_at(world, x, y, BuildingKind::Ship).is_some() {
+            return Some("there is already a ship site on this tile".into());
+        }
+        return None;
+    }
     let shape = Placed { kind: kind_name(kind), x, y };
     let tiles = footprint_tiles(shape, size);
     let nodes: Vec<_> =
@@ -400,6 +450,11 @@ pub fn build_problem(
             })
         {
             return Some(format!("a {name} goes in a city’s area"));
+        }
+        if ON_SHORE.contains(&kind)
+            && terrain.is_some_and(|t| !touches_water(&tiles, size, |tx, ty| t.at(tx, ty)))
+        {
+            return Some(format!("a {name} goes on the shore, touching Lake or Sea"));
         }
     } else if nodes.len() != 1 || node_workplace(nodes[0].kind) != kind {
         return Some(format!("a {name} goes with one tile on a fitting resource node"));

@@ -144,6 +144,7 @@ pub enum SkillName {
     Farming,
     Combat,
     Driving,
+    Seafaring,
 }
 
 /// What a training ground teaches (`TrainingSubject`): a stat or a skill.
@@ -249,18 +250,275 @@ pub enum NoScript {
     None,
 }
 
-/// A queue (`CONTEXT.md`: Queue): steps done one after another.
+/// A queue (`CONTEXT.md`: Queue, Repeat block; ADR 0032): a tree of steps and repeat blocks,
+/// worked through top to bottom.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Queue {
     pub realm_id: String,
-    pub steps: Vec<QueueStep>,
-    /// An index into `steps`; the server's invariant checks `Number.isInteger`.
+    /// The queue's steps and blocks as written, top to bottom.
+    pub items: Vec<QueueItem>,
+    /// The id of the step being done, or started next, somewhere in `items`.
     pub current: u32,
     pub started_at: Option<f64>,
     pub r#loop: bool,
-    /// Step ids: counted up from `steps.length + 1` with `++` only.
+    /// Ids of steps and blocks, one id space: counted up with `++` only.
     pub next_step_id: u32,
+    /// Whether a step started since the queue last began from its top: a looping queue whose
+    /// pass started none ends, as a block's empty round does (`CONTEXT.md`: Repeat block).
+    #[serde(default, skip_serializing_if = "is_false")]
+    #[ts(as = "Option<bool>", optional)]
+    pub started: bool,
+}
+
+fn is_false(b: &bool) -> bool {
+    !*b
+}
+
+fn is_zero(n: &u32) -> bool {
+    *n == 0
+}
+
+/// One item of a queue: a step, or a repeat block of more.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(untagged)]
+pub enum QueueItem {
+    Step(QueueStep),
+    Repeat(RepeatBlock),
+    If(IfBlock),
+}
+
+impl QueueItem {
+    /// The step's or block's id.
+    pub fn id(&self) -> u32 {
+        match self {
+            QueueItem::Step(s) => s.id,
+            QueueItem::Repeat(b) => b.id,
+            QueueItem::If(b) => b.id,
+        }
+    }
+
+    /// The lists of items a block holds: a repeat block's items, an If block's items and its
+    /// Else part; none for a step.
+    pub fn parts(&self) -> Vec<&[QueueItem]> {
+        match self {
+            QueueItem::Step(_) => vec![],
+            QueueItem::Repeat(b) => vec![&b.items],
+            QueueItem::If(b) => {
+                let mut out: Vec<&[QueueItem]> = vec![&b.items];
+                if let Some(e) = &b.r#else {
+                    out.push(e);
+                }
+                out
+            }
+        }
+    }
+}
+
+/// A block whose steps run only when its condition holds (`CONTEXT.md`: If block), with an
+/// optional Else part run when it doesn't. The condition is checked once, when its turn comes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct IfBlock {
+    pub id: u32,
+    pub r#if: Condition,
+    pub items: Vec<QueueItem>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub r#else: Option<Vec<QueueItem>>,
+    /// The part being run while the current step is inside the block: `then` (`items`) or
+    /// `else`; left out otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub branch: Option<Branch>,
+}
+
+/// Which part of an If block runs (`IfBlock::branch`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum Branch {
+    Then,
+    Else,
+}
+
+/// Some steps in a row done again and again (`CONTEXT.md`: Repeat block): a count of rounds,
+/// forever, or until a condition holds, asked before each round. A round in which none of its
+/// steps could start ends it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct RepeatBlock {
+    pub id: u32,
+    pub repeat: Repeat,
+    pub items: Vec<QueueItem>,
+    /// The round being run, from 1, while the current step is inside the block; 0 (left out)
+    /// otherwise.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    #[ts(as = "Option<u32>", optional)]
+    pub round: u32,
+    /// Whether a step started in this round.
+    #[serde(default, skip_serializing_if = "is_false")]
+    #[ts(as = "Option<bool>", optional)]
+    pub started: bool,
+}
+
+/// How often a repeat block runs: a count of rounds, `"forever"`, or `{ "until": condition }`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(untagged)]
+pub enum Repeat {
+    Times(u32),
+    Forever(Forever),
+    Until(RepeatUntil),
+}
+
+/// A Repeat until's condition (`Repeat::Until`, `CONTEXT.md`: Repeat block): asked before each
+/// round, the block runs no more rounds once it holds.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+pub struct RepeatUntil {
+    pub until: Condition,
+}
+
+/// The literal `"forever"` of `Repeat`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+pub enum Forever {
+    #[serde(rename = "forever")]
+    Forever,
+}
+
+impl Repeat {
+    /// The most rounds the count allows: a Repeat until's count never ends it, its condition
+    /// does ([`Repeat::until`]).
+    pub fn most(&self) -> u32 {
+        match self {
+            Repeat::Times(n) => *n,
+            Repeat::Forever(_) | Repeat::Until(_) => u32::MAX,
+        }
+    }
+
+    /// Whether the count allows another round after round `round`.
+    pub fn more_after(&self, round: u32) -> bool {
+        round < self.most()
+    }
+
+    /// A Repeat until's condition.
+    pub fn until(&self) -> Option<&Condition> {
+        match self {
+            Repeat::Until(u) => Some(&u.until),
+            _ => None,
+        }
+    }
+}
+
+impl Queue {
+    /// The steps top to bottom as written, each once whatever its blocks repeat.
+    pub fn steps(&self) -> Vec<&QueueStep> {
+        let mut out = Vec::new();
+        collect_steps(&self.items, &mut out);
+        out
+    }
+
+    /// The current step, if `current` names one.
+    pub fn current_step(&self) -> Option<&QueueStep> {
+        self.steps().into_iter().find(|s| s.id == self.current)
+    }
+
+    /// The current step's place among the steps top to bottom, from 0.
+    pub fn current_index(&self) -> Option<usize> {
+        self.steps().iter().position(|s| s.id == self.current)
+    }
+}
+
+fn collect_steps<'a>(items: &'a [QueueItem], out: &mut Vec<&'a QueueStep>) {
+    for item in items {
+        match item {
+            QueueItem::Step(s) => out.push(s),
+            block => {
+                for part in block.parts() {
+                    collect_steps(part, out);
+                }
+            }
+        }
+    }
+}
+
+/// What a Wait until, an If block or a Repeat until asks (`CONTEXT.md`: Condition): something
+/// about the resident themself or one place of their own realm. Plain data, checked by the server.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub enum Condition {
+    /// They, or with `vehicle` the carriage or vessel they drive, carry at least or less than
+    /// `amount` of `good`.
+    Carries {
+        #[serde(default, skip_serializing_if = "is_false")]
+        #[ts(as = "Option<bool>", optional)]
+        vehicle: bool,
+        good: Good,
+        compare: Compare,
+        amount: f64,
+    },
+    /// They, or with `vehicle` the carriage or vessel they drive, are full or empty.
+    Load {
+        #[serde(default, skip_serializing_if = "is_false")]
+        #[ts(as = "Option<bool>", optional)]
+        vehicle: bool,
+        load: LoadState,
+    },
+    /// A storage, workplace pile or site of the realm holds at least or less than `amount` of
+    /// `good`. `place_id` is the building's id.
+    Stock { place_id: String, good: Good, compare: Compare, amount: f64 },
+    /// Their hunger meter or health is above or below `share` of full (0 to 1).
+    Need { need: NeedName, side: Side, share: f64 },
+    /// They are mounted (or, with `is` false, not).
+    Mounted { is: bool },
+    /// They are aboard a boat or ship (or, with `is` false, not).
+    Aboard { is: bool },
+    /// The game hour is before `hour`, or `hour` or later.
+    Hour { side: HourSide, hour: f64 },
+}
+
+/// At least or less than an amount (`Condition`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum Compare {
+    AtLeast,
+    LessThan,
+}
+
+/// Full or empty (`Condition::Load`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum LoadState {
+    Full,
+    Empty,
+}
+
+/// The resident's hunger meter or health (`Condition::Need`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum NeedName {
+    Hunger,
+    Health,
+}
+
+/// Above or below a share (`Condition::Need`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum Side {
+    Above,
+    Below,
+}
+
+/// Before or after an hour (`Condition::Hour`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum HourSide {
+    Before,
+    After,
 }
 
 /// One step of a queue.
@@ -416,7 +674,8 @@ pub struct ScriptRunSteps {
     pub out_of_steps: Option<OutOfSteps>,
 }
 
-/// A place on the resident's own tile that goods are taken from or put (`GoodsSpot`).
+/// A place on the resident's own tile that goods are taken from or put (`GoodsSpot`), or a vessel
+/// beside them (`CONTEXT.md`: Beside a vessel).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(
     tag = "kind",
@@ -430,9 +689,11 @@ pub enum GoodsSpot {
     Site { site_id: String },
     Carriage { carriage_id: String },
     Resident { resident_id: String },
+    Vessel { vessel_id: String },
 }
 
-/// Where a store or fetch order takes goods to or from (`GoodsPlace`): a storage or a carriage.
+/// Where a store or fetch order takes goods to or from (`GoodsPlace`): a storage, a carriage, or a
+/// vessel, loaded from beside it (`CONTEXT.md`: Beside a vessel).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(
     tag = "kind",
@@ -443,6 +704,7 @@ pub enum GoodsSpot {
 pub enum GoodsPlace {
     Storage { storage_id: String },
     Carriage { carriage_id: String },
+    Vessel { vessel_id: String },
 }
 
 /// Walking to a tile.
@@ -615,6 +877,18 @@ pub struct DriveOrder {
     pub near: Option<bool>,
 }
 
+/// Rowing a boat to a water tile (`CONTEXT.md`: Rowing): the rower is aboard and at its oars, and
+/// the boat goes a Step at a time over water along `path`. Sailing a ship (`Sail`) holds the same:
+/// the captain is one of its crew, and the ship goes over Sea only (`CONTEXT.md`: Sailing).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RowOrder {
+    pub vessel_id: String,
+    pub target: Tile,
+    pub path: Option<TilePath>,
+    pub progress: f64,
+}
+
 /// A haul route's stop.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -663,6 +937,29 @@ pub struct HaulOrder {
     pub keep_food: f64,
     pub stop: HaulStop,
     pub phase: HaulPhase,
+    pub path: Option<TilePath>,
+    pub progress: f64,
+    pub moving: Option<HaulMoving>,
+}
+
+/// A haul route by water (`CONTEXT.md`: Haul route by water): the rower rows a vessel between
+/// two stops on land, havens or shore tiles, again and again. At a stop they stand on it, beside
+/// the vessel, and load by hand like a carriage's driver; leaving, they board, take the oars and
+/// row to the free water tile beside the other stop (`water`). Its phase `driving` is the rowing.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct WaterHaulOrder {
+    pub vessel_id: String,
+    pub from: Tile,
+    pub to: Tile,
+    pub goods: Vec<Good>,
+    pub return_goods: Vec<Good>,
+    /// Food kept on board for the rower.
+    pub keep_food: f64,
+    pub stop: HaulStop,
+    pub phase: HaulPhase,
+    /// The water tile beside the stop it is rowed to, set as it leaves a stop.
+    pub water: Option<Tile>,
     pub path: Option<TilePath>,
     pub progress: f64,
     pub moving: Option<HaulMoving>,
@@ -881,6 +1178,10 @@ pub enum ResidentOrder {
     AcceptOffer(AcceptOfferOrder),
     Relocate(RelocateOrder),
     Feed(FeedOrder),
+    Row(RowOrder),
+    HaulByWater(WaterHaulOrder),
+    /// Sailing a ship to a Sea tile or a haven, its captain one of its crew (`CONTEXT.md`: Sailing).
+    Sail(RowOrder),
 }
 
 /// Everything in the world that changes, saved as snapshots (ADR 0006).
@@ -901,6 +1202,10 @@ pub struct WorldState {
     pub buildings: Vec<Building>,
     pub horses: Vec<Horse>,
     pub carriages: Vec<Carriage>,
+    /// Boats (and later ships) on the water (`CONTEXT.md`: Vessel). Left out of a save while there
+    /// are none, so a world from before format 113 reads as having none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub vessels: Vec<Vessel>,
     pub piles: Vec<Pile>,
     pub events: Vec<RealmEvent>,
     pub alliances: Vec<Alliance>,
@@ -1632,6 +1937,14 @@ pub struct Crime {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub horse: Option<String>,
+    /// A boat taken, as `carriage` (`CONTEXT.md`: Stealing a carriage or horse, its vessel part).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "true")]
+    pub boat: Option<bool>,
+    /// The boat taken is a ship (`CONTEXT.md`: Sailing), so the log names it one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "true")]
+    pub ship: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub building: Option<BuildingKind>,
@@ -1913,6 +2226,14 @@ pub enum RealmEventWhat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         horse: Option<String>,
+        /// A boat, stolen like a carriage (`CONTEXT.md`: Stealing a carriage or horse).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional, type = "true")]
+        boat: Option<bool>,
+        /// The boat taken is a ship (`CONTEXT.md`: Sailing), so the log names it one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional, type = "true")]
+        ship: Option<bool>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         building: Option<BuildingKind>,
@@ -1926,6 +2247,14 @@ pub enum RealmEventWhat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         horse: Option<String>,
+        /// A boat, stolen like a carriage (`CONTEXT.md`: Stealing a carriage or horse).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional, type = "true")]
+        boat: Option<bool>,
+        /// The boat taken is a ship (`CONTEXT.md`: Sailing), so the log names it one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional, type = "true")]
+        ship: Option<bool>,
     },
     TransportTaken {
         resident_id: String,
@@ -1939,6 +2268,14 @@ pub enum RealmEventWhat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         horse: Option<String>,
+        /// A boat, stolen like a carriage (`CONTEXT.md`: Stealing a carriage or horse).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional, type = "true")]
+        boat: Option<bool>,
+        /// The boat taken is a ship (`CONTEXT.md`: Sailing), so the log names it one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional, type = "true")]
+        ship: Option<bool>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         goods: Option<Stock>,
@@ -2484,6 +2821,13 @@ pub enum RealmEventWhat {
         #[ts(optional, type = "true")]
         queue_ended: Option<bool>,
     },
+    /// A condition of the resident's queue asked about a place that is gone or no longer the
+    /// realm's, and counted as false (`CONTEXT.md`: Condition).
+    ConditionPlaceGone {
+        resident_id: String,
+        name: String,
+        place_id: String,
+    },
     RelocateFailed {
         resident_id: String,
         name: String,
@@ -2767,6 +3111,27 @@ pub struct City {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub layout: Option<CityLayout>,
+    /// For an NPC city, the realms whose fighters near it have outweighed it without a break, and
+    /// since when (`CONTEXT.md`: Respect; ADR 0033), as of its last planning pass. Left out while
+    /// there are none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub outweighed: Option<Vec<Outweighed>>,
+}
+
+/// Since when a realm's fighters near an NPC city have outweighed it without a break
+/// (`City.outweighed`, `CONTEXT.md`: Respect, Persuading a city, Demand; ADR 0033).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Outweighed {
+    pub realm_id: String,
+    /// The planning pass from which they have outweighed its own side (enough to persuade it).
+    pub since: f64,
+    /// The planning pass from which they have far outweighed it (enough for a demand), if they
+    /// do now.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub far_since: Option<f64>,
 }
 
 /// The layouts an NPC city can get (`CITY_LAYOUTS`).
@@ -2808,6 +3173,11 @@ pub enum BuildingKind {
     TrainingGround,
     Road,
     Carriage,
+    Haven,
+    /// A boat site (`CONTEXT.md`: Building a boat): finished, it is gone and a boat floats.
+    Boat,
+    /// A ship site (`CONTEXT.md`: Building a ship): finished, it is gone and a ship floats on Sea.
+    Ship,
 }
 
 /// A building or construction site (`Building`).
@@ -2888,6 +3258,38 @@ pub struct Carriage {
     pub y: f64,
     pub horse_id: Option<String>,
     pub load: Stock,
+}
+
+/// The kinds of vessel (`CONTEXT.md`: Vessel): a rowed boat, on Lake and Sea, or a sailed ship, on
+/// Sea only (`CONTEXT.md`: Ship).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum VesselKind {
+    Boat,
+    Ship,
+}
+
+/// A boat or ship (`CONTEXT.md`: Vessel): always on a water tile, one vessel per tile, with the
+/// goods it carries. Those aboard are residents (`Resident::aboard`, from T90.3).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Vessel {
+    pub id: String,
+    pub kind: VesselKind,
+    pub realm_id: Option<String>,
+    pub x: f64,
+    pub y: f64,
+    pub load: Stock,
+    /// The one aboard at its oars, who rowed it last or rows it now (`CONTEXT.md`: Rowing): no
+    /// passenger, so not counted against what it holds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub rower_id: Option<String>,
+    /// Those aboard a ship as its crew rather than as passengers (`CONTEXT.md`: Crew): of its
+    /// realm, aboard it, and not counted against what it holds. A boat has none. Left out of a
+    /// save while empty (format 117).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub crew_ids: Vec<String>,
 }
 
 /// What a resource node yields once worked (`ResourceKind`).

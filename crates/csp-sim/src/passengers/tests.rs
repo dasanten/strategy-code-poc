@@ -98,7 +98,7 @@ fn get_off_only_next_to_the_carriage_and_only_while_aboard() {
     let (mut world, map) = setup();
     assert_eq!(
         order(&mut world, &map, json!({"kind": "getOff", "residentId": "p1"})),
-        Err("not aboard a carriage".into())
+        Err("not aboard a carriage or boat".into())
     );
     board(&mut world, &map, "p1").expect("aboard");
     assert_eq!(

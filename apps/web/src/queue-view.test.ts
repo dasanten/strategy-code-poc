@@ -1,22 +1,36 @@
 import { QUEUE_DEFAULT_STEP_MINUTES } from '@csp/balance'
-import { queueStepsProblem } from './shared/queue.js'
+import { queueSteps, queueStepsProblem } from './shared/queue.js'
 import type { OrderRequest, Queue } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
   appendRequest,
   appendRequests,
   appendToEach,
+  clearedItems,
+  draftEdit,
+  draftFor,
   editPlan,
   EMPTY_PLAN,
+  givePlan,
   giveToAll,
   planOf,
   planStep,
   queueRows,
+  showsMinutes,
+  stepGroup,
   STORE_ALL,
   stepLabel,
   type Queued,
 } from './queue-view.js'
-import { dropItem, idsOf, moveItem, removeItem, timeItem, unroll } from './plan-blocks.js'
+import {
+  dropItem,
+  idsOf,
+  moveItem,
+  planSteps,
+  removeItem,
+  timedItems,
+  timeItem,
+} from './plan-blocks.js'
 
 /** Queues on the resident card (`CONTEXT.md`: Queue): Shift-append and the queue list. */
 
@@ -29,8 +43,9 @@ function queueOf(request: OrderRequest, current = 0): Queue {
   const steps = request.steps as { id?: number; order: OrderRequest; minutes?: number }[]
   return {
     realmId: 'r1',
-    steps: steps.map((s, i) => ({ ...s, id: s.id ?? i + 1 })),
-    current,
+    items: steps.map((s, i) => ({ ...s, id: s.id ?? i + 1 })),
+    // `current` counts from 0 here; the server names the step by its id.
+    current: steps[current]?.id ?? current + 1,
     startedAt: 0,
     loop: request.loop === true,
     nextStepId: steps.length + 1,
@@ -128,12 +143,12 @@ describe('Shift-append', () => {
 describe('the queue list', () => {
   // Work the farm, store, walk home: the browser check's round.
   const round = shiftQueue(idle, [work, { ...STORE_ALL, residentId: 'w1' }, walkHome])
-  const q = { ...round.queue!, current: 1, loop: true }
+  const q = { ...round.queue!, current: 2, loop: true }
   const names = { buildings: [{ id: 'f1', kind: 'farm' as const }] }
 
   it('lists the steps, the current one, durations and real time', () => {
     expect(queueRows(q, names)).toEqual([
-      { id: 1, label: 'Walk to 6, 6', current: false, endless: false },
+      { id: 1, label: 'Walk to 6, 6', current: false, endless: false, group: 'move' },
       {
         id: 2,
         label: 'Work the farm',
@@ -141,9 +156,10 @@ describe('the queue list', () => {
         minutes: QUEUE_DEFAULT_STEP_MINUTES,
         real: '1 min',
         endless: true,
+        group: 'work',
       },
-      { id: 3, label: 'Store what they carry', current: false, endless: false },
-      { id: 4, label: 'Walk to 9, 3', current: false, endless: false },
+      { id: 3, label: 'Store what they carry', current: false, endless: false, group: 'goods' },
+      { id: 4, label: 'Walk to 9, 3', current: false, endless: false, group: 'move' },
     ])
     expect(q.loop).toBe(true)
   })
@@ -175,7 +191,7 @@ describe('the queue list', () => {
 
   it('gives work moved off the end a duration', () => {
     const last = shiftQueue(idle, [walkHome, work])
-    const moved = unroll(moveItem(planOf(last.queue!).items, 3, -1))
+    const moved = planSteps(timedItems(moveItem(planOf(last.queue!).items, 3, -1)))
     expect(moved.map((s) => [s.id, s.minutes])).toEqual([
       [1, undefined],
       [3, QUEUE_DEFAULT_STEP_MINUTES],
@@ -219,10 +235,41 @@ describe('step labels', () => {
 
   it('names the waypoint a step at its tile goes to', () => {
     const waypoints = [{ name: 'Pass', x: 12, y: 6 }]
-    expect(stepLabel({ kind: 'walkTo', x: 12, y: 6 }, { waypoints })).toBe('Walk to Pass (12, 6)')
+    expect(stepLabel({ kind: 'walkTo', x: 12, y: 6 }, { waypoints })).toBe('Walk to Pass')
     expect(stepLabel({ kind: 'walkTo', x: 12, y: 7 }, { waypoints })).toBe('Walk to 12, 7')
     // A removed waypoint leaves the step where it was: its tile.
     expect(stepLabel({ kind: 'walkTo', x: 12, y: 6 }, {})).toBe('Walk to 12, 6')
+  })
+
+  it('names a building at a step’s tile with its city, and its city on a step acting on it', () => {
+    const cities = [{ id: 'c1', name: 'Quarrytown IV' }]
+    const farm = { id: 'f1', kind: 'farm' as const, x: 10, y: 20, cityId: 'c1' }
+    // A farm covers more than its corner tile.
+    expect(stepLabel({ kind: 'walkTo', x: 11, y: 21 }, { buildings: [farm], cities })).toBe(
+      'Walk to Farm, Quarrytown IV',
+    )
+    expect(
+      stepLabel({ kind: 'task', task: 'work', workplaceId: 'f1' }, { buildings: [farm], cities }),
+    ).toBe('Work the farm in Quarrytown IV')
+    expect(
+      stepLabel(
+        { ...STORE_ALL, to: 's1' },
+        { buildings: [{ ...buildings[0]!, cityId: 'c1' }], cities },
+      ),
+    ).toBe('Store what they carry at the storage in Quarrytown IV')
+    // One out of sight is named as last seen; one with no city known, without it.
+    expect(stepLabel({ kind: 'walkTo', x: 10, y: 20 }, { lastSeen: [farm], cities })).toBe(
+      'Walk to Farm, Quarrytown IV (as last seen)',
+    )
+    expect(stepLabel({ kind: 'walkTo', x: 10, y: 20 }, { buildings: [farm] })).toBe('Walk to Farm')
+    // A waypoint on the tile goes first; a bare tile falls back to coordinates.
+    const waypoints = [{ name: 'Gate', x: 10, y: 20 }]
+    expect(stepLabel({ kind: 'walkTo', x: 10, y: 20 }, { buildings: [farm], waypoints })).toBe(
+      'Walk to Gate',
+    )
+    expect(stepLabel({ kind: 'walkTo', x: 40, y: 40 }, { buildings: [farm], cities })).toBe(
+      'Walk to 40, 40',
+    )
   })
 
   it('names the city a Relocate step goes to', () => {
@@ -262,17 +309,20 @@ describe('the group planner', () => {
     expect(planStep(looped, store).items.at(-1)!.id).toBe(4)
   })
 
-  it('Give to all unrolls repeat blocks into plain steps', () => {
+  it('Give to all gives repeat blocks as they are, without the plan’s ids', () => {
     const repeated = editPlan(plan, [{ repeat: 3, items: plan.items }])
     const [request] = giveToAll(repeated, members.slice(0, 1))
-    const steps = request!.steps as { order: OrderRequest }[]
-    expect(steps).toHaveLength(9)
-    expect(steps.map((s) => s.order).slice(3, 6)).toEqual([
-      { kind: 'walkTo', ...mine },
-      workMine,
-      store,
+    expect(request!.steps).toEqual([
+      {
+        repeat: 3,
+        items: [
+          { order: { kind: 'walkTo', ...mine } },
+          { order: workMine, minutes: QUEUE_DEFAULT_STEP_MINUTES },
+          { order: store },
+        ],
+      },
     ])
-    expect(queueStepsProblem(steps)).toBeUndefined()
+    expect(queueStepsProblem(request!.steps)).toBeUndefined()
   })
 
   it('Give to all sends one queue request per member with the same steps', () => {
@@ -314,5 +364,205 @@ describe('the group planner', () => {
         steps: [{ id: 1, order: { kind: 'walkTo', x: 2, y: 2 } }, walkMine, step],
       },
     ])
+  })
+})
+
+describe('the queue draft', () => {
+  // A looped three-step draft for an idle resident: walk to the mine, work it, store.
+  const mine = { x: 30, y: 4 }
+  const workMine: OrderRequest = { kind: 'task', task: 'work', workplaceId: 'm1' }
+  const store: OrderRequest = { kind: 'store', goods: STORE_ALL.goods, to: 's9' }
+
+  it('collects steps added for a resident with no queue, giving nothing until Start queue', () => {
+    expect(draftFor(idle, undefined)).toEqual(EMPTY_PLAN)
+    // Steps go onto the open draft; the resident still has no queue and no order was made.
+    const built = planStep(planStep(draftFor(idle, undefined)!, workMine, mine), store)
+    const open = editPlan(built, built.items, true)
+    expect(draftFor(idle, open)).toBe(open)
+    expect(idle.queue).toBeUndefined()
+    expect(planSteps(open.items)).toHaveLength(3)
+    // Start queue gives it as a new looped queue.
+    expect(givePlan(idle, open)).toEqual({
+      kind: 'queue',
+      residentId: 'w1',
+      steps: [
+        { order: { kind: 'walkTo', ...mine } },
+        { order: workMine, minutes: QUEUE_DEFAULT_STEP_MINUTES },
+        { order: store },
+      ],
+      loop: true,
+    })
+  })
+
+  it('opens a draft for a paste or load into a resident with no queue', () => {
+    const draft = draftEdit(idle, [{ order: walkHome }, { order: store }])
+    expect(draft?.items.map((s) => ('order' in s ? s.order.kind : 'block'))).toEqual([
+      'walkTo',
+      'store',
+    ])
+  })
+
+  it('edits a running queue live, repeat blocks and all', () => {
+    const running = shiftQueue(idle, [walkHome, work])
+    expect(draftFor(running, undefined)).toBeUndefined()
+    const steps = planOf(running.queue!).items
+    expect(draftEdit(running, steps.slice(1))).toBeUndefined()
+    // A repeat block goes to the server as it is (ADR 0032): no draft.
+    expect(draftEdit(running, [{ repeat: 2, items: steps }])).toBeUndefined()
+    expect(givePlan(running, { items: [{ repeat: 2, items: steps }] }).steps).toEqual([
+      { repeat: 2, items: steps },
+    ])
+  })
+
+  it('Edit as draft leaves the running queue untouched until Start queue', () => {
+    const running = shiftQueue(idle, [walkHome, work, { ...walkHome, x: 1 }])
+    const queue = structuredClone(running.queue!)
+    let draft = planOf(running.queue!)
+    // Steps added and removed go onto the draft, never to the server.
+    expect(draftFor(running, draft)).toBe(draft)
+    draft = planStep(draft, store)
+    draft = editPlan(draft, removeItem(draft.items, 1), true)
+    expect(running.queue).toEqual(queue)
+    // Start queue replaces it; the steps it keeps keep their ids, so the current one goes on.
+    const started = givePlan(running, draft)
+    expect(started.kind).toBe('editQueue')
+    const kept = queueSteps(running.queue!.items)
+      .slice(1)
+      .map((s) => s.id)
+    expect((started.steps as { id?: number }[]).map((s) => s.id)).toEqual([...kept, undefined])
+    expect(started.loop).toBe(true)
+  })
+
+  it('still queues an order given with Shift at once', () => {
+    expect(appendRequest(idle, walkHome)?.kind).toBe('queue')
+    const running = shiftQueue(idle, [walkHome])
+    expect(appendRequest(running, work)?.kind).toBe('editQueue')
+  })
+})
+
+describe('Clear', () => {
+  const store: OrderRequest = { kind: 'store', goods: STORE_ALL.goods, to: 's9' }
+
+  it('empties a draft', () => {
+    const built = planStep(planStep(EMPTY_PLAN, walkHome), store)
+    // A draft has no current step, even one copied from a running queue.
+    expect(editPlan(built, clearedItems(built.items)).items).toEqual([])
+  })
+
+  it('keeps only the current step of a running looped queue and turns loop off', () => {
+    const five = shiftQueue(idle, [
+      walkHome,
+      { ...walkHome, x: 1 },
+      { ...walkHome, x: 2 },
+      { ...walkHome, x: 3 },
+      { ...walkHome, x: 4 },
+    ])
+    const running = { ...five, queue: { ...five.queue!, loop: true, current: 3 } }
+    const current = queueSteps(running.queue.items)[2]!
+    const items = clearedItems(planOf(running.queue).items, current.id)
+    expect(givePlan(running, { items, loop: false })).toEqual({
+      kind: 'editQueue',
+      residentId: 'w1',
+      steps: [{ id: current.id, order: current.order }],
+      loop: false,
+    })
+  })
+
+  it('empties a group plan', () => {
+    const plan = planStep(planStep(EMPTY_PLAN, walkHome), store)
+    expect(editPlan(plan, clearedItems(plan.items)).items).toEqual([])
+  })
+})
+
+describe('the duration chip', () => {
+  const step = (minutes: number | undefined, endless: boolean) => ({ minutes, endless })
+  it('shows when a step has a duration', () => {
+    expect(showsMinutes(step(10, false), false)).toBe(true)
+    expect(showsMinutes(step(10, true), true)).toBe(true)
+  })
+  it('shows when a step that never ends needs one, not being last', () => {
+    expect(showsMinutes(step(undefined, true), false)).toBe(true)
+    expect(showsMinutes(step(undefined, true), true)).toBe(false)
+  })
+  it('hides on a step that ends on its own with none', () => {
+    expect(showsMinutes(step(undefined, false), false)).toBe(false)
+  })
+  it('groups steps by the Orders tab kind for their icon', () => {
+    expect(stepGroup({ kind: 'walkTo', x: 1, y: 1 })).toBe('move')
+    expect(stepGroup({ kind: 'task', task: 'explore' })).toBe('move')
+    expect(stepGroup(STORE_ALL)).toBe('goods')
+    expect(stepGroup({ kind: 'task', task: 'work', workplaceId: 'f1' })).toBe('work')
+    expect(stepGroup({ kind: 'runScript', scriptId: 'x' })).toBe('scripts')
+  })
+})
+
+describe('adding a step between two others', () => {
+  const store: OrderRequest = { kind: 'store', goods: STORE_ALL.goods, to: 's9' }
+  const fetch: OrderRequest = { kind: 'fetch', goods: { wood: 5 }, from: 's9' }
+  const storage = { x: 20, y: 20 }
+  const three = planStep(planStep(planStep(EMPTY_PLAN, walkHome), store), { kind: 'dismount' })
+
+  it('puts it after the insert point, keeping the rest', () => {
+    // A Fetch walks to its storage itself.
+    const placed = planStep(three, fetch, storage, 1)
+    expect(planSteps(placed.items).map((s) => [s.id, s.order.kind])).toEqual([
+      [1, 'walkTo'],
+      [4, 'fetch'],
+      [2, 'store'],
+      [3, 'dismount'],
+    ])
+  })
+
+  it('puts a walk before a step done on its tile, unless the step before walks there', () => {
+    const pickUp: OrderRequest = { kind: 'pickUp', goods: { wood: 5 } }
+    expect(planSteps(planStep(three, pickUp, storage, 1).items).map((s) => s.order.kind)).toEqual([
+      'walkTo',
+      'walkTo',
+      'pickUp',
+      'store',
+      'dismount',
+    ])
+    const atStorage = planStep(EMPTY_PLAN, { kind: 'walkTo', ...storage })
+    const two = planStep(atStorage, { kind: 'dismount' })
+    const placed = planStep(two, pickUp, storage, 1)
+    expect(planSteps(placed.items).map((s) => s.order.kind)).toEqual([
+      'walkTo',
+      'pickUp',
+      'dismount',
+    ])
+  })
+
+  it('goes into a running queue as one edit with the step in place', () => {
+    const running = shiftQueue(idle, [walkHome, { kind: 'dismount', residentId: 'w1' }])
+    const placed = planStep(planOf(running.queue!), store, undefined, 1)
+    const request = givePlan(running, placed)
+    expect(request.kind).toBe('editQueue')
+    expect((request.steps as { order: OrderRequest }[]).map((s) => s.order.kind)).toEqual([
+      'walkTo',
+      'store',
+      'dismount',
+    ])
+  })
+})
+
+describe('a step acting on no place', () => {
+  const explore: OrderRequest = { kind: 'task', task: 'explore' }
+
+  it('adds Explore to an empty queue as one step, with no walk before it', () => {
+    expect(planStep(EMPTY_PLAN, explore).items).toEqual([{ id: 1, order: explore }])
+    expect(appendRequest(idle, { ...explore, residentId: 'w1' })).toEqual({
+      kind: 'queue',
+      residentId: 'w1',
+      steps: [{ order: explore }],
+    })
+  })
+
+  it('adds Dismount, Get off and Run script with no walk either', () => {
+    for (const order of [
+      { kind: 'dismount' },
+      { kind: 'getOff' },
+      { kind: 'runScript', scriptId: 's' },
+    ] as OrderRequest[])
+      expect(appendRequest(idle, { ...order, residentId: 'w1' })?.steps).toEqual([{ order }])
   })
 })

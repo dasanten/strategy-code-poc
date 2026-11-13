@@ -10,16 +10,19 @@ import type {
   BuildingKind,
   Carriage,
   City,
+  Condition,
   Good,
   GoodsSpot,
   OrderRequest,
   SeenHorse,
+  SeenVessel,
   Stock,
   Task,
   TrainingSubject,
 } from '@csp/shared-types'
 import type { HaulSetup } from './Residents.js'
 import { anyonesToWork } from './script-params-view.js'
+import { NEW_DRAFT, type ConditionDraft } from './condition-view.js'
 
 /**
  * The queue planner's Add step (`CONTEXT.md`: Queue, Planning ahead): every kind of step a queue
@@ -38,13 +41,25 @@ export type PlanPick =
   | 'stable'
   | 'ground'
   | 'carriage'
+  | 'vessel'
+  | 'shore'
   | 'horse'
   | 'city'
   | 'toFeed'
+  | 'place'
 
 /** What a planned step asks for on the card once its places are picked. */
 export type PlanAsk =
-  'goods' | 'buildingKind' | 'makes' | 'horses' | 'horse' | 'haul' | 'script' | 'subject' | 'units'
+  | 'goods'
+  | 'buildingKind'
+  | 'makes'
+  | 'horses'
+  | 'horse'
+  | 'haul'
+  | 'script'
+  | 'subject'
+  | 'units'
+  | 'condition'
 
 export type PlanStepId =
   | 'walk'
@@ -60,12 +75,17 @@ export type PlanStepId =
   | 'teach'
   | 'train'
   | 'haul'
+  | 'haulBoat'
   | 'drive'
   | 'road'
   | 'wall'
   | 'mount'
   | 'dismount'
   | 'board'
+  | 'boardBoat'
+  | 'boardCrew'
+  | 'row'
+  | 'sail'
   | 'getOff'
   | 'unhitch'
   | 'hitch'
@@ -73,6 +93,8 @@ export type PlanStepId =
   | 'feed'
   | 'explore'
   | 'runScript'
+  | 'waitUntil'
+  | 'if'
 
 /** One kind of step Add step offers. */
 export interface PlanKind {
@@ -101,6 +123,38 @@ export const PLAN_STEPS: readonly PlanKind[] = [
     id: 'board',
     label: 'Board a carriage',
     picks: [{ pick: 'carriage', prompt: 'the carriage to board' }],
+  },
+  {
+    id: 'boardBoat',
+    label: 'Board a boat',
+    picks: [
+      { pick: 'vessel', prompt: 'the boat to board' },
+      { pick: 'shore', prompt: 'the shore to board it from, beside where the boat will be' },
+    ],
+  },
+  {
+    id: 'boardCrew',
+    label: 'Board a ship as crew',
+    picks: [
+      { pick: 'vessel', prompt: 'the ship to crew' },
+      { pick: 'shore', prompt: 'the tile of the haven it is docked at to board it from' },
+    ],
+  },
+  {
+    id: 'row',
+    label: 'Row the boat',
+    picks: [
+      { pick: 'vessel', prompt: 'the boat to row' },
+      { pick: 'tile', prompt: 'where to row it: water, or the shore to land at' },
+    ],
+  },
+  {
+    id: 'sail',
+    label: 'Sail the ship',
+    picks: [
+      { pick: 'vessel', prompt: 'the ship to sail' },
+      { pick: 'tile', prompt: 'where to sail it: the Sea, or a haven to dock at' },
+    ],
   },
   { id: 'getOff', label: 'Get off', picks: [] },
   {
@@ -167,12 +221,12 @@ export const PLAN_STEPS: readonly PlanKind[] = [
   {
     id: 'store',
     label: 'Store what they carry',
-    picks: [{ pick: 'storage', prompt: 'the storage, stable or carriage to store at' }],
+    picks: [{ pick: 'storage', prompt: 'the storage, stable, carriage or boat to store at' }],
   },
   {
     id: 'fetch',
     label: 'Fetch',
-    picks: [{ pick: 'storage', prompt: 'the storage, stable or carriage to fetch from' }],
+    picks: [{ pick: 'storage', prompt: 'the storage, stable, carriage or boat to fetch from' }],
     ask: 'goods',
   },
   {
@@ -203,12 +257,35 @@ export const PLAN_STEPS: readonly PlanKind[] = [
     ask: 'haul',
   },
   {
+    // `CONTEXT.md`: Haul route by water: it starts on the shore beside the boat, a ship's on the
+    // haven it is docked at, and a ship's stops are havens.
+    id: 'haulBoat',
+    label: 'Haul route by boat or ship',
+    picks: [
+      { pick: 'vessel', prompt: 'the boat or ship to haul with' },
+      {
+        pick: 'shore',
+        prompt:
+          'the first stop: the shore or haven beside where the boat will be (a ship: a haven)',
+      },
+      {
+        pick: 'tile',
+        prompt: 'the other stop: a shore tile or haven with water beside it (a ship: a haven)',
+      },
+    ],
+    ask: 'haul',
+  },
+  {
     id: 'relocate',
     label: 'Relocate',
     picks: [{ pick: 'city', prompt: 'the city of yours to relocate to' }],
   },
   { id: 'explore', label: 'Explore', picks: [] },
   { id: 'runScript', label: 'Run script', picks: [], ask: 'script' },
+  // Flow: its condition is set on the card, a place it asks about picked on the map (`nextPick`).
+  { id: 'waitUntil', label: 'Wait until', picks: [], ask: 'condition' },
+  // Flow: an If block around the picked steps (`Plan.wrap`), or a block's condition (`blockId`).
+  { id: 'if', label: 'If', picks: [], ask: 'condition' },
 ]
 
 /** The task a kind of step gives, whose Customise (`CONTEXT.md`: Before it starts) it offers. */
@@ -222,6 +299,7 @@ export const PLAN_TASKS: Partial<Readonly<Record<PlanStepId, Task>>> = {
   breed: 'breed',
   train: 'train',
   haul: 'haul',
+  haulBoat: 'haul',
   explore: 'explore',
 }
 
@@ -245,13 +323,46 @@ export interface Picked {
 export interface Plan {
   kind: PlanStepId
   picked: Picked[]
+  /** The step or block it goes after, set by the planner's insert point; at the end without. */
+  after?: number
   /** Why the last tap picked nothing, said under the banner. */
   error?: string
+  /** A Wait until's condition as the card's editor holds it, kept while the map picks a place. */
+  condition?: ConditionDraft
+  /** Whether the map is picking the place a Wait until's condition asks about. */
+  placing?: boolean
+  /** For an If: the steps and blocks it wraps, by id, as picked when it was started. */
+  wrap?: number[]
+  /** For an If: the block whose condition changes, rather than a new one. */
+  blockId?: number
+  /**
+   * With `blockId`: the block is a repeat block, and the condition set is what it repeats until
+   * (`CONTEXT.md`: Repeat block).
+   */
+  until?: boolean
 }
+
+/** The pick of the place a condition asks about (`CONTEXT.md`: Condition). */
+const PLACE_PICK = {
+  pick: 'place',
+  prompt: 'the storage, workplace or site of yours to ask about',
+} as const
 
 /** The next place the plan picks on the map, if it still needs one. */
 export function nextPick(plan: Plan): PlanKind['picks'][number] | undefined {
+  // A Wait until picks a place only when its editor asks for one.
+  if (plan.kind === 'waitUntil' || plan.kind === 'if') return plan.placing ? PLACE_PICK : undefined
   return planKind(plan.kind).picks[plan.picked.length]
+}
+
+/**
+ * The plan with its condition's draft kept and the map set to pick the place it asks about:
+ * picked, the card's editor shows again with it.
+ */
+export function pickPlace(plan: Plan, condition: ConditionDraft): Plan {
+  const kept = { ...plan, condition, placing: true, picked: [] }
+  delete kept.error
+  return kept
 }
 
 /** What the card asks for once every place is picked; undefined when the step needs nothing. */
@@ -276,6 +387,10 @@ export interface PlanWorld {
   /** The buildings the Player remembers out of sight (`CONTEXT.md`: Last seen). */
   lastSeen: readonly Building[]
   carriages: readonly Pick<Carriage, 'id' | 'x' | 'y' | 'realmId'>[]
+  /** The vessels in sight, to board, row or load the realm's (`CONTEXT.md`: Beside a vessel). */
+  vessels?: readonly Pick<SeenVessel, 'id' | 'x' | 'y' | 'realmId'>[]
+  /** Whether a tile is known to be water, where nobody stands to board (`CONTEXT.md`: Water). */
+  water?: (x: number, y: number) => boolean
   horses: readonly Pick<SeenHorse, 'id' | 'x' | 'y' | 'realmId'>[]
   cities: readonly Pick<City, 'id' | 'realmId'>[]
   realmId: string
@@ -305,15 +420,18 @@ export function planPickAt(
   const ownCarriage = w.carriages.find(
     (k) => k.x === at.x && k.y === at.y && k.realmId === w.realmId,
   )
+  const ownBoat = w.vessels?.find((v) => v.x === at.x && v.y === at.y && v.realmId === w.realmId)
   const named = (b: Building): Picked => ({ ...tile, id: b.id, building: b.kind })
   switch (pick) {
     case 'tile':
       return building?.site ? { ...tile, building: building.kind } : tile
     case 'spot': {
+      // Loading a boat is Store and Fetch, which walk beside it themselves.
+      if (ownBoat) return 'a boat: Store or Fetch to load it'
       if (ownCarriage) return { ...tile, spot: { kind: 'carriage', carriageId: ownCarriage.id } }
       if (!building) return { ...tile, spot: { kind: 'ground' } }
       if (building.site) return { ...tile, spot: { kind: 'site', siteId: building.id } }
-      if (['storage', 'stable'].includes(building.kind))
+      if (['storage', 'stable', 'haven'].includes(building.kind))
         return { ...tile, spot: { kind: 'storage', storageId: building.id } }
       return { ...tile, spot: { kind: 'ground' } }
     }
@@ -336,12 +454,20 @@ export function planPickAt(
       return b ? named(b) : 'no finished training ground there'
     }
     case 'storage': {
-      const b = here.find((x) => ['storage', 'stable'].includes(x.kind) && !x.site)
+      const b = here.find((x) => ['storage', 'stable', 'haven'].includes(x.kind) && !x.site)
       if (b) return named(b)
-      return ownCarriage ? { ...tile, id: ownCarriage.id } : 'no storage, stable or carriage there'
+      if (ownBoat) return { ...tile, id: ownBoat.id }
+      return ownCarriage
+        ? { ...tile, id: ownCarriage.id }
+        : 'no storage, stable, haven, carriage or boat there'
     }
     case 'carriage':
       return ownCarriage ? { ...tile, id: ownCarriage.id } : 'no carriage of yours there'
+    case 'vessel':
+      return ownBoat ? { ...tile, id: ownBoat.id } : 'no boat of yours there'
+    case 'shore':
+      // Whether the boat is beside it then is checked when the step's turn comes.
+      return w.water?.(at.x, at.y) ? 'that is water: pick the shore beside the boat' : tile
     case 'horse': {
       const h = w.horses.find((x) => x.x === at.x && x.y === at.y && x.realmId === w.realmId)
       return h ? { ...tile, id: h.id } : 'no horse of yours there'
@@ -358,8 +484,19 @@ export function planPickAt(
       const r = w.toFeed?.find((x) => x.x === at.x && x.y === at.y)
       return r ? { ...tile, id: r.id } : 'nobody to feed there'
     }
+    case 'place': {
+      // What a condition asks about: a storage, workplace or site of the realm's own
+      // (`CONTEXT.md`: Condition), never another realm's.
+      const b = here.find(
+        (x) => own(x) && (x.site || STOCKED.includes(x.kind) || MAX_WORKERS[x.kind] !== undefined),
+      )
+      return b ? named(b) : 'no storage, workplace or site of yours there'
+    }
   }
 }
+
+/** The kinds of building that keep a stock: what a condition calls a storage (as the server). */
+const STOCKED: readonly BuildingKind[] = ['storage', 'warehouse', 'stable', 'haven']
 
 /** A city of the realm as Add step lists it to pick (Relocate): its town hall's tile, if known. */
 export interface PlanCity {
@@ -394,7 +531,7 @@ export function planCities(seen: RelocateWorld, realmId: string): PlanCity[] {
  */
 export function pickCity(plan: Plan, city: Pick<PlanCity, 'id' | 'x' | 'y'>): Plan {
   if (nextPick(plan)?.pick !== 'city') return plan
-  return { kind: plan.kind, picked: [...plan.picked, { x: city.x, y: city.y, id: city.id }] }
+  return { ...plan, picked: [...plan.picked, { x: city.x, y: city.y, id: city.id }] }
 }
 
 /** The plan with a tap on the map picked into it, or why the tap picked nothing. */
@@ -403,7 +540,14 @@ export function pickInto(w: PlanWorld, plan: Plan, at: { x: number; y: number })
   if (!next) return plan
   const picked = planPickAt(w, next.pick, at)
   if (typeof picked === 'string') return { ...plan, error: picked }
-  return { kind: plan.kind, picked: [...plan.picked, picked] }
+  const kept = { ...plan }
+  delete kept.error
+  // The place a condition asks about goes into its draft, and the editor shows again.
+  if (next.pick === 'place') {
+    delete kept.placing
+    return { ...kept, condition: { ...(plan.condition ?? NEW_DRAFT), placeId: picked.id! } }
+  }
+  return { ...kept, picked: [...plan.picked, picked] }
 }
 
 /** What the card's ask answered: goods with units, a kind to build, two horses, and so on. */
@@ -417,6 +561,7 @@ export type PlanAnswer =
   | { ask: 'script'; scriptId: number }
   | { ask: 'subject'; subject: TrainingSubject }
   | { ask: 'units'; units: number }
+  | { ask: 'condition'; condition: Condition }
 
 /** Where a step acts, for the walk put before it (`appendRequest`'s `at`). */
 type At = { x: number; y: number }
@@ -447,6 +592,18 @@ export function planOrder(
       return { order: { kind: 'dismount' } }
     case 'board':
       return { order: { kind: 'board', carriageId: p.id }, at }
+    case 'boardBoat':
+      // From beside it: a walk to the shore picked goes first (`CONTEXT.md`: Beside a vessel).
+      return { order: { kind: 'board', vesselId: p.id }, at: { x: q.x, y: q.y } }
+    case 'boardCrew':
+      // From its haven: a walk there goes first (`CONTEXT.md`: Docked, Crew).
+      return { order: { kind: 'board', vesselId: p.id, asCrew: true }, at: { x: q.x, y: q.y } }
+    case 'row':
+      // Aboard or beside it already, as a step before saw to (`CONTEXT.md`: Rowing).
+      return { order: { kind: 'row', vesselId: p.id, x: q.x, y: q.y } }
+    case 'sail':
+      // Aboard it as one of its crew already, as a step before saw to (`CONTEXT.md`: Sailing).
+      return { order: { kind: 'sail', vesselId: p.id, x: q.x, y: q.y } }
     case 'getOff':
       return { order: { kind: 'getOff' } }
     case 'explore':
@@ -500,6 +657,13 @@ export function planOrder(
       const order = { kind: 'task', task: 'haul', carriageId: p.id, x: q.x, y: q.y, ...setup }
       return { order, at }
     }
+    case 'haulBoat': {
+      // A walk to the first stop goes first; the boat is given as the Haul task's carriage.
+      const setup = a?.ask === 'haul' ? a.setup : {}
+      const to = plan.picked[2] as Picked
+      const order = { kind: 'task', task: 'haul', carriageId: p.id, x: to.x, y: to.y, ...setup }
+      return { order, at: { x: q.x, y: q.y } }
+    }
     case 'relocate':
       return { order: { kind: 'relocate', cityId: p.id } }
     case 'feed': {
@@ -509,6 +673,14 @@ export function planOrder(
     }
     case 'runScript':
       return { order: { kind: 'runScript', scriptId: a?.ask === 'script' ? a.scriptId : null } }
+    case 'waitUntil':
+      // They stand idle where they are until it holds (`CONTEXT.md`: Wait until).
+      return {
+        order: { kind: 'waitUntil', condition: a?.ask === 'condition' ? a.condition : null },
+      }
+    case 'if':
+      // No step: the planner puts the block in (`PlannerFlow.ifDone`).
+      return undefined
   }
 }
 

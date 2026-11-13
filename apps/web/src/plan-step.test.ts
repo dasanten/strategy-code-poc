@@ -1,7 +1,7 @@
 import { GOODS } from './shared/world.js'
-import { QUEUE_STEP_KINDS, queueStepsProblem, stepLine } from './shared/queue.js'
+import { QUEUE_STEP_KINDS, queueSteps, queueStepsProblem, stepLine } from './shared/queue.js'
 import { freeHousing } from './shared/city.js'
-import type { Building, Queue, QueueStepRequest } from '@csp/shared-types'
+import type { Building, Condition, Queue, QueueStepRequest } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import {
   PLAN_STEPS,
@@ -10,6 +10,7 @@ import {
   nextPick,
   pickCity,
   pickInto,
+  pickPlace,
   planAsk,
   planCities,
   planHorses,
@@ -20,7 +21,8 @@ import {
   type PlanAsk,
   type PlanWorld,
 } from './plan-step.js'
-import { appendRequest, type Queued } from './queue-view.js'
+import { appendRequest, stepLabel, type Queued } from './queue-view.js'
+import { NEW_DRAFT, conditionLabel, conditionOf } from './condition-view.js'
 
 /** Add step (`CONTEXT.md`: Queue, Planning ahead): steps planned on other tiles. */
 
@@ -68,7 +70,7 @@ function planned(kind: Plan['kind'], ...taps: [number, number][]): Plan {
 function kept(steps: QueueStepRequest[]): Queue {
   return {
     realmId: 'r1',
-    steps: steps.map((s, i) => ({
+    items: steps.map((s, i) => ({
       ...s,
       id: s.id ?? i + 1,
     })),
@@ -78,6 +80,9 @@ function kept(steps: QueueStepRequest[]): Queue {
     nextStepId: steps.length + 1,
   }
 }
+
+/** The kinds Add step plans as steps: an If is a block the planner puts in, not a step. */
+const STEP_KINDS = PLAN_STEPS.filter((k) => k.id !== 'if')
 
 describe('Add step', () => {
   it('offers every kind of step a queue holds', () => {
@@ -91,9 +96,10 @@ describe('Add step', () => {
       script: { ask: 'script', scriptId: 1 },
       subject: { ask: 'subject', subject: 'strength' },
       units: { ask: 'units', units: 2 },
+      condition: { ask: 'condition', condition: { kind: 'mounted', is: true } },
     }
     const kinds = new Set(
-      PLAN_STEPS.map((k) => {
+      STEP_KINDS.map((k) => {
         const picked = k.picks.map(() => ({
           x: 0,
           y: 0,
@@ -120,8 +126,9 @@ describe('Add step', () => {
       script: { ask: 'script', scriptId: 1 },
       subject: { ask: 'subject', subject: 'strength' },
       units: { ask: 'units', units: 2 },
+      condition: { ask: 'condition', condition: { kind: 'mounted', is: true } },
     }
-    for (const k of PLAN_STEPS) {
+    for (const k of STEP_KINDS) {
       const picked = k.picks.map(() => ({ x: 0, y: 0, id: 'x', spot: { kind: 'ground' as const } }))
       const plan: Plan = { kind: k.id, picked }
       const ask = planAsk(plan)
@@ -179,13 +186,13 @@ describe('Add step', () => {
       const request = appendRequest(r, order, at)!
       r = { ...r, queue: kept(request.steps as QueueStepRequest[]) }
     }
-    expect(r.queue!.steps.map((s) => s.order)).toEqual([
+    expect(queueSteps(r.queue!.items).map((s) => s.order)).toEqual([
       { kind: 'walkTo', x: 20, y: 20 },
       { kind: 'task', task: 'work', workplaceId: 'f1' },
       { kind: 'store', goods: [...GOODS], to: 's1' },
     ])
     // The work gets a duration once a step follows it.
-    expect(r.queue!.steps[1]!.minutes).toBeGreaterThan(0)
+    expect(queueSteps(r.queue!.items)[1]!.minutes).toBeGreaterThan(0)
   })
 
   it('picks only what could make sense, and says why not', () => {
@@ -260,6 +267,75 @@ describe('Add step', () => {
       { order: { kind: 'walkTo', x: 30, y: 4 } },
       { order: { kind: 'mount', horseId: 'h1' } },
     ])
+  })
+
+  it('crews a ship from the tile of its haven picked (`CONTEXT.md`: Crew)', () => {
+    const sea: PlanWorld = {
+      ...w,
+      vessels: [{ id: 'ship1', x: 10, y: 10, realmId: 'r1' }],
+      water: (x) => x >= 10,
+    }
+    const plan = (...taps: [number, number][]) =>
+      taps.reduce<Plan>((p, [x, y]) => pickInto(sea, p, { x, y }), {
+        kind: 'boardCrew',
+        picked: [],
+      })
+    expect(planOrder(plan([10, 10], [8, 10]))).toEqual({
+      order: { kind: 'board', vesselId: 'ship1', asCrew: true },
+      at: { x: 8, y: 10 },
+    })
+    // Then sailing it to a tile, from aboard: no walk (`CONTEXT.md`: Sailing).
+    const sail = [
+      [10, 10],
+      [14, 3],
+    ].reduce<Plan>((p, [x, y]) => pickInto(sea, p, { x: x!, y: y! }), { kind: 'sail', picked: [] })
+    expect(planOrder(sail)).toEqual({ order: { kind: 'sail', vesselId: 'ship1', x: 14, y: 3 } })
+  })
+
+  it('boards a boat from the shore picked, rows it, gets off and loads it (`CONTEXT.md`: Beside a vessel)', () => {
+    // A lake over x 10..14, y 8..12, with the realm's boat v1 at (10, 10) and r2's v2 at (12, 10).
+    const lake: PlanWorld = {
+      ...w,
+      vessels: [
+        { id: 'v1', x: 10, y: 10, realmId: 'r1' },
+        { id: 'v2', x: 12, y: 10, realmId: 'r2' },
+      ],
+      water: (x, y) => x >= 10 && x <= 14 && y >= 8 && y <= 12,
+    }
+    const plan = (kind: Plan['kind'], ...taps: [number, number][]) =>
+      taps.reduce<Plan>((p, [x, y]) => pickInto(lake, p, { x, y }), { kind, picked: [] })
+    // Only the realm's boat, and a shore tile to board from, are picked.
+    expect(plan('boardBoat', [12, 10]).error).toBe('no boat of yours there')
+    expect(plan('boardBoat', [10, 10], [11, 10]).error).toBe(
+      'that is water: pick the shore beside the boat',
+    )
+    // Boarding goes after a walk to the shore picked; rowing and getting off need no walk.
+    const board = planOrder(plan('boardBoat', [10, 10], [9, 10]))!
+    expect(board).toEqual({ order: { kind: 'board', vesselId: 'v1' }, at: { x: 9, y: 10 } })
+    const row = planOrder(plan('row', [10, 10], [15, 10]))!
+    expect(row).toEqual({ order: { kind: 'row', vesselId: 'v1', x: 15, y: 10 } })
+    let request = appendRequest(inCity, board.order, board.at)!
+    const queued = { ...inCity, queue: kept(request.steps as QueueStepRequest[]) }
+    request = appendRequest(queued, row.order, row.at)!
+    expect(request.steps).toEqual([
+      { id: 1, order: { kind: 'walkTo', x: 9, y: 10 } },
+      { id: 2, order: { kind: 'board', vesselId: 'v1' } },
+      { order: { kind: 'row', vesselId: 'v1', x: 15, y: 10 } },
+    ])
+    // Store and Fetch load and unload it from beside it, walking there themselves.
+    expect(planOrder(plan('store', [10, 10]))).toEqual({
+      order: { kind: 'store', goods: [...GOODS], to: 'v1' },
+    })
+    expect(plan('pickUp', [10, 10]).error).toBe('a boat: Store or Fetch to load it')
+    // A haul route by boat: the boat, the first stop (walked to first), then the other one, as
+    // the Haul task with the boat as its carriage (`CONTEXT.md`: Haul route by water).
+    const route = plan('haulBoat', [10, 10], [9, 10], [15, 10])
+    expect(planAsk(route)).toBe('haul')
+    const setup = { goods: ['wood' as const], returnGoods: [], keepFood: 2 }
+    expect(planOrder(route, { ask: 'haul', setup })).toEqual({
+      order: { kind: 'task', task: 'haul', carriageId: 'v1', x: 15, y: 10, ...setup },
+      at: { x: 9, y: 10 },
+    })
   })
 
   it('feeds someone Down picked on the map, after a walk to their tile (`CONTEXT.md`: Reviving)', () => {
@@ -384,5 +460,74 @@ describe('Add step', () => {
     expect(listed).toEqual([{ id: 'c4', name: 'Redbank', room, x: 50, y: 50 }])
     expect(room).toBeGreaterThan(0)
     expect(planOrder(pickCity({ kind: 'relocate', picked: [] }, listed[0]!))!.order).toEqual(order)
+  })
+})
+
+describe('Wait until', () => {
+  const wood = {
+    kind: 'stock',
+    placeId: 's1',
+    good: 'wood',
+    compare: 'atLeast',
+    amount: 20,
+  } as const
+
+  it('asks for its condition on the card, picking the place it asks about on the map', () => {
+    const fresh: Plan = { kind: 'waitUntil', picked: [] }
+    expect(nextPick(fresh)).toBeUndefined()
+    expect(planAsk(fresh)).toBe('condition')
+    const draft = { ...NEW_DRAFT, amount: 20 }
+    const placing = pickPlace(fresh, draft)
+    expect(nextPick(placing)?.pick).toBe('place')
+    // Another realm's storage, or a house, is nothing to ask about.
+    expect(pickInto(w, placing, { x: 40, y: 40 })).toMatchObject({
+      error: 'no storage, workplace or site of yours there',
+    })
+    const picked = pickInto(w, placing, { x: 12, y: 6 })
+    expect(nextPick(picked)).toBeUndefined()
+    expect(planAsk(picked)).toBe('condition')
+    expect(picked.condition).toEqual({ ...draft, placeId: 's1' })
+    expect(conditionOf(picked.condition!)).toEqual(wood)
+    expect(planOrder(picked, { ask: 'condition', condition: wood })).toEqual({
+      order: { kind: 'waitUntil', condition: wood },
+    })
+    // A workplace of the realm's is one too.
+    expect(planPickAt(w, 'place', { x: 20, y: 20 })).toMatchObject({ id: 'f1' })
+  })
+
+  it('is checked as the server checks it', () => {
+    const step = (condition: unknown) => [{ order: { kind: 'waitUntil', condition } }]
+    expect(queueStepsProblem(step(wood))).toBeUndefined()
+    expect(queueStepsProblem([{ order: { kind: 'waitUntil' } }])).toBe('step 1: needs a condition')
+    expect(queueStepsProblem(step({ kind: 'weather' }))).toBe('step 1: that is no condition')
+    expect(queueStepsProblem(step({ ...wood, amount: 1.5 }))).toBe(
+      "step 1: a condition's amount is a whole number from 0",
+    )
+    expect(queueStepsProblem(step({ kind: 'hour', side: 'after', hour: 24 }))).toBe(
+      "step 1: a condition's hour is a whole number from 0 to 23",
+    )
+    expect(queueStepsProblem(step({ kind: 'need', need: 'health', side: 'above', share: 2 }))).toBe(
+      "step 1: a condition's share is from 0 to 1",
+    )
+    expect(queueStepsProblem([{ order: { kind: 'waitUntil', condition: wood, x: 1 } }])).toBe(
+      'step 1: a Wait until holds only its condition',
+    )
+  })
+
+  it('names its condition in the step', () => {
+    const names = { buildings: [storage], cities: [{ id: 'c1', name: 'Ashford' }] }
+    expect(stepLabel({ kind: 'waitUntil', condition: wood }, names)).toBe(
+      'Wait until the storage in Ashford holds at least 20 wood',
+    )
+    const label = (condition: Condition) => conditionLabel(condition)
+    expect(
+      label({ kind: 'carries', vehicle: true, good: 'stone', compare: 'lessThan', amount: 5 }),
+    ).toBe('their carriage or boat carries less than 5 stone')
+    expect(label({ kind: 'load', load: 'full' })).toBe('they are full')
+    expect(label({ kind: 'need', need: 'hunger', side: 'below', share: 0.3 })).toBe(
+      'their hunger meter is below 30%',
+    )
+    expect(label({ kind: 'mounted', is: false })).toBe('they are not mounted')
+    expect(label({ kind: 'hour', side: 'after', hour: 6 })).toBe('it is 06:00 or later')
   })
 })

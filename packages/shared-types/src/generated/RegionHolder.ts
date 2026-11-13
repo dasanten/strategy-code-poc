@@ -2,7 +2,6 @@
 import type { RegionAlliance } from "./RegionAlliance.js";
 
 /**
- * An Organization holding territory on the Region map (`RegionHolder`), with the tiles it holds
- * in what this update covers, as `y * size + x`.
+ * An Organization holding territory on the Region map (`RegionHolder`).
  */
-export type RegionHolder = { id: string, name: string, alliance: RegionAlliance | null, tiles: Array<number>, };
+export type RegionHolder = { id: string, name: string, alliance: RegionAlliance | null, };

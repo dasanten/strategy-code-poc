@@ -192,6 +192,7 @@ fn seen_is(e: &SeenEntity) -> &'static str {
         SeenEntity::Army(_) => "army",
         SeenEntity::Caravan(_) => "caravan",
         SeenEntity::Trader(_) => "trader",
+        SeenEntity::Vessel(_) => "vessel",
     }
 }
 
@@ -312,6 +313,7 @@ fn skill_name(s: SkillName) -> &'static str {
         SkillName::Farming => "farming",
         SkillName::Combat => "combat",
         SkillName::Driving => "driving",
+        SkillName::Seafaring => "seafaring",
     }
 }
 
@@ -925,6 +927,7 @@ impl<'a> ScriptBindings<'a> {
             "cities" => self.seen_of("city", |s, id| Some(s.occupation_seen(id))),
             "horses" => self.seen_of("horse", |_, _| None),
             "carriages" => self.seen_of("carriage", |_, _| None),
+            "vessels" => self.seen_of("vessel", |_, _| None),
             "traders" => self.seen_of("trader", |_, _| None),
             "piles" => self.seen_of("pile", |_, _| None),
             "nodes" => Json::Array(
@@ -1490,7 +1493,22 @@ impl<'a> ScriptBindings<'a> {
             "hitch" => {
                 self.request("hitch", vec![("carriageId", place(0)?), ("horseId", place(1)?)])
             }
-            "board" => self.request("board", vec![("carriageId", p(0)?)]),
+            "board" => {
+                let mut input = vec![("carriageId", p(0)?)];
+                if a(1).is_some_and(|v| !v.is_null()) {
+                    input.push(("asCrew", p(1)?));
+                }
+                self.request("board", input)
+            }
+            "loadShip" | "unloadShip" => {
+                let unload = Some(Json::Bool(name == "unloadShip"));
+                let input = vec![("vesselId", place(0)?), ("goods", p(1)?), ("unload", unload)];
+                self.request("load", input)
+            }
+            "row" => self.request("row", vec![("vesselId", place(0)?), ("x", p(1)?), ("y", p(2)?)]),
+            "sail" => {
+                self.request("sail", vec![("vesselId", place(0)?), ("x", p(1)?), ("y", p(2)?)])
+            }
             "getOff" => {
                 let given = a(0).filter(|v| !v.is_null()).or(a(1).filter(|v| !v.is_null()));
                 let input = if given.is_none() { vec![] } else { vec![("x", p(0)?), ("y", p(1)?)] };

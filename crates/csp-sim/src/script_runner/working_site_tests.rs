@@ -230,7 +230,7 @@ fn is_a_queue_step_they_walk_there_build_it_with_a_build_builder_then_work_it() 
     ] });
     assert_eq!(s.give(queue, "w1"), "ack");
     s.until(200, |s| kind_is(s, "w1", "build"));
-    assert_eq!(s.r("w1").queue.as_ref().map(|q| q.current), Some(1));
+    assert_eq!(s.r("w1").queue.as_ref().and_then(|q| q.current_index()), Some(1));
     assert_eq!(s.order("w1")["siteId"], "f1");
     // One fetcher at a time between the two scripts: the invariant runs every tick.
     s.until(6000, |s| !s.f1_is_site());

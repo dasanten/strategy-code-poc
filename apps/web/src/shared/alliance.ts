@@ -247,6 +247,7 @@ export function diplomacyFor(
     | 'joinRequests'
     | 'directives'
     | 'debts'
+    | 'tick'
   >,
   realmId: string,
   seenRealms: Iterable<string>,

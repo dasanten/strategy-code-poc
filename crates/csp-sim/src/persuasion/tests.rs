@@ -1,17 +1,20 @@
 //! `apps/server/src/persuasion.test.ts` and the respect queries of shared `persuasion.ts`, ported
 //! one to one. `diplomacyFor` (the Player's view of the asks) is T86.11's; the full invariant
-//! check after a city joins is T86.13's.
+//! check after a city joins is T86.13's. Respect by strength near the city is ADR 0033's (T96.1).
 
 use csp_shared::balance::{
-    PERSUADE_ASK_AGAIN_DAYS, PERSUADE_CHECK_TICKS, PERSUADE_STANDING, SIGHT_RANGE,
+    BLOW_BASE, COMBAT_SKILL_LIMIT, NPC_PLAN_TICKS, PERSUADE_ASK_AGAIN_DAYS, PERSUADE_CHECK_TICKS,
+    PERSUADE_STANDING, PROTECTION_DEFENCE, RESPECT_PER_WALL, SIGHT_RANGE, SKILL_MAX, WEAPON_ATTACK,
 };
 use csp_shared::time::TICKS_PER_GAME_DAY;
-use csp_shared::world::{
-    BuildingKind, ConstructionSite, Good, JoinRequest, RealmEventWhat, WorldState,
-};
+use csp_shared::world::{BuildingKind, Good, JoinRequest, RealmEventWhat, SkillName, WorldState};
 
 use super::*;
-use crate::queries::persuasion::{city_soldiers, persuaded_by, respect_seen_by};
+use crate::queries::city::for_sale;
+use crate::queries::persuasion::{
+    city_strength, fighter_strength, outweigh_hold_ticks, outweighed_by, persuaded_by,
+    respect_seen_by,
+};
 use crate::standing::{change_standing, step_standing};
 use crate::test_world::{add_city, building, empty_world, realm, resident};
 
@@ -68,10 +71,27 @@ fn n1(world: &WorldState) -> &csp_shared::world::City {
     world.cities.iter().find(|c| c.id == "n1").unwrap()
 }
 
-/// Steps persuasion at the next check and checks its invariant.
+/// As if every force near an NPC city had stood where it stands for `OUTWEIGH_HOLD_DAYS` already.
+fn stayed(world: &mut WorldState) {
+    let hold = outweigh_hold_ticks();
+    for ci in 0..world.cities.len() {
+        if !for_sale(&world.cities[ci]) {
+            continue;
+        }
+        let mut now = outweighed_now(world, &world.cities[ci], SIZE);
+        for o in &mut now {
+            o.since -= hold;
+            o.far_since = o.far_since.map(|f| f - hold);
+        }
+        world.cities[ci].outweighed = Some(now).filter(|v| !v.is_empty());
+    }
+}
+
+/// Steps persuasion at the next check, the forces near having stayed, and checks its invariant.
 fn check(world: &mut WorldState) {
     let every = PERSUADE_CHECK_TICKS as u64;
     world.tick = (world.tick + 1).div_ceil(every) * every;
+    stayed(world);
     step_persuasion(world, SIZE);
     assert!(join_requests_sound(world).is_empty());
 }
@@ -101,47 +121,113 @@ fn asks(world: &WorldState) -> Vec<&RealmEventWhat> {
         .collect()
 }
 
-#[test]
-fn respect_counts_the_armed_residents_and_walls_a_city_sees() {
-    let world = setup(2, 3);
-    assert_eq!(respect_seen_by(&world, n1(&world), "r1", SIZE), 5.0);
-    assert_eq!(respect_seen_by(&world, n1(&world), "r2", SIZE), 0.0);
+/// Gives the resident a shield, armour and full Combat skill.
+fn train_and_armour(world: &mut WorldState, i: usize) {
+    let r = &mut world.residents[i];
+    r.carried.insert(Good::Shield, 1.0);
+    r.carried.insert(Good::Armour, 1.0);
+    r.skills.insert(SkillName::Combat, SKILL_MAX.combat);
 }
 
 #[test]
-fn respect_leaves_out_unarmed_residents_construction_sites_and_what_is_out_of_sight() {
-    let mut world = setup(1, 1);
+fn a_fighter_counts_by_gear_and_training_as_combat_weighs_them() {
+    let mut world = setup(0, 0);
+    let p = citizen(&mut world, "p", Some("r1"), 45.0, 40.0, None);
+    assert_eq!(fighter_strength(&world.residents[p]), 0.0);
+    world.residents[p].carried.insert(Good::Spear, 1.0);
+    let spear = fighter_strength(&world.residents[p]);
+    assert_eq!(spear, BLOW_BASE + WEAPON_ATTACK.get("spear").unwrap());
+    world.residents[p].carried.insert(Good::Sword, 1.0);
+    let sword = fighter_strength(&world.residents[p]);
+    assert!(sword > spear);
+    train_and_armour(&mut world, p);
+    let trained = fighter_strength(&world.residents[p]);
+    let protection =
+        PROTECTION_DEFENCE.get("shield").unwrap() + PROTECTION_DEFENCE.get("armour").unwrap();
+    assert_eq!(trained, sword * (1.0 + COMBAT_SKILL_LIMIT) + protection);
+}
+
+#[test]
+fn respect_weighs_the_armed_residents_near_the_city_but_not_their_walls() {
+    let world = setup(2, 3);
+    let sword = fighter_strength(world.residents.iter().find(|r| r.id == "s0").unwrap());
+    assert_eq!(respect_seen_by(&world, n1(&world), "r1", SIZE), 2.0 * sword);
+    assert_eq!(respect_seen_by(&world, n1(&world), "r2", SIZE), 0.0);
+    // The sender's walls, however many, add nothing.
+    let walled = setup(0, 30);
+    assert_eq!(respect_seen_by(&walled, n1(&walled), "r1", SIZE), 0.0);
+}
+
+#[test]
+fn respect_leaves_out_unarmed_residents_and_what_is_out_of_sight_of_home() {
+    let mut world = setup(1, 0);
+    let one = respect_seen_by(&world, n1(&world), "r1", SIZE);
     citizen(&mut world, "unarmed", Some("r1"), 44.0, 40.0, Some("c1"));
-    let site = building(&mut world, "site", BuildingKind::Wall, Some("c1"), 37.0, 40.0);
-    world.buildings[site].site = Some(
-        serde_json::from_value::<ConstructionSite>(
-            serde_json::json!({ "delivered": {}, "work": 0 }),
-        )
-        .unwrap(),
-    );
     let far = citizen(&mut world, "far", Some("r1"), 42.0 + SIGHT_RANGE, 40.0, Some("c1"));
     world.residents[far].carried.insert(Good::Spear, 1.0);
-    assert_eq!(respect_seen_by(&world, n1(&world), "r1", SIZE), 2.0);
-    // A resident of the city who walks out sees further.
-    world.residents.iter_mut().find(|r| r.id == "n1b").unwrap().x = 45.0;
-    assert_eq!(respect_seen_by(&world, n1(&world), "r1", SIZE), 3.0);
+    assert_eq!(respect_seen_by(&world, n1(&world), "r1", SIZE), one);
+    // The city's scout, far from home, sees the far one; that counts for nothing.
+    world.residents.iter_mut().find(|r| r.id == "n1b").unwrap().x = 80.0;
+    assert_eq!(respect_seen_by(&world, n1(&world), "r1", SIZE), one);
 }
 
 #[test]
-fn respect_is_nothing_when_nobody_lives_in_the_city_to_see_it() {
+fn respect_is_nothing_when_nobody_of_the_city_is_at_home_to_see_it() {
     let mut world = setup(3, 0);
+    for r in world.residents.iter_mut().filter(|r| r.city_id.as_deref() == Some("n1")) {
+        r.x = 90.0;
+    }
+    assert_eq!(respect_seen_by(&world, n1(&world), "r1", SIZE), 0.0);
     world.residents.retain(|r| r.city_id.as_deref() != Some("n1"));
     assert_eq!(respect_seen_by(&world, n1(&world), "r1", SIZE), 0.0);
 }
 
 #[test]
-fn needs_high_standing_and_more_respect_than_the_city_has_soldiers() {
-    let mut world = setup(1, 0);
-    assert_eq!(city_soldiers(&world, n1(&world)), 1.0);
+fn residents_the_city_lent_never_count_as_the_hirers_fighters() {
+    let mut world = setup(0, 0);
+    let lent = citizen(&mut world, "lent", None, 45.0, 40.0, Some("n1"));
+    world.residents[lent].carried.insert(Good::Sword, 1.0);
+    let contract = serde_json::json!({
+        "id": "k1", "lenderId": "n1", "hirerId": "r1", "offeredBy": "lender",
+        "residentIds": ["lent"], "days": 7, "pricePerWeek": 5, "storageId": "n1-hall",
+        "startedAt": 0, "paidWeeks": 1,
+    });
+    world.contracts.push(serde_json::from_value(contract).unwrap());
+    assert_eq!(respect_seen_by(&world, n1(&world), "r1", SIZE), 0.0);
+    // Even were they the hirer's to command by owner, they are the city's own.
+    world.residents[lent].owner = Some("r1".into());
+    assert_eq!(respect_seen_by(&world, n1(&world), "r1", SIZE), 0.0);
+}
+
+#[test]
+fn the_citys_own_side_is_its_soldiers_by_strength_and_its_walls() {
+    let mut world = setup(0, 0);
+    let spear = fighter_strength(world.residents.iter().find(|r| r.id == "n1a").unwrap());
+    assert_eq!(city_strength(&world, n1(&world)), spear);
+    for i in 0..4 {
+        building(
+            &mut world,
+            &format!("nw{i}"),
+            BuildingKind::Wall,
+            Some("n1"),
+            44.0,
+            36.0 + i as f64,
+        );
+    }
+    building(&mut world, "ng", BuildingKind::Gate, Some("n1"), 44.0, 41.0);
+    assert_eq!(city_strength(&world, n1(&world)), spear + 5.0 * RESPECT_PER_WALL);
+}
+
+#[test]
+fn needs_high_standing_and_more_respect_than_the_citys_own_side() {
+    // One resident with a spear against the city's one with a spear: not more.
+    let mut world = setup(0, 0);
+    let s = citizen(&mut world, "s", Some("r1"), 46.0, 40.0, Some("c1"));
+    world.residents[s].carried.insert(Good::Spear, 1.0);
     change_standing(&mut world, "n1", "r1", PERSUADE_STANDING);
     assert!(!persuaded_by(&world, n1(&world), "r1", SIZE));
-    let s9 = citizen(&mut world, "s9", Some("r1"), 46.0, 40.0, Some("c1"));
-    world.residents[s9].carried.insert(Good::Spear, 1.0);
+    world.residents[s].carried.insert(Good::Shield, 1.0);
+    stayed(&mut world);
     assert!(persuaded_by(&world, n1(&world), "r1", SIZE));
     change_standing(&mut world, "n1", "r1", -1.0);
     assert!(!persuaded_by(&world, n1(&world), "r1", SIZE));
@@ -304,4 +390,58 @@ fn is_caught_by_its_invariant_when_an_ask_goes_wrong() {
     ] {
         assert!(messages.iter().any(|x| x == m), "{m} in {messages:?}");
     }
+}
+
+#[test]
+fn respect_is_caught_by_its_invariant_when_a_weight_goes_below_nothing() {
+    let mut world = setup(2, 0);
+    world.join_requests.push(JoinRequest {
+        city_id: "n1".into(),
+        realm_id: "r1".into(),
+        at: 0.0,
+        declined: false,
+    });
+    assert_eq!(respect_sound(&world, SIZE), vec![]);
+    let s0 = world.residents.iter_mut().find(|r| r.id == "s0").unwrap();
+    s0.skills.insert(SkillName::Combat, -100.0);
+    let found: Vec<_> = respect_sound(&world, SIZE).into_iter().map(|v| v.entity_ids).collect();
+    assert_eq!(found, vec![vec!["n1".to_string(), "r1".to_string()]]);
+}
+
+/// Steps NPC cities weighing who outweighs them and persuasion for `n` ticks, checking both
+/// invariants.
+fn ticks(world: &mut WorldState, n: u64) {
+    for _ in 0..n {
+        step_persuasion(world, SIZE);
+        step_outweighed(world, SIZE);
+        assert_eq!(outweighed_sound(world, SIZE), vec![]);
+        assert!(join_requests_sound(world).is_empty());
+        world.tick += 1;
+    }
+}
+
+#[test]
+fn asks_only_once_the_force_has_outweighed_it_for_the_hold_and_starts_again_after_a_break() {
+    let mut world = setup(2, 0);
+    change_standing(&mut world, "n1", "r1", 60.0);
+    let hold = outweigh_hold_ticks() as u64;
+    let pass = NPC_PLAN_TICKS as u64;
+    ticks(&mut world, hold / 2);
+    assert!(outweighed_by(n1(&world), "r1").is_some());
+    // Away for a planning pass: forgotten.
+    for r in world.residents.iter_mut().filter(|r| r.id.starts_with('s')) {
+        r.x += 60.0;
+    }
+    ticks(&mut world, pass);
+    assert!(outweighed_by(n1(&world), "r1").is_none());
+    for r in world.residents.iter_mut().filter(|r| r.id.starts_with('s')) {
+        r.x -= 60.0;
+    }
+    let back = world.tick;
+    ticks(&mut world, hold);
+    assert_eq!(world.join_requests, vec![], "not a full hold since it came back");
+    ticks(&mut world, pass + PERSUADE_CHECK_TICKS as u64);
+    assert_eq!(world.join_requests.len(), 1);
+    let asked = world.join_requests[0].at as u64;
+    assert!(asked >= back + hold);
 }

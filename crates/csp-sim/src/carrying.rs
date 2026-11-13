@@ -5,6 +5,7 @@
 use std::collections::HashSet;
 
 use csp_shared::balance::MAP_SIZE;
+use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{
     DropOrder, GoodsSpot, OrderRequest, PickUpOrder, ResidentOrder, Stock, WorldState,
 };
@@ -24,6 +25,7 @@ use crate::queries::goods::{
 };
 use crate::queries::guard::outpost_storage_guarded;
 use crate::queries::names::{good_of, held};
+use crate::queries::vessels::{beside_vessel, units_that_fit_vessel};
 use crate::storing::carried_for_order;
 
 /// Whether an action takes goods from a spot or puts carried goods there.
@@ -68,6 +70,7 @@ pub fn read_spot(spot: Option<&Value>) -> Option<GoodsSpot> {
         "carriage" => Some(GoodsSpot::Carriage { carriage_id: id("carriageId")? }),
         "storage" => Some(GoodsSpot::Storage { storage_id: id("storageId")? }),
         "site" => Some(GoodsSpot::Site { site_id: id("siteId")? }),
+        "vessel" => Some(GoodsSpot::Vessel { vessel_id: id("vesselId")? }),
         _ => None,
     }
 }
@@ -92,7 +95,7 @@ fn check(
     let r = &world.residents[ri];
     let Some(spot) = read_spot(o.get("spot")) else {
         return Err(
-            "the spot must be the ground, a storage, a construction site, a carriage or a Down resident"
+            "the spot must be the ground, a storage, a construction site, a carriage, a boat or a Down resident"
                 .into(),
         );
     };
@@ -114,6 +117,9 @@ fn check(
         }
         GoodsSpot::Carriage { .. } if goods_at_spot(world, r.x, r.y, &spot).is_none() => {
             return Err("that carriage is not on the resident’s tile".into());
+        }
+        GoodsSpot::Vessel { .. } if goods_at_spot(world, r.x, r.y, &spot).is_none() => {
+            return Err("that boat is not beside the resident".into());
         }
         GoodsSpot::Resident { resident_id }
             if down_index_on(world, r.x, r.y, resident_id).is_none() =>
@@ -239,6 +245,17 @@ struct Theft {
 /// take the same goods. A take or put of a pick-up or drop order ends it; a store or fetch order
 /// goes on or ends (`carried_for_order`). Thefts raise their alarms once all have carried.
 pub fn resolve_carrying(world: &mut WorldState, actions: &[CarryAction], size: i32) {
+    resolve_carrying_on(world, actions, size, None);
+}
+
+/// `resolve_carrying` with the map at hand, which the last materials put into a boat site need to
+/// float its boat (`finish_site`).
+pub fn resolve_carrying_on(
+    world: &mut WorldState,
+    actions: &[CarryAction],
+    size: i32,
+    terrain: Option<&TerrainMap>,
+) {
     let mut robbed = HashSet::new();
     let mut thefts = Vec::new();
     for a in actions {
@@ -247,7 +264,7 @@ pub fn resolve_carrying(world: &mut WorldState, actions: &[CarryAction], size: i
         };
         match a.kind {
             CarryKind::Take => take(world, ri, a, size, &mut robbed, &mut thefts),
-            CarryKind::Put => put(world, ri, a, size),
+            CarryKind::Put => put(world, ri, a, size, terrain),
         }
         let r = &mut world.residents[ri];
         if matches!(r.order, Some(ResidentOrder::PickUp(_) | ResidentOrder::Drop(_))) {
@@ -276,6 +293,11 @@ fn spot_holder(world: &mut WorldState, ri: usize, spot: &GoodsSpot) -> Option<Ho
             .iter()
             .position(|k| &k.id == carriage_id && k.x == x && k.y == y)
             .map(Holder::Carriage),
+        GoodsSpot::Vessel { vessel_id } => world
+            .vessels
+            .iter()
+            .position(|v| &v.id == vessel_id && beside_vessel(world, v, x, y))
+            .map(Holder::Vessel),
         GoodsSpot::Resident { resident_id } => {
             down_index_on(world, x, y, resident_id).map(Holder::Resident)
         }
@@ -398,13 +420,22 @@ fn spot_organization(world: &WorldState, spot: &GoodsSpot) -> Option<String> {
         GoodsSpot::Carriage { carriage_id } => {
             world.carriages.iter().find(|k| &k.id == carriage_id).and_then(carriage_organization)
         }
+        GoodsSpot::Vessel { vessel_id } => {
+            world.vessels.iter().find(|v| &v.id == vessel_id).and_then(|v| v.realm_id.clone())
+        }
         _ => None,
     }
 }
 
 /// Puts down goods (`put`). The last materials delivered to a site that has all its work finish
 /// it (`finish_site`).
-fn put(world: &mut WorldState, ri: usize, a: &CarryAction, size: i32) {
+fn put(
+    world: &mut WorldState,
+    ri: usize,
+    a: &CarryAction,
+    size: i32,
+    terrain: Option<&TerrainMap>,
+) {
     // On the ground the goods go in the tile's pile; a storage or site that is gone takes nothing,
     // nor does a Down resident: Food goes into their hands by feeding (`CONTEXT.md`: Reviving).
     if matches!(a.spot, GoodsSpot::Resident { .. }) {
@@ -425,6 +456,8 @@ fn put(world: &mut WorldState, ri: usize, a: &CarryAction, size: i32) {
     for (&good, &wanted) in &a.goods {
         let fits = match target {
             Some(Holder::Carriage(k)) => units_that_fit_carriage(world, &world.carriages[k], good),
+            // Passengers count against what a vessel holds (`CONTEXT.md`: Beside a vessel).
+            Some(Holder::Vessel(v)) => units_that_fit_vessel(world, &world.vessels[v], good),
             _ => f64::INFINITY,
         };
         let carried = held(&world.residents[ri].carried, good);
@@ -438,7 +471,7 @@ fn put(world: &mut WorldState, ri: usize, a: &CarryAction, size: i32) {
         drop_goods(world, x, y, &dropped, MAP_SIZE);
     }
     if let Some(Holder::Site(i)) = target {
-        if finish_site(world, i, ri) {
+        if finish_site(world, i, ri, terrain) {
             update_city_membership(world, size);
         }
     }

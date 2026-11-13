@@ -250,7 +250,7 @@ export class Motion {
 export function goingOf(order: ResidentOrder | null | undefined): Going | undefined {
   const o = order
   if (!o || !('path' in o) || !o.path || o.path.length === 0) return undefined
-  if (o.kind === 'haul' && o.phase !== 'driving') return undefined
+  if ((o.kind === 'haul' || o.kind === 'haulByWater') && o.phase !== 'driving') return undefined
   if ((isLineOrder(o) || o.kind === 'store' || o.kind === 'fetch') && o.phase !== 'walking') {
     return undefined
   }
@@ -260,14 +260,22 @@ export function goingOf(order: ResidentOrder | null | undefined): Going | undefi
 /**
  * The tokens of a state, each with the way it goes (`CONTEXT.md`: Motion on the map): a resident's
  * own, a carriage's and its passengers' its driver's, a hitched horse's its carriage's, a ridden
- * horse's its rider's. So riders and passengers move with their horse or carriage.
+ * horse's its rider's, a boat's and everyone's aboard it its rower's (`CONTEXT.md`: Rowing). So
+ * riders and passengers move with their horse, carriage or boat.
  */
-export function motionTokens(world: Pick<MapWorld, 'residents' | 'horses' | 'carriages'>): Token[] {
+export function motionTokens(
+  world: Pick<MapWorld, 'residents' | 'horses' | 'carriages' | 'vessels'>,
+): Token[] {
   const byCarriage = new Map<string, Going | undefined>()
   const byHorse = new Map<string, Going | undefined>()
   for (const r of world.residents) {
     const carriage = drivenCarriageId(r)
     if (carriage !== undefined) byCarriage.set(carriage, goingOf(r.order))
+    // A boat goes the way its rower rows (on a haul route too), a ship the way its captain sails
+    // (`CONTEXT.md`: Rowing, Haul route by water, Sailing).
+    if (r.order?.kind === 'row' || r.order?.kind === 'haulByWater' || r.order?.kind === 'sail') {
+      byCarriage.set(r.order.vesselId, goingOf(r.order))
+    }
     if (r.riding !== undefined) byHorse.set(r.riding, goingOf(r.order))
   }
   for (const k of world.carriages) {
@@ -281,6 +289,7 @@ export function motionTokens(world: Pick<MapWorld, 'residents' | 'horses' | 'car
     ),
     ...world.horses.map((h) => token(h.id, h.x, h.y, byHorse.get(h.id))),
     ...world.carriages.map((k) => token(k.id, k.x, k.y, byCarriage.get(k.id))),
+    ...(world.vessels ?? []).map((v) => token(v.id, v.x, v.y, byCarriage.get(v.id))),
   ]
 }
 

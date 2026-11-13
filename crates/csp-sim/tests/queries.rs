@@ -17,8 +17,9 @@ use csp_shared::protocol::SeenEntity;
 use csp_shared::time::TICKS_PER_GAME_YEAR;
 use csp_shared::world::{
     Building, BuildingKind, City, CityLayout, ConstructionSite, Good, Horse, HorseStats, Realm,
-    Resident, ResidentOrder, Standing, Stock, TradeOrgCity, WorldState,
+    Resident, Standing, Stock, TradeOrgCity, WorldState,
 };
+use csp_sim::npc_hire::{npc_lending_keeps_reserve, step_npc_hire, LentGear};
 use csp_sim::queries::building::recipe_for;
 use csp_sim::queries::city::{city_price, npc_city_refuses, sells_to, town_hall_of};
 use csp_sim::queries::horse_market::{
@@ -27,8 +28,8 @@ use csp_sim::queries::horse_market::{
 use csp_sim::queries::js_round;
 use csp_sim::queries::names::{good_name, held, ALL_GOODS, PRICED_GOODS};
 use csp_sim::queries::npc_trade::{
-    npc_city_prices, npc_horses_wanted, npc_reserve, npc_soldier_target, spare_residents,
-    NPC_SMITHY_WEAPON,
+    hire_spare, npc_city_prices, npc_hire_threat, npc_horses_wanted, npc_reserve,
+    npc_soldier_target, spare_residents, NPC_SMITHY_WEAPON,
 };
 use csp_sim::queries::residents::{can_work, is_armed};
 use csp_sim::queries::standing::standing_organization;
@@ -37,7 +38,7 @@ use csp_sim::queries::warehouse::{
 };
 use csp_sim::sight::entities_in_sight;
 use csp_sim::world_index::WorldIndex;
-use serde_json::json;
+use serde_json::{json, Value};
 
 const SIZE: i32 = 64;
 
@@ -352,26 +353,128 @@ mod npc_trade {
         assert!(!seen["trade"].as_array().unwrap().is_empty());
     }
 
+    /// Plans `jobs` for npc's residents, as its planning pass would (`city_plans`).
+    fn plan(world: &mut WorldState, jobs: Value) {
+        let plan = json!({ "plannedAt": 0, "jobs": jobs });
+        world.city_plans.insert("npc".into(), serde_json::from_value(plan).unwrap());
+    }
+
+    fn spare_ids(world: &WorldState, npc: &City) -> Vec<String> {
+        spare_residents(world, npc, None).iter().map(|r| r.id.clone()).collect()
+    }
+
     #[test]
-    fn lends_only_idle_adults_it_can_spare_keeping_its_farmers_and_a_share_at_home() {
+    fn lends_only_spare_hands_keeping_its_farmers_builders_and_a_share_at_home() {
         let (mut world, npc) = setup();
-        // n1 and n2 farm, n3 is a soldier (carries a spear), n4 to n6 are idle.
-        for id in ["n1", "n2"] {
-            at(&mut world, id).order = Some(
-                serde_json::from_value::<ResidentOrder>(json!({
-                    "kind": "workAt", "buildingId": "farm", "at": { "x": 25, "y": 20 }, "progress": 0
-                }))
-                .unwrap(),
-            );
-        }
+        // n1 farms, n2 builds its project, n3 is a soldier (carries a spear), n4 to n6 are idle,
+        // on a road crew and scouting.
+        plan(
+            &mut world,
+            json!({ "n1": { "kind": "farm", "buildingId": "farm" }, "n2": { "kind": "build" },
+                "n3": { "kind": "soldier" }, "n4": { "kind": "idle" }, "n5": { "kind": "road" },
+                "n6": { "kind": "scout" } }),
+        );
         at(&mut world, "n3").carried.insert(Good::Spear, 1.0);
-        // Six adults: two farm, a quarter (two) stay at home with the soldier among them.
-        let spare: Vec<String> =
-            spare_residents(&world, &npc, None).iter().map(|r| r.id.clone()).collect();
-        assert_eq!(spare, ["n4", "n5"]);
+        // Six adults: two kept busy, a quarter (two) stay at home with the soldier among them.
+        assert_eq!(spare_ids(&world, &npc), ["n4", "n5"]);
         resident(&mut world, "kid", None, 20.0, 21.0, Some("npc"));
         at(&mut world, "kid").born_at = 0.0;
         assert!(!spare_residents(&world, &npc, None).iter().any(|r| r.id == "kid"));
+    }
+
+    #[test]
+    fn lends_nobody_with_everyone_working_for_a_short_good_and_its_surplus_workers_once_it_isnt() {
+        let (mut world, npc) = setup();
+        let jobs: serde_json::Map<String, Value> = (1..=6)
+            .map(|i| (format!("n{i}"), json!({ "kind": "work", "buildingId": "farm" })))
+            .collect();
+        plan(&mut world, Value::Object(jobs));
+        assert_eq!(spare_ids(&world, &npc), Vec::<String>::new(), "Food is short");
+        storage(&mut world).stock = Some([(Good::Food, 10_000.0)].into_iter().collect());
+        // Working for surplus now: all but the quarter at home.
+        assert_eq!(spare_ids(&world, &npc), ["n1", "n2", "n3", "n4"]);
+    }
+
+    #[test]
+    fn lends_nobody_while_it_feels_threatened_by_the_hirer() {
+        let (mut world, npc) = setup();
+        plan(&mut world, json!({}));
+        assert!(npc_hire_threat(&world, &npc, "r1", SIZE).is_none());
+        assert!(hire_spare(&world, &npc, "r1", SIZE) > 0.0);
+        // Armed residents of the hirer near it.
+        at(&mut world, "p1").carried.insert(Good::Spear, 1.0);
+        assert!(npc_hire_threat(&world, &npc, "r1", SIZE).unwrap().contains("armed residents"));
+        assert_eq!(hire_spare(&world, &npc, "r1", SIZE), 0.0);
+        at(&mut world, "p1").carried = Stock::new();
+        // Its town hall occupied.
+        let mut occupied = world.clone();
+        occupied.cities.iter_mut().find(|c| c.id == "npc").unwrap().occupation =
+            Some(serde_json::from_value(json!({ "realmId": "r2", "since": 0 })).unwrap());
+        let city = occupied.cities.iter().find(|c| c.id == "npc").unwrap().clone();
+        assert!(npc_hire_threat(&occupied, &city, "r1", SIZE).unwrap().contains("occupied"));
+        // Weighing a demand.
+        world.demands.push(
+            serde_json::from_value(json!({ "id": "d1", "fromId": "r9", "toId": "npc",
+                "terms": { "kind": "city", "cityId": "npc", "cityName": "Dunmere" },
+                "note": "Yield.", "sentAt": 0, "deadline": 9000 }))
+            .unwrap(),
+        );
+        assert!(npc_hire_threat(&world, &npc, "r1", SIZE).unwrap().contains("demand"));
+        assert_eq!(hire_spare(&world, &npc, "r1", SIZE), 0.0);
+    }
+
+    /// r1 asks npc for n4, idle, at a good price.
+    fn ask_for_n4(world: &mut WorldState) {
+        plan(world, json!({ "n4": { "kind": "idle" } }));
+        let contract = json!({ "id": "k1", "lenderId": "npc", "hirerId": "r1",
+            "offeredBy": "hirer", "residentIds": ["n4"], "days": 7, "pricePerWeek": 100,
+            "storageId": "store", "startedAt": null, "paidWeeks": 0 });
+        world.contracts.push(serde_json::from_value(contract).unwrap());
+    }
+
+    #[test]
+    fn arms_lent_residents_only_from_weapons_and_armour_above_its_reserve() {
+        let (mut world, npc) = setup();
+        let reserve = npc_reserve(&world, &npc);
+        let kept = held(&reserve, NPC_SMITHY_WEAPON);
+        let stock: Stock =
+            [(NPC_SMITHY_WEAPON, kept), (Good::Food, 10_000.0)].into_iter().collect();
+        storage(&mut world).stock = Some(stock);
+        ask_for_n4(&mut world);
+        let took = step_npc_hire(&mut world, SIZE);
+        assert!(world.contracts[0].started_at.is_some(), "lent");
+        assert!(!is_armed(&at(&mut world, "n4").carried), "nothing spare: unarmed");
+        assert_eq!(held(storage(&mut world).stock.as_ref().unwrap(), NPC_SMITHY_WEAPON), kept);
+        assert_eq!(took, vec![]);
+
+        let (mut world, npc) = setup();
+        let reserve = npc_reserve(&world, &npc);
+        let kept = held(&reserve, NPC_SMITHY_WEAPON);
+        let stock: Stock =
+            [(NPC_SMITHY_WEAPON, kept + 1.0), (Good::Shield, 1.0), (Good::Food, 10_000.0)]
+                .into_iter()
+                .collect();
+        storage(&mut world).stock = Some(stock);
+        ask_for_n4(&mut world);
+        let took = step_npc_hire(&mut world, SIZE);
+        assert!(is_armed(&at(&mut world, "n4").carried), "one spare weapon");
+        assert!(held(storage(&mut world).stock.as_ref().unwrap(), NPC_SMITHY_WEAPON) >= kept);
+        assert_eq!(took.len(), 1 + usize::from(held(&reserve, Good::Shield) < 1.0));
+        assert_eq!(npc_lending_keeps_reserve(&took), vec![]);
+        let _ = npc;
+    }
+
+    #[test]
+    fn lending_under_the_reserve_is_caught_by_its_invariant() {
+        let gear = LentGear {
+            contract_id: "k1".into(),
+            city_id: "npc".into(),
+            resident_id: "n4".into(),
+            good: Good::Spear,
+            left: 1.0,
+            reserve: 2.0,
+        };
+        assert_eq!(npc_lending_keeps_reserve(&[gear])[0].invariant, "npc-lending-keeps-reserve");
     }
 }
 

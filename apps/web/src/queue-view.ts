@@ -1,18 +1,22 @@
 import { useEffect, useRef } from 'react'
 import { CHILD_GOODS } from './shared/narrowed.js'
 import { GOODS } from './shared/world.js'
-import { QUEUE_DEFAULT_STEP_MINUTES } from '@csp/balance'
-import { QUEUE_STEP_KINDS, neverEnds, stepLine } from './shared/queue.js'
+import { QUEUE_STEP_KINDS, neverEnds, queueSteps, stepLine } from './shared/queue.js'
 import { TICKS_PER_GAME_HOUR } from './shared/time.js'
 import { canWork } from './shared/stats.js'
+import { isVesselId } from './shared/vessels.js'
+import { covers } from './shared/footprint.js'
 import type {
   Building,
+  Branch,
   BuildingKind,
   City,
+  Condition,
   Waypoint,
   Good,
   OrderRequest,
   Queue,
+  QueueItem,
   QueueStep,
   QueueStepRequest,
   Resident,
@@ -22,8 +26,21 @@ import type {
 import { BUILDING_NAMES } from './city-view.js'
 import { GOOD_LABELS, subjectLabel } from './Residents.js'
 import { gonePlace } from './saved-queues.js'
-import { timedItems, unroll, withIds, type PlanItem } from './plan-blocks.js'
+import {
+  find,
+  insertItems,
+  isBlock,
+  isIf,
+  mapParts,
+  planSteps,
+  timedItems,
+  withIds,
+  type Block,
+  type PlanItem,
+} from './plan-blocks.js'
 import { realTimeOf } from './wiki-view.js'
+import { conditionLabel } from './condition-view.js'
+import { conditionProblem } from './shared/condition.js'
 
 /**
  * Queues on the resident card (`CONTEXT.md`: Queue): holding Shift while giving an order appends
@@ -67,8 +84,8 @@ export function appendRequest(
   at: Tile = { x: r.x, y: r.y },
 ): OrderRequest | undefined {
   if (!QUEUE_STEP_KINDS.includes(order.kind)) return undefined
-  const before: QueueStepRequest[] = r.queue
-    ? stepsOf(r.queue)
+  const before: PlanItem[] = r.queue
+    ? itemsOf(r.queue)
     : r.order?.kind === 'walkTo' && !r.script
       ? [{ order: { kind: 'walkTo', ...r.order.target } }]
       : []
@@ -79,11 +96,11 @@ export function appendRequest(
 }
 
 /**
- * The steps with `order` added last, after a walk to `at` when it acts on its tile and the step
- * before doesn't already walk there; a step that never ends gets a duration once another follows.
+ * The items with `order` added last, after a walk to `at` when it acts on its tile and the last
+ * step doesn't already walk there; a step that never ends gets a duration once another follows.
  */
-function withStep(before: QueueStepRequest[], order: OrderRequest, at: Tile | undefined) {
-  return timed([...before, ...stepsAfter(before.at(-1), order, at)])
+function withStep(before: PlanItem[], order: OrderRequest, at: Tile | undefined) {
+  return timedItems([...before, ...stepsAfter(planSteps(before).at(-1), order, at)])
 }
 
 /**
@@ -137,8 +154,8 @@ export function appendToEach(
 
 /**
  * A queue planned in this browser until it is given: on the group card (`CONTEXT.md`: Group,
- * Planning for a group), or on a resident's card once a step is wrapped in a repeat block
- * (`CONTEXT.md`: Repeat block). Its items are steps and repeat blocks with ids of the plan's own,
+ * Planning for a group), or on a resident's card as a draft until Start queue (`CONTEXT.md`:
+ * Queue draft). Its items are steps and repeat blocks with ids of the plan's own,
  * and those of a resident's queue it was planned from.
  */
 export interface QueuePlan {
@@ -161,28 +178,77 @@ export function editPlan(plan: QueuePlan, items: readonly PlanItem[], loop?: boo
 }
 
 /**
- * The plan with a step planned with Add step added last, after a walk to `at` when it acts on
- * that tile, as a resident's own queue gets it (`appendRequest`).
+ * The plan with a step planned with Add step added last, or after the step or block `after` (the
+ * planner's insert point, `CONTEXT.md`: Planner blocks), after a walk to `at` when it acts on
+ * that tile and the step before doesn't already walk there, as a resident's own queue gets it
+ * (`appendRequest`).
  */
-export function planStep(plan: QueuePlan, order: OrderRequest, at?: Tile): QueuePlan {
-  return editPlan(plan, [...plan.items, ...stepsAfter(unroll(plan.items).at(-1), order, at)])
+export function planStep(
+  plan: QueuePlan,
+  order: OrderRequest,
+  at?: Tile,
+  after?: number,
+): QueuePlan {
+  const added = stepsAfter(stepBefore(plan.items, after), order, at)
+  return editPlan(plan, insertItems(plan.items, after, added))
 }
 
-/** A resident's queue as a plan, to wrap its steps in a repeat block before giving it back. */
-export function planOf(q: Pick<Queue, 'steps' | 'loop' | 'nextStepId'>): QueuePlan {
-  return { items: stepsOf(q), loop: q.loop, nextStepId: q.nextStepId }
+/** The step a step inserted after `after` (or at the end) follows: the last one up to there. */
+function stepBefore(items: readonly PlanItem[], after: number | undefined) {
+  const mark = -1
+  const marked = planSteps(insertItems(items, after, [{ id: mark, order: { kind: 'dismount' } }]))
+  return marked[marked.findIndex((s) => s.id === mark) - 1]
 }
 
 /**
- * Give to all: each member's queue becomes a copy of the plan unrolled, one `queue` request each,
- * ending what they do. A member who can't do a step gets it anyway and skips it when its turn
- * comes.
+ * The draft a step planned for a resident goes onto (`CONTEXT.md`: Queue draft): the open one,
+ * or a new one when they have no queue. None while a queue runs and no draft is open: the step is
+ * added to the running queue at once.
+ */
+export function draftFor(
+  r: Partial<Pick<Resident, 'queue'>>,
+  draft: QueuePlan | undefined,
+): QueuePlan | undefined {
+  return draft ?? (r.queue ? undefined : EMPTY_PLAN)
+}
+
+/**
+ * The draft an edit of a resident's planner with no draft open (a paste, a load, steps wrapped in
+ * a repeat block) makes, or none when it edits the running queue live: only a resident with no
+ * queue gets a draft. A running queue takes repeat blocks as they are (ADR 0032).
+ */
+export function draftEdit(
+  r: Partial<Pick<Resident, 'queue'>>,
+  items: readonly PlanItem[],
+  loop?: boolean,
+): QueuePlan | undefined {
+  if (!r.queue) return editPlan(EMPTY_PLAN, items, loop)
+  return undefined
+}
+
+/**
+ * The items the planner's Clear leaves (`CONTEXT.md`: Clear): none in a draft or a group's plan;
+ * in a running queue only the step the resident is on (`currentId`), so they finish it and the
+ * queue ends once loop is off too.
+ */
+export function clearedItems(items: readonly PlanItem[], currentId?: number): PlanItem[] {
+  if (currentId === undefined) return []
+  const step = find(items, currentId)
+  return step && !isBlock(step) ? [step] : []
+}
+
+/** A resident's queue as a plan: Edit as draft, and the running queue's planner. */
+export function planOf(q: Pick<Queue, 'items' | 'loop' | 'nextStepId'>): QueuePlan {
+  return { items: itemsOf(q), loop: q.loop, nextStepId: q.nextStepId }
+}
+
+/**
+ * Give to all: each member's queue becomes a copy of the plan, its repeat blocks as they are, one
+ * `queue` request each, ending what they do. A member who can't do a step gets it anyway and
+ * skips it when its turn comes.
  */
 export function giveToAll(plan: QueuePlan, residents: readonly Pick<Resident, 'id'>[]) {
-  const steps = unroll(plan.items).map(({ order, minutes }) => ({
-    order,
-    ...(minutes === undefined ? {} : { minutes }),
-  }))
+  const steps = keepIds(plan.items, new Set())
   return residents.map((r): OrderRequest => ({
     kind: 'queue',
     residentId: r.id,
@@ -192,39 +258,70 @@ export function giveToAll(plan: QueuePlan, residents: readonly Pick<Resident, 'i
 }
 
 /**
- * The order giving a resident the plan, unrolled: an edit of the queue they work through, keeping
- * the steps it still has (the current one keeps going), or a new queue when it has ended since.
+ * The order giving a resident the plan, its repeat blocks as they are: an edit of the queue they
+ * work through, keeping the steps and blocks it still has (the current step keeps going, each
+ * block its round), or a new queue when it has ended since.
  */
 export function givePlan(
   r: Pick<Resident, 'id'> & Partial<Pick<Resident, 'queue'>>,
   plan: Pick<QueuePlan, 'items'> & { loop?: boolean },
 ): OrderRequest {
-  const kept = new Set(r.queue?.steps.map((s) => s.id))
-  const steps = unroll(plan.items).map((s) => {
-    if (s.id === undefined || kept.has(s.id)) return s
-    const fresh = { ...s }
-    delete fresh.id
-    return fresh
+  const kept = new Set(r.queue ? idsOfQueue(r.queue.items) : [])
+  return queueRequest(r, keepIds(plan.items, kept), plan.loop)
+}
+
+/** The items with the ids in `kept` and no others: a step or block new to the queue has none. */
+function keepIds(items: readonly PlanItem[], kept: ReadonlySet<number>): PlanItem[] {
+  return items.map((item): PlanItem => {
+    const id = item.id !== undefined && kept.has(item.id) ? { id: item.id } : {}
+    if (isBlock(item)) {
+      const head = isIf(item) ? { if: item.if } : { repeat: item.repeat }
+      const block = {
+        ...head,
+        items: item.items,
+        ...(isIf(item) && item.else ? { else: item.else } : {}),
+      }
+      return { ...id, ...mapParts(block as Block, (l) => keepIds(l, kept)) }
+    }
+    const minutes = item.minutes === undefined ? {} : { minutes: item.minutes }
+    return { ...id, order: item.order, ...minutes }
   })
-  return queueRequest(r, steps, plan.loop)
 }
 
-/** The queue's steps as an edit-queue request keeps them: each by its id. */
-export function stepsOf(q: Pick<Queue, 'steps'>): QueueStepRequest[] {
-  return q.steps.map((s) => ({
-    id: s.id,
-    order: s.order,
-    ...(s.minutes === undefined ? {} : { minutes: s.minutes }),
-  }))
+/** Every id in a queue's items, steps and blocks. */
+function idsOfQueue(items: readonly QueueItem[]): number[] {
+  return items.flatMap((item) => [item.id, ...idsOfQueue(queueParts(item).flat())])
 }
 
-/** The steps with every one that never ends on its own, and isn't last, given a duration. */
-function timed(steps: QueueStepRequest[]): QueueStepRequest[] {
-  return steps.map((s, i) =>
-    s.minutes === undefined && neverEnds(s.order) && i < steps.length - 1
-      ? { ...s, minutes: QUEUE_DEFAULT_STEP_MINUTES }
-      : s,
-  )
+/**
+ * The queue's items as an edit-queue request keeps them: each step and block by its id, without
+ * the rounds the server counts.
+ */
+export function itemsOf(q: Pick<Queue, 'items'>): PlanItem[] {
+  const keep = (items: readonly QueueItem[]): PlanItem[] =>
+    items.map((item) => {
+      if ('repeat' in item) return { id: item.id, repeat: item.repeat, items: keep(item.items) }
+      if ('if' in item) {
+        const other = item.else ? { else: keep(item.else) } : {}
+        return { id: item.id, if: item.if, items: keep(item.items), ...other }
+      }
+      const minutes = item.minutes === undefined ? {} : { minutes: item.minutes }
+      return { id: item.id, order: item.order, ...minutes }
+    })
+  return keep(q.items)
+}
+
+/** The round each block around the current step is on, by block id; other blocks run none. */
+export function roundsOf(q: Pick<Queue, 'items'>): Map<number, number> {
+  const out = new Map<number, number>()
+  const walk = (items: readonly QueueItem[]) => {
+    for (const item of items) {
+      if ('repeat' in item && item.round) out.set(item.id, item.round)
+      for (const part of queueParts(item)) walk(part)
+    }
+  }
+  walk(q.items)
+  return out
 }
 
 /** Orders that act on the tile they are given for (by the card, their own): they only start there. */
@@ -235,8 +332,8 @@ function actsHere(order: OrderRequest): boolean {
     )
   )
     return true
-  // A Build line walks to its line itself (`CONTEXT.md`: Build line).
-  if (order.kind !== 'task' || order.task === 'buildLine') return false
+  // A Build line walks to its line itself (`CONTEXT.md`: Build line); Explore acts on no place.
+  if (order.kind !== 'task' || order.task === 'buildLine' || order.task === 'explore') return false
   // A Build task laid out somewhere else (`at`) walks there itself.
   return order.task !== 'build' || order.at === undefined
 }
@@ -258,7 +355,7 @@ function withoutResident(order: OrderRequest): OrderRequest {
  */
 export function queueRequest(
   r: Pick<Resident, 'id'> & Partial<Pick<Resident, 'queue'>>,
-  steps: QueueStepRequest[],
+  steps: PlanItem[],
   loop?: boolean,
 ): OrderRequest {
   if (r.queue) return editRequest(r, steps, loop)
@@ -268,7 +365,7 @@ export function queueRequest(
 /** The order editing the resident's queue to these steps. */
 export function editRequest(
   r: Pick<Resident, 'id'>,
-  steps: QueueStepRequest[],
+  steps: PlanItem[],
   loop?: boolean,
 ): OrderRequest {
   return { kind: 'editQueue', residentId: r.id, steps, ...(loop === undefined ? {} : { loop }) }
@@ -289,7 +386,53 @@ export interface QueueRow {
   endless: boolean
   /** Why its place is gone, if it is: "the workplace is gone" (`CONTEXT.md`: Saved queue). */
   gone?: string
+  /** The Orders tab heading its kind of order is under, which picks its icon. */
+  group: StepGroup
 }
+
+/** The Orders tab's kinds of order a step's icon shows (`CONTEXT.md`: Planner blocks). */
+export type StepGroup = 'move' | 'work' | 'goods' | 'scripts' | 'flow'
+
+/** Which kind each order is; one not listed is work. */
+const STEP_GROUP: Partial<Record<OrderRequest['kind'], StepGroup>> = {
+  walkTo: 'move',
+  drive: 'move',
+  board: 'move',
+  row: 'move',
+  sail: 'move',
+  unhitch: 'move',
+  hitch: 'move',
+  getOff: 'move',
+  mount: 'move',
+  dismount: 'move',
+  relocate: 'move',
+  pickUp: 'goods',
+  drop: 'goods',
+  store: 'goods',
+  fetch: 'goods',
+  feed: 'goods',
+  haul: 'move',
+  runScript: 'scripts',
+  waitUntil: 'flow',
+}
+
+/** The kind of order a step is, for its icon: as the Orders tab groups it: Explore and Haul move. */
+export function stepGroup(order: OrderRequest): StepGroup {
+  if (order.kind === 'task' && order.task === 'explore') return 'move'
+  if (order.kind === 'task' && order.task === 'haul') return 'move'
+  return STEP_GROUP[order.kind] ?? 'work'
+}
+
+/**
+ * Whether a step's duration chip shows (`CONTEXT.md`: Planner blocks): when it has a duration,
+ * or needs one, never ending on its own and not being the last step.
+ */
+export function showsMinutes(row: Pick<QueueRow, 'minutes' | 'endless'>, last: boolean): boolean {
+  return row.minutes !== undefined || (row.endless && !last)
+}
+
+/** A building as step labels name it: by kind, with its city, found by id or by a tile it covers. */
+type NamedBuilding = Pick<Building, 'id' | 'kind'> & Partial<Pick<Building, 'x' | 'y' | 'cityId'>>
 
 /**
  * What step labels name: the Player's scripts, the buildings in sight and those last seen, and
@@ -297,8 +440,8 @@ export interface QueueRow {
  */
 export interface StepNames {
   scripts?: readonly Pick<ScriptSummary, 'id' | 'name'>[]
-  buildings?: readonly Pick<Building, 'id' | 'kind'>[]
-  lastSeen?: readonly Pick<Building, 'id' | 'kind'>[]
+  buildings?: readonly NamedBuilding[]
+  lastSeen?: readonly NamedBuilding[]
   cities?: readonly Pick<City, 'id' | 'name'>[]
   /** The Player's waypoints: a step at one's tile names it (`CONTEXT.md`: Waypoint). */
   waypoints?: readonly Pick<Waypoint, 'name' | 'x' | 'y'>[]
@@ -309,8 +452,8 @@ export interface StepNames {
  * place is gone from the map is flagged (`gonePlace`), as a saved queue's step loaded after its
  * workplace was torn down.
  */
-export function queueRows(q: Pick<Queue, 'steps' | 'current'>, names: StepNames = {}): QueueRow[] {
-  return q.steps.map((s, i) => stepRow(s, i === q.current, names))
+export function queueRows(q: Pick<Queue, 'items' | 'current'>, names: StepNames = {}): QueueRow[] {
+  return queueSteps(q.items).map((s) => stepRow(s, s.id === q.current, names))
 }
 
 /** One step as the card lists it, in a queue or a plan's repeat block. */
@@ -328,40 +471,71 @@ export function stepRow(
     ...(s.minutes === undefined ? {} : { minutes: s.minutes, real: realMinutes(s.minutes) }),
     endless: neverEnds(s.order),
     ...(gone ? { gone } : {}),
+    group: stepGroup(s.order),
   }
 }
 
 /** A duration in game minutes as real time, "10 s", "1 min". */
 export const realMinutes = (minutes: number) => realTimeOf(minutes * TICKS_PER_GAME_MINUTE)
 
-/** What a queue step does, as the card lists it: "Work the farm", "Walk to 12, 6". */
+/**
+ * What a queue step does, as the card lists it, its place by name (`CONTEXT.md`: Planner blocks):
+ * "Work the farm in Quarrytown IV", "Walk to Farm, Quarrytown IV", "Walk to Pass" (a waypoint),
+ * "Walk to 12, 6" (a bare tile).
+ */
 export function stepLabel(
   order: OrderRequest,
   { scripts = [], buildings = [], lastSeen = [], cities = [], waypoints = [] }: StepNames,
 ): string {
+  const cityOf = (b: NamedBuilding) => cities.find((c) => c.id === b.cityId)?.name
+  // A tile by name: a waypoint on it, else a building covering it with its city, else coordinates.
   const at = (p: unknown) => {
     const { x, y } = p as { x: number; y: number }
     const marked = waypoints.find((w) => w.x === x && w.y === y)
-    return marked ? `${marked.name} (${x}, ${y})` : `${x}, ${y}`
+    if (marked) return marked.name
+    const onIt = (b: NamedBuilding) =>
+      b.x !== undefined && b.y !== undefined && covers({ kind: b.kind, x: b.x, y: b.y }, x, y)
+    const seen = buildings.find(onIt)
+    const was = seen ? undefined : lastSeen.find(onIt)
+    const b = seen ?? was
+    if (!b) return `${x}, ${y}`
+    const name = capitalised(BUILDING_NAMES[b.kind])
+    const city = cityOf(b)
+    return `${name}${city ? `, ${city}` : ''}${was ? ' (as last seen)' : ''}`
   }
   const building = (id: unknown) => {
-    const kind = buildings.find((b) => b.id === id)?.kind
-    if (kind) return `the ${BUILDING_NAMES[kind]}`
-    const was = lastSeen.find((b) => b.id === id)?.kind
-    return was ? `the ${BUILDING_NAMES[was]} (as last seen)` : 'the building'
+    const seen = buildings.find((b) => b.id === id)
+    const b = seen ?? lastSeen.find((l) => l.id === id)
+    if (!b) return 'the building'
+    const city = cityOf(b)
+    return `the ${BUILDING_NAMES[b.kind]}${city ? ` in ${city}` : ''}${seen ? '' : ' (as last seen)'}`
   }
-  // A storage or stable in sight a store or fetch names, if it names one; a carriage goes unnamed.
+  // A storage or stable in sight a store or fetch names, if it names one, or a boat; a carriage
+  // goes unnamed.
   const named = (word: string, id: unknown) => {
-    const kind = buildings.find((b) => b.id === id)?.kind
-    return kind ? `${word} the ${BUILDING_NAMES[kind]}` : ''
+    if (typeof id === 'string' && isVesselId(id))
+      return `${word} the ${id.startsWith('ship') ? 'ship' : 'boat'}`
+    const b = buildings.find((b) => b.id === id)
+    if (!b) return ''
+    const city = cityOf(b)
+    return `${word} the ${BUILDING_NAMES[b.kind]}${city ? ` in ${city}` : ''}`
   }
   switch (order.kind) {
     case 'walkTo':
       return `Walk to ${at(order)}`
     case 'drive':
       return `Drive the carriage to ${at(order)}`
-    case 'board':
-      return 'Board the carriage'
+    case 'board': {
+      const vessel = (order.vesselId ?? order.carriageId) as string | undefined
+      if (!isVesselId(vessel)) return 'Board the carriage'
+      // Named after its kind, as the server names its ids (`isVesselId`).
+      if (vessel!.startsWith('ship')) return order.asCrew ? 'Crew the ship' : 'Board the ship'
+      return 'Board the boat'
+    }
+    case 'row':
+      return `Row the boat to ${at(order)}`
+    case 'sail':
+      return `Sail the ship to ${at(order)}`
     case 'unhitch':
       return 'Unhitch the horse'
     case 'hitch':
@@ -403,6 +577,10 @@ export function stepLabel(
       return `Relocate to ${cities.find((c) => c.id === order.cityId)?.name ?? 'another city'}`
     case 'feed':
       return `Feed: ${String(order.units)} Food`
+    case 'waitUntil':
+      return conditionProblem(order.condition)
+        ? 'Wait until'
+        : `Wait until ${conditionLabel(order.condition as Condition, { buildings, lastSeen, cities })}`
     case 'runScript': {
       const script = scripts.find((s) => s.id === order.scriptId)
       return `Run ${script?.name ?? 'a script'}`
@@ -427,6 +605,8 @@ export function stepLabel(
   }
   return order.kind
 }
+
+const capitalised = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 function dropVerb(spot: unknown): string {
   const kind = (spot as { kind?: string } | undefined)?.kind
@@ -471,4 +651,24 @@ export function useShiftHeld(): { readonly current: boolean } {
     }
   }, [])
   return held
+}
+
+/** A queue item's lists: a block's items, and an If block's Else part; none for a step. */
+function queueParts(item: QueueItem): QueueItem[][] {
+  if ('repeat' in item) return [item.items]
+  if ('if' in item) return item.else ? [item.items, item.else] : [item.items]
+  return []
+}
+
+/** The part each If block around the current step runs, by block id (`CONTEXT.md`: If block). */
+export function branchesOf(q: Pick<Queue, 'items'>): Map<number, Branch> {
+  const out = new Map<number, Branch>()
+  const walk = (items: readonly QueueItem[]) => {
+    for (const item of items) {
+      if ('if' in item && item.branch) out.set(item.id, item.branch)
+      for (const part of queueParts(item)) walk(part)
+    }
+  }
+  walk(q.items)
+  return out
 }

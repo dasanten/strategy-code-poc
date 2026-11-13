@@ -22,7 +22,9 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, post};
 use axum::{Extension, Json, Router};
 use csp_shared::balance::SCRIPT_WRITES_PER_MINUTE;
-use csp_shared::chunks::{ADMIN_TERRAIN_OVERVIEW_PATH, TERRAIN_BATCH_MAX, TERRAIN_BATCH_PATH};
+use csp_shared::chunks::{
+    ADMIN_TERRAIN_OVERVIEW_PATH, TERRAIN_BATCH_MAX, TERRAIN_BATCH_PATH, TERRAIN_LEVEL_MAX,
+};
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::WorldState;
 use csp_sim::admin_map::{
@@ -33,7 +35,7 @@ use csp_sim::admin_map::{
 use csp_sim::directives::{
     admin_directives, directive_target_choices, give_directive, lift_directive, set_directive_price,
 };
-use csp_sim::explored::ExploredTerrain;
+use csp_sim::explored::{ExploredTerrain, MapTerrain};
 use csp_sim::orders::OrderQueue;
 use csp_sim::sight::SightTracker;
 use csp_sim::tick::Scratch;
@@ -82,6 +84,11 @@ pub type GameJob = Box<dyn for<'a> FnOnce(GameView<'a>) + Send>;
 pub trait GameHandle: Send + Sync + 'static {
     /// Runs `job` between ticks; resolves false if the game is gone and the job never ran.
     fn run_job(&self, job: GameJob) -> Pin<Box<dyn Future<Output = bool> + Send + '_>>;
+    /// The explored terrain, shared with the game: terrain requests read it under its own lock on
+    /// an HTTP worker, not as jobs between ticks (ADR 0034).
+    fn explored(&self) -> Arc<Mutex<ExploredTerrain>>;
+    /// The map's terrain and what is made from it alone, read without any lock.
+    fn map(&self) -> Arc<MapTerrain>;
 }
 
 impl<L: crate::monitoring::LogSink + Send + Sync + 'static> GameHandle
@@ -107,6 +114,38 @@ impl<L: crate::monitoring::LogSink + Send + Sync + 'static> GameHandle
             .is_some()
         })
     }
+
+    fn explored(&self) -> Arc<Mutex<ExploredTerrain>> {
+        Arc::clone(&self.explored)
+    }
+
+    fn map(&self) -> Arc<MapTerrain> {
+        Arc::clone(&self.map)
+    }
+}
+
+/// Runs `f` on a blocking worker, off the async runtime and off the game thread.
+async fn off_the_runtime<T: Send + 'static>(
+    f: impl FnOnce() -> T + Send + 'static,
+) -> ApiResult<T> {
+    tokio::task::spawn_blocking(f).await.map_err(|e| ApiFailure::Internal(e.to_string()))
+}
+
+/// Reads the explored terrain on an HTTP worker, never as a job on the game thread (ADR 0034):
+/// `prepare` runs first without the lock (to make what is shared by every Player), then `read`
+/// with the explored terrain's lock held, for as long as one request's bytes take to copy. A tick
+/// that needs the lock waits at most that long.
+async fn read_explored<T: Send + 'static>(
+    game: &dyn GameHandle,
+    prepare: impl FnOnce(&MapTerrain) + Send + 'static,
+    read: impl FnOnce(&ExploredTerrain) -> T + Send + 'static,
+) -> ApiResult<T> {
+    let (explored, map) = (game.explored(), game.map());
+    off_the_runtime(move || {
+        prepare(&map);
+        read(&explored.lock().unwrap_or_else(|e| e.into_inner()))
+    })
+    .await
 }
 
 /// Runs `f` on the game between ticks and answers its result; `None` if the game is gone.
@@ -623,7 +662,7 @@ async fn terrain_chunk(
     let game = game_of(&state)?;
     let chunk = match (chunk_param(&cx), chunk_param(&cy)) {
         (Some(cx), Some(cy)) => {
-            with_game(game.as_ref(), move |g| g.explored.chunk(id, cx, cy)).await.flatten()
+            read_explored(game.as_ref(), |_| {}, move |e| e.chunk(id, cx, cy)).await?
         }
         _ => None,
     };
@@ -650,6 +689,19 @@ async fn terrain_batch(
             ))
         }
     };
+    // No level is level 0, full detail (ADR 0034).
+    let level = match b.get("level") {
+        None | Some(Value::Null) => 0,
+        Some(v) => match v.as_u64() {
+            Some(l) if l <= u64::from(TERRAIN_LEVEL_MAX) => l as u8,
+            _ => {
+                return Err(fail(
+                    ApiErrorCode::InvalidInput,
+                    format!("Ask for a level from 0 to {TERRAIN_LEVEL_MAX}."),
+                ))
+            }
+        },
+    };
     // Anything but a whole number is no chunk's index, and is left out.
     let indices: Vec<i64> = wanted
         .iter()
@@ -658,9 +710,17 @@ async fn terrain_batch(
             _ => -1,
         })
         .collect();
-    let bytes = with_game(game.as_ref(), move |g| g.explored.chunks(id, &indices))
-        .await
-        .ok_or_else(|| ApiFailure::Internal("the game is gone".into()))?;
+    let bytes = read_explored(
+        game.as_ref(),
+        // A coarse level's squares are made once for the whole map, outside the lock.
+        move |map| {
+            if level > 0 {
+                map.coarse_squares(level);
+            }
+        },
+        move |e| e.chunks_at(id, level, &indices),
+    )
+    .await?;
     Ok(octets(bytes))
 }
 
@@ -828,9 +888,8 @@ async fn admin_overview(
 ) -> ApiResult<Response> {
     user.admin()?;
     let game = game_of(&state)?;
-    let bytes = with_game(game.as_ref(), |g| g.explored.overview().to_vec())
-        .await
-        .ok_or_else(|| ApiFailure::Internal("the game is gone".into()))?;
+    let map = game.map();
+    let bytes = off_the_runtime(move || map.overview().to_vec()).await?;
     Ok(octets(bytes))
 }
 
@@ -843,7 +902,8 @@ async fn admin_chunk(
     let game = game_of(&state)?;
     let chunk = match (chunk_param(&cx), chunk_param(&cy)) {
         (Some(cx), Some(cy)) => {
-            with_game(game.as_ref(), move |g| g.explored.whole_chunk(cx, cy)).await.flatten()
+            let map = game.map();
+            off_the_runtime(move || map.whole_chunk(cx, cy)).await?
         }
         _ => None,
     };
@@ -1178,14 +1238,6 @@ pub fn build_app(opts: AppOptions) -> Router {
         .route("/api/admin/invites", post(admin_invites))
         .route("/api/admin/password", post(admin_password))
         .route("/api/admin/tick-health", get(admin_tick_health));
-    if let (Some(rt), Some(game)) = (opts.realtime.clone(), state.game.clone()) {
-        api = api.route(
-            crate::realtime::WS_PATH,
-            get(move |headers: HeaderMap, ws: axum::extract::ws::WebSocketUpgrade| {
-                crate::realtime::upgrade(rt, game, headers, ws)
-            }),
-        );
-    }
     if state.game.is_some() {
         api = api
             .route("/api/terrain/{cx}/{cy}", get(terrain_chunk))
@@ -1207,7 +1259,25 @@ pub fn build_app(opts: AppOptions) -> Router {
             );
     }
 
-    let mut app = api.merge(auth).merge(script_writes);
+    // API responses go out compressed when the request accepts it (ADR 0034): terrain is
+    // `application/octet-stream`, which Caddy does not compress. The layer compresses as the body
+    // is sent, on the HTTP threads, never in a job on the game thread. Routes added after it (the
+    // WebSocket upgrade, the built client's files) stay as they are.
+    let mut app = api.merge(auth).merge(script_writes).layer(
+        tower_http::compression::CompressionLayer::new().gzip(true).zstd(true).no_br().no_deflate(),
+    );
+    if let (Some(rt), Some(game)) = (opts.realtime.clone(), state.game.clone()) {
+        app = app.route(
+            crate::realtime::WS_PATH,
+            get(
+                move |headers: HeaderMap,
+                      axum::extract::RawQuery(query): axum::extract::RawQuery,
+                      ws: axum::extract::ws::WebSocketUpgrade| {
+                    crate::realtime::upgrade(rt, game, headers, query, ws)
+                },
+            ),
+        );
+    }
     app = match opts.web_dist.filter(|d| d.is_dir()) {
         Some(dir) => {
             let index = Arc::new(dir.join("index.html"));

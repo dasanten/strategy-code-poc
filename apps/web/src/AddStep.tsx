@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useContext, useState } from 'react'
 import { FEED_UNITS, HAUL_KEEP_FOOD } from '@csp/balance'
 import { GOODS } from './shared/world.js'
 import type {
@@ -12,6 +12,8 @@ import type {
 import { BuildMenu } from './BuildMenu.js'
 import { CustomiseButton, taskStart } from './Customise.js'
 import { HorsePick } from './HorsePick.js'
+import { ConditionEditor } from './ConditionEditor.js'
+import type { ConditionNames } from './condition-view.js'
 import { GOOD_LABELS, SubjectPicker } from './Residents.js'
 import {
   makesAt,
@@ -19,15 +21,24 @@ import {
   PLAN_STEPS,
   PLAN_TASKS,
   planAsk,
+  pickPlace,
   type Plan,
   type PlanAnswer,
   type PlanCity,
   type PlanStepId,
 } from './plan-step.js'
+import {
+  PALETTE_GROUPS,
+  PLAN_STEP_ICONS,
+  PlannerFlowContext,
+  REPEAT_ICON,
+  STEP_KIND_TYPE,
+} from './step-palette-view.js'
 
 /**
- * The queue planner's Add step on the resident card (`CONTEXT.md`: Queue, Planning ahead): a list
- * of every kind of step; one acting on a place has the map pick it first (pick mode), and one
+ * The queue planner's Add step on the resident card (`CONTEXT.md`: Queue, Planning ahead, Planner
+ * blocks): a palette of every kind of step grouped as the Orders tab is, plus Flow (Repeat); one
+ * acting on a place has the map pick it first (pick mode), and one
  * that needs more (goods, what to build, a script, …) asks for it here after. A city (Relocate)
  * can be picked on the map or from the list here.
  */
@@ -42,11 +53,15 @@ export function AddStep({
   tick,
   cities,
   onPickCity,
+  open,
+  onOpen,
+  onPlan,
+  conditionNames,
 }: {
   /** The step being planned, if one is. */
   plan: Plan | undefined
-  /** Starts planning a step of this kind. */
-  onStart: (kind: PlanStepId) => void
+  /** Starts planning a step of this kind, to go after `after` (the planner's insert point). */
+  onStart: (kind: PlanStepId, after?: number) => void
   /** Adds the step planned with what its ask answered. */
   onAnswer: (answer: PlanAnswer) => void
   onCancel: () => void
@@ -66,8 +81,16 @@ export function AddStep({
   cities: readonly PlanCity[]
   /** Picks a city from the list, as a tap in its area on the map would. */
   onPickCity: (cityId: string) => void
+  /** Whether the palette is open: kept by the card, so it stays open as the queue appears. */
+  open: boolean
+  onOpen: (open: boolean) => void
+  /** Changes the step being planned: a Wait until's editor has the map pick a place. */
+  onPlan: (plan: Plan) => void
+  /** What a condition's place is named by: the buildings and cities known. */
+  conditionNames: ConditionNames
 }) {
-  const [open, setOpen] = useState(false)
+  // Repeat and the insert point of the planner this palette sits under, if it is in one.
+  const flow = useContext(PlannerFlowContext)
   const ask = plan && planAsk(plan)
   if (plan && nextPick(plan)?.pick === 'city') {
     const label = PLAN_STEPS.find((k) => k.id === plan.kind)!.label
@@ -100,7 +123,7 @@ export function AddStep({
     )
   }
   if (plan && ask) {
-    const label = PLAN_STEPS.find((k) => k.id === plan.kind)!.label
+    const label = plan.until ? 'Repeat until' : PLAN_STEPS.find((k) => k.id === plan.kind)!.label
     return (
       <section className="inspector-block" aria-label="Add step">
         <div className="panel-head">
@@ -142,6 +165,21 @@ export function AddStep({
             onAnswer={(horseId) => onAnswer({ ask, horseId })}
           />
         )}
+        {ask === 'condition' && (
+          <ConditionEditor
+            draft={plan.condition}
+            names={conditionNames}
+            action={plan.kind !== 'if' ? 'Add' : plan.blockId === undefined ? 'Wrap in If' : 'Set'}
+            lead={plan.kind !== 'if' ? 'Wait until' : plan.until ? 'Repeat until' : 'If'}
+            onPickPlace={(draft) => onPlan(pickPlace(plan, draft))}
+            onDone={(condition) => {
+              // An If is no step: the planner it sits under puts the block in.
+              if (plan.kind !== 'if') return onAnswer({ ask, condition })
+              flow?.ifDone?.(plan, condition)
+              onCancel()
+            }}
+          />
+        )}
         {ask === 'haul' && <HaulAsk onAnswer={(setup) => onAnswer({ ask, setup })} />}
         {ask === 'units' && <UnitsAsk onAnswer={(units) => onAnswer({ ask, units })} />}
         {ask === 'subject' && (
@@ -172,37 +210,98 @@ export function AddStep({
   return (
     <section className="inspector-block" aria-label="Add step">
       <div className="order-buttons">
-        <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <button type="button" aria-expanded={open} onClick={() => onOpen(!open)}>
           Add step
         </button>
+        {flow?.after !== undefined && (
+          <span className="small muted">New steps go where the + is set.</span>
+        )}
       </div>
       {open && (
-        <>
-          <div className="chips">
-            {PLAN_STEPS.map((k) => {
-              const task = PLAN_TASKS[k.id]
-              return (
-                <span className="chip-with" key={k.id}>
-                  <button type="button" className="chip" onClick={() => onStart(k.id)}>
-                    {k.label}
-                  </button>
-                  {task && (
-                    <CustomiseButton
-                      order={taskStart(task)}
-                      of={k.label}
-                      give={() => onStart(k.id)}
-                    />
-                  )}
-                </span>
-              )
-            })}
+        <div className="step-palette">
+          {PALETTE_GROUPS.map((g) => (
+            <div className="step-palette-group" key={g.id}>
+              <h4 className="small muted">{g.label}</h4>
+              <div className="step-palette-items">
+                {g.steps.map((id) => {
+                  const k = PLAN_STEPS.find((s) => s.id === id)!
+                  const task = PLAN_TASKS[id]
+                  return (
+                    <span className="step-palette-item" key={id}>
+                      <button
+                        type="button"
+                        onClick={() => onStart(id, flow?.after)}
+                        // Dragged onto a place in the planner, it is planned there.
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData(STEP_KIND_TYPE, id)
+                          e.dataTransfer.effectAllowed = 'copy'
+                        }}
+                      >
+                        <span aria-hidden="true">{PLAN_STEP_ICONS[id]}</span> {k.label}
+                      </button>
+                      {task && (
+                        <CustomiseButton
+                          order={taskStart(task)}
+                          of={k.label}
+                          give={() => onStart(id, flow?.after)}
+                          small
+                        />
+                      )}
+                    </span>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+          <div className="step-palette-group">
+            <h4 className="small muted">Flow</h4>
+            <div className="step-palette-items">
+              <span className="step-palette-item">
+                <button
+                  type="button"
+                  disabled={!flow?.repeat}
+                  title={
+                    flow?.repeat
+                      ? 'Wrap the picked steps in a repeat block'
+                      : 'Pick steps in a row in the planner to repeat them'
+                  }
+                  onClick={() => flow?.repeat?.()}
+                >
+                  <span aria-hidden="true">{REPEAT_ICON}</span> Repeat
+                </button>
+              </span>
+              <span className="step-palette-item">
+                <button
+                  type="button"
+                  disabled={!flow?.wrapIf}
+                  title={
+                    flow?.wrapIf
+                      ? 'Run the picked steps only when a condition holds'
+                      : 'Pick steps in a row in the planner to put them under an If'
+                  }
+                  onClick={() => flow?.wrapIf?.()}
+                >
+                  <span aria-hidden="true">{PLAN_STEP_ICONS.if}</span> If
+                </button>
+              </span>
+              <span className="step-palette-item">
+                <button
+                  type="button"
+                  title="A step that ends once its condition holds; meanwhile they stand idle"
+                  onClick={() => onStart('waitUntil', flow?.after)}
+                >
+                  <span aria-hidden="true">{PLAN_STEP_ICONS.waitUntil}</span> Wait until
+                </button>
+              </span>
+            </div>
           </div>
           <p className="muted small">
             A step that acts on a place is picked on the map, with a walk there put before it.
             Whether it can be done is checked when its turn comes; if it can’t, it is skipped and
             noted in the realm log.
           </p>
-        </>
+        </div>
       )}
     </section>
   )

@@ -71,6 +71,54 @@ export function terrainAt(map: TerrainMap, x: number, y: number): Terrain {
   return map.tiles[tileIndex(map.size, x, y)] as Terrain
 }
 
+/** Whether the terrain is water (`CONTEXT.md`: Water): Lake or Sea, where only vessels go. */
+export function isWater(t: number): boolean {
+  return t === Terrain.Lake || t === Terrain.Sea
+}
+
+/**
+ * Whether one of `tiles` touches water, straight or diagonally (`CONTEXT.md`: Haven): a Lake or
+ * Sea tile among the eight around it. `at` gives a tile's terrain.
+ */
+export function touchesWater(
+  tiles: readonly (readonly [number, number])[],
+  size: number,
+  at: (x: number, y: number) => number,
+): boolean {
+  return touches(tiles, size, at, isWater)
+}
+
+/** Whether the terrain is Sea (`CONTEXT.md`: Ship: it sails only on Sea, never onto Lake). */
+export function isSea(t: number): boolean {
+  return t === Terrain.Sea
+}
+
+/** Whether one of `tiles` touches Sea, straight or diagonally (`CONTEXT.md`: Building a ship). */
+export function touchesSea(
+  tiles: readonly (readonly [number, number])[],
+  size: number,
+  at: (x: number, y: number) => number,
+): boolean {
+  return touches(tiles, size, at, isSea)
+}
+
+/** Whether one of `tiles` has a tile of terrain `what` among the eight around it. */
+function touches(
+  tiles: readonly (readonly [number, number])[],
+  size: number,
+  at: (x: number, y: number) => number,
+  what: (t: number) => boolean,
+): boolean {
+  return tiles.some(([x, y]) => {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if ((dx || dy) && what(at(wrap(x + dx, size), wrap(y + dy, size)))) return true
+      }
+    }
+    return false
+  })
+}
+
 /** Lake and Sea can't be entered. */
 export function isPassableTerrain(t: number): boolean {
   return (
@@ -102,6 +150,28 @@ export const TERRAIN_BATCH_PATH = '/api/terrain/chunks'
 
 /** The most chunks one `TERRAIN_BATCH_PATH` request may ask for. */
 export const TERRAIN_BATCH_MAX = 64
+
+/**
+ * The coarsest level explored terrain is served at (ADR 0034). At level `k` one byte stands for a
+ * square of `2^k × 2^k` tiles, the most common terrain the Player explored in it, and a chunk is
+ * `CHUNK_SIZE × CHUNK_SIZE` squares; level 0 is one byte a tile. A `TERRAIN_BATCH_PATH` request
+ * names its level as `level`, 0 if none.
+ */
+export const TERRAIN_LEVEL_MAX = 5
+
+/**
+ * How many chunks of `level` fit across a map `across` level-0 chunks wide. Chunk `i` of a level
+ * is at `(i % n, ⌊i / n⌋)`; squares past the map's side are padding.
+ */
+export function levelChunksAcross(across: number, level: number): number {
+  return Math.ceil(across / 2 ** level)
+}
+
+/** The chunk of `level` that holds level-0 chunk `i`, on a map `across` level-0 chunks wide. */
+export function coarseChunkOf(i: number, across: number, level: number): number {
+  const [cx, cy] = [i % across, Math.floor(i / across)]
+  return (cy >> level) * levelChunksAcross(across, level) + (cx >> level)
+}
 
 /**
  * Where an admin loads any chunk of terrain, explored or not (`CONTEXT.md`: admin map): the same

@@ -8,6 +8,7 @@ import type {
   SeenHorse,
   SeenResident,
   SeenTrader,
+  SeenVessel,
   Waypoint,
 } from '@csp/shared-types'
 import type { CityEmblem, FarMarker } from './far.js'
@@ -21,6 +22,8 @@ export interface MapWorld {
   map: { size: number }
   /** Chunks whose terrain may be loaded; any copy of `grownChunks` loaded before is stale. */
   exploredChunks: ReadonlySet<number>
+  /** How many tiles of each explored chunk are explored, where the browser keeps terrain (ADR 0034). */
+  exploredCounts?: ReadonlyMap<number, number>
   grownChunks: readonly number[]
   /** Whose realm is "own", its Leader, and where the view centres. */
   home: { realmId: string; leaderId: string | null; cityId?: string | null; x: number; y: number }
@@ -33,6 +36,8 @@ export interface MapWorld {
   armies: Pick<Army, 'id' | 'realmId' | 'memberIds'>[]
   caravans: SeenCaravan[]
   traders: SeenTrader[]
+  /** Boats on the water (`CONTEXT.md`: Vessel); none on the admin map yet. */
+  vessels?: SeenVessel[]
   /**
    * Buildings and cities the Player remembers out of their sight (`CONTEXT.md`: Last seen), drawn
    * faded; none on the admin map.

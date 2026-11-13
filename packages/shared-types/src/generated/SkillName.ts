@@ -3,4 +3,4 @@
 /**
  * Something learned by doing or training (`SkillName`).
  */
-export type SkillName = "mining" | "woodcutting" | "smelting" | "smithing" | "construction" | "farming" | "combat" | "driving";
+export type SkillName = "mining" | "woodcutting" | "smelting" | "smithing" | "construction" | "farming" | "combat" | "driving" | "seafaring";

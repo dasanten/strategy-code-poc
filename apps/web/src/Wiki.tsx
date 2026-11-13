@@ -2,6 +2,8 @@ import { useEffect, type ReactNode } from 'react'
 import {
   QUEUE_DEFAULT_STEP_MINUTES,
   QUEUE_MAX_STEPS,
+  QUEUE_MAX_DEPTH,
+  QUEUE_MAX_REPEAT,
   ADULT_AGE,
   AGILITY_LIMIT,
   AGILITY_SPEED_EFFECT,
@@ -23,6 +25,10 @@ import {
   TRADER_STOP_REACH,
   TRADER_STOP_TICKS,
   CARRIAGE_CAPACITY,
+  BOAT_CAPACITY,
+  SHIP_CAPACITY,
+  SHIP_MIN_CREW,
+  SAIL_SPEED,
   DIRECT_OFFERS_TO_ONE_REALM,
   DIRECT_OFFER_DAYS,
   PASSENGER_WEIGHT,
@@ -44,6 +50,7 @@ import {
   CITY_QUARTER_ROWS,
   CLIMB_TICKS,
   COMBAT_SKILL_EFFECT,
+  COMBAT_SKILL_LIMIT,
   COMBAT_SKILL_PER_BLOW,
   CONSTRUCTION_SKILL_EFFECT,
   CONSTRUCTION_SKILL_MAX,
@@ -61,6 +68,13 @@ import {
   DODGE_PER_AGILITY,
   DRIVING_SKILL_EFFECT,
   DRIVING_SKILL_LIMIT,
+  ROW_SPEED,
+  ROW_STRENGTH_AVERAGE,
+  ROW_STRENGTH_EFFECT,
+  ROW_STRENGTH_LIMIT,
+  SEAFARING_SKILL_EFFECT,
+  SEAFARING_SKILL_LIMIT,
+  SEAFARING_SKILL_PER_DAY,
   DRIVING_SKILL_PER_DAY,
   STARVE_DAYS,
   DOWN_DAYS,
@@ -223,6 +237,8 @@ import {
   DEMAND_TRADE_ORG_STANDING_LOSS,
   DEMAND_YIELD_RESPECT_MIN,
   DEMAND_YIELD_RESPECT_TIMES,
+  RESPECT_PER_WALL,
+  OUTWEIGH_HOLD_DAYS,
   STANDING_RANGE,
   STANDING_NPC_TRADE_COINS_PER_POINT,
   STANDING_TRADE_COINS_PER_POINT,
@@ -275,6 +291,7 @@ import { PARAM_DESCRIPTIONS, DEFAULT_SCRIPTS, SCRIPT_VIEWS } from '@csp/lang-was
 import { WORKPLACE_PARAM } from './shared/default-scripts.js'
 import { SCRIPT_PARAM_TYPES } from './shared/script-api.js'
 import { NPC_SMITHY_WEAPON } from './shared/npc-trade.js'
+import { fighterStrength } from './shared/persuasion.js'
 import type {
   BuildingKind,
   CrimeKind,
@@ -297,6 +314,8 @@ import {
   breakTicks,
   buildCosts,
   carriageCost,
+  boatCost,
+  shipCost,
   cityControl,
   coinsPerMintWorkerDay,
   crimeForgotten,
@@ -334,6 +353,13 @@ import {
 } from './wiki-scripting.js'
 import { apiNames, type ApiName } from './script-editor.js'
 
+/** An untrained fighter with a spear and a fully trained, armoured one, as respect weighs them. */
+const UNTRAINED_SPEAR = { carried: { spear: 1 }, skills: {} }
+const TRAINED_AND_ARMOURED = {
+  carried: { sword: 1, shield: 1, armour: 1 },
+  skills: { combat: COMBAT_SKILL_MAX },
+}
+
 /** The Wiki's topics, in order, each a section with its own anchor (`/wiki#food`). */
 export const WIKI_TOPICS = [
   { id: 'controls', title: 'Controls' },
@@ -348,6 +374,7 @@ export const WIKI_TOPICS = [
   { id: 'work', title: 'Workplaces & output' },
   { id: 'building', title: 'Building & tearing down' },
   { id: 'transport', title: 'Carrying & transport' },
+  { id: 'water', title: 'Water & havens' },
   { id: 'how-to-trade', title: 'How to trade' },
   { id: 'trade', title: 'Trade & prices' },
   { id: 'standing', title: 'Standing & reactions' },
@@ -496,6 +523,7 @@ export function Wiki() {
   }, [])
   const avg = AVERAGE_STATS.strength
   const groundCost = buildCosts().find((b) => b.kind === 'trainingGround')!
+  const havenCost = buildCosts().find((b) => b.kind === 'haven')!
   const strong = wikiResident({ strength: avg * 1.5 }, { mining: WORK_SKILL_MAX / 10 })
   const strongAgile = wikiResident({ agility: avg * 1.5 })
   const plainsTicksPerTile = 1 / walkSpeed(AVERAGE, Terrain.Plains, 0)
@@ -551,6 +579,16 @@ export function Wiki() {
           the tile card instead, which lists them all. With a mouse, what a click would pick is
           outlined while you hover over it, in its owner’s colour; on a touch screen a tap picks by
           the same order.
+        </p>
+        <p>
+          The tool rail on the left opens drawers over the map, one at a time, in three groups:
+          People (Residents, Horses, Armies), Diplomacy, and Realm (Cities, Waypoints, Scripts,
+          Realm log). The Diplomacy drawer has a tab each for Contracts, Demands, Direct offers,
+          Alliance and Standing; it reopens on the tab you left it on, and a notice’s Open takes you
+          to its tab. A small dot on a rail button or tab says it holds something you haven’t seen
+          yet: a demand, Direct offer or contract offer sent to you, or Realm log lines newer than
+          the last time you had the log open. Opening it there clears the dot. On a phone the menu
+          button shows the dot too.
         </p>
         <p>
           The Residents drawer’s Open full list button opens the list across the screen, with
@@ -685,7 +723,8 @@ export function Wiki() {
           renaming, which are about one resident. Nothing ties them together afterwards; each goes
           on alone. The card shows the orders some of them can take where they stand, as rows with
           the same keys as on a resident's card; while it stays open, an order none of them can take
-          any more stays greyed out, saying why (“nobody stands on a carriage of your realm”).
+          any more stays greyed out, saying why (“nobody stands on a carriage or beside a boat of
+          your realm”).
         </p>
         <ul>
           <li>
@@ -729,7 +768,9 @@ export function Wiki() {
           <li>
             <strong>Board carriage</strong> (with several carriages of your realm where some of them
             stand, pick one) puts those on its tile aboard, in the group's order, until it is full;{' '}
-            <strong>Get off</strong> gets every passenger among them off. See Passengers.
+            <strong>Get off</strong> gets every passenger among them off. See Passengers. A boat of
+            your realm beside some of them is boarded the same way (Board boat), and{' '}
+            <strong>Row boats to</strong> has one of them row each boat there; see Water.
           </li>
         </ul>
         <p>
@@ -758,27 +799,44 @@ export function Wiki() {
 
       <Section id="queues">
         <p>
-          A queue gives a resident a list of steps to do one after another, up to{' '}
-          {num(QUEUE_MAX_STEPS)} of them. A step is any order you could give them on its own: walk
-          to, pick up, drop, store, fetch, drive, hitch or unhitch a horse, mount or dismount, board
-          or get off a carriage, work, build, haul, feed the stable, breed horses, tear down, Build
-          line (road or wall), relocate to another of your cities, or run one of your scripts with
-          its params.
+          A queue gives a resident a list of steps to do one after another, some of them wrapped in
+          repeat blocks, up to {num(QUEUE_MAX_STEPS)} steps and blocks in all. A step is any order
+          you could give them on its own: walk to, pick up, drop, store, fetch, drive, hitch or
+          unhitch a horse, mount or dismount, board or get off a carriage, work, build, haul, feed
+          the stable, breed horses, tear down, Build line (road or wall), relocate to another of
+          your cities, or run one of your scripts with its params.
         </p>
         <p>
-          To plan ahead, use <strong>Add step</strong> under the queue on the resident's card: it
-          lists every kind of step. One that acts on a place (work a workplace, build, store at or
-          fetch from a storage, pick up, feed the stable, breed, …) has you pick that place on the
-          map, anywhere, not only where the resident stands now; one that needs more (which goods,
-          what to build, what a smithy makes, which script) asks for it on the card after. What to
-          build is the same Build menu as on the card; a kind dimmed because the tile lacks
-          something today, such as a city's area, can still be added, for a step before it may bring
-          that. A step that has to be done on its tile goes after a walk there, unless the step
-          before already walks there. It works on a resident with no queue too, and starts one.
-          Adding a step only checks that it could make sense (the place is there as you last knew
-          it, and a carriage or horse is yours). A workplace or construction site can be anyone's,
-          in sight or as last seen, since a workplace has no owner: queue Work at a far mine and
-          they walk there and work it. Whether a step can start is checked when its turn comes.
+          To plan ahead, use <strong>Add step</strong> right under the queue's steps on the
+          resident's card: a palette of every kind of step, each with its icon, grouped as the
+          Orders tab is (Move, Work &amp; build, Goods, Scripts), plus Flow with{' '}
+          <strong>Repeat</strong> and <strong>If</strong> for the picked steps, and{' '}
+          <strong>Wait until</strong>. Customise is the small ⚙ beside a step. New steps go at the
+          end; tap the <strong>+</strong> between two steps to add the next ones there instead, and
+          tap it again to go back to the end. One that acts on a place (work a workplace, build,
+          store at or fetch from a storage, pick up, feed the stable, breed, …) has you pick that
+          place on the map, anywhere, not only where the resident stands now; one that needs more
+          (which goods, what to build, what a smithy makes, which script) asks for it on the card
+          after. What to build is the same Build menu as on the card; a kind dimmed because the tile
+          lacks something today, such as a city's area, can still be added, for a step before it may
+          bring that. A step that has to be done on its tile goes after a walk there, unless the
+          step before already walks there; one that acts on no place (Explore, Dismount, Get off,
+          Run script) gets no walk. Adding a step only checks that it could make sense (the place is
+          there as you last knew it, and a carriage or horse is yours). A workplace or construction
+          site can be anyone's, in sight or as last seen, since a workplace has no owner: queue Work
+          at a far mine and they walk there and work it. Whether a step can start is checked when
+          its turn comes.
+        </p>
+        <p>
+          For a resident with no queue, the steps you add, paste or load collect as a{' '}
+          <strong>draft</strong>, marked “Draft, not started”: nothing runs until you press{' '}
+          <strong>Start queue</strong>, which gives it. <strong>Discard draft</strong> throws it
+          away. A running queue is edited live; <strong>Edit as draft</strong> copies it into a
+          draft while the queue runs on untouched, and Start queue replaces it (the step they are on
+          keeps going if it is still in it). A draft is kept in this browser and lost on reloading
+          the page. <strong>Clear</strong> empties a draft or a group's plan. On a running queue it
+          asks first, then removes every step but the one the resident is on and turns loop off, so
+          they finish that step and the queue ends; <strong>Stop</strong> still halts them at once.
         </p>
         <p>
           Hold <kbd>Shift</kbd> while you give an order (a button, its key, or a tile picked on the
@@ -792,8 +850,17 @@ export function Wiki() {
         </p>
         <p>
           The resident's card lists the queue with the current step marked and what they are doing
-          in it. Drag a step or use its arrows to reorder it, remove it, type a duration in game
-          minutes (the real time shows beside it) or clear it, and switch loop on or off.
+          in it, each step on one line with an icon for its kind of order and its place by name: a
+          building with its city (“Walk to Farm, Quarrytown IV”), a waypoint or a city, or the
+          tile's coordinates when nothing is there. A step's duration shows as a chip when it has
+          one, or when it needs one; tap it to type the duration in game minutes (the real time
+          shows beside it), empty it to clear it. The steps sit in a bracket, <strong>Loop</strong>,
+          with its switch in its head: on, the first step follows the last. Drag a step to reorder
+          it, also into or out of a repeat block's bracket, or focus it and press <kbd>Alt</kbd>+
+          <kbd>↑</kbd> or <kbd>Alt</kbd>+<kbd>↓</kbd>. On a phone, tap the steps to move to pick
+          them, then tap <strong>Move here</strong> where they go. A step kind dragged from Add step
+          and dropped between two steps is planned there. Remove a step with ✕. The planner's{' '}
+          <strong>?</strong> shows how it works.
         </p>
         <p>
           To reuse steps, tap one in the planner to pick it (<kbd>Shift</kbd>+tap picks a range;
@@ -806,27 +873,100 @@ export function Wiki() {
           step keeps its places and the walk before it, and is checked again when its turn comes.
         </p>
         <p>
-          To keep a plan, <strong>Save…</strong> it under a name, such as “Mine run”; saving under a
-          name already taken asks before it overwrites. <strong>Load…</strong> lists the saved
-          queues with their step count and date, to load one or delete it; loading adds its steps
-          after the planned ones, in any resident's planner or a group's. Saved queues are kept in
-          this browser, as saved groups are: the server never sees them, and another browser has its
-          own. A saved step keeps its places, so one whose building is gone from the map (torn down,
-          say) is flagged in the planner; it is still given, and skipped when its turn comes.
+          To keep a plan, open the planner's <strong>Saved…</strong> and save it under a name, such
+          as “Mine run”; saving under a name already taken asks before it overwrites. Saved… also
+          lists the saved queues with their step count and date, to load one or delete it (a
+          resident with nothing queued has <strong>Load…</strong> for the same list); loading adds
+          its steps after the planned ones, in any resident's planner or a group's. Saved queues are
+          kept in this browser, as saved groups are: the server never sees them, and another browser
+          has its own. A saved step keeps its places, so one whose building is gone from the map
+          (torn down, say) is flagged in the planner; it is still given, and skipped when its turn
+          comes.
         </p>
         <p>
           To do some steps several times in a row, pick them (in a row) and press{' '}
           <strong>Repeat</strong>: they are wrapped in a repeat block, done {num(DEFAULT_REPEAT)}{' '}
-          times until you type another count. The block shows its count with its steps indented
-          under it; it is picked, moved, copied, pasted, saved and removed as one,
-          <strong> Unwrap</strong> puts its steps back as they were, and a block can hold another.
-          Repeat blocks are the planner's own: on a resident's card, wrapping steps opens a plan of
-          their queue that waits for <strong>Give</strong> (or Discard), and giving it, or Give to
-          all on a group's plan, makes each block that many plain copies of its steps, so the queue,
-          the server and your scripts only ever see steps. The running queue lists the copies, the
-          current one marked. A queue holds at most {num(QUEUE_MAX_STEPS)} steps after repeats; the
-          planner counts them and won't give a plan over that, saying by how much. Loop still loops
-          the whole queue.
+          times until you type another count (up to {num(QUEUE_MAX_REPEAT)}), or pick{' '}
+          <strong>forever</strong> or <strong>until…</strong> in its head. The block is a bracket
+          inside Loop's, its count in its head and its steps inside; it is picked, moved (into
+          another block too), copied, pasted, saved and removed as one,
+          <strong> Unwrap</strong> puts its steps back as they were, and a block can hold another,
+          up to {num(QUEUE_MAX_DEPTH)} deep. The block is part of the queue itself: wrapping steps
+          of a running queue edits it live, and the resident does the block's steps round after
+          round. The running queue shows the round the block is on (“round 2 of 3”), and an edit
+          keeps it. A round in which none of its steps could start ends the block, so a block whose
+          steps all fail never spins: the queue goes on after it. A queue holds at most{' '}
+          {num(QUEUE_MAX_STEPS)} steps and blocks as written: “repeat 100 times” of two steps is
+          three. The planner counts them and won't give a plan over that, saying by how much. Loop
+          still loops the whole queue; a looping queue that got through all its steps without
+          starting one ends. Your scripts see a queue as before: the step the resident is on and its
+          number among the steps counted top to bottom, not the blocks or their rounds.
+        </p>
+        <p>
+          <strong>Repeat until</strong> repeats the block until a condition holds (the same
+          conditions as Wait until, below), set on the card when you pick <strong>until…</strong>;{' '}
+          <strong>Change</strong> in the head sets another. The condition is checked before each
+          round: when the block's turn comes, and again after each round. Once it holds, the block
+          runs no more rounds and the queue goes on after it; a round already begun runs to its end.
+          If it holds when the block's turn comes, the block runs no round at all. It has no count,
+          so the running queue shows just the round it is on (“round 4”), and a round in which none
+          of its steps could start still ends it. For example, “repeat until the storage holds 100
+          Wood: fetch, haul” keeps hauling until the storage is full enough. A condition on a place
+          gone, or no longer your realm's, counts as false and is noted in your realm log.
+        </p>
+        <p>
+          To do some steps only sometimes, pick them (in a row) and press <strong>If</strong> in Add
+          step's Flow, then set its condition (the same conditions as Wait until, below): they are
+          wrapped in an If block, a bracket with the condition in its head. When its turn comes the
+          condition is checked once: if it holds, the block's steps run; if not, they are passed
+          over. To do something else instead, pick other steps and press the block's{' '}
+          <strong>Else</strong>: they move into its Else part, a second part of the bracket, run
+          when the condition doesn't hold. The condition is not checked again while the block's
+          steps run, whatever changes meanwhile. <strong>Change</strong> sets another condition,{' '}
+          <strong>Unwrap</strong> puts its steps (then its Else steps) back where it was. An If
+          block nests with repeat blocks and counts as a block towards the queue's size and depth;
+          inside a repeat block it is checked again each round. A running queue marks the part it is
+          running. A condition on a place gone, or no longer your realm's, counts as false (so the
+          Else part runs) and is noted in your realm log. Your scripts see the steps counted top to
+          bottom, the Else part's after the block's own.
+        </p>
+        <p>
+          <strong>Wait until</strong>, in Add step's Flow, is a step that ends once its condition
+          holds; meanwhile the resident stands idle where they are. With a duration it also ends
+          when that is up, whether the condition holds or not. Its condition is set on the card:
+          pick the kind, then its fields. A condition is about the resident themself or one place of
+          your own realm, never anything you couldn't know:
+        </p>
+        <ul>
+          <li>
+            <strong>Carrying</strong>: they, or the carriage or boat they drive, carry at least or
+            less than so many of a good. The carriage or boat is the one they drive or are aboard,
+            else a carriage of yours on their tile; with none, the condition is false.
+          </li>
+          <li>
+            <strong>Full or empty</strong>: they, or that carriage or boat, are full (not room left
+            for one more unit of what they hold) or empty.
+          </li>
+          <li>
+            <strong>Stock at a place</strong>: a storage, workplace pile or construction site of
+            your realm, picked on the map, holds at least or less than so many of a good.
+          </li>
+          <li>
+            <strong>Hunger or health</strong>: their hunger meter or health is above or below a
+            share of full.
+          </li>
+          <li>
+            <strong>Mounted</strong> or <strong>Aboard</strong>: they are, or are not.
+          </li>
+          <li>
+            <strong>Game hour</strong>: it is before an hour, or that hour or later.
+          </li>
+        </ul>
+        <p>
+          The condition is checked from the tick after the wait started, so a wait whose condition
+          already holds lasts a tick. A condition on a place that is gone, or no longer your
+          realm's, counts as false and is noted once in your realm log. In a group's plan each
+          member checks the condition for themself.
         </p>
         <p>
           A step ends when it is done (the walk arrives, the goods are stored, the script calls{' '}
@@ -1456,7 +1596,8 @@ export function Wiki() {
           Strength {num(strong.stats.strength.base)}. A carriage behind an average horse carries{' '}
           {num(CARRIAGE_CAPACITY)} kg; each point of its driver's Driving skill makes it{' '}
           {pct(DRIVING_SKILL_EFFECT)} faster, at most {pct(DRIVING_SKILL_LIMIT)}, learned at{' '}
-          {num(DRIVING_SKILL_PER_DAY)} a game day of driving. Carriages can't enter mountains.
+          {num(DRIVING_SKILL_PER_DAY)} a game day of driving. Carriages enter mountains only along a
+          finished road, so a road over a ridge opens a pass for them.
         </p>
         <p>
           A carriage is built at a finished stable: a resident there lays out a carriage site on a
@@ -1498,7 +1639,8 @@ export function Wiki() {
           hauling and group orders. Its owner's realm log says at once that it is gone and where it
           was last; who took it they learn only from a witness (see Standing). One that belongs to
           nobody is simply yours. A carriage handed over to an alliance army is its commander's to
-          drive, which is no theft.
+          drive, which is no theft. A boat is stolen the same way, by rowing it off from beside it
+          (see Water &amp; havens).
         </p>
         <p>
           A carriage's card shows its load as a bar against what it holds (its passengers counted
@@ -1876,6 +2018,215 @@ export function Wiki() {
         </p>
       </Section>
 
+      <Section id="water">
+        <p>
+          Lake and Sea are <b>water</b>. Nobody walks on them, and a walk always goes round on land.
+          Boats and ships are what cross them, and they start at a haven.
+        </p>
+        <p>
+          A <b>haven</b> is a {num(FOOTPRINT.haven)} × {num(FOOTPRINT.haven)} building on the shore:
+          every tile of it on passable land, off Mountain and off resource nodes, and at least one
+          of its tiles touching Lake or Sea, straight or diagonally. The Build menu offers it only
+          where it fits. It is built from {goods(havenCost.materials)} and{' '}
+          {duration(havenCost.buildTicks)} of one average resident's work.
+        </p>
+        <p>
+          A haven has a <b>storage</b>: anyone standing at it puts goods in or takes them out, by
+          hand, with Store and Fetch, or with a script, as at any storage. Like a stable it has no
+          owner of its own: it is the city's whose resident laid it out, and taking goods from it is
+          judged as taking from any storage of that city. NPC cities don't build havens.
+        </p>
+        <p>
+          <b>Building a boat.</b> A resident standing on a tile of a finished haven that touches the
+          water lays out a <b>boat site</b> there with Build (in the Build menu under Transport). It
+          is a construction site like any other: it takes {goods(boatCost().materials)} and{' '}
+          {duration(boatCost().buildTicks)} of one average resident's work, anyone may bring
+          materials or work on it, and torn down it leaves all its materials. Once finished the site
+          is gone, and an empty boat of the realm of whoever finished it floats on the nearest free
+          water tile next to it.
+        </p>
+        <p>
+          A boat always floats on a water tile, one boat to a tile. It carries a few residents and a
+          little cargo: {num(BOAT_CAPACITY)} kg in all, each passenger counting as{' '}
+          {num(PASSENGER_WEIGHT)} kg. It shows on the map to whoever sees its tile, like a carriage;
+          its card tells whose it is and how heavily it is loaded, and what it holds only to its own
+          realm and allies. Scripts see the boats in sight with <code>vessels()</code>. A boat of a
+          realm that ends belongs to nobody, as NPC cities don't use the water.
+        </p>
+        <p>
+          <b>Building a ship.</b> A <b>ship</b> is the big vessel of the Sea: it carries far more
+          than a carriage, {num(SHIP_CAPACITY)} kg in all, sails with a crew and goes only on Sea,
+          never onto a Lake. A resident standing on a tile of a finished haven that touches the Sea
+          lays out a <b>ship site</b> there with Build (under Transport); a haven on a Lake alone
+          builds boats only. The site takes {goods(shipCost().materials)} and{' '}
+          {duration(shipCost().buildTicks)} of one average resident's work, so it is a job for many
+          hands, and like a boat site anyone may bring materials or work on it. Once finished the
+          site is gone, and an empty ship of the realm of whoever finished it floats on the nearest
+          free Sea tile next to it. It shows on the map on a token of its own, to whoever sees its
+          tile; its card tells whose it is, its load, and who is aboard.
+        </p>
+        <p>
+          <b>Docked.</b> A ship on a water tile touching a haven, straight or diagonally, is docked
+          there; one launched at a haven is docked at it. Only docked, and only from that haven, do
+          residents board it, get off it or load it: for a ship, beside it means standing anywhere
+          on the haven it is docked at, and getting off lands on a free tile of that haven. A ship
+          out at sea takes nobody on and lets nobody off. Store and Fetch with a docked ship as the
+          place walk onto its haven.
+        </p>
+        <p>
+          <b>Crew.</b> Residents of the ship's realm board it as its <b>crew</b> rather than as
+          passengers: Board ship… on their card opens the choice (As crew or As passenger), the
+          group card offers Crew the ship and Board the ship, a queue step Board a ship as crew, and
+          a script <code>board(ship.id, true)</code>. Only grown residents crew a ship, and crew
+          don't count against what it holds, while each passenger counts as {num(PASSENGER_WEIGHT)}{' '}
+          kg as on a boat. A ship sails only with at least {num(SHIP_MIN_CREW)} crew aboard; its
+          card names its crew and says whether it can sail. Getting off, one of the crew is its crew
+          no more.
+        </p>
+        <p>
+          <b>Loading a ship.</b> Those standing on the haven a ship is docked at move goods straight
+          between the haven's storage and the ship, as many as there are and fit, at once: Load ship
+          and Unload in the Goods panel, or a script's <code>loadShip(ship, goods)</code> and{' '}
+          <code>unloadShip(ship, goods)</code>. Taking goods from another city's haven this way is
+          judged as taking from its storage. Goods can also go aboard by hand, as onto a boat, from
+          the haven.
+        </p>
+        <p>
+          <b>Sailing.</b> One of the crew aboard, its <b>captain</b>, sails the ship: Sail ship to
+          on their card, then a tile, a queue step Sail the ship, or a script's{' '}
+          <code>sail(ship, x, y)</code>. Given a Sea tile it sails there; given a tile of a haven,
+          it docks on the free Sea tile beside that haven nearest it. It goes a Step at a time over
+          Sea only, never onto a Lake, so a lake haven builds boats, not ships. It sails only with
+          at least {num(SHIP_MIN_CREW)} crew aboard, and stops where it is if fewer are left. An
+          unskilled crew sails it {num(SAIL_SPEED)} times as fast as walking on Plains; their
+          average <b>Seafaring</b> makes it faster as a rower's does a boat, and every tick of
+          sailing teaches Seafaring to the whole crew. Everyone aboard goes along and sees from the
+          ship's tile. Crew and passengers eat their own food and, running low, take a meal from the
+          ship's Food, as on a boat.
+        </p>
+        <p>
+          <b>Stealing a ship.</b> Residents of your realm on the haven another realm's ship is
+          docked at board it as crew, if nobody of another realm is aboard and no armed resident of
+          its owner stands on the haven while none of yours does; with at least {num(SHIP_MIN_CREW)}{' '}
+          of them aboard, sailing it off steals it with its load, known through a witness like a
+          boat's theft.
+        </p>
+        <p>
+          <b>Fighting at a ship.</b> Those aboard a docked ship can be attacked from anywhere on its
+          haven, and fight back at those on it; out at sea, as with a boat, nobody reaches them.
+        </p>
+        <p>
+          <b>Beside a boat</b> means on a land tile touching its water tile, straight or diagonally.
+          A resident beside a boat of their realm <b>boards</b> it, children too (Board boat on
+          their card, or on the boat's card, or a script's <code>board(id)</code>), and steps onto
+          its water tile: on the map they ride inside it, which shows how many are aboard, and their
+          Doing line says "Aboard a boat". Each passenger counts as {num(PASSENGER_WEIGHT)} kg of
+          the {num(BOAT_CAPACITY)} kg it holds, so{' '}
+          {num(Math.floor(BOAT_CAPACITY / PASSENGER_WEIGHT))} residents fill an empty one. No horse
+          goes aboard: a rider dismounts first, and the driver of a carriage can't board.
+        </p>
+        <p>
+          A passenger <b>gets off</b> onto a free land tile beside the boat: one they pick (a
+          script's <code>getOff(x, y)</code>), or the first one there. Giving a passenger a walk or
+          an order that acts on a tile gets them off first, onto the shore nearest where they are
+          going. A boat away from every shore keeps its passengers aboard: they can't get off, and a
+          walk given to them ends. Walking never uses a boat. Down or dead, a passenger stays in the
+          boat, and what they carried stays in it.
+        </p>
+        <p>
+          <b>Loading.</b> Residents beside a boat put goods in it and take goods out, up to what it
+          holds with its passengers counted in: Store and Fetch with the boat as the place (they
+          walk to the shore beside it), or a pick-up or drop at <code>{'{kind: "vessel"}'}</code>{' '}
+          from a script. Residents and goods only: a boat takes no horse or carriage.
+        </p>
+        <p>
+          <b>Rowing.</b> A grown resident aboard a boat of their realm, or beside it (they board
+          first), rows it to a water tile: Row boat to on their card, then a tile on the map, or a
+          script's <code>row(boat, x, y)</code>. Given a land tile, the boat goes to the nearest
+          free water tile beside it. It goes a Step at a time over water only, Lake and Sea alike,
+          and a diagonal Step only where both straight tiles beside it are water too, so it never
+          squeezes between two pieces of land. The rower takes its oars and is no passenger: they
+          don't count against what it holds, and whoever was at the oars before becomes a passenger.
+          Everyone aboard goes along and sees from the boat's tile, so rowing along a coast explores
+          it. On the map the boat glides from tile to tile, and the rower's Doing line says where it
+          is heading. A boat nobody rows stays where it is; it never drifts. Walking never uses a
+          boat: a walk across water still goes round on land.
+        </p>
+        <p>
+          An average rower moves a boat {num(ROW_SPEED)} times as fast as walking on Plains. Each
+          point of Strength above {num(ROW_STRENGTH_AVERAGE)} makes it {pct(ROW_STRENGTH_EFFECT)}{' '}
+          faster (and each below, slower), at most {pct(ROW_STRENGTH_LIMIT)} either way. Rowing
+          teaches <b>Seafaring</b>, {num(SEAFARING_SKILL_PER_DAY)} a game day of rowing at average
+          Intellect, and each point of it makes the boat {pct(SEAFARING_SKILL_EFFECT)} faster, at
+          most {pct(SEAFARING_SKILL_LIMIT)}. Rowing costs food as walking on Plains does. The rower
+          and passengers eat their own food and, running low, take a meal from the boat's Food.
+        </p>
+        <p>
+          <b>Boats in queues and groups.</b> Boarding, rowing, getting off and loading are queue
+          steps like any other, so a queue can take a resident across a lake and back, and a saved
+          queue keeps them. With Add step, <b>Board a boat</b> picks the boat, then the shore tile
+          to board it from (a walk there goes first): beside the boat now, or beside where an
+          earlier step rows it. <b>Row the boat</b> picks the boat, then where to row it; it needs
+          them aboard or beside it already, so it usually follows Board a boat. <b>Get off</b> lands
+          them on the shore beside the boat, and Store and Fetch take the boat as their place. A
+          step that can't be done when its turn comes (the boat isn't beside them) is skipped and
+          noted in the realm log. On the group card, <b>Board boat</b> boards those beside a boat of
+          your realm until it is full, <b>Get off</b> gets everyone aboard off together, and{' '}
+          <b>Row boats to</b> has one of them row each boat (the first already aboard it, else the
+          first beside it) while the others aboard go along: board, row, get off, and the whole crew
+          is across.
+        </p>
+        <p>
+          <b>Haul route by boat.</b> A boat runs a haul route as a carriage does, between two stops
+          on land: shore tiles or a haven, each with free water beside it. A grown resident standing
+          on the shore beside a boat of your realm picks <strong>Haul route…</strong> on their card,
+          the goods to take and to bring back and the Food kept on board for them (
+          {num(HAUL_KEEP_FOOD)} unless you pick another amount), then the other stop on the map; the
+          tile they stand on is the first stop. With Add step it is <b>Haul route by boat</b>: the
+          boat, the first stop (a walk there goes first), then the other one. A script gives it with{' '}
+          <code>haul(boat, x, y, goods)</code> from the shore beside the boat. At each stop the
+          rower gets off onto it and loads and unloads by hand from beside the boat, like a
+          carriage's driver: at a haven from and into its storage, at a shore from and onto the pile
+          on the tile. Then they board, take the oars and row to the free water beside the other
+          stop. The boat leaves the first stop once it has goods on board and nothing more to load
+          there; with none there yet it waits. The route ends when the boat isn't beside the stop
+          any more (rowed off by someone else) or the rower can't get off onto it, and goes on until
+          stopped otherwise. The rower's Doing line says what they load or where they row.
+        </p>
+        <p>
+          <b>Haul route by ship.</b> A ship runs a haul route between two havens. A grown resident
+          standing on the haven a ship of your realm is docked at picks <strong>Haul route…</strong>{' '}
+          on their card (or <b>Haul route by boat or ship</b> with Add step, or a script's{' '}
+          <code>haul(ship, x, y, goods)</code>), then a tile of the other haven; they are its
+          captain. With them aboard it must have at least {num(SHIP_MIN_CREW)} crew, so the others
+          board as crew first. At each haven the captain gets off and moves the goods straight
+          between the haven's storage and the ship, as many as there are and fit, at once: first the
+          goods for that haven off, then the Food kept on board for the crew topped up, then the
+          goods for the other haven on. Then they board again as one of the crew and sail to the
+          other haven, docking on the free Sea beside it; the rest of the crew stays aboard all the
+          while and eats from the ship's Food. Goods go both ways as for a carriage, ore home and
+          Food out, say. The ship leaves the first haven once it has goods for the other aboard;
+          with none there yet it waits. Sailing on each time teaches Seafaring to the whole crew.
+        </p>
+        <p>
+          <b>Stealing a boat.</b> A grown resident beside another realm's boat can row it off as a
+          carriage is driven off: <strong>Row off (theft)</strong> on their card, then a tile, or a
+          script's <code>row(boat, x, y)</code> naming that boat. The boat joins your realm at once
+          with its load, and they take its oars. It can't be taken while someone rows it or anyone
+          is aboard, nor while an armed resident of its owner stands beside it and none of your
+          realm does. Boat and load are one theft, known through a witness like a carriage's: its
+          owner's realm log says at once that it is gone and where it was last. A boat of nobody is
+          simply yours.
+        </p>
+        <p>
+          <b>Fighting at a boat.</b> Those aboard can be attacked by anyone beside it, as if the
+          boat were the next land tile, and fight back from aboard; Down or dead, they stay in it.
+          There are no fights between boats and none from open water, so a boat away from every
+          shore is out of reach: an attack on someone aboard it finds no way and ends. An alarm at
+          home doesn't reach whoever is rowing.
+        </p>
+      </Section>
+
       <Section id="how-to-trade">
         <p>
           Trade happens in person: one of your residents, or a carriage of yours, stands on the tile
@@ -1903,16 +2254,16 @@ export function Wiki() {
         </p>
         <h3>Direct offers</h3>
         <p>
-          Under <strong>Direct offers</strong> on the tool rail you can send an offer to one realm
-          you know of: one you see residents of, an ally, one whose city you have seen, one with a
-          standing either way, or your side in a contract, demand or direct offer. Name a storage of
-          yours, and the goods are set aside there as for any offer. They hear at once wherever they
-          are, with a notice and the place, and only they can accept it: someone of theirs goes to
-          the storage and takes it in person, as with any offer, or they decline it from anywhere.
-          Anyone else in sight of the storage sees it, and that it is for another realm. It lapses
-          after {num(DIRECT_OFFER_DAYS)} game days. Declined, lapsed or taken down, the goods are
-          ordinary again and both of you are told. At most {num(DIRECT_OFFERS_TO_ONE_REALM)} can
-          stand to one realm.
+          Under <strong>Direct offers</strong> in the Diplomacy drawer you can send an offer to one
+          realm you know of: one you see residents of, an ally, one whose city you have seen, one
+          with a standing either way, or your side in a contract, demand or direct offer. Name a
+          storage of yours, and the goods are set aside there as for any offer. They hear at once
+          wherever they are, with a notice and the place, and only they can accept it: someone of
+          theirs goes to the storage and takes it in person, as with any offer, or they decline it
+          from anywhere. Anyone else in sight of the storage sees it, and that it is for another
+          realm. It lapses after {num(DIRECT_OFFER_DAYS)} game days. Declined, lapsed or taken down,
+          the goods are ordinary again and both of you are told. At most{' '}
+          {num(DIRECT_OFFERS_TO_ONE_REALM)} can stand to one realm.
         </p>
         <p>
           Or have the Trade Organization carry it, while the HQ stands. Name a city of yours and a
@@ -2361,10 +2712,20 @@ export function Wiki() {
         </p>
         <p>
           An NPC city sells only what it holds above this reserve and buys only what it is short of.
-          It lends residents at {num(NPC_TRADE.pricePerResidentWeek)} coins each a game week,
-          keeping {pct(NPC_TRADE.defenceShare)} of its adults at home. The Trade Organization hires
-          out soldiers at {num(TRADE_ORG_ARMY.pricePerSoldierWeek)} coins each a game week. A
-          contract runs at most {days(CONTRACT_MAX_DAYS)}.
+          It lends residents at {num(NPC_TRADE.pricePerResidentWeek)} coins each a game week, but
+          only its spare hands: those its plan has idle, on a road crew, scouting or working for
+          surplus. Its farmers, those working for a good short of its reserve and its builders stay,
+          and so do {pct(NPC_TRADE.defenceShare)} of its adults at home, its soldiers among them.
+          They take weapons and armour along only from what its storages hold above its reserve;
+          with none spare they come unarmed. It lends nobody while it weighs a demand, while its
+          town hall is occupied, or while your armed residents stand in its City area or in sight of
+          it. Those it lends never act against it: they refuse an order to attack its residents,
+          walls or gates, to climb its walls or to tear down its buildings, whether you give it by
+          hand, in a queue, to a group or an army or from a script, and they can't occupy its town
+          hall nor count as your fighters toward it. Struck by one of its own, they still defend
+          themselves. The Trade Organization hires out soldiers at{' '}
+          {num(TRADE_ORG_ARMY.pricePerSoldierWeek)} coins each a game week. A contract runs at most{' '}
+          {days(CONTRACT_MAX_DAYS)}.
         </p>
         <p>
           An NPC city shuts its gates while anyone armed who isn't of the city or its alliance
@@ -2474,8 +2835,9 @@ export function Wiki() {
             itself to you.
           </li>
           <li>
-            At {signed(PERSUADE_STANDING)} and with enough respect an NPC city asks to join you;
-            declined, it asks again after {days(PERSUADE_ASK_AGAIN_DAYS)}.
+            At {signed(PERSUADE_STANDING)}, and once your fighters near it have outweighed its own
+            side for {days(OUTWEIGH_HOLD_DAYS)} without a break (Respect, below), an NPC city asks
+            to join you; declined, it asks again after {days(PERSUADE_ASK_AGAIN_DAYS)}.
           </li>
           <li>
             An NPC city joins an alliance when it holds every member at{' '}
@@ -2570,6 +2932,21 @@ export function Wiki() {
           Leaving an alliance takes {realSeconds(ALLIANCE_LEAVE_DELAY)}; soldiers recalled from its
           army are back under their owner's command after {realSeconds(ALLIANCE_RECALL_DELAY)}.
         </p>
+        <h3>Respect</h3>
+        <p>
+          What an NPC city weighs when you demand it or it thinks of joining you. On your side only
+          your armed residents count, and only while they stand in its City area or in sight of one
+          of its people who is at home there: what its scouts and traders see far away doesn't
+          count, nor do your walls, nor residents it lent you. Each counts by strength, as combat
+          weighs them: their best weapon's blow, harder with Combat skill (up to{' '}
+          {num(1 + COMBAT_SKILL_LIMIT)} times), plus what their shield and armour take off a blow.
+          An untrained resident with a spear counts {num(fighterStrength(UNTRAINED_SPEAR))}; one
+          with a sword, shield and armour and full Combat skill counts{' '}
+          {num(fighterStrength(TRAINED_AND_ARMOURED))}. On its side count its soldiers, weighed the
+          same way, and {num(RESPECT_PER_WALL)} for each of its own finished wall and gate tiles. It
+          weighs this at its planning pass, once a game hour, and remembers since when each realm
+          has outweighed it; the first pass one doesn't, that time starts again from nothing.
+        </p>
       </Section>
 
       <Section id="demands">
@@ -2577,9 +2954,9 @@ export function Wiki() {
           A demand tells another realm what you want and by when: <strong>a named city</strong> of
           theirs, or <strong>goods or Coins</strong>, with a note of at most{' '}
           {num(DEMAND_NOTE_MAX_LENGTH)} characters and a deadline of up to {days(DEMAND_MAX_DAYS)}.
-          Open <strong>Demands</strong> on the tool rail to send one or to answer one. Scripts can
-          too (<code>sendDemand</code>, <code>acceptDemand</code>, <code>declineDemand</code>,{' '}
-          <code>demands</code>).
+          Open <strong>Demands</strong> in the Diplomacy drawer to send one or to answer one.
+          Scripts can too (<code>sendDemand</code>, <code>acceptDemand</code>,{' '}
+          <code>declineDemand</code>, <code>demands</code>).
         </p>
         <ul>
           <li>
@@ -2588,7 +2965,7 @@ export function Wiki() {
             in a contract, demand or Direct offer.
           </li>
           <li>
-            It arrives at once, wherever they are, in their Demands drawer and as a notice. A realm
+            It arrives at once, wherever they are, on their Demands tab and as a notice. A realm
             sends at most {num(DEMANDS_PER_GAME_DAY)} a game day, scripts included.
           </li>
           <li>
@@ -2613,14 +2990,19 @@ export function Wiki() {
             holds is what goes. With none of it there you can't accept that way.
           </li>
           <li>
-            <strong>An NPC city answers for itself</strong> within a game hour, when it next plans.
-            You can send one to any NPC city you have seen or have a standing with. It gives in when
-            the armed residents and walls of yours in its sight come to at least{' '}
-            {num(DEMAND_YIELD_RESPECT_TIMES)} times its soldiers, and at least{' '}
-            {num(DEMAND_YIELD_RESPECT_MIN)}, so an army at the gate can win a city without a fight.
-            Those out of its sight don't count. It joins your realm as a persuaded city does, or
-            sets what it holds of the goods aside at its storage for you alone to fetch. Otherwise,
-            or with none of the goods there, it declines, and its standing toward you drops by{' '}
+            <strong>An NPC city weighs it at its planning passes</strong>, one each game hour. You
+            can send one to any NPC city you have seen or have a standing with. It gives in once the
+            strength of your fighters near it (Respect, under Standing) has come to at least{' '}
+            {num(DEMAND_YIELD_RESPECT_TIMES)} times its own side, and at least{' '}
+            {num(DEMAND_YIELD_RESPECT_MIN)}, for {days(OUTWEIGH_HOLD_DAYS)} without a break: a real
+            army that stays at the gate wins a city without a fight, a crowd with spears or an army
+            walking through doesn't. Until then it <strong>wavers</strong>, and the Demands drawer
+            shows how long is left; a planning pass on which your force doesn't outweigh it that far
+            starts the time again from nothing. Your walls and fighters out of its sight don't
+            count. It joins your realm as a persuaded city does, or sets what it holds of the goods
+            aside at its storage for you alone to fetch. With none of your fighters near it declines
+            at its next pass; it declines too when the deadline comes first, or with none of the
+            goods there. Declining drops its standing toward you by{' '}
             {num(DEMAND_DECLINED_STANDING_LOSS)}.
           </li>
           <li>

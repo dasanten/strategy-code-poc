@@ -74,8 +74,29 @@ Daniel's call as before.
 **Rust follow-ups (Epic 89, 2026-11-10):** written with Daniel from an audit of what the rewrite
 left of Epics 81 and 82's aims: placeholder tests, measurements after the port, profiling, tick
 health on the admin panel, slow tests back in the suite. T89.1 (the 21 placeholder tests) should
-land before the next `dev` → `main` release. The epic's place against other new epics is not
-agreed yet.
+land before the next `dev` → `main` release. Merged into `dev` on 2026-11-11.
+
+**Agreed with Daniel on 2026-11-11:** Havens and boats (Epic 90, ADR 0031: Lake and Sea crossed by
+boats rowed from any shore), then Ships (91: crewed ships between havens, haul routes by water),
+both ahead of Bandits.
+
+**Agreed with Daniel on 2026-11-12,** from an evaluation of the NPC planner: Cities that can't be
+talked over (Epic 96, ADR 0033: an NPC city yields only to a force that stays, and lends only what
+it can spare), then Goods get used (97: lasting outlets for a big NPC city's goods and work for its
+soldiers, the fix for its idle crowd), then NPC cities with intent (98: stance, threat memory,
+temperament, acting first), in that order, all ahead of Bandits. They touch NPC rules only and run
+alongside Ships (91) and the UI epics (92 to 95).
+
+**Agreed with Daniel on 2026-11-12,** from a UX review of the left menus and the queue editor:
+Queue planner rework (Epic 92: drafts, Clear, one-line steps, a grouped palette, blocks and
+brackets), Cities drawer (93) and Clearer menus (94: rail groups, one Diplomacy drawer, unseen
+marks) run side by side, all client only; then Queue conditions (95, ADR 0032: repeat blocks on the
+server, If blocks, Wait until), which needs Epic 92 on `dev`. All ahead of Bandits.
+
+**Agreed with Daniel on 2026-11-12:** Faster map loading (Epic 99, ADR 0034: explored terrain by
+level for the minimap and the far zoom, compressed and kept in the browser, with Last seen and the
+Region map sending only what changed) runs alongside the open epics, ahead of Bandits. It changes
+no rule.
 
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
@@ -166,6 +187,17 @@ I sleep.
 | 87  | [Rust backend: the shell](https://github.com/dasanten/strategy-code-poc/issues/1004)            | scope only              |
 | 88  | [Rust backend: client and cutover](https://github.com/dasanten/strategy-code-poc/issues/1005)   | scope only              |
 | 89  | [Rust follow-ups](https://github.com/dasanten/strategy-code-poc/issues/1126)                    | ticketed                |
+| 90  | [Havens and boats](https://github.com/dasanten/strategy-code-poc/issues/1146)                   | ticketed                |
+| 91  | [Ships](https://github.com/dasanten/strategy-code-poc/issues/1153)                              | ticketed                |
+| 92  | [Queue planner rework](https://github.com/dasanten/strategy-code-poc/issues/1168)               | ticketed                |
+| 93  | [Cities drawer](https://github.com/dasanten/strategy-code-poc/issues/1169)                      | ticketed                |
+| 94  | [Clearer menus](https://github.com/dasanten/strategy-code-poc/issues/1170)                      | ticketed                |
+| 95  | [Queue conditions](https://github.com/dasanten/strategy-code-poc/issues/1171)                   | ticketed                |
+| 96  | [Cities that can't be talked over](https://github.com/dasanten/strategy-code-poc/issues/1188)   | ticketed                |
+| 97  | [Goods get used](https://github.com/dasanten/strategy-code-poc/issues/1189)                     | scope only              |
+| 98  | [NPC cities with intent](https://github.com/dasanten/strategy-code-poc/issues/1190)             | scope only              |
+
+| 99  | [Faster map loading](https://github.com/dasanten/strategy-code-poc/issues/1198)                 | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.

@@ -1,15 +1,26 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import {
+  Fragment,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import { formatGameTime } from './shared/time.js'
 import type { FirstDay, TraderVisit } from '@csp/shared-types'
 import { DrawerStatus } from './drawer-head.js'
 import {
+  DIPLOMACY_TABS,
   DRAWERS,
+  railGroups,
   DRAWER_WIDTH,
   KEY_GOODS,
   drawerWidth,
   goodsLabel,
   isWide,
   rememberedDrawerWidth,
+  type DiplomacyTab,
   type DrawerId,
   type GoodsPick,
   type KeyGood,
@@ -23,7 +34,7 @@ import { WIKI_PATH } from './wiki-view.js'
 /** The HUD over the full-screen map (ADR 0008): top bar, tool rail, drawers and dialogs. */
 
 /** Line-art icons, 24×24 in `currentColor`, for the rail and the top bar. */
-const ICONS: Record<DrawerId | KeyGood | 'crown', ReactNode> = {
+const ICONS: Record<DrawerId | DiplomacyTab | KeyGood | 'crown', ReactNode> = {
   residents: (
     <>
       <circle cx="12" cy="6" r="3.2" fill="currentColor" />
@@ -54,6 +65,12 @@ const ICONS: Record<DrawerId | KeyGood | 'crown', ReactNode> = {
       <path d="M6 4h12v14a2 2 0 0 1-2 2H6" />
       <path d="M6 4a2 2 0 0 0 0 4h2M6 20a2 2 0 0 1 0-4h10" />
       <path d="M10 8h6M10 12h6" />
+    </>
+  ),
+  diplomacy: (
+    <>
+      <path d="M3 5h12v8H8l-3 3v-3H3z" />
+      <path d="M17 9h4v8h-2v3l-3-3h-5v-2" />
     </>
   ),
   demands: (
@@ -135,6 +152,7 @@ const STATUS_LABELS: Record<ConnectionStatus, string> = {
   connecting: 'connecting…',
   closed: 'offline',
   throttled: 'too many requests',
+  updated: 'updated',
 }
 
 export function Icon({ name, size = 18 }: { name: keyof typeof ICONS; size?: number }) {
@@ -278,27 +296,44 @@ export function TopBar({
 export function ToolRail({
   open,
   onToggle,
+  marked = NONE_MARKED,
 }: {
   open: OpenDrawer
   onToggle: (id: DrawerId) => void
+  /** The drawers holding something the Player hasn't seen (`unseenMarks`). */
+  marked?: ReadonlySet<DrawerId>
 }) {
   return (
     <nav className="hud-rail" aria-label="Tools">
-      {DRAWERS.map((d) => (
-        <button
-          key={d.id}
-          type="button"
-          className={open === d.id ? 'on' : ''}
-          aria-pressed={open === d.id}
-          aria-label={d.label}
-          data-tip={d.label}
-          onClick={() => onToggle(d.id)}
-        >
-          <Icon name={d.id} size={20} />
-        </button>
+      {railGroups().map((g, i) => (
+        <div key={g.id} className="hud-rail-group" role="group" aria-label={g.label}>
+          {i > 0 && <hr className="hud-rail-divider" aria-hidden="true" />}
+          {g.drawers.map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              className={open === d.id ? 'on' : ''}
+              aria-pressed={open === d.id}
+              aria-label={marked.has(d.id) ? `${d.label}, something new` : d.label}
+              data-tip={d.label}
+              onClick={() => onToggle(d.id)}
+            >
+              <Icon name={d.id} size={20} />
+              {marked.has(d.id) && <UnseenMark />}
+            </button>
+          ))}
+        </div>
       ))}
     </nav>
   )
+}
+
+/** No drawer or tab marked. */
+const NONE_MARKED: ReadonlySet<never> = new Set()
+
+/** The small mark on a rail button or tab whose drawer holds something the Player hasn't seen. */
+function UnseenMark() {
+  return <span className="unseen-mark" aria-hidden="true" />
 }
 
 /**
@@ -308,6 +343,7 @@ export function ToolRail({
 export function PhoneMenu({
   open,
   onToggle,
+  marked = NONE_MARKED,
   goods,
   leader,
   account,
@@ -316,6 +352,8 @@ export function PhoneMenu({
 }: {
   open: OpenDrawer
   onToggle: (id: DrawerId) => void
+  /** The drawers holding something the Player hasn't seen (`unseenMarks`). */
+  marked?: ReadonlySet<DrawerId>
   goods?: GoodsShown
   leader?: string
   account: string
@@ -337,31 +375,38 @@ export function PhoneMenu({
       <button
         type="button"
         className="hud-menu-button"
-        aria-label="Menu"
+        aria-label={marked.size > 0 ? 'Menu, something new' : 'Menu'}
         aria-expanded={shown}
         onClick={() => setShown((s) => !s)}
       >
         <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24">
           <path d="M4 6h16M4 12h16M4 18h16" />
         </svg>
+        {marked.size > 0 && <UnseenMark />}
       </button>
       {shown && (
         <>
           <div className="hud-menu-backdrop" onClick={() => setShown(false)} />
           <nav className="hud-menu" aria-label="Menu">
-            {DRAWERS.map((d) => (
-              <button
-                key={d.id}
-                type="button"
-                className={open === d.id ? 'on' : ''}
-                aria-pressed={open === d.id}
-                onClick={() => {
-                  onToggle(d.id)
-                  setShown(false)
-                }}
-              >
-                <Icon name={d.id} size={18} /> {d.label}
-              </button>
+            {railGroups().map((g) => (
+              <Fragment key={g.id}>
+                <h2 className="hud-menu-heading">{g.label}</h2>
+                {g.drawers.map((d) => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    className={open === d.id ? 'on' : ''}
+                    aria-pressed={open === d.id}
+                    onClick={() => {
+                      onToggle(d.id)
+                      setShown(false)
+                    }}
+                  >
+                    <Icon name={d.id} size={18} /> {d.label}
+                    {marked.has(d.id) && <UnseenMark />}
+                  </button>
+                ))}
+              </Fragment>
             ))}
             {goods && <Goods goods={goods} className="hud-menu-goods" />}
             {leader && (
@@ -429,6 +474,60 @@ export function Drawer({
       </div>
       <DrawerStatus.Provider value={status}>{children}</DrawerStatus.Provider>
     </section>
+  )
+}
+
+/**
+ * The Diplomacy drawer's tabs (`CONTEXT.md`: Tool rail). Every tab's panel stays mounted and only
+ * the picked one shows, so a panel keeps what the Player typed into it; only that one puts its
+ * count beside the drawer's title.
+ */
+export function DiplomacyTabs({
+  tab,
+  onTab,
+  marked = NONE_MARKED,
+  panels,
+}: {
+  tab: DiplomacyTab
+  onTab: (tab: DiplomacyTab) => void
+  /** The tabs holding something the Player hasn't seen (`unseenMarks`). */
+  marked?: ReadonlySet<DiplomacyTab>
+  panels: Record<DiplomacyTab, ReactNode>
+}) {
+  const status = useContext(DrawerStatus)
+  return (
+    <>
+      <div className="diplomacy-tabs" role="tablist" aria-label="Diplomacy">
+        {DIPLOMACY_TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            id={`diplomacy-tab-${t.id}`}
+            aria-selected={tab === t.id}
+            aria-controls={`diplomacy-panel-${t.id}`}
+            className={tab === t.id ? 'on' : ''}
+            onClick={() => onTab(t.id)}
+          >
+            <Icon name={t.id} size={15} /> {t.label}
+            {marked.has(t.id) && <UnseenMark />}
+          </button>
+        ))}
+      </div>
+      {DIPLOMACY_TABS.map((t) => (
+        <div
+          key={t.id}
+          role="tabpanel"
+          id={`diplomacy-panel-${t.id}`}
+          aria-labelledby={`diplomacy-tab-${t.id}`}
+          hidden={tab !== t.id}
+        >
+          <DrawerStatus.Provider value={tab === t.id ? status : null}>
+            {panels[t.id]}
+          </DrawerStatus.Provider>
+        </div>
+      ))}
+    </>
   )
 }
 

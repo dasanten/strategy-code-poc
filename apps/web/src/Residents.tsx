@@ -17,6 +17,7 @@ import {
 import { horsesInNeed } from './shared/reviving.js'
 import { isDown, GOODS, STAT_NAMES, SKILL_NAMES } from './shared/world.js'
 import { inContact } from './shared/combat.js'
+import { isVesselId, vesselCapacity, vesselName } from './shared/vessels.js'
 import {
   LINE_BUILDING,
   isLineOrder,
@@ -34,6 +35,7 @@ import {
 } from './shared/building.js'
 import {
   CARRIAGE_CAPACITY,
+  PASSENGER_WEIGHT,
   CARRYING_DAYS,
   FEED_UNITS,
   HAUL_KEEP_FOOD,
@@ -48,6 +50,8 @@ import {
   REALM_NAME_MAX_LENGTH,
   RESIDENT_NAME_MAX_LENGTH,
   QUEUE_MAX_STEPS,
+  QUEUE_MAX_REPEAT,
+  QUEUE_MAX_DEPTH,
   FOAL_STAT_SPREAD,
   STABLE_BREED_DAYS,
 } from '@csp/balance'
@@ -58,6 +62,12 @@ import { wallStrength, wallStrengthLeft } from './shared/walls.js'
 import { putAwayUnits } from './shared/goods.js'
 import { nameProblem } from './shared/names.js'
 import type {
+  Branch,
+  Condition,
+  QueueStepRequest,
+  Repeat,
+  SeenVessel,
+  VesselKind,
   Building,
   Carriage,
   City,
@@ -86,11 +96,15 @@ import {
   keptPair,
 } from './shared/horses.js'
 import {
+  Fragment,
+  useContext,
   useEffect,
   useRef,
   useState,
+  type DragEvent,
   type FormEvent,
   type KeyboardEvent,
+  type MouseEvent,
   type ReactNode,
 } from 'react'
 import {
@@ -119,21 +133,44 @@ import { workSpan } from './build-menu-view.js'
 import { doingLine, interruptedLine, scriptLine } from './doing-view.js'
 import { type RelocateChoice } from './relocate-view.js'
 import {
+  clearedItems,
   editPlan,
   planOf,
+  branchesOf,
+  roundsOf,
   realMinutes,
+  showsMinutes,
   stepRow,
   type QueuePlan,
   type QueueRow,
+  type StepGroup,
 } from './queue-view.js'
 import { copy, paste, pickStep, useClipboardEmpty } from './planner-clipboard.js'
 import {
+  followInsert,
+  InsertPointContext,
+  PlannerFlowContext,
+  PLAN_STEP_ICONS,
+  REPEAT_ICON,
+  STEP_KIND_TYPE,
+} from './step-palette-view.js'
+import { canMoveTo, insertPoints, moveItems } from './queue-brackets-view.js'
+import type { Plan, PlanStepId } from './plan-step.js'
+import { conditionLabel, draftOf, type ConditionNames } from './condition-view.js'
+import {
   canMove,
+  DEFAULT_REPEAT,
   capProblem,
   dropItem,
   hasBlocks,
   idsOf,
+  itemCount,
+  inner,
   insertItems,
+  intoElse,
+  isIf,
+  setCondition,
+  type IfBlock,
   isBlock,
   lastPicked,
   moveItem,
@@ -148,6 +185,7 @@ import {
   withIds,
   wrap,
   type PlanItem,
+  type RepeatBlock,
 } from './plan-blocks.js'
 import {
   browserStorage,
@@ -235,6 +273,7 @@ export const SKILL_LABELS: Record<SkillName, string> = {
   farming: 'Farming',
   combat: 'Combat',
   driving: 'Driving',
+  seafaring: 'Seafaring',
 }
 
 /** A stat or skill a training ground teaches, as the UI names it: "Strength", "Combat". */
@@ -310,7 +349,9 @@ export type Picking =
   | false
   | 'walk'
   | 'drive'
+  | 'row'
   | 'driveOff'
+  | 'rowOff'
   | 'hitchOff'
   | 'haul'
   | 'roadFrom'
@@ -405,10 +446,22 @@ export function QueueBlock({
   onEdit,
   title = 'Queue',
   realm,
+  running = false,
+  palette,
+  rounds,
+  branches,
 }: {
   queue: Pick<QueuePlan, 'items' | 'loop' | 'nextStepId'>
+  /** The Add step palette, right under the steps (`CONTEXT.md`: Planner blocks). */
+  palette?: ReactNode
   /** The id of the step being done, in a running queue. */
   currentId?: number
+  /** The round each block around the current step is on, by block id, in a running queue. */
+  rounds?: ReadonlyMap<number, number>
+  /** The part each If block around the current step runs, by block id, in a running queue. */
+  branches?: ReadonlyMap<number, Branch>
+  /** The resident's running queue, not a draft or a group's plan: Clear asks and keeps the current step. */
+  running?: boolean
   doing?: string
   scripts: ScriptSummary[]
   buildings: Building[]
@@ -424,6 +477,8 @@ export function QueueBlock({
   realm?: string
 }) {
   const [dragged, setDragged] = useState<number>()
+  // The planner's help, behind its "?".
+  const [help, setHelp] = useState(false)
   // The steps and blocks picked for the clipboard, by id; one removed since drops out.
   const [pickedIds, setPicked] = useState<number[]>([])
   const clipboardEmpty = useClipboardEmpty()
@@ -431,6 +486,20 @@ export function QueueBlock({
   const rows = planRows(q.items)
   const ids = rows.map((row) => row.id)
   const picked = pickedIds.filter((id) => ids.includes(id))
+  // The insert point: the row the next step added goes after ("+" between two steps).
+  const kept = useContext(InsertPointContext)
+  const [ownAt, setOwnAt] = useState<number>()
+  const insertAt = kept ? kept.at : ownAt
+  const setInsertAt = kept ? kept.set : setOwnAt
+  const seenIds = useRef(ids)
+  useEffect(() => {
+    // Once a step goes in there, the next follows it.
+    const next = followInsert(seenIds.current, ids, insertAt)
+    if (next !== insertAt) setInsertAt(next)
+    seenIds.current = ids
+  }, [ids.join(',')])
+  const inserts = insertPoints(q.items)
+  const dragging = dragged !== undefined
   const edit = (items: PlanItem[], loop?: boolean) => {
     const given = withIds(items, q.nextStepId)
     onEdit(given.items, loop)
@@ -452,6 +521,35 @@ export function QueueBlock({
     const given = edit(wrapped)
     setPicked(newIds(q.items, given.items))
   }
+  // An If planned with Flow's If or a block's Change, its condition set (`CONTEXT.md`: If block):
+  // the steps picked when it was started are wrapped, or the block's condition changes.
+  const ifDone = (plan: Plan, condition: Condition) => {
+    // A repeat block's Until (`CONTEXT.md`: Repeat block): it repeats until the condition holds.
+    if (plan.until && plan.blockId !== undefined) {
+      edit(setRepeat(q.items, plan.blockId, { until: condition }))
+      return
+    }
+    if (plan.blockId !== undefined) {
+      edit(setCondition(q.items, plan.blockId, condition))
+      return
+    }
+    const into = wrap(q.items, plan.wrap ?? [], condition)
+    if (!into) return
+    const given = edit(into)
+    setPicked(newIds(q.items, given.items))
+  }
+  // Clear (`CONTEXT.md`: Clear): empties a draft or a group's plan; on a running queue, asked
+  // once, keeps only the current step with loop off, so the queue ends after it.
+  const clear = () => {
+    if (!running) {
+      edit([])
+      return
+    }
+    const ok = window.confirm(
+      'Clear the queue? They finish the step they are on, then the queue ends. Stop halts them at once.',
+    )
+    if (ok) edit(clearedItems(q.items, currentId), false)
+  }
   // Ctrl+C and Ctrl+V while the list has focus, not while typing in a field.
   const onKey = (e: KeyboardEvent) => {
     if (!(e.ctrlKey || e.metaKey) || e.altKey) return
@@ -463,22 +561,20 @@ export function QueueBlock({
     if (key === 'c') copyPicked()
     else pasteSteps()
   }
-  const unrolled = stepCount(q.items)
+  const written = itemCount(q.items)
   const over = capProblem(q.items)
+  const lastStepId = rows.filter((row) => row.kind === 'step').at(-1)?.id
+  // Alt+↑ and Alt+↓ move the focused step or block (drag does too).
+  const onRowKey = (e: KeyboardEvent, id: number) => {
+    if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
+    const by = e.key === 'ArrowUp' ? -1 : 1
+    e.preventDefault()
+    e.stopPropagation()
+    if (canMove(q.items, id, by)) edit(moveItem(q.items, id, by))
+  }
   let n = 0
   return (
     <section className="inspector-block" aria-label={title}>
-      <div className="panel-head">
-        <h3>{title}</h3>
-        <label className="small queue-loop">
-          <input
-            type="checkbox"
-            checked={q.loop}
-            onChange={(e) => edit(q.items, e.target.checked)}
-          />{' '}
-          Loop
-        </label>
-      </div>
       <div className="order-buttons queue-tools">
         <button type="button" disabled={picked.length === 0} onClick={copyPicked}>
           Copy
@@ -494,125 +590,345 @@ export function QueueBlock({
         >
           Repeat
         </button>
-        <span className="small muted">
-          {picked.length === 0 ? 'Tap a step to pick it' : `${picked.length} picked`}
-        </span>
+        <button
+          type="button"
+          disabled={q.items.length === 0}
+          title={
+            running
+              ? 'Remove every step but the current one and turn loop off: the queue ends after it'
+              : 'Remove every step'
+          }
+          onClick={clear}
+        >
+          Clear
+        </button>
+        {realm && (
+          <SavedQueueTools
+            realm={realm}
+            steps={q.items}
+            onLoad={(loaded) => add(undefined, loaded)}
+            oneButton
+          />
+        )}
+        <button
+          type="button"
+          aria-label="How the planner works"
+          aria-expanded={help}
+          onClick={() => setHelp(!help)}
+        >
+          ?
+        </button>
+        {picked.length > 0 && <span className="small muted">{picked.length} picked</span>}
       </div>
-      {realm && (
-        <SavedQueueTools
-          realm={realm}
-          steps={q.items}
-          onLoad={(loaded) => add(undefined, loaded)}
-        />
+      {help && (
+        <p className="muted small">
+          Tap a step to pick it (Shift for a range), then Copy; Paste puts the copies after the
+          picked step. Drag a step or block to move it, into or out of a bracket, or pick it and tap
+          Move here; focus it and press Alt+↑ or Alt+↓. Drag a step kind from Add step to put it
+          where you drop it. Loop is the outer bracket, its switch in its head. Working, hauling,
+          teaching and training never end on their own, so they need a duration unless they are
+          last: tap the duration to set it. Repeat wraps the picked steps in a block done so many
+          times in a row, or forever; a round in which none of its steps could start ends it, and a
+          running queue shows the round it is on. If (in Add step’s Flow) puts the picked steps
+          under a condition, checked once when its turn comes; Else moves other picked steps into
+          its Else part, run when the condition doesn’t hold. A queue holds up to {QUEUE_MAX_STEPS}{' '}
+          steps and blocks as written, nested up to {QUEUE_MAX_DEPTH} deep. Saved… keeps the steps
+          in this browser under a name, and loads a saved queue’s steps at the end. Clear empties a
+          draft; on a running queue it keeps only the current step and turns loop off, so the queue
+          ends after it.
+        </p>
       )}
       {hasBlocks(q.items) && (
         <p className={`small ${over ? 'queue-unrolled-over' : 'muted'}`}>
-          {over ? `Too long: ${over}.` : `${unrolled} steps after repeats.`}
+          {over ? `Too long: ${over}.` : `${written} of ${QUEUE_MAX_STEPS} steps and blocks.`}
         </p>
       )}
-      <ol className="queue-steps" tabIndex={-1} onKeyDown={onKey}>
-        {rows.map((row) => {
-          const isPicked = picked.includes(row.id)
-          const step =
-            row.kind === 'step'
-              ? stepRow({ ...row.step, id: row.id }, row.id === currentId, names)
-              : undefined
-          if (step) n++
-          return (
-            <li
-              key={row.id}
-              className={`queue-step${row.kind === 'block' ? ' queue-block' : ''}${step?.current ? ' current' : ''}${isPicked ? ' picked' : ''}`}
-              style={row.depth > 0 ? { marginLeft: `${row.depth * 1.25}em` } : undefined}
-              aria-current={step?.current ? 'step' : undefined}
-              aria-selected={isPicked}
-              // Shift+tap picks a range rather than selecting text.
-              onMouseDown={(e) => e.shiftKey && e.preventDefault()}
-              onClick={(e) => {
-                // The row's own buttons and fields do their own thing.
-                if ((e.target as HTMLElement).closest('button, input, label')) return
-                setPicked(pickStep(picked, ids, row.id, e.shiftKey))
-              }}
-              draggable
-              onDragStart={(e) => {
-                e.stopPropagation()
-                setDragged(row.id)
-              }}
-              onDragEnd={() => setDragged(undefined)}
-              onDragOver={(e) => dragged !== undefined && e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault()
-                if (dragged !== undefined && dragged !== row.id)
-                  edit(dropItem(q.items, dragged, row.id))
-                setDragged(undefined)
-              }}
-            >
-              <div className="queue-step-head">
-                {step ? (
-                  <span className="small">
-                    {n}. {step.label}
-                  </span>
-                ) : (
-                  <RepeatCount
-                    repeat={row.kind === 'block' ? row.repeat : 1}
-                    steps={row.kind === 'block' ? row.steps : 0}
-                    onSet={(count) => edit(setRepeat(q.items, row.id, count))}
-                  />
-                )}
-                <span className="buttons">
-                  {row.kind === 'block' && (
-                    <button type="button" onClick={() => edit(unwrap(q.items, row.id))}>
-                      Unwrap
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    aria-label="Move up"
-                    disabled={!canMove(q.items, row.id, -1)}
-                    onClick={() => edit(moveItem(q.items, row.id, -1))}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Move down"
-                    disabled={!canMove(q.items, row.id, 1)}
-                    onClick={() => edit(moveItem(q.items, row.id, 1))}
-                  >
-                    ↓
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={row.kind === 'block' ? 'Remove the block and its steps' : 'Remove'}
-                    onClick={() => edit(removeItem(q.items, row.id))}
-                  >
-                    ✕
-                  </button>
-                </span>
-              </div>
-              {step?.gone && (
-                <span className="small queue-step-gone">{step.gone}: it will be skipped</span>
-              )}
-              {step?.current && <span className="small muted">{doing}</span>}
-              {step && (
-                <StepMinutes
-                  row={step}
-                  onSet={(minutes) => edit(timeItem(q.items, row.id, minutes))}
-                />
-              )}
-            </li>
-          )
-        })}
-      </ol>
-      <p className="muted small">
-        Drag a step or use the arrows to reorder. Working, hauling, teaching and training never end
-        on their own, so they need a duration unless they are last. Tap a step to pick it (Shift for
-        a range), then Copy; Paste puts the copies after the picked step. Repeat wraps the picked
-        steps in a block done so many times in a row; giving the queue makes it that many copies, up
-        to {QUEUE_MAX_STEPS} steps in all. Save keeps the steps in this browser under a name; Load
-        adds a saved queue’s steps at the end.
-      </p>
+      <div className={`queue-bracket queue-loop-bracket${q.loop ? ' on' : ''}`}>
+        <div className="queue-bracket-head">
+          <label className="small queue-loop">
+            <input
+              type="checkbox"
+              checked={q.loop}
+              onChange={(e) => edit(q.items, e.target.checked)}
+            />{' '}
+            <span aria-hidden="true">⟲</span> Loop
+          </label>
+          <span className="small muted">
+            {q.loop ? 'from the top again after the last step' : 'ends after the last step'}
+          </span>
+        </div>
+        <ol className="queue-steps" tabIndex={-1} onKeyDown={onKey}>
+          {renderItems(q.items, 0)}
+          {(picked.length > 0 || dragging) && point(undefined)}
+        </ol>
+      </div>
+      {palette && (
+        <PlannerFlowContext.Provider
+          value={{
+            ...(wrapped ? { repeat } : {}),
+            ...(wrapped && kept?.start
+              ? { wrapIf: () => kept.start?.('if', undefined, { wrap: picked }) }
+              : {}),
+            ifDone,
+            ...(insertAt === undefined ? {} : { after: insertAt }),
+          }}
+        >
+          {palette}
+        </PlannerFlowContext.Provider>
+      )}
     </section>
   )
+
+  // The items of one bracket, each followed by its "+" point where it has one.
+  function renderItems(items: readonly PlanItem[], depth: number): ReactNode[] {
+    return items.map((item) => (
+      <Fragment key={item.id}>
+        {isIf(item)
+          ? ifItem(item, depth)
+          : isBlock(item)
+            ? blockItem(item, depth)
+            : stepItem(item, depth)}
+        {inserts.includes(item.id!) && point(item.id!)}
+      </Fragment>
+    ))
+  }
+
+  // What a row does when something is dropped on it or on a point: a step or block dragged in
+  // the planner moves there; a step kind dragged from the palette is planned there.
+  function dropAt(e: DragEvent, after: number | undefined, onto?: number) {
+    e.preventDefault()
+    e.stopPropagation()
+    const kind = e.dataTransfer.getData(STEP_KIND_TYPE)
+    if (kind && kept?.start) kept.start(kind as PlanStepId, after)
+    else if (dragged !== undefined && onto !== undefined && dragged !== onto)
+      edit(dropItem(q.items, dragged, onto))
+    else if (dragged !== undefined && onto === undefined) edit(moveItems(q.items, [dragged], after))
+    setDragged(undefined)
+  }
+  function accepts(e: DragEvent) {
+    if (dragged !== undefined || e.dataTransfer.types.includes(STEP_KIND_TYPE)) e.preventDefault()
+  }
+
+  // A "+" between two items: where the next step added goes, or, with steps picked, where they
+  // move to (`after` undefined: the end of the queue).
+  function point(after: number | undefined) {
+    const moving = picked.length > 0
+    const set = !moving && after !== undefined && insertAt === after
+    const canMove = moving && canMoveTo(q.items, picked, after)
+    if (!moving && !palette && !dragging) return null
+    if (moving && !canMove) return null
+    const label = moving ? 'Move here' : set ? '+ next step goes here' : '+'
+    return (
+      <li
+        key={`point-${after ?? 'end'}`}
+        className={`queue-insert${set ? ' set' : ''}${moving ? ' move' : ''}`}
+        onDragOver={accepts}
+        onDrop={(e) => dropAt(e, after)}
+      >
+        <button
+          type="button"
+          aria-label={
+            moving
+              ? `Move the picked steps ${after === undefined ? 'to the end' : 'here'}`
+              : set
+                ? 'Add new steps at the end again'
+                : 'Add the next step here'
+          }
+          aria-pressed={moving ? undefined : set}
+          onClick={() => {
+            if (moving) {
+              edit(moveItems(q.items, picked, after))
+              setPicked([])
+            } else if (after !== undefined) setInsertAt(set ? undefined : after)
+          }}
+        >
+          {moving && after === undefined ? 'Move to the end' : label}
+        </button>
+      </li>
+    )
+  }
+
+  // Tapping picks it (Shift+tap a range), dragging moves it, Alt+↑/↓ too.
+  function rowProps(id: number) {
+    return {
+      'aria-selected': picked.includes(id),
+      tabIndex: 0,
+      onKeyDown: (e: KeyboardEvent) => onRowKey(e, id),
+      // Shift+tap picks a range rather than selecting text.
+      onMouseDown: (e: MouseEvent) => e.shiftKey && e.preventDefault(),
+      onClick: (e: MouseEvent) => {
+        // The row's own buttons and fields do their own thing.
+        if ((e.target as HTMLElement).closest('button, input, label')) return
+        e.stopPropagation()
+        setPicked(pickStep(picked, ids, id, e.shiftKey))
+      },
+      draggable: true,
+      onDragStart: (e: DragEvent) => {
+        e.stopPropagation()
+        e.dataTransfer.effectAllowed = 'move'
+        setDragged(id)
+      },
+      onDragEnd: () => setDragged(undefined),
+      onDragOver: accepts,
+      onDrop: (e: DragEvent) => dropAt(e, id, id),
+    }
+  }
+
+  // A repeat block: a bracket with its count, Unwrap and remove in its head, its items inside.
+  function blockItem(block: RepeatBlock, depth: number) {
+    const id = block.id!
+    const isPicked = picked.includes(id)
+    return (
+      <li
+        className={`queue-bracket queue-repeat-bracket${isPicked ? ' picked' : ''}`}
+        data-depth={depth}
+      >
+        <div className="queue-bracket-head" {...rowProps(id)}>
+          <span className="queue-step-icon" aria-hidden="true">
+            {REPEAT_ICON}
+          </span>
+          <RepeatCount
+            repeat={block.repeat}
+            steps={stepCount(block.items)}
+            names={names}
+            {...(rounds?.has(id) ? { round: rounds.get(id) } : {})}
+            onSet={(count) => edit(setRepeat(q.items, id, count))}
+            {...(kept?.start
+              ? {
+                  onUntil: (until?: Condition) =>
+                    kept.start?.('if', undefined, {
+                      blockId: id,
+                      until: true,
+                      ...(until ? { condition: draftOf(until) } : {}),
+                    }),
+                }
+              : {})}
+          />
+          <span className="buttons">
+            <button type="button" onClick={() => edit(unwrap(q.items, id))}>
+              Unwrap
+            </button>
+            <button
+              type="button"
+              aria-label="Remove the block and its steps"
+              onClick={() => edit(removeItem(q.items, id))}
+            >
+              ✕
+            </button>
+          </span>
+        </div>
+        <ol className="queue-steps">{renderItems(block.items, depth + 1)}</ol>
+      </li>
+    )
+  }
+
+  // An If block: a bracket with its condition, Change, Else, Unwrap and remove in its head, its
+  // items inside, and its Else part as a second part under its own head. In a running queue the
+  // part being run is marked.
+  function ifItem(block: IfBlock, depth: number) {
+    const id = block.id!
+    const isPicked = picked.includes(id)
+    const taken = branches?.get(id)
+    const toElse = intoElse(q.items, picked, id)
+    const runs = <span className="queue-branch small"> · running</span>
+    return (
+      <li
+        className={`queue-bracket queue-if-bracket${isPicked ? ' picked' : ''}`}
+        data-depth={depth}
+      >
+        <div className="queue-bracket-head" {...rowProps(id)}>
+          <span className="queue-step-icon" aria-hidden="true">
+            {PLAN_STEP_ICONS.if}
+          </span>
+          <span className="small queue-step-label">
+            If {conditionLabel(block.if, names)}
+            {taken === 'then' && runs}
+          </span>
+          <span className="buttons">
+            {kept?.start && (
+              <button
+                type="button"
+                title="Change the condition"
+                onClick={() =>
+                  kept.start?.('if', undefined, { blockId: id, condition: draftOf(block.if) })
+                }
+              >
+                Change
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={!toElse}
+              title={
+                toElse
+                  ? 'Move the picked steps into the Else part'
+                  : 'Pick steps outside the block to move them into its Else part'
+              }
+              onClick={() => toElse && edit(toElse)}
+            >
+              Else
+            </button>
+            <button type="button" onClick={() => edit(unwrap(q.items, id))}>
+              Unwrap
+            </button>
+            <button
+              type="button"
+              aria-label="Remove the block and its steps"
+              onClick={() => edit(removeItem(q.items, id))}
+            >
+              ✕
+            </button>
+          </span>
+        </div>
+        <ol className="queue-steps">{renderItems(block.items, depth + 1)}</ol>
+        {block.else && (
+          <>
+            <div className="queue-bracket-head queue-else-head small">
+              Else{taken === 'else' && runs}
+            </div>
+            <ol className="queue-steps">{renderItems(block.else, depth + 1)}</ol>
+          </>
+        )}
+      </li>
+    )
+  }
+
+  function stepItem(item: QueueStepRequest, depth: number) {
+    const id = item.id!
+    const isPicked = picked.includes(id)
+    const step = stepRow({ ...item, id }, id === currentId, names)
+    n++
+    return (
+      <li
+        className={`queue-step${step.current ? ' current' : ''}${isPicked ? ' picked' : ''}`}
+        data-depth={depth}
+        aria-current={step.current ? 'step' : undefined}
+        {...rowProps(id)}
+      >
+        <div className="queue-step-head">
+          <span className="queue-step-icon" aria-hidden="true">
+            {STEP_ICONS[step.group]}
+          </span>
+          <span
+            className="small queue-step-label"
+            title={step.gone ? `${step.gone}: it will be skipped` : step.label}
+          >
+            {n}. {step.label}
+            {step.gone && <span className="queue-step-gone"> · {step.gone}</span>}
+          </span>
+          {showsMinutes(step, id === lastStepId) && (
+            <DurationChip row={step} onSet={(minutes) => edit(timeItem(q.items, id, minutes))} />
+          )}
+          <span className="buttons">
+            <button type="button" aria-label="Remove" onClick={() => edit(removeItem(q.items, id))}>
+              ✕
+            </button>
+          </span>
+        </div>
+        {step.current && doing && <span className="small muted">{doing}</span>}
+      </li>
+    )
+  }
 }
 
 /** The ids in `after` that `before` didn't have, the outermost of each new item only. */
@@ -621,72 +937,131 @@ function newIds(before: readonly PlanItem[], after: readonly PlanItem[]): number
   const fresh = (items: readonly PlanItem[]): number[] =>
     items.flatMap((item) => {
       if (item.id !== undefined && !had.has(item.id)) return [item.id]
-      return isBlock(item) ? fresh(item.items) : []
+      return isBlock(item) ? fresh(inner(item)) : []
     })
   return fresh(after)
 }
 
-/** A repeat block's count, set on Enter or leaving the field, with how many steps it repeats. */
+/**
+ * A repeat block's head (`CONTEXT.md`: Repeat block): how it repeats, a count (set on Enter or
+ * leaving the field), forever, or until a condition holds (set on the card's condition editor,
+ * `onUntil`), with how many steps it repeats; in a running queue, the round the block is on
+ * ("round 2 of 3").
+ */
 function RepeatCount({
   repeat,
   steps,
+  names,
+  round,
   onSet,
+  onUntil,
 }: {
-  repeat: number
+  repeat: Repeat
   steps: number
-  onSet: (repeat: number) => void
+  names: ConditionNames
+  /** The round it is on, while the resident's current step is inside it. */
+  round?: number
+  onSet: (repeat: Repeat) => void
+  /** Opens the condition editor for its Until, with the condition it has, if any. */
+  onUntil?: (until?: Condition) => void
 }) {
-  const [text, setText] = useState(String(repeat))
-  useEffect(() => setText(String(repeat)), [repeat])
+  const count = typeof repeat === 'number' ? repeat : undefined
+  const until = typeof repeat === 'object' ? repeat.until : undefined
+  const mode = count !== undefined ? 'times' : until ? 'until' : 'forever'
+  // The count the field shows, kept while another mode is on so going back to it keeps it.
+  const [last, setLast] = useState(count ?? DEFAULT_REPEAT)
+  const [text, setText] = useState(String(last))
+  useEffect(() => {
+    if (count === undefined) return
+    setLast(count)
+    setText(String(count))
+  }, [count])
   const commit = () => {
     const typed = Math.floor(Number(text))
-    if (typed >= 1 && typed !== repeat) onSet(typed)
-    else setText(String(repeat))
+    if (typed >= 1 && typed !== count) onSet(Math.min(typed, QUEUE_MAX_REPEAT))
+    else setText(String(last))
+  }
+  const pick = (to: string) => {
+    if (to === 'times') onSet(last)
+    else if (to === 'forever') onSet('forever')
+    else onUntil?.()
   }
   return (
-    <label className="small queue-step-minutes">
-      Repeat ×
-      <input
-        className="queue-block-count"
-        aria-label="Times to repeat"
-        type="number"
-        min={1}
-        step={1}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => e.key === 'Enter' && commit()}
-      />
+    <span className="small queue-step-minutes">
+      <label>
+        Repeat{' '}
+        <select aria-label="How it repeats" value={mode} onChange={(e) => pick(e.target.value)}>
+          <option value="times">×</option>
+          <option value="forever">forever</option>
+          <option value="until" disabled={!onUntil}>
+            until…
+          </option>
+        </select>
+      </label>{' '}
+      {mode === 'times' && (
+        <input
+          className="queue-block-count"
+          aria-label="Times to repeat"
+          type="number"
+          min={1}
+          max={QUEUE_MAX_REPEAT}
+          step={1}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => e.key === 'Enter' && commit()}
+        />
+      )}
+      {until && (
+        <>
+          <span className="queue-step-label">{conditionLabel(until, names)}</span>{' '}
+          {onUntil && (
+            <button type="button" title="Change the condition" onClick={() => onUntil(until)}>
+              Change
+            </button>
+          )}
+        </>
+      )}{' '}
+      {round !== undefined && (
+        <strong className="queue-block-round">
+          round {round}
+          {count === undefined ? '' : ` of ${count}`}
+        </strong>
+      )}{' '}
       <span className="muted">
-        {steps} step{steps === 1 ? '' : 's'} each, {steps * repeat} in all
+        {steps} step{steps === 1 ? '' : 's'}
+        {count === undefined ? ' each round' : ` each, ${steps * count} in all`}
       </span>
-    </label>
+    </span>
   )
 }
 
 /**
  * Save and Load for a queue planner (`CONTEXT.md`: Saved queue): Save keeps `steps` in this
  * browser under a name, asking before it overwrites one saved under the same name; Load lists the
- * saved queues, each with its step count after repeats and date, to load (`onLoad` gets fresh
+ * saved queues, each with its step count as written and date, to load (`onLoad` gets fresh
  * copies of its steps and blocks) or delete. With no steps, only Load shows.
  */
 export function SavedQueueTools({
   realm,
   steps,
   onLoad,
+  oneButton = false,
 }: {
   realm: string
   steps: readonly PlanItem[]
   onLoad: (steps: PlanItem[]) => void
+  /** One "Saved…" button opening both, for the planner's one-row toolbar. */
+  oneButton?: boolean
 }) {
-  const [open, setOpen] = useState<'save' | 'load'>()
+  const [open, setOpen] = useState<'save' | 'load' | 'both'>()
   const [name, setName] = useState('')
   const [queues, setQueues] = useState(() => readQueues(browserStorage(), realm))
   const keep = (next: SavedQueues) => {
     storeQueues(browserStorage(), realm, next)
     setQueues(next)
   }
-  const toggle = (panel: 'save' | 'load') => {
+  const toggle = (panel: 'save' | 'load' | 'both') => {
     // Read again: another planner may have saved since.
     setQueues(readQueues(browserStorage(), realm))
     setOpen(open === panel ? undefined : panel)
@@ -703,16 +1078,28 @@ export function SavedQueueTools({
   return (
     <div className="saved-queues">
       <div className="order-buttons">
-        {steps.length > 0 && (
+        {oneButton && (
+          <button
+            type="button"
+            title="Save these steps under a name, or load saved ones"
+            aria-expanded={open === 'both'}
+            onClick={() => toggle('both')}
+          >
+            Saved…
+          </button>
+        )}
+        {!oneButton && steps.length > 0 && (
           <button type="button" aria-expanded={open === 'save'} onClick={() => toggle('save')}>
             Save…
           </button>
         )}
-        <button type="button" aria-expanded={open === 'load'} onClick={() => toggle('load')}>
-          Load…
-        </button>
+        {!oneButton && (
+          <button type="button" aria-expanded={open === 'load'} onClick={() => toggle('load')}>
+            Load…
+          </button>
+        )}
       </div>
-      {open === 'save' && (
+      {(open === 'save' || (open === 'both' && steps.length > 0)) && (
         <form className="saved-queues-save" onSubmit={onSave}>
           <input
             aria-label="Name to save the queue under"
@@ -730,7 +1117,7 @@ export function SavedQueueTools({
           )}
         </form>
       )}
-      {open === 'load' &&
+      {(open === 'load' || open === 'both') &&
         (saved.length === 0 ? (
           <p className="muted small">No queues saved in this browser yet.</p>
         ) : (
@@ -787,14 +1174,15 @@ export function PasteSteps({ onPaste }: { onPaste: (steps: PlanItem[]) => void }
 }
 
 /**
- * Give and Discard under a plan held in this browser (`QueuePlan`): on a resident's card while it
- * has repeat blocks, and on the group card. A plan that can't be given (no steps, more steps after
+ * Give and Discard under a plan held in this browser (`QueuePlan`): Start queue and Discard draft
+ * under a resident's queue draft, Give to all on the group card. A plan that can't be given (no steps, more steps after
  * repeats than a queue holds, a step that never ends before another) says why, by how much when
  * it is too long, and Give waits.
  */
 export function GivePlan({
   plan,
   give,
+  discard = 'Discard plan',
   note,
   onGive,
   onDiscard,
@@ -802,6 +1190,8 @@ export function GivePlan({
   plan: Pick<QueuePlan, 'items'>
   /** The Give button's label. */
   give: string
+  /** The Discard button's label. */
+  discard?: string
   /** What giving does, said while it can be given. */
   note: string
   onGive: () => void
@@ -815,7 +1205,7 @@ export function GivePlan({
           {give}
         </button>
         <button type="button" onClick={onDiscard}>
-          Discard plan
+          {discard}
         </button>
       </div>
       <p className={`small ${problem && plan.items.length > 0 ? 'queue-unrolled-over' : 'muted'}`}>
@@ -825,42 +1215,63 @@ export function GivePlan({
   )
 }
 
-/** A step's duration in game minutes, with real time beside; set on Enter or leaving the field. */
-function StepMinutes({
+/** A step's icon by the kind of order it is, as the Orders tab groups them. */
+const STEP_ICONS: Record<StepGroup, string> = {
+  move: '➜',
+  work: '⚒',
+  goods: '▣',
+  scripts: '{}',
+  flow: '⏳',
+}
+
+/**
+ * A step's duration as a chip (`CONTEXT.md`: Planner blocks): "10 min · 10 s", or "Duration?"
+ * flagged while a step that never ends has none; tapped, it turns into a field of game minutes,
+ * set on Enter or leaving it, cleared when emptied.
+ */
+function DurationChip({
   row,
   onSet,
 }: {
   row: QueueRow
   onSet: (minutes: number | undefined) => void
 }) {
+  const [editing, setEditing] = useState(false)
   const [text, setText] = useState(row.minutes === undefined ? '' : String(row.minutes))
   useEffect(() => setText(row.minutes === undefined ? '' : String(row.minutes)), [row.minutes])
   const typed = Math.floor(Number(text))
   const commit = () => {
+    setEditing(false)
     const minutes = text.trim() === '' || !(typed > 0) ? undefined : typed
     if (minutes !== row.minutes) onSet(minutes)
   }
+  if (!editing)
+    return (
+      <button
+        type="button"
+        className={`small queue-step-chip${row.minutes === undefined ? ' needed' : ''}`}
+        title="Duration in game minutes"
+        onClick={() => setEditing(true)}
+      >
+        {row.minutes === undefined ? 'Duration?' : `${row.minutes} min · ${row.real}`}
+      </button>
+    )
   return (
     <label className="small queue-step-minutes">
-      Duration{' '}
       <input
         type="number"
         min={1}
         step={1}
         placeholder="none"
+        aria-label="Duration in game minutes"
+        autoFocus
         value={text}
         onChange={(e) => setText(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => e.key === 'Enter' && commit()}
-        style={{ width: '5em' }}
-      />{' '}
-      game min
-      {typed > 0 && <span className="muted"> · {realMinutes(typed)} real</span>}
-      {row.minutes !== undefined && (
-        <button type="button" onClick={() => onSet(undefined)}>
-          Clear
-        </button>
-      )}
+        style={{ width: '4.5em' }}
+      />
+      min{typed > 0 && <span className="muted"> · {realMinutes(typed)}</span>}
     </label>
   )
 }
@@ -892,6 +1303,16 @@ export function orderDoing(
     if (!o.path) return `Finding a way for the carriage to ${o.target.x}, ${o.target.y}`
     return `Driving to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
   }
+  if (o?.kind === 'row') {
+    // `CONTEXT.md`: Rowing.
+    if (!o.path) return `Finding a way over the water to ${o.target.x}, ${o.target.y}`
+    return `Rowing to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
+  }
+  if (o?.kind === 'sail') {
+    // `CONTEXT.md`: Sailing.
+    if (!o.path) return `Finding a way over the Sea to ${o.target.x}, ${o.target.y}`
+    return `Sailing to ${o.target.x}, ${o.target.y} · ${left(o.path)}`
+  }
   if (o?.kind === 'haul') {
     const what = o.goods.map((g) => GOOD_LABELS[g].toLowerCase()).join(', ')
     const { x, y } = o[o.stop]
@@ -901,6 +1322,24 @@ export function orderDoing(
     const back = o.returnGoods.map((g) => GOOD_LABELS[g].toLowerCase()).join(', ')
     const leg =
       o.stop === 'to' ? `Hauling ${what} to` : back ? `Hauling ${back} back to` : 'Driving back to'
+    return o.path ? `${leg} ${x}, ${y} · ${left(o.path)}` : `${leg} ${x}, ${y}`
+  }
+  if (o?.kind === 'haulByWater') {
+    // `CONTEXT.md`: Haul route by water.
+    const what = o.goods.map((g) => GOOD_LABELS[g].toLowerCase()).join(', ')
+    const { x, y } = o[o.stop]
+    if (o.phase === 'loading') {
+      return o.stop === 'from' ? `Loading ${what} at ${x}, ${y}` : `Unloading ${what} at ${x}, ${y}`
+    }
+    const back = o.returnGoods.map((g) => GOOD_LABELS[g].toLowerCase()).join(', ')
+    // A ship's captain sails it (`CONTEXT.md`: Sailing); the server names its id after its kind.
+    const doing = o.vesselId.startsWith('ship') ? 'Sailing' : 'Rowing'
+    const leg =
+      o.stop === 'to'
+        ? `${doing} ${what} to`
+        : back
+          ? `${doing} ${back} back to`
+          : `${doing} back to`
     return o.path ? `${leg} ${x}, ${y} · ${left(o.path)}` : `${leg} ${x}, ${y}`
   }
   if (o?.kind === 'pickUp') return 'Picking up goods'
@@ -1159,6 +1598,7 @@ export function GroupCard({
   scripts,
   buildings,
   carriages = [],
+  boats = [],
   inSight = [],
   cities,
   arrivesIn,
@@ -1186,6 +1626,14 @@ export function GroupCard({
    * each, to board (`CONTEXT.md`: Passenger).
    */
   carriages?: { carriage: Pick<Carriage, 'id' | 'x' | 'y' | 'realmId' | 'cityId'>; seats: number }[]
+  /**
+   * The realm's boats someone of the group stands beside, with how many more passengers fit in
+   * each, to board (`CONTEXT.md`: Beside a vessel).
+   */
+  boats?: {
+    vessel: Pick<SeenVessel, 'id' | 'x' | 'y'> & Partial<Pick<SeenVessel, 'kind' | 'dockedAt'>>
+    seats: number
+  }[]
   /** Everyone in sight, to say where a passenger's carriage is heading (`doingLine`). */
   inSight?: readonly SeenResident[]
   /** The cities the Player knows, to name where a resident relocates to (`doingLine`). */
@@ -1251,6 +1699,7 @@ export function GroupCard({
   const picks: Partial<Record<GroupButton, Exclude<GroupPicking, false>>> = {
     walk: 'walk',
     drive: 'drive',
+    row: 'row',
     work: 'work',
     build: 'build',
     roadTo: 'roadFrom',
@@ -1279,6 +1728,7 @@ export function GroupCard({
     size: mapSize ?? 0,
     seen,
     carriages: carriages.length,
+    boats: boats.length,
     relocateProblem: relocate ? relocate.problem : 'your realm has no other city',
   })
   // Each row keeps its slot while the card is open (ADR 0019); a row picking a tile shows it.
@@ -1298,8 +1748,11 @@ export function GroupCard({
   })
   const act = (a: CardAction<GroupButton>) => {
     if (tab !== 'orders' && a.id !== 'script') showTab('orders')
-    // With one carriage to board it boards that; with several, a panel lists them.
-    if (a.id === 'board' && carriages.length === 1) {
+    // With one carriage or boat to board they board that; with several, or a ship (as crew or as
+    // passengers, `CONTEXT.md`: Crew), a panel lists them.
+    const ship = boats.some((b) => b.vessel.kind === 'ship')
+    if (a.id === 'board' && carriages.length + boats.length === 1 && !ship) {
+      if (boats[0]) return onOrder({ kind: 'boardBoat', ...boats[0] })
       const { carriage, seats } = carriages[0]!
       return onOrder({ kind: 'board', carriage, seats })
     }
@@ -1336,8 +1789,29 @@ export function GroupCard({
                 Board at {carriage.x}, {carriage.y}
               </button>
             ))}
+            {boats.flatMap(({ vessel, seats }) => {
+              const board = (asCrew: boolean, label: string) => (
+                <button
+                  type="button"
+                  key={`${vessel.id}-${asCrew}`}
+                  onClick={() => {
+                    setPanel(undefined)
+                    onOrder({ kind: 'boardBoat', vessel, seats, ...(asCrew ? { asCrew } : {}) })
+                  }}
+                >
+                  {label}
+                </button>
+              )
+              const at = `${vessel.x}, ${vessel.y}`
+              return vessel.kind === 'ship'
+                ? [board(true, `Crew the ship at ${at}`), board(false, `Board the ship at ${at}`)]
+                : [board(false, `Board the boat at ${at}`)]
+            })}
           </div>
-          <p className="muted small">Those standing on the carriage board it, until it is full.</p>
+          <p className="muted small">
+            Those standing on the carriage, or beside the boat, board it, until it is full; a ship's
+            from the haven it is docked at, as its crew (who take no room) or as passengers.
+          </p>
         </section>
       )}
       {shown === 'feed' && (
@@ -1657,6 +2131,7 @@ export type GroupPicking =
   | 'work'
   | 'build'
   | 'drive'
+  | 'row'
   | 'haul'
   | 'roadFrom'
   | 'roadTo'
@@ -1712,6 +2187,7 @@ export function ResidentCard({
   pile,
   storage,
   onPickUp,
+  onLoad,
   onDrop,
   building,
   road,
@@ -1740,6 +2216,7 @@ export function ResidentCard({
   walls,
   onClimb,
   carriage,
+  boat,
   carriageTheirs,
   onDriveTo,
   driveOff,
@@ -1754,6 +2231,11 @@ export function ResidentCard({
   onStop,
   horseToRide,
   carriageToBoard,
+  boatToBoard,
+  boatToRow,
+  rowOff,
+  onRowOff,
+  onRowTo,
   onBoard,
   carriageToUnhitch,
   onUnhitch,
@@ -1786,6 +2268,7 @@ export function ResidentCard({
   queuePlan,
   onPlanQueue,
   onGivePlan,
+  onDraftQueue,
   addStep,
   collapsed = false,
 }: {
@@ -1803,6 +2286,8 @@ export function ResidentCard({
   picking: Picking
   /** Starts (or cancels) picking a tile to walk to. */
   onWalkTo: () => void
+  /** A boat of their realm beside them, to load and unload (`CONTEXT.md`: Beside a vessel). */
+  boat?: SeenVessel
   /** A carriage on the resident's tile, if one is in sight. */
   carriage: Carriage | undefined
   /** That carriage is another organization's, not theirs to drive or haul with. */
@@ -1842,8 +2327,21 @@ export function ResidentCard({
   horseToRide: { id: string } | undefined
   /** A carriage of the realm on the resident's tile (`CONTEXT.md`: Passenger), to board. */
   carriageToBoard: { id: string } | undefined
+  /** A boat of the realm beside the resident with room (`CONTEXT.md`: Beside a vessel), to board. */
+  boatToBoard?: { id: string; kind?: VesselKind } | undefined
+  /** A boat of the realm the resident is aboard or beside, to row, and why they can't now (`CONTEXT.md`: Rowing). */
+  boatToRow?: { id: string; problem?: string; ship?: boolean }
+  /**
+   * Another organization's boat (or nobody's) beside the resident, to row off, and why it can't be
+   * taken now, if so (`CONTEXT.md`: Stealing a carriage or horse, its vessel part).
+   */
+  rowOff?: { problem: string | undefined }
+  /** Starts (or cancels) picking a tile to row that boat off to. */
+  onRowOff?: () => void
+  /** Starts (or cancels) picking a tile to row the boat to. */
+  onRowTo?: () => void
   /** Orders the resident to board that carriage, or with none to get off the one they are on. */
-  onBoard: (carriageId?: string) => void
+  onBoard: (carriageId?: string, asCrew?: boolean) => void
   /**
    * A carriage of the realm on the resident's tile with a horse hitched to it, to unhitch
    * (`CONTEXT.md`: Hitched horse).
@@ -1887,6 +2385,11 @@ export function ResidentCard({
   storage: Building | undefined
   /** Orders the resident to take goods from a spot on their tile. */
   onPickUp: (from: GoodsSpot, goods: Stock) => void
+  /**
+   * Moves goods straight between the haven's storage and the ship docked there, onto the ship or
+   * with `unload` off it (`CONTEXT.md`: Docked).
+   */
+  onLoad?: (vesselId: string, goods: Stock, unload: boolean) => void
   /** Orders the resident to put carried goods at a spot on their tile. */
   onDrop: (to: GoodsSpot, goods: Stock) => void
   /** The building or construction site on the resident's tile, if one is in sight. */
@@ -1979,16 +2482,19 @@ export function ResidentCard({
   /** Orders the resident to store what they carry at the nearest storage (`STORE_ALL`). */
   onStore?: () => void
   /**
-   * Edits the resident's queue to these steps, and loop when given (`CONTEXT.md`: Queue); with a
-   * repeat block among them, opens a plan of them to give instead (`CONTEXT.md`: Repeat block).
+   * Edits the resident's queue to these steps, and loop when given (`CONTEXT.md`: Queue); for a
+   * resident with no queue, or with a repeat block among them, opens a draft of them instead
+   * (`CONTEXT.md`: Queue draft).
    */
   onEditQueue?: (items: PlanItem[], loop?: boolean) => void
-  /** The plan with repeat blocks waiting to be given to the resident, if one is open. */
+  /** The resident's queue draft waiting for Start queue, if one is open. */
   queuePlan?: QueuePlan
-  /** Edits or discards (undefined) that plan. */
+  /** Edits or discards (undefined) that draft. */
   onPlanQueue?: (plan: QueuePlan | undefined) => void
-  /** Gives the resident the plan unrolled, as their queue. */
+  /** Start queue: gives the resident the draft, its repeat blocks as they are, as their queue. */
   onGivePlan?: () => void
+  /** Edit as draft: copies the running queue into a draft; the queue runs on. */
+  onDraftQueue?: () => void
   /** The queue planner's Add step (`AddStep`), under the queue. */
   addStep?: ReactNode
   /** Shrunk to its header while the map waits for a target (ADR 0012: pick mode). */
@@ -2021,6 +2527,7 @@ export function ResidentCard({
   const site = building?.site ? building : undefined
   const atSite: GoodsSpot = { kind: 'site', siteId: site?.id ?? '' }
   const onCarriage: GoodsSpot = { kind: 'carriage', carriageId: carriage?.id ?? '' }
+  const inBoat: GoodsSpot = { kind: 'vessel', vesselId: boat?.id ?? '' }
   const needed = site ? materialsNeeded(site) : {}
   const roadSite = road?.site ? road : undefined
   const atRoadSite: GoodsSpot = { kind: 'site', siteId: roadSite?.id ?? '' }
@@ -2053,6 +2560,7 @@ export function ResidentCard({
     carriageHorseDown: horses.some((h) => h.id === carriage?.horseId && isDown(h)),
     ...(carriageTheirs ? { carriageTheirs } : {}),
     ...(driveOff ? { driveOff } : {}),
+    ...(rowOff ? { rowOff } : {}),
     ...(hitchOff ? { hitchOff } : {}),
     ...(stealHorse ? { stealHorse } : {}),
     pile,
@@ -2072,6 +2580,16 @@ export function ResidentCard({
     aboard: r.aboard !== undefined,
     driving: r.order?.kind === 'drive' || r.order?.kind === 'haul',
     carriageToBoard: !!carriageToBoard,
+    boatToBoard: !!boatToBoard,
+    shipToBoard: boatToBoard?.kind === 'ship',
+    ...(boatToRow
+      ? {
+          boatToRow: {
+            ...(boatToRow.problem ? { problem: boatToRow.problem } : {}),
+            ...(boatToRow.ship ? { ship: true } : {}),
+          },
+        }
+      : {}),
     carriageToUnhitch: !!carriageToUnhitch,
     horseToHitch: !!toHitch,
     carrying: !!r.carrying,
@@ -2094,7 +2612,9 @@ export function ResidentCard({
     }
     if (a.id === 'walk') onWalkTo()
     if (a.id === 'drive') onDriveTo()
+    if (a.id === 'row') onRowTo?.()
     if (a.id === 'driveOff') onDriveOff?.()
+    if (a.id === 'rowOff') onRowOff?.()
     if (a.id === 'hitchOff') onHitchOff?.()
     if (a.id === 'stealHorse') onStealHorse?.()
     if (a.id === 'roadTo') onRoadTo()
@@ -2102,7 +2622,8 @@ export function ResidentCard({
     if (a.id === 'stop') onStop()
     if (a.id === 'ride') onRide(r.riding === undefined ? horseToRide?.id : undefined)
     if (a.id === 'unhitch' && carriageToUnhitch) onUnhitch(carriageToUnhitch.id)
-    if (a.id === 'board') onBoard(r.aboard === undefined ? carriageToBoard?.id : undefined)
+    if (a.id === 'board')
+      onBoard(r.aboard === undefined ? (carriageToBoard ?? boatToBoard)?.id : undefined)
     if (a.id === 'feedStable' && building) onFeedStable(building.id)
     if (a.id === 'train' && building) onTrain(building.id)
     if (a.id === 'explore') onExplore()
@@ -2125,10 +2646,12 @@ export function ResidentCard({
   // The open order's panel, right under the row that opened it (`ActionRows`).
   const openPanel = shown && (
     <div className="sel-panel">
-      {shown === 'haul' && carriage && (
+      {shown === 'haul' && (carriage || boatToRow) && (
         <HaulBlock
           adult={!child}
-          onRoute={r.order?.kind === 'haul'}
+          onRoute={r.order?.kind === 'haul' || r.order?.kind === 'haulByWater'}
+          byWater={!carriage}
+          ship={!carriage && !!boatToRow?.ship}
           picking={picking === 'haul'}
           onHaulTo={onHaulTo}
         />
@@ -2207,6 +2730,27 @@ export function ResidentCard({
           onTeach={(subject) => onTeach(building.id, subject)}
         />
       )}
+      {shown === 'board' && boatToBoard && (
+        <section className="inspector-block" aria-label="Board ship">
+          <p className="muted small">
+            Crew sail the ship and take no room; a passenger rides along and counts against its
+            load.
+          </p>
+          <div className="order-buttons">
+            <button
+              type="button"
+              disabled={child}
+              title={child ? 'children can’t crew a ship' : undefined}
+              onClick={() => onBoard(boatToBoard.id, true)}
+            >
+              As crew
+            </button>
+            <button type="button" onClick={() => onBoard(boatToBoard.id, false)}>
+              As passenger
+            </button>
+          </div>
+        </section>
+      )}
       {shown === 'hitch' && toHitch && (
         <HitchBlock
           key={r.id}
@@ -2266,6 +2810,7 @@ export function ResidentCard({
                     ? [{ label: 'Deliver to road', spot: atRoadSite }]
                     : []),
                   ...(carriage ? [{ label: 'Load', spot: onCarriage }] : []),
+                  ...(boat ? [{ label: 'Load into boat', spot: inBoat }] : []),
                 ]}
                 onAct={onDrop}
               />
@@ -2277,6 +2822,7 @@ export function ResidentCard({
             carriageSite ||
             roadSite ||
             carriage ||
+            boat ||
             downHere.length > 0) && (
             <section className="inspector-block" aria-label="On this tile">
               <div className="panel-head">
@@ -2292,7 +2838,11 @@ export function ResidentCard({
               />
               {storage && (
                 <TileGoods
-                  title={storage.kind === 'stable' ? 'In the stable' : 'In the storage'}
+                  title={
+                    storage.kind === 'stable' || storage.kind === 'haven'
+                      ? `In the ${storage.kind}`
+                      : 'In the storage'
+                  }
                   stock={storage.stock}
                   spot={inStorage}
                   onPickUp={onPickUp}
@@ -2334,6 +2884,38 @@ export function ResidentCard({
                   onPickUp={onPickUp}
                   refused={refused}
                 />
+              )}
+              {boat?.load && (
+                // From beside it, a ship's from its haven; its passengers count against what it
+                // holds (`CONTEXT.md`: Beside a vessel, Docked).
+                <TileGoods
+                  title={`In the ${vesselName(boat)} · ${kg(stockWeight(boat.load) + boat.passengerIds.length * PASSENGER_WEIGHT)} / ${kg(vesselCapacity(boat.kind))}`}
+                  stock={boat.load}
+                  spot={inBoat}
+                  onPickUp={onPickUp}
+                  refused={refused}
+                />
+              )}
+              {storage && boat?.kind === 'ship' && storage.id === boat.dockedAt && onLoad && (
+                // Straight between the haven's storage and the ship (`CONTEXT.md`: Docked).
+                <>
+                  <TileGoods
+                    title="From the haven onto the ship"
+                    stock={storage.stock}
+                    spot={inStorage}
+                    label="Load ship"
+                    onPickUp={(_, goods) => onLoad(boat.id, goods, false)}
+                    refused={refused}
+                  />
+                  <TileGoods
+                    title="From the ship into the haven"
+                    stock={boat.load}
+                    spot={inBoat}
+                    label="Unload"
+                    onPickUp={(_, goods) => onLoad(boat.id, goods, true)}
+                    refused={refused}
+                  />
+                </>
               )}
               {downHere.map((d) => (
                 <TileGoods
@@ -2538,10 +3120,15 @@ export function ResidentCard({
       {tab === 'queue' &&
         (queuePlan && onPlanQueue ? (
           <>
+            <p className="small queue-draft-mark">
+              {r.queue
+                ? 'Draft, not started: the queue runs on until you start it.'
+                : 'Draft, not started'}
+            </p>
             <QueueBlock
-              title="Plan"
+              title="Draft"
               queue={queuePlan}
-              currentId={r.queue?.steps[r.queue.current]?.id}
+              currentId={r.queue?.current}
               doing={doingLine(r, {
                 scripts,
                 buildings,
@@ -2557,40 +3144,56 @@ export function ResidentCard({
               cities={cities}
               onEdit={(items, loop) => onPlanQueue(editPlan(queuePlan, items, loop))}
               realm={realmId}
+              palette={addStep}
             />
             <GivePlan
               plan={queuePlan}
-              give="Give"
-              note="Give makes their queue this plan, each repeat block that many copies of its steps; the step they are on keeps going if it is still in it."
+              give="Start queue"
+              discard="Discard draft"
+              note="Start queue makes their queue this draft, repeat blocks and all; the step they are on keeps going if it is still in it."
               onGive={() => onGivePlan?.()}
               onDiscard={() => onPlanQueue(undefined)}
             />
           </>
         ) : r.queue && onEditQueue ? (
-          <QueueBlock
-            queue={planOf(r.queue)}
-            currentId={r.queue.steps[r.queue.current]?.id}
-            doing={doingLine(r, {
-              scripts,
-              buildings,
-              residents,
-              horses,
-              cities,
-              arrives: arrivesIn?.(r),
-            })}
-            scripts={scripts}
-            buildings={buildings}
-            lastSeen={lastSeen}
-            waypoints={waypoints}
-            cities={cities}
-            onEdit={onEditQueue}
-            realm={realmId}
-          />
+          <>
+            <QueueBlock
+              queue={planOf(r.queue)}
+              currentId={r.queue.current}
+              rounds={roundsOf(r.queue)}
+              branches={branchesOf(r.queue)}
+              running
+              doing={doingLine(r, {
+                scripts,
+                buildings,
+                residents,
+                horses,
+                cities,
+                arrives: arrivesIn?.(r),
+              })}
+              scripts={scripts}
+              buildings={buildings}
+              lastSeen={lastSeen}
+              waypoints={waypoints}
+              cities={cities}
+              onEdit={onEditQueue}
+              realm={realmId}
+              palette={addStep}
+            />
+            {onDraftQueue && (
+              <div className="order-buttons">
+                <button type="button" onClick={onDraftQueue}>
+                  Edit as draft
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <>
             <p className="muted small">
-              Nothing queued. Hold Shift with any order to queue it, plan steps with Add step, paste
-              copied ones or load a saved queue.
+              Nothing queued. Plan steps with Add step, paste copied ones or load a saved queue:
+              they wait as a draft until you press Start queue. Hold Shift with any order to queue
+              it at once.
             </p>
             {onEditQueue && <PasteSteps onPaste={(steps) => onEditQueue(steps)} />}
             {onEditQueue && (
@@ -2598,7 +3201,7 @@ export function ResidentCard({
             )}
           </>
         ))}
-      {tab === 'queue' && addStep}
+      {tab === 'queue' && !(queuePlan && onPlanQueue) && !(r.queue && onEditQueue) && addStep}
       {tab === 'script' &&
         (r.script ? (
           <>
@@ -2633,7 +3236,7 @@ export function ResidentCard({
             <li>
               {child ? 'Child' : 'Adult'} · {age} years · {home}
               {r.riding ? ' · on horseback' : ''}
-              {r.aboard ? ' · aboard a carriage' : ''}
+              {r.aboard ? (isVesselId(r.aboard) ? ' · aboard a boat' : ' · aboard a carriage') : ''}
             </li>
             {grown && <li>{capitalised(grown)}</li>}
             {family && <li>{family}</li>}
@@ -2687,13 +3290,16 @@ export function ResidentCard({
 }
 
 /**
- * Setting up a haul route with the carriage on the resident's tile (`CONTEXT.md`: Haul route):
- * which goods go from here to the other stop, which come back, and how much Food stays on board
- * for the horse, then the other stop on the map.
+ * Setting up a haul route with the carriage on the resident's tile (`CONTEXT.md`: Haul route), or
+ * the boat beside them (Haul route by water): which goods go from here to the other stop, which
+ * come back, and how much Food stays on board for the horse or the rower, then the other stop on
+ * the map.
  */
 function HaulBlock({
   adult,
   onRoute,
+  byWater = false,
+  ship = false,
   picking,
   onHaulTo,
 }: {
@@ -2701,6 +3307,10 @@ function HaulBlock({
   adult: boolean
   /** Already hauling on a route. */
   onRoute: boolean
+  /** With the boat beside them, rowed between shores or havens. */
+  byWater?: boolean
+  /** With a ship docked at their haven, sailed between havens by its crew. */
+  ship?: boolean
   /** The map is waiting for the route's other stop. */
   picking: boolean
   onHaulTo: (setup: HaulSetup) => void
@@ -2738,7 +3348,11 @@ function HaulBlock({
         </div>
       ))}
       <label className="small">
-        Food kept for the horse{' '}
+        {ship
+          ? 'Food kept for the crew'
+          : byWater
+            ? 'Food kept for the rower'
+            : 'Food kept for the horse'}{' '}
         <input
           type="number"
           min={0}
@@ -2765,12 +3379,29 @@ function HaulBlock({
           give={() => onHaulTo({ goods, returnGoods, keepFood })}
         />
       </div>
-      <p className="muted small">
-        The driver loads the picked goods here, drives them to the other stop and unloads them,
-        brings the goods picked to come back, again and again until stopped. A stop with a storage
-        loads and unloads there, else on the ground. The horse eats from the carriage’s load; its
-        Food is topped up wherever there is some.
-      </p>
+      {ship ? (
+        <p className="muted small">
+          The captain moves the picked goods straight from this haven onto the ship, sails it with
+          the crew to the other haven, gets off and unloads them there, brings the goods picked to
+          come back, again and again until stopped; the rest of the crew stays aboard. The crew take
+          meals from the ship’s Food, topped up at any haven with some.
+        </p>
+      ) : byWater ? (
+        <p className="muted small">
+          The rower loads the picked goods into the boat from this shore, rows them to the other
+          stop (a shore tile or a haven, with free water beside it), gets off and unloads them,
+          brings the goods picked to come back, again and again until stopped. A haven loads and
+          unloads at its storage, a shore on the ground. The rower takes meals from the boat’s Food,
+          topped up wherever there is some.
+        </p>
+      ) : (
+        <p className="muted small">
+          The driver loads the picked goods here, drives them to the other stop and unloads them,
+          brings the goods picked to come back, again and again until stopped. A stop with a storage
+          loads and unloads there, else on the ground. The horse eats from the carriage’s load; its
+          Food is topped up wherever there is some.
+        </p>
+      )}
     </section>
   )
 }
@@ -3680,11 +4311,14 @@ export function TileGoods({
   spot,
   onPickUp,
   refused,
+  label = 'Pick up',
 }: {
   title: string
   stock: Stock | undefined
   spot: GoodsSpot
   onPickUp: (from: GoodsSpot, goods: Stock) => void
+  /** The button's label: "Pick up", or what else takes them. */
+  label?: string
   /** Whether the resident may not pick up this good, as a child anything but Food. */
   refused: (good: Good) => boolean
 }) {
@@ -3700,7 +4334,7 @@ export function TileGoods({
           units={units}
           byDefault={units}
           disabled={refused(good)}
-          actions={[{ label: 'Pick up', spot }]}
+          actions={[{ label, spot }]}
           onAct={onPickUp}
         />
       ))}

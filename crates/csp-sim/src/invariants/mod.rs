@@ -44,6 +44,7 @@ pub struct Ledgers<'a> {
     pub offers: Option<&'a OfferLedger>,
     pub debt_payments: Option<&'a DebtLedger>,
     pub buy_offs: &'a [BuyOffRecord],
+    pub lent_gear: &'a [crate::npc_hire::LentGear],
 }
 
 impl Invariant {
@@ -82,6 +83,9 @@ fn ledgered_check(name: &str) -> Option<fn(&WorldState, &Ledgers) -> Vec<Invaria
         }
         "npc-horse-purchases-wanted" => {
             |_, l| empty(l.trades, crate::trading::npc_horse_purchases_wanted)
+        }
+        "npc-lending-keeps-reserve" => {
+            |_, l| crate::npc_hire::npc_lending_keeps_reserve(l.lent_gear)
         }
         "npc-trades-keep-reserve" => {
             |_, l| empty(l.trades, crate::trading::npc_trades_keep_reserve)
@@ -192,10 +196,14 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant { name: "children-dont-work", check: checks::children_dont_work },
         Invariant { name: "children-carry-only-food", check: checks::children_carry_only_food },
         Invariant { name: "carriages-in-place", check: checks::carriages_in_place },
+        Invariant { name: "vessels-in-place", check: checks::vessels_in_place },
         Invariant { name: "riders-on-horses", check: checks::riders_on_horses },
         Invariant { name: "passengers-aboard", check: checks::passengers_aboard },
+        Invariant { name: "vessel-passengers", check: checks::vessel_passengers },
+        Invariant { name: "ship-crew", check: checks::ship_crew },
         Invariant { name: "drivers-on-carriages", check: checks::drivers_on_carriages },
         Invariant { name: "haul-routes-sound", check: checks::haul_routes_sound },
+        Invariant { name: "water-haul-routes-sound", check: checks::water_haul_routes_sound },
         Invariant { name: "alliances-sound", check: checks::alliances_sound },
         Invariant { name: "territory-sound", check: checks::territory_sound },
         Invariant { name: "dead-leave-loot", check: checks::dead_leave_loot },
@@ -217,6 +225,7 @@ pub fn world_invariants() -> Vec<Invariant> {
         ledgered("npc-horse-sales-keep-pair"),
         ledgered("npc-horse-purchases-wanted"),
         ledgered("npc-trades-keep-reserve"),
+        ledgered("npc-lending-keeps-reserve"),
         Invariant { name: "offers-sound", check: |w, _| crate::offers::offers_sound(w) },
         // `offersKeepGoods` checks the scratch's offer ledger: `offers::offers_keep_goods`.
         ledgered("offers-keep-goods"),
@@ -241,6 +250,14 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant {
             name: "join-requests-sound",
             check: |w, _| crate::persuasion::join_requests_sound(w),
+        },
+        Invariant {
+            name: "respect-sound",
+            check: |w, t| crate::persuasion::respect_sound(w, t.size),
+        },
+        Invariant {
+            name: "outweighed-sound",
+            check: |w, t| crate::persuasion::outweighed_sound(w, t.size),
         },
         Invariant {
             name: "former-players-sound",
@@ -275,6 +292,7 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: |w, t| crate::trade_org_army::trade_org_army_sound(w, t.size),
         },
         Invariant { name: "npc-hire-sound", check: |w, _| crate::npc_hire::npc_hire_sound(w) },
+        Invariant { name: "lent-never-turn", check: |w, _| crate::lent::lent_never_turn(w) },
         Invariant {
             name: "punishments-sound",
             check: |w, _| crate::trade_org_punishment::punishments_sound(w),

@@ -309,12 +309,13 @@ export interface BuildCost {
 }
 
 /**
- * The building cost sheet: every kind that can be built but a carriage, which is no building once
- * finished (`carriageCost`).
+ * The building cost sheet: every kind that can be built but a carriage, boat or ship, which are no
+ * buildings once finished (`carriageCost`, `boatCost`, `shipCost`).
  */
 export function buildCosts(): BuildCost[] {
   const pace = buildWork(AVERAGE, AT)
-  return BUILDABLE.filter((kind) => kind !== 'carriage').map((kind) => {
+  const vehicles: readonly BuildingKind[] = ['carriage', 'boat', 'ship']
+  return BUILDABLE.filter((kind) => !vehicles.includes(kind)).map((kind) => {
     const materials = BUILD_MATERIALS[kind] ?? {}
     const work = BUILD_WORK[kind] ?? 0
     const returned: Stock = {}
@@ -341,6 +342,28 @@ export function carriageCost(): { materials: Stock; buildTicks: number } {
   return {
     materials: BUILD_MATERIALS.carriage ?? {},
     buildTicks: (BUILD_WORK.carriage ?? 0) / buildWork(AVERAGE, AT),
+  }
+}
+
+/**
+ * What a boat takes to build at a haven (`CONTEXT.md`: Building a boat): its materials and the
+ * ticks one average builder takes, alone.
+ */
+export function boatCost(): { materials: Stock; buildTicks: number } {
+  return {
+    materials: BUILD_MATERIALS.boat ?? {},
+    buildTicks: (BUILD_WORK.boat ?? 0) / buildWork(AVERAGE, AT),
+  }
+}
+
+/**
+ * What a ship takes to build at a haven on the Sea (`CONTEXT.md`: Building a ship): its materials
+ * and the ticks one average builder takes, alone.
+ */
+export function shipCost(): { materials: Stock; buildTicks: number } {
+  return {
+    materials: BUILD_MATERIALS.ship ?? {},
+    buildTicks: (BUILD_WORK.ship ?? 0) / buildWork(AVERAGE, AT),
   }
 }
 

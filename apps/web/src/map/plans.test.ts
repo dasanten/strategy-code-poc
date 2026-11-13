@@ -18,7 +18,7 @@ const wallLine = (tiles: [number, number][]): LineOrder => ({
 
 const queue = (orders: object[], current = 0, loop = false): Queue => ({
   realmId: 'me',
-  steps: orders.map((order, id) => ({ id, order: order as never })),
+  items: orders.map((order, id) => ({ id, order: order as never })),
   current,
   startedAt: 0,
   loop,

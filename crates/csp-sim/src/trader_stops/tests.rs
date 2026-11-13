@@ -371,7 +371,7 @@ fn stolen_it_starts_over_at_the_hq_with_no_stop_to_make() {
         &mut world,
         "thief",
         "r1",
-        crate::stealing::Taken { carriage: Some(ki), horse: None },
+        crate::stealing::Taken { carriage: Some(ki), horse: None, vessel: None },
         terrain.size,
     );
     let t = &world.traders[0];

@@ -101,6 +101,8 @@ import type {
   SeenCaravan,
   SeenTrader,
   SeenCarriage,
+  SeenVessel,
+  VesselKind,
   GoodsPlace,
   GoodsWanted,
   LoadLevel,
@@ -122,6 +124,7 @@ import { faresKnown, horseFaresKnown } from './seen.js'
 import { FEED_HORSE_HINT, horseDownLine, horseNeed } from './horses-view.js'
 import { lastSeenText, type LastSeenBuilding } from './last-seen.js'
 import { describeOccupation, type OccupationView } from './city-view.js'
+import { besideVessel, boardBoatProblem, crewShort, vesselCapacity } from './shared/vessels.js'
 import type { Picking } from './Residents.js'
 
 /**
@@ -140,7 +143,9 @@ export type ActionId =
   | 'unhitch'
   | 'hitch'
   | 'drive'
+  | 'row'
   | 'driveOff'
+  | 'rowOff'
   | 'hitchOff'
   | 'stealHorse'
   | 'haul'
@@ -180,7 +185,9 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   unhitch: 'U',
   hitch: 'J',
   drive: 'D',
+  row: 'D',
   driveOff: 'D',
+  rowOff: 'D',
   hitchOff: 'D',
   stealHorse: 'M',
   haul: 'H',
@@ -246,6 +253,11 @@ export interface ResidentHere {
    */
   driveOff?: { problem: string | undefined }
   /**
+   * Another organization's boat (or nobody's) beside them, to row off, and why it can't be taken
+   * now, if so (`CONTEXT.md`: Stealing a carriage or horse, its vessel part).
+   */
+  rowOff?: { problem: string | undefined }
+  /**
    * Their realm's carriage on their tile with no horse of the realm's to pull it, and another
    * organization's free horse there to steal for it, and why they can't now, if so (`CONTEXT.md`:
    * Stealing a carriage or horse).
@@ -292,6 +304,18 @@ export interface ResidentHere {
   driving?: boolean
   /** A carriage of their realm on their tile, to board (`CONTEXT.md`: Passenger). */
   carriageToBoard?: boolean
+  /** A boat of their realm beside them with room, to board (`CONTEXT.md`: Beside a vessel). */
+  boatToBoard?: boolean
+  /**
+   * The vessel to board is a ship docked at their haven: Board opens a choice, as crew or as a
+   * passenger (`CONTEXT.md`: Crew).
+   */
+  shipToBoard?: boolean
+  /**
+   * A boat of their realm they are aboard or beside, to row, with why they can't take its oars
+   * now, if so (`CONTEXT.md`: Rowing).
+   */
+  boatToRow?: { problem?: string; ship?: boolean }
   /** A carriage of their realm on their tile with a horse hitched, to unhitch (`CONTEXT.md`: Hitched horse). */
   carriageToUnhitch?: boolean
   /** A carriage of their realm on their tile and a horse to hitch to it (`hitchChoice`). */
@@ -339,8 +363,14 @@ export function residentActions(h: ResidentHere): CardAction[] {
 /** Why a carriage whose horse is Down can't be driven (`CONTEXT.md`: Down). */
 export const HORSE_DOWN_NO_DRIVE = 'its horse is Down'
 
+/** Why a haul route by water can't start aboard (`CONTEXT.md`: Haul route by water). */
+export const HAUL_STARTS_ASHORE = 'the route starts on the shore beside the boat: get off first'
+
 /** The action that steals a carriage, which says so (`CONTEXT.md`: Stealing a carriage or horse). */
 export const DRIVE_OFF_LABEL = 'Drive off (theft)'
+
+/** The action that steals a boat by rowing it off, which says so (its vessel part). */
+export const ROW_OFF_LABEL = 'Row off (theft)'
 
 /** The action that steals a horse by driving off with it hitched, which says so. */
 export const HITCH_OFF_LABEL = 'Drive with their horse (theft)'
@@ -434,7 +464,17 @@ function ordersOffered(h: ResidentHere): {
     const reason = h.driving ? 'the driver can’t board' : h.riding ? 'dismount first to board' : ''
     const refused = reason ? { disabled: true as const, reason } : {}
     add(row('board', 'Board carriage', refused))
-  } else miss('board', 'no carriage of yours here')
+  } else if (h.boatToBoard) {
+    // From beside it, onto its water tile; no horse goes aboard (`CONTEXT.md`: Beside a vessel).
+    const reason = h.driving
+      ? 'the driver can’t board'
+      : h.riding
+        ? 'no horse goes aboard: dismount first'
+        : ''
+    const refused = reason ? { disabled: true as const, reason } : {}
+    if (h.shipToBoard) add(row('board', 'Board ship…', { ...refused, opens: true }))
+    else add(row('board', 'Board boat', refused))
+  } else miss('board', 'no carriage or boat of yours here')
   if (h.adult && h.carriageToUnhitch) add(row('unhitch', 'Unhitch horse'))
   else miss('unhitch', h.adult ? 'no hitched horse here' : 'children can’t unhitch')
   if (h.adult && h.horseToHitch) add(row('hitch', 'Hitch horse…', { opens: true }))
@@ -461,8 +501,39 @@ function ordersOffered(h: ResidentHere): {
         ? 'children can’t drive'
         : 'no carriage here'
     miss('drive', why)
-    miss('haul', why)
+    // A boat of theirs beside them hauls instead (`CONTEXT.md`: Haul route by water).
+    if (!h.boatToRow || !h.adult) miss('haul', why)
   }
+  // Rowing a boat of theirs they are aboard or beside (`CONTEXT.md`: Rowing); a carriage to drive
+  // on the same tile keeps the key.
+  if (h.boatToRow && !(drivable && h.adult)) {
+    const reason = !h.adult
+      ? 'children can’t row'
+      : h.riding
+        ? 'no horse goes aboard: dismount first'
+        : h.driving
+          ? 'the driver can’t row'
+          : h.boatToRow.problem
+    // A ship is sailed by one of its crew aboard (`CONTEXT.md`: Sailing); ashore on its haven
+    // they take it on a haul route instead.
+    if (h.boatToRow.ship && !h.aboard) miss('row', 'board the ship as crew to sail it')
+    else {
+      add(
+        row('row', '', {
+          ...picks('row', h.boatToRow.ship ? 'Sail ship to' : 'Row boat to'),
+          ...(reason ? { disabled: true as const, reason } : {}),
+        }),
+      )
+    }
+    // A haul route by water starts on the shore beside the boat, the first stop
+    // (`CONTEXT.md`: Haul route by water).
+    if (h.adult && !reason && !h.aboard && !h.carrying) {
+      const label = h.picking === 'haul' ? 'Pick the other stop…' : 'Haul route…'
+      add(row('haul', label, { opens: true }))
+    } else if (h.adult) {
+      miss('haul', h.carrying ? CARRYING_A_CHILD : h.aboard ? HAUL_STARTS_ASHORE : (reason ?? ''))
+    }
+  } else miss('row', 'no boat or ship of yours here')
   // Only ever on its own row, saying what it is (`CONTEXT.md`: Stealing a carriage or horse).
   if (h.driveOff) {
     const { problem } = h.driveOff
@@ -473,6 +544,16 @@ function ordersOffered(h: ResidentHere): {
       }),
     )
   } else miss('driveOff', 'no carriage of another realm here')
+  // A boat likewise, from beside it (`CONTEXT.md`: Stealing a carriage or horse, its vessel part).
+  if (h.rowOff) {
+    const { problem } = h.rowOff
+    add(
+      row('rowOff', '', {
+        ...picks('rowOff', ROW_OFF_LABEL),
+        ...(problem ? { disabled: true as const, reason: problem } : {}),
+      }),
+    )
+  } else miss('rowOff', 'no boat of another realm beside them')
   if (h.hitchOff) {
     const { problem } = h.hitchOff
     add(
@@ -601,7 +682,9 @@ const ORDER_GROUP: Partial<Record<ActionId, OrderGroup>> = {
   unhitch: 'move',
   hitch: 'move',
   drive: 'move',
+  row: 'move',
   driveOff: 'move',
+  rowOff: 'move',
   hitchOff: 'move',
   stealHorse: 'move',
   haul: 'move',
@@ -856,6 +939,18 @@ export interface TileCard {
    */
   unhitch?: { carriageId: string; residents: { id: string; name: string }[] }
   /**
+   * The Player's boat on the tile, their residents beside it who may board it, each with why they
+   * can't now, if so, and its passengers of theirs, who may get off (`CONTEXT.md`: Beside a
+   * vessel).
+   */
+  boat?: {
+    vesselId: string
+    /** "Boat" or "Ship", for its Board action. */
+    name?: string
+    board: { id: string; name: string; problem: string | undefined }[]
+    getOff: { id: string; name: string }[]
+  }
+  /**
    * Another organization's carriage on the tile and the Player's residents on it, who may drive it
    * off, each with why they can't now, if so (`CONTEXT.md`: Stealing a carriage or horse).
    */
@@ -929,6 +1024,13 @@ export interface CarriageView {
   /** Said instead of a horse row: "No horse hitched", or "Horse hitched" with it out of sight. */
   noHorse?: string
   driver?: NamedResident
+  /** A boat's rower, at its oars, no passenger (`CONTEXT.md`: Rowing). */
+  rower?: NamedResident
+  /**
+   * A ship's crew in sight, no passengers, and whether it can sail: "can sail", or "needs 2 more
+   * crew to sail" (`CONTEXT.md`: Crew).
+   */
+  crew?: { residents: NamedResident[]; sail: string }
   /** Its passengers in sight, and what they weigh of what it holds: "160 kg of it people". */
   passengers?: { residents: NamedResident[]; weight: string }
   /**
@@ -1004,6 +1106,8 @@ export interface TileThings {
   y: number
   buildings: SeenBuilding[]
   carriages: SeenCarriage[]
+  /** Boats on the water in sight (`CONTEXT.md`: Vessel). */
+  vessels?: SeenVessel[]
   horses: SeenHorse[]
   piles: Pile[]
   node: KnownNode | undefined
@@ -1506,6 +1610,9 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   const road = here(t.buildings).find((b) => b.kind === 'road')
   const carriageSite = here(t.buildings).find((b) => b.kind === 'carriage')
   const carriage = here(t.carriages)[0]
+  const boatSite = here(t.buildings).find((b) => b.kind === 'boat')
+  const shipSite = here(t.buildings).find((b) => b.kind === 'ship')
+  const vessel = here(t.vessels ?? [])[0]
   const pileTile = live ?? t
   const pile = t.piles.find((p) => p.x === pileTile.x && p.y === pileTile.y)
   const cityOf = (b: Building) => t.cities.find((c) => c.id === b.cityId)
@@ -1528,6 +1635,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   let card: Omit<TileCard, 'lines'> | undefined
   let buildHere: TileCard['buildHere']
   let unhitch: TileCard['unhitch']
+  let boat: TileCard['boat']
   let driveOff: TileCard['driveOff']
   let hitchOff: TileCard['hitchOff']
   let stealHorse: TileCard['stealHorse']
@@ -1626,6 +1734,54 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     card ??= { title: 'Carriage site', what: 'building' }
     sites.push({ ...head, ...describeSite(carriageSite, t) })
     if (carriageSite.teardown) lines.push(teardownLine(carriageSite))
+  }
+  if (boatSite?.site) {
+    // A boat site has no owner either; on its haven's card under a head of its own
+    // (`CONTEXT.md`: Building a boat).
+    const head = card ? { title: 'Boat site' } : {}
+    card ??= { title: 'Boat site', what: 'building' }
+    sites.push({ ...head, ...describeSite(boatSite, t) })
+    if (boatSite.teardown) lines.push(teardownLine(boatSite))
+  }
+  if (shipSite?.site) {
+    // A ship site likewise (`CONTEXT.md`: Building a ship).
+    const head = card ? { title: 'Ship site' } : {}
+    card ??= { title: 'Ship site', what: 'building' }
+    sites.push({ ...head, ...describeSite(shipSite, t) })
+    if (shipSite.teardown) lines.push(teardownLine(shipSite))
+  }
+  if (vessel) {
+    // A boat or ship on the water, on a card of its own (`CONTEXT.md`: Vessel): its owner first.
+    const rel = realmRelationship(vessel.realmId, null, t.cities, t.viewer)
+    card ??= { title: VESSEL_NAMES[vessel.kind], rel, what: 'carriage' }
+    lines.push(rel ? RELATIONSHIP_NAMES[rel] : 'Nobody’s')
+    carriageView = describeVessel(vessel, rel, t)
+    // The Player's residents beside it board it, a ship's from the haven it is docked at, and its
+    // passengers of theirs get off (`CONTEXT.md`: Beside a vessel, Docked).
+    const mine = (t.residents ?? []).filter(
+      (r) => !t.strangers.some((s) => s.id === r.id) && !isDown(r),
+    )
+    const viewerRealm = t.viewer.realmId
+    if (viewerRealm && vessel.realmId === viewerRealm) {
+      const board = mine
+        .filter(
+          (r) =>
+            r.aboard === undefined && besideVessel(vessel, r, t.mapSize ?? MAP_SIZE, t.buildings),
+        )
+        .map((r) => ({
+          id: r.id,
+          name: r.name,
+          problem: boardBoatProblem({ ...r, driving: !!drivenCarriageId(r) }, vessel, {
+            buildings: t.buildings,
+            size: t.mapSize ?? MAP_SIZE,
+          }),
+        }))
+      const getOff = mine
+        .filter((r) => r.aboard === vessel.id)
+        .map(({ id, name }) => ({ id, name }))
+      const name = VESSEL_NAMES[vessel.kind]
+      if (board.length > 0 || getOff.length > 0) boat = { vesselId: vessel.id, name, board, getOff }
+    }
   }
   if (carriage) {
     const rel = realmRelationship(carriage.realmId, carriage.cityId, t.cities, t.viewer)
@@ -1766,6 +1922,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     ...(buildHere ? { buildHere } : {}),
     ...(carriageView ? { carriage: carriageView } : {}),
     ...(unhitch ? { unhitch } : {}),
+    ...(boat ? { boat } : {}),
     ...(driveOff ? { driveOff } : {}),
     ...(hitchOff ? { hitchOff } : {}),
     ...(stealHorse ? { stealHorse } : {}),
@@ -1777,6 +1934,52 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     ...(lists.length > 0 ? { lists } : {}),
     ...(stableFood ? { stableFood } : {}),
   }
+}
+
+/** What each kind of vessel is called on its card (`CONTEXT.md`: Vessel). */
+export const VESSEL_NAMES: Record<VesselKind, string> = { boat: 'Boat', ship: 'Ship' }
+
+/**
+ * A boat or ship as rows and meters (`CONTEXT.md`: Vessel, Goods on cards): its load against what
+ * it holds and its goods when the Player sees inside (its own realm and allies), else only how
+ * heavily it is loaded; who is aboard.
+ */
+export function describeVessel(
+  vessel: SeenVessel,
+  rel: Relationship | undefined,
+  t?: Pick<TileThings, 'residents' | 'strangers'>,
+): CarriageView {
+  // Its passengers, as many as are in sight, counted against what it holds (`CONTEXT.md`: Beside a
+  // vessel).
+  const named = (id: string) => {
+    const r = t?.residents?.find((x) => x.id === id)
+    return r ? [{ id: r.id, name: r.name, pick: !t?.strangers.some((s) => s.id === r.id) }] : []
+  }
+  const aboard = (vessel.passengerIds ?? []).flatMap(named)
+  // Its rower is no passenger and weighs nothing against it (`CONTEXT.md`: Rowing).
+  const [rower] = vessel.rowerId ? named(vessel.rowerId) : []
+  const people = (vessel.passengerIds ?? []).length * PASSENGER_WEIGHT
+  const weight = vessel.load ? stockWeight(vessel.load) + people : 0
+  const capacity = vesselCapacity(vessel.kind)
+  const view: CarriageView = {
+    title: `${VESSEL_NAMES[vessel.kind]}${rel ? ` (${RELATIONSHIP_NAMES[rel].toLowerCase()})` : ''}`,
+    load: vessel.load
+      ? { text: `${Math.round(weight)} / ${capacity} kg`, share: weight / capacity }
+      : { text: capital(LOAD_LEVEL_NAMES[vessel.loadLevel]) },
+    ...(vessel.load ? { goods: vessel.load } : {}),
+  }
+  if (aboard.length > 0) {
+    view.passengers = { residents: aboard, weight: `${Math.round(people)} kg of it people` }
+  }
+  if (rower) view.rower = rower
+  if (vessel.kind === 'ship') {
+    const short = crewShort(vessel)
+    view.crew = {
+      residents: (vessel.crewIds ?? []).flatMap(named),
+      sail: short === 0 ? 'can sail' : `needs ${short} more crew to sail`,
+    }
+  }
+  return view
 }
 
 /**
@@ -2245,6 +2448,15 @@ export function tileActions(
   }
   if (card.unhitch)
     actions.push({ id: 'unhitch', label: 'Unhitch horse', key: ACTION_KEYS.unhitch })
+  const boater = boaterOf(card, actor)
+  if (boater) {
+    actions.push({
+      id: 'board',
+      label: boater.getOff ? 'Get off' : `Board ${(card.boat?.name ?? 'Boat').toLowerCase()}`,
+      key: ACTION_KEYS.board,
+      ...(boater.problem ? { disabled: true as const, reason: boater.problem } : {}),
+    })
+  }
   const thief = thiefOf(card, actor)
   if (thief) {
     actions.push({
@@ -2304,6 +2516,25 @@ export function tileActions(
     opens: true,
   })
   return actions
+}
+
+/**
+ * Who boards the tile card's boat or gets off it (`TileCard.boat`): the resident picked last when
+ * they are aboard it or beside it, or else the first of the Player's beside it, or else the first
+ * of their passengers.
+ */
+export function boaterOf(
+  card: TileCard,
+  actor: { id: string } | undefined,
+): { id: string; getOff: boolean; problem: string | undefined } | undefined {
+  const boat = card.boat
+  if (!boat) return undefined
+  const off = boat.getOff.find((r) => r.id === actor?.id)
+  if (off) return { id: off.id, getOff: true, problem: undefined }
+  const on = boat.board.find((r) => r.id === actor?.id) ?? boat.board[0]
+  if (on) return { id: on.id, getOff: false, problem: on.problem }
+  const first = boat.getOff[0]
+  return first && { id: first.id, getOff: true, problem: undefined }
 }
 
 /**

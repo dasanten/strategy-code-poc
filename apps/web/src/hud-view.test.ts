@@ -1,20 +1,28 @@
 import { describe, expect, it } from 'vitest'
 import { TICKS_PER_GAME_DAY } from '@csp/balance'
 import type { Building } from '@csp/shared-types'
+import { centreBeside, tileToScreen } from './map/camera.js'
 import {
+  DIPLOMACY_TABS,
   DRAWERS,
   DRAWER_WIDTH,
+  NO_DRAWER,
   MIN_OPEN_MAP,
   drawerWidth,
   goodsLabel,
   goodsOldText,
   goodsPickCities,
   goodsPickOf,
+  RAIL_GROUPS,
+  railGroups,
   rememberGoodsPick,
   rememberedDrawerWidth,
   rememberedGoodsPick,
   isWide,
   keyGoods,
+  openDiplomacy,
+  showsTab,
+  withOpen,
   showBeside,
   toggleDrawer,
   type OpenDrawer,
@@ -28,16 +36,61 @@ describe('drawers', () => {
       'Horses',
       'Waypoints',
       'Armies',
-      'Contracts',
-      'Demands',
-      'Direct offers',
-      'Alliance',
-      'Standing',
+      'Diplomacy',
+      'Cities',
       'Scripts',
       'Realm log',
     ])
       expect(labels).toContain(tool)
     expect(new Set(DRAWERS.map((d) => d.id)).size).toBe(DRAWERS.length)
+  })
+
+  it('puts every drawer in exactly one group, in rail order', () => {
+    const groups = railGroups()
+    expect(groups.map((g) => g.id)).toEqual(RAIL_GROUPS.map((g) => g.id))
+    expect(groups.flatMap((g) => g.drawers.map((d) => d.id))).toEqual(DRAWERS.map((d) => d.id))
+    expect(Object.fromEntries(groups.map((g) => [g.label, g.drawers.map((d) => d.label)]))).toEqual(
+      {
+        People: ['Residents', 'Horses', 'Armies'],
+        Diplomacy: ['Diplomacy'],
+        Realm: ['Cities', 'Waypoints', 'Scripts', 'Realm log'],
+      },
+    )
+  })
+
+  it('has one Diplomacy drawer, with a tab each for its five parts', () => {
+    expect(DRAWERS.filter((d) => d.group === 'diplomacy').map((d) => d.id)).toEqual(['diplomacy'])
+    expect(DIPLOMACY_TABS.map((t) => t.label)).toEqual([
+      'Contracts',
+      'Demands',
+      'Direct offers',
+      'Alliance',
+      'Standing',
+    ])
+  })
+
+  it('starts the Diplomacy drawer on its first tab', () => {
+    expect(withOpen(NO_DRAWER, 'diplomacy')).toEqual({ open: 'diplomacy', tab: 'contracts' })
+  })
+
+  it("lands a notice's Open on its tab, whatever was open before", () => {
+    const demands = openDiplomacy('demands')
+    expect(demands).toEqual({ open: 'diplomacy', tab: 'demands' })
+    expect(showsTab(demands, 'demands')).toBe(true)
+    expect(showsTab(demands, 'directOffers')).toBe(false)
+    const offers = openDiplomacy('directOffers')
+    expect(showsTab(offers, 'directOffers')).toBe(true)
+    expect(showsTab(offers, 'demands')).toBe(false)
+  })
+
+  it('remembers the Diplomacy tab while the drawer is closed or another is open', () => {
+    let drawers = openDiplomacy('standing')
+    drawers = withOpen(drawers, undefined)
+    expect(showsTab(drawers, 'standing')).toBe(false)
+    drawers = withOpen(drawers, toggleDrawer(drawers.open, 'residents'))
+    drawers = withOpen(drawers, toggleDrawer(drawers.open, 'diplomacy'))
+    expect(drawers).toEqual({ open: 'diplomacy', tab: 'standing' })
+    expect(showsTab(drawers, 'standing')).toBe(true)
   })
 
   it('opens the clicked drawer when none is open', () => {
@@ -59,6 +112,18 @@ describe('drawers', () => {
 
   it('makes only the Scripts drawer wide', () => {
     expect(DRAWERS.filter((d) => isWide(d.id)).map((d) => d.id)).toEqual(['scripts'])
+  })
+
+  it('centres a resident picked in the drawer in the map left free beside the drawer and card', () => {
+    // The Residents drawer covers 428 px on the left, the card 372 px on the right, of 1280.
+    const view = { width: 1280, height: 800 }
+    const cover = showBeside(view.width, 428, 372)
+    expect(cover.closeDrawer).toBe(false)
+    const cam = centreBeside(2806, 3427, cover, 24, 5760)
+    // The resident's tile shows in the middle of 428..908, not of the whole screen.
+    const [sx, sy] = tileToScreen(cam, view, 5760, 2806.5, 3427.5)
+    expect(sx).toBeCloseTo(668, 6)
+    expect(sy).toBe(400)
   })
 
   it('shows a place between the open drawer and the card', () => {

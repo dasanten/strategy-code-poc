@@ -198,16 +198,76 @@
   flex: none;
   font-size: 0.75rem;
 }
-/* Add step: a step's chip with its Customise beside it. */
-.chip-with {
-  display: inline-flex;
-  gap: 2px;
+/* The Add step palette (`CONTEXT.md`: Planner blocks): step kinds grouped as the Orders tab is,
+   each a compact button with its icon, Customise a small ⚙ on its step. */
+.step-palette {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
 }
-.chip-with button.customise {
-  padding: 4px 10px;
-  border: 1px solid #3a424a;
+.step-palette-group h4 {
+  margin: 0 0 3px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.step-palette-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 3px;
+}
+.step-palette-item {
+  display: flex;
+  min-width: 0;
+}
+.step-palette-item > button:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 30px;
+  padding: 2px 6px;
+  text-align: left;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.step-palette-item button.customise-small {
+  flex: none;
+  min-width: 26px;
+  min-height: 30px;
+  padding: 0 4px;
+  margin-left: -1px;
+  font-size: 12px;
+}
+/* An insert point between two steps: "+" to add the next step there, faint until hovered. */
+.queue-insert {
+  list-style: none;
+  display: flex;
+  justify-content: center;
+  height: 0;
+  position: relative;
+  z-index: 1;
+}
+.queue-insert button {
+  position: absolute;
+  top: -11px;
+  min-width: 22px;
+  min-height: 18px;
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 16px;
   border-radius: 999px;
-  font-size: 0.75rem;
+  opacity: 0.35;
+}
+.queue-insert button:hover,
+.queue-insert button:focus-visible,
+.queue-insert.set button {
+  opacity: 1;
+}
+.queue-insert.set button {
+  color: var(--ui-live);
+  border-color: var(--ui-live);
 }
 .sel-actions button {
   display: grid;
@@ -327,13 +387,13 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 3px;
 }
 .queue-step {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 6px 8px;
+  gap: 2px;
+  padding: 2px 4px 2px 8px;
   border: 1px solid var(--ui-line);
   border-left-width: 3px;
   border-radius: 6px;
@@ -356,26 +416,143 @@
   outline-offset: 2px;
   border-radius: 6px;
 }
-/* The planner's toolbar: Copy and Paste, with how many steps are picked. */
+/* The planner's toolbar, one compact row (`CONTEXT.md`: Planner blocks): its title, Loop, the
+   tools, Save and Load, the help's "?", and how many steps are picked. */
 .queue-tools {
   align-items: center;
+  gap: 4px;
   margin-bottom: 6px;
+}
+.order-buttons.queue-tools {
+  gap: 2px;
+}
+.order-buttons.queue-tools button {
+  min-width: 0;
+  min-height: 30px;
+  padding: 2px 4px;
+  font-size: 12px;
+}
+.queue-tools .queue-loop {
+  gap: 2px;
+  margin-right: 2px;
 }
 .queue-tools .muted {
   margin-left: auto;
+}
+/* Save and Load sit in the toolbar's row; the name to save under and the list open below it. */
+.queue-tools .saved-queues,
+.queue-tools .saved-queues > .order-buttons {
+  display: contents;
+}
+.queue-tools .saved-queues > :not(.order-buttons) {
+  flex-basis: 100%;
 }
 /* A step whose place is gone from the map, as a saved queue's loaded after a tear-down. */
 .queue-step-gone {
   color: var(--ui-warn);
 }
-/* A repeat block's head (`CONTEXT.md`: Repeat block): its count; its steps follow, indented. */
-.queue-step.queue-block {
-  border-style: dashed;
-  border-left-style: solid;
-  border-left-color: var(--ui-line-strong);
+/* Brackets (`CONTEXT.md`: Planner blocks): loop the outermost around the steps, its switch in
+   the head; each repeat block a bracket nested in it, its count in its head. A bracket is a
+   rule down the left with a head on top and a foot under its last step. */
+.queue-bracket {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 0 4px 8px;
+  border-left: 3px solid var(--ui-line-strong);
+  border-bottom: 1px solid var(--ui-line-strong);
+  border-radius: 6px 0 0 6px;
+}
+.queue-bracket-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  margin-left: -8px;
+  padding: 0 4px 0 6px;
+  border-radius: 6px 6px 0 0;
+  background: var(--ui-raised);
+}
+.queue-bracket-head .buttons {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.queue-bracket-head button {
+  min-width: 28px;
+  min-height: 28px;
+}
+/* Loop: off, its bracket is faint, the queue ends after its last step. */
+.queue-loop-bracket {
+  margin-bottom: 6px;
+  border-left-style: dashed;
+  border-bottom-style: dashed;
+  border-color: var(--ui-line);
+}
+.queue-loop-bracket.on {
+  border-style: solid;
+  border-color: var(--ui-live);
+}
+.queue-loop-bracket > .queue-bracket-head {
+  cursor: default;
+}
+.queue-repeat-bracket {
+  border-color: var(--ui-warn);
+}
+.queue-repeat-bracket > .queue-bracket-head {
+  cursor: grab;
+}
+.queue-repeat-bracket.picked > .queue-bracket-head {
+  background: color-mix(in srgb, var(--ui-live) 14%, transparent);
+  outline: 1px solid var(--ui-line-strong);
+}
+/* An If block (`CONTEXT.md`: If block): its Else part sits under a second head in the bracket. */
+.queue-if-bracket {
+  border-color: var(--ui-live);
+}
+/* Its condition reads in full: the head's buttons wrap below it when the card is narrow. */
+.queue-if-bracket > .queue-bracket-head {
+  cursor: grab;
+  flex-wrap: wrap;
+  padding-block: 2px;
+}
+.queue-if-bracket > .queue-bracket-head > .queue-step-label {
+  flex: 1 1 14em;
+  white-space: normal;
+}
+.queue-if-bracket.picked > .queue-bracket-head {
+  background: color-mix(in srgb, var(--ui-live) 14%, transparent);
+  outline: 1px solid var(--ui-line-strong);
+}
+.queue-if-bracket > .queue-else-head {
+  cursor: default;
+  border-radius: 0;
+}
+.queue-branch {
+  color: var(--ui-live);
+  font-weight: 600;
+}
+/* With steps picked, the "+" points are where they move to. */
+.queue-insert.move button {
+  opacity: 1;
+  color: var(--ui-live);
+  border-color: var(--ui-live);
+}
+.queue-insert.move {
+  height: auto;
+}
+.queue-insert.move button {
+  position: static;
 }
 .queue-block-count {
   width: 4em;
+}
+/* A resident's queue draft, marked as not running yet (`CONTEXT.md`: Queue draft). */
+.queue-draft-mark {
+  color: var(--ui-warn);
+  font-weight: 600;
+  margin: 0 0 4px;
 }
 /* How many steps the plan becomes after repeats, warned when over what a queue holds. */
 .queue-unrolled-over {
@@ -412,19 +589,52 @@
   align-items: center;
   gap: 6px;
 }
+/* A step on one line: icon, label with its place, the duration chip, remove. */
 .queue-step-head {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+}
+.queue-step-icon {
+  flex: none;
+  width: 1.4em;
+  text-align: center;
+  color: var(--ui-muted);
+}
+.queue-step-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .queue-step-head .buttons {
   display: flex;
   gap: 4px;
+  margin-left: auto;
 }
 .queue-step-head button {
-  min-width: 32px;
-  min-height: 32px;
+  min-width: 28px;
+  min-height: 28px;
+}
+/* A step's duration (`DurationChip`), flagged while a step that never ends needs one. */
+.queue-step-head .queue-step-chip {
+  flex: none;
+  min-width: 0;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.queue-step-chip.needed {
+  color: var(--ui-warn);
+  border-color: var(--ui-warn);
+}
+
+.queue-step:focus-visible {
+  outline: 2px solid var(--ui-line-strong);
+  outline-offset: 1px;
 }
 .queue-step-minutes,
 .queue-loop {

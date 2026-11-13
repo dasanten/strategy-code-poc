@@ -303,6 +303,15 @@ describe('doingLine', () => {
     expect(line({ order: null, script: { scriptId: 5, doing: 'Guarding' } })).toBe('Guarding')
   })
 
+  it('says a boat’s passenger is aboard a boat', () => {
+    expect(doingLine({ order: null, aboard: 'boat7' }, { scripts, buildings, residents: [] })).toBe(
+      'Aboard a boat',
+    )
+    expect(doingLine({ order: null, aboard: 'ship3' }, { scripts, buildings, residents: [] })).toBe(
+      'Aboard a ship',
+    )
+  })
+
   it('says a passenger is aboard, and where the carriage is heading while it is driven', () => {
     const aboard = (residents: { order: ResidentOrder | null }[], more: Partial<DoingOf> = {}) =>
       doingLine({ order: null, aboard: 'k1', ...more }, { scripts, buildings, residents })
@@ -341,6 +350,13 @@ describe('doingLine', () => {
       progress: 0,
     }
     expect(soon({ order: drive }, 1200)).toBe('Driving to 4, 5 · about 20 min (a game day)')
+    const row: ResidentOrder = { kind: 'row', vesselId: 'boat1', target: at, path: [], progress: 0 }
+    expect(soon({ order: row, aboard: 'boat1' }, 60)).toBe(
+      'Rowing to 4, 5 · about 1 min (a game hour)',
+    )
+    expect(soon({ order: { ...row, path: null }, aboard: 'boat1' }, 60)).toBe(
+      'Finding a way over the water to 4, 5',
+    )
     const hauling = { ...haul, path: [[4, 5]] as [number, number][] }
     expect(soon({ order: hauling, script: { scriptId: 3 } }, 180)).toBe(
       'Hauling wood to 4, 5 · about 3 min (3 game hours)',

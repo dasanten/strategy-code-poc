@@ -2,24 +2,41 @@ import { buildingRealm } from './shared/city.js'
 import type { Building, City, Good } from '@csp/shared-types'
 import { agoText } from './last-seen.js'
 
+/** The groups of the tool rail, in rail order (`CONTEXT.md`: Tool rail). */
+export const RAIL_GROUPS = [
+  { id: 'people', label: 'People' },
+  { id: 'diplomacy', label: 'Diplomacy' },
+  { id: 'realm', label: 'Realm' },
+] as const
+
+export type RailGroupId = (typeof RAIL_GROUPS)[number]['id']
+
 /**
- * The drawers the tool rail opens over the map (ADR 0008), in rail order. Cities holds the city
- * inspector until selecting a city shows it on the selection card.
+ * The drawers the tool rail opens over the map (ADR 0008), in rail order, each in its group
+ * (`CONTEXT.md`: Tool rail). Cities holds the city inspector until selecting a city shows it on the
+ * selection card.
  */
 export const DRAWERS = [
-  { id: 'residents', label: 'Residents' },
-  { id: 'horses', label: 'Horses' },
-  { id: 'waypoints', label: 'Waypoints' },
-  { id: 'armies', label: 'Armies' },
-  { id: 'contracts', label: 'Contracts' },
-  { id: 'demands', label: 'Demands' },
-  { id: 'directOffers', label: 'Direct offers' },
-  { id: 'alliance', label: 'Alliance' },
-  { id: 'standing', label: 'Standing' },
-  { id: 'cities', label: 'Cities' },
-  { id: 'scripts', label: 'Scripts', wide: true },
-  { id: 'realmLog', label: 'Realm log' },
-] as const satisfies readonly { id: string; label: string; wide?: boolean }[]
+  { id: 'residents', label: 'Residents', group: 'people' },
+  { id: 'horses', label: 'Horses', group: 'people' },
+  { id: 'armies', label: 'Armies', group: 'people' },
+  { id: 'diplomacy', label: 'Diplomacy', group: 'diplomacy' },
+  { id: 'cities', label: 'Cities', group: 'realm' },
+  { id: 'waypoints', label: 'Waypoints', group: 'realm' },
+  { id: 'scripts', label: 'Scripts', group: 'realm', wide: true },
+  { id: 'realmLog', label: 'Realm log', group: 'realm' },
+] as const satisfies readonly { id: string; label: string; group: RailGroupId; wide?: boolean }[]
+
+export type Drawer = (typeof DRAWERS)[number]
+
+/** The rail's groups with their drawers, both in rail order; the rail draws a divider between them. */
+export function railGroups(): { id: RailGroupId; label: string; drawers: Drawer[] }[] {
+  return RAIL_GROUPS.map((g) => ({
+    id: g.id,
+    label: g.label,
+    drawers: DRAWERS.filter((d) => d.group === g.id),
+  }))
+}
 
 export type DrawerId = (typeof DRAWERS)[number]['id']
 
@@ -29,6 +46,44 @@ export type OpenDrawer = DrawerId | undefined
 /** A rail button: opens its drawer in place of the open one, or closes it when it is open. */
 export function toggleDrawer(open: OpenDrawer, clicked: DrawerId): OpenDrawer {
   return open === clicked ? undefined : clicked
+}
+
+/** The tabs of the Diplomacy drawer, in order (`CONTEXT.md`: Tool rail). */
+export const DIPLOMACY_TABS = [
+  { id: 'contracts', label: 'Contracts' },
+  { id: 'demands', label: 'Demands' },
+  { id: 'directOffers', label: 'Direct offers' },
+  { id: 'alliance', label: 'Alliance' },
+  { id: 'standing', label: 'Standing' },
+] as const
+
+export type DiplomacyTab = (typeof DIPLOMACY_TABS)[number]['id']
+
+/**
+ * The drawer open over the map, and the Diplomacy drawer's tab. The tab stays what it was while
+ * the drawer is closed or another one is open, so the Diplomacy button reopens it there.
+ */
+export interface Drawers {
+  open: OpenDrawer
+  tab: DiplomacyTab
+}
+
+/** No drawer open, the Diplomacy drawer on its first tab. */
+export const NO_DRAWER: Drawers = { open: undefined, tab: DIPLOMACY_TABS[0].id }
+
+/** Opens the drawer, or closes them all with undefined; the Diplomacy tab stays. */
+export function withOpen(drawers: Drawers, open: OpenDrawer): Drawers {
+  return { ...drawers, open }
+}
+
+/** Opens the Diplomacy drawer on the tab, as a notice's Open does, or picks the tab in it. */
+export function openDiplomacy(tab: DiplomacyTab): Drawers {
+  return { open: 'diplomacy', tab }
+}
+
+/** Whether the Player has this Diplomacy tab in front of them: its drawer open and on it. */
+export function showsTab(drawers: Drawers, tab: DiplomacyTab): boolean {
+  return drawers.open === 'diplomacy' && drawers.tab === tab
 }
 
 /** Whether the drawer is a wide one (the script editor needs the room). */

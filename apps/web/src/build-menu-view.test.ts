@@ -65,6 +65,49 @@ describe('the Build menu', () => {
     )
   })
 
+  it('offers a haven only on the shore, where a tile of it touches Lake or Sea', () => {
+    expect(entry(menu(), 'haven').problem).toBe('a haven goes on the shore, touching Lake or Sea')
+    const ground = (at: (x: number, y: number) => number) => ({ size: 200, at })
+    const lakeAt = (lx: number, ly: number) =>
+      ground((x, y) => (x === lx && y === ly ? Terrain.Lake : Terrain.Plains))
+    const haven = (terrain: ReturnType<typeof ground>) =>
+      buildHereProblem('haven', 50, 50, seen, () => undefined, terrain)
+    // Its footprint runs from (50, 50) to (52, 52).
+    expect(haven(lakeAt(53, 53))).toBeUndefined()
+    expect(haven(lakeAt(53, 51))).toBeUndefined()
+    expect(haven(lakeAt(54, 51))).toBe('a haven goes on the shore, touching Lake or Sea')
+    const mountainOnShore = ground((x, y) =>
+      x === 53 ? Terrain.Sea : x === 52 && y === 52 ? Terrain.Mountain : Terrain.Plains,
+    )
+    expect(haven(mountainOnShore)).toBe('a haven goes off any resource node, and not on Mountain')
+  })
+
+  it('offers a ship only on a finished haven tile touching the Sea, never a Lake alone', () => {
+    const NOT_HERE = 'a ship is built on a tile of a finished haven touching the Sea'
+    expect(entry(menu(), 'ship').problem).toBe(NOT_HERE)
+    // A finished haven covering (48, 48)–(50, 50), with the water east of (50, 50).
+    const haven = { id: 'h1', kind: 'haven', x: 48, y: 48 } as Building
+    const at = (w: number) => ({ size: 200, at: (x: number) => (x === 51 ? w : Terrain.Plains) })
+    const ship = (water: number, buildings: Building[] = [haven]) =>
+      buildHereProblem('ship', 50, 50, { ...seen, buildings }, () => undefined, at(water))
+    expect(ship(Terrain.Sea)).toBeUndefined()
+    expect(ship(Terrain.Lake)).toBe(NOT_HERE)
+    expect(
+      buildHereProblem(
+        'boat',
+        50,
+        50,
+        { ...seen, buildings: [haven] },
+        () => undefined,
+        at(Terrain.Lake),
+      ),
+    ).toBeUndefined()
+    expect(ship(Terrain.Sea, [{ ...haven, site: { delivered: {}, work: 0 } }])).toBe(NOT_HERE)
+    expect(ship(Terrain.Sea, [haven, { id: 's1', kind: 'ship', x: 50, y: 50 } as Building])).toBe(
+      'there is already a ship site on this tile',
+    )
+  })
+
   it('offers a workplace only on its node, even when its footprint would reach one from here', () => {
     // The rule lets a footprint reach the node, but from here the card never offered it.
     const groups = menu(undefined, { '51,51': forestAt(51, 51) })
@@ -96,7 +139,7 @@ describe('the Build menu', () => {
         .map((k) => k.kind)
     const off = open(menu())
     expect(off).not.toContain('lumberCamp')
-    expect(off.filter((k) => k !== 'road' && k !== 'carriage').sort()).toEqual(
+    expect(off.filter((k) => !['road', 'carriage', 'boat', 'ship'].includes(k)).sort()).toEqual(
       [...buildMenu(undefined)].sort(),
     )
     expect(open(menu(forestAt(50, 50))).sort()).toEqual(['lumberCamp', 'road'])

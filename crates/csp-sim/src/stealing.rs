@@ -1,46 +1,59 @@
 //! Stealing a carriage or horse (`apps/server/src/stealing.ts`, `CONTEXT.md`: Stealing a carriage
-//! or horse): taking it over for the thief's realm, once the shared check allows it.
+//! or horse, with its vessel part): taking it over for the thief's realm, once the shared check
+//! allows it.
 
 use csp_shared::world::{CrimeKind, RealmEventWhat, Stock, WorldState};
 
-/// What stealing takes over (`Taken`).
+/// What stealing takes over (`Taken`): a carriage with its hitched horse, a horse, or a vessel.
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Taken {
     pub carriage: Option<usize>,
     pub horse: Option<usize>,
+    pub vessel: Option<usize>,
 }
 
-/// `thief` takes a carriage or horse of another organization for the realm `realm_id`, on a map
-/// of `size` tiles (`takeOver`, `stealing.ts`; `CONTEXT.md`: Stealing a carriage or horse), once
-/// the shared check allows it. It joins that realm at once, a carriage with its load and hitched
-/// horse, and leaves any alliance army. One theft, known through a witness; none when it belonged
-/// to nobody. A theft raises the alarm for those at home who see it (`raise_theft`). The owner's
-/// log says at once that it is gone and where it was last, without the thief, and the thief's
-/// realm's log says what they took. A caravan's carriage robs the caravan and is replaced, a
-/// trader's likewise; a supply wagon's is gone for its army.
+/// What of a load there is (`goodsOf`); none for none.
+fn goods_of(load: &Stock) -> Option<Stock> {
+    let there: Stock = load.iter().filter(|(_, &n)| n > 0.0).map(|(&g, &n)| (g, n)).collect();
+    (!there.is_empty()).then_some(there)
+}
+
+/// `thief` takes a carriage, horse or vessel of another organization for the realm `realm_id`, on
+/// a map of `size` tiles (`takeOver`, `stealing.ts`; `CONTEXT.md`: Stealing a carriage or horse),
+/// once the shared check allows it. It joins that realm at once, a carriage or vessel with its
+/// load, a carriage with its hitched horse, and leaves any alliance army. One theft, known through
+/// a witness; none when it belonged to nobody. A theft raises the alarm for those at home who see
+/// it (`raise_theft`). The owner's log says at once that it is gone and where it was last, without
+/// the thief, and the thief's realm's log says what they took. A caravan's carriage robs the
+/// caravan and is replaced, a trader's likewise; a supply wagon's is gone for its army.
 pub fn take_over(world: &mut WorldState, thief: &str, realm_id: &str, taken: Taken, size: i32) {
-    let (victim_org, x, y) = match (taken.carriage, taken.horse) {
-        (Some(i), _) => {
+    let (victim_org, x, y) = match taken {
+        Taken { carriage: Some(i), .. } => {
             let k = &world.carriages[i];
             (k.realm_id.clone().or_else(|| k.city_id.clone()), k.x, k.y)
         }
-        (None, Some(i)) => {
+        Taken { horse: Some(i), .. } => {
             let h = &world.horses[i];
             (h.realm_id.clone().or_else(|| h.city_id.clone()), h.x, h.y)
         }
-        (None, None) => return,
+        Taken { vessel: Some(i), .. } => {
+            let v = &world.vessels[i];
+            (v.realm_id.clone(), v.x, v.y)
+        }
+        Taken { .. } => return,
     };
     let carriage = taken.carriage.is_some().then_some(true);
+    let boat = taken.vessel.is_some().then_some(true);
+    let ship = taken
+        .vessel
+        .is_some_and(|i| world.vessels[i].kind == csp_shared::world::VesselKind::Ship)
+        .then_some(true);
     let horse = taken.horse.map(|i| world.horses[i].name.clone());
-    // What of a load there is (`goodsOf`); none for none.
-    let goods = taken.carriage.and_then(|i| {
-        let there: Stock = world.carriages[i]
-            .load
-            .iter()
-            .filter(|(_, &n)| n > 0.0)
-            .map(|(&g, &n)| (g, n))
-            .collect();
-        (!there.is_empty()).then_some(there)
-    });
+    let goods = match taken {
+        Taken { carriage: Some(i), .. } => goods_of(&world.carriages[i].load),
+        Taken { vessel: Some(i), .. } => goods_of(&world.vessels[i].load),
+        Taken { .. } => None,
+    };
     let from = victim_org.as_deref().map(|o| crate::crimes::organization_name(world, o));
     let mut ids = Vec::new();
     if let Some(i) = taken.carriage {
@@ -55,6 +68,9 @@ pub fn take_over(world: &mut WorldState, thief: &str, realm_id: &str, taken: Tak
         h.city_id = None;
         ids.push(h.id.clone());
     }
+    if let Some(i) = taken.vessel {
+        world.vessels[i].realm_id = Some(realm_id.to_string());
+    }
     for a in &mut world.alliances {
         a.army.retain(|p| !ids.contains(&p.id));
     }
@@ -68,6 +84,8 @@ pub fn take_over(world: &mut WorldState, thief: &str, realm_id: &str, taken: Tak
             goods: goods.clone(),
             carriage: carriage.is_some(),
             horse: horse.clone(),
+            boat: boat.is_some(),
+            ship: ship.is_some(),
             ..Default::default()
         },
     );
@@ -77,7 +95,7 @@ pub fn take_over(world: &mut WorldState, thief: &str, realm_id: &str, taken: Tak
     crate::events::record_event(
         world,
         victim_org.as_deref(),
-        RealmEventWhat::TransportGone { x, y, carriage, horse: horse.clone() },
+        RealmEventWhat::TransportGone { x, y, carriage, horse: horse.clone(), boat, ship },
     );
     if let Some(t) = world.residents.iter().find(|r| r.id == thief) {
         let (resident_id, name) = (t.id.clone(), t.name.clone());
@@ -92,6 +110,8 @@ pub fn take_over(world: &mut WorldState, thief: &str, realm_id: &str, taken: Tak
                 from,
                 carriage,
                 horse,
+                boat,
+                ship,
                 goods,
             },
         );

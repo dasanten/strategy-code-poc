@@ -76,11 +76,14 @@ pub fn kind_name(k: BuildingKind) -> &'static str {
         BuildingKind::TrainingGround => "trainingGround",
         BuildingKind::Road => "road",
         BuildingKind::Carriage => "carriage",
+        BuildingKind::Haven => "haven",
+        BuildingKind::Boat => "boat",
+        BuildingKind::Ship => "ship",
     }
 }
 
 /// Every building kind, in the order of `FOOTPRINT`'s keys.
-pub const ALL_KINDS: [BuildingKind; 17] = [
+pub const ALL_KINDS: [BuildingKind; 20] = [
     BuildingKind::TownHall,
     BuildingKind::House,
     BuildingKind::Storage,
@@ -98,6 +101,9 @@ pub const ALL_KINDS: [BuildingKind; 17] = [
     BuildingKind::TrainingGround,
     BuildingKind::Road,
     BuildingKind::Carriage,
+    BuildingKind::Haven,
+    BuildingKind::Boat,
+    BuildingKind::Ship,
 ];
 
 /// The building kind a TypeScript name names, if any (`Object.hasOwn(FOOTPRINT, kind)`).
