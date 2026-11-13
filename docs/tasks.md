@@ -93,6 +93,11 @@ brackets), Cities drawer (93) and Clearer menus (94: rail groups, one Diplomacy 
 marks) run side by side, all client only; then Queue conditions (95, ADR 0032: repeat blocks on the
 server, If blocks, Wait until), which needs Epic 92 on `dev`. All ahead of Bandits.
 
+**Agreed with Daniel on 2026-11-12:** Faster map loading (Epic 99, ADR 0034: explored terrain by
+level for the minimap and the far zoom, compressed and kept in the browser, with Last seen and the
+Region map sending only what changed) runs alongside the open epics, ahead of Bandits. It changes
+no rule.
+
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
 
@@ -191,6 +196,8 @@ I sleep.
 | 96  | [Cities that can't be talked over](https://github.com/dasanten/strategy-code-poc/issues/1188)   | ticketed                |
 | 97  | [Goods get used](https://github.com/dasanten/strategy-code-poc/issues/1189)                     | scope only              |
 | 98  | [NPC cities with intent](https://github.com/dasanten/strategy-code-poc/issues/1190)             | scope only              |
+
+| 99  | [Faster map loading](https://github.com/dasanten/strategy-code-poc/issues/1198)                 | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.

@@ -21,9 +21,15 @@ import type { JsonValue } from "./serde_json/JsonValue.js";
  */
 export type ServerMessage = { "type": "founding", account: Account, leaderName: string, } | { "type": "welcome", account: Account, tick: number, map: MapInfo, 
 /**
- * Chunks with explored terrain, to load from `TERRAIN_BATCH_PATH`.
+ * Chunks with explored terrain, to load from `TERRAIN_BATCH_PATH`: to a client of a
+ * protocol version before `COUNTS_FROM_VERSION` only.
  */
-exploredChunks: Array<number>, home: WelcomeHome, 
+exploredChunks?: Array<number>, 
+/**
+ * The chunks with explored terrain and how many of each one's tiles are explored, as
+ * `encode_explored_counts` lists them: to a client of `COUNTS_FROM_VERSION` or later.
+ */
+exploredCounts?: Array<number>, home: WelcomeHome, 
 /**
  * Everything the Player's residents see.
  */
@@ -47,4 +53,9 @@ horseOffer: boolean, waypoints: Array<Waypoint>, traderVisits: Array<TraderVisit
 /**
  * The realm's Workplace settings by building id; only its own.
  */
-workSettings: { [key in string]: WorkplaceSettings }, } | { "type": "tick", tick: number, changed: Array<SeenEntity>, gone: Array<string>, lastSeen?: LastSeenChange, explored: Array<number>, events: Array<RealmEvent>, diplomacy?: Diplomacy, region?: RegionMap, leaderId?: string, realmName?: string, horseOffer?: boolean, workSettings?: { [key in string]: WorkplaceSettings }, waypoints?: Array<Waypoint>, traderVisits?: Array<TraderVisit>, } | { "type": "scriptMemory", id: string, memory: { [key in string]: JsonValue } | null, } | { "type": "scriptRun", id: string, run: ScriptRunSeen | null, } | { "type": "scriptLog", id: string, lines: Array<ScriptLogLine> | null, } | { "type": "firstDay", firstDay: FirstDay, } | { "type": "ack", requestId: string, } | { "type": "rejected", requestId: string, reason: string, };
+workSettings: { [key in string]: WorkplaceSettings }, } | { "type": "tick", tick: number, changed: Array<SeenEntity>, gone: Array<string>, lastSeen?: LastSeenChange, explored: Array<number>, 
+/**
+ * The new counts of the chunks in `explored`, as `encode_explored_counts` lists them: to a
+ * client of `COUNTS_FROM_VERSION` or later, when some grew.
+ */
+exploredCounts?: Array<number>, events: Array<RealmEvent>, diplomacy?: Diplomacy, region?: RegionMap, leaderId?: string, realmName?: string, horseOffer?: boolean, workSettings?: { [key in string]: WorkplaceSettings }, waypoints?: Array<Waypoint>, traderVisits?: Array<TraderVisit>, } | { "type": "scriptMemory", id: string, memory: { [key in string]: JsonValue } | null, } | { "type": "scriptRun", id: string, run: ScriptRunSeen | null, } | { "type": "scriptLog", id: string, lines: Array<ScriptLogLine> | null, } | { "type": "firstDay", firstDay: FirstDay, } | { "type": "ack", requestId: string, } | { "type": "rejected", requestId: string, reason: string, };

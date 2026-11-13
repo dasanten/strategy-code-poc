@@ -28,6 +28,9 @@ pub struct RealtimeLimits {
     pub connections_per_user: usize,
     /// The most orders a realm may have waiting for the next tick; the next is rejected.
     pub pending_orders_per_realm: usize,
+    /// A message longer than this many bytes goes out gzipped as a binary frame, to a client
+    /// whose protocol version takes them (ADR 0034).
+    pub compress_over_bytes: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -142,6 +145,7 @@ impl Config {
                 messages_per_second: 10,
                 connections_per_user: 8,
                 pending_orders_per_realm: 100,
+                compress_over_bytes: 8 * 1024,
             },
         })
     }

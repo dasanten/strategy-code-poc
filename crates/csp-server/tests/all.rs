@@ -28,6 +28,8 @@ mod field_check;
 mod first_day;
 #[path = "horse_offer.rs"]
 mod horse_offer;
+#[path = "map_tools.rs"]
+mod map_tools;
 #[path = "npc_alliances.rs"]
 mod npc_alliances;
 #[path = "realtime.rs"]

@@ -14,7 +14,8 @@ use csp_server::config::{Origins, RealtimeLimits};
 use csp_server::db::open_db;
 use csp_server::monitoring::LogSink;
 use csp_server::realtime::{
-    Realtime, RealtimeOptions, TickView, WS_CLOSE_LOGGED_OUT, WS_CLOSE_TOO_MANY_REQUESTS,
+    Realtime, RealtimeOptions, TickView, COUNTS_FROM_VERSION, MIN_PROTOCOL_VERSION,
+    PROTOCOL_VERSION, WS_CLOSE_LOGGED_OUT, WS_CLOSE_TOO_MANY_REQUESTS, WS_CLOSE_UPDATED,
 };
 use csp_server::server::{Game, GameThread, TickSettings};
 use csp_shared::terrain::{Terrain, TerrainMap};
@@ -23,6 +24,7 @@ use csp_shared::world::{Realm, WorldState};
 use csp_sim::explored::ExploredTerrain;
 use csp_sim::order_sender::OrderSender;
 use csp_sim::orders::{OrderKind, OrderKinds, OrderQueue};
+use csp_sim::queries::territory::compute_territory;
 use csp_sim::residents::{new_resident, NewResident};
 use csp_sim::world::create_world;
 use futures_util::{SinkExt, StreamExt};
@@ -48,6 +50,7 @@ fn limits() -> RealtimeLimits {
         messages_per_second: 10,
         connections_per_user: 3,
         pending_orders_per_realm: 50,
+        compress_over_bytes: 8 * 1024,
     }
 }
 
@@ -91,7 +94,10 @@ impl OrderKind for Broken {
 }
 
 struct Server {
+    /// The socket's address, naming the protocol version the server speaks, as the client does.
     url: String,
+    /// The socket's address without a version.
+    base: String,
     db_path: std::path::PathBuf,
     _dir: tempfile::TempDir,
     user_id: i64,
@@ -202,7 +208,7 @@ async fn start(opts: StartOptions) -> Server {
     let game = GameThread::spawn(
         move || {
             let explored = ExploredTerrain::new(terrain.clone(), &world.nodes);
-            let mut game = Game::new(world, terrain, explored, NoLog);
+            let mut game = Game::new(world, explored, NoLog);
             let mut kinds = OrderKinds::default();
             kinds.insert("wait", Wait(kinds_applied));
             kinds.insert("claimHorses", Wait(Arc::new(Mutex::new(Vec::new()))));
@@ -240,7 +246,8 @@ async fn start(opts: StartOptions) -> Server {
             .unwrap();
     });
     Server {
-        url: format!("ws://127.0.0.1:{port}/ws"),
+        url: format!("ws://127.0.0.1:{port}/ws?v={PROTOCOL_VERSION}"),
+        base: format!("ws://127.0.0.1:{port}/ws"),
         db_path,
         _dir: dir,
         user_id,
@@ -260,6 +267,25 @@ struct Client {
     socket: Socket,
     got: Vec<Value>,
     closed: Option<u16>,
+    /// The type of every message read so far, and whether it came as a binary (gzipped) frame.
+    frames: Vec<(String, bool)>,
+}
+
+/// The JSON a data frame holds: a text frame's own, a binary frame's gunzipped; none for others.
+fn json_of(frames: &mut Vec<(String, bool)>, msg: &Message) -> Option<(Value, String)> {
+    let (text, binary) = match msg {
+        Message::Text(text) => (text.to_string(), false),
+        Message::Binary(bytes) => {
+            let mut text = String::new();
+            std::io::Read::read_to_string(&mut flate2::read::GzDecoder::new(&bytes[..]), &mut text)
+                .expect("a binary frame is gzipped JSON");
+            (text, true)
+        }
+        _ => return None,
+    };
+    let v: Value = serde_json::from_str(&text).unwrap();
+    frames.push((v["type"].as_str().unwrap_or_default().to_owned(), binary));
+    Some((v, text))
 }
 
 /// The status a refused upgrade answered with, or the open socket.
@@ -272,7 +298,7 @@ async fn open(url: &str, token: Option<&str>, origin: Option<&str>) -> Result<Cl
         req.headers_mut().insert("origin", origin.parse().unwrap());
     }
     match tokio_tungstenite::connect_async(req).await {
-        Ok((socket, _)) => Ok(Client { socket, got: Vec::new(), closed: None }),
+        Ok((socket, _)) => Ok(Client { socket, got: Vec::new(), closed: None, frames: Vec::new() }),
         Err(tokio_tungstenite::tungstenite::Error::Http(res)) => Err(res.status().as_u16()),
         Err(e) => panic!("unexpected: {e}"),
     }
@@ -294,8 +320,8 @@ impl Client {
                 .await
                 .unwrap_or_else(|_| panic!("no {kind} message; got {:?}", self.got));
             match msg {
-                Some(Ok(Message::Text(text))) => {
-                    let v: Value = serde_json::from_str(&text).unwrap();
+                Some(Ok(m @ (Message::Text(_) | Message::Binary(_)))) => {
+                    let (v, _) = json_of(&mut self.frames, &m).unwrap();
                     if v["type"] == kind {
                         return v;
                     }
@@ -323,8 +349,8 @@ impl Client {
                 Ok(Some(Ok(Message::Close(frame)))) => {
                     return frame.map_or(1005, |f| u16::from(f.code));
                 }
-                Ok(Some(Ok(Message::Text(text)))) => {
-                    self.got.push(serde_json::from_str(&text).unwrap())
+                Ok(Some(Ok(m @ (Message::Text(_) | Message::Binary(_))))) => {
+                    self.got.push(json_of(&mut self.frames, &m).unwrap().0)
                 }
                 Ok(Some(Ok(_))) => {}
                 Ok(Some(Err(_))) | Ok(None) => return 1006,
@@ -358,8 +384,22 @@ async fn refuses_a_socket_from_another_origin_and_takes_the_allowed_ones_and_its
     assert_eq!(open(&s.url, token, Some("https://evil.example.com")).await.err(), Some(403));
     assert_eq!(open(&s.url, token, Some("not a url")).await.err(), Some(403));
     assert!(open(&s.url, token, Some("https://game.example.com")).await.is_ok());
-    let own = s.url.trim_start_matches("ws://").trim_end_matches("/ws");
+    let own = s.base.trim_start_matches("ws://").trim_end_matches("/ws");
     assert!(open(&s.url, token, Some(&format!("http://{own}"))).await.is_ok());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn upgrades_a_socket_whose_request_accepts_compressed_responses() {
+    // A browser sends `Accept-Encoding` on the upgrade too; the API's compression leaves it alone.
+    let s = start(StartOptions::default()).await;
+    let mut req = s.url.as_str().into_client_request().unwrap();
+    req.headers_mut().insert("cookie", format!("csp_session={}", s.token).parse().unwrap());
+    req.headers_mut().insert("accept-encoding", "gzip, deflate, br, zstd".parse().unwrap());
+    let (socket, res) = tokio_tungstenite::connect_async(req).await.unwrap();
+    assert_eq!(res.status().as_u16(), 101);
+    assert!(res.headers().get("content-encoding").is_none());
+    let mut client = Client { socket, got: Vec::new(), closed: None, frames: Vec::new() };
+    client.next("welcome").await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -456,6 +496,74 @@ async fn caps_a_realms_orders_waiting_for_the_next_tick_and_takes_more_once_it_r
     assert_eq!(c.next("ack").await["requestId"], "o4");
 }
 
+// ----------------------------------------------------------------- protocol version (ADR 0034)
+
+/// Connects naming protocol version `v`, or none.
+async fn connect_speaking(s: &Server, v: Option<u32>) -> Client {
+    let url = v.map_or_else(|| s.base.clone(), |v| format!("{}?v={v}", s.base));
+    open(&url, Some(&s.token), None).await.unwrap_or_else(|status| panic!("refused: {status}"))
+}
+
+/// The next data frame's JSON as sent, waiting up to 2 s.
+async fn raw_next(c: &mut Client) -> (Value, String) {
+    loop {
+        let msg = tokio::time::timeout(Duration::from_secs(2), c.socket.next())
+            .await
+            .expect("a message")
+            .expect("open")
+            .unwrap();
+        if let Some(got) = json_of(&mut c.frames, &msg) {
+            return got;
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn sends_a_new_client_a_large_welcome_gzipped_and_a_small_message_as_text() {
+    // The same world twice: under the threshold the welcome goes as text; over it, gzipped.
+    let plain = start(StartOptions::default()).await;
+    let (_, as_text) = raw_next(&mut connect(&plain).await).await;
+    // A low threshold: this test's welcome is a few KB, an order's ack a few dozen bytes.
+    let mut l = limits();
+    l.compress_over_bytes = 300;
+    let s = start(StartOptions { limits: l, ..StartOptions::default() }).await;
+    assert!(as_text.len() > 300, "the welcome is {} bytes", as_text.len());
+    let mut new = connect(&s).await;
+    let (welcome, gunzipped) = raw_next(&mut new).await;
+    assert_eq!(welcome["type"], "welcome");
+    assert_eq!(new.frames, vec![("welcome".to_owned(), true)]);
+    assert_eq!(gunzipped, as_text, "the binary frame gunzips to the JSON sent as text");
+    new.send(
+        json!({ "type": "order", "requestId": "o1", "order": { "kind": "wait", "ticks": 1 } }),
+    )
+    .await;
+    new.next("ack").await;
+    assert_eq!(new.frames.last(), Some(&("ack".to_owned(), false)));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn closes_a_client_older_than_the_server_serves_with_the_updated_code() {
+    let s = start(StartOptions::default()).await;
+    // A tab from before protocol versions names none; one from before T99.8 names 1.
+    for v in [None, Some(1), MIN_PROTOCOL_VERSION.checked_sub(1)] {
+        let mut c = connect_speaking(&s, v).await;
+        assert_eq!(c.close_code().await, WS_CLOSE_UPDATED, "version {v:?}");
+    }
+    connect_speaking(&s, Some(MIN_PROTOCOL_VERSION)).await.next("welcome").await;
+}
+
+#[test]
+fn the_client_speaks_the_servers_protocol_version_and_knows_its_close_code() {
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../apps/web/src/shared/protocol.ts");
+    let protocol = std::fs::read_to_string(path).unwrap();
+    let has = |line: String| protocol.lines().any(|l| l.trim() == line);
+    assert!(
+        has(format!("export const PROTOCOL_VERSION = {PROTOCOL_VERSION}")),
+        "apps/web/src/shared/protocol.ts names another PROTOCOL_VERSION than the server's"
+    );
+    assert!(has(format!("export const WS_CLOSE_UPDATED = {WS_CLOSE_UPDATED}")));
+}
+
 // --------------------------------------------------------------------------------- the world
 
 #[tokio::test(flavor = "multi_thread")]
@@ -475,7 +583,7 @@ async fn welcomes_a_logged_in_player_then_sends_only_changes() {
         welcome["entities"].as_array().unwrap().iter().map(|e| e["id"].as_str().unwrap()).collect();
     assert_eq!(ids, ["a1", "a2"]);
     // Explored terrain: what the residents see, not the whole map.
-    let explored = welcome["exploredChunks"].as_array().unwrap().len();
+    let explored = counts_of(&welcome["exploredCounts"]).len();
     assert!(explored > 0 && explored < 16, "{explored}");
     assert_eq!(welcome["events"], json!([]));
     assert_eq!(welcome["horseOffer"], true);
@@ -651,6 +759,32 @@ async fn sends_what_left_sight_as_last_seen_and_drops_it_when_back_in_sight() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn sends_every_tab_of_a_realm_the_same_last_seen_tick_for_tick() {
+    let s = start(StartOptions { realm: false, ..StartOptions::default() }).await;
+    let mut first = connect(&s).await;
+    first.next("founding").await;
+    found(&mut first).await;
+    let mut second = connect(&s).await;
+    second.next("welcome").await;
+    // Everyone walks far off and back, twice: the city leaves sight, comes back, leaves again.
+    let mut sent = 0;
+    for by in [0.0, 0.5, 0.5, 0.0, 0.5, 0.0, 0.5, 0.5] {
+        s.world(move |w| {
+            for r in &mut w.residents {
+                r.x = (r.x + by * f64::from(CITY_MAP)) % f64::from(CITY_MAP);
+                r.order = None;
+            }
+        })
+        .await;
+        s.tick().await;
+        let (a, b) = (first.next("tick").await, second.next("tick").await);
+        assert_eq!(a["lastSeen"], b["lastSeen"], "tick {}", a["tick"]);
+        sent += usize::from(!a["lastSeen"].is_null());
+    }
+    assert!(sent >= 3, "{sent} ticks sent Last seen");
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn sends_the_player_their_alliance_matters_on_connect_and_again_only_when_they_change() {
     let s = start(StartOptions::default()).await;
     let mut c = connect(&s).await;
@@ -703,7 +837,7 @@ async fn sends_the_region_map_whole_when_territory_is_worked_out_then_the_chunks
     let welcome = found(&mut c).await;
     // Territory is worked out on the first tick after a start: nothing to show yet.
     assert_eq!(welcome["region"], Value::Null);
-    let explored = welcome["exploredChunks"][0].as_u64().unwrap() as usize;
+    let explored = counts_of(&welcome["exploredCounts"])[0].0 as usize;
     let (tick, realm) = s
         .game
         .run(|g, _| {
@@ -715,7 +849,10 @@ async fn sends_the_region_map_whole_when_territory_is_worked_out_then_the_chunks
     s.broadcast().await;
     let whole = c.next("tick").await;
     assert_eq!(whole["region"]["tick"], json!(tick));
-    assert_eq!(whole["region"]["chunks"], Value::Null);
+    assert_eq!(whole["region"]["whole"], json!(true));
+    let sent: Vec<&Value> = whole["region"]["chunks"].as_array().unwrap().iter().collect();
+    assert!(!sent.is_empty());
+    assert!(sent.iter().all(|c| c["runs"].as_array().is_some_and(|r| !r.is_empty())));
     let holders: Vec<&Value> = whole["region"]["holders"].as_array().unwrap().iter().collect();
     assert_eq!(holders.len(), 1);
     assert_eq!((&holders[0]["id"], &holders[0]["name"]), (&json!(realm), &json!("Ironvale")));
@@ -723,10 +860,20 @@ async fn sends_the_region_map_whole_when_territory_is_worked_out_then_the_chunks
     // Only once: the next tick has nothing new for it.
     s.broadcast().await;
     assert!(c.next("tick").await.get("region").is_none());
-    // Explored terrain grew in a chunk: that chunk goes out again.
+    // Explored terrain grew in a chunk where what the Player sees stays the same: nothing goes out.
     let grown = [(s.user_id as u64, [explored].into_iter().collect())].into_iter().collect();
     s.broadcast_grown(grown).await;
-    assert_eq!(c.next("tick").await["region"]["chunks"], json!([explored]));
+    assert!(c.next("tick").await.get("region").is_none());
+    // Territory worked out again with nothing changed: nothing goes out either.
+    s.game
+        .run(|g, _| {
+            g.world.tick += 1;
+            g.territory.current = Some(compute_territory(&g.world, g.terrain.size));
+        })
+        .await
+        .unwrap();
+    s.broadcast().await;
+    assert!(c.next("tick").await.get("region").is_none());
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -955,4 +1102,107 @@ async fn closes_the_socket_of_a_session_that_ended_on_the_next_check() {
 /// A realm event, any will do.
 fn hungry() -> csp_shared::world::RealmEventWhat {
     csp_shared::world::RealmEventWhat::Hungry { resident_id: "a1".into(), name: "Ada".into() }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn map_stats_prints_the_bytes_of_the_welcome_the_server_sends_part_by_part() {
+    use csp_server::explored::save_explored;
+    use csp_server::map_tools::{map_stats, region_held_tiles, WelcomeBytes};
+    use csp_server::saves::{save_terrain, save_world};
+    let s = start(StartOptions { realm: false, ..StartOptions::default() }).await;
+    let mut c = connect(&s).await;
+    c.next("founding").await;
+    found(&mut c).await;
+    s.tick().await;
+    // Territory worked out and the world saved, as a running server has it.
+    s.game
+        .run(|g, conn| {
+            g.territory.update(&g.world, &g.terrain);
+            save_terrain(conn, g.world.seed, &g.terrain).unwrap();
+            save_world(conn, &g.world).unwrap();
+            save_explored(conn, &mut g.explored.lock().unwrap(), now_ms()).unwrap();
+        })
+        .await
+        .unwrap();
+    let mut second = connect(&s).await;
+    let welcome = second.next("welcome").await;
+    assert!(welcome["region"]["holders"].as_array().is_some_and(|h| !h.is_empty()));
+    let stats = map_stats(&s.conn()).unwrap();
+    assert_eq!(stats.len(), 1);
+    let daniel = &stats[0];
+    assert_eq!((daniel.user_id, daniel.name.as_str()), (s.user_id, "Daniel"));
+    assert_eq!(daniel.welcome, WelcomeBytes::of(&welcome));
+    let w = daniel.welcome;
+    assert_eq!(w.total, welcome.to_string().len());
+    assert_eq!(w.explored_chunks + w.entities + w.last_seen + w.region + w.rest, w.total);
+    assert_eq!(w.region, welcome["region"].to_string().len());
+    assert_eq!(daniel.explored_chunks * 2, welcome["exploredCounts"].as_array().unwrap().len());
+    let holders = welcome["region"]["holders"].as_array().unwrap();
+    assert_eq!(daniel.region_holders, holders.len());
+    assert_eq!(daniel.region_tiles, region_held_tiles(&welcome["region"]));
+    assert!(daniel.region_tiles > 0);
+    // Nothing was written: the same save, the same explored terrain.
+    let saves: i64 =
+        s.conn().query_row("SELECT count(*) FROM world_saves", [], |r| r.get(0)).unwrap();
+    assert_eq!(saves, 1);
+}
+
+/// A list of `encode_explored_counts` as JSON, read back.
+fn counts_of(v: &Value) -> Vec<(u32, u16)> {
+    let list: Vec<u32> = serde_json::from_value(v.clone()).unwrap();
+    csp_shared::chunks::decode_explored_counts(&list)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn tells_a_client_of_the_counts_version_how_much_of_each_chunk_is_explored_as_it_grows() {
+    let s = start(StartOptions::default()).await;
+    let user = s.user_id as u64;
+    let mut c = connect(&s).await;
+    let welcome = c.next("welcome").await;
+    assert!(welcome.get("exploredChunks").is_none());
+    let explored = s.game.run(move |g, _| g.explored.lock().unwrap().explored_counts(user)).await;
+    let sent = counts_of(&welcome["exploredCounts"]);
+    assert!(!sent.is_empty());
+    assert_eq!(Some(sent.clone()), explored);
+    // Every count is the chunk's explored tiles, counted from the bitmap.
+    let scanned = s
+        .game
+        .run(move |g, _| {
+            let ex = g.explored.lock().unwrap();
+            sent.iter()
+                .map(|&(c, _)| {
+                    let (cx, cy) = ((c % 4) as i32 * 32, (c / 4) as i32 * 32);
+                    let mut n = 0u16;
+                    for y in cy..cy + 32 {
+                        for x in cx..cx + 32 {
+                            n += u16::from(ex.is_explored(user, x, y));
+                        }
+                    }
+                    (c, n)
+                })
+                .collect::<Vec<_>>()
+        })
+        .await
+        .unwrap();
+    assert_eq!(Some(scanned), explored);
+    // The Player explores further: the tick tells the grown chunks' new counts.
+    let grown =
+        s.game.run(move |g, _| g.explored.lock().unwrap().explore(user, 70, 70, 20)).await.unwrap();
+    assert!(!grown.is_empty());
+    let set: BTreeSet<usize> = grown.iter().map(|&c| c as usize).collect();
+    s.broadcast_grown([(user, set)].into_iter().collect()).await;
+    let tick = c.next("tick").await;
+    let counts = counts_of(&tick["exploredCounts"]);
+    assert_eq!(counts.iter().map(|&(c, _)| c).collect::<Vec<_>>(), grown);
+    let now = s.game.run(move |g, _| g.explored.lock().unwrap().explored_counts(user)).await;
+    for (c, n) in &counts {
+        assert!(now.as_ref().unwrap().contains(&(*c, *n)));
+    }
+    // A tick with nothing grown sends no counts; an older client never gets them.
+    s.broadcast().await;
+    assert!(c.next("tick").await.get("exploredCounts").is_none());
+    let mut old = connect_speaking(&s, Some(COUNTS_FROM_VERSION - 1)).await;
+    let welcome = old.next("welcome").await;
+    assert!(welcome.get("exploredCounts").is_none());
+    assert!(welcome["exploredChunks"].as_array().is_some_and(|l| !l.is_empty()));
 }
