@@ -780,19 +780,24 @@ export function Wiki() {
           its params.
         </p>
         <p>
-          To plan ahead, use <strong>Add step</strong> under the queue on the resident's card: it
-          lists every kind of step. One that acts on a place (work a workplace, build, store at or
-          fetch from a storage, pick up, feed the stable, breed, …) has you pick that place on the
-          map, anywhere, not only where the resident stands now; one that needs more (which goods,
-          what to build, what a smithy makes, which script) asks for it on the card after. What to
-          build is the same Build menu as on the card; a kind dimmed because the tile lacks
-          something today, such as a city's area, can still be added, for a step before it may bring
-          that. A step that has to be done on its tile goes after a walk there, unless the step
-          before already walks there. Adding a step only checks that it could make sense (the place
-          is there as you last knew it, and a carriage or horse is yours). A workplace or
-          construction site can be anyone's, in sight or as last seen, since a workplace has no
-          owner: queue Work at a far mine and they walk there and work it. Whether a step can start
-          is checked when its turn comes.
+          To plan ahead, use <strong>Add step</strong> right under the queue's steps on the
+          resident's card: a palette of every kind of step, each with its icon, grouped as the
+          Orders tab is (Move, Work &amp; build, Goods, Scripts), plus Flow with{' '}
+          <strong>Repeat</strong> for the picked steps. Customise is the small ⚙ beside a step. New
+          steps go at the end; tap the <strong>+</strong> between two steps to add the next ones
+          there instead, and tap it again to go back to the end. One that acts on a place (work a
+          workplace, build, store at or fetch from a storage, pick up, feed the stable, breed, …)
+          has you pick that place on the map, anywhere, not only where the resident stands now; one
+          that needs more (which goods, what to build, what a smithy makes, which script) asks for
+          it on the card after. What to build is the same Build menu as on the card; a kind dimmed
+          because the tile lacks something today, such as a city's area, can still be added, for a
+          step before it may bring that. A step that has to be done on its tile goes after a walk
+          there, unless the step before already walks there; one that acts on no place (Explore,
+          Dismount, Get off, Run script) gets no walk. Adding a step only checks that it could make
+          sense (the place is there as you last knew it, and a carriage or horse is yours). A
+          workplace or construction site can be anyone's, in sight or as last seen, since a
+          workplace has no owner: queue Work at a far mine and they walk there and work it. Whether
+          a step can start is checked when its turn comes.
         </p>
         <p>
           For a resident with no queue, the steps you add, paste or load collect as a{' '}

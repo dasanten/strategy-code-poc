@@ -478,3 +478,70 @@ describe('the duration chip', () => {
     expect(stepGroup({ kind: 'runScript', scriptId: 'x' })).toBe('scripts')
   })
 })
+
+describe('adding a step between two others', () => {
+  const store: OrderRequest = { kind: 'store', goods: STORE_ALL.goods, to: 's9' }
+  const fetch: OrderRequest = { kind: 'fetch', goods: { wood: 5 }, from: 's9' }
+  const storage = { x: 20, y: 20 }
+  const three = planStep(planStep(planStep(EMPTY_PLAN, walkHome), store), { kind: 'dismount' })
+
+  it('puts it after the insert point, keeping the rest', () => {
+    // A Fetch walks to its storage itself.
+    const placed = planStep(three, fetch, storage, 1)
+    expect(unroll(placed.items).map((s) => [s.id, s.order.kind])).toEqual([
+      [1, 'walkTo'],
+      [4, 'fetch'],
+      [2, 'store'],
+      [3, 'dismount'],
+    ])
+  })
+
+  it('puts a walk before a step done on its tile, unless the step before walks there', () => {
+    const pickUp: OrderRequest = { kind: 'pickUp', goods: { wood: 5 } }
+    expect(unroll(planStep(three, pickUp, storage, 1).items).map((s) => s.order.kind)).toEqual([
+      'walkTo',
+      'walkTo',
+      'pickUp',
+      'store',
+      'dismount',
+    ])
+    const atStorage = planStep(EMPTY_PLAN, { kind: 'walkTo', ...storage })
+    const two = planStep(atStorage, { kind: 'dismount' })
+    const placed = planStep(two, pickUp, storage, 1)
+    expect(unroll(placed.items).map((s) => s.order.kind)).toEqual(['walkTo', 'pickUp', 'dismount'])
+  })
+
+  it('goes into a running queue as one edit with the step in place', () => {
+    const running = shiftQueue(idle, [walkHome, { kind: 'dismount', residentId: 'w1' }])
+    const placed = planStep(planOf(running.queue!), store, undefined, 1)
+    const request = givePlan(running, placed)
+    expect(request.kind).toBe('editQueue')
+    expect((request.steps as { order: OrderRequest }[]).map((s) => s.order.kind)).toEqual([
+      'walkTo',
+      'store',
+      'dismount',
+    ])
+  })
+})
+
+describe('a step acting on no place', () => {
+  const explore: OrderRequest = { kind: 'task', task: 'explore' }
+
+  it('adds Explore to an empty queue as one step, with no walk before it', () => {
+    expect(planStep(EMPTY_PLAN, explore).items).toEqual([{ id: 1, order: explore }])
+    expect(appendRequest(idle, { ...explore, residentId: 'w1' })).toEqual({
+      kind: 'queue',
+      residentId: 'w1',
+      steps: [{ order: explore }],
+    })
+  })
+
+  it('adds Dismount, Get off and Run script with no walk either', () => {
+    for (const order of [
+      { kind: 'dismount' },
+      { kind: 'getOff' },
+      { kind: 'runScript', scriptId: 's' },
+    ] as OrderRequest[])
+      expect(appendRequest(idle, { ...order, residentId: 'w1' })?.steps).toEqual([{ order }])
+  })
+})
