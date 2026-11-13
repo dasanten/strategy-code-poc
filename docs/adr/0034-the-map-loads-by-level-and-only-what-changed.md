@@ -115,6 +115,47 @@ in batches of 64. Not checked in a browser's Network tab.
 | The whole map at full detail | 32,400 chunks, 32 MB  | 0.43 MB (77 times smaller) | 0.45 MB (75 times smaller) |
 | A batch of 64 chunks         | 64.5 KB               | 0.7 KB                     | 0.8 KB                     |
 
+### T99.3: large WebSocket messages travel gzipped
+
+| Ticket                        | Before                                    | After                                                                  |
+| ----------------------------- | ----------------------------------------- | ---------------------------------------------------------------------- |
+| T99.3 (WebSocket compression) | the welcome: 63,201 bytes as a text frame | 12,990 bytes as a gzipped binary frame (21%); only messages over 8 KiB |
+
+T99.3 measured on 2026-11-12 on a copy of a dev world (tick about 810, a Player with one young
+city), with a Node WebSocket client against the server: the same welcome at protocol 0 and 1.
+
+### T99.7: Last seen costs a tick only what changed
+
+`bench-broadcast villages <clients> 100` (60 NPC villages on a 432 × 432 map, a Player's realm
+for each client, the first Player remembering every building and city: 7,200 with 1 client,
+7,680 with 5), release build, on the dev machine on 2026-11-12 while other sessions were building.
+The Broadcast phase, before and after; the bytes sent are the same (12.2 KB a tick with 1 client,
+54.6 KB with 5).
+
+| Broadcast phase | Before: mean, p95  | After: mean, p95   |
+| --------------- | ------------------ | ------------------ |
+| 1 client        | 28.07 ms, 86.99 ms | 5.55 ms, 12.09 ms  |
+| 5 clients       | 42.29 ms, 73.76 ms | 11.79 ms, 14.82 ms |
+
+With 5,000 remembered buildings and nothing changing, a tick now copies none of them and turns
+none into JSON (tested by counting); before, every tick turned all of them into JSON for every
+socket.
+
+### T99.4: chunk textures are painted when first shown
+
+Worked out from the per-chunk cost measured above (1.1 ms and 64 KB a texture) for the staged
+Player with the minimap open, which loads all 32,400 explored chunks. Not yet measured in the
+browser.
+
+| Textures painted                        | Before                    | After                                           |
+| --------------------------------------- | ------------------------- | ----------------------------------------------- |
+| Every explored chunk loaded             | 32,400: about 36 s, 2 GB  | none for chunks never on screen                 |
+| The home view (1920 × 1080, start zoom) | painted with all the rest | about 24: about 26 ms over a few frames, 1.5 MB |
+| Kept at most                            | every loaded chunk        | 1,024 (64 MB) besides those on screen           |
+
+A frame paints at most 4 ms of textures (at least one); loaded chunks still waiting for theirs
+show the loading grey.
+
 ### T99.5: coarse levels for the minimap (2026-11-13)
 
 The staged Player (`explore --all`) with the minimap open, counted from the code rather than in

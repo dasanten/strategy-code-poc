@@ -1565,7 +1565,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   }
 
   // A Player without a realm names it before the world shows (`CONTEXT.md`: Realm name).
-  if (founding && !world) return <Founding leaderName={founding.leaderName} onFound={found} />
+  if (founding && !world && status !== 'updated')
+    return <Founding leaderName={founding.leaderName} onFound={found} />
 
   const game = (
     <div className={phone ? 'game phone' : 'game'}>
@@ -2510,6 +2511,16 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           }}
           onCancel={() => setStarting(undefined)}
         />
+      )}
+      {status === 'updated' && (
+        <CentredDialog title="The game was updated">
+          <p>A new version of the game is out. Reload the page to play on.</p>
+          <div className="hud-dialog-actions">
+            <button type="button" className="primary" onClick={() => window.location.reload()}>
+              Reload
+            </button>
+          </div>
+        </CentredDialog>
       )}
       {world && realmEnded(world.events) && (
         <CentredDialog title="Your realm has ended">

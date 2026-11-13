@@ -503,11 +503,13 @@ export function MapView({
       store.want(onScreen, { cx: cam.x / CHUNK_SIZE, cy: cam.y / CHUNK_SIZE }, forMinimap)
       const notHere = store.waiting(onScreen)
       waiting.clear()
-      for (const i of notHere) {
+      // Loaded chunks whose texture is still to be painted show the same grey (ADR 0034).
+      const grey = [...notHere, ...terrainLayer.unpainted(onScreen)]
+      for (const i of grey) {
         const [sx, sy] = chunkToScreen(cam, view, mapSize, i % across, Math.floor(i / across))
         waiting.rect(sx, sy, CHUNK_SIZE * cam.scale, CHUNK_SIZE * cam.scale)
       }
-      if (notHere.length > 0) waiting.fill(LOADING_COLOR)
+      if (grey.length > 0) waiting.fill(LOADING_COLOR)
       setLoading(notHere.length > 0)
       drawOverlay(overlay, cam, view, onScreen)
       drawMinimap(view)

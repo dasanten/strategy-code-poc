@@ -6,15 +6,19 @@
 
 mod common;
 
+use std::collections::HashMap;
+
 use csp_shared::balance::LAST_SEEN_EVERY_TICKS;
+use csp_shared::footprint::Placed;
 use csp_shared::terrain::TerrainMap;
-use csp_shared::world::{BuildingKind, Good, WorldState};
+use csp_shared::world::{BuildingKind, Good, Remembered, WorldState};
 use csp_sim::last_seen::{
     last_seen_in_sight, last_seen_on_cadence, last_seen_out_of_sight, last_seen_turn,
-    refresh_last_seen, step_last_seen, LastSeenState,
+    refresh_last_seen, step_last_seen, LastSeenState, MemoryChanges, OutOfSight, OutOfSightDiff,
 };
-use csp_sim::sight::entities_in_sight;
+use csp_sim::sight::{entities_in_sight, sight_of};
 use csp_sim::world_index::{world_index, WorldIndex};
+use indexmap::IndexMap;
 use serde_json::{json, Value};
 
 const EVERY: u64 = LAST_SEEN_EVERY_TICKS as u64;
@@ -546,4 +550,198 @@ fn flags_as_an_invariant_a_realm_off_its_cadence_or_remembering_past_its_last_re
         .map(|v| v.entity_ids)
         .collect();
     assert_eq!(ids, [vec![id, tobin]]);
+}
+
+// ------------------------------------------------------------------ kept from what changed (T99.7)
+
+fn id_of(e: &Remembered) -> &str {
+    match e {
+        Remembered::Building(b) => &b.id,
+        Remembered::City(c) => &c.id,
+    }
+}
+
+/// The whole-list way, the reference: what `ClientView::diff_alone` sent over
+/// `last_seen_out_of_sight` each tick before T99.7, every entry turned into JSON and compared.
+#[derive(Default)]
+struct WholeList {
+    sent: IndexMap<String, String>,
+}
+
+impl WholeList {
+    fn diff(&mut self, list: &[Remembered]) -> OutOfSightDiff {
+        let after: IndexMap<String, String> =
+            list.iter().map(|e| (id_of(e).to_owned(), serde_json::to_string(e).unwrap())).collect();
+        let changed = list
+            .iter()
+            .filter(|e| self.sent.get(id_of(e)) != after.get(id_of(e)))
+            .cloned()
+            .collect();
+        let gone = self.sent.keys().filter(|id| !after.contains_key(*id)).cloned().collect();
+        self.sent = after;
+        OutOfSightDiff { changed, gone }
+    }
+}
+
+/// A Player's Last seen out of sight, kept both ways.
+struct Both {
+    whole: WholeList,
+    kept: Option<OutOfSight>,
+}
+
+impl Two {
+    /// This tick's diffs for `user`, the whole-list way and kept, after the refreshes' `changes`;
+    /// none on the first, which starts the kept one.
+    fn diffs(
+        &mut self,
+        user: u64,
+        both: &mut Both,
+        changes: &HashMap<u64, MemoryChanges>,
+    ) -> Option<(OutOfSightDiff, OutOfSightDiff)> {
+        let index = world_index(&mut self.index, &self.world, self.size);
+        let whole = both.whole.diff(&last_seen_out_of_sight(&self.world, index, user));
+        match &mut both.kept {
+            None => {
+                both.kept = Some(OutOfSight::new(&self.world, index, None, user));
+                None
+            }
+            Some(kept) => Some((whole, kept.update(&self.world, index, None, changes.get(&user)))),
+        }
+    }
+
+    /// A house of hers built anew next to her storage, as `id`.
+    fn build_house(&mut self, id: &str) {
+        let s = self.world.buildings.iter().find(|b| b.id == self.storage).unwrap();
+        let (x, y) = (s.x + 3.0, s.y);
+        let mut house = self
+            .world
+            .buildings
+            .iter()
+            .find(|b| b.city_id.as_deref() == Some(&self.city) && b.kind == BuildingKind::House)
+            .unwrap()
+            .clone();
+        (house.id, house.x, house.y) = (id.into(), x, y);
+        self.world.buildings.push(house);
+    }
+}
+
+#[test]
+fn keeps_last_seen_out_of_sight_from_what_changed_as_the_whole_list_sends_it_tick_for_tick() {
+    let mut t = two_realms();
+    let mara = t.mara.clone();
+    let homes: Vec<(usize, f64, f64)> = t
+        .world
+        .residents
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| r.owner.as_deref() == Some(&mara))
+        .map(|(i, r)| (i, r.x, r.y))
+        .collect();
+    let mut both: Vec<(u64, Both)> =
+        [1, 2].map(|u| (u, Both { whole: WholeList::default(), kept: None })).into();
+    let mut sent = 0;
+    for k in 0..12 * EVERY {
+        match k {
+            // Her storage leaves his sight, then fills while out of it.
+            k if k == EVERY => t.go_home(),
+            k if k == 2 * EVERY + 1 => {
+                let si = t.world.buildings.iter().position(|b| b.id == t.storage).unwrap();
+                *t.world.buildings[si]
+                    .stock
+                    .get_or_insert_with(Default::default)
+                    .entry(Good::Wood)
+                    .or_insert(0.0) += 50.0;
+            }
+            // A house of hers is torn down out of his sight.
+            k if k == 3 * EVERY => {
+                let hers = t.hers();
+                let house = t
+                    .world
+                    .buildings
+                    .iter()
+                    .rev()
+                    .find(|b| hers.contains(&b.id) && b.kind == BuildingKind::House)
+                    .unwrap()
+                    .id
+                    .clone();
+                t.world.buildings.retain(|b| b.id != house);
+            }
+            // His scout comes back between two of his refreshes; she builds in his sight.
+            k if k == 4 * EVERY + 2 => t.scout_to(t.back),
+            k if k == 5 * EVERY + 2 => t.build_house("house-new"),
+            k if k == 6 * EVERY => t.go_home(),
+            k if k == 7 * EVERY + 1 => t.scout_to(t.back),
+            // The new house is torn down in his sight.
+            k if k == 8 * EVERY + 3 => t.world.buildings.retain(|b| b.id != "house-new"),
+            // Her people walk off, so her own city leaves her sight, and come back.
+            k if k == 9 * EVERY => t.mara_walks_off(),
+            k if k == 10 * EVERY + 4 => {
+                for &(i, x, y) in &homes {
+                    (t.world.residents[i].x, t.world.residents[i].y) = (x, y);
+                }
+            }
+            _ => {}
+        }
+        t.tick();
+        let changes = t.state.take_changes();
+        for (user, b) in &mut both {
+            let Some((whole, kept)) = t.diffs(*user, b, &changes) else { continue };
+            assert_eq!(
+                serde_json::to_value(&kept.changed).unwrap(),
+                serde_json::to_value(&whole.changed).unwrap(),
+                "changed, tick {} for user {user}",
+                t.world.tick
+            );
+            assert_eq!(kept.gone, whole.gone, "gone, tick {} for user {user}", t.world.tick);
+            sent += usize::from(!whole.is_empty());
+        }
+    }
+    assert!(sent >= 6, "only {sent} ticks changed anything");
+}
+
+#[test]
+fn copies_nothing_and_makes_no_json_on_a_quiet_tick_however_much_is_remembered() {
+    let mut t = two_realms();
+    let tobin = t.tobin.clone();
+    // Tobin remembers 5,000 houses all over the map, out of his sight; his scout still sees her
+    // storage, so his refreshes go on.
+    let mut houses = Vec::new();
+    {
+        let index = world_index(&mut t.index, &t.world, t.size);
+        let eyes = sight_of(&t.world, index, &tobin, None);
+        let mut i = 0;
+        while houses.len() < 5_000 {
+            i += 1;
+            let (x, y) = ((i * 37) % t.size, (i * 101) % t.size);
+            if eyes.building_seen(Placed { kind: "house", x, y }) {
+                continue;
+            }
+            houses.push(
+                serde_json::from_value::<Remembered>(json!({
+                    "is": "building", "id": format!("seen-{i}"), "kind": "house",
+                    "cityId": null, "x": x, "y": y, "seenAt": 0
+                }))
+                .unwrap(),
+            );
+        }
+    }
+    t.world.last_seen.insert(2, houses);
+    for _ in 0..2 * EVERY {
+        t.tick();
+    }
+    t.state.take_changes();
+    let index = world_index(&mut t.index, &t.world, t.size);
+    let mut kept = OutOfSight::new(&t.world, index, None, 2);
+    let made = (kept.made_json, kept.copied);
+    let mut refreshed = 0;
+    for _ in 0..3 * EVERY {
+        t.tick();
+        let changes = t.state.take_changes();
+        refreshed += usize::from(changes.get(&2).is_some_and(|c| !c.is_empty()));
+        let index = world_index(&mut t.index, &t.world, t.size);
+        assert!(kept.update(&t.world, index, None, changes.get(&2)).is_empty());
+    }
+    assert_eq!(refreshed, 3);
+    assert!(t.world.last_seen[&2].len() > 5_000);
+    assert_eq!((kept.made_json, kept.copied), made);
 }

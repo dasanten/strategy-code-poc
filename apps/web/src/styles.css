@@ -96,7 +96,8 @@ body {
   color: var(--ui-live);
 }
 .hud-status.closed,
-.hud-status.throttled {
+.hud-status.throttled,
+.hud-status.updated {
   color: var(--ui-bad);
 }
 .hud-goods {
