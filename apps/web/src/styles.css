@@ -182,6 +182,18 @@ button.hud-logout {
   background: var(--ui-bar);
   border-right: 1px solid var(--ui-line);
 }
+.hud-rail-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.hud-rail-divider {
+  width: 24px;
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px solid var(--ui-line-strong);
+}
 .hud-rail button {
   position: relative;
   width: 36px;
@@ -200,8 +212,9 @@ button.hud-logout {
   background: var(--rel-own);
   color: var(--ui-ink);
 }
-.hud-rail button:hover::after,
-.hud-rail button:focus-visible::after {
+/* Not on the open drawer's own button: there it would cover the drawer's title. */
+.hud-rail button:not(.on):hover::after,
+.hud-rail button:not(.on):focus-visible::after {
   content: attr(data-tip);
   position: absolute;
   left: 44px;
@@ -283,6 +296,31 @@ button.hud-logout {
   text-align: right;
   font-size: 12px;
   color: var(--ui-muted);
+}
+.diplomacy-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--ui-line);
+}
+.diplomacy-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12px;
+}
+.diplomacy-tabs button:hover {
+  background: var(--ui-raised-hover);
+}
+.diplomacy-tabs button.on {
+  background: var(--rel-own);
+  color: var(--ui-ink);
 }
 .hud-drawer-head button {
   padding: 2px 8px;
@@ -567,6 +605,19 @@ button.hud-logout {
   border: 1px solid var(--ui-line);
   border-left: 0;
   border-radius: 0 0 10px 0;
+}
+.hud-menu-heading {
+  margin: 0;
+  padding: 8px 10px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ui-muted);
+}
+.hud-menu-heading:not(:first-child) {
+  margin-top: 6px;
+  border-top: 1px solid var(--ui-line);
 }
 .hud-menu > button {
   display: flex;
@@ -2537,4 +2588,43 @@ button.residents-row.selected:hover {
 
 .incoming-list strong {
   overflow-wrap: anywhere;
+}
+/* A drawer or tab holding something the Player hasn't seen (`CONTEXT.md`: Tool rail). */
+.unseen-mark {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--rel-own);
+  box-shadow: 0 0 0 2px var(--ui-bar);
+}
+.hud-rail .unseen-mark,
+.hud-menu-button .unseen-mark {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+.hud-menu .unseen-mark,
+.diplomacy-tabs .unseen-mark {
+  margin-left: 2px;
+  box-shadow: none;
+}
+.diplomacy-tabs button.on .unseen-mark {
+  background: var(--ui-ink);
+}
+/* The legend keeps clear of an open drawer: beside it, or out of sight beside a wide or full one
+   and on a phone, where drawers fill the screen. */
+.game:has(.hud-drawer:not([hidden])) .game-map .map-legend-panel,
+.game:has(.hud-drawer:not([hidden])) .game-map .map-legend-button {
+  left: calc(
+    var(--rail-w) + min(var(--drawer-w, 380px), calc(100vw - var(--rail-w))) + 12px
+  );
+}
+.game:has(.hud-drawer.wide:not([hidden])) .game-map .map-legend-panel,
+.game:has(.hud-drawer.wide:not([hidden])) .game-map .map-legend-button,
+.game:has(.hud-drawer.full:not([hidden])) .game-map .map-legend-panel,
+.game:has(.hud-drawer.full:not([hidden])) .game-map .map-legend-button,
+.game.phone:has(.hud-drawer:not([hidden])) .game-map .map-legend-panel,
+.game.phone:has(.hud-drawer:not([hidden])) .game-map .map-legend-button {
+  display: none;
 }

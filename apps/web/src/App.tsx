@@ -75,6 +75,16 @@ import { demandNoticeLine, demandSides } from './demand-view.js'
 import { DemandsPanel } from './Demands.js'
 import { DirectOffersPanel } from './DirectOffers.js'
 import { incomingItems, incomingNoticeLine } from './incoming-view.js'
+import {
+  NOTHING_SEEN,
+  newestLine,
+  rememberLogSeen,
+  rememberedLogSeen,
+  seeTab,
+  sentToRealm,
+  unseenMarks,
+  type SeenIds,
+} from './unseen-view.js'
 import { StandingPanel } from './Standing.js'
 import { TileMenu, WaypointsPanel } from './Waypoints.js'
 import { api } from './api.js'
@@ -87,7 +97,12 @@ import {
   rememberGoodsPick,
   rememberedGoodsPick,
   showBeside,
+  NO_DRAWER,
+  openDiplomacy,
+  showsTab,
   toggleDrawer,
+  withOpen,
+  type Drawers,
   type DrawerId,
   type GoodsPick,
   type OpenDrawer,
@@ -95,6 +110,7 @@ import {
 import { cityPlace, cityScale } from './cities-drawer-view.js'
 import {
   CentredDialog,
+  DiplomacyTabs,
   Drawer,
   DrawerEdge,
   FirstDayCard,
@@ -513,7 +529,16 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     cover: Covered
   }>()
   // The drawer open over the map, if any (ADR 0008: one at a time).
-  const [openDrawer, setOpenDrawer] = useState<OpenDrawer>()
+  // The Diplomacy drawer's tab is kept with it, and stays while the drawer is closed.
+  const [drawers, setDrawers] = useState<Drawers>(NO_DRAWER)
+  const openDrawer = drawers.open
+  const setOpenDrawer = useCallback(
+    (open: OpenDrawer | ((open: OpenDrawer) => OpenDrawer)) =>
+      setDrawers((d) => withOpen(d, typeof open === 'function' ? open(d.open) : open)),
+    [],
+  )
+  const demandsShown = showsTab(drawers, 'demands')
+  const offersShown = showsTab(drawers, 'directOffers')
   // The notice of demands sent to the realm (`CONTEXT.md`: Demand), until the Player dismisses it
   // or has them in front of them in the drawer.
   const [demandsPutAway, setDemandsPutAway] = useState<ReadonlySet<string>>(new Set())
@@ -525,11 +550,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     }
   }, [demands, homeRealm])
   useEffect(() => {
-    if (openDrawer === 'demands') putDemandsAway()
-  }, [openDrawer, putDemandsAway])
+    if (demandsShown) putDemandsAway()
+  }, [demandsShown, putDemandsAway])
   const demandNotice =
     demands && homeRealm
-      ? demandNoticeLine(demands, homeRealm, demandsPutAway, openDrawer === 'demands')
+      ? demandNoticeLine(demands, homeRealm, demandsPutAway, demandsShown)
       : undefined
   // The notice of what others sent the realm (`CONTEXT.md`: Notices), until the Player dismisses it
   // or has it in front of them in the drawer.
@@ -543,14 +568,44 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     [incoming],
   )
   useEffect(() => {
-    if (openDrawer === 'directOffers') putIncomingAway()
-  }, [openDrawer, putIncomingAway])
-  const incomingNotice = incomingNoticeLine(
-    incoming,
-    incomingPutAway,
-    openDrawer === 'directOffers',
+    if (offersShown) putIncomingAway()
+  }, [offersShown, putIncomingAway])
+  const incomingNotice = incomingNoticeLine(incoming, incomingPutAway, offersShown)
+  // What the Player hasn't seen in a drawer yet, for the marks on the rail and the Diplomacy tabs
+  // (`CONTEXT.md`: Tool rail): what was sent to the realm, seen once its tab was in front of them,
+  // and realm log lines newer than the last one they had open.
+  const [seenIds, setSeenIds] = useState<SeenIds>(NOTHING_SEEN)
+  const sent = useMemo(
+    () =>
+      world
+        ? sentToRealm(world.diplomacy, world.home.realmId)
+        : { contracts: [], demands: [], directOffers: [] },
+    [world],
   )
-  const closeDrawer = useCallback(() => setOpenDrawer(undefined), [])
+  const tabShown = openDrawer === 'diplomacy' ? drawers.tab : undefined
+  useEffect(() => {
+    if (tabShown === 'contracts' || tabShown === 'demands' || tabShown === 'directOffers') {
+      setSeenIds((s) => seeTab(s, tabShown, sent[tabShown]))
+    }
+  }, [tabShown, sent])
+  const [logSeenUpTo, setLogSeenUpTo] = useState<number | null>(null)
+  const events = world?.events
+  useEffect(() => {
+    if (!events || !homeRealm) return
+    const newest = newestLine(events)
+    if (openDrawer === 'realmLog' && newest !== null) {
+      setLogSeenUpTo((upTo) => {
+        if (upTo !== null && upTo >= newest) return upTo
+        rememberLogSeen(homeRealm, newest)
+        return newest
+      })
+    } else {
+      // Until the log was open in this browser, what it held on arrival counts as seen.
+      setLogSeenUpTo((upTo) => upTo ?? rememberedLogSeen(homeRealm) ?? newest ?? -1)
+    }
+  }, [events, homeRealm, openDrawer])
+  const marks = unseenMarks(sent, seenIds, events ?? [], logSeenUpTo)
+  const closeDrawer = useCallback(() => setOpenDrawer(undefined), [setOpenDrawer])
   // The Residents drawer opened fully (`CONTEXT.md`: Residents list); closing it goes back.
   const [residentsFull, setResidentsFull] = useState(false)
   const fullList = residentsFull && openDrawer === 'residents'
@@ -1635,6 +1690,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         <PhoneMenu
           open={openDrawer}
           onToggle={(id) => setOpenDrawer((open) => toggleDrawer(open, id))}
+          marked={marks.rail}
           goods={goods}
           leader={leader?.name}
           account={account.name}
@@ -1645,6 +1701,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         <ToolRail
           open={openDrawer}
           onToggle={(id) => setOpenDrawer((open) => toggleDrawer(open, id))}
+          marked={marks.rail}
         />
       )}
       {residentsPanel &&
@@ -1747,79 +1804,80 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         )}
       {world &&
         drawer(
-          'contracts',
-          <ContractsPanel
-            contracts={world.diplomacy.contracts}
-            realmId={world.home.realmId}
-            own={own}
-            inSight={world.residents}
-            horses={world.horses}
-            buildings={world.buildings}
-            cities={world.cities}
-            realms={realms}
-            scripts={scripts}
-            tick={world.tick}
-            sendOrder={sendOrder}
-          />,
-        )}
-      {world &&
-        drawer(
-          'demands',
-          <DemandsPanel
-            demands={world.diplomacy.demands}
-            realmId={world.home.realmId}
-            knownRealms={world.diplomacy.knownRealms}
-            knownNpcOrgs={world.diplomacy.knownNpcOrgs}
-            cities={world.cities}
-            buildings={world.buildings}
-            carriedWays={world.diplomacy.carriedWays ?? []}
-            noCaravans={world.diplomacy.noCaravans === true}
-            lastSeen={world.lastSeen.cities}
-            tick={world.tick}
-            sendOrder={sendOrder}
-          />,
-        )}
-      {world &&
-        drawer(
-          'directOffers',
-          <DirectOffersPanel
-            offers={world.diplomacy.directOffers}
-            knownRealms={world.diplomacy.directOfferRealms}
-            carriedWays={world.diplomacy.carriedWays ?? []}
-            buildings={world.buildings}
-            cities={world.cities}
-            residents={world.residents}
-            carriages={world.carriages}
-            horses={world.horses}
-            realmId={world.home.realmId}
-            tick={world.tick}
-            mapSize={world.map.size}
-            noCaravans={world.diplomacy.noCaravans === true}
-            arrivesIn={arrivesIn || undefined}
-            onShowPlace={showOnMap}
-            giveOrder={giveOrder}
-            sendOrder={sendOrder}
-          />,
-        )}
-      {world &&
-        drawer(
-          'alliance',
-          <AlliancePanel
-            diplomacy={world.diplomacy}
-            residents={world.residents}
-            carriages={world.carriages}
-            realmId={world.home.realmId}
-            sendOrder={sendOrder}
-          />,
-        )}
-      {world &&
-        drawer(
-          'standing',
-          <StandingPanel
-            standings={world.diplomacy.standings}
-            joinRequests={world.diplomacy.joinRequests}
-            directives={world.diplomacy.directives}
-            sendOrder={sendOrder}
+          'diplomacy',
+          <DiplomacyTabs
+            tab={drawers.tab}
+            onTab={(tab) => setDrawers(openDiplomacy(tab))}
+            marked={marks.tabs}
+            panels={{
+              contracts: (
+                <ContractsPanel
+                  contracts={world.diplomacy.contracts}
+                  realmId={world.home.realmId}
+                  own={own}
+                  inSight={world.residents}
+                  horses={world.horses}
+                  buildings={world.buildings}
+                  cities={world.cities}
+                  realms={realms}
+                  scripts={scripts}
+                  tick={world.tick}
+                  sendOrder={sendOrder}
+                />
+              ),
+              demands: (
+                <DemandsPanel
+                  demands={world.diplomacy.demands}
+                  realmId={world.home.realmId}
+                  knownRealms={world.diplomacy.knownRealms}
+                  knownNpcOrgs={world.diplomacy.knownNpcOrgs}
+                  cities={world.cities}
+                  buildings={world.buildings}
+                  carriedWays={world.diplomacy.carriedWays ?? []}
+                  noCaravans={world.diplomacy.noCaravans === true}
+                  lastSeen={world.lastSeen.cities}
+                  tick={world.tick}
+                  sendOrder={sendOrder}
+                />
+              ),
+              directOffers: (
+                <DirectOffersPanel
+                  offers={world.diplomacy.directOffers}
+                  knownRealms={world.diplomacy.directOfferRealms}
+                  carriedWays={world.diplomacy.carriedWays ?? []}
+                  buildings={world.buildings}
+                  cities={world.cities}
+                  residents={world.residents}
+                  carriages={world.carriages}
+                  horses={world.horses}
+                  realmId={world.home.realmId}
+                  tick={world.tick}
+                  mapSize={world.map.size}
+                  noCaravans={world.diplomacy.noCaravans === true}
+                  arrivesIn={arrivesIn || undefined}
+                  onShowPlace={showOnMap}
+                  giveOrder={giveOrder}
+                  sendOrder={sendOrder}
+                />
+              ),
+              alliance: (
+                <AlliancePanel
+                  diplomacy={world.diplomacy}
+                  residents={world.residents}
+                  carriages={world.carriages}
+                  realmId={world.home.realmId}
+                  sendOrder={sendOrder}
+                />
+              ),
+              standing: (
+                <StandingPanel
+                  standings={world.diplomacy.standings}
+                  joinRequests={world.diplomacy.joinRequests}
+                  directives={world.diplomacy.directives}
+                  sendOrder={sendOrder}
+                />
+              ),
+            }}
           />,
         )}
       {world &&
@@ -1946,14 +2004,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             <IncomingNotice
               key={kind}
               line={demandNotice}
-              onOpen={() => setOpenDrawer('demands')}
+              onOpen={() => setDrawers(openDiplomacy('demands'))}
               onDismiss={putDemandsAway}
             />
           ) : kind === 'incoming' && incomingNotice ? (
             <IncomingNotice
               key={kind}
               line={incomingNotice}
-              onOpen={() => setOpenDrawer('directOffers')}
+              onOpen={() => setDrawers(openDiplomacy('directOffers'))}
               onDismiss={putIncomingAway}
             />
           ) : kind === 'firstDay' && world ? (
