@@ -830,9 +830,13 @@ export function Wiki() {
           building with its city (“Walk to Farm, Quarrytown IV”), a waypoint or a city, or the
           tile's coordinates when nothing is there. A step's duration shows as a chip when it has
           one, or when it needs one; tap it to type the duration in game minutes (the real time
-          shows beside it), empty it to clear it. Drag a step to reorder it, or focus it and press{' '}
-          <kbd>Alt</kbd>+<kbd>↑</kbd> or <kbd>Alt</kbd>+<kbd>↓</kbd>; remove it with ✕, and switch
-          loop on or off. The planner's <strong>?</strong> shows how it works.
+          shows beside it), empty it to clear it. The steps sit in a bracket, <strong>Loop</strong>,
+          with its switch in its head: on, the first step follows the last. Drag a step to reorder
+          it, also into or out of a repeat block's bracket, or focus it and press <kbd>Alt</kbd>+
+          <kbd>↑</kbd> or <kbd>Alt</kbd>+<kbd>↓</kbd>. On a phone, tap the steps to move to pick
+          them, then tap <strong>Move here</strong> where they go. A step kind dragged from Add step
+          and dropped between two steps is planned there. Remove a step with ✕. The planner's{' '}
+          <strong>?</strong> shows how it works.
         </p>
         <p>
           To reuse steps, tap one in the planner to pick it (<kbd>Shift</kbd>+tap picks a range;
@@ -858,8 +862,9 @@ export function Wiki() {
         <p>
           To do some steps several times in a row, pick them (in a row) and press{' '}
           <strong>Repeat</strong>: they are wrapped in a repeat block, done {num(DEFAULT_REPEAT)}{' '}
-          times until you type another count. The block shows its count with its steps indented
-          under it; it is picked, moved, copied, pasted, saved and removed as one,
+          times until you type another count. The block is a bracket inside Loop's, its count in its
+          head and its steps inside; it is picked, moved (into another block too), copied, pasted,
+          saved and removed as one,
           <strong> Unwrap</strong> puts its steps back as they were, and a block can hold another.
           Repeat blocks are the planner's own: on a resident's card, wrapping steps of a running
           queue opens a draft of it that waits for <strong>Start queue</strong>, and starting it, or
@@ -1497,8 +1502,8 @@ export function Wiki() {
           Strength {num(strong.stats.strength.base)}. A carriage behind an average horse carries{' '}
           {num(CARRIAGE_CAPACITY)} kg; each point of its driver's Driving skill makes it{' '}
           {pct(DRIVING_SKILL_EFFECT)} faster, at most {pct(DRIVING_SKILL_LIMIT)}, learned at{' '}
-          {num(DRIVING_SKILL_PER_DAY)} a game day of driving. Carriages enter mountains only along a finished road, so a
-          road over a ridge opens a pass for them.
+          {num(DRIVING_SKILL_PER_DAY)} a game day of driving. Carriages enter mountains only along a
+          finished road, so a road over a ridge opens a pass for them.
         </p>
         <p>
           A carriage is built at a finished stable: a resident there lays out a carriage site on a

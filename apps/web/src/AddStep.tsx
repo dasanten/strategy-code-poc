@@ -29,6 +29,7 @@ import {
   PLAN_STEP_ICONS,
   PlannerFlowContext,
   REPEAT_ICON,
+  STEP_KIND_TYPE,
 } from './step-palette-view.js'
 
 /**
@@ -203,7 +204,16 @@ export function AddStep({
                   const task = PLAN_TASKS[id]
                   return (
                     <span className="step-palette-item" key={id}>
-                      <button type="button" onClick={() => onStart(id, flow?.after)}>
+                      <button
+                        type="button"
+                        onClick={() => onStart(id, flow?.after)}
+                        // Dragged onto a place in the planner, it is planned there.
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData(STEP_KIND_TYPE, id)
+                          e.dataTransfer.effectAllowed = 'copy'
+                        }}
+                      >
                         <span aria-hidden="true">{PLAN_STEP_ICONS[id]}</span> {k.label}
                       </button>
                       {task && (

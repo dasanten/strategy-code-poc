@@ -451,11 +451,73 @@
 .queue-step-gone {
   color: var(--ui-warn);
 }
-/* A repeat block's head (`CONTEXT.md`: Repeat block): its count; its steps follow, indented. */
-.queue-step.queue-block {
-  border-style: dashed;
-  border-left-style: solid;
-  border-left-color: var(--ui-line-strong);
+/* Brackets (`CONTEXT.md`: Planner blocks): loop the outermost around the steps, its switch in
+   the head; each repeat block a bracket nested in it, its count in its head. A bracket is a
+   rule down the left with a head on top and a foot under its last step. */
+.queue-bracket {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 0 4px 8px;
+  border-left: 3px solid var(--ui-line-strong);
+  border-bottom: 1px solid var(--ui-line-strong);
+  border-radius: 6px 0 0 6px;
+}
+.queue-bracket-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  margin-left: -8px;
+  padding: 0 4px 0 6px;
+  border-radius: 6px 6px 0 0;
+  background: var(--ui-raised);
+}
+.queue-bracket-head .buttons {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.queue-bracket-head button {
+  min-width: 28px;
+  min-height: 28px;
+}
+/* Loop: off, its bracket is faint, the queue ends after its last step. */
+.queue-loop-bracket {
+  margin-bottom: 6px;
+  border-left-style: dashed;
+  border-bottom-style: dashed;
+  border-color: var(--ui-line);
+}
+.queue-loop-bracket.on {
+  border-style: solid;
+  border-color: var(--ui-live);
+}
+.queue-loop-bracket > .queue-bracket-head {
+  cursor: default;
+}
+.queue-repeat-bracket {
+  border-color: var(--ui-warn);
+}
+.queue-repeat-bracket > .queue-bracket-head {
+  cursor: grab;
+}
+.queue-repeat-bracket.picked > .queue-bracket-head {
+  background: color-mix(in srgb, var(--ui-live) 14%, transparent);
+  outline: 1px solid var(--ui-line-strong);
+}
+/* With steps picked, the "+" points are where they move to. */
+.queue-insert.move button {
+  opacity: 1;
+  color: var(--ui-live);
+  border-color: var(--ui-live);
+}
+.queue-insert.move {
+  height: auto;
+}
+.queue-insert.move button {
+  position: static;
 }
 .queue-block-count {
   width: 4em;

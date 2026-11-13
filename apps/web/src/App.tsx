@@ -369,6 +369,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const insertFor = (owner: string): InsertPoint => ({
     at: insertPoint?.owner === owner ? insertPoint.at : undefined,
     set: (at) => setInsertPoint({ owner, at }),
+    start: (kind, after) => void startPlan(kind, after),
   })
   // The queue planned on the group card, held here until given to all (`CONTEXT.md`: Planning
   // for a group); with none open, a step planned for a group goes onto each one's own queue.

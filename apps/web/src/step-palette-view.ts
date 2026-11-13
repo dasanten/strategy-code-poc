@@ -102,14 +102,6 @@ export interface PlannerFlow {
 }
 
 /**
- * The rows the planner's insert points ("+") follow: every step but the last row, so a step can
- * be added between two others. A block's head has its steps right under it, so none follows it.
- */
-export function insertPoints(rows: readonly { id: number; kind: 'step' | 'block' }[]): number[] {
-  return rows.slice(0, -1).flatMap((row) => (row.kind === 'step' ? [row.id] : []))
-}
-
-/**
  * Where the insert point goes once the planner's rows change: after the last of the rows just
  * added right after it, so the next step follows the one added; where it was otherwise; none once
  * its row is gone or is last.
@@ -134,7 +126,12 @@ export function followInsert(
 export interface InsertPoint {
   at: number | undefined
   set: (at: number | undefined) => void
+  /** Plans a step of this kind to go after `after`: a kind dragged from the palette and dropped. */
+  start?: (kind: PlanStepId, after: number | undefined) => void
 }
+
+/** What a step kind dragged from the palette carries (`DataTransfer` type). */
+export const STEP_KIND_TYPE = 'application/x-csp-step-kind'
 
 /** The insert point the card keeps; without one, the planner keeps its own. */
 export const InsertPointContext = createContext<InsertPoint | undefined>(undefined)
