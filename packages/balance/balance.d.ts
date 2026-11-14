@@ -74,6 +74,7 @@ export interface Balance {
   readonly NODE_MIN_SPACING: number
   readonly FRONTIER_NODE_DENSITY: number
   readonly ISLAND_NODE_DENSITY: number
+  readonly GOLD_NODE_DENSITY: number
   readonly STARTING_SITES_PER_HEARTLAND: number
   readonly STARTING_SITE_WALK: {
     minMinutes: number
@@ -115,6 +116,7 @@ export interface Balance {
   }
   readonly START_SPARE_HOUSES: number
   readonly START_FOOD: number
+  readonly START_COINS: number
   readonly START_CARRIED_FOOD: number
   readonly START_HORSES: number
   readonly START_STABLE_FOOD: number

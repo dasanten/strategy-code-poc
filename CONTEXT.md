@@ -1360,7 +1360,8 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   neighbours.
 - **Starting city:** what a Leader spawns with, on a starting site: about 8 residents with
   random stats (one of them the Leader), a town hall, a ring of wooden wall with a gate, houses for everyone with a little room
-  to spare, a storage with a small food stock, one farm outside the wall, a stable next to it
+  to spare, a storage with a small food stock and a few Coins (for a first trade: a heartland has
+  no gold), one farm outside the wall, a stable next to it
   with two horses and a little Food, and one carriage standing at the stable with one of the
   horses hitched to it. The residents start on the farm, working
   it, each with a little food on them.
