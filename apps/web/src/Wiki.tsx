@@ -140,6 +140,10 @@ import {
   ISLAND_COUNT,
   HEARTLAND_COUNT,
   FRONTIER_REGION_COUNT,
+  FRONTIER_NODE_DENSITY,
+  ISLAND_NODE_DENSITY,
+  GOLD_NODE_DENSITY,
+  START_COINS,
   REGION_BORDER_WIDTH,
   PASS_WIDTH,
   SECOND_WAY_SHARE,
@@ -1126,6 +1130,16 @@ export function Wiki() {
           on the farmland round it, so one whose city is gone is free again. Should every site be
           taken, your city goes on the free place nearest an open heartland’s middle. Your realm log
           names the heartland your city stands in.
+        </p>
+        <p>
+          Resource nodes lie thicker away from home: a frontier region holds{' '}
+          {num(FRONTIER_NODE_DENSITY)} times as many as a heartland, an island{' '}
+          {num(ISLAND_NODE_DENSITY)} times. <strong>Gold ore</strong> is a rare good like Coal: no
+          gold node lies in a heartland, only in the frontier and on islands, where it is{' '}
+          {num(GOLD_NODE_DENSITY)} times as common again. Every frontier region has a gold node and a
+          coal node in it or in a region next to it. So a heartland realm gets its Coins by trade, selling Food, Wood,
+          Stone or Iron at its heartland’s trading post, or by holding a gold node out there. Your
+          starting city’s storage holds {num(START_COINS)} Coins for a first trade.
         </p>
         <p>
           The regions of the mainland are parted by Mountain ranges and by arms of the Sea, about{' '}
