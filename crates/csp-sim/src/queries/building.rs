@@ -64,11 +64,14 @@ pub fn recipe_good(recipe: &Recipe) -> &'static str {
 }
 
 /// The recipe a worker follows at a workplace that processes goods (`recipeFor`): the one that
-/// makes `makes`, or with none the workplace's only recipe.
+/// makes `makes`, or with none the workplace's first recipe, so a smelter makes Iron unless told
+/// Steel (`CONTEXT.md`: Coal). A smithy has no such default: its workers always say which weapon
+/// or armour they make (`CONTEXT.md`: Smithy).
 pub fn recipe_for(kind: BuildingKind, makes: Option<&str>) -> Option<&'static Recipe> {
     let recipes = RECIPES.get(kind_name(kind)).unwrap_or(&[]);
     match makes {
-        None => (recipes.len() == 1).then(|| &recipes[0]),
+        None if kind == BuildingKind::Smithy => None,
+        None => recipes.first(),
         Some(good) => recipes.iter().find(|r| recipe_good(r) == good),
     }
 }
@@ -734,11 +737,14 @@ pub fn work_problem(
     };
     let name = kind_name(here.kind);
     if has_choice(here.kind) {
-        let Some(makes) = makes else {
-            return Some(format!("say what to make at the {name}"));
-        };
-        if recipe_for(here.kind, Some(good_name(makes))).is_none() {
-            return Some(format!("a {name} can't make {}", good_name(makes)));
+        match makes {
+            None if recipe_for(here.kind, None).is_none() => {
+                return Some(format!("say what to make at the {name}"));
+            }
+            Some(makes) if recipe_for(here.kind, Some(good_name(makes))).is_none() => {
+                return Some(format!("a {name} can't make {}", good_name(makes)));
+            }
+            _ => {}
         }
     } else if makes.is_some() {
         return Some(format!("nothing to choose at a {name}"));
@@ -954,6 +960,17 @@ mod tests {
         let spear = recipe_for(BuildingKind::Smithy, Some("spear")).unwrap();
         assert_eq!(recipe_good(spear), "spear");
         assert_eq!(recipe_good(recipe_for(BuildingKind::Mint, None).unwrap()), "coins");
+        assert!(has_choice(BuildingKind::Smithy) && has_choice(BuildingKind::Smelter));
         assert!(recipe_for(BuildingKind::House, None).is_none());
+    }
+
+    #[test]
+    fn a_smelter_makes_iron_unless_told_steel() {
+        assert_eq!(recipe_good(recipe_for(BuildingKind::Smelter, None).unwrap()), "iron");
+        let steel = recipe_for(BuildingKind::Smelter, Some("steel")).unwrap();
+        assert_eq!(recipe_good(steel), "steel");
+        let input: Vec<_> = recipe_input(steel).into_iter().map(|(g, _)| g).collect();
+        assert_eq!(input, [Good::Iron, Good::Coal]);
+        assert!(recipe_for(BuildingKind::Smelter, Some("sword")).is_none());
     }
 }

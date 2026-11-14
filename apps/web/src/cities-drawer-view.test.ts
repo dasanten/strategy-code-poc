@@ -110,6 +110,7 @@ describe('the Cities drawer’s lists', () => {
         { good: 'wood', amount: 5 },
         { good: 'stone', amount: 0 },
         { good: 'coal', amount: 0 },
+        { good: 'steel', amount: 0 },
         { good: 'coins', amount: 4 },
       ],
     })

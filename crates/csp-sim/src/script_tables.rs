@@ -433,6 +433,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 description: "Units of coal.",
                 null_when: Some("when there are none"),
             },
+            ScriptField {
+                name: "steel",
+                r#type: ScriptType::Number,
+                description: "Units of steel.",
+                null_when: Some("when there are none"),
+            },
         ],
     },
     ScriptView {
@@ -3391,8 +3397,9 @@ pub static DEFAULT_SCRIPTS: &[(Task, &str, &str)] = &[
 // batch, one of us, picked at random, fetches a load at params.input, else
 // params.storage, while it holds some, else at the nearest storage of my
 // realm holding it, and puts it on the pile; not while one of us carries the
-// output, and with none anywhere we stand idle. At a smithy, memory.makes
-// says what to make. Meals come from the workplace's pile on their own,
+// output, and with none anywhere we stand idle, my Doing line saying what
+// we lack ("Idle: no coal"). At a smithy, memory.makes says what to make, at
+// a smelter iron unless it says steel. Meals come from the workplace's pile on their own,
 // without an order. Below
 // params.foodAt units of Food on me, while the pile holds none, I get Food
 // up to params.foodTake at params.food, else params.storage, else the
@@ -3661,10 +3668,13 @@ fn carryLoadOffIfFull(workplace) {
 // picked at random, fetches a load at params.input, else params.storage,
 // while it holds some, else at the nearest storage of my realm holding it,
 // kept in memory.input until back, when I put it on the pile. With none
-// anywhere we stand idle.
+// anywhere we stand idle, and my Doing line says what we lack.
 fn fetchInputIfShort(workplace) {
   let missing = inputToFetch(workplace, memory.makes)
-  if (missing.length == 0) { return }
+  if (missing.length == 0) {
+    sayLacking(null)
+    return
+  }
   let goods = goodsOf(missing)
   let from = null
   if (params.input != null) { from = materialsFrom(workplace, goods, params.input) }
@@ -3672,13 +3682,36 @@ fn fetchInputIfShort(workplace) {
     from = materialsFrom(workplace, goods, params.storage)
   }
   if (from == null) { from = materialsFrom(workplace, goods, null) }
-  if (from == null || pickInputFetcher(workplace) != me.id) { return }
+  if (from == null) {
+    sayLacking(goods)
+    return
+  }
+  sayLacking(null)
+  if (pickInputFetcher(workplace) != me.id) { return }
   let load = {}
   for (m of missing) { load[m.good] = m.units }
   if (fetch(load, from.id) != null) { return }
   wait() // until I have it
   memory.input = {missing: missing}
   log("fetching " + goodsText(load, goods) + " from " + placeName(from))
+}
+
+// My Doing line while the input for a batch is nowhere to be had: what we
+// lack, as "Idle: no iron, coal"; null gives the usual line back.
+fn sayLacking(goods) {
+  let text = null
+  if (goods != null) {
+    text = ""
+    for (g of goods) {
+      if (text != "") { text = text + ", " }
+      let name = g
+      if (g == "ironOre") { name = "iron ore" }
+      if (g == "goldOre") { name = "gold ore" }
+      text = text + name
+    }
+    text = "Idle: no " + text
+  }
+  if (memory.doing != text) { doing(text) }
 }
 
 // Who fetches inputs: one of us at work here, picked at random, so we all
