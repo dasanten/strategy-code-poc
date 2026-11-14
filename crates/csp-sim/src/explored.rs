@@ -16,6 +16,8 @@ use csp_shared::chunks::{
 use csp_shared::terrain::{tile_index, wrap, TerrainMap};
 use csp_shared::world::ResourceNode;
 
+use crate::regions::Regions;
+
 /// The map's terrain and what is made from it alone, held once and shared (ADR 0034): the game,
 /// the explored terrain and the HTTP workers that read terrain all hold the same copy. None of it
 /// ever changes, so it needs no lock; what is made on first use is made once.
@@ -29,6 +31,9 @@ pub struct MapTerrain {
     /// the whole map, as `coarse_squares` makes it: made once, when first asked for, and used for
     /// every fully explored chunk.
     squares: [OnceLock<Vec<u8>>; TERRAIN_LEVEL_MAX as usize],
+    /// The map's regions (`Regions::of`) with the seed they were worked out from: made on first use
+    /// and kept, since they never change.
+    regions: OnceLock<(i64, Regions)>,
 }
 
 impl MapTerrain {
@@ -46,12 +51,23 @@ impl MapTerrain {
             nodes_by_chunk,
             overview: OnceLock::new(),
             squares: Default::default(),
+            regions: OnceLock::new(),
         }
     }
 
     /// The map's terrain, the one copy.
     pub fn terrain(&self) -> &Arc<TerrainMap> {
         &self.terrain
+    }
+
+    /// The map's regions (`CONTEXT.md`: Region): which region each land tile is in, the regions
+    /// and the passes and land bridges between them. `seed` is the world's; worked out on first use
+    /// (a second or so on the full map), so a caller on the game thread asks off it first.
+    pub fn regions(&self, seed: i64) -> &Regions {
+        let (made_from, regions) =
+            self.regions.get_or_init(|| (seed, Regions::of(seed, &self.terrain)));
+        debug_assert_eq!(*made_from, seed, "the regions of another seed");
+        regions
     }
 
     /// The most common terrain of every square of `level` (1 to `TERRAIN_LEVEL_MAX`) across the

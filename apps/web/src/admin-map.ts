@@ -1,10 +1,17 @@
 import { ADMIN_VIEW_MAX_SIDE } from './shared/admin-map.js'
 import { chunksAcross, wrap } from './shared/terrain.js'
-import type { AdminPlaces, AdminViewRequest, AdminWorldView, MapInfo } from '@csp/shared-types'
+import type {
+  AdminLand,
+  AdminPlaces,
+  AdminViewRequest,
+  AdminWorldView,
+  MapInfo,
+} from '@csp/shared-types'
 import { MAX_SCALE, visibleTiles, zoomTier, type Camera, type Size } from './map/camera.js'
 import { citySize, type CityEmblem, type FarMarker } from './map/far.js'
 import type { MapWorld } from './map/map-world.js'
-import { regionColour, type RegionState } from './map/region.js'
+import type { MapMark } from './map/preview-draw.js'
+import { applyRegionMap, regionColour, type RegionState } from './map/region.js'
 import { cityRelationship, realmRelationship, type Viewer } from './map/tokens.js'
 
 /*
@@ -158,3 +165,26 @@ const allChunks = (() => {
     return last.chunks
   }
 })()
+
+/** The colour of a pass's mark on the admin map's land layer. */
+export const PASS_MARK_COLOR = 0xf2f2f2
+/** The colour of a land bridge's mark on the admin map's land layer. */
+export const LAND_BRIDGE_MARK_COLOR = 0x1f6fd1
+
+/**
+ * The admin map's land layer (`CONTEXT.md`: Region): the regions in place of the territory,
+ * coloured by kind (heartland, frontier, island), and a mark on each pass and land bridge.
+ */
+export function adminLandLayer(
+  land: AdminLand,
+  size: number,
+): { region: RegionState; marks: MapMark[] } {
+  return {
+    region: applyRegionMap(null, land.overlay, size),
+    marks: land.ways.map((w) => ({
+      x: w.x,
+      y: w.y,
+      color: w.kind === 'pass' ? PASS_MARK_COLOR : LAND_BRIDGE_MARK_COLOR,
+    })),
+  }
+}

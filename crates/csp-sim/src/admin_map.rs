@@ -19,10 +19,13 @@ use crate::queries::carriages::crew_ids_of;
 use crate::queries::city::town_hall_of;
 use crate::queries::names::{held, kind_name, ALL_GOODS};
 use crate::queries::npc_trade::locale_compare;
-use crate::queries::region_map::{region_map_for, RegionMap};
+use crate::queries::region_map::{
+    region_map_for, RegionAlliance, RegionChunk, RegionHolder, RegionMap,
+};
 use crate::queries::residents::is_armed;
 use crate::queries::standing::TRADE_ORG_NAME;
 use crate::queries::territory::{city_organization, Territory, TRADE_ORGANIZATION};
+use crate::regions::{Region, RegionKind, Regions, Way};
 
 /// Where an admin loads the map they draw (`ADMIN_MAP_INFO_PATH`).
 pub const ADMIN_MAP_INFO_PATH: &str = "/api/admin/map";
@@ -32,6 +35,8 @@ pub const ADMIN_WORLD_PATH: &str = "/api/admin/world";
 pub const ADMIN_PLACES_PATH: &str = "/api/admin/places";
 /// Where an admin loads the territory of the whole map (`ADMIN_TERRITORY_PATH`).
 pub const ADMIN_TERRITORY_PATH: &str = "/api/admin/territory";
+/// Where an admin loads the land: its regions, passes and land bridges (`ADMIN_LAND_PATH`).
+pub const ADMIN_LAND_PATH: &str = "/api/admin/land";
 /// Where an admin loads one thing for the inspector (`ADMIN_INSPECT_PATH`).
 pub const ADMIN_INSPECT_PATH: &str = "/api/admin/inspect";
 /// The widest and tallest rectangle `ADMIN_WORLD_PATH` gives every entity in
@@ -408,6 +413,65 @@ pub fn admin_places(world: &WorldState, lookups: &dyn AdminLookups) -> Value {
 /// The whole map's territory (`adminTerritory`): the Region map without the explored filter.
 pub fn admin_territory(world: &WorldState, territory: &Territory, size: i32) -> RegionMap {
     region_map_for(world, territory, size, &|_, _| true)
+}
+
+/// The land as the admin map shows it (`AdminLand`, `CONTEXT.md`: Region): every region and every
+/// pass and land bridge, and the regions as a Region map overlay, coloured by kind (each region
+/// a holder in the "alliance" of its kind).
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+pub struct AdminLand {
+    pub regions: Vec<Region>,
+    pub ways: Vec<Way>,
+    pub overlay: RegionMap,
+}
+
+/// What a kind of region is called on the admin map.
+pub fn region_kind_name(kind: RegionKind) -> &'static str {
+    match kind {
+        RegionKind::Heartland => "Heartland",
+        RegionKind::Frontier => "Frontier",
+        RegionKind::Island => "Island",
+    }
+}
+
+/// The land for the admin map (`adminLand`).
+pub fn admin_land(regions: &Regions) -> AdminLand {
+    let size = regions.size;
+    let holders = regions
+        .regions
+        .iter()
+        .map(|r| RegionHolder {
+            id: format!("region:{}", r.id),
+            name: r.name.clone(),
+            alliance: Some(RegionAlliance {
+                id: format!("region-kind:{}", region_kind_name(r.kind)),
+                name: region_kind_name(r.kind).to_string(),
+            }),
+        })
+        .collect();
+    let across = csp_shared::chunks::chunks_across(size);
+    let mut chunks = Vec::new();
+    for chunk in 0..across * across {
+        let (x0, y0, w, h) = crate::queries::region_map::chunk_box(chunk, size);
+        let mut runs: Vec<i32> = Vec::new();
+        let mut any = false;
+        for i in 0..w * h {
+            let holder = regions.id_at(x0 + i % w, y0 + i / w).map_or(-1, |id| id as i32);
+            any |= holder != -1;
+            match runs.as_mut_slice() {
+                [.., len, last] if *last == holder => *len += 1,
+                _ => runs.extend([1, holder]),
+            }
+        }
+        if any {
+            chunks.push(RegionChunk { chunk, runs });
+        }
+    }
+    AdminLand {
+        regions: regions.regions.clone(),
+        ways: regions.ways.clone(),
+        overlay: RegionMap { tick: 0, whole: true, holders, chunks, gone: Vec::new() },
+    }
 }
 
 /// One thing in the world as the admin map's inspector shows it (`adminInspection`), or None when

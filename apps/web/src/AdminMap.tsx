@@ -1,11 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { adminTerrainChunkPath } from './shared/terrain.js'
-import type { AdminInspectTarget, AdminPlaces, AdminWorldView, MapInfo } from '@csp/shared-types'
+import type {
+  AdminInspectTarget,
+  AdminLand,
+  AdminPlaces,
+  AdminWorldView,
+  MapInfo,
+  RegionKind,
+} from '@csp/shared-types'
 import { api, ApiFailure } from './api.js'
 import {
   ADMIN_MAP_REFRESH_MS,
   ADMIN_MAP_SETTLE_MS,
   ADMIN_TERRITORY_REFRESH_MS,
+  LAND_BRIDGE_MARK_COLOR,
+  PASS_MARK_COLOR,
+  adminLandLayer,
   adminMapWorld,
   adminViewRequest,
   mapViewSearch,
@@ -17,7 +27,49 @@ import { jumpScale, type JumpEntry } from './admin-jump.js'
 import { AdminJumpList } from './AdminJumpList.js'
 import { MapView } from './MapView.js'
 import type { Camera, Size } from './map/camera.js'
-import { applyRegionMap, type RegionState } from './map/region.js'
+import { applyRegionMap, regionColour, type RegionState } from './map/region.js'
+
+const KIND_NAMES: Record<RegionKind, string> = {
+  heartland: 'Heartland',
+  frontier: 'Frontier',
+  island: 'Island',
+}
+
+const hex = (c: number) => `#${c.toString(16).padStart(6, '0')}`
+
+/**
+ * What the land layer's colours and marks stand for: each kind of region with how many there
+ * are (coloured as the overlay colours them, by the kind's name), and the passes and land bridges.
+ */
+function AdminLandLegend({ land }: { land: AdminLand }) {
+  const kinds = (Object.keys(KIND_NAMES) as RegionKind[]).map((kind) => ({
+    kind,
+    count: land.regions.filter((r) => r.kind === kind && r.tiles > 0).length,
+  }))
+  const ways = (kind: 'pass' | 'landBridge') => land.ways.filter((w) => w.kind === kind).length
+  return (
+    <ul className="admin-land-legend">
+      {kinds.map(({ kind, count }) => (
+        <li key={kind}>
+          <span
+            className="swatch"
+            style={{ background: hex(regionColour(`region-kind:${KIND_NAMES[kind]}`)) }}
+          />
+          {count} {KIND_NAMES[kind]}
+          {count === 1 ? '' : 's'}
+        </li>
+      ))}
+      <li>
+        <span className="swatch mark" style={{ background: hex(PASS_MARK_COLOR) }} />
+        {ways('pass')} passes
+      </li>
+      <li>
+        <span className="swatch mark" style={{ background: hex(LAND_BRIDGE_MARK_COLOR) }} />
+        {ways('landBridge')} land bridges
+      </li>
+    </ul>
+  )
+}
 
 /**
  * The admin panel's Map tab (`CONTEXT.md`: admin map): the whole world on the game's map, the
@@ -42,6 +94,9 @@ export function AdminMap({
   const [view, setView] = useState<AdminWorldView | null>(null)
   const [places, setPlaces] = useState<AdminPlaces | null>(null)
   const [region, setRegion] = useState<RegionState | null>(null)
+  // The land layer (regions, passes, land bridges) in place of the territory, loaded once asked.
+  const [showLand, setShowLand] = useState(false)
+  const [land, setLand] = useState<AdminLand | null>(null)
   const [error, setError] = useState<string>()
   const report = useCallback(
     (err: unknown) => setError(err instanceof ApiFailure ? err.message : 'Something went wrong.'),
@@ -68,6 +123,11 @@ export function AdminMap({
     const timer = setInterval(load, ADMIN_TERRITORY_REFRESH_MS)
     return () => clearInterval(timer)
   }, [map])
+
+  useEffect(() => {
+    if (showLand && !land) api.adminLand().then(setLand, report)
+  }, [showLand, land, report])
+  const landLayer = useMemo(() => land && map && adminLandLayer(land, map.size), [land, map])
 
   // The view in place, and which load is the latest, so a slow answer never shows over a newer one.
   const camRef = useRef<{ cam: Camera; size: Size } | null>(null)
@@ -126,9 +186,10 @@ export function AdminMap({
   }, [])
 
   const start = useMemo(() => map && parseMapView(searchRef.current, map.size), [map])
+  const shown = showLand ? (landLayer?.region ?? null) : region
   const world = useMemo(
-    () => map && adminMapWorld({ map, view, places, region, overview }),
-    [map, view, places, region, overview],
+    () => map && adminMapWorld({ map, view, places, region: shown, overview }),
+    [map, view, places, shown, overview],
   )
 
   return (
@@ -142,6 +203,7 @@ export function AdminMap({
             start={start}
             onView={onView}
             focus={focus}
+            marks={showLand ? landLayer?.marks : undefined}
             selectedIds={inspecting?.kind === 'resident' ? [inspecting.id] : undefined}
             selectedCityId={inspecting?.kind === 'city' ? inspecting.id : undefined}
             onSelectTile={(x, y) => inspect(pickOnTile(view, x, y) ?? null)}
@@ -157,6 +219,14 @@ export function AdminMap({
             onClose={() => inspect(null)}
             onDirective={onDirective}
           />
+        )}
+        {world && (
+          <div className="admin-map-layers">
+            <button type="button" aria-pressed={showLand} onClick={() => setShowLand((s) => !s)}>
+              {showLand ? 'Show territory' : 'Show land'}
+            </button>
+            {showLand && land && <AdminLandLegend land={land} />}
+          </div>
         )}
         {world && error && <p className="admin-map-note error">{error}</p>}
       </div>

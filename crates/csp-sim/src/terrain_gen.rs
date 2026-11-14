@@ -19,17 +19,18 @@
 use std::time::{Duration, Instant};
 
 use csp_shared::balance::{
-    ISLAND_COUNT, ISLAND_OFFSHORE_SHARE, ISLAND_RADIUS, JOIN_SEA_SHARE, MAINLAND_SHARE,
-    MAINLAND_STRETCH, MAP_SIZE, NARROWEST_STRAIT, TERRAIN_SHARES,
+    HEARTLAND_TERRAIN, ISLAND_COUNT, ISLAND_OFFSHORE_SHARE, ISLAND_RADIUS, ISLAND_RELIEF,
+    JOIN_SEA_SHARE, MAINLAND_SHARE, MAINLAND_STRETCH, MAP_SIZE, NARROWEST_STRAIT, TERRAIN_SHARES,
 };
 use csp_shared::terrain::{is_passable_terrain, is_water, Terrain, TerrainMap};
 
 use crate::land::{fits_a_haven, near_the_mainland, Land};
 use crate::random::hash;
+use crate::regions::{join_for_carriages, raise_borders, Layout, RegionKind, NONE};
 
 /// Told how long each stage of generation took (`StageTimer` of `terrain-gen.ts`): the stage's
 /// name and its time. `generate_terrain` names `mainland`, `lakes`, `islands`, `relief`, `forest`,
-/// `joining`;
+/// `joining`, `regions`;
 /// world generation times `nodes` with [`timed`].
 pub type StageTimer<'a> = dyn FnMut(&'static str, Duration) + 'a;
 
@@ -123,7 +124,7 @@ fn value_noise(x: f64, y: f64, size: f64, cells: f64, seed: f64) -> f64 {
 
 /// Layered seamless noise in [0, 1) (`fbm`): coarse shapes with finer detail on top. Features are
 /// about `spacing` tiles apart (rounded so a whole number of them fits around the map).
-fn fbm(x: f64, y: f64, size: f64, spacing: f64, octaves: u32, seed: f64) -> f64 {
+pub(crate) fn fbm(x: f64, y: f64, size: f64, spacing: f64, octaves: u32, seed: f64) -> f64 {
     let mut cells = js_round(size / spacing).max(1.0);
     let mut sum = 0.0;
     let mut amp = 1.0;
@@ -285,16 +286,60 @@ pub fn join_sea(size: i32) -> i32 {
     ((JOIN_SEA_SHARE * f64::from(size)).ceil() as i32).max(2)
 }
 
+/// The mainland's shape before its coast is made ragged: a disc in the middle of the map,
+/// stretched by `stretch` along the direction (`cos`, `sin`), `reach` tiles in radius before the
+/// stretch. The same for the same seed and size, so regions (`regions`) are laid out on it.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct MainlandShape {
+    pub stretch: f64,
+    pub sin: f64,
+    pub cos: f64,
+    /// The map's middle, along each direction.
+    pub mid: f64,
+    pub reach: f64,
+}
+
+impl MainlandShape {
+    pub(crate) fn of(seed: f64, size: i32) -> MainlandShape {
+        let stretch = 1.0 + hash(0.0, 11.0, seed) * (MAINLAND_STRETCH - 1.0);
+        let (sin, cos) = (hash(1.0, 11.0, seed) * std::f64::consts::PI).sin_cos();
+        let sz = f64::from(size);
+        let mid = (sz - 1.0) / 2.0;
+        let reach = (MAINLAND_SHARE * sz * sz / std::f64::consts::PI).sqrt();
+        MainlandShape { stretch, sin, cos, mid, reach }
+    }
+
+    /// Tile (x, y) in the shape's own units: (along, across) over `reach`, so the unstretched disc
+    /// has radius 1.
+    pub(crate) fn unit(&self, x: f64, y: f64) -> (f64, f64) {
+        let (dx, dy) = (x - self.mid, y - self.mid);
+        let along = (dx * self.cos + dy * self.sin) / self.stretch;
+        let across = (dy * self.cos - dx * self.sin) * self.stretch;
+        (along / self.reach, across / self.reach)
+    }
+
+    /// The tile at (u, v) of the shape's own units ([`MainlandShape::unit`] back).
+    pub(crate) fn tile(&self, u: f64, v: f64) -> (f64, f64) {
+        let a = u * self.reach * self.stretch;
+        let b = v * self.reach / self.stretch;
+        (self.mid + a * self.cos - b * self.sin, self.mid + a * self.sin + b * self.cos)
+    }
+}
+
 /// Generates the map from a seed (`CONTEXT.md`: Map, Terrain, The land): a square whose opposite
 /// sides join, across Sea only. One mainland in the middle with a ragged coast, islands off it,
 /// small lakes inland on the mainland, mountains in ranges with hills around them, forests in
 /// patches and plains in between. Shares and counts come from the balance file. Mainland land cut
 /// off from the rest becomes water, so the mainland is joined; an island too close to it or too
-/// small for a haven becomes water too.
+/// small for a haven becomes water too. The mainland is cut into regions (`regions`, `CONTEXT.md`:
+/// Region): heartlands lie low and grow less forest; a Mountain range or an arm of the Sea runs
+/// along each border between two, with a few passes and land bridges through it, and the mainland
+/// stays joined for a carriage.
 pub fn generate_terrain_timed(seed: i64, size: i32, timer: &mut StageTimer<'_>) -> TerrainMap {
     let n = (size as usize) * (size as usize);
     let sz = f64::from(size);
     let nf = n as f64;
+    let layout = Layout::new(seed, size);
     let seed = seed as f64;
     let mut tiles = vec![Terrain::Plains as u8; n];
     // Buffers shared by the stages: two fields, the values a cut is taken from, the noise lattice.
@@ -309,10 +354,7 @@ pub fn generate_terrain_timed(seed: i64, size: i32, timer: &mut StageTimer<'_>) 
     // scoring `MAINLAND_SHARE` of the map is land, the rest Sea. Near the joins the score falls
     // away, and along them it is Sea whatever the noise says.
     let mainland = timed(timer, "mainland", || {
-        let stretch = 1.0 + hash(0.0, 11.0, seed) * (MAINLAND_STRETCH - 1.0);
-        let (sin, cos) = (hash(1.0, 11.0, seed) * std::f64::consts::PI).sin_cos();
-        let mid = (sz - 1.0) / 2.0;
-        let reach = (MAINLAND_SHARE * nf / std::f64::consts::PI).sqrt();
+        let MainlandShape { stretch, sin, cos, mid, reach } = MainlandShape::of(seed, size);
         let falloff = f64::from(edge) * 4.0;
         let score = &mut field_a;
         fbm_field(score, &mut coarse, size, sz / 6.0, 6, seed + 5.0);
@@ -350,6 +392,17 @@ pub fn generate_terrain_timed(seed: i64, size: i32, timer: &mut StageTimer<'_>) 
         land
     });
 
+    // The mainland's regions (`regions`): each tile of it in the region of its site.
+    let mut cells: Vec<u8> = (0..n)
+        .map(|t| {
+            if tiles[t] == Terrain::Sea as u8 {
+                NONE
+            } else {
+                layout.cell((t as i32) % size, (t as i32) / size)
+            }
+        })
+        .collect();
+
     // Lakes: the lowest spots of a blobby field, only well away from the sea, so on the mainland.
     timed(timer, "lakes", || {
         let far = far_from_sea(&tiles, size);
@@ -375,10 +428,23 @@ pub fn generate_terrain_timed(seed: i64, size: i32, timer: &mut StageTimer<'_>) 
     timed(timer, "islands", || place_islands(&mut tiles, size, seed, edge));
 
     let is_land = |tile: u8| tile != Terrain::Sea as u8 && tile != Terrain::Lake as u8;
+    // Heartland land (0) has shares of its own (`HEARTLAND_TERRAIN`); the rest of the land (1)
+    // makes up the shares of the whole (`TERRAIN_SHARES`).
+    let part =
+        |cell: u8| usize::from(!(cell != NONE && layout.kind(cell) == RegionKind::Heartland));
+    // How much of the rest's land a terrain covers, when heartlands cover `heart` of theirs.
+    let rest_share = |whole: f64, heart: f64, counts: [f64; 2]| {
+        if counts[1] == 0.0 {
+            0.0
+        } else {
+            ((whole * (counts[0] + counts[1]) - heart * counts[0]) / counts[1]).clamp(0.0, 1.0)
+        }
+    };
 
     // Mountains and hills: ridges of a noise field, strongest where a coarse mask lets ranges form.
-    // The highest ridge tiles are mountains, the band below them hills. The relief overwrites the
-    // ridge field; off land it is 0, as in a fresh typed array.
+    // The highest ridge tiles are mountains, the band below them hills; islands' land lies higher
+    // (`ISLAND_RELIEF`). The relief overwrites the ridge field; off land it is 0.
+    let mut rest: Vec<f32> = Vec::new();
     let (mountain_cut, hills_cut, land) = timed(timer, "relief", || {
         let relief = &mut field_a;
         let masks = &mut field_b;
@@ -392,12 +458,24 @@ pub fn generate_terrain_timed(seed: i64, size: i32, timer: &mut StageTimer<'_>) 
             }
             let ridge = 1.0 - (2.0 * f64::from(relief[t]) - 1.0).abs();
             let mask = f64::from(masks[t]);
-            relief[t] = (ridge * ridge * mask) as f32;
-            values.push(relief[t]);
+            let raise = if cells[t] == NONE { ISLAND_RELIEF } else { 1.0 };
+            relief[t] = (ridge * ridge * mask * raise) as f32;
+            if part(cells[t]) == 0 {
+                values.push(relief[t])
+            } else {
+                rest.push(relief[t])
+            }
         }
-        let land = values.len() as f64;
-        let mountain = quantile(&mut values, 1.0 - TERRAIN_SHARES.mountain);
-        let hills = quantile(&mut values, 1.0 - (TERRAIN_SHARES.mountain + TERRAIN_SHARES.hills));
+        let land = [values.len() as f64, rest.len() as f64];
+        let (s, h) = (TERRAIN_SHARES, HEARTLAND_TERRAIN);
+        let mountain_rest = rest_share(s.mountain, h.mountain, land);
+        let high_rest = rest_share(s.mountain + s.hills, h.mountain + h.hills, land);
+        let mountain =
+            [quantile(&mut values, 1.0 - h.mountain), quantile(&mut rest, 1.0 - mountain_rest)];
+        let hills = [
+            quantile(&mut values, 1.0 - (h.mountain + h.hills)),
+            quantile(&mut rest, 1.0 - high_rest),
+        ];
         (mountain, hills, land)
     });
 
@@ -407,33 +485,59 @@ pub fn generate_terrain_timed(seed: i64, size: i32, timer: &mut StageTimer<'_>) 
         let growth = &mut field_b;
         fbm_field(growth, &mut coarse, size, 280.0, 4, seed + 4.0);
         values.clear();
+        rest.clear();
         for t in 0..n {
-            if is_land(tiles[t]) && relief[t] < hills_cut {
-                values.push(growth[t]);
+            let p = part(cells[t]);
+            if is_land(tiles[t]) && relief[t] < hills_cut[p] {
+                if p == 0 {
+                    values.push(growth[t])
+                } else {
+                    rest.push(growth[t])
+                }
             }
         }
-        let flat = values.len() as f64;
-        let forest_cut = quantile(&mut values, 1.0 - (TERRAIN_SHARES.forest * land) / flat);
+        let flat = [values.len() as f64, rest.len() as f64];
+        let heart = HEARTLAND_TERRAIN.forest;
+        let rest_forest = rest_share(TERRAIN_SHARES.forest, heart, land) * land[1];
+        let forest_cut = [
+            quantile(&mut values, 1.0 - heart * land[0] / flat[0].max(1.0)),
+            quantile(&mut rest, 1.0 - rest_forest / flat[1].max(1.0)),
+        ];
         for t in 0..n {
             if !is_land(tiles[t]) {
                 continue;
             }
-            tiles[t] = if relief[t] >= mountain_cut {
+            let p = part(cells[t]);
+            tiles[t] = if relief[t] >= mountain_cut[p] {
                 Terrain::Mountain
-            } else if relief[t] >= hills_cut {
+            } else if relief[t] >= hills_cut[p] {
                 Terrain::Hills
-            } else if growth[t] >= forest_cut {
+            } else if growth[t] >= forest_cut[p] {
                 Terrain::Forest
             } else {
                 Terrain::Plains
             } as u8;
         }
     });
-    drop((field_a, field_b, values, coarse));
+    drop((field_a, field_b, values, rest, coarse));
 
     // The mainland joined and every island one to build on (`join_land`).
     let mut map = TerrainMap { size, tiles };
     timed(timer, "joining", || join_land(&mut map));
+
+    // The borders between the mainland's regions raised, a few ways left through them, and the
+    // mainland kept joined for a carriage (`regions`).
+    timed(timer, "regions", || {
+        let land = Land::of(&map);
+        for (t, cell) in cells.iter_mut().enumerate() {
+            if !land.is_mainland(t) {
+                *cell = NONE;
+            }
+        }
+        raise_borders(&mut map, &layout, &cells);
+        join_land(&mut map);
+        join_for_carriages(&mut map, &cells);
+    });
     map
 }
 
@@ -733,7 +837,10 @@ mod tests {
     fn reports_every_stage_to_the_timer() {
         let mut stages = Vec::new();
         generate_terrain_timed(1, 64, &mut |stage, _| stages.push(stage));
-        assert_eq!(stages, ["mainland", "lakes", "islands", "relief", "forest", "joining"]);
+        assert_eq!(
+            stages,
+            ["mainland", "lakes", "islands", "relief", "forest", "joining", "regions"]
+        );
     }
 
     #[test]
@@ -847,17 +954,41 @@ mod tests {
         let islands = assert_the_land(&map);
         assert!(islands >= ISLAND_COUNT as usize / 2, "{islands} islands");
 
-        // The terrain shares of the land from the balance file.
+        // The terrain shares of the land from the balance file, before the borders between regions
+        // are raised: the ranges along them add Mountain, the passes Hills.
         let land = map.tiles.iter().filter(|&&t| !is_water(t)).count() as f64;
         let share = |t: Terrain| map.tiles.iter().filter(|&&x| x == t as u8).count() as f64 / land;
         let s = TERRAIN_SHARES;
-        for (t, wanted) in [
-            (Terrain::Mountain, s.mountain),
-            (Terrain::Hills, s.hills),
-            (Terrain::Forest, s.forest),
+        for (t, wanted, borders) in [
+            (Terrain::Mountain, s.mountain, 0.05),
+            (Terrain::Hills, s.hills, 0.02),
+            (Terrain::Forest, s.forest, 0.0),
         ] {
-            assert!((share(t) - wanted).abs() < 0.01, "{t:?}: {} of {wanted}", share(t));
+            let got = share(t);
+            assert!(
+                got > wanted - 0.03 && got < wanted + borders + 0.01,
+                "{t:?}: {got} of {wanted}"
+            );
         }
+        let regions = crate::regions::Regions::of(1, &map);
+        assert_eq!(crate::regions::check_regions(&map, &regions), []);
+        // No two heartlands touch, and both kinds of way are there.
+        use crate::regions::{RegionKind, WayKind};
+        let heart = |t: usize| {
+            regions
+                .id_of_tile(t)
+                .filter(|&id| regions.regions[id as usize].kind == RegionKind::Heartland)
+        };
+        for t in 0..map.tiles.len() {
+            if let Some(a) = heart(t) {
+                for nb in neighbours(map.size, t) {
+                    assert!(heart(nb).is_none_or(|b| b == a), "heartlands touch at {t}");
+                }
+            }
+        }
+        let count = |k: WayKind| regions.ways.iter().filter(|w| w.kind == k).count();
+        eprintln!("{} passes, {} land bridges", count(WayKind::Pass), count(WayKind::LandBridge));
+        assert!(count(WayKind::Pass) > 0 && count(WayKind::LandBridge) > 0);
         assert!(group_sizes(&map, Terrain::Lake).len() > 3);
 
         // Mountains form ranges.

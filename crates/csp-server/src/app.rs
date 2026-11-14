@@ -28,9 +28,9 @@ use csp_shared::chunks::{
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::WorldState;
 use csp_sim::admin_map::{
-    admin_inspection, admin_places, admin_territory, admin_world_view, parse_admin_view,
-    AdminLookups, ADMIN_INSPECT_KINDS, ADMIN_INSPECT_PATH, ADMIN_PLACES_PATH, ADMIN_TERRITORY_PATH,
-    ADMIN_WORLD_PATH,
+    admin_inspection, admin_land, admin_places, admin_territory, admin_world_view,
+    parse_admin_view, AdminLookups, ADMIN_INSPECT_KINDS, ADMIN_INSPECT_PATH, ADMIN_LAND_PATH,
+    ADMIN_PLACES_PATH, ADMIN_TERRITORY_PATH, ADMIN_WORLD_PATH,
 };
 use csp_sim::directives::{
     admin_directives, directive_target_choices, give_directive, lift_directive, set_directive_price,
@@ -1072,6 +1072,23 @@ async fn admin_territory_route(
         .ok_or_else(|| fail(ApiErrorCode::NotFound, "Territory is not worked out yet."))
 }
 
+/// The land for the admin map (`AdminLand`): its regions, passes and land bridges. Worked out
+/// from the terrain the first time, off the game thread.
+async fn admin_land_route(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+) -> ApiResult<Response> {
+    user.admin()?;
+    let game = game_of(&state)?;
+    let seed = with_game(game.as_ref(), |g| g.world.seed).await.ok_or_else(game_gone)?;
+    let map = game.map();
+    let land = off_the_runtime(move || {
+        serde_json::to_value(admin_land(map.regions(seed))).unwrap_or_default()
+    })
+    .await?;
+    Ok(Json(land).into_response())
+}
+
 /// The directives in force and whom an admin can name (`AdminDirectives`).
 async fn admin_directives_list(
     State(state): State<Shared>,
@@ -1251,6 +1268,7 @@ pub fn build_app(opts: AppOptions) -> Router {
             .route(ADMIN_PLACES_PATH, get(admin_places_route))
             .route(&format!("{ADMIN_INSPECT_PATH}/{{kind}}/{{id}}"), get(admin_inspect))
             .route(ADMIN_TERRITORY_PATH, get(admin_territory_route))
+            .route(ADMIN_LAND_PATH, get(admin_land_route))
             // Admin directives (`CONTEXT.md`: Admin directive), given and lifted between ticks.
             .route("/api/admin/directives", get(admin_directives_list).post(admin_directives_give))
             .route(

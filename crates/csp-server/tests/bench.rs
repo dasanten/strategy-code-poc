@@ -24,7 +24,7 @@ fn bench_world_times_every_stage_and_prints_both_tables() {
     }
     assert_eq!(
         stages(&made.terrain_stages),
-        ["mainland", "lakes", "islands", "relief", "forest", "joining"]
+        ["mainland", "lakes", "islands", "relief", "forest", "joining", "regions"]
     );
     assert_eq!(
         stages(&made.world_stages),
