@@ -22,6 +22,7 @@ describe('buildingInfoLines', () => {
     expect(buildingInfoLines('smelter', labels)).toEqual([
       BUILDING_PURPOSE.smelter,
       '2 iron ore → 1 iron',
+      '1 iron, 1 coal → 1 steel',
       'Teaches Smelting',
       `Up to ${WORKPLACE_MAX_WORKERS.smelter} workers`,
       `Footprint ${FOOTPRINT.smelter} × ${FOOTPRINT.smelter} tiles`,

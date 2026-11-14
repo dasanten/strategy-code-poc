@@ -116,6 +116,7 @@ export const KEY_GOODS = [
   'wood',
   'stone',
   'coal',
+  'steel',
   'coins',
 ] as const satisfies readonly Good[]
 export type KeyGood = (typeof KEY_GOODS)[number]
@@ -173,7 +174,7 @@ export function keyGoods(
   realmId: string,
   pick: GoodsPick,
 ): GoodsHeld {
-  const totals = { food: 0, wood: 0, stone: 0, coal: 0, coins: 0 }
+  const totals = { food: 0, wood: 0, stone: 0, coal: 0, steel: 0, coins: 0 }
   const counts = (b: Building) =>
     !b.site &&
     (b.kind === 'storage' || b.kind === 'warehouse') &&

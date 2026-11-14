@@ -73,22 +73,20 @@ pub fn first_difference(want: &Value, got: &Value, at: &str) -> Option<String> {
     }
 }
 
-/// `v` with Coal left out (`CONTEXT.md`: Coal, T101.3): the frozen TypeScript knew no Coal, so a
-/// comparison with its fixtures leaves out every `coal` key and every list entry of Coal (the good
-/// itself, `{ good: "coal", … }` or `["coal", …]`). Rust tests of Coal check it instead.
+/// `v` with Coal and Steel left out (`CONTEXT.md`: Coal, T101.3, T101.4): the frozen TypeScript
+/// knew neither, so a comparison with its fixtures leaves out every `coal` and `steel` key and every
+/// list entry of them (the good itself, `{ good: "coal", … }` or `["coal", …]`). Rust tests of
+/// Coal and Steel check them instead.
 pub fn without_coal(v: &Value) -> Value {
-    let is_coal = |e: &Value| {
-        e == "coal"
-            || e.get("good").is_some_and(|g| g == "coal")
-            || e.get(0).is_some_and(|g| g == "coal")
-    };
+    let new = |g: &Value| g == "coal" || g == "steel";
+    let is_coal = |e: &Value| new(e) || e.get("good").is_some_and(new) || e.get(0).is_some_and(new);
     match v {
         Value::Array(a) => {
             Value::Array(a.iter().filter(|e| !is_coal(e)).map(without_coal).collect())
         }
         Value::Object(o) => Value::Object(
             o.iter()
-                .filter(|(k, _)| *k != "coal")
+                .filter(|(k, _)| *k != "coal" && *k != "steel")
                 .map(|(k, v)| (k.clone(), without_coal(v)))
                 .collect(),
         ),

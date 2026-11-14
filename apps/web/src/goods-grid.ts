@@ -17,6 +17,7 @@ export const GOOD_LABELS: Record<Good, string> = {
   shield: 'Shield',
   armour: 'Armour',
   coal: 'Coal',
+  steel: 'Steel',
 }
 
 /**
@@ -36,6 +37,7 @@ export const GOOD_ART: Record<Good, string> = {
   shield: 'shield.svg',
   armour: 'armour.svg',
   coal: 'coal.svg',
+  steel: 'steel.svg',
 }
 
 /** The SVG source of every file in `assets/goods/`, by file name. */

@@ -368,3 +368,57 @@ fn flags_two_residents_of_a_workplace_away_fetching_its_inputs_at_once() {
     assert_eq!(found[0].invariant, "one-input-fetcher-at-a-time");
     assert_eq!(found[0].entity_ids, ["place", "w1", "w2"]);
 }
+
+// Steel (`CONTEXT.md`: Coal, T101.4)
+
+#[test]
+fn fetches_iron_and_coal_for_a_smelter_set_to_steel() {
+    let (mut world, terrain) = smelter_world("smelter");
+    storage(&mut world, "s1", 10.0, 6.0, json!({ "iron": 200, "coal": 200, "ironOre": 200 }));
+    add_worker(&mut world, "w1", json!({}), Some("steel"));
+    let fetcher = one_fetcher(&mut world, &terrain);
+    let load = load_of(&world, &fetcher, BuildingKind::Smelter, Some("steel"));
+    assert_eq!(held(&load, Good::Coal), held(&load, Good::Iron));
+    assert!(held(&load, Good::Iron) > 1.0);
+    assert_eq!(held(&load, Good::IronOre), 0.0);
+    assert_matches(
+        &order_json(&fetcher),
+        json!({ "kind": "fetch", "goods": load, "from": { "kind": "storage", "storageId": "s1" } }),
+    );
+}
+
+#[test]
+fn a_smelter_set_to_steel_with_no_coal_anywhere_stands_idle_and_says_so() {
+    let (mut world, terrain) = smelter_world("smelter");
+    storage(&mut world, "s1", 10.0, 6.0, json!({ "food": 50 }));
+    world.piles.push(
+        serde_json::from_value(json!({ "id": "p", "x": 6, "y": 6, "goods": { "iron": 5 } }))
+            .unwrap(),
+    );
+    add_worker(&mut world, "w1", json!({}), Some("steel"));
+    let mut runner = runner(&terrain);
+    let mut scratch = Scratch::default();
+    for _ in 0..5 {
+        assert_eq!(runner.run_all(&mut world, &mut scratch, true), vec![]);
+        step_world(&mut world, &terrain, &mut scratch, None, None);
+    }
+    assert!(fetchers(&world).is_empty());
+    let doing =
+        |w: &WorldState| w.residents[0].script.as_ref().unwrap().memory.get("doing").cloned();
+    assert_eq!(doing(&world), Some(json!("Idle: no coal")));
+    // Coal in a storage: a worker goes for it, and the Doing line is the usual one again.
+    let s = world.buildings.iter_mut().find(|b| b.id == "s1").unwrap();
+    s.stock.as_mut().unwrap().insert(Good::Coal, 50.0);
+    one_fetcher(&mut world, &terrain);
+    assert_eq!(doing(&world), None);
+}
+
+#[test]
+fn a_smelter_with_no_ore_anywhere_says_so() {
+    let (mut world, terrain) = smelter_world("smelter");
+    storage(&mut world, "s1", 10.0, 6.0, json!({ "food": 50 }));
+    add_worker(&mut world, "w1", json!({}), None);
+    assert_eq!(runner(&terrain).run_all(&mut world, &mut Scratch::default(), true), vec![]);
+    let memory = &world.residents[0].script.as_ref().unwrap().memory;
+    assert_eq!(memory.get("doing"), Some(&json!("Idle: no iron ore")));
+}
