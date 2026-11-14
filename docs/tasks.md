@@ -98,6 +98,15 @@ level for the minimap and the far zoom, compressed and kept in the browser, with
 Region map sending only what changed) runs alongside the open epics, ahead of Bandits. It changes
 no rule.
 
+**Agreed with Daniel on 2026-11-14,** from his finding that the game loop ends fast and then gets
+boring: Scarce land, as one reset of the world (ADR 0035). A new world (Epic 100: a mainland of
+heartlands and frontier regions joined by passes and land bridges, islands by vessel only, Players
+starting as neighbours, and the reset), then Rich and poor land (101: richness, Coal and Steel, no
+gold in a heartland), then Veins run dry (102), each waiting for the one before to reach `dev`.
+An heir (Epic 103: a named heir keeps one city at Leader death) runs alongside Epic 100. The three
+of 100 to 102 are released together, and Daniel runs the reset at that release. Whether NPC cities
+fight for nodes they lack stays an open question of Epic 98.
+
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
 
@@ -198,6 +207,10 @@ I sleep.
 | 98  | [NPC cities with intent](https://github.com/dasanten/strategy-code-poc/issues/1190)             | scope only              |
 
 | 99  | [Faster map loading](https://github.com/dasanten/strategy-code-poc/issues/1198)                 | ticketed                |
+| 100 | [A new world](https://github.com/dasanten/strategy-code-poc/issues/1253)                        | ticketed                |
+| 101 | [Rich and poor land](https://github.com/dasanten/strategy-code-poc/issues/1262)                 | ticketed                |
+| 102 | [Veins run dry](https://github.com/dasanten/strategy-code-poc/issues/1269)                      | ticketed                |
+| 103 | [An heir](https://github.com/dasanten/strategy-code-poc/issues/1274)                            | ticketed                |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.

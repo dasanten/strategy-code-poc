@@ -50,8 +50,22 @@ The shared language of the game. Domain terms only — no implementation details
   straight tiles beside it could be stepped onto as well, so no wall, gate in the way, Lake, Sea
   or (for a carriage) Mountain without a road may stand on either. Two wall tiles touching at a corner close
   the way like a straight stretch.
-- No rivers, so all land is joined: any tile can be reached on foot from any other, if only the
-  long way round. Boats and ships (Water) cross Lake and Sea; nobody walks on them.
+- No rivers. Boats and ships (Water) cross Lake and Sea; nobody walks on them.
+- **The land** (settled with Daniel on 2026-11-14, Epics 100 to 102, ADR 0035): one **mainland**
+  and, off its coasts, **islands**, with Sea all around. The mainland is joined: any mainland tile
+  can be reached on foot, and by carriage, from any other. An island is reached only by vessel.
+- **Region:** a part of the land of one kind, known for every land tile: a **heartland**, a
+  **frontier** region or an island. Regions of the mainland are parted by Mountain ranges and by
+  arms of the Sea, and joined only by a few **passes** (a gap in a range that a carriage can
+  cross) and **land bridges** (a narrow neck of land between two arms of the Sea). Whoever holds
+  a pass or a land bridge holds the way between two regions. Not the Region map, which shows
+  territory.
+- **Heartland:** a mainland region of good farmland and poor resource nodes, where Players start
+  (Starting city). It has a trading post near its middle. No rule protects it: it is safe only in
+  that it holds little worth taking, and the admin directive covers whoever farms new Players.
+- **Frontier:** a mainland region beyond the passes and land bridges, with normal resource nodes,
+  a few rich ones, and the rare goods (Coal, Gold ore). Nobody starts there.
+- **Island:** land off the mainland, reached only by vessel, holding the richest nodes.
 
 ## Resources and goods
 
@@ -59,10 +73,26 @@ The shared language of the game. Domain terms only — no implementation details
   weight. PoC goods: Food, Wood, Stone, Iron ore, Iron, Gold ore, Coins. Goods are always
   somewhere: in a storage, carried by a resident or carriage, or in a pile.
 - **Pile:** goods lying on the ground on one tile, for anyone to take.
-- **Resource node:** a spot on the map that never runs out (forest, stone, iron ore, gold ore).
-  Produces nothing on its own; it needs a workplace built on it and residents working there.
-  Nodes lie on terrain that fits them: forest nodes in Forest, stone in Hills, ore in Hills and
-  (more of it) Mountain.
+- **Resource node:** a spot on the map that yields a good (forest, stone, iron ore, gold ore,
+  coal). Produces nothing on its own; it needs a workplace built on it and residents working
+  there. Nodes lie on terrain that fits them: forest nodes in Forest, stone in Hills, ore and coal
+  in Hills and (more of it) Mountain.
+- **Richness** (Epic 101): every resource node is **poor**, **normal** or **rich**, fixed when it
+  comes into being. The workplace on it makes less or more per worker by its richness. Heartland
+  nodes are poor; frontier nodes are normal, with a few rich ones at spots worth fighting over;
+  island nodes are rich. A Player sees a node's richness on its tile card once the tile is
+  explored, and scripts see it. Farms are on no node and yield the same everywhere.
+- **Rare goods** (Epic 101): Gold ore and Coal have no nodes in a heartland, only in the frontier
+  and on islands. A heartland realm gets Coins and Steel by trade, or by holding a node out there.
+- **Coal:** a good mined at a mine on a coal node. A smelter turns Iron and Coal into **Steel**,
+  and a smithy makes a steel Sword, Shield and Armour from Steel, each better than the iron one.
+- **Running dry** (Epic 102): a normal or rich ore node (iron ore, gold ore, coal) holds a
+  **stock**, and working it uses the stock up. Poor nodes, forest and stone never run dry. A node
+  whose stock is gone is gone for good: the mine on it stays as a building and makes nothing. A
+  new node of the same kind and richness then comes into being somewhere else in a region that
+  fits, out of every Player's sight; nobody is told, so it has to be found. Whoever works a mine
+  (their realm and its allies) sees how its vein stands in words (plenty, thinning, nearly gone),
+  never as a number; others see nothing of it.
 - **Workplace:** a building where residents produce goods. Output depends on the workers'
   Strength and skill and is limited by the workplace's maximum number of workers. Working there
   teaches its skill. Its output is left in the pile on the workplace's tile, not in the
@@ -1319,7 +1349,13 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
 
 ## Starting city
 
-- **Starting city:** what a Leader spawns with, far from other Players: about 8 residents with
+- **Starting site:** a place in a heartland where a starting city can stand. Each heartland has a
+  set number of them (a balance number), a walk of 20 to 40 real minutes from the next, each with
+  farmland and a poor forest, stone and iron node in reach. A new Leader (a Player's first, or one
+  after a Leader death with no heir) gets a free site in the **open** heartland with the most
+  Players' cities; a heartland opens only once every open one is full. So Players start as
+  neighbours.
+- **Starting city:** what a Leader spawns with, on a starting site: about 8 residents with
   random stats (one of them the Leader), a town hall, a ring of wooden wall with a gate, houses for everyone with a little room
   to spare, a storage with a small food stock, one farm outside the wall, a stable next to it
   with two horses and a little Food, and one carriage standing at the stable with one of the
