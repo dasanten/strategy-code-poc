@@ -370,7 +370,7 @@ fn leaves_a_lane_through_a_gate_wherever_it_stands() {
 
 /// The world as `migrateWorld` 102 → 103 leaves it for an NPC city without a layout: the layout
 /// its seed picks, and nothing else changed. That step stays in the TypeScript, which migrates
-/// saves older than the freeze (`FREEZE_FORMAT_VERSION`, ADR 0030), so here it is applied by hand.
+/// saves older than the freeze (format 111, ADR 0030), so here it is applied by hand.
 fn given_its_layout(world: &mut WorldState, city: &str) {
     let seed = world.seed;
     city_mut(world, city).layout = Some(pick_layout(seed, city));

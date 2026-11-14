@@ -4,7 +4,7 @@
 //!
 //! lost-post.test.ts: saves from before / stay as they are: posts lost before were never heard of.
 //! That is the TypeScript's migration step 83, long before the freeze: the Rust server reads saves
-//! from `FREEZE_FORMAT_VERSION` (111) on (`csp-server`'s `world_format.rs`, ADR 0030), so the step
+//! from the freeze (format 111) on (`csp-server`'s `world_format.rs`, ADR 0030), so the step
 //! and its test stay in TypeScript.
 
 use std::sync::Arc;
