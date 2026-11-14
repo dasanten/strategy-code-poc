@@ -57,8 +57,13 @@ pub fn in_region(r: &Region, (x, y): (f64, f64)) -> bool {
 }
 
 /// The resource kinds in the order they win a tie for a region's most common (`KINDS`).
-const KINDS: [ResourceKind; 4] =
-    [ResourceKind::Forest, ResourceKind::Stone, ResourceKind::IronOre, ResourceKind::GoldOre];
+const KINDS: [ResourceKind; 5] = [
+    ResourceKind::Forest,
+    ResourceKind::Stone,
+    ResourceKind::IronOre,
+    ResourceKind::GoldOre,
+    ResourceKind::Coal,
+];
 
 /// The kind of resource node a region has most of, or none when it has no nodes
 /// (`commonResource`).

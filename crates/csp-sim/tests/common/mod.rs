@@ -73,6 +73,29 @@ pub fn first_difference(want: &Value, got: &Value, at: &str) -> Option<String> {
     }
 }
 
+/// `v` with Coal left out (`CONTEXT.md`: Coal, T101.3): the frozen TypeScript knew no Coal, so a
+/// comparison with its fixtures leaves out every `coal` key and every list entry of Coal (the good
+/// itself, `{ good: "coal", … }` or `["coal", …]`). Rust tests of Coal check it instead.
+pub fn without_coal(v: &Value) -> Value {
+    let is_coal = |e: &Value| {
+        e == "coal"
+            || e.get("good").is_some_and(|g| g == "coal")
+            || e.get(0).is_some_and(|g| g == "coal")
+    };
+    match v {
+        Value::Array(a) => {
+            Value::Array(a.iter().filter(|e| !is_coal(e)).map(without_coal).collect())
+        }
+        Value::Object(o) => Value::Object(
+            o.iter()
+                .filter(|(k, _)| *k != "coal")
+                .map(|(k, v)| (k.clone(), without_coal(v)))
+                .collect(),
+        ),
+        other => other.clone(),
+    }
+}
+
 /// Asserts `got` serialises to the JSON the TypeScript wrote, as parsed JSON.
 pub fn assert_same_json(what: &str, want: &Value, got: &Value) {
     let (want, got) = (normalised(want), normalised(got));

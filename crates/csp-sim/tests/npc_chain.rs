@@ -47,7 +47,7 @@ fn every_city_of_the_fixtures_is_short_of_what_it_is_short_of_in_typescript() {
                 "tradeOrgReserve": trade_org_reserve(&world, city),
                 "warehouseStock": warehouse_stock(&world, city),
             });
-            assert_same_json(&format!("{name} {id}"), want, &got);
+            assert_same_json(&format!("{name} {id}"), want, &common::without_coal(&got));
         }
     }
 }

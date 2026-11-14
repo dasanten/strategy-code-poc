@@ -3,4 +3,4 @@
 /**
  * `PricedGood`: every good but Coins (`Exclude<Good, 'coins'>`), the goods with a price.
  */
-export type PricedGood = "food" | "wood" | "stone" | "ironOre" | "iron" | "goldOre" | "spear" | "sword" | "shield" | "armour";
+export type PricedGood = "food" | "wood" | "stone" | "ironOre" | "iron" | "goldOre" | "spear" | "sword" | "shield" | "armour" | "coal";

@@ -24,6 +24,7 @@ export const NODE_GLYPH_COLORS: Record<ResourceKind, number> = {
   stone: 0xc9ccd1,
   ironOre: 0xff9a6a,
   goldOre: 0xffd34d,
+  coal: 0xa9b0bb,
 }
 
 /**

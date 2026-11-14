@@ -162,7 +162,9 @@ pub(crate) fn node_terrains(kind: ResourceKind) -> &'static [Terrain] {
     match kind {
         ResourceKind::Forest => &[Terrain::Forest],
         ResourceKind::Stone => &[Terrain::Hills],
-        ResourceKind::IronOre | ResourceKind::GoldOre => &[Terrain::Hills, Terrain::Mountain],
+        ResourceKind::IronOre | ResourceKind::GoldOre | ResourceKind::Coal => {
+            &[Terrain::Hills, Terrain::Mountain]
+        }
     }
 }
 

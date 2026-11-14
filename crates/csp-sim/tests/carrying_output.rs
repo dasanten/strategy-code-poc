@@ -340,6 +340,33 @@ fn carries_only_the_output_from_a_smelter() {
     );
 }
 
+/// A mine on a coal node (`CONTEXT.md`: Coal): its crew carries the Coal to the storage like any
+/// other output.
+#[test]
+fn carries_the_coal_from_a_mine_on_a_coal_node_to_the_storage() {
+    let (mut world, terrain, _) = farm_world();
+    world.residents.clear();
+    world.nodes.push(ResourceNode { id: "n".into(), kind: ResourceKind::Coal, x: 3.0, y: 12.0 });
+    let mut mine = building("mine", BuildingKind::Mine, 3.0, 12.0);
+    mine.city_id = Some("c1".into());
+    world.buildings.push(mine.clone());
+    add_worker(&mut world, "w1", &mine);
+    storage(&mut world, "s1", 8.0, 12.0, Stock::new());
+    world.piles.push(Pile { id: "p".into(), x: 3.0, y: 12.0, goods: stock(&[(Good::Coal, 40.0)]) });
+    let mut runner = runner(&terrain, None);
+    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut scratch = Scratch::default();
+    for _ in 0..300 {
+        world.residents[0].hunger = MAX_HUNGER;
+        runner.run_all(&mut world, &mut scratch, false);
+        step_world(&mut world, &terrain, &mut scratch, Some(&mut walking), None);
+        if held(&world, "s1", Good::Coal) > 0.0 {
+            break;
+        }
+    }
+    assert!(held(&world, "s1", Good::Coal) >= 20.0, "{}", held(&world, "s1", Good::Coal));
+}
+
 #[test]
 fn has_a_starting_citys_farmers_work_by_their_players_work_default() {
     let terrain = csp_sim::terrain_gen::generate_terrain(1, 1536);

@@ -277,8 +277,13 @@ pub fn nearest_free_node(
 }
 
 /// The resource kinds the HQ runs a workplace on (`HQ_NODES`).
-const HQ_NODES: [ResourceKind; 4] =
-    [ResourceKind::Forest, ResourceKind::Stone, ResourceKind::IronOre, ResourceKind::GoldOre];
+const HQ_NODES: [ResourceKind; 5] = [
+    ResourceKind::Forest,
+    ResourceKind::Stone,
+    ResourceKind::IronOre,
+    ResourceKind::GoldOre,
+    ResourceKind::Coal,
+];
 
 use crate::cities::{given_city_name, CITY_NAMES};
 use crate::starting_city::{resident_tiles, FARM_RING};

@@ -276,6 +276,7 @@ fn a_workplace_on_a_node_makes_its_good_onto_the_pile_on_its_tile_and_teaches_it
         (BuildingKind::Quarry, "quarry", ResourceKind::Stone, 5.0, Good::Stone, SkillName::Mining),
         (BuildingKind::Mine, "mine", ResourceKind::IronOre, 7.0, Good::IronOre, SkillName::Mining),
         (BuildingKind::Mine, "mine", ResourceKind::GoldOre, 7.0, Good::GoldOre, SkillName::Mining),
+        (BuildingKind::Mine, "mine", ResourceKind::Coal, 7.0, Good::Coal, SkillName::Mining),
     ];
     for (kind, name, node, x, good, skill) in cases {
         let (mut world, t, _) = on_node(kind, node, x, name);

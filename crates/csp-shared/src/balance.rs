@@ -186,11 +186,14 @@ pub struct NodeDensity {
     pub stone: TerrainTable,
     pub iron_ore: TerrainTable,
     pub gold_ore: TerrainTable,
+    /// Only outside a heartland (`CONTEXT.md`: Rare goods): `place_resource_nodes_by_region`
+    /// places none there.
+    pub coal: TerrainTable,
 }
 
 /// Resource nodes per tile of each terrain they lie on, when the world is created: as many per
 /// area as on the old 40 m grid, so a sixteenth per tile. Ore is denser in Mountain than in Hills;
-/// gold is rare.
+/// gold is rare. Coal is about as common as iron ore, a little more of it in Hills.
 pub const NODE_DENSITY: NodeDensity = NodeDensity {
     forest: TerrainTable(&[(Terrain::Forest as u8, 1.0 / 4800.0)]),
     stone: TerrainTable(&[(Terrain::Hills as u8, 1.0 / 4000.0)]),
@@ -201,6 +204,10 @@ pub const NODE_DENSITY: NodeDensity = NodeDensity {
     gold_ore: TerrainTable(&[
         (Terrain::Hills as u8, 1.0 / 240000.0),
         (Terrain::Mountain as u8, 1.0 / 48000.0),
+    ]),
+    coal: TerrainTable(&[
+        (Terrain::Hills as u8, 1.0 / 16000.0),
+        (Terrain::Mountain as u8, 1.0 / 4800.0),
     ]),
 };
 
@@ -953,6 +960,7 @@ pub const TRADE_ORG_HQ: TradeOrgHq = TradeOrgHq {
         ("ironOre", 150.0),
         ("iron", 100.0),
         ("goldOre", 50.0),
+        ("coal", 100.0),
     ]),
 };
 
@@ -1004,6 +1012,7 @@ pub const TRADING_POST: TradingPost = TradingPost {
         ("ironOre", 20.0),
         ("iron", 10.0),
         ("goldOre", 10.0),
+        ("coal", 20.0),
         ("spear", 4.0),
         ("sword", 2.0),
         ("shield", 4.0),
@@ -1022,6 +1031,7 @@ pub const WAREHOUSE_FLOOR: Table<f64> = Table(&[
     ("ironOre", 10.0),
     ("iron", 5.0),
     ("goldOre", 5.0),
+    ("coal", 10.0),
     ("coins", 1_000.0),
     ("spear", 2.0),
     ("sword", 1.0),
@@ -1041,7 +1051,7 @@ pub const HQ_FOOD_FLOOR_FACTOR: f64 = 15.0;
 /// What a warehouse sells a unit of each good for, in coins, when it holds `PRICE_REFERENCE_FLOORS`
 /// times its floor (`CONTEXT.md`: Warehouse prices, Price anchor). Roughly what goes into it: an
 /// iron is two iron ore and the work, a sword two iron and a wood; gold ore stays below the 10
-/// coins the mint strikes from it.
+/// coins the mint strikes from it; coal, found only beyond the heartlands, a little above iron ore.
 pub const WAREHOUSE_BASE_PRICE: Table<f64> = Table(&[
     ("food", 2.0),
     ("wood", 2.0),
@@ -1049,6 +1059,7 @@ pub const WAREHOUSE_BASE_PRICE: Table<f64> = Table(&[
     ("ironOre", 4.0),
     ("iron", 10.0),
     ("goldOre", 8.0),
+    ("coal", 5.0),
     ("spear", 20.0),
     ("sword", 30.0),
     ("shield", 22.0),
@@ -1190,6 +1201,7 @@ pub const GOOD_WEIGHT: Table<f64> = Table(&[
     ("sword", 3.0),
     ("shield", 4.0),
     ("armour", 8.0),
+    ("coal", 1.0),
 ]);
 
 /// Attack each weapon adds to a resident's blow (`CONTEXT.md`: Weapons and armour, Combat). A
@@ -1915,9 +1927,15 @@ pub const BATCHES_PER_DAY: Table<f64> = Table(&[("smelter", 2.0), ("mint", 2.0),
 
 /// Units of each good one worker of average Strength and no skill makes per game day. Food is four
 /// times the `FOOD_PER_DAY` a resident eats, so about a quarter of a city farms; ore is slow, and
-/// gold ore slowest.
-pub const WORK_OUTPUT_PER_DAY: Table<f64> =
-    Table(&[("food", 2.0), ("wood", 4.0), ("stone", 3.0), ("ironOre", 2.0), ("goldOre", 1.0)]);
+/// gold ore slowest; coal as fast as iron ore.
+pub const WORK_OUTPUT_PER_DAY: Table<f64> = Table(&[
+    ("food", 2.0),
+    ("wood", 4.0),
+    ("stone", 3.0),
+    ("ironOre", 2.0),
+    ("goldOre", 1.0),
+    ("coal", 2.0),
+]);
 
 /// The Strength at which a worker makes `WORK_OUTPUT_PER_DAY`.
 pub const WORK_STRENGTH_AVERAGE: f64 = 10.0;

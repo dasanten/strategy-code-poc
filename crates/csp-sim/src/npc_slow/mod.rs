@@ -26,7 +26,7 @@ pub fn node_terrain(kind: ResourceKind) -> Terrain {
     match kind {
         ResourceKind::Forest => Terrain::Forest,
         ResourceKind::Stone | ResourceKind::IronOre => Terrain::Hills,
-        ResourceKind::GoldOre => Terrain::Mountain,
+        ResourceKind::GoldOre | ResourceKind::Coal => Terrain::Mountain,
     }
 }
 

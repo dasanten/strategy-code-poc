@@ -145,6 +145,27 @@ fn frontier_regions_and_islands_hold_denser_nodes_than_heartlands() {
     assert!(per(RegionKind::Island) > per(RegionKind::Heartland) * 1.2, "{count:?} {tiles:?}");
 }
 
+/// Coal (`CONTEXT.md`: Rare goods) lies in frontier regions and on islands, on Hills and
+/// Mountain, and in no heartland; a map without regions has none.
+#[test]
+fn coal_lies_only_in_frontier_regions_and_on_islands() {
+    let terrain = generate_terrain(1, 1536);
+    let regions = Regions::of(1, &terrain);
+    let nodes = place_resource_nodes_by_region(&terrain, 1, &regions);
+    let mut coal: BTreeMap<u8, usize> = BTreeMap::new();
+    for n in nodes.iter().filter(|n| n.kind == ResourceKind::Coal) {
+        let t = terrain_at(&terrain, n.x as i32, n.y as i32);
+        assert!(t == Terrain::Hills as u8 || t == Terrain::Mountain as u8, "{n:?} on {t}");
+        let r = regions.id_at(n.x as i32, n.y as i32).expect("coal in a region");
+        *coal.entry(regions.regions[r as usize].kind as u8).or_default() += 1;
+    }
+    assert_eq!(coal.get(&(RegionKind::Heartland as u8)), None, "{coal:?}");
+    assert!(coal.get(&(RegionKind::Frontier as u8)).copied().unwrap_or(0) > 5, "{coal:?}");
+    assert!(coal.get(&(RegionKind::Island as u8)).copied().unwrap_or(0) > 0, "{coal:?}");
+    let plain = crate::node_gen::place_resource_nodes(&terrain, 1);
+    assert!(plain.iter().all(|n| n.kind != ResourceKind::Coal));
+}
+
 /// The world generator places the sites before any city, all of them free, and the Trade Org HQ,
 /// trading posts and NPC cities it places after them leave each site its room.
 #[test]

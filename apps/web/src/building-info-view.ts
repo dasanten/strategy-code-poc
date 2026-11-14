@@ -63,7 +63,9 @@ export function buildingInfoLines(
   for (const r of info.recipes)
     lines.push(`${goodsText(r.input, labels.goods)} → ${goodsText(r.output, labels.goods)}`)
   if (info.yields.length > 0) {
-    const yields = info.yields.map(good).join(' or ')
+    const names = info.yields.map(good)
+    const yields =
+      names.length > 1 ? `${names.slice(0, -1).join(', ')} or ${names.at(-1)}` : (names[0] ?? '')
     lines.push(kind === 'farm' ? `Makes ${yields}` : `Makes ${yields}, from its node`)
   }
   if (info.skill) lines.push(`Teaches ${labels.skills[info.skill]}`)
