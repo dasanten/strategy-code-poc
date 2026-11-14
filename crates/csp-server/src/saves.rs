@@ -17,7 +17,9 @@ use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::Value;
 
-use crate::world_format::{migrate_world, MigrationContext, WorldFormatError, RESET_BEFORE};
+use crate::world_format::{
+    before_the_reset, migrate_world, MigrationContext, WorldFormatError, RESET_FORMAT_VERSION,
+};
 
 /// How many of the newest saves are always kept.
 pub const KEEP_LATEST: i64 = 20;
@@ -236,13 +238,10 @@ pub fn load_or_create_world(
     generate_world: impl FnOnce(&TerrainMap, i64) -> WorldState,
     new_seed: i64,
 ) -> Result<(WorldState, TerrainMap), SavesError> {
-    let mut save = latest_save(conn)?;
-    if save.as_ref().is_some_and(|(_, version)| *version < RESET_BEFORE) {
-        // The resets (ADR 0006): a world from before the finer grid is thrown away with its
-        // terrain and explored terrain. Accounts, sessions, invite codes and scripts stay, and
-        // every Player gets a new starting city on their next login.
-        reset_world(conn)?;
-        save = None;
+    let save = latest_save(conn)?;
+    if let Some((_, version)) = save.as_ref().filter(|(_, v)| *v < RESET_FORMAT_VERSION) {
+        // The world from before the new one (ADR 0035): refused before any terrain is touched.
+        return Err(WorldFormatError(before_the_reset(*version)).into());
     }
     // Every save format so far carries the seed at the top level.
     let seed = match &save {
@@ -273,13 +272,4 @@ pub fn prune_saves(conn: &Connection, now_s: i64) -> rusqlite::Result<usize> {
            )",
         params![KEEP_LATEST, now_s - KEEP_HOURLY_FOR_S],
     )
-}
-
-/// Deletes the world, its terrain and every Player's explored terrain; nothing else.
-pub fn reset_world(conn: &Connection) -> rusqlite::Result<()> {
-    let tx = conn.unchecked_transaction()?;
-    tx.execute("DELETE FROM world_saves", [])?;
-    tx.execute("DELETE FROM terrain", [])?;
-    tx.execute("DELETE FROM explored", [])?;
-    tx.commit()
 }

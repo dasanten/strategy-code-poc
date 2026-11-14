@@ -1,5 +1,5 @@
-//! World saves through the database: the cases of `saves.test.ts` that are not migration steps
-//! (those stay in TypeScript, before the freeze), and a round trip of the live save fixture.
+//! World saves through the database: the cases of `saves.test.ts` that are not migration steps,
+//! and the live save fixture: refused as a save from before the reset (ADR 0035), read as it is.
 use std::{cell::RefCell, path::PathBuf, sync::OnceLock};
 
 use csp_server::{
@@ -8,7 +8,7 @@ use csp_server::{
         gunzip, gzip, latest_save, load_or_create_world, load_terrain, prune_saves, save_world,
         SaveLog, SavesError, WorldSaver, KEEP_LATEST,
     },
-    world_format::{FREEZE_FORMAT_VERSION, RESET_BEFORE},
+    world_format::RESET_FORMAT_VERSION,
 };
 use csp_shared::{
     terrain::TerrainMap,
@@ -117,112 +117,39 @@ fn refuses_stored_terrain_from_another_seed_than_the_save() {
     assert!(err.to_string().contains("seed 1, the world is seed 2"));
 }
 
+/// ADR 0035: a save from before the reset, the live TypeScript one among them, is refused with
+/// what to do. Nothing is thrown away and no terrain generated.
 #[test]
-fn discards_a_world_from_before_the_resets_keeping_accounts() {
-    for version in [5, RESET_BEFORE - 1] {
+fn refuses_a_save_from_before_the_reset_saying_to_run_it() {
+    let (gz, live_version) = live_gz();
+    for (version, data) in [
+        (RESET_FORMAT_VERSION - 1, gzip(br#"{"tick":1,"seed":1}"#).unwrap()),
+        (*live_version, gz.clone()),
+    ] {
         let conn = db();
         conn.execute(
-            "INSERT INTO users (name, password_hash, is_admin) VALUES ('Daniel', '', 1)",
-            [],
+            "INSERT INTO world_saves (tick, version, data) VALUES (1, ?1, ?2)",
+            params![version, data],
         )
         .unwrap();
-        let user: i64 = conn.query_row("SELECT id FROM users", [], |r| r.get(0)).unwrap();
-        // An old world: an old save, its terrain and a Player's explored terrain.
-        let old = gzip(br#"{"tick":900,"seed":1}"#).unwrap();
-        conn.execute(
-            "INSERT INTO world_saves (tick, version, data) VALUES (900, ?1, ?2)",
-            params![version, old],
-        )
-        .unwrap();
-        conn.execute(
-            "INSERT INTO terrain (id, seed, diameter, data) VALUES (1, 1, 120, ?1)",
-            [vec![0u8; 120 * 120]],
-        )
-        .unwrap();
-        conn.execute(
-            "INSERT INTO explored (user_id, data, updated_at) VALUES (?1, ?2, 0)",
-            params![user, vec![0u8; 8]],
-        )
-        .unwrap();
-
-        let gen = Counting::new();
-        let (mut world, fresh) =
-            load_or_create_world(&conn, gen.terrain(), generate_world, 1).unwrap();
-        assert_eq!(gen.seeds(), vec![1]);
-        assert_eq!(world, generate_world(&fresh, 1));
-        assert_eq!(load_terrain(&conn).unwrap(), Some((1, fresh)));
-        assert_eq!(count(&conn, "SELECT count(*) FROM world_saves"), 0);
-        assert_eq!(count(&conn, "SELECT count(*) FROM explored"), 0);
-        assert_eq!(count(&conn, "SELECT count(*) FROM users"), 1);
-
-        // A save in the current format loads as it is; nothing is reset again.
-        world.tick = 77;
-        save_world(&conn, &world).unwrap();
-        let gen = Counting::new();
-        let (again, _) = load_or_create_world(&conn, gen.terrain(), generate_world, 1).unwrap();
-        assert_eq!(again.tick, 77);
-        assert!(gen.seeds().is_empty());
+        let err =
+            load_or_create_world(&conn, |_| panic!("generated"), |_, _| panic!("generated"), 1)
+                .unwrap_err();
+        assert!(err.to_string().contains("run `csp-admin reset-world`"), "{err}");
+        assert_eq!(ticks(&conn), vec![1]);
+        assert_eq!(load_terrain(&conn).unwrap(), None);
     }
 }
 
+/// The live world, read as it is, round trips through the database in the current format, with a
+/// boat and a ship aboard (T90.2, T91.1).
 #[test]
-fn refuses_a_save_from_before_the_freeze_saying_to_run_the_typescript_server() {
+fn a_world_with_vessels_is_saved_and_loads_back_the_same() {
     let conn = db();
-    conn.execute(
-        "INSERT INTO world_saves (tick, version, data) VALUES (1, ?1, ?2)",
-        params![FREEZE_FORMAT_VERSION - 1, gzip(br#"{"tick":1,"seed":1}"#).unwrap()],
-    )
-    .unwrap();
-    let err =
-        load_or_create_world(&conn, Counting::new().terrain(), generate_world, 1).unwrap_err();
-    assert!(err.to_string().contains("run the TypeScript server once"), "{err}");
-    // Nothing was thrown away.
-    assert_eq!(ticks(&conn), vec![1]);
-}
-
-/// The live save, from the TypeScript's last format, is from before the new world (ADR 0035): the
-/// server refuses it and keeps it. A world in today's format round trips: written by this server
-/// and read again, the same world.
-#[test]
-fn the_live_save_is_refused_and_a_world_round_trips_through_the_database() {
-    let (gz, version) = live_gz();
-    assert_eq!(*version, FREEZE_FORMAT_VERSION);
-    let conn = db();
-    let expected = live_world();
-    conn.execute(
-        "INSERT INTO world_saves (tick, version, data) VALUES (?1, ?2, ?3)",
-        params![expected.tick as i64, version, gz],
-    )
-    .unwrap();
+    let mut world = live_world();
     conn.execute(
         "INSERT INTO terrain (id, seed, diameter, data) VALUES (1, ?1, 16, ?2)",
-        params![expected.seed, small_terrain(expected.seed).tiles],
-    )
-    .unwrap();
-    let load =
-        || load_or_create_world(&conn, |_| panic!("generated"), |_, _| panic!("generated"), 1);
-    let err = load().unwrap_err();
-    assert!(err.to_string().contains("from before the new world"), "{err}");
-    assert_eq!(ticks(&conn), vec![expected.tick as i64]);
-
-    save_world(&conn, &expected).unwrap();
-    let (state, v) = latest_save(&conn).unwrap().unwrap();
-    assert_eq!(v, WORLD_FORMAT_VERSION);
-    assert_eq!(serde_json::from_value::<WorldState>(state).unwrap(), expected);
-    assert_eq!(load().unwrap().0, expected);
-}
-
-/// Format 113 (T90.2): a world with no vessels loads with none; a world with a boat is saved with
-/// it and loads back with it, and a server of format 112 would refuse that save.
-#[test]
-fn a_world_with_a_boat_is_saved_and_loads_with_it_and_one_from_before_has_none() {
-    let conn = db();
-    let expected = live_world();
-    assert!(expected.vessels.is_empty());
-    save_world(&conn, &expected).unwrap();
-    conn.execute(
-        "INSERT INTO terrain (id, seed, diameter, data) VALUES (1, ?1, 16, ?2)",
-        params![expected.seed, small_terrain(expected.seed).tiles],
+        params![world.seed, small_terrain(world.seed).tiles],
     )
     .unwrap();
     let load = || {
@@ -230,8 +157,8 @@ fn a_world_with_a_boat_is_saved_and_loads_with_it_and_one_from_before_has_none()
             .unwrap()
             .0
     };
-    let mut world = load();
-    assert!(world.vessels.is_empty());
+    save_world(&conn, &world).unwrap();
+    assert_eq!(load(), world);
 
     world.tick += 1;
     world.vessels.push(csp_shared::world::Vessel {
@@ -244,7 +171,6 @@ fn a_world_with_a_boat_is_saved_and_loads_with_it_and_one_from_before_has_none()
         rower_id: None,
         crew_ids: Vec::new(),
     });
-    // A ship is a vessel of another kind (T91.1): no new field, so no new format.
     world.vessels.push(csp_shared::world::Vessel {
         id: "ship2".into(),
         kind: csp_shared::world::VesselKind::Ship,
@@ -260,7 +186,7 @@ fn a_world_with_a_boat_is_saved_and_loads_with_it_and_one_from_before_has_none()
     assert_eq!(v, WORLD_FORMAT_VERSION);
     assert_eq!(state["vessels"][0]["kind"], "boat");
     assert_eq!(state["vessels"][1]["kind"], "ship");
-    assert_eq!(load().vessels, world.vessels);
+    assert_eq!(load(), world);
 }
 
 #[test]

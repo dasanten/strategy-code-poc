@@ -15,6 +15,8 @@ pub const KEEP_BACKUPS_DAYS: u64 = 14;
 pub enum Reason {
     Start,
     Daily,
+    /// Before `csp-admin reset-world` (ADR 0035): the world from before the new one, kept for good.
+    Reset,
 }
 
 impl Reason {
@@ -22,6 +24,7 @@ impl Reason {
         match self {
             Reason::Start => "start",
             Reason::Daily => "daily",
+            Reason::Reset => "reset",
         }
     }
 }
@@ -75,7 +78,8 @@ pub fn prune_backups(dir: &Path, now: SystemTime) -> Result<(), DbError> {
         let entry = entry?;
         let name = entry.file_name();
         let name = name.to_string_lossy();
-        if !(name.starts_with("world-") && name.ends_with(".db")) {
+        // The backup a reset wrote holds the only copy of the old world: never pruned.
+        if !(name.starts_with("world-") && name.ends_with(".db")) || name.ends_with("-reset.db") {
             continue;
         }
         let modified = entry.metadata()?.modified()?;
