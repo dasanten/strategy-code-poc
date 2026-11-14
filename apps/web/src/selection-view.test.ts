@@ -2051,8 +2051,9 @@ describe('the card for a resource node', () => {
     expect(card.what).toBe('building')
     const [, , , good] = kinds.find(([kind]) => kind === k)!
     const perDay = WORK_OUTPUT_PER_DAY[NODE_GOOD[k]]
+    const words = { forest: 'forest', stone: 'stone', ironOre: 'iron ore', goldOre: 'gold ore' }[k]
     expect(card.lines).toContain(
-      `On a normal ${good} node · about ${perDay} ${good} each a game day at average Strength`,
+      `On a normal ${words} node · about ${perDay} ${good} each a game day at average Strength`,
     )
     expect(card.lines.some((l) => l.includes('can be built'))).toBe(false)
     expect(card.buildHere).toBeUndefined()
