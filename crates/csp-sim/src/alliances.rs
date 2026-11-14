@@ -593,6 +593,21 @@ pub fn leave_on_leader_death(world: &mut WorldState, realm_id: &str) {
     }
 }
 
+/// The residents and carriages `ids` left their realm with a city that became self-managed while
+/// the realm went on under its heir (`CONTEXT.md`: Leader death with an heir): any alliance army
+/// gives them back. Call it while they are still the realm's, before they walk home.
+pub fn give_back_everywhere(world: &mut WorldState, ids: &HashSet<String>) {
+    for a in 0..world.alliances.len() {
+        let own: Vec<String> = world.alliances[a]
+            .army
+            .iter()
+            .filter(|p| ids.contains(&p.id))
+            .map(|p| p.id.clone())
+            .collect();
+        give_back(world, a, own);
+    }
+}
+
 /// One tick of alliances (`stepAlliances`): recalls, leaves and removals whose delay ran out take
 /// effect; members and invitations of realms that no longer exist go; so do army parts gone or no
 /// longer a member's. An NPC city member torn down or joined to a realm leaves at once; one whose

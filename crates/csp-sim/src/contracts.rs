@@ -584,6 +584,28 @@ pub fn end_contracts_on_leader_death(world: &mut WorldState, realm_id: &str) {
     }
 }
 
+/// The residents `ids` left their realm with a city that became self-managed while the realm went
+/// on under its heir (`CONTEXT.md`: Leader death with an heir): they drop out of its contracts and
+/// leave the hirer's armies, and walk home as the city's residents do. A contract in force that
+/// is left with nobody ends, costing no standing; one only offered goes once it names nobody.
+pub fn leave_contracts(world: &mut WorldState, ids: &HashSet<String>) {
+    let mut emptied = Vec::new();
+    for c in &mut world.contracts {
+        let before = c.resident_ids.len();
+        c.resident_ids.retain(|id| !ids.contains(id));
+        if c.resident_ids.is_empty() && before > 0 {
+            emptied.push(c.id.clone());
+        }
+    }
+    leave_armies(world, ids);
+    let (ending, kept): (Vec<_>, Vec<_>) =
+        world.contracts.drain(..).partition(|c| emptied.contains(&c.id));
+    world.contracts = kept;
+    for c in ending.iter().filter(|c| c.started_at.is_some()) {
+        tell_both(world, c, ContractWhat::Ended, None, None);
+    }
+}
+
 /// The Trade Org HQ fell (`endTradeOrgContracts`): every contract with it ends at once. Soldiers
 /// it had hired out stop where they stand; mercenaries it had hired walk home. Offers lapse.
 pub fn end_trade_org_contracts(world: &mut WorldState) {
