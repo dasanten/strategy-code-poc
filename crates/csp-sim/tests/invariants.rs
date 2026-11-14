@@ -18,14 +18,17 @@ use csp_sim::invariants::{
 use csp_sim::queries::balance::carry_capacity;
 use csp_sim::queries::building::building_at;
 use csp_sim::queries::names::placed;
-use csp_sim::terrain_gen::generate_terrain;
 use csp_sim::tick::Scratch;
 use csp_sim::world::step_world;
 use serde_json::json;
 
 fn terrain() -> &'static TerrainMap {
     static T: OnceLock<TerrainMap> = OnceLock::new();
-    T.get_or_init(|| generate_terrain(1, 1536))
+    // The TypeScript's `cityTerrain()`, which `sight/city.json` was founded on.
+    T.get_or_init(|| {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/terrain/1-1536.bin");
+        TerrainMap { size: 1536, tiles: std::fs::read(path).expect("terrain fixture") }
+    })
 }
 
 /// A world on `cityTerrain()` where Player 1 founded their starting city (`worldWithCity`).

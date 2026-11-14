@@ -77,7 +77,10 @@ mod tests {
         let path = format!("{}/fixtures/nodes/{seed}-{size}.json", env!("CARGO_MANIFEST_DIR"));
         let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
         let expected: Vec<ResourceNode> = serde_json::from_str(&text).expect("nodes fixture");
-        assert_eq!(place_resource_nodes(&generate_terrain(seed, size), seed), expected);
+        // The terrain the TypeScript placed them on (`fixtures/terrain`), not today's generator.
+        let tiles = format!("{}/fixtures/terrain/{seed}-{size}.bin", env!("CARGO_MANIFEST_DIR"));
+        let terrain = TerrainMap { size, tiles: std::fs::read(&tiles).expect("terrain fixture") };
+        assert_eq!(place_resource_nodes(&terrain, seed), expected);
     }
 
     #[test]

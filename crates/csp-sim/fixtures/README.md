@@ -55,7 +55,7 @@ Conventions:
 | `sight/visitors.json` | Player 1 visiting NPC cities and the Trade Org HQ on Plains (dumpVisitors), with entitiesInSight for every realm and city |
 | `terrain/1-256.bin` | generateTerrain(1, 256).tiles |
 | `terrain/1-512.bin` | generateTerrain(1, 512).tiles |
-| `terrain/1-5760.sha256` | sha256 of generateTerrain(1, 5760).tiles (--full) |
+| `terrain/1-1536.bin` | generateTerrain(1, 1536).tiles (`cityTerrain()`), written after the freeze by the Rust port, which matched the TypeScript bit for bit (T100.1) |
 | `terrain/1-64.bin` | generateTerrain(1, 64).tiles |
 | `terrain/42-256.bin` | generateTerrain(42, 256).tiles |
 | `terrain/7-1024.bin` | generateTerrain(7, 1024).tiles |

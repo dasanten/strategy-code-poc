@@ -80,9 +80,7 @@ pub const MAP_SIZE: i32 = 5760;
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TerrainShares {
-    /// A few large bodies of water.
-    pub sea: f64,
-    /// Inland water, a few scattered lakes.
+    /// Inland water, a few scattered lakes, as a share of the mainland (lakes included).
     pub lake: f64,
     /// In ranges.
     pub mountain: f64,
@@ -91,10 +89,51 @@ pub struct TerrainShares {
     pub forest: f64,
 }
 
-/// Share of the map's tiles each terrain covers in a freshly generated map. Plains take the rest.
-/// The generator hits these closely; the map test checks them.
+/// Share of the land's tiles (the mainland and the islands, `CONTEXT.md`: The land) each terrain
+/// covers in a freshly generated map. Plains take the rest; the Sea is everything off the land
+/// (`MAINLAND_SHARE`, `ISLAND_COUNT`). The generator hits these closely; the map test checks them.
 pub const TERRAIN_SHARES: TerrainShares =
-    TerrainShares { sea: 0.08, lake: 0.025, mountain: 0.07, hills: 0.13, forest: 0.25 };
+    TerrainShares { lake: 0.03, mountain: 0.08, hills: 0.15, forest: 0.28 };
+
+/// Share of the map's tiles the mainland covers (`CONTEXT.md`: The land): one joined land in the
+/// middle of the map with Sea all around, so the map's joins cross only water. A little less than
+/// half the map, so its coast stays well clear of the joins and islands fit off it.
+pub const MAINLAND_SHARE: f64 = 0.42;
+
+/// How much longer the mainland is than wide, at most: each seed picks a stretch up to this and a
+/// direction, so mainlands differ in shape before their coasts are made ragged.
+pub const MAINLAND_STRETCH: f64 = 1.2;
+
+/// Share of the map's side kept Sea along each of the map's joins: no land within it.
+pub const JOIN_SEA_SHARE: f64 = 0.03;
+
+/// Islands the generator tries to place off the mainland's coast (`CONTEXT.md`: Island); on a
+/// small map fewer fit.
+pub const ISLAND_COUNT: f64 = 12.0;
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IslandRadius {
+    /// Share of the map's side.
+    pub min: f64,
+    /// Share of the map's side.
+    pub max: f64,
+    /// Tiles, at least, whatever the map's size: room for a haven and a mine or two.
+    pub min_tiles: f64,
+}
+
+/// How far an island reaches from its middle before its coast is made ragged: each island picks a
+/// radius between `min` and `max`, small ones more often. On a full-size map about 35 to 170
+/// tiles: from a rock with room for a haven and a mine to an island that holds a city.
+pub const ISLAND_RADIUS: IslandRadius = IslandRadius { min: 0.006, max: 0.03, min_tiles: 6.0 };
+
+/// The narrowest strait (`CONTEXT.md`: Island): at least this many tiles of water lie between an
+/// island and the mainland, and between two islands, so no walk reaches one; a short row.
+pub const NARROWEST_STRAIT: i32 = 16;
+
+/// Share of the map's side an island lies from the mainland, at most (about 350 tiles on a
+/// full-size map): near enough that a boat reaches it from the coast.
+pub const ISLAND_OFFSHORE_SHARE: f64 = 0.06;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1035,9 +1074,6 @@ pub const DELIVERY_DRIVE_TRIES: f64 = 3.0;
 /// carries for others what they could carry themselves. 100 iron over a region and back cost
 /// about 300 coins.
 pub const TRANSFER_FEE_FACTOR: f64 = 3.0;
-
-/// Large seas the generator makes, roughly; together they cover `TERRAIN_SHARES.sea`.
-pub const SEA_COUNT: f64 = 3.0;
 
 /// What one unit of each good weighs, in kg (`CONTEXT.md`: Good). Coins are light but not
 /// weightless, so a fortune still has to be carried. Weapons and armour weigh what went into them
@@ -2262,6 +2298,13 @@ pub fn balance_json() -> Value {
     let mut m = Map::new();
     m.insert("MAP_SIZE".into(), json!(MAP_SIZE));
     m.insert("TERRAIN_SHARES".into(), to_value(TERRAIN_SHARES).expect("serialisable"));
+    m.insert("MAINLAND_SHARE".into(), json!(MAINLAND_SHARE));
+    m.insert("MAINLAND_STRETCH".into(), json!(MAINLAND_STRETCH));
+    m.insert("JOIN_SEA_SHARE".into(), json!(JOIN_SEA_SHARE));
+    m.insert("ISLAND_COUNT".into(), json!(ISLAND_COUNT));
+    m.insert("ISLAND_RADIUS".into(), to_value(ISLAND_RADIUS).expect("serialisable"));
+    m.insert("NARROWEST_STRAIT".into(), json!(NARROWEST_STRAIT));
+    m.insert("ISLAND_OFFSHORE_SHARE".into(), json!(ISLAND_OFFSHORE_SHARE));
     m.insert("NODE_DENSITY".into(), to_value(NODE_DENSITY).expect("serialisable"));
     m.insert("NODE_MIN_SPACING".into(), json!(NODE_MIN_SPACING));
     m.insert("TERRAIN_SPEED".into(), to_value(TERRAIN_SPEED).expect("serialisable"));
@@ -2431,7 +2474,6 @@ pub fn balance_json() -> Value {
     m.insert("DELIVERY_FEE_PER_KG_TILE".into(), json!(DELIVERY_FEE_PER_KG_TILE));
     m.insert("DELIVERY_DRIVE_TRIES".into(), json!(DELIVERY_DRIVE_TRIES));
     m.insert("TRANSFER_FEE_FACTOR".into(), json!(TRANSFER_FEE_FACTOR));
-    m.insert("SEA_COUNT".into(), json!(SEA_COUNT));
     m.insert("GOOD_WEIGHT".into(), to_value(GOOD_WEIGHT).expect("serialisable"));
     m.insert("WEAPON_ATTACK".into(), to_value(WEAPON_ATTACK).expect("serialisable"));
     m.insert("PROTECTION_DEFENCE".into(), to_value(PROTECTION_DEFENCE).expect("serialisable"));
