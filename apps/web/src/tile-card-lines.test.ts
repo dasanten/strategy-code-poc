@@ -143,7 +143,9 @@ describe('buildings on a tile’s card', () => {
     expect(card.lists?.find((l) => l.title === 'Pile')?.goods).toEqual({ food: 7 })
     // A mine's node lies on one tile of its footprint, not necessarily the one clicked.
     const nodeAt = (x: number, y: number) =>
-      x === 6 && y === 6 ? { kind: 'goldOre' as const, x, y } : undefined
+      x === 6 && y === 6
+        ? { kind: 'goldOre' as const, x, y, richness: 'normal' as const }
+        : undefined
     expect(linesOf({ buildings: [building({ kind: 'mine' })], nodeAt })).toContain('Makes gold ore')
     expect(linesOf({ buildings: [building({ kind: 'smelter' })] })).toContain('Makes iron')
     const house = linesOf({ buildings: [building({ kind: 'house', cityId: 'c-me' })] })
@@ -218,7 +220,9 @@ describe('buildings on a tile’s card', () => {
     it('gives a mine what its node yields, the same way', () => {
       const mine = building({ kind: 'mine' })
       const nodeAt = (x: number, y: number) =>
-        x === 6 && y === 6 ? { kind: 'goldOre' as const, x, y } : undefined
+        x === 6 && y === 6
+          ? { kind: 'goldOre' as const, x, y, richness: 'normal' as const }
+          : undefined
       const perDay = WORK_OUTPUT_PER_DAY.goldOre!
       const ana = perDay * (20 / WORK_STRENGTH_AVERAGE) * skilled(10)
       const bo = perDay * (5 / WORK_STRENGTH_AVERAGE)

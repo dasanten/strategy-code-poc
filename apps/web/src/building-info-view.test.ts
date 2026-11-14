@@ -82,7 +82,7 @@ describe('buildingInfoLines', () => {
 
 describe('buildingNodeKind', () => {
   it('finds the node under any tile of the footprint', () => {
-    const node: KnownNode = { kind: 'ironOre', x: 11, y: 11 }
+    const node: KnownNode = { kind: 'ironOre', x: 11, y: 11, richness: 'normal' as const }
     const nodeAt = (x: number, y: number) => (x === node.x && y === node.y ? node : undefined)
     expect(buildingNodeKind(site({ kind: 'mine', x: 10, y: 10 }), nodeAt)).toBe('ironOre')
     expect(buildingNodeKind(site({ kind: 'mine', x: 20, y: 20 }), nodeAt)).toBeUndefined()

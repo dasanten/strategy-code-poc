@@ -839,6 +839,31 @@ mod tests {
         assert_eq!(decode_chunk(1, 1, &explored.chunk(PLAYER, 1, 1).unwrap()).nodes.len(), 2);
     }
 
+    /// `CONTEXT.md`: Richness. A node's richness comes with it once its tile is explored, and not
+    /// before.
+    #[test]
+    fn a_nodes_richness_comes_with_it_only_once_its_tile_is_explored() {
+        use csp_shared::world::Richness;
+        let mut rich = node("n1", ResourceKind::IronOre, 40.0, 40.0);
+        rich.richness = Richness::Rich;
+        let mut poor = node("n2", ResourceKind::Stone, 50.0, 50.0);
+        poor.richness = Richness::Poor;
+        let mut explored = ExploredTerrain::new(small_terrain(), &[rich, poor]);
+        explored.explore(PLAYER, 40, 40, 2);
+        let got = decode_chunk(1, 1, &explored.chunk(PLAYER, 1, 1).unwrap()).nodes;
+        assert_eq!(
+            got.iter().map(|n| (n.x, n.richness)).collect::<Vec<_>>(),
+            [(40, Richness::Rich)]
+        );
+        explored.explore(PLAYER, 50, 50, 1);
+        let got = decode_chunk(1, 1, &explored.chunk(PLAYER, 1, 1).unwrap()).nodes;
+        assert_eq!(
+            got.iter().map(|n| (n.x, n.richness)).collect::<Vec<_>>(),
+            [(40, Richness::Rich), (50, Richness::Poor)]
+        );
+        assert!(explored.chunk(OTHER, 1, 1).is_none());
+    }
+
     #[test]
     fn admin_terrain_gives_any_chunk_whole_with_every_resource_node() {
         let terrain = small_terrain();

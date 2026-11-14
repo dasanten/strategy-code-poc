@@ -130,7 +130,7 @@ describe('the actions on a resident’s card', () => {
 
   it('offers work at a finished workplace, not at a site or a house', () => {
     expect(ids(here({ building: building({ kind: 'farm' }) }))).toContain('work')
-    const node = { kind: 'stone' as const, x: 5, y: 5 }
+    const node = { kind: 'stone' as const, x: 5, y: 5, richness: 'normal' as const }
     expect(ids(here({ building: building({ kind: 'quarry' }), node }))).toContain('work')
     expect(ids(here({ building: building({ kind: 'smithy' }) }))).toContain('work')
     const site = building({ kind: 'farm', site: { work: 0, delivered: {} } })
@@ -1195,7 +1195,7 @@ describe('the card for a tile', () => {
         goods: { stone: 4 },
       },
     ])
-    const node = { kind: 'ironOre' as const, x: 5, y: 5 }
+    const node = { kind: 'ironOre' as const, x: 5, y: 5, richness: 'normal' as const }
     expect(tile({ node })).toMatchObject({ what: 'node', title: 'Iron ore node' })
   })
 
@@ -2015,7 +2015,7 @@ describe('the card for a resource node', () => {
 
   it.each(kinds)('says a %s node’s workplace can be built there when it fits', (k, name) => {
     const kind = NODE_WORKPLACE[k]
-    const card = tile({ node: { kind: k, x: 5, y: 5 }, nodeFit: fit })
+    const card = tile({ node: { kind: k, x: 5, y: 5, richness: 'normal' as const }, nodeFit: fit })
     expect(card.what).toBe('node')
     expect(card.lines[0]).toBe(`A ${name} can be built here`)
     const work = BUILD_WORK[kind]! / TICKS_PER_GAME_DAY
@@ -2028,7 +2028,7 @@ describe('the card for a resource node', () => {
   it.each(kinds)('says what a %s node’s workplace makes, teaches and takes', (k, ...rest) => {
     const [, , good, skill] = rest
     const kind = NODE_WORKPLACE[k]
-    const card = tile({ node: { kind: k, x: 5, y: 5 }, nodeFit: fit })
+    const card = tile({ node: { kind: k, x: 5, y: 5, richness: 'normal' as const }, nodeFit: fit })
     expect(card.lines).toContain(`Makes ${good} · teaches ${skill}`)
     expect(card.lines).toContain(
       `Up to ${MAX_WORKERS[kind]} workers · about ${WORK_OUTPUT_PER_DAY[NODE_GOOD[k]]} ${good} each a game day at average Strength`,
@@ -2036,14 +2036,18 @@ describe('the card for a resource node', () => {
   })
 
   it.each(kinds)('says there is no room on a %s node where it doesn’t fit', (k, name) => {
-    const card = tile({ node: { kind: k, x: 5, y: 5 } })
+    const card = tile({ node: { kind: k, x: 5, y: 5, richness: 'normal' as const } })
     expect(card.lines[0]).toBe(`No room for a ${name} here`)
     expect(card.buildHere).toEqual({ kind: NODE_WORKPLACE[k], at: undefined })
   })
 
   it.each(kinds)('keeps the short line on a %s node built over', (k) => {
     const workplace = building({ kind: NODE_WORKPLACE[k], cityId: null })
-    const card = tile({ node: { kind: k, x: 5, y: 5 }, buildings: [workplace], nodeFit: fit })
+    const card = tile({
+      node: { kind: k, x: 5, y: 5, richness: 'normal' as const },
+      buildings: [workplace],
+      nodeFit: fit,
+    })
     expect(card.what).toBe('building')
     const [, , , good] = kinds.find(([kind]) => kind === k)!
     const perDay = WORK_OUTPUT_PER_DAY[NODE_GOOD[k]]
@@ -2071,15 +2075,19 @@ describe('the card for a resource node', () => {
   })
 
   it('is named after the node’s kind', () => {
-    expect(tile({ node: { kind: 'forest', x: 5, y: 5 } }).title).toBe('Forest node')
-    expect(tile({ node: { kind: 'ironOre', x: 5, y: 5 } }).title).toBe('Iron ore node')
+    expect(tile({ node: { kind: 'forest', x: 5, y: 5, richness: 'normal' as const } }).title).toBe(
+      'Forest node',
+    )
+    expect(tile({ node: { kind: 'ironOre', x: 5, y: 5, richness: 'normal' as const } }).title).toBe(
+      'Iron ore node',
+    )
   })
 })
 
 describe('where a node’s workplace fits on what the Player knows', () => {
   const SIZE = 64
   const seen = { buildings: [] as Building[], cities: [] as City[] }
-  const forest = { kind: 'forest' as const, x: 10, y: 10 }
+  const forest = { kind: 'forest' as const, x: 10, y: 10, richness: 'normal' as const }
   const nodes = [forest]
   const nodeAt = (x: number, y: number) => nodes.find((n) => n.x === x && n.y === y)
   const lookup = (at: (x: number, y: number) => number) => ({ size: SIZE, at })
@@ -2160,7 +2168,9 @@ describe('what the build menu offers off a node, and why a kind can’t go here'
       'there is already a building there',
     )
     const forestAt = (x: number, y: number) =>
-      x === 51 && y === 51 ? { kind: 'forest' as const, x, y } : undefined
+      x === 51 && y === 51
+        ? { kind: 'forest' as const, x, y, richness: 'normal' as const }
+        : undefined
     expect(buildHereProblem('townHall', 50, 50, seen, forestAt, plains)).toBe(
       'a townHall goes off any resource node, and not on Mountain',
     )
@@ -2174,7 +2184,7 @@ describe('what the build menu offers off a node, and why a kind can’t go here'
 describe('Build a … here on a node’s card', () => {
   const adult = { id: 'r1', name: 'Ada', bornAt: -ticksForAge(30) } as Resident
   const child = { id: 'r2', name: 'Pip', bornAt: -ticksForAge(5) } as Resident
-  const node = { kind: 'forest' as const, x: 5, y: 5 }
+  const node = { kind: 'forest' as const, x: 5, y: 5, richness: 'normal' as const }
   const build = (card: ReturnType<typeof tile>, actor: Resident | undefined) =>
     tileActions(card, actor, 0).find((a) => a.id === 'build')
 
