@@ -169,6 +169,7 @@ describe('goods in the top bar', () => {
       wood: 4,
       stone: 2,
       coal: 6,
+      steel: 0,
       coins: 20,
     })
   })
@@ -185,6 +186,7 @@ describe('goods in the top bar', () => {
       wood: 0,
       stone: 0,
       coal: 0,
+      steel: 0,
       coins: 1,
     })
     expect(keyGoods({ buildings, lastSeen: [], cities }, 'r1', 'second').totals.food).toBe(7)
@@ -200,7 +202,7 @@ describe('goods in the top bar', () => {
       building({ cityId: null, realmId: 'r1', site, stock: { wood: 9 } }),
       building({ kind: 'stable', stock: { food: 9 } }),
     ]
-    const nothing = { food: 0, wood: 0, stone: 0, coal: 0, coins: 0 }
+    const nothing = { food: 0, wood: 0, stone: 0, coal: 0, steel: 0, coins: 0 }
     expect(keyGoods({ buildings, lastSeen: [], cities }, 'r1', null).totals).toEqual(nothing)
     const fromHome = { buildings: buildings.slice(3), lastSeen: [], cities }
     expect(keyGoods(fromHome, 'r1', 'home').totals).toEqual(nothing)
@@ -213,7 +215,7 @@ describe('goods in the top bar', () => {
     it('counts an outpost storage out of sight as last seen, and marks the total', () => {
       const lastSeen = [seen(100, { cityId: null, realmId: 'r1', stock: { food: 5, wood: 2 } })]
       const held = keyGoods({ buildings: inSight, lastSeen, cities }, 'r1', null)
-      expect(held.totals).toEqual({ food: 15, wood: 2, stone: 0, coal: 0, coins: 0 })
+      expect(held.totals).toEqual({ food: 15, wood: 2, stone: 0, coal: 0, steel: 0, coins: 0 })
       expect(held.old).toEqual({ oldestSeenAt: 100, all: false })
     })
 
@@ -257,7 +259,7 @@ describe('goods in the top bar', () => {
         seen(100, { kind: 'stable', stock: { food: 9 } }),
       ]
       const held = keyGoods({ buildings: inSight, lastSeen, cities }, 'r1', null)
-      expect(held.totals).toEqual({ food: 10, wood: 0, stone: 0, coal: 0, coins: 0 })
+      expect(held.totals).toEqual({ food: 10, wood: 0, stone: 0, coal: 0, steel: 0, coins: 0 })
       expect(held.old).toBeNull()
     })
 

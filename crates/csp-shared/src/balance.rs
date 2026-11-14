@@ -961,6 +961,7 @@ pub const TRADE_ORG_HQ: TradeOrgHq = TradeOrgHq {
         ("iron", 100.0),
         ("goldOre", 50.0),
         ("coal", 100.0),
+        ("steel", 50.0),
     ]),
 };
 
@@ -1013,6 +1014,7 @@ pub const TRADING_POST: TradingPost = TradingPost {
         ("iron", 10.0),
         ("goldOre", 10.0),
         ("coal", 20.0),
+        ("steel", 10.0),
         ("spear", 4.0),
         ("sword", 2.0),
         ("shield", 4.0),
@@ -1032,6 +1034,7 @@ pub const WAREHOUSE_FLOOR: Table<f64> = Table(&[
     ("iron", 5.0),
     ("goldOre", 5.0),
     ("coal", 10.0),
+    ("steel", 5.0),
     ("coins", 1_000.0),
     ("spear", 2.0),
     ("sword", 1.0),
@@ -1051,7 +1054,8 @@ pub const HQ_FOOD_FLOOR_FACTOR: f64 = 15.0;
 /// What a warehouse sells a unit of each good for, in coins, when it holds `PRICE_REFERENCE_FLOORS`
 /// times its floor (`CONTEXT.md`: Warehouse prices, Price anchor). Roughly what goes into it: an
 /// iron is two iron ore and the work, a sword two iron and a wood; gold ore stays below the 10
-/// coins the mint strikes from it; coal, found only beyond the heartlands, a little above iron ore.
+/// coins the mint strikes from it; coal, found only beyond the heartlands, a little above iron ore;
+/// steel an iron and a coal and the work.
 pub const WAREHOUSE_BASE_PRICE: Table<f64> = Table(&[
     ("food", 2.0),
     ("wood", 2.0),
@@ -1060,6 +1064,7 @@ pub const WAREHOUSE_BASE_PRICE: Table<f64> = Table(&[
     ("iron", 10.0),
     ("goldOre", 8.0),
     ("coal", 5.0),
+    ("steel", 20.0),
     ("spear", 20.0),
     ("sword", 30.0),
     ("shield", 22.0),
@@ -1202,6 +1207,7 @@ pub const GOOD_WEIGHT: Table<f64> = Table(&[
     ("shield", 4.0),
     ("armour", 8.0),
     ("coal", 1.0),
+    ("steel", 1.0),
 ]);
 
 /// Attack each weapon adds to a resident's blow (`CONTEXT.md`: Weapons and armour, Combat). A
@@ -1890,12 +1896,22 @@ pub struct Recipe {
 }
 
 /// The fixed recipes of the workplaces that process goods (`CONTEXT.md`: Smelter, Coins, Smithy).
-/// A smelter turns 2 iron ore into 1 iron, a mint 1 gold ore into 10 coins (less weight than the
+/// A smelter turns 2 iron ore into 1 iron, or 1 iron and 1 coal into 1 steel (`CONTEXT.md`: Coal);
+/// its first recipe, Iron, is what its workers make when they name none. A mint 1 gold ore into 10 coins (less weight than the
 /// ore, but a fortune still weighs something). A smithy has one recipe for each weapon and piece
 /// of armour, each from Iron and Wood weighing what the good weighs (`GOOD_WEIGHT`): a spear is
 /// mostly wood, a sword mostly iron, a shield wood bound with iron, armour nearly all iron.
 pub const RECIPES: Table<&[Recipe]> = Table(&[
-    ("smelter", &[Recipe { input: Table(&[("ironOre", 2.0)]), output: Table(&[("iron", 1.0)]) }]),
+    (
+        "smelter",
+        &[
+            Recipe { input: Table(&[("ironOre", 2.0)]), output: Table(&[("iron", 1.0)]) },
+            Recipe {
+                input: Table(&[("iron", 1.0), ("coal", 1.0)]),
+                output: Table(&[("steel", 1.0)]),
+            },
+        ],
+    ),
     ("mint", &[Recipe { input: Table(&[("goldOre", 1.0)]), output: Table(&[("coins", 10.0)]) }]),
     (
         "smithy",
@@ -1921,7 +1937,7 @@ pub const RECIPES: Table<&[Recipe]> = Table(&[
 ]);
 
 /// Batches one worker of average Strength and no skill gets through per game day: a smelter worker
-/// smelts what two miners dig (4 iron ore into 2 iron), a mint worker strikes what two gold miners
+/// smelts what two miners dig (4 iron ore into 2 iron), or 2 iron and 2 coal into 2 steel, a mint worker strikes what two gold miners
 /// dig (2 gold ore into 20 coins), a smithy worker makes two weapons or pieces of armour.
 pub const BATCHES_PER_DAY: Table<f64> = Table(&[("smelter", 2.0), ("mint", 2.0), ("smithy", 2.0)]);
 

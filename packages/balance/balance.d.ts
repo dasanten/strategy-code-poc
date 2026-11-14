@@ -296,6 +296,7 @@ export interface Balance {
       iron: number
       goldOre: number
       coal: number
+      steel: number
       [key: string]: number
     }
     [key: string]: number | {
@@ -305,6 +306,7 @@ export interface Balance {
       iron: number
       goldOre: number
       coal: number
+      steel: number
       [key: string]: number
     }
   }
@@ -325,6 +327,7 @@ export interface Balance {
       iron: number
       goldOre: number
       coal: number
+      steel: number
       spear: number
       sword: number
       shield: number
@@ -339,6 +342,7 @@ export interface Balance {
       iron: number
       goldOre: number
       coal: number
+      steel: number
       spear: number
       sword: number
       shield: number
@@ -354,6 +358,7 @@ export interface Balance {
     iron: number
     goldOre: number
     coal: number
+    steel: number
     coins: number
     spear: number
     sword: number
@@ -371,6 +376,7 @@ export interface Balance {
     iron: number
     goldOre: number
     coal: number
+    steel: number
     spear: number
     sword: number
     shield: number
@@ -419,6 +425,7 @@ export interface Balance {
     shield: number
     armour: number
     coal: number
+    steel: number
     [key: string]: number
   }
   readonly WEAPON_ATTACK: {
@@ -752,6 +759,24 @@ export interface Balance {
         iron: number
         [key: string]: number
       }
+    } | {
+      input: {
+        iron: number
+        coal: number
+        [key: string]: number
+      }
+      output: {
+        steel: number
+        [key: string]: number
+      }
+      [key: string]: {
+        iron: number
+        coal: number
+        [key: string]: number
+      } | {
+        steel: number
+        [key: string]: number
+      }
     })[]
     mint: ({
       input: {
@@ -857,6 +882,24 @@ export interface Balance {
         [key: string]: number
       } | {
         iron: number
+        [key: string]: number
+      }
+    } | {
+      input: {
+        iron: number
+        coal: number
+        [key: string]: number
+      }
+      output: {
+        steel: number
+        [key: string]: number
+      }
+      [key: string]: {
+        iron: number
+        coal: number
+        [key: string]: number
+      } | {
+        steel: number
         [key: string]: number
       }
     })[] | ({
