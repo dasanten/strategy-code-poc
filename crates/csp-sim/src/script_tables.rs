@@ -427,6 +427,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 description: "Units of armour.",
                 null_when: Some("when there are none"),
             },
+            ScriptField {
+                name: "coal",
+                r#type: ScriptType::Number,
+                description: "Units of coal.",
+                null_when: Some("when there are none"),
+            },
         ],
     },
     ScriptView {
@@ -1750,7 +1756,7 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
             ScriptField {
                 name: "kind",
                 r#type: ScriptType::String,
-                description: "What it yields: \"forest\", \"stone\", \"ironOre\" or \"goldOre\".",
+                description: "What it yields: \"forest\", \"stone\", \"ironOre\", \"goldOre\" or \"coal\".",
                 null_when: None,
             },
             ScriptField {
@@ -2297,7 +2303,7 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Query,
         params: &["kind?"],
         cost: 20.0,
-        description: "The resource nodes the Player sees now; with `kind` (\"forest\", \"stone\", \"ironOre\" or \"goldOre\"), only those of that kind.",
+        description: "The resource nodes the Player sees now; with `kind` (\"forest\", \"stone\", \"ironOre\", \"goldOre\" or \"coal\"), only those of that kind.",
         returns: ScriptType::List(&ScriptType::View("node")),
     },
     ScriptBinding {
@@ -3149,7 +3155,7 @@ pub static ARMY_SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Query,
         params: &["kind?"],
         cost: 20.0,
-        description: "The resource nodes the Player sees now; with `kind` (\"forest\", \"stone\", \"ironOre\" or \"goldOre\"), only those of that kind.",
+        description: "The resource nodes the Player sees now; with `kind` (\"forest\", \"stone\", \"ironOre\", \"goldOre\" or \"coal\"), only those of that kind.",
         returns: ScriptType::List(&ScriptType::View("node")),
     },
     ScriptBinding {
@@ -5281,7 +5287,7 @@ fn goodsText(load, goods) {
 // stop: once my Player sees a node of that kind that none of their
 // waypoints marks, I put a waypoint on it ("Gold ore node"), walk back to
 // where I refill and end. Without it I go on until stopped.
-param find: choice(forest, stone, ironOre, goldOre) // the node to find; none: just explore
+param find: choice(forest, stone, ironOre, goldOre, coal) // the node to find; none: just explore
 param toward: choice(north, northeast, east, southeast, south, southwest, west, northwest) // the way to go; none: the nearest unexplored tiles first
 param waypoint: waypoint // a waypoint to head for instead; none: go by toward
 param food: storage // where to refill; a carriage too; none: the nearest storage with Food
@@ -5414,6 +5420,7 @@ fn unmarked(nodes) {
 fn nodeName(kind) {
   if (kind == "ironOre") { return "Iron ore node" }
   if (kind == "goldOre") { return "Gold ore node" }
+  if (kind == "coal") { return "Coal node" }
   if (kind == "forest") { return "Forest node" }
   return "Stone node"
 }

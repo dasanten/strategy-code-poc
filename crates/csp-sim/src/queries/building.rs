@@ -151,7 +151,7 @@ pub fn node_workplace(kind: ResourceKind) -> BuildingKind {
     match kind {
         ResourceKind::Forest => BuildingKind::LumberCamp,
         ResourceKind::Stone => BuildingKind::Quarry,
-        ResourceKind::IronOre | ResourceKind::GoldOre => BuildingKind::Mine,
+        ResourceKind::IronOre | ResourceKind::GoldOre | ResourceKind::Coal => BuildingKind::Mine,
     }
 }
 
@@ -162,6 +162,7 @@ pub fn node_good(kind: ResourceKind) -> Good {
         ResourceKind::Stone => Good::Stone,
         ResourceKind::IronOre => Good::IronOre,
         ResourceKind::GoldOre => Good::GoldOre,
+        ResourceKind::Coal => Good::Coal,
     }
 }
 

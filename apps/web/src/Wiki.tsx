@@ -531,6 +531,7 @@ const NODE_WORK: { kind: BuildingKind; good: Good }[] = [
   { kind: 'quarry', good: 'stone' },
   { kind: 'mine', good: 'ironOre' },
   { kind: 'mine', good: 'goldOre' },
+  { kind: 'mine', good: 'coal' },
 ]
 
 /** The Wiki (`CONTEXT.md`: Wiki): the rules in plain words, with the game's current numbers. */
@@ -1051,6 +1052,14 @@ export function Wiki() {
           safe: it is safe only in that it holds little worth taking.
         </p>
         <p>
+          <strong>Coal</strong> lies only out there: its nodes are in Hills and, more of them,
+          Mountain of the frontier regions and the islands, never in a heartland. A mine built on a
+          coal node yields Coal, {num(WORK_OUTPUT_PER_DAY.coal ?? 0)} a game day for an average
+          worker, and teaches Mining. Coal is carried, stored, hauled and traded like any other
+          good; it weighs {num(GOOD_WEIGHT.coal ?? 0)} kg a unit, and trading posts and the HQ buy
+          and sell it. Your realm’s Coal shows in the top bar beside its Food, Wood and Stone.
+        </p>
+        <p>
           Each heartland has {num(STARTING_SITES_PER_HEARTLAND)} <strong>starting sites</strong>, a
           walk of {num(STARTING_SITE_WALK.minMinutes)} to {num(STARTING_SITE_WALK.maxMinutes)} real
           minutes from the next one. A new Leader (your first, or one after your Leader died with no
@@ -1139,11 +1148,11 @@ export function Wiki() {
         <p>
           Give a grown resident <strong>Explore</strong> on their card, on foot or riding, and they
           go into the unknown on their own. Before they start, pick <code>find</code>, a kind of
-          resource node to look for (forest, stone, iron ore or gold ore), or none to just explore
-          until you stop them; <code>toward</code>, a compass direction, or a <code>waypoint</code>{' '}
-          to head for instead; with neither they take the nearest unexplored land first.{' '}
-          <code>food</code> is where they refill; with none picked, the nearest storage of your
-          realm with Food.
+          resource node to look for (forest, stone, iron ore, gold ore or coal), or none to just
+          explore until you stop them; <code>toward</code>, a compass direction, or a{' '}
+          <code>waypoint</code> to head for instead; with neither they take the nearest unexplored
+          land first. <code>food</code> is where they refill; with none picked, the nearest storage
+          of your realm with Food.
         </p>
         <p>
           They set out with as much Food as they can carry and walk to the edge of what you have

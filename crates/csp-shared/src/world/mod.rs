@@ -77,6 +77,7 @@ pub enum Good {
     Sword,
     Shield,
     Armour,
+    Coal,
 }
 
 /// `PricedGood`: every good but Coins (`Exclude<Good, 'coins'>`), the goods with a price.
@@ -93,6 +94,7 @@ pub enum PricedGood {
     Sword,
     Shield,
     Armour,
+    Coal,
 }
 
 /// A resident's stats (`STAT_NAMES`).
@@ -3327,6 +3329,7 @@ pub enum ResourceKind {
     Stone,
     IronOre,
     GoldOre,
+    Coal,
 }
 
 /// How much a resource node gives per worker (`CONTEXT.md`: Richness), fixed when it comes into

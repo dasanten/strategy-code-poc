@@ -54,6 +54,11 @@ export interface Balance {
       '3': number
       [key: string]: number
     }
+    coal: {
+      '2': number
+      '3': number
+      [key: string]: number
+    }
     [key: string]: {
       '1': number
       [key: string]: number
@@ -298,6 +303,7 @@ export interface Balance {
       ironOre: number
       iron: number
       goldOre: number
+      coal: number
       [key: string]: number
     }
     [key: string]: number | {
@@ -306,6 +312,7 @@ export interface Balance {
       ironOre: number
       iron: number
       goldOre: number
+      coal: number
       [key: string]: number
     }
   }
@@ -325,6 +332,7 @@ export interface Balance {
       ironOre: number
       iron: number
       goldOre: number
+      coal: number
       spear: number
       sword: number
       shield: number
@@ -338,6 +346,7 @@ export interface Balance {
       ironOre: number
       iron: number
       goldOre: number
+      coal: number
       spear: number
       sword: number
       shield: number
@@ -352,6 +361,7 @@ export interface Balance {
     ironOre: number
     iron: number
     goldOre: number
+    coal: number
     coins: number
     spear: number
     sword: number
@@ -368,6 +378,7 @@ export interface Balance {
     ironOre: number
     iron: number
     goldOre: number
+    coal: number
     spear: number
     sword: number
     shield: number
@@ -415,6 +426,7 @@ export interface Balance {
     sword: number
     shield: number
     armour: number
+    coal: number
     [key: string]: number
   }
   readonly WEAPON_ATTACK: {
@@ -957,6 +969,7 @@ export interface Balance {
     stone: number
     ironOre: number
     goldOre: number
+    coal: number
     [key: string]: number
   }
   readonly WORK_STRENGTH_AVERAGE: number

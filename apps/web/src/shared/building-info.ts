@@ -31,7 +31,7 @@ export const BUILDING_PURPOSE: Record<BuildingKind, string> = {
   gate: 'A gate in a wall, which its city’s realm opens and closes; it grows the city like a wall does.',
   farm: 'A farm is fields that make Food; on Plains only.',
   stable: 'A stable keeps horses and their Food, and breeds them; on Plains only.',
-  mine: 'A mine digs the ore of the iron ore or gold ore node it stands on.',
+  mine: 'A mine digs what the iron ore, gold ore or coal node it stands on yields.',
   quarry: 'A quarry cuts stone from the stone node it stands on.',
   lumberCamp: 'A lumber camp fells wood in the forest node it stands on.',
   smelter: 'A smelter turns iron ore into iron; not on Mountain.',

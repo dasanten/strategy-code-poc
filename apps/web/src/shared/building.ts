@@ -519,11 +519,12 @@ export const NODE_GOOD: Record<ResourceKind, Good> = {
   stone: 'stone',
   ironOre: 'ironOre',
   goldOre: 'goldOre',
+  coal: 'coal',
 }
 
 /**
  * The good a workplace makes (`CONTEXT.md`: Workplace): Food on a farm; on a resource node, what
- * the node yields, so a mine makes iron ore or gold ore by the node it stands on; at a smelter or
+ * the node yields, so a mine makes iron ore, gold ore or coal by the node it stands on; at a smelter or
  * mint, what its recipe makes (Iron, Coins); at a smithy, the weapon or armour `makes` names
  * (`recipeFor`), and nothing without it.
  */

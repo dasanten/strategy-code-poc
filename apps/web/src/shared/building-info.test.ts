@@ -44,7 +44,7 @@ describe('buildingInfo', () => {
   })
 
   it('says a node’s workplace yields what its node does, either ore for a mine until its node is known', () => {
-    expect(buildingInfo('mine').yields).toEqual(['ironOre', 'goldOre'])
+    expect(buildingInfo('mine').yields).toEqual(['ironOre', 'goldOre', 'coal'])
     expect(buildingInfo('mine', 'goldOre').yields).toEqual(['goldOre'])
     expect(buildingInfo('lumberCamp').yields).toEqual(['wood'])
     expect(buildingInfo('mine').skill).toBe('mining')

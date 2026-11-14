@@ -288,6 +288,7 @@ export function jobDays(): JobDay[] {
     node('Quarry worker', 'stone', 'mining'),
     node('Iron miner', 'ironOre', 'mining'),
     node('Gold miner', 'goldOre', 'mining'),
+    node('Coal miner', 'coal', 'mining'),
     processing('Smelter worker', 'smelter'),
     processing('Mint worker', 'mint'),
     ...RECIPES.smithy!.map((_, i) => processing('Smith', 'smithy', i)),
