@@ -1390,6 +1390,7 @@ export function orderDoing(
 export function ResidentsList({
   groups,
   leaderId,
+  heirId,
   tick,
   scripts = [],
   buildings = [],
@@ -1404,6 +1405,8 @@ export function ResidentsList({
 }: {
   groups: ResidentGroup<Resident>[]
   leaderId: string
+  /** The realm's heir, marked in their row (`CONTEXT.md`: Heir). */
+  heirId?: string | null
   tick: number
   /** The Player's script library, to name the script each runs and the task it is for. */
   scripts?: ScriptSummary[]
@@ -1462,6 +1465,7 @@ export function ResidentsList({
                       key={r.id}
                       lines={residentLines(r, {
                         leaderId,
+                        heirId,
                         tick,
                         doing: doingLine(r, {
                           scripts,
@@ -1493,6 +1497,7 @@ export function ResidentsList({
                     <span className="name">
                       {r.name}
                       {r.id === leaderId && <small className="leader-mark">Leader</small>}
+                      {r.id === heirId && <small className="leader-mark">Heir</small>}
                     </span>
                     <span className="mono">{Math.floor(ageInYears(r, tick))}</span>
                     <span className="doing">
@@ -1550,6 +1555,7 @@ function ResidentLinesRow({
         <span className="name">
           {lines.name}
           {lines.leader && <span className="leader-mark"> · Leader</span>}
+          {lines.heir && <span className="leader-mark"> · Heir</span>}
         </span>
         <span className="mono">{lines.age}</span>
       </span>
@@ -2253,6 +2259,9 @@ export function ResidentCard({
   makeLeader,
   leaderName,
   onMakeLeader,
+  heirName,
+  onNameHeir,
+  onClearHeir,
   relocate,
   onRelocate,
   rename,
@@ -2448,11 +2457,19 @@ export function ResidentCard({
    * For one of the Player's own residents who isn't their Leader: why they can't be made Leader
    * now, if they can't (`makeLeaderProblem`). Undefined for the Leader and others' residents.
    */
-  makeLeader: { problem: string | undefined } | undefined
+  makeLeader:
+    | { problem: string | undefined; heir?: { problem: string | undefined; named: boolean } }
+    | undefined
   /** The Player's Leader's name, for the handover's confirm. */
   leaderName: string | undefined
   /** Orders the Leader to hand the realm over to this resident (`CONTEXT.md`: Leader handover). */
   onMakeLeader: () => void
+  /** The name of the realm's heir, if it has one other than this resident (`CONTEXT.md`: Heir). */
+  heirName?: string
+  /** Names this resident the realm's heir (`CONTEXT.md`: Heir). */
+  onNameHeir?: () => void
+  /** Clears the realm's heir, this resident (`CONTEXT.md`: Heir). */
+  onClearHeir?: () => void
   /**
    * For one of the Player's own residents: the realm's other cities to relocate them to
    * (`relocateChoices`) and why they can't be told to at all, if they can't
@@ -3015,6 +3032,52 @@ export function ResidentCard({
           </div>
         </section>
       )}
+      {shown === 'makeLeader' && makeLeader?.heir && (
+        <section className="inspector-block" aria-label="Heir">
+          <div className="panel-head">
+            <h3>Heir</h3>
+          </div>
+          {makeLeader.heir.named ? (
+            <>
+              <p className="small">{r.name} is your realm’s heir.</p>
+              <div className="order-buttons">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPanel(undefined)
+                    onClearHeir?.()
+                  }}
+                >
+                  Clear heir
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="small">
+                Name {r.name} your realm’s heir, to carry it on
+                {heirName ? ` in place of ${heirName}` : ''}? Free and at once, from anywhere.
+              </p>
+              {makeLeader.heir.problem && (
+                <p className="muted small">{makeLeader.heir.problem}.</p>
+              )}
+              <div className="order-buttons">
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={!!makeLeader.heir.problem}
+                  onClick={() => {
+                    setPanel(undefined)
+                    onNameHeir?.()
+                  }}
+                >
+                  Name {r.name} heir
+                </button>
+              </div>
+            </>
+          )}
+        </section>
+      )}
       {shown === 'rename' && rename && (
         <RenameBlock
           // Starts again from the new name once the rename comes back.
@@ -3033,7 +3096,7 @@ export function ResidentCard({
     <SelectionCard
       rel={r.owner === realmId ? 'own' : 'alliance'}
       title={r.name}
-      badge={r.id === leaderId ? 'Leader' : undefined}
+      badge={r.id === leaderId ? 'Leader' : makeLeader?.heir?.named ? 'Heir' : undefined}
       lines={[
         <strong key="doing">
           {doingLine(r, {

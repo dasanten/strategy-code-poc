@@ -17,6 +17,7 @@ fn world() -> WorldState {
             leader_id: "w1".into(),
             name: None,
             demands_sent_at: None,
+            heir_id: None,
         });
     }
     add_city(&mut w, "c1", Some("r1"), 2.0, 2.0);

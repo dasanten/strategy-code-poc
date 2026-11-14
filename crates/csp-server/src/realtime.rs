@@ -156,6 +156,7 @@ struct Client {
     /// What the Player was last sent of the Region map.
     region: RegionSent,
     leader_id: String,
+    heir_id: Option<String>,
     realm_name: Option<String>,
     horse_offer: bool,
     last_work_settings: String,
@@ -415,6 +416,7 @@ fn build_welcome(
         last_diplomacy: String::new(),
         region: RegionSent::default(),
         leader_id: realm.leader_id.clone(),
+        heir_id: realm.heir_id.clone(),
         realm_name: realm.name.clone(),
         horse_offer: !world.horse_offers_claimed.contains(&(user_id as u64)),
         last_work_settings: String::new(),
@@ -462,6 +464,7 @@ fn build_welcome(
         "home": {
             "realmId": realm.id,
             "leaderId": realm.leader_id,
+            "heirId": realm.heir_id,
             "realmName": client.realm_name,
             "cityId": city.map(|c| c.id.clone()),
             "x": x,
@@ -976,6 +979,13 @@ impl Realtime {
                     if leader_id != client.leader_id {
                         client.leader_id = leader_id.clone();
                         tick.insert("leaderId".into(), json!(leader_id));
+                    }
+                }
+                // Null once the realm has no heir (`CONTEXT.md`: Heir).
+                if let Some(heir_id) = realm.map(|r| r.heir_id.clone()) {
+                    if heir_id != client.heir_id {
+                        client.heir_id = heir_id.clone();
+                        tick.insert("heirId".into(), json!(heir_id));
                     }
                 }
                 if let Some(name) = realm.and_then(|r| r.name.clone()) {

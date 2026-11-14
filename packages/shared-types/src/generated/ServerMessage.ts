@@ -58,4 +58,8 @@ workSettings: { [key in string]: WorkplaceSettings }, } | { "type": "tick", tick
  * The new counts of the chunks in `explored`, as `encode_explored_counts` lists them: to a
  * client of `COUNTS_FROM_VERSION` or later, when some grew.
  */
-exploredCounts?: Array<number>, events: Array<RealmEvent>, diplomacy?: Diplomacy, region?: RegionMap, leaderId?: string, realmName?: string, horseOffer?: boolean, workSettings?: { [key in string]: WorkplaceSettings }, waypoints?: Array<Waypoint>, traderVisits?: Array<TraderVisit>, } | { "type": "scriptMemory", id: string, memory: { [key in string]: JsonValue } | null, } | { "type": "scriptRun", id: string, run: ScriptRunSeen | null, } | { "type": "scriptLog", id: string, lines: Array<ScriptLogLine> | null, } | { "type": "firstDay", firstDay: FirstDay, } | { "type": "ack", requestId: string, } | { "type": "rejected", requestId: string, reason: string, };
+exploredCounts?: Array<number>, events: Array<RealmEvent>, diplomacy?: Diplomacy, region?: RegionMap, leaderId?: string, realmName?: string, 
+/**
+ * The realm's heir once it changed: their id, or null once it has none.
+ */
+heirId?: string | null, horseOffer?: boolean, workSettings?: { [key in string]: WorkplaceSettings }, waypoints?: Array<Waypoint>, traderVisits?: Array<TraderVisit>, } | { "type": "scriptMemory", id: string, memory: { [key in string]: JsonValue } | null, } | { "type": "scriptRun", id: string, run: ScriptRunSeen | null, } | { "type": "scriptLog", id: string, lines: Array<ScriptLogLine> | null, } | { "type": "firstDay", firstDay: FirstDay, } | { "type": "ack", requestId: string, } | { "type": "rejected", requestId: string, reason: string, };

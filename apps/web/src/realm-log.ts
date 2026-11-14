@@ -1,7 +1,13 @@
 import { REALM_LOG_LENGTH } from '@csp/balance'
 import { TRADE_ORG_NAME } from './shared/trade-org.js'
 import { timeLeft } from './shared/estimates.js'
-import type { DeliveryView, PunishmentEnd, RealmEvent, StandingMove } from '@csp/shared-types'
+import type {
+  DeliveryView,
+  HeirLapse,
+  PunishmentEnd,
+  RealmEvent,
+  StandingMove,
+} from '@csp/shared-types'
 import { BUILDING_NAMES } from './city-view.js'
 import { formatMove } from './standing-view.js'
 
@@ -95,6 +101,9 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         oldAge: 'died of old age',
         killed: e.by ? `was killed by ${e.by}` : 'was killed',
       }[e.cause]
+      if (e.leader && e.heir) {
+        return { text: `Your Leader ${e.name} ${how}. Your heir ${e.heir} takes over.`, tone: 'bad' }
+      }
       if (e.leader) {
         return { text: `Your Leader ${e.name} ${how}. Your realm has ended.`, tone: 'bad' }
       }
@@ -589,6 +598,24 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         tone: 'info',
         places: [{ name: e.city, x: e.x, y: e.y }],
       }
+    case 'heirTookOver': {
+      const each = e.cities.map((c) => `${c.name} (${residentsText(c.residents)})`)
+      const now =
+        e.cities.length === 1
+          ? 'is now a self-managed city and holds you'
+          : 'are now self-managed cities and hold you'
+      const others = e.cities.length === 0 ? '' : ` ${listText(each)} ${now} in good standing.`
+      return {
+        text: `${e.heir} is your Leader now and leads your realm on from ${e.city}, its only city.${others}`,
+        tone: 'warn',
+        places: [
+          { name: e.city, x: e.x, y: e.y },
+          ...e.cities.map((c) => ({ name: c.name, x: c.x, y: c.y })),
+        ],
+      }
+    }
+    case 'heirLapsed':
+      return { text: `${heirLapsedText(e.heir, e.why)} Name another heir.`, tone: 'warn' }
     case 'leaderHandedOver':
       return {
         text: `${e.from} handed your realm over to ${e.to} in ${e.city}; ${e.to} is your Leader now.`,
@@ -869,6 +896,51 @@ export function realmEnded(log: RealmEvent[]): boolean {
   return last?.kind === 'selfManaged'
 }
 
+/**
+ * The newest line of the log saying the heir took over (`CONTEXT.md`: Leader death with an heir)
+ * after `dismissedSeq`, the last one the Player put away: the notice shows it until they do, also
+ * on their next login. Not once the realm has ended or a new one was founded since.
+ */
+export function heirTakeover(
+  log: RealmEvent[],
+  dismissedSeq: number | null,
+): Extract<RealmEvent, { kind: 'heirTookOver' }> | undefined {
+  const last = log.findLast(
+    (e) => e.kind === 'heirTookOver' || e.kind === 'selfManaged' || e.kind === 'founded',
+  )
+  return last?.kind === 'heirTookOver' && (dismissedSeq === null || last.seq > dismissedSeq)
+    ? last
+    : undefined
+}
+
+const TAKEOVER_SEEN_KEY = 'csp.heirTakeoverSeen'
+
+/** The last heir takeover the Player put away in this browser, if it lets us remember it. */
+export function rememberedTakeoverSeen(
+  realmId: string,
+  storage: () => Pick<Storage, 'getItem'> = () => localStorage,
+): number | null {
+  try {
+    const n = Number.parseInt(storage().getItem(`${TAKEOVER_SEEN_KEY}.${realmId}`) ?? '', 10)
+    return Number.isFinite(n) ? n : null
+  } catch {
+    return null
+  }
+}
+
+/** Remembers that the Player put the heir takeover `seq` away, if the browser lets us. */
+export function rememberTakeoverSeen(
+  realmId: string,
+  seq: number,
+  storage: () => Pick<Storage, 'setItem'> = () => localStorage,
+): void {
+  try {
+    storage().setItem(`${TAKEOVER_SEEN_KEY}.${realmId}`, String(seq))
+  } catch {
+    // Not remembered: after a reload the notice shows once more.
+  }
+}
+
 /** Adds a tick's new events to the log, keeping the latest `REALM_LOG_LENGTH` as the server does. */
 export function appendEvents(log: RealmEvent[], events: RealmEvent[]): RealmEvent[] {
   if (events.length === 0) return log
@@ -1026,5 +1098,23 @@ function punishedLine(e: Extract<RealmEvent, { kind: 'punished' }>): EventLine {
                 : `${army} was lost on its way home from ${e.city}, with ${taking}.`,
         tone: 'info',
       }
+  }
+}
+
+/** Why the heir lapsed, in words (`CONTEXT.md`: Heir). */
+function heirLapsedText(heir: string, why: HeirLapse): string {
+  switch (why) {
+    case 'died':
+      return `Your heir ${heir} died; your realm has no heir.`
+    case 'leftRealm':
+      return `Your heir ${heir} is no longer of your realm; it has no heir.`
+    case 'homeless':
+      return `Your heir ${heir} lives in no city of your realm now; it has no heir.`
+    case 'lent':
+      return `Your heir ${heir} is lent out by a mercenary contract; your realm has no heir.`
+    case 'allianceArmy':
+      return `Your heir ${heir} went to the alliance army; your realm has no heir.`
+    case 'becameLeader':
+      return `Your heir ${heir} is your Leader now; your realm has no heir.`
   }
 }

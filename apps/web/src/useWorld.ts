@@ -250,6 +250,8 @@ export function useWorld(onLoggedOut: () => void) {
                 ...w.home,
                 ...(msg.leaderId ? { leaderId: msg.leaderId } : {}),
                 ...(msg.realmName ? { realmName: msg.realmName } : {}),
+                // Null once the realm has no heir (`CONTEXT.md`: Heir).
+                ...(msg.heirId !== undefined ? { heirId: msg.heirId } : {}),
               },
               tick: msg.tick,
               exploredChunks,

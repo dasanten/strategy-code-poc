@@ -187,6 +187,7 @@ fn describe_every_field_of_everything_the_queries_and_me_hand_a_script() {
             "lineTiles",
             "lineTiles({building: \"road\", from: {x: 10, y: 12}, to: {x: 13, y: 12}}, me)",
         ),
+        ("realm", "realm()"),
         ("debt", "debt"),
         ("tick", "tick"),
         ("mapSize", "mapSize"),

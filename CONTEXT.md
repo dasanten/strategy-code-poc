@@ -944,7 +944,20 @@ The shared language of the game. Domain terms only — no implementation details
   free and instant, also while the city is under attack. The old Leader stays on as
   an ordinary resident of the realm. Contracts, alliances, standing, scripts and the realm log
   belong to the Player and carry over; the realm log records the handover.
-- **Leader death:** the Player instantly loses control of everything they held, wherever the
+- **Heir** (settled with Daniel on 2026-11-14, Epic 103): one adult of the realm the Player names
+  to carry it on, by hand or from a script, free, instant and from anywhere; naming another
+  replaces them, and the Player can clear it. The heir lives in a city of the realm, isn't the
+  Leader and serves no one else (the residents a Leader handover allows; the two need not stand in
+  one city). It lapses, with a line in the realm log, when the heir dies, leaves the realm, becomes
+  homeless, is lent out or handed to the alliance army, or becomes the Leader by a handover. Only
+  the Player and their allies see who the heir is.
+- **Leader death with an heir:** the heir becomes the Leader at once, a Down heir too. The realm
+  goes on under its name, with its standing, contracts, alliance, scripts and realm log. Only the
+  city the heir lives in stays the realm's, with its residents wherever they stand and what is in
+  it; every other city becomes a self-managed city as below, holding the Player in good standing.
+  The realm then has no heir until the Player names one. Leader and heir dying in the same tick
+  is a Leader death without an heir.
+- **Leader death:** without a living heir, the Player instantly loses control of everything they held, wherever the
   Leader was. Their cities become self-managed and the realm ends: its alliance membership,
   contracts and standing end with it. The Player respawns as a new Leader with a fresh starting
   city on their next login, founding a new realm: they give its realm name and their new

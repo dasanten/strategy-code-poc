@@ -1172,6 +1172,17 @@ impl<'a> ScriptBindings<'a> {
                     Json::Array(demands_for(world, self.side.as_deref().expect("checked")))
                 }
             }
+            "realm" => {
+                // My own realm without an id; only it shows its heir (`CONTEXT.md`: Heir).
+                let id = arg(0).and_then(Value::as_str).or(self.side.as_deref());
+                match id.and_then(|id| world.realms.iter().find(|r| r.id == id)) {
+                    Some(r) => json!({
+                        "id": r.id,
+                        "heir": r.heir_id.as_ref().filter(|_| self.side.as_deref() == Some(&r.id)),
+                    }),
+                    None => none,
+                }
+            }
             "waypoints" => {
                 if self.npc() {
                     Json::Array(vec![])
@@ -1630,6 +1641,8 @@ impl<'a> ScriptBindings<'a> {
                 ],
             ),
             "handOver" => self.request("handOver", vec![("newLeaderId", p(0)?)]),
+            "nameHeir" => self.request("nameHeir", vec![("heirId", p(0)?)]),
+            "clearHeir" => self.request("clearHeir", vec![]),
             "rename" => {
                 let mut input = vec![("targetId", p(0)?), ("name", p(1)?)];
                 if a(2).is_some_and(|v| !v.is_null()) {

@@ -306,6 +306,9 @@ fn step_rest(
     step_debts(world, scratch);
     step_persuasion(world, size);
     step_armies(world, size);
+    // An heir who no longer qualifies lapses, now that cities, contracts and the alliance army
+    // have changed hands this tick (`CONTEXT.md`: Heir).
+    crate::heir::lapse_heirs(world);
     // Who came into a City area, now that everyone has moved and nobody changes sides this tick.
     let outsiders_from = std::time::Instant::now();
     step_outsiders(world, size, scratch);

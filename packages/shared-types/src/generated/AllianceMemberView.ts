@@ -3,4 +3,8 @@
 /**
  * A member of the Player's alliance (`Diplomacy.alliance.members`).
  */
-export type AllianceMemberView = { joinedAt: number, leavesAt: number | null, realmId: string, realm: string, city?: true, };
+export type AllianceMemberView = { joinedAt: number, leavesAt: number | null, 
+/**
+ * The name of the member's heir (`CONTEXT.md`: Heir): only allies see it; absent with none.
+ */
+heir?: string, realmId: string, realm: string, city?: true, };

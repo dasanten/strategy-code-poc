@@ -1,7 +1,15 @@
 import { REALM_LOG_LENGTH } from '@csp/balance'
-import type { RealmEvent } from '@csp/shared-types'
+import type { HeirLapse, RealmEvent } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
-import { appendEvents, describeDelivery, describeEvent, realmEnded } from './realm-log.js'
+import {
+  appendEvents,
+  describeDelivery,
+  describeEvent,
+  heirTakeover,
+  realmEnded,
+  rememberTakeoverSeen,
+  rememberedTakeoverSeen,
+} from './realm-log.js'
 
 const at = { tick: 7, userId: 1 }
 
@@ -932,6 +940,91 @@ describe('realm log', () => {
       tone: 'info',
       places: [{ name: 'Ashford', x: 3, y: 9 }],
     })
+  })
+
+  it('says the heir took over, from where, and what became of the other cities', () => {
+    const died = { kind: 'died', residentId: 'r1', name: 'Mara', cause: 'killed' } as const
+    expect(
+      describeEvent({ ...died, leader: true, by: 'Tobin', heir: 'Ysolde', seq: 1, ...at }).text,
+    ).toBe('Your Leader Mara was killed by Tobin. Your heir Ysolde takes over.')
+    const took = {
+      kind: 'heirTookOver',
+      heirId: 'r2',
+      heir: 'Ysolde',
+      cityId: 'c2',
+      city: 'Redbank',
+      x: 40,
+      y: 50,
+      seq: 2,
+      ...at,
+    } as const
+    const city = (name: string, residents: number, x: number) =>
+      ({ cityId: name, name, x, y: 1, residents }) as const
+    expect(describeEvent({ ...took, cities: [city('Ashford', 3, 10)] })).toEqual({
+      text: 'Ysolde is your Leader now and leads your realm on from Redbank, its only city. Ashford (3 residents) is now a self-managed city and holds you in good standing.',
+      tone: 'warn',
+      places: [
+        { name: 'Redbank', x: 40, y: 50 },
+        { name: 'Ashford', x: 10, y: 1 },
+      ],
+    })
+    const two = describeEvent({ ...took, cities: [city('Ashford', 3, 10), city('Kell', 1, 20)] })
+    expect(two.text).toContain(
+      'Ashford (3 residents) and Kell (1 resident) are now self-managed cities and hold you in good standing.',
+    )
+    expect(describeEvent({ ...took, cities: [] }).text).toBe(
+      'Ysolde is your Leader now and leads your realm on from Redbank, its only city.',
+    )
+  })
+
+  it('shows the takeover notice until it is put away, and not once the realm has ended', () => {
+    const took = {
+      kind: 'heirTookOver',
+      heirId: 'r2',
+      heir: 'Ysolde',
+      cityId: 'c2',
+      city: 'Redbank',
+      x: 40,
+      y: 50,
+      cities: [],
+      seq: 4,
+      ...at,
+    } satisfies RealmEvent
+    const spoiled = { kind: 'foodSpoiled', units: 1, seq: 5, ...at } satisfies RealmEvent
+    expect(heirTakeover([], null)).toBeUndefined()
+    expect(heirTakeover([took, spoiled], null)).toEqual(took)
+    expect(heirTakeover([took, spoiled], 3)).toEqual(took)
+    expect(heirTakeover([took, spoiled], 4)).toBeUndefined()
+    const ended: RealmEvent = { kind: 'selfManaged', cities: [], seq: 6, ...at }
+    expect(heirTakeover([took, ended], null)).toBeUndefined()
+    expect(realmEnded([took, spoiled])).toBe(false)
+  })
+
+  it('remembers the takeover put away, where the browser lets it', () => {
+    const kept = new Map<string, string>()
+    const storage = () => ({
+      getItem: (k: string) => kept.get(k) ?? null,
+      setItem: (k: string, v: string) => void kept.set(k, v),
+    })
+    expect(rememberedTakeoverSeen('r1', storage)).toBeNull()
+    rememberTakeoverSeen('r1', 4, storage)
+    expect(rememberedTakeoverSeen('r1', storage)).toBe(4)
+    const broken = () => {
+      throw new Error('no storage')
+    }
+    expect(rememberedTakeoverSeen('r1', broken)).toBeNull()
+    expect(() => rememberTakeoverSeen('r1', 4, broken)).not.toThrow()
+  })
+
+  it('says the heir lapsed and why, and to name another', () => {
+    const lapsed = (why: HeirLapse) =>
+      describeEvent({ kind: 'heirLapsed', heirId: 'r2', heir: 'Ysolde', why, seq: 1, ...at })
+    expect(lapsed('died')).toEqual({
+      text: 'Your heir Ysolde died; your realm has no heir. Name another heir.',
+      tone: 'warn',
+    })
+    expect(lapsed('lent').text).toContain('lent out by a mercenary contract')
+    expect(lapsed('becameLeader').text).toContain('is your Leader now')
   })
 
   it('tells both sides of a carried direct offer, with what they pay', () => {

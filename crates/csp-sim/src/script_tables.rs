@@ -2074,6 +2074,24 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
         ],
     },
     ScriptView {
+        name: "realm",
+        description: "A realm, as the Player sees it.",
+        fields: &[
+            ScriptField {
+                name: "id",
+                r#type: ScriptType::String,
+                description: "The realm’s id, unique in the world.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "heir",
+                r#type: ScriptType::String,
+                description: "The id of the resident named to carry the realm on.",
+                null_when: Some("while my realm has none named, and always for another realm"),
+            },
+        ],
+    },
+    ScriptView {
         name: "demand",
         description: "A demand my realm sent or was sent, waiting for an answer (`sendDemand`, `acceptDemand`, `declineDemand`).",
         fields: &[
@@ -2313,6 +2331,14 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         cost: 20.0,
         description: "My Player’s waypoints, oldest first: the named markers they put on the map, which only they see.",
         returns: ScriptType::List(&ScriptType::View("waypoint")),
+    },
+    ScriptBinding {
+        name: "realm",
+        is: Is::Query,
+        params: &["realmId?"],
+        cost: 1.0,
+        description: "The realm with that id, my own without one; null for none. Only my own realm shows its heir.",
+        returns: ScriptType::View("realm"),
     },
     ScriptBinding {
         name: "demands",
@@ -2896,6 +2922,22 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         params: &["newLeaderId"],
         cost: 10.0,
         description: "As my realm’s Leader, make another resident its Leader: an adult of my realm serving no one else (no mercenary contract, not in the alliance army), standing in the same city of my realm as I do. Free and at once; I stay on as an ordinary resident.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "nameHeir",
+        is: Is::Action,
+        params: &["residentId"],
+        cost: 10.0,
+        description: "Name a resident my realm’s heir, in place of any before: an adult of my realm who lives in one of its cities, isn’t its Leader and serves no one else (no mercenary contract or offer, not in the alliance army). Free and at once, from anywhere. The heir lapses, with a line in the realm log, once they die, leave the realm, become homeless, are lent out or handed to the alliance army, or become the Leader.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "clearHeir",
+        is: Is::Action,
+        params: &[],
+        cost: 10.0,
+        description: "Clear my realm’s heir, so it has none: free and at once; refused while it has none.",
         returns: ScriptType::String,
     },
     ScriptBinding {

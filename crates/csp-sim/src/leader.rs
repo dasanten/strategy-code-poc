@@ -76,6 +76,8 @@ pub fn apply_hand_over(
     };
     world.realms[ri].leader_id = to_id.to_string();
     record_event(world, Some(&realm_id), what);
+    // A handover to the heir clears it (`CONTEXT.md`: Heir).
+    crate::heir::lapse_heirs(world);
 }
 
 /// Invariant (`leadersServeNoOne`): every realm's Leader is a living adult of that realm who
