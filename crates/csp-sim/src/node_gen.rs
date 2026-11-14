@@ -5,8 +5,8 @@
 //! the kinds that may lie on it is built once, so most tiles (plains, water) cost one lookup.
 
 use csp_shared::balance::{
-    TerrainTable, FRONTIER_NODE_DENSITY, ISLAND_NODE_DENSITY, NODE_DENSITY, NODE_MIN_SPACING,
-    RARE_NODE_DENSITY,
+    TerrainTable, FRONTIER_NODE_DENSITY, GOLD_NODE_DENSITY, ISLAND_NODE_DENSITY, NODE_DENSITY,
+    NODE_MIN_SPACING,
 };
 use csp_shared::terrain::{tile_index, TerrainMap};
 use csp_shared::world::{ResourceKind, ResourceNode};
@@ -14,13 +14,16 @@ use csp_shared::world::{ResourceKind, ResourceNode};
 use crate::random::hash;
 use crate::regions::{RegionKind, Regions};
 
-/// The kinds in the order of `Object.keys(NODE_DENSITY)`, with their densities.
-fn kinds() -> [(ResourceKind, TerrainTable); 4] {
+/// The kinds in the order of `Object.keys(NODE_DENSITY)`, with their densities. Coal comes last,
+/// so a tile where an older kind falls keeps it, and the nodes of a world without coal stay as
+/// they were.
+fn kinds() -> [(ResourceKind, TerrainTable); 5] {
     [
         (ResourceKind::Forest, NODE_DENSITY.forest),
         (ResourceKind::Stone, NODE_DENSITY.stone),
         (ResourceKind::IronOre, NODE_DENSITY.iron_ore),
         (ResourceKind::GoldOre, NODE_DENSITY.gold_ore),
+        (ResourceKind::Coal, NODE_DENSITY.coal),
     ]
 }
 
@@ -31,13 +34,14 @@ type Candidate = (ResourceKind, f64, f64);
 /// Places the resource nodes (`placeResourceNodes`): each tile may hold one, with the chance its
 /// terrain gives that kind in the balance file (the first kind in order whose hash falls below
 /// it), and no two nodes closer than `NODE_MIN_SPACING`, measured across the map's joins too.
-/// The same terrain and seed always give the same nodes, `n1`, `n2`, … row by row.
+/// The same terrain and seed always give the same nodes, `n1`, `n2`, … row by row. A map
+/// without regions has no coal (`CONTEXT.md`: Rare goods): coal lies only outside a heartland.
 pub fn place_resource_nodes(terrain: &TerrainMap, seed: i64) -> Vec<ResourceNode> {
-    place_nodes_scaled(terrain, seed, |_, _| 1.0)
+    place_nodes_scaled(terrain, seed, |_, kind| if kind == ResourceKind::Coal { 0.0 } else { 1.0 })
 }
 
 /// The kinds that have no nodes in a heartland (`CONTEXT.md`: Rare goods).
-pub const RARE_KINDS: [ResourceKind; 1] = [ResourceKind::GoldOre];
+pub const RARE_KINDS: [ResourceKind; 2] = [ResourceKind::GoldOre, ResourceKind::Coal];
 
 /// Whether a node of this kind may lie in a region of this kind (`CONTEXT.md`: Rare goods): a rare
 /// kind only in the frontier and on islands, every other kind anywhere.
@@ -46,13 +50,13 @@ pub fn allowed_in(kind: ResourceKind, region: RegionKind) -> bool {
 }
 
 /// How many times its region's density a kind's chances are: none where it is not
-/// [`allowed_in`], `RARE_NODE_DENSITY` for a rare kind where it is, so the frontier and islands
-/// make up for the heartlands.
+/// [`allowed_in`]; gold `GOLD_NODE_DENSITY` where it is, so the frontier and islands make up for
+/// the heartlands (coal's own density already counts only out there).
 fn kind_scale(kind: ResourceKind, region: RegionKind) -> f64 {
     if !allowed_in(kind, region) {
         0.0
-    } else if RARE_KINDS.contains(&kind) {
-        RARE_NODE_DENSITY
+    } else if kind == ResourceKind::GoldOre {
+        GOLD_NODE_DENSITY
     } else {
         1.0
     }
@@ -61,7 +65,8 @@ fn kind_scale(kind: ResourceKind, region: RegionKind) -> f64 {
 /// Places the resource nodes by region (`CONTEXT.md`: Heartland, Frontier, Island, Rare goods): as
 /// [`place_resource_nodes`], each tile's chances times its region's density (`NODE_DENSITY` in a
 /// heartland, `FRONTIER_NODE_DENSITY` and `ISLAND_NODE_DENSITY` times it elsewhere) and its kind's
-/// share there ([`kind_scale`]: no gold in a heartland).
+/// share there ([`kind_scale`]): gold and coal lie only in frontier regions and on islands, none in
+/// a heartland. Tiles in no region (water) hold no coal.
 pub fn place_resource_nodes_by_region(
     terrain: &TerrainMap,
     seed: i64,
@@ -80,10 +85,11 @@ pub fn place_resource_nodes_by_region(
         })
         .collect();
     let mut nodes = place_nodes_scaled(terrain, seed, |t, kind| {
-        regions.id_of_tile(t).map_or(1.0, |id| {
-            let (region, density) = scale[id as usize];
-            density * kind_scale(kind, region)
-        })
+        let Some(id) = regions.id_of_tile(t) else {
+            return if kind == ResourceKind::Coal { 0.0 } else { 1.0 };
+        };
+        let (region, density) = scale[id as usize];
+        density * kind_scale(kind, region)
     });
     place_missing_rare_nodes(&mut nodes, terrain, regions);
     nodes
@@ -259,9 +265,9 @@ mod tests {
         let at = |n: &ResourceNode| terrain_at(&terrain, n.x as i32, n.y as i32);
 
         // Every node on terrain that fits its kind.
-        let kinds = kinds();
+        let all = kinds();
         let fits = |n: &ResourceNode| {
-            kinds.iter().any(|(k, densities)| *k == n.kind && densities.get(at(n)).is_some())
+            all.iter().any(|(k, densities)| *k == n.kind && densities.get(at(n)).is_some())
         };
         assert!(nodes.iter().all(fits));
 
@@ -283,6 +289,8 @@ mod tests {
         }
 
         // Roughly the densities from the balance file, gold rarest.
+        // A map without regions has no coal.
+        let kinds = kinds().into_iter().filter(|(k, _)| *k != ResourceKind::Coal);
         let mut tiles_of = [0usize; 256];
         for &t in &terrain.tiles {
             tiles_of[usize::from(t)] += 1;

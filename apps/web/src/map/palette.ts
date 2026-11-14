@@ -49,6 +49,7 @@ export const NODE_COLORS: Record<ResourceKind, number> = {
   stone: 0xc9c2b0,
   ironOre: 0xb5653e,
   goldOre: 0xe2b93b,
+  coal: 0x6e7480,
 }
 
 export const NODE_NAMES: Record<ResourceKind, string> = {
@@ -56,6 +57,7 @@ export const NODE_NAMES: Record<ResourceKind, string> = {
   stone: 'Stone',
   ironOre: 'Iron ore',
   goldOre: 'Gold ore',
+  coal: 'Coal',
 }
 
 /** The selection ring and a selected resident's way. */

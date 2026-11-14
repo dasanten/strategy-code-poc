@@ -1007,7 +1007,7 @@ impl<'a> ScriptBindings<'a> {
                 let wanted = match kind {
                     None => None,
                     Some(Value::String(k))
-                        if ["forest", "stone", "ironOre", "goldOre"].contains(&k.as_ref()) =>
+                        if csp_shared::chunks::NODE_KINDS.contains(&k.as_ref()) =>
                     {
                         Some(k.to_string())
                     }

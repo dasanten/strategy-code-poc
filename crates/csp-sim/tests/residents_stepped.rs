@@ -7,7 +7,8 @@
 
 mod common;
 
-use csp_shared::world::WorldState;
+use csp_shared::balance::{HQ_FLOOR_FACTOR, WAREHOUSE_FLOOR};
+use csp_shared::world::{Good, WorldState};
 use csp_sim::aging::step_aging;
 use csp_sim::spoilage::step_spoilage;
 use csp_sim::stock_floor::step_stock_floor;
@@ -72,11 +73,23 @@ fn survival_spoilage_floor_aging_and_refill_step_as_in_typescript() {
             if let Some(want) = next.filter(|w| w["t"] == t) {
                 // JSON leaves out `undefined`; `null` fields the TypeScript dropped compare equal.
                 let got = subset(&world, t);
-                assert_same_json(&format!("{name}@{t}"), &strip_nulls(want), &strip_nulls(&got));
+                let got = common::without_coal(&strip_nulls(&got));
+                assert_same_json(&format!("{name}@{t}"), &strip_nulls(want), &got);
                 next = at.next();
             }
         }
         assert!(next.is_none(), "{name}: not every tick was compared");
+        // Coal, which the TypeScript knew nothing of: the HQ's warehouse keeps its floor of it.
+        if name == "hq-0" {
+            let hq_floor = WAREHOUSE_FLOOR.get("coal").unwrap() * HQ_FLOOR_FACTOR;
+            let held = |b: &csp_shared::world::Building| {
+                b.stock.as_ref().and_then(|s| s.get(&Good::Coal)).copied().unwrap_or(0.0)
+            };
+            assert!(
+                world.buildings.iter().any(|b| held(b) >= hq_floor),
+                "{name}: no Coal at the floor"
+            );
+        }
     }
 }
 

@@ -40,22 +40,25 @@ fn regions_with(nodes: &[ResourceNode], regions: &Regions, kind: ResourceKind) -
         .collect()
 }
 
-/// On one generated map: no gold node in a heartland, every frontier region with one of its own
-/// or next to one that has, and the heartlands still with their iron.
+/// On one generated map: no gold or coal node in a heartland, every frontier region with one of
+/// each in it
+/// or next to it, and the heartlands still with their iron.
 fn assert_gold_lies_out_there(seed: i64) {
     let terrain = generate_terrain(seed, 1536);
     let regions = Regions::of(seed, &terrain);
     let nodes = place_resource_nodes_by_region(&terrain, seed, &regions);
     let kind_of = |id: &u32| regions.regions[*id as usize].kind;
-    let gold = regions_with(&nodes, &regions, ResourceKind::GoldOre);
-    assert!(gold.iter().all(|id| kind_of(id) != RegionKind::Heartland), "seed {seed}: {gold:?}");
     let next = regions.next_to();
-    for r in regions.of_kind(RegionKind::Frontier) {
-        assert!(
-            gold.contains(&r.id) || next[r.id as usize].iter().any(|n| gold.contains(n)),
-            "seed {seed}: frontier {} has no gold of its own nor next to it",
-            r.name
-        );
+    for kind in RARE_KINDS {
+        let rare = regions_with(&nodes, &regions, kind);
+        assert!(rare.iter().all(|id| kind_of(id) != RegionKind::Heartland), "{seed} {kind:?}");
+        for r in regions.of_kind(RegionKind::Frontier) {
+            assert!(
+                rare.contains(&r.id) || next[r.id as usize].iter().any(|n| rare.contains(n)),
+                "seed {seed}: frontier {} has no {kind:?} of its own nor next to it",
+                r.name
+            );
+        }
     }
     let iron = regions_with(&nodes, &regions, ResourceKind::IronOre);
     assert!(iron.iter().any(|id| kind_of(id) == RegionKind::Heartland), "seed {seed}");

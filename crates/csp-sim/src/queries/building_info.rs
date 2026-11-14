@@ -105,8 +105,13 @@ pub struct BuildingInfo {
 }
 
 /// The resource kinds in `NODE_WORKPLACE`'s order.
-const RESOURCE_KINDS: [ResourceKind; 4] =
-    [ResourceKind::Forest, ResourceKind::Stone, ResourceKind::IronOre, ResourceKind::GoldOre];
+const RESOURCE_KINDS: [ResourceKind; 5] = [
+    ResourceKind::Forest,
+    ResourceKind::Stone,
+    ResourceKind::IronOre,
+    ResourceKind::GoldOre,
+    ResourceKind::Coal,
+];
 
 /// What a kind of building is and does (`buildingInfo`); `node` picks what a mine yields.
 pub fn building_info(kind: BuildingKind, node: Option<ResourceKind>) -> BuildingInfo {
@@ -193,7 +198,7 @@ mod tests {
     fn says_a_nodes_workplace_yields_what_its_node_does() {
         let names =
             |k, n| -> Vec<&str> { building_info(k, n).yields.into_iter().map(good_name).collect() };
-        assert_eq!(names(BuildingKind::Mine, None), ["ironOre", "goldOre"]);
+        assert_eq!(names(BuildingKind::Mine, None), ["ironOre", "goldOre", "coal"]);
         assert_eq!(names(BuildingKind::Mine, Some(ResourceKind::GoldOre)), ["goldOre"]);
         assert_eq!(names(BuildingKind::LumberCamp, None), ["wood"]);
         assert_eq!(building_info(BuildingKind::Mine, None).skill, Some(SkillName::Mining));

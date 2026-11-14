@@ -39,7 +39,9 @@ describe('buildingInfoLines', () => {
     expect(buildingInfoLines('mine', labels, { node: 'goldOre' })).toContain(
       'Makes gold ore, from its node',
     )
-    expect(buildingInfoLines('mine', labels)).toContain('Makes iron ore or gold ore, from its node')
+    expect(buildingInfoLines('mine', labels)).toContain(
+      'Makes iron ore, gold ore or coal, from its node',
+    )
     expect(buildingInfoLines('lumberCamp', labels)).toContain(
       'Built from no materials and about 2 game days of one resident’s work',
     )
