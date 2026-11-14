@@ -1,12 +1,22 @@
 {
   "MAP_SIZE": 5760,
   "TERRAIN_SHARES": {
-    "sea": 0.08,
-    "lake": 0.025,
-    "mountain": 0.07,
-    "hills": 0.13,
-    "forest": 0.25
+    "lake": 0.03,
+    "mountain": 0.08,
+    "hills": 0.15,
+    "forest": 0.28
   },
+  "MAINLAND_SHARE": 0.42,
+  "MAINLAND_STRETCH": 1.2,
+  "JOIN_SEA_SHARE": 0.03,
+  "ISLAND_COUNT": 12.0,
+  "ISLAND_RADIUS": {
+    "min": 0.006,
+    "max": 0.03,
+    "minTiles": 6.0
+  },
+  "NARROWEST_STRAIT": 16,
+  "ISLAND_OFFSHORE_SHARE": 0.06,
   "NODE_DENSITY": {
     "forest": {
       "1": 0.00020833333333333335
@@ -305,7 +315,6 @@
   "DELIVERY_FEE_PER_KG_TILE": 0.00125,
   "DELIVERY_DRIVE_TRIES": 3.0,
   "TRANSFER_FEE_FACTOR": 3.0,
-  "SEA_COUNT": 3.0,
   "GOOD_WEIGHT": {
     "food": 1.0,
     "wood": 1.0,

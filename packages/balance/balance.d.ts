@@ -4,13 +4,24 @@
 export interface Balance {
   readonly MAP_SIZE: number
   readonly TERRAIN_SHARES: {
-    sea: number
     lake: number
     mountain: number
     hills: number
     forest: number
     [key: string]: number
   }
+  readonly MAINLAND_SHARE: number
+  readonly MAINLAND_STRETCH: number
+  readonly JOIN_SEA_SHARE: number
+  readonly ISLAND_COUNT: number
+  readonly ISLAND_RADIUS: {
+    min: number
+    max: number
+    minTiles: number
+    [key: string]: number
+  }
+  readonly NARROWEST_STRAIT: number
+  readonly ISLAND_OFFSHORE_SHARE: number
   readonly NODE_DENSITY: {
     forest: {
       '1': number
@@ -356,7 +367,6 @@ export interface Balance {
   readonly DELIVERY_FEE_PER_KG_TILE: number
   readonly DELIVERY_DRIVE_TRIES: number
   readonly TRANSFER_FEE_FACTOR: number
-  readonly SEA_COUNT: number
   readonly GOOD_WEIGHT: {
     food: number
     wood: number

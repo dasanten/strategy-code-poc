@@ -22,7 +22,10 @@ fn bench_world_times_every_stage_and_prints_both_tables() {
     fn stages(s: &[(&'static str, f64)]) -> Vec<&'static str> {
         s.iter().map(|(n, _)| *n).collect()
     }
-    assert_eq!(stages(&made.terrain_stages), ["seas", "lakes", "relief", "forest", "joining"]);
+    assert_eq!(
+        stages(&made.terrain_stages),
+        ["mainland", "lakes", "islands", "relief", "forest", "joining"]
+    );
     assert_eq!(
         stages(&made.world_stages),
         ["nodes", "HQ", "NPC cities", "trading posts", "caravans"]
