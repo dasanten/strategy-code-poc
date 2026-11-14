@@ -19,6 +19,7 @@ use csp_shared::world::{
 };
 use serde_json::json;
 
+use crate::land_sites::{near_a_starting_site, starting_site_middles, FootReach};
 use crate::npc_behaviour::{default_script, stop_work, Jobs};
 use crate::npc_chain::short_goods;
 use crate::npc_cities::{hall_tile, npc_site_fits, taken_ground, FARM_RING};
@@ -341,7 +342,8 @@ pub fn lacked_good(world: &WorldState, city: &City, home: (i32, i32), size: i32)
 
 /// A site for a city's daughter (`findFoundingSite`), by its town hall's tile: of
 /// `NPC_FOUND_SAMPLES` random tiles between `NPC_CITY_MIN_DISTANCE` and `NPC_FOUND_REACH` from its
-/// home, those where a village fits with no tile of it on a realm's territory; the one nearest a
+/// home, those where a village fits with no tile of it on a realm's territory, on land its people walk to
+/// (never an island) and clear of the starting sites (`NPC_STARTING_SITE_CLEARANCE`); the one nearest a
 /// node of the good it lacks wins, else the one nearest home.
 pub fn find_founding_site(
     world: &WorldState,
@@ -389,6 +391,13 @@ pub fn find_founding_site(
             nodes.iter().map(|n| wrap_distance(size, at, *n)).fold(f64::INFINITY, f64::min)
         }
     };
+    // The daughter stays on its mother's land, the mainland, and off the starting sites.
+    let starting = starting_site_middles(world);
+    let reach = (NPC_FOUND_REACH + NPC_VILLAGE.size) as i32 + 2 * FARM_RING;
+    let walk: std::cell::OnceCell<FootReach> = std::cell::OnceCell::new();
+    let walks_to = |(x, y): (i32, i32)| {
+        walk.get_or_init(|| FootReach::from(terrain, home_at, reach)).reaches(x, y)
+    };
     let mut best: Option<((i32, i32), f64)> = None;
     let half = (NPC_VILLAGE.size / 2.0).floor() as i32;
     for _ in 0..NPC_FOUND_SAMPLES as usize {
@@ -405,6 +414,10 @@ pub fn find_founding_site(
             continue;
         }
         if on_realm(x, y) {
+            continue;
+        }
+        let middle = (f64::from(x + half), f64::from(y + half));
+        if near_a_starting_site(&starting, size, middle) || !walks_to(hall) {
             continue;
         }
         best = Some((hall, s));
@@ -596,6 +609,6 @@ pub fn npc_cities_have_halls(world: &WorldState) -> Vec<InvariantViolation> {
 }
 
 mod invariants;
-pub use invariants::{founding_parties_sound, full_wait_sound};
+pub use invariants::{founding_parties_sound, founding_site_clear, full_wait_sound};
 #[cfg(test)]
 mod tests;

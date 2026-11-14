@@ -787,3 +787,30 @@ fn builds_its_storage_a_farm_and_a_house_in_that_order_then_walls_itself() {
     assert!(ring.len() as f64 > 8.0 * d - 8.0);
     assert!(ring.iter().all(|b| b.city_id.as_deref() == Some(city.as_str())));
 }
+
+// the daughter stays on the mainland (T100.5)
+
+#[test]
+fn looks_for_its_daughter_only_on_land_its_people_walk_to_never_across_the_sea() {
+    let mut t = full_town(1600);
+    let home = t.home();
+    let (hx, size) = (home.x as i32, t.terrain.size);
+    // Two straits of Sea run north to south 300 tiles either side of the town: the land between
+    // them is its own, and the land beyond them, in reach of a founding party, an island.
+    for y in 0..size {
+        for d in 300..340 {
+            for x in [hx + d, hx - d] {
+                t.terrain.tiles[tile_index(size, x, y)] = Terrain::Sea as u8;
+            }
+        }
+    }
+    let mut found = 0;
+    for _ in 0..8 {
+        t.world.tick += 977;
+        let Some(site) = t.site() else { continue };
+        found += 1;
+        let dx = csp_shared::terrain::wrap_delta(hx, site.x as i32, size).abs();
+        assert!(dx < 300, "a site across the sea at {site:?}");
+    }
+    assert!(found > 0);
+}

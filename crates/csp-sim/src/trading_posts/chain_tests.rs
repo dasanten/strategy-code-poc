@@ -23,6 +23,7 @@ use crate::queries::city_area::free_housing;
 use crate::queries::names::held;
 use crate::queries::residents::can_work;
 use crate::queries::warehouse::warehouse_keeps;
+use crate::random::Mulberry32;
 use crate::realm_test_world::plains;
 use crate::tick::Scratch;
 use crate::trade_org::found_trade_org_hq;
