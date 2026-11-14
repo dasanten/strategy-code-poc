@@ -3329,6 +3329,36 @@ pub enum ResourceKind {
     GoldOre,
 }
 
+/// How much a resource node gives per worker (`CONTEXT.md`: Richness), fixed when it comes into
+/// being.
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, TS,
+)]
+#[serde(rename_all = "camelCase")]
+pub enum Richness {
+    Poor,
+    #[default]
+    Normal,
+    Rich,
+}
+
+impl Richness {
+    /// What a worker's output on a node of this richness is multiplied by (`RICHNESS_FACTOR`).
+    pub fn factor(self) -> f64 {
+        let f = crate::balance::RICHNESS_FACTOR;
+        match self {
+            Richness::Poor => f.poor,
+            Richness::Normal => f.normal,
+            Richness::Rich => f.rich,
+        }
+    }
+
+    /// Its steps up from poor: 0, 1 or 2.
+    pub fn rank(self) -> u8 {
+        self as u8
+    }
+}
+
 /// A spot on the map that never runs out (`ResourceNode`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
@@ -3337,4 +3367,15 @@ pub struct ResourceNode {
     pub kind: ResourceKind,
     pub x: f64,
     pub y: f64,
+    /// Fixed when it comes into being (`CONTEXT.md`: Richness); normal where nothing set it, as in
+    /// the frozen fixtures from before richness.
+    #[serde(default)]
+    pub richness: Richness,
+}
+
+impl ResourceNode {
+    /// A normal node of `kind` at (x, y).
+    pub fn new(id: impl Into<String>, kind: ResourceKind, x: f64, y: f64) -> Self {
+        ResourceNode { id: id.into(), kind, x, y, richness: Richness::Normal }
+    }
 }

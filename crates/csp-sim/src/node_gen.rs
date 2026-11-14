@@ -4,11 +4,14 @@
 //! The TypeScript asks every kind of every tile with a closure; here a table from each terrain to
 //! the kinds that may lie on it is built once, so most tiles (plains, water) cost one lookup.
 
+use std::collections::HashMap;
+
 use csp_shared::balance::{
-    TerrainTable, FRONTIER_NODE_DENSITY, ISLAND_NODE_DENSITY, NODE_DENSITY, NODE_MIN_SPACING,
+    TerrainTable, FRONTIER_NODE_DENSITY, FRONTIER_RICH_NODES, ISLAND_NODE_DENSITY, NODE_DENSITY,
+    NODE_MIN_SPACING,
 };
-use csp_shared::terrain::{tile_index, TerrainMap};
-use csp_shared::world::{ResourceKind, ResourceNode};
+use csp_shared::terrain::{tile_index, wrap_distance, TerrainMap};
+use csp_shared::world::{ResourceKind, ResourceNode, Richness};
 
 use crate::random::hash;
 use crate::regions::{RegionKind, Regions};
@@ -93,7 +96,7 @@ fn place_nodes_scaled(
             else {
                 continue;
             };
-            nodes.push(ResourceNode { id: format!("n{}", nodes.len() + 1), kind, x: xf, y: yf });
+            nodes.push(ResourceNode::new(format!("n{}", nodes.len() + 1), kind, xf, yf));
             for by in y - reach..=y + reach {
                 for bx in x - reach..=x + reach {
                     blocked[tile_index(size, bx, by)] = true;
@@ -102,6 +105,71 @@ fn place_nodes_scaled(
         }
     }
     nodes
+}
+
+/// How far apart, in tiles, the border between two frontier regions is looked at when picking
+/// their rich nodes: near enough to a border is all that counts, not the exact tile.
+const BORDER_STEP: i32 = 4;
+
+/// Sets every node's richness by its region (`CONTEXT.md`: Richness): poor in a heartland, rich
+/// on an island, normal in the frontier but for the `FRONTIER_RICH_NODES` of each frontier region
+/// nearest its passes, land bridges and borders with other frontier regions, which are rich. Run
+/// once, after all of a new world's nodes are placed; the same nodes, terrain and regions always
+/// give the same richness.
+pub fn assign_richness(nodes: &mut [ResourceNode], terrain: &TerrainMap, regions: &Regions) {
+    let size = terrain.size;
+    let kind_of = |id: Option<u32>| id.and_then(|id| regions.region(id)).map(|r| r.kind);
+    // Spots worth fighting over, by frontier region: its ways and its borders with another
+    // frontier region.
+    let mut spots: HashMap<u32, Vec<(i32, i32)>> = HashMap::new();
+    for way in &regions.ways {
+        for id in way.between {
+            if kind_of(Some(id)) == Some(RegionKind::Frontier) {
+                spots.entry(id).or_default().push((way.x, way.y));
+            }
+        }
+    }
+    for y in (0..size).step_by(BORDER_STEP as usize) {
+        for x in (0..size).step_by(BORDER_STEP as usize) {
+            let Some(here) = regions.id_at(x, y) else { continue };
+            if kind_of(Some(here)) != Some(RegionKind::Frontier) {
+                continue;
+            }
+            for (nx, ny) in [(x + BORDER_STEP, y), (x, y + BORDER_STEP)] {
+                let Some(there) = regions.id_at(nx, ny) else { continue };
+                if there != here && kind_of(Some(there)) == Some(RegionKind::Frontier) {
+                    spots.entry(here).or_default().push((x, y));
+                    spots.entry(there).or_default().push((nx, ny));
+                }
+            }
+        }
+    }
+    let mut frontier: HashMap<u32, Vec<(f64, usize)>> = HashMap::new();
+    for (i, node) in nodes.iter_mut().enumerate() {
+        let at = (node.x as i32, node.y as i32);
+        let id = regions.id_at(at.0, at.1);
+        node.richness = match kind_of(id) {
+            Some(RegionKind::Heartland) => Richness::Poor,
+            Some(RegionKind::Island) => Richness::Rich,
+            Some(RegionKind::Frontier) | None => Richness::Normal,
+        };
+        if let (Some(id), Some(RegionKind::Frontier)) = (id, kind_of(id)) {
+            let near = spots
+                .get(&id)
+                .into_iter()
+                .flatten()
+                .map(|&s| wrap_distance(size, at, s))
+                .fold(f64::INFINITY, f64::min);
+            frontier.entry(id).or_default().push((near, i));
+        }
+    }
+    for mut in_region in frontier.into_values() {
+        // Stable: of two as near, the one placed first.
+        in_region.sort_by(|a, b| a.0.total_cmp(&b.0));
+        for &(_, i) in in_region.iter().take(FRONTIER_RICH_NODES as usize) {
+            nodes[i].richness = Richness::Rich;
+        }
+    }
 }
 
 #[cfg(test)]

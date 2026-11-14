@@ -31,7 +31,13 @@ fn me() -> OrderSender {
 }
 
 fn iron_ore_node() -> ResourceNode {
-    ResourceNode { id: "n1".into(), kind: ResourceKind::IronOre, x: 7.0, y: 5.0 }
+    ResourceNode {
+        id: "n1".into(),
+        kind: ResourceKind::IronOre,
+        x: 7.0,
+        y: 5.0,
+        richness: Default::default(),
+    }
 }
 
 /// A world with realm r1 (Player 7), a finished `kind` at (2, 2) and resident w1 working it.

@@ -26,7 +26,7 @@ use csp_shared::world::{ResourceKind, ResourceNode, StartingSite, WorldState};
 use csp_shared::TICK_MS;
 
 use crate::invariants::checks::node_terrains;
-use crate::node_gen::place_resource_nodes_by_region;
+use crate::node_gen::{assign_richness, place_resource_nodes_by_region};
 use crate::placing::Ground;
 use crate::random::hash;
 use crate::regions::{Region, RegionKind, Regions};
@@ -105,6 +105,7 @@ pub fn place_starting_sites(world: &mut WorldState, terrain: &TerrainMap) {
     for h in &heartlands {
         place_in_heartland(world, terrain, &regions, h, &rules, &fitting);
     }
+    assign_richness(&mut world.nodes, terrain, &regions);
 }
 
 /// A place a site may go, before the nodes and the walk are looked at.
@@ -202,7 +203,13 @@ fn place_in_heartland(
         };
         for (kind, (x, y)) in nodes {
             let id = format!("n{}", world.nodes.len() + 1);
-            world.nodes.push(ResourceNode { id, kind, x: f64::from(x), y: f64::from(y) });
+            world.nodes.push(ResourceNode {
+                id,
+                kind,
+                x: f64::from(x),
+                y: f64::from(y),
+                richness: Default::default(),
+            });
         }
         if alone {
             lone.push(here.len());

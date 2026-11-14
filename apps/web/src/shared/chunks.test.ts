@@ -6,11 +6,13 @@ describe('chunk encoding', () => {
     const tiles = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE).fill(Terrain.Forest)
     tiles[5] = Terrain.Hills
     const nodes = [
-      { kind: 'forest' as const, x: 64, y: 96 },
-      { kind: 'goldOre' as const, x: 95, y: 127 },
+      { kind: 'forest' as const, x: 64, y: 96, richness: 'poor' as const },
+      { kind: 'goldOre' as const, x: 95, y: 127, richness: 'rich' as const },
     ]
     const bytes = encodeChunk(tiles, nodes, 2, 3)
     expect(bytes).toHaveLength(CHUNK_SIZE * CHUNK_SIZE + 6)
+    // The same bytes the server writes: the kind's index with the richness's above it (normal 0).
+    expect([...bytes.slice(CHUNK_SIZE * CHUNK_SIZE)]).toEqual([0, 0, 1 << 4, 31, 31, 3 | (2 << 4)])
     expect(decodeChunk(2, 3, bytes)).toEqual({ cx: 2, cy: 3, tiles, nodes })
   })
 

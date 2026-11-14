@@ -17,6 +17,7 @@ import {
   SHIP_CAPACITY,
   SHIP_MIN_CREW,
   ticksForAge,
+  RICHNESS_FACTOR,
 } from '@csp/balance'
 import { FOOTPRINT, footprintTiles } from './shared/footprint.js'
 import { MAX_WORKERS, NODE_GOOD, buildMenu } from './shared/building.js'
@@ -43,6 +44,7 @@ import type {
   Resident,
   SeenResident,
   SeenHorse,
+  Richness,
 } from '@csp/shared-types'
 import { BUILDING_NAMES } from './map/palette.js'
 import {
@@ -2043,15 +2045,29 @@ describe('the card for a resource node', () => {
     const workplace = building({ kind: NODE_WORKPLACE[k], cityId: null })
     const card = tile({ node: { kind: k, x: 5, y: 5 }, buildings: [workplace], nodeFit: fit })
     expect(card.what).toBe('building')
-    const words = {
-      forest: 'a forest',
-      stone: 'a stone',
-      ironOre: 'an iron ore',
-      goldOre: 'a gold ore',
-    }[k]
-    expect(card.lines).toContain(`On ${words} node`)
+    const [, , , good] = kinds.find(([kind]) => kind === k)!
+    const perDay = WORK_OUTPUT_PER_DAY[NODE_GOOD[k]]
+    expect(card.lines).toContain(
+      `On a normal ${good} node · about ${perDay} ${good} each a game day at average Strength`,
+    )
     expect(card.lines.some((l) => l.includes('can be built'))).toBe(false)
     expect(card.buildHere).toBeUndefined()
+  })
+
+  it('says a node’s richness and what a worker makes there by it (`CONTEXT.md`: Richness)', () => {
+    const iron = WORK_OUTPUT_PER_DAY.ironOre!
+    const node = (richness: Richness) => ({ kind: 'ironOre' as const, x: 5, y: 5, richness })
+    const poor = tile({ node: node('poor'), nodeFit: fit })
+    expect(poor.lines).toContain(`Poor: ${RICHNESS_FACTOR.poor} times what a normal node makes`)
+    const day = (factor: number) => Math.round(iron * factor * 10) / 10
+    expect(poor.lines).toContain(
+      `Up to ${MAX_WORKERS.mine} workers · about ${day(RICHNESS_FACTOR.poor)} iron ore each a game day at average Strength`,
+    )
+    const mine = building({ kind: 'mine', cityId: null })
+    const rich = tile({ node: node('rich'), buildings: [mine], nodeFit: fit })
+    expect(rich.lines).toContain(
+      `On a rich iron ore node · about ${day(RICHNESS_FACTOR.rich)} iron ore each a game day at average Strength`,
+    )
   })
 
   it('is named after the node’s kind', () => {

@@ -34,7 +34,7 @@ use crate::npc_training::wants_training_ground;
 use crate::placing::Ground;
 use crate::queries::building::{
     build_materials, build_problem, building_at, materials_needed, max_workers, node_corner,
-    node_good, node_workplace, work_needed,
+    node_good, node_pick_distance, node_workplace, work_needed,
 };
 use crate::queries::city::{has_food_surplus, in_city_area, is_city_building};
 use crate::queries::city_area::{city_area_tiles, city_membership, free_housing};
@@ -510,7 +510,7 @@ fn nearest_node(
             continue;
         }
         let at = (node.x as i32, node.y as i32);
-        let d = wrap_distance(terrain.size, home_at, at);
+        let d = node_pick_distance(wrap_distance(terrain.size, home_at, at), node);
         if best.as_ref().is_some_and(|b| d >= b.2) || !knows_node(city, home_at, at, terrain.size) {
             continue;
         }

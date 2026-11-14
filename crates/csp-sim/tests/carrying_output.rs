@@ -261,7 +261,13 @@ fn refills_from_the_storage_when_low_on_food() {
     // A woodcutter with no food on them: no Food to keep from the load.
     let (ax, ay) = (6.0, 10.0);
     terrain.tiles[(10 * SIZE + 6) as usize] = Terrain::Forest as u8;
-    world.nodes.push(ResourceNode { id: "n".into(), kind: ResourceKind::Forest, x: ax, y: ay });
+    world.nodes.push(ResourceNode {
+        id: "n".into(),
+        kind: ResourceKind::Forest,
+        x: ax,
+        y: ay,
+        richness: Default::default(),
+    });
     let mut camp = building("camp", BuildingKind::LumberCamp, ax, ay);
     camp.city_id = Some("c1".into());
     world.buildings.push(camp.clone());
@@ -321,7 +327,13 @@ fn leaves_the_pile_to_grow_with_no_finished_storage_of_the_realm() {
 fn carries_only_the_output_from_a_smelter() {
     let (mut world, terrain, _) = farm_world();
     world.residents.clear();
-    world.nodes.push(ResourceNode { id: "n".into(), kind: ResourceKind::IronOre, x: 3.0, y: 12.0 });
+    world.nodes.push(ResourceNode {
+        id: "n".into(),
+        kind: ResourceKind::IronOre,
+        x: 3.0,
+        y: 12.0,
+        richness: Default::default(),
+    });
     let mut smelter = building("smelter", BuildingKind::Smelter, 3.0, 12.0);
     smelter.city_id = Some("c1".into());
     world.buildings.push(smelter.clone());

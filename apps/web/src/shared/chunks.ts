@@ -2,6 +2,7 @@
 // types come from @csp/shared-types and the balance numbers from @csp/balance.
 
 import { CHUNK_SIZE } from './terrain.js'
+import { RICHNESSES } from './richness.js'
 import type { KnownNode, ResourceKind, TerrainChunk } from '@csp/shared-types'
 
 /** Resource node kinds by the byte that stands for them in a served chunk. Only add to the end. */
@@ -9,7 +10,8 @@ export const NODE_KINDS: readonly ResourceKind[] = ['forest', 'stone', 'ironOre'
 
 /**
  * A chunk as served from `terrainChunkPath`: the `CHUNK_SIZE`² terrain bytes, then three bytes
- * per resource node (x and y within the chunk, and its kind's index in `NODE_KINDS`).
+ * per resource node (x and y within the chunk, and its kind's index in `NODE_KINDS` with its
+ * richness's index in `RICHNESSES` in the upper four bits).
  */
 export function encodeChunk(tiles: Uint8Array, nodes: KnownNode[], cx: number, cy: number) {
   const out = new Uint8Array(tiles.length + nodes.length * 3)
@@ -18,7 +20,7 @@ export function encodeChunk(tiles: Uint8Array, nodes: KnownNode[], cx: number, c
     const at = tiles.length + i * 3
     out[at] = n.x - cx * CHUNK_SIZE
     out[at + 1] = n.y - cy * CHUNK_SIZE
-    out[at + 2] = NODE_KINDS.indexOf(n.kind)
+    out[at + 2] = NODE_KINDS.indexOf(n.kind) | (Math.max(0, RICHNESSES.indexOf(n.richness)) << 4)
   })
   return out
 }
@@ -59,9 +61,15 @@ export function decodeChunk(cx: number, cy: number, bytes: Uint8Array): TerrainC
   const size = CHUNK_SIZE * CHUNK_SIZE
   const nodes: KnownNode[] = []
   for (let at = size; at + 2 < bytes.length; at += 3) {
-    const kind = NODE_KINDS[bytes[at + 2]!]
+    const kind = NODE_KINDS[bytes[at + 2]! & 0x0f]
     if (!kind) continue
-    nodes.push({ kind, x: cx * CHUNK_SIZE + bytes[at]!, y: cy * CHUNK_SIZE + bytes[at + 1]! })
+    const richness = RICHNESSES[bytes[at + 2]! >> 4] ?? 'normal'
+    nodes.push({
+      kind,
+      x: cx * CHUNK_SIZE + bytes[at]!,
+      y: cy * CHUNK_SIZE + bytes[at + 1]!,
+      richness,
+    })
   }
   return { cx, cy, tiles: bytes.slice(0, size), nodes }
 }

@@ -13,6 +13,7 @@ import {
   TICKS_PER_GAME_YEAR,
   WORK_SKILL_EFFECT,
   WORK_STRENGTH_AVERAGE,
+  RICHNESS_FACTOR,
   hungerFactor,
 } from '@csp/balance'
 import { GOODS } from './shared/world.js'
@@ -226,6 +227,20 @@ describe('buildings on a tile’s card', () => {
         ['Ana', 'Gold ore', tenth(ana)],
         ['Bo', 'Gold ore', tenth(bo)],
         ['Total', 'Gold ore', tenth(ana + bo)],
+      ])
+    })
+
+    it('counts in the richness of the mine’s node (`CONTEXT.md`: Richness)', () => {
+      const mine = building({ kind: 'mine' })
+      const nodeAt = (x: number, y: number) =>
+        x === 6 && y === 6
+          ? { kind: 'ironOre' as const, x, y, richness: 'rich' as const }
+          : undefined
+      const perDay = WORK_OUTPUT_PER_DAY.ironOre! * RICHNESS_FACTOR.rich
+      const residents = [worker(mine, 'Ana', 10)]
+      expect(amounts({ buildings: [mine], residents, nodeAt })).toEqual([
+        ['Ana', 'Iron ore', tenth(perDay)],
+        ['Total', 'Iron ore', tenth(perDay)],
       ])
     })
 

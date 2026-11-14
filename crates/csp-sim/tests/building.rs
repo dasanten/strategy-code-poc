@@ -35,7 +35,7 @@ fn stranger() -> OrderSender {
 }
 
 fn node(id: &str, kind: ResourceKind, x: f64, y: f64) -> ResourceNode {
-    ResourceNode { id: id.into(), kind, x, y }
+    ResourceNode { id: id.into(), kind, x, y, richness: Default::default() }
 }
 
 /// A world on a small map: a forest node at (3, 3), a stone node at (6, 6) and an iron ore node at

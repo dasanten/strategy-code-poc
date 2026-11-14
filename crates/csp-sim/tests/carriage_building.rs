@@ -151,7 +151,13 @@ fn is_turned_down_at_an_unfinished_stable_on_another_building_or_where_no_carria
         build_problem(&world, 12, 4, BuildingKind::Carriage, lookup).as_deref(),
         Some("a carriage can’t stand on this land")
     );
-    world.nodes.push(ResourceNode { id: "n1".into(), kind: ResourceKind::Stone, x: 12.0, y: 5.0 });
+    world.nodes.push(ResourceNode {
+        id: "n1".into(),
+        kind: ResourceKind::Stone,
+        x: 12.0,
+        y: 5.0,
+        richness: Default::default(),
+    });
     assert_eq!(
         build_problem(&world, 12, 5, BuildingKind::Carriage, lookup).as_deref(),
         Some("a carriage goes off any resource node")

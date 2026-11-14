@@ -48,6 +48,13 @@
   "NODE_MIN_SPACING": 16.0,
   "FRONTIER_NODE_DENSITY": 1.5,
   "ISLAND_NODE_DENSITY": 2.0,
+  "RICHNESS_FACTOR": {
+    "poor": 0.6,
+    "normal": 1.0,
+    "rich": 1.5
+  },
+  "FRONTIER_RICH_NODES": 3.0,
+  "RICHER_NODE_REACH": 0.25,
   "STARTING_SITES_PER_HEARTLAND": 10.0,
   "STARTING_SITE_WALK": {
     "minMinutes": 20.0,

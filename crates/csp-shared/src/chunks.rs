@@ -1,7 +1,7 @@
 //! Terrain served to clients in chunks (ADR 0006): the constants, sizes and the chunk encoding of
 //! `packages/shared/src/chunks.ts` and `terrain.ts`, byte for byte.
 
-use crate::world::ResourceKind;
+use crate::world::{ResourceKind, Richness};
 use ts_rs::TS;
 
 /// Terrain is served to clients in square chunks of this many tiles a side (ADR 0006).
@@ -104,6 +104,8 @@ pub struct KnownNode {
     pub kind: ResourceKind,
     pub x: i32,
     pub y: i32,
+    /// Known with the node, once its tile is explored (`CONTEXT.md`: Richness).
+    pub richness: Richness,
 }
 
 /// One chunk of explored terrain as the client gets it.
@@ -128,6 +130,28 @@ pub fn node_kind_index(kind: ResourceKind) -> u8 {
     }
 }
 
+/// The index of a richness in [`RICHNESSES`], the upper four bits of a node's byte in a chunk:
+/// normal 0, so a normal node's bytes are what they were before richness.
+pub fn richness_index(richness: Richness) -> u8 {
+    match richness {
+        Richness::Normal => 0,
+        Richness::Poor => 1,
+        Richness::Rich => 2,
+    }
+}
+
+/// The richnesses by their [`richness_index`]. Only add to the end.
+pub const RICHNESSES: [&str; 3] = ["normal", "poor", "rich"];
+
+/// The richness of an index, normal for one it doesn't know.
+fn richness_from_index(index: u8) -> Richness {
+    match index {
+        1 => Richness::Poor,
+        2 => Richness::Rich,
+        _ => Richness::Normal,
+    }
+}
+
 fn node_kind_from_index(index: u8) -> Option<ResourceKind> {
     Some(match index {
         0 => ResourceKind::Forest,
@@ -139,7 +163,8 @@ fn node_kind_from_index(index: u8) -> Option<ResourceKind> {
 }
 
 /// A chunk as served from [`terrain_chunk_path`]: the `CHUNK_TILES` terrain bytes, then three bytes
-/// per resource node (x and y within the chunk, and its kind's index in [`NODE_KINDS`]).
+/// per resource node (x and y within the chunk, and its kind's index in [`NODE_KINDS`] with its
+/// richness's [`richness_index`] in the upper four bits).
 pub fn encode_chunk(tiles: &[u8], nodes: &[KnownNode], cx: i32, cy: i32) -> Vec<u8> {
     let mut out = Vec::with_capacity(tiles.len() + nodes.len() * 3);
     out.extend_from_slice(tiles);
@@ -147,7 +172,7 @@ pub fn encode_chunk(tiles: &[u8], nodes: &[KnownNode], cx: i32, cy: i32) -> Vec<
         // Like a `Uint8Array` store: a coordinate outside the chunk keeps its low byte.
         out.push((n.x - cx * CHUNK_SIZE) as u8);
         out.push((n.y - cy * CHUNK_SIZE) as u8);
-        out.push(node_kind_index(n.kind));
+        out.push(node_kind_index(n.kind) | (richness_index(n.richness) << 4));
     }
     out
 }
@@ -187,11 +212,12 @@ pub fn decode_chunk(cx: i32, cy: i32, bytes: &[u8]) -> TerrainChunk {
     let mut nodes = Vec::new();
     let mut at = CHUNK_TILES;
     while at + 2 < bytes.len() {
-        if let Some(kind) = node_kind_from_index(bytes[at + 2]) {
+        if let Some(kind) = node_kind_from_index(bytes[at + 2] & 0x0f) {
             nodes.push(KnownNode {
                 kind,
                 x: cx * CHUNK_SIZE + i32::from(bytes[at]),
                 y: cy * CHUNK_SIZE + i32::from(bytes[at + 1]),
+                richness: richness_from_index(bytes[at + 2] >> 4),
             });
         }
         at += 3;
@@ -251,6 +277,10 @@ mod tests {
             let kind: ResourceKind = serde_json::from_str(&format!("\"{name}\"")).unwrap();
             assert_eq!(usize::from(node_kind_index(kind)), i);
         }
+        for (i, name) in RICHNESSES.iter().enumerate() {
+            let richness: Richness = serde_json::from_str(&format!("\"{name}\"")).unwrap();
+            assert_eq!(usize::from(richness_index(richness)), i);
+        }
     }
 
     #[test]
@@ -258,13 +288,16 @@ mod tests {
         let mut tiles = vec![Terrain::Forest as u8; CHUNK_TILES];
         tiles[5] = Terrain::Hills as u8;
         let nodes = [
-            KnownNode { kind: ResourceKind::Forest, x: 64, y: 96 },
-            KnownNode { kind: ResourceKind::GoldOre, x: 95, y: 127 },
+            KnownNode { kind: ResourceKind::Forest, x: 64, y: 96, richness: Richness::Poor },
+            KnownNode { kind: ResourceKind::GoldOre, x: 95, y: 127, richness: Richness::Rich },
         ];
         let bytes = encode_chunk(&tiles, &nodes, 2, 3);
         assert_eq!(bytes.len(), CHUNK_TILES + 6);
-        // The layout the TypeScript writes: x and y within the chunk, then the kind's index.
-        assert_eq!(bytes[CHUNK_TILES..], [0, 0, 0, 31, 31, 3]);
+        // x and y within the chunk, then the kind's index with the richness's above it.
+        assert_eq!(bytes[CHUNK_TILES..], [0, 0, 1 << 4, 31, 31, 3 | (2 << 4)]);
+        // A normal node's bytes are what they were before richness.
+        let normal = KnownNode { richness: Richness::Normal, ..nodes[1] };
+        assert_eq!(encode_chunk(&tiles, &[normal], 2, 3)[CHUNK_TILES..], [31, 31, 3]);
         assert_eq!(
             decode_chunk(2, 3, &bytes),
             TerrainChunk { cx: 2, cy: 3, tiles, nodes: nodes.to_vec() }

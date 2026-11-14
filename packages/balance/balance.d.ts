@@ -69,6 +69,14 @@ export interface Balance {
   readonly NODE_MIN_SPACING: number
   readonly FRONTIER_NODE_DENSITY: number
   readonly ISLAND_NODE_DENSITY: number
+  readonly RICHNESS_FACTOR: {
+    poor: number
+    normal: number
+    rich: number
+    [key: string]: number
+  }
+  readonly FRONTIER_RICH_NODES: number
+  readonly RICHER_NODE_REACH: number
   readonly STARTING_SITES_PER_HEARTLAND: number
   readonly STARTING_SITE_WALK: {
     minMinutes: number

@@ -48,7 +48,13 @@ fn building_setup() -> (WorldState, TerrainMap) {
         ("n3", ResourceKind::IronOre, 10.0),
     ]
     .into_iter()
-    .map(|(id, kind, at)| ResourceNode { id: id.into(), kind, x: at, y: at })
+    .map(|(id, kind, at)| ResourceNode {
+        id: id.into(),
+        kind,
+        x: at,
+        y: at,
+        richness: Default::default(),
+    })
     .collect();
     world.realms.push(realm("r1", 7, "w1"));
     resident(&mut world, "w1", 3.0, 3.0);
@@ -110,8 +116,20 @@ fn teardown_setup() -> (WorldState, TerrainMap) {
     t.tiles[7 * 16 + 7] = Terrain::Hills as u8;
     let mut world = empty_world(&plains(16));
     world.nodes = vec![
-        ResourceNode { id: "n1".into(), kind: ResourceKind::Forest, x: 3.0, y: 3.0 },
-        ResourceNode { id: "n3".into(), kind: ResourceKind::IronOre, x: 7.0, y: 7.0 },
+        ResourceNode {
+            id: "n1".into(),
+            kind: ResourceKind::Forest,
+            x: 3.0,
+            y: 3.0,
+            richness: Default::default(),
+        },
+        ResourceNode {
+            id: "n3".into(),
+            kind: ResourceKind::IronOre,
+            x: 7.0,
+            y: 7.0,
+            richness: Default::default(),
+        },
     ];
     world.buildings.push(building("b1", BuildingKind::Mine, 7.0, 7.0));
     world.realms.push(realm("r1", 7, "w1"));

@@ -298,6 +298,9 @@ import {
   RECIPES,
   BATCHES_PER_DAY,
   WORK_OUTPUT_PER_DAY,
+  RICHNESS_FACTOR,
+  FRONTIER_RICH_NODES,
+  RICHER_NODE_REACH,
   carryCapacity,
   walkSpeed,
   workFactor,
@@ -1048,17 +1051,17 @@ export function Wiki() {
           safe: it is safe only in that it holds little worth taking.
         </p>
         <p>
-          Each heartland has {num(STARTING_SITES_PER_HEARTLAND)} <strong>starting sites</strong>,
-          a walk of {num(STARTING_SITE_WALK.minMinutes)} to {num(STARTING_SITE_WALK.maxMinutes)}{' '}
-          real minutes from the next one. A new Leader (your first, or one after your Leader died
-          with no heir) gets a free site in the <strong>open</strong> heartland where Players have
-          the most cities, the one opened first on a tie, and in it the free site nearest another
-          Player’s city: you start as someone’s neighbour. The world’s first Player opens the first
+          Each heartland has {num(STARTING_SITES_PER_HEARTLAND)} <strong>starting sites</strong>, a
+          walk of {num(STARTING_SITE_WALK.minMinutes)} to {num(STARTING_SITE_WALK.maxMinutes)} real
+          minutes from the next one. A new Leader (your first, or one after your Leader died with no
+          heir) gets a free site in the <strong>open</strong> heartland where Players have the most
+          cities, the one opened first on a tie, and in it the free site nearest another Player’s
+          city: you start as someone’s neighbour. The world’s first Player opens the first
           heartland; the next one opens, the one nearest an open heartland, only once no open
           heartland has a free site left. A site is free while nothing of anyone’s stands on it or
           on the farmland round it, so one whose city is gone is free again. Should every site be
-          taken, your city goes on the free place nearest an open heartland’s middle. Your realm
-          log names the heartland your city stands in.
+          taken, your city goes on the free place nearest an open heartland’s middle. Your realm log
+          names the heartland your city stands in.
         </p>
         <p>
           The regions of the mainland are parted by Mountain ranges and by arms of the Sea, about{' '}
@@ -1073,14 +1076,32 @@ export function Wiki() {
           You know the region of every tile you have explored. A tile’s card names it: “Heartland of
           …”, “Frontier: …” or “Island: …”, with “pass” or “land bridge” on a tile of one. Zoomed
           out to the middle and far zoom, the map writes the names of the regions you have explored
-          part of over them and marks the passes (a white diamond) and land bridges (a blue one)
-          you have explored. Nothing shows for land you haven’t explored. This is not the Region
-          map, which shows territory (see Territory).
+          part of over them and marks the passes (a white diamond) and land bridges (a blue one) you
+          have explored. Nothing shows for land you haven’t explored. This is not the Region map,
+          which shows territory (see Territory).
         </p>
         <p>
           Scripts read a tile’s region in its view: <code>region</code> is its name and{' '}
           <code>regionKind</code> is <code>"heartland"</code>, <code>"frontier"</code> or{' '}
           <code>"island"</code>, both <code>null</code> on water and on tiles you haven’t explored.
+        </p>
+        <p>
+          Every resource node is <strong>poor</strong>, <strong>normal</strong> or{' '}
+          <strong>rich</strong>, from the day it comes into being. A mine, quarry or lumber camp on
+          it makes {num(RICHNESS_FACTOR.poor)}, {num(RICHNESS_FACTOR.normal)} or{' '}
+          {num(RICHNESS_FACTOR.rich)} times as much per worker; workers, skill and Strength count as
+          ever. Heartland nodes are poor. Frontier nodes are normal, but for the{' '}
+          {num(FRONTIER_RICH_NODES)} of each frontier region nearest its passes, land bridges and
+          borders with another frontier region, which are rich. Island nodes are rich. Farms stand
+          on no node and make the same everywhere.
+        </p>
+        <p>
+          A node’s card says its richness once you have explored its tile, with what a worker of
+          average Strength makes there a game day; so does the card of the workplace on it, and its
+          Made a game day list counts it in. Scripts read it as the node’s <code>richness</code>:{' '}
+          <code>"poor"</code>, <code>"normal"</code> or <code>"rich"</code>. NPC cities and the
+          Trade Organization pick the richer of two nodes about as far away: each step of richness
+          counts as {pct(RICHER_NODE_REACH)} less of the way.
         </p>
       </Section>
 
@@ -2526,14 +2547,14 @@ export function Wiki() {
         </table>
         <h3>NPC cities</h3>
         <p>
-          When the world is made, NPC cities are placed region by region, wherever there is room:
-          in each frontier region {num(NPC_TOWNS_PER_FRONTIER)} town(s) and{' '}
+          When the world is made, NPC cities are placed region by region, wherever there is room: in
+          each frontier region {num(NPC_TOWNS_PER_FRONTIER)} town(s) and{' '}
           {num(NPC_VILLAGES_PER_FRONTIER)} village(s), in each heartland{' '}
           {num(NPC_VILLAGES_PER_HEARTLAND)} village(s). They stand on the mainland only: none on an
           island, none within {num(NPC_STARTING_SITE_CLEARANCE)} tiles of a starting site, and none
           within {num(NPC_WAY_CLEARANCE)} tiles of a pass or land bridge, with its farms. A full
-          city's new village stays on land its people can walk to, never across the sea, and as
-          far from the starting sites.
+          city's new village stays on land its people can walk to, never across the sea, and as far
+          from the starting sites.
         </p>
         <p>
           An NPC city thinks over what its people do once a game hour ({realTimeOf(NPC_PLAN_TICKS)}
@@ -2717,10 +2738,10 @@ export function Wiki() {
         <p>
           Every heartland has a trading post near its middle; the frontier gets one more in each
           stretch of about {num(TRADING_POST_REGION)} tiles across that has room. The HQ stands in a
-          frontier region, as far from the starting sites as the mainland allows. None of them stands
-          on an island, a pass or a land bridge, or within {num(NPC_STARTING_SITE_CLEARANCE)} tiles
-          of a starting site, and the caravans and wandering traders drive from the HQ to every post
-          over the passes and land bridges.
+          frontier region, as far from the starting sites as the mainland allows. None of them
+          stands on an island, a pass or a land bridge, or within {num(NPC_STARTING_SITE_CLEARANCE)}{' '}
+          tiles of a starting site, and the caravans and wandering traders drive from the HQ to
+          every post over the passes and land bridges.
         </p>
         <p>
           The Trade Organization runs its own chain the same way. A trading post's reserve is its

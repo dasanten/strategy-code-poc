@@ -103,6 +103,7 @@ fn is_refused_on_mountain_on_a_node_on_the_water_and_on_another_building() {
         kind: ResourceKind::Forest,
         x: 18.0,
         y: 15.0,
+        richness: Default::default(),
     });
     assert_eq!(
         problem(&world, 17, 14).as_deref(),
