@@ -240,6 +240,7 @@ fn run_their_defaults_far_fewer_times_than_once_a_tick_each_on_their_way_to_work
         kind: ResourceKind::Forest,
         x: 74.0,
         y: 34.0,
+        richness: Default::default(),
     });
     land.tiles[tile_index(200, 74, 34)] = Terrain::Forest as u8;
     // Everyone goes to work, none scouting (`CONTEXT.md`: Scout).

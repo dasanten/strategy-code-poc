@@ -54,6 +54,7 @@ fn a_worker_makes_that_much_a_game_day(
             kind: ResourceKind::IronOre,
             x: 2.0,
             y: 2.0,
+            richness: Default::default(),
         });
     }
     world.buildings.push(building("b1", kind, 2.0, 2.0));

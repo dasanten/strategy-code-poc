@@ -227,6 +227,7 @@ fn client_roots(cfg: &Config) -> io::Result<()> {
         csp_shared::world::ResidentOrder,
         csp_shared::world::ResourceKind,
         csp_shared::world::ResourceNode,
+        csp_shared::world::Richness,
         csp_shared::world::ScriptLogLine,
         csp_shared::world::ScriptParamValue,
         csp_shared::world::ScriptRunError,

@@ -44,7 +44,12 @@ impl MapTerrain {
         for node in nodes {
             let (x, y) = (node.x.floor() as i32, node.y.floor() as i32);
             let c = y.div_euclid(CHUNK_SIZE) * n + x.div_euclid(CHUNK_SIZE);
-            nodes_by_chunk.entry(c as u32).or_default().push(KnownNode { kind: node.kind, x, y });
+            nodes_by_chunk.entry(c as u32).or_default().push(KnownNode {
+                kind: node.kind,
+                x,
+                y,
+                richness: node.richness,
+            });
         }
         MapTerrain {
             terrain,
@@ -623,7 +628,7 @@ mod tests {
     }
 
     fn node(id: &str, kind: ResourceKind, x: f64, y: f64) -> ResourceNode {
-        ResourceNode { id: id.to_string(), kind, x, y }
+        ResourceNode { id: id.to_string(), kind, x, y, richness: Default::default() }
     }
 
     /// 32-bit FNV-1a, to compare bytes with what the TypeScript gives.
@@ -821,9 +826,42 @@ mod tests {
         let mut explored = ExploredTerrain::new(small_terrain(), &nodes);
         explored.explore(PLAYER, 40, 40, 2);
         let got = decode_chunk(1, 1, &explored.chunk(PLAYER, 1, 1).unwrap()).nodes;
-        assert_eq!(got, vec![KnownNode { kind: ResourceKind::Stone, x: 40, y: 40 }]);
+        assert_eq!(
+            got,
+            vec![KnownNode {
+                kind: ResourceKind::Stone,
+                x: 40,
+                y: 40,
+                richness: Default::default()
+            }]
+        );
         explored.explore(PLAYER, 50, 50, 1);
         assert_eq!(decode_chunk(1, 1, &explored.chunk(PLAYER, 1, 1).unwrap()).nodes.len(), 2);
+    }
+
+    /// `CONTEXT.md`: Richness. A node's richness comes with it once its tile is explored, and not
+    /// before.
+    #[test]
+    fn a_nodes_richness_comes_with_it_only_once_its_tile_is_explored() {
+        use csp_shared::world::Richness;
+        let mut rich = node("n1", ResourceKind::IronOre, 40.0, 40.0);
+        rich.richness = Richness::Rich;
+        let mut poor = node("n2", ResourceKind::Stone, 50.0, 50.0);
+        poor.richness = Richness::Poor;
+        let mut explored = ExploredTerrain::new(small_terrain(), &[rich, poor]);
+        explored.explore(PLAYER, 40, 40, 2);
+        let got = decode_chunk(1, 1, &explored.chunk(PLAYER, 1, 1).unwrap()).nodes;
+        assert_eq!(
+            got.iter().map(|n| (n.x, n.richness)).collect::<Vec<_>>(),
+            [(40, Richness::Rich)]
+        );
+        explored.explore(PLAYER, 50, 50, 1);
+        let got = decode_chunk(1, 1, &explored.chunk(PLAYER, 1, 1).unwrap()).nodes;
+        assert_eq!(
+            got.iter().map(|n| (n.x, n.richness)).collect::<Vec<_>>(),
+            [(40, Richness::Rich), (50, Richness::Poor)]
+        );
+        assert!(explored.chunk(OTHER, 1, 1).is_none());
     }
 
     #[test]
@@ -832,7 +870,15 @@ mod tests {
         let nodes = [node("n1", ResourceKind::GoldOre, 70.0, 100.0)];
         let explored = ExploredTerrain::new(terrain.clone(), &nodes);
         let chunk = decode_chunk(2, 3, &explored.whole_chunk(2, 3).unwrap());
-        assert_eq!(chunk.nodes, vec![KnownNode { kind: ResourceKind::GoldOre, x: 70, y: 100 }]);
+        assert_eq!(
+            chunk.nodes,
+            vec![KnownNode {
+                kind: ResourceKind::GoldOre,
+                x: 70,
+                y: 100,
+                richness: Default::default()
+            }]
+        );
         for dy in 0..CHUNK_SIZE {
             for dx in 0..CHUNK_SIZE {
                 assert_eq!(

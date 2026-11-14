@@ -1777,6 +1777,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 description: "The tile it stands on, from north to south.",
                 null_when: None,
             },
+            ScriptField {
+                name: "richness",
+                r#type: ScriptType::String,
+                description: "How much its workplace makes per worker: \"poor\", \"normal\" or \"rich\".",
+                null_when: None,
+            },
         ],
     },
     ScriptView {

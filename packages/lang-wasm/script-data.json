@@ -1742,6 +1742,11 @@
           "name": "y",
           "type": "number",
           "description": "The tile it stands on, from north to south."
+        },
+        {
+          "name": "richness",
+          "type": "string",
+          "description": "How much its workplace makes per worker: \"poor\", \"normal\" or \"rich\"."
         }
       ]
     },

@@ -221,6 +221,27 @@ pub const FRONTIER_NODE_DENSITY: f64 = 1.5;
 /// How many times `NODE_DENSITY` an island holds (`CONTEXT.md`: Island): the densest land.
 pub const ISLAND_NODE_DENSITY: f64 = 2.0;
 
+/// What a worker's output is multiplied by on a node of each richness (`CONTEXT.md`: Richness).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct RichnessFactor {
+    pub poor: f64,
+    pub normal: f64,
+    pub rich: f64,
+}
+
+/// A mine's, quarry's or lumber camp's output per worker on a poor, normal and rich node
+/// (`CONTEXT.md`: Richness): a heartland's poor nodes make well under a frontier's, an island's
+/// rich ones half again as much.
+pub const RICHNESS_FACTOR: RichnessFactor = RichnessFactor { poor: 0.6, normal: 1.0, rich: 1.5 };
+
+/// How many of a frontier region's nodes are rich (`CONTEXT.md`: Richness): those nearest its
+/// passes, land bridges and borders with other frontier regions.
+pub const FRONTIER_RICH_NODES: f64 = 3.0;
+
+/// How much farther a richer node may lie than a poorer one and still be picked by an NPC city or
+/// the Trade Organization (`CONTEXT.md`: Richness): each richness step counts as this share of
+/// the distance.
+pub const RICHER_NODE_REACH: f64 = 0.25;
 /// How many times its region's density gold ore has in the frontier and on islands
 /// (`CONTEXT.md`: Rare goods): it has no nodes in a heartland, so the land out there holds more.
 pub const GOLD_NODE_DENSITY: f64 = 2.0;
@@ -2459,6 +2480,9 @@ pub fn balance_json() -> Value {
     m.insert("NODE_MIN_SPACING".into(), json!(NODE_MIN_SPACING));
     m.insert("FRONTIER_NODE_DENSITY".into(), json!(FRONTIER_NODE_DENSITY));
     m.insert("ISLAND_NODE_DENSITY".into(), json!(ISLAND_NODE_DENSITY));
+    m.insert("RICHNESS_FACTOR".into(), to_value(RICHNESS_FACTOR).expect("serialisable"));
+    m.insert("FRONTIER_RICH_NODES".into(), json!(FRONTIER_RICH_NODES));
+    m.insert("RICHER_NODE_REACH".into(), json!(RICHER_NODE_REACH));
     m.insert("GOLD_NODE_DENSITY".into(), json!(GOLD_NODE_DENSITY));
     m.insert("STARTING_SITES_PER_HEARTLAND".into(), json!(STARTING_SITES_PER_HEARTLAND));
     m.insert("STARTING_SITE_WALK".into(), to_value(STARTING_SITE_WALK).expect("serialisable"));

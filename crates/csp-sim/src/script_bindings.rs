@@ -999,7 +999,7 @@ impl<'a> ScriptBindings<'a> {
                     .nodes
                     .iter()
                     .filter(|n| (self.ctx.explored)(n.x as i32, n.y as i32))
-                    .map(|n| serde_json::to_value(n).unwrap_or(Json::Null))
+                    .map(node_view)
                     .collect(),
             ),
             "nodesInSight" => {
@@ -1028,7 +1028,7 @@ impl<'a> ScriptBindings<'a> {
                                 k.as_ref().and_then(Json::as_str) == Some(w.as_str())
                             }) && self.in_sight((n.x as i32, n.y as i32))
                         })
-                        .map(|n| serde_json::to_value(n).unwrap_or(Json::Null))
+                        .map(node_view)
                         .collect(),
                 )
             }
@@ -2049,6 +2049,16 @@ fn requests_sound(
         }
     }
     out
+}
+
+/// A node as a script sees it (the `node` view): every field, `richness` too while it is normal,
+/// which a save leaves out.
+fn node_view(n: &csp_shared::world::ResourceNode) -> Json {
+    let mut v = serde_json::to_value(n).unwrap_or(Json::Null);
+    if let Json::Object(m) = &mut v {
+        m.insert("richness".into(), serde_json::to_value(n.richness).unwrap_or(Json::Null));
+    }
+    v
 }
 
 #[cfg(test)]
