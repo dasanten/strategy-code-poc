@@ -74,11 +74,18 @@ pub fn world_with_city() -> (WorldState, TerrainMap) {
     (crate::test_world::world_with_city(), crate::test_world::city_terrain().clone())
 }
 
-/// A generated world on `cityTerrain` where Player 1 has founded their starting city
+/// The seed-1 map of 1536 tiles as today's generator makes it: a mainland with its regions and
+/// islands (ADR 0035), unlike `cityTerrain`, which is the TypeScript's. Made once.
+pub fn new_land() -> &'static TerrainMap {
+    static TERRAIN: std::sync::OnceLock<TerrainMap> = std::sync::OnceLock::new();
+    TERRAIN.get_or_init(|| crate::terrain_gen::generate_terrain(1, 1536))
+}
+
+/// A generated world on `new_land` where Player 1 has founded their starting city
 /// (`worldWithPost`), with its terrain. The world is generated once and cloned for each test.
 pub fn world_with_post() -> (WorldState, TerrainMap) {
     static WORLD: std::sync::OnceLock<WorldState> = std::sync::OnceLock::new();
-    let terrain = crate::test_world::city_terrain();
+    let terrain = new_land();
     let world = WORLD.get_or_init(|| {
         let mut world = crate::world::generate_world(terrain, 1);
         crate::starting_city::found_starting_city(&mut world, terrain, 1, None);
