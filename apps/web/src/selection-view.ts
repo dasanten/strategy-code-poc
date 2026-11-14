@@ -115,7 +115,7 @@ import type {
 } from '@csp/shared-types'
 import { covers, FOOTPRINT, footprintTiles } from './shared/footprint.js'
 import { wrap, Terrain, UNEXPLORED } from './shared/terrain.js'
-import { handOverProblem } from './shared/leader.js'
+import { handOverProblem, heirProblem } from './shared/leader.js'
 import { aboutTime, workLeft } from './shared/estimates.js'
 import type { Relationship } from './theme.js'
 import { cityRelationship, rankedAs, type Viewer } from './map/tokens.js'
@@ -285,9 +285,13 @@ export interface ResidentHere {
   /**
    * For one of the Player's own residents who isn't their Leader: why the Leader can't hand the
    * realm over to them now (`CONTEXT.md`: Leader handover), undefined when they can. Absent for
-   * the Leader and for anyone else's resident, who get no Make Leader row.
+   * the Leader and for anyone else's resident, who get no Leader and heir row. `heir` says
+   * whether they are the realm's heir, and why they can't be named it now (`CONTEXT.md`: Heir).
    */
-  makeLeader?: { problem: string | undefined }
+  makeLeader?: {
+    problem: string | undefined
+    heir?: { problem: string | undefined; named: boolean }
+  }
   /** One of the Player's own residents, whom they can rename (`CONTEXT.md`: Renaming a resident). */
   renamable?: boolean
   /**
@@ -631,11 +635,14 @@ function ordersOffered(h: ResidentHere): {
   else miss('walls', 'no wall in sight')
   add(row('script', 'Run script…', { opens: true }))
   if (h.makeLeader) {
-    const { problem } = h.makeLeader
+    // One row for both: making them Leader and naming them heir (`CONTEXT.md`: Heir). It is off
+    // only when neither can be done and there is no heir to clear.
+    const { problem, heir } = h.makeLeader
+    const off = problem && (!heir || (heir.problem && !heir.named))
     add(
-      row('makeLeader', 'Make Leader…', {
+      row('makeLeader', 'Leader and heir…', {
         opens: true,
-        ...(problem ? { disabled: true as const, reason: problem } : {}),
+        ...(off ? { disabled: true as const, reason: problem } : {}),
       }),
     )
   }
@@ -792,6 +799,23 @@ export function makeLeaderProblem(
   leader: Resident | undefined,
   target: Resident,
 ): string | undefined {
+  return handOverProblem(seenWorld(seen), realm, leader, target, seen.mapSize)
+}
+
+/**
+ * The shared heir check (`heirProblem`, the one the server runs) on what the Player sees, as for
+ * the handover (`CONTEXT.md`: Heir). The server checks again when the order arrives.
+ */
+export function nameHeirProblem(
+  seen: HandOverSeen,
+  realm: { id: string; leaderId: string },
+  target: Resident,
+): string | undefined {
+  return heirProblem(seenWorld(seen), realm, target)
+}
+
+/** The world the shared checks read, from what the Player sees. */
+function seenWorld(seen: HandOverSeen) {
   const a = seen.diplomacy.alliance
   const alliances: Alliance[] = a
     ? [
@@ -821,14 +845,13 @@ export function makeLeaderProblem(
     startedAt: c.startedAt,
     paidWeeks: c.paidWeeks,
   }))
-  const world = {
+  return {
     tick: seen.tick,
     alliances,
     contracts,
     cities: seen.cities,
     buildings: seen.buildings,
   }
-  return handOverProblem(world, realm, leader, target, seen.mapSize)
 }
 
 /** The relationship of a carriage's or a resident's owner (ADR 0008), seen from the viewer. */

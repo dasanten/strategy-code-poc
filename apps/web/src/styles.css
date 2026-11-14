@@ -150,6 +150,16 @@ body {
 .hud-leader .icon {
   color: var(--rel-own);
 }
+/* The realm's heir, or a button to name one (`CONTEXT.md`: Heir). */
+.hud-heir.none {
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--ui-text);
+  background: none;
+  border: 1px dashed var(--ui-line-strong);
+  border-radius: 6px;
+  cursor: pointer;
+}
 a.hud-wiki {
   padding: 3px 10px;
   font-size: 12px;
@@ -546,6 +556,7 @@ button.hud-logout {
 }
 .game.phone .hud-top .hud-goods,
 .game.phone .hud-top .hud-leader,
+.game.phone .hud-top .hud-heir,
 .game.phone .hud-top .hud-wiki,
 .game.phone .hud-top .hud-logout,
 .game.phone .hud-top .hud-sep,
@@ -649,7 +660,8 @@ button.hud-logout {
   padding: 8px;
   font-size: 14px;
 }
-.hud-menu .hud-leader {
+.hud-menu .hud-leader,
+.hud-menu .hud-heir {
   padding: 6px 10px;
 }
 .hud-menu-links {

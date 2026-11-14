@@ -53,6 +53,7 @@ import {
   escapeStep,
   keepRows,
   makeLeaderProblem,
+  nameHeirProblem,
   nodeFit,
   groupOrders,
   orderGroupOf,
@@ -513,13 +514,25 @@ describe('the actions on a resident’s card', () => {
     expect(new Set(keys).size).toBe(keys.length)
   })
 
-  it('offers Make Leader only for an own resident who isn’t the Leader', () => {
+  it('offers Leader and heir only for an own resident who isn’t the Leader', () => {
     expect(ids(here())).not.toContain('makeLeader')
     const make = residentActions(here({ makeLeader: { problem: undefined } })).find(
       (a) => a.id === 'makeLeader',
     )
-    expect(make).toMatchObject({ label: 'Make Leader…', key: 'L', opens: true })
+    expect(make).toMatchObject({ label: 'Leader and heir…', key: 'L', opens: true })
     expect(make?.disabled).toBeUndefined()
+  })
+
+  it('keeps Leader and heir on while they can be named heir or are the heir', () => {
+    const problem = 'Ana must stand in the same city as your Leader'
+    const row = (heir: { problem: string | undefined; named: boolean }) =>
+      residentActions(here({ makeLeader: { problem, heir } })).find((x) => x.id === 'makeLeader')
+    expect(row({ problem: undefined, named: false })?.disabled).toBeUndefined()
+    expect(row({ problem: 'Ana is your Leader', named: true })?.disabled).toBeUndefined()
+    expect(row({ problem: 'Ana is a child', named: false })).toMatchObject({
+      disabled: true,
+      reason: problem,
+    })
   })
 
   it('offers Relocate for an own resident, a child too, off with the reason when it can’t go', () => {
@@ -629,6 +642,22 @@ describe('whether a resident can be made Leader', () => {
   it('can’t make another realm’s resident Leader', () => {
     const theirs = { ...ana, owner: 'them' }
     expect(makeLeaderProblem(seen(), realm, leader, theirs)).toBe('not one of your residents')
+  })
+
+  it('names an heir from anywhere, but not the Leader, a child, a soldier lent out or a homeless one', () => {
+    const away = { ...ana, x: 200, y: 200 }
+    expect(nameHeirProblem(seen(), realm, away)).toBeUndefined()
+    expect(nameHeirProblem(seen(), realm, leader)).toBe('Old Bram is your Leader')
+    expect(nameHeirProblem(seen(), realm, { ...ana, bornAt: 0 })).toBe('Ana is a child')
+    expect(nameHeirProblem(seen({ contracts: [contract(0)] }), realm, ana)).toBe(
+      'Ana is in a mercenary contract',
+    )
+    expect(nameHeirProblem(seen(), realm, { ...ana, cityId: null })).toBe(
+      'Ana lives in no city of your realm',
+    )
+    expect(nameHeirProblem(seen(), realm, { ...ana, owner: 'them' })).toBe(
+      'not one of your residents',
+    )
   })
 })
 

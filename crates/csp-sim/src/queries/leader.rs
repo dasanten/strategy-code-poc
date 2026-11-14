@@ -71,3 +71,45 @@ pub fn hand_over_problem(
     }
     None
 }
+
+/// Why `target` can't be named the realm's heir (`CONTEXT.md`: Heir), or `None` when they can:
+/// the residents a Leader handover allows, a living adult of the realm who isn't its Leader and
+/// serves no one else, who also lives in a city of the realm. Unlike a handover, they need not
+/// stand anywhere in particular. `realm` is the realm's id and its Leader's.
+pub fn heir_problem(
+    world: &WorldState,
+    realm: (&str, &str),
+    target: Option<&Resident>,
+) -> Option<String> {
+    let (realm_id, leader_id) = realm;
+    let target = match target {
+        Some(t) if t.owner.as_deref() == Some(realm_id) && t.health > 0.0 => t,
+        _ => return Some("not one of your residents".into()),
+    };
+    let name = &target.name;
+    if target.id == leader_id {
+        return Some(format!("{name} is your Leader"));
+    }
+    if !can_work(target.born_at, world.tick as f64) {
+        return Some(format!("{name} is a child"));
+    }
+    match serves_others(world, &target.id) {
+        Some(ServesOthers::Contract) => return Some(format!("{name} is in a mercenary contract")),
+        Some(ServesOthers::AllianceArmy) => return Some(format!("{name} is in the alliance army")),
+        None => {}
+    }
+    if world.contracts.iter().any(|c| c.resident_ids.contains(&target.id)) {
+        return Some(format!("{name} is named in a mercenary contract offer"));
+    }
+    if !lives_in_realm(world, realm_id, target) {
+        return Some(format!("{name} lives in no city of your realm"));
+    }
+    None
+}
+
+/// Whether a resident lives in a city of the realm.
+pub fn lives_in_realm(world: &WorldState, realm_id: &str, r: &Resident) -> bool {
+    r.city_id.as_deref().is_some_and(|id| {
+        world.cities.iter().any(|c| c.id == id && c.realm_id.as_deref() == Some(realm_id))
+    })
+}

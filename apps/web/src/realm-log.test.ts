@@ -1,5 +1,5 @@
 import { REALM_LOG_LENGTH } from '@csp/balance'
-import type { RealmEvent } from '@csp/shared-types'
+import type { HeirLapse, RealmEvent } from '@csp/shared-types'
 import { describe, expect, it } from 'vitest'
 import { appendEvents, describeDelivery, describeEvent, realmEnded } from './realm-log.js'
 
@@ -932,6 +932,17 @@ describe('realm log', () => {
       tone: 'info',
       places: [{ name: 'Ashford', x: 3, y: 9 }],
     })
+  })
+
+  it('says the heir lapsed and why, and to name another', () => {
+    const lapsed = (why: HeirLapse) =>
+      describeEvent({ kind: 'heirLapsed', heirId: 'r2', heir: 'Ysolde', why, seq: 1, ...at })
+    expect(lapsed('died')).toEqual({
+      text: 'Your heir Ysolde died; your realm has no heir. Name another heir.',
+      tone: 'warn',
+    })
+    expect(lapsed('lent').text).toContain('lent out by a mercenary contract')
+    expect(lapsed('becameLeader').text).toContain('is your Leader now')
   })
 
   it('tells both sides of a carried direct offer, with what they pay', () => {

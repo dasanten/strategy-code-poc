@@ -42,6 +42,7 @@ pub fn migrations() -> BTreeMap<u32, MigrationStep> {
     steps.insert(120, waits_note_gone_places);
     steps.insert(121, queues_hold_if_blocks);
     steps.insert(122, repeat_blocks_run_until);
+    steps.insert(123, realms_name_heirs);
     steps
 }
 
@@ -155,6 +156,13 @@ fn queues_hold_if_blocks(state: Value, _: &MigrationContext<'_>) -> Value {
 /// 0032, T95.4): its `repeat` may be `{ "until": condition }`. A world from before has none, so
 /// the save stays as it is; the bump keeps a server of format 122 from loading one.
 fn repeat_blocks_run_until(state: Value, _: &MigrationContext<'_>) -> Value {
+    state
+}
+
+/// 123 → 124: a realm may have an heir (`CONTEXT.md`: Heir; T103.1): its `heirId`. A world from
+/// before has none named, so the save stays as it is; the bump keeps a server of format 123 from
+/// loading one.
+fn realms_name_heirs(state: Value, _: &MigrationContext<'_>) -> Value {
     state
 }
 
@@ -448,6 +456,21 @@ mod tests {
         });
         let migrated = migrate_world_with(save.clone(), 122, &ctx, &migrations(), 123).unwrap();
         assert_eq!(migrated, save);
+    }
+
+    #[test]
+    fn step_123_keeps_a_world_whose_realms_have_no_heir() {
+        let terrain = ctx_terrain();
+        let ctx = MigrationContext { terrain: &terrain };
+        let save = json!({
+            "tick": 3,
+            "realms": [{ "id": "r1", "userId": 1, "leaderId": "w1", "name": "North" }],
+        });
+        let migrated = migrate_world_with(save.clone(), 123, &ctx, &migrations(), 124).unwrap();
+        assert_eq!(migrated, save);
+        let realm: csp_shared::world::Realm =
+            serde_json::from_value(migrated["realms"][0].clone()).unwrap();
+        assert_eq!(realm.heir_id, None);
     }
 
     #[test]

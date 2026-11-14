@@ -99,6 +99,9 @@ pub struct AllianceMemberView {
     pub label: RealmLabel,
     pub joined_at: f64,
     pub leaves_at: Option<f64>,
+    /// The name of the member's heir (`CONTEXT.md`: Heir): only allies see it; absent with none.
+    #[ts(optional)]
+    pub heir: Option<String>,
 }
 
 /// A part of the alliance army with its realm (`Diplomacy.alliance.army`).

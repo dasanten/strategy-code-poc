@@ -360,6 +360,7 @@ pub fn die(world: &mut WorldState, id: &str) -> Option<Resident> {
     let i = world.residents.iter().position(|x| x.id == id)?;
     let r = world.residents.remove(i);
     leave_caravans(world, &r.id);
+    crate::heir::heir_died(world, &r.id, &r.name);
     // Dead aboard a vessel, what they carried stays in it: their own place there leaves room
     // enough (`CONTEXT.md`: Fighting at a vessel).
     let vessel = r.aboard.as_deref().and_then(|id| world.vessels.iter_mut().find(|v| v.id == id));

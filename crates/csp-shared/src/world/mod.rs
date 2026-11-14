@@ -2633,6 +2633,12 @@ pub enum RealmEventWhat {
         x: f64,
         y: f64,
     },
+    /// The heir no longer qualifies and the realm has none (`CONTEXT.md`: Heir).
+    HeirLapsed {
+        heir_id: String,
+        heir: String,
+        why: HeirLapse,
+    },
     LeaderHandedOver {
         from_id: String,
         from: String,
@@ -2974,6 +2980,29 @@ pub struct Realm {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub demands_sent_at: Option<Vec<f64>>,
+    /// The resident the Player named to carry the realm on (`CONTEXT.md`: Heir); none until named.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub heir_id: Option<String>,
+}
+
+/// Why a realm's heir lapsed (`CONTEXT.md`: Heir).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum HeirLapse {
+    /// They died.
+    Died,
+    /// They belong to another realm or to nobody now (their city changed hands, they were handed
+    /// over).
+    LeftRealm,
+    /// They live in no city of the realm.
+    Homeless,
+    /// A mercenary contract in force lends them out.
+    Lent,
+    /// They were handed over to the alliance army.
+    AllianceArmy,
+    /// A Leader handover made them the Leader.
+    BecameLeader,
 }
 
 /// What a demand asks for (`DemandTerms`).
