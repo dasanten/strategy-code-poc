@@ -17,6 +17,18 @@
   },
   "NARROWEST_STRAIT": 16,
   "ISLAND_OFFSHORE_SHARE": 0.06,
+  "HEARTLAND_COUNT": 3.0,
+  "FRONTIER_REGION_COUNT": 9.0,
+  "REGION_BORDER_WIDTH": 12,
+  "PASS_WIDTH": 8,
+  "SEA_ARM_SHARE": 0.6,
+  "SECOND_WAY_SHARE": 0.4,
+  "HEARTLAND_TERRAIN": {
+    "mountain": 0.01,
+    "hills": 0.08,
+    "forest": 0.18
+  },
+  "ISLAND_RELIEF": 1.25,
   "NODE_DENSITY": {
     "forest": {
       "1": 0.00020833333333333335

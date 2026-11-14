@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { ADMIN_VIEW_MAX_SIDE } from './shared/admin-map.js'
 import { OVERVIEW_SCALE, Terrain, chunksAcross } from './shared/terrain.js'
-import type { AdminEntity, AdminPlaces, AdminWorldView } from '@csp/shared-types'
+import type { AdminEntity, AdminLand, AdminPlaces, AdminWorldView } from '@csp/shared-types'
 import {
   ADMIN_LINK_SCALE,
   ADMIN_VIEW_MARGIN,
   ADMIN_VIEWER,
+  LAND_BRIDGE_MARK_COLOR,
+  PASS_MARK_COLOR,
+  adminLandLayer,
   adminMapWorld,
   adminViewRequest,
   mapViewSearch,
@@ -224,5 +227,50 @@ describe('admin terrain overview', () => {
     expect(overviewTerrainAt(overview, 2 * OVERVIEW_SCALE - 1, 2 * OVERVIEW_SCALE - 1)).toBe(
       Terrain.Mountain,
     )
+  })
+})
+
+describe('admin map land layer', () => {
+  const size = 64
+  // Region 0 (a heartland) on the first two tiles of chunk 0, region 1 (a frontier) on the next.
+  const land: AdminLand = {
+    regions: [
+      { id: 0, kind: 'heartland', name: 'Ashvale', tiles: 2, x: 0, y: 0 },
+      { id: 1, kind: 'frontier', name: 'Ironfell', tiles: 1, x: 2, y: 0 },
+    ],
+    ways: [
+      { kind: 'pass', between: [0, 1], x: 1, y: 0, width: 8 },
+      { kind: 'landBridge', between: [0, 1], x: 2, y: 0, width: 8 },
+    ],
+    overlay: {
+      tick: 0,
+      whole: true,
+      holders: [
+        {
+          id: 'region:0',
+          name: 'Ashvale',
+          alliance: { id: 'region-kind:Heartland', name: 'Heartland' },
+        },
+        {
+          id: 'region:1',
+          name: 'Ironfell',
+          alliance: { id: 'region-kind:Frontier', name: 'Frontier' },
+        },
+      ],
+      chunks: [{ chunk: 0, runs: [2, 0, 1, 1] }],
+      gone: [],
+    },
+  }
+
+  it('shows the regions in place of territory and marks each pass and land bridge', () => {
+    const layer = adminLandLayer(land, size)
+    expect(layer.region.owners.get(0)).toBe('region:0')
+    expect(layer.region.owners.get(1)).toBe('region:0')
+    expect(layer.region.owners.get(2)).toBe('region:1')
+    expect(layer.region.owners.has(3)).toBe(false)
+    expect(layer.marks).toEqual([
+      { x: 1, y: 0, color: PASS_MARK_COLOR },
+      { x: 2, y: 0, color: LAND_BRIDGE_MARK_COLOR },
+    ])
   })
 })

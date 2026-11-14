@@ -22,6 +22,19 @@ export interface Balance {
   }
   readonly NARROWEST_STRAIT: number
   readonly ISLAND_OFFSHORE_SHARE: number
+  readonly HEARTLAND_COUNT: number
+  readonly FRONTIER_REGION_COUNT: number
+  readonly REGION_BORDER_WIDTH: number
+  readonly PASS_WIDTH: number
+  readonly SEA_ARM_SHARE: number
+  readonly SECOND_WAY_SHARE: number
+  readonly HEARTLAND_TERRAIN: {
+    mountain: number
+    hills: number
+    forest: number
+    [key: string]: number
+  }
+  readonly ISLAND_RELIEF: number
   readonly NODE_DENSITY: {
     forest: {
       '1': number

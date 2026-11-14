@@ -94,6 +94,7 @@ pub mod random;
 #[cfg(test)]
 mod realm_test_world;
 pub mod region_map;
+pub mod regions;
 pub mod relocating;
 pub mod renaming;
 pub mod residents;

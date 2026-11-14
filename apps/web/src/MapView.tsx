@@ -116,7 +116,7 @@ import {
 } from './map/roads.js'
 import { drawPlans, plannedBuilding } from './map/plans.js'
 import { drawPlaces, pickedPlaces } from './map/places.js'
-import { drawPickPreview } from './map/preview-draw.js'
+import { drawMarks, drawPickPreview, type MapMark } from './map/preview-draw.js'
 import type { PickPreview } from './pick-preview.js'
 import {
   inBox,
@@ -165,6 +165,7 @@ export function MapView({
   picking = false,
   onPickTile,
   preview,
+  marks,
   onPointerTile,
   onNodesLoaded,
   onTerrainLoaded,
@@ -207,6 +208,8 @@ export function MapView({
   ) => void
   /** What the pick waiting for a tile would do there, drawn while `picking` (`pickPreview`). */
   preview?: PickPreview
+  /** Spots marked on the map at every zoom, such as the admin map's passes and land bridges. */
+  marks?: readonly MapMark[]
   /** Called while `picking` with the tile a mouse or pen hovers over, undefined once off the map. */
   onPointerTile?: (tile: { x: number; y: number } | undefined) => void
   /** Called with a lookup of known resource nodes by tile, and again whenever more load. */
@@ -257,6 +260,7 @@ export function MapView({
   const onPickTileRef = useRef(onPickTile)
   onPickTileRef.current = onPickTile
   const previewRef = useRef(preview)
+  const marksRef = useRef(marks)
   const onPointerTileRef = useRef(onPointerTile)
   onPointerTileRef.current = onPointerTile
   const onNodesLoadedRef = useRef(onNodesLoaded)
@@ -276,12 +280,7 @@ export function MapView({
   const controlsRef = useRef<{
     zoom(factor: number): void
     centre(): void
-    goTo(
-      x: number,
-      y: number,
-      scale?: number | ((now: number) => number),
-      cover?: Covered,
-    ): void
+    goTo(x: number, y: number, scale?: number | ((now: number) => number), cover?: Covered): void
   } | null>(null)
   const [hover, setHover] = useState<Hover | null>(null)
   const [scale, setScale] = useState(START_SCALE)
@@ -316,8 +315,7 @@ export function MapView({
   }, [minimapOpen])
 
   useEffect(() => {
-    if (focus)
-      controlsRef.current?.goTo(focus.x, focus.y, focus.zoom ?? focus.scale, focus.cover)
+    if (focus) controlsRef.current?.goTo(focus.x, focus.y, focus.zoom ?? focus.scale, focus.cover)
   }, [focus])
 
   // The Region map changes once a game hour, and where explored terrain grows.
@@ -342,6 +340,11 @@ export function MapView({
     previewRef.current = picking ? preview : undefined
     redrawRef.current()
   }, [preview, picking])
+
+  useEffect(() => {
+    marksRef.current = marks
+    redrawRef.current()
+  }, [marks])
 
   useEffect(() => {
     worldRef.current = world
@@ -714,6 +717,7 @@ export function MapView({
       if (zoomTier(cam.scale) === 'far') drawFar(g, cam, view)
       else drawMiddle(g, cam, view, onScreen)
       drawWaypoints(g, cam, view)
+      if (marksRef.current) drawMarks(g, cam, view, mapSize, marksRef.current)
       labels.end()
       tokens.end()
       badges.end()
@@ -1195,11 +1199,7 @@ export function MapView({
             cover,
             scale === undefined
               ? cam.scale
-              : clampScale(
-                  typeof scale === 'function' ? scale(cam.scale) : scale,
-                  mapSize,
-                  size(),
-                ),
+              : clampScale(typeof scale === 'function' ? scale(cam.scale) : scale, mapSize, size()),
             mapSize,
           ),
         ),

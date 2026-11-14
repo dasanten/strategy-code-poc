@@ -135,6 +135,50 @@ pub const NARROWEST_STRAIT: i32 = 16;
 /// full-size map): near enough that a boat reaches it from the coast.
 pub const ISLAND_OFFSHORE_SHARE: f64 = 0.06;
 
+/// Heartlands on the mainland (`CONTEXT.md`: Heartland, Region): good farmland where Players
+/// start, in the middle of the mainland, none touching another where that can be helped.
+pub const HEARTLAND_COUNT: f64 = 3.0;
+
+/// Frontier regions on the mainland (`CONTEXT.md`: Frontier): the rest of the mainland, cut into
+/// regions of roughly even size with the heartlands (about 1,100 tiles across on a full-size map).
+pub const FRONTIER_REGION_COUNT: f64 = 9.0;
+
+/// How wide the Mountain range or arm of the Sea along a border between two mainland regions is,
+/// in tiles, both sides together (`CONTEXT.md`: Region). A smaller map gets a narrower one.
+pub const REGION_BORDER_WIDTH: i32 = 12;
+
+/// How wide a pass or a land bridge is along its border, in tiles (`CONTEXT.md`: Region): room for
+/// a carriage, and for a realm to hold it. A smaller map gets a narrower one.
+pub const PASS_WIDTH: i32 = 8;
+
+/// Share of the borders between two mainland regions that are arms of the Sea rather than
+/// Mountain ranges (`CONTEXT.md`: Region): crossed by land bridges instead of passes. Only a
+/// border that reaches the coast can be one; the rest of an arm, cut off from the open Sea, is a
+/// range. So about this share of the borders that reach the coast are arms.
+pub const SEA_ARM_SHARE: f64 = 0.6;
+
+/// Share of the borders between two mainland regions with two ways through instead of one.
+pub const SECOND_WAY_SHARE: f64 = 0.4;
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegionTerrain {
+    pub mountain: f64,
+    pub hills: f64,
+    pub forest: f64,
+}
+
+/// Share of a heartland's land each terrain covers before its borders are raised (`CONTEXT.md`:
+/// Heartland): mostly Plains, with some Forest and Hills. The rest of the land makes up the
+/// `TERRAIN_SHARES` of the whole, so frontier regions and islands have more Hills and Mountain.
+/// The Mountain range along a border comes on top.
+pub const HEARTLAND_TERRAIN: RegionTerrain =
+    RegionTerrain { mountain: 0.01, hills: 0.08, forest: 0.18 };
+
+/// How much higher an island's land lies than a frontier region's: the generator's relief on an
+/// island is multiplied by this before Mountain and Hills are cut (`CONTEXT.md`: Island).
+pub const ISLAND_RELIEF: f64 = 1.25;
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NodeDensity {
@@ -2305,6 +2349,14 @@ pub fn balance_json() -> Value {
     m.insert("ISLAND_RADIUS".into(), to_value(ISLAND_RADIUS).expect("serialisable"));
     m.insert("NARROWEST_STRAIT".into(), json!(NARROWEST_STRAIT));
     m.insert("ISLAND_OFFSHORE_SHARE".into(), json!(ISLAND_OFFSHORE_SHARE));
+    m.insert("HEARTLAND_COUNT".into(), json!(HEARTLAND_COUNT));
+    m.insert("FRONTIER_REGION_COUNT".into(), json!(FRONTIER_REGION_COUNT));
+    m.insert("REGION_BORDER_WIDTH".into(), json!(REGION_BORDER_WIDTH));
+    m.insert("PASS_WIDTH".into(), json!(PASS_WIDTH));
+    m.insert("SEA_ARM_SHARE".into(), json!(SEA_ARM_SHARE));
+    m.insert("SECOND_WAY_SHARE".into(), json!(SECOND_WAY_SHARE));
+    m.insert("HEARTLAND_TERRAIN".into(), to_value(HEARTLAND_TERRAIN).expect("serialisable"));
+    m.insert("ISLAND_RELIEF".into(), json!(ISLAND_RELIEF));
     m.insert("NODE_DENSITY".into(), to_value(NODE_DENSITY).expect("serialisable"));
     m.insert("NODE_MIN_SPACING".into(), json!(NODE_MIN_SPACING));
     m.insert("TERRAIN_SPEED".into(), to_value(TERRAIN_SPEED).expect("serialisable"));

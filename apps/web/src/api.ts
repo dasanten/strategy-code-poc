@@ -1,4 +1,5 @@
 import {
+  ADMIN_LAND_PATH,
   ADMIN_MAP_INFO_PATH,
   ADMIN_PLACES_PATH,
   ADMIN_TERRITORY_PATH,
@@ -13,6 +14,7 @@ import type {
   AdminDirectives,
   AdminInspectTarget,
   AdminInspection,
+  AdminLand,
   AdminPlaces,
   AdminViewRequest,
   AdminWorldView,
@@ -87,6 +89,7 @@ export const api = {
   adminInspect: (target: AdminInspectTarget) =>
     call<AdminInspection>('GET', adminInspectPath(target)),
   adminTerritory: () => call<RegionMap>('GET', ADMIN_TERRITORY_PATH),
+  adminLand: () => call<AdminLand>('GET', ADMIN_LAND_PATH),
   adminOverview: async () => {
     const res = await fetch(ADMIN_TERRAIN_OVERVIEW_PATH, { credentials: 'same-origin' }).catch(
       () => {

@@ -2617,9 +2617,7 @@ button.residents-row.selected:hover {
    and on a phone, where drawers fill the screen. */
 .game:has(.hud-drawer:not([hidden])) .game-map .map-legend-panel,
 .game:has(.hud-drawer:not([hidden])) .game-map .map-legend-button {
-  left: calc(
-    var(--rail-w) + min(var(--drawer-w, 380px), calc(100vw - var(--rail-w))) + 12px
-  );
+  left: calc(var(--rail-w) + min(var(--drawer-w, 380px), calc(100vw - var(--rail-w))) + 12px);
 }
 .game:has(.hud-drawer.wide:not([hidden])) .game-map .map-legend-panel,
 .game:has(.hud-drawer.wide:not([hidden])) .game-map .map-legend-button,
@@ -2628,4 +2626,31 @@ button.residents-row.selected:hover {
 .game.phone:has(.hud-drawer:not([hidden])) .game-map .map-legend-panel,
 .game.phone:has(.hud-drawer:not([hidden])) .game-map .map-legend-button {
   display: none;
+}
+.admin-map-layers {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.admin-land-legend {
+  margin: 0;
+  padding: 6px 10px;
+  list-style: none;
+  border-radius: 6px;
+  background: var(--ui-panel);
+  font-size: 0.85rem;
+}
+.admin-land-legend .swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 2px;
+}
+.admin-land-legend .swatch.mark {
+  transform: rotate(45deg);
 }

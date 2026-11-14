@@ -20,6 +20,9 @@ export const ADMIN_PLACES_PATH = '/api/admin/places'
 /** Where an admin loads the territory of the whole map, as a `RegionMap` of all of it. */
 export const ADMIN_TERRITORY_PATH = '/api/admin/territory'
 
+/** Where an admin loads the land: its regions, passes and land bridges (`AdminLand`). */
+export const ADMIN_LAND_PATH = '/api/admin/land'
+
 /**
  * The widest and tallest rectangle `ADMIN_WORLD_PATH` gives every entity in, in tiles; the far
  * zoom asks for cities only, which may span the whole map.
