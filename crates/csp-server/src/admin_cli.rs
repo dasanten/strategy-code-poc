@@ -1,15 +1,19 @@
 //! What the `admin` binary does (`apps/server/src/cli/admin.ts`), apart from its terminal, so it is
 //! testable.
-use std::path::PathBuf;
+use std::{path::PathBuf, time::SystemTime};
+
+use csp_sim::terrain_gen::generate_full_terrain;
 
 use rusqlite::Connection;
 
 use crate::auth::{create_admin, create_invite_code, AuthFailure};
 use crate::map_tools::{describe_map_stats, explore, map_stats, Reach};
+use crate::reset::reset_world;
 
 pub const USAGE: &str = "usage: admin create <name> | admin invite \
                          | admin explore <player> (--radius <tiles> | --all) [--yes] \
-                         | admin map-stats";
+                         | admin map-stats \r
+                         | admin reset-world [--seed <n>] [--yes]";
 
 /// The database the server uses (`config.dbPath`, `.env` included): `DB_PATH`, or
 /// `data/world.db` from where it runs.
@@ -18,6 +22,14 @@ pub fn db_path() -> PathBuf {
         std::env::var_os("DB_PATH")
             .map(PathBuf::from)
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_default().join("data/world.db"))
+    })
+}
+
+/// Where `reset-world` writes its backup: `BACKUP_DIR` as the server uses it, or `backups/` next
+/// to the database when that is unset (dev).
+pub fn backup_dir() -> PathBuf {
+    crate::config::Config::from_env().ok().and_then(|c| c.backup_dir).unwrap_or_else(|| {
+        db_path().parent().map_or_else(|| PathBuf::from("backups"), |p| p.join("backups"))
     })
 }
 
@@ -56,6 +68,19 @@ pub fn run(
             explore(conn, player, reach, yes)
         }
         [command] if command == "map-stats" => Ok(describe_map_stats(&map_stats(conn)?)),
+        [command, rest @ ..] if command == "reset-world" => {
+            let yes = rest.iter().any(|a| a == "--yes");
+            let seed = match rest.iter().position(|a| a == "--seed") {
+                Some(i) => Some(
+                    rest.get(i + 1)
+                        .and_then(|s| s.parse::<i64>().ok())
+                        .filter(|s| *s > 0)
+                        .ok_or_else(|| USAGE.to_owned())?,
+                ),
+                None => None,
+            };
+            reset_world(conn, seed, yes, &backup_dir(), SystemTime::now(), generate_full_terrain)
+        }
         _ => Err(USAGE.to_owned()),
     }
 }

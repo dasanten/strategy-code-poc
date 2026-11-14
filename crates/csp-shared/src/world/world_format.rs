@@ -1,12 +1,12 @@
-//! The save format (ADR 0006, ADR 0030): which version of `WorldState` a save holds. The Rust
-//! server migrates saves from the TypeScript freeze (format 111) on, in `csp-server`'s
-//! `world_format`; migrations from older ones are not ported (a save is migrated once by the
-//! TypeScript server before the cutover).
+//! The save format (ADR 0006, ADR 0035): which version of `WorldState` a save holds. The Rust
+//! server reads saves from the reset (`csp-admin reset-world`) on and migrates them in
+//! `csp-server`'s `world_format`; an older save is refused.
 
 use super::WorldState;
 
-/// The current save format. A bump comes with a migration step in `csp-server`'s `world_format`.
-pub const WORLD_FORMAT_VERSION: u32 = 123;
+/// The current save format. A bump comes with a migration step in `csp-server`'s `world_format`
+/// (none until the reset ships, ADR 0035).
+pub const WORLD_FORMAT_VERSION: u32 = 124;
 
 /// Why a save does not load.
 #[derive(Debug, thiserror::Error)]

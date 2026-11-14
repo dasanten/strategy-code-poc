@@ -17,7 +17,7 @@ use crate::explored::{load_explored, save_explored};
 use crate::first_day::read_first_day;
 use crate::realtime::{welcome_message, TickView};
 use crate::saves::{gzip, latest_save, load_terrain};
-use crate::world_format::{migrate_world, MigrationContext, RESET_BEFORE};
+use crate::world_format::{migrate_world, MigrationContext};
 
 /// What `explore` marks as explored.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,12 +34,9 @@ Run it on a copy of a world (DB_PATH) or with the server stopped: a running serv
 own bitmap back at its next save. Add --yes to write.";
 
 /// The newest save and the terrain, as the server would start with them, read without writing:
-/// no world is made, no terrain generated and no old world reset.
+/// no world is made and no terrain generated. A save from before the reset is refused.
 pub fn load_world(conn: &Connection) -> Result<(WorldState, TerrainMap), String> {
     let (state, version) = latest_save(conn).map_err(|e| e.to_string())?.ok_or("no saved world")?;
-    if version < RESET_BEFORE {
-        return Err(format!("the saved world's format {version} is from before the last reset"));
-    }
     let (_, terrain) = load_terrain(conn).map_err(|e| e.to_string())?.ok_or("no terrain stored")?;
     let migrated = migrate_world(state, version, &MigrationContext { terrain: &terrain })
         .map_err(|e| e.to_string())?;
