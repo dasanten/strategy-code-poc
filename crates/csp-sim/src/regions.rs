@@ -118,7 +118,7 @@ impl Regions {
         let mut of_tile = vec![NONE; n];
         let mut tiles = vec![0u32; next];
         let mut sum = vec![(0f64, 0f64); next];
-        for t in 0..n {
+        for (t, region) in of_tile.iter_mut().enumerate() {
             let g = land.group[t];
             if g == -1 {
                 continue;
@@ -128,7 +128,7 @@ impl Regions {
             if id == NONE {
                 continue;
             }
-            of_tile[t] = id;
+            *region = id;
             tiles[id as usize] += 1;
             sum[id as usize].0 += f64::from(x);
             sum[id as usize].1 += f64::from(y);
@@ -262,7 +262,8 @@ impl Layout {
         let mut sites: Vec<(f64, f64)> = Vec::with_capacity(count);
         let mut tile_sites: Vec<(f64, f64)> = Vec::with_capacity(count);
         for _ in 0..count {
-            let mut best: Option<(f64, (f64, f64), (f64, f64))> = None;
+            // The candidate farthest from the sites so far, in the shape's units, and how far.
+            let mut best = (f64::NEG_INFINITY, (0.0, 0.0));
             for _ in 0..SITE_CANDIDATES {
                 let r = SITE_REACH * rand().sqrt();
                 let a = rand() * std::f64::consts::TAU;
@@ -272,13 +273,12 @@ impl Layout {
                     .iter()
                     .map(|&(x, y)| (x - tile.0).hypot(y - tile.1))
                     .fold(f64::INFINITY, f64::min);
-                if best.is_none_or(|(bd, _, _)| d > bd) {
-                    best = Some((d, unit, tile));
+                if d > best.0 {
+                    best = (d, unit);
                 }
             }
-            let (_, unit, tile) = best.expect("a candidate");
-            sites.push(unit);
-            tile_sites.push(tile);
+            sites.push(best.1);
+            tile_sites.push(shape.tile(best.1 .0, best.1 .1));
         }
         let spacing = (shape.reach / 2.0).max(4.0);
         let step = (size / 96).max(1);
