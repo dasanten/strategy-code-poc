@@ -209,6 +209,7 @@ import {
   escapeStep,
   hitchChoice,
   makeLeaderProblem,
+  nameHeirProblem,
   nodeFit,
   type ActionId,
   commandedCarriages,
@@ -1390,6 +1391,20 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     setOrderError(await giveOrder(order))
   }
   /**
+   * Names the picked resident the realm's heir (`CONTEXT.md`: Heir), the same `nameHeir` order a
+   * script's `nameHeir` requests.
+   */
+  async function nameHeir() {
+    if (!selected) return
+    const order = { kind: 'nameHeir', residentId: selected.id, heirId: selected.id }
+    setOrderError(await giveOrder(order))
+  }
+  /** Clears the realm's heir (`CONTEXT.md`: Heir), as a script's `clearHeir` does. */
+  async function clearHeir() {
+    if (!selected) return
+    setOrderError(await giveOrder({ kind: 'clearHeir', residentId: selected.id }))
+  }
+  /**
    * Renames the picked resident (`CONTEXT.md`: Renaming a resident), with the realm name when it
    * is the Leader of an unnamed realm: the same `rename` order a script's `rename` requests.
    */
@@ -1629,6 +1644,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const leader = world?.residents.find(
     (r): r is Resident => r.id === world.home.leaderId && faresKnown(r),
   )
+  // The realm's heir (`CONTEXT.md`: Heir): absent before the world comes, null with none.
+  const heirId = world?.home.heirId ?? null
+  const heirName = world && heirId ? world.residents.find((r) => r.id === heirId)?.name : undefined
+  const heirShown = world && leader ? (heirName ?? null) : undefined
+  const pickHeir = () => setOpenDrawer('residents')
   const drawer = (id: DrawerId, panel: ReactNode, full = false) => (
     <Drawer id={id} open={openDrawer} onClose={closeDrawer} full={full}>
       {panel}
@@ -1644,6 +1664,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       diplomacy: world.diplomacy,
     }),
     leaderId: world.home.leaderId,
+    heirId,
     scripts,
     buildings: world.buildings,
     inSight: world.residents,
@@ -1722,6 +1743,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
         status={status}
         goods={goods}
         leader={leader?.name}
+        heir={heirShown}
+        onPickHeir={pickHeir}
         onLogout={logout}
         onWiki={() => reportFirstDay('openWiki')}
       />
@@ -1732,6 +1755,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           marked={marks.rail}
           goods={goods}
           leader={leader?.name}
+          heir={heirShown}
+          onPickHeir={pickHeir}
           account={account.name}
           onLogout={logout}
           onWiki={() => reportFirstDay('openWiki')}
@@ -2420,26 +2445,31 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   world.cities.find((c) => c.id === b.cityId)?.realmId !== world.home.realmId,
               )}
               onClimb={climb}
-              makeLeader={
-                selected.owner === world.home.realmId && selected.id !== world.home.leaderId
-                  ? {
-                      problem: makeLeaderProblem(
-                        {
-                          tick: world.tick,
-                          diplomacy: world.diplomacy,
-                          cities: world.cities,
-                          buildings: world.buildings,
-                          mapSize: world.map.size,
-                        },
-                        { id: world.home.realmId, leaderId: world.home.leaderId },
-                        leader,
-                        selected,
-                      ),
-                    }
-                  : undefined
-              }
+              makeLeader={(() => {
+                if (selected.owner !== world.home.realmId || selected.id === world.home.leaderId) {
+                  return undefined
+                }
+                const seen = {
+                  tick: world.tick,
+                  diplomacy: world.diplomacy,
+                  cities: world.cities,
+                  buildings: world.buildings,
+                  mapSize: world.map.size,
+                }
+                const realm = { id: world.home.realmId, leaderId: world.home.leaderId }
+                return {
+                  problem: makeLeaderProblem(seen, realm, leader, selected),
+                  heir: {
+                    problem: nameHeirProblem(seen, realm, selected),
+                    named: selected.id === heirId,
+                  },
+                }
+              })()}
               leaderName={leader?.name}
               onMakeLeader={makeLeader}
+              heirName={heirId !== selected.id ? heirName : undefined}
+              onNameHeir={() => void nameHeir()}
+              onClearHeir={() => void clearHeir()}
               relocate={relocateFor(selected)}
               onRelocate={relocate}
               rename={

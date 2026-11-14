@@ -1,7 +1,13 @@
 import { REALM_LOG_LENGTH } from '@csp/balance'
 import { TRADE_ORG_NAME } from './shared/trade-org.js'
 import { timeLeft } from './shared/estimates.js'
-import type { DeliveryView, PunishmentEnd, RealmEvent, StandingMove } from '@csp/shared-types'
+import type {
+  DeliveryView,
+  HeirLapse,
+  PunishmentEnd,
+  RealmEvent,
+  StandingMove,
+} from '@csp/shared-types'
 import { BUILDING_NAMES } from './city-view.js'
 import { formatMove } from './standing-view.js'
 
@@ -589,6 +595,8 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         tone: 'info',
         places: [{ name: e.city, x: e.x, y: e.y }],
       }
+    case 'heirLapsed':
+      return { text: `${heirLapsedText(e.heir, e.why)} Name another heir.`, tone: 'warn' }
     case 'leaderHandedOver':
       return {
         text: `${e.from} handed your realm over to ${e.to} in ${e.city}; ${e.to} is your Leader now.`,
@@ -1026,5 +1034,23 @@ function punishedLine(e: Extract<RealmEvent, { kind: 'punished' }>): EventLine {
                 : `${army} was lost on its way home from ${e.city}, with ${taking}.`,
         tone: 'info',
       }
+  }
+}
+
+/** Why the heir lapsed, in words (`CONTEXT.md`: Heir). */
+function heirLapsedText(heir: string, why: HeirLapse): string {
+  switch (why) {
+    case 'died':
+      return `Your heir ${heir} died; your realm has no heir.`
+    case 'leftRealm':
+      return `Your heir ${heir} is no longer of your realm; it has no heir.`
+    case 'homeless':
+      return `Your heir ${heir} lives in no city of your realm now; it has no heir.`
+    case 'lent':
+      return `Your heir ${heir} is lent out by a mercenary contract; your realm has no heir.`
+    case 'allianceArmy':
+      return `Your heir ${heir} went to the alliance army; your realm has no heir.`
+    case 'becameLeader':
+      return `Your heir ${heir} is your Leader now; your realm has no heir.`
   }
 }

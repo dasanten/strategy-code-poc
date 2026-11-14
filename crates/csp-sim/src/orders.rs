@@ -120,13 +120,15 @@ pub fn order_kinds() -> OrderKinds {
 }
 
 /// The order kinds that leave a resident's script running (`keeps` in `applyAll`): pairing, the
-/// Leader handover, renaming and claiming the Horse offer change nobody's order, nor do picking a
-/// param value, a defence or Alarm script, the demand, offer and waypoint orders; editing a queue
-/// keeps its current step going.
-const KEEPS_SCRIPT: [&str; 23] = [
+/// Leader handover, naming an heir, renaming and claiming the Horse offer change nobody's order,
+/// nor do picking a param value, a defence or Alarm script, the demand, offer and waypoint
+/// orders; editing a queue keeps its current step going.
+const KEEPS_SCRIPT: [&str; 25] = [
     "runScript",
     "pair",
     "handOver",
+    "nameHeir",
+    "clearHeir",
     "rename",
     "renameCity",
     "renameHorse",

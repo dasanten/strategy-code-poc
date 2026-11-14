@@ -1183,6 +1183,21 @@ export function Wiki() {
           hands. A homeless resident has no home to refill at and can't pair.
         </p>
         <p>
+          Your <b>heir</b> is the one resident you name to carry your realm on. Name them from their
+          card (<strong>Leader and heir…</strong>, then <strong>Name heir</strong>) or from a script
+          with <code>nameHeir(residentId)</code>; it is free, at once and from anywhere. Who
+          qualifies: an adult of your realm who lives in one of its cities, isn't your Leader and
+          serves no one else (no mercenary contract or offer naming them, not in the alliance
+          army), the same residents a Leader handover allows, but they need not stand by your
+          Leader. You have one heir: naming another replaces the first, and{' '}
+          <strong>Clear heir</strong> or <code>clearHeir()</code> leaves you with none. The top bar
+          shows your heir, or “No heir” to pick one; their card and the Residents list mark them.
+          Only you and your allies see who it is. The heir lapses, with a line in your realm log,
+          when they die, leave your realm (their city changes hands, or they are handed over),
+          become homeless, are lent out or handed to the alliance army, or become your Leader by a
+          handover; then name another.
+        </p>
+        <p>
           <b>Relocate</b> moves any resident of your realm, your Leader, children and homeless ones
           too, to another of your cities: pick it on their card. They walk there and become its
           resident on stepping into its area, at once if they are already in it. You can give the

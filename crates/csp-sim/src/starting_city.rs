@@ -398,6 +398,7 @@ pub fn found_starting_city(
         leader_id: residents[0].id.clone(),
         name: None,
         demands_sent_at: None,
+        heir_id: None,
     };
     if let (Some(names), Some(leader_name)) = (names, &leader_name) {
         realm.name = Some(crate::queries::people::js_trim(&names.realm_name).to_string());

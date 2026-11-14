@@ -120,6 +120,8 @@ export function AlliancePanel({
               {m.leavesAt !== null && (
                 <span className="badge">leaves {formatGameTime(m.leavesAt)}</span>
               )}
+              {/* Only allies see who a realm's heir is (`CONTEXT.md`: Heir). */}
+              {m.realmId !== realmId && m.heir && <span className="badge">heir {m.heir}</span>}
             </span>
             {leading && m.realmId !== realmId && m.leavesAt === null && (
               <button

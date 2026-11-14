@@ -62,6 +62,7 @@ const COLUMN_HEADINGS: Partial<Record<ListColumn, string>> = {
 export function ResidentsFullList({
   groups,
   leaderId,
+  heirId,
   tick,
   scripts = [],
   buildings = [],
@@ -77,6 +78,8 @@ export function ResidentsFullList({
 }: {
   groups: ResidentGroup<Resident>[]
   leaderId: string
+  /** The realm's heir, marked in their row (`CONTEXT.md`: Heir). */
+  heirId?: string | null
   tick: number
   /** The Player's script library, to name the script each runs and the task it is for. */
   scripts?: ScriptSummary[]
@@ -280,6 +283,7 @@ export function ResidentsFullList({
                 row={residentRow(r, {
                   city,
                   leaderId,
+                  heirId,
                   tick,
                   doing: doingOf(r),
                   under:
@@ -413,6 +417,7 @@ function ResidentTableRow({ row, selected, onSelect }: RowProps) {
       <span className="name cut" title={row.name}>
         {row.name}
         {row.leader && <small className="leader-mark">Leader</small>}
+        {row.heir && <small className="leader-mark">Heir</small>}
       </span>
       <span className="mono">{row.age}</span>
       <span className="cut" title={row.city}>
@@ -458,6 +463,7 @@ function ResidentCardRow({ row, selected, onSelect }: RowProps) {
         <span className="name cut">
           {row.name}
           {row.leader && <span className="leader-mark"> · Leader</span>}
+          {row.heir && <span className="leader-mark"> · Heir</span>}
         </span>
         <span className="mono">{yearsLine(row.age)}</span>
       </span>
