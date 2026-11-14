@@ -166,28 +166,30 @@ fn buys_the_coins_go_into_the_warehouse_and_the_goods_into_the_hands_at_its_sell
     assert_eq!(s.wh(Good::Coins), coins + cost);
 }
 
-/// A trading post buys and sells Coal (`CONTEXT.md`: Coal) like any other good, from the stock it is
-/// placed with.
+/// A trading post buys and sells Coal and Steel (`CONTEXT.md`: Coal) like any other good, from the
+/// stock it is placed with.
 #[test]
-fn buys_and_sells_coal() {
-    let mut s = post();
-    let start = s.wh(Good::Coal);
-    assert!(start > 0.0);
-    let floor = stock_floor(&s.world, s.warehouse())[&Good::Coal];
-    assert!(floor > 0.0);
-    s.carry(json!({ "coal": 10, "coins": 500 }));
-    assert_eq!(s.order(json!({ "kind": "sell", "good": "coal", "units": 4 })), "ack");
-    s.run();
-    let paid = sum(4, |n| price_for(Good::Coal, start + n, floor).buy);
-    assert!(paid > 0.0);
-    assert_eq!(s.held(Good::Coal), Some(6.0));
-    assert_eq!(s.wh(Good::Coal), start + 4.0);
-    assert_eq!(s.order(json!({ "kind": "buy", "good": "coal", "units": 3 })), "ack");
-    s.run();
-    let cost = sum(3, |n| price_for(Good::Coal, start + 4.0 - n + 1.0, floor).sell);
-    assert!(cost > paid * 3.0 / 4.0);
-    assert_eq!(s.held(Good::Coal), Some(9.0));
-    assert_eq!(s.wh(Good::Coal), start + 1.0);
+fn buys_and_sells_coal_and_steel() {
+    for (good, name) in [(Good::Coal, "coal"), (Good::Steel, "steel")] {
+        let mut s = post();
+        let start = s.wh(good);
+        assert!(start > 0.0, "{name}");
+        let floor = stock_floor(&s.world, s.warehouse())[&good];
+        assert!(floor > 0.0, "{name}");
+        s.carry(json!({ name: 10, "coins": 500 }));
+        assert_eq!(s.order(json!({ "kind": "sell", "good": name, "units": 4 })), "ack");
+        s.run();
+        let paid = sum(4, |n| price_for(good, start + n, floor).buy);
+        assert!(paid > 0.0, "{name}");
+        assert_eq!(s.held(good), Some(6.0));
+        assert_eq!(s.wh(good), start + 4.0);
+        assert_eq!(s.order(json!({ "kind": "buy", "good": name, "units": 3 })), "ack");
+        s.run();
+        let cost = sum(3, |n| price_for(good, start + 4.0 - n + 1.0, floor).sell);
+        assert!(cost > paid * 3.0 / 4.0, "{name}");
+        assert_eq!(s.held(good), Some(9.0));
+        assert_eq!(s.wh(good), start + 1.0);
+    }
 }
 
 #[test]

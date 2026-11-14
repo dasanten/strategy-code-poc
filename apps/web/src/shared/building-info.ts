@@ -34,7 +34,7 @@ export const BUILDING_PURPOSE: Record<BuildingKind, string> = {
   mine: 'A mine digs what the iron ore, gold ore or coal node it stands on yields.',
   quarry: 'A quarry cuts stone from the stone node it stands on.',
   lumberCamp: 'A lumber camp fells wood in the forest node it stands on.',
-  smelter: 'A smelter turns iron ore into iron; not on Mountain.',
+  smelter: 'A smelter turns iron ore into iron, or iron and coal into steel; not on Mountain.',
   mint: 'A mint turns gold ore into coins; not on Mountain.',
   smithy: 'A smithy turns iron and wood into spears, swords, shields and armour; not on Mountain.',
   trainingGround:

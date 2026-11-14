@@ -140,6 +140,10 @@ import {
   ISLAND_COUNT,
   HEARTLAND_COUNT,
   FRONTIER_REGION_COUNT,
+  FRONTIER_NODE_DENSITY,
+  ISLAND_NODE_DENSITY,
+  GOLD_NODE_DENSITY,
+  START_COINS,
   REGION_BORDER_WIDTH,
   PASS_WIDTH,
   SECOND_WAY_SHARE,
@@ -370,6 +374,9 @@ import {
   SCRIPT_LANGUAGE,
 } from './wiki-scripting.js'
 import { apiNames, type ApiName } from './script-editor.js'
+
+/** A smelter's Steel recipe (`CONTEXT.md`: Coal): its second, after Iron. */
+const STEEL = RECIPES.smelter!.find((r) => 'steel' in r.output)!
 
 /** An untrained fighter with a spear and a fully trained, armoured one, as respect weighs them. */
 const UNTRAINED_SPEAR = { carried: { spear: 1 }, skills: {} }
@@ -1060,6 +1067,16 @@ export function Wiki() {
           and sell it. Your realm’s Coal shows in the top bar beside its Food, Wood and Stone.
         </p>
         <p>
+          A smelter turns Iron and Coal into <strong>Steel</strong>: {num(STEEL.input.iron ?? 0)}{' '}
+          Iron and {num(STEEL.input.coal ?? 0)} Coal make {num(STEEL.output.steel ?? 0)} Steel, so
+          an average smelter worker makes{' '}
+          {num(batchesPerDay('smelter') * (STEEL.output.steel ?? 0))} Steel a game day. Whether a
+          smelter’s worker makes Iron or Steel is said when they are given Work there, as a smith
+          says what to forge; told nothing, they make Iron. Set to Steel without Coal, they stand
+          idle and their Doing line says what is missing. Steel weighs {num(GOOD_WEIGHT.steel ?? 0)}{' '}
+          kg a unit, is stored and traded like any good, and shows in the top bar beside Coal.
+        </p>
+        <p>
           Each heartland has {num(STARTING_SITES_PER_HEARTLAND)} <strong>starting sites</strong>, a
           walk of {num(STARTING_SITE_WALK.minMinutes)} to {num(STARTING_SITE_WALK.maxMinutes)} real
           minutes from the next one. A new Leader (your first, or one after your Leader died with no
@@ -1071,6 +1088,16 @@ export function Wiki() {
           on the farmland round it, so one whose city is gone is free again. Should every site be
           taken, your city goes on the free place nearest an open heartland’s middle. Your realm log
           names the heartland your city stands in.
+        </p>
+        <p>
+          Resource nodes lie thicker away from home: a frontier region holds{' '}
+          {num(FRONTIER_NODE_DENSITY)} times as many as a heartland, an island{' '}
+          {num(ISLAND_NODE_DENSITY)} times. <strong>Gold ore</strong> is a rare good like Coal: no
+          gold node lies in a heartland, only in the frontier and on islands, where it is{' '}
+          {num(GOLD_NODE_DENSITY)} times as common again. Every frontier region has a gold node and a
+          coal node in it or in a region next to it. So a heartland realm gets its Coins by trade, selling Food, Wood,
+          Stone or Iron at its heartland’s trading post, or by holding a gold node out there. Your
+          starting city’s storage holds {num(START_COINS)} Coins for a first trade.
         </p>
         <p>
           The regions of the mainland are parted by Mountain ranges and by arms of the Sea, about{' '}
@@ -1446,11 +1473,12 @@ export function Wiki() {
         </p>
         <p>
           A smelter, mint or smithy has no storage: it works what its workers carry and what lies in
-          its pile. Once they lack the input for a batch (Iron ore, Gold ore, or the Iron and Wood
-          of what a smith makes), one worker at a time, picked at random, fetches a load of what is
-          missing from their <code>input</code> storage, else their <code>storage</code>, else the
-          nearest storage of their realm holding it, puts it on the pile and goes back to work; not
-          while someone carries the output. With none anywhere they stand idle.
+          its pile. Once they lack the input for a batch (Iron ore, the Iron and Coal of Steel, Gold
+          ore, or the Iron and Wood of what a smith makes), one worker at a time, picked at random,
+          fetches a load of what is missing from their <code>input</code> storage, else their{' '}
+          <code>storage</code>, else the nearest storage of their realm holding it, puts it on the
+          pile and goes back to work; not while someone carries the output. With none anywhere they
+          stand idle, and their Doing line says what is missing ("Idle: no coal").
         </p>
         <p>
           Work's params on the card: <code>storage</code> is the main storage, used for the output,

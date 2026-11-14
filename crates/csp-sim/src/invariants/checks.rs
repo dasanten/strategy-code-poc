@@ -35,9 +35,9 @@ use crate::queries::alliance::{allied_realms, carriage_commander_of, commander_o
 use crate::queries::balance::carry_capacity;
 use crate::queries::building::{
     build_materials, build_work_of, building_at, carriage_can_go_to, has_choice, line_building,
-    line_order, materials_needed, max_workers, node_workplace, teardown_work, work_needed,
-    workplace_good, BUILDABLE, KEEPS_GOODS, OFF_NODES, ON_PLAINS, ON_SHORE, PROCESSING,
-    SHARES_A_TILE,
+    line_order, materials_needed, max_workers, node_workplace, recipe_for, teardown_work,
+    work_needed, workplace_good, BUILDABLE, KEEPS_GOODS, OFF_NODES, ON_PLAINS, ON_SHORE,
+    PROCESSING, SHARES_A_TILE,
 };
 use crate::queries::city_area::{city_membership, is_city_building};
 use crate::queries::command::commander_of_resident;
@@ -990,11 +990,11 @@ pub fn work_orders_on_workplaces(world: &WorldState, _: &TerrainMap) -> Out {
         let makes = o.makes.map(good_name);
         match place {
             Some(p) if p.site.is_none() && max_workers(p.kind).is_some() => {
-                if has_choice(p.kind) != makes.is_some() {
-                    fail(match makes {
-                        None => "making nothing".into(),
-                        Some(m) => format!("making {m} with nothing to choose"),
-                    });
+                // A smithy's workers say what they make; a smelter's may (Steel), else Iron.
+                if makes.is_none() && has_choice(p.kind) && recipe_for(p.kind, None).is_none() {
+                    fail("making nothing".into());
+                } else if makes.is_some() && !has_choice(p.kind) {
+                    fail(format!("making {} with nothing to choose", makes.unwrap_or_default()));
                 } else if workplace_good(world, p, o.makes).is_none() {
                     fail(match makes {
                         None => "which makes nothing".into(),

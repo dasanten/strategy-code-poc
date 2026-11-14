@@ -59,6 +59,7 @@
   },
   "FRONTIER_RICH_NODES": 3.0,
   "RICHER_NODE_REACH": 0.25,
+  "GOLD_NODE_DENSITY": 2.0,
   "STARTING_SITES_PER_HEARTLAND": 10.0,
   "STARTING_SITE_WALK": {
     "minMinutes": 20.0,
@@ -99,6 +100,7 @@
   },
   "START_SPARE_HOUSES": 1.0,
   "START_FOOD": 100.0,
+  "START_COINS": 50.0,
   "START_CARRIED_FOOD": 2.0,
   "START_HORSES": 2.0,
   "START_STABLE_FOOD": 30.0,
@@ -273,7 +275,8 @@
       "ironOre": 150.0,
       "iron": 100.0,
       "goldOre": 50.0,
-      "coal": 100.0
+      "coal": 100.0,
+      "steel": 50.0
     }
   },
   "TRADE_ORG_HQ_MIN_DISTANCE": 1600.0,
@@ -293,6 +296,7 @@
       "iron": 10.0,
       "goldOre": 10.0,
       "coal": 20.0,
+      "steel": 10.0,
       "spear": 4.0,
       "sword": 2.0,
       "shield": 4.0,
@@ -307,6 +311,7 @@
     "iron": 5.0,
     "goldOre": 5.0,
     "coal": 10.0,
+    "steel": 5.0,
     "coins": 1000.0,
     "spear": 2.0,
     "sword": 1.0,
@@ -323,6 +328,7 @@
     "iron": 10.0,
     "goldOre": 8.0,
     "coal": 5.0,
+    "steel": 20.0,
     "spear": 20.0,
     "sword": 30.0,
     "shield": 22.0,
@@ -368,7 +374,8 @@
     "sword": 3.0,
     "shield": 4.0,
     "armour": 8.0,
-    "coal": 1.0
+    "coal": 1.0,
+    "steel": 1.0
   },
   "WEAPON_ATTACK": {
     "spear": 4.0,
@@ -635,6 +642,15 @@
         },
         "output": {
           "iron": 1.0
+        }
+      },
+      {
+        "input": {
+          "iron": 1.0,
+          "coal": 1.0
+        },
+        "output": {
+          "steel": 1.0
         }
       }
     ],

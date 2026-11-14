@@ -225,12 +225,17 @@ mod the_smithy {
     }
 
     #[test]
-    fn a_smelter_takes_no_choice() {
+    fn a_mint_takes_no_choice_a_smelter_iron_unless_told_steel() {
+        // A smelter makes Iron or Steel (`CONTEXT.md`: Coal, T101.4), Iron when told nothing.
         let (mut world, mut q) = setup();
-        world.buildings[0].kind = BuildingKind::Smelter;
-        let said = work(&mut world, &mut q, "w1", Some(json!("iron")));
+        world.buildings[0].kind = BuildingKind::Mint;
+        let said = work(&mut world, &mut q, "w1", Some(json!("coins")));
         assert!(said.contains("nothing to choose"), "{said}");
+        world.buildings[0].kind = BuildingKind::Smelter;
+        let said = work(&mut world, &mut q, "w1", Some(json!("spear")));
+        assert!(said.contains("can't make spear"), "{said}");
         assert_eq!(work(&mut world, &mut q, "w1", None), "ack");
+        assert_eq!(work(&mut world, &mut q, "w1", Some(json!("steel"))), "ack");
     }
 
     #[test]
@@ -258,7 +263,14 @@ mod the_smithy {
         assert!(first(&world).is_some_and(|m| m.contains("can't make iron")));
         set(&mut world, Some("spear"));
         assert_eq!(first(&world), None);
-        world.buildings[0].kind = BuildingKind::Smelter;
+        world.buildings[0].kind = BuildingKind::Mint;
         assert!(first(&world).is_some_and(|m| m.contains("nothing to choose")));
+        // A smelter makes Iron unless told Steel (`CONTEXT.md`: Coal), but no weapons.
+        world.buildings[0].kind = BuildingKind::Smelter;
+        assert!(first(&world).is_some_and(|m| m.contains("can't make spear")));
+        for makes in [None, Some("iron"), Some("steel")] {
+            set(&mut world, makes);
+            assert_eq!(first(&world), None);
+        }
     }
 }

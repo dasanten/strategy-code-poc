@@ -138,6 +138,13 @@ const ICONS: Record<DrawerId | DiplomacyTab | KeyGood | 'crown', ReactNode> = {
       <path d="M8 9l2-4 4-1 2 4-3 2z" />
     </>
   ),
+  steel: (
+    <>
+      <path d="M3 19l3-6h12l3 6z" />
+      <path d="M9 16h6" />
+      <path d="M18 3v4M16 5h4" />
+    </>
+  ),
   coins: (
     <>
       <circle cx="12" cy="12" r="8" />
@@ -152,6 +159,7 @@ const GOOD_LABELS: Record<KeyGood, string> = {
   wood: 'Wood',
   stone: 'Stone',
   coal: 'Coal',
+  steel: 'Steel',
   coins: 'Coins',
 }
 

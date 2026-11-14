@@ -5,9 +5,9 @@
 
 /// PoC goods (`CONTEXT.md`: Good, Weapons and armour). Amounts are counted in units;
 /// `GOOD_WEIGHT` weighs them.
-pub const GOODS: [&str; 12] = [
+pub const GOODS: [&str; 13] = [
     "food", "wood", "stone", "ironOre", "iron", "goldOre", "coins", "spear", "sword", "shield",
-    "armour", "coal",
+    "armour", "coal", "steel",
 ];
 
 /// Goods that make a resident armed (`CONTEXT.md`: Soldier, Weapons and armour).

@@ -70,7 +70,7 @@ The shared language of the game. Domain terms only — no implementation details
 ## Resources and goods
 
 - **Good:** any physical thing that can be carried, stored, traded or stolen. Every good has
-  weight. PoC goods: Food, Wood, Stone, Iron ore, Iron, Gold ore, Coal, Coins. Goods are always
+  weight. PoC goods: Food, Wood, Stone, Iron ore, Iron, Gold ore, Coal, Steel, Coins. Goods are always
   somewhere: in a storage, carried by a resident or carriage, or in a pile.
 - **Pile:** goods lying on the ground on one tile, for anyone to take.
 - **Resource node:** a spot on the map that yields a good (forest, stone, iron ore, gold ore,
@@ -107,8 +107,9 @@ The shared language of the game. Domain terms only — no implementation details
     iron ore or gold ore). Lumber camps teach Woodcutting, quarries and mines Mining.
   - **Farm:** built on plains, produces Food and teaches Farming. Not tied to a node, but each
     farm has a cap. A farm belongs to the city of the resident who laid it out.
-  - **Smelter / Mint:** a smelter turns ore into metal (Iron ore → Iron), a mint Gold ore into
-    Coins, at fixed conversion rates. Anyone can build either. They have no storage: the ore
+  - **Smelter / Mint:** a smelter turns ore into metal (Iron ore → Iron), or Iron and Coal into
+    Steel, a mint Gold ore into Coins, at fixed conversion rates. Which of the two a smelter's
+    worker makes is said with their Work, as at a smithy; told nothing, they make Iron. Anyone can build either. They have no storage: the ore
     they use is what their workers carry, then what lies in the pile on their tile; the Work
     default fetches more (Fetching inputs), and without any the workers stand idle. Both teach
     Smelting.
@@ -118,10 +119,11 @@ The shared language of the game. Domain terms only — no implementation details
   `output` param, else its `storage`, else the nearest storage of their realm, stores it and comes
   back to work; only one carries at a time. With no storage in reach the pile just grows.
 - **Fetching inputs:** at a smelter, mint or smithy whose pile and workers lack what it uses (ore,
-  or a recipe's Iron and Wood), one of the residents working there, picked at random, fetches a
+  Steel's Iron and Coal, or a recipe's Iron and Wood), one of the residents working there, picked at random, fetches a
   load of it from the Work default's `input` param, else its `storage`, else the nearest storage
   of their realm holding it, puts it on the pile and goes back to work; only one fetches at a
-  time, and not while someone carries the output. With none anywhere they stand idle, as before.
+  time, and not while someone carries the output. With none anywhere they stand idle, and their
+  Doing line says what is missing ("Idle: no coal").
 - **Crew food:** on the way back from storing a load, the carrier brings Food for the whole crew
   and puts it on the workplace's pile, where the workers take their meals (Refilling at a
   workplace). So a far-off crew keeps working while one of them walks, and nobody else goes
@@ -1358,7 +1360,8 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   neighbours.
 - **Starting city:** what a Leader spawns with, on a starting site: about 8 residents with
   random stats (one of them the Leader), a town hall, a ring of wooden wall with a gate, houses for everyone with a little room
-  to spare, a storage with a small food stock, one farm outside the wall, a stable next to it
+  to spare, a storage with a small food stock and a few Coins (for a first trade: a heartland has
+  no gold), one farm outside the wall, a stable next to it
   with two horses and a little Food, and one carriage standing at the stable with one of the
   horses hitched to it. The residents start on the farm, working
   it, each with a little food on them.
@@ -1749,7 +1752,7 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   resident, give them an order, open the Wiki. Each line is ticked when the game sees it done;
   the card goes for good once all are ticked or the Player dismisses it. Kept per Player, not per
   realm: a Player who dismissed it never sees it again, also after a Leader death.
-- **Goods in the top bar:** the top bar shows the Food, Wood, Stone, Coal and Coins held in storages, for
+- **Goods in the top bar:** the top bar shows the Food, Wood, Stone, Coal, Steel and Coins held in storages, for
   what is picked beside them: **Entire realm** (the default: every storage of the realm, outpost
   storages included) or one city of the realm by name. Stables, carriages and piles don't count. A storage out of sight
   counts with what the Player last saw in it (Last seen), and the total says so when part of it is

@@ -2210,7 +2210,12 @@ function makesLine(
       const recipe = recipeFor(b.kind, o.makes)
       if (recipe) making.set(recipeGood(recipe), (making.get(recipeGood(recipe)) ?? 0) + 1)
     }
-    if (making.size === 0) return amounts ? undefined : 'Makes weapons and armour, nobody at it'
+    if (making.size === 0) {
+      if (amounts) return undefined
+      if (b.kind === 'smithy') return 'Makes weapons and armour, nobody at it'
+      const goods = (RECIPES[b.kind] ?? []).map((r) => label(recipeGood(r)))
+      return `Makes ${goods.join(' or ')}, nobody at it`
+    }
     const list = [...making].map(([g, n]) => `${label(g)} (${n})`).join(', ')
     return `${amounts ? 'Others make' : 'Its workers make'} ${list}`
   }

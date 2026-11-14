@@ -147,7 +147,10 @@ describe('buildings on a tile’s card', () => {
         ? { kind: 'goldOre' as const, x, y, richness: 'normal' as const }
         : undefined
     expect(linesOf({ buildings: [building({ kind: 'mine' })], nodeAt })).toContain('Makes gold ore')
-    expect(linesOf({ buildings: [building({ kind: 'smelter' })] })).toContain('Makes iron')
+    // A smelter makes Iron or Steel, by what its workers are set to (`CONTEXT.md`: Coal).
+    expect(linesOf({ buildings: [building({ kind: 'smelter' })] })).toContain(
+      'Makes iron or steel, nobody at it',
+    )
     const house = linesOf({ buildings: [building({ kind: 'house', cityId: 'c-me' })] })
     expect(house.some((l) => l.startsWith('Makes'))).toBe(false)
   })
