@@ -1238,6 +1238,10 @@ pub struct WorldState {
     /// generated, free or taken. Left out of a save while there are none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub starting_sites: Vec<StartingSite>,
+    /// The heartlands (region ids) open to new Players, in the order they opened (`CONTEXT.md`:
+    /// Starting site). Left out of a save while none is.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub opened_heartlands: Vec<u32>,
 }
 
 /// A place in a heartland where a starting city can stand (`CONTEXT.md`: Starting site): the
@@ -2651,6 +2655,10 @@ pub enum RealmEventWhat {
         city: String,
         x: f64,
         y: f64,
+        /// The heartland the starting city stands in, if it stands in one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        heartland: Option<String>,
     },
     LeaderHandedOver {
         from_id: String,

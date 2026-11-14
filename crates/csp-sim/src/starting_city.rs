@@ -20,9 +20,11 @@ use crate::cities::{given_city_name, update_city_membership, CITY_NAMES};
 use crate::events::record_event;
 use crate::horses::{new_horse, NewHorse};
 use crate::placing::Ground;
+use crate::player_start::{pick_start, StartPlace};
 use crate::queries::city::town_hall_of;
 use crate::queries::names::kind_name;
 use crate::random::{new_id, Mulberry32};
+use crate::regions::{RegionKind, Regions};
 use crate::residents::{new_resident, resident_name, NewResident};
 use crate::standing::welcome_former_player;
 
@@ -273,6 +275,10 @@ pub struct FoundingNames {
 /// with a gate, houses for everyone and a spare, a storage with food, a farm outside the wall, a
 /// stable next to it with horses and a little food, and a carriage at the stable with a horse
 /// hitched to it. The residents start on the farm, working it. Returns the realm's index.
+///
+/// On a world with starting sites the city goes where `pick_start` says (`CONTEXT.md`: Starting
+/// site); this works out the map's regions for it, so a caller that holds them uses
+/// [`found_starting_city_in`].
 pub fn found_starting_city(
     world: &mut WorldState,
     terrain: &TerrainMap,
@@ -282,8 +288,45 @@ pub fn found_starting_city(
     if let Some(existing) = realm_of(world, user_id) {
         return existing;
     }
+    if world.starting_sites.is_empty() {
+        return found_at(world, terrain, None, user_id, names).0;
+    }
+    let regions = Regions::of(world.seed, terrain);
+    found_starting_city_in(world, terrain, &regions, user_id, names).0
+}
+
+/// `found_starting_city` with the map's regions given. Returns the realm's index and, for a city
+/// founded now on a world with starting sites, where it went.
+pub fn found_starting_city_in(
+    world: &mut WorldState,
+    terrain: &TerrainMap,
+    regions: &Regions,
+    user_id: u64,
+    names: Option<&FoundingNames>,
+) -> (usize, Option<StartPlace>) {
+    if let Some(existing) = realm_of(world, user_id) {
+        return (existing, None);
+    }
+    found_at(world, terrain, Some(regions), user_id, names)
+}
+
+fn found_at(
+    world: &mut WorldState,
+    terrain: &TerrainMap,
+    regions: Option<&Regions>,
+    user_id: u64,
+    names: Option<&FoundingNames>,
+) -> (usize, Option<StartPlace>) {
     let mut rand = Mulberry32::new(world.seed as f64 * 7919.0 + user_id as f64);
-    let (x, y) = find_city_site(world, terrain, &mut rand);
+    let place = regions.and_then(|r| pick_start(world, terrain, r));
+    let (x, y) = match place {
+        Some(StartPlace::Site { site, .. }) => {
+            let s = &world.starting_sites[site];
+            (s.x, s.y)
+        }
+        Some(StartPlace::WorldFull { x, y }) => (x, y),
+        None => find_city_site(world, terrain, &mut rand),
+    };
     let size = START_SIZE;
     let mid = size / 2;
     let realm_id = new_id("realm", &mut world.next_id);
@@ -437,6 +480,13 @@ pub fn found_starting_city(
         horse_id,
         load: Default::default(),
     });
+    if let Some(StartPlace::Site { site, .. }) = place {
+        world.starting_sites[site].city_id = Some(city_id.clone());
+    }
+    let heartland = regions
+        .and_then(|r| r.region_at(hall_x as i32, hall_y as i32))
+        .filter(|r| r.kind == RegionKind::Heartland)
+        .map(|r| r.name.clone());
     let city = world.cities.iter().find(|c| c.id == city_id).expect("just founded");
     let what = RealmEventWhat::Founded {
         resident_id: leader_id,
@@ -445,9 +495,10 @@ pub fn found_starting_city(
         city: city.name.clone(),
         x: hall_x,
         y: hall_y,
+        heartland,
     };
     record_event(world, Some(&realm_id), what);
-    world.realms.len() - 1
+    (world.realms.len() - 1, place)
 }
 
 #[cfg(test)]

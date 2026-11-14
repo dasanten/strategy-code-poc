@@ -256,6 +256,8 @@ import {
   STANDING_NPC_TRADE_COINS_PER_POINT,
   STANDING_TRADE_COINS_PER_POINT,
   START_RESIDENTS,
+  STARTING_SITE_WALK,
+  STARTING_SITES_PER_HEARTLAND,
   STAT_BASE_MAX,
   STAT_BASE_MIN,
   STRIKE_TICKS,
@@ -1044,6 +1046,19 @@ export function Wiki() {
           Players start, and {num(FRONTIER_REGION_COUNT)} <strong>frontier</strong> regions beyond
           them, where nobody starts. Each island is a region of its own. No rule keeps a heartland
           safe: it is safe only in that it holds little worth taking.
+        </p>
+        <p>
+          Each heartland has {num(STARTING_SITES_PER_HEARTLAND)} <strong>starting sites</strong>,
+          a walk of {num(STARTING_SITE_WALK.minMinutes)} to {num(STARTING_SITE_WALK.maxMinutes)}{' '}
+          real minutes from the next one. A new Leader (your first, or one after your Leader died
+          with no heir) gets a free site in the <strong>open</strong> heartland where Players have
+          the most cities, the one opened first on a tie, and in it the free site nearest another
+          Player’s city: you start as someone’s neighbour. The world’s first Player opens the first
+          heartland; the next one opens, the one nearest an open heartland, only once no open
+          heartland has a free site left. A site is free while nothing of anyone’s stands on it or
+          on the farmland round it, so one whose city is gone is free again. Should every site be
+          taken, your city goes on the free place nearest an open heartland’s middle. Your realm
+          log names the heartland your city stands in.
         </p>
         <p>
           The regions of the mainland are parted by Mountain ranges and by arms of the Sea, about{' '}

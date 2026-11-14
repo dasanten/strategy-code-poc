@@ -345,6 +345,10 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: |w, t| crate::npc_founding::founding_site_clear(w, t.size),
         },
         Invariant {
+            name: "starting-sites-sound",
+            check: |w, _t| crate::player_start::starting_sites_sound(w),
+        },
+        Invariant {
             name: "coins-short-only-with-income",
             check: |w, t| crate::npc_coins::coins_short_only_with_income(w, t.size),
         },

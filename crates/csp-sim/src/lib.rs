@@ -85,6 +85,7 @@ pub mod passengers;
 pub mod pathfinding;
 pub mod persuasion;
 pub mod placing;
+pub mod player_start;
 #[cfg(test)]
 mod poc_tests;
 pub mod queries;

@@ -98,6 +98,7 @@ pub fn create_world(terrain: &TerrainMap, seed: i64) -> WorldState {
         city_plans: Default::default(),
         workplace_settings: Default::default(),
         starting_sites: Vec::new(),
+        opened_heartlands: Vec::new(),
     }
 }
 
