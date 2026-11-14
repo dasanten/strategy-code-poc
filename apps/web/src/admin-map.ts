@@ -1,3 +1,4 @@
+import { START_CITY_SIZE } from '@csp/balance'
 import { ADMIN_VIEW_MAX_SIDE } from './shared/admin-map.js'
 import { chunksAcross, wrap } from './shared/terrain.js'
 import type {
@@ -169,21 +170,34 @@ const allChunks = (() => {
 
 // The passes and land bridges are marked as on the Player's map.
 export { LAND_BRIDGE_MARK_COLOR, PASS_MARK_COLOR }
+/** The colour of a free starting site's mark on the admin map's land layer. */
+export const FREE_SITE_MARK_COLOR = 0x2fbf4f
+/** The colour of a taken starting site's mark on the admin map's land layer. */
+export const TAKEN_SITE_MARK_COLOR = 0xd14b1f
 
 /**
- * The admin map's land layer (`CONTEXT.md`: Region): the regions in place of the territory,
- * coloured by kind (heartland, frontier, island), and a mark on each pass and land bridge.
+ * The admin map's land layer (`CONTEXT.md`: Region, Starting site): the regions in place of the
+ * territory, coloured by kind (heartland, frontier, island), a mark on each pass and land bridge,
+ * and one in the middle of each starting site, free or taken.
  */
 export function adminLandLayer(
   land: AdminLand,
   size: number,
 ): { region: RegionState; marks: MapMark[] } {
+  const half = Math.floor(START_CITY_SIZE / 2)
   return {
     region: applyRegionMap(null, land.overlay, size),
-    marks: land.ways.map((w) => ({
-      x: w.x,
-      y: w.y,
-      color: w.kind === 'pass' ? PASS_MARK_COLOR : LAND_BRIDGE_MARK_COLOR,
-    })),
+    marks: [
+      ...land.ways.map((w) => ({
+        x: w.x,
+        y: w.y,
+        color: w.kind === 'pass' ? PASS_MARK_COLOR : LAND_BRIDGE_MARK_COLOR,
+      })),
+      ...land.sites.map((s) => ({
+        x: s.x + half,
+        y: s.y + half,
+        color: s.cityId === undefined ? FREE_SITE_MARK_COLOR : TAKEN_SITE_MARK_COLOR,
+      })),
+    ],
   }
 }

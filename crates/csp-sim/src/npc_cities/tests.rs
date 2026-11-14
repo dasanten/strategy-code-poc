@@ -152,17 +152,26 @@ fn places_the_same_cities_for_the_same_world() {
     assert_eq!(&generate_world(terrain, 1), world);
 }
 
+/// Starting cities go on the starting sites (`CONTEXT.md`: Starting site), which every NPC city
+/// keeps clear of; a heartland's own village and post stand nearer than `NPC_CITY_MIN_DISTANCE`
+/// by design (T100.5), so that distance no longer holds between them. A starting city founded
+/// on the generated world still breaks no invariant.
 #[test]
-fn leaves_room_for_starting_cities_far_from_the_npc_cities() {
+fn leaves_room_for_starting_cities_on_the_starting_sites() {
     let (terrain, world) = generated();
+    assert!(!world.starting_sites.is_empty());
+    let clearance = crate::land_sites::starting_site_clearance(terrain.size);
+    for site in &world.starting_sites {
+        let (sx, sy) = crate::starting_sites::site_middle(site);
+        for c in &world.cities {
+            let d = wrap_distance(terrain.size, (sx, sy), hall_of(world, c));
+            assert!(d >= clearance - NPC_TOWN.size, "{} is {d} from {site:?}", c.id);
+        }
+    }
+    let regions = Regions::of(world.seed, terrain);
+    assert_eq!(crate::starting_sites::check_starting_sites(world, terrain, &regions), []);
     let mut w = world.clone();
     found_starting_city(&mut w, terrain, 1, None);
-    let mine = w.cities.iter().find(|c| c.realm_id.is_some()).unwrap();
-    let hall = hall_of(&w, mine);
-    for c in &world.cities {
-        let d = wrap_distance(terrain.size, hall, hall_of(&w, c));
-        assert!(d >= NPC_CITY_MIN_DISTANCE - NPC_TOWN.size);
-    }
     assert_eq!(check_all(&w, terrain), []);
 }
 

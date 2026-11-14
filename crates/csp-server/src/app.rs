@@ -1115,18 +1115,21 @@ async fn admin_territory_route(
         .ok_or_else(|| fail(ApiErrorCode::NotFound, "Territory is not worked out yet."))
 }
 
-/// The land for the admin map (`AdminLand`): its regions, passes and land bridges. Worked out
-/// from the terrain the first time, off the game thread.
+/// The land for the admin map (`AdminLand`): its regions, passes, land bridges and starting
+/// sites. Worked out from the terrain the first time, off the game thread.
 async fn admin_land_route(
     State(state): State<Shared>,
     Extension(user): Extension<User>,
 ) -> ApiResult<Response> {
     user.admin()?;
     let game = game_of(&state)?;
-    let seed = with_game(game.as_ref(), |g| g.world.seed).await.ok_or_else(game_gone)?;
+    let (seed, sites) =
+        with_game(game.as_ref(), |g| (g.world.seed, g.world.starting_sites.clone()))
+            .await
+            .ok_or_else(game_gone)?;
     let map = game.map();
     let land = off_the_runtime(move || {
-        serde_json::to_value(admin_land(map.regions(seed))).unwrap_or_default()
+        serde_json::to_value(admin_land(map.regions(seed), &sites)).unwrap_or_default()
     })
     .await?;
     Ok(Json(land).into_response())

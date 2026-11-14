@@ -15,8 +15,9 @@
 use std::collections::HashSet;
 
 use csp_shared::balance::{
-    NpcCitySize, NPC_STARTING_SITE_CLEARANCE, NPC_TOWN, NPC_TOWNS_PER_FRONTIER, NPC_VILLAGE,
-    NPC_VILLAGES_PER_FRONTIER, NPC_VILLAGES_PER_HEARTLAND, NPC_WAY_CLEARANCE, TRADING_POST,
+    NpcCitySize, MAP_SIZE, NPC_STARTING_SITE_CLEARANCE, NPC_TOWN, NPC_TOWNS_PER_FRONTIER,
+    NPC_VILLAGE, NPC_VILLAGES_PER_FRONTIER, NPC_VILLAGES_PER_HEARTLAND, NPC_WAY_CLEARANCE,
+    TRADING_POST,
 };
 use csp_shared::footprint::footprint_tiles;
 use csp_shared::terrain::{
@@ -46,11 +47,15 @@ use crate::trading_posts::{
 pub type RegionId = u32;
 
 /// The middles of the world's starting sites (`CONTEXT.md`: Starting site), as tiles.
-///
-/// T100.3 keeps the sites in the world; until it lands there are none, and every rule here that
-/// keeps clear of them holds trivially.
-pub fn starting_site_middles(_world: &WorldState) -> Vec<(f64, f64)> {
-    Vec::new()
+pub fn starting_site_middles(world: &WorldState) -> Vec<(f64, f64)> {
+    world
+        .starting_sites
+        .iter()
+        .map(|s| {
+            let (x, y) = crate::starting_sites::site_middle(s);
+            (f64::from(x), f64::from(y))
+        })
+        .collect()
 }
 
 /// A box of tiles, `[x0, x1) × [y0, y1)`.
@@ -153,7 +158,17 @@ impl LandSites {
     }
 }
 
-/// Whether `at` lies closer than `NPC_STARTING_SITE_CLEARANCE` to one of `starting`, the short way
+/// How far an NPC city, trading post or the HQ stands from every starting site on a map of `size`,
+/// middle to middle: `NPC_STARTING_SITE_CLEARANCE` on a full-size map. On a smaller one, whose
+/// sites stand closer together (`SiteRules::for_size`), it is scaled with the side, but never so
+/// near that a walled square of `TRADING_POST.size` with its farm ring could touch a site's.
+pub fn starting_site_clearance(size: i32) -> f64 {
+    let f = (f64::from(size) / f64::from(MAP_SIZE)).min(1.0);
+    let square = TRADING_POST.size + 2.0 * f64::from(FARM_RING);
+    (NPC_STARTING_SITE_CLEARANCE * f).max((square * std::f64::consts::SQRT_2).ceil())
+}
+
+/// Whether `at` lies closer than `starting_site_clearance` to one of `starting`, the short way
 /// round a map of `size`.
 pub fn near_a_starting_site(starting: &[(f64, f64)], size: i32, at: (f64, f64)) -> bool {
     let d = |p: f64, q: f64| {
@@ -161,7 +176,8 @@ pub fn near_a_starting_site(starting: &[(f64, f64)], size: i32, at: (f64, f64)) 
         let v = (q - p).rem_euclid(s);
         v.min(s - v)
     };
-    starting.iter().any(|s| d(s.0, at.0).hypot(d(s.1, at.1)) < NPC_STARTING_SITE_CLEARANCE)
+    let clearance = starting_site_clearance(size);
+    starting.iter().any(|s| d(s.0, at.0).hypot(d(s.1, at.1)) < clearance)
 }
 
 /// Places the Trade Organization and the NPC cities on a new world's land
@@ -448,8 +464,8 @@ pub const ROUTE_RULE: &str = "route-drivable";
 /// - `on-the-mainland`: no tile of the HQ's, a post's or an NPC city's buildings is on an island
 ///   or on water;
 /// - `clear-of-ways`: none is on a pass's or land bridge's tiles;
-/// - `clear-of-starting-sites`: no such city's town hall is within `NPC_STARTING_SITE_CLEARANCE`
-///   of a starting site;
+/// - `clear-of-starting-sites`: no such city's town hall is within `starting_site_clearance`, less
+///   a `TRADING_POST.size` for where in its square the hall stands, of a starting site;
 /// - `route-drivable`: a carriage drives (on the terrain alone) from the HQ to every post, every
 ///   wandering trader's stop and every heartland.
 pub fn check_on_the_land(
@@ -503,7 +519,14 @@ pub fn check_on_the_land(
     }
     for c in world.cities.iter().filter(|c| ours.contains(c.id.as_str())) {
         if let Some((x, y)) = hall(c) {
-            if land.near_a_starting_site((f64::from(x), f64::from(y))) {
+            // Placing keeps the middle of the square clear; its town hall stands within a square of
+            // it (as `keeps_clear_of_the_starting_sites` allows).
+            let clearance = starting_site_clearance(size) - TRADING_POST.size;
+            if land
+                .starting
+                .iter()
+                .any(|&s| wrap_distance(size, (s.0 as i32, s.1 as i32), (x, y)) < clearance)
+            {
                 problem("clear-of-starting-sites", format!("{} stands by a starting site", c.id));
             }
         }

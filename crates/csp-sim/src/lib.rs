@@ -118,6 +118,7 @@ pub mod sight;
 pub mod spoilage;
 pub mod standing;
 pub mod starting_city;
+pub mod starting_sites;
 pub mod stealing;
 pub mod stock_floor;
 pub mod storing;
