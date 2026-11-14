@@ -544,12 +544,26 @@ pub const SIGHT_RANGE: f64 = 48.0;
 /// that leaves sight between two refreshes is remembered as it was up to this many ticks earlier.
 pub const LAST_SEEN_EVERY_TICKS: f64 = 5.0;
 
-/// NPC villages placed on a full-size map (`CONTEXT.md`: NPC city); a smaller map gets fewer, by
-/// its area. Fewer are placed when the map has no room left for them.
-pub const NPC_VILLAGES: f64 = 12.0;
+/// NPC towns placed in each frontier region when the world is generated (`CONTEXT.md`: NPC city,
+/// Frontier). Towns are placed first; fewer when a region has no room left. No town stands in a
+/// heartland, and no NPC city on an island.
+pub const NPC_TOWNS_PER_FRONTIER: f64 = 1.0;
 
-/// NPC towns placed on a full-size map, like `NPC_VILLAGES`. Towns are placed first.
-pub const NPC_TOWNS: f64 = 4.0;
+/// NPC villages placed in each frontier region, after the towns, like `NPC_TOWNS_PER_FRONTIER`.
+pub const NPC_VILLAGES_PER_FRONTIER: f64 = 1.0;
+
+/// NPC villages placed in each heartland (`CONTEXT.md`: Heartland), after its trading post.
+pub const NPC_VILLAGES_PER_HEARTLAND: f64 = 1.0;
+
+/// How far an NPC city, trading post or the Trade Org HQ stands from every starting site
+/// (`CONTEXT.md`: Starting site), in tiles from middle to middle: room for a starting city, its
+/// farm and its stable between them (about 12 minutes' walk on plains). A full NPC city founds no
+/// daughter closer either.
+pub const NPC_STARTING_SITE_CLEARANCE: f64 = 96.0;
+
+/// How far an NPC city, trading post or the Trade Org HQ, with the ring its farms go in, stands
+/// from every pass and land bridge (`CONTEXT.md`: Region), in tiles: none blocks the way.
+pub const NPC_WAY_CLEARANCE: i32 = 24;
 
 /// NPC cities lie at least this many tiles from every other city, starting cities and NPC cities
 /// alike (about an hour's walk on plains), the short way round the map.
@@ -947,9 +961,10 @@ pub const TRADE_ORG_HQ: TradeOrgHq = TradeOrgHq {
 /// as the map allows.
 pub const TRADE_ORG_HQ_MIN_DISTANCE: f64 = 1600.0;
 
-/// How wide a region is for trading posts (`CONTEXT.md`: Trading post), in tiles along each side:
-/// the map is cut into a grid of about this size, one post in each square. A full-size map gets
-/// 4 × 4 = 16 posts, as many as it gets NPC cities; a small map gets at least one.
+/// How wide a square is for the frontier's trading posts (`CONTEXT.md`: Trading post), in tiles
+/// along each side: the map is cut into a grid of about this size, and each square with no post
+/// yet gets one on frontier land in it, if it has room. Every heartland has its own post near its
+/// middle besides; no post stands on an island.
 pub const TRADING_POST_REGION: f64 = 1440.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -2473,8 +2488,11 @@ pub fn balance_json() -> Value {
     m.insert("WALL_ENCLOSES_MAX".into(), json!(WALL_ENCLOSES_MAX));
     m.insert("SIGHT_RANGE".into(), json!(SIGHT_RANGE));
     m.insert("LAST_SEEN_EVERY_TICKS".into(), json!(LAST_SEEN_EVERY_TICKS));
-    m.insert("NPC_VILLAGES".into(), json!(NPC_VILLAGES));
-    m.insert("NPC_TOWNS".into(), json!(NPC_TOWNS));
+    m.insert("NPC_TOWNS_PER_FRONTIER".into(), json!(NPC_TOWNS_PER_FRONTIER));
+    m.insert("NPC_VILLAGES_PER_FRONTIER".into(), json!(NPC_VILLAGES_PER_FRONTIER));
+    m.insert("NPC_VILLAGES_PER_HEARTLAND".into(), json!(NPC_VILLAGES_PER_HEARTLAND));
+    m.insert("NPC_STARTING_SITE_CLEARANCE".into(), json!(NPC_STARTING_SITE_CLEARANCE));
+    m.insert("NPC_WAY_CLEARANCE".into(), json!(NPC_WAY_CLEARANCE));
     m.insert("NPC_CITY_MIN_DISTANCE".into(), json!(NPC_CITY_MIN_DISTANCE));
     m.insert("NPC_VILLAGE".into(), to_value(NPC_VILLAGE).expect("serialisable"));
     m.insert("NPC_TOWN".into(), to_value(NPC_TOWN).expect("serialisable"));

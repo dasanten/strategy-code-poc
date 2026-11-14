@@ -136,6 +136,13 @@ import {
   LIFESPAN_MAX,
   LIFESPAN_MIN,
   MAP_SIZE,
+  MAINLAND_SHARE,
+  ISLAND_COUNT,
+  HEARTLAND_COUNT,
+  FRONTIER_REGION_COUNT,
+  REGION_BORDER_WIDTH,
+  PASS_WIDTH,
+  SECOND_WAY_SHARE,
   MAX_HEALTH,
   MIN_BLOW_DAMAGE,
   OCCUPATION_GAME_DAYS,
@@ -158,6 +165,12 @@ import {
   NPC_FOUND_VILLAGE_RESIDENTS,
   NPC_FULL_DAYS,
   NPC_FULL_DAYS_LEAST,
+  NPC_STARTING_SITE_CLEARANCE,
+  NPC_TOWNS_PER_FRONTIER,
+  NPC_VILLAGES_PER_FRONTIER,
+  NPC_VILLAGES_PER_HEARTLAND,
+  NPC_WAY_CLEARANCE,
+  TRADING_POST_REGION,
   NPC_FULL_DIP_DAYS,
   NPC_FULL_RESIDENTS_PER_DAY,
   NPC_GATE_WATCH_RANGE,
@@ -365,6 +378,7 @@ export const WIKI_TOPICS = [
   { id: 'controls', title: 'Controls' },
   { id: 'queues', title: 'Queues' },
   { id: 'time', title: 'Time & map' },
+  { id: 'land', title: 'The land' },
   { id: 'waypoints', title: 'Waypoints' },
   { id: 'exploring', title: 'Exploring' },
   { id: 'terrain', title: 'Terrain & walking' },
@@ -1013,6 +1027,45 @@ export function Wiki() {
           brought up to date once every {duration(LAST_SEEN_EVERY_TICKS)}, so a building that leaves
           your sight in between is remembered as it was up to that long before. What is in sight now
           is always shown as it is.
+        </p>
+      </Section>
+
+      <Section id="land">
+        <p>
+          The land is one <strong>mainland</strong> and, off its coasts, <strong>islands</strong>,
+          with Sea all around. The mainland covers about {pct(MAINLAND_SHARE)} of the map, and up to{' '}
+          {num(ISLAND_COUNT)} islands lie off it. Any tile of the mainland can be reached on foot,
+          and by carriage, from any other. An island is reached only by vessel: a boat or a ship
+          from a haven (see Water &amp; havens).
+        </p>
+        <p>
+          All land lies in a <strong>region</strong> of one of three kinds. The mainland has{' '}
+          {num(HEARTLAND_COUNT)} <strong>heartlands</strong>, good farmland in its middle where
+          Players start, and {num(FRONTIER_REGION_COUNT)} <strong>frontier</strong> regions beyond
+          them, where nobody starts. Each island is a region of its own. No rule keeps a heartland
+          safe: it is safe only in that it holds little worth taking.
+        </p>
+        <p>
+          The regions of the mainland are parted by Mountain ranges and by arms of the Sea, about{' '}
+          {num(REGION_BORDER_WIDTH)} tiles across, and joined only by a few ways through: a{' '}
+          <strong>pass</strong> is a gap of Hills in a range that a carriage can cross, a{' '}
+          <strong>land bridge</strong> a narrow neck of land between two arms of the Sea. Each is
+          about {num(PASS_WIDTH)} tiles wide, and about {pct(SECOND_WAY_SHARE)} of the borders have
+          two of them instead of one. Whoever holds a pass or a land bridge holds the way between
+          two regions.
+        </p>
+        <p>
+          You know the region of every tile you have explored. A tile’s card names it: “Heartland of
+          …”, “Frontier: …” or “Island: …”, with “pass” or “land bridge” on a tile of one. Zoomed
+          out to the middle and far zoom, the map writes the names of the regions you have explored
+          part of over them and marks the passes (a white diamond) and land bridges (a blue one)
+          you have explored. Nothing shows for land you haven’t explored. This is not the Region
+          map, which shows territory (see Territory).
+        </p>
+        <p>
+          Scripts read a tile’s region in its view: <code>region</code> is its name and{' '}
+          <code>regionKind</code> is <code>"heartland"</code>, <code>"frontier"</code> or{' '}
+          <code>"island"</code>, both <code>null</code> on water and on tiles you haven’t explored.
         </p>
       </Section>
 
@@ -2458,6 +2511,16 @@ export function Wiki() {
         </table>
         <h3>NPC cities</h3>
         <p>
+          When the world is made, NPC cities are placed region by region, wherever there is room:
+          in each frontier region {num(NPC_TOWNS_PER_FRONTIER)} town(s) and{' '}
+          {num(NPC_VILLAGES_PER_FRONTIER)} village(s), in each heartland{' '}
+          {num(NPC_VILLAGES_PER_HEARTLAND)} village(s). They stand on the mainland only: none on an
+          island, none within {num(NPC_STARTING_SITE_CLEARANCE)} tiles of a starting site, and none
+          within {num(NPC_WAY_CLEARANCE)} tiles of a pass or land bridge, with its farms. A full
+          city's new village stays on land its people can walk to, never across the sea, and as
+          far from the starting sites.
+        </p>
+        <p>
           An NPC city thinks over what its people do once a game hour ({realTimeOf(NPC_PLAN_TICKS)}
           of real time) and keeps to that plan in between: a worker stays where the city put them
           until it moves them, and a builder picks up the next piece of a project as soon as one is
@@ -2636,6 +2699,14 @@ export function Wiki() {
           soldiers train there.
         </p>
         <h3>Trading posts and the HQ</h3>
+        <p>
+          Every heartland has a trading post near its middle; the frontier gets one more in each
+          stretch of about {num(TRADING_POST_REGION)} tiles across that has room. The HQ stands in a
+          frontier region, as far from the starting sites as the mainland allows. None of them stands
+          on an island, a pass or a land bridge, or within {num(NPC_STARTING_SITE_CLEARANCE)} tiles
+          of a starting site, and the caravans and wandering traders drive from the HQ to every post
+          over the passes and land bridges.
+        </p>
         <p>
           The Trade Organization runs its own chain the same way. A trading post's reserve is its
           warehouse's stock floor ({num(WAREHOUSE_FLOOR.ironOre)} Iron ore,{' '}

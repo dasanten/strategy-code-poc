@@ -17,11 +17,9 @@ use csp_shared::world::{
 use crate::goods_deps::{new_id, update_city_membership};
 use crate::placing::{node_workplace, Ground};
 use crate::queries::building::node_corner;
-use crate::queries::city::town_hall_of;
 use crate::queries::names::good_of;
-use crate::queries::trade_org::trade_org_hq;
 use crate::queries::warehouse::HQ_COIN_WAREHOUSE as HQ_COINS;
-use crate::random::{hash_str, Mulberry32};
+use crate::random::hash_str;
 use crate::residents::{new_resident, NewResident, Rand};
 
 /// A tile as `(x, y)`.
@@ -115,7 +113,7 @@ pub fn hq_layout(cx: i32, cy: i32) -> Rc<HqLayout> {
     })
 }
 
-fn side(kind: &str) -> i32 {
+pub(crate) fn side(kind: &str) -> i32 {
     FOOTPRINT.get(kind).expect("a footprint")
 }
 
@@ -257,48 +255,6 @@ pub fn hq_site_fits(
         }
     }
     farm_tiles(ground, cx, cy).len() >= TRADE_ORG_HQ.farms as usize
-}
-
-/// How far apart candidate sites for the HQ lie (`SITE_STEP`).
-const SITE_STEP: usize = 24;
-
-/// Picks the site for the HQ's town hall (`findHqSite`): as far from the nearest city as the map
-/// allows, by a random pick among the equally far.
-pub fn find_hq_site(world: &WorldState, terrain: &TerrainMap, rand: &mut Rand) -> Option<Tile> {
-    let edge = hq_footprint() as i32 + side("farm");
-    let halls: Vec<(i32, i32)> = world
-        .cities
-        .iter()
-        .filter_map(|c| town_hall_of(world, c))
-        .map(|h| (h.x as i32, h.y as i32))
-        .collect();
-    let mut candidates: Vec<(Tile, f64, f64)> = Vec::new();
-    for y in (edge..terrain.size - edge).step_by(SITE_STEP) {
-        for x in (edge..terrain.size - edge).step_by(SITE_STEP) {
-            let far = halls
-                .iter()
-                .map(|h| wrap_distance(terrain.size, *h, (x, y)))
-                .fold(f64::INFINITY, f64::min);
-            candidates.push(((x, y), far, rand()));
-        }
-    }
-    // `b.far - a.far || a.order - b.order`: Infinity - Infinity is NaN, which counts as equal.
-    candidates.sort_by(|a, b| {
-        let far = b.1 - a.1;
-        let by_far = if far > 0.0 {
-            std::cmp::Ordering::Greater
-        } else if far < 0.0 {
-            std::cmp::Ordering::Less
-        } else {
-            std::cmp::Ordering::Equal
-        };
-        by_far.then(a.2.partial_cmp(&b.2).expect("numbers"))
-    });
-    let ground = taken_ground(world, terrain);
-    candidates
-        .into_iter()
-        .find(|c| hq_site_fits(world, terrain, c.0 .0, c.0 .1, &ground))
-        .map(|c| c.0)
 }
 
 /// The nearest node of `kind` from (cx, cy) whose workplace can still be laid out on it
@@ -461,16 +417,12 @@ pub fn found_trade_org_hq(
     id
 }
 
-/// Places the Trade Org HQ unless the world has one already (`placeTradeOrgHq`), or none when
-/// the map has no room for it. Returns its city's id.
+/// Places the Trade Org HQ unless the world has one already (`placeTradeOrgHq`), in a frontier
+/// region (`land_sites::place_trade_org_hq_on`), or none when the map has no room for it. Returns
+/// its city's id.
 pub fn place_trade_org_hq(world: &mut WorldState, terrain: &TerrainMap) -> Option<String> {
-    if let Some(hq) = trade_org_hq(world) {
-        return Some(hq.id.clone());
-    }
-    let mut rand = Mulberry32::new(world.seed as f64 * 7919.0 + 17.0);
-    let mut next = || rand.next();
-    let site = find_hq_site(world, terrain, &mut next)?;
-    Some(found_trade_org_hq(world, terrain, site.0, site.1, &mut next))
+    let land = crate::land_sites::LandSites::of(world, terrain);
+    crate::land_sites::place_trade_org_hq_on(world, terrain, &land)
 }
 
 #[cfg(test)]

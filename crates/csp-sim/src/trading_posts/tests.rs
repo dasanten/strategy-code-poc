@@ -12,6 +12,7 @@ use serde_json::json;
 use super::*;
 use crate::invariants::check_all;
 use crate::queries::city::{in_city_area, is_city_building, stored_food};
+use crate::random::Mulberry32;
 use crate::realm_test_world::plains;
 use crate::sight::entities_in_sight;
 use crate::starting_city::found_starting_city;
@@ -167,21 +168,32 @@ fn hall_tile(world: &WorldState, c: &City) -> (i32, i32) {
 }
 
 #[test]
-fn places_about_one_in_every_region_spread_evenly() {
+fn places_one_in_every_heartland_and_at_most_one_more_in_every_square() {
     let (terrain, world) = generated();
     let posts = trading_posts(world);
     let all = regions(terrain.size);
     assert_eq!(all.len(), 4);
-    assert!(posts.len() + 1 >= all.len());
-    // At most one in each region, and none near another city.
-    for r in &all {
-        let inside = posts.iter().filter(|c| {
+    let land = crate::regions::Regions::of(world.seed, terrain);
+    // Each post's town hall, and whether it stands in a heartland.
+    let halls: Vec<((f64, f64), bool)> = posts
+        .iter()
+        .map(|c| {
             let h = town_hall_of(world, c).unwrap();
-            in_region(r, (h.x, h.y))
-        });
-        assert!(inside.count() <= 1);
+            let kind = land.region_at(h.x as i32, h.y as i32).map(|r| r.kind);
+            ((h.x, h.y), kind == Some(crate::regions::RegionKind::Heartland))
+        })
+        .collect();
+    let heartlands = land.of_kind(crate::regions::RegionKind::Heartland).count();
+    assert_eq!(halls.iter().filter(|h| h.1).count(), heartlands);
+    // The frontier's posts: at most one in each square, and none in a square with a heartland's.
+    for r in &all {
+        let inside = |heartland: bool| {
+            halls.iter().filter(|h| h.1 == heartland && in_region(r, h.0)).count()
+        };
+        assert!(inside(false) <= 1 && (inside(false) == 0 || inside(true) == 0));
     }
-    for p in &posts {
+    // The frontier's posts stand far from every other city.
+    for (p, _) in posts.iter().zip(&halls).filter(|(_, h)| !h.1) {
         let hall = hall_tile(world, p);
         for c in world.cities.iter().filter(|o| o.id != p.id) {
             let d = wrap_distance(terrain.size, hall, hall_tile(world, c));

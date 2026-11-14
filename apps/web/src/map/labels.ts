@@ -18,10 +18,19 @@ interface Label {
  * Name labels on dark pills, such as the cities' in the far tier, redrawn every frame like
  * `TokenLayer`: `begin`, `place` each, `end`.
  */
+/** How a layer's labels look: city names and waypoints on pills; region names larger, without. */
+export interface LabelStyle {
+  size: number
+  pill: boolean
+  italic?: boolean
+}
+
 export class LabelLayer {
   readonly container = new Container()
   private labels: Label[] = []
   private used = 0
+
+  constructor(private readonly style: LabelStyle = { size: LABEL_SIZE, pill: true }) {}
 
   begin() {
     this.used = 0
@@ -38,9 +47,12 @@ export class LabelLayer {
         anchor: 0.5,
         style: {
           fontFamily: THEME.font.ui,
-          fontSize: LABEL_SIZE,
+          fontSize: this.style.size,
           fontWeight: '600',
+          fontStyle: this.style.italic ? 'italic' : 'normal',
           fill: GLYPH_COLOR,
+          // Without a pill the text keeps a dark edge, to read on any terrain.
+          ...(this.style.pill ? {} : { stroke: { color: PILL_COLOR, width: 3 } }),
         },
       })
       root.addChild(pill, t)
@@ -51,12 +63,14 @@ export class LabelLayer {
     this.used++
     if (label.text.text !== text) {
       label.text.text = text
-      const w = label.text.width + LABEL_SIZE * 0.9
-      const h = LABEL_SIZE * 1.4
-      label.pill
-        .clear()
-        .roundRect(-w / 2, -h / 2, w, h, 4)
-        .fill({ color: PILL_COLOR, alpha: PILL_ALPHA })
+      label.pill.clear()
+      if (this.style.pill) {
+        const w = label.text.width + this.style.size * 0.9
+        const h = this.style.size * 1.4
+        label.pill
+          .roundRect(-w / 2, -h / 2, w, h, 4)
+          .fill({ color: PILL_COLOR, alpha: PILL_ALPHA })
+      }
     }
     label.root.position.set(Math.round(x), Math.round(y))
     label.root.visible = true

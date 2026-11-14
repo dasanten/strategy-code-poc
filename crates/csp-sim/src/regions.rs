@@ -492,7 +492,7 @@ fn region_names(seed: i64, count: usize) -> Vec<String> {
 
 /// Whether a carriage drives on the terrain (`can_drive`): Plains, Forest, Hills. Roads are never
 /// stored in the map.
-fn drivable(tile: u8) -> bool {
+pub(crate) fn drivable(tile: u8) -> bool {
     matches!(Terrain::from_byte(tile), Some(Terrain::Plains | Terrain::Forest | Terrain::Hills))
 }
 

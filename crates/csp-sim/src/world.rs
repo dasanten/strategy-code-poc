@@ -102,18 +102,13 @@ pub fn create_world(terrain: &TerrainMap, seed: i64) -> WorldState {
 }
 
 /// A world as the world generator makes it for a new game (`generateWorld`): `create_world`,
-/// its nodes placed by region and the heartlands' starting sites (`place_starting_sites`), with
-/// the Trade Org HQ (`place_trade_org_hq`), its NPC cities (`place_npc_cities`) and then its
-/// trading posts placed (`place_trading_posts`), with a caravan for each (`place_caravans`) and
-/// wandering traders going round them (`place_traders`).
+/// its nodes placed by region and the heartlands' starting sites (`place_starting_sites`), then
+/// the Trade Org HQ, its trading posts and the NPC cities placed on the land clear of the sites, a
+/// caravan for each post and wandering traders going round them (`place_on_the_land`).
 pub fn generate_world(terrain: &TerrainMap, seed: i64) -> WorldState {
     let mut world = create_world(terrain, seed);
     crate::starting_sites::place_starting_sites(&mut world, terrain);
-    place_trade_org_hq(&mut world, terrain);
-    place_npc_cities(&mut world, terrain);
-    place_trading_posts(&mut world, terrain);
-    place_caravans(&mut world);
-    place_traders(&mut world, terrain.size);
+    place_on_the_land(&mut world, terrain);
     world
 }
 
@@ -353,23 +348,16 @@ fn step_rest(
 // many it resolved. A ticket deletes its stubs and adds a `use` of its module.
 // ------------------------------------------------------------------------------------------------
 
-// T86.9 (`trade-org.ts`, `trading-posts.ts`, `caravans.ts`, `traders.ts`): world generation.
-fn place_trade_org_hq(world: &mut WorldState, terrain: &TerrainMap) {
-    crate::trade_org::place_trade_org_hq(world, terrain);
-}
-fn place_trading_posts(world: &mut WorldState, terrain: &TerrainMap) {
-    crate::trading_posts::place_trading_posts(world, terrain);
-}
-fn place_caravans(world: &mut WorldState) {
-    crate::caravans::place_caravans(world);
-}
-fn place_traders(world: &mut WorldState, size: i32) {
-    crate::traders::place_traders(world, size);
-}
-
-// T86.10 (`npc-cities.ts`): world generation.
-fn place_npc_cities(world: &mut WorldState, terrain: &TerrainMap) {
-    crate::npc_cities::place_npc_cities(world, terrain);
+// T100.5: the Trade Organization and the NPC cities on the land. A post or trader stop the HQ has
+// no carriage way to is a generation error.
+fn place_on_the_land(world: &mut WorldState, terrain: &TerrainMap) {
+    let problems = crate::land_sites::place_on_the_land(world, terrain);
+    let broken: Vec<&str> = problems
+        .iter()
+        .filter(|p| p.rule == crate::land_sites::ROUTE_RULE)
+        .map(|p| p.message.as_str())
+        .collect();
+    assert!(broken.is_empty(), "world {} has no carriage way: {}", world.seed, broken.join("; "));
 }
 
 // Road materials (`road-line.ts`) and offers (`offers.ts`); carrying, storing, hauling, buying and

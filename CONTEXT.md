@@ -670,7 +670,8 @@ The shared language of the game. Domain terms only — no implementation details
 - **Seeing how someone fares:** a resident's or horse's hunger and health are seen only by its
   own realm and its allies. Others see that it is there.
 - **Explored terrain:** tiles a Player has ever had in sight. Their terrain and resource nodes stay
-  known, and so do the buildings on them (see Last seen); people, horses, carriages, armies and
+  known, and so do the buildings on them (see Last seen) and the region each lies in, its name
+  and kind, and whether it is a pass or land bridge (Region); people, horses, carriages, armies and
   goods on them do not. Where the map shows explored terrain coarser than tile by tile (zoomed far
   out, on the minimap), a square shows the most common terrain among the tiles the Player explored
   in it, and stays unexplored only while they explored none of it: nothing of an unexplored tile

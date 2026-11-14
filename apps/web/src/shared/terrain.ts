@@ -152,6 +152,12 @@ export const TERRAIN_BATCH_PATH = '/api/terrain/chunks'
 export const TERRAIN_BATCH_MAX = 64
 
 /**
+ * Where the client loads the land the Player knows (`PlayerLand`): a `POST` whose JSON body is
+ * `{ chunks?: number[] }`, the chunks to send, or every chunk they explored part of without it.
+ */
+export const LAND_PATH = '/api/land'
+
+/**
  * The coarsest level explored terrain is served at (ADR 0034). At level `k` one byte stands for a
  * square of `2^k × 2^k` tiles, the most common terrain the Player explored in it, and a chunk is
  * `CHUNK_SIZE × CHUNK_SIZE` squares; level 0 is one byte a tile. A `TERRAIN_BATCH_PATH` request

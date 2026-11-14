@@ -43,6 +43,7 @@ pub mod hq_fall;
 pub mod hq_growth;
 pub mod invariants;
 pub mod land;
+pub mod land_sites;
 pub mod last_seen;
 pub mod leader;
 pub mod lent;

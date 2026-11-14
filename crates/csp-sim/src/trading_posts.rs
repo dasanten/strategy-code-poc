@@ -1,5 +1,5 @@
 //! Trading posts (`apps/server/src/trading-posts.ts`, `CONTEXT.md`: Trading post, Trade Org debt):
-//! one per region of the map, an NPC village of the Trade Organization's with a warehouse.
+//! one in every heartland and others across the frontier, an NPC village of the Trade Organization's with a warehouse.
 //!
 //! Laying a post out is `found_npc_city` with a warehouse beside its storage, and finding its site
 //! is `npc_site_fits` (`npc-cities.ts`).
@@ -16,7 +16,6 @@ use crate::npc_cities::{found_npc_city, npc_site_fits_among, taken_ground, SiteW
 use crate::placing::{node_workplace, Ground};
 use crate::queries::city::town_hall_of;
 use crate::queries::names::{good_of, held_in, placed};
-use crate::random::Mulberry32;
 use crate::residents::Rand;
 use crate::starting_city::FARM_RING;
 use crate::trade_org::nearest_free_node;
@@ -226,7 +225,7 @@ pub fn storages_become_warehouses(
 const SITE_STEP: usize = 3;
 
 /// A trading post as `found_npc_city` lays out a village (`TRADING_POST`).
-fn post_size() -> NpcCitySize {
+pub(crate) fn post_size() -> NpcCitySize {
     NpcCitySize {
         size: TRADING_POST.size,
         residents: TRADING_POST.residents,
@@ -246,6 +245,23 @@ pub fn find_trading_post_site(
     region: &Region,
     ground: Option<&Ground>,
 ) -> Option<(i32, i32)> {
+    let middle = (region.x + region.width / 2.0, region.y + region.height / 2.0);
+    find_trading_post_site_where(world, terrain, region, middle, ground, true, &|_, _| true)
+}
+
+/// `find_trading_post_site` nearest `middle` (the tile a post's middle is wanted on) rather than
+/// the region's, and only where `allowed` lets a post's top-left wall tile be: on the land, a
+/// heartland's or frontier land clear of the starting sites and ways (`land_sites`). With `apart` false it
+/// keeps no distance from other cities (`SiteWorld::players_only`).
+pub fn find_trading_post_site_where(
+    world: &WorldState,
+    terrain: &TerrainMap,
+    region: &Region,
+    middle: (f64, f64),
+    ground: Option<&Ground>,
+    apart: bool,
+    allowed: &dyn Fn(i32, i32) -> bool,
+) -> Option<(i32, i32)> {
     let made;
     let ground = match ground {
         Some(g) => g,
@@ -261,7 +277,8 @@ pub fn find_trading_post_site(
     while dy <= region.height - size - ring {
         let mut dx = ring;
         while dx <= region.width - size - ring {
-            let off = (dx + (size - region.width) / 2.0).hypot(dy + (size - region.height) / 2.0);
+            let off = (region.x + dx + size / 2.0 - middle.0)
+                .hypot(region.y + dy + size / 2.0 - middle.1);
             candidates.push((((region.x + dx) as i32, (region.y + dy) as i32), off));
             dx += SITE_STEP as f64;
         }
@@ -269,10 +286,12 @@ pub fn find_trading_post_site(
     }
     candidates.sort_by(|a, b| a.1.total_cmp(&b.1));
     let kind = post_size();
-    let among = SiteWorld::new(world);
+    let among = if apart { SiteWorld::new(world) } else { SiteWorld::players_only(world) };
     candidates
         .into_iter()
-        .find(|&((x, y), _)| npc_site_fits_among(&among, terrain, &kind, x, y, ground, true))
+        .find(|&((x, y), _)| {
+            allowed(x, y) && npc_site_fits_among(&among, terrain, &kind, x, y, ground, true)
+        })
         .map(|(at, _)| at)
 }
 
@@ -345,26 +364,13 @@ pub fn found_trading_post(
     city_id
 }
 
-/// Places a trading post in every region that has none yet (`placeTradingPosts`: `regions`,
-/// `find_trading_post_site`, `found_trading_post`), skipping a region with no room. The same
-/// world always gets the same posts. Returns their ids.
+/// Places the trading posts that are missing (`placeTradingPosts`): one near the middle of every
+/// heartland, then one on frontier land in every square of the grid (`regions`) that has none yet,
+/// skipping where there is no room (`land_sites::place_trading_posts_on`). The same world always
+/// gets the same posts. Returns their ids.
 pub fn place_trading_posts(world: &mut WorldState, terrain: &TerrainMap) -> Vec<String> {
-    let mut m = Mulberry32::new((world.seed * 15_485_863 + 47) as f64);
-    let halls: Vec<(f64, f64)> = trading_posts(world)
-        .into_iter()
-        .filter_map(|c| town_hall_of(world, c))
-        .map(|h| (h.x, h.y))
-        .collect();
-    let mut placed_posts = Vec::new();
-    for region in regions(terrain.size) {
-        if halls.iter().any(|&h| in_region(&region, h)) {
-            continue;
-        }
-        let Some((x, y)) = find_trading_post_site(world, terrain, &region, None) else { continue };
-        let resource = common_resource(world, &region);
-        placed_posts.push(found_trading_post(world, terrain, x, y, resource, &mut || m.next()));
-    }
-    placed_posts
+    let land = crate::land_sites::LandSites::of(world, terrain);
+    crate::land_sites::place_trading_posts_on(world, terrain, &land)
 }
 
 #[cfg(test)]

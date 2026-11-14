@@ -774,6 +774,18 @@
           "name": "y",
           "type": "number",
           "description": "From north to south."
+        },
+        {
+          "name": "region",
+          "type": "string",
+          "description": "The name of the region it lies in.",
+          "nullWhen": "on water, or on a tile the Player hasn’t explored"
+        },
+        {
+          "name": "regionKind",
+          "type": "string",
+          "description": "What its region is: \"heartland\", \"frontier\" or \"island\".",
+          "nullWhen": "on water, or on a tile the Player hasn’t explored"
         }
       ]
     },

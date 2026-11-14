@@ -162,8 +162,11 @@ export interface Balance {
   readonly WALL_ENCLOSES_MAX: number
   readonly SIGHT_RANGE: number
   readonly LAST_SEEN_EVERY_TICKS: number
-  readonly NPC_VILLAGES: number
-  readonly NPC_TOWNS: number
+  readonly NPC_TOWNS_PER_FRONTIER: number
+  readonly NPC_VILLAGES_PER_FRONTIER: number
+  readonly NPC_VILLAGES_PER_HEARTLAND: number
+  readonly NPC_STARTING_SITE_CLEARANCE: number
+  readonly NPC_WAY_CLEARANCE: number
   readonly NPC_CITY_MIN_DISTANCE: number
   readonly NPC_VILLAGE: {
     size: number

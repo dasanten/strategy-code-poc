@@ -88,6 +88,7 @@ import {
 } from './map/far.js'
 import { PIN_HEIGHT, PIN_RADIUS, pinAt } from './map/pins.js'
 import { LabelLayer } from './map/labels.js'
+import type { LandLabel } from './map/land.js'
 import { destroyAtlas, loadAtlas, type Atlas } from './map/atlas.js'
 import {
   GLYPH_COLOR,
@@ -135,6 +136,9 @@ const NONE: readonly string[] = []
 /** How strongly the hover outline tints what a click would pick, so it shows on its own colour. */
 const HOVER_FILL = 0.18
 
+/** Region names' text size in pixels, larger than a city's name; they keep it at every zoom. */
+const REGION_LABEL_SIZE = 16
+
 /** Starting zoom, in screen pixels per tile. */
 const START_SCALE = 12
 
@@ -166,6 +170,7 @@ export function MapView({
   onPickTile,
   preview,
   marks,
+  land,
   onPointerTile,
   onNodesLoaded,
   onTerrainLoaded,
@@ -210,6 +215,11 @@ export function MapView({
   preview?: PickPreview
   /** Spots marked on the map at every zoom, such as the admin map's passes and land bridges. */
   marks?: readonly MapMark[]
+  /**
+   * The land the Player knows (`CONTEXT.md`: Region), shown at the middle and far zoom: the names
+   * of the regions they explored part of, and a mark on each pass and land bridge they explored.
+   */
+  land?: { labels: readonly LandLabel[]; marks: readonly MapMark[] }
   /** Called while `picking` with the tile a mouse or pen hovers over, undefined once off the map. */
   onPointerTile?: (tile: { x: number; y: number } | undefined) => void
   /** Called with a lookup of known resource nodes by tile, and again whenever more load. */
@@ -261,6 +271,7 @@ export function MapView({
   onPickTileRef.current = onPickTile
   const previewRef = useRef(preview)
   const marksRef = useRef(marks)
+  const landRef = useRef(land)
   const onPointerTileRef = useRef(onPointerTile)
   onPointerTileRef.current = onPointerTile
   const onNodesLoadedRef = useRef(onNodesLoaded)
@@ -347,6 +358,11 @@ export function MapView({
   }, [marks])
 
   useEffect(() => {
+    landRef.current = land
+    redrawRef.current()
+  }, [land])
+
+  useEffect(() => {
     worldRef.current = world
     if (world.grownChunks.length > 0) forgetRef.current(world.grownChunks)
     motionRef.current(world)
@@ -387,6 +403,8 @@ export function MapView({
     let atlas: Atlas | undefined
     const overlay = new Graphics()
     const labels = new LabelLayer()
+    // The names of the regions the Player knows, under the tokens and the other labels.
+    const regionNames = new LabelLayer({ size: REGION_LABEL_SIZE, pill: false, italic: true })
     // Where each resident's token was drawn last frame; up close each has its own figure.
     let drawnSpots = new Map<string, Spot>()
     // Where the tokens are between ticks (`CONTEXT.md`: Motion on the map).
@@ -714,10 +732,14 @@ export function MapView({
       tokens.begin()
       badges.begin()
       labels.begin()
-      if (zoomTier(cam.scale) === 'far') drawFar(g, cam, view)
+      regionNames.begin()
+      const tier = zoomTier(cam.scale)
+      if (tier === 'far') drawFar(g, cam, view)
       else drawMiddle(g, cam, view, onScreen)
+      if (tier !== 'close') drawLand(g, cam, view)
       drawWaypoints(g, cam, view)
       if (marksRef.current) drawMarks(g, cam, view, mapSize, marksRef.current)
+      regionNames.end()
       labels.end()
       tokens.end()
       badges.end()
@@ -776,6 +798,21 @@ export function MapView({
           color: relationshipColor(hovered.rel),
         })
       }
+    }
+
+    /**
+     * The land the Player knows (`CONTEXT.md`: Region) at the middle and far tiers: each region's
+     * name over a tile of it they explored, and a mark on each pass and land bridge.
+     */
+    function drawLand(g: Graphics, cam: Camera, view: Size) {
+      const land = landRef.current
+      if (!land) return
+      for (const l of land.labels) {
+        const [sx, sy] = tileToScreen(cam, view, mapSize, l.x + 0.5, l.y + 0.5)
+        if (sx < -200 || sy < -20 || sx > view.width + 200 || sy > view.height + 20) continue
+        regionNames.place(l.name, sx, sy)
+      }
+      drawMarks(g, cam, view, mapSize, land.marks)
     }
 
     /**
@@ -1236,6 +1273,7 @@ export function MapView({
         regionLayer,
         borderLayer,
         under,
+        regionNames.container,
         tokens.container,
         overlay,
         labels.container,

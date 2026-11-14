@@ -145,11 +145,10 @@ fn frontier_regions_and_islands_hold_denser_nodes_than_heartlands() {
     assert!(per(RegionKind::Island) > per(RegionKind::Heartland) * 1.2, "{count:?} {tiles:?}");
 }
 
-/// The world generator places the sites before any city, all of them free. (That the Trade Org
-/// HQ, NPC cities and trading posts placed after them leave each its room is T100.5's, which
-/// places those on the new land.)
+/// The world generator places the sites before any city, all of them free, and the Trade Org HQ,
+/// trading posts and NPC cities it places after them leave each site its room.
 #[test]
-fn a_generated_world_has_the_starting_sites_all_free() {
+fn a_generated_world_has_the_starting_sites_all_free_with_room_for_a_city() {
     let terrain = generate_terrain(1, 1536);
     let world = generate_world(&terrain, 1);
     assert_eq!(
@@ -161,4 +160,5 @@ fn a_generated_world_has_the_starting_sites_all_free() {
     place_starting_sites(&mut only, &terrain);
     assert_eq!(world.starting_sites, only.starting_sites);
     assert_eq!(free_starting_sites(&world, world.starting_sites[0].region).count(), 10);
+    assert_eq!(check_starting_sites(&world, &terrain, &Regions::of(1, &terrain)), []);
 }
