@@ -6,6 +6,7 @@ use csp_shared::balance::{
     DODGE_LIMIT, DODGE_PER_AGILITY, INTELLECT_AVERAGE, MIN_BLOW_DAMAGE, PROTECTION_DEFENCE,
     WEAPON_ATTACK,
 };
+use csp_shared::goods::PROTECTION_KINDS;
 use csp_shared::terrain::wrap_delta;
 use csp_shared::world::{Resident, SkillName, StatName};
 
@@ -19,13 +20,17 @@ pub fn in_contact(size: i32, a: (i32, i32), b: (i32, i32)) -> bool {
 }
 
 /// Damage a resident's protection takes off each blow (`protection`): a shield and armour, if
-/// they carry them, one of each counting.
+/// they carry them, the best of each kind counting (`PROTECTION_KINDS`), so steel over iron.
 pub fn protection(r: &Resident) -> f64 {
-    PROTECTION_DEFENCE
-        .0
+    PROTECTION_KINDS
         .iter()
-        .filter(|(p, _)| good_of(p).is_some_and(|g| held(&r.carried, g) > 0.0))
-        .fold(0.0, |sum, (_, d)| sum + d)
+        .map(|kind| {
+            kind.iter()
+                .filter(|p| good_of(p).is_some_and(|g| held(&r.carried, g) > 0.0))
+                .filter_map(|p| PROTECTION_DEFENCE.get(p))
+                .fold(0.0, f64::max)
+        })
+        .sum()
 }
 
 /// How hard a resident strikes at `tick` (`attackPower`): from Strength and the best weapon they

@@ -5,16 +5,36 @@
 
 /// PoC goods (`CONTEXT.md`: Good, Weapons and armour). Amounts are counted in units;
 /// `GOOD_WEIGHT` weighs them.
-pub const GOODS: [&str; 13] = [
-    "food", "wood", "stone", "ironOre", "iron", "goldOre", "coins", "spear", "sword", "shield",
-    "armour", "coal", "steel",
+pub const GOODS: [&str; 16] = [
+    "food",
+    "wood",
+    "stone",
+    "ironOre",
+    "iron",
+    "goldOre",
+    "coins",
+    "spear",
+    "sword",
+    "shield",
+    "armour",
+    "coal",
+    "steel",
+    "steelSword",
+    "steelShield",
+    "steelArmour",
 ];
 
 /// Goods that make a resident armed (`CONTEXT.md`: Soldier, Weapons and armour).
-pub const WEAPONS: [&str; 2] = ["spear", "sword"];
+pub const WEAPONS: [&str; 3] = ["spear", "sword", "steelSword"];
 
-/// Goods that take off damage (`CONTEXT.md`: Weapons and armour): shields and armour.
-pub const PROTECTION: [&str; 2] = ["shield", "armour"];
+/// Goods that take off damage (`CONTEXT.md`: Weapons and armour): shields and armour, of iron
+/// or of steel.
+pub const PROTECTION: [&str; 4] = ["shield", "armour", "steelShield", "steelArmour"];
+
+/// The kinds of protection (`CONTEXT.md`: Weapons and armour): a shield and armour, each of iron
+/// or of steel. A resident is protected by the best of each kind they carry, so a second shield
+/// adds nothing.
+pub const PROTECTION_KINDS: [&[&str]; 2] = [&["shield", "steelShield"], &["armour", "steelArmour"]];
 
 /// How many of a carried good a resident puts away (stores, drops, loads, delivers) unless asked
 /// for an exact amount: all of it, but Food only beyond their own food (`CONTEXT.md`: Own food),
@@ -58,5 +78,8 @@ mod tests {
         for good in WEAPONS.iter().chain(&PROTECTION) {
             assert!(GOODS.contains(good));
         }
+        let kinds: Vec<&str> = PROTECTION_KINDS.iter().flat_map(|k| k.iter().copied()).collect();
+        assert_eq!(kinds.len(), PROTECTION.len());
+        assert!(PROTECTION.iter().all(|p| kinds.contains(p)));
     }
 }

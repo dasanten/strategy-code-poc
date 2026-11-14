@@ -439,6 +439,24 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 description: "Units of steel.",
                 null_when: Some("when there are none"),
             },
+            ScriptField {
+                name: "steelSword",
+                r#type: ScriptType::Number,
+                description: "Units of steel sword.",
+                null_when: Some("when there are none"),
+            },
+            ScriptField {
+                name: "steelShield",
+                r#type: ScriptType::Number,
+                description: "Units of steel shield.",
+                null_when: Some("when there are none"),
+            },
+            ScriptField {
+                name: "steelArmour",
+                r#type: ScriptType::Number,
+                description: "Units of steel armour.",
+                null_when: Some("when there are none"),
+            },
         ],
     },
     ScriptView {
@@ -4757,7 +4775,7 @@ fn aboardDriven() {
 
 // Whether I carry a weapon.
 fn armed() {
-  for (w of ["spear", "sword"]) {
+  for (w of ["spear", "sword", "steelSword"]) {
     let n = me.carried[w]
     if (n != null && n > 0) { return true }
   }
@@ -5684,7 +5702,7 @@ fn culprit() {
 
 // Whether they carry a weapon.
 fn armed(who) {
-  for (w of ["spear", "sword"]) {
+  for (w of ["spear", "sword", "steelSword"]) {
     let n = who.carried[w]
     if (n != null && n > 0) { return true }
   }

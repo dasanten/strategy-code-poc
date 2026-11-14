@@ -151,6 +151,7 @@ pub struct TraderVisit {
 pub enum Weapon {
     Spear,
     Sword,
+    SteelSword,
 }
 
 ts_type!(

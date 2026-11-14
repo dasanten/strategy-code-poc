@@ -751,6 +751,10 @@ describe('strangers on a tile’s card', () => {
     expect(linesOf({ strangers: [resident({ carried: { food: 2 } })] })).toContain(
       'Brann · Another realm',
     )
+    const steel = resident({ carried: { steelSword: 1, steelArmour: 1 } })
+    expect(linesOf({ strangers: [steel] })).toContain(
+      'Brann · Another realm · armed: steel sword, steel armour',
+    )
   })
 
   it('counts an army of strangers on the tile as soldiers', () => {

@@ -323,7 +323,10 @@
     "spear": 20.0,
     "sword": 30.0,
     "shield": 22.0,
-    "armour": 90.0
+    "armour": 90.0,
+    "steelSword": 50.0,
+    "steelShield": 30.0,
+    "steelArmour": 160.0
   },
   "PRICE_REFERENCE_FLOORS": 4.0,
   "PRICE_ELASTICITY": 0.5,
@@ -366,15 +369,21 @@
     "shield": 4.0,
     "armour": 8.0,
     "coal": 1.0,
-    "steel": 1.0
+    "steel": 1.0,
+    "steelSword": 3.0,
+    "steelShield": 4.0,
+    "steelArmour": 8.0
   },
   "WEAPON_ATTACK": {
     "spear": 4.0,
-    "sword": 6.0
+    "sword": 6.0,
+    "steelSword": 9.0
   },
   "PROTECTION_DEFENCE": {
     "shield": 3.0,
-    "armour": 5.0
+    "armour": 5.0,
+    "steelShield": 5.0,
+    "steelArmour": 8.0
   },
   "CARRY_BASE": 10.0,
   "CARRY_PER_STRENGTH": 2.0,
@@ -690,6 +699,33 @@
         },
         "output": {
           "armour": 1.0
+        }
+      },
+      {
+        "input": {
+          "steel": 2.0,
+          "wood": 1.0
+        },
+        "output": {
+          "steelSword": 1.0
+        }
+      },
+      {
+        "input": {
+          "steel": 1.0,
+          "wood": 3.0
+        },
+        "output": {
+          "steelShield": 1.0
+        }
+      },
+      {
+        "input": {
+          "steel": 7.0,
+          "wood": 1.0
+        },
+        "output": {
+          "steelArmour": 1.0
         }
       }
     ]

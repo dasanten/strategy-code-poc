@@ -1025,7 +1025,9 @@ pub const TRADING_POST: TradingPost = TradingPost {
 /// A trading post's stock floor (`CONTEXT.md`: Stock floor, ADR 0023), in units: what its spare
 /// hands, caravan and wandering traders go for, and what its prices are reckoned from. It tops up
 /// nothing at a post; the HQ's warehouses top up to `HQ_FLOOR_FACTOR` times this each game day. Half
-/// of what a post starts with, so a fresh post is well above it.
+/// of what a post starts with, so a fresh post is well above it. Steel weapons and armour have none
+/// yet: a warehouse buys and sells what it is brought, and nobody tops them up (T101.6 decides
+/// what the Trade Organization does with Steel).
 pub const WAREHOUSE_FLOOR: Table<f64> = Table(&[
     ("food", 20.0),
     ("wood", 25.0),
@@ -1040,6 +1042,9 @@ pub const WAREHOUSE_FLOOR: Table<f64> = Table(&[
     ("sword", 1.0),
     ("shield", 2.0),
     ("armour", 1.0),
+    ("steelSword", 0.0),
+    ("steelShield", 0.0),
+    ("steelArmour", 0.0),
 ]);
 
 /// How many times a trading post's floor (`WAREHOUSE_FLOOR`) the Trade Org HQ's warehouses keep.
@@ -1055,7 +1060,7 @@ pub const HQ_FOOD_FLOOR_FACTOR: f64 = 15.0;
 /// times its floor (`CONTEXT.md`: Warehouse prices, Price anchor). Roughly what goes into it: an
 /// iron is two iron ore and the work, a sword two iron and a wood; gold ore stays below the 10
 /// coins the mint strikes from it; coal, found only beyond the heartlands, a little above iron ore;
-/// steel an iron and a coal and the work.
+/// steel an iron and a coal and the work; steel weapons and armour their steel, wood and the work.
 pub const WAREHOUSE_BASE_PRICE: Table<f64> = Table(&[
     ("food", 2.0),
     ("wood", 2.0),
@@ -1069,6 +1074,9 @@ pub const WAREHOUSE_BASE_PRICE: Table<f64> = Table(&[
     ("sword", 30.0),
     ("shield", 22.0),
     ("armour", 90.0),
+    ("steelSword", 50.0),
+    ("steelShield", 30.0),
+    ("steelArmour", 160.0),
 ]);
 
 /// Stock, in floors, at which a warehouse sells at its base price; less stock costs more.
@@ -1208,15 +1216,21 @@ pub const GOOD_WEIGHT: Table<f64> = Table(&[
     ("armour", 8.0),
     ("coal", 1.0),
     ("steel", 1.0),
+    ("steelSword", 3.0),
+    ("steelShield", 4.0),
+    ("steelArmour", 8.0),
 ]);
 
 /// Attack each weapon adds to a resident's blow (`CONTEXT.md`: Weapons and armour, Combat). A
-/// sword hits harder than a spear; combat (T10.2) adds it to Strength and Combat skill.
-pub const WEAPON_ATTACK: Table<f64> = Table(&[("spear", 4.0), ("sword", 6.0)]);
+/// sword hits harder than a spear, a steel sword half again as hard as an iron one (`CONTEXT.md`:
+/// Coal); combat (T10.2) adds it to Strength and Combat skill.
+pub const WEAPON_ATTACK: Table<f64> = Table(&[("spear", 4.0), ("sword", 6.0), ("steelSword", 9.0)]);
 
 /// Damage each piece of protection takes off a blow (`CONTEXT.md`: Weapons and armour, Combat).
-/// Armour takes off more than a shield but weighs twice as much.
-pub const PROTECTION_DEFENCE: Table<f64> = Table(&[("shield", 3.0), ("armour", 5.0)]);
+/// Armour takes off more than a shield but weighs twice as much; steel takes off more than iron
+/// at the same weight. Only the best shield and the best armour carried count (`PROTECTION_KINDS`).
+pub const PROTECTION_DEFENCE: Table<f64> =
+    Table(&[("shield", 3.0), ("armour", 5.0), ("steelShield", 5.0), ("steelArmour", 8.0)]);
 
 /// Carry capacity of a resident with no Strength at all, in kg.
 pub const CARRY_BASE: f64 = 10.0;
@@ -1900,7 +1914,9 @@ pub struct Recipe {
 /// its first recipe, Iron, is what its workers make when they name none. A mint 1 gold ore into 10 coins (less weight than the
 /// ore, but a fortune still weighs something). A smithy has one recipe for each weapon and piece
 /// of armour, each from Iron and Wood weighing what the good weighs (`GOOD_WEIGHT`): a spear is
-/// mostly wood, a sword mostly iron, a shield wood bound with iron, armour nearly all iron.
+/// mostly wood, a sword mostly iron, a shield wood bound with iron, armour nearly all iron. The
+/// steel Sword, Shield and Armour (`CONTEXT.md`: Coal) take Steel where the iron ones take Iron,
+/// and the same Wood; the Spear is iron only.
 pub const RECIPES: Table<&[Recipe]> = Table(&[
     (
         "smelter",
@@ -1931,6 +1947,18 @@ pub const RECIPES: Table<&[Recipe]> = Table(&[
             Recipe {
                 input: Table(&[("iron", 7.0), ("wood", 1.0)]),
                 output: Table(&[("armour", 1.0)]),
+            },
+            Recipe {
+                input: Table(&[("steel", 2.0), ("wood", 1.0)]),
+                output: Table(&[("steelSword", 1.0)]),
+            },
+            Recipe {
+                input: Table(&[("steel", 1.0), ("wood", 3.0)]),
+                output: Table(&[("steelShield", 1.0)]),
+            },
+            Recipe {
+                input: Table(&[("steel", 7.0), ("wood", 1.0)]),
+                output: Table(&[("steelArmour", 1.0)]),
             },
         ],
     ),

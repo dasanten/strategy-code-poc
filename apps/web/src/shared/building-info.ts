@@ -36,7 +36,8 @@ export const BUILDING_PURPOSE: Record<BuildingKind, string> = {
   lumberCamp: 'A lumber camp fells wood in the forest node it stands on.',
   smelter: 'A smelter turns iron ore into iron, or iron and coal into steel; not on Mountain.',
   mint: 'A mint turns gold ore into coins; not on Mountain.',
-  smithy: 'A smithy turns iron and wood into spears, swords, shields and armour; not on Mountain.',
+  smithy:
+    'A smithy turns iron and wood into spears, swords, shields and armour, and steel and wood into steel swords, shields and armour; not on Mountain.',
   trainingGround:
     'A training ground is where residents train a stat or a skill under a teacher; not on Mountain. Like a workplace, nobody owns it.',
   road: 'A road: residents walk and carriages drive faster on it, on any land (slower to build on Mountain), and it can run through a gate. Nobody owns it.',

@@ -3,7 +3,7 @@
 
 import { cityAreaTiles, forSale, townHallOf } from './city.js'
 import { standingOf } from './standing.js'
-import { bestWeapon, isArmed } from './stats.js'
+import { bestWeapon, isArmed, protectionValue } from './stats.js'
 import { wrapDistance } from './terrain.js'
 import { isWallOrGate, wallSide } from './walls.js'
 import { type WorldState } from './world.js'
@@ -12,12 +12,11 @@ import {
   COMBAT_SKILL_EFFECT,
   COMBAT_SKILL_LIMIT,
   PERSUADE_STANDING,
-  PROTECTION_DEFENCE,
   RESPECT_PER_WALL,
   SIGHT_RANGE,
   WEAPON_ATTACK,
 } from '@csp/balance'
-import type { City, Good, JoinRequestView, Resident } from '@csp/shared-types'
+import type { City, JoinRequestView, Resident } from '@csp/shared-types'
 
 /*
  * Respect and persuading a city (`CONTEXT.md`: Respect, Persuading a city). Queries here are the
@@ -43,10 +42,7 @@ export function fighterStrength(r: Pick<Resident, 'carried' | 'skills'>): number
   const weapon = bestWeapon(r)
   if (weapon === undefined) return 0
   const skill = Math.min(COMBAT_SKILL_LIMIT, (r.skills.combat ?? 0) * COMBAT_SKILL_EFFECT)
-  const protection = (Object.entries(PROTECTION_DEFENCE) as [Good, number][])
-    .filter(([g]) => (r.carried[g] ?? 0) > 0)
-    .reduce((sum, [, d]) => sum + d, 0)
-  return (BLOW_BASE + WEAPON_ATTACK[weapon]) * (1 + skill) + protection
+  return (BLOW_BASE + WEAPON_ATTACK[weapon]) * (1 + skill) + protectionValue(r)
 }
 
 /**
