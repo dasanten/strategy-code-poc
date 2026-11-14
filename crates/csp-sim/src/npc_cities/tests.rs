@@ -4,16 +4,19 @@ use std::collections::HashSet;
 use std::sync::OnceLock;
 
 use csp_shared::balance::{
-    NPC_CITY_MIN_DISTANCE, NPC_TOWN, NPC_TOWNS, NPC_VILLAGE, NPC_VILLAGES, SIGHT_RANGE,
+    FRONTIER_REGION_COUNT, HEARTLAND_COUNT, NPC_CITY_MIN_DISTANCE, NPC_TOWN,
+    NPC_TOWNS_PER_FRONTIER, NPC_VILLAGE, NPC_VILLAGES_PER_FRONTIER, NPC_VILLAGES_PER_HEARTLAND,
+    SIGHT_RANGE,
 };
 use csp_shared::terrain::{terrain_at, wrap_distance, Terrain, TerrainMap};
 use csp_shared::world::{BuildingKind, City, ResourceKind, ResourceNode, WorldState};
 use serde_json::{json, Value};
 
-use super::{find_npc_city_site, found_npc_city, npc_city_count, npc_site_fits, taken_ground};
+use super::{find_npc_city_site, found_npc_city, npc_site_fits, taken_ground};
 use crate::invariants::check_all;
 use crate::queries::city::{city_price, in_city_area, is_city_building, town_hall_of};
 use crate::random::Mulberry32;
+use crate::regions::{RegionKind, Regions};
 use crate::residents::{new_resident, NewResident};
 use crate::sight::entities_in_sight;
 use crate::starting_city::found_starting_city;
@@ -58,23 +61,30 @@ fn npc(world: &WorldState) -> Vec<&City> {
 // placeNpcCities (through generateWorld)
 
 #[test]
-fn places_towns_and_villages_by_the_map_area_run_by_the_game() {
+fn places_towns_in_the_frontier_and_villages_by_region_run_by_the_game() {
     let (terrain, world) = generated();
-    assert_eq!(npc_city_count(NPC_TOWNS, 5760), NPC_TOWNS as usize);
-    assert_eq!(npc_city_count(NPC_VILLAGES, 5760), NPC_VILLAGES as usize);
-    let towns = npc_city_count(NPC_TOWNS, 2880);
-    let villages = npc_city_count(NPC_VILLAGES, 2880);
-    assert!(towns > 0);
+    let most = FRONTIER_REGION_COUNT * (NPC_TOWNS_PER_FRONTIER + NPC_VILLAGES_PER_FRONTIER)
+        + HEARTLAND_COUNT * NPC_VILLAGES_PER_HEARTLAND;
     let npc = npc(world);
-    assert_eq!(npc.len(), towns + villages);
+    assert!(!npc.is_empty() && npc.len() <= most as usize, "{}", npc.len());
     let sizes: Vec<usize> = npc
         .iter()
         .map(|c| world.residents.iter().filter(|r| r.city_id.as_deref() == Some(&c.id)).count())
         .collect();
+    // Towns first, then villages; every town in a frontier region.
+    let towns = sizes.iter().filter(|&&n| n == NPC_TOWN.residents as usize).count();
+    assert!(towns > 0);
     let want: Vec<usize> = std::iter::repeat_n(NPC_TOWN.residents as usize, towns)
-        .chain(std::iter::repeat_n(NPC_VILLAGE.residents as usize, villages))
+        .chain(std::iter::repeat_n(NPC_VILLAGE.residents as usize, npc.len() - towns))
         .collect();
     assert_eq!(sizes, want);
+    let regions = Regions::of(world.seed, terrain);
+    for c in &npc[..towns] {
+        let (x, y) = hall_of(world, c);
+        assert_eq!(regions.region_at(x, y).map(|r| r.kind), Some(RegionKind::Frontier));
+    }
+    let land = crate::land_sites::LandSites::new(regions, Vec::new());
+    assert_eq!(crate::land_sites::check_on_the_land(world, terrain, &land), []);
     assert!(world.cities.iter().all(|c| c.realm_id.is_none()));
     assert!(world.residents.iter().all(|r| r.owner.is_none()));
     assert!(world.realms.is_empty());

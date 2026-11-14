@@ -17,16 +17,17 @@ use csp_shared::balance::{MAP_SIZE, NPC_VILLAGE};
 use csp_shared::terrain::{tile_index, Terrain, TerrainMap};
 use csp_shared::world::{ResourceKind, ResourceNode, WorldState};
 use csp_sim::caravans::place_caravans;
-use csp_sim::npc_cities::place_npc_cities;
+use csp_sim::land_sites::{
+    place_npc_cities_on, place_trade_org_hq_on, place_trading_posts_on, LandSites,
+};
 use csp_sim::sight::InvariantViolation;
 use csp_sim::terrain_gen::{generate_terrain, generate_terrain_timed};
 use csp_sim::tick::{
     run_tick, Scratch, ScriptErrorWhere, TickHealth, TickOptions, TickPhase, TickReporter,
     TICK_PHASES,
 };
-use csp_sim::trade_org::{found_trade_org_hq, place_trade_org_hq};
+use csp_sim::trade_org::found_trade_org_hq;
 use csp_sim::traders::place_traders;
-use csp_sim::trading_posts::place_trading_posts;
 use csp_sim::walking::Walking;
 use csp_sim::world::{create_world, generate_world};
 
@@ -155,9 +156,12 @@ pub fn bench_world(size: i32, seed: i64, out: &mut Out<'_>) -> WorldBench {
     };
     let mut world = create_world(&terrain, 0);
     time("nodes", &mut || world = create_world(&terrain, seed));
-    time("HQ", &mut || drop(place_trade_org_hq(&mut world, &terrain)));
-    time("NPC cities", &mut || drop(place_npc_cities(&mut world, &terrain)));
-    time("trading posts", &mut || drop(place_trading_posts(&mut world, &terrain)));
+    let mut land = None;
+    time("land", &mut || land = Some(LandSites::of(&world, &terrain)));
+    let land = land.expect("the land");
+    time("HQ", &mut || drop(place_trade_org_hq_on(&mut world, &terrain, &land)));
+    time("trading posts", &mut || drop(place_trading_posts_on(&mut world, &terrain, &land)));
+    time("NPC cities", &mut || drop(place_npc_cities_on(&mut world, &terrain, &land)));
     time("caravans", &mut || {
         place_caravans(&mut world);
         place_traders(&mut world, terrain.size);

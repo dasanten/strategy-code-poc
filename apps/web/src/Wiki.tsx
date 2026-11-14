@@ -158,6 +158,12 @@ import {
   NPC_FOUND_VILLAGE_RESIDENTS,
   NPC_FULL_DAYS,
   NPC_FULL_DAYS_LEAST,
+  NPC_STARTING_SITE_CLEARANCE,
+  NPC_TOWNS_PER_FRONTIER,
+  NPC_VILLAGES_PER_FRONTIER,
+  NPC_VILLAGES_PER_HEARTLAND,
+  NPC_WAY_CLEARANCE,
+  TRADING_POST_REGION,
   NPC_FULL_DIP_DAYS,
   NPC_FULL_RESIDENTS_PER_DAY,
   NPC_GATE_WATCH_RANGE,
@@ -2458,6 +2464,16 @@ export function Wiki() {
         </table>
         <h3>NPC cities</h3>
         <p>
+          When the world is made, NPC cities are placed region by region, wherever there is room:
+          in each frontier region {num(NPC_TOWNS_PER_FRONTIER)} town(s) and{' '}
+          {num(NPC_VILLAGES_PER_FRONTIER)} village(s), in each heartland{' '}
+          {num(NPC_VILLAGES_PER_HEARTLAND)} village(s). They stand on the mainland only: none on an
+          island, none within {num(NPC_STARTING_SITE_CLEARANCE)} tiles of a starting site, and none
+          within {num(NPC_WAY_CLEARANCE)} tiles of a pass or land bridge, with its farms. A full
+          city's new village stays on land its people can walk to, never across the sea, and as
+          far from the starting sites.
+        </p>
+        <p>
           An NPC city thinks over what its people do once a game hour ({realTimeOf(NPC_PLAN_TICKS)}
           of real time) and keeps to that plan in between: a worker stays where the city put them
           until it moves them, and a builder picks up the next piece of a project as soon as one is
@@ -2636,6 +2652,14 @@ export function Wiki() {
           soldiers train there.
         </p>
         <h3>Trading posts and the HQ</h3>
+        <p>
+          Every heartland has a trading post near its middle; the frontier gets one more in each
+          stretch of about {num(TRADING_POST_REGION)} tiles across that has room. The HQ stands in a
+          frontier region, as far from the starting sites as the mainland allows. None of them stands
+          on an island, a pass or a land bridge, or within {num(NPC_STARTING_SITE_CLEARANCE)} tiles
+          of a starting site, and the caravans and wandering traders drive from the HQ to every post
+          over the passes and land bridges.
+        </p>
         <p>
           The Trade Organization runs its own chain the same way. A trading post's reserve is its
           warehouse's stock floor ({num(WAREHOUSE_FLOOR.ironOre)} Iron ore,{' '}
