@@ -37,6 +37,7 @@ use csp_sim::directives::{
 };
 use csp_sim::explored::{ExploredTerrain, MapTerrain};
 use csp_sim::orders::OrderQueue;
+use csp_sim::queries::player_land::{explored_in, player_land, LAND_PATH};
 use csp_sim::sight::SightTracker;
 use csp_sim::tick::Scratch;
 use rusqlite::Connection;
@@ -724,6 +725,48 @@ async fn terrain_batch(
     Ok(octets(bytes))
 }
 
+/// The land the Player knows (`PlayerLand`, `CONTEXT.md`: Region) in the chunks the body's
+/// `chunks` lists, or in every chunk they explored part of without it. Their explored bitmap is
+/// copied under the lock and the rest worked out off it, off the game thread (ADR 0034).
+async fn land_route(
+    State(state): State<Shared>,
+    Extension(user): Extension<User>,
+    body: Bytes,
+) -> ApiResult<Response> {
+    let id = user.logged_in()?.id as u64;
+    let game = game_of(&state)?;
+    let b = JsonBody::parse(&body)?;
+    let wanted: Option<std::collections::BTreeSet<u32>> = match b.get("chunks") {
+        None | Some(Value::Null) => None,
+        Some(Value::Array(list)) => Some(
+            // Anything but a chunk's index is left out.
+            list.iter().filter_map(Value::as_u64).filter_map(|n| u32::try_from(n).ok()).collect(),
+        ),
+        Some(_) => {
+            return Err(fail(ApiErrorCode::InvalidInput, "Ask for a list of chunk indices."));
+        }
+    };
+    let seed = with_game(game.as_ref(), |g| g.world.seed).await.ok_or_else(game_gone)?;
+    let (explored, map) = (game.explored(), game.map());
+    let land = off_the_runtime(move || {
+        let (bitmap, chunks) = {
+            let e = explored.lock().unwrap_or_else(|e| e.into_inner());
+            let bitmap = e.bitmap(id).map(<[u8]>::to_vec).unwrap_or_default();
+            let mut chunks = e.explored_chunks(id);
+            if let Some(wanted) = wanted {
+                chunks.retain(|c| wanted.contains(c));
+            }
+            (bitmap, chunks)
+        };
+        let regions = map.regions(seed);
+        let size = regions.size;
+        let land = player_land(regions, &|x, y| explored_in(&bitmap, size, x, y), &chunks);
+        serde_json::to_value(land).unwrap_or_default()
+    })
+    .await?;
+    Ok(Json(land).into_response())
+}
+
 async fn scripts_list(
     State(state): State<Shared>,
     Extension(user): Extension<User>,
@@ -1259,6 +1302,7 @@ pub fn build_app(opts: AppOptions) -> Router {
         api = api
             .route("/api/terrain/{cx}/{cy}", get(terrain_chunk))
             .route(TERRAIN_BATCH_PATH, post(terrain_batch))
+            .route(LAND_PATH, post(land_route))
             .route(ADMIN_TERRAIN_OVERVIEW_PATH, get(admin_overview))
             .route("/api/admin/terrain/{cx}/{cy}", get(admin_chunk))
             .route(ADMIN_MAP_INFO_PATH, get(admin_map_info))

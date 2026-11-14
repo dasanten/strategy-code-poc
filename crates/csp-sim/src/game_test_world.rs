@@ -183,6 +183,7 @@ pub fn run_script(
         explored: &explored,
         kinds: &kinds,
         edge: None,
+        land: None,
         params: None,
     };
     let mut bound = crate::script_bindings::bind_script(ctx).expect("a script bound");

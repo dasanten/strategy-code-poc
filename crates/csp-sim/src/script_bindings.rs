@@ -48,6 +48,7 @@ use crate::queries::residents::age_in_years;
 use crate::queries::standing::organization_label;
 use crate::queue::queue_view;
 use crate::random::{hash_str, Mulberry32};
+use crate::regions::{Region, RegionKind, Regions};
 use crate::script_api::{binding, Is, ScriptBinding, ARMY_SCRIPT_API, SCRIPT_API};
 use crate::script_deps::breeding_pair;
 use crate::script_deps::last_seen_out_of_sight;
@@ -100,6 +101,9 @@ pub struct ScriptContext<'a> {
     pub kinds: &'a OrderKinds,
     /// For an NPC city: where `exploredEdge` leads instead (`scoutEdge`).
     pub edge: Option<ScoutEdge<'a>>,
+    /// The map's regions, for a tile view's `region` and `regionKind`; without them those are
+    /// `null`.
+    pub land: Option<&'a Regions>,
     /// The script's `param` lines with what is picked for each; `params` holds nothing without.
     pub params: Option<&'a [ParamWithValue]>,
 }
@@ -253,13 +257,17 @@ fn field_value<T: serde::Serialize>(t: &T, ty: ScriptType) -> Value {
 /// A resident's order as its view (`residentOrder`), through its plain data less the path of a
 /// moving order: the view has no `path`, and a walk's path can run to hundreds of tiles, each of
 /// which would become a JSON object only to be dropped (T89.6).
-fn order_value(order: Option<&ResidentOrder>, ty: ScriptType) -> Value {
+fn order_value(
+    order: Option<&ResidentOrder>,
+    ty: ScriptType,
+    land: Option<&TileLand<'_>>,
+) -> Value {
     let Some(order) = order else { return Value::Null };
     let mut order = order.clone();
     if let Some((path, _)) = crate::walking::order_path_mut(&mut order) {
         *path = None;
     }
-    field_value(&order, ty)
+    view_value_in(&serde_json::to_value(&order).unwrap_or(Json::Null), ty, land)
 }
 
 /// Numbers by name as a view of number fields, such as `goods` or `skills`: each field the
@@ -321,7 +329,13 @@ fn skill_name(s: SkillName) -> &'static str {
 /// `script`, with its `age`), built field by field from the struct rather than through the whole
 /// resident as JSON: the same value, for a fraction of the cost (#1092). Its defence and Alarm
 /// scripts show to its own side only, and `alarm` (what an alarm told it) when `alarm` is set.
-fn resident_view(world: &WorldState, r: &Resident, side: Option<&str>, alarm: bool) -> Value {
+fn resident_view(
+    world: &WorldState,
+    r: &Resident,
+    side: Option<&str>,
+    alarm: bool,
+    land: Option<&TileLand<'_>>,
+) -> Value {
     let own = r.owner.as_deref() == side;
     let struck = r.struck.as_ref().filter(|s| world.residents.iter().any(|x| x.id == s.by));
     let down_until = r.down_until.map_or(Value::Null, number);
@@ -359,7 +373,7 @@ fn resident_view(world: &WorldState, r: &Resident, side: Option<&str>, alarm: bo
             "stats" => stats_view(&r.stats),
             "skills" => numbers_view("skills", &r.skills, skill_name),
             "carried" => numbers_view("goods", &r.carried, good_name),
-            "order" => order_value(r.order.as_ref(), f.r#type),
+            "order" => order_value(r.order.as_ref(), f.r#type, land),
             "orderEnded" => field_value(&r.order_ended, f.r#type),
             "queue" => match &r.queue {
                 Some(q) => field_value(&queue_view(q), f.r#type),
@@ -422,6 +436,36 @@ fn last_struck<'r>(members: impl Iterator<Item = &'r Resident>) -> Option<&'r St
 /// 0011): an object holds exactly its view's fields, each `null` that the data doesn't hold. A
 /// value of the wrong kind for its type is `null`. Frozen, so the script can't change it.
 pub fn view_value(data: &Json, ty: ScriptType) -> Value {
+    view_value_in(data, ty, None)
+}
+
+/// What a tile view tells of the land (`CONTEXT.md`: Region): the region of a tile the Player
+/// explored, by its name and kind.
+#[derive(Clone, Copy)]
+pub struct TileLand<'a> {
+    pub regions: &'a Regions,
+    pub explored: &'a dyn Fn(i32, i32) -> bool,
+}
+
+impl TileLand<'_> {
+    /// The region of tile (x, y) if the Player explored it; none on water.
+    pub fn region_at(&self, x: i32, y: i32) -> Option<&Region> {
+        (self.explored)(x, y).then(|| self.regions.region_at(x, y)).flatten()
+    }
+}
+
+/// A region kind as a script reads it: `"heartland"`, `"frontier"` or `"island"`.
+pub fn region_kind_word(kind: RegionKind) -> &'static str {
+    match kind {
+        RegionKind::Heartland => "heartland",
+        RegionKind::Frontier => "frontier",
+        RegionKind::Island => "island",
+    }
+}
+
+/// [`view_value`], with each tile view's `region` and `regionKind` from `land`: without it they
+/// are `null`.
+fn view_value_in(data: &Json, ty: ScriptType, land: Option<&TileLand<'_>>) -> Value {
     match (data, ty) {
         (Json::Null, _) => Value::Null,
         (_, ScriptType::Any) => Value::from_json(data).freeze(),
@@ -430,15 +474,30 @@ pub fn view_value(data: &Json, ty: ScriptType) -> Value {
         (Json::Bool(b), ScriptType::Boolean) => Value::Bool(*b),
         (Json::Array(items), ScriptType::List(of)) => {
             // Each item comes out frozen already.
-            Value::frozen_list(items.iter().map(|d| view_value(d, *of)).collect())
+            Value::frozen_list(items.iter().map(|d| view_value_in(d, *of, land)).collect())
         }
         (Json::Object(record), ScriptType::View(view)) => {
             let fields = script_view(view).map_or(&[][..], |v| v.fields);
-            Value::frozen_fields(
-                fields.iter().map(|f| {
-                    (f.name, view_value(record.get(f.name).unwrap_or(&Json::Null), f.r#type))
-                }),
-            )
+            let region = match (view, land) {
+                ("tile", Some(land)) => {
+                    let at = |k: &str| record.get(k).and_then(Json::as_f64).map(|n| n.floor());
+                    match (at("x"), at("y")) {
+                        (Some(x), Some(y)) => land.region_at(x as i32, y as i32),
+                        _ => None,
+                    }
+                }
+                _ => None,
+            };
+            Value::frozen_fields(fields.iter().map(|f| {
+                let value = match (view, f.name) {
+                    ("tile", "region") => region.map_or(Value::Null, |r| Value::string(&r.name)),
+                    ("tile", "regionKind") => {
+                        region.map_or(Value::Null, |r| Value::string(region_kind_word(r.kind)))
+                    }
+                    _ => view_value_in(record.get(f.name).unwrap_or(&Json::Null), f.r#type, land),
+                };
+                (f.name, value)
+            }))
         }
         _ => Value::Null,
     }
@@ -627,6 +686,11 @@ pub fn bind_script(ctx: ScriptContext<'_>) -> Result<ScriptBindings<'_>, HostErr
 impl<'a> ScriptBindings<'a> {
     fn world(&self) -> &'a WorldState {
         self.ctx.world
+    }
+
+    /// What tile views tell of the land: nothing without the map's regions.
+    fn land(&self) -> Option<TileLand<'a>> {
+        Some(TileLand { regions: self.ctx.land?, explored: self.ctx.explored })
     }
 
     fn size(&self) -> i32 {
@@ -1822,7 +1886,7 @@ impl<'a> ScriptBindings<'a> {
         let world = self.world();
         let side = self.side.as_deref();
         let Some(army_id) = self.ctx.army_id else {
-            return resident_view(world, self.me(), side, true);
+            return resident_view(world, self.me(), side, true, self.land().as_ref());
         };
         let ty = binding(self.api, "me").expect("every API has me").returns;
         let army = world.armies.iter().find(|a| a.id == army_id).expect("checked on binding");
@@ -1844,7 +1908,7 @@ impl<'a> ScriptBindings<'a> {
         if let Some(s) = last_struck(members.iter().copied()) {
             m = merge(m, struck_view(world, s));
         }
-        view_value(&Json::Object(m), ty)
+        view_value_in(&Json::Object(m), ty, self.land().as_ref())
     }
 
     /// The global `b`, the `id`th name of the API (`globals[name]`), made when the script first
@@ -1905,7 +1969,10 @@ impl Host for ScriptBindings<'_> {
         match b.is {
             Is::Query => match self.direct_query(b.name, &args) {
                 Some(answer) => answer,
-                None => self.query(b.name, &args).map(|d| view_value(&d, b.returns)),
+                None => {
+                    let land = self.land();
+                    self.query(b.name, &args).map(|d| view_value_in(&d, b.returns, land.as_ref()))
+                }
             },
             Is::Action => self.action(b.name, &args),
             Is::Value => Err(host_error(format!("{} is a value", b.name))),

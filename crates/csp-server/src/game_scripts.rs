@@ -5,7 +5,7 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use csp_shared::world::{Task, WorldState};
-use csp_sim::explored::ExploredTerrain;
+use csp_sim::explored::{ExploredTerrain, MapTerrain};
 use csp_sim::order_sender::{Account, OrderSender};
 use csp_sim::orders::{order_kinds, OrderKinds};
 use csp_sim::queues::QueueHost;
@@ -29,6 +29,8 @@ pub struct LibraryHost {
     db: Arc<Mutex<Connection>>,
     defaults: &'static Defaults,
     explored: Arc<Mutex<ExploredTerrain>>,
+    /// The map's terrain, whose regions tile views name.
+    map: Arc<MapTerrain>,
     errors: Option<ScriptErrors>,
 }
 
@@ -39,7 +41,8 @@ impl LibraryHost {
         explored: Arc<Mutex<ExploredTerrain>>,
         errors: Option<ScriptErrors>,
     ) -> Self {
-        LibraryHost { db, defaults, explored, errors }
+        let map = Arc::clone(explored.lock().unwrap_or_else(|e| e.into_inner()).map());
+        LibraryHost { db, defaults, explored, map, errors }
     }
 
     fn db(&self) -> MutexGuard<'_, Connection> {
@@ -89,6 +92,9 @@ impl ScriptHost for LibraryHost {
     }
     fn explored(&self, user_id: u64, x: i32, y: i32) -> bool {
         self.explored.lock().unwrap_or_else(|e| e.into_inner()).is_explored(user_id, x, y)
+    }
+    fn regions(&self, seed: i64) -> Option<&csp_sim::regions::Regions> {
+        Some(self.map.regions(seed))
     }
     fn default_script(&self, user_id: u64, task: Task) -> Option<u64> {
         Some(self.default_id(user_id, task)).filter(|&id| id != 0)

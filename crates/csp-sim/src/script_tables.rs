@@ -751,6 +751,18 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 description: "From north to south.",
                 null_when: None,
             },
+            ScriptField {
+                name: "region",
+                r#type: ScriptType::String,
+                description: "The name of the region it lies in.",
+                null_when: Some("on water, or on a tile the Player hasn’t explored"),
+            },
+            ScriptField {
+                name: "regionKind",
+                r#type: ScriptType::String,
+                description: "What its region is: \"heartland\", \"frontier\" or \"island\".",
+                null_when: Some("on water, or on a tile the Player hasn’t explored"),
+            },
         ],
     },
     ScriptView {

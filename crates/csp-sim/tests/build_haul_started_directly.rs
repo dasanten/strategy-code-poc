@@ -215,7 +215,7 @@ mod build {
         // (`CONTEXT.md`: Spreading over the footprint).
         let memory = Value::Object(s.r("w1").script.as_ref().unwrap().memory.clone());
         assert_eq!(memory["building"], "house");
-        assert_eq!(memory["at"], json!({ "x": 7, "y": 7 }));
+        assert_eq!(memory["at"], json!({ "x": 7, "y": 7, "region": null, "regionKind": null }));
         assert_eq!(memory["siteId"], "hs");
         // Nothing to build on w2's tile: the script ends, and the realm log says why.
         assert!(s.r("w2").script.is_none());

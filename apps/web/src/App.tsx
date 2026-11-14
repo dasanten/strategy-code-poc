@@ -244,6 +244,8 @@ import { CustomiseContext } from './Customise.js'
 import { paramOnTile, paramPickAt, paramValueLabel, type ParamWorld } from './script-params-view.js'
 import { faresKnown, loadKnown } from './seen.js'
 import { useWorld } from './useWorld.js'
+import { useLand } from './useLand.js'
+import { landMarks, regionAt } from './map/land.js'
 
 /**
  * The form shown before a script with params starts (`CONTEXT.md`: Script parameter, Before it
@@ -347,6 +349,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     watchScript,
     setFirstDay,
   } = useWorld(onLoggedOut)
+  // The land the Player knows: regions, passes and land bridges (`CONTEXT.md`: Region).
+  const land = useLand(world?.map, world?.grownChunks)
+  const landShown = useMemo(
+    () => (land ? { labels: land.labels, marks: landMarks(land) } : undefined),
+    [land],
+  )
   // The residents picked on the map or in the list: one shows their card, several a group card.
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   // The first-day lines reported and not turned down, so each goes out once (`reportFirstDay`).
@@ -1709,6 +1717,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             onTerrainLoaded={onTerrainLoaded}
             newRealm={isNewRealm(world.events, world.tick)}
             focus={focus}
+            land={landShown}
           />
         ) : (
           <p className="game-waiting">Waiting for the server…</p>
@@ -2110,6 +2119,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 node: nodeAt?.(selectedTile.x, selectedTile.y),
                 nodeAt,
                 terrain: terrainAt?.(selectedTile.x, selectedTile.y),
+                region: regionAt(land, world.map.size, selectedTile.x, selectedTile.y),
                 strangers: world.residents.filter((r) => !own.some((o) => o.id === r.id)),
                 residents: world.residents,
                 // A building remembered out of sight is named after its city as last seen.

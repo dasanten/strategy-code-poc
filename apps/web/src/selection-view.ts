@@ -120,6 +120,7 @@ import { aboutTime, workLeft } from './shared/estimates.js'
 import type { Relationship } from './theme.js'
 import { cityRelationship, rankedAs, type Viewer } from './map/tokens.js'
 import { BUILDING_NAMES, NODE_NAMES, TERRAIN_NAMES } from './map/palette.js'
+import { regionLine, type TileRegion } from './map/land.js'
 import { faresKnown, horseFaresKnown } from './seen.js'
 import { FEED_HORSE_HINT, horseDownLine, horseNeed } from './horses-view.js'
 import { lastSeenText, type LastSeenBuilding } from './last-seen.js'
@@ -1115,6 +1116,8 @@ export interface TileThings {
   nodeAt?: (x: number, y: number) => KnownNode | undefined
   /** The tile's explored terrain (`Terrain`), undefined while unknown. */
   terrain?: number
+  /** The region the tile lies in, where the Player explored it (`CONTEXT.md`: Region). */
+  region?: TileRegion
   /** Residents in sight on the tile that are not the Player's to command. */
   strangers: SeenResident[]
   /** Everyone in sight, for who works where and who lives in a city. */
@@ -1903,6 +1906,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   // A wandering trader standing at a stop buys and sells on its tile (`CONTEXT.md`: Trader stop).
   const visitor = t.traders?.find((v) => v.standing?.x === t.x && v.standing.y === t.y)
   if (visitor) lines.push('A wandering trader buys and sells here')
+  if (t.region) lines.push(regionLine(t.region))
   lines.push(`Tile ${t.x}, ${t.y}`)
   // Anyone on a Down resident's tile can take what they carry (`CONTEXT.md`: Down).
   const onTile = here(t.residents ?? [])
