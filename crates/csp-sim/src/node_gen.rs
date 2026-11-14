@@ -4,11 +4,14 @@
 //! The TypeScript asks every kind of every tile with a closure; here a table from each terrain to
 //! the kinds that may lie on it is built once, so most tiles (plains, water) cost one lookup.
 
-use csp_shared::balance::{TerrainTable, NODE_DENSITY, NODE_MIN_SPACING};
+use csp_shared::balance::{
+    TerrainTable, FRONTIER_NODE_DENSITY, ISLAND_NODE_DENSITY, NODE_DENSITY, NODE_MIN_SPACING,
+};
 use csp_shared::terrain::{tile_index, TerrainMap};
 use csp_shared::world::{ResourceKind, ResourceNode};
 
 use crate::random::hash;
+use crate::regions::{RegionKind, Regions};
 
 /// The kinds in the order of `Object.keys(NODE_DENSITY)`, with their densities.
 fn kinds() -> [(ResourceKind, TerrainTable); 4] {
@@ -29,6 +32,37 @@ type Candidate = (ResourceKind, f64, f64);
 /// it), and no two nodes closer than `NODE_MIN_SPACING`, measured across the map's joins too.
 /// The same terrain and seed always give the same nodes, `n1`, `n2`, … row by row.
 pub fn place_resource_nodes(terrain: &TerrainMap, seed: i64) -> Vec<ResourceNode> {
+    place_nodes_scaled(terrain, seed, |_| 1.0)
+}
+
+/// Places the resource nodes by region (`CONTEXT.md`: Heartland, Frontier, Island): as
+/// [`place_resource_nodes`], each tile's chances times its region's density (`NODE_DENSITY` in a
+/// heartland, `FRONTIER_NODE_DENSITY` and `ISLAND_NODE_DENSITY` times it elsewhere).
+pub fn place_resource_nodes_by_region(
+    terrain: &TerrainMap,
+    seed: i64,
+    regions: &Regions,
+) -> Vec<ResourceNode> {
+    let scale: Vec<f64> = regions
+        .regions
+        .iter()
+        .map(|r| match r.kind {
+            RegionKind::Heartland => 1.0,
+            RegionKind::Frontier => FRONTIER_NODE_DENSITY,
+            RegionKind::Island => ISLAND_NODE_DENSITY,
+        })
+        .collect();
+    place_nodes_scaled(terrain, seed, |t| {
+        regions.id_of_tile(t).map_or(1.0, |id| scale[id as usize])
+    })
+}
+
+/// [`place_resource_nodes`] with each tile's chances times `scale` of its index.
+fn place_nodes_scaled(
+    terrain: &TerrainMap,
+    seed: i64,
+    scale: impl Fn(usize) -> f64,
+) -> Vec<ResourceNode> {
     let size = terrain.size;
     let su = size as usize;
     let seed = seed as f64;
@@ -49,9 +83,13 @@ pub fn place_resource_nodes(terrain: &TerrainMap, seed: i64) -> Vec<ResourceNode
                 continue;
             }
             let candidates = &by_terrain[usize::from(terrain.tiles[t])];
+            if candidates.is_empty() {
+                continue;
+            }
             let (xf, yf) = (f64::from(x), f64::from(y));
+            let k = scale(t);
             let Some(&(kind, _, _)) =
-                candidates.iter().find(|&&(_, s, density)| hash(xf, yf, s) < density)
+                candidates.iter().find(|&&(_, s, density)| hash(xf, yf, s) < density * k)
             else {
                 continue;
             };

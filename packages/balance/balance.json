@@ -46,6 +46,17 @@
     }
   },
   "NODE_MIN_SPACING": 16.0,
+  "FRONTIER_NODE_DENSITY": 1.5,
+  "ISLAND_NODE_DENSITY": 2.0,
+  "STARTING_SITES_PER_HEARTLAND": 10.0,
+  "STARTING_SITE_WALK": {
+    "minMinutes": 20.0,
+    "maxMinutes": 40.0,
+    "minTiles": 170.0,
+    "maxTiles": 300.0
+  },
+  "STARTING_SITE_WAY_DISTANCE": 120.0,
+  "STARTING_SITE_NODE_REACH": 160.0,
   "TERRAIN_SPEED": {
     "0": 1.0,
     "1": 0.7,

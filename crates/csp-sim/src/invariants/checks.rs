@@ -158,7 +158,7 @@ pub fn realms_have_leaders(world: &WorldState, _: &TerrainMap) -> Out {
 }
 
 /// The terrains each kind of node lies on (`NODE_TERRAINS`).
-fn node_terrains(kind: ResourceKind) -> &'static [Terrain] {
+pub(crate) fn node_terrains(kind: ResourceKind) -> &'static [Terrain] {
     match kind {
         ResourceKind::Forest => &[Terrain::Forest],
         ResourceKind::Stone => &[Terrain::Hills],

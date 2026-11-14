@@ -9,7 +9,9 @@ use std::collections::{HashMap, HashSet};
 use ts_rs::TS;
 
 use csp_shared::terrain::wrap;
-use csp_shared::world::{BuildingKind, Caravan, City, RunningScript, Stock, Trader, WorldState};
+use csp_shared::world::{
+    BuildingKind, Caravan, City, RunningScript, StartingSite, Stock, Trader, WorldState,
+};
 use serde::Serialize;
 use serde_json::{json, Map, Value};
 
@@ -416,12 +418,14 @@ pub fn admin_territory(world: &WorldState, territory: &Territory, size: i32) -> 
 }
 
 /// The land as the admin map shows it (`AdminLand`, `CONTEXT.md`: Region): every region and every
-/// pass and land bridge, and the regions as a Region map overlay, coloured by kind (each region
-/// a holder in the "alliance" of its kind).
+/// pass and land bridge, the starting sites (`CONTEXT.md`: Starting site), and the regions as a
+/// Region map overlay, coloured by kind (each region a holder in the "alliance" of its kind).
 #[derive(Debug, Clone, PartialEq, Serialize, TS)]
 pub struct AdminLand {
     pub regions: Vec<Region>,
     pub ways: Vec<Way>,
+    /// Every heartland's starting sites, free or taken.
+    pub sites: Vec<StartingSite>,
     pub overlay: RegionMap,
 }
 
@@ -434,8 +438,8 @@ pub fn region_kind_name(kind: RegionKind) -> &'static str {
     }
 }
 
-/// The land for the admin map (`adminLand`).
-pub fn admin_land(regions: &Regions) -> AdminLand {
+/// The land for the admin map (`adminLand`), with the world's starting sites.
+pub fn admin_land(regions: &Regions, sites: &[StartingSite]) -> AdminLand {
     let size = regions.size;
     let holders = regions
         .regions
@@ -470,6 +474,7 @@ pub fn admin_land(regions: &Regions) -> AdminLand {
     AdminLand {
         regions: regions.regions.clone(),
         ways: regions.ways.clone(),
+        sites: sites.to_vec(),
         overlay: RegionMap { tick: 0, whole: true, holders, chunks, gone: Vec::new() },
     }
 }

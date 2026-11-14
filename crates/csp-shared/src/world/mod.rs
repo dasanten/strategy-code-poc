@@ -1234,6 +1234,25 @@ pub struct WorldState {
     pub waypoints: BTreeMap<u64, Vec<Waypoint>>,
     pub city_plans: IndexMap<String, CityPlan>,
     pub workplace_settings: IndexMap<String, IndexMap<String, WorkplaceSettings>>,
+    /// The heartlands' starting sites (`CONTEXT.md`: Starting site), placed when the world is
+    /// generated, free or taken. Left out of a save while there are none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub starting_sites: Vec<StartingSite>,
+}
+
+/// A place in a heartland where a starting city can stand (`CONTEXT.md`: Starting site): the
+/// north-west tile of the city's walled square, as `found_starting_city` lays it out there.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct StartingSite {
+    pub x: i32,
+    pub y: i32,
+    /// The heartland it lies in (its region's id).
+    pub region: u32,
+    /// The city standing on it once a Player has been given it; free while there is none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub city_id: Option<String>,
 }
 
 /// What a game-run city's plan has one of its residents do (`CityJob.kind`).

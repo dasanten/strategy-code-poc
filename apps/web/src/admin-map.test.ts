@@ -1,3 +1,4 @@
+import { START_CITY_SIZE } from '@csp/balance'
 import { describe, expect, it } from 'vitest'
 import { ADMIN_VIEW_MAX_SIDE } from './shared/admin-map.js'
 import { OVERVIEW_SCALE, Terrain, chunksAcross } from './shared/terrain.js'
@@ -8,6 +9,8 @@ import {
   ADMIN_VIEWER,
   LAND_BRIDGE_MARK_COLOR,
   PASS_MARK_COLOR,
+  FREE_SITE_MARK_COLOR,
+  TAKEN_SITE_MARK_COLOR,
   adminLandLayer,
   adminMapWorld,
   adminViewRequest,
@@ -242,6 +245,10 @@ describe('admin map land layer', () => {
       { kind: 'pass', between: [0, 1], x: 1, y: 0, width: 8 },
       { kind: 'landBridge', between: [0, 1], x: 2, y: 0, width: 8 },
     ],
+    sites: [
+      { x: 10, y: 20, region: 0 },
+      { x: 40, y: 20, region: 0, cityId: 'city-1' },
+    ],
     overlay: {
       tick: 0,
       whole: true,
@@ -262,7 +269,8 @@ describe('admin map land layer', () => {
     },
   }
 
-  it('shows the regions in place of territory and marks each pass and land bridge', () => {
+  it('shows the regions in place of territory and marks each pass, land bridge and starting site', () => {
+    const half = Math.floor(START_CITY_SIZE / 2)
     const layer = adminLandLayer(land, size)
     expect(layer.region.owners.get(0)).toBe('region:0')
     expect(layer.region.owners.get(1)).toBe('region:0')
@@ -271,6 +279,8 @@ describe('admin map land layer', () => {
     expect(layer.marks).toEqual([
       { x: 1, y: 0, color: PASS_MARK_COLOR },
       { x: 2, y: 0, color: LAND_BRIDGE_MARK_COLOR },
+      { x: 10 + half, y: 20 + half, color: FREE_SITE_MARK_COLOR },
+      { x: 40 + half, y: 20 + half, color: TAKEN_SITE_MARK_COLOR },
     ])
   })
 })

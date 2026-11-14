@@ -97,15 +97,18 @@ pub fn create_world(terrain: &TerrainMap, seed: i64) -> WorldState {
         waypoints: Default::default(),
         city_plans: Default::default(),
         workplace_settings: Default::default(),
+        starting_sites: Vec::new(),
     }
 }
 
 /// A world as the world generator makes it for a new game (`generateWorld`): `create_world`,
-/// with the Trade Org HQ (`place_trade_org_hq`), its NPC cities (`place_npc_cities`) and then its
+/// its nodes placed by region and the heartlands' starting sites (`place_starting_sites`), with
+/// the Trade Org HQ (`place_trade_org_hq`), its NPC cities (`place_npc_cities`) and then its
 /// trading posts placed (`place_trading_posts`), with a caravan for each (`place_caravans`) and
 /// wandering traders going round them (`place_traders`).
 pub fn generate_world(terrain: &TerrainMap, seed: i64) -> WorldState {
     let mut world = create_world(terrain, seed);
+    crate::starting_sites::place_starting_sites(&mut world, terrain);
     place_trade_org_hq(&mut world, terrain);
     place_npc_cities(&mut world, terrain);
     place_trading_posts(&mut world, terrain);

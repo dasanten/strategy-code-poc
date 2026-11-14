@@ -166,7 +166,7 @@ pub(crate) fn spots_outside(
 
 /// Where a city may stand (`siteFits`): its square and the rings around it on open land, with no
 /// nodes, and room outside the wall for the farm and the stable.
-fn site_fits(terrain: &TerrainMap, ground: &Ground, x: i32, y: i32) -> bool {
+pub(crate) fn site_fits(terrain: &TerrainMap, ground: &Ground, x: i32, y: i32) -> bool {
     for ty in (y - FARM_RING)..(y + START_SIZE + FARM_RING) {
         for tx in (x - FARM_RING)..(x + START_SIZE + FARM_RING) {
             let t = terrain_at(terrain, tx, ty);

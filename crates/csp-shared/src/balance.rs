@@ -207,6 +207,46 @@ pub const NODE_DENSITY: NodeDensity = NodeDensity {
 /// No two resource nodes lie closer than this many tiles (in either direction).
 pub const NODE_MIN_SPACING: f64 = 16.0;
 
+/// How many times `NODE_DENSITY` a frontier region holds (`CONTEXT.md`: Frontier): more nodes than
+/// a heartland, worth going out for.
+pub const FRONTIER_NODE_DENSITY: f64 = 1.5;
+
+/// How many times `NODE_DENSITY` an island holds (`CONTEXT.md`: Island): the densest land.
+pub const ISLAND_NODE_DENSITY: f64 = 2.0;
+
+/// Starting sites in each heartland (`CONTEXT.md`: Starting site): room for this many Players'
+/// starting cities before the next heartland opens.
+pub const STARTING_SITES_PER_HEARTLAND: f64 = 10.0;
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartingSiteWalk {
+    /// Real minutes an unloaded walk from a starting site to the nearest other one takes, at least.
+    pub min_minutes: f64,
+    /// And at most.
+    pub max_minutes: f64,
+    /// How far a site is placed from the nearest other one, in tiles, straight, at least: a little
+    /// over the shortest walk on Plains (a Plains tile takes `WALK_TICKS_PER_TILE` seconds).
+    pub min_tiles: f64,
+    /// And at most, so the walk over Forest and round lakes still fits.
+    pub max_tiles: f64,
+}
+
+/// How far a starting site lies from the nearest other one (`CONTEXT.md`: Starting site): a walk
+/// of 20 to 40 real minutes, placed 170 to 300 tiles apart straight. A smaller map scales the tiles and
+/// the minutes with its side.
+pub const STARTING_SITE_WALK: StartingSiteWalk =
+    StartingSiteWalk { min_minutes: 20.0, max_minutes: 40.0, min_tiles: 170.0, max_tiles: 300.0 };
+
+/// How far a starting site's middle lies from every pass and land bridge of its heartland, at
+/// least, in tiles (about 20 minutes' walk): the way in is nobody's doorstep.
+pub const STARTING_SITE_WAY_DISTANCE: f64 = 120.0;
+
+/// How far from a starting site's middle its forest, stone and iron node lie, at most, in tiles
+/// (about 15 minutes' walk; Hills and Forest lie a median 80 to 100 tiles from a heartland's
+/// Plains). Where the land holds none that near, one is placed. The same on a map of any size.
+pub const STARTING_SITE_NODE_REACH: f64 = 160.0;
+
 /// How fast an unloaded resident crosses each terrain, relative to Plains (`CONTEXT.md`:
 /// Terrain). Agility softens the penalty (`walkSpeed`).
 pub const TERRAIN_SPEED: TerrainTable = TerrainTable(&[
@@ -2359,6 +2399,12 @@ pub fn balance_json() -> Value {
     m.insert("ISLAND_RELIEF".into(), json!(ISLAND_RELIEF));
     m.insert("NODE_DENSITY".into(), to_value(NODE_DENSITY).expect("serialisable"));
     m.insert("NODE_MIN_SPACING".into(), json!(NODE_MIN_SPACING));
+    m.insert("FRONTIER_NODE_DENSITY".into(), json!(FRONTIER_NODE_DENSITY));
+    m.insert("ISLAND_NODE_DENSITY".into(), json!(ISLAND_NODE_DENSITY));
+    m.insert("STARTING_SITES_PER_HEARTLAND".into(), json!(STARTING_SITES_PER_HEARTLAND));
+    m.insert("STARTING_SITE_WALK".into(), to_value(STARTING_SITE_WALK).expect("serialisable"));
+    m.insert("STARTING_SITE_WAY_DISTANCE".into(), json!(STARTING_SITE_WAY_DISTANCE));
+    m.insert("STARTING_SITE_NODE_REACH".into(), json!(STARTING_SITE_NODE_REACH));
     m.insert("TERRAIN_SPEED".into(), to_value(TERRAIN_SPEED).expect("serialisable"));
     m.insert("STAT_BASE_MIN".into(), json!(STAT_BASE_MIN));
     m.insert("STAT_BASE_MAX".into(), json!(STAT_BASE_MAX));

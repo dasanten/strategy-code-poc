@@ -67,6 +67,18 @@ export interface Balance {
     }
   }
   readonly NODE_MIN_SPACING: number
+  readonly FRONTIER_NODE_DENSITY: number
+  readonly ISLAND_NODE_DENSITY: number
+  readonly STARTING_SITES_PER_HEARTLAND: number
+  readonly STARTING_SITE_WALK: {
+    minMinutes: number
+    maxMinutes: number
+    minTiles: number
+    maxTiles: number
+    [key: string]: number
+  }
+  readonly STARTING_SITE_WAY_DISTANCE: number
+  readonly STARTING_SITE_NODE_REACH: number
   readonly TERRAIN_SPEED: {
     '0': number
     '1': number

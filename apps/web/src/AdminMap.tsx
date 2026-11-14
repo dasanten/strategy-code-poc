@@ -13,8 +13,10 @@ import {
   ADMIN_MAP_REFRESH_MS,
   ADMIN_MAP_SETTLE_MS,
   ADMIN_TERRITORY_REFRESH_MS,
+  FREE_SITE_MARK_COLOR,
   LAND_BRIDGE_MARK_COLOR,
   PASS_MARK_COLOR,
+  TAKEN_SITE_MARK_COLOR,
   adminLandLayer,
   adminMapWorld,
   adminViewRequest,
@@ -39,7 +41,8 @@ const hex = (c: number) => `#${c.toString(16).padStart(6, '0')}`
 
 /**
  * What the land layer's colours and marks stand for: each kind of region with how many there
- * are (coloured as the overlay colours them, by the kind's name), and the passes and land bridges.
+ * are (coloured as the overlay colours them, by the kind's name), the passes and land bridges,
+ * and the starting sites, free and taken.
  */
 function AdminLandLegend({ land }: { land: AdminLand }) {
   const kinds = (Object.keys(KIND_NAMES) as RegionKind[]).map((kind) => ({
@@ -47,6 +50,7 @@ function AdminLandLegend({ land }: { land: AdminLand }) {
     count: land.regions.filter((r) => r.kind === kind && r.tiles > 0).length,
   }))
   const ways = (kind: 'pass' | 'landBridge') => land.ways.filter((w) => w.kind === kind).length
+  const free = land.sites.filter((s) => s.cityId === undefined).length
   return (
     <ul className="admin-land-legend">
       {kinds.map(({ kind, count }) => (
@@ -66,6 +70,14 @@ function AdminLandLegend({ land }: { land: AdminLand }) {
       <li>
         <span className="swatch mark" style={{ background: hex(LAND_BRIDGE_MARK_COLOR) }} />
         {ways('landBridge')} land bridges
+      </li>
+      <li>
+        <span className="swatch mark" style={{ background: hex(FREE_SITE_MARK_COLOR) }} />
+        {free} free starting sites
+      </li>
+      <li>
+        <span className="swatch mark" style={{ background: hex(TAKEN_SITE_MARK_COLOR) }} />
+        {land.sites.length - free} taken starting sites
       </li>
     </ul>
   )
