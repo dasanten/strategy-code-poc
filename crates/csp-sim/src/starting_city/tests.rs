@@ -4,7 +4,8 @@
 
 use csp_shared::balance::{
     ADULT_AGE, HOUSING_ROOM, MAX_HEALTH, MAX_HUNGER, START_CARRIED_FOOD, START_CITY_SIZE,
-    START_FOOD, START_HORSES, START_RESIDENTS, START_STABLE_FOOD, STAT_BASE_MAX, STAT_BASE_MIN,
+    START_COINS, START_FOOD, START_HORSES, START_RESIDENTS, START_STABLE_FOOD, STAT_BASE_MAX,
+    STAT_BASE_MIN,
 };
 use csp_shared::terrain::{terrain_at, Terrain};
 use csp_shared::world::{BuildingKind, Good, ResidentOrder, WorldState};
@@ -31,15 +32,27 @@ fn founded_for(players: u64) -> WorldState {
     world
 }
 
+/// The world as the TypeScript founded it: its starting cities held no Coins (T101.2 gave them
+/// `START_COINS`, which `gives_a_player_a_realm_with_everything_a_starting_city_has` checks), so
+/// they are taken out of the storages to compare the rest with the frozen fixtures.
+fn without_start_coins(mut world: WorldState) -> WorldState {
+    for b in world.buildings.iter_mut().filter(|b| b.kind == BuildingKind::Storage) {
+        if let Some(stock) = b.stock.as_mut() {
+            assert_eq!(stock.shift_remove(&Good::Coins), Some(START_COINS));
+        }
+    }
+    world
+}
+
 #[test]
 fn founds_the_typescripts_starting_city() {
-    assert_eq!(founded_for(1), fixture("city"));
+    assert_eq!(without_start_coins(founded_for(1)), fixture("city"));
 }
 
 #[test]
 fn founds_the_typescripts_starting_cities_for_two_and_three_players() {
-    assert_eq!(founded_for(2), fixture("two-realms"));
-    assert_eq!(founded_for(3), fixture("three-realms"));
+    assert_eq!(without_start_coins(founded_for(2)), fixture("two-realms"));
+    assert_eq!(without_start_coins(founded_for(3)), fixture("three-realms"));
 }
 
 #[test]
@@ -91,7 +104,8 @@ fn gives_a_player_a_realm_with_everything_a_starting_city_has() {
     assert_eq!(count(BuildingKind::Storage), 1);
     assert_eq!(count(BuildingKind::Farm), 1);
     let storage = world.buildings.iter().find(|b| b.kind == BuildingKind::Storage).unwrap();
-    assert_eq!(storage.stock, Some([(Good::Food, START_FOOD)].into_iter().collect()));
+    let start = [(Good::Food, START_FOOD), (Good::Coins, START_COINS)];
+    assert_eq!(storage.stock, Some(start.into_iter().collect()));
     // The farm lies just past the city's area, so working it is not being at home.
     assert!(!in_city_area(&world, &city.id, farm.x, farm.y, terrain.size));
     assert_eq!(terrain_at(terrain, farm.x as i32, farm.y as i32), Terrain::Plains as u8);

@@ -6,6 +6,7 @@
 
 use csp_shared::balance::{
     TerrainTable, FRONTIER_NODE_DENSITY, ISLAND_NODE_DENSITY, NODE_DENSITY, NODE_MIN_SPACING,
+    RARE_NODE_DENSITY,
 };
 use csp_shared::terrain::{tile_index, TerrainMap};
 use csp_shared::world::{ResourceKind, ResourceNode};
@@ -32,36 +33,140 @@ type Candidate = (ResourceKind, f64, f64);
 /// it), and no two nodes closer than `NODE_MIN_SPACING`, measured across the map's joins too.
 /// The same terrain and seed always give the same nodes, `n1`, `n2`, … row by row.
 pub fn place_resource_nodes(terrain: &TerrainMap, seed: i64) -> Vec<ResourceNode> {
-    place_nodes_scaled(terrain, seed, |_| 1.0)
+    place_nodes_scaled(terrain, seed, |_, _| 1.0)
 }
 
-/// Places the resource nodes by region (`CONTEXT.md`: Heartland, Frontier, Island): as
+/// The kinds that have no nodes in a heartland (`CONTEXT.md`: Rare goods).
+pub const RARE_KINDS: [ResourceKind; 1] = [ResourceKind::GoldOre];
+
+/// Whether a node of this kind may lie in a region of this kind (`CONTEXT.md`: Rare goods): a rare
+/// kind only in the frontier and on islands, every other kind anywhere.
+pub fn allowed_in(kind: ResourceKind, region: RegionKind) -> bool {
+    region != RegionKind::Heartland || !RARE_KINDS.contains(&kind)
+}
+
+/// How many times its region's density a kind's chances are: none where it is not
+/// [`allowed_in`], `RARE_NODE_DENSITY` for a rare kind where it is, so the frontier and islands
+/// make up for the heartlands.
+fn kind_scale(kind: ResourceKind, region: RegionKind) -> f64 {
+    if !allowed_in(kind, region) {
+        0.0
+    } else if RARE_KINDS.contains(&kind) {
+        RARE_NODE_DENSITY
+    } else {
+        1.0
+    }
+}
+
+/// Places the resource nodes by region (`CONTEXT.md`: Heartland, Frontier, Island, Rare goods): as
 /// [`place_resource_nodes`], each tile's chances times its region's density (`NODE_DENSITY` in a
-/// heartland, `FRONTIER_NODE_DENSITY` and `ISLAND_NODE_DENSITY` times it elsewhere).
+/// heartland, `FRONTIER_NODE_DENSITY` and `ISLAND_NODE_DENSITY` times it elsewhere) and its kind's
+/// share there ([`kind_scale`]: no gold in a heartland).
 pub fn place_resource_nodes_by_region(
     terrain: &TerrainMap,
     seed: i64,
     regions: &Regions,
 ) -> Vec<ResourceNode> {
-    let scale: Vec<f64> = regions
+    let scale: Vec<(RegionKind, f64)> = regions
         .regions
         .iter()
-        .map(|r| match r.kind {
-            RegionKind::Heartland => 1.0,
-            RegionKind::Frontier => FRONTIER_NODE_DENSITY,
-            RegionKind::Island => ISLAND_NODE_DENSITY,
+        .map(|r| {
+            let density = match r.kind {
+                RegionKind::Heartland => 1.0,
+                RegionKind::Frontier => FRONTIER_NODE_DENSITY,
+                RegionKind::Island => ISLAND_NODE_DENSITY,
+            };
+            (r.kind, density)
         })
         .collect();
-    place_nodes_scaled(terrain, seed, |t| {
-        regions.id_of_tile(t).map_or(1.0, |id| scale[id as usize])
-    })
+    let mut nodes = place_nodes_scaled(terrain, seed, |t, kind| {
+        regions.id_of_tile(t).map_or(1.0, |id| {
+            let (region, density) = scale[id as usize];
+            density * kind_scale(kind, region)
+        })
+    });
+    place_missing_rare_nodes(&mut nodes, terrain, regions);
+    nodes
 }
 
-/// [`place_resource_nodes`] with each tile's chances times `scale` of its index.
+/// Makes sure every frontier region has a node of each rare kind in it or in a region next to it
+/// (`CONTEXT.md`: Rare goods): one that has neither gets one, on the tile of it whose terrain holds
+/// that kind most densely, nearest its middle, as far from other nodes as `NODE_MIN_SPACING` asks.
+/// A frontier with no such terrain gets none.
+fn place_missing_rare_nodes(
+    nodes: &mut Vec<ResourceNode>,
+    terrain: &TerrainMap,
+    regions: &Regions,
+) {
+    let mut next_to = None;
+    for (kind, densities) in kinds() {
+        if !RARE_KINDS.contains(&kind) {
+            continue;
+        }
+        let frontier: Vec<u32> = regions.of_kind(RegionKind::Frontier).map(|r| r.id).collect();
+        for id in frontier {
+            let has = |nodes: &[ResourceNode], id: u32| {
+                nodes
+                    .iter()
+                    .any(|n| n.kind == kind && regions.id_at(n.x as i32, n.y as i32) == Some(id))
+            };
+            if has(nodes, id) {
+                continue;
+            }
+            let next: &Vec<_> = next_to.get_or_insert_with(|| regions.next_to());
+            if next[id as usize].iter().any(|&o| has(nodes, o)) {
+                continue;
+            }
+            if let Some((x, y)) = rare_node_tile(nodes, terrain, regions, id, densities) {
+                let id = format!("n{}", nodes.len() + 1);
+                nodes.push(ResourceNode { id, kind, x: f64::from(x), y: f64::from(y) });
+            }
+        }
+    }
+}
+
+/// Where a region's missing rare node goes ([`place_missing_rare_nodes`]): the tile of the region
+/// whose terrain gives the kind the highest density, nearest the region's middle, with no node
+/// closer than `NODE_MIN_SPACING`.
+fn rare_node_tile(
+    nodes: &[ResourceNode],
+    terrain: &TerrainMap,
+    regions: &Regions,
+    id: u32,
+    densities: TerrainTable,
+) -> Option<(i32, i32)> {
+    let size = terrain.size;
+    let middle = regions.region(id).map(|r| (r.x, r.y))?;
+    let mut best: Option<(f64, i32, (i32, i32))> = None;
+    let reach = NODE_MIN_SPACING as i32 - 1;
+    for (t, &tile) in terrain.tiles.iter().enumerate() {
+        let Some(density) = densities.get(tile) else { continue };
+        if regions.id_of_tile(t) != Some(id) {
+            continue;
+        }
+        let at = ((t as i32) % size, (t as i32) / size);
+        let d = csp_shared::terrain::wrap_distance(size, at, middle) as i32;
+        if best.is_some_and(|(bd, bdist, _)| (density, -d) <= (bd, -bdist)) {
+            continue;
+        }
+        let near = |n: &ResourceNode| {
+            let (dx, dy) = (n.x as i32 - at.0, n.y as i32 - at.1);
+            let wrapped = |v: i32| v.rem_euclid(size).min((-v).rem_euclid(size));
+            wrapped(dx) <= reach && wrapped(dy) <= reach
+        };
+        if !nodes.iter().any(near) {
+            best = Some((density, d, at));
+        }
+    }
+    best.map(|(_, _, at)| at)
+}
+
+/// [`place_resource_nodes`] with each tile's chances of each kind times `scale` of the tile's
+/// index and the kind.
 fn place_nodes_scaled(
     terrain: &TerrainMap,
     seed: i64,
-    scale: impl Fn(usize) -> f64,
+    scale: impl Fn(usize, ResourceKind) -> f64,
 ) -> Vec<ResourceNode> {
     let size = terrain.size;
     let su = size as usize;
@@ -87,9 +192,9 @@ fn place_nodes_scaled(
                 continue;
             }
             let (xf, yf) = (f64::from(x), f64::from(y));
-            let k = scale(t);
-            let Some(&(kind, _, _)) =
-                candidates.iter().find(|&&(_, s, density)| hash(xf, yf, s) < density * k)
+            let Some(&(kind, _, _)) = candidates
+                .iter()
+                .find(|&&(kind, s, density)| hash(xf, yf, s) < density * scale(t, kind))
             else {
                 continue;
             };
@@ -205,3 +310,7 @@ mod tests {
         assert!(iron_in(Terrain::Mountain) > iron_in(Terrain::Hills));
     }
 }
+
+#[cfg(test)]
+#[path = "rare_goods_tests.rs"]
+mod rare_goods_tests;

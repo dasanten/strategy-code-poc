@@ -214,6 +214,10 @@ pub const FRONTIER_NODE_DENSITY: f64 = 1.5;
 /// How many times `NODE_DENSITY` an island holds (`CONTEXT.md`: Island): the densest land.
 pub const ISLAND_NODE_DENSITY: f64 = 2.0;
 
+/// How many times its region's density a rare kind (gold ore) has in the frontier and on islands
+/// (`CONTEXT.md`: Rare goods): it has no nodes in a heartland, so the land out there holds more.
+pub const RARE_NODE_DENSITY: f64 = 2.0;
+
 /// Starting sites in each heartland (`CONTEXT.md`: Starting site): room for this many Players'
 /// starting cities before the next heartland opens.
 pub const STARTING_SITES_PER_HEARTLAND: f64 = 10.0;
@@ -344,6 +348,11 @@ pub const START_SPARE_HOUSES: f64 = 1.0;
 
 /// Food in a starting city's storage, in kg: about 25 game days for its residents.
 pub const START_FOOD: f64 = 100.0;
+
+/// Coins in a starting city's storage (`CONTEXT.md`: Starting city, Rare goods): a heartland has no
+/// gold, so a new Player starts with enough for a first trade at its trading post, such as a
+/// spear or a few days' Food.
+pub const START_COINS: f64 = 50.0;
 
 /// Food each resident of a starting city carries, in units: four game days' meals, so they have
 /// something to eat while the farm's first harvest comes in (`CONTEXT.md`: Eating).
@@ -2416,6 +2425,7 @@ pub fn balance_json() -> Value {
     m.insert("NODE_MIN_SPACING".into(), json!(NODE_MIN_SPACING));
     m.insert("FRONTIER_NODE_DENSITY".into(), json!(FRONTIER_NODE_DENSITY));
     m.insert("ISLAND_NODE_DENSITY".into(), json!(ISLAND_NODE_DENSITY));
+    m.insert("RARE_NODE_DENSITY".into(), json!(RARE_NODE_DENSITY));
     m.insert("STARTING_SITES_PER_HEARTLAND".into(), json!(STARTING_SITES_PER_HEARTLAND));
     m.insert("STARTING_SITE_WALK".into(), to_value(STARTING_SITE_WALK).expect("serialisable"));
     m.insert("STARTING_SITE_WAY_DISTANCE".into(), json!(STARTING_SITE_WAY_DISTANCE));
@@ -2441,6 +2451,7 @@ pub fn balance_json() -> Value {
     m.insert("HOUSING_ROOM".into(), to_value(HOUSING_ROOM).expect("serialisable"));
     m.insert("START_SPARE_HOUSES".into(), json!(START_SPARE_HOUSES));
     m.insert("START_FOOD".into(), json!(START_FOOD));
+    m.insert("START_COINS".into(), json!(START_COINS));
     m.insert("START_CARRIED_FOOD".into(), json!(START_CARRIED_FOOD));
     m.insert("START_HORSES".into(), json!(START_HORSES));
     m.insert("START_STABLE_FOOD".into(), json!(START_STABLE_FOOD));
