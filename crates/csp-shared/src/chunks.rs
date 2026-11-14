@@ -17,7 +17,7 @@ pub const UNEXPLORED: u8 = 254;
 pub const OVERVIEW_SCALE: i32 = 8;
 
 /// Resource node kinds by the byte that stands for them in a served chunk. Only add to the end.
-pub const NODE_KINDS: [&str; 4] = ["forest", "stone", "ironOre", "goldOre"];
+pub const NODE_KINDS: [&str; 5] = ["forest", "stone", "ironOre", "goldOre", "coal"];
 
 /// Where the client loads many chunks of explored terrain in one request: a `POST` whose JSON body
 /// is `{ chunks: number[] }`, chunk indices as in [`chunks_across`], at most [`TERRAIN_BATCH_MAX`]
@@ -125,6 +125,7 @@ pub fn node_kind_index(kind: ResourceKind) -> u8 {
         ResourceKind::Stone => 1,
         ResourceKind::IronOre => 2,
         ResourceKind::GoldOre => 3,
+        ResourceKind::Coal => 4,
     }
 }
 
@@ -134,6 +135,7 @@ fn node_kind_from_index(index: u8) -> Option<ResourceKind> {
         1 => ResourceKind::Stone,
         2 => ResourceKind::IronOre,
         3 => ResourceKind::GoldOre,
+        4 => ResourceKind::Coal,
         _ => return None,
     })
 }
@@ -210,7 +212,7 @@ mod tests {
         assert_eq!(CHUNK_SIZE, 32);
         assert_eq!(UNEXPLORED, 254);
         assert_eq!(OVERVIEW_SCALE, 8);
-        assert_eq!(NODE_KINDS, ["forest", "stone", "ironOre", "goldOre"]);
+        assert_eq!(NODE_KINDS, ["forest", "stone", "ironOre", "goldOre", "coal"]);
         assert_eq!(TERRAIN_BATCH_MAX, 64);
         assert_eq!(TERRAIN_LEVEL_MAX, 5);
     }

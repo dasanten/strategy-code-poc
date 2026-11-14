@@ -717,6 +717,7 @@ export const GOODS = [
   'sword',
   'shield',
   'armour',
+  'coal',
 ] as const
 
 /** Goods that make a resident armed (`CONTEXT.md`: Soldier, Weapons and armour). */
@@ -774,4 +775,5 @@ export const NODE_WORKPLACE: Record<ResourceKind, BuildingKind> = {
   stone: 'quarry',
   ironOre: 'mine',
   goldOre: 'mine',
+  coal: 'mine',
 }

@@ -528,6 +528,7 @@ const NODE_WORK: { kind: BuildingKind; good: Good }[] = [
   { kind: 'quarry', good: 'stone' },
   { kind: 'mine', good: 'ironOre' },
   { kind: 'mine', good: 'goldOre' },
+  { kind: 'mine', good: 'coal' },
 ]
 
 /** The Wiki (`CONTEXT.md`: Wiki): the rules in plain words, with the game's current numbers. */
@@ -1048,17 +1049,25 @@ export function Wiki() {
           safe: it is safe only in that it holds little worth taking.
         </p>
         <p>
-          Each heartland has {num(STARTING_SITES_PER_HEARTLAND)} <strong>starting sites</strong>,
-          a walk of {num(STARTING_SITE_WALK.minMinutes)} to {num(STARTING_SITE_WALK.maxMinutes)}{' '}
-          real minutes from the next one. A new Leader (your first, or one after your Leader died
-          with no heir) gets a free site in the <strong>open</strong> heartland where Players have
-          the most cities, the one opened first on a tie, and in it the free site nearest another
-          Player’s city: you start as someone’s neighbour. The world’s first Player opens the first
+          <strong>Coal</strong> lies only out there: its nodes are in Hills and, more of them,
+          Mountain of the frontier regions and the islands, never in a heartland. A mine built on a
+          coal node yields Coal, {num(WORK_OUTPUT_PER_DAY.coal ?? 0)} a game day for an average
+          worker, and teaches Mining. Coal is carried, stored, hauled and traded like any other
+          good; it weighs {num(GOOD_WEIGHT.coal ?? 0)} kg a unit, and trading posts and the HQ buy
+          and sell it. Your realm’s Coal shows in the top bar beside its Food, Wood and Stone.
+        </p>
+        <p>
+          Each heartland has {num(STARTING_SITES_PER_HEARTLAND)} <strong>starting sites</strong>, a
+          walk of {num(STARTING_SITE_WALK.minMinutes)} to {num(STARTING_SITE_WALK.maxMinutes)} real
+          minutes from the next one. A new Leader (your first, or one after your Leader died with no
+          heir) gets a free site in the <strong>open</strong> heartland where Players have the most
+          cities, the one opened first on a tie, and in it the free site nearest another Player’s
+          city: you start as someone’s neighbour. The world’s first Player opens the first
           heartland; the next one opens, the one nearest an open heartland, only once no open
           heartland has a free site left. A site is free while nothing of anyone’s stands on it or
           on the farmland round it, so one whose city is gone is free again. Should every site be
-          taken, your city goes on the free place nearest an open heartland’s middle. Your realm
-          log names the heartland your city stands in.
+          taken, your city goes on the free place nearest an open heartland’s middle. Your realm log
+          names the heartland your city stands in.
         </p>
         <p>
           The regions of the mainland are parted by Mountain ranges and by arms of the Sea, about{' '}
@@ -1073,9 +1082,9 @@ export function Wiki() {
           You know the region of every tile you have explored. A tile’s card names it: “Heartland of
           …”, “Frontier: …” or “Island: …”, with “pass” or “land bridge” on a tile of one. Zoomed
           out to the middle and far zoom, the map writes the names of the regions you have explored
-          part of over them and marks the passes (a white diamond) and land bridges (a blue one)
-          you have explored. Nothing shows for land you haven’t explored. This is not the Region
-          map, which shows territory (see Territory).
+          part of over them and marks the passes (a white diamond) and land bridges (a blue one) you
+          have explored. Nothing shows for land you haven’t explored. This is not the Region map,
+          which shows territory (see Territory).
         </p>
         <p>
           Scripts read a tile’s region in its view: <code>region</code> is its name and{' '}
@@ -1118,11 +1127,11 @@ export function Wiki() {
         <p>
           Give a grown resident <strong>Explore</strong> on their card, on foot or riding, and they
           go into the unknown on their own. Before they start, pick <code>find</code>, a kind of
-          resource node to look for (forest, stone, iron ore or gold ore), or none to just explore
-          until you stop them; <code>toward</code>, a compass direction, or a <code>waypoint</code>{' '}
-          to head for instead; with neither they take the nearest unexplored land first.{' '}
-          <code>food</code> is where they refill; with none picked, the nearest storage of your
-          realm with Food.
+          resource node to look for (forest, stone, iron ore, gold ore or coal), or none to just
+          explore until you stop them; <code>toward</code>, a compass direction, or a{' '}
+          <code>waypoint</code> to head for instead; with neither they take the nearest unexplored
+          land first. <code>food</code> is where they refill; with none picked, the nearest storage
+          of your realm with Food.
         </p>
         <p>
           They set out with as much Food as they can carry and walk to the edge of what you have
@@ -2526,14 +2535,14 @@ export function Wiki() {
         </table>
         <h3>NPC cities</h3>
         <p>
-          When the world is made, NPC cities are placed region by region, wherever there is room:
-          in each frontier region {num(NPC_TOWNS_PER_FRONTIER)} town(s) and{' '}
+          When the world is made, NPC cities are placed region by region, wherever there is room: in
+          each frontier region {num(NPC_TOWNS_PER_FRONTIER)} town(s) and{' '}
           {num(NPC_VILLAGES_PER_FRONTIER)} village(s), in each heartland{' '}
           {num(NPC_VILLAGES_PER_HEARTLAND)} village(s). They stand on the mainland only: none on an
           island, none within {num(NPC_STARTING_SITE_CLEARANCE)} tiles of a starting site, and none
           within {num(NPC_WAY_CLEARANCE)} tiles of a pass or land bridge, with its farms. A full
-          city's new village stays on land its people can walk to, never across the sea, and as
-          far from the starting sites.
+          city's new village stays on land its people can walk to, never across the sea, and as far
+          from the starting sites.
         </p>
         <p>
           An NPC city thinks over what its people do once a game hour ({realTimeOf(NPC_PLAN_TICKS)}
@@ -2717,10 +2726,10 @@ export function Wiki() {
         <p>
           Every heartland has a trading post near its middle; the frontier gets one more in each
           stretch of about {num(TRADING_POST_REGION)} tiles across that has room. The HQ stands in a
-          frontier region, as far from the starting sites as the mainland allows. None of them stands
-          on an island, a pass or a land bridge, or within {num(NPC_STARTING_SITE_CLEARANCE)} tiles
-          of a starting site, and the caravans and wandering traders drive from the HQ to every post
-          over the passes and land bridges.
+          frontier region, as far from the starting sites as the mainland allows. None of them
+          stands on an island, a pass or a land bridge, or within {num(NPC_STARTING_SITE_CLEARANCE)}{' '}
+          tiles of a starting site, and the caravans and wandering traders drive from the HQ to
+          every post over the passes and land bridges.
         </p>
         <p>
           The Trade Organization runs its own chain the same way. A trading post's reserve is its

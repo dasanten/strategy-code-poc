@@ -116,6 +116,7 @@ export const NODE_ART: Record<ResourceKind, string> = {
   stone: 'node-stone.svg',
   ironOre: 'node-iron-ore.svg',
   goldOre: 'node-gold-ore.svg',
+  coal: 'node-coal.svg',
 }
 
 /** Residents, carriages, horses, Trade Org caravans and armies; your Leader gets the crown. */

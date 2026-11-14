@@ -70,7 +70,7 @@ The shared language of the game. Domain terms only — no implementation details
 ## Resources and goods
 
 - **Good:** any physical thing that can be carried, stored, traded or stolen. Every good has
-  weight. PoC goods: Food, Wood, Stone, Iron ore, Iron, Gold ore, Coins. Goods are always
+  weight. PoC goods: Food, Wood, Stone, Iron ore, Iron, Gold ore, Coal, Coins. Goods are always
   somewhere: in a storage, carried by a resident or carriage, or in a pile.
 - **Pile:** goods lying on the ground on one tile, for anyone to take.
 - **Resource node:** a spot on the map that yields a good (forest, stone, iron ore, gold ore,
@@ -1749,7 +1749,7 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   resident, give them an order, open the Wiki. Each line is ticked when the game sees it done;
   the card goes for good once all are ticked or the Player dismisses it. Kept per Player, not per
   realm: a Player who dismissed it never sees it again, also after a Leader death.
-- **Goods in the top bar:** the top bar shows the Food, Wood, Stone and Coins held in storages, for
+- **Goods in the top bar:** the top bar shows the Food, Wood, Stone, Coal and Coins held in storages, for
   what is picked beside them: **Entire realm** (the default: every storage of the realm, outpost
   storages included) or one city of the realm by name. Stables, carriages and piles don't count. A storage out of sight
   counts with what the Player last saw in it (Last seen), and the total says so when part of it is

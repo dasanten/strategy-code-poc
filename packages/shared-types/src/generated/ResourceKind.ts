@@ -3,4 +3,4 @@
 /**
  * What a resource node yields once worked (`ResourceKind`).
  */
-export type ResourceKind = "forest" | "stone" | "ironOre" | "goldOre";
+export type ResourceKind = "forest" | "stone" | "ironOre" | "goldOre" | "coal";
