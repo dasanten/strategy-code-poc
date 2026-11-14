@@ -41,8 +41,7 @@ fn regions_with(nodes: &[ResourceNode], regions: &Regions, kind: ResourceKind) -
 }
 
 /// On one generated map: no gold or coal node in a heartland, every frontier region with one of
-/// each in it
-/// or next to it, and the heartlands still with their iron.
+/// each in it or next to it, and the heartlands still with their iron.
 fn assert_gold_lies_out_there(seed: i64) {
     let terrain = generate_terrain(seed, 1536);
     let regions = Regions::of(seed, &terrain);
