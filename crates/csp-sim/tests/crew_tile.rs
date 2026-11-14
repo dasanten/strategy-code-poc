@@ -210,7 +210,7 @@ fn sends_a_lone_worker_to_the_footprint_tile_nearest_them() {
     has(&order_json(r), "kind", json!("workAt"));
     has(&order_json(r), "buildingId", json!("mine"));
     let at = r.script.as_ref().and_then(|s| s.memory.get("at")).cloned();
-    assert_eq!(at, Some(json!({ "x": 6, "y": 6 })));
+    assert_eq!(at, Some(json!({ "x": 6, "y": 6, "region": null, "regionKind": null })));
 }
 
 #[test]

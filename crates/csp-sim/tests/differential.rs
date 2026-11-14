@@ -99,7 +99,8 @@ fn differential(name: &str, ticks: &[u64]) -> Option<String> {
             }
         }
         let want = normalised(&read_json(&format!("worlds/{name}-{at}.json"))["world"]);
-        let got = normalised(&serde_json::to_value(&world).unwrap());
+        let mut got = normalised(&serde_json::to_value(&world).unwrap());
+        without_tile_regions(&mut got);
         if let Some(d) = first_difference(&want, &got, "world") {
             return Some(format!("{name} at tick {at}: {d}"));
         }
@@ -130,4 +131,21 @@ fn the_trade_org_hq_steps_as_the_typescript_did() {
 #[ignore = "8.0 s alone: the HQ's NPC default scripts over a game week, invariants checked on the way; see #1132"]
 fn the_trade_org_hq_steps_as_the_typescript_did_over_a_game_week() {
     assert_eq!(differential("hq", &[1440, 10080]), None);
+}
+
+/// Drops the `region` and `regionKind` a tile view holds since T100.6 (`CONTEXT.md`: Region) from
+/// every object that has them both, with an `x` and a `y`: the TypeScript's tile views had neither.
+/// Tested on their own in `script_bindings`' tile view test.
+fn without_tile_regions(v: &mut serde_json::Value) {
+    match v {
+        serde_json::Value::Object(o) => {
+            if ["x", "y", "region", "regionKind"].iter().all(|k| o.contains_key(*k)) {
+                o.remove("region");
+                o.remove("regionKind");
+            }
+            o.values_mut().for_each(without_tile_regions);
+        }
+        serde_json::Value::Array(a) => a.iter_mut().for_each(without_tile_regions),
+        _ => {}
+    }
 }

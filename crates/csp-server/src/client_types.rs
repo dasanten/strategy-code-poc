@@ -253,6 +253,7 @@ fn client_roots(cfg: &Config) -> io::Result<()> {
         csp_sim::queries::contract::RealmLabel,
         csp_sim::queries::npc_trade::NpcCityPrice,
         csp_sim::queries::region_map::RegionHolder,
+        csp_sim::queries::player_land::PlayerLand,
         csp_sim::queries::region_map::RegionMap,
         csp_sim::queries::standing::StandingView,
         csp_sim::queries::trade_quotes::SwapQuote,

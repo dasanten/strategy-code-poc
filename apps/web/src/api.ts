@@ -6,7 +6,7 @@ import {
   adminInspectPath,
   adminWorldPath,
 } from './shared/admin-map.js'
-import { ADMIN_TERRAIN_OVERVIEW_PATH } from './shared/terrain.js'
+import { ADMIN_TERRAIN_OVERVIEW_PATH, LAND_PATH } from './shared/terrain.js'
 import { FIRST_DAY_DISMISS_PATH, FIRST_DAY_PATH } from './shared/first-day.js'
 import type {
   Account,
@@ -28,6 +28,7 @@ import type {
   InviteCreated,
   LoginRequest,
   MapInfo,
+  PlayerLand,
   RegionMap,
   ReopenHorseOffersRequest,
   ResetPasswordRequest,
@@ -89,6 +90,9 @@ export const api = {
   adminInspect: (target: AdminInspectTarget) =>
     call<AdminInspection>('GET', adminInspectPath(target)),
   adminTerritory: () => call<RegionMap>('GET', ADMIN_TERRITORY_PATH),
+  // The land the Player knows (`CONTEXT.md`: Region): in some chunks, or wherever they explored.
+  land: (chunks?: readonly number[]) =>
+    call<PlayerLand>('POST', LAND_PATH, chunks ? { chunks } : {}),
   adminLand: () => call<AdminLand>('GET', ADMIN_LAND_PATH),
   adminOverview: async () => {
     const res = await fetch(ADMIN_TERRAIN_OVERVIEW_PATH, { credentials: 'same-origin' }).catch(

@@ -541,6 +541,9 @@ pub fn open_world(config: &Config) -> Result<(Connection, Game<TracingLog>), Ser
     let (world, terrain) =
         load_or_create_world(&conn, |seed| generate_terrain(seed, MAP_SIZE), generate_world, 1)?;
     let explored = load_explored(&conn, terrain, &world.nodes)?;
+    // The regions are worked out once, here, rather than in the first tick a script reads a tile
+    // view or a Player asks for their land (about a second on the full map).
+    explored.map().regions(world.seed);
     tag_world(&world);
     let defaults = crate::scripts::game_defaults();
     // Players who haven't edited a default script run the game's current default from now on.

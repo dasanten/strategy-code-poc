@@ -310,6 +310,7 @@ fn bind_every_name_in_the_army_script_api_every_army_order_but_forming_and_disba
         explored: &explored,
         kinds: &kinds,
         edge: None,
+        land: None,
         params: None,
     };
     let mut bound = bind_script(ctx).unwrap();

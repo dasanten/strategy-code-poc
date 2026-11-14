@@ -10,6 +10,7 @@ import type {
 import { MAX_SCALE, visibleTiles, zoomTier, type Camera, type Size } from './map/camera.js'
 import { citySize, type CityEmblem, type FarMarker } from './map/far.js'
 import type { MapWorld } from './map/map-world.js'
+import { LAND_BRIDGE_MARK_COLOR, PASS_MARK_COLOR } from './map/land.js'
 import type { MapMark } from './map/preview-draw.js'
 import { applyRegionMap, regionColour, type RegionState } from './map/region.js'
 import { cityRelationship, realmRelationship, type Viewer } from './map/tokens.js'
@@ -166,10 +167,8 @@ const allChunks = (() => {
   }
 })()
 
-/** The colour of a pass's mark on the admin map's land layer. */
-export const PASS_MARK_COLOR = 0xf2f2f2
-/** The colour of a land bridge's mark on the admin map's land layer. */
-export const LAND_BRIDGE_MARK_COLOR = 0x1f6fd1
+// The passes and land bridges are marked as on the Player's map.
+export { LAND_BRIDGE_MARK_COLOR, PASS_MARK_COLOR }
 
 /**
  * The admin map's land layer (`CONTEXT.md`: Region): the regions in place of the territory,
