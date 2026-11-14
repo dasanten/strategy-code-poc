@@ -18,10 +18,12 @@ use csp_shared::terrain::{tile_index, Terrain, TerrainMap};
 use csp_shared::world::{ResourceKind, ResourceNode, WorldState};
 use csp_sim::caravans::place_caravans;
 use csp_sim::land_sites::{
-    place_npc_cities_on, place_trade_org_hq_on, place_trading_posts_on, LandSites,
+    place_npc_cities_on, place_trade_org_hq_on, place_trading_posts_on, starting_site_middles,
+    LandSites,
 };
+use csp_sim::regions::Regions;
 use csp_sim::sight::InvariantViolation;
-use csp_sim::starting_sites::place_starting_sites;
+use csp_sim::starting_sites::place_starting_sites_on;
 use csp_sim::terrain_gen::{generate_terrain, generate_terrain_timed};
 use csp_sim::tick::{
     run_tick, Scratch, ScriptErrorWhere, TickHealth, TickOptions, TickPhase, TickReporter,
@@ -157,9 +159,17 @@ pub fn bench_world(size: i32, seed: i64, out: &mut Out<'_>) -> WorldBench {
     };
     let mut world = create_world(&terrain, 0);
     time("nodes", &mut || world = create_world(&terrain, seed));
-    time("starting sites", &mut || place_starting_sites(&mut world, &terrain));
+    // Worked out once for the starting sites and the land, as `generate_world` does.
+    let mut regions = None;
+    time("regions", &mut || regions = Some(Regions::of(seed, &terrain)));
+    time("starting sites", &mut || {
+        place_starting_sites_on(&mut world, &terrain, regions.as_ref().expect("the regions"));
+    });
     let mut land = None;
-    time("land", &mut || land = Some(LandSites::of(&world, &terrain)));
+    time("land", &mut || {
+        let regions = regions.take().expect("the regions");
+        land = Some(LandSites::new(regions, starting_site_middles(&world)));
+    });
     let land = land.expect("the land");
     time("HQ", &mut || drop(place_trade_org_hq_on(&mut world, &terrain, &land)));
     time("trading posts", &mut || drop(place_trading_posts_on(&mut world, &terrain, &land)));

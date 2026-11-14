@@ -2065,8 +2065,10 @@ export function Wiki() {
           but may always take {num(WAITING_HORSE_FOOD)} Food for the horse. Short of Food, they top
           up from the goods warehouse, which the stock floor fills each day, so buying Food there
           can keep them waiting a little longer. A caravan with a delivery or transfer waiting wants
-          all it keeps on board, as there is no Food on that way. Away from the HQ nothing waits: a
-          carriage takes what a post's storage has and drives on.
+          all it keeps on board, as there is no Food on that way. A caravan away from the HQ takes
+          what a post's storage has and drives on. A wandering trader waits at a post as at the HQ:
+          it leaves only with enough Food to reach its next stop, topping up from the post's goods
+          warehouse, and stands there until that has some.
         </p>
         <p>
           On its way a wandering trader stops at each NPC or Player city whose town hall lies within{' '}
@@ -2776,7 +2778,9 @@ export function Wiki() {
           A city is full once it has had spare hands, idle, on a road crew, scouting or working for
           surplus, and nothing short of its reserve for {days(NPC_FULL_DAYS)}, with a food surplus
           and its founding party's materials above its reserve; Coins it has no way to earn don't
-          count as short. Past {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a game day less
+          count as short, and nor do weapons it can't make, nor the Iron it keeps to forge them
+          (it can make them with a smithy, or with nodes it knows of for all they are made from),
+          though it still buys them. Past {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a game day less
           for each {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at least {days(NPC_FULL_DAYS_LEAST)}.
           A dip below its reserve only restarts that wait if it lasts longer than{' '}
           {days(NPC_FULL_DIP_DAYS)}, though nobody sets out during one. A full city founds a

@@ -175,7 +175,8 @@ pub fn put_hq_on_loops(world: &mut WorldState, size: i32) {
 /// between its load and the warehouse, leaving what it has over that and taking what it has under.
 /// When the carriage can't hold all that (`capacity`), each good's half way is cut by the same
 /// share, so every good travels. The Food the crew keep on board (`keep_food`) is not load, but it
-/// takes up room. So does the Food it wants before it leaves the HQ (`food_to_hold`), of which it
+/// takes up room. So does the Food it wants before it leaves the HQ or a post (`food_to_hold`: what
+/// the way to its next stop eats), of which it
 /// takes what it lacks, as far as the warehouse has it.
 pub fn even_out_load(
     there: &Stock,
@@ -278,11 +279,19 @@ fn way_food_to(world: &WorldState, t: &Trader, stop_id: &str, ki: usize, size: i
     food_for_way(t.escort_ids.len() as f64, dist(size, (k.x, k.y), to), stops)
 }
 
-/// Whether a trader about to leave the HQ stays for Food (`waitsForFood`, `CONTEXT.md`: Waiting
-/// for Food): it holds too little for the way, so it stands at the goods warehouse until that has
-/// some, then evens out again, which takes what it lacks.
+/// Whether carriage `ki` stands at the storage or goods warehouse of post `post_id`.
+fn stands_at_post_stop(world: &WorldState, post_id: &str, ki: usize, size: i32) -> bool {
+    let RouteEnd { storage, warehouse } = post_end(world, post_id);
+    let k = &world.carriages[ki];
+    let at = |b: usize| is_at((k.x as i32, k.y as i32), placed(&world.buildings[b]), size);
+    storage.is_some_and(at) || warehouse.is_some_and(at)
+}
+
+/// Whether a trader about to leave the HQ or a post stays for Food (`waitsForFood`, `CONTEXT.md`:
+/// Waiting for Food): it holds too little for the way to its next stop, so it stands at the goods
+/// warehouse there until that has some, then evens out again, which takes what it lacks.
 fn waits_for_food(world: &mut WorldState, ti: usize, ki: usize, size: i32) -> bool {
-    let Some(w) = hq_end(world).warehouse else { return false };
+    let Some(w) = trader_end(world, &world.traders[ti]).warehouse else { return false };
     let next = next_stop(world, &world.traders[ti]);
     let want = way_food_to(world, &world.traders[ti], &next, ki, size);
     if held(&world.carriages[ki].load, Good::Food) >= want {
@@ -437,8 +446,9 @@ fn next_of(goods: &mut Stock, keeps: &[Good], most: impl Fn(Good) -> f64) -> Opt
 /// drives that end short of it; at a storage, top up the Food on board for its crew; at a
 /// warehouse, even out its load (`even_out_load`), leaving first, beyond what the warehouse keeps
 /// for deliveries; then go on. At the HQ its Coins are moved in its coin warehouse after the other
-/// goods; at its goods warehouse the trader first waits for its escort to be armed, with no post
-/// left stays there, and leaves only with enough Food for the way (`waits_for_food`).
+/// goods; at its goods warehouse the trader first waits for its escort to be armed and with no post
+/// left stays there. At the HQ and at a post alike it leaves only with enough Food for the way to
+/// its next stop (`waits_for_food`).
 fn run_trader(world: &mut WorldState, ti: usize, ri: usize, ki: usize, size: i32) {
     let c = Convoy::Trader(ti);
     if let Some(lost) = lost_post_ahead(world, &world.traders[ti]) {
@@ -502,12 +512,8 @@ fn run_trader(world: &mut WorldState, ti: usize, ri: usize, ki: usize, size: i32
             spare.insert(g, had - owed_by(world, &b.id, g));
         }
         let t = &world.traders[ti];
-        let food_to_hold = if at_hq {
-            let next = next_stop(world, t);
-            way_food_to(world, t, &next, ki, size)
-        } else {
-            0.0
-        };
+        let next = next_stop(world, t);
+        let food_to_hold = way_food_to(world, t, &next, ki, size);
         let plan = even_out_load(
             &spare,
             &world.carriages[ki].load,
@@ -551,7 +557,7 @@ fn run_trader(world: &mut WorldState, ti: usize, ri: usize, ki: usize, size: i32
     world.traders[ti].plan = Some(plan);
     if world.traders[ti].stop == TraderStop::Warehouse && coins_left {
         world.traders[ti].stop = TraderStop::CoinWarehouse;
-    } else if !at_hq || !waits_for_food(world, ti, ki, size) {
+    } else if !waits_for_food(world, ti, ki, size) {
         go_on(world, ti);
     }
 }
@@ -793,6 +799,30 @@ pub fn traders_sound(world: &WorldState, terrain: &TerrainMap) -> Vec<InvariantV
                         format!("set off from the HQ with {} Food, wanting {}", n(food), n(want)),
                         vec![world.carriages[ki].id.clone()],
                     );
+                }
+            }
+            // Just gone on from a post, its carriage still standing there (T100.8).
+            let from = t
+                .r#loop
+                .iter()
+                .position(|p| *p == t.post_id)
+                .map(|i| t.r#loop[(i + t.r#loop.len() - 1) % t.r#loop.len()].clone());
+            let from = from.filter(|p| *p != t.post_id && Some(p) != hq.as_ref());
+            if let Some(from) = from.filter(|_| t.heading == Heading::Post) {
+                if stands_at_post_stop(world, &from, ki, terrain.size) {
+                    let want =
+                        way_food_to(world, t, &t.post_id, ki, terrain.size) - SET_OFF_FOOD_SLACK;
+                    let food = held(&world.carriages[ki].load, Good::Food);
+                    if food < want {
+                        fail(
+                            format!(
+                                "set off from post {from} with {} Food, wanting {}",
+                                n(food),
+                                n(want)
+                            ),
+                            vec![world.carriages[ki].id.clone()],
+                        );
+                    }
                 }
             }
         }

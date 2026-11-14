@@ -1102,9 +1102,10 @@ pub const CARAVAN_FOOD: f64 = 72.0;
 
 /// How much longer than a plain walk a carriage's way to its next stop may take, for the Food it waits
 /// for at the HQ (`CONTEXT.md`: Waiting for Food): the escort sets its pace, and its way winds and
-/// crosses slower ground. With this a full-size map's longest way, about 4,000 tiles, wants about all
-/// of `CARAVAN_FOOD`.
-pub const WAY_FOOD_MARGIN: f64 = 1.5;
+/// crosses slower ground. On the new land (ADR 0035) a trader's leg took 1.7 to 2.7 times the plain
+/// walk in a game year's run (T100.8), its way going round Mountain ranges to a pass; 1.5 starved a
+/// crew short of its post. A full-size map's longest ways want all of `CARAVAN_FOOD`, its cap.
+pub const WAY_FOOD_MARGIN: f64 = 3.0;
 
 /// What a carriage leaves in the HQ's storage (`CONTEXT.md`: Waiting for Food), in game days of what
 /// its people off the carriages eat. No more than `NPC_FOOD_SHORT_DAYS`, below which the HQ puts
