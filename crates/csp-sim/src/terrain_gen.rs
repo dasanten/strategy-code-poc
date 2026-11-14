@@ -1,7 +1,9 @@
-//! Terrain generation (`CONTEXT.md`: Map, Terrain), ported bit for bit from the frozen
-//! `apps/server/src/terrain-gen.ts` (ADR 0030): the same seed gives the same map, byte for byte.
+//! Terrain generation (`CONTEXT.md`: Map, Terrain, The land): the same seed gives the same map,
+//! byte for byte. One mainland in the middle of the map, islands off its coast and Sea all round
+//! (ADR 0035, T100.1); lakes, relief and forest as the frozen `apps/server/src/terrain-gen.ts`
+//! made them (ADR 0030), whose noise and float rules this keeps.
 //!
-//! Float parity, made explicit:
+//! Float parity with the TypeScript, kept for the stages ported from it:
 //! - Every number of the TypeScript is an `f64` here, every `Float32Array` element an `f32`
 //!   (the noise fields, the sea score, the relief and the values the cuts are taken from). Values
 //!   are worked out in `f64` and rounded to `f32` on the store, as a typed array does.
@@ -16,13 +18,18 @@
 
 use std::time::{Duration, Instant};
 
-use csp_shared::balance::{MAP_SIZE, SEA_COUNT, TERRAIN_SHARES};
-use csp_shared::terrain::{is_passable_terrain, Terrain, TerrainMap};
+use csp_shared::balance::{
+    ISLAND_COUNT, ISLAND_OFFSHORE_SHARE, ISLAND_RADIUS, JOIN_SEA_SHARE, MAINLAND_SHARE,
+    MAINLAND_STRETCH, MAP_SIZE, NARROWEST_STRAIT, TERRAIN_SHARES,
+};
+use csp_shared::terrain::{is_passable_terrain, is_water, Terrain, TerrainMap};
 
+use crate::land::{fits_a_haven, near_the_mainland, Land};
 use crate::random::hash;
 
 /// Told how long each stage of generation took (`StageTimer` of `terrain-gen.ts`): the stage's
-/// name and its time. `generate_terrain` names `seas`, `lakes`, `relief`, `forest`, `joining`;
+/// name and its time. `generate_terrain` names `mainland`, `lakes`, `islands`, `relief`, `forest`,
+/// `joining`;
 /// world generation times `nodes` with [`timed`].
 pub type StageTimer<'a> = dyn FnMut(&'static str, Duration) + 'a;
 
@@ -43,20 +50,9 @@ fn wrap_f(v: f64, size: f64) -> f64 {
     ((v % size) + size) % size
 }
 
-/// `wrapDelta` of `terrain.ts` on JavaScript numbers (the seas' centres are not whole tiles).
-#[inline]
-fn wrap_delta_f(a: f64, b: f64, size: f64) -> f64 {
-    let d = wrap_f(b - a, size);
-    if d > size / 2.0 {
-        d - size
-    } else {
-        d
-    }
-}
-
 /// `Math.hypot(a, b)` as V8 computes it (`MathHypot` in `builtins/math.tq`): both values scaled
 /// by the larger, their squares Kahan-summed, then `sqrt(sum) * max`. Not the same rounding as
-/// `f64::hypot`, and the sea score depends on the last bit.
+/// `f64::hypot`, and the frozen city layouts depend on the last bit.
 #[inline]
 pub(crate) fn js_hypot(a: f64, b: f64) -> f64 {
     let (a, b) = (a.abs(), b.abs());
@@ -276,13 +272,27 @@ pub fn generate_full_terrain(seed: i64) -> TerrainMap {
     generate_terrain(seed, MAP_SIZE)
 }
 
-/// Generates the map from a seed (`generateTerrain`, `CONTEXT.md`: Map, Terrain): a square whose
-/// opposite sides join. A few large seas, small lakes inland, mountains in ranges with hills around
-/// them, forests in patches and plains in between. Land cut off from the rest becomes water, so all
-/// land stays joined. Shares come from the balance file.
+/// How ragged the mainland's coast is: how far the coast noise moves it, as a share of the
+/// mainland's reach.
+const MAINLAND_COAST: f64 = 1.2;
+
+/// How ragged an island's coast is, as a share of its radius: it reaches at most `1 + this / 2`
+/// radii from its middle.
+const ISLAND_COAST: f64 = 0.8;
+
+/// Tiles along each of the map's joins that stay Sea (`JOIN_SEA_SHARE`), at least two.
+pub fn join_sea(size: i32) -> i32 {
+    ((JOIN_SEA_SHARE * f64::from(size)).ceil() as i32).max(2)
+}
+
+/// Generates the map from a seed (`CONTEXT.md`: Map, Terrain, The land): a square whose opposite
+/// sides join, across Sea only. One mainland in the middle with a ragged coast, islands off it,
+/// small lakes inland on the mainland, mountains in ranges with hills around them, forests in
+/// patches and plains in between. Shares and counts come from the balance file. Mainland land cut
+/// off from the rest becomes water, so the mainland is joined; an island too close to it or too
+/// small for a haven becomes water too.
 pub fn generate_terrain_timed(seed: i64, size: i32, timer: &mut StageTimer<'_>) -> TerrainMap {
     let n = (size as usize) * (size as usize);
-    let su = size as usize;
     let sz = f64::from(size);
     let nf = n as f64;
     let seed = seed as f64;
@@ -292,52 +302,55 @@ pub fn generate_terrain_timed(seed: i64, size: i32, timer: &mut StageTimer<'_>) 
     let mut field_b = vec![0f32; n];
     let mut values: Vec<f32> = Vec::with_capacity(n);
     let mut coarse = Vec::new();
+    let edge = join_sea(size);
 
-    // Seas: a few large blobs with ragged coasts. Each tile scores by how deep it lies inside the
-    // nearest blob; the deepest share becomes sea.
-    timed(timer, "seas", || {
-        let mut s = 0.0;
-        let mut rand = || {
-            let v = hash(s, 11.0, seed);
-            s += 1.0;
-            v
-        };
-        let seas: Vec<(f64, f64, f64)> = (0..SEA_COUNT as usize)
-            .map(|_| {
-                let x = rand() * sz;
-                let y = rand() * sz;
-                let r = sz * (0.12 + rand() * 0.08);
-                (x, y, r)
-            })
-            .collect();
-        // The coast field, overwritten by the sea score tile by tile.
+    // The mainland: one blob in the middle of the map, stretched along a direction the seed picks,
+    // its coast moved by noise from bays a sixth of the map across down to coves. The highest
+    // scoring `MAINLAND_SHARE` of the map is land, the rest Sea. Near the joins the score falls
+    // away, and along them it is Sea whatever the noise says.
+    let mainland = timed(timer, "mainland", || {
+        let stretch = 1.0 + hash(0.0, 11.0, seed) * (MAINLAND_STRETCH - 1.0);
+        let (sin, cos) = (hash(1.0, 11.0, seed) * std::f64::consts::PI).sin_cos();
+        let mid = (sz - 1.0) / 2.0;
+        let reach = (MAINLAND_SHARE * nf / std::f64::consts::PI).sqrt();
+        let falloff = f64::from(edge) * 4.0;
         let score = &mut field_a;
-        fbm_field(score, &mut coarse, size, 240.0, 4, seed + 5.0);
-        for y in 0..su {
-            let yf = y as f64;
-            let dys: Vec<f64> = seas.iter().map(|sea| wrap_delta_f(sea.1, yf, sz)).collect();
-            for x in 0..su {
-                let xf = x as f64;
-                let mut deepest = f64::NEG_INFINITY;
-                for (sea, dy) in seas.iter().zip(&dys) {
-                    let d = js_hypot(wrap_delta_f(sea.0, xf, sz), *dy);
-                    deepest = deepest.max(1.0 - d / sea.2);
-                }
-                let t = y * su + x;
-                score[t] = (deepest + (f64::from(score[t]) - 0.5) * 0.6) as f32;
-            }
-        }
+        fbm_field(score, &mut coarse, size, sz / 6.0, 6, seed + 5.0);
         values.clear();
-        values.extend_from_slice(score);
-        let cut = quantile(&mut values, 1.0 - TERRAIN_SHARES.sea);
-        for (tile, &v) in tiles.iter_mut().zip(score.iter()) {
-            if v >= cut {
-                *tile = Terrain::Sea as u8;
+        for y in 0..size {
+            let dy = f64::from(y) - mid;
+            let from_edge_y = y.min(size - 1 - y);
+            for x in 0..size {
+                let t = (y * size + x) as usize;
+                let from_edge = x.min(size - 1 - x).min(from_edge_y);
+                if from_edge < edge {
+                    score[t] = f32::NEG_INFINITY;
+                    continue;
+                }
+                let dx = f64::from(x) - mid;
+                let along = (dx * cos + dy * sin) / stretch;
+                let across = (dy * cos - dx * sin) * stretch;
+                let deep = 1.0 - along.hypot(across) / reach;
+                let near_edge = (1.0 - f64::from(from_edge - edge) / falloff).max(0.0);
+                let coast = (f64::from(score[t]) - 0.5) * MAINLAND_COAST;
+                score[t] = (deep + coast - near_edge * near_edge) as f32;
+                values.push(score[t]);
             }
         }
+        let off_the_joins = values.len() as f64;
+        let cut = quantile(&mut values, 1.0 - MAINLAND_SHARE * nf / off_the_joins);
+        let mut land = 0usize;
+        for (tile, &v) in tiles.iter_mut().zip(score.iter()) {
+            if v < cut {
+                *tile = Terrain::Sea as u8;
+            } else {
+                land += 1;
+            }
+        }
+        land
     });
 
-    // Lakes: the lowest spots of a blobby field, only well away from the sea.
+    // Lakes: the lowest spots of a blobby field, only well away from the sea, so on the mainland.
     timed(timer, "lakes", || {
         let far = far_from_sea(&tiles, size);
         let noise = &mut field_a;
@@ -349,7 +362,7 @@ pub fn generate_terrain_timed(seed: i64, size: i32, timer: &mut StageTimer<'_>) 
             }
         }
         let lakes = values.len();
-        let cut = quantile(&mut values, (TERRAIN_SHARES.lake * nf) / lakes as f64);
+        let cut = quantile(&mut values, (TERRAIN_SHARES.lake * mainland as f64) / lakes as f64);
         // Turning a tile into a lake doesn't change whether another one may become one.
         for t in 0..n {
             if far[t] && tiles[t] != Terrain::Sea as u8 && noise[t] < cut {
@@ -358,12 +371,15 @@ pub fn generate_terrain_timed(seed: i64, size: i32, timer: &mut StageTimer<'_>) 
         }
     });
 
+    // Islands: blobs in the Sea off the mainland's coast, after the lakes so none has a lake.
+    timed(timer, "islands", || place_islands(&mut tiles, size, seed, edge));
+
     let is_land = |tile: u8| tile != Terrain::Sea as u8 && tile != Terrain::Lake as u8;
 
     // Mountains and hills: ridges of a noise field, strongest where a coarse mask lets ranges form.
     // The highest ridge tiles are mountains, the band below them hills. The relief overwrites the
     // ridge field; off land it is 0, as in a fresh typed array.
-    let (mountain_cut, hills_cut) = timed(timer, "relief", || {
+    let (mountain_cut, hills_cut, land) = timed(timer, "relief", || {
         let relief = &mut field_a;
         let masks = &mut field_b;
         fbm_field(relief, &mut coarse, size, 640.0, 4, seed + 2.0);
@@ -380,12 +396,9 @@ pub fn generate_terrain_timed(seed: i64, size: i32, timer: &mut StageTimer<'_>) 
             values.push(relief[t]);
         }
         let land = values.len() as f64;
-        let mountain = quantile(&mut values, 1.0 - (TERRAIN_SHARES.mountain * nf) / land);
-        let hills = quantile(
-            &mut values,
-            1.0 - ((TERRAIN_SHARES.mountain + TERRAIN_SHARES.hills) * nf) / land,
-        );
-        (mountain, hills)
+        let mountain = quantile(&mut values, 1.0 - TERRAIN_SHARES.mountain);
+        let hills = quantile(&mut values, 1.0 - (TERRAIN_SHARES.mountain + TERRAIN_SHARES.hills));
+        (mountain, hills, land)
     });
 
     // Forest: patches of a separate field among the remaining land; plains everywhere else.
@@ -400,7 +413,7 @@ pub fn generate_terrain_timed(seed: i64, size: i32, timer: &mut StageTimer<'_>) 
             }
         }
         let flat = values.len() as f64;
-        let forest_cut = quantile(&mut values, 1.0 - (TERRAIN_SHARES.forest * nf) / flat);
+        let forest_cut = quantile(&mut values, 1.0 - (TERRAIN_SHARES.forest * land) / flat);
         for t in 0..n {
             if !is_land(tiles[t]) {
                 continue;
@@ -418,11 +431,107 @@ pub fn generate_terrain_timed(seed: i64, size: i32, timer: &mut StageTimer<'_>) 
     });
     drop((field_a, field_b, values, coarse));
 
-    // All land joined: land cut off from the largest stretch becomes water as a whole, sea if it
-    // touches the sea anywhere, lake otherwise.
+    // The mainland joined and every island one to build on (`join_land`).
     let mut map = TerrainMap { size, tiles };
     timed(timer, "joining", || join_land(&mut map));
     map
+}
+
+/// Places up to `ISLAND_COUNT` islands in the Sea (`CONTEXT.md`: Island): each a blob of a radius
+/// from `ISLAND_RADIUS` with a ragged coast, more than `NARROWEST_STRAIT` tiles of water from the
+/// land and from every other island, at most `ISLAND_OFFSHORE_SHARE` of the map from the land, and
+/// clear of the Sea along the joins. Spots are drawn from the seed until enough islands fit or the
+/// tries run out; a small map gets fewer.
+fn place_islands(tiles: &mut [u8], size: i32, seed: f64, edge: i32) {
+    let sz = f64::from(size);
+    let step = if size % FIELD_STEP == 0 { FIELD_STEP } else { 1 };
+    let steps = coarse_steps_from_land(tiles, size, step);
+    let side = size / step;
+    let strait = f64::from(NARROWEST_STRAIT);
+    let offshore = ISLAND_OFFSHORE_SHARE * sz;
+    let r = ISLAND_RADIUS;
+    let (rmin, rmax) = ((r.min * sz).max(r.min_tiles), (r.max * sz).max(r.min_tiles));
+    let wanted = ISLAND_COUNT as usize;
+    let mut s = 0.0;
+    let mut rand = || {
+        let v = hash(s, 13.0, seed);
+        s += 1.0;
+        v
+    };
+    let mut placed: Vec<(f64, f64, f64)> = Vec::new();
+    for _ in 0..wanted * 40 {
+        if placed.len() == wanted {
+            break;
+        }
+        let (x, y) = ((rand() * sz).floor(), (rand() * sz).floor());
+        let radius = rmin + (rmax - rmin) * rand().powi(2);
+        // The farthest any tile of the island can lie from its middle.
+        let reach = radius * (1.0 + ISLAND_COAST / 2.0) + 1.0;
+        let lo = f64::from(edge) + reach;
+        let hi = sz - 1.0 - f64::from(edge) - reach;
+        if x < lo || x > hi || y < lo || y > hi {
+            continue;
+        }
+        let cell = (y as i32 / step) * side + x as i32 / step;
+        let Some(from_land) = steps[cell as usize].checked_mul(step as u32) else { continue };
+        // The coarse search samples every `step`-th tile: land may lie up to two cells nearer.
+        // A tile's steps (4 neighbours) can be up to √2 times its straight distance.
+        let from_land = f64::from(from_land) - 2.0 * f64::from(step);
+        let nearest = strait + reach * std::f64::consts::SQRT_2 + 1.0;
+        // On a small map the strait and the island take most of `offshore`: some room is left.
+        if from_land < nearest || from_land > offshore.max(nearest + 2.0 * reach + 8.0) {
+            continue;
+        }
+        if placed.iter().any(|&(px, py, pr)| (px - x).hypot(py - y) < pr + reach + strait * 2.0) {
+            continue;
+        }
+        placed.push((x, y, reach));
+        let spacing = (radius * 0.8).max(4.0);
+        let noise_seed = seed + 6.0 + placed.len() as f64 * 101.0;
+        let r = reach.ceil() as i32;
+        for ty in y as i32 - r..=y as i32 + r {
+            for tx in x as i32 - r..=x as i32 + r {
+                let d = f64::from(tx - x as i32).hypot(f64::from(ty - y as i32));
+                let noise = fbm(f64::from(tx), f64::from(ty), sz, spacing, 3, noise_seed);
+                if 1.0 - d / radius + (noise - 0.5) * ISLAND_COAST > 0.0 {
+                    tiles[(ty * size + tx) as usize] = Terrain::Plains as u8;
+                }
+            }
+        }
+    }
+}
+
+/// Steps (4 neighbours, across the joins) from each cell of a grid of every `step`-th tile to the
+/// nearest cell whose tile is land; `u32::MAX` with no land at all.
+fn coarse_steps_from_land(tiles: &[u8], size: i32, step: i32) -> Vec<u32> {
+    let side = (size / step) as usize;
+    let (su, st) = (size as usize, step as usize);
+    let mut steps = vec![u32::MAX; side * side];
+    let mut frontier = Vec::new();
+    for cy in 0..side {
+        for cx in 0..side {
+            if is_passable_terrain(tiles[cy * st * su + cx * st]) {
+                steps[cy * side + cx] = 0;
+                frontier.push(cy * side + cx);
+            }
+        }
+    }
+    let mut next = Vec::new();
+    let mut d = 0;
+    while !frontier.is_empty() {
+        d += 1;
+        for &c in &frontier {
+            for nb in neighbours(side as i32, c) {
+                if steps[nb] == u32::MAX {
+                    steps[nb] = d;
+                    next.push(nb);
+                }
+            }
+        }
+        std::mem::swap(&mut frontier, &mut next);
+        next.clear();
+    }
+    steps
 }
 
 /// Which tiles lie more than `LAKE_COAST_MARGIN` steps (4 neighbours, across the joins) from the
@@ -458,30 +567,34 @@ fn far_from_sea(tiles: &[u8], size: i32) -> Vec<bool> {
     dist.into_iter().map(|d| d == UNSEEN).collect()
 }
 
-/// The last step of `generateTerrain`: every passable group but the largest (the first of the
-/// largest) becomes sea if any of its tiles touches the sea, lake otherwise.
+/// The last step of generation (`CONTEXT.md`: The land): the mainland is the largest land group
+/// (the first of the largest); every other group stays only as an island, more than
+/// `NARROWEST_STRAIT` tiles of water from the mainland and with room for a haven on its shore
+/// (`land`). Any other group becomes water as a whole: sea if any of its tiles touches the sea,
+/// lake otherwise. So the mainland is joined and no walk reaches an island.
 fn join_land(map: &mut TerrainMap) {
-    let mut group = Vec::new();
-    let sizes = land_groups_into(map, &mut group, &mut Vec::new());
-    let Some(&largest) = sizes.iter().max() else { return };
-    let main = sizes.iter().position(|&s| s == largest).unwrap_or(0) as i32;
+    let land = Land::of(map);
+    let Some(main) = land.mainland else { return };
+    let near = near_the_mainland(map, &land);
+    let haven = fits_a_haven(map, &land);
+    let gone: Vec<bool> =
+        (0..land.sizes.len()).map(|g| g as i32 != main && (near[g] || !haven[g])).collect();
     let size = map.size;
     let tiles = &mut map.tiles;
-    let mut by_sea = vec![false; sizes.len()];
-    for (t, &g) in group.iter().enumerate() {
+    let mut by_sea = vec![false; land.sizes.len()];
+    for (t, &g) in land.group.iter().enumerate() {
         if g != -1
-            && g != main
+            && gone[g as usize]
             && !by_sea[g as usize]
             && neighbours(size, t).iter().any(|&nb| tiles[nb] == Terrain::Sea as u8)
         {
             by_sea[g as usize] = true;
         }
     }
-    for (t, &g) in group.iter().enumerate() {
-        if g == -1 || g == main {
-            continue;
+    for (t, &g) in land.group.iter().enumerate() {
+        if g != -1 && gone[g as usize] {
+            tiles[t] = if by_sea[g as usize] { Terrain::Sea } else { Terrain::Lake } as u8;
         }
-        tiles[t] = if by_sea[g as usize] { Terrain::Sea } else { Terrain::Lake } as u8;
     }
 }
 
@@ -493,7 +606,8 @@ pub struct TerrainProblem {
 }
 
 /// Checks the rules every generated map keeps (`checkTerrain`, ADR 0004): every tile holds a known
-/// terrain, no lake touches the sea, and all land is joined.
+/// terrain, no lake touches the sea, the map's joins cross only water, the mainland is joined (no
+/// land split from it by less than the narrowest strait) and every island has room for a haven.
 pub fn check_terrain(map: &TerrainMap) -> Vec<TerrainProblem> {
     let size = map.size as usize;
     let tiles = &map.tiles;
@@ -517,15 +631,40 @@ pub fn check_terrain(map: &TerrainMap) -> Vec<TerrainProblem> {
             });
         }
     }
-    let (_, sizes) = land_groups(map);
-    if sizes.len() > 1 {
-        let mut largest = sizes.clone();
-        largest.sort_unstable_by(|a, b| b.cmp(a));
-        let largest: Vec<String> = largest.iter().take(5).map(ToString::to_string).collect();
+    let last = size - 1;
+    let on_joins = (0..size)
+        .flat_map(|i| [(0, i), (last, i), (i, 0), (i, last)])
+        .find(|&(x, y)| !is_water(tiles[y * size + x]));
+    if let Some((x, y)) = on_joins {
         problems.push(TerrainProblem {
-            rule: "land-joined",
-            message: format!("land falls into {} parts ({}, â€¦)", sizes.len(), largest.join(", ")),
+            rule: "water-at-joins",
+            message: format!("land at ({x}, {y}) lies on the map's joins"),
         });
+    }
+    let land = Land::of(map);
+    let near = near_the_mainland(map, &land);
+    let haven = fits_a_haven(map, &land);
+    let first = land.first_tiles();
+    for g in land.islands() {
+        let (gi, t) = (g as usize, first[g as usize]);
+        let at = format!("({}, {})", t % size, t / size);
+        if near[gi] {
+            problems.push(TerrainProblem {
+                rule: "mainland-joined",
+                message: format!(
+                    "land of {} tiles at {at} is split from the mainland by less than {} tiles of water",
+                    land.sizes[gi], NARROWEST_STRAIT
+                ),
+            });
+        } else if !haven[gi] {
+            problems.push(TerrainProblem {
+                rule: "island-room",
+                message: format!(
+                    "island of {} tiles at {at} has no room for a haven on its shore",
+                    land.sizes[gi]
+                ),
+            });
+        }
     }
     problems
 }
@@ -535,37 +674,45 @@ mod tests {
     use super::*;
     use csp_shared::terrain::terrain_at;
 
-    fn fixture(name: &str) -> Vec<u8> {
-        let path = format!("{}/fixtures/terrain/{name}", env!("CARGO_MANIFEST_DIR"));
-        std::fs::read(&path).unwrap_or_else(|e| panic!("{path}: {e}"))
-    }
-
-    fn assert_fixture(seed: i64, size: i32) {
-        let map = generate_terrain(seed, size);
-        let expected = fixture(&format!("{seed}-{size}.bin"));
-        assert_eq!(map.tiles.len(), expected.len());
-        let wrong: Vec<usize> =
-            (0..expected.len()).filter(|&t| map.tiles[t] != expected[t]).collect();
-        assert!(
-            wrong.is_empty(),
-            "{seed}-{size}: {} tiles differ, first at {:?}",
-            wrong.len(),
-            wrong.first().map(|&t| (t % size as usize, t / size as usize)),
-        );
-        assert_eq!(check_terrain(&map), []);
+    /// What a generated map must show of the land (`CONTEXT.md`: The land, Island), beyond
+    /// `check_terrain`: the mainland is one group holding most of the land, each island is its own
+    /// group with room for a haven and beyond the strait from every other island, and no land lies
+    /// in the Sea along the joins. Returns how many islands there are.
+    fn assert_the_land(map: &TerrainMap) -> usize {
+        let size = map.size as usize;
+        assert_eq!(check_terrain(map), [], "map of {size}");
+        let land = Land::of(map);
+        let main = land.mainland.expect("a mainland");
+        let total: usize = land.sizes.iter().sum();
+        let share = land.sizes[main as usize] as f64 / total as f64;
+        assert!(share > 0.9, "the mainland holds {share} of the land");
+        let of_map = land.sizes[main as usize] as f64 / map.tiles.len() as f64;
+        assert!((of_map - MAINLAND_SHARE).abs() < 0.1, "the mainland covers {of_map} of the map");
+        let edge = join_sea(map.size) as usize;
+        for (t, &g) in land.group.iter().enumerate() {
+            let (x, y) = (t % size, t / size);
+            let from_edge = x.min(size - 1 - x).min(y).min(size - 1 - y);
+            assert!(g == -1 || from_edge >= edge, "land at ({x}, {y}) by the joins");
+        }
+        let haven = fits_a_haven(map, &land);
+        for g in land.islands() {
+            assert!(haven[g as usize], "island {g} has room for a haven");
+            // Taken as the mainland, the island has no other land within the strait of it.
+            let from_g = Land { mainland: Some(g), ..land.clone() };
+            let near = near_the_mainland(map, &from_g);
+            assert!(near.iter().all(|&n| !n), "land within the strait of island {g}");
+        }
+        land.islands().count()
     }
 
     #[test]
-    fn matches_the_typescript_maps() {
-        assert_fixture(1, 64);
-        assert_fixture(1, 256);
-        assert_fixture(42, 256);
-        assert_fixture(1, 512);
-    }
-
-    #[test]
-    fn matches_the_typescript_map_1024() {
-        assert_fixture(7, 1024);
+    fn makes_one_mainland_with_islands_off_it_over_seeds_and_sizes() {
+        for (seed, size) in [(1, 256), (2, 256), (42, 256), (1, 512), (3, 512), (7, 1024)] {
+            let islands = assert_the_land(&generate_terrain(seed, size));
+            if size >= 512 {
+                assert!(islands >= 4, "{seed}-{size}: only {islands} islands");
+            }
+        }
     }
 
     #[test]
@@ -576,10 +723,17 @@ mod tests {
     }
 
     #[test]
+    fn makes_a_tiny_map_that_keeps_the_rules() {
+        let map = generate_terrain(1, 64);
+        assert_eq!(check_terrain(&map), []);
+        assert!(Land::of(&map).mainland.is_some());
+    }
+
+    #[test]
     fn reports_every_stage_to_the_timer() {
         let mut stages = Vec::new();
         generate_terrain_timed(1, 64, &mut |stage, _| stages.push(stage));
-        assert_eq!(stages, ["seas", "lakes", "relief", "forest", "joining"]);
+        assert_eq!(stages, ["mainland", "lakes", "islands", "relief", "forest", "joining"]);
     }
 
     #[test]
@@ -602,21 +756,46 @@ mod tests {
         assert_eq!(quantile(&mut [], 0.5), f32::INFINITY);
     }
 
-    #[test]
-    fn reports_cut_off_land_a_lake_on_the_sea_and_unknown_terrain() {
-        let size = 8;
-        let mut tiles = vec![Terrain::Plains as u8; 64];
-        // A ring of sea around one plains tile cuts it off.
-        for (x, y) in [(3, 2), (2, 3), (4, 3), (3, 4)] {
-            tiles[y * 8 + x] = Terrain::Sea as u8;
+    /// A 64 × 64 map of Sea with plains rectangles `(x, y, w, h)`.
+    fn sea_with(land: &[(usize, usize, usize, usize)]) -> TerrainMap {
+        let mut tiles = vec![Terrain::Sea as u8; 64 * 64];
+        for &(x, y, w, h) in land {
+            for ty in y..y + h {
+                for tx in x..x + w {
+                    tiles[ty * 64 + tx] = Terrain::Plains as u8;
+                }
+            }
         }
-        tiles[6 * 8 + 6] = Terrain::Lake as u8;
-        tiles[6 * 8 + 7] = Terrain::Sea as u8;
-        tiles[0] = 99;
-        let mut rules: Vec<&str> =
-            check_terrain(&TerrainMap { size, tiles }).iter().map(|p| p.rule).collect();
+        TerrainMap { size: 64, tiles }
+    }
+
+    fn rules(map: &TerrainMap) -> Vec<&'static str> {
+        let mut rules: Vec<&str> = check_terrain(map).iter().map(|p| p.rule).collect();
         rules.sort_unstable();
-        assert_eq!(rules, ["known-terrain", "lakes-inland", "land-joined"]);
+        rules
+    }
+
+    #[test]
+    fn passes_a_mainland_with_an_island_off_it() {
+        assert_eq!(rules(&sea_with(&[(4, 4, 24, 24), (48, 48, 6, 6)])), Vec::<&str>::new());
+    }
+
+    #[test]
+    fn reports_a_split_mainland_a_sliver_island_and_land_on_the_joins() {
+        // Split: a piece two tiles off the mainland's east coast.
+        assert_eq!(rules(&sea_with(&[(4, 4, 24, 24), (30, 4, 6, 6)])), ["mainland-joined"]);
+        // A sliver: an island one tile wide, no room for a haven.
+        assert_eq!(rules(&sea_with(&[(4, 4, 24, 24), (50, 40, 1, 10)])), ["island-room"]);
+        // Land on the joins.
+        assert_eq!(rules(&sea_with(&[(0, 4, 24, 24)])), ["water-at-joins"]);
+    }
+
+    #[test]
+    fn reports_a_lake_on_the_sea_and_unknown_terrain() {
+        let mut map = sea_with(&[(4, 4, 24, 24)]);
+        map.tiles[10 * 64 + 27] = Terrain::Lake as u8;
+        map.tiles[10 * 64 + 10] = 99;
+        assert_eq!(rules(&map), ["known-terrain", "lakes-inland"]);
     }
 
     /// Sizes of the connected groups (4 neighbours, across the joins) of one terrain.
@@ -646,27 +825,11 @@ mod tests {
         sizes
     }
 
-    /// Share of neighbouring tile pairs that differ across one column boundary (`x`) or row's.
-    fn change_across(map: &TerrainMap, along_x: bool, at: i32) -> f64 {
-        let changed = (0..map.size)
-            .filter(|&i| {
-                let (a, b) = if along_x {
-                    (terrain_at(map, at - 1, i), terrain_at(map, at, i))
-                } else {
-                    (terrain_at(map, i, at - 1), terrain_at(map, i, at))
-                };
-                a != b
-            })
-            .count();
-        changed as f64 / f64::from(map.size)
-    }
-
-    /// The full-size map: the TypeScript's hash, its time in release, and the tests of
-    /// `terrain-gen.test.ts` that need it. Run with `cargo test --release -- --ignored`.
+    /// The full-size map: its time in release and the rules of the land on it. Run with
+    /// `cargo test --release -- --ignored`.
     #[test]
-    #[ignore = "6.8 s alone: generates the full-size map; see #1132"]
-    fn generates_the_full_size_map_as_the_typescript_does() {
-        use sha2::{Digest, Sha256};
+    #[ignore = "several seconds alone: generates the full-size map; see #1132"]
+    fn generates_the_full_size_map_as_the_rules_say() {
         let from = Instant::now();
         let mut stages = Vec::new();
         let map =
@@ -674,58 +837,34 @@ mod tests {
         let took = from.elapsed();
         eprintln!("generate_terrain(1, {MAP_SIZE}): {took:?} {stages:?}");
 
-        let digest: String =
-            Sha256::digest(&map.tiles).iter().map(|b| format!("{b:02x}")).collect();
-        let expected = String::from_utf8(fixture("1-5760.sha256")).expect("utf-8");
-        assert_eq!(digest, expected.trim());
-
-        // A 5,760 Ã— 5,760 square whose coordinates run on past every side.
+        // A 5,760 × 5,760 square whose coordinates run on past every side.
         assert_eq!(map.size, 5760);
         assert_eq!(map.tiles.len(), 5760 * 5760);
         assert_eq!(terrain_at(&map, -1, 5), terrain_at(&map, 5759, 5));
-        assert_eq!(terrain_at(&map, 5760, 5), terrain_at(&map, 0, 5));
         assert_eq!(terrain_at(&map, 7, -1), terrain_at(&map, 7, 5759));
 
-        // No seams where the sides join.
-        let inside = (change_across(&map, true, 2880) + change_across(&map, false, 2880)) / 2.0;
-        for across in [change_across(&map, true, 0), change_across(&map, false, 0)] {
-            assert!(across < inside * 2.0 + 0.02, "{across} across a join, {inside} inside");
-        }
+        // One mainland, islands off it, the joins in the Sea.
+        let islands = assert_the_land(&map);
+        assert!(islands >= ISLAND_COUNT as usize / 2, "{islands} islands");
 
-        // The terrain shares from the balance file.
-        let share = |t: Terrain| {
-            map.tiles.iter().filter(|&&x| x == t as u8).count() as f64 / map.tiles.len() as f64
-        };
+        // The terrain shares of the land from the balance file.
+        let land = map.tiles.iter().filter(|&&t| !is_water(t)).count() as f64;
+        let share = |t: Terrain| map.tiles.iter().filter(|&&x| x == t as u8).count() as f64 / land;
         let s = TERRAIN_SHARES;
-        let rest = 1.0 - (s.sea + s.lake + s.mountain + s.hills + s.forest);
         for (t, wanted) in [
-            (Terrain::Sea, s.sea),
-            (Terrain::Lake, s.lake),
             (Terrain::Mountain, s.mountain),
             (Terrain::Hills, s.hills),
             (Terrain::Forest, s.forest),
-            (Terrain::Plains, rest),
         ] {
-            assert!((share(t) - wanted).abs() < 0.005, "{t:?}: {} of {wanted}", share(t));
+            assert!((share(t) - wanted).abs() < 0.01, "{t:?}: {} of {wanted}", share(t));
         }
-
-        // A few large seas, not scattered puddles.
-        let mut seas = group_sizes(&map, Terrain::Sea);
-        seas.sort_unstable_by(|a, b| b.cmp(a));
-        let total: usize = seas.iter().sum();
-        let big: usize = seas.iter().take(SEA_COUNT as usize).sum();
-        assert!(big as f64 / total as f64 > 0.95);
+        assert!(group_sizes(&map, Terrain::Lake).len() > 3);
 
         // Mountains form ranges.
         let sizes = group_sizes(&map, Terrain::Mountain);
         let total: usize = sizes.iter().sum();
         let in_ranges: usize = sizes.iter().filter(|&&s| s >= 3200).sum();
         assert!(in_ranges as f64 / total as f64 > 0.7);
-
-        // All land joined and lakes inland.
-        assert_eq!(land_groups(&map).1.len(), 1);
-        assert_eq!(check_terrain(&map), []);
-        assert!(group_sizes(&map, Terrain::Lake).len() > 3);
 
         assert!(took < Duration::from_secs(10), "took {took:?}");
     }

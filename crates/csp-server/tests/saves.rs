@@ -180,14 +180,15 @@ fn refuses_a_save_from_before_the_freeze_saying_to_run_the_typescript_server() {
     assert_eq!(ticks(&conn), vec![1]);
 }
 
+/// The live save, from the TypeScript's last format, is from before the new world (ADR 0035): the
+/// server refuses it and keeps it. A world in today's format round trips: written by this server
+/// and read again, the same world.
 #[test]
-fn the_live_save_round_trips_through_the_database() {
+fn the_live_save_is_refused_and_a_world_round_trips_through_the_database() {
     let (gz, version) = live_gz();
-    // The TypeScript server's last format; migrated to the current one on load.
     assert_eq!(*version, FREEZE_FORMAT_VERSION);
     let conn = db();
     let expected = live_world();
-    // The row as the TypeScript server wrote it, with the terrain of its seed.
     conn.execute(
         "INSERT INTO world_saves (tick, version, data) VALUES (?1, ?2, ?3)",
         params![expected.tick as i64, version, gz],
@@ -198,73 +199,27 @@ fn the_live_save_round_trips_through_the_database() {
         params![expected.seed, small_terrain(expected.seed).tiles],
     )
     .unwrap();
-    let (world, _) =
-        load_or_create_world(&conn, |_| panic!("generated"), |_, _| panic!("generated"), 1)
-            .unwrap();
-    assert_eq!(world, expected);
+    let load =
+        || load_or_create_world(&conn, |_| panic!("generated"), |_, _| panic!("generated"), 1);
+    let err = load().unwrap_err();
+    assert!(err.to_string().contains("from before the new world"), "{err}");
+    assert_eq!(ticks(&conn), vec![expected.tick as i64]);
 
-    // Written back by this server and read again: the same world, the same JSON.
-    save_world(&conn, &world).unwrap();
+    save_world(&conn, &expected).unwrap();
     let (state, v) = latest_save(&conn).unwrap().unwrap();
     assert_eq!(v, WORLD_FORMAT_VERSION);
-    let original: Value = serde_json::from_slice(&gunzip(gz).unwrap()).unwrap();
-    assert_eq!(serde_json::from_value::<WorldState>(state.clone()).unwrap(), expected);
-    assert_eq!(serde_json::from_value::<WorldState>(original).unwrap(), expected);
-    let (again, _) =
-        load_or_create_world(&conn, |_| panic!("generated"), |_, _| panic!("generated"), 1)
-            .unwrap();
-    assert_eq!(again, expected);
+    assert_eq!(serde_json::from_value::<WorldState>(state).unwrap(), expected);
+    assert_eq!(load().unwrap().0, expected);
 }
 
-/// The production world at the cutover: a building remembered before the TypeScript step 44 still
-/// had a stable's old `breeding` progress, which the Rust server refused, so it never started.
-#[test]
-fn a_typescript_save_remembering_a_buildings_old_breeding_loads() {
-    let (gz, version) = live_gz();
-    let mut state: Value = serde_json::from_slice(&gunzip(gz).unwrap()).unwrap();
-    let tick = state["tick"].clone();
-    let mut remembered = state["buildings"][0].clone();
-    remembered["is"] = "building".into();
-    remembered["seenAt"] = tick;
-    remembered["breeding"] = 5.into();
-    let user = state["lastSeen"].as_object().unwrap().keys().next().unwrap().clone();
-    state["lastSeen"][&user].as_array_mut().unwrap().push(remembered);
-    // As it was: refused.
-    assert!(serde_json::from_value::<WorldState>(state.clone()).is_err());
-
-    let conn = db();
-    let seed = state["seed"].as_i64().unwrap();
-    conn.execute(
-        "INSERT INTO world_saves (tick, version, data) VALUES (1, ?1, ?2)",
-        params![version, gzip(&serde_json::to_vec(&state).unwrap()).unwrap()],
-    )
-    .unwrap();
-    conn.execute(
-        "INSERT INTO terrain (id, seed, diameter, data) VALUES (1, ?1, 16, ?2)",
-        params![seed, small_terrain(seed).tiles],
-    )
-    .unwrap();
-    let (world, _) =
-        load_or_create_world(&conn, |_| panic!("generated"), |_, _| panic!("generated"), 1)
-            .unwrap();
-    // Remembered still, without the old progress.
-    let memory = &world.last_seen[&user.parse::<u64>().unwrap()];
-    assert_eq!(memory.len(), state["lastSeen"][&user].as_array().unwrap().len());
-}
-
-/// Format 113 (T90.2): the live save, from before vessels, loads with none; a world with a boat
-/// is saved with it and loads back with it, and a server of format 112 would refuse that save.
+/// Format 113 (T90.2): a world with no vessels loads with none; a world with a boat is saved with
+/// it and loads back with it, and a server of format 112 would refuse that save.
 #[test]
 fn a_world_with_a_boat_is_saved_and_loads_with_it_and_one_from_before_has_none() {
-    let (gz, version) = live_gz();
     let conn = db();
     let expected = live_world();
     assert!(expected.vessels.is_empty());
-    conn.execute(
-        "INSERT INTO world_saves (tick, version, data) VALUES (?1, ?2, ?3)",
-        params![expected.tick as i64, version, gz],
-    )
-    .unwrap();
+    save_world(&conn, &expected).unwrap();
     conn.execute(
         "INSERT INTO terrain (id, seed, diameter, data) VALUES (1, ?1, 16, ?2)",
         params![expected.seed, small_terrain(expected.seed).tiles],

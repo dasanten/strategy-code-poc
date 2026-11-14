@@ -189,8 +189,14 @@ pub fn migrate_world_with(
     Ok(s)
 }
 
+/// The first format of the new world (ADR 0035, T100.1): one mainland with islands off it. The
+/// world is generated anew rather than migrated, so no step leads here and an older save is
+/// refused.
+pub const NEW_WORLD_FORMAT_VERSION: u32 = 124;
+
 /// Brings a save written in format `version` up to the current format. A save from before the
-/// freeze is refused: the TypeScript server migrates it.
+/// freeze is refused: the TypeScript server migrates it. A save from before the new world is
+/// refused too: nothing carries over to it (ADR 0035).
 pub fn migrate_world(
     state: Value,
     version: u32,
@@ -200,6 +206,12 @@ pub fn migrate_world(
         return Err(WorldFormatError(format!(
             "the saved world is format {version}, older than the Rust server reads \
              ({FREEZE_FORMAT_VERSION}); run the TypeScript server once to migrate and save it"
+        )));
+    }
+    if version < NEW_WORLD_FORMAT_VERSION {
+        return Err(WorldFormatError(format!(
+            "the saved world is format {version}, from before the new world \
+             ({NEW_WORLD_FORMAT_VERSION}, ADR 0035), which is generated anew, not migrated"
         )));
     }
     migrate_world_with(state, version, ctx, &migrations(), WORLD_FORMAT_VERSION)
@@ -451,12 +463,24 @@ mod tests {
     }
 
     #[test]
-    fn has_no_steps_from_before_the_freeze_and_one_for_every_version_since() {
+    fn has_no_steps_from_before_the_freeze_and_one_for_every_version_since_but_the_new_world() {
         let steps = migrations();
         assert!(steps.keys().all(|&v| v >= FREEZE_FORMAT_VERSION));
         for v in FREEZE_FORMAT_VERSION..WORLD_FORMAT_VERSION {
-            assert!(steps.contains_key(&v), "no migration from {v}");
+            let into_the_new_world = v + 1 == NEW_WORLD_FORMAT_VERSION;
+            assert_eq!(steps.contains_key(&v), !into_the_new_world, "the step from {v}");
         }
+    }
+
+    #[test]
+    fn refuses_a_save_from_before_the_new_world() {
+        let terrain = ctx_terrain();
+        let ctx = MigrationContext { terrain: &terrain };
+        for version in [FREEZE_FORMAT_VERSION, NEW_WORLD_FORMAT_VERSION - 1] {
+            let old = migrate_world(json!({ "tick": 1 }), version, &ctx).unwrap_err();
+            assert!(old.0.contains("from before the new world"), "{old}");
+        }
+        assert!(migrate_world(json!({ "tick": 1 }), NEW_WORLD_FORMAT_VERSION, &ctx).is_ok());
     }
 
     #[test]
