@@ -7,7 +7,7 @@ import type { Richness } from "./Richness.js";
  */
 export type ResourceNode = { id: string, kind: ResourceKind, x: number, y: number, 
 /**
- * Fixed when it comes into being (`CONTEXT.md`: Richness); normal where nothing set it, as in
- * the frozen fixtures from before richness.
+ * Fixed when it comes into being (`CONTEXT.md`: Richness). Left out of a save while normal, so
+ * a normal node is saved as before richness (the frozen fixtures).
  */
-richness: Richness, };
+richness?: Richness, };

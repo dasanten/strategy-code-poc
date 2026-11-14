@@ -266,12 +266,13 @@ fn hand_a_script_exactly_its_view() {
 
 #[test]
 fn find_a_field_outside_its_view_a_missing_one_and_a_value_of_the_wrong_kind() {
-    let node = json!({ "id": "n1", "kind": "forest", "x": 1, "y": 2, "secret": 3 });
+    let node =
+        json!({ "id": "n1", "kind": "forest", "x": 1, "y": 2, "richness": "poor", "secret": 3 });
     assert_eq!(
         script_value_problems(Some(&node), ScriptType::View("node"), "n"),
         ["n.secret is not in the node view"]
     );
-    let short = json!({ "id": "n1", "kind": "forest", "x": 1 });
+    let short = json!({ "id": "n1", "kind": "forest", "x": 1, "richness": "rich" });
     assert_eq!(
         script_value_problems(Some(&short), ScriptType::View("node"), "n"),
         ["n.y is missing"]

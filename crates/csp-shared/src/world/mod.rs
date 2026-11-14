@@ -3353,6 +3353,11 @@ impl Richness {
         }
     }
 
+    /// Whether it is normal.
+    pub fn is_normal(&self) -> bool {
+        *self == Richness::Normal
+    }
+
     /// Its steps up from poor: 0, 1 or 2.
     pub fn rank(self) -> u8 {
         self as u8
@@ -3367,9 +3372,9 @@ pub struct ResourceNode {
     pub kind: ResourceKind,
     pub x: f64,
     pub y: f64,
-    /// Fixed when it comes into being (`CONTEXT.md`: Richness); normal where nothing set it, as in
-    /// the frozen fixtures from before richness.
-    #[serde(default)]
+    /// Fixed when it comes into being (`CONTEXT.md`: Richness). Left out of a save while normal, so
+    /// a normal node is saved as before richness (the frozen fixtures).
+    #[serde(default, skip_serializing_if = "Richness::is_normal")]
     pub richness: Richness,
 }
 
