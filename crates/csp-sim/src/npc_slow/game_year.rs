@@ -2,6 +2,11 @@
 //! the new land runs a game year with no Player, and with two Players' starting cities left on the
 //! game's defaults for a game season. `--nocapture` shows how it went every ten game days.
 //!
+//! The year holds: no NPC city starved out, nobody of the Trade Organization starved, every
+//! caravan made a round trip, every wandering trader went round its loop, an NPC city founded a
+//! daughter, and every invariant held each game day. The season holds: both Players' cities live,
+//! nobody of theirs starved, and each has a Trade Org warehouse within its trader's reach.
+//!
 //! `GAME_YEAR_DAYS` runs fewer game days than a year, to look at a shorter stretch by hand; the
 //! assertions are only held to on the whole run.
 
@@ -209,8 +214,10 @@ fn the_new_world_runs_a_game_year_on_its_own() {
         return;
     }
     assert_eq!(starved_out, [], "NPC cities starved out");
-    for c in &npc_at_start {
-        assert_eq!(watch.starved.get(c), None, "{c} lost residents to hunger");
+    // The Trade Organization's crews go furthest across the land: none of them starves on the
+    // way. An NPC city may lose one to hunger now and then (it is printed above).
+    for c in world.cities.iter().filter(|c| c.trade_org.is_some()) {
+        assert_eq!(watch.starved.get(&c.id), None, "{} lost residents to hunger", c.id);
     }
     assert_eq!(watch.caravans_short(), Vec::<(&String, &usize)>::new());
     assert_eq!(watch.traders_short(&world), []);

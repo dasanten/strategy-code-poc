@@ -108,7 +108,7 @@ pub fn place_starting_sites_on(world: &mut WorldState, terrain: &TerrainMap, reg
     // Where each kind of node it needs could lie, for every heartland alike.
     let fitting = NODES_IN_REACH.map(|kind| Coarse::of(terrain, node_terrains(kind)));
     for h in &heartlands {
-        place_in_heartland(world, terrain, &regions, h, &rules, &fitting);
+        place_in_heartland(world, terrain, regions, h, &rules, &fitting);
     }
 }
 
