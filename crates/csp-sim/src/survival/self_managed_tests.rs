@@ -19,7 +19,7 @@ use crate::test_world::{add_city, city_terrain, world_with_city};
 
 /// A free Plains tile at least `far` tiles from every town hall, for a second city's town hall
 /// (`freePlains`).
-fn free_plains(world: &WorldState, terrain: &TerrainMap, far: f64) -> (f64, f64) {
+pub(crate) fn free_plains(world: &WorldState, terrain: &TerrainMap, far: f64) -> (f64, f64) {
     let size = terrain.size;
     let halls: Vec<(i32, i32)> = world
         .buildings
@@ -43,18 +43,18 @@ fn free_plains(world: &WorldState, terrain: &TerrainMap, far: f64) -> (f64, f64)
     panic!("no free Plains")
 }
 
-struct Two {
-    world: WorldState,
-    terrain: &'static TerrainMap,
-    realm: String,
-    user_id: u64,
-    leader: String,
-    first: String,
-    second: String,
+pub(crate) struct Two {
+    pub world: WorldState,
+    pub terrain: &'static TerrainMap,
+    pub realm: String,
+    pub user_id: u64,
+    pub leader: String,
+    pub first: String,
+    pub second: String,
 }
 
 /// Player 1's starting city and a second city of their realm far from it (`twoCities`).
-fn two_cities() -> Two {
+pub(crate) fn two_cities() -> Two {
     let terrain = city_terrain();
     let mut world = world_with_city();
     let realm = world.realms[0].clone();
@@ -73,7 +73,7 @@ fn two_cities() -> Two {
     }
 }
 
-fn hall_of(world: &WorldState, city: &str) -> (f64, f64) {
+pub(crate) fn hall_of(world: &WorldState, city: &str) -> (f64, f64) {
     let c = world.cities.iter().find(|c| c.id == city).unwrap();
     let h = world.buildings.iter().find(|b| b.id == c.town_hall_id).unwrap();
     (h.x, h.y)

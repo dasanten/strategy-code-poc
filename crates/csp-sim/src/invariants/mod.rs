@@ -134,6 +134,10 @@ pub fn world_invariants() -> Vec<Invariant> {
         },
         Invariant { name: "heirs-qualify", check: |w, _| crate::heir::heirs_qualify(w) },
         Invariant {
+            name: "heirs-took-over",
+            check: |w, _| crate::heir::takeover::heirs_took_over(w),
+        },
+        Invariant {
             name: "resident-names-well-formed",
             check: |w, _| crate::renaming::resident_names_well_formed(w),
         },

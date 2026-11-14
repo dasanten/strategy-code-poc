@@ -178,7 +178,12 @@ import { MapView } from './MapView.js'
 import { isWikiPath, pageFor } from './pages.js'
 import { Wiki } from './Wiki.js'
 import { RealmLog } from './RealmLog.js'
-import { realmEnded } from './realm-log.js'
+import {
+  heirTakeover,
+  realmEnded,
+  rememberTakeoverSeen,
+  rememberedTakeoverSeen,
+} from './realm-log.js'
 import { isNewRealm } from './map/legend.js'
 import {
   GOOD_LABELS,
@@ -618,6 +623,19 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     }
   }, [events, homeRealm, openDrawer])
   const marks = unseenMarks(sent, seenIds, events ?? [], logSeenUpTo)
+  // The notice that the heir took over (`CONTEXT.md`: Leader death with an heir), until the Player
+  // puts it away; remembered in this browser, so it shows at once or on their next login.
+  const [takeoverSeen, setTakeoverSeen] = useState<number | null | undefined>(undefined)
+  useEffect(() => {
+    if (homeRealm) setTakeoverSeen((seen) => seen ?? rememberedTakeoverSeen(homeRealm))
+  }, [homeRealm])
+  const takeover =
+    events && takeoverSeen !== undefined ? heirTakeover(events, takeoverSeen) : undefined
+  const putTakeoverAway = () => {
+    if (!takeover || !homeRealm) return
+    rememberTakeoverSeen(homeRealm, takeover.seq)
+    setTakeoverSeen(takeover.seq)
+  }
   const closeDrawer = useCallback(() => setOpenDrawer(undefined), [setOpenDrawer])
   // The Residents drawer opened fully (`CONTEXT.md`: Residents list); closing it goes back.
   const [residentsFull, setResidentsFull] = useState(false)
@@ -2675,6 +2693,29 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
           <div className="hud-dialog-actions">
             <button type="button" className="primary" onClick={() => window.location.reload()}>
               Reload
+            </button>
+          </div>
+        </CentredDialog>
+      )}
+      {takeover && (
+        <CentredDialog title="Your heir has taken over">
+          <p>
+            Your Leader has died. {takeover.heir} is your Leader now and leads your realm on from{' '}
+            {takeover.city}, under its name, with its standing, contracts and alliance.
+            {takeover.cities.length > 0 &&
+              ` Your other ${takeover.cities.length === 1 ? 'city is' : 'cities are'} self-managed now and hold you in good standing.`}{' '}
+            The realm log says what became of each. Name a new heir to be safe again.
+          </p>
+          <div className="hud-dialog-actions">
+            <button
+              type="button"
+              className="primary"
+              onClick={() => {
+                putTakeoverAway()
+                showOnMap(takeover.x, takeover.y)
+              }}
+            >
+              Play on
             </button>
           </div>
         </CentredDialog>

@@ -2197,6 +2197,11 @@ pub enum RealmEventWhat {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[ts(optional)]
         by: Option<String>,
+        /// The heir who takes over the realm of a Leader who died (`CONTEXT.md`: Leader death
+        /// with an heir).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        heir: Option<String>,
     },
     Fight {
         resident_id: String,
@@ -2632,6 +2637,18 @@ pub enum RealmEventWhat {
         city: String,
         x: f64,
         y: f64,
+    },
+    /// The Leader died and the heir took over the realm, keeping only `city`, the one they live
+    /// in; `cities` are the realm's others, now self-managed (`CONTEXT.md`: Leader death with an
+    /// heir).
+    HeirTookOver {
+        heir_id: String,
+        heir: String,
+        city_id: String,
+        city: String,
+        x: f64,
+        y: f64,
+        cities: Vec<SelfManagedCity>,
     },
     /// The heir no longer qualifies and the realm has none (`CONTEXT.md`: Heir).
     HeirLapsed {

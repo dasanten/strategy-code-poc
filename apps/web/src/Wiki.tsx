@@ -1198,6 +1198,25 @@ export function Wiki() {
           handover; then name another.
         </p>
         <p>
+          <b>When your Leader dies</b> and you have a living heir (one who is Down counts), the heir
+          is your Leader at once and you play on: your realm keeps its name, standing, contracts,
+          alliance, scripts and realm log. But it keeps only the city your heir lives in, with its
+          residents wherever they stand (those away keep their orders) and everything in it, and
+          the horses, carriages and boats nearer it than any other of your cities; outpost storages
+          stay yours. Every other city becomes a <b>self-managed city</b> with its residents and
+          the horses and carriages nearest it, holding you in good standing at{' '}
+          {signed(FORMER_PLAYER_STANDING)}; its soldiers lent out or in the alliance army walk
+          home. Your realm then has no heir until you name one. Your realm log and a notice say who
+          took over and what became of each city.
+        </p>
+        <p>
+          Without a living heir, or when your heir dies in the same tick as your Leader, your realm
+          ends: every city becomes self-managed, your contracts end, you leave your alliance, and
+          you start afresh with a new Leader and starting city on your next login. So naming an
+          heir, and keeping them safe in a city other than your Leader's, is what keeps a lost
+          Leader from costing you everything.
+        </p>
+        <p>
           <b>Relocate</b> moves any resident of your realm, your Leader, children and homeless ones
           too, to another of your cities: pick it on their card. They walk there and become its
           resident on stepping into its area, at once if they are already in it. You can give the
@@ -2940,7 +2959,8 @@ export function Wiki() {
           </li>
           <li>
             A city whose Leader died starts out holding its former Player at{' '}
-            {signed(FORMER_PLAYER_STANDING)}.
+            {signed(FORMER_PLAYER_STANDING)}, and so does one that left a realm whose heir took
+            over, toward that realm.
           </li>
         </ul>
         <p>

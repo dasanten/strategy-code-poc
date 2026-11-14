@@ -100,6 +100,16 @@ fn lapse_of(world: &WorldState, ri: usize) -> Option<HeirLapse> {
     None
 }
 
+/// The realm's heir, if it has one who still qualifies (a Down heir does): who takes over when its
+/// Leader dies (`CONTEXT.md`: Leader death with an heir).
+pub fn living_heir(world: &WorldState, realm_id: &str) -> Option<String> {
+    let ri = world.realms.iter().position(|r| r.id == realm_id)?;
+    if lapse_of(world, ri).is_some() {
+        return None;
+    }
+    world.realms[ri].heir_id.clone()
+}
+
 /// Clears the realm at `ri`'s heir, saying why in its realm log; `name` is the heir's.
 fn lapse(world: &mut WorldState, ri: usize, why: HeirLapse, name: String) {
     let Some(heir_id) = world.realms[ri].heir_id.take() else { return };
@@ -162,6 +172,8 @@ pub fn heirs_qualify(world: &WorldState) -> Vec<InvariantViolation> {
     }
     out
 }
+
+pub mod takeover;
 
 #[cfg(test)]
 mod tests;
