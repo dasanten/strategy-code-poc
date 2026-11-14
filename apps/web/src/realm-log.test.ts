@@ -893,6 +893,9 @@ describe('realm log', () => {
       tone: 'info',
       places: [{ name: 'Ashford', x: 3, y: 9 }],
     })
+    expect(describeEvent({ ...founded, heartland: 'Greenmere' }).text).toBe(
+      'Your Leader Mara founded Ashford, your realm’s starting city, in the heartland of Greenmere.',
+    )
     const died = {
       kind: 'died',
       residentId: 'r1',

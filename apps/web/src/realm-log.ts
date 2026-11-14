@@ -585,7 +585,9 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
     }
     case 'founded':
       return {
-        text: `Your Leader ${e.name} founded ${e.city}, your realm’s starting city.`,
+        text: e.heartland
+          ? `Your Leader ${e.name} founded ${e.city}, your realm’s starting city, in the heartland of ${e.heartland}.`
+          : `Your Leader ${e.name} founded ${e.city}, your realm’s starting city.`,
         tone: 'info',
         places: [{ name: e.city, x: e.x, y: e.y }],
       }

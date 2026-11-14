@@ -28,6 +28,7 @@ use csp_sim::last_seen::{
 };
 use csp_sim::order_sender::{Account, OrderSender};
 use csp_sim::orders::OrderReply;
+use csp_sim::player_start::StartPlace;
 use csp_sim::queries::alliance::commander_of;
 use csp_sim::queries::city::town_hall_of;
 use csp_sim::queries::people::founding_problem;
@@ -39,7 +40,7 @@ use csp_sim::region_map::region_map_unsound;
 use csp_sim::sight::{
     entities_in_sight, sent_inside_unseen, sent_out_of_sight, with_sight, InvariantViolation,
 };
-use csp_sim::starting_city::{found_starting_city, suggested_leader_name, FoundingNames};
+use csp_sim::starting_city::{found_starting_city_in, suggested_leader_name, FoundingNames};
 use csp_sim::tick::Scratch;
 use csp_sim::world_index::{world_index, WorldIndex};
 use flate2::{write::GzEncoder, Compression};
@@ -805,7 +806,17 @@ impl Realtime {
                 realm_name: realm_name.as_str().unwrap_or("").to_owned(),
                 leader_name: leader_name.as_str().unwrap_or("").to_owned(),
             };
-            let at = found_starting_city(g.world, g.terrain, user_id as u64, Some(&names));
+            let map = Arc::clone(g.explored.map());
+            let regions = map.regions(g.world.seed);
+            let (at, place) =
+                found_starting_city_in(g.world, g.terrain, regions, user_id as u64, Some(&names));
+            if let Some(StartPlace::WorldFull { x, y }) = place {
+                crate::log::log_event(
+                    tracing::Level::WARN,
+                    &json!({ "userId": user_id, "x": x, "y": y }),
+                    "every starting site is taken: a new Player starts on the free place nearest an open heartland",
+                );
+            }
             let realm = g.world.realms[at].id.clone();
             return self.welcome(g, socket, user, user_id, &realm);
         }

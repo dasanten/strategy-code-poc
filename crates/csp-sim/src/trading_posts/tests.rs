@@ -210,9 +210,14 @@ fn keeps_starting_cities_at_a_distance() {
     let realm = found_starting_city(&mut w, terrain, 1, None);
     let realm_id = w.realms[realm].id.clone();
     let start = w.cities.iter().find(|c| c.realm_id.as_deref() == Some(realm_id.as_str())).unwrap();
+    // A new Player starts on a starting site (T100.4), and posts keep the starting sites'
+    // clearance (T100.5), less where in its square each town hall stands.
+    let keep = crate::land_sites::starting_site_clearance(terrain.size)
+        - TRADING_POST.size
+        - csp_shared::balance::START_CITY_SIZE / 2.0;
     for p in trading_posts(&w) {
         let d = wrap_distance(terrain.size, hall_tile(&w, p), hall_tile(&w, start));
-        assert!(d >= NPC_CITY_MIN_DISTANCE / 2.0);
+        assert!(d >= keep, "{d} < {keep}");
     }
 }
 
