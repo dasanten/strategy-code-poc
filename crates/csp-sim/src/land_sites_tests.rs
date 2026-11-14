@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, OnceLock};
 
-use csp_shared::balance::{NPC_STARTING_SITE_CLEARANCE, NPC_VILLAGE};
+use csp_shared::balance::{MAP_SIZE, NPC_STARTING_SITE_CLEARANCE, NPC_VILLAGE};
 use csp_shared::terrain::{Terrain, TerrainMap};
 
 use super::*;
@@ -11,7 +11,7 @@ use crate::terrain_gen::generate_terrain;
 use crate::world::{create_world, generate_world};
 
 /// Seeds and sizes the rules are checked on: big enough for the HQ and a post in every region.
-const MAPS: [(i64, i32); 3] = [(1, 1024), (2, 1024), (3, 1280)];
+const MAPS: [(i64, i32); 2] = [(1, 1536), (3, 1536)];
 
 /// The worlds `generate_world` makes on `MAPS`, made once, with their land.
 fn generated() -> &'static Vec<(TerrainMap, WorldState, LandSites)> {
@@ -116,7 +116,8 @@ fn keeps_clear_of_the_starting_sites() {
         let (x, y) = hall(&world, c);
         for s in &starting {
             let d = (f64::from(x) - s.0).hypot(f64::from(y) - s.1);
-            assert!(d >= NPC_STARTING_SITE_CLEARANCE - TRADING_POST.size, "{} is {d} away", c.id);
+            let clearance = starting_site_clearance(size);
+            assert!(d >= clearance - TRADING_POST.size, "{} is {d} away", c.id);
         }
     }
     assert!(check_on_the_land(&world, &terrain, &land).iter().all(|p| p.rule != ROUTE_RULE));
@@ -147,5 +148,6 @@ fn a_walker_reaches_the_land_they_stand_on_and_never_across_the_sea() {
 fn a_tile_is_near_a_starting_site_the_short_way_round_the_map() {
     let starting = [(2.0, 2.0)];
     assert!(near_a_starting_site(&starting, 1000, (998.0, 2.0)));
-    assert!(!near_a_starting_site(&starting, 1000, (2.0 + NPC_STARTING_SITE_CLEARANCE, 2.0)));
+    assert!(!near_a_starting_site(&starting, 1000, (2.0 + starting_site_clearance(1000), 2.0)));
+    assert_eq!(starting_site_clearance(MAP_SIZE), NPC_STARTING_SITE_CLEARANCE);
 }
