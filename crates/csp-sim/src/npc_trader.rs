@@ -8,8 +8,8 @@
 use std::collections::HashSet;
 
 use csp_shared::balance::{
-    set_out_food, GOOD_WEIGHT, NPC_OFFER_REACH, NPC_RESIDENTS_PER_TRADER, NPC_TRADER_GIVE_UP_DAYS,
-    NPC_TRADER_REACH, OWN_FOOD, WALK_TICKS_PER_TILE,
+    road_crew_food, set_out_food, GOOD_WEIGHT, NPC_OFFER_REACH, NPC_RESIDENTS_PER_TRADER,
+    NPC_TRADER_GIVE_UP_DAYS, NPC_TRADER_REACH, OWN_FOOD, WALK_TICKS_PER_TILE,
 };
 use csp_shared::footprint::is_at;
 use csp_shared::goods::{put_away_units, WEAPONS};
@@ -90,16 +90,14 @@ struct SpokenFor {
 }
 
 /// What the city's traders out have spoken for (`spokenFor`).
-fn spoken_for(world: &WorldState, city: &City, adults: &[usize]) -> SpokenFor {
+fn spoken_for(world: &WorldState, city: &City) -> SpokenFor {
     let mut spoken = SpokenFor::default();
     let traders = world.city_plans.get(&city.id).and_then(|p| p.traders.as_ref());
     for t in traders.into_iter().flatten() {
-        let r = adults.iter().map(|&i| &world.residents[i]).find(|x| x.id == t.resident_id);
-        let fetched = if t.visiting_id.is_some() {
-            t.loaded == Some(true)
-        } else {
-            t.sells.keys().all(|g| r.is_some_and(|r| held(&r.carried, *g) >= 1.0))
-        };
+        // A run to a visiting trader or with a load to sell has picked it up once `loaded` (what
+        // they carry can't tell: a load of Food looks picked up by their own Food); one to an
+        // offer speaks for what it pays with through `offer` below.
+        let fetched = t.loaded == Some(true) || (t.visiting_id.is_none() && t.sells.is_empty());
         for (good, units) in &t.sells {
             spoken.sells.insert(*good);
             if !fetched {
@@ -176,7 +174,7 @@ fn plan_trader(
     }
     let Some(home) = npc_home(world, &city.id).cloned() else { return false };
     let Some(r) = spare_hand(world, city, adults, jobs) else { return false };
-    let spoken = spoken_for(world, city, adults);
+    let spoken = spoken_for(world, city);
     if plan_offer_run(world, city, r, &spoken, food_short, size) {
         jobs.insert(world.residents[r].id.clone(), trade_job());
         return true;
@@ -288,7 +286,7 @@ fn plan_visit(
         return false;
     }
     let Some(r) = spare_hand(world, city, adults, jobs) else { return false };
-    let spoken = spoken_for(world, city, adults);
+    let spoken = spoken_for(world, city);
     let project = world.city_plans.get(&city.id).and_then(|p| p.project.clone());
     let Some((sells, buys)) =
         visit_deal(world, city, project.as_ref(), r, visitor, carriage, &spoken, size)
@@ -637,7 +635,9 @@ pub fn run_trader(
         return go_home(world, &city.id, i, storage, size);
     }
     if let (Some(store), Some(w), Some((sell, units))) = (&storage_b, &warehouse, sell) {
-        if held(&world.residents[i].carried, sell) < 1.0 {
+        // Whether the load is picked up goes by the run, not by what they carry: a load of Food
+        // looks picked up by the Food a resident carries for themselves (T100.8).
+        if t.loaded != Some(true) {
             if !is_at(at, placed(store), size) {
                 return walk_to(&mut world.residents[i], (store.x, store.y));
             }
@@ -645,20 +645,24 @@ pub fn run_trader(
             if has < 1.0 {
                 return end_run(world, &city.id, &rid);
             }
-            let mut goods = Stock::new();
+            let load = units.min(has);
+            let mut goods = Stock::from([(sell, load)]);
             let food = set_out_food(
                 wrap_distance(size, at, (w.x as i32, w.y as i32)) * WALK_TICKS_PER_TILE,
             );
-            let lacks = held_in(store.stock.as_ref(), Good::Food)
-                .min(food - held(&world.residents[i].carried, Good::Food));
+            let left = held_in(store.stock.as_ref(), Good::Food)
+                - if sell == Good::Food { load } else { 0.0 };
+            let lacks = left.min(food - held(&world.residents[i].carried, Good::Food));
             if lacks >= 1.0 {
-                goods.insert(Good::Food, lacks.floor());
+                *goods.entry(Good::Food).or_insert(0.0) += lacks.floor();
             }
-            goods.insert(sell, units.min(has));
             let coins = held_in(store.stock.as_ref(), Good::Coins)
                 - held(&npc_reserve(world, city), Good::Coins);
             if coins >= 1.0 && buy.is_some() {
                 goods.insert(Good::Coins, coins.floor());
+            }
+            if let Some(t) = run_of(world, &city.id, &rid) {
+                t.loaded = Some(true);
             }
             world.residents[i].order = Some(pick_up(&store.id, goods));
             return;
@@ -666,8 +670,18 @@ pub fn run_trader(
         if !is_at(at, placed(w), size) {
             return walk_to(&mut world.residents[i], (w.x, w.y));
         }
-        let units = held(&world.residents[i].carried, sell);
-        world.residents[i].order = Some(trade(TradeSide::Sell, sell, units));
+        // Selling Food, they keep what the walk home eats.
+        let keep = if sell == Good::Food {
+            road_crew_food(
+                wrap_distance(size, at, (store.x as i32, store.y as i32)) * WALK_TICKS_PER_TILE,
+            )
+        } else {
+            0.0
+        };
+        let units = (held(&world.residents[i].carried, sell) - keep).floor();
+        if units >= 1.0 {
+            world.residents[i].order = Some(trade(TradeSide::Sell, sell, units));
+        }
         if let Some(t) = run_of(world, &city.id, &rid) {
             t.sells.clear();
         }
