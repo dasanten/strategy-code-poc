@@ -331,6 +331,13 @@ impl Insight {
             || self.standing.contains(&(k.x as i32, k.y as i32))
     }
 
+    /// Whether it sees what a resident carries (`CONTEXT.md`: Equipment, Seeing it): as with a
+    /// carriage's load, its own realm's and its allies' residents, those it commands, and anyone
+    /// with a resident on their tile. What they have equipped anyone in sight sees.
+    pub fn carried(&self, world: &WorldState, index: &WorldIndex, r: &Resident) -> bool {
+        self.fares(world, index, r) || self.standing.contains(&(r.x as i32, r.y as i32))
+    }
+
     /// Whether it sees how a resident fares.
     pub fn fares(&self, world: &WorldState, index: &WorldIndex, r: &Resident) -> bool {
         let by = index.commander_of(world, &r.id, r.owner.as_deref());
@@ -447,8 +454,9 @@ pub fn seen_script(world: &WorldState, script: &RunningScript, own: bool) -> See
 /// A resident as `side` sees them (`everythingSeen`): which script they run but not its memory,
 /// its params only for the realm commanding them, the queue only for the realm that gave it,
 /// what a defence script interrupted and the defence and Alarm scripts only for the owner; that
-/// they are Down for anyone, how they fare only as `fares` says. Never their script log nor
-/// whether an order stands against blows (`withoutServerOnly`).
+/// they are Down for anyone, how they fare only as `fares` says, what they have equipped for
+/// anyone and what they carry only as `carried` says. Never their script log nor whether an order
+/// stands against blows (`withoutServerOnly`).
 fn seen_resident(
     world: &WorldState,
     index: &WorldIndex,
@@ -483,8 +491,12 @@ fn seen_resident(
         hunger: fares.then_some(r.hunger),
         born_at: r.born_at,
         lifespan: r.lifespan,
-        carried: r.carried.clone(),
-        equipped: r.equipped.clone(),
+        carried: if insight.carried(world, index, r) {
+            r.carried.clone()
+        } else {
+            Default::default()
+        },
+        equipped: crate::equipment::equipment_of(r),
         order: r.order.clone(),
         order_ended: r.order_ended.clone(),
         struck: r.struck.clone().filter(|_| fares),
@@ -1115,7 +1127,9 @@ pub fn sent_inside_unseen(
                     || r.struck.is_some()
                     || r.down_until.is_some();
                 let it = world.residents.iter().find(|x| x.id == r.id);
-                told && !it.is_some_and(|it| insight.fares(world, index, it))
+                let carried = r.carried.values().any(|n| *n > 0.0);
+                (told && !it.is_some_and(|it| insight.fares(world, index, it)))
+                    || (carried && !it.is_some_and(|it| insight.carried(world, index, it)))
             }
             SeenEntity::Horse(h) => {
                 let told = h.hunger.is_some() || h.health.is_some() || h.down_until.is_some();

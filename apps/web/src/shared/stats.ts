@@ -41,6 +41,7 @@ import {
 import { PROTECTION_KINDS } from './world.js'
 import type {
   BuildingKind,
+  Equipment,
   Good,
   Horse,
   Resident,
@@ -204,8 +205,20 @@ export function workLearned(resident: Resident, skill: SkillName, tick: number):
   return Math.min(room, (WORK_SKILL_PER_DAY / TICKS_PER_GAME_DAY) * pace)
 }
 
-/** The weapon a resident fights with: the best one they carry, if any (`CONTEXT.md`: Weapons and armour). */
-export function bestWeapon(resident: Pick<Resident, 'carried'>): Weapon | undefined {
+/**
+ * A resident as far as their gear goes: what they carry (all of it for one's own, nothing for
+ * another realm's) and what they have equipped, which anyone who sees them sees (`CONTEXT.md`:
+ * Equipment, Seeing it).
+ */
+export type Geared = Pick<Resident, 'carried'> & { equipped?: Equipment }
+
+/**
+ * The weapon a resident fights with (`CONTEXT.md`: Equipment): the one equipped, or with the slot
+ * empty the best one they carry, which an empty slot takes at once.
+ */
+export function bestWeapon(resident: Geared): Weapon | undefined {
+  const equipped = resident.equipped?.weapon
+  if (equipped !== undefined && equipped in WEAPON_ATTACK) return equipped as Weapon
   const carried = (Object.keys(WEAPON_ATTACK) as Weapon[]).filter(
     (w) => (resident.carried[w] ?? 0) > 0,
   )
@@ -213,25 +226,28 @@ export function bestWeapon(resident: Pick<Resident, 'carried'>): Weapon | undefi
 }
 
 /**
- * The protection that counts for a resident (`CONTEXT.md`: Weapons and armour): the best shield and
- * the best armour they carry, so steel over iron; a second shield adds nothing.
+ * The protection that counts for a resident (`CONTEXT.md`: Equipment): the shield and the armour
+ * equipped, or with a slot empty the best of its kind they carry; a second shield adds nothing.
  */
-export function wornProtection(resident: Pick<Resident, 'carried'>): Good[] {
+export function wornProtection(resident: Geared): Good[] {
   const defence = PROTECTION_DEFENCE as Record<string, number>
-  return PROTECTION_KINDS.flatMap((kind) => {
+  const slots = [resident.equipped?.shield, resident.equipped?.armour]
+  return PROTECTION_KINDS.flatMap((kind, i) => {
+    const equipped = slots[i]
+    if (equipped !== undefined) return [equipped]
     const held = kind.filter((p) => (resident.carried[p] ?? 0) > 0)
     return held.sort((a, b) => (defence[b] ?? 0) - (defence[a] ?? 0)).slice(0, 1)
   })
 }
 
 /** Damage a resident's protection takes off each blow (`CONTEXT.md`: Combat): `wornProtection`'s. */
-export function protectionValue(resident: Pick<Resident, 'carried'>): number {
+export function protectionValue(resident: Geared): number {
   const defence = PROTECTION_DEFENCE as Record<string, number>
   return wornProtection(resident).reduce((sum, p) => sum + (defence[p] ?? 0), 0)
 }
 
-/** Whether a resident is armed: carries a weapon (`CONTEXT.md`: Soldier). */
-export function isArmed(resident: Pick<Resident, 'carried'>): boolean {
+/** Whether a resident is armed: has a weapon equipped (`CONTEXT.md`: Soldier). */
+export function isArmed(resident: Geared): boolean {
   return bestWeapon(resident) !== undefined
 }
 

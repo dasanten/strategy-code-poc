@@ -1235,8 +1235,7 @@ export function Wiki() {
           frontier border, gold and coal never in a heartland, and in another region than the old
           one wherever one fits. It appears out of everyone’s sight and, where the map allows, on
           land nobody has explored. Nobody is told: you have to find it. If you had explored its
-          tile before, your map shows no node there until one of your residents sees the tile
-          again.
+          tile before, your map shows no node there until one of your residents sees the tile again.
         </p>
         <p>
           NPC cities and the Trade Organization move on too. When the mine an NPC city or a trading
@@ -1420,27 +1419,26 @@ export function Wiki() {
           card (<strong>Leader and heir…</strong>, then <strong>Name heir</strong>) or from a script
           with <code>nameHeir(residentId)</code>; it is free, at once and from anywhere. Who
           qualifies: an adult of your realm who lives in one of its cities, isn't your Leader and
-          serves no one else (no mercenary contract or offer naming them, not in the alliance
-          army), the same residents a Leader handover allows, but they need not stand by your
-          Leader. You have one heir: naming another replaces the first, and{' '}
-          <strong>Clear heir</strong> or <code>clearHeir()</code> leaves you with none. The top bar
-          shows your heir, or “No heir” to pick one; their card and the Residents list mark them.
-          Only you and your allies see who it is. The heir lapses, with a line in your realm log,
-          when they die, leave your realm (their city changes hands, or they are handed over),
-          become homeless, are lent out or handed to the alliance army, or become your Leader by a
-          handover; then name another.
+          serves no one else (no mercenary contract or offer naming them, not in the alliance army),
+          the same residents a Leader handover allows, but they need not stand by your Leader. You
+          have one heir: naming another replaces the first, and <strong>Clear heir</strong> or{' '}
+          <code>clearHeir()</code> leaves you with none. The top bar shows your heir, or “No heir”
+          to pick one; their card and the Residents list mark them. Only you and your allies see who
+          it is. The heir lapses, with a line in your realm log, when they die, leave your realm
+          (their city changes hands, or they are handed over), become homeless, are lent out or
+          handed to the alliance army, or become your Leader by a handover; then name another.
         </p>
         <p>
           <b>When your Leader dies</b> and you have a living heir (one who is Down counts), the heir
           is your Leader at once and you play on: your realm keeps its name, standing, contracts,
           alliance, scripts and realm log. But it keeps only the city your heir lives in, with its
-          residents wherever they stand (those away keep their orders) and everything in it, and
-          the horses, carriages and boats nearer it than any other of your cities; outpost storages
-          stay yours. Every other city becomes a <b>self-managed city</b> with its residents and
-          the horses and carriages nearest it, holding you in good standing at{' '}
-          {signed(FORMER_PLAYER_STANDING)}; its soldiers lent out or in the alliance army walk
-          home. Your realm then has no heir until you name one. Your realm log and a notice say who
-          took over and what became of each city.
+          residents wherever they stand (those away keep their orders) and everything in it, and the
+          horses, carriages and boats nearer it than any other of your cities; outpost storages stay
+          yours. Every other city becomes a <b>self-managed city</b> with its residents and the
+          horses and carriages nearest it, holding you in good standing at{' '}
+          {signed(FORMER_PLAYER_STANDING)}; its soldiers lent out or in the alliance army walk home.
+          Your realm then has no heir until you name one. Your realm log and a notice say who took
+          over and what became of each city.
         </p>
         <p>
           Without a living heir, or when your heir dies in the same tick as your Leader, your realm
@@ -3352,14 +3350,20 @@ export function Wiki() {
         <p>
           Each resident has three <strong>equipment</strong> slots: a <strong>weapon</strong>, a{' '}
           <strong>shield</strong> and <strong>armour</strong>, one item each. Only what is equipped
-          counts in a fight, and only a resident with a weapon equipped is <strong>armed</strong>{' '}
-          (a soldier): a spare sword in the pack makes nobody a soldier and a second shield adds
-          nothing. A resident with an empty slot equips the best fitting item at once when they
-          pick one up, from a storage, the ground, a carriage or a smithy; with the slot already
-          full, the new one is only carried, even if it is better. Putting the equipped item down
-          (storing, dropping it, or losing it as loot) empties its slot, and the best other item
-          of that kind they carry takes its place. Equipped gear still weighs what it weighs and
-          is part of what they carry. A resident's card shows their three slots.
+          counts in a fight, and only a resident with a weapon equipped is <strong>armed</strong> (a
+          soldier): a spare sword in the pack makes nobody a soldier and a second shield adds
+          nothing. A resident with an empty slot equips the best fitting item at once when they pick
+          one up, from a storage, the ground, a carriage or a smithy; with the slot already full,
+          the new one is only carried, even if it is better. Putting the equipped item down
+          (storing, dropping it, or losing it as loot) empties its slot, and the best other item of
+          that kind they carry takes its place. Equipped gear still weighs what it weighs and is
+          part of what they carry. A resident's card shows their three slots.
+        </p>
+        <p>
+          Anyone who sees a resident sees what they have equipped: on the map up close a mark for
+          their weapon and shield and a rim for armour, bright for steel and grey for iron, and the
+          same on their card, to scripts too. What else they carry stays hidden from other realms,
+          as a carriage's load does, unless one of theirs stands on the same tile.
         </p>
         <p>
           Defenders on their own city's wall take {pct(WALL_DEFENCE)} of the damage. A tile of wall
