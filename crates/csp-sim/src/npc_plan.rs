@@ -313,6 +313,26 @@ pub fn plan_city(
         size,
         &old_jobs,
     );
+    // Those gathering its founding party's materials are still spare hands to its founding
+    // (`CONTEXT.md`: Full city), though they hold their places.
+    let mut unneeded = unneeded;
+    let gathered: HashSet<Good> =
+        founding_lacks(world, &city, home.as_ref(), size).into_iter().map(|s| s.good).collect();
+    if !gathered.is_empty() {
+        for &i in &adults {
+            let gathers = jobs.get(&world.residents[i].id).is_some_and(|j| {
+                j.kind == CityJobKind::Work
+                    && j.building_id.as_ref().is_some_and(|id| {
+                        world.buildings.iter().find(|b| &b.id == id).is_some_and(|b| {
+                            chain_good(world, b).is_some_and(|g| gathered.contains(&g))
+                        })
+                    })
+            });
+            if gathers && !unneeded.contains(&i) {
+                unneeded.push(i);
+            }
+        }
+    }
     // Trading posts and the HQ don't feed their stables this way.
     if city.trade_org.is_none() && !feeding {
         plan_feeder(world, &city, &adults, &mut jobs);
