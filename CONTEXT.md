@@ -626,7 +626,8 @@ The shared language of the game. Domain terms only — no implementation details
   the good it is short of and has no node for. A **founding party** of a village's worth of
   adults, more from a big city, one of them armed, each carrying a share of the materials (a town
   hall's and a storage's, and houses for those past a village's worth) and Food for the walk and
-  the first weeks, walks there and builds the town hall, which founds the **daughter** as an
+  the first weeks, with as many more as it takes to carry it all (Daniel, 2026-11-15, T100.8;
+  those bring no house of their own), walks there and builds the town hall, which founds the **daughter** as an
   ordinary NPC city with a name from the game; then its storage, a farm and a house. Until its
   storage stands its armed residents build with the rest, since the materials are on them and
   there is nowhere else to put them. A member gone back to the mother's storage for materials

@@ -2798,7 +2798,8 @@ export function Wiki() {
           to {num(NPC_FOUND_PARTY_MOST)}, one of them armed, sets out carrying a town hall's and a
           storage's materials, a house's for each {num(HOUSING_ROOM.house ?? 1)} members past{' '}
           {num(NPC_VILLAGE.residents)}, and Food for twice the walk and {days(NPC_FOUND_FOOD_DAYS)}{' '}
-          there, and builds the town hall, which founds the daughter: an NPC city of its own with a
+          there, with as many more adults as it takes to carry all of it, and builds the town hall,
+          which founds the daughter: an NPC city of its own with a
           name from the game. It then builds its storage, a farm and a house, and once its storage
           holds the Wood of its reserve, its first wall, a ring{' '}
           {num(Math.floor(NPC_VILLAGE.size / 2))} tiles round its home. Mother and daughter start at

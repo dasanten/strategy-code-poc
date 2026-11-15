@@ -29,7 +29,7 @@ use crate::npc_growth::far_stable_spot;
 use crate::npc_plan::plan_city;
 use crate::npc_test_world::{plains, Runner};
 use crate::queries::balance::carry_capacity;
-use crate::queries::city::town_hall_of;
+use crate::queries::city::{city_residents, town_hall_of};
 use crate::queries::names::held;
 use crate::queries::npc_trade::{
     npc_founding_party_size, npc_full_days, npc_reserve, npc_soldier_target,
@@ -144,6 +144,34 @@ fn run(
             assert_eq!(check_all(world, terrain), []);
         }
     }
+}
+
+/// Whether a town's founding party has the room for all it carries (`CONTEXT.md`: Founding): the
+/// materials, and each member's Food for the walk and the first weeks.
+fn carries_it_all(t: &Town) -> bool {
+    let party = t.party();
+    let site = t.plan().founding_site.expect("a site");
+    let home = t.home();
+    let walk = wrap_distance(
+        t.terrain.size,
+        (home.x as i32, home.y as i32),
+        (site.x as i32, site.y as i32),
+    ) * WALK_TICKS_PER_TILE;
+    let (way, stay) = founding_food(walk);
+    let n = party.len() as f64;
+    let usual = npc_founding_party_size(city_residents(&t.world, &t.city).len() as f64);
+    let load = crate::queries::residents::stock_weight(&founding_materials(Some(usual)))
+        + n * (way + stay) * good_weight(Good::Food);
+    let room: f64 = party
+        .iter()
+        .map(|id| {
+            let r = t.world.residents.iter().find(|r| &r.id == id).expect("a member");
+            carry_capacity(r, t.world.tick as f64)
+                - crate::queries::residents::stock_weight(&r.carried)
+                + held(&r.carried, Good::Food) * good_weight(Good::Food)
+        })
+        .sum();
+    room >= load
 }
 
 fn found_job() -> CityJob {
@@ -379,7 +407,9 @@ fn a_city_of_a_villages_size_still_waits_a_week_and_sends_a_villages_worth() {
 
     t.plan_mut().full_since = Some(t.world.tick as f64 - NPC_FULL_DAYS * DAY);
     t.plan_city();
-    assert_eq!(t.party().len() as f64, NPC_VILLAGE.residents);
+    // A village's worth at least, and as many more as it takes to carry it all (T100.8).
+    assert!(t.party().len() as f64 >= NPC_VILLAGE.residents);
+    assert!(carries_it_all(&t));
     assert_eq!(
         founding_materials(Some(NPC_VILLAGE.residents)),
         Stock::from([(Good::Wood, 90.0), (Good::Stone, 50.0)])
@@ -520,7 +550,7 @@ fn founds_a_village_480_tiles_away_within_a_few_game_weeks_which_then_feeds_itse
     assert!(wrap_distance(t.terrain.size, at(mother_hall), at(hall)) > far);
     let people: Vec<_> =
         t.world.residents.iter().filter(|r| r.city_id.as_deref() == Some(&village)).collect();
-    assert_eq!(people.len() as f64, NPC_VILLAGE.residents);
+    assert!(people.len() as f64 >= NPC_VILLAGE.residents);
     assert!(people
         .iter()
         .any(|r| { held(&r.carried, Good::Spear) != 0.0 || held(&r.carried, Good::Sword) != 0.0 }));
@@ -641,7 +671,7 @@ fn still_sets_a_party_out_once_nothing_is_short_its_wait_kept() {
     t.home_stock().insert(Good::Food, full);
     t.world.tick += 60;
     t.plan_city();
-    assert_eq!(t.party().len() as f64, NPC_VILLAGE.residents);
+    assert!(t.party().len() as f64 >= NPC_VILLAGE.residents && carries_it_all(&t));
     assert_eq!(t.plan().short_since, None);
 }
 

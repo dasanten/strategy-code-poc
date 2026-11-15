@@ -15,8 +15,8 @@ use csp_shared::footprint::is_at;
 use csp_shared::terrain::{wrap, wrap_distance, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
-    Building, BuildingKind, City, CityJob, CityJobKind, CityPlan, Good, GoodsSpot, PickUpOrder,
-    ResidentOrder, Stock, Task, Tile, WalkOrder, WorldState,
+    Building, BuildingKind, City, CityJob, CityJobKind, CityPlan, DropOrder, Good, GoodsSpot,
+    PickUpOrder, ResidentOrder, Stock, Task, Tile, WalkOrder, WorldState,
 };
 use serde_json::json;
 
@@ -328,8 +328,9 @@ pub fn far_out(r: (i32, i32), home: (i32, i32), size: i32) -> bool {
 
 /// The founding party (`pickParty`, `CONTEXT.md`: Founding): `npc_founding_party_size` adults, one
 /// of them armed while the city has an armed adult, the rest of its spare hands and its workers off
-/// the farms, those with the most room on them first. None while there aren't enough, or while
-/// their arms can't hold the Food for the walk and all the materials.
+/// the farms, those with the most room on them first, and as many more as it takes for their arms
+/// to hold the Food for the walk and the first weeks and all the materials. None while there aren't
+/// enough.
 fn pick_party(
     world: &WorldState,
     city: &City,
@@ -350,6 +351,9 @@ fn pick_party(
         partner.is_none_or(|p| p.carrying.is_none())
     };
     let food_weight = GOOD_WEIGHT.get("food").expect("a weight");
+    // What they carry of their own Food counts as room: they take along what they need of it and
+    // put the rest into the storage (`step_founders`).
+    let (walk, stay) = founding_food(walk_ticks);
     let room = |i: usize| {
         let r = &world.residents[i];
         carry_capacity(r, tick) - stock_weight(&r.carried) + carried_food(r) * food_weight
@@ -373,13 +377,22 @@ fn pick_party(
     }
     rest.sort_by(|&a, &b| room(b).total_cmp(&room(a)));
     let members = npc_founding_party_size(city_residents(world, &city.id).len() as f64) as usize;
-    let party: Vec<usize> = armed.first().copied().into_iter().chain(rest).take(members).collect();
+    let mut candidates = armed.first().copied().into_iter().chain(rest);
+    let mut party: Vec<usize> = candidates.by_ref().take(members).collect();
     if party.len() < members {
         return None;
     }
-    let load = stock_weight(&founding_materials(Some(members as f64)))
-        + party.len() as f64 * founding_food(walk_ticks).0 * food_weight;
-    (party.iter().map(|&i| room(i)).sum::<f64>() >= load).then_some(party)
+    // Each carries a share of the materials and Food for the walk and the first weeks
+    // (`CONTEXT.md`: Founding): as many more go as it takes to carry it all (Daniel, 2026-11-15,
+    // T100.8). Those bring no house of their own; the daughter builds it later.
+    let materials = stock_weight(&founding_materials(Some(members as f64)));
+    let load = |n: usize| materials + n as f64 * (walk + stay) * food_weight;
+    loop {
+        if party.iter().map(|&i| room(i)).sum::<f64>() >= load(party.len()) {
+            return Some(party);
+        }
+        party.push(candidates.next()?);
+    }
 }
 
 /// A pair ends when one of them leaves to found a daughter (`endPair`).
@@ -566,9 +579,9 @@ fn party_lacks(world: &WorldState, members: &[usize], size: f64) -> [Stock; 2] {
 }
 
 /// What the founding party does each tick (`stepFounders`), for its members that are idle: near
-/// the storage, they first take from it, as much as fits: Food for the walk, what the party still
-/// lacks of its materials, then Food for their first weeks; then they build the town hall on the
-/// site by the Build default.
+/// the storage, they first take from it, as much as fits: Food for the walk and their first weeks,
+/// then what the party still lacks of its materials; then they build the town hall on the site by
+/// the Build default.
 pub fn step_founders(
     world: &mut WorldState,
     city_id: &str,
@@ -578,7 +591,9 @@ pub fn step_founders(
 ) {
     let plan = world.city_plans.get(city_id);
     let Some(site) = plan.and_then(|p| p.founding_site) else { return };
-    let party_size = founding_party(plan).len() as f64;
+    // The materials of the usual party: those who come only to carry bring no house (T100.8).
+    let party_size = npc_founding_party_size(city_residents(world, city_id).len() as f64)
+        .min(founding_party(plan).len() as f64);
     let site_at = (site.x as i32, site.y as i32);
     for &i in members {
         let r = &world.residents[i];
@@ -594,15 +609,27 @@ pub fn step_founders(
                 let on_way = (food_walk - carried_food(r)).max(0.0);
                 let stay = (food_walk + food_stay - carried_food(r) - on_way).max(0.0);
                 let [hall, rest] = party_lacks(world, members, party_size);
+                // Their own Food first, the walk's and the first weeks', so one full of
+                // materials doesn't go without (T100.8); the party has the room for all of it.
                 let parts = [
                     Stock::from([(Good::Food, on_way)]),
+                    Stock::from([(Good::Food, stay)]),
                     hall,
                     rest,
-                    Stock::from([(Good::Food, stay)]),
                 ];
-                if let Some(load) = load_for(world, i, &parts, store) {
+                // Food of their own past that goes into the storage first, to make room for the
+                // materials (T100.8).
+                let spare = (carried_food(r) - food_walk - food_stay).floor();
+                let load = load_for(world, i, &parts, store);
+                if spare >= 1.0 || load.is_some() {
                     let (sid, sx, sy) = (store.id.clone(), store.x, store.y);
-                    let order = if is_at(at, placed(store), size) {
+                    let here = is_at(at, placed(store), size);
+                    let order = if here && spare >= 1.0 {
+                        ResidentOrder::Drop(DropOrder {
+                            to: GoodsSpot::Storage { storage_id: sid },
+                            goods: Stock::from([(Good::Food, spare)]),
+                        })
+                    } else if let (true, Some(load)) = (here, load) {
                         ResidentOrder::PickUp(PickUpOrder {
                             from: GoodsSpot::Storage { storage_id: sid },
                             goods: load,
