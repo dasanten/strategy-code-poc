@@ -1096,3 +1096,50 @@ fn game_thread(
     .unwrap();
     Arc::new(game)
 }
+
+// ------------------------------------------------------------------------------------ the land
+
+#[tokio::test]
+async fn serves_the_land_a_player_explored_and_names_no_other_region() {
+    let db = Db::new();
+    let terrain = csp_sim::terrain_gen::generate_terrain(1, 64);
+    let world = create_world(&terrain, 1);
+    let regions = csp_sim::regions::Regions::of(1, &terrain);
+    let mut explored = ExploredTerrain::new(terrain.clone(), &world.nodes);
+    let conn = db.conn();
+    let mara = add_user(&conn, "Mara");
+    let first = &regions.regions[0];
+    explored.explore(mara as u64, first.x, first.y, 1);
+    let game = game_thread(&db, world, explored);
+    let mut opts = db.opts();
+    opts.game = Some(game);
+    let app = build_app(opts);
+    let token = token_for(&conn, mara);
+
+    let land = call(&app, "POST", "/api/land", Some(&token), Some(json!({}))).await;
+    assert_eq!(land.status, StatusCode::OK);
+    let land = land.json();
+    let named: Vec<&str> =
+        land["regions"].as_array().unwrap().iter().map(|r| r["name"].as_str().unwrap()).collect();
+    assert!(named.contains(&first.name.as_str()));
+    // Only regions with a tile within the 3 by 3 explored are named.
+    let near: Vec<&str> = (-1..=1)
+        .flat_map(|dy| (-1..=1).map(move |dx| (dx, dy)))
+        .filter_map(|(dx, dy)| regions.region_at(first.x + dx, first.y + dy))
+        .map(|r| r.name.as_str())
+        .collect();
+    assert!(named.iter().all(|n| near.contains(n)), "{named:?}");
+    assert!(!land["chunks"].as_array().unwrap().is_empty());
+
+    // A chunk asked for that the Player explored nothing of sends nothing.
+    let across = csp_shared::chunks::chunks_across(64) as i32;
+    let here = (first.y / 32) * across + first.x / 32;
+    let other = (here + 1) % (across * across);
+    let none =
+        call(&app, "POST", "/api/land", Some(&token), Some(json!({ "chunks": [other] }))).await;
+    assert_eq!(none.json()["chunks"], json!([]));
+    let bad = call(&app, "POST", "/api/land", Some(&token), Some(json!({ "chunks": 3 }))).await;
+    assert_eq!((bad.status, bad.error().as_str()), (StatusCode::BAD_REQUEST, "invalid-input"));
+    let anon = call(&app, "POST", "/api/land", None, Some(json!({}))).await;
+    assert_eq!(anon.status, StatusCode::UNAUTHORIZED);
+}

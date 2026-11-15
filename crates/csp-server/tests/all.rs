@@ -34,6 +34,8 @@ mod map_tools;
 mod npc_alliances;
 #[path = "realtime.rs"]
 mod realtime;
+#[path = "reset_world.rs"]
+mod reset_world;
 #[path = "saves.rs"]
 mod saves;
 #[path = "scripts.rs"]

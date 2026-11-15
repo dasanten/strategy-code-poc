@@ -22,6 +22,7 @@ describe('buildingInfoLines', () => {
     expect(buildingInfoLines('smelter', labels)).toEqual([
       BUILDING_PURPOSE.smelter,
       '2 iron ore → 1 iron',
+      '1 iron, 1 coal → 1 steel',
       'Teaches Smelting',
       `Up to ${WORKPLACE_MAX_WORKERS.smelter} workers`,
       `Footprint ${FOOTPRINT.smelter} × ${FOOTPRINT.smelter} tiles`,
@@ -39,7 +40,9 @@ describe('buildingInfoLines', () => {
     expect(buildingInfoLines('mine', labels, { node: 'goldOre' })).toContain(
       'Makes gold ore, from its node',
     )
-    expect(buildingInfoLines('mine', labels)).toContain('Makes iron ore or gold ore, from its node')
+    expect(buildingInfoLines('mine', labels)).toContain(
+      'Makes iron ore, gold ore or coal, from its node',
+    )
     expect(buildingInfoLines('lumberCamp', labels)).toContain(
       'Built from no materials and about 2 game days of one resident’s work',
     )
@@ -82,7 +85,7 @@ describe('buildingInfoLines', () => {
 
 describe('buildingNodeKind', () => {
   it('finds the node under any tile of the footprint', () => {
-    const node: KnownNode = { kind: 'ironOre', x: 11, y: 11 }
+    const node: KnownNode = { kind: 'ironOre', x: 11, y: 11, richness: 'normal' as const }
     const nodeAt = (x: number, y: number) => (x === node.x && y === node.y ? node : undefined)
     expect(buildingNodeKind(site({ kind: 'mine', x: 10, y: 10 }), nodeAt)).toBe('ironOre')
     expect(buildingNodeKind(site({ kind: 'mine', x: 20, y: 20 }), nodeAt)).toBeUndefined()

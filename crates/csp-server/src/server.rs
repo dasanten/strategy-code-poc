@@ -179,16 +179,22 @@ pub struct Game<L: LogSink> {
 impl<L: LogSink> Game<L> {
     /// The game without a script library: orders, walking and territory, but no script runs. The
     /// map's terrain is the explored terrain's copy, so the server holds it once (ADR 0034).
-    pub fn new(world: WorldState, explored: ExploredTerrain, log: L) -> Self {
+    pub fn new(world: WorldState, mut explored: ExploredTerrain, log: L) -> Self {
         let log = Arc::new(log);
+        // The nodes that came into being since some Players explored their tiles stay hidden
+        // from them (`CONTEXT.md`: Running dry).
+        csp_sim::new_veins::hide_new_veins(&world, &mut explored);
         let terrain = Arc::clone(explored.map().terrain());
+        let explored = Arc::new(Mutex::new(explored));
+        // The tick places new nodes with it (`CONTEXT.md`: Running dry).
+        let scratch = Scratch { land: Some(Arc::clone(&explored)), ..Scratch::default() };
         Self {
             world,
             orders: OrderQueue::new(order_kinds(), Some(Arc::clone(&terrain))),
             walking: Walking::new(Arc::clone(&terrain)),
             terrain,
-            scratch: Scratch::default(),
-            explored: Arc::new(Mutex::new(explored)),
+            scratch,
+            explored,
             sight: SightTracker::new(),
             territory: TerritoryTracker::default(),
             queues: None,
@@ -293,8 +299,17 @@ impl<L: LogSink> Game<L> {
             timer.time(TickPhase::Territory, || territory.update(world, map));
             let grown = timer.time(TickPhase::Sight, || {
                 let index = scratch.index(world, size);
-                sight.update(world, index, &mut *lock())
+                let mut grown = sight.update(world, index, &mut *lock());
+                // A new node a Player had hidden shows once they see its tile: their map loads
+                // its chunk again (`CONTEXT.md`: Running dry).
+                for &(user, chunk) in &scratch.found_veins {
+                    grown.entry(user).or_default().insert(chunk as usize);
+                }
+                grown
             });
+            for line in &scratch.vein_log {
+                log.log(Level::WARN, json!({ "tick": world.tick }), line);
+            }
             timer.time(TickPhase::Broadcast, || {
                 if let Some(rt) = realtime.as_ref() {
                     let explored = lock();
@@ -540,7 +555,10 @@ pub fn open_world(config: &Config) -> Result<(Connection, Game<TracingLog>), Ser
     let conn = open_db(&config.db_path, Some(&mut backup))?;
     let (world, terrain) =
         load_or_create_world(&conn, |seed| generate_terrain(seed, MAP_SIZE), generate_world, 1)?;
-    let explored = load_explored(&conn, terrain, &world.nodes)?;
+    let explored = load_explored(&conn, terrain, &world.nodes_ever())?;
+    // The regions are worked out once, here, rather than in the first tick a script reads a tile
+    // view or a Player asks for their land (about a second on the full map).
+    explored.map().regions(world.seed);
     tag_world(&world);
     let defaults = crate::scripts::game_defaults();
     // Players who haven't edited a default script run the game's current default from now on.

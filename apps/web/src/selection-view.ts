@@ -82,9 +82,11 @@ import {
   stockWeight,
   madePerDay,
 } from './shared/stats.js'
+import { richnessFactor } from './shared/richness.js'
 import { isOutpostStorage } from './shared/city.js'
 import type {
   BuildingKind,
+  Richness,
   Building,
   Carriage,
   CarriageHorse,
@@ -112,6 +114,7 @@ import type {
   SeenBuilding,
   SeenCity,
   RealmLabel,
+  VeinWord,
 } from '@csp/shared-types'
 import { covers, FOOTPRINT, footprintTiles } from './shared/footprint.js'
 import { wrap, Terrain, UNEXPLORED } from './shared/terrain.js'
@@ -120,6 +123,7 @@ import { aboutTime, workLeft } from './shared/estimates.js'
 import type { Relationship } from './theme.js'
 import { cityRelationship, rankedAs, type Viewer } from './map/tokens.js'
 import { BUILDING_NAMES, NODE_NAMES, TERRAIN_NAMES } from './map/palette.js'
+import { regionLine, type TileRegion } from './map/land.js'
 import { faresKnown, horseFaresKnown } from './seen.js'
 import { FEED_HORSE_HINT, horseDownLine, horseNeed } from './horses-view.js'
 import { lastSeenText, type LastSeenBuilding } from './last-seen.js'
@@ -1138,6 +1142,8 @@ export interface TileThings {
   nodeAt?: (x: number, y: number) => KnownNode | undefined
   /** The tile's explored terrain (`Terrain`), undefined while unknown. */
   terrain?: number
+  /** The region the tile lies in, where the Player explored it (`CONTEXT.md`: Region). */
+  region?: TileRegion
   /** Residents in sight on the tile that are not the Player's to command. */
   strangers: SeenResident[]
   /** Everyone in sight, for who works where and who lives in a city. */
@@ -1153,6 +1159,11 @@ export interface TileThings {
   tick?: number
   /** Residents in sight working each building, by building id. */
   workers: (b: Building) => number
+  /**
+   * How the veins of the workplaces the realm or an ally works stand, by building id
+   * (`CONTEXT.md`: Running dry); the server sends no others.
+   */
+  veins?: Readonly<Record<string, VeinWord>>
   /**
    * About how many ticks until one of the Player's residents arrives where they drive
    * (`arrivalTicks`), for a haul route's leg.
@@ -1278,12 +1289,26 @@ function unbuiltNodeLines(
   const skill = WORKPLACE_SKILL[kind]!
   const needs =
     Object.keys(materials).length > 0 ? goodsText(materials, goodLabels) : 'no materials'
+  const richness = richnessOf(node)
   return [
     fit ? `${capital(aOrAn(name))} can be built here` : `No room for ${aOrAn(name)} here`,
     `Needs ${needs} and ${days} game day${days === 1 ? '' : 's'} of one resident’s work`,
     `Makes ${goodName} · teaches ${capital(skill)}`,
-    `Up to ${MAX_WORKERS[kind]} workers · about ${WORK_OUTPUT_PER_DAY[good]} ${goodName} each a game day at average Strength`,
+    `${capital(richness)}: ${richnessFactor(richness)} times what a normal node makes`,
+    `Up to ${MAX_WORKERS[kind]} workers · ${richnessYield(node, goodName)}`,
   ]
+}
+
+/** A known node's richness, normal where it isn't said (`CONTEXT.md`: Richness). */
+const richnessOf = (node: KnownNode): Richness => node.richness ?? 'normal'
+
+/**
+ * What a worker of average Strength and no skill makes a game day on a node, by its richness
+ * (`CONTEXT.md`: Richness): "about 1.2 iron ore each a game day at average Strength".
+ */
+function richnessYield(node: KnownNode, goodName: string): string {
+  const perDay = (WORK_OUTPUT_PER_DAY[NODE_GOOD[node.kind]] ?? 0) * richnessFactor(richnessOf(node))
+  return `about ${Math.round(perDay * 10) / 10} ${goodName.toLowerCase()} each a game day at average Strength`
 }
 
 /** Goods in words: "4 iron ore, 2 wood". */
@@ -1700,6 +1725,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       }
       const makes = live && makesLine(live, t, goodLabels, amounts !== undefined)
       if (makes) lines.push(makes)
+      const vein = t.veins?.[building.id]
+      if (vein) lines.push(veinLine(vein))
       // A finished training ground teaches what its teacher set, and nothing while nobody
       // teaches there (`CONTEXT.md`: Training ground, Teacher).
       if (building.kind === 'trainingGround') lines.push(...trainingLines(building, t))
@@ -1877,8 +1904,12 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     const kindName = nodeKindName(t.node)
     card ??= { title: `${capital(kindName)} node`, what: 'node' }
     // Only a node's workplace covers a node: one on it, or its site, has built it over.
-    if (building) lines.push(`On ${aOrAn(kindName)} node`)
-    else {
+    if (building) {
+      const good = NODE_GOOD[t.node.kind]
+      lines.push(
+        `On ${aOrAn(`${richnessOf(t.node)} ${kindName}`)} node · ${richnessYield(t.node, goodLabels[good]!)}`,
+      )
+    } else {
       lines.push(...unbuiltNodeLines(t.node, t.nodeFit, goodLabels))
       buildHere = { kind: NODE_WORKPLACE[t.node.kind], at: t.nodeFit }
     }
@@ -1926,6 +1957,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   // A wandering trader standing at a stop buys and sells on its tile (`CONTEXT.md`: Trader stop).
   const visitor = t.traders?.find((v) => v.standing?.x === t.x && v.standing.y === t.y)
   if (visitor) lines.push('A wandering trader buys and sells here')
+  if (t.region) lines.push(regionLine(t.region))
   lines.push(`Tile ${t.x}, ${t.y}`)
   // Anyone on a Down resident's tile can take what they carry (`CONTEXT.md`: Down).
   const onTile = here(t.residents ?? [])
@@ -2209,12 +2241,33 @@ function makesLine(
       const recipe = recipeFor(b.kind, o.makes)
       if (recipe) making.set(recipeGood(recipe), (making.get(recipeGood(recipe)) ?? 0) + 1)
     }
-    if (making.size === 0) return amounts ? undefined : 'Makes weapons and armour, nobody at it'
+    if (making.size === 0) {
+      if (amounts) return undefined
+      if (b.kind === 'smithy') return 'Makes weapons and armour, nobody at it'
+      const goods = (RECIPES[b.kind] ?? []).map((r) => label(recipeGood(r)))
+      return `Makes ${goods.join(' or ')}, nobody at it`
+    }
     const list = [...making].map(([g, n]) => `${label(g)} (${n})`).join(', ')
     return `${amounts ? 'Others make' : 'Its workers make'} ${list}`
   }
   const good = amounts ? undefined : goodMadeAt(b, t)
   return good && `Makes ${label(good)}`
+}
+
+/** How a vein stands, in words (`CONTEXT.md`: Running dry). */
+const VEIN_WORDS: Record<VeinWord, string> = {
+  plenty: 'plenty',
+  thinning: 'thinning',
+  nearlyGone: 'nearly gone',
+  endless: 'never runs dry',
+}
+
+/**
+ * A workplace's line for how the vein under it stands (`CONTEXT.md`: Running dry), for whoever
+ * works it: "Vein: thinning". Never a number.
+ */
+export function veinLine(vein: VeinWord): string {
+  return `Vein: ${VEIN_WORDS[vein]}`
 }
 
 /**
@@ -2227,11 +2280,16 @@ function goodMadeAt(b: Building, t: TileThings, makes?: Good): Good | undefined 
     const recipe = recipeFor(b.kind, makes)
     return recipe && recipeGood(recipe)
   }
+  const node = nodeUnder(b, t)
+  return node && NODE_GOOD[node.kind]
+}
+
+/** The known node a node's workplace stands on, if the Player knows one under it. */
+function nodeUnder(b: Building, t: TileThings): KnownNode | undefined {
   if (!NODE_WORKPLACE_KINDS.has(b.kind) || !t.nodeAt) return undefined
-  const node = footprintTiles(b)
+  return footprintTiles(b)
     .map(([x, y]) => t.nodeAt!(x, y))
     .find((n) => n && NODE_WORKPLACE[n.kind] === b.kind)
-  return node && NODE_GOOD[node.kind]
 }
 
 /**
@@ -2252,7 +2310,8 @@ function amountsList(
     if (r.owner !== t.viewer.realmId || o?.kind !== 'workAt' || o.buildingId !== b.id) return []
     const good = goodMadeAt(b, t, o.makes)
     if (!good) return []
-    return [{ r, good, perDay: madePerDay(r as Resident, b.kind, good, t.tick ?? 0) }]
+    const factor = richnessFactor(nodeUnder(b, t)?.richness)
+    return [{ r, good, perDay: madePerDay(r as Resident, b.kind, good, t.tick ?? 0) * factor }]
   })
   if (made.length === 0) return undefined
   return {

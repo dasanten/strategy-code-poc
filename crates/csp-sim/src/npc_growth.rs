@@ -34,7 +34,7 @@ use crate::npc_training::wants_training_ground;
 use crate::placing::Ground;
 use crate::queries::building::{
     build_materials, build_problem, building_at, materials_needed, max_workers, node_corner,
-    node_good, node_workplace, work_needed,
+    node_good, node_pick_distance, node_workplace, work_needed, workplace_node,
 };
 use crate::queries::city::{has_food_surplus, in_city_area, is_city_building};
 use crate::queries::city_area::{city_area_tiles, city_membership, free_housing};
@@ -104,6 +104,27 @@ pub fn city_project(
         .then(|| hq::hq_project(world, city, terrain))
         .flatten()
         .or_else(|| trade_org_chain_project(world, city, home, terrain))
+        .or_else(|| tear_down_dead_workplace(world, city))
+}
+
+/// A finished workplace of the city's that stands where its node ran dry (`CONTEXT.md`: Running
+/// dry): it makes nothing any more.
+pub fn dead_workplace<'w>(world: &'w WorldState, city: &City) -> Option<&'w Building> {
+    own_workplaces(world, city).into_iter().find(|b| b.site.is_none() && on_dry_node(world, b))
+}
+
+/// Whether a workplace stands on a node that ran dry and has not come back (`CONTEXT.md`: Running
+/// dry).
+pub fn on_dry_node(world: &WorldState, b: &Building) -> bool {
+    on_node(b.kind)
+        && workplace_node(world, b).is_none()
+        && world.dry_nodes.iter().any(|d| covers(placed(b), d.x as i32, d.y as i32, MAP_SIZE))
+}
+
+/// Its builders tear down a workplace whose node ran dry, for its materials, once they have
+/// nothing better to do (`CONTEXT.md`: Running dry, NPC city).
+fn tear_down_dead_workplace(world: &WorldState, city: &City) -> Option<CityProject> {
+    dead_workplace(world, city).map(|b| CityProject::TearDown { building_id: b.id.clone() })
 }
 
 /// The chain a Trade Org city builds (`tradeOrgChainProject`): a workplace of its own it has begun,
@@ -421,6 +442,9 @@ fn materials_first(
     want: CityProject,
     seen: &mut HashSet<Good>,
 ) -> CityProject {
+    if matches!(want, CityProject::TearDown { .. }) {
+        return want;
+    }
     let (building, x, y) = build_of(&want);
     let need = match building_at(world, x, y, MAP_SIZE).filter(|s| s.site.is_some()) {
         Some(site) => materials_needed(site),
@@ -464,7 +488,7 @@ pub fn chain_project(
         return None;
     }
     let storage = chain_store(world, city);
-    if let Some(input) = chain_input(good) {
+    if let Some(input) = chain_input(world, city, good) {
         for (g, n) in &input {
             if held_in(storage.and_then(|s| s.stock.as_ref()), *g) >= *n || makes(world, city, *g) {
                 continue;
@@ -475,7 +499,7 @@ pub fn chain_project(
     if makes(world, city, good) {
         return None;
     }
-    if let Some(kind) = processed_by(good) {
+    if let Some(kind) = processed_by(world, city, good) {
         let hall = if city.trade_org == Some(TradeOrgCity::Hq) {
             crate::queries::city::town_hall_of(world, city)
         } else {
@@ -495,7 +519,8 @@ pub fn chain_project(
 }
 
 /// The nearest free resource node yielding `good` that the city knows of, with where its workplace
-/// goes (`nearestNode`, `nodeCorner`).
+/// goes (`nearestNode`, `nodeCorner`). The Trade Organization's HQ knows of every node, however far
+/// (`CONTEXT.md`: Trade Org HQ, Running dry).
 fn nearest_node(
     world: &WorldState,
     city: &City,
@@ -510,8 +535,10 @@ fn nearest_node(
             continue;
         }
         let at = (node.x as i32, node.y as i32);
-        let d = wrap_distance(terrain.size, home_at, at);
-        if best.as_ref().is_some_and(|b| d >= b.2) || !knows_node(city, home_at, at, terrain.size) {
+        let d = node_pick_distance(wrap_distance(terrain.size, home_at, at), node);
+        let known =
+            city.trade_org == Some(TradeOrgCity::Hq) || knows_node(city, home_at, at, terrain.size);
+        if best.as_ref().is_some_and(|b| d >= b.2) || !known {
             continue;
         }
         if let Some(corner) = node_corner(world, terrain, node) {
@@ -639,6 +666,9 @@ fn wanted(
             return Some(p);
         }
     }
+    if let Some(dead) = tear_down_dead_workplace(world, city) {
+        return Some(dead);
+    }
     let rings = rings?;
     let inner = InnerRings {
         expanding: rings.expanding,
@@ -711,7 +741,7 @@ fn another_workplace(
         if !seen.insert(good) {
             return None;
         }
-        if let Some(input) = chain_input(good).filter(|i| !holds_batch(stock, i)) {
+        if let Some(input) = chain_input(world, city, good).filter(|i| !holds_batch(stock, i)) {
             let lacking: Vec<Good> =
                 input.iter().filter(|(g, n)| held_in(stock, **g) < **n).map(|(g, _)| *g).collect();
             return lacking.into_iter().find_map(|g| full_good(world, city, own, stock, g, seen));
@@ -733,7 +763,7 @@ fn another_workplace(
             }
             continue;
         }
-        if let Some(kind) = processed_by(good) {
+        if let Some(kind) = processed_by(world, city, good) {
             if let Some(t) = house_tile(world, city, home, terrain, rings, kind) {
                 return Some(build(kind, t));
             }
@@ -1276,6 +1306,8 @@ pub fn farm_tile(
     None
 }
 
+#[cfg(test)]
+mod dry_tests;
 #[cfg(test)]
 mod needs_grow_tests;
 #[cfg(test)]

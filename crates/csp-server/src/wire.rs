@@ -8,7 +8,8 @@
 use csp_shared::protocol::SeenEntity;
 use csp_shared::views::{MapInfo, ScriptRunSeen, TraderVisit};
 use csp_shared::world::{
-    OrderRequest, RealmEvent, Remembered, ScriptLogLine, ScriptMemory, Waypoint, WorkplaceSettings,
+    OrderRequest, RealmEvent, Remembered, ScriptLogLine, ScriptMemory, VeinWord, Waypoint,
+    WorkplaceSettings,
 };
 use csp_sim::queries::region_map::RegionMap;
 use csp_sim::views::Diplomacy;
@@ -75,11 +76,17 @@ pub enum ServerMessage {
         region: Option<RegionMap>,
         /// Whether the Player may still claim their Horse offer.
         horse_offer: bool,
+        /// The tiles (x, y) of the dry nodes the Player knows are gone (`CONTEXT.md`: Running dry):
+        /// their map leaves out the nodes there.
+        gone_nodes: Vec<(i32, i32)>,
         waypoints: Vec<Waypoint>,
         trader_visits: Vec<TraderVisit>,
         first_day: FirstDay,
         /// The realm's Workplace settings by building id; only its own.
         work_settings: IndexMap<String, WorkplaceSettings>,
+        /// How the veins of the workplaces its realm or an ally works stand, by building id
+        /// (`CONTEXT.md`: Running dry): words, never a number.
+        veins: IndexMap<String, VeinWord>,
     },
     /// Every tick: what changed in sight, and what else changed for the Player.
     Tick {
@@ -107,8 +114,14 @@ pub enum ServerMessage {
         heir_id: Option<Option<String>>,
         #[ts(optional)]
         horse_offer: Option<bool>,
+        /// All of `gone_nodes` again, once the Player learns of another.
+        #[ts(optional)]
+        gone_nodes: Option<Vec<(i32, i32)>>,
         #[ts(optional)]
         work_settings: Option<IndexMap<String, WorkplaceSettings>>,
+        /// All of `veins` again, once a word changed.
+        #[ts(optional)]
+        veins: Option<IndexMap<String, VeinWord>>,
         #[ts(optional)]
         waypoints: Option<Vec<Waypoint>>,
         #[ts(optional)]

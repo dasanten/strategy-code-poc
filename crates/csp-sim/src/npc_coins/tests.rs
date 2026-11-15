@@ -86,6 +86,8 @@ fn gold_node(world: &mut WorldState, terrain: &mut TerrainMap, x: f64, y: f64) {
         kind: ResourceKind::GoldOre,
         x,
         y,
+        richness: Default::default(),
+        stock: None,
     });
     terrain.tiles[tile_index(terrain.size, x as i32, y as i32)] = Terrain::Hills as u8;
 }

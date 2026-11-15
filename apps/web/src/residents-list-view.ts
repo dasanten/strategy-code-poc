@@ -1,6 +1,6 @@
 import { MAX_HEALTH, MAX_HUNGER, carryCapacity, statValue } from '@csp/balance'
-import { PROTECTION, STAT_NAMES } from './shared/world.js'
-import { ageInYears, bestWeapon, stockWeight } from './shared/stats.js'
+import { STAT_NAMES } from './shared/world.js'
+import { ageInYears, bestWeapon, stockWeight, wornProtection } from './shared/stats.js'
 import type { Resident, SkillName, StatName } from '@csp/shared-types'
 import { GOOD_LABELS } from './goods-grid.js'
 import { SKILL_LABELS } from './Residents.js'
@@ -74,7 +74,7 @@ export function learnedSkills(r: Pick<Resident, 'skills'>): { skill: SkillName; 
 /** The weapon a resident fights with and the protection they carry: "Sword, Shield"; empty with none. */
 export function gearLine(r: Pick<Resident, 'carried'>): string {
   const weapon = bestWeapon(r)
-  const worn = PROTECTION.filter((p) => (r.carried[p] ?? 0) > 0)
+  const worn = wornProtection(r)
   return [...(weapon ? [weapon] : []), ...worn].map((g) => GOOD_LABELS[g]).join(', ')
 }
 

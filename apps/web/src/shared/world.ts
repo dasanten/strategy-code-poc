@@ -717,13 +717,32 @@ export const GOODS = [
   'sword',
   'shield',
   'armour',
+  'coal',
+  'steel',
+  'steelSword',
+  'steelShield',
+  'steelArmour',
 ] as const
 
 /** Goods that make a resident armed (`CONTEXT.md`: Soldier, Weapons and armour). */
-export const WEAPONS = ['spear', 'sword'] as const satisfies readonly Good[]
+export const WEAPONS = ['spear', 'sword', 'steelSword'] as const satisfies readonly Good[]
 
-/** Goods that take off damage (`CONTEXT.md`: Weapons and armour): shields and armour. */
-export const PROTECTION = ['shield', 'armour'] as const satisfies readonly Good[]
+/** Goods that take off damage (`CONTEXT.md`: Weapons and armour): shields and armour, of iron or steel. */
+export const PROTECTION = [
+  'shield',
+  'armour',
+  'steelShield',
+  'steelArmour',
+] as const satisfies readonly Good[]
+
+/**
+ * The kinds of protection (`CONTEXT.md`: Weapons and armour): a shield and armour, each of iron or
+ * steel. Only the best of each kind a resident carries counts.
+ */
+export const PROTECTION_KINDS = [
+  ['shield', 'steelShield'],
+  ['armour', 'steelArmour'],
+] as const satisfies readonly (readonly Good[])[]
 
 /** Everything one Player controls through their Leader (`CONTEXT.md`: Realm). */
 export interface Realm {
@@ -774,4 +793,5 @@ export const NODE_WORKPLACE: Record<ResourceKind, BuildingKind> = {
   stone: 'quarry',
   ironOre: 'mine',
   goldOre: 'mine',
+  coal: 'mine',
 }

@@ -80,9 +80,7 @@ pub const MAP_SIZE: i32 = 5760;
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TerrainShares {
-    /// A few large bodies of water.
-    pub sea: f64,
-    /// Inland water, a few scattered lakes.
+    /// Inland water, a few scattered lakes, as a share of the mainland (lakes included).
     pub lake: f64,
     /// In ranges.
     pub mountain: f64,
@@ -91,10 +89,95 @@ pub struct TerrainShares {
     pub forest: f64,
 }
 
-/// Share of the map's tiles each terrain covers in a freshly generated map. Plains take the rest.
-/// The generator hits these closely; the map test checks them.
+/// Share of the land's tiles (the mainland and the islands, `CONTEXT.md`: The land) each terrain
+/// covers in a freshly generated map. Plains take the rest; the Sea is everything off the land
+/// (`MAINLAND_SHARE`, `ISLAND_COUNT`). The generator hits these closely; the map test checks them.
 pub const TERRAIN_SHARES: TerrainShares =
-    TerrainShares { sea: 0.08, lake: 0.025, mountain: 0.07, hills: 0.13, forest: 0.25 };
+    TerrainShares { lake: 0.03, mountain: 0.08, hills: 0.15, forest: 0.28 };
+
+/// Share of the map's tiles the mainland covers (`CONTEXT.md`: The land): one joined land in the
+/// middle of the map with Sea all around, so the map's joins cross only water. A little less than
+/// half the map, so its coast stays well clear of the joins and islands fit off it.
+pub const MAINLAND_SHARE: f64 = 0.42;
+
+/// How much longer the mainland is than wide, at most: each seed picks a stretch up to this and a
+/// direction, so mainlands differ in shape before their coasts are made ragged.
+pub const MAINLAND_STRETCH: f64 = 1.2;
+
+/// Share of the map's side kept Sea along each of the map's joins: no land within it.
+pub const JOIN_SEA_SHARE: f64 = 0.03;
+
+/// Islands the generator tries to place off the mainland's coast (`CONTEXT.md`: Island); on a
+/// small map fewer fit.
+pub const ISLAND_COUNT: f64 = 12.0;
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IslandRadius {
+    /// Share of the map's side.
+    pub min: f64,
+    /// Share of the map's side.
+    pub max: f64,
+    /// Tiles, at least, whatever the map's size: room for a haven and a mine or two.
+    pub min_tiles: f64,
+}
+
+/// How far an island reaches from its middle before its coast is made ragged: each island picks a
+/// radius between `min` and `max`, small ones more often. On a full-size map about 35 to 170
+/// tiles: from a rock with room for a haven and a mine to an island that holds a city.
+pub const ISLAND_RADIUS: IslandRadius = IslandRadius { min: 0.006, max: 0.03, min_tiles: 6.0 };
+
+/// The narrowest strait (`CONTEXT.md`: Island): at least this many tiles of water lie between an
+/// island and the mainland, and between two islands, so no walk reaches one; a short row.
+pub const NARROWEST_STRAIT: i32 = 16;
+
+/// Share of the map's side an island lies from the mainland, at most (about 350 tiles on a
+/// full-size map): near enough that a boat reaches it from the coast.
+pub const ISLAND_OFFSHORE_SHARE: f64 = 0.06;
+
+/// Heartlands on the mainland (`CONTEXT.md`: Heartland, Region): good farmland where Players
+/// start, in the middle of the mainland, none touching another where that can be helped.
+pub const HEARTLAND_COUNT: f64 = 3.0;
+
+/// Frontier regions on the mainland (`CONTEXT.md`: Frontier): the rest of the mainland, cut into
+/// regions of roughly even size with the heartlands (about 1,100 tiles across on a full-size map).
+pub const FRONTIER_REGION_COUNT: f64 = 9.0;
+
+/// How wide the Mountain range or arm of the Sea along a border between two mainland regions is,
+/// in tiles, both sides together (`CONTEXT.md`: Region). A smaller map gets a narrower one.
+pub const REGION_BORDER_WIDTH: i32 = 12;
+
+/// How wide a pass or a land bridge is along its border, in tiles (`CONTEXT.md`: Region): room for
+/// a carriage, and for a realm to hold it. A smaller map gets a narrower one.
+pub const PASS_WIDTH: i32 = 8;
+
+/// Share of the borders between two mainland regions that are arms of the Sea rather than
+/// Mountain ranges (`CONTEXT.md`: Region): crossed by land bridges instead of passes. Only a
+/// border that reaches the coast can be one; the rest of an arm, cut off from the open Sea, is a
+/// range. So about this share of the borders that reach the coast are arms.
+pub const SEA_ARM_SHARE: f64 = 0.6;
+
+/// Share of the borders between two mainland regions with two ways through instead of one.
+pub const SECOND_WAY_SHARE: f64 = 0.4;
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegionTerrain {
+    pub mountain: f64,
+    pub hills: f64,
+    pub forest: f64,
+}
+
+/// Share of a heartland's land each terrain covers before its borders are raised (`CONTEXT.md`:
+/// Heartland): mostly Plains, with some Forest and Hills. The rest of the land makes up the
+/// `TERRAIN_SHARES` of the whole, so frontier regions and islands have more Hills and Mountain.
+/// The Mountain range along a border comes on top.
+pub const HEARTLAND_TERRAIN: RegionTerrain =
+    RegionTerrain { mountain: 0.01, hills: 0.08, forest: 0.18 };
+
+/// How much higher an island's land lies than a frontier region's: the generator's relief on an
+/// island is multiplied by this before Mountain and Hills are cut (`CONTEXT.md`: Island).
+pub const ISLAND_RELIEF: f64 = 1.25;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -103,11 +186,14 @@ pub struct NodeDensity {
     pub stone: TerrainTable,
     pub iron_ore: TerrainTable,
     pub gold_ore: TerrainTable,
+    /// Only outside a heartland (`CONTEXT.md`: Rare goods): `place_resource_nodes_by_region`
+    /// places none there.
+    pub coal: TerrainTable,
 }
 
 /// Resource nodes per tile of each terrain they lie on, when the world is created: as many per
 /// area as on the old 40 m grid, so a sixteenth per tile. Ore is denser in Mountain than in Hills;
-/// gold is rare.
+/// gold is rare. Coal is about as common as iron ore, a little more of it in Hills.
 pub const NODE_DENSITY: NodeDensity = NodeDensity {
     forest: TerrainTable(&[(Terrain::Forest as u8, 1.0 / 4800.0)]),
     stone: TerrainTable(&[(Terrain::Hills as u8, 1.0 / 4000.0)]),
@@ -119,10 +205,150 @@ pub const NODE_DENSITY: NodeDensity = NodeDensity {
         (Terrain::Hills as u8, 1.0 / 240000.0),
         (Terrain::Mountain as u8, 1.0 / 48000.0),
     ]),
+    coal: TerrainTable(&[
+        (Terrain::Hills as u8, 1.0 / 16000.0),
+        (Terrain::Mountain as u8, 1.0 / 4800.0),
+    ]),
 };
 
 /// No two resource nodes lie closer than this many tiles (in either direction).
 pub const NODE_MIN_SPACING: f64 = 16.0;
+
+/// How many times `NODE_DENSITY` a frontier region holds (`CONTEXT.md`: Frontier): more nodes than
+/// a heartland, worth going out for.
+pub const FRONTIER_NODE_DENSITY: f64 = 1.5;
+
+/// How many times `NODE_DENSITY` an island holds (`CONTEXT.md`: Island): the densest land.
+pub const ISLAND_NODE_DENSITY: f64 = 2.0;
+
+/// What a worker's output is multiplied by on a node of each richness (`CONTEXT.md`: Richness).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct RichnessFactor {
+    pub poor: f64,
+    pub normal: f64,
+    pub rich: f64,
+}
+
+/// A mine's, quarry's or lumber camp's output per worker on a poor, normal and rich node
+/// (`CONTEXT.md`: Richness): a heartland's poor nodes make well under a frontier's, an island's
+/// rich ones half again as much.
+pub const RICHNESS_FACTOR: RichnessFactor = RichnessFactor { poor: 0.6, normal: 1.0, rich: 1.5 };
+
+/// How many of a frontier region's nodes are rich (`CONTEXT.md`: Richness): those nearest its
+/// passes, land bridges and borders with other frontier regions.
+pub const FRONTIER_RICH_NODES: f64 = 3.0;
+
+/// How much farther a richer node may lie than a poorer one and still be picked by an NPC city or
+/// the Trade Organization (`CONTEXT.md`: Richness): each richness step counts as this share of
+/// the distance.
+pub const RICHER_NODE_REACH: f64 = 0.25;
+/// How many times its region's density gold ore has in the frontier and on islands
+/// (`CONTEXT.md`: Rare goods): it has no nodes in a heartland, so the land out there holds more.
+pub const GOLD_NODE_DENSITY: f64 = 2.0;
+
+/// How many game days a full crew of average workers (Strength `WORK_STRENGTH_AVERAGE`, no
+/// skill) takes to empty a normal and a rich vein (`CONTEXT.md`: Running dry): a real week is 420
+/// game days, so three real weeks for a rich vein and two for a normal one. A skilled crew empties
+/// it in down to half that.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct VeinCrewDays {
+    pub normal: f64,
+    pub rich: f64,
+}
+
+pub const VEIN_CREW_DAYS: VeinCrewDays = VeinCrewDays { normal: 840.0, rich: 1260.0 };
+
+/// How far, in tiles, from a pass, a land bridge or a border with another frontier region a rich
+/// node that comes into being in the frontier lies at most (`CONTEXT.md`: Running dry, Richness):
+/// a spot worth fighting over, as the frontier's rich nodes are at generation.
+pub const NEW_VEIN_SPOT_REACH: f64 = 32.0;
+
+/// How many game days a node that ran dry waits to come back where it was, when no fitting tile
+/// for it is found anywhere else (`CONTEXT.md`: Running dry; a tiny map). About a real hour.
+pub const VEIN_RETURN_DAYS: f64 = 2.5;
+
+/// The stock a node of `kind` and `richness` comes into being with (`CONTEXT.md`: Running dry):
+/// what a full crew of average workers makes there in `VEIN_CREW_DAYS`. None for a node that
+/// never runs dry (forest, stone, a poor node).
+pub fn vein_stock(
+    kind: crate::world::ResourceKind,
+    richness: crate::world::Richness,
+) -> Option<f64> {
+    use crate::world::{ResourceKind, Richness};
+    let good = match kind {
+        ResourceKind::IronOre => "ironOre",
+        ResourceKind::GoldOre => "goldOre",
+        ResourceKind::Coal => "coal",
+        ResourceKind::Forest | ResourceKind::Stone => return None,
+    };
+    let days = match richness {
+        Richness::Poor => return None,
+        Richness::Normal => VEIN_CREW_DAYS.normal,
+        Richness::Rich => VEIN_CREW_DAYS.rich,
+    };
+    let per_day = WORK_OUTPUT_PER_DAY.get(good)? * richness.factor();
+    Some((per_day * WORKPLACE_MAX_WORKERS.get("mine")? * days).round())
+}
+
+/// How a vein stands for whoever works it (`CONTEXT.md`: Running dry), from the share of its
+/// first stock that is left: "thinning" at or below `VEIN_THINNING`, "nearly gone" at or below
+/// `VEIN_NEARLY_GONE`, "plenty" above. A full crew of average workers on a rich vein so has about
+/// 190 game days (three real days) of warning before it runs dry.
+pub const VEIN_THINNING: f64 = 0.5;
+pub const VEIN_NEARLY_GONE: f64 = 0.15;
+
+/// `vein_stock` of every ore node kind, normal and rich, as the client reads it (the Wiki).
+fn vein_stock_json() -> Value {
+    use crate::world::{ResourceKind, Richness};
+    let mut m = Map::new();
+    for (name, kind) in [
+        ("ironOre", ResourceKind::IronOre),
+        ("goldOre", ResourceKind::GoldOre),
+        ("coal", ResourceKind::Coal),
+    ] {
+        m.insert(
+            name.into(),
+            json!({
+                "normal": vein_stock(kind, Richness::Normal),
+                "rich": vein_stock(kind, Richness::Rich),
+            }),
+        );
+    }
+    Value::Object(m)
+}
+
+/// Starting sites in each heartland (`CONTEXT.md`: Starting site): room for this many Players'
+/// starting cities before the next heartland opens.
+pub const STARTING_SITES_PER_HEARTLAND: f64 = 10.0;
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartingSiteWalk {
+    /// Real minutes an unloaded walk from a starting site to the nearest other one takes, at least.
+    pub min_minutes: f64,
+    /// And at most.
+    pub max_minutes: f64,
+    /// How far a site is placed from the nearest other one, in tiles, straight, at least: a little
+    /// over the shortest walk on Plains (a Plains tile takes `WALK_TICKS_PER_TILE` seconds).
+    pub min_tiles: f64,
+    /// And at most, so the walk over Forest and round lakes still fits.
+    pub max_tiles: f64,
+}
+
+/// How far a starting site lies from the nearest other one (`CONTEXT.md`: Starting site): a walk
+/// of 20 to 40 real minutes, placed 170 to 300 tiles apart straight. A smaller map scales the tiles and
+/// the minutes with its side.
+pub const STARTING_SITE_WALK: StartingSiteWalk =
+    StartingSiteWalk { min_minutes: 20.0, max_minutes: 40.0, min_tiles: 170.0, max_tiles: 300.0 };
+
+/// How far a starting site's middle lies from every pass and land bridge of its heartland, at
+/// least, in tiles (about 20 minutes' walk): the way in is nobody's doorstep.
+pub const STARTING_SITE_WAY_DISTANCE: f64 = 120.0;
+
+/// How far from a starting site's middle its forest, stone and iron node lie, at most, in tiles
+/// (about 15 minutes' walk; Hills and Forest lie a median 80 to 100 tiles from a heartland's
+/// Plains). Where the land holds none that near, one is placed. The same on a map of any size.
+pub const STARTING_SITE_NODE_REACH: f64 = 160.0;
 
 /// How fast an unloaded resident crosses each terrain, relative to Plains (`CONTEXT.md`:
 /// Terrain). Agility softens the penalty (`walkSpeed`).
@@ -221,6 +447,11 @@ pub const START_SPARE_HOUSES: f64 = 1.0;
 
 /// Food in a starting city's storage, in kg: about 25 game days for its residents.
 pub const START_FOOD: f64 = 100.0;
+
+/// Coins in a starting city's storage (`CONTEXT.md`: Starting city, Rare goods): a heartland has no
+/// gold, so a new Player starts with enough for a first trade at its trading post, such as a
+/// spear or a few days' Food.
+pub const START_COINS: f64 = 50.0;
 
 /// Food each resident of a starting city carries, in units: four game days' meals, so they have
 /// something to eat while the farm's first harvest comes in (`CONTEXT.md`: Eating).
@@ -421,12 +652,26 @@ pub const SIGHT_RANGE: f64 = 48.0;
 /// that leaves sight between two refreshes is remembered as it was up to this many ticks earlier.
 pub const LAST_SEEN_EVERY_TICKS: f64 = 5.0;
 
-/// NPC villages placed on a full-size map (`CONTEXT.md`: NPC city); a smaller map gets fewer, by
-/// its area. Fewer are placed when the map has no room left for them.
-pub const NPC_VILLAGES: f64 = 12.0;
+/// NPC towns placed in each frontier region when the world is generated (`CONTEXT.md`: NPC city,
+/// Frontier). Towns are placed first; fewer when a region has no room left. No town stands in a
+/// heartland, and no NPC city on an island.
+pub const NPC_TOWNS_PER_FRONTIER: f64 = 1.0;
 
-/// NPC towns placed on a full-size map, like `NPC_VILLAGES`. Towns are placed first.
-pub const NPC_TOWNS: f64 = 4.0;
+/// NPC villages placed in each frontier region, after the towns, like `NPC_TOWNS_PER_FRONTIER`.
+pub const NPC_VILLAGES_PER_FRONTIER: f64 = 1.0;
+
+/// NPC villages placed in each heartland (`CONTEXT.md`: Heartland), after its trading post.
+pub const NPC_VILLAGES_PER_HEARTLAND: f64 = 1.0;
+
+/// How far an NPC city, trading post or the Trade Org HQ stands from every starting site
+/// (`CONTEXT.md`: Starting site), in tiles from middle to middle: room for a starting city, its
+/// farm and its stable between them (about 12 minutes' walk on plains). A full NPC city founds no
+/// daughter closer either.
+pub const NPC_STARTING_SITE_CLEARANCE: f64 = 96.0;
+
+/// How far an NPC city, trading post or the Trade Org HQ, with the ring its farms go in, stands
+/// from every pass and land bridge (`CONTEXT.md`: Region), in tiles: none blocks the way.
+pub const NPC_WAY_CLEARANCE: i32 = 24;
 
 /// NPC cities lie at least this many tiles from every other city, starting cities and NPC cities
 /// alike (about an hour's walk on plains), the short way round the map.
@@ -492,6 +737,11 @@ pub const WORK_FOOD_KEPT: f64 = 2.0;
 /// Share of an NPC city's adults it keeps as soldiers (`CONTEXT.md`: NPC city, Soldier), rounded
 /// up so even a village keeps one: a starting village (6 residents) keeps 2, a town (16) keeps 4.
 pub const NPC_SOLDIER_SHARE: f64 = 0.25;
+
+/// What each soldier of an NPC city that knows of a coal node wants (`CONTEXT.md`: NPC reserve),
+/// forged in this order: its smithy forges the first its soldiers still lack. A city with no coal
+/// node in reach keeps to the iron spear (`NPC_SMITHY_WEAPON`).
+pub const NPC_STEEL_KIT: [&str; 3] = ["steelSword", "steelArmour", "steelShield"];
 
 /// How many of an NPC city's soldiers stand on its town hall between fights, the first to be posted
 /// (`CONTEXT.md`: Soldier posts). One there is enough to block an occupation; a second keeps it held
@@ -816,6 +1066,8 @@ pub const TRADE_ORG_HQ: TradeOrgHq = TradeOrgHq {
         ("ironOre", 150.0),
         ("iron", 100.0),
         ("goldOre", 50.0),
+        ("coal", 100.0),
+        ("steel", 50.0),
     ]),
 };
 
@@ -824,9 +1076,10 @@ pub const TRADE_ORG_HQ: TradeOrgHq = TradeOrgHq {
 /// as the map allows.
 pub const TRADE_ORG_HQ_MIN_DISTANCE: f64 = 1600.0;
 
-/// How wide a region is for trading posts (`CONTEXT.md`: Trading post), in tiles along each side:
-/// the map is cut into a grid of about this size, one post in each square. A full-size map gets
-/// 4 × 4 = 16 posts, as many as it gets NPC cities; a small map gets at least one.
+/// How wide a square is for the frontier's trading posts (`CONTEXT.md`: Trading post), in tiles
+/// along each side: the map is cut into a grid of about this size, and each square with no post
+/// yet gets one on frontier land in it, if it has room. Every heartland has its own post near its
+/// middle besides; no post stands on an island.
 pub const TRADING_POST_REGION: f64 = 1440.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -846,7 +1099,8 @@ pub struct TradingPost {
     /// Coins in its warehouse.
     pub coins: f64,
     /// Goods in its warehouse, in units: twice its floor (`WAREHOUSE_FLOOR`), so it has a market of every
-    /// good until its first trader and caravan come by, and its soldiers' weapons.
+    /// good until its first trader and caravan come by, and its soldiers' weapons. No steel weapons or
+    /// armour: those come by caravan, so its soldiers start out on iron.
     pub goods: Table<f64>,
 }
 
@@ -866,6 +1120,8 @@ pub const TRADING_POST: TradingPost = TradingPost {
         ("ironOre", 20.0),
         ("iron", 10.0),
         ("goldOre", 10.0),
+        ("coal", 20.0),
+        ("steel", 10.0),
         ("spear", 4.0),
         ("sword", 2.0),
         ("shield", 4.0),
@@ -876,7 +1132,8 @@ pub const TRADING_POST: TradingPost = TradingPost {
 /// A trading post's stock floor (`CONTEXT.md`: Stock floor, ADR 0023), in units: what its spare
 /// hands, caravan and wandering traders go for, and what its prices are reckoned from. It tops up
 /// nothing at a post; the HQ's warehouses top up to `HQ_FLOOR_FACTOR` times this each game day. Half
-/// of what a post starts with, so a fresh post is well above it.
+/// of what a post starts with, so a fresh post is well above it. A floor of 0 would mean warehouses
+/// don't trade the good.
 pub const WAREHOUSE_FLOOR: Table<f64> = Table(&[
     ("food", 20.0),
     ("wood", 25.0),
@@ -884,11 +1141,16 @@ pub const WAREHOUSE_FLOOR: Table<f64> = Table(&[
     ("ironOre", 10.0),
     ("iron", 5.0),
     ("goldOre", 5.0),
+    ("coal", 10.0),
+    ("steel", 5.0),
     ("coins", 1_000.0),
     ("spear", 2.0),
     ("sword", 1.0),
     ("shield", 2.0),
     ("armour", 1.0),
+    ("steelSword", 1.0),
+    ("steelShield", 1.0),
+    ("steelArmour", 1.0),
 ]);
 
 /// How many times a trading post's floor (`WAREHOUSE_FLOOR`) the Trade Org HQ's warehouses keep.
@@ -903,7 +1165,8 @@ pub const HQ_FOOD_FLOOR_FACTOR: f64 = 15.0;
 /// What a warehouse sells a unit of each good for, in coins, when it holds `PRICE_REFERENCE_FLOORS`
 /// times its floor (`CONTEXT.md`: Warehouse prices, Price anchor). Roughly what goes into it: an
 /// iron is two iron ore and the work, a sword two iron and a wood; gold ore stays below the 10
-/// coins the mint strikes from it.
+/// coins the mint strikes from it; coal, found only beyond the heartlands, a little above iron ore;
+/// steel an iron and a coal and the work; steel weapons and armour their steel, wood and the work.
 pub const WAREHOUSE_BASE_PRICE: Table<f64> = Table(&[
     ("food", 2.0),
     ("wood", 2.0),
@@ -911,10 +1174,15 @@ pub const WAREHOUSE_BASE_PRICE: Table<f64> = Table(&[
     ("ironOre", 4.0),
     ("iron", 10.0),
     ("goldOre", 8.0),
+    ("coal", 5.0),
+    ("steel", 20.0),
     ("spear", 20.0),
     ("sword", 30.0),
     ("shield", 22.0),
     ("armour", 90.0),
+    ("steelSword", 50.0),
+    ("steelShield", 30.0),
+    ("steelArmour", 160.0),
 ]);
 
 /// Stock, in floors, at which a warehouse sells at its base price; less stock costs more.
@@ -1036,9 +1304,6 @@ pub const DELIVERY_DRIVE_TRIES: f64 = 3.0;
 /// about 300 coins.
 pub const TRANSFER_FEE_FACTOR: f64 = 3.0;
 
-/// Large seas the generator makes, roughly; together they cover `TERRAIN_SHARES.sea`.
-pub const SEA_COUNT: f64 = 3.0;
-
 /// What one unit of each good weighs, in kg (`CONTEXT.md`: Good). Coins are light but not
 /// weightless, so a fortune still has to be carried. Weapons and armour weigh what went into them
 /// (`RECIPES`): an average resident (30 kg) in armour with a sword and a shield has half
@@ -1055,15 +1320,23 @@ pub const GOOD_WEIGHT: Table<f64> = Table(&[
     ("sword", 3.0),
     ("shield", 4.0),
     ("armour", 8.0),
+    ("coal", 1.0),
+    ("steel", 1.0),
+    ("steelSword", 3.0),
+    ("steelShield", 4.0),
+    ("steelArmour", 8.0),
 ]);
 
 /// Attack each weapon adds to a resident's blow (`CONTEXT.md`: Weapons and armour, Combat). A
-/// sword hits harder than a spear; combat (T10.2) adds it to Strength and Combat skill.
-pub const WEAPON_ATTACK: Table<f64> = Table(&[("spear", 4.0), ("sword", 6.0)]);
+/// sword hits harder than a spear, a steel sword half again as hard as an iron one (`CONTEXT.md`:
+/// Coal); combat (T10.2) adds it to Strength and Combat skill.
+pub const WEAPON_ATTACK: Table<f64> = Table(&[("spear", 4.0), ("sword", 6.0), ("steelSword", 9.0)]);
 
 /// Damage each piece of protection takes off a blow (`CONTEXT.md`: Weapons and armour, Combat).
-/// Armour takes off more than a shield but weighs twice as much.
-pub const PROTECTION_DEFENCE: Table<f64> = Table(&[("shield", 3.0), ("armour", 5.0)]);
+/// Armour takes off more than a shield but weighs twice as much; steel takes off more than iron
+/// at the same weight. Only the best shield and the best armour carried count (`PROTECTION_KINDS`).
+pub const PROTECTION_DEFENCE: Table<f64> =
+    Table(&[("shield", 3.0), ("armour", 5.0), ("steelShield", 5.0), ("steelArmour", 8.0)]);
 
 /// Carry capacity of a resident with no Strength at all, in kg.
 pub const CARRY_BASE: f64 = 10.0;
@@ -1743,12 +2016,24 @@ pub struct Recipe {
 }
 
 /// The fixed recipes of the workplaces that process goods (`CONTEXT.md`: Smelter, Coins, Smithy).
-/// A smelter turns 2 iron ore into 1 iron, a mint 1 gold ore into 10 coins (less weight than the
+/// A smelter turns 2 iron ore into 1 iron, or 1 iron and 1 coal into 1 steel (`CONTEXT.md`: Coal);
+/// its first recipe, Iron, is what its workers make when they name none. A mint 1 gold ore into 10 coins (less weight than the
 /// ore, but a fortune still weighs something). A smithy has one recipe for each weapon and piece
 /// of armour, each from Iron and Wood weighing what the good weighs (`GOOD_WEIGHT`): a spear is
-/// mostly wood, a sword mostly iron, a shield wood bound with iron, armour nearly all iron.
+/// mostly wood, a sword mostly iron, a shield wood bound with iron, armour nearly all iron. The
+/// steel Sword, Shield and Armour (`CONTEXT.md`: Coal) take Steel where the iron ones take Iron,
+/// and the same Wood; the Spear is iron only.
 pub const RECIPES: Table<&[Recipe]> = Table(&[
-    ("smelter", &[Recipe { input: Table(&[("ironOre", 2.0)]), output: Table(&[("iron", 1.0)]) }]),
+    (
+        "smelter",
+        &[
+            Recipe { input: Table(&[("ironOre", 2.0)]), output: Table(&[("iron", 1.0)]) },
+            Recipe {
+                input: Table(&[("iron", 1.0), ("coal", 1.0)]),
+                output: Table(&[("steel", 1.0)]),
+            },
+        ],
+    ),
     ("mint", &[Recipe { input: Table(&[("goldOre", 1.0)]), output: Table(&[("coins", 10.0)]) }]),
     (
         "smithy",
@@ -1769,20 +2054,38 @@ pub const RECIPES: Table<&[Recipe]> = Table(&[
                 input: Table(&[("iron", 7.0), ("wood", 1.0)]),
                 output: Table(&[("armour", 1.0)]),
             },
+            Recipe {
+                input: Table(&[("steel", 2.0), ("wood", 1.0)]),
+                output: Table(&[("steelSword", 1.0)]),
+            },
+            Recipe {
+                input: Table(&[("steel", 1.0), ("wood", 3.0)]),
+                output: Table(&[("steelShield", 1.0)]),
+            },
+            Recipe {
+                input: Table(&[("steel", 7.0), ("wood", 1.0)]),
+                output: Table(&[("steelArmour", 1.0)]),
+            },
         ],
     ),
 ]);
 
 /// Batches one worker of average Strength and no skill gets through per game day: a smelter worker
-/// smelts what two miners dig (4 iron ore into 2 iron), a mint worker strikes what two gold miners
+/// smelts what two miners dig (4 iron ore into 2 iron), or 2 iron and 2 coal into 2 steel, a mint worker strikes what two gold miners
 /// dig (2 gold ore into 20 coins), a smithy worker makes two weapons or pieces of armour.
 pub const BATCHES_PER_DAY: Table<f64> = Table(&[("smelter", 2.0), ("mint", 2.0), ("smithy", 2.0)]);
 
 /// Units of each good one worker of average Strength and no skill makes per game day. Food is four
 /// times the `FOOD_PER_DAY` a resident eats, so about a quarter of a city farms; ore is slow, and
-/// gold ore slowest.
-pub const WORK_OUTPUT_PER_DAY: Table<f64> =
-    Table(&[("food", 2.0), ("wood", 4.0), ("stone", 3.0), ("ironOre", 2.0), ("goldOre", 1.0)]);
+/// gold ore slowest; coal as fast as iron ore.
+pub const WORK_OUTPUT_PER_DAY: Table<f64> = Table(&[
+    ("food", 2.0),
+    ("wood", 4.0),
+    ("stone", 3.0),
+    ("ironOre", 2.0),
+    ("goldOre", 1.0),
+    ("coal", 2.0),
+]);
 
 /// The Strength at which a worker makes `WORK_OUTPUT_PER_DAY`.
 pub const WORK_STRENGTH_AVERAGE: f64 = 10.0;
@@ -2262,8 +2565,39 @@ pub fn balance_json() -> Value {
     let mut m = Map::new();
     m.insert("MAP_SIZE".into(), json!(MAP_SIZE));
     m.insert("TERRAIN_SHARES".into(), to_value(TERRAIN_SHARES).expect("serialisable"));
+    m.insert("MAINLAND_SHARE".into(), json!(MAINLAND_SHARE));
+    m.insert("MAINLAND_STRETCH".into(), json!(MAINLAND_STRETCH));
+    m.insert("JOIN_SEA_SHARE".into(), json!(JOIN_SEA_SHARE));
+    m.insert("ISLAND_COUNT".into(), json!(ISLAND_COUNT));
+    m.insert("ISLAND_RADIUS".into(), to_value(ISLAND_RADIUS).expect("serialisable"));
+    m.insert("NARROWEST_STRAIT".into(), json!(NARROWEST_STRAIT));
+    m.insert("ISLAND_OFFSHORE_SHARE".into(), json!(ISLAND_OFFSHORE_SHARE));
+    m.insert("HEARTLAND_COUNT".into(), json!(HEARTLAND_COUNT));
+    m.insert("FRONTIER_REGION_COUNT".into(), json!(FRONTIER_REGION_COUNT));
+    m.insert("REGION_BORDER_WIDTH".into(), json!(REGION_BORDER_WIDTH));
+    m.insert("PASS_WIDTH".into(), json!(PASS_WIDTH));
+    m.insert("SEA_ARM_SHARE".into(), json!(SEA_ARM_SHARE));
+    m.insert("SECOND_WAY_SHARE".into(), json!(SECOND_WAY_SHARE));
+    m.insert("HEARTLAND_TERRAIN".into(), to_value(HEARTLAND_TERRAIN).expect("serialisable"));
+    m.insert("ISLAND_RELIEF".into(), json!(ISLAND_RELIEF));
     m.insert("NODE_DENSITY".into(), to_value(NODE_DENSITY).expect("serialisable"));
     m.insert("NODE_MIN_SPACING".into(), json!(NODE_MIN_SPACING));
+    m.insert("FRONTIER_NODE_DENSITY".into(), json!(FRONTIER_NODE_DENSITY));
+    m.insert("ISLAND_NODE_DENSITY".into(), json!(ISLAND_NODE_DENSITY));
+    m.insert("RICHNESS_FACTOR".into(), to_value(RICHNESS_FACTOR).expect("serialisable"));
+    m.insert("FRONTIER_RICH_NODES".into(), json!(FRONTIER_RICH_NODES));
+    m.insert("RICHER_NODE_REACH".into(), json!(RICHER_NODE_REACH));
+    m.insert("GOLD_NODE_DENSITY".into(), json!(GOLD_NODE_DENSITY));
+    m.insert("VEIN_CREW_DAYS".into(), to_value(VEIN_CREW_DAYS).expect("serialisable"));
+    m.insert("VEIN_STOCK".into(), vein_stock_json());
+    m.insert("VEIN_THINNING".into(), json!(VEIN_THINNING));
+    m.insert("VEIN_NEARLY_GONE".into(), json!(VEIN_NEARLY_GONE));
+    m.insert("NEW_VEIN_SPOT_REACH".into(), json!(NEW_VEIN_SPOT_REACH));
+    m.insert("VEIN_RETURN_DAYS".into(), json!(VEIN_RETURN_DAYS));
+    m.insert("STARTING_SITES_PER_HEARTLAND".into(), json!(STARTING_SITES_PER_HEARTLAND));
+    m.insert("STARTING_SITE_WALK".into(), to_value(STARTING_SITE_WALK).expect("serialisable"));
+    m.insert("STARTING_SITE_WAY_DISTANCE".into(), json!(STARTING_SITE_WAY_DISTANCE));
+    m.insert("STARTING_SITE_NODE_REACH".into(), json!(STARTING_SITE_NODE_REACH));
     m.insert("TERRAIN_SPEED".into(), to_value(TERRAIN_SPEED).expect("serialisable"));
     m.insert("STAT_BASE_MIN".into(), json!(STAT_BASE_MIN));
     m.insert("STAT_BASE_MAX".into(), json!(STAT_BASE_MAX));
@@ -2285,6 +2619,7 @@ pub fn balance_json() -> Value {
     m.insert("HOUSING_ROOM".into(), to_value(HOUSING_ROOM).expect("serialisable"));
     m.insert("START_SPARE_HOUSES".into(), json!(START_SPARE_HOUSES));
     m.insert("START_FOOD".into(), json!(START_FOOD));
+    m.insert("START_COINS".into(), json!(START_COINS));
     m.insert("START_CARRIED_FOOD".into(), json!(START_CARRIED_FOOD));
     m.insert("START_HORSES".into(), json!(START_HORSES));
     m.insert("START_STABLE_FOOD".into(), json!(START_STABLE_FOOD));
@@ -2332,8 +2667,11 @@ pub fn balance_json() -> Value {
     m.insert("WALL_ENCLOSES_MAX".into(), json!(WALL_ENCLOSES_MAX));
     m.insert("SIGHT_RANGE".into(), json!(SIGHT_RANGE));
     m.insert("LAST_SEEN_EVERY_TICKS".into(), json!(LAST_SEEN_EVERY_TICKS));
-    m.insert("NPC_VILLAGES".into(), json!(NPC_VILLAGES));
-    m.insert("NPC_TOWNS".into(), json!(NPC_TOWNS));
+    m.insert("NPC_TOWNS_PER_FRONTIER".into(), json!(NPC_TOWNS_PER_FRONTIER));
+    m.insert("NPC_VILLAGES_PER_FRONTIER".into(), json!(NPC_VILLAGES_PER_FRONTIER));
+    m.insert("NPC_VILLAGES_PER_HEARTLAND".into(), json!(NPC_VILLAGES_PER_HEARTLAND));
+    m.insert("NPC_STARTING_SITE_CLEARANCE".into(), json!(NPC_STARTING_SITE_CLEARANCE));
+    m.insert("NPC_WAY_CLEARANCE".into(), json!(NPC_WAY_CLEARANCE));
     m.insert("NPC_CITY_MIN_DISTANCE".into(), json!(NPC_CITY_MIN_DISTANCE));
     m.insert("NPC_VILLAGE".into(), to_value(NPC_VILLAGE).expect("serialisable"));
     m.insert("NPC_TOWN".into(), to_value(NPC_TOWN).expect("serialisable"));
@@ -2346,6 +2684,7 @@ pub fn balance_json() -> Value {
     m.insert("NPC_FOOD_SHORT_DAYS".into(), json!(NPC_FOOD_SHORT_DAYS));
     m.insert("WORK_FOOD_KEPT".into(), json!(WORK_FOOD_KEPT));
     m.insert("NPC_SOLDIER_SHARE".into(), json!(NPC_SOLDIER_SHARE));
+    m.insert("NPC_STEEL_KIT".into(), json!(NPC_STEEL_KIT));
     m.insert("NPC_SOLDIERS_ON_HALL".into(), json!(NPC_SOLDIERS_ON_HALL));
     m.insert("NPC_SOLDIERS_AT_GATE".into(), json!(NPC_SOLDIERS_AT_GATE));
     m.insert("NPC_POST_AROUND_HALL".into(), json!(NPC_POST_AROUND_HALL));
@@ -2431,7 +2770,6 @@ pub fn balance_json() -> Value {
     m.insert("DELIVERY_FEE_PER_KG_TILE".into(), json!(DELIVERY_FEE_PER_KG_TILE));
     m.insert("DELIVERY_DRIVE_TRIES".into(), json!(DELIVERY_DRIVE_TRIES));
     m.insert("TRANSFER_FEE_FACTOR".into(), json!(TRANSFER_FEE_FACTOR));
-    m.insert("SEA_COUNT".into(), json!(SEA_COUNT));
     m.insert("GOOD_WEIGHT".into(), to_value(GOOD_WEIGHT).expect("serialisable"));
     m.insert("WEAPON_ATTACK".into(), to_value(WEAPON_ATTACK).expect("serialisable"));
     m.insert("PROTECTION_DEFENCE".into(), to_value(PROTECTION_DEFENCE).expect("serialisable"));

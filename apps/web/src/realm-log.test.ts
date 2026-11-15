@@ -59,6 +59,48 @@ describe('the Trade Organization taking a city', () => {
 })
 
 describe('realm log', () => {
+  it('says a mine’s vein ran dry, and where (`CONTEXT.md`: Running dry)', () => {
+    const e = {
+      seq: 1,
+      tick: 2,
+      userId: 7,
+      kind: 'veinRanDry',
+      buildingId: 'b1',
+      node: 'goldOre',
+      x: 40,
+      y: 12,
+    } as const
+    expect(describeEvent(e)).toEqual({
+      text: 'The gold ore vein at the mine at (40, 12) ran dry: the mine makes nothing more.',
+      tone: 'warn',
+      places: [{ name: '(40, 12)', x: 40, y: 12 }],
+    })
+  })
+
+  it('says once a mine’s vein is thinning and once it is nearly gone, never how much is left', () => {
+    const e = {
+      seq: 1,
+      tick: 2,
+      userId: 7,
+      kind: 'veinTurned',
+      buildingId: 'b1',
+      node: 'coal',
+      x: 40,
+      y: 12,
+    } as const
+    const places = [{ name: '(40, 12)', x: 40, y: 12 }]
+    expect(describeEvent({ ...e, vein: 'thinning' })).toEqual({
+      text: 'The coal vein at the mine at (40, 12) is thinning.',
+      tone: 'info',
+      places,
+    })
+    expect(describeEvent({ ...e, vein: 'nearlyGone' })).toEqual({
+      text: 'The coal vein at the mine at (40, 12) is nearly gone: it will soon run dry.',
+      tone: 'warn',
+      places,
+    })
+  })
+
   it('says why a resident couldn’t move in (`CONTEXT.md`: Relocate)', () => {
     const failed = { kind: 'relocateFailed', residentId: 'r1', name: 'Ana', cityId: 'c2' } as const
     expect(
@@ -901,6 +943,9 @@ describe('realm log', () => {
       tone: 'info',
       places: [{ name: 'Ashford', x: 3, y: 9 }],
     })
+    expect(describeEvent({ ...founded, heartland: 'Greenmere' }).text).toBe(
+      'Your Leader Mara founded Ashford, your realm’s starting city, in the heartland of Greenmere.',
+    )
     const died = {
       kind: 'died',
       residentId: 'r1',

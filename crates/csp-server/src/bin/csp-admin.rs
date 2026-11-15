@@ -8,11 +8,18 @@
 //!                       marks tiles as explored for a Player: a disc round their first city's
 //!                       town hall, or the whole map (Epic 99, to stage a far-explored Player)
 //! admin map-stats       prints what each Player's map costs as it is sent (ADR 0034)
+//! admin reset-world [--seed <n>] --yes
+//!                       generates the world again, once (ADR 0035): backs the database up, then
+//!                       removes every world save, the terrain and explored terrain and clears the
+//!                       First day card; accounts, invite codes and script libraries stay. Without
+//!                       --yes it lists what it would remove and keep
 //! ```
 //!
 //! `create`, `invite` and `map-stats` are safe to run while the server is up: SQLite lets both
 //! write, and `map-stats` only reads. `explore` is for a copy of a world or a stopped server: a
-//! running one writes its own explored terrain back at its next save.
+//! running one writes its own explored terrain back at its next save. `reset-world` likewise:
+//! stop the server first (`docker compose stop server`, then `docker compose run --rm server
+//! csp-admin reset-world`).
 use std::{
     io::{self, BufRead, Write},
     process::ExitCode,

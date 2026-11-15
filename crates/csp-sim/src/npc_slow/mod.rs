@@ -14,10 +14,12 @@ use crate::walking::Walking;
 
 mod big_city;
 pub(crate) mod big_city_fixture;
+mod dry_mine;
 mod far_nodes;
 mod inner_wall;
 mod roads;
 mod scouts;
+mod steel;
 mod surplus;
 mod training;
 
@@ -26,7 +28,7 @@ pub fn node_terrain(kind: ResourceKind) -> Terrain {
     match kind {
         ResourceKind::Forest => Terrain::Forest,
         ResourceKind::Stone | ResourceKind::IronOre => Terrain::Hills,
-        ResourceKind::GoldOre => Terrain::Mountain,
+        ResourceKind::GoldOre | ResourceKind::Coal => Terrain::Mountain,
     }
 }
 
@@ -39,7 +41,14 @@ pub fn add_node(
     y: f64,
 ) -> String {
     let id = new_id("n", &mut world.next_id);
-    world.nodes.push(ResourceNode { id: id.clone(), kind, x, y });
+    world.nodes.push(ResourceNode {
+        id: id.clone(),
+        kind,
+        x,
+        y,
+        richness: Default::default(),
+        stock: None,
+    });
     terrain.tiles[tile_index(terrain.size, x as i32, y as i32)] = node_terrain(kind) as u8;
     id
 }

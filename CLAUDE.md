@@ -20,7 +20,8 @@
   state is plain serialisable data. After changing the script tables, run `pnpm script-data:rust`.
 - **World state is never reset** (ADR 0006): a change to its shape bumps `WORLD_FORMAT_VERSION`
   (`crates/csp-shared/src/world/world_format.rs`) and ships a migration step in
-  `crates/csp-server/src/world_format.rs` with a test.
+  `crates/csp-server/src/world_format.rs` with a test. ADR 0035 set this aside once: the world is
+  generated again by `csp-admin reset-world`, and a save from before it is refused.
 - **Monitoring** (ADR 0004): new simulation rules come with invariants and tests.
 - **The server is Rust (ADR 0030)**, in the cargo workspace at the root (`crates/csp-shared`,
   `csp-lang`, `csp-lang-wasm`, `csp-sim`, `csp-server`); the client (`apps/web`) is TypeScript.

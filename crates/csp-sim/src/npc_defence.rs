@@ -6,13 +6,15 @@
 
 use std::collections::HashSet;
 
-use csp_shared::balance::{MAP_SIZE, NPC_GATE_WATCH_RANGE, TRADE_ORG_ARMY};
+use csp_shared::balance::{
+    MAP_SIZE, NPC_GATE_WATCH_RANGE, NPC_STEEL_KIT, PROTECTION_DEFENCE, TRADE_ORG_ARMY,
+};
 use csp_shared::footprint::is_at;
-use csp_shared::goods::WEAPONS;
+use csp_shared::goods::{PROTECTION_KINDS, WEAPONS};
 use csp_shared::terrain::wrap_distance;
 use csp_shared::world::{
-    Building, BuildingKind, City, Good, GoodsSpot, PickUpOrder, ResidentOrder, Stock, Task,
-    TradeOrgCity, WorldState,
+    Building, BuildingKind, City, DropOrder, Good, GoodsSpot, PickUpOrder, ResidentOrder, Stock,
+    Task, TradeOrgCity, WorldState,
 };
 
 use crate::combat::attack_order;
@@ -25,7 +27,8 @@ use crate::queries::building::{building_pile, recipe_for, recipe_input, work_pro
 use crate::queries::city::{for_sale, in_city_area, npc_city_refuses};
 use crate::queries::city_area::{defends_city, occupiers_of};
 use crate::queries::names::{good_name, good_of, held, held_in, placed};
-use crate::queries::npc_trade::{npc_soldier_target, NPC_SMITHY_WEAPON};
+use crate::queries::npc_trade::{npc_makes_steel, npc_soldier_kit, npc_soldier_target};
+use crate::queries::residents::best_weapon;
 use crate::queries::residents::{can_work, carry_capacity, is_armed, stock_weight};
 use crate::queries::standing::TRADE_ORG;
 use crate::queries::walls::wall_side;
@@ -250,6 +253,7 @@ fn keep_soldiers(
             r.script = None;
         }
     }
+    upgrade_soldiers(world, city, &soldiers, storage);
     if soldiers.len() as f64 >= target {
         return;
     }
@@ -292,13 +296,14 @@ fn keep_soldiers(
             return;
         }
     }
-    let recipe = recipe_for(BuildingKind::Smithy, Some(good_name(NPC_SMITHY_WEAPON)));
+    let weapon = npc_soldier_kit(world, city)[0];
+    let recipe = recipe_for(BuildingKind::Smithy, Some(good_name(weapon)));
     let (Some(s), Some(st), Some(recipe)) = (smithy, storage, recipe) else { return };
     let input: Stock = recipe_input(recipe).into_iter().collect();
     // One carrying a child can't work, so can't forge what they would fetch.
     let smiths: Vec<usize> =
         unarmed.iter().copied().filter(|&i| world.residents[i].carrying.is_none()).collect();
-    if smithing(world, s, &smiths, &input) {
+    if smithing(world, s, &smiths, &input, weapon) {
         return;
     }
     let enough = input.iter().all(|(g, n)| held_in(world.buildings[st].stock.as_ref(), *g) >= *n);
@@ -307,9 +312,15 @@ fn keep_soldiers(
     }
 }
 
-/// The first weapon a stock holds, if any (`weaponIn`).
+/// The best weapon a stock holds, if any (`weaponIn`): steel before iron.
 fn weapon_in(stock: Option<&Stock>) -> Option<Good> {
-    WEAPONS.iter().filter_map(|w| good_of(w)).find(|g| held_in(stock, *g) > 0.0)
+    let held: Stock = WEAPONS
+        .iter()
+        .filter_map(|w| good_of(w))
+        .map(|g| (g, held_in(stock, g)))
+        .filter(|(_, n)| *n > 0.0)
+        .collect();
+    best_weapon(&held)
 }
 
 /// A weapon lies on the smithy's pile: an unarmed adult working there, or idle at it, picks it up
@@ -371,7 +382,13 @@ fn fetch(world: &mut WorldState, storage: usize, unarmed: &[usize], goods: &Stoc
 /// The smith's part (`smithing`): an unarmed adult already working the smithy keeps at it; one
 /// carrying the spear's Iron and Wood with nothing to do goes there and makes a spear. Whether
 /// someone is on it.
-fn smithing(world: &mut WorldState, smithy: usize, unarmed: &[usize], input: &Stock) -> bool {
+fn smithing(
+    world: &mut WorldState,
+    smithy: usize,
+    unarmed: &[usize],
+    input: &Stock,
+    weapon: Good,
+) -> bool {
     let sb = world.buildings[smithy].clone();
     if unarmed.iter().any(|&i| matches!(&world.residents[i].order, Some(ResidentOrder::WorkAt(o)) if o.building_id == sb.id)) {
         return true;
@@ -393,10 +410,10 @@ fn smithing(world: &mut WorldState, smithy: usize, unarmed: &[usize], input: &St
         walk_to(&mut world.residents[i], (sb.x, sb.y));
         return true;
     }
-    if work_problem(world, &world.residents[i], Some(NPC_SMITHY_WEAPON)).is_some() {
+    if work_problem(world, &world.residents[i], Some(weapon)).is_some() {
         return false;
     }
-    start_work(&mut world.residents[i], &sb, Some(NPC_SMITHY_WEAPON));
+    start_work(&mut world.residents[i], &sb, Some(weapon));
     true
 }
 
@@ -504,3 +521,98 @@ pub fn npc_gate_shut_to_its_punishers(world: &WorldState, size: i32) -> Vec<Inva
 
 #[cfg(test)]
 mod tests;
+
+/// The steel kit a city's soldiers fetch from its store (`upgradeKit`, `CONTEXT.md`: NPC reserve,
+/// Trade Org army): `NPC_STEEL_KIT` for a Trade Org city and an NPC city that goes for Steel
+/// (`npc_makes_steel`); none for any other, whose soldiers keep the spear they were armed with.
+fn upgrade_kit(world: &WorldState, city: &City) -> Vec<Good> {
+    if city.trade_org.is_some() || npc_makes_steel(world, city) {
+        NPC_STEEL_KIT.iter().filter_map(|g| good_of(g)).collect()
+    } else {
+        Vec::new()
+    }
+}
+
+/// What a soldier carries beyond their gear and the Food and Coins they keep (`spare`): every
+/// weapon but one of their best, of each kind of protection every piece but one of the best, and
+/// any other goods, such as the Steel a smith who took up arms still carries.
+fn spare(carried: &Stock) -> Stock {
+    let mut keep: Vec<Good> = best_weapon(carried).into_iter().collect();
+    for kind in PROTECTION_KINDS {
+        let best = kind
+            .iter()
+            .filter_map(|p| good_of(p).map(|g| (g, PROTECTION_DEFENCE.get(p).unwrap_or(0.0))))
+            .filter(|(g, _)| held(carried, *g) > 0.0)
+            .max_by(|a, b| a.1.total_cmp(&b.1));
+        keep.extend(best.map(|(g, _)| g));
+    }
+    carried
+        .iter()
+        .filter(|(g, n)| **n > 0.0 && **g != Good::Food && **g != Good::Coins)
+        .map(|(g, n)| (*g, if keep.contains(g) { n - 1.0 } else { *n }))
+        .filter(|(_, n)| *n > 0.0)
+        .collect()
+}
+
+/// A city's soldiers arm themselves with steel as far as its store holds it (`upgradeSoldiers`,
+/// `CONTEXT.md`: NPC reserve, Trade Org army): a soldier at the store with nothing to do puts back
+/// what they carry spare (`spare`: what a better piece outdoes, more than one of a piece, other
+/// goods); one with something spare elsewhere goes there to, one at a time; otherwise one soldier at
+/// a time fetches the first piece of the city's steel kit (`upgrade_kit`) they lack that the store
+/// holds. Only orders a Player could give (ADR 0002).
+fn upgrade_soldiers(
+    world: &mut WorldState,
+    city: &City,
+    soldiers: &[usize],
+    storage: Option<usize>,
+) {
+    let Some(st) = storage else { return };
+    let kit = upgrade_kit(world, city);
+    if kit.is_empty() {
+        return;
+    }
+    let sb = &world.buildings[st];
+    let (sx, sy) = (sb.x, sb.y);
+    let to_store = |o: &Option<ResidentOrder>| matches!(o, Some(ResidentOrder::WalkTo(w)) if w.target.x == sx && w.target.y == sy);
+    let free: Vec<usize> = soldiers
+        .iter()
+        .copied()
+        .filter(|&i| {
+            let r = &world.residents[i];
+            r.script.is_none() && (r.order.is_none() || to_store(&r.order))
+        })
+        .collect();
+    let at_store = |world: &WorldState, i: usize| {
+        is_at(tile(world, i), placed(&world.buildings[st]), MAP_SIZE)
+    };
+    for &i in &free {
+        if world.residents[i].order.is_some() || !at_store(world, i) {
+            continue;
+        }
+        let put = spare(&world.residents[i].carried);
+        if !put.is_empty() {
+            let to = GoodsSpot::Storage { storage_id: world.buildings[st].id.clone() };
+            world.residents[i].order = Some(ResidentOrder::Drop(DropOrder { to, goods: put }));
+            return;
+        }
+    }
+    if free.iter().any(|&i| to_store(&world.residents[i].order)) {
+        return;
+    }
+    if let Some(&i) = free.iter().find(|&&i| !spare(&world.residents[i].carried).is_empty()) {
+        walk_to(&mut world.residents[i], (sx, sy));
+        return;
+    }
+    let stock = world.buildings[st].stock.clone();
+    for g in kit {
+        if held_in(stock.as_ref(), g) < 1.0 {
+            continue;
+        }
+        let lacking: Vec<usize> =
+            free.iter().copied().filter(|&i| held(&world.residents[i].carried, g) <= 0.0).collect();
+        if !lacking.is_empty() {
+            fetch(world, st, &lacking, &Stock::from([(g, 1.0)]));
+            return;
+        }
+    }
+}

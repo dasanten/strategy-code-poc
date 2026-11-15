@@ -1,13 +1,12 @@
 //! The world's NPC cities come to be (`apps/server/src/npc-cities.ts`, `npc-horses.ts`,
-//! `CONTEXT.md`: NPC city, NPC horses): `NPC_TOWNS` towns and `NPC_VILLAGES` villages, each laid out
+//! `CONTEXT.md`: NPC city, NPC horses): towns and villages by region (`land_sites`), each laid out
 //! as a starting city is, on a site out of every Player's sight, with its first horses.
 
 use std::collections::HashSet;
 
 use csp_shared::balance::{
-    NpcCitySize, HORSE_FOOD_PER_DAY, MAP_SIZE, NPC_CITY_MIN_DISTANCE, NPC_START_HORSES,
-    NPC_START_HORSE_FOOD_DAYS, NPC_TOWN, NPC_TOWNS, NPC_VILLAGE, NPC_VILLAGES, SIGHT_RANGE,
-    START_CARRIED_FOOD,
+    NpcCitySize, HORSE_FOOD_PER_DAY, NPC_CITY_MIN_DISTANCE, NPC_START_HORSES,
+    NPC_START_HORSE_FOOD_DAYS, SIGHT_RANGE, START_CARRIED_FOOD,
 };
 use csp_shared::footprint::FOOTPRINT;
 use csp_shared::terrain::{terrain_at, wrap, Terrain, TerrainMap};
@@ -34,15 +33,6 @@ pub use crate::starting_city::{hall_tile, FARM_RING};
 use crate::starting_city::{house_tile as row_house_tile, ring_tiles, spots_outside, wall_square};
 
 // ---- The NPC cities. ----
-
-/// How many cities of a kind a map of `size` gets (`npcCityCount`): `per_full_map` on a full-size
-/// map, by area.
-pub fn npc_city_count(per_full_map: f64, size: i32) -> usize {
-    crate::queries::js_round(
-        per_full_map * f64::from(size) * f64::from(size)
-            / (f64::from(MAP_SIZE) * f64::from(MAP_SIZE)),
-    ) as usize
-}
 
 /// How far a city's tiles reach from its middle at most (`footprintRadius`).
 fn footprint_radius(kind: &NpcCitySize) -> f64 {
@@ -88,6 +78,12 @@ impl SiteWorld {
                 .map(|r| (r.x, r.y))
                 .collect(),
         }
+    }
+
+    /// As `new`, but with no city to keep `NPC_CITY_MIN_DISTANCE` from: a heartland's trading post
+    /// stands near its middle however near the next city is.
+    pub fn players_only(world: &WorldState) -> Self {
+        SiteWorld { halls: Vec::new(), ..SiteWorld::new(world) }
     }
 }
 
@@ -334,24 +330,12 @@ fn starting_house_spot(
     best.map(|b| b.0)
 }
 
-/// Places the world's NPC cities (`placeNpcCities`): `NPC_TOWNS` towns, then `NPC_VILLAGES`
-/// villages, scaled to the map's area, each on a site `find_npc_city_site` picks and with its first
-/// horses. Fewer when the map has no room left. Returns their ids.
+/// Places the world's NPC cities (`placeNpcCities`): towns and villages in the frontier regions and
+/// villages in the heartlands, by the counts per region (`land_sites::place_npc_cities_on`), each
+/// with its first horses. Fewer where a region has no room left. Returns their ids.
 pub fn place_npc_cities(world: &mut WorldState, terrain: &TerrainMap) -> Vec<String> {
-    let mut m = Mulberry32::new((world.seed * 104_729 + 31) as f64);
-    let mut rand = || m.next();
-    let mut kinds: Vec<NpcCitySize> = vec![NPC_TOWN; npc_city_count(NPC_TOWNS, terrain.size)];
-    kinds.extend(vec![NPC_VILLAGE; npc_city_count(NPC_VILLAGES, terrain.size)]);
-    let mut placed = Vec::new();
-    for kind in &kinds {
-        if let Some((x, y)) = find_npc_city_site(world, terrain, kind, &mut rand) {
-            placed.push(found_npc_city(world, terrain, kind, x, y, &mut rand, None));
-        }
-    }
-    for id in &placed {
-        give_npc_horses(world, terrain, id);
-    }
-    placed
+    let land = crate::land_sites::LandSites::of(world, terrain);
+    crate::land_sites::place_npc_cities_on(world, terrain, &land)
 }
 
 /// An NPC city's first horses (`giveNpcHorses`, `CONTEXT.md`: NPC horses): `NPC_START_HORSES` new

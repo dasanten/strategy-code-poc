@@ -79,7 +79,7 @@ fn holder_of(world: &WorldState, id: &str) -> RegionHolder {
 }
 
 /// The corner and the width and height of a chunk, clipped to the map.
-fn chunk_box(chunk: i32, size: i32) -> (i32, i32, i32, i32) {
+pub(crate) fn chunk_box(chunk: i32, size: i32) -> (i32, i32, i32, i32) {
     let across = chunks_across(size);
     let (x0, y0) = ((chunk % across) * CHUNK_SIZE, (chunk / across) * CHUNK_SIZE);
     (x0, y0, CHUNK_SIZE.min(size - x0), CHUNK_SIZE.min(size - y0))

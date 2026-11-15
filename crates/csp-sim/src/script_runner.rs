@@ -70,6 +70,11 @@ pub trait ScriptHost {
     fn sender(&self, user_id: u64) -> Option<OrderSender>;
     /// Whether the Player has explored a tile.
     fn explored(&self, user_id: u64, x: i32, y: i32) -> bool;
+    /// The map's regions (`MapTerrain::regions`), for a tile view's `region` and `regionKind`;
+    /// without them those are `null`.
+    fn regions(&self, _seed: i64) -> Option<&crate::regions::Regions> {
+        None
+    }
     /// The id of the Player's version of a task's default script; without it such a script ends.
     fn default_script(&self, _user_id: u64, _task: Task) -> Option<u64> {
         None
@@ -1441,6 +1446,8 @@ impl ScriptRunner {
         let index = crate::world_index::world_index(&mut slot, world, size);
         let host = self.host.clone();
         let explored = move |x: i32, y: i32| host.explored(user_id, x, y);
+        let land_host = self.host.clone();
+        let land = land_host.regions(world.seed);
         let (requests, ended, end_reason, waited, logged, result) = {
             let sight = RefCell::new(scratch.sight.take());
             let world_ref: &WorldState = world;
@@ -1475,6 +1482,7 @@ impl ScriptRunner {
                 explored: &explored,
                 kinds: &self.kinds,
                 edge: None,
+                land,
                 params: Some(&params),
             };
             let mut bound = bind_script(ctx).map_err(|e| e.0)?;
@@ -1926,6 +1934,7 @@ fn run_city_scripts(
                 explored: &explored,
                 kinds,
                 edge: Some(&edge),
+                land: None,
                 params: Some(&default.params),
             };
             let outcome = bind_script(ctx).ok().map(|mut bound| {

@@ -427,6 +427,36 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 description: "Units of armour.",
                 null_when: Some("when there are none"),
             },
+            ScriptField {
+                name: "coal",
+                r#type: ScriptType::Number,
+                description: "Units of coal.",
+                null_when: Some("when there are none"),
+            },
+            ScriptField {
+                name: "steel",
+                r#type: ScriptType::Number,
+                description: "Units of steel.",
+                null_when: Some("when there are none"),
+            },
+            ScriptField {
+                name: "steelSword",
+                r#type: ScriptType::Number,
+                description: "Units of steel sword.",
+                null_when: Some("when there are none"),
+            },
+            ScriptField {
+                name: "steelShield",
+                r#type: ScriptType::Number,
+                description: "Units of steel shield.",
+                null_when: Some("when there are none"),
+            },
+            ScriptField {
+                name: "steelArmour",
+                r#type: ScriptType::Number,
+                description: "Units of steel armour.",
+                null_when: Some("when there are none"),
+            },
         ],
     },
     ScriptView {
@@ -751,6 +781,18 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 description: "From north to south.",
                 null_when: None,
             },
+            ScriptField {
+                name: "region",
+                r#type: ScriptType::String,
+                description: "The name of the region it lies in.",
+                null_when: Some("on water, or on a tile the Player hasn’t explored"),
+            },
+            ScriptField {
+                name: "regionKind",
+                r#type: ScriptType::String,
+                description: "What its region is: \"heartland\", \"frontier\" or \"island\".",
+                null_when: Some("on water, or on a tile the Player hasn’t explored"),
+            },
         ],
     },
     ScriptView {
@@ -948,6 +990,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 r#type: ScriptType::View("workSettings"),
                 description: "My realm’s Workplace settings for a workplace, or a construction site of a workplace kind, set on its card; never another realm’s.",
                 null_when: Some("for any other building, and while my realm has set none there"),
+            },
+            ScriptField {
+                name: "vein",
+                r#type: ScriptType::String,
+                description: "How the vein of a workplace on a node stands: \"plenty\", \"thinning\", \"nearlyGone\", or \"endless\" for a node that never runs dry; never a number.",
+                null_when: Some("for any other building, a construction site, a mine whose vein ran dry, and while neither my realm nor an ally has a resident working it"),
             },
         ],
     },
@@ -1738,7 +1786,7 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
             ScriptField {
                 name: "kind",
                 r#type: ScriptType::String,
-                description: "What it yields: \"forest\", \"stone\", \"ironOre\" or \"goldOre\".",
+                description: "What it yields: \"forest\", \"stone\", \"ironOre\", \"goldOre\" or \"coal\".",
                 null_when: None,
             },
             ScriptField {
@@ -1751,6 +1799,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 name: "y",
                 r#type: ScriptType::Number,
                 description: "The tile it stands on, from north to south.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "richness",
+                r#type: ScriptType::String,
+                description: "How much its workplace makes per worker: \"poor\", \"normal\" or \"rich\".",
                 null_when: None,
             },
         ],
@@ -2297,7 +2351,7 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Query,
         params: &["kind?"],
         cost: 20.0,
-        description: "The resource nodes the Player sees now; with `kind` (\"forest\", \"stone\", \"ironOre\" or \"goldOre\"), only those of that kind.",
+        description: "The resource nodes the Player sees now; with `kind` (\"forest\", \"stone\", \"ironOre\", \"goldOre\" or \"coal\"), only those of that kind.",
         returns: ScriptType::List(&ScriptType::View("node")),
     },
     ScriptBinding {
@@ -3173,7 +3227,7 @@ pub static ARMY_SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Query,
         params: &["kind?"],
         cost: 20.0,
-        description: "The resource nodes the Player sees now; with `kind` (\"forest\", \"stone\", \"ironOre\" or \"goldOre\"), only those of that kind.",
+        description: "The resource nodes the Player sees now; with `kind` (\"forest\", \"stone\", \"ironOre\", \"goldOre\" or \"coal\"), only those of that kind.",
         returns: ScriptType::List(&ScriptType::View("node")),
     },
     ScriptBinding {
@@ -3415,8 +3469,9 @@ pub static DEFAULT_SCRIPTS: &[(Task, &str, &str)] = &[
 // batch, one of us, picked at random, fetches a load at params.input, else
 // params.storage, while it holds some, else at the nearest storage of my
 // realm holding it, and puts it on the pile; not while one of us carries the
-// output, and with none anywhere we stand idle. At a smithy, memory.makes
-// says what to make. Meals come from the workplace's pile on their own,
+// output, and with none anywhere we stand idle, my Doing line saying what
+// we lack ("Idle: no coal"). At a smithy, memory.makes says what to make, at
+// a smelter iron unless it says steel. Meals come from the workplace's pile on their own,
 // without an order. Below
 // params.foodAt units of Food on me, while the pile holds none, I get Food
 // up to params.foodTake at params.food, else params.storage, else the
@@ -3424,7 +3479,8 @@ pub static DEFAULT_SCRIPTS: &[(Task, &str, &str)] = &[
 // my food up to foodTake too. foodAt 0 turns getting food off. At the workplace we stand spread over
 // its footprint. A workplace still being built I build first, as Build would,
 // with materials from the nearest storage of my realm holding them, then work
-// it once it is finished.
+// it once it is finished. At a mine whose vein ran dry, which makes nothing,
+// I end, my log saying why.
 param workplace: building // the workplace to work; none: the one I stand on
 param storage: storage // my main storage, for output, inputs and Food; none: the nearest storage of my realm
 param output: storage // where the output goes; none: my storage, else the nearest storage of my realm
@@ -3463,6 +3519,13 @@ if (workplace == null) { // here, and it isn't: torn down
   end("the workplace is gone")
   return
 }
+if (ranDry(workplace)) { // it stands, making nothing
+  // The realm log says so once for the mine, so each of us notes it in our
+  // own log only.
+  log("the vein ran dry")
+  end()
+  return
+}
 // With Food on the pile my meals come from there; with none anywhere, I work on.
 let food = me.carried.food || 0
 if (food < params.foodAt && !pileHoldsFood(workplace) && getFoodIfLow(params.food || params.storage, workplace)) {
@@ -3483,10 +3546,11 @@ if (me.order == null) {
 carryLoadOffIfFull(workplace)
 
 // Which workplace I work: the one picked, else the one I started on, kept in
-// memory.workplaceId. False once I end: neither is a workplace.
+// memory.workplaceId. False once I end: neither is a workplace. A mine whose
+// vein ran dry is picked still, so that I end there, saying why.
 fn pickWorkplace() {
   if (params.workplace != null) {
-    if (!isWorkplace(params.workplace)) {
+    if (!isWorkplace(params.workplace) && !ranDry(params.workplace)) {
       end("the " + params.workplace.kind + " is no workplace")
       return false
     }
@@ -3495,7 +3559,7 @@ fn pickWorkplace() {
   }
   if (memory.workplaceId == null) {
     let here = buildingAt(me.x, me.y)
-    if (!isWorkplace(here)) {
+    if (!isWorkplace(here) && !ranDry(here)) {
       end("no workplace on their tile")
       return false
     }
@@ -3508,6 +3572,11 @@ fn pickWorkplace() {
 // A building that makes goods, or the construction site of one.
 fn isWorkplace(b) {
   return b != null && outputOf(b).length > 0
+}
+
+// A finished mine that makes nothing: its vein ran dry.
+fn ranDry(b) {
+  return b != null && b.kind == "mine" && b.site == null && outputOf(b).length == 0
 }
 
 // A workplace still being built (Working a site), kept in memory.siteId: I
@@ -3685,10 +3754,13 @@ fn carryLoadOffIfFull(workplace) {
 // picked at random, fetches a load at params.input, else params.storage,
 // while it holds some, else at the nearest storage of my realm holding it,
 // kept in memory.input until back, when I put it on the pile. With none
-// anywhere we stand idle.
+// anywhere we stand idle, and my Doing line says what we lack.
 fn fetchInputIfShort(workplace) {
   let missing = inputToFetch(workplace, memory.makes)
-  if (missing.length == 0) { return }
+  if (missing.length == 0) {
+    sayLacking(null)
+    return
+  }
   let goods = goodsOf(missing)
   let from = null
   if (params.input != null) { from = materialsFrom(workplace, goods, params.input) }
@@ -3696,13 +3768,36 @@ fn fetchInputIfShort(workplace) {
     from = materialsFrom(workplace, goods, params.storage)
   }
   if (from == null) { from = materialsFrom(workplace, goods, null) }
-  if (from == null || pickInputFetcher(workplace) != me.id) { return }
+  if (from == null) {
+    sayLacking(goods)
+    return
+  }
+  sayLacking(null)
+  if (pickInputFetcher(workplace) != me.id) { return }
   let load = {}
   for (m of missing) { load[m.good] = m.units }
   if (fetch(load, from.id) != null) { return }
   wait() // until I have it
   memory.input = {missing: missing}
   log("fetching " + goodsText(load, goods) + " from " + placeName(from))
+}
+
+// My Doing line while the input for a batch is nowhere to be had: what we
+// lack, as "Idle: no iron, coal"; null gives the usual line back.
+fn sayLacking(goods) {
+  let text = null
+  if (goods != null) {
+    text = ""
+    for (g of goods) {
+      if (text != "") { text = text + ", " }
+      let name = g
+      if (g == "ironOre") { name = "iron ore" }
+      if (g == "goldOre") { name = "gold ore" }
+      text = text + name
+    }
+    text = "Idle: no " + text
+  }
+  if (memory.doing != text) { doing(text) }
 }
 
 // Who fetches inputs: one of us at work here, picked at random, so we all
@@ -4748,7 +4843,7 @@ fn aboardDriven() {
 
 // Whether I carry a weapon.
 fn armed() {
-  for (w of ["spear", "sword"]) {
+  for (w of ["spear", "sword", "steelSword"]) {
     let n = me.carried[w]
     if (n != null && n > 0) { return true }
   }
@@ -5305,7 +5400,7 @@ fn goodsText(load, goods) {
 // stop: once my Player sees a node of that kind that none of their
 // waypoints marks, I put a waypoint on it ("Gold ore node"), walk back to
 // where I refill and end. Without it I go on until stopped.
-param find: choice(forest, stone, ironOre, goldOre) // the node to find; none: just explore
+param find: choice(forest, stone, ironOre, goldOre, coal) // the node to find; none: just explore
 param toward: choice(north, northeast, east, southeast, south, southwest, west, northwest) // the way to go; none: the nearest unexplored tiles first
 param waypoint: waypoint // a waypoint to head for instead; none: go by toward
 param food: storage // where to refill; a carriage too; none: the nearest storage with Food
@@ -5438,6 +5533,7 @@ fn unmarked(nodes) {
 fn nodeName(kind) {
   if (kind == "ironOre") { return "Iron ore node" }
   if (kind == "goldOre") { return "Gold ore node" }
+  if (kind == "coal") { return "Coal node" }
   if (kind == "forest") { return "Forest node" }
   return "Stone node"
 }
@@ -5674,7 +5770,7 @@ fn culprit() {
 
 // Whether they carry a weapon.
 fn armed(who) {
-  for (w of ["spear", "sword"]) {
+  for (w of ["spear", "sword", "steelSword"]) {
     let n = who.carried[w]
     if (n != null && n > 0) { return true }
   }

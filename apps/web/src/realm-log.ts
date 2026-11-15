@@ -9,6 +9,7 @@ import type {
   StandingMove,
 } from '@csp/shared-types'
 import { BUILDING_NAMES } from './city-view.js'
+import { NODE_NAMES } from './map/palette.js'
 import { formatMove } from './standing-view.js'
 
 /** How bad an event is, for its colour in the log. */
@@ -144,6 +145,31 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
         tone: 'bad',
         places: [{ name: place, x: e.x, y: e.y }],
       }
+    }
+    case 'veinRanDry': {
+      // `CONTEXT.md`: Running dry.
+      const place = `(${e.x}, ${e.y})`
+      return {
+        text: `The ${NODE_NAMES[e.node].toLowerCase()} vein at the mine at ${place} ran dry: the mine makes nothing more.`,
+        tone: 'warn',
+        places: [{ name: place, x: e.x, y: e.y }],
+      }
+    }
+    case 'veinTurned': {
+      // `CONTEXT.md`: Running dry: never a number.
+      const place = `(${e.x}, ${e.y})`
+      const vein = `The ${NODE_NAMES[e.node].toLowerCase()} vein at the mine at ${place}`
+      return e.vein === 'nearlyGone'
+        ? {
+            text: `${vein} is nearly gone: it will soon run dry.`,
+            tone: 'warn',
+            places: [{ name: place, x: e.x, y: e.y }],
+          }
+        : {
+            text: `${vein} is thinning.`,
+            tone: 'info',
+            places: [{ name: place, x: e.x, y: e.y }],
+          }
     }
     case 'transportTaken': {
       const place = `(${e.x}, ${e.y})`
@@ -594,7 +620,9 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
     }
     case 'founded':
       return {
-        text: `Your Leader ${e.name} founded ${e.city}, your realm’s starting city.`,
+        text: e.heartland
+          ? `Your Leader ${e.name} founded ${e.city}, your realm’s starting city, in the heartland of ${e.heartland}.`
+          : `Your Leader ${e.name} founded ${e.city}, your realm’s starting city.`,
         tone: 'info',
         places: [{ name: e.city, x: e.x, y: e.y }],
       }

@@ -4,16 +4,19 @@ use std::collections::HashSet;
 use std::sync::OnceLock;
 
 use csp_shared::balance::{
-    NPC_CITY_MIN_DISTANCE, NPC_TOWN, NPC_TOWNS, NPC_VILLAGE, NPC_VILLAGES, SIGHT_RANGE,
+    FRONTIER_REGION_COUNT, HEARTLAND_COUNT, NPC_CITY_MIN_DISTANCE, NPC_TOWN,
+    NPC_TOWNS_PER_FRONTIER, NPC_VILLAGE, NPC_VILLAGES_PER_FRONTIER, NPC_VILLAGES_PER_HEARTLAND,
+    SIGHT_RANGE,
 };
 use csp_shared::terrain::{terrain_at, wrap_distance, Terrain, TerrainMap};
 use csp_shared::world::{BuildingKind, City, ResourceKind, ResourceNode, WorldState};
 use serde_json::{json, Value};
 
-use super::{find_npc_city_site, found_npc_city, npc_city_count, npc_site_fits, taken_ground};
+use super::{find_npc_city_site, found_npc_city, npc_site_fits, taken_ground};
 use crate::invariants::check_all;
 use crate::queries::city::{city_price, in_city_area, is_city_building, town_hall_of};
 use crate::random::Mulberry32;
+use crate::regions::{RegionKind, Regions};
 use crate::residents::{new_resident, NewResident};
 use crate::sight::entities_in_sight;
 use crate::starting_city::found_starting_city;
@@ -58,23 +61,30 @@ fn npc(world: &WorldState) -> Vec<&City> {
 // placeNpcCities (through generateWorld)
 
 #[test]
-fn places_towns_and_villages_by_the_map_area_run_by_the_game() {
+fn places_towns_in_the_frontier_and_villages_by_region_run_by_the_game() {
     let (terrain, world) = generated();
-    assert_eq!(npc_city_count(NPC_TOWNS, 5760), NPC_TOWNS as usize);
-    assert_eq!(npc_city_count(NPC_VILLAGES, 5760), NPC_VILLAGES as usize);
-    let towns = npc_city_count(NPC_TOWNS, 2880);
-    let villages = npc_city_count(NPC_VILLAGES, 2880);
-    assert!(towns > 0);
+    let most = FRONTIER_REGION_COUNT * (NPC_TOWNS_PER_FRONTIER + NPC_VILLAGES_PER_FRONTIER)
+        + HEARTLAND_COUNT * NPC_VILLAGES_PER_HEARTLAND;
     let npc = npc(world);
-    assert_eq!(npc.len(), towns + villages);
+    assert!(!npc.is_empty() && npc.len() <= most as usize, "{}", npc.len());
     let sizes: Vec<usize> = npc
         .iter()
         .map(|c| world.residents.iter().filter(|r| r.city_id.as_deref() == Some(&c.id)).count())
         .collect();
+    // Towns first, then villages; every town in a frontier region.
+    let towns = sizes.iter().filter(|&&n| n == NPC_TOWN.residents as usize).count();
+    assert!(towns > 0);
     let want: Vec<usize> = std::iter::repeat_n(NPC_TOWN.residents as usize, towns)
-        .chain(std::iter::repeat_n(NPC_VILLAGE.residents as usize, villages))
+        .chain(std::iter::repeat_n(NPC_VILLAGE.residents as usize, npc.len() - towns))
         .collect();
     assert_eq!(sizes, want);
+    let regions = Regions::of(world.seed, terrain);
+    for c in &npc[..towns] {
+        let (x, y) = hall_of(world, c);
+        assert_eq!(regions.region_at(x, y).map(|r| r.kind), Some(RegionKind::Frontier));
+    }
+    let land = crate::land_sites::LandSites::new(regions, Vec::new());
+    assert_eq!(crate::land_sites::check_on_the_land(world, terrain, &land), []);
     assert!(world.cities.iter().all(|c| c.realm_id.is_none()));
     assert!(world.residents.iter().all(|r| r.owner.is_none()));
     assert!(world.realms.is_empty());
@@ -142,17 +152,26 @@ fn places_the_same_cities_for_the_same_world() {
     assert_eq!(&generate_world(terrain, 1), world);
 }
 
+/// Starting cities go on the starting sites (`CONTEXT.md`: Starting site), which every NPC city
+/// keeps clear of; a heartland's own village and post stand nearer than `NPC_CITY_MIN_DISTANCE`
+/// by design (T100.5), so that distance no longer holds between them. A starting city founded
+/// on the generated world still breaks no invariant.
 #[test]
-fn leaves_room_for_starting_cities_far_from_the_npc_cities() {
+fn leaves_room_for_starting_cities_on_the_starting_sites() {
     let (terrain, world) = generated();
+    assert!(!world.starting_sites.is_empty());
+    let clearance = crate::land_sites::starting_site_clearance(terrain.size);
+    for site in &world.starting_sites {
+        let (sx, sy) = crate::starting_sites::site_middle(site);
+        for c in &world.cities {
+            let d = wrap_distance(terrain.size, (sx, sy), hall_of(world, c));
+            assert!(d >= clearance - NPC_TOWN.size, "{} is {d} from {site:?}", c.id);
+        }
+    }
+    let regions = Regions::of(world.seed, terrain);
+    assert_eq!(crate::starting_sites::check_starting_sites(world, terrain, &regions), []);
     let mut w = world.clone();
     found_starting_city(&mut w, terrain, 1, None);
-    let mine = w.cities.iter().find(|c| c.realm_id.is_some()).unwrap();
-    let hall = hall_of(&w, mine);
-    for c in &world.cities {
-        let d = wrap_distance(terrain.size, hall, hall_of(&w, c));
-        assert!(d >= NPC_CITY_MIN_DISTANCE - NPC_TOWN.size);
-    }
     assert_eq!(check_all(&w, terrain), []);
 }
 
@@ -259,7 +278,14 @@ fn takes_open_plains_far_from_cities_and_players() {
 fn avoids_taken_tiles() {
     let terrain = plains(200);
     let mut world = create_world(&terrain, 1);
-    world.nodes.push(ResourceNode { id: "n1".into(), kind: ResourceKind::Stone, x: 49.0, y: 55.0 });
+    world.nodes.push(ResourceNode {
+        id: "n1".into(),
+        kind: ResourceKind::Stone,
+        x: 49.0,
+        y: 55.0,
+        richness: Default::default(),
+        stock: None,
+    });
     assert!(!fits(&world, &terrain));
 }
 

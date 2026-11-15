@@ -39,8 +39,22 @@ fn stranger() -> OrderSender {
 fn setup() -> (WorldState, TerrainMap, Orders) {
     let mut world = empty_world(&plains(16));
     world.nodes = vec![
-        ResourceNode { id: "n1".into(), kind: ResourceKind::Forest, x: 3.0, y: 3.0 },
-        ResourceNode { id: "n3".into(), kind: ResourceKind::IronOre, x: 7.0, y: 7.0 },
+        ResourceNode {
+            id: "n1".into(),
+            kind: ResourceKind::Forest,
+            x: 3.0,
+            y: 3.0,
+            richness: Default::default(),
+            stock: None,
+        },
+        ResourceNode {
+            id: "n3".into(),
+            kind: ResourceKind::IronOre,
+            x: 7.0,
+            y: 7.0,
+            richness: Default::default(),
+            stock: None,
+        },
     ];
     world.buildings.push(building("b1", BuildingKind::Mine, 7.0, 7.0));
     world.realms.push(realm("r1", 7, "w1"));

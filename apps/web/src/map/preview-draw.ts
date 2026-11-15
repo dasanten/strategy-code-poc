@@ -68,3 +68,28 @@ export function drawPickPreview(
   if (p.place) frame(p.place.x, p.place.y, p.place.side, LEADER_COLOR, 2.5)
   frame(p.at.x, p.at.y, 1, GLYPH_COLOR, 1.5)
 }
+
+/** A spot marked on the map at every zoom (`MapView`'s `marks`): a tile and the mark's colour. */
+export interface MapMark {
+  x: number
+  y: number
+  color: number
+}
+
+/** Draws each mark as a diamond of a steady size on screen over the middle of its tile. */
+export function drawMarks(
+  g: Graphics,
+  cam: Camera,
+  view: Size,
+  size: number,
+  marks: readonly MapMark[],
+) {
+  const r = 6
+  for (const m of marks) {
+    const [sx, sy] = tileToScreen(cam, view, size, m.x + 0.5, m.y + 0.5)
+    if (sx < -r || sy < -r || sx > view.width + r || sy > view.height + r) continue
+    g.poly([sx, sy - r, sx + r, sy, sx, sy + r, sx - r, sy])
+      .fill({ color: m.color })
+      .stroke({ width: 1.5, color: GLYPH_COLOR })
+  }
+}

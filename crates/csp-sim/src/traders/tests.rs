@@ -246,7 +246,7 @@ fn places_none_twice_and_none_without_an_hq_or_with_no_post() {
 
 #[test]
 fn comes_with_a_generated_world() {
-    let terrain = crate::test_world::city_terrain();
+    let terrain = crate::test_support::new_land();
     let mut world = crate::world::generate_world(terrain, 1);
     crate::starting_city::found_starting_city(&mut world, terrain, 1, None);
     let posts = trading_posts(&world).len();

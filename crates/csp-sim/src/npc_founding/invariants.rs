@@ -67,3 +67,25 @@ pub fn full_wait_sound(world: &WorldState) -> Vec<InvariantViolation> {
     }
     out
 }
+
+/// Invariant `founding-site-clear` (`CONTEXT.md`: Founding, Starting site): no city's founding
+/// site lies within `NPC_STARTING_SITE_CLEARANCE` of a starting site.
+pub fn founding_site_clear(world: &WorldState, size: i32) -> Vec<InvariantViolation> {
+    let starting = crate::land_sites::starting_site_middles(world);
+    if starting.is_empty() {
+        return Vec::new();
+    }
+    let half = (csp_shared::balance::NPC_VILLAGE.size / 2.0).floor();
+    let mut out = Vec::new();
+    for (city_id, plan) in &world.city_plans {
+        let Some(site) = plan.founding_site else { continue };
+        // The site is the daughter's town hall; the middle of its square as `find_founding_site`.
+        let (x, y) = super::square_of((site.x as i32, site.y as i32));
+        let middle = (f64::from(x) + half, f64::from(y) + half);
+        if crate::land_sites::near_a_starting_site(&starting, size, middle) {
+            let message = format!("{city_id} means to found by a starting site at {site:?}");
+            out.push(violation("founding-site-clear", message, vec![city_id.clone()]));
+        }
+    }
+    out
+}

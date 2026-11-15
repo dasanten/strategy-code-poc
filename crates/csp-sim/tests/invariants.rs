@@ -18,14 +18,17 @@ use csp_sim::invariants::{
 use csp_sim::queries::balance::carry_capacity;
 use csp_sim::queries::building::building_at;
 use csp_sim::queries::names::placed;
-use csp_sim::terrain_gen::generate_terrain;
 use csp_sim::tick::Scratch;
 use csp_sim::world::step_world;
 use serde_json::json;
 
 fn terrain() -> &'static TerrainMap {
     static T: OnceLock<TerrainMap> = OnceLock::new();
-    T.get_or_init(|| generate_terrain(1, 1536))
+    // The TypeScript's `cityTerrain()`, which `sight/city.json` was founded on.
+    T.get_or_init(|| {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/fixtures/terrain/1-1536.bin");
+        TerrainMap { size: 1536, tiles: std::fs::read(path).expect("terrain fixture") }
+    })
 }
 
 /// A world on `cityTerrain()` where Player 1 founded their starting city (`worldWithCity`).
@@ -450,9 +453,11 @@ fn invariants_for_tick_runs_all_of_them_when_every_tick_is_sampled_none_at_a_rat
     assert!(invariants_for_tick(7, 0.0, &all).is_empty());
     // The TypeScript's list, by name and in order, 151 invariants, `vessels-in-place` (T90.2),
     // `water-haul-routes-sound` (T91.5), `ship-crew` (T91.2), `respect-sound` (T96.1),
-    // `outweighed-sound` (T96.2), `lent-never-turn` (T96.4), `npc-lending-keeps-reserve`
-    // (T96.3), `heirs-qualify` (T103.1) and `heirs-took-over` (T103.2).
-    assert_eq!(all.len(), 161);
+    // `outweighed-sound` (T96.2), `lent-never-turn` (T96.4), `npc-lending-keeps-reserve` (T96.3)
+    // `heirs-qualify` (T103.1), `heirs-took-over` (T103.2), `founding-site-clear` (T100.5),
+    // `starting-sites-sound` (T100.4), `steel-only-with-coal` (T101.6), `veins-sound` (T102.1),
+    // `veins-counted` (T102.2) and `npc-leaves-dry-workplaces` (T102.4).
+    assert_eq!(all.len(), 167);
 }
 
 /// A starting city with everyone idle on the storage's tile, carrying nothing (`atHome` of

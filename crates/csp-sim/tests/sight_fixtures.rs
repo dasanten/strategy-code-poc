@@ -40,7 +40,7 @@ fn every_side_sees_what_it_sees_in_typescript() {
             let seen = entities_in_sight(&world, &index, Some(side), None);
             let want = &without_hire_spare(want.clone());
             let seen_json = without_hire_spare(serde_json::to_value(&*seen).unwrap());
-            assert_same_json(&what, want, &seen_json);
+            assert_same_json(&what, want, &common::without_coal(&seen_json));
             compared += seen.len();
             kinds.extend(seen.iter().map(|e| e.is()));
             // Through a cache, and the buildings looked up by square, the same.
@@ -57,7 +57,9 @@ fn every_side_sees_what_it_sees_in_typescript() {
             assert_same_json(
                 &format!("{what}, places"),
                 &Value::Array(want_places),
-                &without_hire_spare(serde_json::to_value(&*places.seen).unwrap()),
+                &common::without_coal(&without_hire_spare(
+                    serde_json::to_value(&*places.seen).unwrap(),
+                )),
             );
         }
     }

@@ -35,6 +35,7 @@ pub mod offers;
 pub mod pace;
 pub mod people;
 pub mod persuasion;
+pub mod player_land;
 pub mod region_map;
 pub mod residents;
 pub mod riding;

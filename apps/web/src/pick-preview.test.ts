@@ -32,7 +32,8 @@ const world = (more: Partial<PreviewWorld> = {}): PreviewWorld => ({
   size: SIZE,
   cityNames: [{ id: 'c1', name: 'Ashford' }],
   ground: (x, y) => (x === 5 && y === 5 ? Terrain.Lake : x > 40 ? undefined : Terrain.Plains),
-  nodeAt: (x, y) => (x === 20 && y === 20 ? { kind: 'stone', x, y } : undefined),
+  nodeAt: (x, y) =>
+    x === 20 && y === 20 ? { kind: 'stone', x, y, richness: 'normal' as const } : undefined,
   buildProblem: (_kind, x) => (x === 20 ? undefined : 'it overlaps a building'),
   ...more,
 })

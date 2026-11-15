@@ -8,7 +8,7 @@ command does it: `scripts/shadow-run.mts`.
 
 1. Copies the save with SQLite's backup (safe while a server is writing it) into an output
    directory, and lets the TypeScript server open it once and save it again. A save older than
-   the format the Rust server reads (`FREEZE_FORMAT_VERSION`) is migrated that way. Both sides
+   the format the Rust server read at the cutover (111) is migrated that way. Both sides
    start from that copy.
 2. Starts the TypeScript server's tick in the script's own process (`index.ts` without HTTP: the
    same `runTick` with orders, queues, scripts, walking, territory, sight and saves) and the Rust

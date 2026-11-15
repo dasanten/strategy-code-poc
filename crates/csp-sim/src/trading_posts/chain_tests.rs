@@ -23,6 +23,7 @@ use crate::queries::city_area::free_housing;
 use crate::queries::names::held;
 use crate::queries::residents::can_work;
 use crate::queries::warehouse::warehouse_keeps;
+use crate::random::Mulberry32;
 use crate::realm_test_world::plains;
 use crate::tick::Scratch;
 use crate::trade_org::found_trade_org_hq;
@@ -222,6 +223,10 @@ fn hq() -> (WorldState, TerrainMap, String, usize, usize) {
 fn a_posts_soldier_takes_iron_to_the_warehouse_and_keeps_their_weapon_and_food() {
     let (mut world, terrain, c) = post(false);
     let store = warehouse(&world, &c);
+    // No steel gear there, which its soldiers would fetch in place of their spear and shield.
+    for g in [Good::SteelSword, Good::SteelShield, Good::SteelArmour] {
+        world.buildings[store].stock.as_mut().unwrap().shift_remove(&g);
+    }
     let iron = held_in(world.buildings[store].stock.as_ref(), Good::Iron);
     let r = idle(
         &mut world,

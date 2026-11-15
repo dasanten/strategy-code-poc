@@ -5,8 +5,8 @@ use std::collections::HashSet;
 
 use csp_shared::balance::{
     carriage_can_enter, Recipe, BUILD_MATERIALS, BUILD_WORK, MAP_SIZE, MOUNTAIN_ROAD_WORK_FACTOR,
-    RECIPES, TEARDOWN_MATERIALS_RETURNED, TEARDOWN_WORK_SHARE, TRAINING_GROUND_MAX_TRAINEES,
-    WORKPLACE_MAX_WORKERS,
+    RECIPES, RICHER_NODE_REACH, TEARDOWN_MATERIALS_RETURNED, TEARDOWN_WORK_SHARE,
+    TRAINING_GROUND_MAX_TRAINEES, WORKPLACE_MAX_WORKERS,
 };
 use csp_shared::footprint::{covers, footprint_tiles, is_at, may_cover, Placed, FOOTPRINT};
 use csp_shared::terrain::{
@@ -64,11 +64,14 @@ pub fn recipe_good(recipe: &Recipe) -> &'static str {
 }
 
 /// The recipe a worker follows at a workplace that processes goods (`recipeFor`): the one that
-/// makes `makes`, or with none the workplace's only recipe.
+/// makes `makes`, or with none the workplace's first recipe, so a smelter makes Iron unless told
+/// Steel (`CONTEXT.md`: Coal). A smithy has no such default: its workers always say which weapon
+/// or armour they make (`CONTEXT.md`: Smithy).
 pub fn recipe_for(kind: BuildingKind, makes: Option<&str>) -> Option<&'static Recipe> {
     let recipes = RECIPES.get(kind_name(kind)).unwrap_or(&[]);
     match makes {
-        None => (recipes.len() == 1).then(|| &recipes[0]),
+        None if kind == BuildingKind::Smithy => None,
+        None => recipes.first(),
         Some(good) => recipes.iter().find(|r| recipe_good(r) == good),
     }
 }
@@ -78,6 +81,9 @@ pub fn recipe_for(kind: BuildingKind, makes: Option<&str>) -> Option<&'static Re
 
 /// Why a resident carrying a child can't take a working order (`CARRYING_A_CHILD`).
 pub const CARRYING_A_CHILD: &str = "carrying a child";
+
+/// Why a mine whose vein ran dry can't be worked (`CONTEXT.md`: Running dry).
+pub const VEIN_RAN_DRY: &str = "the vein ran dry";
 
 /// Kinds of building that can be built so far (`BUILDABLE`).
 pub const BUILDABLE: [BuildingKind; 19] = [
@@ -151,7 +157,7 @@ pub fn node_workplace(kind: ResourceKind) -> BuildingKind {
     match kind {
         ResourceKind::Forest => BuildingKind::LumberCamp,
         ResourceKind::Stone => BuildingKind::Quarry,
-        ResourceKind::IronOre | ResourceKind::GoldOre => BuildingKind::Mine,
+        ResourceKind::IronOre | ResourceKind::GoldOre | ResourceKind::Coal => BuildingKind::Mine,
     }
 }
 
@@ -162,6 +168,7 @@ pub fn node_good(kind: ResourceKind) -> Good {
         ResourceKind::Stone => Good::Stone,
         ResourceKind::IronOre => Good::IronOre,
         ResourceKind::GoldOre => Good::GoldOre,
+        ResourceKind::Coal => Good::Coal,
     }
 }
 
@@ -530,11 +537,28 @@ pub fn workplace_good(
         let recipe = recipe_for(workplace.kind, makes.map(good_name))?;
         return good_of(recipe_good(recipe));
     }
-    world
-        .nodes
-        .iter()
-        .find(|n| covers(placed(workplace), n.x as i32, n.y as i32, MAP_SIZE))
-        .map(|n| node_good(n.kind))
+    workplace_node(world, workplace).map(|n| node_good(n.kind))
+}
+
+/// The resource node a node's workplace stands on, if any (`CONTEXT.md`: Resource node).
+pub fn workplace_node<'a>(world: &'a WorldState, workplace: &Building) -> Option<&'a ResourceNode> {
+    if workplace.kind == BuildingKind::Farm || RECIPES.get(kind_name(workplace.kind)).is_some() {
+        return None;
+    }
+    world.nodes.iter().find(|n| covers(placed(workplace), n.x as i32, n.y as i32, MAP_SIZE))
+}
+
+/// What a worker's output at a workplace is multiplied by (`CONTEXT.md`: Richness): its node's
+/// richness factor, or 1 at a workplace on no node.
+pub fn richness_factor(world: &WorldState, workplace: &Building) -> f64 {
+    workplace_node(world, workplace).map_or(1.0, |n| n.richness.factor())
+}
+
+/// How far a node at `distance` counts when an NPC city or the Trade Organization picks one
+/// (`CONTEXT.md`: Richness; ADR 0029): each richness step takes `RICHER_NODE_REACH` of it off, so
+/// of two nodes about as far the richer one wins.
+pub fn node_pick_distance(distance: f64, node: &ResourceNode) -> f64 {
+    distance / (1.0 + RICHER_NODE_REACH).powi(i32::from(node.richness.rank()))
 }
 
 /// The goods a recipe's batch uses up, in its order.
@@ -733,16 +757,23 @@ pub fn work_problem(
     };
     let name = kind_name(here.kind);
     if has_choice(here.kind) {
-        let Some(makes) = makes else {
-            return Some(format!("say what to make at the {name}"));
-        };
-        if recipe_for(here.kind, Some(good_name(makes))).is_none() {
-            return Some(format!("a {name} can't make {}", good_name(makes)));
+        match makes {
+            None if recipe_for(here.kind, None).is_none() => {
+                return Some(format!("say what to make at the {name}"));
+            }
+            Some(makes) if recipe_for(here.kind, Some(good_name(makes))).is_none() => {
+                return Some(format!("a {name} can't make {}", good_name(makes)));
+            }
+            _ => {}
         }
     } else if makes.is_some() {
         return Some(format!("nothing to choose at a {name}"));
     }
     if workplace_good(world, here, makes).is_none() {
+        // A mine stands only on a node, or where one ran dry (`CONTEXT.md`: Running dry).
+        if here.kind == BuildingKind::Mine && here.site.is_none() {
+            return Some(VEIN_RAN_DRY.into());
+        }
         return Some("there is no workplace to work here".into());
     }
     if here.site.is_some() {
@@ -953,6 +984,17 @@ mod tests {
         let spear = recipe_for(BuildingKind::Smithy, Some("spear")).unwrap();
         assert_eq!(recipe_good(spear), "spear");
         assert_eq!(recipe_good(recipe_for(BuildingKind::Mint, None).unwrap()), "coins");
+        assert!(has_choice(BuildingKind::Smithy) && has_choice(BuildingKind::Smelter));
         assert!(recipe_for(BuildingKind::House, None).is_none());
+    }
+
+    #[test]
+    fn a_smelter_makes_iron_unless_told_steel() {
+        assert_eq!(recipe_good(recipe_for(BuildingKind::Smelter, None).unwrap()), "iron");
+        let steel = recipe_for(BuildingKind::Smelter, Some("steel")).unwrap();
+        assert_eq!(recipe_good(steel), "steel");
+        let input: Vec<_> = recipe_input(steel).into_iter().map(|(g, _)| g).collect();
+        assert_eq!(input, [Good::Iron, Good::Coal]);
+        assert!(recipe_for(BuildingKind::Smelter, Some("sword")).is_none());
     }
 }

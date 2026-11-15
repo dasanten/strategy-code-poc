@@ -13,6 +13,7 @@ import {
   TICKS_PER_GAME_YEAR,
   WORK_SKILL_EFFECT,
   WORK_STRENGTH_AVERAGE,
+  RICHNESS_FACTOR,
   hungerFactor,
 } from '@csp/balance'
 import { GOODS } from './shared/world.js'
@@ -142,9 +143,14 @@ describe('buildings on a tile’s card', () => {
     expect(card.lists?.find((l) => l.title === 'Pile')?.goods).toEqual({ food: 7 })
     // A mine's node lies on one tile of its footprint, not necessarily the one clicked.
     const nodeAt = (x: number, y: number) =>
-      x === 6 && y === 6 ? { kind: 'goldOre' as const, x, y } : undefined
+      x === 6 && y === 6
+        ? { kind: 'goldOre' as const, x, y, richness: 'normal' as const }
+        : undefined
     expect(linesOf({ buildings: [building({ kind: 'mine' })], nodeAt })).toContain('Makes gold ore')
-    expect(linesOf({ buildings: [building({ kind: 'smelter' })] })).toContain('Makes iron')
+    // A smelter makes Iron or Steel, by what its workers are set to (`CONTEXT.md`: Coal).
+    expect(linesOf({ buildings: [building({ kind: 'smelter' })] })).toContain(
+      'Makes iron or steel, nobody at it',
+    )
     const house = linesOf({ buildings: [building({ kind: 'house', cityId: 'c-me' })] })
     expect(house.some((l) => l.startsWith('Makes'))).toBe(false)
   })
@@ -217,7 +223,9 @@ describe('buildings on a tile’s card', () => {
     it('gives a mine what its node yields, the same way', () => {
       const mine = building({ kind: 'mine' })
       const nodeAt = (x: number, y: number) =>
-        x === 6 && y === 6 ? { kind: 'goldOre' as const, x, y } : undefined
+        x === 6 && y === 6
+          ? { kind: 'goldOre' as const, x, y, richness: 'normal' as const }
+          : undefined
       const perDay = WORK_OUTPUT_PER_DAY.goldOre!
       const ana = perDay * (20 / WORK_STRENGTH_AVERAGE) * skilled(10)
       const bo = perDay * (5 / WORK_STRENGTH_AVERAGE)
@@ -226,6 +234,20 @@ describe('buildings on a tile’s card', () => {
         ['Ana', 'Gold ore', tenth(ana)],
         ['Bo', 'Gold ore', tenth(bo)],
         ['Total', 'Gold ore', tenth(ana + bo)],
+      ])
+    })
+
+    it('counts in the richness of the mine’s node (`CONTEXT.md`: Richness)', () => {
+      const mine = building({ kind: 'mine' })
+      const nodeAt = (x: number, y: number) =>
+        x === 6 && y === 6
+          ? { kind: 'ironOre' as const, x, y, richness: 'rich' as const }
+          : undefined
+      const perDay = WORK_OUTPUT_PER_DAY.ironOre! * RICHNESS_FACTOR.rich
+      const residents = [worker(mine, 'Ana', 10)]
+      expect(amounts({ buildings: [mine], residents, nodeAt })).toEqual([
+        ['Ana', 'Iron ore', tenth(perDay)],
+        ['Total', 'Iron ore', tenth(perDay)],
       ])
     })
 
@@ -747,6 +769,10 @@ describe('strangers on a tile’s card', () => {
     )
     expect(linesOf({ strangers: [resident({ carried: { food: 2 } })] })).toContain(
       'Brann · Another realm',
+    )
+    const steel = resident({ carried: { steelSword: 1, steelArmour: 1 } })
+    expect(linesOf({ strangers: [steel] })).toContain(
+      'Brann · Another realm · armed: steel sword, steel armour',
     )
   })
 

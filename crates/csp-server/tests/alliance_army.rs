@@ -17,16 +17,19 @@ use csp_sim::queries::alliance::{alliance_of, commander_of};
 use csp_sim::queries::city_area::in_city_area;
 use csp_sim::starting_city::found_starting_city;
 use csp_sim::survival::die_all;
-use csp_sim::terrain_gen::generate_terrain;
 use csp_sim::world::create_world;
 use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::sync::{Arc, OnceLock};
 
-/// `cityTerrain()` of `test-terrain.ts`: the seed-1 map of 1536 tiles, made once.
+/// `cityTerrain()` of `test-terrain.ts`: the seed-1 map of 1536 tiles the TypeScript generated
+/// (`csp-sim/fixtures/terrain/1-1536.bin`), not today's new land. Read once.
 fn city_terrain() -> &'static TerrainMap {
     static TERRAIN: OnceLock<TerrainMap> = OnceLock::new();
-    TERRAIN.get_or_init(|| generate_terrain(1, 1536))
+    TERRAIN.get_or_init(|| {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../csp-sim/fixtures/terrain/1-1536.bin");
+        TerrainMap { size: 1536, tiles: std::fs::read(path).expect("terrain fixture") }
+    })
 }
 
 const MARA: u64 = 1;

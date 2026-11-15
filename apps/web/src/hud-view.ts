@@ -111,7 +111,14 @@ export function showBeside(
 }
 
 /** The goods the top bar shows, in this order (`CONTEXT.md`: Goods in the top bar). */
-export const KEY_GOODS = ['food', 'wood', 'stone', 'coins'] as const satisfies readonly Good[]
+export const KEY_GOODS = [
+  'food',
+  'wood',
+  'stone',
+  'coal',
+  'steel',
+  'coins',
+] as const satisfies readonly Good[]
 export type KeyGood = (typeof KEY_GOODS)[number]
 
 /** What the top bar's goods are for: one city of the realm by id, or null for the entire realm. */
@@ -167,7 +174,7 @@ export function keyGoods(
   realmId: string,
   pick: GoodsPick,
 ): GoodsHeld {
-  const totals = { food: 0, wood: 0, stone: 0, coins: 0 }
+  const totals = { food: 0, wood: 0, stone: 0, coal: 0, steel: 0, coins: 0 }
   const counts = (b: Building) =>
     !b.site &&
     (b.kind === 'storage' || b.kind === 'warehouse') &&

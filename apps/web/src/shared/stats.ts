@@ -36,7 +36,9 @@ import {
   statValue,
   trainedCap,
   workOutput,
+  PROTECTION_DEFENCE,
 } from '@csp/balance'
+import { PROTECTION_KINDS } from './world.js'
 import type {
   BuildingKind,
   Good,
@@ -208,6 +210,24 @@ export function bestWeapon(resident: Pick<Resident, 'carried'>): Weapon | undefi
     (w) => (resident.carried[w] ?? 0) > 0,
   )
   return carried.sort((a, b) => WEAPON_ATTACK[b] - WEAPON_ATTACK[a])[0]
+}
+
+/**
+ * The protection that counts for a resident (`CONTEXT.md`: Weapons and armour): the best shield and
+ * the best armour they carry, so steel over iron; a second shield adds nothing.
+ */
+export function wornProtection(resident: Pick<Resident, 'carried'>): Good[] {
+  const defence = PROTECTION_DEFENCE as Record<string, number>
+  return PROTECTION_KINDS.flatMap((kind) => {
+    const held = kind.filter((p) => (resident.carried[p] ?? 0) > 0)
+    return held.sort((a, b) => (defence[b] ?? 0) - (defence[a] ?? 0)).slice(0, 1)
+  })
+}
+
+/** Damage a resident's protection takes off each blow (`CONTEXT.md`: Combat): `wornProtection`'s. */
+export function protectionValue(resident: Pick<Resident, 'carried'>): number {
+  const defence = PROTECTION_DEFENCE as Record<string, number>
+  return wornProtection(resident).reduce((sum, p) => sum + (defence[p] ?? 0), 0)
 }
 
 /** Whether a resident is armed: carries a weapon (`CONTEXT.md`: Soldier). */

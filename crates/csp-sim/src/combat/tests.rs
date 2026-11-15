@@ -531,3 +531,79 @@ fn an_army_ordered_to_attack_an_ally_does_and_that_is_a_crime() {
         matches!(world.crimes.as_slice(), [c] if c.kind == csp_shared::world::CrimeKind::Attack && c.culprit.resident_id == "a1")
     );
 }
+
+// Steel weapons and armour (`CONTEXT.md`: Coal, Weapons and armour; T101.5).
+
+#[test]
+fn a_resident_carrying_an_iron_and_a_steel_sword_strikes_with_the_steel_one() {
+    let mut world = empty_world();
+    let r = resident(&mut world, "x", None, 0.0, 0.0);
+    let fist = BLOW_BASE + BLOW_PER_STRENGTH * 10.0;
+    world.residents[r].carried =
+        stock(&[(Good::Spear, 1.0), (Good::Sword, 1.0), (Good::SteelSword, 1.0)]);
+    assert_eq!(best_weapon(&world.residents[r].carried), Some(Good::SteelSword));
+    let steel = WEAPON_ATTACK.get("steelSword").unwrap();
+    assert!(steel > WEAPON_ATTACK.get("sword").unwrap());
+    assert!((attack_power(&world.residents[r], 0.0) - (fist + steel)).abs() < 1e-9);
+    world.residents[r].carried = stock(&[(Good::SteelSword, 1.0)]);
+    assert!(is_armed(&world.residents[r].carried));
+}
+
+#[test]
+fn only_the_best_shield_and_the_best_armour_carried_count_steel_over_iron() {
+    let mut world = empty_world();
+    let d = resident(&mut world, "d", None, 0.0, 0.0);
+    let defence = |g: &str| PROTECTION_DEFENCE.get(g).unwrap();
+    assert!(defence("steelShield") > defence("shield"));
+    assert!(defence("steelArmour") > defence("armour"));
+    world.residents[d].carried =
+        stock(&[(Good::Shield, 1.0), (Good::SteelShield, 1.0), (Good::Armour, 1.0)]);
+    assert_eq!(protection(&world.residents[d]), defence("steelShield") + defence("armour"));
+    world.residents[d].carried = stock(&[
+        (Good::Shield, 1.0),
+        (Good::SteelShield, 1.0),
+        (Good::Armour, 1.0),
+        (Good::SteelArmour, 1.0),
+    ]);
+    assert_eq!(protection(&world.residents[d]), defence("steelShield") + defence("steelArmour"));
+}
+
+/// Two equal soldiers fight to the death, one with a steel Sword and one with an iron one, a
+/// hundred times on different seeds and taking turns at which side gets steel: the steel one wins
+/// most of them.
+#[test]
+fn of_two_equal_soldiers_the_one_with_a_steel_sword_wins_most_of_a_hundred_fights() {
+    let mut steel_wins = 0;
+    for fight in 0..100 {
+        let mut world = setup();
+        world.seed = 1000 + fight;
+        resident(&mut world, "a2", Some("r1"), 10.0, 11.0);
+        resident(&mut world, "b2", Some("r2"), 11.0, 11.0);
+        let (steel, iron) = if fight % 2 == 0 { ("a2", "b2") } else { ("b2", "a2") };
+        live_mut(&mut world, steel).carried = stock(&[(Good::SteelSword, 1.0)]);
+        live_mut(&mut world, iron).carried = stock(&[(Good::Sword, 1.0)]);
+        // Both fight on: a struck resident's order ends and their Defence script, which this
+        // world doesn't run, would have them fight back, so each is told to again.
+        for _ in 0..200 * STRIKE_TICKS as usize {
+            if live(&world, "a2").is_none() || live(&world, "b2").is_none() {
+                break;
+            }
+            for (who, whom) in [("a2", "b2"), ("b2", "a2")] {
+                if live(&world, who).unwrap().order.is_none() {
+                    let request = AttackRequest {
+                        resident_id: Some(who.into()),
+                        target_id: Some(whom.into()),
+                    };
+                    apply_attack(&mut world, &request, Some(SIZE));
+                }
+            }
+            run(&mut world, SIZE, 1);
+        }
+        match (live(&world, steel).is_some(), live(&world, iron).is_some()) {
+            (true, false) => steel_wins += 1,
+            (false, true) => {}
+            other => panic!("fight {fight} ended undecided: {other:?}"),
+        }
+    }
+    assert!(steel_wins > 75, "steel won {steel_wins} of 100");
+}

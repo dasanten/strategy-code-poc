@@ -88,6 +88,7 @@ import {
 } from './map/far.js'
 import { PIN_HEIGHT, PIN_RADIUS, pinAt } from './map/pins.js'
 import { LabelLayer } from './map/labels.js'
+import type { LandLabel } from './map/land.js'
 import { destroyAtlas, loadAtlas, type Atlas } from './map/atlas.js'
 import {
   GLYPH_COLOR,
@@ -116,7 +117,7 @@ import {
 } from './map/roads.js'
 import { drawPlans, plannedBuilding } from './map/plans.js'
 import { drawPlaces, pickedPlaces } from './map/places.js'
-import { drawPickPreview } from './map/preview-draw.js'
+import { drawMarks, drawPickPreview, type MapMark } from './map/preview-draw.js'
 import type { PickPreview } from './pick-preview.js'
 import {
   inBox,
@@ -134,6 +135,9 @@ const NONE: readonly string[] = []
 
 /** How strongly the hover outline tints what a click would pick, so it shows on its own colour. */
 const HOVER_FILL = 0.18
+
+/** Region names' text size in pixels, larger than a city's name; they keep it at every zoom. */
+const REGION_LABEL_SIZE = 16
 
 /** Starting zoom, in screen pixels per tile. */
 const START_SCALE = 12
@@ -165,6 +169,8 @@ export function MapView({
   picking = false,
   onPickTile,
   preview,
+  marks,
+  land,
   onPointerTile,
   onNodesLoaded,
   onTerrainLoaded,
@@ -207,6 +213,13 @@ export function MapView({
   ) => void
   /** What the pick waiting for a tile would do there, drawn while `picking` (`pickPreview`). */
   preview?: PickPreview
+  /** Spots marked on the map at every zoom, such as the admin map's passes and land bridges. */
+  marks?: readonly MapMark[]
+  /**
+   * The land the Player knows (`CONTEXT.md`: Region), shown at the middle and far zoom: the names
+   * of the regions they explored part of, and a mark on each pass and land bridge they explored.
+   */
+  land?: { labels: readonly LandLabel[]; marks: readonly MapMark[] }
   /** Called while `picking` with the tile a mouse or pen hovers over, undefined once off the map. */
   onPointerTile?: (tile: { x: number; y: number } | undefined) => void
   /** Called with a lookup of known resource nodes by tile, and again whenever more load. */
@@ -257,6 +270,8 @@ export function MapView({
   const onPickTileRef = useRef(onPickTile)
   onPickTileRef.current = onPickTile
   const previewRef = useRef(preview)
+  const marksRef = useRef(marks)
+  const landRef = useRef(land)
   const onPointerTileRef = useRef(onPointerTile)
   onPointerTileRef.current = onPointerTile
   const onNodesLoadedRef = useRef(onNodesLoaded)
@@ -272,16 +287,13 @@ export function MapView({
   const redrawRef = useRef<() => void>(() => {})
   const motionRef = useRef<(world: MapWorld) => void>(() => {})
   const forgetRef = useRef<(chunks: readonly number[]) => void>(() => {})
+  /** Hands the known nodes to `onNodesLoaded` again, once the Player learns some are gone. */
+  const nodesAgainRef = useRef<() => void>(() => {})
   const regionRef = useRef<(region: RegionState | null) => void>(() => {})
   const controlsRef = useRef<{
     zoom(factor: number): void
     centre(): void
-    goTo(
-      x: number,
-      y: number,
-      scale?: number | ((now: number) => number),
-      cover?: Covered,
-    ): void
+    goTo(x: number, y: number, scale?: number | ((now: number) => number), cover?: Covered): void
   } | null>(null)
   const [hover, setHover] = useState<Hover | null>(null)
   const [scale, setScale] = useState(START_SCALE)
@@ -316,8 +328,7 @@ export function MapView({
   }, [minimapOpen])
 
   useEffect(() => {
-    if (focus)
-      controlsRef.current?.goTo(focus.x, focus.y, focus.zoom ?? focus.scale, focus.cover)
+    if (focus) controlsRef.current?.goTo(focus.x, focus.y, focus.zoom ?? focus.scale, focus.cover)
   }, [focus])
 
   // The Region map changes once a game hour, and where explored terrain grows.
@@ -344,7 +355,19 @@ export function MapView({
   }, [preview, picking])
 
   useEffect(() => {
+    marksRef.current = marks
+    redrawRef.current()
+  }, [marks])
+
+  useEffect(() => {
+    landRef.current = land
+    redrawRef.current()
+  }, [land])
+
+  useEffect(() => {
+    const goneBefore = worldRef.current.goneNodes
     worldRef.current = world
+    if (world.goneNodes !== goneBefore) nodesAgainRef.current()
     if (world.grownChunks.length > 0) forgetRef.current(world.grownChunks)
     motionRef.current(world)
     redrawRef.current()
@@ -355,6 +378,15 @@ export function MapView({
     const across = chunksAcross(mapSize)
     const app = new Application()
     const nodes: KnownNode[][] = []
+    // A node the Player saw had run dry is gone from their map (`CONTEXT.md`: Running dry).
+    const gone = (x: number, y: number) => !!worldRef.current.goneNodes?.has(`${x},${y}`)
+    const nodeAt = (x: number, y: number) =>
+      gone(x, y)
+        ? undefined
+        : nodes[Math.floor(y / CHUNK_SIZE) * across + Math.floor(x / CHUNK_SIZE)]?.find(
+            (n) => n.x === x && n.y === y,
+          )
+    nodesAgainRef.current = () => onNodesLoadedRef.current?.((x, y) => nodeAt(x, y))
     const terrainLayer = new TerrainLayer(mapSize, (i) => worldRef.current.exploredChunks.has(i))
     // Explored chunks on screen that haven't loaded yet, a neutral grey so they don't read as
     // unexplored.
@@ -384,6 +416,8 @@ export function MapView({
     let atlas: Atlas | undefined
     const overlay = new Graphics()
     const labels = new LabelLayer()
+    // The names of the regions the Player knows, under the tokens and the other labels.
+    const regionNames = new LabelLayer({ size: REGION_LABEL_SIZE, pill: false, italic: true })
     // Where each resident's token was drawn last frame; up close each has its own figure.
     let drawnSpots = new Map<string, Spot>()
     // Where the tokens are between ticks (`CONTEXT.md`: Motion on the map).
@@ -434,11 +468,7 @@ export function MapView({
         }
         terrainLayer.set(chunk)
         nodes[chunk.cy * across + chunk.cx] = chunk.nodes
-        onNodesLoadedRef.current?.((x, y) =>
-          nodes[Math.floor(y / CHUNK_SIZE) * across + Math.floor(x / CHUNK_SIZE)]?.find(
-            (n) => n.x === x && n.y === y,
-          ),
-        )
+        onNodesLoadedRef.current?.((x, y) => nodeAt(x, y))
         onTerrainLoadedRef.current?.(
           (x, y) =>
             store.get(Math.floor(y / CHUNK_SIZE) * across + Math.floor(x / CHUNK_SIZE))?.tiles[
@@ -711,9 +741,14 @@ export function MapView({
       tokens.begin()
       badges.begin()
       labels.begin()
-      if (zoomTier(cam.scale) === 'far') drawFar(g, cam, view)
+      regionNames.begin()
+      const tier = zoomTier(cam.scale)
+      if (tier === 'far') drawFar(g, cam, view)
       else drawMiddle(g, cam, view, onScreen)
+      if (tier !== 'close') drawLand(g, cam, view)
       drawWaypoints(g, cam, view)
+      if (marksRef.current) drawMarks(g, cam, view, mapSize, marksRef.current)
+      regionNames.end()
       labels.end()
       tokens.end()
       badges.end()
@@ -772,6 +807,21 @@ export function MapView({
           color: relationshipColor(hovered.rel),
         })
       }
+    }
+
+    /**
+     * The land the Player knows (`CONTEXT.md`: Region) at the middle and far tiers: each region's
+     * name over a tile of it they explored, and a mark on each pass and land bridge.
+     */
+    function drawLand(g: Graphics, cam: Camera, view: Size) {
+      const land = landRef.current
+      if (!land) return
+      for (const l of land.labels) {
+        const [sx, sy] = tileToScreen(cam, view, mapSize, l.x + 0.5, l.y + 0.5)
+        if (sx < -200 || sy < -20 || sx > view.width + 200 || sy > view.height + 20) continue
+        regionNames.place(l.name, sx, sy)
+      }
+      drawMarks(g, cam, view, mapSize, land.marks)
     }
 
     /**
@@ -884,7 +934,7 @@ export function MapView({
       const r = tokenRadius(cam.scale)
       for (const i of onScreen) {
         for (const n of nodes[i] ?? []) {
-          if (built.has(`${n.x},${n.y}`)) continue
+          if (built.has(`${n.x},${n.y}`) || gone(n.x, n.y)) continue
           const [sx, sy] = tileToScreen(cam, view, mapSize, n.x + 0.5, n.y + 0.5)
           drawNode(tokens, n.kind, sx, sy, r)
         }
@@ -963,7 +1013,7 @@ export function MapView({
       ]
       const chunk = store.get(Math.floor(ty / CHUNK_SIZE) * across + Math.floor(tx / CHUNK_SIZE))
       const byte = chunk?.tiles[(ty % CHUNK_SIZE) * CHUNK_SIZE + (tx % CHUNK_SIZE)]
-      const node = chunk?.nodes.find((n) => n.x === tx && n.y === ty)
+      const node = gone(tx, ty) ? undefined : chunk?.nodes.find((n) => n.x === tx && n.y === ty)
       const [wx, wy] = [wrap(tx, mapSize), wrap(ty, mapSize)]
       // On the admin map, where far out no chunks load, the overview tells the terrain.
       const overview = worldRef.current.admin?.overview
@@ -1195,11 +1245,7 @@ export function MapView({
             cover,
             scale === undefined
               ? cam.scale
-              : clampScale(
-                  typeof scale === 'function' ? scale(cam.scale) : scale,
-                  mapSize,
-                  size(),
-                ),
+              : clampScale(typeof scale === 'function' ? scale(cam.scale) : scale, mapSize, size()),
             mapSize,
           ),
         ),
@@ -1236,6 +1282,7 @@ export function MapView({
         regionLayer,
         borderLayer,
         under,
+        regionNames.container,
         tokens.container,
         overlay,
         labels.container,
@@ -1260,6 +1307,7 @@ export function MapView({
       cancelAnimationFrame(frame)
       redrawRef.current = () => {}
       forgetRef.current = () => {}
+      nodesAgainRef.current = () => {}
       regionRef.current = () => {}
       overviewRef.current = () => {}
       controlsRef.current = null

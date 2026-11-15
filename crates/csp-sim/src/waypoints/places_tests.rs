@@ -144,6 +144,7 @@ impl Setup {
                 explored: &explored,
                 kinds: &kinds,
                 edge: None,
+                land: None,
                 params: None,
             };
             let mut bound = bind_script(ctx).unwrap();

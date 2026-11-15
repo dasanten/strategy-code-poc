@@ -76,8 +76,20 @@ export function colourKey(holder: RegionHolderInfo): string {
   return holder.alliance?.id ?? holder.id
 }
 
+/**
+ * The admin map's land layer colours each kind of region (`CONTEXT.md`: Region) its own: the
+ * colour keys its overlay uses (`region-kind:` and the kind's name), each with a fixed colour.
+ */
+export const LAND_KIND_COLOURS: Readonly<Record<string, number>> = {
+  'region-kind:Heartland': 0x7cc95a,
+  'region-kind:Frontier': 0xc0623a,
+  'region-kind:Island': 0x8a6fd6,
+}
+
 /** A steady colour for a colour key, as 0xRRGGBB: the same key always gets the same colour. */
 export function regionColour(key: string): number {
+  const fixed = LAND_KIND_COLOURS[key]
+  if (fixed !== undefined) return fixed
   let h = 2166136261
   for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619)
   const hue = ((h >>> 0) % 360) / 360

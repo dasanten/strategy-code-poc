@@ -31,7 +31,14 @@ fn me() -> OrderSender {
 }
 
 fn iron_ore_node() -> ResourceNode {
-    ResourceNode { id: "n1".into(), kind: ResourceKind::IronOre, x: 7.0, y: 5.0 }
+    ResourceNode {
+        id: "n1".into(),
+        kind: ResourceKind::IronOre,
+        x: 7.0,
+        y: 5.0,
+        richness: Default::default(),
+        stock: None,
+    }
 }
 
 /// A world with realm r1 (Player 7), a finished `kind` at (2, 2) and resident w1 working it.
@@ -47,6 +54,24 @@ fn setup(kind: BuildingKind) -> (WorldState, TerrainMap, Orders) {
     assert_eq!(answer, Ok(()));
     orders.apply_all(&mut world, &t);
     (world, t, orders)
+}
+
+/// A smelter at (2, 2) whose worker w1 is set to make `makes` (`CONTEXT.md`: Coal), or is told
+/// nothing with none.
+fn smelter_making(makes: Option<&str>) -> (WorldState, TerrainMap) {
+    let t = terrain();
+    let mut world = empty_world(&t);
+    world.realms.push(realm("r1", 7, "w1"));
+    world.buildings.push(building("smelter", BuildingKind::Smelter, 2.0, 2.0));
+    resident_at_work(&mut world, "w1");
+    let mut order = json!({ "kind": "workAt", "residentId": "w1" });
+    if let Some(m) = makes {
+        order["makes"] = json!(m);
+    }
+    let mut orders = Orders::default();
+    assert_eq!(orders.receive(&world, &me(), order, &t), Ok(()));
+    orders.apply_all(&mut world, &t);
+    (world, t)
 }
 
 /// A resident of r1 on (2, 2) with Strength, Intellect and Endurance 10.
@@ -75,8 +100,8 @@ fn total(world: &WorldState, good: Good) -> f64 {
 fn a_smelter_turns_2_iron_ore_into_1_iron_a_mint_1_gold_ore_into_10_coins() {
     // processing.test.ts: conversion rates (balance file): a smelter turns 2 iron ore into 1 iron,
     // a mint 1 gold ore into 10 coins
+    // Its first recipe; the second, Steel (T101.4), is tested below.
     let smelter = RECIPES.get("smelter").unwrap();
-    assert_eq!(smelter.len(), 1);
     assert_eq!(smelter[0].input.get("ironOre"), Some(2.0));
     assert_eq!(smelter[0].input.0.len(), 1);
     assert_eq!(smelter[0].output.get("iron"), Some(1.0));
@@ -231,4 +256,95 @@ fn the_invariant_catches_one_on_a_node_or_on_mountain() {
         .map(|v| v.entity_ids)
         .collect();
     assert_eq!(ids, vec![vec!["a".to_string()], vec!["b".to_string()]]);
+}
+
+// Steel (`CONTEXT.md`: Coal, T101.4): a smelter turns Iron and Coal into Steel.
+
+#[test]
+fn a_smelters_second_recipe_turns_iron_and_coal_into_steel() {
+    let steel = &RECIPES.get("smelter").unwrap()[1];
+    assert_eq!(steel.input.get("iron"), Some(1.0));
+    assert_eq!(steel.input.get("coal"), Some(1.0));
+    assert_eq!(steel.input.0.len(), 2);
+    assert_eq!(steel.output.get("steel"), Some(1.0));
+    assert_eq!(steel.output.0.len(), 1);
+}
+
+#[test]
+fn a_smelter_set_to_steel_makes_it_at_the_recipes_rate_and_uses_up_iron_and_coal() {
+    let (mut world, t) = smelter_making(Some("steel"));
+    assert_eq!(workplace_good(&world, &world.buildings[0], Some(Good::Steel)), Some(Good::Steel));
+    world.residents[0].carried.insert(Good::Iron, 5.0);
+    world.piles.push(Pile {
+        id: "p1".into(),
+        x: 2.0,
+        y: 2.0,
+        goods: Stock::from([(Good::Coal, 5.0), (Good::IronOre, 4.0)]),
+    });
+    run(&mut world, &t, TICKS_PER_GAME_DAY as usize + 2);
+    let batches = BATCHES_PER_DAY.get("smelter").unwrap();
+    let pile = &pile_at(&world, 2, 2).unwrap().goods;
+    assert_eq!(pile.get(&Good::Steel).copied(), Some(batches));
+    assert_eq!(pile.get(&Good::Coal).copied(), Some(5.0 - batches));
+    // Set to Steel, it leaves the ore alone.
+    assert_eq!(pile.get(&Good::IronOre).copied(), Some(4.0));
+    assert_eq!(pile.get(&Good::Iron), None);
+    assert_eq!(world.residents[0].carried.get(&Good::Iron).copied(), Some(5.0 - batches));
+    assert!(skill_of(&world.residents[0], SkillName::Smelting) > 0.0);
+    // Every unit of iron and of coal that went is in a unit of steel.
+    assert_eq!(total(&world, Good::Iron) + total(&world, Good::Steel), 5.0);
+    assert_eq!(total(&world, Good::Coal) + total(&world, Good::Steel), 5.0);
+    assert_sound(&world, &t);
+}
+
+#[test]
+fn a_smelter_set_to_steel_without_coal_makes_nothing() {
+    let (mut world, t) = smelter_making(Some("steel"));
+    world.residents[0].carried.insert(Good::Iron, 5.0);
+    world.residents[0].carried.insert(Good::IronOre, 6.0);
+    run(&mut world, &t, TICKS_PER_GAME_DAY as usize);
+    let r = &world.residents[0];
+    match &r.order {
+        Some(csp_shared::world::ResidentOrder::WorkAt(o)) => assert_eq!(o.progress, 0.0),
+        other => panic!("not working: {other:?}"),
+    }
+    assert_eq!(skill_of(r, SkillName::Smelting), 0.0);
+    assert_eq!(r.carried.get(&Good::Iron).copied(), Some(5.0));
+    assert_eq!(r.carried.get(&Good::IronOre).copied(), Some(6.0));
+    assert!(world.piles.is_empty());
+    assert_sound(&world, &t);
+}
+
+#[test]
+fn a_smelter_set_to_iron_or_told_nothing_turns_ore_into_iron_as_before() {
+    for makes in [None, Some("iron")] {
+        let (mut world, t) = smelter_making(makes);
+        world.residents[0].carried.insert(Good::IronOre, 10.0);
+        world.residents[0].carried.insert(Good::Coal, 3.0);
+        run(&mut world, &t, TICKS_PER_GAME_DAY as usize + 2);
+        let batches = BATCHES_PER_DAY.get("smelter").unwrap();
+        let pile = &pile_at(&world, 2, 2).unwrap().goods;
+        assert_eq!(pile.get(&Good::Iron).copied(), Some(batches), "{makes:?}");
+        assert_eq!(pile.get(&Good::Steel), None, "{makes:?}");
+        let r = &world.residents[0];
+        assert_eq!(r.carried.get(&Good::IronOre).copied(), Some(10.0 - 2.0 * batches));
+        assert_eq!(r.carried.get(&Good::Coal).copied(), Some(3.0), "{makes:?}");
+        assert_sound(&world, &t);
+    }
+}
+
+#[test]
+fn a_smelter_cant_be_set_to_make_a_weapon() {
+    let t = terrain();
+    let mut world = empty_world(&t);
+    world.realms.push(realm("r1", 7, "w1"));
+    world.buildings.push(building("smelter", BuildingKind::Smelter, 2.0, 2.0));
+    resident_at_work(&mut world, "w1");
+    let answer = Orders::default().receive(
+        &world,
+        &me(),
+        json!({ "kind": "workAt", "residentId": "w1", "makes": "sword" }),
+        &t,
+    );
+    assert!(format!("{answer:?}").contains("can't make sword"), "{answer:?}");
 }

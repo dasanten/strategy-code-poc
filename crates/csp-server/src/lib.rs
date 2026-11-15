@@ -16,6 +16,7 @@ pub mod log;
 pub mod map_tools;
 pub mod monitoring;
 pub mod realtime;
+pub mod reset;
 pub mod saves;
 pub mod scripts;
 pub mod server;

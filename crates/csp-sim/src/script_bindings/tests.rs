@@ -115,6 +115,7 @@ fn answers(calls: &[(&str, &str)], prepare: impl FnOnce(&mut WorldState)) -> Map
         explored: &explored,
         kinds: &kinds,
         edge: None,
+        land: None,
         params: None,
     };
     let mut bound = bind_script(ctx).unwrap();
@@ -266,12 +267,13 @@ fn hand_a_script_exactly_its_view() {
 
 #[test]
 fn find_a_field_outside_its_view_a_missing_one_and_a_value_of_the_wrong_kind() {
-    let node = json!({ "id": "n1", "kind": "forest", "x": 1, "y": 2, "secret": 3 });
+    let node =
+        json!({ "id": "n1", "kind": "forest", "x": 1, "y": 2, "richness": "poor", "secret": 3 });
     assert_eq!(
         script_value_problems(Some(&node), ScriptType::View("node"), "n"),
         ["n.secret is not in the node view"]
     );
-    let short = json!({ "id": "n1", "kind": "forest", "x": 1 });
+    let short = json!({ "id": "n1", "kind": "forest", "x": 1, "richness": "rich" });
     assert_eq!(
         script_value_problems(Some(&short), ScriptType::View("node"), "n"),
         ["n.y is missing"]
@@ -379,6 +381,7 @@ fn bench_bindings() {
             explored: &explored,
             kinds: &kinds,
             edge: None,
+            land: None,
             params: None,
         };
         let mut bound = bind_script(ctx).unwrap();
@@ -456,7 +459,7 @@ fn me_from_the_struct_is_me_from_its_plain_data() {
                         &Json::Object(as_view(world, resident_data(world, r, side, alarm))),
                         ty,
                     );
-                    let direct = resident_view(world, r, side, alarm);
+                    let direct = resident_view(world, r, side, alarm, None);
                     assert_eq!(
                         format!("{direct:?}"),
                         format!("{by_json:?}"),
@@ -519,6 +522,7 @@ fn direct_queries_are_what_their_plain_data_gives() {
                 explored: &explored,
                 kinds: &kinds,
                 edge: None,
+                land: None,
                 params: None,
             };
             let bound = bind_script(ctx).unwrap();
@@ -541,4 +545,78 @@ fn direct_queries_are_what_their_plain_data_gives() {
         }
     }
     assert!(checked > 100, "{checked}");
+}
+
+/// A tile view as plain data.
+fn tile_data(land: Option<&TileLand<'_>>, x: i32, y: i32) -> serde_json::Value {
+    let v = view_value_in(&json!({ "x": x, "y": y }), ScriptType::View("tile"), land);
+    plain_value(&v, 10_000).expect("plain").value
+}
+
+#[test]
+fn a_tile_view_names_the_region_of_an_explored_tile_and_null_otherwise() {
+    let map = crate::terrain_gen::generate_terrain(1, SIZE);
+    let regions = crate::regions::Regions::of(1, &map);
+    let heartland = regions.of_kind(RegionKind::Heartland).next().expect("a heartland");
+    let (hx, hy) = (heartland.x, heartland.y);
+    // Only the heartland's middle tile is explored.
+    let explored = move |x: i32, y: i32| (x, y) == (hx, hy);
+    let land = TileLand { regions: &regions, explored: &explored };
+    assert_eq!(
+        tile_data(Some(&land), hx, hy),
+        json!({ "x": hx, "y": hy, "region": heartland.name, "regionKind": "heartland" })
+    );
+    // A tile next to it, of land or not, is unexplored.
+    let next = tile_data(Some(&land), hx + 1, hy);
+    assert_eq!((&next["region"], &next["regionKind"]), (&json!(null), &json!(null)));
+    // Water has no region, explored or not.
+    let sea = (0..SIZE * SIZE).find(|&t| regions.id_of_tile(t as usize).is_none()).expect("sea");
+    let (sx, sy) = (sea % SIZE, sea / SIZE);
+    let everywhere = |_: i32, _: i32| true;
+    let all = TileLand { regions: &regions, explored: &everywhere };
+    assert_eq!(tile_data(Some(&all), sx, sy)["region"], json!(null));
+    // Without the regions there is nothing to name.
+    assert_eq!(tile_data(None, hx, hy)["regionKind"], json!(null));
+    // A resident's order names its target's region too.
+    let order: ResidentOrder = serde_json::from_value(
+        json!({ "kind": "walkTo", "target": { "x": hx, "y": hy }, "path": null, "progress": 0 }),
+    )
+    .expect("a walk");
+    let v = order_value(Some(&order), ScriptType::View("residentOrder"), Some(&land));
+    let data = plain_value(&v, 10_000).expect("plain").value;
+    assert_eq!(data["target"]["region"], json!(heartland.name));
+}
+
+/// How the vein stands (`CONTEXT.md`: Running dry): `building(id).vein` is the word while the
+/// script's realm or an ally works the workplace, and null for a realm that doesn't.
+#[test]
+fn a_workplaces_vein_is_a_word_for_its_workers_and_their_allies_and_null_for_others() {
+    let mine = |worker: &'static str, allied: bool| {
+        move |w: &mut WorldState| {
+            w.nodes.push(from(json!({
+                "id": "n2", "kind": "ironOre", "x": 14, "y": 12, "richness": "rich",
+                "stock": { "first": 100, "left": 30, "made": 70 }
+            })));
+            w.buildings.push(from(
+                json!({ "id": "m1", "kind": "mine", "cityId": null, "x": 14, "y": 12 }),
+            ));
+            let r = w.residents.iter_mut().find(|r| r.id == worker).unwrap();
+            r.order = Some(from(json!({
+                "kind": "workAt", "buildingId": "m1", "at": { "x": 14, "y": 12 }, "progress": 0
+            })));
+            if allied {
+                w.alliances.push(from(json!({
+                    "id": "al1", "name": "North", "leaderId": "r1", "invites": [], "army": [],
+                    "members": [{ "realmId": "r1", "joinedAt": 0 }, { "realmId": "r2", "joinedAt": 0 }]
+                })));
+            }
+        }
+    };
+    let calls = [("vein", "building(\"m1\").vein")];
+    let own = answers(&calls, mine("a2", false));
+    assert_eq!(own["vein"], json!("thinning"));
+    let others = answers(&calls, mine("b1", false));
+    assert_eq!(others["vein"], json!(null));
+    let ally = answers(&calls, mine("b1", true));
+    assert_eq!(ally["vein"], json!("thinning"));
 }

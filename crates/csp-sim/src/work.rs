@@ -15,13 +15,14 @@ use crate::queries::balance::{batch_work, skill_of, work_learned, work_output, w
 use crate::queries::building::{building_at, work_problem, CARRYING_A_CHILD};
 use crate::queries::building::{
     building_pile_index, has_input, max_workers, recipe_for, recipe_input, recipe_output,
-    worker_indices, workplace_good,
+    richness_factor, worker_indices, workplace_good,
 };
 use crate::queries::names::{good_name, good_of, held, kind_name, placed};
 use crate::queries::residents::can_work;
 use crate::queue::field_str as str_field;
 use crate::survival::drop_goods;
 use crate::tick::Scratch;
+use crate::veins::{take_from_vein, Take};
 use crate::world_index::{building_index, resident_index};
 
 /// Checks a work-at order (`workAt.validate`): one of the sender's adult residents works the
@@ -140,7 +141,9 @@ pub fn resolve_work(world: &mut WorldState, actions: &[WorkAction], scratch: &mu
                 }
                 batch_work(r, kind, tick)
             }
-            None => work_output(r, good, skill, tick),
+            None => {
+                work_output(r, good, skill, tick) * richness_factor(world, &world.buildings[pi])
+            }
         };
         let learned = work_learned(r, skill, tick);
         let had = skill_of(r, skill);
@@ -165,7 +168,16 @@ pub fn resolve_work(world: &mut WorldState, actions: &[WorkAction], scratch: &mu
                         }
                     }
                 }
-                None => produce(world, &place, good, scratch),
+                // A unit from a vein uses its stock up; its last runs it dry, and the workplace
+                // makes nothing more (`CONTEXT.md`: Running dry).
+                None => match take_from_vein(world, &place) {
+                    Take::Made => produce(world, &place, good, scratch),
+                    Take::Last => {
+                        produce(world, &place, good, scratch);
+                        break;
+                    }
+                    Take::Nothing => break,
+                },
             }
         }
     }

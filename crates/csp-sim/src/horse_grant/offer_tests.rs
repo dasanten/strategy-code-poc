@@ -249,6 +249,7 @@ fn claim_from_a_script(world: &WorldState, terrain: &TerrainMap, resident: &str)
         explored: &explored,
         kinds: &kinds,
         edge: None,
+        land: None,
         params: None,
     };
     let mut bound = bind_script(ctx).unwrap();

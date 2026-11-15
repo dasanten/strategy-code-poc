@@ -155,6 +155,7 @@ fn sight_context_run(
         explored: &explored,
         kinds: &kinds,
         edge: None,
+        land: None,
         params: Some(&params),
     };
     let mut bound = bind_script(ctx).unwrap();
@@ -289,7 +290,7 @@ fn work_from_the_ui_plays_as_the_work_at_order_did_the_same_food_on_the_farms_pi
     assert!(food + progress.last().unwrap().0 > progress[0].0);
     assert_eq!(
         serde_json::to_value(&g.world.residents[0].script.as_ref().unwrap().memory).unwrap(),
-        json!({ "workplaceId": "farm", "at": { "x": 3, "y": 3 } })
+        json!({ "workplaceId": "farm", "at": { "x": 3, "y": 3, "region": null, "regionKind": null } })
     );
 }
 
@@ -388,6 +389,8 @@ fn build_a_here_walks_the_resident_to_where_the_nodes_workplace_fits_and_lays_ou
         kind: ResourceKind::Forest,
         x: 11.0,
         y: 9.0,
+        richness: Default::default(),
+        stock: None,
     });
     let corner = node_corner(&g.world, &g.terrain, &g.world.nodes[0]);
     assert_eq!(corner, Some((11, 9)));
@@ -443,6 +446,8 @@ fn build_far_off(edited: bool) -> (Vec<u64>, Game, u64) {
         kind: ResourceKind::Forest,
         x: 13.0,
         y: 9.0,
+        richness: Default::default(),
+        stock: None,
     });
     let corner = node_corner(&g.world, &g.terrain, &g.world.nodes[0]).unwrap();
     if edited {
@@ -598,6 +603,7 @@ fn steps(task: Task, c: &Case) -> u64 {
         explored: &explored,
         kinds: &kinds,
         edge: None,
+        land: None,
         params: Some(&params),
     };
     let mut bound = bind_script(ctx).unwrap();

@@ -379,7 +379,7 @@ fn a_players_city_captured_a_self_managed_former_players_city_brings_what_it_got
 
 #[test]
 fn a_trading_post_captured_leaves_the_trade_organizations_caravans_to_it() {
-    let land = crate::test_world::city_terrain();
+    let land = crate::test_support::new_land();
     let mut world = generate_world(land, 1);
     crate::starting_city::found_starting_city(&mut world, land, 1, None);
     let post = trading_posts(&world)[0].id.clone();

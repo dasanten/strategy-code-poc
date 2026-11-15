@@ -220,6 +220,31 @@ deploy, with no errors. So the last TypeScript image is the rollback for the cut
 the tool for a save older than format 111, which the Rust server refuses: run it once on that
 database (it migrates and saves on start), then start the Rust image.
 
+### The reset (ADR 0035)
+
+The world is generated again once, at the release that carries Epics 100 to 102. Accounts,
+logins, admin rights, invite codes and script libraries stay; the world, its terrain and explored
+terrain go; every Player's First day card and Horse offer show again, and each founds a new realm
+on their next login. The new server refuses the old save ("run `csp-admin reset-world`"), so:
+
+1. Stop the server: `docker compose stop server`.
+2. See what goes and what stays (changes nothing):
+
+   ```bash
+   docker compose run --rm --no-deps server csp-admin reset-world
+   ```
+
+3. Reset. It backs the database up into `/backups` first (`world-<time>-reset.db`, never pruned),
+   picks a new seed (or add `--seed <n>`) and stores its terrain:
+
+   ```bash
+   docker compose run --rm --no-deps server csp-admin reset-world --yes
+   ```
+
+4. Start the server, which generates the new world: `docker compose up -d server`.
+
+To undo it, roll back as above with the `-reset` backup as the file of step 3.
+
 Before scripts see exactly their script views (ADR 0011), list the fields Players' active scripts
 read that the views don't declare, with each script and Player. It only reads, so it is safe while
 the server runs: `docker compose exec server check-fields` (reads `DB_PATH`). It finds reads from

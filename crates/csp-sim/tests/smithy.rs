@@ -29,6 +29,16 @@ fn arms() -> Vec<&'static str> {
     WEAPONS.iter().chain(PROTECTION.iter()).copied().collect()
 }
 
+/// What a weapon or piece of armour is forged from besides Wood: Steel for the steel ones
+/// (`CONTEXT.md`: Coal), else Iron.
+fn metal(made: &str) -> &'static str {
+    if made.starts_with("steel") {
+        "steel"
+    } else {
+        "iron"
+    }
+}
+
 fn good(name: &str) -> Good {
     serde_json::from_value(json!(name)).expect("a good")
 }
@@ -90,13 +100,18 @@ mod weapons_and_armour_balance_file {
     use super::*;
 
     #[test]
-    fn a_smithy_has_one_recipe_from_iron_and_wood_for_each_weapon_and_piece_of_armour() {
+    fn a_smithy_has_one_recipe_from_iron_or_steel_and_wood_for_each_weapon_and_piece_of_armour() {
         let recipes = RECIPES.get("smithy").expect("smithy recipes");
-        assert_eq!(recipes.iter().map(recipe_good).collect::<Vec<_>>(), arms());
+        let mut made: Vec<&str> = recipes.iter().map(recipe_good).collect();
+        let mut want = arms();
+        made.sort_unstable();
+        want.sort_unstable();
+        assert_eq!(made, want);
         for r in recipes {
             let mut inputs: Vec<&str> = r.input.0.iter().map(|(g, _)| *g).collect();
             inputs.sort_unstable();
-            assert_eq!(inputs, ["iron", "wood"]);
+            let m = metal(recipe_good(r));
+            assert_eq!(inputs, [m, "wood"]);
             assert_eq!(json_of(&r.output), json!({ recipe_good(r): 1.0 }));
             // Nothing is lost or gained in weight at the anvil.
             let weight: f64 =
@@ -105,6 +120,23 @@ mod weapons_and_armour_balance_file {
         }
         assert!(BATCHES_PER_DAY.get("smithy").expect("batches") > 0.0);
         assert_eq!(WORKPLACE_SKILL.get("smithy"), Some("smithing"));
+    }
+
+    #[test]
+    fn a_steel_sword_shield_and_armour_take_steel_where_the_iron_one_takes_iron_and_beat_it() {
+        let steel_of =
+            [("sword", "steelSword"), ("shield", "steelShield"), ("armour", "steelArmour")];
+        for (iron, steel) in steel_of {
+            let i = recipe_for(BuildingKind::Smithy, Some(iron)).expect("an iron recipe");
+            let s = recipe_for(BuildingKind::Smithy, Some(steel)).expect("a steel recipe");
+            assert_eq!(i.input.get("iron"), s.input.get("steel"), "{steel}");
+            assert_eq!(i.input.get("wood"), s.input.get("wood"), "{steel}");
+            let better = |t: &csp_shared::balance::Table<f64>| t.get(steel) > t.get(iron);
+            assert!(better(&WEAPON_ATTACK) || better(&PROTECTION_DEFENCE), "{steel}");
+        }
+        // The Spear stays iron only.
+        assert!(recipe_for(BuildingKind::Smithy, Some("steelSpear")).is_none());
+        assert_eq!(WEAPONS.iter().filter(|w| w.contains("pear")).count(), 1);
     }
 
     #[test]
@@ -145,7 +177,8 @@ mod the_smithy {
                 json!(made),
                 "{made}"
             );
-            world.residents[0].carried = stock(&[(Good::Iron, 20.0), (Good::Wood, 10.0)]);
+            let m = good(metal(made));
+            world.residents[0].carried = stock(&[(m, 20.0), (Good::Wood, 10.0)]);
             run(&mut world, TICKS_PER_GAME_DAY as usize + 2);
             let batches = BATCHES_PER_DAY.get("smithy").expect("batches");
             let recipe = recipe_for(BuildingKind::Smithy, Some(made)).expect("a recipe");
@@ -156,7 +189,7 @@ mod the_smithy {
             );
             let r = &world.residents[0];
             let input = |n: &str| recipe.input.get(n).expect("an input");
-            assert_eq!(r.carried.get(&Good::Iron).copied(), Some(20.0 - batches * input("iron")));
+            assert_eq!(r.carried.get(&m).copied(), Some(20.0 - batches * input(metal(made))));
             assert_eq!(r.carried.get(&Good::Wood).copied(), Some(10.0 - batches * input("wood")));
             let skill = r.skills.get(&SkillName::Smithing).copied().unwrap_or(0.0);
             assert!((skill - WORK_SKILL_PER_DAY).abs() < 0.005, "{made}: {skill}");
@@ -225,12 +258,17 @@ mod the_smithy {
     }
 
     #[test]
-    fn a_smelter_takes_no_choice() {
+    fn a_mint_takes_no_choice_a_smelter_iron_unless_told_steel() {
+        // A smelter makes Iron or Steel (`CONTEXT.md`: Coal, T101.4), Iron when told nothing.
         let (mut world, mut q) = setup();
-        world.buildings[0].kind = BuildingKind::Smelter;
-        let said = work(&mut world, &mut q, "w1", Some(json!("iron")));
+        world.buildings[0].kind = BuildingKind::Mint;
+        let said = work(&mut world, &mut q, "w1", Some(json!("coins")));
         assert!(said.contains("nothing to choose"), "{said}");
+        world.buildings[0].kind = BuildingKind::Smelter;
+        let said = work(&mut world, &mut q, "w1", Some(json!("spear")));
+        assert!(said.contains("can't make spear"), "{said}");
         assert_eq!(work(&mut world, &mut q, "w1", None), "ack");
+        assert_eq!(work(&mut world, &mut q, "w1", Some(json!("steel"))), "ack");
     }
 
     #[test]
@@ -258,7 +296,14 @@ mod the_smithy {
         assert!(first(&world).is_some_and(|m| m.contains("can't make iron")));
         set(&mut world, Some("spear"));
         assert_eq!(first(&world), None);
-        world.buildings[0].kind = BuildingKind::Smelter;
+        world.buildings[0].kind = BuildingKind::Mint;
         assert!(first(&world).is_some_and(|m| m.contains("nothing to choose")));
+        // A smelter makes Iron unless told Steel (`CONTEXT.md`: Coal), but no weapons.
+        world.buildings[0].kind = BuildingKind::Smelter;
+        assert!(first(&world).is_some_and(|m| m.contains("can't make spear")));
+        for makes in [None, Some("iron"), Some("steel")] {
+            set(&mut world, makes);
+            assert_eq!(first(&world), None);
+        }
     }
 }

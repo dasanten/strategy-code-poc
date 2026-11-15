@@ -472,6 +472,31 @@ mod npc_trade {
     }
 
     #[test]
+    fn lent_residents_take_the_best_gear_of_the_surplus_steel_first() {
+        let (mut world, npc) = setup();
+        let reserve = npc_reserve(&world, &npc);
+        let kept = held(&reserve, NPC_SMITHY_WEAPON);
+        let stock: Stock = [
+            (NPC_SMITHY_WEAPON, kept + 1.0),
+            (Good::SteelSword, 1.0),
+            (Good::Shield, 1.0),
+            (Good::SteelShield, 1.0),
+            (Good::Food, 10_000.0),
+        ]
+        .into_iter()
+        .collect();
+        storage(&mut world).stock = Some(stock);
+        ask_for_n4(&mut world);
+        let took = step_npc_hire(&mut world, SIZE);
+        let carried = at(&mut world, "n4").carried.clone();
+        assert_eq!(held(&carried, Good::SteelSword), 1.0);
+        assert_eq!(held(&carried, NPC_SMITHY_WEAPON), 0.0);
+        assert_eq!(held(&carried, Good::SteelShield), 1.0);
+        assert_eq!(held(&carried, Good::Shield), 0.0);
+        assert_eq!(npc_lending_keeps_reserve(&took), vec![]);
+    }
+
+    #[test]
     fn lending_under_the_reserve_is_caught_by_its_invariant() {
         let gear = LentGear {
             contract_id: "k1".into(),
@@ -731,18 +756,23 @@ mod stock_floor {
         WAREHOUSE_FLOOR.get(good_name(g)).unwrap()
     }
 
+    /// The goods a warehouse trades: those with a floor (every good since T101.6).
+    fn traded(goods: &[Good]) -> Vec<Good> {
+        goods.iter().copied().filter(|&g| floor(g) > 0.0).collect()
+    }
+
     #[test]
     fn is_every_good_at_a_trading_post_coins_in_the_hq_coin_warehouse_and_the_rest_in_the_other() {
         let (world, warehouse) = post();
         assert_eq!(warehouse_keeps(&world, &warehouse), ALL_GOODS);
-        let all: Stock = ALL_GOODS.iter().map(|&g| (g, floor(g))).collect();
+        let all: Stock = traded(&ALL_GOODS).into_iter().map(|g| (g, floor(g))).collect();
         assert_eq!(stock_floor(&world, &warehouse), all);
         let (world, coins, goods) = hq();
         let want: Stock =
             [(Good::Coins, floor(Good::Coins) * HQ_FLOOR_FACTOR)].into_iter().collect();
         assert_eq!(stock_floor(&world, &coins), want);
         let keys: Vec<Good> = stock_floor(&world, &goods).keys().copied().collect();
-        assert_eq!(keys, PRICED_GOODS);
+        assert_eq!(keys, traded(&PRICED_GOODS));
         assert_eq!(stock_floor(&world, &goods)[&Good::Wood], floor(Good::Wood) * HQ_FLOOR_FACTOR);
     }
 
@@ -810,9 +840,9 @@ mod stock_floor {
             warehouse_prices(world, b).iter().map(|x| x.good).collect()
         };
         let (world, warehouse) = post();
-        assert_eq!(goods_of(&world, &warehouse), PRICED_GOODS);
+        assert_eq!(goods_of(&world, &warehouse), traded(&PRICED_GOODS));
         let (world, coins, goods) = hq();
         assert!(warehouse_prices(&world, &coins).is_empty());
-        assert_eq!(goods_of(&world, &goods), PRICED_GOODS);
+        assert_eq!(goods_of(&world, &goods), traded(&PRICED_GOODS));
     }
 }
