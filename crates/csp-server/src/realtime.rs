@@ -42,6 +42,7 @@ use csp_sim::sight::{
 };
 use csp_sim::starting_city::{found_starting_city_in, suggested_leader_name, FoundingNames};
 use csp_sim::tick::Scratch;
+use csp_sim::vein_stands::veins_seen_by;
 use csp_sim::veins::gone_nodes_of;
 use csp_sim::world_index::{world_index, WorldIndex};
 use flate2::{write::GzEncoder, Compression};
@@ -164,6 +165,8 @@ struct Client {
     /// ever learn of more.
     gone_nodes: usize,
     last_work_settings: String,
+    /// The veins the Player was last sent (`CONTEXT.md`: Running dry), as JSON.
+    last_veins: String,
     last_waypoints: String,
     last_trader_visits: String,
 }
@@ -424,6 +427,7 @@ fn build_welcome(
         horse_offer: !world.horse_offers_claimed.contains(&(user_id as u64)),
         gone_nodes: gone_nodes_of(world, user_id as u64).len(),
         last_work_settings: String::new(),
+        last_veins: String::new(),
         last_waypoints: json_of(
             &world.waypoints.get(&(user_id as u64)).cloned().unwrap_or_default(),
         ),
@@ -453,6 +457,8 @@ fn build_welcome(
         .get(&realm.id)
         .map_or_else(|| json!({}), |s| serde_json::to_value(s).unwrap_or(json!({})));
     client.last_work_settings = json_of(&work_settings);
+    let veins = json!(veins_seen_by(world, &realm.id));
+    client.last_veins = json_of(&veins);
     let mut cache = None;
     if let Some(territory) = view.territory {
         RegionCache::update(&mut cache, world, territory, size);
@@ -484,6 +490,7 @@ fn build_welcome(
         "traderVisits": trader_visits_to(world, &realm.id),
         "firstDay": first_day,
         "workSettings": work_settings,
+        "veins": veins,
     });
     let mut message = message;
     // Explored terrain: the chunks with their counts, or the plain list for an older client.
@@ -1022,6 +1029,14 @@ impl Realtime {
                 if settings_json != client.last_work_settings {
                     client.last_work_settings = settings_json;
                     tick.insert("workSettings".into(), work_settings);
+                }
+                // How the veins its realm and allies work stand, only when a word changed
+                // (`CONTEXT.md`: Running dry).
+                let veins = json!(veins_seen_by(world, &client.realm_id));
+                let veins_json = json_of(&veins);
+                if veins_json != client.last_veins {
+                    client.last_veins = veins_json;
+                    tick.insert("veins".into(), veins);
                 }
                 // Only the Player's own waypoints, only when they changed (`CONTEXT.md`: Waypoint).
                 let waypoints =

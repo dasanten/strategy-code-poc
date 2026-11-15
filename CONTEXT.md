@@ -101,7 +101,8 @@ The shared language of the game. Domain terms only — no implementation details
   nodes of each kind and richness stay as many as the world was made with: with no fitting tile
   anywhere (a tiny map) the node comes back where it was after a few game days. Whoever works a
   mine (their realm and its allies) sees how its vein stands in words (plenty, thinning, nearly
-  gone), never as a number; others see nothing of it.
+  gone), never as a number; others see nothing of it. The log of each realm working it says once
+  when it turns to thinning and once at nearly gone.
 - **Workplace:** a building where residents produce goods. Output depends on the workers'
   Strength and skill and is limited by the workplace's maximum number of workers. Working there
   teaches its skill. Its output is left in the pile on the workplace's tile, not in the

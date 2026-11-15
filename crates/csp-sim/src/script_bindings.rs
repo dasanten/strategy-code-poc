@@ -59,6 +59,7 @@ use crate::script_deps::{
 use crate::script_params::{param_target, param_waypoint, ParamTarget, ParamWithValue};
 use crate::script_views::{script_view, ScriptType};
 use crate::sight::{Eyes, InvariantViolation, Spot};
+use crate::vein_stands::vein_seen_by;
 use crate::walk_time::{walk_time, way_food};
 use crate::waypoints::{add_waypoint_problem, remove_waypoint_problem, waypoints_of};
 use crate::world_index::WorldIndex;
@@ -797,6 +798,21 @@ impl<'a> ScriptBindings<'a> {
         Some(m)
     }
 
+    /// How the vein under a workplace on a node stands, as the side sees it (`CONTEXT.md`: Running
+    /// dry): only while its realm or an ally works it.
+    fn vein_word_at(&self, b: &Building) -> Option<csp_shared::world::VeinWord> {
+        vein_seen_by(self.world(), b, self.side.as_ref()?)
+    }
+
+    /// `vein` of the workplace `id` (`vein_word_at`), left out where it is null.
+    fn vein_at(&self, id: &str) -> Option<Map<String, Json>> {
+        let b = self.world().buildings.iter().find(|b| b.id == id)?;
+        let word = self.vein_word_at(b)?;
+        let mut m = Map::new();
+        m.insert("vein".into(), Json::String(word.name().into()));
+        Some(m)
+    }
+
     /// At a storage, its offers, and at one of the side's own the goods it can take (`offersOf`).
     fn offers_of(&self, b: &Building) -> Option<Map<String, Json>> {
         let world = self.world();
@@ -829,6 +845,7 @@ impl<'a> ScriptBindings<'a> {
     fn building_extras(&self, id: &str) -> Map<String, Json> {
         let mut m = self.teaching_at(id).unwrap_or_default();
         m = merge(m, self.settings_at(id));
+        m = merge(m, self.vein_at(id));
         if !self.world().offers.is_empty() {
             if let Some(b) = self.world().buildings.iter().find(|x| x.id == id) {
                 m = merge(m, self.offers_of(b));
@@ -842,6 +859,7 @@ impl<'a> ScriptBindings<'a> {
     fn as_seen_building(&self, b: &Building) -> Option<Json> {
         if self.own_building(b) {
             let m = merge(merge(to_json(b), self.settings_at(&b.id)), self.offers_of(b));
+            let m = merge(m, self.vein_at(&b.id));
             return Some(Json::Object(m));
         }
         // What is in sight holds a building just when the eyes see its footprint (`places`):
@@ -891,6 +909,7 @@ impl<'a> ScriptBindings<'a> {
                 "closed" => b.closed.map_or(Value::Null, Value::Bool),
                 "damage" => b.damage.map_or(Value::Null, number),
                 "workSettings" => settings.map_or(Value::Null, |s| field_value(s, f.r#type)),
+                "vein" => self.vein_word_at(b).map_or(Value::Null, |w| Value::string(w.name())),
                 // A building's `prices` and `offers` come with its offers, `teacher`,
                 // `subject` and `trainees` with another's.
                 _ => Value::Null,

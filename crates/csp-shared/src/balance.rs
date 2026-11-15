@@ -290,6 +290,13 @@ pub fn vein_stock(
     Some((per_day * WORKPLACE_MAX_WORKERS.get("mine")? * days).round())
 }
 
+/// How a vein stands for whoever works it (`CONTEXT.md`: Running dry), from the share of its
+/// first stock that is left: "thinning" at or below `VEIN_THINNING`, "nearly gone" at or below
+/// `VEIN_NEARLY_GONE`, "plenty" above. A full crew of average workers on a rich vein so has about
+/// 190 game days (three real days) of warning before it runs dry.
+pub const VEIN_THINNING: f64 = 0.5;
+pub const VEIN_NEARLY_GONE: f64 = 0.15;
+
 /// `vein_stock` of every ore node kind, normal and rich, as the client reads it (the Wiki).
 fn vein_stock_json() -> Value {
     use crate::world::{ResourceKind, Richness};
@@ -2578,6 +2585,8 @@ pub fn balance_json() -> Value {
     m.insert("GOLD_NODE_DENSITY".into(), json!(GOLD_NODE_DENSITY));
     m.insert("VEIN_CREW_DAYS".into(), to_value(VEIN_CREW_DAYS).expect("serialisable"));
     m.insert("VEIN_STOCK".into(), vein_stock_json());
+    m.insert("VEIN_THINNING".into(), json!(VEIN_THINNING));
+    m.insert("VEIN_NEARLY_GONE".into(), json!(VEIN_NEARLY_GONE));
     m.insert("NEW_VEIN_SPOT_REACH".into(), json!(NEW_VEIN_SPOT_REACH));
     m.insert("VEIN_RETURN_DAYS".into(), json!(VEIN_RETURN_DAYS));
     m.insert("STARTING_SITES_PER_HEARTLAND".into(), json!(STARTING_SITES_PER_HEARTLAND));

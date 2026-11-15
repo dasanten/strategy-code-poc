@@ -11,6 +11,7 @@ import type { ScriptLogLine } from "./ScriptLogLine.js";
 import type { ScriptRunSeen } from "./ScriptRunSeen.js";
 import type { SeenEntity } from "./SeenEntity.js";
 import type { TraderVisit } from "./TraderVisit.js";
+import type { VeinWord } from "./VeinWord.js";
 import type { Waypoint } from "./Waypoint.js";
 import type { WelcomeHome } from "./WelcomeHome.js";
 import type { WorkplaceSettings } from "./WorkplaceSettings.js";
@@ -58,7 +59,12 @@ goneNodes: Array<[number, number]>, waypoints: Array<Waypoint>, traderVisits: Ar
 /**
  * The realm's Workplace settings by building id; only its own.
  */
-workSettings: { [key in string]: WorkplaceSettings }, } | { "type": "tick", tick: number, changed: Array<SeenEntity>, gone: Array<string>, lastSeen?: LastSeenChange, explored: Array<number>, 
+workSettings: { [key in string]: WorkplaceSettings }, 
+/**
+ * How the veins of the workplaces its realm or an ally works stand, by building id
+ * (`CONTEXT.md`: Running dry): words, never a number.
+ */
+veins: { [key in string]: VeinWord }, } | { "type": "tick", tick: number, changed: Array<SeenEntity>, gone: Array<string>, lastSeen?: LastSeenChange, explored: Array<number>, 
 /**
  * The new counts of the chunks in `explored`, as `encode_explored_counts` lists them: to a
  * client of `COUNTS_FROM_VERSION` or later, when some grew.
@@ -67,4 +73,8 @@ exploredCounts?: Array<number>, events: Array<RealmEvent>, diplomacy?: Diplomacy
 /**
  * All of `gone_nodes` again, once the Player learns of another.
  */
-goneNodes?: Array<[number, number]>, workSettings?: { [key in string]: WorkplaceSettings }, waypoints?: Array<Waypoint>, traderVisits?: Array<TraderVisit>, } | { "type": "scriptMemory", id: string, memory: { [key in string]: JsonValue } | null, } | { "type": "scriptRun", id: string, run: ScriptRunSeen | null, } | { "type": "scriptLog", id: string, lines: Array<ScriptLogLine> | null, } | { "type": "firstDay", firstDay: FirstDay, } | { "type": "ack", requestId: string, } | { "type": "rejected", requestId: string, reason: string, };
+goneNodes?: Array<[number, number]>, workSettings?: { [key in string]: WorkplaceSettings }, 
+/**
+ * All of `veins` again, once a word changed.
+ */
+veins?: { [key in string]: VeinWord }, waypoints?: Array<Waypoint>, traderVisits?: Array<TraderVisit>, } | { "type": "scriptMemory", id: string, memory: { [key in string]: JsonValue } | null, } | { "type": "scriptRun", id: string, run: ScriptRunSeen | null, } | { "type": "scriptLog", id: string, lines: Array<ScriptLogLine> | null, } | { "type": "firstDay", firstDay: FirstDay, } | { "type": "ack", requestId: string, } | { "type": "rejected", requestId: string, reason: string, };

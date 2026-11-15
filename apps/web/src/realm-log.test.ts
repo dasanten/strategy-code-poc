@@ -69,6 +69,30 @@ describe('realm log', () => {
     })
   })
 
+  it('says once a mine’s vein is thinning and once it is nearly gone, never how much is left', () => {
+    const e = {
+      seq: 1,
+      tick: 2,
+      userId: 7,
+      kind: 'veinTurned',
+      buildingId: 'b1',
+      node: 'coal',
+      x: 40,
+      y: 12,
+    } as const
+    const places = [{ name: '(40, 12)', x: 40, y: 12 }]
+    expect(describeEvent({ ...e, vein: 'thinning' })).toEqual({
+      text: 'The coal vein at the mine at (40, 12) is thinning.',
+      tone: 'info',
+      places,
+    })
+    expect(describeEvent({ ...e, vein: 'nearlyGone' })).toEqual({
+      text: 'The coal vein at the mine at (40, 12) is nearly gone: it will soon run dry.',
+      tone: 'warn',
+      places,
+    })
+  })
+
   it('says why a resident couldn’t move in (`CONTEXT.md`: Relocate)', () => {
     const failed = { kind: 'relocateFailed', residentId: 'r1', name: 'Ana', cityId: 'c2' } as const
     expect(

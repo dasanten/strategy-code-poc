@@ -110,6 +110,8 @@ export interface Balance {
       [key: string]: number
     }
   }
+  readonly VEIN_THINNING: number
+  readonly VEIN_NEARLY_GONE: number
   readonly NEW_VEIN_SPOT_REACH: number
   readonly VEIN_RETURN_DAYS: number
   readonly STARTING_SITES_PER_HEARTLAND: number

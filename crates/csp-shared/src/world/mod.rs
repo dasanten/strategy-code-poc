@@ -2848,6 +2848,15 @@ pub enum RealmEventWhat {
         x: f64,
         y: f64,
     },
+    /// The vein of a workplace a realm works turned to thinning or to nearly gone (`CONTEXT.md`:
+    /// Running dry): said once at each step.
+    VeinTurned {
+        building_id: String,
+        node: ResourceKind,
+        x: f64,
+        y: f64,
+        vein: VeinWord,
+    },
     ScriptStopped {
         name: String,
         script_id: u64,
@@ -3454,6 +3463,50 @@ pub struct VeinStock {
     pub first: f64,
     pub left: f64,
     pub made: f64,
+}
+
+impl VeinStock {
+    /// How the vein stands (`CONTEXT.md`: Running dry), from the share of `first` that is left.
+    pub fn word(&self) -> VeinWord {
+        VeinWord::of_share(if self.first > 0.0 { self.left / self.first } else { 0.0 })
+    }
+}
+
+/// How a vein stands, as whoever works its node's workplace sees it (`CONTEXT.md`: Running dry):
+/// in words, never as a number.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum VeinWord {
+    Plenty,
+    Thinning,
+    NearlyGone,
+    /// A node that never runs dry (poor, forest, stone).
+    Endless,
+}
+
+impl VeinWord {
+    /// The word for a vein with `share` of its first stock left (`VEIN_THINNING`,
+    /// `VEIN_NEARLY_GONE`).
+    pub fn of_share(share: f64) -> VeinWord {
+        use crate::balance::{VEIN_NEARLY_GONE, VEIN_THINNING};
+        if share <= VEIN_NEARLY_GONE {
+            VeinWord::NearlyGone
+        } else if share <= VEIN_THINNING {
+            VeinWord::Thinning
+        } else {
+            VeinWord::Plenty
+        }
+    }
+
+    /// Its name in scripts and on the wire.
+    pub fn name(self) -> &'static str {
+        match self {
+            VeinWord::Plenty => "plenty",
+            VeinWord::Thinning => "thinning",
+            VeinWord::NearlyGone => "nearlyGone",
+            VeinWord::Endless => "endless",
+        }
+    }
 }
 
 /// A node that ran dry (`CONTEXT.md`: Running dry): gone from the world, kept only so that a
