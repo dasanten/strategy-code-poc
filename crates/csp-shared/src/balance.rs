@@ -258,6 +258,15 @@ pub struct VeinCrewDays {
 
 pub const VEIN_CREW_DAYS: VeinCrewDays = VeinCrewDays { normal: 840.0, rich: 1260.0 };
 
+/// How far, in tiles, from a pass, a land bridge or a border with another frontier region a rich
+/// node that comes into being in the frontier lies at most (`CONTEXT.md`: Running dry, Richness):
+/// a spot worth fighting over, as the frontier's rich nodes are at generation.
+pub const NEW_VEIN_SPOT_REACH: f64 = 32.0;
+
+/// How many game days a node that ran dry waits to come back where it was, when no fitting tile
+/// for it is found anywhere else (`CONTEXT.md`: Running dry; a tiny map). About a real hour.
+pub const VEIN_RETURN_DAYS: f64 = 2.5;
+
 /// The stock a node of `kind` and `richness` comes into being with (`CONTEXT.md`: Running dry):
 /// what a full crew of average workers makes there in `VEIN_CREW_DAYS`. None for a node that
 /// never runs dry (forest, stone, a poor node).
@@ -2578,6 +2587,8 @@ pub fn balance_json() -> Value {
     m.insert("VEIN_STOCK".into(), vein_stock_json());
     m.insert("VEIN_THINNING".into(), json!(VEIN_THINNING));
     m.insert("VEIN_NEARLY_GONE".into(), json!(VEIN_NEARLY_GONE));
+    m.insert("NEW_VEIN_SPOT_REACH".into(), json!(NEW_VEIN_SPOT_REACH));
+    m.insert("VEIN_RETURN_DAYS".into(), json!(VEIN_RETURN_DAYS));
     m.insert("STARTING_SITES_PER_HEARTLAND".into(), json!(STARTING_SITES_PER_HEARTLAND));
     m.insert("STARTING_SITE_WALK".into(), to_value(STARTING_SITE_WALK).expect("serialisable"));
     m.insert("STARTING_SITE_WAY_DISTANCE".into(), json!(STARTING_SITE_WAY_DISTANCE));

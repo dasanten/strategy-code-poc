@@ -12,6 +12,7 @@ use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{Remembered, WorldState};
 use serde_json::Value;
 
+use crate::new_veins::see_new_veins;
 use crate::queries::names::kind_name;
 use crate::random::hash_str;
 use crate::sight::{buildings_by_square, places_in_sight, InvariantViolation, SightCache, Squares};
@@ -28,6 +29,9 @@ pub struct LastSeenState {
     /// What the refreshes changed in each Player's memory since [`LastSeenState::take_changes`]
     /// last took it, by user id (T99.7).
     changes: HashMap<u64, MemoryChanges>,
+    /// The tiles of new nodes the refreshes showed to Players who had them hidden (`CONTEXT.md`:
+    /// Running dry), by user id, until `veins::reveal_new_veins` takes them.
+    pub revealed_veins: Vec<(u64, i32, i32)>,
 }
 
 /// What refreshes changed in a Player's memory (T99.7): the ids remembered anew, again or as they
@@ -175,6 +179,9 @@ pub fn refresh_last_seen(
         // A node that ran dry is gone from their map once they see its tile again, as a building
         // is (`CONTEXT.md`: Running dry).
         see_dry_nodes(world, user_id, &places.eyes);
+        // A new node they had explored the tile of shows once they see that tile again.
+        let revealed = see_new_veins(world, user_id, &places.eyes);
+        state.revealed_veins.extend(revealed.into_iter().map(|(x, y)| (user_id, x, y)));
         let remembers = world.last_seen.get(&user_id).is_some_and(|m| !m.is_empty());
         if places.seen.is_empty() && !remembers {
             continue;

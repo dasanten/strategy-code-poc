@@ -51,6 +51,7 @@ pub mod loading;
 #[cfg(test)]
 mod movement_test_world;
 pub mod names;
+pub mod new_veins;
 pub mod node_gen;
 pub mod npc_behaviour;
 pub mod npc_chain;

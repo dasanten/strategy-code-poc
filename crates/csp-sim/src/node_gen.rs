@@ -29,6 +29,14 @@ fn kinds() -> [(ResourceKind, TerrainTable); 5] {
     ]
 }
 
+/// Whether a node of `kind` may lie on a tile of terrain `tile` (`CONTEXT.md`: Resource node): its
+/// terrain gives that kind a chance in `NODE_DENSITY`.
+pub fn fits_terrain(kind: ResourceKind, tile: u8) -> bool {
+    kinds()
+        .into_iter()
+        .any(|(k, densities)| k == kind && densities.get(tile).is_some_and(|d| d > 0.0))
+}
+
 /// One kind a terrain may hold: the kind, the seed offset of its hash (`7919 * (i + 1)`) and its
 /// density on that terrain.
 type Candidate = (ResourceKind, f64, f64);
@@ -230,31 +238,7 @@ const BORDER_STEP: i32 = 4;
 pub fn assign_richness(nodes: &mut [ResourceNode], terrain: &TerrainMap, regions: &Regions) {
     let size = terrain.size;
     let kind_of = |id: Option<u32>| id.and_then(|id| regions.region(id)).map(|r| r.kind);
-    // Spots worth fighting over, by frontier region: its ways and its borders with another
-    // frontier region.
-    let mut spots: HashMap<u32, Vec<(i32, i32)>> = HashMap::new();
-    for way in &regions.ways {
-        for id in way.between {
-            if kind_of(Some(id)) == Some(RegionKind::Frontier) {
-                spots.entry(id).or_default().push((way.x, way.y));
-            }
-        }
-    }
-    for y in (0..size).step_by(BORDER_STEP as usize) {
-        for x in (0..size).step_by(BORDER_STEP as usize) {
-            let Some(here) = regions.id_at(x, y) else { continue };
-            if kind_of(Some(here)) != Some(RegionKind::Frontier) {
-                continue;
-            }
-            for (nx, ny) in [(x + BORDER_STEP, y), (x, y + BORDER_STEP)] {
-                let Some(there) = regions.id_at(nx, ny) else { continue };
-                if there != here && kind_of(Some(there)) == Some(RegionKind::Frontier) {
-                    spots.entry(here).or_default().push((x, y));
-                    spots.entry(there).or_default().push((nx, ny));
-                }
-            }
-        }
-    }
+    let spots = contested_spots(size, regions);
     let mut frontier: HashMap<u32, Vec<(f64, usize)>> = HashMap::new();
     for (i, node) in nodes.iter_mut().enumerate() {
         let at = (node.x as i32, node.y as i32);
@@ -285,6 +269,37 @@ pub fn assign_richness(nodes: &mut [ResourceNode], terrain: &TerrainMap, regions
     for node in nodes.iter_mut() {
         node.fill_stock();
     }
+}
+
+/// The spots worth fighting over (`CONTEXT.md`: Richness), by frontier region: its passes and land
+/// bridges and the tiles along its borders with another frontier region, looked at every
+/// `BORDER_STEP` tiles.
+pub fn contested_spots(size: i32, regions: &Regions) -> HashMap<u32, Vec<(i32, i32)>> {
+    let kind_of = |id: Option<u32>| id.and_then(|id| regions.region(id)).map(|r| r.kind);
+    let mut spots: HashMap<u32, Vec<(i32, i32)>> = HashMap::new();
+    for way in &regions.ways {
+        for id in way.between {
+            if kind_of(Some(id)) == Some(RegionKind::Frontier) {
+                spots.entry(id).or_default().push((way.x, way.y));
+            }
+        }
+    }
+    for y in (0..size).step_by(BORDER_STEP as usize) {
+        for x in (0..size).step_by(BORDER_STEP as usize) {
+            let Some(here) = regions.id_at(x, y) else { continue };
+            if kind_of(Some(here)) != Some(RegionKind::Frontier) {
+                continue;
+            }
+            for (nx, ny) in [(x + BORDER_STEP, y), (x, y + BORDER_STEP)] {
+                let Some(there) = regions.id_at(nx, ny) else { continue };
+                if there != here && kind_of(Some(there)) == Some(RegionKind::Frontier) {
+                    spots.entry(here).or_default().push((x, y));
+                    spots.entry(there).or_default().push((nx, ny));
+                }
+            }
+        }
+    }
+    spots
 }
 
 #[cfg(test)]

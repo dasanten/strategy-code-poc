@@ -309,6 +309,7 @@ import {
   VEIN_STOCK,
   VEIN_THINNING,
   VEIN_NEARLY_GONE,
+  NEW_VEIN_SPOT_REACH,
   carryCapacity,
   walkSpeed,
   workFactor,
@@ -1210,6 +1211,16 @@ export function Wiki() {
           its workers stop, each one’s log saying “the vein ran dry”, and your realm log says so
           once. You can tear the mine down like any building, but no mine can be built there again.
           Others who explored the tile still see the node on their map until they see the tile
+          again.
+        </p>
+        <p>
+          The land does not run out, though. The moment a vein runs dry a new node of the same kind
+          and richness comes into being somewhere else: a normal one in a frontier region, a rich
+          one on an island or within {num(NEW_VEIN_SPOT_REACH)} tiles of a pass, land bridge or
+          frontier border, gold and coal never in a heartland, and in another region than the old
+          one wherever one fits. It appears out of everyone’s sight and, where the map allows, on
+          land nobody has explored. Nobody is told: you have to find it. If you had explored its
+          tile before, your map shows no node there until one of your residents sees the tile
           again.
         </p>
       </Section>
