@@ -3347,8 +3347,19 @@ export function Wiki() {
           An average resident hits for {num(unarmed)} with bare fists, {num(sword)} with a sword,{' '}
           {num(steelSword)} with a steel sword, and {num(swordSkilled)} with a sword at full Combat
           skill ({num(COMBAT_SKILL_MAX)} points); they dodge {pct(dodge)} of blows. A resident has{' '}
-          {num(MAX_HEALTH)} health. They fight with the best weapon they carry, and only their best
-          shield and best armour count, so steel over iron and a second shield adds nothing.
+          {num(MAX_HEALTH)} health.
+        </p>
+        <p>
+          Each resident has three <strong>equipment</strong> slots: a <strong>weapon</strong>, a{' '}
+          <strong>shield</strong> and <strong>armour</strong>, one item each. Only what is equipped
+          counts in a fight, and only a resident with a weapon equipped is <strong>armed</strong>{' '}
+          (a soldier): a spare sword in the pack makes nobody a soldier and a second shield adds
+          nothing. A resident with an empty slot equips the best fitting item at once when they
+          pick one up, from a storage, the ground, a carriage or a smithy; with the slot already
+          full, the new one is only carried, even if it is better. Putting the equipped item down
+          (storing, dropping it, or losing it as loot) empties its slot, and the best other item
+          of that kind they carry takes its place. Equipped gear still weighs what it weighs and
+          is part of what they carry. A resident's card shows their three slots.
         </p>
         <p>
           Defenders on their own city's wall take {pct(WALL_DEFENCE)} of the damage. A tile of wall

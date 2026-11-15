@@ -580,7 +580,7 @@ fn react(world: &mut WorldState, ti: usize, ai: usize) {
         start_defence(world, ti);
         return;
     }
-    if is_armed(&t.carried) {
+    if is_armed(t) {
         if !matches!(t.order, Some(ResidentOrder::Attack(_))) {
             let a_id = world.residents[ai].id.clone();
             off_carriage(world, ti);

@@ -85,7 +85,7 @@ pub fn strongest_armed(world: &WorldState) -> f64 {
     let mut armed: HashMap<&str, f64> = HashMap::new();
     for r in &world.residents {
         let Some(owner) = r.owner.as_deref() else { continue };
-        if r.health <= 0.0 || !is_armed(&r.carried) || hired.contains(r.id.as_str()) {
+        if r.health <= 0.0 || !is_armed(r) || hired.contains(r.id.as_str()) {
             continue;
         }
         *armed.entry(side_of.get(owner).copied().unwrap_or(owner)).or_insert(0.0) += 1.0;

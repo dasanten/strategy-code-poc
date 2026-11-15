@@ -484,6 +484,7 @@ fn seen_resident(
         born_at: r.born_at,
         lifespan: r.lifespan,
         carried: r.carried.clone(),
+        equipped: r.equipped.clone(),
         order: r.order.clone(),
         order_ended: r.order_ended.clone(),
         struck: r.struck.clone().filter(|_| fares),

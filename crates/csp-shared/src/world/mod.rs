@@ -195,6 +195,10 @@ pub struct Resident {
     pub born_at: f64,
     pub lifespan: f64,
     pub carried: Stock,
+    /// What the resident has equipped, each item among `carried` (`CONTEXT.md`: Equipment).
+    #[serde(default, skip_serializing_if = "Equipment::is_empty")]
+    #[ts(as = "Option<Equipment>", optional)]
+    pub equipped: Equipment,
     pub order: Option<ResidentOrder>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
@@ -242,6 +246,30 @@ pub struct Resident {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub down_until: Option<f64>,
+}
+
+/// A resident's three equipment slots (`CONTEXT.md`: Equipment, ADR 0038): one weapon, one
+/// shield and one armour at most, each one of the goods the resident carries. Only what is
+/// equipped counts in combat and makes a resident armed.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Equipment {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub weapon: Option<Good>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub shield: Option<Good>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub armour: Option<Good>,
+}
+
+impl Equipment {
+    /// Whether no slot holds anything.
+    pub fn is_empty(&self) -> bool {
+        self.weapon.is_none() && self.shield.is_none() && self.armour.is_none()
+    }
 }
 
 /// What a resident runs when an alarm reaches them (`Resident.alarmScriptId`): a script id, or

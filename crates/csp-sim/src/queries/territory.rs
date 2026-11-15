@@ -96,7 +96,7 @@ pub fn control_sources(world: &WorldState, size: i32) -> Vec<ControlSource> {
                 continue;
             }
             strength += TERRITORY_PER_RESIDENT;
-            if is_armed(&r.carried) && in_city_area(world, &city.id, r.x, r.y, size) {
+            if is_armed(r) && in_city_area(world, &city.id, r.x, r.y, size) {
                 strength += TERRITORY_PER_ARMED;
             }
         }
@@ -109,9 +109,7 @@ pub fn control_sources(world: &WorldState, size: i32) -> Vec<ControlSource> {
         let mut guards: IndexMap<&str, f64> = IndexMap::new();
         for r in &world.residents {
             let Some(owner) = r.owner.as_deref() else { continue };
-            if !is_armed(&r.carried)
-                || !near_footprint(placed(b), (r.x as i32, r.y as i32), 1, size)
-            {
+            if !is_armed(r) || !near_footprint(placed(b), (r.x as i32, r.y as i32), 1, size) {
                 continue;
             }
             *guards.entry(owner).or_insert(0.0) += 1.0;

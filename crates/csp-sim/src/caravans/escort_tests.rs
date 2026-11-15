@@ -137,7 +137,7 @@ fn arm_themselves_at_the_hq_goods_warehouse_before_the_caravan_sets_off() {
         step(&mut s, &mut w, &mut sc);
     }
     for id in &s.world.caravans[s.caravan].escort_ids {
-        assert!(is_armed(&by_id(&s.world, id).carried));
+        assert!(is_armed(by_id(&s.world, id)));
     }
     let spears = held_in(s.world.buildings[s.hq_warehouse].stock.as_ref(), Good::Spear);
     assert_eq!(spears, 10.0 - CARAVAN_ESCORTS);
@@ -279,7 +279,7 @@ fn a_route_robbed_more_often_gets_more_escorts_armed_from_the_hq() {
     let ready = |s: &Route| {
         let ids = &s.world.caravans[s.caravan].escort_ids;
         ids.len() as f64 == CARAVAN_ESCORTS + 2.0
-            && ids.iter().all(|id| is_armed(&by_id(&s.world, id).carried))
+            && ids.iter().all(|id| is_armed(by_id(&s.world, id)))
     };
     for _ in 0..2_000 {
         if ready(&s) {
@@ -296,7 +296,7 @@ fn a_route_robbed_more_often_gets_more_escorts_armed_from_the_hq() {
     for id in &ids {
         let r = by_id(&s.world, id);
         assert_eq!((r.owner.as_ref(), r.city_id.as_ref()), (None, hq.as_ref()));
-        assert!(is_armed(&r.carried));
+        assert!(is_armed(r));
     }
     assert_eq!(check_all(&s.world, &s.terrain), vec![]);
 }

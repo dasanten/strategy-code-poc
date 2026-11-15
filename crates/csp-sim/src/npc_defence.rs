@@ -236,7 +236,7 @@ fn keep_soldiers(
         })
         .collect();
     let soldiers: Vec<usize> =
-        adults.iter().copied().filter(|&i| is_armed(&world.residents[i].carried)).collect();
+        adults.iter().copied().filter(|&i| is_armed(&world.residents[i])).collect();
     let no_storage = no_storage_yet(world, city);
     for &i in &soldiers {
         let r = &mut world.residents[i];
@@ -271,7 +271,7 @@ fn keep_soldiers(
         .copied()
         .filter(|&i| {
             let r = &world.residents[i];
-            !is_armed(&r.carried)
+            !is_armed(r)
                 && !matches!(r.order, Some(ResidentOrder::Attack(_)))
                 && !traders.contains(&r.id)
         })
@@ -459,7 +459,7 @@ fn watch_gates(world: &mut WorldState, city: &City, size: i32) {
     let let_past = army_let_past(world, city);
     let near = world.residents.iter().any(|r| {
         r.health > 0.0
-            && is_armed(&r.carried)
+            && is_armed(r)
             && !let_past.contains(&r.id)
             && !allied(world, &city.id, wall_side(r).unwrap_or(""))
             && gates.iter().any(|&g| {
@@ -498,7 +498,7 @@ pub fn npc_gate_shut_to_its_punishers(world: &WorldState, size: i32) -> Vec<Inva
             .collect();
         for m in &p.members {
             let Some(r) = world.residents.iter().find(|x| x.id == m.resident_id) else { continue };
-            if r.health <= 0.0 || !is_armed(&r.carried) {
+            if r.health <= 0.0 || !is_armed(r) {
                 continue;
             }
             let at = (r.x as i32, r.y as i32);
