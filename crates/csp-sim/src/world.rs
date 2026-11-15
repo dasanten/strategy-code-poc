@@ -259,7 +259,11 @@ fn step_rest(
     crate::lent::drop_orders_against_lender(world);
     let strikes = request_strikes(world, size);
     let strikes_len = strikes.len();
-    let combat = resolve_strikes(world, &strikes, size, &mut GameAlarms, &mut scratch.made);
+    let mut combat = resolve_strikes(world, &strikes, size, &mut GameAlarms, &mut scratch.made);
+    // Whoever was up on a tile that broke falls (`CONTEXT.md`: A tile breaks).
+    let (fell, ended) = crate::wall_walk::fall_from_broken(world, terrain, &combat.broken);
+    combat.died.extend(fell);
+    combat.ended.extend(ended);
     let climbs = request_climbing(world);
     let climbs_len = climbs.len();
     resolve_climbing(world, &climbs, terrain);
