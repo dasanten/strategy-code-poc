@@ -418,7 +418,13 @@ fn leaves_out_the_edge_across_a_lake_they_found_no_way_to_and_goes_on() {
 // with find
 
 fn gold(id: &str, y: f64) -> ResourceNode {
-    ResourceNode { id: id.into(), kind: ResourceKind::GoldOre, x: 500.0, y }
+    ResourceNode {
+        id: id.into(),
+        kind: ResourceKind::GoldOre,
+        x: 500.0,
+        y,
+        richness: Default::default(),
+    }
 }
 
 /// Gold ore lies in hills: a hill on each tile a node is put on.

@@ -77,6 +77,7 @@ mod tests {
                 kind,
                 x: f64::from(x),
                 y: f64::from(y),
+                richness: Default::default(),
             })
             .collect();
         let mut m = Mulberry32::new(7.0);

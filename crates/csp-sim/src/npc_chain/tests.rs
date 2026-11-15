@@ -51,7 +51,7 @@ fn city_with(size: &NpcCitySize, kinds: &[ResourceKind]) -> (WorldState, Terrain
     let at = [(hx + 60.0, hy), (hx, hy + 60.0), (hx + 60.0, hy + 60.0)];
     for (kind, (x, y)) in kinds.iter().zip(at) {
         let id = format!("n-{}", serde_json::to_value(kind).unwrap().as_str().unwrap());
-        world.nodes.push(ResourceNode { id, kind: *kind, x, y });
+        world.nodes.push(ResourceNode { id, kind: *kind, x, y, richness: Default::default() });
         terrain.tiles[tile_index(terrain.size, x as i32, y as i32)] = node_terrain(*kind) as u8;
     }
     (world, terrain, city)

@@ -302,6 +302,9 @@ import {
   RECIPES,
   BATCHES_PER_DAY,
   WORK_OUTPUT_PER_DAY,
+  RICHNESS_FACTOR,
+  FRONTIER_RICH_NODES,
+  RICHER_NODE_REACH,
   carryCapacity,
   walkSpeed,
   workFactor,
@@ -1161,6 +1164,24 @@ export function Wiki() {
           Scripts read a tile’s region in its view: <code>region</code> is its name and{' '}
           <code>regionKind</code> is <code>"heartland"</code>, <code>"frontier"</code> or{' '}
           <code>"island"</code>, both <code>null</code> on water and on tiles you haven’t explored.
+        </p>
+        <p>
+          Every resource node is <strong>poor</strong>, <strong>normal</strong> or{' '}
+          <strong>rich</strong>, from the day it comes into being. A mine, quarry or lumber camp on
+          it makes {num(RICHNESS_FACTOR.poor)}, {num(RICHNESS_FACTOR.normal)} or{' '}
+          {num(RICHNESS_FACTOR.rich)} times as much per worker; workers, skill and Strength count as
+          ever. Heartland nodes are poor. Frontier nodes are normal, but for the{' '}
+          {num(FRONTIER_RICH_NODES)} of each frontier region nearest its passes, land bridges and
+          borders with another frontier region, which are rich. Island nodes are rich. Farms stand
+          on no node and make the same everywhere.
+        </p>
+        <p>
+          A node’s card says its richness once you have explored its tile, with what a worker of
+          average Strength makes there a game day; so does the card of the workplace on it, and its
+          Made a game day list counts it in. Scripts read it as the node’s <code>richness</code>:{' '}
+          <code>"poor"</code>, <code>"normal"</code> or <code>"rich"</code>. NPC cities and the
+          Trade Organization pick the richer of two nodes about as far away: each step of richness
+          counts as {pct(RICHER_NODE_REACH)} less of the way.
         </p>
       </Section>
 

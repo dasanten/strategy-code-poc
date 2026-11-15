@@ -16,7 +16,7 @@ use csp_shared::world::{
 
 use crate::goods_deps::{new_id, update_city_membership};
 use crate::placing::{node_workplace, Ground};
-use crate::queries::building::node_corner;
+use crate::queries::building::{node_corner, node_pick_distance};
 use crate::queries::names::good_of;
 use crate::queries::warehouse::HQ_COIN_WAREHOUSE as HQ_COINS;
 use crate::random::hash_str;
@@ -270,7 +270,10 @@ pub fn nearest_free_node(
         .nodes
         .iter()
         .filter(|n| n.kind == kind)
-        .map(|n| (n, wrap_distance(terrain.size, (n.x as i32, n.y as i32), (cx, cy))))
+        .map(|n| {
+            let d = wrap_distance(terrain.size, (n.x as i32, n.y as i32), (cx, cy));
+            (n, node_pick_distance(d, n))
+        })
         .collect();
     nodes.sort_by(|a, b| a.1.partial_cmp(&b.1).expect("distances"));
     nodes.into_iter().find_map(|(n, _)| node_corner(world, terrain, n))

@@ -5,8 +5,8 @@ use std::collections::HashSet;
 
 use csp_shared::balance::{
     carriage_can_enter, Recipe, BUILD_MATERIALS, BUILD_WORK, MAP_SIZE, MOUNTAIN_ROAD_WORK_FACTOR,
-    RECIPES, TEARDOWN_MATERIALS_RETURNED, TEARDOWN_WORK_SHARE, TRAINING_GROUND_MAX_TRAINEES,
-    WORKPLACE_MAX_WORKERS,
+    RECIPES, RICHER_NODE_REACH, TEARDOWN_MATERIALS_RETURNED, TEARDOWN_WORK_SHARE,
+    TRAINING_GROUND_MAX_TRAINEES, WORKPLACE_MAX_WORKERS,
 };
 use csp_shared::footprint::{covers, footprint_tiles, is_at, may_cover, Placed, FOOTPRINT};
 use csp_shared::terrain::{
@@ -534,11 +534,28 @@ pub fn workplace_good(
         let recipe = recipe_for(workplace.kind, makes.map(good_name))?;
         return good_of(recipe_good(recipe));
     }
-    world
-        .nodes
-        .iter()
-        .find(|n| covers(placed(workplace), n.x as i32, n.y as i32, MAP_SIZE))
-        .map(|n| node_good(n.kind))
+    workplace_node(world, workplace).map(|n| node_good(n.kind))
+}
+
+/// The resource node a node's workplace stands on, if any (`CONTEXT.md`: Resource node).
+pub fn workplace_node<'a>(world: &'a WorldState, workplace: &Building) -> Option<&'a ResourceNode> {
+    if workplace.kind == BuildingKind::Farm || RECIPES.get(kind_name(workplace.kind)).is_some() {
+        return None;
+    }
+    world.nodes.iter().find(|n| covers(placed(workplace), n.x as i32, n.y as i32, MAP_SIZE))
+}
+
+/// What a worker's output at a workplace is multiplied by (`CONTEXT.md`: Richness): its node's
+/// richness factor, or 1 at a workplace on no node.
+pub fn richness_factor(world: &WorldState, workplace: &Building) -> f64 {
+    workplace_node(world, workplace).map_or(1.0, |n| n.richness.factor())
+}
+
+/// How far a node at `distance` counts when an NPC city or the Trade Organization picks one
+/// (`CONTEXT.md`: Richness; ADR 0029): each richness step takes `RICHER_NODE_REACH` of it off, so
+/// of two nodes about as far the richer one wins.
+pub fn node_pick_distance(distance: f64, node: &ResourceNode) -> f64 {
+    distance / (1.0 + RICHER_NODE_REACH).powi(i32::from(node.richness.rank()))
 }
 
 /// The goods a recipe's batch uses up, in its order.

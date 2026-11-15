@@ -216,6 +216,7 @@ fn puts_residents_on_the_farms_first_when_food_runs_short() {
         kind: ResourceKind::Forest,
         x: at.0,
         y: at.1,
+        richness: Default::default(),
     });
     let camp =
         crate::test_support::building("camp", BuildingKind::LumberCamp, Some(&city), at.0, at.1);
