@@ -307,6 +307,8 @@ import {
   RICHER_NODE_REACH,
   VEIN_CREW_DAYS,
   VEIN_STOCK,
+  VEIN_THINNING,
+  VEIN_NEARLY_GONE,
   carryCapacity,
   walkSpeed,
   workFactor,
@@ -1193,6 +1195,15 @@ export function Wiki() {
           {num(VEIN_STOCK.goldOre.rich)}. That is {num(VEIN_CREW_DAYS.normal)} or{' '}
           {num(VEIN_CREW_DAYS.rich)} game days of a full crew of average workers. Poor nodes, forest
           and stone never run dry, so a heartland realm always keeps what its land gives.
+        </p>
+        <p>
+          Whoever works a mine, your realm and your allies, sees how its vein stands on the mine’s
+          card, in words and never as a number: <em>plenty</em> while more than {pct(VEIN_THINNING)}{' '}
+          of what it first held is left, <em>thinning</em> from there, <em>nearly gone</em> at{' '}
+          {pct(VEIN_NEARLY_GONE)} or less. A workplace on a node that never runs dry says so. Your
+          realm log says once when a mine you work turns to thinning and once when it is nearly
+          gone. Others, who work nothing there, see the node and its richness only. Your scripts
+          read the word as a building’s <code>vein</code>.
         </p>
         <p>
           Once a vein runs dry its node is gone for good. The mine stays standing and makes nothing:

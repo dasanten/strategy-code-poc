@@ -114,6 +114,7 @@ import type {
   SeenBuilding,
   SeenCity,
   RealmLabel,
+  VeinWord,
 } from '@csp/shared-types'
 import { covers, FOOTPRINT, footprintTiles } from './shared/footprint.js'
 import { wrap, Terrain, UNEXPLORED } from './shared/terrain.js'
@@ -1136,6 +1137,11 @@ export interface TileThings {
   /** Residents in sight working each building, by building id. */
   workers: (b: Building) => number
   /**
+   * How the veins of the workplaces the realm or an ally works stand, by building id
+   * (`CONTEXT.md`: Running dry); the server sends no others.
+   */
+  veins?: Readonly<Record<string, VeinWord>>
+  /**
    * About how many ticks until one of the Player's residents arrives where they drive
    * (`arrivalTicks`), for a haul route's leg.
    */
@@ -1696,6 +1702,8 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       }
       const makes = live && makesLine(live, t, goodLabels, amounts !== undefined)
       if (makes) lines.push(makes)
+      const vein = t.veins?.[building.id]
+      if (vein) lines.push(veinLine(vein))
       // A finished training ground teaches what its teacher set, and nothing while nobody
       // teaches there (`CONTEXT.md`: Training ground, Teacher).
       if (building.kind === 'trainingGround') lines.push(...trainingLines(building, t))
@@ -2221,6 +2229,22 @@ function makesLine(
   }
   const good = amounts ? undefined : goodMadeAt(b, t)
   return good && `Makes ${label(good)}`
+}
+
+/** How a vein stands, in words (`CONTEXT.md`: Running dry). */
+const VEIN_WORDS: Record<VeinWord, string> = {
+  plenty: 'plenty',
+  thinning: 'thinning',
+  nearlyGone: 'nearly gone',
+  endless: 'never runs dry',
+}
+
+/**
+ * A workplace's line for how the vein under it stands (`CONTEXT.md`: Running dry), for whoever
+ * works it: "Vein: thinning". Never a number.
+ */
+export function veinLine(vein: VeinWord): string {
+  return `Vein: ${VEIN_WORDS[vein]}`
 }
 
 /**

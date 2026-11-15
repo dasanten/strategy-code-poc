@@ -2132,6 +2132,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                   allies: new Set(world.diplomacy.alliance?.members.map((m) => m.realmId)),
                 },
                 workers: (b) => workersHere(world.residents, b),
+                veins: world.veins,
                 // A haul route's arrival only for the Player's own driver.
                 arrivesIn: (r) => {
                   const mine = own.find((o) => o.id === r.id)

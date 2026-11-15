@@ -24,6 +24,7 @@ import type {
   ScriptMemory,
   ScriptRunSeen,
   ServerMessage,
+  VeinWord,
   WorkplaceSettings,
   Waypoint,
 } from '@csp/shared-types'
@@ -92,6 +93,11 @@ export interface ClientWorld {
   firstDay: FirstDay
   /** The realm's Workplace settings (`CONTEXT.md`), by building id. */
   workSettings: Readonly<Record<string, WorkplaceSettings>>
+  /**
+   * How the veins of the workplaces the realm or an ally works stand, by building id (`CONTEXT.md`:
+   * Running dry): words, never a number.
+   */
+  veins: Readonly<Record<string, VeinWord>>
 }
 
 /** Sorts what is in sight by kind, dropping the tag. */
@@ -212,6 +218,7 @@ export function useWorld(onLoggedOut: () => void) {
             waypoints: msg.waypoints,
             firstDay: msg.firstDay,
             workSettings: msg.workSettings,
+            veins: msg.veins,
             ...byKind(entities.values()),
             lastSeen: lastSeenByKind(remembered.values()),
           })
@@ -270,6 +277,7 @@ export function useWorld(onLoggedOut: () => void) {
               goneNodes: msg.goneNodes ? goneNodesOf(msg.goneNodes) : w.goneNodes,
               traderVisits: msg.traderVisits ?? w.traderVisits,
               workSettings: msg.workSettings ?? w.workSettings,
+              veins: msg.veins ?? w.veins,
               waypoints: msg.waypoints ?? w.waypoints,
             }
           })

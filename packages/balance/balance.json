@@ -78,6 +78,8 @@
       "rich": 30240.0
     }
   },
+  "VEIN_THINNING": 0.5,
+  "VEIN_NEARLY_GONE": 0.15,
   "STARTING_SITES_PER_HEARTLAND": 10.0,
   "STARTING_SITE_WALK": {
     "minMinutes": 20.0,
