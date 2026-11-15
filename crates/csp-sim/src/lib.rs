@@ -36,6 +36,7 @@ pub mod gates;
 pub mod goods_deps;
 pub mod goods_made;
 pub mod hauling;
+pub mod heir;
 pub mod holders;
 pub mod horse_grant;
 pub mod horses;

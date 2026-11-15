@@ -37,6 +37,8 @@ export interface ResidentRow {
   id: string
   name: string
   leader: boolean
+  /** They are the realm's heir (`CONTEXT.md`: Heir); absent otherwise. */
+  heir?: true
   /** In whole game years. */
   age: number
   city: string
@@ -89,7 +91,15 @@ export function residentRow(
     tick,
     doing,
     under,
-  }: { city: string; leaderId: string; tick: number; doing: string; under?: string },
+    heirId,
+  }: {
+    city: string
+    leaderId: string
+    heirId?: string | null
+    tick: number
+    doing: string
+    under?: string
+  },
 ): ResidentRow {
   const stats = Object.fromEntries(
     STAT_NAMES.map((s) => [s, Math.round(statValue(r, s, tick) * 10) / 10]),
@@ -98,6 +108,7 @@ export function residentRow(
     id: r.id,
     name: r.name,
     leader: r.id === leaderId,
+    ...(r.id === heirId ? { heir: true as const } : {}),
     age: Math.floor(ageInYears(r, tick)),
     city,
     stats,

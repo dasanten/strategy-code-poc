@@ -39,6 +39,9 @@ pub struct MemberView {
     pub label: RealmLabel,
     pub joined_at: f64,
     pub leaves_at: Option<f64>,
+    /// The name of the member's heir (`CONTEXT.md`: Heir): only allies see it; absent with none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub heir: Option<String>,
 }
 
 /// A part of the alliance's army, with whose it is (`army` of `Diplomacy.alliance`).
@@ -378,6 +381,13 @@ pub fn storages_seen(entities: &[SeenEntity]) -> Vec<Option<&str>> {
         .collect()
 }
 
+/// The name of a realm's heir, if it has one (`CONTEXT.md`: Heir).
+fn heir_name(world: &WorldState, realm_id: &str) -> Option<String> {
+    let realm = world.realms.iter().find(|r| r.id == realm_id)?;
+    let heir_id = realm.heir_id.as_deref()?;
+    world.residents.iter().find(|r| r.id == heir_id).map(|r| r.name.clone())
+}
+
 /// The Player's alliance matters, as their realm sees them, and their open deliveries
 /// (`diplomacyFor`). `seen_realms` are the realms whose residents are in the Player's sight, and
 /// the cities in it.
@@ -410,6 +420,7 @@ pub fn diplomacy_for<'a>(
                 label: label(&m.realm_id),
                 joined_at: m.joined_at,
                 leaves_at: m.leaving.as_ref().map(|l| l.at),
+                heir: heir_name(world, &m.realm_id),
             })
             .collect(),
         invites: own.invites.iter().map(|i| label(i)).collect(),

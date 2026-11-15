@@ -63,7 +63,14 @@ fn create_world() -> WorldState {
 }
 
 fn realm(id: &str, user_id: u64, leader: &str) -> Realm {
-    Realm { id: id.into(), user_id, leader_id: leader.into(), name: None, demands_sent_at: None }
+    Realm {
+        id: id.into(),
+        user_id,
+        leader_id: leader.into(),
+        name: None,
+        demands_sent_at: None,
+        heir_id: None,
+    }
 }
 
 fn building(

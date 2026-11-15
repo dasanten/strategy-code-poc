@@ -8,7 +8,7 @@
 //! the rules of other tickets do on a Leader's death is called through the hooks at the bottom of
 //! the file, each marked with the ticket that ports it.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use csp_shared::balance::{
     DOWN_DAYS, FOOD_PER_DAY, HEAL_DAYS, HOME_FOOD_LOW, HUNGER_DAYS, MAP_SIZE, MAX_HEALTH,
@@ -315,16 +315,29 @@ pub fn die_all(
             world.residents.iter().filter(|r| died.contains(&r.id)).cloned().collect();
         crate::directives::count_soldiers_killed(world, &killed);
     }
+    // Who takes over from each Leader dying: their heir, unless the heir dies with them
+    // (`CONTEXT.md`: Leader death with an heir).
+    let heirs: HashMap<String, String> = world
+        .realms
+        .iter()
+        .filter(|x| died.contains(&x.leader_id))
+        .filter_map(|x| {
+            let heir = crate::heir::living_heir(world, &x.id).filter(|h| !died.contains(h))?;
+            Some((x.leader_id.clone(), heir))
+        })
+        .collect();
     // Every death is written down before any realm ends, so all of them reach the Player.
     for id in died {
         let Some(r) = world.residents.iter().find(|r| &r.id == id) else { continue };
         let leader = world.realms.iter().any(|x| &x.leader_id == id);
+        let heir = heirs.get(id).and_then(|h| world.residents.iter().find(|r| &r.id == h));
         let what = RealmEventWhat::Died {
             resident_id: id.clone(),
             name: r.name.clone(),
             cause,
             leader,
             by: killers.and_then(|k| k(id)),
+            heir: heir.map(|h| h.name.clone()),
         };
         let owner = r.owner.clone();
         record_event(world, owner.as_deref(), what);
@@ -336,8 +349,13 @@ pub fn die_all(
             removed.push(r);
         }
         if let Some(realm) = world.realms.iter().find(|x| &x.leader_id == id).cloned() {
-            end_realm(world, &realm.id, size);
-            ended.push(realm);
+            match heirs.get(id) {
+                Some(heir) => crate::heir::takeover::heir_takes_over(world, &realm.id, heir, size),
+                None => {
+                    end_realm(world, &realm.id, size);
+                    ended.push(realm);
+                }
+            }
         }
     }
     (removed, ended)
@@ -360,6 +378,7 @@ pub fn die(world: &mut WorldState, id: &str) -> Option<Resident> {
     let i = world.residents.iter().position(|x| x.id == id)?;
     let r = world.residents.remove(i);
     leave_caravans(world, &r.id);
+    crate::heir::heir_died(world, &r.id, &r.name);
     // Dead aboard a vessel, what they carried stays in it: their own place there leaves room
     // enough (`CONTEXT.md`: Fighting at a vessel).
     let vessel = r.aboard.as_deref().and_then(|id| world.vessels.iter_mut().find(|v| v.id == id));
@@ -457,21 +476,11 @@ pub fn end_realm(world: &mut WorldState, realm_id: &str, size: i32) {
         if world.residents[i].owner.as_deref() != Some(realm_id) {
             continue;
         }
-        world.residents[i].owner = None;
         if world.residents[i].city_id.is_none() {
             let at = tile_of(&world.residents[i]);
             world.residents[i].city_id = nearest_city(world, &cities, at, size);
         }
-        let city = world.residents[i].city_id.clone().filter(|c| cities.contains(c));
-        if let Some(city) = city {
-            if walk_home_if_away(world, &city, i, size) {
-                continue;
-            }
-        }
-        let r = &mut world.residents[i];
-        if r.order.as_ref().is_some_and(|o| !is_npc_order(o)) {
-            r.order = None;
-        }
+        to_self_managed(world, i, &cities, size);
     }
     for i in 0..world.horses.len() {
         if world.horses[i].realm_id.as_deref() != Some(realm_id) {
@@ -503,7 +512,33 @@ pub fn end_realm(world: &mut WorldState, realm_id: &str, size: i32) {
     }
     // What became of each city goes in the Player's log while the realm is still there to name
     // them.
-    let became: Vec<SelfManagedCity> = cities
+    let became = self_managed_cities(world, &cities);
+    record_event(world, Some(realm_id), RealmEventWhat::SelfManaged { cities: became });
+    world.realms.retain(|x| x.id != realm_id);
+}
+
+/// The resident at `i`, of a realm whose Leader died, now lives in one of `cities`, which just
+/// became self-managed (`CONTEXT.md`: Self-managed city): they belong to no realm; away, they walk
+/// home (`walk_home_if_away`); otherwise they keep only the orders an NPC city gives itself
+/// (`NPC_ORDER_KINDS`). Also for a resident of no city left to go to.
+pub fn to_self_managed(world: &mut WorldState, i: usize, cities: &[String], size: i32) {
+    world.residents[i].owner = None;
+    let city = world.residents[i].city_id.clone().filter(|c| cities.contains(c));
+    if let Some(city) = city {
+        if walk_home_if_away(world, &city, i, size) {
+            return;
+        }
+    }
+    let r = &mut world.residents[i];
+    if r.order.as_ref().is_some_and(|o| !is_npc_order(o)) {
+        r.order = None;
+    }
+}
+
+/// What the realm log says of each of `cities`, just self-managed: its name, town hall and how
+/// many live there.
+pub fn self_managed_cities(world: &WorldState, cities: &[String]) -> Vec<SelfManagedCity> {
+    cities
         .iter()
         .filter_map(|id| {
             let c = world.cities.iter().find(|c| &c.id == id)?;
@@ -518,9 +553,7 @@ pub fn end_realm(world: &mut WorldState, realm_id: &str, size: i32) {
                 residents: residents as f64,
             })
         })
-        .collect();
-    record_event(world, Some(realm_id), RealmEventWhat::SelfManaged { cities: became });
-    world.realms.retain(|x| x.id != realm_id);
+        .collect()
 }
 
 /// Of `cities`, the id of the one whose town hall is nearest a spot (`nearestCity`); `None` when
@@ -829,6 +862,6 @@ use crate::contracts::end_contracts_on_leader_death;
 use crate::demands::lapse_demands_on_leader_death;
 
 #[cfg(test)]
-mod self_managed_tests;
+pub(crate) mod self_managed_tests;
 #[cfg(test)]
 mod tests;

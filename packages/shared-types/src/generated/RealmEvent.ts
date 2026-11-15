@@ -17,6 +17,7 @@ import type { DirectOfferWhat } from "./DirectOfferWhat.js";
 import type { DroppedFieldScript } from "./DroppedFieldScript.js";
 import type { EndedWithHq } from "./EndedWithHq.js";
 import type { Good } from "./Good.js";
+import type { HeirLapse } from "./HeirLapse.js";
 import type { HorsesWhere } from "./HorsesWhere.js";
 import type { OfferEnd } from "./OfferEnd.js";
 import type { PricedGood } from "./PricedGood.js";
@@ -38,7 +39,12 @@ import type { VeinWord } from "./VeinWord.js";
  * The TypeScript twin is `RealmEventWhat & { seq, tick, userId }`, so ts-rs describes it through
  * the flattened shape `RealmEventShape` (the serde impls below are hand-written).
  */
-export type RealmEvent = { seq: number, tick: number, userId: number, } & ({ "kind": "hungry", residentId: string, name: string, } | { "kind": "down", residentId: string, name: string, until: number, } | { "kind": "woke", residentId: string, name: string, by: string, } | { "kind": "died", residentId: string, name: string, cause: DeathCause, leader: boolean, by?: string, } | { "kind": "fight", residentId: string, name: string, otherId: string, other: string, attacker: boolean, } | { "kind": "crimeKnown", crimeId: string, crime: CrimeKind, at: number, x: number, y: number, culpritId: string, culprit: string, culpritOrg: string, victim?: string, goods?: { [key in Good]?: number }, carriage?: true, horse?: string, 
+export type RealmEvent = { seq: number, tick: number, userId: number, } & ({ "kind": "hungry", residentId: string, name: string, } | { "kind": "down", residentId: string, name: string, until: number, } | { "kind": "woke", residentId: string, name: string, by: string, } | { "kind": "died", residentId: string, name: string, cause: DeathCause, leader: boolean, by?: string, 
+/**
+ * The heir who takes over the realm of a Leader who died (`CONTEXT.md`: Leader death
+ * with an heir).
+ */
+heir?: string, } | { "kind": "fight", residentId: string, name: string, otherId: string, other: string, attacker: boolean, } | { "kind": "crimeKnown", crimeId: string, crime: CrimeKind, at: number, x: number, y: number, culpritId: string, culprit: string, culpritOrg: string, victim?: string, goods?: { [key in Good]?: number }, carriage?: true, horse?: string, 
 /**
  * A boat, stolen like a carriage (`CONTEXT.md`: Stealing a carriage or horse).
  */
@@ -66,7 +72,7 @@ ship?: true, goods?: { [key in Good]?: number }, } | { "kind": "punished", what:
 /**
  * The heartland the starting city stands in, if it stands in one.
  */
-heartland?: string, } | { "kind": "leaderHandedOver", fromId: string, from: string, toId: string, to: string, cityId: string, city: string, x: number, y: number, } | { "kind": "foodSpoiled", units: number, } | { "kind": "born", residentId: string, name: string, parents: [string, string], } | { "kind": "grownUp", residentId: string, name: string, } | { "kind": "horseDied", horseId: string, name?: string, } | { "kind": "horseDown", horseId: string, name: string, until: number, } | { "kind": "horseHungry", horseId: string, residentId: string, name: string, horseName?: string, } | { "kind": "horsesGranted", horseIds: Array<string>, where: HorsesWhere, city?: string, x: number, y: number, } | { "kind": "horsesClaimed", horseIds: Array<string>, where: HorsesWhere, city?: string, x: number, y: number, } | { "kind": "foaled", horseId: string, stableId: string, name?: string, } | { "kind": "allianceInvited", allianceId: string, name: string, } | { "kind": "allianceJoined", allianceId: string, name: string, realmId: string, realm: string, city?: true, } | { "kind": "allianceLeft", allianceId: string, name: string, realmId: string, realm: string, why: AllianceLeftWhy, city?: true, } | { "kind": "allianceDeclined", allianceId: string, name: string, realmId: string, realm: string, } | { "kind": "allianceLeader", allianceId: string, name: string, realmId: string, realm: string, } | { "kind": "scriptError", name: string, 
+heartland?: string, } | { "kind": "heirTookOver", heirId: string, heir: string, cityId: string, city: string, x: number, y: number, cities: Array<SelfManagedCity>, } | { "kind": "heirLapsed", heirId: string, heir: string, why: HeirLapse, } | { "kind": "leaderHandedOver", fromId: string, from: string, toId: string, to: string, cityId: string, city: string, x: number, y: number, } | { "kind": "foodSpoiled", units: number, } | { "kind": "born", residentId: string, name: string, parents: [string, string], } | { "kind": "grownUp", residentId: string, name: string, } | { "kind": "horseDied", horseId: string, name?: string, } | { "kind": "horseDown", horseId: string, name: string, until: number, } | { "kind": "horseHungry", horseId: string, residentId: string, name: string, horseName?: string, } | { "kind": "horsesGranted", horseIds: Array<string>, where: HorsesWhere, city?: string, x: number, y: number, } | { "kind": "horsesClaimed", horseIds: Array<string>, where: HorsesWhere, city?: string, x: number, y: number, } | { "kind": "foaled", horseId: string, stableId: string, name?: string, } | { "kind": "allianceInvited", allianceId: string, name: string, } | { "kind": "allianceJoined", allianceId: string, name: string, realmId: string, realm: string, city?: true, } | { "kind": "allianceLeft", allianceId: string, name: string, realmId: string, realm: string, why: AllianceLeftWhy, city?: true, } | { "kind": "allianceDeclined", allianceId: string, name: string, realmId: string, realm: string, } | { "kind": "allianceLeader", allianceId: string, name: string, realmId: string, realm: string, } | { "kind": "scriptError", name: string, 
 /**
  * A script id (see `RunningScript::script_id`).
  */

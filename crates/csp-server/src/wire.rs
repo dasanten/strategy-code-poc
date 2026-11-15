@@ -27,6 +27,8 @@ pub struct WelcomeHome {
     pub leader_id: String,
     /// The realm's own name, null while it has none.
     pub realm_name: Option<String>,
+    /// The realm's heir (`CONTEXT.md`: Heir), null while it has none.
+    pub heir_id: Option<String>,
     pub city_id: Option<String>,
     pub x: f64,
     pub y: f64,
@@ -107,6 +109,9 @@ pub enum ServerMessage {
         leader_id: Option<String>,
         #[ts(optional)]
         realm_name: Option<String>,
+        /// The realm's heir once it changed: their id, or null once it has none.
+        #[ts(optional)]
+        heir_id: Option<Option<String>>,
         #[ts(optional)]
         horse_offer: Option<bool>,
         /// All of `gone_nodes` again, once the Player learns of another.
