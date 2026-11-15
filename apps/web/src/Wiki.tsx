@@ -191,6 +191,7 @@ import {
   NPC_PLAN_TICKS,
   NPC_SURPLUS_CAP,
   NPC_SOLDIER_SHARE,
+  NPC_STEEL_KIT,
   NPC_WAR_CHEST_PER_RESIDENT,
   NPC_TRADE,
   OWN_FOOD,
@@ -1119,6 +1120,20 @@ export function Wiki() {
             ))}
           </tbody>
         </table>
+        <p>
+          <strong>NPC cities and Steel.</strong> An NPC city that knows of a coal node wants a{' '}
+          {NPC_STEEL_KIT.map((g) => goodName(g as Good).toLowerCase()).join(', ')} for each of its
+          soldiers, in that order, instead of a spear. So it keeps them, their Steel and Wood, and
+          the Iron and Coal for that Steel in its reserve, mines Coal, sets every second smelter it
+          builds to Steel, forges the steel gear and arms its soldiers with it: a soldier fetches each
+          piece from its storage once it holds one and puts back the spear it outdoes. A city with no
+          coal node in reach, as in a heartland, stays on the iron spear. NPC cities price Coal,
+          Steel and the steel gear like any good and sell what they hold above their reserve, and
+          lent residents take the best gear of the surplus, steel first. The Trade Organization’s
+          warehouses trade the steel gear too (a floor of {num(WAREHOUSE_FLOOR.steelSword ?? 0)} each
+          at a post), and its HQ and posts arm their soldiers with steel as far as their warehouse
+          holds it, iron otherwise.
+        </p>
         <p>
           Each heartland has {num(STARTING_SITES_PER_HEARTLAND)} <strong>starting sites</strong>, a
           walk of {num(STARTING_SITE_WALK.minMinutes)} to {num(STARTING_SITE_WALK.maxMinutes)} real
@@ -2647,7 +2662,8 @@ export function Wiki() {
           An NPC city keeps a reserve: {days(NPC_TRADE.reserveFoodDays)} of Food for everyone; the
           materials for a house and {num(NPC_TRADE.reserveWallStretches)} tiles of wall; a{' '}
           {GOOD_LABELS[NPC_SMITHY_WEAPON].toLowerCase()} for each soldier it keeps and hasn't armed
-          yet ({pct(NPC_SOLDIER_SHARE)} of its adults), with the Iron and Wood to forge them; and{' '}
+          yet ({pct(NPC_SOLDIER_SHARE)} of its adults), with the Iron and Wood to forge them (a city
+          that knows of a coal node keeps the steel gear instead, under Coal); and{' '}
           {num(NPC_WAR_CHEST_PER_RESIDENT)} coins a resident as its war chest. Coins below the war
           chest count as short only for a city that can earn them: one with a mint or gold mine,
           Gold ore in its storage, a gold node it knows of, a Trade Org warehouse within{' '}

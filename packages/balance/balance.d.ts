@@ -214,6 +214,7 @@ export interface Balance {
   readonly NPC_FOOD_SHORT_DAYS: number
   readonly WORK_FOOD_KEPT: number
   readonly NPC_SOLDIER_SHARE: number
+  readonly NPC_STEEL_KIT: string[]
   readonly NPC_SOLDIERS_ON_HALL: number
   readonly NPC_SOLDIERS_AT_GATE: number
   readonly NPC_POST_AROUND_HALL: number

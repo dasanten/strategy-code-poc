@@ -464,7 +464,7 @@ pub fn chain_project(
         return None;
     }
     let storage = chain_store(world, city);
-    if let Some(input) = chain_input(good) {
+    if let Some(input) = chain_input(world, city, good) {
         for (g, n) in &input {
             if held_in(storage.and_then(|s| s.stock.as_ref()), *g) >= *n || makes(world, city, *g) {
                 continue;
@@ -475,7 +475,7 @@ pub fn chain_project(
     if makes(world, city, good) {
         return None;
     }
-    if let Some(kind) = processed_by(good) {
+    if let Some(kind) = processed_by(world, city, good) {
         let hall = if city.trade_org == Some(TradeOrgCity::Hq) {
             crate::queries::city::town_hall_of(world, city)
         } else {
@@ -711,7 +711,7 @@ fn another_workplace(
         if !seen.insert(good) {
             return None;
         }
-        if let Some(input) = chain_input(good).filter(|i| !holds_batch(stock, i)) {
+        if let Some(input) = chain_input(world, city, good).filter(|i| !holds_batch(stock, i)) {
             let lacking: Vec<Good> =
                 input.iter().filter(|(g, n)| held_in(stock, **g) < **n).map(|(g, _)| *g).collect();
             return lacking.into_iter().find_map(|g| full_good(world, city, own, stock, g, seen));
@@ -733,7 +733,7 @@ fn another_workplace(
             }
             continue;
         }
-        if let Some(kind) = processed_by(good) {
+        if let Some(kind) = processed_by(world, city, good) {
             if let Some(t) = house_tile(world, city, home, terrain, rings, kind) {
                 return Some(build(kind, t));
             }

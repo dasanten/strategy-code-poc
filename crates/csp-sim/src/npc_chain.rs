@@ -12,38 +12,83 @@ use csp_shared::world::{Building, BuildingKind, City, CityProject, Good, Stock, 
 
 use crate::npc_coins::earns_coins;
 use crate::queries::building::{
-    build_materials, building_at, materials_needed, max_workers, recipe_for, recipe_input,
-    workplace_good,
+    build_materials, building_at, has_choice, materials_needed, max_workers, recipe_for,
+    recipe_input, workplace_good,
 };
 use crate::queries::names::{good_name, held, held_in};
-use crate::queries::npc_trade::{npc_city_stock, npc_needs_scale, npc_reserve, NPC_SMITHY_WEAPON};
+use crate::queries::npc_trade::{
+    npc_city_stock, npc_makes_steel, npc_needs_scale, npc_reserve, npc_smithy_good,
+    NPC_SMITHY_WEAPON,
+};
 use crate::queries::warehouse::{stock_floor, warehouse_keeps};
 
-/// The workplace that processes goods into one the chain wants, by that good (`PROCESSED_BY`).
-pub fn processed_by(good: Good) -> Option<BuildingKind> {
+/// The workplace that processes goods into one the chain wants, by that good (`PROCESSED_BY`):
+/// for a city that goes for Steel (`npc_makes_steel`) also Steel at a smelter and the steel kit
+/// at a smithy.
+pub fn processed_by(world: &WorldState, city: &City, good: Good) -> Option<BuildingKind> {
     match good {
         Good::Iron => Some(BuildingKind::Smelter),
         Good::Coins => Some(BuildingKind::Mint),
         g if g == NPC_SMITHY_WEAPON => Some(BuildingKind::Smithy),
+        Good::Steel if npc_makes_steel(world, city) => Some(BuildingKind::Smelter),
+        Good::SteelSword | Good::SteelArmour | Good::SteelShield
+            if npc_makes_steel(world, city) =>
+        {
+            Some(BuildingKind::Smithy)
+        }
         _ => None,
     }
 }
 
 /// What one batch at the workplace that makes `good` uses up, when a workplace processes it
-/// (`chainInput`): 2 Iron ore for Iron, Iron and Wood for a spear. `None` for a good dug, cut or
-/// farmed.
-pub fn chain_input(good: Good) -> Option<Stock> {
-    let kind = processed_by(good)?;
+/// (`chainInput`): 2 Iron ore for Iron, Iron and Wood for a spear, Iron and Coal for Steel. `None`
+/// for a good dug, cut or farmed.
+pub fn chain_input(world: &WorldState, city: &City, good: Good) -> Option<Stock> {
+    let kind = processed_by(world, city, good)?;
     recipe_for(kind, Some(good_name(good))).map(|r| recipe_input(r).into_iter().collect())
 }
 
+/// The city a workplace works for (`workplaceCity`): its own by `cityId`, or the one with it among
+/// its `workplaceIds`.
+fn workplace_city<'w>(world: &'w WorldState, b: &Building) -> Option<&'w City> {
+    match &b.city_id {
+        Some(id) => world.cities.iter().find(|c| &c.id == id),
+        None => world.cities.iter().find(|c| c.workplace_ids.iter().flatten().any(|w| *w == b.id)),
+    }
+}
+
 /// What a workplace makes for an NPC city (`chainGood`): its good (`workplace_good`); a smithy,
-/// its weapon.
+/// what its city forges (`npc_smithy_good`). Of the smelters of a city that goes for Steel, every
+/// second one in the order they stand smelts Steel, the others Iron.
 pub fn chain_good(world: &WorldState, b: &Building) -> Option<Good> {
-    if b.kind == BuildingKind::Smithy {
-        Some(NPC_SMITHY_WEAPON)
+    match b.kind {
+        BuildingKind::Smithy => {
+            Some(workplace_city(world, b).map_or(NPC_SMITHY_WEAPON, |c| npc_smithy_good(world, c)))
+        }
+        BuildingKind::Smelter => {
+            let Some(city) = workplace_city(world, b) else { return Some(Good::Iron) };
+            let smelters: Vec<&Building> = own_workplaces(world, city)
+                .into_iter()
+                .filter(|w| w.kind == BuildingKind::Smelter)
+                .collect();
+            let nth = smelters.iter().position(|w| w.id == b.id).unwrap_or(0);
+            Some(if nth % 2 == 1 && npc_makes_steel(world, city) {
+                Good::Steel
+            } else {
+                Good::Iron
+            })
+        }
+        _ => workplace_good(world, b, None),
+    }
+}
+
+/// What a worker at one of a city's workplaces is told to make (`chainMakes`): its chain good
+/// where the workplace has a choice (`has_choice`), else nothing.
+pub fn chain_makes(world: &WorldState, b: &Building) -> Option<Good> {
+    if has_choice(b.kind) {
+        chain_good(world, b)
     } else {
-        workplace_good(world, b, None)
+        None
     }
 }
 
@@ -157,6 +202,7 @@ pub fn short_goods(
 /// with no cap, or a workplace that processes goods while `storage` holds a batch of its input
 /// only by eating into the reserve.
 pub struct SurplusWork {
+    city_id: String,
     stock: Stock,
     reserve: Stock,
     steps: f64,
@@ -173,14 +219,15 @@ impl SurplusWork {
         for (good, n) in storage.and_then(|s| s.stock.as_ref()).into_iter().flatten() {
             spare.insert(*good, n - held(&reserve, *good));
         }
-        SurplusWork { stock, reserve, steps, spare }
+        SurplusWork { city_id: city.id.clone(), stock, reserve, steps, spare }
     }
 
     /// How full a workplace's good's cap is, if it is to be worked for surplus.
     pub fn full(&self, world: &WorldState, place: &Building) -> Option<f64> {
         let good = chain_good(world, place)?;
         let cap = NPC_SURPLUS_CAP.get(good_name(good)).filter(|c| *c != 0.0)?;
-        if let Some(input) = chain_input(good) {
+        let city = world.cities.iter().find(|c| c.id == self.city_id)?;
+        if let Some(input) = chain_input(world, city, good) {
             if !holds_batch(Some(&self.spare), &input) {
                 return None;
             }
@@ -276,6 +323,34 @@ pub fn warehouse_for<'w>(
     trade_org_warehouses(world, city)
         .into_iter()
         .find(|b| warehouse_keeps(world, b).iter().any(|g| kept.contains(g)))
+}
+
+/// Invariant `steel-only-with-coal` (`CONTEXT.md`: NPC reserve; ADR 0004): an NPC city keeps Steel,
+/// Coal and the steel kit in its reserve only while it knows of a coal node (`npc_makes_steel`), and
+/// then keeps no spear.
+pub fn steel_only_with_coal(world: &WorldState) -> Vec<crate::sight::InvariantViolation> {
+    let steel = [Good::Steel, Good::Coal, Good::SteelSword, Good::SteelArmour, Good::SteelShield];
+    let mut out = Vec::new();
+    for city in world.cities.iter().filter(|c| c.realm_id.is_none() && c.trade_org.is_none()) {
+        let reserve = npc_reserve(world, city);
+        let keeps = |g: &Good| held(&reserve, *g) > 0.0;
+        let makes_steel = npc_makes_steel(world, city);
+        let wrong = if makes_steel {
+            keeps(&NPC_SMITHY_WEAPON).then(|| "goes for Steel but keeps spears".to_string())
+        } else {
+            steel.iter().find(|g| keeps(g)).map(|g| {
+                format!("knows of no coal node but keeps {} in its reserve", good_name(*g))
+            })
+        };
+        if let Some(message) = wrong {
+            out.push(crate::sight::InvariantViolation {
+                invariant: "steel-only-with-coal".into(),
+                message: format!("{} {message}", city.id),
+                entity_ids: vec![city.id.clone()],
+            });
+        }
+    }
+    out
 }
 
 #[cfg(test)]
