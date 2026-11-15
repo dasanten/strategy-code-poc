@@ -114,9 +114,16 @@ pub fn own_workplaces<'w>(world: &'w WorldState, city: &City) -> Vec<&'w Buildin
     own_workplace_indices(world, city).into_iter().map(|i| &world.buildings[i]).collect()
 }
 
-/// Whether one of the city's workplaces, finished or not, makes a good (`makes`).
+/// Whether one of the city's workplaces, finished or not, makes a good (`makes`). A smithy forges
+/// every piece of its city's kit in turn (`npc_smithy_good`), so it makes each of them.
 pub fn makes(world: &WorldState, city: &City, good: Good) -> bool {
-    own_workplaces(world, city).iter().any(|b| chain_good(world, b) == Some(good))
+    let own = own_workplaces(world, city);
+    if processed_by(world, city, good) == Some(BuildingKind::Smithy)
+        && own.iter().any(|b| b.kind == BuildingKind::Smithy)
+    {
+        return true;
+    }
+    own.iter().any(|b| chain_good(world, b) == Some(good))
 }
 
 /// Whether a stock holds the goods of one batch (`holdsBatch`).

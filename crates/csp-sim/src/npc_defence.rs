@@ -533,35 +533,33 @@ fn upgrade_kit(world: &WorldState, city: &City) -> Vec<Good> {
     }
 }
 
-/// What a resident carries that a better piece of the same kind they carry outdoes (`outdone`):
-/// every weapon but their best, and of each kind of protection every piece but the best.
-fn outdone(carried: &Stock) -> Stock {
-    let mut out = Stock::new();
-    let best = best_weapon(carried);
-    for w in WEAPONS.iter().filter_map(|w| good_of(w)) {
-        if Some(w) != best && held(carried, w) > 0.0 {
-            out.insert(w, held(carried, w));
-        }
-    }
+/// What a soldier carries beyond their gear and the Food and Coins they keep (`spare`): every
+/// weapon but one of their best, of each kind of protection every piece but one of the best, and
+/// any other goods, such as the Steel a smith who took up arms still carries.
+fn spare(carried: &Stock) -> Stock {
+    let mut keep: Vec<Good> = best_weapon(carried).into_iter().collect();
     for kind in PROTECTION_KINDS {
-        let mut have: Vec<(Good, f64)> = kind
+        let best = kind
             .iter()
             .filter_map(|p| good_of(p).map(|g| (g, PROTECTION_DEFENCE.get(p).unwrap_or(0.0))))
             .filter(|(g, _)| held(carried, *g) > 0.0)
-            .collect();
-        have.sort_by(|a, b| b.1.total_cmp(&a.1));
-        for (g, _) in have.into_iter().skip(1) {
-            out.insert(g, held(carried, g));
-        }
+            .max_by(|a, b| a.1.total_cmp(&b.1));
+        keep.extend(best.map(|(g, _)| g));
     }
-    out
+    carried
+        .iter()
+        .filter(|(g, n)| **n > 0.0 && **g != Good::Food && **g != Good::Coins)
+        .map(|(g, n)| (*g, if keep.contains(g) { n - 1.0 } else { *n }))
+        .filter(|(_, n)| *n > 0.0)
+        .collect()
 }
 
 /// A city's soldiers arm themselves with steel as far as its store holds it (`upgradeSoldiers`,
 /// `CONTEXT.md`: NPC reserve, Trade Org army): a soldier at the store with nothing to do puts back
-/// what a better piece they carry outdoes; otherwise one soldier at a time fetches the first piece
-/// of the city's steel kit (`upgrade_kit`) they lack that the store holds. Only orders a Player
-/// could give (ADR 0002).
+/// what they carry spare (`spare`: what a better piece outdoes, more than one of a piece, other
+/// goods); one with something spare elsewhere goes there to, one at a time; otherwise one soldier at
+/// a time fetches the first piece of the city's steel kit (`upgrade_kit`) they lack that the store
+/// holds. Only orders a Player could give (ADR 0002).
 fn upgrade_soldiers(
     world: &mut WorldState,
     city: &City,
@@ -574,27 +572,36 @@ fn upgrade_soldiers(
         return;
     }
     let sb = &world.buildings[st];
-    let free = |i: usize| {
-        let r = &world.residents[i];
-        r.script.is_none()
-            && match &r.order {
-                None => true,
-                Some(ResidentOrder::WalkTo(o)) => o.target.x == sb.x && o.target.y == sb.y,
-                _ => false,
-            }
+    let (sx, sy) = (sb.x, sb.y);
+    let to_store = |o: &Option<ResidentOrder>| matches!(o, Some(ResidentOrder::WalkTo(w)) if w.target.x == sx && w.target.y == sy);
+    let free: Vec<usize> = soldiers
+        .iter()
+        .copied()
+        .filter(|&i| {
+            let r = &world.residents[i];
+            r.script.is_none() && (r.order.is_none() || to_store(&r.order))
+        })
+        .collect();
+    let at_store = |world: &WorldState, i: usize| {
+        is_at(tile(world, i), placed(&world.buildings[st]), MAP_SIZE)
     };
-    let free: Vec<usize> = soldiers.iter().copied().filter(|&i| free(i)).collect();
     for &i in &free {
-        let r = &world.residents[i];
-        if r.order.is_some() || !is_at(tile(world, i), placed(sb), MAP_SIZE) {
+        if world.residents[i].order.is_some() || !at_store(world, i) {
             continue;
         }
-        let put = outdone(&r.carried);
+        let put = spare(&world.residents[i].carried);
         if !put.is_empty() {
-            let to = GoodsSpot::Storage { storage_id: sb.id.clone() };
+            let to = GoodsSpot::Storage { storage_id: world.buildings[st].id.clone() };
             world.residents[i].order = Some(ResidentOrder::Drop(DropOrder { to, goods: put }));
             return;
         }
+    }
+    if free.iter().any(|&i| to_store(&world.residents[i].order)) {
+        return;
+    }
+    if let Some(&i) = free.iter().find(|&&i| !spare(&world.residents[i].carried).is_empty()) {
+        walk_to(&mut world.residents[i], (sx, sy));
+        return;
     }
     let stock = world.buildings[st].stock.clone();
     for g in kit {

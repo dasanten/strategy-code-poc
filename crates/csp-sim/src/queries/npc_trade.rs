@@ -215,6 +215,11 @@ pub fn npc_reserve(world: &WorldState, city: &City) -> Stock {
         if let Some(recipe) = recipe_for(BuildingKind::Smelter, Some(good_name(Good::Steel))) {
             add(&mut reserve, recipe.input.0.iter().copied(), smelt);
         }
+        // And the Iron ore for that Iron, so its miners count as working for a short good.
+        let iron = held(&reserve, Good::Iron) - held(&stock, Good::Iron);
+        if let Some(recipe) = recipe_for(BuildingKind::Smelter, Some(good_name(Good::Iron))) {
+            add(&mut reserve, recipe.input.0.iter().copied(), iron);
+        }
     } else if unarmed > 0.0 {
         reserve.insert(NPC_SMITHY_WEAPON, unarmed);
         let stock = npc_city_stock(world, city);

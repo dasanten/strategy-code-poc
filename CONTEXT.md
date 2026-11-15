@@ -534,7 +534,8 @@ The shared language of the game. Domain terms only — no implementation details
   stable; the stable's Food counts); Wood and Stone for its next house and some wall, more as it grows; weapons
   for the soldiers it keeps by its size, and the Iron and Wood to forge them (a city that knows of a
   coal node wants a steel Sword, Armour and Shield for each soldier instead of a spear, forged in that
-  order, and keeps them, their Steel and Wood, and the Iron and Coal for that Steel: it mines Coal,
+  order, and keeps them, their Steel and Wood, the Iron and Coal for that Steel and the Iron ore for
+  that Iron: it mines Coal,
   sets every second smelter it has to Steel and forges steel; its soldiers fetch each piece from its
   storage once it holds one and put back what it outdoes. One with no coal node in reach, as in a
   heartland, stays on iron); Coins as its war

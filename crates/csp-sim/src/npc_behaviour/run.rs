@@ -322,6 +322,17 @@ fn run_city(
             world.city_plans.get(city_id)?.project.clone()
         };
 
+    // Where its soldiers fetch and put back their gear (`upgrade_soldiers`).
+    let stores: Vec<(f64, f64)> = world
+        .buildings
+        .iter()
+        .filter(|b| {
+            matches!(b.kind, BuildingKind::Storage | BuildingKind::Warehouse)
+                && b.site.is_none()
+                && b.city_id.as_deref() == Some(city_id)
+        })
+        .map(|b| (b.x, b.y))
+        .collect();
     for &i in &adults {
         let rid = world.residents[i].id.clone();
         let job = jobs.get(&rid).cloned();
@@ -329,7 +340,7 @@ fn run_city(
         // The pass just now gave a soldier another post: a walk to their old one ends here.
         if passed && has_posts && armed {
             let post = post_of(world, &city, &adults, size, terrain, &mut posts, &rid);
-            if walking_off_post(&world.residents[i], post.as_ref(), size) {
+            if walking_off_post(&world.residents[i], post.as_ref(), &stores, size) {
                 world.residents[i].order = None;
             }
         }
@@ -611,16 +622,21 @@ fn stand_post(
     }
 }
 
-/// Whether a soldier is on a walk that doesn't end on their post, with no load to put away first
-/// (`walkingOffPost`).
+/// Whether a soldier is on a walk that doesn't end on their post or at one of the city's `stores`,
+/// with no load to put away first (`walkingOffPost`).
 fn walking_off_post(
     r: &csp_shared::world::Resident,
     post: Option<&SoldierPost>,
+    stores: &[(f64, f64)],
     size: i32,
 ) -> bool {
     let (Some(ResidentOrder::WalkTo(o)), None, Some(post)) = (&r.order, &r.script, post) else {
         return false;
     };
+    // A walk to the city's storage, to fetch or put back gear, goes on.
+    if stores.contains(&(o.target.x, o.target.y)) {
+        return false;
+    }
     let load = haul(r, None);
     !post.tiles.contains(&tile_index(size, o.target.x as i32, o.target.y as i32))
         && load.as_ref().is_none_or(only_food)

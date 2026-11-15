@@ -300,6 +300,8 @@ fn a_town_that_knows_of_a_coal_node_wants_the_steel_kit_and_builds_mine_smelters
     assert_eq!(held_good(&reserve, Good::Spear), 0.0);
     assert_eq!(held_good(&reserve, Good::Steel), 10.0 * target);
     assert!(held_good(&reserve, Good::Iron) >= 10.0 * target);
+    // And the Iron ore for that Iron, two a unit.
+    assert!(held_good(&reserve, Good::IronOre) >= 20.0 * target);
     assert_eq!(held_good(&reserve, Good::Coal), 10.0 * target);
     let short = short_goods(&world, c, terrain.size, None);
     for g in [Good::SteelSword, Good::Steel, Good::Coal] {
@@ -438,13 +440,16 @@ fn a_heartland_villages_soldiers_keep_their_spears_by_steel_in_its_storage() {
     }
 }
 
-/// A frontier town with a coal node, its forest, ore and coal in reach, runs from nothing until
+/// A frontier town with a coal node, its forest, ore and coal in reach and Stone in store, runs until
 /// its soldiers carry steel swords: it builds mines, smelters and a smithy on the way.
 #[test]
 #[ignore = "a long chain run, like the iron one above; see #1132"]
 fn a_frontier_town_with_a_coal_node_builds_the_chain_and_arms_its_soldiers_in_steel() {
     use ResourceKind::{Coal, Forest, IronOre};
     let (mut world, terrain, city) = city_with(&NPC_TOWN, &[Forest, IronOre, Coal]);
+    // It has no stone node here (three nodes at most): Stone for its mines and smelters in store.
+    let storage = storage_index(&world, &city);
+    world.buildings[storage].stock.get_or_insert_with(Stock::new).insert(Good::Stone, 300.0);
     let steel_armed = |w: &WorldState| {
         let target = soldiers(w, &city).1;
         let n = city_residents(w, &city)
