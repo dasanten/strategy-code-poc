@@ -3056,6 +3056,26 @@
       "returns": "string"
     },
     {
+      "name": "equip",
+      "is": "action",
+      "params": [
+        "good"
+      ],
+      "cost": 10,
+      "description": "Swap a weapon, shield or armour I carry, like \"sword\", into the slot it fits; what was there stays carried. It takes a few ticks, and I strike no blows meanwhile.",
+      "returns": "string"
+    },
+    {
+      "name": "takeOff",
+      "is": "action",
+      "params": [
+        "slot"
+      ],
+      "cost": 10,
+      "description": "Take off what I have in a slot, \"weapon\", \"shield\" or \"armour\"; it stays carried, and the slot stays empty until I pick up more that fits it. It takes a few ticks, and I strike no blows meanwhile.",
+      "returns": "string"
+    },
+    {
       "name": "climb",
       "is": "action",
       "params": [

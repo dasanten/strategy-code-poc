@@ -573,7 +573,9 @@ fn off_carriage(world: &mut WorldState, ti: usize) {
 /// rows on and a passenger stays aboard a boat being rowed.
 fn react(world: &mut WorldState, ti: usize, ai: usize) {
     let t = &world.residents[ti];
-    if matches!(t.order, Some(ResidentOrder::Climb(_))) {
+    // A climber climbs on, and someone swapping gear finishes the swap first (`CONTEXT.md`:
+    // Equipment): they strike no blows meanwhile.
+    if matches!(t.order, Some(ResidentOrder::Climb(_) | ResidentOrder::Equip(_))) {
         return;
     }
     if defends_by_script(world, t) {
