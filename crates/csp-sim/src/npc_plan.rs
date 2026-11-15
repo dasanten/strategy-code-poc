@@ -273,7 +273,10 @@ pub fn plan_city(
     for &i in &adults {
         let r = &world.residents[i];
         let id = r.id.clone();
-        let at = workplace_of(r);
+        // Whoever works where the vein ran dry is a spare hand again (`CONTEXT.md`: Running dry).
+        let at = workplace_of(r).filter(|at| {
+            !world.buildings.iter().any(|b| &b.id == at && crate::npc_growth::on_dry_node(world, b))
+        });
         let feed = feed_job_kept(world, &city, r);
         if traders.contains(&id) {
             jobs.insert(id, job_at(CityJobKind::Trade, None));
@@ -840,8 +843,8 @@ pub fn trade_org_sends_no_one(world: &WorldState) -> Vec<InvariantViolation> {
 mod invariants;
 pub(crate) use invariants::violation;
 pub use invariants::{
-    city_plans_sound, npc_farmers_kept, npc_spare_hands_work, npc_surplus_capped,
-    npc_workplaces_bounded,
+    city_plans_sound, npc_farmers_kept, npc_leaves_dry_workplaces, npc_spare_hands_work,
+    npc_surplus_capped, npc_workplaces_bounded,
 };
 
 #[cfg(test)]

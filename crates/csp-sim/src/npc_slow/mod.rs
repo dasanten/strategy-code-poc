@@ -14,6 +14,7 @@ use crate::walking::Walking;
 
 mod big_city;
 pub(crate) mod big_city_fixture;
+mod dry_mine;
 mod far_nodes;
 mod inner_wall;
 mod roads;

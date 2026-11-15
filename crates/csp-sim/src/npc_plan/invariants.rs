@@ -293,3 +293,45 @@ pub fn npc_workplaces_bounded(world: &WorldState) -> Vec<InvariantViolation> {
     }
     out
 }
+
+/// Invariant `npc-leaves-dry-workplaces` (`CONTEXT.md`: Running dry, NPC city; ADR 0004): no plan
+/// made since a node ran dry gives anyone a job at the workplace that stands on it.
+pub fn npc_leaves_dry_workplaces(world: &WorldState) -> Vec<InvariantViolation> {
+    const NAME: &str = "npc-leaves-dry-workplaces";
+    let mut out = Vec::new();
+    if world.dry_nodes.is_empty() {
+        return out;
+    }
+    for (city_id, plan) in &world.city_plans {
+        for (id, job) in &plan.jobs {
+            let Some(b) = job.building_id.as_ref().and_then(|bid| {
+                world
+                    .buildings
+                    .iter()
+                    .find(|b| &b.id == bid && crate::npc_growth::on_dry_node(world, b))
+            }) else {
+                continue;
+            };
+            let dry = world.dry_nodes.iter().find(|d| {
+                (d.at as f64) < plan.planned_at
+                    && csp_shared::footprint::covers(
+                        crate::queries::names::placed(b),
+                        d.x as i32,
+                        d.y as i32,
+                        MAP_SIZE,
+                    )
+            });
+            if let Some(d) = dry {
+                out.push(violation(
+                    NAME,
+                    format!(
+                        "{city_id}'s plan puts {id} to work at {}, whose node {} ran dry",
+                        b.id, d.id
+                    ),
+                    vec![city_id.clone(), id.clone(), b.id.clone()],
+                ));
+            }
+        }
+    }
+    out
+}
