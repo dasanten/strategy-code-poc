@@ -253,6 +253,22 @@ fn its_spare_hands_quarry_the_stone_its_party_takes_while_its_full_wait_runs() {
 }
 
 #[test]
+fn counts_no_founding_material_short_until_its_food_surplus_comes_first() {
+    // Daniel (2026-11-15): Food comes first, its surplus too.
+    let mut t = without_stone();
+    let home = t.home();
+    let reserve = held(&npc_reserve(&t.world, t.city()), Good::Food);
+    let cap = csp_shared::balance::NPC_SURPLUS_CAP.get("food").unwrap()
+        * crate::queries::npc_trade::npc_needs_scale(&t.world, t.city());
+    let share = csp_shared::balance::NPC_FOUND_FOOD_SURPLUS_SHARE;
+    t.home_stock().insert(Good::Food, reserve + share * cap - 1.0);
+    assert_eq!(super::founding_lacks(&t.world, t.city(), Some(&home), t.terrain.size), []);
+    t.home_stock().insert(Good::Food, reserve + share * cap);
+    let lacks = super::founding_lacks(&t.world, t.city(), Some(&home), t.terrain.size);
+    assert_eq!(lacks.iter().map(|s| s.good).collect::<Vec<_>>(), [Good::Stone]);
+}
+
+#[test]
 fn counts_no_founding_material_short_while_anything_else_is() {
     let mut t = without_stone();
     t.home_stock().insert(Good::Food, 0.0);

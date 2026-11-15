@@ -7,8 +7,9 @@ use std::f64::consts::PI;
 
 use csp_shared::balance::{
     FOOD_PER_DAY, GOOD_WEIGHT, HOUSING_ROOM, MAP_SIZE, NPC_CITY_MIN_DISTANCE, NPC_FOUND_FOOD_DAYS,
-    NPC_FOUND_GIVE_UP_DAYS, NPC_FOUND_REACH, NPC_FOUND_SAMPLES, NPC_FOUND_STANDING,
-    NPC_FULL_DIP_DAYS, NPC_NODE_REACH, NPC_PLAN_TICKS, NPC_VILLAGE, WALK_TICKS_PER_TILE,
+    NPC_FOUND_FOOD_SURPLUS_SHARE, NPC_FOUND_GIVE_UP_DAYS, NPC_FOUND_REACH, NPC_FOUND_SAMPLES,
+    NPC_FOUND_STANDING, NPC_FULL_DIP_DAYS, NPC_NODE_REACH, NPC_PLAN_TICKS, NPC_SURPLUS_CAP,
+    NPC_VILLAGE, WALK_TICKS_PER_TILE,
 };
 use csp_shared::footprint::is_at;
 use csp_shared::terrain::{wrap, wrap_distance, TerrainMap};
@@ -33,7 +34,7 @@ use crate::queries::js_round;
 use crate::queries::names::good_name;
 use crate::queries::names::{held, held_in, kind_name, placed};
 use crate::queries::npc_trade::{
-    npc_city_stock, npc_founding_party_size, npc_full_days, npc_reserve,
+    npc_city_stock, npc_founding_party_size, npc_full_days, npc_needs_scale, npc_reserve,
 };
 use crate::queries::residents::{carry_capacity, good_weight, is_armed, stock_weight};
 use crate::random::{hash_str, Mulberry32};
@@ -107,8 +108,9 @@ pub fn short_for_founding(
 /// (`CONTEXT.md`: Full city, T100.8). Only once nothing else keeps it from being full
 /// (`short_for_founding`) and no party of its is out: then they count as short, so its spare hands
 /// gather them (`share_out`) and it builds the workplace for one it can't get (`wanted`). Food,
-/// Coins and weapons come first, as they keep it from being full. Each as a share of its reserve
-/// and the materials together, like any shortage (`reserve_lacks`).
+/// Coins and weapons come first, as they keep it from being full; Food its surplus too: only once
+/// it holds `NPC_FOUND_FOOD_SURPLUS_SHARE` of its Food surplus cap past its reserve. Each as a
+/// share of its reserve and the materials together, like any shortage (`reserve_lacks`).
 pub fn founding_lacks(
     world: &WorldState,
     city: &City,
@@ -122,11 +124,16 @@ pub fn founding_lacks(
     {
         return Vec::new();
     }
-    let reserve = npc_reserve(world, city);
-    let stock = npc_city_stock(world, city);
     let materials = founding_materials(Some(npc_founding_party_size(
         city_residents(world, &city.id).len() as f64,
     )));
+    // Once its hands gather them, they go on until Food runs short, not each time it dips under
+    // the share of its surplus.
+    if !holds_food_first(world, city) && !gathering(world, city, &materials) {
+        return Vec::new();
+    }
+    let reserve = npc_reserve(world, city);
+    let stock = npc_city_stock(world, city);
     let mut out: Vec<Shortage> = materials
         .iter()
         .map(|(good, n)| {
@@ -137,6 +144,31 @@ pub fn founding_lacks(
         .collect();
     out.sort_by(|a, b| b.share.total_cmp(&a.share));
     out
+}
+
+/// Whether a city holds the Food surplus that comes before its founding party's materials
+/// (`CONTEXT.md`: Full city): `NPC_FOUND_FOOD_SURPLUS_SHARE` of its Food surplus cap past its
+/// reserve.
+pub fn holds_food_first(world: &WorldState, city: &City) -> bool {
+    let cap = NPC_SURPLUS_CAP.get("food").unwrap_or(0.0) * npc_needs_scale(world, city);
+    let past = held(&npc_city_stock(world, city), Good::Food)
+        - held(&npc_reserve(world, city), Good::Food);
+    past >= NPC_FOUND_FOOD_SURPLUS_SHARE * cap
+}
+
+/// Whether the city's last pass had hands at a workplace of one of `materials` (`founding_lacks`
+/// asks only once nothing else is short, so they were gathering them for its founding party).
+fn gathering(world: &WorldState, city: &City, materials: &Stock) -> bool {
+    let Some(plan) = world.city_plans.get(&city.id) else { return false };
+    plan.jobs.values().any(|j| {
+        j.kind == CityJobKind::Work
+            && j.building_id.as_ref().is_some_and(|id| {
+                world.buildings.iter().find(|b| &b.id == id).is_some_and(|b| {
+                    crate::npc_chain::chain_good(world, b)
+                        .is_some_and(|g| materials.contains_key(&g))
+                })
+            })
+    })
 }
 
 /// Whether a city would be full but for its materials (`fullButMaterials`).

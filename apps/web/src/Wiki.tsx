@@ -172,6 +172,7 @@ import {
   NPC_WAY_CLEARANCE,
   TRADING_POST_REGION,
   NPC_FULL_DIP_DAYS,
+  NPC_FOUND_FOOD_SURPLUS_SHARE,
   NPC_FULL_RESIDENTS_PER_DAY,
   NPC_GATE_WATCH_RANGE,
   NPC_VILLAGE,
@@ -2782,7 +2783,9 @@ export function Wiki() {
           (it can make them with a smithy, or with nodes it knows of for all they are made from),
           though it still buys them. Once it lacks nothing but its founding party's materials, those
           count as short: its spare hands gather them, it builds a workplace for one it has none
-          of, and they are still spare hands while they do. Food, Coins and weapons come first.
+          of, and they are still spare hands while they do. Food, Coins and weapons come first, Food
+          its surplus too: only once it holds {pct(NPC_FOUND_FOOD_SURPLUS_SHARE)} of its Food surplus
+          cap past its reserve.
           Past {num(NPC_FOUND_VILLAGE_RESIDENTS)} residents it waits a game day less
           for each {num(NPC_FULL_RESIDENTS_PER_DAY)} more, but at least {days(NPC_FULL_DAYS_LEAST)}.
           A dip below its reserve only restarts that wait if it lasts longer than{' '}

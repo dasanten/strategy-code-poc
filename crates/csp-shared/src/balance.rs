@@ -877,6 +877,12 @@ pub const NPC_FULL_DAYS_LEAST: f64 = 2.0;
 /// Full city): Food its scouts and road crew take out and bring back doesn't count.
 pub const NPC_FULL_DIP_DAYS: f64 = 1.0;
 
+/// How much of its Food surplus cap (`NPC_SURPLUS_CAP`) past its reserve an NPC city holds before
+/// its founding party's materials count as short (`CONTEXT.md`: Full city): Food, its surplus
+/// too, comes first (Daniel, 2026-11-15). Half, so a birth or a party's Food doesn't take it below
+/// its reserve, and spoilage still lets it get there.
+pub const NPC_FOUND_FOOD_SURPLUS_SHARE: f64 = 0.5;
+
 /// Residents past `NPC_FOUND_VILLAGE_RESIDENTS` that add one adult to a founding party
 /// (`npcFoundingPartySize`): a city of 110 sends the most, about one in eight of it.
 pub const NPC_FOUND_RESIDENTS_PER_MEMBER: f64 = 10.0;
@@ -2551,6 +2557,7 @@ pub fn balance_json() -> Value {
     m.insert("NPC_FULL_RESIDENTS_PER_DAY".into(), json!(NPC_FULL_RESIDENTS_PER_DAY));
     m.insert("NPC_FULL_DAYS_LEAST".into(), json!(NPC_FULL_DAYS_LEAST));
     m.insert("NPC_FULL_DIP_DAYS".into(), json!(NPC_FULL_DIP_DAYS));
+    m.insert("NPC_FOUND_FOOD_SURPLUS_SHARE".into(), json!(NPC_FOUND_FOOD_SURPLUS_SHARE));
     m.insert("NPC_FOUND_RESIDENTS_PER_MEMBER".into(), json!(NPC_FOUND_RESIDENTS_PER_MEMBER));
     m.insert("NPC_FOUND_PARTY_MOST".into(), json!(NPC_FOUND_PARTY_MOST));
     m.insert("NPC_FOUND_SAMPLES".into(), json!(NPC_FOUND_SAMPLES));

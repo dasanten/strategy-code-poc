@@ -616,8 +616,9 @@ The shared language of the game. Domain terms only — no implementation details
   They stay short for all else it does, so it still buys them. A city that lacks nothing but its
   founding party's materials counts those as short (Daniel, 2026-11-15, T100.8): its spare hands
   gather them like any shortage, and it builds the workplace for one it has none of. Food, Coins
-  and weapons still come first, since only once nothing else is short do the materials count, and
-  those gathering them are still spare hands for its full wait. A dip below the reserve only restarts that time if it lasts longer than a game
+  and weapons still come first, since only once nothing else is short do the materials count; Food
+  its surplus too (Daniel, 2026-11-15): only once it holds a share of its Food surplus cap past its
+  reserve (a balance number). Those gathering them are still spare hands for its full wait. A dip below the reserve only restarts that time if it lasts longer than a game
   day, though nothing sets out during one. A full city founds a daughter (Founding).
 - **Founding:** how a full NPC city spreads out. It picks a free Plains site the usual distance
   from every city, within a set reach of itself and on no realm's territory, nearest a node of

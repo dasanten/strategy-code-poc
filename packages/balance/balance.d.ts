@@ -267,6 +267,7 @@ export interface Balance {
   readonly NPC_FULL_RESIDENTS_PER_DAY: number
   readonly NPC_FULL_DAYS_LEAST: number
   readonly NPC_FULL_DIP_DAYS: number
+  readonly NPC_FOUND_FOOD_SURPLUS_SHARE: number
   readonly NPC_FOUND_RESIDENTS_PER_MEMBER: number
   readonly NPC_FOUND_PARTY_MOST: number
   readonly NPC_FOUND_SAMPLES: number
