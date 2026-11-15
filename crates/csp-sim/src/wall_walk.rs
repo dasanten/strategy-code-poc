@@ -85,3 +85,6 @@ pub fn up_only_on_own_walls(world: &WorldState, _terrain: &TerrainMap) -> Vec<In
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod sent_up_tests;

@@ -3036,7 +3036,9 @@ export function Wiki() {
           Between fights those soldiers stand spread out, each on the post their id gives them among
           those the city has: first {num(NPC_SOLDIERS_ON_HALL)} on the town hall, where one is
           enough to stop anyone occupying it, then {num(NPC_SOLDIERS_AT_GATE)} at each gate, and the
-          rest on the tiles of its wall they can get up to. A city with too little wall for them, or
+          rest up on the walk of its wall, on the tiles they can get up to; they stay up between
+          fights, and coming down for another post takes the time again. A city with too little
+          wall for them, or
           none, has them stand on the free ground within {num(NPC_POST_AROUND_HALL)} tiles of its
           hall as well. They eat where they stand. If those on the hall or at a gate are called away
           or die, the next soldiers take over at the city's next planning pass, and they come back
@@ -3368,7 +3370,10 @@ export function Wiki() {
           is never a way through the wall. Nobody walks onto a wall on the ground, nor squeezes past
           its corner. A path that ends on the wall counts the time to get up, so your residents go
           up only when you send them there; a path elsewhere never takes the walk. A resident's card
-          says “Up on the wall walk”, and scripts see it as <code>me.up</code>.
+          says “Up on the wall walk”, and scripts see it as <code>me.up</code>. Going after an
+          attacker at the wall, by the Alarm default or your order, a resident inside gets up onto
+          the walk beside them unless the way round through a gate is quicker; a trading post's and
+          the HQ's soldiers do the same.
         </p>
         <h3>Under attack</h3>
         <p>
