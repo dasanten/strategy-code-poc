@@ -430,6 +430,10 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: |w, _t| crate::npc_plan::trade_org_sends_no_one(w),
         },
         Invariant {
+            name: "npc-leaves-dry-workplaces",
+            check: |w, _t| crate::npc_plan::npc_leaves_dry_workplaces(w),
+        },
+        Invariant {
             name: "npc-traders-sound",
             check: |w, _t| crate::npc_trader::npc_traders_sound(w),
         },

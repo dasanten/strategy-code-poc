@@ -1223,6 +1223,15 @@ export function Wiki() {
           tile before, your map shows no node there until one of your residents sees the tile
           again.
         </p>
+        <p>
+          NPC cities and the Trade Organization move on too. When the mine an NPC city or a trading
+          post works runs dry, its workers are free at the city’s next planning pass and the city,
+          still short of the ore, opens a mine on the next fitting node it knows of within its
+          reach. Its builders tear the dead mine down for its materials once they have nothing
+          better to do. With no other node known it buys the ore, or the goods made from it, from a
+          trader or goes without, and a node its scouts find later counts from then on. The Trade
+          Organization’s HQ takes the next nearest node of the kind, however far away it lies.
+        </p>
       </Section>
 
       <Section id="waypoints">

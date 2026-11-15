@@ -102,7 +102,12 @@ The shared language of the game. Domain terms only — no implementation details
   anywhere (a tiny map) the node comes back where it was after a few game days. Whoever works a
   mine (their realm and its allies) sees how its vein stands in words (plenty, thinning, nearly
   gone), never as a number; others see nothing of it. The log of each realm working it says once
-  when it turns to thinning and once at nearly gone.
+  when it turns to thinning and once at nearly gone. When the mine an NPC city, a trading post or
+  the HQ works runs dry, its workers are free at the next planning pass, and its builders tear the
+  dead mine down for its materials once they have nothing better to do. The good is short again,
+  so the city opens a mine on the next fitting node it knows of within its reach (ADR 0029); with
+  none known it buys the good or does without, and a node its scouts find later counts from then
+  on. The HQ takes the next nearest node of the kind, however far.
 - **Workplace:** a building where residents produce goods. Output depends on the workers'
   Strength and skill and is limited by the workplace's maximum number of workers. Working there
   teaches its skill. Its output is left in the pile on the workplace's tile, not in the
