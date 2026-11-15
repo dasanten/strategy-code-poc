@@ -241,6 +241,8 @@ import {
   NPC_START_HORSE_FOOD_DAYS,
   NPC_START_HORSES,
   STABLE_FEED_DAYS,
+  STABLE_HAND_FEED_DAYS,
+  STABLE_HAND_WORK_MINUTES,
   DEFEND_CALM_TICKS,
   STANDING_CONTRACT_BROKEN_LOSS,
   STANDING_DRIFT_PER_DAY,
@@ -260,6 +262,7 @@ import {
   STANDING_RANGE,
   STANDING_NPC_TRADE_COINS_PER_POINT,
   STANDING_TRADE_COINS_PER_POINT,
+  START_HORSES,
   START_RESIDENTS,
   STARTING_SITE_WALK,
   STARTING_SITES_PER_HEARTLAND,
@@ -1162,6 +1165,16 @@ export function Wiki() {
           selling Food, Wood, Stone or Iron at its heartland’s trading post, or by holding a gold
           node out there. Your starting city’s storage holds {num(START_COINS)} Coins for a first
           trade.
+        </p>
+        <p>
+          One resident of your starting city, never your Leader, is its{' '}
+          <strong>stable hand</strong>. They start on a looped queue, <strong>Farm and feed</strong>:
+          if the stable holds less than {days(STABLE_HAND_FEED_DAYS)} of Food for its{' '}
+          {num(START_HORSES)} horses, Feed the stable once; then work the farm for{' '}
+          {num(STABLE_HAND_WORK_MINUTES)} game minutes; again. So your horses don’t starve while you
+          are away, as long as the storage has Food.
+          Their card shows the queue under its name like any queue, which you can change or clear,
+          and the planner’s Saved… lists it among your saved queues in this browser.
         </p>
         <p>
           The regions of the mainland are parted by Mountain ranges and by arms of the Sea, about{' '}

@@ -5,9 +5,10 @@
 use std::collections::HashSet;
 
 use csp_shared::balance::{
-    CITY_AREA_MARGIN, CITY_BUILDING_REACH, CITY_MIN_DISTANCE, HOUSING_ROOM, NPC_CITY_MIN_DISTANCE,
-    START_CARRIED_FOOD, START_CITY_SIZE, START_COINS, START_FOOD, START_HORSES, START_RESIDENTS,
-    START_SPARE_HOUSES, START_STABLE_FOOD, TRADE_ORG_HQ, TRADE_ORG_HQ_MIN_DISTANCE,
+    CITY_AREA_MARGIN, CITY_BUILDING_REACH, CITY_MIN_DISTANCE, HORSE_FOOD_PER_DAY, HOUSING_ROOM,
+    NPC_CITY_MIN_DISTANCE, STABLE_HAND_FEED_DAYS, STABLE_HAND_WORK_MINUTES, START_CARRIED_FOOD,
+    START_CITY_SIZE, START_COINS, START_FOOD, START_HORSES, START_RESIDENTS, START_SPARE_HOUSES,
+    START_STABLE_FOOD, TRADE_ORG_HQ, TRADE_ORG_HQ_MIN_DISTANCE,
 };
 use csp_shared::footprint::{footprint_tiles, Placed, FOOTPRINT};
 use csp_shared::terrain::{terrain_at, Terrain, TerrainMap};
@@ -23,6 +24,9 @@ use crate::placing::Ground;
 use crate::player_start::{pick_start, StartPlace};
 use crate::queries::city::town_hall_of;
 use crate::queries::names::kind_name;
+use crate::queries::residents::can_work;
+use crate::queue::QueueItemRequest;
+use crate::queues::give_queue;
 use crate::random::{new_id, Mulberry32};
 use crate::regions::{RegionKind, Regions};
 use crate::residents::{new_resident, resident_name, NewResident};
@@ -390,6 +394,7 @@ fn found_at(
     let farm = building(world, BuildingKind::Farm, (fx, fy));
     let farm_id = farm.id.clone();
     let mut stable = building(world, BuildingKind::Stable, (sx, sy));
+    let stable_id = stable.id.clone();
     stable.stock = Some([(Good::Food, START_STABLE_FOOD)].into_iter().collect());
     buildings.push(farm);
     buildings.push(stable);
@@ -454,6 +459,13 @@ fn found_at(
     world.buildings.extend(buildings);
     update_city_membership(world, terrain.size);
     let (leader_id, leader) = (residents[0].id.clone(), residents[0].name.clone());
+    // The stable hand: the last grown resident, never the Leader (the first).
+    let tick = world.tick as f64;
+    let hand_id = residents[1..]
+        .iter()
+        .rfind(|r| can_work(r.born_at, tick))
+        .map(|r| r.id.clone())
+        .expect("a starting city has grown residents besides the Leader");
     world.residents.extend(residents);
     let mut horse_rand = Mulberry32::new(world.seed as f64 * 7919.0 + user_id as f64 + 1.0);
     let (sx, sy) = (f64::from(sx), f64::from(sy));
@@ -482,6 +494,7 @@ fn found_at(
         horse_id,
         load: Default::default(),
     });
+    give_stable_hand(world, &realm_id, &hand_id, &farm_id, &stable_id);
     if let Some(StartPlace::Site { site, .. }) = place {
         world.starting_sites[site].city_id = Some(city_id.clone());
     }
@@ -501,6 +514,50 @@ fn found_at(
     };
     record_event(world, Some(&realm_id), what);
     (world.realms.len() - 1, place)
+}
+
+/// The name of the stable hand's queue (`CONTEXT.md`: Starting city).
+pub const FARM_AND_FEED: &str = "Farm and feed";
+
+/// The stable hand's looped queue "Farm and feed" (`CONTEXT.md`: Starting city): if the stable
+/// holds less than `STABLE_HAND_FEED_DAYS` of Food for the starting horses (rounded up: a
+/// condition asks a whole amount), walk into the stable, Feed the stable once and walk back to
+/// the farm, as the planner puts a walk before a step acting on a place; then work the farm for
+/// `STABLE_HAND_WORK_MINUTES`; again.
+pub fn farm_and_feed(farm: &Building, stable: &Building) -> serde_json::Value {
+    let feed_below = (STABLE_HAND_FEED_DAYS * START_HORSES * HORSE_FOOD_PER_DAY).ceil();
+    serde_json::json!([
+        {
+            "if": { "kind": "stock", "placeId": stable.id, "good": "food",
+                "compare": "lessThan", "amount": feed_below },
+            "items": [
+                { "order": { "kind": "walkTo", "x": stable.x, "y": stable.y } },
+                { "order": { "kind": "task", "task": "feedStable", "stableId": stable.id,
+                    "params": { "once": 1 } } },
+                { "order": { "kind": "walkTo", "x": farm.x, "y": farm.y } },
+            ],
+        },
+        { "order": { "kind": "task", "task": "work", "workplaceId": farm.id },
+            "minutes": STABLE_HAND_WORK_MINUTES },
+    ])
+}
+
+/// Puts the stable hand on "Farm and feed" in place of the farm work they were given.
+fn give_stable_hand(
+    world: &mut WorldState,
+    realm_id: &str,
+    hand_id: &str,
+    farm_id: &str,
+    stable_id: &str,
+) {
+    let of = |id: &str| world.buildings.iter().find(|b| b.id == id).expect("just built");
+    let steps = farm_and_feed(of(farm_id), of(stable_id));
+    debug_assert_eq!(crate::queue::queue_steps_problem(Some(&steps)), None);
+    let items: Vec<QueueItemRequest> =
+        serde_json::from_value(steps).expect("Farm and feed is a queue");
+    let i = world.residents.iter().position(|r| r.id == hand_id).expect("just added");
+    world.residents[i].script = None;
+    give_queue(world, i, realm_id, &items, true, Some(FARM_AND_FEED.to_string()));
 }
 
 #[cfg(test)]
