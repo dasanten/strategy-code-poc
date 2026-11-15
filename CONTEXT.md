@@ -697,10 +697,14 @@ The shared language of the game. Domain terms only — no implementation details
 - **Soldier:** a resident carrying a weapon; Combat skill makes them better. Not a separate kind
   of being; soldiers eat, carry, age and die like everyone. **Armed** means carrying a weapon.
 - **Weapons and armour:** goods like any other, with weight: **Spear** and **Sword** (attack),
-  **Shield** and **Armour** (defence). A resident fights with the best weapon and the best
-  protection they carry; there is nothing to equip, so heavy gear leaves less room for food.
+  **Shield** and **Armour** (defence), the Sword, Shield and Armour also of **steel**, each better
+  than the iron one and as heavy (the Spear is iron only). A resident fights with the best weapon
+  and the best protection they carry: their best shield and their best armour count, so steel
+  over iron, and a second shield adds nothing. There is nothing to equip, so heavy gear leaves
+  less room for food.
   No ranged weapons for now.
-- **Smithy:** a workplace that turns Iron and Wood into weapons and armour, at fixed recipes,
+- **Smithy:** a workplace that turns Iron and Wood, or Steel and Wood for the steel ones, into
+  weapons and armour, at fixed recipes,
   from what its workers carry and the pile on its tile. Each worker's work order says which of
   them they make; they can switch. Teaches Smithing.
 - **Army:** a named group of a realm's residents moving and fighting together under one order or

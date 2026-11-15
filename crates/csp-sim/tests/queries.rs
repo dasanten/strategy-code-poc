@@ -724,18 +724,24 @@ mod stock_floor {
         WAREHOUSE_FLOOR.get(good_name(g)).unwrap()
     }
 
+    /// The goods a warehouse trades: those with a floor; the steel weapons and armour have none
+    /// yet (T101.5).
+    fn traded(goods: &[Good]) -> Vec<Good> {
+        goods.iter().copied().filter(|&g| floor(g) > 0.0).collect()
+    }
+
     #[test]
     fn is_every_good_at_a_trading_post_coins_in_the_hq_coin_warehouse_and_the_rest_in_the_other() {
         let (world, warehouse) = post();
         assert_eq!(warehouse_keeps(&world, &warehouse), ALL_GOODS);
-        let all: Stock = ALL_GOODS.iter().map(|&g| (g, floor(g))).collect();
+        let all: Stock = traded(&ALL_GOODS).into_iter().map(|g| (g, floor(g))).collect();
         assert_eq!(stock_floor(&world, &warehouse), all);
         let (world, coins, goods) = hq();
         let want: Stock =
             [(Good::Coins, floor(Good::Coins) * HQ_FLOOR_FACTOR)].into_iter().collect();
         assert_eq!(stock_floor(&world, &coins), want);
         let keys: Vec<Good> = stock_floor(&world, &goods).keys().copied().collect();
-        assert_eq!(keys, PRICED_GOODS);
+        assert_eq!(keys, traded(&PRICED_GOODS));
         assert_eq!(stock_floor(&world, &goods)[&Good::Wood], floor(Good::Wood) * HQ_FLOOR_FACTOR);
     }
 
@@ -803,9 +809,9 @@ mod stock_floor {
             warehouse_prices(world, b).iter().map(|x| x.good).collect()
         };
         let (world, warehouse) = post();
-        assert_eq!(goods_of(&world, &warehouse), PRICED_GOODS);
+        assert_eq!(goods_of(&world, &warehouse), traded(&PRICED_GOODS));
         let (world, coins, goods) = hq();
         assert!(warehouse_prices(&world, &coins).is_empty());
-        assert_eq!(goods_of(&world, &goods), PRICED_GOODS);
+        assert_eq!(goods_of(&world, &goods), traded(&PRICED_GOODS));
     }
 }

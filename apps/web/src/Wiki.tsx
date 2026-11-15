@@ -378,6 +378,20 @@ import { apiNames, type ApiName } from './script-editor.js'
 /** A smelter's Steel recipe (`CONTEXT.md`: Coal): its second, after Iron. */
 const STEEL = RECIPES.smelter!.find((r) => 'steel' in r.output)!
 
+/** The smithy's recipe for `good` (`CONTEXT.md`: Smithy). */
+const forged = (good: Good) => RECIPES.smithy!.find((r) => good in r.output)!
+
+/** Each steel weapon or piece of armour beside the iron one it beats (`CONTEXT.md`: Coal). */
+const STEEL_GEAR: [Good, Good][] = [
+  ['sword', 'steelSword'],
+  ['shield', 'steelShield'],
+  ['armour', 'steelArmour'],
+]
+
+/** What a weapon or piece of protection adds in a fight: its attack, or what it takes off a blow. */
+const gearValue = (good: Good) =>
+  (({ ...WEAPON_ATTACK, ...PROTECTION_DEFENCE }) as Record<string, number>)[good]!
+
 /** An untrained fighter with a spear and a fully trained, armoured one, as respect weighs them. */
 const UNTRAINED_SPEAR = { carried: { spear: 1 }, skills: {} }
 const TRAINED_AND_ARMOURED = {
@@ -556,6 +570,7 @@ export function Wiki() {
   const plainsTicksPerTile = 1 / walkSpeed(AVERAGE, Terrain.Plains, 0)
   const unarmed = blow()
   const sword = blow({ sword: 1 })
+  const steelSword = blow({ steelSword: 1 })
   const swordSkilled = blow({ sword: 1 }, COMBAT_SKILL_MAX)
   const dodge = Math.min(DODGE_LIMIT, avg * DODGE_PER_AGILITY)
   const loads: [number, number][] = [
@@ -1077,6 +1092,34 @@ export function Wiki() {
           kg a unit, is stored and traded like any good, and shows in the top bar beside Coal.
         </p>
         <p>
+          A smithy forges a <strong>steel</strong> Sword, Shield and Armour from Steel and Wood,
+          each better than the iron one and as heavy; the Spear is iron only. The smith says which
+          when given Work there, as for the iron ones.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Gear</th>
+              <th>Made from</th>
+              <th>Iron one</th>
+              <th>Steel one</th>
+            </tr>
+          </thead>
+          <tbody>
+            {STEEL_GEAR.map(([iron, steel]) => (
+              <tr key={steel}>
+                <td>{goodName(steel)}</td>
+                <td>
+                  {num(forged(steel).input.steel ?? 0)} Steel, {num(forged(steel).input.wood ?? 0)}{' '}
+                  Wood
+                </td>
+                <td>{signed(gearValue(iron) * (iron === 'sword' ? 1 : -1))}</td>
+                <td>{signed(gearValue(steel) * (iron === 'sword' ? 1 : -1))}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p>
           Each heartland has {num(STARTING_SITES_PER_HEARTLAND)} <strong>starting sites</strong>, a
           walk of {num(STARTING_SITE_WALK.minMinutes)} to {num(STARTING_SITE_WALK.maxMinutes)} real
           minutes from the next one. A new Leader (your first, or one after your Leader died with no
@@ -1094,10 +1137,11 @@ export function Wiki() {
           {num(FRONTIER_NODE_DENSITY)} times as many as a heartland, an island{' '}
           {num(ISLAND_NODE_DENSITY)} times. <strong>Gold ore</strong> is a rare good like Coal: no
           gold node lies in a heartland, only in the frontier and on islands, where it is{' '}
-          {num(GOLD_NODE_DENSITY)} times as common again. Every frontier region has a gold node and a
-          coal node in it or in a region next to it. So a heartland realm gets its Coins by trade, selling Food, Wood,
-          Stone or Iron at its heartland’s trading post, or by holding a gold node out there. Your
-          starting city’s storage holds {num(START_COINS)} Coins for a first trade.
+          {num(GOLD_NODE_DENSITY)} times as common again. Every frontier region has a gold node and
+          a coal node in it or in a region next to it. So a heartland realm gets its Coins by trade,
+          selling Food, Wood, Stone or Iron at its heartland’s trading post, or by holding a gold
+          node out there. Your starting city’s storage holds {num(START_COINS)} Coins for a first
+          trade.
         </p>
         <p>
           The regions of the mainland are parted by Mountain ranges and by arms of the Sea, about{' '}
@@ -3200,9 +3244,11 @@ export function Wiki() {
           </tbody>
         </table>
         <p>
-          An average resident hits for {num(unarmed)} with bare fists, {num(sword)} with a sword,
-          and {num(swordSkilled)} with a sword at full Combat skill ({num(COMBAT_SKILL_MAX)}{' '}
-          points); they dodge {pct(dodge)} of blows. A resident has {num(MAX_HEALTH)} health.
+          An average resident hits for {num(unarmed)} with bare fists, {num(sword)} with a sword,{' '}
+          {num(steelSword)} with a steel sword, and {num(swordSkilled)} with a sword at full Combat
+          skill ({num(COMBAT_SKILL_MAX)} points); they dodge {pct(dodge)} of blows. A resident has{' '}
+          {num(MAX_HEALTH)} health. They fight with the best weapon they carry, and only their best
+          shield and best armour count, so steel over iron and a second shield adds nothing.
         </p>
         <p>
           Defenders on their own city's wall take {pct(WALL_DEFENCE)} of the damage. A tile of wall

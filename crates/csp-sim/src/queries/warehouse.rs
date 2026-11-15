@@ -63,11 +63,13 @@ pub fn stock_floor(world: &WorldState, b: &Building) -> Stock {
             HQ_FLOOR_FACTOR
         }
     };
+    // A good with no floor (the steel weapons and armour, T101.5) is not traded at a warehouse yet.
     keeps
         .into_iter()
         .map(|g| {
             (g, WAREHOUSE_FLOOR.get(good_name(g)).expect("a floor for every good") * factor(g))
         })
+        .filter(|(_, floor)| *floor > 0.0)
         .collect()
 }
 
