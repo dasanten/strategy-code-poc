@@ -408,7 +408,11 @@ fn share_out(
     let farms: Vec<usize> =
         own.iter().copied().filter(|&b| world.buildings[b].kind == BuildingKind::Farm).collect();
     let short = shortages(world, city, size, project.as_ref());
-    let share_of: HashMap<Good, f64> = short.iter().map(|s| (s.good, s.share)).collect();
+    // Lacking nothing else, its founding party's materials (`CONTEXT.md`: Full city): those who
+    // gather them hold their places as on any shortage.
+    let founding_short = founding_lacks(world, city, roads.0, size);
+    let share_of: HashMap<Good, f64> =
+        short.iter().chain(&founding_short).map(|s| (s.good, s.share)).collect();
     // What a resident's job at a workplace is worth to them: what its good lacks, or only going back.
     let held_score = |world: &WorldState, jobs: &Jobs, i: usize| -> f64 {
         let good = place_of(world, jobs, i)
@@ -713,8 +717,8 @@ fn share_out(
     }
     // Lacking nothing else, its founding party's materials count as short (`CONTEXT.md`: Full
     // city). Those who gather them are still spare hands to its founding.
-    let founding: Vec<(ScoredJob, Offer)> = founding_lacks(world, city, home, size)
-        .into_iter()
+    let founding: Vec<(ScoredJob, Offer)> = founding_short
+        .iter()
         .map(|s| (ScoredJob::Short { share: s.share }, Offer::Short(s.good)))
         .collect();
     let left = if founding.is_empty() {

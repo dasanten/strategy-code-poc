@@ -65,7 +65,8 @@ fn camp(world: &mut WorldState, terrain: &mut TerrainMap, city: &str, dx: f64) -
     add_workplace(world, terrain, city, BuildingKind::LumberCamp, Some(ResourceKind::Forest), x, y)
 }
 
-/// The city holds its reserve, its Food cap and Wood cap above that, and `past` above it
+/// The city holds its reserve, its founding party's materials, its Food cap and Wood cap above
+/// that, and `past` above it
 /// (`setStock`).
 fn set_stock(world: &mut WorldState, city: &str, past: &[(Good, f64)]) {
     let c = world.cities.iter().find(|c| c.id == city).expect("the city");
@@ -79,6 +80,13 @@ fn set_stock(world: &mut WorldState, city: &str, past: &[(Good, f64)]) {
             Some(slot) => slot.1 = *n,
             None => all.push((*good, *n)),
         }
+    }
+    // Its founding party's materials too, which its crew leaves untouched once its full wait is
+    // under way (`CONTEXT.md`: NPC road, Full city), so `past` is what the crew may use.
+    let residents = crate::queries::city::city_residents(world, city).len() as f64;
+    let party = crate::queries::npc_trade::npc_founding_party_size(residents);
+    for (good, n) in crate::npc_founding::founding_materials(Some(party)) {
+        all.push((good, n));
     }
     for (good, n) in all {
         *stock.entry(good).or_insert(0.0) += n;

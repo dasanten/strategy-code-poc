@@ -2681,7 +2681,7 @@ export function Wiki() {
           resident would walk, tile by tile, so a road goes round a lake, and they skip tiles that
           already have a road. They only use materials above its reserve and what its project still
           needs; with none to spare, or with something short that they can work for, they go back to
-          other work and bring back what they carry. Once the city would otherwise be full, they
+          other work and bring back what they carry. Once its full wait is under way, they
           also leave a town hall's and a storage's materials untouched, so founding comes before
           roads. Like any road it belongs to nobody, and anyone can use it or tear it down; a tile
           torn down is laid again in time.

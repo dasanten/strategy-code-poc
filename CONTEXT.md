@@ -578,7 +578,7 @@ The shared language of the game. Domain terms only — no implementation details
   stands in line with the outer gate and goes up last, so its people never lose the way to the
   storage. The city grows its outer wall as before, and never tears the inner ring down.
 - **NPC road:** a road an NPC city builds with a **road crew** of its spare hands (at most a balance
-  number at once, which grows with the city, apart from its builders), only from materials above its reserve. Once the city would otherwise be full (Full city), it also leaves a town hall's and a storage's materials untouched, so founding comes before roads. Its layout's
+  number at once, which grows with the city, apart from its builders), only from materials above its reserve. Once its full wait is under way (Full city), it also leaves a town hall's and a storage's materials untouched, so founding comes before roads. Its layout's
   streets come first (City layout). Then it follows the
   way a resident would walk, tile by tile, skipping tiles that have a road: first from its home to
   each of its workplaces outside its area, nearest first; then to the nearest Trade Org warehouse
