@@ -309,7 +309,10 @@
     "spear": 2.0,
     "sword": 1.0,
     "shield": 2.0,
-    "armour": 1.0
+    "armour": 1.0,
+    "steelSword": 0.0,
+    "steelShield": 0.0,
+    "steelArmour": 0.0
   },
   "HQ_FLOOR_FACTOR": 5.0,
   "HQ_FOOD_FLOOR_FACTOR": 15.0,

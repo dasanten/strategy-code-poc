@@ -387,9 +387,7 @@ const STEEL_GEAR: [Good, Good][] = [
 
 /** What a weapon or piece of protection adds in a fight: its attack, or what it takes off a blow. */
 const gearValue = (good: Good) =>
-  (WEAPON_ATTACK as Record<string, number>)[good] ??
-  (PROTECTION_DEFENCE as Record<string, number>)[good] ??
-  0
+  (({ ...WEAPON_ATTACK, ...PROTECTION_DEFENCE }) as Record<string, number>)[good]!
 
 /** An untrained fighter with a spear and a fully trained, armoured one, as respect weighs them. */
 const UNTRAINED_SPEAR = { carried: { spear: 1 }, skills: {} }
@@ -1136,10 +1134,11 @@ export function Wiki() {
           {num(FRONTIER_NODE_DENSITY)} times as many as a heartland, an island{' '}
           {num(ISLAND_NODE_DENSITY)} times. <strong>Gold ore</strong> is a rare good like Coal: no
           gold node lies in a heartland, only in the frontier and on islands, where it is{' '}
-          {num(GOLD_NODE_DENSITY)} times as common again. Every frontier region has a gold node and a
-          coal node in it or in a region next to it. So a heartland realm gets its Coins by trade, selling Food, Wood,
-          Stone or Iron at its heartland’s trading post, or by holding a gold node out there. Your
-          starting city’s storage holds {num(START_COINS)} Coins for a first trade.
+          {num(GOLD_NODE_DENSITY)} times as common again. Every frontier region has a gold node and
+          a coal node in it or in a region next to it. So a heartland realm gets its Coins by trade,
+          selling Food, Wood, Stone or Iron at its heartland’s trading post, or by holding a gold
+          node out there. Your starting city’s storage holds {num(START_COINS)} Coins for a first
+          trade.
         </p>
         <p>
           The regions of the mainland are parted by Mountain ranges and by arms of the Sea, about{' '}

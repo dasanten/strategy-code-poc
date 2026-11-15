@@ -366,6 +366,9 @@ export interface Balance {
     sword: number
     shield: number
     armour: number
+    steelSword: number
+    steelShield: number
+    steelArmour: number
     [key: string]: number
   }
   readonly HQ_FLOOR_FACTOR: number

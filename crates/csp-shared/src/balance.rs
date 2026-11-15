@@ -1034,9 +1034,9 @@ pub const TRADING_POST: TradingPost = TradingPost {
 /// A trading post's stock floor (`CONTEXT.md`: Stock floor, ADR 0023), in units: what its spare
 /// hands, caravan and wandering traders go for, and what its prices are reckoned from. It tops up
 /// nothing at a post; the HQ's warehouses top up to `HQ_FLOOR_FACTOR` times this each game day. Half
-/// of what a post starts with, so a fresh post is well above it. Steel weapons and armour have none
-/// yet: a warehouse buys and sells what it is brought, and nobody tops them up (T101.6 decides
-/// what the Trade Organization does with Steel).
+/// of what a post starts with, so a fresh post is well above it. A floor of 0 means warehouses don't
+/// trade the good: the steel weapons and armour, until T101.6 decides what the Trade Organization
+/// does with Steel.
 pub const WAREHOUSE_FLOOR: Table<f64> = Table(&[
     ("food", 20.0),
     ("wood", 25.0),
