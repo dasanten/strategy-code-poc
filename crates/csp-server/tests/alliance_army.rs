@@ -253,7 +253,9 @@ fn takes_only_soldiers_and_carriages_of_a_member_each_once() {
         hand(&mut t, ASH, json!({ "residentIds": [ash_soldier] })),
         "you are in no alliance"
     );
+    // Unarmed: without the Sword and the Spear every starting resident carries (T104.1).
     t.r(&s).carried.shift_remove(&Good::Sword);
+    t.r(&s).carried.shift_remove(&Good::Spear);
     assert!(hand(&mut t, TOBIN, json!({ "residentIds": [s] })).contains("is not a soldier"));
     t.r(&s).carried.insert(Good::Sword, 1.0);
     let mara_soldier = t.soldier(MARA);

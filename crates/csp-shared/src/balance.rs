@@ -457,6 +457,10 @@ pub const START_COINS: f64 = 50.0;
 /// something to eat while the farm's first harvest comes in (`CONTEXT.md`: Eating).
 pub const START_CARRIED_FOOD: f64 = 2.0;
 
+/// Iron Spears each grown resident of a starting city (the Leader too) starts with, so they are
+/// armed and defend from the first tick (`CONTEXT.md`: Starting city). Children get none.
+pub const START_SPEARS: f64 = 1.0;
+
 /// Horses in a starting city's stable: two, so a resident can breed them (`CONTEXT.md`: Starting city).
 pub const START_HORSES: f64 = 2.0;
 
@@ -2621,6 +2625,7 @@ pub fn balance_json() -> Value {
     m.insert("START_FOOD".into(), json!(START_FOOD));
     m.insert("START_COINS".into(), json!(START_COINS));
     m.insert("START_CARRIED_FOOD".into(), json!(START_CARRIED_FOOD));
+    m.insert("START_SPEARS".into(), json!(START_SPEARS));
     m.insert("START_HORSES".into(), json!(START_HORSES));
     m.insert("START_STABLE_FOOD".into(), json!(START_STABLE_FOOD));
     m.insert("HORSE_FOOD_PER_DAY".into(), json!(HORSE_FOOD_PER_DAY));

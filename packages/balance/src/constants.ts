@@ -63,6 +63,7 @@ export const START_SPARE_HOUSES = balance.START_SPARE_HOUSES
 export const START_FOOD = balance.START_FOOD
 export const START_COINS = balance.START_COINS
 export const START_CARRIED_FOOD = balance.START_CARRIED_FOOD
+export const START_SPEARS = balance.START_SPEARS
 export const START_HORSES = balance.START_HORSES
 export const START_STABLE_FOOD = balance.START_STABLE_FOOD
 export const HORSE_FOOD_PER_DAY = balance.HORSE_FOOD_PER_DAY
