@@ -465,6 +465,31 @@ mod npc_trade {
     }
 
     #[test]
+    fn lent_residents_take_the_best_gear_of_the_surplus_steel_first() {
+        let (mut world, npc) = setup();
+        let reserve = npc_reserve(&world, &npc);
+        let kept = held(&reserve, NPC_SMITHY_WEAPON);
+        let stock: Stock = [
+            (NPC_SMITHY_WEAPON, kept + 1.0),
+            (Good::SteelSword, 1.0),
+            (Good::Shield, 1.0),
+            (Good::SteelShield, 1.0),
+            (Good::Food, 10_000.0),
+        ]
+        .into_iter()
+        .collect();
+        storage(&mut world).stock = Some(stock);
+        ask_for_n4(&mut world);
+        let took = step_npc_hire(&mut world, SIZE);
+        let carried = at(&mut world, "n4").carried.clone();
+        assert_eq!(held(&carried, Good::SteelSword), 1.0);
+        assert_eq!(held(&carried, NPC_SMITHY_WEAPON), 0.0);
+        assert_eq!(held(&carried, Good::SteelShield), 1.0);
+        assert_eq!(held(&carried, Good::Shield), 0.0);
+        assert_eq!(npc_lending_keeps_reserve(&took), vec![]);
+    }
+
+    #[test]
     fn lending_under_the_reserve_is_caught_by_its_invariant() {
         let gear = LentGear {
             contract_id: "k1".into(),
@@ -724,8 +749,7 @@ mod stock_floor {
         WAREHOUSE_FLOOR.get(good_name(g)).unwrap()
     }
 
-    /// The goods a warehouse trades: those with a floor; the steel weapons and armour have none
-    /// yet (T101.5).
+    /// The goods a warehouse trades: those with a floor (every good since T101.6).
     fn traded(goods: &[Good]) -> Vec<Good> {
         goods.iter().copied().filter(|&g| floor(g) > 0.0).collect()
     }

@@ -186,6 +186,11 @@
   "NPC_FOOD_SHORT_DAYS": 5.0,
   "WORK_FOOD_KEPT": 2.0,
   "NPC_SOLDIER_SHARE": 0.25,
+  "NPC_STEEL_KIT": [
+    "steelSword",
+    "steelArmour",
+    "steelShield"
+  ],
   "NPC_SOLDIERS_ON_HALL": 2.0,
   "NPC_SOLDIERS_AT_GATE": 1.0,
   "NPC_POST_AROUND_HALL": 2.0,
@@ -317,9 +322,9 @@
     "sword": 1.0,
     "shield": 2.0,
     "armour": 1.0,
-    "steelSword": 0.0,
-    "steelShield": 0.0,
-    "steelArmour": 0.0
+    "steelSword": 1.0,
+    "steelShield": 1.0,
+    "steelArmour": 1.0
   },
   "HQ_FLOOR_FACTOR": 5.0,
   "HQ_FOOD_FLOOR_FACTOR": 15.0,

@@ -532,7 +532,13 @@ The shared language of the game. Domain terms only — no implementation details
 - **NPC reserve:** what an NPC city keeps of each good it can use, and never sells: Food for
   some game days for all its residents, and what its stable lacks for its horses (Feeding the
   stable; the stable's Food counts); Wood and Stone for its next house and some wall, more as it grows; weapons
-  for the soldiers it keeps by its size, and the Iron and Wood to forge them; Coins as its war
+  for the soldiers it keeps by its size, and the Iron and Wood to forge them (a city that knows of a
+  coal node wants a steel Sword, Armour and Shield for each soldier instead of a spear, forged in that
+  order, and keeps them, their Steel and Wood, the Iron and Coal for that Steel and the Iron ore for
+  that Iron: it mines Coal,
+  sets every second smelter it has to Steel and forges steel; its soldiers fetch each piece from its
+  storage once it holds one and put back what it outdoes. One with no coal node in reach, as in a
+  heartland, stays on iron); Coins as its war
   chest, for buying what it lacks and hiring help. A stable is wanted once it has horses, or with
   none once nothing else is short (NPC horses), a mint only with a gold node it knows of. Whatever its storages hold above the reserve is its surplus,
   for sale (Trading with an NPC city); whatever is below is short and drives what it works and
@@ -759,7 +765,8 @@ The shared language of the game. Domain terms only — no implementation details
   surplus. Its farmers, those working for a good short of its reserve and its builders with a
   project stay, and so does a share of its adults at home to defend it. Its lent residents take
   weapons and armour along only from its surplus, what its storages hold above its reserve (NPC
-  reserve); with none spare they go unarmed. It lends nobody while it feels threatened: while it
+  reserve), the best of the surplus first, so steel before iron; with none spare they go unarmed.
+  It lends nobody while it feels threatened: while it
   weighs a demand (Demand), while its town hall is occupied, or while armed residents of the
   hirer stand in its area or in sight of it. Those it lends never act against it: they refuse an
   order to attack its residents, walls or gates, to climb its walls or to tear down its buildings,
@@ -769,7 +776,9 @@ The shared language of the game. Domain terms only — no implementation details
   week breaks it and costs standing, a paid one raises it, and at the end they walk home.
 - **Trade Org army:** a large army of normal residents of the Trade Org HQ, for hire like any
   mercenaries. The HQ builds it itself: it arms its own adults with weapons from its goods
-  warehouse until it has its army's size, keeping enough of them at work. Its warehouses refill
+  warehouse, steel as far as it holds it (its soldiers fetch the steel Sword, Armour and Shield and
+  put back what these outdo), iron otherwise (a trading post arms its soldiers the same way from
+  its warehouse), until it has its army's size, keeping enough of them at work. Its warehouses refill
   goods, never people, so lost soldiers come back only as new adults grow up, or as mercenaries.
   - **Hiring it:** in mercenary contracts the Trade Organization is a side like a realm. A Player
     asks for a number of its soldiers, paid into a Trade Org warehouse they name; it accepts at

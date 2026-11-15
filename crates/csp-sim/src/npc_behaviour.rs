@@ -98,9 +98,16 @@ pub fn default_script(task: Task, memory: Value) -> RunningScript {
 /// default for it, which walks them to its anchor tile (`at`) and once there picks the footprint
 /// tile they stand on (`CONTEXT.md`: Spreading over the footprint).
 pub fn put_to_work(r: &mut Resident, place: &Building) {
+    let makes = (place.kind == BuildingKind::Smithy).then_some(NPC_SMITHY_WEAPON);
+    put_to_work_making(r, place, makes);
+}
+
+/// Puts one of the city's residents to work a workplace, told what to make there where it has a
+/// choice (`chain_makes`).
+pub fn put_to_work_making(r: &mut Resident, place: &Building, makes: Option<Good>) {
     let mut memory = json!({ "workplaceId": place.id, "at": { "x": place.x, "y": place.y } });
-    if place.kind == BuildingKind::Smithy {
-        memory["makes"] = json!(good_name(NPC_SMITHY_WEAPON));
+    if let Some(makes) = makes {
+        memory["makes"] = json!(good_name(makes));
     }
     r.script = Some(default_script(Task::Work, memory));
 }

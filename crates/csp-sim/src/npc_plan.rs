@@ -614,7 +614,8 @@ fn share_out(
                 Offer::Short(good) => {
                     let mut took = Vec::new();
                     for i in takers {
-                        let Some(place) = short_place(world, good, &own, held, storage) else {
+                        let Some(place) = short_place(world, city, good, &own, held, storage)
+                        else {
                             break;
                         };
                         give(world, jobs, held, i, work_job(&world.buildings[place]), Some(place));
@@ -743,6 +744,7 @@ struct Share {
 /// storage holds a batch of its input, else the workplace of an input it lacks.
 fn short_place(
     world: &WorldState,
+    city: &City,
     good: Good,
     own: &[usize],
     held: &Places,
@@ -751,6 +753,7 @@ fn short_place(
     let stock = storage.and_then(|s| world.buildings[s].stock.as_ref());
     fn work_for(
         world: &WorldState,
+        city: &City,
         g: Good,
         own: &[usize],
         held: &Places,
@@ -760,12 +763,12 @@ fn short_place(
         if !seen.insert(g) {
             return None;
         }
-        if let Some(input) = chain_input(g).filter(|i| !holds_batch(stock, i)) {
+        if let Some(input) = chain_input(world, city, g).filter(|i| !holds_batch(stock, i)) {
             for (from, n) in &input {
                 if held_in(stock, *from) >= *n {
                     continue;
                 }
-                if let Some(place) = work_for(world, *from, own, held, stock, seen) {
+                if let Some(place) = work_for(world, city, *from, own, held, stock, seen) {
                     return Some(place);
                 }
             }
@@ -776,7 +779,7 @@ fn short_place(
                 && held.room(&world.buildings[b]) > 0.0
         })
     }
-    work_for(world, good, own, held, stock, &mut HashSet::new())
+    work_for(world, city, good, own, held, stock, &mut HashSet::new())
 }
 
 /// Whether a resident could help with a project now (`canTakePart`): anything but a site that needs

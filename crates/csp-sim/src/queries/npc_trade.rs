@@ -8,9 +8,10 @@ use std::collections::HashSet;
 use ts_rs::TS;
 
 use csp_shared::balance::{
-    BUILD_MATERIALS, CITY_PRICE_STANDING_SWING, HORSE_FOOD_PER_DAY, NPC_HORSES_BASE,
-    NPC_RESIDENTS_PER_HORSE, NPC_RESIDENTS_PER_NEEDS_STEP, NPC_SOLDIER_SHARE, NPC_TRADE,
-    NPC_WAR_CHEST_PER_RESIDENT, STABLE_CAPACITY, STABLE_FEED_DAYS, STANDING_RANGE, WAREHOUSE_FLOOR,
+    BUILD_MATERIALS, CITY_PRICE_STANDING_SWING, HORSE_FOOD_PER_DAY, MAP_SIZE, NPC_HORSES_BASE,
+    NPC_RESIDENTS_PER_HORSE, NPC_RESIDENTS_PER_NEEDS_STEP, NPC_SOLDIER_SHARE, NPC_STEEL_KIT,
+    NPC_TRADE, NPC_WAR_CHEST_PER_RESIDENT, STABLE_CAPACITY, STABLE_FEED_DAYS, STANDING_RANGE,
+    WAREHOUSE_FLOOR,
 };
 use csp_shared::goods::WEAPONS;
 use csp_shared::world::npc_trade::ShownNpcCityPrice;
@@ -18,7 +19,7 @@ use csp_shared::world::{
     Building, BuildingKind, City, CityJob, CityJobKind, Good, Resident, Stock, WorldState,
 };
 
-use super::building::recipe_for;
+use super::building::{node_good, recipe_for};
 use super::city::{city_food_use, city_residents, for_sale};
 use super::horses::{horses_in, owns_horse, HorseOwner};
 use super::js_round;
@@ -27,7 +28,9 @@ use super::persuasion::respect_seen_by;
 use super::residents::{can_work, is_armed};
 use super::standing::standing_of;
 use super::warehouse::{price_for, Price};
+use crate::npc_behaviour::npc_home;
 use crate::npc_chain::{chain_good, reserve_lacks};
+use crate::npc_scouts::knows_node;
 
 /// An NPC city's finished storages (`npcStorages`): where it trades and is paid.
 pub fn npc_storages<'w>(world: &'w WorldState, city: &City) -> Vec<&'w Building> {
@@ -55,6 +58,61 @@ pub fn npc_city_stock(world: &WorldState, city: &City) -> Stock {
 
 /// What an NPC city's smithy makes for its soldiers (`NPC_SMITHY_WEAPON`): the cheapest weapon.
 pub const NPC_SMITHY_WEAPON: Good = Good::Spear;
+
+/// Whether an NPC city goes for Steel (`CONTEXT.md`: NPC reserve): it knows of a coal node
+/// (`knows_node`). Then its soldiers want the steel kit (`NPC_STEEL_KIT`), and it mines Coal,
+/// smelts Steel and forges steel. Never a Trade Org city or a Player's.
+pub fn npc_makes_steel(world: &WorldState, city: &City) -> bool {
+    if !for_sale(city) {
+        return false;
+    }
+    let Some(home) = npc_home(world, &city.id) else { return false };
+    let at = (home.x as i32, home.y as i32);
+    world.nodes.iter().any(|n| {
+        node_good(n.kind) == Good::Coal && knows_node(city, at, (n.x as i32, n.y as i32), MAP_SIZE)
+    })
+}
+
+/// What each soldier of an NPC city wants to carry, in the order its smithy forges it
+/// (`npcSoldierKit`): the steel kit for a city that goes for Steel (`npc_makes_steel`), else a
+/// spear.
+pub fn npc_soldier_kit(world: &WorldState, city: &City) -> Vec<Good> {
+    if npc_makes_steel(world, city) {
+        NPC_STEEL_KIT.iter().map(|g| good_of(g).expect("a good")).collect()
+    } else {
+        vec![NPC_SMITHY_WEAPON]
+    }
+}
+
+/// How many of each piece of a steel kit an NPC city's soldiers still lack (`kitLacks`): its
+/// soldier target less the adults carrying that piece, in the kit's order; only those lacking.
+pub fn kit_lacks(world: &WorldState, city: &City, kit: &[Good]) -> Vec<(Good, f64)> {
+    let tick = world.tick as f64;
+    let adults: Vec<&Resident> = city_residents(world, &city.id)
+        .into_iter()
+        .filter(|r| r.owner.is_none() && r.health > 0.0 && can_work(r.born_at, tick))
+        .collect();
+    let target = npc_soldier_target(adults.len() as f64);
+    kit.iter()
+        .map(|&g| (g, target - adults.iter().filter(|r| held(&r.carried, g) > 0.0).count() as f64))
+        .filter(|(_, n)| *n > 0.0)
+        .collect()
+}
+
+/// What an NPC city's smithy forges (`npcSmithyGood`): a spear, or for a city that goes for Steel
+/// the first piece of its kit its soldiers lack beyond what its storages hold; with none, the
+/// first of its kit.
+pub fn npc_smithy_good(world: &WorldState, city: &City) -> Good {
+    let kit = npc_soldier_kit(world, city);
+    if kit.len() == 1 {
+        return kit[0];
+    }
+    let stock = npc_city_stock(world, city);
+    kit_lacks(world, city, &kit)
+        .into_iter()
+        .find(|(g, n)| held(&stock, *g) < *n)
+        .map_or(kit[0], |(g, _)| g)
+}
 
 /// How many soldiers an NPC city keeps (`npcSoldierTarget`): `NPC_SOLDIER_SHARE` of its adults,
 /// rounded up.
@@ -135,7 +193,34 @@ pub fn npc_reserve(world: &WorldState, city: &City) -> Stock {
     let adults: Vec<&&Resident> = residents.iter().filter(|r| can_work(r.born_at, tick)).collect();
     let armed = adults.iter().filter(|r| is_armed(&r.carried)).count() as f64;
     let unarmed = npc_soldier_target(adults.len() as f64) - armed;
-    if unarmed > 0.0 {
+    let kit = npc_soldier_kit(world, city);
+    if kit.len() > 1 {
+        // The steel kit: each piece its soldiers lack, the Steel and Wood to forge what its
+        // storages don't hold, and the Iron and Coal to smelt the Steel they don't hold.
+        let stock = npc_city_stock(world, city);
+        let mut steel = 0.0;
+        for (good, lack) in kit_lacks(world, city, &kit) {
+            reserve.insert(good, lack);
+            let forge = lack - held(&stock, good);
+            if let Some(recipe) = recipe_for(BuildingKind::Smithy, Some(good_name(good))) {
+                for (name, n) in recipe.input.0 {
+                    if *name == "steel" {
+                        steel += n * forge.max(0.0);
+                    }
+                }
+                add(&mut reserve, recipe.input.0.iter().copied(), forge);
+            }
+        }
+        let smelt = steel - held(&stock, Good::Steel);
+        if let Some(recipe) = recipe_for(BuildingKind::Smelter, Some(good_name(Good::Steel))) {
+            add(&mut reserve, recipe.input.0.iter().copied(), smelt);
+        }
+        // And the Iron ore for that Iron, so its miners count as working for a short good.
+        let iron = held(&reserve, Good::Iron) - held(&stock, Good::Iron);
+        if let Some(recipe) = recipe_for(BuildingKind::Smelter, Some(good_name(Good::Iron))) {
+            add(&mut reserve, recipe.input.0.iter().copied(), iron);
+        }
+    } else if unarmed > 0.0 {
         reserve.insert(NPC_SMITHY_WEAPON, unarmed);
         let stock = npc_city_stock(world, city);
         let held_weapons: f64 =
