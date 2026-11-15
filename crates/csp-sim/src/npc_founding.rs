@@ -23,7 +23,7 @@ use serde_json::json;
 use crate::land_sites::{near_a_starting_site, starting_site_middles, FootReach};
 use crate::npc_behaviour::{default_script, stop_work, Jobs};
 use crate::npc_chain::{short_goods, Shortage};
-use crate::npc_cities::{hall_tile, npc_site_fits, taken_ground, FARM_RING};
+use crate::npc_cities::{hall_tile, npc_site_fits_among, taken_ground, SiteWorld, FARM_RING};
 use crate::npc_scouts::knows_node;
 use crate::npc_trader::has_node_for;
 use crate::placing::Ground;
@@ -413,12 +413,25 @@ fn site_still_fits(
     if x < FARM_RING || y < FARM_RING || x > far || y > far {
         return false;
     }
+    let among = SiteWorld::new(world).keeping(daughter_min_distance(terrain.size));
     match ground {
-        Some(g) => npc_site_fits(world, terrain, &NPC_VILLAGE, x, y, g, false),
+        Some(g) => npc_site_fits_among(&among, terrain, &NPC_VILLAGE, x, y, g, false),
         None => {
-            npc_site_fits(world, terrain, &NPC_VILLAGE, x, y, &taken_ground(world, terrain), false)
+            let g = taken_ground(world, terrain);
+            npc_site_fits_among(&among, terrain, &NPC_VILLAGE, x, y, &g, false)
         }
     }
+}
+
+/// How far a daughter stands from every city on a map of `size` (`CONTEXT.md`: Founding):
+/// `NPC_CITY_MIN_DISTANCE` on a full-size map. On a smaller one, whose cities stand closer
+/// together, it is scaled with the side (Daniel, 2026-11-15, T100.8), as the starting sites'
+/// clearance is (`starting_site_clearance`), but never so near that a town and its farm ring could
+/// touch the village's.
+pub fn daughter_min_distance(size: i32) -> f64 {
+    let f = (f64::from(size) / f64::from(MAP_SIZE)).min(1.0);
+    let square = csp_shared::balance::NPC_TOWN.size + 2.0 * f64::from(FARM_RING);
+    (NPC_CITY_MIN_DISTANCE * f).max((square * std::f64::consts::SQRT_2).ceil())
 }
 
 /// The good a city wants its daughter near (`lackedGood`): the first good of a node that no node
@@ -432,7 +445,7 @@ pub fn lacked_good(world: &WorldState, city: &City, home: (i32, i32), size: i32)
 }
 
 /// A site for a city's daughter (`findFoundingSite`), by its town hall's tile: of
-/// `NPC_FOUND_SAMPLES` random tiles between `NPC_CITY_MIN_DISTANCE` and `NPC_FOUND_REACH` from its
+/// `NPC_FOUND_SAMPLES` random tiles between `daughter_min_distance` and `NPC_FOUND_REACH` from its
 /// home, those where a village fits with no tile of it on a realm's territory, on land its people walk to
 /// (never an island) and clear of the starting sites (`NPC_STARTING_SITE_CLEARANCE`); the one nearest a
 /// node of the good it lacks wins, else the one nearest home.
@@ -491,9 +504,10 @@ pub fn find_founding_site(
     };
     let mut best: Option<((i32, i32), f64)> = None;
     let half = (NPC_VILLAGE.size / 2.0).floor() as i32;
+    let nearest = daughter_min_distance(size);
     for _ in 0..NPC_FOUND_SAMPLES as usize {
         let angle = m.next() * 2.0 * PI;
-        let d = NPC_CITY_MIN_DISTANCE + m.next() * (NPC_FOUND_REACH - NPC_CITY_MIN_DISTANCE);
+        let d = nearest + m.next() * (NPC_FOUND_REACH - nearest);
         let x = wrap(js_round(home.x + d * angle.cos()) as i32 - half, size);
         let y = wrap(js_round(home.y + d * angle.sin()) as i32 - half, size);
         let hall = hall_tile(x, y, NPC_VILLAGE.size as i32);

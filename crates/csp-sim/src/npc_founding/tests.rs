@@ -455,7 +455,7 @@ fn looks_for_its_daughter_on_no_realm_territory_near_a_node_of_what_it_lacks() {
         let Some(site) = find_founding_site(&world, &terrain, c, &home) else { continue };
         found += 1;
         let d = wrap_distance(terrain.size, (home.x as i32, home.y as i32), site);
-        assert!(d >= NPC_CITY_MIN_DISTANCE - NPC_VILLAGE.size);
+        assert!(d >= super::daughter_min_distance(terrain.size) - NPC_VILLAGE.size);
         assert!(d <= NPC_FOUND_REACH + NPC_VILLAGE.size);
         for dy in -20..=20 {
             for dx in -20..=20 {
@@ -515,7 +515,7 @@ fn founds_a_village_480_tiles_away_within_a_few_game_weeks_which_then_feeds_itse
     let mother_hall = town_hall_of(&t.world, t.city()).unwrap();
     // The usual distance runs from a city's town hall to the new village's middle
     // (`npcSiteFits`).
-    let far = NPC_CITY_MIN_DISTANCE - NPC_VILLAGE.size / 2.0;
+    let far = super::daughter_min_distance(t.terrain.size) - NPC_VILLAGE.size / 2.0;
     let at = |b: &Building| (b.x as i32, b.y as i32);
     assert!(wrap_distance(t.terrain.size, at(mother_hall), at(hall)) > far);
     let people: Vec<_> =
@@ -928,4 +928,14 @@ fn looks_for_its_daughter_only_on_land_its_people_walk_to_never_across_the_sea()
         assert!(dx < 300, "a site across the sea at {site:?}");
     }
     assert!(found > 0);
+}
+
+#[test]
+fn keeps_a_daughter_the_usual_distance_away_on_a_full_map_scaled_with_the_side_on_a_smaller_one() {
+    use csp_shared::balance::MAP_SIZE;
+    assert_eq!(super::daughter_min_distance(MAP_SIZE), NPC_CITY_MIN_DISTANCE);
+    assert_eq!(super::daughter_min_distance(MAP_SIZE / 2), NPC_CITY_MIN_DISTANCE / 2.0);
+    // Never so near on a tiny map that a town and the village could touch.
+    let floor = super::daughter_min_distance(1);
+    assert!(floor > NPC_TOWN.size + NPC_VILLAGE.size, "{floor}");
 }
