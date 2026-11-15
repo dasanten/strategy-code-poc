@@ -674,7 +674,8 @@ pub const NPC_STARTING_SITE_CLEARANCE: f64 = 96.0;
 pub const NPC_WAY_CLEARANCE: i32 = 24;
 
 /// NPC cities lie at least this many tiles from every other city, starting cities and NPC cities
-/// alike (about an hour's walk on plains), the short way round the map.
+/// alike (about an hour's walk on plains), the short way round the map. A daughter keeps it scaled
+/// with the side on a map of half to all of `MAP_SIZE`'s side (`daughter_min_distance`, T100.8).
 pub const NPC_CITY_MIN_DISTANCE: f64 = 480.0;
 
 /// What an NPC city is placed with, by its size: a walled square like a starting city's.

@@ -972,6 +972,7 @@ fn keeps_a_daughter_the_usual_distance_away_on_a_full_map_scaled_with_the_side_o
     use csp_shared::balance::MAP_SIZE;
     assert_eq!(super::daughter_min_distance(MAP_SIZE), NPC_CITY_MIN_DISTANCE);
     assert_eq!(super::daughter_min_distance(MAP_SIZE / 2), NPC_CITY_MIN_DISTANCE / 2.0);
-    // Never below half of it on a smaller map still.
-    assert_eq!(super::daughter_min_distance(1300), NPC_CITY_MIN_DISTANCE / 2.0);
+    assert_eq!(super::daughter_min_distance(MAP_SIZE * 3 / 4), NPC_CITY_MIN_DISTANCE * 0.75);
+    // A test map under half the side keeps the full distance.
+    assert_eq!(super::daughter_min_distance(1300), NPC_CITY_MIN_DISTANCE);
 }

@@ -437,13 +437,18 @@ fn site_still_fits(
 }
 
 /// How far a daughter stands from every city on a map of `size` (`CONTEXT.md`: Founding):
-/// `NPC_CITY_MIN_DISTANCE` on a full-size map. On a smaller one, whose cities stand closer
-/// together, it is scaled with the side (Daniel, 2026-11-15, T100.8), as the starting sites'
-/// clearance is (`starting_site_clearance`), but never below half of it: nearer, a big mother's
-/// defence takes the daughter's armed founder for an outsider.
+/// `NPC_CITY_MIN_DISTANCE` on a full-size map. On a smaller one of at least half its side, whose
+/// cities stand closer together, it is scaled with the side (Daniel, 2026-11-15, T100.8), as the
+/// starting sites' clearance is (`starting_site_clearance`). A test map smaller still keeps the
+/// full distance: scaled further, a big mother's defence takes the daughter's armed founder for an
+/// outsider, and a big city with room on a small map founds every few days.
 pub fn daughter_min_distance(size: i32) -> f64 {
-    let f = (f64::from(size) / f64::from(MAP_SIZE)).clamp(0.5, 1.0);
-    NPC_CITY_MIN_DISTANCE * f
+    let f = f64::from(size) / f64::from(MAP_SIZE);
+    if (0.5..1.0).contains(&f) {
+        NPC_CITY_MIN_DISTANCE * f
+    } else {
+        NPC_CITY_MIN_DISTANCE
+    }
 }
 
 /// The good a city wants its daughter near (`lackedGood`): the first good of a node that no node

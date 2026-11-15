@@ -644,8 +644,8 @@ The shared language of the game. Domain terms only — no implementation details
   reserve (a balance number). Those gathering them are still spare hands for its full wait. A dip below the reserve only restarts that time if it lasts longer than a game
   day, though nothing sets out during one. A full city founds a daughter (Founding).
 - **Founding:** how a full NPC city spreads out. It picks a free Plains site the usual distance
-  from every city (on a map smaller than the game's, scaled with its side but to no less than half:
-  Daniel, 2026-11-15, T100.8), within a set reach of itself and on no realm's territory, nearest a node of
+  from every city (on a map smaller than the game's but at least half its side, scaled with the
+  side: Daniel, 2026-11-15, T100.8), within a set reach of itself and on no realm's territory, nearest a node of
   the good it is short of and has no node for. A **founding party** of a village's worth of
   adults, more from a big city, one of them armed, each carrying a share of the materials (a town
   hall's and a storage's, and houses for those past a village's worth) and Food for the walk and
