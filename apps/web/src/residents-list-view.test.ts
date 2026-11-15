@@ -87,6 +87,14 @@ describe('a row of the full list', () => {
     expect(residentRow(edda({ carried: { wood: 3 } }), options).gear).toBe('')
   })
 
+  it('shows steel gear over iron, and only the best shield and armour', () => {
+    const row = residentRow(
+      edda({ carried: { sword: 1, steelSword: 1, shield: 1, steelShield: 1, armour: 1 } }),
+      options,
+    )
+    expect(row.gear).toBe('Steel sword, Steel shield, Armour')
+  })
+
   it('says what they carry, the most first, and how heavy it is', () => {
     const row = residentRow(edda({ carried: { food: 2, wood: 4, sword: 1 } }), options)
     expect(row.carrying).toBe('4 Wood, 2 Food, 1 Sword')

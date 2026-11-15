@@ -73,12 +73,13 @@ pub fn first_difference(want: &Value, got: &Value, at: &str) -> Option<String> {
     }
 }
 
-/// `v` with Coal and Steel left out (`CONTEXT.md`: Coal, T101.3, T101.4): the frozen TypeScript
-/// knew neither, so a comparison with its fixtures leaves out every `coal` and `steel` key and every
-/// list entry of them (the good itself, `{ good: "coal", … }` or `["coal", …]`). Rust tests of
-/// Coal and Steel check them instead.
+/// `v` with Coal, Steel and the steel weapons and armour left out (`CONTEXT.md`: Coal, T101.3,
+/// T101.4, T101.5): the frozen TypeScript knew none of them, so a comparison with its fixtures
+/// leaves out every such key and every list entry of them (the good itself, `{ good: "coal", … }`
+/// or `["coal", …]`). Rust tests of these goods check them instead.
 pub fn without_coal(v: &Value) -> Value {
-    let new = |g: &Value| g == "coal" || g == "steel";
+    const NEW: [&str; 5] = ["coal", "steel", "steelSword", "steelShield", "steelArmour"];
+    let new = |g: &Value| NEW.iter().any(|n| g == n);
     let is_coal = |e: &Value| new(e) || e.get("good").is_some_and(new) || e.get(0).is_some_and(new);
     match v {
         Value::Array(a) => {
@@ -86,7 +87,7 @@ pub fn without_coal(v: &Value) -> Value {
         }
         Value::Object(o) => Value::Object(
             o.iter()
-                .filter(|(k, _)| *k != "coal" && *k != "steel")
+                .filter(|(k, _)| !NEW.contains(&k.as_str()))
                 .map(|(k, v)| (k.clone(), without_coal(v)))
                 .collect(),
         ),
