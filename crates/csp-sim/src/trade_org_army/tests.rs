@@ -176,6 +176,44 @@ fn is_built_by_the_hq_from_its_own_adults_and_its_goods_warehouse() {
 }
 
 #[test]
+fn arms_its_soldiers_with_steel_once_its_goods_warehouse_holds_it_and_iron_before() {
+    let mut s = setup();
+    let hq = s.hq.clone();
+    let g = goods_warehouse(&s);
+    fn stock(s: &mut Setup, g: usize) -> &mut csp_shared::world::Stock {
+        s.world.buildings[g].stock.get_or_insert_with(Default::default)
+    }
+    for kit in [Good::SteelSword, Good::SteelArmour, Good::SteelShield] {
+        stock(&mut s, g).shift_remove(&kit);
+    }
+    arm(&mut s.world, &hq, 4);
+    // With no steel there, they keep their spears.
+    run(&mut s, 50, &never);
+    let held = |w: &WorldState, i: usize, g: Good| w.residents[i].carried.get(&g).copied();
+    for i in hq_soldiers(&s.world) {
+        assert_eq!(held(&s.world, i, Good::SteelSword), None);
+    }
+    // Once it holds steel, every soldier fetches the sword, armour and shield and puts the spear
+    // back.
+    let n = TRADE_ORG_ARMY.size + 10.0;
+    for kit in [Good::SteelSword, Good::SteelArmour, Good::SteelShield] {
+        stock(&mut s, g).insert(kit, n);
+    }
+    let steel = |w: &WorldState| {
+        let soldiers = hq_soldiers(w);
+        !soldiers.is_empty()
+            && soldiers.iter().all(|&i| {
+                [Good::SteelSword, Good::SteelArmour, Good::SteelShield]
+                    .iter()
+                    .all(|&k| held(w, i, k).unwrap_or(0.0) > 0.0)
+                    && held(w, i, Good::Spear).unwrap_or(0.0) <= 0.0
+            })
+    };
+    run(&mut s, 3 * TICKS_PER_GAME_DAY as usize, &steel);
+    assert!(steel(&s.world));
+}
+
+#[test]
 fn arms_no_more_than_it_can_while_keeping_its_workers() {
     let mut s = setup();
     let g = goods_warehouse(&s);

@@ -15,7 +15,8 @@ use csp_shared::world::{
 };
 use serde_json::{json, Value};
 
-use super::{default_script, haul, npc_home, put_to_work, stop_work, walk_to, workplace_of};
+use super::{default_script, haul, npc_home, put_to_work_making, stop_work, walk_to, workplace_of};
+use crate::npc_chain::chain_makes;
 use crate::npc_chain::{chain_store_index, holds_batch, warehouse_for};
 use crate::npc_founding::{found_daughter, founding_party, step_founders};
 use crate::npc_growth::{
@@ -36,7 +37,7 @@ use crate::queries::city::{city_residents, in_city_area};
 use crate::queries::goods::units_that_fit;
 use crate::queries::horses::{owns_horse, HorseOwner};
 use crate::queries::names::{good_name, held, held_in, kind_name, placed};
-use crate::queries::npc_trade::{npc_horses_wanted, NPC_SMITHY_WEAPON};
+use crate::queries::npc_trade::npc_horses_wanted;
 use crate::queries::residents::{can_work, carry_capacity, is_armed, stock_weight};
 use crate::queries::warehouse::warehouse_keeps;
 use crate::random::hash_str;
@@ -269,7 +270,7 @@ fn run_city(
             let pb = &world.buildings[place];
             if processes(pb.kind)
                 && !input_left(world, pb, i)
-                && !input_in(pb, store.map(|s| &world.buildings[s]))
+                && !input_in(world, pb, store.map(|s| &world.buildings[s]))
             {
                 stop_work(&mut world.residents[i]);
             }
@@ -321,6 +322,17 @@ fn run_city(
             world.city_plans.get(city_id)?.project.clone()
         };
 
+    // Where its soldiers fetch and put back their gear (`upgrade_soldiers`).
+    let stores: Vec<(f64, f64)> = world
+        .buildings
+        .iter()
+        .filter(|b| {
+            matches!(b.kind, BuildingKind::Storage | BuildingKind::Warehouse)
+                && b.site.is_none()
+                && b.city_id.as_deref() == Some(city_id)
+        })
+        .map(|b| (b.x, b.y))
+        .collect();
     for &i in &adults {
         let rid = world.residents[i].id.clone();
         let job = jobs.get(&rid).cloned();
@@ -328,7 +340,7 @@ fn run_city(
         // The pass just now gave a soldier another post: a walk to their old one ends here.
         if passed && has_posts && armed {
             let post = post_of(world, &city, &adults, size, terrain, &mut posts, &rid);
-            if walking_off_post(&world.residents[i], post.as_ref(), size) {
+            if walking_off_post(&world.residents[i], post.as_ref(), &stores, size) {
                 world.residents[i].order = None;
             }
         }
@@ -478,7 +490,8 @@ fn run_city(
                             .is_none_or(|s| take_set_out_food(world, i, place, s, size, terrain))
                         {
                             let pb = world.buildings[place].clone();
-                            put_to_work(&mut world.residents[i], &pb);
+                            let makes = chain_makes(world, &pb);
+                            put_to_work_making(&mut world.residents[i], &pb, makes);
                             places.take(&pb);
                         }
                         continue;
@@ -609,16 +622,21 @@ fn stand_post(
     }
 }
 
-/// Whether a soldier is on a walk that doesn't end on their post, with no load to put away first
-/// (`walkingOffPost`).
+/// Whether a soldier is on a walk that doesn't end on their post or at one of the city's `stores`,
+/// with no load to put away first (`walkingOffPost`).
 fn walking_off_post(
     r: &csp_shared::world::Resident,
     post: Option<&SoldierPost>,
+    stores: &[(f64, f64)],
     size: i32,
 ) -> bool {
     let (Some(ResidentOrder::WalkTo(o)), None, Some(post)) = (&r.order, &r.script, post) else {
         return false;
     };
+    // A walk to the city's storage, to fetch or put back gear, goes on.
+    if stores.contains(&(o.target.x, o.target.y)) {
+        return false;
+    }
     let load = haul(r, None);
     !post.tiles.contains(&tile_index(size, o.target.x as i32, o.target.y as i32))
         && load.as_ref().is_none_or(only_food)
@@ -670,12 +688,9 @@ fn work_by_default(world: &mut WorldState, i: usize) {
         return;
     }
     let mut memory = json!({ "workplaceId": o.building_id });
-    let smithy = world
-        .buildings
-        .iter()
-        .find(|b| b.id == o.building_id)
-        .is_some_and(|b| b.kind == BuildingKind::Smithy);
-    let makes = o.makes.or(smithy.then_some(NPC_SMITHY_WEAPON));
+    let chain =
+        world.buildings.iter().find(|b| b.id == o.building_id).and_then(|b| chain_makes(world, b));
+    let makes = o.makes.or(chain);
     if let Some(makes) = makes {
         memory["makes"] = json!(good_name(makes));
     }
@@ -816,13 +831,13 @@ fn input_of(world: &WorldState, job: Option<&CityJob>) -> Option<Stock> {
     if !processes(place.kind) {
         return None;
     }
-    let makes = (place.kind == BuildingKind::Smithy).then(|| good_name(NPC_SMITHY_WEAPON));
+    let makes = chain_makes(world, place).map(good_name);
     recipe_for(place.kind, makes).map(|r| recipe_input(r).into_iter().collect())
 }
 
 /// Whether a worker at a workplace that processes goods can go on (`inputLeft`).
 fn input_left(world: &WorldState, place: &Building, i: usize) -> bool {
-    let makes = (place.kind == BuildingKind::Smithy).then(|| good_name(NPC_SMITHY_WEAPON));
+    let makes = chain_makes(world, place).map(good_name);
     let Some(recipe) = recipe_for(place.kind, makes) else { return true };
     if has_input(world, place, recipe) {
         return true;
@@ -831,8 +846,8 @@ fn input_left(world: &WorldState, place: &Building, i: usize) -> bool {
 }
 
 /// Whether a store holds a batch of what a workplace that processes goods uses up (`inputIn`).
-fn input_in(place: &Building, store: Option<&Building>) -> bool {
-    let makes = (place.kind == BuildingKind::Smithy).then(|| good_name(NPC_SMITHY_WEAPON));
+fn input_in(world: &WorldState, place: &Building, store: Option<&Building>) -> bool {
+    let makes = chain_makes(world, place).map(good_name);
     recipe_for(place.kind, makes).is_some_and(|r| {
         holds_batch(store.and_then(|s| s.stock.as_ref()), &recipe_input(r).into_iter().collect())
     })
