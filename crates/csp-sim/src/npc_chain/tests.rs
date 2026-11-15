@@ -13,10 +13,11 @@ use csp_shared::world::{
 };
 use serde_json::json;
 
-use super::short_goods;
+use super::{chain_good, chain_makes, own_workplaces, short_goods};
 use crate::invariants::check_all;
 use crate::npc_behaviour::{npc_home, put_to_work, step_npc_cities};
 use crate::npc_cities::found_npc_city;
+use crate::npc_defence::step_npc_defence;
 use crate::npc_growth::chain_project;
 use crate::npc_plan::plan_city;
 use crate::npc_test_world::{plains, Runner};
@@ -24,7 +25,8 @@ use crate::queries::building::recipe_for;
 use crate::queries::city::city_residents;
 use crate::queries::names::good_name;
 use crate::queries::npc_trade::{
-    npc_city_stock, npc_reserve, npc_soldier_target, NPC_SMITHY_WEAPON,
+    npc_city_stock, npc_makes_steel, npc_reserve, npc_soldier_kit, npc_soldier_target,
+    NPC_SMITHY_WEAPON,
 };
 use crate::queries::residents::{can_work, is_armed};
 use crate::random::Mulberry32;
@@ -268,4 +270,209 @@ fn a_village_with_no_iron_in_reach_stays_short_of_weapons_and_is_still_fed() {
     // Fed: nobody starved, and its storages hold Food.
     assert!(city_residents(&world, &city).iter().filter(|r| r.health > 0.0).count() >= people);
     assert!(npc_city_stock(&world, c).get(&Good::Food).copied().unwrap_or(0.0) > 0.0);
+}
+
+// T101.6: NPC cities and Coal and Steel (`CONTEXT.md`: NPC reserve).
+
+/// A finished workplace of the city's, by its `workplaceIds`.
+fn add_workplace(world: &mut WorldState, city: &str, id: &str, kind: BuildingKind, x: f64, y: f64) {
+    world.buildings.push(crate::test_support::building(id, kind, None, x, y));
+    city_mut(world, city).workplace_ids.get_or_insert_with(Vec::new).push(id.into());
+}
+
+fn held_good(stock: &Stock, g: Good) -> f64 {
+    stock.get(&g).copied().unwrap_or(0.0)
+}
+
+fn storage_index(world: &WorldState, city: &str) -> usize {
+    let home = npc_home(world, city).expect("a home").id.clone();
+    world.buildings.iter().position(|b| b.id == home).expect("the storage")
+}
+
+#[test]
+fn a_town_that_knows_of_a_coal_node_wants_the_steel_kit_and_builds_mine_smelters_and_smithy() {
+    use ResourceKind::{Coal, Forest, IronOre};
+    let (mut world, terrain, city) = city_with(&NPC_TOWN, &[Forest, IronOre, Coal]);
+    let home = npc_home(&world, &city).unwrap().clone();
+    let c = city_of(&world, &city);
+    assert!(npc_makes_steel(&world, c));
+    assert_eq!(super::steel_only_with_coal(&world), []);
+    let target = soldiers(&world, &city).1;
+    let reserve = npc_reserve(&world, c);
+    // A steel Sword, Armour and Shield for each soldier, no spear; their Steel (2 + 7 + 1 each),
+    // and the Iron and Coal for that Steel.
+    for g in [Good::SteelSword, Good::SteelArmour, Good::SteelShield] {
+        assert_eq!(held_good(&reserve, g), target, "{g:?}");
+    }
+    assert_eq!(held_good(&reserve, Good::Spear), 0.0);
+    assert_eq!(held_good(&reserve, Good::Steel), 10.0 * target);
+    assert!(held_good(&reserve, Good::Iron) >= 10.0 * target);
+    // And the Iron ore for that Iron, two a unit.
+    assert!(held_good(&reserve, Good::IronOre) >= 20.0 * target);
+    assert_eq!(held_good(&reserve, Good::Coal), 10.0 * target);
+    let short = short_goods(&world, c, terrain.size, None);
+    for g in [Good::SteelSword, Good::Steel, Good::Coal] {
+        assert!(short.contains(&g), "{g:?} in {short:?}");
+    }
+    let next = |world: &WorldState| {
+        let c = city_of(world, &city);
+        match chain_project(world, c, &home, &terrain, None, Good::SteelSword, &mut HashSet::new())
+        {
+            Some(CityProject::Build { building, .. }) => Some(building),
+            _ => None,
+        }
+    };
+    // Steel wants Iron and Coal: a mine on the ore first, then one on the coal.
+    assert_eq!(next(&world), Some(BuildingKind::Mine));
+    let node = |world: &WorldState, kind: ResourceKind| {
+        let n = world.nodes.iter().find(|n| n.kind == kind).unwrap();
+        (n.x, n.y)
+    };
+    // Its Iron first: a smelter on top of the mine.
+    let (ox, oy) = node(&world, IronOre);
+    add_workplace(&mut world, &city, "ore-mine", BuildingKind::Mine, ox, oy);
+    assert_eq!(next(&world), Some(BuildingKind::Smelter));
+    add_workplace(&mut world, &city, "smelter-1", BuildingKind::Smelter, 30.0, 30.0);
+    assert_eq!(chain_good(&world, world.buildings.last().unwrap()), Some(Good::Iron));
+    // Then the Coal: a mine on the coal node, and a second smelter, which smelts the Steel.
+    assert_eq!(next(&world), Some(BuildingKind::Mine));
+    let (cx, cy) = node(&world, Coal);
+    add_workplace(&mut world, &city, "coal-mine", BuildingKind::Mine, cx, cy);
+    assert_eq!(next(&world), Some(BuildingKind::Smelter));
+    add_workplace(&mut world, &city, "smelter-2", BuildingKind::Smelter, 34.0, 30.0);
+    assert_eq!(chain_good(&world, world.buildings.last().unwrap()), Some(Good::Steel));
+    assert_eq!(chain_makes(&world, world.buildings.last().unwrap()), Some(Good::Steel));
+    // The sword's Wood: a lumber camp. Then the smithy, which forges the steel sword first.
+    assert_eq!(next(&world), Some(BuildingKind::LumberCamp));
+    let (fx, fy) = node(&world, Forest);
+    add_workplace(&mut world, &city, "camp", BuildingKind::LumberCamp, fx, fy);
+    assert_eq!(next(&world), Some(BuildingKind::Smithy));
+    add_workplace(&mut world, &city, "smithy", BuildingKind::Smithy, 38.0, 30.0);
+    assert_eq!(chain_good(&world, world.buildings.last().unwrap()), Some(Good::SteelSword));
+    assert_eq!(next(&world), None);
+    // Once its storage holds the swords its soldiers lack, the smithy forges the armour.
+    let storage = storage_index(&world, &city);
+    world.buildings[storage].stock.get_or_insert_with(Stock::new).insert(Good::SteelSword, target);
+    let smithy = world.buildings.iter().find(|b| b.id == "smithy").unwrap();
+    assert_eq!(chain_good(&world, smithy), Some(Good::SteelArmour));
+}
+
+#[test]
+fn a_village_with_no_coal_node_in_reach_stays_on_the_iron_spear() {
+    use ResourceKind::{Forest, IronOre};
+    let (mut world, _terrain, city) = city_with(&NPC_VILLAGE, &[Forest, IronOre]);
+    // A coal node out of its reach, and not scouted.
+    let home = npc_home(&world, &city).unwrap().clone();
+    world.nodes.push(ResourceNode {
+        id: "far-coal".into(),
+        kind: ResourceKind::Coal,
+        x: home.x + 150.0,
+        y: home.y + 150.0,
+        richness: Default::default(),
+        stock: None,
+    });
+    let c = city_of(&world, &city);
+    assert!(!npc_makes_steel(&world, c));
+    assert_eq!(super::steel_only_with_coal(&world), []);
+    assert_eq!(npc_soldier_kit(&world, c), vec![NPC_SMITHY_WEAPON]);
+    let reserve = npc_reserve(&world, c);
+    assert!(held_good(&reserve, NPC_SMITHY_WEAPON) > 0.0);
+    for g in [Good::SteelSword, Good::SteelArmour, Good::SteelShield, Good::Steel, Good::Coal] {
+        assert_eq!(held_good(&reserve, g), 0.0, "{g:?}");
+    }
+    for (i, x) in [30.0, 34.0].into_iter().enumerate() {
+        add_workplace(&mut world, &city, &format!("smelter-{i}"), BuildingKind::Smelter, x, 30.0);
+        let smelter = world.buildings.last().unwrap();
+        assert_eq!(chain_good(&world, smelter), Some(Good::Iron));
+    }
+}
+
+/// Every adult of the city carries a spear and stands at its storage with nothing to do.
+fn spears_at_the_storage(world: &mut WorldState, city: &str) -> Vec<usize> {
+    let storage = storage_index(world, city);
+    let (sx, sy) = (world.buildings[storage].x, world.buildings[storage].y);
+    let tick = world.tick as f64;
+    let adults: Vec<usize> = (0..world.residents.len())
+        .filter(|&i| world.residents[i].city_id.as_deref() == Some(city))
+        .filter(|&i| can_work(world.residents[i].born_at, tick))
+        .collect();
+    for &i in &adults {
+        let r = &mut world.residents[i];
+        r.carried.insert(Good::Spear, 1.0);
+        (r.x, r.y, r.order, r.script) = (sx, sy, None, None);
+    }
+    adults
+}
+
+#[test]
+fn a_soldier_fetches_the_steel_sword_its_storage_holds_and_puts_back_the_spear() {
+    use ResourceKind::{Coal, Forest, IronOre};
+    let (mut world, terrain, city) = city_with(&NPC_TOWN, &[Forest, IronOre, Coal]);
+    let adults = spears_at_the_storage(&mut world, &city);
+    let storage = storage_index(&world, &city);
+    let storage_id = world.buildings[storage].id.clone();
+    world.buildings[storage].stock.get_or_insert_with(Stock::new).insert(Good::SteelSword, 1.0);
+    step_npc_defence(&mut world, terrain.size);
+    let want = json!({ "kind": "pickUp", "from": { "kind": "storage", "storageId": storage_id },
+        "goods": { "steelSword": 1.0 } });
+    let fetching: Vec<usize> = adults
+        .iter()
+        .copied()
+        .filter(|&i| {
+            let got = serde_json::to_value(&world.residents[i].order).unwrap();
+            crate::test_support::as_numbers(&got) == crate::test_support::as_numbers(&want)
+        })
+        .collect();
+    assert_eq!(fetching.len(), 1, "one soldier fetches it");
+    // Carrying it, they put the spear it outdoes back.
+    let s = fetching[0];
+    world.residents[s].carried.insert(Good::SteelSword, 1.0);
+    world.residents[s].order = None;
+    step_npc_defence(&mut world, terrain.size);
+    let want = json!({ "kind": "drop", "to": { "kind": "storage", "storageId": storage_id },
+        "goods": { "spear": 1.0 } });
+    let got = serde_json::to_value(&world.residents[s].order).unwrap();
+    assert_eq!(crate::test_support::as_numbers(&got), crate::test_support::as_numbers(&want));
+}
+
+#[test]
+fn a_heartland_villages_soldiers_keep_their_spears_by_steel_in_its_storage() {
+    use ResourceKind::{Forest, IronOre};
+    let (mut world, terrain, city) = city_with(&NPC_VILLAGE, &[Forest, IronOre]);
+    let adults = spears_at_the_storage(&mut world, &city);
+    let storage = storage_index(&world, &city);
+    world.buildings[storage].stock.get_or_insert_with(Stock::new).insert(Good::SteelSword, 5.0);
+    step_npc_defence(&mut world, terrain.size);
+    for &i in &adults {
+        assert_eq!(world.residents[i].order, None);
+    }
+}
+
+/// A frontier town with a coal node, its forest, ore and coal in reach and Stone in store, runs until
+/// its soldiers carry steel swords: it builds mines, smelters and a smithy on the way.
+#[test]
+#[ignore = "a long chain run, like the iron one above; see #1132"]
+fn a_frontier_town_with_a_coal_node_builds_the_chain_and_arms_its_soldiers_in_steel() {
+    use ResourceKind::{Coal, Forest, IronOre};
+    let (mut world, terrain, city) = city_with(&NPC_TOWN, &[Forest, IronOre, Coal]);
+    // It has no stone node here (three nodes at most): Stone for its mines and smelters in store.
+    let storage = storage_index(&world, &city);
+    world.buildings[storage].stock.get_or_insert_with(Stock::new).insert(Good::Stone, 300.0);
+    let steel_armed = |w: &WorldState| {
+        let target = soldiers(w, &city).1;
+        let n = city_residents(w, &city)
+            .iter()
+            .filter(|r| r.health > 0.0 && held_good(&r.carried, Good::SteelSword) > 0.0)
+            .count();
+        n as f64 >= target
+    };
+    let finished = run_days(&mut world, &terrain, 240, &steel_armed);
+    for kind in [BuildingKind::Mine, BuildingKind::Smelter, BuildingKind::Smithy] {
+        assert!(finished.contains_key(&kind), "{kind:?} built");
+    }
+    let c = city_of(&world, &city);
+    let smelters =
+        own_workplaces(&world, c).iter().filter(|b| b.kind == BuildingKind::Smelter).count();
+    assert!(smelters >= 2, "an Iron and a Steel smelter");
+    assert!(steel_armed(&world));
 }

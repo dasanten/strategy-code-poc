@@ -738,6 +738,11 @@ pub const WORK_FOOD_KEPT: f64 = 2.0;
 /// up so even a village keeps one: a starting village (6 residents) keeps 2, a town (16) keeps 4.
 pub const NPC_SOLDIER_SHARE: f64 = 0.25;
 
+/// What each soldier of an NPC city that knows of a coal node wants (`CONTEXT.md`: NPC reserve),
+/// forged in this order: its smithy forges the first its soldiers still lack. A city with no coal
+/// node in reach keeps to the iron spear (`NPC_SMITHY_WEAPON`).
+pub const NPC_STEEL_KIT: [&str; 3] = ["steelSword", "steelArmour", "steelShield"];
+
 /// How many of an NPC city's soldiers stand on its town hall between fights, the first to be posted
 /// (`CONTEXT.md`: Soldier posts). One there is enough to block an occupation; a second keeps it held
 /// when the first is called away.
@@ -1094,7 +1099,8 @@ pub struct TradingPost {
     /// Coins in its warehouse.
     pub coins: f64,
     /// Goods in its warehouse, in units: twice its floor (`WAREHOUSE_FLOOR`), so it has a market of every
-    /// good until its first trader and caravan come by, and its soldiers' weapons.
+    /// good until its first trader and caravan come by, and its soldiers' weapons. No steel weapons or
+    /// armour: those come by caravan, so its soldiers start out on iron.
     pub goods: Table<f64>,
 }
 
@@ -1126,9 +1132,8 @@ pub const TRADING_POST: TradingPost = TradingPost {
 /// A trading post's stock floor (`CONTEXT.md`: Stock floor, ADR 0023), in units: what its spare
 /// hands, caravan and wandering traders go for, and what its prices are reckoned from. It tops up
 /// nothing at a post; the HQ's warehouses top up to `HQ_FLOOR_FACTOR` times this each game day. Half
-/// of what a post starts with, so a fresh post is well above it. A floor of 0 means warehouses don't
-/// trade the good: the steel weapons and armour, until T101.6 decides what the Trade Organization
-/// does with Steel.
+/// of what a post starts with, so a fresh post is well above it. A floor of 0 would mean warehouses
+/// don't trade the good.
 pub const WAREHOUSE_FLOOR: Table<f64> = Table(&[
     ("food", 20.0),
     ("wood", 25.0),
@@ -1143,9 +1148,9 @@ pub const WAREHOUSE_FLOOR: Table<f64> = Table(&[
     ("sword", 1.0),
     ("shield", 2.0),
     ("armour", 1.0),
-    ("steelSword", 0.0),
-    ("steelShield", 0.0),
-    ("steelArmour", 0.0),
+    ("steelSword", 1.0),
+    ("steelShield", 1.0),
+    ("steelArmour", 1.0),
 ]);
 
 /// How many times a trading post's floor (`WAREHOUSE_FLOOR`) the Trade Org HQ's warehouses keep.
@@ -2679,6 +2684,7 @@ pub fn balance_json() -> Value {
     m.insert("NPC_FOOD_SHORT_DAYS".into(), json!(NPC_FOOD_SHORT_DAYS));
     m.insert("WORK_FOOD_KEPT".into(), json!(WORK_FOOD_KEPT));
     m.insert("NPC_SOLDIER_SHARE".into(), json!(NPC_SOLDIER_SHARE));
+    m.insert("NPC_STEEL_KIT".into(), json!(NPC_STEEL_KIT));
     m.insert("NPC_SOLDIERS_ON_HALL".into(), json!(NPC_SOLDIERS_ON_HALL));
     m.insert("NPC_SOLDIERS_AT_GATE".into(), json!(NPC_SOLDIERS_AT_GATE));
     m.insert("NPC_POST_AROUND_HALL".into(), json!(NPC_POST_AROUND_HALL));
