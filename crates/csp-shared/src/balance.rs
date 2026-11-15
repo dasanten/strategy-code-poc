@@ -2207,6 +2207,11 @@ pub const BROKEN_MATERIALS_RETURNED: f64 = 0.34;
 /// minute, as long as walking eight tiles of plains, all the while unable to dodge or strike back.
 pub const CLIMB_TICKS: f64 = 60.0;
 
+/// Ticks it takes to get up onto a wall walk from the ground next to the wall, and as long again to
+/// get down (`CONTEXT.md`: Wall walk): twenty seconds, as long as walking about three tiles of
+/// plains, so nobody goes up on the way somewhere else.
+pub const WALL_WALK_TICKS: f64 = 20.0;
+
 /// Chance of dodging a blow for each point of Agility: an average resident dodges one in five.
 pub const DODGE_PER_AGILITY: f64 = 0.02;
 
@@ -2908,6 +2913,7 @@ pub fn balance_json() -> Value {
     m.insert("WALL_STRENGTH".into(), to_value(WALL_STRENGTH).expect("serialisable"));
     m.insert("BROKEN_MATERIALS_RETURNED".into(), json!(BROKEN_MATERIALS_RETURNED));
     m.insert("CLIMB_TICKS".into(), json!(CLIMB_TICKS));
+    m.insert("WALL_WALK_TICKS".into(), json!(WALL_WALK_TICKS));
     m.insert("DODGE_PER_AGILITY".into(), json!(DODGE_PER_AGILITY));
     m.insert("DODGE_LIMIT".into(), json!(DODGE_LIMIT));
     m.insert("COMBAT_SKILL_PER_BLOW".into(), json!(COMBAT_SKILL_PER_BLOW));

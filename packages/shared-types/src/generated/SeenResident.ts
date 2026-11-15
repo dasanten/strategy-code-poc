@@ -13,6 +13,7 @@ import type { SkillName } from "./SkillName.js";
 import type { Stat } from "./Stat.js";
 import type { StatRecord } from "./StatRecord.js";
 import type { Struck } from "./Struck.js";
+import type { UpSide } from "./UpSide.js";
 
 /**
  * A resident as Players see them (`SeenResident`): the fields of `Resident` but their script's
@@ -20,7 +21,7 @@ import type { Struck } from "./Struck.js";
  * when a strike or Down ends) only for their own realm and allies, their script params only for
  * the realm commanding them.
  */
-export type SeenResident = { id: string, name: string, gameName?: true, owner: string | null, cityId: string | null, x: number, y: number, stats: StatRecord<Stat>, skills: { [key in SkillName]?: number }, health?: number, hunger?: number, bornAt: number, lifespan: number, carried: { [key in Good]?: number }, order: ResidentOrder | null, orderEnded?: OrderEnded, struck?: Struck, script?: SeenScript, interrupted?: SeenInterrupted, defenceScriptId?: number, alarmScriptId?: AlarmScriptId, scriptParams?: { [key in number]: { [key in string]: ScriptParamValue } }, queue?: Queue, pair?: Pair, carrying?: Carrying, riding?: string, aboard?: string, downUntil?: number, 
+export type SeenResident = { id: string, name: string, gameName?: true, owner: string | null, cityId: string | null, x: number, y: number, stats: StatRecord<Stat>, skills: { [key in SkillName]?: number }, health?: number, hunger?: number, bornAt: number, lifespan: number, carried: { [key in Good]?: number }, order: ResidentOrder | null, orderEnded?: OrderEnded, struck?: Struck, script?: SeenScript, interrupted?: SeenInterrupted, defenceScriptId?: number, alarmScriptId?: AlarmScriptId, scriptParams?: { [key in number]: { [key in string]: ScriptParamValue } }, queue?: Queue, pair?: Pair, carrying?: Carrying, riding?: string, aboard?: string, up?: UpSide, downUntil?: number, 
 /**
  * Set (to `true`) while they are Down, which anyone in sight sees.
  */

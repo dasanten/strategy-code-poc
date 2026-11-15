@@ -242,6 +242,20 @@ pub struct Resident {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub down_until: Option<f64>,
+    /// Up on the wall walk (`CONTEXT.md`: Wall walk), with the side they came up from, the side
+    /// they come down to; on the ground when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub up: Option<UpSide>,
+}
+
+/// The side of a wall someone up on its walk came up from, and comes down to again (`CONTEXT.md`:
+/// Wall walk): inside its ring, or outside it (either side of a stretch with no inside).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum UpSide {
+    Inside,
+    Outside,
 }
 
 /// What a resident runs when an alarm reaches them (`Resident.alarmScriptId`): a script id, or

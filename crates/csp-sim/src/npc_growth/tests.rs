@@ -10,7 +10,7 @@ use csp_shared::terrain::{tile_index, Terrain};
 use csp_shared::time::{TICKS_PER_GAME_DAY, TICKS_PER_GAME_YEAR};
 use csp_shared::world::{
     Building, BuildingKind, Carrying, CityProject, Good, Pair, Resident, ResidentOrder, StatRecord,
-    Stock, Task, WorldState,
+    Stock, Task, UpSide, WorldState,
 };
 use serde_json::{json, Value};
 
@@ -28,7 +28,7 @@ use crate::queries::city::city_residents;
 use crate::queries::city_area::city_area_tiles;
 use crate::random::{new_id, Mulberry32};
 use crate::residents::{new_resident, NewResident};
-use crate::walls::{may_step, wall_map, wall_side};
+use crate::walls::{may_move, wall_map, wall_side};
 
 const DAY: usize = TICKS_PER_GAME_DAY as usize;
 
@@ -412,7 +412,7 @@ fn catches_a_city_working_one_of_its_farms_as_its_own_workplace() {
 }
 
 #[test]
-fn an_npc_citys_residents_stand_on_its_walls_others_dont() {
+fn an_npc_citys_residents_get_up_on_its_walls_others_dont() {
     let v = village(None);
     let walls = wall_map(&v.world, &v.terrain);
     let size = v.terrain.size;
@@ -421,9 +421,10 @@ fn an_npc_citys_residents_stand_on_its_walls_others_dont() {
     let wall = tile_index(size, hx, hy - WALL);
     let own = &v.world.residents[0];
     assert_eq!(wall_side(own), Some(v.city.as_str()));
-    assert!(may_step(&walls, wall_side(own), inside, wall, true, false));
-    assert!(!may_step(&walls, None, inside, wall, true, false));
-    assert!(!may_step(&walls, Some("realm1"), inside, wall, true, false));
+    let up = Some(UpSide::Inside);
+    assert!(may_move(&walls, wall_side(own), inside, None, wall, up, false));
+    assert!(!may_move(&walls, None, inside, None, wall, up, false));
+    assert!(!may_move(&walls, Some("realm1"), inside, None, wall, up, false));
 }
 
 // npc-growth-village.test.ts

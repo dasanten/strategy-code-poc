@@ -218,6 +218,9 @@ fn as_view(world: &WorldState, mut r: Map<String, Json>) -> Map<String, Json> {
     let down = r.get("downUntil").is_some_and(|v| !v.is_null())
         || r.get("down") == Some(&Json::Bool(true));
     r.insert("down".into(), Json::Bool(down));
+    // Up on the wall walk, whichever side they came from (`CONTEXT.md`: Wall walk).
+    let up = r.get("up").is_some_and(|v| !v.is_null() && *v != Json::Bool(false));
+    r.insert("up".into(), Json::Bool(up));
     if let Some(q) = r.get("queue").filter(|v| !v.is_null()).cloned() {
         if let Ok(q) = serde_json::from_value(q) {
             r.insert("queue".into(), serde_json::to_value(queue_view(&q)).unwrap_or(Json::Null));
@@ -384,6 +387,7 @@ fn resident_view(
             "carrying" => field_value(&r.carrying, f.r#type),
             "riding" => text(r.riding.as_ref()),
             "aboard" => text(r.aboard.as_ref()),
+            "up" => Value::Bool(r.up.is_some()),
             // `knownThief` is for others, and `script` is left out of `me`.
             _ => Value::Null,
         };
