@@ -3375,12 +3375,22 @@ export function Wiki() {
           the walk beside them unless the way round through a gate is quicker; a trading post's and
           the HQ's soldiers do the same.
         </p>
+        <p>
+          <strong>The high ground.</strong> Whoever is up strikes down at anyone on the ground next
+          to the wall, but nobody on the ground can strike anyone up: from below there is only the
+          wall or gate itself to break, or climbing it, both while being struck from above. Order a
+          resident below to attack someone up and they won't (“they are up on the wall”). A climber
+          is on the ground until over; one who made it and stands on the wall fights those up as
+          anywhere, and so do those up on two walls that touch. Up on their own city's wall,
+          defenders still take only {pct(WALL_DEFENCE)} of each blow.
+        </p>
         <h3>Under attack</h3>
         <p>
           A resident of yours who is struck and lives runs their defence script,{' '}
           <strong>Defend</strong> (one of your default scripts): armed, they fight back at whoever
-          struck them until that one is dead, gone or out of sight; unarmed, they walk home to their
-          city's town hall, and stop once there or once no blow has landed for{' '}
+          struck them until that one is dead, gone or out of sight; unarmed, or struck from up on a
+          wall where they can't strike back, they walk home to their city's town hall, away from the
+          wall, and stop once there or once no blow has landed for{' '}
           {duration(DEFEND_CALM_TICKS)}. Their card says “Defending: fighting back at Bo” or
           “Defending: fleeing home”, with what they were doing on the line under it. What they were
           doing waits meanwhile: once Defend ends they go back to it, a script with its memory, a
