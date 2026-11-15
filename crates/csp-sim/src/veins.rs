@@ -61,6 +61,7 @@ fn run_dry(world: &mut WorldState, ni: usize, workplace: &Building) {
         richness: node.richness,
         at: world.tick,
         seen_gone_by: Vec::new(),
+        next: None,
     });
     // A workplace on a node is of no realm: the realms working it are told, once each.
     let mut realms: Vec<String> =
@@ -100,12 +101,20 @@ pub fn see_dry_nodes(world: &mut WorldState, user_id: u64, eyes: &Eyes) -> bool 
 }
 
 /// The tiles of the dry nodes the Player knows are gone, in the order they ran dry: their map
-/// leaves out any node there (`CONTEXT.md`: Running dry).
+/// leaves out any node there (`CONTEXT.md`: Running dry). A tile where the node came back and the
+/// Player has seen it since is not one.
 pub fn gone_nodes_of(world: &WorldState, user_id: u64) -> Vec<(i32, i32)> {
+    let back = |d: &DryNode| {
+        world.nodes.iter().any(|n| {
+            n.x as i32 == d.x as i32
+                && n.y as i32 == d.y as i32
+                && !crate::new_veins::vein_unseen_by(world, &n.id, user_id)
+        })
+    };
     world
         .dry_nodes
         .iter()
-        .filter(|d| d.seen_gone_by.contains(&user_id))
+        .filter(|d| d.seen_gone_by.contains(&user_id) && !back(d))
         .map(|d| (d.x as i32, d.y as i32))
         .collect()
 }

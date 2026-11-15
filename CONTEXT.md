@@ -93,9 +93,15 @@ The shared language of the game. Domain terms only — no implementation details
   built there again. A Player who explored the tile keeps the node on their map until they see
   the tile again, as a building (Last seen). A new
   node of the same kind and richness then comes into being somewhere else in a region that fits,
-  out of every Player's sight; nobody is told, so it has to be found. Whoever works a mine
-  (their realm and its allies) sees how its vein stands in words (plenty, thinning, nearly gone),
-  never as a number; others see nothing of it.
+  out of every Player's sight; nobody is told, so it has to be found. It comes into being in the
+  same tick, on terrain that fits its kind and a free tile spaced from other nodes, in another
+  region than the old one where one fits (a rich one on an island or near a contested frontier
+  spot, a normal one in the frontier) and, where the map allows, on a tile no Player explored; a
+  Player who explored that tile before sees no node there until they see the tile again. The
+  nodes of each kind and richness stay as many as the world was made with: with no fitting tile
+  anywhere (a tiny map) the node comes back where it was after a few game days. Whoever works a
+  mine (their realm and its allies) sees how its vein stands in words (plenty, thinning, nearly
+  gone), never as a number; others see nothing of it.
 - **Workplace:** a building where residents produce goods. Output depends on the workers'
   Strength and skill and is limited by the workplace's maximum number of workers. Working there
   teaches its skill. Its output is left in the pile on the workplace's tile, not in the

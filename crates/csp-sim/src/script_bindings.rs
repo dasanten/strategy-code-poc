@@ -999,6 +999,11 @@ impl<'a> ScriptBindings<'a> {
                     .nodes
                     .iter()
                     .filter(|n| (self.ctx.explored)(n.x as i32, n.y as i32))
+                    // A node that came into being since they explored there is not known yet
+                    // (`CONTEXT.md`: Running dry).
+                    .filter(|n| {
+                        !crate::new_veins::vein_unseen_by(world, &n.id, self.ctx.sender.user_id)
+                    })
                     .map(node_view)
                     .collect(),
             ),

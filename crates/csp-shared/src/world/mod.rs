@@ -1256,6 +1256,15 @@ pub struct WorldState {
     /// them. Left out of a save while there are none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dry_nodes: Vec<DryNode>,
+    /// The new nodes some Players had explored the tile of before they came into being and have
+    /// not seen since (`CONTEXT.md`: Running dry): their map shows no node there yet. Left out of
+    /// a save while there are none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub new_veins: Vec<NewVein>,
+    /// The nodes waiting to come back where they ran dry, as no fitting tile was found for them
+    /// elsewhere (`CONTEXT.md`: Running dry). Left out of a save while there are none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub waiting_veins: Vec<WaitingVein>,
 }
 
 impl WorldState {
@@ -3464,6 +3473,37 @@ pub struct DryNode {
     /// The accounts (see `Realm::user_id`) that have seen its tile since, and so know it is gone.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub seen_gone_by: Vec<u64>,
+    /// The id of the node of its kind and richness that came into being for it (`CONTEXT.md`:
+    /// Running dry): in the world, waiting to come back, or by now dry itself. None only until
+    /// the veins are placed in the tick it ran dry.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub next: Option<String>,
+}
+
+/// A node that came into being where some Players had already explored (`CONTEXT.md`: Running
+/// dry): those who have not seen its tile since still see no node there.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct NewVein {
+    /// The node's id.
+    pub id: String,
+    pub x: f64,
+    pub y: f64,
+    /// The accounts (see `Realm::user_id`) that explored its tile before it was there and have
+    /// not seen the tile since.
+    pub unseen_by: Vec<u64>,
+}
+
+/// A node waiting to come back where it ran dry, as no fitting tile was found for it elsewhere
+/// (`CONTEXT.md`: Running dry).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct WaitingVein {
+    /// The node as it comes back, with a full stock.
+    pub node: ResourceNode,
+    /// The tick it comes back.
+    pub back_at: u64,
 }
 
 impl DryNode {

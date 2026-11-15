@@ -151,6 +151,7 @@ fn a_work_script_started_on_a_dry_mine_ends_there_saying_why() {
         richness: n.richness,
         at: 0,
         seen_gone_by: Vec::new(),
+        next: None,
     });
     let mut g = Game::new(world, terrain, player(MARA));
     g.world.residents[0].script = Some(
@@ -298,6 +299,7 @@ fn far_world() -> (WorldState, TerrainMap) {
         richness: Richness::Rich,
         at: 0,
         seen_gone_by: Vec::new(),
+        next: None,
     });
     (world, terrain)
 }
