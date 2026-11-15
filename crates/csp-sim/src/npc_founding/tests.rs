@@ -167,6 +167,30 @@ fn counts_as_full_from_the_pass_that_finds_spare_hands_with_nowhere_to_go_and_no
     assert_eq!(t.plan().full_since, Some(t.world.tick as f64));
 }
 
+#[test]
+fn counts_as_full_short_of_weapons_and_their_iron_when_it_cannot_make_them() {
+    // No Iron ore it knows of: like Coins it can't earn, the weapons and the Iron to forge them
+    // don't keep it from being full (T100.8). They stay short for all else it does.
+    let mut t = full_town(300);
+    t.home_stock().insert(Good::Iron, 0.0);
+    t.home_stock().insert(Good::Spear, 0.0);
+    t.plan_city();
+    assert_eq!(t.plan().full_since, Some(t.world.tick as f64));
+    let short = crate::npc_chain::short_goods(&t.world, t.city(), t.terrain.size, None);
+    assert!(short.contains(&Good::Iron) && short.contains(&Good::Spear), "{short:?}");
+}
+
+#[test]
+fn is_not_full_short_of_weapons_it_could_make_from_a_node_it_knows() {
+    let mut t = full_town(300);
+    t.home_stock().insert(Good::Iron, 0.0);
+    t.home_stock().insert(Good::Spear, 0.0);
+    let home = t.home();
+    node(&mut t.world, &mut t.terrain, ResourceKind::IronOre, home.x + 30.0, home.y);
+    t.plan_city();
+    assert_eq!(t.plan().full_since, None);
+}
+
 // by its size
 
 /// A full town staged at `residents`, with a site ready and full since `days` ago (`fullFor`).

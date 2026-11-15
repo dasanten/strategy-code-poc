@@ -178,6 +178,15 @@ impl Runner {
     pub fn step(&mut self, world: &mut WorldState, terrain: &TerrainMap) {
         step_world(world, terrain, &mut self.scratch, Some(&mut self.walking), None);
     }
+
+    /// One `stepWorld`, and what it did.
+    pub fn step_with_result(
+        &mut self,
+        world: &mut WorldState,
+        terrain: &TerrainMap,
+    ) -> crate::world::StepResult {
+        step_world(world, terrain, &mut self.scratch, Some(&mut self.walking), None)
+    }
 }
 
 /// Runs the world for up to `ticks`, or until `done`, checking the invariants every game day and,

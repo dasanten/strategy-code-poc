@@ -337,7 +337,10 @@ The shared language of the game. Domain terms only — no implementation details
   waits for it, as there is no Food on that way. A carriage leaves the storage what the HQ's own
   people eat in a few days, but may always take a little for its horse, which eats only from the
   load. Short of Food, it tops up from the goods warehouse, which the HQ's people don't eat from
-  and the Stock floor fills each day; only with none there does it stand and wait.
+  and the Stock floor fills each day; only with none there does it stand and wait. A wandering
+  trader waits the same way at each post (Daniel, 2026-11-14, T100.8): it leaves a post only with
+  enough Food to reach its next stop, topping up from the post's goods warehouse, and with none
+  there stands and waits. A caravan away from the HQ takes what a post's storage has and drives on.
 - **Caravan crew lost:** a caravan outlives its crew. When its driver dies, a surviving escort
   takes over driving. With no crew left, its carriage stands where it is and the HQ sends a new
   driver on foot, from the same adults it makes up escorts from, once it has one free. A caravan's
@@ -607,7 +610,10 @@ The shared language of the game. Domain terms only — no implementation details
 - **Full city:** an NPC city that for a whole game week, less the bigger it is (a balance number), has had spare hands (idle, on a road crew, scouting or working for surplus) and nothing
   short of its reserve, holds a food surplus, and holds its founding party's materials
   above its reserve. Coins it has no way to earn are not short (NPC reserve), so a city that can't
-  earn them isn't held back by its war chest. A dip below the reserve only restarts that time if it lasts longer than a game
+  earn them isn't held back by its war chest. Likewise weapons it can't make, and the Iron its
+  reserve keeps to forge them, don't keep it from being full (Daniel, 2026-11-14, T100.8): it can
+  make a good it has the workplace for, or nodes it knows of for everything the good is made from.
+  They stay short for all else it does, so it still buys them. A dip below the reserve only restarts that time if it lasts longer than a game
   day, though nothing sets out during one. A full city founds a daughter (Founding).
 - **Founding:** how a full NPC city spreads out. It picks a free Plains site the usual distance
   from every city, within a set reach of itself and on no realm's territory, nearest a node of

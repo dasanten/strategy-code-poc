@@ -108,8 +108,10 @@ pub fn create_world(terrain: &TerrainMap, seed: i64) -> WorldState {
 /// caravan for each post and wandering traders going round them (`place_on_the_land`).
 pub fn generate_world(terrain: &TerrainMap, seed: i64) -> WorldState {
     let mut world = create_world(terrain, seed);
-    crate::starting_sites::place_starting_sites(&mut world, terrain);
-    place_on_the_land(&mut world, terrain);
+    // Worked out once for both (T100.8): about a second on the full map.
+    let regions = crate::regions::Regions::of(world.seed, terrain);
+    crate::starting_sites::place_starting_sites_on(&mut world, terrain, &regions);
+    place_on_the_land(&mut world, terrain, regions);
     world
 }
 
@@ -351,8 +353,12 @@ fn step_rest(
 
 // T100.5: the Trade Organization and the NPC cities on the land. A post or trader stop the HQ has
 // no carriage way to is a generation error.
-fn place_on_the_land(world: &mut WorldState, terrain: &TerrainMap) {
-    let problems = crate::land_sites::place_on_the_land(world, terrain);
+fn place_on_the_land(
+    world: &mut WorldState,
+    terrain: &TerrainMap,
+    regions: crate::regions::Regions,
+) {
+    let problems = crate::land_sites::place_on_the_land_in(world, terrain, regions);
     let broken: Vec<&str> = problems
         .iter()
         .filter(|p| p.rule == crate::land_sites::ROUTE_RULE)
