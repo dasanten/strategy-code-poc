@@ -261,6 +261,7 @@ import {
   STANDING_NPC_TRADE_COINS_PER_POINT,
   STANDING_TRADE_COINS_PER_POINT,
   START_RESIDENTS,
+  START_SPEARS,
   STARTING_SITE_WALK,
   STARTING_SITES_PER_HEARTLAND,
   STAT_BASE_MAX,
@@ -1162,6 +1163,13 @@ export function Wiki() {
           selling Food, Wood, Stone or Iron at its heartland’s trading post, or by holding a gold
           node out there. Your starting city’s storage holds {num(START_COINS)} Coins for a first
           trade.
+        </p>
+        <p>
+          <strong>Starting city.</strong> A new Leader’s city starts with {num(START_RESIDENTS)}{' '}
+          residents, your Leader among them, all working the farm. Every grown one, your Leader too,
+          carries {num(START_SPEARS)} iron Spear, so they are armed from the first tick and an alarm
+          sends them to defend the city. Children get none, and no spare weapons lie in the
+          storage. NPC villages keep their own start.
         </p>
         <p>
           The regions of the mainland are parted by Mountain ranges and by arms of the Sea, about{' '}
