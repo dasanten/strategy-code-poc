@@ -74,7 +74,7 @@ pub fn open_shadow(
     let conn = open_db(db_path, None)?;
     let (world, terrain) =
         load_or_create_world(&conn, |seed| generate_terrain(seed, MAP_SIZE), generate_world, 1)?;
-    let explored = load_explored(&conn, terrain, &world.nodes)?;
+    let explored = load_explored(&conn, terrain, &world.nodes_ever())?;
     let defaults = game_defaults();
     sync_default_scripts(&conn, defaults)?;
     let library = Arc::new(Mutex::new(open_db(db_path, None)?));

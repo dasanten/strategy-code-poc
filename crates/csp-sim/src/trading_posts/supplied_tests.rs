@@ -57,6 +57,7 @@ fn hold_food_weapons_and_coins_over_many_game_days_and_their_people_do_not_starv
             x: x as f64,
             y: y as f64,
             richness: Default::default(),
+            stock: None,
         })
         .collect();
     let mut m = Mulberry32::new(11.0);

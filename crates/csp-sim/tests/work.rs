@@ -260,6 +260,7 @@ fn on_node(
         x,
         y: 1.0,
         richness: Default::default(),
+        stock: None,
     });
     world.buildings.push(building(id, kind, x, 1.0));
     at(&mut world, "w1").x = x;

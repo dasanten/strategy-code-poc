@@ -99,6 +99,7 @@ pub fn create_world(terrain: &TerrainMap, seed: i64) -> WorldState {
         workplace_settings: Default::default(),
         starting_sites: Vec::new(),
         opened_heartlands: Vec::new(),
+        dry_nodes: Vec::new(),
     }
 }
 

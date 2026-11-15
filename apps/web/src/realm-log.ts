@@ -3,6 +3,7 @@ import { TRADE_ORG_NAME } from './shared/trade-org.js'
 import { timeLeft } from './shared/estimates.js'
 import type { DeliveryView, PunishmentEnd, RealmEvent, StandingMove } from '@csp/shared-types'
 import { BUILDING_NAMES } from './city-view.js'
+import { NODE_NAMES } from './map/palette.js'
 import { formatMove } from './standing-view.js'
 
 /** How bad an event is, for its colour in the log. */
@@ -133,6 +134,15 @@ export function describeEvent(e: RealmEvent, realmId?: string): EventLine {
       return {
         text: `${what} is gone. It was last at ${place}.`,
         tone: 'bad',
+        places: [{ name: place, x: e.x, y: e.y }],
+      }
+    }
+    case 'veinRanDry': {
+      // `CONTEXT.md`: Running dry.
+      const place = `(${e.x}, ${e.y})`
+      return {
+        text: `The ${NODE_NAMES[e.node].toLowerCase()} vein at the mine at ${place} ran dry: the mine makes nothing more.`,
+        tone: 'warn',
         places: [{ name: place, x: e.x, y: e.y }],
       }
     }

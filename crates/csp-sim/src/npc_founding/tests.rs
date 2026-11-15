@@ -52,6 +52,7 @@ fn node(world: &mut WorldState, terrain: &mut TerrainMap, kind: ResourceKind, x:
         x,
         y,
         richness: Default::default(),
+        stock: None,
     });
     let ground = if kind == ResourceKind::Forest { Terrain::Forest } else { Terrain::Hills };
     terrain.tiles[tile_index(terrain.size, x as i32, y as i32)] = ground as u8;

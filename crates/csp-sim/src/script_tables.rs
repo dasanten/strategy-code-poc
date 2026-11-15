@@ -3413,7 +3413,8 @@ pub static DEFAULT_SCRIPTS: &[(Task, &str, &str)] = &[
 // my food up to foodTake too. foodAt 0 turns getting food off. At the workplace we stand spread over
 // its footprint. A workplace still being built I build first, as Build would,
 // with materials from the nearest storage of my realm holding them, then work
-// it once it is finished.
+// it once it is finished. At a mine whose vein ran dry, which makes nothing,
+// I end, my log saying why.
 param workplace: building // the workplace to work; none: the one I stand on
 param storage: storage // my main storage, for output, inputs and Food; none: the nearest storage of my realm
 param output: storage // where the output goes; none: my storage, else the nearest storage of my realm
@@ -3452,6 +3453,13 @@ if (workplace == null) { // here, and it isn't: torn down
   end("the workplace is gone")
   return
 }
+if (ranDry(workplace)) { // it stands, making nothing
+  // The realm log says so once for the mine, so each of us notes it in our
+  // own log only.
+  log("the vein ran dry")
+  end()
+  return
+}
 // With Food on the pile my meals come from there; with none anywhere, I work on.
 let food = me.carried.food || 0
 if (food < params.foodAt && !pileHoldsFood(workplace) && getFoodIfLow(params.food || params.storage, workplace)) {
@@ -3472,10 +3480,11 @@ if (me.order == null) {
 carryLoadOffIfFull(workplace)
 
 // Which workplace I work: the one picked, else the one I started on, kept in
-// memory.workplaceId. False once I end: neither is a workplace.
+// memory.workplaceId. False once I end: neither is a workplace. A mine whose
+// vein ran dry is picked still, so that I end there, saying why.
 fn pickWorkplace() {
   if (params.workplace != null) {
-    if (!isWorkplace(params.workplace)) {
+    if (!isWorkplace(params.workplace) && !ranDry(params.workplace)) {
       end("the " + params.workplace.kind + " is no workplace")
       return false
     }
@@ -3484,7 +3493,7 @@ fn pickWorkplace() {
   }
   if (memory.workplaceId == null) {
     let here = buildingAt(me.x, me.y)
-    if (!isWorkplace(here)) {
+    if (!isWorkplace(here) && !ranDry(here)) {
       end("no workplace on their tile")
       return false
     }
@@ -3497,6 +3506,11 @@ fn pickWorkplace() {
 // A building that makes goods, or the construction site of one.
 fn isWorkplace(b) {
   return b != null && outputOf(b).length > 0
+}
+
+// A finished mine that makes nothing: its vein ran dry.
+fn ranDry(b) {
+  return b != null && b.kind == "mine" && b.site == null && outputOf(b).length == 0
 }
 
 // A workplace still being built (Working a site), kept in memory.siteId: I

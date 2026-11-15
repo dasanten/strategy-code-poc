@@ -82,6 +82,9 @@ pub fn recipe_for(kind: BuildingKind, makes: Option<&str>) -> Option<&'static Re
 /// Why a resident carrying a child can't take a working order (`CARRYING_A_CHILD`).
 pub const CARRYING_A_CHILD: &str = "carrying a child";
 
+/// Why a mine whose vein ran dry can't be worked (`CONTEXT.md`: Running dry).
+pub const VEIN_RAN_DRY: &str = "the vein ran dry";
+
 /// Kinds of building that can be built so far (`BUILDABLE`).
 pub const BUILDABLE: [BuildingKind; 19] = [
     BuildingKind::LumberCamp,
@@ -767,6 +770,10 @@ pub fn work_problem(
         return Some(format!("nothing to choose at a {name}"));
     }
     if workplace_good(world, here, makes).is_none() {
+        // A mine stands only on a node, or where one ran dry (`CONTEXT.md`: Running dry).
+        if here.kind == BuildingKind::Mine && here.site.is_none() {
+            return Some(VEIN_RAN_DRY.into());
+        }
         return Some("there is no workplace to work here".into());
     }
     if here.site.is_some() {

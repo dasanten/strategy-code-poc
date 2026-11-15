@@ -287,6 +287,8 @@ export function MapView({
   const redrawRef = useRef<() => void>(() => {})
   const motionRef = useRef<(world: MapWorld) => void>(() => {})
   const forgetRef = useRef<(chunks: readonly number[]) => void>(() => {})
+  /** Hands the known nodes to `onNodesLoaded` again, once the Player learns some are gone. */
+  const nodesAgainRef = useRef<() => void>(() => {})
   const regionRef = useRef<(region: RegionState | null) => void>(() => {})
   const controlsRef = useRef<{
     zoom(factor: number): void
@@ -363,7 +365,9 @@ export function MapView({
   }, [land])
 
   useEffect(() => {
+    const goneBefore = worldRef.current.goneNodes
     worldRef.current = world
+    if (world.goneNodes !== goneBefore) nodesAgainRef.current()
     if (world.grownChunks.length > 0) forgetRef.current(world.grownChunks)
     motionRef.current(world)
     redrawRef.current()
@@ -374,6 +378,15 @@ export function MapView({
     const across = chunksAcross(mapSize)
     const app = new Application()
     const nodes: KnownNode[][] = []
+    // A node the Player saw had run dry is gone from their map (`CONTEXT.md`: Running dry).
+    const gone = (x: number, y: number) => !!worldRef.current.goneNodes?.has(`${x},${y}`)
+    const nodeAt = (x: number, y: number) =>
+      gone(x, y)
+        ? undefined
+        : nodes[Math.floor(y / CHUNK_SIZE) * across + Math.floor(x / CHUNK_SIZE)]?.find(
+            (n) => n.x === x && n.y === y,
+          )
+    nodesAgainRef.current = () => onNodesLoadedRef.current?.((x, y) => nodeAt(x, y))
     const terrainLayer = new TerrainLayer(mapSize, (i) => worldRef.current.exploredChunks.has(i))
     // Explored chunks on screen that haven't loaded yet, a neutral grey so they don't read as
     // unexplored.
@@ -455,11 +468,7 @@ export function MapView({
         }
         terrainLayer.set(chunk)
         nodes[chunk.cy * across + chunk.cx] = chunk.nodes
-        onNodesLoadedRef.current?.((x, y) =>
-          nodes[Math.floor(y / CHUNK_SIZE) * across + Math.floor(x / CHUNK_SIZE)]?.find(
-            (n) => n.x === x && n.y === y,
-          ),
-        )
+        onNodesLoadedRef.current?.((x, y) => nodeAt(x, y))
         onTerrainLoadedRef.current?.(
           (x, y) =>
             store.get(Math.floor(y / CHUNK_SIZE) * across + Math.floor(x / CHUNK_SIZE))?.tiles[
@@ -925,7 +934,7 @@ export function MapView({
       const r = tokenRadius(cam.scale)
       for (const i of onScreen) {
         for (const n of nodes[i] ?? []) {
-          if (built.has(`${n.x},${n.y}`)) continue
+          if (built.has(`${n.x},${n.y}`) || gone(n.x, n.y)) continue
           const [sx, sy] = tileToScreen(cam, view, mapSize, n.x + 0.5, n.y + 0.5)
           drawNode(tokens, n.kind, sx, sy, r)
         }
@@ -1004,7 +1013,7 @@ export function MapView({
       ]
       const chunk = store.get(Math.floor(ty / CHUNK_SIZE) * across + Math.floor(tx / CHUNK_SIZE))
       const byte = chunk?.tiles[(ty % CHUNK_SIZE) * CHUNK_SIZE + (tx % CHUNK_SIZE)]
-      const node = chunk?.nodes.find((n) => n.x === tx && n.y === ty)
+      const node = gone(tx, ty) ? undefined : chunk?.nodes.find((n) => n.x === tx && n.y === ty)
       const [wx, wy] = [wrap(tx, mapSize), wrap(ty, mapSize)]
       // On the admin map, where far out no chunks load, the overview tells the terrain.
       const overview = worldRef.current.admin?.overview
@@ -1298,6 +1307,7 @@ export function MapView({
       cancelAnimationFrame(frame)
       redrawRef.current = () => {}
       forgetRef.current = () => {}
+      nodesAgainRef.current = () => {}
       regionRef.current = () => {}
       overviewRef.current = () => {}
       controlsRef.current = null

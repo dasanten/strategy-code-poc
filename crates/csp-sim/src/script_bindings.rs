@@ -2057,6 +2057,8 @@ fn node_view(n: &csp_shared::world::ResourceNode) -> Json {
     let mut v = serde_json::to_value(n).unwrap_or(Json::Null);
     if let Json::Object(m) = &mut v {
         m.insert("richness".into(), serde_json::to_value(n.richness).unwrap_or(Json::Null));
+        // How a vein stands is never a number (`CONTEXT.md`: Running dry).
+        m.remove("stock");
     }
     v
 }

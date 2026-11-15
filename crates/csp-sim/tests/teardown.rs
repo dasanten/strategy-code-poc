@@ -45,6 +45,7 @@ fn setup() -> (WorldState, TerrainMap, Orders) {
             x: 3.0,
             y: 3.0,
             richness: Default::default(),
+            stock: None,
         },
         ResourceNode {
             id: "n3".into(),
@@ -52,6 +53,7 @@ fn setup() -> (WorldState, TerrainMap, Orders) {
             x: 7.0,
             y: 7.0,
             richness: Default::default(),
+            stock: None,
         },
     ];
     world.buildings.push(building("b1", BuildingKind::Mine, 7.0, 7.0));

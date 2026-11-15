@@ -42,6 +42,7 @@ use csp_sim::sight::{
 };
 use csp_sim::starting_city::{found_starting_city_in, suggested_leader_name, FoundingNames};
 use csp_sim::tick::Scratch;
+use csp_sim::veins::gone_nodes_of;
 use csp_sim::world_index::{world_index, WorldIndex};
 use flate2::{write::GzEncoder, Compression};
 use rusqlite::Connection;
@@ -159,6 +160,9 @@ struct Client {
     leader_id: String,
     realm_name: Option<String>,
     horse_offer: bool,
+    /// How many dry nodes the Player was last told are gone (`CONTEXT.md`: Running dry): they only
+    /// ever learn of more.
+    gone_nodes: usize,
     last_work_settings: String,
     last_waypoints: String,
     last_trader_visits: String,
@@ -418,6 +422,7 @@ fn build_welcome(
         leader_id: realm.leader_id.clone(),
         realm_name: realm.name.clone(),
         horse_offer: !world.horse_offers_claimed.contains(&(user_id as u64)),
+        gone_nodes: gone_nodes_of(world, user_id as u64).len(),
         last_work_settings: String::new(),
         last_waypoints: json_of(
             &world.waypoints.get(&(user_id as u64)).cloned().unwrap_or_default(),
@@ -474,6 +479,7 @@ fn build_welcome(
         "diplomacy": diplomacy,
         "region": region_json,
         "horseOffer": client.horse_offer,
+        "goneNodes": gone_nodes_of(world, user_id as u64),
         "waypoints": world.waypoints.get(&(user_id as u64)).cloned().unwrap_or_default(),
         "traderVisits": trader_visits_to(world, &realm.id),
         "firstDay": first_day,
@@ -1000,6 +1006,13 @@ impl Realtime {
                 if horse_offer != client.horse_offer {
                     client.horse_offer = horse_offer;
                     tick.insert("horseOffer".into(), json!(horse_offer));
+                }
+                // The tiles of the dry nodes they know are gone, all of them again once they learn
+                // of another (`CONTEXT.md`: Running dry).
+                let gone = gone_nodes_of(world, client.user_id as u64);
+                if gone.len() != client.gone_nodes {
+                    client.gone_nodes = gone.len();
+                    tick.insert("goneNodes".into(), json!(gone));
                 }
                 let work_settings = world
                     .workplace_settings

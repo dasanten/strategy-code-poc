@@ -83,6 +83,33 @@ export interface Balance {
   readonly FRONTIER_RICH_NODES: number
   readonly RICHER_NODE_REACH: number
   readonly GOLD_NODE_DENSITY: number
+  readonly VEIN_CREW_DAYS: {
+    normal: number
+    rich: number
+    [key: string]: number
+  }
+  readonly VEIN_STOCK: {
+    ironOre: {
+      normal: number
+      rich: number
+      [key: string]: number
+    }
+    goldOre: {
+      normal: number
+      rich: number
+      [key: string]: number
+    }
+    coal: {
+      normal: number
+      rich: number
+      [key: string]: number
+    }
+    [key: string]: {
+      normal: number
+      rich: number
+      [key: string]: number
+    }
+  }
   readonly STARTING_SITES_PER_HEARTLAND: number
   readonly STARTING_SITE_WALK: {
     minMinutes: number

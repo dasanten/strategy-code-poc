@@ -82,6 +82,8 @@ export interface ClientWorld {
   region: RegionState | null
   /** Whether the Player may still claim their Horse offer (`CONTEXT.md`: Horse offer). */
   horseOffer: boolean
+  /** The tiles ("x,y") of the dry nodes the Player knows are gone (`CONTEXT.md`: Running dry). */
+  goneNodes: ReadonlySet<string>
   /** Wandering traders standing at the realm's cities, in sight or not (`CONTEXT.md`: Trader stop). */
   traderVisits: TraderVisit[]
   /** The Player's waypoints, oldest first (`CONTEXT.md`: Waypoint). */
@@ -122,6 +124,11 @@ function byKind(entities: Iterable<SeenEntity>) {
 }
 
 /** Tells the server which scripts the Player watches now (`watchScript`). */
+/** The tiles of dry nodes as the server lists them, as the keys the map looks them up by. */
+function goneNodesOf(tiles: ReadonlyArray<readonly [number, number]>): ReadonlySet<string> {
+  return new Set(tiles.map(([x, y]) => `${x},${y}`))
+}
+
 function sendWatch(socket: WebSocket | null, watched: ReadonlyMap<string, number>) {
   if (socket?.readyState !== WebSocket.OPEN) return
   socket.send(JSON.stringify({ type: 'watch', ids: [...watched.keys()] }))
@@ -200,6 +207,7 @@ export function useWorld(onLoggedOut: () => void) {
             diplomacy: msg.diplomacy,
             region: msg.region && applyRegionMap(null, msg.region, msg.map.size),
             horseOffer: msg.horseOffer,
+            goneNodes: goneNodesOf(msg.goneNodes),
             traderVisits: msg.traderVisits,
             waypoints: msg.waypoints,
             firstDay: msg.firstDay,
@@ -259,6 +267,7 @@ export function useWorld(onLoggedOut: () => void) {
               diplomacy,
               region,
               horseOffer: msg.horseOffer ?? w.horseOffer,
+              goneNodes: msg.goneNodes ? goneNodesOf(msg.goneNodes) : w.goneNodes,
               traderVisits: msg.traderVisits ?? w.traderVisits,
               workSettings: msg.workSettings ?? w.workSettings,
               waypoints: msg.waypoints ?? w.waypoints,

@@ -37,6 +37,7 @@ fn iron_ore_node() -> ResourceNode {
         x: 7.0,
         y: 5.0,
         richness: Default::default(),
+        stock: None,
     }
 }
 

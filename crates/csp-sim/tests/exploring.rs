@@ -424,6 +424,7 @@ fn gold(id: &str, y: f64) -> ResourceNode {
         x: 500.0,
         y,
         richness: Default::default(),
+        stock: None,
     }
 }
 

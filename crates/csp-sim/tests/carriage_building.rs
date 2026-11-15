@@ -157,6 +157,7 @@ fn is_turned_down_at_an_unfinished_stable_on_another_building_or_where_no_carria
         x: 12.0,
         y: 5.0,
         richness: Default::default(),
+        stock: None,
     });
     assert_eq!(
         build_problem(&world, 12, 5, BuildingKind::Carriage, lookup).as_deref(),

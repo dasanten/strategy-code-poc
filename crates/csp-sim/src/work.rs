@@ -22,6 +22,7 @@ use crate::queries::residents::can_work;
 use crate::queue::field_str as str_field;
 use crate::survival::drop_goods;
 use crate::tick::Scratch;
+use crate::veins::{take_from_vein, Take};
 use crate::world_index::{building_index, resident_index};
 
 /// Checks a work-at order (`workAt.validate`): one of the sender's adult residents works the
@@ -167,7 +168,16 @@ pub fn resolve_work(world: &mut WorldState, actions: &[WorkAction], scratch: &mu
                         }
                     }
                 }
-                None => produce(world, &place, good, scratch),
+                // A unit from a vein uses its stock up; its last runs it dry, and the workplace
+                // makes nothing more (`CONTEXT.md`: Running dry).
+                None => match take_from_vein(world, &place) {
+                    Take::Made => produce(world, &place, good, scratch),
+                    Take::Last => {
+                        produce(world, &place, good, scratch);
+                        break;
+                    }
+                    Take::Nothing => break,
+                },
             }
         }
     }

@@ -49,7 +49,12 @@ region: RegionMap | null,
 /**
  * Whether the Player may still claim their Horse offer.
  */
-horseOffer: boolean, waypoints: Array<Waypoint>, traderVisits: Array<TraderVisit>, firstDay: FirstDay, 
+horseOffer: boolean, 
+/**
+ * The tiles (x, y) of the dry nodes the Player knows are gone (`CONTEXT.md`: Running dry):
+ * their map leaves out the nodes there.
+ */
+goneNodes: Array<[number, number]>, waypoints: Array<Waypoint>, traderVisits: Array<TraderVisit>, firstDay: FirstDay, 
 /**
  * The realm's Workplace settings by building id; only its own.
  */
@@ -58,4 +63,8 @@ workSettings: { [key in string]: WorkplaceSettings }, } | { "type": "tick", tick
  * The new counts of the chunks in `explored`, as `encode_explored_counts` lists them: to a
  * client of `COUNTS_FROM_VERSION` or later, when some grew.
  */
-exploredCounts?: Array<number>, events: Array<RealmEvent>, diplomacy?: Diplomacy, region?: RegionMap, leaderId?: string, realmName?: string, horseOffer?: boolean, workSettings?: { [key in string]: WorkplaceSettings }, waypoints?: Array<Waypoint>, traderVisits?: Array<TraderVisit>, } | { "type": "scriptMemory", id: string, memory: { [key in string]: JsonValue } | null, } | { "type": "scriptRun", id: string, run: ScriptRunSeen | null, } | { "type": "scriptLog", id: string, lines: Array<ScriptLogLine> | null, } | { "type": "firstDay", firstDay: FirstDay, } | { "type": "ack", requestId: string, } | { "type": "rejected", requestId: string, reason: string, };
+exploredCounts?: Array<number>, events: Array<RealmEvent>, diplomacy?: Diplomacy, region?: RegionMap, leaderId?: string, realmName?: string, horseOffer?: boolean, 
+/**
+ * All of `gone_nodes` again, once the Player learns of another.
+ */
+goneNodes?: Array<[number, number]>, workSettings?: { [key in string]: WorkplaceSettings }, waypoints?: Array<Waypoint>, traderVisits?: Array<TraderVisit>, } | { "type": "scriptMemory", id: string, memory: { [key in string]: JsonValue } | null, } | { "type": "scriptRun", id: string, run: ScriptRunSeen | null, } | { "type": "scriptLog", id: string, lines: Array<ScriptLogLine> | null, } | { "type": "firstDay", firstDay: FirstDay, } | { "type": "ack", requestId: string, } | { "type": "rejected", requestId: string, reason: string, };

@@ -88,9 +88,12 @@ The shared language of the game. Domain terms only — no implementation details
   and a smithy makes a steel Sword, Shield and Armour from Steel, each better than the iron one.
 - **Running dry** (Epic 102): a normal or rich ore node (iron ore, gold ore, coal) holds a
   **stock**, and working it uses the stock up. Poor nodes, forest and stone never run dry. A node
-  whose stock is gone is gone for good: the mine on it stays as a building and makes nothing. A
-  new node of the same kind and richness then comes into being somewhere else in a region that
-  fits, out of every Player's sight; nobody is told, so it has to be found. Whoever works a mine
+  whose stock is gone is gone for good: the mine on it stays as a building and makes nothing,
+  its workers stop working it, the log of each realm working it says so once, and no mine can be
+  built there again. A Player who explored the tile keeps the node on their map until they see
+  the tile again, as a building (Last seen). A new
+  node of the same kind and richness then comes into being somewhere else in a region that fits,
+  out of every Player's sight; nobody is told, so it has to be found. Whoever works a mine
   (their realm and its allies) sees how its vein stands in words (plenty, thinning, nearly gone),
   never as a number; others see nothing of it.
 - **Workplace:** a building where residents produce goods. Output depends on the workers'
