@@ -47,7 +47,7 @@ use crate::script_deps::kept_pair;
 use crate::script_log::add_to_script_log;
 use crate::script_params::{
     param_target, param_values, script_params_sound, set_start_params, start_params_problem,
-    with_target_param, ParamWithValue,
+    with_once_param, with_target_param, ParamWithValue,
 };
 use crate::scripts::RunnableScript;
 use crate::sight::{
@@ -189,6 +189,7 @@ impl OrderKind for RunScriptOrder {
         let params = order.fields.get("params").and_then(Json::as_object).cloned();
         let params =
             with_target_param(script.as_ref().map(|s| (s.source.as_str(), s.task)), params, None);
+        let params = with_once_param(script.as_ref().map(|s| (s.source.as_str(), s.task)), params);
         let r = &mut world.residents[i];
         r.order = None;
         r.script = Some(running(script_id, Map::new()));
@@ -747,6 +748,7 @@ impl OrderKind for TaskOrder {
             params,
             target.as_deref(),
         );
+        let params = with_once_param(source.as_deref().map(|s| (s, Some(task))), params);
         let r = &mut world.residents[i];
         r.order = None;
         r.script = Some(running(script_id, memory));

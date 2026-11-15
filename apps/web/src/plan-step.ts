@@ -71,6 +71,7 @@ export type PlanStepId =
   | 'pickUp'
   | 'drop'
   | 'feedStable'
+  | 'feedStableOnce'
   | 'breed'
   | 'teach'
   | 'train'
@@ -202,6 +203,12 @@ export const PLAN_STEPS: readonly PlanKind[] = [
     picks: [{ pick: 'stable', prompt: 'the stable to feed' }],
   },
   {
+    // A single round (`CONTEXT.md`: Feeding the stable, Once): it ends once the stable is full.
+    id: 'feedStableOnce',
+    label: 'Feed the stable once',
+    picks: [{ pick: 'stable', prompt: 'the stable to feed' }],
+  },
+  {
     id: 'breed',
     label: 'Breed horses',
     picks: [{ pick: 'stable', prompt: 'the stable to breed in' }],
@@ -296,6 +303,7 @@ export const PLAN_TASKS: Partial<Readonly<Record<PlanStepId, Task>>> = {
   road: 'buildLine',
   wall: 'buildLine',
   feedStable: 'feedStable',
+  feedStableOnce: 'feedStable',
   breed: 'breed',
   train: 'train',
   haul: 'haul',
@@ -633,6 +641,11 @@ export function planOrder(
     }
     case 'feedStable':
       return { order: { kind: 'task', task: 'feedStable', stableId: p.id }, at }
+    case 'feedStableOnce':
+      return {
+        order: { kind: 'task', task: 'feedStable', stableId: p.id, params: { once: 1 } },
+        at,
+      }
     case 'breed': {
       const horseIds = a?.ask === 'horses' ? a.horseIds : []
       return { order: { kind: 'task', task: 'breed', stableId: p.id, horseIds }, at }
