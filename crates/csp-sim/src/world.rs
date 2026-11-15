@@ -286,6 +286,8 @@ fn step_rest(
     // Gear picked up or put down this tick fills or empties its slot at once.
     crate::equipment::settle_all(world);
     step_feeding(world, size, scratch);
+    // Gear swapped or taken off this tick is in or out of its slot before anything else counts it.
+    crate::equipping::step_equipping(world);
     let payments = resolve_payments(world);
     let purchases = resolve_purchases(world, size);
     let trades = resolve_trades(world, size, &mut scratch.trades);
