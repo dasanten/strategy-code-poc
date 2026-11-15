@@ -291,6 +291,7 @@ import {
   Terrain,
   WALL_DEFENCE,
   WALL_STRENGTH,
+  WALL_WALK_TICKS,
   WALK_TICKS_PER_TILE,
   aboutTime,
   WAREHOUSE_BASE_PRICE,
@@ -3357,6 +3358,17 @@ export function Wiki() {
           {duration(breakTicks('gate'))} for a gate. A broken one leaves{' '}
           {pct(BROKEN_MATERIALS_RETURNED)} of its materials. Climbing over takes{' '}
           {duration(CLIMB_TICKS)}, unable to dodge or strike back.
+        </p>
+        <p>
+          <strong>The wall walk.</strong> Every wall and gate tile has a walk on top, unbroken round
+          the ring; whoever is on it is <em>up</em>. Only the city's own realm and its allies get
+          up, from the ground next to the wall, and getting up takes {duration(WALL_WALK_TICKS)}, as
+          long again to get down. Along the walk is walking, over the gates too, while people pass
+          under a gate on the ground. They come down only on the side they went up from, so the walk
+          is never a way through the wall. Nobody walks onto a wall on the ground, nor squeezes past
+          its corner. A path that ends on the wall counts the time to get up, so your residents go
+          up only when you send them there; a path elsewhere never takes the walk. A resident's card
+          says “Up on the wall walk”, and scripts see it as <code>me.up</code>.
         </p>
         <h3>Under attack</h3>
         <p>

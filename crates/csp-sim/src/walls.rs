@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 use csp_shared::balance::{BROKEN_MATERIALS_RETURNED, WALL_ENCLOSES_MAX, WALL_STRENGTH};
 use csp_shared::terrain::{is_passable_terrain, tile_index, wrap, wrap_delta, TerrainMap};
-use csp_shared::world::{Building, BuildingKind, Resident, Stock, WorldState};
+use csp_shared::world::{Building, BuildingKind, Resident, Stock, UpSide, WorldState};
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Deserialize;
 
@@ -88,41 +88,46 @@ pub(crate) fn neighbours(size: i32, t: usize) -> [usize; 4] {
     ]
 }
 
-/// Whether a realm may stand on the wall on tile index `t`: its own city's, or an ally's.
-fn own_wall(walls: &WallMap, realm_id: Option<&str>, t: usize) -> bool {
-    walls.tiles.get(&t).is_some_and(|w| w.kind == WallKind::Wall && w.of_side(realm_id))
-}
-
 /// Whether tile index `t` is a wall or gate of the realm's own cities or its allies'.
-fn own_wall_or_gate(walls: &WallMap, realm_id: Option<&str>, t: usize) -> bool {
+pub(crate) fn own_wall_or_gate(walls: &WallMap, realm_id: Option<&str>, t: usize) -> bool {
     walls.tiles.get(&t).is_some_and(|w| w.of_side(realm_id))
 }
 
-fn is_wall(walls: &WallMap, t: usize) -> bool {
-    walls.tiles.get(&t).is_some_and(|w| w.kind == WallKind::Wall)
+/// Whether tile index `t` is plain ground: no wall or gate stands on it.
+pub fn plain_ground(walls: &WallMap, t: usize) -> bool {
+    !walls.tiles.contains_key(&t)
 }
 
-/// Whether someone of `realm_id` on tile index `t` is stuck on a wall: a wall they may not stand
-/// on (a foreign wall finished under them), or a stretch of their own wall with no gate and no way
-/// down inside. Such a one may climb down anywhere next to it.
-pub fn stranded_on_wall(walls: &WallMap, realm_id: Option<&str>, t: usize) -> bool {
-    if !is_wall(walls, t) {
+/// Which side of the walls the ground tile `t` lies on (`CONTEXT.md`: Wall walk): inside a ring,
+/// or outside it, as is either side of a stretch of wall with no inside.
+pub fn side_of(walls: &WallMap, t: usize) -> UpSide {
+    if walls.inside.contains(&t) {
+        UpSide::Inside
+    } else {
+        UpSide::Outside
+    }
+}
+
+/// Whether someone of `realm_id` up on the walk of tile index `t`, having come up from `side`, is
+/// stuck there: up on a wall or gate not of their side (it changed hands under them), or on a
+/// stretch of their own walk with no ground of their side next to it. Such a one may come down
+/// anywhere next to it.
+pub fn stranded_on_wall(walls: &WallMap, realm_id: Option<&str>, t: usize, side: UpSide) -> bool {
+    if plain_ground(walls, t) {
         return false;
     }
-    if !own_wall(walls, realm_id, t) {
+    if !own_wall_or_gate(walls, realm_id, t) {
         return true;
     }
     let mut seen = FxHashSet::from_iter([t]);
     let mut todo = vec![t];
     while let Some(c) = todo.pop() {
-        if walls.tiles[&c].kind == WallKind::Gate {
-            return false;
-        }
         for n in neighbours(walls.size, c) {
-            if walls.inside.contains(&n) {
-                return false;
-            }
-            if !seen.contains(&n) && own_wall_or_gate(walls, realm_id, n) {
+            if plain_ground(walls, n) {
+                if side_of(walls, n) == side {
+                    return false;
+                }
+            } else if !seen.contains(&n) && own_wall_or_gate(walls, realm_id, n) {
                 seen.insert(n);
                 todo.push(n);
             }
@@ -131,42 +136,73 @@ pub fn stranded_on_wall(walls: &WallMap, realm_id: Option<&str>, t: usize) -> bo
     true
 }
 
-/// Whether someone of `realm_id` may step from tile index `from` to the next tile `to`
-/// (`CONTEXT.md`: Walls in combat), walls and gates aside from the land itself. Nobody walks
-/// through a wall: only the city's own realm and its allies go onto its walls, from inside or from
-/// the wall itself, and down only inside, and only `on_walls` (on foot, not driving). A gate lets
-/// them through always, everyone else only while open, and an NPC city's gate never those it
-/// refuses (`WallTile::shut_to`). `stranded` (`stranded_on_wall`) frees the way down from a wall.
-pub fn may_step(
+/// Whether someone of `realm_id` on the ground may step onto the next tile `to` (`CONTEXT.md`:
+/// Walls in combat), walls and gates aside from the land itself. Nobody walks through a wall: its
+/// tile is only reached up on the walk (`may_move`). A gate lets its city's realm and allies through
+/// always, everyone else only while open, and an NPC city's gate never those it refuses
+/// (`WallTile::shut_to`).
+pub fn may_step(walls: &WallMap, realm_id: Option<&str>, to: usize) -> bool {
+    let Some(w) = walls.tiles.get(&to) else { return true };
+    match w.kind {
+        WallKind::Wall => false,
+        WallKind::Gate => {
+            own_wall_or_gate(walls, realm_id, to)
+                || !(w.closed || realm_id.is_some_and(|r| w.shut_to.iter().any(|s| s == r)))
+        }
+    }
+}
+
+/// Whether someone of `realm_id` may go from tile index `from`, on the ground (`up` none) or up on
+/// the walk from a side, to the next tile `to`, on the ground or up from `to_up` (`CONTEXT.md`: Wall
+/// walk). On the ground it is `may_step`. Only the walls' own side gets up, from plain ground next
+/// to its wall or gate, keeping the side they came from; along the walk they go over their side's
+/// walls and gates; they come down only onto plain ground of the side they came from, or anywhere
+/// when `stranded` (`stranded_on_wall`). Whether the step is straight, and on foot, is the
+/// caller's to check.
+pub fn may_move(
     walls: &WallMap,
     realm_id: Option<&str>,
     from: usize,
+    up: Option<UpSide>,
     to: usize,
-    on_walls: bool,
+    to_up: Option<UpSide>,
     stranded: bool,
 ) -> bool {
-    let w = walls.tiles.get(&to);
-    if let Some(w) = w {
-        match w.kind {
-            WallKind::Gate => {
-                if !own_wall_or_gate(walls, realm_id, to)
-                    && (w.closed || realm_id.is_some_and(|r| w.shut_to.iter().any(|s| s == r)))
-                {
-                    return false;
-                }
-            }
-            WallKind::Wall => {
-                if !on_walls || !own_wall(walls, realm_id, to) {
-                    return false;
-                }
-                return walls.inside.contains(&from) || own_wall_or_gate(walls, realm_id, from);
-            }
+    match (up, to_up) {
+        (None, None) => may_step(walls, realm_id, to),
+        (None, Some(side)) => {
+            plain_ground(walls, from)
+                && own_wall_or_gate(walls, realm_id, to)
+                && side_of(walls, from) == side
+        }
+        (Some(side), Some(to_side)) => side == to_side && own_wall_or_gate(walls, realm_id, to),
+        (Some(side), None) => plain_ground(walls, to) && (stranded || side_of(walls, to) == side),
+    }
+}
+
+/// Where someone at tile index `from`, on the ground or `up`, is once they take the first step of
+/// `path` (tile indices): up on a wall tile, on the ground on plain ground. Across a gate they stay
+/// as they were, unless a wall follows the gates, which they are up on already: a path never gets
+/// up from a gate's ground (`may_move`).
+pub fn up_after(
+    walls: &WallMap,
+    from: usize,
+    up: Option<UpSide>,
+    mut path: impl Iterator<Item = usize>,
+) -> Option<UpSide> {
+    let gets_up = || Some(up.unwrap_or_else(|| side_of(walls, from)));
+    match path.next().and_then(|t| walls.tiles.get(&t)) {
+        None => return None,
+        Some(w) if w.kind == WallKind::Wall => return gets_up(),
+        Some(_) => {}
+    }
+    loop {
+        match path.next().and_then(|t| walls.tiles.get(&t)) {
+            Some(w) if w.kind == WallKind::Wall => return gets_up(),
+            Some(_) => continue,
+            None => return up,
         }
     }
-    if is_wall(walls, from) && !stranded {
-        return walls.inside.contains(&to) || own_wall_or_gate(walls, realm_id, to);
-    }
-    true
 }
 
 // The rest of `packages/shared/src/walls.ts` (T86.6): building the `WallMap` from the world, and
@@ -359,9 +395,14 @@ pub fn on_own_wall(world: &WorldState, r: &Resident) -> bool {
         .buildings
         .iter()
         .find(|b| b.x == r.x && b.y == r.y && b.kind == BuildingKind::Wall && b.site.is_none());
-    let city = wall.and_then(|w| world.cities.iter().find(|c| Some(&c.id) == w.city_id.as_ref()));
+    wall.is_some_and(|w| of_wall_side(world, w, r))
+}
+
+/// Whether a resident is of the side of a wall or gate (`wallSide`): its city's realm or that
+/// realm's allies; an NPC city's walls are its own residents' and its allies'.
+pub fn of_wall_side(world: &WorldState, wall: &Building, r: &Resident) -> bool {
+    let city = world.cities.iter().find(|c| Some(&c.id) == wall.city_id.as_ref());
     let (Some(city), Some(side)) = (city, wall_side(r)) else { return false };
-    // An NPC city's walls are its own residents' and its allies' (`wallSide`).
     let of = city.realm_id.as_deref().unwrap_or(&city.id);
     of == side || allied_realms(world, of).iter().any(|m| m == side)
 }
@@ -451,16 +492,40 @@ mod tests {
     }
 
     #[test]
-    fn only_the_realm_goes_onto_its_walls_and_down_only_inside() {
+    fn only_the_realm_gets_up_and_down_only_to_the_side_it_came_from() {
         let walls = ring();
-        let r1 = Some("r1");
-        assert!(may_step(&walls, r1, 0, 1, true, false));
-        assert!(!may_step(&walls, r1, 0, 1, false, false));
-        assert!(!may_step(&walls, Some("r2"), 0, 1, true, false));
-        assert!(!may_step(&walls, r1, 2, 1, true, false));
-        assert!(may_step(&walls, r1, 1, 0, true, false));
-        assert!(!may_step(&walls, r1, 1, 2, true, false));
-        assert!(may_step(&walls, r1, 1, 2, true, true));
+        let (r1, inside, outside) = (Some("r1"), Some(UpSide::Inside), Some(UpSide::Outside));
+        // Nobody walks onto a wall on the ground.
+        assert!(!may_step(&walls, r1, 1));
+        // Its realm gets up from either side, keeping the side; nobody else does.
+        assert!(may_move(&walls, r1, 0, None, 1, inside, false));
+        assert!(may_move(&walls, r1, 2, None, 1, outside, false));
+        assert!(!may_move(&walls, r1, 2, None, 1, inside, false));
+        assert!(!may_move(&walls, Some("r2"), 0, None, 1, inside, false));
+        // Down only to the side they came up from, unless stranded.
+        assert!(may_move(&walls, r1, 1, inside, 0, None, false));
+        assert!(!may_move(&walls, r1, 1, inside, 2, None, false));
+        assert!(may_move(&walls, r1, 1, outside, 2, None, false));
+        assert!(!may_move(&walls, r1, 1, outside, 0, None, false));
+        assert!(may_move(&walls, r1, 1, inside, 2, None, true));
+    }
+
+    #[test]
+    fn the_walk_goes_over_a_gate_and_nobody_gets_up_from_under_it() {
+        let mut walls = ring();
+        walls.tiles.insert(10, WallTile { realms: vec!["r1".into()], ..WallTile::gate(false) });
+        let (r1, inside) = (Some("r1"), Some(UpSide::Inside));
+        assert!(may_move(&walls, r1, 1, inside, 10, inside, false));
+        assert!(may_move(&walls, r1, 10, inside, 1, inside, false));
+        assert!(may_step(&walls, Some("r2"), 10));
+        assert!(!may_move(&walls, r1, 10, None, 1, inside, false));
+        assert!(!may_move(&walls, r1, 1, inside, 10, None, false));
+        // Onto a wall they are up; across gates as they were, unless a wall follows.
+        assert_eq!(up_after(&walls, 0, None, [1].into_iter()), inside);
+        assert_eq!(up_after(&walls, 0, None, [10, 19].into_iter()), None);
+        assert_eq!(up_after(&walls, 1, inside, [10, 19].into_iter()), inside);
+        assert_eq!(up_after(&walls, 1, inside, [0].into_iter()), None);
+        assert_eq!(up_after(&walls, 11, None, [10, 1].into_iter()), Some(UpSide::Outside));
     }
 
     #[test]
@@ -474,23 +539,26 @@ mod tests {
                 ..WallTile::gate(true)
             },
         );
-        assert!(may_step(&walls, Some("r1"), 0, 1, false, false));
-        assert!(!may_step(&walls, Some("r2"), 0, 1, false, false));
-        assert!(!may_step(&walls, None, 0, 1, false, false));
+        assert!(may_step(&walls, Some("r1"), 1));
+        assert!(!may_step(&walls, Some("r2"), 1));
+        assert!(!may_step(&walls, None, 1));
         walls.tiles.get_mut(&1).unwrap().closed = false;
-        assert!(may_step(&walls, Some("r2"), 0, 1, false, false));
-        assert!(!may_step(&walls, Some("r3"), 0, 1, false, false));
+        assert!(may_step(&walls, Some("r2"), 1));
+        assert!(!may_step(&walls, Some("r3"), 1));
     }
 
     #[test]
     fn stranded_on_a_foreign_wall_or_one_with_no_way_down() {
         let walls = ring();
-        assert!(stranded_on_wall(&walls, Some("r2"), 1));
-        assert!(!stranded_on_wall(&walls, Some("r1"), 1));
-        assert!(!stranded_on_wall(&walls, Some("r2"), 2));
+        let (inside, outside) = (UpSide::Inside, UpSide::Outside);
+        assert!(stranded_on_wall(&walls, Some("r2"), 1, inside));
+        assert!(!stranded_on_wall(&walls, Some("r1"), 1, inside));
+        assert!(!stranded_on_wall(&walls, Some("r1"), 1, outside));
+        assert!(!stranded_on_wall(&walls, Some("r2"), 2, inside));
         let mut cut_off = ring();
         cut_off.inside.clear();
-        assert!(stranded_on_wall(&cut_off, Some("r1"), 1));
+        assert!(stranded_on_wall(&cut_off, Some("r1"), 1, inside));
+        assert!(!stranded_on_wall(&cut_off, Some("r1"), 1, outside));
     }
 
     /// A world with realm r1's city c1 and a wall and a gate of it, on plains.

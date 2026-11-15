@@ -303,6 +303,16 @@ describe('doingLine', () => {
     expect(line({ order: null, script: { scriptId: 5, doing: 'Guarding' } })).toBe('Guarding')
   })
 
+  it('says someone is up on the wall walk (`CONTEXT.md`: Wall walk)', () => {
+    const seen = { scripts, buildings, residents: [] }
+    expect(doingLine({ order: null, up: 'inside' }, seen)).toBe('Up on the wall walk')
+    const walk: ResidentOrder = { kind: 'walkTo', target: { x: 4, y: 5 }, path: null, progress: 0 }
+    expect(doingLine({ order: walk, up: 'outside' }, seen)).toBe(
+      `${doingLine({ order: walk }, seen)} · on the wall walk`,
+    )
+    expect(doingLine({ order: null, up: 'inside', down: true }, seen)).toBe('Down from hunger')
+  })
+
   it('says a boat’s passenger is aboard a boat', () => {
     expect(doingLine({ order: null, aboard: 'boat7' }, { scripts, buildings, residents: [] })).toBe(
       'Aboard a boat',

@@ -209,6 +209,11 @@
           "nullWhen": "unless they are aboard one"
         },
         {
+          "name": "up",
+          "type": "boolean",
+          "description": "Whether they are up on a wall walk, on top of a wall or gate, rather than on the ground. Getting up or down takes a while, and they come down only on the side they went up from."
+        },
+        {
           "name": "script",
           "type": {
             "view": "runningScript"

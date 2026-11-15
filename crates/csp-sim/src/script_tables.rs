@@ -188,6 +188,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 null_when: Some("unless they are aboard one"),
             },
             ScriptField {
+                name: "up",
+                r#type: ScriptType::Boolean,
+                description: "Whether they are up on a wall walk, on top of a wall or gate, rather than on the ground. Getting up or down takes a while, and they come down only on the side they went up from.",
+                null_when: None,
+            },
+            ScriptField {
                 name: "script",
                 r#type: ScriptType::View("runningScript"),
                 description: "The script they run.",

@@ -154,6 +154,7 @@ pub mod veins;
 pub mod views;
 pub mod walk_time;
 pub mod walking;
+pub mod wall_walk;
 pub mod walls;
 pub mod water_hauling;
 pub mod waypoints;
