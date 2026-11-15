@@ -198,8 +198,11 @@ mod seen {
         let mut w = new_resident(1.0, "w1", Some("r1"), 5.0, 5.0);
         w.carried =
             stock(json!({ "food": 2, "wood": 5, "sword": 1, "steelSword": 1, "shield": 1 }));
-        w.equipped =
-            Equipment { weapon: Some(Good::Sword), shield: Some(Good::Shield), armour: None };
+        w.equipped = Equipment {
+            weapon: Some(Good::Sword),
+            shield: Some(Good::Shield),
+            ..Default::default()
+        };
         world.residents.push(w);
         world.residents.push(new_resident(2.0, "v1", Some("r2"), at.0, at.1));
         world
@@ -221,7 +224,11 @@ mod seen {
         let theirs = seen_w1(&world, "r2").expect("r2 sees w1");
         assert_eq!(
             theirs.equipped,
-            Equipment { weapon: Some(Good::Sword), shield: Some(Good::Shield), armour: None }
+            Equipment {
+                weapon: Some(Good::Sword),
+                shield: Some(Good::Shield),
+                ..Default::default()
+            }
         );
         assert!(theirs.carried.is_empty(), "the pack stays hidden: {:?}", theirs.carried);
         let ours = seen_w1(&world, "r1").expect("r1 sees its own");
