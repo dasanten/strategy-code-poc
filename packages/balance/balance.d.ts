@@ -510,6 +510,7 @@ export interface Balance {
   readonly DOWN_DAYS: number
   readonly WAKE_HEALTH: number
   readonly FEED_UNITS: number
+  readonly EQUIP_TICKS: number
   readonly HEAL_DAYS: number
   readonly HUNGER_ENDURANCE_AVERAGE: number
   readonly HUNGER_ENDURANCE_EFFECT: number

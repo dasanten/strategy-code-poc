@@ -118,7 +118,12 @@ fn a_shield_and_armour_picked_up_fill_their_slots_and_only_those_protect() {
     s.fetch(json!({ "shield": 2, "armour": 1 }));
     assert_eq!(
         s.r().equipped,
-        Equipment { weapon: None, shield: Some(Good::Shield), armour: Some(Good::Armour) }
+        Equipment {
+            weapon: None,
+            shield: Some(Good::Shield),
+            armour: Some(Good::Armour),
+            ..Equipment::default()
+        }
     );
     assert!(!is_armed(s.r()), "a shield is no weapon");
     let one_of_each = protection(s.r());
@@ -145,6 +150,7 @@ fn a_save_from_before_equipment_equips_each_residents_best_carried_gear_on_its_f
             weapon: Some(Good::SteelSword),
             shield: Some(Good::SteelShield),
             armour: Some(Good::Armour),
+            ..Equipment::default()
         }
     );
     assert_eq!(check_invariants(&s.world, &s.terrain, &equipment_invariants()), vec![]);

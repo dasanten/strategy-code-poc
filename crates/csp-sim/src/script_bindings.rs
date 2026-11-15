@@ -1673,6 +1673,8 @@ impl<'a> ScriptBindings<'a> {
             "pair" => self.request("pair", vec![("partnerId", p(0)?)]),
             "attack" => self.request("attack", vec![("targetId", p(0)?)]),
             "feed" => self.request("feed", vec![("targetId", p(0)?), ("units", p(1)?)]),
+            "equip" => self.request("equip", vec![("good", p(0)?)]),
+            "takeOff" => self.request("takeOff", vec![("slot", p(0)?)]),
             "climb" => self.request("climb", vec![("wallId", p(0)?)]),
             "pay" => self.request("pay", vec![("contractId", p(0)?), ("weeks", p(1)?)]),
             "buyCity" => self.request("buyCity", vec![("cityId", p(0)?)]),

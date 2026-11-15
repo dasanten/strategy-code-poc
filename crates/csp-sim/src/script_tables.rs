@@ -2857,6 +2857,22 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         returns: ScriptType::String,
     },
     ScriptBinding {
+        name: "equip",
+        is: Is::Action,
+        params: &["good"],
+        cost: 10.0,
+        description: "Swap a weapon, shield or armour I carry, like \"sword\", into the slot it fits; what was there stays carried. It takes a few ticks, and I strike no blows meanwhile.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "takeOff",
+        is: Is::Action,
+        params: &["slot"],
+        cost: 10.0,
+        description: "Take off what I have in a slot, \"weapon\", \"shield\" or \"armour\"; it stays carried, and the slot stays empty until I pick up more that fits it. It takes a few ticks, and I strike no blows meanwhile.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
         name: "climb",
         is: Is::Action,
         params: &["wallId"],

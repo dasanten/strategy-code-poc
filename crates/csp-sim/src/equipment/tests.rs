@@ -25,7 +25,12 @@ fn an_empty_slot_takes_the_best_fitting_item_carried() {
     assert!(settle_equipment(&mut r));
     assert_eq!(
         r.equipped,
-        Equipment { weapon: Some(Good::SteelSword), shield: Some(Good::Shield), armour: None }
+        Equipment {
+            weapon: Some(Good::SteelSword),
+            shield: Some(Good::Shield),
+            armour: None,
+            ..Equipment::default()
+        }
     );
     assert!(!settle_equipment(&mut r), "settled slots stay as they are");
 }

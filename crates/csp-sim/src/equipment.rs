@@ -4,7 +4,8 @@
 //! way the game arms residents (NPC cities, trading posts, the HQ, hired soldiers). With the slot
 //! full, what they pick up is only carried, even a better one. Putting an equipped item down
 //! (storing, dropping, losing it as loot) empties its slot, and the next best carried item of that
-//! kind fills it.
+//! kind fills it. Swapping or taking an item off is an order ([`crate::equipping`]); a slot whose
+//! item was taken off stays empty ([`kept_off`]) until more that fits it is picked up.
 //!
 //! Goods move in many places, so the slots are not kept by each of them. What a slot holds as the
 //! rules count it is [`equipped`]: the item in `Resident::equipped` while it is still carried,
@@ -17,24 +18,26 @@
 
 use csp_shared::balance::{PROTECTION_DEFENCE, WEAPON_ATTACK};
 use csp_shared::goods::PROTECTION_KINDS;
-use csp_shared::world::{Equipment, Good, Resident, Stock, WorldState};
+use csp_shared::world::{Equipment, Good, KeptOff, Resident, Stock, WorldState};
 
 use crate::queries::names::{good_name, held};
 
 /// One of a resident's three equipment slots.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Slot {
-    Weapon,
-    Shield,
-    Armour,
-}
+pub use csp_shared::world::EquipSlot as Slot;
 
 /// Every slot, in the order a card shows them.
 pub const SLOTS: [Slot; 3] = [Slot::Weapon, Slot::Shield, Slot::Armour];
 
-impl Slot {
+/// What a slot takes.
+pub trait SlotFits {
     /// How good `good` is in this slot (attack for a weapon, damage taken off for a shield or
     /// armour), or `None` when it doesn't fit.
+    fn worth(self, good: Good) -> Option<f64>;
+    /// Whether `good` fits this slot.
+    fn fits(self, good: Good) -> bool;
+}
+
+impl SlotFits for Slot {
     fn worth(self, good: Good) -> Option<f64> {
         let name = good_name(good);
         match self {
@@ -45,10 +48,39 @@ impl Slot {
         }
     }
 
-    /// Whether `good` fits this slot.
-    pub fn fits(self, good: Good) -> bool {
+    fn fits(self, good: Good) -> bool {
         self.worth(good).is_some()
     }
+}
+
+/// The slot `good` goes into, if any (the slots take no good in common).
+pub fn slot_of(good: Good) -> Option<Slot> {
+    SLOTS.into_iter().find(|s| s.fits(good))
+}
+
+/// The slot's name in orders, scripts and on the card.
+pub fn slot_name(slot: Slot) -> &'static str {
+    match slot {
+        Slot::Weapon => "weapon",
+        Slot::Shield => "shield",
+        Slot::Armour => "armour",
+    }
+}
+
+/// The slot named `name` (`weapon`, `shield` or `armour`).
+pub fn slot_named(name: &str) -> Option<Slot> {
+    SLOTS.into_iter().find(|s| slot_name(*s) == name)
+}
+
+/// How many units fitting `slot` are among `carried`.
+pub fn units_fitting(carried: &Stock, slot: Slot) -> f64 {
+    carried.iter().filter(|(g, n)| **n > 0.0 && slot.fits(**g)).map(|(_, n)| *n).sum()
+}
+
+/// Whether `slot` is kept empty: its item was taken off, and nothing more that fits has been
+/// picked up since.
+pub fn kept_off(r: &Resident, slot: Slot) -> bool {
+    r.equipped.kept_off.iter().any(|k| k.slot == slot && units_fitting(&r.carried, slot) <= k.units)
 }
 
 /// What `slot` of `e` holds, as stored.
@@ -85,11 +117,16 @@ pub fn best_for(carried: &Stock, slot: Slot) -> Option<Good> {
 }
 
 /// What a resident has in `slot` as the rules count it: the stored item while they still carry
-/// it, otherwise the best fitting item they carry (an empty slot fills at once).
+/// it, otherwise the best fitting item they carry (an empty slot fills at once), unless the slot
+/// is [`kept_off`].
 pub fn equipped(r: &Resident, slot: Slot) -> Option<Good> {
-    in_slot(&r.equipped, slot)
-        .filter(|g| held(&r.carried, *g) > 0.0)
-        .or_else(|| best_for(&r.carried, slot))
+    in_slot(&r.equipped, slot).filter(|g| held(&r.carried, *g) > 0.0).or_else(|| {
+        if kept_off(r, slot) {
+            None
+        } else {
+            best_for(&r.carried, slot)
+        }
+    })
 }
 
 /// Every slot of a resident as the rules count it ([`equipped`]).
@@ -98,6 +135,7 @@ pub fn equipment_of(r: &Resident) -> Equipment {
         weapon: equipped(r, Slot::Weapon),
         shield: equipped(r, Slot::Shield),
         armour: equipped(r, Slot::Armour),
+        kept_off: Vec::new(),
     }
 }
 
@@ -108,7 +146,9 @@ pub fn equipment_json(r: &Resident) -> serde_json::Value {
 }
 
 /// Writes what each slot holds ([`equipped`]) into `Resident::equipped`, so an item picked up
-/// into a full slot stays only carried. Returns whether anything changed.
+/// into a full slot stays only carried. A slot kept empty stops being kept so once the resident
+/// carries more that fits it than when its item came off; carrying less lowers that mark, so the
+/// next pickup counts. Returns whether anything changed.
 pub fn settle_equipment(r: &mut Resident) -> bool {
     let mut changed = false;
     for slot in SLOTS {
@@ -119,7 +159,29 @@ pub fn settle_equipment(r: &mut Resident) -> bool {
             changed = true;
         }
     }
-    changed
+    let carried = &r.carried;
+    let before = r.equipped.kept_off.len();
+    r.equipped.kept_off.retain_mut(|k| {
+        let units = units_fitting(carried, k.slot);
+        if units < k.units {
+            k.units = units;
+            changed = true;
+        }
+        units <= k.units
+    });
+    changed || r.equipped.kept_off.len() != before
+}
+
+/// Puts `good` into `slot` (it fits, and the resident carries it), or with `None` takes the
+/// slot's item off and keeps the slot empty (`CONTEXT.md`: Equipment). Either way the item that
+/// was there stays carried.
+pub fn set_slot(r: &mut Resident, slot: Slot, good: Option<Good>) {
+    r.equipped.kept_off.retain(|k| k.slot != slot);
+    *slot_mut(&mut r.equipped, slot) = good;
+    if good.is_none() {
+        let units = units_fitting(&r.carried, slot);
+        r.equipped.kept_off.push(KeptOff { slot, units });
+    }
 }
 
 /// [`settle_equipment`] for every resident.
@@ -140,7 +202,8 @@ pub fn is_gear(good: Good) -> bool {
 }
 
 /// What breaks the Equipment rules in a resident's stored slots, if anything (ADR 0004): an
-/// equipped item is always among what they carry, and a slot holds only its kind.
+/// equipped item is always among what they carry, a slot holds only its kind, and a slot kept
+/// empty is empty and kept so once.
 pub fn equipment_problem(r: &Resident) -> Option<String> {
     for slot in SLOTS {
         let Some(g) = in_slot(&r.equipped, slot) else { continue };
@@ -149,6 +212,14 @@ pub fn equipment_problem(r: &Resident) -> Option<String> {
         }
         if held(&r.carried, g) <= 0.0 {
             return Some(format!("{} equipped but not carried", good_name(g)));
+        }
+    }
+    for k in &r.equipped.kept_off {
+        if in_slot(&r.equipped, k.slot).is_some() {
+            return Some(format!("{:?} slot kept empty but holds something", k.slot));
+        }
+        if r.equipped.kept_off.iter().filter(|o| o.slot == k.slot).count() > 1 {
+            return Some(format!("{:?} slot kept empty twice", k.slot));
         }
     }
     None

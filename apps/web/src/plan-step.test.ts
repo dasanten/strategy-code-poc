@@ -97,6 +97,8 @@ describe('Add step', () => {
       subject: { ask: 'subject', subject: 'strength' },
       units: { ask: 'units', units: 2 },
       condition: { ask: 'condition', condition: { kind: 'mounted', is: true } },
+      gear: { ask: 'gear', good: 'sword' },
+      slot: { ask: 'slot', slot: 'weapon' },
     }
     const kinds = new Set(
       STEP_KINDS.map((k) => {
@@ -127,6 +129,8 @@ describe('Add step', () => {
       subject: { ask: 'subject', subject: 'strength' },
       units: { ask: 'units', units: 2 },
       condition: { ask: 'condition', condition: { kind: 'mounted', is: true } },
+      gear: { ask: 'gear', good: 'sword' },
+      slot: { ask: 'slot', slot: 'weapon' },
     }
     for (const k of STEP_KINDS) {
       const picked = k.picks.map(() => ({ x: 0, y: 0, id: 'x', spot: { kind: 'ground' as const } }))
