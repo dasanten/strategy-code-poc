@@ -498,7 +498,7 @@ fn built_first(
         .collect();
     if own.iter().any(|b| b.site.is_none()) {
         seen.insert(good);
-        let input = chain_input(good).unwrap_or_default();
+        let input = chain_input(world, city, good).unwrap_or_default();
         return input
             .iter()
             .filter(|(g, n)| held(have, **g) < **n)

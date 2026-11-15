@@ -110,7 +110,7 @@ pub fn place_starting_sites_on(world: &mut WorldState, terrain: &TerrainMap, reg
     for h in &heartlands {
         place_in_heartland(world, terrain, regions, h, &rules, &fitting);
     }
-    assign_richness(&mut world.nodes, terrain, &regions);
+    assign_richness(&mut world.nodes, terrain, regions);
 }
 
 /// A place a site may go, before the nodes and the walk are looked at.
