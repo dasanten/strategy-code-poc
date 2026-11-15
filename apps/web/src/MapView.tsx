@@ -107,14 +107,8 @@ import { Motion, motionTokens, workSway } from './map/motion.js'
 import { overviewPixels, overviewSide, overviewTerrainAt } from './map/overview.js'
 import { caravanAt, caravanParts } from './caravans.js'
 import { drawUnits, type Spot } from './map/unit-tokens.js'
-import {
-  FAR_ROAD_WIDTH,
-  farRoadRuns,
-  roadJoins,
-  roadWidth,
-  wallWidths,
-  type RoadRun,
-} from './map/roads.js'
+import { FAR_ROAD_WIDTH, farRoadRuns, roadJoins, roadWidth, type RoadRun } from './map/roads.js'
+import { drawWallTiles, wallSides, type WallTile } from './map/wall-tile.js'
 import { drawPlans, plannedBuilding } from './map/plans.js'
 import { drawPlaces, pickedPlaces } from './map/places.js'
 import { drawMarks, drawPickPreview, type MapMark } from './map/preview-draw.js'
@@ -1769,37 +1763,23 @@ function drawStructures(
   const near = (sx: number, sy: number) =>
     sx > -tile * 2 && sy > -tile * 2 && sx < view.width + tile * 2 && sy < view.height + tile * 2
 
-  // Walls and gates as joined lines in the owner's colour over a dark edge (ADR 0008); a wall
-  // site shows faintly.
+  // Walls and gates as the whole tile in the owner's colour with a darker edge (`CONTEXT.md`:
+  // Wall / Gate), drawn in `wall-tile.ts`; a wall site shows faintly.
   const walls = structures.walls
   const wallAt = (x: number, y: number) => walls.has(`${(x + size) % size},${(y + size) % size}`)
-  const { edge, band } = wallWidths(tile)
-  const lines = new Map<string, [number, number, number, number][]>()
+  const wallTiles = new Map<string, WallTile[]>()
   for (const b of buildings) {
     if (b.kind !== 'wall' && b.kind !== 'gate') continue
-    const [cx, cy] = centre(cam, view, size, b)
-    if (!near(cx, cy)) continue
+    const [sx, sy] = tileToScreen(cam, view, size, b.x, b.y)
+    if (!near(sx + tile / 2, sy + tile / 2)) continue
     const key = `${relationshipColor(relOf(b))},${(b.site ? 0.35 : 1) * fade}`
-    const list = lines.get(key) ?? []
-    lines.set(key, list)
-    // A dot on every wall tile, so one standing alone shows, and a line to each wall right or below.
-    list.push([cx, cy, cx, cy])
-    if (wallAt(b.x + 1, b.y)) list.push([cx, cy, cx + tile, cy])
-    if (wallAt(b.x, b.y + 1)) list.push([cx, cy, cx, cy + tile])
+    const list = wallTiles.get(key) ?? []
+    wallTiles.set(key, list)
+    list.push({ sx, sy, ...wallSides(b.x, b.y, wallAt) })
   }
-  const stroke = (width: number, color: number, alpha: number, segments: number[][]) => {
-    const dots = segments.filter(([x0, y0, x1, y1]) => x0 === x1 && y0 === y1)
-    for (const [x, y] of dots) under.rect(x! - width / 2, y! - width / 2, width, width)
-    if (dots.length > 0) under.fill({ color, alpha })
-    const joins = segments.filter(([x0, y0, x1, y1]) => x0 !== x1 || y0 !== y1)
-    for (const [x0, y0, x1, y1] of joins) under.moveTo(x0!, y0!).lineTo(x1!, y1!)
-    if (joins.length > 0) under.stroke({ width, color, alpha, cap: 'square' })
-  }
-  for (const [key, segments] of lines)
-    stroke(edge, 0x0e1419, Number(key.split(',')[1]) * 0.85, segments)
-  for (const [key, segments] of lines) {
+  for (const [key, list] of wallTiles) {
     const [color, alpha] = key.split(',').map(Number) as [number, number]
-    stroke(band, color, alpha, segments)
+    drawWallTiles(under, list, tile, color, alpha)
   }
 
   // Buildings as icon tokens over their footprint (`CONTEXT.md`: Footprint): a plate in the
