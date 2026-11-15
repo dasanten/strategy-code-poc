@@ -75,7 +75,7 @@ pub fn soldiers_at_hand(world: &WorldState, city: &City, adults: &[usize]) -> Ve
         .copied()
         .filter(|&i| {
             let r = &world.residents[i];
-            is_armed(&r.carried)
+            is_armed(r)
                 && r.down_until.is_none()
                 && r.script.as_ref().is_none_or(|s| s.task == Some(Task::Train))
                 && r.carrying.is_none()

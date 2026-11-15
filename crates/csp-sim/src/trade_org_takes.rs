@@ -33,7 +33,7 @@ pub fn hall_blockers(
             let r = &world.residents[i];
             r.health > 0.0
                 && !ids.contains(&r.id)
-                && is_armed(&r.carried)
+                && is_armed(r)
                 && is_at((r.x as i32, r.y as i32), placed(hall), size)
                 && contract_of(world, &r.id).is_none_or(|c| c.hirer_id != TRADE_ORG)
                 && (r.owner.is_some() || defends_city(world, city, r, size))

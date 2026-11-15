@@ -239,7 +239,7 @@ fn trains_more_soldiers_than_its_armys_size_when_a_player_grows_strong() {
     assert_eq!(hq_soldiers(&s.world).len() as f64, wanted);
     let unarmed = hq_people(&s.world, &s.hq)
         .into_iter()
-        .filter(|&i| !is_armed(&s.world.residents[i].carried))
+        .filter(|&i| !is_armed(&s.world.residents[i]))
         .count();
     assert!(unarmed as f64 >= TRADE_ORG_ARMY.workers);
 }

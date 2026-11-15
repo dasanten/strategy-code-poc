@@ -481,9 +481,10 @@ fn run_trader(world: &mut WorldState, ti: usize, ri: usize, ki: usize, size: i32
     let at_hq = at_the_hq(world, &world.traders[ti]);
     if world.traders[ti].stop == TraderStop::Warehouse && at_hq {
         let t = &world.traders[ti];
-        let armed = t.escort_ids.iter().all(|id| {
-            world.residents.iter().find(|r| &r.id == id).is_none_or(|r| is_armed(&r.carried))
-        });
+        let armed = t
+            .escort_ids
+            .iter()
+            .all(|id| world.residents.iter().find(|r| &r.id == id).is_none_or(is_armed));
         if !armed || t.r#loop.len() < 2 {
             return;
         }

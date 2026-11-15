@@ -48,6 +48,8 @@ mod demand_goods;
 mod differential;
 #[path = "down.rs"]
 mod down;
+#[path = "equipment.rs"]
+mod equipment;
 #[path = "exploring.rs"]
 mod exploring;
 #[path = "feeding_horse.rs"]

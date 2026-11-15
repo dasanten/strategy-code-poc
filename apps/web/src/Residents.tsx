@@ -127,6 +127,7 @@ import {
   type ResidentLines,
 } from './residents-view.js'
 import { GOOD_LABELS, carriedItems } from './goods-grid.js'
+import { equipmentLine, equipmentSlots } from './equipment-view.js'
 import { GoodsGrid } from './GoodsGrid.js'
 import { BuildMenu } from './BuildMenu.js'
 import { workSpan } from './build-menu-view.js'
@@ -2789,6 +2790,19 @@ export function ResidentCard({
       )}
       {shown === 'goods' && (
         <>
+          <section className="inspector-block" aria-label="Equipped">
+            <div className="panel-head">
+              <h3>Equipped</h3>
+            </div>
+            <ul className="equipment-slots">
+              {equipmentSlots(r.equipped).map((s) => (
+                <li key={s.slot}>
+                  <span className="muted small">{s.label}</span>{' '}
+                  <span className={s.item ? undefined : 'muted'}>{s.item ?? 'empty'}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
           <section className="inspector-block" aria-label="Carrying">
             <div className="panel-head">
               <h3>Carrying</h3>
@@ -3120,6 +3134,9 @@ export function ResidentCard({
           <GoodsGrid label="Carried" {...carriedItems(r.carried)} />
           <span className="mono">{carryLine(stockWeight(r.carried), carryCapacity(r, tick))}</span>
         </div>,
+        <span key="equipped" className="muted">
+          {equipmentLine(r.equipped)}
+        </span>,
         ...(ridden ? [ridden] : []),
       ]}
       head={

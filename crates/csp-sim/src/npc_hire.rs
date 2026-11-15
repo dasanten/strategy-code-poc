@@ -155,7 +155,7 @@ fn arm_lent(
         if !in_city_area(world, &city.id, r.x as i32, r.y as i32, size) {
             continue;
         }
-        if !is_armed(&world.residents[i].carried) {
+        if !is_armed(&world.residents[i]) {
             for w in by_strength() {
                 if take(world, i, w) {
                     break;

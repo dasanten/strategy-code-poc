@@ -27,6 +27,7 @@ pub mod demands;
 pub mod directive;
 pub mod directives;
 pub mod driving;
+pub mod equipment;
 pub mod events;
 pub mod explored;
 pub mod explored_edge;
