@@ -5,8 +5,9 @@ mod common;
 
 use std::collections::BTreeSet;
 
+use csp_shared::balance::TRADE_ORG_HQ;
 use csp_shared::terrain::{tile_index, Terrain, TerrainMap};
-use csp_shared::world::{BuildingKind, ResourceKind, ResourceNode};
+use csp_shared::world::{BuildingKind, Good, ResourceKind, ResourceNode};
 use csp_sim::random::Mulberry32;
 use csp_sim::trade_org::{found_trade_org_hq, hq_layout};
 use csp_sim::world::create_world;
@@ -65,6 +66,8 @@ fn founds_the_hq_the_typescript_founded() {
             kind: *kind,
             x: f64::from(*x),
             y: f64::from(*y),
+            richness: Default::default(),
+            stock: None,
         })
         .collect();
     let mut rand = Mulberry32::new(7.0);
@@ -73,6 +76,13 @@ fn founds_the_hq_the_typescript_founded() {
     common::assert_same_json(
         "world",
         &serde_json::to_value(&want).unwrap(),
-        &serde_json::to_value(&world).unwrap(),
+        &common::without_coal(&serde_json::to_value(&world).unwrap()),
     );
+    // Coal, which the TypeScript knew nothing of: the goods warehouse starts with its Coal.
+    let coal = world
+        .buildings
+        .iter()
+        .filter_map(|b| b.stock.as_ref()?.get(&Good::Coal).copied())
+        .sum::<f64>();
+    assert_eq!(coal, TRADE_ORG_HQ.goods.get("coal").unwrap());
 }

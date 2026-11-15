@@ -263,6 +263,13 @@ fn hand_over_request(o: &OrderRequest) -> crate::leader::HandOverRequest<'_> {
     }
 }
 
+fn heir_request(o: &OrderRequest) -> crate::heir::HeirRequest<'_> {
+    crate::heir::HeirRequest {
+        resident_id: text_ref(o, "residentId"),
+        heir_id: text_ref(o, "heirId"),
+    }
+}
+
 fn map_size(t: Option<&TerrainMap>) -> i32 {
     t.map_or(csp_shared::balance::MAP_SIZE, |t| t.size)
 }
@@ -440,6 +447,22 @@ pub fn add_later_rule_orders(kinds: &mut OrderKinds) {
                     t.map(|t| t.size),
                 )
             }),
+        ),
+    );
+
+    // T103.1: naming an heir.
+    kinds.insert(
+        "nameHeir",
+        fn_kind(
+            Box::new(|w, s, o, _| crate::heir::validate_name_heir(w, s.user_id, &heir_request(o))),
+            Box::new(|w, s, o, _| crate::heir::apply_name_heir(w, s.user_id, &heir_request(o))),
+        ),
+    );
+    kinds.insert(
+        "clearHeir",
+        fn_kind(
+            Box::new(|w, s, o, _| crate::heir::validate_clear_heir(w, s.user_id, &heir_request(o))),
+            Box::new(|w, s, o, _| crate::heir::apply_clear_heir(w, s.user_id, &heir_request(o))),
         ),
     );
 

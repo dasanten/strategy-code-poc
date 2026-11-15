@@ -16,7 +16,7 @@ use csp_shared::balance::{
     REALM_NAME_MAX_LENGTH, ROAD_LINE_MAX_TILES, STABLE_BREED_DAYS, TRAINING_GROUND_MAX_TRAINEES,
     WORK_SKILL_MAX,
 };
-use csp_shared::footprint::{footprint_tiles, is_at, near_footprint};
+use csp_shared::footprint::{covers, footprint_tiles, is_at, near_footprint};
 use csp_shared::terrain::{
     beside_step, is_passable_terrain, is_sea, is_water, step_length, terrain_at, tile_index,
     touches_sea, touches_water, wrap_delta, Terrain, TerrainMap,
@@ -35,9 +35,9 @@ use crate::queries::alliance::{allied_realms, carriage_commander_of, commander_o
 use crate::queries::balance::carry_capacity;
 use crate::queries::building::{
     build_materials, build_work_of, building_at, carriage_can_go_to, has_choice, line_building,
-    line_order, materials_needed, max_workers, node_workplace, teardown_work, work_needed,
-    workplace_good, BUILDABLE, KEEPS_GOODS, OFF_NODES, ON_PLAINS, ON_SHORE, PROCESSING,
-    SHARES_A_TILE,
+    line_order, materials_needed, max_workers, node_workplace, recipe_for, teardown_work,
+    work_needed, workplace_good, BUILDABLE, KEEPS_GOODS, OFF_NODES, ON_PLAINS, ON_SHORE,
+    PROCESSING, SHARES_A_TILE,
 };
 use crate::queries::city_area::{city_membership, is_city_building};
 use crate::queries::command::commander_of_resident;
@@ -162,7 +162,9 @@ pub(crate) fn node_terrains(kind: ResourceKind) -> &'static [Terrain] {
     match kind {
         ResourceKind::Forest => &[Terrain::Forest],
         ResourceKind::Stone => &[Terrain::Hills],
-        ResourceKind::IronOre | ResourceKind::GoldOre => &[Terrain::Hills, Terrain::Mountain],
+        ResourceKind::IronOre | ResourceKind::GoldOre | ResourceKind::Coal => {
+            &[Terrain::Hills, Terrain::Mountain]
+        }
     }
 }
 
@@ -281,7 +283,14 @@ pub fn buildings_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
                 }
             }
         } else if BUILDABLE.contains(&b.kind) && !ON_PLAINS.contains(&b.kind) {
-            if nodes.len() != 1 || node_workplace(nodes[0].kind) != b.kind {
+            // A workplace whose node ran dry stands on where it was (`CONTEXT.md`: Running dry).
+            let on_dry = nodes.is_empty()
+                && b.site.is_none()
+                && world.dry_nodes.iter().any(|d| {
+                    covers(placed(b), d.x as i32, d.y as i32, size)
+                        && node_workplace(d.kind) == b.kind
+                });
+            if !on_dry && (nodes.len() != 1 || node_workplace(nodes[0].kind) != b.kind) {
                 fail(&b.id, format!("is a {kind} off its node"));
             }
             if let Some(c) = city {
@@ -988,11 +997,11 @@ pub fn work_orders_on_workplaces(world: &WorldState, _: &TerrainMap) -> Out {
         let makes = o.makes.map(good_name);
         match place {
             Some(p) if p.site.is_none() && max_workers(p.kind).is_some() => {
-                if has_choice(p.kind) != makes.is_some() {
-                    fail(match makes {
-                        None => "making nothing".into(),
-                        Some(m) => format!("making {m} with nothing to choose"),
-                    });
+                // A smithy's workers say what they make; a smelter's may (Steel), else Iron.
+                if makes.is_none() && has_choice(p.kind) && recipe_for(p.kind, None).is_none() {
+                    fail("making nothing".into());
+                } else if makes.is_some() && !has_choice(p.kind) {
+                    fail(format!("making {} with nothing to choose", makes.unwrap_or_default()));
                 } else if workplace_good(world, p, o.makes).is_none() {
                     fail(match makes {
                         None => "which makes nothing".into(),

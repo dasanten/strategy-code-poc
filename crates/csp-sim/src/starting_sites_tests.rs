@@ -145,6 +145,27 @@ fn frontier_regions_and_islands_hold_denser_nodes_than_heartlands() {
     assert!(per(RegionKind::Island) > per(RegionKind::Heartland) * 1.2, "{count:?} {tiles:?}");
 }
 
+/// Coal (`CONTEXT.md`: Rare goods) lies in frontier regions and on islands, on Hills and
+/// Mountain, and in no heartland; a map without regions has none.
+#[test]
+fn coal_lies_only_in_frontier_regions_and_on_islands() {
+    let terrain = generate_terrain(1, 1536);
+    let regions = Regions::of(1, &terrain);
+    let nodes = place_resource_nodes_by_region(&terrain, 1, &regions);
+    let mut coal: BTreeMap<u8, usize> = BTreeMap::new();
+    for n in nodes.iter().filter(|n| n.kind == ResourceKind::Coal) {
+        let t = terrain_at(&terrain, n.x as i32, n.y as i32);
+        assert!(t == Terrain::Hills as u8 || t == Terrain::Mountain as u8, "{n:?} on {t}");
+        let r = regions.id_at(n.x as i32, n.y as i32).expect("coal in a region");
+        *coal.entry(regions.regions[r as usize].kind as u8).or_default() += 1;
+    }
+    assert_eq!(coal.get(&(RegionKind::Heartland as u8)), None, "{coal:?}");
+    assert!(coal.get(&(RegionKind::Frontier as u8)).copied().unwrap_or(0) > 5, "{coal:?}");
+    assert!(coal.get(&(RegionKind::Island as u8)).copied().unwrap_or(0) > 0, "{coal:?}");
+    let plain = crate::node_gen::place_resource_nodes(&terrain, 1);
+    assert!(plain.iter().all(|n| n.kind != ResourceKind::Coal));
+}
+
 /// The world generator places the sites before any city, all of them free, and the Trade Org HQ,
 /// trading posts and NPC cities it places after them leave each site its room.
 #[test]
@@ -161,4 +182,68 @@ fn a_generated_world_has_the_starting_sites_all_free_with_room_for_a_city() {
     assert_eq!(world.starting_sites, only.starting_sites);
     assert_eq!(free_starting_sites(&world, world.starting_sites[0].region).count(), 10);
     assert_eq!(check_starting_sites(&world, &terrain, &Regions::of(1, &terrain)), []);
+}
+
+/// `CONTEXT.md`: Richness. Every heartland node is poor, the starting sites' own ones too; every
+/// island node is rich; a frontier region's nodes are normal but for its `FRONTIER_RICH_NODES`
+/// nearest its ways and its borders with other frontier regions.
+#[test]
+fn heartland_nodes_are_poor_island_nodes_rich_and_frontier_ones_normal_but_for_a_few() {
+    use csp_shared::balance::FRONTIER_RICH_NODES;
+    use csp_shared::world::Richness;
+    let (world, _, regions) = placed(1, 1536);
+    let mut rich_in: BTreeMap<u32, usize> = BTreeMap::new();
+    let mut in_frontier: BTreeMap<u32, usize> = BTreeMap::new();
+    let mut kinds_seen = [false; 3];
+    for n in &world.nodes {
+        let region = regions.region_at(n.x as i32, n.y as i32).expect("a node on land");
+        kinds_seen[region.kind as usize] = true;
+        match region.kind {
+            RegionKind::Heartland => assert_eq!(n.richness, Richness::Poor, "{n:?}"),
+            RegionKind::Island => assert_eq!(n.richness, Richness::Rich, "{n:?}"),
+            RegionKind::Frontier => {
+                assert_ne!(n.richness, Richness::Poor, "{n:?}");
+                *in_frontier.entry(region.id).or_default() += 1;
+                if n.richness == Richness::Rich {
+                    *rich_in.entry(region.id).or_default() += 1;
+                }
+            }
+        }
+    }
+    assert_eq!(kinds_seen, [true; 3], "nodes in every kind of region");
+    for (id, count) in in_frontier {
+        let want = count.min(FRONTIER_RICH_NODES as usize);
+        assert_eq!(rich_in.get(&id).copied().unwrap_or(0), want, "frontier region {id}");
+    }
+}
+
+/// The rich nodes of a frontier region lie nearer its ways and borders than its normal ones do,
+/// on the whole.
+#[test]
+fn a_frontier_regions_rich_nodes_lie_near_its_ways_and_borders() {
+    use csp_shared::terrain::wrap_distance;
+    use csp_shared::world::Richness;
+    let (world, terrain, regions) = placed(1, 1536);
+    let mut near = [0.0f64; 3];
+    let mut count = [0.0f64; 3];
+    for n in &world.nodes {
+        let at = (n.x as i32, n.y as i32);
+        let Some(r) = regions.region_at(at.0, at.1) else { continue };
+        if r.kind != RegionKind::Frontier {
+            continue;
+        }
+        let d = regions
+            .ways
+            .iter()
+            .filter(|w| w.between.contains(&r.id))
+            .map(|w| wrap_distance(terrain.size, at, (w.x, w.y)))
+            .fold(f64::INFINITY, f64::min);
+        if d.is_finite() {
+            near[n.richness as usize] += d;
+            count[n.richness as usize] += 1.0;
+        }
+    }
+    let mean = |r: Richness| near[r as usize] / count[r as usize];
+    assert!(count[Richness::Rich as usize] > 0.0 && count[Richness::Normal as usize] > 0.0);
+    assert!(mean(Richness::Rich) < mean(Richness::Normal), "{near:?} {count:?}");
 }

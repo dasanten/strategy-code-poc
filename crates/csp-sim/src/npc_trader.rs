@@ -553,7 +553,7 @@ pub fn has_node_for(
     if !seen.insert(good) {
         return false;
     }
-    if let Some(input) = chain_input(good) {
+    if let Some(input) = chain_input(world, city, good) {
         return input.keys().all(|g| has_node_for(world, city, home, *g, size, seen));
     }
     world.nodes.iter().any(|n| {

@@ -46,7 +46,14 @@ const DAY: f64 = TICKS_PER_GAME_DAY;
 /// Puts a node of `kind` on its tile, with the terrain it lies on (`node`).
 fn node(world: &mut WorldState, terrain: &mut TerrainMap, kind: ResourceKind, x: f64, y: f64) {
     let name = serde_json::to_value(kind).unwrap().as_str().unwrap().to_string();
-    world.nodes.push(ResourceNode { id: format!("{name}{x},{y}"), kind, x, y });
+    world.nodes.push(ResourceNode {
+        id: format!("{name}{x},{y}"),
+        kind,
+        x,
+        y,
+        richness: Default::default(),
+        stock: None,
+    });
     let ground = if kind == ResourceKind::Forest { Terrain::Forest } else { Terrain::Hills };
     terrain.tiles[tile_index(terrain.size, x as i32, y as i32)] = ground as u8;
 }

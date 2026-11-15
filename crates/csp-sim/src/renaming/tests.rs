@@ -181,6 +181,7 @@ fn keeps_the_old_name_in_realm_log_entries_from_before() {
         cause: DeathCause::Starved,
         leader: false,
         by: None,
+        heir: None,
     };
     record_event(&mut world, Some(&realm), what);
     let logged = world.events.clone();

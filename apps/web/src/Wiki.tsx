@@ -140,6 +140,10 @@ import {
   ISLAND_COUNT,
   HEARTLAND_COUNT,
   FRONTIER_REGION_COUNT,
+  FRONTIER_NODE_DENSITY,
+  ISLAND_NODE_DENSITY,
+  GOLD_NODE_DENSITY,
+  START_COINS,
   REGION_BORDER_WIDTH,
   PASS_WIDTH,
   SECOND_WAY_SHARE,
@@ -188,6 +192,7 @@ import {
   NPC_PLAN_TICKS,
   NPC_SURPLUS_CAP,
   NPC_SOLDIER_SHARE,
+  NPC_STEEL_KIT,
   NPC_WAR_CHEST_PER_RESIDENT,
   NPC_TRADE,
   OWN_FOOD,
@@ -299,6 +304,14 @@ import {
   RECIPES,
   BATCHES_PER_DAY,
   WORK_OUTPUT_PER_DAY,
+  RICHNESS_FACTOR,
+  FRONTIER_RICH_NODES,
+  RICHER_NODE_REACH,
+  VEIN_CREW_DAYS,
+  VEIN_STOCK,
+  VEIN_THINNING,
+  VEIN_NEARLY_GONE,
+  NEW_VEIN_SPOT_REACH,
   carryCapacity,
   walkSpeed,
   workFactor,
@@ -368,6 +381,23 @@ import {
   SCRIPT_LANGUAGE,
 } from './wiki-scripting.js'
 import { apiNames, type ApiName } from './script-editor.js'
+
+/** A smelter's Steel recipe (`CONTEXT.md`: Coal): its second, after Iron. */
+const STEEL = RECIPES.smelter!.find((r) => 'steel' in r.output)!
+
+/** The smithy's recipe for `good` (`CONTEXT.md`: Smithy). */
+const forged = (good: Good) => RECIPES.smithy!.find((r) => good in r.output)!
+
+/** Each steel weapon or piece of armour beside the iron one it beats (`CONTEXT.md`: Coal). */
+const STEEL_GEAR: [Good, Good][] = [
+  ['sword', 'steelSword'],
+  ['shield', 'steelShield'],
+  ['armour', 'steelArmour'],
+]
+
+/** What a weapon or piece of protection adds in a fight: its attack, or what it takes off a blow. */
+const gearValue = (good: Good) =>
+  (({ ...WEAPON_ATTACK, ...PROTECTION_DEFENCE }) as Record<string, number>)[good]!
 
 /** An untrained fighter with a spear and a fully trained, armoured one, as respect weighs them. */
 const UNTRAINED_SPEAR = { carried: { spear: 1 }, skills: {} }
@@ -529,6 +559,7 @@ const NODE_WORK: { kind: BuildingKind; good: Good }[] = [
   { kind: 'quarry', good: 'stone' },
   { kind: 'mine', good: 'ironOre' },
   { kind: 'mine', good: 'goldOre' },
+  { kind: 'mine', good: 'coal' },
 ]
 
 /** The Wiki (`CONTEXT.md`: Wiki): the rules in plain words, with the game's current numbers. */
@@ -546,6 +577,7 @@ export function Wiki() {
   const plainsTicksPerTile = 1 / walkSpeed(AVERAGE, Terrain.Plains, 0)
   const unarmed = blow()
   const sword = blow({ sword: 1 })
+  const steelSword = blow({ steelSword: 1 })
   const swordSkilled = blow({ sword: 1 }, COMBAT_SKILL_MAX)
   const dodge = Math.min(DODGE_LIMIT, avg * DODGE_PER_AGILITY)
   const loads: [number, number][] = [
@@ -1049,17 +1081,88 @@ export function Wiki() {
           safe: it is safe only in that it holds little worth taking.
         </p>
         <p>
-          Each heartland has {num(STARTING_SITES_PER_HEARTLAND)} <strong>starting sites</strong>,
-          a walk of {num(STARTING_SITE_WALK.minMinutes)} to {num(STARTING_SITE_WALK.maxMinutes)}{' '}
-          real minutes from the next one. A new Leader (your first, or one after your Leader died
-          with no heir) gets a free site in the <strong>open</strong> heartland where Players have
-          the most cities, the one opened first on a tie, and in it the free site nearest another
-          Player’s city: you start as someone’s neighbour. The world’s first Player opens the first
+          <strong>Coal</strong> lies only out there: its nodes are in Hills and, more of them,
+          Mountain of the frontier regions and the islands, never in a heartland. A mine built on a
+          coal node yields Coal, {num(WORK_OUTPUT_PER_DAY.coal ?? 0)} a game day for an average
+          worker, and teaches Mining. Coal is carried, stored, hauled and traded like any other
+          good; it weighs {num(GOOD_WEIGHT.coal ?? 0)} kg a unit, and trading posts and the HQ buy
+          and sell it. Your realm’s Coal shows in the top bar beside its Food, Wood and Stone.
+        </p>
+        <p>
+          A smelter turns Iron and Coal into <strong>Steel</strong>: {num(STEEL.input.iron ?? 0)}{' '}
+          Iron and {num(STEEL.input.coal ?? 0)} Coal make {num(STEEL.output.steel ?? 0)} Steel, so
+          an average smelter worker makes{' '}
+          {num(batchesPerDay('smelter') * (STEEL.output.steel ?? 0))} Steel a game day. Whether a
+          smelter’s worker makes Iron or Steel is said when they are given Work there, as a smith
+          says what to forge; told nothing, they make Iron. Set to Steel without Coal, they stand
+          idle and their Doing line says what is missing. Steel weighs {num(GOOD_WEIGHT.steel ?? 0)}{' '}
+          kg a unit, is stored and traded like any good, and shows in the top bar beside Coal.
+        </p>
+        <p>
+          A smithy forges a <strong>steel</strong> Sword, Shield and Armour from Steel and Wood,
+          each better than the iron one and as heavy; the Spear is iron only. The smith says which
+          when given Work there, as for the iron ones.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Gear</th>
+              <th>Made from</th>
+              <th>Iron one</th>
+              <th>Steel one</th>
+            </tr>
+          </thead>
+          <tbody>
+            {STEEL_GEAR.map(([iron, steel]) => (
+              <tr key={steel}>
+                <td>{goodName(steel)}</td>
+                <td>
+                  {num(forged(steel).input.steel ?? 0)} Steel, {num(forged(steel).input.wood ?? 0)}{' '}
+                  Wood
+                </td>
+                <td>{signed(gearValue(iron) * (iron === 'sword' ? 1 : -1))}</td>
+                <td>{signed(gearValue(steel) * (iron === 'sword' ? 1 : -1))}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p>
+          <strong>NPC cities and Steel.</strong> An NPC city that knows of a coal node wants a{' '}
+          {NPC_STEEL_KIT.map((g) => goodName(g as Good).toLowerCase()).join(', ')} for each of its
+          soldiers, in that order, instead of a spear. So it keeps them, their Steel and Wood, and
+          the Iron and Coal for that Steel and the Iron ore for that Iron in its reserve, mines
+          Coal, sets every second smelter it builds to Steel, forges the steel gear and arms its
+          soldiers with it: a soldier fetches each piece from its storage once it holds one and puts
+          back the spear it outdoes. A city with no coal node in reach, as in a heartland, stays on
+          the iron spear. NPC cities price Coal, Steel and the steel gear like any good and sell
+          what they hold above their reserve, and lent residents take the best gear of the surplus,
+          steel first. The Trade Organization’s warehouses trade the steel gear too (a floor of{' '}
+          {num(WAREHOUSE_FLOOR.steelSword ?? 0)} each at a post), and its HQ and posts arm their
+          soldiers with steel as far as their warehouse holds it, iron otherwise.
+        </p>
+        <p>
+          Each heartland has {num(STARTING_SITES_PER_HEARTLAND)} <strong>starting sites</strong>, a
+          walk of {num(STARTING_SITE_WALK.minMinutes)} to {num(STARTING_SITE_WALK.maxMinutes)} real
+          minutes from the next one. A new Leader (your first, or one after your Leader died with no
+          heir) gets a free site in the <strong>open</strong> heartland where Players have the most
+          cities, the one opened first on a tie, and in it the free site nearest another Player’s
+          city: you start as someone’s neighbour. The world’s first Player opens the first
           heartland; the next one opens, the one nearest an open heartland, only once no open
           heartland has a free site left. A site is free while nothing of anyone’s stands on it or
           on the farmland round it, so one whose city is gone is free again. Should every site be
-          taken, your city goes on the free place nearest an open heartland’s middle. Your realm
-          log names the heartland your city stands in.
+          taken, your city goes on the free place nearest an open heartland’s middle. Your realm log
+          names the heartland your city stands in.
+        </p>
+        <p>
+          Resource nodes lie thicker away from home: a frontier region holds{' '}
+          {num(FRONTIER_NODE_DENSITY)} times as many as a heartland, an island{' '}
+          {num(ISLAND_NODE_DENSITY)} times. <strong>Gold ore</strong> is a rare good like Coal: no
+          gold node lies in a heartland, only in the frontier and on islands, where it is{' '}
+          {num(GOLD_NODE_DENSITY)} times as common again. Every frontier region has a gold node and
+          a coal node in it or in a region next to it. So a heartland realm gets its Coins by trade,
+          selling Food, Wood, Stone or Iron at its heartland’s trading post, or by holding a gold
+          node out there. Your starting city’s storage holds {num(START_COINS)} Coins for a first
+          trade.
         </p>
         <p>
           The regions of the mainland are parted by Mountain ranges and by arms of the Sea, about{' '}
@@ -1074,14 +1177,76 @@ export function Wiki() {
           You know the region of every tile you have explored. A tile’s card names it: “Heartland of
           …”, “Frontier: …” or “Island: …”, with “pass” or “land bridge” on a tile of one. Zoomed
           out to the middle and far zoom, the map writes the names of the regions you have explored
-          part of over them and marks the passes (a white diamond) and land bridges (a blue one)
-          you have explored. Nothing shows for land you haven’t explored. This is not the Region
-          map, which shows territory (see Territory).
+          part of over them and marks the passes (a white diamond) and land bridges (a blue one) you
+          have explored. Nothing shows for land you haven’t explored. This is not the Region map,
+          which shows territory (see Territory).
         </p>
         <p>
           Scripts read a tile’s region in its view: <code>region</code> is its name and{' '}
           <code>regionKind</code> is <code>"heartland"</code>, <code>"frontier"</code> or{' '}
           <code>"island"</code>, both <code>null</code> on water and on tiles you haven’t explored.
+        </p>
+        <p>
+          Every resource node is <strong>poor</strong>, <strong>normal</strong> or{' '}
+          <strong>rich</strong>, from the day it comes into being. A mine, quarry or lumber camp on
+          it makes {num(RICHNESS_FACTOR.poor)}, {num(RICHNESS_FACTOR.normal)} or{' '}
+          {num(RICHNESS_FACTOR.rich)} times as much per worker; workers, skill and Strength count as
+          ever. Heartland nodes are poor. Frontier nodes are normal, but for the{' '}
+          {num(FRONTIER_RICH_NODES)} of each frontier region nearest its passes, land bridges and
+          borders with another frontier region, which are rich. Island nodes are rich. Farms stand
+          on no node and make the same everywhere.
+        </p>
+        <p>
+          A node’s card says its richness once you have explored its tile, with what a worker of
+          average Strength makes there a game day; so does the card of the workplace on it, and its
+          Made a game day list counts it in. Scripts read it as the node’s <code>richness</code>:{' '}
+          <code>"poor"</code>, <code>"normal"</code> or <code>"rich"</code>. NPC cities and the
+          Trade Organization pick the richer of two nodes about as far away: each step of richness
+          counts as {pct(RICHER_NODE_REACH)} less of the way.
+        </p>
+        <p>
+          A normal or rich ore node (iron ore, gold ore or coal) holds a <strong>vein</strong> that
+          working it uses up: each unit its mine makes takes one from it. A normal iron ore or coal
+          vein holds {num(VEIN_STOCK.ironOre.normal)} units, a rich one{' '}
+          {num(VEIN_STOCK.ironOre.rich)}; a gold ore vein {num(VEIN_STOCK.goldOre.normal)} or{' '}
+          {num(VEIN_STOCK.goldOre.rich)}. That is {num(VEIN_CREW_DAYS.normal)} or{' '}
+          {num(VEIN_CREW_DAYS.rich)} game days of a full crew of average workers. Poor nodes, forest
+          and stone never run dry, so a heartland realm always keeps what its land gives.
+        </p>
+        <p>
+          Whoever works a mine, your realm and your allies, sees how its vein stands on the mine’s
+          card, in words and never as a number: <em>plenty</em> while more than {pct(VEIN_THINNING)}{' '}
+          of what it first held is left, <em>thinning</em> from there, <em>nearly gone</em> at{' '}
+          {pct(VEIN_NEARLY_GONE)} or less. A workplace on a node that never runs dry says so. Your
+          realm log says once when a mine you work turns to thinning and once when it is nearly
+          gone. Others, who work nothing there, see the node and its richness only. Your scripts
+          read the word as a building’s <code>vein</code>.
+        </p>
+        <p>
+          Once a vein runs dry its node is gone for good. The mine stays standing and makes nothing:
+          its workers stop, each one’s log saying “the vein ran dry”, and your realm log says so
+          once. You can tear the mine down like any building, but no mine can be built there again.
+          Others who explored the tile still see the node on their map until they see the tile
+          again.
+        </p>
+        <p>
+          The land does not run out, though. The moment a vein runs dry a new node of the same kind
+          and richness comes into being somewhere else: a normal one in a frontier region, a rich
+          one on an island or within {num(NEW_VEIN_SPOT_REACH)} tiles of a pass, land bridge or
+          frontier border, gold and coal never in a heartland, and in another region than the old
+          one wherever one fits. It appears out of everyone’s sight and, where the map allows, on
+          land nobody has explored. Nobody is told: you have to find it. If you had explored its
+          tile before, your map shows no node there until one of your residents sees the tile
+          again.
+        </p>
+        <p>
+          NPC cities and the Trade Organization move on too. When the mine an NPC city or a trading
+          post works runs dry, its workers are free at the city’s next planning pass and the city,
+          still short of the ore, opens a mine on the next fitting node it knows of within its
+          reach. Its builders tear the dead mine down for its materials once they have nothing
+          better to do. With no other node known it buys the ore, or the goods made from it, from a
+          trader or goes without, and a node its scouts find later counts from then on. The Trade
+          Organization’s HQ takes the next nearest node of the kind, however far away it lies.
         </p>
       </Section>
 
@@ -1119,11 +1284,11 @@ export function Wiki() {
         <p>
           Give a grown resident <strong>Explore</strong> on their card, on foot or riding, and they
           go into the unknown on their own. Before they start, pick <code>find</code>, a kind of
-          resource node to look for (forest, stone, iron ore or gold ore), or none to just explore
-          until you stop them; <code>toward</code>, a compass direction, or a <code>waypoint</code>{' '}
-          to head for instead; with neither they take the nearest unexplored land first.{' '}
-          <code>food</code> is where they refill; with none picked, the nearest storage of your
-          realm with Food.
+          resource node to look for (forest, stone, iron ore, gold ore or coal), or none to just
+          explore until you stop them; <code>toward</code>, a compass direction, or a{' '}
+          <code>waypoint</code> to head for instead; with neither they take the nearest unexplored
+          land first. <code>food</code> is where they refill; with none picked, the nearest storage
+          of your realm with Food.
         </p>
         <p>
           They set out with as much Food as they can carry and walk to the edge of what you have
@@ -1250,6 +1415,40 @@ export function Wiki() {
           A resident lives in one city, wherever they stand. One who lives in none is{' '}
           <b>homeless</b>: their town hall was torn down, or they were away when their city changed
           hands. A homeless resident has no home to refill at and can't pair.
+        </p>
+        <p>
+          Your <b>heir</b> is the one resident you name to carry your realm on. Name them from their
+          card (<strong>Leader and heir…</strong>, then <strong>Name heir</strong>) or from a script
+          with <code>nameHeir(residentId)</code>; it is free, at once and from anywhere. Who
+          qualifies: an adult of your realm who lives in one of its cities, isn't your Leader and
+          serves no one else (no mercenary contract or offer naming them, not in the alliance
+          army), the same residents a Leader handover allows, but they need not stand by your
+          Leader. You have one heir: naming another replaces the first, and{' '}
+          <strong>Clear heir</strong> or <code>clearHeir()</code> leaves you with none. The top bar
+          shows your heir, or “No heir” to pick one; their card and the Residents list mark them.
+          Only you and your allies see who it is. The heir lapses, with a line in your realm log,
+          when they die, leave your realm (their city changes hands, or they are handed over),
+          become homeless, are lent out or handed to the alliance army, or become your Leader by a
+          handover; then name another.
+        </p>
+        <p>
+          <b>When your Leader dies</b> and you have a living heir (one who is Down counts), the heir
+          is your Leader at once and you play on: your realm keeps its name, standing, contracts,
+          alliance, scripts and realm log. But it keeps only the city your heir lives in, with its
+          residents wherever they stand (those away keep their orders) and everything in it, and
+          the horses, carriages and boats nearer it than any other of your cities; outpost storages
+          stay yours. Every other city becomes a <b>self-managed city</b> with its residents and
+          the horses and carriages nearest it, holding you in good standing at{' '}
+          {signed(FORMER_PLAYER_STANDING)}; its soldiers lent out or in the alliance army walk
+          home. Your realm then has no heir until you name one. Your realm log and a notice say who
+          took over and what became of each city.
+        </p>
+        <p>
+          Without a living heir, or when your heir dies in the same tick as your Leader, your realm
+          ends: every city becomes self-managed, your contracts end, you leave your alliance, and
+          you start afresh with a new Leader and starting city on your next login. So naming an
+          heir, and keeping them safe in a city other than your Leader's, is what keeps a lost
+          Leader from costing you everything.
         </p>
         <p>
           <b>Relocate</b> moves any resident of your realm, your Leader, children and homeless ones
@@ -1417,11 +1616,12 @@ export function Wiki() {
         </p>
         <p>
           A smelter, mint or smithy has no storage: it works what its workers carry and what lies in
-          its pile. Once they lack the input for a batch (Iron ore, Gold ore, or the Iron and Wood
-          of what a smith makes), one worker at a time, picked at random, fetches a load of what is
-          missing from their <code>input</code> storage, else their <code>storage</code>, else the
-          nearest storage of their realm holding it, puts it on the pile and goes back to work; not
-          while someone carries the output. With none anywhere they stand idle.
+          its pile. Once they lack the input for a batch (Iron ore, the Iron and Coal of Steel, Gold
+          ore, or the Iron and Wood of what a smith makes), one worker at a time, picked at random,
+          fetches a load of what is missing from their <code>input</code> storage, else their{' '}
+          <code>storage</code>, else the nearest storage of their realm holding it, puts it on the
+          pile and goes back to work; not while someone carries the output. With none anywhere they
+          stand idle, and their Doing line says what is missing ("Idle: no coal").
         </p>
         <p>
           Work's params on the card: <code>storage</code> is the main storage, used for the output,
@@ -2529,14 +2729,14 @@ export function Wiki() {
         </table>
         <h3>NPC cities</h3>
         <p>
-          When the world is made, NPC cities are placed region by region, wherever there is room:
-          in each frontier region {num(NPC_TOWNS_PER_FRONTIER)} town(s) and{' '}
+          When the world is made, NPC cities are placed region by region, wherever there is room: in
+          each frontier region {num(NPC_TOWNS_PER_FRONTIER)} town(s) and{' '}
           {num(NPC_VILLAGES_PER_FRONTIER)} village(s), in each heartland{' '}
           {num(NPC_VILLAGES_PER_HEARTLAND)} village(s). They stand on the mainland only: none on an
           island, none within {num(NPC_STARTING_SITE_CLEARANCE)} tiles of a starting site, and none
           within {num(NPC_WAY_CLEARANCE)} tiles of a pass or land bridge, with its farms. A full
-          city's new village stays on land its people can walk to, never across the sea, and as
-          far from the starting sites.
+          city's new village stays on land its people can walk to, never across the sea, and as far
+          from the starting sites.
         </p>
         <p>
           An NPC city thinks over what its people do once a game hour ({realTimeOf(NPC_PLAN_TICKS)}
@@ -2548,7 +2748,8 @@ export function Wiki() {
           An NPC city keeps a reserve: {days(NPC_TRADE.reserveFoodDays)} of Food for everyone; the
           materials for a house and {num(NPC_TRADE.reserveWallStretches)} tiles of wall; a{' '}
           {GOOD_LABELS[NPC_SMITHY_WEAPON].toLowerCase()} for each soldier it keeps and hasn't armed
-          yet ({pct(NPC_SOLDIER_SHARE)} of its adults), with the Iron and Wood to forge them; and{' '}
+          yet ({pct(NPC_SOLDIER_SHARE)} of its adults), with the Iron and Wood to forge them (a city
+          that knows of a coal node keeps the steel gear instead, under Coal); and{' '}
           {num(NPC_WAR_CHEST_PER_RESIDENT)} coins a resident as its war chest. Coins below the war
           chest count as short only for a city that can earn them: one with a mint or gold mine,
           Gold ore in its storage, a gold node it knows of, a Trade Org warehouse within{' '}
@@ -2720,10 +2921,10 @@ export function Wiki() {
         <p>
           Every heartland has a trading post near its middle; the frontier gets one more in each
           stretch of about {num(TRADING_POST_REGION)} tiles across that has room. The HQ stands in a
-          frontier region, as far from the starting sites as the mainland allows. None of them stands
-          on an island, a pass or a land bridge, or within {num(NPC_STARTING_SITE_CLEARANCE)} tiles
-          of a starting site, and the caravans and wandering traders drive from the HQ to every post
-          over the passes and land bridges.
+          frontier region, as far from the starting sites as the mainland allows. None of them
+          stands on an island, a pass or a land bridge, or within {num(NPC_STARTING_SITE_CLEARANCE)}{' '}
+          tiles of a starting site, and the caravans and wandering traders drive from the HQ to
+          every post over the passes and land bridges.
         </p>
         <p>
           The Trade Organization runs its own chain the same way. A trading post's reserve is its
@@ -3022,7 +3223,8 @@ export function Wiki() {
           </li>
           <li>
             A city whose Leader died starts out holding its former Player at{' '}
-            {signed(FORMER_PLAYER_STANDING)}.
+            {signed(FORMER_PLAYER_STANDING)}, and so does one that left a realm whose heir took
+            over, toward that realm.
           </li>
         </ul>
         <p>
@@ -3153,9 +3355,11 @@ export function Wiki() {
           </tbody>
         </table>
         <p>
-          An average resident hits for {num(unarmed)} with bare fists, {num(sword)} with a sword,
-          and {num(swordSkilled)} with a sword at full Combat skill ({num(COMBAT_SKILL_MAX)}{' '}
-          points); they dodge {pct(dodge)} of blows. A resident has {num(MAX_HEALTH)} health.
+          An average resident hits for {num(unarmed)} with bare fists, {num(sword)} with a sword,{' '}
+          {num(steelSword)} with a steel sword, and {num(swordSkilled)} with a sword at full Combat
+          skill ({num(COMBAT_SKILL_MAX)} points); they dodge {pct(dodge)} of blows. A resident has{' '}
+          {num(MAX_HEALTH)} health. They fight with the best weapon they carry, and only their best
+          shield and best armour count, so steel over iron and a second shield adds nothing.
         </p>
         <p>
           Defenders on their own city's wall take {pct(WALL_DEFENCE)} of the damage. A tile of wall

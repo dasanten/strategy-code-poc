@@ -16,8 +16,8 @@ use csp_shared::footprint::FOOTPRINT;
 use csp_shared::terrain::{Terrain, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
-    BuildingKind, Good, Pile, Resident, ResidentOrder, ResourceKind, ResourceNode, SkillName,
-    Stock, WorldState,
+    BuildingKind, Good, Pile, Resident, ResidentOrder, ResourceKind, ResourceNode, Richness,
+    SkillName, Stock, WorldState,
 };
 use csp_sim::order_sender::OrderSender;
 use csp_sim::queries::balance::{skill_of, work_output};
@@ -254,7 +254,14 @@ fn on_node(
     id: &str,
 ) -> (WorldState, TerrainMap, Orders) {
     let (mut world, t, mut orders) = setup();
-    world.nodes.push(ResourceNode { id: format!("n{x}"), kind: node, x, y: 1.0 });
+    world.nodes.push(ResourceNode {
+        id: format!("n{x}"),
+        kind: node,
+        x,
+        y: 1.0,
+        richness: Default::default(),
+        stock: None,
+    });
     world.buildings.push(building(id, kind, x, 1.0));
     at(&mut world, "w1").x = x;
     at(&mut world, "w1").y = 1.0;
@@ -276,6 +283,7 @@ fn a_workplace_on_a_node_makes_its_good_onto_the_pile_on_its_tile_and_teaches_it
         (BuildingKind::Quarry, "quarry", ResourceKind::Stone, 5.0, Good::Stone, SkillName::Mining),
         (BuildingKind::Mine, "mine", ResourceKind::IronOre, 7.0, Good::IronOre, SkillName::Mining),
         (BuildingKind::Mine, "mine", ResourceKind::GoldOre, 7.0, Good::GoldOre, SkillName::Mining),
+        (BuildingKind::Mine, "mine", ResourceKind::Coal, 7.0, Good::Coal, SkillName::Mining),
     ];
     for (kind, name, node, x, good, skill) in cases {
         let (mut world, t, _) = on_node(kind, node, x, name);
@@ -382,4 +390,65 @@ fn works_the_same_on_a_workplace_of_no_city() {
     let s = at(&mut world, "s1").clone();
     assert_eq!((s.x, s.y), (7.0, 1.0));
     assert_eq!(at(&mut world, "w1").carried.get(&Good::IronOre).copied().unwrap_or(0.0), 0.0);
+}
+
+/// What `crew` workers of average Strength and no skill make in just short of a game day at a mine
+/// on an iron node of `richness`: what lies on its pile plus their shares of the next units.
+fn mined_in_a_day(richness: Richness, crew: usize) -> f64 {
+    let (mut world, t, mut orders) =
+        on_node(BuildingKind::Mine, ResourceKind::IronOre, 7.0, "mine");
+    world.nodes.last_mut().unwrap().richness = richness;
+    for i in 1..crew {
+        let id = format!("w{}", i + 1);
+        worker(&mut world, &id, 7.0, 1.0, "r1");
+        assert_eq!(work(&mut world, &t, &mut orders, &id, &me()), Ok(()));
+    }
+    run(&mut world, &t, TICKS_PER_GAME_DAY as usize - 2);
+    let shares: f64 = world.residents.iter().map(progress).sum();
+    shares + piled(&world, 7, 1, Good::IronOre)
+}
+
+#[test]
+fn the_same_crew_makes_its_nodes_richness_factor_times_as_much() {
+    let normal = mined_in_a_day(Richness::Normal, 1);
+    let iron = WORK_OUTPUT_PER_DAY.get("ironOre").unwrap();
+    assert!((normal - iron).abs() < 0.5, "{normal}");
+    for richness in [Richness::Poor, Richness::Rich] {
+        let made = mined_in_a_day(richness, 1);
+        assert!((made - normal * richness.factor()).abs() < 0.05, "{richness:?}: {made}");
+    }
+    assert!(mined_in_a_day(Richness::Poor, 1) < normal);
+    assert!(mined_in_a_day(Richness::Rich, 1) > normal);
+}
+
+/// Invariant (ADR 0004; `CONTEXT.md`: Richness): a workplace's output over a day is its crew's
+/// output times its node's factor.
+#[test]
+fn a_workplaces_output_over_a_day_is_its_crews_output_times_its_nodes_factor() {
+    let (world, _, _) = setup();
+    let one = work_output(&world.residents[0], Good::IronOre, SkillName::Mining, 0.0);
+    for richness in [Richness::Poor, Richness::Normal, Richness::Rich] {
+        let crew = 3;
+        let made = mined_in_a_day(richness, crew);
+        let want = crew as f64 * one * (TICKS_PER_GAME_DAY - 2.0) * richness.factor();
+        // Skill learned over the day adds a little.
+        assert!(made >= want - 1e-6 && made < want * 1.02, "{richness:?}: {made} of {want}");
+    }
+}
+
+#[test]
+fn a_farm_yields_the_same_whatever_the_nodes_about_it() {
+    let made = |richness: Richness| {
+        let (mut world, t, mut orders) = setup();
+        world.nodes.push(ResourceNode::new("n", ResourceKind::Forest, 3.0, 1.0));
+        world.nodes.last_mut().unwrap().richness = richness;
+        at(&mut world, "w1").carried = Stock::from([(Good::Food, HOME_FOOD_LOW)]);
+        work(&mut world, &t, &mut orders, "w1", &me()).unwrap();
+        run(&mut world, &t, TICKS_PER_GAME_DAY as usize - 2);
+        progress(at(&mut world, "w1")) + piled(&world, 3, 3, Good::Food)
+    };
+    let normal = made(Richness::Normal);
+    assert!((normal - farm_food_per_day()).abs() < 0.5, "{normal}");
+    assert_eq!(made(Richness::Poor), normal);
+    assert_eq!(made(Richness::Rich), normal);
 }

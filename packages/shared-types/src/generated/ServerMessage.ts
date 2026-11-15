@@ -11,6 +11,7 @@ import type { ScriptLogLine } from "./ScriptLogLine.js";
 import type { ScriptRunSeen } from "./ScriptRunSeen.js";
 import type { SeenEntity } from "./SeenEntity.js";
 import type { TraderVisit } from "./TraderVisit.js";
+import type { VeinWord } from "./VeinWord.js";
 import type { Waypoint } from "./Waypoint.js";
 import type { WelcomeHome } from "./WelcomeHome.js";
 import type { WorkplaceSettings } from "./WorkplaceSettings.js";
@@ -49,13 +50,35 @@ region: RegionMap | null,
 /**
  * Whether the Player may still claim their Horse offer.
  */
-horseOffer: boolean, waypoints: Array<Waypoint>, traderVisits: Array<TraderVisit>, firstDay: FirstDay, 
+horseOffer: boolean, 
+/**
+ * The tiles (x, y) of the dry nodes the Player knows are gone (`CONTEXT.md`: Running dry):
+ * their map leaves out the nodes there.
+ */
+goneNodes: Array<[number, number]>, waypoints: Array<Waypoint>, traderVisits: Array<TraderVisit>, firstDay: FirstDay, 
 /**
  * The realm's Workplace settings by building id; only its own.
  */
-workSettings: { [key in string]: WorkplaceSettings }, } | { "type": "tick", tick: number, changed: Array<SeenEntity>, gone: Array<string>, lastSeen?: LastSeenChange, explored: Array<number>, 
+workSettings: { [key in string]: WorkplaceSettings }, 
+/**
+ * How the veins of the workplaces its realm or an ally works stand, by building id
+ * (`CONTEXT.md`: Running dry): words, never a number.
+ */
+veins: { [key in string]: VeinWord }, } | { "type": "tick", tick: number, changed: Array<SeenEntity>, gone: Array<string>, lastSeen?: LastSeenChange, explored: Array<number>, 
 /**
  * The new counts of the chunks in `explored`, as `encode_explored_counts` lists them: to a
  * client of `COUNTS_FROM_VERSION` or later, when some grew.
  */
-exploredCounts?: Array<number>, events: Array<RealmEvent>, diplomacy?: Diplomacy, region?: RegionMap, leaderId?: string, realmName?: string, horseOffer?: boolean, workSettings?: { [key in string]: WorkplaceSettings }, waypoints?: Array<Waypoint>, traderVisits?: Array<TraderVisit>, } | { "type": "scriptMemory", id: string, memory: { [key in string]: JsonValue } | null, } | { "type": "scriptRun", id: string, run: ScriptRunSeen | null, } | { "type": "scriptLog", id: string, lines: Array<ScriptLogLine> | null, } | { "type": "firstDay", firstDay: FirstDay, } | { "type": "ack", requestId: string, } | { "type": "rejected", requestId: string, reason: string, };
+exploredCounts?: Array<number>, events: Array<RealmEvent>, diplomacy?: Diplomacy, region?: RegionMap, leaderId?: string, realmName?: string, 
+/**
+ * The realm's heir once it changed: their id, or null once it has none.
+ */
+heirId?: string | null, horseOffer?: boolean, 
+/**
+ * All of `gone_nodes` again, once the Player learns of another.
+ */
+goneNodes?: Array<[number, number]>, workSettings?: { [key in string]: WorkplaceSettings }, 
+/**
+ * All of `veins` again, once a word changed.
+ */
+veins?: { [key in string]: VeinWord }, waypoints?: Array<Waypoint>, traderVisits?: Array<TraderVisit>, } | { "type": "scriptMemory", id: string, memory: { [key in string]: JsonValue } | null, } | { "type": "scriptRun", id: string, run: ScriptRunSeen | null, } | { "type": "scriptLog", id: string, lines: Array<ScriptLogLine> | null, } | { "type": "firstDay", firstDay: FirstDay, } | { "type": "ack", requestId: string, } | { "type": "rejected", requestId: string, reason: string, };

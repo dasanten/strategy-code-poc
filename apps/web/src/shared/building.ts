@@ -99,16 +99,17 @@ export function recipeGood(recipe: Recipe): Good {
 
 /**
  * The recipe a worker follows at a workplace that processes goods (`RECIPES`): the one that makes
- * `makes`, or with no `makes` the workplace's only recipe. Undefined for a workplace that
- * processes nothing, a good it can't make, or a smithy with no `makes` (it has more than one).
+ * `makes`, or with no `makes` the workplace's first recipe, so a smelter makes Iron unless told
+ * Steel (`CONTEXT.md`: Coal). Undefined for a workplace that processes nothing, a good it can't
+ * make, or a smithy with no `makes`: its workers always say which weapon or armour.
  */
 export function recipeFor(kind: BuildingKind, makes?: Good): Recipe | undefined {
   const recipes = RECIPES[kind] ?? []
-  if (makes === undefined) return recipes.length === 1 ? recipes[0] : undefined
+  if (makes === undefined) return kind === 'smithy' ? undefined : recipes[0]
   return recipes.find((r) => recipeGood(r) === makes)
 }
 
-/** Whether a workplace has more than one recipe, so its workers say what they make (a smithy). */
+/** Whether a workplace has more than one recipe, so its workers say what they make (a smithy, or a smelter for Steel). */
 export function hasChoice(kind: BuildingKind): boolean {
   return (RECIPES[kind]?.length ?? 0) > 1
 }
@@ -519,13 +520,14 @@ export const NODE_GOOD: Record<ResourceKind, Good> = {
   stone: 'stone',
   ironOre: 'ironOre',
   goldOre: 'goldOre',
+  coal: 'coal',
 }
 
 /**
  * The good a workplace makes (`CONTEXT.md`: Workplace): Food on a farm; on a resource node, what
- * the node yields, so a mine makes iron ore or gold ore by the node it stands on; at a smelter or
- * mint, what its recipe makes (Iron, Coins); at a smithy, the weapon or armour `makes` names
- * (`recipeFor`), and nothing without it.
+ * the node yields, so a mine makes iron ore, gold ore or coal by the node it stands on; at a smelter or
+ * mint, what its recipe makes (Iron, Coins; at a smelter Steel when `makes` says so); at a smithy,
+ * the weapon or armour `makes` names (`recipeFor`), and nothing without it.
  */
 export function workplaceGood(
   world: WorldState,
@@ -688,8 +690,8 @@ export function holdersOf(
 /**
  * Why a resident can't start working the building on their tile, or undefined if they can: it
  * has to be a finished workplace residents can work, with room for one more worker. At a smithy
- * `makes` names one of its recipes' goods (`recipeFor`); elsewhere it is left out. A worker there
- * can switch to making something else.
+ * `makes` names one of its recipes' goods (`recipeFor`), at a smelter it may (Iron without);
+ * elsewhere it is left out. A worker there can switch to making something else.
  */
 export function workProblem(
   world: WorldState,
@@ -700,8 +702,9 @@ export function workProblem(
   const max = here && MAX_WORKERS[here.kind]
   if (!here || max === undefined) return 'there is no workplace to work here'
   if (hasChoice(here.kind)) {
-    if (makes === undefined) return `say what to make at the ${here.kind}`
-    if (!recipeFor(here.kind, makes)) return `a ${here.kind} can't make ${makes}`
+    if (makes === undefined && !recipeFor(here.kind)) return `say what to make at the ${here.kind}`
+    if (makes !== undefined && !recipeFor(here.kind, makes))
+      return `a ${here.kind} can't make ${makes}`
   } else if (makes !== undefined) return `nothing to choose at a ${here.kind}`
   if (!workplaceGood(world, here, makes)) return 'there is no workplace to work here'
   if (here.site) return 'it is still a construction site'

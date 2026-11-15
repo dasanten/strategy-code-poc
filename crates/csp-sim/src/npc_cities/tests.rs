@@ -278,7 +278,14 @@ fn takes_open_plains_far_from_cities_and_players() {
 fn avoids_taken_tiles() {
     let terrain = plains(200);
     let mut world = create_world(&terrain, 1);
-    world.nodes.push(ResourceNode { id: "n1".into(), kind: ResourceKind::Stone, x: 49.0, y: 55.0 });
+    world.nodes.push(ResourceNode {
+        id: "n1".into(),
+        kind: ResourceKind::Stone,
+        x: 49.0,
+        y: 55.0,
+        richness: Default::default(),
+        stock: None,
+    });
     assert!(!fits(&world, &terrain));
 }
 

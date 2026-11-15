@@ -86,6 +86,8 @@ mod known_workplace;
 mod last_seen;
 #[path = "lost_post.rs"]
 mod lost_post;
+#[path = "new_veins.rs"]
+mod new_veins;
 #[path = "npc_chain.rs"]
 mod npc_chain;
 #[path = "npc_founded.rs"]
@@ -162,6 +164,10 @@ mod training_ground;
 mod transfers;
 #[path = "transfers_caravans.rs"]
 mod transfers_caravans;
+#[path = "vein_stands.rs"]
+mod vein_stands;
+#[path = "veins.rs"]
+mod veins;
 #[path = "wall_map.rs"]
 mod wall_map;
 #[path = "work.rs"]

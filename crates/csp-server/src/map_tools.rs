@@ -166,7 +166,8 @@ pub struct PlayerMap {
 pub fn map_stats(conn: &Connection) -> Result<Vec<PlayerMap>, String> {
     let (world, terrain) = load_world(conn)?;
     let size = terrain.size;
-    let mut explored = load_explored(conn, terrain, &world.nodes).map_err(|e| e.to_string())?;
+    let mut explored =
+        load_explored(conn, terrain, &world.nodes_ever()).map_err(|e| e.to_string())?;
     let mut slot = None;
     SightTracker::new().update(&world, world_index(&mut slot, &world, size), &mut explored);
     let territory = compute_territory(&world, size);

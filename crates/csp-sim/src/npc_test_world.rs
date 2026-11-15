@@ -77,6 +77,8 @@ pub fn village(layout: Option<CityLayout>) -> Village {
         kind: ResourceKind::Forest,
         x: f64::from(FOREST.0),
         y: f64::from(FOREST.1),
+        richness: Default::default(),
+        stock: None,
     });
     terrain.tiles[tile_index(terrain.size, FOREST.0, FOREST.1)] = Terrain::Forest as u8;
     let home = npc_home(&world, &city).expect("a home").clone();
@@ -107,6 +109,8 @@ pub fn fill_inside(world: &mut WorldState, terrain: &mut TerrainMap, home: &Buil
                 kind: ResourceKind::Stone,
                 x: f64::from(x),
                 y: f64::from(y),
+                richness: Default::default(),
+                stock: None,
             });
             terrain.tiles[tile_index(terrain.size, x, y)] = Terrain::Hills as u8;
         }

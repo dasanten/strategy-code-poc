@@ -5,8 +5,8 @@
 
 use std::collections::HashSet;
 
-use csp_shared::balance::WEAPON_ATTACK;
-use csp_shared::goods::PROTECTION;
+use csp_shared::balance::{PROTECTION_DEFENCE, WEAPON_ATTACK};
+use csp_shared::goods::PROTECTION_KINDS;
 use csp_shared::world::{
     City, ContractSide, ContractWhat, Good, MercenaryContract, RealmEventWhat, WorldState,
 };
@@ -103,7 +103,7 @@ pub struct LentGear {
 /// The city's lent residents take weapons and armour from its storages along (`armLent`,
 /// `CONTEXT.md`: Hiring from an NPC city; ADR 0033), only from its surplus, what it holds above
 /// its reserve (NPC reserve), and as far as they can carry them: each one at home in its area
-/// takes its best weapon if unarmed, then one of each kind of protection they lack. With none
+/// takes its best weapon if unarmed, then the best of each kind of protection they lack. With none
 /// spare they go unarmed. What they took, for the ledger.
 fn arm_lent(
     world: &mut WorldState,
@@ -162,9 +162,19 @@ fn arm_lent(
                 }
             }
         }
-        for p in PROTECTION.iter().filter_map(|p| good_of(p)) {
-            if held(&world.residents[i].carried, p) == 0.0 {
-                take(world, i, p);
+        for kind in PROTECTION_KINDS {
+            let mut best: Vec<(Good, f64)> = kind
+                .iter()
+                .filter_map(|p| good_of(p).map(|g| (g, PROTECTION_DEFENCE.get(p).unwrap_or(0.0))))
+                .collect();
+            if best.iter().any(|(g, _)| held(&world.residents[i].carried, *g) > 0.0) {
+                continue;
+            }
+            best.sort_by(|a, b| b.1.total_cmp(&a.1));
+            for (g, _) in best {
+                if take(world, i, g) {
+                    break;
+                }
             }
         }
     }

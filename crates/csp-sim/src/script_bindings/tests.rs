@@ -188,6 +188,7 @@ fn describe_every_field_of_everything_the_queries_and_me_hand_a_script() {
             "lineTiles",
             "lineTiles({building: \"road\", from: {x: 10, y: 12}, to: {x: 13, y: 12}}, me)",
         ),
+        ("realm", "realm()"),
         ("debt", "debt"),
         ("tick", "tick"),
         ("mapSize", "mapSize"),
@@ -266,12 +267,13 @@ fn hand_a_script_exactly_its_view() {
 
 #[test]
 fn find_a_field_outside_its_view_a_missing_one_and_a_value_of_the_wrong_kind() {
-    let node = json!({ "id": "n1", "kind": "forest", "x": 1, "y": 2, "secret": 3 });
+    let node =
+        json!({ "id": "n1", "kind": "forest", "x": 1, "y": 2, "richness": "poor", "secret": 3 });
     assert_eq!(
         script_value_problems(Some(&node), ScriptType::View("node"), "n"),
         ["n.secret is not in the node view"]
     );
-    let short = json!({ "id": "n1", "kind": "forest", "x": 1 });
+    let short = json!({ "id": "n1", "kind": "forest", "x": 1, "richness": "rich" });
     assert_eq!(
         script_value_problems(Some(&short), ScriptType::View("node"), "n"),
         ["n.y is missing"]
@@ -583,4 +585,38 @@ fn a_tile_view_names_the_region_of_an_explored_tile_and_null_otherwise() {
     let v = order_value(Some(&order), ScriptType::View("residentOrder"), Some(&land));
     let data = plain_value(&v, 10_000).expect("plain").value;
     assert_eq!(data["target"]["region"], json!(heartland.name));
+}
+
+/// How the vein stands (`CONTEXT.md`: Running dry): `building(id).vein` is the word while the
+/// script's realm or an ally works the workplace, and null for a realm that doesn't.
+#[test]
+fn a_workplaces_vein_is_a_word_for_its_workers_and_their_allies_and_null_for_others() {
+    let mine = |worker: &'static str, allied: bool| {
+        move |w: &mut WorldState| {
+            w.nodes.push(from(json!({
+                "id": "n2", "kind": "ironOre", "x": 14, "y": 12, "richness": "rich",
+                "stock": { "first": 100, "left": 30, "made": 70 }
+            })));
+            w.buildings.push(from(
+                json!({ "id": "m1", "kind": "mine", "cityId": null, "x": 14, "y": 12 }),
+            ));
+            let r = w.residents.iter_mut().find(|r| r.id == worker).unwrap();
+            r.order = Some(from(json!({
+                "kind": "workAt", "buildingId": "m1", "at": { "x": 14, "y": 12 }, "progress": 0
+            })));
+            if allied {
+                w.alliances.push(from(json!({
+                    "id": "al1", "name": "North", "leaderId": "r1", "invites": [], "army": [],
+                    "members": [{ "realmId": "r1", "joinedAt": 0 }, { "realmId": "r2", "joinedAt": 0 }]
+                })));
+            }
+        }
+    };
+    let calls = [("vein", "building(\"m1\").vein")];
+    let own = answers(&calls, mine("a2", false));
+    assert_eq!(own["vein"], json!("thinning"));
+    let others = answers(&calls, mine("b1", false));
+    assert_eq!(others["vein"], json!(null));
+    let ally = answers(&calls, mine("b1", true));
+    assert_eq!(ally["vein"], json!("thinning"));
 }

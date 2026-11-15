@@ -59,6 +59,7 @@ use crate::script_deps::{
 use crate::script_params::{param_target, param_waypoint, ParamTarget, ParamWithValue};
 use crate::script_views::{script_view, ScriptType};
 use crate::sight::{Eyes, InvariantViolation, Spot};
+use crate::vein_stands::vein_seen_by;
 use crate::walk_time::{walk_time, way_food};
 use crate::waypoints::{add_waypoint_problem, remove_waypoint_problem, waypoints_of};
 use crate::world_index::WorldIndex;
@@ -797,6 +798,21 @@ impl<'a> ScriptBindings<'a> {
         Some(m)
     }
 
+    /// How the vein under a workplace on a node stands, as the side sees it (`CONTEXT.md`: Running
+    /// dry): only while its realm or an ally works it.
+    fn vein_word_at(&self, b: &Building) -> Option<csp_shared::world::VeinWord> {
+        vein_seen_by(self.world(), b, self.side.as_ref()?)
+    }
+
+    /// `vein` of the workplace `id` (`vein_word_at`), left out where it is null.
+    fn vein_at(&self, id: &str) -> Option<Map<String, Json>> {
+        let b = self.world().buildings.iter().find(|b| b.id == id)?;
+        let word = self.vein_word_at(b)?;
+        let mut m = Map::new();
+        m.insert("vein".into(), Json::String(word.name().into()));
+        Some(m)
+    }
+
     /// At a storage, its offers, and at one of the side's own the goods it can take (`offersOf`).
     fn offers_of(&self, b: &Building) -> Option<Map<String, Json>> {
         let world = self.world();
@@ -829,6 +845,7 @@ impl<'a> ScriptBindings<'a> {
     fn building_extras(&self, id: &str) -> Map<String, Json> {
         let mut m = self.teaching_at(id).unwrap_or_default();
         m = merge(m, self.settings_at(id));
+        m = merge(m, self.vein_at(id));
         if !self.world().offers.is_empty() {
             if let Some(b) = self.world().buildings.iter().find(|x| x.id == id) {
                 m = merge(m, self.offers_of(b));
@@ -842,6 +859,7 @@ impl<'a> ScriptBindings<'a> {
     fn as_seen_building(&self, b: &Building) -> Option<Json> {
         if self.own_building(b) {
             let m = merge(merge(to_json(b), self.settings_at(&b.id)), self.offers_of(b));
+            let m = merge(m, self.vein_at(&b.id));
             return Some(Json::Object(m));
         }
         // What is in sight holds a building just when the eyes see its footprint (`places`):
@@ -891,6 +909,7 @@ impl<'a> ScriptBindings<'a> {
                 "closed" => b.closed.map_or(Value::Null, Value::Bool),
                 "damage" => b.damage.map_or(Value::Null, number),
                 "workSettings" => settings.map_or(Value::Null, |s| field_value(s, f.r#type)),
+                "vein" => self.vein_word_at(b).map_or(Value::Null, |w| Value::string(w.name())),
                 // A building's `prices` and `offers` come with its offers, `teacher`,
                 // `subject` and `trainees` with another's.
                 _ => Value::Null,
@@ -999,7 +1018,12 @@ impl<'a> ScriptBindings<'a> {
                     .nodes
                     .iter()
                     .filter(|n| (self.ctx.explored)(n.x as i32, n.y as i32))
-                    .map(|n| serde_json::to_value(n).unwrap_or(Json::Null))
+                    // A node that came into being since they explored there is not known yet
+                    // (`CONTEXT.md`: Running dry).
+                    .filter(|n| {
+                        !crate::new_veins::vein_unseen_by(world, &n.id, self.ctx.sender.user_id)
+                    })
+                    .map(node_view)
                     .collect(),
             ),
             "nodesInSight" => {
@@ -1007,7 +1031,7 @@ impl<'a> ScriptBindings<'a> {
                 let wanted = match kind {
                     None => None,
                     Some(Value::String(k))
-                        if ["forest", "stone", "ironOre", "goldOre"].contains(&k.as_ref()) =>
+                        if csp_shared::chunks::NODE_KINDS.contains(&k.as_ref()) =>
                     {
                         Some(k.to_string())
                     }
@@ -1028,7 +1052,7 @@ impl<'a> ScriptBindings<'a> {
                                 k.as_ref().and_then(Json::as_str) == Some(w.as_str())
                             }) && self.in_sight((n.x as i32, n.y as i32))
                         })
-                        .map(|n| serde_json::to_value(n).unwrap_or(Json::Null))
+                        .map(node_view)
                         .collect(),
                 )
             }
@@ -1234,6 +1258,17 @@ impl<'a> ScriptBindings<'a> {
                     Json::Array(vec![])
                 } else {
                     Json::Array(demands_for(world, self.side.as_deref().expect("checked")))
+                }
+            }
+            "realm" => {
+                // My own realm without an id; only it shows its heir (`CONTEXT.md`: Heir).
+                let id = arg(0).and_then(Value::as_str).or(self.side.as_deref());
+                match id.and_then(|id| world.realms.iter().find(|r| r.id == id)) {
+                    Some(r) => json!({
+                        "id": r.id,
+                        "heir": r.heir_id.as_ref().filter(|_| self.side.as_deref() == Some(&r.id)),
+                    }),
+                    None => none,
                 }
             }
             "waypoints" => {
@@ -1694,6 +1729,8 @@ impl<'a> ScriptBindings<'a> {
                 ],
             ),
             "handOver" => self.request("handOver", vec![("newLeaderId", p(0)?)]),
+            "nameHeir" => self.request("nameHeir", vec![("heirId", p(0)?)]),
+            "clearHeir" => self.request("clearHeir", vec![]),
             "rename" => {
                 let mut input = vec![("targetId", p(0)?), ("name", p(1)?)];
                 if a(2).is_some_and(|v| !v.is_null()) {
@@ -2049,6 +2086,18 @@ fn requests_sound(
         }
     }
     out
+}
+
+/// A node as a script sees it (the `node` view): every field, `richness` too while it is normal,
+/// which a save leaves out.
+fn node_view(n: &csp_shared::world::ResourceNode) -> Json {
+    let mut v = serde_json::to_value(n).unwrap_or(Json::Null);
+    if let Json::Object(m) = &mut v {
+        m.insert("richness".into(), serde_json::to_value(n.richness).unwrap_or(Json::Null));
+        // How a vein stands is never a number (`CONTEXT.md`: Running dry).
+        m.remove("stock");
+    }
+    v
 }
 
 #[cfg(test)]

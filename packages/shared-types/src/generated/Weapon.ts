@@ -3,4 +3,4 @@
 /**
  * A weapon (`Weapon`: `WEAPONS`).
  */
-export type Weapon = "spear" | "sword";
+export type Weapon = "spear" | "sword" | "steelSword";

@@ -131,6 +131,20 @@ const ICONS: Record<DrawerId | DiplomacyTab | KeyGood | 'crown', ReactNode> = {
       <path d="M11 10l1 4-3 5" />
     </>
   ),
+  coal: (
+    <>
+      <path d="M3 19l2-6 5-2 3 3-1 5z" />
+      <path d="M12 19l2-7 5-1 2 8z" />
+      <path d="M8 9l2-4 4-1 2 4-3 2z" />
+    </>
+  ),
+  steel: (
+    <>
+      <path d="M3 19l3-6h12l3 6z" />
+      <path d="M9 16h6" />
+      <path d="M18 3v4M16 5h4" />
+    </>
+  ),
   coins: (
     <>
       <circle cx="12" cy="12" r="8" />
@@ -144,6 +158,8 @@ const GOOD_LABELS: Record<KeyGood, string> = {
   food: 'Food',
   wood: 'Wood',
   stone: 'Stone',
+  coal: 'Coal',
+  steel: 'Steel',
   coins: 'Coins',
 }
 
@@ -231,6 +247,8 @@ export function TopBar({
   status,
   goods,
   leader,
+  heir,
+  onPickHeir,
   onLogout,
   onWiki,
 }: {
@@ -242,6 +260,10 @@ export function TopBar({
   status: ConnectionStatus
   goods?: GoodsShown
   leader?: string
+  /** The heir's name, null with none (`CONTEXT.md`: Heir); absent before the world comes. */
+  heir?: string | null
+  /** Opens the Residents list to name an heir. */
+  onPickHeir?: () => void
   onLogout: () => void
   /** The Wiki link was followed (`CONTEXT.md`: First day). */
   onWiki?: () => void
@@ -275,6 +297,12 @@ export function TopBar({
           <span className="hud-leader" title="Your Leader">
             <Icon name="crown" size={15} /> {leader}
           </span>
+        </>
+      )}
+      {heir !== undefined && (
+        <>
+          <span className="hud-sep" />
+          <HeirShown heir={heir} onPickHeir={onPickHeir} />
         </>
       )}
       <span className="hud-sep" />
@@ -346,6 +374,8 @@ export function PhoneMenu({
   marked = NONE_MARKED,
   goods,
   leader,
+  heir,
+  onPickHeir,
   account,
   onLogout,
   onWiki,
@@ -356,6 +386,10 @@ export function PhoneMenu({
   marked?: ReadonlySet<DrawerId>
   goods?: GoodsShown
   leader?: string
+  /** The heir's name, null with none (`CONTEXT.md`: Heir); absent before the world comes. */
+  heir?: string | null
+  /** Opens the Residents list to name an heir. */
+  onPickHeir?: () => void
   account: string
   onLogout: () => void
   /** The Wiki link was followed (`CONTEXT.md`: First day). */
@@ -413,6 +447,15 @@ export function PhoneMenu({
               <span className="hud-leader" title="Your Leader">
                 <Icon name="crown" size={15} /> {leader}
               </span>
+            )}
+            {heir !== undefined && (
+              <HeirShown
+                heir={heir}
+                onPickHeir={() => {
+                  setShown(false)
+                  onPickHeir?.()
+                }}
+              />
             )}
             <div className="hud-menu-links">
               <a
@@ -909,5 +952,29 @@ export function FirstDayCard({
         ✕
       </button>
     </aside>
+  )
+}
+
+/**
+ * The realm's heir beside the Leader (`CONTEXT.md`: Heir): their name, or with none a line that
+ * the realm has no heir, a button that opens the Residents list to pick one.
+ */
+function HeirShown({ heir, onPickHeir }: { heir: string | null; onPickHeir?: () => void }) {
+  if (heir !== null) {
+    return (
+      <span className="hud-leader hud-heir" title="Your heir">
+        Heir: {heir}
+      </span>
+    )
+  }
+  return (
+    <button
+      type="button"
+      className="hud-heir none"
+      title="Your realm has no heir: pick a resident and name them heir"
+      onClick={onPickHeir}
+    >
+      No heir
+    </button>
   )
 }

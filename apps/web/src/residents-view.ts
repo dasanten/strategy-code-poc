@@ -69,6 +69,8 @@ export interface ResidentLines {
   /** First line: their name, the Leader mark after it, and their age. */
   name: string
   leader: boolean
+  /** They are the realm's heir (`CONTEXT.md`: Heir). */
+  heir: boolean
   age: string
   /** Second line: what they are doing, with a hunger meter at its end. */
   doing: string
@@ -88,11 +90,17 @@ export function yearsLine(years: number): string {
  */
 export function residentLines(
   r: Pick<Resident, 'id' | 'name' | 'bornAt' | 'hunger'>,
-  { leaderId, tick, doing }: { leaderId: string; tick: number; doing: string },
+  {
+    leaderId,
+    heirId,
+    tick,
+    doing,
+  }: { leaderId: string; heirId?: string | null; tick: number; doing: string },
 ): ResidentLines {
   return {
     name: r.name,
     leader: r.id === leaderId,
+    heir: r.id === heirId,
     age: yearsLine(Math.floor(ageInYears(r, tick))),
     doing,
     fed: Math.max(0, Math.min(1, r.hunger / MAX_HUNGER)),

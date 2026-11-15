@@ -83,6 +83,7 @@ pub fn realm(world: &mut WorldState, id: &str, user_id: u64, leader_id: &str) {
         leader_id: leader_id.into(),
         name: None,
         demands_sent_at: None,
+        heir_id: None,
     });
 }
 

@@ -273,7 +273,10 @@ pub fn plan_city(
     for &i in &adults {
         let r = &world.residents[i];
         let id = r.id.clone();
-        let at = workplace_of(r);
+        // Whoever works where the vein ran dry is a spare hand again (`CONTEXT.md`: Running dry).
+        let at = workplace_of(r).filter(|at| {
+            !world.buildings.iter().any(|b| &b.id == at && crate::npc_growth::on_dry_node(world, b))
+        });
         let feed = feed_job_kept(world, &city, r);
         if traders.contains(&id) {
             jobs.insert(id, job_at(CityJobKind::Trade, None));
@@ -638,7 +641,8 @@ fn share_out(
                 Offer::Short(good) => {
                     let mut took = Vec::new();
                     for i in takers {
-                        let Some(place) = short_place(world, good, &own, held, storage) else {
+                        let Some(place) = short_place(world, city, good, &own, held, storage)
+                        else {
                             break;
                         };
                         give(world, jobs, held, i, work_job(&world.buildings[place]), Some(place));
@@ -781,6 +785,7 @@ struct Share {
 /// storage holds a batch of its input, else the workplace of an input it lacks.
 fn short_place(
     world: &WorldState,
+    city: &City,
     good: Good,
     own: &[usize],
     held: &Places,
@@ -789,6 +794,7 @@ fn short_place(
     let stock = storage.and_then(|s| world.buildings[s].stock.as_ref());
     fn work_for(
         world: &WorldState,
+        city: &City,
         g: Good,
         own: &[usize],
         held: &Places,
@@ -798,12 +804,12 @@ fn short_place(
         if !seen.insert(g) {
             return None;
         }
-        if let Some(input) = chain_input(g).filter(|i| !holds_batch(stock, i)) {
+        if let Some(input) = chain_input(world, city, g).filter(|i| !holds_batch(stock, i)) {
             for (from, n) in &input {
                 if held_in(stock, *from) >= *n {
                     continue;
                 }
-                if let Some(place) = work_for(world, *from, own, held, stock, seen) {
+                if let Some(place) = work_for(world, city, *from, own, held, stock, seen) {
                     return Some(place);
                 }
             }
@@ -814,7 +820,7 @@ fn short_place(
                 && held.room(&world.buildings[b]) > 0.0
         })
     }
-    work_for(world, good, own, held, stock, &mut HashSet::new())
+    work_for(world, city, good, own, held, stock, &mut HashSet::new())
 }
 
 /// Whether a resident could help with a project now (`canTakePart`): anything but a site that needs
@@ -875,8 +881,8 @@ pub fn trade_org_sends_no_one(world: &WorldState) -> Vec<InvariantViolation> {
 mod invariants;
 pub(crate) use invariants::violation;
 pub use invariants::{
-    city_plans_sound, npc_farmers_kept, npc_spare_hands_work, npc_surplus_capped,
-    npc_workplaces_bounded,
+    city_plans_sound, npc_farmers_kept, npc_leaves_dry_workplaces, npc_spare_hands_work,
+    npc_surplus_capped, npc_workplaces_bounded,
 };
 
 #[cfg(test)]

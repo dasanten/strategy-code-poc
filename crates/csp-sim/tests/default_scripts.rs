@@ -389,6 +389,8 @@ fn build_a_here_walks_the_resident_to_where_the_nodes_workplace_fits_and_lays_ou
         kind: ResourceKind::Forest,
         x: 11.0,
         y: 9.0,
+        richness: Default::default(),
+        stock: None,
     });
     let corner = node_corner(&g.world, &g.terrain, &g.world.nodes[0]);
     assert_eq!(corner, Some((11, 9)));
@@ -444,6 +446,8 @@ fn build_far_off(edited: bool) -> (Vec<u64>, Game, u64) {
         kind: ResourceKind::Forest,
         x: 13.0,
         y: 9.0,
+        richness: Default::default(),
+        stock: None,
     });
     let corner = node_corner(&g.world, &g.terrain, &g.world.nodes[0]).unwrap();
     if edited {

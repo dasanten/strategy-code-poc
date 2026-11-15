@@ -263,7 +263,14 @@ fn mulberry(seed: u32) -> impl FnMut() -> f64 {
 }
 
 fn node(id: &str, kind: ResourceKind, x: i32, y: i32) -> ResourceNode {
-    ResourceNode { id: id.into(), kind, x: f64::from(x), y: f64::from(y) }
+    ResourceNode {
+        id: id.into(),
+        kind,
+        x: f64::from(x),
+        y: f64::from(y),
+        richness: Default::default(),
+        stock: None,
+    }
 }
 
 /// `village()` of `npc-growth.fixture.ts`: one village on a Plains map with a forest east of it.

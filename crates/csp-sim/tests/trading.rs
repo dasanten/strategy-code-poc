@@ -166,6 +166,32 @@ fn buys_the_coins_go_into_the_warehouse_and_the_goods_into_the_hands_at_its_sell
     assert_eq!(s.wh(Good::Coins), coins + cost);
 }
 
+/// A trading post buys and sells Coal and Steel (`CONTEXT.md`: Coal) like any other good, from the
+/// stock it is placed with.
+#[test]
+fn buys_and_sells_coal_and_steel() {
+    for (good, name) in [(Good::Coal, "coal"), (Good::Steel, "steel")] {
+        let mut s = post();
+        let start = s.wh(good);
+        assert!(start > 0.0, "{name}");
+        let floor = stock_floor(&s.world, s.warehouse())[&good];
+        assert!(floor > 0.0, "{name}");
+        s.carry(json!({ name: 10, "coins": 500 }));
+        assert_eq!(s.order(json!({ "kind": "sell", "good": name, "units": 4 })), "ack");
+        s.run();
+        let paid = sum(4, |n| price_for(good, start + n, floor).buy);
+        assert!(paid > 0.0, "{name}");
+        assert_eq!(s.held(good), Some(6.0));
+        assert_eq!(s.wh(good), start + 4.0);
+        assert_eq!(s.order(json!({ "kind": "buy", "good": name, "units": 3 })), "ack");
+        s.run();
+        let cost = sum(3, |n| price_for(good, start + 4.0 - n + 1.0, floor).sell);
+        assert!(cost > paid * 3.0 / 4.0, "{name}");
+        assert_eq!(s.held(good), Some(9.0));
+        assert_eq!(s.wh(good), start + 1.0);
+    }
+}
+
 #[test]
 fn cuts_a_purchase_down_to_what_fits_in_their_hands_and_to_the_coins_they_have() {
     let mut s = post();

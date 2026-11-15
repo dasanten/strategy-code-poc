@@ -7,4 +7,8 @@ export type WelcomeHome = { realmId: string, leaderId: string,
 /**
  * The realm's own name, null while it has none.
  */
-realmName: string | null, cityId: string | null, x: number, y: number, };
+realmName: string | null, 
+/**
+ * The realm's heir (`CONTEXT.md`: Heir), null while it has none.
+ */
+heirId: string | null, cityId: string | null, x: number, y: number, };

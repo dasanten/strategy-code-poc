@@ -31,12 +31,13 @@ export const BUILDING_PURPOSE: Record<BuildingKind, string> = {
   gate: 'A gate in a wall, which its city’s realm opens and closes; it grows the city like a wall does.',
   farm: 'A farm is fields that make Food; on Plains only.',
   stable: 'A stable keeps horses and their Food, and breeds them; on Plains only.',
-  mine: 'A mine digs the ore of the iron ore or gold ore node it stands on.',
+  mine: 'A mine digs what the iron ore, gold ore or coal node it stands on yields.',
   quarry: 'A quarry cuts stone from the stone node it stands on.',
   lumberCamp: 'A lumber camp fells wood in the forest node it stands on.',
-  smelter: 'A smelter turns iron ore into iron; not on Mountain.',
+  smelter: 'A smelter turns iron ore into iron, or iron and coal into steel; not on Mountain.',
   mint: 'A mint turns gold ore into coins; not on Mountain.',
-  smithy: 'A smithy turns iron and wood into spears, swords, shields and armour; not on Mountain.',
+  smithy:
+    'A smithy turns iron and wood into spears, swords, shields and armour, and steel and wood into steel swords, shields and armour; not on Mountain.',
   trainingGround:
     'A training ground is where residents train a stat or a skill under a teacher; not on Mountain. Like a workplace, nobody owns it.',
   road: 'A road: residents walk and carriages drive faster on it, on any land (slower to build on Mountain), and it can run through a gate. Nobody owns it.',

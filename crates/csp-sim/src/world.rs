@@ -99,6 +99,9 @@ pub fn create_world(terrain: &TerrainMap, seed: i64) -> WorldState {
         workplace_settings: Default::default(),
         starting_sites: Vec::new(),
         opened_heartlands: Vec::new(),
+        dry_nodes: Vec::new(),
+        new_veins: Vec::new(),
+        waiting_veins: Vec::new(),
     }
 }
 
@@ -228,6 +231,7 @@ pub fn step_world(
         // sight (`SightCache`). Nobody moves or changes hands after this.
         scratch.new_sight_phase();
         step_last_seen(world, size, scratch);
+        crate::new_veins::reveal_new_veins(scratch);
     });
     time(timer, TickPhase::Rest, || {
         step_riders(world);
@@ -285,6 +289,9 @@ fn step_rest(
     let work = request_work(world);
     let work_len = work.len();
     resolve_work(world, &work, scratch);
+    // A node that ran dry this tick has a new one elsewhere at once (`CONTEXT.md`: Running dry).
+    scratch.vein_log.clear();
+    crate::new_veins::step_new_veins(world, terrain, scratch);
     step_teaching(world, size);
     step_training(world, size);
     let breeding = request_breeding(world);
@@ -307,6 +314,9 @@ fn step_rest(
     step_debts(world, scratch);
     step_persuasion(world, size);
     step_armies(world, size);
+    // An heir who no longer qualifies lapses, now that cities, contracts and the alliance army
+    // have changed hands this tick (`CONTEXT.md`: Heir).
+    crate::heir::lapse_heirs(world);
     // Who came into a City area, now that everyone has moved and nobody changes sides this tick.
     let outsiders_from = std::time::Instant::now();
     step_outsiders(world, size, scratch);

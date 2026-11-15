@@ -27,4 +27,17 @@ describe('fighterStrength (Respect, ADR 0033)', () => {
         PROTECTION_DEFENCE.armour,
     )
   })
+
+  it('weighs steel over iron, the best shield and the best armour only', () => {
+    const steel = fighterStrength({
+      carried: { sword: 1, steelSword: 1, shield: 1, steelShield: 1, armour: 1 },
+      skills: {},
+    })
+    expect(steel).toBe(
+      BLOW_BASE +
+        WEAPON_ATTACK.steelSword +
+        PROTECTION_DEFENCE.steelShield +
+        PROTECTION_DEFENCE.armour,
+    )
+  })
 })

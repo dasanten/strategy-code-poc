@@ -265,6 +265,7 @@ describe('residentLines', () => {
     expect(residentLines(edda, { leaderId: 'edda', tick, doing: 'Working the field' })).toEqual({
       name: 'Edda',
       leader: true,
+      heir: false,
       age: '34 years',
       doing: 'Working the field',
       fed: 0.4,
@@ -275,6 +276,12 @@ describe('residentLines', () => {
     const lines = residentLines(edda, { leaderId: 'ann', tick: ticksForAge(1), doing: 'Idle' })
     expect(lines.leader).toBe(false)
     expect(lines.age).toBe('1 year')
+  })
+
+  it('marks the realm’s heir', () => {
+    const lines = residentLines(edda, { leaderId: 'ann', heirId: 'edda', tick, doing: 'Idle' })
+    expect(lines).toMatchObject({ leader: false, heir: true })
+    expect(residentLines(edda, { leaderId: 'ann', heirId: null, tick, doing: 'Idle' }).heir).toBe(false)
   })
 
   it('keeps the hunger meter between empty and full', () => {

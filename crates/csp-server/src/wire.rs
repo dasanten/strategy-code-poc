@@ -8,7 +8,8 @@
 use csp_shared::protocol::SeenEntity;
 use csp_shared::views::{MapInfo, ScriptRunSeen, TraderVisit};
 use csp_shared::world::{
-    OrderRequest, RealmEvent, Remembered, ScriptLogLine, ScriptMemory, Waypoint, WorkplaceSettings,
+    OrderRequest, RealmEvent, Remembered, ScriptLogLine, ScriptMemory, VeinWord, Waypoint,
+    WorkplaceSettings,
 };
 use csp_sim::queries::region_map::RegionMap;
 use csp_sim::views::Diplomacy;
@@ -26,6 +27,8 @@ pub struct WelcomeHome {
     pub leader_id: String,
     /// The realm's own name, null while it has none.
     pub realm_name: Option<String>,
+    /// The realm's heir (`CONTEXT.md`: Heir), null while it has none.
+    pub heir_id: Option<String>,
     pub city_id: Option<String>,
     pub x: f64,
     pub y: f64,
@@ -73,11 +76,17 @@ pub enum ServerMessage {
         region: Option<RegionMap>,
         /// Whether the Player may still claim their Horse offer.
         horse_offer: bool,
+        /// The tiles (x, y) of the dry nodes the Player knows are gone (`CONTEXT.md`: Running dry):
+        /// their map leaves out the nodes there.
+        gone_nodes: Vec<(i32, i32)>,
         waypoints: Vec<Waypoint>,
         trader_visits: Vec<TraderVisit>,
         first_day: FirstDay,
         /// The realm's Workplace settings by building id; only its own.
         work_settings: IndexMap<String, WorkplaceSettings>,
+        /// How the veins of the workplaces its realm or an ally works stand, by building id
+        /// (`CONTEXT.md`: Running dry): words, never a number.
+        veins: IndexMap<String, VeinWord>,
     },
     /// Every tick: what changed in sight, and what else changed for the Player.
     Tick {
@@ -100,10 +109,19 @@ pub enum ServerMessage {
         leader_id: Option<String>,
         #[ts(optional)]
         realm_name: Option<String>,
+        /// The realm's heir once it changed: their id, or null once it has none.
+        #[ts(optional)]
+        heir_id: Option<Option<String>>,
         #[ts(optional)]
         horse_offer: Option<bool>,
+        /// All of `gone_nodes` again, once the Player learns of another.
+        #[ts(optional)]
+        gone_nodes: Option<Vec<(i32, i32)>>,
         #[ts(optional)]
         work_settings: Option<IndexMap<String, WorkplaceSettings>>,
+        /// All of `veins` again, once a word changed.
+        #[ts(optional)]
+        veins: Option<IndexMap<String, VeinWord>>,
         #[ts(optional)]
         waypoints: Option<Vec<Waypoint>>,
         #[ts(optional)]

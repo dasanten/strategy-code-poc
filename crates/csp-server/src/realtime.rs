@@ -42,6 +42,8 @@ use csp_sim::sight::{
 };
 use csp_sim::starting_city::{found_starting_city_in, suggested_leader_name, FoundingNames};
 use csp_sim::tick::Scratch;
+use csp_sim::vein_stands::veins_seen_by;
+use csp_sim::veins::gone_nodes_of;
 use csp_sim::world_index::{world_index, WorldIndex};
 use flate2::{write::GzEncoder, Compression};
 use rusqlite::Connection;
@@ -157,9 +159,15 @@ struct Client {
     /// What the Player was last sent of the Region map.
     region: RegionSent,
     leader_id: String,
+    heir_id: Option<String>,
     realm_name: Option<String>,
     horse_offer: bool,
+    /// How many dry nodes the Player was last told are gone (`CONTEXT.md`: Running dry): they only
+    /// ever learn of more.
+    gone_nodes: usize,
     last_work_settings: String,
+    /// The veins the Player was last sent (`CONTEXT.md`: Running dry), as JSON.
+    last_veins: String,
     last_waypoints: String,
     last_trader_visits: String,
 }
@@ -416,9 +424,12 @@ fn build_welcome(
         last_diplomacy: String::new(),
         region: RegionSent::default(),
         leader_id: realm.leader_id.clone(),
+        heir_id: realm.heir_id.clone(),
         realm_name: realm.name.clone(),
         horse_offer: !world.horse_offers_claimed.contains(&(user_id as u64)),
+        gone_nodes: gone_nodes_of(world, user_id as u64).len(),
         last_work_settings: String::new(),
+        last_veins: String::new(),
         last_waypoints: json_of(
             &world.waypoints.get(&(user_id as u64)).cloned().unwrap_or_default(),
         ),
@@ -448,6 +459,8 @@ fn build_welcome(
         .get(&realm.id)
         .map_or_else(|| json!({}), |s| serde_json::to_value(s).unwrap_or(json!({})));
     client.last_work_settings = json_of(&work_settings);
+    let veins = json!(veins_seen_by(world, &realm.id));
+    client.last_veins = json_of(&veins);
     let mut cache = None;
     if let Some(territory) = view.territory {
         RegionCache::update(&mut cache, world, territory, size);
@@ -463,6 +476,7 @@ fn build_welcome(
         "home": {
             "realmId": realm.id,
             "leaderId": realm.leader_id,
+            "heirId": realm.heir_id,
             "realmName": client.realm_name,
             "cityId": city.map(|c| c.id.clone()),
             "x": x,
@@ -474,10 +488,12 @@ fn build_welcome(
         "diplomacy": diplomacy,
         "region": region_json,
         "horseOffer": client.horse_offer,
+        "goneNodes": gone_nodes_of(world, user_id as u64),
         "waypoints": world.waypoints.get(&(user_id as u64)).cloned().unwrap_or_default(),
         "traderVisits": trader_visits_to(world, &realm.id),
         "firstDay": first_day,
         "workSettings": work_settings,
+        "veins": veins,
     });
     let mut message = message;
     // Explored terrain: the chunks with their counts, or the plain list for an older client.
@@ -989,6 +1005,13 @@ impl Realtime {
                         tick.insert("leaderId".into(), json!(leader_id));
                     }
                 }
+                // Null once the realm has no heir (`CONTEXT.md`: Heir).
+                if let Some(heir_id) = realm.map(|r| r.heir_id.clone()) {
+                    if heir_id != client.heir_id {
+                        client.heir_id = heir_id.clone();
+                        tick.insert("heirId".into(), json!(heir_id));
+                    }
+                }
                 if let Some(name) = realm.and_then(|r| r.name.clone()) {
                     if client.realm_name.as_deref() != Some(name.as_str()) {
                         client.realm_name = Some(name.clone());
@@ -1001,6 +1024,13 @@ impl Realtime {
                     client.horse_offer = horse_offer;
                     tick.insert("horseOffer".into(), json!(horse_offer));
                 }
+                // The tiles of the dry nodes they know are gone, all of them again once they learn
+                // of another (`CONTEXT.md`: Running dry).
+                let gone = gone_nodes_of(world, client.user_id as u64);
+                if gone.len() != client.gone_nodes {
+                    client.gone_nodes = gone.len();
+                    tick.insert("goneNodes".into(), json!(gone));
+                }
                 let work_settings = world
                     .workplace_settings
                     .get(&client.realm_id)
@@ -1009,6 +1039,14 @@ impl Realtime {
                 if settings_json != client.last_work_settings {
                     client.last_work_settings = settings_json;
                     tick.insert("workSettings".into(), work_settings);
+                }
+                // How the veins its realm and allies work stand, only when a word changed
+                // (`CONTEXT.md`: Running dry).
+                let veins = json!(veins_seen_by(world, &client.realm_id));
+                let veins_json = json_of(&veins);
+                if veins_json != client.last_veins {
+                    client.last_veins = veins_json;
+                    tick.insert("veins".into(), veins);
                 }
                 // Only the Player's own waypoints, only when they changed (`CONTEXT.md`: Waypoint).
                 let waypoints =

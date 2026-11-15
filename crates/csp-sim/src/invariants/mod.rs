@@ -132,6 +132,11 @@ pub fn world_invariants() -> Vec<Invariant> {
             name: "leaders-serve-no-one",
             check: |w, _| crate::leader::leaders_serve_no_one(w),
         },
+        Invariant { name: "heirs-qualify", check: |w, _| crate::heir::heirs_qualify(w) },
+        Invariant {
+            name: "heirs-took-over",
+            check: |w, _| crate::heir::takeover::heirs_took_over(w),
+        },
         Invariant {
             name: "resident-names-well-formed",
             check: |w, _| crate::renaming::resident_names_well_formed(w),
@@ -206,6 +211,8 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant { name: "water-haul-routes-sound", check: checks::water_haul_routes_sound },
         Invariant { name: "alliances-sound", check: checks::alliances_sound },
         Invariant { name: "territory-sound", check: checks::territory_sound },
+        Invariant { name: "veins-sound", check: |w, _| crate::veins::veins_sound(w) },
+        Invariant { name: "veins-counted", check: |w, _| crate::new_veins::veins_counted(w) },
         Invariant { name: "dead-leave-loot", check: checks::dead_leave_loot },
         Invariant { name: "down-do-nothing", check: |w, _| crate::survival::down_do_nothing(w) },
         Invariant { name: "awake-alive", check: |w, _| crate::survival::awake_alive(w) },
@@ -349,6 +356,10 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: |w, _t| crate::player_start::starting_sites_sound(w),
         },
         Invariant {
+            name: "steel-only-with-coal",
+            check: |w, _t| crate::npc_chain::steel_only_with_coal(w),
+        },
+        Invariant {
             name: "coins-short-only-with-income",
             check: |w, t| crate::npc_coins::coins_short_only_with_income(w, t.size),
         },
@@ -426,6 +437,10 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant {
             name: "trade-org-sends-no-one",
             check: |w, _t| crate::npc_plan::trade_org_sends_no_one(w),
+        },
+        Invariant {
+            name: "npc-leaves-dry-workplaces",
+            check: |w, _t| crate::npc_plan::npc_leaves_dry_workplaces(w),
         },
         Invariant {
             name: "npc-traders-sound",

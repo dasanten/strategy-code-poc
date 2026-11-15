@@ -319,6 +319,16 @@ pub struct Scratch {
     /// What lent residents took from their NPC city's storages in the latest `stepNpcHire`, for
     /// `npc-lending-keeps-reserve`.
     pub lent_gear: Vec<crate::npc_hire::LentGear>,
+    /// The Players' explored terrain and the map's regions, shared with the server (`Game`):
+    /// where a new node may come into being and who had explored its tile (`CONTEXT.md`: Running
+    /// dry). Without it the regions are worked out from the terrain and nobody explored anything.
+    pub land: Option<std::sync::Arc<std::sync::Mutex<crate::explored::ExploredTerrain>>>,
+    /// The chunks of new nodes this tick showed to Players who had them hidden, by user id
+    /// (`CONTEXT.md`: Running dry): their maps load those chunks again.
+    pub found_veins: Vec<(u64, u32)>,
+    /// What the server logs of the veins this tick: a node waiting to come back where it ran dry,
+    /// as no tile fits it elsewhere, and its coming back (`CONTEXT.md`: Running dry).
+    pub vein_log: Vec<String>,
 }
 
 impl Scratch {

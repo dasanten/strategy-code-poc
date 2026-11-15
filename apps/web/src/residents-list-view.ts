@@ -1,6 +1,6 @@
 import { MAX_HEALTH, MAX_HUNGER, carryCapacity, statValue } from '@csp/balance'
-import { PROTECTION, STAT_NAMES } from './shared/world.js'
-import { ageInYears, bestWeapon, stockWeight } from './shared/stats.js'
+import { STAT_NAMES } from './shared/world.js'
+import { ageInYears, bestWeapon, stockWeight, wornProtection } from './shared/stats.js'
 import type { Resident, SkillName, StatName } from '@csp/shared-types'
 import { GOOD_LABELS } from './goods-grid.js'
 import { SKILL_LABELS } from './Residents.js'
@@ -37,6 +37,8 @@ export interface ResidentRow {
   id: string
   name: string
   leader: boolean
+  /** They are the realm's heir (`CONTEXT.md`: Heir); absent otherwise. */
+  heir?: true
   /** In whole game years. */
   age: number
   city: string
@@ -72,7 +74,7 @@ export function learnedSkills(r: Pick<Resident, 'skills'>): { skill: SkillName; 
 /** The weapon a resident fights with and the protection they carry: "Sword, Shield"; empty with none. */
 export function gearLine(r: Pick<Resident, 'carried'>): string {
   const weapon = bestWeapon(r)
-  const worn = PROTECTION.filter((p) => (r.carried[p] ?? 0) > 0)
+  const worn = wornProtection(r)
   return [...(weapon ? [weapon] : []), ...worn].map((g) => GOOD_LABELS[g]).join(', ')
 }
 
@@ -89,7 +91,15 @@ export function residentRow(
     tick,
     doing,
     under,
-  }: { city: string; leaderId: string; tick: number; doing: string; under?: string },
+    heirId,
+  }: {
+    city: string
+    leaderId: string
+    heirId?: string | null
+    tick: number
+    doing: string
+    under?: string
+  },
 ): ResidentRow {
   const stats = Object.fromEntries(
     STAT_NAMES.map((s) => [s, Math.round(statValue(r, s, tick) * 10) / 10]),
@@ -98,6 +108,7 @@ export function residentRow(
     id: r.id,
     name: r.name,
     leader: r.id === leaderId,
+    ...(r.id === heirId ? { heir: true as const } : {}),
     age: Math.floor(ageInYears(r, tick)),
     city,
     stats,

@@ -81,7 +81,8 @@ export function stockFloor(world: Pick<WorldState, 'cities' | 'buildings'>, b: B
   const hq = world.cities.find((c) => c.id === b.cityId)?.tradeOrg === 'hq'
   const floor: Stock = {}
   const factor = (g: Good) => (!hq ? 1 : g === 'food' ? HQ_FOOD_FLOOR_FACTOR : HQ_FLOOR_FACTOR)
-  for (const g of keeps) floor[g] = WAREHOUSE_FLOOR[g] * factor(g)
+  // A good with no floor (the steel weapons and armour, T101.5) is not traded at a warehouse yet.
+  for (const g of keeps) if (WAREHOUSE_FLOOR[g] > 0) floor[g] = WAREHOUSE_FLOOR[g] * factor(g)
   return floor
 }
 

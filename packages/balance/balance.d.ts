@@ -54,6 +54,11 @@ export interface Balance {
       '3': number
       [key: string]: number
     }
+    coal: {
+      '2': number
+      '3': number
+      [key: string]: number
+    }
     [key: string]: {
       '1': number
       [key: string]: number
@@ -69,6 +74,46 @@ export interface Balance {
   readonly NODE_MIN_SPACING: number
   readonly FRONTIER_NODE_DENSITY: number
   readonly ISLAND_NODE_DENSITY: number
+  readonly RICHNESS_FACTOR: {
+    poor: number
+    normal: number
+    rich: number
+    [key: string]: number
+  }
+  readonly FRONTIER_RICH_NODES: number
+  readonly RICHER_NODE_REACH: number
+  readonly GOLD_NODE_DENSITY: number
+  readonly VEIN_CREW_DAYS: {
+    normal: number
+    rich: number
+    [key: string]: number
+  }
+  readonly VEIN_STOCK: {
+    ironOre: {
+      normal: number
+      rich: number
+      [key: string]: number
+    }
+    goldOre: {
+      normal: number
+      rich: number
+      [key: string]: number
+    }
+    coal: {
+      normal: number
+      rich: number
+      [key: string]: number
+    }
+    [key: string]: {
+      normal: number
+      rich: number
+      [key: string]: number
+    }
+  }
+  readonly VEIN_THINNING: number
+  readonly VEIN_NEARLY_GONE: number
+  readonly NEW_VEIN_SPOT_REACH: number
+  readonly VEIN_RETURN_DAYS: number
   readonly STARTING_SITES_PER_HEARTLAND: number
   readonly STARTING_SITE_WALK: {
     minMinutes: number
@@ -110,6 +155,7 @@ export interface Balance {
   }
   readonly START_SPARE_HOUSES: number
   readonly START_FOOD: number
+  readonly START_COINS: number
   readonly START_CARRIED_FOOD: number
   readonly START_HORSES: number
   readonly START_STABLE_FOOD: number
@@ -199,6 +245,7 @@ export interface Balance {
   readonly NPC_FOOD_SHORT_DAYS: number
   readonly WORK_FOOD_KEPT: number
   readonly NPC_SOLDIER_SHARE: number
+  readonly NPC_STEEL_KIT: string[]
   readonly NPC_SOLDIERS_ON_HALL: number
   readonly NPC_SOLDIERS_AT_GATE: number
   readonly NPC_POST_AROUND_HALL: number
@@ -291,6 +338,8 @@ export interface Balance {
       ironOre: number
       iron: number
       goldOre: number
+      coal: number
+      steel: number
       [key: string]: number
     }
     [key: string]: number | {
@@ -299,6 +348,8 @@ export interface Balance {
       ironOre: number
       iron: number
       goldOre: number
+      coal: number
+      steel: number
       [key: string]: number
     }
   }
@@ -318,6 +369,8 @@ export interface Balance {
       ironOre: number
       iron: number
       goldOre: number
+      coal: number
+      steel: number
       spear: number
       sword: number
       shield: number
@@ -331,6 +384,8 @@ export interface Balance {
       ironOre: number
       iron: number
       goldOre: number
+      coal: number
+      steel: number
       spear: number
       sword: number
       shield: number
@@ -345,11 +400,16 @@ export interface Balance {
     ironOre: number
     iron: number
     goldOre: number
+    coal: number
+    steel: number
     coins: number
     spear: number
     sword: number
     shield: number
     armour: number
+    steelSword: number
+    steelShield: number
+    steelArmour: number
     [key: string]: number
   }
   readonly HQ_FLOOR_FACTOR: number
@@ -361,10 +421,15 @@ export interface Balance {
     ironOre: number
     iron: number
     goldOre: number
+    coal: number
+    steel: number
     spear: number
     sword: number
     shield: number
     armour: number
+    steelSword: number
+    steelShield: number
+    steelArmour: number
     [key: string]: number
   }
   readonly PRICE_REFERENCE_FLOORS: number
@@ -408,16 +473,24 @@ export interface Balance {
     sword: number
     shield: number
     armour: number
+    coal: number
+    steel: number
+    steelSword: number
+    steelShield: number
+    steelArmour: number
     [key: string]: number
   }
   readonly WEAPON_ATTACK: {
     spear: number
     sword: number
+    steelSword: number
     [key: string]: number
   }
   readonly PROTECTION_DEFENCE: {
     shield: number
     armour: number
+    steelShield: number
+    steelArmour: number
     [key: string]: number
   }
   readonly CARRY_BASE: number
@@ -741,6 +814,24 @@ export interface Balance {
         iron: number
         [key: string]: number
       }
+    } | {
+      input: {
+        iron: number
+        coal: number
+        [key: string]: number
+      }
+      output: {
+        steel: number
+        [key: string]: number
+      }
+      [key: string]: {
+        iron: number
+        coal: number
+        [key: string]: number
+      } | {
+        steel: number
+        [key: string]: number
+      }
     })[]
     mint: ({
       input: {
@@ -831,6 +922,60 @@ export interface Balance {
         armour: number
         [key: string]: number
       }
+    } | {
+      input: {
+        steel: number
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        steelSword: number
+        [key: string]: number
+      }
+      [key: string]: {
+        steel: number
+        wood: number
+        [key: string]: number
+      } | {
+        steelSword: number
+        [key: string]: number
+      }
+    } | {
+      input: {
+        steel: number
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        steelShield: number
+        [key: string]: number
+      }
+      [key: string]: {
+        steel: number
+        wood: number
+        [key: string]: number
+      } | {
+        steelShield: number
+        [key: string]: number
+      }
+    } | {
+      input: {
+        steel: number
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        steelArmour: number
+        [key: string]: number
+      }
+      [key: string]: {
+        steel: number
+        wood: number
+        [key: string]: number
+      } | {
+        steelArmour: number
+        [key: string]: number
+      }
     })[]
     [key: string]: ({
       input: {
@@ -848,6 +993,24 @@ export interface Balance {
         iron: number
         [key: string]: number
       }
+    } | {
+      input: {
+        iron: number
+        coal: number
+        [key: string]: number
+      }
+      output: {
+        steel: number
+        [key: string]: number
+      }
+      [key: string]: {
+        iron: number
+        coal: number
+        [key: string]: number
+      } | {
+        steel: number
+        [key: string]: number
+      }
     })[] | ({
       input: {
         goldOre: number
@@ -934,6 +1097,60 @@ export interface Balance {
         [key: string]: number
       } | {
         armour: number
+        [key: string]: number
+      }
+    } | {
+      input: {
+        steel: number
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        steelSword: number
+        [key: string]: number
+      }
+      [key: string]: {
+        steel: number
+        wood: number
+        [key: string]: number
+      } | {
+        steelSword: number
+        [key: string]: number
+      }
+    } | {
+      input: {
+        steel: number
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        steelShield: number
+        [key: string]: number
+      }
+      [key: string]: {
+        steel: number
+        wood: number
+        [key: string]: number
+      } | {
+        steelShield: number
+        [key: string]: number
+      }
+    } | {
+      input: {
+        steel: number
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        steelArmour: number
+        [key: string]: number
+      }
+      [key: string]: {
+        steel: number
+        wood: number
+        [key: string]: number
+      } | {
+        steelArmour: number
         [key: string]: number
       }
     })[]
@@ -950,6 +1167,7 @@ export interface Balance {
     stone: number
     ironOre: number
     goldOre: number
+    coal: number
     [key: string]: number
   }
   readonly WORK_STRENGTH_AVERAGE: number

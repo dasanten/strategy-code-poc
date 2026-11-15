@@ -186,11 +186,14 @@ pub struct NodeDensity {
     pub stone: TerrainTable,
     pub iron_ore: TerrainTable,
     pub gold_ore: TerrainTable,
+    /// Only outside a heartland (`CONTEXT.md`: Rare goods): `place_resource_nodes_by_region`
+    /// places none there.
+    pub coal: TerrainTable,
 }
 
 /// Resource nodes per tile of each terrain they lie on, when the world is created: as many per
 /// area as on the old 40 m grid, so a sixteenth per tile. Ore is denser in Mountain than in Hills;
-/// gold is rare.
+/// gold is rare. Coal is about as common as iron ore, a little more of it in Hills.
 pub const NODE_DENSITY: NodeDensity = NodeDensity {
     forest: TerrainTable(&[(Terrain::Forest as u8, 1.0 / 4800.0)]),
     stone: TerrainTable(&[(Terrain::Hills as u8, 1.0 / 4000.0)]),
@@ -201,6 +204,10 @@ pub const NODE_DENSITY: NodeDensity = NodeDensity {
     gold_ore: TerrainTable(&[
         (Terrain::Hills as u8, 1.0 / 240000.0),
         (Terrain::Mountain as u8, 1.0 / 48000.0),
+    ]),
+    coal: TerrainTable(&[
+        (Terrain::Hills as u8, 1.0 / 16000.0),
+        (Terrain::Mountain as u8, 1.0 / 4800.0),
     ]),
 };
 
@@ -213,6 +220,102 @@ pub const FRONTIER_NODE_DENSITY: f64 = 1.5;
 
 /// How many times `NODE_DENSITY` an island holds (`CONTEXT.md`: Island): the densest land.
 pub const ISLAND_NODE_DENSITY: f64 = 2.0;
+
+/// What a worker's output is multiplied by on a node of each richness (`CONTEXT.md`: Richness).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct RichnessFactor {
+    pub poor: f64,
+    pub normal: f64,
+    pub rich: f64,
+}
+
+/// A mine's, quarry's or lumber camp's output per worker on a poor, normal and rich node
+/// (`CONTEXT.md`: Richness): a heartland's poor nodes make well under a frontier's, an island's
+/// rich ones half again as much.
+pub const RICHNESS_FACTOR: RichnessFactor = RichnessFactor { poor: 0.6, normal: 1.0, rich: 1.5 };
+
+/// How many of a frontier region's nodes are rich (`CONTEXT.md`: Richness): those nearest its
+/// passes, land bridges and borders with other frontier regions.
+pub const FRONTIER_RICH_NODES: f64 = 3.0;
+
+/// How much farther a richer node may lie than a poorer one and still be picked by an NPC city or
+/// the Trade Organization (`CONTEXT.md`: Richness): each richness step counts as this share of
+/// the distance.
+pub const RICHER_NODE_REACH: f64 = 0.25;
+/// How many times its region's density gold ore has in the frontier and on islands
+/// (`CONTEXT.md`: Rare goods): it has no nodes in a heartland, so the land out there holds more.
+pub const GOLD_NODE_DENSITY: f64 = 2.0;
+
+/// How many game days a full crew of average workers (Strength `WORK_STRENGTH_AVERAGE`, no
+/// skill) takes to empty a normal and a rich vein (`CONTEXT.md`: Running dry): a real week is 420
+/// game days, so three real weeks for a rich vein and two for a normal one. A skilled crew empties
+/// it in down to half that.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct VeinCrewDays {
+    pub normal: f64,
+    pub rich: f64,
+}
+
+pub const VEIN_CREW_DAYS: VeinCrewDays = VeinCrewDays { normal: 840.0, rich: 1260.0 };
+
+/// How far, in tiles, from a pass, a land bridge or a border with another frontier region a rich
+/// node that comes into being in the frontier lies at most (`CONTEXT.md`: Running dry, Richness):
+/// a spot worth fighting over, as the frontier's rich nodes are at generation.
+pub const NEW_VEIN_SPOT_REACH: f64 = 32.0;
+
+/// How many game days a node that ran dry waits to come back where it was, when no fitting tile
+/// for it is found anywhere else (`CONTEXT.md`: Running dry; a tiny map). About a real hour.
+pub const VEIN_RETURN_DAYS: f64 = 2.5;
+
+/// The stock a node of `kind` and `richness` comes into being with (`CONTEXT.md`: Running dry):
+/// what a full crew of average workers makes there in `VEIN_CREW_DAYS`. None for a node that
+/// never runs dry (forest, stone, a poor node).
+pub fn vein_stock(
+    kind: crate::world::ResourceKind,
+    richness: crate::world::Richness,
+) -> Option<f64> {
+    use crate::world::{ResourceKind, Richness};
+    let good = match kind {
+        ResourceKind::IronOre => "ironOre",
+        ResourceKind::GoldOre => "goldOre",
+        ResourceKind::Coal => "coal",
+        ResourceKind::Forest | ResourceKind::Stone => return None,
+    };
+    let days = match richness {
+        Richness::Poor => return None,
+        Richness::Normal => VEIN_CREW_DAYS.normal,
+        Richness::Rich => VEIN_CREW_DAYS.rich,
+    };
+    let per_day = WORK_OUTPUT_PER_DAY.get(good)? * richness.factor();
+    Some((per_day * WORKPLACE_MAX_WORKERS.get("mine")? * days).round())
+}
+
+/// How a vein stands for whoever works it (`CONTEXT.md`: Running dry), from the share of its
+/// first stock that is left: "thinning" at or below `VEIN_THINNING`, "nearly gone" at or below
+/// `VEIN_NEARLY_GONE`, "plenty" above. A full crew of average workers on a rich vein so has about
+/// 190 game days (three real days) of warning before it runs dry.
+pub const VEIN_THINNING: f64 = 0.5;
+pub const VEIN_NEARLY_GONE: f64 = 0.15;
+
+/// `vein_stock` of every ore node kind, normal and rich, as the client reads it (the Wiki).
+fn vein_stock_json() -> Value {
+    use crate::world::{ResourceKind, Richness};
+    let mut m = Map::new();
+    for (name, kind) in [
+        ("ironOre", ResourceKind::IronOre),
+        ("goldOre", ResourceKind::GoldOre),
+        ("coal", ResourceKind::Coal),
+    ] {
+        m.insert(
+            name.into(),
+            json!({
+                "normal": vein_stock(kind, Richness::Normal),
+                "rich": vein_stock(kind, Richness::Rich),
+            }),
+        );
+    }
+    Value::Object(m)
+}
 
 /// Starting sites in each heartland (`CONTEXT.md`: Starting site): room for this many Players'
 /// starting cities before the next heartland opens.
@@ -344,6 +447,11 @@ pub const START_SPARE_HOUSES: f64 = 1.0;
 
 /// Food in a starting city's storage, in kg: about 25 game days for its residents.
 pub const START_FOOD: f64 = 100.0;
+
+/// Coins in a starting city's storage (`CONTEXT.md`: Starting city, Rare goods): a heartland has no
+/// gold, so a new Player starts with enough for a first trade at its trading post, such as a
+/// spear or a few days' Food.
+pub const START_COINS: f64 = 50.0;
 
 /// Food each resident of a starting city carries, in units: four game days' meals, so they have
 /// something to eat while the farm's first harvest comes in (`CONTEXT.md`: Eating).
@@ -629,6 +737,11 @@ pub const WORK_FOOD_KEPT: f64 = 2.0;
 /// Share of an NPC city's adults it keeps as soldiers (`CONTEXT.md`: NPC city, Soldier), rounded
 /// up so even a village keeps one: a starting village (6 residents) keeps 2, a town (16) keeps 4.
 pub const NPC_SOLDIER_SHARE: f64 = 0.25;
+
+/// What each soldier of an NPC city that knows of a coal node wants (`CONTEXT.md`: NPC reserve),
+/// forged in this order: its smithy forges the first its soldiers still lack. A city with no coal
+/// node in reach keeps to the iron spear (`NPC_SMITHY_WEAPON`).
+pub const NPC_STEEL_KIT: [&str; 3] = ["steelSword", "steelArmour", "steelShield"];
 
 /// How many of an NPC city's soldiers stand on its town hall between fights, the first to be posted
 /// (`CONTEXT.md`: Soldier posts). One there is enough to block an occupation; a second keeps it held
@@ -959,6 +1072,8 @@ pub const TRADE_ORG_HQ: TradeOrgHq = TradeOrgHq {
         ("ironOre", 150.0),
         ("iron", 100.0),
         ("goldOre", 50.0),
+        ("coal", 100.0),
+        ("steel", 50.0),
     ]),
 };
 
@@ -990,7 +1105,8 @@ pub struct TradingPost {
     /// Coins in its warehouse.
     pub coins: f64,
     /// Goods in its warehouse, in units: twice its floor (`WAREHOUSE_FLOOR`), so it has a market of every
-    /// good until its first trader and caravan come by, and its soldiers' weapons.
+    /// good until its first trader and caravan come by, and its soldiers' weapons. No steel weapons or
+    /// armour: those come by caravan, so its soldiers start out on iron.
     pub goods: Table<f64>,
 }
 
@@ -1010,6 +1126,8 @@ pub const TRADING_POST: TradingPost = TradingPost {
         ("ironOre", 20.0),
         ("iron", 10.0),
         ("goldOre", 10.0),
+        ("coal", 20.0),
+        ("steel", 10.0),
         ("spear", 4.0),
         ("sword", 2.0),
         ("shield", 4.0),
@@ -1020,7 +1138,8 @@ pub const TRADING_POST: TradingPost = TradingPost {
 /// A trading post's stock floor (`CONTEXT.md`: Stock floor, ADR 0023), in units: what its spare
 /// hands, caravan and wandering traders go for, and what its prices are reckoned from. It tops up
 /// nothing at a post; the HQ's warehouses top up to `HQ_FLOOR_FACTOR` times this each game day. Half
-/// of what a post starts with, so a fresh post is well above it.
+/// of what a post starts with, so a fresh post is well above it. A floor of 0 would mean warehouses
+/// don't trade the good.
 pub const WAREHOUSE_FLOOR: Table<f64> = Table(&[
     ("food", 20.0),
     ("wood", 25.0),
@@ -1028,11 +1147,16 @@ pub const WAREHOUSE_FLOOR: Table<f64> = Table(&[
     ("ironOre", 10.0),
     ("iron", 5.0),
     ("goldOre", 5.0),
+    ("coal", 10.0),
+    ("steel", 5.0),
     ("coins", 1_000.0),
     ("spear", 2.0),
     ("sword", 1.0),
     ("shield", 2.0),
     ("armour", 1.0),
+    ("steelSword", 1.0),
+    ("steelShield", 1.0),
+    ("steelArmour", 1.0),
 ]);
 
 /// How many times a trading post's floor (`WAREHOUSE_FLOOR`) the Trade Org HQ's warehouses keep.
@@ -1047,7 +1171,8 @@ pub const HQ_FOOD_FLOOR_FACTOR: f64 = 15.0;
 /// What a warehouse sells a unit of each good for, in coins, when it holds `PRICE_REFERENCE_FLOORS`
 /// times its floor (`CONTEXT.md`: Warehouse prices, Price anchor). Roughly what goes into it: an
 /// iron is two iron ore and the work, a sword two iron and a wood; gold ore stays below the 10
-/// coins the mint strikes from it.
+/// coins the mint strikes from it; coal, found only beyond the heartlands, a little above iron ore;
+/// steel an iron and a coal and the work; steel weapons and armour their steel, wood and the work.
 pub const WAREHOUSE_BASE_PRICE: Table<f64> = Table(&[
     ("food", 2.0),
     ("wood", 2.0),
@@ -1055,10 +1180,15 @@ pub const WAREHOUSE_BASE_PRICE: Table<f64> = Table(&[
     ("ironOre", 4.0),
     ("iron", 10.0),
     ("goldOre", 8.0),
+    ("coal", 5.0),
+    ("steel", 20.0),
     ("spear", 20.0),
     ("sword", 30.0),
     ("shield", 22.0),
     ("armour", 90.0),
+    ("steelSword", 50.0),
+    ("steelShield", 30.0),
+    ("steelArmour", 160.0),
 ]);
 
 /// Stock, in floors, at which a warehouse sells at its base price; less stock costs more.
@@ -1197,15 +1327,23 @@ pub const GOOD_WEIGHT: Table<f64> = Table(&[
     ("sword", 3.0),
     ("shield", 4.0),
     ("armour", 8.0),
+    ("coal", 1.0),
+    ("steel", 1.0),
+    ("steelSword", 3.0),
+    ("steelShield", 4.0),
+    ("steelArmour", 8.0),
 ]);
 
 /// Attack each weapon adds to a resident's blow (`CONTEXT.md`: Weapons and armour, Combat). A
-/// sword hits harder than a spear; combat (T10.2) adds it to Strength and Combat skill.
-pub const WEAPON_ATTACK: Table<f64> = Table(&[("spear", 4.0), ("sword", 6.0)]);
+/// sword hits harder than a spear, a steel sword half again as hard as an iron one (`CONTEXT.md`:
+/// Coal); combat (T10.2) adds it to Strength and Combat skill.
+pub const WEAPON_ATTACK: Table<f64> = Table(&[("spear", 4.0), ("sword", 6.0), ("steelSword", 9.0)]);
 
 /// Damage each piece of protection takes off a blow (`CONTEXT.md`: Weapons and armour, Combat).
-/// Armour takes off more than a shield but weighs twice as much.
-pub const PROTECTION_DEFENCE: Table<f64> = Table(&[("shield", 3.0), ("armour", 5.0)]);
+/// Armour takes off more than a shield but weighs twice as much; steel takes off more than iron
+/// at the same weight. Only the best shield and the best armour carried count (`PROTECTION_KINDS`).
+pub const PROTECTION_DEFENCE: Table<f64> =
+    Table(&[("shield", 3.0), ("armour", 5.0), ("steelShield", 5.0), ("steelArmour", 8.0)]);
 
 /// Carry capacity of a resident with no Strength at all, in kg.
 pub const CARRY_BASE: f64 = 10.0;
@@ -1885,12 +2023,24 @@ pub struct Recipe {
 }
 
 /// The fixed recipes of the workplaces that process goods (`CONTEXT.md`: Smelter, Coins, Smithy).
-/// A smelter turns 2 iron ore into 1 iron, a mint 1 gold ore into 10 coins (less weight than the
+/// A smelter turns 2 iron ore into 1 iron, or 1 iron and 1 coal into 1 steel (`CONTEXT.md`: Coal);
+/// its first recipe, Iron, is what its workers make when they name none. A mint 1 gold ore into 10 coins (less weight than the
 /// ore, but a fortune still weighs something). A smithy has one recipe for each weapon and piece
 /// of armour, each from Iron and Wood weighing what the good weighs (`GOOD_WEIGHT`): a spear is
-/// mostly wood, a sword mostly iron, a shield wood bound with iron, armour nearly all iron.
+/// mostly wood, a sword mostly iron, a shield wood bound with iron, armour nearly all iron. The
+/// steel Sword, Shield and Armour (`CONTEXT.md`: Coal) take Steel where the iron ones take Iron,
+/// and the same Wood; the Spear is iron only.
 pub const RECIPES: Table<&[Recipe]> = Table(&[
-    ("smelter", &[Recipe { input: Table(&[("ironOre", 2.0)]), output: Table(&[("iron", 1.0)]) }]),
+    (
+        "smelter",
+        &[
+            Recipe { input: Table(&[("ironOre", 2.0)]), output: Table(&[("iron", 1.0)]) },
+            Recipe {
+                input: Table(&[("iron", 1.0), ("coal", 1.0)]),
+                output: Table(&[("steel", 1.0)]),
+            },
+        ],
+    ),
     ("mint", &[Recipe { input: Table(&[("goldOre", 1.0)]), output: Table(&[("coins", 10.0)]) }]),
     (
         "smithy",
@@ -1911,20 +2061,38 @@ pub const RECIPES: Table<&[Recipe]> = Table(&[
                 input: Table(&[("iron", 7.0), ("wood", 1.0)]),
                 output: Table(&[("armour", 1.0)]),
             },
+            Recipe {
+                input: Table(&[("steel", 2.0), ("wood", 1.0)]),
+                output: Table(&[("steelSword", 1.0)]),
+            },
+            Recipe {
+                input: Table(&[("steel", 1.0), ("wood", 3.0)]),
+                output: Table(&[("steelShield", 1.0)]),
+            },
+            Recipe {
+                input: Table(&[("steel", 7.0), ("wood", 1.0)]),
+                output: Table(&[("steelArmour", 1.0)]),
+            },
         ],
     ),
 ]);
 
 /// Batches one worker of average Strength and no skill gets through per game day: a smelter worker
-/// smelts what two miners dig (4 iron ore into 2 iron), a mint worker strikes what two gold miners
+/// smelts what two miners dig (4 iron ore into 2 iron), or 2 iron and 2 coal into 2 steel, a mint worker strikes what two gold miners
 /// dig (2 gold ore into 20 coins), a smithy worker makes two weapons or pieces of armour.
 pub const BATCHES_PER_DAY: Table<f64> = Table(&[("smelter", 2.0), ("mint", 2.0), ("smithy", 2.0)]);
 
 /// Units of each good one worker of average Strength and no skill makes per game day. Food is four
 /// times the `FOOD_PER_DAY` a resident eats, so about a quarter of a city farms; ore is slow, and
-/// gold ore slowest.
-pub const WORK_OUTPUT_PER_DAY: Table<f64> =
-    Table(&[("food", 2.0), ("wood", 4.0), ("stone", 3.0), ("ironOre", 2.0), ("goldOre", 1.0)]);
+/// gold ore slowest; coal as fast as iron ore.
+pub const WORK_OUTPUT_PER_DAY: Table<f64> = Table(&[
+    ("food", 2.0),
+    ("wood", 4.0),
+    ("stone", 3.0),
+    ("ironOre", 2.0),
+    ("goldOre", 1.0),
+    ("coal", 2.0),
+]);
 
 /// The Strength at which a worker makes `WORK_OUTPUT_PER_DAY`.
 pub const WORK_STRENGTH_AVERAGE: f64 = 10.0;
@@ -2423,6 +2591,16 @@ pub fn balance_json() -> Value {
     m.insert("NODE_MIN_SPACING".into(), json!(NODE_MIN_SPACING));
     m.insert("FRONTIER_NODE_DENSITY".into(), json!(FRONTIER_NODE_DENSITY));
     m.insert("ISLAND_NODE_DENSITY".into(), json!(ISLAND_NODE_DENSITY));
+    m.insert("RICHNESS_FACTOR".into(), to_value(RICHNESS_FACTOR).expect("serialisable"));
+    m.insert("FRONTIER_RICH_NODES".into(), json!(FRONTIER_RICH_NODES));
+    m.insert("RICHER_NODE_REACH".into(), json!(RICHER_NODE_REACH));
+    m.insert("GOLD_NODE_DENSITY".into(), json!(GOLD_NODE_DENSITY));
+    m.insert("VEIN_CREW_DAYS".into(), to_value(VEIN_CREW_DAYS).expect("serialisable"));
+    m.insert("VEIN_STOCK".into(), vein_stock_json());
+    m.insert("VEIN_THINNING".into(), json!(VEIN_THINNING));
+    m.insert("VEIN_NEARLY_GONE".into(), json!(VEIN_NEARLY_GONE));
+    m.insert("NEW_VEIN_SPOT_REACH".into(), json!(NEW_VEIN_SPOT_REACH));
+    m.insert("VEIN_RETURN_DAYS".into(), json!(VEIN_RETURN_DAYS));
     m.insert("STARTING_SITES_PER_HEARTLAND".into(), json!(STARTING_SITES_PER_HEARTLAND));
     m.insert("STARTING_SITE_WALK".into(), to_value(STARTING_SITE_WALK).expect("serialisable"));
     m.insert("STARTING_SITE_WAY_DISTANCE".into(), json!(STARTING_SITE_WAY_DISTANCE));
@@ -2448,6 +2626,7 @@ pub fn balance_json() -> Value {
     m.insert("HOUSING_ROOM".into(), to_value(HOUSING_ROOM).expect("serialisable"));
     m.insert("START_SPARE_HOUSES".into(), json!(START_SPARE_HOUSES));
     m.insert("START_FOOD".into(), json!(START_FOOD));
+    m.insert("START_COINS".into(), json!(START_COINS));
     m.insert("START_CARRIED_FOOD".into(), json!(START_CARRIED_FOOD));
     m.insert("START_HORSES".into(), json!(START_HORSES));
     m.insert("START_STABLE_FOOD".into(), json!(START_STABLE_FOOD));
@@ -2512,6 +2691,7 @@ pub fn balance_json() -> Value {
     m.insert("NPC_FOOD_SHORT_DAYS".into(), json!(NPC_FOOD_SHORT_DAYS));
     m.insert("WORK_FOOD_KEPT".into(), json!(WORK_FOOD_KEPT));
     m.insert("NPC_SOLDIER_SHARE".into(), json!(NPC_SOLDIER_SHARE));
+    m.insert("NPC_STEEL_KIT".into(), json!(NPC_STEEL_KIT));
     m.insert("NPC_SOLDIERS_ON_HALL".into(), json!(NPC_SOLDIERS_ON_HALL));
     m.insert("NPC_SOLDIERS_AT_GATE".into(), json!(NPC_SOLDIERS_AT_GATE));
     m.insert("NPC_POST_AROUND_HALL".into(), json!(NPC_POST_AROUND_HALL));

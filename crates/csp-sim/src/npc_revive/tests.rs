@@ -312,6 +312,8 @@ fn camp(world: &mut WorldState, city: &str) -> Building {
         kind: ResourceKind::Forest,
         x: place.x,
         y: place.y,
+        richness: Default::default(),
+        stock: None,
     });
     let home = npc_home(world, city).unwrap().id.clone();
     let i = world.buildings.iter().position(|b| b.id == home).unwrap();

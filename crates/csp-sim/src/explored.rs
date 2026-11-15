@@ -7,7 +7,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, OnceLock, RwLock};
 
 use csp_shared::chunks::{
     chunks_across, encode_chunk, encode_chunk_batch, level_chunks_across, squares_across,
@@ -24,8 +24,9 @@ use crate::regions::Regions;
 #[derive(Debug)]
 pub struct MapTerrain {
     terrain: Arc<TerrainMap>,
-    /// Resource nodes by chunk index; nodes never move, so this is built once.
-    nodes_by_chunk: HashMap<u32, Vec<KnownNode>>,
+    /// Resource nodes by chunk index, built once; a node that comes into being where one ran dry
+    /// (`CONTEXT.md`: Running dry) is added (`add_node`), none ever leaves.
+    nodes_by_chunk: RwLock<HashMap<u32, Vec<KnownNode>>>,
     overview: OnceLock<Vec<u8>>,
     /// Per coarse level (1 to `TERRAIN_LEVEL_MAX`), the most common terrain of every square of
     /// the whole map, as `coarse_squares` makes it: made once, when first asked for, and used for
@@ -39,19 +40,35 @@ pub struct MapTerrain {
 impl MapTerrain {
     pub fn new(terrain: impl Into<Arc<TerrainMap>>, nodes: &[ResourceNode]) -> Self {
         let terrain = terrain.into();
-        let n = chunks_across(terrain.size);
-        let mut nodes_by_chunk: HashMap<u32, Vec<KnownNode>> = HashMap::new();
-        for node in nodes {
-            let (x, y) = (node.x.floor() as i32, node.y.floor() as i32);
-            let c = y.div_euclid(CHUNK_SIZE) * n + x.div_euclid(CHUNK_SIZE);
-            nodes_by_chunk.entry(c as u32).or_default().push(KnownNode { kind: node.kind, x, y });
-        }
-        MapTerrain {
+        let map = MapTerrain {
             terrain,
-            nodes_by_chunk,
+            nodes_by_chunk: RwLock::new(HashMap::new()),
             overview: OnceLock::new(),
             squares: Default::default(),
             regions: OnceLock::new(),
+        };
+        for node in nodes {
+            map.add_node(node);
+        }
+        map
+    }
+
+    /// The chunk index of tile (x, y).
+    pub fn chunk_of(&self, x: i32, y: i32) -> u32 {
+        let n = chunks_across(self.terrain.size);
+        (y.div_euclid(CHUNK_SIZE) * n + x.div_euclid(CHUNK_SIZE)) as u32
+    }
+
+    /// Lists a node in its chunk: one that came into being where a node ran dry (`CONTEXT.md`:
+    /// Running dry). A node of the same kind and richness already listed on its tile (one that
+    /// came back where it ran dry) is listed once.
+    pub fn add_node(&self, node: &ResourceNode) {
+        let (x, y) = (node.x.floor() as i32, node.y.floor() as i32);
+        let known = KnownNode { kind: node.kind, x, y, richness: node.richness };
+        let mut by_chunk = self.nodes_by_chunk.write().unwrap_or_else(|e| e.into_inner());
+        let listed = by_chunk.entry(self.chunk_of(x, y)).or_default();
+        if !listed.contains(&known) {
+            listed.push(known);
         }
     }
 
@@ -87,11 +104,18 @@ impl MapTerrain {
     /// One chunk of terrain as it is, for admins only (`CONTEXT.md`: admin map): every tile and
     /// every resource node, explored or not. None for a chunk off the map.
     pub fn whole_chunk(&self, cx: i32, cy: i32) -> Option<Vec<u8>> {
-        self.encode(cx, cy, |_, _| true)
+        self.encode(cx, cy, |_, _| true, |_, _| true)
     }
 
-    /// A chunk with the tiles and nodes `known` lets through; None if none or off the map.
-    fn encode(&self, cx: i32, cy: i32, known: impl Fn(i32, i32) -> bool) -> Option<Vec<u8>> {
+    /// A chunk with the tiles and nodes `known` lets through, of those nodes only the ones `shown`
+    /// lets through too; None if none or off the map.
+    fn encode(
+        &self,
+        cx: i32,
+        cy: i32,
+        known: impl Fn(i32, i32) -> bool,
+        shown: impl Fn(i32, i32) -> bool,
+    ) -> Option<Vec<u8>> {
         let n = chunks_across(self.terrain.size);
         if cx < 0 || cy < 0 || cx >= n || cy >= n {
             return None;
@@ -120,8 +144,10 @@ impl MapTerrain {
         }
         let nodes: Vec<KnownNode> = self
             .nodes_by_chunk
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
             .get(&((cy * n + cx) as u32))
-            .map(|v| v.iter().copied().filter(|k| known(k.x, k.y)).collect())
+            .map(|v| v.iter().copied().filter(|k| known(k.x, k.y) && shown(k.x, k.y)).collect())
             .unwrap_or_default();
         Some(encode_chunk(&out, &nodes, cx, cy))
     }
@@ -139,6 +165,10 @@ pub struct ExploredTerrain {
     /// memory, rebuilt from the bitmap on load.
     chunks: HashMap<u64, BTreeMap<u32, u16>>,
     dirty: BTreeSet<u64>,
+    /// Per Player, the tiles of the nodes that came into being where they had explored and that
+    /// they have not seen since (`CONTEXT.md`: Running dry): their chunks leave those nodes out.
+    /// Set from the world's `new_veins`.
+    hidden_nodes: HashMap<u64, BTreeSet<(i32, i32)>>,
     /// Tiles read one by one to answer coarse chunks, for the tests to count.
     tiles_read: TilesRead,
 }
@@ -161,6 +191,7 @@ impl ExploredTerrain {
             bits: HashMap::new(),
             chunks: HashMap::new(),
             dirty: BTreeSet::new(),
+            hidden_nodes: HashMap::new(),
             tiles_read: TilesRead::default(),
         }
     }
@@ -324,10 +355,35 @@ impl ExploredTerrain {
     /// included (they stay known like the terrain). None when they have explored nothing in it.
     pub fn chunk(&self, user_id: u64, cx: i32, cy: i32) -> Option<Vec<u8>> {
         let bits = self.bits.get(&user_id);
-        self.map.encode(cx, cy, |x, y| {
-            let t = tile_index(self.terrain().size, x, y);
-            bits.and_then(|b| b.get(t >> 3)).is_some_and(|b| b & (1 << (t & 7)) != 0)
-        })
+        let hidden = self.hidden_nodes.get(&user_id);
+        self.map.encode(
+            cx,
+            cy,
+            |x, y| {
+                let t = tile_index(self.terrain().size, x, y);
+                bits.and_then(|b| b.get(t >> 3)).is_some_and(|b| b & (1 << (t & 7)) != 0)
+            },
+            |x, y| !hidden.is_some_and(|h| h.contains(&(x, y))),
+        )
+    }
+
+    /// Hides the node on tile (x, y) from the Player's chunks: it came into being after they
+    /// explored there (`CONTEXT.md`: Running dry).
+    pub fn hide_node(&mut self, user_id: u64, x: i32, y: i32) {
+        self.hidden_nodes.entry(user_id).or_default().insert((x, y));
+    }
+
+    /// Shows the Player the node on tile (x, y) again: they saw its tile. Returns the chunk it is
+    /// in when it was hidden, for their map to load again.
+    pub fn reveal_node(&mut self, user_id: u64, x: i32, y: i32) -> Option<u32> {
+        let set = self.hidden_nodes.get_mut(&user_id)?;
+        if !set.remove(&(x, y)) {
+            return None;
+        }
+        if set.is_empty() {
+            self.hidden_nodes.remove(&user_id);
+        }
+        Some(self.map.chunk_of(x, y))
     }
 
     /// The chunks among `indices` (see `chunks_across`) in which the Player explored something,
@@ -623,7 +679,7 @@ mod tests {
     }
 
     fn node(id: &str, kind: ResourceKind, x: f64, y: f64) -> ResourceNode {
-        ResourceNode { id: id.to_string(), kind, x, y }
+        ResourceNode { id: id.to_string(), kind, x, y, richness: Default::default(), stock: None }
     }
 
     /// 32-bit FNV-1a, to compare bytes with what the TypeScript gives.
@@ -821,9 +877,42 @@ mod tests {
         let mut explored = ExploredTerrain::new(small_terrain(), &nodes);
         explored.explore(PLAYER, 40, 40, 2);
         let got = decode_chunk(1, 1, &explored.chunk(PLAYER, 1, 1).unwrap()).nodes;
-        assert_eq!(got, vec![KnownNode { kind: ResourceKind::Stone, x: 40, y: 40 }]);
+        assert_eq!(
+            got,
+            vec![KnownNode {
+                kind: ResourceKind::Stone,
+                x: 40,
+                y: 40,
+                richness: Default::default()
+            }]
+        );
         explored.explore(PLAYER, 50, 50, 1);
         assert_eq!(decode_chunk(1, 1, &explored.chunk(PLAYER, 1, 1).unwrap()).nodes.len(), 2);
+    }
+
+    /// `CONTEXT.md`: Richness. A node's richness comes with it once its tile is explored, and not
+    /// before.
+    #[test]
+    fn a_nodes_richness_comes_with_it_only_once_its_tile_is_explored() {
+        use csp_shared::world::Richness;
+        let mut rich = node("n1", ResourceKind::IronOre, 40.0, 40.0);
+        rich.richness = Richness::Rich;
+        let mut poor = node("n2", ResourceKind::Stone, 50.0, 50.0);
+        poor.richness = Richness::Poor;
+        let mut explored = ExploredTerrain::new(small_terrain(), &[rich, poor]);
+        explored.explore(PLAYER, 40, 40, 2);
+        let got = decode_chunk(1, 1, &explored.chunk(PLAYER, 1, 1).unwrap()).nodes;
+        assert_eq!(
+            got.iter().map(|n| (n.x, n.richness)).collect::<Vec<_>>(),
+            [(40, Richness::Rich)]
+        );
+        explored.explore(PLAYER, 50, 50, 1);
+        let got = decode_chunk(1, 1, &explored.chunk(PLAYER, 1, 1).unwrap()).nodes;
+        assert_eq!(
+            got.iter().map(|n| (n.x, n.richness)).collect::<Vec<_>>(),
+            [(40, Richness::Rich), (50, Richness::Poor)]
+        );
+        assert!(explored.chunk(OTHER, 1, 1).is_none());
     }
 
     #[test]
@@ -832,7 +921,15 @@ mod tests {
         let nodes = [node("n1", ResourceKind::GoldOre, 70.0, 100.0)];
         let explored = ExploredTerrain::new(terrain.clone(), &nodes);
         let chunk = decode_chunk(2, 3, &explored.whole_chunk(2, 3).unwrap());
-        assert_eq!(chunk.nodes, vec![KnownNode { kind: ResourceKind::GoldOre, x: 70, y: 100 }]);
+        assert_eq!(
+            chunk.nodes,
+            vec![KnownNode {
+                kind: ResourceKind::GoldOre,
+                x: 70,
+                y: 100,
+                richness: Default::default()
+            }]
+        );
         for dy in 0..CHUNK_SIZE {
             for dx in 0..CHUNK_SIZE {
                 assert_eq!(

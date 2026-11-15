@@ -18,7 +18,7 @@
 //! `MapTerrain::regions(world.seed)`; then [`Regions::region_at`], [`Regions::of_kind`],
 //! [`Regions::ways_between`] and the rest. The admin map shows them (`admin_map::admin_land`).
 
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 
 use serde::Serialize;
 use ts_rs::TS;
@@ -197,6 +197,24 @@ impl Regions {
     /// The regions of one kind.
     pub fn of_kind(&self, kind: RegionKind) -> impl Iterator<Item = &Region> + '_ {
         self.regions.iter().filter(move |r| r.kind == kind)
+    }
+
+    /// Each region's neighbours, by id: the regions one of its tiles touches side by side, across
+    /// the map's joins too.
+    pub fn next_to(&self) -> Vec<BTreeSet<u32>> {
+        let mut out = vec![BTreeSet::new(); self.regions.len()];
+        for y in 0..self.size {
+            for x in 0..self.size {
+                let Some(a) = self.id_at(x, y) else { continue };
+                for (nx, ny) in [(x + 1, y), (x, y + 1)] {
+                    if let Some(b) = self.id_at(nx, ny).filter(|&b| b != a) {
+                        out[a as usize].insert(b);
+                        out[b as usize].insert(a);
+                    }
+                }
+            }
+        }
+        out
     }
 
     /// The ways between regions `a` and `b`, either way round.

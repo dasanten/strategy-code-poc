@@ -188,6 +188,7 @@ fn world_for(user_id: i64, realm: bool) -> (WorldState, TerrainMap) {
             leader_id: "a1".into(),
             name: Some("Ironvale".into()),
             demands_sent_at: None,
+            heir_id: None,
         });
     }
     (world, terrain)
@@ -577,7 +578,7 @@ async fn welcomes_a_logged_in_player_then_sends_only_changes() {
     // The view starts with the Leader, as the realm has no city.
     assert_eq!(
         welcome["home"],
-        json!({ "realmId": "r1", "leaderId": "a1", "realmName": "Ironvale", "cityId": null, "x": 10.0, "y": 10.0 })
+        json!({ "realmId": "r1", "leaderId": "a1", "heirId": null, "realmName": "Ironvale", "cityId": null, "x": 10.0, "y": 10.0 })
     );
     let ids: Vec<&str> =
         welcome["entities"].as_array().unwrap().iter().map(|e| e["id"].as_str().unwrap()).collect();

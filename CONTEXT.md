@@ -70,7 +70,7 @@ The shared language of the game. Domain terms only — no implementation details
 ## Resources and goods
 
 - **Good:** any physical thing that can be carried, stored, traded or stolen. Every good has
-  weight. PoC goods: Food, Wood, Stone, Iron ore, Iron, Gold ore, Coins. Goods are always
+  weight. PoC goods: Food, Wood, Stone, Iron ore, Iron, Gold ore, Coal, Steel, Coins. Goods are always
   somewhere: in a storage, carried by a resident or carriage, or in a pile.
 - **Pile:** goods lying on the ground on one tile, for anyone to take.
 - **Resource node:** a spot on the map that yields a good (forest, stone, iron ore, gold ore,
@@ -88,11 +88,26 @@ The shared language of the game. Domain terms only — no implementation details
   and a smithy makes a steel Sword, Shield and Armour from Steel, each better than the iron one.
 - **Running dry** (Epic 102): a normal or rich ore node (iron ore, gold ore, coal) holds a
   **stock**, and working it uses the stock up. Poor nodes, forest and stone never run dry. A node
-  whose stock is gone is gone for good: the mine on it stays as a building and makes nothing. A
-  new node of the same kind and richness then comes into being somewhere else in a region that
-  fits, out of every Player's sight; nobody is told, so it has to be found. Whoever works a mine
-  (their realm and its allies) sees how its vein stands in words (plenty, thinning, nearly gone),
-  never as a number; others see nothing of it.
+  whose stock is gone is gone for good: the mine on it stays as a building and makes nothing,
+  its workers stop working it, the log of each realm working it says so once, and no mine can be
+  built there again. A Player who explored the tile keeps the node on their map until they see
+  the tile again, as a building (Last seen). A new
+  node of the same kind and richness then comes into being somewhere else in a region that fits,
+  out of every Player's sight; nobody is told, so it has to be found. It comes into being in the
+  same tick, on terrain that fits its kind and a free tile spaced from other nodes, in another
+  region than the old one where one fits (a rich one on an island or near a contested frontier
+  spot, a normal one in the frontier) and, where the map allows, on a tile no Player explored; a
+  Player who explored that tile before sees no node there until they see the tile again. The
+  nodes of each kind and richness stay as many as the world was made with: with no fitting tile
+  anywhere (a tiny map) the node comes back where it was after a few game days. Whoever works a
+  mine (their realm and its allies) sees how its vein stands in words (plenty, thinning, nearly
+  gone), never as a number; others see nothing of it. The log of each realm working it says once
+  when it turns to thinning and once at nearly gone. When the mine an NPC city, a trading post or
+  the HQ works runs dry, its workers are free at the next planning pass, and its builders tear the
+  dead mine down for its materials once they have nothing better to do. The good is short again,
+  so the city opens a mine on the next fitting node it knows of within its reach (ADR 0029); with
+  none known it buys the good or does without, and a node its scouts find later counts from then
+  on. The HQ takes the next nearest node of the kind, however far.
 - **Workplace:** a building where residents produce goods. Output depends on the workers'
   Strength and skill and is limited by the workplace's maximum number of workers. Working there
   teaches its skill. Its output is left in the pile on the workplace's tile, not in the
@@ -107,8 +122,9 @@ The shared language of the game. Domain terms only — no implementation details
     iron ore or gold ore). Lumber camps teach Woodcutting, quarries and mines Mining.
   - **Farm:** built on plains, produces Food and teaches Farming. Not tied to a node, but each
     farm has a cap. A farm belongs to the city of the resident who laid it out.
-  - **Smelter / Mint:** a smelter turns ore into metal (Iron ore → Iron), a mint Gold ore into
-    Coins, at fixed conversion rates. Anyone can build either. They have no storage: the ore
+  - **Smelter / Mint:** a smelter turns ore into metal (Iron ore → Iron), or Iron and Coal into
+    Steel, a mint Gold ore into Coins, at fixed conversion rates. Which of the two a smelter's
+    worker makes is said with their Work, as at a smithy; told nothing, they make Iron. Anyone can build either. They have no storage: the ore
     they use is what their workers carry, then what lies in the pile on their tile; the Work
     default fetches more (Fetching inputs), and without any the workers stand idle. Both teach
     Smelting.
@@ -118,10 +134,11 @@ The shared language of the game. Domain terms only — no implementation details
   `output` param, else its `storage`, else the nearest storage of their realm, stores it and comes
   back to work; only one carries at a time. With no storage in reach the pile just grows.
 - **Fetching inputs:** at a smelter, mint or smithy whose pile and workers lack what it uses (ore,
-  or a recipe's Iron and Wood), one of the residents working there, picked at random, fetches a
+  Steel's Iron and Coal, or a recipe's Iron and Wood), one of the residents working there, picked at random, fetches a
   load of it from the Work default's `input` param, else its `storage`, else the nearest storage
   of their realm holding it, puts it on the pile and goes back to work; only one fetches at a
-  time, and not while someone carries the output. With none anywhere they stand idle, as before.
+  time, and not while someone carries the output. With none anywhere they stand idle, and their
+  Doing line says what is missing ("Idle: no coal").
 - **Crew food:** on the way back from storing a load, the carrier brings Food for the whole crew
   and puts it on the workplace's pile, where the workers take their meals (Refilling at a
   workplace). So a far-off crew keeps working while one of them walks, and nobody else goes
@@ -533,7 +550,13 @@ The shared language of the game. Domain terms only — no implementation details
 - **NPC reserve:** what an NPC city keeps of each good it can use, and never sells: Food for
   some game days for all its residents, and what its stable lacks for its horses (Feeding the
   stable; the stable's Food counts); Wood and Stone for its next house and some wall, more as it grows; weapons
-  for the soldiers it keeps by its size, and the Iron and Wood to forge them; Coins as its war
+  for the soldiers it keeps by its size, and the Iron and Wood to forge them (a city that knows of a
+  coal node wants a steel Sword, Armour and Shield for each soldier instead of a spear, forged in that
+  order, and keeps them, their Steel and Wood, the Iron and Coal for that Steel and the Iron ore for
+  that Iron: it mines Coal,
+  sets every second smelter it has to Steel and forges steel; its soldiers fetch each piece from its
+  storage once it holds one and put back what it outdoes. One with no coal node in reach, as in a
+  heartland, stays on iron); Coins as its war
   chest, for buying what it lacks and hiring help. A stable is wanted once it has horses, or with
   none once nothing else is short (NPC horses), a mint only with a gold node it knows of. Whatever its storages hold above the reserve is its surplus,
   for sale (Trading with an NPC city); whatever is below is short and drives what it works and
@@ -708,10 +731,14 @@ The shared language of the game. Domain terms only — no implementation details
 - **Soldier:** a resident carrying a weapon; Combat skill makes them better. Not a separate kind
   of being; soldiers eat, carry, age and die like everyone. **Armed** means carrying a weapon.
 - **Weapons and armour:** goods like any other, with weight: **Spear** and **Sword** (attack),
-  **Shield** and **Armour** (defence). A resident fights with the best weapon and the best
-  protection they carry; there is nothing to equip, so heavy gear leaves less room for food.
+  **Shield** and **Armour** (defence), the Sword, Shield and Armour also of **steel**, each better
+  than the iron one and as heavy (the Spear is iron only). A resident fights with the best weapon
+  and the best protection they carry: their best shield and their best armour count, so steel
+  over iron, and a second shield adds nothing. There is nothing to equip, so heavy gear leaves
+  less room for food.
   No ranged weapons for now.
-- **Smithy:** a workplace that turns Iron and Wood into weapons and armour, at fixed recipes,
+- **Smithy:** a workplace that turns Iron and Wood, or Steel and Wood for the steel ones, into
+  weapons and armour, at fixed recipes,
   from what its workers carry and the pile on its tile. Each worker's work order says which of
   them they make; they can switch. Teaches Smithing.
 - **Army:** a named group of a realm's residents moving and fighting together under one order or
@@ -766,7 +793,8 @@ The shared language of the game. Domain terms only — no implementation details
   surplus. Its farmers, those working for a good short of its reserve and its builders with a
   project stay, and so does a share of its adults at home to defend it. Its lent residents take
   weapons and armour along only from its surplus, what its storages hold above its reserve (NPC
-  reserve); with none spare they go unarmed. It lends nobody while it feels threatened: while it
+  reserve), the best of the surplus first, so steel before iron; with none spare they go unarmed.
+  It lends nobody while it feels threatened: while it
   weighs a demand (Demand), while its town hall is occupied, or while armed residents of the
   hirer stand in its area or in sight of it. Those it lends never act against it: they refuse an
   order to attack its residents, walls or gates, to climb its walls or to tear down its buildings,
@@ -776,7 +804,9 @@ The shared language of the game. Domain terms only — no implementation details
   week breaks it and costs standing, a paid one raises it, and at the end they walk home.
 - **Trade Org army:** a large army of normal residents of the Trade Org HQ, for hire like any
   mercenaries. The HQ builds it itself: it arms its own adults with weapons from its goods
-  warehouse until it has its army's size, keeping enough of them at work. Its warehouses refill
+  warehouse, steel as far as it holds it (its soldiers fetch the steel Sword, Armour and Shield and
+  put back what these outdo), iron otherwise (a trading post arms its soldiers the same way from
+  its warehouse), until it has its army's size, keeping enough of them at work. Its warehouses refill
   goods, never people, so lost soldiers come back only as new adults grow up, or as mercenaries.
   - **Hiring it:** in mercenary contracts the Trade Organization is a side like a realm. A Player
     asks for a number of its soldiers, paid into a Trade Org warehouse they name; it accepts at
@@ -988,7 +1018,20 @@ The shared language of the game. Domain terms only — no implementation details
   free and instant, also while the city is under attack. The old Leader stays on as
   an ordinary resident of the realm. Contracts, alliances, standing, scripts and the realm log
   belong to the Player and carry over; the realm log records the handover.
-- **Leader death:** the Player instantly loses control of everything they held, wherever the
+- **Heir** (settled with Daniel on 2026-11-14, Epic 103): one adult of the realm the Player names
+  to carry it on, by hand or from a script, free, instant and from anywhere; naming another
+  replaces them, and the Player can clear it. The heir lives in a city of the realm, isn't the
+  Leader and serves no one else (the residents a Leader handover allows; the two need not stand in
+  one city). It lapses, with a line in the realm log, when the heir dies, leaves the realm, becomes
+  homeless, is lent out or handed to the alliance army, or becomes the Leader by a handover. Only
+  the Player and their allies see who the heir is.
+- **Leader death with an heir:** the heir becomes the Leader at once, a Down heir too. The realm
+  goes on under its name, with its standing, contracts, alliance, scripts and realm log. Only the
+  city the heir lives in stays the realm's, with its residents wherever they stand and what is in
+  it; every other city becomes a self-managed city as below, holding the Player in good standing.
+  The realm then has no heir until the Player names one. Leader and heir dying in the same tick
+  is a Leader death without an heir.
+- **Leader death:** without a living heir, the Player instantly loses control of everything they held, wherever the
   Leader was. Their cities become self-managed and the realm ends: its alliance membership,
   contracts and standing end with it. The Player respawns as a new Leader with a fresh starting
   city on their next login, founding a new realm: they give its realm name and their new
@@ -1371,7 +1414,8 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   neighbours.
 - **Starting city:** what a Leader spawns with, on a starting site: about 8 residents with
   random stats (one of them the Leader), a town hall, a ring of wooden wall with a gate, houses for everyone with a little room
-  to spare, a storage with a small food stock, one farm outside the wall, a stable next to it
+  to spare, a storage with a small food stock and a few Coins (for a first trade: a heartland has
+  no gold), one farm outside the wall, a stable next to it
   with two horses and a little Food, and one carriage standing at the stable with one of the
   horses hitched to it. The residents start on the farm, working
   it, each with a little food on them.
@@ -1762,7 +1806,7 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   resident, give them an order, open the Wiki. Each line is ticked when the game sees it done;
   the card goes for good once all are ticked or the Player dismisses it. Kept per Player, not per
   realm: a Player who dismissed it never sees it again, also after a Leader death.
-- **Goods in the top bar:** the top bar shows the Food, Wood, Stone and Coins held in storages, for
+- **Goods in the top bar:** the top bar shows the Food, Wood, Stone, Coal, Steel and Coins held in storages, for
   what is picked beside them: **Entire realm** (the default: every storage of the realm, outpost
   storages included) or one city of the realm by name. Stables, carriages and piles don't count. A storage out of sight
   counts with what the Player last saw in it (Last seen), and the total says so when part of it is
