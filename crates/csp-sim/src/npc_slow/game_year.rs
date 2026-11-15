@@ -168,7 +168,20 @@ fn run(world: &mut WorldState, terrain: &TerrainMap, days: usize, watch: &mut Wa
             trace_day(t, world, terrain, day);
             let _ = std::io::Write::flush(t);
         }
-        assert_eq!(check_all(world, terrain), [], "day {day}");
+        let broken = check_all(world, terrain);
+        // Who a broken invariant names: their city, when they were born and what they do.
+        for id in broken.iter().flat_map(|v| &v.entity_ids) {
+            if let Some(r) = world.residents.iter().find(|r| &r.id == id) {
+                let job = r.city_id.as_ref().and_then(|c| world.city_plans.get(c)?.jobs.get(id));
+                eprintln!(
+                    "{id} {}: city {:?}, born day {:.0}, job {job:?}",
+                    r.name,
+                    r.city_id,
+                    r.born_at / TICKS_PER_GAME_DAY
+                );
+            }
+        }
+        assert_eq!(broken, [], "day {day}");
         if day % 10 == 0 || day == days {
             let npc = npc_city_ids(world);
             let people: usize = npc.iter().map(|c| people_of(world, c)).sum();
