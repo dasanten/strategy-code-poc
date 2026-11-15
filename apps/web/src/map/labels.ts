@@ -67,7 +67,9 @@ export class LabelLayer {
       if (this.style.pill) {
         const w = label.text.width + this.style.size * 0.9
         const h = this.style.size * 1.4
-        label.pill.roundRect(-w / 2, -h / 2, w, h, 4).fill({ color: PILL_COLOR, alpha: PILL_ALPHA })
+        label.pill
+          .roundRect(-w / 2, -h / 2, w, h, 4)
+          .fill({ color: PILL_COLOR, alpha: PILL_ALPHA })
       }
     }
     label.root.position.set(Math.round(x), Math.round(y))

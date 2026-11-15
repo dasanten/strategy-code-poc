@@ -64,7 +64,9 @@ describe('structuresOf', () => {
     const s = structuresOf(buildings, size)
     expect([...s.roads.keys()].sort()).toEqual(['12,12', '13,12'])
     expect([...s.walls].sort()).toEqual(['8,8', '9,8'])
-    const built = buildings.filter((b) => b.kind !== 'road').flatMap((b) => footprintKeys(b, size))
+    const built = buildings
+      .filter((b) => b.kind !== 'road')
+      .flatMap((b) => footprintKeys(b, size))
     expect(s.built).toEqual(new Set(built))
   })
 
