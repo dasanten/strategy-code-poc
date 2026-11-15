@@ -369,6 +369,7 @@ fn a_village_with_no_coal_node_in_reach_stays_on_the_iron_spear() {
         x: home.x + 150.0,
         y: home.y + 150.0,
         richness: Default::default(),
+        stock: None,
     });
     let c = city_of(&world, &city);
     assert!(!npc_makes_steel(&world, c));
