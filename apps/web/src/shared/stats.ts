@@ -38,7 +38,6 @@ import {
   workOutput,
   PROTECTION_DEFENCE,
 } from '@csp/balance'
-import { PROTECTION_KINDS } from './world.js'
 import type {
   BuildingKind,
   Equipment,
@@ -206,38 +205,22 @@ export function workLearned(resident: Resident, skill: SkillName, tick: number):
 }
 
 /**
- * A resident as far as their gear goes: what they carry (all of it for one's own, nothing for
- * another realm's) and what they have equipped, which anyone who sees them sees (`CONTEXT.md`:
- * Equipment, Seeing it).
+ * A resident as far as their gear goes: what they have equipped, which anyone who sees them sees
+ * (`CONTEXT.md`: Equipment, Seeing it). The server sends each slot as the rules count it, filled at
+ * once or kept empty, so the client reads the slots and never what is carried.
  */
-export type Geared = Pick<Resident, 'carried'> & { equipped?: Equipment }
+export type Geared = { equipped?: Equipment }
 
-/**
- * The weapon a resident fights with (`CONTEXT.md`: Equipment): the one equipped, or with the slot
- * empty the best one they carry, which an empty slot takes at once.
- */
+/** The weapon a resident fights with: the one equipped, if any (`CONTEXT.md`: Equipment). */
 export function bestWeapon(resident: Geared): Weapon | undefined {
   const equipped = resident.equipped?.weapon
-  if (equipped !== undefined && equipped in WEAPON_ATTACK) return equipped as Weapon
-  const carried = (Object.keys(WEAPON_ATTACK) as Weapon[]).filter(
-    (w) => (resident.carried[w] ?? 0) > 0,
-  )
-  return carried.sort((a, b) => WEAPON_ATTACK[b] - WEAPON_ATTACK[a])[0]
+  return equipped !== undefined && equipped in WEAPON_ATTACK ? (equipped as Weapon) : undefined
 }
 
-/**
- * The protection that counts for a resident (`CONTEXT.md`: Equipment): the shield and the armour
- * equipped, or with a slot empty the best of its kind they carry; a second shield adds nothing.
- */
+/** The protection that counts for a resident (`CONTEXT.md`: Equipment): the shield and armour equipped. */
 export function wornProtection(resident: Geared): Good[] {
-  const defence = PROTECTION_DEFENCE as Record<string, number>
-  const slots = [resident.equipped?.shield, resident.equipped?.armour]
-  return PROTECTION_KINDS.flatMap((kind, i) => {
-    const equipped = slots[i]
-    if (equipped !== undefined) return [equipped]
-    const held = kind.filter((p) => (resident.carried[p] ?? 0) > 0)
-    return held.sort((a, b) => (defence[b] ?? 0) - (defence[a] ?? 0)).slice(0, 1)
-  })
+  const { shield, armour } = resident.equipped ?? {}
+  return [shield, armour].filter((g): g is Good => g !== undefined)
 }
 
 /** Damage a resident's protection takes off each blow (`CONTEXT.md`: Combat): `wornProtection`'s. */
