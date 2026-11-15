@@ -5,16 +5,16 @@
 use std::collections::HashSet;
 
 use csp_shared::balance::{
-    CITY_AREA_MARGIN, CITY_BUILDING_REACH, CITY_MIN_DISTANCE, HORSE_FOOD_PER_DAY, HOUSING_ROOM,
-    NPC_CITY_MIN_DISTANCE, STABLE_HAND_FEED_DAYS, STABLE_HAND_WORK_MINUTES, START_CARRIED_FOOD,
-    START_CITY_SIZE, START_COINS, START_FOOD, START_HORSES, START_RESIDENTS, START_SPARE_HOUSES,
-    START_STABLE_FOOD, TRADE_ORG_HQ, TRADE_ORG_HQ_MIN_DISTANCE,
+    ADULT_AGE, CITY_AREA_MARGIN, CITY_BUILDING_REACH, CITY_MIN_DISTANCE, HORSE_FOOD_PER_DAY,
+    HOUSING_ROOM, NPC_CITY_MIN_DISTANCE, STABLE_HAND_FEED_DAYS, STABLE_HAND_WORK_MINUTES,
+    START_CARRIED_FOOD, START_CITY_SIZE, START_COINS, START_FOOD, START_HORSES, START_RESIDENTS,
+    START_SPARE_HOUSES, START_SPEARS, START_STABLE_FOOD, TRADE_ORG_HQ, TRADE_ORG_HQ_MIN_DISTANCE,
 };
 use csp_shared::footprint::{footprint_tiles, Placed, FOOTPRINT};
 use csp_shared::terrain::{terrain_at, Terrain, TerrainMap};
 use csp_shared::world::{
     Building, BuildingKind, Carriage, City, Good, Realm, RealmEventWhat, ResidentOrder,
-    RunningScript, Task, Tile, TradeOrgCity, WorkOrder, WorldState,
+    RunningScript, Stock, Task, Tile, TradeOrgCity, WorkOrder, WorldState,
 };
 
 use crate::cities::{given_city_name, update_city_membership, CITY_NAMES};
@@ -24,7 +24,7 @@ use crate::placing::Ground;
 use crate::player_start::{pick_start, StartPlace};
 use crate::queries::city::town_hall_of;
 use crate::queries::names::kind_name;
-use crate::queries::residents::can_work;
+use crate::queries::residents::{age_in_years, can_work};
 use crate::queue::QueueItemRequest;
 use crate::queues::give_queue;
 use crate::random::{new_id, Mulberry32};
@@ -314,6 +314,16 @@ pub fn found_starting_city_in(
     found_at(world, terrain, Some(regions), user_id, names)
 }
 
+/// What a starting city's resident carries from the start (`CONTEXT.md`: Starting city): a little
+/// food, and a grown one (the Leader too) an iron Spear, so they defend from the first tick.
+pub(crate) fn starting_carry(grown: bool) -> Stock {
+    let mut carried: Stock = [(Good::Food, START_CARRIED_FOOD)].into_iter().collect();
+    if grown {
+        carried.insert(Good::Spear, START_SPEARS);
+    }
+    carried
+}
+
 fn found_at(
     world: &mut WorldState,
     terrain: &TerrainMap,
@@ -416,7 +426,7 @@ fn found_at(
         };
         let names_from = if i == 0 && leader_name.is_some() { None } else { Some(&mut taken) };
         let mut r = new_resident(&mut || rand.next(), &place, names_from);
-        r.carried = [(Good::Food, START_CARRIED_FOOD)].into_iter().collect();
+        r.carried = starting_carry(age_in_years(r.born_at, world.tick as f64) >= ADULT_AGE);
         r.order = Some(ResidentOrder::WorkAt(WorkOrder {
             building_id: farm_id.clone(),
             at: Tile { x: fx, y: fy },
