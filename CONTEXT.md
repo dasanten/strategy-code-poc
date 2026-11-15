@@ -186,7 +186,7 @@ The shared language of the game. Domain terms only — no implementation details
   while a carriage or ridden horse stands on it (Road). A horse left there unridden stays, and
   can't be ridden on bare Mountain.
 - **Footprint:** the square of tiles a building or construction site covers, the same for every
-  building of a kind: Wall, Gate and Road 1×1; House, Storage, Smelter, Mint, Smithy, Mine,
+  building of a kind: Wall, Gate and Road 1×1; Tower, House, Storage, Smelter, Mint, Smithy, Mine,
   Quarry and Lumber camp 2×2; Town hall, Warehouse, Stable, Training ground and Haven 3×3; Farm 4×4. A site covers its
   building's footprint from the moment it is laid out. Footprints are never turned.
 - **Where buildings go:** one building per tile: every tile of a footprint must be free and
@@ -485,7 +485,22 @@ The shared language of the game. Domain terms only — no implementation details
   any shape: a closed ring, an inner ring or a single stretch. Nothing forces a closed ring.
   Walls count as city buildings, so they grow the area like houses do. A wall can be built along
   a line like a road (Build line), skipping tiles that have a wall or gate; a diagonal line closes the way,
-  since two wall tiles touching at a corner do (see Step).
+  since two wall tiles touching at a corner do (see Step). The map draws each wall and gate tile
+  as the whole tile.
+  - **Wood or stone:** a wall or gate is of **wood** (from Wood) or **stone** (from Stone, more
+    work), and so is a tower. Stone holds out several times longer against blows; it is no
+    higher, with the same wall walk. A stone wall can be built on a wooden wall tile: the wooden
+    one stands, and can be defended, until the stone one is finished and replaces it. A Build line
+    of wall is of wood or stone; a stone line also upgrades the wooden tiles on its way. Starting
+    cities' walls are wooden. An NPC city upgrades its wall to stone once it is a town and holds
+    Stone beyond its reserve, gate first.
+- **Tower:** a 2×2 building, of wood or stone, standing in a wall's line or alone. It closes the
+  way like a wall, and its top is part of the wall walk wherever a wall tile touches it. Up on it
+  a resident sees further than up on a wall, which grows the Player's Sight, and archers reach
+  further still; it gives the wall's cover and holds a few residents up at once (balance numbers).
+  It is broken like a wall and holds out longer; those up on it fall when it does. An NPC city
+  with a stone wall builds one by each gate, then at its corners; its wall posts fill its towers
+  first.
 - **House:** a building in a city's area where a fixed number of residents live (the number is in `balance.ts` and the Wiki). A city's **free housing** is
   its houses' room minus its residents. Houses are the only housing for now; later buildings
   (a palace, a castle) may add room the same way.
@@ -715,19 +730,36 @@ The shared language of the game. Domain terms only — no implementation details
 
 ## Military
 
-- **Soldier:** a resident carrying a weapon; Combat skill makes them better. Not a separate kind
-  of being; soldiers eat, carry, age and die like everyone. **Armed** means carrying a weapon.
+- **Soldier:** a resident with a weapon equipped; Combat skill makes them better. Not a separate
+  kind of being; soldiers eat, carry, age and die like everyone. **Armed** means having a weapon
+  equipped: a spare Sword in the pack doesn't make a soldier.
 - **Weapons and armour:** goods like any other, with weight: **Spear** and **Sword** (attack),
-  **Shield** and **Armour** (defence), the Sword, Shield and Armour also of **steel**, each better
-  than the iron one and as heavy (the Spear is iron only). A resident fights with the best weapon
-  and the best protection they carry: their best shield and their best armour count, so steel
-  over iron, and a second shield adds nothing. There is nothing to equip, so heavy gear leaves
-  less room for food.
-  No ranged weapons for now.
+  **Bow** and **Crossbow** (ranged), **Shield** and **Armour** (defence), the Sword, Shield and
+  Armour also of **steel**, each better than the iron one and as heavy (the Spear is iron only).
+  **Arrows** are a good too, used by bows and crossbows alike.
+- **Equipment** (ADR 0038): each resident has three slots: **weapon**, **shield** and **armour**, one item
+  each. Only what is equipped counts in combat; equipped goods still weigh what they weigh, so
+  heavy gear leaves less room for food. A resident with an empty slot equips the best fitting
+  item at once when they pick one up; swapping or taking one off is done from their card or by
+  script, takes a few ticks, and they can't strike meanwhile. A Bow or Crossbow takes both hands:
+  with one equipped the shield slot stays empty. **Seeing it:** anyone who sees a resident (Sight)
+  sees what they have equipped, its kind and whether iron or steel, on the map and on their card;
+  what they carry unequipped stays hidden like any goods carried.
 - **Smithy:** a workplace that turns Iron and Wood, or Steel and Wood for the steel ones, into
-  weapons and armour, at fixed recipes,
+  weapons and armour, at fixed recipes: a Bow from Wood, a Crossbow from Wood and Iron, Arrows
+  from Wood and a little Iron,
   from what its workers carry and the pile on its tile. Each worker's work order says which of
   them they make; they can switch. Teaches Smithing.
+- **Ranged combat:** an armed resident with a Bow or Crossbow shoots anyone they may strike whom
+  they see (Sight) within their weapon's **reach**, in tiles, contact included; each shot uses up
+  one Arrow they carry, and out of Arrows they fight with their fists. A Bow shoots faster and
+  further and gets much better with Combat skill; a Crossbow shoots slower and less far but hard,
+  through part of the target's armour, and needs little skill. Nothing blocks a shot for now. Up
+  on a wall walk an archer's reach grows, and up on a tower more (Walls in combat). The Defence and
+  Alarm defaults have an archer shoot from where they stand rather than walk into contact. Scripts
+  see each weapon's reach and the Arrows a resident carries. NPC cities with a smithy arm some of
+  their soldiers with bows and keep Arrows in their reserve; their archers take wall and tower
+  posts first.
 - **Army:** a named group of a realm's residents moving and fighting together under one order or
   script, at the pace of the slowest. A resident leaves it when given an order of their own.
   Needs a supply line or it starves far from home.
@@ -746,11 +778,37 @@ The shared language of the game. Domain terms only — no implementation details
   as far as the Player may see how that resident fares.
   A trading post's and the HQ's soldiers fight attackers in its area on their own; every other city's
   armed residents go by the Alarm script (Alarm).
-- **Walls in combat:** nobody walks through a wall. The city's own realm and its allies can stand on its walls
-  and defend far better there. A **gate** lets the city's realm and its allies through always, everyone else
+- **Walls in combat:** nobody walks through a wall. A **gate** lets the city's realm and its allies through always, everyone else
   only while it is open; the city's realm opens and closes it. A wall or gate can be **broken**
   (attacked until it falls, leaving part of its materials) or **climbed** (slow, and a climber
   can't defend themselves, so a defended wall is costly to climb).
+  - **Wall walk** (ADR 0036): every wall, gate and tower tile has a walk on top, unbroken round the ring
+    (people pass under a gate on the ground). A resident on it is **up**. Only the city's realm
+    and its allies get up, from the ground next to the wall, and getting up or down is slow (a
+    balance number each way); along the walk is walking. They come down only to the side they
+    came up from, so the walk is never a way through the wall. A path that ends on the wall or
+    runs along it counts the time to get up and down, so people go up only when sent: a wall or
+    tower post, an order or a Move to a wall tile.
+  - **High ground:** someone up strikes down at anyone on the ground next to the wall; nobody on
+    the ground can strike anyone up, only the wall, gate or tower itself, or climb it. Archers on
+    the ground can shoot those up (Ranged combat). Up against up (a climber who made it, two walls
+    touching) fights as anywhere. Whoever is up on their own city's wall takes only a share of
+    every blow and shot (the wall's cover).
+  - **A tile breaks:** whoever is up on it falls to the ground on its inside and takes a fall's
+    damage.
+  - **Siege machines:** a ram's crew under its roof can't be struck from above nor shot (Siege
+    machine).
+- **Siege machine:** a machine of a realm built in the field as a construction site from goods
+  carried there (ADR 0037). Once finished its **crew** of a few residents pushes it, slowly, like
+  a carriage with no horse. It can be broken by blows, leaving part of its materials. Scripts can
+  order a crew to push, aim and shoot. NPC cities and the Trade Organization don't build them, for
+  now.
+  - **Ram:** of Wood and some Iron. Next to a wall, gate or tower it strikes it many times harder
+    than a blow. Its crew under its roof can't be struck from above nor shot; defenders who come
+    down and out can attack the ram, or its crew in contact.
+  - **Catapult:** of Wood, Iron and Stone. It throws one Stone a shot at a wall, gate or tower
+    within a long reach, beyond a bow's from a wall. It hits buildings only, not people. Its crew
+    stands in the open.
 - **Loot:** when a resident dies, everything they carried drops on the ground for anyone to take.
 - **Capturing a city:** only by occupying its town hall for a set number of game days without a
   break (Occupying a town hall; ADR 0017). When the time is up, the city and its residents join
@@ -1235,7 +1293,9 @@ The shared language of the game. Domain terms only — no implementation details
   the horses standing in it: below that they fetch what is missing from a storage and store it in
   the stable; otherwise they wait there. Its params: `stable`, the stable to feed (by default the
   one they stand in when it starts), and `source`, where the Food comes from (by default the nearest
-  storage of their realm with Food). With no Food to fetch they wait.
+  storage of their realm with Food). With no Food to fetch they wait. **Once:** the same task can
+  run a single round: fetch what is missing, store it, and end once the stable is full (a queue
+  step).
 - **NPC horses:** a new NPC village or town starts with two horses, with some Food by them; one from
   before this got two when it shipped. It wants a stable once it has any and lays it out where they
   stand, so they are in it when it is finished; it keeps it fed as Feeding
@@ -1405,7 +1465,12 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   no gold), one farm outside the wall, a stable next to it
   with two horses and a little Food, and one carriage standing at the stable with one of the
   horses hitched to it. The residents start on the farm, working
-  it, each with a little food on them.
+  it, each with a little food on them, and every grown one (the Leader too) with an iron Spear
+  equipped, so they defend from the first tick. One of them, never the Leader, is the **stable
+  hand**: they start on a saved, looped queue "Farm and feed": if the stable holds less than a few
+  game days of Food, one round of Feeding the stable (Once); then work the farm for a game hour;
+  again. The Player sees it on their card like any queue and can change or clear it. NPC villages
+  keep their own start.
 
 ## Control
 
