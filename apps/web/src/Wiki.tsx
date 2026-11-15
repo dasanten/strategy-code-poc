@@ -1124,15 +1124,15 @@ export function Wiki() {
           <strong>NPC cities and Steel.</strong> An NPC city that knows of a coal node wants a{' '}
           {NPC_STEEL_KIT.map((g) => goodName(g as Good).toLowerCase()).join(', ')} for each of its
           soldiers, in that order, instead of a spear. So it keeps them, their Steel and Wood, and
-          the Iron and Coal for that Steel and the Iron ore for that Iron in its reserve, mines Coal, sets every second smelter it
-          builds to Steel, forges the steel gear and arms its soldiers with it: a soldier fetches each
-          piece from its storage once it holds one and puts back the spear it outdoes. A city with no
-          coal node in reach, as in a heartland, stays on the iron spear. NPC cities price Coal,
-          Steel and the steel gear like any good and sell what they hold above their reserve, and
-          lent residents take the best gear of the surplus, steel first. The Trade Organization’s
-          warehouses trade the steel gear too (a floor of {num(WAREHOUSE_FLOOR.steelSword ?? 0)} each
-          at a post), and its HQ and posts arm their soldiers with steel as far as their warehouse
-          holds it, iron otherwise.
+          the Iron and Coal for that Steel and the Iron ore for that Iron in its reserve, mines
+          Coal, sets every second smelter it builds to Steel, forges the steel gear and arms its
+          soldiers with it: a soldier fetches each piece from its storage once it holds one and puts
+          back the spear it outdoes. A city with no coal node in reach, as in a heartland, stays on
+          the iron spear. NPC cities price Coal, Steel and the steel gear like any good and sell
+          what they hold above their reserve, and lent residents take the best gear of the surplus,
+          steel first. The Trade Organization’s warehouses trade the steel gear too (a floor of{' '}
+          {num(WAREHOUSE_FLOOR.steelSword ?? 0)} each at a post), and its HQ and posts arm their
+          soldiers with steel as far as their warehouse holds it, iron otherwise.
         </p>
         <p>
           Each heartland has {num(STARTING_SITES_PER_HEARTLAND)} <strong>starting sites</strong>, a
