@@ -223,6 +223,10 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant { name: "attack-orders-sound", check: checks::attack_orders_sound },
         Invariant { name: "up-only-on-walls", check: crate::wall_walk::up_only_on_walls },
         Invariant { name: "up-only-on-own-walls", check: crate::wall_walk::up_only_on_own_walls },
+        Invariant {
+            name: "none-attack-up-from-below",
+            check: crate::wall_walk::none_attack_up_from_below,
+        },
         Invariant { name: "armies-sound", check: |w, _| crate::armies::armies_sound(w) },
         Invariant { name: "contracts-sound", check: |w, _| crate::contracts::contracts_sound(w) },
         Invariant { name: "demands-sound", check: |w, _| crate::demands::demands_sound(w) },
