@@ -110,6 +110,8 @@ export interface Balance {
       [key: string]: number
     }
   }
+  readonly VEIN_THINNING: number
+  readonly VEIN_NEARLY_GONE: number
   readonly STARTING_SITES_PER_HEARTLAND: number
   readonly STARTING_SITE_WALK: {
     minMinutes: number

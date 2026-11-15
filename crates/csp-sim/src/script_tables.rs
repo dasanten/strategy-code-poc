@@ -991,6 +991,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 description: "My realm’s Workplace settings for a workplace, or a construction site of a workplace kind, set on its card; never another realm’s.",
                 null_when: Some("for any other building, and while my realm has set none there"),
             },
+            ScriptField {
+                name: "vein",
+                r#type: ScriptType::String,
+                description: "How the vein of a workplace on a node stands: \"plenty\", \"thinning\", \"nearlyGone\", or \"endless\" for a node that never runs dry; never a number.",
+                null_when: Some("for any other building, a construction site, a mine whose vein ran dry, and while neither my realm nor an ally has a resident working it"),
+            },
         ],
     },
     ScriptView {

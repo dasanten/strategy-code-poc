@@ -147,6 +147,7 @@ pub mod trading;
 pub mod trading_posts;
 pub mod training;
 pub mod transfers;
+pub mod vein_stands;
 pub mod veins;
 pub mod views;
 pub mod walk_time;

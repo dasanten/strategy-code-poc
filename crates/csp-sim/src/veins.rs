@@ -40,9 +40,11 @@ pub fn take_from_vein(world: &mut WorldState, workplace: &Building) -> Take {
     if stock.left < 1.0 {
         return Take::Nothing;
     }
+    let before = *stock;
     stock.left -= 1.0;
     stock.made += 1.0;
     if stock.left >= 1.0 {
+        crate::vein_stands::tell_vein_turned(world, workplace, before);
         return Take::Made;
     }
     run_dry(world, ni, workplace);

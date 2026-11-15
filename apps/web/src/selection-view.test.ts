@@ -45,6 +45,7 @@ import type {
   SeenResident,
   SeenHorse,
   Richness,
+  VeinWord,
 } from '@csp/shared-types'
 import { BUILDING_NAMES } from './map/palette.js'
 import {
@@ -2073,6 +2074,24 @@ describe('the card for a resource node', () => {
     expect(rich.lines).toContain(
       `On a rich iron ore node · about ${day(RICHNESS_FACTOR.rich)} iron ore each a game day at average Strength`,
     )
+  })
+
+  it('says how the vein stands on the workplace card of whoever works it, in words (`CONTEXT.md`: Running dry)', () => {
+    const node = { kind: 'ironOre' as const, x: 5, y: 5, richness: 'rich' as const }
+    const mine = building({ kind: 'mine', cityId: null })
+    const card = (vein?: VeinWord) =>
+      tile({
+        node,
+        buildings: [mine],
+        nodeFit: fit,
+        ...(vein ? { veins: { [mine.id]: vein } } : {}),
+      })
+    expect(card('plenty').lines).toContain('Vein: plenty')
+    expect(card('thinning').lines).toContain('Vein: thinning')
+    expect(card('nearlyGone').lines).toContain('Vein: nearly gone')
+    expect(card('endless').lines).toContain('Vein: never runs dry')
+    // A realm not working it is sent no word, and its card says nothing of the vein.
+    expect(card().lines.some((l) => l.startsWith('Vein'))).toBe(false)
   })
 
   it('is named after the node’s kind', () => {
