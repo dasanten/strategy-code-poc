@@ -626,7 +626,8 @@ The shared language of the game. Domain terms only — no implementation details
   on, and fetches more by Getting food.
 - **Scout:** a spare hand an NPC city sends exploring: a few at a time by its size (a balance
   number) run the game's Explore default with no `find`, and come home when their Food says turn
-  back. A city knows every resource node within its set reach (NPC city). What a scout saw is
+  back. A new scout is sent only while the Food they set out with comes from above the city's
+  reserve, so sending one never makes Food short (Spare hands' work). A city knows every resource node within its set reach (NPC city). What a scout saw is
   the city's only once they step back into its area alive: from then on it knows those nodes, out
   to a wider limit (a balance number), and can build on them. So a good it has no node for is one
   it knows no node of: its trader and a founding go by that too. A scout killed on the way brings

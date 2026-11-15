@@ -2844,7 +2844,8 @@ export function Wiki() {
         <p>
           A spare hand with nothing short to work for doesn't stand idle. A few at a time, one for
           every {num(NPC_RESIDENTS_PER_SCOUT)} residents, go scouting: they explore with as much
-          Food as they can carry, and turn back when it only just covers the way home. A city knows
+          Food as they can carry, and turn back when it only just covers the way home. A new scout
+          sets out only while that Food comes from above the city's reserve. A city knows
           every node within {num(NPC_NODE_REACH)} tiles; what a scout saw, out to{' '}
           {num(NPC_SCOUT_LIMIT)} tiles, it knows only once they step back into its area alive. A
           scout killed on the way brings nothing, and nothing protects them. What is short calls
