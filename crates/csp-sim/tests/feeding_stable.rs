@@ -16,7 +16,7 @@ use csp_sim::invariants::check_all;
 use csp_sim::order_sender::OrderSender;
 use goods_support::{drawn_resident, open, realm};
 use serde_json::{json, Value};
-use tasks_support::{ack, add_city, from, reason, Game};
+use tasks_support::{ack, add_city, events, from, reason, Game};
 
 const SIZE: i32 = 32;
 
@@ -196,4 +196,123 @@ fn is_turned_down_outside_the_stable_and_for_a_child() {
         reason(&give(&mut g, "s1")).as_deref(),
         Some("children can\u{2019}t store or fetch goods")
     );
+}
+
+// Once (`CONTEXT.md`: Feeding the stable, Once): a single round, as a queue step.
+
+fn give_once(g: &mut Game) -> csp_sim::orders::OrderReply {
+    let order = json!({ "kind": "task", "task": "feedStable", "residentId": "w1",
+        "stableId": "s1", "params": { "once": 1 } });
+    g.give(&me(), order)
+}
+
+fn stopped(g: &Game) -> Vec<String> {
+    events(&g.world, "scriptStopped")
+        .into_iter()
+        .map(|e| e["reason"].as_str().unwrap_or("").to_string())
+        .collect()
+}
+
+/// Runs until w1's script ends, at most `ticks`; the ticks it took.
+fn run_until_ended(g: &mut Game, ticks: usize) -> usize {
+    for n in 0..ticks {
+        if w1(g).script.is_none() {
+            return n;
+        }
+        run(g, 1, |_| {});
+    }
+    panic!("still running after {ticks} ticks");
+}
+
+#[test]
+fn once_fills_a_stable_that_is_short_and_ends() {
+    let mut g = setup(3.0);
+    assert_eq!(give_once(&mut g), ack());
+    run_until_ended(&mut g, 300);
+    assert!(food_in(&g, "s1") >= KEEP - 0.1);
+    assert_eq!(stopped(&g), ["the stable is full"]);
+    assert!(w1(&g).order.is_none());
+}
+
+#[test]
+fn once_ends_at_once_with_a_full_stable() {
+    let mut g = setup(KEEP + 1.0);
+    give_once(&mut g);
+    assert!(run_until_ended(&mut g, 3) <= 2);
+    assert_eq!(stopped(&g), ["the stable is full"]);
+    assert_eq!(food_in(&g, "s1"), KEEP + 1.0);
+}
+
+#[test]
+fn once_ends_with_a_reason_when_no_food_is_in_reach() {
+    let mut g = setup(0.0);
+    for b in &mut g.world.buildings {
+        if b.kind == csp_shared::world::BuildingKind::Storage {
+            b.stock = Some(Stock::new());
+        }
+    }
+    give_once(&mut g);
+    assert!(run_until_ended(&mut g, 3) <= 2);
+    assert_eq!(stopped(&g), ["no Food to fetch"]);
+}
+
+#[test]
+fn without_once_it_keeps_running_once_the_stable_is_full() {
+    let mut g = setup(3.0);
+    give(&mut g, "s1");
+    run(&mut g, 300, |_| {});
+    assert!(food_in(&g, "s1") >= KEEP - 0.1);
+    assert!(w1(&g).script.is_some());
+    assert_eq!(stopped(&g), Vec::<String>::new());
+}
+
+#[test]
+fn once_is_not_kept_for_the_next_start_of_the_task() {
+    let mut g = setup(KEEP + 1.0);
+    give_once(&mut g);
+    run_until_ended(&mut g, 3);
+    give(&mut g, "s1");
+    run(&mut g, 20, |_| {});
+    assert!(w1(&g).script.is_some(), "the full-time task keeps running");
+    assert_eq!(stopped(&g), ["the stable is full"]);
+}
+
+struct QueueSenders;
+impl csp_sim::queues::QueueHost for QueueSenders {
+    fn sender(&self, user_id: u64) -> Option<OrderSender> {
+        (user_id == 7).then(me)
+    }
+}
+
+#[test]
+fn as_a_queue_step_it_ends_and_the_queue_goes_on() {
+    let mut g = setup(3.0);
+    let terrain = std::sync::Arc::new(g.terrain.clone());
+    let mut queues = csp_sim::queues::QueueRunner::new(
+        Box::new(QueueSenders),
+        g.tasks.kinds.clone(),
+        Some(terrain),
+    );
+    let steps = json!([
+        { "order": { "kind": "task", "task": "feedStable", "stableId": "s1",
+            "params": { "once": 1 } } },
+        { "order": { "kind": "walkTo", "x": 20, "y": 20 } },
+    ]);
+    assert_eq!(
+        g.give(&me(), json!({ "kind": "queue", "residentId": "w1", "steps": steps })),
+        ack()
+    );
+    for _ in 0..400 {
+        for r in &mut g.world.residents {
+            r.hunger = MAX_HUNGER;
+        }
+        g.queue.apply_all(&mut g.world);
+        queues.run_all(&mut g.world, &mut g.scratch);
+        assert_eq!(g.run_scripts(), []);
+        g.step();
+    }
+    assert!(food_in(&g, "s1") >= KEEP - 0.1);
+    assert_eq!(stopped(&g), ["the stable is full"]);
+    assert_eq!((w1(&g).x, w1(&g).y), (20.0, 20.0));
+    assert_eq!(check_all(&g.world, &g.terrain), []);
 }

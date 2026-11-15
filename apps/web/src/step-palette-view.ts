@@ -45,7 +45,18 @@ export const PALETTE_GROUPS: readonly PaletteGroup[] = [
   {
     id: 'work',
     label: ORDER_GROUP_LABELS.work,
-    steps: ['work', 'build', 'road', 'wall', 'tearDown', 'feedStable', 'breed', 'teach', 'train'],
+    steps: [
+      'work',
+      'build',
+      'road',
+      'wall',
+      'tearDown',
+      'feedStable',
+      'feedStableOnce',
+      'breed',
+      'teach',
+      'train',
+    ],
   },
   {
     id: 'goods',
@@ -82,6 +93,7 @@ export const PLAN_STEP_ICONS: Record<PlanStepId, string> = {
   wall: '🧱',
   tearDown: '🪓',
   feedStable: '🌾',
+  feedStableOnce: '🌾',
   breed: '🐴',
   teach: '📖',
   train: '🎯',

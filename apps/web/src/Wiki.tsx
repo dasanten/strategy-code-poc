@@ -2190,6 +2190,13 @@ export function Wiki() {
           never kept between starts. With no stable there, or once theirs is gone, Feed the stable
           ends and your realm log says why.
         </p>
+        <p>
+          It can also run <strong>once</strong>: the queue step{' '}
+          <strong>Feed the stable once</strong> (or its <code>once</code> param set to 1) fetches
+          what the stable is missing, stores it, and ends once the stable is full, so the queue goes
+          on to its next step. With no Food to fetch it ends too, and your realm log says why. A
+          start without it keeps the stable fed as before.
+        </p>
         <h3>Horse offer</h3>
         <p>
           Every Player may claim {num(HORSE_GRANT_HORSES)} new horses once, whenever they choose and
