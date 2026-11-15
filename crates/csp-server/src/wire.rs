@@ -73,6 +73,9 @@ pub enum ServerMessage {
         region: Option<RegionMap>,
         /// Whether the Player may still claim their Horse offer.
         horse_offer: bool,
+        /// The tiles (x, y) of the dry nodes the Player knows are gone (`CONTEXT.md`: Running dry):
+        /// their map leaves out the nodes there.
+        gone_nodes: Vec<(i32, i32)>,
         waypoints: Vec<Waypoint>,
         trader_visits: Vec<TraderVisit>,
         first_day: FirstDay,
@@ -102,6 +105,9 @@ pub enum ServerMessage {
         realm_name: Option<String>,
         #[ts(optional)]
         horse_offer: Option<bool>,
+        /// All of `gone_nodes` again, once the Player learns of another.
+        #[ts(optional)]
+        gone_nodes: Option<Vec<(i32, i32)>>,
         #[ts(optional)]
         work_settings: Option<IndexMap<String, WorkplaceSettings>>,
         #[ts(optional)]

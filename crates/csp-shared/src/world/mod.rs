@@ -1246,6 +1246,18 @@ pub struct WorldState {
     /// Starting site). Left out of a save while none is.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub opened_heartlands: Vec<u32>,
+    /// The nodes that ran dry (`CONTEXT.md`: Running dry), for the Players who still remember
+    /// them. Left out of a save while there are none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dry_nodes: Vec<DryNode>,
+}
+
+impl WorldState {
+    /// Every node the map's terrain lists (`MapTerrain`): those in the world and those that ran
+    /// dry, which the Players who explored them remember until they see their tiles again.
+    pub fn nodes_ever(&self) -> Vec<ResourceNode> {
+        self.nodes.iter().cloned().chain(self.dry_nodes.iter().map(DryNode::as_node)).collect()
+    }
 }
 
 /// A place in a heartland where a starting city can stand (`CONTEXT.md`: Starting site): the
@@ -2814,6 +2826,13 @@ pub enum RealmEventWhat {
         name: String,
         script_id: u64,
     },
+    /// A workplace's vein ran dry (`CONTEXT.md`: Running dry): it makes nothing from now on.
+    VeinRanDry {
+        building_id: String,
+        node: ResourceKind,
+        x: f64,
+        y: f64,
+    },
     ScriptStopped {
         name: String,
         script_id: u64,
@@ -3369,7 +3388,8 @@ impl Richness {
     }
 }
 
-/// A spot on the map that never runs out (`ResourceNode`).
+/// A spot on the map where a workplace makes its good (`ResourceNode`); a normal or rich ore node
+/// runs dry once worked long enough (`CONTEXT.md`: Running dry).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
 pub struct ResourceNode {
@@ -3381,11 +3401,75 @@ pub struct ResourceNode {
     /// a normal node is saved as before richness (the frozen fixtures).
     #[serde(default, skip_serializing_if = "Richness::is_normal")]
     pub richness: Richness,
+    /// What is left in a normal or rich ore node (`CONTEXT.md`: Running dry), given it when it
+    /// comes into being (`fill_stock`). None for a node that never runs dry (poor, forest,
+    /// stone) and for the nodes of worlds made without regions (tests, the frozen fixtures). Left
+    /// out of a save while none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub stock: Option<VeinStock>,
 }
 
 impl ResourceNode {
-    /// A normal node of `kind` at (x, y).
+    /// A normal node of `kind` at (x, y), with no stock.
     pub fn new(id: impl Into<String>, kind: ResourceKind, x: f64, y: f64) -> Self {
-        ResourceNode { id: id.into(), kind, x, y, richness: Richness::Normal }
+        ResourceNode { id: id.into(), kind, x, y, richness: Richness::Normal, stock: None }
+    }
+
+    /// Whether a node of its kind and richness runs dry (`CONTEXT.md`: Running dry): a normal or
+    /// rich ore node (iron ore, gold ore, coal).
+    pub fn runs_dry(&self) -> bool {
+        matches!(self.kind, ResourceKind::IronOre | ResourceKind::GoldOre | ResourceKind::Coal)
+            && self.richness != Richness::Poor
+    }
+
+    /// Gives it the stock of its kind and richness (`vein_stock`), or none if it never runs dry.
+    pub fn fill_stock(&mut self) {
+        self.stock = crate::balance::vein_stock(self.kind, self.richness)
+            .filter(|_| self.runs_dry())
+            .map(|first| VeinStock { first, left: first, made: 0.0 });
+    }
+}
+
+/// A vein's stock (`CONTEXT.md`: Running dry): what it held when it came into being, what is left
+/// and how much its workplaces have made from it, so that `left + made == first` always.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct VeinStock {
+    pub first: f64,
+    pub left: f64,
+    pub made: f64,
+}
+
+/// A node that ran dry (`CONTEXT.md`: Running dry): gone from the world, kept only so that a
+/// Player who explored its tile keeps it on their map until they see the tile again, as a
+/// building is (Last seen).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DryNode {
+    pub id: String,
+    pub kind: ResourceKind,
+    pub x: f64,
+    pub y: f64,
+    #[serde(default, skip_serializing_if = "Richness::is_normal")]
+    pub richness: Richness,
+    /// The tick it ran dry.
+    pub at: u64,
+    /// The accounts (see `Realm::user_id`) that have seen its tile since, and so know it is gone.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub seen_gone_by: Vec<u64>,
+}
+
+impl DryNode {
+    /// The node as it was, as the map's terrain still lists it (`MapTerrain`).
+    pub fn as_node(&self) -> ResourceNode {
+        ResourceNode {
+            id: self.id.clone(),
+            kind: self.kind,
+            x: self.x,
+            y: self.y,
+            richness: self.richness,
+            stock: None,
+        }
     }
 }

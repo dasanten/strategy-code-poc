@@ -45,6 +45,11 @@ export interface MapWorld {
   lastSeen?: { cities: SeenCity[]; buildings: Building[] }
   /** The Player's waypoints (`CONTEXT.md`: Waypoint), drawn at every tier; none on the admin map. */
   waypoints?: readonly Waypoint[]
+  /**
+   * The tiles ("x,y") of the dry nodes the Player knows are gone (`CONTEXT.md`: Running dry): no
+   * node is drawn there, though their explored terrain still lists one. None on the admin map.
+   */
+  goneNodes?: ReadonlySet<string>
   diplomacy: { alliance?: { members: readonly { realmId: string }[] } | null }
   region: RegionState | null
   /** Set on the admin map, which looks at the world as nobody's (`CONTEXT.md`: admin map). */

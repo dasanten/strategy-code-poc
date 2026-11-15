@@ -305,6 +305,8 @@ import {
   RICHNESS_FACTOR,
   FRONTIER_RICH_NODES,
   RICHER_NODE_REACH,
+  VEIN_CREW_DAYS,
+  VEIN_STOCK,
   carryCapacity,
   walkSpeed,
   workFactor,
@@ -1094,10 +1096,11 @@ export function Wiki() {
           {num(FRONTIER_NODE_DENSITY)} times as many as a heartland, an island{' '}
           {num(ISLAND_NODE_DENSITY)} times. <strong>Gold ore</strong> is a rare good like Coal: no
           gold node lies in a heartland, only in the frontier and on islands, where it is{' '}
-          {num(GOLD_NODE_DENSITY)} times as common again. Every frontier region has a gold node and a
-          coal node in it or in a region next to it. So a heartland realm gets its Coins by trade, selling Food, Wood,
-          Stone or Iron at its heartland’s trading post, or by holding a gold node out there. Your
-          starting city’s storage holds {num(START_COINS)} Coins for a first trade.
+          {num(GOLD_NODE_DENSITY)} times as common again. Every frontier region has a gold node and
+          a coal node in it or in a region next to it. So a heartland realm gets its Coins by trade,
+          selling Food, Wood, Stone or Iron at its heartland’s trading post, or by holding a gold
+          node out there. Your starting city’s storage holds {num(START_COINS)} Coins for a first
+          trade.
         </p>
         <p>
           The regions of the mainland are parted by Mountain ranges and by arms of the Sea, about{' '}
@@ -1138,6 +1141,22 @@ export function Wiki() {
           <code>"poor"</code>, <code>"normal"</code> or <code>"rich"</code>. NPC cities and the
           Trade Organization pick the richer of two nodes about as far away: each step of richness
           counts as {pct(RICHER_NODE_REACH)} less of the way.
+        </p>
+        <p>
+          A normal or rich ore node (iron ore, gold ore or coal) holds a <strong>vein</strong> that
+          working it uses up: each unit its mine makes takes one from it. A normal iron ore or coal
+          vein holds {num(VEIN_STOCK.ironOre.normal)} units, a rich one{' '}
+          {num(VEIN_STOCK.ironOre.rich)}; a gold ore vein {num(VEIN_STOCK.goldOre.normal)} or{' '}
+          {num(VEIN_STOCK.goldOre.rich)}. That is {num(VEIN_CREW_DAYS.normal)} or{' '}
+          {num(VEIN_CREW_DAYS.rich)} game days of a full crew of average workers. Poor nodes, forest
+          and stone never run dry, so a heartland realm always keeps what its land gives.
+        </p>
+        <p>
+          Once a vein runs dry its node is gone for good. The mine stays standing and makes nothing:
+          its workers stop, each one’s log saying “the vein ran dry”, and your realm log says so
+          once. You can tear the mine down like any building, but no mine can be built there again.
+          Others who explored the tile still see the node on their map until they see the tile
+          again.
         </p>
       </Section>
 

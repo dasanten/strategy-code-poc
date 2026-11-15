@@ -284,6 +284,7 @@ fn avoids_taken_tiles() {
         x: 49.0,
         y: 55.0,
         richness: Default::default(),
+        stock: None,
     });
     assert!(!fits(&world, &terrain));
 }

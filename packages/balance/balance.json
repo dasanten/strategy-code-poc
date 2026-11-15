@@ -60,6 +60,24 @@
   "FRONTIER_RICH_NODES": 3.0,
   "RICHER_NODE_REACH": 0.25,
   "GOLD_NODE_DENSITY": 2.0,
+  "VEIN_CREW_DAYS": {
+    "normal": 840.0,
+    "rich": 1260.0
+  },
+  "VEIN_STOCK": {
+    "ironOre": {
+      "normal": 13440.0,
+      "rich": 30240.0
+    },
+    "goldOre": {
+      "normal": 6720.0,
+      "rich": 15120.0
+    },
+    "coal": {
+      "normal": 13440.0,
+      "rich": 30240.0
+    }
+  },
   "STARTING_SITES_PER_HEARTLAND": 10.0,
   "STARTING_SITE_WALK": {
     "minMinutes": 20.0,

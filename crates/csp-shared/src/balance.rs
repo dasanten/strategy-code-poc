@@ -246,6 +246,61 @@ pub const RICHER_NODE_REACH: f64 = 0.25;
 /// (`CONTEXT.md`: Rare goods): it has no nodes in a heartland, so the land out there holds more.
 pub const GOLD_NODE_DENSITY: f64 = 2.0;
 
+/// How many game days a full crew of average workers (Strength `WORK_STRENGTH_AVERAGE`, no
+/// skill) takes to empty a normal and a rich vein (`CONTEXT.md`: Running dry): a real week is 420
+/// game days, so three real weeks for a rich vein and two for a normal one. A skilled crew empties
+/// it in down to half that.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+pub struct VeinCrewDays {
+    pub normal: f64,
+    pub rich: f64,
+}
+
+pub const VEIN_CREW_DAYS: VeinCrewDays = VeinCrewDays { normal: 840.0, rich: 1260.0 };
+
+/// The stock a node of `kind` and `richness` comes into being with (`CONTEXT.md`: Running dry):
+/// what a full crew of average workers makes there in `VEIN_CREW_DAYS`. None for a node that
+/// never runs dry (forest, stone, a poor node).
+pub fn vein_stock(
+    kind: crate::world::ResourceKind,
+    richness: crate::world::Richness,
+) -> Option<f64> {
+    use crate::world::{ResourceKind, Richness};
+    let good = match kind {
+        ResourceKind::IronOre => "ironOre",
+        ResourceKind::GoldOre => "goldOre",
+        ResourceKind::Coal => "coal",
+        ResourceKind::Forest | ResourceKind::Stone => return None,
+    };
+    let days = match richness {
+        Richness::Poor => return None,
+        Richness::Normal => VEIN_CREW_DAYS.normal,
+        Richness::Rich => VEIN_CREW_DAYS.rich,
+    };
+    let per_day = WORK_OUTPUT_PER_DAY.get(good)? * richness.factor();
+    Some((per_day * WORKPLACE_MAX_WORKERS.get("mine")? * days).round())
+}
+
+/// `vein_stock` of every ore node kind, normal and rich, as the client reads it (the Wiki).
+fn vein_stock_json() -> Value {
+    use crate::world::{ResourceKind, Richness};
+    let mut m = Map::new();
+    for (name, kind) in [
+        ("ironOre", ResourceKind::IronOre),
+        ("goldOre", ResourceKind::GoldOre),
+        ("coal", ResourceKind::Coal),
+    ] {
+        m.insert(
+            name.into(),
+            json!({
+                "normal": vein_stock(kind, Richness::Normal),
+                "rich": vein_stock(kind, Richness::Rich),
+            }),
+        );
+    }
+    Value::Object(m)
+}
+
 /// Starting sites in each heartland (`CONTEXT.md`: Starting site): room for this many Players'
 /// starting cities before the next heartland opens.
 pub const STARTING_SITES_PER_HEARTLAND: f64 = 10.0;
@@ -2484,6 +2539,8 @@ pub fn balance_json() -> Value {
     m.insert("FRONTIER_RICH_NODES".into(), json!(FRONTIER_RICH_NODES));
     m.insert("RICHER_NODE_REACH".into(), json!(RICHER_NODE_REACH));
     m.insert("GOLD_NODE_DENSITY".into(), json!(GOLD_NODE_DENSITY));
+    m.insert("VEIN_CREW_DAYS".into(), to_value(VEIN_CREW_DAYS).expect("serialisable"));
+    m.insert("VEIN_STOCK".into(), vein_stock_json());
     m.insert("STARTING_SITES_PER_HEARTLAND".into(), json!(STARTING_SITES_PER_HEARTLAND));
     m.insert("STARTING_SITE_WALK".into(), to_value(STARTING_SITE_WALK).expect("serialisable"));
     m.insert("STARTING_SITE_WAY_DISTANCE".into(), json!(STARTING_SITE_WAY_DISTANCE));

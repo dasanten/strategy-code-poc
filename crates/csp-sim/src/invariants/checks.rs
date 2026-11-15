@@ -16,7 +16,7 @@ use csp_shared::balance::{
     REALM_NAME_MAX_LENGTH, ROAD_LINE_MAX_TILES, STABLE_BREED_DAYS, TRAINING_GROUND_MAX_TRAINEES,
     WORK_SKILL_MAX,
 };
-use csp_shared::footprint::{footprint_tiles, is_at, near_footprint};
+use csp_shared::footprint::{covers, footprint_tiles, is_at, near_footprint};
 use csp_shared::terrain::{
     beside_step, is_passable_terrain, is_sea, is_water, step_length, terrain_at, tile_index,
     touches_sea, touches_water, wrap_delta, Terrain, TerrainMap,
@@ -283,7 +283,14 @@ pub fn buildings_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
                 }
             }
         } else if BUILDABLE.contains(&b.kind) && !ON_PLAINS.contains(&b.kind) {
-            if nodes.len() != 1 || node_workplace(nodes[0].kind) != b.kind {
+            // A workplace whose node ran dry stands on where it was (`CONTEXT.md`: Running dry).
+            let on_dry = nodes.is_empty()
+                && b.site.is_none()
+                && world.dry_nodes.iter().any(|d| {
+                    covers(placed(b), d.x as i32, d.y as i32, size)
+                        && node_workplace(d.kind) == b.kind
+                });
+            if !on_dry && (nodes.len() != 1 || node_workplace(nodes[0].kind) != b.kind) {
                 fail(&b.id, format!("is a {kind} off its node"));
             }
             if let Some(c) = city {

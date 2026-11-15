@@ -267,6 +267,7 @@ fn refills_from_the_storage_when_low_on_food() {
         x: ax,
         y: ay,
         richness: Default::default(),
+        stock: None,
     });
     let mut camp = building("camp", BuildingKind::LumberCamp, ax, ay);
     camp.city_id = Some("c1".into());
@@ -333,6 +334,7 @@ fn carries_only_the_output_from_a_smelter() {
         x: 3.0,
         y: 12.0,
         richness: Default::default(),
+        stock: None,
     });
     let mut smelter = building("smelter", BuildingKind::Smelter, 3.0, 12.0);
     smelter.city_id = Some("c1".into());

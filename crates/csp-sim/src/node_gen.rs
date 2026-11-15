@@ -223,7 +223,8 @@ const BORDER_STEP: i32 = 4;
 
 /// Sets every node's richness by its region (`CONTEXT.md`: Richness): poor in a heartland, rich
 /// on an island, normal in the frontier but for the `FRONTIER_RICH_NODES` of each frontier region
-/// nearest its passes, land bridges and borders with other frontier regions, which are rich. Run
+/// nearest its passes, land bridges and borders with other frontier regions, which are rich; and
+/// gives each normal or rich ore node its stock (`CONTEXT.md`: Running dry). Run
 /// once, after all of a new world's nodes are placed; the same nodes, terrain and regions always
 /// give the same richness.
 pub fn assign_richness(nodes: &mut [ResourceNode], terrain: &TerrainMap, regions: &Regions) {
@@ -279,6 +280,10 @@ pub fn assign_richness(nodes: &mut [ResourceNode], terrain: &TerrainMap, regions
         for &(_, i) in in_region.iter().take(FRONTIER_RICH_NODES as usize) {
             nodes[i].richness = Richness::Rich;
         }
+    }
+    // A normal or rich ore node comes into being with its stock (`CONTEXT.md`: Running dry).
+    for node in nodes.iter_mut() {
+        node.fill_stock();
     }
 }
 

@@ -15,6 +15,7 @@ use serde_json::Value;
 use crate::queries::names::kind_name;
 use crate::random::hash_str;
 use crate::sight::{buildings_by_square, places_in_sight, InvariantViolation, SightCache, Squares};
+use crate::veins::see_dry_nodes;
 use crate::world_index::{world_index, WorldIndex};
 
 /// When each realm's Last seen was last brought up to date, whether it had anyone to see through
@@ -171,6 +172,9 @@ pub fn refresh_last_seen(
         state
             .refreshes
             .insert(realm_id.clone(), Refresh { tick: world.tick, looking: places.looking });
+        // A node that ran dry is gone from their map once they see its tile again, as a building
+        // is (`CONTEXT.md`: Running dry).
+        see_dry_nodes(world, user_id, &places.eyes);
         let remembers = world.last_seen.get(&user_id).is_some_and(|m| !m.is_empty());
         if places.seen.is_empty() && !remembers {
             continue;

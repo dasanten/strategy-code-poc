@@ -540,7 +540,7 @@ pub fn open_world(config: &Config) -> Result<(Connection, Game<TracingLog>), Ser
     let conn = open_db(&config.db_path, Some(&mut backup))?;
     let (world, terrain) =
         load_or_create_world(&conn, |seed| generate_terrain(seed, MAP_SIZE), generate_world, 1)?;
-    let explored = load_explored(&conn, terrain, &world.nodes)?;
+    let explored = load_explored(&conn, terrain, &world.nodes_ever())?;
     // The regions are worked out once, here, rather than in the first tick a script reads a tile
     // view or a Player asks for their land (about a second on the full map).
     explored.map().regions(world.seed);

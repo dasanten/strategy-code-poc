@@ -257,6 +257,7 @@ fn node(id: &str, kind: ResourceKind, x: i32, y: i32) -> ResourceNode {
         x: f64::from(x),
         y: f64::from(y),
         richness: Default::default(),
+        stock: None,
     }
 }
 

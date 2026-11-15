@@ -628,7 +628,7 @@ mod tests {
     }
 
     fn node(id: &str, kind: ResourceKind, x: f64, y: f64) -> ResourceNode {
-        ResourceNode { id: id.to_string(), kind, x, y, richness: Default::default() }
+        ResourceNode { id: id.to_string(), kind, x, y, richness: Default::default(), stock: None }
     }
 
     /// 32-bit FNV-1a, to compare bytes with what the TypeScript gives.

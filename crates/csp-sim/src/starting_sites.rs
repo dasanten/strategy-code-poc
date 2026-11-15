@@ -209,6 +209,7 @@ fn place_in_heartland(
                 x: f64::from(x),
                 y: f64::from(y),
                 richness: Default::default(),
+                stock: None,
             });
         }
         if alone {

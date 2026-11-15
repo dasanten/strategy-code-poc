@@ -51,6 +51,24 @@ describe('the Trade Organization taking a city', () => {
 })
 
 describe('realm log', () => {
+  it('says a mine’s vein ran dry, and where (`CONTEXT.md`: Running dry)', () => {
+    const e = {
+      seq: 1,
+      tick: 2,
+      userId: 7,
+      kind: 'veinRanDry',
+      buildingId: 'b1',
+      node: 'goldOre',
+      x: 40,
+      y: 12,
+    } as const
+    expect(describeEvent(e)).toEqual({
+      text: 'The gold ore vein at the mine at (40, 12) ran dry: the mine makes nothing more.',
+      tone: 'warn',
+      places: [{ name: '(40, 12)', x: 40, y: 12 }],
+    })
+  })
+
   it('says why a resident couldn’t move in (`CONTEXT.md`: Relocate)', () => {
     const failed = { kind: 'relocateFailed', residentId: 'r1', name: 'Ana', cityId: 'c2' } as const
     expect(

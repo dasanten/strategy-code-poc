@@ -67,6 +67,7 @@ fn founds_the_hq_the_typescript_founded() {
             x: f64::from(*x),
             y: f64::from(*y),
             richness: Default::default(),
+            stock: None,
         })
         .collect();
     let mut rand = Mulberry32::new(7.0);

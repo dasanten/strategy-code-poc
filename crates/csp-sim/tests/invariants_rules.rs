@@ -54,6 +54,7 @@ fn building_setup() -> (WorldState, TerrainMap) {
         x: at,
         y: at,
         richness: Default::default(),
+        stock: None,
     })
     .collect();
     world.realms.push(realm("r1", 7, "w1"));
@@ -122,6 +123,7 @@ fn teardown_setup() -> (WorldState, TerrainMap) {
             x: 3.0,
             y: 3.0,
             richness: Default::default(),
+            stock: None,
         },
         ResourceNode {
             id: "n3".into(),
@@ -129,6 +131,7 @@ fn teardown_setup() -> (WorldState, TerrainMap) {
             x: 7.0,
             y: 7.0,
             richness: Default::default(),
+            stock: None,
         },
     ];
     world.buildings.push(building("b1", BuildingKind::Mine, 7.0, 7.0));
