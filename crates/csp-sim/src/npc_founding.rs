@@ -21,7 +21,7 @@ use serde_json::json;
 
 use crate::land_sites::{near_a_starting_site, starting_site_middles, FootReach};
 use crate::npc_behaviour::{default_script, stop_work, Jobs};
-use crate::npc_chain::short_goods;
+use crate::npc_chain::{short_goods, Shortage};
 use crate::npc_cities::{hall_tile, npc_site_fits, taken_ground, FARM_RING};
 use crate::npc_scouts::knows_node;
 use crate::npc_trader::has_node_for;
@@ -101,6 +101,42 @@ pub fn short_for_founding(
             && !has_node_for(world, city, at, g, size, &mut HashSet::new())
     };
     short.into_iter().filter(|g| !unmakeable(*g)).collect()
+}
+
+/// What an NPC city lacks of its founding party's materials above its reserve, the shortest first
+/// (`CONTEXT.md`: Full city, T100.8). Only once nothing else keeps it from being full
+/// (`short_for_founding`) and no party of its is out: then they count as short, so its spare hands
+/// gather them (`share_out`) and it builds the workplace for one it can't get (`wanted`). Food,
+/// Coins and weapons come first, as they keep it from being full. Each as a share of its reserve
+/// and the materials together, like any shortage (`reserve_lacks`).
+pub fn founding_lacks(
+    world: &WorldState,
+    city: &City,
+    home: Option<&Building>,
+    size: i32,
+) -> Vec<Shortage> {
+    if city.trade_org.is_some()
+        || home.is_none()
+        || !founding_party(world.city_plans.get(&city.id)).is_empty()
+        || !short_for_founding(world, city, home, size).is_empty()
+    {
+        return Vec::new();
+    }
+    let reserve = npc_reserve(world, city);
+    let stock = npc_city_stock(world, city);
+    let materials = founding_materials(Some(npc_founding_party_size(
+        city_residents(world, &city.id).len() as f64,
+    )));
+    let mut out: Vec<Shortage> = materials
+        .iter()
+        .map(|(good, n)| {
+            let want = held(&reserve, *good) + n;
+            Shortage { good: *good, share: (want - held(&stock, *good)) / want }
+        })
+        .filter(|s| s.share > 1e-9)
+        .collect();
+    out.sort_by(|a, b| b.share.total_cmp(&a.share));
+    out
 }
 
 /// Whether a city would be full but for its materials (`fullButMaterials`).

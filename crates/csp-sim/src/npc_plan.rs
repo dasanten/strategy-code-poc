@@ -21,7 +21,7 @@ use crate::npc_behaviour::{npc_home, workplace_of, Jobs};
 use crate::npc_chain::{
     chain_good, chain_input, chain_store_index, holds_batch, shortages, SurplusWork,
 };
-use crate::npc_founding::{founding_party, plan_founding, FoundingPeople};
+use crate::npc_founding::{founding_lacks, founding_party, plan_founding, FoundingPeople};
 use crate::npc_growth::{
     city_grows, city_project, end_pairs, farms_full, is_builder, no_farm, npc_builders, pair_adults,
 };
@@ -711,6 +711,20 @@ fn share_out(
     if unneeded.is_empty() {
         return unneeded;
     }
+    // Lacking nothing else, its founding party's materials count as short (`CONTEXT.md`: Full
+    // city). Those who gather them are still spare hands to its founding.
+    let founding: Vec<(ScoredJob, Offer)> = founding_lacks(world, city, home, size)
+        .into_iter()
+        .map(|s| (ScoredJob::Short { share: s.share }, Offer::Short(s.good)))
+        .collect();
+    let left = if founding.is_empty() {
+        unneeded.clone()
+    } else {
+        fill(world, jobs, held, &kept, &mut state, &mut ways, founding, unneeded.clone())
+    };
+    if left.is_empty() {
+        return unneeded;
+    }
     // Nothing short has a use for them (`CONTEXT.md`: Spare hands' work).
     let mut second: Vec<(ScoredJob, Offer)> = vec![
         (ScoredJob::Road, Offer::Road),
@@ -725,7 +739,7 @@ fn share_out(
             }
         }
     }
-    let idle = fill(world, jobs, held, &kept, &mut state, &mut ways, second, unneeded.clone());
+    let idle = fill(world, jobs, held, &kept, &mut state, &mut ways, second, left);
     for i in idle {
         jobs.insert(world.residents[i].id.clone(), job_at(CityJobKind::Idle, None));
     }

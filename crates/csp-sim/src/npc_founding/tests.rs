@@ -191,6 +191,81 @@ fn is_not_full_short_of_weapons_it_could_make_from_a_node_it_knows() {
     assert_eq!(t.plan().full_since, None);
 }
 
+// lacking only its founding party's materials (T100.8)
+
+/// A full town that holds no Stone past its reserve, with a Stone node in reach.
+fn without_stone() -> Town {
+    let mut t = full_town(300);
+    let reserve = held(&npc_reserve(&t.world, t.city()), Good::Stone);
+    t.home_stock().insert(Good::Stone, reserve);
+    let home = t.home();
+    node(&mut t.world, &mut t.terrain, ResourceKind::Stone, home.x + 30.0, home.y);
+    t
+}
+
+fn is_quarry_job(t: &Town, job: &CityJob) -> bool {
+    job.building_id.as_ref().is_some_and(|id| {
+        t.world.buildings.iter().any(|b| &b.id == id && b.kind == BuildingKind::Quarry)
+    })
+}
+
+#[test]
+fn lacking_only_its_founding_materials_it_counts_them_short_and_builds_their_workplace() {
+    let mut t = without_stone();
+    let home = t.home();
+    let lacks = super::founding_lacks(&t.world, t.city(), Some(&home), t.terrain.size);
+    assert_eq!(lacks.iter().map(|s| s.good).collect::<Vec<_>>(), [Good::Stone]);
+    t.plan_city();
+    let building = match &t.plan().project {
+        Some(csp_shared::world::CityProject::Build { building, .. }) => Some(*building),
+        _ => None,
+    };
+    assert_eq!(building, Some(BuildingKind::Quarry));
+    // Its spare hands, gathering or not, still count toward its full wait.
+    assert_eq!(t.plan().full_since, Some(t.world.tick as f64));
+}
+
+#[test]
+fn its_spare_hands_quarry_the_stone_its_party_takes_while_its_full_wait_runs() {
+    let mut t = without_stone();
+    let home = t.home();
+    let quarry =
+        crate::test_support::building("quarry0", BuildingKind::Quarry, None, home.x + 30.0, home.y);
+    t.world.buildings.push(quarry);
+    let city = t.world.cities.iter_mut().find(|c| c.id == t.city).unwrap();
+    city.workplace_ids.get_or_insert_with(Vec::new).push("quarry0".into());
+    t.plan_city();
+    assert!(t.plan().jobs.values().any(|j| is_quarry_job(&t, j)), "nobody quarries");
+    let since = t.plan().full_since;
+    assert_eq!(since, Some(t.world.tick as f64));
+    let city = t.city.clone();
+    // The first Stone stored past its reserve is the party's.
+    let want = held(&npc_reserve(&t.world, t.city()), Good::Stone) + 1.0;
+    let stone = |w: &WorldState| {
+        let c = w.cities.iter().find(|c| c.id == city).unwrap();
+        held(&crate::queries::npc_trade::npc_city_stock(w, c), Good::Stone)
+    };
+    let (world, terrain) = (&mut t.world, &t.terrain);
+    run(world, terrain, (4.0 * DAY) as usize, &|w| stone(w) >= want);
+    assert!(stone(&t.world) >= want, "{} Stone of {want}", stone(&t.world));
+    // Quarrying for the party kept its wait going.
+    assert_eq!(t.plan().full_since, since);
+}
+
+#[test]
+fn counts_no_founding_material_short_while_anything_else_is() {
+    let mut t = without_stone();
+    t.home_stock().insert(Good::Food, 0.0);
+    let home = t.home();
+    assert_eq!(super::founding_lacks(&t.world, t.city(), Some(&home), t.terrain.size), []);
+    t.plan_city();
+    let quarry = matches!(
+        &t.plan().project,
+        Some(csp_shared::world::CityProject::Build { building: BuildingKind::Quarry, .. })
+    );
+    assert!(!quarry, "{:?}", t.plan().project);
+}
+
 // by its size
 
 /// A full town staged at `residents`, with a site ready and full since `days` ago (`fullFor`).

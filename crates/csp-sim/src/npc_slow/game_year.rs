@@ -154,6 +154,9 @@ impl Watch {
 fn run(world: &mut WorldState, terrain: &TerrainMap, days: usize, watch: &mut Watch) {
     let mut runner = Runner::new(terrain);
     let started = Instant::now();
+    let mut trace = std::env::var("GAME_YEAR_TRACE")
+        .ok()
+        .map(|p| std::io::BufWriter::new(std::fs::File::create(p).expect("a trace file")));
     for day in 1..=days {
         for _ in 0..TICKS_PER_GAME_DAY as usize {
             let step = runner.step_with_result(world, terrain);
@@ -161,6 +164,10 @@ fn run(world: &mut WorldState, terrain: &TerrainMap, days: usize, watch: &mut Wa
             watch.tick(world, &starved);
         }
         watch.day(world);
+        if let Some(t) = trace.as_mut() {
+            trace_day(t, world, terrain, day);
+            let _ = std::io::Write::flush(t);
+        }
         assert_eq!(check_all(world, terrain), [], "day {day}");
         if day % 10 == 0 || day == days {
             let npc = npc_city_ids(world);
@@ -176,6 +183,61 @@ fn run(world: &mut WorldState, terrain: &TerrainMap, days: usize, watch: &mut Wa
                 watch.traders_short(world).len(),
             );
         }
+    }
+}
+
+/// One line a game day for each NPC city, to `GAME_YEAR_TRACE` if set: what holds back its
+/// founding, what it builds, and what it holds against its reserve.
+fn trace_day(out: &mut impl std::io::Write, world: &WorldState, terrain: &TerrainMap, day: usize) {
+    use crate::npc_chain::own_workplaces;
+    use crate::npc_founding::{founding_lacks, short_for_founding};
+    use crate::queries::names::{good_name, held, kind_name};
+    use crate::queries::npc_trade::{npc_city_stock, npc_reserve};
+    use csp_shared::world::{CityJobKind, Good};
+    for id in npc_city_ids(world) {
+        let city = world.cities.iter().find(|c| c.id == id).expect("a city");
+        let home = crate::npc_behaviour::npc_home(world, &id);
+        let short: Vec<&str> = short_for_founding(world, city, home, terrain.size)
+            .into_iter()
+            .map(good_name)
+            .collect();
+        let lacks: Vec<String> = founding_lacks(world, city, home, terrain.size)
+            .into_iter()
+            .map(|s| format!("{}:{:.2}", good_name(s.good), s.share))
+            .collect();
+        let plan = world.city_plans.get(&id);
+        let jobs =
+            |k: CityJobKind| plan.map_or(0, |p| p.jobs.values().filter(|j| j.kind == k).count());
+        let project = plan.and_then(|p| p.project.as_ref()).map(|p| format!("{p:?}"));
+        let places: Vec<String> = own_workplaces(world, city)
+            .into_iter()
+            .map(|b| format!("{}{}", kind_name(b.kind), if b.site.is_some() { "*" } else { "" }))
+            .collect();
+        let stock = npc_city_stock(world, city);
+        let reserve = npc_reserve(world, city);
+        let goods: Vec<String> = [
+            Good::Food,
+            Good::Coins,
+            Good::Wood,
+            Good::Stone,
+            Good::IronOre,
+            Good::Iron,
+            Good::Spear,
+        ]
+        .into_iter()
+        .map(|g| format!("{}={:.0}/{:.0}", good_name(g), held(&stock, g), held(&reserve, g)))
+        .collect();
+        let _ = writeln!(
+            out,
+            "d{day} {id} {} n={} idle={} work={} build={} full_since={:?} short={short:?} \
+             lacks={lacks:?} goods={goods:?} places={places:?} project={project:?}",
+            city.name,
+            people_of(world, &id),
+            jobs(CityJobKind::Idle),
+            jobs(CityJobKind::Work),
+            jobs(CityJobKind::Build),
+            plan.and_then(|p| p.full_since).map(|t| (t / TICKS_PER_GAME_DAY) as i64),
+        );
     }
 }
 
