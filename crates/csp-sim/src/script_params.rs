@@ -310,6 +310,26 @@ pub fn with_target_param(
     Some(out)
 }
 
+/// The param a single round of Feeding the stable is asked for in (`CONTEXT.md`: Feeding the
+/// stable, Once).
+pub const ONCE_PARAM: &str = "once";
+
+/// The param values a Feed the stable start sets, with `once` never kept from the start before:
+/// what the order gives, else cleared, so a queue's single round leaves the full-time task as it
+/// was. Only while the script declares it.
+pub fn with_once_param(
+    script: Option<(&str, Option<Task>)>,
+    params: Option<serde_json::Map<String, Value>>,
+) -> Option<serde_json::Map<String, Value>> {
+    let Some((source, Some(Task::FeedStable))) = script else { return params };
+    if !script_params(source).iter().any(|p| p.param.name == ONCE_PARAM) {
+        return params;
+    }
+    let mut out = params.unwrap_or_default();
+    out.entry(ONCE_PARAM).or_insert(Value::Null);
+    Some(out)
+}
+
 /// The set-script-param order (`setScriptParamOrder`, `CONTEXT.md`: Script parameter): the
 /// Player picks, or clears with a null `targetId`, the value of a `param` of the script one of
 /// their residents runs. Free and instant, from anywhere.
