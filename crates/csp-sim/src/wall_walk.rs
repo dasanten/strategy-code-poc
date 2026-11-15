@@ -3,10 +3,12 @@
 //! keeps being up true to the walls each tick, and the invariants of it (ADR 0004).
 
 use csp_shared::terrain::TerrainMap;
-use csp_shared::world::{Building, BuildingKind, ResidentOrder, UpSide, WorldState};
+use csp_shared::world::{Building, BuildingKind, Resident, ResidentOrder, UpSide, WorldState};
 use rustc_hash::FxHashMap;
 
 use crate::invariants::{violation, InvariantViolation};
+use crate::queries::combat::in_contact;
+use crate::queries::walls::is_up;
 use crate::walls::{is_wall_or_gate, of_wall_side};
 
 /// The finished walls and gates by tile.
@@ -60,6 +62,31 @@ pub fn up_only_on_walls(world: &WorldState, _terrain: &TerrainMap) -> Vec<Invari
             let msg =
                 format!("{} is up on a wall walk at ({}, {}) with no wall there", r.id, r.x, r.y);
             violation(name, msg, &[&r.id])
+        })
+        .collect()
+}
+
+/// Nobody on the ground holds an attack order on someone up on the wall walk they are in contact
+/// with (`CONTEXT.md`: High ground, ADR 0004): no blow reaches up, so such an order ends.
+pub fn none_attack_up_from_below(
+    world: &WorldState,
+    terrain: &TerrainMap,
+) -> Vec<InvariantViolation> {
+    let name = "none-attack-up-from-below";
+    let size = terrain.size;
+    let tile = |r: &Resident| (r.x as i32, r.y as i32);
+    world
+        .residents
+        .iter()
+        .filter(|a| !is_up(world, a))
+        .filter_map(|a| {
+            let Some(ResidentOrder::Attack(o)) = &a.order else { return None };
+            let t = world.residents.iter().find(|t| t.id == o.target_id)?;
+            if t.up.is_none() || !in_contact(size, tile(a), tile(t)) {
+                return None;
+            }
+            let msg = format!("{} on the ground attacks {}, up on the wall walk", a.id, t.id);
+            Some(violation(name, msg, &[&a.id, &t.id]))
         })
         .collect()
 }
