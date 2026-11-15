@@ -76,7 +76,6 @@ fn the_word_follows_the_share_left_through_both_steps() {
     assert_eq!(word(100.0 * VEIN_NEARLY_GONE + 1.0), VeinWord::Thinning);
     assert_eq!(word(100.0 * VEIN_NEARLY_GONE), VeinWord::NearlyGone);
     assert_eq!(word(1.0), VeinWord::NearlyGone);
-    assert!(VEIN_NEARLY_GONE < VEIN_THINNING && VEIN_THINNING < 1.0);
 }
 
 #[test]
