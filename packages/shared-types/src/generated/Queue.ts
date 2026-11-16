@@ -22,4 +22,10 @@ nextStepId: number,
  * Whether a step started since the queue last began from its top: a looping queue whose
  * pass started none ends, as a block's empty round does (`CONTEXT.md`: Repeat block).
  */
-started?: boolean, };
+started?: boolean, 
+/**
+ * The name the queue was given under, as a saved queue's (`CONTEXT.md`: Saved queue): the
+ * stable hand's "Farm and feed" (`CONTEXT.md`: Starting city). A queue the Player gives has
+ * none; editing keeps it.
+ */
+name?: string, };

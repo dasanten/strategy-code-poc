@@ -189,6 +189,7 @@ import {
 } from './plan-blocks.js'
 import {
   browserStorage,
+  keepGivenQueue,
   list,
   load as loadQueue,
   readQueues,
@@ -2525,6 +2526,15 @@ export function ResidentCard({
   // Children pick up and put down only Food (`CONTEXT.md`: Child).
   const refused = (good: Good) => !canHandle(r, tick, [good])
   const family = familyLine(r, residents, tick)
+  // A queue the game gave under a name (the stable hand's "Farm and feed") goes into the saved
+  // queues once (`CONTEXT.md`: Starting city, Saved queue).
+  const given = r.owner === realmId && r.queue?.name ? r.queue : undefined
+  useEffect(() => {
+    if (given?.name && realmId) {
+      keepGivenQueue(browserStorage(), realmId, given.name, planOf(given).items, Date.now())
+    }
+    // Once a name, not every tick: the steps are read when it first shows.
+  }, [given?.name, realmId])
   // Only the owning Player picks it (`CONTEXT.md`: Defence script).
   const defenceScript = onSetDefenceScript && r.owner === realmId && (
     <DefenceScript
@@ -3220,7 +3230,13 @@ export function ResidentCard({
           </>
         ) : r.queue && onEditQueue ? (
           <>
+            {r.queue.name && (
+              <p className="small queue-name">
+                <strong>{r.queue.name}</strong>
+              </p>
+            )}
             <QueueBlock
+              title={r.queue.name ?? 'Queue'}
               queue={planOf(r.queue)}
               currentId={r.queue.current}
               rounds={roundsOf(r.queue)}

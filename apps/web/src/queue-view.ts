@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { CHILD_GOODS } from './shared/narrowed.js'
 import { GOODS } from './shared/world.js'
-import { QUEUE_STEP_KINDS, neverEnds, queueSteps, stepLine } from './shared/queue.js'
+import { QUEUE_STEP_KINDS, feedsOnce, neverEnds, queueSteps, stepLine } from './shared/queue.js'
 import { TICKS_PER_GAME_HOUR } from './shared/time.js'
 import { canWork } from './shared/stats.js'
 import { isVesselId } from './shared/vessels.js'
@@ -592,7 +592,8 @@ export function stepLabel(
         return `Build ${/^[aeiou]/.test(name) ? 'an' : 'a'} ${name}`
       }
       if (order.task === 'tearDown') return `Tear down ${building(order.buildingId)}`
-      if (order.task === 'feedStable') return `Feed ${building(order.stableId)}`
+      if (order.task === 'feedStable')
+        return `Feed ${building(order.stableId)}${feedsOnce(order) ? ' once' : ''}`
       if (order.task === 'breed') return `Breed horses at ${building(order.stableId)}`
       if (order.task === 'train') return `Train at ${building(order.groundId)}`
       if (order.task === 'explore') return 'Explore'

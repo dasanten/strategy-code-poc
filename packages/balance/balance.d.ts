@@ -157,6 +157,7 @@ export interface Balance {
   readonly START_FOOD: number
   readonly START_COINS: number
   readonly START_CARRIED_FOOD: number
+  readonly START_SPEARS: number
   readonly START_HORSES: number
   readonly START_STABLE_FOOD: number
   readonly HORSE_FOOD_PER_DAY: number
@@ -166,6 +167,8 @@ export interface Balance {
   readonly HORSE_HUNGRY_SHARE: number
   readonly HORSE_WAKE_HEALTH: number
   readonly STABLE_FEED_DAYS: number
+  readonly STABLE_HAND_FEED_DAYS: number
+  readonly STABLE_HAND_WORK_MINUTES: number
   readonly NPC_STABLE_REFILL_DAYS: number
   readonly NPC_STABLE_HUNGRY_DAYS: number
   readonly NPC_START_HORSES: number

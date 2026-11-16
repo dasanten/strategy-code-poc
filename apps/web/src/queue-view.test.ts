@@ -216,6 +216,8 @@ describe('step labels', () => {
     expect(stepLabel({ kind: 'task', task: 'feedStable', stableId: 'b1' }, { buildings })).toBe(
       'Feed the stable',
     )
+    const once = { kind: 'task', task: 'feedStable', stableId: 'b1', params: { once: 1 } }
+    expect(stepLabel(once, { buildings })).toBe('Feed the stable once')
     expect(stepLabel({ kind: 'mount', horseId: 'h1' }, {})).toBe('Mount a horse')
   })
 

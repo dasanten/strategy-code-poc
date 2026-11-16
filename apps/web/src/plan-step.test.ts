@@ -140,6 +140,23 @@ describe('Add step', () => {
     }
   })
 
+  it('plans Feed the stable once as the task with once, which may go before other steps', () => {
+    const plan = planned('feedStableOnce', [30, 4])
+    const { order } = planOrder(plan)!
+    expect(order).toEqual({
+      kind: 'task',
+      task: 'feedStable',
+      stableId: 'b1',
+      params: { once: 1 },
+    })
+    expect(PLAN_TASKS.feedStableOnce).toBe('feedStable')
+    const walk = { order: { kind: 'walkTo', x: 1, y: 1 } }
+    // Ending once the stable is full; the full-time task needs a duration before another step.
+    expect(queueStepsProblem([{ order }, walk])).toBeUndefined()
+    const fullTime = planOrder(planned('feedStable', [30, 4]))!.order
+    expect(queueStepsProblem([{ order: fullTime }, walk])).toBeDefined()
+  })
+
   it('plans a Build line from its two picked ends, with no walk before it', () => {
     const plan = planned('wall', [30, 10], [34, 14])
     expect(nextPick(plan)).toBeUndefined()
