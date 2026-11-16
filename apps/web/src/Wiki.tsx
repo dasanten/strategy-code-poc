@@ -158,6 +158,7 @@ import {
   FOOD_PER_DAY,
   NPC_BUILDERS,
   NPC_INNER_WALL_REACH,
+  NPC_STONE_WALL_RESIDENTS,
   NPC_ROAD_CREW,
   NPC_ROAD_LONGEST,
   NPC_CITY_MIN_DISTANCE,
@@ -2968,6 +2969,17 @@ export function Wiki() {
           stays when the outer wall moves. Before that, with nothing short and materials above its
           reserve, it builds one <a href="#training">training ground</a> in its area, and its
           soldiers train there.
+        </p>
+        <p>
+          Once it is a <strong>town</strong>, {num(NPC_STONE_WALL_RESIDENTS)} residents or more, an
+          NPC city upgrades its wall to <strong>stone</strong> (see{' '}
+          <a href="#transport">Upgrading to stone</a>): its outer gate first, then that wall tile by
+          tile, nearest the gate first, and its inner ring once the outer one is all stone. It does
+          this last of all its projects, from Stone beyond its reserve: a tile at a time once it
+          holds a builder's trip of it above its reserve, while its road crew is in and its wall is
+          not moving out. A town with none builds a quarry for it, and its spare hands work it. A
+          new outer wall it puts up when it grows is of stone once its old one was. Villages,
+          starting cities and the Trade Organization's cities stay wooden.
         </p>
         <h3>Trading posts and the HQ</h3>
         <p>
