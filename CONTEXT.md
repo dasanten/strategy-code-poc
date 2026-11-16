@@ -710,7 +710,8 @@ The shared language of the game. Domain terms only — no implementation details
   - **Fortify:** more soldiers than by its size, walls, stone and a training ground first, gates
     shut sooner, bigger escorts.
   - **Trade:** more traders going further, and a smaller surplus cap, so more goes to market.
-  - **Expand:** counts as full sooner, scouts more, founds more often.
+  - **Expand:** counts as full sooner, scouts more, founds more often, and goes for nodes it lacks
+    (Taking a node).
   - **Retaliate:** turned on one Organization that hurt it (Retaliating).
   Whoever has traded with a city or sees it reads its temperament on its card; whoever sees it
   reads its stance as a mood line ("arming", "busy trading"). Scripts see the same. Its stance and
@@ -735,6 +736,12 @@ The shared language of the game. Domain terms only — no implementation details
   city), only with very high threat and very low standing and an army that far outweighs that
   city's defenders. It ends when its threat from them has faded, a demand is paid, or its losses
   leave it the weaker; then it turns to Fortify, and an attack under way is called off.
+- **Taking a node** (Epic 98): an NPC city in Expand that is short of a good it has no node for
+  goes for the nearest node of it that it knows. One nobody works it builds on, sending its crew
+  with an escort. One another Organization holds only a militarist city takes, and only when it far
+  outweighs that node's guards: its soldiers drive the workers out and its own move in (Holding a
+  workplace). That is an attack like any other, and a crime against the holder. Never against a
+  realm in its shelter.
 - **New realm's shelter:** no NPC city sends a demand to, or marches on, a realm in its first game
   weeks. Players can.
 - **Alliance army:** soldiers and carriages members hand over to the alliance leader's command.
