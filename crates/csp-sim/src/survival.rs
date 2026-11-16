@@ -271,6 +271,7 @@ pub fn order_kind(o: &ResidentOrder) -> &'static str {
         ResidentOrder::Fetch(_) => "fetch",
         ResidentOrder::Build(_) => "build",
         ResidentOrder::TearDown(_) => "tearDown",
+        ResidentOrder::Repair(_) => "repair",
         ResidentOrder::WorkAt(_) => "workAt",
         ResidentOrder::Breed(_) => "breed",
         ResidentOrder::Attack(_) => "attack",

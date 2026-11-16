@@ -310,6 +310,8 @@ fn new_building(
         closed: None,
         damage: None,
         breedings: None,
+        decay: None,
+        repair: None,
     }
 }
 

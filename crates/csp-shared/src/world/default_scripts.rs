@@ -11,6 +11,7 @@ pub enum Task {
     Build,
     Haul,
     TearDown,
+    Repair,
     Breed,
     FeedStable,
     Defend,

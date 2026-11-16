@@ -925,6 +925,40 @@ fn keeps_every_default_at_most_a_quarter_of_a_residents_budget() {
             ),
         ],
     ));
+    let repair = json!({ "buildingId": "farm" });
+    let worn = |world: &mut WorldState| {
+        world.buildings.iter_mut().find(|b| b.id == "farm").unwrap().decay = Some(0.5);
+    };
+    cases.push((
+        Task::Repair,
+        vec![
+            // Starting on a worn farm (no materials), repairing it, done, and the building gone.
+            case(repair.clone(), worn),
+            case(repair.clone(), move |world| {
+                worn(world);
+                w1(world).order = Some(from(json!({
+                    "kind": "repair", "buildingId": "farm", "at": { "x": 3, "y": 3 }
+                })));
+            }),
+            case(
+                {
+                    let mut m = repair.clone();
+                    m["started"] = json!(true);
+                    m
+                },
+                |_| {},
+            ),
+            case(repair.clone(), |world| world.buildings = Vec::new()),
+            // A worn house that lacks Wood, with many storages to look through.
+            case(json!({ "buildingId": "h1" }), |world| {
+                add(
+                    world,
+                    json!({ "id": "h1", "kind": "house", "cityId": "c1", "x": 6, "y": 6, "decay": 0.5 }),
+                );
+                many_storages(world, "wood", "stone", |i| (2 + i, 14));
+            }),
+        ],
+    ));
     let with = |m: &Value, k: &str, v: Value| {
         let mut m = m.clone();
         m[k] = v;

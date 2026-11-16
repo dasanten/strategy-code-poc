@@ -268,6 +268,10 @@ import {
   STRIKE_TICKS,
   TEARDOWN_MATERIALS_RETURNED,
   TEARDOWN_WORK_SHARE,
+  DECAY_WORN,
+  DECAY_NEARLY_RUIN,
+  REPAIR_MATERIALS_SHARE,
+  REPAIR_WORK_SHARE,
   TERRAIN_FOOD,
   TERRAIN_SPEED,
   TERRITORY_CITY_BASE,
@@ -319,6 +323,7 @@ import { PARAM_DESCRIPTIONS, DEFAULT_SCRIPTS, SCRIPT_VIEWS } from '@csp/lang-was
 import { WORKPLACE_PARAM } from './shared/default-scripts.js'
 import { SCRIPT_PARAM_TYPES } from './shared/script-api.js'
 import { NPC_SMITHY_WEAPON } from './shared/npc-trade.js'
+import { DECAY_DAYS, repairMaterials, repairWork } from './shared/decay.js'
 import { fighterStrength } from './shared/persuasion.js'
 import type {
   BuildingKind,
@@ -538,6 +543,9 @@ function ApiTable({ is }: { is: ApiName['is'] }) {
 }
 
 const kindName = (kind: BuildingKind) => BUILDING_NAMES[kind]
+/** Each kind that decays, with the game days it takes to lose all its condition. */
+const decayRows = () =>
+  (Object.entries(DECAY_DAYS) as [BuildingKind, number][]).map(([kind, days]) => ({ kind, days }))
 const goodName = (good: Good) => GOOD_LABELS[good]
 const skillName = (kind: BuildingKind) => {
   const skill = WORKPLACE_SKILL[kind] ?? ''
@@ -1235,8 +1243,7 @@ export function Wiki() {
           frontier border, gold and coal never in a heartland, and in another region than the old
           one wherever one fits. It appears out of everyone’s sight and, where the map allows, on
           land nobody has explored. Nobody is told: you have to find it. If you had explored its
-          tile before, your map shows no node there until one of your residents sees the tile
-          again.
+          tile before, your map shows no node there until one of your residents sees the tile again.
         </p>
         <p>
           NPC cities and the Trade Organization move on too. When the mine an NPC city or a trading
@@ -1420,27 +1427,26 @@ export function Wiki() {
           card (<strong>Leader and heir…</strong>, then <strong>Name heir</strong>) or from a script
           with <code>nameHeir(residentId)</code>; it is free, at once and from anywhere. Who
           qualifies: an adult of your realm who lives in one of its cities, isn't your Leader and
-          serves no one else (no mercenary contract or offer naming them, not in the alliance
-          army), the same residents a Leader handover allows, but they need not stand by your
-          Leader. You have one heir: naming another replaces the first, and{' '}
-          <strong>Clear heir</strong> or <code>clearHeir()</code> leaves you with none. The top bar
-          shows your heir, or “No heir” to pick one; their card and the Residents list mark them.
-          Only you and your allies see who it is. The heir lapses, with a line in your realm log,
-          when they die, leave your realm (their city changes hands, or they are handed over),
-          become homeless, are lent out or handed to the alliance army, or become your Leader by a
-          handover; then name another.
+          serves no one else (no mercenary contract or offer naming them, not in the alliance army),
+          the same residents a Leader handover allows, but they need not stand by your Leader. You
+          have one heir: naming another replaces the first, and <strong>Clear heir</strong> or{' '}
+          <code>clearHeir()</code> leaves you with none. The top bar shows your heir, or “No heir”
+          to pick one; their card and the Residents list mark them. Only you and your allies see who
+          it is. The heir lapses, with a line in your realm log, when they die, leave your realm
+          (their city changes hands, or they are handed over), become homeless, are lent out or
+          handed to the alliance army, or become your Leader by a handover; then name another.
         </p>
         <p>
           <b>When your Leader dies</b> and you have a living heir (one who is Down counts), the heir
           is your Leader at once and you play on: your realm keeps its name, standing, contracts,
           alliance, scripts and realm log. But it keeps only the city your heir lives in, with its
-          residents wherever they stand (those away keep their orders) and everything in it, and
-          the horses, carriages and boats nearer it than any other of your cities; outpost storages
-          stay yours. Every other city becomes a <b>self-managed city</b> with its residents and
-          the horses and carriages nearest it, holding you in good standing at{' '}
-          {signed(FORMER_PLAYER_STANDING)}; its soldiers lent out or in the alliance army walk
-          home. Your realm then has no heir until you name one. Your realm log and a notice say who
-          took over and what became of each city.
+          residents wherever they stand (those away keep their orders) and everything in it, and the
+          horses, carriages and boats nearer it than any other of your cities; outpost storages stay
+          yours. Every other city becomes a <b>self-managed city</b> with its residents and the
+          horses and carriages nearest it, holding you in good standing at{' '}
+          {signed(FORMER_PLAYER_STANDING)}; its soldiers lent out or in the alliance army walk home.
+          Your realm then has no heir until you name one. Your realm log and a notice say who took
+          over and what became of each city.
         </p>
         <p>
           Without a living heir, or when your heir dies in the same tick as your Leader, your realm
@@ -1784,6 +1790,49 @@ export function Wiki() {
                 <td>{duration(b.buildTicks)}</td>
                 <td>{duration(b.teardownTicks)}</td>
                 <td>{goods(b.returned)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <h3>Decay and repairing</h3>
+        <p>
+          Every finished building, wall, gate and road slowly loses its <strong>condition</strong>,
+          used or not: an even share at the turn of each game day, faster for roads and the wooden
+          walls and gates, slowest for those mostly of stone. Blows from attackers are apart from
+          this (see <a href="#combat">Combat</a>). Its tile card says how it stands: good, then{' '}
+          <strong>worn</strong> once it has lost {pct(DECAY_WORN)}, then{' '}
+          <strong>nearly a ruin</strong> once it has lost {pct(DECAY_NEARLY_RUIN)}. Everyone who
+          sees a building sees its condition; scripts read it as <code>building.condition</code>.
+        </p>
+        <p>
+          A worn building can be <strong>repaired</strong>: pick a resident, then the building's
+          tile, and <em>Repair</em> on its tile card. They run your Repair default: it walks them
+          there, and while the repair lacks materials they carry none of, they fetch what it lacks
+          from its <code>source</code> param, or the nearest storage of your realm holding some. A
+          repair takes {pct(REPAIR_MATERIALS_SHARE)} of the building's materials (rounded up) and{' '}
+          {pct(REPAIR_WORK_SHARE)} of its work, and puts it back to good. With none of the materials
+          in any storage, Repair ends and your realm log says why. Anyone's building can be
+          repaired. Scripts repair with <code>repair(buildingId)</code> on the building's tile and
+          ask what it lacks with <code>repairNeeded(building)</code>.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Building</th>
+              <th>Worn after</th>
+              <th>All gone after</th>
+              <th>Repair materials</th>
+              <th>Repair, one builder</th>
+            </tr>
+          </thead>
+          <tbody>
+            {decayRows().map((b) => (
+              <tr key={b.kind}>
+                <td>{kindName(b.kind)}</td>
+                <td>{num(Math.ceil(b.days * DECAY_WORN))} game days</td>
+                <td>{num(b.days)} game days</td>
+                <td>{goods(repairMaterials(b.kind))}</td>
+                <td>{duration(repairWork(b.kind))}</td>
               </tr>
             ))}
           </tbody>

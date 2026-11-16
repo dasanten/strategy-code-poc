@@ -1176,6 +1176,30 @@ export interface Balance {
   readonly WORK_SKILL_PER_DAY: number
   readonly TEARDOWN_WORK_SHARE: number
   readonly TEARDOWN_MATERIALS_RETURNED: number
+  readonly DECAY_DAYS: {
+    road: number
+    wall: number
+    gate: number
+    farm: number
+    house: number
+    stable: number
+    lumberCamp: number
+    storage: number
+    trainingGround: number
+    haven: number
+    quarry: number
+    mine: number
+    townHall: number
+    warehouse: number
+    smelter: number
+    mint: number
+    smithy: number
+    [key: string]: number
+  }
+  readonly DECAY_WORN: number
+  readonly DECAY_NEARLY_RUIN: number
+  readonly REPAIR_MATERIALS_SHARE: number
+  readonly REPAIR_WORK_SHARE: number
   readonly ALLIANCE_LEAVE_DELAY: number
   readonly ALLIANCE_RECALL_DELAY: number
   readonly NPC_ALLIANCE_JOIN_STANDING: number

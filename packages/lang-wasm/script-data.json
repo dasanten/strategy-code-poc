@@ -1018,6 +1018,12 @@
           "type": "string",
           "description": "How the vein of a workplace on a node stands: \"plenty\", \"thinning\", \"nearlyGone\", or \"endless\" for a node that never runs dry; never a number.",
           "nullWhen": "for any other building, a construction site, a mine whose vein ran dry, and while neither my realm nor an ally has a resident working it"
+        },
+        {
+          "name": "condition",
+          "type": "string",
+          "description": "How it has decayed: \"good\", \"worn\" or \"nearlyRuin\"; a worn one, or worse, can be repaired (`repair`).",
+          "nullWhen": "for a construction site and a building that never decays"
         }
       ]
     },
@@ -2542,6 +2548,20 @@
       }
     },
     {
+      "name": "repairNeeded",
+      "is": "query",
+      "params": [
+        "building"
+      ],
+      "cost": 1,
+      "description": "The materials a repair of a worn building still lacks, as a list like [{good: \"wood\", units: 2}]; empty once it has them all, and for a building in good condition.",
+      "returns": {
+        "list": {
+          "view": "material"
+        }
+      }
+    },
+    {
       "name": "lineTiles",
       "is": "query",
       "params": [
@@ -2953,6 +2973,16 @@
       ],
       "cost": 10,
       "description": "Tear down the building or site on my tile.",
+      "returns": "string"
+    },
+    {
+      "name": "repair",
+      "is": "action",
+      "params": [
+        "buildingId"
+      ],
+      "cost": 10,
+      "description": "Repair the worn building on my tile: what I carry of the materials it lacks goes in, then my work; once it has all of both it is good again. My order is \"repair\" until done.",
       "returns": "string"
     },
     {
@@ -3907,6 +3937,10 @@
     "tearDown": {
       "name": "Tear down",
       "source": "// Tear down (default): tear down params.building, or while none is picked\n// the building or site on my tile when I start, kept in memory.buildingId,\n// until it is gone; then end. With none I end. Away from it, I walk there\n// first. Below params.foodAt units of Food on me I get Food up to\n// params.foodTake at params.food, else params.source, else the nearest\n// storage of my realm with Food, and come back. foodAt 0 turns it off.\nparam building: building // the building or site to tear down; none: the one I stand on\nparam source: storage // my main storage, for Food; a carriage too; none: the nearest storage with Food\nparam food: storage // where Food comes from; a carriage too; none: my source, else the nearest storage with Food\nparam foodAt: number = 1 // get Food below this many units on me; 0 never\nparam foodTake: number = 3 // units of Food to take along\n\nif (memory.stuck) { return }\nif (!pickBuilding()) { return }\nif (memory.walked && me.order != null && me.order.kind == \"walkTo\") { // on my way\n  wait()\n  return\n}\nif (walkBack()) { return }\n// With no Food anywhere, I tear down on.\nlet x = me.x\nlet y = me.y\nif (getFoodIfLow(params.food || params.source, me)) {\n  memory.food = {walked: false, x: x, y: y}\n  return\n}\nif (me.order == null || me.order.kind != \"tearDown\") { startTearingDown() }\n\n// What I tear down: the one picked, else the one I started on, kept in\n// memory.buildingId. False once I end: there is none.\nfn pickBuilding() {\n  if (params.building != null) { memory.buildingId = params.building.id }\n  if (memory.buildingId == null) {\n    let here = buildingAt(me.x, me.y)\n    if (here == null) {\n      end(\"no building on their tile\")\n      return false\n    }\n    memory.buildingId = here.id\n  }\n  return true\n}\n\n// Away getting food: walk back to the tile I tear down from, once; with no\n// way back I stay put. True until I am there.\nfn walkBack() {\n  let away = memory.food\n  if (away == null) { return false }\n  if (me.order != null && me.order.kind != \"tearDown\") { // on my way\n    wait()\n    return true\n  }\n  if (me.x == away.x && me.y == away.y) {\n    memory.food = null\n    return false\n  }\n  if (away.walked) {\n    memory.stuck = true\n    log(\"no way back to where I tear down\")\n  } else {\n    if (walkTo(away.x, away.y) == null) { wait() } // until I am there\n    away.walked = true\n  }\n  return true\n}\n\n// Tearing it down; picked somewhere else, I walk there once first. Turned\n// down, such as with the building gone, tearDown says why: done.\nfn startTearingDown() {\n  let problem = tearDown(memory.buildingId)\n  let target = building(memory.buildingId)\n  if (target == null) { target = params.building } // picked out of sight: as last seen\n  if (problem == \"the resident is not at that building\" && target != null && !memory.walked) {\n    memory.walked = true\n    if (walkTo(target.x, target.y) == null) { wait() } // until I am there\n    log(\"walking to \" + placeName(target) + \" to tear it down\")\n    return\n  }\n  if (problem != null) {\n    log(problem)\n    end()\n  } else if (target != null) { log(\"tearing down \" + placeName(target)) }\n}\n\n// Getting food: below params.foodAt units of Food on me, fetch Food up to\n// params.foodTake at from while it holds Food, else at the nearest storage of\n// my realm with Food from near. True once I set off, which I log; I wait\n// until I have it.\nfn getFoodIfLow(from, near) {\n  let food = me.carried.food\n  if (food == null) { food = 0 }\n  if (food >= params.foodAt) { return false }\n  let units = floor(params.foodTake - food) // fetch takes whole units\n  if (units < 1) { return false }\n  let at = from\n  if (at == null || !holdsFood(at)) {\n    at = null\n    let stores = storages(near, [\"food\"]) // nearest first, holding some\n    if (stores.length > 0) { at = stores[0] }\n  }\n  if (at == null || fetch({food: units}, at.id) != null) { return false }\n  wait() // until I have it\n  log(\"low on Food (\" + floor(food) + \"): fetching \" + units + \" at \" + placeName(at))\n  return true\n}\n\n// Whether a storage, or a carriage, holds a whole unit of Food to fetch.\nfn holdsFood(at) {\n  let held = at.stock\n  if (held == null) { held = at.load } // a carriage\n  return held != null && held.food != null && held.food >= 1\n}\n\n// The Food that tops me up to params.foodTake, in whole units.\nfn foodToTake() {\n  let food = me.carried.food\n  if (food == null) { food = 0 }\n  let units = floor(params.foodTake - food)\n  if (units < 1) { return 0 }\n  return units\n}\n\n\n// A building or carriage for my log: \"the storage at 12,6\".\nfn placeName(b) {\n  let kind = b.kind\n  if (kind == null) { kind = \"carriage\" }\n  return \"the \" + kind + \" at \" + b.x + \",\" + b.y\n}\n\n// The units of goods in load for my log: \"10 stone, 4 wood\".\nfn goodsText(load, goods) {\n  let text = \"\"\n  for (g of goods) {\n    let n = load[g]\n    if (n != null && n >= 1) {\n      if (text != \"\") { text = text + \", \" }\n      text = text + floor(n) + \" \" + g\n    }\n  }\n  return text\n}\n"
+    },
+    "repair": {
+      "name": "Repair",
+      "source": "// Repair (default): repair params.building, or while none is picked the\n// building on my tile when I start, kept in memory.buildingId, until it is\n// good again; then end. With none, or one in good condition, I end. While\n// the repair lacks materials and I carry none of them, I fetch what it\n// lacks at params.source, else the nearest storage of my realm holding\n// some, and come back; with none in any storage I end, saying so. Away\n// from it, I walk there first.\nparam building: building // the building to repair; none: the one I stand on\nparam source: storage // where materials come from; a carriage too; none: the nearest storage holding them\n\nif (!pickBuilding()) { return }\nlet target = building(memory.buildingId)\nif (target == null) { target = params.building } // picked out of sight: as last seen\nif (target == null) {\n  end(\"the building is gone\")\n  return\n}\nif (memory.started && target.condition == \"good\") {\n  log(\"repaired \" + placeName(target))\n  end()\n  return\n}\nif (me.order != null && me.order.kind != \"repair\") { // on my way, or fetching\n  wait()\n  return\n}\nlet missing = repairNeeded(target)\nif (missing.length > 0 && carriedOf(me, missing) == null) {\n  fetchMissing(target, missing)\n} else if (me.order == null) { startRepairing(target) }\n\n// What I repair: the one picked, else the one I started on, kept in\n// memory.buildingId. False once I end: there is none.\nfn pickBuilding() {\n  if (params.building != null) { memory.buildingId = params.building.id }\n  if (memory.buildingId == null) {\n    let here = buildingAt(me.x, me.y)\n    if (here == null) {\n      end(\"no building on their tile\")\n      return false\n    }\n    memory.buildingId = here.id\n  }\n  return true\n}\n\n// Repairing it; somewhere else, I walk there first, once a leg. Turned\n// down, such as in good condition, repair says why: done.\nfn startRepairing(target) {\n  let problem = repair(target.id)\n  if (problem == \"the resident is not at that building\") {\n    if (memory.walked) {\n      end(\"no way to \" + placeName(target))\n      return\n    }\n    memory.walked = true\n    if (walkTo(target.x, target.y) == null) { wait() } // until I am there\n    log(\"walking to \" + placeName(target) + \" to repair it\")\n    return\n  }\n  if (problem != null) {\n    log(problem)\n    end()\n    return\n  }\n  memory.started = true\n  memory.walked = false\n  log(\"repairing \" + placeName(target))\n}\n\n// Fetching what the repair lacks: at params.source while it holds some,\n// else the nearest storage of my realm holding some. With none, I end.\nfn fetchMissing(target, missing) {\n  let goods = goodsOf(missing)\n  let from = materialsFrom(target, goods)\n  if (from == null) {\n    end(\"no \" + goodsList(goods) + \" in any storage\")\n    return\n  }\n  let load = {}\n  for (m of missing) { load[m.good] = m.units }\n  let problem = fetch(load, from.id)\n  if (problem != null) {\n    log(problem)\n    end()\n    return\n  }\n  memory.walked = false\n  wait() // until I have it\n  log(\"fetching \" + goodsText(load, goods) + \" at \" + placeName(from) + \" for the repair\")\n}\n\n// Where materials come from: params.source while it holds some of goods,\n// else the nearest storage of my realm holding some; null with none.\nfn materialsFrom(target, goods) {\n  let from = params.source\n  if (from != null) {\n    let held = from.stock\n    if (held == null) { held = from.load } // a carriage\n    if (held != null) {\n      for (g of goods) {\n        if (held[g] != null && held[g] > 0) { return from }\n      }\n    }\n  }\n  let stores = storages(target, goods) // nearest first, holding some\n  if (stores.length == 0) { return null }\n  return stores[0]\n}\n\n// What someone carries of what the repair lacks; null if nothing.\nfn carriedOf(r, missing) {\n  let load = null\n  for (m of missing) {\n    let n = r.carried[m.good]\n    if (n != null && n > 0) {\n      if (n > m.units) { n = m.units }\n      if (load == null) { load = {} }\n      load[m.good] = n\n    }\n  }\n  return load\n}\n\n// The goods of what the repair lacks.\nfn goodsOf(missing) {\n  let goods = []\n  for (m of missing) { goods[goods.length] = m.good }\n  return goods\n}\n\n// The goods for my log: \"wood or stone\".\nfn goodsList(goods) {\n  let text = \"\"\n  for (g of goods) {\n    if (text != \"\") { text = text + \" or \" }\n    text = text + g\n  }\n  return text\n}\n\n// A building or carriage for my log: \"the house at 12,6\".\nfn placeName(b) {\n  let kind = b.kind\n  if (kind == null) { kind = \"carriage\" }\n  return \"the \" + kind + \" at \" + b.x + \",\" + b.y\n}\n\n// The units of goods in load for my log: \"1 stone, 2 wood\".\nfn goodsText(load, goods) {\n  let text = \"\"\n  for (g of goods) {\n    let n = load[g]\n    if (n != null && n >= 1) {\n      if (text != \"\") { text = text + \", \" }\n      text = text + floor(n) + \" \" + g\n    }\n  }\n  return text\n}\n"
     },
     "breed": {
       "name": "Breed horses",

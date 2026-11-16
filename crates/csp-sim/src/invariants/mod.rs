@@ -182,6 +182,8 @@ pub fn world_invariants() -> Vec<Invariant> {
             name: "tear-down-orders-on-buildings",
             check: checks::tear_down_orders_on_buildings,
         },
+        Invariant { name: "conditions-in-range", check: checks::conditions_in_range },
+        Invariant { name: "repair-orders-on-buildings", check: checks::repair_orders_on_buildings },
         Invariant { name: "nodes-on-fitting-terrain", check: checks::nodes_on_fitting_terrain },
         Invariant { name: "realm-logs-in-order", check: checks::realm_logs_in_order },
         Invariant { name: "residents-in-cities", check: checks::residents_in_cities },

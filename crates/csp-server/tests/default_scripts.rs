@@ -85,6 +85,7 @@ fn a_players_default_scripts_are_in_their_library_from_the_start_one_per_task_fo
         ("Explore (default)", Task::Explore),
         ("Feed the stable (default)", Task::FeedStable),
         ("Haul (default)", Task::Haul),
+        ("Repair (default)", Task::Repair),
         ("Tear down (default)", Task::TearDown),
         ("Train (default)", Task::Train),
         ("Work (default)", Task::Work),

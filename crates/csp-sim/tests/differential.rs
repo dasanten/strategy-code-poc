@@ -101,6 +101,7 @@ fn differential(name: &str, ticks: &[u64]) -> Option<String> {
         let want = normalised(&read_json(&format!("worlds/{name}-{at}.json"))["world"]);
         let mut got = normalised(&serde_json::to_value(&world).unwrap());
         without_tile_regions(&mut got);
+        without_decay(&mut got);
         if let Some(d) = first_difference(&want, &got, "world") {
             return Some(format!("{name} at tick {at}: {d}"));
         }
@@ -146,6 +147,24 @@ fn without_tile_regions(v: &mut serde_json::Value) {
             o.values_mut().for_each(without_tile_regions);
         }
         serde_json::Value::Array(a) => a.iter_mut().for_each(without_tile_regions),
+        _ => {}
+    }
+}
+
+/// Drops what a building has lost to decay, a repair under way and its condition in words (T97.5,
+/// `CONTEXT.md`: Decay) from every object with a `kind`, an `x` and a `y`: the TypeScript's
+/// buildings never decayed. Tested on their own in `repair`'s tests and `tests/repairing.rs`.
+fn without_decay(v: &mut serde_json::Value) {
+    match v {
+        serde_json::Value::Object(o) => {
+            if ["kind", "x", "y"].iter().all(|k| o.contains_key(*k)) {
+                o.remove("decay");
+                o.remove("repair");
+                o.remove("condition");
+            }
+            o.values_mut().for_each(without_decay);
+        }
+        serde_json::Value::Array(a) => a.iter_mut().for_each(without_decay),
         _ => {}
     }
 }

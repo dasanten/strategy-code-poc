@@ -2122,6 +2122,46 @@ pub const TEARDOWN_WORK_SHARE: f64 = 0.5;
 /// to whole units. An unfinished site leaves all its delivered materials.
 pub const TEARDOWN_MATERIALS_RETURNED: f64 = 0.5;
 
+/// Game days a finished building of each kind takes to lose all its condition, unrepaired
+/// (`CONTEXT.md`: Decay): it loses an even share each game day, used or not. Roads and the wooden
+/// walls and gates go fastest, about two game months; timber buildings in four; those mostly of
+/// stone (smelter, mint, smithy) in eight. A kind not listed (a carriage, boat or ship site) never
+/// decays.
+pub const DECAY_DAYS: Table<f64> = Table(&[
+    ("road", 60.0),
+    ("wall", 60.0),
+    ("gate", 60.0),
+    ("farm", 90.0),
+    ("house", 120.0),
+    ("stable", 120.0),
+    ("lumberCamp", 120.0),
+    ("storage", 150.0),
+    ("trainingGround", 150.0),
+    ("haven", 150.0),
+    ("quarry", 150.0),
+    ("mine", 150.0),
+    ("townHall", 180.0),
+    ("warehouse", 240.0),
+    ("smelter", 240.0),
+    ("mint", 240.0),
+    ("smithy", 240.0),
+]);
+
+/// Share of its condition lost from which a building reads worn, rather than good
+/// (`CONTEXT.md`: Decay), and can be repaired: a road after about two game weeks.
+pub const DECAY_WORN: f64 = 0.25;
+
+/// Share of its condition lost from which a building reads nearly a ruin.
+pub const DECAY_NEARLY_RUIN: f64 = 0.75;
+
+/// Share of a building's materials a repair takes (`CONTEXT.md`: Repairing), rounded up to whole
+/// units of each good: a tile of road or wall a unit, a house 5 Wood.
+pub const REPAIR_MATERIALS_SHARE: f64 = 0.25;
+
+/// Share of a building's `BUILD_WORK` a repair takes: less than building it, and less than
+/// tearing it down (`TEARDOWN_WORK_SHARE`).
+pub const REPAIR_WORK_SHARE: f64 = 0.25;
+
 /// How long after a realm says it leaves an alliance, or the alliance leader removes it, it stops
 /// being a member (`CONTEXT.md`: Alliance): one real hour, time enough for the others to react.
 pub const ALLIANCE_LEAVE_DELAY: f64 = 3600.0;
@@ -2888,6 +2928,11 @@ pub fn balance_json() -> Value {
     m.insert("WORK_SKILL_PER_DAY".into(), json!(WORK_SKILL_PER_DAY));
     m.insert("TEARDOWN_WORK_SHARE".into(), json!(TEARDOWN_WORK_SHARE));
     m.insert("TEARDOWN_MATERIALS_RETURNED".into(), json!(TEARDOWN_MATERIALS_RETURNED));
+    m.insert("DECAY_DAYS".into(), to_value(DECAY_DAYS).expect("serialisable"));
+    m.insert("DECAY_WORN".into(), json!(DECAY_WORN));
+    m.insert("DECAY_NEARLY_RUIN".into(), json!(DECAY_NEARLY_RUIN));
+    m.insert("REPAIR_MATERIALS_SHARE".into(), json!(REPAIR_MATERIALS_SHARE));
+    m.insert("REPAIR_WORK_SHARE".into(), json!(REPAIR_WORK_SHARE));
     m.insert("ALLIANCE_LEAVE_DELAY".into(), json!(ALLIANCE_LEAVE_DELAY));
     m.insert("ALLIANCE_RECALL_DELAY".into(), json!(ALLIANCE_RECALL_DELAY));
     m.insert("NPC_ALLIANCE_JOIN_STANDING".into(), json!(NPC_ALLIANCE_JOIN_STANDING));

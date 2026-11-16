@@ -172,6 +172,7 @@ fn describe_every_field_of_everything_the_queries_and_me_hand_a_script() {
         ("pileAt", "pileAt(10, 10)"),
         ("outputOf", "outputOf(building(\"s1\"))"),
         ("materialsNeeded", "materialsNeeded(building(\"site1\"))"),
+        ("repairNeeded", "repairNeeded(building(\"s1\"))"),
         ("terrainAt", "terrainAt(10, 10)"),
         ("distance", "distance(me, building(\"s1\"))"),
         ("floor", "floor(2.5)"),

@@ -813,6 +813,15 @@ impl<'a> ScriptBindings<'a> {
         Some(m)
     }
 
+    /// `condition` of a finished building that decays, in words (`CONTEXT.md`: Decay): seen by
+    /// everyone who sees the building.
+    fn condition_at(b: &Building) -> Option<Map<String, Json>> {
+        let word = crate::repair::condition_of(b)?;
+        let mut m = Map::new();
+        m.insert("condition".into(), Json::String(word.name().into()));
+        Some(m)
+    }
+
     /// At a storage, its offers, and at one of the side's own the goods it can take (`offersOf`).
     fn offers_of(&self, b: &Building) -> Option<Map<String, Json>> {
         let world = self.world();
@@ -859,7 +868,7 @@ impl<'a> ScriptBindings<'a> {
     fn as_seen_building(&self, b: &Building) -> Option<Json> {
         if self.own_building(b) {
             let m = merge(merge(to_json(b), self.settings_at(&b.id)), self.offers_of(b));
-            let m = merge(m, self.vein_at(&b.id));
+            let m = merge(merge(m, self.vein_at(&b.id)), Self::condition_at(b));
             return Some(Json::Object(m));
         }
         // What is in sight holds a building just when the eyes see its footprint (`places`):
@@ -877,7 +886,8 @@ impl<'a> ScriptBindings<'a> {
                 .find(|e| matches!(e, SeenEntity::Building(sb) if sb.building.id == b.id))?
                 .clone(),
         };
-        Some(Json::Object(merge(untagged(&shown), Some(self.building_extras(&b.id)))))
+        let m = merge(untagged(&shown), Some(self.building_extras(&b.id)));
+        Some(Json::Object(merge(m, Self::condition_at(b))))
     }
 
     /// One of the side's own buildings as `building(id)` gives it, built from the struct rather
@@ -910,6 +920,9 @@ impl<'a> ScriptBindings<'a> {
                 "damage" => b.damage.map_or(Value::Null, number),
                 "workSettings" => settings.map_or(Value::Null, |s| field_value(s, f.r#type)),
                 "vein" => self.vein_word_at(b).map_or(Value::Null, |w| Value::string(w.name())),
+                "condition" => {
+                    crate::repair::condition_of(b).map_or(Value::Null, |c| Value::string(c.name()))
+                }
                 // A building's `prices` and `offers` come with its offers, `teacher`,
                 // `subject` and `trainees` with another's.
                 _ => Value::Null,
@@ -1237,6 +1250,19 @@ impl<'a> ScriptBindings<'a> {
                 }
                 Json::Array(
                     materials_needed(b)
+                        .iter()
+                        .map(|(g, u)| json!({ "good": good_name(*g), "units": u }))
+                        .collect(),
+                )
+            }
+            "repairNeeded" => {
+                let b = self.building_of(arg(0)).filter(|b| crate::repair::repairable(b));
+                let Some(b) = b else { return Ok(Json::Array(vec![])) };
+                if !(self.own_building(b) || self.in_sight((b.x as i32, b.y as i32))) {
+                    return Ok(Json::Array(vec![]));
+                }
+                Json::Array(
+                    crate::repair::repair_materials_needed(b)
                         .iter()
                         .map(|(g, u)| json!({ "good": good_name(*g), "units": u }))
                         .collect(),
@@ -1634,6 +1660,7 @@ impl<'a> ScriptBindings<'a> {
             }
             "build" => self.request("build", vec![("building", p(0)?)]),
             "tearDown" => self.request("tearDown", vec![("buildingId", p(0)?)]),
+            "repair" => self.request("repair", vec![("buildingId", p(0)?)]),
             "workAt" => {
                 let input = if a(0).is_some_and(|v| !v.is_null()) {
                     vec![("makes", p(0)?)]

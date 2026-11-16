@@ -1348,6 +1348,7 @@ export function orderDoing(
   if (o?.kind === 'store') return o.phase === 'refilling' ? 'Taking food along' : 'Storing goods'
   if (o?.kind === 'fetch') return 'Fetching goods'
   if (o?.kind === 'tearDown') return 'Tearing down'
+  if (o?.kind === 'repair') return 'Repairing'
   if (o?.kind === 'breed') return 'Breeding horses'
   if (o?.kind === 'build') {
     const what = BUILDING_NAMES[o.building].toLowerCase()
@@ -3058,9 +3059,7 @@ export function ResidentCard({
                 Name {r.name} your realm’s heir, to carry it on
                 {heirName ? ` in place of ${heirName}` : ''}? Free and at once, from anywhere.
               </p>
-              {makeLeader.heir.problem && (
-                <p className="muted small">{makeLeader.heir.problem}.</p>
-              )}
+              {makeLeader.heir.problem && <p className="muted small">{makeLeader.heir.problem}.</p>}
               <div className="order-buttons">
                 <button
                   type="button"

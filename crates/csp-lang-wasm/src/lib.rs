@@ -164,12 +164,13 @@ fn binding_json(b: &ScriptBinding) -> Value {
 
 /// The order `DEFAULT_SCRIPTS` lists the default scripts in `default-scripts.ts`, which the
 /// Library's template picker shows them in; not the order of `TASKS`.
-pub const DEFAULT_SCRIPTS_ORDER: [Task; 11] = [
+pub const DEFAULT_SCRIPTS_ORDER: [Task; 12] = [
     Task::Work,
     Task::Build,
     Task::BuildLine,
     Task::Haul,
     Task::TearDown,
+    Task::Repair,
     Task::Breed,
     Task::FeedStable,
     Task::Train,

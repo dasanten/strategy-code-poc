@@ -997,6 +997,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 description: "How the vein of a workplace on a node stands: \"plenty\", \"thinning\", \"nearlyGone\", or \"endless\" for a node that never runs dry; never a number.",
                 null_when: Some("for any other building, a construction site, a mine whose vein ran dry, and while neither my realm nor an ally has a resident working it"),
             },
+            ScriptField {
+                name: "condition",
+                r#type: ScriptType::String,
+                description: "How it has decayed: \"good\", \"worn\" or \"nearlyRuin\"; a worn one, or worse, can be repaired (`repair`).",
+                null_when: Some("for a construction site and a building that never decays"),
+            },
         ],
     },
     ScriptView {
@@ -2475,6 +2481,14 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         returns: ScriptType::List(&ScriptType::View("material")),
     },
     ScriptBinding {
+        name: "repairNeeded",
+        is: Is::Query,
+        params: &["building"],
+        cost: 1.0,
+        description: "The materials a repair of a worn building still lacks, as a list like [{good: \"wood\", units: 2}]; empty once it has them all, and for a building in good condition.",
+        returns: ScriptType::List(&ScriptType::View("material")),
+    },
+    ScriptBinding {
         name: "lineTiles",
         is: Is::Query,
         params: &["line", "from?"],
@@ -2768,6 +2782,14 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         params: &["buildingId"],
         cost: 10.0,
         description: "Tear down the building or site on my tile.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "repair",
+        is: Is::Action,
+        params: &["buildingId"],
+        cost: 10.0,
+        description: "Repair the worn building on my tile: what I carry of the materials it lacks goes in, then my work; once it has all of both it is good again. My order is \"repair\" until done.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -4479,6 +4501,171 @@ fn placeName(b) {
 }
 
 // The units of goods in load for my log: "10 stone, 4 wood".
+fn goodsText(load, goods) {
+  let text = ""
+  for (g of goods) {
+    let n = load[g]
+    if (n != null && n >= 1) {
+      if (text != "") { text = text + ", " }
+      text = text + floor(n) + " " + g
+    }
+  }
+  return text
+}
+"#,
+    ),
+    (
+        Task::Repair,
+        "Repair",
+        r#"// Repair (default): repair params.building, or while none is picked the
+// building on my tile when I start, kept in memory.buildingId, until it is
+// good again; then end. With none, or one in good condition, I end. While
+// the repair lacks materials and I carry none of them, I fetch what it
+// lacks at params.source, else the nearest storage of my realm holding
+// some, and come back; with none in any storage I end, saying so. Away
+// from it, I walk there first.
+param building: building // the building to repair; none: the one I stand on
+param source: storage // where materials come from; a carriage too; none: the nearest storage holding them
+
+if (!pickBuilding()) { return }
+let target = building(memory.buildingId)
+if (target == null) { target = params.building } // picked out of sight: as last seen
+if (target == null) {
+  end("the building is gone")
+  return
+}
+if (memory.started && target.condition == "good") {
+  log("repaired " + placeName(target))
+  end()
+  return
+}
+if (me.order != null && me.order.kind != "repair") { // on my way, or fetching
+  wait()
+  return
+}
+let missing = repairNeeded(target)
+if (missing.length > 0 && carriedOf(me, missing) == null) {
+  fetchMissing(target, missing)
+} else if (me.order == null) { startRepairing(target) }
+
+// What I repair: the one picked, else the one I started on, kept in
+// memory.buildingId. False once I end: there is none.
+fn pickBuilding() {
+  if (params.building != null) { memory.buildingId = params.building.id }
+  if (memory.buildingId == null) {
+    let here = buildingAt(me.x, me.y)
+    if (here == null) {
+      end("no building on their tile")
+      return false
+    }
+    memory.buildingId = here.id
+  }
+  return true
+}
+
+// Repairing it; somewhere else, I walk there first, once a leg. Turned
+// down, such as in good condition, repair says why: done.
+fn startRepairing(target) {
+  let problem = repair(target.id)
+  if (problem == "the resident is not at that building") {
+    if (memory.walked) {
+      end("no way to " + placeName(target))
+      return
+    }
+    memory.walked = true
+    if (walkTo(target.x, target.y) == null) { wait() } // until I am there
+    log("walking to " + placeName(target) + " to repair it")
+    return
+  }
+  if (problem != null) {
+    log(problem)
+    end()
+    return
+  }
+  memory.started = true
+  memory.walked = false
+  log("repairing " + placeName(target))
+}
+
+// Fetching what the repair lacks: at params.source while it holds some,
+// else the nearest storage of my realm holding some. With none, I end.
+fn fetchMissing(target, missing) {
+  let goods = goodsOf(missing)
+  let from = materialsFrom(target, goods)
+  if (from == null) {
+    end("no " + goodsList(goods) + " in any storage")
+    return
+  }
+  let load = {}
+  for (m of missing) { load[m.good] = m.units }
+  let problem = fetch(load, from.id)
+  if (problem != null) {
+    log(problem)
+    end()
+    return
+  }
+  memory.walked = false
+  wait() // until I have it
+  log("fetching " + goodsText(load, goods) + " at " + placeName(from) + " for the repair")
+}
+
+// Where materials come from: params.source while it holds some of goods,
+// else the nearest storage of my realm holding some; null with none.
+fn materialsFrom(target, goods) {
+  let from = params.source
+  if (from != null) {
+    let held = from.stock
+    if (held == null) { held = from.load } // a carriage
+    if (held != null) {
+      for (g of goods) {
+        if (held[g] != null && held[g] > 0) { return from }
+      }
+    }
+  }
+  let stores = storages(target, goods) // nearest first, holding some
+  if (stores.length == 0) { return null }
+  return stores[0]
+}
+
+// What someone carries of what the repair lacks; null if nothing.
+fn carriedOf(r, missing) {
+  let load = null
+  for (m of missing) {
+    let n = r.carried[m.good]
+    if (n != null && n > 0) {
+      if (n > m.units) { n = m.units }
+      if (load == null) { load = {} }
+      load[m.good] = n
+    }
+  }
+  return load
+}
+
+// The goods of what the repair lacks.
+fn goodsOf(missing) {
+  let goods = []
+  for (m of missing) { goods[goods.length] = m.good }
+  return goods
+}
+
+// The goods for my log: "wood or stone".
+fn goodsList(goods) {
+  let text = ""
+  for (g of goods) {
+    if (text != "") { text = text + " or " }
+    text = text + g
+  }
+  return text
+}
+
+// A building or carriage for my log: "the house at 12,6".
+fn placeName(b) {
+  let kind = b.kind
+  if (kind == null) { kind = "carriage" }
+  return "the " + kind + " at " + b.x + "," + b.y
+}
+
+// The units of goods in load for my log: "1 stone, 2 wood".
 fn goodsText(load, goods) {
   let text = ""
   for (g of goods) {
