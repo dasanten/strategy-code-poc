@@ -63,14 +63,28 @@ pub(crate) fn field_str<'a>(order: &'a OrderRequest, name: &str) -> Option<&'a s
 }
 
 /// A step that never ends on its own (`neverEnds`): working a workplace, a haul route, feeding a
-/// stable, teaching or training.
+/// stable (but not once: [`feeds_once`]), teaching or training.
 pub fn never_ends(order: &OrderRequest) -> bool {
     if ["workAt", "haul", "teach"].contains(&order.kind.as_str()) {
         return true;
     }
-    order.kind == "task"
+    !feeds_once(order)
+        && order.kind == "task"
         && field_str(order, "task")
             .is_some_and(|t| ["work", "haul", "feedStable", "train"].contains(&t))
+}
+
+/// A Feed the stable step that runs a single round (its `once` param above 0), ending once the
+/// stable is full (`CONTEXT.md`: Feeding the stable, Once).
+pub fn feeds_once(order: &OrderRequest) -> bool {
+    order.kind == "task"
+        && field_str(order, "task") == Some("feedStable")
+        && order
+            .fields
+            .get("params")
+            .and_then(|p| p.get("once"))
+            .and_then(Value::as_f64)
+            .is_some_and(|n| n > 0.0)
 }
 
 /// A whole-number tile `{ x, y }`, as `stepLine` reads one.
@@ -560,5 +574,15 @@ mod tests {
         );
         assert!(never_ends(&order(json!({ "kind": "task", "task": "train" }))));
         assert!(!never_ends(&order(json!({ "kind": "walkTo" }))));
+    }
+
+    #[test]
+    fn feeding_the_stable_never_ends_unless_once() {
+        let feed = json!({ "kind": "task", "task": "feedStable", "stableId": "s1" });
+        assert!(never_ends(&order(feed.clone())));
+        let mut once = feed;
+        once["params"] = json!({ "once": 1 });
+        assert!(feeds_once(&order(once.clone())));
+        assert!(!never_ends(&order(once)));
     }
 }

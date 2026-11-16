@@ -1011,8 +1011,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       (r) => r.scriptParams,
     )
     // Customise on a step, or a param it can't go without (`CONTEXT.md`: Before it starts).
+    // What the step gives itself (Feed the stable once's `once`) stays beside what is picked.
+    const given = order.params as StartParamValues | undefined
     const add = (params?: StartParamValues) =>
-      addStepOrder({ ...order, ...(params && { params }) }, at, planned.after)
+      addStepOrder(
+        { ...order, ...(params && { params: { ...params, ...given } }) },
+        at,
+        planned.after,
+      )
     if (!opensForm(order, keptBy, add)) await add()
   }
   /**

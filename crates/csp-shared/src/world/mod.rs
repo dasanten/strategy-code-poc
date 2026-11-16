@@ -344,6 +344,12 @@ pub struct Queue {
     #[serde(default, skip_serializing_if = "is_false")]
     #[ts(as = "Option<bool>", optional)]
     pub started: bool,
+    /// The name the queue was given under, as a saved queue's (`CONTEXT.md`: Saved queue): the
+    /// stable hand's "Farm and feed" (`CONTEXT.md`: Starting city). A queue the Player gives has
+    /// none; editing keeps it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub name: Option<String>,
 }
 
 fn is_false(b: &bool) -> bool {

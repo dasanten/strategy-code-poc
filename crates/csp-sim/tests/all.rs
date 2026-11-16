@@ -138,6 +138,8 @@ mod sight_fixtures;
 mod smithy;
 #[path = "smoke.rs"]
 mod smoke;
+#[path = "stable_hand.rs"]
+mod stable_hand;
 #[path = "stealing.rs"]
 mod stealing;
 #[path = "stealing_horse.rs"]

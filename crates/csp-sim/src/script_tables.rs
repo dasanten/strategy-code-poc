@@ -4687,10 +4687,13 @@ fn goodsText(load, goods) {
 // stand in when I start, kept in memory.stableId; with none, or once it is
 // gone, I end. Below that I fetch what is missing from params.source, or
 // the nearest storage of my realm with Food while none is picked, and store
-// it in the stable; otherwise I wait there. memory.spareFood, kept only by an
-// NPC city's feeder, is the most Food I may take now.
+// it in the stable; otherwise I wait there. With params.once I feed it a
+// single round: once it is full, or with no Food to fetch, I end.
+// memory.spareFood, kept only by an NPC city's feeder, is the most Food I may
+// take now.
 param stable: storage // the stable to feed; none: the one I stand in
 param source: storage // where the Food comes from; a carriage too; none: the nearest storage with Food
+param once: number = 0 // 1: a single round, then end; 0: keep it fed
 let days = 10 // game days of Food to keep
 let perHorse = 0.75 // Food a horse eats a game day
 let side = 3 // tiles along each side of a stable
@@ -4738,12 +4741,16 @@ fn storeFetched(stable) {
 }
 
 // Below the Food to keep for the horses in it now: fetch what is missing.
-// True once I set off.
+// True once I set off, or once I end (params.once).
 fn fetchIfLow(stable) {
   let held = 0
   if (stable.stock != null && stable.stock.food != null) { held = stable.stock.food }
   let need = horsesIn(stable) * days * perHorse - held
   if (need <= 0) {
+    if (params.once > 0) {
+      end("the stable is full")
+      return true
+    }
     say("enough Food in the stable: waiting")
     return false
   }
@@ -4760,6 +4767,10 @@ fn fetchIfLow(stable) {
       say("stable low (" + floor(held) + "): fetching " + units + " Food at " + placeName(from))
       return true
     }
+  }
+  if (params.once > 0) {
+    end("no Food to fetch")
+    return true
   }
   say("stable low (" + floor(held) + "): no Food to fetch, waiting")
   return false

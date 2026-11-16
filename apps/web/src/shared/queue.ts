@@ -64,13 +64,25 @@ export function runsScript(order: Pick<OrderRequest, 'kind'>): boolean {
 
 /**
  * A step that never ends on its own: working a workplace, a haul route, feeding a stable,
- * teaching or training.
+ * teaching or training. Feeding the stable once ends (`feedsOnce`).
  */
 export function neverEnds(order: OrderRequest): boolean {
   if (['workAt', 'haul', 'teach'].includes(order.kind)) return true
   return (
-    order.kind === 'task' && ['work', 'haul', 'feedStable', 'train'].includes(order.task as string)
+    !feedsOnce(order) &&
+    order.kind === 'task' &&
+    ['work', 'haul', 'feedStable', 'train'].includes(order.task as string)
   )
+}
+
+/**
+ * A Feed the stable step that runs a single round, its `once` param above 0, ending once the
+ * stable is full (`CONTEXT.md`: Feeding the stable, Once).
+ */
+export function feedsOnce(order: OrderRequest): boolean {
+  if (order.kind !== 'task' || order.task !== 'feedStable') return false
+  const once = (order.params as Record<string, unknown> | undefined)?.once
+  return typeof once === 'number' && once > 0
 }
 
 /**
