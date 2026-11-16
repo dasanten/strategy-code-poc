@@ -40,7 +40,8 @@ fn every_side_sees_what_it_sees_in_typescript() {
             let seen = entities_in_sight(&world, &index, Some(side), None);
             let want = &without_hire_spare(want.clone());
             let seen_json = without_hire_spare(serde_json::to_value(&*seen).unwrap());
-            assert_same_json(&what, want, &common::without_coal(&seen_json));
+            let (want_now, seen_now) = as_equipment_shows(want, &seen_json);
+            assert_same_json(&what, &want_now, &common::without_coal(&seen_now));
             compared += seen.len();
             kinds.extend(seen.iter().map(|e| e.is()));
             // Through a cache, and the buildings looked up by square, the same.
@@ -73,6 +74,37 @@ fn every_side_sees_what_it_sees_in_typescript() {
 /// Leaves out how many residents an NPC city would lend (`hire.spare`): since T96.3 (ADR 0033) an
 /// NPC city lends only its plan's spare hands and nobody while it feels threatened, which the
 /// TypeScript fixtures predate. `queries::npc_trade` and `npc_hire` test it in Rust.
+/// Since T107.3 (`CONTEXT.md`: Equipment, Seeing it) another realm's resident shows what they have
+/// equipped and not their pack, unless one of the side's residents stands on their tile; the
+/// TypeScript fixtures predate both. Leaves out `equipped` and, for each resident whose pack is no
+/// longer sent, the fixture's `carried`, so every pack still sent is compared. `tests/equipment.rs`
+/// (`seen`) tests the new rule.
+fn as_equipment_shows(want: &Value, seen: &Value) -> (Value, Value) {
+    let hidden: std::collections::HashSet<&str> = seen
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|e| e["is"] == "resident" && e["carried"].as_object().is_some_and(|c| c.is_empty()))
+        .filter_map(|e| e["id"].as_str())
+        .collect();
+    let strip = |v: &Value, blank: bool| {
+        let mut v = v.clone();
+        for e in v.as_array_mut().into_iter().flatten() {
+            if e["is"] != "resident" {
+                continue;
+            }
+            let id = e["id"].as_str().unwrap_or_default().to_string();
+            let o = e.as_object_mut().expect("an entity");
+            o.remove("equipped");
+            if blank && hidden.contains(id.as_str()) {
+                o.insert("carried".into(), Value::Object(Default::default()));
+            }
+        }
+        v
+    };
+    (strip(want, true), strip(seen, false))
+}
+
 fn without_hire_spare(mut v: Value) -> Value {
     for e in v.as_array_mut().into_iter().flatten() {
         if let Some(hire) = e.get_mut("hire").and_then(Value::as_object_mut) {

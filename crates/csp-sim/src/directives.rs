@@ -487,7 +487,7 @@ pub fn count_soldiers_killed(world: &mut WorldState, killed: &[Resident]) {
                 .iter()
                 .filter(|r| {
                     let org = r.owner.as_deref().or(r.city_id.as_deref()).unwrap_or("");
-                    is_armed(&r.carried) && orgs.iter().any(|o| o == org)
+                    is_armed(r) && orgs.iter().any(|o| o == org)
                 })
                 .count() as f64
         })

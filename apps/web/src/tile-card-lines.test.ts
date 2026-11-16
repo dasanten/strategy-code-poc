@@ -759,34 +759,34 @@ describe('who is on the way to a storage or stable (CONTEXT.md: Goods on cards)'
 })
 
 describe('strangers on a tile’s card', () => {
-  it('says which weapons and armour a stranger carries, and nothing else they carry', () => {
-    const armed = resident({ carried: { sword: 1, shield: 1, food: 3, coins: 50 } })
+  it('says which weapons and armour a stranger has equipped, and nothing else (Equipment, Seeing it)', () => {
+    const armed = resident({ equipped: { weapon: 'sword', shield: 'shield' } })
     expect(linesOf({ strangers: [armed] })).toContain(
       'Brann · Another realm · armed: sword, shield',
     )
-    expect(linesOf({ strangers: [resident({ carried: { armour: 1 } })] })).toContain(
+    expect(linesOf({ strangers: [resident({ equipped: { armour: 'armour' } })] })).toContain(
       'Brann · Another realm · unarmed, with armour',
     )
     expect(linesOf({ strangers: [resident({ carried: { food: 2 } })] })).toContain(
       'Brann · Another realm',
     )
-    const steel = resident({ carried: { steelSword: 1, steelArmour: 1 } })
+    const steel = resident({ equipped: { weapon: 'steelSword', armour: 'steelArmour' } })
     expect(linesOf({ strangers: [steel] })).toContain(
       'Brann · Another realm · armed: steel sword, steel armour',
     )
   })
 
   it('counts an army of strangers on the tile as soldiers', () => {
-    const marching = (id: string, carried: Resident['carried']) =>
+    const marching = (id: string, equipped: Resident['equipped']) =>
       resident({
         id,
-        carried,
+        equipped,
         order: { kind: 'walkTo', target: { x: 9, y: 9 }, path: null, progress: 0, army: 'a1' },
       })
     const strangers = [
-      ...Array.from({ length: 12 }, (_, i) => marching(`s${i}`, { spear: 1 })),
+      ...Array.from({ length: 12 }, (_, i) => marching(`s${i}`, { weapon: 'spear' })),
       marching('u', {}),
-      resident({ id: 'x', carried: { sword: 1 } }),
+      resident({ id: 'x', equipped: { weapon: 'sword' } }),
       resident({ id: 'y' }),
     ]
     expect(linesOf({ strangers })).toEqual(

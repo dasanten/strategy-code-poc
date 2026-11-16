@@ -185,7 +185,7 @@ fn crew_holds(
             r.id == id
                 && r.health > 0.0
                 && !is_down(r.down_until)
-                && (!armed || is_armed(&r.carried))
+                && (!armed || is_armed(r))
                 && wrap_distance(size, (r.x as i32, r.y as i32), at) <= CARAVAN_GUARD_RANGE
         })
     };

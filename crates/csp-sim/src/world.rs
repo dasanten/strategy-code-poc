@@ -196,6 +196,10 @@ pub fn step_world(
         }
     }
     let size = terrain.size;
+    // Gear picked up or put down outside a tick (or set up by hand, or a save from before
+    // Equipment) fills or empties slots before anyone looks at who is armed (`CONTEXT.md`:
+    // Equipment).
+    crate::equipment::settle_all(world);
     // What the scripts saw is gone once the world steps (`SightCache`).
     scratch.new_sight_phase();
     let (survival, horses_died) = time(timer, TickPhase::Rest, || {
@@ -212,8 +216,13 @@ pub fn step_world(
         step_npc_defence(world, size, scratch);
         step_trade_org_army(world, size, scratch);
         step_npc_hire(world, size, scratch);
+        // Gear handed out with lent soldiers is theirs to fight with now.
+        crate::equipment::settle_all(world);
         step_punishments(world, size, scratch);
         npc_plan_ms = step_npc_cities(world, size, terrain, reborrow(&mut walking), scratch);
+        // The game's cities, posts and hirers armed and disarmed residents: scripts see the
+        // slots filled.
+        crate::equipment::settle_all(world);
         let runs = run_npc_scripts(world, terrain, scratch);
         // Whatever the game's own cities gave someone Down ends before they act on it.
         keep_down_still(world);
@@ -237,6 +246,8 @@ pub fn step_world(
         // A fight or an army may have given someone Down an order; it ends with the tick.
         keep_down_still(world);
     });
+    // Last, whatever else moved goods this tick (work, trades, offers, loot, a capture).
+    crate::equipment::settle_all(world);
     // The orders the world advanced in place this tick are still the ones scripts wait on.
     scratch.waiting.settle(world);
     StepResult { npc_script_runs, npc_plan_ms, survival, horses_died, ..result }
@@ -257,6 +268,8 @@ fn step_rest(
     // A lent resident never acts against the city that lent them (`CONTEXT.md`: Hiring from an
     // NPC city).
     crate::lent::drop_orders_against_lender(world);
+    // Whatever the scripts moved is equipped before blows are struck.
+    crate::equipment::settle_all(world);
     let strikes = request_strikes(world, size);
     let strikes_len = strikes.len();
     let combat = resolve_strikes(world, &strikes, size, &mut GameAlarms, &mut scratch.made);
@@ -270,7 +283,11 @@ fn step_rest(
     carries.extend(request_road_materials(world, scratch));
     let carries_len = carries.len();
     resolve_carrying_on(world, &carries, size, Some(terrain));
+    // Gear picked up or put down this tick fills or empties its slot at once.
+    crate::equipment::settle_all(world);
     step_feeding(world, size, scratch);
+    // Gear swapped or taken off this tick is in or out of its slot before anything else counts it.
+    crate::equipping::step_equipping(world);
     let payments = resolve_payments(world);
     let purchases = resolve_purchases(world, size);
     let trades = resolve_trades(world, size, &mut scratch.trades);

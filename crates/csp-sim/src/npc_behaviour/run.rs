@@ -336,7 +336,7 @@ fn run_city(
     for &i in &adults {
         let rid = world.residents[i].id.clone();
         let job = jobs.get(&rid).cloned();
-        let armed = is_armed(&world.residents[i].carried);
+        let armed = is_armed(&world.residents[i]);
         // The pass just now gave a soldier another post: a walk to their old one ends here.
         if passed && has_posts && armed {
             let post = post_of(world, &city, &adults, size, terrain, &mut posts, &rid);
