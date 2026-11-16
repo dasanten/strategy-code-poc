@@ -1297,6 +1297,15 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
    * Gives the picked resident the Tear down task for the building or site on their tile: they
    * run the Player's Tear down (default) script.
    */
+  /**
+   * Gives the picked resident the Repair task for a worn building (`CONTEXT.md`: Repairing): they
+   * run the Player's Repair (default) script, walking there and fetching what it lacks.
+   */
+  async function repair(buildingId: string) {
+    if (!selected) return
+    const order = { kind: 'task', task: 'repair', residentId: selected.id, buildingId }
+    setOrderError(await giveOrder(order))
+  }
   async function tearDown(buildingId: string) {
     if (!selected) return
     const order = { kind: 'task', task: 'tearDown', residentId: selected.id, buildingId }
@@ -2271,6 +2280,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
             }
             mapSize={world.map.size}
             onFeed={(targetId, units) => void feed(targetId, units)}
+            onRepair={(buildingId) => void repair(buildingId)}
             onPickUp={async (residentId, spot, goods) =>
               setOrderError(await giveOrder({ kind: 'pickUp', residentId, spot, goods }))
             }

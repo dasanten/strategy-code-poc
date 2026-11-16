@@ -177,6 +177,7 @@ const TASK_ORDER: Record<Task, ResidentOrder['kind'] | undefined> = {
   buildLine: 'build',
   haul: 'haul',
   tearDown: 'tearDown',
+  repair: 'repair',
   breed: 'breed',
   feedStable: undefined,
   train: 'train',
@@ -206,6 +207,7 @@ function taskLine(task: Task, building: SeenScript['building'], site?: true): st
   if (task === 'buildLine')
     return name ? `Building ${article(name)} ${name} line` : 'Building a line'
   if (task === 'tearDown') return name ? `Tearing down the ${name}` : 'Tearing down'
+  if (task === 'repair') return name ? `Repairing the ${name}` : 'Repairing'
   if (task === 'feedStable') return 'Feeding the stable'
   if (task === 'train') return 'Training'
   if (task === 'defend') return 'Defending'

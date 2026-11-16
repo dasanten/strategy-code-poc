@@ -103,6 +103,7 @@ pub mod region_map;
 pub mod regions;
 pub mod relocating;
 pub mod renaming;
+pub mod repair;
 pub mod residents;
 pub mod reviving;
 pub mod riding;

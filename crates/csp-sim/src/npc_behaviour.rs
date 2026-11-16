@@ -35,6 +35,7 @@ pub fn is_npc_order(o: &ResidentOrder) -> bool {
             | ResidentOrder::WorkAt(_)
             | ResidentOrder::Build(_)
             | ResidentOrder::TearDown(_)
+            | ResidentOrder::Repair(_)
             | ResidentOrder::Breed(_)
             | ResidentOrder::Attack(_)
             | ResidentOrder::Trade(_)

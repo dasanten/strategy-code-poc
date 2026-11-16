@@ -116,6 +116,8 @@ mod processing;
 mod queries;
 #[path = "relocate_steps.rs"]
 mod relocate_steps;
+#[path = "repairing.rs"]
+mod repairing;
 #[path = "residents_stepped.rs"]
 mod residents_stepped;
 #[path = "road_line.rs"]

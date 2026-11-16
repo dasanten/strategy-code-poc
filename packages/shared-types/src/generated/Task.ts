@@ -3,4 +3,4 @@
 /**
  * The tasks that run a default script (`TASKS`).
  */
-export type Task = "work" | "build" | "haul" | "tearDown" | "breed" | "feedStable" | "defend" | "train" | "buildLine" | "explore" | "alarm";
+export type Task = "work" | "build" | "haul" | "tearDown" | "repair" | "breed" | "feedStable" | "defend" | "train" | "buildLine" | "explore" | "alarm";

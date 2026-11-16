@@ -962,6 +962,59 @@ pub fn tear_down_orders_on_buildings(world: &WorldState, _: &TerrainMap) -> Out 
     out
 }
 
+/// A building's condition stays within its range: what it lost to decay is between nothing and
+/// all of it, only on a finished building of a kind that decays; a repair under way is on one too,
+/// and holds no more of each material, nor work, than a repair takes (`CONTEXT.md`: Decay,
+/// Repairing).
+pub fn conditions_in_range(world: &WorldState, _: &TerrainMap) -> Out {
+    use crate::repair::{decays, repair_materials, repair_work};
+    let name = "conditions-in-range";
+    let mut out = Vec::new();
+    for b in &world.buildings {
+        let mut fail = |m: String| out.push(violation(name, format!("{} {m}", b.id), &[&b.id]));
+        if let Some(d) = b.decay {
+            if !(0.0..=1.0).contains(&d) {
+                fail(format!("has lost {} of its condition", js_number(d)));
+            }
+            if !decays(b) {
+                fail("has decayed but never decays".into());
+            }
+        }
+        let Some(repair) = &b.repair else { continue };
+        if !decays(b) {
+            fail("is being repaired but never decays".into());
+        }
+        let materials = repair_materials(b.kind);
+        for (good, units) in &repair.delivered {
+            let most = materials.get(good).copied().unwrap_or(0.0);
+            if !(*units >= 0.0 && *units <= most) {
+                fail(format!("has {} {good:?} for its repair of {}", js_number(*units), most));
+            }
+        }
+        let work = repair_work(b.kind);
+        if !(repair.work >= 0.0 && repair.work <= work) {
+            fail(format!("has repair work {} of {}", js_number(repair.work), js_number(work)));
+        }
+    }
+    out
+}
+
+/// A resident with a repair order stands at that building, and it is still there.
+pub fn repair_orders_on_buildings(world: &WorldState, _: &TerrainMap) -> Out {
+    let name = "repair-orders-on-buildings";
+    let mut out = Vec::new();
+    for r in &world.residents {
+        let Some(ResidentOrder::Repair(o)) = &r.order else { continue };
+        let b = world.buildings.iter().find(|x| x.id == o.building_id);
+        if b.is_some_and(|b| at_building(r.x, r.y, b)) {
+            continue;
+        }
+        let msg = format!("resident {} repairs {}, which they don’t stand at", r.id, o.building_id);
+        out.push(violation(name, msg, &[&r.id, &o.building_id]));
+    }
+    out
+}
+
 /// Realm logs stay in order and in bounds (`realmLogsInOrder`).
 pub fn realm_logs_in_order(world: &WorldState, _: &TerrainMap) -> Out {
     let name = "realm-logs-in-order";
@@ -2002,9 +2055,9 @@ pub fn carrying_doesnt_work(world: &WorldState, _: &TerrainMap) -> Out {
 }
 
 /// Orders only a grown resident can hold (`ADULT_ORDERS`).
-const ADULT_ORDERS: [&str; 10] = [
-    "build", "roadLine", "wallLine", "tearDown", "workAt", "teach", "train", "breed", "drive",
-    "feed",
+const ADULT_ORDERS: [&str; 11] = [
+    "build", "roadLine", "wallLine", "tearDown", "repair", "workAt", "teach", "train", "breed",
+    "drive", "feed",
 ];
 
 /// Children don't work until they are grown (`childrenDontWork`).
