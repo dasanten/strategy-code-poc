@@ -26,6 +26,7 @@ use crate::water_hauling::stop_tile;
 
 use crate::armies::waiting_for_army;
 use crate::caravans::waiting_for_escort;
+use crate::combat::strikes_from_here;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::{int_field, str_field, OrderKind};
 use crate::pathfinding::{
@@ -508,8 +509,21 @@ fn arrive(world: &mut WorldState, i: usize) {
 }
 
 /// An attack order that need not walk this tick (`attackHolds`): its target is gone or in
-/// contact. One whose path no longer ends in contact with its target finds a new one.
+/// contact, or an archer can shoot it from where they stand (`CONTEXT.md`: Ranged combat). One
+/// whose path no longer ends in contact with its target finds a new one.
 fn attack_holds(world: &mut WorldState, i: usize, size: i32) -> bool {
+    let r = &world.residents[i];
+    let Some(o) = &r.order else { return false };
+    if let ResidentOrder::Attack(a) = o {
+        let target = world.residents.iter().position(|t| t.id == a.target_id);
+        if target.is_some_and(|t| t != i && strikes_from_here(world, size, i, t)) {
+            if let Some(ResidentOrder::Attack(a)) = &mut world.residents[i].order {
+                a.path = None;
+                a.progress = 0.0;
+            }
+            return true;
+        }
+    }
     let r = &world.residents[i];
     let Some(o) = &r.order else { return false };
     let target = target_of(world, o);

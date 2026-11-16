@@ -432,6 +432,26 @@
     "bow": 0.0,
     "crossbow": 0.0
   },
+  "SHOT_REACH": {
+    "bow": 8.0,
+    "crossbow": 5.0
+  },
+  "SHOT_TICKS": {
+    "bow": 3.0,
+    "crossbow": 6.0
+  },
+  "SHOT_DAMAGE": {
+    "bow": 6.0,
+    "crossbow": 14.0
+  },
+  "SHOT_SKILL_LIMIT": {
+    "bow": 2.0,
+    "crossbow": 0.25
+  },
+  "SHOT_PIERCE": {
+    "bow": 0.0,
+    "crossbow": 0.5
+  },
   "PROTECTION_DEFENCE": {
     "shield": 3.0,
     "armour": 5.0,

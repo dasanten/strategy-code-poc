@@ -303,6 +303,11 @@ import {
   WAREHOUSE_BASE_PRICE,
   WAREHOUSE_FLOOR,
   WEAPON_ATTACK,
+  SHOT_REACH,
+  SHOT_TICKS,
+  SHOT_DAMAGE,
+  SHOT_SKILL_LIMIT,
+  SHOT_PIERCE,
   WORK_SKILL_EFFECT,
   WORK_SKILL_MAX,
   WORKPLACE_MAX_WORKERS,
@@ -3422,6 +3427,43 @@ export function Wiki() {
                 </td>
                 <td>{num(forged(g).output[g] ?? 0)}</td>
                 <td>{num(GOOD_WEIGHT[g])} kg each</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <h3>Ranged combat</h3>
+        <p>
+          An armed resident with a Bow or Crossbow equipped <strong>shoots</strong> anyone they may
+          strike whom they see within their weapon's <strong>reach</strong>, in tiles, contact
+          included: given an attack order, they walk only until the target is in reach and shoot
+          from there. Each shot uses up one Arrow they carry, whether it lands or not; out of Arrows
+          they fight with their fists and have to walk into contact. Nothing blocks a shot for now.
+          A shot is a strike like a blow: the one hit is under attack and fights back or flees,
+          their city's alarm goes, and it is a crime where a blow would be. Agility dodges a shot
+          as it does a blow, and a shield and armour take damage off it, but a Crossbow's bolt goes
+          through part of them. Strength adds nothing to a shot; Combat skill makes a Bow much
+          better, a Crossbow only a little.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Weapon</th>
+              <th>Reach</th>
+              <th>A shot every</th>
+              <th>Damage</th>
+              <th>At full Combat skill</th>
+              <th>Through armour</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(['bow', 'crossbow'] as const).map((w) => (
+              <tr key={w}>
+                <td>{goodName(w)}</td>
+                <td>{num(SHOT_REACH[w] ?? 0)} tiles</td>
+                <td>{duration(SHOT_TICKS[w] ?? 0)}</td>
+                <td>{num(SHOT_DAMAGE[w] ?? 0)}</td>
+                <td>{num((SHOT_DAMAGE[w] ?? 0) * (1 + (SHOT_SKILL_LIMIT[w] ?? 0)))}</td>
+                <td>{pct(SHOT_PIERCE[w] ?? 0)}</td>
               </tr>
             ))}
           </tbody>

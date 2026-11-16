@@ -2221,6 +2221,27 @@ pub const COMBAT_SKILL_LIMIT: f64 = 1.0;
 /// The least damage a blow that lands does, however well the one hit is protected.
 pub const MIN_BLOW_DAMAGE: f64 = 1.0;
 
+/// How far a Bow or Crossbow shoots, in tiles (`CONTEXT.md`: Ranged combat), on the ground: a
+/// Bow further than a Crossbow. Contact counts too.
+pub const SHOT_REACH: Table<f64> = Table(&[("bow", 8.0), ("crossbow", 5.0)]);
+
+/// Ticks between two shots (`CONTEXT.md`: Ranged combat): a Bow looses one every three seconds, a
+/// Crossbow, slow to span, one every six. A blow in contact comes every `STRIKE_TICKS`.
+pub const SHOT_TICKS: Table<f64> = Table(&[("bow", 3.0), ("crossbow", 6.0)]);
+
+/// Damage a shot does before Combat skill and armour (`CONTEXT.md`: Ranged combat): Strength adds
+/// nothing. An unskilled Bow does about what an average fist does, a Crossbow hits hard.
+pub const SHOT_DAMAGE: Table<f64> = Table(&[("bow", 6.0), ("crossbow", 14.0)]);
+
+/// The furthest Combat skill raises a shot, as a share of it, reached at the same skill as a blow's
+/// `COMBAT_SKILL_LIMIT`: a master bowman shoots three times as hard as a beginner, a Crossbow
+/// needs little skill.
+pub const SHOT_SKILL_LIMIT: Table<f64> = Table(&[("bow", 2.0), ("crossbow", 0.25)]);
+
+/// Share of the target's shield and armour a shot goes through (`CONTEXT.md`: Ranged combat): a
+/// Crossbow's bolt half of it, an arrow from a Bow none.
+pub const SHOT_PIERCE: Table<f64> = Table(&[("bow", 0.0), ("crossbow", 0.5)]);
+
 /// What a blow that lands does to a defender standing on their own city's wall, as a share of its
 /// damage (`CONTEXT.md`: Walls in combat): a quarter, so a wall's defenders hold out four times
 /// as long.
@@ -2828,6 +2849,11 @@ pub fn balance_json() -> Value {
     m.insert("TRANSFER_FEE_FACTOR".into(), json!(TRANSFER_FEE_FACTOR));
     m.insert("GOOD_WEIGHT".into(), to_value(GOOD_WEIGHT).expect("serialisable"));
     m.insert("WEAPON_ATTACK".into(), to_value(WEAPON_ATTACK).expect("serialisable"));
+    m.insert("SHOT_REACH".into(), to_value(SHOT_REACH).expect("serialisable"));
+    m.insert("SHOT_TICKS".into(), to_value(SHOT_TICKS).expect("serialisable"));
+    m.insert("SHOT_DAMAGE".into(), to_value(SHOT_DAMAGE).expect("serialisable"));
+    m.insert("SHOT_SKILL_LIMIT".into(), to_value(SHOT_SKILL_LIMIT).expect("serialisable"));
+    m.insert("SHOT_PIERCE".into(), to_value(SHOT_PIERCE).expect("serialisable"));
     m.insert("PROTECTION_DEFENCE".into(), to_value(PROTECTION_DEFENCE).expect("serialisable"));
     m.insert("CARRY_BASE".into(), json!(CARRY_BASE));
     m.insert("CARRY_PER_STRENGTH".into(), json!(CARRY_PER_STRENGTH));

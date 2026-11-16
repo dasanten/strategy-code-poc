@@ -499,6 +499,31 @@ export interface Balance {
     crossbow: number
     [key: string]: number
   }
+  readonly SHOT_REACH: {
+    bow: number
+    crossbow: number
+    [key: string]: number
+  }
+  readonly SHOT_TICKS: {
+    bow: number
+    crossbow: number
+    [key: string]: number
+  }
+  readonly SHOT_DAMAGE: {
+    bow: number
+    crossbow: number
+    [key: string]: number
+  }
+  readonly SHOT_SKILL_LIMIT: {
+    bow: number
+    crossbow: number
+    [key: string]: number
+  }
+  readonly SHOT_PIERCE: {
+    bow: number
+    crossbow: number
+    [key: string]: number
+  }
   readonly PROTECTION_DEFENCE: {
     shield: number
     armour: number
