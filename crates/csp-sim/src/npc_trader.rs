@@ -23,6 +23,7 @@ use csp_shared::world::{
 
 use crate::npc_behaviour::{npc_home, walk_to, Jobs};
 use crate::npc_chain::{chain_input, makes, project_needs, reserve_lacks, short_goods};
+use crate::npc_escort::escort_run;
 use crate::npc_plan::farmers_wanted;
 use crate::npc_scouts::knows_node;
 use crate::queries::alliance::allied;
@@ -148,6 +149,15 @@ pub fn send_traders(
         if !sent {
             return;
         }
+        // The run just added is the last; a town's takes its escort (`CONTEXT.md`: Escort).
+        let trader = world.city_plans[&city.id]
+            .traders
+            .as_ref()
+            .and_then(|t| t.last())
+            .map(|t| t.resident_id.clone());
+        if let Some(trader) = trader {
+            escort_run(world, city, adults, &trader, size);
+        }
     }
 }
 
@@ -226,6 +236,7 @@ fn plan_trader(
         sells: Stock::from([(good, units)]),
         buys,
         since: world.tick as f64,
+        escort_ids: Vec::new(),
     };
     add_run(world, &city.id, run);
     jobs.insert(world.residents[r].id.clone(), trade_job());
@@ -304,6 +315,7 @@ fn plan_visit(
         sells,
         buys,
         since: world.tick as f64,
+        escort_ids: Vec::new(),
     };
     add_run(world, &city.id, run);
     jobs.insert(world.residents[r].id.clone(), trade_job());
@@ -369,6 +381,7 @@ fn plan_offer_run(
         sells: Stock::new(),
         buys: Stock::new(),
         since: world.tick as f64,
+        escort_ids: Vec::new(),
     };
     add_run(world, &city.id, run);
     true

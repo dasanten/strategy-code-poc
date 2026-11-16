@@ -455,6 +455,10 @@ pub fn world_invariants() -> Vec<Invariant> {
             name: "npc-traders-sound",
             check: |w, _t| crate::npc_trader::npc_traders_sound(w),
         },
+        Invariant {
+            name: "npc-escorts-sound",
+            check: |w, _t| crate::npc_escort::npc_escorts_sound(w),
+        },
         Invariant { name: "line-orders-sound", check: checks::line_orders_sound },
         Invariant { name: "paths-are-steps", check: checks::paths_are_steps },
         Invariant { name: "one-carrier-at-a-time", check: checks::game_default_carriers },
