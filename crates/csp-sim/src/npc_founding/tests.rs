@@ -5,9 +5,9 @@
 use csp_shared::balance::ticks_for_age;
 use csp_shared::balance::{
     BUILD_MATERIALS, FOOD_PER_DAY, FOOD_SURPLUS_DAYS, NPC_CITY_MIN_DISTANCE,
-    NPC_FOUND_GIVE_UP_DAYS, NPC_FOUND_PARTY_MOST, NPC_FOUND_REACH, NPC_FOUND_STANDING,
-    NPC_FOUND_VILLAGE_RESIDENTS, NPC_FULL_DAYS, NPC_FULL_DAYS_LEAST, NPC_FULL_DIP_DAYS, NPC_TOWN,
-    NPC_TRADE, NPC_VILLAGE, WALK_TICKS_PER_TILE,
+    NPC_FOUND_ESCORT_SHARE, NPC_FOUND_GIVE_UP_DAYS, NPC_FOUND_PARTY_MOST, NPC_FOUND_REACH,
+    NPC_FOUND_STANDING, NPC_FOUND_VILLAGE_RESIDENTS, NPC_FULL_DAYS, NPC_FULL_DAYS_LEAST,
+    NPC_FULL_DIP_DAYS, NPC_TOWN, NPC_TRADE, NPC_VILLAGE, WALK_TICKS_PER_TILE,
 };
 use csp_shared::terrain::{tile_index, wrap_distance, Terrain, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_DAY;
@@ -27,6 +27,7 @@ use crate::npc_behaviour::npc_home;
 use crate::npc_cities::found_npc_city;
 use crate::npc_growth::far_stable_spot;
 use crate::npc_plan::plan_city;
+use crate::npc_posts::posts_to_hold;
 use crate::npc_test_world::{plains, Runner};
 use crate::queries::balance::carry_capacity;
 use crate::queries::city::town_hall_of;
@@ -258,7 +259,10 @@ fn a_big_city_founds_sooner_than_a_week_and_sends_more_with_more_materials() {
             })
         })
         .count();
-    assert_eq!(armed, 1);
+    // Its escort, in proportion to its size (`CONTEXT.md`: Escort).
+    let escort = ((party.len() as f64 * NPC_FOUND_ESCORT_SHARE).floor() as usize).max(1);
+    assert!(escort > 1);
+    assert_eq!(armed, escort);
     let more = founding_materials(Some(npc_founding_party_size(110.0)));
     assert!(held(&more, Good::Wood) > held(&founding_materials(None), Good::Wood));
 }
@@ -453,6 +457,66 @@ fn founds_a_village_480_tiles_away_within_a_few_game_weeks_which_then_feeds_itse
     }));
     let storage = npc_home(&t.world, &village).unwrap();
     assert!(storage.stock.as_ref().map_or(0.0, |s| held(s, Good::Food)) > 0.0);
+}
+
+// its escort (`CONTEXT.md`: Escort)
+
+/// Whether resident `id` carries a weapon.
+fn armed(world: &WorldState, id: &str) -> bool {
+    world.residents.iter().any(|r| r.id == id && crate::queries::residents::is_armed(r))
+}
+
+#[test]
+fn a_founding_party_takes_its_share_of_soldiers_who_stay_as_the_daughters_first() {
+    let days = npc_full_days(110.0);
+    let mut t = full_for(110, days);
+    t.plan_city();
+    let party = t.party();
+    assert!(!party.is_empty());
+    let soldiers: Vec<String> = party.iter().filter(|id| armed(&t.world, id)).cloned().collect();
+    assert_eq!(
+        soldiers.len(),
+        ((party.len() as f64 * NPC_FOUND_ESCORT_SHARE).floor() as usize).max(1)
+    );
+
+    // Its town hall stands on the site: the party, soldiers and all, is the daughter's.
+    let site = t.plan().founding_site.expect("a site");
+    let (_, daughter) = hall_and_city(&mut t.world, site.x, site.y);
+    let city = t.city.clone();
+    assert_eq!(found_daughter(&mut t.world, &city), Some(daughter.clone()));
+    for id in &soldiers {
+        let r = t.world.residents.iter().find(|r| &r.id == id).unwrap();
+        assert_eq!(r.city_id.as_deref(), Some(daughter.as_str()));
+    }
+}
+
+#[test]
+fn a_founding_party_leaves_the_soldiers_on_the_hall_and_at_the_gates_at_home() {
+    let days = npc_full_days(110.0);
+    let mut t = full_for(110, days);
+    let city = t.city().clone();
+    let hold = posts_to_hold(&t.world, &city) as usize;
+    // Just enough soldiers to hold the hall and gates: none to spare.
+    let mut soldiers: Vec<usize> = (0..t.world.residents.len())
+        .filter(|&i| {
+            let r = &t.world.residents[i];
+            r.city_id.as_deref() == Some(&t.city) && crate::queries::residents::is_armed(r)
+        })
+        .collect();
+    soldiers.sort_by(|&a, &b| t.world.residents[a].id.cmp(&t.world.residents[b].id));
+    assert!(soldiers.len() > hold);
+    for &i in &soldiers[hold..] {
+        t.world.residents[i].carried.shift_remove(&Good::Spear);
+    }
+    // Spears for them in the storage, so it is short of none.
+    t.home_stock().insert(Good::Spear, 200.0);
+    let kept: Vec<String> =
+        soldiers[..hold].iter().map(|&i| t.world.residents[i].id.clone()).collect();
+    t.plan_city();
+    let party = t.party();
+    assert_eq!(party.len() as f64, npc_founding_party_size(110.0));
+    assert!(party.iter().all(|id| !kept.contains(id)));
+    assert!(party.iter().all(|id| !armed(&t.world, id)));
 }
 
 // a dip below the reserve

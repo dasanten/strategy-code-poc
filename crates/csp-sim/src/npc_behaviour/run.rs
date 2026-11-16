@@ -18,6 +18,7 @@ use serde_json::{json, Value};
 use super::{default_script, haul, npc_home, put_to_work_making, stop_work, walk_to, workplace_of};
 use crate::npc_chain::chain_makes;
 use crate::npc_chain::{chain_store_index, holds_batch, warehouse_for};
+use crate::npc_escort::{escort_lags, guard_party, run_escort, wait_for_escort};
 use crate::npc_founding::{found_daughter, founding_party, step_founders};
 use crate::npc_growth::{
     city_grows, city_project, is_builder, no_farm, no_storage_yet, npc_builders,
@@ -124,6 +125,7 @@ fn run_city(
     if !party.is_empty() {
         let members: Vec<usize> =
             people.iter().copied().filter(|&i| party.contains(&world.residents[i].id)).collect();
+        guard_party(world, &members, size);
         step_founders(world, city_id, &members, storage, size);
     }
     let Some(city) = world.cities.iter().find(|c| c.id == city_id).cloned() else { return plan_ms };
@@ -344,6 +346,13 @@ fn run_city(
                 world.residents[i].order = None;
             }
         }
+        // A trader's escort keeps with them, walking or not (`CONTEXT.md`: Escort).
+        if city.trade_org.is_none()
+            && (run_escort(world, city_id, i, storage, size)
+                || wait_for_escort(world, city_id, i, size))
+        {
+            continue;
+        }
         if world.residents[i].order.is_some() || world.residents[i].script.is_some() {
             continue;
         }
@@ -375,7 +384,10 @@ fn run_city(
                 .and_then(|p| p.traders.as_ref())
                 .is_some_and(|t| t.iter().any(|t| t.resident_id == rid));
         if trading {
-            run_trader(world, &city, i, storage, size);
+            // Between legs, they wait for their escort to catch up.
+            if !escort_lags(world, city_id, i, size) {
+                run_trader(world, &city, i, storage, size);
+            }
             continue;
         }
         // Carrying a child, they get no work and stand at a house; a load goes into the storage first.

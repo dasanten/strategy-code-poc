@@ -164,6 +164,9 @@ import {
   NPC_FOUND_FOOD_DAYS,
   NPC_FOUND_GIVE_UP_DAYS,
   NPC_FOUND_PARTY_MOST,
+  NPC_FOUND_ESCORT_SHARE,
+  NPC_ESCORT_TOWN_RESIDENTS,
+  NPC_TRADER_ESCORTS,
   NPC_FOUND_REACH,
   NPC_FOUND_RESIDENTS_PER_MEMBER,
   NPC_FOUND_STANDING,
@@ -3074,7 +3077,12 @@ export function Wiki() {
           to the storage. A city has one trader out for each {num(NPC_RESIDENTS_PER_TRADER)} of its
           residents, and a village keeps one; they spread over the goods with surplus, and only with
           no other good to sell does one take a second load of a good already on the road. None go
-          while Food runs short or armed outsiders stand in its area. Nothing protects them on the
+          while Food runs short or armed outsiders stand in its area. A city of{' '}
+          {num(NPC_ESCORT_TOWN_RESIDENTS)} residents or more, a town, sends{' '}
+          {num(NPC_TRADER_ESCORTS)} soldier with each trader as their escort, of the soldiers beyond
+          those on its town hall and at its gates; a village's trader goes alone. The escort keeps
+          pace with the trader, who waits for them on the way, fights whoever goes for them and comes
+          home with them. Nothing else protects them on the
           way; a trader not back after {days(NPC_TRADER_GIVE_UP_DAYS)} is given up, and the city may
           send another.
         </p>
@@ -3101,7 +3109,11 @@ export function Wiki() {
           nearest a node of a material it has none of in reach. A founding party of{' '}
           {num(NPC_VILLAGE.residents)} adults, one more for each{' '}
           {num(NPC_FOUND_RESIDENTS_PER_MEMBER)} residents past {num(NPC_FOUND_VILLAGE_RESIDENTS)} up
-          to {num(NPC_FOUND_PARTY_MOST)}, one of them armed, sets out carrying a town hall's and a
+          to {num(NPC_FOUND_PARTY_MOST)}, sets out. One in{' '}
+          {num(Math.round(1 / NPC_FOUND_ESCORT_SHARE))} of them, rounded down and at least one, is a
+          soldier of its escort, as far as the city has soldiers beyond those on its town hall and at
+          its gates; they fight for the rest on the way and stay as the daughter's first soldiers.
+          The party carries a town hall's and a
           storage's materials, a house's for each {num(HOUSING_ROOM.house ?? 1)} members past{' '}
           {num(NPC_VILLAGE.residents)}, and Food for twice the walk and {days(NPC_FOUND_FOOD_DAYS)}{' '}
           there, and builds the town hall, which founds the daughter: an NPC city of its own with a

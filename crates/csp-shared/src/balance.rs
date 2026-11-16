@@ -1012,6 +1012,19 @@ pub const NPC_FOUND_RESIDENTS_PER_MEMBER: f64 = 10.0;
 /// (`NPC_SURPLUS_CAP`), or a big city could never found on what it makes.
 pub const NPC_FOUND_PARTY_MOST: f64 = 14.0;
 
+/// Residents from which an NPC city counts as a town and sends soldiers along with its traders
+/// (`CONTEXT.md`: Escort); a village's trader goes alone. Between a village's start (`NPC_VILLAGE`)
+/// and a town's (`NPC_TOWN`).
+pub const NPC_ESCORT_TOWN_RESIDENTS: f64 = 12.0;
+
+/// Soldiers a town's trader takes along on a run (`CONTEXT.md`: Escort), on a way not known to be
+/// dangerous.
+pub const NPC_TRADER_ESCORTS: f64 = 1.0;
+
+/// Soldiers a founding party takes per member (`CONTEXT.md`: Escort), rounded down and at least
+/// one, in place of its one armed member: a village's worth (6) takes one, the largest party two.
+pub const NPC_FOUND_ESCORT_SHARE: f64 = 0.2;
+
 /// Random tiles a full NPC city tries in one search for its daughter's site (`CONTEXT.md`:
 /// Founding), once a game day: enough to find free Plains on most maps, cheap enough to do while
 /// it waits.
@@ -2821,6 +2834,9 @@ pub fn balance_json() -> Value {
     m.insert("NPC_FULL_DIP_DAYS".into(), json!(NPC_FULL_DIP_DAYS));
     m.insert("NPC_FOUND_RESIDENTS_PER_MEMBER".into(), json!(NPC_FOUND_RESIDENTS_PER_MEMBER));
     m.insert("NPC_FOUND_PARTY_MOST".into(), json!(NPC_FOUND_PARTY_MOST));
+    m.insert("NPC_ESCORT_TOWN_RESIDENTS".into(), json!(NPC_ESCORT_TOWN_RESIDENTS));
+    m.insert("NPC_TRADER_ESCORTS".into(), json!(NPC_TRADER_ESCORTS));
+    m.insert("NPC_FOUND_ESCORT_SHARE".into(), json!(NPC_FOUND_ESCORT_SHARE));
     m.insert("NPC_FOUND_SAMPLES".into(), json!(NPC_FOUND_SAMPLES));
     m.insert("NPC_FOUND_REACH".into(), json!(NPC_FOUND_REACH));
     m.insert("NPC_FOUND_FOOD_DAYS".into(), json!(NPC_FOUND_FOOD_DAYS));
