@@ -84,7 +84,7 @@ pub fn share_patrols(
             let Some(&i) = here.get(&p.resident_id) else { return true };
             let r = &world.residents[i];
             let soldier = plan.jobs.get(&r.id).is_some_and(|j| j.kind == CityJobKind::Soldier);
-            if !is_armed(&r.carried) || !soldier {
+            if !is_armed(r) || !soldier {
                 return true;
             }
             food_of(r) < HOME_FOOD_LOW && refill_source(world, r, size).is_none()

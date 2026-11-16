@@ -73,8 +73,8 @@ fn every_land_tile_has_one_region_and_the_counts_are_the_balance_numbers() {
         let regions = Regions::of(seed, &map);
         assert_eq!(check_regions(&map, &regions), [], "{seed}-{size}");
         let land = Land::of(&map);
-        for t in 0..map.tiles.len() {
-            assert_eq!(land.group[t] != -1, region_of(&regions, t).is_some(), "{seed}-{size} {t}");
+        for (t, group) in land.group.iter().enumerate().take(map.tiles.len()) {
+            assert_eq!(*group != -1, region_of(&regions, t).is_some(), "{seed}-{size} {t}");
         }
         let count = |k| regions.of_kind(k).filter(|r| r.tiles > 0).count();
         assert_eq!(count(RegionKind::Heartland), HEARTLAND_COUNT as usize);
@@ -158,10 +158,10 @@ fn heartlands_are_mostly_plains_and_do_not_touch() {
         let map = generate_terrain(seed, size);
         let regions = Regions::of(seed, &map);
         let mut heart = [0usize; 3];
-        for t in 0..map.tiles.len() {
+        for (t, byte) in map.tiles.iter().enumerate() {
             let Some(id) = region_of(&regions, t) else { continue };
             let kind = regions.regions[id as usize].kind;
-            let tile = Terrain::from_byte(map.tiles[t]);
+            let tile = Terrain::from_byte(*byte);
             let add = [
                 1,
                 usize::from(tile == Some(Terrain::Plains)),
@@ -220,8 +220,8 @@ fn a_tiny_map_keeps_the_rules_of_the_land() {
     assert_eq!(check_terrain(&map), []);
     let regions = Regions::of(1, &map);
     let land = Land::of(&map);
-    for t in 0..map.tiles.len() {
-        assert_eq!(land.group[t] != -1, region_of(&regions, t).is_some());
+    for (t, group) in land.group.iter().enumerate().take(map.tiles.len()) {
+        assert_eq!(*group != -1, region_of(&regions, t).is_some());
     }
 }
 

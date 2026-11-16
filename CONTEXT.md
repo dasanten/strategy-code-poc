@@ -147,7 +147,13 @@ The shared language of the game. Domain terms only — no implementation details
   of work, not a fixed amount, so they last until the carrier's first round trip.
 - **Holding a workplace:** whoever physically works and guards a workplace gets its output.
   There is no ownership flag. Drive out the workers, move your own in, and it's yours.
-- **Spoilage:** Food slowly goes bad. Other goods don't.
+- **Tools** (Epic 97): a good a smithy makes from Iron and Wood. A resident carrying Tools works a
+  share faster at a workplace or a construction site (also tearing down and repairing); without
+  them they work at the plain pace, so nothing stops for want of Tools. They aren't equipped:
+  carrying one set is enough, a second adds nothing, and nobody else sees them. Tools wear with
+  each day's work and break (Wear). Iron only. An NPC city keeps a set for each of its workers and
+  builders and a few spare in its reserve, and its workers fetch one from its storage.
+- **Spoilage:** Food slowly goes bad. Other goods don't (but see Wear and Decay).
 - **Coins:** money, and just another good. Made from Gold ore at a **Mint**, which anyone can
   build. No special currency rules.
 
@@ -185,6 +191,22 @@ The shared language of the game. Domain terms only — no implementation details
   site's) are left on the tile as goods, and the tile is free again. A road on Mountain waits
   while a carriage or ridden horse stands on it (Road). A horse left there unridden stays, and
   can't be ridden on bare Mountain.
+- **Decay** (Epic 97): every finished building, wall, gate and road slowly loses **condition**,
+  at a steady pace per game day of its own kind (roads and wooden walls fastest, stone slowest),
+  whether used or not. Blows from attackers are apart from this (Walls in combat). Its condition
+  reads in words: good, worn, nearly a ruin. Everyone's buildings decay, the Trade
+  Organization's too, which repairs its own from its stock so they never fall while it stands.
+- **Repairing:** a resident at a worn building puts its condition back to good with a share of its
+  materials (fetched like Fetching materials) and some work, less than building it. It is an
+  order and a script call; under the Build default a builder with nothing to build repairs worn
+  buildings in their city's area on their own, and further off it takes an order. An NPC city's
+  builders repair its buildings, and its road crew its roads (NPC road).
+- **Ruin:** a building nobody repaired. It still stands where it stood and blocks the way, but
+  does nothing: a ruined wall tile is a gap, a house houses nobody, a workplace makes nothing, a
+  storage takes nothing in. Goods in a ruined storage stay in it, but anyone at it can take them
+  out, as from an unguarded outpost storage (theft for another organization). A ruin is rebuilt
+  like a building, for less than a new one. Left for a long while more it **collapses**: it is
+  gone, and part of its materials, with any goods still in it, lie on its tiles as a pile.
 - **Footprint:** the square of tiles a building or construction site covers, the same for every
   building of a kind: Wall, Gate and Road 1×1; Tower, House, Storage, Smelter, Mint, Smithy, Mine,
   Quarry and Lumber camp 2×2; Town hall, Warehouse, Stable, Training ground and Haven 3×3; Farm 4×4. A site covers its
@@ -642,7 +664,17 @@ The shared language of the game. Domain terms only — no implementation details
   the city has no node for, as far as its coins and their arms allow, and walks home to the
   storage. A village sends one trader at a time, a bigger city more by its size (a balance number),
   each on their own run; they spread over the goods with surplus, and only with no other good to
-  sell does one take a second load of a good already on the road. Nothing protects them on the way but what they carry.
+  sell does one take a second load of a good already on the road. Nothing protects them on the way but what they carry and their escort.
+- **Escort** (Epic 97): soldiers an NPC city sends along with its own people on the road. A town's
+  trader takes one soldier per run (a village's goes alone); a founding party takes soldiers in
+  proportion to its size, at least one, in place of its one armed member. Both take more when the
+  city knows the way is dangerous. Only soldiers beyond those on its hall and at its gates go. An
+  escort fights for those it guards and keeps pace with them; a trader's comes home with them, a
+  founding party's stays as the daughter's first soldiers.
+- **Soldiers in peace** (Epic 97): the soldiers an NPC city keeps by its size are what it keeps in
+  peace; it keeps more while it feels threatened. Between fights they stand their posts, walk
+  rounds, train where it has a training ground (wearing their gear, Wear) and go as escorts.
+  Soldiers just standing on a post count as standing idle.
 - **Full city:** an NPC city that for a whole game week, less the bigger it is (a balance number), has had spare hands (idle, on a road crew, scouting or working for surplus) and nothing
   short of its reserve, holds a food surplus, and holds its founding party's materials
   above its reserve. Coins it has no way to earn are not short (NPC reserve), so a city that can't
@@ -684,7 +716,43 @@ The shared language of the game. Domain terms only — no implementation details
   longest-standing member takes over.
 - **NPC city in an alliance:** accepts an invitation when it holds every member in high standing
   and knows of no recent crime by them against it; leaves on its own when its standing toward
-  any member falls too low. It keeps its own behaviour.
+  any member falls too low. It keeps its own behaviour. It also invites on its own (Acting first).
+- **Temperament** (Epic 98): what an NPC city is like, fixed when it comes into being: **merchant**,
+  **militarist** or **settler**; a daughter mostly takes its mother's. It tilts which stance the
+  city picks and how it weighs its jobs.
+- **Stance** (Epic 98): what an NPC city is after for now, picked again each game day from its
+  needs, threats and neighbours, tilted by its temperament:
+  - **Grow:** houses, farms and workplaces as its needs say (NPC city).
+  - **Fortify:** more soldiers than by its size, walls, stone and a training ground first, gates
+    shut sooner, bigger escorts.
+  - **Trade:** more traders going further, and a smaller surplus cap, so more goes to market.
+  - **Expand:** counts as full sooner, scouts more, founds more often.
+  - **Retaliate:** turned on one Organization that hurt it (Retaliating).
+  Whoever has traded with a city or sees it reads its temperament on its card; whoever sees it
+  reads its stance as a mood line ("arming", "busy trading"). Scripts see the same. Its stance and
+  temperament weigh into every job's score, so the order of its jobs can change; Food short still
+  comes first.
+- **Threat** (Epic 98): how dangerous an NPC city thinks an Organization is, apart from how it
+  regards it (Standing): from that Organization's armed residents it saw near itself or its people,
+  by their gear, and from its people that Organization killed or robbed (traders, scouts, escorts).
+  It fades over game days. A strong friendly neighbour can be a threat. The city also remembers
+  **danger places**, where it lost people, to anyone, bandits too: escorts grow and its people's
+  ways keep clear of them while it remembers.
+- **Acting first** (Epic 98): an NPC city doesn't only answer. On its own it invites those it holds
+  in high standing into an alliance against a common threat; hires mercenaries with its war chest
+  when threatened, as a Player can (Trade Org army, Hiring from an NPC city); sends soldiers after
+  residents it saw commit a crime against it, within its reach, to take back what was taken; and
+  sends demands (NPC demand).
+- **NPC demand:** an NPC city in Retaliate, or a militarist one, that far outweighs an Organization
+  sends it an ordinary Demand for goods or Coins with a deadline, never to the Trade Organization.
+  Paid, its threat and standing towards the payer settle; refused or lapsed, it retaliates.
+- **Retaliating:** an NPC city in Retaliate turns its soldiers on one Organization: escorts and
+  hunting thieves first, demands, and rarely an attack on one of its cities to take it (Capturing a
+  city), only with very high threat and very low standing and an army that far outweighs that
+  city's defenders. It ends when its threat from them has faded, a demand is paid, or its losses
+  leave it the weaker; then it turns to Fortify, and an attack under way is called off.
+- **New realm's shelter:** no NPC city sends a demand to, or marches on, a realm in its first game
+  weeks. Players can.
 - **Alliance army:** soldiers and carriages members hand over to the alliance leader's command.
   They stay in their own realm but take orders only from the alliance leader. Their owner can
   recall them, which takes effect after a real hour; leaving the alliance recalls them.
@@ -745,7 +813,8 @@ The shared language of the game. Domain terms only — no implementation details
   script, takes a few ticks, and they can't strike meanwhile. A Bow or Crossbow takes both hands:
   with one equipped the shield slot stays empty. **Seeing it:** anyone who sees a resident (Sight)
   sees what they have equipped, its kind and whether iron or steel, on the map and on their card;
-  what they carry unequipped stays hidden like any goods carried.
+  what they carry unequipped stays hidden like any goods carried, except from anyone with a resident
+  on their tile (as a carriage's load).
 - **Smithy:** a workplace that turns Iron and Wood, or Steel and Wood for the steel ones, into
   weapons and armour, at fixed recipes: a Bow from Wood, a Crossbow from Wood and Iron, Arrows
   from Wood and a little Iron,
@@ -761,6 +830,15 @@ The shared language of the game. Domain terms only — no implementation details
   see each weapon's reach and the Arrows a resident carries. NPC cities with a smithy arm some of
   their soldiers with bows and keep Arrows in their reserve; their archers take wall and tower
   posts first.
+- **Wear** (Epic 97): weapons, armour and Tools don't last for ever. A weapon wears with each blow
+  it strikes or shot it looses, a shield or armour with each blow it takes, and all of them a
+  little in training; Tools with each day's work (Tools). Worn out, a piece **breaks** and is gone. It fights as well as new until then. Its
+  **condition** reads in words: good, worn, nearly broken. Only the realm carrying it (and its
+  scripts) sees that; anyone else sees just its kind and metal. A worn piece sells and buys for
+  less, a nearly broken one for much less.
+- **Mending:** a smithy worker mends a worn weapon, piece of armour or set of Tools back to good, for a share of
+  its recipe and in less time than forging it. An NPC city counts only pieces in good condition
+  towards its reserve and mends the rest.
 - **Army:** a named group of a realm's residents moving and fighting together under one order or
   script, at the pace of the slowest. A resident leaves it when given an order of their own.
   Needs a supply line or it starves far from home.
@@ -782,7 +860,8 @@ The shared language of the game. Domain terms only — no implementation details
 - **Walls in combat:** nobody walks through a wall. A **gate** lets the city's realm and its allies through always, everyone else
   only while it is open; the city's realm opens and closes it. A wall or gate can be **broken**
   (attacked until it falls, leaving part of its materials) or **climbed** (slow, and a climber
-  can't defend themselves, so a defended wall is costly to climb).
+  can't defend themselves, so a defended wall is costly to climb). Climbing a city's wall attacks
+  it: it raises the alarm there as a blow at it does.
   - **Wall walk** (ADR 0036): every wall, gate and tower tile has a walk on top, unbroken round the ring
     (people pass under a gate on the ground). A resident on it is **up**. Only the city's realm
     and its allies get up, from the ground next to the wall, and getting up or down is slow (a
@@ -984,7 +1063,7 @@ The shared language of the game. Domain terms only — no implementation details
   gate open while only the Trade Organization's army is near, so its soldiers can walk in and buy
   like anyone. A city that refuses it shuts them out as it does anyone it refuses, and other armed
   outsiders near still shut the gate.
-- **Demand:** a Player or the Trade Organization sends a demand to another Organization: **terms**
+- **Demand:** a Player, the Trade Organization or an NPC city (NPC demand) sends a demand to another Organization: **terms**
   (hand over a named city; hand over goods or Coins), a short written note, and a deadline. It
   arrives at once, like a mercenary offer, wherever the other side is, and sending them is limited.
   A Player can send one to any realm they know of: one they see residents of, an ally, one whose city
@@ -1650,7 +1729,8 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   `inCityArea(cityId, x, y)` says whether a tile lies in a City area, for a city of their realm or a
   tile in sight, `cityAreaAt(x, y)` which city's area it lies in, and `outsidersIn(cityId)` lists the
   outsiders they see in a City area. **The Alarm default:** a thief, an occupier or an attacker it goes after
-  until they are dead or have left the area or sight; for an armed outsider it walks to the town
+  until they are dead or have left the area or sight, and then the nearest other attacker still
+  attacking the city in sight, if any; for an armed outsider it walks to the town
   hall and stands there until no armed outsider is left in the area, which blocks an occupation
   before it starts; an unarmed outsider it only logs. NPC villages, towns and self-managed cities
   run this default for their armed residents, and nothing else: no Player picks theirs, and a blow

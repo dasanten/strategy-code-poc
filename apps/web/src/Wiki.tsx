@@ -79,6 +79,7 @@ import {
   STARVE_DAYS,
   DOWN_DAYS,
   FEED_UNITS,
+  EQUIP_TICKS,
   NPC_PATROLS_MAX,
   NPC_PATROL_ROAD_STOPS,
   NPC_PATROL_WALL_STOPS,
@@ -241,6 +242,8 @@ import {
   NPC_START_HORSE_FOOD_DAYS,
   NPC_START_HORSES,
   STABLE_FEED_DAYS,
+  STABLE_HAND_FEED_DAYS,
+  STABLE_HAND_WORK_MINUTES,
   DEFEND_CALM_TICKS,
   STANDING_CONTRACT_BROKEN_LOSS,
   STANDING_DRIFT_PER_DAY,
@@ -260,7 +263,9 @@ import {
   STANDING_RANGE,
   STANDING_NPC_TRADE_COINS_PER_POINT,
   STANDING_TRADE_COINS_PER_POINT,
+  START_HORSES,
   START_RESIDENTS,
+  START_SPEARS,
   STARTING_SITE_WALK,
   STARTING_SITES_PER_HEARTLAND,
   STAT_BASE_MAX,
@@ -1166,6 +1171,23 @@ export function Wiki() {
           trade.
         </p>
         <p>
+          <strong>Starting city.</strong> A new Leader’s city starts with {num(START_RESIDENTS)}{' '}
+          residents, your Leader among them, working the farm. Every grown one, your Leader too,
+          carries {num(START_SPEARS)} iron Spear, so they are armed from the first tick and an alarm
+          sends them to defend the city. Children get none, and no spare weapons lie in the
+          storage. NPC villages keep their own start.
+        </p>
+        <p>
+          One resident of your starting city, never your Leader, is its{' '}
+          <strong>stable hand</strong>. They start on a looped queue, <strong>Farm and feed</strong>:
+          if the stable holds less than {days(STABLE_HAND_FEED_DAYS)} of Food for its{' '}
+          {num(START_HORSES)} horses, Feed the stable once; then work the farm for{' '}
+          {num(STABLE_HAND_WORK_MINUTES)} game minutes; again. So your horses don’t starve while you
+          are away, as long as the storage has Food. Their card shows the queue under its name like
+          any queue, which you can change or clear, and the planner’s Saved… lists it among your
+          saved queues in this browser.
+        </p>
+        <p>
           The regions of the mainland are parted by Mountain ranges and by arms of the Sea, about{' '}
           {num(REGION_BORDER_WIDTH)} tiles across, and joined only by a few ways through: a{' '}
           <strong>pass</strong> is a gap of Hills in a range that a carriage can cross, a{' '}
@@ -1237,8 +1259,7 @@ export function Wiki() {
           frontier border, gold and coal never in a heartland, and in another region than the old
           one wherever one fits. It appears out of everyone’s sight and, where the map allows, on
           land nobody has explored. Nobody is told: you have to find it. If you had explored its
-          tile before, your map shows no node there until one of your residents sees the tile
-          again.
+          tile before, your map shows no node there until one of your residents sees the tile again.
         </p>
         <p>
           NPC cities and the Trade Organization move on too. When the mine an NPC city or a trading
@@ -1422,27 +1443,26 @@ export function Wiki() {
           card (<strong>Leader and heir…</strong>, then <strong>Name heir</strong>) or from a script
           with <code>nameHeir(residentId)</code>; it is free, at once and from anywhere. Who
           qualifies: an adult of your realm who lives in one of its cities, isn't your Leader and
-          serves no one else (no mercenary contract or offer naming them, not in the alliance
-          army), the same residents a Leader handover allows, but they need not stand by your
-          Leader. You have one heir: naming another replaces the first, and{' '}
-          <strong>Clear heir</strong> or <code>clearHeir()</code> leaves you with none. The top bar
-          shows your heir, or “No heir” to pick one; their card and the Residents list mark them.
-          Only you and your allies see who it is. The heir lapses, with a line in your realm log,
-          when they die, leave your realm (their city changes hands, or they are handed over),
-          become homeless, are lent out or handed to the alliance army, or become your Leader by a
-          handover; then name another.
+          serves no one else (no mercenary contract or offer naming them, not in the alliance army),
+          the same residents a Leader handover allows, but they need not stand by your Leader. You
+          have one heir: naming another replaces the first, and <strong>Clear heir</strong> or{' '}
+          <code>clearHeir()</code> leaves you with none. The top bar shows your heir, or “No heir”
+          to pick one; their card and the Residents list mark them. Only you and your allies see who
+          it is. The heir lapses, with a line in your realm log, when they die, leave your realm
+          (their city changes hands, or they are handed over), become homeless, are lent out or
+          handed to the alliance army, or become your Leader by a handover; then name another.
         </p>
         <p>
           <b>When your Leader dies</b> and you have a living heir (one who is Down counts), the heir
           is your Leader at once and you play on: your realm keeps its name, standing, contracts,
           alliance, scripts and realm log. But it keeps only the city your heir lives in, with its
-          residents wherever they stand (those away keep their orders) and everything in it, and
-          the horses, carriages and boats nearer it than any other of your cities; outpost storages
-          stay yours. Every other city becomes a <b>self-managed city</b> with its residents and
-          the horses and carriages nearest it, holding you in good standing at{' '}
-          {signed(FORMER_PLAYER_STANDING)}; its soldiers lent out or in the alliance army walk
-          home. Your realm then has no heir until you name one. Your realm log and a notice say who
-          took over and what became of each city.
+          residents wherever they stand (those away keep their orders) and everything in it, and the
+          horses, carriages and boats nearer it than any other of your cities; outpost storages stay
+          yours. Every other city becomes a <b>self-managed city</b> with its residents and the
+          horses and carriages nearest it, holding you in good standing at{' '}
+          {signed(FORMER_PLAYER_STANDING)}; its soldiers lent out or in the alliance army walk home.
+          Your realm then has no heir until you name one. Your realm log and a notice say who took
+          over and what became of each city.
         </p>
         <p>
           Without a living heir, or when your heir dies in the same tick as your Leader, your realm
@@ -2191,6 +2211,13 @@ export function Wiki() {
           the one they stand in when it starts. Giving Feed the stable in a stable fills it; it is
           never kept between starts. With no stable there, or once theirs is gone, Feed the stable
           ends and your realm log says why.
+        </p>
+        <p>
+          It can also run <strong>once</strong>: the queue step{' '}
+          <strong>Feed the stable once</strong> (or its <code>once</code> param set to 1) fetches
+          what the stable is missing, stores it, and ends once the stable is full, so the queue goes
+          on to its next step. With no Food to fetch it ends too, and your realm log says why. A
+          start without it keeps the stable fed as before.
         </p>
         <h3>Horse offer</h3>
         <p>
@@ -3352,8 +3379,34 @@ export function Wiki() {
           An average resident hits for {num(unarmed)} with bare fists, {num(sword)} with a sword,{' '}
           {num(steelSword)} with a steel sword, and {num(swordSkilled)} with a sword at full Combat
           skill ({num(COMBAT_SKILL_MAX)} points); they dodge {pct(dodge)} of blows. A resident has{' '}
-          {num(MAX_HEALTH)} health. They fight with the best weapon they carry, and only their best
-          shield and best armour count, so steel over iron and a second shield adds nothing.
+          {num(MAX_HEALTH)} health.
+        </p>
+        <p>
+          Each resident has three <strong>equipment</strong> slots: a <strong>weapon</strong>, a{' '}
+          <strong>shield</strong> and <strong>armour</strong>, one item each. Only what is equipped
+          counts in a fight, and only a resident with a weapon equipped is <strong>armed</strong> (a
+          soldier): a spare sword in the pack makes nobody a soldier and a second shield adds
+          nothing. A resident with an empty slot equips the best fitting item at once when they pick
+          one up, from a storage, the ground, a carriage or a smithy; with the slot already full,
+          the new one is only carried, even if it is better. Putting the equipped item down
+          (storing, dropping it, or losing it as loot) empties its slot, and the best other item of
+          that kind they carry takes its place. Equipped gear still weighs what it weighs and is
+          part of what they carry. A resident's card shows their three slots.
+        </p>
+        <p>
+          To <strong>swap</strong> gear, pick another item they carry for a slot on their card (or
+          the group card's Equip…, for each of them who carries it), or take a slot's item off;
+          scripts do the same with <code>equip(good)</code> and <code>takeOff(slot)</code>, and a
+          queue with the Put on gear and Take off gear steps. It takes {duration(EQUIP_TICKS)}, and
+          they strike no blows meanwhile, even when struck; an order given under attack still goes.
+          What comes off stays carried. A slot taken off stays empty until they pick up more that
+          fits it, so a resident can walk unarmed with a sword in the pack.
+        </p>
+        <p>
+          Anyone who sees a resident sees what they have equipped: on the map up close a mark for
+          their weapon and shield and a rim for armour, bright for steel and grey for iron, and the
+          same on their card, to scripts too. What else they carry stays hidden from other realms,
+          as a carriage's load does, unless one of theirs stands on the same tile.
         </p>
         <p>
           Defenders on their own city's wall take {pct(WALL_DEFENCE)} of the damage. A tile of wall
@@ -3361,7 +3414,9 @@ export function Wiki() {
           average unarmed resident alone needs {duration(breakTicks('wall'))} for a wall and{' '}
           {duration(breakTicks('gate'))} for a gate. A broken one leaves{' '}
           {pct(BROKEN_MATERIALS_RETURNED)} of its materials. Climbing over takes{' '}
-          {duration(CLIMB_TICKS)}, unable to dodge or strike back.
+          {duration(CLIMB_TICKS)}, unable to dodge or strike back, and raises the alarm as breaking
+          the wall does. So a starting city's armed residents, at home when the attack starts, get
+          up onto their wall in time to beat breakers and climbers twice their number.
         </p>
         <p>
           <strong>The wall walk.</strong> Every wall and gate tile has a walk on top, unbroken round
@@ -3454,8 +3509,9 @@ export function Wiki() {
           their crews, don't count, and someone already attacking gets no outsider alarm. A theft
           from your realm in that area, of goods from a storage, a carriage or a Down resident, or
           of a carriage or horse, reaches those standing there who see it; what lies in a pile is
-          anyone's to take, so that raises none. An attack, someone striking a wall or gate of the
-          city or a resident of yours standing in its area, reaches those standing there who see it,
+          anyone's to take, so that raises none. An attack, someone striking or climbing a wall or
+          gate of the city or striking a resident of yours standing in its area, reaches those
+          standing there who see it,
           so the armed residents beside them react rather than only the one struck, who runs their
           defence script. It is raised once per attacker, the first time someone at home sees them
           at it, and again only after {duration(DEFEND_CALM_TICKS)} with no blow from them. Those
@@ -3467,8 +3523,9 @@ export function Wiki() {
         <p>
           Alarm goes after the occupier while they stand in the city's area, any other armed one of
           theirs there after them, and ends once they are gone. It goes after a thief or an attacker
-          until they are dead or have left the area or sight. Their card says “On alarm: going after
-          Bo”. For an armed outsider it walks to the town hall and stands there until no armed
+          until they are dead or have left the area or sight; then, while others are still at the
+          city's wall or its residents, it goes after the nearest of them in sight, and ends only
+          once none is left. Their card says “On alarm: going after Bo”. For an armed outsider it walks to the town hall and stands there until no armed
           outsider is left in the area, then goes back to what it was doing; someone armed of yours
           on the hall blocks an occupation before it starts, at no cost in standing. An unarmed
           outsider it only writes in the script log.

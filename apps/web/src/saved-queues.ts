@@ -160,6 +160,50 @@ export function storeQueues(
   }
 }
 
+/**
+ * Where the browser notes the names of queues the game gave (the stable hand's "Farm and feed",
+ * `CONTEXT.md`: Starting city) that it already put among a realm's saved queues.
+ */
+export const givenKey = (realm: string) => `csp.queues.${realm}.given`
+
+/**
+ * The saved queues with a queue the game gave under `name` saved, unless the browser already
+ * did (`given` holds the names it did): once removed, it stays removed. A queue the Player saved
+ * under that name is kept. Undefined when there is nothing to do.
+ */
+export function withGiven(
+  queues: SavedQueues,
+  given: readonly string[],
+  name: string,
+  steps: readonly PlanItem[],
+  savedAt: number,
+): { queues: SavedQueues; given: string[] } | undefined {
+  if (given.includes(name)) return undefined
+  const next = name in queues ? queues : save(queues, name, steps, savedAt)
+  return { queues: next, given: [...given, name] }
+}
+
+/** `withGiven` on what the browser keeps for a realm, kept again; nothing without storage. */
+export function keepGivenQueue(
+  storage: Pick<Storage, 'getItem' | 'setItem'> | undefined,
+  realm: string,
+  name: string,
+  steps: readonly PlanItem[],
+  savedAt: number,
+) {
+  try {
+    if (!storage) return
+    const raw: unknown = JSON.parse(storage.getItem(givenKey(realm)) ?? '[]')
+    const given = Array.isArray(raw) ? raw.filter((n): n is string => typeof n === 'string') : []
+    const next = withGiven(readQueues(storage, realm), given, name, steps, savedAt)
+    if (!next) return
+    storeQueues(storage, realm, next.queues)
+    storage.setItem(givenKey(realm), JSON.stringify(next.given))
+  } catch {
+    // Without storage it just isn't saved.
+  }
+}
+
 /** The browser's storage, if the page may use it. */
 export function browserStorage(): Storage | undefined {
   try {

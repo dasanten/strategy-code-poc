@@ -57,6 +57,7 @@ pub fn new_resident(id: &str, owner: Option<&str>, x: f64, y: f64) -> Resident {
         born_at: -ticks_for_age(30.0).round(),
         lifespan: 60.0,
         carried: Stock::new(),
+        equipped: Default::default(),
         order: None,
         order_ended: None,
         struck: None,

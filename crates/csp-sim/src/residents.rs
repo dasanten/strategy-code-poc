@@ -84,6 +84,7 @@ fn blank(fields: &NewResident, name: (String, Option<bool>), stats: StatRecord<S
         born_at: fields.tick,
         lifespan: 0.0,
         carried: Stock::new(),
+        equipped: Default::default(),
         order: None,
         order_ended: None,
         struck: None,

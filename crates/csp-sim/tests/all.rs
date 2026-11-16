@@ -48,6 +48,8 @@ mod demand_goods;
 mod differential;
 #[path = "down.rs"]
 mod down;
+#[path = "equipment.rs"]
+mod equipment;
 #[path = "exploring.rs"]
 mod exploring;
 #[path = "feeding_horse.rs"]
@@ -136,6 +138,8 @@ mod sight_fixtures;
 mod smithy;
 #[path = "smoke.rs"]
 mod smoke;
+#[path = "stable_hand.rs"]
+mod stable_hand;
 #[path = "stealing.rs"]
 mod stealing;
 #[path = "stealing_horse.rs"]
