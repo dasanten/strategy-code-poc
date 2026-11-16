@@ -948,6 +948,14 @@ pub struct WorkOrder {
     pub makes: Option<Good>,
 }
 
+/// Repairing a worn building (`CONTEXT.md`: Repairing).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RepairOrder {
+    pub building_id: String,
+    pub at: Tile,
+}
+
 /// Tearing down.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -1253,6 +1261,7 @@ pub enum ResidentOrder {
     Fetch(FetchOrder),
     Build(BuildOrder),
     TearDown(TearDownOrder),
+    Repair(RepairOrder),
     WorkAt(WorkOrder),
     Breed(BreedOrder),
     Attack(AttackOrder),
@@ -3424,6 +3433,17 @@ pub struct Building {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub breedings: Option<Vec<KeptBreeding>>,
+    /// Share of its condition a finished building has lost to decay (`CONTEXT.md`: Decay), from 0
+    /// (good, as built) to 1 (nothing left). Left out of a save while it has lost none, so a
+    /// building from before format 130 reads as good.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub decay: Option<f64>,
+    /// A repair under way (`CONTEXT.md`: Repairing): the materials brought and the work put in so
+    /// far. Gone once it is done.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub repair: Option<ConstructionSite>,
 }
 
 /// The breeding progress a stable keeps for two horses in it.

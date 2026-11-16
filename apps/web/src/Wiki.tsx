@@ -276,6 +276,10 @@ import {
   STRIKE_TICKS,
   TEARDOWN_MATERIALS_RETURNED,
   TEARDOWN_WORK_SHARE,
+  DECAY_WORN,
+  DECAY_NEARLY_RUIN,
+  REPAIR_MATERIALS_SHARE,
+  REPAIR_WORK_SHARE,
   TERRAIN_FOOD,
   TERRAIN_SPEED,
   TERRITORY_CITY_BASE,
@@ -329,6 +333,7 @@ import { PARAM_DESCRIPTIONS, DEFAULT_SCRIPTS, SCRIPT_VIEWS } from '@csp/lang-was
 import { WORKPLACE_PARAM } from './shared/default-scripts.js'
 import { SCRIPT_PARAM_TYPES } from './shared/script-api.js'
 import { NPC_SMITHY_WEAPON } from './shared/npc-trade.js'
+import { DECAY_DAYS, repairMaterials, repairWork } from './shared/decay.js'
 import { fighterStrength } from './shared/persuasion.js'
 import type {
   BuildingKind,
@@ -548,6 +553,9 @@ function ApiTable({ is }: { is: ApiName['is'] }) {
 }
 
 const kindName = (kind: BuildingKind) => BUILDING_NAMES[kind]
+/** Each kind that decays, with the game days it takes to lose all its condition. */
+const decayRows = () =>
+  (Object.entries(DECAY_DAYS) as [BuildingKind, number][]).map(([kind, days]) => ({ kind, days }))
 const goodName = (good: Good) => GOOD_LABELS[good]
 const skillName = (kind: BuildingKind) => {
   const skill = WORKPLACE_SKILL[kind] ?? ''
@@ -1809,6 +1817,49 @@ export function Wiki() {
                 <td>{duration(b.buildTicks)}</td>
                 <td>{duration(b.teardownTicks)}</td>
                 <td>{goods(b.returned)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <h3>Decay and repairing</h3>
+        <p>
+          Every finished building, wall, gate and road slowly loses its <strong>condition</strong>,
+          used or not: an even share at the turn of each game day, faster for roads and the wooden
+          walls and gates, slowest for those mostly of stone. Blows from attackers are apart from
+          this (see <a href="#combat">Combat</a>). Its tile card says how it stands: good, then{' '}
+          <strong>worn</strong> once it has lost {pct(DECAY_WORN)}, then{' '}
+          <strong>nearly a ruin</strong> once it has lost {pct(DECAY_NEARLY_RUIN)}. Everyone who
+          sees a building sees its condition; scripts read it as <code>building.condition</code>.
+        </p>
+        <p>
+          A worn building can be <strong>repaired</strong>: pick a resident, then the building's
+          tile, and <em>Repair</em> on its tile card. They run your Repair default: it walks them
+          there, and while the repair lacks materials they carry none of, they fetch what it lacks
+          from its <code>source</code> param, or the nearest storage of your realm holding some. A
+          repair takes {pct(REPAIR_MATERIALS_SHARE)} of the building's materials (rounded up) and{' '}
+          {pct(REPAIR_WORK_SHARE)} of its work, and puts it back to good. With none of the materials
+          in any storage, Repair ends and your realm log says why. Anyone's building can be
+          repaired. Scripts repair with <code>repair(buildingId)</code> on the building's tile and
+          ask what it lacks with <code>repairNeeded(building)</code>.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Building</th>
+              <th>Worn after</th>
+              <th>All gone after</th>
+              <th>Repair materials</th>
+              <th>Repair, one builder</th>
+            </tr>
+          </thead>
+          <tbody>
+            {decayRows().map((b) => (
+              <tr key={b.kind}>
+                <td>{kindName(b.kind)}</td>
+                <td>{num(Math.ceil(b.days * DECAY_WORN))} game days</td>
+                <td>{num(b.days)} game days</td>
+                <td>{goods(repairMaterials(b.kind))}</td>
+                <td>{duration(repairWork(b.kind))}</td>
               </tr>
             ))}
           </tbody>

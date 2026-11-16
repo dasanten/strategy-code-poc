@@ -820,6 +820,7 @@ describe('the rows of a card that stays open', () => {
         'renameCity',
         'renameHorse',
         'addWaypoint',
+        'repair',
       ]
       if (tileCard.includes(id)) continue
       if (['relocate', 'makeLeader', 'rename'].includes(id)) continue
@@ -1344,7 +1345,7 @@ describe('the card for a tile', () => {
     expect(card).toMatchObject({ title: 'Oakhollow storage', rel: 'npcCity', what: 'building' })
     expect(card.lastSeen).toEqual({
       when: 'Last seen: day 1, 00:00 (3 days ago)',
-      lines: ['NPC city'],
+      lines: ['NPC city', 'Condition: good'],
       lists: [expect.objectContaining({ title: 'Goods', goods: { food: 3 } })],
     })
     // What is in sight there now stays apart from it.
@@ -1514,6 +1515,40 @@ describe('horses on the tile card', () => {
     expect(hitched.carriage?.horse?.rows[0]?.detail).toBe(
       `Down from hunger: ${timeLeft(23 * 3600)} · a resident with Food can Feed it · Speed 12, Strength 8, Endurance 10 · 0 game days old`,
     )
+  })
+
+  it('says how a building has decayed and offers the resident picked last to repair a worn one (`CONTEXT.md`: Repairing)', () => {
+    const tick = 100 * TICKS_PER_GAME_YEAR
+    const house = (more: Partial<Building>) =>
+      ({ id: 'h1', kind: 'house', cityId: 'c-npc', x: 5, y: 5, ...more }) as Building
+    const ada = { id: 'r1', name: 'Ada', x: 1, y: 1, bornAt: 0, carried: {} } as unknown as Resident
+    const good = tile({ buildings: [house({})], tick })
+    expect(good.lines).toContain('Condition: good')
+    expect(good.repair).toBeUndefined()
+    expect(tileActions(good, ada, tick).find((a) => a.id === 'repair')).toBeUndefined()
+    const worn = tile({ buildings: [house({ decay: 0.5 })], tick })
+    expect(worn.lines).toContain('Condition: worn')
+    expect(worn.repair).toEqual({ buildingId: 'h1', name: 'house' })
+    expect(tileActions(worn, ada, tick).find((a) => a.id === 'repair')).toEqual({
+      id: 'repair',
+      label: 'Repair house',
+      key: ACTION_KEYS.repair,
+    })
+    const child = { ...ada, bornAt: tick } as Resident
+    expect(tileActions(worn, child, tick).find((a) => a.id === 'repair')).toMatchObject({
+      disabled: true,
+      reason: 'children can’t repair buildings',
+    })
+    const repairing = tile({
+      buildings: [house({ decay: 0.8, repair: { delivered: { wood: 5 }, work: 180 } })],
+      tick,
+    })
+    expect(repairing.lines).toContain(
+      'Condition: nearly a ruin · being repaired, 50% of the work done',
+    )
+    // A worn road under nothing else: the road is repaired.
+    const road = { id: 'rd', kind: 'road', cityId: null, x: 5, y: 5, decay: 0.3 } as Building
+    expect(tile({ buildings: [road], tick }).repair).toEqual({ buildingId: 'rd', name: 'road' })
   })
 
   it('offers the resident picked last to Feed a horse that isn’t full (`CONTEXT.md`: Feeding a horse)', () => {

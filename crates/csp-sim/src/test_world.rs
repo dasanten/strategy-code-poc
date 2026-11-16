@@ -111,6 +111,8 @@ pub fn building(
         closed: None,
         damage: None,
         breedings: None,
+        decay: None,
+        repair: None,
     });
     world.buildings.len() - 1
 }

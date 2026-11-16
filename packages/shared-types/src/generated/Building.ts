@@ -7,4 +7,15 @@ import type { KeptBreeding } from "./KeptBreeding.js";
 /**
  * A building or construction site (`Building`).
  */
-export type Building = { id: string, kind: BuildingKind, cityId: string | null, realmId?: string, x: number, y: number, stock?: { [key in Good]?: number }, site?: ConstructionSite, teardown?: number, closed?: true, damage?: number, breedings?: Array<KeptBreeding>, };
+export type Building = { id: string, kind: BuildingKind, cityId: string | null, realmId?: string, x: number, y: number, stock?: { [key in Good]?: number }, site?: ConstructionSite, teardown?: number, closed?: true, damage?: number, breedings?: Array<KeptBreeding>, 
+/**
+ * Share of its condition a finished building has lost to decay (`CONTEXT.md`: Decay), from 0
+ * (good, as built) to 1 (nothing left). Left out of a save while it has lost none, so a
+ * building from before format 130 reads as good.
+ */
+decay?: number, 
+/**
+ * A repair under way (`CONTEXT.md`: Repairing): the materials brought and the work put in so
+ * far. Gone once it is done.
+ */
+repair?: ConstructionSite, };
