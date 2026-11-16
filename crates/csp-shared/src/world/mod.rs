@@ -934,6 +934,10 @@ pub struct BuildOrder {
     pub building: BuildingKind,
     pub at: Tile,
     pub site_id: Option<String>,
+    /// What a wall or gate is built of; none is wood (`CONTEXT.md`: Wall / Gate, Wood or stone).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub material: Option<WallMaterial>,
 }
 
 /// Working at a workplace.
@@ -1094,6 +1098,10 @@ pub struct LineOrder {
     pub path: Option<TilePath>,
     pub progress: f64,
     pub site_id: Option<String>,
+    /// What a wall line builds of; none is wood (`CONTEXT.md`: Wall / Gate, Wood or stone).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub material: Option<WallMaterial>,
 }
 
 /// Climbing a wall or gate.
@@ -3419,6 +3427,21 @@ pub struct Building {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub breedings: Option<Vec<KeptBreeding>>,
+    /// What a wall or gate, or its site, is of; none is wood (`CONTEXT.md`: Wall / Gate, Wood or
+    /// stone). Only walls and gates have one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub material: Option<WallMaterial>,
+}
+
+/// What a wall or gate is built of (`CONTEXT.md`: Wall / Gate, Wood or stone): wood from Wood, or
+/// stone from Stone with more work, holding out several times longer against blows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum WallMaterial {
+    #[default]
+    Wood,
+    Stone,
 }
 
 /// The breeding progress a stable keeps for two horses in it.

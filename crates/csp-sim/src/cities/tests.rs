@@ -195,6 +195,7 @@ fn nearly_built(world: &mut WorldState, kind: BuildingKind) -> String {
         building: kind,
         at: Tile { x, y },
         site_id: Some(id.clone()),
+        material: None,
     }));
     id
 }

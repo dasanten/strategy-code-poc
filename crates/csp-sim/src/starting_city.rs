@@ -376,6 +376,7 @@ fn found_at(
         closed: None,
         damage: None,
         breedings: None,
+        material: None,
     };
     let hall = building(world, BuildingKind::TownHall, hall_tile(x, y, size));
     city.town_hall_id = hall.id.clone();

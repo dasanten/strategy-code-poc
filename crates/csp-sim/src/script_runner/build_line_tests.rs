@@ -203,6 +203,31 @@ fn builds_a_5_tile_road_line_away_from_the_resident_fetching_stone_when_it_runs_
 }
 
 #[test]
+fn a_stone_wall_line_fetches_stone_and_builds_each_tile_of_stone() {
+    let mut s = setup(json!({ "stone": 50 }));
+    s.r_mut("w1").carried = Stock::from([(Good::Food, OWN_FOOD)]);
+    let mut wall = line();
+    wall["building"] = json!("wall");
+    wall["material"] = json!("stone");
+    assert_eq!(s.build_line(wall), "ack");
+    s.run_out();
+    let walls: Vec<&Building> =
+        s.world.buildings.iter().filter(|b| b.kind == BuildingKind::Wall).collect();
+    assert_eq!(walls.len(), 5);
+    assert!(walls
+        .iter()
+        .all(|b| b.site.is_none() && b.material == Some(csp_shared::world::WallMaterial::Stone)));
+    let per_tile = csp_shared::balance::STONE_BUILD_MATERIALS
+        .get("wall")
+        .and_then(|t| t.get("stone"))
+        .unwrap();
+    let store = s.world.buildings.iter().find(|b| b.id == "s1").unwrap();
+    let left = held(store.stock.as_ref().unwrap(), Good::Stone);
+    assert_eq!(50.0 - left - held(&s.r("w1").carried, Good::Stone), 5.0 * per_tile);
+    assert_eq!(s.stopped(), Vec::<String>::new());
+}
+
+#[test]
 fn skips_tiles_that_have_a_road_already_or_cant_take_one() {
     let mut terrain = plains();
     terrain.tiles[(12 * SIZE + 13) as usize] = Terrain::Lake as u8;
