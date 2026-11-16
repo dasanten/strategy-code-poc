@@ -101,6 +101,7 @@ fn blank(fields: &NewResident, name: (String, Option<bool>), stats: StatRecord<S
         riding: None,
         aboard: None,
         down_until: None,
+        up: None,
     }
 }
 

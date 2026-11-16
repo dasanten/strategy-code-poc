@@ -510,6 +510,7 @@ fn seen_resident(
         carrying: r.carrying.clone(),
         riding: r.riding.clone(),
         aboard: r.aboard.clone(),
+        up: r.up,
         down_until: r.down_until.filter(|_| fares),
         // Anyone in sight sees that they are Down; when it ends goes with how they fare.
         down: r.down_until.map(|_| true),

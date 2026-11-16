@@ -72,6 +72,7 @@ pub fn resident(world: &mut WorldState, id: &str, owner: Option<&str>, x: f64, y
         riding: None,
         aboard: None,
         down_until: None,
+        up: None,
     });
     world.residents.len() - 1
 }

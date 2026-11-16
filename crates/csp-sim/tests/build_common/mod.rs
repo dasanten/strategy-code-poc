@@ -74,6 +74,7 @@ pub fn new_resident(id: &str, owner: Option<&str>, x: f64, y: f64) -> Resident {
         riding: None,
         aboard: None,
         down_until: None,
+        up: None,
     }
 }
 

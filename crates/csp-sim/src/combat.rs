@@ -35,7 +35,8 @@ use crate::queries::vessels::{
     across_docked_ship, being_rowed, between_vessels, rowed_vessel_id, vessel_aboard,
 };
 use crate::queries::walls::{
-    broken_returns, foreign_wall, is_wall_or_gate, on_own_wall, wall_strength, wall_strength_left,
+    broken_returns, foreign_wall, is_up, is_wall_or_gate, on_own_wall, reaches_for_height,
+    wall_strength, wall_strength_left,
 };
 use crate::random::{hash_str, Mulberry32};
 use crate::survival::{die_all, drop_goods};
@@ -78,16 +79,19 @@ fn tile(p: (f64, f64)) -> (i32, i32) {
 }
 
 /// Whether the resident at `ai` can strike the target (`CONTEXT.md`: Combat, Fighting at a
-/// vessel): in contact with it, and not from one vessel at someone aboard another. Those aboard a
-/// vessel are reached from beside it, as if it were the next land tile; those aboard a docked ship
-/// from anywhere on its haven, and the other way round.
+/// vessel, High ground): in contact with it, not from one vessel at someone aboard another, and
+/// not from the ground at someone up. Those aboard a vessel are reached from beside it, as if it
+/// were the next land tile; those aboard a docked ship from anywhere on its haven, and the other
+/// way round.
 fn reaches(world: &WorldState, size: i32, ai: usize, t: Target) -> bool {
     let a = &world.residents[ai];
     let contact = in_contact(size, tile((a.x, a.y)), tile(spot_of(world, t)));
     match t {
         Target::Resident(ti) => {
             let b = &world.residents[ti];
-            (contact || across_docked_ship(world, a, b)) && !between_vessels(world, a, b)
+            (contact || across_docked_ship(world, a, b))
+                && !between_vessels(world, a, b)
+                && reaches_for_height(world, a, b)
         }
         Target::Building(_) => contact,
     }
@@ -253,7 +257,10 @@ pub fn validate_attack(
         .residents
         .iter()
         .any(|x| ours(x) && wrap_distance(size, tile((x.x, x.y)), tile(target)) <= SIGHT_RANGE);
-    if seen {
+    let below = resident.is_some_and(|t| !reaches_for_height(world, me, t));
+    if seen && below {
+        Some("they are up on the wall")
+    } else if seen {
         None
     } else if resident.is_some() {
         Some("that resident is out of sight")
@@ -315,6 +322,15 @@ pub fn request_strikes(world: &mut WorldState, size: i32) -> Vec<StrikeAction> {
         }
         let target = target.expect("not gone");
         if !reaches(world, size, ri, target) {
+            // In contact from the ground with someone up: no blow reaches them, so the order ends
+            // rather than waits below (`CONTEXT.md`: High ground).
+            if let Target::Resident(t) = target {
+                let (a, b) = (&world.residents[ri], &world.residents[t]);
+                let contact = in_contact(size, tile((a.x, a.y)), tile((b.x, b.y)));
+                if contact && !reaches_for_height(world, a, b) {
+                    world.residents[ri].order = None;
+                }
+            }
             continue;
         }
         let target_id = match target {
@@ -568,8 +584,8 @@ fn off_carriage(world: &mut WorldState, ti: usize) {
 
 /// The resident at `ti`, hit by the one at `ai` and still alive, reacts (`react`): a Player's
 /// resident runs their defence script; others, armed, fight back unless already attacking
-/// someone, off any carriage they are aboard; unarmed, they flee home to their city's town hall,
-/// but a driver drives on and a passenger stays aboard a carriage being driven, and so a rower
+/// someone, off any carriage they are aboard; unarmed, or struck from above with no way to strike
+/// back (`CONTEXT.md`: High ground), they flee home to their city's town hall, but a driver drives on and a passenger stays aboard a carriage being driven, and so a rower
 /// rows on and a passenger stays aboard a boat being rowed.
 fn react(world: &mut WorldState, ti: usize, ai: usize) {
     let t = &world.residents[ti];
@@ -582,8 +598,10 @@ fn react(world: &mut WorldState, ti: usize, ai: usize) {
         start_defence(world, ti);
         return;
     }
-    if is_armed(t) {
-        if !matches!(t.order, Some(ResidentOrder::Attack(_))) {
+    let from_above = is_up(world, &world.residents[ai]) && !is_up(world, t);
+    let attacking = matches!(t.order, Some(ResidentOrder::Attack(_)));
+    if is_armed(t) && (!from_above || attacking) {
+        if !attacking {
             let a_id = world.residents[ai].id.clone();
             off_carriage(world, ti);
             let t = &mut world.residents[ti];
@@ -626,5 +644,7 @@ fn react(world: &mut WorldState, ti: usize, ai: usize) {
     record_event(world, owner.as_deref(), what);
 }
 
+#[cfg(test)]
+mod high_ground_tests;
 #[cfg(test)]
 mod tests;

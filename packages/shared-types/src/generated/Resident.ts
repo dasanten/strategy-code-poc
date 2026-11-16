@@ -16,6 +16,7 @@ import type { SkillName } from "./SkillName.js";
 import type { Stat } from "./Stat.js";
 import type { StatRecord } from "./StatRecord.js";
 import type { Struck } from "./Struck.js";
+import type { UpSide } from "./UpSide.js";
 
 /**
  * A person living in the world (`CONTEXT.md`: Resident).
@@ -28,4 +29,9 @@ equipped?: Equipment, order: ResidentOrder | null, orderEnded?: OrderEnded, stru
 /**
  * A script id (see `RunningScript::script_id`).
  */
-defenceScriptId?: number, alarmScriptId?: AlarmScriptId, scriptParams?: { [key in number]: { [key in string]: ScriptParamValue } }, scriptLog?: Array<ScriptLogLine>, queue?: Queue, pair?: Pair, carrying?: Carrying, riding?: string, aboard?: string, downUntil?: number, };
+defenceScriptId?: number, alarmScriptId?: AlarmScriptId, scriptParams?: { [key in number]: { [key in string]: ScriptParamValue } }, scriptLog?: Array<ScriptLogLine>, queue?: Queue, pair?: Pair, carrying?: Carrying, riding?: string, aboard?: string, downUntil?: number, 
+/**
+ * Up on the wall walk (`CONTEXT.md`: Wall walk), with the side they came up from, the side
+ * they come down to; on the ground when absent.
+ */
+up?: UpSide, };

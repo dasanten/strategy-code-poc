@@ -155,6 +155,43 @@ pub fn back_to_outsider_alarm(r: &mut Resident) -> bool {
     true
 }
 
+/// The resident at `i`'s Alarm default called `end()` on an attacked alarm (`CONTEXT.md`: the
+/// Alarm default): while the attack on the city goes on, it goes on for the nearest other
+/// attacker in sight whose blows still raise the alarm there (a breaker at the wall, a climber on
+/// it), so the defenders stay at the wall rather than go back to the hall or their work with the
+/// wall still under attack. False if there is none, and it ends as before. A script the Player
+/// picked decides for itself.
+pub fn on_to_next_attacker(world: &mut WorldState, i: usize, size: i32) -> bool {
+    let r = &world.residents[i];
+    let picked = r.alarm_script_id.is_some();
+    let Some(s) = r.script.as_ref().filter(|s| s.task == Some(Task::Alarm) && !picked) else {
+        return false;
+    };
+    let Some(running) = s.alarm.as_ref().filter(|a| a.kind == AlarmKind::Attacked) else {
+        return false;
+    };
+    let Some(city) = world.cities.iter().find(|c| c.id == running.city_id) else { return false };
+    let Some(fresh) = &city.alarmed_attackers else { return false };
+    let tick = world.tick as f64;
+    let at = tile(r.x, r.y);
+    let next = world
+        .residents
+        .iter()
+        .filter(|a| a.id != running.about)
+        .filter(|a| fresh.get(&a.id).is_some_and(|t| tick - t < DEFEND_CALM_TICKS))
+        .map(|a| (wrap_distance(size, at, tile(a.x, a.y)), a))
+        .filter(|(d, _)| *d <= SIGHT_RANGE)
+        .min_by(|x, y| x.0.total_cmp(&y.0))
+        .map(|(_, a)| alarm(AlarmKind::Attacked, city, a, a.x, a.y, world.tick));
+    let Some(next) = next else { return false };
+    let r = &mut world.residents[i];
+    let s = r.script.as_mut().expect("an Alarm script runs");
+    s.alarm = Some(next);
+    s.waiting_since = None;
+    r.order = None;
+    true
+}
+
 fn alarm(kind: AlarmKind, city: &City, about: &Resident, x: f64, y: f64, tick: u64) -> Alarm {
     Alarm {
         kind,
@@ -499,6 +536,8 @@ pub fn alarm_script_sound(world: &WorldState) -> Vec<InvariantViolation> {
         .collect()
 }
 
+#[cfg(test)]
+mod siege_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

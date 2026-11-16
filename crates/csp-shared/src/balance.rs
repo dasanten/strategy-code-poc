@@ -2212,18 +2212,30 @@ pub struct WallStrength {
 
 /// Damage a wall or gate takes from blows before it falls (`CONTEXT.md`: Walls in combat,
 /// broken). An average unarmed resident (4 a blow, one blow every `STRIKE_TICKS`) breaks a stretch
-/// of wall alone in about five minutes; ten soldiers with swords in well under one. A gate holds
-/// out half as long again.
-pub const WALL_STRENGTH: WallStrength = WallStrength { wall: 600.0, gate: 900.0 };
+/// of wall alone in about 25 minutes, one with a Spear in about 12. A gate holds out half as long
+/// again. Long enough that a starting city's defenders get from their town hall up onto the wall
+/// and beat the breakers first, at twice their numbers too (T105.6).
+pub const WALL_STRENGTH: WallStrength = WallStrength { wall: 3000.0, gate: 4500.0 };
 
 /// Share of a broken wall's or gate's materials left on its tile, rounded down to whole units:
 /// less than tearing it down leaves (`TEARDOWN_MATERIALS_RETURNED`), as much of it is splintered;
 /// enough that a tile of wall leaves a unit of Wood.
 pub const BROKEN_MATERIALS_RETURNED: f64 = 0.34;
 
-/// Ticks it takes to climb over a wall or gate (`CONTEXT.md`: Walls in combat, climbed): a
-/// minute, as long as walking eight tiles of plains, all the while unable to dodge or strike back.
-pub const CLIMB_TICKS: f64 = 60.0;
+/// Ticks it takes to climb over a wall or gate (`CONTEXT.md`: Walls in combat, climbed): six
+/// minutes, all the while unable to dodge or strike back, so a starting city's defenders get up
+/// onto its wall and strike the climbers down before they are over (T105.6).
+pub const CLIMB_TICKS: f64 = 360.0;
+
+/// Ticks it takes to get up onto a wall walk from the ground next to the wall, and as long again to
+/// get down (`CONTEXT.md`: Wall walk): twenty seconds, as long as walking about three tiles of
+/// plains, so nobody goes up on the way somewhere else.
+pub const WALL_WALK_TICKS: f64 = 20.0;
+
+/// Health someone up on a wall or gate tile loses when the tile breaks under them and they fall to
+/// the ground (`CONTEXT.md`: A tile breaks), of `MAX_HEALTH`: about as much as a few good blows,
+/// so a fall hurts but kills only those already low on health.
+pub const FALL_DAMAGE: f64 = 30.0;
 
 /// Chance of dodging a blow for each point of Agility: an average resident dodges one in five.
 pub const DODGE_PER_AGILITY: f64 = 0.02;
@@ -2930,6 +2942,8 @@ pub fn balance_json() -> Value {
     m.insert("WALL_STRENGTH".into(), to_value(WALL_STRENGTH).expect("serialisable"));
     m.insert("BROKEN_MATERIALS_RETURNED".into(), json!(BROKEN_MATERIALS_RETURNED));
     m.insert("CLIMB_TICKS".into(), json!(CLIMB_TICKS));
+    m.insert("WALL_WALK_TICKS".into(), json!(WALL_WALK_TICKS));
+    m.insert("FALL_DAMAGE".into(), json!(FALL_DAMAGE));
     m.insert("DODGE_PER_AGILITY".into(), json!(DODGE_PER_AGILITY));
     m.insert("DODGE_LIMIT".into(), json!(DODGE_LIMIT));
     m.insert("COMBAT_SKILL_PER_BLOW".into(), json!(COMBAT_SKILL_PER_BLOW));

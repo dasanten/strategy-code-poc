@@ -648,7 +648,8 @@ The shared language of the game. Domain terms only — no implementation details
   on, and fetches more by Getting food.
 - **Scout:** a spare hand an NPC city sends exploring: a few at a time by its size (a balance
   number) run the game's Explore default with no `find`, and come home when their Food says turn
-  back. A city knows every resource node within its set reach (NPC city). What a scout saw is
+  back. A new scout is sent only while the Food they set out with comes from above the city's
+  reserve, so sending one never makes Food short (Spare hands' work). A city knows every resource node within its set reach (NPC city). What a scout saw is
   the city's only once they step back into its area alive: from then on it knows those nodes, out
   to a wider limit (a balance number), and can build on them. So a good it has no node for is one
   it knows no node of: its trader and a founding go by that too. A scout killed on the way brings
@@ -859,7 +860,8 @@ The shared language of the game. Domain terms only — no implementation details
 - **Walls in combat:** nobody walks through a wall. A **gate** lets the city's realm and its allies through always, everyone else
   only while it is open; the city's realm opens and closes it. A wall or gate can be **broken**
   (attacked until it falls, leaving part of its materials) or **climbed** (slow, and a climber
-  can't defend themselves, so a defended wall is costly to climb).
+  can't defend themselves, so a defended wall is costly to climb). Climbing a city's wall attacks
+  it: it raises the alarm there as a blow at it does.
   - **Wall walk** (ADR 0036): every wall, gate and tower tile has a walk on top, unbroken round the ring
     (people pass under a gate on the ground). A resident on it is **up**. Only the city's realm
     and its allies get up, from the ground next to the wall, and getting up or down is slow (a
@@ -1727,7 +1729,8 @@ Settled with Daniel on 2026-11-11 (Epics 90 and 91).
   `inCityArea(cityId, x, y)` says whether a tile lies in a City area, for a city of their realm or a
   tile in sight, `cityAreaAt(x, y)` which city's area it lies in, and `outsidersIn(cityId)` lists the
   outsiders they see in a City area. **The Alarm default:** a thief, an occupier or an attacker it goes after
-  until they are dead or have left the area or sight; for an armed outsider it walks to the town
+  until they are dead or have left the area or sight, and then the nearest other attacker still
+  attacking the city in sight, if any; for an armed outsider it walks to the town
   hall and stands there until no armed outsider is left in the area, which blocks an occupation
   before it starts; an unarmed outsider it only logs. NPC villages, towns and self-managed cities
   run this default for their armed residents, and nothing else: no Player picks theirs, and a blow

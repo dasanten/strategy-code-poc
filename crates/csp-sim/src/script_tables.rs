@@ -194,6 +194,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 null_when: Some("unless they are aboard one"),
             },
             ScriptField {
+                name: "up",
+                r#type: ScriptType::Boolean,
+                description: "Whether they are up on a wall walk, on top of a wall or gate, rather than on the ground. Getting up or down takes a while, and they come down only on the side they went up from.",
+                null_when: None,
+            },
+            ScriptField {
                 name: "script",
                 r#type: ScriptType::View("runningScript"),
                 description: "The script they run.",
@@ -4862,19 +4868,32 @@ fn goodsText(load, goods) {
 // which goes on once I end. Armed, I fight back at whoever struck me while
 // they are in sight, and end once they are dead, gone or out of sight; a
 // driver walks back to the carriage first, should the fight have led away.
-// Unarmed, I walk home to my city's town hall, and end there, or once no
-// blow has landed for calm ticks; but driving I end at once and drive on, and
+// Unarmed, or struck from up on a wall while I stand below, where no blow of
+// mine reaches, I walk home to my city's town hall, away from the wall, and
+// end there, or once no blow has landed for calm ticks; but driving I end at once and drive on, and
 // aboard a carriage being driven I end at once and stay aboard.
 let calm = 30 // ticks without a blow before I go back, fleeing
 
-if (armed()) {
+if (armed() && !struckFromAbove()) {
   // My drive waits while I fight: kept for the way back to my carriage.
   if (holdsCarriage()) { memory.carriageId = me.order.carriageId }
   fightBack()
+} else if (armed()) {
+  fleeHome()
 } else if (holdsCarriage() || betweenDrives() || aboardDriven()) {
   end()
 } else {
   fleeHome()
+}
+
+// Whether whoever struck me is up on a wall and I am on the ground below,
+// where nobody strikes anyone up.
+fn struckFromAbove() {
+  if (me.up) { return false }
+  for (r of residents()) {
+    if (r.id == me.struckBy) { return r.up }
+  }
+  return false
 }
 
 // Whether I drive a carriage, or haul with one.

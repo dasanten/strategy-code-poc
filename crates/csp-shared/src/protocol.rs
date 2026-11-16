@@ -16,7 +16,7 @@ use crate::world::warehouse::ShownWarehousePrice;
 use crate::world::{
     AlarmScriptId, ArmyOrder, Building, BuildingKind, Carrying, City, Equipment, Good, Heading,
     HorseStats, OrderEnded, Pair, Pile, PricedGood, Queue, ResidentOrder, ScriptParamValue,
-    ScriptParamValues, SkillName, Stat, StatRecord, Stock, Struck, Task, Tile, VesselKind,
+    ScriptParamValues, SkillName, Stat, StatRecord, Stock, Struck, Task, Tile, UpSide, VesselKind,
 };
 
 /// How heavily a carriage looks loaded to a Player who can't see its load (`LoadLevel`,
@@ -172,6 +172,9 @@ pub struct SeenResident {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub aboard: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub up: Option<UpSide>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub down_until: Option<f64>,

@@ -811,11 +811,13 @@
   "MIN_BLOW_DAMAGE": 1.0,
   "WALL_DEFENCE": 0.25,
   "WALL_STRENGTH": {
-    "wall": 600.0,
-    "gate": 900.0
+    "wall": 3000.0,
+    "gate": 4500.0
   },
   "BROKEN_MATERIALS_RETURNED": 0.34,
-  "CLIMB_TICKS": 60.0,
+  "CLIMB_TICKS": 360.0,
+  "WALL_WALK_TICKS": 20.0,
+  "FALL_DAMAGE": 30.0,
   "DODGE_PER_AGILITY": 0.02,
   "DODGE_LIMIT": 0.5,
   "COMBAT_SKILL_PER_BLOW": 0.02,

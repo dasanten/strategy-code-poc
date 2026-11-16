@@ -296,6 +296,8 @@ import {
   Terrain,
   WALL_DEFENCE,
   WALL_STRENGTH,
+  WALL_WALK_TICKS,
+  FALL_DAMAGE,
   WALK_TICKS_PER_TILE,
   aboutTime,
   WAREHOUSE_BASE_PRICE,
@@ -2870,7 +2872,8 @@ export function Wiki() {
         <p>
           A spare hand with nothing short to work for doesn't stand idle. A few at a time, one for
           every {num(NPC_RESIDENTS_PER_SCOUT)} residents, go scouting: they explore with as much
-          Food as they can carry, and turn back when it only just covers the way home. A city knows
+          Food as they can carry, and turn back when it only just covers the way home. A new scout
+          sets out only while that Food comes from above the city's reserve. A city knows
           every node within {num(NPC_NODE_REACH)} tiles; what a scout saw, out to{' '}
           {num(NPC_SCOUT_LIMIT)} tiles, it knows only once they step back into its area alive. A
           scout killed on the way brings nothing, and nothing protects them. What is short calls
@@ -3062,7 +3065,9 @@ export function Wiki() {
           Between fights those soldiers stand spread out, each on the post their id gives them among
           those the city has: first {num(NPC_SOLDIERS_ON_HALL)} on the town hall, where one is
           enough to stop anyone occupying it, then {num(NPC_SOLDIERS_AT_GATE)} at each gate, and the
-          rest on the tiles of its wall they can get up to. A city with too little wall for them, or
+          rest up on the walk of its wall, on the tiles they can get up to; they stay up between
+          fights, and coming down for another post takes the time again. A city with too little
+          wall for them, or
           none, has them stand on the free ground within {num(NPC_POST_AROUND_HALL)} tiles of its
           hall as well. They eat where they stand. If those on the hall or at a gate are called away
           or die, the next soldiers take over at the city's next planning pass, and they come back
@@ -3409,14 +3414,47 @@ export function Wiki() {
           average unarmed resident alone needs {duration(breakTicks('wall'))} for a wall and{' '}
           {duration(breakTicks('gate'))} for a gate. A broken one leaves{' '}
           {pct(BROKEN_MATERIALS_RETURNED)} of its materials. Climbing over takes{' '}
-          {duration(CLIMB_TICKS)}, unable to dodge or strike back.
+          {duration(CLIMB_TICKS)}, unable to dodge or strike back, and raises the alarm as breaking
+          the wall does. So a starting city's armed residents, at home when the attack starts, get
+          up onto their wall in time to beat breakers and climbers twice their number.
+        </p>
+        <p>
+          <strong>The wall walk.</strong> Every wall and gate tile has a walk on top, unbroken round
+          the ring; whoever is on it is <em>up</em>. Only the city's own realm and its allies get
+          up, from the ground next to the wall, and getting up takes {duration(WALL_WALK_TICKS)}, as
+          long again to get down. Along the walk is walking, over the gates too, while people pass
+          under a gate on the ground. They come down only on the side they went up from, so the walk
+          is never a way through the wall. Nobody walks onto a wall on the ground, nor squeezes past
+          its corner. A path that ends on the wall counts the time to get up, so your residents go
+          up only when you send them there; a path elsewhere never takes the walk. A resident's card
+          says “Up on the wall walk”, and scripts see it as <code>me.up</code>. Going after an
+          attacker at the wall, by the Alarm default or your order, a resident inside gets up onto
+          the walk beside them unless the way round through a gate is quicker; a trading post's and
+          the HQ's soldiers do the same.
+        </p>
+        <p>
+          <strong>The high ground.</strong> Whoever is up strikes down at anyone on the ground next
+          to the wall, but nobody on the ground can strike anyone up: from below there is only the
+          wall or gate itself to break, or climbing it, both while being struck from above. Order a
+          resident below to attack someone up and they won't (“they are up on the wall”). A climber
+          is on the ground until over; one who made it and stands on the wall fights those up as
+          anywhere, and so do those up on two walls that touch. Up on their own city's wall,
+          defenders still take only {pct(WALL_DEFENCE)} of each blow.
+        </p>
+        <p>
+          <strong>A tile breaks.</strong> When a wall or gate tile breaks, whoever is up on it falls
+          to the ground next to it on the inside of the ring (on a stretch with no inside, on the
+          side toward its city) and loses {num(FALL_DAMAGE)} health. A fall kills like a blow: one
+          left with no health, or Down, dies, and what they carried lies there as loot. Those up on
+          the tiles next to it stay up.
         </p>
         <h3>Under attack</h3>
         <p>
           A resident of yours who is struck and lives runs their defence script,{' '}
           <strong>Defend</strong> (one of your default scripts): armed, they fight back at whoever
-          struck them until that one is dead, gone or out of sight; unarmed, they walk home to their
-          city's town hall, and stop once there or once no blow has landed for{' '}
+          struck them until that one is dead, gone or out of sight; unarmed, or struck from up on a
+          wall where they can't strike back, they walk home to their city's town hall, away from the
+          wall, and stop once there or once no blow has landed for{' '}
           {duration(DEFEND_CALM_TICKS)}. Their card says “Defending: fighting back at Bo” or
           “Defending: fleeing home”, with what they were doing on the line under it. What they were
           doing waits meanwhile: once Defend ends they go back to it, a script with its memory, a
@@ -3471,8 +3509,9 @@ export function Wiki() {
           their crews, don't count, and someone already attacking gets no outsider alarm. A theft
           from your realm in that area, of goods from a storage, a carriage or a Down resident, or
           of a carriage or horse, reaches those standing there who see it; what lies in a pile is
-          anyone's to take, so that raises none. An attack, someone striking a wall or gate of the
-          city or a resident of yours standing in its area, reaches those standing there who see it,
+          anyone's to take, so that raises none. An attack, someone striking or climbing a wall or
+          gate of the city or striking a resident of yours standing in its area, reaches those
+          standing there who see it,
           so the armed residents beside them react rather than only the one struck, who runs their
           defence script. It is raised once per attacker, the first time someone at home sees them
           at it, and again only after {duration(DEFEND_CALM_TICKS)} with no blow from them. Those
@@ -3484,8 +3523,9 @@ export function Wiki() {
         <p>
           Alarm goes after the occupier while they stand in the city's area, any other armed one of
           theirs there after them, and ends once they are gone. It goes after a thief or an attacker
-          until they are dead or have left the area or sight. Their card says “On alarm: going after
-          Bo”. For an armed outsider it walks to the town hall and stands there until no armed
+          until they are dead or have left the area or sight; then, while others are still at the
+          city's wall or its residents, it goes after the nearest of them in sight, and ends only
+          once none is left. Their card says “On alarm: going after Bo”. For an armed outsider it walks to the town hall and stands there until no armed
           outsider is left in the area, then goes back to what it was doing; someone armed of yours
           on the hall blocks an occupation before it starts, at no cost in standing. An unarmed
           outsider it only writes in the script log.

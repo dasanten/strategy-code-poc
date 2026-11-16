@@ -32,12 +32,6 @@ export function roadJoins(
 /** How wide a road's band is drawn at a zoom, in screen pixels per tile (ADR 0008). */
 export const roadWidth = (tile: number) => Math.max(3, tile * 0.36)
 
-/** How wide a wall is drawn at a zoom: its dark edge and the band in the owner's colour on it. */
-export const wallWidths = (tile: number) => ({
-  edge: Math.max(3, tile * 0.34),
-  band: Math.max(1.5, tile * 0.22),
-})
-
 /** A straight run of joined road far out: from tile (x, y), `n` steps of (dx, dy); 0 is a lone road. */
 export interface RoadRun {
   x: number

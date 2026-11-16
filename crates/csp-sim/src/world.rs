@@ -272,10 +272,14 @@ fn step_rest(
     crate::equipment::settle_all(world);
     let strikes = request_strikes(world, size);
     let strikes_len = strikes.len();
-    let combat = resolve_strikes(world, &strikes, size, &mut GameAlarms, &mut scratch.made);
+    let mut combat = resolve_strikes(world, &strikes, size, &mut GameAlarms, &mut scratch.made);
+    // Whoever was up on a tile that broke falls (`CONTEXT.md`: A tile breaks).
+    let (fell, ended) = crate::wall_walk::fall_from_broken(world, terrain, &combat.broken);
+    combat.died.extend(fell);
+    combat.ended.extend(ended);
     let climbs = request_climbing(world);
     let climbs_len = climbs.len();
-    resolve_climbing(world, &climbs, terrain);
+    resolve_climbing(world, &climbs, terrain, &mut GameAlarms);
     let mut carries = request_carrying(world);
     carries.extend(request_storing(world));
     carries.extend(request_hauling(world, size));
@@ -343,6 +347,8 @@ fn step_rest(
     // NPC cities weigh who outweighs them at their planning pass, once nothing else changes this
     // tick (ADR 0033).
     step_outweighed(world, size);
+    // Who is up on a wall walk, now that walls broke, changed hands and residents moved this tick.
+    crate::wall_walk::step_wall_walk(world);
     let actions = steps
         + strikes_len
         + climbs_len
