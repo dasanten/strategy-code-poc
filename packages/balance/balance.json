@@ -452,6 +452,7 @@
     "bow": 0.0,
     "crossbow": 0.5
   },
+  "WALL_SHOT_REACH_BONUS": 4.0,
   "PROTECTION_DEFENCE": {
     "shield": 3.0,
     "armour": 5.0,
