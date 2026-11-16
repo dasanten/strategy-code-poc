@@ -112,7 +112,7 @@ pub fn plan_feeder(world: &WorldState, city: &City, adults: &[usize], jobs: &mut
         return false;
     };
     let rank = |r: &Resident| -> Option<u8> {
-        if is_armed(&r.carried) || r.carrying.is_some() || task_of(r) == Some(Task::Breed) {
+        if is_armed(r) || r.carrying.is_some() || task_of(r) == Some(Task::Breed) {
             return None;
         }
         match jobs.get(&r.id).map(|j| j.kind) {

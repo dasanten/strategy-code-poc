@@ -54,6 +54,7 @@ import {
   QUEUE_MAX_DEPTH,
   FOAL_STAT_SPREAD,
   STABLE_BREED_DAYS,
+  EQUIP_TICKS,
 } from '@csp/balance'
 import { ageInYears, bestWeapon, canHandle, canWork, stockWeight } from './shared/stats.js'
 import { isAt } from './shared/footprint.js'
@@ -127,6 +128,13 @@ import {
   type ResidentLines,
 } from './residents-view.js'
 import { GOOD_LABELS, carriedItems } from './goods-grid.js'
+import {
+  equipmentLine,
+  equipmentSlots,
+  groupSwapChoices,
+  swapChoices,
+  type SlotView,
+} from './equipment-view.js'
 import { GoodsGrid } from './GoodsGrid.js'
 import { BuildMenu } from './BuildMenu.js'
 import { workSpan } from './build-menu-view.js'
@@ -1346,6 +1354,8 @@ export function orderDoing(
   if (o?.kind === 'pickUp') return 'Picking up goods'
   if (o?.kind === 'drop') return 'Putting down goods'
   if (o?.kind === 'feed') return 'Feeding'
+  if (o?.kind === 'equip')
+    return o.good ? `Putting on ${GOOD_LABELS[o.good].toLowerCase()}` : `Taking off their ${o.slot}`
   if (o?.kind === 'store') return o.phase === 'refilling' ? 'Taking food along' : 'Storing goods'
   if (o?.kind === 'fetch') return 'Fetching goods'
   if (o?.kind === 'tearDown') return 'Tearing down'
@@ -1686,7 +1696,7 @@ export function GroupCard({
   const [tab, setTab] = useState<GroupTab>(() => rememberedTabOf('group', GROUP_TABS))
   // The order whose panel is open under the rows: what it needs before it goes out.
   const [panel, setPanel] = useState<
-    'haul' | 'fetch' | 'breed' | 'teach' | 'relocate' | 'board' | 'feed'
+    'haul' | 'fetch' | 'breed' | 'teach' | 'relocate' | 'board' | 'feed' | 'equip'
   >()
   const [feedUnits, setFeedUnits] = useState(FEED_UNITS)
   const [good, setGood] = useState<Good>('food')
@@ -1848,6 +1858,28 @@ export function GroupCard({
             Each with Food in hand next to someone Down or a horse that isn’t full feeds them, one
             for each: someone Down eats a unit at once and wakes at low health, a horse eats until
             it is full.
+          </p>
+        </section>
+      )}
+      {shown === 'equip' && (
+        <section className="inspector-block" aria-label="Equip">
+          <div className="order-buttons">
+            {groupSwapChoices(residents).map((c) => (
+              <button
+                key={c.good}
+                type="button"
+                onClick={() => {
+                  setPanel(undefined)
+                  onOrder({ kind: 'equip', good: c.good })
+                }}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+          <p className="muted small">
+            Each who carries it puts it on in its slot, the one there staying carried. It takes{' '}
+            {EQUIP_TICKS} ticks, and they strike no blows meanwhile.
           </p>
         </section>
       )}
@@ -2220,6 +2252,7 @@ export function ResidentCard({
   mapSize,
   onAttack,
   onFeed,
+  onEquip,
   walls,
   onClimb,
   carriage,
@@ -2450,6 +2483,11 @@ export function ResidentCard({
   onAttack: (targetId: string) => void
   /** Orders the resident to Feed someone Down or a horse next to them. */
   onFeed?: (targetId: string, units: number) => void
+  /**
+   * Orders the resident to swap a good they carry into a slot, or with `null` to take the slot's
+   * item off (`CONTEXT.md`: Equipment).
+   */
+  onEquip?: (slot: SlotView['slot'], good: Good | null) => void
   /** Finished walls and gates in sight of other realms' cities, or of none. */
   walls: Building[]
   /** Orders the resident to climb over a wall or gate next to them. */
@@ -2799,6 +2837,52 @@ export function ResidentCard({
       )}
       {shown === 'goods' && (
         <>
+          <section className="inspector-block" aria-label="Equipped">
+            <div className="panel-head">
+              <h3>Equipped</h3>
+              {r.order?.kind === 'equip' && (
+                <span className="muted small">
+                  {r.order.good ? `Putting on ${GOOD_LABELS[r.order.good]}…` : 'Taking off…'}
+                </span>
+              )}
+            </div>
+            <ul className="equipment-slots">
+              {equipmentSlots(r.equipped).map((s) => {
+                const choices = onEquip ? swapChoices(s.slot, r.carried, r.equipped) : []
+                return (
+                  <li key={s.slot}>
+                    <span className="muted small">{s.label}</span>{' '}
+                    <span className={s.item ? undefined : 'muted'}>{s.item ?? 'empty'}</span>
+                    {choices.length > 0 && (
+                      <select
+                        aria-label={`Swap into the ${s.label.toLowerCase()} slot`}
+                        value=""
+                        onChange={(e) => onEquip?.(s.slot, e.target.value as Good)}
+                      >
+                        <option value="">{s.item ? 'Swap for…' : 'Put on…'}</option>
+                        {choices.map((c) => (
+                          <option key={c.good} value={c.good}>
+                            {c.label}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {onEquip && s.item && (
+                      <button type="button" onClick={() => onEquip(s.slot, null)}>
+                        Take off
+                      </button>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+            {onEquip && (
+              <p className="muted small">
+                Swapping or taking off takes {EQUIP_TICKS} ticks, and they strike no blows
+                meanwhile. What comes off stays carried.
+              </p>
+            )}
+          </section>
           <section className="inspector-block" aria-label="Carrying">
             <div className="panel-head">
               <h3>Carrying</h3>
@@ -3068,9 +3152,7 @@ export function ResidentCard({
                 Name {r.name} your realm’s heir, to carry it on
                 {heirName ? ` in place of ${heirName}` : ''}? Free and at once, from anywhere.
               </p>
-              {makeLeader.heir.problem && (
-                <p className="muted small">{makeLeader.heir.problem}.</p>
-              )}
+              {makeLeader.heir.problem && <p className="muted small">{makeLeader.heir.problem}.</p>}
               <div className="order-buttons">
                 <button
                   type="button"
@@ -3130,6 +3212,9 @@ export function ResidentCard({
           <GoodsGrid label="Carried" {...carriedItems(r.carried)} />
           <span className="mono">{carryLine(stockWeight(r.carried), carryCapacity(r, tick))}</span>
         </div>,
+        <span key="equipped" className="muted">
+          {equipmentLine(r.equipped)}
+        </span>,
         ...(ridden ? [ridden] : []),
       ]}
       head={

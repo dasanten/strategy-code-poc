@@ -1445,6 +1445,11 @@ pub const WAKE_HEALTH: f64 = 10.0;
 /// one more to go on with, about four game days of eating.
 pub const FEED_UNITS: f64 = 2.0;
 
+/// Ticks a resident takes to swap an item into an equipment slot or take one off (`CONTEXT.md`:
+/// Equipment), striking no blows meanwhile: long enough that swapping mid-fight costs a blow or
+/// two, short enough to be done before the next one comes.
+pub const EQUIP_TICKS: f64 = 3.0;
+
 /// Game days a fed resident takes to heal from no health back to full.
 pub const HEAL_DAYS: f64 = 3.0;
 
@@ -2819,6 +2824,7 @@ pub fn balance_json() -> Value {
     m.insert("DOWN_DAYS".into(), json!(DOWN_DAYS));
     m.insert("WAKE_HEALTH".into(), json!(WAKE_HEALTH));
     m.insert("FEED_UNITS".into(), json!(FEED_UNITS));
+    m.insert("EQUIP_TICKS".into(), json!(EQUIP_TICKS));
     m.insert("HEAL_DAYS".into(), json!(HEAL_DAYS));
     m.insert("HUNGER_ENDURANCE_AVERAGE".into(), json!(HUNGER_ENDURANCE_AVERAGE));
     m.insert("HUNGER_ENDURANCE_EFFECT".into(), json!(HUNGER_ENDURANCE_EFFECT));

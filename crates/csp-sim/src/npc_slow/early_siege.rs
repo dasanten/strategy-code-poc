@@ -63,7 +63,7 @@ fn armed(world: &WorldState, realm: &str, leader: bool) -> Vec<String> {
         .iter()
         .filter(|r| r.owner.as_deref() == Some(realm))
         .filter(|r| leader || Some(&r.id) != leader_id.as_ref())
-        .filter(|r| can_work(r.born_at, world.tick as f64) && is_armed(&r.carried))
+        .filter(|r| can_work(r.born_at, world.tick as f64) && is_armed(r))
         .map(|r| r.id.clone())
         .collect()
 }

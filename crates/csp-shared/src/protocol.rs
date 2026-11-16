@@ -14,9 +14,9 @@ use crate::world::offers::SeenOffer;
 use crate::world::protocol::Hire;
 use crate::world::warehouse::ShownWarehousePrice;
 use crate::world::{
-    AlarmScriptId, ArmyOrder, Building, BuildingKind, Carrying, City, Good, Heading, HorseStats,
-    OrderEnded, Pair, Pile, PricedGood, Queue, ResidentOrder, ScriptParamValue, ScriptParamValues,
-    SkillName, Stat, StatRecord, Stock, Struck, Task, Tile, UpSide, VesselKind,
+    AlarmScriptId, ArmyOrder, Building, BuildingKind, Carrying, City, Equipment, Good, Heading,
+    HorseStats, OrderEnded, Pair, Pile, PricedGood, Queue, ResidentOrder, ScriptParamValue,
+    ScriptParamValues, SkillName, Stat, StatRecord, Stock, Struck, Task, Tile, UpSide, VesselKind,
 };
 
 /// How heavily a carriage looks loaded to a Player who can't see its load (`LoadLevel`,
@@ -131,6 +131,10 @@ pub struct SeenResident {
     pub born_at: f64,
     pub lifespan: f64,
     pub carried: Stock,
+    /// What the resident has equipped (`CONTEXT.md`: Equipment).
+    #[serde(default, skip_serializing_if = "Equipment::is_empty")]
+    #[ts(as = "Option<Equipment>", optional)]
+    pub equipped: Equipment,
     pub order: Option<ResidentOrder>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]

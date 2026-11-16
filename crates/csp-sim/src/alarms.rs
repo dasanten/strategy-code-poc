@@ -105,7 +105,7 @@ pub fn start_alarm(world: &mut WorldState, i: usize, alarm: &Alarm) {
     let picked = match picked {
         Some(AlarmScriptId::Off(_)) => return,
         Some(AlarmScriptId::Script(id)) => Some(id),
-        None if !is_armed(&t.carried) => return,
+        None if !is_armed(t) => return,
         None => None,
     };
     let t = &mut world.residents[i];
@@ -218,7 +218,7 @@ pub fn raise_occupied(world: &mut WorldState, city_id: &str, occupier: &str, siz
     let Some(hall) = town_hall_of(world, &city).cloned() else { return };
     // Occupying takes someone armed there, so there is one to name; the Trade Org's are of no realm.
     let someone = world.residents.iter().find(|r| {
-        is_armed(&r.carried)
+        is_armed(r)
             && is_at(tile(r.x, r.y), placed(&hall), size)
             && (r.owner.as_deref() == Some(occupier) || occupier == TRADE_ORG)
     });

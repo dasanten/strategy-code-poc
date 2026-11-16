@@ -50,6 +50,8 @@ export const QUEUE_STEP_KINDS: readonly string[] = [
   'dismount',
   'relocate',
   'feed',
+  'equip',
+  'takeOff',
   'task',
   'runScript',
   'waitUntil',

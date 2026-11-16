@@ -306,7 +306,7 @@ export function outpostStorageGuarded(
 }
 
 /** What of a resident guarding looks at: all a Player sees of anyone in sight. */
-export type GuardResident = Pick<Resident, 'carried'> & {
+export type GuardResident = Pick<Resident, 'carried' | 'equipped'> & {
   health?: number
   downUntil?: number
   down?: true

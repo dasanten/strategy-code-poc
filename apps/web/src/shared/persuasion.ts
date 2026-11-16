@@ -38,7 +38,7 @@ function tileKey(at: { x: number; y: number }): string {
  * Combat skill, and what their shield and armour take off each blow struck at them. Nothing for
  * the unarmed.
  */
-export function fighterStrength(r: Pick<Resident, 'carried' | 'skills'>): number {
+export function fighterStrength(r: Pick<Resident, 'equipped' | 'skills'>): number {
   const weapon = bestWeapon(r)
   if (weapon === undefined) return 0
   const skill = Math.min(COMBAT_SKILL_LIMIT, (r.skills.combat ?? 0) * COMBAT_SKILL_EFFECT)
