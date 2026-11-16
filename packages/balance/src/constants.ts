@@ -219,6 +219,7 @@ export const SHOT_TICKS = balance.SHOT_TICKS
 export const SHOT_DAMAGE = balance.SHOT_DAMAGE
 export const SHOT_SKILL_LIMIT = balance.SHOT_SKILL_LIMIT
 export const SHOT_PIERCE = balance.SHOT_PIERCE
+export const WALL_SHOT_REACH_BONUS = balance.WALL_SHOT_REACH_BONUS
 export const PROTECTION_DEFENCE = balance.PROTECTION_DEFENCE
 export const CARRY_BASE = balance.CARRY_BASE
 export const CARRY_PER_STRENGTH = balance.CARRY_PER_STRENGTH
