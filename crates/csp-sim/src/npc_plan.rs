@@ -749,24 +749,20 @@ fn share_out(
             }
         }
     }
-    let roads_and_scouts = vec![(ScoredJob::Road, Offer::Road), (ScoredJob::Scout, Offer::Scout)];
-    let idle = if founding_short.is_empty() {
-        let mut second = roads_and_scouts;
-        second.extend(workplaces);
-        fill(world, jobs, held, &kept, &mut state, &mut ways, second, unneeded.clone())
+    let mut second = vec![(ScoredJob::Road, Offer::Road), (ScoredJob::Scout, Offer::Scout)];
+    second.extend(workplaces);
+    let left = fill(world, jobs, held, &kept, &mut state, &mut ways, second, unneeded.clone());
+    // Lacking nothing else, its founding party's materials count as short (`CONTEXT.md`: Full
+    // city), but its spare hands' work comes first (Daniel, 2026-11-16, T100.8): only the hands
+    // left over gather for the party. All are still spare hands to its founding.
+    let founding: Vec<(ScoredJob, Offer)> = founding_short
+        .iter()
+        .map(|s| (ScoredJob::Short { share: s.share }, Offer::Short(s.good)))
+        .collect();
+    let idle = if founding.is_empty() || left.is_empty() {
+        left
     } else {
-        // Lacking nothing else, its founding party's materials count as short (`CONTEXT.md`: Full
-        // city), but its workplaces come first (Daniel, 2026-11-16, T100.8): only the hands left
-        // over gather for the party, then the road crew and scouts. All are still spare hands to
-        // its founding.
-        let founding: Vec<(ScoredJob, Offer)> = founding_short
-            .iter()
-            .map(|s| (ScoredJob::Short { share: s.share }, Offer::Short(s.good)))
-            .collect();
-        let left =
-            fill(world, jobs, held, &kept, &mut state, &mut ways, workplaces, unneeded.clone());
-        let left = fill(world, jobs, held, &kept, &mut state, &mut ways, founding, left);
-        fill(world, jobs, held, &kept, &mut state, &mut ways, roads_and_scouts, left)
+        fill(world, jobs, held, &kept, &mut state, &mut ways, founding, left)
     };
     for i in idle {
         jobs.insert(world.residents[i].id.clone(), job_at(CityJobKind::Idle, None));

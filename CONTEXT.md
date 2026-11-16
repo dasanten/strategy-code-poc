@@ -641,9 +641,9 @@ The shared language of the game. Domain terms only — no implementation details
   gather them like any shortage, and it builds the workplace for one it has none of. Food, Coins
   and weapons still come first, since only once nothing else is short do the materials count; Food
   its surplus too (Daniel, 2026-11-15): only once it holds a share of its Food surplus cap past its
-  reserve (a balance number). Its workplaces come first too (Daniel, 2026-11-16): its spare hands
-  work at them for surplus (Spare hands' work) before they gather for the party, and only the hands
-  left over gather, ahead of the road crew and scouts. Those gathering them are still spare hands
+  reserve (a balance number). Its workplaces come first too (Daniel, 2026-11-16): its spare hands'
+  work (Spare hands' work: road crew, scouting, its workplaces for surplus) comes before gathering
+  for the party, and only the hands left over gather. Those gathering them are still spare hands
   for its full wait. A dip below the reserve only restarts that time if it lasts longer than a game
   day, though nothing sets out during one. A full city founds a daughter (Founding).
 - **Founding:** how a full NPC city spreads out. It picks a free Plains site the usual distance
