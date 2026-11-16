@@ -3470,6 +3470,17 @@ export function Wiki() {
           </tbody>
         </table>
         <p>
+          <strong>Archers by default.</strong> Struck, an archer's Defend default shoots back from
+          where they stand, walking only until the one who struck them is in reach. On an alarm,
+          the Alarm default sends an archer on the ground up onto the city's wall tile between them
+          and whoever they go after, and they shoot from there; up on the wall they wait for them
+          to come in reach rather than come down. With no wall between them they shoot from where
+          they stand. Out of Arrows an archer does what anyone armed does and closes in. Scripts see
+          a resident's <code>reach</code> (null without a Bow or Crossbow) and the Arrows they carry
+          in <code>carried.arrows</code>; <code>shoot(targetId)</code> shoots someone in reach
+          without a step, and <code>attack</code> walks only until they are in reach.
+        </p>
+        <p>
           To <strong>swap</strong> gear, pick another item they carry for a slot on their card (or
           the group card's Equip…, for each of them who carries it), or take a slot's item off;
           scripts do the same with <code>equip(good)</code> and <code>takeOff(slot)</code>, and a

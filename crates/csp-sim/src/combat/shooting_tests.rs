@@ -42,8 +42,11 @@ fn archers(weapon: Good, arrows: f64, apart: f64) -> WorldState {
 
 fn order(world: &mut WorldState, resident_id: &str, target_id: &str) -> &'static str {
     let sender = OrderSender::player(ME, "Mara");
-    let request =
-        AttackRequest { resident_id: Some(resident_id.into()), target_id: Some(target_id.into()) };
+    let request = AttackRequest {
+        resident_id: Some(resident_id.into()),
+        target_id: Some(target_id.into()),
+        ..AttackRequest::default()
+    };
     if let Some(reason) = validate_attack(world, &sender, &request, Some(SIZE)) {
         return reason;
     }
