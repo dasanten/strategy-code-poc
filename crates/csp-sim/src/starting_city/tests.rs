@@ -267,7 +267,7 @@ fn starting_residents_each_carry_an_iron_spear_and_are_armed() {
         assert!(age_in_years(r.born_at, world.tick as f64) >= ADULT_AGE);
         let start = [(Good::Food, START_CARRIED_FOOD), (Good::Spear, START_SPEARS)];
         assert_eq!(r.carried, start.into_iter().collect::<Stock>());
-        assert!(is_armed(&r.carried), "{} is armed", r.name);
+        assert!(is_armed(r), "{} is armed", r.name);
     }
     assert!(residents.iter().any(|r| r.id == realm.leader_id));
     // No spare weapons in the storage.
@@ -280,7 +280,7 @@ fn starting_residents_each_carry_an_iron_spear_and_are_armed() {
 fn a_starting_child_gets_no_spear() {
     let child = starting_carry(false);
     assert_eq!(child, [(Good::Food, START_CARRIED_FOOD)].into_iter().collect::<Stock>());
-    assert!(!is_armed(&child));
+    assert_eq!(crate::equipment::best_for(&child, crate::equipment::Slot::Weapon), None);
 }
 
 #[test]
