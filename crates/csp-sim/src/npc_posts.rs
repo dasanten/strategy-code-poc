@@ -54,15 +54,16 @@ pub fn free_soldiers(world: &WorldState, city: &City, adults: &[usize]) -> Vec<u
 
 /// The armed adults of a city's `adults` it can put somewhere (`soldiersAtHand`): not at any script
 /// but the Train default, so not on alarm; not fighting, carrying a child, Down, on a round, nor
-/// its traders or founding party.
+/// its traders, their escorts or its founding party.
 pub fn soldiers_at_hand(world: &WorldState, city: &City, adults: &[usize]) -> Vec<usize> {
     let plan = world.city_plans.get(&city.id);
     let party: HashSet<String> = founding_party(plan).into_iter().collect();
+    // A trader's escort walks with them (`CONTEXT.md`: Escort).
     let traders: HashSet<&String> = plan
         .and_then(|p| p.traders.as_ref())
         .into_iter()
         .flatten()
-        .map(|t| &t.resident_id)
+        .flat_map(|t| std::iter::once(&t.resident_id).chain(&t.escort_ids))
         .collect();
     let on_round: HashSet<&String> = plan
         .and_then(|p| p.patrols.as_ref())
