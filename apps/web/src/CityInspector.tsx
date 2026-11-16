@@ -28,8 +28,10 @@ import type {
   TraderVisit,
   SwapQuote,
   SwapRate,
+  Temperament,
 } from '@csp/shared-types'
 import { aboutTime } from './shared/estimates.js'
+import { temperamentLine } from './temperament-view.js'
 import {
   buildingCount,
   describeBuying,
@@ -295,6 +297,7 @@ export function CityInspector({
               {overview.buildings.map(([k, n]) => buildingCount(k, n)).join(', ')}
             </p>
           )}
+          <TemperamentLine temperament={city.temperament} />
           <Reaction city={city} />
           <Buying
             buy={describeBuying(city, { residents, buildings }, realmId)}
@@ -673,6 +676,7 @@ function RememberedCity({
     overview: (
       <>
         <p className="city-details">{lastSeenText(city.seenAt, tick)}</p>
+        <TemperamentLine temperament={city.temperament} />
         <p className="city-details">Housing for {overview.housing}</p>
         {overview.buildings.length > 0 && (
           <p className="city-details">
@@ -704,6 +708,17 @@ function RememberedCity({
         ))}
       </div>
     </li>
+  )
+}
+
+/** What an NPC city is like (`CONTEXT.md`: Temperament), for whoever sees it. */
+function TemperamentLine({ temperament }: { temperament: Temperament | undefined }) {
+  const line = temperamentLine(temperament)
+  if (!line) return null
+  return (
+    <p className="city-details" aria-label="Temperament">
+      {line}
+    </p>
   )
 }
 

@@ -267,8 +267,9 @@ pub fn leave_trade_org(world: &mut WorldState, post_id: &str) {
 pub fn rejoin_trade_org(world: &mut WorldState, post_id: &str, size: i32) {
     let Some(post) = world.cities.iter_mut().find(|c| c.id == post_id) else { return };
     post.trade_org = Some(TradeOrgCity::Post);
-    // A Trade Org city has no layout (`CONTEXT.md`: City layout).
+    // A Trade Org city has no layout (`CONTEXT.md`: City layout) and no temperament.
     post.layout = None;
+    post.temperament = None;
     restore_warehouse(world, post_id, size);
     place_caravans(world);
 }
@@ -283,6 +284,7 @@ pub fn join_trade_org(
     let Some(city) = world.cities.iter_mut().find(|c| c.id == city_id) else { return };
     city.trade_org = Some(TradeOrgCity::Post);
     city.layout = None;
+    city.temperament = None;
     city.former_player = None;
     storages_become_warehouses(world, city_id, size, terrain);
     for b in &mut world.buildings {

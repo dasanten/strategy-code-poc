@@ -479,6 +479,7 @@ mod an_npc_city_breeding_its_horses {
             let c = v.city_mut();
             c.trade_org = Some(TradeOrgCity::Post);
             c.layout = None;
+            c.temperament = None;
         }
         run(&mut v.world, &v.terrain, days(0.25), |world| assert!(breeders(world).is_empty()));
         let city = v.city.clone();

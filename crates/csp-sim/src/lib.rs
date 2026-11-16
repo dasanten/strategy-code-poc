@@ -131,6 +131,7 @@ pub mod supply_wagons;
 pub mod survival;
 pub mod teaching;
 pub mod teardown;
+pub mod temperament;
 pub mod terrain_gen;
 pub mod territory;
 #[cfg(test)]

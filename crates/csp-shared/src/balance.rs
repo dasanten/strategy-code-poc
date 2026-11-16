@@ -1033,6 +1033,10 @@ pub const NPC_FOUND_GIVE_UP_DAYS: f64 = 20.0;
 /// high, of `STANDING_RANGE`, fading like any standing.
 pub const NPC_FOUND_STANDING: f64 = 80.0;
 
+/// The chance a daughter takes its mother's temperament (`CONTEXT.md`: Temperament); otherwise it
+/// is drawn from its id like any NPC city's, so it may still come out the same.
+pub const NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT: f64 = 0.75;
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TradeOrgHq {
@@ -2770,6 +2774,10 @@ pub fn balance_json() -> Value {
     m.insert("NPC_FOUND_FOOD_DAYS".into(), json!(NPC_FOUND_FOOD_DAYS));
     m.insert("NPC_FOUND_GIVE_UP_DAYS".into(), json!(NPC_FOUND_GIVE_UP_DAYS));
     m.insert("NPC_FOUND_STANDING".into(), json!(NPC_FOUND_STANDING));
+    m.insert(
+        "NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT".into(),
+        json!(NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT),
+    );
     m.insert("TRADE_ORG_HQ".into(), to_value(TRADE_ORG_HQ).expect("serialisable"));
     m.insert("TRADE_ORG_HQ_MIN_DISTANCE".into(), json!(TRADE_ORG_HQ_MIN_DISTANCE));
     m.insert("TRADING_POST_REGION".into(), json!(TRADING_POST_REGION));

@@ -20,6 +20,7 @@ use crate::regions::{RegionKind, Regions};
 use crate::residents::{new_resident, NewResident};
 use crate::sight::entities_in_sight;
 use crate::starting_city::found_starting_city;
+use crate::temperament::pick_temperament;
 use crate::terrain_gen::generate_terrain;
 use crate::test_support::plains;
 use crate::test_world::{city_terrain, world_with_city};
@@ -236,6 +237,8 @@ fn shows_an_npc_city_to_a_player_once_one_of_their_residents_comes_in_sight_of_i
     for (k, v) in own.as_object().unwrap() {
         assert_eq!(&city[k], v, "{k}");
     }
+    // What it is like, drawn from its id (`CONTEXT.md`: Temperament).
+    assert_eq!(city["temperament"], json!(pick_temperament(world.seed, &id)));
     assert_eq!(city["price"], json!(city_price(&world, c, None)));
     assert!(!city["hire"].is_null());
     let hall = town_hall_of(&world, c).unwrap();
