@@ -411,7 +411,10 @@ fn counts_a_load_already_fetched_as_gone_from_the_storage_not_as_spoken_for() {
     let r = f.world.residents.iter_mut().find(|r| r.id == trader).unwrap();
     r.carried.insert(Good::Wood, one);
     f.plan();
-    assert_eq!(f.runs().len(), 2);
+    // More go; how many depends on the spare hands not out scouting, and with its Food at the
+    // reserve none goes scouting (`CONTEXT.md`: Scout).
+    assert!(f.runs().len() >= 2, "{:?}", f.runs());
+    assert!(f.runs().iter().any(|t| t.resident_id == trader));
 }
 
 #[test]

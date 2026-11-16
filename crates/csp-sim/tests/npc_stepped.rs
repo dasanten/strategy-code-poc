@@ -61,16 +61,24 @@ fn subset(world: &WorldState, t: u64) -> Value {
     })
 }
 
+/// Cases compared only up to a tick, by name: from T105.7 on (#1344) a new scout sets out only
+/// with the Food they take above the reserve (`CONTEXT.md`: Scout), and the new village sends its
+/// first scout at tick 30 with less above it. The `npc_plan` test
+/// `sends_a_new_scout_only_with_the_food_they_take_above_the_reserve` holds the rule instead.
+const COMPARED_UNTIL: &[(&str, u64)] = &[("village-0", 2)];
+
 #[test]
 fn npc_cities_step_as_in_typescript() {
     let stepped: Value = serde_json::from_str(include_str!("../src/npc/npc-stepped.json"))
         .expect("npc-stepped.json");
     for case in stepped.as_array().unwrap() {
         let name = case["name"].as_str().unwrap();
+        let until = COMPARED_UNTIL.iter().find(|(n, _)| *n == name).map_or(u64::MAX, |c| c.1);
         let file = read_json(&format!("worlds/{name}.json"));
         let terrain = terrain_of(&file);
         let mut world: WorldState = serde_json::from_value(file["world"].clone()).unwrap();
-        let mut at = case["at"].as_array().unwrap().iter();
+        let mut at =
+            case["at"].as_array().unwrap().iter().filter(|w| w["t"].as_u64() <= Some(until));
         let mut next = at.next();
         for t in 1..=360u64 {
             step_npc_defence(&mut world, terrain.size);
