@@ -77,19 +77,22 @@ describe('a row of the full list', () => {
     expect(residentRow(edda({ skills: {} }), options).skills).toBe('')
   })
 
-  it('shows the best weapon and all protection as gear', () => {
+  it('shows what they have equipped as gear, not what else they carry', () => {
     const row = residentRow(
-      edda({ carried: { spear: 2, sword: 1, armour: 1, shield: 1 } }),
+      edda({
+        carried: { spear: 2, sword: 1, armour: 1, shield: 1 },
+        equipped: { weapon: 'sword', shield: 'shield', armour: 'armour' },
+      }),
       options,
     )
     expect(row.gear).toBe('Sword, Shield, Armour')
-    expect(residentRow(edda({ carried: { shield: 1 } }), options).gear).toBe('Shield')
-    expect(residentRow(edda({ carried: { wood: 3 } }), options).gear).toBe('')
+    expect(residentRow(edda({ equipped: { shield: 'shield' } }), options).gear).toBe('Shield')
+    expect(residentRow(edda({ carried: { wood: 3, sword: 1 } }), options).gear).toBe('')
   })
 
-  it('shows steel gear over iron, and only the best shield and armour', () => {
+  it('shows steel gear equipped as steel', () => {
     const row = residentRow(
-      edda({ carried: { sword: 1, steelSword: 1, shield: 1, steelShield: 1, armour: 1 } }),
+      edda({ equipped: { weapon: 'steelSword', shield: 'steelShield', armour: 'armour' } }),
       options,
     )
     expect(row.gear).toBe('Steel sword, Steel shield, Armour')

@@ -3370,6 +3370,12 @@ export function Wiki() {
           fits it, so a resident can walk unarmed with a sword in the pack.
         </p>
         <p>
+          Anyone who sees a resident sees what they have equipped: on the map up close a mark for
+          their weapon and shield and a rim for armour, bright for steel and grey for iron, and the
+          same on their card, to scripts too. What else they carry stays hidden from other realms,
+          as a carriage's load does, unless one of theirs stands on the same tile.
+        </p>
+        <p>
           Defenders on their own city's wall take {pct(WALL_DEFENCE)} of the damage. A tile of wall
           takes {num(WALL_STRENGTH.wall)} damage to break and a gate {num(WALL_STRENGTH.gate)}: an
           average unarmed resident alone needs {duration(breakTicks('wall'))} for a wall and{' '}

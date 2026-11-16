@@ -177,3 +177,87 @@ fn equipment_invariants() -> Vec<csp_sim::invariants::Invariant> {
     let names = ["equipment-sound", "carried-within-capacity", "goods-in-place"];
     world_invariants().into_iter().filter(|i| names.contains(&i.name)).collect()
 }
+
+/// Others see what a resident has equipped (`CONTEXT.md`: Equipment, Seeing it; T107.3): anyone
+/// in sight sees the slots, only the resident's own realm (and anyone beside them) what they carry.
+mod seen {
+    use super::*;
+    use csp_shared::protocol::{SeenEntity, SeenResident};
+    use csp_sim::queries::persuasion::fighter_strength;
+    use csp_sim::sight::{entities_in_sight, sent_inside_unseen};
+    use csp_sim::world_index::WorldIndex;
+
+    const WIDE: i32 = 160;
+
+    /// Realm r1's soldier w1 at (5, 5) with a Sword and Shield equipped, a spare steel Sword, Wood
+    /// and Food in the pack; realm r2's resident v1 at `at`.
+    fn two_realms(at: (f64, f64)) -> WorldState {
+        let mut world = goods_support::world_on(&open(WIDE));
+        world.realms.push(realm("r1", 7, "w1"));
+        world.realms.push(realm("r2", 8, "v1"));
+        let mut w = new_resident(1.0, "w1", Some("r1"), 5.0, 5.0);
+        w.carried =
+            stock(json!({ "food": 2, "wood": 5, "sword": 1, "steelSword": 1, "shield": 1 }));
+        w.equipped = Equipment {
+            weapon: Some(Good::Sword),
+            shield: Some(Good::Shield),
+            ..Default::default()
+        };
+        world.residents.push(w);
+        world.residents.push(new_resident(2.0, "v1", Some("r2"), at.0, at.1));
+        world
+    }
+
+    fn seen_w1(world: &WorldState, side: &str) -> Option<SeenResident> {
+        let index = WorldIndex::new(world, WIDE);
+        let sent = entities_in_sight(world, &index, Some(side), None);
+        assert_eq!(sent_inside_unseen(world, &index, side, &sent), vec![], "{side}");
+        sent.iter().find_map(|e| match e {
+            SeenEntity::Resident(r) if r.id == "w1" => Some((**r).clone()),
+            _ => None,
+        })
+    }
+
+    #[test]
+    fn another_realm_in_sight_sees_the_equipped_gear_and_not_the_pack() {
+        let world = two_realms((12.0, 5.0));
+        let theirs = seen_w1(&world, "r2").expect("r2 sees w1");
+        assert_eq!(
+            theirs.equipped,
+            Equipment {
+                weapon: Some(Good::Sword),
+                shield: Some(Good::Shield),
+                ..Default::default()
+            }
+        );
+        assert!(theirs.carried.is_empty(), "the pack stays hidden: {:?}", theirs.carried);
+        let ours = seen_w1(&world, "r1").expect("r1 sees its own");
+        assert_eq!(held(&ours.carried, Good::Wood), 5.0);
+        assert_eq!(ours.equipped, theirs.equipped);
+    }
+
+    #[test]
+    fn a_resident_standing_beside_them_sees_the_pack_too() {
+        let world = two_realms((5.0, 5.0));
+        let theirs = seen_w1(&world, "r2").expect("r2 sees w1");
+        assert_eq!(held(&theirs.carried, Good::SteelSword), 1.0);
+    }
+
+    #[test]
+    fn out_of_sight_nothing_is_sent() {
+        let world = two_realms((85.0, 85.0));
+        assert!(seen_w1(&world, "r2").is_none());
+    }
+
+    #[test]
+    fn respect_weighs_the_equipped_sword_not_the_better_one_in_the_pack() {
+        let world = two_realms((12.0, 5.0));
+        let mut steel = world.residents[0].clone();
+        steel.equipped.weapon = Some(Good::SteelSword);
+        assert!(fighter_strength(&world.residents[0]) < fighter_strength(&steel));
+        let mut bare = world.residents[0].clone();
+        bare.equipped = Equipment::default();
+        bare.carried = stock(json!({ "food": 2 }));
+        assert_eq!(fighter_strength(&bare), 0.0, "nothing equipped, no soldier");
+    }
+}

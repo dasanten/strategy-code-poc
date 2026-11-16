@@ -142,7 +142,7 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
             ScriptField {
                 name: "carried",
                 r#type: ScriptType::View("goods"),
-                description: "The goods they carry.",
+                description: "The goods they carry: seen of your own and your allies' residents, and of anyone one of yours stands beside; empty for others, who show only what they have equipped.",
                 null_when: None,
             },
             ScriptField {
