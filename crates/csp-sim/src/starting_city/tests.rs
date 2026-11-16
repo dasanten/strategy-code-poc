@@ -53,15 +53,74 @@ fn as_the_typescript_founded(mut world: WorldState) -> WorldState {
     world
 }
 
+/// The world as the TypeScript founded it: its stable hands (T104.3) worked the farm as everyone
+/// else, so each is put back on it to compare the rest with the frozen fixtures;
+/// `one_grown_resident_not_the_leader_starts_on_farm_and_feed` checks the queue.
+fn without_stable_hands(mut world: WorldState) -> WorldState {
+    for realm in world.realms.clone() {
+        let leader = world.residents.iter().find(|r| r.id == realm.leader_id).unwrap().clone();
+        let hand = world
+            .residents
+            .iter_mut()
+            .find(|r| r.owner.as_ref() == Some(&realm.id) && r.queue.is_some())
+            .unwrap();
+        hand.queue = None;
+        (hand.order, hand.script) = (leader.order, leader.script);
+    }
+    world
+}
+
+/// Both of the above.
+fn as_the_typescript(world: WorldState) -> WorldState {
+    without_stable_hands(as_the_typescript_founded(world))
+}
+
 #[test]
 fn founds_the_typescripts_starting_city() {
-    assert_eq!(as_the_typescript_founded(founded_for(1)), fixture("city"));
+    assert_eq!(as_the_typescript(founded_for(1)), fixture("city"));
 }
 
 #[test]
 fn founds_the_typescripts_starting_cities_for_two_and_three_players() {
-    assert_eq!(as_the_typescript_founded(founded_for(2)), fixture("two-realms"));
-    assert_eq!(as_the_typescript_founded(founded_for(3)), fixture("three-realms"));
+    assert_eq!(as_the_typescript(founded_for(2)), fixture("two-realms"));
+    assert_eq!(as_the_typescript(founded_for(3)), fixture("three-realms"));
+}
+
+#[test]
+fn one_grown_resident_not_the_leader_starts_on_farm_and_feed() {
+    let world = founded_for(2);
+    for realm in &world.realms {
+        let hands: Vec<_> = world
+            .residents
+            .iter()
+            .filter(|r| r.owner.as_ref() == Some(&realm.id) && r.queue.is_some())
+            .collect();
+        assert_eq!(hands.len(), 1);
+        let hand = hands[0];
+        assert_ne!(hand.id, realm.leader_id);
+        assert!(age_in_years(hand.born_at, world.tick as f64) >= ADULT_AGE);
+        let city = world.cities.iter().find(|c| c.realm_id.as_ref() == Some(&realm.id)).unwrap();
+        let of_city = |k: BuildingKind| {
+            world.buildings.iter().find(|b| b.kind == k && b.city_id == Some(city.id.clone()))
+        };
+        let (farm, stable) =
+            (of_city(BuildingKind::Farm).unwrap(), of_city(BuildingKind::Stable).unwrap());
+        let q = hand.queue.as_ref().unwrap();
+        assert_eq!((q.name.as_deref(), q.r#loop), (Some(FARM_AND_FEED), true));
+        assert_eq!(q.realm_id, realm.id);
+        let written = serde_json::to_value(&q.items).unwrap();
+        let mut expected = farm_and_feed(farm, stable);
+        // Ids from 1, a block before its items.
+        expected[0]["id"] = 1.into();
+        for (n, id) in [2, 3, 4].into_iter().enumerate() {
+            expected[0]["items"][n]["id"] = id.into();
+        }
+        expected[1]["id"] = 5.into();
+        assert_eq!(written, expected);
+        // The stable starts with plenty, so their first step is the farm, for a game hour.
+        assert_eq!(q.current, 5);
+        assert!(hand.order.is_none() && hand.script.is_none());
+    }
 }
 
 #[test]
@@ -92,14 +151,18 @@ fn gives_a_player_a_realm_with_everything_a_starting_city_has() {
         world.residents.iter().filter(|r| r.owner.as_deref() == Some(realm.id.as_str())).collect();
     assert_eq!(residents.len() as f64, START_RESIDENTS);
     assert!(residents.iter().any(|r| r.id == realm.leader_id));
-    // Everyone starts on the farm, working it, with a little food on them.
+    // Everyone starts on the farm, working it, with a little food on them; the stable hand on
+    // their queue instead (`one_grown_resident_not_the_leader_starts_on_farm_and_feed`).
     let farm = world.buildings.iter().find(|b| b.kind == BuildingKind::Farm).unwrap();
     for r in &residents {
         assert_eq!(r.city_id.as_deref(), Some(city.id.as_str()));
         assert_eq!((r.x, r.y), (farm.x, farm.y));
         assert_eq!(r.carried.get(&Good::Food), Some(&START_CARRIED_FOOD));
-        assert!(matches!(&r.order, Some(ResidentOrder::WorkAt(o))
-            if o.building_id == farm.id && o.at.x == farm.x && o.at.y == farm.y && o.progress == 0.0 && o.makes.is_none()));
+        assert!(
+            r.queue.is_some()
+                || matches!(&r.order, Some(ResidentOrder::WorkAt(o))
+            if o.building_id == farm.id && o.at.x == farm.x && o.at.y == farm.y && o.progress == 0.0 && o.makes.is_none())
+        );
         assert_eq!((r.health, r.hunger), (MAX_HEALTH, MAX_HUNGER));
         assert!(age_in_years(r.born_at, world.tick as f64) >= ADULT_AGE);
         for s in [&r.stats.strength, &r.stats.endurance, &r.stats.agility, &r.stats.intellect] {

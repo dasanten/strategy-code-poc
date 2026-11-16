@@ -23,6 +23,7 @@ fn queue(items: Vec<QueueItem>, r#loop: bool) -> Queue {
         started_at: None,
         r#loop,
         started: false,
+        name: None,
     };
     begin(&mut q, &mut |_| true);
     q
@@ -120,6 +121,7 @@ fn run_asking(items: Vec<QueueItem>, r#loop: bool, answers: &[bool], most: usize
         started_at: None,
         r#loop,
         started: false,
+        name: None,
     };
     let mut out = vec![];
     if begin(&mut q, &mut ask) == Advance::Ended {
@@ -185,6 +187,7 @@ fn an_edit_puts_the_branch_where_the_current_step_is() {
         started_at: None,
         r#loop: false,
         started: false,
+        name: None,
     };
     begin(&mut q, &mut |_| true);
     assert_eq!(q.current, 2);
@@ -219,6 +222,7 @@ fn rounds_problem_finds_an_if_on_the_wrong_branch() {
         started_at: None,
         r#loop: false,
         started: false,
+        name: None,
     };
     begin(&mut q, &mut |_| false);
     assert_eq!((q.current, rounds_problem(&q)), (3, None));
@@ -269,6 +273,7 @@ fn a_repeat_until_still_ends_after_a_round_that_started_nothing_without_asking()
         started_at: None,
         r#loop: false,
         started: false,
+        name: None,
     };
     begin(&mut q, &mut |_| false);
     assert_eq!(q.current, 2);

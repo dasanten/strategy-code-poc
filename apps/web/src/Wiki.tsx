@@ -241,6 +241,8 @@ import {
   NPC_START_HORSE_FOOD_DAYS,
   NPC_START_HORSES,
   STABLE_FEED_DAYS,
+  STABLE_HAND_FEED_DAYS,
+  STABLE_HAND_WORK_MINUTES,
   DEFEND_CALM_TICKS,
   STANDING_CONTRACT_BROKEN_LOSS,
   STANDING_DRIFT_PER_DAY,
@@ -260,6 +262,7 @@ import {
   STANDING_RANGE,
   STANDING_NPC_TRADE_COINS_PER_POINT,
   STANDING_TRADE_COINS_PER_POINT,
+  START_HORSES,
   START_RESIDENTS,
   START_SPEARS,
   STARTING_SITE_WALK,
@@ -1166,10 +1169,20 @@ export function Wiki() {
         </p>
         <p>
           <strong>Starting city.</strong> A new Leader’s city starts with {num(START_RESIDENTS)}{' '}
-          residents, your Leader among them, all working the farm. Every grown one, your Leader too,
+          residents, your Leader among them, working the farm. Every grown one, your Leader too,
           carries {num(START_SPEARS)} iron Spear, so they are armed from the first tick and an alarm
           sends them to defend the city. Children get none, and no spare weapons lie in the
           storage. NPC villages keep their own start.
+        </p>
+        <p>
+          One resident of your starting city, never your Leader, is its{' '}
+          <strong>stable hand</strong>. They start on a looped queue, <strong>Farm and feed</strong>:
+          if the stable holds less than {days(STABLE_HAND_FEED_DAYS)} of Food for its{' '}
+          {num(START_HORSES)} horses, Feed the stable once; then work the farm for{' '}
+          {num(STABLE_HAND_WORK_MINUTES)} game minutes; again. So your horses don’t starve while you
+          are away, as long as the storage has Food. Their card shows the queue under its name like
+          any queue, which you can change or clear, and the planner’s Saved… lists it among your
+          saved queues in this browser.
         </p>
         <p>
           The regions of the mainland are parted by Mountain ranges and by arms of the Sea, about{' '}

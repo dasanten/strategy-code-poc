@@ -497,6 +497,15 @@ pub const HORSE_WAKE_HEALTH: f64 = 20.0;
 /// resident fetches more. Written into the default's source, where a Player can change it.
 pub const STABLE_FEED_DAYS: f64 = 10.0;
 
+/// Game days of Food for a starting city's horses (`START_HORSES`, `HORSE_FOOD_PER_DAY` each)
+/// below which the stable hand's "Farm and feed" queue feeds the stable once (`CONTEXT.md`:
+/// Starting city): a few days, so a round fills it from well before it runs out.
+pub const STABLE_HAND_FEED_DAYS: f64 = 3.0;
+
+/// Game minutes the stable hand works the farm between two looks at the stable (`CONTEXT.md`:
+/// Starting city): a game hour.
+pub const STABLE_HAND_WORK_MINUTES: f64 = 60.0;
+
 /// Game days of Food for its horses below which an NPC city sends one of its residents to fill its
 /// stable up to `STABLE_FEED_DAYS` (`CONTEXT.md`: NPC horses). Half of it, so they go in one trip
 /// every few days and work for the city in between, rather than walk for every unit eaten.
@@ -2635,6 +2644,8 @@ pub fn balance_json() -> Value {
     m.insert("HORSE_HUNGRY_SHARE".into(), json!(HORSE_HUNGRY_SHARE));
     m.insert("HORSE_WAKE_HEALTH".into(), json!(HORSE_WAKE_HEALTH));
     m.insert("STABLE_FEED_DAYS".into(), json!(STABLE_FEED_DAYS));
+    m.insert("STABLE_HAND_FEED_DAYS".into(), json!(STABLE_HAND_FEED_DAYS));
+    m.insert("STABLE_HAND_WORK_MINUTES".into(), json!(STABLE_HAND_WORK_MINUTES));
     m.insert("NPC_STABLE_REFILL_DAYS".into(), json!(NPC_STABLE_REFILL_DAYS));
     m.insert("NPC_STABLE_HUNGRY_DAYS".into(), json!(NPC_STABLE_HUNGRY_DAYS));
     m.insert("NPC_START_HORSES".into(), json!(NPC_START_HORSES));
