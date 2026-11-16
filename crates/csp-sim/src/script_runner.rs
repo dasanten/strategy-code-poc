@@ -27,7 +27,7 @@ use csp_shared::world::{
 };
 use serde_json::{json, Map, Value as Json};
 
-use crate::alarms::{back_to_outsider_alarm, runs_npc_alarm};
+use crate::alarms::{back_to_outsider_alarm, on_to_next_attacker, runs_npc_alarm};
 use crate::default_scripts::{default_script, task_of};
 use crate::defence::resume_interrupted;
 use crate::events::record_event;
@@ -988,10 +988,14 @@ fn memory_object(memory: &ScriptMemory) -> Object {
 }
 
 /// A resident's script called `end()` (`endScript`): it ends and they stand idle. A defence or
-/// Alarm script hands back to what it interrupted. True when it goes on as the same script (an
-/// Alarm script back on an outsider alarm).
-fn end_script(world: &mut WorldState, resident_id: &str) -> bool {
+/// Alarm script hands back to what it interrupted. True when it goes on as the same script (the
+/// Alarm default on to the next attacker, on a map of `size` tiles when given, or an Alarm script
+/// back on an outsider alarm).
+fn end_script(world: &mut WorldState, resident_id: &str, size: Option<i32>) -> bool {
     let Some(i) = world.residents.iter().position(|x| x.id == resident_id) else { return false };
+    if size.is_some_and(|size| on_to_next_attacker(world, i, size)) {
+        return true;
+    }
     if back_to_outsider_alarm(&mut world.residents[i]) {
         return true;
     }
@@ -1305,7 +1309,7 @@ impl ScriptRunner {
             if r.army {
                 r.clear_script(world);
             } else {
-                end_script(world, &r.id);
+                end_script(world, &r.id, None);
             }
         }
         let at = ScriptErrorWhere {
@@ -1557,7 +1561,7 @@ impl ScriptRunner {
         }
         let spent = result.steps() as f64;
         if ended {
-            let same = !r.army && end_script(world, &r.id);
+            let same = !r.army && end_script(world, &r.id, Some(self.terrain.size));
             if r.army {
                 r.clear_script(world);
             }
@@ -1959,7 +1963,7 @@ fn run_city_scripts(
                 scout_ended(world, &city.id, end_reason.as_deref());
             }
             // An Alarm script going back to an outsider alarm hasn't ended: it keeps what it remembered.
-            if end_script(world, id) {
+            if end_script(world, id, Some(terrain.size)) {
                 if let Ok(kept) = keep_memory(&memory) {
                     if let Some(s) = world
                         .residents

@@ -3386,7 +3386,9 @@ export function Wiki() {
           average unarmed resident alone needs {duration(breakTicks('wall'))} for a wall and{' '}
           {duration(breakTicks('gate'))} for a gate. A broken one leaves{' '}
           {pct(BROKEN_MATERIALS_RETURNED)} of its materials. Climbing over takes{' '}
-          {duration(CLIMB_TICKS)}, unable to dodge or strike back.
+          {duration(CLIMB_TICKS)}, unable to dodge or strike back, and raises the alarm as breaking
+          the wall does. So a starting city's armed residents, at home when the attack starts, get
+          up onto their wall in time to beat breakers and climbers twice their number.
         </p>
         <p>
           <strong>The wall walk.</strong> Every wall and gate tile has a walk on top, unbroken round
@@ -3476,8 +3478,9 @@ export function Wiki() {
           their crews, don't count, and someone already attacking gets no outsider alarm. A theft
           from your realm in that area, of goods from a storage, a carriage or a Down resident, or
           of a carriage or horse, reaches those standing there who see it; what lies in a pile is
-          anyone's to take, so that raises none. An attack, someone striking a wall or gate of the
-          city or a resident of yours standing in its area, reaches those standing there who see it,
+          anyone's to take, so that raises none. An attack, someone striking or climbing a wall or
+          gate of the city or striking a resident of yours standing in its area, reaches those
+          standing there who see it,
           so the armed residents beside them react rather than only the one struck, who runs their
           defence script. It is raised once per attacker, the first time someone at home sees them
           at it, and again only after {duration(DEFEND_CALM_TICKS)} with no blow from them. Those
@@ -3489,8 +3492,9 @@ export function Wiki() {
         <p>
           Alarm goes after the occupier while they stand in the city's area, any other armed one of
           theirs there after them, and ends once they are gone. It goes after a thief or an attacker
-          until they are dead or have left the area or sight. Their card says “On alarm: going after
-          Bo”. For an armed outsider it walks to the town hall and stands there until no armed
+          until they are dead or have left the area or sight; then, while others are still at the
+          city's wall or its residents, it goes after the nearest of them in sight, and ends only
+          once none is left. Their card says “On alarm: going after Bo”. For an armed outsider it walks to the town hall and stands there until no armed
           outsider is left in the area, then goes back to what it was doing; someone armed of yours
           on the hall blocks an occupation before it starts, at no cost in standing. An unarmed
           outsider it only writes in the script log.

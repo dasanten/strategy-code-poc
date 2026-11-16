@@ -2207,18 +2207,20 @@ pub struct WallStrength {
 
 /// Damage a wall or gate takes from blows before it falls (`CONTEXT.md`: Walls in combat,
 /// broken). An average unarmed resident (4 a blow, one blow every `STRIKE_TICKS`) breaks a stretch
-/// of wall alone in about five minutes; ten soldiers with swords in well under one. A gate holds
-/// out half as long again.
-pub const WALL_STRENGTH: WallStrength = WallStrength { wall: 600.0, gate: 900.0 };
+/// of wall alone in about 25 minutes, one with a Spear in about 12. A gate holds out half as long
+/// again. Long enough that a starting city's defenders get from their town hall up onto the wall
+/// and beat the breakers first, at twice their numbers too (T105.6).
+pub const WALL_STRENGTH: WallStrength = WallStrength { wall: 3000.0, gate: 4500.0 };
 
 /// Share of a broken wall's or gate's materials left on its tile, rounded down to whole units:
 /// less than tearing it down leaves (`TEARDOWN_MATERIALS_RETURNED`), as much of it is splintered;
 /// enough that a tile of wall leaves a unit of Wood.
 pub const BROKEN_MATERIALS_RETURNED: f64 = 0.34;
 
-/// Ticks it takes to climb over a wall or gate (`CONTEXT.md`: Walls in combat, climbed): a
-/// minute, as long as walking eight tiles of plains, all the while unable to dodge or strike back.
-pub const CLIMB_TICKS: f64 = 60.0;
+/// Ticks it takes to climb over a wall or gate (`CONTEXT.md`: Walls in combat, climbed): six
+/// minutes, all the while unable to dodge or strike back, so a starting city's defenders get up
+/// onto its wall and strike the climbers down before they are over (T105.6).
+pub const CLIMB_TICKS: f64 = 360.0;
 
 /// Ticks it takes to get up onto a wall walk from the ground next to the wall, and as long again to
 /// get down (`CONTEXT.md`: Wall walk): twenty seconds, as long as walking about three tiles of

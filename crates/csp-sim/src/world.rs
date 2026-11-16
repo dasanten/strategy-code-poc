@@ -266,7 +266,7 @@ fn step_rest(
     combat.ended.extend(ended);
     let climbs = request_climbing(world);
     let climbs_len = climbs.len();
-    resolve_climbing(world, &climbs, terrain);
+    resolve_climbing(world, &climbs, terrain, &mut GameAlarms);
     let mut carries = request_carrying(world);
     carries.extend(request_storing(world));
     carries.extend(request_hauling(world, size));
