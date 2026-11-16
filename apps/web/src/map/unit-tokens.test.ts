@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { ResidentOrder, SeenResident } from '@csp/shared-types'
-import { ACTIVITY_ART, PAINTED_UNIT_ART, UNIT_ART, paintedCell } from './art.js'
+import {
+  ACTIVITY_ART,
+  GEAR_ART,
+  METAL_TINT,
+  PAINTED_UNIT_ART,
+  UNIT_ART,
+  paintedCell,
+} from './art.js'
 import { CLOSE_SCALE, FAR_SCALE, type Camera } from './camera.js'
 import { RELATIONSHIP_COLORS, type BadgeLayer, type TokenLayer } from './tokens.js'
 import { drawUnits, mountSpot, type UnitWorld, type Where } from './unit-tokens.js'
@@ -26,7 +33,12 @@ const walkTo = (x: number, y: number): ResidentOrder => ({
 const resident = (
   id: string,
   owner: string,
-  more: { riding?: string; order?: ResidentOrder; down?: true } = {},
+  more: {
+    riding?: string
+    order?: ResidentOrder
+    down?: true
+    equipped?: SeenResident['equipped']
+  } = {},
 ): SeenResident =>
   ({ id, owner, cityId: null, x: 10, y: 10, carried: {}, order: null, ...more }) as SeenResident
 
@@ -232,5 +244,34 @@ describe('drawUnits: stacks to pick (CONTEXT.md: Picking on the map)', () => {
   it('a ridden horse has no token of its own to pick: it shows under its rider', () => {
     const { spots } = draw([resident('a', 'r1', { riding: 'h' })], MIDDLE)
     expect(spots.has('h')).toBe(false)
+  })
+})
+
+describe('drawUnits: equipped gear (CONTEXT.md: Equipment, Seeing it)', () => {
+  const soldier = resident('a', 'r2', {
+    equipped: { weapon: 'steelSword', shield: 'shield', armour: 'steelArmour' },
+  })
+  const gear = (placed: Placed[]) =>
+    placed.filter((p) => (Object.values(GEAR_ART) as string[]).includes(p.file))
+
+  it("marks another realm's soldier up close with their weapon, shield and armour, iron or steel", () => {
+    const marks = gear(draw([soldier], CLOSE).placed).map((p) => [p.file, p.tint])
+    expect(marks).toEqual([
+      [GEAR_ART.armour, METAL_TINT.steel],
+      [GEAR_ART.sword, METAL_TINT.steel],
+      [GEAR_ART.shield, METAL_TINT.iron],
+    ])
+  })
+
+  it('draws a spear as a spear, and nothing for empty slots', () => {
+    const spearman = resident('a', 'r2', { equipped: { weapon: 'spear' } })
+    expect(gear(draw([spearman], CLOSE).placed).map((p) => p.file)).toEqual([GEAR_ART.spear])
+    expect(gear(draw([resident('b', 'r2')], CLOSE).placed)).toEqual([])
+  })
+
+  it('drops the marks further out', () => {
+    for (const scale of [FAR_SCALE / 2, MIDDLE]) {
+      expect(gear(draw([soldier], scale).placed), `${scale}`).toEqual([])
+    }
   })
 })

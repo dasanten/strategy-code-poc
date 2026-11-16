@@ -2,15 +2,18 @@
 //! stand on its town hall, at its gates and along its wall, and the invariant that holds them
 //! there (`npc-soldiers-on-posts`).
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use csp_shared::balance::{NpcCitySize, NPC_SOLDIERS_ON_HALL, NPC_VILLAGE, OWN_FOOD};
+use csp_shared::balance::{
+    NpcCitySize, NPC_SOLDIERS_ON_HALL, NPC_VILLAGE, OWN_FOOD, WALK_TICKS_PER_TILE, WALL_WALK_TICKS,
+};
 use csp_shared::footprint::{covers, is_at};
 use csp_shared::terrain::{wrap_delta, Terrain, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
-    Alarm, Building, BuildingKind, Good, Resident, ResidentOrder, Stock, TradeOrgCity, WorldState,
+    Alarm, Building, BuildingKind, Good, Resident, ResidentOrder, Stock, TradeOrgCity, UpSide,
+    WorldState,
 };
 use csp_sim::alarms::start_alarm;
 use csp_sim::invariants::check_all;
@@ -589,4 +592,65 @@ fn leaves_a_trade_org_city_out() {
     let city = s.world.cities.iter_mut().find(|c| c.id == s.city).unwrap();
     city.trade_org = Some(TradeOrgCity::Post);
     assert_eq!(npc_soldiers_on_posts(&s.world, &s.terrain), vec![]);
+}
+
+// Wall posts are up on the wall walk (T105.5, `CONTEXT.md`: Wall walk)
+
+#[test]
+fn those_on_wall_posts_get_up_onto_it_taking_the_time_and_stay_up() {
+    let mut s = staged(10, 40.0);
+    let mut running = Running::new(&s.terrain);
+    let walls: HashSet<(i32, i32)> = s.walls().into_iter().collect();
+    let soldiers = s.soldier_ids();
+    let want = soldiers.len() - NPC_SOLDIERS_ON_HALL as usize - 1;
+    // Each soldier's last tile on the ground and the tick they came onto it.
+    let mut ground: HashMap<String, ((i32, i32), u64)> = HashMap::new();
+    let mut up: HashSet<String> = HashSet::new();
+    let mut look = |s: &Staged, up: &mut HashSet<String>| {
+        for id in &soldiers {
+            let at = s.tile_of(id);
+            let r = s.r(id);
+            if !walls.contains(&at) {
+                assert!(r.up.is_none(), "{id} up off the wall at {at:?}");
+                if ground.get(id).map(|g| g.0) != Some(at) {
+                    ground.insert(id.clone(), (at, s.world.tick));
+                }
+                continue;
+            }
+            assert_eq!(r.up, Some(UpSide::Inside), "{id} on the wall at {at:?}");
+            if up.insert(id.clone()) {
+                // Got up from the ground beside the wall, which took its time.
+                let (from, since) = ground[id];
+                let d =
+                    (wrap_delta(from.0, at.0, SIZE).abs(), wrap_delta(from.1, at.1, SIZE).abs());
+                assert!(d == (1, 0) || d == (0, 1), "{id} up from {from:?} onto {at:?}");
+                let took = (s.world.tick - since) as f64;
+                assert!(took >= WALL_WALK_TICKS - WALK_TICKS_PER_TILE, "{id} up in {took} ticks");
+            }
+        }
+    };
+    for _ in 0..TICKS_PER_GAME_DAY as usize {
+        look(&s, &mut up);
+        if up.len() >= want {
+            break;
+        }
+        running.step(&mut s);
+        let broken: Vec<String> =
+            check_all(&s.world, &s.terrain).into_iter().map(|v| v.message).collect();
+        assert_eq!(broken, Vec::<String>::new());
+    }
+    assert!(up.len() >= want, "{} of {want} up", up.len());
+
+    // Between fights they stay up: the passes after move nobody on the wall but those on a round.
+    let on_wall_now: Vec<String> =
+        soldiers.iter().filter(|id| walls.contains(&s.tile_of(id))).cloned().collect();
+    for _ in 0..(TICKS_PER_GAME_DAY / 8.0) as usize {
+        running.step(&mut s);
+    }
+    let stayed = s.not_on_round(&on_wall_now);
+    assert!(!stayed.is_empty());
+    for id in stayed {
+        assert_eq!(s.r(&id).up, Some(UpSide::Inside), "{id}");
+        assert!(walls.contains(&s.tile_of(&id)), "{id}");
+    }
 }

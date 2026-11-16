@@ -131,6 +131,22 @@ describe('group orders', () => {
     ])
   })
 
+  it('has each who carries the good put it on, skipping those without it or with it on', () => {
+    const rs = [
+      resident('a', 0, 0, { carried: { sword: 1, spear: 1 }, equipped: { weapon: 'spear' } }),
+      resident('b', 1, 1, { carried: { spear: 1 }, equipped: { weapon: 'spear' } }),
+      resident('c', 2, 2, { carried: { sword: 1 }, equipped: { weapon: 'sword' } }),
+    ]
+    const { requests, skipped } = send({ kind: 'equip', good: 'sword' }, rs)
+    expect(requests).toEqual([
+      { residentId: 'a', order: { kind: 'equip', residentId: 'a', good: 'sword' } },
+    ])
+    expect(skipped).toEqual([
+      { id: 'b', name: 'B', why: 'doesn’t carry it' },
+      { id: 'c', name: 'C', why: 'has it on already' },
+    ])
+  })
+
   it('stores what each carries and skips those carrying nothing', () => {
     const rs = [resident('a', 0, 0, { carried: { wood: 3, food: 2 } }), resident('b', 0, 0)]
     const { requests, skipped } = send({ kind: 'store' }, rs)
@@ -575,7 +591,11 @@ describe('every resident order on the group card', () => {
  */
 const everyOrder = {
   residents: [
-    resident('a', 5, 5, { riding: 'h0', order: { kind: 'workAt' }, carried: { wood: 2 } }),
+    resident('a', 5, 5, {
+      riding: 'h0',
+      order: { kind: 'workAt' },
+      carried: { wood: 2, sword: 1 },
+    }),
     resident('b', 20, 20, { aboard: 'k1' }),
     resident('c', 4, 4, { carried: { food: 3 } }),
     resident('d', 4, 5),
@@ -630,6 +650,7 @@ describe('the group card’s rows', () => {
       breed: 'none of them is in a stable',
       train: 'none of them is on a training ground',
       store: 'none of them carries anything',
+      equip: 'none of them carries gear to swap in',
     })
   })
 

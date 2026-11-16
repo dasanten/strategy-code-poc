@@ -5,7 +5,8 @@ import { currentIndex, queueSteps } from '../shared/queue.js'
 import type { Building, BuildingKind, OrderRequest, SeenResident } from '@csp/shared-types'
 import { tileToScreen, type Camera, type Size } from './camera.js'
 import { ROAD_COLOR } from './palette.js'
-import { roadJoins, roadWidth, wallWidths } from './roads.js'
+import { roadJoins, roadWidth } from './roads.js'
+import { drawWallTiles, wallSides, type WallTile } from './wall-tile.js'
 
 /** What a road or wall line builds on each of its tiles. */
 export type LineBuilding = 'road' | 'wall'
@@ -233,6 +234,21 @@ export function drawPlans(
         .map((b) => at(b.x, b.y)),
     )
     const isAny = (x: number, y: number) => ghosts.has(at(x, y)) || stands.has(at(x, y))
+    if (kind === 'wall') {
+      // A planned wall is the built one, fainter: the whole tile (`wall-tile.ts`).
+      for (const strength of ['faint', 'strong'] as const) {
+        const tiles: WallTile[] = []
+        for (const t of ghosts.values()) {
+          if (t.strong !== (strength === 'strong')) continue
+          const [sx, sy] = tileToScreen(cam, view, size, t.x, t.y)
+          if (near([sx + tile / 2, sy + tile / 2]))
+            tiles.push({ sx, sy, ...wallSides(t.x, t.y, isAny) })
+        }
+        const alpha = GHOST_ALPHA[strength]
+        drawWallTiles(g, tiles, tile, wallColour, alpha, alpha * 0.6)
+      }
+      continue
+    }
     // Each join once, from the tile left of or above it (`roadJoins`), so a finished tile next to
     // a ghost is looked at too; a join is drawn when either end is a ghost, as strong as it.
     const from = new Map<string, readonly [number, number]>()
@@ -243,10 +259,7 @@ export function drawPlans(
     const joins = new Map<string, Map<string, readonly [number, number]>>()
     const joined = new Set<string>()
     for (const [x, y] of from.values()) {
-      const steps =
-        kind === 'road'
-          ? roadJoins(x, y, isAny)
-          : STRAIGHT.filter(([dx, dy]) => isAny(x + dx, y + dy))
+      const steps = roadJoins(x, y, isAny)
       for (const [dx, dy] of steps) {
         const ends = [ghosts.get(at(x, y)), ghosts.get(at(x + dx, y + dy))]
         if (!ends[0] && !ends[1]) continue
@@ -277,24 +290,11 @@ export function drawPlans(
       if (!joined.has(at(t.x, t.y)) && near(c)) dots[t.strong ? 'strong' : 'faint'].push([...c])
     }
     const road = roadWidth(tile)
-    const wall = wallWidths(tile)
     for (const strength of ['faint', 'strong'] as const) {
-      const alpha = GHOST_ALPHA[strength]
-      if (kind === 'road') {
-        stroke(g, dots[strength], runs[strength], road, ROAD_COLOR, alpha, 'round')
-      } else {
-        stroke(g, dots[strength], runs[strength], wall.edge, 0x0e1419, alpha * 0.6, 'square')
-        stroke(g, dots[strength], runs[strength], wall.band, wallColour, alpha, 'square')
-      }
+      stroke(g, dots[strength], runs[strength], road, ROAD_COLOR, GHOST_ALPHA[strength], 'round')
     }
   }
 }
-
-/** Right and below: every pair of walls side by side is looked at once. */
-const STRAIGHT = [
-  [1, 0],
-  [0, 1],
-] as const
 
 /**
  * Dots and lines in one width and colour; a road's dot is round, a wall's square. A fill or stroke

@@ -620,3 +620,13 @@ fn a_workplaces_vein_is_a_word_for_its_workers_and_their_allies_and_null_for_oth
     let ally = answers(&calls, mine("b1", true));
     assert_eq!(ally["vein"], json!("thinning"));
 }
+
+#[test]
+fn a_script_sees_whether_a_resident_is_up_on_a_wall_walk() {
+    let ground = answers(&[("up", "me.up")], |_| {});
+    assert_eq!(ground["up"], json!(false));
+    let up = answers(&[("up", "me.up")], |w| {
+        w.residents[0].up = Some(csp_shared::world::UpSide::Outside);
+    });
+    assert_eq!(up["up"], json!(true));
+}

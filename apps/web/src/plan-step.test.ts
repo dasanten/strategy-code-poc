@@ -97,6 +97,8 @@ describe('Add step', () => {
       subject: { ask: 'subject', subject: 'strength' },
       units: { ask: 'units', units: 2 },
       condition: { ask: 'condition', condition: { kind: 'mounted', is: true } },
+      gear: { ask: 'gear', good: 'sword' },
+      slot: { ask: 'slot', slot: 'weapon' },
     }
     const kinds = new Set(
       STEP_KINDS.map((k) => {
@@ -127,6 +129,8 @@ describe('Add step', () => {
       subject: { ask: 'subject', subject: 'strength' },
       units: { ask: 'units', units: 2 },
       condition: { ask: 'condition', condition: { kind: 'mounted', is: true } },
+      gear: { ask: 'gear', good: 'sword' },
+      slot: { ask: 'slot', slot: 'weapon' },
     }
     for (const k of STEP_KINDS) {
       const picked = k.picks.map(() => ({ x: 0, y: 0, id: 'x', spot: { kind: 'ground' as const } }))
@@ -138,6 +142,23 @@ describe('Add step', () => {
         order.kind === 'task' ? order.task : undefined,
       ])
     }
+  })
+
+  it('plans Feed the stable once as the task with once, which may go before other steps', () => {
+    const plan = planned('feedStableOnce', [30, 4])
+    const { order } = planOrder(plan)!
+    expect(order).toEqual({
+      kind: 'task',
+      task: 'feedStable',
+      stableId: 'b1',
+      params: { once: 1 },
+    })
+    expect(PLAN_TASKS.feedStableOnce).toBe('feedStable')
+    const walk = { order: { kind: 'walkTo', x: 1, y: 1 } }
+    // Ending once the stable is full; the full-time task needs a duration before another step.
+    expect(queueStepsProblem([{ order }, walk])).toBeUndefined()
+    const fullTime = planOrder(planned('feedStable', [30, 4]))!.order
+    expect(queueStepsProblem([{ order: fullTime }, walk])).toBeDefined()
   })
 
   it('plans a Build line from its two picked ends, with no walk before it', () => {

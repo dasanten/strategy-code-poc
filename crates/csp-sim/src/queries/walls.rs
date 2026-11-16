@@ -19,6 +19,23 @@ pub fn is_wall_or_gate(b: &Building) -> bool {
     matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate) && b.site.is_none()
 }
 
+/// Whether a resident is up (`CONTEXT.md`: Wall walk, High ground): on the wall walk, or a climber
+/// who made it and came down on top of a finished wall, the far side being no way down. Someone
+/// on a gate tile and not on its walk passes under it, on the ground.
+pub fn is_up(world: &WorldState, r: &Resident) -> bool {
+    r.up.is_some()
+        || world
+            .buildings
+            .iter()
+            .any(|b| b.x == r.x && b.y == r.y && b.kind == BuildingKind::Wall && b.site.is_none())
+}
+
+/// Whether a blow from `a` can reach `b` for height (`CONTEXT.md`: High ground): nobody on the
+/// ground strikes anyone up; whoever is up strikes down, and up against up fights as anywhere.
+pub fn reaches_for_height(world: &WorldState, a: &Resident, b: &Resident) -> bool {
+    is_up(world, a) || !is_up(world, b)
+}
+
 /// Whether a resident stands on a wall of their own side or an ally's (`onOwnWall`).
 pub fn on_own_wall(world: &WorldState, r: &Resident) -> bool {
     let wall = world

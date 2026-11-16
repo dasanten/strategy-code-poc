@@ -54,7 +54,7 @@ pub fn directive_soldiers<'w>(
         .iter()
         .filter(|r| {
             let org = r.owner.as_deref().or(r.city_id.as_deref()).unwrap_or("");
-            orgs.iter().any(|o| o == org) && is_armed(&r.carried)
+            orgs.iter().any(|o| o == org) && is_armed(r)
         })
         .collect()
 }

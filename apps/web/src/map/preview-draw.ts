@@ -4,6 +4,7 @@ import type { PickPreview } from '../pick-preview.js'
 import { tileToScreen, type Camera, type Size } from './camera.js'
 import { LEADER_COLOR, ROAD_COLOR, WALL_COLOR } from './palette.js'
 import { GLYPH_COLOR } from './tokens.js'
+import { drawWallTiles, wallSides, type WallTile } from './wall-tile.js'
 
 /** What doesn't fit, in a pick's preview: a footprint where it can't go, a line too long. */
 const REFUSED_COLOR = 0xe5484d
@@ -46,11 +47,22 @@ export function drawPickPreview(
       : p.line.building === 'road'
         ? ROAD_COLOR
         : WALL_COLOR
-    for (const [x, y] of p.line.tiles) {
-      const [sx, sy] = at(x, y)
-      g.rect(sx + tile * 0.15, sy + tile * 0.15, tile * 0.7, tile * 0.7)
+    if (p.line.building === 'wall') {
+      // The same whole tile a built wall is (`wall-tile.ts`), fainter.
+      const inLine = new Set(p.line.tiles.map(([x, y]) => `${x},${y}`))
+      const isWall = (x: number, y: number) => inLine.has(`${x},${y}`)
+      const tiles: WallTile[] = p.line.tiles.map(([x, y]) => {
+        const [sx, sy] = at(x, y)
+        return { sx, sy, ...wallSides(x, y, isWall) }
+      })
+      drawWallTiles(g, tiles, tile, color, 0.55, 0.45)
+    } else {
+      for (const [x, y] of p.line.tiles) {
+        const [sx, sy] = at(x, y)
+        g.rect(sx + tile * 0.15, sy + tile * 0.15, tile * 0.7, tile * 0.7)
+      }
+      g.fill({ color, alpha: 0.55 }).stroke({ width: 1.5, color })
     }
-    g.fill({ color, alpha: 0.55 }).stroke({ width: 1.5, color })
   }
   if (p.footprint) {
     const f = p.footprint

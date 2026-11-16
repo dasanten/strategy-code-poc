@@ -93,7 +93,7 @@ pub fn npc_training_problem(
     let city = world.cities.iter().find(|c| c.id == city_id);
     match city {
         Some(city) if city.trade_org.is_none() && is_big_npc_city(world, city) => {
-            if is_armed(&r.carried) {
+            if is_armed(r) {
                 None
             } else {
                 Some("it trains only its soldiers")

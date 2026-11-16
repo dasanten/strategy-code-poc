@@ -177,7 +177,7 @@ fn scenario() -> Scenario {
                 (sx as i32, sy as i32),
                 (n.x as i32, n.y as i32),
                 &CARRIAGE_COSTS,
-                PathOptions { realm_id: None, on_walls: false, near: false, area: None },
+                PathOptions { realm_id: None, on_walls: false, near: false, area: None, up: None },
             );
             match found {
                 PathResult::Found { path, .. } => Some(((n.x, n.y), path.len())),
