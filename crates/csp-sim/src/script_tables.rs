@@ -200,6 +200,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 null_when: None,
             },
             ScriptField {
+                name: "reach",
+                r#type: ScriptType::Number,
+                description: "How far, in tiles, their Bow or Crossbow shoots from where they stand: further up on a wall. The Arrows they shoot are `carried.arrows`; out of them they fight with their fists.",
+                null_when: Some("without a bow or crossbow equipped"),
+            },
+            ScriptField {
                 name: "script",
                 r#type: ScriptType::View("runningScript"),
                 description: "The script they run.",
@@ -2869,7 +2875,15 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Action,
         params: &["targetId"],
         cost: 10.0,
-        description: "Go after a resident I see and strike them, or strike a wall or gate of another realm until it falls.",
+        description: "Go after a resident I see and strike them, or strike a wall or gate of another realm until it falls. With a Bow or Crossbow and Arrows I walk only until they are in my `reach` and shoot from there.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "shoot",
+        is: Is::Action,
+        params: &["targetId"],
+        cost: 10.0,
+        description: "Shoot a resident I see who is in my `reach` now, with my Bow or Crossbow and an Arrow a shot, without a step. The order goes on as an attack: should they get out of reach I go after them, so `stop()` to stay where I am.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -4886,13 +4900,15 @@ fn goodsText(load, goods) {
 // which goes on once I end. Armed, I fight back at whoever struck me while
 // they are in sight, and end once they are dead, gone or out of sight; a
 // driver walks back to the carriage first, should the fight have led away.
+// With a Bow or Crossbow and Arrows I shoot back from where I stand, walking
+// only until they are in my reach, and from below at someone up on a wall too.
 // Unarmed, or struck from up on a wall while I stand below, where no blow of
 // mine reaches, I walk home to my city's town hall, away from the wall, and
 // end there, or once no blow has landed for calm ticks; but driving I end at once and drive on, and
 // aboard a carriage being driven I end at once and stay aboard.
 let calm = 30 // ticks without a blow before I go back, fleeing
 
-if (armed() && !struckFromAbove()) {
+if (armed() && (!struckFromAbove() || canShoot())) {
   // My drive waits while I fight: kept for the way back to my carriage.
   if (holdsCarriage()) { memory.carriageId = me.order.carriageId }
   fightBack()
@@ -4938,6 +4954,11 @@ fn aboardDriven() {
 // Whether I have a weapon equipped.
 fn armed() {
   return me.equipped.weapon != null
+}
+
+// Whether I shoot: a Bow or Crossbow equipped and Arrows to loose.
+fn canShoot() {
+  return me.reach != null && me.carried.arrows != null
 }
 
 // At whoever struck me, while they are in sight.
@@ -5738,7 +5759,10 @@ fn goodsText(load, goods) {
 // stand there until no armed outsider is left, which blocks an occupation before
 // it starts; an unarmed outsider I only log. A theft, an attack or an occupation
 // takes me off the hall, and when I end for it I come back here while armed
-// outsiders remain. Unarmed, or for another alarm, I end at once.
+// outsiders remain. With a Bow or Crossbow and Arrows I shoot whoever I go
+// after from where I stand once they are in my reach; until then I go up on
+// the city's wall tile nearest them and wait there rather than come down. Out of
+// Arrows I close in as anyone armed. Unarmed, or for another alarm, I end at once.
 if (me.alarm == null || !armed(me)) {
   end()
 } else if (me.alarm.kind == "occupied") {
@@ -5821,6 +5845,7 @@ fn goAfterCulprit(goneText) {
 }
 
 fn goAfter(foe) {
+  if (canShoot() && shootFromWall(foe)) { return }
   let o = me.order
   if (o != null && o.kind == "attack" && o.targetId == foe.id) { return } // at it
   let problem = attack(foe.id)
@@ -5830,6 +5855,73 @@ fn goAfter(foe) {
   }
   doing("On alarm: going after " + foe.name)
   log("going after " + foe.name)
+}
+
+// An archer shoots from where they stand. On the ground with the city's wall
+// between us, I go up on its tile nearest them first, for its cover; up on the
+// wall, or with no wall between us, I shoot once they are in my reach and up
+// there wait for them rather than come down. False when I can do neither, for me
+// to go after them as anyone armed.
+fn shootFromWall(foe) {
+  let o = me.order
+  let post = null
+  if (!me.up) { post = wallTileNear(foe) }
+  if (post == null) {
+    if (apart(me, foe) <= me.reach) {
+      if (o != null && o.kind == "attack" && o.targetId == foe.id) { return true } // at it
+      if (shoot(foe.id) != null) { return false }
+      doing("On alarm: shooting at " + foe.name)
+      log("shooting at " + foe.name)
+      return true
+    }
+    if (!me.up) { return false }
+    // Up on the wall: wait for them to come in reach, rather than go down after them.
+    if (o != null) { stop() }
+    doing("On alarm: on the wall, waiting for " + foe.name + " to come in reach")
+    return true
+  }
+  if (o != null && o.kind == "walkTo" && o.target.x == post.x && o.target.y == post.y) {
+    return true // on my way
+  }
+  if (walkTo(post.x, post.y) != null) { return false }
+  doing("On alarm: up on the wall to shoot at " + foe.name)
+  log("going up on the wall to shoot at " + foe.name)
+  return true
+}
+
+// Whether I shoot: a Bow or Crossbow equipped and Arrows to loose.
+fn canShoot() {
+  return me.reach != null && me.carried.arrows != null
+}
+
+// Tiles between two things as reach counts them: the larger of the two steps.
+fn apart(a, b) {
+  let dx = a.x - b.x
+  let dy = a.y - b.y
+  if (dx < 0) { dx = 0 - dx }
+  if (dy < 0) { dy = 0 - dy }
+  if (dx > dy) { return dx }
+  return dy
+}
+
+// The first finished wall or gate tile of the alarm's city on the way from the
+// foe to me, a step at a time: the one between us, nearest them.
+fn wallTileNear(foe) {
+  let x = foe.x
+  let y = foe.y
+  let steps = 0
+  while (steps < 64 && (x != me.x || y != me.y)) {
+    if (x < me.x) { x = x + 1 }
+    if (x > me.x) { x = x - 1 }
+    if (y < me.y) { y = y + 1 }
+    if (y > me.y) { y = y - 1 }
+    let b = buildingAt(x, y)
+    if (b != null && b.cityId == me.alarm.cityId && (b.kind == "wall" || b.kind == "gate") && b.site == null) {
+      return b
+    }
+    steps = steps + 1
+  }
+  return null
 }
 
 // The occupier I am after while they stand in the area, else another armed one

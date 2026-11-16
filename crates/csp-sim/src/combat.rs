@@ -28,7 +28,7 @@ use crate::queries::city::town_hall_of;
 use crate::queries::city_area::{in_city_area, stands_occupying};
 use crate::queries::combat::{
     attack_power, attack_ticks, blow_damage, combat_learned, dodge_chance, in_contact,
-    shooting_weapon, shot_damage, shot_reach, tiles_apart,
+    ranged_weapon, shooting_weapon, shot_damage, shot_reach, tiles_apart,
 };
 use crate::queries::names::{held, placed};
 use crate::queries::residents::{is_armed, is_down};
@@ -217,6 +217,9 @@ fn is_aggression(world: &WorldState, a: &Resident, t: &Resident, size: i32) -> b
 pub struct AttackRequest {
     pub resident_id: Option<String>,
     pub target_id: Option<String>,
+    /// A shot (`shoot`): only from a Bow or Crossbow with Arrows, at a resident in reach from
+    /// where the resident stands, so the order starts without a step (`CONTEXT.md`: Ranged combat).
+    pub shoot: bool,
 }
 
 /// `attack.validate` (`CONTEXT.md`: Combat): one of the Player's residents goes after a resident
@@ -277,6 +280,9 @@ pub fn validate_attack(
         .iter()
         .any(|x| ours(x) && wrap_distance(size, tile((x.x, x.y)), tile(target)) <= SIGHT_RANGE);
     let below = resident.is_some_and(|t| !reaches_for_height(world, me, t));
+    if seen && order.shoot {
+        return shoot_problem(world, size, me, resident);
+    }
     if seen && below {
         Some("they are up on the wall")
     } else if seen {
@@ -286,6 +292,27 @@ pub fn validate_attack(
     } else {
         Some("that wall is out of sight")
     }
+}
+
+/// Why `me` can't shoot `target` from where they stand (`shoot`), None when they can: a Bow or
+/// Crossbow equipped, an Arrow carried, and a resident within its reach, not aboard another vessel.
+fn shoot_problem(
+    world: &WorldState,
+    size: i32,
+    me: &Resident,
+    target: Option<&Resident>,
+) -> Option<&'static str> {
+    if ranged_weapon(me).is_none() {
+        return Some("no bow or crossbow equipped");
+    }
+    if shooting_weapon(me).is_none() {
+        return Some("no arrows");
+    }
+    let Some(t) = target else { return Some("only residents are shot at") };
+    if between_vessels(world, me, t) || !within_shot(size, me, t) {
+        return Some("out of reach");
+    }
+    None
 }
 
 use crate::alarms::{answers_attack, goes_after_occupier};
@@ -680,6 +707,8 @@ fn react(world: &mut WorldState, ti: usize, ai: usize) {
     record_event(world, owner.as_deref(), what);
 }
 
+#[cfg(test)]
+mod archer_defaults_tests;
 #[cfg(test)]
 mod high_ground_tests;
 #[cfg(test)]

@@ -8,7 +8,7 @@ use csp_shared::balance::{
     WEAPON_ATTACK,
 };
 use csp_shared::terrain::wrap_delta;
-use csp_shared::world::{Good, Resident, SkillName, StatName};
+use csp_shared::world::{Good, Resident, SkillName, StatName, WorldState};
 
 use super::names::{good_name, held};
 use super::residents::stat_value;
@@ -116,4 +116,11 @@ pub fn shot_damage(attacker: &Resident, defender: &Resident, weapon: &str) -> f6
     let power = SHOT_DAMAGE.get(weapon).unwrap_or(0.0) * shot_skill_factor(attacker, weapon);
     let kept_off = protection(defender) * (1.0 - SHOT_PIERCE.get(weapon).unwrap_or(0.0));
     MIN_BLOW_DAMAGE.max(power - kept_off)
+}
+
+/// A resident's shot reach as scripts see it (`reach`): tiles their Bow or Crossbow shoots from
+/// where they stand, null without one (`CONTEXT.md`: Ranged combat). Anyone who sees them sees
+/// their weapon, so its reach too.
+pub fn reach_json(_world: &WorldState, r: &Resident) -> serde_json::Value {
+    shot_reach(r).map_or(serde_json::Value::Null, |reach| serde_json::json!(reach))
 }
