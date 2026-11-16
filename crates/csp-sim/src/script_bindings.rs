@@ -1326,6 +1326,9 @@ impl<'a> ScriptBindings<'a> {
                 ))
             }
         };
+        let material = (building == BuildingKind::Wall
+            && field(line, "material").as_ref().and_then(Value::as_str) == Some("stone"))
+        .then_some(csp_shared::world::WallMaterial::Stone);
         let start = spot(field(line, "from").as_ref(), "lineTiles")?;
         let to = spot(field(line, "to").as_ref(), "lineTiles")?;
         let tiles = road_line(start, to, size);
@@ -1335,18 +1338,20 @@ impl<'a> ScriptBindings<'a> {
                 number_to_string(ROAD_LINE_MAX_TILES)
             )));
         }
-        let mut out: Vec<(i32, i32, Option<String>)> = Vec::new();
+        let mut out: Vec<(i32, i32, Option<String>, BuildingKind)> = Vec::new();
         for (x, y) in tiles {
             if self.in_sight((x, y)) {
-                if let Some(t) = line_tile(world, building, x, y, Some(self.ctx.terrain)) {
-                    out.push((t.x, t.y, t.site_id));
+                let terrain =
+                    Some(self.ctx.terrain as &dyn crate::queries::building::TerrainLookup);
+                if let Some(t) = line_tile(world, building, material, x, y, terrain) {
+                    out.push((t.x, t.y, t.site_id, t.building));
                 }
                 continue;
             }
             let site = construction_at(world, x, y, building);
             let own_site =
                 site.filter(|s| s.site.is_some() && s.kind == building && self.own_building(s));
-            out.push((x, y, own_site.map(|s| s.id.clone())));
+            out.push((x, y, own_site.map(|s| s.id.clone()), building));
         }
         if from.is_some_and(|f| !f.is_null()) {
             let near = spot(from, "lineTiles")?;
@@ -1359,7 +1364,11 @@ impl<'a> ScriptBindings<'a> {
             });
         }
         Ok(Json::Array(
-            out.into_iter().map(|(x, y, s)| json!({ "x": x, "y": y, "siteId": s })).collect(),
+            out.into_iter()
+                .map(
+                    |(x, y, s, b)| json!({ "x": x, "y": y, "siteId": s, "building": kind_name(b) }),
+                )
+                .collect(),
         ))
     }
 

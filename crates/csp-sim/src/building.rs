@@ -12,10 +12,11 @@ use csp_shared::world::{
 use crate::cities::update_city_membership;
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::queries::balance::{build_work, construction_learned, skill_of};
-use crate::queries::building::build_at_problem;
+use crate::queries::building::build_at_problem_of;
 use crate::queries::building::{
-    build_problem, construction_index_at, is_stone, line_building, line_order_mut,
-    materials_needed, max_workers, site_work_of, work_needed, work_of, TerrainLookup, ON_PLAINS,
+    build_problem_for, construction_index_at, is_stone, line_building, line_kind_at,
+    line_order_mut, materials_needed, max_workers, site_work_of, wooden_wall_index_at, work_needed,
+    work_of, TerrainLookup, ON_PLAINS,
 };
 use crate::queries::names::{kind_of, placed};
 use crate::queries::vessels::launch_tile;
@@ -131,6 +132,37 @@ fn own_workplace(world: &mut WorldState, r: &Resident, kind: BuildingKind, id: &
     city.workplace_ids.get_or_insert_with(Vec::new).push(id.to_string());
 }
 
+/// The finished wooden wall or gate that the stone site at `site` in `world.buildings` upgrades
+/// (`CONTEXT.md`: Wood or stone), if it stands over one of its kind.
+fn upgraded_by(world: &WorldState, site: usize) -> Option<usize> {
+    let s = &world.buildings[site];
+    if !is_stone(s.kind, s.material) {
+        return None;
+    }
+    wooden_wall_index_at(world, s.x as i32, s.y as i32, s.kind)
+}
+
+/// Orders on the site `from` that a finished upgrade folded into the wall `to` now name `to`, so
+/// a line goes on to its next tile and a builder's order is done as on any finished site.
+fn point_orders_at(world: &mut WorldState, from: &str, to: &str) {
+    for r in &mut world.residents {
+        match r.order.as_mut() {
+            Some(ResidentOrder::Build(b)) if b.site_id.as_deref() == Some(from) => {
+                b.site_id = Some(to.to_string());
+            }
+            Some(ResidentOrder::RoadLine(l) | ResidentOrder::WallLine(l))
+                if l.site_id.as_deref() == Some(from) =>
+            {
+                l.site_id = Some(to.to_string());
+            }
+            Some(ResidentOrder::WorkAt(w)) if w.building_id == from => {
+                w.building_id = to.to_string();
+            }
+            _ => {}
+        }
+    }
+}
+
 /// Makes the construction site at `site` in `world.buildings` the building once it has all its
 /// materials and work (`finishSite`); `r` is the resident who put the last of them in. Returns
 /// whether it was finished; the caller brings city membership up to date. A boat site needs the
@@ -189,6 +221,19 @@ pub fn finish_site(
         });
         return true;
     }
+    if let Some(wooden) = upgraded_by(world, site) {
+        // `CONTEXT.md`: Wood or stone: finished, the stone one replaces the wooden one where it
+        // stands. The wooden one becomes it, keeping its id, its city, a gate's open or closed and
+        // those up on it; its damage goes, and the site with it.
+        let site_id = world.buildings[site].id.clone();
+        let wooden_id = world.buildings[wooden].id.clone();
+        let w = &mut world.buildings[wooden];
+        w.material = Some(WallMaterial::Stone);
+        w.damage = None;
+        world.buildings.remove(site);
+        point_orders_at(world, &site_id, &wooden_id);
+        return true;
+    }
     let b = &mut world.buildings[site];
     b.site = None;
     // Finished, it belongs where its kind of building does, no longer to the realm that laid it out.
@@ -243,8 +288,12 @@ pub fn resolve_building(
         let Some(ri) = world.residents.iter().position(|x| x.id == a.resident_id) else {
             continue;
         };
-        let Some(part) = building_part(world.residents[ri].order.as_ref()) else { continue };
+        let Some(mut part) = building_part(world.residents[ri].order.as_ref()) else { continue };
         let (rx, ry) = (world.residents[ri].x as i32, world.residents[ri].y as i32);
+        if matches!(world.residents[ri].order, Some(ResidentOrder::WallLine(_))) {
+            // A stone line upgrades a wooden gate on its way to a stone gate.
+            part.building = line_kind_at(world, part.building, part.material, rx, ry);
+        }
         if (rx, ry) != part.at {
             world.residents[ri].order = None;
             continue;
@@ -260,7 +309,9 @@ pub fn resolve_building(
             if let Some(i) = joins {
                 let id = world.buildings[i].id.clone();
                 set_site_id(&mut world.residents[ri].order, id);
-            } else if build_problem(world, rx, ry, part.building, lookup).is_some() {
+            } else if build_problem_for(world, rx, ry, part.building, part.material, lookup)
+                .is_some()
+            {
                 next_tile(&mut world.residents[ri]);
             } else {
                 let id = new_id("b", &mut world.next_id);
@@ -358,7 +409,8 @@ pub fn validate_build(
     if let Some(problem) = material_problem(order, building) {
         return Some(problem);
     }
-    build_at_problem(world, r, building, (r.x as i32, r.y as i32), terrain)
+    let material = material_field(order);
+    build_at_problem_of(world, r, building, material, (r.x as i32, r.y as i32), terrain)
 }
 
 /// What a build or wall line order asks its wall or gate to be built of (`material`: "wood" or

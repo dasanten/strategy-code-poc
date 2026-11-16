@@ -2203,7 +2203,7 @@ export interface GroupBuildTile {
   /** The explored terrain beneath this tile, if known. */
   terrain: number | undefined
   /** Why a kind can't be laid out on this tile, as far as the Player knows. */
-  problem: (kind: BuildingKind) => string | undefined
+  problem: (kind: BuildingKind, material?: WallMaterial) => string | undefined
 }
 
 /** What picking a tile does for a group, said while the map waits for it. */
@@ -2453,7 +2453,7 @@ export function ResidentCard({
   /** Orders the resident to build on their tile, or to join the site there. */
   onBuild: (kind: BuildingKind, material?: WallMaterial) => void
   /** Why a kind can't be laid out from the resident's tile, as far as the Player knows. */
-  buildProblem?: (kind: BuildingKind) => string | undefined
+  buildProblem?: (kind: BuildingKind, material?: WallMaterial) => string | undefined
   /** Residents in sight working the building on the resident's tile. */
   workers: number
   /** Realms whose residents in sight work it: who holds it (`CONTEXT.md`: Holding a workplace). */

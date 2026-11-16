@@ -2026,6 +2026,15 @@ export function Wiki() {
           <code>build</code> and <code>wallLine</code>.
         </p>
         <p>
+          <strong>Upgrading to stone.</strong> A stone wall or gate can be laid out on a wooden one
+          of its kind: stand on it, pick Stone in the Build menu and Build. The wooden one stands,
+          with its wall walk, and can be defended until the stone one is finished and takes its
+          place; whoever is up on it stays up, and its Wood goes into the new one. A stone wall line
+          upgrades the wooden walls and gates on its way, a gate to a stone gate, and passes only
+          those already of stone; a wooden line passes both. Breaking the wooden one while the stone
+          site stands leaves the site.
+        </p>
+        <p>
           {' '}
           The tiles your residents' road and wall lines still have to build, running or waiting in
           their queues, show faintly on your map, the picked residents' stronger; only you see them.

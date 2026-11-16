@@ -670,7 +670,9 @@ fn build_line_problem(
             csp_shared::balance::ROAD_LINE_MAX_TILES
         ));
     }
-    let line = crate::queries::building::BuildLine { building, from, to };
+    let material = crate::building::material_field(o)
+        .filter(|m| building == BuildingKind::Wall && *m == csp_shared::world::WallMaterial::Stone);
+    let line = crate::queries::building::BuildLine { building, from, to, material };
     if line_to_build(world, &line, terrain).is_empty() {
         return Some(format!("no {} to build on that line", kind_name(building)));
     }
