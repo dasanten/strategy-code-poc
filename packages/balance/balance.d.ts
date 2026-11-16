@@ -157,6 +157,7 @@ export interface Balance {
   readonly START_FOOD: number
   readonly START_COINS: number
   readonly START_CARRIED_FOOD: number
+  readonly START_SPEARS: number
   readonly START_HORSES: number
   readonly START_STABLE_FOOD: number
   readonly HORSE_FOOD_PER_DAY: number
@@ -166,6 +167,8 @@ export interface Balance {
   readonly HORSE_HUNGRY_SHARE: number
   readonly HORSE_WAKE_HEALTH: number
   readonly STABLE_FEED_DAYS: number
+  readonly STABLE_HAND_FEED_DAYS: number
+  readonly STABLE_HAND_WORK_MINUTES: number
   readonly NPC_STABLE_REFILL_DAYS: number
   readonly NPC_STABLE_HUNGRY_DAYS: number
   readonly NPC_START_HORSES: number
@@ -510,6 +513,7 @@ export interface Balance {
   readonly DOWN_DAYS: number
   readonly WAKE_HEALTH: number
   readonly FEED_UNITS: number
+  readonly EQUIP_TICKS: number
   readonly HEAL_DAYS: number
   readonly HUNGER_ENDURANCE_AVERAGE: number
   readonly HUNGER_ENDURANCE_EFFECT: number
@@ -1224,6 +1228,8 @@ export interface Balance {
   }
   readonly BROKEN_MATERIALS_RETURNED: number
   readonly CLIMB_TICKS: number
+  readonly WALL_WALK_TICKS: number
+  readonly FALL_DAMAGE: number
   readonly DODGE_PER_AGILITY: number
   readonly DODGE_LIMIT: number
   readonly COMBAT_SKILL_PER_BLOW: number

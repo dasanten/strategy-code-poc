@@ -107,11 +107,12 @@ fn reports_tick_health_with_resident_and_action_counts() {
     let mut opts = TickOptions::new(&mut reporter, 1.0, 800.0);
     opts.now = Some(clock(5.0));
     let health = run_tick(&mut world, &terrain, &mut Scratch::default(), opts).unwrap();
-    // Everyone starts working the farm: one work action each. Without a script runner, no script
+    // Everyone but the stable hand starts working the farm: one work action each; the stable
+    // hand starts their queue once queues run. Without a script runner, no script
     // runs; Last seen works out once what the one realm sees.
     assert_eq!(health.tick, 1);
     assert_eq!(health.residents, 8);
-    assert_eq!(health.actions, 8);
+    assert_eq!(health.actions, 7);
     assert_eq!(health.script_runs, 0);
     assert_eq!(health.sight_builds, 1);
     assert!(!health.slow);

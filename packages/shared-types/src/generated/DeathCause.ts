@@ -3,4 +3,4 @@
 /**
  * What a resident died of (`DeathCause`).
  */
-export type DeathCause = "starved" | "oldAge" | "killed";
+export type DeathCause = "starved" | "oldAge" | "killed" | "fell";

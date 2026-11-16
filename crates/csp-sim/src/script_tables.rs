@@ -142,7 +142,13 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
             ScriptField {
                 name: "carried",
                 r#type: ScriptType::View("goods"),
-                description: "The goods they carry.",
+                description: "The goods they carry: seen of your own and your allies' residents, and of anyone one of yours stands beside; empty for others, who show only what they have equipped.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "equipped",
+                r#type: ScriptType::View("equipment"),
+                description: "What they have equipped: a weapon, shield and armour, each among what they carry.",
                 null_when: None,
             },
             ScriptField {
@@ -186,6 +192,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 r#type: ScriptType::String,
                 description: "The id of the carriage or boat they are aboard as a passenger.",
                 null_when: Some("unless they are aboard one"),
+            },
+            ScriptField {
+                name: "up",
+                r#type: ScriptType::Boolean,
+                description: "Whether they are up on a wall walk, on top of a wall or gate, rather than on the ground. Getting up or down takes a while, and they come down only on the side they went up from.",
+                null_when: None,
             },
             ScriptField {
                 name: "script",
@@ -294,6 +306,30 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 r#type: ScriptType::Number,
                 description: "What training added, at most the base.",
                 null_when: None,
+            },
+        ],
+    },
+    ScriptView {
+        name: "equipment",
+        description: "A resident’s three equipment slots: the good in each. Only what is equipped counts in a fight, and a weapon equipped makes them armed.",
+        fields: &[
+            ScriptField {
+                name: "weapon",
+                r#type: ScriptType::String,
+                description: "The weapon equipped: \"spear\", \"sword\" or \"steelSword\".",
+                null_when: Some("when unarmed"),
+            },
+            ScriptField {
+                name: "shield",
+                r#type: ScriptType::String,
+                description: "The shield equipped: \"shield\" or \"steelShield\".",
+                null_when: Some("when they have none equipped"),
+            },
+            ScriptField {
+                name: "armour",
+                r#type: ScriptType::String,
+                description: "The armour equipped: \"armour\" or \"steelArmour\".",
+                null_when: Some("when they have none equipped"),
             },
         ],
     },
@@ -2849,6 +2885,22 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         returns: ScriptType::String,
     },
     ScriptBinding {
+        name: "equip",
+        is: Is::Action,
+        params: &["good"],
+        cost: 10.0,
+        description: "Swap a weapon, shield or armour I carry, like \"sword\", into the slot it fits; what was there stays carried. It takes a few ticks, and I strike no blows meanwhile.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "takeOff",
+        is: Is::Action,
+        params: &["slot"],
+        cost: 10.0,
+        description: "Take off what I have in a slot, \"weapon\", \"shield\" or \"armour\"; it stays carried, and the slot stays empty until I pick up more that fits it. It takes a few ticks, and I strike no blows meanwhile.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
         name: "climb",
         is: Is::Action,
         params: &["wallId"],
@@ -4828,10 +4880,13 @@ fn goodsText(load, goods) {
 // stand in when I start, kept in memory.stableId; with none, or once it is
 // gone, I end. Below that I fetch what is missing from params.source, or
 // the nearest storage of my realm with Food while none is picked, and store
-// it in the stable; otherwise I wait there. memory.spareFood, kept only by an
-// NPC city's feeder, is the most Food I may take now.
+// it in the stable; otherwise I wait there. With params.once I feed it a
+// single round: once it is full, or with no Food to fetch, I end.
+// memory.spareFood, kept only by an NPC city's feeder, is the most Food I may
+// take now.
 param stable: storage // the stable to feed; none: the one I stand in
 param source: storage // where the Food comes from; a carriage too; none: the nearest storage with Food
+param once: number = 0 // 1: a single round, then end; 0: keep it fed
 let days = 10 // game days of Food to keep
 let perHorse = 0.75 // Food a horse eats a game day
 let side = 3 // tiles along each side of a stable
@@ -4879,12 +4934,16 @@ fn storeFetched(stable) {
 }
 
 // Below the Food to keep for the horses in it now: fetch what is missing.
-// True once I set off.
+// True once I set off, or once I end (params.once).
 fn fetchIfLow(stable) {
   let held = 0
   if (stable.stock != null && stable.stock.food != null) { held = stable.stock.food }
   let need = horsesIn(stable) * days * perHorse - held
   if (need <= 0) {
+    if (params.once > 0) {
+      end("the stable is full")
+      return true
+    }
     say("enough Food in the stable: waiting")
     return false
   }
@@ -4901,6 +4960,10 @@ fn fetchIfLow(stable) {
       say("stable low (" + floor(held) + "): fetching " + units + " Food at " + placeName(from))
       return true
     }
+  }
+  if (params.once > 0) {
+    end("no Food to fetch")
+    return true
   }
   say("stable low (" + floor(held) + "): no Food to fetch, waiting")
   return false
@@ -4992,19 +5055,32 @@ fn goodsText(load, goods) {
 // which goes on once I end. Armed, I fight back at whoever struck me while
 // they are in sight, and end once they are dead, gone or out of sight; a
 // driver walks back to the carriage first, should the fight have led away.
-// Unarmed, I walk home to my city's town hall, and end there, or once no
-// blow has landed for calm ticks; but driving I end at once and drive on, and
+// Unarmed, or struck from up on a wall while I stand below, where no blow of
+// mine reaches, I walk home to my city's town hall, away from the wall, and
+// end there, or once no blow has landed for calm ticks; but driving I end at once and drive on, and
 // aboard a carriage being driven I end at once and stay aboard.
 let calm = 30 // ticks without a blow before I go back, fleeing
 
-if (armed()) {
+if (armed() && !struckFromAbove()) {
   // My drive waits while I fight: kept for the way back to my carriage.
   if (holdsCarriage()) { memory.carriageId = me.order.carriageId }
   fightBack()
+} else if (armed()) {
+  fleeHome()
 } else if (holdsCarriage() || betweenDrives() || aboardDriven()) {
   end()
 } else {
   fleeHome()
+}
+
+// Whether whoever struck me is up on a wall and I am on the ground below,
+// where nobody strikes anyone up.
+fn struckFromAbove() {
+  if (me.up) { return false }
+  for (r of residents()) {
+    if (r.id == me.struckBy) { return r.up }
+  }
+  return false
 }
 
 // Whether I drive a carriage, or haul with one.
@@ -5028,13 +5104,9 @@ fn aboardDriven() {
   return false
 }
 
-// Whether I carry a weapon.
+// Whether I have a weapon equipped.
 fn armed() {
-  for (w of ["spear", "sword", "steelSword"]) {
-    let n = me.carried[w]
-    if (n != null && n > 0) { return true }
-  }
-  return false
+  return me.equipped.weapon != null
 }
 
 // At whoever struck me, while they are in sight.
@@ -5955,13 +6027,9 @@ fn culprit() {
   return null
 }
 
-// Whether they carry a weapon.
+// Whether they have a weapon equipped.
 fn armed(who) {
-  for (w of ["spear", "sword", "steelSword"]) {
-    let n = who.carried[w]
-    if (n != null && n > 0) { return true }
-  }
-  return false
+  return who.equipped.weapon != null
 }
 
 // A building or carriage for my log: "the storage at 12,6".

@@ -457,6 +457,10 @@ pub const START_COINS: f64 = 50.0;
 /// something to eat while the farm's first harvest comes in (`CONTEXT.md`: Eating).
 pub const START_CARRIED_FOOD: f64 = 2.0;
 
+/// Iron Spears each grown resident of a starting city (the Leader too) starts with, so they are
+/// armed and defend from the first tick (`CONTEXT.md`: Starting city). Children get none.
+pub const START_SPEARS: f64 = 1.0;
+
 /// Horses in a starting city's stable: two, so a resident can breed them (`CONTEXT.md`: Starting city).
 pub const START_HORSES: f64 = 2.0;
 
@@ -492,6 +496,15 @@ pub const HORSE_WAKE_HEALTH: f64 = 20.0;
 /// (`CONTEXT.md`: Feeding the stable): `HORSE_FOOD_PER_DAY` for each, this many days. Below it the
 /// resident fetches more. Written into the default's source, where a Player can change it.
 pub const STABLE_FEED_DAYS: f64 = 10.0;
+
+/// Game days of Food for a starting city's horses (`START_HORSES`, `HORSE_FOOD_PER_DAY` each)
+/// below which the stable hand's "Farm and feed" queue feeds the stable once (`CONTEXT.md`:
+/// Starting city): a few days, so a round fills it from well before it runs out.
+pub const STABLE_HAND_FEED_DAYS: f64 = 3.0;
+
+/// Game minutes the stable hand works the farm between two looks at the stable (`CONTEXT.md`:
+/// Starting city): a game hour.
+pub const STABLE_HAND_WORK_MINUTES: f64 = 60.0;
 
 /// Game days of Food for its horses below which an NPC city sends one of its residents to fill its
 /// stable up to `STABLE_FEED_DAYS` (`CONTEXT.md`: NPC horses). Half of it, so they go in one trip
@@ -1432,6 +1445,11 @@ pub const WAKE_HEALTH: f64 = 10.0;
 /// one more to go on with, about four game days of eating.
 pub const FEED_UNITS: f64 = 2.0;
 
+/// Ticks a resident takes to swap an item into an equipment slot or take one off (`CONTEXT.md`:
+/// Equipment), striking no blows meanwhile: long enough that swapping mid-fight costs a blow or
+/// two, short enough to be done before the next one comes.
+pub const EQUIP_TICKS: f64 = 3.0;
+
 /// Game days a fed resident takes to heal from no health back to full.
 pub const HEAL_DAYS: f64 = 3.0;
 
@@ -2234,18 +2252,30 @@ pub struct WallStrength {
 
 /// Damage a wall or gate takes from blows before it falls (`CONTEXT.md`: Walls in combat,
 /// broken). An average unarmed resident (4 a blow, one blow every `STRIKE_TICKS`) breaks a stretch
-/// of wall alone in about five minutes; ten soldiers with swords in well under one. A gate holds
-/// out half as long again.
-pub const WALL_STRENGTH: WallStrength = WallStrength { wall: 600.0, gate: 900.0 };
+/// of wall alone in about 25 minutes, one with a Spear in about 12. A gate holds out half as long
+/// again. Long enough that a starting city's defenders get from their town hall up onto the wall
+/// and beat the breakers first, at twice their numbers too (T105.6).
+pub const WALL_STRENGTH: WallStrength = WallStrength { wall: 3000.0, gate: 4500.0 };
 
 /// Share of a broken wall's or gate's materials left on its tile, rounded down to whole units:
 /// less than tearing it down leaves (`TEARDOWN_MATERIALS_RETURNED`), as much of it is splintered;
 /// enough that a tile of wall leaves a unit of Wood.
 pub const BROKEN_MATERIALS_RETURNED: f64 = 0.34;
 
-/// Ticks it takes to climb over a wall or gate (`CONTEXT.md`: Walls in combat, climbed): a
-/// minute, as long as walking eight tiles of plains, all the while unable to dodge or strike back.
-pub const CLIMB_TICKS: f64 = 60.0;
+/// Ticks it takes to climb over a wall or gate (`CONTEXT.md`: Walls in combat, climbed): six
+/// minutes, all the while unable to dodge or strike back, so a starting city's defenders get up
+/// onto its wall and strike the climbers down before they are over (T105.6).
+pub const CLIMB_TICKS: f64 = 360.0;
+
+/// Ticks it takes to get up onto a wall walk from the ground next to the wall, and as long again to
+/// get down (`CONTEXT.md`: Wall walk): twenty seconds, as long as walking about three tiles of
+/// plains, so nobody goes up on the way somewhere else.
+pub const WALL_WALK_TICKS: f64 = 20.0;
+
+/// Health someone up on a wall or gate tile loses when the tile breaks under them and they fall to
+/// the ground (`CONTEXT.md`: A tile breaks), of `MAX_HEALTH`: about as much as a few good blows,
+/// so a fall hurts but kills only those already low on health.
+pub const FALL_DAMAGE: f64 = 30.0;
 
 /// Chance of dodging a blow for each point of Agility: an average resident dodges one in five.
 pub const DODGE_PER_AGILITY: f64 = 0.02;
@@ -2661,6 +2691,7 @@ pub fn balance_json() -> Value {
     m.insert("START_FOOD".into(), json!(START_FOOD));
     m.insert("START_COINS".into(), json!(START_COINS));
     m.insert("START_CARRIED_FOOD".into(), json!(START_CARRIED_FOOD));
+    m.insert("START_SPEARS".into(), json!(START_SPEARS));
     m.insert("START_HORSES".into(), json!(START_HORSES));
     m.insert("START_STABLE_FOOD".into(), json!(START_STABLE_FOOD));
     m.insert("HORSE_FOOD_PER_DAY".into(), json!(HORSE_FOOD_PER_DAY));
@@ -2670,6 +2701,8 @@ pub fn balance_json() -> Value {
     m.insert("HORSE_HUNGRY_SHARE".into(), json!(HORSE_HUNGRY_SHARE));
     m.insert("HORSE_WAKE_HEALTH".into(), json!(HORSE_WAKE_HEALTH));
     m.insert("STABLE_FEED_DAYS".into(), json!(STABLE_FEED_DAYS));
+    m.insert("STABLE_HAND_FEED_DAYS".into(), json!(STABLE_HAND_FEED_DAYS));
+    m.insert("STABLE_HAND_WORK_MINUTES".into(), json!(STABLE_HAND_WORK_MINUTES));
     m.insert("NPC_STABLE_REFILL_DAYS".into(), json!(NPC_STABLE_REFILL_DAYS));
     m.insert("NPC_STABLE_HUNGRY_DAYS".into(), json!(NPC_STABLE_HUNGRY_DAYS));
     m.insert("NPC_START_HORSES".into(), json!(NPC_START_HORSES));
@@ -2831,6 +2864,7 @@ pub fn balance_json() -> Value {
     m.insert("DOWN_DAYS".into(), json!(DOWN_DAYS));
     m.insert("WAKE_HEALTH".into(), json!(WAKE_HEALTH));
     m.insert("FEED_UNITS".into(), json!(FEED_UNITS));
+    m.insert("EQUIP_TICKS".into(), json!(EQUIP_TICKS));
     m.insert("HEAL_DAYS".into(), json!(HEAL_DAYS));
     m.insert("HUNGER_ENDURANCE_AVERAGE".into(), json!(HUNGER_ENDURANCE_AVERAGE));
     m.insert("HUNGER_ENDURANCE_EFFECT".into(), json!(HUNGER_ENDURANCE_EFFECT));
@@ -2953,6 +2987,8 @@ pub fn balance_json() -> Value {
     m.insert("WALL_STRENGTH".into(), to_value(WALL_STRENGTH).expect("serialisable"));
     m.insert("BROKEN_MATERIALS_RETURNED".into(), json!(BROKEN_MATERIALS_RETURNED));
     m.insert("CLIMB_TICKS".into(), json!(CLIMB_TICKS));
+    m.insert("WALL_WALK_TICKS".into(), json!(WALL_WALK_TICKS));
+    m.insert("FALL_DAMAGE".into(), json!(FALL_DAMAGE));
     m.insert("DODGE_PER_AGILITY".into(), json!(DODGE_PER_AGILITY));
     m.insert("DODGE_LIMIT".into(), json!(DODGE_LIMIT));
     m.insert("COMBAT_SKILL_PER_BLOW".into(), json!(COMBAT_SKILL_PER_BLOW));

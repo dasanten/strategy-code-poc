@@ -267,29 +267,45 @@ impl OrderKind for QueueOrder {
         else {
             return;
         };
-        // Steps and blocks get their ids from 1 in the order listed, a block before its items.
-        let mut next_step_id = 1;
-        let items = kept_items(&items_of(order), &mut next_step_id, &Rounds::new());
-        // A queue is an order of their own, so they leave their army (`CONTEXT.md`: Army).
-        let id = world.residents[i].id.clone();
-        leave_armies(world, &HashSet::from([id]));
-        world.residents[i].order = None;
-        let mut q = Queue {
-            realm_id: realm_id.clone(),
-            items,
-            current: 0,
-            started_at: None,
-            r#loop: loop_of(order) == Ok(Some(true)),
-            next_step_id,
-            started: false,
-        };
-        // An If block first in the queue asks its condition now: its turn has come.
-        let mut gone = Vec::new();
-        let outcome = begin(&mut q, &mut |c| asked(world, i, &realm_id, c, &mut gone));
-        world.residents[i].queue = (outcome != Advance::Ended).then_some(q);
-        for place_id in gone {
-            place_gone(world, i, &realm_id, &place_id, world.tick as f64);
-        }
+        let r#loop = loop_of(order) == Ok(Some(true));
+        give_queue(world, i, &realm_id, &items_of(order), r#loop, None);
+    }
+}
+
+/// Gives the resident at `i` a queue of the realm `realm_id` with these items, named or not, as
+/// the queue order does: it ends whatever they were doing and the first step starts on the next
+/// run of the queues. Steps and items must already be checked (`queue_steps_problem`).
+pub(crate) fn give_queue(
+    world: &mut WorldState,
+    i: usize,
+    realm_id: &str,
+    items: &[QueueItemRequest],
+    r#loop: bool,
+    name: Option<String>,
+) {
+    // Steps and blocks get their ids from 1 in the order listed, a block before its items.
+    let mut next_step_id = 1;
+    let items = kept_items(items, &mut next_step_id, &Rounds::new());
+    // A queue is an order of their own, so they leave their army (`CONTEXT.md`: Army).
+    let id = world.residents[i].id.clone();
+    leave_armies(world, &HashSet::from([id]));
+    world.residents[i].order = None;
+    let mut q = Queue {
+        realm_id: realm_id.to_string(),
+        items,
+        current: 0,
+        started_at: None,
+        r#loop,
+        next_step_id,
+        started: false,
+        name,
+    };
+    // An If block first in the queue asks its condition now: its turn has come.
+    let mut gone = Vec::new();
+    let outcome = begin(&mut q, &mut |c| asked(world, i, realm_id, c, &mut gone));
+    world.residents[i].queue = (outcome != Advance::Ended).then_some(q);
+    for place_id in gone {
+        place_gone(world, i, realm_id, &place_id, world.tick as f64);
     }
 }
 

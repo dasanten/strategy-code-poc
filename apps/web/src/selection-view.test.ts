@@ -1814,11 +1814,13 @@ describe('the actions on a tile’s card', () => {
 
     it('greys it with the reason while it can’t be taken', () => {
       const reason = (...residents: SeenResident[]) => row(thing(residents))?.reason
-      const armed = person('st', { owner: 'them', carried: { spear: 1 } })
+      const armed = person('st', { owner: 'them', equipped: { weapon: 'spear' } })
       expect(reason(person('ada'), armed)).toBe('an armed resident guards that carriage')
       expect(row(thing([person('ada'), armed]))?.disabled).toBe(true)
       // One of theirs armed there too lifts the guard.
-      expect(reason(person('ada'), armed, person('bo', { carried: { sword: 1 } }))).toBeUndefined()
+      expect(
+        reason(person('ada'), armed, person('bo', { equipped: { weapon: 'sword' } })),
+      ).toBeUndefined()
       expect(reason(person('ada'), person('st', { owner: 'them', aboard: 'k1' }))).toBe(
         'someone is aboard that carriage',
       )
@@ -1834,13 +1836,15 @@ describe('the actions on a tile’s card', () => {
       )
       expect(reason(person('kid', { bornAt: tick }))).toBe('children can’t steal')
       const caravans = [{ carriageId: 'k1', driverId: 'drv', escortIds: ['esc'] }]
-      const crew = (id: string, carried = {}) => person(id, { owner: null, carried })
+      const crew = (id: string, equipped = {}) => person(id, { owner: null, equipped })
       const offering = (...others: ReturnType<typeof person>[]) =>
         row(thing([person('ada'), ...others], { caravans }))?.reason
       expect(offering()).toBeUndefined()
       expect(offering(crew('drv'))).toBe('its driver is still with that caravan’s carriage')
       expect(offering(crew('esc'))).toBeUndefined()
-      expect(offering(crew('esc', { sword: 1 }))).toBe('its escort guards that caravan’s carriage')
+      expect(offering(crew('esc', { weapon: 'sword' }))).toBe(
+        'its escort guards that caravan’s carriage',
+      )
       const down = { ...horse, down: true as const }
       expect(row(thing([person('ada')], { horses: [down] }))?.reason).toBe('its horse is Down')
     })
@@ -1887,11 +1891,11 @@ describe('the actions on a tile’s card', () => {
 
       it('greys it with the reason while it can’t be taken', () => {
         const reason = (card: TileCard) => mount(card)?.reason
-        const armed = person('st', { owner: 'them', carried: { spear: 1 } })
+        const armed = person('st', { owner: 'them', equipped: { weapon: 'spear' } })
         expect(reason(loose([person('ada'), armed]))).toBe('an armed resident guards that horse')
         expect(mount(loose([person('ada'), armed]))?.disabled).toBe(true)
         expect(
-          reason(loose([person('ada'), armed, person('bo', { carried: { sword: 1 } })])),
+          reason(loose([person('ada'), armed, person('bo', { equipped: { weapon: 'sword' } })])),
         ).toBeUndefined()
         const down = { ...horse, down: true as const }
         expect(reason(loose([person('ada')], { horses: [down] }))).toBe('that horse is Down')
@@ -1938,7 +1942,7 @@ describe('the actions on a tile’s card', () => {
       })
 
       it('greys it with the reason while the horse is guarded', () => {
-        const armed = person('st', { owner: 'them', carried: { spear: 1 } })
+        const armed = person('st', { owner: 'them', equipped: { weapon: 'spear' } })
         expect(hitch(thing([person('ada'), armed], mine))?.reason).toBe(
           'an armed resident guards that horse',
         )

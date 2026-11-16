@@ -15,6 +15,7 @@ import type {
   ScriptSummary,
   SeenScript,
   Task,
+  UpSide,
 } from '@csp/shared-types'
 import { BUILDING_NAMES } from './city-view.js'
 import { selectedWay } from './map/way.js'
@@ -35,7 +36,12 @@ export interface DoingOf {
   /** Down (`CONTEXT.md`: Down): from the world, or as a Player sees them. */
   down?: true
   downUntil?: number
+  /** Up on a wall walk (`CONTEXT.md`: Wall walk), from the side they came up. */
+  up?: UpSide
 }
+
+/** The Doing line of someone up on a wall walk with nothing to do (`CONTEXT.md`: Wall walk). */
+export const UP_ON_THE_WALL = 'Up on the wall walk'
 
 /**
  * Whether a driver just struck drives on with their defence script yet to say otherwise, so their
@@ -58,7 +64,8 @@ function drivesOn(r: {
  * storage". The script's name is not part of it; the card and list show it on a line of its own.
  * A passenger with no order is "Aboard a carriage", heading where its driver among `residents`
  * drives it. While the script waits on the order (`CONTEXT.md`: Running a script, Waiting), the
- * line ends in "· script waiting".
+ * line ends in "· script waiting". Someone up on a wall walk with nothing to do is "Up on the wall
+ * walk"; with something to do, their line ends in "· on the wall walk".
  */
 export function doingLine(r: DoingOf, seen: DoingSeen): string {
   if (drivesOn(r)) {
@@ -68,7 +75,10 @@ export function doingLine(r: DoingOf, seen: DoingSeen): string {
     else delete goingOn.script
     return doingLine(goingOn, seen)
   }
-  const line = doingOfOrder(r, seen)
+  const doing = doingOfOrder(r, seen)
+  // Up on a wall walk, whatever they do there (`CONTEXT.md`: Wall walk).
+  const up = r.up && !isDown(r) && doing !== UP_ON_THE_WALL
+  const line = up ? `${doing} · on the wall walk` : doing
   return r.script?.waiting ? `${line} · script waiting` : line
 }
 
@@ -125,6 +135,7 @@ function doingOfOrder(
   if (isDown(r)) return downLine(r, tick)
   if (r.script?.doing) return r.script.doing
   if (r.aboard !== undefined && !r.order) return aboardLine(r, residents)
+  if (r.up && !r.order) return UP_ON_THE_WALL
   if (r.carrying && !r.order) return 'Carrying a child'
   const task = r.script && taskOf(r.script, scripts)
   const step = stepLine(r.order, buildings, horses)

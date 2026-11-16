@@ -21,13 +21,19 @@ use std::time::Instant;
 
 use csp_shared::balance::{
     TerrainTable, CARRIAGE_SPEED, PATH_DETOUR_LIMIT, PATH_DETOUR_SLACK, TERRAIN_SPEED,
-    WALL_ENCLOSES_MAX,
+    WALK_TICKS_PER_TILE, WALL_ENCLOSES_MAX, WALL_WALK_TICKS,
 };
 use csp_shared::terrain::{
     is_passable_terrain, tile_index, wrap, wrap_delta, Terrain, TerrainMap, DIAGONAL_STEP,
 };
 
-use crate::walls::{may_step, stranded_on_wall, WallMap};
+use csp_shared::world::UpSide;
+use rustc_hash::FxHashMap;
+
+use crate::walls::{
+    may_move, may_step, neighbours, own_wall_or_gate, plain_ground, side_of, stranded_on_wall,
+    WallKind, WallMap,
+};
 
 /// What crossing one tile of each terrain costs, in plains-tiles, by terrain byte; infinity can't
 /// be entered. A tile with a road costs `Terrain::Road`'s, whatever the terrain beneath.
@@ -119,6 +125,9 @@ pub struct PathOptions {
     /// Stop on the first of these tiles (tile indices) rather than at the goal, which then only
     /// says which way to go: to the edge of a city's area, whatever stands inside it.
     pub area: Option<HashSet<usize>>,
+    /// Up on the wall walk at the start, and from which side (`CONTEXT.md`: Wall walk); on the ground
+    /// when none.
+    pub up: Option<UpSide>,
 }
 
 /// A request waiting for or under search, with what `check` worked out for it.
@@ -136,6 +145,8 @@ struct Request {
     start: usize,
     /// Whether the search starts stuck on a wall (`stranded_on_wall`).
     stranded: bool,
+    /// Up on the walk at the start, as `PathOptions::up` says, if the start is a wall or gate.
+    start_up: Option<UpSide>,
     /// Whether the quick checks before any search (`check`) have run.
     checked: bool,
 }
@@ -143,12 +154,15 @@ struct Request {
 /// `Ground::flags` bits.
 const ROAD: u8 = 1;
 const WALL: u8 = 2;
+/// Beside a wall or gate (straight), where someone may get up onto its walk.
+const NEAR_WALL: u8 = 4;
 
 /// What the searches step across: the terrain, its roads, and the walls and gates on it.
 struct Ground {
     size: i32,
     terrain: Arc<TerrainMap>,
-    /// Per tile: `ROAD` where a finished road is, `WALL` where a wall or gate stands.
+    /// Per tile: `ROAD` where a finished road is, `WALL` where a wall or gate stands, `NEAR_WALL`
+    /// beside one.
     flags: Vec<u8>,
     walls: Option<Arc<WallMap>>,
     road_list: Vec<usize>,
@@ -190,11 +204,17 @@ impl Ground {
         }
         for &t in &self.wall_list {
             self.flags[t] &= !WALL;
+            for n in neighbours(self.size, t) {
+                self.flags[n] &= !NEAR_WALL;
+            }
         }
         self.wall_list =
             walls.as_ref().map(|w| w.tiles.keys().copied().collect()).unwrap_or_default();
         for &t in &self.wall_list {
             self.flags[t] |= WALL;
+            for n in neighbours(self.size, t) {
+                self.flags[n] |= NEAR_WALL;
+            }
         }
         self.walls = walls;
     }
@@ -209,18 +229,17 @@ impl Ground {
         }
     }
 
-    /// Whether the request may step from tile index `t` to the next tile `nt`, walls and gates
-    /// aside.
+    /// Whether the request may step on the ground onto the next tile `nt`, walls and gates aside
+    /// (`may_step`).
     #[inline]
-    fn may_step(&self, req: &Request, t: usize, nt: usize) -> bool {
+    fn may_step(&self, req: &Request, nt: usize) -> bool {
         let Some(walls) = &self.walls else {
             return true;
         };
-        if (self.flags[t] | self.flags[nt]) & WALL == 0 {
+        if self.flags[nt] & WALL == 0 {
             return true;
         }
-        let stranded = req.stranded && t == req.start;
-        may_step(walls, req.options.realm_id.as_deref(), t, nt, req.options.on_walls, stranded)
+        may_step(walls, req.options.realm_id.as_deref(), nt)
     }
 }
 
@@ -341,9 +360,81 @@ struct Search {
     limit: f64,
     /// Whether the search came up against a side of its window, so a way may lie beyond it.
     clipped: bool,
+    /// The nodes up on a wall walk this search reached, by node id (`Search::up_id`): few, as
+    /// only walls and gates have them, so they are kept apart from the window's arrays.
+    up: FxHashMap<u32, UpNode>,
+}
+
+/// What getting up onto a wall walk, or down from it, costs a path, in plains-tiles on foot: its
+/// ticks at a walker's pace on plains (`CONTEXT.md`: Wall walk).
+pub const WALL_WALK_COST: f64 = WALL_WALK_TICKS / WALK_TICKS_PER_TILE;
+
+/// A node of a search up on a wall walk: its cost so far, where it came from (a node id), and
+/// whether it is closed.
+#[derive(Debug, Clone, Copy)]
+struct UpNode {
+    g: f32,
+    came_from: i32,
+    closed: bool,
 }
 
 impl Search {
+    /// How many window tiles there are: node ids below it are on the ground, the rest up on a walk.
+    #[inline]
+    fn tiles(&self) -> usize {
+        (self.side * self.side) as usize
+    }
+
+    /// The node id of window tile `l` up on a walk, come up from `side`.
+    #[inline]
+    fn up_id(&self, l: usize, side: UpSide) -> usize {
+        self.tiles() + 2 * l + usize::from(side == UpSide::Outside)
+    }
+
+    /// The window tile of node `id`, and whether it is up on a walk, from which side.
+    #[inline]
+    fn node(&self, id: usize) -> (usize, Option<UpSide>) {
+        let n = self.tiles();
+        if id < n {
+            return (id, None);
+        }
+        let side = if (id - n).is_multiple_of(2) { UpSide::Inside } else { UpSide::Outside };
+        ((id - n) / 2, Some(side))
+    }
+
+    /// The cost so far to node `id`.
+    #[inline]
+    fn g_of(&self, id: usize) -> f32 {
+        if id < self.tiles() {
+            self.g[id]
+        } else {
+            self.up[&(id as u32)].g
+        }
+    }
+
+    /// Reaches ground window tile `nl` from node `from` at cost `g`, unless it is closed or was
+    /// reached cheaper; `h` is the heuristic from it.
+    #[inline]
+    fn relax_ground(&mut self, nl: usize, g: f32, from: usize, h: f64) {
+        let stamp = self.stamp[nl];
+        if stamp == 2 * self.search + 1 || (stamp == 2 * self.search && g >= self.g[nl]) {
+            return;
+        }
+        self.stamp[nl] = 2 * self.search;
+        self.g[nl] = g;
+        self.came_from[nl] = from as i32;
+        self.heap.push(nl as i32, f64::from(g) + h);
+    }
+
+    /// Reaches the walk's node `id` from node `from` at cost `g`, unless it is closed or was reached
+    /// cheaper; `h` is the heuristic from it.
+    fn relax_up(&mut self, id: usize, g: f32, from: usize, h: f64) {
+        if self.up.get(&(id as u32)).is_some_and(|u| u.closed || g >= u.g) {
+            return;
+        }
+        self.up.insert(id as u32, UpNode { g, came_from: from as i32, closed: false });
+        self.heap.push(id as i32, f64::from(g) + h);
+    }
     fn new(map_size: i32, side: i32) -> Search {
         let n = (side * side) as usize;
         Search {
@@ -358,6 +449,7 @@ impl Search {
             y0: 0,
             limit: f64::INFINITY,
             clipped: false,
+            up: FxHashMap::default(),
         }
     }
 
@@ -376,14 +468,22 @@ impl Search {
         }
         self.search += 1;
         self.heap.clear();
+        self.up.clear();
         self.clipped = false;
         let l = (wrap(fy - self.y0, size) * self.side + wrap(fx - self.x0, size)) as usize;
-        self.stamp[l] = 2 * self.search;
-        self.g[l] = 0.0;
-        self.came_from[l] = -1;
         let best = steps_to(req, size, fx, fy) * req.cheapest;
         self.limit =
             PATH_DETOUR_LIMIT * best + PATH_DETOUR_SLACK * table.get(Terrain::Plains as u8);
+        // One who starts up on a walk starts from its node (`CONTEXT.md`: Wall walk).
+        if let Some(side) = req.start_up {
+            let id = self.up_id(l, side);
+            self.up.insert(id as u32, UpNode { g: 0.0, came_from: -1, closed: false });
+            self.heap.push(id as i32, best);
+            return;
+        }
+        self.stamp[l] = 2 * self.search;
+        self.g[l] = 0.0;
+        self.came_from[l] = -1;
         self.heap.push(l as i32, best);
     }
 
@@ -402,22 +502,31 @@ impl Search {
             if self.heap.top() > self.limit {
                 return Some(PathResult::Unreachable);
             }
-            let Some(l) = self.heap.pop() else {
+            let Some(id) = self.heap.pop() else {
                 return Some(PathResult::Unreachable);
             };
-            let l = l as usize;
-            if self.stamp[l] == closed {
-                continue;
+            let id = id as usize;
+            let (l, up) = self.node(id);
+            if up.is_none() {
+                if self.stamp[l] == closed {
+                    continue;
+                }
+                self.stamp[l] = closed;
+            } else {
+                let node = self.up.get_mut(&(id as u32)).expect("a node pushed");
+                if node.closed {
+                    continue;
+                }
+                node.closed = true;
             }
-            self.stamp[l] = closed;
             let lx = l as i32 % side;
             let ly = (l as i32 - lx) / side;
             let x = if self.x0 + lx < size { self.x0 + lx } else { self.x0 + lx - size };
             let y = if self.y0 + ly < size { self.y0 + ly } else { self.y0 + ly - size };
             if reached(req, size, x, y) {
                 return Some(PathResult::Found {
-                    path: self.path_to(l, size),
-                    cost: f64::from(self.g[l]),
+                    path: self.path_to(id, size),
+                    cost: f64::from(self.g_of(id)),
                 });
             }
             let t = (y * size + x) as usize;
@@ -426,6 +535,17 @@ impl Search {
             let w = if x == 0 { size - 1 } else { x - 1 };
             let s = if y + 1 == size { 0 } else { y + 1 };
             let n = if y == 0 { size - 1 } else { y - 1 };
+            // Getting up, along the walk and down again go straight only (`CONTEXT.md`: Wall walk).
+            let walk = |me: &mut Search| {
+                me.visit_walk(req, ground, t, id, up, e, y, lx + 1, ly, table);
+                me.visit_walk(req, ground, t, id, up, w, y, lx - 1, ly, table);
+                me.visit_walk(req, ground, t, id, up, x, s, lx, ly + 1, table);
+                me.visit_walk(req, ground, t, id, up, x, n, lx, ly - 1, table);
+            };
+            if up.is_some() {
+                walk(self);
+                continue;
+            }
             self.visit(req, ground, table, t, l, e, y, lx + 1, ly, false);
             self.visit(req, ground, table, t, l, w, y, lx - 1, ly, false);
             self.visit(req, ground, table, t, l, x, s, lx, ly + 1, false);
@@ -434,8 +554,65 @@ impl Search {
             self.visit(req, ground, table, t, l, w, s, lx - 1, ly + 1, true);
             self.visit(req, ground, table, t, l, e, n, lx + 1, ly - 1, true);
             self.visit(req, ground, table, t, l, w, n, lx - 1, ly - 1, true);
+            if req.options.on_walls && ground.flags[t] & NEAR_WALL != 0 {
+                walk(self);
+            }
         }
         None
+    }
+
+    /// Considers the straight step from tile `t` (node `id`, on the ground or `up` on a walk) to
+    /// (nx, ny), window tile (nlx, nly), that gets up onto a walk, goes along it or gets down from
+    /// it (`may_move`). Getting up or down costs `WALL_WALK_COST`, along the walk the terrain's step.
+    #[allow(clippy::too_many_arguments)]
+    fn visit_walk(
+        &mut self,
+        req: &Request,
+        ground: &Ground,
+        t: usize,
+        id: usize,
+        up: Option<UpSide>,
+        nx: i32,
+        ny: i32,
+        mut nlx: i32,
+        mut nly: i32,
+        table: &TerrainCosts,
+    ) {
+        let Some(walls) = &ground.walls else { return };
+        let side = self.side;
+        if nlx < 0 || nlx >= side || nly < 0 || nly >= side {
+            if !self.full {
+                self.clipped = true;
+                return;
+            }
+            nlx = nx;
+            nly = ny;
+        }
+        let size = ground.size;
+        let nt = (ny * size + nx) as usize;
+        let step = table.get(ground.at(nt));
+        if step == f64::INFINITY {
+            return;
+        }
+        let onto_ground = plain_ground(walls, nt);
+        let (to_up, cost) = match up {
+            None if onto_ground => return,
+            None => (Some(side_of(walls, t)), WALL_WALK_COST),
+            Some(_) if onto_ground => (None, WALL_WALK_COST),
+            Some(s) => (Some(s), step),
+        };
+        let stranded = req.stranded && t == req.start;
+        let realm = req.options.realm_id.as_deref();
+        if !may_move(walls, realm, t, up, nt, to_up, stranded) {
+            return;
+        }
+        let g = (f64::from(self.g_of(id)) + cost) as f32;
+        let h = steps_to(req, size, nx, ny) * req.cheapest;
+        let nl = (nly * side + nlx) as usize;
+        match to_up {
+            None => self.relax_ground(nl, g, id, h),
+            Some(s) => self.relax_up(self.up_id(nl, s), g, id, h),
+        }
     }
 
     /// Considers the step from tile `t` (window tile `l`) to (nx, ny), window tile (nlx, nly). A
@@ -476,7 +653,7 @@ impl Search {
         if stamp == 2 * self.search + 1 {
             return;
         }
-        if !ground.may_step(req, t, nt) {
+        if !ground.may_step(req, nt) {
             return;
         }
         if diagonal {
@@ -487,7 +664,7 @@ impl Search {
             {
                 return;
             }
-            if !ground.may_step(req, t, a) || !ground.may_step(req, t, b) {
+            if !ground.may_step(req, a) || !ground.may_step(req, b) {
                 return;
             }
             step *= DIAGONAL_STEP;
@@ -503,13 +680,20 @@ impl Search {
         self.heap.push(nl as i32, f64::from(g) + steps_to(req, size, nx, ny) * req.cheapest);
     }
 
+    /// The tiles from the start to node `goal`, the start left out, on the ground or up alike.
     fn path_to(&self, goal: usize, size: i32) -> Vec<Point> {
         let side = self.side as usize;
+        let n = self.tiles();
         let mut path = Vec::new();
-        let mut l = goal;
-        while self.came_from[l] != -1 {
+        let mut id = goal;
+        loop {
+            let from = if id < n { self.came_from[id] } else { self.up[&(id as u32)].came_from };
+            if from == -1 {
+                break;
+            }
+            let (l, _) = self.node(id);
             path.push(((self.x0 + (l % side) as i32) % size, (self.y0 + (l / side) as i32) % size));
-            l = self.came_from[l] as usize;
+            id = from as usize;
         }
         path.reverse();
         path
@@ -644,6 +828,7 @@ impl PathFinder {
             cheapest: f64::INFINITY,
             start: 0,
             stranded: false,
+            start_up: None,
             checked: false,
         });
         self.results.insert(id.to_string(), PathResult::Searching);
@@ -792,11 +977,16 @@ impl PathFinder {
             }
         }
         let ground = &self.ground;
-        req.stranded = ground
-            .walls
-            .as_ref()
-            .is_some_and(|w| stranded_on_wall(w, req.options.realm_id.as_deref(), s));
+        // Up only on a wall or gate (`CONTEXT.md`: Wall walk), and stuck there when there is no way
+        // down on their side.
+        let walls = ground.walls.as_ref();
+        req.start_up = req.options.up.filter(|_| walls.is_some_and(|w| !plain_ground(w, s)));
+        req.stranded = match (walls, req.start_up) {
+            (Some(w), Some(side)) => stranded_on_wall(w, req.options.realm_id.as_deref(), s, side),
+            _ => false,
+        };
         if to_goal
+            && req.start_up.is_none()
             && ground.walls.as_ref().is_some_and(|w| w.inside.contains(&goal))
             && self.shut_in(req, goal)
         {
@@ -840,7 +1030,17 @@ impl PathFinder {
                 if seen.contains(&p) || table.get(ground.at(p)) == f64::INFINITY {
                     continue;
                 }
-                if !ground.may_step(req, p, t) {
+                // Nobody stands on the ground on a wall: someone up on its walk might come down here,
+                // which only the search tells, as it does for one who starts on it.
+                if walls.tiles.get(&p).is_some_and(|w| w.kind == WallKind::Wall) {
+                    let realm = req.options.realm_id.as_deref();
+                    if p == req.start || (req.options.on_walls && own_wall_or_gate(walls, realm, p))
+                    {
+                        return false;
+                    }
+                    continue;
+                }
+                if !ground.may_step(req, t) {
                     continue;
                 }
                 if p == req.start || (!walls.inside.contains(&p) && !walls.tiles.contains_key(&p)) {

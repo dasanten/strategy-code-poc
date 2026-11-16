@@ -456,9 +456,10 @@ fn invariants_for_tick_runs_all_of_them_when_every_tick_is_sampled_none_at_a_rat
     // `outweighed-sound` (T96.2), `lent-never-turn` (T96.4), `npc-lending-keeps-reserve` (T96.3)
     // `heirs-qualify` (T103.1), `heirs-took-over` (T103.2), `founding-site-clear` (T100.5),
     // `starting-sites-sound` (T100.4), `steel-only-with-coal` (T101.6), `veins-sound` (T102.1),
-    // `veins-counted` (T102.2), `npc-leaves-dry-workplaces` (T102.4), `conditions-in-range` and
-    // `repair-orders-on-buildings` (T97.5).
-    assert_eq!(all.len(), 169);
+    // `veins-counted` (T102.2), `npc-leaves-dry-workplaces` (T102.4), `equipment-sound` (T107.1),
+    // `up-only-on-walls` and `up-only-on-own-walls` (T105.2), `none-attack-up-from-below` (T105.3),
+    // `conditions-in-range` and `repair-orders-on-buildings` (T97.5).
+    assert_eq!(all.len(), 173);
 }
 
 /// A starting city with everyone idle on the storage's tile, carrying nothing (`atHome` of

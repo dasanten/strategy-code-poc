@@ -715,6 +715,20 @@ pub fn carried_within_capacity(world: &WorldState, _: &TerrainMap) -> Out {
         .collect()
 }
 
+/// Every equipped item is among what its resident carries, and each slot holds only its kind
+/// (`CONTEXT.md`: Equipment).
+pub fn equipment_sound(world: &WorldState, _: &TerrainMap) -> Out {
+    let name = "equipment-sound";
+    world
+        .residents
+        .iter()
+        .filter_map(|r| {
+            crate::equipment::equipment_problem(r)
+                .map(|p| violation(name, format!("resident {}: {p}", r.id), &[&r.id]))
+        })
+        .collect()
+}
+
 fn negative(stock: &Stock) -> bool {
     stock.values().any(|n| !(*n >= 0.0))
 }
@@ -1873,7 +1887,7 @@ pub fn occupations_sound(world: &WorldState, terrain: &TerrainMap) -> Out {
                 r.owner.as_deref() == Some(o.realm_id.as_str())
             };
             theirs
-                && is_armed(&r.carried)
+                && is_armed(r)
                 && hall.is_some_and(|h| is_at((r.x as i32, r.y as i32), placed(h), terrain.size))
         });
         if !holds {

@@ -106,7 +106,7 @@ fn soldiers(world: &WorldState, city: &str) -> (usize, f64) {
         .into_iter()
         .filter(|r| r.health > 0.0 && can_work(r.born_at, tick))
         .collect();
-    let armed = adults.iter().filter(|r| is_armed(&r.carried)).count();
+    let armed = adults.iter().filter(|r| is_armed(r)).count();
     (armed, npc_soldier_target(adults.len() as f64))
 }
 

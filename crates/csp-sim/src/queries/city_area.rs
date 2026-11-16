@@ -298,7 +298,7 @@ pub fn defends_city(world: &WorldState, city: &City, r: &Resident, size: i32) ->
         None => city.realm_id.is_none() && r.city_id.as_deref() == Some(city.id.as_str()),
         Some(owner) => on_city_side(world, city, owner),
     };
-    side && is_armed(&r.carried) && in_city_area(world, &city.id, r.x, r.y, size)
+    side && is_armed(r) && in_city_area(world, &city.id, r.x, r.y, size)
 }
 
 /// Whether the resident is hired by the Trade Organization under a started contract.
@@ -337,7 +337,7 @@ fn occupation_of(world: &WorldState, city: &City, size: i32) -> Option<(String, 
     let mut occupier: Option<String> = None;
     let mut residents = Vec::new();
     for (i, r) in world.residents.iter().enumerate() {
-        if !is_armed(&r.carried) || !is_at((r.x as i32, r.y as i32), placed(hall), size) {
+        if !is_armed(r) || !is_at((r.x as i32, r.y as i32), placed(hall), size) {
             continue;
         }
         if defends_city(world, city, r, size) {
@@ -377,7 +377,7 @@ pub fn occupiers_of(world: &WorldState, city: &City, size: i32) -> Vec<usize> {
 /// footprint, and one who could hold it.
 pub fn stands_occupying(world: &WorldState, city: &City, r: &Resident, size: i32) -> bool {
     let Some(hall) = town_hall_of(world, city) else { return false };
-    if !is_armed(&r.carried)
+    if !is_armed(r)
         || !is_at((r.x as i32, r.y as i32), placed(hall), size)
         || defends_city(world, city, r, size)
     {

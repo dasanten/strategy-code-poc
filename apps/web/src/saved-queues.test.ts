@@ -6,6 +6,7 @@ import { planRows, planSteps, stepCount, withIds, type PlanItem } from './plan-b
 import {
   SAVED_QUEUES_VERSION,
   gonePlace,
+  keepGivenQueue,
   list,
   load,
   migrate,
@@ -92,6 +93,22 @@ describe('saved queues', () => {
     // Without storage they just aren't remembered.
     expect(readQueues(undefined, 'r1')).toEqual({})
     expect(() => storeQueues(undefined, 'r1', {})).not.toThrow()
+  })
+
+  it('saves a queue the game gave under its name once, keeping one the Player saved', () => {
+    const storage = memory()
+    keepGivenQueue(storage, 'r1', 'Farm and feed', mineRun, 1000)
+    expect(load(readQueues(storage, 'r1'), 'Farm and feed')).toHaveLength(3)
+    // Removed by the Player, it stays removed.
+    storeQueues(storage, 'r1', remove(readQueues(storage, 'r1'), 'Farm and feed'))
+    keepGivenQueue(storage, 'r1', 'Farm and feed', mineRun, 2000)
+    expect(readQueues(storage, 'r1')).toEqual({})
+    // One the Player saved under that name first is theirs.
+    const other = memory()
+    storeQueues(other, 'r1', save({}, 'Farm and feed', mineRun.slice(0, 1), 500))
+    keepGivenQueue(other, 'r1', 'Farm and feed', mineRun, 1000)
+    expect(load(readQueues(other, 'r1'), 'Farm and feed')).toHaveLength(1)
+    expect(() => keepGivenQueue(undefined, 'r1', 'Farm and feed', mineRun, 1)).not.toThrow()
   })
 
   it('ignores corrupt storage and corrupt entries', () => {

@@ -1,6 +1,6 @@
 import { FOOTPRINT } from '../shared/footprint.js'
 import type { BuildingKind, ResourceKind } from '@csp/shared-types'
-import type { Activity } from './figures.js'
+import type { Activity, Metal } from './figures.js'
 
 /**
  * The map's art registry (ADR 0008): which file in `assets/map/` draws each game kind. Glyphs are
@@ -141,6 +141,20 @@ export const ACTIVITY_ART: Record<Activity, string> = {
 }
 
 /**
+ * The marks of equipped gear on a resident's token (`figures.ts`, `CONTEXT.md`: Equipment): the
+ * weapon's kind, a shield, armour as a rim around the badge. Placeholders until real art.
+ */
+export const GEAR_ART = {
+  spear: 'gear-spear.svg',
+  sword: 'gear-sword.svg',
+  shield: 'gear-shield.svg',
+  armour: 'gear-armour-rim.svg',
+} as const
+
+/** The tint of a gear mark: iron a dull grey, steel a bright blue-white. */
+export const METAL_TINT: Record<Metal, number> = { iron: 0x9aa0a8, steel: 0xd8ecff }
+
+/**
  * Token bases: a building's dark hex badge and its ring (tinted per owner), a unit's dark round
  * badge and its ring, a node's diamond.
  */
@@ -176,6 +190,7 @@ export const artInUse = (): string[] => [
     ...Object.values(NODE_ART),
     ...Object.values(UNIT_ART),
     ...Object.values(ACTIVITY_ART),
+    ...Object.values(GEAR_ART),
     ...Object.values(BASE_ART),
     ...Object.values(CITY_ART),
   ]),

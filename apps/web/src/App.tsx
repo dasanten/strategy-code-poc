@@ -1011,8 +1011,14 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       (r) => r.scriptParams,
     )
     // Customise on a step, or a param it can't go without (`CONTEXT.md`: Before it starts).
+    // What the step gives itself (Feed the stable once's `once`) stays beside what is picked.
+    const given = order.params as StartParamValues | undefined
     const add = (params?: StartParamValues) =>
-      addStepOrder({ ...order, ...(params && { params }) }, at, planned.after)
+      addStepOrder(
+        { ...order, ...(params && { params: { ...params, ...given } }) },
+        at,
+        planned.after,
+      )
     if (!opensForm(order, keptBy, add)) await add()
   }
   /**
@@ -1457,6 +1463,17 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   async function feed(targetId: string, units: number) {
     if (!selected) return
     setOrderError(await giveOrder({ kind: 'feed', residentId: selected.id, targetId, units }))
+  }
+  /**
+   * Orders the picked resident to swap a good they carry into its slot, or with `null` to take
+   * the slot's item off (`CONTEXT.md`: Equipment); with Shift held it goes in their queue.
+   */
+  async function equip(slot: string, good: string | null) {
+    if (!selected) return
+    const order = good
+      ? { kind: 'equip', residentId: selected.id, good }
+      : { kind: 'takeOff', residentId: selected.id, slot }
+    setOrderError(await giveOrder(order))
   }
   /** Orders the picked resident to mount a horse on their tile, or with none to dismount. */
   async function ride(horseId?: string) {
@@ -2478,6 +2495,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               mapSize={world.map.size}
               onAttack={attack}
               onFeed={(targetId, units) => void feed(targetId, units)}
+              onEquip={(slot, good) => void equip(slot, good)}
               walls={world.buildings.filter(
                 (b) =>
                   isWallOrGate(b) &&
