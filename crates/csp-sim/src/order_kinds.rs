@@ -468,6 +468,9 @@ pub fn add_later_rule_orders(kinds: &mut OrderKinds) {
 
     // reviving.ts (named by no rule ticket; T86.14).
     kinds.insert("feed", crate::reviving::Feed);
+    // Equipment (T107.2).
+    kinds.insert("equip", crate::equipping::Equip);
+    kinds.insert("takeOff", crate::equipping::TakeOff);
     kinds.insert("payDebt", crate::trade_org_debt::PayDebt);
     // Demands.
     kinds.insert("sendDemand", crate::demands::SendDemand);

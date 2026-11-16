@@ -1,6 +1,6 @@
 import { PROTECTION, WEAPONS, isDown } from '../shared/world.js'
 import { isLineOrder } from '../shared/building.js'
-import type { Good, Resident } from '@csp/shared-types'
+import type { Equipment, Good, Resident } from '@csp/shared-types'
 import { isLeader, rankedAs, type Leaders, type Relationship, type Tone } from './tokens.js'
 
 /**
@@ -59,6 +59,33 @@ function moving(r: Pick<Resident, 'order' | 'x' | 'y'>): boolean {
     default:
       return false
   }
+}
+
+/** What a mark of equipped gear is made of: steel is drawn brighter than iron. */
+export type Metal = 'iron' | 'steel'
+
+/**
+ * The marks a resident's token wears for what they have equipped (`CONTEXT.md`: Equipment, Seeing
+ * it): the kind of weapon, a shield, and armour as a rim, each iron or steel. Placeholders until
+ * real art; anyone who sees the resident sees them.
+ */
+export interface GearMarks {
+  weapon?: { kind: 'spear' | 'sword'; metal: Metal }
+  shield?: Metal
+  armour?: Metal
+}
+
+const metalOf = (good: Good): Metal => (good.startsWith('steel') ? 'steel' : 'iron')
+
+/** The marks for what is equipped; none for empty slots. */
+export function gearMarks(equipped: Equipment | undefined): GearMarks {
+  const marks: GearMarks = {}
+  const { weapon, shield, armour } = equipped ?? {}
+  if (weapon)
+    marks.weapon = { kind: weapon === 'spear' ? 'spear' : 'sword', metal: metalOf(weapon) }
+  if (shield) marks.shield = metalOf(shield)
+  if (armour) marks.armour = metalOf(armour)
+  return marks
 }
 
 /** The most single figures on one tile; beyond that the last place shows "+N" (ADR 0008). */

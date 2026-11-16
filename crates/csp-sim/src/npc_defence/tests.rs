@@ -358,7 +358,7 @@ fn arm_soldiers_from_the_storage_by_their_size_and_soldiers_do_not_work() {
         .filter(|&i| can_work(p.world.residents[i].born_at, tick))
         .collect();
     let soldiers: Vec<usize> =
-        adults.iter().copied().filter(|&i| is_armed(&p.world.residents[i].carried)).collect();
+        adults.iter().copied().filter(|&i| is_armed(&p.world.residents[i])).collect();
     assert_eq!(soldiers.len() as f64, npc_soldier_target(adults.len() as f64));
     let spears = p.world.buildings[s].stock.as_ref().map_or(0.0, |st| held(st, Good::Spear));
     assert_eq!(spears, 5.0 - soldiers.len() as f64);
@@ -397,7 +397,7 @@ fn keep_no_soldiers_they_have_no_weapons_for() {
     let mut p = village();
     let mut runner = Runner::new(&p.terrain);
     p.run(&mut runner, DAY);
-    assert!(p.citizens().iter().all(|&i| !is_armed(&p.world.residents[i].carried)));
+    assert!(p.citizens().iter().all(|&i| !is_armed(&p.world.residents[i])));
 }
 
 #[test]
@@ -571,7 +571,7 @@ fn soldier_on(p: &mut Place, kind: BuildingKind) -> String {
     let i = p
         .citizens()
         .into_iter()
-        .find(|&i| !is_armed(&p.world.residents[i].carried))
+        .find(|&i| !is_armed(&p.world.residents[i]))
         .expect("an unarmed citizen");
     let s = &mut p.world.residents[i];
     (s.x, s.y, s.order) = (at.x, at.y, None);
@@ -637,7 +637,7 @@ fn a_trading_post_sends_them_after_an_armed_outsider_who_attacks_nobody_as_no_cr
     let bystander = p
         .citizens()
         .into_iter()
-        .find(|&i| !is_armed(&p.world.residents[i].carried))
+        .find(|&i| !is_armed(&p.world.residents[i]))
         .map(|i| p.world.residents[i].id.clone())
         .unwrap();
     occupier_on(&mut p, "p1");
@@ -830,7 +830,7 @@ fn arm_soldiers_from_the_warehouse_so_one_armed_outsider_does_not_capture_the_po
         .filter(|&i| can_work(p.world.residents[i].born_at, tick))
         .collect();
     let armed: Vec<usize> =
-        adults.iter().copied().filter(|&i| is_armed(&p.world.residents[i].carried)).collect();
+        adults.iter().copied().filter(|&i| is_armed(&p.world.residents[i])).collect();
     assert_eq!(armed.len() as f64, npc_soldier_target(TRADING_POST.residents));
     let s = &mut p.world.residents[armed[0]];
     (s.x, s.y) = (hall.x, hall.y);

@@ -138,6 +138,30 @@ fn gives_every_adult_a_job_soldiers_stand_farmers_feed_the_city_two_build_one_sc
     assert_eq!(check_all(&v.world, &v.terrain), []);
 }
 
+/// A village with its Food at its reserve and `above` more, everyone at home with nothing to do,
+/// planned once: how many it sends scouting.
+fn scouts_sent_with_food_above_reserve(above: f64) -> usize {
+    let mut v = village(None);
+    let (hx, hy) = (v.home.x, v.home.y);
+    for r in &mut v.world.residents {
+        (r.x, r.y, r.order, r.script) = (hx, hy, None, None);
+    }
+    let food = held(&npc_reserve(&v.world, v.city()), Good::Food) + above;
+    let i = v.storage();
+    v.world.buildings[i].stock.get_or_insert_with(Stock::new).insert(Good::Food, food);
+    plan(&mut v);
+    assert_eq!(check_all(&v.world, &v.terrain), []);
+    jobs(&v).values().filter(|j| j.kind == CityJobKind::Scout).count()
+}
+
+#[test]
+fn sends_a_new_scout_only_with_the_food_they_take_above_the_reserve() {
+    // A scout sets out with as much Food as they carry (`CONTEXT.md`: Explore); taken from the
+    // reserve it would make Food short and call everyone to the farms (#1344).
+    assert_eq!(scouts_sent_with_food_above_reserve(1.0), 0);
+    assert_eq!(scouts_sent_with_food_above_reserve(NPC_SURPLUS_CAP.get("food").unwrap_or(0.0)), 1);
+}
+
 #[test]
 fn keeps_a_worker_where_they_are_and_sends_at_most_two_spare_hands_to_build() {
     let mut v = village(None);

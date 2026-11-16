@@ -109,6 +109,14 @@ fight for nodes they lack: settled 2026-11-16 (Epic 98, `CONTEXT.md`: Taking a n
 Daniel on 2026-11-16: Epics 97 and 98 are ticketed and worked alongside the fighting epics (104 to
 110).
 
+**Agreed with Daniel on 2026-11-15,** from his wish to upgrade fighting: Safe start (Epic 104: new
+cities spawn with Spears and a stable hand on a "Farm and feed" queue), Walls that hold (105, ADR
+0036: a wall walk that is high ground, so early cities can't take each other) and Equipment (107,
+ADR 0038: weapon, shield and armour slots others see) run side by side first; then Stone walls
+(106, after 105), Bows and crossbows (108, after 105 and 107), Towers (109, after 106 and 108) and
+Siege machines (110, ADR 0037, after 106), each waiting for the epics it builds on to reach `dev`.
+All ahead of Goods get used (97), NPC cities with intent (98) and Bandits.
+
 **PoC done** = Epic 6 closed: my residents mine iron far away, and a carriage brings it home while
 I sleep.
 
@@ -208,11 +216,18 @@ I sleep.
 | 97  | [Goods get used](https://github.com/dasanten/strategy-code-poc/issues/1189)                     | ticketed                |
 | 98  | [NPC cities with intent](https://github.com/dasanten/strategy-code-poc/issues/1190)             | ticketed                |
 
-| 99  | [Faster map loading](https://github.com/dasanten/strategy-code-poc/issues/1198)                 | ticketed                |
-| 100 | [A new world](https://github.com/dasanten/strategy-code-poc/issues/1253)                        | ticketed                |
-| 101 | [Rich and poor land](https://github.com/dasanten/strategy-code-poc/issues/1262)                 | ticketed                |
-| 102 | [Veins run dry](https://github.com/dasanten/strategy-code-poc/issues/1269)                      | ticketed                |
-| 103 | [An heir](https://github.com/dasanten/strategy-code-poc/issues/1274)                            | ticketed                |
+| 99 | [Faster map loading](https://github.com/dasanten/strategy-code-poc/issues/1198) | ticketed |
+| 100 | [A new world](https://github.com/dasanten/strategy-code-poc/issues/1253) | ticketed |
+| 101 | [Rich and poor land](https://github.com/dasanten/strategy-code-poc/issues/1262) | ticketed |
+| 102 | [Veins run dry](https://github.com/dasanten/strategy-code-poc/issues/1269) | ticketed |
+| 103 | [An heir](https://github.com/dasanten/strategy-code-poc/issues/1274) | ticketed |
+| 104 | [Safe start](https://github.com/dasanten/strategy-code-poc/issues/1299) | ticketed |
+| 105 | [Walls that hold](https://github.com/dasanten/strategy-code-poc/issues/1303) | ticketed |
+| 106 | [Stone walls](https://github.com/dasanten/strategy-code-poc/issues/1310) | ticketed |
+| 107 | [Equipment](https://github.com/dasanten/strategy-code-poc/issues/1314) | ticketed |
+| 108 | [Bows and crossbows](https://github.com/dasanten/strategy-code-poc/issues/1318) | ticketed |
+| 109 | [Towers](https://github.com/dasanten/strategy-code-poc/issues/1324) | ticketed |
+| 110 | [Siege machines](https://github.com/dasanten/strategy-code-poc/issues/1328) | ticketed |
 
 Live progress is on each epic (sub-issue progress bar); this table only changes when an epic gets
 its tickets or closes.

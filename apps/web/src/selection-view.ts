@@ -29,8 +29,6 @@ import {
   GOODS,
   isDown,
   NODE_WORKPLACE,
-  PROTECTION,
-  WEAPONS,
   type HaulOrder,
 } from './shared/world.js'
 import {
@@ -81,6 +79,10 @@ import {
   canWork,
   stockWeight,
   madePerDay,
+  bestWeapon,
+  wornProtection,
+  isArmed,
+  type Geared,
 } from './shared/stats.js'
 import { richnessFactor } from './shared/richness.js'
 import { isOutpostStorage } from './shared/city.js'
@@ -2342,15 +2344,17 @@ function amountsList(
 /** The kinds of workplace built on a resource node. */
 const NODE_WORKPLACE_KINDS = new Set<string>(Object.values(NODE_WORKPLACE))
 
-/** The weapons and armour a resident carries (`CONTEXT.md`: Weapons and armour), in words. */
-function gearText(
-  r: Pick<Resident, 'carried'>,
-  labels: Record<string, string>,
-): string | undefined {
-  const has = (g: Good) => (r.carried[g] ?? 0) > 0
-  const gear = [...WEAPONS, ...PROTECTION].filter(has).map((g) => labels[g]!.toLowerCase())
+/**
+ * What a resident has equipped (`CONTEXT.md`: Equipment, Seeing it), in words: what anyone who
+ * sees them sees, never the spare gear in their pack.
+ */
+function gearText(r: Geared, labels: Record<string, string>): string | undefined {
+  const weapon = bestWeapon(r)
+  const gear = [...(weapon ? [weapon] : []), ...wornProtection(r)].map((g) =>
+    labels[g]!.toLowerCase(),
+  )
   if (gear.length === 0) return undefined
-  return WEAPONS.some(has) ? `armed: ${gear.join(', ')}` : `unarmed, with ${gear.join(', ')}`
+  return weapon ? `armed: ${gear.join(', ')}` : `unarmed, with ${gear.join(', ')}`
 }
 
 /** The army a resident's order is for, if it is one (`CONTEXT.md`: Army). */
@@ -2370,8 +2374,7 @@ function strangersLines(strangers: SeenResident[]): string[] {
     if (a) armies.set(a, [...(armies.get(a) ?? []), r])
     else rest.push(r)
   }
-  const armed = (rs: SeenResident[]) =>
-    rs.filter((r) => WEAPONS.some((w) => (r.carried[w] ?? 0) > 0)).length
+  const armed = (rs: SeenResident[]) => rs.filter((r) => isArmed(r)).length
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
   const lines = [...armies.values()].map((rs) => {
     const soldiers = armed(rs)
