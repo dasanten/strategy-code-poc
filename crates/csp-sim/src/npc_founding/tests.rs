@@ -261,6 +261,36 @@ fn lacking_only_its_founding_materials_it_counts_them_short_and_builds_their_wor
 }
 
 #[test]
+fn works_its_workplaces_for_surplus_before_it_gathers_for_its_party() {
+    // Daniel (2026-11-16): its workplaces come first; only the hands left over gather.
+    let mut t = without_stone();
+    // Some Stone past its reserve, short of the party's: the quarry's surplus is further on than
+    // the mine's, which is as far behind as it can be.
+    let reserve = held(&npc_reserve(&t.world, t.city()), Good::Stone);
+    t.home_stock().insert(Good::Stone, reserve + 30.0);
+    let home = t.home();
+    node(&mut t.world, &mut t.terrain, ResourceKind::IronOre, home.x - 30.0, home.y);
+    for (id, kind, x) in [
+        ("quarry0", BuildingKind::Quarry, home.x + 30.0),
+        ("mine0", BuildingKind::Mine, home.x - 30.0),
+    ] {
+        t.world.buildings.push(crate::test_support::building(id, kind, None, x, home.y));
+        let city = t.world.cities.iter_mut().find(|c| c.id == t.city).unwrap();
+        city.workplace_ids.get_or_insert_with(Vec::new).push(id.into());
+    }
+    t.plan_city();
+    let at = |id: &str| {
+        t.plan().jobs.values().filter(|j| j.building_id.as_deref() == Some(id)).count() as f64
+    };
+    let mine_room = crate::queries::building::max_workers(BuildingKind::Mine).unwrap();
+    // The mine gets its full crew before anyone quarries; the party's Stone takes the rest.
+    assert_eq!(at("mine0"), mine_room, "quarry {}", at("quarry0"));
+    assert!(super::founding_lacks(&t.world, t.city(), Some(&home), t.terrain.size)
+        .iter()
+        .any(|s| s.good == Good::Stone));
+}
+
+#[test]
 fn its_spare_hands_quarry_the_stone_its_party_takes_while_its_full_wait_runs() {
     let mut t = without_stone();
     let home = t.home();

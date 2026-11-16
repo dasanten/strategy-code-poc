@@ -431,11 +431,10 @@ fn share_out(
     let farms: Vec<usize> =
         own.iter().copied().filter(|&b| world.buildings[b].kind == BuildingKind::Farm).collect();
     let short = shortages(world, city, size, project.as_ref());
-    // Lacking nothing else, its founding party's materials (`CONTEXT.md`: Full city): those who
-    // gather them hold their places as on any shortage.
+    // Lacking nothing else, its founding party's materials (`CONTEXT.md`: Full city). Those who
+    // gather them keep their places by going back to them, as with surplus work.
     let founding_short = founding_lacks(world, city, roads.0, size);
-    let share_of: HashMap<Good, f64> =
-        short.iter().chain(&founding_short).map(|s| (s.good, s.share)).collect();
+    let share_of: HashMap<Good, f64> = short.iter().map(|s| (s.good, s.share)).collect();
     // What a resident's job at a workplace is worth to them: what its good lacks, or only going back.
     let held_score = |world: &WorldState, jobs: &Jobs, i: usize| -> f64 {
         let good = place_of(world, jobs, i)
@@ -739,35 +738,36 @@ fn share_out(
     if unneeded.is_empty() {
         return unneeded;
     }
-    // Lacking nothing else, its founding party's materials count as short (`CONTEXT.md`: Full
-    // city). Those who gather them are still spare hands to its founding.
-    let founding: Vec<(ScoredJob, Offer)> = founding_short
-        .iter()
-        .map(|s| (ScoredJob::Short { share: s.share }, Offer::Short(s.good)))
-        .collect();
-    let left = if founding.is_empty() {
-        unneeded.clone()
-    } else {
-        fill(world, jobs, held, &kept, &mut state, &mut ways, founding, unneeded.clone())
-    };
-    if left.is_empty() {
-        return unneeded;
-    }
-    // Nothing short has a use for them (`CONTEXT.md`: Spare hands' work).
-    let mut second: Vec<(ScoredJob, Offer)> = vec![
-        (ScoredJob::Road, Offer::Road),
-        (ScoredJob::Scout, Offer::Scout),
-        (ScoredJob::Back, Offer::Back),
-    ];
+    // Nothing short has a use for them (`CONTEXT.md`: Spare hands' work): work at its workplaces,
+    // going back to their own first, and for surplus.
+    let mut workplaces: Vec<(ScoredJob, Offer)> = vec![(ScoredJob::Back, Offer::Back)];
     if city.trade_org.is_none() {
         let surplus = SurplusWork::of(world, city, storage.map(|s| &world.buildings[s]));
         for &place in &own {
             if let Some(full) = surplus.full(world, &world.buildings[place]) {
-                second.push((ScoredJob::Surplus { full }, Offer::Surplus(place)));
+                workplaces.push((ScoredJob::Surplus { full }, Offer::Surplus(place)));
             }
         }
     }
-    let idle = fill(world, jobs, held, &kept, &mut state, &mut ways, second, left);
+    let roads_and_scouts = vec![(ScoredJob::Road, Offer::Road), (ScoredJob::Scout, Offer::Scout)];
+    let idle = if founding_short.is_empty() {
+        let mut second = roads_and_scouts;
+        second.extend(workplaces);
+        fill(world, jobs, held, &kept, &mut state, &mut ways, second, unneeded.clone())
+    } else {
+        // Lacking nothing else, its founding party's materials count as short (`CONTEXT.md`: Full
+        // city), but its workplaces come first (Daniel, 2026-11-16, T100.8): only the hands left
+        // over gather for the party, then the road crew and scouts. All are still spare hands to
+        // its founding.
+        let founding: Vec<(ScoredJob, Offer)> = founding_short
+            .iter()
+            .map(|s| (ScoredJob::Short { share: s.share }, Offer::Short(s.good)))
+            .collect();
+        let left =
+            fill(world, jobs, held, &kept, &mut state, &mut ways, workplaces, unneeded.clone());
+        let left = fill(world, jobs, held, &kept, &mut state, &mut ways, founding, left);
+        fill(world, jobs, held, &kept, &mut state, &mut ways, roads_and_scouts, left)
+    };
     for i in idle {
         jobs.insert(world.residents[i].id.clone(), job_at(CityJobKind::Idle, None));
     }
