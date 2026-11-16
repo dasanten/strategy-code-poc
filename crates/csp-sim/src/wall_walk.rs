@@ -2,14 +2,20 @@
 //! up, walking along and getting down are steps of a path (`walking`, `pathfinding`); here is what
 //! keeps being up true to the walls each tick, and the invariants of it (ADR 0004).
 
-use csp_shared::terrain::TerrainMap;
-use csp_shared::world::{Building, BuildingKind, Resident, ResidentOrder, UpSide, WorldState};
+use csp_shared::balance::FALL_DAMAGE;
+use csp_shared::terrain::{is_passable_terrain, tile_index, wrap_distance, TerrainMap};
+use csp_shared::world::{
+    Building, BuildingKind, DeathCause, Realm, Resident, ResidentOrder, UpSide, WorldState,
+};
 use rustc_hash::FxHashMap;
 
 use crate::invariants::{violation, InvariantViolation};
+use crate::queries::city::town_hall_of;
 use crate::queries::combat::in_contact;
 use crate::queries::walls::is_up;
-use crate::walls::{is_wall_or_gate, of_wall_side};
+use crate::survival::die_all;
+use crate::walking::order_path_mut;
+use crate::walls::{is_wall_or_gate, neighbours, of_wall_side, plain_ground, side_of, wall_map};
 
 /// The finished walls and gates by tile.
 fn walls_by_tile(world: &WorldState) -> FxHashMap<(i64, i64), &Building> {
@@ -48,6 +54,80 @@ pub fn step_wall_walk(world: &mut WorldState) {
     for (i, up) in changes {
         world.residents[i].up = up;
     }
+}
+
+/// Whoever is up on a wall or gate tile that broke this tick (`broken`) falls (`CONTEXT.md`: A tile
+/// breaks): down to the ground next to it on its inside, as the walls stood before they broke, or
+/// for a stretch with no inside to the ground nearest its city, and loses `FALL_DAMAGE`. Someone
+/// left with no health, a Down resident too, dies of the fall like of a blow: the realm log says
+/// so and what they carried drops as Loot. Returns who died and the realms that ended with them.
+pub fn fall_from_broken(
+    world: &mut WorldState,
+    terrain: &TerrainMap,
+    broken: &[Building],
+) -> (Vec<String>, Vec<Realm>) {
+    let size = terrain.size;
+    let at = |b: &Building| (b.x as i64, b.y as i64);
+    let falling: Vec<(usize, &Building)> = world
+        .residents
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| r.up.is_some())
+        .filter_map(|(i, r)| Some((i, broken.iter().find(|b| at(b) == (r.x as i64, r.y as i64))?)))
+        .collect();
+    if falling.is_empty() {
+        return (Vec::new(), Vec::new());
+    }
+    // The walls as they stood before these tiles broke: their inside is where the falls land.
+    let standing = world.buildings.len();
+    world.buildings.extend(broken.iter().cloned());
+    let walls = wall_map(world, terrain);
+    world.buildings.truncate(standing);
+    let mut died = Vec::new();
+    for (i, wall) in falling {
+        let (x, y) = (wall.x as i32, wall.y as i32);
+        let t = tile_index(size, x, y);
+        let ground: Vec<usize> = neighbours(size, t)
+            .into_iter()
+            .filter(|&n| plain_ground(&walls, n) && is_passable_terrain(terrain.tiles[n]))
+            .collect();
+        let city = wall
+            .city_id
+            .as_deref()
+            .and_then(|id| world.cities.iter().find(|c| c.id == id))
+            .and_then(|c| town_hall_of(world, c))
+            .map(|h| (h.x as i32, h.y as i32));
+        let xy = |n: usize| ((n as i32) % size, (n as i32) / size);
+        let nearest_city = || {
+            let city = city?;
+            ground.iter().copied().min_by(|&a, &b| {
+                let (da, db) = (wrap_distance(size, xy(a), city), wrap_distance(size, xy(b), city));
+                da.total_cmp(&db)
+            })
+        };
+        let landing = ground
+            .iter()
+            .copied()
+            .find(|&n| side_of(&walls, n) == UpSide::Inside)
+            .or_else(nearest_city)
+            .or_else(|| ground.first().copied())
+            .unwrap_or(t);
+        let (lx, ly) = xy(landing);
+        let r = &mut world.residents[i];
+        r.x = f64::from(lx);
+        r.y = f64::from(ly);
+        r.up = None;
+        if let Some((path, progress)) = r.order.as_mut().and_then(order_path_mut) {
+            *path = None;
+            *progress = 0.0;
+        }
+        r.health = (r.health - FALL_DAMAGE).max(0.0);
+        if r.health <= 0.0 {
+            died.push(r.id.clone());
+        }
+    }
+    let (_, ended) = die_all(world, &died, DeathCause::Fell, size, None);
+    (died, ended)
 }
 
 /// Nobody is up anywhere but on a finished wall or gate tile (ADR 0004).

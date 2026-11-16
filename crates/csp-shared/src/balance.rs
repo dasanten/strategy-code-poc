@@ -2212,6 +2212,11 @@ pub const CLIMB_TICKS: f64 = 60.0;
 /// plains, so nobody goes up on the way somewhere else.
 pub const WALL_WALK_TICKS: f64 = 20.0;
 
+/// Health someone up on a wall or gate tile loses when the tile breaks under them and they fall to
+/// the ground (`CONTEXT.md`: A tile breaks), of `MAX_HEALTH`: about as much as a few good blows,
+/// so a fall hurts but kills only those already low on health.
+pub const FALL_DAMAGE: f64 = 30.0;
+
 /// Chance of dodging a blow for each point of Agility: an average resident dodges one in five.
 pub const DODGE_PER_AGILITY: f64 = 0.02;
 
@@ -2914,6 +2919,7 @@ pub fn balance_json() -> Value {
     m.insert("BROKEN_MATERIALS_RETURNED".into(), json!(BROKEN_MATERIALS_RETURNED));
     m.insert("CLIMB_TICKS".into(), json!(CLIMB_TICKS));
     m.insert("WALL_WALK_TICKS".into(), json!(WALL_WALK_TICKS));
+    m.insert("FALL_DAMAGE".into(), json!(FALL_DAMAGE));
     m.insert("DODGE_PER_AGILITY".into(), json!(DODGE_PER_AGILITY));
     m.insert("DODGE_LIMIT".into(), json!(DODGE_LIMIT));
     m.insert("COMBAT_SKILL_PER_BLOW".into(), json!(COMBAT_SKILL_PER_BLOW));

@@ -1201,6 +1201,7 @@ export interface Balance {
   readonly BROKEN_MATERIALS_RETURNED: number
   readonly CLIMB_TICKS: number
   readonly WALL_WALK_TICKS: number
+  readonly FALL_DAMAGE: number
   readonly DODGE_PER_AGILITY: number
   readonly DODGE_LIMIT: number
   readonly COMBAT_SKILL_PER_BLOW: number

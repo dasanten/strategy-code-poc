@@ -292,6 +292,7 @@ import {
   WALL_DEFENCE,
   WALL_STRENGTH,
   WALL_WALK_TICKS,
+  FALL_DAMAGE,
   WALK_TICKS_PER_TILE,
   aboutTime,
   WAREHOUSE_BASE_PRICE,
@@ -3383,6 +3384,13 @@ export function Wiki() {
           is on the ground until over; one who made it and stands on the wall fights those up as
           anywhere, and so do those up on two walls that touch. Up on their own city's wall,
           defenders still take only {pct(WALL_DEFENCE)} of each blow.
+        </p>
+        <p>
+          <strong>A tile breaks.</strong> When a wall or gate tile breaks, whoever is up on it falls
+          to the ground next to it on the inside of the ring (on a stretch with no inside, on the
+          side toward its city) and loses {num(FALL_DAMAGE)} health. A fall kills like a blow: one
+          left with no health, or Down, dies, and what they carried lies there as loot. Those up on
+          the tiles next to it stay up.
         </p>
         <h3>Under attack</h3>
         <p>
