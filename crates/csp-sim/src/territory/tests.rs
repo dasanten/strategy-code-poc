@@ -196,7 +196,7 @@ fn a_workplace_projects_control_only_while_its_holder_guards_it() {
     // An armed worker on it guards it too.
     world.residents[guard].x = 0.0;
     world.residents[worker].carried = [(Good::Sword, 1.0)].into_iter().collect();
-    assert!(is_armed(&world.residents[worker].carried));
+    assert!(is_armed(&world.residents[worker]));
     assert_eq!(owner(&world, 240, 240).as_deref(), Some("r1"));
 }
 

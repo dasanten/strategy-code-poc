@@ -195,6 +195,10 @@ pub struct Resident {
     pub born_at: f64,
     pub lifespan: f64,
     pub carried: Stock,
+    /// What the resident has equipped, each item among `carried` (`CONTEXT.md`: Equipment).
+    #[serde(default, skip_serializing_if = "Equipment::is_empty")]
+    #[ts(as = "Option<Equipment>", optional)]
+    pub equipped: Equipment,
     pub order: Option<ResidentOrder>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
@@ -242,6 +246,67 @@ pub struct Resident {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub down_until: Option<f64>,
+}
+
+/// A resident's three equipment slots (`CONTEXT.md`: Equipment, ADR 0038): one weapon, one
+/// shield and one armour at most, each one of the goods the resident carries. Only what is
+/// equipped counts in combat and makes a resident armed.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Equipment {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub weapon: Option<Good>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub shield: Option<Good>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub armour: Option<Good>,
+    /// Slots the item was taken off (`CONTEXT.md`: Equipment): each stays empty though the
+    /// resident carries something that fits, until they pick up more of what fits.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[ts(skip)]
+    pub kept_off: Vec<KeptOff>,
+}
+
+impl Equipment {
+    /// Whether no slot holds anything and none is kept empty.
+    pub fn is_empty(&self) -> bool {
+        self.weapon.is_none()
+            && self.shield.is_none()
+            && self.armour.is_none()
+            && self.kept_off.is_empty()
+    }
+}
+
+/// One of a resident's three equipment slots (`CONTEXT.md`: Equipment).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum EquipSlot {
+    Weapon,
+    Shield,
+    Armour,
+}
+
+/// A slot kept empty after its item was taken off, and how many units fitting it the resident
+/// carried then: carrying more of them (picking one up) ends it, and the slot fills at once again.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct KeptOff {
+    pub slot: EquipSlot,
+    pub units: f64,
+}
+
+/// Swapping an item into a slot or taking one off (`CONTEXT.md`: Equipment): it takes
+/// `EQUIP_TICKS`, and the resident strikes no blows meanwhile. `good` is what goes into `slot`,
+/// `None` to take its item off (it stays carried). `progress` counts the ticks spent on it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EquipOrder {
+    pub slot: EquipSlot,
+    pub good: Option<Good>,
+    pub progress: f64,
 }
 
 /// What a resident runs when an alarm reaches them (`Resident.alarmScriptId`): a script id, or
@@ -1198,6 +1263,8 @@ pub enum ResidentOrder {
     HaulByWater(WaterHaulOrder),
     /// Sailing a ship to a Sea tile or a haven, its captain one of its crew (`CONTEXT.md`: Sailing).
     Sail(RowOrder),
+    /// Swapping or taking off gear (`CONTEXT.md`: Equipment).
+    Equip(EquipOrder),
 }
 
 /// Everything in the world that changes, saved as snapshots (ADR 0006).

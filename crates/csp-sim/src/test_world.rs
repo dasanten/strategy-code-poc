@@ -55,6 +55,7 @@ pub fn resident(world: &mut WorldState, id: &str, owner: Option<&str>, x: f64, y
         born_at: -20.0 * 24.0 * 3600.0,
         lifespan: 60.0,
         carried: Default::default(),
+        equipped: Default::default(),
         order: None,
         order_ended: None,
         struck: None,

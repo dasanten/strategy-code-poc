@@ -191,7 +191,7 @@ pub fn npc_reserve(world: &WorldState, city: &City) -> Stock {
         .filter(|r| r.owner.is_none() && r.health > 0.0)
         .collect();
     let adults: Vec<&&Resident> = residents.iter().filter(|r| can_work(r.born_at, tick)).collect();
-    let armed = adults.iter().filter(|r| is_armed(&r.carried)).count() as f64;
+    let armed = adults.iter().filter(|r| is_armed(r)).count() as f64;
     let unarmed = npc_soldier_target(adults.len() as f64) - armed;
     let kit = npc_soldier_kit(world, city);
     if kit.len() > 1 {
@@ -390,11 +390,11 @@ pub fn spare_residents<'w>(
     let mut candidates: Vec<&Resident> = adults
         .iter()
         .copied()
-        .filter(|r| !is_armed(&r.carried) && spare_hand(job(r), workplace_short))
+        .filter(|r| !is_armed(r) && spare_hand(job(r), workplace_short))
         .collect();
     let staying = (NPC_TRADE.defence_share * adults.len() as f64 - 1e-9).ceil();
     // Its soldiers count toward the share at home; the rest its plan keeps busy come on top.
-    let armed = adults.iter().filter(|r| is_armed(&r.carried)).count();
+    let armed = adults.iter().filter(|r| is_armed(r)).count();
     let kept_busy = (adults.len() - candidates.len() - armed) as f64;
     let idle = |r: &Resident| u8::from(!job(r).is_some_and(|j| j.kind != CityJobKind::Idle));
     candidates.sort_by(|a, b| idle(b).cmp(&idle(a)).then_with(|| locale_compare(&a.id, &b.id)));

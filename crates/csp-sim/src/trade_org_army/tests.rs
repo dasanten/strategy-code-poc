@@ -167,7 +167,7 @@ fn is_built_by_the_hq_from_its_own_adults_and_its_goods_warehouse() {
     // It keeps enough at work: none of its soldiers works, and the rest still do.
     let unarmed = hq_people(&s.world, &s.hq)
         .into_iter()
-        .filter(|&i| !is_armed(&s.world.residents[i].carried))
+        .filter(|&i| !is_armed(&s.world.residents[i]))
         .count();
     assert!(unarmed as f64 >= TRADE_ORG_ARMY.workers);
     for i in hq_soldiers(&s.world) {

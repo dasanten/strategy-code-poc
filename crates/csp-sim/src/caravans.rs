@@ -458,7 +458,7 @@ pub fn free_hands(world: &WorldState, hq_id: Option<&str>) -> Vec<usize> {
                 && r.health > 0.0
                 && !is_down(r.down_until)
                 && can_work(r.born_at, tick)
-                && !is_armed(&r.carried)
+                && !is_armed(r)
                 && matches!(r.order, None | Some(ResidentOrder::WorkAt(_)))
                 && !crew.contains(&r.id)
                 && !away.contains(&r.id)
@@ -599,7 +599,7 @@ fn guard_caravan(world: &mut WorldState, c: Convoy, ki: usize, size: i32) {
             }
             continue;
         }
-        if threats.is_empty() || !is_armed(&world.residents[i].carried) {
+        if threats.is_empty() || !is_armed(&world.residents[i]) {
             continue;
         }
         let me = xy_r(&world.residents[i]);
@@ -651,7 +651,7 @@ fn man_escort(world: &mut WorldState, c: Convoy, ki: usize, wanted: f64, size: i
     let mut arming = false;
     for id in c.escort_ids(world) {
         let Some(i) = resident_index(world, &id) else { continue };
-        if is_armed(&world.residents[i].carried) {
+        if is_armed(&world.residents[i]) {
             continue;
         }
         if let Some(o) = &world.residents[i].order {

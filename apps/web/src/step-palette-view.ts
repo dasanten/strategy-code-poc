@@ -61,7 +61,7 @@ export const PALETTE_GROUPS: readonly PaletteGroup[] = [
   {
     id: 'goods',
     label: ORDER_GROUP_LABELS.goods,
-    steps: ['store', 'fetch', 'pickUp', 'drop', 'feed'],
+    steps: ['store', 'fetch', 'pickUp', 'drop', 'feed', 'equip', 'takeOff'],
   },
   { id: 'scripts', label: ORDER_GROUP_LABELS.scripts, steps: ['runScript'] },
 ]
@@ -102,6 +102,8 @@ export const PLAN_STEP_ICONS: Record<PlanStepId, string> = {
   pickUp: '✋',
   drop: '📤',
   feed: '🍞',
+  equip: '🛡',
+  takeOff: '🎒',
   runScript: '📜',
   waitUntil: '⏳',
   if: '🔀',

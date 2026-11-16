@@ -223,7 +223,7 @@ pub fn npc_revivers(world: &WorldState, size: i32) -> Vec<InvariantViolation> {
                 if r.down_until.is_some() {
                     fail("who is Down".into(), &[]);
                 }
-                if is_armed(&r.carried) {
+                if is_armed(r) {
                     fail("a soldier".into(), &[]);
                 }
                 if r.carrying.is_some() {

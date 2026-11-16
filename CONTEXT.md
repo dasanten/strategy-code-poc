@@ -812,7 +812,8 @@ The shared language of the game. Domain terms only — no implementation details
   script, takes a few ticks, and they can't strike meanwhile. A Bow or Crossbow takes both hands:
   with one equipped the shield slot stays empty. **Seeing it:** anyone who sees a resident (Sight)
   sees what they have equipped, its kind and whether iron or steel, on the map and on their card;
-  what they carry unequipped stays hidden like any goods carried.
+  what they carry unequipped stays hidden like any goods carried, except from anyone with a resident
+  on their tile (as a carriage's load).
 - **Smithy:** a workplace that turns Iron and Wood, or Steel and Wood for the steel ones, into
   weapons and armour, at fixed recipes: a Bow from Wood, a Crossbow from Wood and Iron, Arrows
   from Wood and a little Iron,

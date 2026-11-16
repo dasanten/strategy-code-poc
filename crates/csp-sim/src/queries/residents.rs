@@ -12,6 +12,7 @@ use csp_shared::time::{TICKS_PER_GAME_DAY, TICKS_PER_GAME_YEAR};
 use csp_shared::world::{Good, Horse, HorseStats, Resident, StatName, Stock};
 
 use super::names::{good_name, good_of, held};
+use crate::equipment::{equipped, Slot};
 
 const CHILDHOOD_TICKS: f64 = ADULT_AGE * CHILD_YEAR_DAYS * TICKS_PER_GAME_DAY;
 
@@ -71,11 +72,10 @@ pub fn best_weapon(carried: &Stock) -> Option<Good> {
     armed.first().map(|(g, _)| *g)
 }
 
-/// Whether a resident is armed: carries a weapon (`isArmed`, `CONTEXT.md`: Soldier).
-pub fn is_armed(carried: &Stock) -> bool {
-    // What `best_weapon` would find something in, asked of the few goods carried rather than of
-    // every weapon by name (T89.6): a good's name names that good back (`good_of`).
-    carried.iter().any(|(g, n)| *n > 0.0 && WEAPON_ATTACK.get(good_name(*g)).is_some())
+/// Whether a resident is armed: has a weapon equipped (`CONTEXT.md`: Soldier, Equipment). A
+/// spare weapon in the pack does not count.
+pub fn is_armed(r: &Resident) -> bool {
+    equipped(r, Slot::Weapon).is_some()
 }
 
 /// What a stock weighs, in kg (`stockWeight`).
@@ -167,7 +167,5 @@ mod tests {
         carried.insert(Good::Spear, 1.0);
         carried.insert(Good::Sword, 1.0);
         assert_eq!(best_weapon(&carried), Some(Good::Sword));
-        carried.insert(Good::Sword, 0.0);
-        assert!(is_armed(&carried));
     }
 }

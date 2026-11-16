@@ -292,7 +292,7 @@ mod npc_trade {
         let adults: Vec<&&Resident> =
             residents.iter().filter(|r| can_work(r.born_at, world.tick as f64)).collect();
         let unarmed = npc_soldier_target(adults.len() as f64)
-            - adults.iter().filter(|r| is_armed(&r.carried)).count() as f64;
+            - adults.iter().filter(|r| is_armed(r)).count() as f64;
         let spear =
             recipe_for(BuildingKind::Smithy, Some(good_name(NPC_SMITHY_WEAPON))).unwrap().input;
         assert_eq!(reserve.get(&NPC_SMITHY_WEAPON), Some(&unarmed));
@@ -450,7 +450,7 @@ mod npc_trade {
         ask_for_n4(&mut world);
         let took = step_npc_hire(&mut world, SIZE);
         assert!(world.contracts[0].started_at.is_some(), "lent");
-        assert!(!is_armed(&at(&mut world, "n4").carried), "nothing spare: unarmed");
+        assert!(!is_armed(at(&mut world, "n4")), "nothing spare: unarmed");
         assert_eq!(held(storage(&mut world).stock.as_ref().unwrap(), NPC_SMITHY_WEAPON), kept);
         assert_eq!(took, vec![]);
 
@@ -464,7 +464,7 @@ mod npc_trade {
         storage(&mut world).stock = Some(stock);
         ask_for_n4(&mut world);
         let took = step_npc_hire(&mut world, SIZE);
-        assert!(is_armed(&at(&mut world, "n4").carried), "one spare weapon");
+        assert!(is_armed(at(&mut world, "n4")), "one spare weapon");
         assert!(held(storage(&mut world).stock.as_ref().unwrap(), NPC_SMITHY_WEAPON) >= kept);
         assert_eq!(took.len(), 1 + usize::from(held(&reserve, Good::Shield) < 1.0));
         assert_eq!(npc_lending_keeps_reserve(&took), vec![]);

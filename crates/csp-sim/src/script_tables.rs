@@ -142,7 +142,13 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
             ScriptField {
                 name: "carried",
                 r#type: ScriptType::View("goods"),
-                description: "The goods they carry.",
+                description: "The goods they carry: seen of your own and your allies' residents, and of anyone one of yours stands beside; empty for others, who show only what they have equipped.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "equipped",
+                r#type: ScriptType::View("equipment"),
+                description: "What they have equipped: a weapon, shield and armour, each among what they carry.",
                 null_when: None,
             },
             ScriptField {
@@ -294,6 +300,30 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 r#type: ScriptType::Number,
                 description: "What training added, at most the base.",
                 null_when: None,
+            },
+        ],
+    },
+    ScriptView {
+        name: "equipment",
+        description: "A resident’s three equipment slots: the good in each. Only what is equipped counts in a fight, and a weapon equipped makes them armed.",
+        fields: &[
+            ScriptField {
+                name: "weapon",
+                r#type: ScriptType::String,
+                description: "The weapon equipped: \"spear\", \"sword\" or \"steelSword\".",
+                null_when: Some("when unarmed"),
+            },
+            ScriptField {
+                name: "shield",
+                r#type: ScriptType::String,
+                description: "The shield equipped: \"shield\" or \"steelShield\".",
+                null_when: Some("when they have none equipped"),
+            },
+            ScriptField {
+                name: "armour",
+                r#type: ScriptType::String,
+                description: "The armour equipped: \"armour\" or \"steelArmour\".",
+                null_when: Some("when they have none equipped"),
             },
         ],
     },
@@ -2827,6 +2857,22 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         returns: ScriptType::String,
     },
     ScriptBinding {
+        name: "equip",
+        is: Is::Action,
+        params: &["good"],
+        cost: 10.0,
+        description: "Swap a weapon, shield or armour I carry, like \"sword\", into the slot it fits; what was there stays carried. It takes a few ticks, and I strike no blows meanwhile.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "takeOff",
+        is: Is::Action,
+        params: &["slot"],
+        cost: 10.0,
+        description: "Take off what I have in a slot, \"weapon\", \"shield\" or \"armour\"; it stays carried, and the slot stays empty until I pick up more that fits it. It takes a few ticks, and I strike no blows meanwhile.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
         name: "climb",
         is: Is::Action,
         params: &["wallId"],
@@ -4852,13 +4898,9 @@ fn aboardDriven() {
   return false
 }
 
-// Whether I carry a weapon.
+// Whether I have a weapon equipped.
 fn armed() {
-  for (w of ["spear", "sword", "steelSword"]) {
-    let n = me.carried[w]
-    if (n != null && n > 0) { return true }
-  }
-  return false
+  return me.equipped.weapon != null
 }
 
 // At whoever struck me, while they are in sight.
@@ -5779,13 +5821,9 @@ fn culprit() {
   return null
 }
 
-// Whether they carry a weapon.
+// Whether they have a weapon equipped.
 fn armed(who) {
-  for (w of ["spear", "sword", "steelSword"]) {
-    let n = who.carried[w]
-    if (n != null && n > 0) { return true }
-  }
-  return false
+  return who.equipped.weapon != null
 }
 
 // A building or carriage for my log: "the storage at 12,6".

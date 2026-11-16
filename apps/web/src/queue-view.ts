@@ -411,6 +411,8 @@ const STEP_GROUP: Partial<Record<OrderRequest['kind'], StepGroup>> = {
   store: 'goods',
   fetch: 'goods',
   feed: 'goods',
+  equip: 'goods',
+  takeOff: 'goods',
   haul: 'move',
   runScript: 'scripts',
   waitUntil: 'flow',
@@ -577,6 +579,10 @@ export function stepLabel(
       return `Relocate to ${cities.find((c) => c.id === order.cityId)?.name ?? 'another city'}`
     case 'feed':
       return `Feed: ${String(order.units)} Food`
+    case 'equip':
+      return `Put on ${GOOD_LABELS[order.good as Good] ?? 'gear'}`
+    case 'takeOff':
+      return `Take off the ${String(order.slot)}`
     case 'waitUntil':
       return conditionProblem(order.condition)
         ? 'Wait until'

@@ -233,6 +233,7 @@ export const STARVE_DAYS = balance.STARVE_DAYS
 export const DOWN_DAYS = balance.DOWN_DAYS
 export const WAKE_HEALTH = balance.WAKE_HEALTH
 export const FEED_UNITS = balance.FEED_UNITS
+export const EQUIP_TICKS = balance.EQUIP_TICKS
 export const HEAL_DAYS = balance.HEAL_DAYS
 export const HUNGER_ENDURANCE_AVERAGE = balance.HUNGER_ENDURANCE_AVERAGE
 export const HUNGER_ENDURANCE_EFFECT = balance.HUNGER_ENDURANCE_EFFECT
