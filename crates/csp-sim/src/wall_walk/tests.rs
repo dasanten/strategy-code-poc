@@ -4,11 +4,15 @@
 
 use std::sync::Arc;
 
-use csp_shared::balance::{WALK_TICKS_PER_TILE, WALL_WALK_TICKS};
+use csp_shared::balance::{FALL_DAMAGE, MAX_HEALTH, WALK_TICKS_PER_TILE, WALL_WALK_TICKS};
 use csp_shared::terrain::TerrainMap;
-use csp_shared::world::{BuildingKind, ClimbOrder, ResidentOrder, Tile, UpSide, WorldState};
+use csp_shared::world::{
+    BuildingKind, ClimbOrder, DeathCause, Good, RealmEventWhat, ResidentOrder, Tile, UpSide,
+    WorldState,
+};
 
 use super::*;
+use crate::invariants::check_all;
 use crate::movement_test_world::{add_city, building, plains, realm, resident, walk_to};
 use crate::pathfinding::{PathFinder, PathOptions, PathResult, WALKING_COSTS, WALL_WALK_COST};
 use crate::tick::Scratch;
@@ -251,4 +255,119 @@ fn up_stays_true_to_the_walls_while_residents_come_and_go() {
         broken.extend(up_only_on_own_walls(w, &terrain));
     });
     assert!(broken.is_empty(), "{broken:?}");
+}
+
+/// Breaks the wall tile `wall_id` with r2's b9 striking it from `from` until it falls; the tick
+/// it fell on, the world as it is then.
+fn break_tile(world: &mut WorldState, terrain: &Arc<TerrainMap>, wall_id: &str, from: (f64, f64)) {
+    let wall = world.buildings.iter_mut().find(|b| b.id == wall_id).expect("the wall");
+    wall.damage = Some(crate::queries::walls::wall_strength(wall) - 0.01);
+    let mut b9 = resident("b9", Some("r2"), from.0, from.1);
+    b9.order = Some(ResidentOrder::Attack(crate::combat::attack_order(wall_id, false, false)));
+    world.residents.push(b9);
+    let mut walking = Walking::new(terrain.clone());
+    let mut scratch = Scratch::default();
+    for _ in 0..20 {
+        step_world(world, terrain, &mut scratch, Some(&mut walking), None);
+        if !world.buildings.iter().any(|b| b.id == wall_id) {
+            return;
+        }
+    }
+    panic!("{wall_id} never broke");
+}
+
+fn health(world: &WorldState, id: &str) -> f64 {
+    world.residents.iter().find(|r| r.id == id).expect("the resident").health
+}
+
+#[test]
+fn a_broken_tile_drops_both_defenders_up_on_it_inside_with_a_falls_damage() {
+    let (mut world, terrain) = setup();
+    for (id, x) in [("a1", 8.0), ("a2", 8.0), ("a3", 7.0), ("a4", 9.0)] {
+        let mut r = resident(id, Some("r1"), x, 5.0);
+        r.up = Some(UpSide::Inside);
+        world.residents.push(r);
+    }
+    let before = check_all(&world, &terrain);
+    break_tile(&mut world, &terrain, "w8-5", (8.0, 4.0));
+    for id in ["a1", "a2"] {
+        assert_eq!(at(&world, id), (8.0, 6.0, None), "{id} fell inside");
+        assert_eq!(health(&world, id), MAX_HEALTH - FALL_DAMAGE);
+    }
+    for (id, x) in [("a3", 7.0), ("a4", 9.0)] {
+        assert_eq!(
+            at(&world, id),
+            (x, 5.0, Some(UpSide::Inside)),
+            "{id} on the next tile stays up"
+        );
+        assert_eq!(health(&world, id), MAX_HEALTH);
+    }
+    no_new_violations(&before, &world, &terrain);
+}
+
+#[test]
+fn a_fall_kills_a_resident_low_on_health_and_their_goods_drop_as_loot() {
+    let (mut world, terrain) = setup();
+    let mut a1 = resident("a1", Some("r1"), 8.0, 5.0);
+    a1.up = Some(UpSide::Inside);
+    a1.health = FALL_DAMAGE / 2.0;
+    a1.carried.insert(Good::Stone, 3.0);
+    world.residents.push(a1);
+    let before = check_all(&world, &terrain);
+    break_tile(&mut world, &terrain, "w8-5", (8.0, 4.0));
+    assert!(world.residents.iter().all(|r| r.id != "a1"), "the fall killed a1");
+    let loot = world.piles.iter().find(|p| (p.x, p.y) == (8.0, 6.0)).expect("a pile inside");
+    assert_eq!(loot.goods.get(&Good::Stone), Some(&3.0));
+    let died = world.events.iter().find_map(|e| match &e.what {
+        RealmEventWhat::Died { resident_id, cause, .. } if resident_id == "a1" => Some(*cause),
+        _ => None,
+    });
+    assert_eq!(died, Some(DeathCause::Fell), "the realm log says so");
+    no_new_violations(&before, &world, &terrain);
+}
+
+#[test]
+fn a_down_resident_up_on_a_broken_tile_dies_of_the_fall() {
+    let (mut world, terrain) = setup();
+    let mut a1 = resident("a1", Some("r1"), 8.0, 5.0);
+    a1.up = Some(UpSide::Inside);
+    a1.health = 0.0;
+    a1.down_until = Some(1e9);
+    world.residents.push(a1);
+    break_tile(&mut world, &terrain, "w8-5", (8.0, 4.0));
+    assert!(world.residents.iter().all(|r| r.id != "a1"));
+}
+
+#[test]
+fn a_stretch_with_no_inside_drops_those_up_on_it_toward_its_city() {
+    let (mut world, terrain) = setup();
+    // A stretch of r1's wall out east of the ring, from (20, 7) to (20, 9), the city to its west.
+    for y in 7..=9 {
+        let mut b = building(&format!("e{y}"), BuildingKind::Wall, 20.0, f64::from(y));
+        b.city_id = Some("c1".into());
+        world.buildings.push(b);
+    }
+    let mut a1 = resident("a1", Some("r1"), 20.0, 8.0);
+    a1.up = Some(UpSide::Outside);
+    world.residents.push(a1);
+    break_tile(&mut world, &terrain, "e8", (21.0, 8.0));
+    assert_eq!(at(&world, "a1"), (19.0, 8.0, None));
+    assert_eq!(health(&world, "a1"), MAX_HEALTH - FALL_DAMAGE);
+}
+
+/// No invariant fails after that didn't already before, on the test world as it is set up (it has
+/// no Leaders, nor real lifespans; `break_tile`'s attacker neither).
+fn no_new_violations(
+    before: &[crate::invariants::InvariantViolation],
+    world: &WorldState,
+    terrain: &TerrainMap,
+) {
+    let fixture = |v: &crate::invariants::InvariantViolation| {
+        matches!(v.invariant.as_str(), "ages-in-range" | "realms-have-leaders")
+    };
+    let new: Vec<_> = check_all(world, terrain)
+        .into_iter()
+        .filter(|v| !fixture(v) && !before.iter().any(|b| b.message == v.message))
+        .collect();
+    assert!(new.is_empty(), "{new:?}");
 }

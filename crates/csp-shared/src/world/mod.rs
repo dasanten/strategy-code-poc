@@ -2065,6 +2065,8 @@ pub enum DeathCause {
     Starved,
     OldAge,
     Killed,
+    /// Fell from a wall or gate tile that broke under them (`CONTEXT.md`: A tile breaks).
+    Fell,
 }
 
 /// What a punishment did, in a `punished` event.
