@@ -267,7 +267,7 @@ fn pick_party(
         let r = &world.residents[i];
         carry_capacity(r, tick) - stock_weight(&r.carried) + carried_food(r) * food_weight
     };
-    let armed_now = |i: usize| is_armed(&world.residents[i].carried);
+    let armed_now = |i: usize| is_armed(&world.residents[i]);
     // Its escort: soldiers beyond those on its hall and at its gates (`CONTEXT.md`: Escort).
     let mut armed: Vec<usize> =
         spare_soldiers(world, city, adults).into_iter().filter(|&i| free(i)).collect();

@@ -3,7 +3,7 @@
 
 use csp_shared::balance::{NpcCitySize, NPC_TOWN, NPC_VILLAGE};
 use csp_shared::footprint::is_at;
-use csp_shared::terrain::{wrap_distance, TerrainMap};
+use csp_shared::terrain::{wrap_delta, wrap_distance, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{BuildingKind, CityTrader, Good, Stock, WorldState};
 
@@ -121,8 +121,8 @@ fn a_towns_trader_walks_out_with_a_soldier_who_keeps_with_them_and_comes_home_wi
     assert_eq!(run.warehouse_id.as_deref(), Some(f.warehouse.as_str()));
     assert_eq!(run.escort_ids.len(), 1);
     let (trader, escort) = (run.resident_id.clone(), run.escort_ids[0].clone());
-    assert!(is_armed(&f.world.residents[f.index(&escort)].carried));
-    assert!(!is_armed(&f.world.residents[f.index(&trader)].carried));
+    assert!(is_armed(&f.world.residents[f.index(&escort)]));
+    assert!(!is_armed(&f.world.residents[f.index(&trader)]));
 
     let mut runner = Runner::new(&f.terrain);
     let size = f.terrain.size;
@@ -145,8 +145,9 @@ fn a_towns_trader_walks_out_with_a_soldier_who_keeps_with_them_and_comes_home_wi
         }
         set_out |= wrap_distance(size, a, (storage.x as i32, storage.y as i32)) > 10.0;
         if set_out {
-            // On the road they keep pace: never more than a few tiles apart.
-            assert!(wrap_distance(size, a, b) <= 3.0, "tick {t}: {a:?} {b:?}");
+            // On the road they keep pace: never more than three tiles apart either way.
+            let apart = wrap_delta(a.0, b.0, size).abs().max(wrap_delta(a.1, b.1, size).abs());
+            assert!(apart <= 3, "tick {t}: {a:?} {b:?}");
         }
         if is_at(a, placed(&warehouse), size) {
             at_warehouse = true;
@@ -158,7 +159,7 @@ fn a_towns_trader_walks_out_with_a_soldier_who_keeps_with_them_and_comes_home_wi
     assert!(is_at(f.at(&trader), placed(storage), size));
     assert!(wrap_distance(size, f.at(&trader), f.at(&escort)) <= 1.5);
     let e = &f.world.residents[f.index(&escort)];
-    assert!(e.health > 0.0 && is_armed(&e.carried));
+    assert!(e.health > 0.0 && is_armed(e));
     assert!(
         held(
             &f.world.buildings[f.world.buildings.iter().position(|b| b.id == f.warehouse).unwrap()]

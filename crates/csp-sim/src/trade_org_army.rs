@@ -52,7 +52,7 @@ pub fn hq_soldiers(world: &WorldState) -> Vec<usize> {
     (0..world.residents.len())
         .filter(|&i| {
             let r = &world.residents[i];
-            of_hq(hq, r) && r.health > 0.0 && is_armed(&r.carried) && !crew.contains(&r.id)
+            of_hq(hq, r) && r.health > 0.0 && is_armed(r) && !crew.contains(&r.id)
         })
         .collect()
 }
@@ -236,7 +236,7 @@ pub fn armed_outsiders_near(world: &WorldState, hq: &City, size: i32) -> Vec<usi
         .filter(|&i| {
             let r = &world.residents[i];
             r.health > 0.0
-                && is_armed(&r.carried)
+                && is_armed(r)
                 && !of_hq(hq, r)
                 && !hired.contains(&r.id)
                 && (in_city_area(world, &hq.id, r.x, r.y, size)
@@ -351,10 +351,7 @@ fn run_mercenaries(world: &mut WorldState, hq: &City, size: i32) {
         if r.health <= 0.0 || matches!(r.order, Some(ResidentOrder::Attack(_))) {
             continue;
         }
-        if !attackers.is_empty()
-            && is_armed(&r.carried)
-            && in_city_area(world, &hq.id, r.x, r.y, size)
-        {
+        if !attackers.is_empty() && is_armed(r) && in_city_area(world, &hq.id, r.x, r.y, size) {
             go_after_nearest(world, i, &attackers, &occupiers, size);
             continue;
         }
@@ -383,7 +380,7 @@ pub fn soldiers_lacking(world: &WorldState, hq: &City) -> f64 {
         })
         .collect();
     let working: Vec<&&Resident> = adults.iter().filter(|r| can_work(r.born_at, tick)).collect();
-    let soldiers = working.iter().filter(|r| is_armed(&r.carried)).count() as f64;
+    let soldiers = working.iter().filter(|r| is_armed(r)).count() as f64;
     let armable = 0f64.max(working.len() as f64 - TRADE_ORG_ARMY.workers - soldiers);
     let hired: f64 = world
         .contracts
@@ -423,7 +420,7 @@ fn hire_mercenaries(world: &mut WorldState, hq: &City, size: i32) {
         .filter(|r| {
             r.owner.as_deref().is_some_and(|o| !asked.contains(o) && !trade_org_refuses(world, o))
                 && r.health > 0.0
-                && is_armed(&r.carried)
+                && is_armed(r)
                 && !leaders.contains(r.id.as_str())
                 && !busy.contains(r.id.as_str())
                 && handed_over_to(world, &r.id).is_none()

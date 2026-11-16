@@ -104,7 +104,7 @@ pub fn npc_farmers_kept(world: &WorldState) -> Vec<InvariantViolation> {
         }
         for (resident_id, job) in &plan.jobs {
             let Some(r) = world.residents.iter().find(|r| &r.id == resident_id) else { continue };
-            if r.health <= 0.0 || r.carrying.is_some() || is_armed(&r.carried) {
+            if r.health <= 0.0 || r.carrying.is_some() || is_armed(r) {
                 continue;
             }
             if job.kind != CityJobKind::Work && job.kind != CityJobKind::Idle {
@@ -197,7 +197,7 @@ pub fn npc_spare_hands_work(world: &WorldState) -> Vec<InvariantViolation> {
                     && can_work(r.born_at, tick)
                     && !is_down(r.down_until)
                     && r.carrying.is_none()
-                    && !is_armed(&r.carried)
+                    && !is_armed(r)
             })
             .collect();
         if idle.is_empty() {

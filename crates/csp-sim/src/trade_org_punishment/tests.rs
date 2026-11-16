@@ -353,7 +353,7 @@ fn takes_goods_once_the_coins_run_out_the_most_worth_first() {
     let goods = warehouse_for(&s.world, &hq, Good::Iron);
     // Nobody but its soldiers, and at its floor in every good, so its own chain leaves its Iron
     // be for as long as the trip takes.
-    s.world.residents.retain(|r| r.owner.is_some() || is_armed(&r.carried));
+    s.world.residents.retain(|r| r.owner.is_some() || is_armed(r));
     let mut full = stock_floor(&s.world, &s.world.buildings[goods]);
     for (&g, &n) in s.world.buildings[goods].stock.iter().flatten() {
         full.insert(g, n);
@@ -773,7 +773,7 @@ fn sets_out_with_what_it_has_when_the_hq_has_no_food_at_all() {
             }
         }
     }
-    s.world.residents.retain(|r| r.owner.is_some() || is_armed(&r.carried));
+    s.world.residents.retain(|r| r.owner.is_some() || is_armed(r));
     run(&mut s, 1, &never);
     let pid = s.world.punishments[0].id.clone();
     // They fetch their Coins (`pack_purse`), find no Food and go.

@@ -66,6 +66,12 @@ const CHECK_EVERY: u64 = 60;
 /// Steps `name-0` to each of `ticks` and compares with `name-<tick>`; the first difference, if any.
 /// Every world invariant holds at each checkpoint and every `CHECK_EVERY` ticks.
 fn differential(name: &str, ticks: &[u64]) -> Option<String> {
+    stepped(name, ticks, true)
+}
+
+/// Steps `name-0` to each of `ticks`, comparing with the fixtures when `compare`; with or without,
+/// every world invariant holds on the way.
+fn stepped(name: &str, ticks: &[u64], compare: bool) -> Option<String> {
     let (mut world, terrain) = load(&format!("{name}-0"));
     let mut walking = Unhurried(Walking::new(terrain.clone()));
     let mut scratch = Scratch::default();
@@ -98,6 +104,9 @@ fn differential(name: &str, ticks: &[u64]) -> Option<String> {
                 }
             }
         }
+        if !compare {
+            continue;
+        }
         let want = normalised(&read_json(&format!("worlds/{name}-{at}.json"))["world"]);
         let mut got = normalised(&serde_json::to_value(&world).unwrap());
         without_tile_regions(&mut got);
@@ -108,20 +117,27 @@ fn differential(name: &str, ticks: &[u64]) -> Option<String> {
     None
 }
 
+/// Only the first tick still compares: from T105.2 on (`CONTEXT.md`: Wall walk) nobody walks onto
+/// a wall or cuts a corner past one, and getting up onto the walk takes `WALL_WALK_TICKS`, so the
+/// village's residents take its gate where the TypeScript's stepped over its wall (tick 60). The
+/// new rule has its own tests (`wall_walk`, `walls`, `pathfinding`).
 #[test]
 fn the_village_steps_as_the_typescript_did() {
-    assert_eq!(differential("village", &[1, 60, 1440]), None);
+    assert_eq!(differential("village", &[1]), None);
 }
 
-/// The village's long run, a game week: 3.3 s alone since #1092 made the NPC scripts faster.
+/// The village's long run, a game week, with the invariants checked on the way: no longer
+/// compared with the TypeScript's since T105.2 (`the_village_steps_as_the_typescript_did`).
 #[test]
-fn the_village_steps_as_the_typescript_did_over_a_game_week() {
-    assert_eq!(differential("village", &[10080]), None);
+fn the_village_keeps_its_invariants_over_a_game_week() {
+    assert_eq!(stepped("village", &[1440, 10080], false), None);
 }
 
+/// Only the first tick still compares: from T105.2 on nobody cuts a corner past a wall tile on the
+/// ground, so paths out of the HQ's gates differ from the TypeScript's (tick 60).
 #[test]
 fn the_trade_org_hq_steps_as_the_typescript_did() {
-    assert_eq!(differential("hq", &[1, 60]), None);
+    assert_eq!(differential("hq", &[1]), None);
 }
 
 /// The HQ's long run, a game week: 25 to 40 s depending on the machine's load (2026-11-09), most
@@ -129,8 +145,8 @@ fn the_trade_org_hq_steps_as_the_typescript_did() {
 /// Run it with `cargo nextest run -p csp-sim --run-ignored only`.
 #[test]
 #[ignore = "8.0 s alone: the HQ's NPC default scripts over a game week, invariants checked on the way; see #1132"]
-fn the_trade_org_hq_steps_as_the_typescript_did_over_a_game_week() {
-    assert_eq!(differential("hq", &[1440, 10080]), None);
+fn the_trade_org_hq_keeps_its_invariants_over_a_game_week() {
+    assert_eq!(stepped("hq", &[1440, 10080], false), None);
 }
 
 /// Drops the `region` and `regionKind` a tile view holds since T100.6 (`CONTEXT.md`: Region) from

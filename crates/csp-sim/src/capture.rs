@@ -143,7 +143,7 @@ pub fn capture_city(world: &mut WorldState, city_id: &str, captor: &str, size: i
             .iter()
             .find(|r| {
                 r.owner.as_deref() == Some(captor)
-                    && is_armed(&r.carried)
+                    && is_armed(r)
                     && is_at((r.x as i32, r.y as i32), placed(hall), size)
             })
             .map(|r| r.id.clone()),

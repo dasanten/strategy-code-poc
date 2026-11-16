@@ -373,7 +373,7 @@ pub const HAND_OVER_TO_ALLIANCE: AllianceOrder = AllianceOrder {
             if world.contracts.iter().any(|c| c.resident_ids.contains(id)) {
                 return Some(format!("{} is in a mercenary contract", r.name));
             }
-            if !is_armed(&r.carried) {
+            if !is_armed(r) {
                 return Some(format!("{} is not a soldier: they carry no weapon", r.name));
             }
         }

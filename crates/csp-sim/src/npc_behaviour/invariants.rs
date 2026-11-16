@@ -215,7 +215,7 @@ pub fn npc_soldiers_on_posts(world: &WorldState, terrain: &TerrainMap) -> Vec<In
             _ => false,
         };
         let held_hall = own.iter().map(|&i| &world.residents[i]).any(|r| {
-            is_armed(&r.carried)
+            is_armed(r)
                 && (is_at((r.x as i32, r.y as i32), placed(hall), size) || on_the_way(&r.order))
         });
         if !held_hall {

@@ -771,7 +771,7 @@ fn sends_a_spare_hand_never_a_soldier_who_sells_its_surplus_and_buys_what_it_is_
     assert!(held(&run.sells, Good::Wood) > 0.0);
     assert!(held(&run.buys, Good::Iron) > 0.0);
     let hand = v.world.residents.iter().find(|r| r.id == run.resident_id).unwrap();
-    assert!(!crate::queries::residents::is_armed(&hand.carried));
+    assert!(!crate::queries::residents::is_armed(hand));
     let ki = carriage_of(&v.world, 0);
     let wood_before = city_stock(&v.world, &v.city, Good::Wood);
     let load_before = held(&v.world.carriages[ki].load, Good::Wood);

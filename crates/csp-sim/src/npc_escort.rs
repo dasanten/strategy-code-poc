@@ -15,7 +15,7 @@ use csp_shared::balance::{
     NPC_TRADER_ESCORTS, WALK_TICKS_PER_TILE,
 };
 use csp_shared::footprint::is_at;
-use csp_shared::terrain::wrap_distance;
+use csp_shared::terrain::{wrap_delta, wrap_distance};
 use csp_shared::world::{
     City, CityTrader, Good, GoodsSpot, PickUpOrder, ResidentOrder, Stock, WorldState,
 };
@@ -151,18 +151,44 @@ pub fn escorting<'w>(world: &'w WorldState, city_id: &str, id: &str) -> Option<&
 /// Whether a trader waits for their escort before their next leg (`CONTEXT.md`: Escort: it keeps
 /// pace with them): one of it who lives and is on their feet is out of contact with them.
 pub fn escort_lags(world: &WorldState, city_id: &str, trader: usize, size: i32) -> bool {
+    escort_beyond(world, city_id, trader, 1, size)
+}
+
+/// Tiles an escort may fall behind a walking trader before the trader stops for them.
+const ESCORT_PACE_TILES: i32 = 2;
+
+/// Whether one of the trader's escort who lives and is on their feet is more than `reach` tiles
+/// from them, either way.
+fn escort_beyond(world: &WorldState, city_id: &str, trader: usize, reach: i32, size: i32) -> bool {
     let t = &world.residents[trader];
     let Some(run) = run_of(world, city_id, &t.id) else { return false };
     let at = (t.x as i32, t.y as i32);
     run.escort_ids.iter().any(|id| {
         resident_index(world, id).is_some_and(|i| {
             let e = &world.residents[i];
+            let (ex, ey) = (e.x as i32, e.y as i32);
             e.health > 0.0
                 && e.down_until.is_none()
                 && e.city_id.as_deref() == Some(city_id)
-                && !in_contact(size, at, (e.x as i32, e.y as i32))
+                && (wrap_delta(at.0, ex, size).abs() > reach
+                    || wrap_delta(at.1, ey, size).abs() > reach)
         })
     })
+}
+
+/// A walking trader whose escort has fallen behind stands where they are, their walk kept, until
+/// it catches up (`CONTEXT.md`: Escort: it keeps pace with them). Returns whether they wait.
+pub fn wait_for_escort(world: &mut WorldState, city_id: &str, trader: usize, size: i32) -> bool {
+    if !matches!(world.residents[trader].order, Some(ResidentOrder::WalkTo(_))) {
+        return false;
+    }
+    if !escort_beyond(world, city_id, trader, ESCORT_PACE_TILES, size) {
+        return false;
+    }
+    if let Some(ResidentOrder::WalkTo(o)) = world.residents[trader].order.as_mut() {
+        o.progress = 0.0;
+    }
+    true
 }
 
 /// Who goes for those a city guards (`guarded`, by index) near `at`: alive, none of `crew`,
@@ -219,7 +245,7 @@ fn guard(
         }
         return !far;
     }
-    if !is_armed(&r.carried) {
+    if !is_armed(r) {
         return false;
     }
     let me = at_of(r);
@@ -331,7 +357,7 @@ fn way_food(
 /// the Build default for it; `step_founders` sets them on again once the fight is over.
 pub fn guard_party(world: &mut WorldState, members: &[usize], size: i32) {
     let armed: Vec<usize> =
-        members.iter().copied().filter(|&i| is_armed(&world.residents[i].carried)).collect();
+        members.iter().copied().filter(|&i| is_armed(&world.residents[i])).collect();
     if armed.is_empty() {
         return;
     }

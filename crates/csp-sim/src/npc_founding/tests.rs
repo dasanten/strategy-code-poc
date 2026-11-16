@@ -463,7 +463,7 @@ fn founds_a_village_480_tiles_away_within_a_few_game_weeks_which_then_feeds_itse
 
 /// Whether resident `id` carries a weapon.
 fn armed(world: &WorldState, id: &str) -> bool {
-    world.residents.iter().any(|r| r.id == id && crate::queries::residents::is_armed(&r.carried))
+    world.residents.iter().any(|r| r.id == id && crate::queries::residents::is_armed(r))
 }
 
 #[test]
@@ -500,7 +500,7 @@ fn a_founding_party_leaves_the_soldiers_on_the_hall_and_at_the_gates_at_home() {
     let mut soldiers: Vec<usize> = (0..t.world.residents.len())
         .filter(|&i| {
             let r = &t.world.residents[i];
-            r.city_id.as_deref() == Some(&t.city) && crate::queries::residents::is_armed(&r.carried)
+            r.city_id.as_deref() == Some(&t.city) && crate::queries::residents::is_armed(r)
         })
         .collect();
     soldiers.sort_by(|&a, &b| t.world.residents[a].id.cmp(&t.world.residents[b].id));

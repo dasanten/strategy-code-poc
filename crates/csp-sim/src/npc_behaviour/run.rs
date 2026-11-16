@@ -18,7 +18,7 @@ use serde_json::{json, Value};
 use super::{default_script, haul, npc_home, put_to_work_making, stop_work, walk_to, workplace_of};
 use crate::npc_chain::chain_makes;
 use crate::npc_chain::{chain_store_index, holds_batch, warehouse_for};
-use crate::npc_escort::{escort_lags, guard_party, run_escort};
+use crate::npc_escort::{escort_lags, guard_party, run_escort, wait_for_escort};
 use crate::npc_founding::{found_daughter, founding_party, step_founders};
 use crate::npc_growth::{
     city_grows, city_project, is_builder, no_farm, no_storage_yet, npc_builders,
@@ -338,7 +338,7 @@ fn run_city(
     for &i in &adults {
         let rid = world.residents[i].id.clone();
         let job = jobs.get(&rid).cloned();
-        let armed = is_armed(&world.residents[i].carried);
+        let armed = is_armed(&world.residents[i]);
         // The pass just now gave a soldier another post: a walk to their old one ends here.
         if passed && has_posts && armed {
             let post = post_of(world, &city, &adults, size, terrain, &mut posts, &rid);
@@ -347,7 +347,10 @@ fn run_city(
             }
         }
         // A trader's escort keeps with them, walking or not (`CONTEXT.md`: Escort).
-        if city.trade_org.is_none() && run_escort(world, city_id, i, storage, size) {
+        if city.trade_org.is_none()
+            && (run_escort(world, city_id, i, storage, size)
+                || wait_for_escort(world, city_id, i, size))
+        {
             continue;
         }
         if world.residents[i].order.is_some() || world.residents[i].script.is_some() {

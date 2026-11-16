@@ -387,7 +387,8 @@ fn has_a_starting_citys_farmers_work_by_their_players_work_default() {
     let mut world = create_world(&terrain, 1);
     csp_sim::starting_city::found_starting_city(&mut world, &terrain, 1, None);
     let farm = world.buildings.iter().find(|b| b.kind == BuildingKind::Farm).unwrap().id.clone();
-    for r in &world.residents {
+    // The stable hand is on their queue instead (`stable_hand.rs`).
+    for r in world.residents.iter().filter(|r| r.queue.is_none()) {
         assert_eq!(
             json_of(&r.script),
             json!({ "scriptId": 0, "task": "work", "memory": { "workplaceId": farm } })
@@ -395,7 +396,7 @@ fn has_a_starting_citys_farmers_work_by_their_players_work_default() {
     }
     let mut runner = runner(&terrain, Some(7));
     assert_eq!(run_all(&mut runner, &mut world, &mut Scratch::default()), Vec::<String>::new());
-    for r in &world.residents {
+    for r in world.residents.iter().filter(|r| r.queue.is_none()) {
         assert_eq!(r.script.as_ref().map(|s| s.script_id), Some(7));
         assert_matches(&r.order, json!({ "kind": "workAt", "buildingId": farm }));
     }
