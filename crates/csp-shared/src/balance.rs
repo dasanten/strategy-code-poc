@@ -2571,6 +2571,48 @@ pub const RESPECT_PER_WALL: f64 = 0.25;
 /// have time to come to help, and one army can't collect villages by walking through.
 pub const OUTWEIGH_HOLD_DAYS: f64 = 1.0;
 
+/// Threat an NPC city takes from an Organization for each point of its armed residents' strength
+/// (as respect weighs them) it sees near itself or its people for a whole game day (`CONTEXT.md`:
+/// Threat). An untrained spearman passing in sight for a game hour adds about a fifth; ten of them
+/// camped at the gate for a day add about fifty.
+pub const THREAT_SEEN_PER_DAY: f64 = 1.0;
+
+/// Threat an NPC city takes from an Organization once it knows that one killed one of its people
+/// (`CONTEXT.md`: Threat): as much as the standing it loses for it.
+pub const THREAT_PER_KILLING: f64 = 30.0;
+
+/// Threat an NPC city takes from an Organization once it knows that one robbed it (`CONTEXT.md`:
+/// Threat): as much as the standing it loses for it.
+pub const THREAT_PER_ROBBERY: f64 = 10.0;
+
+/// Game days for an NPC city's threat to fade to half (`CONTEXT.md`: Threat): a killing is down to
+/// what it forgets in about 25 game days, some ten real hours.
+pub const THREAT_HALF_LIFE_DAYS: f64 = 3.0;
+
+/// Below this an NPC city forgets a threat (`CONTEXT.md`: Threat): under what one untrained
+/// spearman in sight for a planning pass adds, so a passer-by is remembered for a few game days.
+pub const THREAT_FORGOTTEN: f64 = 0.1;
+
+/// Game days for a danger place to fade to half (`CONTEXT.md`: Threat): a place where one person
+/// was lost is forgotten after twelve game days.
+pub const DANGER_PLACE_HALF_LIFE_DAYS: f64 = 6.0;
+
+/// Below this weight an NPC city forgets a danger place (`CONTEXT.md`: Threat). A place starts at
+/// one for each person lost there.
+pub const DANGER_PLACE_FORGOTTEN: f64 = 0.25;
+
+/// Tiles within which a new loss counts toward a danger place the city already remembers instead
+/// of being a new one (`CONTEXT.md`: Threat).
+pub const DANGER_PLACE_MERGE_RANGE: f64 = 8.0;
+
+/// Tiles from a way within which a danger place makes it dangerous (`CONTEXT.md`: Threat, Escort).
+pub const DANGER_PLACE_WAY_REACH: f64 = 12.0;
+
+/// Most soldiers an NPC city sends along beyond its usual escort on a dangerous way: one for each
+/// person it lost by the way, rounded up while it remembers, up to this (`CONTEXT.md`: Threat,
+/// Escort).
+pub const DANGER_ESCORTS_MAX: f64 = 3.0;
+
 /// What an NPC city's standing toward a realm drops by when it declines that realm's demand
 /// (`CONTEXT.md`: Demand): as much as a theft, so three in a game day shut its gates.
 pub const DEMAND_DECLINED_STANDING_LOSS: f64 = 10.0;
@@ -2999,6 +3041,16 @@ pub fn balance_json() -> Value {
     m.insert("DEMAND_YIELD_RESPECT_MIN".into(), json!(DEMAND_YIELD_RESPECT_MIN));
     m.insert("RESPECT_PER_WALL".into(), json!(RESPECT_PER_WALL));
     m.insert("OUTWEIGH_HOLD_DAYS".into(), json!(OUTWEIGH_HOLD_DAYS));
+    m.insert("THREAT_SEEN_PER_DAY".into(), json!(THREAT_SEEN_PER_DAY));
+    m.insert("THREAT_PER_KILLING".into(), json!(THREAT_PER_KILLING));
+    m.insert("THREAT_PER_ROBBERY".into(), json!(THREAT_PER_ROBBERY));
+    m.insert("THREAT_HALF_LIFE_DAYS".into(), json!(THREAT_HALF_LIFE_DAYS));
+    m.insert("THREAT_FORGOTTEN".into(), json!(THREAT_FORGOTTEN));
+    m.insert("DANGER_PLACE_HALF_LIFE_DAYS".into(), json!(DANGER_PLACE_HALF_LIFE_DAYS));
+    m.insert("DANGER_PLACE_FORGOTTEN".into(), json!(DANGER_PLACE_FORGOTTEN));
+    m.insert("DANGER_PLACE_MERGE_RANGE".into(), json!(DANGER_PLACE_MERGE_RANGE));
+    m.insert("DANGER_PLACE_WAY_REACH".into(), json!(DANGER_PLACE_WAY_REACH));
+    m.insert("DANGER_ESCORTS_MAX".into(), json!(DANGER_ESCORTS_MAX));
     m.insert("DEMAND_DECLINED_STANDING_LOSS".into(), json!(DEMAND_DECLINED_STANDING_LOSS));
     m.insert("DEMAND_TRADE_ORG_STANDING_LOSS".into(), json!(DEMAND_TRADE_ORG_STANDING_LOSS));
     m.insert("DIRECT_OFFER_DAYS".into(), json!(DIRECT_OFFER_DAYS));

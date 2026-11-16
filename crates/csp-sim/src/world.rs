@@ -347,6 +347,9 @@ fn step_rest(
     // NPC cities weigh who outweighs them at their planning pass, once nothing else changes this
     // tick (ADR 0033).
     step_outweighed(world, size);
+    // And take threat from the armed residents they see, letting old threats and danger places fade
+    // (`CONTEXT.md`: Threat).
+    crate::npc_threat::step_threat(world, size);
     // Who is up on a wall walk, now that walls broke, changed hands and residents moved this tick.
     crate::wall_walk::step_wall_walk(world);
     let actions = steps

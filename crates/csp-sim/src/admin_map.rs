@@ -597,6 +597,17 @@ pub fn admin_inspection(
             m.insert("storage".into(), json!(storage));
             m.insert("gates".into(), json!({ "open": gates.len() - shut, "shut": shut }));
             m.insert("soldiers".into(), json!(residents.iter().filter(|r| is_armed(r)).count()));
+            // How dangerous it thinks each Organization is, most first (`CONTEXT.md`: Threat).
+            let mut threats: Vec<(&String, f64)> =
+                c.threats.iter().flatten().map(|(org, v)| (org, *v)).collect();
+            threats.sort_by(|a, b| b.1.total_cmp(&a.1));
+            m.insert(
+                "threats".into(),
+                json!(threats
+                    .into_iter()
+                    .map(|(org, v)| json!({ "org": admin_organization(world, org, lookups), "threat": v }))
+                    .collect::<Vec<_>>()),
+            );
             m
         }
         "building" => {

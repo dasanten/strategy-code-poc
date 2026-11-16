@@ -222,6 +222,8 @@ pub fn found_npc_city(
         outsiders: None,
         alarmed_attackers: None,
         outweighed: None,
+        threats: None,
+        danger_places: None,
         layout: trade_org.is_none().then(|| pick_layout(world.seed, &id)),
     };
     let b = |world: &mut WorldState, k, bx, by| {

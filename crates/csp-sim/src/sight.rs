@@ -753,7 +753,10 @@ fn places(
         // Since when it has felt outweighed is its own mind (ADR 0033); demands show what it
         // means to their sides.
         shown.outweighed = None;
-        out.push(SeenEntity::City(SeenCity {
+        // So is how dangerous it thinks others are and where it lost people (`CONTEXT.md`: Threat).
+        shown.threats = None;
+        shown.danger_places = None;
+        out.push(SeenEntity::City(Box::new(SeenCity {
             city: shown,
             price,
             wont_sell,
@@ -762,7 +765,7 @@ fn places(
             trade,
             horses: (!horses.is_empty()).then_some(horses),
             horses_to_sell: (!to_sell.is_empty()).then_some(to_sell),
-        }));
+        })));
     }
     out
 }

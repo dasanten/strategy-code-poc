@@ -408,7 +408,8 @@ pub enum SeenEntity {
     /// Boxed: a resident carries far more than anything else seen.
     Resident(Box<SeenResident>),
     Building(SeenBuilding),
-    City(SeenCity),
+    /// Boxed too: a city carries its prices and what it keeps in mind.
+    City(Box<SeenCity>),
     Horse(SeenHorse),
     Carriage(SeenCarriage),
     Pile(Pile),
