@@ -9,7 +9,7 @@ use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{EquipOrder, Good, OrderRequest, Resident, ResidentOrder, WorldState};
 use serde_json::Value;
 
-use crate::equipment::{equipped, set_slot, slot_name, slot_named, slot_of, Slot};
+use crate::equipment::{equipped, hands_full, set_slot, slot_name, slot_named, slot_of, Slot};
 use crate::order_sender::{ordered_resident, OrderSender};
 use crate::orders::OrderKind;
 use crate::queries::names::{good_name, good_of, held};
@@ -25,6 +25,10 @@ pub fn equip_problem(r: &Resident, good: Good) -> Option<String> {
     }
     if equipped(r, slot) == Some(good) {
         return Some(format!("{} is equipped already", good_name(good)));
+    }
+    if slot == Slot::Shield && hands_full(r) {
+        let weapon = equipped(r, Slot::Weapon).map(good_name).unwrap_or("weapon");
+        return Some(format!("the {weapon} takes both hands"));
     }
     None
 }

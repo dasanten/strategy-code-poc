@@ -9,7 +9,7 @@ use csp_shared::balance::{
     BATCHES_PER_DAY, BUILD_MATERIALS, BUILD_WORK, GOOD_WEIGHT, PROTECTION_DEFENCE, RECIPES,
     WEAPON_ATTACK, WORKPLACE_SKILL, WORK_SKILL_PER_DAY,
 };
-use csp_shared::goods::{PROTECTION, WEAPONS};
+use csp_shared::goods::{PROTECTION, TWO_HANDED, WEAPONS};
 use csp_shared::terrain::{Terrain, TerrainMap};
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{BuildingKind, Good, Pile, SkillName, Stock, WorldState};
@@ -27,6 +27,11 @@ fn terrain() -> TerrainMap {
 
 fn arms() -> Vec<&'static str> {
     WEAPONS.iter().chain(PROTECTION.iter()).copied().collect()
+}
+
+/// Everything a smithy makes: each weapon and piece of armour, and Arrows (`CONTEXT.md`: Smithy).
+fn made_at_smithy() -> Vec<&'static str> {
+    arms().into_iter().chain(["arrows"]).collect()
 }
 
 /// What a weapon or piece of armour is forged from besides Wood: Steel for the steel ones
@@ -103,16 +108,32 @@ mod weapons_and_armour_balance_file {
     fn a_smithy_has_one_recipe_from_iron_or_steel_and_wood_for_each_weapon_and_piece_of_armour() {
         let recipes = RECIPES.get("smithy").expect("smithy recipes");
         let mut made: Vec<&str> = recipes.iter().map(recipe_good).collect();
-        let mut want = arms();
+        let mut want = made_at_smithy();
         made.sort_unstable();
         want.sort_unstable();
         assert_eq!(made, want);
         for r in recipes {
             let mut inputs: Vec<&str> = r.input.0.iter().map(|(g, _)| *g).collect();
             inputs.sort_unstable();
-            let m = metal(recipe_good(r));
-            assert_eq!(inputs, [m, "wood"]);
-            assert_eq!(json_of(&r.output), json!({ recipe_good(r): 1.0 }));
+            let good = recipe_good(r);
+            // A Bow is all Wood (`CONTEXT.md`: Smithy); everything else takes metal too.
+            if good == "bow" {
+                assert_eq!(inputs, ["wood"]);
+            } else {
+                assert_eq!(inputs, [metal(good), "wood"]);
+            }
+            // One of each a batch, but Arrows come by the batch.
+            let units = if good == "arrows" { 40.0 } else { 1.0 };
+            assert_eq!(json_of(&r.output), json!({ good: units }));
+            if good == "arrows" {
+                // A little iron: far less than the wood.
+                assert!(r.input.get("iron") < r.input.get("wood"));
+                let weight: f64 =
+                    r.input.0.iter().map(|(g, n)| n * GOOD_WEIGHT.get(g).expect("a weight")).sum();
+                let made = units * GOOD_WEIGHT.get("arrows").expect("a weight");
+                assert!((weight - made).abs() < 1e-9, "arrows: {weight} in, {made} out");
+                continue;
+            }
             // Nothing is lost or gained in weight at the anvil.
             let weight: f64 =
                 r.input.0.iter().map(|(g, n)| n * GOOD_WEIGHT.get(g).expect("a weight")).sum();
@@ -142,7 +163,14 @@ mod weapons_and_armour_balance_file {
     #[test]
     fn weapons_attack_shields_and_armour_defend_and_all_of_them_weigh_something() {
         for w in WEAPONS {
-            assert!(WEAPON_ATTACK.get(w).expect("an attack") > 0.0);
+            let attack = WEAPON_ATTACK.get(w).expect("an attack");
+            // A Bow or Crossbow shoots; in a blow its archer has only their fists (`CONTEXT.md`:
+            // Ranged combat).
+            if TWO_HANDED.contains(&w) {
+                assert_eq!(attack, 0.0, "{w}");
+            } else {
+                assert!(attack > 0.0, "{w}");
+            }
         }
         for p in PROTECTION {
             assert!(PROTECTION_DEFENCE.get(p).expect("a defence") > 0.0);
@@ -167,7 +195,7 @@ mod the_smithy {
     /// `it.each(ARMS)`: one run per weapon and piece of armour.
     #[test]
     fn turns_the_iron_and_wood_its_worker_carries_into_each_on_its_pile() {
-        for made in arms() {
+        for made in made_at_smithy() {
             let (mut world, mut q) = setup();
             assert_eq!(work(&mut world, &mut q, "w1", Some(json!(made))), "ack");
             assert_matches(&world.residents[0].order, json!({ "kind": "workAt", "makes": made }));
@@ -183,12 +211,14 @@ mod the_smithy {
             let batches = BATCHES_PER_DAY.get("smithy").expect("batches");
             let recipe = recipe_for(BuildingKind::Smithy, Some(made)).expect("a recipe");
             let g = good(made);
+            let per_batch = recipe.output.get(made).expect("an output");
             assert_eq!(
                 pile_at(&world, 2.0, 2.0).and_then(|p| p.goods.get(&g)).copied(),
-                Some(batches)
+                Some(batches * per_batch),
+                "{made}"
             );
             let r = &world.residents[0];
-            let input = |n: &str| recipe.input.get(n).expect("an input");
+            let input = |n: &str| recipe.input.get(n).unwrap_or(0.0);
             assert_eq!(r.carried.get(&m).copied(), Some(20.0 - batches * input(metal(made))));
             assert_eq!(r.carried.get(&Good::Wood).copied(), Some(10.0 - batches * input("wood")));
             let skill = r.skills.get(&SkillName::Smithing).copied().unwrap_or(0.0);

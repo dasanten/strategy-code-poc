@@ -17,7 +17,7 @@
 //! the same way.
 
 use csp_shared::balance::{PROTECTION_DEFENCE, WEAPON_ATTACK};
-use csp_shared::goods::PROTECTION_KINDS;
+use csp_shared::goods::{PROTECTION_KINDS, TWO_HANDED};
 use csp_shared::world::{Equipment, Good, KeptOff, Resident, Stock, WorldState};
 
 use crate::queries::names::{good_name, held};
@@ -116,10 +116,25 @@ pub fn best_for(carried: &Stock, slot: Slot) -> Option<Good> {
     best.map(|(g, _)| g)
 }
 
+/// Whether `good` takes both hands (`TWO_HANDED`: a Bow or Crossbow).
+pub fn is_two_handed(good: Good) -> bool {
+    TWO_HANDED.contains(&good_name(good))
+}
+
+/// Whether the resident's weapon as the rules count it takes both hands, so their shield slot
+/// stays empty (`CONTEXT.md`: Equipment).
+pub fn hands_full(r: &Resident) -> bool {
+    equipped(r, Slot::Weapon).is_some_and(is_two_handed)
+}
+
 /// What a resident has in `slot` as the rules count it: the stored item while they still carry
 /// it, otherwise the best fitting item they carry (an empty slot fills at once), unless the slot
-/// is [`kept_off`].
+/// is [`kept_off`]. The shield slot is empty while a weapon that takes both hands is equipped;
+/// the shield stays carried.
 pub fn equipped(r: &Resident, slot: Slot) -> Option<Good> {
+    if slot == Slot::Shield && hands_full(r) {
+        return None;
+    }
     in_slot(&r.equipped, slot).filter(|g| held(&r.carried, *g) > 0.0).or_else(|| {
         if kept_off(r, slot) {
             None
@@ -213,6 +228,9 @@ pub fn equipment_problem(r: &Resident) -> Option<String> {
         if held(&r.carried, g) <= 0.0 {
             return Some(format!("{} equipped but not carried", good_name(g)));
         }
+    }
+    if r.equipped.shield.is_some() && r.equipped.weapon.is_some_and(is_two_handed) {
+        return Some("shield equipped beside a weapon that takes both hands".into());
     }
     for k in &r.equipped.kept_off {
         if in_slot(&r.equipped, k.slot).is_some() {

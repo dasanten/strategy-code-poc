@@ -105,3 +105,46 @@ fn every_slot_holds_only_its_kind() {
     r.equipped.weapon = Some(Good::Shield);
     assert!(equipment_problem(&r).is_some());
 }
+
+#[test]
+fn a_bow_takes_both_hands_so_the_shield_slot_empties_and_the_shield_stays_carried() {
+    let mut r = someone();
+    r.carried = stock(&[(Good::Shield, 1.0)]);
+    settle_equipment(&mut r);
+    assert_eq!(r.equipped.shield, Some(Good::Shield));
+    r.carried.insert(Good::Bow, 1.0);
+    settle_equipment(&mut r);
+    assert_eq!(r.equipped.weapon, Some(Good::Bow), "an empty weapon slot takes the bow");
+    assert_eq!(r.equipped.shield, None, "the bow empties the shield slot");
+    assert_eq!(r.carried.get(&Good::Shield), Some(&1.0), "the shield stays carried");
+    assert_eq!(protection(&r), 0.0, "a shield carried beside a bow takes nothing off");
+    assert!(is_armed(&r));
+    assert_eq!(equipment_problem(&r), None);
+    // Put the bow down and the shield goes back on.
+    r.carried.shift_remove(&Good::Bow);
+    settle_equipment(&mut r);
+    assert_eq!(r.equipped, Equipment { shield: Some(Good::Shield), ..Equipment::default() });
+}
+
+#[test]
+fn a_crossbow_strikes_no_harder_than_fists_and_keeps_the_shield_off_too() {
+    let mut r = someone();
+    r.carried = stock(&[(Good::Crossbow, 1.0), (Good::SteelShield, 1.0), (Good::Arrows, 40.0)]);
+    settle_equipment(&mut r);
+    assert_eq!(
+        r.equipped,
+        Equipment { weapon: Some(Good::Crossbow), ..Equipment::default() },
+        "Arrows go in no slot"
+    );
+    assert_eq!(weapon_attack(&r), 0.0);
+    assert_eq!(slot_of(Good::Arrows), None);
+}
+
+#[test]
+fn the_invariant_catches_a_shield_stored_beside_a_bow() {
+    let mut r = someone();
+    r.carried = stock(&[(Good::Bow, 1.0), (Good::Shield, 1.0)]);
+    r.equipped =
+        Equipment { weapon: Some(Good::Bow), shield: Some(Good::Shield), ..Equipment::default() };
+    assert!(equipment_problem(&r).is_some_and(|m| m.contains("both hands")));
+}
