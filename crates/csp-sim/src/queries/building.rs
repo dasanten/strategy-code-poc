@@ -34,14 +34,77 @@ pub const KEEPS_GOODS: [BuildingKind; 4] =
 
 /// Where in `world.buildings` the building or construction site whose footprint covers (x, y)
 /// stands, if one does (`buildingAt`): the first in the world's order, roads and carriage sites
-/// aside.
+/// aside. A stone wall or gate site over the wooden one it upgrades (`CONTEXT.md`: Wood or stone)
+/// shares its tile: there the wooden one, standing until the stone one is finished, is the
+/// building; [`construction_index_at`] finds the site.
 pub fn building_index_at(world: &WorldState, x: i32, y: i32, size: i32) -> Option<usize> {
-    world.buildings.iter().position(|b| {
+    let on = |b: &Building| {
         // Nearly all are far off: their footprint needn't be worked out (T89.6).
         may_cover(b.x as i32, b.y as i32, x, y, size)
             && covers(placed(b), x, y, size)
             && !SHARES_A_TILE.contains(&b.kind)
+    };
+    let first = world.buildings.iter().position(on)?;
+    if !is_upgrade_kind_site(&world.buildings[first]) {
+        return Some(first);
+    }
+    let finished = world.buildings[first + 1..].iter().position(|b| on(b) && b.site.is_none());
+    Some(finished.map_or(first, |i| first + 1 + i))
+}
+
+/// Whether `b` is a site that may share its tile with the wooden wall or gate it upgrades: a stone
+/// wall or gate site.
+fn is_upgrade_kind_site(b: &Building) -> bool {
+    b.site.is_some() && is_stone(b.kind, b.material)
+}
+
+/// Where in `world.buildings` the finished wooden wall or gate of `kind` on (x, y) stands, that a
+/// stone one of that kind may be built on (`CONTEXT.md`: Wood or stone).
+pub fn wooden_wall_index_at(
+    world: &WorldState,
+    x: i32,
+    y: i32,
+    kind: BuildingKind,
+) -> Option<usize> {
+    if !matches!(kind, BuildingKind::Wall | BuildingKind::Gate) {
+        return None;
+    }
+    world.buildings.iter().position(|b| {
+        b.kind == kind
+            && b.site.is_none()
+            && !is_stone(b.kind, b.material)
+            && b.x as i32 == x
+            && b.y as i32 == y
     })
+}
+
+/// Where in `world.buildings` a wall or gate site on (x, y) stands, of wood or stone.
+fn wall_site_index_at(world: &WorldState, x: i32, y: i32) -> Option<usize> {
+    world.buildings.iter().position(|b| {
+        b.site.is_some()
+            && matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate)
+            && b.x as i32 == x
+            && b.y as i32 == y
+    })
+}
+
+/// What a wall line of `material` builds on (x, y) (`CONTEXT.md`: Wood or stone): a gate where a
+/// stone line upgrades a wooden gate, a wall otherwise.
+pub fn line_kind_at(
+    world: &WorldState,
+    building: BuildingKind,
+    material: Option<WallMaterial>,
+    x: i32,
+    y: i32,
+) -> BuildingKind {
+    let upgrades_gate = building == BuildingKind::Wall
+        && is_stone(building, material)
+        && wooden_wall_index_at(world, x, y, BuildingKind::Gate).is_some();
+    if upgrades_gate {
+        BuildingKind::Gate
+    } else {
+        building
+    }
 }
 
 /// The building or construction site whose footprint covers (x, y) (`buildingAt`).
@@ -258,6 +321,10 @@ pub fn construction_index_at(
         BuildingKind::Carriage | BuildingKind::Boat | BuildingKind::Ship => {
             first_of_kind_at(world, x, y, kind)
         }
+        // A wall or gate site first: one may stand over the wooden wall it upgrades.
+        BuildingKind::Wall | BuildingKind::Gate => {
+            wall_site_index_at(world, x, y).or_else(|| building_index_at(world, x, y, MAP_SIZE))
+        }
         _ => building_index_at(world, x, y, MAP_SIZE),
     }
 }
@@ -414,6 +481,26 @@ pub fn build_problem(
     kind: BuildingKind,
     terrain: Option<&dyn TerrainLookup>,
 ) -> Option<String> {
+    build_problem_for(world, x, y, kind, None, terrain)
+}
+
+/// [`build_problem`] for a wall or gate of `material`: a stone one may also be laid out on a
+/// finished wooden one of its kind with no site on it yet, which stands until the stone one is
+/// finished (`CONTEXT.md`: Wood or stone).
+pub fn build_problem_for(
+    world: &WorldState,
+    x: i32,
+    y: i32,
+    kind: BuildingKind,
+    material: Option<WallMaterial>,
+    terrain: Option<&dyn TerrainLookup>,
+) -> Option<String> {
+    if is_stone(kind, material)
+        && wooden_wall_index_at(world, x, y, kind).is_some()
+        && wall_site_index_at(world, x, y).is_none()
+    {
+        return None;
+    }
     if !BUILDABLE.contains(&kind) {
         return Some(format!("a {} can't be built yet", kind_name(kind)));
     }
@@ -534,6 +621,19 @@ pub fn build_at_problem(
     at: (i32, i32),
     terrain: Option<&TerrainMap>,
 ) -> Option<String> {
+    build_at_problem_of(world, r, building, None, at, terrain)
+}
+
+/// [`build_at_problem`] for a wall or gate of `material`: it joins only a site of its own
+/// material, and a stone one may go on a wooden one of its kind (`CONTEXT.md`: Wood or stone).
+pub fn build_at_problem_of(
+    world: &WorldState,
+    r: &Resident,
+    building: Option<BuildingKind>,
+    material: Option<WallMaterial>,
+    at: (i32, i32),
+    terrain: Option<&TerrainMap>,
+) -> Option<String> {
     if !can_work(r.born_at, world.tick as f64) {
         return Some("children can’t build".into());
     }
@@ -543,11 +643,14 @@ pub fn build_at_problem(
     let Some(kind) = building.filter(|k| BUILDABLE.contains(k)) else {
         return Some("that can’t be built".into());
     };
-    if construction_at(world, at.0, at.1, kind).is_some_and(|h| h.site.is_some() && h.kind == kind)
-    {
+    if construction_at(world, at.0, at.1, kind).is_some_and(|h| {
+        h.site.is_some()
+            && h.kind == kind
+            && is_stone(h.kind, h.material) == is_stone(kind, material)
+    }) {
         return None;
     }
-    build_problem(world, at.0, at.1, kind, terrain.map(|t| t as &dyn TerrainLookup))
+    build_problem_for(world, at.0, at.1, kind, material, terrain.map(|t| t as &dyn TerrainLookup))
 }
 
 /// Where a node's workplace can be laid out (`nodeCorner`): the node's own tile first.
@@ -968,6 +1071,8 @@ pub struct BuildLine {
     pub building: BuildingKind,
     pub from: (i32, i32),
     pub to: (i32, i32),
+    /// What a wall line builds of; none is wood.
+    pub material: Option<WallMaterial>,
 }
 
 /// A tile of a Build line still to build, with its construction site once laid out (`LineTile`).
@@ -976,25 +1081,33 @@ pub struct LineTile {
     pub x: i32,
     pub y: i32,
     pub site_id: Option<String>,
+    /// What is built there: the line's building, or a gate where a stone line upgrades one.
+    pub building: BuildingKind,
 }
 
-/// Tile (x, y) of a line of `building` as still to build (`lineTile`).
+/// Tile (x, y) of a line of `building` of `material` as still to build (`lineTile`): one with a
+/// site of its own material to join, or that takes one. A stone wall line takes the wooden wall
+/// and gate tiles on its way too, and passes only those of stone (`CONTEXT.md`: Wood or stone).
 pub fn line_tile(
     world: &WorldState,
     building: BuildingKind,
+    material: Option<WallMaterial>,
     x: i32,
     y: i32,
     terrain: Option<&dyn TerrainLookup>,
 ) -> Option<LineTile> {
-    if let Some(here) = construction_at(world, x, y, building) {
-        if here.site.is_some() && here.kind == building {
-            return Some(LineTile { x, y, site_id: Some(here.id.clone()) });
+    let kind = line_kind_at(world, building, material, x, y);
+    if let Some(here) = construction_at(world, x, y, kind) {
+        let same = is_stone(here.kind, here.material) == is_stone(kind, material);
+        if here.site.is_some() && here.kind == kind && same {
+            return Some(LineTile { x, y, site_id: Some(here.id.clone()), building: kind });
         }
     }
-    build_problem(world, x, y, building, terrain).is_none().then_some(LineTile {
+    build_problem_for(world, x, y, kind, material, terrain).is_none().then_some(LineTile {
         x,
         y,
         site_id: None,
+        building: kind,
     })
 }
 
@@ -1008,7 +1121,8 @@ pub fn line_to_build(
     road_line(line.from, line.to, size)
         .into_iter()
         .filter_map(|(x, y)| {
-            line_tile(world, line.building, x, y, terrain.map(|t| t as &dyn TerrainLookup))
+            let terrain = terrain.map(|t| t as &dyn TerrainLookup);
+            line_tile(world, line.building, line.material, x, y, terrain)
         })
         .collect()
 }

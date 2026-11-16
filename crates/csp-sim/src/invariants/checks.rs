@@ -34,10 +34,10 @@ use crate::pairing::carrying_blocks;
 use crate::queries::alliance::{allied_realms, carriage_commander_of, commander_of};
 use crate::queries::balance::carry_capacity;
 use crate::queries::building::{
-    building_at, carriage_can_go_to, has_choice, line_building, line_order, materials_needed,
-    materials_of, max_workers, node_workplace, recipe_for, teardown_work, work_needed, work_of,
-    workplace_good, BUILDABLE, KEEPS_GOODS, OFF_NODES, ON_PLAINS, ON_SHORE, PROCESSING,
-    SHARES_A_TILE,
+    building_at, carriage_can_go_to, has_choice, is_stone, line_building, line_order,
+    materials_needed, materials_of, max_workers, node_workplace, recipe_for, teardown_work,
+    wooden_wall_index_at, work_needed, work_of, workplace_good, BUILDABLE, KEEPS_GOODS, OFF_NODES,
+    ON_PLAINS, ON_SHORE, PROCESSING, SHARES_A_TILE,
 };
 use crate::queries::city_area::{city_membership, is_city_building};
 use crate::queries::command::commander_of_resident;
@@ -188,8 +188,18 @@ pub fn buildings_in_place(world: &WorldState, terrain: &TerrainMap) -> Out {
         let kind = kind_name(b.kind);
         for &(x, y) in &footprint {
             let key = format!("{x},{y}");
-            let layer =
-                if SHARES_A_TILE.contains(&b.kind) { format!("{kind} {key}") } else { key.clone() };
+            // A stone wall or gate site over the finished wooden one of its kind it upgrades has a
+            // layer of its own (`CONTEXT.md`: Wood or stone); anywhere else it overlaps as any.
+            let upgrades = b.site.is_some()
+                && is_stone(b.kind, b.material)
+                && wooden_wall_index_at(world, x, y, b.kind).is_some();
+            let layer = if SHARES_A_TILE.contains(&b.kind) {
+                format!("{kind} {key}")
+            } else if upgrades {
+                format!("upgrade {key}")
+            } else {
+                key.clone()
+            };
             if let Some(other) = tiles.get(&layer) {
                 fail(&b.id, format!("overlaps {other} on tile ({key})"));
             }
@@ -2512,8 +2522,15 @@ pub fn line_orders_sound(world: &WorldState, terrain: &TerrainMap) -> Out {
         }
         let Some(site_id) = &o.site_id else { continue };
         let site = world.buildings.iter().find(|b| &b.id == site_id);
-        let on_it =
-            site.is_some_and(|s| s.site.is_some() && s.kind == kind && s.x == r.x && s.y == r.y);
+        // A stone wall line builds a gate where it upgrades a wooden one (`CONTEXT.md`: Wood or
+        // stone).
+        let fits = |s: &csp_shared::world::Building| {
+            s.kind == kind
+                || (kind == BuildingKind::Wall
+                    && s.kind == BuildingKind::Gate
+                    && is_stone(s.kind, s.material))
+        };
+        let on_it = site.is_some_and(|s| s.site.is_some() && fits(s) && s.x == r.x && s.y == r.y);
         if !on_it || r.x != first.0 || r.y != first.1 {
             fail(format!(
                 "builds {site_id}, which is not the {building} site on their tile and the order’s next"

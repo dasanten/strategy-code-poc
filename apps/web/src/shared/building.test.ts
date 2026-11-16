@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { BUILD_MATERIALS, BUILD_WORK, STONE_BUILD_MATERIALS, STONE_BUILD_WORK } from './narrowed.js'
 import { STONE_WALL_STRENGTH, WALL_STRENGTH } from './narrowed.js'
-import { isStone, materialsOfKind, workOfKind } from './building.js'
+import { isStone, materialsOfKind, stoneOverAt, workOfKind } from './building.js'
 import { brokenReturns, wallStrength } from './walls.js'
 import type { Building } from '@csp/shared-types'
 
@@ -33,5 +33,19 @@ describe('stone walls and gates (`CONTEXT.md`: Wood or stone)', () => {
     expect(wallStrength(wall('gate', 'stone'))).toBe(STONE_WALL_STRENGTH.gate)
     expect(wallStrength(wall('wall'))).toBe(WALL_STRENGTH.wall)
     expect(Object.keys(brokenReturns(wall('wall', 'stone')))).toEqual(['stone'])
+  })
+})
+
+describe('a stone wall on a wooden one (`CONTEXT.md`: Wood or stone)', () => {
+  const site = { delivered: {}, work: 0 }
+  it('goes on a finished wooden one of its kind with no site on it yet', () => {
+    const at = (buildings: Building[]) => stoneOverAt({ buildings }, 1, 1, 'wall')
+    expect(at([wall('wall')])).toBe(true)
+    expect(at([wall('wall', 'stone')])).toBe(false)
+    expect(at([wall('gate')])).toBe(false)
+    expect(at([{ ...wall('wall'), site }])).toBe(false)
+    expect(at([wall('wall'), { ...wall('wall', 'stone'), id: 's', site }])).toBe(false)
+    expect(stoneOverAt({ buildings: [wall('gate')] }, 1, 1, 'gate')).toBe(true)
+    expect(stoneOverAt({ buildings: [wall('wall')] }, 1, 1, 'house')).toBe(false)
   })
 })

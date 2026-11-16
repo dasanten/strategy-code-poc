@@ -15,6 +15,7 @@ import {
   SHARES_A_TILE,
   takesWorkSettings,
   roadTiles,
+  stoneOverAt,
 } from './shared/building.js'
 import { firstDayShown } from './shared/first-day.js'
 import type {
@@ -1062,18 +1063,24 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     const request = { ...order, residentId: selected.id }
     setOrderError(await sendOrder(appendRequest(selected, request, at) ?? request))
   }
-  /** Why a kind can't be laid out on a tile, as far as the Player knows (`buildHereProblem`). */
+  /**
+   * Why a kind can't be laid out on a tile, as far as the Player knows (`buildHereProblem`); a
+   * stone wall or gate may go on the wooden one of its kind (`CONTEXT.md`: Wood or stone).
+   */
   const buildProblemAt =
-    (w: NonNullable<typeof world>, x: number, y: number) => (kind: BuildingKind) =>
-      buildHereProblem(
-        kind,
-        x,
-        y,
-        w,
-        (nx, ny) => nodeAt?.(nx, ny),
-        // Terrain not loaded counts as unexplored: nothing is laid out there.
-        { size: w.map.size, at: (tx, ty) => terrainAt?.(tx, ty) ?? UNEXPLORED },
-      )
+    (w: NonNullable<typeof world>, x: number, y: number) =>
+    (kind: BuildingKind, material?: WallMaterial) =>
+      material === 'stone' && stoneOverAt(w, x, y, kind)
+        ? undefined
+        : buildHereProblem(
+            kind,
+            x,
+            y,
+            w,
+            (nx, ny) => nodeAt?.(nx, ny),
+            // Terrain not loaded counts as unexplored: nothing is laid out there.
+            { size: w.map.size, at: (tx, ty) => terrainAt?.(tx, ty) ?? UNEXPLORED },
+          )
   /** The queue planner's Add step, on the resident card and the group card. */
   function addStep(w: NonNullable<typeof world>) {
     const seen = { cities: knownCities, buildings: knownBuildings, residents: w.residents }

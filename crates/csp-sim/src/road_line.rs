@@ -16,7 +16,8 @@ use crate::carrying::{CarryAction, CarryKind};
 use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::queries::building::materials_needed;
 use crate::queries::building::{
-    build_problem, building_at, road_at, road_line, TerrainLookup, CARRYING_A_CHILD,
+    build_problem_for, building_at, is_stone, line_kind_at, road_at, road_line, TerrainLookup,
+    CARRYING_A_CHILD,
 };
 use crate::queries::names::{held, kind_name};
 use crate::queries::residents::can_work;
@@ -49,12 +50,33 @@ fn tile_field(order: &OrderRequest, key: &str) -> Option<(i32, i32)> {
 }
 
 /// Whether a line order passes over (x, y) without building there (`alreadyBuilt`): it has a road
-/// already, for a road line, or a wall or gate, finished or not, for a wall line.
-fn already_built(world: &WorldState, kind: LineKind, x: i32, y: i32) -> bool {
+/// already, for a road line, or a wall or gate, finished or not, for a wall line; a stone wall
+/// line passes only those of stone, and upgrades a finished wooden one (`CONTEXT.md`: Wood or
+/// stone).
+fn already_built(
+    world: &WorldState,
+    kind: LineKind,
+    material: Option<WallMaterial>,
+    x: i32,
+    y: i32,
+) -> bool {
     match kind {
         LineKind::RoadLine => road_at(world, x, y).is_some(),
-        LineKind::WallLine => building_at(world, x, y, MAP_SIZE)
-            .is_some_and(|b| matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate)),
+        LineKind::WallLine => {
+            let wall = building_at(world, x, y, MAP_SIZE)
+                .filter(|b| matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate));
+            match wall {
+                None => false,
+                Some(b) => {
+                    let line_kind = line_kind_at(world, BuildingKind::Wall, material, x, y);
+                    let upgrades = is_stone(BuildingKind::Wall, material)
+                        && b.site.is_none()
+                        && !is_stone(b.kind, b.material)
+                        && b.kind == line_kind;
+                    !upgrades
+                }
+            }
+        }
     }
 }
 
@@ -71,6 +93,7 @@ pub fn validate_line(
     if let Some(problem) = material_problem(order, Some(building)) {
         return Some(problem);
     }
+    let material = material_field(order).filter(|m| *m == WallMaterial::Stone);
     let id = str_field(order, "residentId");
     let r = world.residents.iter().find(|x| Some(x.id.as_str()) == id);
     let realm = realm_of(world, sender.user_id);
@@ -98,10 +121,11 @@ pub fn validate_line(
     }
     let lookup = terrain.map(|t| t as &dyn TerrainLookup);
     for (x, y) in tiles {
-        if already_built(world, kind, x, y) {
+        if already_built(world, kind, material, x, y) {
             continue;
         }
-        if let Some(problem) = build_problem(world, x, y, building, lookup) {
+        let here = line_kind_at(world, building, material, x, y);
+        if let Some(problem) = build_problem_for(world, x, y, here, material, lookup) {
             return Some(format!("({x}, {y}): {problem}"));
         }
     }

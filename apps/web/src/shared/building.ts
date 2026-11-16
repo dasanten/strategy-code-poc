@@ -903,3 +903,21 @@ export function lineToBuild(world: WorldState, line: BuildLine, terrain?: Terrai
   const tiles = roadLine(line.from, line.to, terrain?.size ?? MAP_SIZE)
   return tiles.flatMap(([x, y]) => lineTile(world, line.building, x, y, terrain) ?? [])
 }
+
+/**
+ * Whether a stone wall or gate of `kind` may be laid out on (x, y) over the finished wooden one of
+ * its kind there, which stands until the stone one is finished (`CONTEXT.md`: Wood or stone): no
+ * wall or gate site there yet.
+ */
+export function stoneOverAt(
+  world: { buildings: readonly Pick<Building, 'kind' | 'x' | 'y' | 'site' | 'material'>[] },
+  x: number,
+  y: number,
+  kind: BuildingKind,
+): boolean {
+  if (kind !== 'wall' && kind !== 'gate') return false
+  const here = world.buildings.filter((b) => b.x === x && b.y === y)
+  const wooden = here.some((b) => b.kind === kind && !b.site && b.material !== 'stone')
+  const site = here.some((b) => (b.kind === 'wall' || b.kind === 'gate') && b.site)
+  return wooden && !site
+}

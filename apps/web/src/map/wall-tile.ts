@@ -91,3 +91,28 @@ export function drawStoneMarks(
   for (const t of tiles) g.rect(t.sx + inset, t.sy + tile / 2 - mortar / 2, side, mortar)
   g.fill({ color: WALL_EDGE_COLOR, alpha: alpha * 0.6 })
 }
+
+/**
+ * Marks stone gate tiles (`CONTEXT.md`: Wood or stone): the gate's token covers the middle of its
+ * tile, so its stone shows as a grey frame round the token, inside the dark edge.
+ */
+export function drawStoneFrames(
+  g: Graphics,
+  tiles: readonly WallTile[],
+  tile: number,
+  alpha: number,
+) {
+  if (tiles.length === 0) return
+  const inset = Math.min(wallEdgeWidth(tile), tile / 2)
+  const band = Math.max(1, tile * 0.1)
+  const side = tile - 2 * inset
+  if (side <= 2 * band) return
+  for (const t of tiles) {
+    const [x, y] = [t.sx + inset, t.sy + inset]
+    g.rect(x, y, side, band)
+    g.rect(x, y + side - band, side, band)
+    g.rect(x, y + band, band, side - 2 * band)
+    g.rect(x + side - band, y + band, band, side - 2 * band)
+  }
+  g.fill({ color: STONE_WALL_COLOR, alpha })
+}

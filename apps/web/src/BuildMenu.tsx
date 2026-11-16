@@ -28,19 +28,23 @@ export function KindDetail({
   blocked,
   planning,
   onBuild,
+  problemOf,
 }: {
   item: BuildMenuKind
   terrain?: number
   blocked: boolean
   planning: boolean
   onBuild: (kind: BuildingKind, material?: WallMaterial) => void
+  /** Why it can't go here of a material: a stone wall may go on a wooden one (`buildProblem`). */
+  problemOf?: (kind: BuildingKind, material?: WallMaterial) => string | undefined
 }) {
-  const { kind, name, problem } = item
+  const { kind, name } = item
   const ref = useRef<HTMLDivElement>(null)
   // A wall or gate is of wood or stone (`CONTEXT.md`: Wood or stone): wood unless picked.
   const [material, setMaterial] = useState<WallMaterial>('wood')
   const ofMaterial = kind === 'wall' || kind === 'gate'
   const picked = ofMaterial ? material : undefined
+  const problem = picked === 'stone' && problemOf ? problemOf(kind, 'stone') : item.problem
   const label = picked === 'stone' ? `stone ${name.toLowerCase()}` : name.toLowerCase()
   const build = () => onBuild(kind, picked === 'stone' ? 'stone' : undefined)
   // On a phone the grid can fill the sheet, so the detail under it might open out of sight.
@@ -82,7 +86,7 @@ export function KindDetail({
           {workFactor(kind, terrain) > 1 && ' here on Mountain'}
         </span>
       </div>
-      {canChooseKind(item, planning) && (
+      {canChooseKind({ ...item, problem }, planning) && (
         <div className="order-buttons">
           <button type="button" className="primary" disabled={blocked} onClick={build}>
             {planning ? 'Add: build' : 'Build'} {label}
@@ -119,7 +123,7 @@ export function BuildMenu({
   /** The explored terrain beneath this tile, if known (`buildingWork`). */
   terrain?: number
   /** Why a kind can't be laid out on this tile, as far as the Player knows. */
-  buildProblem: (kind: BuildingKind) => string | undefined
+  buildProblem: (kind: BuildingKind, material?: WallMaterial) => string | undefined
   /** Whoever would build can't right now, so Build is off whatever the tile allows. */
   blocked?: boolean
   /** For the planner: the kind is added as a step, whose turn checks it (`canChooseKind`). */
@@ -160,6 +164,7 @@ export function BuildMenu({
           blocked={blocked}
           planning={planning}
           onBuild={onBuild}
+          problemOf={buildProblem}
         />
       )}
     </>

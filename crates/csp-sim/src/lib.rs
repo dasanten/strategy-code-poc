@@ -126,6 +126,8 @@ pub mod starting_city;
 pub mod starting_sites;
 pub mod stealing;
 pub mod stock_floor;
+#[cfg(test)]
+mod stone_upgrade_tests;
 pub mod storing;
 pub mod supply_wagons;
 pub mod survival;
