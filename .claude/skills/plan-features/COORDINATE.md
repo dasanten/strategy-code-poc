@@ -29,6 +29,9 @@ Check the PR itself, not just the note.
    run `pnpm check origin/epic/<n>-<slug>` (lint, typecheck and the affected client tests, ADR 0013)
    and, when it touches `crates/`, `pnpm check:rust`. Green: merge the PR, close its tickets
    by hand and remove `in progress`. Red: send the failure to that session with `SendMessage`.
+   **Merged:** delete that session's worktree `target/` folder (Rust build cache, about 10–20 GB;
+   third-party crates come back from the shared sccache). Before starting more Rust sessions,
+   check `(Get-PSDrive C).Free` and keep at least 25 GB free.
 2. **`WORLD_FORMAT_VERSION`:** several open PRs that bump it merge one at a time. After each,
    tell the next one which number to take.
 3. **Questions:** a session asking about a rule goes to Daniel. Quote Daniel word for word when you
