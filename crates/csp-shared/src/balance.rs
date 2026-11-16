@@ -2242,6 +2242,11 @@ pub const SHOT_SKILL_LIMIT: Table<f64> = Table(&[("bow", 2.0), ("crossbow", 0.25
 /// Crossbow's bolt half of it, an arrow from a Bow none.
 pub const SHOT_PIERCE: Table<f64> = Table(&[("bow", 0.0), ("crossbow", 0.5)]);
 
+/// Tiles of reach an archer up on a wall walk gets on top of their weapon's (`CONTEXT.md`: Ranged
+/// combat, Walls in combat): half a Bow's again, so a Bow on the wall outshoots one on the ground
+/// by four tiles and a Crossbow on the wall outshoots a Bow below.
+pub const WALL_SHOT_REACH_BONUS: f64 = 4.0;
+
 /// What a blow that lands does to a defender standing on their own city's wall, as a share of its
 /// damage (`CONTEXT.md`: Walls in combat): a quarter, so a wall's defenders hold out four times
 /// as long.
@@ -2854,6 +2859,7 @@ pub fn balance_json() -> Value {
     m.insert("SHOT_DAMAGE".into(), to_value(SHOT_DAMAGE).expect("serialisable"));
     m.insert("SHOT_SKILL_LIMIT".into(), to_value(SHOT_SKILL_LIMIT).expect("serialisable"));
     m.insert("SHOT_PIERCE".into(), to_value(SHOT_PIERCE).expect("serialisable"));
+    m.insert("WALL_SHOT_REACH_BONUS".into(), json!(WALL_SHOT_REACH_BONUS));
     m.insert("PROTECTION_DEFENCE".into(), to_value(PROTECTION_DEFENCE).expect("serialisable"));
     m.insert("CARRY_BASE".into(), json!(CARRY_BASE));
     m.insert("CARRY_PER_STRENGTH".into(), json!(CARRY_PER_STRENGTH));

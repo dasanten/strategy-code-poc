@@ -5,13 +5,14 @@ use csp_shared::balance::{
     BLOW_BASE, BLOW_PER_STRENGTH, COMBAT_SKILL_EFFECT, COMBAT_SKILL_LIMIT, COMBAT_SKILL_PER_BLOW,
     DODGE_LIMIT, DODGE_PER_AGILITY, INTELLECT_AVERAGE, MIN_BLOW_DAMAGE, PROTECTION_DEFENCE,
     SHOT_DAMAGE, SHOT_PIERCE, SHOT_REACH, SHOT_SKILL_LIMIT, SHOT_TICKS, STRIKE_TICKS,
-    WEAPON_ATTACK,
+    WALL_SHOT_REACH_BONUS, WEAPON_ATTACK,
 };
 use csp_shared::terrain::wrap_delta;
 use csp_shared::world::{Good, Resident, SkillName, StatName, WorldState};
 
 use super::names::{good_name, held};
 use super::residents::stat_value;
+use super::walls::is_up;
 use crate::equipment::{equipped, Slot};
 
 /// Whether two spots are in contact (`inContact`): on the same tile or one of the eight around
@@ -78,16 +79,30 @@ pub fn shooting_weapon(r: &Resident) -> Option<&'static str> {
     ranged_weapon(r).filter(|_| held(&r.carried, Good::Arrows) > 0.0)
 }
 
-/// How far, in tiles, a resident's equipped Bow or Crossbow shoots; None without one.
-pub fn shot_reach(r: &Resident) -> Option<f64> {
-    ranged_weapon(r).and_then(|w| SHOT_REACH.get(w))
+/// How far, in tiles, a resident's equipped Bow or Crossbow shoots from where they stand: its
+/// `SHOT_REACH`, further from up high (`height_reach_bonus`); None without one.
+pub fn shot_reach(world: &WorldState, r: &Resident) -> Option<f64> {
+    ranged_weapon(r)
+        .and_then(|w| SHOT_REACH.get(w))
+        .map(|reach| reach + height_reach_bonus(world, r))
+}
+
+/// The reach an archer gets from where they stand above the ground (`CONTEXT.md`: Ranged combat,
+/// Walls in combat): up on a wall walk `WALL_SHOT_REACH_BONUS`, on the ground none. Towers (Epic
+/// 109) give more here.
+pub fn height_reach_bonus(world: &WorldState, r: &Resident) -> f64 {
+    if is_up(world, r) {
+        WALL_SHOT_REACH_BONUS
+    } else {
+        0.0
+    }
 }
 
 /// How far, in tiles, a resident strikes from at all (`CONTEXT.md`: Combat, Ranged combat): their
-/// weapon's reach with a Bow or Crossbow equipped, else contact (1). What `shots-within-reach`
-/// holds every blow and shot to.
-pub fn strike_reach(r: &Resident) -> f64 {
-    shot_reach(r).unwrap_or(1.0).max(1.0)
+/// weapon's reach from where they stand with a Bow or Crossbow equipped, else contact (1). What
+/// `shots-within-reach` holds every blow and shot to.
+pub fn strike_reach(world: &WorldState, r: &Resident) -> f64 {
+    shot_reach(world, r).unwrap_or(1.0).max(1.0)
 }
 
 /// Tiles between two spots as reach counts them: the larger of the two steps, the short way round
@@ -121,6 +136,6 @@ pub fn shot_damage(attacker: &Resident, defender: &Resident, weapon: &str) -> f6
 /// A resident's shot reach as scripts see it (`reach`): tiles their Bow or Crossbow shoots from
 /// where they stand, null without one (`CONTEXT.md`: Ranged combat). Anyone who sees them sees
 /// their weapon, so its reach too.
-pub fn reach_json(_world: &WorldState, r: &Resident) -> serde_json::Value {
-    shot_reach(r).map_or(serde_json::Value::Null, |reach| serde_json::json!(reach))
+pub fn reach_json(world: &WorldState, r: &Resident) -> serde_json::Value {
+    shot_reach(world, r).map_or(serde_json::Value::Null, |reach| serde_json::json!(reach))
 }

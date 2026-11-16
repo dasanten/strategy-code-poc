@@ -2121,7 +2121,7 @@ pub fn shots_within_reach(world: &WorldState, terrain: &TerrainMap) -> Out {
             (a.x as i32, a.y as i32),
             (t.x as i32, t.y as i32),
         );
-        let reach = crate::queries::combat::strike_reach(a);
+        let reach = crate::queries::combat::strike_reach(world, a);
         if apart > reach + 1.0 {
             let msg = format!(
                 "resident {} struck {} from {} tiles away, beyond their reach of {}",

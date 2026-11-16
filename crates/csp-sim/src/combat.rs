@@ -85,16 +85,17 @@ fn tile(p: (f64, f64)) -> (i32, i32) {
 /// vessel, High ground): in contact with it, not from one vessel at someone aboard another, and
 /// not from the ground at someone up. Those aboard a vessel are reached from beside it, as if it
 /// were the next land tile; those aboard a docked ship from anywhere on its haven, and the other
-/// way round.
+/// way round. A shot reaches within the archer's reach, from the ground at someone up too: the one
+/// way to hit them from below (`CONTEXT.md`: Ranged combat).
 fn reaches(world: &WorldState, size: i32, ai: usize, t: Target) -> bool {
     let a = &world.residents[ai];
     let contact = in_contact(size, tile((a.x, a.y)), tile(spot_of(world, t)));
     match t {
         Target::Resident(ti) => {
             let b = &world.residents[ti];
-            (contact || across_docked_ship(world, a, b) || within_shot(size, a, b))
-                && !between_vessels(world, a, b)
-                && reaches_for_height(world, a, b)
+            let blow =
+                (contact || across_docked_ship(world, a, b)) && reaches_for_height(world, a, b);
+            (blow || within_shot(world, size, a, b)) && !between_vessels(world, a, b)
         }
         // A wall or gate is struck in contact, never shot at.
         Target::Building(_) => contact,
@@ -102,11 +103,11 @@ fn reaches(world: &WorldState, size: i32, ai: usize, t: Target) -> bool {
 }
 
 /// Whether `a` shoots at `b` from where they stand (`CONTEXT.md`: Ranged combat): a Bow or
-/// Crossbow equipped, an Arrow carried, and `b` within its reach. Sight is checked by the attack
-/// order itself; nothing else blocks a shot for now.
-fn within_shot(size: i32, a: &Resident, b: &Resident) -> bool {
+/// Crossbow equipped, an Arrow carried, and `b` within its reach from there (further from up on a
+/// wall). Sight is checked by the attack order itself; nothing else blocks a shot for now.
+fn within_shot(world: &WorldState, size: i32, a: &Resident, b: &Resident) -> bool {
     shooting_weapon(a).is_some()
-        && shot_reach(a)
+        && shot_reach(world, a)
             .is_some_and(|reach| tiles_apart(size, tile((a.x, a.y)), tile((b.x, b.y))) <= reach)
 }
 
@@ -279,10 +280,12 @@ pub fn validate_attack(
         .residents
         .iter()
         .any(|x| ours(x) && wrap_distance(size, tile((x.x, x.y)), tile(target)) <= SIGHT_RANGE);
-    let below = resident.is_some_and(|t| !reaches_for_height(world, me, t));
     if seen && order.shoot {
         return shoot_problem(world, size, me, resident);
     }
+    // An archer shoots up at them (`CONTEXT.md`: Ranged combat); nobody else on the ground reaches.
+    let below = resident.is_some_and(|t| !reaches_for_height(world, me, t))
+        && shooting_weapon(me).is_none();
     if seen && below {
         Some("they are up on the wall")
     } else if seen {
@@ -309,7 +312,7 @@ fn shoot_problem(
         return Some("no arrows");
     }
     let Some(t) = target else { return Some("only residents are shot at") };
-    if between_vessels(world, me, t) || !within_shot(size, me, t) {
+    if between_vessels(world, me, t) || !within_shot(world, size, me, t) {
         return Some("out of reach");
     }
     None
@@ -661,7 +664,9 @@ fn react(world: &mut WorldState, ti: usize, ai: usize) {
         start_defence(world, ti);
         return;
     }
-    let from_above = is_up(world, &world.residents[ai]) && !is_up(world, t);
+    // Struck from above, only an archer can answer: they shoot back up (`CONTEXT.md`: Ranged combat).
+    let from_above =
+        is_up(world, &world.residents[ai]) && !is_up(world, t) && shooting_weapon(t).is_none();
     let attacking = matches!(t.order, Some(ResidentOrder::Attack(_)));
     if is_armed(t) && (!from_above || attacking) {
         if !attacking {
@@ -715,3 +720,5 @@ mod high_ground_tests;
 mod shooting_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod wall_shooting_tests;

@@ -524,6 +524,7 @@ export interface Balance {
     crossbow: number
     [key: string]: number
   }
+  readonly WALL_SHOT_REACH_BONUS: number
   readonly PROTECTION_DEFENCE: {
     shield: number
     armour: number

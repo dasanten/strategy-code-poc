@@ -40,3 +40,12 @@ describe('shots', () => {
     expect(shots([archer(256 - 3), target], 256)).toHaveLength(1)
   })
 })
+
+describe('shots from the wall', () => {
+  it('reaches further for an archer up on a wall walk', () => {
+    const far = reach + 2
+    expect(shots([archer(far), target], 256)).toEqual([])
+    const up = { ...(archer(far) as object), up: 'inside' } as never
+    expect(shots([up, target], 256)).toEqual([{ from: 'a', to: 'b' }])
+  })
+})

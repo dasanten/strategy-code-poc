@@ -184,7 +184,7 @@ fn the_invariant_catches_a_blow_from_beyond_reach() {
     let check = invariant_named("shots-within-reach").expect("an invariant").check;
     let terrain = crate::test_support::plains(SIZE);
     world.tick = 5;
-    let r = strike_reach(live(&world, "a1").unwrap());
+    let r = strike_reach(&world, live(&world, "a1").unwrap());
     assert_eq!(r, reach("bow"));
     live_mut(&mut world, "b1").struck =
         Some(csp_shared::world::Struck { by: "a1".into(), tick: 4.0 });
@@ -196,5 +196,5 @@ fn the_invariant_catches_a_blow_from_beyond_reach() {
     assert!(check(&world, &terrain).is_empty());
     // Without a ranged weapon, reach is contact.
     live_mut(&mut world, "a1").carried.clear();
-    assert_eq!(strike_reach(live(&world, "a1").unwrap()), 1.0);
+    assert_eq!(strike_reach(&world, live(&world, "a1").unwrap()), 1.0);
 }

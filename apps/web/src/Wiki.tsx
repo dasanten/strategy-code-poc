@@ -308,6 +308,7 @@ import {
   SHOT_DAMAGE,
   SHOT_SKILL_LIMIT,
   SHOT_PIERCE,
+  WALL_SHOT_REACH_BONUS,
   WORK_SKILL_EFFECT,
   WORK_SKILL_MAX,
   WORKPLACE_MAX_WORKERS,
@@ -3521,11 +3522,20 @@ export function Wiki() {
         <p>
           <strong>The high ground.</strong> Whoever is up strikes down at anyone on the ground next
           to the wall, but nobody on the ground can strike anyone up: from below there is only the
-          wall or gate itself to break, or climbing it, both while being struck from above. Order a
-          resident below to attack someone up and they won't (“they are up on the wall”). A climber
-          is on the ground until over; one who made it and stands on the wall fights those up as
-          anywhere, and so do those up on two walls that touch. Up on their own city's wall,
-          defenders still take only {pct(WALL_DEFENCE)} of each blow.
+          wall or gate itself to break, or climbing it, both while being struck from above, or
+          shooting up at them with a Bow or Crossbow. Order a resident below without Arrows to
+          shoot to attack someone up and they won't (“they are up on the wall”). A climber is on the
+          ground until over; one who made it and stands on the wall fights those up as anywhere,
+          and so do those up on two walls that touch. Up on their own city's wall, defenders still
+          take only {pct(WALL_DEFENCE)} of each blow and each shot.
+        </p>
+        <p>
+          <strong>Archers on the wall.</strong> An archer up on a wall walk shoots{' '}
+          {num(WALL_SHOT_REACH_BONUS)} tiles further than on the ground: a Bow{' '}
+          {num((SHOT_REACH.bow ?? 0) + WALL_SHOT_REACH_BONUS)} tiles, a Crossbow{' '}
+          {num((SHOT_REACH.crossbow ?? 0) + WALL_SHOT_REACH_BONUS)}. So archers on a wall shoot
+          attackers before those can shoot back, and take only {pct(WALL_DEFENCE)} of what does
+          come back up.
         </p>
         <p>
           <strong>A tile breaks.</strong> When a wall or gate tile breaks, whoever is up on it falls

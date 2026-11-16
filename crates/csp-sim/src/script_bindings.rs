@@ -395,7 +395,7 @@ fn resident_view(
             "skills" => numbers_view("skills", &r.skills, skill_name),
             "carried" => numbers_view("goods", &r.carried, good_name),
             "equipped" => equipment_view(r),
-            "reach" => crate::queries::combat::shot_reach(r).map_or(Value::Null, number),
+            "reach" => crate::queries::combat::shot_reach(world, r).map_or(Value::Null, number),
             "order" => order_value(r.order.as_ref(), f.r#type, land),
             "orderEnded" => field_value(&r.order_ended, f.r#type),
             "queue" => match &r.queue {
