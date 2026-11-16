@@ -5865,7 +5865,16 @@ fn goAfter(foe) {
 fn shootFromWall(foe) {
   let o = me.order
   let post = null
-  if (!me.up) { post = wallTileNear(foe) }
+  if (!me.up) {
+    // The post I set out for, while they are still in reach of it; else the
+    // wall tile between us now.
+    post = memory.post
+    if (post == null || apart(post, foe) > me.reach) {
+      post = wallTileNear(foe)
+      memory.post = null
+      if (post != null) { memory.post = {x: post.x, y: post.y} }
+    }
+  }
   if (post == null) {
     if (apart(me, foe) <= me.reach) {
       if (o != null && o.kind == "attack" && o.targetId == foe.id) { return true } // at it
