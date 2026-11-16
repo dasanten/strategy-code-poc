@@ -28,6 +28,8 @@ pub enum Condition {
     Good,
     Worn,
     NearlyRuin,
+    /// Nothing left: a ruin (`CONTEXT.md`: Ruin), rebuilt with the repair order.
+    Ruin,
 }
 
 impl Condition {
@@ -37,6 +39,7 @@ impl Condition {
             Condition::Good => "good",
             Condition::Worn => "worn",
             Condition::NearlyRuin => "nearlyRuin",
+            Condition::Ruin => "ruin",
         }
     }
 }
@@ -57,6 +60,9 @@ pub fn decays(b: &Building) -> bool {
 pub fn condition_of(b: &Building) -> Option<Condition> {
     if !decays(b) {
         return None;
+    }
+    if crate::ruins::is_ruin(b) {
+        return Some(Condition::Ruin);
     }
     let lost = b.decay.unwrap_or(0.0);
     Some(if lost >= DECAY_NEARLY_RUIN {
@@ -102,10 +108,28 @@ pub fn repair_work(kind: BuildingKind) -> f64 {
     build_work_of(kind) * REPAIR_WORK_SHARE
 }
 
+/// The materials a repair of `b` takes in all: rebuilding it if it is a ruin (`CONTEXT.md`: Ruin).
+pub fn repair_materials_of(b: &Building) -> Stock {
+    if crate::ruins::is_ruin(b) {
+        crate::ruins::rebuild_materials(b.kind)
+    } else {
+        repair_materials(b.kind)
+    }
+}
+
+/// The work a repair of `b` takes in all: rebuilding it if it is a ruin.
+pub fn repair_work_of(b: &Building) -> f64 {
+    if crate::ruins::is_ruin(b) {
+        crate::ruins::rebuild_work(b.kind)
+    } else {
+        repair_work(b.kind)
+    }
+}
+
 /// The materials a repair of `b` still lacks: all of them before anyone starts.
 pub fn repair_materials_needed(b: &Building) -> Stock {
     let mut out = Stock::new();
-    for (good, units) in repair_materials(b.kind) {
+    for (good, units) in repair_materials_of(b) {
         let left = units - b.repair.as_ref().map_or(0.0, |r| held(&r.delivered, good));
         if left > 0.0 {
             out.insert(good, left);
@@ -116,7 +140,7 @@ pub fn repair_materials_needed(b: &Building) -> Stock {
 
 /// The work a repair of `b` still needs.
 pub fn repair_work_needed(b: &Building) -> f64 {
-    0f64.max(repair_work(b.kind) - b.repair.as_ref().map_or(0.0, |r| r.work))
+    0f64.max(repair_work_of(b) - b.repair.as_ref().map_or(0.0, |r| r.work))
 }
 
 /// Whether `b` can be repaired: worn or worse, or with a repair under way.
@@ -214,7 +238,7 @@ pub fn resolve_repairing(
             let r = &world.residents[ri];
             let under = terrain.map(|t| terrain_at(t, b.x as i32, b.y as i32));
             let work = site_work_of(build_work(r, tick), b.kind, under);
-            let total = repair_work(b.kind).min(b.repair.as_ref().map_or(0.0, |x| x.work) + work);
+            let total = repair_work_of(b).min(b.repair.as_ref().map_or(0.0, |x| x.work) + work);
             let learned = construction_learned(r, tick);
             let had = skill_of(r, SkillName::Construction);
             if let Some(x) = world.buildings[bi].repair.as_mut() {
@@ -226,6 +250,7 @@ pub fn resolve_repairing(
         if repair_work_needed(b) == 0.0 && repair_materials_needed(b).is_empty() {
             b.decay = None;
             b.repair = None;
+            b.ruined_at = None;
             done.push(b.id.clone());
         }
     }

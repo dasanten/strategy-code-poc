@@ -20,7 +20,7 @@ pub fn carriage_can_go_to(world: &WorldState, map: &TerrainMap, x: i32, y: i32) 
         .iter()
         .find(|b| b.x as i32 == x && b.y as i32 == y && b.kind == BuildingKind::Road);
     let ground = match road {
-        Some(r) if r.site.is_none() => Terrain::Road as u8,
+        Some(r) if crate::ruins::standing(r) => Terrain::Road as u8,
         _ => terrain_at(map, x, y),
     };
     carriage_can_enter(ground)

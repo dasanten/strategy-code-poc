@@ -2180,6 +2180,22 @@ pub const REPAIR_MATERIALS_SHARE: f64 = 0.25;
 /// tearing it down (`TEARDOWN_WORK_SHARE`).
 pub const REPAIR_WORK_SHARE: f64 = 0.25;
 
+/// Game days a ruin stands before it collapses (`CONTEXT.md`: Ruin): "a long while more", about
+/// two game months, time enough to notice it and rebuild it.
+pub const RUIN_COLLAPSE_DAYS: f64 = 60.0;
+
+/// Share of a building's materials rebuilding its ruin takes (`CONTEXT.md`: Ruin), rounded up to
+/// whole units: more than a repair, less than a new one.
+pub const REBUILD_MATERIALS_SHARE: f64 = 0.5;
+
+/// Share of a building's `BUILD_WORK` rebuilding its ruin takes: more than a repair, less than
+/// building it new.
+pub const REBUILD_WORK_SHARE: f64 = 0.5;
+
+/// Share of a building's materials that lies on its tiles once its ruin collapses, rounded down
+/// to whole units, as when it is torn down (`TEARDOWN_MATERIALS_RETURNED`).
+pub const COLLAPSE_MATERIALS_LEFT: f64 = 0.25;
+
 /// How long after a realm says it leaves an alliance, or the alliance leader removes it, it stops
 /// being a member (`CONTEXT.md`: Alliance): one real hour, time enough for the others to react.
 pub const ALLIANCE_LEAVE_DELAY: f64 = 3600.0;
@@ -2967,6 +2983,10 @@ pub fn balance_json() -> Value {
     m.insert("DECAY_NEARLY_RUIN".into(), json!(DECAY_NEARLY_RUIN));
     m.insert("REPAIR_MATERIALS_SHARE".into(), json!(REPAIR_MATERIALS_SHARE));
     m.insert("REPAIR_WORK_SHARE".into(), json!(REPAIR_WORK_SHARE));
+    m.insert("RUIN_COLLAPSE_DAYS".into(), json!(RUIN_COLLAPSE_DAYS));
+    m.insert("REBUILD_MATERIALS_SHARE".into(), json!(REBUILD_MATERIALS_SHARE));
+    m.insert("REBUILD_WORK_SHARE".into(), json!(REBUILD_WORK_SHARE));
+    m.insert("COLLAPSE_MATERIALS_LEFT".into(), json!(COLLAPSE_MATERIALS_LEFT));
     m.insert("ALLIANCE_LEAVE_DELAY".into(), json!(ALLIANCE_LEAVE_DELAY));
     m.insert("ALLIANCE_RECALL_DELAY".into(), json!(ALLIANCE_RECALL_DELAY));
     m.insert("NPC_ALLIANCE_JOIN_STANDING".into(), json!(NPC_ALLIANCE_JOIN_STANDING));

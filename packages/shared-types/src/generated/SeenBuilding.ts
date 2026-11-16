@@ -21,4 +21,10 @@ decay?: number,
  * A repair under way (`CONTEXT.md`: Repairing): the materials brought and the work put in so
  * far. Gone once it is done.
  */
-repair?: ConstructionSite, };
+repair?: ConstructionSite, 
+/**
+ * The tick a building nobody repaired became a ruin (`CONTEXT.md`: Ruin): it stands but does
+ * nothing, and collapses `RUIN_COLLAPSE_DAYS` game days later. Gone once it is rebuilt; left
+ * out of a save while it is none, so a building from before format 135 is no ruin.
+ */
+ruinedAt?: number, };

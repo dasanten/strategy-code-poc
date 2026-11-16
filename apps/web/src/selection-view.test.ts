@@ -19,6 +19,7 @@ import {
   ticksForAge,
   RICHNESS_FACTOR,
 } from '@csp/balance'
+import { rebuildWork } from './shared/decay.js'
 import { FOOTPRINT, footprintTiles } from './shared/footprint.js'
 import { MAX_WORKERS, NODE_GOOD, buildMenu } from './shared/building.js'
 import { TICKS_PER_GAME_HOUR } from './shared/time.js'
@@ -1549,6 +1550,30 @@ describe('horses on the tile card', () => {
     // A worn road under nothing else: the road is repaired.
     const road = { id: 'rd', kind: 'road', cityId: null, x: 5, y: 5, decay: 0.3 } as Building
     expect(tile({ buildings: [road], tick }).repair).toEqual({ buildingId: 'rd', name: 'road' })
+  })
+
+  it('says a ruin does nothing and offers to rebuild it (`CONTEXT.md`: Ruin)', () => {
+    const tick = 100 * TICKS_PER_GAME_YEAR
+    const ruin = (more: Partial<Building>) =>
+      ({ id: 'h1', kind: 'house', cityId: 'c-npc', x: 5, y: 5, decay: 1, ruinedAt: 0, ...more }) as Building
+    const ada = { id: 'r1', name: 'Ada', x: 1, y: 1, bornAt: 0, carried: {} } as unknown as Resident
+    const card = tile({ buildings: [ruin({})], tick })
+    expect(card.lines).toContain('A ruin: it does nothing until it is rebuilt, and collapses if left')
+    expect(card.repair).toEqual({ buildingId: 'h1', name: 'house', rebuild: true })
+    expect(tileActions(card, ada, tick).find((a) => a.id === 'repair')).toEqual({
+      id: 'repair',
+      label: 'Rebuild house',
+      key: ACTION_KEYS.repair,
+    })
+    // A quarter of a house's rebuild work is a quarter done.
+    const work = rebuildWork('house')
+    const rebuilding = tile({
+      buildings: [ruin({ repair: { delivered: {}, work: work / 4 } })],
+      tick,
+    })
+    expect(rebuilding.lines).toContain(
+      'A ruin: it does nothing until it is rebuilt, and collapses if left · being rebuilt, 25% of the work done',
+    )
   })
 
   it('offers the resident picked last to Feed a horse that isn’t full (`CONTEXT.md`: Feeding a horse)', () => {

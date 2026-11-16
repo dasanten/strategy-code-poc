@@ -1036,7 +1036,7 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
             ScriptField {
                 name: "condition",
                 r#type: ScriptType::String,
-                description: "How it has decayed: \"good\", \"worn\" or \"nearlyRuin\"; a worn one, or worse, can be repaired (`repair`).",
+                description: "How it has decayed: \"good\", \"worn\", \"nearlyRuin\" or \"ruin\"; a worn one, or worse, can be repaired (`repair`), and repairing a ruin rebuilds it.",
                 null_when: Some("for a construction site and a building that never decays"),
             },
         ],

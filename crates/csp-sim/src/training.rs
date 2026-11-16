@@ -89,7 +89,7 @@ pub fn step_training(world: &mut WorldState, size: i32) {
         let count = trainees.get(&building_id).copied().unwrap_or(0.0);
         let ground = world.buildings.iter().find(|b| b.id == building_id).filter(|g| {
             g.kind == BuildingKind::TrainingGround
-                && g.site.is_none()
+                && crate::ruins::standing(g)
                 && is_at((r.x as i32, r.y as i32), placed(g), size)
                 && count < TRAINING_GROUND_MAX_TRAINEES
         });

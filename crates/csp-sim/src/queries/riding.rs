@@ -120,7 +120,7 @@ pub fn rider_spare_food(carried: &Stock) -> f64 {
 /// of `size` tiles.
 pub fn stable_index_at(world: &WorldState, x: i32, y: i32, size: i32) -> Option<usize> {
     world.buildings.iter().position(|b| {
-        b.kind == BuildingKind::Stable && b.site.is_none() && covers(placed(b), x, y, size)
+        b.kind == BuildingKind::Stable && crate::ruins::standing(b) && covers(placed(b), x, y, size)
     })
 }
 
