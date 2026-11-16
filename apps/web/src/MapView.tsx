@@ -24,6 +24,7 @@ import {
 import { ChunkStore, chunkByChunk, exploredChunkBatches, type ChunkSource } from './map/chunks.js'
 import { cachedSource, countsAt, openTerrainCache } from './map/terrain-cache.js'
 import { selectedWay, wayInView, wayLine } from './map/way.js'
+import { shots, type Shot } from './map/shots.js'
 import { TerrainLayer } from './map/terrain-layer.js'
 import { CoarseLayer, type LevelChunk } from './map/coarse-layer.js'
 import {
@@ -982,6 +983,8 @@ export function MapView({
         rings = true
       }
       if (rings) g.stroke({ width: 2.5, color: LEADER_COLOR })
+      // Archers shooting, a thin line to whom they shoot at (`CONTEXT.md`: Ranged combat).
+      drawShots(g, shots(world.residents, mapSize), spots)
       // What their params and orders point at (`CONTEXT.md`: Places of the picked).
       drawPlaces(g, cam, view, mapSize, pickedPlaces(world, ids), spots)
       for (const id of ids) {
@@ -1564,6 +1567,29 @@ function drawPath(
       .fill(LEADER_COLOR)
       .stroke({ width: 1.5, color: 0xffffff })
   else g.circle(...end, 5).fill(LEADER_COLOR)
+}
+
+/** The colour of a shot's line: pale, as an arrow in flight. */
+const SHOT_COLOR = 0xf2e6c9
+
+/**
+ * Each shot as a thin line from the archer to whom they shoot at, both where they stand on screen
+ * (`spots`); a shot with either out of view is skipped.
+ */
+function drawShots(
+  g: Graphics,
+  list: readonly Shot[],
+  spots: ReadonlyMap<string, { x: number; y: number }>,
+) {
+  let any = false
+  for (const s of list) {
+    const from = spots.get(s.from)
+    const to = spots.get(s.to)
+    if (!from || !to) continue
+    g.moveTo(from.x, from.y).lineTo(to.x, to.y)
+    any = true
+  }
+  if (any) g.stroke({ width: 1.5, color: SHOT_COLOR, alpha: 0.8, cap: 'round' })
 }
 
 /** The end of a way far out: a dot in the way's colour with a white ring, in screen pixels. */
