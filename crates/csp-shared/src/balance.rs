@@ -1164,6 +1164,9 @@ pub const WAREHOUSE_FLOOR: Table<f64> = Table(&[
     ("steelSword", 1.0),
     ("steelShield", 1.0),
     ("steelArmour", 1.0),
+    ("bow", 1.0),
+    ("crossbow", 1.0),
+    ("arrows", 40.0),
 ]);
 
 /// How many times a trading post's floor (`WAREHOUSE_FLOOR`) the Trade Org HQ's warehouses keep.
@@ -1196,6 +1199,9 @@ pub const WAREHOUSE_BASE_PRICE: Table<f64> = Table(&[
     ("steelSword", 50.0),
     ("steelShield", 30.0),
     ("steelArmour", 160.0),
+    ("bow", 12.0),
+    ("crossbow", 30.0),
+    ("arrows", 1.0),
 ]);
 
 /// Stock, in floors, at which a warehouse sells at its base price; less stock costs more.
@@ -1338,12 +1344,18 @@ pub const GOOD_WEIGHT: Table<f64> = Table(&[
     ("steelSword", 3.0),
     ("steelShield", 4.0),
     ("steelArmour", 8.0),
+    ("bow", 2.0),
+    ("crossbow", 4.0),
+    ("arrows", 0.1),
 ]);
 
 /// Attack each weapon adds to a resident's blow (`CONTEXT.md`: Weapons and armour, Combat). A
 /// sword hits harder than a spear, a steel sword half again as hard as an iron one (`CONTEXT.md`:
-/// Coal); combat (T10.2) adds it to Strength and Combat skill.
-pub const WEAPON_ATTACK: Table<f64> = Table(&[("spear", 4.0), ("sword", 6.0), ("steelSword", 9.0)]);
+/// Coal); combat (T10.2) adds it to Strength and Combat skill. A Bow or Crossbow adds nothing to
+/// a blow: it is a weapon for shooting (`CONTEXT.md`: Ranged combat), and in a blow its archer
+/// fights with their fists.
+pub const WEAPON_ATTACK: Table<f64> =
+    Table(&[("spear", 4.0), ("sword", 6.0), ("steelSword", 9.0), ("bow", 0.0), ("crossbow", 0.0)]);
 
 /// Damage each piece of protection takes off a blow (`CONTEXT.md`: Weapons and armour, Combat).
 /// Armour takes off more than a shield but weighs twice as much; steel takes off more than iron
@@ -2040,7 +2052,9 @@ pub struct Recipe {
 /// of armour, each from Iron and Wood weighing what the good weighs (`GOOD_WEIGHT`): a spear is
 /// mostly wood, a sword mostly iron, a shield wood bound with iron, armour nearly all iron. The
 /// steel Sword, Shield and Armour (`CONTEXT.md`: Coal) take Steel where the iron ones take Iron,
-/// and the same Wood; the Spear is iron only.
+/// and the same Wood; the Spear is iron only. A Bow is all wood, a Crossbow wood with an iron
+/// bow and trigger, and a batch of 40 Arrows mostly wood with a little iron for the heads
+/// (`CONTEXT.md`: Smithy).
 pub const RECIPES: Table<&[Recipe]> = Table(&[
     (
         "smelter",
@@ -2083,6 +2097,15 @@ pub const RECIPES: Table<&[Recipe]> = Table(&[
             Recipe {
                 input: Table(&[("steel", 7.0), ("wood", 1.0)]),
                 output: Table(&[("steelArmour", 1.0)]),
+            },
+            Recipe { input: Table(&[("wood", 2.0)]), output: Table(&[("bow", 1.0)]) },
+            Recipe {
+                input: Table(&[("iron", 1.0), ("wood", 3.0)]),
+                output: Table(&[("crossbow", 1.0)]),
+            },
+            Recipe {
+                input: Table(&[("iron", 1.0), ("wood", 3.0)]),
+                output: Table(&[("arrows", 40.0)]),
             },
         ],
     ),

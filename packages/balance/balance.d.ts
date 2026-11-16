@@ -412,6 +412,9 @@ export interface Balance {
     steelSword: number
     steelShield: number
     steelArmour: number
+    bow: number
+    crossbow: number
+    arrows: number
     [key: string]: number
   }
   readonly HQ_FLOOR_FACTOR: number
@@ -432,6 +435,9 @@ export interface Balance {
     steelSword: number
     steelShield: number
     steelArmour: number
+    bow: number
+    crossbow: number
+    arrows: number
     [key: string]: number
   }
   readonly PRICE_REFERENCE_FLOORS: number
@@ -480,12 +486,17 @@ export interface Balance {
     steelSword: number
     steelShield: number
     steelArmour: number
+    bow: number
+    crossbow: number
+    arrows: number
     [key: string]: number
   }
   readonly WEAPON_ATTACK: {
     spear: number
     sword: number
     steelSword: number
+    bow: number
+    crossbow: number
     [key: string]: number
   }
   readonly PROTECTION_DEFENCE: {
@@ -979,6 +990,58 @@ export interface Balance {
         steelArmour: number
         [key: string]: number
       }
+    } | {
+      input: {
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        bow: number
+        [key: string]: number
+      }
+      [key: string]: {
+        wood: number
+        [key: string]: number
+      } | {
+        bow: number
+        [key: string]: number
+      }
+    } | {
+      input: {
+        iron: number
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        crossbow: number
+        [key: string]: number
+      }
+      [key: string]: {
+        iron: number
+        wood: number
+        [key: string]: number
+      } | {
+        crossbow: number
+        [key: string]: number
+      }
+    } | {
+      input: {
+        iron: number
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        arrows: number
+        [key: string]: number
+      }
+      [key: string]: {
+        iron: number
+        wood: number
+        [key: string]: number
+      } | {
+        arrows: number
+        [key: string]: number
+      }
     })[]
     [key: string]: ({
       input: {
@@ -1154,6 +1217,58 @@ export interface Balance {
         [key: string]: number
       } | {
         steelArmour: number
+        [key: string]: number
+      }
+    } | {
+      input: {
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        bow: number
+        [key: string]: number
+      }
+      [key: string]: {
+        wood: number
+        [key: string]: number
+      } | {
+        bow: number
+        [key: string]: number
+      }
+    } | {
+      input: {
+        iron: number
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        crossbow: number
+        [key: string]: number
+      }
+      [key: string]: {
+        iron: number
+        wood: number
+        [key: string]: number
+      } | {
+        crossbow: number
+        [key: string]: number
+      }
+    } | {
+      input: {
+        iron: number
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        arrows: number
+        [key: string]: number
+      }
+      [key: string]: {
+        iron: number
+        wood: number
+        [key: string]: number
+      } | {
+        arrows: number
         [key: string]: number
       }
     })[]

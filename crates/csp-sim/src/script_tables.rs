@@ -316,7 +316,7 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
             ScriptField {
                 name: "weapon",
                 r#type: ScriptType::String,
-                description: "The weapon equipped: \"spear\", \"sword\" or \"steelSword\".",
+                description: "The weapon equipped: \"spear\", \"sword\", \"steelSword\", \"bow\" or \"crossbow\". A bow or crossbow takes both hands, so the shield slot stays empty.",
                 null_when: Some("when unarmed"),
             },
             ScriptField {
@@ -491,6 +491,24 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 name: "steelArmour",
                 r#type: ScriptType::Number,
                 description: "Units of steel armour.",
+                null_when: Some("when there are none"),
+            },
+            ScriptField {
+                name: "bow",
+                r#type: ScriptType::Number,
+                description: "Units of bow.",
+                null_when: Some("when there are none"),
+            },
+            ScriptField {
+                name: "crossbow",
+                r#type: ScriptType::Number,
+                description: "Units of crossbow.",
+                null_when: Some("when there are none"),
+            },
+            ScriptField {
+                name: "arrows",
+                r#type: ScriptType::Number,
+                description: "Units of arrows.",
                 null_when: Some("when there are none"),
             },
         ],

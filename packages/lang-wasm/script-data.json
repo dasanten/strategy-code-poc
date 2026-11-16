@@ -340,7 +340,7 @@
         {
           "name": "weapon",
           "type": "string",
-          "description": "The weapon equipped: \"spear\", \"sword\" or \"steelSword\".",
+          "description": "The weapon equipped: \"spear\", \"sword\", \"steelSword\", \"bow\" or \"crossbow\". A bow or crossbow takes both hands, so the shield slot stays empty.",
           "nullWhen": "when unarmed"
         },
         {
@@ -513,6 +513,24 @@
           "name": "steelArmour",
           "type": "number",
           "description": "Units of steel armour.",
+          "nullWhen": "when there are none"
+        },
+        {
+          "name": "bow",
+          "type": "number",
+          "description": "Units of bow.",
+          "nullWhen": "when there are none"
+        },
+        {
+          "name": "crossbow",
+          "type": "number",
+          "description": "Units of crossbow.",
+          "nullWhen": "when there are none"
+        },
+        {
+          "name": "arrows",
+          "type": "number",
+          "description": "Units of arrows.",
           "nullWhen": "when there are none"
         }
       ]

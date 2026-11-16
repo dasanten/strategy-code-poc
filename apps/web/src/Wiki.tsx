@@ -3394,6 +3394,39 @@ export function Wiki() {
           part of what they carry. A resident's card shows their three slots.
         </p>
         <p>
+          A <strong>Bow</strong> and a <strong>Crossbow</strong> are weapons for shooting, and each
+          takes both hands: with one equipped the shield slot stays empty (the shield stays carried
+          and goes back on when they put a one-handed weapon in its place), and a shield can't be
+          put on beside one. In a blow they add nothing, so an archer in a brawl fights with their
+          fists. They shoot <strong>Arrows</strong>, a plain good that is carried, stored and traded
+          like any other and goes in no slot. A smithy makes each, the smith saying which as for
+          the other gear:
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Good</th>
+              <th>Made from</th>
+              <th>A batch makes</th>
+              <th>Weight</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(['bow', 'crossbow', 'arrows'] as const).map((g) => (
+              <tr key={g}>
+                <td>{goodName(g)}</td>
+                <td>
+                  {(Object.entries(forged(g).input) as [Good, number][])
+                    .map(([input, n]) => `${num(n)} ${goodName(input)}`)
+                    .join(', ')}
+                </td>
+                <td>{num(forged(g).output[g] ?? 0)}</td>
+                <td>{num(GOOD_WEIGHT[g])} kg each</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p>
           To <strong>swap</strong> gear, pick another item they carry for a slot on their card (or
           the group card's Equip…, for each of them who carries it), or take a slot's item off;
           scripts do the same with <code>equip(good)</code> and <code>takeOff(slot)</code>, and a

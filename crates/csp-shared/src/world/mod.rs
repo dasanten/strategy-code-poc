@@ -82,6 +82,9 @@ pub enum Good {
     SteelSword,
     SteelShield,
     SteelArmour,
+    Bow,
+    Crossbow,
+    Arrows,
 }
 
 /// `PricedGood`: every good but Coins (`Exclude<Good, 'coins'>`), the goods with a price.
@@ -103,6 +106,9 @@ pub enum PricedGood {
     SteelSword,
     SteelShield,
     SteelArmour,
+    Bow,
+    Crossbow,
+    Arrows,
 }
 
 /// A resident's stats (`STAT_NAMES`).
