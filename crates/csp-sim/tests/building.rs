@@ -318,6 +318,11 @@ fn building_part_names_what_a_line_order_builds_on_its_next_tile() {
     .unwrap();
     assert_eq!(
         csp_sim::building::building_part(Some(&line)),
-        Some(BuildingPart { building: BuildingKind::Wall, at: (4, 5), site_id: Some("b3".into()) })
+        Some(BuildingPart {
+            building: BuildingKind::Wall,
+            at: (4, 5),
+            site_id: Some("b3".into()),
+            material: None
+        })
     );
 }

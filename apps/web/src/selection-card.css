@@ -27,6 +27,11 @@
 .pick-banner-text .small {
   color: var(--ui-muted);
 }
+/* A wall line's Wood or Stone (`CONTEXT.md`: Wood or stone), beside Cancel. */
+.material-pick {
+  display: flex;
+  gap: 4px;
+}
 /* One line on a phone: what to pick, then the hint after it. */
 .game.phone .pick-banner-text {
   display: block;

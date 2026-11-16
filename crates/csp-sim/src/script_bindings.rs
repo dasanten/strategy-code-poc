@@ -1661,7 +1661,13 @@ impl<'a> ScriptBindings<'a> {
                 }
                 self.request("fetch", input)
             }
-            "build" => self.request("build", vec![("building", p(0)?)]),
+            "build" => {
+                let mut input = vec![("building", p(0)?)];
+                if a(1).is_some_and(|v| !v.is_null()) {
+                    input.push(("material", p(1)?));
+                }
+                self.request("build", input)
+            }
             "tearDown" => self.request("tearDown", vec![("buildingId", p(0)?)]),
             "workAt" => {
                 let input = if a(0).is_some_and(|v| !v.is_null()) {
@@ -1790,7 +1796,11 @@ impl<'a> ScriptBindings<'a> {
                 if let Some(y) = p(1)? {
                     to.insert("y".into(), y);
                 }
-                self.request(name, vec![("from", Some(from)), ("to", Some(Json::Object(to)))])
+                let mut input = vec![("from", Some(from)), ("to", Some(Json::Object(to)))];
+                if name == "wallLine" && a(2).is_some_and(|v| !v.is_null()) {
+                    input.push(("material", p(2)?));
+                }
+                self.request(name, input)
             }
             "doing" => {
                 let doing = doing_text(a(0))?;

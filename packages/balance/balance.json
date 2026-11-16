@@ -642,6 +642,18 @@
     "boat": 1440.0,
     "ship": 14400.0
   },
+  "STONE_BUILD_MATERIALS": {
+    "wall": {
+      "stone": 4.0
+    },
+    "gate": {
+      "stone": 6.0
+    }
+  },
+  "STONE_BUILD_WORK": {
+    "wall": 270.0,
+    "gate": 540.0
+  },
   "MOUNTAIN_ROAD_WORK_FACTOR": 4.0,
   "ROAD_LINE_MAX_TILES": 128.0,
   "BUILD_STRENGTH_AVERAGE": 10.0,
@@ -813,6 +825,10 @@
   "WALL_STRENGTH": {
     "wall": 3000.0,
     "gate": 4500.0
+  },
+  "STONE_WALL_STRENGTH": {
+    "wall": 12000.0,
+    "gate": 18000.0
   },
   "BROKEN_MATERIALS_RETURNED": 0.34,
   "CLIMB_TICKS": 360.0,

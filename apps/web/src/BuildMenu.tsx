@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { BUILD_MATERIALS } from './shared/narrowed.js'
 import { BUILDING_PURPOSE } from './shared/building-info.js'
-import { buildingWork, workFactor } from './shared/building.js'
-import type { BuildingKind, ResourceNode } from '@csp/shared-types'
+import { buildingWork, materialsOfKind, workFactor } from './shared/building.js'
+import type { BuildingKind, ResourceNode, WallMaterial } from '@csp/shared-types'
 import { buildMenuGroups, canChooseKind, workSpan, type BuildMenuKind } from './build-menu-view.js'
 import { CustomiseButton, taskStart } from './Customise.js'
 import { goodsItems } from './goods-grid.js'
@@ -34,10 +33,16 @@ export function KindDetail({
   terrain?: number
   blocked: boolean
   planning: boolean
-  onBuild: (kind: BuildingKind) => void
+  onBuild: (kind: BuildingKind, material?: WallMaterial) => void
 }) {
   const { kind, name, problem } = item
   const ref = useRef<HTMLDivElement>(null)
+  // A wall or gate is of wood or stone (`CONTEXT.md`: Wood or stone): wood unless picked.
+  const [material, setMaterial] = useState<WallMaterial>('wood')
+  const ofMaterial = kind === 'wall' || kind === 'gate'
+  const picked = ofMaterial ? material : undefined
+  const label = picked === 'stone' ? `stone ${name.toLowerCase()}` : name.toLowerCase()
+  const build = () => onBuild(kind, picked === 'stone' ? 'stone' : undefined)
   // On a phone the grid can fill the sheet, so the detail under it might open out of sight.
   useEffect(() => {
     ref.current?.scrollIntoView({ block: 'nearest' })
@@ -52,32 +57,41 @@ export function KindDetail({
         </p>
       )}
       <p className="muted small">{BUILDING_PURPOSE[kind]}</p>
+      {ofMaterial && (
+        <div className="material-pick" role="group" aria-label="Built of">
+          {(['wood', 'stone'] as const).map((m) => (
+            <button
+              type="button"
+              key={m}
+              aria-pressed={material === m}
+              onClick={() => setMaterial(m)}
+            >
+              {m === 'wood' ? 'Wood' : 'Stone'}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="build-cost">
         <GoodsGrid
           label="Materials"
-          items={goodsItems(BUILD_MATERIALS[kind])}
+          items={goodsItems(materialsOfKind(kind, picked))}
           empty="No materials"
         />
         <span className="small muted">
-          about {workSpan(buildingWork(kind, terrain))} of work
+          about {workSpan(buildingWork(kind, terrain, picked))} of work
           {workFactor(kind, terrain) > 1 && ' here on Mountain'}
         </span>
       </div>
       {canChooseKind(item, planning) && (
         <div className="order-buttons">
-          <button
-            type="button"
-            className="primary"
-            disabled={blocked}
-            onClick={() => onBuild(kind)}
-          >
-            {planning ? 'Add: build' : 'Build'} {name.toLowerCase()}
+          <button type="button" className="primary" disabled={blocked} onClick={build}>
+            {planning ? 'Add: build' : 'Build'} {label}
           </button>
           <CustomiseButton
             order={taskStart('build')}
-            of={`Build ${name.toLowerCase()}`}
+            of={`Build ${label}`}
             disabled={blocked}
-            give={() => onBuild(kind)}
+            give={build}
           />
         </div>
       )}
@@ -110,7 +124,7 @@ export function BuildMenu({
   blocked?: boolean
   /** For the planner: the kind is added as a step, whose turn checks it (`canChooseKind`). */
   planning?: boolean
-  onBuild: (kind: BuildingKind) => void
+  onBuild: (kind: BuildingKind, material?: WallMaterial) => void
 }) {
   const [open, setOpen] = useState<BuildingKind | undefined>()
   const groups = buildMenuGroups(node, buildProblem)

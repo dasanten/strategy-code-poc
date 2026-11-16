@@ -762,6 +762,25 @@ export interface Balance {
     ship: number
     [key: string]: number
   }
+  readonly STONE_BUILD_MATERIALS: {
+    wall: {
+      stone: number
+      [key: string]: number
+    }
+    gate: {
+      stone: number
+      [key: string]: number
+    }
+    [key: string]: {
+      stone: number
+      [key: string]: number
+    }
+  }
+  readonly STONE_BUILD_WORK: {
+    wall: number
+    gate: number
+    [key: string]: number
+  }
   readonly MOUNTAIN_ROAD_WORK_FACTOR: number
   readonly ROAD_LINE_MAX_TILES: number
   readonly BUILD_STRENGTH_AVERAGE: number
@@ -1198,6 +1217,11 @@ export interface Balance {
   readonly MIN_BLOW_DAMAGE: number
   readonly WALL_DEFENCE: number
   readonly WALL_STRENGTH: {
+    wall: number
+    gate: number
+    [key: string]: number
+  }
+  readonly STONE_WALL_STRENGTH: {
     wall: number
     gate: number
     [key: string]: number

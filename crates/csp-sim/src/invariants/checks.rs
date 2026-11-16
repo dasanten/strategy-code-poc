@@ -24,7 +24,7 @@ use csp_shared::terrain::{
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
     BuildingKind, Good, HaulPhase, HaulStop, LinePhase, ResidentOrder, ResourceKind, SkillName,
-    Stock, VesselKind, WorldState,
+    Stock, VesselKind, WallMaterial, WorldState,
 };
 
 use super::{js_json, js_number, violation, InvariantViolation};
@@ -34,10 +34,10 @@ use crate::pairing::carrying_blocks;
 use crate::queries::alliance::{allied_realms, carriage_commander_of, commander_of};
 use crate::queries::balance::carry_capacity;
 use crate::queries::building::{
-    build_materials, build_work_of, building_at, carriage_can_go_to, has_choice, line_building,
-    line_order, materials_needed, max_workers, node_workplace, recipe_for, teardown_work,
-    work_needed, workplace_good, BUILDABLE, KEEPS_GOODS, OFF_NODES, ON_PLAINS, ON_SHORE,
-    PROCESSING, SHARES_A_TILE,
+    building_at, carriage_can_go_to, has_choice, line_building, line_order, materials_needed,
+    materials_of, max_workers, node_workplace, recipe_for, teardown_work, work_needed, work_of,
+    workplace_good, BUILDABLE, KEEPS_GOODS, OFF_NODES, ON_PLAINS, ON_SHORE, PROCESSING,
+    SHARES_A_TILE,
 };
 use crate::queries::city_area::{city_membership, is_city_building};
 use crate::queries::command::commander_of_resident;
@@ -881,7 +881,7 @@ pub fn sites_within_needs(world: &WorldState, _: &TerrainMap) -> Out {
     let mut fail = |id: &str, m: String| out.push(violation(name, format!("{id} {m}"), &[id]));
     for b in &world.buildings {
         let Some(site) = &b.site else { continue };
-        let needs = build_materials(b.kind);
+        let needs = materials_of(b);
         for (good, units) in &site.delivered {
             let need = needs.get(good).copied().unwrap_or(0.0);
             if *units > need {
@@ -896,7 +896,7 @@ pub fn sites_within_needs(world: &WorldState, _: &TerrainMap) -> Out {
                 );
             }
         }
-        let work = build_work_of(b.kind);
+        let work = work_of(b);
         if !(site.work >= 0.0 && site.work <= work) {
             fail(&b.id, format!("has work {} of {}", js_number(site.work), js_number(work)));
         }
@@ -2667,4 +2667,24 @@ pub fn outsiders_sound(world: &WorldState, terrain: &TerrainMap) -> Out {
         }
     }
     out
+}
+
+/// Only a wall or gate, or its site, is of stone, and only stone is written down: none is wood
+/// (`CONTEXT.md`: Wall / Gate, Wood or stone).
+pub fn wall_materials_sound(world: &WorldState, _: &TerrainMap) -> Out {
+    let name = "wall-materials-sound";
+    world
+        .buildings
+        .iter()
+        .filter(|b| {
+            b.material.is_some_and(|m| {
+                m != WallMaterial::Stone
+                    || !matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate)
+            })
+        })
+        .map(|b| {
+            let msg = format!("{} {} is of {:?}", kind_name(b.kind), b.id, b.material);
+            violation(name, msg, &[&b.id])
+        })
+        .collect()
 }

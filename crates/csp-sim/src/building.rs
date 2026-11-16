@@ -6,7 +6,7 @@ use csp_shared::balance::MAP_SIZE;
 use csp_shared::terrain::{terrain_at, TerrainMap};
 use csp_shared::world::{
     BuildOrder, Building, BuildingKind, Carriage, ConstructionSite, LinePhase, OrderRequest,
-    Resident, ResidentOrder, SkillName, Stock, Tile, Vessel, VesselKind, WorldState,
+    Resident, ResidentOrder, SkillName, Stock, Tile, Vessel, VesselKind, WallMaterial, WorldState,
 };
 
 use crate::cities::update_city_membership;
@@ -14,8 +14,8 @@ use crate::order_sender::{ordered_resident, OrderSender};
 use crate::queries::balance::{build_work, construction_learned, skill_of};
 use crate::queries::building::build_at_problem;
 use crate::queries::building::{
-    build_problem, build_work_of, construction_index_at, line_building, line_order_mut,
-    materials_needed, max_workers, site_work_of, work_needed, TerrainLookup, ON_PLAINS,
+    build_problem, construction_index_at, is_stone, line_building, line_order_mut,
+    materials_needed, max_workers, site_work_of, work_needed, work_of, TerrainLookup, ON_PLAINS,
 };
 use crate::queries::names::{kind_of, placed};
 use crate::queries::vessels::launch_tile;
@@ -54,6 +54,8 @@ pub struct BuildingPart {
     pub building: BuildingKind,
     pub at: (i32, i32),
     pub site_id: Option<String>,
+    /// What a wall or gate is built of; none is wood.
+    pub material: Option<WallMaterial>,
 }
 
 /// What a resident is building, and where (`buildingPart`). Nothing otherwise.
@@ -63,6 +65,7 @@ pub fn building_part(o: Option<&ResidentOrder>) -> Option<BuildingPart> {
             building: b.building,
             at: (b.at.x as i32, b.at.y as i32),
             site_id: b.site_id.clone(),
+            material: b.material,
         }),
         line @ (ResidentOrder::RoadLine(l) | ResidentOrder::WallLine(l))
             if l.phase == LinePhase::Building =>
@@ -71,6 +74,7 @@ pub fn building_part(o: Option<&ResidentOrder>) -> Option<BuildingPart> {
                 building: line_building(line)?,
                 at: (l.tiles[0].0 as i32, l.tiles[0].1 as i32),
                 site_id: l.site_id.clone(),
+                material: l.material,
             })
         }
         _ => None,
@@ -249,7 +253,9 @@ pub fn resolve_building(
             let here = construction_index_at(world, rx, ry, part.building);
             let joins = here.filter(|&i| {
                 let h = &world.buildings[i];
-                h.site.is_some() && h.kind == part.building
+                h.site.is_some()
+                    && h.kind == part.building
+                    && is_stone(h.kind, h.material) == is_stone(part.building, part.material)
             });
             if let Some(i) = joins {
                 let id = world.buildings[i].id.clone();
@@ -273,6 +279,8 @@ pub fn resolve_building(
                     closed: None,
                     damage: None,
                     breedings: None,
+                    // Only stone is written down: none is wood.
+                    material: is_stone(part.building, part.material).then_some(WallMaterial::Stone),
                 };
                 world.buildings.push(site.clone());
                 gather_pile(world, &site, size);
@@ -296,12 +304,13 @@ pub fn resolve_building(
             let (kind, bx, by) =
                 (world.buildings[si].kind, world.buildings[si].x, world.buildings[si].y);
             let under = terrain.map(|t| terrain_at(t, bx as i32, by as i32));
+            let total = work_of(&world.buildings[si]);
             let r = &world.residents[ri];
             let work = site_work_of(build_work(r, tick), kind, under);
             let learned = construction_learned(r, tick);
             let had = skill_of(r, SkillName::Construction);
             if let Some(s) = world.buildings[si].site.as_mut() {
-                s.work = build_work_of(kind).min(s.work + work);
+                s.work = total.min(s.work + work);
             }
             world.residents[ri].skills.insert(SkillName::Construction, had + learned);
         }
@@ -346,7 +355,33 @@ pub fn validate_build(
     };
     let r = &world.residents[ri];
     let building = str_field(order, "building").and_then(kind_of);
+    if let Some(problem) = material_problem(order, building) {
+        return Some(problem);
+    }
     build_at_problem(world, r, building, (r.x as i32, r.y as i32), terrain)
+}
+
+/// What a build or wall line order asks its wall or gate to be built of (`material`: "wood" or
+/// "stone", `CONTEXT.md`: Wall / Gate, Wood or stone); none is wood.
+pub fn material_field(order: &OrderRequest) -> Option<WallMaterial> {
+    match str_field(order, "material") {
+        Some("stone") => Some(WallMaterial::Stone),
+        Some("wood") => Some(WallMaterial::Wood),
+        _ => None,
+    }
+}
+
+/// Why an order's `material` won't do: one that is neither wood nor stone, or one for anything but
+/// a wall or gate.
+pub fn material_problem(order: &OrderRequest, building: Option<BuildingKind>) -> Option<String> {
+    let given = order.fields.get("material").filter(|v| !v.is_null())?;
+    if material_field(order).is_none() {
+        return Some(format!("a wall is of \"wood\" or \"stone\", not {given}"));
+    }
+    if !matches!(building, Some(BuildingKind::Wall | BuildingKind::Gate)) {
+        return Some("only a wall or gate is of wood or stone".into());
+    }
+    None
 }
 
 /// Gives the resident the build order (`build.apply`); laying out and working happen in later
@@ -359,6 +394,7 @@ pub fn apply_build(world: &mut WorldState, order: &OrderRequest) {
             building,
             at: Tile { x: r.x, y: r.y },
             site_id: None,
+            material: material_field(order).filter(|m| *m == WallMaterial::Stone),
         }));
     }
 }

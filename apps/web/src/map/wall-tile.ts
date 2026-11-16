@@ -67,3 +67,27 @@ export function wallSides(
     down: isWall(x, y + 1),
   }
 }
+
+/** The stone of a stone wall or gate tile (`CONTEXT.md`: Wood or stone), a placeholder look. */
+export const STONE_WALL_COLOR = 0xc9c4ba
+
+/**
+ * Marks stone wall or gate tiles apart from wooden ones (`CONTEXT.md`: Wood or stone): a block of
+ * grey stone inside the owner's colour, split by a mortar line. A placeholder until the texture.
+ */
+export function drawStoneMarks(
+  g: Graphics,
+  tiles: readonly WallTile[],
+  tile: number,
+  alpha: number,
+) {
+  if (tiles.length === 0) return
+  const inset = Math.max(1, tile * 0.22)
+  const side = tile - 2 * inset
+  if (side <= 0) return
+  for (const t of tiles) g.rect(t.sx + inset, t.sy + inset, side, side)
+  g.fill({ color: STONE_WALL_COLOR, alpha })
+  const mortar = Math.max(1, tile * 0.05)
+  for (const t of tiles) g.rect(t.sx + inset, t.sy + tile / 2 - mortar / 2, side, mortar)
+  g.fill({ color: WALL_EDGE_COLOR, alpha: alpha * 0.6 })
+}

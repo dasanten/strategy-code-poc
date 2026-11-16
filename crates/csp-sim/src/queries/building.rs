@@ -5,8 +5,9 @@ use std::collections::HashSet;
 
 use csp_shared::balance::{
     carriage_can_enter, Recipe, BUILD_MATERIALS, BUILD_WORK, MAP_SIZE, MOUNTAIN_ROAD_WORK_FACTOR,
-    RECIPES, RICHER_NODE_REACH, TEARDOWN_MATERIALS_RETURNED, TEARDOWN_WORK_SHARE,
-    TRAINING_GROUND_MAX_TRAINEES, WORKPLACE_MAX_WORKERS,
+    RECIPES, RICHER_NODE_REACH, STONE_BUILD_MATERIALS, STONE_BUILD_WORK,
+    TEARDOWN_MATERIALS_RETURNED, TEARDOWN_WORK_SHARE, TRAINING_GROUND_MAX_TRAINEES,
+    WORKPLACE_MAX_WORKERS,
 };
 use csp_shared::footprint::{covers, footprint_tiles, is_at, may_cover, Placed, FOOTPRINT};
 use csp_shared::terrain::{
@@ -15,7 +16,7 @@ use csp_shared::terrain::{
 };
 use csp_shared::world::{
     Building, BuildingKind, Good, LineOrder, LinePhase, Pile, Resident, ResidentOrder,
-    ResourceKind, ResourceNode, Stock, TrainingSubject, WorldState,
+    ResourceKind, ResourceNode, Stock, TrainingSubject, WallMaterial, WorldState,
 };
 
 use super::balance::{build_work, carry_capacity};
@@ -311,10 +312,48 @@ pub fn build_work_of(kind: BuildingKind) -> f64 {
     BUILD_WORK.get(kind_name(kind)).unwrap_or(0.0)
 }
 
+/// Whether a building of `kind` of `material` is of stone (`CONTEXT.md`: Wall / Gate, Wood or
+/// stone): only a wall or gate can be.
+pub fn is_stone(kind: BuildingKind, material: Option<WallMaterial>) -> bool {
+    material == Some(WallMaterial::Stone) && matches!(kind, BuildingKind::Wall | BuildingKind::Gate)
+}
+
+/// The materials a building of `kind` of `material` takes: a stone wall's or gate's from
+/// `STONE_BUILD_MATERIALS`, any other's from `BUILD_MATERIALS`.
+pub fn build_materials_of(kind: BuildingKind, material: Option<WallMaterial>) -> Stock {
+    if !is_stone(kind, material) {
+        return build_materials(kind);
+    }
+    STONE_BUILD_MATERIALS
+        .get(kind_name(kind))
+        .map(|t| t.0.iter().filter_map(|(g, n)| good_of(g).map(|g| (g, *n))).collect())
+        .unwrap_or_default()
+}
+
+/// Work a building of `kind` of `material` takes: a stone wall's or gate's from
+/// `STONE_BUILD_WORK`, any other's from `BUILD_WORK`.
+pub fn build_work_for(kind: BuildingKind, material: Option<WallMaterial>) -> f64 {
+    if is_stone(kind, material) {
+        STONE_BUILD_WORK.get(kind_name(kind)).unwrap_or(0.0)
+    } else {
+        build_work_of(kind)
+    }
+}
+
+/// The materials this building or site takes, by its kind and material.
+pub fn materials_of(b: &Building) -> Stock {
+    build_materials_of(b.kind, b.material)
+}
+
+/// The work this building or site takes, by its kind and material.
+pub fn work_of(b: &Building) -> f64 {
+    build_work_for(b.kind, b.material)
+}
+
 /// Materials a construction site still needs (`materialsNeeded`).
 pub fn materials_needed(site: &Building) -> Stock {
     let mut out = Stock::new();
-    for (good, units) in build_materials(site.kind) {
+    for (good, units) in materials_of(site) {
         let left = units - site.site.as_ref().map_or(0.0, |s| held(&s.delivered, good));
         if left > 0.0 {
             out.insert(good, left);
@@ -344,7 +383,7 @@ pub fn site_work_of(work: f64, kind: BuildingKind, under: Option<u8>) -> f64 {
 
 /// Work a construction site still needs (`workNeeded`).
 pub fn work_needed(site: &Building) -> f64 {
-    0f64.max(build_work_of(site.kind) - site.site.as_ref().map_or(0.0, |s| s.work))
+    0f64.max(work_of(site) - site.site.as_ref().map_or(0.0, |s| s.work))
 }
 
 /// The terrain of tiles as far as it is known (`TerrainLookup`), for checking where buildings go:
@@ -792,7 +831,7 @@ pub fn work_problem(
 
 /// Work it takes to tear down a building or construction site (`teardownWork`).
 pub fn teardown_work(b: &Building) -> f64 {
-    let built = b.site.as_ref().map_or_else(|| build_work_of(b.kind), |s| s.work);
+    let built = b.site.as_ref().map_or_else(|| work_of(b), |s| s.work);
     built * TEARDOWN_WORK_SHARE
 }
 
@@ -864,7 +903,7 @@ pub fn teardown_returns(b: &Building) -> Stock {
         return site.delivered.clone();
     }
     let mut out = Stock::new();
-    for (good, units) in build_materials(b.kind) {
+    for (good, units) in materials_of(b) {
         let back = (units * TEARDOWN_MATERIALS_RETURNED).floor();
         if back > 0.0 {
             out.insert(good, back);

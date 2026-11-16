@@ -17,11 +17,11 @@ use crate::goods_deps::{
     rob_caravan, rob_trader, update_city_membership, OrderSender,
 };
 use crate::holders::{move_between, stock_of, Holder};
+use crate::queries::building::materials_needed;
 use crate::queries::command::commander_of_resident;
 use crate::queries::goods::{
-    can_handle, down_index_on, free_stock, goods_at_spot, materials_needed, move_goods,
-    pile_index_at, site_at, site_index_at, storage_at, storage_index_at, units_that_fit,
-    units_that_fit_carriage,
+    can_handle, down_index_on, free_stock, goods_at_spot, move_goods, pile_index_at, site_at,
+    site_index_at, storage_at, storage_index_at, units_that_fit, units_that_fit_carriage,
 };
 use crate::queries::guard::outpost_storage_guarded;
 use crate::queries::names::{good_of, held};
