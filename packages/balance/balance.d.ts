@@ -303,6 +303,7 @@ export interface Balance {
   readonly CITY_SIDE_LANE_GAP: number
   readonly CITY_QUARTER_ROWS: number
   readonly NPC_WALL_TILES_PER_TRIP: number
+  readonly NPC_STONE_WALL_RESIDENTS: number
   readonly NPC_NODE_REACH: number
   readonly NPC_RESIDENTS_PER_SCOUT: number
   readonly NPC_SCOUT_LIMIT: number

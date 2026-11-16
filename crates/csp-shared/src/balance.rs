@@ -942,6 +942,11 @@ pub const CITY_QUARTER_ROWS: f64 = 4.0;
 /// not one walk per tile. What a tile doesn't take goes to the next.
 pub const NPC_WALL_TILES_PER_TRIP: f64 = 4.0;
 
+/// Residents an NPC city has from which it is a town and upgrades its wall to stone (`CONTEXT.md`:
+/// Wall / Gate, Wood or stone): as many as a town has when the world is made, so a village goes
+/// stone once it has grown into one.
+pub const NPC_STONE_WALL_RESIDENTS: f64 = NPC_TOWN.residents;
+
 /// How far from its home an NPC city looks for a resource node to build a workplace on when it
 /// needs a material it has no workplace for (`CONTEXT.md`: NPC city), in tiles: about twenty
 /// minutes' walk on plains.
@@ -2764,6 +2769,7 @@ pub fn balance_json() -> Value {
     m.insert("CITY_SIDE_LANE_GAP".into(), json!(CITY_SIDE_LANE_GAP));
     m.insert("CITY_QUARTER_ROWS".into(), json!(CITY_QUARTER_ROWS));
     m.insert("NPC_WALL_TILES_PER_TRIP".into(), json!(NPC_WALL_TILES_PER_TRIP));
+    m.insert("NPC_STONE_WALL_RESIDENTS".into(), json!(NPC_STONE_WALL_RESIDENTS));
     m.insert("NPC_NODE_REACH".into(), json!(NPC_NODE_REACH));
     m.insert("NPC_RESIDENTS_PER_SCOUT".into(), json!(NPC_RESIDENTS_PER_SCOUT));
     m.insert("NPC_SCOUT_LIMIT".into(), json!(NPC_SCOUT_LIMIT));

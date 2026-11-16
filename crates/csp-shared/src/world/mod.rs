@@ -1443,8 +1443,19 @@ pub struct CityRoad {
     deny_unknown_fields
 )]
 pub enum CityProject {
-    Build { building: BuildingKind, x: f64, y: f64 },
-    TearDown { building_id: String },
+    Build {
+        building: BuildingKind,
+        x: f64,
+        y: f64,
+        /// Stone for a stone wall or gate, over a wooden one or new; none is wood (`CONTEXT.md`:
+        /// Wood or stone).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        material: Option<WallMaterial>,
+    },
+    TearDown {
+        building_id: String,
+    },
 }
 
 /// Where a trader is in a run to an offer.
