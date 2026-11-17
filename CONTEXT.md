@@ -496,7 +496,8 @@ The shared language of the game. Domain terms only — no implementation details
   realm whose residents finished it. Tearing it down dissolves the city: its buildings and
   residents stay where they are, and its residents are homeless (a Player can Relocate
   theirs).
-- **City building:** a town hall, house, storage, wall or gate (and later ones of their kind);
+- **City building:** a town hall, house, storage, wall, gate or tower (and later ones of their kind;
+  a tower since T109.3, decided overnight, Daniel to confirm);
   not farms, workplaces or stables. It is part of a city when it lies within a short distance of
   the city's town hall or of another building already part of that city, so a city grows outward
   in a chain. A building belongs to at most one city: the one whose town hall is nearer (the

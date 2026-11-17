@@ -40,6 +40,7 @@ export const CITY_BUILDINGS: readonly BuildingKind[] = [
   'warehouse',
   'wall',
   'gate',
+  'tower',
 ]
 
 /** Whether a building counts toward a city's shape: a finished city building. */
