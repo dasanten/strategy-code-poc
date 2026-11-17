@@ -494,7 +494,9 @@ fn materials_first(
         let Some(first) = built_first(world, city, home, terrain, rings, &have, *good, seen) else {
             continue;
         };
-        if build_of(&first) != (building, x, y) {
+        let same = matches!(&first, CityProject::Build { building: b, x: fx, y: fy, .. }
+            if b == building && *fx as i32 == *x as i32 && *fy as i32 == *y as i32);
+        if !same {
             return materials_first(world, city, home, terrain, rings, first, seen);
         }
     }
