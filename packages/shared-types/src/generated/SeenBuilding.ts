@@ -5,9 +5,15 @@ import type { Good } from "./Good.js";
 import type { KeptBreeding } from "./KeptBreeding.js";
 import type { SeenOffer } from "./SeenOffer.js";
 import type { ShownWarehousePrice } from "./ShownWarehousePrice.js";
+import type { WallMaterial } from "./WallMaterial.js";
 
 /**
  * A building as Players see it (`SeenBuilding`): its stock and a stable's breeding progress only
  * when they see inside, a Trade Org warehouse's prices and a storage's offers either way.
  */
-export type SeenBuilding = { prices?: Array<ShownWarehousePrice>, offers?: Array<SeenOffer>, id: string, kind: BuildingKind, cityId: string | null, realmId?: string, x: number, y: number, stock?: { [key in Good]?: number }, site?: ConstructionSite, teardown?: number, closed?: true, damage?: number, breedings?: Array<KeptBreeding>, };
+export type SeenBuilding = { prices?: Array<ShownWarehousePrice>, offers?: Array<SeenOffer>, id: string, kind: BuildingKind, cityId: string | null, realmId?: string, x: number, y: number, stock?: { [key in Good]?: number }, site?: ConstructionSite, teardown?: number, closed?: true, damage?: number, breedings?: Array<KeptBreeding>, 
+/**
+ * What a wall or gate, or its site, is of; none is wood (`CONTEXT.md`: Wall / Gate, Wood or
+ * stone). Only walls and gates have one.
+ */
+material?: WallMaterial, };

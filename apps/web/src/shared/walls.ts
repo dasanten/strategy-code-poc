@@ -3,7 +3,8 @@
 
 import { allied, alliedRealms } from './alliance.js'
 import { npcCityRefuses } from './city.js'
-import { BUILD_MATERIALS, WALL_STRENGTH } from './narrowed.js'
+import { STONE_WALL_STRENGTH, WALL_STRENGTH } from './narrowed.js'
+import { isStone, materialsOfKind } from './building.js'
 import { isPassableTerrain, tileIndex, type TerrainMap, wrap, wrapDelta } from './terrain.js'
 import { TRADE_ORG } from './trade-org.js'
 import { type WorldState } from './world.js'
@@ -255,7 +256,8 @@ export function onOwnWall(
 
 /** Damage a finished wall or gate takes before it falls (`WALL_STRENGTH`). */
 export function wallStrength(b: Building): number {
-  return WALL_STRENGTH[b.kind === 'gate' ? 'gate' : 'wall']
+  const of = isStone(b.kind, b.material) ? STONE_WALL_STRENGTH : WALL_STRENGTH
+  return of[b.kind === 'gate' ? 'gate' : 'wall']
 }
 
 /** Damage a wall or gate can still take before it falls. */
@@ -269,7 +271,10 @@ export function wallStrengthLeft(b: Building): number {
  */
 export function brokenReturns(b: Building): Stock {
   const out: Stock = {}
-  for (const [good, units] of Object.entries(BUILD_MATERIALS[b.kind] ?? {}) as [Good, number][]) {
+  for (const [good, units] of Object.entries(materialsOfKind(b.kind, b.material)) as [
+    Good,
+    number,
+  ][]) {
     const back = Math.floor(units * BROKEN_MATERIALS_RETURNED)
     if (back > 0) out[good] = back
   }

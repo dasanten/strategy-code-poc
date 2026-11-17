@@ -87,6 +87,7 @@ fn lumber_camp() -> Option<CityProject> {
         building: BuildingKind::LumberCamp,
         x: f64::from(FOREST.0),
         y: f64::from(FOREST.1),
+        material: None,
     })
 }
 
@@ -201,7 +202,7 @@ fn hands_idle_residents_their_planned_job_in_the_tick_and_picks_the_next_project
     plan(&mut v);
     let planned_at = v.world.city_plans[&v.city].planned_at;
     let house = v.world.city_plans[&v.city].project.clone();
-    let Some(CityProject::Build { building: BuildingKind::House, x, y }) = house else {
+    let Some(CityProject::Build { building: BuildingKind::House, x, y, .. }) = house else {
         panic!("a house to build: {house:?}");
     };
     assert!(step(&mut v) >= 0.0);

@@ -17,7 +17,7 @@ use csp_shared::footprint::{covers, footprint_tiles, is_at, Placed, FOOTPRINT};
 use csp_shared::terrain::{wrap, wrap_delta, wrap_distance, TerrainMap};
 use csp_shared::world::{
     Building, BuildingKind, City, CityJobKind, CityProject, Good, GoodsSpot, PickUpOrder,
-    ResidentOrder, Stock, Task, TearDownOrder, Tile, TradeOrgCity, WorldState,
+    ResidentOrder, Stock, Task, TearDownOrder, Tile, TradeOrgCity, WallMaterial, WorldState,
 };
 use serde_json::json;
 
@@ -30,11 +30,13 @@ use crate::npc_chain::{
 use crate::npc_inner_wall::{inner_wall_project, outer_walls, Rings as InnerRings};
 use crate::npc_plan::{farmers_wanted, food_short};
 use crate::npc_scouts::knows_node;
+use crate::npc_stone_walls::{outer_ring_of_stone, stone_upgrade_project, wants_stone_for_walls};
 use crate::npc_training::wants_training_ground;
 use crate::placing::Ground;
 use crate::queries::building::{
-    build_materials, build_problem, building_at, materials_needed, max_workers, node_corner,
-    node_good, node_pick_distance, node_workplace, work_needed, workplace_node,
+    build_materials_of, build_problem, building_at, construction_at, is_stone, materials_needed,
+    max_workers, node_corner, node_good, node_pick_distance, node_workplace, work_needed,
+    workplace_node,
 };
 use crate::queries::city::{has_food_surplus, in_city_area, is_city_building};
 use crate::queries::city_area::{city_area_tiles, city_membership, free_housing};
@@ -77,7 +79,17 @@ impl Rings {
 
 /// A building project (`BuildProject`).
 fn build(building: BuildingKind, at: (i32, i32)) -> CityProject {
-    CityProject::Build { building, x: f64::from(at.0), y: f64::from(at.1) }
+    CityProject::Build { building, x: f64::from(at.0), y: f64::from(at.1), material: None }
+}
+
+/// A wall or gate project of `material`: stone for a stone one; any other project as it is.
+fn with_material(p: CityProject, material: Option<WallMaterial>) -> CityProject {
+    match p {
+        CityProject::Build { building, x, y, .. } if is_stone(building, material) => {
+            CityProject::Build { building, x, y, material }
+        }
+        p => p,
+    }
 }
 
 /// Whether a city grows at all (`cityGrows`): an NPC city always, the Trade Organization's cities
@@ -269,19 +281,20 @@ pub fn take_part(
     let r = &world.residents[i];
     if deliver {
         let carries = match project {
-            CityProject::Build { x, y, .. } => building_at(world, *x as i32, *y as i32, MAP_SIZE)
-                .filter(|s| s.site.is_some())
-                .and_then(|s| pick(Some(&r.carried), &materials_needed(s)))
-                .is_some(),
+            CityProject::Build { building, x, y, material } => {
+                project_site(world, *building, *material, *x, *y)
+                    .and_then(|s| pick(Some(&r.carried), &materials_needed(s)))
+                    .is_some()
+            }
             CityProject::TearDown { .. } => false,
         };
         // Carrying the materials of a few tiles of wall, they help with this one.
-        let wall = matches!(project, CityProject::Build { building, .. } if for_wall(*building, &r.carried));
+        let wall = matches!(project, CityProject::Build { building, material, .. } if for_wall(*building, *material, &r.carried));
         if !carries && !wall {
             return false;
         }
     }
-    let (building, x, y) = match project {
+    let (building, x, y, material) = match project {
         CityProject::TearDown { building_id } => {
             let Some(b) = world.buildings.iter().find(|x| &x.id == building_id) else {
                 return false;
@@ -297,16 +310,18 @@ pub fn take_part(
             }
             return true;
         }
-        CityProject::Build { building, x, y } => (*building, *x, *y),
+        CityProject::Build { building, x, y, material } => (*building, *x, *y, *material),
     };
     let start_build = |world: &mut WorldState| {
         world.residents[i].order = None;
-        let memory = json!({ "building": kind_name(building), "at": { "x": x, "y": y } });
+        let mut memory = json!({ "building": kind_name(building), "at": { "x": x, "y": y } });
+        if is_stone(building, material) {
+            memory["material"] = json!("stone");
+        }
         world.residents[i].script = Some(default_script(Task::Build, memory));
         true
     };
-    let Some(site) = building_at(world, x as i32, y as i32, MAP_SIZE).filter(|s| s.site.is_some())
-    else {
+    let Some(site) = project_site(world, building, material, x, y) else {
         return start_build(world);
     };
     let need = materials_needed(site);
@@ -316,7 +331,7 @@ pub fn take_part(
     // For a tile of wall, enough for a few tiles at once: the rest goes to the next ones.
     let wall = building == BuildingKind::Wall || building == BuildingKind::Gate;
     let store = storage.map(|s| &world.buildings[s]);
-    let stocked = if wall && !for_wall(building, &r.carried) {
+    let stocked = if wall && !for_wall(building, material, &r.carried) {
         pick(store.and_then(|s| s.stock.as_ref()), &times(&need, NPC_WALL_TILES_PER_TRIP))
     } else {
         None
@@ -334,13 +349,33 @@ pub fn take_part(
     can_do_more(world, i, site, store) && start_build(world)
 }
 
-/// Whether a resident carries materials for walls or gates, for a project of `building`
-/// (`forWall`).
-fn for_wall(building: BuildingKind, carried: &Stock) -> bool {
+/// Whether a resident carries materials for walls or gates, for a project of `building` of
+/// `material` (`forWall`).
+fn for_wall(building: BuildingKind, material: Option<WallMaterial>, carried: &Stock) -> bool {
     if building != BuildingKind::Wall && building != BuildingKind::Gate {
         return false;
     }
-    pick(Some(carried), &build_materials(building)).is_some()
+    pick(Some(carried), &build_materials_of(building, material)).is_some()
+}
+
+/// The construction site a build project of `building` of `material` at (x, y) works on, if one
+/// is laid out: a stone one over a wooden wall too (`CONTEXT.md`: Wood or stone).
+pub fn project_site(
+    world: &WorldState,
+    building: BuildingKind,
+    material: Option<WallMaterial>,
+    x: f64,
+    y: f64,
+) -> Option<&Building> {
+    construction_at(world, x as i32, y as i32, building).filter(|s| {
+        s.site.is_some()
+            && (!is_wall_kind(s.kind)
+                || is_stone(s.kind, s.material) == is_stone(building, material))
+    })
+}
+
+fn is_wall_kind(kind: BuildingKind) -> bool {
+    matches!(kind, BuildingKind::Wall | BuildingKind::Gate)
 }
 
 /// `n` times the goods (`times`).
@@ -423,14 +458,6 @@ pub fn no_farm(world: &WorldState, city: &City) -> bool {
         })
 }
 
-/// Where a project builds, and what (`want.x`, `want.y`, `want.building`).
-fn build_of(p: &CityProject) -> (BuildingKind, i32, i32) {
-    match p {
-        CityProject::Build { building, x, y } => (*building, *x as i32, *y as i32),
-        CityProject::TearDown { .. } => unreachable!("a build project"),
-    }
-}
-
 /// The project to take on before `want` (`materialsFirst`): when it needs a material the storage
 /// lacks and none of the city's workplaces makes, the workplace for that material first.
 fn materials_first(
@@ -445,10 +472,11 @@ fn materials_first(
     if matches!(want, CityProject::TearDown { .. }) {
         return want;
     }
-    let (building, x, y) = build_of(&want);
-    let need = match building_at(world, x, y, MAP_SIZE).filter(|s| s.site.is_some()) {
+    let CityProject::Build { building, x, y, material } = &want else { return want };
+    // Its site's needs (a stone one over a wooden wall too), else all the building's.
+    let need = match project_site(world, *building, *material, *x, *y) {
         Some(site) => materials_needed(site),
-        None => build_materials(building),
+        None => build_materials_of(*building, *material),
     };
     let storage = world.buildings.iter().find(|b| {
         b.city_id.as_ref() == Some(&city.id) && b.kind == BuildingKind::Storage && b.site.is_none()
@@ -622,7 +650,13 @@ fn wanted(
     }
     if let Some(t) = wall_site {
         let site = world.buildings.iter().find(|b| Some(&b.id) == t.site.as_ref()).expect("a site");
-        return Some(build(site.kind, (site.x as i32, site.y as i32)));
+        let p = build(site.kind, (site.x as i32, site.y as i32));
+        return Some(with_material(p, site.material));
+    }
+    // A stone site begun over a wooden wall goes on first, as any begun wall (`CONTEXT.md`: Wood
+    // or stone).
+    if let Some(p) = stone_upgrade_project(world, city, home, size, true) {
+        return Some(p);
     }
     let at = |building: BuildingKind, t: Option<(i32, i32)>| t.map(|t| build(building, t));
     if city.trade_org.is_none() {
@@ -696,7 +730,11 @@ fn wanted(
         }
     }
     if let Some(next) = ring.iter().find(|t| !t.done) {
-        return Some(build(next.kind, (next.x, next.y)));
+        // A new outer wall is of the material its old one was (`CONTEXT.md`: Wood or stone).
+        let stone =
+            rings.is_some_and(|r| r.expanding) && outer_ring_of_stone(world, city, home, size);
+        let p = build(next.kind, (next.x, next.y));
+        return Some(with_material(p, stone.then_some(WallMaterial::Stone)));
     }
     // Lacking nothing else, its wall up, the workplace for a founding material it has none for
     // (`CONTEXT.md`: Full city).
@@ -719,13 +757,29 @@ fn wanted(
     if let Some(dead) = tear_down_dead_workplace(world, city) {
         return Some(dead);
     }
-    let rings = rings?;
-    let inner = InnerRings {
-        expanding: rings.expanding,
-        gate: rings.gate.as_ref().map(|g| g.1),
-        new_gate: rings.gate_at(),
-    };
-    inner_wall_project(world, city, home, terrain, &inner, npc_builders(world, city))
+    if let Some(r) = rings {
+        let inner = InnerRings {
+            expanding: r.expanding,
+            gate: r.gate.as_ref().map(|g| g.1),
+            new_gate: r.gate_at(),
+        };
+        if let Some(p) =
+            inner_wall_project(world, city, home, terrain, &inner, npc_builders(world, city))
+        {
+            return Some(p);
+        }
+    }
+    // Last, a town upgrades its wall to stone (`CONTEXT.md`: Wood or stone): the outer ring, then
+    // the inner one, from Stone beyond its reserve; with no quarry, one first, its spare hands
+    // working it for the Stone.
+    let expanding = rings.is_none_or(|r| r.expanding);
+    if let Some(p) = stone_upgrade_project(world, city, home, size, expanding) {
+        return Some(p);
+    }
+    if wants_stone_for_walls(world, city) && !makes(world, city, Good::Stone) {
+        return chain_project(world, city, home, terrain, rings, Good::Stone, &mut HashSet::new());
+    }
+    None
 }
 
 /// Whether a city's last pass left someone idle who is free to work (`handsIdle`).

@@ -70,7 +70,7 @@ fn project(v: &Village) -> Option<CityProject> {
 
 fn build_at(p: &Option<CityProject>, kind: BuildingKind) -> (f64, f64) {
     match p {
-        Some(CityProject::Build { building, x, y }) if *building == kind => (*x, *y),
+        Some(CityProject::Build { building, x, y, .. }) if *building == kind => (*x, *y),
         other => panic!("not a {kind:?} to build: {other:?}"),
     }
 }
@@ -264,6 +264,7 @@ fn with_no_room_left_inside_builds_on_its_edge_then_puts_up_a_new_wall_from_its_
             building: BuildingKind::Gate,
             x: v.home.x,
             y: v.home.y + f64::from(WALL) + NPC_WALL_STEP,
+            material: None,
         })
     );
 }
@@ -279,6 +280,7 @@ fn builds_a_lumber_camp_on_the_nearest_forest_when_it_needs_wood_and_makes_none(
             building: BuildingKind::LumberCamp,
             x: f64::from(FOREST.0),
             y: f64::from(FOREST.1),
+            material: None,
         })
     );
 }

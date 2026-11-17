@@ -75,6 +75,7 @@ pub mod npc_scouts;
 #[cfg(test)]
 mod npc_slow;
 pub mod npc_stable;
+pub mod npc_stone_walls;
 #[cfg(test)]
 mod npc_test_world;
 pub mod npc_trader;
@@ -126,6 +127,8 @@ pub mod starting_city;
 pub mod starting_sites;
 pub mod stealing;
 pub mod stock_floor;
+#[cfg(test)]
+mod stone_upgrade_tests;
 pub mod storing;
 pub mod supply_wagons;
 pub mod survival;

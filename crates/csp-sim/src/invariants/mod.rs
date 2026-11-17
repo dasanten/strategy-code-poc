@@ -222,6 +222,7 @@ pub fn world_invariants() -> Vec<Invariant> {
             check: |w, _| crate::horses::horses_down_lie_still(w),
         },
         Invariant { name: "attack-orders-sound", check: checks::attack_orders_sound },
+        Invariant { name: "shots-within-reach", check: checks::shots_within_reach },
         Invariant { name: "up-only-on-walls", check: crate::wall_walk::up_only_on_walls },
         Invariant { name: "up-only-on-own-walls", check: crate::wall_walk::up_only_on_own_walls },
         Invariant {
@@ -279,6 +280,7 @@ pub fn world_invariants() -> Vec<Invariant> {
         },
         Invariant { name: "gates-sound", check: checks::gates_sound },
         Invariant { name: "wall-damage-sound", check: checks::wall_damage_sound },
+        Invariant { name: "wall-materials-sound", check: checks::wall_materials_sound },
         Invariant { name: "climb-orders-sound", check: checks::climb_orders_sound },
         Invariant { name: "teachers-sound", check: checks::teachers_sound },
         Invariant { name: "trainees-sound", check: checks::trainees_sound },

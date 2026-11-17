@@ -9,7 +9,7 @@ use csp_shared::balance::{
 use csp_shared::footprint::is_at;
 use csp_shared::time::TICKS_PER_GAME_DAY;
 use csp_shared::world::{
-    Building, BuildingKind, CityJobKind, Good, Resident, StatName, Task, WorldState,
+    Building, BuildingKind, CityJobKind, Good, Resident, ResidentOrder, StatName, Task, WorldState,
 };
 use serde_json::json;
 
@@ -144,6 +144,31 @@ fn task_of(r: &Resident) -> Option<Task> {
     r.script.as_ref().and_then(|s| s.task)
 }
 
+/// The staged city of spear soldiers only: with no smithy it arms no archers, who would leave the
+/// hall for its wall (`CONTEXT.md`: Ranged combat).
+fn without_smithy(s: &mut BigCity) {
+    let smithy: Vec<String> = s
+        .world
+        .buildings
+        .iter()
+        .filter(|b| b.kind == BuildingKind::Smithy)
+        .map(|b| b.id.clone())
+        .collect();
+    s.world.buildings.retain(|b| !smithy.contains(&b.id));
+    for c in &mut s.world.cities {
+        if let Some(ids) = c.workplace_ids.as_mut() {
+            ids.retain(|id| !smithy.contains(id));
+        }
+    }
+    for r in &mut s.world.residents {
+        if r.order.as_ref().is_some_and(
+            |o| matches!(o, ResidentOrder::WorkAt(w) if smithy.contains(&w.building_id)),
+        ) {
+            r.order = None;
+        }
+    }
+}
+
 /// The staged city with its ground, stepped with unhurried walking (`running`).
 struct Running {
     s: BigCity,
@@ -154,6 +179,7 @@ struct Running {
 impl Running {
     fn new() -> Self {
         let mut s = big_city(None, 240);
+        without_smithy(&mut s);
         let ground = with_ground(&mut s);
         let runner = Runner { walking: unhurried_walking(&s.terrain), scratch: Scratch::default() };
         Running { s, ground, runner }
@@ -417,6 +443,7 @@ fn run_both(s: &mut BigCity, days: usize) -> Seen {
 #[ignore = "72.3 s alone; see #1132"]
 fn a_city_of_110_does_both_at_once_with_invariants_checked_and_the_hall_held() {
     let mut s = big_city(None, 240);
+    without_smithy(&mut s);
     with_ground(&mut s);
     let seen = run_both(&mut s, 12);
     eprintln!("Training and patrols, city of 110: {seen:?}");
@@ -429,6 +456,7 @@ fn a_city_of_110_does_both_at_once_with_invariants_checked_and_the_hall_held() {
 #[ignore = "39.7 s alone; see #1132"]
 fn a_city_just_big_enough_keeps_its_hall_and_gates_with_its_wall_left_to_training() {
     let mut s = big_city(None, 240);
+    without_smithy(&mut s);
     with_ground(&mut s);
     // Down to 52 residents, 10 of them soldiers: few past those it must keep.
     for id in soldiers_of(&s.world, &s.city).into_iter().skip(10) {

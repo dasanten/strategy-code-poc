@@ -15,6 +15,8 @@ use crate::npc_chain::own_workplaces;
 use crate::npc_test_world::Runner;
 use crate::queries::building::workplace_node;
 use crate::queries::city::city_residents;
+use crate::queries::names::held;
+use crate::queries::npc_trade::npc_reserve;
 use crate::queries::residents::{can_work, is_down};
 use crate::tick::Scratch;
 
@@ -87,9 +89,15 @@ fn a_big_city_whose_vein_runs_dry_ends_a_season_working_the_next_node_no_idler_t
         Runner { walking: unhurried_walking(&staged.terrain), scratch: Scratch::default() };
     for _ in 0..SEASON_DAYS {
         // Whatever Iron ore and Iron it has goes out, so it keeps wanting more: its mine is worked.
+        // Its archers' Arrows are topped up to its reserve: forged from Iron that never stays, they
+        // would be short all season and pull its hands from the mine onto other work.
+        let arrows = held(&npc_reserve(&staged.world, staged.city()), Good::Arrows);
         let stock = staged.home_mut().stock.get_or_insert_with(Default::default);
         stock.insert(Good::IronOre, 0.0);
         stock.insert(Good::Iron, 0.0);
+        if held(stock, Good::Arrows) < arrows {
+            stock.insert(Good::Arrows, arrows);
+        }
         for _ in 0..TICKS_PER_GAME_DAY as usize {
             runner.step(&mut staged.world, &staged.terrain);
             let s = &staged;

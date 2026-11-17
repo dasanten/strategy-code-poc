@@ -143,7 +143,7 @@ fn a_city_whose_mine_ran_dry_frees_its_workers_and_opens_a_mine_on_the_next_node
     // Its chain opens a mine on the other iron ore node, within its reach.
     let ore2 = world.nodes.iter().find(|n| n.id == "ore2").expect("the second node").clone();
     match ore_project(&world, &terrain, &id) {
-        Some(CityProject::Build { building: BuildingKind::Mine, x, y }) => {
+        Some(CityProject::Build { building: BuildingKind::Mine, x, y, .. }) => {
             let d = (x - ore2.x).abs().max((y - ore2.y).abs());
             assert!(d <= 2.0, "a mine at ({x}, {y}), the node at ({}, {})", ore2.x, ore2.y);
         }
@@ -189,7 +189,7 @@ fn with_nothing_better_to_do_its_builders_tear_down_the_dead_mine() {
     for _ in 0..200 {
         match city_project(&world, &c, &h, &terrain, true) {
             Some(CityProject::TearDown { building_id }) if building_id == mine => return,
-            Some(p @ CityProject::Build { building, x, y }) => {
+            Some(p @ CityProject::Build { building, x, y, .. }) => {
                 seen.push(p.clone());
                 // Pretend it stands, so the next want comes up.
                 let id = format!("done{}", seen.len());
@@ -266,7 +266,7 @@ fn the_hq_moves_its_mine_to_the_next_nearest_node_however_far() {
     let home = npc_home(&world, &id).cloned().unwrap_or(hall);
     let ore2 = world.nodes.iter().find(|n| n.id == "ore2").expect("the far node").clone();
     match city_project(&world, &hq, &home, &terrain, false) {
-        Some(CityProject::Build { building: BuildingKind::Mine, x, y }) => {
+        Some(CityProject::Build { building: BuildingKind::Mine, x, y, .. }) => {
             let d = (x - ore2.x).abs().max((y - ore2.y).abs());
             assert!(d <= 2.0, "a mine at ({x}, {y}), the far node at ({}, {})", ore2.x, ore2.y);
         }

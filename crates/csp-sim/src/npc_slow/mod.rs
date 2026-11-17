@@ -22,6 +22,7 @@ mod inner_wall;
 mod roads;
 mod scouts;
 mod steel;
+mod stone_walls;
 mod surplus;
 mod training;
 
