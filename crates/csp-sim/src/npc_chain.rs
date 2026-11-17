@@ -30,6 +30,7 @@ pub fn processed_by(world: &WorldState, city: &City, good: Good) -> Option<Build
         Good::Iron => Some(BuildingKind::Smelter),
         Good::Coins => Some(BuildingKind::Mint),
         g if g == NPC_SMITHY_WEAPON => Some(BuildingKind::Smithy),
+        Good::Tools => Some(BuildingKind::Smithy),
         Good::Steel if npc_makes_steel(world, city) => Some(BuildingKind::Smelter),
         Good::SteelSword | Good::SteelArmour | Good::SteelShield
             if npc_makes_steel(world, city) =>
