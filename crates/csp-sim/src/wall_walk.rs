@@ -229,3 +229,6 @@ mod sent_up_tests;
 
 #[cfg(test)]
 mod tower_tests;
+
+#[cfg(test)]
+mod tower_sight_tests;

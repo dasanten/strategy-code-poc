@@ -2298,6 +2298,15 @@ pub struct WallStrength {
 /// of its four tiles, so a small realm can man one; more wait on the walk or below.
 pub const TOWER_ROOM: f64 = 4.0;
 
+/// How far, in tiles, a resident up on a tower sees (`CONTEXT.md`: Tower, Sight): half as far
+/// again as `SIGHT_RANGE`, so a tower warns of an army well before it reaches the wall. At most
+/// twice `SIGHT_RANGE`, which the sight squares are cut for.
+pub const TOWER_SIGHT_RANGE: f64 = 72.0;
+
+/// How much further, in tiles, an archer up on a tower shoots than on the ground
+/// (`CONTEXT.md`: Tower, Ranged combat): beyond a wall archer's `WALL_SHOT_REACH_BONUS`.
+pub const TOWER_SHOT_REACH_BONUS: f64 = 7.0;
+
 /// Damage a wall or gate takes from blows before it falls (`CONTEXT.md`: Walls in combat,
 /// broken). An average unarmed resident (4 a blow, one blow every `STRIKE_TICKS`) breaks a stretch
 /// of wall alone in about 25 minutes, one with a Spear in about 12. A gate holds out half as long
@@ -3050,6 +3059,8 @@ pub fn balance_json() -> Value {
     m.insert("STONE_WALL_STRENGTH".into(), to_value(STONE_WALL_STRENGTH).expect("serialisable"));
     m.insert("BROKEN_MATERIALS_RETURNED".into(), json!(BROKEN_MATERIALS_RETURNED));
     m.insert("TOWER_ROOM".into(), json!(TOWER_ROOM));
+    m.insert("TOWER_SIGHT_RANGE".into(), json!(TOWER_SIGHT_RANGE));
+    m.insert("TOWER_SHOT_REACH_BONUS".into(), json!(TOWER_SHOT_REACH_BONUS));
     m.insert("CLIMB_TICKS".into(), json!(CLIMB_TICKS));
     m.insert("WALL_WALK_TICKS".into(), json!(WALL_WALK_TICKS));
     m.insert("FALL_DAMAGE".into(), json!(FALL_DAMAGE));

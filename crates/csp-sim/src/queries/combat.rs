@@ -5,14 +5,14 @@ use csp_shared::balance::{
     BLOW_BASE, BLOW_PER_STRENGTH, COMBAT_SKILL_EFFECT, COMBAT_SKILL_LIMIT, COMBAT_SKILL_PER_BLOW,
     DODGE_LIMIT, DODGE_PER_AGILITY, INTELLECT_AVERAGE, MIN_BLOW_DAMAGE, PROTECTION_DEFENCE,
     SHOT_DAMAGE, SHOT_PIERCE, SHOT_REACH, SHOT_SKILL_LIMIT, SHOT_TICKS, STRIKE_TICKS,
-    WALL_SHOT_REACH_BONUS, WEAPON_ATTACK,
+    TOWER_SHOT_REACH_BONUS, WALL_SHOT_REACH_BONUS, WEAPON_ATTACK,
 };
 use csp_shared::terrain::wrap_delta;
 use csp_shared::world::{Good, Resident, SkillName, StatName, WorldState};
 
 use super::names::{good_name, held};
 use super::residents::stat_value;
-use super::walls::is_up;
+use super::walls::{is_up, up_on_tower};
 use crate::equipment::{equipped, Slot};
 
 /// Whether two spots are in contact (`inContact`): on the same tile or one of the eight around
@@ -88,10 +88,12 @@ pub fn shot_reach(world: &WorldState, r: &Resident) -> Option<f64> {
 }
 
 /// The reach an archer gets from where they stand above the ground (`CONTEXT.md`: Ranged combat,
-/// Walls in combat): up on a wall walk `WALL_SHOT_REACH_BONUS`, on the ground none. Towers (Epic
-/// 109) give more here.
+/// Walls in combat, Tower): up on a tower `TOWER_SHOT_REACH_BONUS`, up on a wall walk
+/// `WALL_SHOT_REACH_BONUS`, on the ground none.
 pub fn height_reach_bonus(world: &WorldState, r: &Resident) -> f64 {
-    if is_up(world, r) {
+    if up_on_tower(world, r) {
+        TOWER_SHOT_REACH_BONUS
+    } else if is_up(world, r) {
         WALL_SHOT_REACH_BONUS
     } else {
         0.0

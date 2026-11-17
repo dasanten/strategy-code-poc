@@ -3,7 +3,8 @@
 //! add here.
 
 use csp_shared::balance::{
-    BROKEN_MATERIALS_RETURNED, MAP_SIZE, STONE_WALL_STRENGTH, WALL_STRENGTH,
+    BROKEN_MATERIALS_RETURNED, MAP_SIZE, SIGHT_RANGE, STONE_WALL_STRENGTH, TOWER_SIGHT_RANGE,
+    WALL_STRENGTH,
 };
 use csp_shared::footprint::covers;
 use csp_shared::world::{Building, BuildingKind, Resident, Stock, WorldState};
@@ -51,12 +52,27 @@ pub fn reaches_for_height(world: &WorldState, a: &Resident, b: &Resident) -> boo
     is_up(world, a) || !is_up(world, b)
 }
 
-/// Whether a resident stands on a wall of their own side or an ally's (`onOwnWall`).
+/// Whether a resident is up on a tower (`CONTEXT.md`: Tower): on its walk, on a tile of it. Only
+/// those up are looked at, so asking for everyone costs next to nothing.
+pub fn up_on_tower(world: &WorldState, r: &Resident) -> bool {
+    r.up.is_some()
+        && wall_or_tower_at(world, r.x, r.y).is_some_and(|b| b.kind == BuildingKind::Tower)
+}
+
+/// How far a resident sees (`CONTEXT.md`: Sight, Tower): `TOWER_SIGHT_RANGE` up on a tower, else
+/// `SIGHT_RANGE`.
+pub fn sight_range_of(world: &WorldState, r: &Resident) -> f64 {
+    if up_on_tower(world, r) {
+        TOWER_SIGHT_RANGE
+    } else {
+        SIGHT_RANGE
+    }
+}
+
+/// Whether a resident stands on a wall or tower of their own side or an ally's (`onOwnWall`): up
+/// there they take the wall's cover (`CONTEXT.md`: High ground, Tower).
 pub fn on_own_wall(world: &WorldState, r: &Resident) -> bool {
-    let wall = world
-        .buildings
-        .iter()
-        .find(|b| b.x == r.x && b.y == r.y && b.kind == BuildingKind::Wall && b.site.is_none());
+    let wall = wall_or_tower_at(world, r.x, r.y);
     let city = wall.and_then(|w| world.cities.iter().find(|c| Some(&c.id) == w.city_id.as_ref()));
     let (Some(city), Some(side)) = (city, wall_side(r)) else { return false };
     allied(world, city.realm_id.as_deref().unwrap_or(&city.id), side)
