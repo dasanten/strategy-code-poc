@@ -632,3 +632,23 @@ fn a_script_sees_whether_a_resident_is_up_on_a_wall_walk() {
     });
     assert_eq!(up["up"], json!(true));
 }
+
+#[test]
+fn a_script_sees_the_condition_of_its_own_residents_gear_and_not_of_others() {
+    use csp_shared::world::Good;
+    let worn = |w: &mut WorldState| {
+        for (id, good, wear) in [("a1", Good::Sword, 0.6), ("b1", Good::Armour, 0.9)] {
+            let r = w.residents.iter_mut().find(|r| r.id == id).unwrap();
+            r.carried.insert(good, 1.0);
+            w.wear.insert(id.into(), [(good, vec![wear])].into_iter().collect());
+        }
+        crate::equipment::settle_all(w);
+    };
+    let out = answers(&[("me", "me.condition"), ("all", "residents()")], worn);
+    assert_eq!(out["me"], json!({ "weapon": "worn", "shield": null, "armour": null }));
+    let seen =
+        |id: &str| out["all"].as_array().unwrap().iter().find(|e| e["id"] == id).unwrap().clone();
+    assert_eq!(seen("a1")["condition"], out["me"]);
+    assert_eq!(seen("b1")["equipped"]["armour"], json!("armour"));
+    assert_eq!(seen("b1")["condition"], json!(null), "another realm's gear shows no condition");
+}

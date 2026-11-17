@@ -164,6 +164,7 @@ pub mod wall_walk;
 pub mod walls;
 pub mod water_hauling;
 pub mod waypoints;
+pub mod wear;
 pub mod work;
 pub mod workplace_settings;
 pub mod world;

@@ -384,13 +384,18 @@ pub fn die(world: &mut WorldState, id: &str) -> Option<Resident> {
     // Dead aboard a vessel, what they carried stays in it: their own place there leaves room
     // enough (`CONTEXT.md`: Fighting at a vessel).
     let vessel = r.aboard.as_deref().and_then(|id| world.vessels.iter_mut().find(|v| v.id == id));
-    if let Some(v) = vessel {
+    let into = if let Some(v) = vessel {
         for (good, n) in r.carried.iter().filter(|(_, n)| **n > 0.0) {
             *v.load.entry(*good).or_insert(0.0) += n;
         }
+        Some(v.id.clone())
     } else {
         // The TypeScript leaves out the map's size here, so it is `MAP_SIZE` (ported as it is).
-        drop_goods(world, r.x, r.y, &r.carried, MAP_SIZE);
+        drop_goods(world, r.x, r.y, &r.carried, MAP_SIZE).map(|i| world.piles[i].id.clone())
+    };
+    // Their worn gear stays as worn where it fell (`CONTEXT.md`: Wear).
+    if let Some(into) = into {
+        crate::wear::hand_over_wear(world, &r.id, &into);
     }
     if let Some(pair) = &r.pair {
         if let Some(partner) = world.residents.iter_mut().find(|x| x.id == pair.partner_id) {
@@ -405,12 +410,18 @@ pub fn die(world: &mut WorldState, id: &str) -> Option<Resident> {
 /// Puts goods in the pile reached from a tile (`dropGoods`), starting one if there is none and
 /// there is anything to drop: on a building's footprint its one pile (`CONTEXT.md`: A building's
 /// pile), kept on its north-west tile (`pile_tile`). `size` is the map's; the TypeScript's default
-/// is `MAP_SIZE`.
-pub fn drop_goods(world: &mut WorldState, x: f64, y: f64, stock: &Stock, size: i32) {
+/// is `MAP_SIZE`. Returns where in `world.piles` the goods went, if anything dropped.
+pub fn drop_goods(
+    world: &mut WorldState,
+    x: f64,
+    y: f64,
+    stock: &Stock,
+    size: i32,
+) -> Option<usize> {
     let goods: Vec<(Good, f64)> =
         stock.iter().filter(|(_, n)| **n > 0.0).map(|(g, n)| (*g, *n)).collect();
     if goods.is_empty() {
-        return;
+        return None;
     }
     let (px, py) = crate::queries::building::pile_tile(world, x as i32, y as i32, size);
     let (px, py) = (f64::from(px), f64::from(py));
@@ -427,6 +438,7 @@ pub fn drop_goods(world: &mut WorldState, x: f64, y: f64, stock: &Stock, size: i
     for (good, n) in goods {
         *pile.goods.entry(good).or_insert(0.0) += n;
     }
+    Some(i)
 }
 
 /// Gathers the piles lying on a building's footprint into its one pile on its north-west tile

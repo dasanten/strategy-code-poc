@@ -314,6 +314,10 @@ import {
   WAREHOUSE_BASE_PRICE,
   WAREHOUSE_FLOOR,
   WEAPON_ATTACK,
+  WEAR_BLOWS,
+  TRAINING_WEAR_BLOWS_PER_DAY,
+  WORN_FROM,
+  NEARLY_BROKEN_FROM,
   WORK_SKILL_EFFECT,
   WORK_SKILL_MAX,
   WORKPLACE_MAX_WORKERS,
@@ -411,6 +415,12 @@ const STEEL = RECIPES.smelter!.find((r) => 'steel' in r.output)!
 
 /** The smithy's recipe for `good` (`CONTEXT.md`: Smithy). */
 const forged = (good: Good) => RECIPES.smithy!.find((r) => good in r.output)!
+
+/** How many blows a piece of gear lasts (`CONTEXT.md`: Wear), or a dash for gear that never wears. */
+function lasts(good: Good): string {
+  const blows = (WEAR_BLOWS as Record<string, number | undefined>)[good]
+  return blows === undefined ? '—' : num(blows)
+}
 
 /** Each steel weapon or piece of armour beside the iron one it beats (`CONTEXT.md`: Coal). */
 const STEEL_GEAR: [Good, Good][] = [
@@ -3461,6 +3471,7 @@ export function Wiki() {
               <th>Gear</th>
               <th>Attack</th>
               <th>Defence</th>
+              <th>Lasts (blows)</th>
               <th>kg</th>
             </tr>
           </thead>
@@ -3470,6 +3481,7 @@ export function Wiki() {
                 <td>{goodName(g)}</td>
                 <td>{signed(a)}</td>
                 <td>—</td>
+                <td>{lasts(g)}</td>
                 <td>{num(GOOD_WEIGHT[g])}</td>
               </tr>
             ))}
@@ -3478,6 +3490,7 @@ export function Wiki() {
                 <td>{goodName(g)}</td>
                 <td>—</td>
                 <td>{signed(-d)}</td>
+                <td>{lasts(g)}</td>
                 <td>{num(GOOD_WEIGHT[g])}</td>
               </tr>
             ))}
@@ -3515,6 +3528,18 @@ export function Wiki() {
           their weapon and shield and a rim for armour, bright for steel and grey for iron, and the
           same on their card, to scripts too. What else they carry stays hidden from other realms,
           as a carriage's load does, unless one of theirs stands on the same tile.
+        </p>
+        <p>
+          Gear <strong>wears</strong>: a weapon with each blow it strikes, dodged or not, a shield
+          and armour with each blow they take, and every equipped piece a little in training,{' '}
+          {num(TRAINING_WEAR_BLOWS_PER_DAY)} blow's worth a game day. The table says how many blows
+          each lasts. Worn out, a piece <strong>breaks</strong> and is gone, and the next best one
+          carried takes its slot; until then it fights as well as new. A resident uses up the most
+          worn piece of a kind first, and worn gear stays as worn in a storage, a carriage or the
+          loot of the fallen. Its <strong>condition</strong> reads good, worn (from{' '}
+          {pct(WORN_FROM)} of its life used) or nearly broken (from {pct(NEARLY_BROKEN_FROM)}), on
+          the card and to scripts (<code>condition</code>), only for the realm carrying it; anyone
+          else sees just its kind and metal.
         </p>
         <p>
           Defenders on their own city's wall take {pct(WALL_DEFENCE)} of the damage. A tile of wall

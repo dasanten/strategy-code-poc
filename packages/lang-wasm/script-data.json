@@ -164,6 +164,14 @@
           "description": "What they have equipped: a weapon, shield and armour, each among what they carry."
         },
         {
+          "name": "condition",
+          "type": {
+            "view": "condition"
+          },
+          "description": "The condition of what they have equipped.",
+          "nullWhen": "for another realm’s residents"
+        },
+        {
           "name": "order",
           "type": {
             "view": "residentOrder"
@@ -353,6 +361,29 @@
           "name": "armour",
           "type": "string",
           "description": "The armour equipped: \"armour\" or \"steelArmour\".",
+          "nullWhen": "when they have none equipped"
+        }
+      ]
+    },
+    "condition": {
+      "description": "The condition of what a resident has equipped: \"good\", \"worn\" or \"nearlyBroken\". Gear wears with each blow struck or taken and a little in training; worn out, it breaks and is gone. It fights as well as new until then.",
+      "fields": [
+        {
+          "name": "weapon",
+          "type": "string",
+          "description": "The equipped weapon's condition.",
+          "nullWhen": "when unarmed"
+        },
+        {
+          "name": "shield",
+          "type": "string",
+          "description": "The equipped shield's condition.",
+          "nullWhen": "when they have none equipped"
+        },
+        {
+          "name": "armour",
+          "type": "string",
+          "description": "The equipped armour's condition.",
           "nullWhen": "when they have none equipped"
         }
       ]

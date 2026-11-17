@@ -47,6 +47,11 @@ pub type TilePath = Vec<(f64, f64)>;
 /// Goods by kind, as unit counts; a missing good is 0 (`Stock`).
 pub type Stock = IndexMap<Good, f64>;
 
+/// How worn the used pieces of gear among a stock are (`CONTEXT.md`: Wear): for each good, the
+/// share of its life each used piece has worn away, from 0 up to (not including) 1, most worn
+/// first. Units of the good not listed are as new, so a stock of new gear lists nothing.
+pub type Wear = IndexMap<Good, Vec<f64>>;
+
 /// A script value as plain data (`MemoryValue`): any JSON value.
 pub type MemoryValue = serde_json::Value;
 
@@ -301,6 +306,31 @@ pub enum EquipSlot {
     Weapon,
     Shield,
     Armour,
+}
+
+/// A piece of gear's condition in words (`CONTEXT.md`: Wear).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum PieceCondition {
+    Good,
+    Worn,
+    NearlyBroken,
+}
+
+/// The condition of each piece a resident has equipped, an empty slot left out (`CONTEXT.md`:
+/// Wear). Only the realm carrying it sees it.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GearCondition {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub weapon: Option<PieceCondition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub shield: Option<PieceCondition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub armour: Option<PieceCondition>,
 }
 
 /// A slot kept empty after its item was taken off, and how many units fitting it the resident
@@ -1361,6 +1391,12 @@ pub struct WorldState {
     /// elsewhere (`CONTEXT.md`: Running dry). Left out of a save while there are none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub waiting_veins: Vec<WaitingVein>,
+    /// The wear of used gear (`CONTEXT.md`: Wear), by the id of the resident, building, carriage,
+    /// vessel or pile keeping it. Gear nobody has used is in no entry. Left out of a save while
+    /// all gear is as new, so a world from before format 136 reads as all gear in good condition.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    #[ts(optional, as = "Option<IndexMap<String, Wear>>")]
+    pub wear: IndexMap<String, Wear>,
 }
 
 impl WorldState {

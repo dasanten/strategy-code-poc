@@ -498,6 +498,19 @@ export interface Balance {
     steelArmour: number
     [key: string]: number
   }
+  readonly WEAR_BLOWS: {
+    spear: number
+    sword: number
+    steelSword: number
+    shield: number
+    steelShield: number
+    armour: number
+    steelArmour: number
+    [key: string]: number
+  }
+  readonly TRAINING_WEAR_BLOWS_PER_DAY: number
+  readonly WORN_FROM: number
+  readonly NEARLY_BROKEN_FROM: number
   readonly CARRY_BASE: number
   readonly CARRY_PER_STRENGTH: number
   readonly FOOD_PER_DAY: number
