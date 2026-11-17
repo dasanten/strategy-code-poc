@@ -209,6 +209,7 @@
     "gate": 1.25
   },
   "NPC_FOOD_SHORT_DAYS": 5.0,
+  "NPC_FOOD_REFILL_DAYS": 10.0,
   "WORK_FOOD_KEPT": 2.0,
   "NPC_SOLDIER_SHARE": 0.25,
   "NPC_STEEL_KIT": [
