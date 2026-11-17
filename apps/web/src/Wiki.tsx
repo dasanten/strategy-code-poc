@@ -301,6 +301,8 @@ import {
   WALL_STRENGTH,
   STONE_WALL_STRENGTH,
   TOWER_ROOM,
+  TOWER_SIGHT_RANGE,
+  TOWER_SHOT_REACH_BONUS,
   WALL_WALK_TICKS,
   FALL_DAMAGE,
   WALK_TICKS_PER_TILE,
@@ -3582,6 +3584,16 @@ export function Wiki() {
           of stone {num(STONE_WALL_STRENGTH.tower)} ({duration(breakTicks('tower', true))}), and it
           is struck from beside any of its tiles. Whoever is up on it when it breaks falls, as from
           a wall tile. A tower is broken, not climbed.
+        </p>
+        <p>
+          <strong>Up on a tower.</strong> A resident up on a tower sees {num(TOWER_SIGHT_RANGE)}{' '}
+          tiles around instead of {num(SIGHT_RANGE)}, and what they see is your realm's Sight: it
+          shows on the map, is explored and kept in Last seen like anything else seen. An outsider
+          coming into the city's area that such a lookout sees raises the alarm across the whole of
+          its area, so a tower warns of an army early. An archer up on a tower shoots{' '}
+          {num(TOWER_SHOT_REACH_BONUS)} tiles further than on the ground, beyond an archer on the
+          wall ({num(WALL_SHOT_REACH_BONUS)} further), and up there takes the wall's cover as on
+          the wall.
         </p>
         <p>
           <strong>The high ground.</strong> Whoever is up strikes down at anyone on the ground next
