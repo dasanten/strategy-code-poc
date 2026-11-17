@@ -23,6 +23,7 @@ use csp_shared::world::{
 
 use crate::npc_behaviour::{npc_home, walk_to, Jobs};
 use crate::npc_chain::{chain_input, makes, project_needs, reserve_lacks, short_goods};
+use crate::npc_escort::escort_run;
 use crate::npc_plan::farmers_wanted;
 use crate::npc_scouts::knows_node;
 use crate::queries::alliance::allied;
@@ -146,6 +147,15 @@ pub fn send_traders(
         if !sent {
             return;
         }
+        // The run just added is the last; a town's takes its escort (`CONTEXT.md`: Escort).
+        let trader = world.city_plans[&city.id]
+            .traders
+            .as_ref()
+            .and_then(|t| t.last())
+            .map(|t| t.resident_id.clone());
+        if let Some(trader) = trader {
+            escort_run(world, city, adults, &trader, size);
+        }
     }
 }
 
@@ -224,6 +234,7 @@ fn plan_trader(
         sells: Stock::from([(good, units)]),
         buys,
         since: world.tick as f64,
+        escort_ids: Vec::new(),
     };
     add_run(world, &city.id, run);
     jobs.insert(world.residents[r].id.clone(), trade_job());
@@ -302,6 +313,7 @@ fn plan_visit(
         sells,
         buys,
         since: world.tick as f64,
+        escort_ids: Vec::new(),
     };
     add_run(world, &city.id, run);
     jobs.insert(world.residents[r].id.clone(), trade_job());
@@ -367,6 +379,7 @@ fn plan_offer_run(
         sells: Stock::new(),
         buys: Stock::new(),
         since: world.tick as f64,
+        escort_ids: Vec::new(),
     };
     add_run(world, &city.id, run);
     true
@@ -406,7 +419,8 @@ fn visit_deal(
         let arms = surplus.min((room / good_weight(good) + 1e-9).floor());
         let in_hand = Stock::from([(good, arms)]);
         let holder = TradeHolder { stock: &in_hand, room: f64::INFINITY };
-        let q = quote_with_trader(world, visitor, carriage, holder, TradeSide::Sell, good, arms);
+        let q =
+            quote_with_trader(world, visitor, carriage, holder, TradeSide::Sell, good, arms, &[]);
         if q.units < 1.0 || q.coins <= 0.0 || (fresh == best_fresh && q.coins <= best_coins) {
             continue;
         }

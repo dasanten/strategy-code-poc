@@ -292,3 +292,22 @@ fn keeps_training_over_a_long_run_the_teacher_switching_subjects() {
     assert!(skill_of(at(&mut world, "a3"), SkillName::Combat) > 0.0);
     assert_eq!(trained(&mut world, "t1"), 0.0);
 }
+
+/// Training wears a trainee's gear a little (`CONTEXT.md`: Wear): each equipped piece by
+/// `TRAINING_WEAR_BLOWS_PER_DAY` blows a game day, and only while they learn.
+#[test]
+fn training_wears_the_gear_a_trainee_has_equipped_a_little() {
+    use csp_shared::balance::{TRAINING_WEAR_BLOWS_PER_DAY, WEAR_BLOWS};
+    use csp_shared::world::Good;
+    let (mut world, t, mut orders) = setup();
+    at(&mut world, "a1").carried = [(Good::Sword, 1.0), (Good::Shield, 1.0)].into_iter().collect();
+    at(&mut world, "a2").carried = [(Good::Sword, 1.0)].into_iter().collect();
+    assert_eq!(send(&mut world, &t, &mut orders, teach("strength")), "ack");
+    assert_eq!(send(&mut world, &t, &mut orders, train("a1", "g1")), "ack");
+    run(&mut world, &t, TICKS_PER_GAME_DAY as usize);
+    let worn = |id: &str, g| csp_sim::wear::in_use(&world, id, g);
+    let day = TRAINING_WEAR_BLOWS_PER_DAY;
+    near(worn("a1", Good::Sword), day / WEAR_BLOWS.get("sword").unwrap(), 4);
+    near(worn("a1", Good::Shield), day / WEAR_BLOWS.get("shield").unwrap(), 4);
+    assert_eq!(worn("a2", Good::Sword), 0.0, "standing by wears nothing");
+}

@@ -223,11 +223,12 @@
   "NPC_SOLDIERS_AT_GATE": 1.0,
   "NPC_POST_AROUND_HALL": 2.0,
   "NPC_TRAIN_TURN_TICKS": 7200.0,
-  "NPC_PATROLS_MAX": 3.0,
-  "NPC_SOLDIERS_PER_PATROL": 4.0,
+  "NPC_PATROLS_MAX": 8.0,
+  "NPC_SOLDIERS_PER_PATROL": 1.5,
   "NPC_PATROL_WALL_STOPS": 8.0,
   "NPC_PATROL_ROAD_STOPS": 3.0,
   "NPC_WAR_CHEST_PER_RESIDENT": 10.0,
+  "NPC_TOOLS_SPARE": 2.0,
   "NPC_GATE_WATCH_RANGE": 32.0,
   "NPC_ADULTS_PER_PAIR": 6.0,
   "CARRYING_DAYS": 10.0,
@@ -262,8 +263,10 @@
     "iron": 60.0,
     "goldOre": 60.0,
     "coins": 300.0,
-    "spear": 4.0
+    "spear": 4.0,
+    "tools": 2.0
   },
+  "NPC_SURPLUS_PAST_CAP": 4.0,
   "NPC_WALL_STEP": 8.0,
   "NPC_INNER_WALL_REACH": 9.0,
   "CITY_GRID_BLOCK": 4.0,
@@ -289,6 +292,9 @@
   "NPC_FOUND_FOOD_SURPLUS_SHARE": 0.5,
   "NPC_FOUND_RESIDENTS_PER_MEMBER": 10.0,
   "NPC_FOUND_PARTY_MOST": 14.0,
+  "NPC_ESCORT_TOWN_RESIDENTS": 12.0,
+  "NPC_TRADER_ESCORTS": 1.0,
+  "NPC_FOUND_ESCORT_SHARE": 0.2,
   "NPC_FOUND_SAMPLES": 200.0,
   "NPC_FOUND_REACH": 960.0,
   "NPC_FOUND_FOOD_DAYS": 20.0,
@@ -335,7 +341,8 @@
       "spear": 4.0,
       "sword": 2.0,
       "shield": 4.0,
-      "armour": 2.0
+      "armour": 2.0,
+      "tools": 4.0
     }
   },
   "WAREHOUSE_FLOOR": {
@@ -355,6 +362,7 @@
     "steelSword": 1.0,
     "steelShield": 1.0,
     "steelArmour": 1.0,
+    "tools": 2.0,
     "bow": 1.0,
     "crossbow": 1.0,
     "arrows": 40.0
@@ -377,6 +385,7 @@
     "steelSword": 50.0,
     "steelShield": 30.0,
     "steelArmour": 160.0,
+    "tools": 25.0,
     "bow": 12.0,
     "crossbow": 30.0,
     "arrows": 1.0
@@ -426,6 +435,7 @@
     "steelSword": 3.0,
     "steelShield": 4.0,
     "steelArmour": 8.0,
+    "tools": 2.0,
     "bow": 2.0,
     "crossbow": 4.0,
     "arrows": 0.1
@@ -464,6 +474,22 @@
     "steelShield": 5.0,
     "steelArmour": 8.0
   },
+  "WEAR_BLOWS": {
+    "spear": 400.0,
+    "sword": 600.0,
+    "steelSword": 900.0,
+    "shield": 300.0,
+    "steelShield": 450.0,
+    "armour": 400.0,
+    "steelArmour": 600.0
+  },
+  "TRAINING_WEAR_BLOWS_PER_DAY": 1.0,
+  "WORN_FROM": 0.5,
+  "NEARLY_BROKEN_FROM": 0.85,
+  "MEND_RECIPE_SHARE": 0.3,
+  "MEND_WORK_SHARE": 0.5,
+  "WORN_PRICE_SHARE": 0.6,
+  "NEARLY_BROKEN_PRICE_SHARE": 0.25,
   "CARRY_BASE": 10.0,
   "CARRY_PER_STRENGTH": 2.0,
   "FOOD_PER_DAY": 0.5,
@@ -841,6 +867,15 @@
       },
       {
         "input": {
+          "iron": 1.0,
+          "wood": 1.0
+        },
+        "output": {
+          "tools": 1.0
+        }
+      },
+      {
+        "input": {
           "wood": 2.0
         },
         "output": {
@@ -884,9 +919,38 @@
   "WORK_SKILL_EFFECT": 0.01,
   "WORK_SKILL_LIMIT": 1.0,
   "WORK_SKILL_MAX": 100.0,
+  "TOOLS_WORK_BONUS": 0.25,
+  "TOOLS_WORK_DAYS": 60.0,
   "WORK_SKILL_PER_DAY": 0.23809523809523808,
   "TEARDOWN_WORK_SHARE": 0.5,
   "TEARDOWN_MATERIALS_RETURNED": 0.5,
+  "DECAY_DAYS": {
+    "road": 2700.0,
+    "wall": 2700.0,
+    "gate": 2700.0,
+    "farm": 3600.0,
+    "house": 4500.0,
+    "stable": 4500.0,
+    "lumberCamp": 4500.0,
+    "storage": 5400.0,
+    "trainingGround": 5400.0,
+    "haven": 5400.0,
+    "quarry": 5400.0,
+    "mine": 5400.0,
+    "townHall": 7200.0,
+    "warehouse": 10800.0,
+    "smelter": 10800.0,
+    "mint": 10800.0,
+    "smithy": 10800.0
+  },
+  "DECAY_WORN": 0.25,
+  "DECAY_NEARLY_RUIN": 0.75,
+  "REPAIR_MATERIALS_SHARE": 0.25,
+  "REPAIR_WORK_SHARE": 0.25,
+  "RUIN_COLLAPSE_DAYS": 1800.0,
+  "REBUILD_MATERIALS_SHARE": 0.5,
+  "REBUILD_WORK_SHARE": 0.5,
+  "COLLAPSE_MATERIALS_LEFT": 0.25,
   "ALLIANCE_LEAVE_DELAY": 3600.0,
   "ALLIANCE_RECALL_DELAY": 3600.0,
   "NPC_ALLIANCE_JOIN_STANDING": 50.0,

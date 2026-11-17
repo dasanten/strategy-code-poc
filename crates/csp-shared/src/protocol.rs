@@ -14,10 +14,10 @@ use crate::world::offers::SeenOffer;
 use crate::world::protocol::Hire;
 use crate::world::warehouse::ShownWarehousePrice;
 use crate::world::{
-    AlarmScriptId, ArmyOrder, Building, BuildingKind, Carrying, City, Equipment, Good, Heading,
-    HorseStats, OrderEnded, Pair, Pile, PricedGood, Queue, ResidentOrder, ScriptParamValue,
-    ScriptParamValues, SiegeMachineKind, SkillName, Stat, StatRecord, Stock, Struck, Task, Tile,
-    UpSide, VesselKind, WallMaterial,
+    AlarmScriptId, ArmyOrder, Building, BuildingKind, Carrying, City, Equipment, GearCondition,
+    Good, Heading, HorseStats, OrderEnded, Pair, Pile, PricedGood, Queue, ResidentOrder,
+    ScriptParamValue, ScriptParamValues, SiegeMachineKind, SkillName, Stat, StatRecord, Stock,
+    Struck, Task, Tile, UpSide, VesselKind, WallMaterial,
 };
 
 /// How heavily a carriage looks loaded to a Player who can't see its load (`LoadLevel`,
@@ -140,6 +140,10 @@ pub struct SeenResident {
     #[serde(default, skip_serializing_if = "Equipment::is_empty")]
     #[ts(as = "Option<Equipment>", optional)]
     pub equipped: Equipment,
+    /// The condition of what they have equipped (`CONTEXT.md`: Wear): for their own realm only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub condition: Option<GearCondition>,
     pub order: Option<ResidentOrder>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]

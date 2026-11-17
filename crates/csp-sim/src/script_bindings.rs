@@ -306,6 +306,33 @@ fn equipment_view(r: &Resident) -> Value {
     }))
 }
 
+/// The condition of a resident's equipped pieces and their Tools as their `condition` view
+/// (`CONTEXT.md`: Wear, Tools), `null` for an empty slot or no Tools.
+fn condition_view(world: &WorldState, r: &Resident) -> Value {
+    use crate::wear::{condition_name, gear_condition};
+    let gear = gear_condition(world, r);
+    let fields = script_view("condition").map_or(&[][..], |v| v.fields);
+    Value::frozen_fields(fields.iter().map(|f| {
+        let c = match f.name {
+            "weapon" => gear.weapon,
+            "shield" => gear.shield,
+            "armour" => gear.armour,
+            "tools" => gear.tools,
+            _ => None,
+        };
+        (f.name, c.map_or(Value::Null, |c| Value::string(condition_name(c))))
+    }))
+}
+
+/// Whether `side` carries `r`'s gear and so sees its condition (`CONTEXT.md`: Wear): a Player's
+/// own resident, or a resident of the NPC city the side is.
+fn carries_gear_of(r: &Resident, side: Option<&str>) -> bool {
+    side.is_some_and(|s| match &r.owner {
+        Some(o) => o == s,
+        None => r.city_id.as_deref() == Some(s),
+    })
+}
+
 /// A resident's `stats` as their view: each stat's `base` and `trained`.
 fn stats_view(stats: &StatRecord<Stat>) -> Value {
     let stat = |s: &Stat| {
@@ -396,6 +423,7 @@ fn resident_view(
             "skills" => numbers_view("skills", &r.skills, skill_name),
             "carried" => numbers_view("goods", &r.carried, good_name),
             "equipped" => equipment_view(r),
+            "condition" if carries_gear_of(r, side) => condition_view(world, r),
             "reach" => crate::queries::combat::shot_reach(world, r).map_or(Value::Null, number),
             "order" => order_value(r.order.as_ref(), f.r#type, land),
             "orderEnded" => field_value(&r.order_ended, f.r#type),
@@ -443,6 +471,8 @@ fn resident_data(
     m.insert("age".into(), json!(age_in_years(r.born_at, world.tick as f64)));
     // The slots as the rules count them, an empty one too (`CONTEXT.md`: Equipment).
     m.insert("equipped".into(), crate::equipment::equipment_json(r));
+    let condition = carries_gear_of(r, side).then(|| crate::wear::condition_json(world, r));
+    m.insert("condition".into(), condition.unwrap_or(Json::Null));
     m.insert("reach".into(), crate::queries::combat::reach_json(world, r));
     m
 }
@@ -792,6 +822,9 @@ impl<'a> ScriptBindings<'a> {
         // The slots as the rules count them, an empty one too (`CONTEXT.md`: Equipment).
         if let Some(r) = self.ctx.index.resident_by_id(self.world(), id) {
             m.insert("equipped".into(), crate::equipment::equipment_json(r));
+            // The condition of the gear only for the side carrying it (`CONTEXT.md`: Wear).
+            let condition = self.own(r).then(|| crate::wear::condition_json(self.world(), r));
+            m.insert("condition".into(), condition.unwrap_or(Json::Null));
             m.insert("reach".into(), crate::queries::combat::reach_json(self.world(), r));
         }
         m
@@ -845,6 +878,15 @@ impl<'a> ScriptBindings<'a> {
         Some(m)
     }
 
+    /// `condition` of a finished building that decays, in words (`CONTEXT.md`: Decay): seen by
+    /// everyone who sees the building.
+    fn condition_at(b: &Building) -> Option<Map<String, Json>> {
+        let word = crate::repair::condition_of(b)?;
+        let mut m = Map::new();
+        m.insert("condition".into(), Json::String(word.name().into()));
+        Some(m)
+    }
+
     /// At a storage, its offers, and at one of the side's own the goods it can take (`offersOf`).
     fn offers_of(&self, b: &Building) -> Option<Map<String, Json>> {
         let world = self.world();
@@ -891,7 +933,7 @@ impl<'a> ScriptBindings<'a> {
     fn as_seen_building(&self, b: &Building) -> Option<Json> {
         if self.own_building(b) {
             let m = merge(merge(to_json(b), self.settings_at(&b.id)), self.offers_of(b));
-            let m = merge(m, self.vein_at(&b.id));
+            let m = merge(merge(m, self.vein_at(&b.id)), Self::condition_at(b));
             return Some(Json::Object(m));
         }
         // What is in sight holds a building just when the eyes see its footprint (`places`):
@@ -909,7 +951,8 @@ impl<'a> ScriptBindings<'a> {
                 .find(|e| matches!(e, SeenEntity::Building(sb) if sb.building.id == b.id))?
                 .clone(),
         };
-        Some(Json::Object(merge(untagged(&shown), Some(self.building_extras(&b.id)))))
+        let m = merge(untagged(&shown), Some(self.building_extras(&b.id)));
+        Some(Json::Object(merge(m, Self::condition_at(b))))
     }
 
     /// One of the side's own buildings as `building(id)` gives it, built from the struct rather
@@ -942,6 +985,9 @@ impl<'a> ScriptBindings<'a> {
                 "damage" => b.damage.map_or(Value::Null, number),
                 "workSettings" => settings.map_or(Value::Null, |s| field_value(s, f.r#type)),
                 "vein" => self.vein_word_at(b).map_or(Value::Null, |w| Value::string(w.name())),
+                "condition" => {
+                    crate::repair::condition_of(b).map_or(Value::Null, |c| Value::string(c.name()))
+                }
                 // A building's `prices` and `offers` come with its offers, `teacher`,
                 // `subject` and `trainees` with another's.
                 _ => Value::Null,
@@ -1151,6 +1197,7 @@ impl<'a> ScriptBindings<'a> {
                         .map(|r| {
                             let mut m = to_json(r);
                             m.insert("equipped".into(), crate::equipment::equipment_json(r));
+                            m.insert("condition".into(), crate::wear::condition_json(world, r));
                             m.insert("reach".into(), crate::queries::combat::reach_json(world, r));
                             let s = r.script.as_ref().expect("filtered");
                             m.insert(
@@ -1263,6 +1310,40 @@ impl<'a> ScriptBindings<'a> {
                 };
                 Json::Array(goods)
             }
+            "wornBuildings" => {
+                let city = arg(0)
+                    .and_then(Value::as_str)
+                    .and_then(|id| world.cities.iter().find(|c| c.id == id));
+                let ours = city.is_some_and(|c| {
+                    self.side.is_some()
+                        && (if self.npc() { Some(&c.id) } else { c.realm_id.as_ref() })
+                            == self.side.as_ref()
+                });
+                let Some(city) = city.filter(|_| ours) else { return Ok(Json::Array(vec![])) };
+                let near = self.resident.map(|_| (self.me().x as i32, self.me().y as i32));
+                let mut worn: Vec<&Building> = world
+                    .buildings
+                    .iter()
+                    .filter(|b| {
+                        crate::repair::decays(b)
+                            && crate::repair::repairable(b)
+                            && (self.own_building(b)
+                                || (b.city_id.is_none() && building_realm(world, b).is_none()))
+                            && in_city_area(world, &city.id, b.x, b.y, size)
+                    })
+                    .collect();
+                let away = |b: &Building| {
+                    near.map_or(0.0, |at| wrap_distance(size, at, (b.x as i32, b.y as i32)))
+                };
+                worn.sort_by(|a, b| {
+                    let lost = |x: &Building| x.decay.unwrap_or(0.0);
+                    lost(b)
+                        .total_cmp(&lost(a))
+                        .then_with(|| away(a).total_cmp(&away(b)))
+                        .then_with(|| a.id.cmp(&b.id))
+                });
+                Json::Array(worn.into_iter().filter_map(|b| self.as_seen_building(b)).collect())
+            }
             "materialsNeeded" => {
                 let Some(b) = self.building_of(arg(0)).filter(|b| b.site.is_some()) else {
                     return Ok(Json::Array(vec![]));
@@ -1272,6 +1353,19 @@ impl<'a> ScriptBindings<'a> {
                 }
                 Json::Array(
                     materials_needed(b)
+                        .iter()
+                        .map(|(g, u)| json!({ "good": good_name(*g), "units": u }))
+                        .collect(),
+                )
+            }
+            "repairNeeded" => {
+                let b = self.building_of(arg(0)).filter(|b| crate::repair::repairable(b));
+                let Some(b) = b else { return Ok(Json::Array(vec![])) };
+                if !(self.own_building(b) || self.in_sight((b.x as i32, b.y as i32))) {
+                    return Ok(Json::Array(vec![]));
+                }
+                Json::Array(
+                    crate::repair::repair_materials_needed(b)
                         .iter()
                         .map(|(g, u)| json!({ "good": good_name(*g), "units": u }))
                         .collect(),
@@ -1406,10 +1500,14 @@ impl<'a> ScriptBindings<'a> {
                     return Ok(Json::Array(vec![]));
                 }
                 let makes = arg(1).and_then(Value::as_str);
-                let Some(recipe) = recipe_for(b.kind, makes) else {
-                    return Ok(Json::Array(vec![]));
+                let load = if makes == Some(crate::mending::MEND) {
+                    crate::mending::mend_input_to_fetch(world, b)
+                } else {
+                    let Some(recipe) = recipe_for(b.kind, makes) else {
+                        return Ok(Json::Array(vec![]));
+                    };
+                    input_to_fetch(world, b, recipe, r)
                 };
-                let load = input_to_fetch(world, b, recipe, r);
                 Json::Array(
                     load.iter()
                         .map(|(g, u)| json!({ "good": good_name(*g), "units": u }))
@@ -1699,6 +1797,7 @@ impl<'a> ScriptBindings<'a> {
                 self.request("build", input)
             }
             "tearDown" => self.request("tearDown", vec![("buildingId", p(0)?)]),
+            "repair" => self.request("repair", vec![("buildingId", p(0)?)]),
             "workAt" => {
                 let input = if a(0).is_some_and(|v| !v.is_null()) {
                     vec![("makes", p(0)?)]

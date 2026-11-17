@@ -787,11 +787,14 @@ pub const NPC_POST_AROUND_HALL: f64 = 2.0;
 pub const NPC_TRAIN_TURN_TICKS: f64 = 5.0 * TICKS_PER_GAME_DAY;
 
 /// The most of an NPC city's soldiers walking a round at once, whatever its size (`CONTEXT.md`: Soldier
-/// posts). They walk every tick, the dearest of a soldier's jobs, so a city's cost stops growing here.
-pub const NPC_PATROLS_MAX: f64 = 3.0;
+/// posts). They walk every tick, the dearest of a soldier's jobs, so a city's cost stops growing here;
+/// eight keep a big city's soldiers busy in peace (`CONTEXT.md`: Soldiers in peace), those just
+/// standing on a post about a tenth of its adults.
+pub const NPC_PATROLS_MAX: f64 = 8.0;
 
-/// One soldier walks a round for every this many on an NPC city's wall, up to `NPC_PATROLS_MAX`.
-pub const NPC_SOLDIERS_PER_PATROL: f64 = 4.0;
+/// One soldier walks a round for every this many on an NPC city's wall, up to `NPC_PATROLS_MAX`:
+/// two in three of them, so in peace few just stand on a post (`CONTEXT.md`: Soldiers in peace).
+pub const NPC_SOLDIERS_PER_PATROL: f64 = 1.5;
 
 /// How many stops a round has along an NPC city's wall, spread evenly round it. Each costs one path
 /// search; a town's wall of 180 tiles gives legs of about 22 tiles, some 3 game hours each.
@@ -803,6 +806,11 @@ pub const NPC_PATROL_ROAD_STOPS: f64 = 3.0;
 /// Coins an NPC city keeps as its war chest for each of its residents (`CONTEXT.md`: NPC reserve):
 /// a town of 16 keeps 160, what four mint workers strike in two game days (`RECIPES`).
 pub const NPC_WAR_CHEST_PER_RESIDENT: f64 = 10.0;
+
+/// Spare sets of Tools an NPC city keeps in its reserve beyond one for each of its workers and
+/// builders who carries none (`CONTEXT.md`: Tools, NPC reserve): enough for the next sets that
+/// break before its smithy forges more.
+pub const NPC_TOOLS_SPARE: f64 = 2.0;
 
 /// How near to an NPC city's gate, in tiles, an armed outsider makes it close its gates
 /// (`CONTEXT.md`: NPC city): a little inside sight, so the gate shuts before they reach it.
@@ -910,7 +918,9 @@ pub const NPC_REVIVE_REACH: f64 = 48.0;
 /// of its needs (`npcNeedsScale`; `CONTEXT.md`: Spare hands' work). Several of a trader's full loads
 /// (about 30 kg, `CARRY_BASE`), so its trader has something to sell, and above the materials a Full city wants (`townHall` and
 /// `storage` in `BUILD_MATERIALS`), or it could never found; few weapons, which its trader never
-/// sells. A good not named here is not worked for surplus.
+/// sells. Tools (`CONTEXT.md`: Tools) are forged only this way: below its reserve of them they are
+/// the first surplus work, and past it a couple spare. A good not named here is not worked for
+/// surplus.
 pub const NPC_SURPLUS_CAP: Table<f64> = Table(&[
     ("food", 100.0),
     ("wood", 150.0),
@@ -920,7 +930,15 @@ pub const NPC_SURPLUS_CAP: Table<f64> = Table(&[
     ("goldOre", 60.0),
     ("coins", 300.0),
     ("spear", 4.0),
+    ("tools", 2.0),
 ]);
+
+/// How many times its surplus cap (`NPC_SURPLUS_CAP`) an NPC city's spare hands work on to, once
+/// every good they could work for is at its cap and nothing else wants them (`CONTEXT.md`: Spare
+/// hands' work): the good least far past its cap first, farms aside. Enough that a big city with no
+/// one to sell to and no room to found keeps its crews at work for a game month or more while wear
+/// and decay use its goods up, and bounded, so its storage never fills without end.
+pub const NPC_SURPLUS_PAST_CAP: f64 = 4.0;
 
 /// How many tiles further out an NPC city puts up its new wall when it has no room left inside
 /// the old one (`CONTEXT.md`: NPC city), on every side, with the gate in the same place. At most
@@ -1036,6 +1054,19 @@ pub const NPC_FOUND_RESIDENTS_PER_MEMBER: f64 = 10.0;
 /// village's worth (`foundingMaterials`), its materials stay under the surplus caps
 /// (`NPC_SURPLUS_CAP`), or a big city could never found on what it makes.
 pub const NPC_FOUND_PARTY_MOST: f64 = 14.0;
+
+/// Residents from which an NPC city counts as a town and sends soldiers along with its traders
+/// (`CONTEXT.md`: Escort); a village's trader goes alone. Between a village's start (`NPC_VILLAGE`)
+/// and a town's (`NPC_TOWN`).
+pub const NPC_ESCORT_TOWN_RESIDENTS: f64 = 12.0;
+
+/// Soldiers a town's trader takes along on a run (`CONTEXT.md`: Escort), on a way not known to be
+/// dangerous.
+pub const NPC_TRADER_ESCORTS: f64 = 1.0;
+
+/// Soldiers a founding party takes per member (`CONTEXT.md`: Escort), rounded down and at least
+/// one, in place of its one armed member: a village's worth (6) takes one, the largest party two.
+pub const NPC_FOUND_ESCORT_SHARE: f64 = 0.2;
 
 /// Random tiles a full NPC city tries in one search for its daughter's site (`CONTEXT.md`:
 /// Founding), once a game day: enough to find free Plains on most maps, cheap enough to do while
@@ -1164,6 +1195,7 @@ pub const TRADING_POST: TradingPost = TradingPost {
         ("sword", 2.0),
         ("shield", 4.0),
         ("armour", 2.0),
+        ("tools", 4.0),
     ]),
 };
 
@@ -1189,6 +1221,7 @@ pub const WAREHOUSE_FLOOR: Table<f64> = Table(&[
     ("steelSword", 1.0),
     ("steelShield", 1.0),
     ("steelArmour", 1.0),
+    ("tools", 2.0),
     ("bow", 1.0),
     ("crossbow", 1.0),
     ("arrows", 40.0),
@@ -1224,6 +1257,7 @@ pub const WAREHOUSE_BASE_PRICE: Table<f64> = Table(&[
     ("steelSword", 50.0),
     ("steelShield", 30.0),
     ("steelArmour", 160.0),
+    ("tools", 25.0),
     ("bow", 12.0),
     ("crossbow", 30.0),
     ("arrows", 1.0),
@@ -1370,6 +1404,7 @@ pub const GOOD_WEIGHT: Table<f64> = Table(&[
     ("steelSword", 3.0),
     ("steelShield", 4.0),
     ("steelArmour", 8.0),
+    ("tools", 2.0),
     ("bow", 2.0),
     ("crossbow", 4.0),
     ("arrows", 0.1),
@@ -1388,6 +1423,45 @@ pub const WEAPON_ATTACK: Table<f64> =
 /// at the same weight. Only the best shield and the best armour carried count (`PROTECTION_KINDS`).
 pub const PROTECTION_DEFENCE: Table<f64> =
     Table(&[("shield", 3.0), ("armour", 5.0), ("steelShield", 5.0), ("steelArmour", 8.0)]);
+
+/// How many blows each piece of gear lasts before it breaks (`CONTEXT.md`: Wear): a weapon's
+/// blows struck, a shield's or armour's blows taken. A fight to the death is some 15 to 30 blows,
+/// so an iron sword sees about twenty fights; steel lasts half again as long as iron.
+pub const WEAR_BLOWS: Table<f64> = Table(&[
+    ("spear", 400.0),
+    ("sword", 600.0),
+    ("steelSword", 900.0),
+    ("shield", 300.0),
+    ("steelShield", 450.0),
+    ("armour", 400.0),
+    ("steelArmour", 600.0),
+]);
+
+/// How many blows' wear a game day of training puts on each piece a trainee has equipped
+/// (`CONTEXT.md`: Wear): a little, so a soldier training every day wears out an iron sword in
+/// well over a game year.
+pub const TRAINING_WEAR_BLOWS_PER_DAY: f64 = 1.0;
+
+/// Share of its life worn away from which a piece's condition reads "worn" (`CONTEXT.md`: Wear).
+pub const WORN_FROM: f64 = 0.5;
+
+/// Share of its life worn away from which a piece's condition reads "nearly broken".
+pub const NEARLY_BROKEN_FROM: f64 = 0.85;
+
+/// Share of a piece's smithy recipe that mending it takes (`CONTEXT.md`: Mending): each input's
+/// units times this, rounded, and at least one unit of its biggest input. A worn Sword takes 1
+/// Iron, worn Armour 2 Iron, a worn Spear or Shield 1 Wood.
+pub const MEND_RECIPE_SHARE: f64 = 0.3;
+
+/// Share of a batch's work that mending a piece takes (`CONTEXT.md`: Mending): a smithy worker
+/// mends twice as many pieces a day as they forge.
+pub const MEND_WORK_SHARE: f64 = 0.5;
+
+/// What a worn piece sells and buys for, as a share of a new one's price (`CONTEXT.md`: Wear).
+pub const WORN_PRICE_SHARE: f64 = 0.6;
+
+/// What a nearly broken piece sells and buys for, as a share of a new one's price.
+pub const NEARLY_BROKEN_PRICE_SHARE: f64 = 0.25;
 
 /// Carry capacity of a resident with no Strength at all, in kg.
 pub const CARRY_BASE: f64 = 10.0;
@@ -2153,6 +2227,10 @@ pub const RECIPES: Table<&[Recipe]> = Table(&[
                 input: Table(&[("steel", 7.0), ("wood", 1.0)]),
                 output: Table(&[("steelArmour", 1.0)]),
             },
+            Recipe {
+                input: Table(&[("iron", 1.0), ("wood", 1.0)]),
+                output: Table(&[("tools", 1.0)]),
+            },
             Recipe { input: Table(&[("wood", 2.0)]), output: Table(&[("bow", 1.0)]) },
             Recipe {
                 input: Table(&[("iron", 1.0), ("wood", 3.0)]),
@@ -2196,6 +2274,16 @@ pub const WORK_SKILL_LIMIT: f64 = 1.0;
 /// The most of a workplace's skill a resident can have: where it reaches `WORK_SKILL_LIMIT`.
 pub const WORK_SKILL_MAX: f64 = WORK_SKILL_LIMIT / WORK_SKILL_EFFECT;
 
+/// How much faster a resident carrying Tools works (`CONTEXT.md`: Tools), as a share of their
+/// plain pace: a quarter, at a workplace (what they make) and at a construction site (building,
+/// tearing down, repairing). One set counts; a second adds nothing.
+pub const TOOLS_WORK_BONUS: f64 = 0.25;
+
+/// Game days of work a set of Tools lasts before it breaks (`CONTEXT.md`: Tools, Wear): some two
+/// months of daily work, so a set made from an Iron and a Wood (`RECIPES`) pays for itself many
+/// times over before a worker needs the next.
+pub const TOOLS_WORK_DAYS: f64 = 60.0;
+
 /// Skill a worker of average Intellect gains per game day of work at a workplace: the cap takes
 /// about a game year (one real week).
 pub const WORK_SKILL_PER_DAY: f64 = 100.0 / 420.0;
@@ -2217,6 +2305,65 @@ pub const TEARDOWN_WORK_SHARE: f64 = 0.5;
 /// Share of a finished building's materials left in its pile when it is torn down, rounded down
 /// to whole units. An unfinished site leaves all its delivered materials.
 pub const TEARDOWN_MATERIALS_RETURNED: f64 = 0.5;
+
+/// Game days a finished building of each kind takes to lose all its condition, unrepaired
+/// (`CONTEXT.md`: Decay): it loses an even share each game day, used or not. A city left alone for
+/// a real month (1800 game days) is still there: its buildings may be worn, but none has fallen to
+/// ruin from decay alone (Daniel, 2026-11-17). Decay only: Food and defence while away are the
+/// Player's own scripts. Roads and the wooden walls and gates go fastest, in
+/// 45 real days; farms in 60; timber buildings in 75; storages, workplaces on a node, training
+/// grounds and havens in 90; the town hall in 120; those mostly of stone (warehouse, smelter, mint,
+/// smithy) in 180. A kind not listed (a carriage, boat or ship site) never decays.
+pub const DECAY_DAYS: Table<f64> = Table(&[
+    ("road", 2700.0),
+    ("wall", 2700.0),
+    ("gate", 2700.0),
+    ("farm", 3600.0),
+    ("house", 4500.0),
+    ("stable", 4500.0),
+    ("lumberCamp", 4500.0),
+    ("storage", 5400.0),
+    ("trainingGround", 5400.0),
+    ("haven", 5400.0),
+    ("quarry", 5400.0),
+    ("mine", 5400.0),
+    ("townHall", 7200.0),
+    ("warehouse", 10800.0),
+    ("smelter", 10800.0),
+    ("mint", 10800.0),
+    ("smithy", 10800.0),
+]);
+
+/// Share of its condition lost from which a building reads worn, rather than good
+/// (`CONTEXT.md`: Decay), and can be repaired: a road after about eleven real days.
+pub const DECAY_WORN: f64 = 0.25;
+
+/// Share of its condition lost from which a building reads nearly a ruin.
+pub const DECAY_NEARLY_RUIN: f64 = 0.75;
+
+/// Share of a building's materials a repair takes (`CONTEXT.md`: Repairing), rounded up to whole
+/// units of each good: a tile of road or wall a unit, a house 5 Wood.
+pub const REPAIR_MATERIALS_SHARE: f64 = 0.25;
+
+/// Share of a building's `BUILD_WORK` a repair takes: less than building it, and less than
+/// tearing it down (`TEARDOWN_WORK_SHARE`).
+pub const REPAIR_WORK_SHARE: f64 = 0.25;
+
+/// Game days a ruin stands before it collapses (`CONTEXT.md`: Ruin): "a long while more", a real
+/// month (Daniel, 2026-11-17), time enough to notice it and rebuild it.
+pub const RUIN_COLLAPSE_DAYS: f64 = 1800.0;
+
+/// Share of a building's materials rebuilding its ruin takes (`CONTEXT.md`: Ruin), rounded up to
+/// whole units: more than a repair, less than a new one.
+pub const REBUILD_MATERIALS_SHARE: f64 = 0.5;
+
+/// Share of a building's `BUILD_WORK` rebuilding its ruin takes: more than a repair, less than
+/// building it new.
+pub const REBUILD_WORK_SHARE: f64 = 0.5;
+
+/// Share of a building's materials that lies on its tiles once its ruin collapses, rounded down
+/// to whole units, as when it is torn down (`TEARDOWN_MATERIALS_RETURNED`).
+pub const COLLAPSE_MATERIALS_LEFT: f64 = 0.25;
 
 /// How long after a realm says it leaves an alliance, or the alliance leader removes it, it stops
 /// being a member (`CONTEXT.md`: Alliance): one real hour, time enough for the others to react.
@@ -2893,6 +3040,7 @@ pub fn balance_json() -> Value {
     m.insert("NPC_PATROL_WALL_STOPS".into(), json!(NPC_PATROL_WALL_STOPS));
     m.insert("NPC_PATROL_ROAD_STOPS".into(), json!(NPC_PATROL_ROAD_STOPS));
     m.insert("NPC_WAR_CHEST_PER_RESIDENT".into(), json!(NPC_WAR_CHEST_PER_RESIDENT));
+    m.insert("NPC_TOOLS_SPARE".into(), json!(NPC_TOOLS_SPARE));
     m.insert("NPC_GATE_WATCH_RANGE".into(), json!(NPC_GATE_WATCH_RANGE));
     m.insert("NPC_ADULTS_PER_PAIR".into(), json!(NPC_ADULTS_PER_PAIR));
     m.insert("CARRYING_DAYS".into(), json!(CARRYING_DAYS));
@@ -2908,6 +3056,7 @@ pub fn balance_json() -> Value {
     m.insert("NPC_ROAD_LONGEST".into(), json!(NPC_ROAD_LONGEST));
     m.insert("NPC_REVIVE_REACH".into(), json!(NPC_REVIVE_REACH));
     m.insert("NPC_SURPLUS_CAP".into(), to_value(NPC_SURPLUS_CAP).expect("serialisable"));
+    m.insert("NPC_SURPLUS_PAST_CAP".into(), json!(NPC_SURPLUS_PAST_CAP));
     m.insert("NPC_WALL_STEP".into(), json!(NPC_WALL_STEP));
     m.insert("NPC_INNER_WALL_REACH".into(), json!(NPC_INNER_WALL_REACH));
     m.insert("CITY_GRID_BLOCK".into(), json!(CITY_GRID_BLOCK));
@@ -2933,6 +3082,9 @@ pub fn balance_json() -> Value {
     m.insert("NPC_FOUND_FOOD_SURPLUS_SHARE".into(), json!(NPC_FOUND_FOOD_SURPLUS_SHARE));
     m.insert("NPC_FOUND_RESIDENTS_PER_MEMBER".into(), json!(NPC_FOUND_RESIDENTS_PER_MEMBER));
     m.insert("NPC_FOUND_PARTY_MOST".into(), json!(NPC_FOUND_PARTY_MOST));
+    m.insert("NPC_ESCORT_TOWN_RESIDENTS".into(), json!(NPC_ESCORT_TOWN_RESIDENTS));
+    m.insert("NPC_TRADER_ESCORTS".into(), json!(NPC_TRADER_ESCORTS));
+    m.insert("NPC_FOUND_ESCORT_SHARE".into(), json!(NPC_FOUND_ESCORT_SHARE));
     m.insert("NPC_FOUND_SAMPLES".into(), json!(NPC_FOUND_SAMPLES));
     m.insert("NPC_FOUND_REACH".into(), json!(NPC_FOUND_REACH));
     m.insert("NPC_FOUND_FOOD_DAYS".into(), json!(NPC_FOUND_FOOD_DAYS));
@@ -2980,6 +3132,14 @@ pub fn balance_json() -> Value {
     m.insert("SHOT_PIERCE".into(), to_value(SHOT_PIERCE).expect("serialisable"));
     m.insert("WALL_SHOT_REACH_BONUS".into(), json!(WALL_SHOT_REACH_BONUS));
     m.insert("PROTECTION_DEFENCE".into(), to_value(PROTECTION_DEFENCE).expect("serialisable"));
+    m.insert("WEAR_BLOWS".into(), to_value(WEAR_BLOWS).expect("serialisable"));
+    m.insert("TRAINING_WEAR_BLOWS_PER_DAY".into(), json!(TRAINING_WEAR_BLOWS_PER_DAY));
+    m.insert("WORN_FROM".into(), json!(WORN_FROM));
+    m.insert("NEARLY_BROKEN_FROM".into(), json!(NEARLY_BROKEN_FROM));
+    m.insert("MEND_RECIPE_SHARE".into(), json!(MEND_RECIPE_SHARE));
+    m.insert("MEND_WORK_SHARE".into(), json!(MEND_WORK_SHARE));
+    m.insert("WORN_PRICE_SHARE".into(), json!(WORN_PRICE_SHARE));
+    m.insert("NEARLY_BROKEN_PRICE_SHARE".into(), json!(NEARLY_BROKEN_PRICE_SHARE));
     m.insert("CARRY_BASE".into(), json!(CARRY_BASE));
     m.insert("CARRY_PER_STRENGTH".into(), json!(CARRY_PER_STRENGTH));
     m.insert("FOOD_PER_DAY".into(), json!(FOOD_PER_DAY));
@@ -3098,9 +3258,20 @@ pub fn balance_json() -> Value {
     m.insert("WORK_SKILL_EFFECT".into(), json!(WORK_SKILL_EFFECT));
     m.insert("WORK_SKILL_LIMIT".into(), json!(WORK_SKILL_LIMIT));
     m.insert("WORK_SKILL_MAX".into(), json!(WORK_SKILL_MAX));
+    m.insert("TOOLS_WORK_BONUS".into(), json!(TOOLS_WORK_BONUS));
+    m.insert("TOOLS_WORK_DAYS".into(), json!(TOOLS_WORK_DAYS));
     m.insert("WORK_SKILL_PER_DAY".into(), json!(WORK_SKILL_PER_DAY));
     m.insert("TEARDOWN_WORK_SHARE".into(), json!(TEARDOWN_WORK_SHARE));
     m.insert("TEARDOWN_MATERIALS_RETURNED".into(), json!(TEARDOWN_MATERIALS_RETURNED));
+    m.insert("DECAY_DAYS".into(), to_value(DECAY_DAYS).expect("serialisable"));
+    m.insert("DECAY_WORN".into(), json!(DECAY_WORN));
+    m.insert("DECAY_NEARLY_RUIN".into(), json!(DECAY_NEARLY_RUIN));
+    m.insert("REPAIR_MATERIALS_SHARE".into(), json!(REPAIR_MATERIALS_SHARE));
+    m.insert("REPAIR_WORK_SHARE".into(), json!(REPAIR_WORK_SHARE));
+    m.insert("RUIN_COLLAPSE_DAYS".into(), json!(RUIN_COLLAPSE_DAYS));
+    m.insert("REBUILD_MATERIALS_SHARE".into(), json!(REBUILD_MATERIALS_SHARE));
+    m.insert("REBUILD_WORK_SHARE".into(), json!(REBUILD_WORK_SHARE));
+    m.insert("COLLAPSE_MATERIALS_LEFT".into(), json!(COLLAPSE_MATERIALS_LEFT));
     m.insert("ALLIANCE_LEAVE_DELAY".into(), json!(ALLIANCE_LEAVE_DELAY));
     m.insert("ALLIANCE_RECALL_DELAY".into(), json!(ALLIANCE_RECALL_DELAY));
     m.insert("NPC_ALLIANCE_JOIN_STANDING".into(), json!(NPC_ALLIANCE_JOIN_STANDING));

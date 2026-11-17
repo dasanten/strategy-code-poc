@@ -124,8 +124,23 @@ fn next_tile(
     size: i32,
     taken: &HashSet<(i32, i32)>,
 ) -> Option<((i32, i32), usize)> {
+    next_tile_from(world, streets, roads, size, taken, None)
+}
+
+/// [`next_tile`], or with `near`, where one of the crew stands out on a way, the tile still to
+/// build nearest them: they lay the way they are on before they walk home to its streets
+/// (`CONTEXT.md`: NPC road).
+fn next_tile_from(
+    world: &WorldState,
+    streets: &[(f64, f64)],
+    roads: &[CityRoad],
+    size: i32,
+    taken: &HashSet<(i32, i32)>,
+    near: Option<(i32, i32)>,
+) -> Option<((i32, i32), usize)> {
     let built = road_tiles(world, size);
     let mut tile = None;
+    let mut nearest = f64::INFINITY;
     let mut left = 0;
     let all = std::iter::once(streets).chain(roads.iter().map(|r| r.tiles.as_slice()));
     for tiles in all {
@@ -135,8 +150,19 @@ fn next_tile(
                 continue;
             }
             left += 1;
-            if tile.is_none() && !taken.contains(&at) {
-                tile = Some(at);
+            if taken.contains(&at) {
+                continue;
+            }
+            match near {
+                Some(from) => {
+                    let d = wrap_distance(size, from, at);
+                    if d < nearest {
+                        nearest = d;
+                        tile = Some(at);
+                    }
+                }
+                None if tile.is_none() => tile = Some(at),
+                None => {}
             }
         }
     }
@@ -362,7 +388,7 @@ fn plan_roads(
 
 /// The road crew of this planning pass (`roadCrew`), from `unneeded`, the spare hands nothing short
 /// has a use for: none at a Trade Org city, or while what a road takes is short or neither the
-/// storage nor the crew has any to spare, or with no road to build. Those on the crew stay on it;
+/// storage nor the crew has any to spare, or with no road to build or repair. Those on the crew stay on it;
 /// next come those free of any workplace, then those who would go back to one, and last a scout
 /// out. `old_jobs` are the plan's jobs from its last pass.
 #[allow(clippy::too_many_arguments)]
@@ -415,7 +441,9 @@ pub fn road_crew(
             (i, rank)
         })
         .collect();
-    if !plan_roads(world, city, home, ways, terrain) {
+    // With no road to build, the crew repairs its roads (`CONTEXT.md`: Repairing).
+    let to_build = plan_roads(world, city, home, ways, terrain);
+    if !to_build && !crate::npc_repair::repair_due(world, city, Some(store), true) {
         return Vec::new();
     }
     let mut sorted = ranks;
@@ -472,7 +500,10 @@ pub fn lay_road(
     let plan = world.city_plans.get(&city.id).expect("a plan");
     let streets = plan.streets.clone().unwrap_or_default();
     let roads = plan.roads.clone().unwrap_or_default();
-    let Some(((x, y), left)) = next_tile(world, &streets, &roads, size, &taken) else {
+    // Out on a way, they lay the tiles near them first; in the city its streets come first.
+    let (rx, ry) = (world.residents[i].x as i32, world.residents[i].y as i32);
+    let near = (!in_city_area(world, &city.id, rx, ry, size)).then_some((rx, ry));
+    let Some(((x, y), left)) = next_tile_from(world, &streets, &roads, size, &taken, near) else {
         return false;
     };
     let r = &world.residents[i];

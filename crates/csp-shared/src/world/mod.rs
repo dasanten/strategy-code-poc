@@ -47,6 +47,11 @@ pub type TilePath = Vec<(f64, f64)>;
 /// Goods by kind, as unit counts; a missing good is 0 (`Stock`).
 pub type Stock = IndexMap<Good, f64>;
 
+/// How worn the used pieces of gear among a stock are (`CONTEXT.md`: Wear): for each good, the
+/// share of its life each used piece has worn away, from 0 up to (not including) 1, most worn
+/// first. Units of the good not listed are as new, so a stock of new gear lists nothing.
+pub type Wear = IndexMap<Good, Vec<f64>>;
+
 /// A script value as plain data (`MemoryValue`): any JSON value.
 pub type MemoryValue = serde_json::Value;
 
@@ -82,6 +87,7 @@ pub enum Good {
     SteelSword,
     SteelShield,
     SteelArmour,
+    Tools,
     Bow,
     Crossbow,
     Arrows,
@@ -106,6 +112,7 @@ pub enum PricedGood {
     SteelSword,
     SteelShield,
     SteelArmour,
+    Tools,
     Bow,
     Crossbow,
     Arrows,
@@ -307,6 +314,35 @@ pub enum EquipSlot {
     Weapon,
     Shield,
     Armour,
+}
+
+/// A piece of gear's condition in words (`CONTEXT.md`: Wear).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum PieceCondition {
+    Good,
+    Worn,
+    NearlyBroken,
+}
+
+/// The condition of each piece a resident has equipped, an empty slot left out (`CONTEXT.md`:
+/// Wear). Only the realm carrying it sees it.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GearCondition {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub weapon: Option<PieceCondition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub shield: Option<PieceCondition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub armour: Option<PieceCondition>,
+    /// The set of Tools they work with (`CONTEXT.md`: Tools), if they carry one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub tools: Option<PieceCondition>,
 }
 
 /// A slot kept empty after its item was taken off, and how many units fitting it the resident
@@ -956,6 +992,18 @@ pub struct WorkOrder {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub makes: Option<Good>,
+    /// At a smithy, mending worn gear instead of making anything (`CONTEXT.md`: Mending).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[ts(optional, as = "Option<bool>")]
+    pub mends: bool,
+}
+
+/// Repairing a worn building (`CONTEXT.md`: Repairing).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RepairOrder {
+    pub building_id: String,
+    pub at: Tile,
 }
 
 /// Tearing down.
@@ -1308,6 +1356,7 @@ pub enum ResidentOrder {
     Fetch(FetchOrder),
     Build(BuildOrder),
     TearDown(TearDownOrder),
+    Repair(RepairOrder),
     WorkAt(WorkOrder),
     Breed(BreedOrder),
     Attack(AttackOrder),
@@ -1420,6 +1469,12 @@ pub struct WorldState {
     /// elsewhere (`CONTEXT.md`: Running dry). Left out of a save while there are none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub waiting_veins: Vec<WaitingVein>,
+    /// The wear of used gear (`CONTEXT.md`: Wear), by the id of the resident, building, carriage,
+    /// vessel or pile keeping it. Gear nobody has used is in no entry. Left out of a save while
+    /// all gear is as new, so a world from before format 136 reads as all gear in good condition.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    #[ts(optional, as = "Option<IndexMap<String, Wear>>")]
+    pub wear: IndexMap<String, Wear>,
 }
 
 impl WorldState {
@@ -1556,6 +1611,11 @@ pub struct CityTrader {
     pub sells: Stock,
     pub buys: Stock,
     pub since: f64,
+    /// The city's soldiers who walk with this trader and guard them (`CONTEXT.md`: Escort). Left
+    /// out while none do.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[ts(as = "Option<Vec<String>>", optional)]
+    pub escort_ids: Vec<String>,
 }
 
 /// What a scout out has seen and not brought home yet (`CONTEXT.md`: Scout).
@@ -3505,6 +3565,23 @@ pub struct Building {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub breedings: Option<Vec<KeptBreeding>>,
+    /// Share of its condition a finished building has lost to decay (`CONTEXT.md`: Decay), from 0
+    /// (good, as built) to 1 (nothing left). Left out of a save while it has lost none, so a
+    /// building from before format 130 reads as good.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub decay: Option<f64>,
+    /// A repair under way (`CONTEXT.md`: Repairing): the materials brought and the work put in so
+    /// far. Gone once it is done.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub repair: Option<ConstructionSite>,
+    /// The tick a building nobody repaired became a ruin (`CONTEXT.md`: Ruin): it stands but does
+    /// nothing, and collapses `RUIN_COLLAPSE_DAYS` game days later. Gone once it is rebuilt; left
+    /// out of a save while it is none, so a building from before format 135 is no ruin.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub ruined_at: Option<f64>,
     /// What a wall, gate or tower, or its site, is of; none is wood (`CONTEXT.md`: Wall / Gate,
     /// Wood or stone, Tower). Only walls, gates and towers have one.
     #[serde(default, skip_serializing_if = "Option::is_none")]

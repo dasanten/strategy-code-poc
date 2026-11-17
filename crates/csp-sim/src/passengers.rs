@@ -215,7 +215,7 @@ impl OrderKind for GetOff {
 
 /// The orders that act on a tile, and so get a passenger off their carriage first
 /// (`GETS_OFF_FIRST`).
-pub const GETS_OFF_FIRST: [&str; 34] = [
+pub const GETS_OFF_FIRST: [&str; 35] = [
     "walkTo",
     "relocate",
     "drive",
@@ -228,6 +228,7 @@ pub const GETS_OFF_FIRST: [&str; 34] = [
     "fetch",
     "build",
     "tearDown",
+    "repair",
     "workAt",
     "teach",
     "train",

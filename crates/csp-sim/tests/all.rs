@@ -88,6 +88,8 @@ mod known_workplace;
 mod last_seen;
 #[path = "lost_post.rs"]
 mod lost_post;
+#[path = "mending.rs"]
+mod mending;
 #[path = "new_veins.rs"]
 mod new_veins;
 #[path = "npc_chain.rs"]
@@ -116,12 +118,16 @@ mod processing;
 mod queries;
 #[path = "relocate_steps.rs"]
 mod relocate_steps;
+#[path = "repairing.rs"]
+mod repairing;
 #[path = "residents_stepped.rs"]
 mod residents_stepped;
 #[path = "road_line.rs"]
 mod road_line;
 #[path = "roads.rs"]
 mod roads;
+#[path = "ruins.rs"]
+mod ruins;
 #[path = "script_waiting.rs"]
 mod script_waiting;
 #[path = "ship_building.rs"]
@@ -156,6 +162,8 @@ mod tasks_started_directly;
 mod teaching;
 #[path = "teardown.rs"]
 mod teardown;
+#[path = "tools.rs"]
+mod tools;
 #[path = "trade_org_debt_demand.rs"]
 mod trade_org_debt_demand;
 #[path = "trade_org_layout.rs"]

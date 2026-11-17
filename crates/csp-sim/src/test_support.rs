@@ -65,6 +65,9 @@ pub fn building(id: &str, kind: BuildingKind, city_id: Option<&str>, x: f64, y: 
         closed: None,
         damage: None,
         breedings: None,
+        decay: None,
+        ruined_at: None,
+        repair: None,
         material: None,
     }
 }

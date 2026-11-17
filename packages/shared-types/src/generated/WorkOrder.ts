@@ -5,4 +5,8 @@ import type { Tile } from "./Tile.js";
 /**
  * Working at a workplace.
  */
-export type WorkOrder = { buildingId: string, at: Tile, progress: number, makes?: Good, };
+export type WorkOrder = { buildingId: string, at: Tile, progress: number, makes?: Good, 
+/**
+ * At a smithy, mending worn gear instead of making anything (`CONTEXT.md`: Mending).
+ */
+mends?: boolean, };

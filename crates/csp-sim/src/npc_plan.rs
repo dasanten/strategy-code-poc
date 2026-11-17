@@ -547,7 +547,10 @@ fn share_out(
     };
     // Workers of a workplace whose good the city isn't short of become spare hands, the farms aside.
     for &i in adults {
-        if held_score(world, jobs, i) <= only_back && jobs.contains_key(&world.residents[i].id) {
+        if held_score(world, jobs, i) <= only_back
+            && jobs.contains_key(&world.residents[i].id)
+            && !crate::npc_mending::mends(&world.residents[i])
+        {
             release(world, jobs, held, &mut kept, &mut spare, i);
         }
     }
@@ -587,6 +590,8 @@ fn share_out(
         .map(|i| (i, held_score(world, jobs, i)))
         .collect();
     let storage = chain_store_index(world, city);
+    // With nothing to build, its builders repair its buildings (`CONTEXT.md`: Repairing).
+    let repairs = crate::npc_repair::repair_due(world, city, storage, false);
     let (home, mut ways, terrain) = roads;
     let mut state = Share { builders, farming };
     let mut unneeded: Vec<usize> = Vec::new();
@@ -654,13 +659,13 @@ fn share_out(
                         .collect()
                 }
                 Offer::Project => {
-                    let project = project.clone().expect("a project");
+                    let project = project.clone();
                     takers
                         .into_iter()
                         .filter(|&i| {
-                            if state.builders >= npc_builders(world, city)
-                                || !can_take_part(world, city, i, &project)
-                            {
+                            let part =
+                                project.as_ref().is_some_and(|p| can_take_part(world, city, i, p));
+                            if state.builders >= npc_builders(world, city) || !(part || repairs) {
                                 return false;
                             }
                             give(world, jobs, held, i, job_at(CityJobKind::Build, None), None);
@@ -764,7 +769,7 @@ fn share_out(
         (ScoredJob::Farm { food_short: false }, Offer::Farm),
         (ScoredJob::Revive, Offer::Revive),
     ];
-    if project.is_some() {
+    if project.is_some() || repairs {
         first.push((ScoredJob::Project, Offer::Project));
     }
     first.extend(short.iter().map(|s| (ScoredJob::Short { share: s.share }, Offer::Short(s.good))));
@@ -794,11 +799,26 @@ fn share_out(
         .iter()
         .map(|s| (ScoredJob::Short { share: s.share }, Offer::Short(s.good)))
         .collect();
-    let idle = if founding.is_empty() || left.is_empty() {
+    let mut idle = if founding.is_empty() || left.is_empty() {
         left
     } else {
         fill(world, jobs, held, &kept, &mut state, &mut ways, founding, left)
     };
+    // With every good they could work for at its cap and nothing left to gather for a founding
+    // party, they work on past the cap, the good least far past first (`NPC_SURPLUS_PAST_CAP`).
+    if city.trade_org.is_none() && !idle.is_empty() {
+        let surplus = SurplusWork::of(world, city, storage.map(|s| &world.buildings[s]));
+        let past: Vec<(ScoredJob, Offer)> = own
+            .iter()
+            .filter_map(|&place| {
+                let full = surplus.past(world, &world.buildings[place])?;
+                Some((ScoredJob::Surplus { full }, Offer::Surplus(place)))
+            })
+            .collect();
+        if !past.is_empty() {
+            idle = fill(world, jobs, held, &kept, &mut state, &mut ways, past, idle);
+        }
+    }
     for i in idle {
         jobs.insert(world.residents[i].id.clone(), job_at(CityJobKind::Idle, None));
     }

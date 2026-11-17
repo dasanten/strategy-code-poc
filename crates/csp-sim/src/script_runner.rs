@@ -380,6 +380,7 @@ fn as_order(o: &OrderRequest, task: Task) -> OrderRequest {
             ]),
         ),
         Task::TearDown => ("tearDown", pick(&[("buildingId", "buildingId")])),
+        Task::Repair => ("repair", pick(&[("buildingId", "buildingId")])),
         Task::Breed => ("breed", pick(&[("stableId", "stableId"), ("horseIds", "horseIds")])),
         Task::Build => ("build", pick(&[("building", "building"), ("material", "material")])),
         Task::Train => ("train", pick(&[("buildingId", "groundId")])),
@@ -457,7 +458,7 @@ fn task_memory(
             );
             m.insert("keepFood".into(), f.get("keepFood").cloned().unwrap_or(Json::Null));
         }
-        Task::TearDown => {
+        Task::TearDown | Task::Repair => {
             m.insert("buildingId".into(), f.get("buildingId").cloned().unwrap_or(Json::Null));
         }
         Task::Breed => {
@@ -490,7 +491,9 @@ fn task_target(
     let (id, ty) = match task {
         Task::BuildLine | Task::Explore | Task::Defend | Task::Alarm => return None,
         Task::Work => (field_str(o, "workplaceId").map(str::to_string), ParamType::Building),
-        Task::TearDown => (field_str(o, "buildingId").map(str::to_string), ParamType::Building),
+        Task::TearDown | Task::Repair => {
+            (field_str(o, "buildingId").map(str::to_string), ParamType::Building)
+        }
         Task::Train => (field_str(o, "groundId").map(str::to_string), ParamType::Building),
         Task::Breed | Task::FeedStable => {
             (field_str(o, "stableId").map(str::to_string), ParamType::Storage)
@@ -603,6 +606,17 @@ impl TaskOrder {
                     return Some("train a stat or a skill".into());
                 }
             }
+        }
+        if task == Task::Repair {
+            // Given from the building's card, so maybe from afar: its default walks there first.
+            if !can_work(r.born_at, tick) {
+                return Some("children can’t repair buildings".into());
+            }
+            let id = field_str(o, "buildingId");
+            let Some(b) = world.buildings.iter().find(|b| Some(b.id.as_str()) == id) else {
+                return Some("which building?".into());
+            };
+            return crate::repair::repair_problem(world, b.x as i32, b.y as i32, &b.id);
         }
         let built = work_site_order(world, o, task, r, size)
             .unwrap_or_else(|| as_order(&with_kept_pair(world, o, task, Some(&realm.id)), task));
@@ -2078,7 +2092,8 @@ fn target_known(task: Task) -> Option<(&'static str, &'static [&'static str], &'
 }
 
 /// Invariant (`defaultsHaveATarget`): a resident running the Work, Build, Haul or Build line
-/// default as the game ships it knows its target once it has run.
+/// default as the game ships it knows its target once it has run: for Build, a site or the
+/// building it repairs.
 pub fn defaults_have_a_target(
     world: &WorldState,
     task_of: &dyn Fn(&Resident) -> Option<Task>,
@@ -2087,7 +2102,13 @@ pub fn defaults_have_a_target(
     for r in &world.residents {
         let Some(s) = &r.script else { continue };
         let Some((invariant, keys, without)) = task_of(r).and_then(target_known) else { continue };
-        if keys.iter().all(|k| s.memory.get(*k).is_some_and(|v| !v.is_null())) {
+        let known = |k: &str| s.memory.get(k).is_some_and(|v| !v.is_null());
+        if keys.iter().all(|k| known(k)) {
+            continue;
+        }
+        // With nothing to build, the Build default repairs (`CONTEXT.md`: Repairing): the
+        // building it repairs is its target then.
+        if task_of(r) == Some(Task::Build) && known("repairId") {
             continue;
         }
         out.push(InvariantViolation {

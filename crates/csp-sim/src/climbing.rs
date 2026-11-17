@@ -112,7 +112,7 @@ pub fn resolve_climbing(
         let Some(ResidentOrder::Climb(o)) = &r.order else { continue };
         let wall = world.buildings.iter().find(|b| b.id == o.wall_id);
         let finished = wall.filter(|w| {
-            matches!(w.kind, BuildingKind::Wall | BuildingKind::Gate) && w.site.is_none()
+            matches!(w.kind, BuildingKind::Wall | BuildingKind::Gate) && crate::ruins::standing(w)
         });
         let stays = finished.is_some_and(|w| {
             r.x == o.at.x && r.y == o.at.y && besides(terrain.size, (r.x, r.y), (w.x, w.y))

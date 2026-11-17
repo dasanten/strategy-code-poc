@@ -105,7 +105,9 @@ starting as neighbours, and the reset), then Rich and poor land (101: richness, 
 gold in a heartland), then Veins run dry (102), each waiting for the one before to reach `dev`.
 An heir (Epic 103: a named heir keeps one city at Leader death) runs alongside Epic 100. The three
 of 100 to 102 are released together, and Daniel runs the reset at that release. Whether NPC cities
-fight for nodes they lack stays an open question of Epic 98.
+fight for nodes they lack: settled 2026-11-16 (Epic 98, `CONTEXT.md`: Taking a node). Agreed with
+Daniel on 2026-11-16: Epics 97 and 98 are ticketed and worked alongside the fighting epics (104 to
+110).
 
 **Agreed with Daniel on 2026-11-15,** from his wish to upgrade fighting: Safe start (Epic 104: new
 cities spawn with Spears and a stable hand on a "Farm and feed" queue), Walls that hold (105, ADR
@@ -211,8 +213,8 @@ I sleep.
 | 94  | [Clearer menus](https://github.com/dasanten/strategy-code-poc/issues/1170)                      | ticketed                |
 | 95  | [Queue conditions](https://github.com/dasanten/strategy-code-poc/issues/1171)                   | ticketed                |
 | 96  | [Cities that can't be talked over](https://github.com/dasanten/strategy-code-poc/issues/1188)   | ticketed                |
-| 97  | [Goods get used](https://github.com/dasanten/strategy-code-poc/issues/1189)                     | scope only              |
-| 98  | [NPC cities with intent](https://github.com/dasanten/strategy-code-poc/issues/1190)             | scope only              |
+| 97  | [Goods get used](https://github.com/dasanten/strategy-code-poc/issues/1189)                     | ticketed                |
+| 98  | [NPC cities with intent](https://github.com/dasanten/strategy-code-poc/issues/1190)             | ticketed                |
 
 | 99 | [Faster map loading](https://github.com/dasanten/strategy-code-poc/issues/1198) | ticketed |
 | 100 | [A new world](https://github.com/dasanten/strategy-code-poc/issues/1253) | ticketed |

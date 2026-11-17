@@ -217,7 +217,9 @@ pub fn is_builder(r: &csp_shared::world::Resident) -> bool {
         r.script.as_ref().is_some_and(|s| s.script_id == 0 && s.task == Some(Task::Build));
     building
         || match &r.order {
-            Some(ResidentOrder::Build(_)) | Some(ResidentOrder::TearDown(_)) => true,
+            Some(ResidentOrder::Build(_))
+            | Some(ResidentOrder::TearDown(_))
+            | Some(ResidentOrder::Repair(_)) => true,
             Some(ResidentOrder::Drop(o)) => matches!(o.to, GoodsSpot::Site { .. }),
             Some(ResidentOrder::PickUp(o)) => {
                 matches!(o.from, GoodsSpot::Storage { .. }) && !o.goods.contains_key(&Good::Food)

@@ -23,14 +23,14 @@ pub fn wall_side(r: &Resident) -> Option<&str> {
 /// closes the way, carries the wall walk and is broken by blows.
 pub fn is_wall_or_gate(b: &Building) -> bool {
     matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate | BuildingKind::Tower)
-        && b.site.is_none()
+        && crate::ruins::standing(b)
 }
 
 /// The finished wall or tower standing on tile (x, y), if one does: what a resident there is up on
 /// (a gate is passed under). A tower covers its whole footprint.
 pub fn wall_or_tower_at(world: &WorldState, x: f64, y: f64) -> Option<&Building> {
     world.buildings.iter().find(|b| {
-        b.site.is_none()
+        crate::ruins::standing(b)
             && match b.kind {
                 BuildingKind::Wall => b.x == x && b.y == y,
                 BuildingKind::Tower => covers(placed(b), x as i32, y as i32, MAP_SIZE),

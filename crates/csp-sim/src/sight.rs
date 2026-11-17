@@ -492,8 +492,9 @@ pub fn seen_script(world: &WorldState, script: &RunningScript, own: bool) -> See
 /// its params only for the realm commanding them, the queue only for the realm that gave it,
 /// what a defence script interrupted and the defence and Alarm scripts only for the owner; that
 /// they are Down for anyone, how they fare only as `fares` says, what they have equipped for
-/// anyone and what they carry only as `carried` says. Never their script log nor whether an order
-/// stands against blows (`withoutServerOnly`).
+/// anyone but its condition (`CONTEXT.md`: Wear) for the owner only, and what they carry only as
+/// `carried` says. Never their script log nor whether an order stands against blows
+/// (`withoutServerOnly`).
 fn seen_resident(
     world: &WorldState,
     index: &WorldIndex,
@@ -534,6 +535,9 @@ fn seen_resident(
             Default::default()
         },
         equipped: crate::equipment::equipment_of(r),
+        condition: own
+            .then(|| crate::wear::gear_condition(world, r))
+            .filter(|c| *c != Default::default()),
         order: r.order.clone(),
         order_ended: r.order_ended.clone(),
         struck: r.struck.clone().filter(|_| fares),

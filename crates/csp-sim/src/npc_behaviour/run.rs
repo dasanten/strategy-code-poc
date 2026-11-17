@@ -18,6 +18,7 @@ use serde_json::{json, Value};
 use super::{default_script, haul, npc_home, put_to_work_making, stop_work, walk_to, workplace_of};
 use crate::npc_chain::chain_makes;
 use crate::npc_chain::{chain_store_index, holds_batch, warehouse_for};
+use crate::npc_escort::{escort_lags, guard_party, run_escort, wait_for_escort};
 use crate::npc_founding::{found_daughter, founding_party, step_founders};
 use crate::npc_growth::{
     city_grows, city_project, is_builder, no_farm, no_storage_yet, npc_builders,
@@ -26,6 +27,7 @@ use crate::npc_growth::{
 use crate::npc_patrols::{next_stop, share_patrols};
 use crate::npc_plan::{food_short, plan_city, plan_due, project_done, run_residents, Places};
 use crate::npc_posts::{free_soldiers, soldier_posts, stands_posts, SoldierPost};
+use crate::npc_repair::take_repair;
 use crate::npc_revive::{revive_target, run_reviver};
 use crate::npc_roads::{lay_road, on_road_work, WayFinder};
 use crate::npc_scouts::{give_up_site, send_scout, step_scouts};
@@ -124,6 +126,7 @@ fn run_city(
     if !party.is_empty() {
         let members: Vec<usize> =
             people.iter().copied().filter(|&i| party.contains(&world.residents[i].id)).collect();
+        guard_party(world, &members, size);
         step_founders(world, city_id, &members, storage, size);
     }
     let Some(city) = world.cities.iter().find(|c| c.id == city_id).cloned() else { return plan_ms };
@@ -265,10 +268,14 @@ fn run_city(
         // At a workplace that processes goods with nothing left to process, with none in the store,
         // they get their next job.
         let at = workplace_of(&world.residents[i]);
+        // A mender goes by `steer_menders` instead (`CONTEXT.md`: Mending).
+        let mending =
+            matches!(&world.residents[i].order, Some(ResidentOrder::WorkAt(o)) if o.mends);
         let working = matches!(world.residents[i].order, Some(ResidentOrder::WorkAt(_)));
         if let Some(place) = at.filter(|_| working).and_then(|id| building_index(world, &id)) {
             let pb = &world.buildings[place];
             if processes(pb.kind)
+                && !mending
                 && !input_left(world, pb, i)
                 && !input_in(world, pb, store.map(|s| &world.buildings[s]))
             {
@@ -322,6 +329,7 @@ fn run_city(
             world.city_plans.get(city_id)?.project.clone()
         };
 
+    crate::npc_mending::steer_menders(world, &city);
     // Where its soldiers fetch and put back their gear (`upgrade_soldiers`).
     let stores: Vec<(f64, f64)> = world
         .buildings
@@ -343,6 +351,13 @@ fn run_city(
             if walking_off_post(&world.residents[i], post.as_ref(), &stores, size) {
                 world.residents[i].order = None;
             }
+        }
+        // A trader's escort keeps with them, walking or not (`CONTEXT.md`: Escort).
+        if city.trade_org.is_none()
+            && (run_escort(world, city_id, i, storage, size)
+                || wait_for_escort(world, city_id, i, size))
+        {
+            continue;
         }
         if world.residents[i].order.is_some() || world.residents[i].script.is_some() {
             continue;
@@ -375,7 +390,10 @@ fn run_city(
                 .and_then(|p| p.traders.as_ref())
                 .is_some_and(|t| t.iter().any(|t| t.resident_id == rid));
         if trading {
-            run_trader(world, &city, i, storage, size);
+            // Between legs, they wait for their escort to catch up.
+            if !escort_lags(world, city_id, i, size) {
+                run_trader(world, &city, i, storage, size);
+            }
             continue;
         }
         // Carrying a child, they get no work and stand at a house; a load goes into the storage first.
@@ -391,7 +409,8 @@ fn run_city(
         }
         if job.as_ref().is_some_and(|j| j.kind == CityJobKind::Road)
             && world.city_plans.contains_key(city_id)
-            && lay_road(world, &city, i, &crew, store, size)
+            && (lay_road(world, &city, i, &crew, store, size)
+                || take_repair(world, &city, i, store, size, true, true))
         {
             continue;
         }
@@ -405,6 +424,17 @@ fn run_city(
                     continue;
                 }
             }
+        }
+        // A soldier with worn gear takes it to the smithy, with what mending it takes, before
+        // stowing anything (`CONTEXT.md`: Mending).
+        if crate::npc_mending::go_mend(world, &city, i, storage) {
+            continue;
+        }
+        // A builder carrying what a repair lacks takes it there rather than putting it away.
+        let builder = job.as_ref().is_some_and(|j| j.kind == CityJobKind::Build);
+        if builder && free > 0.0 && take_repair(world, &city, i, store, size, false, false) {
+            free -= 1.0;
+            continue;
         }
         let input = input_of(world, job.as_ref());
         let stow = stowing(world, &city, i, storage, input.as_ref());
@@ -465,6 +495,11 @@ fn run_city(
                         free -= 1.0;
                         continue;
                     }
+                }
+                // With nothing to build, they repair its buildings, worst first.
+                if take_repair(world, &city, i, store, size, false, true) {
+                    free -= 1.0;
+                    continue;
                 }
             }
             if let Some(bid) = job.as_ref().and_then(|j| j.building_id.clone()) {
@@ -900,9 +935,11 @@ fn processes(kind: BuildingKind) -> bool {
 }
 
 /// Whether a Trade Org city's warehouse takes a good back from an idle resident
-/// (`backToWarehouse`): all but Food and the weapons and armour that stay on them.
+/// (`backToWarehouse`): all but Food and the weapons, armour and Tools that stay on them. Put
+/// back, a worker would fetch their Tools again at once and never work.
 fn back_to_warehouse(good: Good) -> bool {
     good != Good::Food
+        && good != Good::Tools
         && !WEAPONS.contains(&good_name(good))
         && !PROTECTION.contains(&good_name(good))
 }

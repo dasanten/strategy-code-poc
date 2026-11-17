@@ -14,6 +14,7 @@ use crate::npc_test_world::{plains, Runner};
 use crate::queries::names::held;
 use crate::queries::npc_trade::{
     is_npc_archer, npc_archer_target, npc_reserve, npc_smithy_good, npc_soldier_target,
+    npc_tools_wanted,
 };
 use crate::queries::residents::{can_work, is_armed};
 use crate::random::Mulberry32;
@@ -190,6 +191,10 @@ fn its_smithy_forges_bows_then_arrows_once_its_soldiers_are_armed() {
     t.world.buildings[s].stock.get_or_insert_with(Stock::new).insert(Good::Bow, 3.0);
     assert_eq!(npc_smithy_good(&t.world, t.city()), Good::Arrows);
     t.world.buildings[s].stock.get_or_insert_with(Stock::new).insert(Good::Arrows, 200.0);
+    // Then the Tools its workers want (`CONTEXT.md`: Tools).
+    assert_eq!(npc_smithy_good(&t.world, t.city()), Good::Tools);
+    let tools = npc_tools_wanted(&t.world, t.city());
+    t.world.buildings[s].stock.get_or_insert_with(Stock::new).insert(Good::Tools, tools);
     assert_eq!(npc_smithy_good(&t.world, t.city()), Good::Spear, "nothing lacking: its kit");
     // One of its soldiers unarmed comes first.
     let i = t.adults()[0];

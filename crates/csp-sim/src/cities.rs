@@ -105,6 +105,8 @@ pub fn found_city(world: &mut WorldState, hall: usize, realm_id: Option<&str>) -
 pub fn dissolve_city(world: &mut WorldState, city_id: &str) {
     let Some(ci) = world.cities.iter().position(|c| c.id == city_id) else { return };
     let city = world.cities.remove(ci);
+    // Its plan goes with it: nobody runs it any more (`city-plans-sound`).
+    world.city_plans.shift_remove(city_id);
     for b in &mut world.buildings {
         if b.city_id.as_deref() == Some(city_id)
             && b.kind == BuildingKind::Storage

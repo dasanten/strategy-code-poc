@@ -376,6 +376,9 @@ fn found_at(
         closed: None,
         damage: None,
         breedings: None,
+        decay: None,
+        ruined_at: None,
+        repair: None,
         material: None,
     };
     let hall = building(world, BuildingKind::TownHall, hall_tile(x, y, size));
@@ -433,6 +436,7 @@ fn found_at(
             at: Tile { x: fx, y: fy },
             progress: 0.0,
             makes: None,
+            mends: false,
         }));
         // By the Work default, the Player's version from the first tick their scripts run.
         let mut memory = serde_json::Map::new();

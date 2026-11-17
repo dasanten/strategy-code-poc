@@ -123,7 +123,7 @@ pub fn road_tiles(world: &WorldState, size: i32) -> HashSet<usize> {
     world
         .buildings
         .iter()
-        .filter(|b| b.kind == BuildingKind::Road && b.site.is_none())
+        .filter(|b| b.kind == BuildingKind::Road && crate::ruins::standing(b))
         .map(|b| tile_index(size, b.x as i32, b.y as i32))
         .collect()
 }
@@ -354,7 +354,8 @@ pub fn construction_at(
 
 /// The finished stable a carriage site on (x, y) is built at (`stableFor`).
 pub fn stable_for(world: &WorldState, x: i32, y: i32, size: i32) -> Option<&Building> {
-    let finished_stable = |b: &&Building| b.kind == BuildingKind::Stable && b.site.is_none();
+    let finished_stable =
+        |b: &&Building| b.kind == BuildingKind::Stable && crate::ruins::standing(b);
     if let Some(here) = building_at(world, x, y, size).filter(finished_stable) {
         return Some(here);
     }
@@ -373,7 +374,7 @@ pub fn stable_for(world: &WorldState, x: i32, y: i32, size: i32) -> Option<&Buil
 pub fn carriage_can_go_to(world: &WorldState, map: &TerrainMap, x: i32, y: i32) -> bool {
     let road = road_at(world, x, y);
     let under = match road {
-        Some(r) if r.site.is_none() => Terrain::Road as u8,
+        Some(r) if crate::ruins::standing(r) => Terrain::Road as u8,
         _ => terrain_at(map, x, y),
     };
     carriage_can_enter(under)

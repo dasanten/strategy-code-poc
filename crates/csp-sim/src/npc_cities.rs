@@ -194,6 +194,9 @@ fn building(id: String, kind: BuildingKind, city_id: &str, x: i32, y: i32) -> Bu
         closed: None,
         damage: None,
         breedings: None,
+        decay: None,
+        ruined_at: None,
+        repair: None,
         material: None,
     }
 }
@@ -295,6 +298,7 @@ pub fn found_npc_city(
             at: Tile { x: farm.x, y: farm.y },
             progress: 0.0,
             makes: None,
+            mends: false,
         }));
         r.script = Some(default_script(Task::Work, json!({ "workplaceId": farm.id })));
         world.residents.push(r);

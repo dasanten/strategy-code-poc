@@ -277,7 +277,7 @@ pub fn housing_room(world: &WorldState, city_id: &str) -> f64 {
     world
         .buildings
         .iter()
-        .filter(|b| b.city_id.as_deref() == Some(city_id) && b.site.is_none())
+        .filter(|b| b.city_id.as_deref() == Some(city_id) && crate::ruins::standing(b))
         .fold(0.0, |room, b| room + HOUSING_ROOM.get(kind_name(b.kind)).unwrap_or(0.0))
 }
 

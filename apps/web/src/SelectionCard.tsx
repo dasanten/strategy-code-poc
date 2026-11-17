@@ -549,6 +549,7 @@ export function TileCard({
   onAddWaypoint,
   onFeed,
   onPickUp,
+  onRepair,
 }: {
   card: TileCardData
   /** The building the card is named after, for its icon. */
@@ -618,6 +619,8 @@ export function TileCard({
   onFeed?: (targetId: string, units: number) => void
   /** Orders one of the Player's residents to take goods from a spot on their tile. */
   onPickUp: (residentId: string, from: GoodsSpot, goods: Stock) => void
+  /** Gives the actor the Repair task for a worn building, wall, gate or road on the tile. */
+  onRepair?: (buildingId: string) => void
 }) {
   const actions = tileActions(card, actor, tick, mapSize)
   const [open, setOpen] = useState<string | undefined>()
@@ -732,6 +735,7 @@ export function TileCard({
           onAction={(a) => {
             if (a.opens) setOpen(shown === a.id ? undefined : a.id)
             if (a.id === 'sendHere') onSendHere()
+            if (a.id === 'repair' && card.repair) onRepair?.(card.repair.buildingId)
             if (a.id === 'build' && card.buildHere?.at)
               onBuildHere(card.buildHere.kind, card.buildHere.at)
             if (a.id === 'gate' && card.gate) onSetGate(card.gate.id, !!card.gate.closed)

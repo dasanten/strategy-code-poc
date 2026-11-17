@@ -103,6 +103,7 @@ pub fn create_world(terrain: &TerrainMap, seed: i64) -> WorldState {
         dry_nodes: Vec::new(),
         new_veins: Vec::new(),
         waiting_veins: Vec::new(),
+        wear: Default::default(),
     }
 }
 
@@ -254,6 +255,8 @@ pub fn step_world(
     });
     // Last, whatever else moved goods this tick (work, trades, offers, loot, a capture).
     crate::equipment::settle_all(world);
+    // Worn pieces stay with the units still kept, wherever goods went (`CONTEXT.md`: Wear).
+    crate::wear::settle_wear(world);
     // The orders the world advanced in place this tick are still the ones scripts wait on.
     scratch.waiting.settle(world);
     StepResult { npc_script_runs, npc_plan_ms, survival, horses_died, ..result }
@@ -324,6 +327,9 @@ fn step_rest(
     let teardowns_len = teardowns.len();
     let wrecked = resolve_tearing_down(world, &teardowns, Some(terrain), scratch);
     count_wrecked(world, wrecked, scratch);
+    let repairs = crate::repair::request_repairing(world);
+    let repairs_len = repairs.len();
+    crate::repair::resolve_repairing(world, &repairs, Some(terrain));
     let work = request_work(world);
     let work_len = work.len();
     resolve_work(world, &work, scratch);
@@ -339,6 +345,11 @@ fn step_rest(
     let births_len = births.len();
     resolve_births(world, &births);
     world.tick += 1;
+    // Buildings lose their day's share of condition at the turn of the day (`CONTEXT.md`: Decay).
+    crate::repair::step_decay(world);
+    crate::repair::trade_org_repairs(world);
+    // One that lost all of it is a ruin, and a ruin left long enough collapses (`CONTEXT.md`: Ruin).
+    crate::ruins::step_ruins(world, size, scratch);
     let aging = step_aging(world, size);
     answer_demands(world, size, scratch);
     step_alliances(world);
@@ -374,6 +385,7 @@ fn step_rest(
         + carries_len
         + builds_len
         + teardowns_len
+        + repairs_len
         + work_len
         + breeding_len
         + births_len

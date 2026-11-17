@@ -316,6 +316,10 @@ pub struct BigCityHold {
     pub idle_share: f64,
     /// The mean of that share over its plans.
     pub mean_idle_share: f64,
+    /// The most of its adults standing idle in any one plan, its soldiers just standing on a
+    /// post counted (`npc_idle`, T97.9).
+    pub idle_with_posts: f64,
+    pub mean_idle_with_posts: f64,
     /// The most of its adults, its soldiers aside, with no order and no script at any tick.
     pub still_share: f64,
     pub mean_still_share: f64,
@@ -337,6 +341,7 @@ pub struct BigCityHold {
 pub struct BigCityWatch {
     from_day: f64,
     shares: Vec<f64>,
+    posts_shares: Vec<f64>,
     farmers: Vec<usize>,
     standing: HashMap<String, usize>,
     still_shares: f64,
@@ -353,6 +358,7 @@ impl BigCityWatch {
         BigCityWatch {
             from_day,
             shares: Vec::new(),
+            posts_shares: Vec::new(),
             farmers: Vec::new(),
             standing: HashMap::new(),
             still_shares: 0.0,
@@ -383,6 +389,8 @@ impl BigCityWatch {
             if Some(plan.planned_at) != self.planned_at {
                 self.planned_at = Some(plan.planned_at);
                 self.shares.push(count(CityJobKind::Idle) as f64 / adults.len() as f64);
+                let city = world.cities.iter().find(|c| c.id == s.city).expect("the city");
+                self.posts_shares.push(crate::queries::npc_idle::npc_idle(world, city).share());
             }
         }
         if world.tick.is_multiple_of(TICKS_PER_GAME_DAY as u64) {
@@ -443,6 +451,9 @@ impl BigCityWatch {
         BigCityHold {
             idle_share: self.shares.iter().copied().fold(f64::NEG_INFINITY, f64::max),
             mean_idle_share: self.shares.iter().sum::<f64>() / self.shares.len() as f64,
+            idle_with_posts: self.posts_shares.iter().copied().fold(f64::NEG_INFINITY, f64::max),
+            mean_idle_with_posts: self.posts_shares.iter().sum::<f64>()
+                / self.posts_shares.len() as f64,
             still_share: self.still_share,
             mean_still_share: self.still_shares / self.ticks as f64,
             longest_on_storage: self.longest_on_storage,
@@ -463,6 +474,11 @@ pub fn big_city_hold_report(hold: &BigCityHold) -> String {
             "idle: at most {} of its adults, {} on average",
             percent(hold.idle_share),
             percent(hold.mean_idle_share)
+        ),
+        format!(
+            "standing idle, soldiers on posts counted: at most {}, {} on average",
+            percent(hold.idle_with_posts),
+            percent(hold.mean_idle_with_posts)
         ),
         format!(
             "no order and no script, soldiers aside: at most {}, {} on average",

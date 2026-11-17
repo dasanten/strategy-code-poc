@@ -722,6 +722,7 @@ export const GOODS = [
   'steelSword',
   'steelShield',
   'steelArmour',
+  'tools',
   'bow',
   'crossbow',
   'arrows',

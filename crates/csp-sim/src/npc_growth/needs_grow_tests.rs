@@ -5,7 +5,7 @@
 
 use csp_shared::balance::{
     BUILD_MATERIALS, NPC_BUILDERS, NPC_FOUND_FOOD_SURPLUS_SHARE, NPC_RESIDENTS_PER_NEEDS_STEP,
-    NPC_ROAD_CREW, NPC_SURPLUS_CAP, NPC_TOWN, NPC_TRADE, NPC_VILLAGE,
+    NPC_ROAD_CREW, NPC_SURPLUS_CAP, NPC_SURPLUS_PAST_CAP, NPC_TOWN, NPC_TRADE, NPC_VILLAGE,
 };
 use csp_shared::terrain::TerrainMap;
 use csp_shared::world::{
@@ -104,6 +104,11 @@ impl T {
 
     fn surplus(&self, place: &str) -> Option<f64> {
         SurplusWork::of(&self.world, self.c(), Some(self.home())).full(&self.world, self.b(place))
+    }
+
+    /// How far past its cap a workplace is to be worked past it (`SurplusWork::past`).
+    fn past(&self, place: &str) -> Option<f64> {
+        SurplusWork::of(&self.world, self.c(), Some(self.home())).past(&self.world, self.b(place))
     }
 
     /// A free node of `kind` the city knows of, near its home (`freeNode`).
@@ -309,6 +314,41 @@ fn works_for_surplus_up_to_a_cap_by_the_step() {
     assert_eq!(t.surplus(&camp), None);
 }
 
+#[test]
+fn works_on_past_its_cap_only_once_at_it_and_up_to_a_bound() {
+    let mut t = big();
+    let cap = cap("wood") * t.scale();
+    let reserve = held(&t.reserve(), Good::Wood);
+    let camp = t.camp.clone();
+    t.stock().insert(Good::Wood, reserve + cap / 2.0);
+    assert_eq!(t.past(&camp), None);
+    t.stock().insert(Good::Wood, reserve + 2.0 * cap);
+    assert!(close_to(t.past(&camp), 2.0), "{:?}", t.past(&camp));
+    t.stock().insert(Good::Wood, reserve + NPC_SURPLUS_PAST_CAP * cap);
+    assert_eq!(t.past(&camp), None);
+}
+
+#[test]
+fn sends_spare_hands_past_the_cap_rather_than_idle() {
+    let mut t = big();
+    let steps = t.scale();
+    let reserve = t.reserve();
+    let mut stock = reserve.clone();
+    // Every good it works for past its cap, Wood the least far.
+    for (name, cap) in NPC_SURPLUS_CAP.0 {
+        let Some(good) = crate::queries::names::good_of(name) else { continue };
+        let past = if good == Good::Wood { 1.5 } else { 3.0 };
+        stock.insert(good, held(&reserve, good) + past * cap * steps);
+    }
+    *t.stock() = stock;
+    let camp = t.camp.clone();
+    let terrain = t.terrain.clone();
+    plan_city(&mut t.world, &t.city, Some(&terrain), None, None);
+    let jobs = &t.world.city_plans[&t.city].jobs;
+    assert!(jobs.values().any(|j| j.building_id.as_deref() == Some(camp.as_str())));
+    assert_eq!(npc_surplus_capped(&t.world), vec![]);
+}
+
 // a second workplace
 
 /// A big city with nothing short, its lumber camp's crew full and Wood below its cap (`ready`),
@@ -483,9 +523,10 @@ fn hold_a_big_city_to_its_bigger_surplus_cap() {
     t.set_plan(json!({
         "plannedAt": tick, "jobs": { r: { "kind": "work", "buildingId": camp } },
     }));
-    t.stock().insert(Good::Wood, reserve + 2.0 * cap - 1.0);
+    let bound = (NPC_SURPLUS_PAST_CAP + 1.0) * cap;
+    t.stock().insert(Good::Wood, reserve + bound - 1.0);
     assert_eq!(npc_surplus_capped(&t.world), vec![]);
-    t.stock().insert(Good::Wood, reserve + 2.0 * cap);
+    t.stock().insert(Good::Wood, reserve + bound);
     assert_eq!(npc_surplus_capped(&t.world).len(), 1);
 }
 

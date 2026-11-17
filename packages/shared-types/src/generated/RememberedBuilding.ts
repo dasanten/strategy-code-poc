@@ -11,4 +11,4 @@ import type { WallMaterial } from "./WallMaterial.js";
  * `SeenBuilding & { seenAt }`: the fields of `Building`, what a Player sees on top of them, and
  * `seenAt`.
  */
-export type RememberedBuilding = { id: string, kind: BuildingKind, cityId: string | null, realmId?: string, x: number, y: number, stock?: { [key in Good]?: number }, site?: ConstructionSite, teardown?: number, closed?: true, damage?: number, breedings?: Array<KeptBreeding>, material?: WallMaterial, prices?: Array<ShownWarehousePrice>, offers?: Array<SeenOffer>, seenAt: number, };
+export type RememberedBuilding = { id: string, kind: BuildingKind, cityId: string | null, realmId?: string, x: number, y: number, stock?: { [key in Good]?: number }, site?: ConstructionSite, teardown?: number, closed?: true, damage?: number, breedings?: Array<KeptBreeding>, decay?: number, repair?: ConstructionSite, ruinedAt?: number, material?: WallMaterial, prices?: Array<ShownWarehousePrice>, offers?: Array<SeenOffer>, seenAt: number, };

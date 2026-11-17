@@ -349,6 +349,9 @@ pub fn resolve_building(
                     closed: None,
                     damage: None,
                     breedings: None,
+                    decay: None,
+                    ruined_at: None,
+                    repair: None,
                     // Only stone is written down: none is wood.
                     material: is_stone(part.building, part.material).then_some(WallMaterial::Stone),
                 };
@@ -383,6 +386,7 @@ pub fn resolve_building(
                 s.work = total.min(s.work + work);
             }
             world.residents[ri].skills.insert(SkillName::Construction, had + learned);
+            crate::wear::wear_tools(world, ri);
         }
         let kind = world.buildings[si].kind;
         let r = world.residents[ri].clone();
@@ -505,14 +509,16 @@ impl crate::orders::OrderKind for Kind {
 /// registry (`orderKinds`' `build`, `tearDown`, `roadLine`, `wallLine`, `workAt`, `teach`,
 /// `train`).
 pub fn add_building_orders(kinds: &mut crate::orders::OrderKinds) {
+    use crate::repair::{apply_repair, validate_repair};
     use crate::road_line::{apply_line, validate_line, LineKind};
     use crate::teaching::{apply_teach, validate_teach};
     use crate::teardown::{apply_tear_down, validate_tear_down};
     use crate::training::{apply_train, validate_train};
     use crate::work::{apply_work_at, validate_work_at};
-    let kinds_of: [(&str, Validate, Apply); 7] = [
+    let kinds_of: [(&str, Validate, Apply); 8] = [
         ("build", validate_build, |w, o, _| apply_build(w, o)),
         ("tearDown", validate_tear_down, |w, o, _| apply_tear_down(w, o)),
+        ("repair", |w, s, o, _| validate_repair(w, s, o), |w, o, _| apply_repair(w, o)),
         (
             "roadLine",
             |w, s, o, t| validate_line(LineKind::RoadLine, w, s, o, t),

@@ -122,6 +122,7 @@ import type {
   VeinWord,
 } from '@csp/shared-types'
 import { covers, FOOTPRINT, footprintTiles } from './shared/footprint.js'
+import { conditionLine, isRuin, repairable } from './shared/decay.js'
 import { wrap, Terrain, UNEXPLORED } from './shared/terrain.js'
 import { handOverProblem, heirProblem } from './shared/leader.js'
 import { aboutTime, workLeft } from './shared/estimates.js'
@@ -167,6 +168,7 @@ export type ActionId =
   | 'teach'
   | 'train'
   | 'tearDown'
+  | 'repair'
   | 'breed'
   | 'goods'
   | 'pair'
@@ -213,6 +215,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   teach: 'Y',
   train: 'I',
   tearDown: 'T',
+  repair: 'R',
   breed: 'F',
   goods: 'G',
   pair: 'P',
@@ -1028,6 +1031,12 @@ export interface TileCard {
    * Another organization's free horse on the tile and the Player's residents on it, who may mount
    * it, each with why they can't now, if so (`CONTEXT.md`: Stealing a carriage or horse).
    */
+  /**
+   * A worn building, wall, gate or road on the tile, in sight, which the resident picked last may
+   * repair, or a ruin rebuild (`CONTEXT.md`: Repairing, Ruin): they walk there, fetching what the
+   * repair lacks.
+   */
+  repair?: { buildingId: string; name: string; rebuild?: true }
   stealHorse?: {
     horseId: string
     residents: { id: string; name: string; problem: string | undefined }[]
@@ -1719,6 +1728,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   let driveOff: TileCard['driveOff']
   let hitchOff: TileCard['hitchOff']
   let stealHorse: TileCard['stealHorse']
+  let repair: TileCard['repair']
   let carriageView: CarriageView | undefined
   if (building) {
     const city = cityOf(building)
@@ -1803,6 +1813,10 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       }
     }
     if (building.teardown) lines.push(teardownLine(building))
+    const condition = conditionLine(building)
+    if (condition) lines.push(condition)
+    if (live && repairable(live))
+      repair = { buildingId: live.id, name: name.toLowerCase(), ...rebuildOf(live) }
     if (remembered && t.lastSeen) {
       card.lastSeen = {
         when: lastSeenText(remembered.seenAt, t.lastSeen.tick),
@@ -2049,6 +2063,10 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
   if (road) {
     lines.push(road.site ? roadSiteLine(road, t.terrain) : terrain!)
     if (road.teardown) lines.push(teardownLine(road))
+    const condition = conditionLine(road)
+    if (condition) lines.push(condition)
+    // The building's repair first; a worn road under it waits for the next.
+    if (!repair && repairable(road)) repair = { buildingId: road.id, name: 'road', ...rebuildOf(road) }
   }
   if (terrain && !(road && !road.site)) lines.push(terrain)
   // A wandering trader standing at a stop buys and sells on its tile (`CONTEXT.md`: Trader stop).
@@ -2078,6 +2096,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     ...(driveOff ? { driveOff } : {}),
     ...(hitchOff ? { hitchOff } : {}),
     ...(stealHorse ? { stealHorse } : {}),
+    ...(repair ? { repair } : {}),
     ...(downGoods.length > 0 ? { downGoods } : {}),
     ...(renameHorses.length > 0 ? { renameHorses } : {}),
     ...(machineCard ? { machine: machineCard } : {}),
@@ -2595,6 +2614,11 @@ function horseTradeLine(b: { id: string }, city: TileThings['cities'][number]): 
       : 'Sells horses here'
 }
 
+/** A ruin's repair rebuilds it (`CONTEXT.md`: Ruin): the card's button says so. */
+function rebuildOf(b: Building): { rebuild?: true } {
+  return isRuin(b) ? { rebuild: true } : {}
+}
+
 /** How far tearing a building or site down has come (`CONTEXT.md`: Tearing down). */
 function teardownLine(b: Building): string {
   const work = teardownWork(b)
@@ -2661,6 +2685,15 @@ export function tileActions(
       id: 'build',
       label: `Build ${aOrAn(name)} here`,
       key: ACTION_KEYS.build,
+      ...(reason ? { disabled: true as const, reason } : {}),
+    })
+  }
+  if (actor && card.repair) {
+    const reason = canWork(actor, tick) ? undefined : 'children can’t repair buildings'
+    actions.push({
+      id: 'repair',
+      label: `${card.repair.rebuild ? 'Rebuild' : 'Repair'} ${card.repair.name}`,
+      key: ACTION_KEYS.repair,
       ...(reason ? { disabled: true as const, reason } : {}),
     })
   }
