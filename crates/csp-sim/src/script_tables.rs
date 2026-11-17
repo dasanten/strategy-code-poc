@@ -493,6 +493,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 description: "Units of steel armour.",
                 null_when: Some("when there are none"),
             },
+            ScriptField {
+                name: "tools",
+                r#type: ScriptType::Number,
+                description: "Units of Tools.",
+                null_when: Some("when there are none"),
+            },
         ],
     },
     ScriptView {

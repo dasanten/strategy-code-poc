@@ -7,7 +7,7 @@ use csp_shared::balance::{
     SkillValues, BATCHES_PER_DAY, BUILD_STRENGTH_AVERAGE, CARRY_BASE, CARRY_PER_STRENGTH,
     CONSTRUCTION_SKILL_EFFECT, CONSTRUCTION_SKILL_LIMIT, CONSTRUCTION_SKILL_MAX,
     CONSTRUCTION_SKILL_PER_DAY, INTELLECT_AVERAGE, RECIPES, SKILL_MAX, SKILL_PER_DAY,
-    TRAIN_COMBAT_FACTOR, TRAIN_SKILL_FACTOR, TRAIN_STAT_PER_TICK, WORKPLACE_SKILL,
+    TOOLS_WORK_BONUS, TRAIN_COMBAT_FACTOR, TRAIN_SKILL_FACTOR, TRAIN_STAT_PER_TICK, WORKPLACE_SKILL,
     WORK_OUTPUT_PER_DAY, WORK_SKILL_EFFECT, WORK_SKILL_LIMIT, WORK_SKILL_MAX, WORK_SKILL_PER_DAY,
     WORK_STRENGTH_AVERAGE,
 };
@@ -70,7 +70,22 @@ pub fn subject_parts(subject: TrainingSubject) -> Result<StatName, SkillName> {
 pub fn build_work(r: &Resident, tick: f64) -> f64 {
     let strength = stat_value(r, StatName::Strength, tick) / BUILD_STRENGTH_AVERAGE;
     let skill = skill_of(r, SkillName::Construction) * CONSTRUCTION_SKILL_EFFECT;
-    strength * (1.0 + CONSTRUCTION_SKILL_LIMIT.min(skill))
+    strength * (1.0 + CONSTRUCTION_SKILL_LIMIT.min(skill)) * tools_factor(r)
+}
+
+/// Whether a resident carries a set of Tools (`CONTEXT.md`: Tools): a whole one, as gear counts.
+pub fn has_tools(r: &Resident) -> bool {
+    r.carried.get(&Good::Tools).copied().unwrap_or(0.0) >= 1.0
+}
+
+/// How many times their plain pace a resident works (`CONTEXT.md`: Tools): `1 + TOOLS_WORK_BONUS`
+/// carrying Tools, however many sets, 1 without.
+pub fn tools_factor(r: &Resident) -> f64 {
+    if has_tools(r) {
+        1.0 + TOOLS_WORK_BONUS
+    } else {
+        1.0
+    }
 }
 
 /// Construction a resident learns from one tick of building work (`constructionLearned`).
@@ -84,7 +99,7 @@ pub fn construction_learned(r: &Resident, tick: f64) -> f64 {
 fn pace_of(r: &Resident, per_day: f64, skill: SkillName, tick: f64) -> f64 {
     let strength = stat_value(r, StatName::Strength, tick) / WORK_STRENGTH_AVERAGE;
     let skilled = 1.0 + WORK_SKILL_LIMIT.min(skill_of(r, skill) * WORK_SKILL_EFFECT);
-    (per_day / TICKS_PER_GAME_DAY) * strength * skilled
+    (per_day / TICKS_PER_GAME_DAY) * strength * skilled * tools_factor(r)
 }
 
 /// How much of a unit of `good` a worker makes per tick using `skill` (`workOutput`).
