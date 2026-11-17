@@ -1045,6 +1045,24 @@ pub fn repair_orders_on_buildings(world: &WorldState, _: &TerrainMap) -> Out {
     out
 }
 
+/// The Trade Organization repairs its own at the turn of each day, so no building of the HQ or a
+/// trading post is ever nearly a ruin, let alone a ruin (`CONTEXT.md`: Decay).
+pub fn trade_org_kept_up(world: &WorldState, _: &TerrainMap) -> Out {
+    use crate::repair::{condition_of, Condition};
+    let name = "trade-org-kept-up";
+    let theirs: Vec<&str> =
+        world.cities.iter().filter(|c| c.trade_org.is_some()).map(|c| c.id.as_str()).collect();
+    world
+        .buildings
+        .iter()
+        .filter(|b| b.city_id.as_deref().is_some_and(|c| theirs.contains(&c)))
+        .filter(|b| matches!(condition_of(b), Some(Condition::NearlyRuin | Condition::Ruin)))
+        .map(|b| {
+            violation(name, format!("the Trade Org’s {} is nearly a ruin or worse", b.id), &[&b.id])
+        })
+        .collect()
+}
+
 /// Realm logs stay in order and in bounds (`realmLogsInOrder`).
 pub fn realm_logs_in_order(world: &WorldState, _: &TerrainMap) -> Out {
     let name = "realm-logs-in-order";

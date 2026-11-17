@@ -75,3 +75,53 @@ fn a_house_in_good_condition_is_not_repaired() {
     let reply = g.give_to("w1", json!({ "kind": "task", "task": "repair", "buildingId": "h1" }));
     assert_eq!(rejected(&reply), Some("the house is in good condition"));
 }
+
+/// The Build default with nothing to build (`CONTEXT.md`: Repairing; T97.7): w1 of city c1
+/// stands on an empty tile of its area, a house of the city is worn and another nearly a ruin.
+fn idle_builder(g: &mut Game) {
+    g.world.residents.iter_mut().find(|r| r.id == "w1").unwrap().city_id = Some("c1".into());
+    g.world.residents.iter_mut().find(|r| r.id == "w1").unwrap().x = 8.0;
+    let mut worse = building("h2", BuildingKind::House, 6.0, 12.0);
+    worse.city_id = Some("c1".into());
+    worse.decay = Some(0.8);
+    g.world.buildings.push(worse);
+}
+
+#[test]
+fn an_idle_build_default_builder_repairs_the_worn_buildings_of_their_city_worst_first() {
+    let mut g = game(30.0);
+    idle_builder(&mut g);
+    let build = default_script_id(MARA, Task::Build);
+    let reply = g.give_to("w1", json!({ "kind": "runScript", "scriptId": build }));
+    assert!(acked(&reply), "{reply:?}");
+    g.tick();
+    let memory = &g.r("w1").script.as_ref().expect("still running").memory;
+    assert_eq!(memory["repairId"], json!("h2"), "the one nearly a ruin first");
+    let h2 = |g: &Game| g.world.buildings.iter().find(|b| b.id == "h2").unwrap().decay;
+    g.until(3_000, |g| h2(g).is_none());
+    assert_eq!(h2(&g), None);
+    // Then the worn one, on their own.
+    g.until(3_000, |g| house(g).decay.is_none());
+    assert_eq!(house(&g).decay, None);
+    // Nothing left: the script ends.
+    g.until(5, |g| g.r("w1").script.is_none());
+    assert!(g.r("w1").script.is_none());
+    let stock = g.world.buildings.iter().find(|b| b.id == "s1").unwrap().stock.clone().unwrap();
+    assert_eq!(stock.get(&Good::Wood), Some(&20.0), "5 Wood for each house");
+}
+
+#[test]
+fn a_worn_building_outside_their_city_area_is_left_alone() {
+    let mut g = game(30.0);
+    idle_builder(&mut g);
+    g.world.buildings.retain(|b| b.id != "h2");
+    // Far from the town hall the house is in no city's area of theirs.
+    let h1 = g.world.buildings.iter_mut().find(|b| b.id == "h1").unwrap();
+    h1.city_id = None;
+    let build = default_script_id(MARA, Task::Build);
+    let reply = g.give_to("w1", json!({ "kind": "runScript", "scriptId": build }));
+    assert!(acked(&reply), "{reply:?}");
+    g.until(5, |g| g.r("w1").script.is_none());
+    assert!(g.r("w1").script.is_none());
+    assert_eq!(house(&g).decay, Some(0.5));
+}
