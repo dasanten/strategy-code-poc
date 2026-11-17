@@ -134,7 +134,15 @@ export function armyBanners(
 
 /** The kinds of unit token, each with its own size (ADR 0008). */
 export type UnitToken =
-  'horse' | 'carriage' | 'boat' | 'ship' | 'army' | 'residents' | 'aside' | 'figure'
+  | 'horse'
+  | 'carriage'
+  | 'boat'
+  | 'ship'
+  | 'ram'
+  | 'army'
+  | 'residents'
+  | 'aside'
+  | 'figure'
 
 /**
  * A token's radius as a fraction of a tile, before `UNIT_GROWTH`: `aside` is people beside a
@@ -145,6 +153,7 @@ const UNIT_SIZE: Record<UnitToken, number> = {
   carriage: 0.36,
   boat: 0.36,
   ship: 0.44,
+  ram: 0.4,
   army: 0.4,
   residents: 0.36,
   aside: 0.28,

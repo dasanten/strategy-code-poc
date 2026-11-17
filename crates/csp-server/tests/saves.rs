@@ -141,6 +141,45 @@ fn refuses_a_save_from_before_the_reset_saying_to_run_it() {
     }
 }
 
+/// A save from before siege machines (format 133) has none and reads as having none; one with a
+/// ram round trips through the database in the current format (T110.1). The reset hasn't shipped,
+/// so format 134 needs no migration step (ADR 0035): the field is left out while empty.
+#[test]
+fn a_world_with_a_siege_machine_is_saved_and_loads_back_the_same() {
+    let conn = db();
+    let mut world = live_world();
+    assert!(world.siege_machines.is_empty());
+    let before = serde_json::to_value(&world).unwrap();
+    assert!(before.get("siegeMachines").is_none(), "an empty list is left out of a save");
+    conn.execute(
+        "INSERT INTO terrain (id, seed, diameter, data) VALUES (1, ?1, 16, ?2)",
+        params![world.seed, small_terrain(world.seed).tiles],
+    )
+    .unwrap();
+    let load = || {
+        load_or_create_world(&conn, |_| panic!("generated"), |_, _| panic!("generated"), 1)
+            .unwrap()
+            .0
+    };
+    world.tick += 1;
+    world.siege_machines.push(csp_shared::world::SiegeMachine {
+        id: "ram1".into(),
+        kind: csp_shared::world::SiegeMachineKind::Ram,
+        realm_id: Some("r1".into()),
+        x: 3.0,
+        y: 4.0,
+        damage: Some(12.0),
+        teardown: None,
+        crew_ids: vec!["a".into(), "b".into()],
+    });
+    save_world(&conn, &world).unwrap();
+    let (state, v) = latest_save(&conn).unwrap().unwrap();
+    assert_eq!(v, WORLD_FORMAT_VERSION);
+    assert_eq!(state["siegeMachines"][0]["kind"], "ram");
+    assert_eq!(state["siegeMachines"][0]["crewIds"][1], "b");
+    assert_eq!(load(), world);
+}
+
 /// The live world, read as it is, round trips through the database in the current format, with a
 /// boat and a ship aboard (T90.2, T91.1).
 #[test]

@@ -10,6 +10,7 @@ import type {
   SeenHorse,
   SeenResident,
   SeenVessel,
+  SeenMachine,
 } from '@csp/shared-types'
 import { caravanParts } from '../caravans.js'
 import {
@@ -57,6 +58,7 @@ export interface UnitWorld {
   caravans: readonly SeenCaravan[]
   traders?: readonly SeenTrader[]
   vessels?: readonly SeenVessel[]
+  machines?: readonly SeenMachine[]
   cities: readonly Pick<SeenCity, 'id' | 'realmId' | 'tradeOrg'>[]
   buildings: readonly Pick<Building, 'kind' | 'x' | 'y'>[]
 }
@@ -160,7 +162,8 @@ export function drawUnits(
   }
   const key = (e: { x: number; y: number }) => `${e.x},${e.y}`
   const built = new Set(world.buildings.filter((b) => !SHARES_A_TILE.includes(b.kind)).map(key))
-  const carted = new Set(world.carriages.map(key))
+  // People and horses step aside of a cart or a siege machine on their tile, as of a building.
+  const carted = new Set([...world.carriages.map(key), ...(world.machines ?? []).map(key)])
   const peopled = new Set(world.residents.map(key))
   const at = (x: number, y: number, dx = 0, dy = 0) =>
     tileToScreen(cam, view, size, x + 0.5 + dx, y + 0.5 + dy)
@@ -244,6 +247,17 @@ export function drawUnits(
     ]
     if (aboard.length > 0) badge(`${aboard.length}`, ...p, r)
     for (const id of [v.id, ...aboard]) spots.set(id, { x: p[0], y: p[1], r })
+  }
+
+  // Siege machines in the field (`CONTEXT.md`: Siege machine), their crew counted on them: the
+  // crew stand on its tile, found at it.
+  for (const m of world.machines ?? []) {
+    const p = at(...where(m.id, m.x, m.y))
+    if (!near(p)) continue
+    const r = unitRadius('ram', tile)
+    drawUnit(tokens, UNIT_ART.ram, ...p, r, entityRelationship(m, viewer, known))
+    if (m.crewIds.length > 0) badge(`${m.crewIds.length}`, ...p, r)
+    spots.set(m.id, { x: p[0], y: p[1], r })
   }
 
   // People step to the lower right of a building or a cart on their tile.

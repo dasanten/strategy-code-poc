@@ -16,8 +16,8 @@ use crate::world::warehouse::ShownWarehousePrice;
 use crate::world::{
     AlarmScriptId, ArmyOrder, Building, BuildingKind, Carrying, City, Equipment, Good, Heading,
     HorseStats, OrderEnded, Pair, Pile, PricedGood, Queue, ResidentOrder, ScriptParamValue,
-    ScriptParamValues, SkillName, Stat, StatRecord, Stock, Struck, Task, Tile, UpSide, VesselKind,
-    WallMaterial,
+    ScriptParamValues, SiegeMachineKind, SkillName, Stat, StatRecord, Stock, Struck, Task, Tile,
+    UpSide, VesselKind, WallMaterial,
 };
 
 /// How heavily a carriage looks loaded to a Player who can't see its load (`LoadLevel`,
@@ -330,6 +330,32 @@ pub struct SeenVessel {
     pub docked_at: Option<String>,
 }
 
+/// A siege machine as Players see it (`CONTEXT.md`: Siege machine): anyone with its tile in sight
+/// sees its kind, its realm, its crew and how battered it is. Last seen doesn't keep it: it moves.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SeenMachine {
+    pub id: String,
+    pub kind: SiegeMachineKind,
+    pub realm_id: Option<String>,
+    pub x: f64,
+    pub y: f64,
+    /// Damage it has taken from blows (`RAM_STRENGTH` breaks it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub damage: Option<f64>,
+    /// Work put into tearing it down so far.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub teardown: Option<f64>,
+    /// Its crew on its tile, in the order they joined.
+    pub crew_ids: Vec<String>,
+    /// The one of its crew pushing it now, if it is moving.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub pusher_id: Option<String>,
+}
+
 /// Which script an army runs, without its memory.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -425,6 +451,8 @@ pub enum SeenEntity {
     Trader(SeenTrader),
     /// A boat (later a ship) on the water.
     Vessel(SeenVessel),
+    /// A siege machine in the field (`CONTEXT.md`: Siege machine).
+    Machine(SeenMachine),
 }
 
 impl SeenEntity {
@@ -441,6 +469,7 @@ impl SeenEntity {
             SeenEntity::Caravan(e) => &e.id,
             SeenEntity::Trader(e) => &e.id,
             SeenEntity::Vessel(e) => &e.id,
+            SeenEntity::Machine(e) => &e.id,
         }
     }
 
@@ -457,6 +486,7 @@ impl SeenEntity {
             SeenEntity::Caravan(_) => "caravan",
             SeenEntity::Trader(_) => "trader",
             SeenEntity::Vessel(_) => "vessel",
+            SeenEntity::Machine(_) => "machine",
         }
     }
 }

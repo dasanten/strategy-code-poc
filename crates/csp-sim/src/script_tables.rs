@@ -1786,6 +1786,66 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
         ],
     },
     ScriptView {
+        name: "machine",
+        description: "A siege machine in the field, as the Player sees it.",
+        fields: &[
+            ScriptField {
+                name: "id",
+                r#type: ScriptType::String,
+                description: "The machine’s id, unique in the world.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "kind",
+                r#type: ScriptType::String,
+                description: "What it is: \"ram\".",
+                null_when: None,
+            },
+            ScriptField {
+                name: "realmId",
+                r#type: ScriptType::String,
+                description: "The realm it belongs to.",
+                null_when: Some("for one of nobody"),
+            },
+            ScriptField {
+                name: "x",
+                r#type: ScriptType::Number,
+                description: "The tile it stands on, from west to east.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "y",
+                r#type: ScriptType::Number,
+                description: "The tile it stands on, from north to south.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "damage",
+                r#type: ScriptType::Number,
+                description: "The damage blows have done it; at its strength it breaks.",
+                null_when: Some("while it is unharmed"),
+            },
+            ScriptField {
+                name: "teardown",
+                r#type: ScriptType::Number,
+                description: "The work put into tearing it down so far.",
+                null_when: Some("while nobody has started"),
+            },
+            ScriptField {
+                name: "crewIds",
+                r#type: ScriptType::List(&ScriptType::String),
+                description: "Its crew on its tile, in the order they joined.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "pusherId",
+                r#type: ScriptType::String,
+                description: "The one of its crew pushing it now.",
+                null_when: Some("while it stands still"),
+            },
+        ],
+    },
+    ScriptView {
         name: "pile",
         description: "Goods lying on a tile.",
         fields: &[
@@ -2377,6 +2437,14 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         returns: ScriptType::List(&ScriptType::View("vessel")),
     },
     ScriptBinding {
+        name: "machines",
+        is: Is::Query,
+        params: &[],
+        cost: 20.0,
+        description: "The siege machines the Player sees, theirs and others'.",
+        returns: ScriptType::List(&ScriptType::View("machine")),
+    },
+    ScriptBinding {
         name: "traders",
         is: Is::Query,
         params: &[],
@@ -2718,6 +2786,22 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         params: &["ship", "x", "y"],
         cost: 10.0,
         description: "Sail a ship, by it or its id, to the Sea tile x, y, or to the haven on x, y, docking on the free Sea tile beside it nearest the ship. I must be aboard it as one of its crew, with at least the fewest crew it sails with aboard. A Step at a time over Sea only, never onto a Lake; the crew's Seafaring sets the pace, and sailing teaches it to all of them. My order is \"sail\" until it gets there.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "crew",
+        is: Is::Action,
+        params: &["machine"],
+        cost: 10.0,
+        description: "Join the crew of a siege machine of my realm, by it or its id: I walk onto its tile, following it if it is pushed on, and am one of its crew there until I leave its tile. My order is \"crew\" until I get there.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "push",
+        is: Is::Action,
+        params: &["machine", "x", "y"],
+        cost: 10.0,
+        description: "Push a siege machine, by it or its id, to the tile x, y, where a carriage could go. I must be one of its crew on its tile, with at least as many crew as it needs there; they go along with it, slowly, a Step at a time. My order is \"push\" until it gets there.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -3267,6 +3351,14 @@ pub static ARMY_SCRIPT_API: &[ScriptBinding] = &[
         cost: 20.0,
         description: "The boats and ships the Player sees on the water.",
         returns: ScriptType::List(&ScriptType::View("vessel")),
+    },
+    ScriptBinding {
+        name: "machines",
+        is: Is::Query,
+        params: &[],
+        cost: 20.0,
+        description: "The siege machines the Player sees, theirs and others'.",
+        returns: ScriptType::List(&ScriptType::View("machine")),
     },
     ScriptBinding {
         name: "traders",

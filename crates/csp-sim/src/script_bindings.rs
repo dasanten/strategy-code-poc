@@ -198,6 +198,7 @@ fn seen_is(e: &SeenEntity) -> &'static str {
         SeenEntity::Caravan(_) => "caravan",
         SeenEntity::Trader(_) => "trader",
         SeenEntity::Vessel(_) => "vessel",
+        SeenEntity::Machine(_) => "machine",
     }
 }
 
@@ -1039,6 +1040,7 @@ impl<'a> ScriptBindings<'a> {
             "horses" => self.seen_of("horse", |_, _| None),
             "carriages" => self.seen_of("carriage", |_, _| None),
             "vessels" => self.seen_of("vessel", |_, _| None),
+            "machines" => self.seen_of("machine", |_, _| None),
             "traders" => self.seen_of("trader", |_, _| None),
             "piles" => self.seen_of("pile", |_, _| None),
             "nodes" => Json::Array(
@@ -1643,6 +1645,10 @@ impl<'a> ScriptBindings<'a> {
                 self.request("load", input)
             }
             "row" => self.request("row", vec![("vesselId", place(0)?), ("x", p(1)?), ("y", p(2)?)]),
+            "crew" => self.request("crew", vec![("machineId", place(0)?)]),
+            "push" => {
+                self.request("push", vec![("machineId", place(0)?), ("x", p(1)?), ("y", p(2)?)])
+            }
             "sail" => {
                 self.request("sail", vec![("vesselId", place(0)?), ("x", p(1)?), ("y", p(2)?)])
             }

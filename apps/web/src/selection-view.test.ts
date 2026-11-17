@@ -14,6 +14,8 @@ import {
   TICKS_PER_GAME_YEAR,
   PASSENGER_WEIGHT,
   BOAT_CAPACITY,
+  RAM_CREW,
+  RAM_STRENGTH,
   SHIP_CAPACITY,
   SHIP_MIN_CREW,
   ticksForAge,
@@ -76,6 +78,7 @@ import {
   hitchChoice,
   unhitcherOf,
   boaterOf,
+  pusherOf,
   type ActionId,
   HAUL_STARTS_ASHORE,
   type CardAction,
@@ -820,6 +823,8 @@ describe('the rows of a card that stays open', () => {
         'renameCity',
         'renameHorse',
         'addWaypoint',
+        'crew',
+        'push',
       ]
       if (tileCard.includes(id)) continue
       if (['relocate', 'makeLeader', 'rename'].includes(id)) continue
@@ -861,6 +866,73 @@ const things = (more: Partial<TileThings> = {}): TileThings => ({
   ...more,
 })
 const tile = (more: Partial<TileThings> = {}) => describeTile(things(more), GOOD_LABELS)
+
+describe('the card for a tile with a siege machine', () => {
+  const ram = {
+    id: 'm1',
+    kind: 'ram' as const,
+    realmId: 'me',
+    x: 5,
+    y: 5,
+    crewIds: ['a', 'b'],
+  }
+  const actor = (id: string, x = 9, more: Partial<Resident> = {}) =>
+    ({ id, name: id, x, y: 5, bornAt: -1e9, ...more }) as unknown as Resident
+
+  it('shows a ram with its owner, its crew against what it needs, and its damage', () => {
+    const card = tile({ machines: [{ ...ram, damage: RAM_STRENGTH / 4 }] })
+    expect(card).toMatchObject({ title: 'Ram', rel: 'own', what: 'carriage' })
+    expect(card.lines).toEqual([
+      'Yours',
+      `Crew 2 of ${RAM_CREW}: needs ${RAM_CREW - 2} more to be pushed`,
+      'Damaged: 25%',
+      'Tile 5, 5',
+    ])
+    expect(card.machine).toMatchObject({ id: 'm1', own: true, short: RAM_CREW - 2 })
+    const theirs = tile({ machines: [{ ...ram, realmId: 'r2' }] })
+    expect(theirs.machine?.own).toBe(false)
+  })
+
+  it('shows a ram site in the field on a card of its own, with what it still needs', () => {
+    const site = {
+      id: 'rs',
+      kind: 'ram' as const,
+      cityId: null,
+      x: 5,
+      y: 5,
+      site: { delivered: { wood: 10 }, work: 0 },
+    }
+    const card = tile({ buildings: [site] })
+    expect(card).toMatchObject({ title: 'Ram site', what: 'building' })
+    expect(card.sites?.length).toBe(1)
+  })
+
+  it('lets the resident picked last crew it, its crew push it once enough, its realm tear it down', () => {
+    const card = tile({ machines: [ram] })
+    const ids = (r: Resident | undefined) => tileActions(card, r).map((a) => a.id)
+    // From anywhere a resident of the realm walks over to crew it.
+    expect(ids(actor('c'))).toEqual(expect.arrayContaining(['crew', 'push']))
+    expect(ids(actor('a'))).not.toContain('crew')
+    // Below its crew size the push is greyed out, saying why.
+    const push = tileActions(card, actor('a')).find((a) => a.id === 'push')
+    expect(push).toMatchObject({
+      label: 'Push the ram to…',
+      disabled: true,
+      reason: `the ram needs ${RAM_CREW - 2} more crew to be pushed`,
+    })
+    const full = tile({ machines: [{ ...ram, crewIds: ['a', 'b', 'c', 'd'].slice(0, RAM_CREW) }] })
+    expect(tileActions(full, actor('a')).find((a) => a.id === 'push')?.disabled).toBeUndefined()
+    expect(pusherOf(full, actor('b'))).toBe('b')
+    expect(pusherOf(full, actor('z'))).toBe('a')
+    // Only on its tile is it torn down.
+    expect(ids(actor('a'))).not.toContain('tearDown')
+    expect(ids(actor('a', 5))).toContain('tearDown')
+    // Another realm's ram offers none of it.
+    const theirs = tile({ machines: [{ ...ram, realmId: 'r2' }] })
+    expect(ids(actor('c', 5))).toContain('crew')
+    expect(tileActions(theirs, actor('c', 5)).map((a) => a.id)).not.toContain('crew')
+  })
+})
 
 describe('the card for a tile', () => {
   it('shows a boat on the water with its owner and load, what it holds only to its own realm', () => {

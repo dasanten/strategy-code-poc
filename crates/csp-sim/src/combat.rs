@@ -55,13 +55,18 @@ pub struct StrikeAction {
 pub enum Target {
     Resident(usize),
     Building(usize),
+    /// A siege machine (`CONTEXT.md`: Siege machine): broken by blows like a wall.
+    Machine(usize),
 }
 
 /// The target `target_id` names (`attackTarget`): the resident of that id, or else the finished
-/// wall or gate; None once it is gone.
+/// wall or gate, or the siege machine; None once it is gone.
 pub fn attack_target(world: &WorldState, target_id: &str) -> Option<Target> {
     if let Some(i) = world.residents.iter().position(|x| x.id == target_id) {
         return Some(Target::Resident(i));
+    }
+    if let Some(i) = crate::siege::machine_index(world, target_id) {
+        return Some(Target::Machine(i));
     }
     let i = world.buildings.iter().position(|x| x.id == target_id)?;
     is_wall_or_gate(&world.buildings[i]).then_some(Target::Building(i))
@@ -71,6 +76,7 @@ fn spot_of(world: &WorldState, t: Target) -> (f64, f64) {
     match t {
         Target::Resident(i) => (world.residents[i].x, world.residents[i].y),
         Target::Building(i) => (world.buildings[i].x, world.buildings[i].y),
+        Target::Machine(i) => (world.siege_machines[i].x, world.siege_machines[i].y),
     }
 }
 
@@ -93,7 +99,8 @@ fn reaches(world: &WorldState, size: i32, ai: usize, t: Target) -> bool {
                 && !between_vessels(world, a, b)
                 && reaches_for_height(world, a, b)
         }
-        Target::Building(_) => contact,
+        // A wall, gate or siege machine is struck by anyone in contact with it.
+        Target::Building(_) | Target::Machine(_) => contact,
     }
 }
 
@@ -231,9 +238,17 @@ pub fn validate_attack(
     if resident.is_some_and(|r| organization_of(r) == Some(side)) {
         return Some("that is one of your own residents");
     }
-    let target = match resident {
-        Some(r) => (r.x, r.y),
-        None => {
+    let machine = target_id.and_then(|id| crate::siege::machine_by_id(world, id));
+    let target = match (resident, machine) {
+        (Some(r), _) => (r.x, r.y),
+        // Any siege machine but the side's own (`CONTEXT.md`: Siege machine: broken by blows).
+        (None, Some(m)) => {
+            if m.realm_id.as_deref() == Some(side) {
+                return Some("that is one of your own siege machines");
+            }
+            (m.x, m.y)
+        }
+        (None, None) => {
             if npc.is_some() {
                 return Some("no such resident");
             }
@@ -264,6 +279,8 @@ pub fn validate_attack(
         None
     } else if resident.is_some() {
         Some("that resident is out of sight")
+    } else if machine.is_some() {
+        Some("that siege machine is out of sight")
     } else {
         Some("that wall is out of sight")
     }
@@ -336,6 +353,7 @@ pub fn request_strikes(world: &mut WorldState, size: i32) -> Vec<StrikeAction> {
         let target_id = match target {
             Target::Resident(t) => world.residents[t].id.clone(),
             Target::Building(b) => world.buildings[b].id.clone(),
+            Target::Machine(m) => world.siege_machines[m].id.clone(),
         };
         let r = &mut world.residents[ri];
         let Some(ResidentOrder::Attack(o)) = &mut r.order else { continue };
@@ -382,6 +400,7 @@ pub fn resolve_strikes(
     let mut killers: Vec<(String, String)> = Vec::new();
     let mut died: Vec<String> = Vec::new();
     let mut broken: Vec<Building> = Vec::new();
+    let mut machines_broken: Vec<String> = Vec::new();
     let mut blows = 0;
     for StrikeAction { attacker_id, target_id } in strikes {
         let Some(ai) = world.residents.iter().position(|x| x.id == *attacker_id) else { continue };
@@ -394,6 +413,7 @@ pub fn resolve_strikes(
         let real_id = match target {
             Target::Resident(t) => &world.residents[t].id,
             Target::Building(b) => &world.buildings[b].id,
+            Target::Machine(m) => &world.siege_machines[m].id,
         };
         if o.target_id != *real_id || !reaches(world, size, ai, target) {
             continue;
@@ -406,6 +426,14 @@ pub fn resolve_strikes(
                 alarms.raise_wall_attacked(world, attacker_id, &wall_id, size);
                 if let Some(b) = break_wall(world, ai, &wall_id, size, made) {
                     broken.push(b);
+                }
+                continue;
+            }
+            Target::Machine(mi) => {
+                blows += 1;
+                let machine_id = world.siege_machines[mi].id.clone();
+                if break_machine(world, ai, &machine_id, size, made) {
+                    machines_broken.push(machine_id);
                 }
                 continue;
             }
@@ -493,8 +521,12 @@ pub fn resolve_strikes(
     if !broken.is_empty() {
         update_city_membership(world, size);
     }
-    let gone: HashSet<&str> =
-        died.iter().map(String::as_str).chain(broken.iter().map(|b| b.id.as_str())).collect();
+    let gone: HashSet<&str> = died
+        .iter()
+        .map(String::as_str)
+        .chain(broken.iter().map(|b| b.id.as_str()))
+        .chain(machines_broken.iter().map(String::as_str))
+        .collect();
     for r in &mut world.residents {
         if matches!(&r.order, Some(ResidentOrder::Attack(o)) if gone.contains(o.target_id.as_str()))
         {
@@ -548,6 +580,46 @@ fn break_wall(
     drop_goods(world, b.x, b.y, &returned, MAP_SIZE);
     made.note(&returned);
     Some(b)
+}
+
+/// A blow from the resident at `ai` at the siege machine `machine_id` (`CONTEXT.md`: Siege
+/// machine): like a blow at a wall it always lands, its attacker's `attackPower` going onto the
+/// machine's damage, and teaches Combat. Once it has taken its strength it breaks: it is gone, its
+/// crew with it no longer, and `BROKEN_MATERIALS_RETURNED` of its materials lie on its tile.
+/// Breaking another Organization's machine is a crime of tearing down by whoever strikes the last
+/// blow. Returns whether it broke.
+fn break_machine(
+    world: &mut WorldState,
+    ai: usize,
+    machine_id: &str,
+    size: i32,
+    made: &mut GoodsMade,
+) -> bool {
+    let tick = world.tick as f64;
+    let learned = combat_learned(&world.residents[ai], tick);
+    *world.residents[ai].skills.entry(csp_shared::world::SkillName::Combat).or_insert(0.0) +=
+        learned;
+    let power = attack_power(&world.residents[ai], tick);
+    let Some(mi) = crate::siege::machine_index(world, machine_id) else { return false };
+    let m = &mut world.siege_machines[mi];
+    let strength = crate::siege::machine_strength(m.kind);
+    let damage = strength.min(m.damage.unwrap_or(0.0) + power);
+    m.damage = Some(damage);
+    if damage < strength {
+        return false;
+    }
+    let against = CrimeAgainst {
+        victim_org: world.siege_machines[mi].realm_id.clone(),
+        building: Some(crate::siege::site_kind(world.siege_machines[mi].kind)),
+        ..CrimeAgainst::default()
+    };
+    let attacker_id = world.residents[ai].id.clone();
+    commit_crime(world, size, CrimeKind::TearDown, &attacker_id, against);
+    let m = world.siege_machines.remove(mi);
+    let returned = crate::siege::broken_machine_returns(m.kind);
+    drop_goods(world, m.x, m.y, &returned, MAP_SIZE);
+    made.note(&returned);
+    true
 }
 
 /// Whether `t` drives a caravan, wandering trader or supply wagon and stands with its carriage
