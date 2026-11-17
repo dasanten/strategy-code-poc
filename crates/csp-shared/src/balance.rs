@@ -1188,7 +1188,7 @@ pub const NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT: f64 = 0.75;
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NpcStance {
-    /// The threat (all Organizations' together) at which Fortify's need reaches one.
+    /// The threat from the one Organization it fears most at which Fortify's need reaches one.
     pub fortify_threat: f64,
     /// Fortify keeps this many times the soldiers it keeps by its size.
     pub fortify_soldiers: f64,
@@ -1216,7 +1216,7 @@ pub struct NpcStance {
 }
 
 pub const NPC_STANCE: NpcStance = NpcStance {
-    fortify_threat: 30.0,
+    fortify_threat: 35.0,
     fortify_soldiers: 1.5,
     fortify_escorts: 1.0,
     fortify_gate_watch: 1.5,
