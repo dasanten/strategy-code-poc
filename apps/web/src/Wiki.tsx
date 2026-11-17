@@ -1921,7 +1921,9 @@ export function Wiki() {
           <strong>nearly a ruin</strong> once it has lost {pct(DECAY_NEARLY_RUIN)}. Everyone who
           sees a building sees its condition; scripts read it as <code>building.condition</code>. A
           city left alone for a real month is still there: its buildings may be worn, but none has
-          fallen to ruin from decay alone.
+          fallen to ruin from decay alone. That is all the game does for an absent Player: Food and
+          defence while you are away are your own setup, with work scripts that give every resident
+          access to Food and your defence scripts.
         </p>
         <p>
           A worn building can be <strong>repaired</strong>: pick a resident, then the building's
