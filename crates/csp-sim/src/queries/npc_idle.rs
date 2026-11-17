@@ -113,7 +113,9 @@ mod tests {
         assert!(ids.len() >= 4, "{ids:?}");
         let kinds =
             [CityJobKind::Idle, CityJobKind::Soldier, CityJobKind::Soldier, CityJobKind::Work];
-        let plan = v.world.city_plans.get_mut(&v.city).expect("a plan");
+        let plan = v.world.city_plans.entry(v.city.clone()).or_insert_with(|| {
+            serde_json::from_value(json!({ "plannedAt": 0.0, "jobs": {} })).expect("a plan")
+        });
         plan.jobs.clear();
         for (id, kind) in ids.iter().zip(kinds) {
             plan.jobs.insert(id.clone(), job(kind));
