@@ -1879,6 +1879,15 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     const name = MACHINE_NAMES[machine.kind]
     card ??= { title: capital(name), rel, what: 'carriage' }
     lines.push(...describeMachine(machine, rel))
+    // Its crew, inside it as passengers in a cart are: picked from here (`CONTEXT.md`: Siege
+    // machine).
+    const crewRows = machine.crewIds.flatMap((id) => {
+      const r = (t.residents ?? []).find((x) => x.id === id)
+      return r ? [{ id: r.id, name: r.name }] : []
+    })
+    if (crewRows.length > 0) {
+      lists.push({ title: 'Crew', count: `${crewRows.length}`, meters: [], rows: crewRows })
+    }
     const own = !!t.viewer.realmId && machine.realmId === t.viewer.realmId
     const short = Math.max(0, RAM_CREW - machine.crewIds.length)
     const { x, y } = machine
