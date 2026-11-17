@@ -71,6 +71,7 @@ pub fn create_world(terrain: &TerrainMap, seed: i64) -> WorldState {
         horses: Vec::new(),
         carriages: Vec::new(),
         vessels: Vec::new(),
+        siege_machines: Vec::new(),
         piles: Vec::new(),
         events: Vec::new(),
         alliances: Vec::new(),
@@ -243,6 +244,9 @@ pub fn step_world(
     time(timer, TickPhase::Rest, || {
         step_riders(world);
         step_passengers(world, terrain);
+        // A siege machine's crew is who is with it now that everyone moved (`CONTEXT.md`: Siege
+        // machine).
+        crate::siege::step_siege_machines(world);
         // A fight or an army may have given someone Down an order; it ends with the tick.
         keep_down_still(world);
     });

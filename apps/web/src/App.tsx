@@ -383,6 +383,8 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
     tab: rememberedTab(),
   }))
   const [picking, setPicking] = useState<Picking>(false)
+  /** The siege machine the picked resident pushes once a tile is picked (`CONTEXT.md`: Siege machine). */
+  const [pushing, setPushing] = useState<string | undefined>()
   const [haulSetup, setHaulSetup] = useState<HaulSetup>()
   const [orderError, setOrderError] = useState<string | undefined>()
   const [armyPick, setArmyPick] = useState<ArmyPick>()
@@ -932,6 +934,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       return
     }
     if (!selected) return
+    // One of a siege machine's crew pushes it there (`CONTEXT.md`: Siege machine).
+    if (mode === 'push' && pushing) {
+      const order = { kind: 'push', residentId: selected.id, machineId: pushing, x, y }
+      setOrderError(await giveOrder(order, false))
+      return
+    }
     // Driving and hauling keep to the realm's; only Drive off takes another's (`CONTEXT.md`:
     // Stealing a carriage or horse), whatever else stands on the tile.
     const carriage = ownCarriageHere
@@ -2201,6 +2209,7 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
                 buildings: world.buildings,
                 carriages: world.carriages,
                 vessels: world.vessels,
+                machines: world.machines,
                 horses: world.horses,
                 piles: world.piles,
                 node: nodeAt?.(selectedTile.x, selectedTile.y),
@@ -2293,6 +2302,19 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               select([residentId])
               setPicking('hitchOff')
             }}
+            onCrew={(machineId, residentId) =>
+              void giveOrder({ kind: 'crew', residentId, machineId }, false).then(setOrderError)
+            }
+            onPush={(machineId, residentId) => {
+              select([residentId])
+              setPushing(machineId)
+              setPicking('push')
+            }}
+            onTearDownMachine={(machineId, residentId) =>
+              void giveOrder({ kind: 'tearDown', residentId, buildingId: machineId }, false).then(
+                setOrderError,
+              )
+            }
             onStealHorse={(horseId, residentId) =>
               void giveOrder({ kind: 'mount', residentId, horseId }, false).then(setOrderError)
             }

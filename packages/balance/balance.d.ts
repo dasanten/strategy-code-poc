@@ -712,6 +712,11 @@ export interface Balance {
       iron: number
       [key: string]: number
     }
+    ram: {
+      wood: number
+      iron: number
+      [key: string]: number
+    }
     [key: string]: Record<string, never> | {
       wood: number
       [key: string]: number
@@ -761,6 +766,7 @@ export interface Balance {
     carriage: number
     boat: number
     ship: number
+    ram: number
     [key: string]: number
   }
   readonly STONE_BUILD_MATERIALS: {
@@ -1228,6 +1234,9 @@ export interface Balance {
     [key: string]: number
   }
   readonly BROKEN_MATERIALS_RETURNED: number
+  readonly RAM_CREW: number
+  readonly SIEGE_PUSH_SHARE: number
+  readonly RAM_STRENGTH: number
   readonly CLIMB_TICKS: number
   readonly WALL_WALK_TICKS: number
   readonly FALL_DAMAGE: number
@@ -1352,6 +1361,7 @@ export interface Balance {
     carriage: number
     boat: number
     ship: number
+    ram: number
     house: number
     storage: number
     smelter: number

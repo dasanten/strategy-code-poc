@@ -82,6 +82,10 @@ pub fn resolve_tearing_down(
         let r = &world.residents[ri];
         let Some(ResidentOrder::TearDown(o)) = &r.order else { continue };
         let (rx, ry) = (r.x as i32, r.y as i32);
+        if let Some(mi) = crate::siege::machine_index(world, &o.building_id) {
+            tear_down_machine(world, ri, mi, size, scratch);
+            continue;
+        }
         let bi = building_index(world, &o.building_id);
         let stays = (rx, ry) == (o.at.x as i32, o.at.y as i32);
         let Some(bi) = bi.filter(|&i| stays && is_at((rx, ry), placed(&world.buildings[i]), size))
@@ -130,7 +134,9 @@ pub fn resolve_tearing_down(
     let gone = |id: &str| building_index(world, id).is_none();
     let ends: Vec<usize> = (0..world.residents.len())
         .filter(|&i| match &world.residents[i].order {
-            Some(ResidentOrder::TearDown(o)) => gone(&o.building_id),
+            Some(ResidentOrder::TearDown(o)) => {
+                gone(&o.building_id) && crate::siege::machine_index(world, &o.building_id).is_none()
+            }
             Some(ResidentOrder::Build(o)) => o.site_id.as_deref().is_some_and(gone),
             _ => false,
         })
@@ -139,6 +145,46 @@ pub fn resolve_tearing_down(
         world.residents[i].order = None;
     }
     felled
+}
+
+/// A tick's work at tearing down the siege machine at `mi` by the resident at `ri`, who stays on
+/// its tile while it stands there (`CONTEXT.md`: Siege machine, Tearing down). Once its work is in
+/// it is gone and `TEARDOWN_MATERIALS_RETURNED` of its materials lie on its tile; the order is done.
+fn tear_down_machine(
+    world: &mut WorldState,
+    ri: usize,
+    mi: usize,
+    size: i32,
+    scratch: &mut Scratch,
+) {
+    let tick = world.tick as f64;
+    let r = &world.residents[ri];
+    let m = &world.siege_machines[mi];
+    let stays = matches!(&r.order, Some(ResidentOrder::TearDown(o))
+        if (o.at.x as i32, o.at.y as i32) == (r.x as i32, r.y as i32));
+    let on_it = (r.x as i32, r.y as i32) == (m.x as i32, m.y as i32);
+    if !stays || !on_it || r.owner.is_none() || r.owner != m.realm_id {
+        world.residents[ri].order = None;
+        return;
+    }
+    let needed = crate::siege::machine_teardown_work(m.kind);
+    let total = needed.min(m.teardown.unwrap_or(0.0) + build_work(r, tick));
+    let learned = construction_learned(r, tick);
+    let had = skill_of(r, SkillName::Construction);
+    world.residents[ri].skills.insert(SkillName::Construction, had + learned);
+    world.siege_machines[mi].teardown = Some(total);
+    if total < needed {
+        return;
+    }
+    let m = world.siege_machines.remove(mi);
+    let returned = crate::siege::torn_down_machine_returns(m.kind);
+    drop_goods(world, m.x, m.y, &returned, size);
+    scratch.made.note(&returned);
+    for r in &mut world.residents {
+        if matches!(&r.order, Some(ResidentOrder::TearDown(o)) if o.building_id == m.id) {
+            r.order = None;
+        }
+    }
 }
 
 /// Checks a tear-down order (`tearDown.validate`): one of the Player's adult residents works at
@@ -169,6 +215,18 @@ pub fn validate_tear_down(
     };
     if let Some(no) = crate::lent::refusal(world, r, building_id) {
         return Some(no.into());
+    }
+    // A siege machine is torn down by its own realm only, standing on its tile (`CONTEXT.md`:
+    // Siege machine).
+    if let Some(m) = crate::siege::machine_by_id(world, building_id) {
+        let name = crate::siege::machine_name(m.kind);
+        if m.realm_id.as_deref() != Some(realm.id.as_str()) {
+            return Some(format!("only its own realm tears down a {name}"));
+        }
+        if (r.x as i32, r.y as i32) != (m.x as i32, m.y as i32) {
+            return Some(format!("the resident is not at that {name}"));
+        }
+        return None;
     }
     tear_down_problem(world, r.x as i32, r.y as i32, building_id, terrain)
 }

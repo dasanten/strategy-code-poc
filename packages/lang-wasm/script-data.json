@@ -1758,6 +1758,62 @@
         }
       ]
     },
+    "machine": {
+      "description": "A siege machine in the field, as the Player sees it.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "description": "The machine’s id, unique in the world."
+        },
+        {
+          "name": "kind",
+          "type": "string",
+          "description": "What it is: \"ram\"."
+        },
+        {
+          "name": "realmId",
+          "type": "string",
+          "description": "The realm it belongs to.",
+          "nullWhen": "for one of nobody"
+        },
+        {
+          "name": "x",
+          "type": "number",
+          "description": "The tile it stands on, from west to east."
+        },
+        {
+          "name": "y",
+          "type": "number",
+          "description": "The tile it stands on, from north to south."
+        },
+        {
+          "name": "damage",
+          "type": "number",
+          "description": "The damage blows have done it; at its strength it breaks.",
+          "nullWhen": "while it is unharmed"
+        },
+        {
+          "name": "teardown",
+          "type": "number",
+          "description": "The work put into tearing it down so far.",
+          "nullWhen": "while nobody has started"
+        },
+        {
+          "name": "crewIds",
+          "type": {
+            "list": "string"
+          },
+          "description": "Its crew on its tile, in the order they joined."
+        },
+        {
+          "name": "pusherId",
+          "type": "string",
+          "description": "The one of its crew pushing it now.",
+          "nullWhen": "while it stands still"
+        }
+      ]
+    },
     "pile": {
       "description": "Goods lying on a tile.",
       "fields": [
@@ -2356,6 +2412,18 @@
       }
     },
     {
+      "name": "machines",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The siege machines the Player sees, theirs and others'.",
+      "returns": {
+        "list": {
+          "view": "machine"
+        }
+      }
+    },
+    {
       "name": "traders",
       "is": "query",
       "params": [],
@@ -2868,6 +2936,28 @@
       ],
       "cost": 10,
       "description": "Sail a ship, by it or its id, to the Sea tile x, y, or to the haven on x, y, docking on the free Sea tile beside it nearest the ship. I must be aboard it as one of its crew, with at least the fewest crew it sails with aboard. A Step at a time over Sea only, never onto a Lake; the crew's Seafaring sets the pace, and sailing teaches it to all of them. My order is \"sail\" until it gets there.",
+      "returns": "string"
+    },
+    {
+      "name": "crew",
+      "is": "action",
+      "params": [
+        "machine"
+      ],
+      "cost": 10,
+      "description": "Join the crew of a siege machine of my realm, by it or its id: I walk onto its tile, following it if it is pushed on, and am one of its crew there until I leave its tile. My order is \"crew\" until I get there.",
+      "returns": "string"
+    },
+    {
+      "name": "push",
+      "is": "action",
+      "params": [
+        "machine",
+        "x",
+        "y"
+      ],
+      "cost": 10,
+      "description": "Push a siege machine, by it or its id, to the tile x, y, where a carriage could go. I must be one of its crew on its tile, with at least as many crew as it needs there; they go along with it, slowly, a Step at a time. My order is \"push\" until it gets there.",
       "returns": "string"
     },
     {
@@ -3602,6 +3692,18 @@
       "returns": {
         "list": {
           "view": "vessel"
+        }
+      }
+    },
+    {
+      "name": "machines",
+      "is": "query",
+      "params": [],
+      "cost": 20,
+      "description": "The siege machines the Player sees, theirs and others'.",
+      "returns": {
+        "list": {
+          "view": "machine"
         }
       }
     },

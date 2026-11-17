@@ -85,6 +85,7 @@ export const BUILDING_NAMES: Record<BuildingKind, string> = {
   carriage: 'carriage site',
   boat: 'boat site',
   ship: 'ship site',
+  ram: 'ram site',
   haven: 'haven',
 }
 

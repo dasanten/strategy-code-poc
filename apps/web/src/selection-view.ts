@@ -43,6 +43,8 @@ import {
   TERRAIN_FOOD,
   TERRAIN_SPEED,
   hungerFactor,
+  RAM_CREW,
+  RAM_STRENGTH,
 } from '@csp/balance'
 import {
   carriageCapacity,
@@ -103,7 +105,9 @@ import type {
   SeenTrader,
   SeenCarriage,
   SeenVessel,
+  SeenMachine,
   VesselKind,
+  SiegeMachineKind,
   GoodsPlace,
   GoodsWanted,
   LoadLevel,
@@ -177,6 +181,8 @@ export type ActionId =
   | 'renameCity'
   | 'renameHorse'
   | 'addWaypoint'
+  | 'crew'
+  | 'push'
 
 /** The key that runs each action; fixed per action, so it is the same whatever is selected. */
 export const ACTION_KEYS: Record<ActionId, string> = {
@@ -219,6 +225,8 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   renameCity: 'N',
   renameHorse: 'N',
   addWaypoint: 'J',
+  crew: 'K',
+  push: 'D',
 }
 
 /**
@@ -942,6 +950,19 @@ export interface TileCard {
    */
   renameHorses?: { id: string; name: string }[]
   /**
+   * The siege machine on the tile (`CONTEXT.md`: Siege machine): whether it is the Player's own,
+   * its crew there, and how many more it needs to be pushed.
+   */
+  machine?: {
+    id: string
+    name: string
+    own: boolean
+    crewIds: string[]
+    short: number
+    x: number
+    y: number
+  }
+  /**
    * Residents in sight lying Down on the tile, of any realm, whom the resident picked last may
    * Feed (`CONTEXT.md`: Reviving).
    */
@@ -1134,6 +1155,8 @@ export interface TileThings {
   carriages: SeenCarriage[]
   /** Boats on the water in sight (`CONTEXT.md`: Vessel). */
   vessels?: SeenVessel[]
+  /** Siege machines in sight (`CONTEXT.md`: Siege machine). */
+  machines?: SeenMachine[]
   horses: SeenHorse[]
   piles: Pile[]
   node: KnownNode | undefined
@@ -1835,6 +1858,20 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       if (board.length > 0 || getOff.length > 0) boat = { vesselId: vessel.id, name, board, getOff }
     }
   }
+  const machine = here(t.machines ?? [])[0]
+  let machineCard: TileCard['machine']
+  if (machine) {
+    // A siege machine in the field, on a card of its own (`CONTEXT.md`: Siege machine): its owner
+    // first, then its crew against what it needs to be pushed and how battered it is.
+    const rel = realmRelationship(machine.realmId, null, t.cities, t.viewer)
+    const name = MACHINE_NAMES[machine.kind]
+    card ??= { title: capital(name), rel, what: 'carriage' }
+    lines.push(...describeMachine(machine, rel))
+    const own = !!t.viewer.realmId && machine.realmId === t.viewer.realmId
+    const short = Math.max(0, RAM_CREW - machine.crewIds.length)
+    const { x, y } = machine
+    machineCard = { id: machine.id, name, own, crewIds: machine.crewIds, short, x, y }
+  }
   if (carriage) {
     const rel = realmRelationship(carriage.realmId, carriage.cityId, t.cities, t.viewer)
     // On a card of its own, its owner is the card's first line, as a building's.
@@ -1985,12 +2022,34 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     ...(stealHorse ? { stealHorse } : {}),
     ...(downGoods.length > 0 ? { downGoods } : {}),
     ...(renameHorses.length > 0 ? { renameHorses } : {}),
+    ...(machineCard ? { machine: machineCard } : {}),
     ...(sites.length > 0 ? { sites } : {}),
     ...(downHere.length > 0 ? { downHere } : {}),
     ...(horsesToFeed.length > 0 ? { horsesToFeed } : {}),
     ...(lists.length > 0 ? { lists } : {}),
     ...(stableFood ? { stableFood } : {}),
   }
+}
+
+/** What each kind of siege machine is called (`CONTEXT.md`: Siege machine). */
+export const MACHINE_NAMES: Record<SiegeMachineKind, string> = { ram: 'ram' }
+
+/**
+ * A siege machine's lines (`CONTEXT.md`: Siege machine): its owner, its crew against what it
+ * needs to be pushed, whether it is being pushed, and the damage blows have done it.
+ */
+export function describeMachine(m: SeenMachine, rel: Relationship | undefined): string[] {
+  const lines = [rel ? RELATIONSHIP_NAMES[rel] : 'Nobody’s']
+  const crew = m.crewIds.length
+  const short = Math.max(0, RAM_CREW - crew)
+  lines.push(
+    short > 0
+      ? `Crew ${crew} of ${RAM_CREW}: needs ${short} more to be pushed`
+      : `Crew ${crew}: can be pushed`,
+  )
+  if (m.pusherId) lines.push('Being pushed')
+  if (m.damage) lines.push(`Damaged: ${Math.round((100 * m.damage) / RAM_STRENGTH)}%`)
+  return lines
 }
 
 /** What each kind of vessel is called on its card (`CONTEXT.md`: Vessel). */
@@ -2569,6 +2628,34 @@ export function tileActions(
       ...(rider.problem ? { disabled: true as const, reason: rider.problem } : {}),
     })
   }
+  // A siege machine of the realm (`CONTEXT.md`: Siege machine): the resident picked last joins its
+  // crew, walking onto it; one of its crew pushes it, with enough of them on it; one of the realm
+  // on its tile tears it down.
+  const machine = card.machine
+  if (machine?.own) {
+    const name = machine.name
+    if (actor && !machine.crewIds.includes(actor.id)) {
+      const reason = !canWork(actor, tick) ? `children don’t crew a ${name}` : undefined
+      actions.push({
+        id: 'crew',
+        label: `Crew the ${name}`,
+        key: ACTION_KEYS.crew,
+        ...(reason ? { disabled: true as const, reason } : {}),
+      })
+    }
+    if (pusherOf(card, actor)) {
+      const reason = machine.short > 0 ? machinePushProblem(machine) : undefined
+      actions.push({
+        id: 'push',
+        label: `Push the ${name} to…`,
+        key: ACTION_KEYS.push,
+        ...(reason ? { disabled: true as const, reason } : {}),
+      })
+    }
+    if (actor && actor.x === machine.x && actor.y === machine.y && canWork(actor, tick)) {
+      actions.push({ id: 'tearDown', label: `Tear down the ${name}`, key: ACTION_KEYS.tearDown })
+    }
+  }
   if (card.gate)
     actions.push({
       id: 'gate',
@@ -2620,6 +2707,19 @@ export function boaterOf(
   if (on) return { id: on.id, getOff: false, problem: on.problem }
   const first = boat.getOff[0]
   return first && { id: first.id, getOff: true, problem: undefined }
+}
+
+/** Why the card's siege machine can't be pushed for want of crew (`CONTEXT.md`: Siege machine). */
+export const machinePushProblem = (m: { name: string; short: number }) =>
+  `the ${m.name} needs ${m.short} more crew to be pushed`
+
+/**
+ * Who pushes the tile card's siege machine (`TileCard.machine`): the resident picked last when
+ * they are one of its crew, or else the first of its crew.
+ */
+export function pusherOf(card: TileCard, actor: { id: string } | undefined): string | undefined {
+  const crew = card.machine?.crewIds ?? []
+  return crew.find((id) => id === actor?.id) ?? crew[0]
 }
 
 /**

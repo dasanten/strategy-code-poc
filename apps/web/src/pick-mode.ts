@@ -46,6 +46,7 @@ const RESIDENT_PROMPTS: Record<Exclude<Picking, false>, string> = {
   row: 'where to row the boat: water, or a shore to land at',
   driveOff: 'where to drive the carriage off to',
   rowOff: 'where to row the boat off to: water, or a shore to land at',
+  push: 'where to push the ram, where a carriage could go',
   hitchOff: 'where to drive the carriage',
   haul: 'where the haul route’s other stop is',
   roadFrom: 'where the road starts',

@@ -1926,6 +1926,9 @@ pub const BUILD_MATERIALS: Table<Table<f64>> = Table(&[
     // A ship, built at a haven on the Sea (`CONTEXT.md`: Building a ship): a hull, a mast and
     // rigging, iron-fastened, so Wood and some Iron; six boats' timber.
     ("ship", Table(&[("wood", 120.0), ("iron", 15.0)])),
+    // A ram (`CONTEXT.md`: Siege machine, Ram): a roofed frame on wheels round a heavy beam with an
+    // iron head, so a little more timber than a carriage and as much Iron; built in the field.
+    ("ram", Table(&[("wood", 40.0), ("iron", 5.0)])),
 ]);
 
 /// Work each kind of building needs, in ticks of one unskilled resident of average Strength: a
@@ -1933,7 +1936,7 @@ pub const BUILD_MATERIALS: Table<Table<f64>> = Table(&[
 /// a mint 5, a smithy 5, a town hall 6, a training ground 3 (about a stable), a haven 4. A tile of wooden
 /// wall takes a sixteenth of a game day, a gate an eighth, a tile of road a sixteenth (a quarter of
 /// what a 40 m tile took), a house one game day, a storage two and a farm half of one; a carriage
-/// two, a boat one, a ship ten. More or stronger workers finish it sooner (`buildWork`).
+/// two, a boat one, a ship ten, a ram two. More or stronger workers finish it sooner (`buildWork`).
 pub const BUILD_WORK: Table<f64> = Table(&[
     ("lumberCamp", 2.0 * TICKS_PER_GAME_DAY),
     ("quarry", 3.0 * TICKS_PER_GAME_DAY),
@@ -1954,6 +1957,7 @@ pub const BUILD_WORK: Table<f64> = Table(&[
     ("carriage", 2.0 * TICKS_PER_GAME_DAY),
     ("boat", TICKS_PER_GAME_DAY),
     ("ship", 10.0 * TICKS_PER_GAME_DAY),
+    ("ram", 2.0 * TICKS_PER_GAME_DAY),
 ]);
 
 /// What a stone wall or gate takes instead of `BUILD_MATERIALS` (`CONTEXT.md`: Wall / Gate, Wood
@@ -2241,6 +2245,19 @@ pub const STONE_WALL_STRENGTH: WallStrength = WallStrength { wall: 12000.0, gate
 /// less than tearing it down leaves (`TEARDOWN_MATERIALS_RETURNED`), as much of it is splintered;
 /// enough that a tile of wall leaves a unit of Wood.
 pub const BROKEN_MATERIALS_RETURNED: f64 = 0.34;
+
+/// The fewest crew on a ram's tile for it to be pushed (`CONTEXT.md`: Siege machine): a few
+/// residents, as many as a ship's, so a ram takes a realm's hands from other work.
+pub const RAM_CREW: f64 = 4.0;
+
+/// How fast a crewed siege machine is pushed, as a share of a carriage's pace on the same ground
+/// (`CONTEXT.md`: Siege machine: slowly, like a carriage with no horse): half of walking on Plains,
+/// a crawl in Forest and Hills, a little faster on a road, and onto Mountain only by road.
+pub const SIEGE_PUSH_SHARE: f64 = 0.25;
+
+/// Damage a ram takes from blows before it breaks (`CONTEXT.md`: Siege machine): twice a tile of
+/// wooden wall, so defenders who come out need a while at it, but less than a stone wall tile.
+pub const RAM_STRENGTH: f64 = 6000.0;
 
 /// Ticks it takes to climb over a wall or gate (`CONTEXT.md`: Walls in combat, climbed): six
 /// minutes, all the while unable to dodge or strike back, so a starting city's defenders get up
@@ -2968,6 +2985,9 @@ pub fn balance_json() -> Value {
     m.insert("WALL_STRENGTH".into(), to_value(WALL_STRENGTH).expect("serialisable"));
     m.insert("STONE_WALL_STRENGTH".into(), to_value(STONE_WALL_STRENGTH).expect("serialisable"));
     m.insert("BROKEN_MATERIALS_RETURNED".into(), json!(BROKEN_MATERIALS_RETURNED));
+    m.insert("RAM_CREW".into(), json!(RAM_CREW));
+    m.insert("SIEGE_PUSH_SHARE".into(), json!(SIEGE_PUSH_SHARE));
+    m.insert("RAM_STRENGTH".into(), json!(RAM_STRENGTH));
     m.insert("CLIMB_TICKS".into(), json!(CLIMB_TICKS));
     m.insert("WALL_WALK_TICKS".into(), json!(WALL_WALK_TICKS));
     m.insert("FALL_DAMAGE".into(), json!(FALL_DAMAGE));

@@ -36,6 +36,7 @@ describe('the Build menu', () => {
       'City',
       'Defence',
       'Transport',
+      'Siege',
     ])
     const kinds = groups.flatMap((g) => g.kinds)
     expect(kinds.map((k) => k.kind).sort()).toEqual([...BUILDABLE].sort())
@@ -108,6 +109,20 @@ describe('the Build menu', () => {
     )
   })
 
+  it('offers a ram under Siege anywhere a carriage could stand, one site to a tile', () => {
+    const groups = menu()
+    expect(groups.find((g) => g.name === 'Siege')?.kinds.map((k) => k.kind)).toEqual(['ram'])
+    expect(entry(groups, 'ram').problem).toBeUndefined()
+    const ground = (t: number) => ({ size: 200, at: () => t })
+    const ram = (t: number, buildings: Building[] = []) =>
+      buildHereProblem('ram', 50, 50, { ...seen, buildings }, () => undefined, ground(t))
+    expect(ram(Terrain.Forest)).toBeUndefined()
+    expect(ram(Terrain.Lake)).toBe('a ram is built where a carriage could stand')
+    expect(ram(Terrain.Plains, [{ id: 'r1', kind: 'ram', x: 50, y: 50 } as Building])).toBe(
+      'there is already a ram site on this tile',
+    )
+  })
+
   it('offers a workplace only on its node, even when its footprint would reach one from here', () => {
     // The rule lets a footprint reach the node, but from here the card never offered it.
     const groups = menu(undefined, { '51,51': forestAt(51, 51) })
@@ -139,7 +154,8 @@ describe('the Build menu', () => {
         .map((k) => k.kind)
     const off = open(menu())
     expect(off).not.toContain('lumberCamp')
-    expect(off.filter((k) => !['road', 'carriage', 'boat', 'ship'].includes(k)).sort()).toEqual(
+    const vehicles = ['road', 'carriage', 'boat', 'ship', 'ram']
+    expect(off.filter((k) => !vehicles.includes(k)).sort()).toEqual(
       [...buildMenu(undefined)].sort(),
     )
     expect(open(menu(forestAt(50, 50))).sort()).toEqual(['lumberCamp', 'road'])
