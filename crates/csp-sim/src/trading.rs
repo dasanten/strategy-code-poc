@@ -227,7 +227,7 @@ fn holder_of(world: &WorldState, ri: usize, carriage: Option<usize>) -> (Holder,
 /// The price share of each unit of `good` that `from` would give up in a trade (`CONTEXT.md`: Wear:
 /// a worn piece sells and buys for less).
 fn shares_from(world: &WorldState, from: Holder, good: Good) -> Vec<f64> {
-    let units = held(holder_stock(world, from), good);
+    let units = held(&crate::holders::stock_of(world, from), good);
     leaving_shares(world, holder_id(world, from), units, good)
 }
 
