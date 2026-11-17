@@ -1214,3 +1214,35 @@ fn counts_only_gear_in_good_condition_towards_its_reserve() {
     p.world.wear.insert(storage_id, [(Good::Spear, vec![0.6])].into_iter().collect());
     assert!(short(&p), "a worn spear doesn't count");
 }
+
+/// A trading post's workers fetch a set of Tools from its warehouse and keep it, working with it:
+/// once its stowing put Tools back, a worker fetched and put back a set every tick and never
+/// worked (a game year's run starved out every post).
+#[test]
+fn a_trading_posts_farmers_fetch_tools_and_go_on_farming_with_them() {
+    let mut p = post();
+    let w = p.building(BuildingKind::Warehouse);
+    p.world.buildings[w].stock.get_or_insert_with(Stock::new).insert(Good::Tools, 50.0);
+    let mut runner = Runner::new(&p.terrain);
+    p.run(&mut runner, 3 * DAY);
+    let jobs = p.world.city_plans[&p.city].jobs.clone();
+    let farmers: Vec<usize> = p
+        .citizens()
+        .into_iter()
+        .filter(|&i| {
+            jobs.get(&p.world.residents[i].id)
+                .is_some_and(|j| j.kind == csp_shared::world::CityJobKind::Farm)
+        })
+        .collect();
+    assert!(!farmers.is_empty());
+    for i in farmers {
+        let r = &p.world.residents[i];
+        assert!(held(&r.carried, Good::Tools) >= 1.0, "{} carries no Tools", r.id);
+        assert!(
+            matches!(r.order, Some(ResidentOrder::WorkAt(_))),
+            "{} isn't farming: {:?}",
+            r.id,
+            r.order
+        );
+    }
+}

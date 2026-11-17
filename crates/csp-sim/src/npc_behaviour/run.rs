@@ -935,9 +935,11 @@ fn processes(kind: BuildingKind) -> bool {
 }
 
 /// Whether a Trade Org city's warehouse takes a good back from an idle resident
-/// (`backToWarehouse`): all but Food and the weapons and armour that stay on them.
+/// (`backToWarehouse`): all but Food and the weapons, armour and Tools that stay on them. Put
+/// back, a worker would fetch their Tools again at once and never work.
 fn back_to_warehouse(good: Good) -> bool {
     good != Good::Food
+        && good != Good::Tools
         && !WEAPONS.contains(&good_name(good))
         && !PROTECTION.contains(&good_name(good))
 }

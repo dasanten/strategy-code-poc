@@ -2290,31 +2290,32 @@ pub const TEARDOWN_MATERIALS_RETURNED: f64 = 0.5;
 
 /// Game days a finished building of each kind takes to lose all its condition, unrepaired
 /// (`CONTEXT.md`: Decay): it loses an even share each game day, used or not. Roads and the wooden
-/// walls and gates go fastest, about two game months; timber buildings in four; those mostly of
-/// stone (smelter, mint, smithy) in eight. A kind not listed (a carriage, boat or ship site) never
-/// decays.
+/// walls and gates go fastest, in under half a game year; timber buildings in most of one; those
+/// mostly of stone (smelter, mint, smithy) in nearly two. A kind not listed (a carriage, boat or
+/// ship site) never decays. Three times the first numbers (decided overnight): at those an NPC
+/// city's builders couldn't keep up and every city fell to ruin within a game year.
 pub const DECAY_DAYS: Table<f64> = Table(&[
-    ("road", 60.0),
-    ("wall", 60.0),
-    ("gate", 60.0),
-    ("farm", 90.0),
-    ("house", 120.0),
-    ("stable", 120.0),
-    ("lumberCamp", 120.0),
-    ("storage", 150.0),
-    ("trainingGround", 150.0),
-    ("haven", 150.0),
-    ("quarry", 150.0),
-    ("mine", 150.0),
-    ("townHall", 180.0),
-    ("warehouse", 240.0),
-    ("smelter", 240.0),
-    ("mint", 240.0),
-    ("smithy", 240.0),
+    ("road", 180.0),
+    ("wall", 180.0),
+    ("gate", 180.0),
+    ("farm", 270.0),
+    ("house", 360.0),
+    ("stable", 360.0),
+    ("lumberCamp", 360.0),
+    ("storage", 450.0),
+    ("trainingGround", 450.0),
+    ("haven", 450.0),
+    ("quarry", 450.0),
+    ("mine", 450.0),
+    ("townHall", 540.0),
+    ("warehouse", 720.0),
+    ("smelter", 720.0),
+    ("mint", 720.0),
+    ("smithy", 720.0),
 ]);
 
 /// Share of its condition lost from which a building reads worn, rather than good
-/// (`CONTEXT.md`: Decay), and can be repaired: a road after about two game weeks.
+/// (`CONTEXT.md`: Decay), and can be repaired: a road after about six game weeks.
 pub const DECAY_WORN: f64 = 0.25;
 
 /// Share of its condition lost from which a building reads nearly a ruin.
