@@ -459,8 +459,8 @@ fn invariants_for_tick_runs_all_of_them_when_every_tick_is_sampled_none_at_a_rat
     // `veins-counted` (T102.2), `npc-leaves-dry-workplaces` (T102.4), `equipment-sound` (T107.1),
     // `up-only-on-walls` and `up-only-on-own-walls` (T105.2), `none-attack-up-from-below` (T105.3),
     // `threat-sound` (T98.2),
-    // `trading-posts-have-no-temperament` (T98.1).
-    assert_eq!(all.len(), 173);
+    // `trading-posts-have-no-temperament` (T98.1), `npc-hunts-sound` (T98.6).
+    assert_eq!(all.len(), 174);
 }
 
 /// A starting city with everyone idle on the storage's tile, carrying nothing (`atHome` of
