@@ -1380,6 +1380,8 @@ export interface Balance {
   readonly RAM_CREW: number
   readonly SIEGE_PUSH_SHARE: number
   readonly RAM_STRENGTH: number
+  readonly RAM_STRIKE_TICKS: number
+  readonly RAM_BLOW: number
   readonly CLIMB_TICKS: number
   readonly WALL_WALK_TICKS: number
   readonly FALL_DAMAGE: number

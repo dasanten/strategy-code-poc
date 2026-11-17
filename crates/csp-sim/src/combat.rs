@@ -99,12 +99,18 @@ fn reaches(world: &WorldState, size: i32, ai: usize, t: Target) -> bool {
     match t {
         Target::Resident(ti) => {
             let b = &world.residents[ti];
-            let blow =
-                (contact || across_docked_ship(world, a, b)) && reaches_for_height(world, a, b);
-            (blow || within_shot(world, size, a, b)) && !between_vessels(world, a, b)
+            // A ram's crew under its roof can't be struck from above nor shot (`CONTEXT.md`: Ram).
+            let sheltered = crate::siege::under_roof(world, b);
+            let blow = (contact || across_docked_ship(world, a, b))
+                && reaches_for_height(world, a, b)
+                && !(sheltered && is_up(world, a));
+            let shot = !sheltered && within_shot(world, size, a, b);
+            (blow || shot) && !between_vessels(world, a, b)
         }
-        // A wall, gate or siege machine is struck in contact, never shot at.
-        Target::Building(_) | Target::Machine(_) => contact,
+        // A wall or gate is struck in contact, never shot at.
+        Target::Building(_) => contact,
+        // So is a siege machine, and only from the ground: defenders come down and out for it.
+        Target::Machine(_) => contact && !is_up(world, a),
     }
 }
 
@@ -294,6 +300,15 @@ pub fn validate_attack(
         .residents
         .iter()
         .any(|x| ours(x) && wrap_distance(size, tile((x.x, x.y)), tile(target)) <= SIGHT_RANGE);
+    // A ram's crew under its roof can't be struck from above nor shot, and a siege machine is
+    // struck from the ground (`CONTEXT.md`: Ram).
+    let roofed = resident.is_some_and(|t| crate::siege::under_roof(world, t));
+    if seen && roofed && (order.shoot || is_up(world, me)) {
+        return Some("they are under the ram’s roof");
+    }
+    if seen && machine.is_some() && is_up(world, me) {
+        return Some("a siege machine is struck from the ground");
+    }
     if seen && order.shoot {
         return shoot_problem(world, size, me, resident);
     }
@@ -387,6 +402,18 @@ pub fn request_strikes(world: &mut WorldState, size: i32) -> Vec<StrikeAction> {
         }
         let target = target.expect("not gone");
         if !reaches(world, size, ri, target) {
+            // From up on a wall nothing reaches a ram or its crew under its roof: the order ends
+            // rather than waits up there (`CONTEXT.md`: Ram).
+            let a = &world.residents[ri];
+            let roofed = match target {
+                Target::Resident(t) => crate::siege::under_roof(world, &world.residents[t]),
+                Target::Machine(_) => true,
+                Target::Building(_) => false,
+            };
+            if roofed && is_up(world, a) {
+                world.residents[ri].order = None;
+                continue;
+            }
             // In contact from the ground with someone up: no blow reaches them, so the order ends
             // rather than waits below (`CONTEXT.md`: High ground).
             if let Target::Resident(t) = target {

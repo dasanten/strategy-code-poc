@@ -1209,6 +1209,31 @@ pub fn siege_machines_in_place(world: &WorldState, terrain: &TerrainMap) -> Out 
             out.push(violation(name, msg, &[&m.id, &r.id]));
         }
     }
+    // A ram strikes only with its crew, at a foreign wall or gate next to it (`CONTEXT.md`: Ram).
+    for r in &world.residents {
+        let Some(ResidentOrder::Ram(o)) = &r.order else { continue };
+        let problem = match crate::siege::machine_by_id(world, &o.machine_id) {
+            None => "which is gone".to_string(),
+            Some(m) => match crate::siege::ram_problem(world, r, m, &o.target_id) {
+                None => continue,
+                Some(p) => p,
+            },
+        };
+        let msg =
+            format!("resident {} rams {} with {}, but {problem}", r.id, o.target_id, o.machine_id);
+        out.push(violation(name, msg, &[&r.id]));
+    }
+    // Nobody up struck one of a ram's crew under its roof this tick.
+    for r in world.residents.iter().filter(|r| crate::siege::under_roof(world, r)) {
+        let Some(s) = r.struck.as_ref().filter(|s| s.tick + 1.0 == world.tick as f64) else {
+            continue;
+        };
+        let by = world.residents.iter().find(|a| a.id == s.by);
+        if by.is_some_and(|a| crate::queries::walls::is_up(world, a)) {
+            let msg = format!("{} under a ram's roof was struck from above by {}", r.id, s.by);
+            out.push(violation(name, msg, &[&r.id, &s.by]));
+        }
+    }
     out
 }
 
@@ -2098,9 +2123,9 @@ pub fn carrying_doesnt_work(world: &WorldState, _: &TerrainMap) -> Out {
 }
 
 /// Orders only a grown resident can hold (`ADULT_ORDERS`).
-const ADULT_ORDERS: [&str; 12] = [
+const ADULT_ORDERS: [&str; 13] = [
     "build", "roadLine", "wallLine", "tearDown", "workAt", "teach", "train", "breed", "drive",
-    "feed", "crew", "push",
+    "feed", "crew", "push", "ram",
 ];
 
 /// Children don't work until they are grown (`childrenDontWork`).

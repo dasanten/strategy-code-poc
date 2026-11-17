@@ -825,6 +825,7 @@ describe('the rows of a card that stays open', () => {
         'addWaypoint',
         'crew',
         'push',
+        'ram',
       ]
       if (tileCard.includes(id)) continue
       if (['relocate', 'makeLeader', 'rename'].includes(id)) continue
@@ -905,6 +906,22 @@ describe('the card for a tile with a siege machine', () => {
     const card = tile({ buildings: [site] })
     expect(card).toMatchObject({ title: 'Ram site', what: 'building' })
     expect(card.sites?.length).toBe(1)
+  })
+
+  it('offers its crew to ram the gate of another realm next to it, once enough (CONTEXT.md: Ram)', () => {
+    const gate = { id: 'g1', kind: 'gate' as const, cityId: 'c-npc', x: 6, y: 5 }
+    const wall = { id: 'w1', kind: 'wall' as const, cityId: 'c-npc', x: 6, y: 4 }
+    const own = { id: 'w2', kind: 'wall' as const, cityId: 'c-me', x: 4, y: 5 }
+    const card = tile({ machines: [ram], buildings: [wall, gate, own] })
+    expect(card.machine?.ramAt).toEqual({ id: 'g1', name: 'gate' })
+    const row = tileActions(card, actor('a')).find((a) => a.id === 'ram')
+    expect(row).toMatchObject({
+      label: 'Ram the gate',
+      disabled: true,
+      reason: `the ram needs ${RAM_CREW - 2} more crew to strike`,
+    })
+    // Nothing of another realm next to it: nothing to ram.
+    expect(tile({ machines: [ram], buildings: [own] }).machine?.ramAt).toBeUndefined()
   })
 
   it('lets the resident picked last crew it, its crew push it once enough, its realm tear it down', () => {

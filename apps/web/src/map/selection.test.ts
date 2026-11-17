@@ -61,6 +61,14 @@ describe('selecting residents on the map', () => {
     expect(pickableAt(list, 50, 50)).toBeUndefined()
     expect(inBox(list, { x: 0, y: 0 }, { x: 100, y: 100 })).toEqual(['p'])
   })
+
+  it('boxes a siege machine’s crew, but a click on them is the machine’s', () => {
+    const spots = new Map([['c', { x: 50, y: 50, r: 10 }]])
+    const crew = [{ id: 'c', owner: 'me', x: 5, y: 5 }]
+    const list = pickables(crew, 'me', spots, place, 40, true, new Set(['c']))
+    expect(pickableAt(list, 50, 50)).toBeUndefined()
+    expect(inBox(list, { x: 0, y: 0 }, { x: 100, y: 100 })).toEqual(['c'])
+  })
 })
 
 describe('what a click on the map picks (CONTEXT.md: Picking on the map)', () => {

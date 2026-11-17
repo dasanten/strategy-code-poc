@@ -1015,6 +1015,16 @@ pub struct PushOrder {
     pub progress: f64,
 }
 
+/// Ramming a wall or gate (`CONTEXT.md`: Ram): one of a ram's crew swings it, with its whole crew,
+/// at the wall or gate next to it; `progress` builds up to its next strike.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RamOrder {
+    pub machine_id: String,
+    pub target_id: String,
+    pub progress: f64,
+}
+
 /// A haul route's stop.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -1318,6 +1328,8 @@ pub enum ResidentOrder {
     Crew(CrewOrder),
     /// Pushing a siege machine to a tile, as one of its crew (`CONTEXT.md`: Siege machine).
     Push(PushOrder),
+    /// Swinging a ram at the wall or gate next to it, as one of its crew (`CONTEXT.md`: Ram).
+    Ram(RamOrder),
 }
 
 /// Everything in the world that changes, saved as snapshots (ADR 0006).

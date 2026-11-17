@@ -2316,6 +2316,15 @@ pub const SIEGE_PUSH_SHARE: f64 = 0.25;
 /// wooden wall, so defenders who come out need a while at it, but less than a stone wall tile.
 pub const RAM_STRENGTH: f64 = 6000.0;
 
+/// Ticks between a crewed ram's strikes at the wall, gate or tower next to it (`CONTEXT.md`: Ram):
+/// a heavy beam swung back and forth by its crew, slower than a resident's blows.
+pub const RAM_STRIKE_TICKS: f64 = 10.0;
+
+/// Damage each strike of a ram does to the wall, gate or tower it is at (`CONTEXT.md`: Ram: many
+/// times harder than a blow): it breaks a tile of wooden wall in 20 strikes, a little over three
+/// minutes, and one of stone in about thirteen, where a Spear alone takes 12 and 50.
+pub const RAM_BLOW: f64 = 150.0;
+
 /// Ticks it takes to climb over a wall or gate (`CONTEXT.md`: Walls in combat, climbed): six
 /// minutes, all the while unable to dodge or strike back, so a starting city's defenders get up
 /// onto its wall and strike the climbers down before they are over (T105.6).
@@ -3053,6 +3062,8 @@ pub fn balance_json() -> Value {
     m.insert("RAM_CREW".into(), json!(RAM_CREW));
     m.insert("SIEGE_PUSH_SHARE".into(), json!(SIEGE_PUSH_SHARE));
     m.insert("RAM_STRENGTH".into(), json!(RAM_STRENGTH));
+    m.insert("RAM_STRIKE_TICKS".into(), json!(RAM_STRIKE_TICKS));
+    m.insert("RAM_BLOW".into(), json!(RAM_BLOW));
     m.insert("CLIMB_TICKS".into(), json!(CLIMB_TICKS));
     m.insert("WALL_WALK_TICKS".into(), json!(WALL_WALK_TICKS));
     m.insert("FALL_DAMAGE".into(), json!(FALL_DAMAGE));

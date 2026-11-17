@@ -277,6 +277,12 @@ fn step_rest(
     let strikes = request_strikes(world, size);
     let strikes_len = strikes.len();
     let mut combat = resolve_strikes(world, &strikes, size, &mut GameAlarms, &mut scratch.made);
+    // Crewed rams strike the walls and gates next to them (`CONTEXT.md`: Ram).
+    let rammed = crate::siege::resolve_ram_strikes(world, size, &mut GameAlarms, &mut scratch.made);
+    if !rammed.is_empty() {
+        crate::cities::update_city_membership(world, size);
+    }
+    combat.broken.extend(rammed);
     // Whoever was up on a tile that broke falls (`CONTEXT.md`: A tile breaks).
     let (fell, ended) = crate::wall_walk::fall_from_broken(world, terrain, &combat.broken);
     combat.died.extend(fell);

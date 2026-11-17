@@ -183,6 +183,7 @@ export type ActionId =
   | 'addWaypoint'
   | 'crew'
   | 'push'
+  | 'ram'
 
 /** The key that runs each action; fixed per action, so it is the same whatever is selected. */
 export const ACTION_KEYS: Record<ActionId, string> = {
@@ -227,6 +228,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   addWaypoint: 'J',
   crew: 'K',
   push: 'D',
+  ram: 'R',
 }
 
 /**
@@ -961,6 +963,8 @@ export interface TileCard {
     short: number
     x: number
     y: number
+    /** The wall or gate of another realm next to it, for a ram to strike (`CONTEXT.md`: Ram). */
+    ramAt?: { id: string; name: string }
   }
   /**
    * Residents in sight lying Down on the tile, of any realm, whom the resident picked last may
@@ -1875,10 +1879,44 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     const name = MACHINE_NAMES[machine.kind]
     card ??= { title: capital(name), rel, what: 'carriage' }
     lines.push(...describeMachine(machine, rel))
+    // Its crew, inside it as passengers in a cart are: picked from here (`CONTEXT.md`: Siege
+    // machine).
+    const crewRows = machine.crewIds.flatMap((id) => {
+      const r = (t.residents ?? []).find((x) => x.id === id)
+      return r ? [{ id: r.id, name: r.name }] : []
+    })
+    if (crewRows.length > 0) {
+      lists.push({ title: 'Crew', count: `${crewRows.length}`, meters: [], rows: crewRows })
+    }
     const own = !!t.viewer.realmId && machine.realmId === t.viewer.realmId
     const short = Math.max(0, RAM_CREW - machine.crewIds.length)
     const { x, y } = machine
-    machineCard = { id: machine.id, name, own, crewIds: machine.crewIds, short, x, y }
+    // A gate first, else a wall, of another realm's city or of nobody's, next to it.
+    const ownRealm = (b: SeenBuilding) =>
+      t.cities.find((c) => c.id === b.cityId)?.realmId === t.viewer.realmId
+    const ramAt =
+      machine.kind === 'ram'
+        ? t.buildings
+            .filter(
+              (b) =>
+                (b.kind === 'gate' || b.kind === 'wall') &&
+                !b.site &&
+                Math.abs(b.x - x) <= 1 &&
+                Math.abs(b.y - y) <= 1 &&
+                !ownRealm(b),
+            )
+            .sort((a, b) => Number(b.kind === 'gate') - Number(a.kind === 'gate'))[0]
+        : undefined
+    machineCard = {
+      id: machine.id,
+      name,
+      own,
+      crewIds: machine.crewIds,
+      short,
+      x,
+      y,
+      ...(ramAt ? { ramAt: { id: ramAt.id, name: ramAt.kind } } : {}),
+    }
   }
   if (carriage) {
     const rel = realmRelationship(carriage.realmId, carriage.cityId, t.cities, t.viewer)
@@ -2657,6 +2695,18 @@ export function tileActions(
         id: 'push',
         label: `Push the ${name} to…`,
         key: ACTION_KEYS.push,
+        ...(reason ? { disabled: true as const, reason } : {}),
+      })
+    }
+    // One of its crew swings a ram at the wall or gate of another realm next to it (`CONTEXT.md`:
+    // Ram), with its whole crew there.
+    if (machine.ramAt && pusherOf(card, actor)) {
+      const reason =
+        machine.short > 0 ? `the ram needs ${machine.short} more crew to strike` : undefined
+      actions.push({
+        id: 'ram',
+        label: `Ram the ${machine.ramAt.name}`,
+        key: ACTION_KEYS.ram,
         ...(reason ? { disabled: true as const, reason } : {}),
       })
     }
