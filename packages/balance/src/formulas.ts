@@ -193,9 +193,12 @@ export function buildWork(resident: ResidentLike, tick: number): number {
   return strength * (1 + Math.min(CONSTRUCTION_SKILL_LIMIT, skill)) * toolsFactor(resident)
 }
 
-/** How many times their plain pace a resident works (`CONTEXT.md`: Tools): faster carrying a set of Tools, however many. */
-export function toolsFactor(resident: Pick<ResidentLike, 'carried'>): number {
-  return (resident.carried.tools ?? 0) >= 1 ? 1 + TOOLS_WORK_BONUS : 1
+/**
+ * How many times their plain pace a resident works (`CONTEXT.md`: Tools): faster carrying a set of
+ * Tools, however many. Another realm's resident comes without what they carry: the plain pace.
+ */
+export function toolsFactor(resident: { carried?: Partial<Record<string, number>> }): number {
+  return (resident.carried?.tools ?? 0) >= 1 ? 1 + TOOLS_WORK_BONUS : 1
 }
 
 function workPace(resident: ResidentLike, perDay: number, skill: string, tick: number): number {

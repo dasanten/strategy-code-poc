@@ -385,6 +385,12 @@
           "type": "string",
           "description": "The equipped armour's condition.",
           "nullWhen": "when they have none equipped"
+        },
+        {
+          "name": "tools",
+          "type": "string",
+          "description": "The condition of the set of Tools they work with: it wears with each day's work.",
+          "nullWhen": "when they carry none"
         }
       ]
     },

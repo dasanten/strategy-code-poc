@@ -333,6 +333,10 @@ pub struct GearCondition {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub armour: Option<PieceCondition>,
+    /// The set of Tools they work with (`CONTEXT.md`: Tools), if they carry one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub tools: Option<PieceCondition>,
 }
 
 /// A slot kept empty after its item was taken off, and how many units fitting it the resident

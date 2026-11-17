@@ -245,6 +245,7 @@ pub fn resolve_repairing(
                 x.work = total;
             }
             world.residents[ri].skills.insert(SkillName::Construction, had + learned);
+            crate::wear::wear_tools(world, ri);
         }
         let b = &mut world.buildings[bi];
         if repair_work_needed(b) == 0.0 && repair_materials_needed(b).is_empty() {

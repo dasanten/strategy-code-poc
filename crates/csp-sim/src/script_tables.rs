@@ -361,6 +361,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 description: "The equipped armour's condition.",
                 null_when: Some("when they have none equipped"),
             },
+            ScriptField {
+                name: "tools",
+                r#type: ScriptType::String,
+                description: "The condition of the set of Tools they work with: it wears with each day's work.",
+                null_when: Some("when they carry none"),
+            },
         ],
     },
     ScriptView {

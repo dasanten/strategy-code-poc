@@ -307,6 +307,7 @@ pub fn resolve_building(
                 s.work = build_work_of(kind).min(s.work + work);
             }
             world.residents[ri].skills.insert(SkillName::Construction, had + learned);
+            crate::wear::wear_tools(world, ri);
         }
         let kind = world.buildings[si].kind;
         let r = world.residents[ri].clone();

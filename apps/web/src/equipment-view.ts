@@ -50,13 +50,15 @@ export function equipmentSlots(
 
 /**
  * One line for a card: "Sword (worn) · Shield (good) · no armour", or "Nothing equipped"; the
- * condition only where it is known.
+ * condition only where it is known. The realm's own resident carrying Tools adds their set's
+ * condition, "· Tools (worn)" (`CONTEXT.md`: Tools): not equipped, but worn with work like gear.
  */
 export function equipmentLine(equipped: Equipment | undefined, condition?: GearCondition): string {
   const slots = equipmentSlots(equipped, condition)
-  if (slots.every((s) => !s.item)) return 'Nothing equipped'
+  const tools = condition?.tools ? ` · ${GOOD_LABELS.tools} (${CONDITION_WORDS[condition.tools]})` : ''
+  if (slots.every((s) => !s.item)) return `Nothing equipped${tools}`
   const named = (s: SlotView) => (s.condition ? `${s.item} (${s.condition})` : s.item)
-  return slots.map((s) => named(s) ?? `no ${s.label.toLowerCase()}`).join(' · ')
+  return slots.map((s) => named(s) ?? `no ${s.label.toLowerCase()}`).join(' · ') + tools
 }
 
 /** The slot a good goes into, or `undefined` for a good that is no gear (`CONTEXT.md`: Equipment). */

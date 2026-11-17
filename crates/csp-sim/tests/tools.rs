@@ -11,9 +11,13 @@ use csp_shared::balance::{
 };
 use csp_shared::terrain::TerrainMap;
 use csp_shared::time::TICKS_PER_GAME_DAY;
-use csp_shared::world::{BuildingKind, Good, Resident, ResidentOrder, SkillName, Stock, WorldState};
+use csp_shared::world::{
+    BuildingKind, Good, Resident, ResidentOrder, ResourceKind, ResourceNode, SkillName, Stock,
+    Wear, WorldState,
+};
 use csp_sim::queries::balance::{batch_work, build_work, made_per_day, work_output};
 use csp_sim::queries::building::{pile_tile, recipe_for};
+use csp_sim::wear::{gear_condition, in_use, PieceCondition};
 use csp_sim::world::create_world;
 use serde_json::json;
 
@@ -85,7 +89,6 @@ fn a_smithy_makes_tools_from_iron_and_wood_and_they_weigh_what_went_into_them() 
     // Warehouses trade them like any other good.
     assert!(WAREHOUSE_FLOOR.get("tools").unwrap() > 0.0);
     assert!(WAREHOUSE_BASE_PRICE.get("tools").unwrap() > 0.0);
-    assert!(TOOLS_WORK_BONUS > 0.0 && TOOLS_WORK_DAYS > 0.0);
 }
 
 #[test]
@@ -125,4 +128,115 @@ fn a_farmer_carrying_tools_makes_more_in_a_day_and_one_without_the_same_as_befor
     assert!((plain - 2.0).abs() < 0.5, "{plain}");
     let with = farmed_in_a_day(1.0);
     assert!((with - plain * (1.0 + TOOLS_WORK_BONUS)).abs() < 0.1, "{with} vs {plain}");
+}
+
+/// The farm's worker w1, carrying Food and `tools` sets, set to work; the work order's first tick
+/// has run.
+fn farming(tools: f64) -> (WorldState, TerrainMap) {
+    let (mut world, t, mut orders) = setup();
+    let w = at(&mut world, "w1");
+    w.carried = Stock::from([(Good::Food, HOME_FOOD_LOW), (Good::Tools, tools)]);
+    order(&mut world, &mut orders, &player(7), json!({ "kind": "workAt", "residentId": "w1" }), &t)
+        .unwrap();
+    (world, t)
+}
+
+/// A tick of work's share of a set of Tools' life.
+fn per_tick() -> f64 {
+    1.0 / (TICKS_PER_GAME_DAY * TOOLS_WORK_DAYS)
+}
+
+fn tools_of(world: &mut WorldState) -> f64 {
+    at(world, "w1").carried.get(&Good::Tools).copied().unwrap_or(0.0)
+}
+
+#[test]
+fn tools_wear_with_each_tick_of_work_and_read_worn_on_their_own_realms_card() {
+    let (mut world, t) = farming(1.0);
+    let worn = in_use(&world, "w1", Good::Tools);
+    assert!(worn > 0.0 && worn <= 2.0 * per_tick(), "{worn}");
+    run(&mut world, &t, 100);
+    let worn = in_use(&world, "w1", Good::Tools);
+    assert!((worn - 101.0 * per_tick()).abs() < 2.0 * per_tick(), "{worn}");
+    let r = at(&mut world, "w1").clone();
+    assert_eq!(gear_condition(&world, &r).tools, Some(PieceCondition::Good));
+    world.wear.insert("w1".into(), Wear::from([(Good::Tools, vec![0.6])]));
+    assert_eq!(gear_condition(&world, &r).tools, Some(PieceCondition::Worn));
+    assert_sound(&world, &t);
+}
+
+#[test]
+fn worn_out_tools_break_and_the_worker_goes_on_at_the_plain_pace() {
+    let (mut world, t) = farming(1.0);
+    // Ten ticks of work left in the set.
+    world.wear.insert("w1".into(), Wear::from([(Good::Tools, vec![1.0 - 10.0 * per_tick()])]));
+    run(&mut world, &t, 20);
+    assert_eq!(tools_of(&mut world), 0.0);
+    assert!(world.wear.get("w1").is_none());
+    let r = at(&mut world, "w1").clone();
+    assert!(matches!(r.order, Some(ResidentOrder::WorkAt(_))), "they work on");
+    assert_eq!(gear_condition(&world, &r).tools, None);
+    let plain = work_output(&r, Good::Food, SkillName::Farming, 0.0);
+    let mut new_set = r.clone();
+    new_set.carried.insert(Good::Tools, 1.0);
+    let fast = work_output(&new_set, Good::Food, SkillName::Farming, 0.0);
+    assert!((fast - plain * (1.0 + TOOLS_WORK_BONUS)).abs() < 1e-9);
+    assert_sound(&world, &t);
+}
+
+#[test]
+fn only_the_set_in_use_wears_and_a_spare_takes_over_when_it_breaks() {
+    let (mut world, t) = farming(2.0);
+    world.wear.insert("w1".into(), Wear::from([(Good::Tools, vec![1.0 - 10.0 * per_tick()])]));
+    run(&mut world, &t, 20);
+    assert_eq!(tools_of(&mut world), 1.0);
+    let worn = in_use(&world, "w1", Good::Tools);
+    assert!(worn > 0.0 && worn < 12.0 * per_tick(), "the spare wears from new: {worn}");
+    let r = at(&mut world, "w1").clone();
+    let mut without = r.clone();
+    without.carried.shift_remove(&Good::Tools);
+    let plain = work_output(&without, Good::Food, SkillName::Farming, 0.0);
+    let now = work_output(&r, Good::Food, SkillName::Farming, 0.0);
+    assert!((now - plain * (1.0 + TOOLS_WORK_BONUS)).abs() < 1e-9, "still faster");
+    assert_sound(&world, &t);
+}
+
+#[test]
+fn tools_carried_but_not_worked_with_dont_wear() {
+    let (mut world, t, _) = setup();
+    at(&mut world, "w1").carried = Stock::from([(Good::Tools, 1.0)]);
+    run(&mut world, &t, 100);
+    assert_eq!(in_use(&world, "w1", Good::Tools), 0.0);
+    assert_eq!(tools_of(&mut world), 1.0);
+}
+
+#[test]
+fn a_builder_carrying_tools_builds_faster_and_wears_them() {
+    let mut t = plains(16);
+    t.tiles[3 * 16 + 3] = csp_shared::terrain::Terrain::Forest as u8;
+    let mut world = empty_world(&t);
+    world.nodes = vec![ResourceNode {
+        id: "n1".into(),
+        kind: ResourceKind::Forest,
+        x: 3.0,
+        y: 3.0,
+        richness: Default::default(),
+        stock: None,
+    }];
+    world.realms.push(realm("r1", 7, "w1"));
+    resident(&mut world, "w1", 3.0, 3.0);
+    at(&mut world, "w1").carried = Stock::from([(Good::Tools, 1.0)]);
+    let mut orders = Orders::default();
+    let o = json!({ "kind": "build", "residentId": "w1", "building": "lumberCamp" });
+    order(&mut world, &mut orders, &player(7), o, &t).unwrap();
+    let r = at(&mut world, "w1").clone();
+    let per = build_work(&r, world.tick as f64);
+    close(per, 1.0 + TOOLS_WORK_BONUS);
+    let before = site_of(&world).and_then(|b| b.site.as_ref()).map(|s| s.work).unwrap();
+    run(&mut world, &t, 10);
+    let after = site_of(&world).and_then(|b| b.site.as_ref()).map(|s| s.work).unwrap();
+    close(after - before, 10.0 * per);
+    let worn = in_use(&world, "w1", Good::Tools);
+    assert!((worn - 11.0 * per_tick()).abs() < 1.5 * per_tick(), "{worn}");
+    assert_sound(&world, &t);
 }
