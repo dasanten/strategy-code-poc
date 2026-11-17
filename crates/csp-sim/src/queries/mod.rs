@@ -30,6 +30,7 @@ pub mod horse_market;
 pub mod horses;
 pub mod leader;
 pub mod names;
+pub mod npc_idle;
 pub mod npc_trade;
 pub mod offers;
 pub mod pace;

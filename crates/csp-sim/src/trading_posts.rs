@@ -137,6 +137,7 @@ pub fn restore_warehouse(world: &mut WorldState, post_id: &str, size: i32) {
         decay: None,
         ruined_at: None,
         repair: None,
+        material: None,
     });
 }
 
@@ -205,6 +206,7 @@ pub fn storages_become_warehouses(
             decay: None,
             ruined_at: None,
             repair: None,
+            material: None,
         });
         Some(world.buildings.len() - 1)
     };
@@ -343,6 +345,7 @@ pub fn found_trading_post(
         decay: None,
         ruined_at: None,
         repair: None,
+        material: None,
     });
     let hall = world
         .cities
@@ -371,6 +374,7 @@ pub fn found_trading_post(
             decay: None,
             ruined_at: None,
             repair: None,
+            material: None,
         });
         workplaces.push(id);
     }

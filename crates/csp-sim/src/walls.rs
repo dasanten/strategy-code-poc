@@ -5,14 +5,16 @@
 
 use std::collections::HashMap;
 
-use csp_shared::balance::{BROKEN_MATERIALS_RETURNED, WALL_ENCLOSES_MAX, WALL_STRENGTH};
+use csp_shared::balance::{
+    BROKEN_MATERIALS_RETURNED, STONE_WALL_STRENGTH, WALL_ENCLOSES_MAX, WALL_STRENGTH,
+};
 use csp_shared::terrain::{is_passable_terrain, tile_index, wrap, wrap_delta, TerrainMap};
 use csp_shared::world::{Building, BuildingKind, Resident, Stock, UpSide, WorldState};
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Deserialize;
 
 use crate::queries::alliance::allied_realms;
-use crate::queries::building::build_materials;
+use crate::queries::building::{is_stone, materials_of};
 use crate::queries::city::npc_city_refuses;
 use crate::queries::standing::TRADE_ORG;
 
@@ -408,10 +410,11 @@ pub fn of_wall_side(world: &WorldState, wall: &Building, r: &Resident) -> bool {
 
 /// Damage a finished wall or gate takes before it falls (`wallStrength`).
 pub fn wall_strength(b: &Building) -> f64 {
+    let of = if is_stone(b.kind, b.material) { STONE_WALL_STRENGTH } else { WALL_STRENGTH };
     if b.kind == BuildingKind::Gate {
-        WALL_STRENGTH.gate
+        of.gate
     } else {
-        WALL_STRENGTH.wall
+        of.wall
     }
 }
 
@@ -423,7 +426,7 @@ pub fn wall_strength_left(b: &Building) -> f64 {
 /// Goods left on the tile of a broken wall or gate (`brokenReturns`).
 pub fn broken_returns(b: &Building) -> Stock {
     let mut out = Stock::new();
-    for (good, units) in build_materials(b.kind) {
+    for (good, units) in materials_of(b) {
         let back = (units * BROKEN_MATERIALS_RETURNED).floor();
         if back > 0.0 {
             out.insert(good, back);

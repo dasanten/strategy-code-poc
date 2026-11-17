@@ -2,11 +2,11 @@
 //! Walls in combat). Movement's wall map (`wallMap`, `mayStep`, `climbLanding`) is T86.6's to
 //! add here.
 
-use csp_shared::balance::{BROKEN_MATERIALS_RETURNED, BUILD_MATERIALS, WALL_STRENGTH};
+use csp_shared::balance::{BROKEN_MATERIALS_RETURNED, STONE_WALL_STRENGTH, WALL_STRENGTH};
 use csp_shared::world::{Building, BuildingKind, Resident, Stock, WorldState};
 
 use super::alliance::allied;
-use super::names::{good_of, kind_name};
+use super::building::{is_stone, materials_of};
 
 /// Whose side a resident is on at walls and gates (`wallSide`): their realm, or for a resident of
 /// an NPC city, that city. None for a resident of nobody.
@@ -47,10 +47,11 @@ pub fn on_own_wall(world: &WorldState, r: &Resident) -> bool {
 
 /// Damage a finished wall or gate takes before it falls (`wallStrength`).
 pub fn wall_strength(b: &Building) -> f64 {
+    let of = if is_stone(b.kind, b.material) { STONE_WALL_STRENGTH } else { WALL_STRENGTH };
     if b.kind == BuildingKind::Gate {
-        WALL_STRENGTH.gate
+        of.gate
     } else {
-        WALL_STRENGTH.wall
+        of.wall
     }
 }
 
@@ -63,12 +64,10 @@ pub fn wall_strength_left(b: &Building) -> f64 {
 /// `BROKEN_MATERIALS_RETURNED` of its materials, in whole units.
 pub fn broken_returns(b: &Building) -> Stock {
     let mut out = Stock::new();
-    if let Some(materials) = BUILD_MATERIALS.get(kind_name(b.kind)) {
-        for (good, units) in materials.0 {
-            let back = (units * BROKEN_MATERIALS_RETURNED).floor();
-            if back > 0.0 {
-                out.insert(good_of(good).expect("a material is a good"), back);
-            }
+    for (good, units) in materials_of(b) {
+        let back = (units * BROKEN_MATERIALS_RETURNED).floor();
+        if back > 0.0 {
+            out.insert(good, back);
         }
     }
     out

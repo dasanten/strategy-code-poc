@@ -57,6 +57,7 @@ fn put(world: &mut WorldState, kind: BuildingKind, (x, y): (i32, i32)) {
         decay: None,
         ruined_at: None,
         repair: None,
+        material: None,
     });
 }
 

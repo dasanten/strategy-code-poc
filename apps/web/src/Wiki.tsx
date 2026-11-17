@@ -158,6 +158,7 @@ import {
   FOOD_PER_DAY,
   NPC_BUILDERS,
   NPC_INNER_WALL_REACH,
+  NPC_STONE_WALL_RESIDENTS,
   NPC_ROAD_CREW,
   NPC_ROAD_LONGEST,
   NPC_CITY_MIN_DISTANCE,
@@ -194,6 +195,9 @@ import {
   NPC_TRADER_REACH,
   NPC_PLAN_TICKS,
   NPC_SURPLUS_CAP,
+  NPC_SURPLUS_PAST_CAP,
+  NPC_ARCHER_ARROWS,
+  NPC_ARCHER_SHARE,
   NPC_SOLDIER_SHARE,
   NPC_STEEL_KIT,
   NPC_WAR_CHEST_PER_RESIDENT,
@@ -310,6 +314,7 @@ import {
   Terrain,
   WALL_DEFENCE,
   WALL_STRENGTH,
+  STONE_WALL_STRENGTH,
   WALL_WALK_TICKS,
   FALL_DAMAGE,
   WALK_TICKS_PER_TILE,
@@ -325,6 +330,12 @@ import {
   MEND_WORK_SHARE,
   WORN_PRICE_SHARE,
   NEARLY_BROKEN_PRICE_SHARE,
+  SHOT_REACH,
+  SHOT_TICKS,
+  SHOT_DAMAGE,
+  SHOT_SKILL_LIMIT,
+  SHOT_PIERCE,
+  WALL_SHOT_REACH_BONUS,
   WORK_SKILL_EFFECT,
   WORK_SKILL_MAX,
   WORKPLACE_MAX_WORKERS,
@@ -377,6 +388,7 @@ import {
   blow,
   breakTicks,
   buildCosts,
+  stoneWallCosts,
   carriageCost,
   boatCost,
   shipCost,
@@ -1862,9 +1874,12 @@ export function Wiki() {
             </tr>
           </thead>
           <tbody>
-            {buildCosts().map((b) => (
-              <tr key={b.kind}>
-                <td>{kindName(b.kind)}</td>
+            {[
+              ...buildCosts().map((b) => ({ ...b, name: kindName(b.kind) })),
+              ...stoneWallCosts(),
+            ].map((b) => (
+              <tr key={b.name}>
+                <td>{b.name}</td>
                 <td>
                   {num(b.footprint)}×{num(b.footprint)}
                 </td>
@@ -2153,9 +2168,30 @@ export function Wiki() {
           work column above). Roads are built along a line with <strong>Build line</strong> (see{' '}
           <a href="#building">Building</a>): at most {num(ROAD_LINE_MAX_TILES)} tiles, straight or
           diagonal. A wall is built along a line the same way, past tiles with a wall or gate
-          already; a diagonal wall line closes the way like a straight one. The tiles your
-          residents' road and wall lines still have to build, running or waiting in their queues,
-          show faintly on your map, the picked residents' stronger; only you see them.
+          already; a diagonal wall line closes the way like a straight one.
+        </p>
+        <p>
+          A wall or gate is of <strong>wood</strong> or <strong>stone</strong>: pick which in the
+          Build menu, or on the banner while picking a wall line's ends (wood unless you pick
+          stone). Stone takes Stone instead of Wood and more work (the stone rows above), and it
+          holds out several times longer against blows (see <a href="#combat">Combat</a>); it is no
+          higher, with the same wall walk and cover. On the map a stone tile shows a grey block in
+          its colour, and its card says what it is of. Scripts pass <code>"stone"</code> to{' '}
+          <code>build</code> and <code>wallLine</code>.
+        </p>
+        <p>
+          <strong>Upgrading to stone.</strong> A stone wall or gate can be laid out on a wooden one
+          of its kind: stand on it, pick Stone in the Build menu and Build. The wooden one stands,
+          with its wall walk, and can be defended until the stone one is finished and takes its
+          place; whoever is up on it stays up, and its Wood goes into the new one. A stone wall line
+          upgrades the wooden walls and gates on its way, a gate to a stone gate, and passes only
+          those already of stone; a wooden line passes both. Breaking the wooden one while the stone
+          site stands leaves the site.
+        </p>
+        <p>
+          {' '}
+          The tiles your residents' road and wall lines still have to build, running or waiting in
+          their queues, show faintly on your map, the picked residents' stronger; only you see them.
         </p>
         <p>
           An average horse eats {num(HORSE_FOOD_PER_DAY)} Food a game day, from a stable, the
@@ -3051,9 +3087,11 @@ export function Wiki() {
           ore, Iron and Gold ore, {num(NPC_SURPLUS_CAP.coins ?? 0)} coins and{' '}
           {num(NPC_SURPLUS_CAP[NPC_SMITHY_WEAPON] ?? 0)}{' '}
           {GOOD_LABELS[NPC_SMITHY_WEAPON].toLowerCase()}s above what it keeps. A smelter, smithy or
-          mint is worked for surplus only from input above the reserve. Past the cap they stop and
-          are idle. What is short, its trader and a founding party still take them first, the next
-          time it thinks. So its workplaces stay busy, and its trader has more to sell.
+          mint is worked for surplus only from input above the reserve. Once every good they could
+          work for is at its cap they work on past it, the good least far past first, up to{' '}
+          {num(NPC_SURPLUS_PAST_CAP)} times its cap, farms aside; only past that are they idle. What
+          is short, its trader and a founding party still take them first, the next time it thinks.
+          So its workplaces stay busy, and its trader has more to sell.
         </p>
         <p>
           With nothing short, a big city whose one lumber camp, quarry or mine has its crew full and
@@ -3065,7 +3103,9 @@ export function Wiki() {
           hands a step, apart from its builders, build its streets, then road from its home to each
           of its workplaces outside its area, farms too, the nearest first. They follow the way a
           resident would walk, tile by tile, so a road goes round a lake, and they skip tiles that
-          already have a road. They only use materials above its reserve and what its project still
+          already have a road. One of them out on a way with a tile's materials and Food in hand
+          lays the tiles nearest them before walking home to a street owed meanwhile. They only use
+          materials above its reserve and what its project still
           needs; with none to spare, or with something short that they can work for, they go back to
           other work and bring back what they carry. Once the city would otherwise be full, they
           also leave a town hall's and a storage's materials untouched, so founding comes before
@@ -3100,6 +3140,17 @@ export function Wiki() {
           stays when the outer wall moves. Before that, with nothing short and materials above its
           reserve, it builds one <a href="#training">training ground</a> in its area, and its
           soldiers train there.
+        </p>
+        <p>
+          Once it is a <strong>town</strong>, {num(NPC_STONE_WALL_RESIDENTS)} residents or more, an
+          NPC city upgrades its wall to <strong>stone</strong> (see{' '}
+          <a href="#transport">Upgrading to stone</a>): its outer gate first, then that wall tile by
+          tile, nearest the gate first, and its inner ring once the outer one is all stone. It does
+          this last of all its projects, from Stone beyond its reserve: a tile at a time once it
+          holds a builder's trip of it above its reserve, while its road crew is in and its wall is
+          not moving out. A town with none builds a quarry for it, and its spare hands work it. A
+          new outer wall it puts up when it grows is of stone once its old one was. Villages,
+          starting cities and the Trade Organization's cities stay wooden.
         </p>
         <h3>Trading posts and the HQ</h3>
         <p>
@@ -3239,7 +3290,15 @@ export function Wiki() {
           turns (<a href="#training">Training</a>). Trading posts and the HQ don't do this.
         </p>
         <p>
-          For every {num(NPC_SOLDIERS_PER_PATROL)} soldiers on its wall one walks a round, and never
+          The soldiers it keeps by its size ({pct(NPC_SOLDIER_SHARE)} of its adults) are all it keeps
+          in peace. Anyone else armed, such as a smith carrying the smithy’s spears to the
+          storage, stands down: they put their weapons, armour and Arrows into its storage and go
+          back to work, those on a round, escorting, training or on alarm last. Soldiers just
+          standing on a post count as standing idle; those on a round, escorting or training
+          don’t.
+        </p>
+        <p>
+          Of the soldiers on its wall {pct(1 / NPC_SOLDIERS_PER_PATROL)} walk a round, and never
           more than {num(NPC_PATROLS_MAX)} in a city however big: {num(NPC_PATROL_WALL_STOPS)} stops
           along its wall, {num(NPC_PATROL_ROAD_STOPS)} along its roads inside it, and back to where
           they set out. When a round ends the next by id goes, so those on the wall take turns;
@@ -3561,6 +3620,97 @@ export function Wiki() {
           part of what they carry. A resident's card shows their three slots.
         </p>
         <p>
+          A <strong>Bow</strong> and a <strong>Crossbow</strong> are weapons for shooting, and each
+          takes both hands: with one equipped the shield slot stays empty (the shield stays carried
+          and goes back on when they put a one-handed weapon in its place), and a shield can't be
+          put on beside one. In a blow they add nothing, so an archer in a brawl fights with their
+          fists. They shoot <strong>Arrows</strong>, a plain good that is carried, stored and traded
+          like any other and goes in no slot. A smithy makes each, the smith saying which as for
+          the other gear:
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Good</th>
+              <th>Made from</th>
+              <th>A batch makes</th>
+              <th>Weight</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(['bow', 'crossbow', 'arrows'] as const).map((g) => (
+              <tr key={g}>
+                <td>{goodName(g)}</td>
+                <td>
+                  {(Object.entries(forged(g).input) as [Good, number][])
+                    .map(([input, n]) => `${num(n)} ${goodName(input)}`)
+                    .join(', ')}
+                </td>
+                <td>{num(forged(g).output[g] ?? 0)}</td>
+                <td>{num(GOOD_WEIGHT[g])} kg each</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <h3>Ranged combat</h3>
+        <p>
+          An armed resident with a Bow or Crossbow equipped <strong>shoots</strong> anyone they may
+          strike whom they see within their weapon's <strong>reach</strong>, in tiles, contact
+          included: given an attack order, they walk only until the target is in reach and shoot
+          from there. Each shot uses up one Arrow they carry, whether it lands or not; out of Arrows
+          they fight with their fists and have to walk into contact. Nothing blocks a shot for now.
+          A shot is a strike like a blow: the one hit is under attack and fights back or flees,
+          their city's alarm goes, and it is a crime where a blow would be. Agility dodges a shot
+          as it does a blow, and a shield and armour take damage off it, but a Crossbow's bolt goes
+          through part of them. Strength adds nothing to a shot; Combat skill makes a Bow much
+          better, a Crossbow only a little.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Weapon</th>
+              <th>Reach</th>
+              <th>A shot every</th>
+              <th>Damage</th>
+              <th>At full Combat skill</th>
+              <th>Through armour</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(['bow', 'crossbow'] as const).map((w) => (
+              <tr key={w}>
+                <td>{goodName(w)}</td>
+                <td>{num(SHOT_REACH[w] ?? 0)} tiles</td>
+                <td>{duration(SHOT_TICKS[w] ?? 0)}</td>
+                <td>{num(SHOT_DAMAGE[w] ?? 0)}</td>
+                <td>{num((SHOT_DAMAGE[w] ?? 0) * (1 + (SHOT_SKILL_LIMIT[w] ?? 0)))}</td>
+                <td>{pct(SHOT_PIERCE[w] ?? 0)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p>
+          <strong>Archers by default.</strong> Struck, an archer's Defend default shoots back from
+          where they stand, walking only until the one who struck them is in reach. On an alarm,
+          the Alarm default sends an archer on the ground up onto the city's wall tile between them
+          and whoever they go after, and they shoot from there; up on the wall they wait for them
+          to come in reach rather than come down. With no wall between them they shoot from where
+          they stand. Out of Arrows an archer does what anyone armed does and closes in. Scripts see
+          a resident's <code>reach</code> (null without a Bow or Crossbow) and the Arrows they carry
+          in <code>carried.arrows</code>; <code>shoot(targetId)</code> shoots someone in reach
+          without a step, and <code>attack</code> walks only until they are in reach.
+        </p>
+        <p>
+          <strong>NPC archers.</strong> An NPC city with a smithy arms{' '}
+          {pct(NPC_ARCHER_SHARE)} of its soldiers with a Bow (rounded down) and keeps{' '}
+          {num(NPC_ARCHER_ARROWS)} Arrows in its reserve for each of them; its smithy forges them
+          once its soldiers are armed. Each archer carries {num(NPC_ARCHER_ARROWS)} Arrows and
+          fetches more from its storage as they run low. While the city has a wall, its archers
+          stand on it and leave the town hall and the gates to the others. One without a smithy, and
+          the Trade Organization's cities, keep no archers. A resident hired from an NPC city who
+          takes a Bow from its surplus takes Arrows along too, also only from its surplus.
+        </p>
+        <p>
           To <strong>swap</strong> gear, pick another item they carry for a slot on their card (or
           the group card's Equip…, for each of them who carries it), or take a slot's item off;
           scripts do the same with <code>equip(good)</code> and <code>takeOff(slot)</code>, and a
@@ -3591,11 +3741,13 @@ export function Wiki() {
           Defenders on their own city's wall take {pct(WALL_DEFENCE)} of the damage. A tile of wall
           takes {num(WALL_STRENGTH.wall)} damage to break and a gate {num(WALL_STRENGTH.gate)}: an
           average unarmed resident alone needs {duration(breakTicks('wall'))} for a wall and{' '}
-          {duration(breakTicks('gate'))} for a gate. A broken one leaves{' '}
-          {pct(BROKEN_MATERIALS_RETURNED)} of its materials. Climbing over takes{' '}
-          {duration(CLIMB_TICKS)}, unable to dodge or strike back, and raises the alarm as breaking
-          the wall does. So a starting city's armed residents, at home when the attack starts, get
-          up onto their wall in time to beat breakers and climbers twice their number.
+          {duration(breakTicks('gate'))} for a gate. Of stone, a tile of wall takes{' '}
+          {num(STONE_WALL_STRENGTH.wall)} and a gate {num(STONE_WALL_STRENGTH.gate)}:{' '}
+          {duration(breakTicks('wall', true))} and {duration(breakTicks('gate', true))} for that
+          resident. A broken one leaves {pct(BROKEN_MATERIALS_RETURNED)} of its materials. Climbing
+          over takes {duration(CLIMB_TICKS)}, unable to dodge or strike back, and raises the alarm
+          as breaking the wall does. So a starting city's armed residents, at home when the attack
+          starts, get up onto their wall in time to beat breakers and climbers twice their number.
         </p>
         <p>
           <strong>The wall walk.</strong> Every wall and gate tile has a walk on top, unbroken round
@@ -3614,11 +3766,20 @@ export function Wiki() {
         <p>
           <strong>The high ground.</strong> Whoever is up strikes down at anyone on the ground next
           to the wall, but nobody on the ground can strike anyone up: from below there is only the
-          wall or gate itself to break, or climbing it, both while being struck from above. Order a
-          resident below to attack someone up and they won't (“they are up on the wall”). A climber
-          is on the ground until over; one who made it and stands on the wall fights those up as
-          anywhere, and so do those up on two walls that touch. Up on their own city's wall,
-          defenders still take only {pct(WALL_DEFENCE)} of each blow.
+          wall or gate itself to break, or climbing it, both while being struck from above, or
+          shooting up at them with a Bow or Crossbow. Order a resident below without Arrows to
+          shoot to attack someone up and they won't (“they are up on the wall”). A climber is on the
+          ground until over; one who made it and stands on the wall fights those up as anywhere,
+          and so do those up on two walls that touch. Up on their own city's wall, defenders still
+          take only {pct(WALL_DEFENCE)} of each blow and each shot.
+        </p>
+        <p>
+          <strong>Archers on the wall.</strong> An archer up on a wall walk shoots{' '}
+          {num(WALL_SHOT_REACH_BONUS)} tiles further than on the ground: a Bow{' '}
+          {num((SHOT_REACH.bow ?? 0) + WALL_SHOT_REACH_BONUS)} tiles, a Crossbow{' '}
+          {num((SHOT_REACH.crossbow ?? 0) + WALL_SHOT_REACH_BONUS)}. So archers on a wall shoot
+          attackers before those can shoot back, and take only {pct(WALL_DEFENCE)} of what does
+          come back up.
         </p>
         <p>
           <strong>A tile breaks.</strong> When a wall or gate tile breaks, whoever is up on it falls

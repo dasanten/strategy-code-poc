@@ -186,7 +186,11 @@ fn fighting_back_is_no_crime() {
     );
     apply_attack(
         &mut world,
-        &AttackRequest { resident_id: Some("b1".into()), target_id: Some("a1".into()) },
+        &AttackRequest {
+            resident_id: Some("b1".into()),
+            target_id: Some("a1".into()),
+            ..AttackRequest::default()
+        },
         Some(SIZE),
     );
     assert!(matches!(&live(&world, "b1").unwrap().order,

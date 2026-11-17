@@ -140,7 +140,9 @@ export function AddStep({
             terrain={buildTile.terrain}
             buildProblem={buildTile.problem}
             planning
-            onBuild={(building) => onAnswer({ ask, building })}
+            onBuild={(building, material) =>
+              onAnswer({ ask, building, ...(material ? { material } : {}) })
+            }
           />
         )}
         {ask === 'makes' && (

@@ -249,6 +249,8 @@ export interface Balance {
   readonly WORK_FOOD_KEPT: number
   readonly NPC_SOLDIER_SHARE: number
   readonly NPC_STEEL_KIT: string[]
+  readonly NPC_ARCHER_SHARE: number
+  readonly NPC_ARCHER_ARROWS: number
   readonly NPC_SOLDIERS_ON_HALL: number
   readonly NPC_SOLDIERS_AT_GATE: number
   readonly NPC_POST_AROUND_HALL: number
@@ -298,6 +300,7 @@ export interface Balance {
     tools: number
     [key: string]: number
   }
+  readonly NPC_SURPLUS_PAST_CAP: number
   readonly NPC_WALL_STEP: number
   readonly NPC_INNER_WALL_REACH: number
   readonly CITY_GRID_BLOCK: number
@@ -305,6 +308,7 @@ export interface Balance {
   readonly CITY_SIDE_LANE_GAP: number
   readonly CITY_QUARTER_ROWS: number
   readonly NPC_WALL_TILES_PER_TRIP: number
+  readonly NPC_STONE_WALL_RESIDENTS: number
   readonly NPC_NODE_REACH: number
   readonly NPC_RESIDENTS_PER_SCOUT: number
   readonly NPC_SCOUT_LIMIT: number
@@ -420,6 +424,9 @@ export interface Balance {
     steelShield: number
     steelArmour: number
     tools: number
+    bow: number
+    crossbow: number
+    arrows: number
     [key: string]: number
   }
   readonly HQ_FLOOR_FACTOR: number
@@ -441,6 +448,9 @@ export interface Balance {
     steelShield: number
     steelArmour: number
     tools: number
+    bow: number
+    crossbow: number
+    arrows: number
     [key: string]: number
   }
   readonly PRICE_REFERENCE_FLOORS: number
@@ -490,14 +500,45 @@ export interface Balance {
     steelShield: number
     steelArmour: number
     tools: number
+    bow: number
+    crossbow: number
+    arrows: number
     [key: string]: number
   }
   readonly WEAPON_ATTACK: {
     spear: number
     sword: number
     steelSword: number
+    bow: number
+    crossbow: number
     [key: string]: number
   }
+  readonly SHOT_REACH: {
+    bow: number
+    crossbow: number
+    [key: string]: number
+  }
+  readonly SHOT_TICKS: {
+    bow: number
+    crossbow: number
+    [key: string]: number
+  }
+  readonly SHOT_DAMAGE: {
+    bow: number
+    crossbow: number
+    [key: string]: number
+  }
+  readonly SHOT_SKILL_LIMIT: {
+    bow: number
+    crossbow: number
+    [key: string]: number
+  }
+  readonly SHOT_PIERCE: {
+    bow: number
+    crossbow: number
+    [key: string]: number
+  }
+  readonly WALL_SHOT_REACH_BONUS: number
   readonly PROTECTION_DEFENCE: {
     shield: number
     armour: number
@@ -789,6 +830,25 @@ export interface Balance {
     ship: number
     [key: string]: number
   }
+  readonly STONE_BUILD_MATERIALS: {
+    wall: {
+      stone: number
+      [key: string]: number
+    }
+    gate: {
+      stone: number
+      [key: string]: number
+    }
+    [key: string]: {
+      stone: number
+      [key: string]: number
+    }
+  }
+  readonly STONE_BUILD_WORK: {
+    wall: number
+    gate: number
+    [key: string]: number
+  }
   readonly MOUNTAIN_ROAD_WORK_FACTOR: number
   readonly ROAD_LINE_MAX_TILES: number
   readonly BUILD_STRENGTH_AVERAGE: number
@@ -1024,6 +1084,58 @@ export interface Balance {
         tools: number
         [key: string]: number
       }
+    } | {
+      input: {
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        bow: number
+        [key: string]: number
+      }
+      [key: string]: {
+        wood: number
+        [key: string]: number
+      } | {
+        bow: number
+        [key: string]: number
+      }
+    } | {
+      input: {
+        iron: number
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        crossbow: number
+        [key: string]: number
+      }
+      [key: string]: {
+        iron: number
+        wood: number
+        [key: string]: number
+      } | {
+        crossbow: number
+        [key: string]: number
+      }
+    } | {
+      input: {
+        iron: number
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        arrows: number
+        [key: string]: number
+      }
+      [key: string]: {
+        iron: number
+        wood: number
+        [key: string]: number
+      } | {
+        arrows: number
+        [key: string]: number
+      }
     })[]
     [key: string]: ({
       input: {
@@ -1219,6 +1331,58 @@ export interface Balance {
         tools: number
         [key: string]: number
       }
+    } | {
+      input: {
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        bow: number
+        [key: string]: number
+      }
+      [key: string]: {
+        wood: number
+        [key: string]: number
+      } | {
+        bow: number
+        [key: string]: number
+      }
+    } | {
+      input: {
+        iron: number
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        crossbow: number
+        [key: string]: number
+      }
+      [key: string]: {
+        iron: number
+        wood: number
+        [key: string]: number
+      } | {
+        crossbow: number
+        [key: string]: number
+      }
+    } | {
+      input: {
+        iron: number
+        wood: number
+        [key: string]: number
+      }
+      output: {
+        arrows: number
+        [key: string]: number
+      }
+      [key: string]: {
+        iron: number
+        wood: number
+        [key: string]: number
+      } | {
+        arrows: number
+        [key: string]: number
+      }
     })[]
   }
   readonly BATCHES_PER_DAY: {
@@ -1291,6 +1455,11 @@ export interface Balance {
   readonly MIN_BLOW_DAMAGE: number
   readonly WALL_DEFENCE: number
   readonly WALL_STRENGTH: {
+    wall: number
+    gate: number
+    [key: string]: number
+  }
+  readonly STONE_WALL_STRENGTH: {
     wall: number
     gate: number
     [key: string]: number

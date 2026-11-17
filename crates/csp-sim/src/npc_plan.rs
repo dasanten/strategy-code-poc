@@ -33,7 +33,9 @@ use crate::npc_stable::{feed_job_kept, plan_feeder};
 use crate::npc_trader::{send_traders, traders_out};
 use crate::npc_training::plan_training;
 use crate::queries::alliance::contract_of;
-use crate::queries::building::{building_at, materials_needed, max_workers, workplace_good};
+use crate::queries::building::{
+    building_at, construction_at, is_stone, materials_needed, max_workers, workplace_good,
+};
 use crate::queries::city::{city_food_use, city_residents, has_food_surplus, stored_food};
 use crate::queries::names::{held, held_in};
 use crate::queries::npc_trade::npc_storages;
@@ -679,7 +681,10 @@ fn share_out(
                             let worth = surplus.as_ref().is_none_or(|s| {
                                 chain_good(world, b).is_none() || s.full(world, b).is_some()
                             });
-                            if held.room(b) <= 0.0 || !worth {
+                            // Never back where the vein ran dry (`CONTEXT.md`: Running dry): it makes
+                            // nothing, so no surplus says so.
+                            let dry = crate::npc_growth::on_dry_node(world, b);
+                            if held.room(b) <= 0.0 || !worth || dry {
                                 return false;
                             }
                             give(world, jobs, held, i, back, Some(place));
@@ -734,7 +739,22 @@ fn share_out(
             }
         }
     }
-    let idle = fill(world, jobs, held, &kept, &mut state, &mut ways, second, unneeded.clone());
+    let mut idle = fill(world, jobs, held, &kept, &mut state, &mut ways, second, unneeded.clone());
+    // With every good they could work for at its cap, they work on past it, the good least far
+    // past first (`NPC_SURPLUS_PAST_CAP`).
+    if city.trade_org.is_none() && !idle.is_empty() {
+        let surplus = SurplusWork::of(world, city, storage.map(|s| &world.buildings[s]));
+        let past: Vec<(ScoredJob, Offer)> = own
+            .iter()
+            .filter_map(|&place| {
+                let full = surplus.past(world, &world.buildings[place])?;
+                Some((ScoredJob::Surplus { full }, Offer::Surplus(place)))
+            })
+            .collect();
+        if !past.is_empty() {
+            idle = fill(world, jobs, held, &kept, &mut state, &mut ways, past, idle);
+        }
+    }
     for i in idle {
         jobs.insert(world.residents[i].id.clone(), job_at(CityJobKind::Idle, None));
     }
@@ -793,13 +813,13 @@ fn short_place(
 /// Whether a resident could help with a project now (`canTakePart`): anything but a site that needs
 /// materials neither they carry nor the storage holds.
 fn can_take_part(world: &WorldState, city: &City, i: usize, project: &CityProject) -> bool {
-    let (x, y) = match project {
+    let x = match project {
         CityProject::TearDown { building_id } => {
             return world.buildings.iter().any(|b| &b.id == building_id)
         }
-        CityProject::Build { x, y, .. } => (*x as i32, *y as i32),
+        CityProject::Build { building, x, y, material } => (*building, *x, *y, *material),
     };
-    let Some(site) = building_at(world, x, y, MAP_SIZE).filter(|s| s.site.is_some()) else {
+    let Some(site) = crate::npc_growth::project_site(world, x.0, x.3, x.1, x.2) else {
         return true;
     };
     let need = materials_needed(site);
@@ -819,8 +839,17 @@ pub fn project_done(world: &WorldState, project: &CityProject) -> bool {
         CityProject::TearDown { building_id } => {
             !world.buildings.iter().any(|b| &b.id == building_id)
         }
-        CityProject::Build { building, x, y } => building_at(world, *x as i32, *y as i32, MAP_SIZE)
-            .is_some_and(|b| b.kind != *building || b.site.is_none()),
+        CityProject::Build { building, x, y, material } if is_stone(*building, *material) => {
+            // Done once a finished stone one of its kind stands there, or something else does
+            // (`CONTEXT.md`: Wood or stone); the wooden one it upgrades and its site go on.
+            construction_at(world, *x as i32, *y as i32, *building).is_some_and(|b| {
+                b.kind != *building || (b.site.is_none() == is_stone(b.kind, b.material))
+            })
+        }
+        CityProject::Build { building, x, y, .. } => {
+            building_at(world, *x as i32, *y as i32, MAP_SIZE)
+                .is_some_and(|b| b.kind != *building || b.site.is_none())
+        }
     }
 }
 

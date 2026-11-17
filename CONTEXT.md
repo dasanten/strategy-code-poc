@@ -612,7 +612,11 @@ The shared language of the game. Domain terms only — no implementation details
 - **Spare hands' work:** with nothing short of its reserve, an NPC city's spare hands don't stand
   idle. In this order they go on a road crew while it has a road to build (NPC road), scout (Scout),
   and otherwise work at its workplaces for **surplus**, past the reserve, up to a cap per good (a
-  balance number that grows with its residents). With a crew full and its good below the cap, a big
+  balance number that grows with its residents). Once every good they could work for is at its cap,
+  they work on past it, the good least far past its cap first, up to a few times the cap (a balance
+  number), farms aside, so a city with no one to sell to and no room to found stays busy while wear
+  and decay use its goods up (decided overnight, Daniel to confirm). With a crew full and its good
+  below the cap, a big
   city opens a second workplace of that kind on a node it knows. What is short, its traders and a
   founding party still take them first, and they count as spare hands for a Full city: Food short
   with every farm full opens another farm, and those working for surplus and scouting are its first
@@ -651,7 +655,10 @@ The shared language of the game. Domain terms only — no implementation details
   neighbours, nearest first. Like any road nobody owns it, and anyone can use it
   or tear it down; a tile torn down is laid again in time. A way too long (a balance number, in
   tiles) or with no way through is given up. A road two cities would each build between them is
-  built by only one. The crew takes Food along, never starts a tile with too little to walk home
+  built by only one. Streets first goes for what the crew starts from the city: one of them out on
+  a way, with a tile's materials and the Food for it in hand, lays the tiles nearest them before
+  walking home to a street owed meanwhile (decided overnight, Daniel to confirm). The crew takes
+  Food along, never starts a tile with too little to walk home
   on, and fetches more by Getting food.
 - **Scout:** a spare hand an NPC city sends exploring: a few at a time by its size (a balance
   number) run the game's Explore default with no `find`, and come home when their Food says turn
@@ -682,7 +689,11 @@ The shared language of the game. Domain terms only — no implementation details
 - **Soldiers in peace** (Epic 97): the soldiers an NPC city keeps by its size are what it keeps in
   peace; it keeps more while it feels threatened. Between fights they stand their posts, walk
   rounds, train where it has a training ground (wearing their gear, Wear) and go as escorts.
-  Soldiers just standing on a post count as standing idle.
+  Soldiers just standing on a post count as standing idle. Anyone else of the city armed in peace,
+  such as a smith carrying the smithy's weapons to its storage, stands down: they put their
+  weapons, armour and Arrows into its storage and go back to work, never those holding its town
+  hall; those on a round, escorting, training or on alarm stay soldiers until they are free
+  (decided overnight, Daniel to confirm).
 - **Full city:** an NPC city that for a whole game week, less the bigger it is (a balance number), has had spare hands (idle, on a road crew, scouting or working for surplus) and nothing
   short of its reserve, holds a food surplus, and holds its founding party's materials
   above its reserve. Coins it has no way to earn are not short (NPC reserve), so a city that can't

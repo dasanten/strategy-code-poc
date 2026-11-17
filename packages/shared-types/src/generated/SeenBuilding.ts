@@ -5,6 +5,7 @@ import type { Good } from "./Good.js";
 import type { KeptBreeding } from "./KeptBreeding.js";
 import type { SeenOffer } from "./SeenOffer.js";
 import type { ShownWarehousePrice } from "./ShownWarehousePrice.js";
+import type { WallMaterial } from "./WallMaterial.js";
 
 /**
  * A building as Players see it (`SeenBuilding`): its stock and a stable's breeding progress only
@@ -27,4 +28,9 @@ repair?: ConstructionSite,
  * nothing, and collapses `RUIN_COLLAPSE_DAYS` game days later. Gone once it is rebuilt; left
  * out of a save while it is none, so a building from before format 135 is no ruin.
  */
-ruinedAt?: number, };
+ruinedAt?: number, 
+/**
+ * What a wall or gate, or its site, is of; none is wood (`CONTEXT.md`: Wall / Gate, Wood or
+ * stone). Only walls and gates have one.
+ */
+material?: WallMaterial, };

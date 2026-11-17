@@ -17,7 +17,7 @@ use crate::world::{
     AlarmScriptId, ArmyOrder, Building, BuildingKind, Carrying, City, Equipment, GearCondition,
     Good, Heading, HorseStats, OrderEnded, Pair, Pile, PricedGood, Queue, ResidentOrder,
     ScriptParamValue, ScriptParamValues, SkillName, Stat, StatRecord, Stock, Struck, Task, Tile,
-    UpSide, VesselKind,
+    UpSide, VesselKind, WallMaterial,
 };
 
 /// How heavily a carriage looks loaded to a Player who can't see its load (`LoadLevel`,
@@ -42,6 +42,10 @@ pub struct BuildLine {
     pub building: BuildingKind,
     pub from: Tile,
     pub to: Tile,
+    /// What a wall line builds of; none is wood (`CONTEXT.md`: Wall / Gate, Wood or stone).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub material: Option<WallMaterial>,
 }
 
 /// What a Player sees of the script a resident runs (`SeenScript`): which one, and for the owning

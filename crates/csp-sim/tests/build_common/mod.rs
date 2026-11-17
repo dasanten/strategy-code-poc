@@ -107,6 +107,7 @@ pub fn building(id: &str, kind: BuildingKind, x: f64, y: f64) -> Building {
         decay: None,
         ruined_at: None,
         repair: None,
+        material: None,
     }
 }
 

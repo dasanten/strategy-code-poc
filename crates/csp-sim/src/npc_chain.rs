@@ -7,14 +7,15 @@
 
 use std::collections::HashSet;
 
-use csp_shared::balance::{MAP_SIZE, NPC_SURPLUS_CAP};
+use csp_shared::balance::{MAP_SIZE, NPC_SURPLUS_CAP, NPC_SURPLUS_PAST_CAP};
 use csp_shared::world::{Building, BuildingKind, City, CityProject, Good, Stock, WorldState};
 
 use crate::npc_coins::earns_coins;
 use crate::queries::building::{
-    build_materials, building_at, has_choice, materials_needed, max_workers, recipe_for,
-    recipe_input, workplace_good,
+    build_materials_of, building_at, has_choice, is_stone, materials_needed, max_workers,
+    recipe_for, recipe_input, wooden_wall_index_at, workplace_good,
 };
+use crate::queries::city::for_sale;
 use crate::queries::names::{good_name, held, held_in};
 use crate::queries::npc_trade::{
     npc_city_good_stock, npc_city_stock, npc_makes_steel, npc_needs_scale, npc_reserve,
@@ -34,6 +35,7 @@ pub fn processed_by(world: &WorldState, city: &City, good: Good) -> Option<Build
         // get them as any good.
         Good::Tools if city.trade_org.is_none() => Some(BuildingKind::Smithy),
         Good::Steel if npc_makes_steel(world, city) => Some(BuildingKind::Smelter),
+        Good::Bow | Good::Arrows if for_sale(city) => Some(BuildingKind::Smithy),
         Good::SteelSword | Good::SteelArmour | Good::SteelShield
             if npc_makes_steel(world, city) =>
         {
@@ -155,8 +157,16 @@ pub fn reserve_lacks(
     } else {
         npc_reserve(world, city)
     };
-    for (good, n) in project_needs(world, project) {
-        *want.entry(good).or_insert(0.0) += n;
+    // A town's upgrade to stone takes only Stone beyond its reserve (`CONTEXT.md`: Wood or stone):
+    // it makes the city short of nothing, so its hands go on working for what else it wants.
+    let upgrade = matches!(
+        project,
+        Some(CityProject::Build { building, material, .. }) if is_stone(*building, *material)
+    );
+    if !upgrade {
+        for (good, n) in project_needs(world, project) {
+            *want.entry(good).or_insert(0.0) += n;
+        }
     }
     let stock = if city.trade_org.is_some() {
         warehouse_stock(world, city)
@@ -248,17 +258,43 @@ impl SurplusWork {
         let full = (held(&self.stock, good) - held(&self.reserve, good)) / (cap * self.steps);
         (full < 1.0).then_some(full)
     }
+
+    /// How full a workplace's good's cap is once it is at its cap, if it is to be worked past it
+    /// (`CONTEXT.md`: Spare hands' work): from 1 up to `NPC_SURPLUS_PAST_CAP`; never a farm.
+    pub fn past(&self, world: &WorldState, place: &Building) -> Option<f64> {
+        if place.kind == BuildingKind::Farm {
+            return None;
+        }
+        let good = chain_good(world, place)?;
+        let cap = NPC_SURPLUS_CAP.get(good_name(good)).filter(|c| *c != 0.0)?;
+        let city = world.cities.iter().find(|c| c.id == self.city_id)?;
+        if let Some(input) = chain_input(world, city, good) {
+            if !holds_batch(Some(&self.spare), &input) {
+                return None;
+            }
+        }
+        let full = (held(&self.stock, good) - held(&self.reserve, good)) / (cap * self.steps);
+        (1.0..NPC_SURPLUS_PAST_CAP).contains(&full).then_some(full)
+    }
 }
 
 /// The materials a project still needs (`projectNeeds`): its site's, or all of the building's
 /// before it is laid out.
 pub fn project_needs(world: &WorldState, project: Option<&CityProject>) -> Stock {
-    let Some(CityProject::Build { building, x, y }) = project else { return Stock::new() };
+    let Some(CityProject::Build { building, x, y, material }) = project else {
+        return Stock::new();
+    };
+    if let Some(site) = crate::npc_growth::project_site(world, *building, *material, *x, *y) {
+        return materials_needed(site);
+    }
+    // A stone wall or gate over a wooden one still takes all its Stone (`CONTEXT.md`: Wood or
+    // stone).
+    let upgrade = is_stone(*building, *material)
+        && wooden_wall_index_at(world, *x as i32, *y as i32, *building).is_some();
     // The TypeScript's `buildingAt` without a size: `MAP_SIZE`.
     match building_at(world, *x as i32, *y as i32, MAP_SIZE) {
-        Some(site) if site.site.is_some() => materials_needed(site),
-        Some(_) => Stock::new(),
-        None => build_materials(*building),
+        Some(_) if !upgrade => Stock::new(),
+        _ => build_materials_of(*building, *material),
     }
 }
 
