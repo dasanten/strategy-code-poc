@@ -167,6 +167,7 @@ import {
   NPC_FOUND_REACH,
   NPC_FOUND_RESIDENTS_PER_MEMBER,
   NPC_FOUND_STANDING,
+  NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT,
   NPC_FOUND_VILLAGE_RESIDENTS,
   NPC_FULL_DAYS,
   NPC_FULL_DAYS_LEAST,
@@ -3026,6 +3027,16 @@ export function Wiki() {
           a standing of {num(NPC_FOUND_STANDING)} toward each other, which fades like any other, and
           share nothing. A party whose town hall doesn't stand after {days(NPC_FOUND_GIVE_UP_DAYS)}{' '}
           gives up and walks home. Trading posts and the Trade Organization's HQ never found cities.
+        </p>
+        <h3>Temperament</h3>
+        <p>
+          Every NPC city has a temperament, fixed when it comes to be: merchant, militarist or
+          settler. A self-managed city gets one when its Leader dies, unless it had one before. A
+          daughter takes its mother's {pct(NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT)} of the time and
+          otherwise draws one of its own, which may still be the same. Whoever sees a city reads its
+          temperament on its card, and keeps it in Last seen; whoever has traded with it reads it
+          in the Standing list while they hold a standing with each other. Scripts see the same.
+          Trading posts and the HQ have none. On its own a temperament changes nothing yet.
         </p>
         <p>
           An NPC city sells only what it holds above this reserve and buys only what it is short of.

@@ -3326,6 +3326,20 @@ pub struct City {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub outweighed: Option<Vec<Outweighed>>,
+    /// For an NPC city, what it is like (`CONTEXT.md`: Temperament), fixed when it comes into
+    /// being. Left out for a trading post and a city founded by a Player.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub temperament: Option<Temperament>,
+}
+
+/// What an NPC city is like (`City.temperament`, `CONTEXT.md`: Temperament).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum Temperament {
+    Merchant,
+    Militarist,
+    Settler,
 }
 
 /// Since when a realm's fighters near an NPC city have outweighed it without a break

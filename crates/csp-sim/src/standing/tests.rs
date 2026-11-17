@@ -8,6 +8,7 @@ use csp_shared::world::{Standing, TradeOrgCity, WorldState};
 
 use super::*;
 use crate::queries::standing::{standings_for, OrganizationIs, StandingView, TRADE_ORG_NAME};
+use crate::temperament::pick_temperament;
 use crate::test_world::{add_city, empty_world, realm};
 
 /// Realms r1 and r2 with a city each, an NPC city n1, and the Trade Org HQ `hq`.
@@ -141,6 +142,8 @@ fn shows_a_player_how_others_regard_their_realm_and_how_it_regards_them_worst_fi
         is,
         theirs,
         yours,
+        // n1, an NPC city, has the temperament its id draws; those who trade with it read it.
+        temperament: (is == OrganizationIs::City).then(|| pick_temperament(1, "n1")),
     };
     assert_eq!(
         standings_for(&world, "r1"),

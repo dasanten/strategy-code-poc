@@ -70,7 +70,10 @@ export function StandingPanel({
         <ul className="alliance-list">
           {standings.map((s) => (
             <li key={s.org} className={relationshipClass(standingRelationship(s))}>
-              <span>{standingName(s)}</span>
+              <span>
+                {standingName(s)}
+                {s.temperament && <span className="muted small"> · {s.temperament}</span>}
+              </span>
               <span className="badge" title="How they regard you">
                 {standingWord(s.theirs)} {formatStanding(s.theirs)}
               </span>

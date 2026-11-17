@@ -4,6 +4,7 @@ import type { CityScouted } from "./CityScouted.js";
 import type { FormerPlayer } from "./FormerPlayer.js";
 import type { Occupation } from "./Occupation.js";
 import type { Outweighed } from "./Outweighed.js";
+import type { Temperament } from "./Temperament.js";
 import type { TradeOrgCity } from "./TradeOrgCity.js";
 
 /**
@@ -15,4 +16,9 @@ export type City = { id: string, name: string, gameName?: true, realmId: string 
  * since when (`CONTEXT.md`: Respect; ADR 0033), as of its last planning pass. Left out while
  * there are none.
  */
-outweighed?: Array<Outweighed>, };
+outweighed?: Array<Outweighed>, 
+/**
+ * For an NPC city, what it is like (`CONTEXT.md`: Temperament), fixed when it comes into
+ * being. Left out for a trading post and a city founded by a Player.
+ */
+temperament?: Temperament, };
