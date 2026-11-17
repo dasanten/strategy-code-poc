@@ -1574,7 +1574,6 @@ export interface Balance {
   readonly SCRIPT_TILE_QUERY_COST: number
   readonly SCRIPT_HELPER_COST: number
   readonly SCRIPT_ACTION_COST: number
-  readonly SCRIPT_REALM_STEP_BUDGET: number
   readonly SCRIPT_MEMORY_MAX: number
   readonly SCRIPT_ACTION_VALUE_MAX: number
   readonly DOING_MAX_LENGTH: number

@@ -227,7 +227,6 @@ import {
   SCRIPT_LOG_LINES,
   SCRIPT_ACTION_VALUE_MAX,
   SCRIPT_MEMORY_MAX,
-  SCRIPT_REALM_STEP_BUDGET,
   SCRIPT_STEP_BUDGET,
   SCRIPT_TILE_QUERY_COST,
   LAST_SEEN_EVERY_TICKS,
@@ -4426,7 +4425,6 @@ if (params.storage != null) { store(["wood"], params.storage) }`}</code>
         </p>
         <ul>
           <li>Each resident's or army's script: {num(SCRIPT_STEP_BUDGET)} steps a tick.</li>
-          <li>All of a realm's scripts together: {num(SCRIPT_REALM_STEP_BUDGET)} steps a tick.</li>
           <li>Function calls nest at most {num(SCRIPT_MAX_CALL_DEPTH)} deep.</li>
           <li>A script's memory holds at most {num(SCRIPT_MEMORY_MAX)} characters of JSON.</li>
           <li>
