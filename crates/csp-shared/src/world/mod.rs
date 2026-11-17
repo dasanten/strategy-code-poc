@@ -1681,6 +1681,11 @@ pub struct CityPlan {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub hunts: Option<Vec<CityHunt>>,
+    /// When it last sent a demand to each Organization, by its id (`CONTEXT.md`: NPC demand), so
+    /// it doesn't send the next too soon.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub demanded: Option<IndexMap<String, f64>>,
 }
 
 /// A soldier of an NPC city out after a thief it knows of, to take back what was taken
@@ -3328,6 +3333,11 @@ pub struct Realm {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub heir_id: Option<String>,
+    /// The tick the realm began, for its shelter (`CONTEXT.md`: New realm's shelter). Left out for
+    /// a realm from before it was kept, which is past its shelter.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub founded_at: Option<f64>,
 }
 
 /// Why a realm's heir lapsed (`CONTEXT.md`: Heir).

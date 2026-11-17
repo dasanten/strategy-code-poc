@@ -454,6 +454,10 @@ pub fn world_invariants() -> Vec<Invariant> {
         },
         Invariant { name: "npc-hunts-sound", check: |w, _t| crate::npc_hunts::npc_hunts_sound(w) },
         Invariant {
+            name: "npc-demands-sound",
+            check: |w, _t| crate::npc_demands::npc_demands_sound(w),
+        },
+        Invariant {
             name: "npc-training-grounds-bounded",
             check: |w, t| crate::npc_training::npc_training_grounds_bounded(w, t.size),
         },

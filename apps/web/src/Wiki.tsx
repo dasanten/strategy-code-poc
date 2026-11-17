@@ -379,6 +379,13 @@ import {
   NEW_VEIN_SPOT_REACH,
   NPC_HUNT_REACH,
   NPC_HUNTERS_PER_THIEF,
+  NPC_DEMAND_OUTWEIGH_TIMES,
+  NPC_DEMAND_MIN_STRENGTH,
+  NPC_DEMAND_COINS,
+  NPC_DEMAND_DAYS,
+  NPC_DEMAND_AGAIN_DAYS,
+  NPC_DEMAND_REFUSED_STANDING,
+  NEW_REALM_SHELTER_DAYS,
   carryCapacity,
   walkSpeed,
   workFactor,
@@ -3692,6 +3699,23 @@ export function Wiki() {
             <strong>The Trade Organization always declines</strong>, within a game hour, and being
             asked costs you {num(DEMAND_TRADE_ORG_STANDING_LOSS)} of its standing. Everyone knows of
             it.
+          </li>
+          <li>
+            <strong>A militarist NPC city sends demands too.</strong> Once a game day it sends one
+            to each realm it knows of (one it feels threatened by, or one with a standing either
+            way) whose armed residents, wherever they are, its own side outweighs at least{' '}
+            {num(NPC_DEMAND_OUTWEIGH_TIMES)} times over, and by at least{' '}
+            {num(NPC_DEMAND_MIN_STRENGTH)}: {num(NPC_DEMAND_COINS)} Coins within{' '}
+            {days(NPC_DEMAND_DAYS)}, and the next no sooner than {days(NPC_DEMAND_AGAIN_DAYS)}{' '}
+            later. It fetches nothing set aside: you pay by a Transfer from a city of yours to it,
+            in sight or not. Paid, it no longer feels threatened by you and its standing toward you
+            is back to neutral at least. Declined or let lapse, its standing toward you falls to{' '}
+            {num(NPC_DEMAND_REFUSED_STANDING)}: it turns hostile. It never sends one to the Trade
+            Organization.
+          </li>
+          <li>
+            <strong>A new realm is sheltered</strong> for its first {days(NEW_REALM_SHELTER_DAYS)}:
+            no NPC city sends it a demand or marches on it then. Players can.
           </li>
           <li>
             <strong>The threat is only words.</strong> Ignoring a demand does nothing by itself:

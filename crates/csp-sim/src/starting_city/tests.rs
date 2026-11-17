@@ -40,8 +40,12 @@ fn founded_for(players: u64) -> WorldState {
 /// The world as the TypeScript founded it: its starting cities held no Coins (T101.2 gave them
 /// `START_COINS`, which `gives_a_player_a_realm_with_everything_a_starting_city_has` checks) and
 /// its residents no Spear (T104.1, `starting_residents_each_carry_an_iron_spear_and_are_armed`), so
-/// these are taken out to compare the rest with the frozen fixtures.
+/// these are taken out to compare the rest with the frozen fixtures. Nor did its realms keep when
+/// they began (T98.7, `a_realm_keeps_when_it_began_for_its_shelter`).
 fn as_the_typescript_founded(mut world: WorldState) -> WorldState {
+    for realm in &mut world.realms {
+        assert_eq!(realm.founded_at.take(), Some(world.tick as f64));
+    }
     for b in world.buildings.iter_mut().filter(|b| b.kind == BuildingKind::Storage) {
         if let Some(stock) = b.stock.as_mut() {
             assert_eq!(stock.shift_remove(&Good::Coins), Some(START_COINS));
@@ -84,6 +88,16 @@ fn founds_the_typescripts_starting_city() {
 fn founds_the_typescripts_starting_cities_for_two_and_three_players() {
     assert_eq!(as_the_typescript(founded_for(2)), fixture("two-realms"));
     assert_eq!(as_the_typescript(founded_for(3)), fixture("three-realms"));
+}
+
+#[test]
+fn a_realm_keeps_when_it_began_for_its_shelter() {
+    let terrain = city_terrain();
+    let mut world = create_world(terrain, 1);
+    world.tick = 5_000;
+    found_starting_city(&mut world, terrain, 1, None);
+    assert_eq!(world.realms[0].founded_at, Some(5_000.0));
+    assert!(crate::npc_demands::sheltered(&world, &world.realms[0].id));
 }
 
 #[test]

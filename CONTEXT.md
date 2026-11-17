@@ -819,6 +819,14 @@ The shared language of the game. Domain terms only — no implementation details
 - **NPC demand:** an NPC city in Retaliate, or a militarist one, that far outweighs an Organization
   sends it an ordinary Demand for goods or Coins with a deadline, never to the Trade Organization.
   Paid, its threat and standing towards the payer settle; refused or lapsed, it retaliates.
+  Decided overnight 2026-11-17, Daniel to confirm: a militarist city sends one to a realm it knows
+  of (holds a threat from, or a standing either way) whose armed residents, wherever they are, its
+  own side far outweighs, at its first planning pass of a game day; Players' realms only for now;
+  it asks for Coins (a balance number), and the next to the same realm only after a set time. It
+  fetches nothing set aside, so it is paid only by a Transfer to it, which the Player can send
+  without seeing the city. Paid means accepted: its threat from the payer is gone and its standing
+  toward them back to neutral at least; refused or lapsed, its standing falls to hostile. Retaliate
+  (T98.8) sends them too.
 - **Retaliating:** an NPC city in Retaliate turns its soldiers on one Organization: escorts and
   hunting thieves first, demands, and rarely an attack on one of its cities to take it (Capturing a
   city), only with very high threat and very low standing and an army that far outweighs that
@@ -831,7 +839,8 @@ The shared language of the game. Domain terms only — no implementation details
   workplace). That is an attack like any other, and a crime against the holder. Never against a
   realm in its shelter.
 - **New realm's shelter:** no NPC city sends a demand to, or marches on, a realm in its first game
-  weeks. Players can.
+  weeks. Players can. Decided overnight 2026-11-17, Daniel to confirm: a realm's weeks count from
+  when it began; a realm from before that was kept has none.
 - **Alliance army:** soldiers and carriages members hand over to the alliance leader's command.
   They stay in their own realm but take orders only from the alliance leader. Their owner can
   recall them, which takes effect after a real hour; leaving the alliance recalls them.

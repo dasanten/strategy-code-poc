@@ -16,7 +16,7 @@ use csp_shared::world::{
 use csp_sim::directive::{directives_for, DirectiveView};
 use csp_sim::queries::alliance::{alliance_of, sharing_sight};
 use csp_sim::queries::alliance_rules::is_alliance_city;
-use csp_sim::queries::city::town_hall_of;
+use csp_sim::queries::city::{for_sale, town_hall_of};
 use csp_sim::queries::contract::{contracts_for, ContractView, RealmLabel};
 use csp_sim::queries::demand::{
     answered_by_game, demand_wavering, npc_orgs_known_to, realms_known_to, AnsweredBy,
@@ -351,6 +351,14 @@ pub fn carried_ways_for<'a>(
         let theirs = city.realm_id.as_deref().is_some_and(|r| r != realm_id);
         if theirs && !others.contains(&city.id.as_str()) {
             others.push(&city.id);
+        }
+    }
+    // An NPC city that demanded something of the realm is paid by Transfer, seen or not
+    // (`CONTEXT.md`: NPC demand).
+    for d in world.demands.iter().filter(|d| d.to_id == realm_id) {
+        let npc = world.cities.iter().any(|c| c.id == d.from_id && for_sale(c));
+        if npc && !others.contains(&d.from_id.as_str()) {
+            others.push(&d.from_id);
         }
     }
     if others.is_empty() {

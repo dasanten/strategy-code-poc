@@ -260,6 +260,13 @@ export interface Balance {
   readonly NPC_SOLDIERS_PER_PATROL: number
   readonly NPC_HUNT_REACH: number
   readonly NPC_HUNTERS_PER_THIEF: number
+  readonly NPC_DEMAND_OUTWEIGH_TIMES: number
+  readonly NPC_DEMAND_MIN_STRENGTH: number
+  readonly NPC_DEMAND_COINS: number
+  readonly NPC_DEMAND_DAYS: number
+  readonly NPC_DEMAND_AGAIN_DAYS: number
+  readonly NPC_DEMAND_REFUSED_STANDING: number
+  readonly NEW_REALM_SHELTER_DAYS: number
   readonly NPC_PATROL_WALL_STOPS: number
   readonly NPC_PATROL_ROAD_STOPS: number
   readonly NPC_WAR_CHEST_PER_RESIDENT: number
