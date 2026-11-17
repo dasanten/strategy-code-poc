@@ -8,6 +8,7 @@ import type { NpcHorseOffer } from "./NpcHorseOffer.js";
 import type { Occupation } from "./Occupation.js";
 import type { Outweighed } from "./Outweighed.js";
 import type { ShownNpcCityPrice } from "./ShownNpcCityPrice.js";
+import type { Stance } from "./Stance.js";
 import type { Temperament } from "./Temperament.js";
 import type { TradeOrgCity } from "./TradeOrgCity.js";
 
@@ -47,4 +48,9 @@ dangerPlaces?: Array<DangerPlace>,
  * For an NPC city, what it is like (`CONTEXT.md`: Temperament), fixed when it comes into
  * being. Left out for a trading post and a city founded by a Player.
  */
-temperament?: Temperament, };
+temperament?: Temperament, 
+/**
+ * For an NPC city, what it is after for now (`CONTEXT.md`: Stance), picked again each game day.
+ * Left out while it grows, and for a trading post and a city a Player holds.
+ */
+stance?: Stance, };

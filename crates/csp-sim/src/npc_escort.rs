@@ -32,9 +32,11 @@ use crate::sight::InvariantViolation;
 use crate::world_index::resident_index;
 
 /// Soldiers more a city sends along on a way it knows to be dangerous (`CONTEXT.md`: Escort): by
-/// the danger places it remembers by the way from its town hall (`npc_threat::danger_escorts`).
+/// the danger places it remembers by the way from its town hall (`npc_threat::danger_escorts`), and
+/// more under Fortify (`NPC_STANCE.fortify_escorts`).
 pub fn escorts_for_danger(world: &WorldState, city: &City, to: (i32, i32)) -> usize {
     crate::npc_threat::danger_escorts(world, city, to, MAP_SIZE)
+        + crate::npc_stance::extra_escorts(city)
 }
 
 /// How many soldiers a city's trader takes along on a run to `to` (`CONTEXT.md`: Escort): a

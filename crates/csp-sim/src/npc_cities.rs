@@ -238,6 +238,7 @@ pub fn found_npc_city(
         threats: None,
         danger_places: None,
         layout: trade_org.is_none().then(|| pick_layout(world.seed, &id)),
+        stance: None,
         temperament: trade_org
             .is_none()
             .then(|| crate::temperament::pick_temperament(world.seed, &id)),

@@ -1458,6 +1458,12 @@
           "nullWhen": "otherwise"
         },
         {
+          "name": "stance",
+          "type": "string",
+          "description": "What an NPC city is after for now: \"grow\", \"fortify\", \"trade\" or \"expand\".",
+          "nullWhen": "for a realm’s city and a city of the Trade Organization"
+        },
+        {
           "name": "refuses",
           "type": "boolean",
           "description": "true when an NPC city won’t trade with the Player, hire out to them or let their residents through its gates.",

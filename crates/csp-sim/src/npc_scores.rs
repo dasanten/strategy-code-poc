@@ -3,7 +3,9 @@
 //! what each is worth, so each goes to the highest-scoring job with room (`shareOut`). Pure, with
 //! the numbers in `balance.rs`.
 
-use csp_shared::balance::{NpcJobWeights, NPC_JOB_MARGIN, NPC_JOB_SCORE, NPC_JOB_WEIGHTS};
+use csp_shared::balance::{
+    NpcJobWeights, NPC_JOB_MARGIN, NPC_JOB_SCORE, NPC_JOB_WEIGHTS, NPC_STANCE,
+};
 use csp_shared::world::City;
 
 #[cfg(test)]
@@ -11,14 +13,19 @@ thread_local! {
     static WEIGHTS: std::cell::Cell<Option<NpcJobWeights>> = const { std::cell::Cell::new(None) };
 }
 
-/// What weighs on `city`'s jobs at a place now (`jobWeights`). The same for every city for now;
-/// its stance and temperament tilt them later (`CONTEXT.md`: Stance).
-pub fn job_weights(_city: &City) -> NpcJobWeights {
+/// What weighs on `city`'s jobs at a place now (`jobWeights`, `CONTEXT.md`: Stance): `NPC_JOB_WEIGHTS`,
+/// with danger weighing `NPC_STANCE.fortify_danger` times as much under Fortify. Its temperament
+/// weighs in through the stance it leans to.
+pub fn job_weights(city: &City) -> NpcJobWeights {
     #[cfg(test)]
     if let Some(w) = WEIGHTS.with(std::cell::Cell::get) {
         return w;
     }
-    NPC_JOB_WEIGHTS
+    let mut w = NPC_JOB_WEIGHTS;
+    if crate::npc_stance::stance_of(city) == csp_shared::world::Stance::Fortify {
+        w.danger *= NPC_STANCE.fortify_danger;
+    }
+    w
 }
 
 /// Runs `f` with every city weighing its jobs by `weights`, on this thread.

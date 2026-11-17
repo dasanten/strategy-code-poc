@@ -172,6 +172,7 @@ import {
   NPC_FOUND_RESIDENTS_PER_MEMBER,
   NPC_FOUND_STANDING,
   NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT,
+  NPC_STANCE,
   NPC_FOUND_VILLAGE_RESIDENTS,
   NPC_FULL_DAYS,
   NPC_FULL_DAYS_LEAST,
@@ -3309,7 +3310,39 @@ export function Wiki() {
           otherwise draws one of its own, which may still be the same. Whoever sees a city reads its
           temperament on its card, and keeps it in Last seen; whoever has traded with it reads it
           in the Standing list while they hold a standing with each other. Scripts see the same.
-          Trading posts and the HQ have none. On its own a temperament changes nothing yet.
+          Trading posts and the HQ have none. On its own a temperament changes nothing: it tilts
+          the city's stance.
+        </p>
+        <h3>Stance</h3>
+        <p>
+          What an NPC city is after for now. It picks again at its first planning pass of each game
+          day, from what it needs: <b>Fortify</b> by the threat it feels from everyone together,
+          fully at {num(NPC_STANCE.fortifyThreat)}; <b>Trade</b> with a Food surplus and a Trade
+          Organization warehouse within its traders' reach; <b>Expand</b> with a Food surplus and
+          nothing short. Trade and Expand alone are worth {pct(NPC_STANCE.tradeNeed)} and{' '}
+          {pct(NPC_STANCE.expandNeed)} of what it takes. Its temperament's own stance (merchant
+          Trade, militarist Fortify, settler Expand) counts {num(NPC_STANCE.temperamentTilt)} times;
+          the greatest need that is full wins, and it grows (<b>Grow</b>) when none is.
+        </p>
+        <ul>
+          <li>
+            <b>Fortify</b> keeps {num(NPC_STANCE.fortifySoldiers)} times the soldiers it keeps by its
+            size, sends {num(NPC_STANCE.fortifyEscorts)} more with each escort, shuts its gates to
+            armed outsiders {num(NPC_STANCE.fortifyGateWatch)} times as far off, and weighs the
+            danger places by the way to a workplace {num(NPC_STANCE.fortifyDanger)} times as much.
+          </li>
+          <li>
+            <b>Trade</b> works for surplus only up to {pct(NPC_STANCE.tradeSurplusCap)} of its caps,
+            so more goes to market, and has {num(NPC_STANCE.tradeTraders)} more trader out.
+          </li>
+          <li>
+            <b>Expand</b> waits {pct(NPC_STANCE.expandFullDays)} of the days full before it founds
+            and sends {num(NPC_STANCE.expandScouts)} times the scouts.
+          </li>
+        </ul>
+        <p>
+          Whoever sees an NPC city reads its stance on its card as a mood line: growing, arming,
+          busy trading or looking to expand. Scripts see it as the city's stance.
         </p>
         <p>
           An NPC city sells only what it holds above this reserve and buys only what it is short of.

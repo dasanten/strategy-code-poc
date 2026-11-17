@@ -106,12 +106,13 @@ fn as_equipment_shows(want: &Value, seen: &Value) -> (Value, Value) {
     (strip(want, true), strip(seen, false))
 }
 
-/// Also without a city's temperament (T98.1), which the frozen TypeScript knew nothing of; Rust
-/// tests check it instead.
+/// Also without a city's temperament (T98.1) and stance (T98.4), which the frozen TypeScript knew
+/// nothing of; Rust tests check them instead.
 fn without_hire_spare(mut v: Value) -> Value {
     for e in v.as_array_mut().into_iter().flatten() {
         if let Some(o) = e.as_object_mut().filter(|o| o.get("is").is_some_and(|i| i == "city")) {
             o.remove("temperament");
+            o.remove("stance");
         }
         if let Some(hire) = e.get_mut("hire").and_then(Value::as_object_mut) {
             hire.remove("spare");

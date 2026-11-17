@@ -309,6 +309,20 @@
   "NPC_FOUND_GIVE_UP_DAYS": 20.0,
   "NPC_FOUND_STANDING": 80.0,
   "NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT": 0.75,
+  "NPC_STANCE": {
+    "fortifyThreat": 30.0,
+    "fortifySoldiers": 1.5,
+    "fortifyEscorts": 1.0,
+    "fortifyGateWatch": 1.5,
+    "fortifyDanger": 2.0,
+    "tradeNeed": 0.8,
+    "tradeSurplusCap": 0.5,
+    "tradeTraders": 1.0,
+    "expandNeed": 0.8,
+    "expandFullDays": 0.5,
+    "expandScouts": 2.0,
+    "temperamentTilt": 1.5
+  },
   "TRADE_ORG_HQ": {
     "innerRadius": 16.0,
     "outerRadius": 40.0,

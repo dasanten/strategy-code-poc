@@ -48,6 +48,7 @@ pub fn add_city(world: &mut WorldState, id: &str, realm_id: Option<&str>, x: f64
         outweighed: None,
         threats: None,
         danger_places: None,
+        stance: None,
         temperament: None,
         layout: realm_id.is_none().then_some(csp_shared::world::CityLayout::Grid),
     });

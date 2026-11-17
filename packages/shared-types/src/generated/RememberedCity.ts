@@ -6,6 +6,7 @@ import type { Hire } from "./Hire.js";
 import type { NpcHorseOffer } from "./NpcHorseOffer.js";
 import type { Occupation } from "./Occupation.js";
 import type { ShownNpcCityPrice } from "./ShownNpcCityPrice.js";
+import type { Stance } from "./Stance.js";
 import type { Temperament } from "./Temperament.js";
 import type { TradeOrgCity } from "./TradeOrgCity.js";
 
@@ -13,4 +14,4 @@ import type { TradeOrgCity } from "./TradeOrgCity.js";
  * `SeenCity & { seenAt }`: the fields of `City`, what a Player sees on top of them, and
  * `seenAt`.
  */
-export type RememberedCity = { id: string, name: string, gameName?: true, realmId: string | null, townHallId: string, tradeOrg?: TradeOrgCity, workplaceIds?: Array<string>, scouted?: CityScouted, formerPlayer?: FormerPlayer, occupation: Occupation | null, outsiders?: Array<string>, alarmedAttackers?: { [key in string]: number }, layout?: CityLayout, temperament?: Temperament, price?: number, wontSell?: true, refuses?: true, hire?: Hire, trade?: Array<ShownNpcCityPrice>, horses?: Array<NpcHorseOffer>, horsesToSell?: Array<NpcHorseOffer>, seenAt: number, };
+export type RememberedCity = { id: string, name: string, gameName?: true, realmId: string | null, townHallId: string, tradeOrg?: TradeOrgCity, workplaceIds?: Array<string>, scouted?: CityScouted, formerPlayer?: FormerPlayer, occupation: Occupation | null, outsiders?: Array<string>, alarmedAttackers?: { [key in string]: number }, layout?: CityLayout, temperament?: Temperament, stance?: Stance, price?: number, wontSell?: true, refuses?: true, hire?: Hire, trade?: Array<ShownNpcCityPrice>, horses?: Array<NpcHorseOffer>, horsesToSell?: Array<NpcHorseOffer>, seenAt: number, };

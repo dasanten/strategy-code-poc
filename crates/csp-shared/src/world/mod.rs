@@ -3506,6 +3506,11 @@ pub struct City {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub temperament: Option<Temperament>,
+    /// For an NPC city, what it is after for now (`CONTEXT.md`: Stance), picked again each game day.
+    /// Left out while it grows, and for a trading post and a city a Player holds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub stance: Option<Stance>,
 }
 
 /// A place where an NPC city lost people (`City.danger_places`, `CONTEXT.md`: Threat). How much it
@@ -3526,6 +3531,17 @@ pub enum Temperament {
     Merchant,
     Militarist,
     Settler,
+}
+
+/// What an NPC city is after for now (`City.stance`, `CONTEXT.md`: Stance). Retaliate comes with
+/// T98.8.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum Stance {
+    Grow,
+    Fortify,
+    Trade,
+    Expand,
 }
 
 /// Since when a realm's fighters near an NPC city have outweighed it without a break

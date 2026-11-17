@@ -139,7 +139,7 @@ pub fn npc_surplus_capped(world: &WorldState) -> Vec<InvariantViolation> {
         }
         let stock = chain_store(world, city).and_then(|s| s.stock.as_ref()).unwrap_or(&empty);
         let reserve = npc_reserve(world, city);
-        let steps = npc_needs_scale(world, city);
+        let steps = crate::npc_chain::surplus_steps(world, city);
         let farmers = plan.jobs.values().filter(|j| j.kind == CityJobKind::Farm).count() as f64;
         for place in own_workplaces(world, city) {
             let Some(good) = chain_good(world, place) else { continue };
