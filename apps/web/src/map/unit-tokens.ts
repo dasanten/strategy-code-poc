@@ -254,8 +254,8 @@ export function drawUnits(
   for (const m of world.machines ?? []) {
     const p = at(...where(m.id, m.x, m.y))
     if (!near(p)) continue
-    const r = unitRadius('ram', tile)
-    drawUnit(tokens, UNIT_ART.ram, ...p, r, entityRelationship(m, viewer, known))
+    const r = unitRadius(m.kind, tile)
+    drawUnit(tokens, UNIT_ART[m.kind], ...p, r, entityRelationship(m, viewer, known))
     if (m.crewIds.length > 0) badge(`${m.crewIds.length}`, ...p, r)
     spots.set(m.id, { x: p[0], y: p[1], r })
   }

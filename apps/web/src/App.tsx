@@ -940,6 +940,12 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
       setOrderError(await giveOrder(order, false))
       return
     }
+    // One of a catapult's crew aims it at the wall on that tile (`CONTEXT.md`: Catapult).
+    if (mode === 'throw' && pushing) {
+      const order = { kind: 'throw', residentId: selected.id, machineId: pushing, x, y }
+      setOrderError(await giveOrder(order, false))
+      return
+    }
     // Driving and hauling keep to the realm's; only Drive off takes another's (`CONTEXT.md`:
     // Stealing a carriage or horse), whatever else stands on the tile.
     const carriage = ownCarriageHere
@@ -1571,9 +1577,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
   const buildingHere =
     selected && world?.buildings.find((b) => !SHARES_A_TILE.includes(b.kind) && isAt(selected, b))
   const roadHere = onTile(world?.buildings.filter((b) => b.kind === 'road'))
-  // A carriage or ram site on the tile, worked and supplied the same way (`CONTEXT.md`: Siege machine).
+  // A carriage, ram or catapult site on the tile, worked and supplied the same way (`CONTEXT.md`: Siege machine).
   const carriageSiteHere = onTile(
-    world?.buildings.filter((b) => b.kind === 'carriage' || b.kind === 'ram'),
+    world?.buildings.filter(
+      (b) => b.kind === 'carriage' || b.kind === 'ram' || b.kind === 'catapult',
+    ),
   )
   const armyCarriages = commandedCarriages(world?.diplomacy.alliance, world?.home.realmId)
   const isStrangers = (k: { id: string; realmId: string | null }) =>
@@ -2312,6 +2320,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               select([residentId])
               setPushing(machineId)
               setPicking('push')
+            }}
+            onThrow={(machineId, residentId) => {
+              select([residentId])
+              setPushing(machineId)
+              setPicking('throw')
             }}
             onRam={(machineId, residentId, targetId) =>
               void giveOrder({ kind: 'ram', residentId, machineId, targetId }, false).then(

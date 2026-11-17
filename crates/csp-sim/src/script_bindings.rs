@@ -1651,6 +1651,16 @@ impl<'a> ScriptBindings<'a> {
             "row" => self.request("row", vec![("vesselId", place(0)?), ("x", p(1)?), ("y", p(2)?)]),
             "crew" => self.request("crew", vec![("machineId", place(0)?)]),
             "ram" => self.request("ram", vec![("machineId", place(0)?), ("targetId", place(1)?)]),
+            "throw" => {
+                let at = if a(2).is_some_and(|v| !v.is_null()) {
+                    vec![("x", p(1)?), ("y", p(2)?)]
+                } else {
+                    vec![("targetId", place(1)?)]
+                };
+                let mut input = vec![("machineId", place(0)?)];
+                input.extend(at);
+                self.request("throw", input)
+            }
             "push" => {
                 self.request("push", vec![("machineId", place(0)?), ("x", p(1)?), ("y", p(2)?)])
             }

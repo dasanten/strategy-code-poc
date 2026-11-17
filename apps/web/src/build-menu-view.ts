@@ -42,7 +42,7 @@ export function buildMenuGroups(
   const offered: readonly BuildingKind[] = [
     ...buildMenu(node),
     'road',
-    ...(node ? [] : (['carriage', 'boat', 'ship', 'ram'] as const)),
+    ...(node ? [] : (['carriage', 'boat', 'ship', 'ram', 'catapult'] as const)),
   ]
   return BUILD_GROUPS.map((group) => ({
     name: group.name,

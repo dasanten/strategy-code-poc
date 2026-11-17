@@ -541,6 +541,7 @@ export function TileCard({
   onPush,
   onTearDownMachine,
   onRam,
+  onThrow,
   tile,
   waypoints,
   workSettings,
@@ -603,6 +604,8 @@ export function TileCard({
   onTearDownMachine?: (machineId: string, residentId: string) => void
   /** Has one of a ram's crew swing it at the wall or gate next to it (`CONTEXT.md`: Ram). */
   onRam?: (machineId: string, residentId: string, targetId: string) => void
+  /** Has one of a catapult's crew aim it, by picking the wall to throw Stone at (`CONTEXT.md`: Catapult). */
+  onThrow?: (machineId: string, residentId: string) => void
   /** The tile the card is for. */
   tile: { x: number; y: number }
   /** The Player's waypoints, for a new one's name and the cap (`CONTEXT.md`: Waypoint). */
@@ -755,6 +758,7 @@ export function TileCard({
             if (a.id === 'tearDown' && machine && actor) onTearDownMachine?.(machine.id, actor.id)
             if (a.id === 'ram' && machine?.ramAt && pusher)
               onRam?.(machine.id, pusher, machine.ramAt.id)
+            if (a.id === 'throw' && machine?.throws && pusher) onThrow?.(machine.id, pusher)
           }}
           beside={(a) =>
             a.id === 'build' &&

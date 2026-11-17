@@ -1949,6 +1949,9 @@ pub const BUILD_MATERIALS: Table<Table<f64>> = Table(&[
     // A ram (`CONTEXT.md`: Siege machine, Ram): a roofed frame on wheels round a heavy beam with an
     // iron head, so a little more timber than a carriage and as much Iron; built in the field.
     ("ram", Table(&[("wood", 40.0), ("iron", 5.0)])),
+    // A catapult (`CONTEXT.md`: Siege machine, Catapult): a timber frame and throwing arm on wheels,
+    // iron-bound, weighted with Stone for its counterweight; a little less timber than a ram.
+    ("catapult", Table(&[("wood", 30.0), ("iron", 5.0), ("stone", 10.0)])),
 ]);
 
 /// Work each kind of building needs, in ticks of one unskilled resident of average Strength: a
@@ -1956,7 +1959,8 @@ pub const BUILD_MATERIALS: Table<Table<f64>> = Table(&[
 /// a mint 5, a smithy 5, a town hall 6, a training ground 3 (about a stable), a haven 4. A tile of wooden
 /// wall takes a sixteenth of a game day, a gate an eighth, a tile of road a sixteenth (a quarter of
 /// what a 40 m tile took), a house one game day, a storage two and a farm half of one; a carriage
-/// two, a boat one, a ship ten, a ram two. More or stronger workers finish it sooner (`buildWork`).
+/// two, a boat one, a ship ten, a ram two, a catapult two. More or stronger workers finish it
+/// sooner (`buildWork`).
 pub const BUILD_WORK: Table<f64> = Table(&[
     ("lumberCamp", 2.0 * TICKS_PER_GAME_DAY),
     ("quarry", 3.0 * TICKS_PER_GAME_DAY),
@@ -1978,6 +1982,7 @@ pub const BUILD_WORK: Table<f64> = Table(&[
     ("boat", TICKS_PER_GAME_DAY),
     ("ship", 10.0 * TICKS_PER_GAME_DAY),
     ("ram", 2.0 * TICKS_PER_GAME_DAY),
+    ("catapult", 2.0 * TICKS_PER_GAME_DAY),
 ]);
 
 /// What a stone wall or gate takes instead of `BUILD_MATERIALS` (`CONTEXT.md`: Wall / Gate, Wood
@@ -2324,6 +2329,28 @@ pub const RAM_STRIKE_TICKS: f64 = 10.0;
 /// times harder than a blow): it breaks a tile of wooden wall in 20 strikes, a little over three
 /// minutes, and one of stone in about thirteen, where a Spear alone takes 12 and 50.
 pub const RAM_BLOW: f64 = 150.0;
+
+/// The fewest crew on a catapult's tile for it to be pushed or to shoot (`CONTEXT.md`: Catapult): one
+/// fewer than a ram's, a lighter frame to push and an arm to wind and load.
+pub const CATAPULT_CREW: f64 = 3.0;
+
+/// Damage a catapult takes from blows before it breaks (`CONTEXT.md`: Siege machine): a tile of
+/// wooden wall's, half a ram's, having no roof of planks over it.
+pub const CATAPULT_STRENGTH: f64 = 3000.0;
+
+/// How far a catapult throws, in tiles (`CONTEXT.md`: Catapult: beyond a bow's from a wall): a Bow
+/// reaches 8, 12 from up on a wall, so a catapult shoots from well out of any archer's reach.
+pub const CATAPULT_REACH: f64 = 20.0;
+
+/// Ticks between a crewed catapult's shots (`CONTEXT.md`: Catapult): its arm wound down and a
+/// Stone loaded each time, six times a ram's strikes, so it does less to a wall a minute than a
+/// ram at it.
+pub const CATAPULT_SHOT_TICKS: f64 = 60.0;
+
+/// Damage each Stone a catapult throws does to the wall, gate or tower it hits (`CONTEXT.md`:
+/// Catapult): a tile of wooden wall falls to 5 in five minutes, one of stone to 20 in twenty,
+/// slower than a ram at the wall but from out of reach.
+pub const CATAPULT_BLOW: f64 = 600.0;
 
 /// Ticks it takes to climb over a wall or gate (`CONTEXT.md`: Walls in combat, climbed): six
 /// minutes, all the while unable to dodge or strike back, so a starting city's defenders get up
@@ -3064,6 +3091,11 @@ pub fn balance_json() -> Value {
     m.insert("RAM_STRENGTH".into(), json!(RAM_STRENGTH));
     m.insert("RAM_STRIKE_TICKS".into(), json!(RAM_STRIKE_TICKS));
     m.insert("RAM_BLOW".into(), json!(RAM_BLOW));
+    m.insert("CATAPULT_CREW".into(), json!(CATAPULT_CREW));
+    m.insert("CATAPULT_STRENGTH".into(), json!(CATAPULT_STRENGTH));
+    m.insert("CATAPULT_REACH".into(), json!(CATAPULT_REACH));
+    m.insert("CATAPULT_SHOT_TICKS".into(), json!(CATAPULT_SHOT_TICKS));
+    m.insert("CATAPULT_BLOW".into(), json!(CATAPULT_BLOW));
     m.insert("CLIMB_TICKS".into(), json!(CLIMB_TICKS));
     m.insert("WALL_WALK_TICKS".into(), json!(WALL_WALK_TICKS));
     m.insert("FALL_DAMAGE".into(), json!(FALL_DAMAGE));

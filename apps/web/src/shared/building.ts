@@ -84,14 +84,22 @@ export const BUILDABLE: readonly BuildingKind[] = [
   'boat',
   'ship',
   'ram',
+  'catapult',
 ]
 
 /**
  * Kinds that share a tile with a building rather than taking it (`CONTEXT.md`: Road, Carriage,
- * Building a boat, Building a ship, Siege machine): roads, carriage, boat, ship and ram sites, one of each
- * per tile at most.
+ * Building a boat, Building a ship, Siege machine): roads, carriage, boat, ship, ram and
+ * catapult sites, one of each per tile at most.
  */
-export const SHARES_A_TILE: readonly BuildingKind[] = ['road', 'carriage', 'boat', 'ship', 'ram']
+export const SHARES_A_TILE: readonly BuildingKind[] = [
+  'road',
+  'carriage',
+  'boat',
+  'ship',
+  'ram',
+  'catapult',
+]
 
 /** Workplaces that turn goods into other goods (`RECIPES`): smelters, mints and smithies. */
 export const PROCESSING = Object.keys(RECIPES) as readonly BuildingKind[]
@@ -248,13 +256,14 @@ export function shipSiteAt(
   return world.buildings.find((b) => b.x === x && b.y === y && b.kind === 'ship')
 }
 
-/** The ram site on a tile, if there is one (`CONTEXT.md`: Siege machine). */
-export function ramSiteAt(
+/** The ram or catapult site on a tile, if there is one (`CONTEXT.md`: Siege machine). */
+export function siegeSiteAt(
   world: Pick<WorldState, 'buildings'>,
   x: number,
   y: number,
+  kind: 'ram' | 'catapult' = 'ram',
 ): Building | undefined {
-  return world.buildings.find((b) => b.x === x && b.y === y && b.kind === 'ram')
+  return world.buildings.find((b) => b.x === x && b.y === y && b.kind === kind)
 }
 
 /**
@@ -271,7 +280,7 @@ export function constructionAt(
   if (kind === 'carriage') return carriageSiteAt(world, x, y)
   if (kind === 'boat') return boatSiteAt(world, x, y)
   if (kind === 'ship') return shipSiteAt(world, x, y)
-  if (kind === 'ram') return ramSiteAt(world, x, y)
+  if (kind === 'ram' || kind === 'catapult') return siegeSiteAt(world, x, y, kind)
   return buildingAt(world, x, y)
 }
 
@@ -442,13 +451,16 @@ export function buildProblem(
     if (carriageSiteAt(world, x, y)) return 'there is already a carriage site on this tile'
     return undefined
   }
-  if (kind === 'ram') {
+  if (kind === 'ram' || kind === 'catapult') {
     // `CONTEXT.md`: Siege machine: laid out in the field, anywhere a carriage could stand.
     const t = at?.(x, y)
-    if (t !== undefined && !carriageCanEnter(t)) return 'a ram is built where a carriage could stand'
-    if (world.nodes.some((n) => n.x === x && n.y === y)) return 'a ram goes off any resource node'
+    if (t !== undefined && !carriageCanEnter(t))
+      return `a ${kind} is built where a carriage could stand`
+    if (world.nodes.some((n) => n.x === x && n.y === y))
+      return `a ${kind} goes off any resource node`
     if (buildingAt(world, x, y, size)) return 'there is already a building there'
-    if (ramSiteAt(world, x, y)) return 'there is already a ram site on this tile'
+    if (siegeSiteAt(world, x, y, 'ram') || siegeSiteAt(world, x, y, 'catapult'))
+      return 'there is already a siege machine site on this tile'
     return undefined
   }
   if (kind === 'boat') {
