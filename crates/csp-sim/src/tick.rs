@@ -157,7 +157,7 @@ pub struct TickHealth {
     /// Milliseconds spent noting who came into a City area (ADR 0028), part of the `rest` phase.
     pub outsiders_ms: f64,
     /// The scripts that ran this tick, the Players' and the NPC cities' residents': waiting ones
-    /// (`CONTEXT.md`: Running a script, Waiting) and those a realm's budget skipped don't count.
+    /// (`CONTEXT.md`: Running a script, Waiting) don't count.
     pub script_runs: usize,
     /// How many times a side's sight was worked out this tick (`SightCache.builds`): about one
     /// per realm or NPC city looking, per phase; one per socket would show here.

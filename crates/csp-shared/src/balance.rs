@@ -2094,11 +2094,6 @@ pub const SCRIPT_HELPER_COST: f64 = 1.0;
 /// Extra steps a script pays to request an action (`walkTo`, `pickUp`, …), accepted or not.
 pub const SCRIPT_ACTION_COST: f64 = 10.0;
 
-/// How many interpreter steps all of a realm's running scripts may use together each tick
-/// (`CONTEXT.md`: Step budget): ten residents at their full `SCRIPT_STEP_BUDGET`. When it runs
-/// out, the rest skip the tick; who goes first rotates, so the same ones don't always skip.
-pub const SCRIPT_REALM_STEP_BUDGET: f64 = 20000.0;
-
 /// The most a running script's memory may hold, in characters of its JSON (`CONTEXT.md`:
 /// Memory). Enough for a role, a few tiles and ids; a run that leaves more keeps the old memory.
 pub const SCRIPT_MEMORY_MAX: f64 = 4000.0;
@@ -2592,7 +2587,6 @@ pub fn balance_json() -> Value {
     m.insert("SCRIPT_TILE_QUERY_COST".into(), json!(SCRIPT_TILE_QUERY_COST));
     m.insert("SCRIPT_HELPER_COST".into(), json!(SCRIPT_HELPER_COST));
     m.insert("SCRIPT_ACTION_COST".into(), json!(SCRIPT_ACTION_COST));
-    m.insert("SCRIPT_REALM_STEP_BUDGET".into(), json!(SCRIPT_REALM_STEP_BUDGET));
     m.insert("SCRIPT_MEMORY_MAX".into(), json!(SCRIPT_MEMORY_MAX));
     m.insert("SCRIPT_ACTION_VALUE_MAX".into(), json!(SCRIPT_ACTION_VALUE_MAX));
     m.insert("DOING_MAX_LENGTH".into(), json!(DOING_MAX_LENGTH));
