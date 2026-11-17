@@ -2525,6 +2525,14 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         returns: ScriptType::List(&ScriptType::View("material")),
     },
     ScriptBinding {
+        name: "wornBuildings",
+        is: Is::Query,
+        params: &["cityId"],
+        cost: 20.0,
+        description: "The buildings in that city’s area, a city of my realm’s, that need repairing (worn, nearly a ruin, or with a repair under way), worst first, then nearest me; my realm’s own and those of no city and no realm, such as a road. Empty for any other city.",
+        returns: ScriptType::List(&ScriptType::View("building")),
+    },
+    ScriptBinding {
         name: "lineTiles",
         is: Is::Query,
         params: &["line", "from?"],
@@ -4095,22 +4103,29 @@ fn goodsText(load, goods) {
         r#"// Build (default): build a memory.building with the north-west tile of its
 // footprint at memory.at, laying out the site or joining the one there, as
 // the Build order gives it. Without one I join params.site, or while none is
-// picked the construction site on my tile when I start; with none I end.
+// picked the construction site on my tile when I start. With none, and none
+// picked, I repair the worn buildings in my city's area on my own, worst
+// first, one after another, kept in memory.repairId; with none left I end.
 // While the site lacks materials, one of us building it, picked at random,
 // fetches a load of what is missing from params.source, or the nearest
 // storage of my realm that holds it while none is picked, and brings it
-// back. With none there we just build. Below params.foodAt units of Food on
+// back. With none there we just build. A repair's materials I fetch myself
+// the same way. Below params.foodAt units of Food on
 // me I get Food up to params.foodTake at params.food, else params.source,
 // else the nearest storage of my realm with Food, and come back; fetching
 // materials tops my food up to foodTake too. foodAt 0 turns getting food
 // off. At the site we stand spread over its footprint.
-param site: building // the construction site to join; none: the one I stand on
+param site: building // the construction site to join; none: the one I stand on, else repairing my city's worn buildings
 param source: storage // where materials come from; a carriage too; none: the nearest storage holding some
 param food: storage // where Food comes from; a carriage too; none: my source, else the nearest storage with Food
 param foodAt: number = 1 // get Food below this many units on me; 0 never
 param foodTake: number = 3 // units of Food to take along
 
-if (!pickSite()) { return }
+if (memory.repairId == null && !pickSite()) { return }
+if (memory.repairId != null) {
+  repairWorn()
+  return
+}
 if (memory.stuck) { return }
 if (me.order != null && me.order.kind != "build") { // on my way
   wait()
@@ -4137,14 +4152,15 @@ memory.siteId = me.order.siteId
 if (site != null) { fetchMissing(site, params.source) }
 
 // Which site I build: the Build order's, else the one picked, else the one I
-// started on. False once I end: neither is a construction site.
+// started on. False once I end, neither being a construction site, or with
+// nothing to build turn to repairing.
 fn pickSite() {
   if (memory.building != null) { return true }
   let join = params.site
   if (join == null) { join = buildingAt(me.x, me.y) }
   if (join == null || join.site == null) {
     if (params.site != null) { end("the " + params.site.kind + " is no construction site") }
-    else { end("no construction site on their tile") }
+    else if (!pickWorn()) { end("no construction site on their tile") }
     return false
   }
   memory.building = join.kind
@@ -4152,6 +4168,91 @@ fn pickSite() {
   memory.siteId = join.id
   log("joining the site of " + placeName(join))
   return true
+}
+
+// Nothing to build: the worn building in my city's area most in need of a
+// repair, worst first, then nearest, that none of us repairs already. False
+// with none.
+fn pickWorn() {
+  if (me.cityId == null) { return false }
+  for (b of wornBuildings(me.cityId)) {
+    if (withMemory("repairId", b.id).length == 0) {
+      memory.repairId = b.id
+      memory.started = false
+      memory.walked = false
+      log("nothing to build: repairing " + placeName(b))
+      return true
+    }
+  }
+  return false
+}
+
+// Repairing memory.repairId: away from it I walk there first; lacking its
+// materials I fetch them. Once it is good again, or gone, the next one; with
+// none left I end.
+fn repairWorn() {
+  let target = building(memory.repairId)
+  if (target == null || target.condition == "good") {
+    if (target != null && memory.started) { log("repaired " + placeName(target)) }
+    memory.repairId = null
+    if (!pickWorn()) { end("nothing left to repair") }
+    return
+  }
+  if (me.order != null && me.order.kind != "repair") { // on my way, or fetching
+    wait()
+    return
+  }
+  if (getFoodIfLow(params.food || params.source, me)) { return }
+  let missing = repairNeeded(target)
+  if (missing.length > 0 && carriedOf(me, missing) == null) {
+    fetchForRepair(target, missing)
+  } else if (me.order == null) { startRepairing(target) }
+}
+
+// Repairing it; somewhere else, I walk there first, once a leg. Turned
+// down, repair says why: done.
+fn startRepairing(target) {
+  let problem = repair(target.id)
+  if (problem == "the resident is not at that building") {
+    if (memory.walked) {
+      end("no way to " + placeName(target))
+      return
+    }
+    memory.walked = true
+    if (walkTo(target.x, target.y) == null) { wait() } // until I am there
+    log("walking to " + placeName(target) + " to repair it")
+    return
+  }
+  if (problem != null) {
+    log(problem)
+    end()
+    return
+  }
+  memory.started = true
+  memory.walked = false
+  log("repairing " + placeName(target))
+}
+
+// Fetching what the repair lacks: at params.source while it holds some,
+// else the nearest storage of my realm holding some. With none, I end.
+fn fetchForRepair(target, missing) {
+  let goods = goodsOf(missing)
+  let from = materialsFrom(target, goods, params.source)
+  if (from == null) {
+    end("nothing in any storage to repair " + placeName(target))
+    return
+  }
+  let load = {}
+  for (m of missing) { load[m.good] = m.units }
+  let problem = fetch(load, from.id)
+  if (problem != null) {
+    log(problem)
+    end()
+    return
+  }
+  memory.walked = false
+  wait() // until I have it
+  log("fetching " + goodsText(load, goods) + " at " + placeName(from) + " for the repair")
 }
 
 // At the site once it is laid out: finished or gone, building is done. True

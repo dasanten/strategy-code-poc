@@ -2108,7 +2108,8 @@ fn target_known(task: Task) -> Option<(&'static str, &'static [&'static str], &'
 }
 
 /// Invariant (`defaultsHaveATarget`): a resident running the Work, Build, Haul or Build line
-/// default as the game ships it knows its target once it has run.
+/// default as the game ships it knows its target once it has run: for Build, a site or the
+/// building it repairs.
 pub fn defaults_have_a_target(
     world: &WorldState,
     task_of: &dyn Fn(&Resident) -> Option<Task>,
@@ -2117,7 +2118,13 @@ pub fn defaults_have_a_target(
     for r in &world.residents {
         let Some(s) = &r.script else { continue };
         let Some((invariant, keys, without)) = task_of(r).and_then(target_known) else { continue };
-        if keys.iter().all(|k| s.memory.get(*k).is_some_and(|v| !v.is_null())) {
+        let known = |k: &str| s.memory.get(k).is_some_and(|v| !v.is_null());
+        if keys.iter().all(|k| known(k)) {
+            continue;
+        }
+        // With nothing to build, the Build default repairs (`CONTEXT.md`: Repairing): the
+        // building it repairs is its target then.
+        if task_of(r) == Some(Task::Build) && known("repairId") {
             continue;
         }
         out.push(InvariantViolation {

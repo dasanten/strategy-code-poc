@@ -1839,6 +1839,17 @@ export function Wiki() {
           repaired. Scripts repair with <code>repair(buildingId)</code> on the building's tile and
           ask what it lacks with <code>repairNeeded(building)</code>.
         </p>
+        <p>
+          Some repair <strong>on their own</strong>. A resident running your Build default with no
+          construction site to join (none picked, none on their tile) repairs the worn buildings
+          in their city's area instead, worst first, then nearest, one after another, fetching the
+          materials as above; with none left the script ends. Buildings further off take a Repair
+          order. Scripts find what needs repairing with <code>wornBuildings(cityId)</code>. An NPC
+          city's builders repair its buildings and its road crew its roads, worst first, from what
+          its storage holds above its reserve. The Trade Organization repairs its own from its
+          stock at the turn of each day, so the HQ and its trading posts never fall to ruin while
+          it stands.
+        </p>
         <table>
           <thead>
             <tr>

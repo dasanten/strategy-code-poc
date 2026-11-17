@@ -361,7 +361,7 @@ fn plan_roads(
 
 /// The road crew of this planning pass (`roadCrew`), from `unneeded`, the spare hands nothing short
 /// has a use for: none at a Trade Org city, or while what a road takes is short or neither the
-/// storage nor the crew has any to spare, or with no road to build. Those on the crew stay on it;
+/// storage nor the crew has any to spare, or with no road to build or repair. Those on the crew stay on it;
 /// next come those free of any workplace, then those who would go back to one, and last a scout
 /// out. `old_jobs` are the plan's jobs from its last pass.
 #[allow(clippy::too_many_arguments)]
@@ -414,7 +414,9 @@ pub fn road_crew(
             (i, rank)
         })
         .collect();
-    if !plan_roads(world, city, home, ways, terrain) {
+    // With no road to build, the crew repairs its roads (`CONTEXT.md`: Repairing).
+    let to_build = plan_roads(world, city, home, ways, terrain);
+    if !to_build && !crate::npc_repair::repair_due(world, city, Some(store), true) {
         return Vec::new();
     }
     let mut sorted = ranks;

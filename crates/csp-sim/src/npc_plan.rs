@@ -532,6 +532,8 @@ fn share_out(
         .map(|i| (i, held_score(world, jobs, i)))
         .collect();
     let storage = chain_store_index(world, city);
+    // With nothing to build, its builders repair its buildings (`CONTEXT.md`: Repairing).
+    let repairs = crate::npc_repair::repair_due(world, city, storage, false);
     let (home, mut ways, terrain) = roads;
     let mut state = Share { builders, farming };
     let mut unneeded: Vec<usize> = Vec::new();
@@ -599,13 +601,13 @@ fn share_out(
                         .collect()
                 }
                 Offer::Project => {
-                    let project = project.clone().expect("a project");
+                    let project = project.clone();
                     takers
                         .into_iter()
                         .filter(|&i| {
-                            if state.builders >= npc_builders(world, city)
-                                || !can_take_part(world, city, i, &project)
-                            {
+                            let part =
+                                project.as_ref().is_some_and(|p| can_take_part(world, city, i, p));
+                            if state.builders >= npc_builders(world, city) || !(part || repairs) {
                                 return false;
                             }
                             give(world, jobs, held, i, job_at(CityJobKind::Build, None), None);
@@ -706,7 +708,7 @@ fn share_out(
         (ScoredJob::Farm { food_short: false }, Offer::Farm),
         (ScoredJob::Revive, Offer::Revive),
     ];
-    if project.is_some() {
+    if project.is_some() || repairs {
         first.push((ScoredJob::Project, Offer::Project));
     }
     first.extend(short.iter().map(|s| (ScoredJob::Short { share: s.share }, Offer::Short(s.good))));

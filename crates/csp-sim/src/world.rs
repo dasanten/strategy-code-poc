@@ -325,6 +325,7 @@ fn step_rest(
     world.tick += 1;
     // Buildings lose their day's share of condition at the turn of the day (`CONTEXT.md`: Decay).
     crate::repair::step_decay(world);
+    crate::repair::trade_org_repairs(world);
     let aging = step_aging(world, size);
     answer_demands(world, size, scratch);
     step_alliances(world);
