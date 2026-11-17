@@ -11,6 +11,7 @@ import type {
   AdminWorldView,
   Army,
   Caravan,
+  DangerPlace,
   Trader,
   Stock,
 } from '@csp/shared-types'
@@ -162,6 +163,31 @@ const meter = (value: number, most: number) => `${Math.round(value)} / ${most}`
 const loadText = (load: Stock) =>
   `${Math.round(stockWeight(load))} / ${CARRIAGE_CAPACITY} kg: ${goodsText(load)}`
 
+/**
+ * An NPC city's threats, most first, and its danger places, heaviest first (`CONTEXT.md`:
+ * Threat). Nothing for a city that holds none.
+ */
+function threatRows(
+  threats: { org: AdminOrganization; threat: number }[],
+  places: DangerPlace[] | undefined,
+): InspectorRow[] {
+  const rows: InspectorRow[] = []
+  if (threats.length > 0)
+    rows.push({
+      label: 'Threat',
+      text: threats.map((t) => `${t.org.name} ${Math.round(t.threat)}`).join(', '),
+    })
+  if (places && places.length > 0)
+    rows.push({
+      label: 'Danger places',
+      text: [...places]
+        .sort((a, b) => b.weight - a.weight)
+        .map((p) => `${p.x}, ${p.y} (${p.weight.toFixed(1)})`)
+        .join('; '),
+    })
+  return rows
+}
+
 /** The inspector's card for one thing (`AdminInspection`). */
 export function inspectorCard(ins: AdminInspection): InspectorCard {
   const org = ins.org
@@ -224,6 +250,7 @@ export function inspectorCard(ins: AdminInspection): InspectorCard {
           { label: 'Storage', text: goodsText(ins.storage) },
           { label: 'Gates', text: open + shut === 0 ? 'none' : `${open} open, ${shut} shut` },
           { label: 'Soldiers', text: String(ins.soldiers) },
+          ...threatRows(ins.threats, c.dangerPlaces),
           { label: 'Town hall', text: `${c.x}, ${c.y}` },
         ],
       })

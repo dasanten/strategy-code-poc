@@ -326,6 +326,7 @@ export interface Balance {
   readonly NPC_FOUND_FOOD_DAYS: number
   readonly NPC_FOUND_GIVE_UP_DAYS: number
   readonly NPC_FOUND_STANDING: number
+  readonly NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT: number
   readonly TRADE_ORG_HQ: {
     innerRadius: number
     outerRadius: number
@@ -1302,6 +1303,16 @@ export interface Balance {
   readonly DEMAND_YIELD_RESPECT_MIN: number
   readonly RESPECT_PER_WALL: number
   readonly OUTWEIGH_HOLD_DAYS: number
+  readonly THREAT_SEEN_PER_DAY: number
+  readonly THREAT_PER_KILLING: number
+  readonly THREAT_PER_ROBBERY: number
+  readonly THREAT_HALF_LIFE_DAYS: number
+  readonly THREAT_FORGOTTEN: number
+  readonly DANGER_PLACE_HALF_LIFE_DAYS: number
+  readonly DANGER_PLACE_FORGOTTEN: number
+  readonly DANGER_PLACE_MERGE_RANGE: number
+  readonly DANGER_PLACE_WAY_REACH: number
+  readonly DANGER_ESCORTS_MAX: number
   readonly DEMAND_DECLINED_STANDING_LOSS: number
   readonly DEMAND_TRADE_ORG_STANDING_LOSS: number
   readonly DIRECT_OFFER_DAYS: number

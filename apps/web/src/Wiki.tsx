@@ -167,6 +167,7 @@ import {
   NPC_FOUND_REACH,
   NPC_FOUND_RESIDENTS_PER_MEMBER,
   NPC_FOUND_STANDING,
+  NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT,
   NPC_FOUND_VILLAGE_RESIDENTS,
   NPC_FULL_DAYS,
   NPC_FULL_DAYS_LEAST,
@@ -259,6 +260,15 @@ import {
   DEMAND_YIELD_RESPECT_MIN,
   DEMAND_YIELD_RESPECT_TIMES,
   RESPECT_PER_WALL,
+  THREAT_SEEN_PER_DAY,
+  THREAT_PER_KILLING,
+  THREAT_PER_ROBBERY,
+  THREAT_HALF_LIFE_DAYS,
+  THREAT_FORGOTTEN,
+  DANGER_PLACE_MERGE_RANGE,
+  DANGER_PLACE_HALF_LIFE_DAYS,
+  DANGER_PLACE_WAY_REACH,
+  DANGER_ESCORTS_MAX,
   OUTWEIGH_HOLD_DAYS,
   STANDING_RANGE,
   STANDING_NPC_TRADE_COINS_PER_POINT,
@@ -3029,6 +3039,16 @@ export function Wiki() {
           share nothing. A party whose town hall doesn't stand after {days(NPC_FOUND_GIVE_UP_DAYS)}{' '}
           gives up and walks home. Trading posts and the Trade Organization's HQ never found cities.
         </p>
+        <h3>Temperament</h3>
+        <p>
+          Every NPC city has a temperament, fixed when it comes to be: merchant, militarist or
+          settler. A self-managed city gets one when its Leader dies, unless it had one before. A
+          daughter takes its mother's {pct(NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT)} of the time and
+          otherwise draws one of its own, which may still be the same. Whoever sees a city reads its
+          temperament on its card, and keeps it in Last seen; whoever has traded with it reads it
+          in the Standing list while they hold a standing with each other. Scripts see the same.
+          Trading posts and the HQ have none. On its own a temperament changes nothing yet.
+        </p>
         <p>
           An NPC city sells only what it holds above this reserve and buys only what it is short of.
           It lends residents at {num(NPC_TRADE.pricePerResidentWeek)} coins each a game week, but
@@ -3276,6 +3296,26 @@ export function Wiki() {
           same way, and {num(RESPECT_PER_WALL)} for each of its own finished wall and gate tiles. It
           weighs this at its planning pass, once a game hour, and remembers since when each realm
           has outweighed it; the first pass one doesn't, that time starts again from nothing.
+        </p>
+        <h3>Threat</h3>
+        <p>
+          Apart from how it regards you, an NPC city keeps in mind how dangerous you are: its{' '}
+          <strong>threat</strong> from each Organization, a strong friendly neighbour too. At its
+          planning pass it adds what your armed residents weigh, by strength as respect weighs them,
+          wherever it sees them: in its City area or in sight of any of its people, also its traders
+          and scouts far from home. Standing a game day in sight adds{' '}
+          {num(THREAT_SEEN_PER_DAY)} for each point of strength. Learning that you killed one of its
+          people adds {num(THREAT_PER_KILLING)}, that you robbed it {num(THREAT_PER_ROBBERY)}. Threat
+          fades to half every {days(THREAT_HALF_LIFE_DAYS)} and is forgotten below{' '}
+          {num(THREAT_FORGOTTEN)}. You don't see it.
+        </p>
+        <p>
+          It also remembers <strong>danger places</strong>: where one of its people was killed
+          outside its City area, by anyone, bandits too. Another loss within{' '}
+          {num(DANGER_PLACE_MERGE_RANGE)} tiles adds to the same place. A danger place fades to half
+          every {days(DANGER_PLACE_HALF_LIFE_DAYS)}. While it remembers one within{' '}
+          {num(DANGER_PLACE_WAY_REACH)} tiles of a way, the city sends a soldier more along that way
+          for each person lost there, up to {num(DANGER_ESCORTS_MAX)} more.
         </p>
       </Section>
 

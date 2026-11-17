@@ -582,6 +582,7 @@ pub fn found_daughter(world: &mut WorldState, city_id: &str) -> Option<String> {
     }
     plan.full_since = None;
     plan.founding_site = None;
+    crate::temperament::inherit_temperament(world, city_id, &daughter);
     raise_standing_both_ways(world, city_id, &daughter, NPC_FOUND_STANDING);
     Some(daughter)
 }

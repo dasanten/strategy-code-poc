@@ -78,6 +78,7 @@ mod npc_slow;
 pub mod npc_stable;
 #[cfg(test)]
 mod npc_test_world;
+pub mod npc_threat;
 pub mod npc_trader;
 pub mod npc_training;
 pub mod offers;
@@ -132,6 +133,7 @@ pub mod supply_wagons;
 pub mod survival;
 pub mod teaching;
 pub mod teardown;
+pub mod temperament;
 pub mod terrain_gen;
 pub mod territory;
 #[cfg(test)]

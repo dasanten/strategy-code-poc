@@ -11,7 +11,7 @@ use csp_shared::protocol::SeenEntity;
 use csp_shared::world::offers::SeenOffer;
 use csp_shared::world::{
     AllianceArmyPart, AllianceArmyPartIs, BuildingKind, DeliveryKind, DemandTerms,
-    DirectOfferTerms, Good, WorldState,
+    DirectOfferTerms, Good, Temperament, WorldState,
 };
 use csp_sim::directive::{directives_for, DirectiveView};
 use csp_sim::queries::alliance::{alliance_of, realm_name, sharing_sight};
@@ -146,6 +146,8 @@ pub struct StandingShown {
     pub is: &'static str,
     pub theirs: f64,
     pub yours: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperament: Option<Temperament>,
 }
 
 impl From<StandingView> for StandingShown {
@@ -155,7 +157,14 @@ impl From<StandingView> for StandingShown {
             OrganizationIs::City => "city",
             OrganizationIs::TradeOrg => "tradeOrg",
         };
-        StandingShown { org: s.org, name: s.name, is, theirs: s.theirs, yours: s.yours }
+        StandingShown {
+            org: s.org,
+            name: s.name,
+            is,
+            theirs: s.theirs,
+            yours: s.yours,
+            temperament: s.temperament,
+        }
     }
 }
 

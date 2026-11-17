@@ -738,7 +738,9 @@ The shared language of the game. Domain terms only — no implementation details
   by their gear, and from its people that Organization killed or robbed (traders, scouts, escorts).
   It fades over game days. A strong friendly neighbour can be a threat. The city also remembers
   **danger places**, where it lost people, to anyone, bandits too: escorts grow and its people's
-  ways keep clear of them while it remembers.
+  ways keep clear of them while it remembers. A killing or robbery raises threat once the city
+  learns of it, as it does Standing; a danger place is marked where its person was killed outside
+  its City area, at once (decided overnight 2026-11-17, Daniel to confirm).
 - **Acting first** (Epic 98): an NPC city doesn't only answer. On its own it invites those it holds
   in high standing into an alliance against a common threat; hires mercenaries with its war chest
   when threatened, as a Player can (Trade Org army, Hiring from an NPC city); sends soldiers after

@@ -3351,6 +3351,42 @@ pub struct City {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub outweighed: Option<Vec<Outweighed>>,
+    /// For an NPC city, how dangerous it thinks each Organization is, by its id (`CONTEXT.md`:
+    /// Threat), apart from Standing. Its own mind: nobody else sees it. Left out while there are
+    /// none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub threats: Option<IndexMap<String, f64>>,
+    /// For an NPC city, the places where it lost people, to anyone (`CONTEXT.md`: Threat). Its own
+    /// mind too. Left out while there are none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub danger_places: Option<Vec<DangerPlace>>,
+    /// For an NPC city, what it is like (`CONTEXT.md`: Temperament), fixed when it comes into
+    /// being. Left out for a trading post and a city founded by a Player.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub temperament: Option<Temperament>,
+}
+
+/// A place where an NPC city lost people (`City.danger_places`, `CONTEXT.md`: Threat). How much it
+/// still fears it fades over game days.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DangerPlace {
+    pub x: f64,
+    pub y: f64,
+    /// About one for each person lost there, fading.
+    pub weight: f64,
+}
+
+/// What an NPC city is like (`City.temperament`, `CONTEXT.md`: Temperament).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum Temperament {
+    Merchant,
+    Militarist,
+    Settler,
 }
 
 /// Since when a realm's fighters near an NPC city have outweighed it without a break

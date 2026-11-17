@@ -273,6 +273,7 @@ pub fn world_invariants() -> Vec<Invariant> {
             name: "outweighed-sound",
             check: |w, t| crate::persuasion::outweighed_sound(w, t.size),
         },
+        Invariant { name: "threat-sound", check: |w, _| crate::npc_threat::threat_sound(w) },
         Invariant {
             name: "former-players-sound",
             check: |w, _| crate::standing::former_players_sound(w),
@@ -377,6 +378,10 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant {
             name: "city-layouts-sound",
             check: |w, _t| crate::city_layout::city_layouts_sound(w),
+        },
+        Invariant {
+            name: "trading-posts-have-no-temperament",
+            check: |w, _t| crate::temperament::trading_posts_have_no_temperament(w),
         },
         Invariant {
             name: "city-streets-sound",

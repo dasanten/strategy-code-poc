@@ -362,6 +362,7 @@ ts_type!(
       storage: Stock
       gates: { open: number; shut: number }
       soldiers: number
+      threats: { org: AdminOrganization; threat: number }[]
     }
   | { is: 'building'; building: Building; city: AdminNamed | null }
   | { is: 'horse'; horse: Horse }
