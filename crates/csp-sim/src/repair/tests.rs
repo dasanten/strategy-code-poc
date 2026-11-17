@@ -49,8 +49,8 @@ fn condition_falls_per_game_day_by_kind_and_reads_in_words() {
     let road = worn / decay_days(BuildingKind::Road).unwrap();
     let smithy = worn / decay_days(BuildingKind::Smithy).unwrap();
     // Rounded to a billionth each day.
-    assert!((decay_of(&world, "road") - road).abs() < 1e-7);
-    assert!((decay_of(&world, "smithy") - smithy).abs() < 1e-7);
+    assert!((decay_of(&world, "road") - road).abs() < 1e-12);
+    assert!((decay_of(&world, "smithy") - smithy).abs() < 1e-12);
     // Roads go faster than timber, timber faster than stone.
     assert!(decay_of(&world, "road") > decay_of(&world, "house"));
     assert!(decay_of(&world, "house") > decay_of(&world, "smithy"));

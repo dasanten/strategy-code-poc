@@ -169,8 +169,9 @@ fn the_trade_org_hq_and_its_trading_posts_never_fall_to_ruin() {
     let before = wood(&world);
     for w in [&mut world, &mut v.world] {
         assert!(!theirs(w).is_empty());
-        // A year of game days, past every kind's whole decay.
-        for _ in 0..365 {
+        // Past every kind's whole decay.
+        let longest = csp_shared::balance::DECAY_DAYS.0.iter().map(|(_, d)| *d).fold(0.0, f64::max);
+        for _ in 0..longest as usize {
             w.tick += TICKS_PER_GAME_DAY as u64;
             step_decay(w);
             trade_org_repairs(w);

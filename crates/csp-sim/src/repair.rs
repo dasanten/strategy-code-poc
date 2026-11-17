@@ -77,8 +77,8 @@ pub fn condition_of(b: &Building) -> Option<Condition> {
 /// Every finished building loses its day's share of condition at the turn of each game day
 /// (`CONTEXT.md`: Decay): once a day, not a sliver each tick, so what the Players are sent of a
 /// building changes once a game day rather than every tick. Its condition never goes below
-/// nothing. Rounded to a billionth, so a road worn after 15 of its 60 days reads worn on the 15th
-/// rather than a sliver short of it.
+/// nothing. Counted in whole days of its kind's, so a road worn after a quarter of its days reads
+/// worn on that day rather than a sliver short of it.
 pub fn step_decay(world: &mut WorldState) {
     if world.tick == 0 || world.tick as f64 % TICKS_PER_GAME_DAY != 0.0 {
         return;
@@ -88,10 +88,8 @@ pub fn step_decay(world: &mut WorldState) {
             continue;
         }
         let Some(days) = decay_days(b.kind) else { continue };
-        let lost = ((b.decay.unwrap_or(0.0) + 1.0 / days) * 1e9).round() / 1e9;
-        // Rounded each day, a share like 1/450 adds up to a hair under all of it after its
-        // days: within a millionth (far less than a day's share) it is all gone.
-        b.decay = Some(if lost >= 1.0 - 1e-6 { 1.0 } else { lost });
+        let gone = (b.decay.unwrap_or(0.0) * days).round() + 1.0;
+        b.decay = Some((gone / days).min(1.0));
     }
 }
 

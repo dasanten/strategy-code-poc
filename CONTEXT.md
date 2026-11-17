@@ -205,6 +205,8 @@ The shared language of the game. Domain terms only — no implementation details
   whether used or not. Blows from attackers are apart from this (Walls in combat). Its condition
   reads in words: good, worn, nearly a ruin. Everyone's buildings decay, the Trade
   Organization's too, which repairs its own from its stock so they never fall while it stands.
+  A city left alone for a real month is still there: its buildings may be worn, but none has
+  fallen to ruin from decay alone (Daniel, 2026-11-17).
 - **Repairing:** a resident at a worn building puts its condition back to good with a share of its
   materials (fetched like Fetching materials) and some work, less than building it. It is an
   order and a script call; under the Build default a builder with nothing to build repairs worn

@@ -2289,33 +2289,34 @@ pub const TEARDOWN_WORK_SHARE: f64 = 0.5;
 pub const TEARDOWN_MATERIALS_RETURNED: f64 = 0.5;
 
 /// Game days a finished building of each kind takes to lose all its condition, unrepaired
-/// (`CONTEXT.md`: Decay): it loses an even share each game day, used or not. Roads and the wooden
-/// walls and gates go fastest, in under half a game year; timber buildings in most of one; those
-/// mostly of stone (smelter, mint, smithy) in nearly two. A kind not listed (a carriage, boat or
-/// ship site) never decays. Three times the first numbers (decided overnight): at those an NPC
-/// city's builders couldn't keep up and every city fell to ruin within a game year.
+/// (`CONTEXT.md`: Decay): it loses an even share each game day, used or not. A city left alone for
+/// a real month (1800 game days) is still there: its buildings may be worn, but none has fallen to
+/// ruin from decay alone (Daniel, 2026-11-17). Roads and the wooden walls and gates go fastest, in
+/// 45 real days; farms in 60; timber buildings in 75; storages, workplaces on a node, training
+/// grounds and havens in 90; the town hall in 120; those mostly of stone (warehouse, smelter, mint,
+/// smithy) in 180. A kind not listed (a carriage, boat or ship site) never decays.
 pub const DECAY_DAYS: Table<f64> = Table(&[
-    ("road", 180.0),
-    ("wall", 180.0),
-    ("gate", 180.0),
-    ("farm", 270.0),
-    ("house", 360.0),
-    ("stable", 360.0),
-    ("lumberCamp", 360.0),
-    ("storage", 450.0),
-    ("trainingGround", 450.0),
-    ("haven", 450.0),
-    ("quarry", 450.0),
-    ("mine", 450.0),
-    ("townHall", 540.0),
-    ("warehouse", 720.0),
-    ("smelter", 720.0),
-    ("mint", 720.0),
-    ("smithy", 720.0),
+    ("road", 2700.0),
+    ("wall", 2700.0),
+    ("gate", 2700.0),
+    ("farm", 3600.0),
+    ("house", 4500.0),
+    ("stable", 4500.0),
+    ("lumberCamp", 4500.0),
+    ("storage", 5400.0),
+    ("trainingGround", 5400.0),
+    ("haven", 5400.0),
+    ("quarry", 5400.0),
+    ("mine", 5400.0),
+    ("townHall", 7200.0),
+    ("warehouse", 10800.0),
+    ("smelter", 10800.0),
+    ("mint", 10800.0),
+    ("smithy", 10800.0),
 ]);
 
 /// Share of its condition lost from which a building reads worn, rather than good
-/// (`CONTEXT.md`: Decay), and can be repaired: a road after about six game weeks.
+/// (`CONTEXT.md`: Decay), and can be repaired: a road after about eleven real days.
 pub const DECAY_WORN: f64 = 0.25;
 
 /// Share of its condition lost from which a building reads nearly a ruin.
@@ -2329,9 +2330,9 @@ pub const REPAIR_MATERIALS_SHARE: f64 = 0.25;
 /// tearing it down (`TEARDOWN_WORK_SHARE`).
 pub const REPAIR_WORK_SHARE: f64 = 0.25;
 
-/// Game days a ruin stands before it collapses (`CONTEXT.md`: Ruin): "a long while more", about
-/// two game months, time enough to notice it and rebuild it.
-pub const RUIN_COLLAPSE_DAYS: f64 = 60.0;
+/// Game days a ruin stands before it collapses (`CONTEXT.md`: Ruin): "a long while more", a real
+/// month (Daniel, 2026-11-17), time enough to notice it and rebuild it.
+pub const RUIN_COLLAPSE_DAYS: f64 = 1800.0;
 
 /// Share of a building's materials rebuilding its ruin takes (`CONTEXT.md`: Ruin), rounded up to
 /// whole units: more than a repair, less than a new one.
