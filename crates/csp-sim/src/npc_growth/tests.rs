@@ -652,9 +652,14 @@ fn a_builder_of_a_site_beyond_the_node_reach_sets_out_with_food_for_the_walk_the
     let far = sx + NPC_NODE_REACH + 200.0;
     let walk = (far - sx) * WALK_TICKS_PER_TILE;
     let m = memory(&mut v, far);
-    assert_eq!(m["foodAt"], json!(road_crew_food(walk)));
-    assert_eq!(m["foodTake"], json!(set_out_food(walk) + road_crew_food(walk)));
+    assert_eq!(m["foodAt"], csp_lang::plain::number_json(road_crew_food(walk)));
+    assert_eq!(
+        m["foodTake"],
+        csp_lang::plain::number_json(set_out_food(walk) + road_crew_food(walk))
+    );
     assert!(m["foodTake"].as_f64().unwrap() > 3.0);
+    // Kept as a script keeps numbers (#1402: `running-scripts-sound`).
+    assert_eq!(crate::script_runner::running_scripts_sound(&v.world), []);
 }
 
 #[test]

@@ -341,13 +341,16 @@ pub fn take_part(
     }
     let start_build = |world: &mut WorldState| {
         world.residents[i].order = set_out.clone();
-        let mut memory = json!({ "building": kind_name(building), "at": { "x": x, "y": y } });
+        // Numbers as a script keeps them: a whole one reads back as one (`running-scripts-sound`).
+        let num = csp_lang::plain::number_json;
+        let mut memory =
+            json!({ "building": kind_name(building), "at": { "x": num(x), "y": num(y) } });
         if is_stone(building, material) {
             memory["material"] = json!("stone");
         }
         if let Some((at, take)) = far_food {
-            memory["foodAt"] = json!(at);
-            memory["foodTake"] = json!(take);
+            memory["foodAt"] = num(at);
+            memory["foodTake"] = num(take);
         }
         // Until the Build default walks out, nobody takes them for stuck (`no_way_out`).
         if set_out.is_some() {

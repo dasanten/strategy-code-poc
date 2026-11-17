@@ -11,6 +11,7 @@
 //! assertions are only held to on the whole run.
 
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 use std::time::Instant;
 
 use csp_shared::balance::{MAP_SIZE, NPC_TRADER_REACH};
@@ -21,8 +22,12 @@ use csp_shared::world::{BuildingKind, Heading, WorldState};
 
 use crate::invariants::check_all;
 use crate::npc_test_world::Runner;
+use crate::order_sender::OrderSender;
+use crate::queues::{QueueHost, QueueRunner};
+use crate::script_runner::default_host::DefaultScripts;
 use crate::starting_city::found_starting_city;
 use crate::terrain_gen::generate_terrain;
+use crate::tick::Scratch;
 use crate::world::generate_world;
 
 /// The world's seed and size: half the full map's side (`MAP_SIZE`), a quarter of its land. On a
@@ -149,9 +154,50 @@ impl Watch {
     }
 }
 
+/// The Players' side of a tick, as the server runs it (`run_tick`): their residents' queues move
+/// on and their scripts run before the world steps. Without it a starting city's stable hand never
+/// starts "Farm and feed" and starves on the farm (#1402).
+struct Players {
+    queues: QueueRunner,
+    scripts: DefaultScripts,
+}
+
+/// The Players' order senders, by user id (`QueueHost`).
+struct Senders(Vec<OrderSender>);
+
+impl QueueHost for Senders {
+    fn sender(&self, user_id: u64) -> Option<OrderSender> {
+        self.0.iter().find(|s| s.user_id == user_id).cloned()
+    }
+}
+
+impl Players {
+    fn new(terrain: &TerrainMap, users: &[u64]) -> Self {
+        let terrain = Arc::new(terrain.clone());
+        let senders: Vec<OrderSender> =
+            users.iter().map(|&u| OrderSender::player(u, &format!("Player {u}"))).collect();
+        let scripts = DefaultScripts::new(terrain.clone(), &senders);
+        let queues =
+            QueueRunner::new(Box::new(Senders(senders)), scripts.kinds.clone(), Some(terrain));
+        Players { queues, scripts }
+    }
+
+    /// Moves the Players' queues on and runs their scripts, before the world steps.
+    fn step(&mut self, world: &mut WorldState, scratch: &mut Scratch) {
+        self.queues.run_all(world, scratch);
+        assert_eq!(self.scripts.run_all(world, scratch), [], "tick {}", world.tick);
+    }
+}
+
 /// Runs the world for `days` game days, checking every invariant each game day and saying how it
 /// goes every ten.
-fn run(world: &mut WorldState, terrain: &TerrainMap, days: usize, watch: &mut Watch) {
+fn run(
+    world: &mut WorldState,
+    terrain: &TerrainMap,
+    days: usize,
+    watch: &mut Watch,
+    mut players: Option<&mut Players>,
+) {
     let mut runner = Runner::new(terrain);
     let started = Instant::now();
     let mut trace = std::env::var("GAME_YEAR_TRACE")
@@ -159,6 +205,9 @@ fn run(world: &mut WorldState, terrain: &TerrainMap, days: usize, watch: &mut Wa
         .map(|p| std::io::BufWriter::new(std::fs::File::create(p).expect("a trace file")));
     for day in 1..=days {
         for _ in 0..TICKS_PER_GAME_DAY as usize {
+            if let Some(p) = players.as_deref_mut() {
+                p.step(world, &mut runner.scratch);
+            }
             let step = runner.step_with_result(world, terrain);
             let starved: Vec<_> = step.survival.died.clone();
             watch.tick(world, &starved);
@@ -274,7 +323,7 @@ fn the_new_world_runs_a_game_year_on_its_own() {
     );
     let whole = (TICKS_PER_GAME_YEAR / TICKS_PER_GAME_DAY) as usize;
     let days = days_to_run(whole);
-    run(&mut world, terrain, days, &mut watch);
+    run(&mut world, terrain, days, &mut watch, None);
 
     let npc_now = npc_city_ids(&world);
     let starved_out: Vec<(&String, usize)> =
@@ -322,7 +371,8 @@ fn two_players_on_the_defaults_last_a_game_season_on_the_new_world() {
         realms.iter().map(|r| city_of(&world, r).expect("a starting city").id).collect();
     let mut watch = Watch::new(&world);
     let days = days_to_run(GAME_SEASON_DAYS);
-    run(&mut world, terrain, days, &mut watch);
+    let mut players = Players::new(terrain, &[1, 2]);
+    run(&mut world, terrain, days, &mut watch, Some(&mut players));
 
     let size = terrain.size;
     let warehouses = trade_warehouses(&world);
