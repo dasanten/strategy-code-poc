@@ -16,8 +16,8 @@ use std::sync::Arc;
 use csp_lang::interpreter::{run, RunOptions, RunResult, ValueLimits};
 use csp_lang::{parse, plain_value, script_params, NotPlain, Object, Program, Value};
 use csp_shared::balance::{
-    MAP_SIZE, SCRIPT_LOG_INTERVAL, SCRIPT_MAX_CALL_DEPTH, SCRIPT_MEMORY_MAX,
-    SCRIPT_REALM_STEP_BUDGET, SCRIPT_STEP_BUDGET, SCRIPT_VALUE_LIMITS, WORKPLACE_MAX_WORKERS,
+    MAP_SIZE, SCRIPT_LOG_INTERVAL, SCRIPT_MAX_CALL_DEPTH, SCRIPT_MEMORY_MAX, SCRIPT_STEP_BUDGET,
+    SCRIPT_VALUE_LIMITS, WORKPLACE_MAX_WORKERS,
 };
 use csp_shared::protocol::SeenEntity;
 use csp_shared::terrain::TerrainMap;
@@ -1102,8 +1102,8 @@ pub struct ScriptRunner {
     kinds: OrderKinds,
     programs: HashMap<u64, (String, Arc<Program>)>,
     waiting: Waiting,
-    /// The scripts that ran the last `run_all`, waiting ones and those a realm's budget skipped
-    /// left out: for tick health (ADR 0004).
+    /// The scripts that ran the last `run_all`, waiting ones left out: for tick
+    /// health (ADR 0004).
     pub runs: usize,
 }
 
@@ -1124,9 +1124,8 @@ impl ScriptRunner {
     }
 
     /// Runs the scripts and applies what they requested (`runAll`). Realm by realm, each script
-    /// gets `SCRIPT_STEP_BUDGET` steps, or what is left of the realm's `SCRIPT_REALM_STEP_BUDGET`;
-    /// once that is used up the rest skip the tick. Who goes first rotates with the tick. With
-    /// `check`, returns the invariant violations found.
+    /// gets `SCRIPT_STEP_BUDGET` steps; a realm has no budget of its own (Daniel, 2026-11-17).
+    /// Who goes first rotates with the tick. With `check`, returns the invariant violations found.
     pub fn run_all(
         &mut self,
         world: &mut WorldState,
@@ -1241,7 +1240,7 @@ impl ScriptRunner {
         out
     }
 
-    /// Runs one realm's scripts in turn, within the realm's step budget (`runRealm`).
+    /// Runs one realm's scripts in turn, each with its own step budget (`runRealm`).
     #[allow(clippy::too_many_arguments)]
     fn run_realm(
         &mut self,
@@ -1255,7 +1254,6 @@ impl ScriptRunner {
         mut violations: Option<&mut Vec<InvariantViolation>>,
     ) {
         let Some(sender) = self.host.sender(user_id) else { return };
-        let mut left = SCRIPT_REALM_STEP_BUDGET;
         let first = (world.tick as usize) % running.len();
         for k in 0..running.len() {
             let r = &running[(first + k) % running.len()];
@@ -1263,41 +1261,21 @@ impl ScriptRunner {
             if r.script(world).is_none() {
                 continue;
             }
-            if left <= 0.0 {
-                let script_id = r.script(world).map_or(0, |s| s.script_id);
-                if let Some(s) = r.script_mut(world) {
-                    s.last_run =
-                        Some(ScriptRunSteps { steps: 0.0, out_of_steps: Some(OutOfSteps::Realm) });
-                }
-                log_limited(
-                    world,
-                    realm_id,
-                    r,
-                    LoggedAt::Budget,
-                    out_of_steps_event(r, script_id, true),
-                );
-                continue;
-            }
             ran.insert(r.id.clone());
-            let steps = SCRIPT_STEP_BUDGET.min(left);
-            match self.run_one(
+            if let Err(error) = self.run_one(
                 world,
                 scratch,
                 realm_id,
                 user_id,
                 &sender,
                 r,
-                steps,
+                SCRIPT_STEP_BUDGET,
                 used,
                 violations.as_deref_mut(),
             ) {
-                Ok(spent) => left -= spent,
-                Err(error) => {
-                    // The game's own bug, not the script's: it ends this one script and the tick
-                    // goes on.
-                    left -= steps;
-                    self.failed_in_game(world, realm_id, r, &error);
-                }
+                // The game's own bug, not the script's: it ends this one script and the tick
+                // goes on.
+                self.failed_in_game(world, realm_id, r, &error);
             }
         }
     }
@@ -1829,8 +1807,8 @@ fn scout_ended(world: &mut WorldState, city_id: &str, reason: Option<&str>) {
 
 /// An NPC city's residents run the game's default of their task (`runNpcScripts`, `CONTEXT.md`:
 /// NPC city, Default script; ADR 0009), through the same interpreter and game API as a Player's
-/// scripts, with the city as the sender: it sees what its residents see, explored or not, and
-/// has no realm budget. Returns how many scripts ran, for tick health.
+/// scripts, with the city as the sender: it sees what its residents see, explored or not.
+/// Returns how many scripts ran, for tick health.
 pub fn run_npc_scripts(
     world: &mut WorldState,
     terrain: &TerrainMap,

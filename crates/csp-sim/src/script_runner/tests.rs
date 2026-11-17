@@ -306,29 +306,26 @@ fn picks_up_a_saved_change_on_the_next_tick_and_ends_when_the_script_is_deleted(
 }
 
 #[test]
-fn gives_each_resident_its_own_step_budget_and_the_realm_one_together() {
-    let count = (SCRIPT_REALM_STEP_BUDGET / SCRIPT_STEP_BUDGET) as usize + 2;
+fn gives_each_resident_its_own_step_budget_and_the_realm_none() {
+    // Many residents' scripts that each use up their own budget: every one of them still runs
+    // every tick, as a realm has no budget of its own (Daniel, 2026-11-17).
+    let count = 30;
     let mut s = setup(count);
     let id = s.lib.create(MARA, "busy", "memory.ran = tick; while (true) {}");
     let ids: Vec<String> = s.world.residents.iter().map(|r| r.id.clone()).collect();
     s.give_script(id, &ids.iter().map(String::as_str).collect::<Vec<_>>());
-    // Each tick two residents skip, and who skips rotates: over `count` ticks everyone runs.
-    let mut ran = HashSet::new();
-    for _ in 0..count {
+    for _ in 0..3 {
         s.run(false);
         let tick = json!(s.world.tick);
-        let now: Vec<String> = s
+        let now = s
             .world
             .residents
             .iter()
             .filter(|r| r.script.as_ref().is_some_and(|x| x.memory.get("ran") == Some(&tick)))
-            .map(|r| r.id.clone())
-            .collect();
-        assert_eq!(now.len(), count - 2);
-        ran.extend(now);
+            .count();
+        assert_eq!(now, count);
         s.world.tick += 1;
     }
-    assert_eq!(ran.len(), count);
     // Out of steps is a warning in the realm log: once per resident, rate-limited.
     let warnings: Vec<Json> = s
         .script_events()
@@ -340,7 +337,7 @@ fn gives_each_resident_its_own_step_budget_and_the_realm_one_together() {
         warnings.iter().map(|w| w["residentId"].as_str().unwrap().to_string()).collect();
     assert_eq!(who.len(), count);
     assert_eq!(warnings.len(), count);
-    assert!(warnings.iter().any(|w| w["realm"] == true));
+    assert!(warnings.iter().all(|w| w["realm"] == false));
 }
 
 #[test]
@@ -402,8 +399,8 @@ fn keeps_its_last_error_until_another_version_runs() {
 }
 
 #[test]
-fn keeps_the_steps_it_used_last_tick_and_whether_it_ran_out_of_its_own_or_the_realms() {
-    let count = (SCRIPT_REALM_STEP_BUDGET / SCRIPT_STEP_BUDGET) as usize + 1;
+fn keeps_the_steps_it_used_last_tick_and_whether_it_ran_out() {
+    let count = 15;
     let mut s = setup(count);
     let light = s.lib.create(MARA, "light", "memory.n = 1");
     let busy = s.lib.create(MARA, "busy", "while (true) {}");
@@ -418,13 +415,9 @@ fn keeps_the_steps_it_used_last_tick_and_whether_it_ran_out_of_its_own_or_the_re
         .iter()
         .map(|r| r.script.as_ref().unwrap().last_run.clone().unwrap())
         .collect();
-    // The realm's budget runs out: one is cut short or skipped, the rest use their own up.
-    assert_eq!(
-        busy_runs.iter().filter(|r| r.out_of_steps == Some(OutOfSteps::Own)).count(),
-        count - 2
-    );
-    assert_eq!(busy_runs.iter().filter(|r| r.out_of_steps == Some(OutOfSteps::Realm)).count(), 1);
-    for r in busy_runs.iter().filter(|r| r.out_of_steps == Some(OutOfSteps::Own)) {
+    // Each uses its own budget up; none is cut short by the realm's.
+    for r in &busy_runs {
+        assert_eq!(r.out_of_steps, Some(OutOfSteps::Own));
         assert_eq!(r.steps, SCRIPT_STEP_BUDGET);
     }
     assert_eq!(running_scripts_sound(&s.world), vec![]);
