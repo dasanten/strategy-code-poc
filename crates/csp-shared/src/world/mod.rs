@@ -1486,6 +1486,11 @@ pub struct CityTrader {
     pub sells: Stock,
     pub buys: Stock,
     pub since: f64,
+    /// The city's soldiers who walk with this trader and guard them (`CONTEXT.md`: Escort). Left
+    /// out while none do.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[ts(as = "Option<Vec<String>>", optional)]
+    pub escort_ids: Vec<String>,
 }
 
 /// What a scout out has seen and not brought home yet (`CONTEXT.md`: Scout).

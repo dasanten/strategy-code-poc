@@ -670,7 +670,8 @@ The shared language of the game. Domain terms only — no implementation details
   proportion to its size, at least one, in place of its one armed member. Both take more when the
   city knows the way is dangerous. Only soldiers beyond those on its hall and at its gates go. An
   escort fights for those it guards and keeps pace with them; a trader's comes home with them, a
-  founding party's stays as the daughter's first soldiers.
+  founding party's stays as the daughter's first soldiers. With no soldier to spare, a trader or
+  founding party sets out without an escort.
 - **Soldiers in peace** (Epic 97): the soldiers an NPC city keeps by its size are what it keeps in
   peace; it keeps more while it feels threatened. Between fights they stand their posts, walk
   rounds, train where it has a training ground (wearing their gear, Wear) and go as escorts.
