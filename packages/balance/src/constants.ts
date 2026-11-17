@@ -147,6 +147,7 @@ export const PAIRING_WAIT_TICKS = balance.PAIRING_WAIT_TICKS
 export const NPC_PLAN_TICKS = balance.NPC_PLAN_TICKS
 export const NPC_JOB_SCORE = balance.NPC_JOB_SCORE
 export const NPC_JOB_MARGIN = balance.NPC_JOB_MARGIN
+export const NPC_JOB_WEIGHTS = balance.NPC_JOB_WEIGHTS
 export const NPC_RESIDENTS_PER_NEEDS_STEP = balance.NPC_RESIDENTS_PER_NEEDS_STEP
 export const NPC_BUILDERS = balance.NPC_BUILDERS
 export const NPC_ROAD_CREW = balance.NPC_ROAD_CREW

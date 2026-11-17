@@ -248,6 +248,12 @@
     "surplusRange": 5.0
   },
   "NPC_JOB_MARGIN": 6.0,
+  "NPC_JOB_WEIGHTS": {
+    "distance": 0.0,
+    "danger": 7.0,
+    "crew": 0.0,
+    "most": 15.0
+  },
   "NPC_RESIDENTS_PER_NEEDS_STEP": 25.0,
   "NPC_BUILDERS": 2.0,
   "NPC_ROAD_CREW": 2.0,

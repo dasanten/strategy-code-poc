@@ -282,6 +282,13 @@ export interface Balance {
     [key: string]: number
   }
   readonly NPC_JOB_MARGIN: number
+  readonly NPC_JOB_WEIGHTS: {
+    distance: number
+    danger: number
+    crew: number
+    most: number
+    [key: string]: number
+  }
   readonly NPC_RESIDENTS_PER_NEEDS_STEP: number
   readonly NPC_BUILDERS: number
   readonly NPC_ROAD_CREW: number

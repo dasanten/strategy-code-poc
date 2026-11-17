@@ -869,6 +869,38 @@ pub const NPC_JOB_SCORE: NpcJobScore = NpcJobScore {
     surplus_range: 5.0,
 };
 
+/// What weighs on a job at a place besides what it is for (`CONTEXT.md`: Stance; ADR 0039): each
+/// takes from the job's score, together at most `most`, so a dangerous far workplace can lose to a
+/// safe near one. All zero ([`NpcJobWeights::NEUTRAL`]) chooses as the fixed bands did.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NpcJobWeights {
+    /// Per tile from the city's storage to the workplace.
+    pub distance: f64,
+    /// Per unit of the danger places the city remembers by the way there (about one per person
+    /// lost, fading).
+    pub danger: f64,
+    /// Per worker of the city already there.
+    pub crew: f64,
+    /// The most all of them take from one job.
+    pub most: f64,
+}
+
+impl NpcJobWeights {
+    /// Nothing weighs but what the job is for.
+    pub const NEUTRAL: NpcJobWeights =
+        NpcJobWeights { distance: 0.0, danger: 0.0, crew: 0.0, most: 0.0 };
+}
+
+/// What weighs on an NPC city's jobs at a place (`NpcJobWeights`). One person lost by the way
+/// costs more than `NPC_JOB_MARGIN`, so workers move to a safer workplace of the same good. Distance
+/// and crew weigh nothing yet: weighed on their own they pull spare hands from far surplus work
+/// (a new mine past a dry one) and shake the farmers of a big city (the slow NPC tests); a stance
+/// tilts them (T98.4). At most `most`, under the gap from `NPC_JOB_SCORE.short` to `road`, so work
+/// on a good that is short stays ahead of the road crew however dangerous.
+pub const NPC_JOB_WEIGHTS: NpcJobWeights =
+    NpcJobWeights { distance: 0.0, danger: 7.0, crew: 0.0, most: 15.0 };
+
 /// How much more another job must score for an NPC city's worker to leave theirs (`CONTEXT.md`: NPC
 /// city; ADR 0029), so nobody goes back and forth: more than the whole of `NPC_JOB_SCORE.shortRange`
 /// and the step up to `project`, so a worker on one short good stays for another or for the project,
@@ -2792,6 +2824,7 @@ pub fn balance_json() -> Value {
     m.insert("NPC_PLAN_TICKS".into(), json!(NPC_PLAN_TICKS));
     m.insert("NPC_JOB_SCORE".into(), to_value(NPC_JOB_SCORE).expect("serialisable"));
     m.insert("NPC_JOB_MARGIN".into(), json!(NPC_JOB_MARGIN));
+    m.insert("NPC_JOB_WEIGHTS".into(), to_value(NPC_JOB_WEIGHTS).expect("serialisable"));
     m.insert("NPC_RESIDENTS_PER_NEEDS_STEP".into(), json!(NPC_RESIDENTS_PER_NEEDS_STEP));
     m.insert("NPC_BUILDERS".into(), json!(NPC_BUILDERS));
     m.insert("NPC_ROAD_CREW".into(), json!(NPC_ROAD_CREW));
