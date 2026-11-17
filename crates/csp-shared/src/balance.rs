@@ -1133,6 +1133,52 @@ pub const NPC_FOUND_STANDING: f64 = 80.0;
 /// is drawn from its id like any NPC city's, so it may still come out the same.
 pub const NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT: f64 = 0.75;
 
+/// What an NPC city's stance does and when it takes one (`CONTEXT.md`: Stance; T98.4).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NpcStance {
+    /// The threat (all Organizations' together) at which Fortify's need reaches one.
+    pub fortify_threat: f64,
+    /// Fortify keeps this many times the soldiers it keeps by its size.
+    pub fortify_soldiers: f64,
+    /// Fortify sends this many soldiers more with each escort.
+    pub fortify_escorts: f64,
+    /// Fortify shuts its gates to an armed outsider this many times as far off.
+    pub fortify_gate_watch: f64,
+    /// Fortify weighs the danger places by the way to a workplace this many times as much.
+    pub fortify_danger: f64,
+    /// Trade's need with a Trade Org warehouse in its traders' reach and a Food surplus.
+    pub trade_need: f64,
+    /// Under Trade a city's surplus caps are this share of their size, so more goes to market.
+    pub trade_surplus_cap: f64,
+    /// Trade has this many traders more out.
+    pub trade_traders: f64,
+    /// Expand's need with a Food surplus and no good short.
+    pub expand_need: f64,
+    /// Under Expand a city waits this share of the days full before it founds.
+    pub expand_full_days: f64,
+    /// Expand sends this many times the scouts.
+    pub expand_scouts: f64,
+    /// The temperament's own stance (merchant Trade, militarist Fortify, settler Expand) weighs
+    /// this many times its need.
+    pub temperament_tilt: f64,
+}
+
+pub const NPC_STANCE: NpcStance = NpcStance {
+    fortify_threat: 30.0,
+    fortify_soldiers: 1.5,
+    fortify_escorts: 1.0,
+    fortify_gate_watch: 1.5,
+    fortify_danger: 2.0,
+    trade_need: 0.8,
+    trade_surplus_cap: 0.5,
+    trade_traders: 1.0,
+    expand_need: 0.8,
+    expand_full_days: 0.5,
+    expand_scouts: 2.0,
+    temperament_tilt: 1.5,
+};
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TradeOrgHq {
@@ -3183,6 +3229,7 @@ pub fn balance_json() -> Value {
         "NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT".into(),
         json!(NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT),
     );
+    m.insert("NPC_STANCE".into(), to_value(NPC_STANCE).expect("serialisable"));
     m.insert("TRADE_ORG_HQ".into(), to_value(TRADE_ORG_HQ).expect("serialisable"));
     m.insert("TRADE_ORG_HQ_MIN_DISTANCE".into(), json!(TRADE_ORG_HQ_MIN_DISTANCE));
     m.insert("TRADING_POST_REGION".into(), json!(TRADING_POST_REGION));

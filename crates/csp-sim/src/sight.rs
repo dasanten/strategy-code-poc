@@ -821,6 +821,8 @@ fn places(
         } else {
             crate::temperament::temperament_of(world.seed, c)
         };
+        // And its stance, as a mood line (`CONTEXT.md`: Stance); Grow too, which it stores as none.
+        shown.stance = crate::queries::city::for_sale(c).then(|| crate::npc_stance::stance_of(c));
         out.push(SeenEntity::City(Box::new(SeenCity {
             city: shown,
             price,

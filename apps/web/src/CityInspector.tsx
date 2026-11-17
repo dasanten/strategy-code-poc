@@ -28,9 +28,11 @@ import type {
   TraderVisit,
   SwapQuote,
   SwapRate,
+  Stance,
   Temperament,
 } from '@csp/shared-types'
 import { aboutTime } from './shared/estimates.js'
+import { moodLine } from './stance-view.js'
 import { temperamentLine } from './temperament-view.js'
 import {
   buildingCount,
@@ -298,6 +300,7 @@ export function CityInspector({
             </p>
           )}
           <TemperamentLine temperament={city.temperament} />
+          <MoodLine stance={city.stance} />
           <Reaction city={city} />
           <Buying
             buy={describeBuying(city, { residents, buildings }, realmId)}
@@ -708,6 +711,17 @@ function RememberedCity({
         ))}
       </div>
     </li>
+  )
+}
+
+/** What an NPC city is after for now (`CONTEXT.md`: Stance), for whoever sees it. */
+function MoodLine({ stance }: { stance: Stance | undefined }) {
+  const line = moodLine(stance)
+  if (!line) return null
+  return (
+    <p className="city-details" aria-label="Mood">
+      {line}
+    </p>
   )
 }
 

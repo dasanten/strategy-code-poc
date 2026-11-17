@@ -345,6 +345,21 @@ export interface Balance {
   readonly NPC_FOUND_GIVE_UP_DAYS: number
   readonly NPC_FOUND_STANDING: number
   readonly NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT: number
+  readonly NPC_STANCE: {
+    fortifyThreat: number
+    fortifySoldiers: number
+    fortifyEscorts: number
+    fortifyGateWatch: number
+    fortifyDanger: number
+    tradeNeed: number
+    tradeSurplusCap: number
+    tradeTraders: number
+    expandNeed: number
+    expandFullDays: number
+    expandScouts: number
+    temperamentTilt: number
+    [key: string]: number
+  }
   readonly TRADE_ORG_HQ: {
     innerRadius: number
     outerRadius: number

@@ -59,9 +59,12 @@ fn sectors_in_sight(size: i32, at: (i32, i32)) -> Vec<f64> {
     out
 }
 
-/// How many scouts a city sends at a time, by its size (`scoutsWanted`).
+/// How many scouts a city sends at a time, by its size (`scoutsWanted`); more under Expand
+/// (`NPC_STANCE.expand_scouts`).
 pub fn scouts_wanted(world: &WorldState, city: &City) -> usize {
-    (city_residents(world, &city.id).len() as f64 / NPC_RESIDENTS_PER_SCOUT).ceil() as usize
+    (city_residents(world, &city.id).len() as f64 / NPC_RESIDENTS_PER_SCOUT
+        * crate::npc_stance::scouts_factor(city))
+    .ceil() as usize
 }
 
 /// Whether a city knows of a resource node (`knowsNode`, `CONTEXT.md`: Scout): within its set

@@ -1466,6 +1466,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 null_when: Some("otherwise"),
             },
             ScriptField {
+                name: "stance",
+                r#type: ScriptType::String,
+                description: "What an NPC city is after for now: \"grow\", \"fortify\", \"trade\" or \"expand\".",
+                null_when: Some("for a realm’s city and a city of the Trade Organization"),
+            },
+            ScriptField {
                 name: "refuses",
                 r#type: ScriptType::Boolean,
                 description: "true when an NPC city won’t trade with the Player, hire out to them or let their residents through its gates.",

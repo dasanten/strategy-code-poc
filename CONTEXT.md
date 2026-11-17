@@ -780,7 +780,13 @@ The shared language of the game. Domain terms only — no implementation details
   temperament weigh into every job's score, as do the danger places it remembers by the way to a
   workplace (decided overnight, Daniel to confirm: distance and crew weigh nothing yet), so the
   order of its jobs can change: a dangerous far mine can lose to a safe near one. Food short
-  still comes first.
+  still comes first. How it picks (decided overnight 2026-11-17, Daniel to confirm): at its first
+  planning pass of each game day, each stance has a need: Fortify by the threat it feels from
+  everyone together, Trade with a Food surplus and a Trade Org warehouse in its traders' reach,
+  Expand with a Food surplus and nothing short; its temperament's own stance (merchant Trade,
+  militarist Fortify, settler Expand) weighs more, and the greatest full need wins, else Grow.
+  Under Fortify danger places weigh more on its jobs. Not yet: Fortify putting walls, stone and a
+  training ground first, and Trade's traders going further (a later ticket).
 - **Threat** (Epic 98): how dangerous an NPC city thinks an Organization is, apart from how it
   regards it (Standing): from that Organization's armed residents it saw near itself or its people,
   by their gear, and from its people that Organization killed or robbed (traders, scouts, escorts).

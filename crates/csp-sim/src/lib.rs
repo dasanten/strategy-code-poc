@@ -80,6 +80,7 @@ pub mod npc_scouts;
 #[cfg(test)]
 mod npc_slow;
 pub mod npc_stable;
+pub mod npc_stance;
 pub mod npc_stone_walls;
 #[cfg(test)]
 mod npc_test_world;
