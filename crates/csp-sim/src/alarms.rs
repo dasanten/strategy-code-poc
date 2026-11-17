@@ -26,6 +26,7 @@ use crate::queries::names::placed;
 use crate::queries::residents::{is_armed, is_down};
 use crate::queries::standing::TRADE_ORG;
 use crate::queries::vessels::rowed_vessel_id;
+use crate::queries::walls::{sight_range_of, up_on_tower};
 use crate::sight::InvariantViolation;
 
 fn tile(x: f64, y: f64) -> (i32, i32) {
@@ -245,11 +246,20 @@ pub fn raise_outsider(world: &mut WorldState, city_id: &str, who_id: &str, size:
     let Some(who) = world.residents.iter().find(|r| r.id == who_id).cloned() else { return };
     let org = city_organization(&city).to_string();
     let a = alarm(AlarmKind::Outsider, &city, &who, who.x, who.y, world.tick);
+    let seen_from = |r: &Resident| wrap_distance(size, tile(r.x, r.y), tile(who.x, who.y));
+    // A lookout of the city's up on a tower that sees them warns the whole of its area, so a tower
+    // warns of an army early (`CONTEXT.md`: Tower).
+    let lookout = world.residents.iter().any(|r| {
+        organization_of(r) == Some(org.as_str())
+            && up_on_tower(world, r)
+            && in_city_area(world, &city.id, r.x, r.y, size)
+            && seen_from(r) <= sight_range_of(world, r)
+    });
     let reached = (0..world.residents.len())
         .filter(|&i| {
             let r = &world.residents[i];
             organization_of(r) == Some(org.as_str())
-                && wrap_distance(size, tile(r.x, r.y), tile(who.x, who.y)) <= SIGHT_RANGE
+                && (lookout || seen_from(r) <= SIGHT_RANGE)
                 && !matches!(r.order, Some(ResidentOrder::Attack(_)))
                 && can_be_alarmed(world, &city, r, size)
         })

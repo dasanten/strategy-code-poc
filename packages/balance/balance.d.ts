@@ -1384,6 +1384,8 @@ export interface Balance {
   }
   readonly BROKEN_MATERIALS_RETURNED: number
   readonly TOWER_ROOM: number
+  readonly TOWER_SIGHT_RANGE: number
+  readonly TOWER_SHOT_REACH_BONUS: number
   readonly CLIMB_TICKS: number
   readonly WALL_WALK_TICKS: number
   readonly FALL_DAMAGE: number

@@ -230,3 +230,28 @@ fn invariants_flag_a_picked_alarm_script_that_cant_be_one() {
     world.residents[0].alarm_script_id = Some(AlarmScriptId::Script(4));
     assert_eq!(alarm_script_sound(&world), vec![]);
 }
+
+/// A tower of c1 by its town hall, with r1's lookout l1 up on it (`CONTEXT.md`: Tower).
+fn with_lookout(world: &mut WorldState, up: bool) {
+    world
+        .buildings
+        .push(from(json!({ "id": "t1", "kind": "tower", "cityId": "c1", "x": 12, "y": 5 })));
+    let mut l1 = resident("l1", Some("r1"), 12.0, 6.0);
+    l1.city_id = Some("c1".into());
+    l1.up = up.then_some(csp_shared::world::UpSide::Inside);
+    world.residents.push(l1);
+}
+
+#[test]
+fn an_outsider_seen_only_from_a_tower_raises_the_alarm_across_the_city() {
+    // x1 comes in 60 tiles from w1, beyond a resident's sight but within a lookout's on the tower.
+    for up in [false, true] {
+        let mut world = setup();
+        with_lookout(&mut world, up);
+        (world.residents[1].x, world.residents[1].y) = (6.0, 66.0);
+        raise_outsider(&mut world, "c1", "x1", SIZE);
+        let alarmed = w1(&world).script.as_ref().and_then(|s| s.alarm.as_ref()).map(|a| a.kind);
+        let want = up.then_some(AlarmKind::Outsider);
+        assert_eq!(alarmed, want, "lookout up on the tower: {up}");
+    }
+}
