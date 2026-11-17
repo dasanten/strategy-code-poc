@@ -419,7 +419,7 @@ fn run_city(
             && carries_materials(&world.residents[i], &city)
         {
             if let Some(p) = project(world, &mut plan_ms) {
-                if take_part(world, i, &p, store, true) {
+                if take_part(world, i, &p, store, true, terrain) {
                     free -= 1.0;
                     continue;
                 }
@@ -491,7 +491,7 @@ fn run_city(
             }
             if job.as_ref().is_some_and(|j| j.kind == CityJobKind::Build) && free > 0.0 {
                 if let Some(p) = project(world, &mut plan_ms) {
-                    if take_part(world, i, &p, store, false) {
+                    if take_part(world, i, &p, store, false, terrain) {
                         free -= 1.0;
                         continue;
                     }
@@ -688,13 +688,14 @@ fn walking_to_house(r: &csp_shared::world::Resident, houses: &[Building], size: 
     houses.iter().any(|h| is_at((o.target.x as i32, o.target.y as i32), placed(h), size))
 }
 
-/// Where a builder's walk out to their site ended short of it (`noWayOut`): the site, if so.
+/// Where a builder's walk out to their site ended short of it (`noWayOut`): the site, if so. Not
+/// before the Build default has set out (`setOut`, #1379: a builder given Food for a far site).
 fn no_way_out(
     r: &csp_shared::world::Resident,
     memory: &serde_json::Map<String, Value>,
 ) -> Option<(i32, i32)> {
     let present = |k: &str| memory.get(k).is_some_and(|v| !v.is_null());
-    if r.order.is_some() || present("fetch") || present("food") {
+    if r.order.is_some() || present("fetch") || present("food") || present("setOut") {
         return None;
     }
     let at = memory.get("at")?.as_object()?;

@@ -246,6 +246,7 @@ export interface Balance {
     [key: string]: number
   }
   readonly NPC_FOOD_SHORT_DAYS: number
+  readonly NPC_FOOD_REFILL_DAYS: number
   readonly WORK_FOOD_KEPT: number
   readonly NPC_SOLDIER_SHARE: number
   readonly NPC_STEEL_KIT: string[]
@@ -323,6 +324,7 @@ export interface Balance {
   readonly NPC_FULL_RESIDENTS_PER_DAY: number
   readonly NPC_FULL_DAYS_LEAST: number
   readonly NPC_FULL_DIP_DAYS: number
+  readonly NPC_FOUND_FOOD_SURPLUS_SHARE: number
   readonly NPC_FOUND_RESIDENTS_PER_MEMBER: number
   readonly NPC_FOUND_PARTY_MOST: number
   readonly NPC_ESCORT_TOWN_RESIDENTS: number

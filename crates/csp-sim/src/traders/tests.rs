@@ -440,6 +440,38 @@ fn evens_out_with_the_warehouse_every_good_and_goes_on_to_the_next_post() {
 }
 
 #[test]
+fn waits_at_a_post_for_the_food_its_next_leg_needs_and_takes_it_from_the_goods_warehouse() {
+    // Waiting for Food holds at a post as at the HQ (T100.8): on the new land the legs between
+    // posts wind through passes, and a crew that set off short starved on the way.
+    let Fixture { mut world, terrain, .. } = fixture();
+    let bound = world.traders[0].post_id.clone();
+    let w = at_warehouse(&mut world, 0);
+    let ki = carriage_of(&world, 0);
+    world.carriages[ki].load = Stock::new();
+    world.buildings[w].stock = Some(Stock::new());
+    let storage = post_end(&world, &bound).storage.unwrap();
+    world.buildings[storage].stock = Some(Stock::new());
+    let mut walking = Walking::new(Arc::new(terrain.clone()));
+    let mut scratch = Scratch::default();
+    for _ in 0..200 {
+        step_world(&mut world, &terrain, &mut scratch, Some(&mut walking), None);
+    }
+    assert_eq!(world.traders[0].post_id, bound, "it stays with no Food for the way");
+    assert_eq!(world.traders[0].stop, TraderStop::Warehouse);
+    assert_eq!(check_all(&world, &terrain), vec![]);
+
+    world.buildings[w].stock = Some(stock(&[(Good::Food, 200.0)]));
+    let b = bound.clone();
+    run_until(&mut world, &terrain, &move |w| w.traders[0].post_id != b, 200);
+    let t = &world.traders[0];
+    let want = way_food_to(&world, t, &t.post_id, ki, terrain.size);
+    assert!(want >= 1.0);
+    assert!(held(&world.carriages[ki].load, Good::Food) >= want);
+    assert!(held_in(world.buildings[w].stock.as_ref(), Good::Food) < 200.0);
+    assert_eq!(check_all(&world, &terrain), vec![]);
+}
+
+#[test]
 fn leaves_what_the_warehouse_keeps_for_a_delivery_alone() {
     let Fixture { mut world, terrain, .. } = fixture();
     let bound = world.traders[0].post_id.clone();

@@ -211,6 +211,9 @@ fn start_carrying(world: &mut WorldState, parent_ids: &[String; 2]) {
     c.carrying = Some(carrying);
     c.order = None;
     c.script = None;
+    // A defence or Alarm script ended this way ends what it kept aside too (invariant
+    // `interrupted-runs-defence`).
+    c.interrupted = None;
 }
 
 /// A child is born when its time has come (`giveBirth`): on the carrying parent's tile, into their

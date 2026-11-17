@@ -278,7 +278,20 @@ pub fn npc_needs_scale(world: &WorldState, city: &City) -> f64 {
 /// materials by its needs, weapons for the soldiers it has not armed, and a war chest.
 pub fn npc_reserve(world: &WorldState, city: &City) -> Stock {
     let mut reserve = Stock::new();
-    let eaten = city_food_use(world, city, NPC_TRADE.reserve_food_days);
+    // A founding party carries its own Food along (`CONTEXT.md`: Founding), so the mother's
+    // reserve doesn't count its members (T100.8).
+    let party: HashSet<String> =
+        crate::npc_founding::founding_party(world.city_plans.get(&city.id)).into_iter().collect();
+    let theirs: f64 = city_residents(world, &city.id)
+        .iter()
+        .filter(|r| party.contains(&r.id))
+        .map(|r| {
+            csp_shared::balance::FOOD_PER_DAY
+                * super::residents::hunger_factor(r, world.tick as f64)
+                * NPC_TRADE.reserve_food_days
+        })
+        .sum();
+    let eaten = city_food_use(world, city, NPC_TRADE.reserve_food_days) - theirs;
     let food = (eaten + npc_stables_lack(world, city) - 1e-9).ceil();
     if food > 0.0 {
         reserve.insert(Good::Food, food);

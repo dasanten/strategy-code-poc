@@ -22,7 +22,7 @@ use serde_json::json;
 use crate::city_layout::{streets_owed, GateAt};
 use crate::npc_behaviour::{default_script, walk_to};
 use crate::npc_chain::{holds_batch, own_workplaces, project_needs};
-use crate::npc_founding::{founding_materials, full_but_materials};
+use crate::npc_founding::{founding_materials, founding_party};
 use crate::npc_growth::wall_rings;
 use crate::pathfinding::{PathResult, Point};
 use crate::queries::building::{build_materials, road_tiles};
@@ -76,7 +76,8 @@ fn road_materials() -> Stock {
 }
 
 /// What the city keeps from its crew (`keeps`): its reserve, what its project still needs, and
-/// once it would otherwise be full a town hall's and a storage's materials.
+/// once its full wait is under way (`CONTEXT.md`: Full city) a town hall's and a storage's
+/// materials, which then count as short (T100.8), until its founding party sets out with them.
 fn keeps(world: &WorldState, city: &City) -> Stock {
     let mut want = npc_reserve(world, city);
     let plan = world.city_plans.get(&city.id);
@@ -86,7 +87,7 @@ fn keeps(world: &WorldState, city: &City) -> Stock {
         }
     };
     add(project_needs(world, plan.and_then(|p| p.project.as_ref())));
-    if plan.is_some_and(|p| full_but_materials(world, city, p)) {
+    if plan.is_some_and(|p| p.full_since.is_some() && founding_party(Some(p)).is_empty()) {
         add(founding_materials(None));
     }
     want

@@ -60,6 +60,9 @@ pub fn npc_site_fits(
 pub struct SiteWorld {
     halls: Vec<(f64, f64)>,
     players: Vec<(f64, f64)>,
+    /// How far from every hall a site stands: `NPC_CITY_MIN_DISTANCE`, or a daughter's
+    /// (`daughter_min_distance`).
+    min_distance: f64,
 }
 
 impl SiteWorld {
@@ -77,7 +80,13 @@ impl SiteWorld {
                 .filter(|r| r.owner.is_some())
                 .map(|r| (r.x, r.y))
                 .collect(),
+            min_distance: NPC_CITY_MIN_DISTANCE,
         }
+    }
+
+    /// As it is, keeping `min_distance` from every hall instead.
+    pub fn keeping(self, min_distance: f64) -> Self {
+        SiteWorld { min_distance, ..self }
     }
 
     /// As `new`, but with no city to keep `NPC_CITY_MIN_DISTANCE` from: a heartland's trading post
@@ -112,7 +121,7 @@ pub fn npc_site_fits_among(
         };
         js_hypot(d(a.0, b.0), d(a.1, b.1))
     };
-    if among.halls.iter().any(|&hall| dist(hall, centre) < NPC_CITY_MIN_DISTANCE) {
+    if among.halls.iter().any(|&hall| dist(hall, centre) < among.min_distance) {
         return false;
     }
     let unseen = SIGHT_RANGE + footprint_radius(kind);

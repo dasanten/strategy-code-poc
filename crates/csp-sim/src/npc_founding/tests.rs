@@ -30,7 +30,7 @@ use crate::npc_plan::plan_city;
 use crate::npc_posts::posts_to_hold;
 use crate::npc_test_world::{plains, Runner};
 use crate::queries::balance::carry_capacity;
-use crate::queries::city::town_hall_of;
+use crate::queries::city::{city_residents, town_hall_of};
 use crate::queries::names::held;
 use crate::queries::npc_trade::{
     npc_founding_party_size, npc_full_days, npc_reserve, npc_soldier_target,
@@ -131,6 +131,13 @@ fn full_town(size: i32) -> Town {
         f64::from(y),
     );
     t.world.buildings.push(stable);
+    // Its wall already of stone: a town holding Stone beyond its reserve upgrades it first
+    // (`CONTEXT.md`: Wood or stone).
+    for b in t.world.buildings.iter_mut().filter(|b| b.city_id.as_deref() == Some(&t.city)) {
+        if matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate) {
+            b.material = Some(csp_shared::world::WallMaterial::Stone);
+        }
+    }
     t
 }
 
@@ -154,6 +161,34 @@ fn run(
     }
 }
 
+/// Whether a town's founding party has the room for all it carries (`CONTEXT.md`: Founding): the
+/// materials, and each member's Food for the walk and the first weeks.
+fn carries_it_all(t: &Town) -> bool {
+    let party = t.party();
+    let site = t.plan().founding_site.expect("a site");
+    let home = t.home();
+    let walk = wrap_distance(
+        t.terrain.size,
+        (home.x as i32, home.y as i32),
+        (site.x as i32, site.y as i32),
+    ) * WALK_TICKS_PER_TILE;
+    let (way, stay) = founding_food(walk);
+    let n = party.len() as f64;
+    let usual = npc_founding_party_size(city_residents(&t.world, &t.city).len() as f64);
+    let load = crate::queries::residents::stock_weight(&founding_materials(Some(usual)))
+        + n * (way + stay) * good_weight(Good::Food);
+    let room: f64 = party
+        .iter()
+        .map(|id| {
+            let r = t.world.residents.iter().find(|r| &r.id == id).expect("a member");
+            carry_capacity(r, t.world.tick as f64)
+                - crate::queries::residents::stock_weight(&r.carried)
+                + held(&r.carried, Good::Food) * good_weight(Good::Food)
+        })
+        .sum();
+    room >= load
+}
+
 fn found_job() -> CityJob {
     serde_json::from_value(json!({ "kind": "found" })).unwrap()
 }
@@ -173,6 +208,151 @@ fn counts_as_full_from_the_pass_that_finds_spare_hands_with_nowhere_to_go_and_no
     let mut t = full_town(300);
     t.plan_city();
     assert_eq!(t.plan().full_since, Some(t.world.tick as f64));
+}
+
+#[test]
+fn counts_as_full_short_of_weapons_and_their_iron_when_it_cannot_make_them() {
+    // No Iron ore it knows of: like Coins it can't earn, the weapons and the Iron to forge them
+    // don't keep it from being full (T100.8). They stay short for all else it does.
+    let mut t = full_town(300);
+    t.home_stock().insert(Good::Iron, 0.0);
+    t.home_stock().insert(Good::Spear, 0.0);
+    t.plan_city();
+    assert_eq!(t.plan().full_since, Some(t.world.tick as f64));
+    let short = crate::npc_chain::short_goods(&t.world, t.city(), t.terrain.size, None);
+    assert!(short.contains(&Good::Iron) && short.contains(&Good::Spear), "{short:?}");
+}
+
+#[test]
+fn is_not_full_short_of_weapons_it_could_make_from_a_node_it_knows() {
+    let mut t = full_town(300);
+    t.home_stock().insert(Good::Iron, 0.0);
+    t.home_stock().insert(Good::Spear, 0.0);
+    let home = t.home();
+    node(&mut t.world, &mut t.terrain, ResourceKind::IronOre, home.x + 30.0, home.y);
+    t.plan_city();
+    assert_eq!(t.plan().full_since, None);
+}
+
+// lacking only its founding party's materials (T100.8)
+
+/// A full town that holds no Stone past its reserve, with a Stone node in reach.
+fn without_stone() -> Town {
+    let mut t = full_town(300);
+    let reserve = held(&npc_reserve(&t.world, t.city()), Good::Stone);
+    t.home_stock().insert(Good::Stone, reserve);
+    let home = t.home();
+    node(&mut t.world, &mut t.terrain, ResourceKind::Stone, home.x + 30.0, home.y);
+    t
+}
+
+fn is_quarry_job(t: &Town, job: &CityJob) -> bool {
+    job.building_id.as_ref().is_some_and(|id| {
+        t.world.buildings.iter().any(|b| &b.id == id && b.kind == BuildingKind::Quarry)
+    })
+}
+
+#[test]
+fn lacking_only_its_founding_materials_it_counts_them_short_and_builds_their_workplace() {
+    let mut t = without_stone();
+    let home = t.home();
+    let lacks = super::founding_lacks(&t.world, t.city(), Some(&home), t.terrain.size);
+    assert_eq!(lacks.iter().map(|s| s.good).collect::<Vec<_>>(), [Good::Stone]);
+    t.plan_city();
+    let building = match &t.plan().project {
+        Some(csp_shared::world::CityProject::Build { building, .. }) => Some(*building),
+        _ => None,
+    };
+    assert_eq!(building, Some(BuildingKind::Quarry));
+    // Its spare hands, gathering or not, still count toward its full wait.
+    assert_eq!(t.plan().full_since, Some(t.world.tick as f64));
+}
+
+#[test]
+fn works_its_workplaces_for_surplus_before_it_gathers_for_its_party() {
+    // Daniel (2026-11-16): its workplaces come first; only the hands left over gather.
+    let mut t = without_stone();
+    // Some Stone past its reserve, short of the party's: the quarry's surplus is further on than
+    // the mine's, which is as far behind as it can be.
+    let reserve = held(&npc_reserve(&t.world, t.city()), Good::Stone);
+    t.home_stock().insert(Good::Stone, reserve + 30.0);
+    let home = t.home();
+    node(&mut t.world, &mut t.terrain, ResourceKind::IronOre, home.x - 30.0, home.y);
+    for (id, kind, x) in [
+        ("quarry0", BuildingKind::Quarry, home.x + 30.0),
+        ("mine0", BuildingKind::Mine, home.x - 30.0),
+    ] {
+        t.world.buildings.push(crate::test_support::building(id, kind, None, x, home.y));
+        let city = t.world.cities.iter_mut().find(|c| c.id == t.city).unwrap();
+        city.workplace_ids.get_or_insert_with(Vec::new).push(id.into());
+    }
+    t.plan_city();
+    let at = |id: &str| {
+        t.plan().jobs.values().filter(|j| j.building_id.as_deref() == Some(id)).count() as f64
+    };
+    let mine_room = crate::queries::building::max_workers(BuildingKind::Mine).unwrap();
+    // The mine gets its full crew before anyone quarries; the party's Stone takes the rest.
+    assert_eq!(at("mine0"), mine_room, "quarry {}", at("quarry0"));
+    assert!(super::founding_lacks(&t.world, t.city(), Some(&home), t.terrain.size)
+        .iter()
+        .any(|s| s.good == Good::Stone));
+}
+
+#[test]
+fn its_spare_hands_quarry_the_stone_its_party_takes_while_its_full_wait_runs() {
+    let mut t = without_stone();
+    let home = t.home();
+    let quarry =
+        crate::test_support::building("quarry0", BuildingKind::Quarry, None, home.x + 30.0, home.y);
+    t.world.buildings.push(quarry);
+    let city = t.world.cities.iter_mut().find(|c| c.id == t.city).unwrap();
+    city.workplace_ids.get_or_insert_with(Vec::new).push("quarry0".into());
+    t.plan_city();
+    assert!(t.plan().jobs.values().any(|j| is_quarry_job(&t, j)), "nobody quarries");
+    let since = t.plan().full_since;
+    assert_eq!(since, Some(t.world.tick as f64));
+    let city = t.city.clone();
+    // The first Stone stored past its reserve is the party's.
+    let want = held(&npc_reserve(&t.world, t.city()), Good::Stone) + 1.0;
+    let stone = |w: &WorldState| {
+        let c = w.cities.iter().find(|c| c.id == city).unwrap();
+        held(&crate::queries::npc_trade::npc_city_stock(w, c), Good::Stone)
+    };
+    let (world, terrain) = (&mut t.world, &t.terrain);
+    run(world, terrain, (4.0 * DAY) as usize, &|w| stone(w) >= want);
+    assert!(stone(&t.world) >= want, "{} Stone of {want}", stone(&t.world));
+    // Quarrying for the party kept its wait going.
+    assert_eq!(t.plan().full_since, since);
+}
+
+#[test]
+fn counts_no_founding_material_short_until_its_food_surplus_comes_first() {
+    // Daniel (2026-11-15): Food comes first, its surplus too.
+    let mut t = without_stone();
+    let home = t.home();
+    let reserve = held(&npc_reserve(&t.world, t.city()), Good::Food);
+    let cap = csp_shared::balance::NPC_SURPLUS_CAP.get("food").unwrap()
+        * crate::queries::npc_trade::npc_needs_scale(&t.world, t.city());
+    let share = csp_shared::balance::NPC_FOUND_FOOD_SURPLUS_SHARE;
+    t.home_stock().insert(Good::Food, reserve + share * cap - 1.0);
+    assert_eq!(super::founding_lacks(&t.world, t.city(), Some(&home), t.terrain.size), []);
+    t.home_stock().insert(Good::Food, reserve + share * cap);
+    let lacks = super::founding_lacks(&t.world, t.city(), Some(&home), t.terrain.size);
+    assert_eq!(lacks.iter().map(|s| s.good).collect::<Vec<_>>(), [Good::Stone]);
+}
+
+#[test]
+fn counts_no_founding_material_short_while_anything_else_is() {
+    let mut t = without_stone();
+    t.home_stock().insert(Good::Food, 0.0);
+    let home = t.home();
+    assert_eq!(super::founding_lacks(&t.world, t.city(), Some(&home), t.terrain.size), []);
+    t.plan_city();
+    let quarry = matches!(
+        &t.plan().project,
+        Some(csp_shared::world::CityProject::Build { building: BuildingKind::Quarry, .. })
+    );
+    assert!(!quarry, "{:?}", t.plan().project);
 }
 
 // by its size
@@ -275,7 +455,9 @@ fn a_city_of_a_villages_size_still_waits_a_week_and_sends_a_villages_worth() {
 
     t.plan_mut().full_since = Some(t.world.tick as f64 - NPC_FULL_DAYS * DAY);
     t.plan_city();
-    assert_eq!(t.party().len() as f64, NPC_VILLAGE.residents);
+    // A village's worth at least, and as many more as it takes to carry it all (T100.8).
+    assert!(t.party().len() as f64 >= NPC_VILLAGE.residents);
+    assert!(carries_it_all(&t));
     assert_eq!(
         founding_materials(Some(NPC_VILLAGE.residents)),
         Stock::from([(Good::Wood, 90.0), (Good::Stone, 50.0)])
@@ -351,7 +533,7 @@ fn looks_for_its_daughter_on_no_realm_territory_near_a_node_of_what_it_lacks() {
         let Some(site) = find_founding_site(&world, &terrain, c, &home) else { continue };
         found += 1;
         let d = wrap_distance(terrain.size, (home.x as i32, home.y as i32), site);
-        assert!(d >= NPC_CITY_MIN_DISTANCE - NPC_VILLAGE.size);
+        assert!(d >= super::daughter_min_distance(terrain.size) - NPC_VILLAGE.size);
         assert!(d <= NPC_FOUND_REACH + NPC_VILLAGE.size);
         for dy in -20..=20 {
             for dx in -20..=20 {
@@ -411,12 +593,12 @@ fn founds_a_village_480_tiles_away_within_a_few_game_weeks_which_then_feeds_itse
     let mother_hall = town_hall_of(&t.world, t.city()).unwrap();
     // The usual distance runs from a city's town hall to the new village's middle
     // (`npcSiteFits`).
-    let far = NPC_CITY_MIN_DISTANCE - NPC_VILLAGE.size / 2.0;
+    let far = super::daughter_min_distance(t.terrain.size) - NPC_VILLAGE.size / 2.0;
     let at = |b: &Building| (b.x as i32, b.y as i32);
     assert!(wrap_distance(t.terrain.size, at(mother_hall), at(hall)) > far);
     let people: Vec<_> =
         t.world.residents.iter().filter(|r| r.city_id.as_deref() == Some(&village)).collect();
-    assert_eq!(people.len() as f64, NPC_VILLAGE.residents);
+    assert!(people.len() as f64 >= NPC_VILLAGE.residents);
     assert!(people
         .iter()
         .any(|r| { held(&r.carried, Good::Spear) != 0.0 || held(&r.carried, Good::Sword) != 0.0 }));
@@ -597,7 +779,7 @@ fn still_sets_a_party_out_once_nothing_is_short_its_wait_kept() {
     t.home_stock().insert(Good::Food, full);
     t.world.tick += 60;
     t.plan_city();
-    assert_eq!(t.party().len() as f64, NPC_VILLAGE.residents);
+    assert!(t.party().len() as f64 >= NPC_VILLAGE.residents && carries_it_all(&t));
     assert_eq!(t.plan().short_since, None);
 }
 
@@ -649,8 +831,18 @@ fn holds_for_the_largest_party() {
 }
 
 #[test]
-fn finds_a_party_past_the_largest() {
-    let t = with_party(NPC_FOUND_PARTY_MOST as usize + 1);
+fn holds_for_a_party_past_the_largest_with_those_who_carry_its_load() {
+    // As many more go as it takes to carry the load (Daniel, 2026-11-15; #1379).
+    let t = with_party(NPC_FOUND_PARTY_MOST as usize + 2);
+    assert_eq!(founding_parties_sound(&t.world), []);
+}
+
+#[test]
+fn finds_a_party_with_no_site() {
+    let mut t = with_party(NPC_VILLAGE.residents as usize);
+    for plan in t.world.city_plans.values_mut() {
+        plan.founding_site = None;
+    }
     assert_eq!(founding_parties_sound(&t.world).len(), 1);
 }
 
@@ -884,4 +1076,14 @@ fn looks_for_its_daughter_only_on_land_its_people_walk_to_never_across_the_sea()
         assert!(dx < 300, "a site across the sea at {site:?}");
     }
     assert!(found > 0);
+}
+
+#[test]
+fn keeps_a_daughter_the_usual_distance_away_on_a_full_map_scaled_with_the_side_on_a_smaller_one() {
+    use csp_shared::balance::MAP_SIZE;
+    assert_eq!(super::daughter_min_distance(MAP_SIZE), NPC_CITY_MIN_DISTANCE);
+    assert_eq!(super::daughter_min_distance(MAP_SIZE / 2), NPC_CITY_MIN_DISTANCE / 2.0);
+    assert_eq!(super::daughter_min_distance(MAP_SIZE * 3 / 4), NPC_CITY_MIN_DISTANCE * 0.75);
+    // A test map under half the side keeps the full distance.
+    assert_eq!(super::daughter_min_distance(1300), NPC_CITY_MIN_DISTANCE);
 }
