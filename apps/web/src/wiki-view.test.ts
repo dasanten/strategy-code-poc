@@ -28,6 +28,8 @@ import {
 import {
   AVERAGE,
   buildCosts,
+  breakTicks,
+  stoneWallCosts,
   carriageCost,
   boatCost,
   shipCost,
@@ -90,6 +92,18 @@ describe('wiki figures', () => {
       expect(b.teardownTicks).toBeLessThan(b.buildTicks)
       expect(b.returned).toEqual(teardownReturns(b.kind))
     }
+  })
+
+  it('gives stone walls and gates their own rows: Stone, more work, longer to break', () => {
+    const stone = stoneWallCosts()
+    expect(stone.map((b) => b.name)).toEqual(['Stone wall', 'Stone gate'])
+    for (const b of stone) {
+      const wood = buildCosts().find((w) => w.kind === b.kind)!
+      expect(b.materials).toEqual(balance.STONE_BUILD_MATERIALS[b.kind])
+      expect(b.buildTicks).toBeGreaterThan(wood.buildTicks)
+      expect(breakTicks(b.kind, true)).toBeGreaterThan(breakTicks(b.kind))
+    }
+    expect(render()).toContain('Stone wall')
   })
 
   it('lists a carriage apart from the buildings, timed like them', () => {

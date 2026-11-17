@@ -280,6 +280,7 @@ pub fn world_invariants() -> Vec<Invariant> {
         },
         Invariant { name: "gates-sound", check: checks::gates_sound },
         Invariant { name: "wall-damage-sound", check: checks::wall_damage_sound },
+        Invariant { name: "wall-materials-sound", check: checks::wall_materials_sound },
         Invariant { name: "climb-orders-sound", check: checks::climb_orders_sound },
         Invariant { name: "teachers-sound", check: checks::teachers_sound },
         Invariant { name: "trainees-sound", check: checks::trainees_sound },

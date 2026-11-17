@@ -94,7 +94,7 @@ const RESIDENT_HINTS: Partial<Record<Exclude<Picking, false>, string>> = {
   roadFrom: 'Then where it ends; the resident walks there and builds along the line.',
   roadTo: `Builds road along the line, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, fetching stone from storage; with none, the sites are laid out for later.`,
   wallFrom: 'Then where it ends; the resident walks there and builds along the line.',
-  wallTo: `Builds wall along the line, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, past tiles with a wall or gate, fetching wood from storage; with none, the sites are laid out for later.`,
+  wallTo: `Builds wall along the line, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, past tiles with a wall or gate, fetching wood or stone from storage; with none, the sites are laid out for later.`,
 }
 
 /** What picking a tile does for a group, said under the banner. */
@@ -108,7 +108,7 @@ export const GROUP_HINTS: Record<Exclude<GroupPicking, false>, string> = {
   roadFrom: 'Then where it ends; they share the line, each building a tile of their own.',
   roadTo: `They share the road line, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, each building the nearest tile nobody else has taken and fetching stone from storage.`,
   wallFrom: 'Then where it ends; they share the line, each building a tile of their own.',
-  wallTo: `They share the wall line, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, past tiles with a wall or gate, each building the nearest tile nobody else has taken and fetching wood from storage.`,
+  wallTo: `They share the wall line, straight or diagonal, at most ${ROAD_LINE_MAX_TILES} tiles, past tiles with a wall or gate, each building the nearest tile nobody else has taken and fetching wood or stone from storage.`,
   tearDown: 'Those standing at it tear it down.',
   storeAt: 'Each takes there everything they carry, keeping their own Food.',
   fetchFrom: 'Each fetches as much as fits of the good from there.',
@@ -170,4 +170,12 @@ export function pickTap(
   if (!touch) return { pick: tile }
   if (previewed && previewed.x === tile.x && previewed.y === tile.y) return { pick: tile }
   return { preview: tile }
+}
+
+/** Whether the target waits for a wall line's end, whose material the banner picks. */
+export function picksWallLine(target: PickTarget | undefined): boolean {
+  return (
+    (target?.kind === 'resident' || target?.kind === 'group') &&
+    (target.mode === 'wallFrom' || target.mode === 'wallTo')
+  )
 }

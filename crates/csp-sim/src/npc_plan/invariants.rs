@@ -237,7 +237,7 @@ pub fn npc_spare_hands_work(world: &WorldState) -> Vec<InvariantViolation> {
 pub fn npc_workplaces_bounded(world: &WorldState) -> Vec<InvariantViolation> {
     let mut out = Vec::new();
     for (city_id, plan) in &world.city_plans {
-        let Some(CityProject::Build { building, x, y }) = &plan.project else { continue };
+        let Some(CityProject::Build { building, x, y, .. }) = &plan.project else { continue };
         if plan.planned_at != world.tick as f64 {
             continue;
         }

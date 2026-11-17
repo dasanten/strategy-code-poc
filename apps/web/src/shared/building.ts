@@ -8,6 +8,8 @@ import {
   BUILD_WORK,
   GOOD_WEIGHT,
   RECIPES,
+  STONE_BUILD_MATERIALS,
+  STONE_BUILD_WORK,
   WORKPLACE_MAX_WORKERS,
 } from './narrowed.js'
 import { canWork, carriageCanEnter, stockWeight, type Recipe } from './stats.js'
@@ -49,6 +51,7 @@ import type {
   ResourceKind,
   ResourceNode,
   Stock,
+  WallMaterial,
 } from '@csp/shared-types'
 
 /** World queries about buildings and construction sites (ADR 0002: the game API orders and scripts share). */
@@ -311,7 +314,7 @@ export function carriageCanGoTo(
 /** Materials a construction site still needs before it can become the building. */
 export function materialsNeeded(site: Building): Stock {
   const out: Stock = {}
-  for (const [good, units] of Object.entries(BUILD_MATERIALS[site.kind] ?? {}) as [
+  for (const [good, units] of Object.entries(materialsOfKind(site.kind, site.material)) as [
     Good,
     number,
   ][]) {
@@ -335,8 +338,28 @@ export function workFactor(kind: BuildingKind, under?: number): number {
  * Work a building of `kind` takes in ticks of one unskilled resident of average Strength, with
  * `under` the terrain beneath it (`workFactor`): what a Player is shown.
  */
-export function buildingWork(kind: BuildingKind, under?: number): number {
-  return (BUILD_WORK[kind] ?? 0) * workFactor(kind, under)
+export function buildingWork(kind: BuildingKind, under?: number, material?: WallMaterial): number {
+  return workOfKind(kind, material) * workFactor(kind, under)
+}
+
+/** Whether a building of `kind` of `material` is of stone: only a wall or gate can be. */
+export function isStone(kind: BuildingKind, material?: WallMaterial | null): boolean {
+  return material === 'stone' && (kind === 'wall' || kind === 'gate')
+}
+
+/**
+ * The materials a building of `kind` of `material` takes (`CONTEXT.md`: Wood or stone): a stone
+ * wall's or gate's from `STONE_BUILD_MATERIALS`, any other's from `BUILD_MATERIALS`.
+ */
+export function materialsOfKind(kind: BuildingKind, material?: WallMaterial | null): Stock {
+  if (isStone(kind, material)) return STONE_BUILD_MATERIALS[kind as 'wall' | 'gate']
+  return BUILD_MATERIALS[kind] ?? {}
+}
+
+/** Work a building of `kind` of `material` takes, before `workFactor`. */
+export function workOfKind(kind: BuildingKind, material?: WallMaterial | null): number {
+  if (isStone(kind, material)) return STONE_BUILD_WORK[kind as 'wall' | 'gate']
+  return BUILD_WORK[kind] ?? 0
 }
 
 /** How much `work` of a resident counts on a building of `kind` over `under` (`workFactor`). */
@@ -346,7 +369,7 @@ export function siteWorkOf(work: number, kind: BuildingKind, under?: number): nu
 
 /** Work a construction site still needs, out of its `BUILD_WORK` (`siteWorkOf`). */
 export function workNeeded(site: Building): number {
-  return Math.max(0, (BUILD_WORK[site.kind] ?? 0) - (site.site?.work ?? 0))
+  return Math.max(0, workOfKind(site.kind, site.material) - (site.site?.work ?? 0))
 }
 
 /**
@@ -723,7 +746,7 @@ export function workProblem(
  * building, a resident's work on a road on Mountain counts less (`siteWorkOf`).
  */
 export function teardownWork(b: Building): number {
-  const built = b.site ? b.site.work : (BUILD_WORK[b.kind] ?? 0)
+  const built = b.site ? b.site.work : workOfKind(b.kind, b.material)
   return built * TEARDOWN_WORK_SHARE
 }
 
@@ -771,7 +794,10 @@ export function workPace(
 export function teardownReturns(b: Building): Stock {
   if (b.site) return { ...b.site.delivered }
   const out: Stock = {}
-  for (const [good, units] of Object.entries(BUILD_MATERIALS[b.kind] ?? {}) as [Good, number][]) {
+  for (const [good, units] of Object.entries(materialsOfKind(b.kind, b.material)) as [
+    Good,
+    number,
+  ][]) {
     const back = Math.floor(units * TEARDOWN_MATERIALS_RETURNED)
     if (back > 0) out[good] = back
   }
@@ -876,4 +902,22 @@ export function lineTile(
 export function lineToBuild(world: WorldState, line: BuildLine, terrain?: TerrainMap): LineTile[] {
   const tiles = roadLine(line.from, line.to, terrain?.size ?? MAP_SIZE)
   return tiles.flatMap(([x, y]) => lineTile(world, line.building, x, y, terrain) ?? [])
+}
+
+/**
+ * Whether a stone wall or gate of `kind` may be laid out on (x, y) over the finished wooden one of
+ * its kind there, which stands until the stone one is finished (`CONTEXT.md`: Wood or stone): no
+ * wall or gate site there yet.
+ */
+export function stoneOverAt(
+  world: { buildings: readonly Pick<Building, 'kind' | 'x' | 'y' | 'site' | 'material'>[] },
+  x: number,
+  y: number,
+  kind: BuildingKind,
+): boolean {
+  if (kind !== 'wall' && kind !== 'gate') return false
+  const here = world.buildings.filter((b) => b.x === x && b.y === y)
+  const wooden = here.some((b) => b.kind === kind && !b.site && b.material !== 'stone')
+  const site = here.some((b) => (b.kind === 'wall' || b.kind === 'gate') && b.site)
+  return wooden && !site
 }

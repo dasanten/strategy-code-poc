@@ -109,7 +109,14 @@ import { overviewPixels, overviewSide, overviewTerrainAt } from './map/overview.
 import { caravanAt, caravanParts } from './caravans.js'
 import { drawUnits, type Spot } from './map/unit-tokens.js'
 import { FAR_ROAD_WIDTH, farRoadRuns, roadJoins, roadWidth, type RoadRun } from './map/roads.js'
-import { drawWallTiles, wallSides, type WallTile } from './map/wall-tile.js'
+import {
+  drawStoneFrames,
+  drawStoneMarks,
+  drawWallTiles,
+  wallSides,
+  type WallTile,
+} from './map/wall-tile.js'
+import { isStone } from './shared/building.js'
 import { drawPlans, plannedBuilding } from './map/plans.js'
 import { drawPlaces, pickedPlaces } from './map/places.js'
 import { drawMarks, drawPickPreview, type MapMark } from './map/preview-draw.js'
@@ -1798,14 +1805,18 @@ function drawStructures(
     if (b.kind !== 'wall' && b.kind !== 'gate') continue
     const [sx, sy] = tileToScreen(cam, view, size, b.x, b.y)
     if (!near(sx + tile / 2, sy + tile / 2)) continue
-    const key = `${relationshipColor(relOf(b))},${(b.site ? 0.35 : 1) * fade}`
+    // 1: a stone wall, 2: a stone gate, whose token covers the middle of its tile.
+    const stone = isStone(b.kind, b.material) ? (b.kind === 'gate' ? 2 : 1) : 0
+    const key = `${relationshipColor(relOf(b))},${(b.site ? 0.35 : 1) * fade},${stone}`
     const list = wallTiles.get(key) ?? []
     wallTiles.set(key, list)
     list.push({ sx, sy, ...wallSides(b.x, b.y, wallAt) })
   }
   for (const [key, list] of wallTiles) {
-    const [color, alpha] = key.split(',').map(Number) as [number, number]
+    const [color, alpha, stone] = key.split(',').map(Number) as [number, number, number]
     drawWallTiles(under, list, tile, color, alpha)
+    if (stone === 1) drawStoneMarks(under, list, tile, alpha)
+    if (stone === 2) drawStoneFrames(under, list, tile, alpha)
   }
 
   // Buildings as icon tokens over their footprint (`CONTEXT.md`: Footprint): a plate in the

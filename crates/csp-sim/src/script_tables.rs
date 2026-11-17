@@ -1016,6 +1016,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 null_when: Some("until someone strikes it"),
             },
             ScriptField {
+                name: "material",
+                r#type: ScriptType::String,
+                description: "\"stone\" for a stone wall or gate, or its site.",
+                null_when: Some("for one of wood and any other building"),
+            },
+            ScriptField {
                 name: "prices",
                 r#type: ScriptType::List(&ScriptType::View("price")),
                 description: "A Trade Org warehouse’s prices, one for each good it keeps.",
@@ -1946,6 +1952,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 null_when: Some("for a city, until someone strikes it"),
             },
             ScriptField {
+                name: "material",
+                r#type: ScriptType::String,
+                description: "\"stone\" for a stone wall or gate, or its site.",
+                null_when: Some("for a city, for one of wood and any other building"),
+            },
+            ScriptField {
                 name: "prices",
                 r#type: ScriptType::List(&ScriptType::View("price")),
                 description: "A Trade Org warehouse’s prices, one for each good it keeps.",
@@ -2154,6 +2166,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 r#type: ScriptType::String,
                 description: "The construction site of the line’s road or wall on it.",
                 null_when: Some("while none is laid out there"),
+            },
+            ScriptField {
+                name: "building",
+                r#type: ScriptType::String,
+                description: "What is built there: the line's \"road\" or \"wall\", or \"gate\" where a stone wall line upgrades a wooden gate.",
+                null_when: None,
             },
         ],
     },
@@ -2539,7 +2557,7 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Query,
         params: &["line", "from?"],
         cost: 20.0,
-        description: "The tiles of a Build line still to build, from its start to its end; with `from`, something with `x` and `y`, nearest first. `line` is like {building: \"wall\", from: {x: 3, y: 4}, to: {x: 8, y: 4}}, as the Build line task keeps it in `memory.line`, road or wall, straight or diagonal. Tiles the Player sees with one already, or that can’t take one, are left out.",
+        description: "The tiles of a Build line still to build, from its start to its end; with `from`, something with `x` and `y`, nearest first. `line` is like {building: \"wall\", from: {x: 3, y: 4}, to: {x: 8, y: 4}}, as the Build line task keeps it in `memory.line`, road or wall, straight or diagonal. Tiles the Player sees with one already, or that can’t take one, are left out; a stone wall line (`material: \"stone\"`) takes the wooden wall and gate tiles on its way too.",
         returns: ScriptType::List(&ScriptType::View("lineTile")),
     },
     ScriptBinding {
@@ -2817,9 +2835,9 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
     ScriptBinding {
         name: "build",
         is: Is::Action,
-        params: &["building"],
+        params: &["building", "material?"],
         cost: 10.0,
-        description: "Lay out or join a construction site of that kind on my tile.",
+        description: "Lay out or join a construction site of that kind on my tile. A wall or gate is of \"wood\" (by default) or \"stone\"; a stone one may be laid out on a wooden one of its kind, which stands until the stone one is finished.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -3153,9 +3171,9 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
     ScriptBinding {
         name: "wallLine",
         is: Is::Action,
-        params: &["x", "y"],
+        params: &["x", "y", "material?"],
         cost: 10.0,
-        description: "Build wall on each tile of the line from my tile to (x, y), straight or diagonal, one after another, with the materials I carry; tiles with a wall or gate already are skipped.",
+        description: "Build wall of \"wood\" (by default) or \"stone\" on each tile of the line from my tile to (x, y), straight or diagonal, one after another, with the materials I carry; tiles with a wall or gate already are skipped, but a stone line upgrades the wooden ones on its way, passing only those of stone.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -3431,7 +3449,7 @@ pub static ARMY_SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Query,
         params: &["line", "from?"],
         cost: 20.0,
-        description: "The tiles of a Build line still to build, from its start to its end; with `from`, something with `x` and `y`, nearest first. `line` is like {building: \"wall\", from: {x: 3, y: 4}, to: {x: 8, y: 4}}, as the Build line task keeps it in `memory.line`, road or wall, straight or diagonal. Tiles the Player sees with one already, or that can’t take one, are left out.",
+        description: "The tiles of a Build line still to build, from its start to its end; with `from`, something with `x` and `y`, nearest first. `line` is like {building: \"wall\", from: {x: 3, y: 4}, to: {x: 8, y: 4}}, as the Build line task keeps it in `memory.line`, road or wall, straight or diagonal. Tiles the Player sees with one already, or that can’t take one, are left out; a stone wall line (`material: \"stone\"`) takes the wooden wall and gate tiles on its way too.",
         returns: ScriptType::List(&ScriptType::View("lineTile")),
     },
     ScriptBinding {
@@ -3707,7 +3725,7 @@ fn buildFirst(site) {
     return true
   }
   if (me.order == null) {
-    let problem = build(site.kind)
+    let problem = build(site.kind, site.material)
     if (problem != null) { end("can't build the " + site.kind + ": " + problem) }
     return true
   }
@@ -4158,6 +4176,7 @@ fn pickSite() {
     return false
   }
   memory.building = join.kind
+  memory.material = join.material
   memory.at = crewTile(join)
   memory.siteId = join.id
   log("joining the site of " + placeName(join))
@@ -4211,7 +4230,7 @@ fn walkBack() {
 // Laying out the site, or joining it. Turned down, such as with the tile
 // taken, build says why: done.
 fn startBuilding() {
-  let problem = build(memory.building)
+  let problem = build(memory.building, memory.material)
   if (problem != null) {
     log("can't build: " + problem)
     end()
@@ -5206,7 +5225,8 @@ fn goodsText(load, goods) {
     (
         Task::BuildLine,
         "Build line",
-        r#"// Build line (default): build memory.line.building, road or wall, on each
+        r#"// Build line (default): build memory.line.building, road or wall (of
+// memory.line.material, wood or stone, for a wall), on each
 // tile of the line from memory.line.from to memory.line.to, straight or
 // diagonal, as the Build line order gives it; started without one I end.
 // Tiles that have one already, or can't take one, are skipped. I take the
@@ -5325,7 +5345,7 @@ fn walkThere(tile) {
 // Laying out the tile's site, or joining the one there. Turned down, I end
 // saying why.
 fn startBuilding(tile) {
-  let problem = build(memory.line.building)
+  let problem = build(tile.building || memory.line.building, memory.line.material)
   if (problem != null) {
     end("can't build at " + tile.x + "," + tile.y + ": " + problem)
   } else if (tile.siteId == null) {

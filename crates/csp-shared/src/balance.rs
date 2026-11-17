@@ -950,6 +950,11 @@ pub const CITY_QUARTER_ROWS: f64 = 4.0;
 /// not one walk per tile. What a tile doesn't take goes to the next.
 pub const NPC_WALL_TILES_PER_TRIP: f64 = 4.0;
 
+/// Residents an NPC city has from which it is a town and upgrades its wall to stone (`CONTEXT.md`:
+/// Wall / Gate, Wood or stone): as many as a town has when the world is made, so a village goes
+/// stone once it has grown into one.
+pub const NPC_STONE_WALL_RESIDENTS: f64 = NPC_TOWN.residents;
+
 /// How far from its home an NPC city looks for a resource node to build a workplace on when it
 /// needs a material it has no workplace for (`CONTEXT.md`: NPC city), in tiles: about twenty
 /// minutes' walk on plains.
@@ -1971,6 +1976,17 @@ pub const BUILD_WORK: Table<f64> = Table(&[
     ("ship", 10.0 * TICKS_PER_GAME_DAY),
 ]);
 
+/// What a stone wall or gate takes instead of `BUILD_MATERIALS` (`CONTEXT.md`: Wall / Gate, Wood
+/// or stone): Stone, a little more of it than a wooden one takes Wood, so a quarry pays for a
+/// stone ring.
+pub const STONE_BUILD_MATERIALS: Table<Table<f64>> =
+    Table(&[("wall", Table(&[("stone", 4.0)])), ("gate", Table(&[("stone", 6.0)]))]);
+
+/// Work a stone wall or gate takes instead of `BUILD_WORK`: three times a wooden one's, so a
+/// tile of stone wall takes an unskilled resident about a fifth of a game day.
+pub const STONE_BUILD_WORK: Table<f64> =
+    Table(&[("wall", 3.0 * TICKS_PER_GAME_DAY / 16.0), ("gate", 3.0 * TICKS_PER_GAME_DAY / 8.0)]);
+
 /// How many times `BUILD_WORK.road` a road tile on Mountain takes (`CONTEXT.md`: Road): the same
 /// materials, but building goes at a quarter of the usual speed.
 pub const MOUNTAIN_ROAD_WORK_FACTOR: f64 = 4.0;
@@ -2273,6 +2289,10 @@ pub struct WallStrength {
 /// again. Long enough that a starting city's defenders get from their town hall up onto the wall
 /// and beat the breakers first, at twice their numbers too (T105.6).
 pub const WALL_STRENGTH: WallStrength = WallStrength { wall: 3000.0, gate: 4500.0 };
+
+/// Damage a stone wall or gate takes before it falls: four times a wooden one's (`CONTEXT.md`:
+/// Wall / Gate, Wood or stone), so a Spear breaks a tile of stone wall alone in about 50 minutes.
+pub const STONE_WALL_STRENGTH: WallStrength = WallStrength { wall: 12000.0, gate: 18000.0 };
 
 /// Share of a broken wall's or gate's materials left on its tile, rounded down to whole units:
 /// less than tearing it down leaves (`TEARDOWN_MATERIALS_RETURNED`), as much of it is splintered;
@@ -2808,6 +2828,7 @@ pub fn balance_json() -> Value {
     m.insert("CITY_SIDE_LANE_GAP".into(), json!(CITY_SIDE_LANE_GAP));
     m.insert("CITY_QUARTER_ROWS".into(), json!(CITY_QUARTER_ROWS));
     m.insert("NPC_WALL_TILES_PER_TRIP".into(), json!(NPC_WALL_TILES_PER_TRIP));
+    m.insert("NPC_STONE_WALL_RESIDENTS".into(), json!(NPC_STONE_WALL_RESIDENTS));
     m.insert("NPC_NODE_REACH".into(), json!(NPC_NODE_REACH));
     m.insert("NPC_RESIDENTS_PER_SCOUT".into(), json!(NPC_RESIDENTS_PER_SCOUT));
     m.insert("NPC_SCOUT_LIMIT".into(), json!(NPC_SCOUT_LIMIT));
@@ -2960,6 +2981,11 @@ pub fn balance_json() -> Value {
     m.insert("DIRECTIVE_BUY_OFF_PRICE".into(), json!(DIRECTIVE_BUY_OFF_PRICE));
     m.insert("BUILD_MATERIALS".into(), to_value(BUILD_MATERIALS).expect("serialisable"));
     m.insert("BUILD_WORK".into(), to_value(BUILD_WORK).expect("serialisable"));
+    m.insert(
+        "STONE_BUILD_MATERIALS".into(),
+        to_value(STONE_BUILD_MATERIALS).expect("serialisable"),
+    );
+    m.insert("STONE_BUILD_WORK".into(), to_value(STONE_BUILD_WORK).expect("serialisable"));
     m.insert("MOUNTAIN_ROAD_WORK_FACTOR".into(), json!(MOUNTAIN_ROAD_WORK_FACTOR));
     m.insert("ROAD_LINE_MAX_TILES".into(), json!(ROAD_LINE_MAX_TILES));
     m.insert("BUILD_STRENGTH_AVERAGE".into(), json!(BUILD_STRENGTH_AVERAGE));
@@ -3005,6 +3031,7 @@ pub fn balance_json() -> Value {
     m.insert("MIN_BLOW_DAMAGE".into(), json!(MIN_BLOW_DAMAGE));
     m.insert("WALL_DEFENCE".into(), json!(WALL_DEFENCE));
     m.insert("WALL_STRENGTH".into(), to_value(WALL_STRENGTH).expect("serialisable"));
+    m.insert("STONE_WALL_STRENGTH".into(), to_value(STONE_WALL_STRENGTH).expect("serialisable"));
     m.insert("BROKEN_MATERIALS_RETURNED".into(), json!(BROKEN_MATERIALS_RETURNED));
     m.insert("CLIMB_TICKS".into(), json!(CLIMB_TICKS));
     m.insert("WALL_WALK_TICKS".into(), json!(WALL_WALK_TICKS));

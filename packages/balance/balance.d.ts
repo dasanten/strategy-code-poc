@@ -305,6 +305,7 @@ export interface Balance {
   readonly CITY_SIDE_LANE_GAP: number
   readonly CITY_QUARTER_ROWS: number
   readonly NPC_WALL_TILES_PER_TRIP: number
+  readonly NPC_STONE_WALL_RESIDENTS: number
   readonly NPC_NODE_REACH: number
   readonly NPC_RESIDENTS_PER_SCOUT: number
   readonly NPC_SCOUT_LIMIT: number
@@ -799,6 +800,25 @@ export interface Balance {
     carriage: number
     boat: number
     ship: number
+    [key: string]: number
+  }
+  readonly STONE_BUILD_MATERIALS: {
+    wall: {
+      stone: number
+      [key: string]: number
+    }
+    gate: {
+      stone: number
+      [key: string]: number
+    }
+    [key: string]: {
+      stone: number
+      [key: string]: number
+    }
+  }
+  readonly STONE_BUILD_WORK: {
+    wall: number
+    gate: number
     [key: string]: number
   }
   readonly MOUNTAIN_ROAD_WORK_FACTOR: number
@@ -1341,6 +1361,11 @@ export interface Balance {
   readonly MIN_BLOW_DAMAGE: number
   readonly WALL_DEFENCE: number
   readonly WALL_STRENGTH: {
+    wall: number
+    gate: number
+    [key: string]: number
+  }
+  readonly STONE_WALL_STRENGTH: {
     wall: number
     gate: number
     [key: string]: number

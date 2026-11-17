@@ -412,7 +412,10 @@ fn build_line_of(line: Option<&Value>) -> Option<BuildLine> {
         Some("wall") => BuildingKind::Wall,
         _ => return None,
     };
-    Some(BuildLine { building, from: tile(l.get("from"))?, to: tile(l.get("to"))? })
+    let material = (building == BuildingKind::Wall
+        && l.get("material").and_then(Value::as_str) == Some("stone"))
+    .then_some(csp_shared::world::WallMaterial::Stone);
+    Some(BuildLine { building, from: tile(l.get("from"))?, to: tile(l.get("to"))?, material })
 }
 
 /// What a Player sees of the script a resident runs (`seenScript`): which one, and for the owning

@@ -1,4 +1,4 @@
-import { BUILD_WORK } from './shared/narrowed.js'
+import { workOfKind } from './shared/building.js'
 import { CARRIAGE_CAPACITY, MAX_HEALTH, MAX_HUNGER } from '@csp/balance'
 import { GOODS, HORSE_STAT_NAMES, STAT_NAMES } from './shared/world.js'
 import { stockWeight } from './shared/stats.js'
@@ -231,7 +231,7 @@ export function inspectorCard(ins: AdminInspection): InspectorCard {
     case 'building': {
       const b = ins.building
       const name = BUILDING_NAMES[b.kind]
-      const work = BUILD_WORK[b.kind] ?? 0
+      const work = workOfKind(b.kind, b.material)
       return card({
         title: b.site ? `${name} site` : name,
         rows: [
