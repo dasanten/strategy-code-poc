@@ -748,6 +748,14 @@ The shared language of the game. Domain terms only — no implementation details
   when threatened, as a Player can (Trade Org army, Hiring from an NPC city); sends soldiers after
   residents it saw commit a crime against it, within its reach, to take back what was taken; and
   sends demands (NPC demand).
+  - **Hunting a thief:** for a theft it knows of (seen by one of its residents, or the news
+    brought home), a few soldiers (a balance number per thief) go after the thief while they stay
+    within its reach of its home (a balance number, its set reach); only soldiers beyond its hall
+    and gate posts go, those on its wall first. They strike the thief down, which is no crime
+    wherever it happens, take what was stolen from the pile where the thief fell (as much of it
+    as lies there) and carry it into the city's storage, then go back to their posts. A thief who
+    gets out of reach is let go. Decided overnight, Daniel to confirm: the soldiers know where
+    the thief is while in reach, and only goods are taken back, not a stolen carriage or horse.
 - **NPC demand:** an NPC city in Retaliate, or a militarist one, that far outweighs an Organization
   sends it an ordinary Demand for goods or Coins with a deadline, never to the Trade Organization.
   Paid, its threat and standing towards the payer settle; refused or lapsed, it retaliates.

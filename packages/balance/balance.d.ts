@@ -255,6 +255,8 @@ export interface Balance {
   readonly NPC_TRAIN_TURN_TICKS: number
   readonly NPC_PATROLS_MAX: number
   readonly NPC_SOLDIERS_PER_PATROL: number
+  readonly NPC_HUNT_REACH: number
+  readonly NPC_HUNTERS_PER_THIEF: number
   readonly NPC_PATROL_WALL_STOPS: number
   readonly NPC_PATROL_ROAD_STOPS: number
   readonly NPC_WAR_CHEST_PER_RESIDENT: number

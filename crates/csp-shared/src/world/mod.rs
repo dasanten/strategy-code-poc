@@ -1538,6 +1538,31 @@ pub struct CityPlan {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub patrolled_last: Option<String>,
+    /// Its soldiers out after thieves (`CONTEXT.md`: Acting first).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub hunts: Option<Vec<CityHunt>>,
+}
+
+/// A soldier of an NPC city out after a thief it knows of, to take back what was taken
+/// (`CONTEXT.md`: Acting first). While the thief lives they go after them; once the thief has
+/// fallen, they take the goods from the pile where they fell and carry them home.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CityHunt {
+    pub resident_id: String,
+    pub thief_id: String,
+    /// What the thief took from the city, as far as it knows: what the soldier takes back.
+    pub goods: Stock,
+    /// Where the thief was last seen: once they have fallen, where.
+    pub last_at: Tile,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "true")]
+    pub fell: Option<bool>,
+    /// The goods are picked up and on their way home.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional, type = "true")]
+    pub home: Option<bool>,
 }
 
 /// A soldier of an NPC city walking a round (`CONTEXT.md`: Soldier posts).

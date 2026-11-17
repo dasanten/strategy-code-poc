@@ -329,6 +329,8 @@ import {
   VEIN_THINNING,
   VEIN_NEARLY_GONE,
   NEW_VEIN_SPOT_REACH,
+  NPC_HUNT_REACH,
+  NPC_HUNTERS_PER_THIEF,
   carryCapacity,
   walkSpeed,
   workFactor,
@@ -3142,6 +3144,14 @@ export function Wiki() {
           carriage driven off with a horse of a different owner is a theft from each. Taking back
           what was stolen from you is theft like any other. In your own city's area, force against
           someone occupying its town hall or a thief you know of is no crime (see Under attack).
+        </p>
+        <p>
+          An NPC city goes after those who steal from it. Once one of its residents saw the theft,
+          or the news reached it, it sends up to {num(NPC_HUNTERS_PER_THIEF)} soldiers after the
+          thief while they are within {num(NPC_HUNT_REACH)} tiles of its home: only soldiers
+          beyond those holding its town hall and its gates go. They strike the thief down, which is
+          no crime, take what was stolen from where the thief fell and carry it into the city's
+          storage. A thief who gets further off is let go, and the soldiers go back to their posts.
         </p>
         <table>
           <thead>

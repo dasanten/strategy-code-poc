@@ -64,6 +64,7 @@ pub mod npc_defence;
 pub mod npc_founding;
 pub mod npc_growth;
 pub mod npc_hire;
+pub mod npc_hunts;
 pub mod npc_inner_wall;
 pub mod npc_patrols;
 pub mod npc_plan;

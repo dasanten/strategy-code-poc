@@ -779,6 +779,14 @@ pub const NPC_PATROLS_MAX: f64 = 3.0;
 /// One soldier walks a round for every this many on an NPC city's wall, up to `NPC_PATROLS_MAX`.
 pub const NPC_SOLDIERS_PER_PATROL: f64 = 4.0;
 
+/// How far from its home an NPC city sends soldiers after a thief it knows of (`CONTEXT.md`:
+/// Acting first), in tiles: its set reach (`NPC_NODE_REACH`). A thief further off is let go.
+pub const NPC_HUNT_REACH: f64 = 160.0;
+
+/// How many soldiers an NPC city sends after each thief, as far as it has soldiers beyond its hall
+/// and gate posts (`CONTEXT.md`: Acting first).
+pub const NPC_HUNTERS_PER_THIEF: f64 = 2.0;
+
 /// How many stops a round has along an NPC city's wall, spread evenly round it. Each costs one path
 /// search; a town's wall of 180 tiles gives legs of about 22 tiles, some 3 game hours each.
 pub const NPC_PATROL_WALL_STOPS: f64 = 8.0;
@@ -2802,6 +2810,8 @@ pub fn balance_json() -> Value {
     m.insert("NPC_TRAIN_TURN_TICKS".into(), json!(NPC_TRAIN_TURN_TICKS));
     m.insert("NPC_PATROLS_MAX".into(), json!(NPC_PATROLS_MAX));
     m.insert("NPC_SOLDIERS_PER_PATROL".into(), json!(NPC_SOLDIERS_PER_PATROL));
+    m.insert("NPC_HUNT_REACH".into(), json!(NPC_HUNT_REACH));
+    m.insert("NPC_HUNTERS_PER_THIEF".into(), json!(NPC_HUNTERS_PER_THIEF));
     m.insert("NPC_PATROL_WALL_STOPS".into(), json!(NPC_PATROL_WALL_STOPS));
     m.insert("NPC_PATROL_ROAD_STOPS".into(), json!(NPC_PATROL_ROAD_STOPS));
     m.insert("NPC_WAR_CHEST_PER_RESIDENT".into(), json!(NPC_WAR_CHEST_PER_RESIDENT));

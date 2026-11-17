@@ -214,6 +214,7 @@ pub fn step_world(
         step_caravans(world, size, scratch);
         step_traders(world, size, terrain, scratch);
         step_npc_defence(world, size, scratch);
+        crate::npc_hunts::step_npc_hunts(world, size);
         step_trade_org_army(world, size, scratch);
         step_npc_hire(world, size, scratch);
         // Gear handed out with lent soldiers is theirs to fight with now.
