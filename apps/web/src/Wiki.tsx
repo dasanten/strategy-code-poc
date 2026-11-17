@@ -321,6 +321,7 @@ import {
   RECIPES,
   BATCHES_PER_DAY,
   WORK_OUTPUT_PER_DAY,
+  NPC_FOOD_REFILL_DAYS,
   RICHNESS_FACTOR,
   FRONTIER_RICH_NODES,
   RICHER_NODE_REACH,
@@ -1587,7 +1588,9 @@ export function Wiki() {
           pile keeps its own Food instead. <code>crewFood</code> 0 brings none. A resident an NPC
           city sends to a workplace sets out with Food for the walk there and back plus{' '}
           {days(SET_OUT_WORK_DAYS)} of work, not a fixed amount, so they last until the carrier's
-          first round trip.
+          first round trip. Its builders of a site more than {num(NPC_NODE_REACH)} tiles from its
+          storage take the same, and go back for more while they still have what the walk home
+          eats.
         </p>
         <p>
           A full hunger meter lasts {days(HUNGER_DAYS)} without eating; an empty one costs all
@@ -2850,14 +2853,18 @@ export function Wiki() {
         <p>
           It shares out its adults in this order: soldiers; farmers, as many as feed everyone (each
           eats {num(FOOD_PER_DAY)} Food a day, a farmer makes {num(WORK_OUTPUT_PER_DAY.food ?? 0)})
-          and one more while it has no food surplus, a new farm when they don't fit; up to{' '}
+          and one more while it has no food surplus; with its Food below its reserve but not yet
+          running short, as many more as win back what it lacks in{' '}
+          {days(NPC_FOOD_REFILL_DAYS)}, if that is more; a new farm when they don't fit; up to{' '}
           {num(NPC_BUILDERS)} builders a step while it has a project; everyone else is a spare hand.
           A farm is otherwise built only when Food is short of its reserve (
-          {days(NPC_TRADE.reserveFoodDays)} of Food for everyone) with every farm at its full crew
-          of {num(WORKPLACE_MAX_WORKERS.farm ?? 0)}, never because spare hands filled the farms
-          working for surplus. It needs nobody idle for that: the new farm's farmers come from those
-          working for surplus and from its scouts first, and from other work only after them. A farm
-          already begun is finished before another. Spare hands go to the good the reserve is
+          {days(NPC_TRADE.reserveFoodDays)} of Food for everyone), or, with nothing else keeping it
+          from being full, short of the Food surplus its founding waits on (below), with every farm
+          at its full crew of {num(WORKPLACE_MAX_WORKERS.farm ?? 0)}; never because spare hands
+          filled the farms working for surplus. It needs nobody idle for that: the new farm's
+          farmers come from those working for surplus and from its scouts first, and from other
+          work only after them. A farm already begun is finished before another, and that new farm
+          comes before anything else it has begun. Spare hands go to the good the reserve is
           shortest of, as a share of what it wants of it, filling one workplace's crew before the
           next. Without a workplace for that good, the city builds one: on the nearest fitting
           resource node it knows of, or a smelter, smithy or mint in its area like a house. With

@@ -65,7 +65,10 @@ fn subset(world: &WorldState, t: u64) -> Value {
 /// with the Food they take above the reserve (`CONTEXT.md`: Scout), and the new village sends its
 /// first scout at tick 30 with less above it. The `npc_plan` test
 /// `sends_a_new_scout_only_with_the_food_they_take_above_the_reserve` holds the rule instead.
-const COMPARED_UNTIL: &[(&str, u64)] = &[("village-0", 2)];
+/// From #1379 on the village a game week in, its Food below its reserve, keeps the farmers who win
+/// it back (`CONTEXT.md`: NPC city), so it is not compared at all; the `npc_growth` test
+/// `below_its_reserve_keeps_the_farmers_who_win_back_what_its_food_lacks` holds the rule instead.
+const COMPARED_UNTIL: &[(&str, u64)] = &[("village-0", 2), ("village-10080", 0)];
 
 #[test]
 fn npc_cities_step_as_in_typescript() {
