@@ -2343,12 +2343,13 @@ pub const CATAPULT_STRENGTH: f64 = 3000.0;
 pub const CATAPULT_REACH: f64 = 20.0;
 
 /// Ticks between a crewed catapult's shots (`CONTEXT.md`: Catapult): its arm wound down and a
-/// Stone loaded each time, three times a ram's strikes.
-pub const CATAPULT_SHOT_TICKS: f64 = 30.0;
+/// Stone loaded each time, six times a ram's strikes, so it does less to a wall a minute than a
+/// ram at it.
+pub const CATAPULT_SHOT_TICKS: f64 = 60.0;
 
 /// Damage each Stone a catapult throws does to the wall, gate or tower it hits (`CONTEXT.md`:
-/// Catapult): a tile of wooden wall falls to 5, one of stone to 20, slower than a ram at the wall
-/// but from out of reach.
+/// Catapult): a tile of wooden wall falls to 5 in five minutes, one of stone to 20 in twenty,
+/// slower than a ram at the wall but from out of reach.
 pub const CATAPULT_BLOW: f64 = 600.0;
 
 /// Ticks it takes to climb over a wall or gate (`CONTEXT.md`: Walls in combat, climbed): six

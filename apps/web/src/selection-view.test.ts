@@ -826,6 +826,7 @@ describe('the rows of a card that stays open', () => {
         'crew',
         'push',
         'ram',
+        'throw',
       ]
       if (tileCard.includes(id)) continue
       if (['relocate', 'makeLeader', 'rename'].includes(id)) continue

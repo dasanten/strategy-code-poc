@@ -330,9 +330,7 @@ pub fn construction_index_at(
         | BuildingKind::Boat
         | BuildingKind::Ship
         | BuildingKind::Ram
-        | BuildingKind::Catapult => {
-            first_of_kind_at(world, x, y, kind)
-        }
+        | BuildingKind::Catapult => first_of_kind_at(world, x, y, kind),
         // A wall or gate site first: one may stand over the wooden wall it upgrades.
         BuildingKind::Wall | BuildingKind::Gate => {
             wall_site_index_at(world, x, y).or_else(|| building_index_at(world, x, y, MAP_SIZE))

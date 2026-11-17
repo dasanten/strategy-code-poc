@@ -111,7 +111,7 @@ describe('the Build menu', () => {
 
   it('offers a ram under Siege anywhere a carriage could stand, one site to a tile', () => {
     const groups = menu()
-    expect(groups.find((g) => g.name === 'Siege')?.kinds.map((k) => k.kind)).toEqual(['ram'])
+    expect(groups.find((g) => g.name === 'Siege')?.kinds.map((k) => k.kind)).toEqual(['ram', 'catapult'])
     expect(entry(groups, 'ram').problem).toBeUndefined()
     const ground = (t: number) => ({ size: 200, at: () => t })
     const ram = (t: number, buildings: Building[] = []) =>
@@ -154,7 +154,7 @@ describe('the Build menu', () => {
         .map((k) => k.kind)
     const off = open(menu())
     expect(off).not.toContain('lumberCamp')
-    const vehicles = ['road', 'carriage', 'boat', 'ship', 'ram']
+    const vehicles = ['road', 'carriage', 'boat', 'ship', 'ram', 'catapult']
     expect(off.filter((k) => !vehicles.includes(k)).sort()).toEqual(
       [...buildMenu(undefined)].sort(),
     )
