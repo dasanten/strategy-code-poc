@@ -3446,8 +3446,8 @@ export function Wiki() {
           and goes back on when they put a one-handed weapon in its place), and a shield can't be
           put on beside one. In a blow they add nothing, so an archer in a brawl fights with their
           fists. They shoot <strong>Arrows</strong>, a plain good that is carried, stored and traded
-          like any other and goes in no slot. A smithy makes each, the smith saying which as for
-          the other gear:
+          like any other and goes in no slot. A smithy makes each, the smith saying which as for the
+          other gear:
         </p>
         <table>
           <thead>
@@ -3481,8 +3481,8 @@ export function Wiki() {
           from there. Each shot uses up one Arrow they carry, whether it lands or not; out of Arrows
           they fight with their fists and have to walk into contact. Nothing blocks a shot for now.
           A shot is a strike like a blow: the one hit is under attack and fights back or flees,
-          their city's alarm goes, and it is a crime where a blow would be. Agility dodges a shot
-          as it does a blow, and a shield and armour take damage off it, but a Crossbow's bolt goes
+          their city's alarm goes, and it is a crime where a blow would be. Agility dodges a shot as
+          it does a blow, and a shield and armour take damage off it, but a Crossbow's bolt goes
           through part of them. Strength adds nothing to a shot; Combat skill makes a Bow much
           better, a Crossbow only a little.
         </p>
@@ -3512,24 +3512,24 @@ export function Wiki() {
         </table>
         <p>
           <strong>Archers by default.</strong> Struck, an archer's Defend default shoots back from
-          where they stand, walking only until the one who struck them is in reach. On an alarm,
-          the Alarm default sends an archer on the ground up onto the city's wall tile between them
-          and whoever they go after, and they shoot from there; up on the wall they wait for them
-          to come in reach rather than come down. With no wall between them they shoot from where
-          they stand. Out of Arrows an archer does what anyone armed does and closes in. Scripts see
-          a resident's <code>reach</code> (null without a Bow or Crossbow) and the Arrows they carry
+          where they stand, walking only until the one who struck them is in reach. On an alarm, the
+          Alarm default sends an archer on the ground up onto the city's wall tile between them and
+          whoever they go after, and they shoot from there; up on the wall they wait for them to
+          come in reach rather than come down. With no wall between them they shoot from where they
+          stand. Out of Arrows an archer does what anyone armed does and closes in. Scripts see a
+          resident's <code>reach</code> (null without a Bow or Crossbow) and the Arrows they carry
           in <code>carried.arrows</code>; <code>shoot(targetId)</code> shoots someone in reach
           without a step, and <code>attack</code> walks only until they are in reach.
         </p>
         <p>
-          <strong>NPC archers.</strong> An NPC city with a smithy arms{' '}
-          {pct(NPC_ARCHER_SHARE)} of its soldiers with a Bow (rounded down) and keeps{' '}
-          {num(NPC_ARCHER_ARROWS)} Arrows in its reserve for each of them; its smithy forges them
-          once its soldiers are armed. Each archer carries {num(NPC_ARCHER_ARROWS)} Arrows and
-          fetches more from its storage as they run low. While the city has a wall, its archers
-          stand on it and leave the town hall and the gates to the others. One without a smithy, and
-          the Trade Organization's cities, keep no archers. A resident hired from an NPC city who
-          takes a Bow from its surplus takes Arrows along too, also only from its surplus.
+          <strong>NPC archers.</strong> An NPC city with a smithy arms {pct(NPC_ARCHER_SHARE)} of
+          its soldiers with a Bow (rounded down) and keeps {num(NPC_ARCHER_ARROWS)} Arrows in its
+          reserve for each of them; its smithy forges them once its soldiers are armed. Each archer
+          carries {num(NPC_ARCHER_ARROWS)} Arrows and fetches more from its storage as they run low.
+          While the city has a wall, its archers stand on it and leave the town hall and the gates
+          to the others. One without a smithy, and the Trade Organization's cities, keep no archers.
+          A resident hired from an NPC city who takes a Bow from its surplus takes Arrows along too,
+          also only from its surplus.
         </p>
         <p>
           To <strong>swap</strong> gear, pick another item they carry for a slot on their card (or
@@ -3580,10 +3580,10 @@ export function Wiki() {
           tile touches it: residents walk onto it from the walk, or get up onto it from the ground
           beside it as onto a wall. It holds {num(TOWER_ROOM)} residents up at once; one more waits
           beside it until someone leaves. It is broken like a wall but holds out longer: wooden,{' '}
-          {num(WALL_STRENGTH.tower)} damage ({duration(breakTicks('tower'))} for that resident),
-          of stone {num(STONE_WALL_STRENGTH.tower)} ({duration(breakTicks('tower', true))}), and it
-          is struck from beside any of its tiles. Whoever is up on it when it breaks falls, as from
-          a wall tile. A tower is broken, not climbed.
+          {num(WALL_STRENGTH.tower)} damage ({duration(breakTicks('tower'))} for that resident), of
+          stone {num(STONE_WALL_STRENGTH.tower)} ({duration(breakTicks('tower', true))}), and it is
+          struck from beside any of its tiles. Whoever is up on it when it breaks falls, as from a
+          wall tile. A tower is broken, not climbed.
         </p>
         <p>
           <strong>Up on a tower.</strong> A resident up on a tower sees {num(TOWER_SIGHT_RANGE)}{' '}
@@ -3592,26 +3592,36 @@ export function Wiki() {
           coming into the city's area that such a lookout sees raises the alarm across the whole of
           its area, so a tower warns of an army early. An archer up on a tower shoots{' '}
           {num(TOWER_SHOT_REACH_BONUS)} tiles further than on the ground, beyond an archer on the
-          wall ({num(WALL_SHOT_REACH_BONUS)} further), and up there takes the wall's cover as on
-          the wall.
+          wall ({num(WALL_SHOT_REACH_BONUS)} further), and up there takes the wall's cover as on the
+          wall.
+        </p>
+        <p>
+          <strong>NPC towers.</strong> A tower is part of a city like its wall, and grows its area
+          the same way. An NPC town whose outer wall is all of stone builds stone towers, each just
+          inside its wall and touching it: first one by each gate, leaving the way in free, then one
+          in each corner. It builds each from Stone it holds beyond its reserve, last of its
+          projects, and quarries for it if it has to. Its soldiers on wall posts fill its towers
+          first, {num(TOWER_ROOM)} to a tower, its archers before the others. When the town moves
+          its wall out, it builds towers on the new wall, and tears the old ones down with the old
+          wall.
         </p>
         <p>
           <strong>The high ground.</strong> Whoever is up strikes down at anyone on the ground next
           to the wall, but nobody on the ground can strike anyone up: from below there is only the
           wall or gate itself to break, or climbing it, both while being struck from above, or
-          shooting up at them with a Bow or Crossbow. Order a resident below without Arrows to
-          shoot to attack someone up and they won't (“they are up on the wall”). A climber is on the
-          ground until over; one who made it and stands on the wall fights those up as anywhere,
-          and so do those up on two walls that touch. Up on their own city's wall, defenders still
-          take only {pct(WALL_DEFENCE)} of each blow and each shot.
+          shooting up at them with a Bow or Crossbow. Order a resident below without Arrows to shoot
+          to attack someone up and they won't (“they are up on the wall”). A climber is on the
+          ground until over; one who made it and stands on the wall fights those up as anywhere, and
+          so do those up on two walls that touch. Up on their own city's wall, defenders still take
+          only {pct(WALL_DEFENCE)} of each blow and each shot.
         </p>
         <p>
           <strong>Archers on the wall.</strong> An archer up on a wall walk shoots{' '}
           {num(WALL_SHOT_REACH_BONUS)} tiles further than on the ground: a Bow{' '}
           {num((SHOT_REACH.bow ?? 0) + WALL_SHOT_REACH_BONUS)} tiles, a Crossbow{' '}
           {num((SHOT_REACH.crossbow ?? 0) + WALL_SHOT_REACH_BONUS)}. So archers on a wall shoot
-          attackers before those can shoot back, and take only {pct(WALL_DEFENCE)} of what does
-          come back up.
+          attackers before those can shoot back, and take only {pct(WALL_DEFENCE)} of what does come
+          back up.
         </p>
         <p>
           <strong>A tile breaks.</strong> When a wall or gate tile breaks, whoever is up on it falls

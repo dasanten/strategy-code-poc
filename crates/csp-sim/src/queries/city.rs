@@ -66,13 +66,14 @@ pub fn city_price(world: &WorldState, city: &City, buyer_id: Option<&str>) -> f6
 }
 
 /// The kinds that make a city's shape (`CITY_BUILDINGS`).
-pub const CITY_BUILDINGS: [BuildingKind; 6] = [
+pub const CITY_BUILDINGS: [BuildingKind; 7] = [
     BuildingKind::TownHall,
     BuildingKind::House,
     BuildingKind::Storage,
     BuildingKind::Warehouse,
     BuildingKind::Wall,
     BuildingKind::Gate,
+    BuildingKind::Tower,
 ];
 
 /// Whether a building counts toward a city's shape: a finished city building (`isCityBuilding`).

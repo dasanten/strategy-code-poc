@@ -78,6 +78,7 @@ pub mod npc_stable;
 pub mod npc_stone_walls;
 #[cfg(test)]
 mod npc_test_world;
+pub mod npc_towers;
 pub mod npc_trader;
 pub mod npc_training;
 pub mod offers;
