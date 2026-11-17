@@ -8,6 +8,7 @@ import { relocateRoom, type RelocateWorld } from './shared/relocate.js'
 import type {
   Building,
   BuildingKind,
+  WallMaterial,
   Carriage,
   City,
   Condition,
@@ -60,6 +61,8 @@ export type PlanAsk =
   | 'subject'
   | 'units'
   | 'condition'
+  | 'gear'
+  | 'slot'
 
 export type PlanStepId =
   | 'walk'
@@ -71,6 +74,7 @@ export type PlanStepId =
   | 'pickUp'
   | 'drop'
   | 'feedStable'
+  | 'feedStableOnce'
   | 'breed'
   | 'teach'
   | 'train'
@@ -91,6 +95,8 @@ export type PlanStepId =
   | 'hitch'
   | 'relocate'
   | 'feed'
+  | 'equip'
+  | 'takeOff'
   | 'explore'
   | 'runScript'
   | 'waitUntil'
@@ -202,6 +208,12 @@ export const PLAN_STEPS: readonly PlanKind[] = [
     picks: [{ pick: 'stable', prompt: 'the stable to feed' }],
   },
   {
+    // A single round (`CONTEXT.md`: Feeding the stable, Once): it ends once the stable is full.
+    id: 'feedStableOnce',
+    label: 'Feed the stable once',
+    picks: [{ pick: 'stable', prompt: 'the stable to feed' }],
+  },
+  {
     id: 'breed',
     label: 'Breed horses',
     picks: [{ pick: 'stable', prompt: 'the stable to breed in' }],
@@ -247,6 +259,14 @@ export const PLAN_STEPS: readonly PlanKind[] = [
     picks: [{ pick: 'toFeed', prompt: 'the resident lying Down or the horse to feed' }],
     ask: 'units',
   },
+  {
+    // `CONTEXT.md`: Equipment: wherever they are when its turn comes.
+    id: 'equip',
+    label: 'Put on gear',
+    picks: [],
+    ask: 'gear',
+  },
+  { id: 'takeOff', label: 'Take off gear', picks: [], ask: 'slot' },
   {
     id: 'haul',
     label: 'Haul route',
@@ -296,6 +316,7 @@ export const PLAN_TASKS: Partial<Readonly<Record<PlanStepId, Task>>> = {
   road: 'buildLine',
   wall: 'buildLine',
   feedStable: 'feedStable',
+  feedStableOnce: 'feedStable',
   breed: 'breed',
   train: 'train',
   haul: 'haul',
@@ -553,7 +574,7 @@ export function pickInto(w: PlanWorld, plan: Plan, at: { x: number; y: number })
 /** What the card's ask answered: goods with units, a kind to build, two horses, and so on. */
 export type PlanAnswer =
   | { ask: 'goods'; goods: Stock }
-  | { ask: 'buildingKind'; building: BuildingKind }
+  | { ask: 'buildingKind'; building: BuildingKind; material?: WallMaterial }
   | { ask: 'makes'; makes: Good }
   | { ask: 'horses'; horseIds: [string, string] }
   | { ask: 'horse'; horseId: string }
@@ -562,6 +583,9 @@ export type PlanAnswer =
   | { ask: 'subject'; subject: TrainingSubject }
   | { ask: 'units'; units: number }
   | { ask: 'condition'; condition: Condition }
+  /** A good to put on, or the slot to take off (`CONTEXT.md`: Equipment). */
+  | { ask: 'gear'; good: Good }
+  | { ask: 'slot'; slot: 'weapon' | 'shield' | 'armour' }
 
 /** Where a step acts, for the walk put before it (`appendRequest`'s `at`). */
 type At = { x: number; y: number }
@@ -621,7 +645,8 @@ export function planOrder(
     }
     case 'build': {
       const building = a?.ask === 'buildingKind' ? a.building : p.building
-      return { order: { kind: 'task', task: 'build', building, at } }
+      const material = a?.ask === 'buildingKind' && a.material ? { material: a.material } : {}
+      return { order: { kind: 'task', task: 'build', building, at, ...material } }
     }
     case 'tearDown':
       return { order: { kind: 'task', task: 'tearDown', buildingId: p.id }, at }
@@ -633,6 +658,11 @@ export function planOrder(
     }
     case 'feedStable':
       return { order: { kind: 'task', task: 'feedStable', stableId: p.id }, at }
+    case 'feedStableOnce':
+      return {
+        order: { kind: 'task', task: 'feedStable', stableId: p.id, params: { once: 1 } },
+        at,
+      }
     case 'breed': {
       const horseIds = a?.ask === 'horses' ? a.horseIds : []
       return { order: { kind: 'task', task: 'breed', stableId: p.id, horseIds }, at }
@@ -671,6 +701,10 @@ export function planOrder(
       const units = a?.ask === 'units' ? a.units : FEED_UNITS
       return { order: { kind: 'feed', targetId: p.id, units }, at }
     }
+    case 'equip':
+      return { order: { kind: 'equip', good: a?.ask === 'gear' ? a.good : null } }
+    case 'takeOff':
+      return { order: { kind: 'takeOff', slot: a?.ask === 'slot' ? a.slot : null } }
     case 'runScript':
       return { order: { kind: 'runScript', scriptId: a?.ask === 'script' ? a.scriptId : null } }
     case 'waitUntil':

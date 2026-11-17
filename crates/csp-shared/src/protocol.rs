@@ -14,9 +14,10 @@ use crate::world::offers::SeenOffer;
 use crate::world::protocol::Hire;
 use crate::world::warehouse::ShownWarehousePrice;
 use crate::world::{
-    AlarmScriptId, ArmyOrder, Building, BuildingKind, Carrying, City, Good, Heading, HorseStats,
-    OrderEnded, Pair, Pile, PricedGood, Queue, ResidentOrder, ScriptParamValue, ScriptParamValues,
-    SkillName, Stat, StatRecord, Stock, Struck, Task, Tile, VesselKind,
+    AlarmScriptId, ArmyOrder, Building, BuildingKind, Carrying, City, Equipment, Good, Heading,
+    HorseStats, OrderEnded, Pair, Pile, PricedGood, Queue, ResidentOrder, ScriptParamValue,
+    ScriptParamValues, SkillName, Stat, StatRecord, Stock, Struck, Task, Tile, UpSide, VesselKind,
+    WallMaterial,
 };
 
 /// How heavily a carriage looks loaded to a Player who can't see its load (`LoadLevel`,
@@ -41,6 +42,10 @@ pub struct BuildLine {
     pub building: BuildingKind,
     pub from: Tile,
     pub to: Tile,
+    /// What a wall line builds of; none is wood (`CONTEXT.md`: Wall / Gate, Wood or stone).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub material: Option<WallMaterial>,
 }
 
 /// What a Player sees of the script a resident runs (`SeenScript`): which one, and for the owning
@@ -131,6 +136,10 @@ pub struct SeenResident {
     pub born_at: f64,
     pub lifespan: f64,
     pub carried: Stock,
+    /// What the resident has equipped (`CONTEXT.md`: Equipment).
+    #[serde(default, skip_serializing_if = "Equipment::is_empty")]
+    #[ts(as = "Option<Equipment>", optional)]
+    pub equipped: Equipment,
     pub order: Option<ResidentOrder>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
@@ -168,6 +177,9 @@ pub struct SeenResident {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub aboard: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub up: Option<UpSide>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub down_until: Option<f64>,

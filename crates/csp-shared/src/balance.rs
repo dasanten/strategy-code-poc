@@ -457,6 +457,10 @@ pub const START_COINS: f64 = 50.0;
 /// something to eat while the farm's first harvest comes in (`CONTEXT.md`: Eating).
 pub const START_CARRIED_FOOD: f64 = 2.0;
 
+/// Iron Spears each grown resident of a starting city (the Leader too) starts with, so they are
+/// armed and defend from the first tick (`CONTEXT.md`: Starting city). Children get none.
+pub const START_SPEARS: f64 = 1.0;
+
 /// Horses in a starting city's stable: two, so a resident can breed them (`CONTEXT.md`: Starting city).
 pub const START_HORSES: f64 = 2.0;
 
@@ -492,6 +496,15 @@ pub const HORSE_WAKE_HEALTH: f64 = 20.0;
 /// (`CONTEXT.md`: Feeding the stable): `HORSE_FOOD_PER_DAY` for each, this many days. Below it the
 /// resident fetches more. Written into the default's source, where a Player can change it.
 pub const STABLE_FEED_DAYS: f64 = 10.0;
+
+/// Game days of Food for a starting city's horses (`START_HORSES`, `HORSE_FOOD_PER_DAY` each)
+/// below which the stable hand's "Farm and feed" queue feeds the stable once (`CONTEXT.md`:
+/// Starting city): a few days, so a round fills it from well before it runs out.
+pub const STABLE_HAND_FEED_DAYS: f64 = 3.0;
+
+/// Game minutes the stable hand works the farm between two looks at the stable (`CONTEXT.md`:
+/// Starting city): a game hour.
+pub const STABLE_HAND_WORK_MINUTES: f64 = 60.0;
 
 /// Game days of Food for its horses below which an NPC city sends one of its residents to fill its
 /// stable up to `STABLE_FEED_DAYS` (`CONTEXT.md`: NPC horses). Half of it, so they go in one trip
@@ -749,6 +762,14 @@ pub const NPC_SOLDIER_SHARE: f64 = 0.25;
 /// node in reach keeps to the iron spear (`NPC_SMITHY_WEAPON`).
 pub const NPC_STEEL_KIT: [&str; 3] = ["steelSword", "steelArmour", "steelShield"];
 
+/// Share of an NPC city's soldiers it arms with a Bow once it has a smithy (`CONTEXT.md`: Ranged
+/// combat, NPC reserve), rounded down: a town's 4 soldiers have 2 archers, a village's 2 one.
+pub const NPC_ARCHER_SHARE: f64 = 0.5;
+
+/// The Arrows an NPC city's archer carries, fetched from its storage as they run low; its reserve
+/// keeps as many again in its storages for each archer it wants (`CONTEXT.md`: NPC reserve).
+pub const NPC_ARCHER_ARROWS: f64 = 20.0;
+
 /// How many of an NPC city's soldiers stand on its town hall between fights, the first to be posted
 /// (`CONTEXT.md`: Soldier posts). One there is enough to block an occupation; a second keeps it held
 /// when the first is called away.
@@ -934,6 +955,11 @@ pub const CITY_QUARTER_ROWS: f64 = 4.0;
 /// storage (`CONTEXT.md`: NPC city, Fetching materials): a 40 m stretch's worth, so a long wall is
 /// not one walk per tile. What a tile doesn't take goes to the next.
 pub const NPC_WALL_TILES_PER_TRIP: f64 = 4.0;
+
+/// Residents an NPC city has from which it is a town and upgrades its wall to stone (`CONTEXT.md`:
+/// Wall / Gate, Wood or stone): as many as a town has when the world is made, so a village goes
+/// stone once it has grown into one.
+pub const NPC_STONE_WALL_RESIDENTS: f64 = NPC_TOWN.residents;
 
 /// How far from its home an NPC city looks for a resource node to build a workplace on when it
 /// needs a material it has no workplace for (`CONTEXT.md`: NPC city), in tiles: about twenty
@@ -1163,6 +1189,9 @@ pub const WAREHOUSE_FLOOR: Table<f64> = Table(&[
     ("steelSword", 1.0),
     ("steelShield", 1.0),
     ("steelArmour", 1.0),
+    ("bow", 1.0),
+    ("crossbow", 1.0),
+    ("arrows", 40.0),
 ]);
 
 /// How many times a trading post's floor (`WAREHOUSE_FLOOR`) the Trade Org HQ's warehouses keep.
@@ -1195,6 +1224,9 @@ pub const WAREHOUSE_BASE_PRICE: Table<f64> = Table(&[
     ("steelSword", 50.0),
     ("steelShield", 30.0),
     ("steelArmour", 160.0),
+    ("bow", 12.0),
+    ("crossbow", 30.0),
+    ("arrows", 1.0),
 ]);
 
 /// Stock, in floors, at which a warehouse sells at its base price; less stock costs more.
@@ -1338,12 +1370,18 @@ pub const GOOD_WEIGHT: Table<f64> = Table(&[
     ("steelSword", 3.0),
     ("steelShield", 4.0),
     ("steelArmour", 8.0),
+    ("bow", 2.0),
+    ("crossbow", 4.0),
+    ("arrows", 0.1),
 ]);
 
 /// Attack each weapon adds to a resident's blow (`CONTEXT.md`: Weapons and armour, Combat). A
 /// sword hits harder than a spear, a steel sword half again as hard as an iron one (`CONTEXT.md`:
-/// Coal); combat (T10.2) adds it to Strength and Combat skill.
-pub const WEAPON_ATTACK: Table<f64> = Table(&[("spear", 4.0), ("sword", 6.0), ("steelSword", 9.0)]);
+/// Coal); combat (T10.2) adds it to Strength and Combat skill. A Bow or Crossbow adds nothing to
+/// a blow: it is a weapon for shooting (`CONTEXT.md`: Ranged combat), and in a blow its archer
+/// fights with their fists.
+pub const WEAPON_ATTACK: Table<f64> =
+    Table(&[("spear", 4.0), ("sword", 6.0), ("steelSword", 9.0), ("bow", 0.0), ("crossbow", 0.0)]);
 
 /// Damage each piece of protection takes off a blow (`CONTEXT.md`: Weapons and armour, Combat).
 /// Armour takes off more than a shield but weighs twice as much; steel takes off more than iron
@@ -1444,6 +1482,11 @@ pub const WAKE_HEALTH: f64 = 10.0;
 /// Units of Food the Feed row suggests giving (`CONTEXT.md`: Reviving): one eaten at once to wake,
 /// one more to go on with, about four game days of eating.
 pub const FEED_UNITS: f64 = 2.0;
+
+/// Ticks a resident takes to swap an item into an equipment slot or take one off (`CONTEXT.md`:
+/// Equipment), striking no blows meanwhile: long enough that swapping mid-fight costs a blow or
+/// two, short enough to be done before the next one comes.
+pub const EQUIP_TICKS: f64 = 3.0;
 
 /// Game days a fed resident takes to heal from no health back to full.
 pub const HEAL_DAYS: f64 = 3.0;
@@ -1946,6 +1989,17 @@ pub const BUILD_WORK: Table<f64> = Table(&[
     ("ship", 10.0 * TICKS_PER_GAME_DAY),
 ]);
 
+/// What a stone wall or gate takes instead of `BUILD_MATERIALS` (`CONTEXT.md`: Wall / Gate, Wood
+/// or stone): Stone, a little more of it than a wooden one takes Wood, so a quarry pays for a
+/// stone ring.
+pub const STONE_BUILD_MATERIALS: Table<Table<f64>> =
+    Table(&[("wall", Table(&[("stone", 4.0)])), ("gate", Table(&[("stone", 6.0)]))]);
+
+/// Work a stone wall or gate takes instead of `BUILD_WORK`: three times a wooden one's, so a
+/// tile of stone wall takes an unskilled resident about a fifth of a game day.
+pub const STONE_BUILD_WORK: Table<f64> =
+    Table(&[("wall", 3.0 * TICKS_PER_GAME_DAY / 16.0), ("gate", 3.0 * TICKS_PER_GAME_DAY / 8.0)]);
+
 /// How many times `BUILD_WORK.road` a road tile on Mountain takes (`CONTEXT.md`: Road): the same
 /// materials, but building goes at a quarter of the usual speed.
 pub const MOUNTAIN_ROAD_WORK_FACTOR: f64 = 4.0;
@@ -2035,7 +2089,9 @@ pub struct Recipe {
 /// of armour, each from Iron and Wood weighing what the good weighs (`GOOD_WEIGHT`): a spear is
 /// mostly wood, a sword mostly iron, a shield wood bound with iron, armour nearly all iron. The
 /// steel Sword, Shield and Armour (`CONTEXT.md`: Coal) take Steel where the iron ones take Iron,
-/// and the same Wood; the Spear is iron only.
+/// and the same Wood; the Spear is iron only. A Bow is all wood, a Crossbow wood with an iron
+/// bow and trigger, and a batch of 40 Arrows mostly wood with a little iron for the heads
+/// (`CONTEXT.md`: Smithy).
 pub const RECIPES: Table<&[Recipe]> = Table(&[
     (
         "smelter",
@@ -2078,6 +2134,15 @@ pub const RECIPES: Table<&[Recipe]> = Table(&[
             Recipe {
                 input: Table(&[("steel", 7.0), ("wood", 1.0)]),
                 output: Table(&[("steelArmour", 1.0)]),
+            },
+            Recipe { input: Table(&[("wood", 2.0)]), output: Table(&[("bow", 1.0)]) },
+            Recipe {
+                input: Table(&[("iron", 1.0), ("wood", 3.0)]),
+                output: Table(&[("crossbow", 1.0)]),
+            },
+            Recipe {
+                input: Table(&[("iron", 1.0), ("wood", 3.0)]),
+                output: Table(&[("arrows", 40.0)]),
             },
         ],
     ),
@@ -2193,6 +2258,32 @@ pub const COMBAT_SKILL_LIMIT: f64 = 1.0;
 /// The least damage a blow that lands does, however well the one hit is protected.
 pub const MIN_BLOW_DAMAGE: f64 = 1.0;
 
+/// How far a Bow or Crossbow shoots, in tiles (`CONTEXT.md`: Ranged combat), on the ground: a
+/// Bow further than a Crossbow. Contact counts too.
+pub const SHOT_REACH: Table<f64> = Table(&[("bow", 8.0), ("crossbow", 5.0)]);
+
+/// Ticks between two shots (`CONTEXT.md`: Ranged combat): a Bow looses one every three seconds, a
+/// Crossbow, slow to span, one every six. A blow in contact comes every `STRIKE_TICKS`.
+pub const SHOT_TICKS: Table<f64> = Table(&[("bow", 3.0), ("crossbow", 6.0)]);
+
+/// Damage a shot does before Combat skill and armour (`CONTEXT.md`: Ranged combat): Strength adds
+/// nothing. An unskilled Bow does about what an average fist does, a Crossbow hits hard.
+pub const SHOT_DAMAGE: Table<f64> = Table(&[("bow", 6.0), ("crossbow", 14.0)]);
+
+/// The furthest Combat skill raises a shot, as a share of it, reached at the same skill as a blow's
+/// `COMBAT_SKILL_LIMIT`: a master bowman shoots three times as hard as a beginner, a Crossbow
+/// needs little skill.
+pub const SHOT_SKILL_LIMIT: Table<f64> = Table(&[("bow", 2.0), ("crossbow", 0.25)]);
+
+/// Share of the target's shield and armour a shot goes through (`CONTEXT.md`: Ranged combat): a
+/// Crossbow's bolt half of it, an arrow from a Bow none.
+pub const SHOT_PIERCE: Table<f64> = Table(&[("bow", 0.0), ("crossbow", 0.5)]);
+
+/// Tiles of reach an archer up on a wall walk gets on top of their weapon's (`CONTEXT.md`: Ranged
+/// combat, Walls in combat): half a Bow's again, so a Bow on the wall outshoots one on the ground
+/// by four tiles and a Crossbow on the wall outshoots a Bow below.
+pub const WALL_SHOT_REACH_BONUS: f64 = 4.0;
+
 /// What a blow that lands does to a defender standing on their own city's wall, as a share of its
 /// damage (`CONTEXT.md`: Walls in combat): a quarter, so a wall's defenders hold out four times
 /// as long.
@@ -2207,18 +2298,34 @@ pub struct WallStrength {
 
 /// Damage a wall or gate takes from blows before it falls (`CONTEXT.md`: Walls in combat,
 /// broken). An average unarmed resident (4 a blow, one blow every `STRIKE_TICKS`) breaks a stretch
-/// of wall alone in about five minutes; ten soldiers with swords in well under one. A gate holds
-/// out half as long again.
-pub const WALL_STRENGTH: WallStrength = WallStrength { wall: 600.0, gate: 900.0 };
+/// of wall alone in about 25 minutes, one with a Spear in about 12. A gate holds out half as long
+/// again. Long enough that a starting city's defenders get from their town hall up onto the wall
+/// and beat the breakers first, at twice their numbers too (T105.6).
+pub const WALL_STRENGTH: WallStrength = WallStrength { wall: 3000.0, gate: 4500.0 };
+
+/// Damage a stone wall or gate takes before it falls: four times a wooden one's (`CONTEXT.md`:
+/// Wall / Gate, Wood or stone), so a Spear breaks a tile of stone wall alone in about 50 minutes.
+pub const STONE_WALL_STRENGTH: WallStrength = WallStrength { wall: 12000.0, gate: 18000.0 };
 
 /// Share of a broken wall's or gate's materials left on its tile, rounded down to whole units:
 /// less than tearing it down leaves (`TEARDOWN_MATERIALS_RETURNED`), as much of it is splintered;
 /// enough that a tile of wall leaves a unit of Wood.
 pub const BROKEN_MATERIALS_RETURNED: f64 = 0.34;
 
-/// Ticks it takes to climb over a wall or gate (`CONTEXT.md`: Walls in combat, climbed): a
-/// minute, as long as walking eight tiles of plains, all the while unable to dodge or strike back.
-pub const CLIMB_TICKS: f64 = 60.0;
+/// Ticks it takes to climb over a wall or gate (`CONTEXT.md`: Walls in combat, climbed): six
+/// minutes, all the while unable to dodge or strike back, so a starting city's defenders get up
+/// onto its wall and strike the climbers down before they are over (T105.6).
+pub const CLIMB_TICKS: f64 = 360.0;
+
+/// Ticks it takes to get up onto a wall walk from the ground next to the wall, and as long again to
+/// get down (`CONTEXT.md`: Wall walk): twenty seconds, as long as walking about three tiles of
+/// plains, so nobody goes up on the way somewhere else.
+pub const WALL_WALK_TICKS: f64 = 20.0;
+
+/// Health someone up on a wall or gate tile loses when the tile breaks under them and they fall to
+/// the ground (`CONTEXT.md`: A tile breaks), of `MAX_HEALTH`: about as much as a few good blows,
+/// so a fall hurts but kills only those already low on health.
+pub const FALL_DAMAGE: f64 = 30.0;
 
 /// Chance of dodging a blow for each point of Agility: an average resident dodges one in five.
 pub const DODGE_PER_AGILITY: f64 = 0.02;
@@ -2634,6 +2741,7 @@ pub fn balance_json() -> Value {
     m.insert("START_FOOD".into(), json!(START_FOOD));
     m.insert("START_COINS".into(), json!(START_COINS));
     m.insert("START_CARRIED_FOOD".into(), json!(START_CARRIED_FOOD));
+    m.insert("START_SPEARS".into(), json!(START_SPEARS));
     m.insert("START_HORSES".into(), json!(START_HORSES));
     m.insert("START_STABLE_FOOD".into(), json!(START_STABLE_FOOD));
     m.insert("HORSE_FOOD_PER_DAY".into(), json!(HORSE_FOOD_PER_DAY));
@@ -2643,6 +2751,8 @@ pub fn balance_json() -> Value {
     m.insert("HORSE_HUNGRY_SHARE".into(), json!(HORSE_HUNGRY_SHARE));
     m.insert("HORSE_WAKE_HEALTH".into(), json!(HORSE_WAKE_HEALTH));
     m.insert("STABLE_FEED_DAYS".into(), json!(STABLE_FEED_DAYS));
+    m.insert("STABLE_HAND_FEED_DAYS".into(), json!(STABLE_HAND_FEED_DAYS));
+    m.insert("STABLE_HAND_WORK_MINUTES".into(), json!(STABLE_HAND_WORK_MINUTES));
     m.insert("NPC_STABLE_REFILL_DAYS".into(), json!(NPC_STABLE_REFILL_DAYS));
     m.insert("NPC_STABLE_HUNGRY_DAYS".into(), json!(NPC_STABLE_HUNGRY_DAYS));
     m.insert("NPC_START_HORSES".into(), json!(NPC_START_HORSES));
@@ -2699,6 +2809,8 @@ pub fn balance_json() -> Value {
     m.insert("WORK_FOOD_KEPT".into(), json!(WORK_FOOD_KEPT));
     m.insert("NPC_SOLDIER_SHARE".into(), json!(NPC_SOLDIER_SHARE));
     m.insert("NPC_STEEL_KIT".into(), json!(NPC_STEEL_KIT));
+    m.insert("NPC_ARCHER_SHARE".into(), json!(NPC_ARCHER_SHARE));
+    m.insert("NPC_ARCHER_ARROWS".into(), json!(NPC_ARCHER_ARROWS));
     m.insert("NPC_SOLDIERS_ON_HALL".into(), json!(NPC_SOLDIERS_ON_HALL));
     m.insert("NPC_SOLDIERS_AT_GATE".into(), json!(NPC_SOLDIERS_AT_GATE));
     m.insert("NPC_POST_AROUND_HALL".into(), json!(NPC_POST_AROUND_HALL));
@@ -2730,6 +2842,7 @@ pub fn balance_json() -> Value {
     m.insert("CITY_SIDE_LANE_GAP".into(), json!(CITY_SIDE_LANE_GAP));
     m.insert("CITY_QUARTER_ROWS".into(), json!(CITY_QUARTER_ROWS));
     m.insert("NPC_WALL_TILES_PER_TRIP".into(), json!(NPC_WALL_TILES_PER_TRIP));
+    m.insert("NPC_STONE_WALL_RESIDENTS".into(), json!(NPC_STONE_WALL_RESIDENTS));
     m.insert("NPC_NODE_REACH".into(), json!(NPC_NODE_REACH));
     m.insert("NPC_RESIDENTS_PER_SCOUT".into(), json!(NPC_RESIDENTS_PER_SCOUT));
     m.insert("NPC_SCOUT_LIMIT".into(), json!(NPC_SCOUT_LIMIT));
@@ -2787,6 +2900,12 @@ pub fn balance_json() -> Value {
     m.insert("TRANSFER_FEE_FACTOR".into(), json!(TRANSFER_FEE_FACTOR));
     m.insert("GOOD_WEIGHT".into(), to_value(GOOD_WEIGHT).expect("serialisable"));
     m.insert("WEAPON_ATTACK".into(), to_value(WEAPON_ATTACK).expect("serialisable"));
+    m.insert("SHOT_REACH".into(), to_value(SHOT_REACH).expect("serialisable"));
+    m.insert("SHOT_TICKS".into(), to_value(SHOT_TICKS).expect("serialisable"));
+    m.insert("SHOT_DAMAGE".into(), to_value(SHOT_DAMAGE).expect("serialisable"));
+    m.insert("SHOT_SKILL_LIMIT".into(), to_value(SHOT_SKILL_LIMIT).expect("serialisable"));
+    m.insert("SHOT_PIERCE".into(), to_value(SHOT_PIERCE).expect("serialisable"));
+    m.insert("WALL_SHOT_REACH_BONUS".into(), json!(WALL_SHOT_REACH_BONUS));
     m.insert("PROTECTION_DEFENCE".into(), to_value(PROTECTION_DEFENCE).expect("serialisable"));
     m.insert("CARRY_BASE".into(), json!(CARRY_BASE));
     m.insert("CARRY_PER_STRENGTH".into(), json!(CARRY_PER_STRENGTH));
@@ -2806,6 +2925,7 @@ pub fn balance_json() -> Value {
     m.insert("DOWN_DAYS".into(), json!(DOWN_DAYS));
     m.insert("WAKE_HEALTH".into(), json!(WAKE_HEALTH));
     m.insert("FEED_UNITS".into(), json!(FEED_UNITS));
+    m.insert("EQUIP_TICKS".into(), json!(EQUIP_TICKS));
     m.insert("HEAL_DAYS".into(), json!(HEAL_DAYS));
     m.insert("HUNGER_ENDURANCE_AVERAGE".into(), json!(HUNGER_ENDURANCE_AVERAGE));
     m.insert("HUNGER_ENDURANCE_EFFECT".into(), json!(HUNGER_ENDURANCE_EFFECT));
@@ -2876,6 +2996,11 @@ pub fn balance_json() -> Value {
     m.insert("DIRECTIVE_BUY_OFF_PRICE".into(), json!(DIRECTIVE_BUY_OFF_PRICE));
     m.insert("BUILD_MATERIALS".into(), to_value(BUILD_MATERIALS).expect("serialisable"));
     m.insert("BUILD_WORK".into(), to_value(BUILD_WORK).expect("serialisable"));
+    m.insert(
+        "STONE_BUILD_MATERIALS".into(),
+        to_value(STONE_BUILD_MATERIALS).expect("serialisable"),
+    );
+    m.insert("STONE_BUILD_WORK".into(), to_value(STONE_BUILD_WORK).expect("serialisable"));
     m.insert("MOUNTAIN_ROAD_WORK_FACTOR".into(), json!(MOUNTAIN_ROAD_WORK_FACTOR));
     m.insert("ROAD_LINE_MAX_TILES".into(), json!(ROAD_LINE_MAX_TILES));
     m.insert("BUILD_STRENGTH_AVERAGE".into(), json!(BUILD_STRENGTH_AVERAGE));
@@ -2921,8 +3046,11 @@ pub fn balance_json() -> Value {
     m.insert("MIN_BLOW_DAMAGE".into(), json!(MIN_BLOW_DAMAGE));
     m.insert("WALL_DEFENCE".into(), json!(WALL_DEFENCE));
     m.insert("WALL_STRENGTH".into(), to_value(WALL_STRENGTH).expect("serialisable"));
+    m.insert("STONE_WALL_STRENGTH".into(), to_value(STONE_WALL_STRENGTH).expect("serialisable"));
     m.insert("BROKEN_MATERIALS_RETURNED".into(), json!(BROKEN_MATERIALS_RETURNED));
     m.insert("CLIMB_TICKS".into(), json!(CLIMB_TICKS));
+    m.insert("WALL_WALK_TICKS".into(), json!(WALL_WALK_TICKS));
+    m.insert("FALL_DAMAGE".into(), json!(FALL_DAMAGE));
     m.insert("DODGE_PER_AGILITY".into(), json!(DODGE_PER_AGILITY));
     m.insert("DODGE_LIMIT".into(), json!(DODGE_LIMIT));
     m.insert("COMBAT_SKILL_PER_BLOW".into(), json!(COMBAT_SKILL_PER_BLOW));

@@ -341,7 +341,12 @@ fn opens_with_the_first_crew_full_and_its_good_below_the_cap() {
     let (t, at) = ready();
     assert_eq!(
         t.project(),
-        Some(CityProject::Build { building: BuildingKind::LumberCamp, x: at.0, y: at.1 })
+        Some(CityProject::Build {
+            building: BuildingKind::LumberCamp,
+            x: at.0,
+            y: at.1,
+            material: None
+        })
     );
 }
 
@@ -604,7 +609,10 @@ fn finishes_a_farm_already_begun_before_it_opens_another() {
         "site": { "delivered": {}, "work": 0 },
     }));
     t.world.buildings.push(begun);
-    assert_eq!(t.project(), Some(CityProject::Build { building: BuildingKind::Farm, x, y }));
+    assert_eq!(
+        t.project(),
+        Some(CityProject::Build { building: BuildingKind::Farm, x, y, material: None })
+    );
 }
 
 /// The big city with three full farms and a fourth just finished, its lumber camp full and Wood

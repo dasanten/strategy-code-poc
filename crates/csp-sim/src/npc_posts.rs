@@ -17,6 +17,7 @@ use csp_shared::world::{
 use crate::npc_founding::founding_party;
 use crate::queries::city::town_hall_of;
 use crate::queries::names::{kind_name, placed};
+use crate::queries::npc_trade::is_npc_archer;
 use crate::queries::residents::is_armed;
 use crate::random::hash_str;
 
@@ -75,7 +76,7 @@ pub fn soldiers_at_hand(world: &WorldState, city: &City, adults: &[usize]) -> Ve
         .copied()
         .filter(|&i| {
             let r = &world.residents[i];
-            is_armed(&r.carried)
+            is_armed(r)
                 && r.down_until.is_none()
                 && r.script.as_ref().is_none_or(|s| s.task == Some(Task::Train))
                 && r.carrying.is_none()
@@ -103,7 +104,9 @@ pub fn posts_to_hold(world: &WorldState, city: &City) -> f64 {
 /// The posts of a city's `soldiers` (`soldierPosts`), by resident id; none for a city whose
 /// soldiers stand none. In order of id, the first `NPC_SOLDIERS_ON_HALL` stand on the hall and the
 /// next `NPC_SOLDIERS_AT_GATE` at each gate; the rest spread along its wall, each on the tile their
-/// id hashes to. A city with too little wall for them adds the ground around its hall to it.
+/// id hashes to. A city with too little wall for them adds the ground around its hall to it. Its
+/// archers (`is_npc_archer`, `CONTEXT.md`: Ranged combat) take wall posts first: with a wall they
+/// can get up to, they all stand on it, never on the hall, at a gate or on the ground beside it.
 pub fn soldier_posts(
     world: &WorldState,
     city: &City,
@@ -123,6 +126,19 @@ pub fn soldier_posts(
     let on_hall = ids(&hall_tiles);
     let mut ranked: Vec<&String> = soldiers.iter().map(|&i| &world.residents[i].id).collect();
     ranked.sort();
+    let archers: HashSet<&String> = soldiers
+        .iter()
+        .map(|&i| &world.residents[i])
+        .filter(|r| is_npc_archer(r))
+        .map(|r| &r.id)
+        .collect();
+    let (gates, walls) = reachable_walls(world, city, size);
+    // With a wall to stand on, its archers go there and leave the hall and the gates to the others.
+    let (mut ranked, to_wall): (Vec<&String>, Vec<&String>) = if walls.is_empty() {
+        (ranked, Vec::new())
+    } else {
+        ranked.into_iter().partition(|id| !archers.contains(id))
+    };
     let pick = |list: &[(i32, i32)], id: &str| list[hash_str(id) as usize % list.len()];
 
     let on_hall_n = NPC_SOLDIERS_ON_HALL as usize;
@@ -133,7 +149,6 @@ pub fn soldier_posts(
         );
     }
     let mut taken = on_hall_n;
-    let (gates, walls) = reachable_walls(world, city, size);
     let at_gate = NPC_SOLDIERS_AT_GATE as usize;
     for gate in gates {
         let at = (gate.x as i32, gate.y as i32);
@@ -143,11 +158,14 @@ pub fn soldier_posts(
         }
         taken += at_gate;
     }
-    let rest: Vec<&&String> = ranked.iter().skip(taken).collect();
+    ranked = ranked.into_iter().skip(taken).chain(to_wall).collect();
+    let rest = ranked;
     if rest.is_empty() {
         return posts;
     }
     let along: Vec<(i32, i32)> = walls.iter().map(|w| (w.x as i32, w.y as i32)).collect();
+    // Its archers stand on the wall itself, never on the ground beside it.
+    let on_wall = (!along.is_empty()).then(|| (along.clone(), ids(&along)));
     let spots = if along.len() >= rest.len() {
         along
     } else {
@@ -159,7 +177,11 @@ pub fn soldier_posts(
     let tiles = if spots.is_empty() { hall_tiles } else { spots };
     let on_them = ids(&tiles);
     for id in rest {
-        posts.insert(id.to_string(), SoldierPost { at: pick(&tiles, id), tiles: on_them.clone() });
+        let (tiles, on_them) = match &on_wall {
+            Some((wall, on)) if archers.contains(id) => (wall, on),
+            _ => (&tiles, &on_them),
+        };
+        posts.insert(id.to_string(), SoldierPost { at: pick(tiles, id), tiles: on_them.clone() });
     }
     posts
 }

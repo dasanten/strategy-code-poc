@@ -130,6 +130,13 @@ fn full_town(size: i32) -> Town {
         f64::from(y),
     );
     t.world.buildings.push(stable);
+    // Its wall already of stone: a town holding Stone beyond its reserve upgrades it first
+    // (`CONTEXT.md`: Wood or stone).
+    for b in t.world.buildings.iter_mut().filter(|b| b.city_id.as_deref() == Some(&t.city)) {
+        if matches!(b.kind, BuildingKind::Wall | BuildingKind::Gate) {
+            b.material = Some(csp_shared::world::WallMaterial::Stone);
+        }
+    }
     t
 }
 

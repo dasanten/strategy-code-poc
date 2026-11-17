@@ -132,7 +132,7 @@ fn can_walk_out(
             if seen.contains(&i) || !is_passable_terrain(terrain_at(terrain, x, y)) {
                 continue;
             }
-            if !may_step(&walls, Some(city), tile_index(size, tx, ty), i, false, false) {
+            if !may_step(&walls, Some(city), i) {
                 continue;
             }
             seen.insert(i);
@@ -516,7 +516,7 @@ fn still_has_its_project_go_to_the_edge_with_no_room_inside() {
             }
         }
         let p = next_project(&world, city_of(&world, &city), &home, &terrain);
-        let Some(CityProject::Build { building: BuildingKind::House, x, y }) = p else {
+        let Some(CityProject::Build { building: BuildingKind::House, x, y, .. }) = p else {
             panic!("{layout:?}: {p:?}");
         };
         let (x, y) = (x as i32, y as i32);

@@ -24,6 +24,7 @@ import {
 import { ChunkStore, chunkByChunk, exploredChunkBatches, type ChunkSource } from './map/chunks.js'
 import { cachedSource, countsAt, openTerrainCache } from './map/terrain-cache.js'
 import { selectedWay, wayInView, wayLine } from './map/way.js'
+import { shots, type Shot } from './map/shots.js'
 import { TerrainLayer } from './map/terrain-layer.js'
 import { CoarseLayer, type LevelChunk } from './map/coarse-layer.js'
 import {
@@ -107,14 +108,15 @@ import { Motion, motionTokens, workSway } from './map/motion.js'
 import { overviewPixels, overviewSide, overviewTerrainAt } from './map/overview.js'
 import { caravanAt, caravanParts } from './caravans.js'
 import { drawUnits, type Spot } from './map/unit-tokens.js'
+import { FAR_ROAD_WIDTH, farRoadRuns, roadJoins, roadWidth, type RoadRun } from './map/roads.js'
 import {
-  FAR_ROAD_WIDTH,
-  farRoadRuns,
-  roadJoins,
-  roadWidth,
-  wallWidths,
-  type RoadRun,
-} from './map/roads.js'
+  drawStoneFrames,
+  drawStoneMarks,
+  drawWallTiles,
+  wallSides,
+  type WallTile,
+} from './map/wall-tile.js'
+import { isStone } from './shared/building.js'
 import { drawPlans, plannedBuilding } from './map/plans.js'
 import { drawPlaces, pickedPlaces } from './map/places.js'
 import { drawMarks, drawPickPreview, type MapMark } from './map/preview-draw.js'
@@ -988,6 +990,8 @@ export function MapView({
         rings = true
       }
       if (rings) g.stroke({ width: 2.5, color: LEADER_COLOR })
+      // Archers shooting, a thin line to whom they shoot at (`CONTEXT.md`: Ranged combat).
+      drawShots(g, shots(world.residents, mapSize), spots)
       // What their params and orders point at (`CONTEXT.md`: Places of the picked).
       drawPlaces(g, cam, view, mapSize, pickedPlaces(world, ids), spots)
       for (const id of ids) {
@@ -1572,6 +1576,29 @@ function drawPath(
   else g.circle(...end, 5).fill(LEADER_COLOR)
 }
 
+/** The colour of a shot's line: pale, as an arrow in flight. */
+const SHOT_COLOR = 0xf2e6c9
+
+/**
+ * Each shot as a thin line from the archer to whom they shoot at, both where they stand on screen
+ * (`spots`); a shot with either out of view is skipped.
+ */
+function drawShots(
+  g: Graphics,
+  list: readonly Shot[],
+  spots: ReadonlyMap<string, { x: number; y: number }>,
+) {
+  let any = false
+  for (const s of list) {
+    const from = spots.get(s.from)
+    const to = spots.get(s.to)
+    if (!from || !to) continue
+    g.moveTo(from.x, from.y).lineTo(to.x, to.y)
+    any = true
+  }
+  if (any) g.stroke({ width: 1.5, color: SHOT_COLOR, alpha: 0.8, cap: 'round' })
+}
+
 /** The end of a way far out: a dot in the way's colour with a white ring, in screen pixels. */
 const FAR_WAY_END_RADIUS = 4
 
@@ -1769,37 +1796,27 @@ function drawStructures(
   const near = (sx: number, sy: number) =>
     sx > -tile * 2 && sy > -tile * 2 && sx < view.width + tile * 2 && sy < view.height + tile * 2
 
-  // Walls and gates as joined lines in the owner's colour over a dark edge (ADR 0008); a wall
-  // site shows faintly.
+  // Walls and gates as the whole tile in the owner's colour with a darker edge (`CONTEXT.md`:
+  // Wall / Gate), drawn in `wall-tile.ts`; a wall site shows faintly.
   const walls = structures.walls
   const wallAt = (x: number, y: number) => walls.has(`${(x + size) % size},${(y + size) % size}`)
-  const { edge, band } = wallWidths(tile)
-  const lines = new Map<string, [number, number, number, number][]>()
+  const wallTiles = new Map<string, WallTile[]>()
   for (const b of buildings) {
     if (b.kind !== 'wall' && b.kind !== 'gate') continue
-    const [cx, cy] = centre(cam, view, size, b)
-    if (!near(cx, cy)) continue
-    const key = `${relationshipColor(relOf(b))},${(b.site ? 0.35 : 1) * fade}`
-    const list = lines.get(key) ?? []
-    lines.set(key, list)
-    // A dot on every wall tile, so one standing alone shows, and a line to each wall right or below.
-    list.push([cx, cy, cx, cy])
-    if (wallAt(b.x + 1, b.y)) list.push([cx, cy, cx + tile, cy])
-    if (wallAt(b.x, b.y + 1)) list.push([cx, cy, cx, cy + tile])
+    const [sx, sy] = tileToScreen(cam, view, size, b.x, b.y)
+    if (!near(sx + tile / 2, sy + tile / 2)) continue
+    // 1: a stone wall, 2: a stone gate, whose token covers the middle of its tile.
+    const stone = isStone(b.kind, b.material) ? (b.kind === 'gate' ? 2 : 1) : 0
+    const key = `${relationshipColor(relOf(b))},${(b.site ? 0.35 : 1) * fade},${stone}`
+    const list = wallTiles.get(key) ?? []
+    wallTiles.set(key, list)
+    list.push({ sx, sy, ...wallSides(b.x, b.y, wallAt) })
   }
-  const stroke = (width: number, color: number, alpha: number, segments: number[][]) => {
-    const dots = segments.filter(([x0, y0, x1, y1]) => x0 === x1 && y0 === y1)
-    for (const [x, y] of dots) under.rect(x! - width / 2, y! - width / 2, width, width)
-    if (dots.length > 0) under.fill({ color, alpha })
-    const joins = segments.filter(([x0, y0, x1, y1]) => x0 !== x1 || y0 !== y1)
-    for (const [x0, y0, x1, y1] of joins) under.moveTo(x0!, y0!).lineTo(x1!, y1!)
-    if (joins.length > 0) under.stroke({ width, color, alpha, cap: 'square' })
-  }
-  for (const [key, segments] of lines)
-    stroke(edge, 0x0e1419, Number(key.split(',')[1]) * 0.85, segments)
-  for (const [key, segments] of lines) {
-    const [color, alpha] = key.split(',').map(Number) as [number, number]
-    stroke(band, color, alpha, segments)
+  for (const [key, list] of wallTiles) {
+    const [color, alpha, stone] = key.split(',').map(Number) as [number, number, number]
+    drawWallTiles(under, list, tile, color, alpha)
+    if (stone === 1) drawStoneMarks(under, list, tile, alpha)
+    if (stone === 2) drawStoneFrames(under, list, tile, alpha)
   }
 
   // Buildings as icon tokens over their footprint (`CONTEXT.md`: Footprint): a plate in the

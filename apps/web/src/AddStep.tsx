@@ -1,6 +1,7 @@
 import { Fragment, useContext, useState } from 'react'
 import { FEED_UNITS, HAUL_KEEP_FOOD } from '@csp/balance'
 import { GOODS } from './shared/world.js'
+import { GEAR } from './equipment-view.js'
 import type {
   BuildingKind,
   Good,
@@ -139,7 +140,9 @@ export function AddStep({
             terrain={buildTile.terrain}
             buildProblem={buildTile.problem}
             planning
-            onBuild={(building) => onAnswer({ ask, building })}
+            onBuild={(building, material) =>
+              onAnswer({ ask, building, ...(material ? { material } : {}) })
+            }
           />
         )}
         {ask === 'makes' && (
@@ -182,6 +185,24 @@ export function AddStep({
         )}
         {ask === 'haul' && <HaulAsk onAnswer={(setup) => onAnswer({ ask, setup })} />}
         {ask === 'units' && <UnitsAsk onAnswer={(units) => onAnswer({ ask, units })} />}
+        {ask === 'gear' && (
+          <div className="order-buttons">
+            {GEAR.map((good) => (
+              <button type="button" key={good} onClick={() => onAnswer({ ask, good })}>
+                Put on {GOOD_LABELS[good].toLowerCase()}
+              </button>
+            ))}
+          </div>
+        )}
+        {ask === 'slot' && (
+          <div className="order-buttons">
+            {(['weapon', 'shield', 'armour'] as const).map((slot) => (
+              <button type="button" key={slot} onClick={() => onAnswer({ ask, slot })}>
+                Take off the {slot}
+              </button>
+            ))}
+          </div>
+        )}
         {ask === 'subject' && (
           <SubjectPicker action="Add" onPick={(subject) => onAnswer({ ask, subject })} />
         )}

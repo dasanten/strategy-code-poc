@@ -10,7 +10,7 @@ use csp_shared::terrain::{tile_index, Terrain};
 use csp_shared::time::{TICKS_PER_GAME_DAY, TICKS_PER_GAME_YEAR};
 use csp_shared::world::{
     Building, BuildingKind, Carrying, CityProject, Good, Pair, Resident, ResidentOrder, StatRecord,
-    Stock, Task, WorldState,
+    Stock, Task, UpSide, WorldState,
 };
 use serde_json::{json, Value};
 
@@ -28,7 +28,7 @@ use crate::queries::city::city_residents;
 use crate::queries::city_area::city_area_tiles;
 use crate::random::{new_id, Mulberry32};
 use crate::residents::{new_resident, NewResident};
-use crate::walls::{may_step, wall_map, wall_side};
+use crate::walls::{may_move, wall_map, wall_side};
 
 const DAY: usize = TICKS_PER_GAME_DAY as usize;
 
@@ -70,7 +70,7 @@ fn project(v: &Village) -> Option<CityProject> {
 
 fn build_at(p: &Option<CityProject>, kind: BuildingKind) -> (f64, f64) {
     match p {
-        Some(CityProject::Build { building, x, y }) if *building == kind => (*x, *y),
+        Some(CityProject::Build { building, x, y, .. }) if *building == kind => (*x, *y),
         other => panic!("not a {kind:?} to build: {other:?}"),
     }
 }
@@ -264,6 +264,7 @@ fn with_no_room_left_inside_builds_on_its_edge_then_puts_up_a_new_wall_from_its_
             building: BuildingKind::Gate,
             x: v.home.x,
             y: v.home.y + f64::from(WALL) + NPC_WALL_STEP,
+            material: None,
         })
     );
 }
@@ -279,6 +280,7 @@ fn builds_a_lumber_camp_on_the_nearest_forest_when_it_needs_wood_and_makes_none(
             building: BuildingKind::LumberCamp,
             x: f64::from(FOREST.0),
             y: f64::from(FOREST.1),
+            material: None,
         })
     );
 }
@@ -413,7 +415,7 @@ fn catches_a_city_working_one_of_its_farms_as_its_own_workplace() {
 }
 
 #[test]
-fn an_npc_citys_residents_stand_on_its_walls_others_dont() {
+fn an_npc_citys_residents_get_up_on_its_walls_others_dont() {
     let v = village(None);
     let walls = wall_map(&v.world, &v.terrain);
     let size = v.terrain.size;
@@ -422,9 +424,10 @@ fn an_npc_citys_residents_stand_on_its_walls_others_dont() {
     let wall = tile_index(size, hx, hy - WALL);
     let own = &v.world.residents[0];
     assert_eq!(wall_side(own), Some(v.city.as_str()));
-    assert!(may_step(&walls, wall_side(own), inside, wall, true, false));
-    assert!(!may_step(&walls, None, inside, wall, true, false));
-    assert!(!may_step(&walls, Some("realm1"), inside, wall, true, false));
+    let up = Some(UpSide::Inside);
+    assert!(may_move(&walls, wall_side(own), inside, None, wall, up, false));
+    assert!(!may_move(&walls, None, inside, None, wall, up, false));
+    assert!(!may_move(&walls, Some("realm1"), inside, None, wall, up, false));
 }
 
 // npc-growth-village.test.ts
@@ -639,7 +642,8 @@ fn a_builder_of_a_site_beyond_the_node_reach_sets_out_with_food_for_the_walk_the
         (r.order, r.script) = (None, None);
         // Their Food already on them (`a_builder_of_a_far_site_takes_their_food_..._first`).
         r.carried = stock(&[(Good::Food, 40.0)]);
-        let project = CityProject::Build { building: BuildingKind::Quarry, x, y: sy };
+        let project =
+            CityProject::Build { building: BuildingKind::Quarry, x, y: sy, material: None };
         assert!(super::take_part(&mut v.world, 0, &project, Some(storage), false, None));
         v.world.residents[0].script.as_ref().expect("the Build default").memory.clone()
     };
@@ -668,6 +672,7 @@ fn a_builder_of_a_far_site_takes_their_food_from_the_storage_before_setting_out(
         building: BuildingKind::Quarry,
         x: sx + NPC_NODE_REACH + 200.0,
         y: sy,
+        material: None,
     };
     assert!(super::take_part(&mut v.world, 0, &far, Some(storage), false, None));
     let r = &v.world.residents[0];

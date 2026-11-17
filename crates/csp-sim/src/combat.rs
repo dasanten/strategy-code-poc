@@ -8,8 +8,8 @@ use csp_shared::balance::{MAP_SIZE, SIGHT_RANGE, STRIKE_TICKS, WALL_DEFENCE};
 use csp_shared::footprint::is_at;
 use csp_shared::terrain::wrap_distance;
 use csp_shared::world::{
-    AttackOrder, Building, CrimeKind, DeathCause, Realm, RealmEventWhat, Resident, ResidentOrder,
-    Struck, Task, Tile, WalkOrder, WorldState,
+    AttackOrder, Building, CrimeKind, DeathCause, Good, Realm, RealmEventWhat, Resident,
+    ResidentOrder, Struck, Task, Tile, WalkOrder, WorldState,
 };
 
 use crate::cities::update_city_membership;
@@ -26,8 +26,11 @@ use crate::queries::alliance::contract_of;
 use crate::queries::carriages::{driven_carriage_id, stands_still};
 use crate::queries::city::town_hall_of;
 use crate::queries::city_area::{in_city_area, stands_occupying};
-use crate::queries::combat::{attack_power, blow_damage, combat_learned, dodge_chance, in_contact};
-use crate::queries::names::placed;
+use crate::queries::combat::{
+    attack_power, attack_ticks, blow_damage, combat_learned, dodge_chance, in_contact,
+    ranged_weapon, shooting_weapon, shot_damage, shot_reach, tiles_apart,
+};
+use crate::queries::names::{held, placed};
 use crate::queries::residents::{is_armed, is_down};
 use crate::queries::standing::TRADE_ORG;
 use crate::queries::trade_org::{in_inner_ring, of_trade_org_hq, trade_org_hq};
@@ -35,7 +38,8 @@ use crate::queries::vessels::{
     across_docked_ship, being_rowed, between_vessels, rowed_vessel_id, vessel_aboard,
 };
 use crate::queries::walls::{
-    broken_returns, foreign_wall, is_wall_or_gate, on_own_wall, wall_strength, wall_strength_left,
+    broken_returns, foreign_wall, is_up, is_wall_or_gate, on_own_wall, reaches_for_height,
+    wall_strength, wall_strength_left,
 };
 use crate::random::{hash_str, Mulberry32};
 use crate::survival::{die_all, drop_goods};
@@ -78,19 +82,39 @@ fn tile(p: (f64, f64)) -> (i32, i32) {
 }
 
 /// Whether the resident at `ai` can strike the target (`CONTEXT.md`: Combat, Fighting at a
-/// vessel): in contact with it, and not from one vessel at someone aboard another. Those aboard a
-/// vessel are reached from beside it, as if it were the next land tile; those aboard a docked ship
-/// from anywhere on its haven, and the other way round.
+/// vessel, High ground): in contact with it, not from one vessel at someone aboard another, and
+/// not from the ground at someone up. Those aboard a vessel are reached from beside it, as if it
+/// were the next land tile; those aboard a docked ship from anywhere on its haven, and the other
+/// way round. A shot reaches within the archer's reach, from the ground at someone up too: the one
+/// way to hit them from below (`CONTEXT.md`: Ranged combat).
 fn reaches(world: &WorldState, size: i32, ai: usize, t: Target) -> bool {
     let a = &world.residents[ai];
     let contact = in_contact(size, tile((a.x, a.y)), tile(spot_of(world, t)));
     match t {
         Target::Resident(ti) => {
             let b = &world.residents[ti];
-            (contact || across_docked_ship(world, a, b)) && !between_vessels(world, a, b)
+            let blow =
+                (contact || across_docked_ship(world, a, b)) && reaches_for_height(world, a, b);
+            (blow || within_shot(world, size, a, b)) && !between_vessels(world, a, b)
         }
+        // A wall or gate is struck in contact, never shot at.
         Target::Building(_) => contact,
     }
+}
+
+/// Whether `a` shoots at `b` from where they stand (`CONTEXT.md`: Ranged combat): a Bow or
+/// Crossbow equipped, an Arrow carried, and `b` within its reach from there (further from up on a
+/// wall). Sight is checked by the attack order itself; nothing else blocks a shot for now.
+fn within_shot(world: &WorldState, size: i32, a: &Resident, b: &Resident) -> bool {
+    shooting_weapon(a).is_some()
+        && shot_reach(world, a)
+            .is_some_and(|reach| tiles_apart(size, tile((a.x, a.y)), tile((b.x, b.y))) <= reach)
+}
+
+/// Whether the resident at `ai` can strike or shoot the resident at `ti` from where they stand:
+/// what an attack order walks until (`attack_holds`). With nothing to shoot, that is contact.
+pub fn strikes_from_here(world: &WorldState, size: i32, ai: usize, ti: usize) -> bool {
+    reaches(world, size, ai, Target::Resident(ti))
 }
 
 /// A fresh attack order on `target_id` (`attackOrder`); `started` when the fight is already in
@@ -194,6 +218,9 @@ fn is_aggression(world: &WorldState, a: &Resident, t: &Resident, size: i32) -> b
 pub struct AttackRequest {
     pub resident_id: Option<String>,
     pub target_id: Option<String>,
+    /// A shot (`shoot`): only from a Bow or Crossbow with Arrows, at a resident in reach from
+    /// where the resident stands, so the order starts without a step (`CONTEXT.md`: Ranged combat).
+    pub shoot: bool,
 }
 
 /// `attack.validate` (`CONTEXT.md`: Combat): one of the Player's residents goes after a resident
@@ -253,13 +280,42 @@ pub fn validate_attack(
         .residents
         .iter()
         .any(|x| ours(x) && wrap_distance(size, tile((x.x, x.y)), tile(target)) <= SIGHT_RANGE);
-    if seen {
+    if seen && order.shoot {
+        return shoot_problem(world, size, me, resident);
+    }
+    // An archer shoots up at them (`CONTEXT.md`: Ranged combat); nobody else on the ground reaches.
+    let below = resident.is_some_and(|t| !reaches_for_height(world, me, t))
+        && shooting_weapon(me).is_none();
+    if seen && below {
+        Some("they are up on the wall")
+    } else if seen {
         None
     } else if resident.is_some() {
         Some("that resident is out of sight")
     } else {
         Some("that wall is out of sight")
     }
+}
+
+/// Why `me` can't shoot `target` from where they stand (`shoot`), None when they can: a Bow or
+/// Crossbow equipped, an Arrow carried, and a resident within its reach, not aboard another vessel.
+fn shoot_problem(
+    world: &WorldState,
+    size: i32,
+    me: &Resident,
+    target: Option<&Resident>,
+) -> Option<&'static str> {
+    if ranged_weapon(me).is_none() {
+        return Some("no bow or crossbow equipped");
+    }
+    if shooting_weapon(me).is_none() {
+        return Some("no arrows");
+    }
+    let Some(t) = target else { return Some("only residents are shot at") };
+    if between_vessels(world, me, t) || !within_shot(world, size, me, t) {
+        return Some("out of reach");
+    }
+    None
 }
 
 use crate::alarms::{answers_attack, goes_after_occupier};
@@ -315,17 +371,28 @@ pub fn request_strikes(world: &mut WorldState, size: i32) -> Vec<StrikeAction> {
         }
         let target = target.expect("not gone");
         if !reaches(world, size, ri, target) {
+            // In contact from the ground with someone up: no blow reaches them, so the order ends
+            // rather than waits below (`CONTEXT.md`: High ground).
+            if let Target::Resident(t) = target {
+                let (a, b) = (&world.residents[ri], &world.residents[t]);
+                let contact = in_contact(size, tile((a.x, a.y)), tile((b.x, b.y)));
+                if contact && !reaches_for_height(world, a, b) {
+                    world.residents[ri].order = None;
+                }
+            }
             continue;
         }
-        let target_id = match target {
-            Target::Resident(t) => world.residents[t].id.clone(),
-            Target::Building(b) => world.buildings[b].id.clone(),
+        let (target_id, ticks) = match target {
+            Target::Resident(t) => {
+                (world.residents[t].id.clone(), attack_ticks(&world.residents[ri]))
+            }
+            Target::Building(b) => (world.buildings[b].id.clone(), STRIKE_TICKS),
         };
         let r = &mut world.residents[ri];
         let Some(ResidentOrder::Attack(o)) = &mut r.order else { continue };
         o.path = None;
         o.progress = 0.0;
-        o.strike += 1.0 / STRIKE_TICKS;
+        o.strike += 1.0 / ticks;
         if o.strike < 1.0 - 1e-9 {
             continue;
         }
@@ -436,6 +503,18 @@ pub fn resolve_strikes(
         alarms.raise_resident_attacked(world, attacker_id, &t_id, size);
         // An alarm changes orders and scripts, never who is in the world: the indices hold.
         let tf = tick as f64;
+        // A shot looses one of the Arrows they carry, whether it lands or not (`CONTEXT.md`:
+        // Ranged combat).
+        let shot = shooting_weapon(&world.residents[ai]);
+        if shot.is_some() {
+            let carried = &mut world.residents[ai].carried;
+            let left = held(carried, Good::Arrows) - 1.0;
+            if left > 0.0 {
+                carried.insert(Good::Arrows, left);
+            } else {
+                carried.shift_remove(&Good::Arrows);
+            }
+        }
         let learned_a = combat_learned(&world.residents[ai], tf);
         *world.residents[ai].skills.entry(csp_shared::world::SkillName::Combat).or_insert(0.0) +=
             learned_a;
@@ -453,7 +532,10 @@ pub fn resolve_strikes(
             continue;
         }
         let cover = if on_own_wall(world, t) { WALL_DEFENCE } else { 1.0 };
-        let damage = blow_damage(&world.residents[ai], t, tf) * cover;
+        let damage = match shot {
+            Some(weapon) => shot_damage(&world.residents[ai], t, weapon),
+            None => blow_damage(&world.residents[ai], t, tf),
+        } * cover;
         let t = &mut world.residents[ti];
         t.health = 0f64.max(t.health - damage);
         if t.health <= 0.0 {
@@ -568,20 +650,26 @@ fn off_carriage(world: &mut WorldState, ti: usize) {
 
 /// The resident at `ti`, hit by the one at `ai` and still alive, reacts (`react`): a Player's
 /// resident runs their defence script; others, armed, fight back unless already attacking
-/// someone, off any carriage they are aboard; unarmed, they flee home to their city's town hall,
-/// but a driver drives on and a passenger stays aboard a carriage being driven, and so a rower
+/// someone, off any carriage they are aboard; unarmed, or struck from above with no way to strike
+/// back (`CONTEXT.md`: High ground), they flee home to their city's town hall, but a driver drives on and a passenger stays aboard a carriage being driven, and so a rower
 /// rows on and a passenger stays aboard a boat being rowed.
 fn react(world: &mut WorldState, ti: usize, ai: usize) {
     let t = &world.residents[ti];
-    if matches!(t.order, Some(ResidentOrder::Climb(_))) {
+    // A climber climbs on, and someone swapping gear finishes the swap first (`CONTEXT.md`:
+    // Equipment): they strike no blows meanwhile.
+    if matches!(t.order, Some(ResidentOrder::Climb(_) | ResidentOrder::Equip(_))) {
         return;
     }
     if defends_by_script(world, t) {
         start_defence(world, ti);
         return;
     }
-    if is_armed(&t.carried) {
-        if !matches!(t.order, Some(ResidentOrder::Attack(_))) {
+    // Struck from above, only an archer can answer: they shoot back up (`CONTEXT.md`: Ranged combat).
+    let from_above =
+        is_up(world, &world.residents[ai]) && !is_up(world, t) && shooting_weapon(t).is_none();
+    let attacking = matches!(t.order, Some(ResidentOrder::Attack(_)));
+    if is_armed(t) && (!from_above || attacking) {
+        if !attacking {
             let a_id = world.residents[ai].id.clone();
             off_carriage(world, ti);
             let t = &mut world.residents[ti];
@@ -625,4 +713,12 @@ fn react(world: &mut WorldState, ti: usize, ai: usize) {
 }
 
 #[cfg(test)]
+mod archer_defaults_tests;
+#[cfg(test)]
+mod high_ground_tests;
+#[cfg(test)]
+mod shooting_tests;
+#[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod wall_shooting_tests;

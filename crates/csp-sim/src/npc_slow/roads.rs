@@ -342,21 +342,25 @@ fn on_the_map_stands_down_for_the_founding_with_a_further_road_unfinished_and_th
         let plan = s.world.city_plans[&city].clone();
         let stone = stock(&s.world, &city, Good::Stone);
         let c = s.world.cities.iter().find(|c| c.id == city).expect("the city");
+        // What the crew holds, watched every tick: one put on it carrying Stone from other work, or
+        // back on it with Stone taken meanwhile, hasn't taken it as the crew.
+        let crew = crew_of(&s.world, &plan);
+        let mut crew_took = false;
+        let mut now_held = HashMap::new();
+        for &i in &crew {
+            let r = &s.world.residents[i];
+            let now = r.carried.get(&Good::Stone).copied().unwrap_or(0.0);
+            if held.get(&r.id).is_some_and(|h| now > *h) {
+                crew_took = true;
+            }
+            now_held.insert(r.id.clone(), now);
+        }
+        held = now_held;
         if !founding_party(Some(&plan)).is_empty() {
             set_out =
                 Some((s.world.tick as f64 / TICKS_PER_GAME_DAY, unfinished(&s.world), before));
         } else if full_but_materials(&s.world, c, &plan) {
             // What others take isn't the crew's: its project is built from the store as ever.
-            let crew = crew_of(&s.world, &plan);
-            let mut crew_took = false;
-            for &i in &crew {
-                let r = &s.world.residents[i];
-                let now = r.carried.get(&Good::Stone).copied().unwrap_or(0.0);
-                if now > held.get(&r.id).copied().unwrap_or(0.0) {
-                    crew_took = true;
-                }
-                held.insert(r.id.clone(), now);
-            }
             if crew_took && stone < kept {
                 took_kept += 1;
             }

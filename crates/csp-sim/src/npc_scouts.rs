@@ -10,11 +10,14 @@ use csp_shared::balance::{
     NPC_NODE_REACH, NPC_RESIDENTS_PER_SCOUT, NPC_SCOUT_LIMIT, NPC_SCOUT_SECTOR, SIGHT_RANGE,
 };
 use csp_shared::terrain::{wrap, wrap_distance};
-use csp_shared::world::{City, CityScouted, Resident, ScoutTrip, Task, WorldState};
+use csp_shared::world::{City, CityScouted, Good, Resident, ScoutTrip, Task, WorldState};
 use serde_json::json;
 
 use crate::npc_behaviour::{default_script, npc_home};
-use crate::queries::city::{city_residents, in_city_area};
+use crate::queries::city::{city_residents, in_city_area, stored_food};
+use crate::queries::goods::units_that_fit;
+use crate::queries::names::held;
+use crate::queries::npc_trade::npc_reserve;
 use crate::random::hash_str;
 
 /// Sectors along each side of the map (`sectorsAcross`).
@@ -111,7 +114,8 @@ pub fn give_up_site(world: &mut WorldState, city_id: &str, site: (i32, i32), siz
 
 /// Those of a city's spare hands who scout for it next (`pickScouts`), up to `scouts_wanted`:
 /// while it doesn't know its limit and Food isn't short, of `unneeded`, first those already out,
-/// then those with no workplace to go back to, then the rest.
+/// then those with no workplace to go back to, then the rest; a new one only while the Food they
+/// set out with fits above the reserve.
 pub fn pick_scouts(
     world: &WorldState,
     city: &City,
@@ -137,8 +141,27 @@ pub fn pick_scouts(
     };
     let mut sorted = unneeded.to_vec();
     sorted.sort_by_key(|&i| rank(i));
-    sorted.truncate(scouts_wanted(world, city));
-    sorted
+    // A new scout sets out with as much Food as they can carry (`CONTEXT.md`: Explore), and only
+    // from what lies above the reserve: scouting is spare hands' work, so sending one never makes
+    // Food short of the reserve (`CONTEXT.md`: Scout).
+    let tick = world.tick as f64;
+    let mut spare_food = stored_food(world, city) - held(&npc_reserve(world, city), Good::Food);
+    let wanted = scouts_wanted(world, city);
+    let mut picked = Vec::new();
+    for i in sorted {
+        if picked.len() >= wanted {
+            break;
+        }
+        if rank(i) != 0 {
+            let takes = units_that_fit(&world.residents[i], Good::Food, tick);
+            if takes > spare_food {
+                continue;
+            }
+            spare_food -= takes;
+        }
+        picked.push(i);
+    }
+    picked
 }
 
 /// Sends a resident scouting (`sendScout`): they run the game's Explore default with no `find`.

@@ -239,7 +239,7 @@ fn spare_hand(world: &WorldState, city: &City, adults: &[usize], jobs: &Jobs) ->
     let extra: HashSet<usize> = farmers.into_iter().skip(wanted).collect();
     let rank = |i: usize| -> Option<u8> {
         let r = &world.residents[i];
-        if is_armed(&r.carried) || r.carrying.is_some() {
+        if is_armed(r) || r.carrying.is_some() {
             return None;
         }
         match kind(i) {
@@ -570,7 +570,7 @@ fn armed_outsiders(
 ) -> bool {
     world.residents.iter().any(|r| {
         r.health > 0.0
-            && is_armed(&r.carried)
+            && is_armed(r)
             && !except.is_some_and(|e| e.contains(&r.id))
             && !allied(world, &city.id, wall_side(r).unwrap_or(""))
             && in_city_area(world, &city.id, r.x as i32, r.y as i32, size)
@@ -973,8 +973,8 @@ pub fn npc_traders_sound(world: &WorldState) -> Vec<InvariantViolation> {
             else {
                 continue;
             };
-            if r.city_id.as_ref() != Some(city_id) || r.owner.is_some() || is_armed(&r.carried) {
-                let what = if is_armed(&r.carried) { "armed" } else { "not of the city" };
+            if r.city_id.as_ref() != Some(city_id) || r.owner.is_some() || is_armed(r) {
+                let what = if is_armed(r) { "armed" } else { "not of the city" };
                 push(
                     format!("{city_id}'s trader {} is {what}", r.id),
                     vec![city_id.clone(), r.id.clone()],

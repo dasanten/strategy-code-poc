@@ -8,10 +8,10 @@ use std::collections::HashSet;
 use ts_rs::TS;
 
 use csp_shared::balance::{
-    BUILD_MATERIALS, CITY_PRICE_STANDING_SWING, HORSE_FOOD_PER_DAY, MAP_SIZE, NPC_HORSES_BASE,
-    NPC_RESIDENTS_PER_HORSE, NPC_RESIDENTS_PER_NEEDS_STEP, NPC_SOLDIER_SHARE, NPC_STEEL_KIT,
-    NPC_TRADE, NPC_WAR_CHEST_PER_RESIDENT, STABLE_CAPACITY, STABLE_FEED_DAYS, STANDING_RANGE,
-    WAREHOUSE_FLOOR,
+    BUILD_MATERIALS, CITY_PRICE_STANDING_SWING, HORSE_FOOD_PER_DAY, MAP_SIZE, NPC_ARCHER_ARROWS,
+    NPC_ARCHER_SHARE, NPC_HORSES_BASE, NPC_RESIDENTS_PER_HORSE, NPC_RESIDENTS_PER_NEEDS_STEP,
+    NPC_SOLDIER_SHARE, NPC_STEEL_KIT, NPC_TRADE, NPC_WAR_CHEST_PER_RESIDENT, STABLE_CAPACITY,
+    STABLE_FEED_DAYS, STANDING_RANGE, WAREHOUSE_FLOOR,
 };
 use csp_shared::goods::WEAPONS;
 use csp_shared::world::npc_trade::ShownNpcCityPrice;
@@ -85,7 +85,8 @@ pub fn npc_soldier_kit(world: &WorldState, city: &City) -> Vec<Good> {
 }
 
 /// How many of each piece of a steel kit an NPC city's soldiers still lack (`kitLacks`): its
-/// soldier target less the adults carrying that piece, in the kit's order; only those lacking.
+/// soldier target less the adults carrying that piece, in the kit's order; only those lacking. Its
+/// archers (`npc_archer_target`) want no weapon or shield of it: their Bow takes both hands.
 pub fn kit_lacks(world: &WorldState, city: &City, kit: &[Good]) -> Vec<(Good, f64)> {
     let tick = world.tick as f64;
     let adults: Vec<&Resident> = city_residents(world, &city.id)
@@ -93,31 +94,102 @@ pub fn kit_lacks(world: &WorldState, city: &City, kit: &[Good]) -> Vec<(Good, f6
         .filter(|r| r.owner.is_none() && r.health > 0.0 && can_work(r.born_at, tick))
         .collect();
     let target = npc_soldier_target(adults.len() as f64);
+    let archers = npc_archer_target(world, city, adults.len() as f64);
+    let hands = |g: Good| g == Good::SteelShield || WEAPONS.contains(&good_name(g));
     kit.iter()
-        .map(|&g| (g, target - adults.iter().filter(|r| held(&r.carried, g) > 0.0).count() as f64))
+        .map(|&g| {
+            let want = if hands(g) { target - archers } else { target };
+            let carrying = adults
+                .iter()
+                .filter(|r| held(&r.carried, g) > 0.0 && !(hands(g) && is_npc_archer(r)))
+                .count() as f64;
+            (g, want - carrying)
+        })
         .filter(|(_, n)| *n > 0.0)
         .collect()
 }
 
-/// What an NPC city's smithy forges (`npcSmithyGood`): a spear, or for a city that goes for Steel
-/// the first piece of its kit its soldiers lack beyond what its storages hold; with none, the
-/// first of its kit.
+/// What an NPC city's smithy forges (`npcSmithyGood`): what its soldiers lack first, beyond what
+/// its storages hold (a spear for one unarmed, or for a city that goes for Steel the first piece of
+/// its kit they lack); then a Bow or Arrows its archers lack (`archer_lacks`); with nothing lacking,
+/// the first of its kit.
 pub fn npc_smithy_good(world: &WorldState, city: &City) -> Good {
     let kit = npc_soldier_kit(world, city);
-    if kit.len() == 1 {
-        return kit[0];
-    }
     let stock = npc_city_stock(world, city);
-    kit_lacks(world, city, &kit)
-        .into_iter()
-        .find(|(g, n)| held(&stock, *g) < *n)
-        .map_or(kit[0], |(g, _)| g)
+    let soldiers = if kit.len() == 1 {
+        let tick = world.tick as f64;
+        let adults: Vec<&Resident> = city_residents(world, &city.id)
+            .into_iter()
+            .filter(|r| r.owner.is_none() && r.health > 0.0 && can_work(r.born_at, tick))
+            .collect();
+        let armed = adults.iter().filter(|r| is_armed(r)).count() as f64;
+        let held_weapons: f64 =
+            WEAPONS.iter().map(|w| held(&stock, good_of(w).expect("a weapon"))).sum();
+        (npc_soldier_target(adults.len() as f64) - armed > held_weapons).then_some(kit[0])
+    } else {
+        kit_lacks(world, city, &kit)
+            .into_iter()
+            .find(|(g, n)| held(&stock, *g) < *n)
+            .map(|(g, _)| g)
+    };
+    soldiers
+        .or_else(|| {
+            archer_lacks(world, city)
+                .into_iter()
+                .find(|(g, n)| held(&stock, *g) < *n)
+                .map(|(g, _)| g)
+        })
+        .unwrap_or(kit[0])
 }
 
 /// How many soldiers an NPC city keeps (`npcSoldierTarget`): `NPC_SOLDIER_SHARE` of its adults,
 /// rounded up.
 pub fn npc_soldier_target(adults: f64) -> f64 {
     (adults * NPC_SOLDIER_SHARE).ceil()
+}
+
+/// An NPC city's finished smithy, its own or among its workplaces, if any (`CONTEXT.md`: NPC
+/// city): where it forges its soldiers' weapons.
+pub fn npc_smithy(world: &WorldState, city: &City) -> Option<usize> {
+    world.buildings.iter().position(|b| {
+        b.kind == BuildingKind::Smithy
+            && b.site.is_none()
+            && (b.city_id.as_ref() == Some(&city.id)
+                || city.workplace_ids.iter().flatten().any(|id| *id == b.id))
+    })
+}
+
+/// Whether a resident is one of an NPC city's archers: they carry a Bow (`CONTEXT.md`: Ranged
+/// combat).
+pub fn is_npc_archer(r: &Resident) -> bool {
+    held(&r.carried, Good::Bow) > 0.0
+}
+
+/// How many of its soldiers an NPC city arms with a Bow (`CONTEXT.md`: Ranged combat): with a
+/// finished smithy (`npc_smithy`), `NPC_ARCHER_SHARE` of the soldiers it keeps for its `adults`,
+/// rounded down; none without one, and none for the Trade Org's cities or a Player's.
+pub fn npc_archer_target(world: &WorldState, city: &City, adults: f64) -> f64 {
+    if !for_sale(city) || npc_smithy(world, city).is_none() {
+        return 0.0;
+    }
+    (npc_soldier_target(adults) * NPC_ARCHER_SHARE).floor()
+}
+
+/// What an NPC city keeps for its archers (`CONTEXT.md`: NPC reserve): a Bow for each archer it
+/// wants beyond those carrying one, and `NPC_ARCHER_ARROWS` Arrows in its storages for each archer
+/// it wants. Only those it wants any of.
+pub fn archer_lacks(world: &WorldState, city: &City) -> Vec<(Good, f64)> {
+    let tick = world.tick as f64;
+    let adults: Vec<&Resident> = city_residents(world, &city.id)
+        .into_iter()
+        .filter(|r| r.owner.is_none() && r.health > 0.0 && can_work(r.born_at, tick))
+        .collect();
+    let target = npc_archer_target(world, city, adults.len() as f64);
+    let archers = adults.iter().filter(|r| is_npc_archer(r)).count() as f64;
+    [(Good::Bow, target - archers), (Good::Arrows, target * NPC_ARCHER_ARROWS)]
+        .into_iter()
+        .filter(|(_, n)| *n > 0.0)
+        .collect()
 }
 
 /// How many horses an NPC city wants for its size (`npcHorsesWanted`); none for the Trade
@@ -204,7 +276,7 @@ pub fn npc_reserve(world: &WorldState, city: &City) -> Stock {
         .filter(|r| r.owner.is_none() && r.health > 0.0)
         .collect();
     let adults: Vec<&&Resident> = residents.iter().filter(|r| can_work(r.born_at, tick)).collect();
-    let armed = adults.iter().filter(|r| is_armed(&r.carried)).count() as f64;
+    let armed = adults.iter().filter(|r| is_armed(r)).count() as f64;
     let unarmed = npc_soldier_target(adults.len() as f64) - armed;
     let kit = npc_soldier_kit(world, city);
     if kit.len() > 1 {
@@ -241,6 +313,20 @@ pub fn npc_reserve(world: &WorldState, city: &City) -> Stock {
         let recipe = recipe_for(BuildingKind::Smithy, Some(good_name(NPC_SMITHY_WEAPON)));
         if let Some(recipe) = recipe {
             add(&mut reserve, recipe.input.0.iter().copied(), unarmed - held_weapons);
+        }
+    }
+    // Its archers' Bows and Arrows, and the Iron and Wood for the batches its storages lack.
+    let lacks = archer_lacks(world, city);
+    if !lacks.is_empty() {
+        let stock = npc_city_stock(world, city);
+        for (good, lack) in lacks {
+            *reserve.entry(good).or_insert(0.0) += lack;
+            let forge = lack - held(&stock, good);
+            let Some(recipe) = recipe_for(BuildingKind::Smithy, Some(good_name(good))) else {
+                continue;
+            };
+            let batch = recipe.output.get(good_name(good)).unwrap_or(1.0);
+            add(&mut reserve, recipe.input.0.iter().copied(), (forge / batch).ceil());
         }
     }
     if !residents.is_empty() {
@@ -403,11 +489,11 @@ pub fn spare_residents<'w>(
     let mut candidates: Vec<&Resident> = adults
         .iter()
         .copied()
-        .filter(|r| !is_armed(&r.carried) && spare_hand(job(r), workplace_short))
+        .filter(|r| !is_armed(r) && spare_hand(job(r), workplace_short))
         .collect();
     let staying = (NPC_TRADE.defence_share * adults.len() as f64 - 1e-9).ceil();
     // Its soldiers count toward the share at home; the rest its plan keeps busy come on top.
-    let armed = adults.iter().filter(|r| is_armed(&r.carried)).count();
+    let armed = adults.iter().filter(|r| is_armed(r)).count();
     let kept_busy = (adults.len() - candidates.len() - armed) as f64;
     let idle = |r: &Resident| u8::from(!job(r).is_some_and(|j| j.kind != CityJobKind::Idle));
     candidates.sort_by(|a, b| idle(b).cmp(&idle(a)).then_with(|| locale_compare(&a.id, &b.id)));

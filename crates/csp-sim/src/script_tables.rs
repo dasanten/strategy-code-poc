@@ -142,7 +142,13 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
             ScriptField {
                 name: "carried",
                 r#type: ScriptType::View("goods"),
-                description: "The goods they carry.",
+                description: "The goods they carry: seen of your own and your allies' residents, and of anyone one of yours stands beside; empty for others, who show only what they have equipped.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "equipped",
+                r#type: ScriptType::View("equipment"),
+                description: "What they have equipped: a weapon, shield and armour, each among what they carry.",
                 null_when: None,
             },
             ScriptField {
@@ -186,6 +192,18 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 r#type: ScriptType::String,
                 description: "The id of the carriage or boat they are aboard as a passenger.",
                 null_when: Some("unless they are aboard one"),
+            },
+            ScriptField {
+                name: "up",
+                r#type: ScriptType::Boolean,
+                description: "Whether they are up on a wall walk, on top of a wall or gate, rather than on the ground. Getting up or down takes a while, and they come down only on the side they went up from.",
+                null_when: None,
+            },
+            ScriptField {
+                name: "reach",
+                r#type: ScriptType::Number,
+                description: "How far, in tiles, their Bow or Crossbow shoots from where they stand: further up on a wall. The Arrows they shoot are `carried.arrows`; out of them they fight with their fists.",
+                null_when: Some("without a bow or crossbow equipped"),
             },
             ScriptField {
                 name: "script",
@@ -294,6 +312,30 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 r#type: ScriptType::Number,
                 description: "What training added, at most the base.",
                 null_when: None,
+            },
+        ],
+    },
+    ScriptView {
+        name: "equipment",
+        description: "A resident’s three equipment slots: the good in each. Only what is equipped counts in a fight, and a weapon equipped makes them armed.",
+        fields: &[
+            ScriptField {
+                name: "weapon",
+                r#type: ScriptType::String,
+                description: "The weapon equipped: \"spear\", \"sword\", \"steelSword\", \"bow\" or \"crossbow\". A bow or crossbow takes both hands, so the shield slot stays empty.",
+                null_when: Some("when unarmed"),
+            },
+            ScriptField {
+                name: "shield",
+                r#type: ScriptType::String,
+                description: "The shield equipped: \"shield\" or \"steelShield\".",
+                null_when: Some("when they have none equipped"),
+            },
+            ScriptField {
+                name: "armour",
+                r#type: ScriptType::String,
+                description: "The armour equipped: \"armour\" or \"steelArmour\".",
+                null_when: Some("when they have none equipped"),
             },
         ],
     },
@@ -455,6 +497,24 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 name: "steelArmour",
                 r#type: ScriptType::Number,
                 description: "Units of steel armour.",
+                null_when: Some("when there are none"),
+            },
+            ScriptField {
+                name: "bow",
+                r#type: ScriptType::Number,
+                description: "Units of bow.",
+                null_when: Some("when there are none"),
+            },
+            ScriptField {
+                name: "crossbow",
+                r#type: ScriptType::Number,
+                description: "Units of crossbow.",
+                null_when: Some("when there are none"),
+            },
+            ScriptField {
+                name: "arrows",
+                r#type: ScriptType::Number,
+                description: "Units of arrows.",
                 null_when: Some("when there are none"),
             },
         ],
@@ -954,6 +1014,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 r#type: ScriptType::Number,
                 description: "Damage a wall or gate has taken from blows.",
                 null_when: Some("until someone strikes it"),
+            },
+            ScriptField {
+                name: "material",
+                r#type: ScriptType::String,
+                description: "\"stone\" for a stone wall or gate, or its site.",
+                null_when: Some("for one of wood and any other building"),
             },
             ScriptField {
                 name: "prices",
@@ -1886,6 +1952,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 null_when: Some("for a city, until someone strikes it"),
             },
             ScriptField {
+                name: "material",
+                r#type: ScriptType::String,
+                description: "\"stone\" for a stone wall or gate, or its site.",
+                null_when: Some("for a city, for one of wood and any other building"),
+            },
+            ScriptField {
                 name: "prices",
                 r#type: ScriptType::List(&ScriptType::View("price")),
                 description: "A Trade Org warehouse’s prices, one for each good it keeps.",
@@ -2094,6 +2166,12 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
                 r#type: ScriptType::String,
                 description: "The construction site of the line’s road or wall on it.",
                 null_when: Some("while none is laid out there"),
+            },
+            ScriptField {
+                name: "building",
+                r#type: ScriptType::String,
+                description: "What is built there: the line's \"road\" or \"wall\", or \"gate\" where a stone wall line upgrades a wooden gate.",
+                null_when: None,
             },
         ],
     },
@@ -2479,7 +2557,7 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Query,
         params: &["line", "from?"],
         cost: 20.0,
-        description: "The tiles of a Build line still to build, from its start to its end; with `from`, something with `x` and `y`, nearest first. `line` is like {building: \"wall\", from: {x: 3, y: 4}, to: {x: 8, y: 4}}, as the Build line task keeps it in `memory.line`, road or wall, straight or diagonal. Tiles the Player sees with one already, or that can’t take one, are left out.",
+        description: "The tiles of a Build line still to build, from its start to its end; with `from`, something with `x` and `y`, nearest first. `line` is like {building: \"wall\", from: {x: 3, y: 4}, to: {x: 8, y: 4}}, as the Build line task keeps it in `memory.line`, road or wall, straight or diagonal. Tiles the Player sees with one already, or that can’t take one, are left out; a stone wall line (`material: \"stone\"`) takes the wooden wall and gate tiles on its way too.",
         returns: ScriptType::List(&ScriptType::View("lineTile")),
     },
     ScriptBinding {
@@ -2757,9 +2835,9 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
     ScriptBinding {
         name: "build",
         is: Is::Action,
-        params: &["building"],
+        params: &["building", "material?"],
         cost: 10.0,
-        description: "Lay out or join a construction site of that kind on my tile.",
+        description: "Lay out or join a construction site of that kind on my tile. A wall or gate is of \"wood\" (by default) or \"stone\"; a stone one may be laid out on a wooden one of its kind, which stands until the stone one is finished.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -2815,7 +2893,15 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Action,
         params: &["targetId"],
         cost: 10.0,
-        description: "Go after a resident I see and strike them, or strike a wall or gate of another realm until it falls.",
+        description: "Go after a resident I see and strike them, or strike a wall or gate of another realm until it falls. With a Bow or Crossbow and Arrows I walk only until they are in my `reach` and shoot from there.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "shoot",
+        is: Is::Action,
+        params: &["targetId"],
+        cost: 10.0,
+        description: "Shoot a resident I see who is in my `reach` now, with my Bow or Crossbow and an Arrow a shot, without a step. The order goes on as an attack: should they get out of reach I go after them, so `stop()` to stay where I am.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -2824,6 +2910,22 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         params: &["targetId", "units"],
         cost: 10.0,
         description: "Feed a resident who is Down or a horse that isn’t full, of any realm, on or next to my tile, with up to that many units of the Food in my hands. A resident gets it in their hands, eats at once and wakes at low health. A horse eats until it is full, and wakes if it was Down; the rest stays with me.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "equip",
+        is: Is::Action,
+        params: &["good"],
+        cost: 10.0,
+        description: "Swap a weapon, shield or armour I carry, like \"sword\", into the slot it fits; what was there stays carried. It takes a few ticks, and I strike no blows meanwhile.",
+        returns: ScriptType::String,
+    },
+    ScriptBinding {
+        name: "takeOff",
+        is: Is::Action,
+        params: &["slot"],
+        cost: 10.0,
+        description: "Take off what I have in a slot, \"weapon\", \"shield\" or \"armour\"; it stays carried, and the slot stays empty until I pick up more that fits it. It takes a few ticks, and I strike no blows meanwhile.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -3069,9 +3171,9 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
     ScriptBinding {
         name: "wallLine",
         is: Is::Action,
-        params: &["x", "y"],
+        params: &["x", "y", "material?"],
         cost: 10.0,
-        description: "Build wall on each tile of the line from my tile to (x, y), straight or diagonal, one after another, with the materials I carry; tiles with a wall or gate already are skipped.",
+        description: "Build wall of \"wood\" (by default) or \"stone\" on each tile of the line from my tile to (x, y), straight or diagonal, one after another, with the materials I carry; tiles with a wall or gate already are skipped, but a stone line upgrades the wooden ones on its way, passing only those of stone.",
         returns: ScriptType::String,
     },
     ScriptBinding {
@@ -3347,7 +3449,7 @@ pub static ARMY_SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Query,
         params: &["line", "from?"],
         cost: 20.0,
-        description: "The tiles of a Build line still to build, from its start to its end; with `from`, something with `x` and `y`, nearest first. `line` is like {building: \"wall\", from: {x: 3, y: 4}, to: {x: 8, y: 4}}, as the Build line task keeps it in `memory.line`, road or wall, straight or diagonal. Tiles the Player sees with one already, or that can’t take one, are left out.",
+        description: "The tiles of a Build line still to build, from its start to its end; with `from`, something with `x` and `y`, nearest first. `line` is like {building: \"wall\", from: {x: 3, y: 4}, to: {x: 8, y: 4}}, as the Build line task keeps it in `memory.line`, road or wall, straight or diagonal. Tiles the Player sees with one already, or that can’t take one, are left out; a stone wall line (`material: \"stone\"`) takes the wooden wall and gate tiles on its way too.",
         returns: ScriptType::List(&ScriptType::View("lineTile")),
     },
     ScriptBinding {
@@ -3623,7 +3725,7 @@ fn buildFirst(site) {
     return true
   }
   if (me.order == null) {
-    let problem = build(site.kind)
+    let problem = build(site.kind, site.material)
     if (problem != null) { end("can't build the " + site.kind + ": " + problem) }
     return true
   }
@@ -4076,6 +4178,7 @@ fn pickSite() {
     return false
   }
   memory.building = join.kind
+  memory.material = join.material
   memory.at = crewTile(join)
   memory.siteId = join.id
   log("joining the site of " + placeName(join))
@@ -4130,7 +4233,7 @@ fn walkBack() {
 // Laying out the site, or joining it. Turned down, such as with the tile
 // taken, build says why: done.
 fn startBuilding() {
-  let problem = build(memory.building)
+  let problem = build(memory.building, memory.material)
   if (problem != null) {
     log("can't build: " + problem)
     end()
@@ -4644,10 +4747,13 @@ fn goodsText(load, goods) {
 // stand in when I start, kept in memory.stableId; with none, or once it is
 // gone, I end. Below that I fetch what is missing from params.source, or
 // the nearest storage of my realm with Food while none is picked, and store
-// it in the stable; otherwise I wait there. memory.spareFood, kept only by an
-// NPC city's feeder, is the most Food I may take now.
+// it in the stable; otherwise I wait there. With params.once I feed it a
+// single round: once it is full, or with no Food to fetch, I end.
+// memory.spareFood, kept only by an NPC city's feeder, is the most Food I may
+// take now.
 param stable: storage // the stable to feed; none: the one I stand in
 param source: storage // where the Food comes from; a carriage too; none: the nearest storage with Food
+param once: number = 0 // 1: a single round, then end; 0: keep it fed
 let days = 10 // game days of Food to keep
 let perHorse = 0.75 // Food a horse eats a game day
 let side = 3 // tiles along each side of a stable
@@ -4695,12 +4801,16 @@ fn storeFetched(stable) {
 }
 
 // Below the Food to keep for the horses in it now: fetch what is missing.
-// True once I set off.
+// True once I set off, or once I end (params.once).
 fn fetchIfLow(stable) {
   let held = 0
   if (stable.stock != null && stable.stock.food != null) { held = stable.stock.food }
   let need = horsesIn(stable) * days * perHorse - held
   if (need <= 0) {
+    if (params.once > 0) {
+      end("the stable is full")
+      return true
+    }
     say("enough Food in the stable: waiting")
     return false
   }
@@ -4717,6 +4827,10 @@ fn fetchIfLow(stable) {
       say("stable low (" + floor(held) + "): fetching " + units + " Food at " + placeName(from))
       return true
     }
+  }
+  if (params.once > 0) {
+    end("no Food to fetch")
+    return true
   }
   say("stable low (" + floor(held) + "): no Food to fetch, waiting")
   return false
@@ -4808,19 +4922,34 @@ fn goodsText(load, goods) {
 // which goes on once I end. Armed, I fight back at whoever struck me while
 // they are in sight, and end once they are dead, gone or out of sight; a
 // driver walks back to the carriage first, should the fight have led away.
-// Unarmed, I walk home to my city's town hall, and end there, or once no
-// blow has landed for calm ticks; but driving I end at once and drive on, and
+// With a Bow or Crossbow and Arrows I shoot back from where I stand, walking
+// only until they are in my reach, and from below at someone up on a wall too.
+// Unarmed, or struck from up on a wall while I stand below, where no blow of
+// mine reaches, I walk home to my city's town hall, away from the wall, and
+// end there, or once no blow has landed for calm ticks; but driving I end at once and drive on, and
 // aboard a carriage being driven I end at once and stay aboard.
 let calm = 30 // ticks without a blow before I go back, fleeing
 
-if (armed()) {
+if (armed() && (!struckFromAbove() || canShoot())) {
   // My drive waits while I fight: kept for the way back to my carriage.
   if (holdsCarriage()) { memory.carriageId = me.order.carriageId }
   fightBack()
+} else if (armed()) {
+  fleeHome()
 } else if (holdsCarriage() || betweenDrives() || aboardDriven()) {
   end()
 } else {
   fleeHome()
+}
+
+// Whether whoever struck me is up on a wall and I am on the ground below,
+// where nobody strikes anyone up.
+fn struckFromAbove() {
+  if (me.up) { return false }
+  for (r of residents()) {
+    if (r.id == me.struckBy) { return r.up }
+  }
+  return false
 }
 
 // Whether I drive a carriage, or haul with one.
@@ -4844,13 +4973,14 @@ fn aboardDriven() {
   return false
 }
 
-// Whether I carry a weapon.
+// Whether I have a weapon equipped.
 fn armed() {
-  for (w of ["spear", "sword", "steelSword"]) {
-    let n = me.carried[w]
-    if (n != null && n > 0) { return true }
-  }
-  return false
+  return me.equipped.weapon != null
+}
+
+// Whether I shoot: a Bow or Crossbow equipped and Arrows to loose.
+fn canShoot() {
+  return me.reach != null && me.carried.arrows != null
 }
 
 // At whoever struck me, while they are in sight.
@@ -5098,7 +5228,8 @@ fn goodsText(load, goods) {
     (
         Task::BuildLine,
         "Build line",
-        r#"// Build line (default): build memory.line.building, road or wall, on each
+        r#"// Build line (default): build memory.line.building, road or wall (of
+// memory.line.material, wood or stone, for a wall), on each
 // tile of the line from memory.line.from to memory.line.to, straight or
 // diagonal, as the Build line order gives it; started without one I end.
 // Tiles that have one already, or can't take one, are skipped. I take the
@@ -5217,7 +5348,7 @@ fn walkThere(tile) {
 // Laying out the tile's site, or joining the one there. Turned down, I end
 // saying why.
 fn startBuilding(tile) {
-  let problem = build(memory.line.building)
+  let problem = build(tile.building || memory.line.building, memory.line.material)
   if (problem != null) {
     end("can't build at " + tile.x + "," + tile.y + ": " + problem)
   } else if (tile.siteId == null) {
@@ -5651,7 +5782,10 @@ fn goodsText(load, goods) {
 // stand there until no armed outsider is left, which blocks an occupation before
 // it starts; an unarmed outsider I only log. A theft, an attack or an occupation
 // takes me off the hall, and when I end for it I come back here while armed
-// outsiders remain. Unarmed, or for another alarm, I end at once.
+// outsiders remain. With a Bow or Crossbow and Arrows I shoot whoever I go
+// after from where I stand once they are in my reach; until then I go up on
+// the city's wall tile nearest them and wait there rather than come down. Out of
+// Arrows I close in as anyone armed. Unarmed, or for another alarm, I end at once.
 if (me.alarm == null || !armed(me)) {
   end()
 } else if (me.alarm.kind == "occupied") {
@@ -5734,6 +5868,7 @@ fn goAfterCulprit(goneText) {
 }
 
 fn goAfter(foe) {
+  if (canShoot() && shootFromWall(foe)) { return }
   let o = me.order
   if (o != null && o.kind == "attack" && o.targetId == foe.id) { return } // at it
   let problem = attack(foe.id)
@@ -5743,6 +5878,82 @@ fn goAfter(foe) {
   }
   doing("On alarm: going after " + foe.name)
   log("going after " + foe.name)
+}
+
+// An archer shoots from where they stand. On the ground with the city's wall
+// between us, I go up on its tile nearest them first, for its cover; up on the
+// wall, or with no wall between us, I shoot once they are in my reach and up
+// there wait for them rather than come down. False when I can do neither, for me
+// to go after them as anyone armed.
+fn shootFromWall(foe) {
+  let o = me.order
+  let post = null
+  if (!me.up) {
+    // The post I set out for, while they are still in reach of it; else the
+    // wall tile between us now.
+    post = memory.post
+    if (post == null || apart(post, foe) > me.reach) {
+      post = wallTileNear(foe)
+      memory.post = null
+      if (post != null) { memory.post = {x: post.x, y: post.y} }
+    }
+  }
+  if (post == null) {
+    if (apart(me, foe) <= me.reach) {
+      if (o != null && o.kind == "attack" && o.targetId == foe.id) { return true } // at it
+      if (shoot(foe.id) != null) { return false }
+      doing("On alarm: shooting at " + foe.name)
+      log("shooting at " + foe.name)
+      return true
+    }
+    if (!me.up) { return false }
+    // Up on the wall: wait for them to come in reach, rather than go down after them.
+    if (o != null) { stop() }
+    doing("On alarm: on the wall, waiting for " + foe.name + " to come in reach")
+    return true
+  }
+  if (o != null && o.kind == "walkTo" && o.target.x == post.x && o.target.y == post.y) {
+    return true // on my way
+  }
+  if (walkTo(post.x, post.y) != null) { return false }
+  doing("On alarm: up on the wall to shoot at " + foe.name)
+  log("going up on the wall to shoot at " + foe.name)
+  return true
+}
+
+// Whether I shoot: a Bow or Crossbow equipped and Arrows to loose.
+fn canShoot() {
+  return me.reach != null && me.carried.arrows != null
+}
+
+// Tiles between two things as reach counts them: the larger of the two steps.
+fn apart(a, b) {
+  let dx = a.x - b.x
+  let dy = a.y - b.y
+  if (dx < 0) { dx = 0 - dx }
+  if (dy < 0) { dy = 0 - dy }
+  if (dx > dy) { return dx }
+  return dy
+}
+
+// The first finished wall or gate tile of the alarm's city on the way from the
+// foe to me, a step at a time: the one between us, nearest them.
+fn wallTileNear(foe) {
+  let x = foe.x
+  let y = foe.y
+  let steps = 0
+  while (steps < 64 && (x != me.x || y != me.y)) {
+    if (x < me.x) { x = x + 1 }
+    if (x > me.x) { x = x - 1 }
+    if (y < me.y) { y = y + 1 }
+    if (y > me.y) { y = y - 1 }
+    let b = buildingAt(x, y)
+    if (b != null && b.cityId == me.alarm.cityId && (b.kind == "wall" || b.kind == "gate") && b.site == null) {
+      return b
+    }
+    steps = steps + 1
+  }
+  return null
 }
 
 // The occupier I am after while they stand in the area, else another armed one
@@ -5771,13 +5982,9 @@ fn culprit() {
   return null
 }
 
-// Whether they carry a weapon.
+// Whether they have a weapon equipped.
 fn armed(who) {
-  for (w of ["spear", "sword", "steelSword"]) {
-    let n = who.carried[w]
-    if (n != null && n > 0) { return true }
-  }
-  return false
+  return who.equipped.weapon != null
 }
 
 // A building or carriage for my log: "the storage at 12,6".

@@ -5,6 +5,7 @@ use csp_shared::balance::{CLIMB_TICKS, MAP_SIZE};
 use csp_shared::terrain::{wrap_delta, TerrainMap};
 use csp_shared::world::{BuildingKind, ClimbOrder, OrderRequest, ResidentOrder, Tile, WorldState};
 
+use crate::defence::Alarms;
 use crate::order_sender::{commands, realm_of, OrderSender};
 use crate::orders::{str_field, OrderKind};
 use crate::walls::{climb_landing, foreign_wall};
@@ -92,8 +93,15 @@ pub fn request_climbing(world: &WorldState) -> Vec<ClimbAction> {
 
 /// Resolves climbing (`resolveClimbing`, ADR 0002), one action after another. A climber who has
 /// left their tile, or whose wall is gone, stops. Each tick takes them `1 / CLIMB_TICKS` of the
-/// way; once over, they come down where `climb_landing` says and the order is done.
-pub fn resolve_climbing(world: &mut WorldState, actions: &[ClimbAction], terrain: &TerrainMap) {
+/// way; once over, they come down where `climb_landing` says and the order is done. Climbing a
+/// city's wall attacks it: each tick raises the alarm in its city as a blow at it would (ADR 0036:
+/// a climber climbs while being struck).
+pub fn resolve_climbing(
+    world: &mut WorldState,
+    actions: &[ClimbAction],
+    terrain: &TerrainMap,
+    alarms: &mut dyn Alarms,
+) {
     for a in actions {
         let Some(i) = world.residents.iter().position(|x| x.id == a.resident_id) else { continue };
         let r = &world.residents[i];
@@ -111,6 +119,9 @@ pub fn resolve_climbing(world: &mut WorldState, actions: &[ClimbAction], terrain
         }
         let wall_at = finished.map(|w| (w.x, w.y)).expect("a finished wall");
         let from = (r.x, r.y);
+        let wall_id = o.wall_id.clone();
+        alarms.raise_wall_attacked(world, &a.resident_id, &wall_id, terrain.size);
+        let Some(ResidentOrder::Climb(o)) = &world.residents[i].order else { continue };
         let progress = 1.0f64.min(o.progress + 1.0 / CLIMB_TICKS);
         if progress < 1.0 - 1e-9 {
             if let Some(ResidentOrder::Climb(o)) = &mut world.residents[i].order {

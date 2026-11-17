@@ -6,6 +6,7 @@ import { covers, isAt } from './shared/footprint.js'
 import { inContact } from './shared/combat.js'
 import { NO_FOOD_TO_FEED } from './shared/reviving.js'
 import { wrap, wrapDelta } from './shared/terrain.js'
+import { groupSwapChoices, slotOf } from './equipment-view.js'
 import type {
   Building,
   BuildingKind,
@@ -19,6 +20,7 @@ import type {
   StartParamValues,
   Stock,
   TrainingSubject,
+  WallMaterial,
 } from '@csp/shared-types'
 import { appendRequests, storeAll } from './queue-view.js'
 import { ACTION_KEYS, type ActionId, type CardAction, type OrderGroup } from './selection-view.js'
@@ -30,7 +32,13 @@ import { ACTION_KEYS, type ActionId, type CardAction, type OrderGroup } from './
 export type GroupOrder =
   | { kind: 'walkTo'; x: number; y: number }
   | ({ kind: 'work'; workplace: Pick<Building, 'id' | 'kind' | 'x' | 'y'>; name: string } & Starts)
-  | ({ kind: 'build'; building: BuildingKind; at: { x: number; y: number } } & Starts)
+  | ({
+      kind: 'build'
+      building: BuildingKind
+      at: { x: number; y: number }
+      /** What a wall or gate is built of; none is wood (`CONTEXT.md`: Wall / Gate, Wood or stone). */
+      material?: WallMaterial
+    } & Starts)
   /** Everything carried to the nearest storage, or to the one picked (`to`). */
   | { kind: 'store'; to?: Place }
   /** As much as fits of a good from the nearest storage holding it, or from the one picked. */
@@ -117,6 +125,8 @@ export type GroupOrder =
       building: 'road' | 'wall'
       from: { x: number; y: number }
       to: { x: number; y: number }
+      /** What a wall line builds of; none is wood. */
+      material?: WallMaterial
     } & Starts)
   /** Those standing at the building tear it down. */
   | ({
@@ -147,6 +157,8 @@ export type GroupOrder =
    * to `units` each, one of them for each one Down.
    */
   | { kind: 'feed'; units: number }
+  /** Each of them who carries the good swaps it into its slot (`CONTEXT.md`: Equipment). */
+  | { kind: 'equip'; good: Good }
 
 /**
  * The order a group order starts a script by, as far as it names the script, for the form before
@@ -226,7 +238,9 @@ type GroupResident = Pick<
   Resident,
   'id' | 'name' | 'x' | 'y' | 'bornAt' | 'carried' | 'owner' | 'cityId'
 > &
-  Partial<Pick<Resident, 'carrying' | 'order' | 'script' | 'queue' | 'aboard' | 'riding'>>
+  Partial<
+    Pick<Resident, 'carrying' | 'order' | 'script' | 'queue' | 'aboard' | 'riding' | 'equipped'>
+  >
 
 /** The goods carried, at least one unit of each. */
 const carriedGoods = (stock: Stock): Good[] => GOODS.filter((g) => (stock[g] ?? 0) > 0)
@@ -380,6 +394,12 @@ export function groupSkip(
       if (toFeedNear(r, seen, size).length === 0) return 'nobody to feed nearby'
       if ((r.carried.food ?? 0) < 1) return NO_FOOD_TO_FEED
       break
+    case 'equip': {
+      if ((r.carried[order.good] ?? 0) <= 0) return 'doesn’t carry it'
+      const slot = slotOf(order.good)
+      if (slot && r.equipped?.[slot] === order.good) return 'has it on already'
+      break
+    }
   }
   if (queued) return undefined
   if (order.kind === 'board') {
@@ -544,7 +564,14 @@ export function groupRequests(
         break
       case 'build':
         // The Build task walks there first and joins the site once one of them has laid it out.
-        send(r, { kind: 'task', task: 'build', building: order.building, at: order.at, ...params })
+        send(r, {
+          kind: 'task',
+          task: 'build',
+          building: order.building,
+          at: order.at,
+          ...(order.material ? { material: order.material } : {}),
+          ...params,
+        })
         break
       case 'store': {
         // Everything they carry to the nearest storage; their own food stays in their hands.
@@ -641,8 +668,16 @@ export function groupRequests(
         })
         break
       case 'line': {
-        const { building, from, to } = order
-        send(r, { kind: 'task', task: 'buildLine', building, from, to, ...params })
+        const { building, from, to, material } = order
+        send(r, {
+          kind: 'task',
+          task: 'buildLine',
+          building,
+          from,
+          to,
+          ...(material ? { material } : {}),
+          ...params,
+        })
         break
       }
       case 'tearDown':
@@ -682,6 +717,9 @@ export function groupRequests(
         }
         break
       }
+      case 'equip':
+        send(r, { kind: 'equip', good: order.good })
+        break
     }
   }
   // Setting a param is no step: it is given as it is, queued or not.
@@ -780,6 +818,7 @@ export type GroupButton =
   | 'climb'
   | 'relocate'
   | 'feed'
+  | 'equip'
   | 'script'
 
 /**
@@ -814,6 +853,7 @@ export const GROUP_BUTTONS: readonly { id: GroupButton; label: string; group: Or
   { id: 'fetch', label: 'Fetch…', group: 'goods' },
   { id: 'drop', label: 'Drop all', group: 'goods' },
   { id: 'feed', label: 'Feed…', group: 'goods' },
+  { id: 'equip', label: 'Equip…', group: 'goods' },
   { id: 'script', label: 'Run script…', group: 'scripts' },
   { id: 'attack', label: 'Attack', group: 'other' },
   { id: 'climb', label: 'Climb a wall', group: 'other' },
@@ -857,7 +897,7 @@ export const GROUP_COUNTERPARTS: Record<
   wallTo: ['wallTo'],
   tearDown: ['tearDown'],
   breed: ['breed'],
-  goods: ['store', 'storeAt', 'fetch', 'drop'],
+  goods: ['store', 'storeAt', 'fetch', 'drop', 'equip'],
   attack: ['attack'],
   walls: ['attack', 'climb'],
   script: ['script'],
@@ -903,6 +943,8 @@ export const GROUP_KEYS: Record<GroupButton, string> = {
   attack: ACTION_KEYS.attack,
   climb: ACTION_KEYS.walls,
   feed: ACTION_KEYS.feed,
+  // Equip: put on a weapon, shield or armour.
+  equip: 'N',
 }
 
 /** The kind each of the group card's orders is grouped under (`GROUP_BUTTONS`). */
@@ -910,7 +952,15 @@ export const groupButtonGroup = (id: GroupButton): OrderGroup =>
   GROUP_BUTTONS.find((b) => b.id === id)?.group ?? 'other'
 
 /** The group card's orders that open a panel below the rows with what they need. */
-const GROUP_PANELS: readonly GroupButton[] = ['haul', 'relocate', 'teach', 'breed', 'fetch', 'feed']
+const GROUP_PANELS: readonly GroupButton[] = [
+  'haul',
+  'relocate',
+  'teach',
+  'breed',
+  'fetch',
+  'feed',
+  'equip',
+]
 
 /** What the group card's rows need to know about the group and where they stand. */
 export interface GroupHere {
@@ -943,6 +993,8 @@ const GROUP_REASONS: Record<string, string> = {
   'no boat here': 'none of them is aboard or beside a boat of your realm',
   'nobody to feed nearby': 'nobody to feed next to them',
   [NO_FOOD_TO_FEED]: 'none of them has Food in hand',
+  'doesn’t carry it': 'none of them carries it',
+  'has it on already': 'they all have it on already',
 }
 
 /**
@@ -1016,6 +1068,8 @@ export function groupRows(h: GroupHere): {
     })
     if (id === 'stop' && !h.residents.some((r) => r.order || r.script))
       missing.stop = 'none of them has an order'
+    else if (id === 'equip' && groupSwapChoices(h.residents).length === 0)
+      missing.equip = 'none of them carries gear to swap in'
     else if (id === 'board' && h.carriages + boats === 0)
       missing.board = 'nobody stands on a carriage or beside a boat of your realm'
     else if (whys.length > 0 && whys.every((w) => w !== undefined))

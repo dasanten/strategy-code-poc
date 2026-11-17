@@ -12,9 +12,23 @@ import type {
   SeenVessel,
 } from '@csp/shared-types'
 import { caravanParts } from '../caravans.js'
-import { ACTIVITY_ART, BASE_ART, PAINTED_UNIT_ART, UNIT_ART, paintedCell } from './art.js'
+import {
+  ACTIVITY_ART,
+  BASE_ART,
+  GEAR_ART,
+  METAL_TINT,
+  PAINTED_UNIT_ART,
+  UNIT_ART,
+  paintedCell,
+} from './art.js'
 import { tileToScreen, zoomTier, type Camera, type Size } from './camera.js'
-import { residentActivity, tileFigures, type Activity } from './figures.js'
+import {
+  gearMarks,
+  residentActivity,
+  tileFigures,
+  type Activity,
+  type GearMarks,
+} from './figures.js'
 import {
   isLeader,
   relationshipColor,
@@ -270,6 +284,7 @@ export function drawUnits(
         relOf: (id) => rels.get(id),
         leaders,
         activityOf: (id) => residentActivity(byId.get(id)!),
+        gearOf: (id) => gearMarks(byId.get(id)?.equipped),
         rides: (id) => byId.get(id)?.riding !== undefined,
         lies: (id) => isDown(byId.get(id) ?? {}),
         spots,
@@ -291,6 +306,22 @@ export function drawUnits(
   return spots
 }
 
+/**
+ * The marks of what a figure has equipped (`CONTEXT.md`: Equipment, Seeing it), tinted iron or
+ * steel: armour as a rim around the badge, the weapon at its upper left, a shield at its upper
+ * right. Figures are drawn at close zoom only, so the marks drop out further out.
+ */
+function drawGear(tokens: TokenLayer, gear: GearMarks, x: number, y: number, r: number) {
+  if (gear.armour) tokens.place(GEAR_ART.armour, x, y, r * 2.5, METAL_TINT[gear.armour])
+  const mark = (file: string, metal: keyof typeof METAL_TINT, dx: number) => {
+    const [mx, my] = [x + r * dx, y - r * 0.8]
+    tokens.place(BASE_ART.round, mx, my, r * 1.05)
+    tokens.place(file, mx, my, r * 0.7, METAL_TINT[metal])
+  }
+  if (gear.weapon) mark(GEAR_ART[gear.weapon.kind], gear.weapon.metal, -0.85)
+  if (gear.shield) mark(GEAR_ART.shield, gear.shield, 0.85)
+}
+
 /** From this many pixels per tile up, figures get their activity icon; below it they are too small. */
 const ACTIVITY_SCALE = 22
 
@@ -310,6 +341,7 @@ function drawFigures(
     relOf: (id: string) => Tone | undefined
     leaders: Leaders
     activityOf: (id: string) => Activity | undefined
+    gearOf: (id: string) => GearMarks
     rides: (id: string) => boolean
     lies: (id: string) => boolean
     spots: Map<string, Spot>
@@ -323,6 +355,7 @@ function drawFigures(
     const leader = isLeader(of.leaders, f.id)
     if (of.rides(f.id)) drawMount(tokens, { x, y, r }, rel)
     drawUnit(tokens, leader ? UNIT_ART.leader : UNIT_ART.person, x, y, r, rel, of.lies(f.id))
+    drawGear(tokens, of.gearOf(f.id), x, y, r)
     of.spots.set(f.id, { x, y, r })
     const activity = of.activityOf(f.id)
     if (activity && tile >= ACTIVITY_SCALE) {

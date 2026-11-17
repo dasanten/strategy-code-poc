@@ -41,8 +41,11 @@ fn setup() -> WorldState {
 /// Sends an attack order from Player 7 and answers whether it was taken (`order`).
 fn order(world: &mut WorldState, resident_id: &str, target_id: &str) -> &'static str {
     let sender = OrderSender::player(ME, "Mara");
-    let request =
-        AttackRequest { resident_id: Some(resident_id.into()), target_id: Some(target_id.into()) };
+    let request = AttackRequest {
+        resident_id: Some(resident_id.into()),
+        target_id: Some(target_id.into()),
+        ..AttackRequest::default()
+    };
     if let Some(reason) = validate_attack(world, &sender, &request, Some(SIZE)) {
         return reason;
     }
@@ -62,7 +65,7 @@ fn a_blow_comes_from_strength_and_the_best_weapon_carried_harder_with_combat_ski
     assert!((attack_power(&world.residents[r], 0.0) - fist).abs() < 1e-9);
     world.residents[r].carried = stock(&[(Good::Spear, 1.0), (Good::Sword, 1.0)]);
     assert_eq!(best_weapon(&world.residents[r].carried), Some(Good::Sword));
-    assert!(is_armed(&world.residents[r].carried));
+    assert!(is_armed(&world.residents[r]));
     let sword = WEAPON_ATTACK.get("sword").unwrap();
     assert!((attack_power(&world.residents[r], 0.0) - (fist + sword)).abs() < 1e-9);
     world.residents[r].skills.insert(SkillName::Combat, 1000.0);
@@ -546,7 +549,7 @@ fn a_resident_carrying_an_iron_and_a_steel_sword_strikes_with_the_steel_one() {
     assert!(steel > WEAPON_ATTACK.get("sword").unwrap());
     assert!((attack_power(&world.residents[r], 0.0) - (fist + steel)).abs() < 1e-9);
     world.residents[r].carried = stock(&[(Good::SteelSword, 1.0)]);
-    assert!(is_armed(&world.residents[r].carried));
+    assert!(is_armed(&world.residents[r]));
 }
 
 #[test]
@@ -593,6 +596,7 @@ fn of_two_equal_soldiers_the_one_with_a_steel_sword_wins_most_of_a_hundred_fight
                     let request = AttackRequest {
                         resident_id: Some(who.into()),
                         target_id: Some(whom.into()),
+                        ..AttackRequest::default()
                     };
                     apply_attack(&mut world, &request, Some(SIZE));
                 }

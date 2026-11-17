@@ -36,7 +36,7 @@ fn tile(r: &Resident) -> (i32, i32) {
 /// weapon, harder with Combat skill, and what their shield and armour take off each blow struck at
 /// them. Nothing for the unarmed.
 pub fn fighter_strength(r: &Resident) -> f64 {
-    if !is_armed(&r.carried) {
+    if !is_armed(r) {
         return 0.0;
     }
     (BLOW_BASE + weapon_attack(r)) * combat_skill_factor(r) + protection(r)
@@ -60,7 +60,7 @@ pub fn respect_by_side<'w>(world: &'w WorldState, city: &City, size: i32) -> Has
         let Some(side) = wall_side(r) else { continue };
         if side == city.id
             || r.health <= 0.0
-            || !is_armed(&r.carried)
+            || !is_armed(r)
             || is_lent_by(world, &r.id, &city.id)
             || !near(tile(r))
         {

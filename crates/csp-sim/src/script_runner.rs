@@ -27,7 +27,7 @@ use csp_shared::world::{
 };
 use serde_json::{json, Map, Value as Json};
 
-use crate::alarms::{back_to_outsider_alarm, runs_npc_alarm};
+use crate::alarms::{back_to_outsider_alarm, on_to_next_attacker, runs_npc_alarm};
 use crate::default_scripts::{default_script, task_of};
 use crate::defence::resume_interrupted;
 use crate::events::record_event;
@@ -47,7 +47,7 @@ use crate::script_deps::kept_pair;
 use crate::script_log::add_to_script_log;
 use crate::script_params::{
     param_target, param_values, script_params_sound, set_start_params, start_params_problem,
-    with_target_param, ParamWithValue,
+    with_once_param, with_target_param, ParamWithValue,
 };
 use crate::scripts::RunnableScript;
 use crate::sight::{
@@ -189,6 +189,7 @@ impl OrderKind for RunScriptOrder {
         let params = order.fields.get("params").and_then(Json::as_object).cloned();
         let params =
             with_target_param(script.as_ref().map(|s| (s.source.as_str(), s.task)), params, None);
+        let params = with_once_param(script.as_ref().map(|s| (s.source.as_str(), s.task)), params);
         let r = &mut world.residents[i];
         r.order = None;
         r.script = Some(running(script_id, Map::new()));
@@ -380,7 +381,7 @@ fn as_order(o: &OrderRequest, task: Task) -> OrderRequest {
         ),
         Task::TearDown => ("tearDown", pick(&[("buildingId", "buildingId")])),
         Task::Breed => ("breed", pick(&[("stableId", "stableId"), ("horseIds", "horseIds")])),
-        Task::Build => ("build", pick(&[("building", "building")])),
+        Task::Build => ("build", pick(&[("building", "building"), ("material", "material")])),
         Task::Train => ("train", pick(&[("buildingId", "groundId")])),
         _ => ("workAt", pick(&[("makes", "makes")])),
     };
@@ -433,13 +434,17 @@ fn task_memory(
         }
         Task::Build => {
             m.insert("building".into(), f.get("building").cloned().unwrap_or(Json::Null));
+            if let Some(material) = f.get("material").filter(|v| !v.is_null()) {
+                m.insert("material".into(), material.clone());
+            }
             m.insert("at".into(), tile(f.get("at")).unwrap_or_else(|| json!({ "x": x, "y": y })));
         }
         Task::BuildLine => {
-            m.insert(
-                "line".into(),
-                json!({ "building": f.get("building"), "from": tile(f.get("from")), "to": tile(f.get("to")) }),
-            );
+            let mut line = json!({ "building": f.get("building"), "from": tile(f.get("from")), "to": tile(f.get("to")) });
+            if let Some(material) = f.get("material").filter(|v| !v.is_null()) {
+                line["material"] = material.clone();
+            }
+            m.insert("line".into(), line);
         }
         Task::Haul => {
             m.insert("carriageId".into(), f.get("carriageId").cloned().unwrap_or(Json::Null));
@@ -665,7 +670,9 @@ fn build_line_problem(
             csp_shared::balance::ROAD_LINE_MAX_TILES
         ));
     }
-    let line = crate::queries::building::BuildLine { building, from, to };
+    let material = crate::building::material_field(o)
+        .filter(|m| building == BuildingKind::Wall && *m == csp_shared::world::WallMaterial::Stone);
+    let line = crate::queries::building::BuildLine { building, from, to, material };
     if line_to_build(world, &line, terrain).is_empty() {
         return Some(format!("no {} to build on that line", kind_name(building)));
     }
@@ -747,6 +754,7 @@ impl OrderKind for TaskOrder {
             params,
             target.as_deref(),
         );
+        let params = with_once_param(source.as_deref().map(|s| (s, Some(task))), params);
         let r = &mut world.residents[i];
         r.order = None;
         r.script = Some(running(script_id, memory));
@@ -986,10 +994,14 @@ fn memory_object(memory: &ScriptMemory) -> Object {
 }
 
 /// A resident's script called `end()` (`endScript`): it ends and they stand idle. A defence or
-/// Alarm script hands back to what it interrupted. True when it goes on as the same script (an
-/// Alarm script back on an outsider alarm).
-fn end_script(world: &mut WorldState, resident_id: &str) -> bool {
+/// Alarm script hands back to what it interrupted. True when it goes on as the same script (the
+/// Alarm default on to the next attacker, on a map of `size` tiles when given, or an Alarm script
+/// back on an outsider alarm).
+fn end_script(world: &mut WorldState, resident_id: &str, size: Option<i32>) -> bool {
     let Some(i) = world.residents.iter().position(|x| x.id == resident_id) else { return false };
+    if size.is_some_and(|size| on_to_next_attacker(world, i, size)) {
+        return true;
+    }
     if back_to_outsider_alarm(&mut world.residents[i]) {
         return true;
     }
@@ -1303,7 +1315,7 @@ impl ScriptRunner {
             if r.army {
                 r.clear_script(world);
             } else {
-                end_script(world, &r.id);
+                end_script(world, &r.id, None);
             }
         }
         let at = ScriptErrorWhere {
@@ -1555,7 +1567,7 @@ impl ScriptRunner {
         }
         let spent = result.steps() as f64;
         if ended {
-            let same = !r.army && end_script(world, &r.id);
+            let same = !r.army && end_script(world, &r.id, Some(self.terrain.size));
             if r.army {
                 r.clear_script(world);
             }
@@ -1957,7 +1969,7 @@ fn run_city_scripts(
                 scout_ended(world, &city.id, end_reason.as_deref());
             }
             // An Alarm script going back to an outsider alarm hasn't ended: it keeps what it remembered.
-            if end_script(world, id) {
+            if end_script(world, id, Some(terrain.size)) {
                 if let Ok(kept) = keep_memory(&memory) {
                     if let Some(s) = world
                         .residents

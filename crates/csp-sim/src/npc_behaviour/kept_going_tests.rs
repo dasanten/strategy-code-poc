@@ -213,6 +213,7 @@ mod an_npc_resident_carrying_a_child {
             closed: None,
             damage: None,
             breedings: None,
+            material: None,
         });
         world.cities.iter_mut().find(|c| c.id == city).unwrap().workplace_ids =
             Some(vec!["smithy".into()]);
@@ -526,7 +527,7 @@ mod after_a_leader_death {
             r.carried = [(Good::Spear, 1.0), (Good::Food, 1.0)].into_iter().collect();
             r.order = Some(work);
         });
-        assert!(is_armed(&s.r(&armed).carried));
+        assert!(is_armed(s.r(&armed)));
         s.leader_dies();
         for _ in 0..70 {
             s.tick();

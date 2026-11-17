@@ -1,6 +1,4 @@
 import {
-  BUILD_MATERIALS,
-  BUILD_WORK,
   BATCHES_PER_DAY,
   RECIPES,
   WORK_OUTPUT_PER_DAY,
@@ -32,6 +30,9 @@ import {
   recipeGood,
   teardownReturns,
   teardownWork,
+  isStone,
+  materialsOfKind,
+  workOfKind,
 } from './shared/building.js'
 import {
   CARRIAGE_CAPACITY,
@@ -54,6 +55,7 @@ import {
   QUEUE_MAX_DEPTH,
   FOAL_STAT_SPREAD,
   STABLE_BREED_DAYS,
+  EQUIP_TICKS,
 } from '@csp/balance'
 import { ageInYears, bestWeapon, canHandle, canWork, stockWeight } from './shared/stats.js'
 import { isAt } from './shared/footprint.js'
@@ -86,6 +88,7 @@ import type {
   SeenResident,
   SeenHorse,
   ResourceNode,
+  WallMaterial,
   Waypoint,
 } from '@csp/shared-types'
 import {
@@ -127,6 +130,13 @@ import {
   type ResidentLines,
 } from './residents-view.js'
 import { GOOD_LABELS, carriedItems } from './goods-grid.js'
+import {
+  equipmentLine,
+  equipmentSlots,
+  groupSwapChoices,
+  swapChoices,
+  type SlotView,
+} from './equipment-view.js'
 import { GoodsGrid } from './GoodsGrid.js'
 import { BuildMenu } from './BuildMenu.js'
 import { workSpan } from './build-menu-view.js'
@@ -189,6 +199,7 @@ import {
 } from './plan-blocks.js'
 import {
   browserStorage,
+  keepGivenQueue,
   list,
   load as loadQueue,
   readQueues,
@@ -1345,6 +1356,8 @@ export function orderDoing(
   if (o?.kind === 'pickUp') return 'Picking up goods'
   if (o?.kind === 'drop') return 'Putting down goods'
   if (o?.kind === 'feed') return 'Feeding'
+  if (o?.kind === 'equip')
+    return o.good ? `Putting on ${GOOD_LABELS[o.good].toLowerCase()}` : `Taking off their ${o.slot}`
   if (o?.kind === 'store') return o.phase === 'refilling' ? 'Taking food along' : 'Storing goods'
   if (o?.kind === 'fetch') return 'Fetching goods'
   if (o?.kind === 'tearDown') return 'Tearing down'
@@ -1685,7 +1698,7 @@ export function GroupCard({
   const [tab, setTab] = useState<GroupTab>(() => rememberedTabOf('group', GROUP_TABS))
   // The order whose panel is open under the rows: what it needs before it goes out.
   const [panel, setPanel] = useState<
-    'haul' | 'fetch' | 'breed' | 'teach' | 'relocate' | 'board' | 'feed'
+    'haul' | 'fetch' | 'breed' | 'teach' | 'relocate' | 'board' | 'feed' | 'equip'
   >()
   const [feedUnits, setFeedUnits] = useState(FEED_UNITS)
   const [good, setGood] = useState<Good>('food')
@@ -1850,6 +1863,28 @@ export function GroupCard({
           </p>
         </section>
       )}
+      {shown === 'equip' && (
+        <section className="inspector-block" aria-label="Equip">
+          <div className="order-buttons">
+            {groupSwapChoices(residents).map((c) => (
+              <button
+                key={c.good}
+                type="button"
+                onClick={() => {
+                  setPanel(undefined)
+                  onOrder({ kind: 'equip', good: c.good })
+                }}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+          <p className="muted small">
+            Each who carries it puts it on in its slot, the one there staying carried. It takes{' '}
+            {EQUIP_TICKS} ticks, and they strike no blows meanwhile.
+          </p>
+        </section>
+      )}
       {shown === 'fetch' && (
         <section className="inspector-block" aria-label="Fetch">
           <div className="order-buttons">
@@ -1994,6 +2029,7 @@ export function GroupCard({
                     kind: 'build',
                     building: buildAt.site!.kind,
                     at: { x: buildAt.site!.x, y: buildAt.site!.y },
+                    ...(buildAt.site!.material === 'stone' ? { material: 'stone' as const } : {}),
                   })
                 }
               >
@@ -2007,6 +2043,7 @@ export function GroupCard({
                     kind: 'build',
                     building: buildAt.site!.kind,
                     at: { x: buildAt.site!.x, y: buildAt.site!.y },
+                    ...(buildAt.site!.material === 'stone' ? { material: 'stone' as const } : {}),
                   })
                 }
               />
@@ -2018,11 +2055,12 @@ export function GroupCard({
               node={buildAt.node}
               terrain={buildAt.terrain}
               buildProblem={buildAt.problem}
-              onBuild={(kind) =>
+              onBuild={(kind, material) =>
                 onOrder({
                   kind: 'build',
                   building: kind,
                   at: { x: buildAt.x, y: buildAt.y },
+                  ...(material ? { material } : {}),
                 })
               }
             />
@@ -2165,7 +2203,7 @@ export interface GroupBuildTile {
   /** The explored terrain beneath this tile, if known. */
   terrain: number | undefined
   /** Why a kind can't be laid out on this tile, as far as the Player knows. */
-  problem: (kind: BuildingKind) => string | undefined
+  problem: (kind: BuildingKind, material?: WallMaterial) => string | undefined
 }
 
 /** What picking a tile does for a group, said while the map waits for it. */
@@ -2219,6 +2257,7 @@ export function ResidentCard({
   mapSize,
   onAttack,
   onFeed,
+  onEquip,
   walls,
   onClimb,
   carriage,
@@ -2412,9 +2451,9 @@ export function ResidentCard({
   /** The resource node on the resident's tile, if the Player knows of one. */
   node: KnownNode | undefined
   /** Orders the resident to build on their tile, or to join the site there. */
-  onBuild: (kind: BuildingKind) => void
+  onBuild: (kind: BuildingKind, material?: WallMaterial) => void
   /** Why a kind can't be laid out from the resident's tile, as far as the Player knows. */
-  buildProblem?: (kind: BuildingKind) => string | undefined
+  buildProblem?: (kind: BuildingKind, material?: WallMaterial) => string | undefined
   /** Residents in sight working the building on the resident's tile. */
   workers: number
   /** Realms whose residents in sight work it: who holds it (`CONTEXT.md`: Holding a workplace). */
@@ -2449,6 +2488,11 @@ export function ResidentCard({
   onAttack: (targetId: string) => void
   /** Orders the resident to Feed someone Down or a horse next to them. */
   onFeed?: (targetId: string, units: number) => void
+  /**
+   * Orders the resident to swap a good they carry into a slot, or with `null` to take the slot's
+   * item off (`CONTEXT.md`: Equipment).
+   */
+  onEquip?: (slot: SlotView['slot'], good: Good | null) => void
   /** Finished walls and gates in sight of other realms' cities, or of none. */
   walls: Building[]
   /** Orders the resident to climb over a wall or gate next to them. */
@@ -2525,6 +2569,15 @@ export function ResidentCard({
   // Children pick up and put down only Food (`CONTEXT.md`: Child).
   const refused = (good: Good) => !canHandle(r, tick, [good])
   const family = familyLine(r, residents, tick)
+  // A queue the game gave under a name (the stable hand's "Farm and feed") goes into the saved
+  // queues once (`CONTEXT.md`: Starting city, Saved queue).
+  const given = r.owner === realmId && r.queue?.name ? r.queue : undefined
+  useEffect(() => {
+    if (given?.name && realmId) {
+      keepGivenQueue(browserStorage(), realmId, given.name, planOf(given).items, Date.now())
+    }
+    // Once a name, not every tick: the steps are read when it first shows.
+  }, [given?.name, realmId])
   // Only the owning Player picks it (`CONTEXT.md`: Defence script).
   const defenceScript = onSetDefenceScript && r.owner === realmId && (
     <DefenceScript
@@ -2789,6 +2842,52 @@ export function ResidentCard({
       )}
       {shown === 'goods' && (
         <>
+          <section className="inspector-block" aria-label="Equipped">
+            <div className="panel-head">
+              <h3>Equipped</h3>
+              {r.order?.kind === 'equip' && (
+                <span className="muted small">
+                  {r.order.good ? `Putting on ${GOOD_LABELS[r.order.good]}…` : 'Taking off…'}
+                </span>
+              )}
+            </div>
+            <ul className="equipment-slots">
+              {equipmentSlots(r.equipped).map((s) => {
+                const choices = onEquip ? swapChoices(s.slot, r.carried, r.equipped) : []
+                return (
+                  <li key={s.slot}>
+                    <span className="muted small">{s.label}</span>{' '}
+                    <span className={s.item ? undefined : 'muted'}>{s.item ?? 'empty'}</span>
+                    {choices.length > 0 && (
+                      <select
+                        aria-label={`Swap into the ${s.label.toLowerCase()} slot`}
+                        value=""
+                        onChange={(e) => onEquip?.(s.slot, e.target.value as Good)}
+                      >
+                        <option value="">{s.item ? 'Swap for…' : 'Put on…'}</option>
+                        {choices.map((c) => (
+                          <option key={c.good} value={c.good}>
+                            {c.label}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {onEquip && s.item && (
+                      <button type="button" onClick={() => onEquip(s.slot, null)}>
+                        Take off
+                      </button>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+            {onEquip && (
+              <p className="muted small">
+                Swapping or taking off takes {EQUIP_TICKS} ticks, and they strike no blows
+                meanwhile. What comes off stays carried.
+              </p>
+            )}
+          </section>
           <section className="inspector-block" aria-label="Carrying">
             <div className="panel-head">
               <h3>Carrying</h3>
@@ -3058,9 +3157,7 @@ export function ResidentCard({
                 Name {r.name} your realm’s heir, to carry it on
                 {heirName ? ` in place of ${heirName}` : ''}? Free and at once, from anywhere.
               </p>
-              {makeLeader.heir.problem && (
-                <p className="muted small">{makeLeader.heir.problem}.</p>
-              )}
+              {makeLeader.heir.problem && <p className="muted small">{makeLeader.heir.problem}.</p>}
               <div className="order-buttons">
                 <button
                   type="button"
@@ -3120,6 +3217,9 @@ export function ResidentCard({
           <GoodsGrid label="Carried" {...carriedItems(r.carried)} />
           <span className="mono">{carryLine(stockWeight(r.carried), carryCapacity(r, tick))}</span>
         </div>,
+        <span key="equipped" className="muted">
+          {equipmentLine(r.equipped)}
+        </span>,
         ...(ridden ? [ridden] : []),
       ]}
       head={
@@ -3220,7 +3320,13 @@ export function ResidentCard({
           </>
         ) : r.queue && onEditQueue ? (
           <>
+            {r.queue.name && (
+              <p className="small queue-name">
+                <strong>{r.queue.name}</strong>
+              </p>
+            )}
             <QueueBlock
+              title={r.queue.name ?? 'Queue'}
               queue={planOf(r.queue)}
               currentId={r.queue.current}
               rounds={roundsOf(r.queue)}
@@ -3497,13 +3603,15 @@ function SiteBlock({
   /** The explored terrain beneath the site, if known (`buildingWork`). */
   terrain?: number
   at: OnSite
-  onBuild: (kind: BuildingKind) => void
+  onBuild: (kind: BuildingKind, material?: WallMaterial) => void
 }) {
   const adult = canWork(resident, tick)
   const o = resident.order
   const name = BUILDING_NAMES[site.kind]
-  const work = BUILD_WORK[site.kind] ?? 0
-  const materials = goodsIn(BUILD_MATERIALS[site.kind])
+  const work = workOfKind(site.kind, site.material)
+  const materials = goodsIn(materialsOfKind(site.kind, site.material))
+  const stone = isStone(site.kind, site.material)
+  const help = () => onBuild(site.kind, stone ? 'stone' : undefined)
   const joined = o?.kind === 'build' && o.siteId === site.id
   return (
     <section className="inspector-block" aria-label="Construction site">
@@ -3528,19 +3636,20 @@ function SiteBlock({
         </div>
       ))}
       <div className="order-buttons">
-        <button type="button" disabled={!adult || joined} onClick={() => onBuild(site.kind)}>
+        <button type="button" disabled={!adult || joined} onClick={help}>
           {joined ? 'Building…' : 'Help build'}
         </button>
         <CustomiseButton
           order={taskStart('build')}
           of="Help build"
           disabled={!adult || joined}
-          give={() => onBuild(site.kind)}
+          give={help}
         />
       </div>
       <p className="muted small">
-        It becomes a {name.toLowerCase()} once its materials are delivered and the work is done:
-        about {workSpan(buildingWork(site.kind, terrain))} of one resident’s work in all
+        It becomes a {stone ? 'stone ' : ''}
+        {name.toLowerCase()} once its materials are delivered and the work is done: about{' '}
+        {workSpan(buildingWork(site.kind, terrain, site.material))} of one resident’s work in all
         {workFactor(site.kind, terrain) > 1 &&
           `, on Mountain ${workFactor(site.kind, terrain)} times as much as elsewhere`}
         .

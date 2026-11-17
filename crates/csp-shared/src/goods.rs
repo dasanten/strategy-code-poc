@@ -5,7 +5,7 @@
 
 /// PoC goods (`CONTEXT.md`: Good, Weapons and armour). Amounts are counted in units;
 /// `GOOD_WEIGHT` weighs them.
-pub const GOODS: [&str; 16] = [
+pub const GOODS: [&str; 19] = [
     "food",
     "wood",
     "stone",
@@ -22,10 +22,17 @@ pub const GOODS: [&str; 16] = [
     "steelSword",
     "steelShield",
     "steelArmour",
+    "bow",
+    "crossbow",
+    "arrows",
 ];
 
 /// Goods that make a resident armed (`CONTEXT.md`: Soldier, Weapons and armour).
-pub const WEAPONS: [&str; 3] = ["spear", "sword", "steelSword"];
+pub const WEAPONS: [&str; 5] = ["spear", "sword", "steelSword", "bow", "crossbow"];
+
+/// Weapons that take both hands (`CONTEXT.md`: Equipment): with one equipped the shield slot stays
+/// empty.
+pub const TWO_HANDED: [&str; 2] = ["bow", "crossbow"];
 
 /// Goods that take off damage (`CONTEXT.md`: Weapons and armour): shields and armour, of iron
 /// or of steel.

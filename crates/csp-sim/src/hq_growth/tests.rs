@@ -239,7 +239,7 @@ fn trains_more_soldiers_than_its_armys_size_when_a_player_grows_strong() {
     assert_eq!(hq_soldiers(&s.world).len() as f64, wanted);
     let unarmed = hq_people(&s.world, &s.hq)
         .into_iter()
-        .filter(|&i| !is_armed(&s.world.residents[i].carried))
+        .filter(|&i| !is_armed(&s.world.residents[i]))
         .count();
     assert!(unarmed as f64 >= TRADE_ORG_ARMY.workers);
 }
@@ -349,7 +349,8 @@ fn grows_a_new_outer_ring_once_it_has_no_room_for_houses_and_houses_beyond_the_o
     fill_room(&mut s, 0);
     let hq = hq_city(&s);
     // Out of room: it starts on a gate of the next ring, in line with the others.
-    let Some(CityProject::Build { building: kind, x, y }) = hq_project(&s.world, &hq, &s.terrain)
+    let Some(CityProject::Build { building: kind, x, y, .. }) =
+        hq_project(&s.world, &hq, &s.terrain)
     else {
         panic!("a building project")
     };

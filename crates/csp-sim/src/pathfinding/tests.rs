@@ -600,6 +600,7 @@ fn matches_the_path_fixtures_exactly() {
             on_walls: o["onWalls"].as_bool().unwrap_or(false),
             near: o["near"].as_bool().unwrap_or(false),
             area: None,
+            up: None,
         };
         let costs = match req["costs"].as_str().unwrap() {
             "walking" => walking(),
@@ -681,6 +682,7 @@ fn answers_on_the_same_ticks_as_the_typescript() {
                     on_walls: o["onWalls"].as_bool().unwrap_or(false),
                     near: o["near"].as_bool().unwrap_or(false),
                     area: None,
+                    up: None,
                 };
                 let costs = if r["costs"] == "walking" { walking() } else { carriage() };
                 f.request(&r["id"].to_string(), point(&r["from"]), point(&r["to"]), costs, options);

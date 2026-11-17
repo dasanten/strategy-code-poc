@@ -358,7 +358,7 @@ fn pick_party(
         let r = &world.residents[i];
         carry_capacity(r, tick) - stock_weight(&r.carried) + carried_food(r) * food_weight
     };
-    let armed_now = |i: usize| is_armed(&world.residents[i].carried);
+    let armed_now = |i: usize| is_armed(&world.residents[i]);
     let mut armed: Vec<usize> =
         adults.iter().copied().filter(|&i| armed_now(i) && free(i)).collect();
     armed.sort_by(|&a, &b| room(b).total_cmp(&room(a)));
@@ -705,6 +705,14 @@ pub fn found_daughter(world: &mut WorldState, city_id: &str) -> Option<String> {
             continue;
         }
         r.city_id = Some(daughter.clone());
+        // They leave the mother's defence behind: what it kept aside for them and its defence or
+        // Alarm script end, and the daughter gives them their work (T100.8).
+        let defending =
+            matches!(r.script.as_ref().and_then(|s| s.task), Some(Task::Defend | Task::Alarm));
+        if r.interrupted.take().is_some() || defending {
+            r.order = None;
+            r.script = None;
+        }
         // One gone back to the mother's storage for materials comes to the daughter instead.
         let fetching =
             r.script.as_ref().and_then(|s| s.memory.get("fetch")).is_some_and(|v| !v.is_null());

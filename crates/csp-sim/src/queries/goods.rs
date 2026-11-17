@@ -220,28 +220,6 @@ pub fn take_out(stock: &mut Stock, good: Good, units: f64) {
     }
 }
 
-/// Materials a construction site still needs before it can become the building
-/// (`materialsNeeded`), in `BUILD_MATERIALS`' order.
-pub fn materials_needed(site: &Building) -> Stock {
-    let mut out = Stock::new();
-    let Some((_, table)) = csp_shared::balance::BUILD_MATERIALS
-        .0
-        .iter()
-        .find(|(k, _)| *k == super::names::kind_name(site.kind))
-    else {
-        return out;
-    };
-    for (name, units) in table.0 {
-        let Some(good) = super::names::good_of(name) else { continue };
-        let delivered = site.site.as_ref().map_or(0.0, |s| held(&s.delivered, good));
-        let left = units - delivered;
-        if left > 0.0 {
-            out.insert(good, left);
-        }
-    }
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

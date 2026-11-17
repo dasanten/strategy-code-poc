@@ -319,7 +319,12 @@ pub fn inner_wall_project(
     if !holds_above_reserve(world, city, &goods) {
         return None;
     }
-    Some(CityProject::Build { building: next.kind, x: f64::from(next.x), y: f64::from(next.y) })
+    Some(CityProject::Build {
+        building: next.kind,
+        x: f64::from(next.x),
+        y: f64::from(next.y),
+        material: None,
+    })
 }
 
 /// How far from its home someone stands who has come out past the farthest an inner ring can

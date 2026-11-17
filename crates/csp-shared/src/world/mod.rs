@@ -82,6 +82,9 @@ pub enum Good {
     SteelSword,
     SteelShield,
     SteelArmour,
+    Bow,
+    Crossbow,
+    Arrows,
 }
 
 /// `PricedGood`: every good but Coins (`Exclude<Good, 'coins'>`), the goods with a price.
@@ -103,6 +106,9 @@ pub enum PricedGood {
     SteelSword,
     SteelShield,
     SteelArmour,
+    Bow,
+    Crossbow,
+    Arrows,
 }
 
 /// A resident's stats (`STAT_NAMES`).
@@ -195,6 +201,10 @@ pub struct Resident {
     pub born_at: f64,
     pub lifespan: f64,
     pub carried: Stock,
+    /// What the resident has equipped, each item among `carried` (`CONTEXT.md`: Equipment).
+    #[serde(default, skip_serializing_if = "Equipment::is_empty")]
+    #[ts(as = "Option<Equipment>", optional)]
+    pub equipped: Equipment,
     pub order: Option<ResidentOrder>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
@@ -242,6 +252,81 @@ pub struct Resident {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub down_until: Option<f64>,
+    /// Up on the wall walk (`CONTEXT.md`: Wall walk), with the side they came up from, the side
+    /// they come down to; on the ground when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub up: Option<UpSide>,
+}
+
+/// The side of a wall someone up on its walk came up from, and comes down to again (`CONTEXT.md`:
+/// Wall walk): inside its ring, or outside it (either side of a stretch with no inside).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum UpSide {
+    Inside,
+    Outside,
+}
+
+/// A resident's three equipment slots (`CONTEXT.md`: Equipment, ADR 0038): one weapon, one
+/// shield and one armour at most, each one of the goods the resident carries. Only what is
+/// equipped counts in combat and makes a resident armed.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Equipment {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub weapon: Option<Good>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub shield: Option<Good>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub armour: Option<Good>,
+    /// Slots the item was taken off (`CONTEXT.md`: Equipment): each stays empty though the
+    /// resident carries something that fits, until they pick up more of what fits.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[ts(skip)]
+    pub kept_off: Vec<KeptOff>,
+}
+
+impl Equipment {
+    /// Whether no slot holds anything and none is kept empty.
+    pub fn is_empty(&self) -> bool {
+        self.weapon.is_none()
+            && self.shield.is_none()
+            && self.armour.is_none()
+            && self.kept_off.is_empty()
+    }
+}
+
+/// One of a resident's three equipment slots (`CONTEXT.md`: Equipment).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum EquipSlot {
+    Weapon,
+    Shield,
+    Armour,
+}
+
+/// A slot kept empty after its item was taken off, and how many units fitting it the resident
+/// carried then: carrying more of them (picking one up) ends it, and the slot fills at once again.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct KeptOff {
+    pub slot: EquipSlot,
+    pub units: f64,
+}
+
+/// Swapping an item into a slot or taking one off (`CONTEXT.md`: Equipment): it takes
+/// `EQUIP_TICKS`, and the resident strikes no blows meanwhile. `good` is what goes into `slot`,
+/// `None` to take its item off (it stays carried). `progress` counts the ticks spent on it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EquipOrder {
+    pub slot: EquipSlot,
+    pub good: Option<Good>,
+    pub progress: f64,
 }
 
 /// What a resident runs when an alarm reaches them (`Resident.alarmScriptId`): a script id, or
@@ -279,6 +364,12 @@ pub struct Queue {
     #[serde(default, skip_serializing_if = "is_false")]
     #[ts(as = "Option<bool>", optional)]
     pub started: bool,
+    /// The name the queue was given under, as a saved queue's (`CONTEXT.md`: Saved queue): the
+    /// stable hand's "Farm and feed" (`CONTEXT.md`: Starting city). A queue the Player gives has
+    /// none; editing keeps it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub name: Option<String>,
 }
 
 fn is_false(b: &bool) -> bool {
@@ -849,6 +940,10 @@ pub struct BuildOrder {
     pub building: BuildingKind,
     pub at: Tile,
     pub site_id: Option<String>,
+    /// What a wall or gate is built of; none is wood (`CONTEXT.md`: Wall / Gate, Wood or stone).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub material: Option<WallMaterial>,
 }
 
 /// Working at a workplace.
@@ -1009,6 +1104,10 @@ pub struct LineOrder {
     pub path: Option<TilePath>,
     pub progress: f64,
     pub site_id: Option<String>,
+    /// What a wall line builds of; none is wood (`CONTEXT.md`: Wall / Gate, Wood or stone).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub material: Option<WallMaterial>,
 }
 
 /// Climbing a wall or gate.
@@ -1192,6 +1291,8 @@ pub enum ResidentOrder {
     HaulByWater(WaterHaulOrder),
     /// Sailing a ship to a Sea tile or a haven, its captain one of its crew (`CONTEXT.md`: Sailing).
     Sail(RowOrder),
+    /// Swapping or taking off gear (`CONTEXT.md`: Equipment).
+    Equip(EquipOrder),
 }
 
 /// Everything in the world that changes, saved as snapshots (ADR 0006).
@@ -1348,8 +1449,19 @@ pub struct CityRoad {
     deny_unknown_fields
 )]
 pub enum CityProject {
-    Build { building: BuildingKind, x: f64, y: f64 },
-    TearDown { building_id: String },
+    Build {
+        building: BuildingKind,
+        x: f64,
+        y: f64,
+        /// Stone for a stone wall or gate, over a wooden one or new; none is wood (`CONTEXT.md`:
+        /// Wood or stone).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[ts(optional)]
+        material: Option<WallMaterial>,
+    },
+    TearDown {
+        building_id: String,
+    },
 }
 
 /// Where a trader is in a run to an offer.
@@ -2051,6 +2163,8 @@ pub enum DeathCause {
     Starved,
     OldAge,
     Killed,
+    /// Fell from a wall or gate tile that broke under them (`CONTEXT.md`: A tile breaks).
+    Fell,
 }
 
 /// What a punishment did, in a `punished` event.
@@ -3330,6 +3444,21 @@ pub struct Building {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub breedings: Option<Vec<KeptBreeding>>,
+    /// What a wall or gate, or its site, is of; none is wood (`CONTEXT.md`: Wall / Gate, Wood or
+    /// stone). Only walls and gates have one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub material: Option<WallMaterial>,
+}
+
+/// What a wall or gate is built of (`CONTEXT.md`: Wall / Gate, Wood or stone): wood from Wood, or
+/// stone from Stone with more work, holding out several times longer against blows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum WallMaterial {
+    #[default]
+    Wood,
+    Stone,
 }
 
 /// The breeding progress a stable keeps for two horses in it.

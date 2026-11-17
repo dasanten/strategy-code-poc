@@ -27,6 +27,8 @@ pub mod demands;
 pub mod directive;
 pub mod directives;
 pub mod driving;
+pub mod equipment;
+pub mod equipping;
 pub mod events;
 pub mod explored;
 pub mod explored_edge;
@@ -73,6 +75,7 @@ pub mod npc_scouts;
 #[cfg(test)]
 mod npc_slow;
 pub mod npc_stable;
+pub mod npc_stone_walls;
 #[cfg(test)]
 mod npc_test_world;
 pub mod npc_trader;
@@ -124,6 +127,8 @@ pub mod starting_city;
 pub mod starting_sites;
 pub mod stealing;
 pub mod stock_floor;
+#[cfg(test)]
+mod stone_upgrade_tests;
 pub mod storing;
 pub mod supply_wagons;
 pub mod survival;
@@ -154,6 +159,7 @@ pub mod veins;
 pub mod views;
 pub mod walk_time;
 pub mod walking;
+pub mod wall_walk;
 pub mod walls;
 pub mod water_hauling;
 pub mod waypoints;

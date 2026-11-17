@@ -22,17 +22,12 @@ import {
   recipeGood,
   teardownWork,
   workFactor,
+  isStone,
+  materialsOfKind,
+  workOfKind,
   type TerrainLookup,
 } from './shared/building.js'
-import {
-  CARRYING_A_CHILD,
-  GOODS,
-  isDown,
-  NODE_WORKPLACE,
-  PROTECTION,
-  WEAPONS,
-  type HaulOrder,
-} from './shared/world.js'
+import { CARRYING_A_CHILD, GOODS, isDown, NODE_WORKPLACE, type HaulOrder } from './shared/world.js'
 import {
   HORSE_FOOD_PER_DAY,
   HORSE_HUNGRY_SHARE,
@@ -81,6 +76,10 @@ import {
   canWork,
   stockWeight,
   madePerDay,
+  bestWeapon,
+  wornProtection,
+  isArmed,
+  type Geared,
 } from './shared/stats.js'
 import { richnessFactor } from './shared/richness.js'
 import { isOutpostStorage } from './shared/city.js'
@@ -1741,6 +1740,9 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       for (const foal of stable ? daysToFoals(stable, t.residents ?? []) : [])
         lines.push(`Breeding: a foal in about ${foal} game ${foal === 1 ? 'day' : 'days'}`)
       if (stable) lines.push(...pausedBreedingLines(stable, t.residents ?? [], t.horses, t.tick))
+      // What a wall or gate, or its site, is of (`CONTEXT.md`: Wood or stone).
+      if (building.kind === 'wall' || building.kind === 'gate')
+        lines.push(isStone(building.kind, building.material) ? 'Of stone' : 'Of wood')
       if (building.kind === 'gate') lines.push(building.closed ? 'Closed' : 'Open')
       if (building.kind === 'townHall' && live && city)
         card.occupation = describeOccupation(city, t.tick ?? 0, t.viewer.realmId, t.realms ?? [])
@@ -2201,9 +2203,9 @@ function terrainLine(terrain: number | undefined, road: Building | undefined): s
  * remembered has none.
  */
 function describeSite(site: Building, t: TileThings | undefined): SiteView {
-  const work = BUILD_WORK[site.kind] ?? 0
+  const work = workOfKind(site.kind, site.material)
   const share = work > 0 ? Math.min(1, (site.site?.work ?? 0) / work) : 1
-  const need = BUILD_MATERIALS[site.kind] ?? {}
+  const need = materialsOfKind(site.kind, site.material)
   const left =
     t?.tick === undefined
       ? undefined
@@ -2342,15 +2344,17 @@ function amountsList(
 /** The kinds of workplace built on a resource node. */
 const NODE_WORKPLACE_KINDS = new Set<string>(Object.values(NODE_WORKPLACE))
 
-/** The weapons and armour a resident carries (`CONTEXT.md`: Weapons and armour), in words. */
-function gearText(
-  r: Pick<Resident, 'carried'>,
-  labels: Record<string, string>,
-): string | undefined {
-  const has = (g: Good) => (r.carried[g] ?? 0) > 0
-  const gear = [...WEAPONS, ...PROTECTION].filter(has).map((g) => labels[g]!.toLowerCase())
+/**
+ * What a resident has equipped (`CONTEXT.md`: Equipment, Seeing it), in words: what anyone who
+ * sees them sees, never the spare gear in their pack.
+ */
+function gearText(r: Geared, labels: Record<string, string>): string | undefined {
+  const weapon = bestWeapon(r)
+  const gear = [...(weapon ? [weapon] : []), ...wornProtection(r)].map((g) =>
+    labels[g]!.toLowerCase(),
+  )
   if (gear.length === 0) return undefined
-  return WEAPONS.some(has) ? `armed: ${gear.join(', ')}` : `unarmed, with ${gear.join(', ')}`
+  return weapon ? `armed: ${gear.join(', ')}` : `unarmed, with ${gear.join(', ')}`
 }
 
 /** The army a resident's order is for, if it is one (`CONTEXT.md`: Army). */
@@ -2370,8 +2374,7 @@ function strangersLines(strangers: SeenResident[]): string[] {
     if (a) armies.set(a, [...(armies.get(a) ?? []), r])
     else rest.push(r)
   }
-  const armed = (rs: SeenResident[]) =>
-    rs.filter((r) => WEAPONS.some((w) => (r.carried[w] ?? 0) > 0)).length
+  const armed = (rs: SeenResident[]) => rs.filter((r) => isArmed(r)).length
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
   const lines = [...armies.values()].map((rs) => {
     const soldiers = armed(rs)

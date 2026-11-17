@@ -596,10 +596,7 @@ pub fn admin_inspection(
             );
             m.insert("storage".into(), json!(storage));
             m.insert("gates".into(), json!({ "open": gates.len() - shut, "shut": shut }));
-            m.insert(
-                "soldiers".into(),
-                json!(residents.iter().filter(|r| is_armed(&r.carried)).count()),
-            );
+            m.insert("soldiers".into(), json!(residents.iter().filter(|r| is_armed(r)).count()));
             m
         }
         "building" => {

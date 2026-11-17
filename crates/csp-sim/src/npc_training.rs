@@ -185,7 +185,7 @@ pub fn plan_training(
         ground_job(CityJobKind::Teach, &ground_id, Some(subject)),
     );
     let armed: Vec<usize> =
-        adults.iter().copied().filter(|&i| is_armed(&world.residents[i].carried)).collect();
+        adults.iter().copied().filter(|&i| is_armed(&world.residents[i])).collect();
     for i in their_turn(world, &armed, &learners, places as usize, tick) {
         jobs.insert(
             world.residents[i].id.clone(),
@@ -313,7 +313,7 @@ pub fn go_train(
 pub fn npc_training_grounds_bounded(world: &WorldState, size: i32) -> Vec<InvariantViolation> {
     let mut out = Vec::new();
     for (city_id, plan) in &world.city_plans {
-        let Some(CityProject::Build { building, x, y }) = &plan.project else { continue };
+        let Some(CityProject::Build { building, x, y, .. }) = &plan.project else { continue };
         if plan.planned_at != world.tick as f64 || *building != BuildingKind::TrainingGround {
             continue;
         }
@@ -372,7 +372,7 @@ pub fn npc_trains_its_soldiers(world: &WorldState) -> Vec<InvariantViolation> {
             report(format!("plans {} trainees", trainees.len()), names.clone());
         }
         for id in &names {
-            if world.residents.iter().find(|r| &r.id == id).is_some_and(|r| !is_armed(&r.carried)) {
+            if world.residents.iter().find(|r| &r.id == id).is_some_and(|r| !is_armed(r)) {
                 report(format!("trains {id}, who is no soldier"), vec![id.clone()]);
             }
         }

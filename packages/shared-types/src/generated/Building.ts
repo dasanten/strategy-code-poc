@@ -3,8 +3,14 @@ import type { BuildingKind } from "./BuildingKind.js";
 import type { ConstructionSite } from "./ConstructionSite.js";
 import type { Good } from "./Good.js";
 import type { KeptBreeding } from "./KeptBreeding.js";
+import type { WallMaterial } from "./WallMaterial.js";
 
 /**
  * A building or construction site (`Building`).
  */
-export type Building = { id: string, kind: BuildingKind, cityId: string | null, realmId?: string, x: number, y: number, stock?: { [key in Good]?: number }, site?: ConstructionSite, teardown?: number, closed?: true, damage?: number, breedings?: Array<KeptBreeding>, };
+export type Building = { id: string, kind: BuildingKind, cityId: string | null, realmId?: string, x: number, y: number, stock?: { [key in Good]?: number }, site?: ConstructionSite, teardown?: number, closed?: true, damage?: number, breedings?: Array<KeptBreeding>, 
+/**
+ * What a wall or gate, or its site, is of; none is wood (`CONTEXT.md`: Wall / Gate, Wood or
+ * stone). Only walls and gates have one.
+ */
+material?: WallMaterial, };

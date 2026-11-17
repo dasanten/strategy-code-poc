@@ -56,7 +56,11 @@ fn text(order: &OrderRequest, key: &str) -> Option<String> {
 }
 
 fn attack_request(order: &OrderRequest) -> AttackRequest {
-    AttackRequest { resident_id: text(order, "residentId"), target_id: text(order, "targetId") }
+    AttackRequest {
+        resident_id: text(order, "residentId"),
+        target_id: text(order, "targetId"),
+        shoot: order.fields.get("shoot").and_then(Value::as_bool).unwrap_or(false),
+    }
 }
 
 fn army_request(order: &OrderRequest) -> ArmyRequest {
@@ -468,6 +472,9 @@ pub fn add_later_rule_orders(kinds: &mut OrderKinds) {
 
     // reviving.ts (named by no rule ticket; T86.14).
     kinds.insert("feed", crate::reviving::Feed);
+    // Equipment (T107.2).
+    kinds.insert("equip", crate::equipping::Equip);
+    kinds.insert("takeOff", crate::equipping::TakeOff);
     kinds.insert("payDebt", crate::trade_org_debt::PayDebt);
     // Demands.
     kinds.insert("sendDemand", crate::demands::SendDemand);
