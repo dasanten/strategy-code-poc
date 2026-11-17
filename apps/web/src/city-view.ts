@@ -72,6 +72,7 @@ export const BUILDING_NAMES: Record<BuildingKind, string> = {
   warehouse: 'warehouse',
   wall: 'wall',
   gate: 'gate',
+  tower: 'tower',
   farm: 'farm',
   stable: 'stable',
   mine: 'mine',

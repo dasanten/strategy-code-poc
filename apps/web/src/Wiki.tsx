@@ -300,6 +300,7 @@ import {
   WALL_DEFENCE,
   WALL_STRENGTH,
   STONE_WALL_STRENGTH,
+  TOWER_ROOM,
   WALL_WALK_TICKS,
   FALL_DAMAGE,
   WALK_TICKS_PER_TILE,
@@ -3568,6 +3569,19 @@ export function Wiki() {
           attacker at the wall, by the Alarm default or your order, a resident inside gets up onto
           the walk beside them unless the way round through a gate is quicker; a trading post's and
           the HQ's soldiers do the same.
+        </p>
+        <p>
+          <strong>Towers.</strong> A tower is a {num(FOOTPRINT.tower)} × {num(FOOTPRINT.tower)}{' '}
+          building of wood or stone (Build menu, under Defence), standing in a wall's line or alone,
+          off resource nodes and not on Mountain. It isn't built over wall tiles: tear those down
+          first. Like a wall it closes the way, and its top is part of the wall walk wherever a wall
+          tile touches it: residents walk onto it from the walk, or get up onto it from the ground
+          beside it as onto a wall. It holds {num(TOWER_ROOM)} residents up at once; one more waits
+          beside it until someone leaves. It is broken like a wall but holds out longer: wooden,{' '}
+          {num(WALL_STRENGTH.tower)} damage ({duration(breakTicks('tower'))} for that resident),
+          of stone {num(STONE_WALL_STRENGTH.tower)} ({duration(breakTicks('tower', true))}), and it
+          is struck from beside any of its tiles. Whoever is up on it when it breaks falls, as from
+          a wall tile. A tower is broken, not climbed.
         </p>
         <p>
           <strong>The high ground.</strong> Whoever is up strikes down at anyone on the ground next
