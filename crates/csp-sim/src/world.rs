@@ -219,6 +219,7 @@ pub fn step_world(
         step_traders(world, size, terrain, scratch);
         step_npc_defence(world, size, scratch);
         crate::npc_hunts::step_npc_hunts(world, size);
+        crate::npc_take_node::step_npc_take_nodes(world, terrain);
         // NPC cities seek allies and hire mercenaries on their own (`CONTEXT.md`: Acting first),
         // before the Trade Org army answers offers.
         crate::npc_acting_first::step_npc_acting_first(world, size);

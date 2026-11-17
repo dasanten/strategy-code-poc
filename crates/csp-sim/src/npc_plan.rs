@@ -222,6 +222,8 @@ pub fn plan_city(
         patrolled_last: None,
         hunts: None,
         demanded: None,
+        taking: None,
+        site_escort: None,
         march: None,
     });
     plan.planned_at = tick;

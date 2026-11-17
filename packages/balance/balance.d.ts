@@ -267,6 +267,10 @@ export interface Balance {
   readonly NPC_DEMAND_AGAIN_DAYS: number
   readonly NPC_DEMAND_REFUSED_STANDING: number
   readonly NEW_REALM_SHELTER_DAYS: number
+  readonly NPC_NODE_GUARD_RANGE: number
+  readonly NPC_TAKE_OUTWEIGH_TIMES: number
+  readonly NPC_TAKE_PARTY_MIN: number
+  readonly NPC_SITE_ESCORTS: number
   readonly NPC_PATROL_WALL_STOPS: number
   readonly NPC_PATROL_ROAD_STOPS: number
   readonly NPC_WAR_CHEST_PER_RESIDENT: number
