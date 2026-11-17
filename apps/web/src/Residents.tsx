@@ -364,6 +364,7 @@ export type Picking =
   | 'driveOff'
   | 'rowOff'
   | 'push'
+  | 'throw'
   | 'hitchOff'
   | 'haul'
   | 'roadFrom'
@@ -1328,6 +1329,10 @@ export function orderDoing(
   if (o?.kind === 'ram') {
     // `CONTEXT.md`: Ram: its crew under its roof.
     return 'Ramming with the crew'
+  }
+  if (o?.kind === 'throw') {
+    // `CONTEXT.md`: Catapult.
+    return 'Throwing Stone with the crew'
   }
   if (o?.kind === 'push') {
     if (!o.path) return `Finding a way for the ram to ${o.target.x}, ${o.target.y}`

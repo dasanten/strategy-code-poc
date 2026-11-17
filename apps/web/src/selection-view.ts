@@ -45,6 +45,8 @@ import {
   hungerFactor,
   RAM_CREW,
   RAM_STRENGTH,
+  CATAPULT_CREW,
+  CATAPULT_STRENGTH,
 } from '@csp/balance'
 import {
   carriageCapacity,
@@ -184,6 +186,7 @@ export type ActionId =
   | 'crew'
   | 'push'
   | 'ram'
+  | 'throw'
 
 /** The key that runs each action; fixed per action, so it is the same whatever is selected. */
 export const ACTION_KEYS: Record<ActionId, string> = {
@@ -229,6 +232,7 @@ export const ACTION_KEYS: Record<ActionId, string> = {
   crew: 'K',
   push: 'D',
   ram: 'R',
+  throw: 'R',
 }
 
 /**
@@ -965,6 +969,8 @@ export interface TileCard {
     y: number
     /** The wall or gate of another realm next to it, for a ram to strike (`CONTEXT.md`: Ram). */
     ramAt?: { id: string; name: string }
+    /** A catapult, which throws Stone at a wall, gate or tower picked on the map (`CONTEXT.md`: Catapult). */
+    throws?: boolean
   }
   /**
    * Residents in sight lying Down on the tile, of any realm, whom the resident picked last may
@@ -1814,11 +1820,13 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
     sites.push({ ...head, ...describeSite(carriageSite, t) })
     if (carriageSite.teardown) lines.push(teardownLine(carriageSite))
   }
-  const ramSite = here(t.buildings).find((b) => b.kind === 'ram')
+  const ramSite = here(t.buildings).find((b) => b.kind === 'ram' || b.kind === 'catapult')
   if (ramSite?.site) {
-    // A ram site in the field (`CONTEXT.md`: Siege machine), worked like a carriage site.
-    const head = card ? { title: 'Ram site' } : {}
-    card ??= { title: 'Ram site', what: 'building' }
+    // A ram or catapult site in the field (`CONTEXT.md`: Siege machine), worked like a carriage
+    // site.
+    const title = ramSite.kind === 'ram' ? 'Ram site' : 'Catapult site'
+    const head = card ? { title } : {}
+    card ??= { title, what: 'building' }
     sites.push({ ...head, ...describeSite(ramSite, t) })
     if (ramSite.teardown) lines.push(teardownLine(ramSite))
   }
@@ -1889,7 +1897,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       lists.push({ title: 'Crew', count: `${crewRows.length}`, meters: [], rows: crewRows })
     }
     const own = !!t.viewer.realmId && machine.realmId === t.viewer.realmId
-    const short = Math.max(0, RAM_CREW - machine.crewIds.length)
+    const short = Math.max(0, MACHINE_CREW[machine.kind] - machine.crewIds.length)
     const { x, y } = machine
     // A gate first, else a wall, of another realm's city or of nobody's, next to it.
     const ownRealm = (b: SeenBuilding) =>
@@ -1916,6 +1924,7 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
       x,
       y,
       ...(ramAt ? { ramAt: { id: ramAt.id, name: ramAt.kind } } : {}),
+      ...(machine.kind === 'catapult' ? { throws: true } : {}),
     }
   }
   if (carriage) {
@@ -2078,7 +2087,22 @@ export function describeTile(t: TileThings, goodLabels: Record<string, string>):
 }
 
 /** What each kind of siege machine is called (`CONTEXT.md`: Siege machine). */
-export const MACHINE_NAMES: Record<SiegeMachineKind, string> = { ram: 'ram' }
+export const MACHINE_NAMES: Record<SiegeMachineKind, string> = {
+  ram: 'ram',
+  catapult: 'catapult',
+}
+
+/** The fewest crew on each kind of machine for it to be pushed or used (`CONTEXT.md`: Siege machine). */
+export const MACHINE_CREW: Record<SiegeMachineKind, number> = {
+  ram: RAM_CREW,
+  catapult: CATAPULT_CREW,
+}
+
+/** Damage each kind of machine takes before it breaks (`CONTEXT.md`: Siege machine). */
+const MACHINE_STRENGTH: Record<SiegeMachineKind, number> = {
+  ram: RAM_STRENGTH,
+  catapult: CATAPULT_STRENGTH,
+}
 
 /**
  * A siege machine's lines (`CONTEXT.md`: Siege machine): its owner, its crew against what it
@@ -2087,14 +2111,15 @@ export const MACHINE_NAMES: Record<SiegeMachineKind, string> = { ram: 'ram' }
 export function describeMachine(m: SeenMachine, rel: Relationship | undefined): string[] {
   const lines = [rel ? RELATIONSHIP_NAMES[rel] : 'Nobody’s']
   const crew = m.crewIds.length
-  const short = Math.max(0, RAM_CREW - crew)
+  const needed = MACHINE_CREW[m.kind]
+  const short = Math.max(0, needed - crew)
   lines.push(
     short > 0
-      ? `Crew ${crew} of ${RAM_CREW}: needs ${short} more to be pushed`
+      ? `Crew ${crew} of ${needed}: needs ${short} more to be pushed`
       : `Crew ${crew}: can be pushed`,
   )
   if (m.pusherId) lines.push('Being pushed')
-  if (m.damage) lines.push(`Damaged: ${Math.round((100 * m.damage) / RAM_STRENGTH)}%`)
+  if (m.damage) lines.push(`Damaged: ${Math.round((100 * m.damage) / MACHINE_STRENGTH[m.kind])}%`)
   return lines
 }
 
@@ -2707,6 +2732,18 @@ export function tileActions(
         id: 'ram',
         label: `Ram the ${machine.ramAt.name}`,
         key: ACTION_KEYS.ram,
+        ...(reason ? { disabled: true as const, reason } : {}),
+      })
+    }
+    // One of its crew aims a catapult at a wall, gate or tower picked on the map (`CONTEXT.md`:
+    // Catapult), with its whole crew there.
+    if (machine.throws && pusherOf(card, actor)) {
+      const reason =
+        machine.short > 0 ? `the catapult needs ${machine.short} more crew to shoot` : undefined
+      actions.push({
+        id: 'throw',
+        label: 'Throw Stone at…',
+        key: ACTION_KEYS.throw,
         ...(reason ? { disabled: true as const, reason } : {}),
       })
     }

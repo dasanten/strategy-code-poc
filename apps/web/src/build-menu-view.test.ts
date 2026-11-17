@@ -119,7 +119,7 @@ describe('the Build menu', () => {
     expect(ram(Terrain.Forest)).toBeUndefined()
     expect(ram(Terrain.Lake)).toBe('a ram is built where a carriage could stand')
     expect(ram(Terrain.Plains, [{ id: 'r1', kind: 'ram', x: 50, y: 50 } as Building])).toBe(
-      'there is already a ram site on this tile',
+      'there is already a siege machine site on this tile',
     )
   })
 

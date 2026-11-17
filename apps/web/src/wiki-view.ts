@@ -6,6 +6,8 @@ import {
   BUILD_WORK,
   BROKEN_MATERIALS_RETURNED,
   RAM_BLOW,
+  CATAPULT_BLOW,
+  CATAPULT_SHOT_TICKS,
   RAM_STRIKE_TICKS,
   CARRIAGE_SPEED,
   SIEGE_PUSH_SHARE,
@@ -325,7 +327,7 @@ export interface BuildCost {
  */
 export function buildCosts(): BuildCost[] {
   const pace = buildWork(AVERAGE, AT)
-  const vehicles: readonly BuildingKind[] = ['carriage', 'boat', 'ship', 'ram']
+  const vehicles: readonly BuildingKind[] = ['carriage', 'boat', 'ship', 'ram', 'catapult']
   return BUILDABLE.filter((kind) => !vehicles.includes(kind)).map((kind) => {
     const materials = BUILD_MATERIALS[kind] ?? {}
     const work = BUILD_WORK[kind] ?? 0
@@ -408,14 +410,14 @@ export function shipCost(): { materials: Stock; buildTicks: number } {
  * materials, the ticks one average builder takes alone and as long torn down, and the goods left
  * on its tile when it is broken or torn down.
  */
-export function ramCost(): {
+export function ramCost(kind: 'ram' | 'catapult' = 'ram'): {
   materials: Stock
   buildTicks: number
   teardownTicks: number
   broken: Stock
   tornDown: Stock
 } {
-  const materials = BUILD_MATERIALS.ram ?? {}
+  const materials = BUILD_MATERIALS[kind] ?? {}
   const share = (of: number): Stock => {
     const out: Stock = {}
     for (const [good, units] of Object.entries(materials) as [Good, number][]) {
@@ -427,8 +429,8 @@ export function ramCost(): {
   const pace = buildWork(AVERAGE, AT)
   return {
     materials,
-    buildTicks: (BUILD_WORK.ram ?? 0) / pace,
-    teardownTicks: ((BUILD_WORK.ram ?? 0) * TEARDOWN_WORK_SHARE) / pace,
+    buildTicks: (BUILD_WORK[kind] ?? 0) / pace,
+    teardownTicks: ((BUILD_WORK[kind] ?? 0) * TEARDOWN_WORK_SHARE) / pace,
     broken: share(BROKEN_MATERIALS_RETURNED),
     tornDown: share(TEARDOWN_MATERIALS_RETURNED),
   }
@@ -542,3 +544,16 @@ export function cityControl(residents: number, armed: number) {
  */
 export const ramBreakTicks = (what: 'wall' | 'gate', stone = false) =>
   Math.ceil((stone ? STONE_WALL_STRENGTH : WALL_STRENGTH)[what] / RAM_BLOW) * RAM_STRIKE_TICKS
+
+/**
+ * Stone a crewed catapult throws, and the ticks it takes, to break a tile of wall or a gate,
+ * wooden or of stone (`CONTEXT.md`: Catapult): one Stone and `CATAPULT_BLOW` every
+ * `CATAPULT_SHOT_TICKS`.
+ */
+export function catapultBreak(
+  what: 'wall' | 'gate',
+  stone = false,
+): { shots: number; ticks: number } {
+  const shots = Math.ceil((stone ? STONE_WALL_STRENGTH : WALL_STRENGTH)[what] / CATAPULT_BLOW)
+  return { shots, ticks: shots * CATAPULT_SHOT_TICKS }
+}

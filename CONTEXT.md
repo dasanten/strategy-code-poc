@@ -888,7 +888,9 @@ The shared language of the game. Domain terms only — no implementation details
     down and out can attack the ram, or its crew in contact.
   - **Catapult:** of Wood, Iron and Stone. It throws one Stone a shot at a wall, gate or tower
     within a long reach, beyond a bow's from a wall. It hits buildings only, not people. Its crew
-    stands in the open.
+    stands in the open. The Stone it throws is what its crew on its tile carry, then what lies in
+    the pile on its tile (the machine itself holds no goods); out of Stone it stops. It is aimed
+    at a building or at a tile of one. *(Decided overnight, Daniel to confirm.)*
 - **Loot:** when a resident dies, everything they carried drops on the ground for anyone to take.
 - **Capturing a city:** only by occupying its town hall for a set number of game days without a
   break (Occupying a town hall; ADR 0017). When the time is up, the city and its residents join
