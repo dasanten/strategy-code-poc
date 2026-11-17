@@ -353,6 +353,7 @@ export const WALL_DEFENCE = balance.WALL_DEFENCE
 export const WALL_STRENGTH = balance.WALL_STRENGTH
 export const STONE_WALL_STRENGTH = balance.STONE_WALL_STRENGTH
 export const BROKEN_MATERIALS_RETURNED = balance.BROKEN_MATERIALS_RETURNED
+export const TOWER_ROOM = balance.TOWER_ROOM
 export const CLIMB_TICKS = balance.CLIMB_TICKS
 export const WALL_WALK_TICKS = balance.WALL_WALK_TICKS
 export const FALL_DAMAGE = balance.FALL_DAMAGE

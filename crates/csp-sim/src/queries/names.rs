@@ -89,6 +89,7 @@ pub fn kind_name(k: BuildingKind) -> &'static str {
         BuildingKind::Warehouse => "warehouse",
         BuildingKind::Wall => "wall",
         BuildingKind::Gate => "gate",
+        BuildingKind::Tower => "tower",
         BuildingKind::Farm => "farm",
         BuildingKind::Stable => "stable",
         BuildingKind::Mine => "mine",
@@ -107,13 +108,14 @@ pub fn kind_name(k: BuildingKind) -> &'static str {
 }
 
 /// Every building kind, in the order of `FOOTPRINT`'s keys.
-pub const ALL_KINDS: [BuildingKind; 20] = [
+pub const ALL_KINDS: [BuildingKind; 21] = [
     BuildingKind::TownHall,
     BuildingKind::House,
     BuildingKind::Storage,
     BuildingKind::Warehouse,
     BuildingKind::Wall,
     BuildingKind::Gate,
+    BuildingKind::Tower,
     BuildingKind::Farm,
     BuildingKind::Stable,
     BuildingKind::Mine,

@@ -10,7 +10,7 @@ import type { WallMaterial } from "./WallMaterial.js";
  */
 export type Building = { id: string, kind: BuildingKind, cityId: string | null, realmId?: string, x: number, y: number, stock?: { [key in Good]?: number }, site?: ConstructionSite, teardown?: number, closed?: true, damage?: number, breedings?: Array<KeptBreeding>, 
 /**
- * What a wall or gate, or its site, is of; none is wood (`CONTEXT.md`: Wall / Gate, Wood or
- * stone). Only walls and gates have one.
+ * What a wall, gate or tower, or its site, is of; none is wood (`CONTEXT.md`: Wall / Gate,
+ * Wood or stone, Tower). Only walls, gates and towers have one.
  */
 material?: WallMaterial, };

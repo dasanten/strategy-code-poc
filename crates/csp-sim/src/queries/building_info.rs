@@ -25,6 +25,7 @@ pub fn building_purpose(kind: BuildingKind) -> String {
         BuildingKind::Warehouse => "A warehouse keeps the Trade Organization’s goods; a resident or carriage on it can sell goods for its coins or buy with them.".into(),
         BuildingKind::Wall => "A stretch of wall; walls grow the city they stand by, like houses.".into(),
         BuildingKind::Gate => "A gate in a wall, which its city’s realm opens and closes; it grows the city like a wall does.".into(),
+        BuildingKind::Tower => "A tower is a square building of wood or stone, two tiles a side, in a wall’s line or alone; it closes the way like a wall, its top is part of the wall walk where a wall touches it, and it holds a few residents up at once. It is broken like a wall but holds out longer.".into(),
         BuildingKind::Farm => "A farm is fields that make Food; on Plains only.".into(),
         BuildingKind::Stable => "A stable keeps horses and their Food, and breeds them; on Plains only.".into(),
         BuildingKind::Mine => "A mine digs the ore of the iron ore or gold ore node it stands on.".into(),
@@ -70,7 +71,10 @@ pub const BUILD_GROUPS: [BuildGroup; 6] = [
             BuildingKind::TrainingGround,
         ],
     },
-    BuildGroup { name: "Defence", kinds: &[BuildingKind::Wall, BuildingKind::Gate] },
+    BuildGroup {
+        name: "Defence",
+        kinds: &[BuildingKind::Wall, BuildingKind::Gate, BuildingKind::Tower],
+    },
     BuildGroup {
         name: "Transport",
         kinds: &[

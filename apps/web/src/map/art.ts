@@ -14,6 +14,8 @@ export const BUILDING_ART: Record<BuildingKind, string> = {
   warehouse: 'warehouse.svg',
   wall: 'wall.svg',
   gate: 'gate.svg',
+  // A placeholder until Daniel's art (`CONTEXT.md`: Tower).
+  tower: 'tower.svg',
   farm: 'farm.svg',
   stable: 'stable.svg',
   mine: 'mine.svg',

@@ -225,6 +225,7 @@ pub fn world_invariants() -> Vec<Invariant> {
         Invariant { name: "shots-within-reach", check: checks::shots_within_reach },
         Invariant { name: "up-only-on-walls", check: crate::wall_walk::up_only_on_walls },
         Invariant { name: "up-only-on-own-walls", check: crate::wall_walk::up_only_on_own_walls },
+        Invariant { name: "tower-room", check: crate::wall_walk::tower_room },
         Invariant {
             name: "none-attack-up-from-below",
             check: crate::wall_walk::none_attack_up_from_below,
