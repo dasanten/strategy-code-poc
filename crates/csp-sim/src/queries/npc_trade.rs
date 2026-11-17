@@ -10,8 +10,8 @@ use ts_rs::TS;
 use csp_shared::balance::{
     BUILD_MATERIALS, CITY_PRICE_STANDING_SWING, HORSE_FOOD_PER_DAY, MAP_SIZE, NPC_HORSES_BASE,
     NPC_RESIDENTS_PER_HORSE, NPC_RESIDENTS_PER_NEEDS_STEP, NPC_SOLDIER_SHARE, NPC_STEEL_KIT,
-    NPC_TRADE, NPC_WAR_CHEST_PER_RESIDENT, STABLE_CAPACITY, STABLE_FEED_DAYS, STANDING_RANGE,
-    WAREHOUSE_FLOOR,
+    NPC_TOOLS_SPARE, NPC_TRADE, NPC_WAR_CHEST_PER_RESIDENT, STABLE_CAPACITY, STABLE_FEED_DAYS,
+    STANDING_RANGE, WAREHOUSE_FLOOR,
 };
 use csp_shared::goods::WEAPONS;
 use csp_shared::world::npc_trade::ShownNpcCityPrice;
@@ -111,19 +111,64 @@ pub fn kit_lacks(world: &WorldState, city: &City, kit: &[Good]) -> Vec<(Good, f6
         .collect()
 }
 
-/// What an NPC city's smithy forges (`npcSmithyGood`): a spear, or for a city that goes for Steel
-/// the first piece of its kit its soldiers lack beyond what its storages hold; with none, the
-/// first of its kit.
+/// What an NPC city's smithy forges (`npcSmithyGood`): a spear while its soldiers lack more than
+/// its storages hold, or for a city that goes for Steel the first piece of its kit its soldiers
+/// lack beyond what its storages hold; with none, Tools while its storages hold fewer than it
+/// wants (`npc_tools_wanted`, `CONTEXT.md`: Tools), not in a Trade Organization city; with none of
+/// that either, the first of its kit.
 pub fn npc_smithy_good(world: &WorldState, city: &City) -> Good {
     let kit = npc_soldier_kit(world, city);
-    if kit.len() == 1 {
-        return kit[0];
-    }
     let stock = npc_city_stock(world, city);
-    kit_lacks(world, city, &kit)
+    let weapon = if kit.len() == 1 {
+        let held_weapons: f64 =
+            WEAPONS.iter().map(|w| held(&stock, good_of(w).expect("a weapon"))).sum();
+        (npc_unarmed(world, city) > held_weapons).then_some(kit[0])
+    } else {
+        kit_lacks(world, city, &kit)
+            .into_iter()
+            .find(|(g, n)| held(&stock, *g) < *n)
+            .map(|(g, _)| g)
+    };
+    if let Some(g) = weapon {
+        return g;
+    }
+    // The Trade Organization's warehouses get their Tools as any good (`HQ_FLOOR_FACTOR`).
+    if city.trade_org.is_none() && held(&stock, Good::Tools) < npc_tools_wanted(world, city) {
+        return Good::Tools;
+    }
+    kit[0]
+}
+
+/// An NPC city's grown residents, alive (`npcAdults`).
+fn npc_adults<'w>(world: &'w WorldState, city: &City) -> Vec<&'w Resident> {
+    let tick = world.tick as f64;
+    city_residents(world, &city.id)
         .into_iter()
-        .find(|(g, n)| held(&stock, *g) < *n)
-        .map_or(kit[0], |(g, _)| g)
+        .filter(|r| r.owner.is_none() && r.health > 0.0 && can_work(r.born_at, tick))
+        .collect()
+}
+
+/// How many more soldiers an NPC city wants armed: its soldier target less its armed adults.
+fn npc_unarmed(world: &WorldState, city: &City) -> f64 {
+    let adults = npc_adults(world, city);
+    let armed = adults.iter().filter(|r| is_armed(r)).count() as f64;
+    npc_soldier_target(adults.len() as f64) - armed
+}
+
+/// How many sets of Tools an NPC city wants in its storages (`CONTEXT.md`: Tools, NPC reserve):
+/// one for each of its workers and builders (its adults beyond the soldiers it keeps) who carries
+/// none, and `NPC_TOOLS_SPARE` besides.
+pub fn npc_tools_wanted(world: &WorldState, city: &City) -> f64 {
+    let adults = npc_adults(world, city);
+    let workers = adults.len() as f64 - npc_soldier_target(adults.len() as f64);
+    let equipped = adults.iter().filter(|r| !is_armed(r) && held(&r.carried, Good::Tools) >= 1.0);
+    (workers - equipped.count() as f64).max(0.0) + NPC_TOOLS_SPARE
+}
+
+/// Whether an NPC city has a smithy of its own, finished or begun (`CONTEXT.md`: Tools, NPC
+/// reserve): only then does it keep Tools in its reserve.
+pub fn has_smithy(world: &WorldState, city: &City) -> bool {
+    crate::npc_chain::own_workplaces(world, city).iter().any(|b| b.kind == BuildingKind::Smithy)
 }
 
 /// How many soldiers an NPC city keeps (`npcSoldierTarget`): `NPC_SOLDIER_SHARE` of its adults,
@@ -241,6 +286,14 @@ pub fn npc_reserve(world: &WorldState, city: &City) -> Stock {
         if let Some(recipe) = recipe {
             add(&mut reserve, recipe.input.0.iter().copied(), unarmed - held_weapons);
         }
+    }
+    // Tools for its workers and builders: only for a city with a smithy of its own, finished or
+    // begun, to forge them. They are kept, never sold, but never short: its spare hands forge them
+    // as surplus work (`NPC_SURPLUS_CAP`), from Iron and Wood above the reserve, so a big city
+    // forging a set for every worker still counts as full (decided overnight, Daniel to confirm).
+    // The Trade Organization's cities keep theirs by their warehouses' floors.
+    if !adults.is_empty() && city.trade_org.is_none() && has_smithy(world, city) {
+        reserve.insert(Good::Tools, npc_tools_wanted(world, city));
     }
     if !residents.is_empty() {
         reserve.insert(Good::Coins, residents.len() as f64 * NPC_WAR_CHEST_PER_RESIDENT);

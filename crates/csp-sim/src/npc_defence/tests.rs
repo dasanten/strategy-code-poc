@@ -893,6 +893,194 @@ fn leave_a_thief_alone_that_nobody_of_theirs_saw() {
     assert_eq!(p.r(&soldier).order, None);
 }
 
+mod tools {
+    //! An NPC city's workers and builders carry Tools (`CONTEXT.md`: Tools, NPC reserve, T97.4).
+
+    use super::*;
+    use crate::queries::npc_trade::{npc_reserve, npc_smithy_good, npc_tools_wanted};
+    use crate::wear::in_use;
+    use csp_shared::balance::{NPC_TOOLS_SPARE, TOOLS_WORK_DAYS, WAREHOUSE_FLOOR};
+
+    /// The city's grown, unarmed residents: its workers and builders.
+    fn workers(p: &Place) -> Vec<usize> {
+        let tick = p.world.tick as f64;
+        p.citizens()
+            .into_iter()
+            .filter(|&i| {
+                let r = &p.world.residents[i];
+                can_work(r.born_at, tick) && !is_armed(r)
+            })
+            .collect()
+    }
+
+    fn carries_tools(p: &Place, i: usize) -> bool {
+        held(&p.world.residents[i].carried, Good::Tools) >= 1.0
+    }
+
+    /// A village with spears for its soldiers and `tools` sets in its storage.
+    fn armed_village(tools: f64) -> Place {
+        let mut p = village();
+        let s = p.building(BuildingKind::Storage);
+        let stock = p.world.buildings[s].stock.get_or_insert_with(Stock::new);
+        stock.insert(Good::Spear, 5.0);
+        stock.insert(Good::Tools, tools);
+        p
+    }
+
+    /// Gives the village a smithy of its own, as `make_spears_in_their_smithy…` does.
+    fn add_smithy(p: &mut Place) {
+        let hall = p.at(BuildingKind::TownHall);
+        let smithy = crate::test_support::building(
+            "smithy",
+            BuildingKind::Smithy,
+            None,
+            hall.x + 3.0,
+            hall.y,
+        );
+        p.world.buildings.push(smithy);
+        let city = p.city.clone();
+        p.world.cities.iter_mut().find(|c| c.id == city).unwrap().workplace_ids =
+            Some(vec!["smithy".into()]);
+    }
+
+    #[test]
+    fn its_workers_fetch_a_set_each_from_its_storage_and_its_soldiers_none() {
+        let mut p = armed_village(20.0);
+        let mut runner = Runner::new(&p.terrain);
+        p.run(&mut runner, 3 * DAY);
+        let workers = workers(&p);
+        assert!(!workers.is_empty());
+        for &i in &workers {
+            assert!(carries_tools(&p, i), "{} carries no Tools", p.world.residents[i].id);
+        }
+        let s = p.building(BuildingKind::Storage);
+        let left = p.world.buildings[s].stock.as_ref().map_or(0.0, |st| held(st, Good::Tools));
+        let carried: f64 =
+            p.citizens().iter().map(|&i| held(&p.world.residents[i].carried, Good::Tools)).sum();
+        assert_eq!(left + carried, 20.0, "nothing lost, one set each");
+        assert_eq!(carried, workers.len() as f64);
+        for i in p.citizens() {
+            if is_armed(&p.world.residents[i]) {
+                assert!(!carries_tools(&p, i), "a soldier carries no Tools");
+            }
+        }
+    }
+
+    #[test]
+    fn a_set_worn_out_at_work_is_replaced_from_the_storage() {
+        let mut p = armed_village(20.0);
+        let mut runner = Runner::new(&p.terrain);
+        p.run(&mut runner, 3 * DAY);
+        let s = p.building(BuildingKind::Storage);
+        let in_store =
+            |p: &Place| p.world.buildings[s].stock.as_ref().map_or(0.0, |st| held(st, Good::Tools));
+        let before = in_store(&p);
+        // Wear every worker's set down to a few ticks of work.
+        let almost = 1.0 - 5.0 / (TICKS_PER_GAME_DAY * TOOLS_WORK_DAYS);
+        for i in workers(&p) {
+            let id = p.world.residents[i].id.clone();
+            p.world.wear.insert(id, [(Good::Tools, vec![almost])].into_iter().collect());
+        }
+        p.run(&mut runner, 2 * DAY);
+        assert!(in_store(&p) < before, "the broken sets were replaced from the storage");
+        let workers = workers(&p);
+        let equipped = workers.iter().filter(|&&i| carries_tools(&p, i)).count();
+        assert_eq!(equipped, workers.len(), "every worker carries a set again");
+        let fresh = workers
+            .iter()
+            .filter(|&&i| in_use(&p.world, &p.world.residents[i].id, Good::Tools) < almost)
+            .count();
+        assert!(fresh > 0, "some of the sets now in use are new ones");
+    }
+
+    #[test]
+    fn its_reserve_holds_a_set_for_each_worker_without_one_and_a_few_spare_once_it_has_a_smithy() {
+        let mut p = armed_village(0.0);
+        let reserve = npc_reserve(&p.world, p.city());
+        assert_eq!(held(&reserve, Good::Tools), 0.0, "no smithy, no Tools in its reserve");
+        add_smithy(&mut p);
+        // Its workers and builders: its adults beyond the soldiers it keeps.
+        let tick = p.world.tick as f64;
+        let adults =
+            p.citizens().iter().filter(|&&i| can_work(p.world.residents[i].born_at, tick)).count();
+        let hands = adults as f64 - npc_soldier_target(adults as f64);
+        assert!(hands > 0.0);
+        let reserve = npc_reserve(&p.world, p.city());
+        assert_eq!(held(&reserve, Good::Tools), hands + NPC_TOOLS_SPARE);
+        assert_eq!(npc_tools_wanted(&p.world, p.city()), hands + NPC_TOOLS_SPARE);
+        // Kept, never sold, but never short: spare hands forge them as surplus work.
+        let size = p.terrain.size;
+        let short = crate::npc_chain::short_goods(&p.world, p.city(), size, None);
+        assert!(!short.contains(&Good::Tools));
+        // One worker more with a set of their own: one set fewer wanted. The reserve follows its
+        // workers.
+        let first = workers(&p)[0];
+        p.world.residents[first].carried.insert(Good::Tools, 1.0);
+        assert_eq!(npc_tools_wanted(&p.world, p.city()), hands - 1.0 + NPC_TOOLS_SPARE);
+    }
+
+    #[test]
+    fn with_nothing_short_its_spare_hands_forge_tools_once_its_soldiers_are_armed() {
+        let mut p = armed_village(0.0);
+        add_smithy(&mut p);
+        assert_eq!(npc_smithy_good(&p.world, p.city()), Good::Tools, "spears in store: Tools next");
+        let s = p.building(BuildingKind::Storage);
+        let stock = p.world.buildings[s].stock.get_or_insert_with(Stock::new);
+        stock.insert(Good::Spear, 0.0);
+        assert_eq!(npc_smithy_good(&p.world, p.city()), Good::Spear, "unarmed soldiers first");
+        // Nothing short: its spare hands work for surplus, Tools first while below its reserve.
+        let stock = p.world.buildings[s].stock.get_or_insert_with(Stock::new);
+        for (g, n) in [
+            (Good::Spear, 5.0),
+            (Good::Food, 400.0),
+            (Good::Wood, 400.0),
+            (Good::Stone, 300.0),
+            (Good::Iron, 100.0),
+            (Good::IronOre, 100.0),
+            (Good::Coins, 2000.0),
+        ] {
+            stock.insert(g, n);
+        }
+        let mut runner = Runner::new(&p.terrain);
+        p.run(&mut runner, 6 * DAY);
+        let made: f64 = p
+            .citizens()
+            .iter()
+            .map(|&i| held(&p.world.residents[i].carried, Good::Tools))
+            .sum::<f64>()
+            + p.world.buildings[s].stock.as_ref().map_or(0.0, |st| held(st, Good::Tools));
+        assert!(made >= 1.0, "its smithy forged Tools: {made}");
+        let equipped = workers(&p).iter().filter(|&&i| carries_tools(&p, i)).count();
+        assert!(equipped >= 1, "and its workers took them up");
+    }
+
+    #[test]
+    fn a_trading_posts_workers_take_only_what_its_warehouse_holds_above_its_floor() {
+        let mut p = post();
+        let w = p.building(BuildingKind::Warehouse);
+        let floor = WAREHOUSE_FLOOR.get("tools").unwrap();
+        let held_tools =
+            |p: &Place| p.world.buildings[w].stock.as_ref().map_or(0.0, |st| held(st, Good::Tools));
+        let start = held_tools(&p);
+        assert!(start > floor);
+        let carried = |p: &Place| -> f64 {
+            p.citizens().iter().map(|&i| held(&p.world.residents[i].carried, Good::Tools)).sum()
+        };
+        let mut runner = Runner::new(&p.terrain);
+        p.run(&mut runner, 3 * DAY);
+        assert!(carried(&p) >= 1.0, "its workers take a set");
+        assert!(held_tools(&p) >= floor, "its market keeps its floor of Tools");
+        assert_eq!(held_tools(&p) + carried(&p), start);
+        // At its floor, nobody takes any more.
+        let at_floor = held_tools(&p);
+        p.world.buildings[w].stock.get_or_insert_with(Stock::new).insert(Good::Tools, floor);
+        let before = carried(&p);
+        p.run(&mut runner, 2 * DAY);
+        assert_eq!(carried(&p), before, "none taken below the floor (it held {at_floor})");
+        assert_eq!(held_tools(&p), floor);
+    }
+}
+
 /// A village with a smithy it works, Iron and Wood in its storage, run until its soldiers are
 /// armed with spears from it.
 fn village_with_smithy() -> (Place, Runner) {

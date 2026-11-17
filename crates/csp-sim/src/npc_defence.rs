@@ -32,7 +32,7 @@ use crate::queries::residents::best_weapon;
 use crate::queries::residents::{can_work, carry_capacity, is_armed, stock_weight};
 use crate::queries::standing::TRADE_ORG;
 use crate::queries::walls::wall_side;
-use crate::queries::warehouse::warehouse_keeps;
+use crate::queries::warehouse::{stock_floor, warehouse_keeps};
 use crate::sight::InvariantViolation;
 use crate::work::start_work;
 
@@ -89,6 +89,11 @@ pub fn step_npc_defence(world: &mut WorldState, size: i32) {
             });
             let target = trade_org_army_target(adults, trade_org_army_wanted(world));
             keep_soldiers(world, &city, &people, target, goods);
+            let tools = world.buildings.iter().position(|b| {
+                b.city_id.as_deref() == Some(id.as_str())
+                    && warehouse_keeps(world, b).contains(&Good::Tools)
+            });
+            keep_tools(world, &city, &people, tools);
         }
         if city.trade_org == Some(TradeOrgCity::Post) {
             // A trading post arms from its warehouse, as far as it holds weapons.
@@ -96,6 +101,7 @@ pub fn step_npc_defence(world: &mut WorldState, size: i32) {
                 b.city_id.as_deref() == Some(id.as_str()) && b.kind == BuildingKind::Warehouse
             });
             keep_soldiers(world, &city, &people, npc_soldier_target(adults), warehouse);
+            keep_tools(world, &city, &people, warehouse);
         }
         if city.trade_org.is_some() {
             continue;
@@ -106,7 +112,45 @@ pub fn step_npc_defence(world: &mut WorldState, size: i32) {
                 && b.site.is_none()
         });
         keep_soldiers(world, &city, &people, npc_soldier_target(adults), storage);
+        keep_tools(world, &city, &people, storage);
         watch_gates(world, &city, size);
+    }
+}
+
+/// An NPC city's workers and builders carry a set of Tools each (`CONTEXT.md`: Tools, NPC
+/// reserve): while `store` holds a set, one grown, unarmed resident at a time who carries none,
+/// idle or at work, fetches one from it, as soldiers fetch their weapons (`fetch`); a set that
+/// breaks is replaced the same way. Not its traders nor a founding party's members, who are on
+/// their way. Trading posts and the HQ fetch from their warehouse, only what it holds above its
+/// floor (`stock_floor`), so their market of Tools stays (decided overnight, Daniel to confirm).
+/// Only orders a Player could give (ADR 0002).
+fn keep_tools(world: &mut WorldState, city: &City, people: &[usize], store: Option<usize>) {
+    let Some(st) = store else { return };
+    let b = &world.buildings[st];
+    let floor =
+        if city.trade_org.is_some() { held(&stock_floor(world, b), Good::Tools) } else { 0.0 };
+    if b.site.is_some() || held_in(b.stock.as_ref(), Good::Tools) - floor < 1.0 {
+        return;
+    }
+    let tick = world.tick as f64;
+    let plan = world.city_plans.get(&city.id);
+    let mut away: HashSet<String> = founding_party(plan).into_iter().collect();
+    away.extend(
+        plan.and_then(|p| p.traders.as_ref()).into_iter().flatten().map(|t| t.resident_id.clone()),
+    );
+    let lacking: Vec<usize> = people
+        .iter()
+        .copied()
+        .filter(|&i| {
+            let r = &world.residents[i];
+            can_work(r.born_at, tick)
+                && !is_armed(r)
+                && held(&r.carried, Good::Tools) < 1.0
+                && !away.contains(&r.id)
+        })
+        .collect();
+    if !lacking.is_empty() {
+        fetch(world, st, &lacking, &Stock::from([(Good::Tools, 1.0)]));
     }
 }
 

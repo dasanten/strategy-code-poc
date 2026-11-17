@@ -258,6 +258,7 @@ export interface Balance {
   readonly NPC_PATROL_WALL_STOPS: number
   readonly NPC_PATROL_ROAD_STOPS: number
   readonly NPC_WAR_CHEST_PER_RESIDENT: number
+  readonly NPC_TOOLS_SPARE: number
   readonly NPC_GATE_WATCH_RANGE: number
   readonly NPC_ADULTS_PER_PAIR: number
   readonly CARRYING_DAYS: number
@@ -294,6 +295,7 @@ export interface Balance {
     goldOre: number
     coins: number
     spear: number
+    tools: number
     [key: string]: number
   }
   readonly NPC_WALL_STEP: number

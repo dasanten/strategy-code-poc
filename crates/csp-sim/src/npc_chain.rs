@@ -24,12 +24,15 @@ use crate::queries::warehouse::{stock_floor, warehouse_keeps};
 
 /// The workplace that processes goods into one the chain wants, by that good (`PROCESSED_BY`):
 /// for a city that goes for Steel (`npc_makes_steel`) also Steel at a smelter and the steel kit
-/// at a smithy.
+/// at a smithy; for an NPC city also Tools at a smithy.
 pub fn processed_by(world: &WorldState, city: &City, good: Good) -> Option<BuildingKind> {
     match good {
         Good::Iron => Some(BuildingKind::Smelter),
         Good::Coins => Some(BuildingKind::Mint),
         g if g == NPC_SMITHY_WEAPON => Some(BuildingKind::Smithy),
+        // An NPC city forges its Tools (`CONTEXT.md`: Tools); the Trade Organization's warehouses
+        // get them as any good.
+        Good::Tools if city.trade_org.is_none() => Some(BuildingKind::Smithy),
         Good::Steel if npc_makes_steel(world, city) => Some(BuildingKind::Smelter),
         Good::SteelSword | Good::SteelArmour | Good::SteelShield
             if npc_makes_steel(world, city) =>
@@ -181,7 +184,10 @@ pub fn shortages(
     size: i32,
     project: Option<&CityProject>,
 ) -> Vec<Shortage> {
-    let short = reserve_lacks(world, city, project);
+    // Tools are never short: spare hands forge them as surplus work (`NPC_SURPLUS_CAP`,
+    // `CONTEXT.md`: Tools).
+    let short: Vec<Shortage> =
+        reserve_lacks(world, city, project).into_iter().filter(|s| s.good != Good::Tools).collect();
     // Looked into only once Coins are short: finding a way to earn them looks over the map.
     if city.trade_org.is_some()
         || !short.iter().any(|s| s.good == Good::Coins)

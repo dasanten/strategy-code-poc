@@ -225,6 +225,7 @@
   "NPC_PATROL_WALL_STOPS": 8.0,
   "NPC_PATROL_ROAD_STOPS": 3.0,
   "NPC_WAR_CHEST_PER_RESIDENT": 10.0,
+  "NPC_TOOLS_SPARE": 2.0,
   "NPC_GATE_WATCH_RANGE": 32.0,
   "NPC_ADULTS_PER_PAIR": 6.0,
   "CARRYING_DAYS": 10.0,
@@ -259,7 +260,8 @@
     "iron": 60.0,
     "goldOre": 60.0,
     "coins": 300.0,
-    "spear": 4.0
+    "spear": 4.0,
+    "tools": 2.0
   },
   "NPC_WALL_STEP": 8.0,
   "NPC_INNER_WALL_REACH": 9.0,
