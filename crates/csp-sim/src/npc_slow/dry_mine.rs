@@ -35,6 +35,9 @@ const MOVING_ON_DAYS: f64 = 15.0;
 /// adults: about one adult of its hundred.
 const IDLE_SLACK: f64 = 0.01;
 
+/// The share of its plans after moving on that put someone to work at the new mine, at least.
+const MOST_WORKED: f64 = 0.75;
+
 /// The share of its adults the city's plan leaves idle.
 fn idle_share(s: &BigCity) -> Option<f64> {
     let world = &s.world;
@@ -78,6 +81,8 @@ fn a_big_city_whose_vein_runs_dry_ends_a_season_working_the_next_node_no_idler_t
     let mut dry_day: Option<f64> = None;
     let mut planned_at = None;
     let (mut before, mut after) = (Vec::new(), Vec::new());
+    // For each plan after it moved on: whether anyone works a mine on the second node.
+    let mut worked: Vec<bool> = Vec::new();
     let mut runner =
         Runner { walking: unhurried_walking(&staged.terrain), scratch: Scratch::default() };
     for _ in 0..SEASON_DAYS {
@@ -100,7 +105,19 @@ fn a_big_city_whose_vein_runs_dry_ends_a_season_working_the_next_node_no_idler_t
             let Some(share) = idle_share(s) else { continue };
             match dry_day {
                 None => before.push(share),
-                Some(d) if day >= d + MOVING_ON_DAYS => after.push(share),
+                Some(d) if day >= d + MOVING_ON_DAYS => {
+                    after.push(share);
+                    let on_ore2 = |id: &String| {
+                        s.world.buildings.iter().any(|b| {
+                            &b.id == id
+                                && b.kind == BuildingKind::Mine
+                                && workplace_node(&s.world, b).is_some_and(|n| n.id == ore2)
+                        })
+                    };
+                    worked.push(
+                        plan.jobs.values().any(|j| j.building_id.as_ref().is_some_and(on_ore2)),
+                    );
+                }
                 Some(_) => {}
             }
         }
@@ -122,10 +139,11 @@ fn a_big_city_whose_vein_runs_dry_ends_a_season_working_the_next_node_no_idler_t
     let dead_gone = !world.buildings.iter().any(|b| b.id == mine.id);
     let mean = |v: &[f64]| v.iter().sum::<f64>() / v.len().max(1) as f64;
     eprintln!(
-        "vein ran dry on day {dry_day:?}; new mine {:?}, finished {}, crew {crew}; dead mine torn \
+        "vein ran dry on day {dry_day:?}; new mine {:?}, finished {}, crew {crew}, worked in {:.0}% of plans after; dead mine torn \
          down: {dead_gone}; idle before {:.1}% ({} plans), after {:.1}% ({} plans)",
         new_mine.as_ref().map(|m| (m.x, m.y)),
         new_mine.as_ref().is_some_and(|m| m.site.is_none()),
+        worked.iter().filter(|w| **w).count() as f64 / worked.len().max(1) as f64 * 100.0,
         mean(&before) * 100.0,
         before.len(),
         mean(&after) * 100.0,
@@ -134,7 +152,11 @@ fn a_big_city_whose_vein_runs_dry_ends_a_season_working_the_next_node_no_idler_t
     assert!(dry_day.is_some(), "the vein never ran dry");
     let new_mine = new_mine.expect("a mine on the second node");
     assert!(new_mine.site.is_none(), "the new mine is still a site");
-    assert!(crew > 0, "nobody works the new mine");
+    // It works the new mine through the season after moving on, not only on its last day: a birth
+    // can make Wood short for a day and send the crew to the lumber camp, and a city that founds
+    // daughters keeps them there for its parties' Wood (T100.8).
+    let share = worked.iter().filter(|w| **w).count() as f64 / worked.len().max(1) as f64;
+    assert!(share >= MOST_WORKED, "the new mine is worked in {:.0}% of plans", share * 100.0);
     assert!(dead_gone, "the dead mine still stands");
     assert!(!before.is_empty() && !after.is_empty());
     assert!(mean(&after) <= mean(&before) + IDLE_SLACK, "{before:?}\n{after:?}");

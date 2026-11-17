@@ -420,7 +420,11 @@ fn share_out(
     let project = world.city_plans[&city.id].project.clone();
     let own: Vec<usize> = crate::npc_chain::own_workplace_indices(world, city)
         .into_iter()
-        .filter(|&b| world.buildings[b].site.is_none())
+        // A workplace whose node ran dry is no one's place any more (`CONTEXT.md`: Running dry).
+        .filter(|&b| {
+            world.buildings[b].site.is_none()
+                && !crate::npc_growth::on_dry_node(world, &world.buildings[b])
+        })
         .collect();
     let by_id: HashMap<String, usize> =
         own.iter().map(|&b| (world.buildings[b].id.clone(), b)).collect();
