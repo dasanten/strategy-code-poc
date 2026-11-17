@@ -26,6 +26,10 @@ const HOLDS_FROM_DAY: f64 = 30.0;
 /// The most of its adults idle from then on.
 const MOST_IDLE_SHARE: f64 = 0.15;
 
+/// How long the closed-in city is run: to game day 60, so wear, decay, Tools and escorts have used
+/// its goods up for a month after it found its feet (T97.9).
+const CLOSED_IN_DAYS: usize = 60;
+
 /// The most ticks anyone stands on the storage with nothing to do: one pass and the ticks round it
 /// (`LONGEST_ON_STORAGE`).
 const LONGEST_ON_STORAGE: usize = NPC_PLAN_TICKS as usize + 5;
@@ -52,11 +56,12 @@ fn invariants_hold(s: &BigCity) {
 fn with_no_room_and_no_warehouse_keeps_its_storage_clear_and_reports_its_jobs() {
     let mut staged = big_city(None, 240);
     let mut watch = BigCityWatch::new(HOLDS_FROM_DAY);
-    let run = run_big_city(&mut staged, 40, 5, &mut invariants_hold, &mut |s| watch.tick(s));
+    let run =
+        run_big_city(&mut staged, CLOSED_IN_DAYS, 5, &mut invariants_hold, &mut |s| watch.tick(s));
     let hold = watch.hold();
     eprintln!("Big city, {BIG_CITY_RESIDENTS} residents staged:\n{}", big_city_report(&run));
     eprintln!("From day {HOLDS_FROM_DAY}, no room, no warehouse:\n{}", big_city_hold_report(&hold));
-    assert_eq!(run.counts.len(), 8);
+    assert_eq!(run.counts.len(), CLOSED_IN_DAYS / 5);
     assert!(hold.longest_on_storage <= LONGEST_ON_STORAGE, "{hold:?}");
     // Needs grow with the city (`CONTEXT.md`: Spare hands' work): at most a second of each
     // workplace on a node, and no more farms than it was staged with.
