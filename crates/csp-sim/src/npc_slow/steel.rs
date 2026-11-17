@@ -70,9 +70,17 @@ fn season(coal: bool) -> Season {
     Season {
         hold: watch.hold(),
         steel_armed,
-        // Its archers carry a Bow, not a sword (`CONTEXT.md`: Ranged combat).
+        // Its archers carry a Bow, not a sword (`CONTEXT.md`: Ranged combat): those it has, which
+        // may be one more than its archer target for a while.
         soldiers_wanted: npc_soldier_target(adults)
-            - npc_archer_target(world, staged.city(), adults),
+            - npc_archer_target(world, staged.city(), adults).max(
+                people
+                    .iter()
+                    .filter(|r| {
+                        r.health > 0.0 && r.carried.get(&Good::Bow).copied().unwrap_or(0.0) > 0.0
+                    })
+                    .count() as f64,
+            ),
         smelters,
         report: big_city_report(&run),
     }
