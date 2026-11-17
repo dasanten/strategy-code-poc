@@ -6,7 +6,6 @@ mod goods_support;
 mod tasks_support;
 
 use csp_lang::interpreter::Host as _;
-use csp_shared::balance::{SCRIPT_REALM_STEP_BUDGET, SCRIPT_STEP_BUDGET};
 use csp_shared::time::TICKS_PER_GAME_YEAR;
 use csp_shared::world::{Army, ArmyOrder, OrderRequest};
 use csp_sim::armies::ArmyOrderKind;
@@ -236,11 +235,12 @@ fn logs_trouble_naming_the_army_and_ends_when_the_script_is_deleted() {
 }
 
 #[test]
-fn shares_the_realms_step_budget_with_its_residents_scripts() {
+fn runs_with_its_own_step_budget_however_many_residents_scripts_run() {
     let mut g = setup();
     let lp = create(&g, "loop", "while (true) { }");
-    // Enough residents' scripts to use up the realm's budget, and the army's too.
-    let count = (SCRIPT_REALM_STEP_BUDGET / SCRIPT_STEP_BUDGET) as usize;
+    // Many residents' scripts that each use up their own budget: none is cut short by the
+    // realm's, as a realm has none (Daniel, 2026-11-17).
+    let count = 15;
     for i in 0..count {
         let id = format!("c{i}");
         let r = drawn_resident(100.0 + i as f64, &id, Some("r1"), None, 20.0, 20.0);
@@ -253,7 +253,8 @@ fn shares_the_realms_step_budget_with_its_residents_scripts() {
         .into_iter()
         .filter(|e| e["realm"] == json!(true))
         .collect();
-    assert_eq!(cut.len(), 1, "{cut:?}");
+    assert_eq!(cut, Vec::<Value>::new());
+    assert_eq!(events(&g.world, "scriptOutOfSteps").len(), count + 1);
 }
 
 #[test]
