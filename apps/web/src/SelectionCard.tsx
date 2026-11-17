@@ -540,6 +540,7 @@ export function TileCard({
   onCrew,
   onPush,
   onTearDownMachine,
+  onRam,
   tile,
   waypoints,
   workSettings,
@@ -600,6 +601,8 @@ export function TileCard({
   onPush?: (machineId: string, residentId: string) => void
   /** Orders a resident on a siege machine's tile to tear it down. */
   onTearDownMachine?: (machineId: string, residentId: string) => void
+  /** Has one of a ram's crew swing it at the wall or gate next to it (`CONTEXT.md`: Ram). */
+  onRam?: (machineId: string, residentId: string, targetId: string) => void
   /** The tile the card is for. */
   tile: { x: number; y: number }
   /** The Player's waypoints, for a new one's name and the cap (`CONTEXT.md`: Waypoint). */
@@ -750,6 +753,8 @@ export function TileCard({
             const pusher = pusherOf(card, actor)
             if (a.id === 'push' && machine && pusher) onPush?.(machine.id, pusher)
             if (a.id === 'tearDown' && machine && actor) onTearDownMachine?.(machine.id, actor.id)
+            if (a.id === 'ram' && machine?.ramAt && pusher)
+              onRam?.(machine.id, pusher, machine.ramAt.id)
           }}
           beside={(a) =>
             a.id === 'build' &&

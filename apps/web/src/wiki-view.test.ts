@@ -37,6 +37,7 @@ import {
   shipCost,
   ramCost,
   ramPushTicks,
+  ramBreakTicks,
   coinsPerMintWorkerDay,
   daysToWorkSkillMax,
   trainingDays,
@@ -146,6 +147,11 @@ describe('wiki figures', () => {
     // Broken it leaves less than torn down, as with walls.
     expect(ram.broken.wood!).toBeLessThan(ram.tornDown.wood!)
     expect(RAM_CREW).toBeGreaterThan(1)
+  })
+
+  it('has a ram break a wall far sooner than one resident’s blows, stone slower', () => {
+    expect(ramBreakTicks('wall') * 4).toBeLessThan(breakTicks('wall'))
+    expect(ramBreakTicks('gate', true)).toBeGreaterThan(ramBreakTicks('gate'))
   })
 
   it('pushes a ram slower than walking, slowest in forest', () => {

@@ -2313,6 +2313,11 @@ function Game({ account, onLoggedOut }: { account: Account; onLoggedOut: () => v
               setPushing(machineId)
               setPicking('push')
             }}
+            onRam={(machineId, residentId, targetId) =>
+              void giveOrder({ kind: 'ram', residentId, machineId, targetId }, false).then(
+                setOrderError,
+              )
+            }
             onTearDownMachine={(machineId, residentId) =>
               void giveOrder({ kind: 'tearDown', residentId, buildingId: machineId }, false).then(
                 setOrderError,

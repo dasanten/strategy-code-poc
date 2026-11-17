@@ -5,6 +5,8 @@ import {
   BUILD_MATERIALS,
   BUILD_WORK,
   BROKEN_MATERIALS_RETURNED,
+  RAM_BLOW,
+  RAM_STRIKE_TICKS,
   CARRIAGE_SPEED,
   SIEGE_PUSH_SHARE,
   WALK_TICKS_PER_TILE,
@@ -533,3 +535,10 @@ export function cityControl(residents: number, armed: number) {
     TERRITORY_CITY_BASE + residents * TERRITORY_PER_RESIDENT + armed * TERRITORY_PER_ARMED
   return { residents, armed, strength, reach: controlReach(strength) }
 }
+
+/**
+ * Ticks a crewed ram takes to break a tile of wall or a gate, wooden or of stone (`CONTEXT.md`:
+ * Ram): `RAM_BLOW` every `RAM_STRIKE_TICKS`.
+ */
+export const ramBreakTicks = (what: 'wall' | 'gate', stone = false) =>
+  Math.ceil((stone ? STONE_WALL_STRENGTH : WALL_STRENGTH)[what] / RAM_BLOW) * RAM_STRIKE_TICKS

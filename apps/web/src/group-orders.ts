@@ -870,6 +870,7 @@ export type ResidentOrderId = Exclude<
   | 'renameHorse'
   | 'addWaypoint'
   | 'crew'
+  | 'ram'
   | 'push'
 >
 

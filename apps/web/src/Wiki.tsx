@@ -301,6 +301,8 @@ import {
   WALL_STRENGTH,
   RAM_CREW,
   RAM_STRENGTH,
+  RAM_BLOW,
+  RAM_STRIKE_TICKS,
   STONE_WALL_STRENGTH,
   WALL_WALK_TICKS,
   FALL_DAMAGE,
@@ -366,6 +368,7 @@ import {
   shipCost,
   ramCost,
   ramPushTicks,
+  ramBreakTicks,
   cityControl,
   coinsPerMintWorkerDay,
   crimeForgotten,
@@ -3788,6 +3791,18 @@ export function Wiki() {
           {duration(ramPushTicks()[1]!.ticks)} and of road {duration(ramPushTicks()[2]!.ticks)}.
           The crew go along on its tile. One who walks off is no longer of its crew, and below{' '}
           {num(RAM_CREW)} it stops where it is.
+        </p>
+        <p>
+          <b>Ramming.</b> Pushed next to a wall or gate of another realm's city, or of nobody's, one
+          of its crew swings it with the whole crew (Ram the gate on its card, or{' '}
+          <code>ram(machine, wall)</code> in a script). It strikes every{' '}
+          {duration(RAM_STRIKE_TICKS)} for {num(RAM_BLOW)} damage, far harder than any blow: a tile
+          of wooden wall falls in {duration(ramBreakTicks('wall'))}, a stone gate in{' '}
+          {duration(ramBreakTicks('gate', true))}. Each strike raises the alarm as a blow at the wall
+          does, and breaking another realm's wall is a crime of tearing down, as by hand. Below its
+          crew size it stops. Its crew is under its roof: nobody up on a wall strikes them, and no
+          shot reaches them, so defenders have to come down and out to fight them or to strike the
+          ram, which is struck only from the ground.
         </p>
         <p>
           <b>Breaking and tearing down.</b> Anyone may attack a ram of another realm, as a wall: every
