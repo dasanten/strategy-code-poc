@@ -2917,10 +2917,12 @@ export function Wiki() {
         <p>
           A city with a smithy of its own, finished or begun, also keeps a set of{' '}
           <a href="#work">Tools</a> for each of its workers and builders who carries none (its
-          adults beyond the soldiers it keeps) and {num(NPC_TOOLS_SPARE)} spare, with the Iron and
-          Wood to forge them; its smithy forges Tools once its soldiers are armed. Being short of
-          Tools sends hands to its smithy, but never keeps the city from counting as full (it still
-          founds, lays roads and trains), nor does it build or buy for them. One grown, unarmed
+          adults beyond the soldiers it keeps) and {num(NPC_TOOLS_SPARE)} spare. It never sells them,
+          but they never count as short either: its spare hands forge them, first of all surplus
+          work while it holds fewer, from Iron and Wood above its reserve, and up to{' '}
+          {num(NPC_SURPLUS_CAP.tools ?? 0)} more a step of its needs; its smithy forges them only
+          once its soldiers are armed. So a city forging a set for every worker still founds, lays
+          roads and trains. One grown, unarmed
           resident at a time who carries none, idle or at work, fetches a set from its storage, as
           soldiers fetch their weapons, and one whose set breaks fetches the next. Soldiers carry
           none. A trading post's and the HQ's workers fetch theirs from their warehouse, only what

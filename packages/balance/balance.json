@@ -260,7 +260,8 @@
     "iron": 60.0,
     "goldOre": 60.0,
     "coins": 300.0,
-    "spear": 4.0
+    "spear": 4.0,
+    "tools": 2.0
   },
   "NPC_WALL_STEP": 8.0,
   "NPC_INNER_WALL_REACH": 9.0,

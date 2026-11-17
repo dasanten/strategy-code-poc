@@ -1008,11 +1008,10 @@ mod tools {
         let reserve = npc_reserve(&p.world, p.city());
         assert_eq!(held(&reserve, Good::Tools), hands + NPC_TOOLS_SPARE);
         assert_eq!(npc_tools_wanted(&p.world, p.city()), hands + NPC_TOOLS_SPARE);
-        // And the Iron and Wood to forge them, on top of what it keeps for anything else.
-        let recipe = crate::queries::building::recipe_for(BuildingKind::Smithy, Some("tools"))
-            .expect("a Tools recipe");
-        let iron = recipe.input.get("iron").unwrap();
-        assert!(held(&reserve, Good::Iron) >= iron * (hands + NPC_TOOLS_SPARE));
+        // Kept, never sold, but never short: spare hands forge them as surplus work.
+        let size = p.terrain.size;
+        let short = crate::npc_chain::short_goods(&p.world, p.city(), size, None);
+        assert!(!short.contains(&Good::Tools));
         // One worker more with a set of their own: one set fewer wanted. The reserve follows its
         // workers.
         let first = workers(&p)[0];
@@ -1021,7 +1020,7 @@ mod tools {
     }
 
     #[test]
-    fn short_of_tools_its_smithy_forges_them_once_its_soldiers_are_armed() {
+    fn with_nothing_short_its_spare_hands_forge_tools_once_its_soldiers_are_armed() {
         let mut p = armed_village(0.0);
         add_smithy(&mut p);
         assert_eq!(npc_smithy_good(&p.world, p.city()), Good::Tools, "spears in store: Tools next");
@@ -1029,10 +1028,19 @@ mod tools {
         let stock = p.world.buildings[s].stock.get_or_insert_with(Stock::new);
         stock.insert(Good::Spear, 0.0);
         assert_eq!(npc_smithy_good(&p.world, p.city()), Good::Spear, "unarmed soldiers first");
+        // Nothing short: its spare hands work for surplus, Tools first while below its reserve.
         let stock = p.world.buildings[s].stock.get_or_insert_with(Stock::new);
-        stock.insert(Good::Spear, 5.0);
-        stock.insert(Good::Iron, 30.0);
-        stock.insert(Good::Wood, 60.0);
+        for (g, n) in [
+            (Good::Spear, 5.0),
+            (Good::Food, 400.0),
+            (Good::Wood, 400.0),
+            (Good::Stone, 300.0),
+            (Good::Iron, 100.0),
+            (Good::IronOre, 100.0),
+            (Good::Coins, 2000.0),
+        ] {
+            stock.insert(g, n);
+        }
         let mut runner = Runner::new(&p.terrain);
         p.run(&mut runner, 6 * DAY);
         let made: f64 = p

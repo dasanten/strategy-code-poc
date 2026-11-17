@@ -184,7 +184,10 @@ pub fn shortages(
     size: i32,
     project: Option<&CityProject>,
 ) -> Vec<Shortage> {
-    let short = reserve_lacks(world, city, project);
+    // Tools are never short: spare hands forge them as surplus work (`NPC_SURPLUS_CAP`,
+    // `CONTEXT.md`: Tools).
+    let short: Vec<Shortage> =
+        reserve_lacks(world, city, project).into_iter().filter(|s| s.good != Good::Tools).collect();
     // Looked into only once Coins are short: finding a way to earn them looks over the map.
     if city.trade_org.is_some()
         || !short.iter().any(|s| s.good == Good::Coins)
@@ -195,22 +198,14 @@ pub fn shortages(
     short.into_iter().filter(|s| s.good != Good::Coins).collect()
 }
 
-/// The goods an NPC city is short of, the shortest first (`shortGoods`): what keeps it from
-/// counting as full (founding, roads, training, its inner wall, growing) and what it builds and
-/// buys for. Tools aside (`CONTEXT.md`: Tools, decided overnight, Daniel to confirm): being short
-/// of them sends hands to its smithy (`shortages`, its planning pass) but never holds the rest up,
-/// so a big city forging a set for every worker still founds and builds.
+/// The goods an NPC city is short of, the shortest first (`shortGoods`).
 pub fn short_goods(
     world: &WorldState,
     city: &City,
     size: i32,
     project: Option<&CityProject>,
 ) -> Vec<Good> {
-    shortages(world, city, size, project)
-        .into_iter()
-        .map(|s| s.good)
-        .filter(|g| *g != Good::Tools)
-        .collect()
+    shortages(world, city, size, project).into_iter().map(|s| s.good).collect()
 }
 
 /// How an NPC city weighs its workplaces for surplus work (`surplusWork`, `CONTEXT.md`: Spare

@@ -275,17 +275,13 @@ pub fn npc_reserve(world: &WorldState, city: &City) -> Stock {
             add(&mut reserve, recipe.input.0.iter().copied(), unarmed - held_weapons);
         }
     }
-    // Tools for its workers and builders, and the Iron and Wood to forge what its storages lack:
-    // only for a city with a smithy of its own, finished or begun, to forge them (decided
-    // overnight, Daniel to confirm), so one without stays full and founds as before. The Trade
-    // Organization's cities keep theirs by their warehouses' floors.
+    // Tools for its workers and builders: only for a city with a smithy of its own, finished or
+    // begun, to forge them. They are kept, never sold, but never short: its spare hands forge them
+    // as surplus work (`NPC_SURPLUS_CAP`), from Iron and Wood above the reserve, so a big city
+    // forging a set for every worker still counts as full (decided overnight, Daniel to confirm).
+    // The Trade Organization's cities keep theirs by their warehouses' floors.
     if !adults.is_empty() && city.trade_org.is_none() && has_smithy(world, city) {
-        let tools = npc_tools_wanted(world, city);
-        reserve.insert(Good::Tools, tools);
-        let forge = tools - held(&npc_city_stock(world, city), Good::Tools);
-        if let Some(recipe) = recipe_for(BuildingKind::Smithy, Some(good_name(Good::Tools))) {
-            add(&mut reserve, recipe.input.0.iter().copied(), forge);
-        }
+        reserve.insert(Good::Tools, npc_tools_wanted(world, city));
     }
     if !residents.is_empty() {
         reserve.insert(Good::Coins, residents.len() as f64 * NPC_WAR_CHEST_PER_RESIDENT);

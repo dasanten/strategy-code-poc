@@ -295,6 +295,7 @@ export interface Balance {
     goldOre: number
     coins: number
     spear: number
+    tools: number
     [key: string]: number
   }
   readonly NPC_WALL_STEP: number

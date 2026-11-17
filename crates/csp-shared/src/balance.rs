@@ -901,7 +901,9 @@ pub const NPC_REVIVE_REACH: f64 = 48.0;
 /// of its needs (`npcNeedsScale`; `CONTEXT.md`: Spare hands' work). Several of a trader's full loads
 /// (about 30 kg, `CARRY_BASE`), so its trader has something to sell, and above the materials a Full city wants (`townHall` and
 /// `storage` in `BUILD_MATERIALS`), or it could never found; few weapons, which its trader never
-/// sells. A good not named here is not worked for surplus.
+/// sells. Tools (`CONTEXT.md`: Tools) are forged only this way: below its reserve of them they are
+/// the first surplus work, and past it a couple spare. A good not named here is not worked for
+/// surplus.
 pub const NPC_SURPLUS_CAP: Table<f64> = Table(&[
     ("food", 100.0),
     ("wood", 150.0),
@@ -911,6 +913,7 @@ pub const NPC_SURPLUS_CAP: Table<f64> = Table(&[
     ("goldOre", 60.0),
     ("coins", 300.0),
     ("spear", 4.0),
+    ("tools", 2.0),
 ]);
 
 /// How many tiles further out an NPC city puts up its new wall when it has no room left inside
