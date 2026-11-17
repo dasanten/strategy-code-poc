@@ -1179,6 +1179,23 @@ pub const NPC_STANCE: NpcStance = NpcStance {
     temperament_tilt: 1.5,
 };
 
+/// When an NPC city acts first against a threat (`CONTEXT.md`: Acting first; T98.5).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NpcActingFirst {
+    /// The threat from one Organization at which a city seeks allies against it.
+    pub ally_threat: f64,
+    /// The threat from one Organization at which a city hires mercenaries.
+    pub hire_threat: f64,
+    /// How many Trade Org soldiers it hires at most.
+    pub hire_soldiers: f64,
+    /// For how many game days.
+    pub hire_days: f64,
+}
+
+pub const NPC_ACTING_FIRST: NpcActingFirst =
+    NpcActingFirst { ally_threat: 30.0, hire_threat: 30.0, hire_soldiers: 4.0, hire_days: 7.0 };
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TradeOrgHq {
@@ -3230,6 +3247,7 @@ pub fn balance_json() -> Value {
         json!(NPC_DAUGHTER_TAKES_MOTHERS_TEMPERAMENT),
     );
     m.insert("NPC_STANCE".into(), to_value(NPC_STANCE).expect("serialisable"));
+    m.insert("NPC_ACTING_FIRST".into(), to_value(NPC_ACTING_FIRST).expect("serialisable"));
     m.insert("TRADE_ORG_HQ".into(), to_value(TRADE_ORG_HQ).expect("serialisable"));
     m.insert("TRADE_ORG_HQ_MIN_DISTANCE".into(), json!(TRADE_ORG_HQ_MIN_DISTANCE));
     m.insert("TRADING_POST_REGION".into(), json!(TRADING_POST_REGION));
