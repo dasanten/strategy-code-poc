@@ -84,6 +84,7 @@ fn mending_a_piece_takes_a_share_of_its_recipe_rounded_and_at_least_one_unit() {
     assert_eq!(mend_input(Good::Spear), Some(vec![(Good::Wood, 1.0)]));
     assert_eq!(mend_input(Good::Shield), Some(vec![(Good::Wood, 1.0)]));
     assert_eq!(mend_input(Good::SteelArmour), Some(vec![(Good::Steel, 2.0)]));
+    assert!(mend_input(Good::Tools).is_some(), "a set of Tools mends too");
     assert_eq!(mend_input(Good::Iron), None);
 }
 
