@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { DECAY_NEARLY_RUIN, DECAY_WORN, TICKS_PER_GAME_DAY } from '@csp/balance'
-import { conditionOf, DECAY_DAYS, repairable, repairMaterials, repairWork } from './decay.js'
+import {
+  conditionOf,
+  DECAY_DAYS,
+  isRuin,
+  rebuildMaterials,
+  rebuildWork,
+  repairable,
+  repairMaterials,
+  repairWork,
+} from './decay.js'
 
 describe('decay (`CONTEXT.md`: Decay, Repairing)', () => {
   it('reads a building’s condition in words, none for a site or a kind that never decays', () => {
@@ -27,5 +36,18 @@ describe('decay (`CONTEXT.md`: Decay, Repairing)', () => {
     expect(repairMaterials('road')).toEqual({ stone: 1 })
     expect(repairMaterials('farm')).toEqual({})
     expect(repairWork('house')).toBe(TICKS_PER_GAME_DAY / 4)
+  })
+})
+
+describe('ruins (`CONTEXT.md`: Ruin)', () => {
+  it('reads a ruin as one, rebuilt for more than a repair and less than a new building', () => {
+    const ruin = { kind: 'house', decay: 1, ruinedAt: 0 } as const
+    expect(isRuin(ruin)).toBe(true)
+    expect(isRuin({})).toBe(false)
+    expect(conditionOf(ruin)).toBe('ruin')
+    expect(repairable(ruin)).toBe(true)
+    expect(rebuildMaterials('house')).toEqual({ wood: 10 })
+    expect(rebuildWork('house')).toBeGreaterThan(repairWork('house'))
+    expect(rebuildWork('house')).toBeLessThan(TICKS_PER_GAME_DAY)
   })
 })

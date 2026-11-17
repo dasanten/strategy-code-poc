@@ -1036,7 +1036,7 @@ pub static SCRIPT_VIEWS: &[ScriptView] = &[
             ScriptField {
                 name: "condition",
                 r#type: ScriptType::String,
-                description: "How it has decayed: \"good\", \"worn\" or \"nearlyRuin\"; a worn one, or worse, can be repaired (`repair`).",
+                description: "How it has decayed: \"good\", \"worn\", \"nearlyRuin\" or \"ruin\"; a worn one, or worse, can be repaired (`repair`), and repairing a ruin rebuilds it.",
                 null_when: Some("for a construction site and a building that never decays"),
             },
         ],
@@ -2529,7 +2529,7 @@ pub static SCRIPT_API: &[ScriptBinding] = &[
         is: Is::Query,
         params: &["cityId"],
         cost: 20.0,
-        description: "The buildings in that city’s area, a city of my realm’s, that need repairing (worn, nearly a ruin, or with a repair under way), worst first, then nearest me; my realm’s own and those of no city and no realm, such as a road. Empty for any other city.",
+        description: "The buildings in that city’s area, a city of my realm’s, that need repairing (worn, nearly a ruin, a ruin, or with a repair under way), worst first, then nearest me; my realm’s own and those of no city and no realm, such as a road. Empty for any other city.",
         returns: ScriptType::List(&ScriptType::View("building")),
     },
     ScriptBinding {

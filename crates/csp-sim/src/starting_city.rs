@@ -377,6 +377,7 @@ fn found_at(
         damage: None,
         breedings: None,
         decay: None,
+        ruined_at: None,
         repair: None,
     };
     let hall = building(world, BuildingKind::TownHall, hall_tile(x, y, size));

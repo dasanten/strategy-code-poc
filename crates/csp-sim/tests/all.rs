@@ -124,6 +124,8 @@ mod residents_stepped;
 mod road_line;
 #[path = "roads.rs"]
 mod roads;
+#[path = "ruins.rs"]
+mod ruins;
 #[path = "script_waiting.rs"]
 mod script_waiting;
 #[path = "ship_building.rs"]

@@ -967,7 +967,7 @@ pub fn tear_down_orders_on_buildings(world: &WorldState, _: &TerrainMap) -> Out 
 /// and holds no more of each material, nor work, than a repair takes (`CONTEXT.md`: Decay,
 /// Repairing).
 pub fn conditions_in_range(world: &WorldState, _: &TerrainMap) -> Out {
-    use crate::repair::{decays, repair_materials, repair_work};
+    use crate::repair::{decays, repair_materials_of, repair_work_of};
     let name = "conditions-in-range";
     let mut out = Vec::new();
     for b in &world.buildings {
@@ -984,16 +984,46 @@ pub fn conditions_in_range(world: &WorldState, _: &TerrainMap) -> Out {
         if !decays(b) {
             fail("is being repaired but never decays".into());
         }
-        let materials = repair_materials(b.kind);
+        let materials = repair_materials_of(b);
         for (good, units) in &repair.delivered {
             let most = materials.get(good).copied().unwrap_or(0.0);
             if !(*units >= 0.0 && *units <= most) {
                 fail(format!("has {} {good:?} for its repair of {}", js_number(*units), most));
             }
         }
-        let work = repair_work(b.kind);
+        let work = repair_work_of(b);
         if !(repair.work >= 0.0 && repair.work <= work) {
             fail(format!("has repair work {} of {}", js_number(repair.work), js_number(work)));
+        }
+    }
+    out
+}
+
+/// A ruin is a finished building of a kind that decays and has lost all its condition, takes no
+/// blows, and has stood no longer than `RUIN_COLLAPSE_DAYS` (`CONTEXT.md`: Ruin).
+pub fn ruins_ruined(world: &WorldState, _: &TerrainMap) -> Out {
+    use csp_shared::balance::RUIN_COLLAPSE_DAYS;
+    use csp_shared::time::TICKS_PER_GAME_DAY;
+    let name = "ruins-ruined";
+    let tick = world.tick as f64;
+    let mut out = Vec::new();
+    for b in &world.buildings {
+        let Some(at) = b.ruined_at else { continue };
+        let mut fail = |m: String| out.push(violation(name, format!("{} {m}", b.id), &[&b.id]));
+        if !crate::repair::decays(b) {
+            fail("is a ruin but never decays".into());
+        }
+        if b.decay != Some(1.0) {
+            fail(format!(
+                "is a ruin with {} of its condition lost",
+                js_number(b.decay.unwrap_or(0.0))
+            ));
+        }
+        if b.damage.is_some() {
+            fail("is a ruin with damage".into());
+        }
+        if !(at <= tick && tick - at < RUIN_COLLAPSE_DAYS * TICKS_PER_GAME_DAY) {
+            fail(format!("became a ruin at tick {}", js_number(at)));
         }
     }
     out
@@ -1016,7 +1046,7 @@ pub fn repair_orders_on_buildings(world: &WorldState, _: &TerrainMap) -> Out {
 }
 
 /// The Trade Organization repairs its own at the turn of each day, so no building of the HQ or a
-/// trading post is ever nearly a ruin (`CONTEXT.md`: Decay).
+/// trading post is ever nearly a ruin, let alone a ruin (`CONTEXT.md`: Decay).
 pub fn trade_org_kept_up(world: &WorldState, _: &TerrainMap) -> Out {
     use crate::repair::{condition_of, Condition};
     let name = "trade-org-kept-up";
@@ -1026,8 +1056,10 @@ pub fn trade_org_kept_up(world: &WorldState, _: &TerrainMap) -> Out {
         .buildings
         .iter()
         .filter(|b| b.city_id.as_deref().is_some_and(|c| theirs.contains(&c)))
-        .filter(|b| condition_of(b) == Some(Condition::NearlyRuin))
-        .map(|b| violation(name, format!("the Trade Org's {} is nearly a ruin", b.id), &[&b.id]))
+        .filter(|b| matches!(condition_of(b), Some(Condition::NearlyRuin | Condition::Ruin)))
+        .map(|b| {
+            violation(name, format!("the Trade Org’s {} is nearly a ruin or worse", b.id), &[&b.id])
+        })
         .collect()
 }
 

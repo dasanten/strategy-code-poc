@@ -214,6 +214,7 @@ mod an_npc_resident_carrying_a_child {
             damage: None,
             breedings: None,
             decay: None,
+            ruined_at: None,
             repair: None,
         });
         world.cities.iter_mut().find(|c| c.id == city).unwrap().workplace_ids =

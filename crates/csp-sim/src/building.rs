@@ -274,6 +274,7 @@ pub fn resolve_building(
                     damage: None,
                     breedings: None,
                     decay: None,
+                    ruined_at: None,
                     repair: None,
                 };
                 world.buildings.push(site.clone());
