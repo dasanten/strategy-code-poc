@@ -216,6 +216,8 @@
     "steelArmour",
     "steelShield"
   ],
+  "NPC_ARCHER_SHARE": 0.5,
+  "NPC_ARCHER_ARROWS": 20.0,
   "NPC_SOLDIERS_ON_HALL": 2.0,
   "NPC_SOLDIERS_AT_GATE": 1.0,
   "NPC_POST_AROUND_HALL": 2.0,
@@ -350,7 +352,10 @@
     "armour": 1.0,
     "steelSword": 1.0,
     "steelShield": 1.0,
-    "steelArmour": 1.0
+    "steelArmour": 1.0,
+    "bow": 1.0,
+    "crossbow": 1.0,
+    "arrows": 40.0
   },
   "HQ_FLOOR_FACTOR": 5.0,
   "HQ_FOOD_FLOOR_FACTOR": 15.0,
@@ -369,7 +374,10 @@
     "armour": 90.0,
     "steelSword": 50.0,
     "steelShield": 30.0,
-    "steelArmour": 160.0
+    "steelArmour": 160.0,
+    "bow": 12.0,
+    "crossbow": 30.0,
+    "arrows": 1.0
   },
   "PRICE_REFERENCE_FLOORS": 4.0,
   "PRICE_ELASTICITY": 0.5,
@@ -415,13 +423,39 @@
     "steel": 1.0,
     "steelSword": 3.0,
     "steelShield": 4.0,
-    "steelArmour": 8.0
+    "steelArmour": 8.0,
+    "bow": 2.0,
+    "crossbow": 4.0,
+    "arrows": 0.1
   },
   "WEAPON_ATTACK": {
     "spear": 4.0,
     "sword": 6.0,
-    "steelSword": 9.0
+    "steelSword": 9.0,
+    "bow": 0.0,
+    "crossbow": 0.0
   },
+  "SHOT_REACH": {
+    "bow": 8.0,
+    "crossbow": 5.0
+  },
+  "SHOT_TICKS": {
+    "bow": 3.0,
+    "crossbow": 6.0
+  },
+  "SHOT_DAMAGE": {
+    "bow": 6.0,
+    "crossbow": 14.0
+  },
+  "SHOT_SKILL_LIMIT": {
+    "bow": 2.0,
+    "crossbow": 0.25
+  },
+  "SHOT_PIERCE": {
+    "bow": 0.0,
+    "crossbow": 0.5
+  },
+  "WALL_SHOT_REACH_BONUS": 4.0,
   "PROTECTION_DEFENCE": {
     "shield": 3.0,
     "armour": 5.0,
@@ -782,6 +816,32 @@
         },
         "output": {
           "steelArmour": 1.0
+        }
+      },
+      {
+        "input": {
+          "wood": 2.0
+        },
+        "output": {
+          "bow": 1.0
+        }
+      },
+      {
+        "input": {
+          "iron": 1.0,
+          "wood": 3.0
+        },
+        "output": {
+          "crossbow": 1.0
+        }
+      },
+      {
+        "input": {
+          "iron": 1.0,
+          "wood": 3.0
+        },
+        "output": {
+          "arrows": 40.0
         }
       }
     ]

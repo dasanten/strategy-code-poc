@@ -5,7 +5,7 @@
 
 use std::collections::HashSet;
 
-use csp_shared::balance::{PROTECTION_DEFENCE, WEAPON_ATTACK};
+use csp_shared::balance::{NPC_ARCHER_ARROWS, PROTECTION_DEFENCE, WEAPON_ATTACK};
 use csp_shared::goods::PROTECTION_KINDS;
 use csp_shared::world::{
     City, ContractSide, ContractWhat, Good, MercenaryContract, RealmEventWhat, WorldState,
@@ -14,6 +14,7 @@ use csp_shared::world::{
 use crate::contracts::{cannot_start, start_contract};
 use crate::events::record_event;
 use crate::queries::city::{for_sale, in_city_area};
+use crate::queries::combat::ranged_weapon;
 use crate::queries::names::{good_name, good_of, held};
 use crate::queries::npc_trade::{
     npc_city_stock, npc_hire_problem, npc_reserve, npc_storages, spare_residents,
@@ -158,6 +159,14 @@ fn arm_lent(
         if !is_armed(&world.residents[i]) {
             for w in by_strength() {
                 if take(world, i, w) {
+                    break;
+                }
+            }
+        }
+        // With a Bow or Crossbow, Arrows as an archer of the city carries them, from its surplus.
+        if ranged_weapon(&world.residents[i]).is_some() {
+            while held(&world.residents[i].carried, Good::Arrows) < NPC_ARCHER_ARROWS {
+                if !take(world, i, Good::Arrows) {
                     break;
                 }
             }

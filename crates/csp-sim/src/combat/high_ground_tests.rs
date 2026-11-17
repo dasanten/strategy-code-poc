@@ -37,8 +37,11 @@ fn setup() -> WorldState {
 /// Sends an attack order from Player `user_id`: "ack", or the reason it was rejected.
 fn order(world: &mut WorldState, user_id: u64, resident_id: &str, target_id: &str) -> &'static str {
     let sender = OrderSender::player(user_id, "Mara");
-    let request =
-        AttackRequest { resident_id: Some(resident_id.into()), target_id: Some(target_id.into()) };
+    let request = AttackRequest {
+        resident_id: Some(resident_id.into()),
+        target_id: Some(target_id.into()),
+        ..AttackRequest::default()
+    };
     if let Some(reason) = validate_attack(world, &sender, &request, Some(SIZE)) {
         return reason;
     }

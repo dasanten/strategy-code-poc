@@ -15,6 +15,7 @@ use crate::queries::building::{
     build_materials_of, building_at, has_choice, is_stone, materials_needed, max_workers,
     recipe_for, recipe_input, wooden_wall_index_at, workplace_good,
 };
+use crate::queries::city::for_sale;
 use crate::queries::names::{good_name, held, held_in};
 use crate::queries::npc_trade::{
     npc_city_stock, npc_makes_steel, npc_needs_scale, npc_reserve, npc_smithy_good,
@@ -31,6 +32,7 @@ pub fn processed_by(world: &WorldState, city: &City, good: Good) -> Option<Build
         Good::Coins => Some(BuildingKind::Mint),
         g if g == NPC_SMITHY_WEAPON => Some(BuildingKind::Smithy),
         Good::Steel if npc_makes_steel(world, city) => Some(BuildingKind::Smelter),
+        Good::Bow | Good::Arrows if for_sale(city) => Some(BuildingKind::Smithy),
         Good::SteelSword | Good::SteelArmour | Good::SteelShield
             if npc_makes_steel(world, city) =>
         {

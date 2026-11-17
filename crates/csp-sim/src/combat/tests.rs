@@ -41,8 +41,11 @@ fn setup() -> WorldState {
 /// Sends an attack order from Player 7 and answers whether it was taken (`order`).
 fn order(world: &mut WorldState, resident_id: &str, target_id: &str) -> &'static str {
     let sender = OrderSender::player(ME, "Mara");
-    let request =
-        AttackRequest { resident_id: Some(resident_id.into()), target_id: Some(target_id.into()) };
+    let request = AttackRequest {
+        resident_id: Some(resident_id.into()),
+        target_id: Some(target_id.into()),
+        ..AttackRequest::default()
+    };
     if let Some(reason) = validate_attack(world, &sender, &request, Some(SIZE)) {
         return reason;
     }
@@ -593,6 +596,7 @@ fn of_two_equal_soldiers_the_one_with_a_steel_sword_wins_most_of_a_hundred_fight
                     let request = AttackRequest {
                         resident_id: Some(who.into()),
                         target_id: Some(whom.into()),
+                        ..AttackRequest::default()
                     };
                     apply_attack(&mut world, &request, Some(SIZE));
                 }

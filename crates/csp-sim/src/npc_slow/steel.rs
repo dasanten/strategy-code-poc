@@ -13,7 +13,7 @@ use super::big_city_fixture::{
 use crate::invariants::check_all;
 use crate::npc_chain::own_workplaces;
 use crate::queries::city::city_residents;
-use crate::queries::npc_trade::{npc_makes_steel, npc_soldier_target};
+use crate::queries::npc_trade::{npc_archer_target, npc_makes_steel, npc_soldier_target};
 use crate::queries::residents::can_work;
 
 /// A game season: a quarter of a game year.
@@ -70,7 +70,9 @@ fn season(coal: bool) -> Season {
     Season {
         hold: watch.hold(),
         steel_armed,
-        soldiers_wanted: npc_soldier_target(adults),
+        // Its archers carry a Bow, not a sword (`CONTEXT.md`: Ranged combat).
+        soldiers_wanted: npc_soldier_target(adults)
+            - npc_archer_target(world, staged.city(), adults),
         smelters,
         report: big_city_report(&run),
     }

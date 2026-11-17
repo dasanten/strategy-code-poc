@@ -2111,6 +2111,41 @@ pub fn attack_orders_sound(world: &WorldState, _: &TerrainMap) -> Out {
     out
 }
 
+/// Nobody strikes or shoots from beyond their reach (`CONTEXT.md`: Ranged combat; ADR 0004): a
+/// resident struck in the tick just stepped stands within their striker's `strike_reach`, contact
+/// without a Bow or Crossbow. One tile of slack, as a fall from a broken wall tile can move either
+/// of them a tile after the blow. Those aboard a vessel are left out: from a docked ship anyone on
+/// its haven is in reach (`CONTEXT.md`: Fighting at a vessel).
+pub fn shots_within_reach(world: &WorldState, terrain: &TerrainMap) -> Out {
+    let name = "shots-within-reach";
+    let last = world.tick as f64 - 1.0;
+    let mut out = Vec::new();
+    for t in &world.residents {
+        let Some(s) = t.struck.as_ref().filter(|s| s.tick == last) else { continue };
+        let Some(a) = world.residents.iter().find(|a| a.id == s.by) else { continue };
+        if a.aboard.is_some() || t.aboard.is_some() {
+            continue;
+        }
+        let apart = crate::queries::combat::tiles_apart(
+            terrain.size,
+            (a.x as i32, a.y as i32),
+            (t.x as i32, t.y as i32),
+        );
+        let reach = crate::queries::combat::strike_reach(world, a);
+        if apart > reach + 1.0 {
+            let msg = format!(
+                "resident {} struck {} from {} tiles away, beyond their reach of {}",
+                a.id,
+                t.id,
+                js_number(apart),
+                js_number(reach)
+            );
+            out.push(violation(name, msg, &[&a.id, &t.id]));
+        }
+    }
+    out
+}
+
 /// The longest an alliance's name may be (`ALLIANCE_NAME_MAX_LENGTH`).
 const ALLIANCE_NAME_MAX_LENGTH: usize = 30;
 
