@@ -37,8 +37,10 @@ const MOVING_ON_DAYS: f64 = 15.0;
 /// adults: about one adult of its hundred.
 const IDLE_SLACK: f64 = 0.01;
 
-/// The share of its plans after moving on that put someone to work at the new mine, at least.
-const MOST_WORKED: f64 = 0.75;
+/// The share of its plans after moving on that put someone to work at the new mine, at least. Since
+/// its spare hands work past their caps (T97.9) it founds a second daughter in the season, and its
+/// party's gathering and road crew take the mine's hands for a while (72% when measured).
+const MOST_WORKED: f64 = 0.65;
 
 /// The share of its adults the city's plan leaves idle, of those who could work: one carrying a
 /// child gets no work (`CONTEXT.md`: Standing idle). Since its spare hands work past their caps

@@ -4,8 +4,9 @@
 //!
 //! The upgrade is the last use of its Stone (beyond its reserve, after its roads and other
 //! projects), and a town's ring is long (a ring 22 tiles out has 176 tiles, 704 Stone): it builds
-//! its quarry first, so its gate goes stone in its second game month and over half of its outer
-//! wall within a game season (109 of 176 when measured), the rest over the next.
+//! its quarry first, so its gate goes stone in its second game month and over a third of its outer
+//! wall within a game season (65 of 176 when measured, with its wooden ring's repairs), the rest
+//! over the next.
 
 use csp_shared::balance::NPC_TOWN;
 use csp_shared::time::{TICKS_PER_GAME_DAY, TICKS_PER_GAME_YEAR};
@@ -25,11 +26,14 @@ use crate::world::create_world;
 /// A game season: a quarter of the game year.
 const SEASON_DAYS: usize = (TICKS_PER_GAME_YEAR / TICKS_PER_GAME_DAY / 4.0) as usize;
 
-/// The game day by which its gate is of stone (day 31 when measured).
-const GATE_BY_DAY: usize = 45;
+/// The game day by which its gate is of stone (day 50 when measured; day 27 before its wooden walls
+/// decayed, Epic 97: from day 15 their repairs take a Wood a tile, about 12 a day for its ring, so it
+/// is short of Wood more often and opens its quarry later).
+const GATE_BY_DAY: usize = 60;
 
-/// The share of its outer wall of stone at the end of the season (62% when measured).
-const SHARE_BY_SEASON: f64 = 0.5;
+/// The share of its outer wall of stone at the end of the season (37% when measured; 62% before its
+/// wooden walls decayed).
+const SHARE_BY_SEASON: f64 = 0.3;
 
 #[test]
 #[ignore = "slow: runs a town for a game season"]
