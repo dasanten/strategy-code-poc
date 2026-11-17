@@ -260,6 +260,15 @@ import {
   DEMAND_YIELD_RESPECT_MIN,
   DEMAND_YIELD_RESPECT_TIMES,
   RESPECT_PER_WALL,
+  THREAT_SEEN_PER_DAY,
+  THREAT_PER_KILLING,
+  THREAT_PER_ROBBERY,
+  THREAT_HALF_LIFE_DAYS,
+  THREAT_FORGOTTEN,
+  DANGER_PLACE_MERGE_RANGE,
+  DANGER_PLACE_HALF_LIFE_DAYS,
+  DANGER_PLACE_WAY_REACH,
+  DANGER_ESCORTS_MAX,
   OUTWEIGH_HOLD_DAYS,
   STANDING_RANGE,
   STANDING_NPC_TRADE_COINS_PER_POINT,
@@ -3277,6 +3286,26 @@ export function Wiki() {
           same way, and {num(RESPECT_PER_WALL)} for each of its own finished wall and gate tiles. It
           weighs this at its planning pass, once a game hour, and remembers since when each realm
           has outweighed it; the first pass one doesn't, that time starts again from nothing.
+        </p>
+        <h3>Threat</h3>
+        <p>
+          Apart from how it regards you, an NPC city keeps in mind how dangerous you are: its{' '}
+          <strong>threat</strong> from each Organization, a strong friendly neighbour too. At its
+          planning pass it adds what your armed residents weigh, by strength as respect weighs them,
+          wherever it sees them: in its City area or in sight of any of its people, also its traders
+          and scouts far from home. Standing a game day in sight adds{' '}
+          {num(THREAT_SEEN_PER_DAY)} for each point of strength. Learning that you killed one of its
+          people adds {num(THREAT_PER_KILLING)}, that you robbed it {num(THREAT_PER_ROBBERY)}. Threat
+          fades to half every {days(THREAT_HALF_LIFE_DAYS)} and is forgotten below{' '}
+          {num(THREAT_FORGOTTEN)}. You don't see it.
+        </p>
+        <p>
+          It also remembers <strong>danger places</strong>: where one of its people was killed
+          outside its City area, by anyone, bandits too. Another loss within{' '}
+          {num(DANGER_PLACE_MERGE_RANGE)} tiles adds to the same place. A danger place fades to half
+          every {days(DANGER_PLACE_HALF_LIFE_DAYS)}. While it remembers one within{' '}
+          {num(DANGER_PLACE_WAY_REACH)} tiles of a way, the city sends a soldier more along that way
+          for each person lost there, up to {num(DANGER_ESCORTS_MAX)} more.
         </p>
       </Section>
 

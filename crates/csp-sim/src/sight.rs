@@ -753,6 +753,9 @@ fn places(
         // Since when it has felt outweighed is its own mind (ADR 0033); demands show what it
         // means to their sides.
         shown.outweighed = None;
+        // So is how dangerous it thinks others are and where it lost people (`CONTEXT.md`: Threat).
+        shown.threats = None;
+        shown.danger_places = None;
         // Whoever sees an NPC city reads its temperament (`CONTEXT.md`: Temperament); a city a
         // Player holds now is theirs to run, whatever it was like before.
         shown.temperament = if shown.realm_id.is_some() {
@@ -760,7 +763,7 @@ fn places(
         } else {
             crate::temperament::temperament_of(world.seed, c)
         };
-        out.push(SeenEntity::City(SeenCity {
+        out.push(SeenEntity::City(Box::new(SeenCity {
             city: shown,
             price,
             wont_sell,
@@ -769,7 +772,7 @@ fn places(
             trade,
             horses: (!horses.is_empty()).then_some(horses),
             horses_to_sell: (!to_sell.is_empty()).then_some(to_sell),
-        }));
+        })));
     }
     out
 }

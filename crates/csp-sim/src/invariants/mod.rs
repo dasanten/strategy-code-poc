@@ -273,6 +273,7 @@ pub fn world_invariants() -> Vec<Invariant> {
             name: "outweighed-sound",
             check: |w, t| crate::persuasion::outweighed_sound(w, t.size),
         },
+        Invariant { name: "threat-sound", check: |w, _| crate::npc_threat::threat_sound(w) },
         Invariant {
             name: "former-players-sound",
             check: |w, _| crate::standing::former_players_sound(w),

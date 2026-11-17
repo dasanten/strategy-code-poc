@@ -315,6 +315,7 @@ pub fn die_all(
         let killed: Vec<Resident> =
             world.residents.iter().filter(|r| died.contains(&r.id)).cloned().collect();
         crate::directives::count_soldiers_killed(world, &killed);
+        crate::npc_threat::note_losses(world, &killed, size);
     }
     // Who takes over from each Leader dying: their heir, unless the heir dies with them
     // (`CONTEXT.md`: Leader death with an heir).
